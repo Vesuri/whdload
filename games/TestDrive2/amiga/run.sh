@@ -2,6 +2,7 @@
 # Boot the installed original Test Drive II under WHDLoad in FS-UAE.
 #   amiga/run.sh            windowed, real speed, with sound
 #   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger)
+#   SLAVE=path amiga/run.sh run another slave build instead of the installed one
 # Host: Kickstart 3.1 + Workbench 2.04 floppy boots DH0, which runs WHDLoad on DH1;
 # the slave itself runs Kickstart 1.3 (kick34005.A500 + .RTB) inside WHDLoad.
 set -euo pipefail
@@ -22,6 +23,8 @@ rm -rf "$DH0" "$DH1"
 mkdir -p "$DH0/s" "$DH0/devs/Kickstarts" "$RUN/state"
 cp -R "$GAME" "$DH1"
 cp -f "$WHD" "$DH1/WHDLoad"
+# SLAVE= runs a rebuilt or patched slave in place of the installed one.
+[ -n "${SLAVE:-}" ] && cp -f "$SLAVE" "$DH1/TestDrive2.slave"
 cp -f "$BIOS/kick34005.A500" "$DH0/devs/Kickstarts/"
 cp -f "$RTB" "$DH0/devs/Kickstarts/"
 chmod -R u+w "$DH0" "$DH1"

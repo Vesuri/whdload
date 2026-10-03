@@ -14,6 +14,7 @@ local input under `tmp/` (see `.gitignore`).
 | `tools/barto.py` | reader for the stub's `monitor profile` trace format |
 | `tools/hotspots.py`, `tools/disd.py`, `tools/dis.sh` | hottest instructions per routine, disassembly by `duel` hunk offset |
 | `tools/ingame.py` | "is this screenshot the driving view" check |
+| `whdload/` | JOTD's slave source (v1.5, public domain) + vendored `kick13.s`; `make -C whdload` cross-builds it with vasm |
 | `docs/profiling.md` | the profiling procedure, exactly, with every trap found setting it up |
 
 ## Local inputs
@@ -34,4 +35,5 @@ mkdir -p tmp/game tmp/installer
 (cd tmp/installer && lha xq ../TestDrive2.lha)
 amiga/run.sh                     # play it
 tools/profile_demo.sh            # profile it (docs/profiling.md)
+make -C whdload && SLAVE=$PWD/whdload/TestDrive2.slave tools/profile_demo.sh tmp/prof/mine
 ```
