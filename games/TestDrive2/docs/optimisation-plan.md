@@ -39,7 +39,7 @@ limit). The cost centres, in % of all CPU cycles:
 | H | 1.5% | the slave's own `set_copper` beam wait (JOTD's flicker fix) | WHDLoad |
 
 **B is mostly not on the critical path.** Measured with a test slave that clears INTENA's BLIT
-bit before starting the game (benchmark window below): the interrupts disappear, but the frame
+bit before starting the game (`make -C whdload noblitirq`) (benchmark window below): the interrupts disappear, but the frame
 rate only goes from 6.9–7.1 to **7.2 fps** and the blitter wait rises from 12–14% to **21%**.
 The interrupts were firing while the CPU was already polling BBUSY, so they cost waiting time,
 not work. The real cost is that **the CPU stops for every blit**. (The DMA slot count — blitter

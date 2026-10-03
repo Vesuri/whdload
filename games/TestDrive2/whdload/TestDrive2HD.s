@@ -299,6 +299,10 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		moveq	#_args_end-_args,d0
 		lea	(_args,pc),a0
 
+	IFD	NOBLITIRQ
+	; experiment (docs/optimisation-plan.md): no blitter-finished interrupts while the game runs
+		move.w	#$0040,_custom+intena
+	ENDC
 		jsr	(4,a1)
 		movem.l	(a7)+,d1/d7/a2/a6
 

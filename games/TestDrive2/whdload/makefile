@@ -6,12 +6,16 @@ NDK ?= /path/to/sys-include
 VASM ?= /path/to/vasmm68k_mot
 VASMFLAGS ?=
 
-.PHONY: all clean FORCE
+.PHONY: all noblitirq clean FORCE
 all: TestDrive2.slave
 
 # Always assemble: options must not leave a stale variant.
 TestDrive2.slave: TestDrive2HD.s FORCE
 	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I. -Iinclude -I"$(WHDLOAD)/Include" -I"$(NDK)" -o $@ $<
+
+# Experiment: clear INTENA BLIT before starting the game (docs/optimisation-plan.md).
+noblitirq:
+	$(MAKE) TestDrive2.slave VASMFLAGS="$(VASMFLAGS) -DNOBLITIRQ=1"
 
 clean:
 	rm -f TestDrive2.slave
