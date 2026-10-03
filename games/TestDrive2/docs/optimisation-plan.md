@@ -1,6 +1,8 @@
 # Optimisation plan
 
 > How to make the original game faster **as WHDLoad slave patches**, and in what order.
+> **Subordinate to `docs/open-work.md`**: rendering speed is work item W6 there, after the
+> simulation/rendering timing architecture is understood and a design is chosen.
 > Numbers are from `docs/profiling.md` traces (stock-A500-equivalent machine, 2026-10-04).
 
 ## Constraints
