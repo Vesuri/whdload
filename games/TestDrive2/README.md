@@ -10,12 +10,14 @@ local input under `tmp/` (see `.gitignore`).
 | `amiga/run.sh`, `amiga/env.sh` | boot the WHDLoad install in FS-UAE (Kickstart 3.1 host, kick 1.3 kickemu inside WHDLoad) |
 | `tools/td2.py` | long-lived gdb session on FS-UAE's Barto stub: screenshots, cycle-exact traces |
 | `tools/profile_demo.sh` | one command: boot, wait for the attract demo to drive, trace, report |
+| `tools/fixed_window.sh` | A/B benchmark: trace a fixed window from the first demo frame, any slave |
 | `tools/td2_report.py`, `tools/frames.py` | attribute a trace to routines; frame rate, blitter waits, interrupts, bus use |
 | `tools/barto.py` | reader for the stub's `monitor profile` trace format |
 | `tools/hotspots.py`, `tools/disd.py`, `tools/dis.sh` | hottest instructions per routine, disassembly by `duel` hunk offset |
 | `tools/ingame.py` | "is this screenshot the driving view" check |
 | `whdload/` | JOTD's slave source (v1.5, public domain) + vendored `kick13.s`; `make -C whdload` cross-builds it with vasm |
 | `docs/profiling.md` | the profiling procedure, exactly, with every trap found setting it up |
+| `docs/optimisation-plan.md` | how to speed the game up through slave patches, in order |
 
 ## Local inputs
 

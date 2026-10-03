@@ -37,6 +37,7 @@ rm -f "$RUN"/state/*.uss
 AUDIO=(); [ "${SILENT:-0}" = 1 ] && AUDIO=(--audio_driver=dummy)
 DBG=(); [ "${DEBUG:-0}" = 1 ] && DBG=(--remote_debugger=20 --remote_debugger_port="$DEBUG_PORT")
 REC=(); [ -n "${RECORD:-}" ] && REC=(--record="$RECORD" --deterministic=1)
+[ "${DETERMINISTIC:-0}" = 1 ] && REC+=(--deterministic=1)
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
 "${FSUAE:-fs-uae}" \

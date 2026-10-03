@@ -192,6 +192,27 @@ burnt between instructions (interrupt entry). A PAL field is 142 102 CPU clocks.
 The blitter is busy in only **5%** of bus slots (CPU 37%, bitplanes 28%, free 26%): the game is
 CPU-bound and serial, not bus- or blitter-bound. The same demo with 2 MB fast RAM ran at 6.6 fps.
 
+## 6a. The benchmark window (A/B comparisons)
+
+`profile_demo.sh` traces whatever moment of the demo the poll catches, and the demo content
+varies (different sceneries per attract loop, traffic, signs): a run with a vector-font sign and
+a rock wall ran at 4.3 fps against 7.2 for open road. **Never compare two `profile_demo.sh`
+runs.** For A/B use
+
+```sh
+tools/fixed_window.sh tmp/prof/base                      # shipped slave
+tools/fixed_window.sh tmp/prof/mine "$PWD/whdload/TestDrive2.slave"
+```
+
+It boots with `DETERMINISTIC=1` (FS-UAE `--deterministic=1`) on the stock-A500-equivalent
+machine, waits until `duel` is loaded (gdb dump of slow RAM, located as in §5 — skipping
+WHDLoad's PRELOAD cache copy of the file, which is preceded by its own `$3F3` hunk header),
+runs to the first entry of the span filler `duel:0789c` (`td2.py until`: the first driving
+frame of the first demo), traces `FIELDS` (100) fields and prints `frames.py`'s summary. The
+first demo always starts the same way (desert, 2.6 miles, 0:00) but deterministic mode does not
+make it pixel-identical between boots, so compare **fields/frame**, not pictures. Measured:
+6.9, 6.9, 7.1 fps for three boots of the shipped slave.
+
 ## 7. Input, if it is ever needed
 
 The demo made it unnecessary, but these were established:

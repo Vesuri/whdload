@@ -10,6 +10,7 @@ Commands (the emulator is left running after each unless noted):
   shot <png>                   record one field, save its screenshot
   profile <fields> <bin>       cycle-exact trace of <fields> PAL fields (Barto format)
   wait <seconds>               let it run
+  until <addr>                 run to a breakpoint at addr and stay stopped there
   quit                         kill gdb and the emulator
 """
 import os, select, signal, socket, subprocess, sys, time
@@ -155,6 +156,12 @@ def handle(g, line):
         g.cont(); return 'running'
     if op == 'wait':
         g.cont(); time.sleep(float(rest)); return 'ok'
+    if op == 'until':
+        g.stop()
+        g.cmd(f'break *{rest}')
+        out = g.cmd('continue', timeout=1800)
+        g.cmd('delete')
+        return out
     if op == 'gdb':
         was = g.running; g.stop()
         out = g.cmd(rest, timeout=600)

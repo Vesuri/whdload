@@ -61,7 +61,13 @@ def locate(mem, blob, base, step=64):
         i = mem.find(w)
         if i >= 0 and mem.find(w, i + 1) < 0:
             votes[base + i - off] += 1
-    return votes.most_common(1)[0][0] if votes else None
+    # WHDLoad's PRELOAD caches whole files in memory: a copy preceded by its own hunk header
+    # ($3F3 at file offset 0) is the cached file, not the loaded program.
+    for a, n in votes.most_common():
+        hdr = a - base - 0x28
+        if n >= 4 and not (hdr >= 0 and mem[hdr:hdr + 4] == b'\0\0\x03\xf3'):
+            return a
+    return None
 
 
 def regions(dump, base):
