@@ -58,9 +58,11 @@ def locate(mem, blob, base, step=64):
         w = blob[off:off + 16]
         if w.count(0) > 8:
             continue
-        i = mem.find(w)
-        if i >= 0 and mem.find(w, i + 1) < 0:
+        # Vote for every occurrence (up to 4): WHDLoad's PRELOAD cache can hold a second copy.
+        i, seen = mem.find(w), 0
+        while i >= 0 and seen < 4:
             votes[base + i - off] += 1
+            i, seen = mem.find(w, i + 1), seen + 1
     # WHDLoad's PRELOAD caches whole files in memory: a copy preceded by its own hunk header
     # ($3F3 at file offset 0) is the cached file, not the loaded program.
     for a, n in votes.most_common():

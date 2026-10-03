@@ -23,7 +23,10 @@ def raw(a, n):
     return code[o:o + n] if 0 <= o and o + n <= len(code) else b''
 
 POLL = bytes.fromhex('082e00060002')  # btst #6,2(a6)
-cop = base + code.find(bytes.fromhex('23c800dff080'))  # set_copper: move.l a0,$dff080
+# set_copper: move.l a0,$dff080, searched inside the located slave (other copies of the
+# slave file can sit in memory, e.g. on machines with lots of fast RAM).
+slo, shi, _ = regs['slave']
+cop = slo + code[slo - base:shi - base].find(bytes.fromhex('23c800dff080'))
 watch = {0xfc0d14 + kick: 'level-3 interrupts', 0xfc0d38 + kick: '  blitter-finished',
          0xfc0d4a + kick: '  vertical blank'}
 DMA = {0: 'free', 1: 'refresh', 2: 'CPU', 3: 'copper', 4: 'audio', 5: 'blitter', 6: 'bitplane',

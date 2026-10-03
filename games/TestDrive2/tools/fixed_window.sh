@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # Benchmark window: trace FIELDS fields from the first driving frame of the first attract demo.
 #   tools/fixed_window.sh OUTDIR [SLAVE]
-# Deterministic boot of the stock-A500-equivalent machine; once `duel` is in memory, break at its
+# Deterministic boot (default: the stock-A500-equivalent machine; CHIP_KB/FAST_KB/EXTRA_ARGS/CPU
+# as in amiga/run.sh choose another); once `duel` is in memory, break at its
 # span filler (duel:0789c, first entered when the demo starts driving), then trace.  The demo
 # begins identically every boot (desert, 2.6 miles, 0:00) but is NOT pixel-identical between
 # boots, so compare frame rates over this window, not frames (docs/optimisation-plan.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}
-export CHIP_KB=512 FAST_KB=0 EXTRA_ARGS=--slow_memory=1536 DETERMINISTIC=1 SLAVE="${2:-}"
-BASE=0xc00000 SIZE=$((1536 * 1024))
+export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
+export DETERMINISTIC=1 SLAVE="${2:-}" CPU="${CPU:-68000}"
+# The code is loaded into "other" memory: fast RAM at $200000 when there is any, else slow RAM.
+SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
+if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))
+else BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024)); fi
 td2() { python3 tools/td2.py "$@"; }
 [ -S amiga/.run/td2.sock ] && { td2 quit > /dev/null 2>&1 || true; sleep 1; }
 rm -f amiga/.run/serve.log "$OUT/trace.bin"
