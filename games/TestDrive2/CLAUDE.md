@@ -17,3 +17,4 @@ game is meant to ship as WHDLoad slave patches (`resload_PatchSeg` patch lists, 
 | Doc | Read it when |
 |---|---|
 | `docs/profiling.md` | Running the game, driving it, tracing it, or quoting any performance number |
+| `docs/optimisation-plan.md` | Planning or writing any speed patch; A/B-measuring a slave |
