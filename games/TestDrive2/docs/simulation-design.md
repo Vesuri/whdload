@@ -1,7 +1,21 @@
-# Higher-rate simulation for duel v1
+# Fixed-time simulation for duel v1
 
-CUSTOM2 bit 0 uses the existing priority-4 simulation process, reducing its
-six-field deadline to one video field. On PAL this is 50 updates per second.
+CUSTOM2 bit 0 uses the existing priority-4 simulation process with a period of
+`sim_p` PAL fields, chosen from AttnFlags before PatchSeg (`sim_configure`):
+6 fields on a 68000/010 (the original 8.33 Hz, so the CPU is not spent on steps
+nobody sees) and 2 fields on a 68020+ (25 Hz, the measured rendering cap).
+Each step is 1/`sim_n` of an original step, `sim_n` = 6/`sim_p` (1 or 3). The
+text below was written for the former one-field mode (`sim_n` = 6, still the
+VERIFY unit-check default); every "six"/"sixth" in rates, Euler corrections and
+relaxation roots now reads `sim_n`, and every per-field clock quantum reads per
+`sim_p` fields. Field-timed rules (recovery 240 fields, gear holds, envelopes)
+and six-field cadence decisions are unchanged. After PatchSeg the two deadline
+`moveq`s receive `sim_p`.
+
+Different periods are different integrations of the same game, not the same
+trajectory: over 1,500 demo fields the 6-field period travels ~1.5% and the
+2-field period ~0.5% less than the former one-field mode; race clocks agree.
+CPUs with the same period match all 35 core variables exactly.
 The priority-minus-1 drawing task samples current state independently. Rendering
 never owns elapsed game time. The original mode remains the default; v2 is unchanged.
 

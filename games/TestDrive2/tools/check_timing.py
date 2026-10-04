@@ -9,7 +9,7 @@ from pathlib import Path
 from state_report import VARIABLES, value
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('state',type=Path)
-p.add_argument('--period',type=int,choices=(1,3),default=1,help='fields per simulation step; 3 for historical captures')
+p.add_argument('--period',type=int,choices=(1,2,3,6),default=2,help='fields per simulation step: 6 on a 68000, 2 on a 68020+; 1 and 3 for historical captures')
 p.add_argument('--min-fields',type=int,default=1000)
 p.add_argument('--fatal-end',action='store_true',help='without trainer: stop active checks at fatal crash 17')
 a=p.parse_args()
@@ -41,7 +41,8 @@ for i in range(active,last):
         penalty+=200*(change//200)
     ticks=1+(i-active)//a.period
     # PAL: 50 fields/second; the dashboard unit is 1/10 second.
-    expected=clock[active]+(ticks*a.period)//5+penalty
+    # Base on the clock before the first step: a 6-field step adds a whole tenth.
+    expected=clock[active-1]+(ticks*a.period)//5+penalty
     if clock[i]!=expected:errors.append((i,clock[i],expected))
 assert not errors, f'elapsed-clock mismatch: {errors[:8]}'
 print(f'{last} consecutive fields: deadline lag 0..{a.period-1}; {a.period}-field pacing holds')

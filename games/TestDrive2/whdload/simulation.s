@@ -1,7 +1,36 @@
-; duel v1: one-field simulation. All entry hooks are gated by CUSTOM2.
-; Continuous dynamics use dt = 1/6 of the original six-field step. Spatial
-; road-unit loops, event impulses and field-based input/audio timers stay intact.
+; duel v1: fixed-period simulation. All entry hooks are gated by CUSTOM2.
+; A step lasts sim_p PAL fields: 6 on a 68000/010 (the original period, so no
+; CPU is spent on steps nobody sees), 2 on a 68020+ (the 25 fps render cap).
+; Continuous dynamics use dt = 1/sim_n of the original six-field step,
+; sim_n = 6/sim_p. Spatial road-unit loops, event impulses and field-based
+; input/audio timers stay intact.
 ; Private fractional state belongs to the slave, never the read-only debugger.
+
+; Choose the period from the CPU before PatchSeg (d0 = AttnFlags).
+sim_configure:
+    movem.l d0/a0-a1,-(sp)
+    lea sim_periods(pc),a0
+    btst #1,d0                ; AFB_68020
+    beq.b .table
+    lea SIM_PERIOD_SIZE(a0),a0
+.table
+    lea sim_p(pc),a1
+    moveq #SIM_PERIOD_SIZE/2-1,d0
+.copy
+    move.w (a0)+,(a1)+
+    dbf d0,.copy
+    movem.l (sp)+,d0/a0-a1
+    rts
+; The two deadline instructions patched by PL_L hold moveq #1; set sim_p.
+; a1 = root code. Call after PatchSeg; the caller flushes caches.
+sim_set_deadline:
+    move.l d0,-(sp)
+    move.w sim_p(pc),d0
+    or.w #$7000,d0            ; moveq #sim_p,d0
+    move.w d0,$05bea(a1)
+    move.w d0,$05c0c(a1)
+    move.l (sp)+,d0
+    rts
 
 sim_start:
     movem.l d0/a0,-(sp)
@@ -16,7 +45,9 @@ sim_start:
     lea sim_recovery_until(pc),a0
     clr.l (a0)
     lea sim_phase(pc),a0
-    move.w #5,(a0)
+    moveq #6,d0
+    sub.w sim_p(pc),d0
+    move.w d0,(a0)            ; the first step is an original six-field boundary
     lea sim_rates(pc),a0
     moveq #SIM_RATE_WORDS-1,d0
 .clear_rates
@@ -39,7 +70,8 @@ sim_start:
 sim_begin:
     movem.l d0-d2/a0,-(sp)
     lea sim_phase(pc),a0
-    addq.w #1,(a0)
+    move.w sim_p(pc),d0
+    add.w d0,(a0)
     cmp.w #6,(a0)
     bcs.b .phase
     clr.w (a0)               ; zero at original six-field boundaries
@@ -66,12 +98,13 @@ sim_begin:
 .demo
     rts
 
- ; Signed 32-bit division by six with a private remainder per accumulator.
-; d0 is the rate in original-step units; a0 points to a word in 0..5.
+; Signed 32-bit division by sim_n with a private remainder per accumulator.
+; d0 is the rate in original-step units; a0 points to a word in 0..sim_n-1.
 ; Floor division plus carry also handles INT_MIN without a DIVS overflow.
-; Six constant-rate calls sum exactly to the original signed rate.
+; sim_n constant-rate calls sum exactly to the original signed rate.
 sim_scale_long:
-    movem.l d1-d3,-(sp)
+    movem.l d1-d4,-(sp)
+    move.w sim_n(pc),d4
     move.l d0,d3
     bpl.b .positive
     neg.l d0                 ; INT_MIN remains its unsigned magnitude
@@ -79,11 +112,11 @@ sim_scale_long:
     move.l d0,d1
     clr.w d0
     swap d0
-    divu.w #6,d0             ; high quotient and remainder
+    divu.w d4,d0             ; high quotient and remainder
     move.w d0,d2
     clr.w d0
     move.w d1,d0
-    divu.w #6,d0             ; remaining high remainder + low word
+    divu.w d4,d0             ; remaining high remainder + low word
     swap d2
     move.w d0,d2
     swap d0
@@ -95,17 +128,17 @@ sim_scale_long:
     beq.b .carry
     subq.l #1,d2
     neg.w d0
-    addq.w #6,d0
+    add.w d4,d0
 .carry
     add.w (a0),d0
-    cmp.w #6,d0
+    cmp.w d4,d0
     bcs.b .store
-    subq.w #6,d0
+    sub.w d4,d0
     addq.l #1,d2
 .store
     move.w d0,(a0)
     move.l d2,d0
-    movem.l (sp)+,d1-d3
+    movem.l (sp)+,d1-d4
     rts
 
 ; Unsigned 32-bit division with a word divisor and a carry in that divisor's
@@ -113,13 +146,15 @@ sim_scale_long:
 ; shifts would lose creeping motion and the constant-force Euler equivalence.
 sim_scale_distance:
     move.l d3,-(sp)
-    move.w #768,d3           ; 2 * 64 * 6
+    move.w sim_n(pc),d3
+    lsl.w #7,d3              ; 2 * 64 * sim_n
     bsr sim_scale_unsigned
     move.l (sp)+,d3
     rts
 sim_scale_ai_motion:
     move.l d3,-(sp)
-    moveq #12,d3             ; 2 * 6
+    move.w sim_n(pc),d3
+    add.w d3,d3              ; 2 * sim_n
     bsr sim_scale_unsigned
     move.l (sp)+,d3
     rts
@@ -149,14 +184,12 @@ sim_scale_unsigned:
 
 ; The original force lookup samples the beginning of a coarse Euler step.
 ; A finer lookup needs the corresponding half-step correction too: evaluate
-; at v - (6-1)/2*dv from the preceding field. Real velocity/RPM remain live;
+; at v - (sim_n-1)/2*dv from the preceding step. Real velocity/RPM remain live;
 ; only throttle/drag lookup inputs use this modified-Euler reference.
 sim_force_reference:
     move.l d1,-(sp)
     move.l sim_prev_force(pc),d1
-    move.l d1,d0
-    lsl.l #2,d1
-    add.l d1,d0
+    bsr sim_times_n_minus_1
     asr.l #1,d0
     neg.l d0
     add.l -13282(a4),d0
@@ -184,6 +217,20 @@ sim_drag_curve:
 sim_scale_word:
     ext.l d0
     bra sim_scale_long
+
+; d0 = d1 * (sim_n - 1), for the small sim_n used (1, 3 or 6).
+sim_times_n_minus_1:
+    move.l d2,-(sp)
+    moveq #0,d0
+    move.w sim_n(pc),d2
+    subq.w #2,d2
+    bmi.b .done
+.add
+    add.l d1,d0
+    dbf d2,.add
+.done
+    move.l (sp)+,d2
+    rts
 
 ; AI rates require independent carries for the opponent, demo driver and police.
 ; a5 is the original car record. No allocation or gameplay RNG is used here.
@@ -219,15 +266,15 @@ sim_speed_add:
 
 sim_player_motion:
     move.l a0,-(sp)
-    ; Preserve the original semi-implicit Euler displacement. Six small
-    ; steps otherwise sum v + 7*a/12 rather than the original v + a.
-    ; Per field, add (6-1)/2 times its continuous velocity change.
+    ; Preserve the original semi-implicit Euler displacement. n small steps
+    ; otherwise sum less than the original v + a. Per step, add (n-1)/2
+    ; times its continuous velocity change (n = sim_n).
     move.l d1,-(sp)
+    move.l d0,-(sp)
     move.l sim_tick_force(pc),d1
-    add.l d0,d0
-    add.l d1,d0
-    lsl.l #2,d1
-    add.l d1,d0             ; 2*v + 5*dv; spatial impulses are excluded
+    bsr sim_times_n_minus_1
+    add.l (sp),d0
+    add.l (sp)+,d0          ; 2*v + (n-1)*dv; spatial impulses are excluded
     bpl.b .forward
     moveq #0,d0
 .forward
@@ -354,11 +401,11 @@ sim_ai_motion:
     beq.b .predicted
     bsr sim_ai_remainder
     move.l d0,d1
-    sub.l 6(a0),d1           ; this field's physical speed change
-    add.l d0,d0
-    add.l d1,d0
-    lsl.l #2,d1
-    add.l d1,d0
+    sub.l 6(a0),d1           ; this step's physical speed change
+    move.l d0,-(sp)
+    bsr sim_times_n_minus_1
+    add.l (sp),d0
+    add.l (sp)+,d0          ; 2*v + (n-1)*dv
     bpl.b .forward
     moveq #0,d0
 .forward
@@ -660,38 +707,46 @@ sim_heat_message: dc.b "ENGINE DAMAGE - 20 SECOND PENALTY",0
 sim_recovery_kind: dc.w 0
 sim_recovery_until: dc.l 0
 
-; One PAL field = 1/5 of a nominal tenth. Carry fractions instead of
-; truncating each step. Speed sums use the same weighting as race time.
+; One PAL field = 1/5 of a nominal tenth, a step sim_p/5. Carry fractions
+; instead of truncating each step. Speed sums use the same weighting as time.
 sim_player_time:
     movem.l d0-d1/a0,-(sp)
     lea sim_player_sum_frac(pc),a0
-    add.w (a0),d0
-    divu.w #5,d0
-    moveq #0,d1
-    move.w d0,d1
-    add.l d1,-7674(a4)
-    swap d0
-    move.w d0,(a0)
+    bsr sim_fifths
+    add.l d0,-7674(a4)
     lea sim_player_time_frac(pc),a0
-    addq.w #1,(a0)
-    cmp.w #5,(a0)
-    bcs.b .done
-    subq.w #5,(a0)
-    addq.l #1,-10146(a4)
-.done
+    bsr sim_tenths
+    add.l d0,-10146(a4)
     movem.l (sp)+,d0-d1/a0
+    rts
+; d0.w speed * sim_p / 5 with the carry word at a0 (in fifths); d0 = quotient.
+sim_fifths:
+    move.l d3,-(sp)
+    mulu.w sim_p(pc),d0
+    moveq #5,d3
+    bsr sim_scale_unsigned
+    move.l (sp)+,d3
+    rts
+; Whole nominal tenths elapsed in this step; the carry word at a0 is in fifths.
+sim_tenths:
+    moveq #0,d0
+    move.w (a0),d1
+    add.w sim_p(pc),d1
+.carry
+    cmp.w #5,d1
+    bcs.b .done
+    subq.w #5,d1
+    addq.l #1,d0
+    bra.b .carry
+.done
+    move.w d1,(a0)
     rts
 sim_opponent_sum:
     asr.l d1,d0             ; displaced speed conversion
     movem.l d0-d1/a0,-(sp)
     lea sim_opponent_sum_frac(pc),a0
-    add.w (a0),d0
-    divu.w #5,d0
-    moveq #0,d1
-    move.w d0,d1
-    add.l d1,-10836(a4)
-    swap d0
-    move.w d0,(a0)
+    bsr sim_fifths
+    add.l d0,-10836(a4)
     movem.l (sp)+,d0-d1/a0
     rts
 sim_opponent_time:
@@ -701,12 +756,11 @@ sim_opponent_time:
     move.w -13356(a4),d0
     cmp.w -10076(a4),d0
     bge.b .done
+    move.l d1,-(sp)
     lea sim_opponent_time_frac(pc),a0
-    addq.w #1,(a0)
-    cmp.w #5,(a0)
-    bcs.b .done
-    subq.w #5,(a0)
-    addq.l #1,-10844(a4)
+    bsr sim_tenths
+    add.l d0,-10844(a4)
+    move.l (sp)+,d1
 .done
     movem.l (sp)+,d0/a0
     jsr -32238(a4)          ; displaced input/exit check
@@ -932,10 +986,10 @@ sim_free_rpm:
     movem.l d0/a0,-(sp)
     tst.w -13038(a4)
     beq.b .free
-    ; Original clutch map is rpm' = (15/16)*rpm + 700. Its sixth-root
-    ; affine map needs 700*(1-rho^(1/6))/(1-rho), not simply 700/6.
+    ; Original clutch map is rpm' = (15/16)*rpm + 700. Its n-th-root
+    ; affine map needs 700*(1-rho^(1/n))/(1-rho), not simply 700/n.
     lea sim_clutch_rise_frac(pc),a0
-    move.l #7851200,d0       ; Q16: 700 * 701 / 4096 per field
+    move.l sim_q_rise(pc),d0 ; Q16: 700 * 16 * sim_q_clutch per step
     add.l (a0),d0
     move.w d0,2(a0)
     clr.w (a0)
@@ -1024,7 +1078,7 @@ sim_heading_decay:
     movem.l d0-d2/a0,-(sp)
     move.w -13390(a4),d0
     ext.l d0
-    muls.w #1442,d0
+    muls.w sim_q_heading(pc),d0 ; Q16 1-(7/8)^(1/n)
     lea sim_heading_decay_frac(pc),a0
     add.l (a0),d0
     move.w d0,2(a0)
@@ -1038,7 +1092,7 @@ sim_yaw_decay:
     movem.l d0-d2/a0,-(sp)
     move.w -9862(a4),d0
     ext.l d0
-    muls.w #3068,d0
+    muls.w sim_q_yaw(pc),d0  ; Q16 1-(3/4)^(1/n)
     lea sim_yaw_decay_frac(pc),a0
     add.l (a0),d0
     move.w d0,2(a0)
@@ -1052,7 +1106,7 @@ sim_clutch_decay:
     movem.l d0-d2/a0,-(sp)
     move.w -13188(a4),d0
     and.l #$ffff,d0
-    muls.w #701,d0
+    muls.w sim_q_clutch(pc),d0 ; Q16 1-(15/16)^(1/n)
     lea sim_clutch_decay_frac(pc),a0
     add.l (a0),d0
     move.w d0,2(a0)
@@ -1096,6 +1150,20 @@ sim_opponent_sum_frac: dc.w 0
 sim_gear_value: dc.w 0
 sim_gear_field: dc.l 0
 sim_code: dc.l 0
+; Period parameters, copied from sim_periods by sim_configure (68000 / 68020+).
+; The defaults are the former one-field mode, used by the VERIFY unit checks.
+sim_p: dc.w 1                 ; fields per step
+sim_n: dc.w 6                 ; steps per original six-field step
+sim_q_heading: dc.w 1442
+sim_q_yaw: dc.w 3068
+sim_q_clutch: dc.w 701
+sim_q_rise: dc.l 7851200
+SIM_PERIOD_SIZE equ *-sim_p
+sim_periods:
+    dc.w 6,1,8192,16384,4096  ; 68000: the original step
+    dc.l 45875200
+    dc.w 2,3,2853,5993,1395   ; 68020+: a third of it
+    dc.l 15624000
 
 ; Read only v1 options. Control fills tag values; all game patches remain C2-gated.
 sim_tags:
@@ -1103,6 +1171,8 @@ sim_tags:
 render_options: dc.l 0
     dc.l WHDLTAG_CUSTOM1_GET
 sim_trainer: dc.l 0
+    dc.l WHDLTAG_ATTNFLAGS_GET
+sim_attn: dc.l 0
     IFD VERIFY
     dc.l WHDLTAG_CUSTOM5_GET
 sim_drive_enabled: dc.l 0

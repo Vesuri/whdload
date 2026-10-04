@@ -775,6 +775,34 @@ frame. Details, per-blit costs and the measurements below are in
 The 100 MHz emulated boots need longer than the harness's 180 s server wait:
 use `SERVE_WAIT=1700`.
 
+### Per-CPU simulation period (2026-10-04, user decision)
+
+The user accepted 25 fps as the rendering cap and asked for: simulation every
+6 fields on a 68000 (the original rate; no CPU spent on unseen steps), every
+2 fields on a 68020+, all CPU rendering removed, and blitter priority on both.
+`sim_configure` picks `sim_p`/`sim_n` and the Q16 relaxation constants from
+AttnFlags before PatchSeg; `sim_set_deadline` writes `moveq #sim_p` into the two
+deadline instructions after it. CUSTOM2 bit 1 now sets BLTPRI as well as
+suppressing unused blitter IRQs (the separate bit 2 is gone).
+
+Same normal build (`tmp/slavebuild/p6.slave`), CUSTOM2=3 unless noted:
+
+| Check | 68000 (period 6) | 68020+ (period 2) |
+|---|---|---|
+| Fixed-window fps | 7.1 (CUSTOM2=0: 6.1; old 50 Hz mode: 5.2) | A1200 16.7 |
+| Simulation CPU share | 6.5% (50 Hz mode: 28.6%) | — |
+| Pacing / real-time clock, 1500 fields | pass (`p6-state-a500`) | pass (`p6-state-a1200`, `p6-state-030`) |
+| Same-period cross-CPU state | — | A1200 vs 68030/25 MHz: 35 variables 1500/1500 |
+| VERIFY units (107: 59 one-field + 48 period sums) | 0 failures | 0 failures |
+| Forced engine damage, 1800 fields | 2 recoveries, 2 penalties, clock exact | same |
+
+CUSTOM2=2 keeps original bytes at all 67 simulation ranges (`p6-disabled`).
+Across periods the trajectories differ slightly (field 1499 distance: period 6
+396.0, period 2 400.0, former one-field 402.0 road units from the start; speed
+within 1.3 mph; clocks equal within one tenth): finer steps integrate the same
+forces differently. `check_timing.py --period 6|2`; its clock base is now the
+value before the first step, as a 6-field step adds a whole tenth at once.
+
 ### Tooling debts (fix when they bite, not before)
 
 - Race anchoring and boot polling are fixed by W1; see its calibration-cache trap above.

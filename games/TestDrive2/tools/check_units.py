@@ -3,6 +3,7 @@
   check_units.py OUT --base 0xc00000   (68000)
   check_units.py OUT --base 0x200000   (fast RAM)
 Requires a VERIFY + CUSTOM2=1 CUSTOM5=1 capture. No target writes.
+59 checks use the former one-field defaults; 48 cover both shipping periods.
 """
 import argparse, os, struct
 from pathlib import Path
@@ -19,4 +20,4 @@ start=b.find(marker,lo-a.base,hi-a.base)
 assert start>=0, 'no assembly rate-check results in this slave'
 failures,cases=struct.unpack_from('>II',b,(start+len(marker)+1)&~1)
 print(f'Assembly rate invariants: {cases} cases, {failures} failures')
-assert cases==59 and failures==0, 'assembly rate checks did not pass'
+assert cases==107 and failures==0, 'assembly rate checks did not pass'

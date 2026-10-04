@@ -43,7 +43,7 @@ make -C whdload && SLAVE=$PWD/whdload/TestDrive2.slave tools/profile_demo.sh tmp
 
 ## Optional fixed-time simulation (duel v1)
 
-Build and run the local slave with the higher-rate mode enabled:
+Build and run the local slave with the fixed-time mode enabled:
 
 ```sh
 source amiga/env.sh
@@ -51,15 +51,15 @@ make -C whdload
 WHD_ARGS=CUSTOM2=3 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
 ```
 
-`CUSTOM2=1` runs simulation every PAL field (50 Hz), independently of drawing.
-The rendering option suppresses unused interrupts and retains every original
-wait and JOTD's display fix. Two fixed-window repeats per arm measure
-4.5 → 5.2 fps with the same 50 Hz physics. More frequent physics uses CPU time;
-this gain is relative to that mode.
-CUSTOM2 is a bitfield: bit 0 enables simulation, bit 1 suppresses unused blitter
-interrupts, bit 2 gives the blitter bus priority (BLTPRI). `CUSTOM2=7` enables all
-three; `CUSTOM2=2` changes only rendering overhead. On fast CPUs the renderer is
-chip-bus bound at 25 fps; see `docs/optimisation-plan.md`.
+`CUSTOM2=1` runs the simulation on a fixed PAL period, independently of drawing:
+every 6 fields (8.33 Hz, the original period) on a 68000, every 2 fields (25 Hz)
+on a 68020+. Rendering is chip-bus bound at 25 fps even on fast CPUs, so steps
+nobody sees are not simulated. Bit 1 (rendering) gives the blitter bus priority
+(BLTPRI) and suppresses unused blitter interrupts; it retains every original
+wait and JOTD's display fix. `CUSTOM2=3` enables both; `CUSTOM2=2` changes only
+rendering. First-race fixed window, CUSTOM2=3: A500 7.1 fps (original game 6.1),
+A1200 16.7 fps; 68030/25 MHz and faster reach the 25 fps cap. See
+`docs/optimisation-plan.md`.
 Motion rates are scaled, the race clock follows elapsed field time, and nonfatal
 crash/engine-damage recovery lasts 240 fields with a 20-second penalty. Handling
 and recovery presentation change; see `docs/simulation-design.md`. Leave CUSTOM2

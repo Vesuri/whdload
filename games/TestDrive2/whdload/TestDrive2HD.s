@@ -86,7 +86,7 @@ DECL_VERSION:MACRO
 _tdboot
 	dc.b	"tdboot",0
 slv_config
-	dc.b "C2:X:higher-rate simulation (v1):0;C2:X:blitter priority, no unused blitter interrupt (v1):1;"
+	dc.b "C2:X:fixed-time simulation (v1):0;C2:X:blitter priority, no unused blitter interrupt (v1):1;"
 	IFD VERIFY
 	dc.b "C3:B:reproducible verification (v1);"
 	dc.b "C4:B:slow renderer verification (v1);"
@@ -373,12 +373,27 @@ _patchexe:
 .no_units
 	bsr verify_draw_init
 	ENDC
+	move.l sim_attn(pc),d0
+	bsr sim_configure          ; after the unit checks, which use the defaults
 	lea pl_main_v1(pc),a0
+	move.l	d7,a1
+	move.l	_resload(pc),a2
+	jsr	(resload_PatchSeg,a2)
+	move.l render_options(pc),d0
+	btst #0,d0
+	beq.b .out
+	move.l d7,a1
+	add.l a1,a1
+	add.l a1,a1
+	addq.l #4,a1               ; root code hunk
+	bsr sim_set_deadline
+	jsr (resload_FlushCache,a2)
+	bra.b .out
 .pp
 	move.l	d7,a1
 	move.l	_resload(pc),a2
 	jsr	(resload_PatchSeg,a2)
-	
+.out
 	movem.l	(a7)+,d0-a6
 	rts
 

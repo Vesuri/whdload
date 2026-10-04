@@ -337,6 +337,38 @@ verify_simulation_units:
     move.l #107,d1
     bsr verify_equal
 
+    ; Both shipping periods: sim_n calls sum exactly to each signed rate and
+    ; leave no remainder (68000: one call; 68020+: three). Runs last, before
+    ; _patchexe selects the actual period; earlier checks use the defaults.
+    moveq #0,d5               ; AttnFlags: 68000 table
+.period
+    move.l d5,d0
+    bsr sim_configure
+    lea verify_rates(pc),a2
+    moveq #11,d6
+.period_rate
+    lea sim_speed_frac(pc),a0
+    clr.w (a0)
+    moveq #0,d4
+    move.w sim_n(pc),d7
+    subq.w #1,d7
+.period_call
+    move.l (a2),d0
+    bsr sim_scale_long
+    add.l d0,d4
+    dbf d7,.period_call
+    move.l d4,d0
+    move.l (a2)+,d1
+    bsr verify_equal
+    moveq #0,d0
+    move.w (a0),d0
+    moveq #0,d1
+    bsr verify_equal
+    dbf d6,.period_rate
+    addq.w #2,d5              ; AFF_68020
+    cmp.w #4,d5
+    bne.b .period
+
     move.l a4,a1
     suba.l #32766,a1
     move.l #32768,d0
