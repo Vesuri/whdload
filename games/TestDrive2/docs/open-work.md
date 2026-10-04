@@ -426,6 +426,41 @@ Write up the options with the W3 evidence and **ask the user**. The options depe
 
 ### W5. Implement the chosen design
 
+**IN PROGRESS.** The optional v1 `CUSTOM2` prototype uses a three-field PAL
+step (16.67 Hz), halves continuous rates, retains road-unit operations and event
+impulses, and carries 3/5 fractions for clocks and average-speed sums. Visual
+phases move to simulation ticks; the renderer's rare event uses a private RNG.
+The unmodified mode is still the default. This is not yet a validated release.
+
+The first prototype stalled because a hook displaced a shared input-check entry;
+expanded hooks also had branches into their overwritten tails. The corrected
+layout passes `tools/audit_simulation.py tmp/game/TestDrive2/data/duel` (30 hooks,
+no boundary, overlap or direct incoming-branch errors). The tool excludes data
+outside the root code hunk and documents its limits for indirect calls and helper
+return adjustments. No rendering optimisation has started.
+
+A corrected pre-recovery prototype matched 68000/68020 driving state through the
+first crash, which begins at relative field 1068. It then exposed another timing
+dependency: blocking crash animation, drawing and automatic acknowledgement run
+inside the simulation process. The 20-second penalty appeared at field 1312 on
+the 68020 and later on the 68000. Restarted motion then diverged. Evidence:
+`tmp/prof/sim-000-long`, `sim-020-long`, `sim-000-slow`. These runs do **not**
+prove W5 complete. They motivated a field-timed recovery state, keeping opponents
+and the clock running while the renderer shows the penalty. That replacement is
+still being validated, including life loss and terminal race-end behaviour.
+
+A measurement correction accompanies this work: `td2_report.regions` now reads
+`SLAVE` when supplied, rather than always using the installed slave's smaller
+size. Otherwise the copper write beyond the old region end was missed, producing
+zero counted frames despite active drawing. Recounting the existing fixed-window
+trace with its actual slave found 7 frames in 88 fields, 4.0 fps, at relative
+fields 3000–3099. This is a different trajectory from the original simulation;
+it is not a rendering optimisation A/B result.
+
+The state map now also includes lane, heading, yaw, heat, gear, clutch, police
+counters, crash code, gear envelope, opponent clock and average-speed sums.
+They must be compared alongside longitudinal position before accepting W5.
+
 Only now. One patch per commit, each with a `fixed_window.sh` A/B and the W1 reproducibility
 check showing the simulation trajectory (W2 variables per field) is unchanged where it must be.
 

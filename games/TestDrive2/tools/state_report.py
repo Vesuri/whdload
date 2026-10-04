@@ -15,6 +15,11 @@ VARIABLES = {
     'engine_period': (-2792, 2), 'needle_speed': (-24648, 2), 'needle_rpm': (-24652, 2),
     'background_1': (-3120, 4), 'background_2': (-3116, 4),
     'background_3': (-3112, 4), 'background_4': (-3108, 4),
+    'lane': (-13386,4), 'heading': (-13390,2), 'yaw': (-9862,2),
+    'heat': (-24718,2), 'gear': (-13036,2), 'clutch': (-13038,2),
+    'police': (-7642,2), 'police_wait': (-12980,2), 'crash': (-14916,2),
+    'gear_envelope': (-24720,2), 'opponent_lane': (-13352,4),
+    'opponent_clock': (-10844,4), 'player_sum': (-7674,4), 'opponent_sum': (-10836,4),
     'road_length': (-17240, 2), 'stage': (-10866, 2), 'rng': (-18632, 2),
 }
 def value(b, offset, size):

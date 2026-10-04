@@ -285,3 +285,14 @@ comparison. See open-work for the simulation verdict and W4 decision boundary.
 Road Drawer task from their Exec structures, including signed node priorities.
 The saved process SP can lie outside its initial bounds because the C runtime uses
 a replacement stack; correlate it with trace SP pages, not the original bounds alone.
+
+
+For rebuilt slaves, keep `SLAVE` set when running `frames.py` or `td2_report.py`
+on saved captures. Their slave-region lookup uses that selected file's size;
+using the installed slave's smaller footprint can miss the new copper-write
+location and falsely report no buffer swaps. Use the exact build that made the
+capture, retained under ignored `tmp/` if the source changes between runs.
+
+`tools/audit_simulation.py tmp/game/TestDrive2/data/duel` checks v1 simulation
+hook instruction boundaries, overlaps and direct incoming branches. It reads the
+original game locally and emits only diagnostics; it embeds no game bytes.
