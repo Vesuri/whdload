@@ -5,7 +5,7 @@ not an official installer release. Only duel v1 receives the new options;
 v2's patch list and timing are unchanged.
 
 History — 2026-10-04
-* CUSTOM2 bit 0: three-field simulation (~16.67 Hz nominal PAL), independently
+* CUSTOM2 bit 0: one-field simulation (50 Hz PAL), independently
   of drawing. Continuous rates are scaled; race time follows video fields.
   Animation phases and random updates no longer depend on drawing frequency.
 * Nonfatal crash/engine-damage recovery is 240 fields with a 20-second penalty.
@@ -15,7 +15,11 @@ History — 2026-10-04
   blitter ownership and JOTD's beam/display fix remain intact. The fixed first-
   race window repeats 5.6 -> 6.5 fps; other scenes have not been given that gain.
 
-Set CUSTOM2=3 for both options, CUSTOM2=1 for simulation only, or CUSTOM2=2
+* CUSTOM2 bit 2: blitter bus priority (DMACON BLTPRI) while the game runs.
+  Same-build fixed window: A500 5.2 -> 5.4, A1200 16.1 -> 16.7, 100 MHz 68020
+  21.1 -> 25.0 fps. Fast CPUs remain chip-bus bound at 25 fps.
+
+Set CUSTOM2=7 for all three, CUSTOM2=3 for simulation plus interrupt suppression, CUSTOM2=1 for simulation only, or CUSTOM2=2
 for rendering overhead only. Leave CUSTOM2 unset for original behavior.
 CUSTOM1=1 enables the existing infinite-lives trainer.
 

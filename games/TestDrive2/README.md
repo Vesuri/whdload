@@ -57,7 +57,9 @@ wait and JOTD's display fix. Two fixed-window repeats per arm measure
 4.5 → 5.2 fps with the same 50 Hz physics. More frequent physics uses CPU time;
 this gain is relative to that mode.
 CUSTOM2 is a bitfield: bit 0 enables simulation, bit 1 suppresses unused blitter
-interrupts. `CUSTOM2=3` enables both; `CUSTOM2=2` changes only rendering overhead.
+interrupts, bit 2 gives the blitter bus priority (BLTPRI). `CUSTOM2=7` enables all
+three; `CUSTOM2=2` changes only rendering overhead. On fast CPUs the renderer is
+chip-bus bound at 25 fps; see `docs/optimisation-plan.md`.
 Motion rates are scaled, the race clock follows elapsed field time, and nonfatal
 crash/engine-damage recovery lasts 240 fields with a 20-second penalty. Handling
 and recovery presentation change; see `docs/simulation-design.md`. Leave CUSTOM2
