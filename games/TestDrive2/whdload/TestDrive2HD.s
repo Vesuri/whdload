@@ -86,9 +86,11 @@ DECL_VERSION:MACRO
 _tdboot
 	dc.b	"tdboot",0
 slv_config
+	dc.b "C2:B:higher-rate simulation (v1);"
 	IFD VERIFY
 	dc.b "C3:B:reproducible verification (v1);"
 	dc.b "C4:B:slow renderer verification (v1);"
+	dc.b "C5:X:scripted driving verification (v1):0;C5:X:force engine damage verification (v1):1;C5:X:force fatal crash verification (v1):2;"
 	ENDC
 	dc.b    "C1:X:trainer infinite lives:0;"	
 	dc.b	0
@@ -320,6 +322,8 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 .end		moveq	#0,d0
 		rts
 
+	include "simulation.s"
+
 	IFD VERIFY
 ; W3 stress instrument: delay only drawing; VBL and task scheduling remain live.
 verify_slow_copper:
@@ -349,8 +353,20 @@ _patchexe:
 	lea	pl_main_v1(pc),a0
 	bsr	get_version
 	cmp.l	#2,d0
-	bne.b	.pp
+	bne.b	.v1
 	lea	pl_main_v2(pc),a0
+	bra.b .pp
+.v1
+	lea sim_tags(pc),a0
+	move.l _resload(pc),a2
+	jsr (resload_Control,a2)
+	IFD VERIFY
+	move.l sim_drive_enabled(pc),d0
+	beq.b .no_units
+	bsr verify_simulation_units
+.no_units
+	ENDC
+	lea pl_main_v1(pc),a0
 .pp
 	move.l	d7,a1
 	move.l	_resload(pc),a2
@@ -388,6 +404,7 @@ get_version:
 
 pl_main_v1
 	PL_START
+	include "simulation-patches.i"
 	IFD VERIFY
 	; Remove beam-position entropy only when CUSTOM3 is enabled (duel v1).
 	PL_IFC3
@@ -413,8 +430,18 @@ pl_main_v1
 	ENDC
     
     ; keyboard support
-	PL_PS	$001A1A,read_joydat
-	PL_PS	$00EAA2,read_joydat
+    IFD VERIFY
+    PL_IFC5
+    PL_PS $001A1A,verify_read_joydat
+    PL_PS $00EAA2,verify_read_joydat
+    PL_ELSE
+    PL_PS $001A1A,read_joydat
+    PL_PS $00EAA2,read_joydat
+    PL_ENDIF
+    ELSE
+    PL_PS $001A1A,read_joydat
+    PL_PS $00EAA2,read_joydat
+    ENDC
     
     PL_PS   $001A02,read_fire1
     PL_PSS  $00EA8E,read_fire2,2

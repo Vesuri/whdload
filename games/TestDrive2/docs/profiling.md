@@ -313,3 +313,40 @@ It accelerates, turns left at fields 100–105, right at 106–111, brakes at 20
 coasts at 300–399, then accelerates. There are no debugger target writes.
 `CUSTOM1=1` tests infinite lives through repeated recoveries. Normal builds omit
 this fixture, and v2's joystick hooks stay unchanged.
+
+
+## Higher-rate simulation checks (W5)
+
+Use the normal build with CUSTOM2=1 to test the shipping v1 mode. VERIFY adds
+CUSTOM5 bit 0 for the field-based joystick tape; CUSTOM5=3 also forces engine
+damage once and CUSTOM5=5 forces fatal crash 17 during an existing recovery.
+The latter requires CUSTOM1 off. The fixture clears both the live demo flag and
+the race stack frame's cached attract flag; clearing only the live flag skips
+player life-loss handling at a terminal event.
+
+```
+source amiga/env.sh
+make -C whdload verify
+WHD_ARGS="CUSTOM2=1 CUSTOM3=1 CUSTOM5=3" STATE_FIELDS=1800 FIELDS=1 SLAVE="$PWD/whdload/TestDrive2.slave" tools/fixed_window.sh tmp/prof/damage "$PWD/whdload/TestDrive2.slave"
+python3 tools/check_units.py tmp/prof/damage
+python3 tools/check_timing.py tmp/prof/damage/state --min-fields 1800
+python3 tools/check_recovery.py tmp/prof/damage/state --damage
+```
+
+For fast-RAM dumps, `check_units.py` and `check_disabled.py` require
+`--base 0x200000`. `check_recovery.py --trainer` expects no life loss. A fatal
+fixture uses `check_terminal.py` and `check_timing.py --min-fields 900 --fatal-end`:
+the active clock check ends at the fatal event, before the original menu path.
+Do not report a frozen race clock after game over as simulation lag.
+
+`check_disabled.py OUT` reads the original local v1 file and verifies its bytes
+at all 57 simulation patch ranges when CUSTOM2 is off. It excludes the two RNG
+ranges shared with CUSTOM3. An original-mode RNG comparison can differ because
+the original renderer still consumes that generator; it is not an optional
+simulation patch accidentally left active.
+
+Every fixed-window capture retains `OUT/slave.slave`. Set SLAVE to that copy
+when re-running trace reports: using the installed or latest slave's different
+size can omit the copper write and falsely report zero frames. FIELDS=1 captures
+are for state checks and visual QA; they cannot establish fps. The W5 higher-rate
+rendering baseline uses two full 100-field captures, `w5-repeat-a/b`, 5.6 fps each.

@@ -10,6 +10,7 @@ from state_report import VARIABLES, value
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('state',type=Path)
 p.add_argument('--min-fields',type=int,default=1000)
+p.add_argument('--fatal-end',action='store_true',help='without trainer: stop active checks at fatal crash 17')
 a=p.parse_args()
 data=[f.read_bytes() for f in sorted(a.state.glob('[0-9][0-9][0-9][0-9].bin'))]
 assert len(data)>=a.min_fields, 'insufficient field samples'
@@ -19,7 +20,9 @@ deadline=[value(b,*VARIABLES['deadline']) for b in data]
 active=next((i for i,b in enumerate(data) if value(b,-7670,2)),None)
 assert active is not None, 'race never started moving'
 last=len(data)
-for i in range(1,len(data)):
+if a.fatal_end:
+    last=next((i for i,b in enumerate(data) if value(b,*VARIABLES['crash'])==17),last)
+for i in range(1,last):
     assert (vbl[i]-vbl[i-1])&0xffffffff==1, f'non-consecutive VBL at {i}'
     lag=(vbl[i]-deadline[i])&0xffffffff
     advance=(deadline[i]-deadline[i-1])&0xffffffff

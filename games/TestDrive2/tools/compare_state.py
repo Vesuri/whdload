@@ -10,6 +10,7 @@ from state_report import VARIABLES,value
 CORE={'distance','speed','clock','opponent_distance','opponent_speed','traffic_forward',
       'traffic_oncoming','rpm','fuel','animation_1','animation_2','engine_period','road_length','stage','rng',
       'lane','heading','yaw','heat','gear','clutch','police','police_wait','crash',
+      'lives','crash_count','damage_count','penalties','engine_damage','running',
       'gear_envelope','opponent_lane','opponent_clock','player_sum','opponent_sum'}
 def read(p):
     root=Path(p)

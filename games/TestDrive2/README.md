@@ -40,3 +40,27 @@ amiga/run.sh                     # play it
 tools/profile_demo.sh            # profile it (docs/profiling.md)
 make -C whdload && SLAVE=$PWD/whdload/TestDrive2.slave tools/profile_demo.sh tmp/prof/mine
 ```
+
+## Optional fixed-time simulation (duel v1)
+
+Build and run the local slave with the higher-rate mode enabled:
+
+```sh
+source amiga/env.sh
+make -C whdload
+WHD_ARGS=CUSTOM2=1 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
+```
+
+`CUSTOM2=1` runs simulation every three PAL fields, independently of drawing.
+Motion rates are scaled, the race clock follows elapsed field time, and nonfatal
+crash/engine-damage recovery lasts 240 fields with a 20-second penalty. Handling
+and recovery presentation change; see `docs/simulation-design.md`. Leave CUSTOM2
+off to use the original game. v2 has no simulation patches. CUSTOM1's infinite
+lives trainer remains supported. NTSC timing has not been validated.
+
+`make -C whdload verify` adds tools for the study: CUSTOM3 removes RNG beam
+entropy from the original mode, CUSTOM4 slows drawing, and CUSTOM5 bit 0 drives
+an input tape. CUSTOM5=3 also forces engine damage once; CUSTOM5=5 instead forces
+a fatal crash. These verification options are absent from the normal build.
+Use `tools/fixed_window.sh` for fps, state captures for game-time comparisons,
+and the retained `OUT/slave.slave` when analysing older traces.

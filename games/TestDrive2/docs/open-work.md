@@ -4,7 +4,7 @@
 > `docs/optimisation-plan.md` (performance ranking). Everything here was measured or read from
 > the binary on 2026-10-04; each claim says which. Do the work items **in order**.
 
-**Current status:** W1–W4 complete; W5 is in progress. W6 has not started. The original handoff measurements below are retained as historical
+**Current status:** W1–W5 complete. W6 has not started. The original handoff measurements below are retained as historical
 context; the completed work-item findings supersede their unproven assumptions.
 
 ## The goal
@@ -426,15 +426,15 @@ Write up the options with the W3 evidence and **ask the user**. The options depe
 
 ### W5. Implement the chosen design
 
-**IN PROGRESS.** The optional v1 `CUSTOM2` prototype uses a three-field PAL
+**DONE (2026-10-04).** The optional v1 `CUSTOM2` patch uses a three-field PAL
 step (16.67 Hz), halves continuous rates, retains road-unit operations and event
 impulses, and carries 3/5 fractions for clocks and average-speed sums. Visual
 phases move to simulation ticks; the renderer's rare event uses a private RNG.
-The unmodified mode is still the default. This is not yet a validated release.
+The unmodified mode is still the default. Both normal and VERIFY builds assemble.
 
 The first prototype stalled because a hook displaced a shared input-check entry;
 expanded hooks also had branches into their overwritten tails. The corrected
-layout passes `tools/audit_simulation.py tmp/game/TestDrive2/data/duel` (30 hooks,
+layout passes `tools/audit_simulation.py tmp/game/TestDrive2/data/duel` (31 hooks,
 no boundary, overlap or direct incoming-branch errors). The tool excludes data
 outside the root code hunk and documents its limits for indirect calls and helper
 return adjustments. No rendering optimisation has started.
@@ -446,8 +446,37 @@ inside the simulation process. The 20-second penalty appeared at field 1312 on
 the 68020 and later on the 68000. Restarted motion then diverged. Evidence:
 `tmp/prof/sim-000-long`, `sim-020-long`, `sim-000-slow`. These runs do **not**
 prove W5 complete. They motivated a field-timed recovery state, keeping opponents
-and the clock running while the renderer shows the penalty. That replacement is
-still being validated, including life loss and terminal race-end behaviour.
+and the clock running while the renderer shows the penalty. The field-timed replacement now matches 68000, 68020/fast RAM and deliberately
+slow drawing over 1,800 fields. Capture checks verify one life loss (or none with
+CUSTOM1), one penalty and 240 stationary fields at idle engine pitch. Engine
+damage uses the same original blocking path and now receives timed recovery too.
+The fatal-event fixture exposed a terminal-precedence defect during an existing
+recovery; fatal crashes now override it. It also needed to clear the race frame's
+cached attract flag before it could exercise the original player death path.
+`fatal-player-000/020` now match all core state 1200/1200: fatal code 17 at field
+900, lives zero by field 903, one additional crash counted, race clock frozen and
+VBL continuing. Active pacing/clock checks stop at the terminal event, not the
+later menu animation.
+
+With CUSTOM2 off, `check_disabled.py w5-original-mode` verifies original bytes
+at all 57 non-RNG simulation patch ranges. Motion, clock and opponent state match
+the original 1000-field run; transient first-step RPM/lane/period samples and
+original renderer-driven RNG differences are the known W3 behaviour.
+
+Two higher-rate boots (`w5-repeat-a/b`, VERIFY + CUSTOM2/CUSTOM3) have identical
+field-0 and field-99 images: MD5 **9fb8e78911ccb9c21432cbe39e09347e** and
+**813cba1a17bd8cb91634dc959a0f7614**. Each fixed window measures 10 frames in
+89 fields, **5.6 fps**, with 17.1% polling. This is the W6 baseline in the new
+simulation mode; the original-mode 5.9 fps has a different simulation trajectory.
+The normal build (`w5-normal-build/020`, CUSTOM2 only) passes 1,800 fields on
+both CPUs, including one full recovery. All core variables match at samples
+1..1799; sample 0 can interrupt the initial demo borrow/audio transaction.
+Clock, speed, opponents, traffic, RNG, life loss and penalty match 1800/1800.
+`w5-recovery-view` confirms the normal renderer displays the complete penalty
+message during a stopped-player recovery; the 1,200-field state capture still
+passes pacing/clock checks. The terminal trace shows the original GAME OVER
+presentation without the timed-recovery overlay. Screens are visual QA only;
+all game-time claims above come from state measurements.
 
 A measurement correction accompanies this work: `td2_report.regions` now reads
 `SLAVE` when supplied, rather than always using the installed slave's smaller
@@ -459,7 +488,20 @@ it is not a rendering optimisation A/B result.
 
 The state map now also includes lane, heading, yaw, heat, gear, clutch, police
 counters, crash code, gear envelope, opponent clock and average-speed sums.
-They must be compared alongside longitudinal position before accepting W5.
+They are compared alongside longitudinal position. `unit-final-000/020` match
+motion, clocks, opponents, steering, gears, random state and average-speed sums
+1800/1800; only the two animation phases differ at the known first interrupt
+sample. `damage-final-000/020/slow` exercise engine damage: all core quantities
+match from sample 1 through 1799, and all motion/time/life/penalty quantities match
+1800/1800. Their clocks track PAL field time from field 69 with one 200-unit
+penalty. The VERIFY assembly invariants pass 18 cases, including signed rounding,
+heat rates and police counters. Natural police pursuit has not been captured.
+
+The earlier `drive-020-extended` trainer run held three-field pacing for 6,000
+fields through eight recoveries. It predates the idle-pitch and engine-damage
+fixes; it supports pacing through repeated recovery, not validation of those later
+changes. `docs/simulation-design.md` records rates, recovery behaviour and the
+measured handling change (~+5.4% distance, +3.4% speed at field 999).
 
 Only now. One patch per commit, each with a `fixed_window.sh` A/B and the W1 reproducibility
 check showing the simulation trajectory (W2 variables per field) is unchanged where it must be.
