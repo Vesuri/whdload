@@ -48,10 +48,14 @@ Build and run the local slave with the higher-rate mode enabled:
 ```sh
 source amiga/env.sh
 make -C whdload
-WHD_ARGS=CUSTOM2=1 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
+WHD_ARGS=CUSTOM2=3 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
 ```
 
-`CUSTOM2=1` runs simulation every three PAL fields, independently of drawing.
+`CUSTOM2=1` runs simulation every three PAL fields (16.67 Hz), independently of drawing.
+The rendering option measured 5.6 → 6.5 fps in the reproducible first-race
+window; it retains every original wait and JOTD's display fix.
+CUSTOM2 is a bitfield: bit 0 enables simulation, bit 1 suppresses unused blitter
+interrupts. `CUSTOM2=3` enables both; `CUSTOM2=2` changes only rendering overhead.
 Motion rates are scaled, the race clock follows elapsed field time, and nonfatal
 crash/engine-damage recovery lasts 240 fields with a 20-second penalty. Handling
 and recovery presentation change; see `docs/simulation-design.md`. Leave CUSTOM2
@@ -61,6 +65,7 @@ lives trainer remains supported. NTSC timing has not been validated.
 `make -C whdload verify` adds tools for the study: CUSTOM3 removes RNG beam
 entropy from the original mode, CUSTOM4 slows drawing, and CUSTOM5 bit 0 drives
 an input tape. CUSTOM5=3 also forces engine damage once; CUSTOM5=5 instead forces
-a fatal crash. These verification options are absent from the normal build.
+a fatal crash. CUSTOM5=9 adds original-versus-patched shape pixel checks to the driving tape.
+These verification options are absent from the normal build.
 Use `tools/fixed_window.sh` for fps, state captures for game-time comparisons,
 and the retained `OUT/slave.slave` when analysing older traces.

@@ -562,6 +562,8 @@ sim_code: dc.l 0
 
 ; Read only v1 options. Control fills tag values; all game patches remain C2-gated.
 sim_tags:
+    dc.l WHDLTAG_CUSTOM2_GET
+render_options: dc.l 0
     dc.l WHDLTAG_CUSTOM1_GET
 sim_trainer: dc.l 0
     IFD VERIFY

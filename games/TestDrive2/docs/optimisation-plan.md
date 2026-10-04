@@ -17,12 +17,51 @@
   The slave also supports v2 (109 248 bytes, different offsets); the optimisations must be
   limited to v1 (`get_version`) unless a v2 `duel` is obtained and the patches ported.
 - **Optional.** Gate the speed patches behind a WHDLoad tooltype (`CUSTOM2`, `slv_config`
-  `"C2:B:speed patches;"`, `PL_IFC2`). That gives users a way out, and gives us an A/B switch
+  `"C2:X:...:1;"`, `PL_IFC2X 1`). That gives users a way out, and gives us an A/B switch
   inside one slave binary.
 - **No game bytes in the repo.** Replacement routines are our own code; patch lists name
   offsets. The slave source (JOTD, public domain) is in `whdload/`.
 
-## What the profile says
+## W6 measured update (2026-10-04)
+
+W1–W5 and the user's higher-rate design are now complete; their evidence is in
+open-work.md. The tables and predicted gains below are the original handoff,
+not current release measurements. In particular, a function's binary being
+assembly does not establish its original source language. Inspect its actual
+stack and register traffic before proposing a C rewrite.
+
+The shape wait-before-start prototype lost speed: 5.6 → 5.4 fps in two
+same-build fixed-window boots per arm. With unused blitter IRQs suppressed the
+combined prototype reached 6.2 fps. IRQ removal alone reached 6.5 fps in the
+same comparison build. The asynchronous prototype was removed, retaining all
+original blitter waits, ownership and display contracts. The line routine
+already waits before each blit; it did not have the assumed wait-after pattern.
+JOTD's beam wait has not changed. The normal release repeats 5.6 versus 6.5 fps with identical first/last images
+in both arms. Cross-CPU/slow-rendering state, fatal and normal trainer checks
+pass; exact evidence is in open-work.md.
+
+After that structural experiment, individual costs were summed from the
+IRQ-only fixed window `w6-irq-only-a` (all 100 fields, exact saved slave):
+
+| Candidate | Measured cost / bound | Decision |
+|---|---:|---|
+| Pair span interior stores | stores 2.623%, DBF 0.874%; 25%/50% savings give ≤1.093% before extra setup | skip |
+| Tighten CPU clear | clear kernel 3.809%; bulk MOVEM 3.170%, at least 104/112 of that is mandatory writes; even deleting all other clear work saves <0.87% | skip |
+| Cache projection angle accumulators | all four affected memory instructions together cost 0.346%; actual removable work is smaller | skip |
+| Masked-copy rewrite | 2.77% of the inspected complete serial frame | skip |
+| Remove beam wait | 1.5% in the handoff; preserves JOTD's display fix | retain |
+
+The span and both projection passes already hold loop state in registers rather
+than stack temporaries; the clear already uses two 13-register MOVEM writes per
+104 bytes. Straight register allocation is not a measured ≥3% opportunity here.
+This does not establish an optimal renderer. Colour-specific span edges, an
+indexed sign scene and an early DMA clear are possible **new algorithmic
+experiments**, needing their own reproducible scene, pixel twin and same-build
+A/B. They have no claimed gain and are not part of this release. A DMA clear
+would need a new safe overlap window: CPU-loop lower bounds do not bound DMA
+latency hiding.
+
+## What the original profile said
 
 The game is **CPU-bound and serial**: the CPU never idles, and draws a frame every ~7 fields
 (**6.9–7.1 fps**) in the first attract demo. Fast RAM barely helps (bus contention is not the
@@ -113,7 +152,7 @@ worth more. Verify nothing uses `QBlit`/`QBSBlit` (they would never complete).
 ReadMe/history entry), with the speed patches under `CUSTOM2` and v2 left unpatched. Test on the
 stock-A500-equivalent machine, on 68020/fast-RAM, and with the infinite-lives trainer on.
 
-## Expected result
+## Original estimate (not a measured result)
 
 If §1 recovers most of the waiting (12–21%) and §2–§3 halve C–G, a frame shrinks by roughly
 40%, i.e. **~7 → ~11–12 fps** in the demo window — before any frame cap that §0.2 may require.

@@ -47,7 +47,7 @@ for f in trace.fields:
         if pc in watch:
             hits[watch[pc]] += 1
         b = raw(pc, 6)
-        if b == POLL or (b[:2] == b'\x4e\x71' and POLL in raw(pc, 10)) or (b[:2] == b'\x66\xf4' and raw(pc - 6, 6) == POLL):
+        if b == POLL or (b[:2] == b'\x4e\x71' and POLL in raw(pc, 10)) or (b[:2] in (b'\x66\xf4', b'\x66\xf8') and raw(pc - 6, 6) == POLL):
             wait += cost
     swaps.append(n)
     for i in range(0, len(f.dma), f.dma_size):

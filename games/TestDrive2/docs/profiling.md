@@ -350,3 +350,41 @@ when re-running trace reports: using the installed or latest slave's different
 size can omit the copper write and falsely report zero frames. FIELDS=1 captures
 are for state checks and visual QA; they cannot establish fps. The W5 higher-rate
 rendering baseline uses two full 100-field captures, `w5-repeat-a/b`, 5.6 fps each.
+
+
+## Rendering checks (W6)
+
+CUSTOM2 is now a v1 bitfield: bit 0 keeps the W5 simulation, bit 1 suppresses
+unused blitter-finished interrupts. Compare CUSTOM2=1 against CUSTOM2=3 in the
+**same build**, with CUSTOM3=1 and no CUSTOM5 fixture for fps. The shipping
+rendering option changes no game code, wait, ownership call or beam wait.
+
+VERIFY + CUSTOM2=3 CUSTOM5=9 runs a shape twin during active racing. Before
+PatchSeg it copies the original function into allocated memory and redirects its
+only external PC-relative call through a local jump. Each twin receives identical
+register inputs and destination pixels. It compares all bitmap planes and the
+clipping carry; the checker requires positive completed cases and zero failures:
+
+```
+source amiga/env.sh
+make -C whdload verify
+WHD_ARGS="CUSTOM2=3 CUSTOM3=1 CUSTOM5=9" SLAVE="$PWD/whdload/TestDrive2.slave" tools/fixed_window.sh tmp/prof/draw-check "$PWD/whdload/TestDrive2.slave"
+python3 tools/check_draw.py tmp/prof/draw-check
+```
+
+The two shadows allocate 128 KB of public memory and the checks greatly slow
+rendering. They preserve normal simulation scheduling, but their fps is **not**
+a performance result. Introductory checks exceeded the harness's boot deadline;
+the oracle is gated on the simulation's first race epoch. The initial byte-copy
+version completed no cases within 100 fields; zero cases is a failed check.
+The long-copy version finishes positive cases. The first offender counter records
+a differing long-word's byte offset +1. Fast-RAM dumps need `--base 0x200000`.
+The entry must be PL_P: PL_PS would return into the original body after the twin
+already executed it, corrupting the caller stack. This was caught and repaired.
+
+For candidate costs, inspect individual instructions rather than treating every
+region attributed to an earlier unframed routine as that routine. The actual
+clear kernel is duel:086c0..08768; its two bulk MOVEMs are 08746/0874a. The
+span interior is 07928..0793a. Projection angle accumulators are read/written at
+073fc/07400/0742a/0742e. Their cycle totals can be summed from `barto.instructions`
+or inspected with `hotspots.py`. These are cost bounds, never fps comparisons.

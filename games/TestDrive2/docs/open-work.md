@@ -4,7 +4,7 @@
 > `docs/optimisation-plan.md` (performance ranking). Everything here was measured or read from
 > the binary on 2026-10-04; each claim says which. Do the work items **in order**.
 
-**Current status:** W1–W5 complete. W6 has not started. The original handoff measurements below are retained as historical
+**Current status:** W1–W6 complete. The original handoff measurements below are retained as historical
 context; the completed work-item findings supersede their unproven assumptions.
 
 ## The goal
@@ -437,7 +437,7 @@ expanded hooks also had branches into their overwritten tails. The corrected
 layout passes `tools/audit_simulation.py tmp/game/TestDrive2/data/duel` (31 hooks,
 no boundary, overlap or direct incoming-branch errors). The tool excludes data
 outside the root code hunk and documents its limits for indirect calls and helper
-return adjustments. No rendering optimisation has started.
+return adjustments. Rendering work began only after the completed W5 checks below.
 
 A corrected pre-recovery prototype matched 68000/68020 driving state through the
 first crash, which begins at relative field 1068. It then exposed another timing
@@ -514,6 +514,82 @@ clear (`duel:0789c`, `duel:0844e`) as blitter or long-word operations, then proj
 with `fixed_window.sh` on the reproducible slave. Skip anything worth < 3% of a frame unless it
 is free. Do not touch the slave's `set_copper` beam wait (JOTD's flicker fix) without testing a
 68020/68030 configuration for tearing.
+
+**DONE (2026-10-04).** The accepted rendering change is v1 CUSTOM2 bit 1,
+suppression of unused blitter-finished interrupts. The first v1 rendering prototype moved shape
+waits before the next plane and moved the common final wait to ownership/CPU
+writer/display barriers. The original line routine already waits before each
+plane; it was incorrectly described as wait-after-start in the original plan.
+JOTD's beam wait was retained throughout.
+
+Four same-build fixed windows (`w6-serial-a/b`, `w6-async-a/b`) give 5.6 fps
+serial and 5.4 fps asynchronous. A second same-build experiment
+(`w6-irq-serial-a/b`, `w6-irq-async-a/b`) gives 5.6 fps serial and 6.2 fps
+with asynchronous drawing plus disabled blitter IRQs. IRQ removal alone
+(`w6-irq-only-a`) gives 6.5 fps in that exact second build; `w6-irq-only-b`
+repeats 6.5 fps but includes the pixel-verifier code and has a different size,
+so it is supporting evidence, not a same-build repeat. The slower asynchronous
+prototype has been removed. No changed blitter wait is shipping.
+
+The shipping patch retains every original wait/ownership/display contract and
+suppresses only INTENA BLIT, restoring its original enable on a normal return.
+Only the v1 Control call reads the option. All game graphics call stubs were
+checked: none calls QBlit (-276) or QBSBlit (-294). A VERIFY shape twin copies
+the original routine at runtime before PatchSeg, relocates its external clip
+call, and compares complete destination planes plus clipping carry with IRQs
+on/off from identical pixels and register inputs. It runs only during racing:
+checking introductory full-screen drawing prevented a timely anchored boot.
+The final VERIFY build passes six completed shape twins on the 68000 and nine
+on the 68020, with zero pixel/carry mismatches (`w6-irq-long-twin-000/020`).
+Its own four same-build windows (`w6-final-serial-a/b`, `w6-final-irq-a/b`)
+repeat 5.6 versus 6.5 fps. One VERIFY repeat's trace images differ only in three
+rightmost columns outside the game viewport; all game pixels match. No images
+were cropped or normalised to claim the raw W1 check.
+
+The **normal shipping build**, 8,506 code bytes / 8,544-byte file, independently
+repeats both arms (`w6-release-serial-a/b`, `w6-release-irq-a/b`): 10 frames in
+90 fields = 5.6 fps with CUSTOM2=1; 11 in 85 = 6.5 fps with CUSTOM2=3. This is
+about **16.5% more frames per second / 14.1% less time per frame** in this scene,
+not a claim for every scene. Polling rises from 17.0% to 19.5%; BLIT interrupts
+fall from 2,438 to zero, and VBL interrupts remain 100/100. All four use one
+exact build, with no VERIFY code or fixture arguments.
+
+Both normal arms pass the full, uncropped W1 check: serial field-0/99 MD5s are
+`a2c31ccefeec8a15fd78c56c9234405d` / `098da8eea96c1f2f427e5c496a8be614`;
+IRQ-off MD5s are `9fb8e78911ccb9c21432cbe39e09347e` /
+`10e8f27815ee07997fac5604266a4219`, identical between the two boots of each arm.
+Screens are reproducibility/visual checks, not game-speed evidence.
+
+VERIFY driving (`w6-state-000/020/slow`) matches all **35 core variables
+1800/1800**, including sample 0, against the W5 trainer tape and across both
+CPUs plus slow drawing. Pacing is three fields, deadline lag 0..2, and the
+clock follows nominal PAL elapsed fields from field 69 with one penalty of 200.
+All three complete a 240-field stationary recovery at idle pitch; the 18 rate
+invariants still pass. `w6-fatal` matches W5's player fatal fixture through
+1200 fields: fatal 17 at field 900, exhausted lives, frozen race clock and
+continuing VBL. Terminal checks stop active pacing at that event.
+
+Normal `w6-release-state-000/020` also matches all 35 core variables 1800/1800
+across CPUs, with one full recovery. Against W5's normal capture all core state
+matches at samples 1..1799; sample 0 differs in the documented borrowed-demo
+transaction (distance, lane, RPM, engine period and two visual phases), not in
+subsequent trajectory. Normal `CUSTOM2=2` (`w6-release-render-only`) verifies
+original bytes at all 57 non-RNG simulation ranges, demonstrating independent
+bit gating. `w6-release-trainer` completes the normal-build trainer-on check: 1,800 fields,
+three-field pacing, correct elapsed clock, one penalty, no lost life, and one
+complete 240-field idle recovery. The normal release has no VERIFY fixtures.
+
+The next candidates were inspected after that structural experiment. The span,
+MOVEM clear and both projection passes already use register-held loop state; the proposed C-to-assembly rewrites do not apply. In the IRQ-only
+100-field capture, span stores plus DBF cost about 3.5% of all cycles. Pairing
+stores saves only one quarter of the stores and half the DBF cost before added
+setup, below the 3% frame threshold. More complex edge specialisation or early
+DMA clearing would need a separate measured prototype and pixel oracle; they
+are not established wins. Projection accumulator caching was quantified: all four affected instructions
+together cost 0.346% of the IRQ-only fixed window, before mandatory output writes.
+The real clear kernel costs 3.809%; mandatory writes leave less than 0.87%
+recoverable by any CPU-loop rewrite. These candidates were skipped under the
+3% rule; larger new algorithms remain unmeasured future experiments.
 
 ### Tooling debts (fix when they bite, not before)
 

@@ -1,5 +1,5 @@
     ; Higher-rate simulation, duel v1 only. Off restores the original game.
-    PL_IFC2
+    PL_IFC2X 0
     PL_PS  $05a4c,sim_start
     PL_PSS $05a5a,sim_begin,2
     PL_L   $05bea,$70034e71    ; deadline comparison: moveq #3,d0; nop

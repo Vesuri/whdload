@@ -86,11 +86,11 @@ DECL_VERSION:MACRO
 _tdboot
 	dc.b	"tdboot",0
 slv_config
-	dc.b "C2:B:higher-rate simulation (v1);"
+	dc.b "C2:X:higher-rate simulation (v1):0;C2:X:disable unused blitter interrupt (v1):1;"
 	IFD VERIFY
 	dc.b "C3:B:reproducible verification (v1);"
 	dc.b "C4:B:slow renderer verification (v1);"
-	dc.b "C5:X:scripted driving verification (v1):0;C5:X:force engine damage verification (v1):1;C5:X:force fatal crash verification (v1):2;"
+	dc.b "C5:X:scripted driving verification (v1):0;C5:X:force engine damage verification (v1):1;C5:X:force fatal crash verification (v1):2;C5:X:shape pixel twin verification (v1):3;"
 	ENDC
 	dc.b    "C1:X:trainer infinite lives:0;"	
 	dc.b	0
@@ -309,7 +309,9 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 	; experiment (docs/optimisation-plan.md): no blitter-finished interrupts while the game runs
 		move.w	#$0040,_custom+intena
 	ENDC
+		bsr render_interrupt_option
 		jsr	(4,a1)
+		bsr render_interrupt_restore
 		movem.l	(a7)+,d1/d7/a2/a6
 
 	;remove exe
@@ -323,6 +325,10 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		rts
 
 	include "simulation.s"
+	include "render.s"
+	IFD VERIFY
+	include "render-verify.s"
+	ENDC
 
 	IFD VERIFY
 ; W3 stress instrument: delay only drawing; VBL and task scheduling remain live.
@@ -365,6 +371,7 @@ _patchexe:
 	beq.b .no_units
 	bsr verify_simulation_units
 .no_units
+	bsr verify_draw_init
 	ENDC
 	lea pl_main_v1(pc),a0
 .pp
@@ -405,6 +412,7 @@ get_version:
 pl_main_v1
 	PL_START
 	include "simulation-patches.i"
+	include "render-patches.i"
 	IFD VERIFY
 	; Remove beam-position entropy only when CUSTOM3 is enabled (duel v1).
 	PL_IFC3

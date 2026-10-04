@@ -10,7 +10,7 @@ VASMFLAGS ?=
 all: TestDrive2.slave
 
 # Always assemble: options must not leave a stale variant.
-TestDrive2.slave: TestDrive2HD.s simulation.s simulation-verify.s simulation-patches.i FORCE
+TestDrive2.slave: TestDrive2HD.s simulation.s simulation-verify.s simulation-patches.i render.s render-verify.s render-patches.i FORCE
 	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I. -Iinclude -I"$(WHDLOAD)/Include" -I"$(NDK)" -o $@ $<
 
 verify:

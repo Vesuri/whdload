@@ -9,6 +9,7 @@ from pathlib import Path
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('duel',type=Path)
+p.add_argument('--patches',type=Path,help='alternative patch list to check')
 a=p.parse_args()
 raw=a.duel.read_bytes()
 if len(raw)!=108868: p.error('requires duel v1 (108868 bytes)')
@@ -20,7 +21,7 @@ for line in out.splitlines():
     m=re.match(r'\s*([0-9a-f]+):\s+((?:[0-9a-f]{4} ?)+)\s+(.+)',line)
     if m: ins[int(m[1],16)-40]=m[3]
 spans=[]
-source=Path(__file__).resolve().parents[1]/'whdload/simulation-patches.i'
+source=a.patches or Path(__file__).resolve().parents[1]/'whdload/simulation-patches.i'
 for line in source.read_text().splitlines():
     m=re.search(r'PL_(PSS|PS|P)\s+\$([0-9a-f]+),([^;]+)',line)
     if not m:continue

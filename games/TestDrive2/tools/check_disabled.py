@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify CUSTOM2-off capture retains original v1 bytes at every simulation patch.
+"""Verify CUSTOM2 bit-0-off capture retains original v1 bytes at every simulation patch.
 CUSTOM3's shared reproducibility RNG patch is excluded. No game bytes are emitted.
 """
 import argparse,json,re
@@ -26,4 +26,4 @@ for line in (root/'whdload/simulation-patches.i').read_text().splitlines():
     else:size={'W':2,'L':4}[kind]
     assert mem[code+start:code+start+size]==original[40+start:40+start+size],f'optional patch still active at {start:05x}'
     cases+=1
-print(f'CUSTOM2 off: {cases} patch ranges retain original v1 instructions')
+print(f'CUSTOM2 simulation bit off: {cases} patch ranges retain original v1 instructions')

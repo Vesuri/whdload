@@ -32,7 +32,7 @@ indirect jumps or semantics; return adjustments also received manual review.
 
 The four visual phases advance on simulation ticks. The rare high-speed effect
 has its own random generator and six-field event/animation cadence. Drawing reads
-its cached state. Gameplay RNG excludes beam-position entropy under CUSTOM2.
+its cached state. Gameplay RNG excludes beam-position entropy under CUSTOM2 bit 0.
 The main task's camera position and needle caches remain drawing snapshots;
 their differing ages across CPUs do not represent physical trajectory changes.
 
@@ -40,7 +40,7 @@ their differing ages across CPUs do not represent physical trajectory changes.
 
 The original nonfatal crash and engine-damage path blocks the simulation while
 it draws animation and waits for acknowledgement. CPU speed changes when it
-applies a penalty and resumes motion. CUSTOM2 replaces those paths with 240-field
+applies a penalty and resumes motion. CUSTOM2 bit 0 replaces those paths with 240-field
 recovery (4.8 nominal PAL seconds): neutral engine, stopped player, one life loss
 unless the trainer is enabled, and one 20-second penalty. Opponents, traffic and
 race time continue. The ordinary drawing task displays the recovery message.
@@ -49,11 +49,13 @@ This changes the original crash presentation and acknowledgement behaviour.
 
 ## Verification
 
-Normal builds contain only the optional shipping simulation patch. VERIFY adds:
+Normal builds contain the optional shipping simulation (CUSTOM2 bit 0) and
+unused-blitter-IRQ suppression (bit 1). CUSTOM2=3 enables both. VERIFY adds:
 CUSTOM3 for reproducible original-mode RNG; CUSTOM4 for deliberately slow drawing;
 CUSTOM5 bit 0 for an input tape (accelerate, steer both ways, brake, coast, accelerate)
 and bit 1 for one engine-damage event (CUSTOM5=3); bit 2 forces a fatal crash
-(CUSTOM5=5 without the trainer). Fixtures run in the slave, never through
+(CUSTOM5=5 without the trainer). Bit 3 runs original/patched shape pixel twins
+(CUSTOM5=9 with CUSTOM2=3). Fixtures run in the slave, never through
 memory/register writes by the debugger. Private data tests execute the assembly
 half-rate and timer helpers on dummy allocations before the game starts.
 
