@@ -94,7 +94,6 @@ reproducible RNG, CUSTOM4 for deliberately slow drawing, and CUSTOM5 fixtures:
 - Bit 0: accelerate, steer both ways, brake, coast and accelerate input tape.
 - Bit 1: one engine-damage event (CUSTOM5=3).
 - Bit 2: fatal crash (CUSTOM5=5, without the trainer).
-- Bit 3: original/patched shape pixel and carry twins (CUSTOM5=9).
 - Bit 4: a straight acceleration/braking tape (CUSTOM5=17). This tape deliberately
   does not follow road bends; it is a handling fixture, not the demo driver.
 

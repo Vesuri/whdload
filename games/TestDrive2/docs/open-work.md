@@ -827,6 +827,13 @@ finer integration predicts. Both 6,000-field demos pass pacing (lag 0..5 and
 original-mode demo is not a baseline: CUSTOM3's RNG pinning exists only in
 VERIFY builds, so `hand-demo-orig` is a different demo from field 0.
 
+**Code cleanup (2026-10-05).** Duplicate rate, decay, Euler and life-event code
+now shares one body each. The pixel twin and the `noblitirq` experiment were
+removed. The cleaned normal and VERIFY slaves reproduce every pre-cleanup capture
+exactly: straight tape (both periods and original mode, 1,000 fields), damage
+(both periods, 1,800), demo (both periods, 6,000). Units pass 107/107; fatal,
+disabled-bytes and fps (A500 7.1, A1200 16.7) are unchanged.
+
 ### Remaining open work
 
 1. **NTSC.** Everything is PAL-validated. The period counts fields and the

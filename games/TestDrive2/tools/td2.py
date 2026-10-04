@@ -14,6 +14,8 @@ Commands (the emulator is left running after each unless noted):
   quit                         kill gdb and the emulator
 """
 import os, select, signal, socket, subprocess, sys, time
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import barto
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUN = os.path.join(ROOT, 'amiga/.run')
@@ -68,30 +70,6 @@ class Gdb:
             self.cmd('', timeout=30)
             time.sleep(0.3)
             self.running = False
-
-
-def screenshot_from_trace(path):
-    """Return (kind, bytes) of the last field's screenshot in a Barto profile file."""
-    import struct
-    data = open(path, 'rb').read()
-    off = 0
-    def w():
-        nonlocal off
-        v = struct.unpack_from('<I', data, off)[0]; off += 4; return v
-    fields = w(); sections = w(); off += 4 * sections + 16
-    for _ in range(3):
-        n = w(); off += n
-    w(); w()
-    shot = None
-    for _ in range(fields):
-        n = w(); off += n  # custom registers
-        n = w(); off += n  # AGA colours
-        for _ in range(2):
-            s, c = w(), w(); off += s * c
-        w(); w(); n = w(); off += 4 * n
-        size, kind = w(), w()
-        shot = (kind, data[off:off + size]); off += size
-    return shot
 
 
 # This FS-UAE build's Barto stub (x86_64, /path/to/fs-uae) leaves the profiler's PC window
@@ -186,9 +164,9 @@ def handle(g, line):
         out = g.cmd(f'monitor profile {fields} "" "{target}"', timeout=1800)
         if was: g.cont()
         if op == 'shot':
-            kind, img = screenshot_from_trace(target)
-            open(png, 'wb').write(img)
-            return f'{png} kind={kind} {len(img)} bytes {out}'
+            f = barto.load(target).fields[-1]
+            open(png, 'wb').write(f.shot)
+            return f'{png} kind={f.shot_kind} {len(f.shot)} bytes {out}'
         return out or 'ok'
     if op == 'quit':
         g.p.kill()

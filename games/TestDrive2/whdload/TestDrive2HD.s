@@ -90,7 +90,7 @@ slv_config
 	IFD VERIFY
 	dc.b "C3:B:reproducible verification (v1);"
 	dc.b "C4:B:slow renderer verification (v1);"
-	dc.b "C5:X:scripted driving verification (v1):0;C5:X:force engine damage verification (v1):1;C5:X:force fatal crash verification (v1):2;C5:X:shape pixel twin verification (v1):3;"
+	dc.b "C5:X:scripted driving verification (v1):0;C5:X:force engine damage verification (v1):1;C5:X:force fatal crash verification (v1):2;C5:X:straight driving tape (v1):4;"
 	ENDC
 	dc.b    "C1:X:trainer infinite lives:0;"	
 	dc.b	0
@@ -305,10 +305,6 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 		moveq	#_args_end-_args,d0
 		lea	(_args,pc),a0
 
-	IFD	NOBLITIRQ
-	; experiment (docs/optimisation-plan.md): no blitter-finished interrupts while the game runs
-		move.w	#$0040,_custom+intena
-	ENDC
 		bsr render_interrupt_option
 		jsr	(4,a1)
 		bsr render_interrupt_restore
@@ -326,9 +322,6 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 
 	include "simulation.s"
 	include "render.s"
-	IFD VERIFY
-	include "render-verify.s"
-	ENDC
 
 	IFD VERIFY
 ; W3 stress instrument: delay only drawing; VBL and task scheduling remain live.
@@ -361,39 +354,15 @@ _patchexe:
 	cmp.l	#2,d0
 	bne.b	.v1
 	lea	pl_main_v2(pc),a0
-	bra.b .pp
+	bra.b	.pp
 .v1
-	lea sim_tags(pc),a0
-	move.l _resload(pc),a2
-	jsr (resload_Control,a2)
-	IFD VERIFY
-	move.l sim_drive_enabled(pc),d0
-	beq.b .no_units
-	bsr verify_simulation_units
-.no_units
-	bsr verify_draw_init
-	ENDC
-	move.l sim_attn(pc),d0
-	bsr sim_configure          ; after the unit checks, which use the defaults
-	lea pl_main_v1(pc),a0
-	move.l	d7,a1
-	move.l	_resload(pc),a2
-	jsr	(resload_PatchSeg,a2)
-	move.l render_options(pc),d0
-	btst #0,d0
-	beq.b .out
-	move.l d7,a1
-	add.l a1,a1
-	add.l a1,a1
-	addq.l #4,a1               ; root code hunk
-	bsr sim_set_deadline
-	jsr (resload_FlushCache,a2)
-	bra.b .out
+	bsr	sim_init
+	lea	pl_main_v1(pc),a0
 .pp
 	move.l	d7,a1
 	move.l	_resload(pc),a2
 	jsr	(resload_PatchSeg,a2)
-.out
+	bsr	sim_set_deadline	; v1 only: v2 reads no options
 	movem.l	(a7)+,d0-a6
 	rts
 
@@ -427,14 +396,6 @@ get_version:
 pl_main_v1
 	PL_START
 	include "simulation-patches.i"
-	include "render-patches.i"
-	IFD VERIFY
-	; Remove beam-position entropy only when CUSTOM3 is enabled (duel v1).
-	PL_IFC3
-	PL_W $00E9F0,$7200 ; moveq #0,d1
-	PL_NOP $00E9F2,4
-	PL_ENDIF
-	ENDC
 	; protection
 	PL_B	$00052A,$60
 	PL_NOP	$0041CA,2
@@ -442,29 +403,11 @@ pl_main_v1
 	; speed regulation
 ;	PL_PS	$0016BE,sync_dot_fade_1	; works but too scattered
 	PL_PS	$0016C8,sync_dot_fade_2
-	IFD VERIFY
-	PL_IFC4
-	PL_P $00588A,verify_slow_copper
-	PL_ELSE
-	PL_P $00588A,set_copper
-	PL_ENDIF
-	ELSE
-	PL_P $00588A,set_copper
-	ENDC
+	PL_P	$00588A,set_copper
     
     ; keyboard support
-    IFD VERIFY
-    PL_IFC5
-    PL_PS $001A1A,verify_read_joydat
-    PL_PS $00EAA2,verify_read_joydat
-    PL_ELSE
-    PL_PS $001A1A,read_joydat
-    PL_PS $00EAA2,read_joydat
-    PL_ENDIF
-    ELSE
-    PL_PS $001A1A,read_joydat
-    PL_PS $00EAA2,read_joydat
-    ENDC
+	PL_PS	$001A1A,read_joydat
+	PL_PS	$00EAA2,read_joydat
     
     PL_PS   $001A02,read_fire1
     PL_PSS  $00EA8E,read_fire2,2
@@ -474,6 +417,20 @@ pl_main_v1
     PL_NOP  $005D0E,4
     PL_ENDIF
 
+	IFD VERIFY
+	; Instruments. PatchSeg applies entries in order: these win at shared offsets.
+	PL_IFC3
+	PL_W $00E9F0,$7200	; RNG without beam position: moveq #0,d1
+	PL_NOP $00E9F2,4
+	PL_ENDIF
+	PL_IFC4
+	PL_P $00588A,verify_slow_copper
+	PL_ENDIF
+	PL_IFC5
+	PL_PS $001A1A,verify_read_joydat
+	PL_PS $00EAA2,verify_read_joydat
+	PL_ENDIF
+	ENDC
 	PL_END
 	
 pl_main_v2

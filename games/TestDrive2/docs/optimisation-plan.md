@@ -53,7 +53,7 @@ in 40, PCs near zero) — use `SWAP_ONLY=1` for fps; do not read routine costs.
 "Add a CPU shape-drawing experiment…" and "Merge CPU shape blits…"):** it kept the game's clip routine and reproduces each blit of
 `0f114` word for word (ASH/BSH carries, FWM/LWM, modulos, minterm $CA, D-only
 mode, original phase order). The VERIFY twin (`make verify VASMFLAGS=-DCPUSHAPES=1`,
-CUSTOM2=11 CUSTOM5=9) compared it against the blitter: 18 shapes, 0 mismatches
+CUSTOM2=11 CUSTOM5=9, also removed) compared it against the blitter: 18 shapes, 0 mismatches
 (`cpu-twin-a1200`). It is **slower everywhere** (same build, CUSTOM2=7 → 15):
 A1200 16.7 → 7.5, 68030/25 MHz 25.0 → 12.4, 68020/100 MHz 25.0 → 16.3 fps.
 Even at 100 MHz the CPU's chip-RAM accesses, not its instructions, are the
@@ -151,7 +151,7 @@ limit). The cost centres, in % of all CPU cycles:
 | H | 1.5% | the slave's own `set_copper` beam wait (JOTD's flicker fix) | WHDLoad |
 
 **B is mostly not on the critical path.** Measured with a test slave that clears INTENA's BLIT
-bit before starting the game (`make -C whdload noblitirq`) (benchmark window below): the interrupts disappear, but the frame
+bit before starting the game (a since-removed `noblitirq` build; benchmark window below): the interrupts disappear, but the frame
 rate only goes from 6.9–7.1 to **7.2 fps** and the blitter wait rises from 12–14% to **21%**.
 The interrupts were firing while the CPU was already polling BBUSY, so they cost waiting time,
 not work. The real cost is that **the CPU stops for every blit**. (The DMA slot count — blitter

@@ -2,8 +2,8 @@
 """Read the slave's assembly rate-check results from a captured memory dump.
   check_units.py OUT --base 0xc00000   (68000)
   check_units.py OUT --base 0x200000   (fast RAM)
-Requires a VERIFY + CUSTOM2=1 CUSTOM5=1 capture. No target writes.
-59 checks use the former one-field defaults; 48 cover both shipping periods.
+Requires a VERIFY capture with CUSTOM5 set (the checks run before PatchSeg).
+59 checks use the one-field default period; 48 cover both shipping periods.
 """
 import argparse, os, struct
 from pathlib import Path

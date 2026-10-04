@@ -6,7 +6,20 @@
 ; input/audio timers stay intact.
 ; Private fractional state belongs to the slave, never the read-only debugger.
 
-; Choose the period from the CPU before PatchSeg (d0 = AttnFlags).
+; Before PatchSeg: read the options, run any VERIFY unit checks (they use the
+; default period), then choose the period from the CPU.
+sim_init:
+    lea sim_tags(pc),a0
+    move.l _resload(pc),a2
+    jsr (resload_Control,a2)
+    IFD VERIFY
+    move.l sim_drive_enabled(pc),d0
+    beq.b .configure
+    bsr verify_simulation_units
+.configure
+    ENDC
+    move.l sim_attn(pc),d0
+; d0 = AttnFlags.
 sim_configure:
     movem.l d0/a0-a1,-(sp)
     lea sim_periods(pc),a0
@@ -21,23 +34,32 @@ sim_configure:
     dbf d0,.copy
     movem.l (sp)+,d0/a0-a1
     rts
-; The two deadline instructions patched by PL_L hold moveq #1; set sim_p.
-; a1 = root code. Call after PatchSeg; the caller flushes caches.
+; After PatchSeg (d7 = seglist): the two PL_L deadline patches hold
+; moveq #1; make them moveq #sim_p.
 sim_set_deadline:
-    move.l d0,-(sp)
+    move.l render_options(pc),d0
+    btst #0,d0
+    beq.b .done
+    move.l d7,a1
+    add.l a1,a1
+    add.l a1,a1               ; root hunk - 4
     move.w sim_p(pc),d0
-    or.w #$7000,d0            ; moveq #sim_p,d0
-    move.w d0,$05bea(a1)
-    move.w d0,$05c0c(a1)
-    move.l (sp)+,d0
+    or.w #$7000,d0
+    move.w d0,4+$05bea(a1)
+    move.w d0,4+$05c0c(a1)
+    move.l _resload(pc),a2
+    jsr (resload_FlushCache,a2)
+.done
     rts
 
 sim_start:
     movem.l d0/a0,-(sp)
     move.l -17216(a4),d0
     move.l d0,-17212(a4)       ; displaced initial deadline
+    IFD VERIFY
     lea sim_epoch(pc),a0
     move.l d0,(a0)
+    ENDC
     lea sim_gear_field(pc),a0
     move.l d0,(a0)
     lea sim_gear_value(pc),a0
@@ -218,6 +240,19 @@ sim_scale_word:
     ext.l d0
     bra sim_scale_long
 
+; Keep the original semi-implicit Euler displacement: n small steps otherwise
+; sum less than v + a. d0 = v, d1 = this step's dv; returns
+; max(0, 2v + (n-1)dv), twice the step's displacement.
+sim_euler_velocity:
+    move.l d0,-(sp)
+    bsr sim_times_n_minus_1
+    add.l (sp),d0
+    add.l (sp)+,d0
+    bpl.b .done
+    moveq #0,d0
+.done
+    rts
+
 ; d0 = d1 * (sim_n - 1), for the small sim_n used (1, 3 or 6).
 sim_times_n_minus_1:
     move.l d2,-(sp)
@@ -266,19 +301,8 @@ sim_speed_add:
 
 sim_player_motion:
     move.l a0,-(sp)
-    ; Preserve the original semi-implicit Euler displacement. n small steps
-    ; otherwise sum less than the original v + a. Per step, add (n-1)/2
-    ; times its continuous velocity change (n = sim_n).
-    move.l d1,-(sp)
-    move.l d0,-(sp)
-    move.l sim_tick_force(pc),d1
-    bsr sim_times_n_minus_1
-    add.l (sp),d0
-    add.l (sp)+,d0          ; 2*v + (n-1)*dv; spatial impulses are excluded
-    bpl.b .forward
-    moveq #0,d0
-.forward
-    move.l (sp)+,d1
+    move.l sim_tick_force(pc),d1 ; spatial impulses are excluded
+    bsr sim_euler_velocity
     lea sim_distance_frac(pc),a0
     bsr sim_scale_distance
     move.l (sp)+,a0
@@ -402,13 +426,7 @@ sim_ai_motion:
     bsr sim_ai_remainder
     move.l d0,d1
     sub.l 6(a0),d1           ; this step's physical speed change
-    move.l d0,-(sp)
-    bsr sim_times_n_minus_1
-    add.l (sp),d0
-    add.l (sp)+,d0          ; 2*v + (n-1)*dv
-    bpl.b .forward
-    moveq #0,d0
-.forward
+    bsr sim_euler_velocity
     addq.l #4,a0
     bsr sim_scale_ai_motion
 .predicted
@@ -540,43 +558,29 @@ sim_verge_rate:
 sim_overheat_check:
     tst.w -12938(a4)
     beq.b .done
-    movem.l d0/a0,-(sp)
-    move.l sim_trainer(pc),d0
-    btst #0,d0
-    bne.b .pending
-    cmp.w #17,-14916(a4)      ; fatal crashes override an existing recovery
-    beq.b .terminal
-.pending
-    lea sim_recovery_until(pc),a0
-    tst.l (a0)
-    bne.b .restore
-    btst #0,d0
-    bne.b .recover
-    cmp.w #1,-17228(a4)
-    ble.b .terminal
-    subq.w #1,-17228(a4)
-.recover
-    addq.w #1,-10870(a4)
-    lea sim_recovery_kind(pc),a0
-    move.w #1,(a0)
-    move.w #1,-14916(a4)      ; inhibit player physics during cooling
-    bsr sim_begin_recovery
-    bra.b .restore
-.terminal
-    lea sim_recovery_until(pc),a0
-    clr.l (a0)
-    movem.l (sp)+,d0/a0
+    movem.l d0-d1/a0-a1,-(sp)
+    moveq #1,d1
+    lea -10870(a4),a1         ; damage count
+    bsr sim_life_event
+    movem.l (sp)+,d0-d1/a0-a1
+    bne.b .done
     add.l #44,(sp)           ; original damage/race-end path at duel:05ca6
-    rts
-.restore
-    movem.l (sp)+,d0/a0
 .done
     rts
-
 sim_crash_check:
     tst.w -14916(a4)
-    beq .done
-    movem.l d0/a0,-(sp)
+    beq.b .done
+    movem.l d0-d1/a0-a1,-(sp)
+    moveq #0,d1
+    lea -10872(a4),a1         ; crash count
+    bsr sim_life_event
+    movem.l (sp)+,d0-d1/a0-a1
+    bne.b .done
+    add.l #32,(sp)           ; original race-end handler at duel:05ca6
+.done
+    rts
+; d1 = recovery kind, a1 = its event counter. Z set: end the race instead.
+sim_life_event:
     move.l sim_trainer(pc),d0
     btst #0,d0
     bne.b .pending
@@ -585,27 +589,27 @@ sim_crash_check:
 .pending
     lea sim_recovery_until(pc),a0
     tst.l (a0)
-    bne.b .restore
+    bne.b .continue
     btst #0,d0
     bne.b .recover
     cmp.w #1,-17228(a4)
     ble.b .terminal
     subq.w #1,-17228(a4)
 .recover
-    addq.w #1,-10872(a4)
+    addq.w #1,(a1)
     lea sim_recovery_kind(pc),a0
-    clr.w (a0)
+    move.w d1,(a0)
+    beq.b .begin
+    move.w #1,-14916(a4)      ; engine damage: inhibit player physics while cooling
+.begin
     bsr sim_begin_recovery
-    bra.b .restore
+.continue
+    moveq #1,d0
+    rts
 .terminal
     lea sim_recovery_until(pc),a0
     clr.l (a0)
-    movem.l (sp)+,d0/a0
-    add.l #32,(sp)           ; original race-end handler at duel:05ca6
-    rts
-.restore
-    movem.l (sp)+,d0/a0
-.done
+    moveq #0,d0
     rts
 
 sim_begin_recovery:
@@ -623,8 +627,7 @@ sim_begin_recovery:
     clr.w -13390(a4)
     move.w #-1,-24720(a4)
     clr.w -2988(a4)
-    bsr sim_idle_sound
-    rts
+    bra sim_idle_sound
 
 sim_idle_sound:
     movem.l d0-a6,-(sp)
@@ -922,60 +925,31 @@ sim_original_gear:
 sim_clutch_brake:
     movem.l d0/a0,-(sp)
     move.l #-352256,d0
-    lea sim_speed_frac(pc),a0
-    bsr sim_scale_long
-    bsr sim_record_force
-    add.l d0,-13282(a4)
-    movem.l (sp)+,d0/a0
-    rts
+    bra.b sim_speed_rate
 sim_assisted_clutch:
     movem.l d0/a0,-(sp)
     move.l #-851968,d0
-    lea sim_speed_frac(pc),a0
-    bsr sim_scale_long
-    bsr sim_record_force
-    add.l d0,-13282(a4)
-    movem.l (sp)+,d0/a0
-    rts
+    bra.b sim_speed_rate
 sim_neutral_drag:
     movem.l d0/a0,-(sp)
     move.l #-32768,d0
-    lea sim_speed_frac(pc),a0
-    bsr sim_scale_long
-    bsr sim_record_force
-    add.l d0,-13282(a4)
-    movem.l (sp)+,d0/a0
-    rts
+    bra.b sim_speed_rate
 sim_fuel_drag:
     movem.l d0/a0,-(sp)
     move.l #-32768,d0
-    lea sim_speed_frac(pc),a0
-    bsr sim_scale_long
-    bsr sim_record_force
-    add.l d0,-13282(a4)
-    movem.l (sp)+,d0/a0
-    rts
+    bra.b sim_speed_rate
 sim_brake:
     movem.l d0/a0,-(sp)
     move.l #-278528,d0
-    lea sim_speed_frac(pc),a0
-    bsr sim_scale_long
-    bsr sim_record_force
-    add.l d0,-13282(a4)
-    movem.l (sp)+,d0/a0
-    rts
+    bra.b sim_speed_rate
 sim_assisted_brake:
     movem.l d0/a0,-(sp)
     move.l #-786432,d0
-    lea sim_speed_frac(pc),a0
-    bsr sim_scale_long
-    bsr sim_record_force
-    add.l d0,-13282(a4)
-    movem.l (sp)+,d0/a0
-    rts
+    bra.b sim_speed_rate
 sim_scrub:
     movem.l d0/a0,-(sp)
     move.l #-88064,d0
+sim_speed_rate:             ; d0 = rate; the hook saved d0/a0
     lea sim_speed_frac(pc),a0
     bsr sim_scale_long
     bsr sim_record_force
@@ -1035,20 +1009,15 @@ sim_effect_phase:
 sim_ai_stop:
     movem.l d0/a0,-(sp)
     move.l #-6144,d0
-    bsr sim_ai_scale_speed
-    add.l d0,10(a5)
-    movem.l (sp)+,d0/a0
-    rts
+    bra.b sim_ai_speed_rate
 sim_ai_pursuit:
     move.l a0,-(sp)
     move.l #-1536,d0
-    bsr sim_ai_scale_speed
-    neg.l d0
-    move.l (sp)+,a0
-    rts
+    bra.b sim_ai_brake_rate
 sim_ai_brake:
     move.l a0,-(sp)
     move.l #-2432,d0
+sim_ai_brake_rate:          ; d0 = rate; returns its magnitude, the hook saved a0
     bsr sim_ai_scale_speed
     neg.l d0
     move.l (sp)+,a0
@@ -1056,65 +1025,45 @@ sim_ai_brake:
 sim_ai_curve:
     movem.l d0/a0,-(sp)
     move.l #-1024,d0
-    bsr sim_ai_scale_speed
-    add.l d0,10(a5)
-    movem.l (sp)+,d0/a0
-    rts
+    bra.b sim_ai_speed_rate
 sim_police_brake:
     movem.l d0/a0,-(sp)
     move.l #-1536,d0
-    bsr sim_ai_scale_speed
-    add.l d0,10(a5)
-    movem.l (sp)+,d0/a0
-    rts
+    bra.b sim_ai_speed_rate
 sim_police_accel:
     movem.l d0/a0,-(sp)
     move.l #1536,d0
+sim_ai_speed_rate:          ; d0 = rate; the hook saved d0/a0
     bsr sim_ai_scale_speed
     add.l d0,10(a5)
     movem.l (sp)+,d0/a0
     rts
 sim_heading_decay:
-    movem.l d0-d2/a0,-(sp)
-    move.w -13390(a4),d0
-    ext.l d0
-    muls.w sim_q_heading(pc),d0 ; Q16 1-(7/8)^(1/n)
+    movem.l d0/a0-a1,-(sp)
+    move.w sim_q_heading(pc),d0 ; Q16 1-(7/8)^(1/n)
     lea sim_heading_decay_frac(pc),a0
-    add.l (a0),d0
-    move.w d0,2(a0)
-    swap d0
-    ext.l d0
-    clr.w (a0)
-    sub.w d0,-13390(a4)
-    movem.l (sp)+,d0-d2/a0
-    rts
+    lea -13390(a4),a1
+    bra.b sim_relax
 sim_yaw_decay:
-    movem.l d0-d2/a0,-(sp)
-    move.w -9862(a4),d0
-    ext.l d0
-    muls.w sim_q_yaw(pc),d0  ; Q16 1-(3/4)^(1/n)
+    movem.l d0/a0-a1,-(sp)
+    move.w sim_q_yaw(pc),d0  ; Q16 1-(3/4)^(1/n)
     lea sim_yaw_decay_frac(pc),a0
-    add.l (a0),d0
-    move.w d0,2(a0)
-    swap d0
-    ext.l d0
-    clr.w (a0)
-    sub.w d0,-9862(a4)
-    movem.l (sp)+,d0-d2/a0
-    rts
+    lea -9862(a4),a1
+    bra.b sim_relax
 sim_clutch_decay:
-    movem.l d0-d2/a0,-(sp)
-    move.w -13188(a4),d0
-    and.l #$ffff,d0
-    muls.w sim_q_clutch(pc),d0 ; Q16 1-(15/16)^(1/n)
+    movem.l d0/a0-a1,-(sp)
+    move.w sim_q_clutch(pc),d0 ; Q16 1-(15/16)^(1/n)
     lea sim_clutch_decay_frac(pc),a0
+    lea -13188(a4),a1
+; (a1) -= d0 * (a1) in Q16, carrying the fraction in the low word at a0.
+sim_relax:
+    muls.w (a1),d0
     add.l (a0),d0
     move.w d0,2(a0)
-    swap d0
-    ext.l d0
     clr.w (a0)
-    sub.w d0,-13188(a4)
-    movem.l (sp)+,d0-d2/a0
+    swap d0
+    sub.w d0,(a1)
+    movem.l (sp)+,d0/a0-a1
     rts
 
 sim_rates:
@@ -1178,9 +1127,9 @@ sim_attn: dc.l 0
 sim_drive_enabled: dc.l 0
     ENDC
     dc.l 0
-sim_epoch: dc.l 0
 
     IFD VERIFY
+sim_epoch: dc.l 0
 ; Actual joystick decoding and normal player physics consume this field-based
 ; tape. It starts after the race anchor; no debugger writes are involved.
 verify_original_begin:
@@ -1216,9 +1165,6 @@ verify_drive_mode:
     rts
 verify_read_joydat:
     bsr read_joydat
-    bsr verify_drive_joydat
-    rts
-verify_drive_joydat:
     movem.l d1/a0,-(sp)
     move.l sim_drive_enabled(pc),d1
     btst #0,d1

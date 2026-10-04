@@ -69,7 +69,7 @@ lives trainer remains supported. NTSC timing has not been validated.
 `make -C whdload verify` adds tools for the study: CUSTOM3 removes RNG beam
 entropy from the original mode, CUSTOM4 slows drawing, and CUSTOM5 bit 0 drives
 an input tape. CUSTOM5=3 also forces engine damage once; CUSTOM5=5 instead forces
-a fatal crash. CUSTOM5=9 adds original-versus-patched shape pixel checks to the driving tape.
+a fatal crash.
 CUSTOM5=17 uses a straight acceleration/braking fixture; it does not follow road bends.
 These verification options are absent from the normal build.
 Use `tools/fixed_window.sh` for fps, state captures for game-time comparisons,
