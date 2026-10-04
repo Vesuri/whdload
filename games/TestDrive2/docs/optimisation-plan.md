@@ -49,8 +49,8 @@ Simulation state with/without bit 2 on the A500 is recorded in open-work.md.
 **Trap:** with BLTPRI set, the 68020 cycle trace is corrupt (268 fields of cycles
 in 40, PCs near zero) — use `SWAP_ONLY=1` for fps; do not read routine costs.
 
-**CPU shapes (CUSTOM2 bit 3, `make cpushapes` experiment only, not shipped):**
-`whdload/render-cpu.s` keeps the game's clip routine and reproduces each blit of
+**CPU shapes (removed; in git history as `whdload/render-cpu.s`, commits
+"Add a CPU shape-drawing experiment…" and "Merge CPU shape blits…"):** it kept the game's clip routine and reproduces each blit of
 `0f114` word for word (ASH/BSH carries, FWM/LWM, modulos, minterm $CA, D-only
 mode, original phase order). The VERIFY twin (`make verify VASMFLAGS=-DCPUSHAPES=1`,
 CUSTOM2=11 CUSTOM5=9) compared it against the blitter: 18 shapes, 0 mismatches

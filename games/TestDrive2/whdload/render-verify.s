@@ -149,13 +149,6 @@ verify_draw_original:
     move.l verify_draw_vars(pc),-(sp)
     rts
 verify_draw_updated:
-    IFD CPUSHAPES
-    move.l a0,-(sp)
-    lea render_cpu_enabled(pc),a0
-    tst.w (a0)
-    movem.l (sp)+,a0
-    bne render_cpu_shape        ; CUSTOM2 bit 3 on 68020+: twin the CPU drawer
-    ENDC
     movem.l d0-d6/a0-a3/a5,-(sp)
     move.l a0,a5
     move.l -32266(a4),-(sp)

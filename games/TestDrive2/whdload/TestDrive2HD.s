@@ -87,9 +87,6 @@ _tdboot
 	dc.b	"tdboot",0
 slv_config
 	dc.b "C2:X:higher-rate simulation (v1):0;C2:X:disable unused blitter interrupt (v1):1;C2:X:blitter priority (v1):2;"
-	IFD CPUSHAPES
-	dc.b "C2:X:CPU shape drawing on 68020+ (v1):3;"
-	ENDC
 	IFD VERIFY
 	dc.b "C3:B:reproducible verification (v1);"
 	dc.b "C4:B:slow renderer verification (v1);"
@@ -329,9 +326,6 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 
 	include "simulation.s"
 	include "render.s"
-	IFD CPUSHAPES
-	include "render-cpu.s"
-	ENDC
 	IFD VERIFY
 	include "render-verify.s"
 	ENDC
@@ -372,9 +366,6 @@ _patchexe:
 	lea sim_tags(pc),a0
 	move.l _resload(pc),a2
 	jsr (resload_Control,a2)
-	IFD CPUSHAPES
-	bsr render_cpu_init
-	ENDC
 	IFD VERIFY
 	move.l sim_drive_enabled(pc),d0
 	beq.b .no_units

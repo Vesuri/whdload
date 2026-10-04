@@ -765,8 +765,9 @@ frame. Details, per-blit costs and the measurements below are in
   68020/100 MHz 21.1 → 25.0 fps. A500 state with bit 2 (`pri-state-a500-c3/c7`)
   matches all 35 core variables at samples 1..1499; sample 0 differs only in the
   documented initial transaction (RPM, engine period, two animation phases).
-- CPU shape drawing (`make cpushapes`, bit 3): pixel-exact against the blitter
-  (18 twins, 0 mismatches) but slower on every machine tested. Not shipped.
+- CPU shape drawing (removed, in git history): pixel-exact against the blitter
+  (up to 276 twins, 0 mismatches) but slower on every machine tested, including
+  a merged longword version. The user accepted 25 fps as the cap.
 - Next candidate, needing the user's decision: a fast-RAM back buffer with all
   blitter users replaced by CPU code and a viewport copy to chip (68030+).
   Unmeasured; it is a renderer redesign, not a patch.
