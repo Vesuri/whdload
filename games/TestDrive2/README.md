@@ -8,6 +8,7 @@ local input under `tmp/` (see `.gitignore`).
 | Path | What |
 |---|---|
 | `amiga/run.sh`, `amiga/env.sh` | boot the WHDLoad install in FS-UAE (Kickstart 3.1 host, kick 1.3 kickemu inside WHDLoad) |
+| `amiga/run-a1200.sh` | build the patched slave and play it on an expanded A1200 (`CPU=68030` for a 25 MHz 68030) |
 | `tools/td2.py` | long-lived gdb session on FS-UAE's Barto stub: screenshots, cycle-exact traces |
 | `tools/profile_demo.sh` | one command: boot, wait for the attract demo to drive, trace, report |
 | `tools/fixed_window.sh` | A/B benchmark: fixed race window; cycle trace or read-only swap counter (`SWAP_ONLY=1`) |
@@ -49,6 +50,7 @@ Build and run the local slave with the fixed-time mode enabled:
 source amiga/env.sh
 make -C whdload
 WHD_ARGS=CUSTOM2=3 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
+amiga/run-a1200.sh               # the same on an expanded A1200 (68EC020)
 ```
 
 `CUSTOM2=1` runs the simulation on a fixed PAL period, independently of drawing:
