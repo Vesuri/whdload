@@ -86,6 +86,9 @@ DECL_VERSION:MACRO
 _tdboot
 	dc.b	"tdboot",0
 slv_config
+	IFD VERIFY
+	dc.b "C3:B:reproducible verification (v1);"
+	ENDC
 	dc.b    "C1:X:trainer infinite lives:0;"	
 	dc.b	0
 
@@ -373,6 +376,13 @@ get_version:
 
 pl_main_v1
 	PL_START
+	IFD VERIFY
+	; Remove beam-position entropy only when CUSTOM3 is enabled (duel v1).
+	PL_IFC3
+	PL_W $00E9F0,$7200 ; moveq #0,d1
+	PL_NOP $00E9F2,4
+	PL_ENDIF
+	ENDC
 	; protection
 	PL_B	$00052A,$60
 	PL_NOP	$0041CA,2

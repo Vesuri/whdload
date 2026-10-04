@@ -135,6 +135,45 @@ second, so rendering faster than that shows repeated states.
 
 ### W1. Make runs reproducible (infrastructure; required by everything else)
 
+**DONE (2026-10-04).** `make -C whdload verify` includes the v1-only RNG beam-mix
+patch, gated by WHDLoad `CUSTOM3=1`. Normal builds and v2 retain the original RNG.
+The patch replaces `duel:0e9f0` with `moveq #0,d1; nop; nop`, preserving the following XOR.
+
+The dashboard clock is `-$27A2(a4)` / `-10146(a4)`, long. Its reset writer is
+`duel:0bbf8` (`move.l #1,...`); a read-only gdb watchpoint observed 0 → 1, stopping at
+`duel:0bc00`. Raw 1 displays as 0:00 (the HUD divides by 600, 100 and 10).
+The final window starts at `duel:05a4c`, after setup has drawn the dashboard and before
+the gameplay loop starts; the clock is still 1. Starting immediately at the reset mostly
+traces setup, so it is not a useful simulation window.
+
+Two deterministic 68000 boots (`tmp/prof/verify-race-a`, `verify-race-b`) gave identical
+`barto.Field.shot` MD5s: field 0 `a2c31ccefeec8a15fd78c56c9234405d`, field 99
+`412e6285e23e5199a419ae933ab2dc56`. Both start at raw clock 1 and select stage 2 (trees,
+5.4 miles). `fixed_window.sh` measured 5.9 fps in each window; this is a new scene/window,
+not an A/B performance improvement over the old desert capture.
+
+**Another timing input was in the harness, not the game:** the one-second host poll in
+warp can miss the first race on the 68020. An initial 68020 capture's reset watchpoint
+reported 1365 → 1, proving it captured a later race. Discard it (`verify-race-020`).
+`td2.py serve` now accepts `BOOT_BREAK`, armed while the emulated CPU is still at reset;
+`fixed_window.sh` calibrates the loaded hunk address, caches it by machine/arguments/slave,
+and reboots to capture the first reset. It validates the loaded hunk against that address.
+`BOOT_HUNK` can supply a calibrated address explicitly.
+
+The corrected 68020 first-race capture (`verify-first-020`, 1 MB chip/4 MB fast) observes
+0 → 1, selects the same stage 2, and has the same post-setup RNG seed `$E940` as the
+68000. It measured 9.3 fps. Its different rendered fields do not establish game speed.
+The reset seed `$DE3C` becomes `$E940` during setup on both CPUs; comparing a pre-setup
+seed with a post-setup seed would falsely suggest another RNG input.
+
+Run (source the environment in the same shell):
+```
+source amiga/env.sh
+make -C whdload verify
+WHD_ARGS=CUSTOM3=1 SLAVE="$PWD/whdload/TestDrive2.slave" tools/fixed_window.sh tmp/prof/check "$PWD/whdload/TestDrive2.slave"
+```
+
+
 **Do:** add a `VERIFY` assembly option to the slave that patches the RNG's VHPOSR mix
 (`duel:0e9f0`, `move.w $dff006,d1` / `eor.w d1,d0` — 6 + 2 bytes) to a constant (e.g. replace
 the `move.w $dff006,d1` with `moveq #0,d1` + `nop`s via `PL_W`/`PL_NOP`), and anchor the

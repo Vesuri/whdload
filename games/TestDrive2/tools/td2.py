@@ -127,7 +127,14 @@ def serve():
         time.sleep(0.25)
     g = Gdb(port)
     print('attached; pc', g.cmd('info registers pc'), flush=True)
-    g.cont()
+    # Arm an address learned in a calibration boot before emulated time advances.
+    # This prevents a fast warp boot from passing the first race during host polling.
+    if os.environ.get('BOOT_BREAK'):
+        g.cmd(f"break *{os.environ['BOOT_BREAK']}")
+        print(g.cmd('continue', timeout=1800), flush=True)
+        g.cmd('delete')
+    else:
+        g.cont()
     if os.path.exists(SOCK):
         os.unlink(SOCK)
     s = socket.socket(socket.AF_UNIX); s.bind(SOCK); s.listen(1)

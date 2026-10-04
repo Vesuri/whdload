@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-# Benchmark window: trace FIELDS fields from the first driving frame of the first attract demo.
-#   tools/fixed_window.sh OUTDIR [SLAVE]
-# Deterministic boot (default: the stock-A500-equivalent machine; CHIP_KB/FAST_KB/EXTRA_ARGS/CPU
-# as in amiga/run.sh choose another); once `duel` is in memory, break at its
-# span filler (duel:0789c, first entered when the demo starts driving), then trace.  The demo
-# begins identically every boot (desert, 2.6 miles, 0:00) but is NOT pixel-identical between
-# boots, so compare frame rates over this window, not frames (docs/optimisation-plan.md).
+# Benchmark window: trace FIELDS PAL fields from race-clock initialisation in duel v1.
+# tools/fixed_window.sh OUTDIR [SLAVE]
+# Build `make -C whdload verify`, use SLAVE=$PWD/whdload/TestDrive2.slave and
+# WHD_ARGS=CUSTOM3=1 for the reproducibility study. ANCHOR overrides the hunk offset
+# for diagnostic windows only. The old span anchor (0x789c) was already 7-8 s into a race.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}
@@ -15,17 +13,31 @@ export DETERMINISTIC=1 SLAVE="${2:-}" CPU="${CPU:-68000}"
 SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))
 else BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024)); fi
+# Cache only the address, keyed by machine, arguments and slave build. A calibration
+# boot discovers it; the measurement boot arms the race breakpoint at CPU reset.
+mkdir -p tmp/prof
+KEY=$(python3 -c 'import hashlib,os; from pathlib import Path; p=os.environ.get("SLAVE") or "tmp/game/TestDrive2/TestDrive2.slave"; h=hashlib.sha256(Path(p).read_bytes()); h.update(repr([(k,os.environ.get(k)) for k in ("CPU","CHIP_KB","FAST_KB","EXTRA_ARGS","WHD_ARGS")]).encode()); print(h.hexdigest()[:20])')
+CACHE="tmp/prof/hunk-$KEY.txt"
+BOOT_HUNK=${BOOT_HUNK:-$(cat "$CACHE" 2>/dev/null || true)}
+if [ -n "$BOOT_HUNK" ]; then export BOOT_BREAK=$(printf '%#x' $((BOOT_HUNK + ${ANCHOR:-0xbbf8}))); fi
 td2() { python3 tools/td2.py "$@"; }
 [ -S amiga/.run/td2.sock ] && { td2 quit > /dev/null 2>&1 || true; sleep 1; }
 rm -f amiga/.run/serve.log "$OUT/trace.bin"
 WARP=1 python3 tools/td2.py serve > amiga/.run/serve.log 2>&1 &
 trap 'td2 quit > /dev/null 2>&1 || true' EXIT
-until grep -q serving amiga/.run/serve.log 2>/dev/null; do sleep 1; done
+SERVER=$!
+for _ in $(seq 1 180); do
+  grep -q serving amiga/.run/serve.log 2>/dev/null && break
+  kill -0 "$SERVER" 2>/dev/null || { cat amiga/.run/serve.log >&2; exit 1; }
+  sleep 1
+done
+grep -q serving amiga/.run/serve.log || { echo "race breakpoint not reached" >&2; exit 1; }
 
 dump() { td2 gdb "dump binary memory /tmp/td2-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv /tmp/td2-code.bin "$OUT/code.bin"; }
 hunk=
 for _ in $(seq 1 60); do
-  td2 wait 1 > /dev/null; dump
+  [ -n "$BOOT_HUNK" ] || td2 wait 1 > /dev/null
+  dump
   hunk=$(python3 -c "
 import sys; sys.path.insert(0, 'tools'); from td2_report import regions
 r = {n: lo for lo, hi, n, o in regions(open('$OUT/code.bin', 'rb').read(), $BASE)}
@@ -34,7 +46,23 @@ print(hex(r['duel']) if 'duel' in r else '')")
 done
 [ -n "$hunk" ] || { echo "duel never appeared in memory" >&2; exit 1; }
 echo "duel code hunk at $hunk"
-td2 until "$(printf '%#x' $((hunk + 0x0789c)))" | grep -m1 Breakpoint
+if [ -z "$BOOT_HUNK" ]; then
+  printf '%s\n' "$hunk" > "$CACHE"
+  td2 quit > /dev/null; trap - EXIT
+  echo "calibrated code address; rebooting with the race breakpoint armed"
+  exec bash "$0" "$OUT" "$SLAVE"
+fi
+[ "$((hunk))" = "$((BOOT_HUNK))" ] || { echo "loaded hunk differs from boot breakpoint" >&2; exit 1; }
+# Watch the clock's initialising store, then stay stopped for state/trace capture.
+td2 gdb 'info registers a4 pc' > "$OUT/anchor.txt"
+if [ "${ANCHOR:-0xbbf8}" = 0xbbf8 ]; then
+  td2 gdb 'watch *(int*)($a4-10146)' >> "$OUT/anchor.txt"
+  td2 gdb continue >> "$OUT/anchor.txt"
+  td2 gdb delete >> "$OUT/anchor.txt"
+  # Race setup draws the initial dashboard, then the gameplay loop starts here.
+  td2 until "$(printf '%#x' $((hunk + 0x5a4c)))" >> "$OUT/anchor.txt"
+fi
+td2 gdb 'x/1uw $a4-10146' >> "$OUT/anchor.txt"
 reply=$(td2 profile "$FIELDS" "$PWD/$OUT/trace.bin")
 [ -f "$OUT/trace.bin" ] || { echo "no trace: $reply" >&2; exit 1; }
 dump

@@ -133,7 +133,7 @@ make an exact compare impossible, so 16-byte windows vote for a base):
 | Region | Found as | In a 512K/1.5M run |
 |---|---|---|
 | `duel` root code hunk (hunk 0, `$1156C` bytes, file offset `$28`) | `duel:OFFSET` | `$D000A8` |
-| `duel` data hunk (hunk 1) — holds a `jmp abs.l` jump table (Aztec C) | resolved to targets | `$D11620` |
+| `duel` data hunk (hunk 1, `$3A38` file-backed, `$7A70` allocated) — holds a `jmp abs.l` jump table (Aztec C) | resolved to targets | `$D11620` |
 | Kickstart 1.3, **copied into RAM by kickemu** | `kick:ROMADDR` (`$FC0000`-based) | `$CB5000` |
 | the WHDLoad slave | `slave:FILEOFFSET` | `$D7CF20` |
 
@@ -204,14 +204,21 @@ tools/fixed_window.sh tmp/prof/base                      # shipped slave
 tools/fixed_window.sh tmp/prof/mine "$PWD/whdload/TestDrive2.slave"
 ```
 
-It boots with `DETERMINISTIC=1` (FS-UAE `--deterministic=1`) on the stock-A500-equivalent
-machine, waits until `duel` is loaded (gdb dump of slow RAM, located as in §5 — skipping
-WHDLoad's PRELOAD cache copy of the file, which is preceded by its own `$3F3` hunk header),
-runs to the first entry of the span filler `duel:0789c` (`td2.py until`: the first driving
-frame of the first demo), traces `FIELDS` (100) fields and prints `frames.py`'s summary. The
-first demo always starts the same way (desert, 2.6 miles, 0:00) but deterministic mode does not
-make it pixel-identical between boots, so compare **fields/frame**, not pictures. Measured:
-6.9, 6.9, 7.1 fps for three boots of the shipped slave.
+It boots with `DETERMINISTIC=1`. The W1 harness now calibrates the loaded `duel` address
+once per machine/arguments/slave combination, then reboots with the race-clock reset breakpoint
+already armed at CPU reset (`BOOT_BREAK` in `td2.py serve`). This avoids missing the first race
+on fast warp boots. `BOOT_HUNK` can supply a known loaded address; it is checked against the dump.
+The reset at `duel:0bbf8` writes 1 to `-10146(a4)`, which displays as 0:00. A gdb watchpoint
+confirms the store, then the window starts at `duel:05a4c`, after dashboard setup and before the
+gameplay loop. `anchor.txt` preserves the clock and breakpoint evidence.
+
+For reproducibility build `make -C whdload verify`, and run with `WHD_ARGS=CUSTOM3=1`
+and `SLAVE="$PWD/whdload/TestDrive2.slave"` (also pass the slave as the second argument).
+The v1-only VERIFY patch removes VHPOSR from the RNG. Two 68000 windows have identical field-0
+and field-99 screenshot bytes and measure 5.9 fps in stage 2; a first-race 68020 window reaches
+the same stage and measures 9.3 fps. These replace the old span-anchor window for future work.
+They must not be compared as an optimisation A/B with the earlier desert captures.
+`ANCHOR` is a diagnostic override of the hunk offset, not a substitute for the race-start window.
 
 ## 7. Input, if it is ever needed
 
