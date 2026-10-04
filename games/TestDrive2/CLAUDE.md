@@ -19,3 +19,4 @@ game is meant to ship as WHDLoad slave patches (`resload_PatchSeg` patch lists, 
 | `docs/open-work.md` | **First.** The goal (simulation vs rendering speed), what is known, ordered work items |
 | `docs/profiling.md` | Running the game, driving it, tracing it, or quoting any performance number |
 | `docs/optimisation-plan.md` | Planning or writing any speed patch; A/B-measuring a slave |
+| `docs/subunit-rendering.md` | Making the road, objects and cars move by fractions of a road unit |
