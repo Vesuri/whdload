@@ -1,12 +1,13 @@
-; v1 CUSTOM2 bit 1: suppress unused graphics.library blitter queue IRQs.
+; v1 CUSTOM2 bit 1: suppress unused graphics.library blitter queue IRQs and
+; give the blitter bus priority (DMACON BLTPRI): the CPU only polls BBUSY while
+; a shape blit runs, so its DMACONR reads no longer take the blitter's slots.
+; Faster on both the 68000 and 68020+ machines measured.
 ; All original blitter waits, ownership and CPU/display barriers remain intact.
-; Bit 2: blitter priority (DMACON BLTPRI). The CPU only polls BBUSY while a
-; shape blit runs; its DMACONR reads then no longer take the blitter's slots.
 ; Preserve the game entry's argc/argv registers and restore the original enables.
 render_interrupt_option:
     movem.l d0/a0,-(sp)
     move.l render_options(pc),d0
-    btst #2,d0
+    btst #1,d0
     beq.b .no_priority
     lea render_saved_priority(pc),a0
     move.w $dff002,(a0)
@@ -26,7 +27,7 @@ render_interrupt_option:
 render_interrupt_restore:
     move.l d0,-(sp)
     move.l render_options(pc),d0
-    btst #2,d0
+    btst #1,d0
     beq.b .no_priority
     move.w render_saved_priority(pc),d0
     bne.b .no_priority

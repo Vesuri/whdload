@@ -86,7 +86,7 @@ DECL_VERSION:MACRO
 _tdboot
 	dc.b	"tdboot",0
 slv_config
-	dc.b "C2:X:higher-rate simulation (v1):0;C2:X:disable unused blitter interrupt (v1):1;C2:X:blitter priority (v1):2;"
+	dc.b "C2:X:higher-rate simulation (v1):0;C2:X:blitter priority, no unused blitter interrupt (v1):1;"
 	IFD VERIFY
 	dc.b "C3:B:reproducible verification (v1);"
 	dc.b "C4:B:slow renderer verification (v1);"
