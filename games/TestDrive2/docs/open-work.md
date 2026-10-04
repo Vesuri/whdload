@@ -750,6 +750,30 @@ The real clear kernel costs 3.809%; mandatory writes leave less than 0.87%
 recoverable by any CPU-loop rewrite. These candidates were skipped under the
 3% rule; larger new algorithms remain unmeasured future experiments.
 
+### Fast-CPU study: the 25 fps ceiling (2026-10-04)
+
+**Game speed is CPU-independent (re-verified):** normal slave, CUSTOM2=3, 1,500
+fields: the 68000 (`review-state-000`, ~5 fps) and an emulated 100 MHz 68030
+(`review-state-030-100`, 25 fps) match all 35 core variables 1500/1500; pacing is
+one field with zero lag and the clock follows PAL time. **Rendering is capped at
+25.0 fps** on 68030/25 MHz, 68030/100 MHz and 68020/100 MHz with blitter
+priority: the chip bus (blitter + five-bitplane display), not the CPU, limits a
+frame. Details, per-blit costs and the measurements below are in
+`optimisation-plan.md` ("Fast-CPU ceiling").
+
+- CUSTOM2 bit 2 (blitter priority, shipping): A500 5.2 → 5.4, A1200 16.1 → 16.7,
+  68020/100 MHz 21.1 → 25.0 fps. A500 state with bit 2 (`pri-state-a500-c3/c7`)
+  matches all 35 core variables at samples 1..1499; sample 0 differs only in the
+  documented initial transaction (RPM, engine period, two animation phases).
+- CPU shape drawing (`make cpushapes`, bit 3): pixel-exact against the blitter
+  (18 twins, 0 mismatches) but slower on every machine tested. Not shipped.
+- Next candidate, needing the user's decision: a fast-RAM back buffer with all
+  blitter users replaced by CPU code and a viewport copy to chip (68030+).
+  Unmeasured; it is a renderer redesign, not a patch.
+
+The 100 MHz emulated boots need longer than the harness's 180 s server wait:
+use `SERVE_WAIT=1700`.
+
 ### Tooling debts (fix when they bite, not before)
 
 - Race anchoring and boot polling are fixed by W1; see its calibration-cache trap above.

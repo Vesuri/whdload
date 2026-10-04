@@ -22,6 +22,55 @@
 - **No game bytes in the repo.** Replacement routines are our own code; patch lists name
   offsets. The slave source (JOTD, public domain) is in `whdload/`.
 
+## Fast-CPU ceiling: blitter priority and CPU shapes (2026-10-04)
+
+**On fast CPUs the renderer is chip-bus bound, not CPU bound.** Emulated
+A1200/68030 at 25 MHz and at 100 MHz both give exactly 25.0 fps (one frame per two
+fields). A 100 MHz 68020 cycle trace (`review-020-100`, CUSTOM2=3) spends 63%
+of all cycles polling BBUSY (65% self time in `duel:0f114`), 8% in JOTD's beam
+wait and 0.9% in the 50 Hz simulation. Per-blit accounting of that trace
+(BLTSIZE writes at `0f1d4/0f224/0f27e/0f4ce/0f524/0f5ee/0f714/0f812/0fbc0`, polls
+attributed to the preceding blit): shape cookie-cut 69 blits/field, 4,748
+words/field, 54.7% of cycles waiting; shape clear-under-mask 6.7%; every other
+blitter user ≤1%. A cookie-cut word costs ~19 colour clocks instead of the ideal
+8: five low-res bitplanes take 28% of slots and the CPU's DMACONR polls 22%.
+
+**Blitter priority (CUSTOM2 bit 2, shipping option):** DMACON BLTPRI set for the
+game's lifetime, original value restored. Same build (`pri-*`), CUSTOM2=3 → 7:
+
+| Machine | fps 3 → 7 |
+|---|---|
+| A500 (68000, 512K chip + 1.5M slow) | 5.2 → 5.4 |
+| A1200 (68EC020, 2M chip + 4M fast) | 16.1 → 16.7 |
+| 68020 100 MHz, same RAM | 21.1 → 25.0 (swap counter repeats 25.0) |
+| 68030 25 MHz, same RAM | 25.0 → 25.0 |
+
+Simulation state with/without bit 2 on the A500 is recorded in open-work.md.
+**Trap:** with BLTPRI set, the 68020 cycle trace is corrupt (268 fields of cycles
+in 40, PCs near zero) — use `SWAP_ONLY=1` for fps; do not read routine costs.
+
+**CPU shapes (CUSTOM2 bit 3, `make cpushapes` experiment only, not shipped):**
+`whdload/render-cpu.s` keeps the game's clip routine and reproduces each blit of
+`0f114` word for word (ASH/BSH carries, FWM/LWM, modulos, minterm $CA, D-only
+mode, original phase order). The VERIFY twin (`make verify VASMFLAGS=-DCPUSHAPES=1`,
+CUSTOM2=11 CUSTOM5=9) compared it against the blitter: 18 shapes, 0 mismatches
+(`cpu-twin-a1200`). It is **slower everywhere** (same build, CUSTOM2=7 → 15):
+A1200 16.7 → 7.5, 68030/25 MHz 25.0 → 12.4, 68020/100 MHz 25.0 → 16.3 fps.
+Even at 100 MHz the CPU's chip-RAM accesses, not its instructions, are the
+cost: each CPU access takes longer on the chip bus than a blitter DMA slot, and
+the blitter is the most efficient chip-RAM user available. A merged single-pass
+version with longword accesses would cut accesses ~2.5× for a typical 5-plane
+shape; that is roughly break-even, not a path past 25 fps.
+
+**What could pass 25 fps:** less chip-bus work per frame, not a faster CPU or
+moving blits to the CPU. The one structural option measured as plausible is a
+fast-RAM back buffer for 68030+: point the bitmap planes at fast RAM so all
+CPU drawing (spans, clear, masked copy) runs from cache, replace *every* blitter
+user with CPU code (the exact twin above is the shapes' building block), and
+copy only the 3D viewport to chip at the swap. Its copy cost and the remaining
+display contention have not been measured; treat it as a new design to propose,
+not an optimisation.
+
 ## One-field release revalidation (2026-10-04)
 
 The final normal slave uses 50 Hz physics. Two fixed-window boots per arm give

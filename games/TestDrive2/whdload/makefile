@@ -6,11 +6,11 @@ NDK ?= /path/to/sys-include
 VASM ?= /path/to/vasmm68k_mot
 VASMFLAGS ?=
 
-.PHONY: all verify noblitirq clean FORCE
+.PHONY: all verify noblitirq cpushapes clean FORCE
 all: TestDrive2.slave
 
 # Always assemble: options must not leave a stale variant.
-TestDrive2.slave: TestDrive2HD.s simulation.s simulation-verify.s simulation-patches.i render.s render-verify.s render-patches.i FORCE
+TestDrive2.slave: TestDrive2HD.s simulation.s simulation-verify.s simulation-patches.i render.s render-cpu.s render-verify.s render-patches.i FORCE
 	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I. -Iinclude -I"$(WHDLOAD)/Include" -I"$(NDK)" -o $@ $<
 
 verify:
@@ -19,6 +19,11 @@ verify:
 # Experiment: clear INTENA BLIT before starting the game (docs/optimisation-plan.md).
 noblitirq:
 	$(MAKE) TestDrive2.slave VASMFLAGS="$(VASMFLAGS) -DNOBLITIRQ=1"
+
+# Experiment: CUSTOM2 bit 3 draws duel:0f114 shapes with the CPU on 68020+ (slower; see
+# docs/optimisation-plan.md). Combine with verify: make verify VASMFLAGS=-DCPUSHAPES=1
+cpushapes:
+	$(MAKE) TestDrive2.slave VASMFLAGS="$(VASMFLAGS) -DCPUSHAPES=1"
 
 clean:
 	rm -f TestDrive2.slave
