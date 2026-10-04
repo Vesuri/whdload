@@ -88,6 +88,7 @@ _tdboot
 slv_config
 	IFD VERIFY
 	dc.b "C3:B:reproducible verification (v1);"
+	dc.b "C4:B:slow renderer verification (v1);"
 	ENDC
 	dc.b    "C1:X:trainer infinite lives:0;"	
 	dc.b	0
@@ -319,6 +320,17 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 .end		moveq	#0,d0
 		rts
 
+	IFD VERIFY
+; W3 stress instrument: delay only drawing; VBL and task scheduling remain live.
+verify_slow_copper:
+	move.l d0,-(a7)
+	move.w #65535,d0
+.delay
+	dbf d0,.delay
+	move.l (a7)+,d0
+	bra set_copper
+	ENDC
+
 set_copper:
 	movem.l	d0-d1,-(a7)
 	moveq.l	#0,d0
@@ -390,7 +402,15 @@ pl_main_v1
 	; speed regulation
 ;	PL_PS	$0016BE,sync_dot_fade_1	; works but too scattered
 	PL_PS	$0016C8,sync_dot_fade_2
-	PL_P	$00588A,set_copper
+	IFD VERIFY
+	PL_IFC4
+	PL_P $00588A,verify_slow_copper
+	PL_ELSE
+	PL_P $00588A,set_copper
+	PL_ENDIF
+	ELSE
+	PL_P $00588A,set_copper
+	ENDC
     
     ; keyboard support
 	PL_PS	$001A1A,read_joydat

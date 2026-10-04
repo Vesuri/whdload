@@ -260,3 +260,28 @@ The sampler reads the full allocated `$7A70`-byte data hunk, including the zero-
 not just its `$3A38` file payload. See the state table and transient demo-state trap in open-work.
 Constant-address `watch -location *(int*)ADDR` uses the stub's hardware write watchpoints;
 register-dependent `watch *(int*)($a4-OFFSET)` may instead choose software watchpoints.
+
+## 10. Cross-machine state comparisons (W3)
+
+Use `python3 tools/compare_state.py OUT_A/state OUT_B/state` to compare the same
+relative VBL indices. It reports exact raw matches, including the shared RNG, plus
+field-clock/deadline values normalised by the first sample's field counter. Absolute
+field counts differ because boots take different amounts of emulated time. Do not
+ignore later mismatches just because the known sample-0 borrowed-state transaction
+can explain a few early differences.
+
+The VERIFY slave additionally offers v1-only `CUSTOM4=1`: a 65,536-iteration DBF
+delay before the existing copper hook, preserving registers and leaving interrupts
+and scheduling enabled. This is a W3 stress instrument, not an optimisation or
+shipping timing design. Use `WHD_ARGS="CUSTOM3=1 CUSTOM4=1"`. Both flags are off by
+default; normal builds omit the instruments.
+
+The 1,000-sample W3 windows trace fields 1000–1099 after sampling. Their measured
+render rates are 4.3 fps (68000), 6.8 fps (68020/fast), and 2.7 fps (68000 with
+CUSTOM4). Longer state-only runs use `FIELDS=1`; these provide no meaningful fps
+comparison. See open-work for the simulation verdict and W4 decision boundary.
+
+`tools/task_state.py OUT/code.bin BASE` reports the cached game process and named
+Road Drawer task from their Exec structures, including signed node priorities.
+The saved process SP can lie outside its initial bounds because the C runtime uses
+a replacement stack; correlate it with trace SP pages, not the original bounds alone.

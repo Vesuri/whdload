@@ -4,6 +4,10 @@
 > `docs/optimisation-plan.md` (performance ranking). Everything here was measured or read from
 > the binary on 2026-10-04; each claim says which. Do the work items **in order**.
 
+**Current status:** W1–W3 complete; W4 awaits the user’s design choice. W5/W6 have
+not started. The original handoff measurements below are retained as historical
+context; the completed work-item findings supersede their unproven assumptions.
+
 ## The goal
 
 Make the game **advance at the same speed regardless of the CPU it runs on**: game time
@@ -149,7 +153,7 @@ traces setup, so it is not a useful simulation window.
 Two deterministic 68000 boots (`tmp/prof/verify-race-a`, `verify-race-b`) gave identical
 `barto.Field.shot` MD5s: field 0 `a2c31ccefeec8a15fd78c56c9234405d`, field 99
 `412e6285e23e5199a419ae933ab2dc56`. Both start at raw clock 1 and select stage 2 (trees,
-5.4 miles). `fixed_window.sh` measured 5.9 fps in each window; this is a new scene/window,
+5.9 miles). `fixed_window.sh` measured 5.9 fps in each window; this is a new scene/window,
 not an A/B performance improvement over the old desert capture.
 
 **Another timing input was in the harness, not the game:** the one-second host poll in
@@ -263,6 +267,96 @@ routine, for at least distance, speed, clock and one opponent position.
 
 ### W3. Prove or refute H1
 
+**DONE (2026-10-04). Measured verdict: H1 holds for the core six-field simulation in the
+windows tested, but is partial as a description of the whole game.** Drawing has
+its own time-dependent visual state and consumes the simulation's shared RNG.
+A faster renderer does not make the measured car/clock/opponents progress faster;
+it does change visual animation rates and the subsequent random sequence.
+
+All runs use the first race, stage 2, post-setup seed `$E940`, `CUSTOM3=1`, and the
+same relative VBL indices. The first 1,000 samples cover approximately 20 PAL seconds;
+the following fixed-window traces cover relative fields 1000–1099:
+
+| Configuration | Render fps (fixed_window only) | Deadline changes / spacing | Clock changes / spacing |
+|---|---:|---|---|
+| 68000, 512K chip + 1.5M slow (`state-000-long`) | 4.3 | 166 changes; all 165 intervals = 6 fields | 154 changes; all 153 intervals = 6 fields |
+| 68020, 1M chip + 4M fast (`state-020-long`) | 6.8 | same | same |
+| 68000 + drawing delay (`state-000-slow`) | 2.7 | same | same |
+
+The delay is a VERIFY-only, v1-only `CUSTOM4=1` patch at `duel:0588a`: save d0,
+65,536 DBF iterations, restore d0, enter the existing copper hook. Interrupts and
+scheduling remain enabled. This is an instrument explicitly allowed by W3; no
+rendering optimisation or shipping timing design has been implemented.
+
+At sample 999, all three machines have these exact raw values:
+
+| Player position (16.16) | Speed (16.16) | Clock | Opponent position (16.16) |
+|---:|---:|---:|---:|
+| 15390991 | 8828952 | 155 | 15894051 |
+
+Every sample 1–999 matches exactly for position, speed, clock, opponent position and
+increment, both traffic origins, RPM, fuel, engine period and both dashboard phases.
+The few sample-0 differences are the W2 borrowed-state/first-step transaction; initial
+anchor values match. Normalised field counter/deadline phases match 1000/1000.
+Camera/needle differences are the ages of drawing caches, not accumulated motion.
+The slow renderer skips displayed steps while the simulation continues on schedule.
+In each subsequent trace the clock/deadline writers execute at fields 1,7,…97,
+including at 2.7 fps. No missed or late six-field interval was observed.
+
+**Priority evidence:** `tools/task_state.py CODE.bin BASE` reads the actual Exec
+nodes from the full dump. On all three machines the simulation context is the
+original `Initial CLI` process (type 13, priority **4**, saved SP `$CFC41C` / `$57C41C`),
+while drawing is the separate `Road Drawer` task (type 1, priority **−1**, SP in
+`$D1Dxxx` / `$59Dxxx`). Thus “main task” and “second task” in the initial profile
+were context labels, not creation order: the created task is the renderer.
+This priority relationship explains the measured preemption, but the measurements
+establish robustness only for these tested loads, not arbitrary interrupt starvation.
+
+**Extended check:** `state-000-3000` and `state-020-3000` use the current VERIFY
+slave with CUSTOM4 off, sampling 3,000 fields (~60 seconds). Position, speed, clock,
+opponent position/increment, traffic, RPM, fuel and engine period match **3000/3000**;
+the two dashboard phases match 2999/3000 with only the known first-step difference.
+Normalised field counter/deadline phases match 3000/3000. Each run has 499 deadline
+changes (498 intervals of six fields) and 487 clock changes (486 intervals of six).
+At sample 2999 both have position **75909113**, speed **12979580**, clock **488**,
+and opponent position **80651103**. No later physical trajectory divergence was
+observed, despite RNG divergence. These state-only captures use FIELDS=1 and provide
+no additional fps evidence. Comparing the older and current 68020 builds' overlapping
+1,000 samples gives 1000/1000 for every core variable, including RNG: the added test
+instrument is inert with CUSTOM4 off.
+
+Both `make -C whdload` and `make -C whdload verify` assemble successfully. The current
+local slave is the VERIFY build; its instruments remain off unless their tooltypes
+are set. Only `pl_main_v1` has the optional patches.
+
+**Remaining dependencies, measured and read from code:**
+
+- Four visual phases at `-$0C30/-$0C2C/-$0C28/-$0C24(a4)` accumulate per drawn frame
+  at `duel:08cd0/08cd8/08ce0/08ce8`. At sample 999 phase 1 is **384000 / 600000 /
+  236000** on 68000 / 68020 / delayed 68000. They are autonomous visual clocks.
+- A rare visual-effect path tests speed ≥95 MPH, then calls RNG once per drawn frame
+  at `duel:08db6`; extra calls at `08dc4`, `08dd4`, `08e26` initialise/select shapes.
+  Its y/animation counters also advance per draw (`08e06`, `08e0a`). The spawn flag
+  is `-7640(a4)`, y is `-7636(a4)`, countdown is `-7626(a4)`.
+- RNG's central writer `duel:0e9f8`, seed `-18632(a4)`, runs on **both** task stacks.
+  In the fields 1000–1099 trace it is called 105 times in the simulation on all
+  machines, plus **9 / 14 / 5** times by drawing. The two normal CPUs first disagree
+  at sample **564** (seeds 46036 vs 54697); delayed drawing first disagrees with the
+  baseline at 583. Removing VHPOSR alone does not decouple random state from drawing.
+  The shared generator also feeds simulation/collision/object-selection paths, so
+  matching core variables in a finite window does not prove all future race outcomes
+  independent of render rate. Fuel in this demo is distance-derived, not RNG-derived.
+- Clock starts at 1 and first advances at sample 78, then 84,…996. Once running,
+  ten nominal tenths require **60 PAL fields = 1.2 real seconds**: the dashboard runs
+  at **5/6 = 0.8333 displayed seconds per real second**. CPU independence and a
+  correctly calibrated real-time clock are separate requirements. These are PAL
+  measurements; NTSC has not been tested.
+
+Reproduce state comparisons with `tools/compare_state.py A/state B/state`; it reports
+raw values and separately normalises absolute boot field counts. Dumps and traces
+are local ignored evidence under `tmp/prof/`; no game bytes are committed.
+
+
 **Do:** with the W1 slave and the W2 variables, run the same window on the A500-equivalent
 machine and on `CPU=68020 FAST_KB=4096` (and a third, slower configuration if available, e.g.
 the A500-equivalent with an artificial busy loop added to `set_copper` via a test slave). Record
@@ -283,6 +377,27 @@ period over a long window in the heaviest scene you can catch (the vector-font s
 4.3 fps): if the period stays 6 fields, the simulation is robust to slow rendering.
 
 ### W4. Choose the design with the user (stop here and ask)
+
+**Decision pending. Stop before W5/W6.** W3 shows an existing preemptible fixed-step
+simulation, so wrapping the entire drawing loop in a new physics loop is not justified.
+All candidate designs must address the remaining visual clocks, drawing's shared-RNG
+consumption/beam entropy, and the PAL dashboard clock calibration:
+
+1. **Minimal correction (recommended for the stated goal):** retain the original
+   six-field physics and motion pace; make the remaining animation/random updates
+   follow fields rather than drawing, and make elapsed race time track real time.
+   Drawing still samples the latest state. Above 8.33 fps, motion remains stepped.
+2. **Interpolation:** do the same corrections, then render between snapshots of
+   fixed-step simulation state. Preserve physics/AI cadence; improve smoothness on
+   faster machines. Requires auditing all moving drawing inputs and adds latency.
+3. **Higher-rate simulation:** shorten the interval and scale every per-step physics,
+   AI, timer and animation quantity. More responsive movement, substantially greater
+   risk of changing handling and race balance; W2 is only the starting map.
+
+The user has not chosen yet. Record their selection and any pace/clock preferences
+here before implementing. The original conditional options below remain background
+for the decision; the measured partial verdict above takes precedence.
+
 
 Write up the options with the W3 evidence and **ask the user**. The options depend on W3:
 
@@ -319,7 +434,7 @@ is free. Do not touch the slave's `set_copper` beam wait (JOTD's flicker fix) wi
 
 ### Tooling debts (fix when they bite, not before)
 
-- `fixed_window.sh` anchors on the first `duel:0789c` entry, not the race start (W1 fixes it).
+- Race anchoring and boot polling are fixed by W1; see its calibration-cache trap above.
 - `td2_report.py` names self time by nearest preceding `link a5`/call target; functions without
   `link` merge into their predecessor. Check with `hotspots.py` before trusting a big self number.
 - The trace format holds no fast-RAM snapshot; the scripts dump the code region separately with
