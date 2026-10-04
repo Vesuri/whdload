@@ -303,7 +303,7 @@ calibration reboot. For later analysis use `SLAVE="$PWD/OUT/slave.slave"` so a
 new build cannot change the slave-region bounds for an old capture.
 
 For W5, `tools/check_timing.py OUT/state --min-fields 1800` checks consecutive
-VBL indices, three-field deadline increments/spacing and the clock against PAL
+VBL indices, one-field deadline increments/spacing and the clock against PAL
 elapsed time, accounting for recorded 20-second penalties. It reports any end of
 the continuous driving prefix; it does not count menu phases as active simulation.
 
@@ -327,7 +327,7 @@ player life-loss handling at a terminal event.
 ```
 source amiga/env.sh
 make -C whdload verify
-WHD_ARGS="CUSTOM2=1 CUSTOM3=1 CUSTOM5=3" STATE_FIELDS=1800 FIELDS=1 SLAVE="$PWD/whdload/TestDrive2.slave" tools/fixed_window.sh tmp/prof/damage "$PWD/whdload/TestDrive2.slave"
+WHD_ARGS="CUSTOM2=1 CUSTOM3=1 CUSTOM5=3" STATE_FIELDS=1800 STATE_ONLY=1 SLAVE="$PWD/whdload/TestDrive2.slave" tools/fixed_window.sh tmp/prof/damage "$PWD/whdload/TestDrive2.slave"
 python3 tools/check_units.py tmp/prof/damage
 python3 tools/check_timing.py tmp/prof/damage/state --min-fields 1800
 python3 tools/check_recovery.py tmp/prof/damage/state --damage
@@ -340,16 +340,16 @@ the active clock check ends at the fatal event, before the original menu path.
 Do not report a frozen race clock after game over as simulation lag.
 
 `check_disabled.py OUT` reads the original local v1 file and verifies its bytes
-at all 57 simulation patch ranges when CUSTOM2 is off. It excludes the two RNG
+at the simulation patch ranges when CUSTOM2 bit 0 is off. It excludes the two RNG
 ranges shared with CUSTOM3. An original-mode RNG comparison can differ because
 the original renderer still consumes that generator; it is not an optional
 simulation patch accidentally left active.
 
 Every fixed-window capture retains `OUT/slave.slave`. Set SLAVE to that copy
 when re-running trace reports: using the installed or latest slave's different
-size can omit the copper write and falsely report zero frames. FIELDS=1 captures
-are for state checks and visual QA; they cannot establish fps. The W5 higher-rate
-rendering baseline uses two full 100-field captures, `w5-repeat-a/b`, 5.6 fps each.
+size can omit the copper write and falsely report zero frames. STATE_ONLY skips
+tracing and fps reporting; FIELDS=1 captures cannot establish fps either. The
+historical three-field baseline was `w5-repeat-a/b`, 5.6 fps each.
 
 
 ## Rendering checks (W6)
@@ -388,3 +388,16 @@ clear kernel is duel:086c0..08768; its two bulk MOVEMs are 08746/0874a. The
 span interior is 07928..0793a. Projection angle accumulators are read/written at
 073fc/07400/0742a/0742e. Their cycle totals can be summed from `barto.instructions`
 or inspected with `hotspots.py`. These are cost bounds, never fps comparisons.
+
+## One-field refinement
+
+The current optional mode updates once per PAL field (50 Hz). Historical
+three-field captures need `check_timing.py --period 3`. `STATE_ONLY=1` skips
+profiling, screenshots and fps reporting after the requested STATE_FIELDS; use
+it for long state comparisons. Normal fixed-window runs remain the only fps
+instrument. `compare_state.py --assert-core` checks all 35 gameplay variables;
+`--start` is only for an individually explained initial transaction sample.
+VERIFY CUSTOM5=17 accelerates, brakes, coasts and restarts without steering; it
+will leave a curved road. Evaluate normal attract driving with CUSTOM5 off.
+An updated slave can move the loaded hunk to another allocation page; calibrate
+again or supply a verified BOOT_HUNK. The harness checks the supplied address.

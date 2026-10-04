@@ -1,5 +1,5 @@
-; duel v1: three-field simulation. All entry hooks are gated by CUSTOM2.
-; Continuous dynamics use dt = 1/2 of the original six-field step. Spatial
+; duel v1: one-field simulation. All entry hooks are gated by CUSTOM2.
+; Continuous dynamics use dt = 1/6 of the original six-field step. Spatial
 ; road-unit loops, event impulses and field-based input/audio timers stay intact.
 ; Private fractional state belongs to the slave, never the read-only debugger.
 
@@ -16,7 +16,12 @@ sim_start:
     lea sim_recovery_until(pc),a0
     clr.l (a0)
     lea sim_phase(pc),a0
-    move.w #1,(a0)
+    move.w #5,(a0)
+    lea sim_rates(pc),a0
+    moveq #SIM_RATE_WORDS-1,d0
+.clear_rates
+    clr.w (a0)+
+    dbf d0,.clear_rates
     lea sim_fractions(pc),a0
     clr.l (a0)+               ; player time / opponent time
     clr.l (a0)                ; player sum / opponent sum
@@ -34,7 +39,14 @@ sim_start:
 sim_begin:
     movem.l d0-d2/a0,-(sp)
     lea sim_phase(pc),a0
-    eori.w #1,(a0)            ; zero at original six-field boundaries
+    addq.w #1,(a0)
+    cmp.w #6,(a0)
+    bcs.b .phase
+    clr.w (a0)               ; zero at original six-field boundaries
+.phase
+    lea sim_tick_force(pc),a0
+    move.l (a0),sim_prev_force-sim_tick_force(a0)
+    clr.l (a0)
     bsr sim_visual_step
     bsr sim_recovery_step
     IFD VERIFY
@@ -54,82 +66,323 @@ sim_begin:
 .demo
     rts
 
-; Round odd signed word rates alternately. Constant inputs preserve their
-; original six-field total, including negative rates and the 41-unit police rate.
-sim_half_word:
-    asr.w #1,d0             ; floor first: avoids overflow at +32767
-    bcc.b .done
-    bsr sim_test_phase
-    bne.b .done
-    addq.w #1,d0
-.done
+ ; Signed 32-bit division by six with a private remainder per accumulator.
+; d0 is the rate in original-step units; a0 points to a word in 0..5.
+; Floor division plus carry also handles INT_MIN without a DIVS overflow.
+; Six constant-rate calls sum exactly to the original signed rate.
+sim_scale_long:
+    movem.l d1-d3,-(sp)
+    move.l d0,d3
+    bpl.b .positive
+    neg.l d0                 ; INT_MIN remains its unsigned magnitude
+.positive
+    move.l d0,d1
+    clr.w d0
+    swap d0
+    divu.w #6,d0             ; high quotient and remainder
+    move.w d0,d2
+    clr.w d0
+    move.w d1,d0
+    divu.w #6,d0             ; remaining high remainder + low word
+    swap d2
+    move.w d0,d2
+    swap d0
+    and.l #$ffff,d0           ; remainder
+    tst.l d3
+    bpl.b .carry
+    neg.l d2
+    tst.w d0
+    beq.b .carry
+    subq.l #1,d2
+    neg.w d0
+    addq.w #6,d0
+.carry
+    add.w (a0),d0
+    cmp.w #6,d0
+    bcs.b .store
+    subq.w #6,d0
+    addq.l #1,d2
+.store
+    move.w d0,(a0)
+    move.l d2,d0
+    movem.l (sp)+,d1-d3
+    rts
+
+; Unsigned 32-bit division with a word divisor and a carry in that divisor's
+; units. Keeping the /64 low bits until the FINAL division is essential: early
+; shifts would lose creeping motion and the constant-force Euler equivalence.
+sim_scale_distance:
+    move.l d3,-(sp)
+    move.w #768,d3           ; 2 * 64 * 6
+    bsr sim_scale_unsigned
+    move.l (sp)+,d3
+    rts
+sim_scale_ai_motion:
+    move.l d3,-(sp)
+    moveq #12,d3             ; 2 * 6
+    bsr sim_scale_unsigned
+    move.l (sp)+,d3
+    rts
+sim_scale_unsigned:
+    movem.l d1-d2/d4,-(sp)
+    move.l d0,d1
+    clr.w d0
+    swap d0
+    divu.w d3,d0
+    move.w d0,d2
+    clr.w d0
+    move.w d1,d0
+    divu.w d3,d0
+    swap d2
+    move.w d0,d2
+    swap d0
+    add.w (a0),d0
+    cmp.w d3,d0
+    bcs.b .store
+    sub.w d3,d0
+    addq.l #1,d2
+.store
+    move.w d0,(a0)
+    move.l d2,d0
+    movem.l (sp)+,d1-d2/d4
+    rts
+
+; The original force lookup samples the beginning of a coarse Euler step.
+; A finer lookup needs the corresponding half-step correction too: evaluate
+; at v - (6-1)/2*dv from the preceding field. Real velocity/RPM remain live;
+; only throttle/drag lookup inputs use this modified-Euler reference.
+sim_force_reference:
+    move.l d1,-(sp)
+    move.l sim_prev_force(pc),d1
+    move.l d1,d0
+    lsl.l #2,d1
+    add.l d1,d0
+    asr.l #1,d0
+    neg.l d0
+    add.l -13282(a4),d0
+    bpl.b .forward
+    moveq #0,d0
+.forward
+    move.l (sp)+,d1
+    rts
+sim_throttle_curve:
+    bsr sim_force_reference
+    lsr.l #8,d0
+    mulu.w -13034(a4),d0
+    swap d0
+    lsr.w #7,d0
+    rts
+sim_drag_curve:
+    move.l d0,-(sp)
+    bsr sim_force_reference
+    swap d0
+    move.w d0,d1
+    lsr.w #2,d1
+    move.l (sp)+,d0
+    rts
+
+sim_scale_word:
+    ext.l d0
+    bra sim_scale_long
+
+; AI rates require independent carries for the opponent, demo driver and police.
+; a5 is the original car record. No allocation or gameplay RNG is used here.
+sim_ai_remainder:
+    movem.l d0-d1,-(sp)
+    lea sim_ai_rates(pc),a0
+    moveq #3,d1
+.find
+    move.l (a0),d0
+    beq.b .claim
+    cmp.l a5,d0
+    beq.b .found
+    adda.w #14,a0
+    dbf d1,.find
+    ; All four installed records are bounded by the game's call sites.
+    lea sim_ai_rates(pc),a0
+.claim
+    move.l a5,(a0)
+.found
+    addq.l #4,a0
+    movem.l (sp)+,d0-d1
     rts
 
 sim_speed_add:
-    asr.l #1,d0
+    move.l a0,-(sp)
+    lea sim_speed_frac(pc),a0
+    bsr sim_scale_long
+    move.l (sp)+,a0
+    bsr sim_record_force
     add.l d0,-13282(a4)
-    tst.w -13188(a4)          ; displaced following test
+    tst.w -13188(a4)
+    rts
+
+sim_player_motion:
+    move.l a0,-(sp)
+    ; Preserve the original semi-implicit Euler displacement. Six small
+    ; steps otherwise sum v + 7*a/12 rather than the original v + a.
+    ; Per field, add (6-1)/2 times its continuous velocity change.
+    move.l d1,-(sp)
+    move.l sim_tick_force(pc),d1
+    add.l d0,d0
+    add.l d1,d0
+    lsl.l #2,d1
+    add.l d1,d0             ; 2*v + 5*dv; spatial impulses are excluded
+    bpl.b .forward
+    moveq #0,d0
+.forward
+    move.l (sp)+,d1
+    lea sim_distance_frac(pc),a0
+    bsr sim_scale_distance
+    move.l (sp)+,a0
+    move.l -17238(a4),d1       ; displaced next instruction
     rts
 
 sim_yaw_add:
+    move.l a0,-(sp)
     move.w -4(a5),d0
-    bsr sim_half_word
+    lea sim_yaw_frac(pc),a0
+    bsr sim_scale_word
+    move.l (sp)+,a0
     add.w d0,-9862(a4)
     rts
 
 sim_heat_add:
-    move.l d0,-(sp)
+    movem.l d0/a0,-(sp)
     move.w d1,d0
-    bsr sim_half_word
+    lea sim_heat_frac(pc),a0
+    bsr sim_scale_word
     move.w d0,d1
-    movem.l (sp)+,d0
+    movem.l (sp)+,d0/a0
     add.w -24718(a4),d1
     move.w d1,-24718(a4)
     rts
 
-sim_dashboard:
-    move.l d0,-(sp)
-    lsr.w #7,d1
+sim_heat_cool:
+    movem.l d0/a0,-(sp)
+    lsr.w #2,d1
+    moveq #0,d0
     move.w d1,d0
-    bsr sim_half_word
+    lea sim_heat_frac(pc),a0
+    neg.l d0
+    bsr sim_scale_long
+    neg.w d0
     move.w d0,d1
-    movem.l (sp)+,d0
+    movem.l (sp)+,d0/a0
+    sub.w d1,-24718(a4)       ; CCR feeds original underflow clamp
+    rts
+
+sim_dashboard:
+    move.l a0,-(sp)
+    lsr.w #7,d1
+    moveq #0,d0
+    move.w d1,d0
+    lea sim_dashboard_frac(pc),a0
+    bsr sim_scale_long
+    move.w d0,d1
+    move.l (sp)+,a0
     move.w -3008(a4),d0
     rts
 
+; d0 is the signed physical speed change just applied by a rate producer.
+; Event/gear/collision impulses do not call this accumulator.
+sim_record_force:
+    move.l a0,-(sp)
+    lea sim_tick_force(pc),a0
+    add.l d0,(a0)
+    move.l (sp)+,a0
+    rts
+
+sim_ai_prepare:
+    movem.l a0,-(sp)
+    bsr sim_ai_remainder
+    move.l 10(a5),6(a0)
+    movem.l (sp)+,a0
+    rts
+sim_ai_begin:
+    movem.l d0-a6,-(sp)     ; original prologue, before the body's own epilogue
+    bsr sim_ai_prepare
+    clr.w -2770(a4)         ; original following instruction
+    move.l sim_code(pc),-(sp)
+    add.l #$d6b6,(sp)
+    rts
+
+; The demo record is a predictor, not a second physical car: duel:05a62
+; seeds it from the player on EVERY call, then discards its speed/distance.
+; Preserve the original prediction horizon; only its lane output is a real rate.
+sim_is_demo:
+    move.l a0,-(sp)
+    lea -10478(a4),a0
+    cmpa.l a0,a5
+    move.l (sp)+,a0
+    rts
+sim_ai_scale_speed:
+    bsr sim_is_demo
+    beq.b .done
+    bsr sim_ai_remainder
+    bsr sim_scale_long
+.done
+    rts
+
 sim_ai_accel:
+    move.l a0,-(sp)
     mulu.w 22(a5),d0
     clr.w d0
     swap d0
-    lsr.l #1,d0
+    bsr sim_ai_scale_speed
+    move.l (sp)+,a0
     rts
 
 sim_ai_lane:
-    move.l d1,-(sp)
+    movem.l d1/a0,-(sp)
     move.w d0,d1
     move.w d2,d0
-    bsr sim_half_word
+    bsr sim_ai_remainder
+    addq.l #2,a0
+    bsr sim_scale_word
     move.w d0,d2
     move.w d1,d0
-    movem.l (sp)+,d1
+    movem.l (sp)+,d1/a0
     add.w d2,d0
     move.w d0,6(a5)
     rts
 
 sim_ai_motion:
-    move.l 10(a5),d0          ; AI speed retains original units for lookahead
-    lsr.l #1,d0
+    movem.l d1/a0,-(sp)
+    move.l 10(a5),d0
+    bsr sim_is_demo
+    beq.b .predicted
+    bsr sim_ai_remainder
+    move.l d0,d1
+    sub.l 6(a0),d1           ; this field's physical speed change
+    add.l d0,d0
+    add.l d1,d0
+    lsl.l #2,d1
+    add.l d1,d0
+    bpl.b .forward
+    moveq #0,d0
+.forward
+    addq.l #4,a0
+    bsr sim_scale_ai_motion
+.predicted
+    movem.l (sp)+,d1/a0
     add.l 2(a5),d0
     rts
 
 sim_traffic_forward:
-    lsr.l #1,d0
+    move.l a0,-(sp)
+    lea sim_traffic_forward_frac(pc),a0
+    bsr sim_scale_long
+    move.l (sp)+,a0
     add.l -13470(a4),d0
     move.l d0,-13470(a4)
     rts
 sim_traffic_oncoming:
+    move.l a0,-(sp)
     move.l -7652(a4),d0
-    lsr.l #1,d0
+    lea sim_traffic_oncoming_frac(pc),a0
+    bsr sim_scale_long
+    move.l (sp)+,a0
     sub.l d0,-13466(a4)       ; CCR preserved for original wrap branch
     rts
 
@@ -154,10 +407,7 @@ sim_police_time_motion:
     bne.b .read
     addq.w #1,-7642(a4)
 .read
-    move.l 10(a5),d0
-    lsr.l #1,d0
-    add.l 2(a5),d0
-    rts
+    bra sim_ai_motion
 sim_police_time_read:
     bsr sim_test_phase
     bne.b .read
@@ -180,11 +430,13 @@ sim_police_limit:
 .test
     rts
 sim_police_return_lane:
-    movem.l d0,-(sp)
-    moveq #41,d0
-    bsr sim_half_word
-    sub.w d0,6(a5)
-    movem.l (sp)+,d0
+    movem.l d0/a0,-(sp)
+    moveq #-41,d0
+    bsr sim_ai_remainder
+    addq.l #2,a0
+    bsr sim_scale_word
+    add.w d0,6(a5)
+    movem.l (sp)+,d0/a0
     rts
 
 ; Gear audio can be called in the VBL as well as by physics. Elapsed fields,
@@ -227,7 +479,10 @@ sim_verge_high:
 sim_verge_rate:
     tst.w -3136(a4)
     beq.b .impulse
-    lsr.l #1,d0
+    move.l a0,-(sp)
+    lea sim_verge_frac(pc),a0
+    bsr sim_scale_long
+    move.l (sp)+,a0
 .impulse
     rts
 
@@ -405,11 +660,10 @@ sim_heat_message: dc.b "ENGINE DAMAGE - 20 SECOND PENALTY",0
 sim_recovery_kind: dc.w 0
 sim_recovery_until: dc.l 0
 
-; Three PAL fields = 3/5 of a nominal tenth. Carry fractions instead of
+; One PAL field = 1/5 of a nominal tenth. Carry fractions instead of
 ; truncating each step. Speed sums use the same weighting as race time.
 sim_player_time:
     movem.l d0-d1/a0,-(sp)
-    mulu.w #3,d0
     lea sim_player_sum_frac(pc),a0
     add.w (a0),d0
     divu.w #5,d0
@@ -419,7 +673,7 @@ sim_player_time:
     swap d0
     move.w d0,(a0)
     lea sim_player_time_frac(pc),a0
-    addq.w #3,(a0)
+    addq.w #1,(a0)
     cmp.w #5,(a0)
     bcs.b .done
     subq.w #5,(a0)
@@ -430,7 +684,6 @@ sim_player_time:
 sim_opponent_sum:
     asr.l d1,d0             ; displaced speed conversion
     movem.l d0-d1/a0,-(sp)
-    mulu.w #3,d0
     lea sim_opponent_sum_frac(pc),a0
     add.w (a0),d0
     divu.w #5,d0
@@ -449,7 +702,7 @@ sim_opponent_time:
     cmp.w -10076(a4),d0
     bge.b .done
     lea sim_opponent_time_frac(pc),a0
-    addq.w #3,(a0)
+    addq.w #1,(a0)
     cmp.w #5,(a0)
     bcs.b .done
     subq.w #5,(a0)
@@ -466,10 +719,22 @@ sim_visual_step:
     move.l -14920(a4),a0
     tst.w 2(a0)
     beq.b .event
-    add.l #2000,-3120(a4)
-    add.l #2500,-3116(a4)
-    add.l #3000,-3112(a4)
-    add.l #3500,-3108(a4)
+    lea sim_background_frac(pc),a0
+    move.l #4000,d0
+    bsr sim_scale_long
+    add.l d0,-3120(a4)
+    addq.l #2,a0
+    move.l #5000,d0
+    bsr sim_scale_long
+    add.l d0,-3116(a4)
+    addq.l #2,a0
+    move.l #6000,d0
+    bsr sim_scale_long
+    add.l d0,-3112(a4)
+    addq.l #2,a0
+    move.l #7000,d0
+    bsr sim_scale_long
+    add.l d0,-3108(a4)
 .event
     bsr sim_test_phase
     bne .done
@@ -549,7 +814,279 @@ sim_test_active:
     movem.l (sp)+,a0
     rts
 
-sim_phase: dc.w 1
+
+; An original gear command returns before the player's physics/motion for
+; that whole six-field step. Preserve that 120 ms hold, not just one 20 ms tick.
+sim_gear_hold:
+    movem.l d0/a0,-(sp)
+    move.l -17216(a4),d0
+    addq.l #6,d0
+    lea sim_player_hold_until(pc),a0
+    move.l d0,(a0)
+    movem.l (sp)+,d0/a0
+    clr.w -13446(a4)
+    move.w #7,-12672(a4)     ; displaced command-handler prefix
+    rts
+sim_controller_hold:
+    movem.l d0/a0,-(sp)
+    move.l sim_player_hold_until(pc),d0
+    sub.l -17216(a4),d0
+    bgt.b .hold
+    movem.l (sp)+,d0/a0
+    clr.w -13446(a4)
+    cmp.w #4,-14912(a4)      ; displaced controller prefix; CCR feeds branch
+    rts
+.hold
+    movem.l (sp)+,d0/a0
+    addq.l #4,sp             ; discard the hook return, then return to its caller
+    rts
+
+ ; Gear selection and lever/clutch travel count original steps, not fields.
+; Keep that bookkeeping at six fields while motion and controls run every field.
+sim_auto_gear:
+    bsr sim_test_phase
+    beq.b .original
+    add.l #$38,(sp)          ; JSRed return is site+6, not site+8; skip automatic decisions to duel:0af6c
+    rts
+.original
+    move.w -17200(a4),d0
+    cmp.w -13188(a4),d0
+    rts
+sim_gear_update:
+    bsr sim_test_phase
+    bne.b .tail
+    bsr sim_original_gear
+.tail
+    jsr -32754(a4)          ; displaced next call
+    rts
+sim_original_gear:
+    move.l sim_code(pc),-(sp)
+    add.l #$623e,(sp)
+    rts
+
+; Continuous speed changes share one signed carry; impulses remain unscaled.
+sim_clutch_brake:
+    movem.l d0/a0,-(sp)
+    move.l #-352256,d0
+    lea sim_speed_frac(pc),a0
+    bsr sim_scale_long
+    bsr sim_record_force
+    add.l d0,-13282(a4)
+    movem.l (sp)+,d0/a0
+    rts
+sim_assisted_clutch:
+    movem.l d0/a0,-(sp)
+    move.l #-851968,d0
+    lea sim_speed_frac(pc),a0
+    bsr sim_scale_long
+    bsr sim_record_force
+    add.l d0,-13282(a4)
+    movem.l (sp)+,d0/a0
+    rts
+sim_neutral_drag:
+    movem.l d0/a0,-(sp)
+    move.l #-32768,d0
+    lea sim_speed_frac(pc),a0
+    bsr sim_scale_long
+    bsr sim_record_force
+    add.l d0,-13282(a4)
+    movem.l (sp)+,d0/a0
+    rts
+sim_fuel_drag:
+    movem.l d0/a0,-(sp)
+    move.l #-32768,d0
+    lea sim_speed_frac(pc),a0
+    bsr sim_scale_long
+    bsr sim_record_force
+    add.l d0,-13282(a4)
+    movem.l (sp)+,d0/a0
+    rts
+sim_brake:
+    movem.l d0/a0,-(sp)
+    move.l #-278528,d0
+    lea sim_speed_frac(pc),a0
+    bsr sim_scale_long
+    bsr sim_record_force
+    add.l d0,-13282(a4)
+    movem.l (sp)+,d0/a0
+    rts
+sim_assisted_brake:
+    movem.l d0/a0,-(sp)
+    move.l #-786432,d0
+    lea sim_speed_frac(pc),a0
+    bsr sim_scale_long
+    bsr sim_record_force
+    add.l d0,-13282(a4)
+    movem.l (sp)+,d0/a0
+    rts
+sim_scrub:
+    movem.l d0/a0,-(sp)
+    move.l #-88064,d0
+    lea sim_speed_frac(pc),a0
+    bsr sim_scale_long
+    bsr sim_record_force
+    add.l d0,-13282(a4)
+    movem.l (sp)+,d0/a0
+    rts
+sim_free_rpm:
+    movem.l d0/a0,-(sp)
+    tst.w -13038(a4)
+    beq.b .free
+    ; Original clutch map is rpm' = (15/16)*rpm + 700. Its sixth-root
+    ; affine map needs 700*(1-rho^(1/6))/(1-rho), not simply 700/6.
+    lea sim_clutch_rise_frac(pc),a0
+    move.l #7851200,d0       ; Q16: 700 * 701 / 4096 per field
+    add.l (a0),d0
+    move.w d0,2(a0)
+    clr.w (a0)
+    swap d0
+    add.w d0,-13188(a4)
+    bra.b .done
+.free
+    move.l #700,d0
+    lea sim_rpm_frac(pc),a0
+    bsr sim_scale_long
+    add.w d0,-13188(a4)
+.done
+    movem.l (sp)+,d0/a0
+    rts
+
+sim_centre_limit:
+    movem.l d0/a0,-(sp)
+    moveq #20,d0
+    lea sim_centre_frac(pc),a0
+    bsr sim_scale_long
+    move.w d0,d1
+    movem.l (sp)+,d0/a0
+    cmp.w d2,d1
+    rts
+sim_return_limit:
+    movem.l d0/a0,-(sp)
+    moveq #20,d0
+    lea sim_centre_frac(pc),a0
+    bsr sim_scale_long
+    move.w d0,d1
+    movem.l (sp)+,d0/a0
+    cmp.w d0,d1
+    rts
+
+sim_effect_phase:
+    move.l a0,-(sp)
+    lsr.l #5,d0
+    lea sim_effect_frac(pc),a0
+    bsr sim_scale_long
+    move.l (sp)+,a0
+    add.l d0,-14970(a4)
+    rts
+sim_ai_stop:
+    movem.l d0/a0,-(sp)
+    move.l #-6144,d0
+    bsr sim_ai_scale_speed
+    add.l d0,10(a5)
+    movem.l (sp)+,d0/a0
+    rts
+sim_ai_pursuit:
+    move.l a0,-(sp)
+    move.l #-1536,d0
+    bsr sim_ai_scale_speed
+    neg.l d0
+    move.l (sp)+,a0
+    rts
+sim_ai_brake:
+    move.l a0,-(sp)
+    move.l #-2432,d0
+    bsr sim_ai_scale_speed
+    neg.l d0
+    move.l (sp)+,a0
+    rts
+sim_ai_curve:
+    movem.l d0/a0,-(sp)
+    move.l #-1024,d0
+    bsr sim_ai_scale_speed
+    add.l d0,10(a5)
+    movem.l (sp)+,d0/a0
+    rts
+sim_police_brake:
+    movem.l d0/a0,-(sp)
+    move.l #-1536,d0
+    bsr sim_ai_scale_speed
+    add.l d0,10(a5)
+    movem.l (sp)+,d0/a0
+    rts
+sim_police_accel:
+    movem.l d0/a0,-(sp)
+    move.l #1536,d0
+    bsr sim_ai_scale_speed
+    add.l d0,10(a5)
+    movem.l (sp)+,d0/a0
+    rts
+sim_heading_decay:
+    movem.l d0-d2/a0,-(sp)
+    move.w -13390(a4),d0
+    ext.l d0
+    muls.w #1442,d0
+    lea sim_heading_decay_frac(pc),a0
+    add.l (a0),d0
+    move.w d0,2(a0)
+    swap d0
+    ext.l d0
+    clr.w (a0)
+    sub.w d0,-13390(a4)
+    movem.l (sp)+,d0-d2/a0
+    rts
+sim_yaw_decay:
+    movem.l d0-d2/a0,-(sp)
+    move.w -9862(a4),d0
+    ext.l d0
+    muls.w #3068,d0
+    lea sim_yaw_decay_frac(pc),a0
+    add.l (a0),d0
+    move.w d0,2(a0)
+    swap d0
+    ext.l d0
+    clr.w (a0)
+    sub.w d0,-9862(a4)
+    movem.l (sp)+,d0-d2/a0
+    rts
+sim_clutch_decay:
+    movem.l d0-d2/a0,-(sp)
+    move.w -13188(a4),d0
+    and.l #$ffff,d0
+    muls.w #701,d0
+    lea sim_clutch_decay_frac(pc),a0
+    add.l (a0),d0
+    move.w d0,2(a0)
+    swap d0
+    ext.l d0
+    clr.w (a0)
+    sub.w d0,-13188(a4)
+    movem.l (sp)+,d0-d2/a0
+    rts
+
+sim_rates:
+sim_speed_frac: dc.w 0
+sim_distance_frac: dc.w 0
+sim_yaw_frac: dc.w 0
+sim_heat_frac: dc.w 0
+sim_dashboard_frac: dc.w 0
+sim_traffic_forward_frac: dc.w 0
+sim_traffic_oncoming_frac: dc.w 0
+sim_verge_frac: dc.w 0
+sim_rpm_frac: dc.w 0
+sim_centre_frac: dc.w 0
+sim_effect_frac: dc.w 0
+sim_background_frac: dcb.w 4,0
+sim_ai_rates: dcb.b 56,0
+sim_player_hold_until: dc.l 0
+sim_tick_force: dc.l 0
+sim_prev_force: dc.l 0
+sim_heading_decay_frac: dc.l 0
+sim_yaw_decay_frac: dc.l 0
+sim_clutch_decay_frac: dc.l 0
+sim_clutch_rise_frac: dc.l 0
+SIM_RATE_WORDS equ (*-sim_rates)/2
+
+sim_phase: dc.w 5
 sim_visual_seed: dc.w 0
 sim_fractions:
 sim_player_time_frac: dc.w 0
@@ -576,6 +1113,15 @@ sim_epoch: dc.l 0
     IFD VERIFY
 ; Actual joystick decoding and normal player physics consume this field-based
 ; tape. It starts after the race anchor; no debugger writes are involved.
+verify_original_begin:
+    movem.l d0-d2/a0,-(sp)
+    bsr verify_drive_mode
+    movem.l (sp)+,d0-d2/a0
+    tst.w -17282(a4)
+    bne.b .demo
+    add.l #$92,(sp)
+.demo
+    rts
 verify_drive_mode:
     move.l sim_drive_enabled(pc),d0
     btst #0,d0
@@ -606,33 +1152,49 @@ verify_drive_joydat:
     movem.l d1/a0,-(sp)
     move.l sim_drive_enabled(pc),d1
     btst #0,d1
-    beq.b .done
+    beq .done
     bsr sim_test_active
-    beq.b .done
+    beq .done
     move.l -17216(a4),d1
     sub.l sim_epoch(pc),d1
+    move.l sim_drive_enabled(pc),d0
+    btst #4,d0
+    beq.b .steer_tape
+    move.w #$0100,d0
+    cmp.l #400,d1
+    bcs .done
+    cmp.l #600,d1
+    bcc.b .straight_coast
+    moveq #1,d0
+    bra .done
+.straight_coast
+    cmp.l #800,d1
+    bcc .done
+    moveq #0,d0
+    bra .done
+.steer_tape
     move.w #$0100,d0           ; accelerate, including from idle
     cmp.l #100,d1
-    bcs.b .done
+    bcs .done
     cmp.l #106,d1
     bcc.b .right
     move.w #$0200,d0           ; up + left
-    bra.b .done
+    bra .done
 .right
     cmp.l #112,d1
     bcc.b .brake
     move.w #$0103,d0           ; up + right
-    bra.b .done
+    bra .done
 .brake
     cmp.l #200,d1
-    bcs.b .done
+    bcs .done
     cmp.l #300,d1
     bcc.b .coast
     moveq #1,d0               ; brake
-    bra.b .done
+    bra .done
 .coast
     cmp.l #400,d1
-    bcc.b .done
+    bcc .done
     moveq #0,d0               ; neutral joystick/coast
 .done
     movem.l (sp)+,d1/a0

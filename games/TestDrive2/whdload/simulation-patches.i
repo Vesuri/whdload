@@ -2,37 +2,45 @@
     PL_IFC2X 0
     PL_PS  $05a4c,sim_start
     PL_PSS $05a5a,sim_begin,2
-    PL_L   $05bea,$70034e71    ; deadline comparison: moveq #3,d0; nop
-    PL_L   $05c0c,$70034e71    ; deadline advance: moveq #3,d0; nop
-    PL_W   $0b29e,$ee88        ; player motion: speed /128 (was /64)
+    PL_L   $05bea,$70014e71    ; deadline comparison: moveq #1,d0; nop
+    PL_L   $05c0c,$70014e71    ; deadline advance: moveq #1,d0; nop
+    PL_PS  $0b29e,sim_player_motion ; original speed /64, then /6 with carry
+    PL_PS  $0a88a,sim_throttle_curve
+    PL_PS  $0a8ca,sim_drag_curve
     PL_PSS $0a8e6,sim_speed_add,2
-    PL_W   $0a7e0,$ea49        ; clutch RPM decay /32 (was /16)
-    PL_L   $0a7f8,176128       ; clutch braking, original 352256 /2
-    PL_L   $0a802,425984       ; assisted clutch braking, 851968 /2
-    PL_L   $0a82a,16384        ; neutral drag, 32768 /2
-    PL_W   $0a838,350          ; free RPM rise, 700 /2
-    PL_L   $0a854,16384        ; fuel-out drag, 32768 /2
-    PL_L   $0a868,139264       ; braking, 278528 /2
-    PL_L   $0a872,393216       ; assisted braking, 786432 /2
-    PL_L   $0a910,44032        ; tyre scrub, 88064 /2
-    PL_W   $0b0e4,$e840        ; heading relaxation /16 (was /8)
-    PL_W   $0b0ee,$e640        ; yaw relaxation /8 (was /4)
+    PL_PS  $0a7e0,sim_clutch_decay
+    PL_PSS $0a7f6,sim_clutch_brake,2
+    PL_PSS $0a800,sim_assisted_clutch,2
+    PL_PSS $0a828,sim_neutral_drag,2
+    PL_PS  $0a836,sim_free_rpm
+    PL_PSS $0a852,sim_fuel_drag,2
+    PL_PSS $0a866,sim_brake,2
+    PL_PSS $0a870,sim_assisted_brake,2
+    PL_PSS $0a90e,sim_scrub,2
+    PL_PS  $0b0e4,sim_heading_decay
+    PL_PS  $0b0ee,sim_yaw_decay
     PL_PSS $0b1a2,sim_yaw_add,2
-    PL_W   $0b2d4,$720a        ; auto-centre lane at 10 (was 20)
-    PL_W   $0b2fa,$720a        ; return to road at 10 (was 20)
-    PL_W   $0aee0,$e649        ; overheat cooling /8 (was /4)
+    PL_PS  $0b2d4,sim_centre_limit
+    PL_PS  $0b2fa,sim_return_limit
+    PL_PS  $0aee0,sim_heat_cool
     PL_PSS $0aeee,sim_heat_add,2
+    PL_PSS $0aec6,sim_controller_hold,4
+    PL_PSS $0ae3a,sim_gear_hold,4
+    PL_PSS $0ae90,sim_gear_hold,4
+    PL_PSS $0af2e,sim_auto_gear,2
+    PL_PSS $05bd4,sim_gear_update,2
     PL_PS  $0adf8,sim_dashboard
+    PL_P   $0d6ae,sim_ai_begin
     PL_PSS $0dd52,sim_ai_accel,2
-    PL_L   $0dcd6,3072         ; AI stopping deceleration, 6144 /2
-    PL_L   $0dd18,768          ; pursuit braking, 1536 /2
-    PL_L   $0dd30,1216         ; normal AI braking, 2432 /2
-    PL_L   $0de30,512          ; AI curve braking, 1024 /2
+    PL_PSS $0dcd4,sim_ai_stop,2
+    PL_PS  $0dd16,sim_ai_pursuit
+    PL_PS  $0dd2e,sim_ai_brake
+    PL_PSS $0de2e,sim_ai_curve,2
     PL_PSS $0de36,sim_ai_motion,2
     PL_PS  $0ddce,sim_ai_lane
     PL_PS  $0e080,sim_ai_lane
-    PL_L   $0def4,768          ; police braking, 1536 /2
-    PL_L   $0df30,768          ; police restart acceleration, 1536 /2
+    PL_PSS $0def2,sim_police_brake,2
+    PL_PSS $0df2e,sim_police_accel,2
     PL_PS  $0df54,sim_police_return_lane
     PL_PSS $0e0f2,sim_traffic_forward,2
     PL_PSS $0e1b0,sim_traffic_oncoming,2
@@ -47,7 +55,7 @@
     PL_PS  $08bfa,sim_verge_high
     PL_PS  $08c30,sim_verge_low
     PL_PS  $08c3c,sim_verge_high
-    PL_W   $091b8,$ec88        ; distance-driven effect phase /64 (was /32)
+    PL_PS  $091b8,sim_effect_phase
     PL_PS  $05c74,sim_overheat_check
     PL_PS  $05c80,sim_crash_check
     PL_PS  $06510,sim_dashboard_draw
@@ -59,4 +67,11 @@
     PL_P   $08d94,sim_draw_event
     PL_W   $0e9f0,$7200        ; gameplay RNG excludes beam-position entropy
     PL_NOP $0e9f2,4
+    IFD VERIFY
+    PL_ELSE
+    PL_IFC5X 0
+    PL_PS  $05a4c,sim_start
+    PL_PSS $05a5a,verify_original_begin,2
+    PL_ENDIF
+    ENDC
     PL_ENDIF

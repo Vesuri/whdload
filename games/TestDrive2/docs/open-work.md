@@ -4,8 +4,9 @@
 > `docs/optimisation-plan.md` (performance ranking). Everything here was measured or read from
 > the binary on 2026-10-04; each claim says which. Do the work items **in order**.
 
-**Current status:** W1–W6 complete. The original handoff measurements below are retained as historical
-context; the completed work-item findings supersede their unproven assumptions.
+**Current status:** W1–W6 complete, including the user-requested one-field
+refinement (2026-10-04). The original handoff and three-field measurements remain
+as historical context; the one-field completion records below describe this release.
 
 ## The goal
 
@@ -426,6 +427,76 @@ Write up the options with the W3 evidence and **ask the user**. The options depe
 
 ### W5. Implement the chosen design
 
+**Follow-up authorised (2026-10-04):** the user requested six one-sixth-sized
+substeps per original step, following the Revs/SCR elapsed-time approach, with
+appropriate tests and all improvements finished. Retain the independent existing
+simulation task; use one PAL field per physical step. Require signed fractional
+carries, original-cadence bookkeeping, original-mode handling fixtures, cross-CPU
+and slow-drawing state checks, recovery/terminal checks, and new release benchmarks.
+The user also reported demo off-road behaviour. The first prototype exposed
+unscaled gear-lever travel (early clutch release). Its gear-hook return adjustment
+then landed two bytes before the intended instruction; the exception at $D08012
+identified that error. The correction has an assembly return-boundary regression
+fixture. A 6,000-field normal-demo capture reproduced an early crash and showed that
+the demo AI record is a full-step predictor: its speed/distance outputs are discarded,
+so they must not be scaled as physical rates. The completed validation is recorded below.
+
+**One-field W5 refinement DONE (2026-10-04).** The v1 optional simulation now
+runs once per PAL video field (50 Hz), retaining the existing independent tasks.
+Signed word/long rates have fractional carries; physical AI records have independent
+carries. Player/AI displacement receives a modified-Euler constant-force correction,
+and heading/yaw/clutch relaxation uses Q16 sixth roots. Coupled free-RPM rise and
+decay compose to the original map within one word unit. Gear decisions/lever travel
+and script counters retain six-field cadence. A gear command preserves the entire
+six-field player-physics hold that the original skipped. The demo record retains
+full-step prediction speed/distance; only its applied lane movement is fractional.
+
+The corrected hooks pass `audit_simulation.py`: 63 hooks, no errors. VERIFY has
+59 assembly assertions, covering signed endpoints, separate car carries, clocks,
+counters, relaxations, coupled RPM, constant-force acceleration/braking travel,
+gear holds and the prediction distinction. The return-boundary test has a sentinel
+at site+54: deliberately restoring the erroneous $36 return adjustment produces
+five failures; the correct $38 passes 59/59 (`six-gear-regression-bad/good`).
+The bad build captured only one field, before driving, and is not shipped.
+
+`six-validated-drive-000/020/slow` compares all **35 core variables 1800/1800**,
+including sample 0, across the 68000, 68020/fast RAM and artificially slow drawing.
+`six-validated-damage-000/020/slow` does the same for forced engine damage.
+`six-validated-fatal-000/020` matches core state **1200/1200**: fatal code 17
+at field 900 overrides an existing recovery, lives reach zero and the race clock
+freezes while VBL continues. Deadline checks end at that terminal event; later
+menu deadline differences are not active physics. All nonterminal checks show
+one-field pacing, deadline lag exactly zero and nominal PAL elapsed race time.
+
+Ordinary demo captures `six-holds-demo-000` / `six-validated-demo-020` match all
+35 variables **6000/6000**, through one complete recovery. The same game patches
+ship in the normal build: `six-release-state-000/020` match **6000/6000**, and
+normal/VERIFY trajectories also match **6000/6000**. Camera and needle snapshots
+can differ because drawing samples at different times. The normal trainer run
+`six-release-trainer` passes 4000-field timing and a full 240-field idle recovery:
+one penalty of 200, lives stay 5. The normal slave is 10008 bytes, SHA-256
+`ac3d955a3639a5c12b2a49fa8f624272335431d2b766e7a3eea14cd34193aed8`.
+
+With simulation off, `six-validated-disabled` confirms original v1 bytes at all
+67 checked non-RNG ranges (including alternative fixture ranges). VERIFY input
+fixtures can now run the original controller too, providing a real handling
+baseline rather than a different attract driver. The straight fixture intentionally
+has no road-following steering and must not be mistaken for the demo.
+
+**Measured handling limits:** the original ordinary demo first crashes at field
+3474; the uncorrected fractional predictor crashed at 1092. The final full-horizon
+build crashes at **3457**, 17 fields earlier than original. At field 999 original
+speed/distance are 8828952/15390991, versus 8929273/15621755: about +1.14% speed,
++1.73% travel measured from the common start position 2031616. The straight
+acceleration fixture at field 399 has about +2.57% speed and +3.04% travel; its
+stopped position after braking is +3.27% farther from the start. These changes
+are finer-integration/decision effects, not CPU divergence. Six constant-rate
+updates preserve an old increment; arbitrary nonlinear races are not byte-exact
+coarse-step replicas. PAL is validated; NTSC and natural police pursuit are not.
+
+The completed three-field release below is historical evidence, not validation of
+the new one-field build.
+
 **DONE (2026-10-04).** The optional v1 `CUSTOM2` patch uses a three-field PAL
 step (16.67 Hz), halves continuous rates, retains road-unit operations and event
 impulses, and carries 3/5 fractions for clocks and average-speed sums. Visual
@@ -514,6 +585,43 @@ clear (`duel:0789c`, `duel:0844e`) as blitter or long-word operations, then proj
 with `fixed_window.sh` on the reproducible slave. Skip anything worth < 3% of a frame unless it
 is free. Do not touch the slave's `set_copper` beam wait (JOTD's flicker fix) without testing a
 68020/68030 configuration for tearing.
+
+**One-field W6 revalidation DONE (2026-10-04).** No additional rendering
+algorithm is shipping. The existing v1 unused-blitter-interrupt option is
+revalidated against the final 50 Hz simulation. Four normal-build fixed windows
+(`six-release-serial-a/b`, `six-release-irq-a/b`) use the identical 10008-byte slave:
+
+| Arm | Both repeats | Polling | BLIT / VBL interrupts per 100 fields |
+|---|---|---:|---:|
+| CUSTOM2=1 | 7 frames / 78 fields = 4.5 fps | 12.7% | 1955 / 100 |
+| CUSTOM2=3 | 9 frames / 87 fields = 5.2 fps | 14.2% | 0 / 100 |
+
+That is **15.3% more frames per second / 13.2% less time per frame** in this
+window, above the noise and 3% thresholds. It compares the same 50 Hz physics in
+both arms. The extra physics updates cost CPU time: the historical three-field
+mode drew faster (6.5 fps with IRQ suppression). This refinement improves update
+frequency and handling fidelity, not rendering speed relative to that old mode.
+
+The recommended CUSTOM2=3 arm passes the complete, uncropped W1 image repeat:
+first/last MD5s **9fb8e78911ccb9c21432cbe39e09347e** /
+**4eb34ff6e3c47aee3361d16718fd8371** in both boots. The serial baseline's raw
+images fail the byte repeat: 6140 differing pixels, confined to outer capture
+columns 751–753 and rows 568–575. Its complete game viewport (x=74..713,
+y=37..436) matches exactly at both endpoints. No images were cropped or
+normalised, and the serial arm is not claimed to pass the full raw check.
+Frame counts repeat exactly; game-speed evidence comes from state, not images.
+
+`six-validated-irq-on-state` matches all 35 driving variables 1800/1800 with
+IRQ suppression on/off. Damage plus slow drawing also matches 1800/1800.
+Runtime shape twins (`six-validated-twin-000/020`) complete **18 / 33 checks**
+with zero pixel/carry mismatches; both retain one-field scheduling in their
+300-field state windows. Their deliberately expensive oracle has no useful
+fps result and is excluded from performance claims. The normal `six-release-render-only` capture independently verifies original
+instructions at all 67 simulation ranges with CUSTOM2=2. Normal release state,
+trainer, recovery and terminal proofs are recorded in the W5 completion above.
+All original blitter waits, ownership barriers and JOTD's display fix remain.
+
+The previous three-field rendering results below are historical.
 
 **DONE (2026-10-04).** The accepted rendering change is v1 CUSTOM2 bit 1,
 suppression of unused blitter-finished interrupts. The first v1 rendering prototype moved shape

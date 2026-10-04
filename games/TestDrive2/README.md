@@ -51,9 +51,11 @@ make -C whdload
 WHD_ARGS=CUSTOM2=3 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
 ```
 
-`CUSTOM2=1` runs simulation every three PAL fields (16.67 Hz), independently of drawing.
-The rendering option measured 5.6 → 6.5 fps in the reproducible first-race
-window; it retains every original wait and JOTD's display fix.
+`CUSTOM2=1` runs simulation every PAL field (50 Hz), independently of drawing.
+The rendering option suppresses unused interrupts and retains every original
+wait and JOTD's display fix. Two fixed-window repeats per arm measure
+4.5 → 5.2 fps with the same 50 Hz physics. More frequent physics uses CPU time;
+this gain is relative to that mode.
 CUSTOM2 is a bitfield: bit 0 enables simulation, bit 1 suppresses unused blitter
 interrupts. `CUSTOM2=3` enables both; `CUSTOM2=2` changes only rendering overhead.
 Motion rates are scaled, the race clock follows elapsed field time, and nonfatal
@@ -66,6 +68,7 @@ lives trainer remains supported. NTSC timing has not been validated.
 entropy from the original mode, CUSTOM4 slows drawing, and CUSTOM5 bit 0 drives
 an input tape. CUSTOM5=3 also forces engine damage once; CUSTOM5=5 instead forces
 a fatal crash. CUSTOM5=9 adds original-versus-patched shape pixel checks to the driving tape.
+CUSTOM5=17 uses a straight acceleration/braking fixture; it does not follow road bends.
 These verification options are absent from the normal build.
 Use `tools/fixed_window.sh` for fps, state captures for game-time comparisons,
 and the retained `OUT/slave.slave` when analysing older traces.

@@ -19,4 +19,4 @@ start=b.find(marker,lo-a.base,hi-a.base)
 assert start>=0, 'no assembly rate-check results in this slave'
 failures,cases=struct.unpack_from('>II',b,(start+len(marker)+1)&~1)
 print(f'Assembly rate invariants: {cases} cases, {failures} failures')
-assert cases==18 and failures==0, 'assembly rate checks did not pass'
+assert cases==59 and failures==0, 'assembly rate checks did not pass'

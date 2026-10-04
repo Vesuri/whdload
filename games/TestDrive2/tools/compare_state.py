@@ -16,7 +16,7 @@ def read(p):
     root=Path(p)
     return (root/'initial.bin').read_bytes(),[f.read_bytes() for f in sorted(root.glob('[0-9][0-9][0-9][0-9].bin'))]
 def main():
-    p=argparse.ArgumentParser();p.add_argument('a');p.add_argument('b');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('a');p.add_argument('b');p.add_argument('--assert-core',action='store_true');p.add_argument('--start',type=int,default=0);a=p.parse_args()
     ia,aa=read(a.a);ib,bb=read(a.b);n=min(len(aa),len(bb))
     if not n: p.error('both directories must contain VBL samples')
     print(f'Comparing {n} VBL samples (indices 0..{n-1}); lengths={len(aa)}/{len(bb)}')
@@ -24,6 +24,12 @@ def main():
         initial=(value(ia,*v),value(ib,*v));bad=[i for i,(x,y) in enumerate(zip(aa,bb)) if value(x,*v)!=value(y,*v)]
         kind='core' if name in CORE else 'sampled/visual/field-counter'
         print(f'{name} [{kind}]: initial={initial}, match={n-len(bad)}/{n}, first mismatches='+str([(i,value(aa[i],*v),value(bb[i],*v)) for i in bad[:8]]))
+    if a.assert_core:
+        assert len(aa)==len(bb), 'capture lengths differ'
+        failures={name:[i for i in range(a.start,n) if value(aa[i],*VARIABLES[name])!=value(bb[i],*VARIABLES[name])] for name in CORE}
+        failures={name:bad[:8] for name,bad in failures.items() if bad}
+        assert not failures, f'core state differs: {failures}'
+        print(f'All {len(CORE)} core variables match at samples {a.start}..{n-1}')
     # Boot lengths differ; compare field-clock/deadline phases relative to sample 0.
     va=value(aa[0],*VARIABLES['vbl']);vb=value(bb[0],*VARIABLES['vbl'])
     for name in ('vbl','deadline'):

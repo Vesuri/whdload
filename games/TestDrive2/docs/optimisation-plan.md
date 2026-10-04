@@ -22,7 +22,22 @@
 - **No game bytes in the repo.** Replacement routines are our own code; patch lists name
   offsets. The slave source (JOTD, public domain) is in `whdload/`.
 
-## W6 measured update (2026-10-04)
+## One-field release revalidation (2026-10-04)
+
+The final normal slave uses 50 Hz physics. Two fixed-window boots per arm give
+4.5 fps with CUSTOM2=1 and 5.2 fps with CUSTOM2=3: 15.3% more frames, with every
+original wait retained. Cross-CPU state matches 6000/6000; the render option does
+not change the 1800-field input trajectory. Shape twins complete 18/33 cases on
+the two CPUs, with no mismatches. The recommended combined mode repeats full raw
+first/last images; the serial baseline differs only outside the game viewport
+and is not claimed to pass that raw check. See open-work.md for exact evidence.
+
+The additional simulation updates use CPU time; this fps gain is measured against
+the same 50 Hz simulation, not against the faster three-field release. The
+candidate bounds and experiments below are historical three-field measurements.
+No new speculative rendering algorithm or changed blitter wait is included.
+
+## Three-field W6 measured update (2026-10-04)
 
 W1–W5 and the user's higher-rate design are now complete; their evidence is in
 open-work.md. The tables and predicted gains below are the original handoff,
