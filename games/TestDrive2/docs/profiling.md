@@ -401,3 +401,64 @@ VERIFY CUSTOM5=17 accelerates, brakes, coasts and restarts without steering; it
 will leave a curved road. Evaluate normal attract driving with CUSTOM5 off.
 An updated slave can move the loaded hunk to another allocation page; calibrate
 again or supply a verified BOOT_HUNK. The harness checks the supplied address.
+
+
+## A1200 and 68030 configuration studies
+
+`AMIGA_MODEL` selects the FS-UAE model in `amiga/run.sh` (default A500).
+Set `CPU` explicitly when selecting another model; its default remains 68000.
+The calibration key includes the model and host Kickstart path. Each completed
+capture retains the effective emulator configuration in `fsuae.log` and stdout
+in `fsuae-stdout.log`. Emulator files/logs use a project-local base directory,
+so other projects' emulators cannot overwrite this evidence.
+
+For the expanded A1200 tested here:
+
+```sh
+source amiga/env.sh
+export AMIGA_MODEL=A1200 CPU=68EC020 CHIP_KB=2048 FAST_KB=4096
+export KICKSTART="/path/to/kickstarts/kick40068.A1200"
+export EXTRA_ARGS='--slow_memory=0' WHD_ARGS='CUSTOM2=3'
+export SLAVE="$PWD/whdload/TestDrive2.slave"
+STATE_FIELDS=6000 STATE_ONLY=1 tools/fixed_window.sh tmp/prof/a1200-state "$SLAVE"
+tools/fixed_window.sh tmp/prof/a1200-fps-a "$SLAVE"
+tools/fixed_window.sh tmp/prof/a1200-fps-b "$SLAVE"
+```
+
+For the 25 MHz 68030 configuration, retain that model/ROM/RAM and change:
+
+```sh
+export CPU=68030
+export EXTRA_ARGS='--slow_memory=0 --uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency=25000000 --uae_cpu_cycle_exact=true'
+```
+
+This is an accelerated A1200 configuration, not an A4000 hardware claim.
+No A4000 host ROM was available locally. Verify the retained log's effective
+CPU, frequency and timing mode before interpreting FPS as a hardware estimate.
+Use state-only captures for timing/physics comparisons and separate 100-field
+windows, with no preceding state samples, for rendering comparisons.
+
+
+This FS-UAE binary's 68030 backend emits **zero CPU instruction bytes** in a
+100-field trace (`030-fps-a`); it cannot supply the usual COP1LC instruction
+count or polling percentages. `frames.py` now rejects such a trace explicitly.
+Use `SWAP_ONLY=1 tools/fixed_window.sh ...` for these CPUs. This retains the
+same calibration, fresh-boot race anchor and field window, but calls
+`swap_fields.py`: read-only breakpoints at the slave's COP1LC write and
+`duel:0231c` count swaps over 100 complete PAL fields. Only debugger convenience
+variables are modified. It retains `swaps-gdb.txt`, `frames.txt`, the exact slave,
+code dump and effective configuration log; it does not claim cycle costs or
+trace screenshots.
+
+The `a1200-swaps` validation gives the **exact same 100-field swap pattern**
+and 30 frames over 93 fields / 16.1 fps as both ordinary A1200 cycle traces.
+This independently validates the field boundaries and FPS calculation before
+using the alternate instrument on the 68030. FPS comparisons still run only
+through `fixed_window.sh`; the state study remains a separate capture.
+
+The completed 25 MHz 68030 runs are `030-state` (6,000 fields, all 35 gameplay
+variables exact against the 68000; elapsed-clock and recovery checks pass) and
+`030-swaps-a/b` (both 49 frames over 98 fields = 25.0 fps, identical swap
+patterns). The A1200 ordinary trace repeats are 16.1 / 16.1 fps. All use
+CUSTOM2=3 and normal shipping slave hash
+`ac3d955a3639a5c12b2a49fa8f624272335431d2b766e7a3eea14cd34193aed8`.

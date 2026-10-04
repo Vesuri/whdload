@@ -16,6 +16,7 @@ RTB="${RTB:-/path/to/kick34005.A500.RTB}"
 WB="${WB:-/path/to/Workbenchv2.04rev37.67Workbench.adf}"
 WHD="/path/to/WHDLoad"
 CPU="${CPU:-68000}"
+AMIGA_MODEL="${AMIGA_MODEL:-A500}"
 RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"
 
 fsuae_claim_port
@@ -41,7 +42,8 @@ REC=(); [ -n "${RECORD:-}" ] && REC=(--record="$RECORD" --deterministic=1)
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
 "${FSUAE:-fs-uae}" \
-  --amiga_model=A500 --cpu="$CPU" --chip_memory="${CHIP_KB:-1024}" --fast_memory="${FAST_KB:-2048}" \
+  --base_dir="$PWD/$RUN/fsuae" \
+  --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-1024}" --fast_memory="${FAST_KB:-2048}" \
   --kickstart_file="$KICKSTART" \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   --floppy_drive_0="$WB" \

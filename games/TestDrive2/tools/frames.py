@@ -53,6 +53,8 @@ for f in trace.fields:
     for i in range(0, len(f.dma), f.dma_size):
         slots[f.dma[i + 29]] += 1
 
+if not total:
+    sys.exit('No CPU instruction records in this trace; use fixed_window.sh with SWAP_ONLY=1.')
 nf = len(trace.fields)
 first = next((i for i, n in enumerate(swaps) if n), None)
 last = max((i for i, n in enumerate(swaps) if n), default=None)

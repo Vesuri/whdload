@@ -577,6 +577,57 @@ measured handling change (~+5.4% distance, +3.4% speed at field 999).
 Only now. One patch per commit, each with a `fixed_window.sh` A/B and the W1 reproducibility
 check showing the simulation trajectory (W2 variables per field) is unchanged where it must be.
 
+### Additional machine validation (2026-10-04)
+
+The user requested A1200 and A4000/general-68030 testing. All new captures use
+normal shipping slave SHA256
+`ac3d955a3639a5c12b2a49fa8f624272335431d2b766e7a3eea14cd34193aed8`,
+`CUSTOM2=3`, normal attract driving, and no VERIFY fixtures or trainer.
+The harness now selects the machine model explicitly and isolates emulator logs.
+
+Expanded A1200: FS-UAE A1200 model, 68EC020, host Kickstart 3.1 A1200,
+2 MB chip RAM, 4 MB fast RAM, no slow RAM. Effective log confirms real CPU speed,
+approximate cycle timing, 24-bit addressing and JIT disabled.
+`a1200-state` matches all 35 core gameplay variables against
+`six-release-state-000` at every sample 0..5999. Timing checks pass 6,000
+consecutive one-field deadlines with zero lag; the clock follows elapsed PAL
+fields from field 73 plus the single 200-unit penalty. Recovery checks confirm
+one lost life, one penalty, and a complete 240-field stationary idle recovery.
+
+Two separate fresh-boot 100-field windows, `a1200-fps-a/b`, both measure
+30 frames over 93 fields = **16.1 fps**, with identical swap patterns, 38.7%
+blitter polling, 0 BLIT interrupts and 100 VBL interrupts. Their full raw first
+and last trace screenshots are byte-identical across boots. These windows
+start immediately at the race anchor, not after the long state study.
+
+The general 68030 configuration retains that A1200 model/ROM/RAM and sets
+CPU=68030, real speed, cycle timing enabled, multiplier zero and frequency
+25,000,000 Hz. This is an accelerated A1200 setup; no local A4000 ROM was
+available. These are emulator measurements, not measured physical hardware FPS.
+`030-state` also matches all 35 gameplay variables at every sample 0..5999;
+the one-field pacing, elapsed clock and complete recovery checks pass with the
+same event timing as the 68000 and 68EC020. The retained effective configuration
+confirms CPU=68030, the requested 25 MHz frequency with multiplier zero,
+approximate cycle timing, no FPU, MMU=68030 and JIT disabled.
+The 68030 instruction profiler emitted zero instruction bytes over 100 fields
+(`030-fps-a`), so that capture is rejected as an FPS instrument. The harness's
+new `SWAP_ONLY=1` mode counts COP1LC writes at read-only debugger breakpoints
+over 100 complete VBL intervals. `a1200-swaps` reproduces the **exact** swap
+pattern and 16.1 fps of both ordinary A1200 traces, validating this alternate
+instrument's field boundaries before using it on the 68030.
+
+Two fresh-boot `030-swaps-a/b` windows both give an identical alternating swap
+pattern: **49 frames in 98 fields = 25.0 fps**. Both use the same shipping slave,
+settings and race anchor. No 68030 polling/interrupt percentages are claimed
+from its empty CPU trace. Physics/state checks remain independent of drawing.
+
+| Emulated setup, CUSTOM2=3 | Fixed-window FPS, two boots | Gameplay state vs 68000 |
+|---|---|---|
+| Expanded A1200 / 68EC020, 2 MB chip + 4 MB fast | 16.1 / 16.1 | 35 variables × 6,000 fields, exact |
+| A1200 / 68030 at requested 25 MHz, same RAM | 25.0 / 25.0 | 35 variables × 6,000 fields, exact |
+
+Commands and effective configuration evidence are described in `docs/profiling.md`.
+
 ### W6. Then, and only then, rendering speed
 
 Follow `docs/optimisation-plan.md` §1–§3, **largest structural item first**: let the CPU run while

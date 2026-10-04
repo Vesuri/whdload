@@ -10,7 +10,7 @@ local input under `tmp/` (see `.gitignore`).
 | `amiga/run.sh`, `amiga/env.sh` | boot the WHDLoad install in FS-UAE (Kickstart 3.1 host, kick 1.3 kickemu inside WHDLoad) |
 | `tools/td2.py` | long-lived gdb session on FS-UAE's Barto stub: screenshots, cycle-exact traces |
 | `tools/profile_demo.sh` | one command: boot, wait for the attract demo to drive, trace, report |
-| `tools/fixed_window.sh` | A/B benchmark: trace a fixed window from the first demo frame, any slave |
+| `tools/fixed_window.sh` | A/B benchmark: fixed race window; cycle trace or read-only swap counter (`SWAP_ONLY=1`) |
 | `tools/td2_report.py`, `tools/frames.py` | attribute a trace to routines; frame rate, blitter waits, interrupts, bus use |
 | `tools/barto.py` | reader for the stub's `monitor profile` trace format |
 | `tools/hotspots.py`, `tools/disd.py`, `tools/dis.sh` | hottest instructions per routine, disassembly by `duel` hunk offset |
