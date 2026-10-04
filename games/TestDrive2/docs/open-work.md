@@ -191,6 +191,62 @@ attract sequence's choice has another timing input; find it the same way.
 
 ### W2. Map the game state
 
+**DONE (2026-10-04).** `tools/state_fields.py` reads the allocated data hunk at successive
+entries to `duel:0231c`; `state_report.py` reports raw values and change fields.
+`state_writers.py` correlates executed simple destination EAs with task stacks. It is not a
+complete instruction emulator; absence from its report is not proof of no writes.
+`state_watch.py` independently verifies candidate stores with constant-address hardware write
+watchpoints. All capture files remain in ignored `tmp/`.
+
+**Data-hunk correction:** the file's hunk-1 payload is `$3A38`, but its allocation in the
+HUNK_HEADER is `$1E9C` longs = `$7A70` bytes. Most mutable state is in the zero-filled tail.
+Follow the BPTR at `hunk0−4` to get hunk 1's segment link, then add 4 for its data address.
+Do not byte-search for it: that can find WHDLoad's PRELOAD copy. In this VERIFY 68000 boot,
+hunk 0 = `$CFF0A8`, hunk 1 = `$D10620`, a4 = hunk 1 + `$7FFE` = `$D1861E`.
+`td2_report.regions` now includes the full allocated `duel-data` region.
+
+| State | a4 displacement | Size / meaning | Update schedule | Observed writer (duel hunk offset) |
+|---|---|---|---|---|
+| Player longitudinal position | `-$4356` / -17238 | long, 16.16 road units | six-field step | `0b2a6` (integration); `05a88`, `05aec` temporarily borrow/restore it for demo AI |
+| Player speed | `-$33E2` / -13282 | long, 16.16; integer word feeds MPH needle | six-field step | `0a8e6` (add increment); `0a754`, `0a828`, `0a8fa`; `05a9a`, `05ad8` demo borrow/restore |
+| Race clock | `-$27A2` / -10146 | long, nominal tenths; initial 1 displays 0:00 | six-field step after movement starts | `05b90` (+1); reset `0bbf8`; finish/penalty path `05c58`, `05eea` |
+| Opponent longitudinal position | `-$342C` / -13356 | long, 16.16 road units | six-field step | `0de3e` stores to `2(a5)` with a5 = a4−13358 |
+| Opponent longitudinal increment | `-$3424` / -13348 | long, road units per step, player-speed scale /64 | six-field step | `0dd6e` stores to `10(a5)` |
+| Same-direction traffic origin | `-$349E` / -13470 | long, 16.16, wraps at road length | six-field step | `0e0f6` |
+| Oncoming traffic origin | `-$349A` / -13466 | long, 16.16, wraps at road length | six-field step | `0e1b4`, wrap `0e1be` |
+| Render/camera position snapshot | `-$3452` / -13394 | long, copy of player position | once per rendered frame | `06442` |
+| MILES display | camera above + `-$4358` / -17240 | derived; road length is word | display recomputed per rendered frame | `08fba` onward reads `road length−camera integer`, ×100 /4325, then decimal digits; no separate continuously accumulated miles counter |
+| Gameplay field clock | `-$4340` / -17216 | long | every video field | `01abc` adds 1 through `(a1)` in VBL callback |
+| Step deadline | `-$433C` / -17212 | long, field clock units | advances by 6 per heavy step | `05c12`; `-$6CD6` / -27862 is the word constant 6 |
+| RPM | `-$3384` / -13188 | long, 16.16 | six-field step | `0a6f0`, `0a750`, `0a7e2`, `0a836` |
+| Engine audio period | `-$0AE8` / -2792 | word, computed from RPM | six-field step | `0d156` |
+| Fuel | `-$2A46` / -10822 | word | six-field step | `0ade6` |
+| Two dashboard animation phases | `-$0BC0` / -3008, `-$0BBE` / -3006 | words | six-field step | `0ae04`, `0ae34` |
+| Needle redraw caches (speed/RPM) | `-$6048` / -24648, `-$604C` / -24652 | words, sampled values | once per rendered frame | `0ad6e`, `0ad1e`, helper `0b45a` |
+| Four visual/background phases | `-$0C30` / -3120, `-$0C2C` / -3116, `-$0C28` / -3112, `-$0C24` / -3108 | longs; +4000/+5000/+6000/+7000 | **once per rendered frame** | `08cd0`, `08cd8`, `08ce0`, `08ce8` |
+
+In `state-000`, 300 VBL snapshots: clock and opponent position first change at sample 78,
+then every six samples through 294 (37 changes). This particular attract demo waits before
+moving; a changing word is not necessarily an additional clock. The camera cache changes at
+85, 94, 103… with the slower render schedule. In the following 100-field trace (relative
+fields 300–399), all listed core writers run at trace fields 5,11,…95 on stack page `$CFC`,
+while the camera/phase writers use renderer stack page `$D1D` (camera at 3,14,…91).
+
+Hardware write watchpoints in `state-watch/state/watchpoints.txt` confirmed:
+player position 2576994 → 2620780 at `0b2a6`; speed 2802353 → 2902475 at `0a8e6`;
+clock 23 → 24 at `05b90`; opponent position 1429220 → 1462868 at `0de3e`.
+All four use the second game task's `$CFCxxx` stack.
+
+**Sampling trap:** the demo temporarily substitutes opponent values into the player globals
+inside the heavy step. A VBL can interrupt this transaction (sample 0 caught player position
+1114112 instead of committed 2031616). Compare initial anchor values and committed values;
+classify any isolated mismatch by its PC before calling it a gameplay-speed difference.
+
+**W3 audit already has a concrete target:** the four visual phase accumulators really advance
+per render; needle/camera caches merely sample fixed-step inputs. The engine period writer is
+in the heavy task. W3 must distinguish visual clock dependence from gameplay dependence.
+
+
 **Do:** find, in `duel`'s data hunk (hunk 1, `$3A38` bytes; located like hunk 0 — see
 `td2_report.regions`, add hunk 1), the variables for: player distance/position along the road,
 player speed, the race clock, the "MILES" display value, opponent/traffic positions. Method:

@@ -63,8 +63,16 @@ if [ "${ANCHOR:-0xbbf8}" = 0xbbf8 ]; then
   td2 until "$(printf '%#x' $((hunk + 0x5a4c)))" >> "$OUT/anchor.txt"
 fi
 td2 gdb 'x/1uw $a4-10146' >> "$OUT/anchor.txt"
+# Optional read-only state study: sample N VBL entries before the traced window.
+# The trace then starts after these N fields; record that offset when quoting its fps.
+if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
+  python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
+fi
 reply=$(td2 profile "$FIELDS" "$PWD/$OUT/trace.bin")
 [ -f "$OUT/trace.bin" ] || { echo "no trace: $reply" >&2; exit 1; }
+if [ "${WATCH_STATE:-0}" = 1 ]; then
+  python3 tools/state_watch.py "$OUT/state"
+fi
 dump
 td2 quit > /dev/null; trap - EXIT
 python3 - "$OUT" <<'EOF'

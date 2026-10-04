@@ -127,7 +127,7 @@ python3 tools/disd.py       tmp/prof/run/code.bin 0xc00000 <duel-hunk-base> 0x0f
 
 (`--base 0x200000` and a fast-RAM dump when `FAST_KB>0`.)
 
-**Code regions** are found by byte-matching the dump against the installed files (relocations
+**Code regions** (except the linked data hunk) are found by byte-matching the dump against the installed files (relocations
 make an exact compare impossible, so 16-byte windows vote for a base):
 
 | Region | Found as | In a 512K/1.5M run |
@@ -248,3 +248,15 @@ The demo made it unnecessary, but these were established:
   which genuinely idles. Check the screenshots and that PCs are present before trusting a trace
   (`profile_demo.sh` checks the screenshots; §3's assert covers the window).
 - Killing a `td2.py` client mid-reply used to kill the server (BrokenPipe); it now survives.
+
+## 9. Per-field state studies (W2)
+
+`STATE_FIELDS=300 tools/fixed_window.sh ...` takes an initial data snapshot at the race anchor,
+then 300 snapshots at successive game VBL-server entries before its ordinary trace. Its trace
+therefore starts at that field offset; record it when quoting fps. `WATCH_STATE=1` additionally
+runs four writer watchpoint checks after the trace; they do not change the traced window.
+Use `tools/state_report.py OUT/state` and `tools/state_writers.py OUT/trace.bin OUT/code.bin BASE`.
+The sampler reads the full allocated `$7A70`-byte data hunk, including the zero-filled tail,
+not just its `$3A38` file payload. See the state table and transient demo-state trap in open-work.
+Constant-address `watch -location *(int*)ADDR` uses the stub's hardware write watchpoints;
+register-dependent `watch *(int*)($a4-OFFSET)` may instead choose software watchpoints.

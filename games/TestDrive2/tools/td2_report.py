@@ -79,7 +79,13 @@ def regions(dump, base):
     out = []
     code = duel[0x28:0x28 + 0x1156c]  # root code hunk (hunk 0)
     a = locate(dump, code, base)
-    if a: out.append((a, a + len(code), 'duel', a))
+    if a:
+        out.append((a, a + len(code), 'duel', a))
+        # Follow LoadSeg's BPTR chain; a byte search can select the PRELOAD data copy.
+        next_bptr = struct.unpack_from('>I', dump, a - base - 4)[0]
+        data_base = next_bptr * 4 + 4
+        if base <= data_base and data_base + 0x7a70 <= base + len(dump):
+            out.append((data_base, data_base + 0x7a70, 'duel-data', data_base))
     a = locate(dump, kick[:0x40000], base, 256)
     if a: out.append((a, a + 0x40000, 'kick', a - 0xfc0000))  # name by ROM address
     a = locate(dump, slave, base, 16)
