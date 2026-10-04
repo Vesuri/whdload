@@ -296,3 +296,20 @@ capture, retained under ignored `tmp/` if the source changes between runs.
 `tools/audit_simulation.py tmp/game/TestDrive2/data/duel` checks v1 simulation
 hook instruction boundaries, overlaps and direct incoming branches. It reads the
 original game locally and emits only diagnostics; it embeds no game bytes.
+
+
+The harness now retains `OUT/slave.slave` and runs that exact copy, including its
+calibration reboot. For later analysis use `SLAVE="$PWD/OUT/slave.slave"` so a
+new build cannot change the slave-region bounds for an old capture.
+
+For W5, `tools/check_timing.py OUT/state --min-fields 1800` checks consecutive
+VBL indices, three-field deadline increments/spacing and the clock against PAL
+elapsed time, accounting for recorded 20-second penalties. It reports any end of
+the continuous driving prefix; it does not count menu phases as active simulation.
+
+`make -C whdload verify` additionally offers v1 `CUSTOM5=1` with `CUSTOM2=1`:
+the first race uses normal player physics with a field-based joystick tape.
+It accelerates, turns left at fields 100–105, right at 106–111, brakes at 200–299,
+coasts at 300–399, then accelerates. There are no debugger target writes.
+`CUSTOM1=1` tests infinite lives through repeated recoveries. Normal builds omit
+this fixture, and v2's joystick hooks stay unchanged.

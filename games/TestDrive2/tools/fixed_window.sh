@@ -8,7 +8,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
-export DETERMINISTIC=1 SLAVE="${2:-}" CPU="${CPU:-68000}"
+# Retain exactly the slave used by this capture; later builds must not change
+# region sizes or hook addresses when analysing a saved trace.
+INPUT_SLAVE=${2:-tmp/game/TestDrive2/TestDrive2.slave}
+if [ "$INPUT_SLAVE" != "$PWD/$OUT/slave.slave" ]; then
+  cp "$INPUT_SLAVE" "$OUT/slave.slave"
+fi
+export DETERMINISTIC=1 SLAVE="$PWD/$OUT/slave.slave" CPU="${CPU:-68000}"
 # The code is loaded into "other" memory: fast RAM at $200000 when there is any, else slow RAM.
 SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))

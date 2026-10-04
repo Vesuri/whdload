@@ -8,7 +8,9 @@ import argparse
 from pathlib import Path
 from state_report import VARIABLES,value
 CORE={'distance','speed','clock','opponent_distance','opponent_speed','traffic_forward',
-      'traffic_oncoming','rpm','fuel','animation_1','animation_2','engine_period','road_length','stage','rng'}
+      'traffic_oncoming','rpm','fuel','animation_1','animation_2','engine_period','road_length','stage','rng',
+      'lane','heading','yaw','heat','gear','clutch','police','police_wait','crash',
+      'gear_envelope','opponent_lane','opponent_clock','player_sum','opponent_sum'}
 def read(p):
     root=Path(p)
     return (root/'initial.bin').read_bytes(),[f.read_bytes() for f in sorted(root.glob('[0-9][0-9][0-9][0-9].bin'))]
