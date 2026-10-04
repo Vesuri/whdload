@@ -58,9 +58,16 @@ CUSTOM2=11 CUSTOM5=9) compared it against the blitter: 18 shapes, 0 mismatches
 A1200 16.7 → 7.5, 68030/25 MHz 25.0 → 12.4, 68020/100 MHz 25.0 → 16.3 fps.
 Even at 100 MHz the CPU's chip-RAM accesses, not its instructions, are the
 cost: each CPU access takes longer on the chip bus than a blitter DMA slot, and
-the blitter is the most efficient chip-RAM user available. A merged single-pass
-version with longword accesses would cut accesses ~2.5× for a typical 5-plane
-shape; that is roughly break-even, not a path past 25 fps.
+the blitter is the most efficient chip-RAM user available.
+
+A second version (commit "Merge CPU shape blits per plane with longword chip
+access") merges each shape's blits per destination plane (A is shared, so a
+plane ends as A ? last B : C), builds shifted A/B for all rows in fast buffers
+with aligned long chip reads, and combines each plane once with aligned long
+chip reads/writes: ~8 chip accesses per word instead of 20 for a typical
+five-plane shape. Twin: 276 shapes, 0 mismatches (`cpu3-twin-a1200`). Still
+A1200 16.7 → 7.1 fps (a row-at-a-time variant: 5.3; 68030/25 MHz 10.3 vs 25.0).
+The user accepted 25 fps as the cap; the CPU drawer was then removed.
 
 **What could pass 25 fps:** less chip-bus work per frame, not a faster CPU or
 moving blits to the CPU. The one structural option measured as plausible is a
