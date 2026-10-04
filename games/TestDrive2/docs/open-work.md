@@ -4,9 +4,10 @@
 > `docs/optimisation-plan.md` (performance ranking). Everything here was measured or read from
 > the binary on 2026-10-04; each claim says which. Do the work items **in order**.
 
-**Current status:** W1–W6 complete, including the user-requested one-field
-refinement (2026-10-04). The original handoff and three-field measurements remain
-as historical context; the one-field completion records below describe this release.
+**Current status:** W1–W6 complete. The shipping release runs the simulation
+every 6 fields on a 68000 and every 2 on a 68020+ ("Per-CPU simulation period",
+below). The handoff, three-field and one-field records remain as historical
+evidence; the one-field build validated the substep machinery the periods reuse.
 
 ## The goal
 
@@ -761,8 +762,8 @@ priority: the chip bus (blitter + five-bitplane display), not the CPU, limits a
 frame. Details, per-blit costs and the measurements below are in
 `optimisation-plan.md` ("Fast-CPU ceiling").
 
-- CUSTOM2 bit 2 (blitter priority, shipping): A500 5.2 → 5.4, A1200 16.1 → 16.7,
-  68020/100 MHz 21.1 → 25.0 fps. A500 state with bit 2 (`pri-state-a500-c3/c7`)
+- Blitter priority (measured as CUSTOM2 bit 2; now part of bit 1): A500 5.2 → 5.4, A1200 16.1 → 16.7,
+  68020/100 MHz 21.1 → 25.0 fps. A500 state with it (`pri-state-a500-c3/c7`)
   matches all 35 core variables at samples 1..1499; sample 0 differs only in the
   documented initial transaction (RPM, engine period, two animation phases).
 - CPU shape drawing (removed, in git history): pixel-exact against the blitter
@@ -803,6 +804,40 @@ within 1.3 mph; clocks equal within one tenth): finer steps integrate the same
 forces differently. `check_timing.py --period 6|2`; its clock base is now the
 value before the first step, as a 6-field step adds a whole tenth at once.
 
+**Handling against the original (2026-10-05).** Same tests as the one-field
+validation (W5): the 6,000-field ordinary demo against `six-original-demo-000`
+(VERIFY, CUSTOM2=0 CUSTOM3=1), and the 1,000-field straight tape (VERIFY
+CUSTOM5=17) against a fresh original-mode run, `hand-straight-orig`, which
+reproduces `six-original-straight` except for the known sample-0 transaction.
+
+| Build | Demo first crash | Demo speed / travel, field 999 | Straight speed / travel, field 399 | Stop after braking |
+|---|---|---|---|---|
+| Original | 3474 | — | — | field 492 |
+| Period 6, 68000 (`hand-demo-p6`, `hand-straight-p6`) | **3474** | +0.00% / +0.00% | +0.00% / +0.00% | 492, +0.00% |
+| Period 2, A1200 (`hand-demo-p2`, `hand-straight-p2`) | 3464 | +0.72% / +0.99% | +1.75% / +1.59% | 494, +1.84% |
+| Former one-field (W5) | 3457 | +1.14% / +1.73% | +2.57% / +3.04% | 495, +3.27% |
+
+Period 6 is the original step. It reproduces the original's speed exactly
+until the crash, with travel within 285 road units (+0.0003%). The original
+drops sub-unit motion and the patch carries it. After the crash the state
+differs by design: the patch has non-blocking recovery and an elapsed-time
+clock. Period 2 sits between the original and the former one-field build, as
+finer integration predicts. Both 6,000-field demos pass pacing (lag 0..5 and
+0..1), the elapsed clock (one penalty) and a complete recovery. A normal-build
+original-mode demo is not a baseline: CUSTOM3's RNG pinning exists only in
+VERIFY builds, so `hand-demo-orig` is a different demo from field 0.
+
+### Remaining open work
+
+1. **NTSC.** Everything is PAL-validated. The period counts fields and the
+   clock assumes 50 per second, so on NTSC physics and clock would run 20% fast.
+2. **Natural police pursuit.** The counters are unit-tested; a chase in ordinary
+   play has never been captured.
+3. **Beyond 25 fps (user decision).** A fast-RAM back buffer drawn by the CPU
+   and copied to chip (68030+). Unmeasured; the CPU shape results argue against it.
+4. Rendering candidates under the 3% rule (span store pairing, projection
+   caching, early DMA clear) stay skipped unless a new measurement changes that.
+
 ### Tooling debts (fix when they bite, not before)
 
 - Race anchoring and boot polling are fixed by W1; see its calibration-cache trap above.
@@ -819,6 +854,6 @@ value before the first step, as a 6-field step adds a whole tenth at once.
 |---|---|
 | `docs/profiling.md` | how to run, drive, trace and read; traps; baseline |
 | `docs/optimisation-plan.md` | rendering cost centres and the order to attack them (W6) |
-| `whdload/TestDrive2HD.s` | the slave (JOTD v1.5 + `NOBLITIRQ` experiment flag) |
+| `whdload/TestDrive2HD.s` | the slave (JOTD v1.5 + CUSTOM2 simulation/rendering patches) |
 | `tools/` | harness, tracer, reports (README table) |
 | `tmp/prof/w3/`, `tmp/prof/f020/` | the A500-equivalent and 68020 windows quoted above (local only) |
