@@ -4,8 +4,7 @@
 > `docs/optimisation-plan.md` (performance ranking). Everything here was measured or read from
 > the binary on 2026-10-04; each claim says which. Do the work items **in order**.
 
-**Current status:** W1–W3 complete; W4 awaits the user’s design choice. W5/W6 have
-not started. The original handoff measurements below are retained as historical
+**Current status:** W1–W4 complete; W5 is in progress. W6 has not started. The original handoff measurements below are retained as historical
 context; the completed work-item findings supersede their unproven assumptions.
 
 ## The goal
@@ -378,7 +377,11 @@ period over a long window in the heaviest scene you can catch (the vector-font s
 
 ### W4. Choose the design with the user (stop here and ask)
 
-**Decision pending. Stop before W5/W6.** W3 shows an existing preemptible fixed-step
+**DONE (2026-10-04): the user selected option 3:** “We want higher-rate simulation
+independent from the frame rate.” Implement a higher-rate fixed simulation step,
+scaling per-step quantities and keeping rendering independent. W5 is now authorised.
+
+**Evidence governing the design:** W3 shows an existing preemptible fixed-step
 simulation, so wrapping the entire drawing loop in a new physics loop is not justified.
 All candidate designs must address the remaining visual clocks, drawing's shared-RNG
 consumption/beam entropy, and the PAL dashboard clock calibration:
@@ -394,8 +397,11 @@ consumption/beam entropy, and the PAL dashboard clock calibration:
    AI, timer and animation quantity. More responsive movement, substantially greater
    risk of changing handling and race balance; W2 is only the starting map.
 
-The user has not chosen yet. Record their selection and any pace/clock preferences
-here before implementing. The original conditional options below remain background
+The user chose the higher-rate simulation design. Preserve the existing motion pace
+where possible, correct elapsed race time to real time, and measure any handling
+change caused by finer integration. The exact rate is an implementation choice;
+start with a three-field step (16.67 Hz PAL) and scale the old six-field quantities.
+Do not start W6 until W5 is validated. The original conditional options below remain background
 for the decision; the measured partial verdict above takes precedence.
 
 
