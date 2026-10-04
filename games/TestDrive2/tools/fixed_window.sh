@@ -42,7 +42,7 @@ rm -f amiga/.run/serve.log "$OUT/trace.bin"
 WARP=1 python3 tools/td2.py serve > amiga/.run/serve.log 2>&1 &
 trap 'td2 quit > /dev/null 2>&1 || true' EXIT
 SERVER=$!
-for _ in $(seq 1 180); do
+for _ in $(seq 1 "${SERVE_WAIT:-180}"); do
   grep -q serving amiga/.run/serve.log 2>/dev/null && break
   kill -0 "$SERVER" 2>/dev/null || { cat amiga/.run/serve.log >&2; exit 1; }
   sleep 1
