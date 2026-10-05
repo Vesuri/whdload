@@ -83,6 +83,12 @@ hpos $a4, so a stop dropping from $a8 to $a0 matched on neither side of the writ
 window stayed open into the car's first line, which fetched one extra word and offset every
 following line. See `intro_ddfstop_close` in `whdload/TestDrive2HD.s`.
 
+`python3 tools/package_release.py` rebuilds JOTD's installer and the Retroplay preinstalled
+archive from their v1.5 copies in `tmp/` into `dist/TestDrive2-<ver>.lha` and
+`dist/TestDrive2_v<ver>_0588.lha`. Only the slave, the ReadMe (gaining
+`whdload/readme-history.txt`), the game icon (gaining `CUSTOM2=1`) and the installer's
+`source/` change. The preinstalled archive contains the game; do not publish it with the repo.
+
 `make -C whdload verify` adds tools for the study: CUSTOM3 removes RNG beam
 entropy from the original mode, CUSTOM4 slows drawing, and CUSTOM5 bit 0 drives
 an input tape. CUSTOM5=3 also forces engine damage once; CUSTOM5=5 instead forces
