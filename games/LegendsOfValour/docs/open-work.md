@@ -2,7 +2,8 @@
 
 Status 2026-10-05: playbook §1–§8 done (fixed window, frame counter, A500-eq. and 68020
 baselines; `docs/profiling.md` §6–§7). W0/W1 complete; measurements in §8. Next is W2,
-chunky buffer allocation in fast RAM. Deeper AI timing mapping remains open.
+chunky buffer allocation in fast RAM. Frame-rate-independent simulation timing is required
+follow-up work (`docs/performance-plan.md` §2.3.1).
 
 ## Done
 
@@ -30,7 +31,10 @@ chunky buffer allocation in fast RAM. Deeper AI timing mapping remains open.
   `h12:14b78` reads movement step `h12:0cdd6`. The faster spin ends at a different heading
   with unchanged position; frame coupling remains. `tools/lov_state.py` maps visible-object
   render records but does not identify the townsman's world position. Deeper AI timing/state
-  mapping remains open. The user accepted existing timing for W1; no clock/cap/AI patch.
+  mapping remains open. Acceptance of existing timing is specific to W1; investigate a
+  frame-rate-independent simulation step for movement, turning, animation and AI. Compare
+  equal elapsed-field intervals across rendering rates, then evaluate elapsed-time scaling
+  versus fixed ticks and A500 catch-up costs. See performance-plan §2.3.1 for the work plan.
 - The conversation panel polls through h2, so `W` cannot wait for it; the route clicks EXIT
   blindly. A hook on its poll would make the route shorter.
 - Entropy: the windows are identical across boots, so VPOSR reads do not leak into this

@@ -126,6 +126,31 @@ Consequences:
   view area (rows 16..108 of the screen). **A faster C2P reduces tearing; do not remove the
   wait** without checking a fast CPU for tearing (Test Drive II's lesson).
 
+### 2.3.1 Required follow-up: frame-rate-independent simulation timing
+
+The user's acceptance of existing timing applies to W1 compatibility; it does not close
+this investigation. Investigate a simulation time step independent of rendered frames,
+covering movement, turning, animation, and AI. Keep the 25 fps rendering cap and beam wait
+as separate constraints while investigating.
+
+1. Complete the state map: identify the townsman's world position and AI state, every
+   movement-step reader, turn increments, animation counters, and per-frame AI updates.
+2. Establish intended rates from the compensated range (12 fields/frame or faster), then
+   compare equal elapsed PAL-field intervals with the same field-timed input at different
+   rendering rates. Compare world state, not screenshots or frame counts alone. Include
+   the A500's uncompensated range and W1 off/on on both CPUs.
+3. Evaluate elapsed-field scaling versus fixed simulation ticks with an accumulator.
+   Preserve fractional motion, handle collisions and input consistently, and measure the
+   CPU cost of catch-up ticks on the A500. Define how pauses, dialogs, loading, and long
+   stalls affect elapsed time; avoid silently accumulating a backlog during a pause.
+4. Document a proposed reference rate and any gameplay changes before implementing a
+   separate optional slave patch. Do not repurpose the W1–W6 CUSTOM2 bits; choose its option
+   when the design is concrete. Validate equal-time player/AI progression across rendering
+   rates as well as performance, including the existing cap and display synchronization.
+
+W1 keeps its existing timing behaviour. This follow-up remains required alongside the
+remaining performance work; W7's layout deferral does not defer the timing investigation.
+
 ### 2.4 Slave infrastructure that exists
 
 - `_patchgame` (`whdload/LegendsOfValourHD.s`) gets hunk 0's address; hunk N is found by
@@ -355,7 +380,8 @@ the same paired measurement protocol.
 ## 6. Decisions for the user (ask, don't assume)
 
 1. Decided: CUSTOM2 bits 0–5 map to W1–W6. Enable each completed, verified patch in local prefs.
-2. Decided: accept the existing game-time behaviour, including changes below 4.2 fps. Keep
-   movement/AI timing and the 25 fps cap intact.
+2. Decided: accept existing game-time behaviour for W1, including changes below 4.2 fps.
+   Investigate frame-rate-independent simulation timing as required follow-up (§2.3.1).
+   W1 keeps movement/AI timing, the 25 fps cap, and beam wait intact.
 3. ~~Medium/small views~~: decided — convert an enclosing 32-pixel-multiple window (W1).
 4. Decided: defer W7 beyond W0/W1.
