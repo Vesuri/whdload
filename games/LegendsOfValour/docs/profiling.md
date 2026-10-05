@@ -89,3 +89,19 @@ by the user, 2026-10-05).
 Start-screen trace (5 fields, A500-eq., `tmp/prof/start`): 91.5% of the CPU on the main stack in
 a polling loop through `h6:0076c`, `h0:01524`, `h2:00000`, `h1:01b8c`, `h12:16a4e`, `h12:0fe66`
 (each called ~43 times a field), 7.6% in the Kickstart. Not a gameplay figure.
+
+## 5. Input and time, as the game reads them
+
+All in **h12's vertical-blank server `h12:06404`** (found statically; runs in the interrupt
+context `ctx1` of the start-screen trace):
+
+| Offset | What |
+|---|---|
+| `h12:06404` | `addq.l #1,h11:0602c` — **field counter** (time source). `h12:063ac` combines its low word with VPOSR into a beam-time value; `h12:063f0` waits for the next field |
+| `h12:0643e` | `move.w $dff00a,d0` (**JOY0DAT**), deltas against `h12:0002c` added to the **pointer accumulators `h11:008d2` (x) / `h11:008d4` (y)** |
+| `h12:06472` | optional per-field callback through `h12:0648e` |
+| `h12:06480` → `h12:05298` | buttons: left = CIAAPRA bit 6 (`h12:0529a`), right = POTINP bit 10 (`h12:052ee`), each debounced over 2 fields; state bits in **`h12:05292`** (bit 0 left, bit 1 right), read by `h12:05288` |
+
+No CIA keyboard reads in AMIGA2; the keyboard, if used, comes through the OS (intuition is opened
+by h0/h11). So the game can be driven entirely by replacing the JOY0DAT read and the button call
+in this server with a tape indexed by the field counter.

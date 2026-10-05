@@ -25,6 +25,16 @@ representative profile probably needs the player to move. **The user chooses:**
 3. **Anchor without input**: a VERIFY slave calls the game's own load-slot routine at boot, then
    traces the first in-game frames standing still. Only useful if the game redraws while idle.
 
+**Prior art (surveyed 2026-10-05).** None of the user's other projects injects input at the FS-UAE
+level: no recordings, no Lua, and gdb writes are dropped. All of them script input *inside* the
+emulated machine. Vette and Alone in the Dark override the mouse in their VBI with absolute
+positions and button phases. Revs answers the game's own polls from an `AutoStep{key, polls,
+hits, until}` table and counts polls, not time. Each step can also wait on a game-state byte.
+Stunt Car Racer reads memory back through WHDLoad `COREDUMP`/`TIMEOUT`. For this game that points
+to option 2 placed at `h12:0643e`/`h12:06480` (`docs/profiling.md` §5). Write absolute pointer
+positions into `h11:008d2/008d4` and button bits into `h12:05292`, and advance on the field
+counter `h11:0602c` or on game state.
+
 Also needed: a save game to load. The archive's data has `16SAVE.lbm`, but which file a slot reads
 is not known yet. Saves written during a run are lost (DH1 is recreated); run.sh needs a way to keep
 them in `tmp/`.
