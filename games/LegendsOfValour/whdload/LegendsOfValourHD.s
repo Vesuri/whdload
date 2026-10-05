@@ -15,6 +15,9 @@
 ; the 2025 one, v1.0 used 2005's.  Equivalence is checked by behaviour.
 ;
 ; Differences from v1.0, all deliberate:
+; - kick13.s options as in the 2026 example (IOCACHE, CACHECHIP, SETPATCH, SEGTRACKER, ...).
+;   Without IOCACHE every small Read() of the game is a resload call and, unless the file was
+;   PRELOADed, a slow OS switch.
 ; - v1.0 opened AMIGA2, read 300 bytes and CRC16'd them, then ignored the result and left the
 ;   file open.  Dropped: _patchgame checks the bytes it patches.
 ; - The program is called with the example's .call (arguments through Input()), not jsr.
@@ -47,25 +50,25 @@ BOOTDOS				;enable _bootdos routine
 ;CBDOSREAD			;enable _cb_dosRead routine
 ;CBKEYBOARD			;enable _cb_keyboard routine
 ;CACHE				;enable inst/data cache for fast memory with MMU
-;CACHECHIP			;off: v1.0 ran without caches, keep timings comparable
+CACHECHIP			;enable inst cache for chip/fast memory
 ;CACHECHIPDATA			;enable inst/data cache for chip/fast memory
 ;DEBUG				;add more internal checks
 ;DISKSONBOOT			;insert disks in floppy drives
 DOSASSIGN			;enable _dos_assign routine
 ;FONTHEIGHT	= 8		;enable 80 chars per line
 HDINIT				;initialize filesystem handler
-;HRTMON				;add support for HrtMON
-;IOCACHE	= 1024		;cache for the filesystem handler (per fh)
+HRTMON				;add support for HrtMON
+IOCACHE		= 1024		;cache for the filesystem handler (per fh)
 ;MEMFREE	= $200		;location to store free memory counter
 ;NEEDFPU			;set requirement for a fpu
-;POINTERTICKS	= 1		;set mouse speed
-;SEGTRACKER			;add segment tracker
-;SETKEYBOARD			;activate host keymap
-;SETPATCH			;enable patches from SetPatch 1.38
+POINTERTICKS	= 1		;set mouse speed
+SEGTRACKER			;add segment tracker
+SETKEYBOARD			;activate host keymap
+SETPATCH			;enable patches from SetPatch 1.38
 ;SNOOPFS			;trace filesystem handler
 ;STACKSIZE	= 6000		;increase default stack
 ;TRDCHANGEDISK			;enable _trd_changedisk routine
-;WHDCTRL			;add WHDCtrl resident command
+WHDCTRL				;add WHDCtrl resident command
 
 ;============================================================================
 

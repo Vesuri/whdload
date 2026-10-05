@@ -5,10 +5,11 @@
 # default the stock-A500-equivalent 512K chip + 1.5M slow, no fast), DEMO_TIMEOUT (seconds, 300).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export FSUAE_RUN="${FSUAE_RUN:-.cap}"; CAP=$FSUAE_RUN; mkdir -p "amiga/$CAP"
 OUT="${1:-tmp/prof/run}"
 FIELDS="${FIELDS:-80}"
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
-mkdir -p "$OUT" amiga/.run
+mkdir -p "$OUT" amiga/$CAP
 rm -f "$OUT"/trace.bin "$OUT"/code.bin "$OUT"/report.txt "$OUT"/first.png "$OUT"/last.png
 lov() { python3 tools/lov.py "$@"; }
 
@@ -17,20 +18,20 @@ SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))
 else BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024)); fi
 
-[ -S amiga/.run/lov.sock ] && { lov quit > /dev/null 2>&1 || true; sleep 1; }
-WARP=1 python3 tools/lov.py serve > amiga/.run/serve.log 2>&1 &
+[ -S amiga/$CAP/lov.sock ] && { lov quit > /dev/null 2>&1 || true; sleep 1; }
+WARP=1 python3 tools/lov.py serve > amiga/$CAP/serve.log 2>&1 &
 SERVER=$!
 trap 'lov quit > /dev/null 2>&1 || kill $SERVER 2>/dev/null || true' EXIT
-until grep -q serving amiga/.run/serve.log 2>/dev/null; do
-  kill -0 $SERVER 2>/dev/null || { cat amiga/.run/serve.log; exit 1; }
+until grep -q serving amiga/$CAP/serve.log 2>/dev/null; do
+  kill -0 $SERVER 2>/dev/null || { cat amiga/$CAP/serve.log; exit 1; }
   sleep 1
 done
-head -3 amiga/.run/serve.log
+head -3 amiga/$CAP/serve.log
 
 # Boot, intro and menus run in warp; the demo starts by itself.  Poll one-field screenshots
 # until the driving view is up, then trace immediately (the demo only lasts a few seconds).
 deadline=$((SECONDS + ${DEMO_TIMEOUT:-300}))
-until lov shot "$PWD/amiga/.run/poll.png" > /dev/null && python3 tools/ingame.py amiga/.run/poll.png; do
+until lov shot "$PWD/amiga/$CAP/poll.png" > /dev/null && python3 tools/ingame.py amiga/$CAP/poll.png; do
   (( SECONDS < deadline )) || { echo "demo not reached in ${DEMO_TIMEOUT:-300}s" >&2; exit 1; }
   lov wait 0.5 > /dev/null
 done

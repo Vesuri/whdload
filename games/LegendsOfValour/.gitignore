@@ -27,6 +27,7 @@ __pycache__/
 
 # --- Emulator / debugger run state --------------------------------------------
 /amiga/.run/
+/amiga/.cap/
 
 # --- Build output ------------------------------------------------------------
 build/

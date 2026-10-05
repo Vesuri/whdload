@@ -18,7 +18,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import barto
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RUN = os.path.join(ROOT, 'amiga/.run')
+# Captures run in amiga/.cap (FSUAE_RUN), apart from interactive amiga/run.sh sessions in
+# amiga/.run: run.sh stops the emulator its run directory last started.
+CAP = os.environ.get('FSUAE_RUN', '.cap')
+RUN = os.path.join(ROOT, 'amiga', CAP)
 SOCK = os.path.join(RUN, 'lov.sock')
 GDB = os.path.expanduser('~/.local/opt/bin/m68k-amiga-elf-gdb')
 SENT = '@@LOV-DONE@@'
@@ -97,7 +100,7 @@ def fix_profile_window():
 
 
 def serve():
-    env = dict(os.environ, DEBUG='1', SILENT=os.environ.get('SILENT', '1'))
+    env = dict(os.environ, DEBUG='1', SILENT=os.environ.get('SILENT', '1'), FSUAE_RUN=CAP)
     out = subprocess.run(['bash', os.path.join(ROOT, 'amiga/run.sh')], env=env,
                          capture_output=True, text=True, check=True).stdout
     print(out, end='', flush=True)

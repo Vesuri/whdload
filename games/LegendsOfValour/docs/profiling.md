@@ -105,3 +105,34 @@ context `ctx1` of the start-screen trace):
 No CIA keyboard reads in AMIGA2; the keyboard, if used, comes through the OS (intuition is opened
 by h0/h11). So the game can be driven entirely by replacing the JOY0DAT read and the button call
 in this server with a tape indexed by the field counter.
+
+## 6. The rebuilt slave and the input tape
+
+`whdload/LegendsOfValourHD.s` (`make -C whdload`, `make -C whdload verify`) rebuilds CFou!'s v1.0
+on WHDLoad 20.0's `kick13.asm` example (09.11.25) and the 2025 `kick13.s`, with the example's
+options: `IOCACHE = 1024` (without it every small game `Read()` was a resload call, i.e. an OS
+switch unless PRELOADed — slow, with a garbled display during IO), `CACHECHIP`, `SETPATCH`,
+`SEGTRACKER`, `POINTERTICKS`, `SETKEYBOARD`, `HRTMON`, `WHDCTRL`. `slv_Version` 17: the host's
+WHDLoad is 19.2, so no v20 `ws_MemConfig`. PRELOAD only helps when the 3.2 MB of data fits:
+interactive `run.sh` now defaults to 1 MB chip + 8 MB fast; the A500-equivalent machine cannot
+preload it.
+
+**Input tape** (VERIFY build, `CUSTOM5=1`, `whdload/tape.s`): h12:05298 (the VBL server's button
+routine) jumps into the slave, which writes the tape's pointer position into the game window's
+`MouseX/MouseY` (the game copies them every poll, `h1:01b8c`) and its buttons into `h12:05292`.
+Script → file: `tools/tape.py` (`FIELDS X Y [L|R|LR]` lines, window coordinates = (screenshot
+x − 75) / 2, (y − 38) / 2). `tools/tape_explore.sh SCRIPT OUT [COUNT STEP]` boots it and takes
+screenshots every STEP s of warp (exploration only, not timing). Tape field 0 is the first VBL
+after the game installs its server; screens arrive at wall-clock-dependent field counts, so
+waits are generous.
+
+What the screens do (`tools/tapes/`):
+- Start screen: green = load a **character** (`Charact.__N`, written by `CUSTOM1` character
+  creation), red = load a **saved game** (`Legend1.__N`), Amiga DOS. The archive has neither.
+- Save-slot screen (`h8:001de`): bars 1–8 select, left die loads (only an existing file), middle
+  die switches save disk, **right die cancels → the game starts with the default character**.
+- In game, a townsman walks up and talks soon after the start; EXIT is at (75,183).
+- View size: computer button (15,188) → options dialog → second icon from the right on the top
+  row (193,52) cycles small → large → medium; clicking outside the dialog applies it.
+- **Benchmark route `spin.txt`**: default character, large view, hold turn-right (143,148).
+  The game redraws the view continuously, also when standing still.

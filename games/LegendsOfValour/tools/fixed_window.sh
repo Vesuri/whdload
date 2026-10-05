@@ -6,6 +6,7 @@
 # for diagnostic windows only. The old span anchor (0x789c) was already 7-8 s into a race.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export FSUAE_RUN="${FSUAE_RUN:-.cap}"; CAP=$FSUAE_RUN; mkdir -p "amiga/$CAP"
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
 # Retain exactly the slave used by this capture; later builds must not change
@@ -28,26 +29,26 @@ BOOT_HUNK=${BOOT_HUNK:-$(cat "$CACHE" 2>/dev/null || true)}
 if [ -n "$BOOT_HUNK" ]; then export BOOT_BREAK=$(printf '%#x' $((BOOT_HUNK + ${ANCHOR:-0xbbf8}))); fi
 lov() { python3 tools/lov.py "$@"; }
 retain_log() {
-  cp amiga/.run/fsuae.log "$OUT/fsuae-stdout.log"
+  cp amiga/$CAP/fsuae.log "$OUT/fsuae-stdout.log"
   local logfile
-  logfile=$(sed -n 's/^LOGFILE: //p' amiga/.run/fsuae.log | tail -1)
+  logfile=$(sed -n 's/^LOGFILE: //p' amiga/$CAP/fsuae.log | tail -1)
   if [ -n "$logfile" ] && [ -f "$logfile" ]; then
     cp "$logfile" "$OUT/fsuae.log"
   else
-    cp amiga/.run/fsuae.log "$OUT/fsuae.log"
+    cp amiga/$CAP/fsuae.log "$OUT/fsuae.log"
   fi
 }
-[ -S amiga/.run/lov.sock ] && { lov quit > /dev/null 2>&1 || true; sleep 1; }
-rm -f amiga/.run/serve.log "$OUT/trace.bin"
-WARP=1 python3 tools/lov.py serve > amiga/.run/serve.log 2>&1 &
+[ -S amiga/$CAP/lov.sock ] && { lov quit > /dev/null 2>&1 || true; sleep 1; }
+rm -f amiga/$CAP/serve.log "$OUT/trace.bin"
+WARP=1 python3 tools/lov.py serve > amiga/$CAP/serve.log 2>&1 &
 trap 'lov quit > /dev/null 2>&1 || true' EXIT
 SERVER=$!
 for _ in $(seq 1 "${SERVE_WAIT:-180}"); do
-  grep -q serving amiga/.run/serve.log 2>/dev/null && break
-  kill -0 "$SERVER" 2>/dev/null || { cat amiga/.run/serve.log >&2; exit 1; }
+  grep -q serving amiga/$CAP/serve.log 2>/dev/null && break
+  kill -0 "$SERVER" 2>/dev/null || { cat amiga/$CAP/serve.log >&2; exit 1; }
   sleep 1
 done
-grep -q serving amiga/.run/serve.log || { echo "race breakpoint not reached" >&2; exit 1; }
+grep -q serving amiga/$CAP/serve.log || { echo "race breakpoint not reached" >&2; exit 1; }
 
 dump() { lov gdb "dump binary memory /tmp/lov-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv /tmp/lov-code.bin "$OUT/code.bin"; }
 hunk=

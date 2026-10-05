@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Boot the installed original Legends of Valour under WHDLoad in FS-UAE.
 #   amiga/run.sh            windowed, real speed, with sound
+#   FSUAE_RUN=dir         run directory under amiga/ (default .run; the debugger tools use .cap,
+#                         so captures never stop an interactive session)
 #   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger)
 #   SLAVE=path amiga/run.sh run another slave build instead of the installed one
 #   TAPE=file WHD_ARGS=CUSTOM5=1  scripted mouse input (VERIFY slave, tools/tape.py)
@@ -18,7 +20,7 @@ WB="${WB:-$AMIGA_SHARE/Workbenchv2.04rev37.67Workbench.adf}"
 WHD="$HOME/.local/share/amiga/WHDLoad/C/WHDLoad"
 CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
-RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"
+RUN="$FSUAE_RUN"; DH0="$RUN/dh0"; DH1="$RUN/dh1"
 
 fsuae_claim_port
 rm -rf "$DH0" "$DH1"
@@ -46,7 +48,7 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSE
 
 "${FSUAE:-fs-uae}" \
   --base_dir="$PWD/$RUN/fsuae" \
-  --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-1024}" --fast_memory="${FAST_KB:-2048}" \
+  --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-1024}" --fast_memory="${FAST_KB:-8192}" \
   --kickstart_file="$KICKSTART" \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   --floppy_drive_0="$WB" \
