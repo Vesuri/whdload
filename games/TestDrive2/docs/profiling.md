@@ -109,7 +109,13 @@ to that string, around `0x5a49e`), and the profile command loads both and passes
 `base, base+size` to `start_cpu_profiler` (around `0x5f380`). **A different FS-UAE binary needs
 these addresses re-derived** the same way; `fix_profile_window` asserts the read-back and fails
 loudly otherwise. lldb attaching works because the binary is not hardened; it stops the process
-for a moment, which (like a gdb stop) costs no emulated time.
+for a moment, which (like a gdb stop) costs no emulated time. Attaching to this x86_64 binary
+under Rosetta takes from 25 s to several minutes, so `td2.py` attaches one asynchronous lldb on
+the first capture of a session, with symbol preloading off, and reuses it.
+
+To trace a moment in the game, use `td2.py until '<addr> if <cond>'`: it leaves the emulator
+stopped at the hit, so the next `profile` starts there. A `gdb continue` resumes the emulator
+afterwards, and warp mode runs far past the hit before the capture starts.
 
 ## 4. Catching the demo
 

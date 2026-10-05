@@ -80,16 +80,43 @@ class Gdb:
 BASETEXT_VM = 0x32dea04
 
 
+class Lldb:
+    """One lldb attached for the whole session: attaching to this x86_64 FS-UAE under Rosetta
+    takes minutes, so it is done once, on the first capture, and the process kept running."""
+
+    def __init__(self):
+        pid = open(os.path.join(RUN, 'fsuae.pid')).read().strip()
+        self.p = subprocess.Popen(['lldb', '-O', 'settings set target.preload-symbols false',
+                                   '-p', pid], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT, bufsize=0)
+        self.buf = b''
+        out = self.cmd('image list -o -f fs-uae', timeout=900)
+        self.base = int(out.split('[  0] ')[1].split()[0], 16) + BASETEXT_VM
+        self.cmd('script lldb.debugger.SetAsync(True)')  # else continue blocks the command loop
+        self.cmd('process continue')
+
+    read_until = Gdb.read_until
+
+    def cmd(self, text, timeout=60):
+        self.p.stdin.write((text + f"\nscript print('{SENT}')\n").encode())
+        return self.read_until(SENT + '\n', timeout)
+
+
+LLDB = None
+
+
 def fix_profile_window():
-    pid = open(os.path.join(RUN, 'fsuae.pid')).read().strip()
-    out = subprocess.run(['lldb', '-p', pid, '--batch', '-o', 'image list -o -f fs-uae'],
-                         capture_output=True, text=True, timeout=60).stdout
-    slide = int(out.split('[  0] ')[1].split()[0], 16)
-    a = slide + BASETEXT_VM
-    out = subprocess.run(['lldb', '-p', pid, '--batch', '-o', f'memory write -s4 {a:#x} 0',
-                          '-o', f'memory write -s4 {a + 4:#x} 0x7fffffff',
-                          '-o', f'memory read -s4 -fx -c2 {a:#x}'],
-                         capture_output=True, text=True, timeout=60).stdout
+    global LLDB
+    if LLDB is None:
+        LLDB = Lldb()
+    a = LLDB.base
+    LLDB.cmd('process interrupt')
+    while 'stopped' not in LLDB.cmd('process status'):
+        time.sleep(0.2)
+    LLDB.cmd(f'memory write -s4 {a:#x} 0')
+    LLDB.cmd(f'memory write -s4 {a + 4:#x} 0x7fffffff')
+    out = LLDB.cmd(f'memory read -s4 -fx -c2 {a:#x}')
+    LLDB.cmd('process continue')
     assert '0x00000000 0x7fffffff' in out, out
 
 
@@ -170,6 +197,8 @@ def handle(g, line):
         return out or 'ok'
     if op == 'quit':
         g.p.kill()
+        if LLDB:
+            LLDB.p.kill()
         pid = open(os.path.join(RUN, 'fsuae.pid')).read().strip()
         os.kill(int(pid), signal.SIGKILL)
         return 'bye'
