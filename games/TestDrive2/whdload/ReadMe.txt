@@ -4,27 +4,28 @@ Based on JOTD's public-domain v1.5 slave source. This is a local study build,
 not an official installer release. Only duel v1 receives the new options;
 v2's patch list and timing are unchanged.
 
-History — 2026-10-05
-* CUSTOM2 bit 2: sub-unit road and car position in both views (duel v1).
+History — 2026-10-05 (1.6b)
+* The three changes below are one option, "Enhanced framerate" (CUSTOM2).
+  WHDLoad options have no default value: add the tooltype CUSTOM2=1 to the
+  game icon to enable it by default. CUSTOM2=0 runs the original game.
+* Sub-unit road and car position in both views (duel v1).
   Uses frame-latched 16.16 positions and fractional curve/hill integration;
   sprite size selection is unchanged.
 
 History — 2026-10-04
-* CUSTOM2 bit 0: fixed-time simulation, independently of drawing: every
+* Fixed-time simulation, independently of drawing: every
   6 fields on a 68000 (the original rate), every 2 fields on a 68020+. Continuous rates are scaled; race time follows video fields.
   Animation phases and random updates no longer depend on drawing frequency.
 * Nonfatal crash/engine-damage recovery is 240 fields with a 20-second penalty.
   Opponents and race time continue; the player stops at idle pitch. The trainer
   remains supported. Fatal/last-life events use the original game-over path.
-* CUSTOM2 bit 1: blitter bus priority and no unused blitter-finished
+* Blitter bus priority and no unused blitter-finished
   interrupts. Original waits, blitter ownership and JOTD's beam/display fix
   remain intact.
 
-* First-race window with CUSTOM2=3: A500 7.1 fps (original 6.1), A1200
-  16.7 fps; 68030/25 MHz and faster reach the 25 fps chip-bus cap.
+* First-race window: A500 7.1 fps (original 6.1), A1200 16.7 fps;
+  68030/25 MHz reaches the 25 fps chip-bus cap until the car is at speed.
 
-Set CUSTOM2=7 for all three options, CUSTOM2=3 for simulation and bus priority, CUSTOM2=1 for simulation only, or CUSTOM2=2
-for rendering overhead only. CUSTOM2=4 enables fractional rendering alone. Leave CUSTOM2 unset for original behavior.
 CUSTOM1=1 enables the existing infinite-lives trainer.
 
 Finer integration changes handling slightly: over 1,500 demo fields the two

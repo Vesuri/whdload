@@ -4,6 +4,11 @@
 > Everything here was measured on this machine (macOS, x86_64 FS-UAE in `/path/to/fs-uae`
 > with the Barto gdb stub, `m68k-amiga-elf-gdb` 2026 toolchain), 2026-10-03/04.
 
+**Slave 1.6b (2026-10-05):** the three features are one option, "Enhanced framerate"
+(`CUSTOM2`, any nonzero value; enable it by default with the icon tooltype `CUSTOM2=1`).
+Commands and results below that name `CUSTOM2=1`/`2`/`3`/`4`/`5`/`7` predate 1.6b, when each
+feature was a separate bit; per-feature A/B runs now need a temporary build.
+
 ## TL;DR
 
 ```sh

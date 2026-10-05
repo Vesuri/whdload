@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify CUSTOM2 bit-0-off capture retains original v1 bytes at every simulation patch.
+"""Verify a CUSTOM2=0 (enhanced framerate off) capture retains original v1 bytes at every simulation patch.
 CUSTOM3's shared reproducibility RNG patch is excluded. No game bytes are emitted.
 """
 import argparse,json,re
@@ -7,7 +7,7 @@ from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('capture',type=Path)
 p.add_argument('--base',type=lambda s:int(s,0),default=0xc00000)
-p.add_argument("--render-only",action="store_true",help="check only sub-unit rendering ranges (CUSTOM2 bit 2 off)")
+p.add_argument("--render-only",action="store_true",help="check only sub-unit rendering ranges ")
 a=p.parse_args()
 root=Path(__file__).resolve().parents[1]
 original=(root/'tmp/game/TestDrive2/data/duel').read_bytes()
@@ -30,4 +30,4 @@ for line in lines:
     else:size={'W':2,'L':4}[kind]
     assert mem[code+start:code+start+size]==original[40+start:40+start+size],f'optional patch still active at {start:05x}'
     cases+=1
-print(f'CUSTOM2 optional bits off: {cases} patch ranges retain original v1 instructions')
+print(f'Enhanced framerate off: {cases} patch ranges retain original v1 instructions')

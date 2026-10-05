@@ -1,4 +1,4 @@
-; duel v1: fixed-period simulation. All entry hooks are gated by CUSTOM2.
+; duel v1: fixed-period simulation, part of the enhanced framerate option (CUSTOM2).
 ; A step lasts sim_p PAL fields: 6 on a 68000/010 (the original period, so no
 ; CPU is spent on steps nobody sees), 2 on a 68020+ (the 25 fps render cap).
 ; Continuous dynamics use dt = 1/sim_n of the original six-field step,
@@ -12,6 +12,12 @@ sim_init:
     lea sim_tags(pc),a0
     move.l _resload(pc),a2
     jsr (resload_Control,a2)
+    lea render_options(pc),a0  ; one switch enables all three features
+    tst.l (a0)
+    beq.b .options
+    moveq #7,d0
+    move.l d0,(a0)
+.options
     IFD VERIFY
     move.l sim_drive_enabled(pc),d0
     beq.b .configure
@@ -1114,7 +1120,8 @@ sim_periods:
     dc.w 2,3,2853,5993,1395   ; 68020+: a third of it
     dc.l 15624000
 
-; Read only v1 options. Control fills tag values; all game patches remain C2-gated.
+; Read only v1 options. Control fills tag values; render_options becomes the
+; internal feature mask (bits 0-2), all set when CUSTOM2 is nonzero.
 sim_tags:
     dc.l WHDLTAG_CUSTOM2_GET
 render_options: dc.l 0

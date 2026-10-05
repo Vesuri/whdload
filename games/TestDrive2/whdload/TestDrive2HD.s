@@ -72,7 +72,7 @@ slv_keyexit	= $5D	; num '*'
 	ENDC
 
 DECL_VERSION:MACRO
-	dc.b	"1.5"
+	dc.b	"1.6b"
 	IFD BARFLY
 		dc.b	" "
 		INCBIN	"T:date"
@@ -86,11 +86,11 @@ DECL_VERSION:MACRO
 _tdboot
 	dc.b	"tdboot",0
 slv_config
-	dc.b "C2:X:fixed-time simulation (v1):0;C2:X:blitter priority, no unused blitter interrupt (v1):1;C2:X:sub-unit road position (v1):2;"
+	dc.b "C2:B:Enhanced framerate;"
 	IFD VERIFY
-	dc.b "C3:B:reproducible verification (v1);"
-	dc.b "C4:B:slow renderer verification (v1);"
-	dc.b "C5:X:scripted driving verification (v1):0;C5:X:force engine damage verification (v1):1;C5:X:force fatal crash verification (v1):2;C5:X:sub-unit with zero fraction (v1):3;C5:X:straight driving tape (v1):4;"
+	dc.b "C3:B:reproducible verification;"
+	dc.b "C4:B:slow renderer verification;"
+	dc.b "C5:X:scripted driving verification:0;C5:X:force engine damage verification:1;C5:X:force fatal crash verification:2;C5:X:sub-unit with zero fraction:3;C5:X:straight driving tape:4;"
 	ENDC
 	dc.b    "C1:X:trainer infinite lives:0;"	
 	dc.b	0
@@ -101,7 +101,7 @@ slv_name		dc.b	"Test Drive II"
 	ENDC
 	dc.b	0
 slv_copy		dc.b	"1989 Accolade",0
-slv_info		dc.b	"adapted by JOTD",10
+slv_info		dc.b	"adapted by JOTD and Vesuri",10
 		dc.b	"from Wepl excellent KickStarter 34.005",10,10
 		dc.b	"Version "
 		DECL_VERSION
@@ -396,7 +396,7 @@ get_version:
 pl_main_v1
 	PL_START
 	include "simulation-patches.i"
-	PL_IFC2X 2
+	PL_IFC2
 	PL_PS $006c66,render_subunit_main
 	PL_PS $006daa,render_subunit_mirror
 	PL_PS $006474,render_subunit_latch

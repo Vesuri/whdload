@@ -1,5 +1,6 @@
-; v1 CUSTOM2 bit 1: give the blitter bus priority (DMACON BLTPRI) and disable
-; graphics.library's unused blitter-finished interrupt while the game runs.
+; v1 enhanced framerate (render_options bit 1): give the blitter bus priority
+; (DMACON BLTPRI) and disable graphics.library's unused blitter-finished
+; interrupt while the game runs.
 ; The CPU only polls BBUSY during shape blits, so its DMACONR reads no longer
 ; take the blitter's slots. Game code, waits and ownership are unchanged.
 ; Preserves the game entry's registers; restore puts back the original enables.
@@ -38,7 +39,7 @@ render_interrupt_restore:
 render_saved_priority: dc.w 0
 render_saved_irq: dc.w 0
 
-; v1 CUSTOM2 bit 2: project each view at the latched fractional road position.
+; v1 enhanced framerate (render_options bit 2): project each view at the latched fractional road position.
 ; The bottom row and mirror horizon retain their original scales.
 render_subunit_main:
     move.w #10,-7610(a4)

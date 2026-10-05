@@ -4,6 +4,11 @@
 > `docs/optimisation-plan.md` (performance ranking). Everything here was measured or read from
 > the binary on 2026-10-04; each claim says which. Do the work items **in order**.
 
+**Slave 1.6b (2026-10-05):** the three features are one option, "Enhanced framerate"
+(`CUSTOM2`, any nonzero value; enable it by default with the icon tooltype `CUSTOM2=1`).
+Commands and results below that name `CUSTOM2=1`/`2`/`3`/`4`/`5`/`7` predate 1.6b, when each
+feature was a separate bit; per-feature A/B runs now need a temporary build.
+
 **Current status:** W1–W6 complete. The shipping release runs the simulation
 every 6 fields on a 68000 and every 2 on a 68020+ ("Per-CPU simulation period",
 below). The handoff, three-field and one-field records remain as historical

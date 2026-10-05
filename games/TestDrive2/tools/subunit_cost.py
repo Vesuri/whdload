@@ -2,8 +2,8 @@
 """Measure the complete sub-unit patch's A500 self cycles in a fixed_window trace.
   subunit_cost.py CAPTURE [--limit 3]
 Conservatively includes the displaced instructions and all seven hook calls.
-Use a normal slave, CUSTOM2=5 (without BLTPRI), CPU=68000. Do not use a
-CPU trace from an A1200 with BLTPRI: its instruction records can be corrupt.
+Use a CPU=68000 trace. Slave 1.6b always enables BLTPRI with the sub-unit code;
+do not use an A1200 trace with BLTPRI: its instruction records can be corrupt.
 """
 import argparse,os
 from pathlib import Path

@@ -18,7 +18,7 @@ fi
 export AMIGA_MODEL=A1200 CPU=68030 CHIP_KB=2048 FAST_KB=4096
 export KICKSTART="/path/to/kickstarts/kick40068.A1200"
 export EXTRA_ARGS='--slow_memory=0 --uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency=25000000 --uae_cpu_cycle_exact=true'
-export WHD_ARGS="${WHD_ARGS:-CUSTOM2=7}"
+export WHD_ARGS="${WHD_ARGS:-CUSTOM2=1}"
 # Interactive play uses real wall time, sound and no debugging instrument.
 export WARP=0 SILENT=0 DEBUG=0 DETERMINISTIC=0
 unset BOOT_BREAK RECORD

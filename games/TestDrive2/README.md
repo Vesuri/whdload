@@ -43,34 +43,39 @@ tools/profile_demo.sh            # profile it (docs/profiling.md)
 make -C whdload && SLAVE=$PWD/whdload/TestDrive2.slave tools/profile_demo.sh tmp/prof/mine
 ```
 
-## Optional fixed-time simulation (duel v1)
+## Enhanced framerate (duel v1, slave 1.6b)
 
-Build and run the local slave with the fixed-time mode enabled:
+Build and run the local slave with the option enabled:
 
 ```sh
 source amiga/env.sh
 make -C whdload
-WHD_ARGS=CUSTOM2=7 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
-WHD_ARGS=CUSTOM2=7 amiga/run-a1200.sh  # the same on an expanded A1200 (68EC020)
+WHD_ARGS=CUSTOM2=1 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
+amiga/run-a1200.sh  # the same on an expanded A1200 (68EC020)
 ```
 
-`CUSTOM2=1` runs the simulation on a fixed PAL period, independently of drawing:
-every 6 fields (8.33 Hz, the original period) on a 68000, every 2 fields (25 Hz)
-on a 68020+. Rendering is chip-bus bound at 25 fps even on fast CPUs, so steps
-nobody sees are not simulated. Bit 1 (rendering) gives the blitter bus priority
-(BLTPRI) and suppresses unused blitter interrupts; it retains every original
-wait and JOTD's display fix. `CUSTOM2=3` enables both; `CUSTOM2=2` changes only
-rendering. Bit 2 adds fractional road/car projection and curve/hill integration in both views;
-`CUSTOM2=7` enables all three options, or use `CUSTOM2=4` for fractional
-rendering with the original simulation. Car size selection remains discrete.
-First-race fixed window, CUSTOM2=3: A500 7.1 fps (original game 6.1),
-A1200 16.7 fps; 68030/25 MHz and faster reach the 25 fps cap. See
+One option, "Enhanced framerate" (`CUSTOM2`), enables three changes together. WHDLoad
+options cannot carry a default, so add the tooltype `CUSTOM2=1` to the game icon to
+make it the default; the run scripts pass it. `CUSTOM2=0` is the original game.
+
+- The simulation runs on a fixed PAL period, independently of drawing: every
+  6 fields (8.33 Hz, the original period) on a 68000, every 2 fields (25 Hz) on a
+  68020+. Rendering is chip-bus bound at 25 fps even on fast CPUs, so steps
+  nobody sees are not simulated.
+- The blitter gets bus priority (BLTPRI) and unused blitter interrupts are
+  suppressed; every original wait and JOTD's display fix remain.
+- Road and cars are projected at fractional positions, with fractional curve/hill
+  integration, in both views. Car size selection remains discrete.
+
+First-race fixed window: A500 7.1 fps (original game 6.1), A1200 16.7 fps;
+68030/25 MHz reaches the 25 fps cap until the car is at speed, then 16.7 fps. See
 `docs/optimisation-plan.md`.
 Motion rates are scaled, the race clock follows elapsed field time, and nonfatal
 crash/engine-damage recovery lasts 240 fields with a 20-second penalty. Handling
-and recovery presentation change; see `docs/simulation-design.md`. Leave CUSTOM2
-off to use the original game. v2 has no simulation patches. CUSTOM1's infinite
-lives trainer remains supported. NTSC timing has not been validated.
+and recovery presentation change; see `docs/simulation-design.md`. v2 is
+unchanged. CUSTOM1's infinite lives trainer remains supported. NTSC timing has
+not been validated. Measurements in the docs that name `CUSTOM2=1`/`3`/`5`/`7`
+predate 1.6b, when each feature was a separate bit.
 
 `make -C whdload verify` adds tools for the study: CUSTOM3 removes RNG beam
 entropy from the original mode, CUSTOM4 slows drawing, and CUSTOM5 bit 0 drives
@@ -91,7 +96,7 @@ source amiga/env.sh
 amiga/run-68030.sh
 ```
 
-This builds the normal slave and launches real-time PAL play with CUSTOM2=7,
+This builds the normal slave and launches real-time PAL play with CUSTOM2=1,
 an A1200 chipset/ROM, 68030 at 25 MHz, 2 MiB chip and 4 MiB fast RAM. To run a
 packaged slave instead, prefix the launcher with `SLAVE="/absolute/path/TestDrive2.slave"`.
 Start a race normally, or leave the title screen for the attract demo. The demo
