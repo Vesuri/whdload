@@ -8,6 +8,7 @@ local input under `tmp/` (see `.gitignore`).
 | Path | What |
 |---|---|
 | `amiga/run.sh`, `amiga/env.sh` | boot the WHDLoad install in FS-UAE (Kickstart 3.1 host, kick 1.3 kickemu inside WHDLoad) |
+| `amiga/run-68030.sh` | play the PAL 68030/25 MHz setup, with all options enabled |
 | `amiga/run-a1200.sh` | build the patched slave and play it on an expanded A1200 (`CPU=68030` for a 25 MHz 68030) |
 | `tools/td2.py` | long-lived gdb session on FS-UAE's Barto stub: screenshots, cycle-exact traces |
 | `tools/profile_demo.sh` | one command: boot, wait for the attract demo to drive, trace, report |
@@ -81,3 +82,22 @@ for the byte-identity oracle; use it in both comparison arms.
 These verification options are absent from the normal build.
 Use `tools/fixed_window.sh` for fps, state captures for game-time comparisons,
 and the retained `OUT/slave.slave` when analysing older traces.
+
+## Testing a normal release on 68030/25 MHz
+
+```sh
+cd "/path/to/Test Drive 2"
+source amiga/env.sh
+amiga/run-68030.sh
+```
+
+This builds the normal slave and launches real-time PAL play with CUSTOM2=7,
+an A1200 chipset/ROM, 68030 at 25 MHz, 2 MiB chip and 4 MiB fast RAM. To run a
+packaged slave instead, prefix the launcher with `SLAVE="/absolute/path/TestDrive2.slave"`.
+Start a race normally, or leave the title screen for the attract demo. The demo
+can drive off road; the normal release includes no scripted driver.
+
+Ordinary launch mode runs at real wall time with sound. The previous measured
+first-race window reached 25 game FPS on this configuration. Scene complexity
+can change the rate during play; an emulator refresh overlay reports video
+refresh rather than game drawing FPS.
