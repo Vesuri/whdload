@@ -57,7 +57,9 @@ CBDOSLOADSEG
 ;============================================================================
 
 
-slv_Version	= 17
+; WHDLoad 20.0 interface; use the standard KickEmu memory allocation.
+slv_Version	= 20
+slv_MemConfig	= slv_base	; no alternate memory configurations
 slv_Flags	= WHDLF_NoError|WHDLF_Examine
 slv_keyexit	= $5D	; num '*'
 
@@ -72,7 +74,7 @@ slv_keyexit	= $5D	; num '*'
 	ENDC
 
 DECL_VERSION:MACRO
-	dc.b	"1.6b"
+	dc.b	"1.6c"
 	IFD BARFLY
 		dc.b	" "
 		INCBIN	"T:date"

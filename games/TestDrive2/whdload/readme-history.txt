@@ -1,3 +1,11 @@
+ version 1.6c (06.10.2026) done by Vesuri:
+ - updated the slave to the WHDLoad 20.0 interface and official KickEmu/API
+   source baseline; requires WHDLoad 20.0 or later
+ - included the matching public-domain headers and KickEmu sources in the
+   installer source package for reproducible builds
+ - this update does not yet establish a fix for the reported A4000/68060
+   black screen
+
  version 1.6b (05.10.2026) done by Vesuri:
  - added the "Enhanced framerate" option (CUSTOM2), for the version of the game
    whose "duel" file is 108868 bytes long (the other version is unchanged):

@@ -30,7 +30,10 @@ LHA = os.path.expanduser('/path/to/lha-compress')  # LHa for UNIX: Lhasa cannot 
 INSTALLER = ROOT / 'tmp/TestDrive2.lha'
 PREINSTALLED = ROOT / 'tmp/TestDrive2_v1.5_0588.lha'
 SOURCES = ['TestDrive2HD.s', 'simulation.s', 'simulation-patches.i', 'simulation-verify.s',
-           'render.s']
+           'render.s', 'Makefile', 'whdload/kick13.s', 'whdload/kickfs.s',
+           'whdload/segtracker.s', 'whdload/kick.readme', 'whdload/README.md', 'include/whdload.i',
+           'include/whdmacros.i', 'include/lvo/dos.i', 'include/lvo/exec.i',
+           'include/lvo/graphics.i', 'include/lvo/expansion.i']
 TOOLTYPE = b'CUSTOM2=1'
 
 
@@ -106,9 +109,12 @@ def main():
         (top / 'readme').write_bytes(readme((top / 'readme').read_bytes()))
         add_tooltype(top / 'TestDrive2.exoticon', TOOLTYPE)
         at = names.index('TestDrive2Install/source/TestDrive2HD.s')
-        names[at + 1:at + 1] = [f'TestDrive2Install/source/{s}' for s in SOURCES[1:]]
+        names[at + 1:at + 1] = [f'TestDrive2Install/source/{s}' for s in SOURCES[1:]
+                               if f'TestDrive2Install/source/{s}' not in names]
         for s in SOURCES:
-            shutil.copyfile(ROOT / 'whdload' / s, top / 'source' / s)
+            destination = top / 'source' / s
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / 'whdload' / s, destination)
         archive(stage, names, ROOT / f'dist/TestDrive2-{version}.lha')
 
         stage = Path(tmp) / 'preinstalled'

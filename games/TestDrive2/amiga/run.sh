@@ -14,7 +14,12 @@ GAME="${GAME:-../tmp/game/TestDrive2}"
 BIOS="/path/to/kickstarts"
 RTB="${RTB:-/path/to/kick34005.A500.RTB}"
 WB="${WB:-/path/to/Workbenchv2.04rev37.67Workbench.adf}"
-WHD="/path/to/WHDLoad"
+WHD="${WHDLOAD_BINARY:-/path/to/WHDLoad}"
+# Prefer the official 20.0 runtime retained by this project's SDK validation.
+# An explicit WHDLOAD_BINARY always wins; no shared installation is modified.
+if [ -z "${WHDLOAD_BINARY:-}" ] && [ -f ../tmp/whd20/official/WHDLoad/C/WHDLoad ]; then
+  WHD=../tmp/whd20/official/WHDLoad/C/WHDLoad
+fi
 CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
 RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"
