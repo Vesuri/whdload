@@ -9,14 +9,17 @@ VASM ?= $(HOME)/.local/vasmm68k_mot
 VASMFLAGS ?=
 
 .PHONY: all verify clean FORCE
-all: LegendsOfValour.Slave
+OUT ?= ../tmp/build
+SLAVE = $(OUT)/LegendsOfValour.Slave
+all: $(SLAVE)
 
 # Always assemble: options must not leave a stale variant.
-LegendsOfValour.Slave: LegendsOfValourHD.s FORCE
+$(SLAVE): LegendsOfValourHD.s FORCE
+	mkdir -p "$(OUT)"
 	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym -L $(@:.Slave=.lst) $(VASMFLAGS) -I. -I"$(WHDLOAD)/Include" -I"$(NDK)" -o $@ $<
 
 verify:
-	$(MAKE) LegendsOfValour.Slave VASMFLAGS="$(VASMFLAGS) -DVERIFY=1"
+	$(MAKE) all VASMFLAGS="$(VASMFLAGS) -DVERIFY=1"
 
 clean:
-	rm -f LegendsOfValour.Slave LegendsOfValour.lst
+	rm -f "$(SLAVE)" "$(OUT)/LegendsOfValour.lst"

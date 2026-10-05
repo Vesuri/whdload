@@ -344,8 +344,8 @@ time compensation starts working (§2.3). 68020 with fast RAM: W1 + W2 should be
 
 ## 6. Decisions for the user (ask, don't assume)
 
-1. CUSTOM2 bit layout (one bit per item, all on by default in the user's prefs?).
-2. Whether faster A500 frame rates may change the perceived game speed (they make the game
-   *closer* to real time below 4.2 fps; see §2.3).
+1. Decided: CUSTOM2 bits 0–5 map to W1–W6. Enable each completed, verified patch in local prefs.
+2. Decided: accept the existing game-time behaviour, including changes below 4.2 fps. Keep
+   movement/AI timing and the 25 fps cap intact.
 3. ~~Medium/small views~~: decided — convert an enclosing 32-pixel-multiple window (W1).
-4. Whether to pursue W7's column-major chunky layout.
+4. Decided: defer W7 beyond W0/W1.

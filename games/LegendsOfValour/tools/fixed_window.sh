@@ -15,8 +15,8 @@ OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}; TAPE_TXT=${2:-tools/tapes/spin.t
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
 if [ -z "${KEEP_SLAVE:-}" ]; then
   make -s -C whdload verify > /dev/null
-  cp whdload/LegendsOfValour.Slave "$OUT/slave.slave"
-  cp whdload/LegendsOfValour.lst "$OUT/slave.lst"
+  cp tmp/build/LegendsOfValour.Slave "$OUT/slave.slave"
+  cp tmp/build/LegendsOfValour.lst "$OUT/slave.lst"
 fi
 python3 tools/tape.py "$TAPE_TXT" "$OUT/tape.bin" > /dev/null
 cp "$TAPE_TXT" "$OUT/tape.txt"
@@ -74,6 +74,8 @@ h11=$(lov gdb "x/1xw $(printf '%#x' $((slave + H11)))" | awk '{print $2}')
   lov gdb "x/1uw $(printf '%#x' $((h11 + 0x602c)))" | sed 's/^/gamefield /'
   echo "h11 $h11"; } >> "$OUT/anchor.txt"
 cat "$OUT/anchor.txt"
+# Refresh after decrunching: the early slave-location dump need not contain game hunks.
+dump
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
 fi

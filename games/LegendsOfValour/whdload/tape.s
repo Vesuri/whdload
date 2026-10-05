@@ -29,26 +29,7 @@ _tape_install	move.l	(_custom5,pc),d0
 		btst	#0,d0
 		beq	.off
 		movem.l	d1-d2/a1-a2,-(a7)
-	;hunk addresses: follow the segment chain from hunk 0
-		move.l	(_hunk0,pc),a0
-		moveq	#11-1,d1
-.h11		move.l	(-4,a0),d0
-		lsl.l	#2,d0
-		move.l	d0,a0
-		addq.l	#4,a0
-		cmp.w	#11-6,d1
-		bne	.not6
-		lea	(_h6,pc),a1
-		move.l	a0,(a1)
-.not6		dbf	d1,.h11
-		lea	(_h11,pc),a1
-		move.l	a0,(a1)
-		move.l	(-4,a0),d0
-		lsl.l	#2,d0
-		move.l	d0,a0
-		addq.l	#4,a0
-		lea	(_h12,pc),a1
-		move.l	a0,(a1)
+		move.l	(_h12,pc),a0
 	;check the bytes replaced: moveq #0,d0 / btst #6,$bfe001
 		cmp.l	#$70000839,($5298,a0)
 		bne	.bad
@@ -179,10 +160,6 @@ _tapename	dc.b	"lovtape",0
 _tapebad	dc.b	"input tape: unexpected game code or tape too large",0
 	EVEN
 	CNOP 0,4
-_hunk0		dc.l	0
-_h6		dc.l	0
-_h11		dc.l	0
-_h12		dc.l	0
 _tapeptr	dc.l	0
 _tapelist	dc.l	0		;button list of the last hit test (cleared every field)
 _tapefield	dc.l	0		;fields since the tape started (for debugging)

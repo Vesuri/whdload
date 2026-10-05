@@ -23,9 +23,10 @@ baselines; `docs/profiling.md` §6–§7). Next is §9, game time.
   rendered frame? The two machines' windows show different scenes at the anchor, and the
   townsman reaches the player much sooner on the 68020: likely per frame. Needs the state map
   (heading `h5:01e64`'s 0–359 value, positions) and a coupling test.
-- **Rebuilt slave equivalence (§10).** The fixed window runs the VERIFY build; compare its state
-  with the original slave's behaviour, then add CUSTOM gating.
-- `swap_fields.py` (68030 without an instruction trace) still has Test Drive II's addresses.
+- W0 complete: original/rebuilt start-screen view bytes agree; only pointer coloration and
+  three fields of startup timing differ. Hunk table, CPU/CUSTOM2 tags, disabled-hook checker
+  and validated breakpoint frame counter are in place (`docs/profiling.md` §8).
+- `swap_fields.py` now agrees exactly with the full trace on the A500 fixed window.
 - The conversation panel polls through h2, so `W` cannot wait for it; the route clicks EXIT
   blindly. A hook on its poll would make the route shorter.
 - Entropy: the windows are identical across boots, so VPOSR reads do not leak into this

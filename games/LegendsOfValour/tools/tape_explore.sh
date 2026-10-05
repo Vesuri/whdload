@@ -9,8 +9,8 @@ export FSUAE_RUN="${FSUAE_RUN:-.cap}"; CAP=$FSUAE_RUN; mkdir -p "amiga/$CAP"
 SCRIPT=$1 OUT=$2 COUNT=${3:-8} STEP=${4:-5}
 mkdir -p "$OUT"; rm -f "$OUT"/shot*.png
 make -s -C whdload verify > /dev/null
-cp whdload/LegendsOfValour.Slave "$OUT/slave.slave"
-TAPEFIELD=$(LC_ALL=C sed -n 's/^_tapefield  *00:\([0-9A-F]*\) *$/0x\1/p' whdload/LegendsOfValour.lst | head -1)
+cp tmp/build/LegendsOfValour.Slave "$OUT/slave.slave"
+TAPEFIELD=$(LC_ALL=C sed -n 's/^_tapefield  *00:\([0-9A-F]*\) *$/0x\1/p' tmp/build/LegendsOfValour.lst | head -1)
 python3 tools/tape.py "$SCRIPT" "$OUT/tape.bin" > /dev/null
 export SLAVE="$PWD/$OUT/slave.slave" TAPE="$PWD/$OUT/tape.bin" WHD_ARGS="CUSTOM5=1 ${WHD_ARGS:-}" \
   JOY0=none CHIP_KB=${CHIP_KB:-512} FAST_KB=${FAST_KB:-0} EXTRA_ARGS=${EXTRA_ARGS---slow_memory=1536} WARP=1

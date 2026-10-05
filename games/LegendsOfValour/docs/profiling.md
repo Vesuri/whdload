@@ -201,3 +201,52 @@ W steps finish earlier on the faster machine (anchor at tape field 4 729 on the 
 on the 68020), and the 68020's *last* field shows the view of the A500's *first*. So the sprite
 share differs, and whether the turn and the townsman advance per field or per rendered frame is
 the first game-time question (playbook §9).
+
+
+## 8. Performance patch validation (2026-10-05)
+
+### W0 groundwork
+
+The slave now records the segment chain in `_hunks[17]`, shared with the VERIFY input tape,
+and queries `WHDLTAG_ATTNFLAGS_GET` and CUSTOM2 in `_bootdos`. CUSTOM2 bits 0–5 are reserved
+for W1–W6, respectively. Only implemented options are exposed in `slv_config`; patches remain
+opt-in in the slave. The user chose to enable completed, verified patches in local preferences,
+accept the existing game-time behaviour (including faster world progression below 4.2 fps),
+and defer W7. No change to movement, AI timing, the beam wait, or the 25 fps cap is authorized
+by this performance work.
+
+Build outputs now live in `tmp/build/`, including the listing. Captures retain their exact
+slave and listing. `tools/check_disabled.py` compares each `PERF_RANGE` declaration with the
+local decrunched executable, applying its RELOC32 fixups before comparison. The W1 entry
+range is ten bytes (whole `movem` and `movea` instructions), rather than a six-byte jump that
+would split the second instruction.
+
+**Original-slave behaviour check:**
+
+```
+python3 tools/behaviour_check.py tmp/prof/w0-original
+make -C whdload
+python3 tools/behaviour_check.py tmp/prof/w0-rebuilt --slave tmp/build/LegendsOfValour.Slave
+```
+
+Each capture calibrates h6's loaded address, then reboots with a breakpoint armed before
+reset advances at the **first `h6:0076c` button poll**. Neither slave receives tape input.
+At this start-screen point both have geometry 192 × 92 and byte-identical chunky colours
+(high nibbles) and four-plane view bytes. The plane-byte SHA256 is
+`9b8f447c8b27a0c3f93502cb1522acdcb8586546f7f16584fb9d0f7442f98db6`.
+Full screenshots agree except the 18 × 18 Intuition pointer at the top-left: the rebuilt
+kickemu uses a red pointer, the original a grey pointer. The first poll is at game field
+2,450 (original) / 2,453 (rebuilt). This verifies the no-input start screen; it does not claim
+identical IO timing or a full gameplay-state equivalence test.
+
+**Tape/frame-counter validation:** `WHD_ARGS=CUSTOM2=0 tools/fixed_window.sh tmp/prof/w0-trace`
+reaches tape field 4,729 / game field 4,730, the existing baseline anchor. The disabled-hook
+checker passes for `h12:054ce` (ten original bytes). The breakpoint counter now watches
+`h12:05ea6` and the VBL entry `h12:06404`, using debugger convenience variables only.
+
+`KEEP_SLAVE=1 SWAP_ONLY=1 WHD_ARGS=CUSTOM2=0 tools/fixed_window.sh tmp/prof/w0-swaps`
+(retaining the same slave/listing) gives **exactly the full trace's 100-field frame pattern**:
+entries at fields 3, 21, 40, 61, 82; four intervals across 79 fields = 19.75 fields/frame,
+2.5 fps. All 17 `_hunks` entries match the live segment chain. The A500 attention flags are
+`$200` (no AFF_68020). The harness now refreshes its memory dump at the anchor before using
+STATE_ONLY/SWAP_ONLY, rather than relying on a pre-decrunch dump.

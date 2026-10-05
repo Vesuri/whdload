@@ -89,6 +89,7 @@ slv_info	dc.b	"Coded By CFou!",10
 		dc.b	"Version 1.0 (06.02.2005)",10
 		dc.b	"reconstructed by Vesuri",0
 slv_config	dc.b	"C1:B:character creation;"
+		dc.b	"C2:X:faster chunky-to-planar:0;"
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
 	ENDC
@@ -216,14 +217,9 @@ _decrunched	movem.l	(a7)+,d0-a6
 ; D0 = APTR hunk 0.  Out: D0/A0 = args as passed to the program; all other registers kept.
 
 _patchgame
-	IFD VERIFY
-		lea	(_hunk0,pc),a0
-		move.l	d0,(a0)
-	ENDC
-		move.l	d0,a0
-		move.l	(-4,a0),d0
-		lsl.l	#2,d0
-		move.l	d0,a0			;A0 = hunk 1 - 4
+		bsr	_map_hunks
+		move.l	(_hunks+4,pc),a0
+		subq.l	#4,a0			;A0 = hunk 1 - 4
 	;skip the manual protection, two AMIGA2 versions
 		cmp.l	#$bc876656,($13e4,a0)	;h1:013e0 cmp.l d7,d6 / bne
 		bne	.v2
@@ -236,11 +232,28 @@ _patchgame
 		move.l	#$4e714e71,($141a,a0)
 		move.w	#$4e71,($141e,a0)
 .done
+	; Reserved W1 hook, checked while disabled: PERF_RANGE h12:054ce 10
 	IFD VERIFY
 		bsr	_tape_install
 	ENDC
 		moveq	#_args_end-_args,d0
 		lea	(_args,pc),a0
+		rts
+
+; D0 = first hunk APTR. Shared by the normal patches and VERIFY tape.
+; CHARACT has fewer hunks: stop at its null link and clear the remaining entries.
+_map_hunks	movem.l	d1/a1,-(a7)
+		lea	(_hunks,pc),a1
+		moveq	#17-1,d1
+.next		move.l	d0,(a1)+
+		beq	.zero
+		move.l	d0,a0
+		move.l	(-4,a0),d0
+		lsl.l	#2,d0
+		beq	.zero
+		addq.l	#4,d0
+.zero		dbf	d1,.next
+		movem.l	(a7)+,d1/a1
 		rts
 
 	IFD VERIFY
@@ -259,6 +272,10 @@ _args_end
 	CNOP 0,4
 _tag		dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
+		dc.l	WHDLTAG_CUSTOM2_GET
+_custom2	dc.l	0
+		dc.l	WHDLTAG_ATTNFLAGS_GET
+_lov_attnflags	dc.l	0
 	IFD VERIFY
 		dc.l	WHDLTAG_CUSTOM5_GET
 _custom5	dc.l	0
@@ -270,6 +287,14 @@ _dosbase	dc.l	0
 _callregs	ds.l	11
 _callrts	dc.l	0
 _callargs	ds.b	208
+_hunks
+_hunk0		dc.l	0
+		ds.l	5
+_h6		dc.l	0
+		ds.l	4
+_h11		dc.l	0
+_h12		dc.l	0
+		ds.l	4
 
 ;============================================================================
 
