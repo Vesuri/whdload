@@ -149,7 +149,8 @@ def handle(g, line):
         g.cont(); time.sleep(float(rest)); return 'ok'
     if op == 'until':
         g.stop()
-        g.cmd(f'break *{rest}')
+        for address in rest.split():
+            g.cmd(f'break *{address}')
         out = g.cmd('continue', timeout=1800)
         g.cmd('delete')
         return out

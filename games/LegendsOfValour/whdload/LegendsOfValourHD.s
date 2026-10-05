@@ -92,6 +92,7 @@ slv_config	dc.b	"C1:B:character creation;"
 		dc.b	"C2:X:faster chunky-to-planar:0;"
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
+		dc.b	"C5:X:C2P pixel twin (verification):1;"
 	ENDC
 		dc.b	0
 	EVEN
@@ -232,7 +233,8 @@ _patchgame
 		move.l	#$4e714e71,($141a,a0)
 		move.w	#$4e71,($141e,a0)
 .done
-	; Reserved W1 hook, checked while disabled: PERF_RANGE h12:054ce 10
+	; Optional W1 hook, checked while disabled: PERF_RANGE h12:054ce 10
+		bsr	_c2p_install
 	IFD VERIFY
 		bsr	_tape_install
 	ENDC
@@ -256,11 +258,6 @@ _map_hunks	movem.l	d1/a1,-(a7)
 		movem.l	(a7)+,d1/a1
 		rts
 
-	IFD VERIFY
-		INCLUDE	tape.s
-	ENDC
-
-;============================================================================
 
 _disk1		dc.b	"LOV",0		;for Assign
 _program	dc.b	"AMIGA2",0
@@ -295,6 +292,23 @@ _h6		dc.l	0
 _h11		dc.l	0
 _h12		dc.l	0
 		ds.l	4
+
+		INCLUDE	c2p.s
+
+	IFD VERIFY
+		INCLUDE	tape.s
+	ENDC
+
+;============================================================================
+
+		CNOP 0,4
+_c2p_edges	ds.b	4*92*4
+	IFD VERIFY
+		CNOP 0,4
+_c2p_scratch	ds.b	4*40*92
+	ENDC
+		CNOP 0,4
+_c2p_chunky	ds.b	192*92
 
 ;============================================================================
 

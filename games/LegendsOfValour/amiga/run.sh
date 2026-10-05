@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Boot the installed original Legends of Valour under WHDLoad in FS-UAE.
+# Boot Legends of Valour under WHDLoad in FS-UAE (local performance prefs optional).
 #   amiga/run.sh            windowed, real speed, with sound
 #   FSUAE_RUN=dir         run directory under amiga/ (default .run; the debugger tools use .cap,
 #                         so captures never stop an interactive session)
@@ -11,6 +11,15 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
+# Optional local preference; captures provide explicit SLAVE/WHD_ARGS and override it.
+[ ! -f performance.env ] || . ./performance.env
+if [ -z "${SLAVE:-}" ] && [ "${LOV_PERFORMANCE_BITS:-0}" != 0 ]; then
+  make -s -C ../whdload OUT=../tmp/build-release > /dev/null
+  SLAVE="$PWD/../tmp/build-release/LegendsOfValour.Slave"
+fi
+if [ -z "${WHD_ARGS:-}" ] && [ "${LOV_PERFORMANCE_BITS:-0}" != 0 ]; then
+  WHD_ARGS="CUSTOM2=$LOV_PERFORMANCE_BITS"
+fi
 . "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
 
 GAME="${GAME:-../tmp/game/LegendsOfValour}"

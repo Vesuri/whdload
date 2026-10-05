@@ -1,7 +1,8 @@
 # Open work — Legends of Valour
 
 Status 2026-10-05: playbook §1–§8 done (fixed window, frame counter, A500-eq. and 68020
-baselines; `docs/profiling.md` §6–§7). Next is §9, game time.
+baselines; `docs/profiling.md` §6–§7). W0/W1 complete; measurements in §8. Next is W2,
+chunky buffer allocation in fast RAM. Deeper AI timing mapping remains open.
 
 ## Done
 
@@ -16,17 +17,20 @@ baselines; `docs/profiling.md` §6–§7). Next is §9, game time.
 - Baseline: **2.5 fps** on the A500-eq., **12.5 fps** on a 14 MHz 68020; render ~45–53%,
   chunky-to-planar ~26–30%, game logic 6–16% (`docs/profiling.md` §7).
 
+- W0: shared hunk table, CPU/CUSTOM2 tags, disabled-hook checker and original/rebuilt
+  first-button-poll comparison completed; startup pointer/timing limitations in §8.
+- W1: CPU-selected Kalms C2P, all three sizes, 1,860 pixel twins passed. Spin fps
+  2.5 → 3.0 / 12.4 → 14.8 (A500 / 020); matching-scene wall A/B confirms savings.
+  CUSTOM2=1 enabled in ignored local preferences; shipped build excludes VERIFY instruments.
+- `swap_fields.py` agrees exactly with the full trace on the A500 fixed window.
+
 ## Open questions
 
-- **Game time (§9).** Time sources are the VBL field counter `h11:0602c` and VPOSR reads in
-  h12 (`063ac`..`063f0`). Does the world (turning, the townsman) advance per field or per
-  rendered frame? The two machines' windows show different scenes at the anchor, and the
-  townsman reaches the player much sooner on the 68020: likely per frame. Needs the state map
-  (heading `h5:01e64`'s 0–359 value, positions) and a coupling test.
-- W0 complete: original/rebuilt start-screen view bytes agree; only pointer coloration and
-  three fields of startup timing differ. Hunk table, CPU/CUSTOM2 tags, disabled-hook checker
-  and validated breakpoint frame counter are in place (`docs/profiling.md` §8).
-- `swap_fields.py` now agrees exactly with the full trace on the A500 fixed window.
+- **Game time (§9).** Heading is `h11:08c28`, player x/y `h11:08c1c`/`08c20`;
+  `h12:14b78` reads movement step `h12:0cdd6`. The faster spin ends at a different heading
+  with unchanged position; frame coupling remains. `tools/lov_state.py` maps visible-object
+  render records but does not identify the townsman's world position. Deeper AI timing/state
+  mapping remains open. The user accepted existing timing for W1; no clock/cap/AI patch.
 - The conversation panel polls through h2, so `W` cannot wait for it; the route clicks EXIT
   blindly. A hook on its poll would make the route shorter.
 - Entropy: the windows are identical across boots, so VPOSR reads do not leak into this
@@ -34,7 +38,9 @@ baselines; `docs/profiling.md` §6–§7). Next is §9, game time.
 
 ## Candidate optimisations (not started; plan in `docs/performance-plan.md`)
 
-- Chunky-to-planar `h12:054ce`: a quarter of the A500 frame. A faster conversion (or blitter
-  assisted on the A500, longword merges on 020+) is the classic win.
+- W2: allocate the chunky buffer in fast RAM on 020+; audit every DMA/blitter user and the
+  matching free before patching. Keep other pool users in chip RAM.
 - Wall column drawer `h12:04c1a` and its setup `h12:02808`: ~38% of the A500 frame.
 - Scaled sprites `h12:05114`: up to 13% when people are in view.
+
+W7 (column-major layout and other later work) is deferred beyond W0/W1 by user decision.

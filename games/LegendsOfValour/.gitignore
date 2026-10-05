@@ -34,3 +34,6 @@ build/
 *.o
 *.Slave
 *.lst
+
+# Local performance preferences (amiga/performance.env.example is tracked).
+/amiga/performance.env

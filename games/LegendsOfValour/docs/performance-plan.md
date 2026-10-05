@@ -5,6 +5,10 @@
 > (all of it), then this file.** Every number here is from that window unless marked
 > *estimate*; estimates must be replaced by measurements before anything is claimed.
 
+**Status 2026-10-05:** W0 and W1 implemented and measured; evidence and exact commands in
+`docs/profiling.md` §8. W1 is enabled in ignored local preferences. W2 is next; W7 is deferred.
+The remaining items below are the work plan, not implemented features.
+
 ## 0. Ground rules (from CLAUDE.md and the playbook, restated because they bite)
 
 - Every change ships as a **WHDLoad slave patch** in `whdload/LegendsOfValourHD.s`, applied in
@@ -67,8 +71,8 @@ Reproduce the histogram with the snippet in §3.3.
    offset to the view's top-left), `h12:0002e` (width in pixels), `h12:00030` (height). Source
    row step `192 - width`, destination row step `40 - width/8` (screen is 320 × 200, **4
    separate planes, 8 000 bytes apart**, not interleaved). Saves/restores d0–a6 itself; ends in
-   `rts`. Large view: width 192, height 92, planes `$108B8/$127F8/$14738/$16678` in this
-   capture (= x 64, y 16: byte-, word- and longword-aligned, x multiple of 32).
+   `rts`. Large view: width 192, height 92, planes at their current bitmap bases + `$288`
+   (= x 64, y 16: byte-, word- and longword-aligned, x multiple of 32).
 4. **Pixel format: the colour is the HIGH nibble** (bits 7..4) of each chunky byte. The
    original takes bit 7 → plane 3 (`a4`), bit 6 → plane 2, bit 5 → plane 1, bit 4 → plane 0
    (`a1`). The low nibble is **not guaranteed zero**: wall texels are copied straight from the
@@ -113,11 +117,10 @@ Consequences:
   faster up to 12 fields/frame changes the perceived game speed (towards the intended speed).
   Above that, the world speed should stay constant.
 - Not everything is compensated: the townsman reached the player far sooner on the 68020
-  (see profiling.md §6), so some AI advances per frame. **This is playbook §9 work; finish it
-  before or alongside W1**, at least: who reads `h12:0cdd6` (not found statically: no
-  relocated reader; use a gdb read-watchpoint), the heading (`h5:01e64`, 0–359), and the
-  townsman's position. Faster frames will change what the fixed window shows (different scene
-  at the anchor), which matters for §3.
+  (see profiling.md §6), so some AI advances per frame. W1 maps the heading to `h11:08c28`
+  and finds a movement-step reader at `h12:14b78`. The townsman's world position and deeper
+  AI timing remain open; the user accepted existing timing behaviour. Faster frames change
+  the scene at the fixed-window anchor, which matters for §3. Evidence is in profiling §8.
 - The beam wait exists because the C2P writes **straight into the displayed bitplanes**
   (single buffer). Starting at line $98 keeps the conversion out of the beam's way in the
   view area (rows 16..108 of the screen). **A faster C2P reduces tearing; do not remove the
@@ -126,21 +129,19 @@ Consequences:
 ### 2.4 Slave infrastructure that exists
 
 - `_patchgame` (`whdload/LegendsOfValourHD.s`) gets hunk 0's address; hunk N is found by
-  walking the BPTR chain (`whdload/tape.s` `_tape_install` does it for h6/h11/h12 — move that
-  into a shared routine that fills a hunk table `_hunks[17]`).
+  walking the BPTR chain (W0 now fills the shared `_hunks[17]` table).
 - The chain is a real AmigaDOS segment list, so `resload_PatchSeg` (`seglist = (hunk0-4)>>2`)
   can apply `PL_*` lists — check in the WHDLoad autodoc how it numbers offsets across hunks
   before relying on it; otherwise patch with `_hunks[12] + offset` by hand like `tape.s` does,
   verifying the original bytes first and aborting with `TDREASON_FAILMSG` on mismatch.
-- CPU detection: `WHDLTAG_ATTNFLAGS_GET` via `resload_Control` in `_bootdos` (add it to `_tag`),
+- CPU detection: W0 reads `WHDLTAG_ATTNFLAGS_GET` via `resload_Control` in `_bootdos`,
   test `AFF_68020`.
-- Build: `make -C whdload` / `make -C whdload verify` (listing `whdload/LegendsOfValour.lst`
+- Build: `make -C whdload` / `make -C whdload verify` (listing `tmp/build/LegendsOfValour.lst`
   gives slave symbol offsets; `fixed_window.sh` reads `_tape_anchor` from it).
-- **Prerequisite (playbook §10)**: the rebuilt slave has not yet been compared with the
-  original v1.0 slave by behaviour. Do it first: run the original slave (`SLAVE=` unset in
-  `run.sh` uses `tmp/game/LegendsOfValour/LegendsOfValour.Slave`) — it cannot run the tape, so
-  compare a state snapshot at a fixed point reachable without input (e.g. the start screen
-  after N fields) and the rebuilt normal build at the same point.
+- **Prerequisite (playbook §10), completed W0**: profiling §8 records the first-button-poll
+  original/rebuilt comparison and its startup timing/pointer limitations. Repeat with
+  `tools/behaviour_check.py OUT` (original), or add `--slave tmp/build/LegendsOfValour.Slave`
+  after a normal build. Both explicitly disable performance patches and supply no tape.
 
 ## 3. Measurement protocol (every item)
 
@@ -178,7 +179,7 @@ Consequences:
 
 ## 4. Work items, in order
 
-### W0. Groundwork (small, required)
+### W0. Groundwork (completed)
 
 - Hunk table in the slave (`_hunks`), shared by `tape.s` and the patches.
 - `WHDLTAG_ATTNFLAGS_GET` read in `_bootdos`.
@@ -188,7 +189,7 @@ Consequences:
 - Adapt `swap_fields.py` to count `h12:05ea6` entries with read-only breakpoints (needed for
   CPUs without an instruction trace, e.g. a 68030 at 25/50 MHz; template in Test Drive II).
 
-### W1. Replace the C2P with Kalms' (first, as requested)
+### W1. Replace the C2P with Kalms' (completed)
 
 **Source.** Mikael Kalms' public-domain collection, shared checkout
 `~/.local/share/amiga/kalms-c2p` (upstream https://github.com/Kalmalyzer/kalms-c2p, commit
@@ -224,16 +225,22 @@ save/restore d0–a6 like the original and `rts`):
   `and.l #$0f0f0f0f` on four longwords, then `lsl.l #4` on two and `or`. For this game change
   it to `and.l #$f0f0f0f0` on all four and `lsr.l #4` on the **other** two (the ones Kalms
   does not shift), then `or` into the unshifted ones, so the intermediate layout (first pixel
-  of each pair in the high nibble) is unchanged — same cycle count. Do this in both the
+  of each pair in the high nibble) is unchanged — same cycle count in the word routine.
+  The longword routine actually lacks upstream masks, so explicit masks add instructions (see the vendor README). Do this in both the
   prologue copy and the loop copy of the merge, in both routines, and document it in the
   vendored README. Verify bit/plane order with the pixel test, not by reasoning.
 - **Sizes: convert a little extra rather than exactly** (user decision, 2026-10-05). The
   large view is 192 wide (= 6 × 32) at x 64 and meets every restriction as is. The medium and
-  small views are narrower and not multiples of 32 (screenshot estimate, *unverified*: medium
-  ~112, small 80). For those, convert an **enclosing window**: width rounded up to the next
-  multiple of 32 (80 → 96, ~112 → 128), left edge at a multiple of 16 (word writes on the
+  small views are narrower and not multiples of 32 (verified: medium 112 × 64 at
+  104,30; small 80 × 48 at 120,38). For those, convert an **enclosing window**:
+  width rounded up to the next
+  multiple of 32 (80 → 96, 112 → 128), left edge at a multiple of 16 (word writes on the
   68000; a multiple of 32 is better for the 020's longword writes), containing the view.
-  - The screen around the smaller views is **solid colour 0** (black) for tens of pixels on
+  - **W1 correction:** the first medium conversion retains previous large-view pixels
+    in the extra columns. Source padding alone failed the pixel twin. Save/restore all
+    extra destination bytes, while zeroing staged source padding each frame. Geometry
+    and normalized plane offsets are recorded in profiling §8. In settled views,
+    the screen around the smaller views is **solid colour 0** (black) for tens of pixels on
     each side inside the frame (checked on `tmp/explore/viewcycle` screenshots: the frame's
     dither starts far outside the view). So the extra pixels are invisible **provided they
     convert to colour 0**. Confirm on the real geometry that the enclosing window stays inside
@@ -262,10 +269,10 @@ save/restore d0–a6 like the original and `rts`):
    mismatch. Run the spin route on both CPUs for a few hundred frames, plus the viewcycle route
    (all three sizes) and a route with sprites (the townsman, the street) to exercise the
    high/low nibble.
-2. A/B on the fixed window (§3). *Estimate*: Kalms' 4-plane c5 on a 68000 should land around
-   15–20 cycles/pixel against 42 now (saving ~350–450k cycles of ~2.8M per A500 frame, i.e.
-   ~12–16% of the frame); on the 68020 much more, because the original does byte writes and
-   the `bm` version longword writes. Measure.
+2. A/B on the fixed window (§3), completed. Measured main-task costs are about 28.4
+   cycles/pixel on 68000 and 9.6 on 020; spin fps 2.5 → 3.0 / 12.4 → 14.8, with a
+   scene-stable wall A/B as well (profiling §8). The initial 15–20 cycles/pixel estimate
+   for 68000 was optimistic; use the measurements, including adapter costs.
 
 ### W2. Chunky buffer in fast RAM (68020+ with fast memory)
 
@@ -335,12 +342,15 @@ by walls. Small but easy; good warm-up for the patch framework.
 - 68030/040/060: run `SWAP_ONLY` windows after W0 adapts `swap_fields.py`; Kalms' bm routine
   is fine there too.
 
-## 5. Expected outcome (*estimate*, to be replaced by measurements)
+## 5. Expected outcome (W1 measured; remaining items are estimates)
 
-A500-eq.: C2P −~15% of the frame (W1), walls −~12% (W3), sprites −~5% (W4) → from ~20 to
-roughly 13–14 fields/frame (~3.5 fps), i.e. close to the 12-field point where the game's own
-time compensation starts working (§2.3). 68020 with fast RAM: W1 + W2 should be the big step
-(from 4 fields/frame towards the 2-field / 25 fps cap).
+W1 measured: C2P cycles/call −33% / −52% (68000 / 020), spin fps 2.5 → 3.0 /
+12.4 → 14.8. Fixed-wall results confirm the savings at a matching scene.
+
+Remaining estimates: walls −~12% of the original A500 frame (W3), sprites −~5% (W4).
+Re-measure their share after each change, because scene and frame timing affect it.
+On the 68020, W2 should move further towards the 2-field / 25 fps cap; quantify it with
+the same paired measurement protocol.
 
 ## 6. Decisions for the user (ask, don't assume)
 

@@ -175,7 +175,7 @@ chunky buffer (one byte per pixel, 192 bytes wide; `h12:027bc`) and then shows i
 converts the buffer into the screen's 4 bitplanes (chunky-to-planar, `h12:054ce`..`055e6`
 for this size: `add.b`/`addx.w` bit shuffles, 8 pixels per step, with a shortcut for 8 equal
 pixels), or copies with `BltBitMap` + `WaitBlit`. `frames.py` counts entries of `h12:05ea6`.
-`swap_fields.py` is not adapted yet (68030 runs without an instruction trace need it).
+`swap_fields.py` now watches that same display entry (validated against the trace in §8).
 
 **Baseline, spin route, large view, 100 fields from the anchor (2026-10-05):**
 
@@ -250,3 +250,148 @@ entries at fields 3, 21, 40, 61, 82; four intervals across 79 fields = 19.75 fie
 2.5 fps. All 17 `_hunks` entries match the live segment chain. The A500 attention flags are
 `$200` (no AFF_68020). The harness now refreshes its memory dump at the anchor before using
 STATE_ONLY/SWAP_ONLY, rather than relying on a pre-decrunch dump.
+
+
+### W1 CPU-selected Kalms C2P
+
+**Implemented and verified.** CUSTOM2 bit 0 replaces only `h12:054ce`'s first ten bytes
+with a jump and two NOPs. The adapter preserves d0–a6 and returns to the original caller.
+The patch checks the relocated entry before writing and flushes caches afterwards.
+The hunk relocation cross-reference has no absolute references into these ten bytes;
+the h12 branch audit finds the dispatcher entry at `h12:05eb2`, with none into the middle.
+CUSTOM2=0 passes `check_disabled.py` on both CPUs and both benchmark routes below.
+
+WHDLoad attention flags select the word-writing routine on 68000/10 (`$200` observed),
+the longword-writing routine on 68020+ (`$203` observed). The two Kalms files are vendored
+at commit `d8ecf79a3325615305dd800ae7704b518e0d9dda`; all local changes are listed in
+[the vendor README](../whdload/kalms/README.md). Both ignore the low nibble, use source
+stride 192, and finish each row's pipeline before skipping to the next row. Contrary to
+the initial plan, the longword routine has no upstream nibble masks: explicit masks cost
+extra instructions. Measured costs below replace the original cycle estimates.
+
+**Actual geometry**, recorded by the successful in-game twins. Plane pointers
+`h12:00042..00051` are reread every call. Each is the current screen plane base plus
+`y*40+x/8`; the four bases are separated by 8,000 bytes, with 40-byte row stride.
+Offsets here are relative to each current plane base, not capture-specific addresses.
+
+| View | Width × height | Origin x,y | Original plane offset | Enclosing x,width | Enclosing plane offset |
+|---|---|---|---|---|---|
+| Large | 192 × 92 | 64,16 | `$288` | 64,192 | `$288` |
+| Medium | 112 × 64 | 104,30 | `$4bd` | 96,128 | `$4bc` |
+| Small | 80 × 48 | 120,38 | `$5ff` | 112,96 | `$5fe` |
+
+Large view reads the game buffer directly. Medium/small use a private staging buffer:
+copy the active pixels at source column zero, add eight black pixels at each side, and
+advance source rows by 192. Never read/write before chunky column zero. The smaller-view
+enclosing destination is word aligned; large is also longword aligned.
+
+A first medium-view twin found an important transition case: extra destination columns
+still held earlier large-view pixels, rather than black. The adapter saves/restores those
+extra screen bytes around conversion. Source padding is always black; surrounding screen
+pixels stay exactly as the original left them, including during view-size transitions.
+
+**Pixel-exact self-test:** VERIFY + CUSTOM2=1 + CUSTOM5=3 runs the relocated original
+routine into scratch planes seeded from the screen, then the replacement into the screen.
+It compares all 40 bytes of every row in all four planes, including margins/guards, and
+aborts at the first differing byte. Before both routines it XORs every active low nibble
+with `$0f`, restoring source bytes afterwards: duplicated colour nibbles cannot hide a
+wrong nibble merge. The retained early failing run demonstrated the abort path; it is not
+counted as a successful test. The host requires the completion breakpoint, not merely an
+interrupted debugger session.
+
+```
+TAPE_OPTIONS=3 SELFTEST_FRAMES=300 WHD_ARGS=CUSTOM2=1 tools/fixed_window.sh tmp/prof/w1-views-a500 tools/tapes/c2p-views.txt
+AMIGA_MODEL=A1200 KICKSTART="$AMIGA_SHARE/Kickstarts/kick40068.A1200" CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 EXTRA_ARGS=--slow_memory=0 TAPE_OPTIONS=3 SELFTEST_FRAMES=300 WHD_ARGS=CUSTOM2=1 tools/fixed_window.sh tmp/prof/w1-views-a1200 tools/tapes/c2p-views.txt
+python3 tools/c2p_check.py tmp/prof/w1-views-a500 --require-all-views
+python3 tools/c2p_check.py tmp/prof/w1-views-a1200 --base 0x200000 --require-all-views
+```
+
+| CPU/converter | Medium twins | Small twins | Large twins | Total |
+|---|---|---|---|---|
+| 68000 / word | 37 | 104 | 389 | 530 |
+| 68020 / longword | 297 | 427 | 606 | 1,330 |
+
+All **1,860** comparisons passed. The route visits all sizes, handles the townsman's
+conversation and continues turning through street/wall/sprite views; at least 300 large
+frames complete after the anchor on each CPU. Performance runs use CUSTOM5=1, excluding
+all twin work. Normal builds contain neither the twin nor input tape.
+
+**100-field spin A/B**, sequential captures with the same retained VERIFY slave in all
+four runs (SHA256 `1b94f390bb8e6719720ee39cde601da0db80ddb588ae44dddc9e46cbbe8bafe7`).
+Only CUSTOM2 differs. Geometry is 192 × 92 in every measured window.
+
+```
+WHD_ARGS=CUSTOM2=0 tools/fixed_window.sh tmp/prof/w1-a500-off
+WHD_ARGS=CUSTOM2=1 tools/fixed_window.sh tmp/prof/w1-a500-on
+AMIGA_MODEL=A1200 KICKSTART="$AMIGA_SHARE/Kickstarts/kick40068.A1200" CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 EXTRA_ARGS=--slow_memory=0 WHD_ARGS=CUSTOM2=0 tools/fixed_window.sh tmp/prof/w1-a1200-off
+AMIGA_MODEL=A1200 KICKSTART="$AMIGA_SHARE/Kickstarts/kick40068.A1200" CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 EXTRA_ARGS=--slow_memory=0 WHD_ARGS=CUSTOM2=1 tools/fixed_window.sh tmp/prof/w1-a1200-on
+```
+
+| Machine | fps off → on | Frame intervals / fields off → on | C2P completed calls off → on | Main-task cycles/call off → on | Inclusive cycles/call off → on |
+|---|---|---|---|---|---|
+| A500-equivalent | **2.5 → 3.0** | 4/79 → 5/82 | 5 → 6 | 748,288 → 502,191 (−32.9%) | 803,106 → 540,342 |
+| 14 MHz 68020 + fast | **12.4 → 14.8** | 24/97 → 29/98 | 25 → 30 | 356,316 → 169,955 (−52.3%) | 364,280 → 175,143 |
+
+Use this fresh paired 68020 baseline (24 intervals/97 fields); §7's earlier 12.5 fps
+window had 24/96. Unrounded fps improves 20.4% / 19.6%, respectively. The faster turn
+renders a different scene, most visibly on the 020. First/last screenshots of both
+variants are shown in these ignored local comparison sheets (off left, on right;
+first above, last below):
+
+![A500 spin off/on first/last](../tmp/prof/w1-a500-comparison.png)
+![68020 spin off/on first/last](../tmp/prof/w1-a1200-comparison.png)
+
+**Scene-stable second A/B:** `tools/tapes/wall.txt` uses VERIFY's new H wait to stop at
+heading 150, then waits 1,000 fields before the anchor. H reads `h11:08c28`; the ordinary
+counting path adds no work inside the performance window. The shipping slave has no H/tape
+code. Repeat the four commands above using `w1-wall-...` output names and append
+`tools/tapes/wall.txt`. The retained slave is identical across all four wall captures,
+SHA256 `b091177a3a85c67904d3d97d427e4a1cea950384b4ea86dc9c2a479cd52336b9`.
+Its C2P code matches the spin build; only the VERIFY heading fixture was added.
+
+| Machine | fps off → on | Frame intervals / fields off → on | C2P completed calls off → on | Main-task cycles/call off → on | Inclusive cycles/call off → on |
+|---|---|---|---|---|---|
+| A500-equivalent | **2.8 → 3.1** | 5/89 → 6/97 | 6 → 6 | 741,853 → 501,837 (−32.4%) | 800,207 → 541,502 |
+| 14 MHz 68020 + fast | **11.9 → 14.1** | 23/97 → 27/96 | 24 → 28 | 363,379 → 169,915 (−53.2%) | 372,102 → 174,543 |
+
+Unrounded fps improves 10.1% / 18.6%. All four viewport images per machine are
+pixel-identical (physical crop 202,68–586,252 in the 754 × 576 captures). Player position
+is 5216,3616 and heading 150 in all four state dumps; visible-object render records also
+match. This supports the cycle savings without the spin route's changed scene.
+
+![A500 wall off/on first/last](../tmp/prof/w1-wall-a500-comparison.png)
+![68020 wall off/on first/last](../tmp/prof/w1-wall-a1200-comparison.png)
+
+Each output retains slave/listing, code dump, trace, tape, anchor, logs, first/last images,
+`frames.txt`, `profile.txt`, `blocks.txt`, `c2p.txt`, and `state.json`. Analyse with the retained slave:
+
+```
+SLAVE=tmp/prof/w1-a500-off/slave.slave python3 tools/frames.py tmp/prof/w1-a500-off/trace.bin tmp/prof/w1-a500-off/code.bin 0xc00000
+python3 tools/c2p_report.py tmp/prof/w1-a500-off
+python3 tools/c2p_report.py tmp/prof/w1-a1200-on --base 0x200000
+SLAVE=tmp/prof/w1-a500-off/slave.slave python3 tools/check_disabled.py tmp/prof/w1-a500-off
+python3 tools/lov_state.py tmp/prof/w1-a1200-on --base 0x200000
+```
+
+`c2p_report.py` pairs the unchanged entry `h12:054ce` with the original or replacement
+RTS at the same stack depth. Boundary calls are excluded. Inclusive costs include IRQs;
+main-task costs exclude the separate IRQ stack and include the entire adapter. Large-view
+replacement costs are about 28.4 cycles/pixel on the 68000 and 9.6 on the 020, in trace-reported cycle units. The original's equal-pixel shortcut remains scene
+dependent, so both routes and both measures are retained.
+
+**Game-time check and limit.** State snapshots map heading to `h11:08c28`, player x/y to
+`h11:08c1c`/`08c20` (A4 = h11 + `$8000`). A trace effective-address scan finds a movement
+step reader at `h12:14b78`, `add.w -4232(a0),d0`, reading `h12:0cdd6`; it has no relocated
+absolute operand. The A500 spin ends at heading 210 off / 255 on with step 48 in both;
+the 020 ends at 150 off / 30 on, step 16 / 12, animation pacing 3 / 4. Position remains
+5216,3616. Turning therefore remains coupled to the game's frame timing. The object
+records dumped here are render records, not a mapped townsman world position; deeper
+AI timing/state mapping remains open. The user accepted the existing behaviour. W1
+changes no movement/AI timing instruction, 25 fps cap, beam wait, or one-shot conversion.
+
+**Local preference:** `amiga/performance.env` (ignored) now enables only W1, mask 1.
+`amiga/run.sh` builds the normal slave under `tmp/build-release` on the next interactive
+boot. Explicit SLAVE/WHD_ARGS override the preference; captures always provide both.
+No interactive `.run` emulator was started or modified. `make -C whdload
+OUT=../tmp/build-release` assembles the normal slave with 68000/PIC checks; the VERIFY
+build assembles too. W7 remains deferred; W2 is the next planned feature.

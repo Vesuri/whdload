@@ -19,7 +19,7 @@ import shutil
 shutil.copy2(shutil_source, a.out/'slave.slave')
 a.slave = a.out/'slave.slave'
 env = dict(os.environ, FSUAE_RUN='.cap', JOY0='none', CHIP_KB='512', FAST_KB='0',
-           EXTRA_ARGS='--slow_memory=1536', DETERMINISTIC='1', WARP='1')
+           EXTRA_ARGS='--slow_memory=1536', DETERMINISTIC='1', WARP='1', WHD_ARGS='CUSTOM2=0')
 if a.slave:
     env['SLAVE'] = str(a.slave.resolve())
 else:

@@ -14,8 +14,10 @@
 ; Tape file data/lovtape (tools/tape.py builds it), big-endian words, entries of 8 bytes:
 ;	dc.w	fields,x,y,buttons	; hold for FIELDS fields; FIELDS=0 holds forever
 ; buttons: bit 0 left, bit 1 right, bit 15 anchor (the entry's first field runs _tape_anchor),
-; bit 14 wait: instead of counting fields, hold until the button list the game last hit-tested
-; has a button with id FIELDS (0: any) containing (x,y).  The game hit-tests its current
+; bit 14 (W): hold until the last hit-tested list has a button with id FIELDS
+; (0: any) containing (x,y), instead of counting fields.
+; Bit 13 (H, with bit 14): wait for heading h11:08c28 to equal FIELDS instead.
+; The game hit-tests its current
 ; screen's list through h6:0076c (entries: next, id, x, y, w, h longs), which the tape hooks to
 ; remember the list; it is forgotten every field, so only a list in use counts.
 ; Field 0 of the tape is the first call of the server after the game installs it.
@@ -105,7 +107,9 @@ _tape_next	lea	(_tapefield,pc),a0
 		rts
 
 ; wait entry: look for button id (a1) at (2,a1)/(4,a1) in the last hit-tested list
-_tw_wait	move.l	(_tapelist,pc),d0
+_tw_wait	btst	#5,(6,a1)		;H: wait for a heading, not a button
+		bne	_tw_heading
+		move.l	(_tapelist,pc),d0
 		moveq	#64-1,d1
 _tw_node	btst	#0,d0
 		bne	_tape_next
@@ -130,6 +134,7 @@ _tw_anyid	move.w	(2,a1),d0
 		cmp.l	(20,a0),d0
 		bgt	_tw_skip
 	;found: next entry
+_tw_advance
 		lea	(_tapecnt,pc),a0
 		clr.w	(a0)
 		lea	(_tapeptr,pc),a0
@@ -141,6 +146,15 @@ _tw_anyid	move.w	(2,a1),d0
 _tw_skip	move.l	(a0),d0
 		dbf	d1,_tw_node
 		bra	_tape_next
+
+; H entry: read game state, then release the turn input when the target is reached.
+; The normal count path (including performance windows) has no additional work.
+_tw_heading	move.l	(_h11,pc),a0
+		add.l	#$8c28,a0
+		move.w	(a0),d0
+		cmp.w	(a1),d0
+		bne	_tape_next
+		bra	_tw_advance
 
 ; replaces h6:0076c, the game's button hit test (list,x,y): remember the list
 _tape_hit	move.l	a0,-(a7)

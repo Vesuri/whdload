@@ -21,7 +21,7 @@ fi
 python3 tools/tape.py "$TAPE_TXT" "$OUT/tape.bin" > /dev/null
 cp "$TAPE_TXT" "$OUT/tape.txt"
 export DETERMINISTIC=1 SLAVE="$PWD/$OUT/slave.slave" TAPE="$PWD/$OUT/tape.bin" CPU="${CPU:-68000}" \
-  JOY0=none WHD_ARGS="CUSTOM5=1 ${WHD_ARGS:-}"
+  JOY0=none WHD_ARGS="CUSTOM5=${TAPE_OPTIONS:-1} ${WHD_ARGS:-}"
 sym() { python3 -c "
 import re, sys
 for l in open('$OUT/slave.lst', errors='replace'):
@@ -66,7 +66,16 @@ for _ in $(seq 1 60); do
 done
 [ -n "$slave" ] || { echo "live slave never appeared in memory" >&2; exit 1; }
 echo "slave at $slave, anchor $(printf '%#x' $((slave + ANCHOR)))"
-{ echo "slave $slave"; lov until "$(printf '%#x' $((slave + ANCHOR)))"; } > "$OUT/anchor.txt"
+ABORT=$(sym _c2p_abort)
+BREAKS=("$(printf '%#x' $((slave + ANCHOR)))")
+[ -z "$ABORT" ] || BREAKS+=("$(printf '%#x' $((slave + ABORT)))")
+{ echo "slave $slave"; lov until "${BREAKS[@]}"; } > "$OUT/anchor.txt"
+if [ -n "$ABORT" ] && grep -qi "$(printf '0x%08x' $((slave + ABORT)))" "$OUT/anchor.txt"; then
+  lov gdb 'x/s $a0' >> "$OUT/anchor.txt"
+  lov gdb 'info registers' > "$OUT/failure-registers.txt"
+  dump; retain_log
+  cat "$OUT/anchor.txt" >&2; exit 1
+fi
 # The tape's field count is fixed by the script; the game's own field counter (h11:0602c)
 # and its position (the hunks' addresses) show whether the boot took the same course.
 h11=$(lov gdb "x/1xw $(printf '%#x' $((slave + H11)))" | awk '{print $2}')
@@ -76,6 +85,31 @@ h11=$(lov gdb "x/1xw $(printf '%#x' $((slave + H11)))" | awk '{print $2}')
 cat "$OUT/anchor.txt"
 # Refresh after decrunching: the early slave-location dump need not contain game hunks.
 dump
+if [ "${SELFTEST_FRAMES:-0}" -gt 0 ]; then
+  DONE=$(sym _c2p_test_done)
+  [ -n "$DONE" ] || { echo "pixel-twin symbol missing" >&2; exit 1; }
+  lov gdb "break *$(printf '%#x' $((slave + ABORT)))
+break *$(printf '%#x' $((slave + DONE)))
+ignore \$bpnum $((SELFTEST_FRAMES - 1))
+continue
+info registers pc
+delete" > "$OUT/selftest-gdb.txt"
+  if grep -qi "$(printf '0x%08x' $((slave + ABORT)))" "$OUT/selftest-gdb.txt"; then
+    lov gdb 'x/s $a0' >> "$OUT/selftest-gdb.txt"
+    lov gdb 'info registers' > "$OUT/failure-registers.txt"
+    dump; retain_log
+    cat "$OUT/selftest-gdb.txt" >&2; exit 1
+  fi
+  if ! grep -Eq "^pc[[:space:]]+0x0*$(printf '%x' $((slave + DONE)))[[:space:]]" "$OUT/selftest-gdb.txt"; then
+    cat "$OUT/selftest-gdb.txt" >&2
+    echo "pixel-twin frame-count breakpoint was not reached" >&2; exit 1
+  fi
+  dump
+  lov shot "$PWD/$OUT/selftest.png" > /dev/null
+  lov quit > /dev/null; trap - EXIT; retain_log
+  python3 tools/c2p_check.py "$OUT" --base "$BASE"
+  exit 0
+fi
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
 fi
