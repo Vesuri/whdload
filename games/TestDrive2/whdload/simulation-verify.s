@@ -371,6 +371,7 @@ verify_simulation_units:
 
     bsr verify_render_units
     bsr verify_render_seed
+    bsr verify_render_tangent
 
     move.l a4,a1
     suba.l #32766,a1

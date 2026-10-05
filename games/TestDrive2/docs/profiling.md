@@ -458,10 +458,12 @@ CUSTOM2=3 and normal shipping slave hash
 
 ## Sub-unit rendering capture (2026-10-05)
 
-CUSTOM2 bit 2 enables fractional road and car projection in duel v1. Combine
-with fixed-time simulation and blitter priority as CUSTOM2=7. Compare 3/7 in
-one **normal build** for FPS, two fresh 100-field fixed windows per arm. Use
-SWAP_ONLY=1 on the A1200/68030; BLTPRI corrupts A1200 CPU trace records.
+Enhanced framerate (CUSTOM2=1, any nonzero value) includes fractional road/car
+projection and sideways smoothing in duel v1. The historical 3/7 FPS comparison
+below predates the boolean option. Those values now enable identical features.
+For new FPS comparisons use distinct retained slave builds and two fresh normal
+100-field fixed windows per arm. Use SWAP_ONLY=1 on A1200/68030; BLTPRI corrupts
+A1200 CPU trace records.
 
 `RENDER_FRAMES=90 STATE_ONLY=1 tools/fixed_window.sh OUT "$SLAVE"` collects
 completed main and mirror geometry, full row records, scanline buffers and car
@@ -471,7 +473,7 @@ later interval. The current sub-unit slave is required in both arms.
 
 VERIFY CUSTOM5 bit 3 (`CUSTOM5=8`) forces road/car fractions to zero and clears
 the 117-line scanline buffer before each view, **in both arms**. Compare
-CUSTOM2=1 CUSTOM3=1 CUSTOM5=8 with CUSTOM2=5 CUSTOM3=1 CUSTOM5=8. Different
+CUSTOM2=0 CUSTOM3=1 CUSTOM5=8 with CUSTOM2=1 CUSTOM3=1 CUSTOM5=8. Different
 render cadences retain different unused scanline history in the original;
 matching completed views with identical inputs and initial buffers is the
 valid whole-buffer oracle. Interrupted VBL snapshots are not completed rows.
@@ -482,14 +484,31 @@ captures covering the opponent and both traffic directions to check actual
 x/y draw registers and a constant-gap flat-road geometry fixture. A natural
 police chase remains unrecorded; do not claim one from the traffic list.
 
-There are 121 assembly assertions in the VERIFY build (107 simulation, 12
-rendering bounds/fraction checks and 2 turned-camera straight-segment seeds).
-Historical captures still expect 107 or 119 according to their build markers.
-`check_disabled.py --render-only` checks the seven sub-unit ranges when bit 2
-is off. The full disabled check covers 74 ranges with CUSTOM2=0 and
+There are 127 assembly assertions in the VERIFY build (107 simulation, 12
+rendering bounds/fraction checks, 2 turned-camera straight-segment seeds and
+6 tangent-cache checks). Historical captures retain their own count markers.
+`check_disabled.py --render-only` checks the nine sub-unit ranges with CUSTOM2=0.
+The full disabled check covers 76 ranges with CUSTOM2=0 and
 CUSTOM5 bit 0 off (e.g. CUSTOM5=16 to run assertions without scripted input).
 The input instrument deliberately patches two simulation entries.
 `subunit_geometry.py ORIGINAL/render SUBUNIT/render` validates the independent
 geometry model against completed rows before measuring held-input world-boundary
 continuity. It reads captured tables/track from ignored assets.bin, with no
 game bytes embedded in the tool.
+
+
+### Sideways capture and cost checks
+
+Sideways work uses the ignored `tmp/horiz/tools/fw.sh` and `hcap.py` to capture
+completed main rows at 06c74 and backdrop d2 plus inputs at 08c9e. The recovery
+variant also captures VBL state. `RW` records contain field, drawn heading/lane
+and raw heading/lane; compare those values during lane changes, not screenshots
+or individual road-row indices. `BD` records permit counting pixel steps and
+nonzero-step direction reversals. Compare steering captures over the same field
+prefix. The scratch scripts and retained slave builds remain in tmp/horiz.
+
+Run a normal CPU=68000 100-field `tools/fixed_window.sh` window and then
+`python3 tools/subunit_cost.py OUT`. Repeat with STATE_FIELDS=1000 for the moving
+window. The cost includes all helpers, nine calls and PL_PSS NOPs; malformed
+traces are rejected and the 3% budget is enforced. These cost checks do not
+establish an FPS improvement. Final provenance is in subunit-rendering.md.

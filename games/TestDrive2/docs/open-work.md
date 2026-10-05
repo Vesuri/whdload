@@ -841,6 +841,8 @@ disabled-bytes and fps (A500 7.1, A1200 16.7) are unchanged.
 
 ### Sub-unit rendering (2026-10-05, A+B+C complete)
 
+Historical forward/curve validation, before sideways smoothing and the boolean option:
+
 Completed `docs/subunit-rendering.md` under independent CUSTOM2 bit 2. A+B
 ships road-table interpolation and car projection; C adds fractional curve
 and hill seeds. All seven hooks are duel v1 only. CUSTOM2=7 combines these
@@ -945,3 +947,36 @@ discrete. This delivers smoother positions at unchanged measured FPS.
 | `whdload/TestDrive2HD.s` | the slave (JOTD v1.5 + CUSTOM2 simulation/rendering patches) |
 | `tools/` | harness, tracer, reports (README table) |
 | `tmp/prof/w3/`, `tmp/prof/f020/` | the A500-equivalent and 68020 windows quoted above (local only) |
+
+
+## Sideways smoothing — 2026-10-05
+
+The handoff work has been completed in render.s for duel v1 under
+Enhanced framerate (CUSTOM2 any nonzero). Nine sub-unit ranges / 76 optional
+ranges / 72 audited hooks are the current counts. v2 is untouched.
+The design, addresses, handoff findings and capture instruments are folded into
+subunit-rendering.md and profiling.md. The separate handoff file is retired.
+
+`tmp/horiz/ready-demo` fixes the demo lane wobble: all 300 drawn lateral values
+match raw, maximum step 20 units (also frames 225–250). Mountains step at most
+2 pixels with no reversals. The coefficient optimisation matches 206 identical
+input main-view frames, all 44 x/y rows, against final-demo. `ready-recovery`
+passes one complete 240-field recovery and 127/127 assertions; all 45 forced
+damage views in the VBL window preserve raw lateral position. Through field
+393, steering mountains improve from 5 reversals / 4px maximum to 0 / 1px;
+drawn heading quarter-unit maximum improves 55 to 18.
+
+Normal A500 initial/moving 100-field cost windows measure **2.018% / 2.917%**,
+including all nine calls and displaced instructions. The moving window follows
+1,000 state fields. No new FPS comparison or 6,000-field state comparison was
+run for this renderer-only change. Detailed cycles and regression provenance
+are in subunit-rendering.md. Zero and disabled checks pass on both A500 and A1200: 60 / 84 matched frames
+per view, no row/scanline mismatches; all 76 / nine ranges retain original bytes
+and both disabled captures pass 127/127 assertions.
+
+**User display-delay decision: accepted (2026-10-05).** The user tested the
+normal build and reported: "Tested, feels great." Heading/mountains interpolate the last
+observed segment samples, giving a one-segment delay at low speed. At speed a
+view can cross several segments; lateral smoothing delays only one crossing's
+sine displacement, while lane changes and recovery apply immediately. The user accepted this tradeoff; the release archives are rebuilt and the
+feature is committed as one coherent change.

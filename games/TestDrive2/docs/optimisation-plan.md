@@ -232,14 +232,15 @@ These are estimates to be replaced by benchmark-window measurements, one commit 
 
 ## Sub-unit road, cars, curves and hills (2026-10-05)
 
-Current CUSTOM2 bit 2 is fractional road/car projection, combined mode 7. The
+Historical CUSTOM2 bit 2 selected fractional road/car projection, combined mode 7.
+Since 1.6b, any nonzero CUSTOM2 enables all enhanced-framerate features. The
 old priority experiment above used a different bit assignment; priority and
 interrupt suppression now share bit 1. No waits or ownership calls changed.
 
 A500 normal-build 100-field moving windows at relative fields 1000–1099:
 `subunit3-cost` (C2=5) 244,152 / 14,210,186 cycles = 1.718%;
 `subunit3-visual-a500` (C2=7) 336,772 / 14,210,190 = 2.370%.
-`tools/subunit_cost.py` sums all sub-unit helpers and the seven hook calls,
+`tools/subunit_cost.py` sums all sub-unit helpers and, for the current sideways build, all nine hook calls and PL_PSS NOPs,
 conservatively including displaced instructions. It rejects malformed field
 traces and enforces the 3% limit. A1200 BLTPRI instruction costs are not used.
 
@@ -254,3 +255,16 @@ Two fresh fixed windows per arm again give 7.1 / 7.1 A500 and 16.7 / 16.7
 A1200. A cycle-exact 25 MHz 68030 with A1200 ROM/chipset and 4 MiB fast RAM
 gives 25.0 / 25.0 (49 swaps in 98 fields), repeated twice per arm. This is
 a general 68030 configuration, not an A4000 motherboard test.
+
+
+Sideways smoothing (2026-10-05) adds full 8.8 heading-table interpolation and
+frame-latched heading/mountain offsets. The final normal A500 initial window
+(`tmp/horiz/ready-cost-initial`) costs 286,784 / 14,210,190 = **2.018%**;
+the moving window after 1,000 fields (`ready-cost-moving`) costs 414,468 /
+14,210,196 = **2.917%**. Both are 100-field fixed-window traces with CUSTOM2=1,
+including all sub-unit helpers, nine hook calls and displaced instructions.
+Exact tangent caching, precomputed immutable gradients, width products and
+unrolled coefficient rows avoid the initial 4.635% cost and the cache-only
+moving cost of 3.291%. No FPS A/B was run for this sideways feature; earlier
+FPS results above describe the prior renderer. See subunit-rendering.md for
+geometry/recovery checks and the low-speed display-delay tradeoff.

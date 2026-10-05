@@ -5,9 +5,11 @@ not an official installer release. Only duel v1 receives the new options;
 v2's patch list and timing are unchanged.
 
 History — 2026-10-05 (1.6b)
-* The three changes below are one option, "Enhanced framerate" (CUSTOM2).
+* The enhancements below are one option, "Enhanced framerate" (CUSTOM2).
   WHDLoad options have no default value: add the tooltype CUSTOM2=1 to the
   game icon to enable it by default. CUSTOM2=0 runs the original game.
+* Sideways motion (steering, lane position and mountains) is smooth as well
+  when Enhanced framerate is enabled.
 * Sub-unit road and car position in both views (duel v1).
   Uses frame-latched 16.16 positions and fractional curve/hill integration;
   sprite size selection is unchanged.

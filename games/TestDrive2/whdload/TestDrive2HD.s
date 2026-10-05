@@ -458,6 +458,8 @@ pl_main_v1
 	PL_PS $007a78,render_subunit_oncoming
 	PL_PS $00801a,render_subunit_opponent
 	PL_PS $008052,render_subunit_police
+	PL_PSS $00741e,render_subunit_road_angle,6
+	PL_PSS $008c90,render_subunit_backdrop,8
 	PL_ENDIF
 	; protection
 	PL_B	$00052A,$60

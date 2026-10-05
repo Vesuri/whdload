@@ -54,7 +54,7 @@ WHD_ARGS=CUSTOM2=1 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
 amiga/run-a1200.sh  # the same on an expanded A1200 (68EC020)
 ```
 
-One option, "Enhanced framerate" (`CUSTOM2`), enables three changes together. WHDLoad
+One option, "Enhanced framerate" (`CUSTOM2`), enables these changes together. WHDLoad
 options cannot carry a default, so add the tooltype `CUSTOM2=1` to the game icon to
 make it the default; the run scripts pass it. `CUSTOM2=0` is the original game.
 
@@ -64,6 +64,7 @@ make it the default; the run scripts pass it. `CUSTOM2=0` is the original game.
   nobody sees are not simulated.
 - The blitter gets bus priority (BLTPRI) and unused blitter interrupts are
   suppressed; every original wait and JOTD's display fix remain.
+- Sideways motion (steering, lane position and mountains) is smooth as well.
 - Road and cars are projected at fractional positions, with fractional curve/hill
   integration, in both views. Car size selection remains discrete.
 

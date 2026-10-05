@@ -6,6 +6,7 @@
      Faster machines draw more frames without changing the game speed
    - the blitter gets bus priority and unused blitter interrupts are removed
    - the road and cars are drawn at fractional positions for smoother motion
+   - sideways motion (steering, lane position and mountains) is smooth as well
    - measured in the first race: A500 7.1 fps (6.1 without the option),
      A1200 16.7 fps, 68030/25 MHz 25 fps until the car is at speed
    - after a crash or engine damage, the player's car recovers in about 5
