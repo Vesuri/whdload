@@ -36,7 +36,7 @@ def summary(path):
         for k in range(1,len(r['rows'])):
             old=k+shift
             if 0<=old<len(prev['rows']):jumps.append(abs(r['rows'][k][6]-prev['rows'][old][6]))
-    print(path, f'{len(rr)} frames; visible motion {moved}/{changed} changed-distance frames; row-1 max jump {max(labels,default=0)} px; matched-boundary max {max(jumps,default=0)} px; overruns {len(bounds)}')
+    print(path, f'{len(rr)} frames; geometry/colour motion {moved}/{changed} changed-distance frames; row-1 max jump {max(labels,default=0)} px; matched-boundary max {max(jumps,default=0)} px; overruns {len(bounds)}')
     if bounds:raise AssertionError(bounds[:8])
     for view in ('mirror',):
         for r in records(path,view):
@@ -192,6 +192,32 @@ def constant_gap(path):
             assert span<=(2 if mirror and k==1 else 1) and abs(cars[-1]-cars[0])<=1,'a constant-gap car retains a whole-unit sawtooth'
 
 
+def fractional_gap(path):
+    """Sweep sub-unit car/camera carries at fixed noninteger interior gaps."""
+    b=next(path.glob('main-*.bin')).read_bytes();a=0x7ffe
+    word=lambda off:struct.unpack_from('>h',b,a+off)[0]
+    for mirror in (False,True):
+        table=-26968 if mirror else -26780
+        offset=29 if mirror else 76
+        for nominal in ((5,10) if mirror else (1,5,10)):
+            for gap_fraction in (16384,32768,49152):
+                values=[]
+                for camera in range(0,65536,256):
+                    carry,car=divmod(camera+gap_fraction,65536)
+                    row=nominal-carry if mirror else nominal+carry
+                    def y(k):
+                        scale=word(table+2*k)
+                        neighbour=k+1 if mirror else k-1
+                        if k:scale+=(word(table+2*neighbour)-scale)*(camera>>1)>>15
+                        return offset+(83*scale>>16)
+                    matched=y(row);neighbour=y(row-1 if mirror else row+1)
+                    values.append(matched+((neighbour-matched)*(car>>1)>>15))
+                jumps=[abs(right-left) for left,right in zip(values,values[1:])]
+                jumps.append(abs(values[-1]-values[0]))
+                print('fractional-gap flat fixture',('mirror' if mirror else 'main'),nominal,gap_fraction,'largest carry/per-sample y jump',max(jumps),'px')
+                assert max(jumps)<=1,'a fractional-gap car jumps at a car/camera unit carry'
+
+
 if __name__ == "__main__":
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('off',type=Path);p.add_argument('on',type=Path)
@@ -200,6 +226,6 @@ if __name__ == "__main__":
     p.add_argument('--initialised',action='store_true',help='both zero-identity arms initialise the entire scanline buffer')
     a=p.parse_args();summary(a.off);summary(a.on);cars(a.off);cars(a.on)
     if a.check_cars:
-        check_car_coordinates(a.off,False);check_car_coordinates(a.on,True);constant_gap(a.on)
+        check_car_coordinates(a.off,False);check_car_coordinates(a.on,True);constant_gap(a.on);fractional_gap(a.on)
     if a.zero:zero_scales(a.zero)
     if a.zero and a.baseline:identity(a.zero,a.baseline,a.initialised)

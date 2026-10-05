@@ -6,7 +6,8 @@ v2's patch list and timing are unchanged.
 
 History — 2026-10-05
 * CUSTOM2 bit 2: sub-unit road and car position in both views (duel v1).
-  Uses the frame-latched 16.16 positions; sprite size selection is unchanged.
+  Uses frame-latched 16.16 positions and fractional curve/hill integration;
+  sprite size selection is unchanged.
 
 History — 2026-10-04
 * CUSTOM2 bit 0: fixed-time simulation, independently of drawing: every

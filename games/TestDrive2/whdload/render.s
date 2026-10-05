@@ -95,7 +95,73 @@ render_subunit_rows:
     move.w d0,30(a3)
     adda.w #52,a3
     dbf d5,.row
+    bsr render_subunit_seed
     movem.l (sp)+,d0-d6/a0-a3
+    rts
+
+; Integrate only the visible fraction of the first segment. The original row
+; walker still handles every complete segment; these seeds are renderer-only.
+render_subunit_seed:
+    tst.w d4
+    beq.b .done
+    move.w -13394(a4),d0
+    addq.w #1,d0
+    move.l -13148(a4),a0
+    move.b (0,a0,d0.w),d0
+    and.w #127,d0
+    lsl.w #2,d0
+    move.l -13152(a4),a0
+    adda.w d0,a0
+    move.b 1(a0),d2
+    ext.w d2
+    add.w d2,d2
+    move.b 2(a0),d3
+    ext.w d3
+    lea -26166(a4),a1
+    move.w d2,d0
+    bsr.b render_subunit_angle
+    tst.w d6
+    bmi.b .main
+    add.w d0,-14936(a4)
+    move.w d3,d0
+    bsr.b render_subunit_angle
+    sub.w d0,-14932(a4)
+    move.w -14932(a4),d0
+    bsr.b render_subunit_sine
+    add.w d0,-14928(a4)
+    move.w -14936(a4),d0
+    bsr.b render_subunit_sine
+    add.w d0,-14930(a4)
+.done
+    rts
+.main
+    sub.w d0,-14936(a4)
+    move.w d3,d0
+    bsr.b render_subunit_angle
+    add.w d0,-14932(a4)
+    move.w -14932(a4),d0
+    sub.w d3,d0
+    bsr.b render_subunit_sine
+    sub.w d0,-14928(a4)
+    move.w -14936(a4),d0
+    add.w d2,d0
+    bsr.b render_subunit_sine
+    sub.w d0,-14930(a4)
+    rts
+; Round 8.8 angle fractions so f -> 1 reaches the next lookup exactly.
+render_subunit_angle:
+    muls.w d4,d0
+    add.l d0,d0
+    add.l #$8000,d0
+    swap d0
+    rts
+render_subunit_sine:
+    asr.w #8,d0              ; high byte, as in the original MOVE.B of a word
+    add.w d0,d0
+    move.w (0,a1,d0.w),d0
+    muls.w d4,d0
+    add.l d0,d0
+    swap d0
     rts
 
 ; Frame snapshots: traffic origins share one fraction per direction.
@@ -326,4 +392,41 @@ render_zero_table:
     dbf d1,.clear
     movem.l (sp)+,d0-d1/a0
     rts
+    ENDC
+
+    IFD VERIFY
+; A straight segment still advances laterally when the camera is turned.
+verify_render_seed:
+    lea -13100(a4),a0
+    clr.w (a0)
+    move.l a0,-13148(a4)
+    lea -13090(a4),a0
+    clr.l (a0)
+    move.l a0,-13152(a4)
+    clr.w -13394(a4)
+    clr.w -26166(a4)
+    move.w #8,-26164(a4)
+    move.w #-8,-26168(a4)
+    moveq #1,d7
+.view
+    move.w #256,-14936(a4)
+    moveq #-2,d6
+    tst.w d7
+    bne.b .main
+    neg.w -14936(a4)
+    moveq #2,d6
+.main
+    clr.w -14932(a4)
+    move.w #83,-14928(a4)
+    clr.w -14930(a4)
+    move.w #16384,d4
+    bsr render_subunit_seed
+    move.w -14930(a4),d0
+    ext.l d0
+    moveq #-4,d1
+    bsr verify_equal
+    dbf d7,.view
+    rts
+    dc.b "TD2SEEDCHECK",0
+    even
     ENDC

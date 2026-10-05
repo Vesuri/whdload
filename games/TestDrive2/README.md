@@ -59,7 +59,7 @@ on a 68020+. Rendering is chip-bus bound at 25 fps even on fast CPUs, so steps
 nobody sees are not simulated. Bit 1 (rendering) gives the blitter bus priority
 (BLTPRI) and suppresses unused blitter interrupts; it retains every original
 wait and JOTD's display fix. `CUSTOM2=3` enables both; `CUSTOM2=2` changes only
-rendering. Bit 2 adds fractional road and car projection in both views;
+rendering. Bit 2 adds fractional road/car projection and curve/hill integration in both views;
 `CUSTOM2=7` enables all three options, or use `CUSTOM2=4` for fractional
 rendering with the original simulation. Car size selection remains discrete.
 First-race fixed window, CUSTOM2=3: A500 7.1 fps (original game 6.1),

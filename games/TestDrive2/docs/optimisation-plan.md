@@ -230,7 +230,7 @@ If §1 recovers most of the waiting (12–21%) and §2–§3 halve C–G, a fram
 These are estimates to be replaced by benchmark-window measurements, one commit per patch.
 
 
-## Sub-unit road and cars (2026-10-05, A+B)
+## Sub-unit road, cars, curves and hills (2026-10-05)
 
 Current CUSTOM2 bit 2 is fractional road/car projection, combined mode 7. The
 old priority experiment above used a different bit assignment; priority and
@@ -245,5 +245,12 @@ traces and enforces the 3% limit. A1200 BLTPRI instruction costs are not used.
 
 Two fresh same-build normal first-race fixed windows per arm (`subunit3-fps-*`,
 SWAP_ONLY=1, C2=3 / 7): A500 7.1 / 7.1 fps, A1200 16.7 / 16.7. The option
-improves fractional motion at unchanged measured FPS. The separate curve and
-hill seed correction still requires its own cost and FPS revalidation.
+improves fractional motion at unchanged measured FPS.
+
+The final curve/hill build (`subunit5-*`) measures 397,300 / 14,210,192 cycles
+= **2.796%** in the initial A500 window and 345,128 / 14,210,198 = **2.429%**
+in the moving window, both C2=7. All helpers and hook calls are included.
+Two fresh fixed windows per arm again give 7.1 / 7.1 A500 and 16.7 / 16.7
+A1200. A cycle-exact 25 MHz 68030 with A1200 ROM/chipset and 4 MiB fast RAM
+gives 25.0 / 25.0 (49 swaps in 98 fields), repeated twice per arm. This is
+a general 68030 configuration, not an A4000 motherboard test.

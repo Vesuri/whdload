@@ -370,6 +370,7 @@ verify_simulation_units:
     bne.b .period
 
     bsr verify_render_units
+    bsr verify_render_seed
 
     move.l a4,a1
     suba.l #32766,a1

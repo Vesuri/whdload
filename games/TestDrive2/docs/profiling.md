@@ -471,7 +471,14 @@ captures covering the opponent and both traffic directions to check actual
 x/y draw registers and a constant-gap flat-road geometry fixture. A natural
 police chase remains unrecorded; do not claim one from the traffic list.
 
-There are 119 assembly assertions in the VERIFY build (107 simulation and 12
-rendering bounds/fraction checks); historical captures still expect 107.
+There are 121 assembly assertions in the VERIFY build (107 simulation, 12
+rendering bounds/fraction checks and 2 turned-camera straight-segment seeds).
+Historical captures still expect 107 or 119 according to their build markers.
 `check_disabled.py --render-only` checks the seven sub-unit ranges when bit 2
-is off. The full disabled check covers 74 ranges with bit 0 also off.
+is off. The full disabled check covers 74 ranges with CUSTOM2=0 and
+CUSTOM5 bit 0 off (e.g. CUSTOM5=16 to run assertions without scripted input).
+The input instrument deliberately patches two simulation entries.
+`subunit_geometry.py ORIGINAL/render SUBUNIT/render` validates the independent
+geometry model against completed rows before measuring held-input world-boundary
+continuity. It reads captured tables/track from ignored assets.bin, with no
+game bytes embedded in the tool.

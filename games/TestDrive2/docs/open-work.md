@@ -834,71 +834,81 @@ exactly: straight tape (both periods and original mode, 1,000 fields), damage
 (both periods, 1,800), demo (both periods, 6,000). Units pass 107/107; fatal,
 disabled-bytes and fps (A500 7.1, A1200 16.7) are unchanged.
 
-### Sub-unit rendering (2026-10-05, A+B complete; C pending)
+### Sub-unit rendering (2026-10-05, A+B+C complete)
 
-Implementing `docs/subunit-rendering.md` under independent CUSTOM2 bit 2.
-The road hooks interpolate the original scale tables; moving traffic uses the
-fractional origin for each direction. Opponent and active police drawing have
-separate hooks at `0801a` / `08052`, using their frame-latched fractions.
+Completed `docs/subunit-rendering.md` under independent CUSTOM2 bit 2. A+B
+ships road-table interpolation and car projection; C adds fractional curve
+and hill seeds. All seven hooks are duel v1 only. CUSTOM2=7 combines these
+with fixed-time simulation and the existing rendering-speed option.
 
-Re-checks corrected three draft assumptions: row field 46 is **0..43**, not
-43..0; both traffic lists move with their origins; the opponent is drawn outside
-those lists. Road rows already include the camera fraction, so object projection
-adds the **car** fraction, without subtracting the camera a second time.
-Bottom rows and the mirror horizon remain fixed; neighbour bounds are explicit.
+Re-checks corrected the draft: row field 46 is **0..43**; both traffic lists
+move with fractional origins; opponent/police use separate frame snapshots.
+Road rows already incorporate the camera fraction, so ordinary car projection
+adds the car fraction without subtracting the camera twice. Row 0 is fixed in
+both views, with relative fractions at that edge; mirror row 23 is fixed.
+The scanline table is 117×16 bytes, immediately followed by row 0.
 
-The road/car candidate passes 119/119 assembly checks in both arms on the
-A500 and A1200. Straight tape (600 fields) and demo (1,800) match all 35 core
-variables, including sample 0. Longer pre-edge-refinement demo comparisons
-match 6,000 fields, with exact PAL clock pacing and a complete 240-field crash
-recovery. All 74 optional ranges retain original bytes with both bits off;
-the latest straight-tape baselines independently check all seven render ranges.
-The instruction/branch audit covers 70 hooks with no errors.
+C adjusts renderer-only heading, slope, height and lateral seeds for the
+partial first segment. Angles are 8.8 and the sine lookup reads the high byte;
+fractional angles round to nearest. A straight segment still needs a lateral
+correction when the camera is turned. The original complete-segment walker,
+physics, sprite size selection, segment matching and painter order remain intact.
 
-| Completed-frame check | A500 | A1200 |
+Final captures are `subunit5-*`, with immutable `seed2-normal.slave` and
+`seed2-verify.slave` snapshots in ignored tmp. The original geometry oracle
+first matches 90 completed frames per view on each machine. It then matches
+all 1,198 final candidate view frames from straight, post-recovery and traffic
+captures, with zero mismatches. Held-input world-boundary crossings fall from
+13 px main / 4 px mirror in the original inputs to at most **1 / 0 px**.
+A fixed row label can reset by 5 px because it names a different world boundary.
+
+| Final check | A500 | Expanded A1200 |
 |---|---:|---:|
-| Road motion with sub-unit / changed-distance frames | 46/46 | 69/69 |
-| Original road motion / changed-distance frames | 33/45 | 33/70 |
-| Forced-zero identical-input main + mirror frames | 54 + 54 | 87 + 87 |
+| Assembly assertions, enabled / disabled | 121/121 | 121/121 |
+| Straight tape: identical core state (35 variables) | 600 fields | 600 fields |
+| Demo: identical core state (including sample 0) | 6,000 fields | 6,000 fields |
+| Clock/pacing and complete 240-field recovery | pass | pass |
+| Geometry/colour motion / changed-distance frames | 46/46 | 69/69 |
+| Original geometry/colour motion / changed-distance frames | 33/45 | 33/70 |
+| Forced-zero identical-input main + mirror frames | 55 + 55 | 87 + 87 |
 | Forced-zero source scale words exact | 24,480 | 24,480 |
-| Row or 117-line scanline bytes differing in zero fixture | 0 | 0 |
+| Row or full scanline bytes differing in zero fixture | 0 | 0 |
+| Eligible forward / opponent / oncoming draw coordinates exact | 12 / 62 / 27 | 22 / 119 / 24 |
+| Out-of-bounds projected rows | 0 | 0 |
+| Fixed-window FPS, CUSTOM2=3 → 7 | 7.1 → 7.1 | 16.7 → 16.7 |
 
-These are completed geometry captures, not interrupted VBL data. The zero
-fixture clears both scanline inputs: otherwise the original retains unused
-lines/fields from a different previous frame. Compare world boundaries rather
-than row labels, which change meaning at a whole-unit crossing. A fixed row-1
-label can reset by 5 px even though the world boundary moves continuously.
+The zero oracle compares completed views with matching camera/heading/lane
+inputs and initialises both scanline buffers: unused bytes otherwise retain
+history from different render cadences. Two initial A1200 car draws precede
+any completed-row snapshot and are excluded explicitly. The demo supplies no
+four-draw <=0.5-unit-gap episode spanning two camera-unit crossings, so this
+is not claimed as a live constant-gap test. The live coordinate oracle validates
+the arithmetic; held flat-road constant-gap fixtures reduce main row-1 sweep
+from 6 px (road only) to 1 px. Mirror row 1 spans 2 px at its fixed clipped
+edge, with <=1 px whole-unit reset. Quarter/half/three-quarter-unit interior
+held gaps have <=1 px carry/per-sample jumps. Natural police pursuit remains
+unrecorded; its separate latched position is implemented.
 
-The entire A+B patch in the moving A500 cost window (`subunit3-cost`, C2=5,
-fields 1000–1099) costs 244,152 / 14,210,186 cycles = **1.718%**, including all
-seven calls and displaced instructions. With the recommended C2=7 it costs
-336,772 / 14,210,190 = **2.370%** (`subunit3-visual-a500`). Both meet the 3%
-limit. Trace images across the moving A500/A1200 interval show intact road and
-mirror edges, with cars/scenery attached. Normal-build FPS (`subunit3-fps-*`),
-two fresh first-race boots per arm: **7.1 → 7.1 A500**, **16.7 → 16.7 A1200**
-for C2=3 → 7. This is smoothness at unchanged measured FPS, not a speed gain.
+The full normal patch costs **397,300 / 14,210,192 cycles = 2.796%** in the
+initial A500 window and **345,128 / 14,210,198 = 2.429%** in the moving window
+(CUSTOM2=7). Both pass the 3% budget, including hook calls and displaced
+instructions. Earlier A+B-only moving costs were 1.718% (C2=5) / 2.370%
+(C2=7); C is now included in the final measurements. Normal text size is
+10,612 bytes (10,648-byte slave). Trace images at the start/end of the moving
+A500/A1200 interval (fields 0, 20, 60 and 99) show intact road/mirror edges
+and attached cars/scenery.
 
-The live car-coordinate oracle checks every eligible draw against the captured
-road rows and latched fractional positions: A500 11 forward / 61 opponent /
-28 oncoming; A1200 23 / 120 / 24 (both views). Two initial A500 draws precede a
-completed-row snapshot and are explicitly excluded. The natural demo does not
-supply a four-frame <=0.5-unit-gap episode across two camera-unit crossings;
-this is not claimed as a live constant-gap test. The validated integer
-projection's held flat-road gap fixture spans 1 px in the main view, versus
-6 px near the bottom with road interpolation alone; mirror row 1 spans 2 px
-near its fixed clipped edge, with <=1 px at the whole-unit reset. Police use
-the separate latched 16.16 block; natural pursuit remains unrecorded.
+FPS comes from two fresh 100-field `fixed_window.sh` boots per arm, using
+SWAP_ONLY for A1200/68030. A 25 MHz cycle-exact **68030 in the expanded A1200
+configuration** reaches **25.0 → 25.0 FPS**, 49 frames/98 fields in all four
+runs. Its 1,800-field enabled/disabled comparison matches all 35 core variables;
+the enabled state also matches the A1200's same-period capture exactly.
+This is a general 68030 test, not an A4000 motherboard/ROM test.
 
-Draft Step C is built separately and awaiting runtime tests; it is excluded
-from the A+B commit. The A+B normal slave is 10,450 text bytes.
-
-Curve measurement is complete, implementation pending as separate Step C.
-`subunit_geometry.py` matches all 90 original frames in each view on both
-machines. With heading/lane held fixed at the crossing, the uncorrected maximum
-is 13 px main / 4 px mirror on both machines (including the boundary into mirror row 23). Fractional first-segment
-seeds reduce the model to at most 1 / 0 px. Angles are 8.8: the original byte
-load reads their high byte; rounding fractional angle increments is required to
-reach the same lookup at f -> 1.
+The final disabled capture checks all 74 optional ranges for original bytes
+with CUSTOM2=0; the instruction/branch audit covers 70 hooks with zero errors.
+Builds, assembly checks and geometry/carry fixtures pass. Sprite LOD remains
+discrete. This delivers smoother positions at unchanged measured FPS.
 
 ### Remaining open work
 

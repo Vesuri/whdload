@@ -4,7 +4,8 @@
   check_units.py OUT --base 0x200000   (fast RAM)
 Requires a VERIFY capture with CUSTOM5 set (the checks run before PatchSeg).
 59 checks use the one-field default period; 48 cover both shipping periods.
-Sub-unit builds add 12 viewport-edge/fraction assertions.
+Sub-unit builds add 12 viewport-edge/fraction assertions; curve builds add
+2 straight-segment seed assertions.
 """
 import argparse, os, struct
 from pathlib import Path
@@ -21,5 +22,6 @@ start=b.find(marker,lo-a.base,hi-a.base)
 assert start>=0, 'no assembly rate-check results in this slave'
 failures,cases=struct.unpack_from('>II',b,(start+len(marker)+1)&~1)
 print(f'Assembly rate invariants: {cases} cases, {failures} failures')
-expected=119 if b'TD2RENDERCHECK\0' in b[lo-a.base:hi-a.base] else 107
+loaded=b[lo-a.base:hi-a.base]
+expected=121 if b'TD2SEEDCHECK\0' in loaded else (119 if b'TD2RENDERCHECK\0' in loaded else 107)
 assert cases==expected and failures==0, 'assembly rate checks did not pass'
