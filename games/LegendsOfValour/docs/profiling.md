@@ -19,10 +19,10 @@ python3 tools/lov_report.py tmp/prof/x/trace.bin tmp/prof/x/code.bin --base 0xc0
 python3 tools/lov.py quit
 ```
 
-There is **no fixed gameplay window yet** (see `docs/open-work.md`): `fixed_window.sh`,
-`profile_demo.sh`, `frames.py`, `swap_fields.py`, `ingame.py` and the `state_*` tools are
-still Test Drive II's game-specific versions (anchors, frame marker, VBL address, pixel test)
-with only the names changed.
+**Fixed window** (§7): `tools/fixed_window.sh OUT` builds the VERIFY slave, boots with the
+`spin` tape and traces 100 fields from the tape's anchor; `frames.py` gives fps, `lov_report.py`
+the profile.  `profile_demo.sh`, `swap_fields.py`, `ingame.py` and the `state_*` tools are still
+Test Drive II's game-specific versions with only the names changed.
 
 ## 1. The game and the slave
 
@@ -120,19 +120,84 @@ preload it.
 **Input tape** (VERIFY build, `CUSTOM5=1`, `whdload/tape.s`): h12:05298 (the VBL server's button
 routine) jumps into the slave, which writes the tape's pointer position into the game window's
 `MouseX/MouseY` (the game copies them every poll, `h1:01b8c`) and its buttons into `h12:05292`.
-Script → file: `tools/tape.py` (`FIELDS X Y [L|R|LR]` lines, window coordinates = (screenshot
+Script → file: `tools/tape.py` (`FIELDS X Y [L|R|A|W]` lines, window coordinates = (screenshot
 x − 75) / 2, (y − 38) / 2). `tools/tape_explore.sh SCRIPT OUT [COUNT STEP]` boots it and takes
-screenshots every STEP s of warp (exploration only, not timing). Tape field 0 is the first VBL
-after the game installs its server; screens arrive at wall-clock-dependent field counts, so
-waits are generous.
+screenshots every STEP s of warp, labelled with the tape field (exploration only). Tape field 0
+is the first VBL after the game installs its server.
+
+Screens do not arrive at fixed fields (the start screen came anywhere between field 2 400 and
+2 750 in different routes), so fixed waits either misfire or waste minutes. A **`W` entry** waits
+on game state instead: the tape also hooks the game's button hit test `h6:0076c` (list, x, y) to
+remember the list it was given; the entry holds until that list has the button with id FIELDS
+(0: any) under (X,Y). It covers every screen that hit-tests through h6 (start screen, slot
+screen, the game's panels once a frame) but **not the conversation panel**, which polls through
+h2. An **`A` entry** marks the anchor: its first field runs `_tape_anchor`, where
+`fixed_window.sh` breaks.
 
 What the screens do (`tools/tapes/`):
 - Start screen: green = load a **character** (`Charact.__N`, written by `CUSTOM1` character
   creation), red = load a **saved game** (`Legend1.__N`), Amiga DOS. The archive has neither.
 - Save-slot screen (`h8:001de`): bars 1–8 select, left die loads (only an existing file), middle
   die switches save disk, **right die cancels → the game starts with the default character**.
-- In game, a townsman walks up and talks soon after the start; EXIT is at (75,183).
-- View size: computer button (15,188) → options dialog → second icon from the right on the top
-  row (193,52) cycles small → large → medium; clicking outside the dialog applies it.
-- **Benchmark route `spin.txt`**: default character, large view, hold turn-right (143,148).
-  The game redraws the view continuously, also when standing still.
+- In game, a townsman may walk up and talk: soon after the start on a 68020, often not at all
+  on the A500. His speech blocks the game (the main loop only waits for fields) until EXIT
+  (75,183) in the conversation panel; clicking there with no conversation hits the status bar,
+  harmlessly.
+- View size: the game **starts in the medium view**; nothing is saved (and DH1 is fresh every
+  run). Computer button (15,188) → options dialog → second icon from the right on the top row
+  (193,52); each click cycles medium → small → large → medium (`tools/tapes/viewcycle.txt`);
+  clicking outside the dialog applies it. The townsman's conversation shows the face in a
+  full-frame view, which looks like the large view.
+- **Benchmark route `spin.txt`**: W-driven through the start and slot screens, default
+  character, two clicks → large view, 1 500 fields clicking EXIT every 100 (dismisses the
+  greeting on any machine), then 250 fields turning right (143,148) and the anchor; the turn
+  continues through the window. The game redraws the view continuously, also when standing still.
+
+## 7. Fixed window, frame counter, baseline
+
+**Window.** `tools/fixed_window.sh OUT [TAPE]` (A500-equivalent unless `CHIP_KB` etc. say
+otherwise): builds the VERIFY slave and keeps it and its listing in OUT, boots with
+`DETERMINISTIC=1`, finds the live slave in a dump, breaks at `slave + _tape_anchor` (from the
+listing) and traces `FIELDS` fields (100; the stub caps a profile at 100). `anchor.txt` records
+the tape field and the game's own field counter (`h11:0602c`) at the anchor.
+
+**Reproducibility.** `tools/compare_traces.py A B` compares every field's instruction records
+(PCs, costs, registers), DMA records and screenshot. Two fresh A500-equivalent boots of the
+spin route (`tmp/prof/a500`, `a500b`, 2026-10-05): anchor at tape field 4 729 / game field
+4 730 in both, **all 100 fields identical** in all three (also for the route without the EXIT
+phase, `spin1`/`spin2`). **Run one capture at a time:** with a second emulator capturing in
+parallel both debugger sessions failed, and a boot that survived had the Intuition pointer
+elsewhere and a one-field phase shift.
+
+**Frame counter.** The game never writes the copper. The main loop renders the view into a
+chunky buffer (one byte per pixel, 192 bytes wide; `h12:027bc`) and then shows it with
+`h12:05ea6`, a dispatcher on a view-size word that waits for the beam (`h12:063ce`) and
+converts the buffer into the screen's 4 bitplanes (chunky-to-planar, `h12:054ce`..`055e6`
+for this size: `add.b`/`addx.w` bit shuffles, 8 pixels per step, with a shortcut for 8 equal
+pixels), or copies with `BltBitMap` + `WaitBlit`. `frames.py` counts entries of `h12:05ea6`.
+`swap_fields.py` is not adapted yet (68030 runs without an instruction trace need it).
+
+**Baseline, spin route, large view, 100 fields from the anchor (2026-10-05):**
+
+| Machine | fps | fields/frame | CPU busy | Command |
+|---|---|---|---|---|
+| A500-eq. (68000 7 MHz, 512K chip + 1.5M slow) | **2.5** | 19.75 (4 frames in 79 fields) | 100% (no STOP) | `tools/fixed_window.sh tmp/prof/a500` |
+| A1200 (68EC020 14 MHz, 2M chip + 4M fast) | **12.5** | 4.0 (24 frames in 96 fields) | 100% | `AMIGA_MODEL=A1200 KICKSTART=…/kick40068.A1200 CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 EXTRA_ARGS=--slow_memory=0 tools/fixed_window.sh tmp/prof/a1200` |
+
+Where the time goes (share of all CPU cycles in the window; inclusive unless noted):
+
+| Work | A500-eq. | 68020 | Code |
+|---|---|---|---|
+| Render the 3D view | 43.8% | 53.1% | `h12:027bc` → `h12:02808` (per-column wall setup, 11.7% / 14.1% self) |
+| — textured wall columns | 26.8% self | 31.8% self | `h12:04c1a`: scaled column, drawn outward from the middle both ways |
+| Chunky-to-planar to the screen | 26.0% | 29.9% | `h12:05ea6` (its loop at `054ce` shows up as "h12:05288" self: no prologues in h12) |
+| Game logic and objects (h5) | 15.8% | 6.2% | `h5:02358` → `h5:01f2a` → `h5:00292` |
+| — scaled sprites (people, pillars) | 12.6% self | 4.9% self | `h12:05114`: masked, z-tested columns (scene-dependent, see below) |
+| Interrupts and OS | ~9% | ~3% | VBL server `h12:06404` → module player in chip RAM (`?020124`), Kickstart |
+
+No blitter waits are polled (0%); one level-3 interrupt (vertical blank) per field; DMA slots on
+the A500-eq.: 42% CPU, 22.5% bitplane, 31% free. The two windows do not show the same scene: the
+W steps finish earlier on the faster machine (anchor at tape field 4 729 on the A500-eq., 4 333
+on the 68020), and the 68020's *last* field shows the view of the A500's *first*. So the sprite
+share differs, and whether the turn and the townsman advance per field or per rendered frame is
+the first game-time question (playbook §9).

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Whole-trace summary for a Test Drive II trace: frame rate, blitter waits, interrupts, bus use.
+"""Whole-trace summary for a Legends of Valour trace: frame rate, blitter waits, interrupts, bus use.
 
   python3 tools/frames.py TRACE.bin CODE.bin BASE
 
-Frames are counted at the slave's set_copper (the COP1LC write `move.l a0,$dff080` that
-WHDLoad patches in for the game's buffer swap, duel+$588a in v1).  Blitter waits are the
+The game draws through the OS and never writes the copper: the 3D view is rendered off
+screen (h12:027bc) and then made visible by h12:05ea6, which waits for the beam and copies
+the view into the screen bitmap (CPU byte copy, or BltBitMap + WaitBlit).  Frames are
+counted at the entries of h12:05ea6.  Blitter waits are the
 cycles spent on `btst #6,2(a6)` polls (DMACONR BBUSY) and the nop/bne around them.
 Interrupts are counted at Kickstart 1.3's level-3 handler (ROM $FC0D14) and its BLIT ($FC0D38)
 and VERTB ($FC0D4A) branches.  DMA slot types come from the per-field DMA records.
@@ -23,10 +25,7 @@ def raw(a, n):
     return code[o:o + n] if 0 <= o and o + n <= len(code) else b''
 
 POLL = bytes.fromhex('082e00060002')  # btst #6,2(a6)
-# set_copper: move.l a0,$dff080, searched inside the located slave (other copies of the
-# slave file can sit in memory, e.g. on machines with lots of fast RAM).
-slo, shi, _ = regs['slave']
-cop = slo + code[slo - base:shi - base].find(bytes.fromhex('23c800dff080'))
+cop = regs['h12'][0] + 0x5ea6  # the view copy: one per displayed frame
 watch = {0xfc0d14 + kick: 'level-3 interrupts', 0xfc0d38 + kick: '  blitter-finished',
          0xfc0d4a + kick: '  vertical blank'}
 DMA = {0: 'free', 1: 'refresh', 2: 'CPU', 3: 'copper', 4: 'audio', 5: 'blitter', 6: 'bitplane',

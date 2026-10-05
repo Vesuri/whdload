@@ -1,42 +1,44 @@
 #!/usr/bin/env bash
-# Benchmark window: trace FIELDS PAL fields from race-clock initialisation in duel v1.
-# tools/fixed_window.sh OUTDIR [SLAVE]
-# Build `make -C whdload verify`, use SLAVE=$PWD/whdload/TestDrive2.slave and
-# WHD_ARGS=CUSTOM3=1 for the reproducibility study. ANCHOR overrides the hunk offset
-# for diagnostic windows only. The old span anchor (0x789c) was already 7-8 s into a race.
+# Benchmark window: trace FIELDS PAL fields from the input tape's anchor (an entry marked A,
+# whdload/tape.s _tape_anchor).  Default route tools/tapes/spin.txt: default character,
+# large view, 250 fields into turning right on the spot.
+#   tools/fixed_window.sh OUTDIR [TAPE.txt]
+# Builds the VERIFY slave and keeps it (OUT/slave.slave + listing) with the capture; analyse
+# with SLAVE=$OUT/slave.slave.  One boot: the slave is in memory long before the anchor, so
+# its address is found from a dump and the anchor breakpoint armed in the same boot.
+#   FIELDS=100      fields traced          STATE_ONLY / SWAP_ONLY as in Test Drive II
+#   CHIP_KB/FAST_KB/EXTRA_ARGS/CPU/AMIGA_MODEL/KICKSTART: machine (default A500-equivalent)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export FSUAE_RUN="${FSUAE_RUN:-.cap}"; CAP=$FSUAE_RUN; mkdir -p "amiga/$CAP"
-OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}
+OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}; TAPE_TXT=${2:-tools/tapes/spin.txt}
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
-# Retain exactly the slave used by this capture; later builds must not change
-# region sizes or hook addresses when analysing a saved trace.
-INPUT_SLAVE=${2:-tmp/game/LegendsOfValour/LegendsOfValour.Slave}
-if [ "$INPUT_SLAVE" != "$PWD/$OUT/slave.slave" ]; then
-  cp "$INPUT_SLAVE" "$OUT/slave.slave"
+if [ -z "${KEEP_SLAVE:-}" ]; then
+  make -s -C whdload verify > /dev/null
+  cp whdload/LegendsOfValour.Slave "$OUT/slave.slave"
+  cp whdload/LegendsOfValour.lst "$OUT/slave.lst"
 fi
-export DETERMINISTIC=1 SLAVE="$PWD/$OUT/slave.slave" CPU="${CPU:-68000}"
+python3 tools/tape.py "$TAPE_TXT" "$OUT/tape.bin" > /dev/null
+cp "$TAPE_TXT" "$OUT/tape.txt"
+export DETERMINISTIC=1 SLAVE="$PWD/$OUT/slave.slave" TAPE="$PWD/$OUT/tape.bin" CPU="${CPU:-68000}" \
+  JOY0=none WHD_ARGS="CUSTOM5=1 ${WHD_ARGS:-}"
+sym() { python3 -c "
+import re, sys
+for l in open('$OUT/slave.lst', errors='replace'):
+    m = re.match(r'^$1\s+00:([0-9A-F]{8})\s*$', l)
+    if m: print(hex(int(m.group(1), 16))); break"; }
+ANCHOR=$(sym _tape_anchor); TAPEFIELD=$(sym _tapefield); H11=$(sym _h11)
+[ -n "$ANCHOR" ] && [ -n "$TAPEFIELD" ] || { echo "no _tape_anchor in $OUT/slave.lst" >&2; exit 1; }
 # The code is loaded into "other" memory: fast RAM at $200000 when there is any, else slow RAM.
 SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))
 else BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024)); fi
-# Cache only the address, keyed by machine, arguments and slave build. A calibration
-# boot discovers it; the measurement boot arms the race breakpoint at CPU reset.
-mkdir -p tmp/prof
-KEY=$(python3 -c 'import hashlib,os; from pathlib import Path; p=os.environ.get("SLAVE") or "tmp/game/LegendsOfValour/LegendsOfValour.Slave"; h=hashlib.sha256(Path(p).read_bytes()); h.update(repr([(k,os.environ.get(k)) for k in ("AMIGA_MODEL","KICKSTART","CPU","CHIP_KB","FAST_KB","EXTRA_ARGS","WHD_ARGS")]).encode()); print(h.hexdigest()[:20])')
-CACHE="tmp/prof/hunk-$KEY.txt"
-BOOT_HUNK=${BOOT_HUNK:-$(cat "$CACHE" 2>/dev/null || true)}
-if [ -n "$BOOT_HUNK" ]; then export BOOT_BREAK=$(printf '%#x' $((BOOT_HUNK + ${ANCHOR:-0xbbf8}))); fi
 lov() { python3 tools/lov.py "$@"; }
 retain_log() {
   cp amiga/$CAP/fsuae.log "$OUT/fsuae-stdout.log"
   local logfile
   logfile=$(sed -n 's/^LOGFILE: //p' amiga/$CAP/fsuae.log | tail -1)
-  if [ -n "$logfile" ] && [ -f "$logfile" ]; then
-    cp "$logfile" "$OUT/fsuae.log"
-  else
-    cp amiga/$CAP/fsuae.log "$OUT/fsuae.log"
-  fi
+  if [ -n "$logfile" ] && [ -f "$logfile" ]; then cp "$logfile" "$OUT/fsuae.log"; fi
 }
 [ -S amiga/$CAP/lov.sock ] && { lov quit > /dev/null 2>&1 || true; sleep 1; }
 rm -f amiga/$CAP/serve.log "$OUT/trace.bin"
@@ -48,68 +50,43 @@ for _ in $(seq 1 "${SERVE_WAIT:-180}"); do
   kill -0 "$SERVER" 2>/dev/null || { cat amiga/$CAP/serve.log >&2; exit 1; }
   sleep 1
 done
-grep -q serving amiga/$CAP/serve.log || { echo "race breakpoint not reached" >&2; exit 1; }
+grep -q serving amiga/$CAP/serve.log || { echo "server did not start" >&2; exit 1; }
 
-dump() { lov gdb "dump binary memory /tmp/lov-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv /tmp/lov-code.bin "$OUT/code.bin"; }
-hunk=
-for _ in $(seq 1 60); do
-  [ -n "$BOOT_HUNK" ] || lov wait 1 > /dev/null
-  dump
-  hunk=$(python3 -c "
+dump() { lov gdb "dump binary memory /tmp/lov-code-$$.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv /tmp/lov-code-$$.bin "$OUT/code.bin"; }
+region() { python3 -c "
 import sys; sys.path.insert(0, 'tools'); from lov_report import regions
 r = {n: lo for lo, hi, n, o in regions(open('$OUT/code.bin', 'rb').read(), $BASE)}
-print(hex(r['duel']) if 'duel' in r else '')")
-  [ -n "$hunk" ] && break
+print(hex(r['$1']) if '$1' in r else '')"; }
+slave=
+for _ in $(seq 1 60); do
+  lov wait 0.5 > /dev/null
+  dump
+  slave=$(region slave)
+  [ -n "$slave" ] && break
 done
-[ -n "$hunk" ] || { echo "duel never appeared in memory" >&2; exit 1; }
-echo "duel code hunk at $hunk"
-if [ -z "$BOOT_HUNK" ]; then
-  printf '%s\n' "$hunk" > "$CACHE"
-  lov quit > /dev/null; trap - EXIT
-  echo "calibrated code address; rebooting with the race breakpoint armed"
-  exec bash "$0" "$OUT" "$SLAVE"
-fi
-[ "$((hunk))" = "$((BOOT_HUNK))" ] || { echo "loaded hunk differs from boot breakpoint" >&2; exit 1; }
-# Watch the clock's initialising store, then stay stopped for state/trace capture.
-lov gdb 'info registers a4 pc' > "$OUT/anchor.txt"
-if [ "${ANCHOR:-0xbbf8}" = 0xbbf8 ]; then
-  lov gdb 'watch *(int*)($a4-10146)' >> "$OUT/anchor.txt"
-  lov gdb continue >> "$OUT/anchor.txt"
-  lov gdb delete >> "$OUT/anchor.txt"
-  # Race setup draws the initial dashboard, then the gameplay loop starts here.
-  lov until "$(printf '%#x' $((hunk + 0x5a4c)))" >> "$OUT/anchor.txt"
-fi
-lov gdb 'x/1uw $a4-10146' >> "$OUT/anchor.txt"
-# Optional read-only state study: sample N VBL entries before the traced window.
-# The trace then starts after these N fields; record that offset when quoting its fps.
+[ -n "$slave" ] || { echo "live slave never appeared in memory" >&2; exit 1; }
+echo "slave at $slave, anchor $(printf '%#x' $((slave + ANCHOR)))"
+{ echo "slave $slave"; lov until "$(printf '%#x' $((slave + ANCHOR)))"; } > "$OUT/anchor.txt"
+# The tape's field count is fixed by the script; the game's own field counter (h11:0602c)
+# and its position (the hunks' addresses) show whether the boot took the same course.
+h11=$(lov gdb "x/1xw $(printf '%#x' $((slave + H11)))" | awk '{print $2}')
+{ lov gdb "x/1uw $(printf '%#x' $((slave + TAPEFIELD)))" | sed 's/^/tapefield /'
+  lov gdb "x/1uw $(printf '%#x' $((h11 + 0x602c)))" | sed 's/^/gamefield /'
+  echo "h11 $h11"; } >> "$OUT/anchor.txt"
+cat "$OUT/anchor.txt"
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
 fi
-if [ "${RENDER_FRAMES:-0}" -gt 0 ]; then
-  python3 tools/render_fields.py "$RENDER_FRAMES" "$OUT/render" "$OUT/code.bin" "$BASE"
-fi
-# State-only studies need no cycle trace or debugger attach to the host process.
-# Deliberately emit no frame-rate figure in this mode.
 if [ "${STATE_ONLY:-0}" = 1 ]; then
-  [ "${STATE_FIELDS:-0}" -gt 0 ] || [ "${RENDER_FRAMES:-0}" -gt 0 ] || { echo "STATE_ONLY requires STATE_FIELDS or RENDER_FRAMES" >&2; exit 1; }
-  dump
-  lov quit > /dev/null; trap - EXIT
-  retain_log
-  echo "state-only capture complete (no frame-rate measurement)"
-  exit 0
+  dump; lov quit > /dev/null; trap - EXIT; retain_log
+  echo "state-only capture complete (no frame-rate measurement)"; exit 0
 fi
 if [ "${SWAP_ONLY:-0}" = 1 ]; then
   python3 tools/swap_fields.py "$FIELDS" "$OUT" "$OUT/code.bin" "$BASE"
-  dump
-  lov quit > /dev/null; trap - EXIT
-  retain_log
-  exit 0
+  dump; lov quit > /dev/null; trap - EXIT; retain_log; exit 0
 fi
 reply=$(lov profile "$FIELDS" "$PWD/$OUT/trace.bin")
 [ -f "$OUT/trace.bin" ] || { echo "no trace: $reply" >&2; exit 1; }
-if [ "${WATCH_STATE:-0}" = 1 ]; then
-  python3 tools/state_watch.py "$OUT/state"
-fi
 dump
 lov quit > /dev/null; trap - EXIT
 retain_log
@@ -119,4 +96,3 @@ out = sys.argv[1]; t = barto.load(f'{out}/trace.bin')
 open(f'{out}/first.png', 'wb').write(t.fields[0].shot)
 open(f'{out}/last.png', 'wb').write(t.fields[-1].shot)
 EOF
-python3 tools/frames.py "$OUT/trace.bin" "$OUT/code.bin" "$BASE" | tee "$OUT/frames.txt"

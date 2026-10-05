@@ -20,6 +20,8 @@ patches.
 - Never `pkill fs-uae` or `pkill gdb` (other projects run emulators): `fsuae_common.sh` kills only
   our own pid.
 - Capture runs use `JOY0=none`: the host mouse over the window feeds port 0 and changes the game.
+- Captures run in `amiga/.cap` (`FSUAE_RUN`), interactive `amiga/run.sh` in `amiga/.run`: never
+  quit or kill an emulator in `.run`. Run one capture at a time.
 - No performance claim without a measurement from the right instrument (`docs/profiling.md`).
 
 ## Reference docs — read before working in the area

@@ -27,9 +27,10 @@ __pycache__/
 
 # --- Emulator / debugger run state --------------------------------------------
 /amiga/.run/
-/amiga/.cap/
+/amiga/.cap*/
 
 # --- Build output ------------------------------------------------------------
 build/
 *.o
 *.Slave
+*.lst

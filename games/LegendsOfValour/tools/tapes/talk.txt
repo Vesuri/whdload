@@ -1,0 +1,6 @@
+# Study: into the game and stand still until the townsman talks.
+1    51 174 W
+10   51 174 L
+10   132 175 W
+10   132 175 L
+0    75 183 -

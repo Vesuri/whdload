@@ -1,21 +1,53 @@
 # Benchmark route: default character, largest 3D view, turn right on the spot forever.
-3000 51 174 -     # wait at the start screen's green (character) button; up by ~field 2400
-10   51 174 L     # click: save-slot screen
-300  132 175 -    # right die (id 10): cancel -> the game starts with the default character
-10   132 175 L
-2500 75 183 -     # wait until the game has loaded; a townsman soon walks up and talks:
-10   75 183 L     # EXIT in the conversation panel (status bar when no conversation)
-300  75 183 -
-10   75 183 L
-300  75 183 -
-10   75 183 L
-300  15 188 -     # computer button (bottom left)
+# W entries wait on game state (the button under the pointer is live), so the route does not
+# depend on how long loading takes.  View size starts at medium and cycles small -> large ->
+# medium per click on its icon; the setting is not saved.
+1    51 174 W     # start screen: green (character) button, id 1
+10   51 174 L     # -> save-slot screen
+10   132 175 W    # right die, id 10
+10   132 175 L    # cancel -> the game starts with the default character
+0    15 188 W     # in game: computer button live
 10   15 188 L     # options dialog
-300  193 52 -     # view-size icon (second from the right, top row): small -> large -> medium
-10   193 52 L
-300  193 52 -
-10   193 52 L
-300  160 90 -     # click outside the dialog applies the setting
-10   160 90 L
-500  143 148 -    # arrow pad: turn right
-0    143 148 L    # hold
+150  193 52 -     # view-size icon (second from the right, top row)
+10   193 52 L     # medium -> small
+20   193 52 -
+10   193 52 L     # small -> large
+50   160 90 -
+10   160 90 L     # click outside the dialog applies it
+# The townsman walks up and greets the player at a machine-dependent time (soon after the
+# start on a 68020, often not at all on the A500).  His speech blocks the game until EXIT in the
+# conversation panel (polled by h2, invisible to W).  Stand and click EXIT every 100 fields for
+# 1500 fields, on every machine; with no conversation the click lands on the status bar.
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+150  143 148 -    # arrow pad: turn right
+250  143 148 L    # turn for 5 s
+0    143 148 LA   # anchor: the fixed window starts here, turning right forever

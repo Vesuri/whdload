@@ -1,49 +1,39 @@
 # Open work — Legends of Valour
 
-Status 2026-10-05: playbook §1–§5 done, §6 started. See `docs/profiling.md` for everything measured.
+Status 2026-10-05: playbook §1–§8 done (fixed window, frame counter, A500-eq. and 68020
+baselines; `docs/profiling.md` §6–§7). Next is §9, game time.
 
 ## Done
 
 - Repo, rules, harness copied from Test Drive II (`lov.py`, `barto.py`, `lov_report.py`).
-- Slave decoded without source (`tools/slave_info.py`): kickemu 1.3, `_bootdos`, stub and
-  protection patches (`docs/profiling.md` §1).
-- `AMIGA2` decrunched offline (`tools/unpack.py`); 17-hunk layout known.
-- Boots on the A500-equivalent machine; traces carry PCs; `lov_report.py` names all 17 hunks, the
+- Slave decoded without source (`tools/slave_info.py`) and rebuilt from the disassembly on WHDLoad
+  20.0's kick13 example (`whdload/`), with a VERIFY-only input tape (`whdload/tape.s`).
+- `AMIGA2` decrunched offline (`tools/unpack.py`); `lov_report.py` names all 17 hunks, the
   Kickstart and the live slave.
+- Benchmark route `tools/tapes/spin.txt` (default character, large view, turning right), driven
+  by game-state waits; reproducible fixed window `tools/fixed_window.sh` (two boots identical).
+- Frame counter: `frames.py` counts the view's chunky-to-planar display step `h12:05ea6`.
+- Baseline: **2.5 fps** on the A500-eq., **12.5 fps** on a 14 MHz 68020; render ~45–53%,
+  chunky-to-planar ~26–30%, game logic 6–16% (`docs/profiling.md` §7).
 
-## Blocking: how to reach a reproducible gameplay window
+## Open questions
 
-There is no attract demo. Gameplay is behind a mouse click (load button → slot → in game), and a
-representative profile probably needs the player to move. **The user chooses:**
+- **Game time (§9).** Time sources are the VBL field counter `h11:0602c` and VPOSR reads in
+  h12 (`063ac`..`063f0`). Does the world (turning, the townsman) advance per field or per
+  rendered frame? The two machines' windows show different scenes at the anchor, and the
+  townsman reaches the player much sooner on the 68020: likely per frame. Needs the state map
+  (heading `h5:01e64`'s 0–359 value, positions) and a coupling test.
+- **Rebuilt slave equivalence (§10).** The fixed window runs the VERIFY build; compare its state
+  with the original slave's behaviour, then add CUSTOM gating.
+- `swap_fields.py` (68030 without an instruction trace) still has Test Drive II's addresses.
+- The conversation panel polls through h2, so `W` cannot wait for it; the route clicks EXIT
+  blindly. A hook on its poll would make the route shorter.
+- Entropy: the windows are identical across boots, so VPOSR reads do not leak into this
+  route; re-check for any new route.
 
-1. **FS-UAE input recording** (`RECORD=` in run.sh): the user records the clicks and some walking;
-   playback replays them deterministically. Cheap to try, untested end to end (TD2 §7), and the
-   recording is tied to the exact machine and slave.
-2. **A VERIFY-only slave tape**: rebuild the slave from disassembly (needed for §10 anyway, as
-   there is no source), hook the game's mouse/keyboard read and feed it a fixed script. Most robust,
-   most work.
-3. **Anchor without input**: a VERIFY slave calls the game's own load-slot routine at boot, then
-   traces the first in-game frames standing still. Only useful if the game redraws while idle.
+## Candidate optimisations (not started; each needs a measurement first)
 
-**Prior art (surveyed 2026-10-05).** None of the user's other projects injects input at the FS-UAE
-level: no recordings, no Lua, and gdb writes are dropped. All of them script input *inside* the
-emulated machine. Vette and Alone in the Dark override the mouse in their VBI with absolute
-positions and button phases. Revs answers the game's own polls from an `AutoStep{key, polls,
-hits, until}` table and counts polls, not time. Each step can also wait on a game-state byte.
-Stunt Car Racer reads memory back through WHDLoad `COREDUMP`/`TIMEOUT`. For this game that points
-to option 2 placed at `h12:0643e`/`h12:06480` (`docs/profiling.md` §5). Write absolute pointer
-positions into `h11:008d2/008d4` and button bits into `h12:05292`, and advance on the field
-counter `h11:0602c` or on game state.
-
-Also needed: a save game to load. The archive's data has `16SAVE.lbm`, but which file a slot reads
-is not known yet. Saves written during a run are lost (DH1 is recreated); run.sh needs a way to keep
-them in `tmp/`.
-
-## Next, in order
-
-1. Decide the driving method (above); keep a save game under `tmp/`.
-2. Find the frame marker (COP1LC / BPLxPT writes, `LoadView`/`ScrollVPort`, or a double-buffer
-   flip, probably in h12) and the VBL handler; adapt `frames.py` / `swap_fields.py`.
-3. Find an anchor (the first in-game 3D frame after loading) and adapt `fixed_window.sh`;
-   prove two boots give identical fields (§6). Remove entropy (VHPOSR reads in h12, CIA, mouse).
-4. Baseline on the A500-eq. and a 68020 (§8); game-time model (§9); rebuilt slave (§10).
+- Chunky-to-planar `h12:054ce`: a quarter of the A500 frame. A faster conversion (or blitter
+  assisted on the A500, longword merges on 020+) is the classic win.
+- Wall column drawer `h12:04c1a` and its setup `h12:02808`: ~38% of the A500 frame.
+- Scaled sprites `h12:05114`: up to 13% when people are in view.
