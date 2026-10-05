@@ -216,9 +216,10 @@ save/restore d0–a6 like the original and `rts`):
   `d0` = width (`h12:0002e`), `d1` = height (`h12:00030`), `a0` = `h11:05fc2`. Re-read the
   pointers every frame (they change with the view size and on screen rebuilds).
 - **Source stride.** Kalms assumes chunky rows of exactly `chunkyx` bytes. The game's stride
-  is always 192. Large view: width 192 = stride → direct. Smaller views: call once per row
-  (chunkyy = 1, advance a0 by 192 and the plane pointers by 40), or keep the original routine
-  for them (see sizes below).
+  is always 192. Large view: width 192 = stride → direct. Smaller views: add a **source
+  modulo** to Kalms' modulo path (one `add` to `a0` per row in the outer loop; document it in
+  the vendored README), or call once per row (chunkyy = 1, advance a0 by 192 and the plane
+  pointers by 40; ~92 calls of overhead per frame).
 - **High nibble.** Kalms reads the colour from the low nibble: the first merge is
   `and.l #$0f0f0f0f` on four longwords, then `lsl.l #4` on two and `or`. For this game change
   it to `and.l #$f0f0f0f0` on all four and `lsr.l #4` on the **other** two (the ones Kalms
@@ -226,13 +227,30 @@ save/restore d0–a6 like the original and `rts`):
   of each pair in the high nibble) is unchanged — same cycle count. Do this in both the
   prologue copy and the loop copy of the merge, in both routines, and document it in the
   vendored README. Verify bit/plane order with the pixel test, not by reasoning.
-- **Sizes.** The large view is 192 wide (= 6 × 32) at x 64: meets every restriction. Read
-  the medium and small widths and plane pointers from memory after switching
-  (`tools/tapes/viewcycle.txt` visits small → large → medium; dump `h12:0002e/00030/00042`
-  with `lov.py gdb` at each step). Rough screenshot estimate (*unverified*): medium ~112,
-  small ~80 pixels — not multiples of 32. For those, either keep the original C2P (simplest;
-  CUSTOM2 still on), or write a 16-pixel tail. Do not convert a wider area: it would
-  overwrite the frame graphics next to the view.
+- **Sizes: convert a little extra rather than exactly** (user decision, 2026-10-05). The
+  large view is 192 wide (= 6 × 32) at x 64 and meets every restriction as is. The medium and
+  small views are narrower and not multiples of 32 (screenshot estimate, *unverified*: medium
+  ~112, small 80). For those, convert an **enclosing window**: width rounded up to the next
+  multiple of 32 (80 → 96, ~112 → 128), left edge at a multiple of 16 (word writes on the
+  68000; a multiple of 32 is better for the 020's longword writes), containing the view.
+  - The screen around the smaller views is **solid colour 0** (black) for tens of pixels on
+    each side inside the frame (checked on `tmp/explore/viewcycle` screenshots: the frame's
+    dither starts far outside the view). So the extra pixels are invisible **provided they
+    convert to colour 0**. Confirm on the real geometry that the enclosing window stays inside
+    the black area for every size.
+  - The renderer does not necessarily write (or clear) chunky columns outside the view, and
+    after a switch from the large view those columns hold stale pixels. So each frame,
+    before converting, **zero the chunky bytes of the enclosing window that lie outside the
+    view** (high nibble 0 is enough; ~16 bytes × rows, a few thousand cycles), or prove the
+    game's clear `h12:051ee` already zeroes them (it may fill sky/floor colours instead).
+  - Prefer extending to the **right**. If the view's left edge is not aligned and the window
+    must extend left, check where the view sits in the 192-byte chunky row first (read the
+    row origin the renderer uses, e.g. `a5` at `h12:04c1a` and `h12:05114`'s `4(a1)`/`6(a1)`
+    arithmetic): bytes left of chunky column 0 belong to the previous row, and for row 0 they
+    lie before the buffer — do not write there.
+  - Read the actual width, height and plane pointers for each size from memory
+    (`tools/tapes/viewcycle.txt` visits small → large → medium; dump `h12:0002e/00030/00042`
+    with `lov.py gdb` at each step) and record them in `docs/profiling.md`.
 - CPU choice at `_patchgame` time from the attention flags: 68020+ → `bm`, else `bm_word`.
 - Kalms' init routines may compute and store values (check each file for variables written at
   run time; the slave's code hunk is writable, so PC-relative storage is fine).
@@ -329,6 +347,5 @@ time compensation starts working (§2.3). 68020 with fast RAM: W1 + W2 should be
 1. CUSTOM2 bit layout (one bit per item, all on by default in the user's prefs?).
 2. Whether faster A500 frame rates may change the perceived game speed (they make the game
    *closer* to real time below 4.2 fps; see §2.3).
-3. Whether to keep the original C2P for the medium/small views or extend Kalms with a
-   16-pixel tail.
+3. ~~Medium/small views~~: decided — convert an enclosing 32-pixel-multiple window (W1).
 4. Whether to pursue W7's column-major chunky layout.
