@@ -86,11 +86,11 @@ DECL_VERSION:MACRO
 _tdboot
 	dc.b	"tdboot",0
 slv_config
-	dc.b "C2:X:fixed-time simulation (v1):0;C2:X:blitter priority, no unused blitter interrupt (v1):1;"
+	dc.b "C2:X:fixed-time simulation (v1):0;C2:X:blitter priority, no unused blitter interrupt (v1):1;C2:X:sub-unit road position (v1):2;"
 	IFD VERIFY
 	dc.b "C3:B:reproducible verification (v1);"
 	dc.b "C4:B:slow renderer verification (v1);"
-	dc.b "C5:X:scripted driving verification (v1):0;C5:X:force engine damage verification (v1):1;C5:X:force fatal crash verification (v1):2;C5:X:straight driving tape (v1):4;"
+	dc.b "C5:X:scripted driving verification (v1):0;C5:X:force engine damage verification (v1):1;C5:X:force fatal crash verification (v1):2;C5:X:sub-unit with zero fraction (v1):3;C5:X:straight driving tape (v1):4;"
 	ENDC
 	dc.b    "C1:X:trainer infinite lives:0;"	
 	dc.b	0
@@ -396,6 +396,15 @@ get_version:
 pl_main_v1
 	PL_START
 	include "simulation-patches.i"
+	PL_IFC2X 2
+	PL_PS $006c66,render_subunit_main
+	PL_PS $006daa,render_subunit_mirror
+	PL_PS $006474,render_subunit_latch
+	PL_PS $007a34,render_subunit_forward
+	PL_PS $007a78,render_subunit_oncoming
+	PL_PS $00801a,render_subunit_opponent
+	PL_PS $008052,render_subunit_police
+	PL_ENDIF
 	; protection
 	PL_B	$00052A,$60
 	PL_NOP	$0041CA,2
@@ -425,6 +434,10 @@ pl_main_v1
 	PL_ENDIF
 	PL_IFC4
 	PL_P $00588A,verify_slow_copper
+	PL_ENDIF
+	PL_IFC5X 3
+	PL_PS $006c66,render_zero_main
+	PL_PS $006daa,render_zero_mirror
 	PL_ENDIF
 	PL_IFC5
 	PL_PS $001A1A,verify_read_joydat

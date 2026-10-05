@@ -84,10 +84,13 @@ td2 gdb 'x/1uw $a4-10146' >> "$OUT/anchor.txt"
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
 fi
+if [ "${RENDER_FRAMES:-0}" -gt 0 ]; then
+  python3 tools/render_fields.py "$RENDER_FRAMES" "$OUT/render" "$OUT/code.bin" "$BASE"
+fi
 # State-only studies need no cycle trace or debugger attach to the host process.
 # Deliberately emit no frame-rate figure in this mode.
 if [ "${STATE_ONLY:-0}" = 1 ]; then
-  [ "${STATE_FIELDS:-0}" -gt 0 ] || { echo "STATE_ONLY requires STATE_FIELDS" >&2; exit 1; }
+  [ "${STATE_FIELDS:-0}" -gt 0 ] || [ "${RENDER_FRAMES:-0}" -gt 0 ] || { echo "STATE_ONLY requires STATE_FIELDS or RENDER_FRAMES" >&2; exit 1; }
   dump
   td2 quit > /dev/null; trap - EXIT
   retain_log

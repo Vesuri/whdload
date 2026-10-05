@@ -4,6 +4,10 @@ Based on JOTD's public-domain v1.5 slave source. This is a local study build,
 not an official installer release. Only duel v1 receives the new options;
 v2's patch list and timing are unchanged.
 
+History — 2026-10-05
+* CUSTOM2 bit 2: sub-unit road and car position in both views (duel v1).
+  Uses the frame-latched 16.16 positions; sprite size selection is unchanged.
+
 History — 2026-10-04
 * CUSTOM2 bit 0: fixed-time simulation, independently of drawing: every
   6 fields on a 68000 (the original rate), every 2 fields on a 68020+. Continuous rates are scaled; race time follows video fields.
@@ -18,8 +22,8 @@ History — 2026-10-04
 * First-race window with CUSTOM2=3: A500 7.1 fps (original 6.1), A1200
   16.7 fps; 68030/25 MHz and faster reach the 25 fps chip-bus cap.
 
-Set CUSTOM2=3 for both options, CUSTOM2=1 for simulation only, or CUSTOM2=2
-for rendering overhead only. Leave CUSTOM2 unset for original behavior.
+Set CUSTOM2=7 for all three options, CUSTOM2=3 for simulation and bus priority, CUSTOM2=1 for simulation only, or CUSTOM2=2
+for rendering overhead only. CUSTOM2=4 enables fractional rendering alone. Leave CUSTOM2 unset for original behavior.
 CUSTOM1=1 enables the existing infinite-lives trainer.
 
 Finer integration changes handling slightly: over 1,500 demo fields the two

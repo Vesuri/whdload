@@ -369,6 +369,8 @@ verify_simulation_units:
     cmp.w #4,d5
     bne.b .period
 
+    bsr verify_render_units
+
     move.l a4,a1
     suba.l #32766,a1
     move.l #32768,d0

@@ -443,3 +443,35 @@ variables exact against the 68000; elapsed-clock and recovery checks pass) and
 patterns). The A1200 ordinary trace repeats are 16.1 / 16.1 fps. All use
 CUSTOM2=3 and normal shipping slave hash
 `ac3d955a3639a5c12b2a49fa8f624272335431d2b766e7a3eea14cd34193aed8`.
+
+
+## Sub-unit rendering capture (2026-10-05)
+
+CUSTOM2 bit 2 enables fractional road and car projection in duel v1. Combine
+with fixed-time simulation and blitter priority as CUSTOM2=7. Compare 3/7 in
+one **normal build** for FPS, two fresh 100-field fixed windows per arm. Use
+SWAP_ONLY=1 on the A1200/68030; BLTPRI corrupts A1200 CPU trace records.
+
+`RENDER_FRAMES=90 STATE_ONLY=1 tools/fixed_window.sh OUT "$SLAVE"` collects
+completed main and mirror geometry, full row records, scanline buffers and car
+draw coordinates through read-only breakpoints. It writes ignored OUT/render;
+it does not measure FPS. STATE_FIELDS can precede this capture to select a
+later interval. The current sub-unit slave is required in both arms.
+
+VERIFY CUSTOM5 bit 3 (`CUSTOM5=8`) forces road/car fractions to zero and clears
+the 117-line scanline buffer before each view, **in both arms**. Compare
+CUSTOM2=1 CUSTOM3=1 CUSTOM5=8 with CUSTOM2=5 CUSTOM3=1 CUSTOM5=8. Different
+render cadences retain different unused scanline history in the original;
+matching completed views with identical inputs and initial buffers is the
+valid whole-buffer oracle. Interrupted VBL snapshots are not completed rows.
+`subunit_report.py OFF/render ON/render ZERO/render BASE/render --initialised`
+checks every row byte and all 117×16 scanline bytes for matched inputs. It also
+writes per-frame road/colour-boundary CSVs. Use `--check-cars` on later demo
+captures covering the opponent and both traffic directions to check actual
+x/y draw registers and a constant-gap flat-road geometry fixture. A natural
+police chase remains unrecorded; do not claim one from the traffic list.
+
+There are 119 assembly assertions in the VERIFY build (107 simulation and 12
+rendering bounds/fraction checks); historical captures still expect 107.
+`check_disabled.py --render-only` checks the seven sub-unit ranges when bit 2
+is off. The full disabled check covers 74 ranges with bit 0 also off.

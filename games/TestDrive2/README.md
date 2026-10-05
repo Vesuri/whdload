@@ -49,8 +49,8 @@ Build and run the local slave with the fixed-time mode enabled:
 ```sh
 source amiga/env.sh
 make -C whdload
-WHD_ARGS=CUSTOM2=3 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
-amiga/run-a1200.sh               # the same on an expanded A1200 (68EC020)
+WHD_ARGS=CUSTOM2=7 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
+WHD_ARGS=CUSTOM2=7 amiga/run-a1200.sh  # the same on an expanded A1200 (68EC020)
 ```
 
 `CUSTOM2=1` runs the simulation on a fixed PAL period, independently of drawing:
@@ -59,7 +59,10 @@ on a 68020+. Rendering is chip-bus bound at 25 fps even on fast CPUs, so steps
 nobody sees are not simulated. Bit 1 (rendering) gives the blitter bus priority
 (BLTPRI) and suppresses unused blitter interrupts; it retains every original
 wait and JOTD's display fix. `CUSTOM2=3` enables both; `CUSTOM2=2` changes only
-rendering. First-race fixed window, CUSTOM2=3: A500 7.1 fps (original game 6.1),
+rendering. Bit 2 adds fractional road and car projection in both views;
+`CUSTOM2=7` enables all three options, or use `CUSTOM2=4` for fractional
+rendering with the original simulation. Car size selection remains discrete.
+First-race fixed window, CUSTOM2=3: A500 7.1 fps (original game 6.1),
 A1200 16.7 fps; 68030/25 MHz and faster reach the 25 fps cap. See
 `docs/optimisation-plan.md`.
 Motion rates are scaled, the race clock follows elapsed field time, and nonfatal
@@ -73,6 +76,8 @@ entropy from the original mode, CUSTOM4 slows drawing, and CUSTOM5 bit 0 drives
 an input tape. CUSTOM5=3 also forces engine damage once; CUSTOM5=5 instead forces
 a fatal crash.
 CUSTOM5=17 uses a straight acceleration/braking fixture; it does not follow road bends.
+CUSTOM5=8 forces zero rendering fractions and initialises both scanline buffers
+for the byte-identity oracle; use it in both comparison arms.
 These verification options are absent from the normal build.
 Use `tools/fixed_window.sh` for fps, state captures for game-time comparisons,
 and the retained `OUT/slave.slave` when analysing older traces.

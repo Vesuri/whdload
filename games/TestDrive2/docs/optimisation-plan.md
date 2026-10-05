@@ -35,7 +35,7 @@ words/field, 54.7% of cycles waiting; shape clear-under-mask 6.7%; every other
 blitter user ≤1%. A cookie-cut word costs ~19 colour clocks instead of the ideal
 8: five low-res bitplanes take 28% of slots and the CPU's DMACONR polls 22%.
 
-**Blitter priority (CUSTOM2 bit 2, shipping option):** DMACON BLTPRI set for the
+**Historical blitter priority (then CUSTOM2 bit 2; now bit 1):** DMACON BLTPRI set for the
 game's lifetime, original value restored. Same build (`pri-*`), CUSTOM2=3 → 7:
 
 | Machine | fps 3 → 7 |
@@ -228,3 +228,22 @@ stock-A500-equivalent machine, on 68020/fast-RAM, and with the infinite-lives tr
 If §1 recovers most of the waiting (12–21%) and §2–§3 halve C–G, a frame shrinks by roughly
 40%, i.e. **~7 → ~11–12 fps** in the demo window — before any frame cap that §0.2 may require.
 These are estimates to be replaced by benchmark-window measurements, one commit per patch.
+
+
+## Sub-unit road and cars (2026-10-05, A+B)
+
+Current CUSTOM2 bit 2 is fractional road/car projection, combined mode 7. The
+old priority experiment above used a different bit assignment; priority and
+interrupt suppression now share bit 1. No waits or ownership calls changed.
+
+A500 normal-build 100-field moving windows at relative fields 1000–1099:
+`subunit3-cost` (C2=5) 244,152 / 14,210,186 cycles = 1.718%;
+`subunit3-visual-a500` (C2=7) 336,772 / 14,210,190 = 2.370%.
+`tools/subunit_cost.py` sums all sub-unit helpers and the seven hook calls,
+conservatively including displaced instructions. It rejects malformed field
+traces and enforces the 3% limit. A1200 BLTPRI instruction costs are not used.
+
+Two fresh same-build normal first-race fixed windows per arm (`subunit3-fps-*`,
+SWAP_ONLY=1, C2=3 / 7): A500 7.1 / 7.1 fps, A1200 16.7 / 16.7. The option
+improves fractional motion at unchanged measured FPS. The separate curve and
+hill seed correction still requires its own cost and FPS revalidation.

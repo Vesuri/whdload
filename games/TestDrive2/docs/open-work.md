@@ -834,6 +834,72 @@ exactly: straight tape (both periods and original mode, 1,000 fields), damage
 (both periods, 1,800), demo (both periods, 6,000). Units pass 107/107; fatal,
 disabled-bytes and fps (A500 7.1, A1200 16.7) are unchanged.
 
+### Sub-unit rendering (2026-10-05, A+B complete; C pending)
+
+Implementing `docs/subunit-rendering.md` under independent CUSTOM2 bit 2.
+The road hooks interpolate the original scale tables; moving traffic uses the
+fractional origin for each direction. Opponent and active police drawing have
+separate hooks at `0801a` / `08052`, using their frame-latched fractions.
+
+Re-checks corrected three draft assumptions: row field 46 is **0..43**, not
+43..0; both traffic lists move with their origins; the opponent is drawn outside
+those lists. Road rows already include the camera fraction, so object projection
+adds the **car** fraction, without subtracting the camera a second time.
+Bottom rows and the mirror horizon remain fixed; neighbour bounds are explicit.
+
+The road/car candidate passes 119/119 assembly checks in both arms on the
+A500 and A1200. Straight tape (600 fields) and demo (1,800) match all 35 core
+variables, including sample 0. Longer pre-edge-refinement demo comparisons
+match 6,000 fields, with exact PAL clock pacing and a complete 240-field crash
+recovery. All 74 optional ranges retain original bytes with both bits off;
+the latest straight-tape baselines independently check all seven render ranges.
+The instruction/branch audit covers 70 hooks with no errors.
+
+| Completed-frame check | A500 | A1200 |
+|---|---:|---:|
+| Road motion with sub-unit / changed-distance frames | 46/46 | 69/69 |
+| Original road motion / changed-distance frames | 33/45 | 33/70 |
+| Forced-zero identical-input main + mirror frames | 54 + 54 | 87 + 87 |
+| Forced-zero source scale words exact | 24,480 | 24,480 |
+| Row or 117-line scanline bytes differing in zero fixture | 0 | 0 |
+
+These are completed geometry captures, not interrupted VBL data. The zero
+fixture clears both scanline inputs: otherwise the original retains unused
+lines/fields from a different previous frame. Compare world boundaries rather
+than row labels, which change meaning at a whole-unit crossing. A fixed row-1
+label can reset by 5 px even though the world boundary moves continuously.
+
+The entire A+B patch in the moving A500 cost window (`subunit3-cost`, C2=5,
+fields 1000–1099) costs 244,152 / 14,210,186 cycles = **1.718%**, including all
+seven calls and displaced instructions. With the recommended C2=7 it costs
+336,772 / 14,210,190 = **2.370%** (`subunit3-visual-a500`). Both meet the 3%
+limit. Trace images across the moving A500/A1200 interval show intact road and
+mirror edges, with cars/scenery attached. Normal-build FPS (`subunit3-fps-*`),
+two fresh first-race boots per arm: **7.1 → 7.1 A500**, **16.7 → 16.7 A1200**
+for C2=3 → 7. This is smoothness at unchanged measured FPS, not a speed gain.
+
+The live car-coordinate oracle checks every eligible draw against the captured
+road rows and latched fractional positions: A500 11 forward / 61 opponent /
+28 oncoming; A1200 23 / 120 / 24 (both views). Two initial A500 draws precede a
+completed-row snapshot and are explicitly excluded. The natural demo does not
+supply a four-frame <=0.5-unit-gap episode across two camera-unit crossings;
+this is not claimed as a live constant-gap test. The validated integer
+projection's held flat-road gap fixture spans 1 px in the main view, versus
+6 px near the bottom with road interpolation alone; mirror row 1 spans 2 px
+near its fixed clipped edge, with <=1 px at the whole-unit reset. Police use
+the separate latched 16.16 block; natural pursuit remains unrecorded.
+
+Draft Step C is built separately and awaiting runtime tests; it is excluded
+from the A+B commit. The A+B normal slave is 10,450 text bytes.
+
+Curve measurement is complete, implementation pending as separate Step C.
+`subunit_geometry.py` matches all 90 original frames in each view on both
+machines. With heading/lane held fixed at the crossing, the uncorrected maximum
+is 13 px main / 4 px mirror on both machines (including the boundary into mirror row 23). Fractional first-segment
+seeds reduce the model to at most 1 / 0 px. Angles are 8.8: the original byte
+load reads their high byte; rounding fractional angle increments is required to
+reach the same lookup at f -> 1.
+
 ### Remaining open work
 
 1. **NTSC.** Everything is PAL-validated. The period counts fields and the

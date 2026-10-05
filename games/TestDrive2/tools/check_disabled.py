@@ -7,6 +7,7 @@ from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('capture',type=Path)
 p.add_argument('--base',type=lambda s:int(s,0),default=0xc00000)
+p.add_argument("--render-only",action="store_true",help="check only sub-unit rendering ranges (CUSTOM2 bit 2 off)")
 a=p.parse_args()
 root=Path(__file__).resolve().parents[1]
 original=(root/'tmp/game/TestDrive2/data/duel').read_bytes()
@@ -15,7 +16,10 @@ meta=json.loads((a.capture/'state/metadata.json').read_text())
 code=meta['code_base']-a.base
 mem=(a.capture/'code.bin').read_bytes()
 cases=0
-for line in (root/'whdload/simulation-patches.i').read_text().splitlines():
+lines=[] if a.render_only else (root/'whdload/simulation-patches.i').read_text().splitlines()
+lines += [line for line in (root/'whdload/TestDrive2HD.s').read_text().splitlines()
+          if 'render_subunit_' in line and 'PL_' in line]
+for line in lines:
     m=re.search(r'PL_(PSS|PS|P|NOP|W|L)\s+\$([0-9a-f]+),([^;]+)',line)
     if not m:continue
     kind,start,args=m.groups();start=int(start,16)
@@ -26,4 +30,4 @@ for line in (root/'whdload/simulation-patches.i').read_text().splitlines():
     else:size={'W':2,'L':4}[kind]
     assert mem[code+start:code+start+size]==original[40+start:40+start+size],f'optional patch still active at {start:05x}'
     cases+=1
-print(f'CUSTOM2 simulation bit off: {cases} patch ranges retain original v1 instructions')
+print(f'CUSTOM2 optional bits off: {cases} patch ranges retain original v1 instructions')
