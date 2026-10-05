@@ -77,6 +77,12 @@ unchanged. CUSTOM1's infinite lives trainer remains supported. NTSC timing has
 not been validated. Measurements in the docs that name `CUSTOM2=1`/`3`/`5`/`7`
 predate 1.6b, when each feature was a separate bit.
 
+Independently of the option, the 1.6b slave fixes an original bug in duel v1: each intro
+car jumped 16 pixels left for one frame. The copper wrote DDFSTOP above the car's window at
+hpos $a4, so a stop dropping from $a8 to $a0 matched on neither side of the write; the fetch
+window stayed open into the car's first line, which fetched one extra word and offset every
+following line. See `intro_ddfstop_close` in `whdload/TestDrive2HD.s`.
+
 `make -C whdload verify` adds tools for the study: CUSTOM3 removes RNG beam
 entropy from the original mode, CUSTOM4 slows drawing, and CUSTOM5 bit 0 drives
 an input tape. CUSTOM5=3 also forces engine damage once; CUSTOM5=5 instead forces

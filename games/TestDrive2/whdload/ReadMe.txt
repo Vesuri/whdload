@@ -11,6 +11,9 @@ History — 2026-10-05 (1.6b)
 * Sub-unit road and car position in both views (duel v1).
   Uses frame-latched 16.16 positions and fractional curve/hill integration;
   sprite size selection is unchanged.
+* Fixed the intro cars jumping 16 pixels left for one frame (duel v1, always
+  on). The copper changed DDFSTOP after that line's stop had passed, so the
+  car's first line fetched an extra word.
 
 History — 2026-10-04
 * Fixed-time simulation, independently of drawing: every

@@ -346,6 +346,60 @@ set_copper:
 	MOVE.L	A0,$00DFF080
 	rts
 	
+; Intro car (original bug). The copper wrote DDFSTOP on the line above a viewport, at hpos
+; $a4 for 5-plane viewports after their 32-colour palette. When the stop dropped from $a8 to
+; $a0, neither stop matched on that line, the fetch window stayed open and the viewport's first
+; line fetched one extra word: every line then read 2 bytes further, and each intro car showed
+; 16 pixels left for one field. For those viewports, when the new stop is $a0 or less, the move
+; now writes $a8, which always closes that line's window, and the real stop follows after the
+; modulo moves (hpos $b0). Other viewports keep the original single move. Later writes, at or
+; past $d8 or on the viewport's first line, would also work on hardware but leave a stale column
+; at FS-UAE's right edge.
+intro_ddfstop_close:			; replaces the pushes of the DDFSTOP move at $4c50
+	move.l	(a7)+,a1
+	lea	intro_ddfstop_late(pc),a0
+	clr.w	(a0)
+	move.w	-10(a5),d0
+	cmp.w	#$a0,d0
+	bhi.b	.push
+	move.l	4(a5),d1		; the viewport's caller in duel
+	sub.l	a1,d1
+	cmp.l	#$343c-$4c56,d1
+	beq.b	.palette
+	cmp.l	#$4e9a-$4c56,d1
+	bne.b	.push
+.palette
+	move.l	12(a5),a0
+	cmp.b	#5,5(a0)		; planes
+	bne.b	.push
+	lea	intro_ddfstop_late(pc),a0
+	move.w	d0,(a0)
+	move.w	#$a8,d0
+.push
+	move.w	d0,-(a7)
+	move.w	#$94,-(a7)
+	jmp	(a1)
+
+intro_ddfstop:				; replaces clr.w -4(a5); lea 48(sp),sp at $4c8c
+	move.l	(a7)+,a1
+	lea	48(a7),a7
+	clr.w	-4(a5)
+	move.w	intro_ddfstop_late(pc),d0
+	beq.b	.done
+	move.l	a1,-(a7)
+	move.w	d0,-(a7)		; DDFSTOP value
+	move.w	#$94,-(a7)
+	move.l	8(a5),-(a7)		; copper list
+	lea	$46e2-$4c92(a1),a0	; the game's copper move builder
+	jsr	(a0)
+	addq.l	#8,a7
+	move.l	(a7)+,a1
+.done
+	jmp	(a1)
+
+intro_ddfstop_late:
+	dc.w	0			; nonzero: the real DDFSTOP still to be written
+
 _patchexe:
 	movem.l	d0-a6,-(a7)
 
@@ -413,6 +467,8 @@ pl_main_v1
 ;	PL_PS	$0016BE,sync_dot_fade_1	; works but too scattered
 	PL_PS	$0016C8,sync_dot_fade_2
 	PL_P	$00588A,set_copper
+	PL_PSS	$004C50,intro_ddfstop_close,2	; intro car jump
+	PL_PSS	$004C8C,intro_ddfstop,2
     
     ; keyboard support
 	PL_PS	$001A1A,read_joydat
