@@ -5,8 +5,8 @@
 > (all of it), then this file.** Every number here is from that window unless marked
 > *estimate*; estimates must be replaced by measurements before anything is claimed.
 
-**Status 2026-10-05:** W0 and W1 implemented and measured; evidence and exact commands in
-`docs/profiling.md` §8. W1 is enabled in ignored local preferences. W2 is next; W7 is deferred.
+**Status 2026-10-06:** W0, W1 and W2 implemented and measured; evidence and exact commands in
+`docs/profiling.md` §8. W1+W2 are enabled in ignored local preferences (mask 3). W2 uses MEMF_PUBLIC on any CPU; W3 is next and W7 is deferred.
 The remaining items below are the work plan, not implemented features.
 
 ## 0. Ground rules (from CLAUDE.md and the playbook, restated because they bite)
@@ -299,23 +299,25 @@ save/restore d0–a6 like the original and `rts`):
    scene-stable wall A/B as well (profiling §8). The initial 15–20 cycles/pixel estimate
    for 68000 was optimistic; use the measurements, including adapter costs.
 
-### W2. Chunky buffer in fast RAM (68020+ with fast memory)
+### W2. Chunky buffer in PUBLIC memory (any CPU; completed)
 
-The renderer's writes (walls, sprites, clear: ~40% of the 68020 frame) and the C2P's reads go
-to **chip RAM** today. Allocating the 20 000-byte chunky buffer in fast RAM should help every
-020+ machine with fast RAM.
-- Find where the Lattice pool gets its memory (`h0:00dd4` takes from the free list
-  `-8912(a4)`; follow the refill path to the `AllocMem` and its flags — Lattice's `_MemType`
-  or a literal `MEMF_CHIP`). Option A: patch the single allocation at `h1:022c6` to call
-  `AllocMem(20000, MEMF_ANY)` (prefer fast) and leave the pool alone. Option B: if the pool is
-  chip only because of a global flag, do **not** change the flag (other pool users need chip:
-  bitmaps, audio).
-- Check every user of `h11:05fc2` (`h12:02816`, `051a8`, `054d4`, `05606`, `05704`, `05a98`,
-  `05b88`, `05cac`, `09404`, `0948c`; `h1:02760` frees it; `h2:026c6`, `h5:0026a`,
-  `h5:00412`, `h9:00024`) for blitter or DMA use (any `BltBitMap`/`BltClear`/custom-register
-  access on it would break with fast memory). Freed with the matching size at exit
-  (`h1:02760`): the replacement must free with `FreeMem` too.
-- A500-eq.: no fast RAM (the 1.5 MB slow RAM is chip-bus memory) → no change; keep it gated.
+Before W2, renderer writes and C2P reads used a chunky suballocation in chip RAM.
+The user's allocation policy (2026-10-06) is `AllocMem(20000, MEMF_PUBLIC)` on every
+processor: Exec chooses its normal memory priority, without an explicit MEMF_FAST
+requirement. W2 implements the single-allocation option and leaves other pool users alone.
+
+- `h1:022c6` routes only the chunky allocation through Exec; failure retains the original
+  pool allocator and its error handling. The pool refill at `h0:00d68` uses AllocMem with
+  flags 0; no global memory flag was changed.
+- Every `h11:05fc2` user was audited for DMA/blitter use. These users are CPU work;
+  planar bitmaps and audio keep their original allocation paths. `h1:02760` frees owned
+  allocations with FreeMem and the matching 20,000-byte size, or uses the original pool free.
+- No CPU gate. Exec reports expansion slow RAM as FAST on the A500-equivalent; the
+  measurements distinguish that from physical fast RAM. Both 68000 configurations and
+  the 020 are covered. Audit: `docs/w2-audit.md`; 2,096 pixel twins, lifecycle/failure
+  checks and ten fixed-window A/B captures: profiling.md §8.
+- Measured: 020 spin 14.9 → 16.0 fps, fixed wall 14.2 → 15.1. Stock 7 MHz 68000 FPS
+  is unchanged with either slow or physical fast RAM; overclocked performance is unmeasured.
 
 ### W3. Wall column loop (`h12:04c1a` family)
 
@@ -374,8 +376,9 @@ W1 measured: C2P cycles/call −33% / −52% (68000 / 020), spin fps 2.5 → 3.0
 
 Remaining estimates: walls −~12% of the original A500 frame (W3), sprites −~5% (W4).
 Re-measure their share after each change, because scene and frame timing affect it.
-On the 68020, W2 should move further towards the 2-field / 25 fps cap; quantify it with
-the same paired measurement protocol.
+W2 measured: 020 spin 14.9 → 16.0 fps, matching-wall 14.2 → 15.1 fps; C2P main-task
+cycles/call −15.3% at the wall. Stock 7 MHz 68000 FPS is unchanged with slow or physical
+fast RAM. The 25 fps cap remains intact; overclocked 68000 performance is unmeasured.
 
 ## 6. Decisions for the user (ask, don't assume)
 

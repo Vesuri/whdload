@@ -11,6 +11,8 @@ from unpack import hunks
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('capture', type=Path)
+p.add_argument('--custom2', type=lambda x: int(x, 0), default=0,
+               help='enabled option mask; check only disabled patches (default all off)')
 p.add_argument('--base', type=lambda x: int(x, 0), default=0xc00000)
 a = p.parse_args()
 root = Path(__file__).resolve().parents[1]
@@ -46,9 +48,11 @@ r = {n: lo for lo, hi, n, origin in regions(mem, a.base)}
 # Every optional mutation has a PERF_RANGE declaration beside its patch installer.
 ranges = []
 for source in (root/'whdload').glob('*.s'):
-    ranges += [(int(h), int(o,16), int(n)) for h,o,n in
-               re.findall(r'PERF_RANGE h(\d+):([0-9a-fA-F]+) (\d+)', source.read_text())]
-for h, offset, size in ranges:
+    ranges += [(int(h), int(o,16), int(n), int(bit or 0)) for h,o,n,bit in
+               re.findall(r'PERF_RANGE h(\d+):([0-9a-fA-F]+) (\d+)(?: bit=(\d+))?', source.read_text())]
+ranges = [entry for entry in ranges if not a.custom2 & (1 << entry[3])]
+assert ranges, "no disabled patch ranges selected"
+for h, offset, size, bit in ranges:
     _, file_offset, file_size, alloc, flags = layout[h]
     expected = bytearray(original[file_offset:file_offset+file_size])
     for target, offsets in relocations[h]:
@@ -57,4 +61,4 @@ for h, offset, size in ranges:
             struct.pack_into('>I', expected, at, (value+r[f'h{target}']) & 0xffffffff)
     at = r[f'h{h}']-a.base+offset
     assert mem[at:at+size] == expected[offset:offset+size], f'optional patch active at h{h}:{offset:05x}'
-print(f'CUSTOM2=0: {len(ranges)} declared optional ranges retain original instructions')
+print(f'CUSTOM2={a.custom2}: {len(ranges)} declared optional ranges retain original instructions')

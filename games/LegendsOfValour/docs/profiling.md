@@ -203,7 +203,7 @@ share differs, and whether the turn and the townsman advance per field or per re
 the first game-time question (playbook §9).
 
 
-## 8. Performance patch validation (2026-10-05)
+## 8. Performance patch validation (2026-10-05–06)
 
 ### W0 groundwork
 
@@ -395,3 +395,164 @@ boot. Explicit SLAVE/WHD_ARGS override the preference; captures always provide b
 No interactive `.run` emulator was started or modified. `make -C whdload
 OUT=../tmp/build-release` assembles the normal slave with 68000/PIC checks; the VERIFY
 build assembles too. W7 remains deferred; W2 is the next planned feature.
+
+### W2 CPU-independent PUBLIC chunky allocation (2026-10-06)
+
+CUSTOM2 bit 1 now replaces only the 20,000-byte chunky allocation with
+`AllocMem(20000, MEMF_PUBLIC)`, on every CPU. Exec chooses its normal memory priority;
+there is no MEMF_FAST requirement or CPU gate. Only slave-owned allocations use
+`FreeMem(pointer,20000)`. Failed allocations retain the game's original pool allocator,
+free and error handling. The two complete-instruction hooks are `h1:022c6` and
+`h1:02760`; both signatures are checked before patching. All other allocations retain
+their original paths. The [pointer/ownership audit](w2-audit.md) covers every chunky
+pointer user and finds no DMA or blitter consumer of that buffer.
+
+**Correctness.** The retained VERIFY build is SHA256
+`b7484e3af7fe5628252cab342e9f3b9c18051165d356ecd8cbd75fca82cfda54`.
+With CUSTOM2=3 / CUSTOM5=11, original-versus-Kalms pixel twins passed on the W2 buffer:
+
+| Processor / physical memory | Large | Medium | Small | Total |
+|---|---:|---:|---:|---:|
+| 68000, 1 MB chip + 8 MB fast | 371 | 73 | 107 | 551 |
+| 68EC020, 2 MB chip + 4 MB fast | 746 | 347 | 452 | 1,545 |
+
+Both use the correct CPU-selected converter, perturb unrelated low nibbles, and cover
+192×92, 112×64 and 80×48 views. Both also pass allocation/free/reallocation through the
+same dispatchers used by the game, clearing ownership on free and recording PUBLIC/FAST
+memory in physical fast RAM. CUSTOM5=13 forces the PUBLIC attempt to fail: the 020 reaches
+the wall anchor using the original chip-memory pool and passes the same lifecycle check.
+See `tmp/prof/w2-views-68000-fast-1m`, `w2-views-a1200` and
+`w2-public-fallback-a1200`. The normal build excludes these test controls and counters.
+
+**Performance protocol.** Every capture uses the identical retained slave above,
+CUSTOM5=1, a 100-field window, JOY0=none and `amiga/.cap`. W1 stays enabled; only W2
+changes (CUSTOM2=1 off / 3 on). Captures are sequential. The A500-equivalent is unchanged:
+512 KB chip + 1.5 MB expansion slow RAM, 68000 at 7 MHz. The 020 configuration is unchanged:
+A1200, 2 MB chip + 4 MB fast, 68EC020 at 14 MHz. W2 buffers on the first machine actually
+land in expansion **slow** RAM, despite Exec's PUBLIC/FAST flags; on the 020 they land
+in physical fast RAM. This distinction is confirmed from ownership, TypeOfMem and the
+captured memory region, rather than assuming all memory flagged FAST has a fast bus.
+
+Reproduce the eight primary captures, one at a time:
+
+```sh
+for route in spin wall; do
+  for mode in off on; do
+    bits=1; [ "$mode" != on ] || bits=3
+    AMIGA_MODEL=A500 CPU=68000 CHIP_KB=512 FAST_KB=0 EXTRA_ARGS=--slow_memory=1536 TAPE_OPTIONS=1 WHD_ARGS=CUSTOM2=$bits tools/fixed_window.sh tmp/prof/w2-$route-a500-$mode tools/tapes/$route.txt
+  done
+  for mode in off on; do
+    bits=1; [ "$mode" != on ] || bits=3
+    AMIGA_MODEL=A1200 KICKSTART="$AMIGA_SHARE/Kickstarts/kick40068.A1200" CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 EXTRA_ARGS=--slow_memory=0 TAPE_OPTIONS=1 WHD_ARGS=CUSTOM2=$bits tools/fixed_window.sh tmp/prof/w2-$route-a1200-$mode tools/tapes/$route.txt
+  done
+done
+```
+
+**Turning window:**
+
+| Machine | fps off → on | Intervals/fields | Completed C2P calls | Main-task cycles/call | Inclusive cycles/call |
+|---|---|---|---|---|---|
+| A500-equivalent | 3.0 → 3.0 | 5/82 → 5/82 | 6 → 6 | 502,064 → 502,198 | 540,215 → 537,349 |
+| 14 MHz 68020 + fast | 14.9 → 16.0 | 28/94 → 30/94 | 29 → 31 | 169,973 → 144,062 (−15.2%) | 173,287 → 146,040 |
+
+Unrounded 020 fps improves 7.1%. A500 first/last off/on screenshots and all state fields
+match; its tiny cycle differences do not establish a speed gain. The 020 ends at heading
+30 off / 135 on, with movement step 12 in both; position stays 5216,3616 but visible
+objects differ. Renderer/wall comparisons on this route therefore include changed scenes.
+
+![A500 W2 spin off/on first/last](../tmp/prof/w2-spin-a500-comparison.png)
+![68020 W2 spin off/on first/last](../tmp/prof/w2-spin-a1200-comparison.png)
+
+**Fixed wall:**
+
+| Machine | fps off → on | Intervals/fields | Completed C2P calls | Main-task cycles/call | Inclusive cycles/call |
+|---|---|---|---|---|---|
+| A500-equivalent | 3.1 → 3.1 | 6/97 → 6/97 | 6 → 6 | 501,750 → 501,750 | 541,403 → 541,403 |
+| 14 MHz 68020 + fast | 14.2 → 15.1 | 27/95 → 29/96 | 28 → 30 | 170,030 → 144,078 (−15.3%) | 174,070 → 147,128 |
+
+Unrounded 020 fps improves 6.3%. All four viewports per machine are pixel-identical
+(crop 202,68–586,252); position 5216,3616, heading 150 and visible-object records match.
+The 020 whole screenshots match off/on. On the A500 only the far-right capture border
+(x=751–753, y=0–303) differs outside the game viewport; do not claim whole-image equality.
+The A500 movement step remains 48; the 020 changes 16 → 12 under the existing timing code.
+
+| Machine / completed work | Calls off → on | Main-task cycles/call off → on | Inclusive cycles/call off → on |
+|---|---|---|---|
+| A500 renderer | 6 → 6 | 1,278,367 → 1,278,367 | 1,374,842 → 1,374,842 |
+| A500 wall column | 1,152 → 1,152 | 4,276 → 4,276 | 4,631 → 4,631 |
+| A500 sky/floor clear | 6 → 6 | 69,195 → 69,195 | 73,706 → 73,706 |
+| 020 renderer | 28 → 29 | 661,428 → 629,439 (−4.8%) | 676,179 → 643,645 |
+| 020 wall column | 5,443 → 5,857 | 2,361 → 2,277 (−3.6%) | 2,412 → 2,328 |
+| 020 sky/floor clear | 29 → 30 | 37,228 → 19,222 (−48.4%) | 37,903 → 20,116 |
+
+![A500 W2 wall off/on first/last](../tmp/prof/w2-wall-a500-comparison.png)
+![68020 W2 wall off/on first/last](../tmp/prof/w2-wall-a1200-comparison.png)
+
+**Additional 7 MHz 68000 with physical fast RAM:** A500 model, 1 MB chip + 8 MB
+fast, no slow RAM. The smaller 512 KB chip + 4 MB fast VERIFY fixture hit the original
+startup allocator failure loop before W2; the 1 MB/8 MB control boots successfully.
+Both completed wall captures use the same retained build as the primary matrix.
+
+```sh
+for mode in off on; do
+  bits=1; [ "$mode" != on ] || bits=3
+  AMIGA_MODEL=A500 CPU=68000 CHIP_KB=1024 FAST_KB=8192 EXTRA_ARGS=--slow_memory=0 TAPE_OPTIONS=1 WHD_ARGS=CUSTOM2=$bits tools/fixed_window.sh tmp/prof/w2-wall-68000-fast-$mode tools/tapes/wall.txt
+done
+```
+
+| Work | Calls off → on | Main-task cycles/call off → on | Inclusive cycles/call off → on |
+|---|---|---|---|
+| C2P | 6 → 7 | 496,192 → 496,679 | 533,916 → 535,026 |
+| Renderer | 6 → 6 | 1,230,841 → 1,213,599 (−1.4%) | 1,319,703 → 1,303,583 |
+| Wall column | 1,191 → 1,152 | 4,125 → 4,140 | 4,437 → 4,421 |
+| Sky/floor clear | 6 → 6 | 73,454 → 68,878 (−6.2%) | 80,551 → 74,084 |
+
+FPS is **3.2 → 3.2**, six intervals in 94 fields in both windows. The W2 buffer is
+owned PUBLIC/FAST memory in the physical fast region. Anchor fields differ (5,483 off /
+5,495 on), but heading 150, position 5216,3616, movement step 48 and object records
+match; all four viewports and off/on whole screenshots match. There is no measured
+FPS gain at stock 7 MHz; the small renderer/clear savings support allowing W2 on a
+68000. Overclocked 68000 performance remains unmeasured.
+
+![68000 with physical fast W2 wall off/on first/last](../tmp/prof/w2-wall-68000-fast-comparison.png)
+
+**Analysis and limits.** Each output retains slave/listing, trace, code dump, tape,
+anchor, logs, first/last screenshots, `frames.txt`, `profile.txt`, `blocks.txt`,
+`c2p.txt`, `render.txt` and `state.json`. All ten VERIFY slave hashes match.
+`render_report.py` pairs `h12:027bc`, the `04c1a`/`04cbe`/`04d42` column family,
+and `051a2` clear with an RTS at their entry stack depth. Each routine excludes its
+own partial boundary calls; column counts can include columns from partial render
+frames. Inclusive costs include interrupts; main-task costs exclude the separate IRQ
+stack, in the same trace-reported cycle units as W1. `blocks.py` produces the plan's
+64-byte histogram with the whole-window cycle denominator.
+
+```sh
+OUT=tmp/prof/w2-wall-a1200-on
+SLAVE="$OUT/slave.slave" python3 tools/frames.py "$OUT/trace.bin" "$OUT/code.bin" 0x200000
+SLAVE="$OUT/slave.slave" python3 tools/lov_report.py "$OUT/trace.bin" "$OUT/code.bin" --base 0x200000
+python3 tools/c2p_report.py "$OUT" --base 0x200000
+python3 tools/render_report.py "$OUT" --base 0x200000
+python3 tools/blocks.py "$OUT" --base 0x200000
+python3 tools/lov_state.py "$OUT" --base 0x200000
+python3 tools/chunky_check.py "$OUT" --base 0x200000 --expect fast
+SLAVE=tmp/prof/w2-wall-a1200-off/slave.slave python3 tools/check_disabled.py tmp/prof/w2-wall-a1200-off --base 0x200000 --custom2 1
+```
+
+All five W2-off captures pass the disabled-byte check for both W2 ranges. The checker
+also checks all three declared ranges with mask 0 on a retained all-off W1 capture.
+The harness now stops during host memory-region discovery and rejects stops other
+than the tape anchor: large dumps exposed a race that could miss the one-time anchor.
+Interrupted exploratory runs and earlier explicit-FAST builds are excluded from results.
+
+W2 changes no movement/turning, animation, AI timing, 25 fps cap or beam-wait code.
+Frame-rate-independent simulation timing remains required investigation (§2.3.1 of
+the performance plan). The scene-stable route controls the visible scene, not the
+whole simulated world or its AI state.
+
+**Local preference:** `amiga/performance.env` now enables W1+W2, mask 3. The tracked
+example matches. The next interactive boot builds the normal slave in `tmp/build-release`;
+explicit SLAVE/WHD_ARGS still override preferences. The normal slave builds with 68000/PIC
+checks (28,896-byte code hunk, 28,932-byte file), and the VERIFY build also assembles.
+All built files and game-derived evidence remain in ignored tmp. No `.run` emulator was
+started or modified. W3 is the next performance item; simulation timing is open and W7
+remains deferred.

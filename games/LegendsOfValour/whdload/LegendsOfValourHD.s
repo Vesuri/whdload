@@ -34,6 +34,8 @@
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 	INCLUDE	lvo/dos_lib.i
+	INCLUDE	lvo/exec_lib.i
+	INCLUDE	exec/memory.i
 
 ;============================================================================
 
@@ -90,9 +92,12 @@ slv_info	dc.b	"Coded By CFou!",10
 		dc.b	"reconstructed by Vesuri",0
 slv_config	dc.b	"C1:B:character creation;"
 		dc.b	"C2:X:faster chunky-to-planar:0;"
+		dc.b	"C2:X:chunky buffer in public memory:1;"
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
 		dc.b	"C5:X:C2P pixel twin (verification):1;"
+		dc.b	"C5:X:force chunky PUBLIC allocation failure (verification):2;"
+		dc.b	"C5:X:chunky allocation/free cycle (verification):3;"
 	ENDC
 		dc.b	0
 	EVEN
@@ -235,6 +240,7 @@ _patchgame
 .done
 	; Optional W1 hook, checked while disabled: PERF_RANGE h12:054ce 10
 		bsr	_c2p_install
+		bsr	_w2_install
 	IFD VERIFY
 		bsr	_tape_install
 	ENDC
@@ -294,6 +300,7 @@ _h12		dc.l	0
 		ds.l	4
 
 		INCLUDE	c2p.s
+		INCLUDE	chunky.s
 
 	IFD VERIFY
 		INCLUDE	tape.s

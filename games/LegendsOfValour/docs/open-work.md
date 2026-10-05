@@ -1,9 +1,9 @@
 # Open work — Legends of Valour
 
-Status 2026-10-05: playbook §1–§8 done (fixed window, frame counter, A500-eq. and 68020
-baselines; `docs/profiling.md` §6–§7). W0/W1 complete; measurements in §8. Next is W2,
-chunky buffer allocation in fast RAM. Frame-rate-independent simulation timing is required
-follow-up work (`docs/performance-plan.md` §2.3.1).
+Status 2026-10-06: playbook §1–§8 done (fixed window, frame counter, A500-eq. and 68020
+baselines; `docs/profiling.md` §6–§7). W0/W1/W2 complete; measurements in §8. W2 uses
+MEMF_PUBLIC on every CPU. Next is W3, the wall-column loop. Frame-rate-independent
+simulation timing is required follow-up work (`docs/performance-plan.md` §2.3.1).
 
 ## Done
 
@@ -22,7 +22,11 @@ follow-up work (`docs/performance-plan.md` §2.3.1).
   first-button-poll comparison completed; startup pointer/timing limitations in §8.
 - W1: CPU-selected Kalms C2P, all three sizes, 1,860 pixel twins passed. Spin fps
   2.5 → 3.0 / 12.4 → 14.8 (A500 / 020); matching-scene wall A/B confirms savings.
-  CUSTOM2=1 enabled in ignored local preferences; shipped build excludes VERIFY instruments.
+  Shipped build excludes VERIFY instruments.
+- W2: PUBLIC chunky allocation on every CPU, matching owned free and original-pool fallback;
+  2,096 pixel twins across all views plus lifecycle/failure checks passed. Ten fixed-window
+  captures: 020 spin 14.9 → 16.0 fps, wall 14.2 → 15.1; stock 68000 FPS unchanged.
+  W1+W2 enabled in ignored local preferences (mask 3); audit in `docs/w2-audit.md`.
 - `swap_fields.py` agrees exactly with the full trace on the A500 fixed window.
 
 ## Open questions
@@ -31,7 +35,7 @@ follow-up work (`docs/performance-plan.md` §2.3.1).
   `h12:14b78` reads movement step `h12:0cdd6`. The faster spin ends at a different heading
   with unchanged position; frame coupling remains. `tools/lov_state.py` maps visible-object
   render records but does not identify the townsman's world position. Deeper AI timing/state
-  mapping remains open. Acceptance of existing timing is specific to W1; investigate a
+  mapping remains open. W1/W2 retain existing timing; investigate a
   frame-rate-independent simulation step for movement, turning, animation and AI. Compare
   equal elapsed-field intervals across rendering rates, then evaluate elapsed-time scaling
   versus fixed ticks and A500 catch-up costs. See performance-plan §2.3.1 for the work plan.
@@ -42,9 +46,7 @@ follow-up work (`docs/performance-plan.md` §2.3.1).
 
 ## Candidate optimisations (not started; plan in `docs/performance-plan.md`)
 
-- W2: allocate the chunky buffer in fast RAM on 020+; audit every DMA/blitter user and the
-  matching free before patching. Keep other pool users in chip RAM.
 - Wall column drawer `h12:04c1a` and its setup `h12:02808`: ~38% of the A500 frame.
 - Scaled sprites `h12:05114`: up to 13% when people are in view.
 
-W7 (column-major layout and other later work) is deferred beyond W0/W1 by user decision.
+W7 (column-major layout and other later work) remains deferred by user decision.

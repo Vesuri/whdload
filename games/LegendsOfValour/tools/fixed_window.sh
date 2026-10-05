@@ -60,6 +60,9 @@ print(hex(r['$1']) if '$1' in r else '')"; }
 slave=
 for _ in $(seq 1 60); do
   lov wait 0.5 > /dev/null
+  # Keep the emulator stopped while scanning a large expansion-memory dump.
+  # The gdb command otherwise resumes it and can pass the one-time tape anchor.
+  lov stop > /dev/null
   dump
   slave=$(region slave)
   [ -n "$slave" ] && break
@@ -75,6 +78,11 @@ if [ -n "$ABORT" ] && grep -qi "$(printf '0x%08x' $((slave + ABORT)))" "$OUT/anc
   lov gdb 'info registers' > "$OUT/failure-registers.txt"
   dump; retain_log
   cat "$OUT/anchor.txt" >&2; exit 1
+fi
+if ! grep -Eq "^Breakpoint [0-9]+, 0x0*$(printf '%x' $((slave + ANCHOR)))[[:space:]]" "$OUT/anchor.txt"; then
+  dump; retain_log
+  cat "$OUT/anchor.txt" >&2
+  echo "tape anchor breakpoint was not reached" >&2; exit 1
 fi
 # The tape's field count is fixed by the script; the game's own field counter (h11:0602c)
 # and its position (the hunks' addresses) show whether the boot took the same course.
