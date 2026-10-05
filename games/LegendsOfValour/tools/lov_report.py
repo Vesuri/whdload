@@ -111,14 +111,15 @@ def regions(dump, base, chip=b''):
     a = locate(dump, kick[:0x40000], base, 256)
     if a: out.append((a, a + 0x40000, 'kick', a - 0xfc0000))  # name by ROM address
     slave = slave_info.code_hunk(os.environ.get('SLAVE') or SLAVE)[0]
-    # The live slave has its resload pointer (slave+$f4e in v1.0) filled in by WHDLoad;
-    # the PRELOAD copy has zero there.  Match the code after the header, which WHDLoad rewrites.
-    w, i = slave[0x60:0x460], -1
-    while (i := dump.find(w, i + 1)) >= 0:
-        a = base + i - 0x60
-        if mem.long(a + 0xf4e):
-            out.append((a, a + len(slave), 'slave', a))
-            break
+    # The live slave has its resload pointer filled in by WHDLoad; the PRELOAD copy has zero
+    # there.  kick13.s's _boot (ws_GameLoader) starts with lea (_resload,pc),a1.
+    boot = struct.unpack_from('>H', slave, 24)[0]
+    assert slave[boot:boot + 2] == b'\x43\xfa', 'ws_GameLoader is not lea (_resload,pc),a1'
+    resload = boot + 2 + struct.unpack_from('>h', slave, boot + 2)[0]
+    # Vote with 16-byte windows: WHDLoad and kick13.s rewrite parts of the live slave.
+    a = locate(dump, slave, base, 16)
+    if a and mem.long(a + resload):
+        out.append((a, a + len(slave), 'slave', a))
     return out
 
 

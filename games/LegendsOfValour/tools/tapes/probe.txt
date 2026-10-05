@@ -1,0 +1,2 @@
+# Coordinate probe: park the pointer on the start screen's load button and stay.
+0 51 174 -

@@ -1,0 +1,273 @@
+;*---------------------------------------------------------------------------
+;  :Program.	LegendsOfValourHD.s
+;  :Contents.	Slave for "Legends of Valour" (US Gold 1992), reconstructed
+;  :Author.	CFou! (v1.0, 06.02.2005); reconstructed from the binary by Vesuri
+;  :History.	05.10.26 rebuilt on WHDLoad 20.0's kick13.asm example (09.11.25) and
+;			 kick13.s (07.11.25), game part from the v1.0 disassembly
+;  :Requires.	WHDLoad 17+, whdload/kick13.s, kick34005.A500 + .RTB
+;  :Language.	68000 Assembler
+;  :Translator.	vasm (Devpac mode)
+;---------------------------------------------------------------------------*
+;
+; No source of CFou!'s slave is public.  This file follows WHDLoad 20.0's kick13.asm slave
+; example and rebuilds the game-specific part of the installed LegendsOfValour.Slave v1.0 from
+; its disassembly (slave+$fa4.., docs/profiling.md §1).  It is not byte-identical: kick13.s is
+; the 2025 one, v1.0 used 2005's.  Equivalence is checked by behaviour.
+;
+; Differences from v1.0, all deliberate:
+; - v1.0 opened AMIGA2, read 300 bytes and CRC16'd them, then ignored the result and left the
+;   file open.  Dropped: _patchgame checks the bytes it patches.
+; - The program is called with the example's .call (arguments through Input()), not jsr.
+;
+; AMIGA2 is a PowerPacker stub executable: hunk 0 decrunches hunk 1 and then loads the
+; decrunched 17-hunk program itself.  The slave lets the stub run, takes over at its final
+; "movem.l (a7)+,d0-a6 / rts" and patches the loaded program before entering it.
+;
+;---------------------------------------------------------------------------*
+
+	IFND __VASM
+	INCDIR	Includes:
+	ENDC
+	INCLUDE	whdload.i
+	INCLUDE	whdmacros.i
+	INCLUDE	lvo/dos_lib.i
+
+;============================================================================
+
+CHIPMEMSIZE	= $80000	;size of chip memory (as v1.0)
+FASTMEMSIZE	= $80000	;size of fast memory (as v1.0)
+NUMDRIVES	= 1		;amount of floppy drives to be configured
+WPDRIVES	= %0000		;write protection of floppy drives
+
+;BLACKSCREEN			;set all initial colors to black
+;BOOTBLOCK			;enable _bootblock routine
+BOOTDOS				;enable _bootdos routine
+;BOOTEARLY			;enable _bootearly routine
+;CBDOSLOADSEG			;enable _cb_dosLoadSeg routine
+;CBDOSREAD			;enable _cb_dosRead routine
+;CBKEYBOARD			;enable _cb_keyboard routine
+;CACHE				;enable inst/data cache for fast memory with MMU
+;CACHECHIP			;off: v1.0 ran without caches, keep timings comparable
+;CACHECHIPDATA			;enable inst/data cache for chip/fast memory
+;DEBUG				;add more internal checks
+;DISKSONBOOT			;insert disks in floppy drives
+DOSASSIGN			;enable _dos_assign routine
+;FONTHEIGHT	= 8		;enable 80 chars per line
+HDINIT				;initialize filesystem handler
+;HRTMON				;add support for HrtMON
+;IOCACHE	= 1024		;cache for the filesystem handler (per fh)
+;MEMFREE	= $200		;location to store free memory counter
+;NEEDFPU			;set requirement for a fpu
+;POINTERTICKS	= 1		;set mouse speed
+;SEGTRACKER			;add segment tracker
+;SETKEYBOARD			;activate host keymap
+;SETPATCH			;enable patches from SetPatch 1.38
+;SNOOPFS			;trace filesystem handler
+;STACKSIZE	= 6000		;increase default stack
+;TRDCHANGEDISK			;enable _trd_changedisk routine
+;WHDCTRL			;add WHDCtrl resident command
+
+;============================================================================
+
+slv_Version	= 17
+slv_Flags	= WHDLF_NoError
+slv_keyexit	= $59	;F10
+
+;============================================================================
+
+	INCLUDE	whdload/kick13.s
+
+;============================================================================
+
+slv_CurrentDir	dc.b	"data",0
+slv_name	dc.b	"Legends Of Valour",0
+slv_copy	dc.b	"1992 US-GOLD.",0
+slv_info	dc.b	"Coded By CFou!",10
+		dc.b	"Version 1.0 (06.02.2005)",10
+		dc.b	"reconstructed by Vesuri",0
+slv_config	dc.b	"C1:B:character creation;"
+	IFD VERIFY
+		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
+	ENDC
+		dc.b	0
+	EVEN
+
+;============================================================================
+; like a program from "startup-sequence" executed, full dos process
+
+_bootdos	lea	(_saveregs,pc),a0
+		movem.l	d1-d3/d5-d7/a1-a2/a4-a6,(a0)
+		move.l	(a7)+,(11*4,a0)
+		move.l	(_resload,pc),a2	;A2 = resload
+
+		lea	(_tag,pc),a0
+		jsr	(resload_Control,a2)
+
+	;open doslib
+		lea	(_dosname,pc),a1
+		move.l	(4),a6
+		jsr	(_LVOOldOpenLibrary,a6)
+		lea	(_dosbase,pc),a0
+		move.l	d0,(a0)
+		move.l	d0,a6			;A6 = dosbase
+
+	;assigns
+		lea	(_disk1,pc),a0
+		sub.l	a1,a1
+		bsr	_dos_assign
+
+	;load exe: CUSTOM1 selects the character creation program
+		lea	(_program,pc),a0
+		move.l	(_custom1,pc),d0
+		beq	.load
+		lea	(_program2,pc),a0
+.load		move.l	a0,d1
+		jsr	(_LVOLoadSeg,a6)
+		move.l	d0,d7			;D7 = segment
+		beq	.program_err
+
+	;set debug
+		clr.l	-(a7)
+		move.l	d7,-(a7)
+		pea	WHDLTAG_DBGSEG_SET
+		move.l	a7,a0
+		jsr	(resload_Control,a2)
+		add.w	#12,a7
+
+	;patch: PowerPacker stub exit, or the program itself if not crunched
+		move.l	d7,a1
+		add.l	a1,a1
+		add.l	a1,a1
+		cmp.l	#$487a0178,(4,a1)	;stub: pea ($178,pc)
+		bne	.unpacked
+		pea	(_decrunched,pc)
+		move.w	#$4ef9,($17a,a1)	;stub+$176: jmp _decrunched
+		move.l	(a7)+,($17c,a1)
+		cmp.w	#$33cb,($214,a1)	;stub+$210: move.w a3,$dff180
+		bne	.patched
+		move.w	#$6004,($214,a1)	;bra.s over the decrunch flash
+		bra	.patched
+.unpacked	lea	(4,a1),a0
+		move.l	a0,d0
+		bsr	_patchgame
+.patched
+	;call
+		move.l	d7,d1
+		moveq	#_args_end-_args,d0
+		lea	(_args,pc),a0
+		bsr	.call
+
+		pea	TDREASON_OK
+		move.l	(_resload,pc),a2
+		jmp	(resload_Abort,a2)
+
+.program_err	jsr	(_LVOIoErr,a6)
+		pea	(_program,pc)
+		move.l	d0,-(a7)
+		pea	TDREASON_DOSREAD
+		jmp	(resload_Abort,a2)
+
+; D0 = ULONG arg length
+; D1 = BPTR  segment
+; A0 = CPTR  arg string
+
+.call		lea	(_callregs,pc),a1
+		movem.l	d2-d7/a2-a6,(a1)
+		move.l	(a7)+,(11*4,a1)
+		move.l	d0,d4
+		lsl.l	#2,d1
+		move.l	d1,a3
+		move.l	a0,a4
+	;create longword aligend copy of args
+		lea	(_callargs,pc),a1
+		move.l	a1,d2
+.callca		move.b	(a0)+,(a1)+
+		subq.w	#1,d0
+		bne	.callca
+	;set args
+		move.l	(_dosbase,pc),a6
+		jsr	(_LVOInput,a6)
+		lsl.l	#2,d0		;BPTR -> APTR
+		move.l	d0,a0
+		lsr.l	#2,d2		;APTR -> BPTR
+		move.l	d2,(fh_Buf,a0)
+		clr.l	(fh_Pos,a0)
+		move.l	d4,(fh_End,a0)
+	;call
+		move.l	d4,d0
+		move.l	a4,a0
+		movem.l	(_saveregs,pc),d1-d3/d5-d7/a1-a2/a4-a6
+		jsr	(4,a3)
+	;return
+		movem.l	(_callregs,pc),d2-d7/a2-a6
+		move.l	(_callrts,pc),a0
+		jmp	(a0)
+
+;============================================================================
+; The stub's "movem.l (a7)+,d0-a6 / rts", replaced: (a7) is the entry of the loaded hunk 0
+; and the restored registers are the program's startup registers, except D0/A0 (args).
+
+_decrunched	movem.l	(a7)+,d0-a6
+		move.l	(a7),d0
+
+; D0 = APTR hunk 0.  Out: D0/A0 = args as passed to the program; all other registers kept.
+
+_patchgame
+	IFD VERIFY
+		lea	(_hunk0,pc),a0
+		move.l	d0,(a0)
+	ENDC
+		move.l	d0,a0
+		move.l	(-4,a0),d0
+		lsl.l	#2,d0
+		move.l	d0,a0			;A0 = hunk 1 - 4
+	;skip the manual protection, two AMIGA2 versions
+		cmp.l	#$bc876656,($13e4,a0)	;h1:013e0 cmp.l d7,d6 / bne
+		bne	.v2
+		move.l	#$2e064e71,($13e4,a0)	;move.l d6,d7 / nop
+		move.l	#$4e714e71,($1422,a0)
+		move.w	#$4e71,($1426,a0)
+.v2		cmp.l	#$bc876656,($13dc,a0)	;h1:013d8
+		bne	.done
+		move.l	#$2e064e71,($13dc,a0)
+		move.l	#$4e714e71,($141a,a0)
+		move.w	#$4e71,($141e,a0)
+.done
+	IFD VERIFY
+		bsr	_tape_install
+	ENDC
+		moveq	#_args_end-_args,d0
+		lea	(_args,pc),a0
+		rts
+
+	IFD VERIFY
+		INCLUDE	tape.s
+	ENDC
+
+;============================================================================
+
+_disk1		dc.b	"LOV",0		;for Assign
+_program	dc.b	"AMIGA2",0
+_program2	dc.b	"CHARACT",0
+_args		dc.b	10		;must be LF terminated
+_args_end
+	EVEN
+
+	CNOP 0,4
+_tag		dc.l	WHDLTAG_CUSTOM1_GET
+_custom1	dc.l	0
+	IFD VERIFY
+		dc.l	WHDLTAG_CUSTOM5_GET
+_custom5	dc.l	0
+	ENDC
+		dc.l	TAG_DONE
+_saveregs	ds.l	11
+_saverts	dc.l	0
+_dosbase	dc.l	0
+_callregs	ds.l	11
+_callrts	dc.l	0
+_callargs	ds.b	208
+
+;============================================================================
+
+	END

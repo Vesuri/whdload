@@ -1,0 +1,18 @@
+# Probe: options menu -> film-camera icon -> close (logo); twice.
+3000 51 174 -
+10   51 174 L     # load button
+300  132 175 -
+10   132 175 L    # cancel: default character, in game
+2500 15 188 -     # computer button: options menu
+10   15 188 L
+300  225 52 -     # film camera
+10   225 52 L
+300  93 60 -      # logo: close
+10   93 60 L
+1000 15 188 -
+10   15 188 L     # menu again
+300  225 52 -
+10   225 52 L     # camera again
+300  93 60 -
+10   93 60 L
+0    143 148 -

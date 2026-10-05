@@ -1,0 +1,12 @@
+# Start screen -> load -> cancel (default character, in game) -> walk.
+3000 51 174 -     # wait at the load button (start screen is up by ~field 2400)
+10   51 174 L     # click: save-slot screen
+300  132 175 -    # move to the right die (id 10: cancel)
+10   132 175 L    # click: the game starts with the default character
+1500 126 148 -    # move to the arrow pad's forward button; wait for the game to load
+300  126 148 L    # hold forward
+10   143 148 -
+40   143 148 L    # turn right
+10   126 148 -
+300  126 148 L    # forward
+0    126 148 -

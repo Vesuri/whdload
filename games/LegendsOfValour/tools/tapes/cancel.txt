@@ -1,0 +1,6 @@
+# Start screen -> load button -> slot screen -> cancel (right die, id 10).
+3000 51 174 -     # wait at the load button (start screen is up by ~field 2400)
+10   51 174 L     # click: save-slot screen
+300  132 175 -    # move to the right die (id 10: x 120..144, y 166..184)
+10   132 175 L    # click
+0    160 100 -
