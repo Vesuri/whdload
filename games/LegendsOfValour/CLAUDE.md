@@ -30,4 +30,5 @@ patches.
 |---|---|
 | `docs/open-work.md` | **First.** What is known, what blocks a gameplay window, ordered work items |
 | `docs/profiling.md` | Running the game, driving it, tracing it, or quoting any performance number |
+| `docs/performance-plan.md` | Before changing any game code for speed: hot path, game-time constraints, ordered work items |
 | Test Drive 2 `docs/new-game-playbook.md` | The method this repo follows (set up from Test Drive II) |

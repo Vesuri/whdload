@@ -31,7 +31,7 @@ baselines; `docs/profiling.md` §6–§7). Next is §9, game time.
 - Entropy: the windows are identical across boots, so VPOSR reads do not leak into this
   route; re-check for any new route.
 
-## Candidate optimisations (not started; each needs a measurement first)
+## Candidate optimisations (not started; plan in `docs/performance-plan.md`)
 
 - Chunky-to-planar `h12:054ce`: a quarter of the A500 frame. A faster conversion (or blitter
   assisted on the A500, longword merges on 020+) is the classic win.
