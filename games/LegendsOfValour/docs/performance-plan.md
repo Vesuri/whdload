@@ -117,8 +117,9 @@ Consequences:
   faster up to 12 fields/frame changes the perceived game speed (towards the intended speed).
   Above that, the world speed should stay constant.
 - Not everything is compensated: the townsman reached the player far sooner on the 68020
-  (see profiling.md §6), so some AI advances per frame. W1 maps the heading to `h11:08c28`
-  and finds a movement-step reader at `h12:14b78`. The townsman's world position and deeper
+  (see profiling.md §6), so some AI advances per frame. W1 maps the heading to `h11:08c28`. The `h12:14b78` step reader
+  initializes actor speed; a renderer-driven actor update is now mapped in
+  `docs/timing-investigation.md`. The townsman's world position and deeper
   AI timing remain open; the user accepted existing timing behaviour. Faster frames change
   the scene at the fixed-window anchor, which matters for §3. Evidence is in profiling §8.
 - The beam wait exists because the C2P writes **straight into the displayed bitplanes**

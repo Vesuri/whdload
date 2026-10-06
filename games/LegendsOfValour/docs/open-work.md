@@ -32,7 +32,9 @@ simulation timing is required follow-up work (`docs/performance-plan.md` §2.3.1
 ## Open questions
 
 - **Game time (§9).** Heading is `h11:08c28`, player x/y `h11:08c1c`/`08c20`;
-  `h12:14b78` reads movement step `h12:0cdd6`. The faster spin ends at a different heading
+  `h12:14b78` reads movement step `h12:0cdd6` when initializing actor speed.
+  `docs/timing-investigation.md` maps a persistent 56-record actor table and its
+  renderer-driven position/countdown updates; townsman identity remains open. The faster spin ends at a different heading
   with unchanged position; frame coupling remains. `tools/lov_state.py` maps visible-object
   render records but does not identify the townsman's world position. Deeper AI timing/state
   mapping remains open. W1/W2 retain existing timing; investigate a
