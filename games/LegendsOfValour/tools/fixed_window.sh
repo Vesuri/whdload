@@ -58,8 +58,12 @@ import sys; sys.path.insert(0, 'tools'); from lov_report import regions
 r = {n: lo for lo, hi, n, o in regions(open('$OUT/code.bin', 'rb').read(), $BASE)}
 print(hex(r['$1']) if '$1' in r else '')"; }
 slave=
-for _ in $(seq 1 60); do
-  lov wait 0.5 > /dev/null
+for scan_pass in $(seq 1 60); do
+  # BOOT_BREAK leaves startup paused so abort breakpoints can be armed before
+  # VERIFY unit tests run. Inspect that first stopped state without resuming it.
+  if [ "$scan_pass" -ne 1 ] || [ -z "${BOOT_BREAK:-}" ]; then
+    lov wait 0.5 > /dev/null
+  fi
   # Keep the emulator stopped while scanning a large expansion-memory dump.
   # The gdb command otherwise resumes it and can pass the one-time tape anchor.
   lov stop > /dev/null
