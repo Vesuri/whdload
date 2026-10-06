@@ -33,6 +33,9 @@ measure() {
   python3 tools/lov_state.py "$out" --base "$base" > "$out/state.json"
   head -4 "$out/frames.txt"
   cat "$out/c2p.txt" "$out/render.txt"
+  if [ "${KEEP_TRACE:-1}" = 0 ]; then
+    rm -f "$out/trace.bin" "$out/fsuae.log"
+  fi
 }
 for route in $ROUTES; do
   for machine in $MACHINES; do

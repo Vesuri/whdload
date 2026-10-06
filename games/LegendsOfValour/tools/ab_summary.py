@@ -7,7 +7,12 @@ from pathlib import Path
 import json,re,hashlib,sys
 from PIL import Image,ImageDraw,ImageChops
 root=Path('tmp/prof'); prefix=sys.argv[1]
-for route,machine in [('spin','a500'),('spin','a1200'),('wall','a500'),('wall','a1200'),('wall','68000-fast')]:
+pairs=set()
+for path in root.glob(f'{prefix}-*-off'):
+ rest=path.name[len(prefix)+1:-4]
+ for machine in ('68000-fast','a1200','a500'):
+  if rest.endswith('-'+machine):pairs.add((rest[:-len(machine)-1],machine));break
+for route,machine in sorted(pairs):
  dirs=[root/f'{prefix}-{route}-{machine}-{mode}' for mode in ('off','on')]
  if not all((p/'state.json').exists() for p in dirs): continue
  print('\n',route,machine)

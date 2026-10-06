@@ -12,7 +12,8 @@ b = (a.capture/'code.bin').read_bytes(); t = barto.load(str(a.capture/'trace.bin
 r = {n:(lo,hi) for lo,hi,n,o in regions(b,a.base,t.chip)}
 h = r['h12'][0]
 entries = {h+0x27bc:'render', h+0x4c1a:'wall columns', h+0x4cbe:'wall columns',
-           h+0x4d42:'wall columns', h+0x51a2:'sky/floor clear'}
+           h+0x4d42:'wall columns', h+0x51a2:'sky/floor clear',
+           h+0x5114:'sprite columns', h+0x93f0:'mapped sprite columns', h+0x9476:'mapped sprite columns'}
 blob = b[h-a.base:r['h12'][1]-a.base]
 returns = {h+i for i in range(0,len(blob)-1,2) if blob[i:i+2]==b'\x4e\x75'}
 active = {}; calls = {name:[] for name in set(entries.values())}
@@ -29,7 +30,7 @@ for field in t.fields:
             for name in list(active):
                 if regs[15]==active[name][0]:
                     calls[name].append(active.pop(name)[1:])
-for name in ('render','wall columns','sky/floor clear'):
+for name in ('render','wall columns','sprite columns','mapped sprite columns','sky/floor clear'):
     samples = calls[name]
     if not samples:
         print(f'{name}: no completed calls'); continue

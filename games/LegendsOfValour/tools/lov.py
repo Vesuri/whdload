@@ -80,7 +80,7 @@ class Gdb:
 # (127.0.0.1 lands in baseText), so every trace record comes out without a PC.  Under WHDLoad no
 # trigger can name the game, so set the window to everything through lldb before each capture.
 # Addresses are this binary's link-time ones (baseText = 0x32dea04, read by start_cpu_profiler).
-BASETEXT_VM = 0x32dea04
+BASETEXT_VM = int(os.environ.get("BASETEXT_VM", "0x32dea04"), 0)
 
 
 LLDB_FIX = (

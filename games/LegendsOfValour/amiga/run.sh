@@ -24,8 +24,8 @@ fi
 
 GAME="${GAME:-../tmp/game/LegendsOfValour}"
 BIOS="$AMIGA_SHARE/Kickstarts"
-RTB="${RTB:-$AMIGA_SHARE/Kickstarts/kick34005.A500.RTB}"
-WB="${WB:-$AMIGA_SHARE/Workbenchv2.04rev37.67Workbench.adf}"
+RTB="${RTB:-$HOME/.local/share/amiga/Kickstarts/kick34005.A500.RTB}"
+WB="${WB:-$HOME/.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf}"
 WHD="$HOME/.local/share/amiga/WHDLoad/C/WHDLoad"
 CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
