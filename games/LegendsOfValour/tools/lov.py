@@ -16,6 +16,7 @@ Commands (the emulator is left running after each unless noted):
 import os, select, signal, socket, subprocess, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import barto
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Captures run in amiga/.cap (FSUAE_RUN), apart from interactive amiga/run.sh sessions in
@@ -35,6 +36,7 @@ class Gdb:
                                   stderr=subprocess.STDOUT, env=env, bufsize=0)
         self.buf = b''
         self.running = False
+        self.profiler_pc_base = None
         for c in ('set pagination off', 'set confirm off', 'set height 0', 'set width 0',
                   'set remotetimeout 120', 'set architecture m68k'):
             self.cmd(c)
@@ -157,6 +159,8 @@ def handle(g, line):
     if op == 'gdb':
         was = g.running; g.stop()
         out = g.cmd(rest, timeout=600)
+        if os.environ.get('PROFILE_WINDOW') == 'guest' and rest.strip() == 'maintenance packet qOffsets':
+            g.profiler_pc_base = 0x1018 if 'received: "00001018"' in out else None
         if was: g.cont()
         return out
     if op in ('shot', 'profile'):
@@ -167,8 +171,13 @@ def handle(g, line):
             fields, target = rest.split(None, 1)
             target = os.path.abspath(target)
         if op == 'profile':
-            fix_profile_window()
+            if os.environ.get('PROFILE_WINDOW') == 'guest':
+                assert g.profiler_pc_base == 0x1018, 'guest profiler handshake was not acknowledged'
+            else:
+                fix_profile_window()
+                g.profiler_pc_base = 0
         out = g.cmd(f'monitor profile {fields} "" "{target}"', timeout=1800)
+        Path(target).with_suffix('.pc-base').write_text(f'{g.profiler_pc_base or 0:#x}\n')
         if was: g.cont()
         if op == 'shot':
             f = barto.load(target).fields[-1]

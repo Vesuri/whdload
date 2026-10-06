@@ -12,6 +12,7 @@ Layout (little-endian uint32 unless noted):
   then 17 registers (d0-d7, a0-a7, sr).
 """
 import struct
+from pathlib import Path
 from dataclasses import dataclass, field
 
 
@@ -37,6 +38,7 @@ class Trace:
     chip: bytes
     slow: bytes
     fields: list = field(default_factory=list)
+    pc_base: int = 0
 
     def instructions(self, f):
         """Yield (pc, cost, regs) for every record of field f; pc is None while the CPU is
@@ -56,6 +58,10 @@ class Trace:
             cost = 0xffffffff - v
             r = regs(d, off)
             off += 68
+            # Barto stores RAM PCs relative to the profiler window, but physical
+            # Kickstart PCs and the IRQ marker remain absolute. Registers are absolute.
+            if pc is not None and pc != 0x7fffffff and not 0xf80000 <= pc < 0x1000000:
+                pc += self.pc_base
             yield pc, cost, r
 
 
@@ -83,6 +89,11 @@ def load(path):
     rom, chip, slow = blob(), blob(), blob()
     w(), w()
     t = Trace(data, sections, rom, chip, slow)
+    # Explicit metadata: old LLDB captures use base zero regardless of section bases.
+    pc_base_path = Path(path).with_suffix(".pc-base")
+    if pc_base_path.exists():
+        t.pc_base = int(pc_base_path.read_text().strip(), 0)
+        assert 0 <= t.pc_base < 0xffff0000, "invalid profiler PC base"
     for i in range(nfields):
         custom = blob()
         blob()

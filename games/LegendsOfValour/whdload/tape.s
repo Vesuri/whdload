@@ -98,7 +98,14 @@ _tape_vbl	move.l	(_tapeptr,pc),a1
 		move.l	(a0),a0
 		tst.w	(6,a0)
 		bpl	_tape_next
-_tape_anchor	nop			;an entry marked A begins: tools/fixed_window.sh breaks here
+_tape_anchor
+	IFD PROFILER_WINDOW
+		bsr _profile_prepare
+_profile_ready	bsr _profile_restore
+_profile_restored nop
+	ELSE
+		nop			;an entry marked A begins
+	ENDC
 _tape_next	lea	(_tapefield,pc),a0
 		addq.l	#1,(a0)
 		lea	(_tapelist,pc),a0

@@ -14,7 +14,11 @@ export FSUAE_RUN="${FSUAE_RUN:-.cap}"; CAP=$FSUAE_RUN; mkdir -p "amiga/$CAP"
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}; TAPE_TXT=${2:-tools/tapes/spin.txt}
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
 if [ -z "${KEEP_SLAVE:-}" ]; then
-  make -s -C whdload verify > /dev/null
+  if [ "${PROFILE_WINDOW:-}" = guest ]; then
+    make -s -C whdload verify VASMFLAGS="${VASMFLAGS:-} -DPROFILER_WINDOW=1" > /dev/null
+  else
+    make -s -C whdload verify > /dev/null
+  fi
   cp tmp/build/LegendsOfValour.Slave "$OUT/slave.slave"
   cp tmp/build/LegendsOfValour.lst "$OUT/slave.lst"
 fi
@@ -27,7 +31,9 @@ import re, sys
 for l in open('$OUT/slave.lst', errors='replace'):
     m = re.match(r'^$1\s+00:([0-9A-F]{8})\s*$', l)
     if m: print(hex(int(m.group(1), 16))); break"; }
-ANCHOR=$(sym _tape_anchor); TAPEFIELD=$(sym _tapefield); H11=$(sym _h11)
+ANCHOR=$(sym _tape_anchor)
+if [ "${PROFILE_WINDOW:-}" = guest ]; then ANCHOR=$(sym _profile_ready); fi
+TAPEFIELD=$(sym _tapefield); H11=$(sym _h11)
 [ -n "$ANCHOR" ] && [ -n "$TAPEFIELD" ] || { echo "no _tape_anchor in $OUT/slave.lst" >&2; exit 1; }
 # The code is loaded into "other" memory: fast RAM at $200000 when there is any, else slow RAM.
 SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
@@ -88,6 +94,18 @@ if ! grep -Eq "^Breakpoint [0-9]+, 0x0*$(printf '%x' $((slave + ANCHOR)))[[:spac
   cat "$OUT/anchor.txt" >&2
   echo "tape anchor breakpoint was not reached" >&2; exit 1
 fi
+if [ "${PROFILE_WINDOW:-}" = guest ]; then
+  RESTORED=$(sym _profile_restored)
+  [ -n "$RESTORED" ] || { echo "profiler restoration symbol missing" >&2; exit 1; }
+  lov gdb 'maintenance packet qOffsets' > "$OUT/profiler-window.txt"
+  grep -q 'received: "00001018"' "$OUT/profiler-window.txt" || {
+    echo "profiler metadata query failed" >&2; exit 1;
+  }
+  lov until "$(printf '%#x' $((slave + RESTORED)))" >> "$OUT/profiler-window.txt"
+  grep -Eq "^Breakpoint [0-9]+, 0x0*$(printf '%x' $((slave + RESTORED)))[[:space:]]" "$OUT/profiler-window.txt" || {
+    echo "profiler metadata restoration was not reached" >&2; exit 1;
+  }
+fi
 # The tape's field count is fixed by the script; the game's own field counter (h11:0602c)
 # and its position (the hunks' addresses) show whether the boot took the same course.
 h11=$(lov gdb "x/1xw $(printf '%#x' $((slave + H11)))" | awk '{print $2}')
@@ -97,6 +115,15 @@ h11=$(lov gdb "x/1xw $(printf '%#x' $((slave + H11)))" | awk '{print $2}')
 cat "$OUT/anchor.txt"
 # Refresh after decrunching: the early slave-location dump need not contain game hunks.
 dump
+if [ "${PROFILE_WINDOW:-}" = guest ]; then
+  lov gdb "dump binary memory /tmp/lov-profiler-chip-$$.bin 0x1000 0x1020" > /dev/null
+  mv /tmp/lov-profiler-chip-$$.bin "$OUT/profiler-chip.bin"
+  PROFSTATE=$(sym _profile_state)
+  proftask=$(lov gdb "x/1xw $(printf '%#x' $((slave + PROFSTATE + 2)))" | awk '{print $2}')
+  lov gdb "dump binary memory /tmp/lov-profiler-task-$$.bin $(printf '%#x' $((proftask + 128))) $(printf '%#x' $((proftask + 144)))" > /dev/null
+  mv /tmp/lov-profiler-task-$$.bin "$OUT/profiler-task.bin"
+  python3 tools/profile_window_check.py "$OUT" --base "$BASE"
+fi
 if [ "${SELFTEST_FRAMES:-0}" -gt 0 ]; then
   DONE=$(sym _c2p_test_done)
   [ -n "$DONE" ] || { echo "pixel-twin symbol missing" >&2; exit 1; }

@@ -303,6 +303,9 @@ _h12		dc.l	0
 		INCLUDE	chunky.s
 
 	IFD VERIFY
+	IFD PROFILER_WINDOW
+		INCLUDE	profile_window.s
+	ENDC
 		INCLUDE	tape.s
 	ENDC
 
