@@ -23,7 +23,8 @@ same compiler and NDK. Release archives are generated/re-extracted and checked;
 no WHDLoad executable, game data, ROM or capture is committed.
 
 The launcher permits WHDLOAD_BINARY. With no override it prefers the official
-20.0 runtime cached in tmp/whd20/official/WHDLoad/C/WHDLoad when present, then
+20.0 runtime in /path/to/WHDLoad when present (the
+official WHDLoad_dev archive, kept beside it as WHDLoad_dev-20.0.lha), then
 uses the shared installation. Users must supply WHDLoad 20.0 or later. Tests
 below explicitly use official 20.0 build 7051 (27.03.2026), leaving the shared
 19.2 runtime untouched.

@@ -504,13 +504,16 @@ game bytes embedded in the tool.
 
 ### Sideways capture and cost checks
 
-Sideways work uses the ignored `tmp/horiz/tools/fw.sh` and `hcap.py` to capture
-completed main rows at 06c74 and backdrop d2 plus inputs at 08c9e. The recovery
-variant also captures VBL state. `RW` records contain field, drawn heading/lane
-and raw heading/lane; compare those values during lane changes, not screenshots
-or individual road-row indices. `BD` records permit counting pixel steps and
-nonzero-step direction reversals. Compare steering captures over the same field
-prefix. The scratch scripts and retained slave builds remain in tmp/horiz.
+`SIDEWAYS_FRAMES=N STATE_ONLY=1 tools/fixed_window.sh OUT "$SLAVE"` runs
+`tools/sideways_fields.py`: completed main rows at 06c74 and backdrop d2 plus
+inputs at 08c9e, into OUT/sideways. `SIDEWAYS_RECOVERY=1` also records recovery
+state and dumps 1000 VBL states to OUT/state (for `check_recovery.py`). `RW`
+records contain field, drawn heading/lane and raw heading/lane; compare those
+values during lane changes, not screenshots or individual road-row indices.
+`python3 tools/sideways_report.py OUT/sideways [...] [--until FIELD]` counts
+steps and nonzero-step direction reversals; compare steering captures over the
+same field prefix. The 2026-10-05 captures (`tmp/horiz/*/h`, made with the
+earlier scratch copy of these tools) keep only their text records.
 
 Run a normal CPU=68000 100-field `tools/fixed_window.sh` window and then
 `python3 tools/subunit_cost.py OUT`. Repeat with STATE_FIELDS=1000 for the moving

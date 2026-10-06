@@ -87,10 +87,15 @@ fi
 if [ "${RENDER_FRAMES:-0}" -gt 0 ]; then
   python3 tools/render_fields.py "$RENDER_FRAMES" "$OUT/render" "$OUT/code.bin" "$BASE"
 fi
+if [ "${SIDEWAYS_FRAMES:-0}" -gt 0 ]; then
+  python3 tools/sideways_fields.py "$SIDEWAYS_FRAMES" "$OUT/sideways" "$OUT/code.bin" "$BASE" \
+    $([ "${SIDEWAYS_RECOVERY:-0}" = 1 ] && echo --recovery)
+fi
 # State-only studies need no cycle trace or debugger attach to the host process.
 # Deliberately emit no frame-rate figure in this mode.
 if [ "${STATE_ONLY:-0}" = 1 ]; then
-  [ "${STATE_FIELDS:-0}" -gt 0 ] || [ "${RENDER_FRAMES:-0}" -gt 0 ] || { echo "STATE_ONLY requires STATE_FIELDS or RENDER_FRAMES" >&2; exit 1; }
+  [ "${STATE_FIELDS:-0}" -gt 0 ] || [ "${RENDER_FRAMES:-0}" -gt 0 ] || [ "${SIDEWAYS_FRAMES:-0}" -gt 0 ] ||
+    { echo "STATE_ONLY requires STATE_FIELDS, RENDER_FRAMES or SIDEWAYS_FRAMES" >&2; exit 1; }
   dump
   td2 quit > /dev/null; trap - EXIT
   retain_log

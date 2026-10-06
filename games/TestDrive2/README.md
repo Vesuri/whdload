@@ -30,7 +30,8 @@ tmp/TestDrive2.lha               WHDLoad installer (slave source) → unpack to 
 /path/to/kickstarts/       kick31.rom (host), kick34005.A500 (slave)
 /path/to/kick34005.A500.RTB
 /path/to/Workbenchv2.04rev37.67Workbench.adf
-/path/to/WHDLoad/    WHDLoad package
+/path/to/WHDLoad/    WHDLoad 19.2 package (build includes)
+/path/to/WHDLoad-20.0/  WHDLoad 20.0 package (run.sh prefers its C/WHDLoad)
 /path/to/fs-uae, /path/to/bin  FS-UAE (Barto gdb stub) and m68k-amiga-elf toolchain
 ```
 
