@@ -23,7 +23,6 @@ fi
 . "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
 
 GAME="${GAME:-../tmp/game/LegendsOfValour}"
-BIOS="$AMIGA_SHARE/Kickstarts"
 RTB="${RTB:-$HOME/.local/share/amiga/Kickstarts/kick34005.A500.RTB}"
 WB="${WB:-$HOME/.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf}"
 WHD="$HOME/.local/share/amiga/WHDLoad/C/WHDLoad"
@@ -40,7 +39,7 @@ cp -f "$WHD" "$DH1/WHDLoad"
 [ -n "${SLAVE:-}" ] && cp -f "$SLAVE" "$DH1/LegendsOfValour.Slave"
 # TAPE= installs a VERIFY slave input tape (tools/tape.py; read with WHD_ARGS=CUSTOM5=1).
 [ -n "${TAPE:-}" ] && cp -f "$TAPE" "$DH1/data/lovtape"
-cp -f "$BIOS/kick34005.A500" "$DH0/devs/Kickstarts/"
+cp -f "$KICK13" "$DH0/devs/Kickstarts/"
 cp -f "$RTB" "$DH0/devs/Kickstarts/"
 chmod -R u+w "$DH0" "$DH1"
 printf 'Expert\nReadDelay=0\n' > "$DH0/s/WHDLoad.prefs"

@@ -8,6 +8,7 @@
 # Machines: a500 (A500-equivalent), a1200 (68EC020 + 4 MB fast), 68000-fast (68000 + 8 MB fast).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. amiga/env.sh
 PREFIX=$1 OFF_BITS=$2 ON_BITS=$3 ROUTES=${4:-"spin wall"} MACHINES=${5:-"a500 a1200"}
 measure() {
   local route=$1 machine=$2 mode=$3 out base bits
@@ -17,11 +18,17 @@ measure() {
   local -a machine_args
   case "$machine" in
     a500) machine_args=(AMIGA_MODEL=A500 CPU=68000 CHIP_KB=512 FAST_KB=0 EXTRA_ARGS=--slow_memory=1536) ;;
-    a1200) machine_args=(AMIGA_MODEL=A1200 "KICKSTART=$AMIGA_SHARE/Kickstarts/kick40068.A1200" CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 EXTRA_ARGS=--slow_memory=0) ;;
+    a1200) machine_args=(AMIGA_MODEL=A1200 "KICKSTART=$KICKSTART_A1200" CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 EXTRA_ARGS=--slow_memory=0) ;;
     68000-fast) machine_args=(AMIGA_MODEL=A500 CPU=68000 CHIP_KB=1024 FAST_KB=8192 EXTRA_ARGS=--slow_memory=0) ;;
     *) echo "unknown machine $machine" >&2; exit 1 ;;
   esac
-  env "${machine_args[@]}" TAPE_OPTIONS=1 "WHD_ARGS=CUSTOM2=$bits" tools/fixed_window.sh "$out" "tools/tapes/$route.txt"
+  if [ "${RESUME:-0}" = 1 ] && [ -s "$out/state.json" ] && [ -s "$out/render.txt" ] && [ -s "$out/frames.txt" ]; then
+    echo "retaining completed window $out"
+    return
+  fi
+  if [ "${RESUME:-0}" != 1 ] || [ ! -s "$out/trace.bin" ]; then
+    env "${machine_args[@]}" TAPE_OPTIONS=1 "WHD_ARGS=CUSTOM2=$bits" tools/fixed_window.sh "$out" "tools/tapes/$route.txt"
+  fi
   export SLAVE="$PWD/$out/slave.slave"
   if [ "$mode" = off ]; then python3 tools/check_disabled.py "$out" --base "$base" --custom2 "$OFF_BITS"
   else python3 tools/chunky_check.py "$out" --base "$base" --expect auto; fi
