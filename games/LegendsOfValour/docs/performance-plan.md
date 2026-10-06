@@ -170,6 +170,11 @@ remaining performance work; W7's layout deferral does not defer the timing inves
 
 ## 3. Measurement protocol (every item)
 
+`tools/ab_window.sh PREFIX OFF_BITS ON_BITS [ROUTES [MACHINES]]` runs steps 1–3 for a CUSTOM2
+patch (captures plus the whole analysis chain) and `tools/ab_summary.py PREFIX` compares them.
+Traces are 0.5–1 GB each: once the derived files exist, delete `trace.bin` and `fsuae.log`
+(any window can be recaptured deterministically).
+
 1. Build both variants from the same source; the only difference is the CUSTOM2 bit
    (`WHD_ARGS=CUSTOM2=…` is passed through `fixed_window.sh` → `run.sh`).
 2. `tools/fixed_window.sh tmp/prof/<item>-off` and `…-on` with `WHD_ARGS="CUSTOM2=<bits>"`, on

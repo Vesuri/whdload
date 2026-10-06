@@ -433,7 +433,10 @@ land in expansion **slow** RAM, despite Exec's PUBLIC/FAST flags; on the 020 the
 in physical fast RAM. This distinction is confirmed from ownership, TypeOfMem and the
 captured memory region, rather than assuming all memory flagged FAST has a fast bus.
 
-Reproduce the eight primary captures, one at a time:
+Reproduce the captures and their analysis (`check_disabled`/`chunky_check`, `frames`, profile,
+C2P, render, blocks, state) with `tools/ab_window.sh w2 1 3 "spin wall" "a500 a1200 68000-fast"`,
+then `python3 tools/ab_summary.py w2` (fps, cycles/call, state, comparison sheets; summary kept
+in `tmp/prof/w2-results.txt`). The capture commands alone, one at a time:
 
 ```sh
 for route in spin wall; do
