@@ -169,7 +169,8 @@ _c2p_edges_io
 		neg.w	d6
 		sub.w	d5,d6
 		sub.w	d6,d0			;right padding begins at this byte
-		lea	(_c2p_edges,pc),a2
+		lea	(_c2p_bitmap,pc),a2
+		adda.l	#_c2p_edges-_c2p_bitmap,a2
 		lea	(_c2p_bitmap+bm_Planes,pc),a3
 		moveq	#4-1,d4
 .plane		move.l	(a3)+,a0

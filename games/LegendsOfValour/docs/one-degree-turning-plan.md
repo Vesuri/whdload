@@ -1,7 +1,7 @@
 # One-degree turning plan
 
-Status: approved for implementation, 7 October 2026. No one-degree patch has
-been implemented or validated. This is separate from W7, which remains deferred.
+Status: implemented and automated validation complete, 7 October 2026.
+Normal interactive evaluation is the remaining acceptance step. This is separate from W7, which remains deferred.
 
 ## Intended result
 
@@ -133,3 +133,165 @@ realistic 68020 setup with normal blitter timing. Let the user assess one-degree
 taps, sustained turning and wall/sprite stability before changing their defaults.
 Record the tested build, enabled options, remaining limitations and easy-to-adjust
 input-rate constants. W7 and sub-degree rendering remain deferred.
+
+## Implementation and verification evidence
+
+The plan/toggle decision was committed as `09dc53b`. The following are automated validation results. Interactive acceptance remains
+with the user; the A/B limitations are recorded in profiling §8.
+
+- `python3 tools/turning_tables.py` reconstructs all 13,824 consumed columns of
+  all 108 original rows exactly. The empirical floating-point model uses the
+  double immediately above pi; this reproduces the original asymmetric 90°
+  truncation. It does not establish how the original offline tool was written.
+- Each ray is the rotated vector `(focal, (width-1)/2-column)`. Store
+  `floor(65536*minor/major)` and `round(65536/major)` with its octant. A zero word
+  advances to the preceding octant. Unconsumed row padding in smaller original
+  files contains unrelated trailing values; it is not ray geometry.
+- The shipping candidate copies the 36 existing rows at runtime, including their
+  padding, and constructs the other 144 with original Q22 sine constants and
+  68000 integer arithmetic. This preserves legacy rounding exactly without an
+  FPU or copying game tables into source. Across all 55,296 intermediate columns,
+  projection words match the floating model and slope error is at most 1/65536.
+- Near-axis rays need a minimum slope of two: zero is a control marker and one
+  overflows the original `65536 / slope` DIVU. The same explicit bound is applied
+  to the independent mathematical reference; it is below 0.002° angular error.
+- `turn-table-oracle-a1200` and `turn-table-oracle-a500` both reach the spin anchor
+  with the full large-view table active. All 180 guest rows match the host model
+  byte for byte, both angle units are one, and two table generations completed.
+  VERIFY checks all copied rows and an independent mathematical checksum of new
+  rows before publication. These runs use CUSTOM2=191 (timing disabled).
+- `turn-table-a1200` establishes a real allocation-failure fallback: both angle
+  units remain five and the active table is null. The original KickEmu 512 KB
+  expansion pool cannot accommodate the full new table. The candidate raises
+  FASTMEMSIZE by 144 KiB (to 656 KiB); this increases the slave's reservation even
+  when the option is off. PUBLIC allocation in the successful runs selected chip
+  RAM. Physical host fast RAM alone does not expand KickEmu's fixed pool.
+- The original table pointer remains owned by the game. Only the renderer's row
+  selector uses the new allocation; original loading/freeing paths never see it.
+  One owned buffer is reused on view changes and released on game cleanup.
+- Candidate button policy: first press one degree; suppress repeats for eight
+  PAL fields (160 ms), then retain the view's existing held increment. Use consumed
+  simulation fields when timing is enabled. Mouse headings normalize to 0–359.
+  The 020 `turn-tap-a1200` completed-tick capture records exactly one change,
+  heading 156→157, from the four-field test press; the following 35 ticks hold
+  at 157. Its shared-animation regression passes 40 ticks/five phase advances.
+  The later input cases are recorded below. The unverified cosmetic-random hook is
+  now opt-in at build time so timing-enabled turning tests retain the approved
+  shared-animation correction without introducing that experiment.
+
+Remaining acceptance work: normal interactive evaluation. Automated table, input, full-angle ray, wall-twin,
+allocation/fallback and both-CPU fixed-window checks are complete as detailed
+below and in profiling §8. No local performance preference has been changed.
+
+The all-view captures `turn-views-a500` and `turn-views-a1200` pass every table
+oracle and 231/1,161 original-versus-Kalms conversion twins respectively. Their
+small/medium/large table-generation counts are 1/2/2 and 2/2/3. These conversion
+twins validate conversion integration, not wall geometry by themselves.
+
+A separate VERIFY bit-19 wall twin runs h12:02808 twice at headings divisible by
+five: once with the new table/divisor and once with the original table/divisor.
+Actor/world updates preceding that pass run only once. It compares all 20,000
+chunky bytes and aborts on a mismatch, restores the new table state and output
+registers, and publishes the normal ray-output cursor. Its shared staging buffer
+requires W6's nested twin (CUSTOM5 bit 7) to be off. `turn-wall-twins-a1200` passes
+357/250/312 small/medium/large wall twins, plus 958 conversion twins. This covers
+the legacy headings encountered by the route, not every possible heading.
+
+The tap drawing-delay pairs `turn-tap[-delayed]-a500` and
+`turn-tap[-delayed]-a1200` each compare 41 consecutive completed ticks. All
+decoded world categories match except the independent live game clock; player,
+all 56 actors, RNG and animation match. Each short press adds one degree after
+queued pre-anchor input is consumed. No frame-rate inference is made from these
+observations.
+
+`turn-wall-twins-a500` adds 60/40/40 small/medium/large full-wall comparisons,
+plus 179 conversion twins. No wall-pixel differences occurred in either CPU run.
+
+`turn-mouse-sweep-{a500,a1200}` and `turn-mouse-reverse-{a500,a1200}` each retain
+401 consecutive completed-tick samples. `tools/turning_input_check.py --sweep
+forward|reverse` verifies exactly 360 unit steps, every heading 0–359, one wrap,
+and exact agreement with the historical mouse-counter deltas. The displayed
+heading equals the raw heading throughout. These are input/state tests; they
+do not assert that the slower A500 displayed every simulation tick. The 020
+forward run also passes 400 ticks/50 shared-animation phase advances.
+
+The VERIFY bit-21 native ray-walker sweep has now passed all 360 headings in
+all three views on both CPUs (`turn-ray-sweep-a500`, `turn-ray-sweep-a1200`).
+It holds the world position fixed, checks the words immediately outside the
+chunky allocation, and restores the real heading before the ordinary drawing
+pass. Actors are not advanced by this fixture. The captures also pass all-view
+legacy wall twins (A500 8/18/9; 020 298/251/229) and conversion twins.
+
+`turn-lifecycle-{a500,a1200}` run the standalone feature without the timing
+prototype. VERIFY bit 22 allocates, releases through the actual shutdown helper,
+checks both ownership pointers cleared, reallocates, and reaches gameplay with
+an exact generated table. `turn-fallback-{a500,a1200}` force the PUBLIC attempt
+to fail (bit 18); both angle units remain five and the active table stays null.
+
+`turn-hold-{a500,a1200}` each cover 51 consecutive completed ticks. The 40-field
+press produces steps `[1,0,0,0]` followed by sixteen five-degree steps, then no
+turn after release. Animation regressions pass on both CPUs. This explicitly
+checks that finer taps do not reduce sustained turning to one fifth speed.
+
+The source-isolated normal build excludes the unfinished simulation work. Its
+SHA256 remains `e38c94ff27c6349036e82bca6d1168f5f449dbe227603e5173acfdfc7caf3118`
+after adding the exhaustive VERIFY ray sweep; those instruments do not enter
+the normal slave. Timing integration is covered separately by the captures above.
+
+
+Save/load format audit: h2:04cce serializes fourteen bytes from h11:08c1c
+through h11:08c29, including displayed heading at 08c22 and raw heading at
+08c28. h2:04bde restores the same bytes. Their copy helpers h2:04a5e/04a8a
+perform byte copies, without angle quantization. The optional patch does not
+change the save format. Native UI round trips pass on both CPUs as recorded below.
+
+The final standalone A/B is recorded in profiling §8. It shows matched camera
+poses but different actor state, so no speedup is claimed. Large-view table
+construction takes 542/87 PAL fields on the A500/14 MHz 020; this is a setup
+cost. The tap delay can be adjusted with `TURN_REPEAT_FIELDS` in turning_input.s;
+held increments retain the game's current view/timing setting.
+
+
+### Reproducing the geometry checks
+
+`python3 tools/turning_tables.py` checks the mathematical reconstruction against
+locally supplied game files. For guest verification, build with
+`make -C whdload verify VASMFLAGS=-DVERIFY_WAIT_RESCUE=1`. Retain that slave and
+listing in the capture folder, then use the §7 machine settings with
+`KEEP_SLAVE=1 WHD_ARGS=CUSTOM2=191 TAPE_OPTIONS=2621443 SELFTEST_FRAMES=40
+TURNING_CHECK=1 TURNING_CHECK_ARGS="--require-all-views --require-wall-twins
+--require-ray-sweeps" tools/fixed_window.sh OUT tools/tapes/c2p-views.txt`.
+This enables the conversion twin, wall twin and complete ray sweep together;
+W6's separate scratch-sharing twin must remain off.
+
+For the allocation/free/reallocation fixture use `STATE_ONLY=1`,
+`TAPE_OPTIONS=4194305`, and `TURNING_CHECK_ARGS=--require-lifecycle` on the spin
+route. Forced allocation failure uses `TAPE_OPTIONS=262145` and
+`TURNING_CHECK_ARGS=--fallback`. The tick-input checker consumes retained
+`ticks` observations from the separate, still-uncommitted timing harness; it
+is not a dependency of the standalone turning patch or geometry checks.
+
+
+### Save/load and normal trial
+
+`turn-save-load-a1200` records stable raw/displayed headings 166° before saving,
+32° after turning away, then exactly 166° after loading. The A500 counterpart
+records 316° → 347° → 316°. Both return to large-view gameplay with the exact
+180-row table active and both divisors equal to one. The tape takes three
+anchors (before save, before load, after load); checkpoint dumps and route are
+retained with the captures. A500 menu clicks need forty fields: the initial
+short-click route stalled before entering the save panel and was rejected.
+The successful A500 build includes the existing VERIFY-only wait rescue.
+No save format or user save files were changed.
+
+Normal standalone SHA256:
+`e38c94ff27c6349036e82bca6d1168f5f449dbe227603e5173acfdfc7caf3118`.
+The separate normal interactive candidate adds the current animation-approved
+25 Hz simulation prototype; SHA256:
+`8ea3d1773ca76844c98a39b19ec4384f86fdefd712b927df2487f67e4cf9cd54`.
+`SIM_FIRE_EXPERIMENT` and `SIM_KEYBOARD_EXPERIMENT` are absent. The normal build
+contains no tape or verification fixtures. Trial settings are CUSTOM2=255,
+68020 at 28,375,160 Hz, 2 MB chip/8 MB fast, PAL, normal blitter timing and no
+warp. It uses `tmp/playtest-turning`, leaving amiga/.run and preferences alone.
+The broader simulation goal is still unfinished; this trial evaluates angular
+precision while retaining the accepted animation correction.

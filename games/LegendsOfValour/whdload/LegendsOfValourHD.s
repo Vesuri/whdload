@@ -40,7 +40,7 @@
 ;============================================================================
 
 CHIPMEMSIZE	= $80000	;size of chip memory (as v1.0)
-FASTMEMSIZE	= $80000	;size of fast memory (as v1.0)
+FASTMEMSIZE	= $a4000	;original 512K + 144K reserve for optional ray table
 NUMDRIVES	= 1		;amount of floppy drives to be configured
 WPDRIVES	= %0000		;write protection of floppy drives
 
@@ -97,6 +97,7 @@ slv_config	dc.b	"C1:B:character creation;"
 		dc.b	"C2:X:unrolled sprite columns:3;"
 		dc.b	"C2:X:cached ray reciprocals:4;"
 		dc.b	"C2:X:MOVEM chunky clear:5;"
+		dc.b	"C2:X:1 degree turning:7;"
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
 		dc.b	"C5:X:C2P pixel twin (verification):1;"
@@ -256,6 +257,7 @@ _patchgame
 		bsr	_w4_install
 		bsr	_w5_install
 		bsr	_w6_install
+		bsr	_turn_install
 	IFD VERIFY
 	IFD TIMING_STUDY
 		bsr	_timing_study_install
@@ -323,6 +325,7 @@ _h12		dc.l	0
 		INCLUDE	sprites.s
 		INCLUDE	rays.s
 		INCLUDE	clear.s
+		INCLUDE	turning.s
 
 	IFD VERIFY
 	IFD PROFILER_WINDOW

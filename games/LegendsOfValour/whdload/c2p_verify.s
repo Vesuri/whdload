@@ -5,7 +5,8 @@ _c2p_twin_before
 		movem.l	d0-a6,-(sp)
 		bsr	_c2p_flip_low
 		lea	(_c2p_bitmap+bm_Planes,pc),a2
-		lea	(_c2p_scratch,pc),a3
+		lea	(_c2p_bitmap,pc),a3
+		adda.l	#_c2p_scratch-_c2p_bitmap,a3
 		moveq	#4-1,d7
 .plane		move.l	(a2)+,a0
 		move.l	a3,a1
@@ -20,7 +21,8 @@ _c2p_twin_before
 	; Save and redirect the game's original view-origin plane pointers.
 		lea	($42,a5),a0
 		lea	(_c2p_saved_planes,pc),a1
-		lea	(_c2p_scratch,pc),a2
+		lea	(_c2p_bitmap,pc),a2
+		adda.l	#_c2p_scratch-_c2p_bitmap,a2
 		moveq	#0,d0
 		move.w	(_c2p_left,pc),d0
 		lsr.w	#3,d0
@@ -42,7 +44,8 @@ _c2p_twin_before
 _c2p_twin_after
 		movem.l	d0-a6,-(sp)
 		lea	(_c2p_bitmap+bm_Planes,pc),a2
-		lea	(_c2p_scratch,pc),a3
+		lea	(_c2p_bitmap,pc),a3
+		adda.l	#_c2p_scratch-_c2p_bitmap,a3
 		moveq	#0,d0			;plane-major byte index, stride 3680
 		moveq	#4-1,d7
 .plane		move.l	(a2)+,a0
@@ -106,7 +109,8 @@ _c2p_difference
 		move.b	(-1,a0),(a2)+
 		move.b	(-1,a1),(a2)+
 		move.l	a1,d0
-		lea	(_c2p_scratch,pc),a0
+		lea	(_c2p_bitmap,pc),a0
+		adda.l	#_c2p_scratch-_c2p_bitmap,a0
 		sub.l	a0,d0
 		subq.l	#1,d0
 	; D0 identifies the first differing byte in the scratch plane layout.

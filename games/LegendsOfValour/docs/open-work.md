@@ -79,3 +79,12 @@ Native capture blocking is resolved with the opt-in guest profiler handshake and
 explicit PC-base normalization; see [native capture notes](native-capture.md).
 Shared assets use ~/.local/share/amiga; projects are separate checkouts. ROM lookup
 prefers shared files and retains verified fallbacks for ROMs not moved yet.
+
+
+## Optional one-degree turning
+
+CUSTOM2 bit 7 adds one-degree rendering and taps, with the existing held-turn
+rate retained after 160 ms. Both-CPU table, full-angle ray, legacy-pixel, input
+and allocation checks pass. See [the implementation plan](one-degree-turning-plan.md)
+and profiling §8 for evidence, setup cost and interactive evaluation status.
+The feature is isolated from the unfinished simulation prototype; W7 stays deferred.

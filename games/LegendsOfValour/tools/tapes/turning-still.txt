@@ -1,0 +1,75 @@
+# Stationary turning-patch benchmark: default character, large view, no turn input.
+# W entries wait on game state (the button under the pointer is live), so the route does not
+# depend on how long loading takes.  View size starts at medium and cycles small -> large ->
+# medium per click on its icon; the setting is not saved.
+1    51 174 W     # start screen: green (character) button, id 1
+10   51 174 L     # -> save-slot screen
+10   132 175 W    # right die, id 10
+10   132 175 L    # cancel -> the game starts with the default character
+0    15 188 W     # in game: computer button live
+10   15 188 L     # options dialog
+150  193 52 -     # view-size icon (second from the right, top row)
+10   193 52 L     # medium -> small
+20   193 52 -
+10   193 52 L     # small -> large
+50   160 90 -
+10   160 90 L     # click outside the dialog applies it
+# The townsman walks up and greets the player at a machine-dependent time (soon after the
+# start on a 68020, often not at all on the A500).  His speech blocks the game until EXIT in the
+# conversation panel (polled by h2, invisible to W).  Stand and click EXIT every 100 fields for
+# 1500 fields, on every machine; with no conversation the click lands on the status bar.
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+# Stationary comparison: retain the initial heading so fine-turn tap policy
+# cannot alter the pose. No heading-wait relies on multiples of five.
+# Continue dismissing the welcome dialog while holding the initial heading.
+90 75 183 -
+10 75 183 L
+90 75 183 -
+10 75 183 L
+90 75 183 -
+10 75 183 L
+90 75 183 -
+10 75 183 L
+90 75 183 -
+10 75 183 L
+90 75 183 -
+10 75 183 L
+90 75 183 -
+10 75 183 L
+90 75 183 -
+10 75 183 L
+90 75 183 -
+10 75 183 L
+90 75 183 -
+10 75 183 L
+20 160 90 -
+0 160 90 A       # stationary, immediately after the final EXIT pulse

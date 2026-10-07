@@ -124,6 +124,13 @@ if [ "${PROFILE_WINDOW:-}" = guest ]; then
   mv /tmp/lov-profiler-task-$$.bin "$OUT/profiler-task.bin"
   python3 tools/profile_window_check.py "$OUT" --base "$BASE"
 fi
+turning_check() {
+  if [ "${TURNING_CHECK:-0}" = 1 ]; then
+    lov gdb "dump binary memory /tmp/lov-turning-chip-$$.bin 0 $(printf '%#x' $((CHIP_KB * 1024)))" > /dev/null
+    mv /tmp/lov-turning-chip-$$.bin "$OUT/chip.bin"
+    python3 tools/turning_check.py "$OUT" --base "$BASE" ${TURNING_CHECK_ARGS:-}
+  fi
+}
 if [ "${SELFTEST_FRAMES:-0}" -gt 0 ]; then
   DONE=$(sym _c2p_test_done)
   [ -n "$DONE" ] || { echo "pixel-twin symbol missing" >&2; exit 1; }
@@ -144,6 +151,7 @@ delete" > "$OUT/selftest-gdb.txt"
     echo "pixel-twin frame-count breakpoint was not reached" >&2; exit 1
   fi
   dump
+  turning_check
   lov shot "$PWD/$OUT/selftest.png" > /dev/null
   lov quit > /dev/null; trap - EXIT; retain_log
   python3 tools/c2p_check.py "$OUT" --base "$BASE"
@@ -155,6 +163,7 @@ fi
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/lov_timing_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT" "$BASE"
 fi
+turning_check
 if [ "${STATE_ONLY:-0}" = 1 ]; then
   dump; lov quit > /dev/null; trap - EXIT; retain_log
   echo "state-only capture complete (no frame-rate measurement)"; exit 0

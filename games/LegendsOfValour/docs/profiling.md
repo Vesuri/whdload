@@ -882,3 +882,55 @@ For pause observation use TIMING_PAUSE=1, STATE_ONLY=1, TAPE_OPTIONS=1 and an
 early-game tape anchor followed by a stationary hold, as retained in
 `tmp/prof/timing-pause-a500/tape.txt`. All captures were serial in amiga/.cap,
 with JOY0=none; game-derived artifacts remain ignored under tmp.
+
+
+### Optional one-degree turning (2026-10-07)
+
+CUSTOM2 bit 7 changes angular precision; W7 remains deferred. The standalone
+candidate excludes the unfinished simulation patch. All four captures use the
+same PROFILE slave SHA256
+`aa81853ff1fece05384af9536b09a61a1fde71cede0611408c5176795d4fcb2c`,
+CUSTOM2=63/191, CUSTOM5=1, 100 fields, JOY0=none, serial in amiga/.cap.
+The stationary route retains heading 270 and position (5216,3616), so the
+new tap/hold policy cannot change the camera pose during this comparison.
+
+| Machine | fps off → on | Intervals / fields off → on | Renderer main cycles/call | C2P main cycles/call |
+|---|---|---|---|---|
+| A500 equivalent | 3.4 → 3.6 | 6/88 → 7/96 | 1,165,803 → 1,162,327 | 503,544 → 500,835 |
+| 14 MHz 68020 + 4 MB fast | 16.8 → 17.0 | 32/95 → 33/97 | 560,145 → 560,753 | 143,587 → 143,748 |
+
+These are observed window costs, **not a speedup claim**: visible-object state
+is different between off/on runs, especially the A500's mapped sprite work.
+The four 020 viewports are identical; the A500 viewports are not. The original
+simulation advances with rendered frames, and table construction also changes
+startup timing. Matched-state VERIFY wall twins, rather than this A/B, establish
+legacy-heading pixel equality. Renderer inclusive cycles/call are
+1,257,047 → 1,250,715 (A500) and 571,232 → 572,755 (020), with 6/7 and 33/33
+complete calls respectively. All six normal turning hook ranges retain their
+original bytes in each off capture (the worktree checker also checks inactive
+timing ranges). The on captures pass the W2 PUBLIC ownership check.
+
+Generating a table occurs at view setup, outside these measurement windows.
+The VERIFY VBL counter around the generator, excluding the oracle, reports
+304/542 PAL fields for medium/large on A500 (6.08/10.84 seconds), and 50/87 on
+020 (1.00/1.74 seconds). Small-view setup was not timed by this route.
+The private table allocation is 144,000 bytes, MEMF_PUBLIC on every CPU.
+The slave reserves an additional 144 KiB of expansion memory even with bit 7
+off; with bit 7 on allocation failure retains coherent five-degree behavior.
+The original game-owned table remains allocated. Normal slave code is 43,380
+bytes; VERIFY buffers and fixtures are excluded.
+
+Reproduce from the standalone turning commit using §7 machine settings:
+
+```sh
+FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" PROFILE_WINDOW=guest \
+  tools/ab_window.sh one-degree-final 63 191 turning-still 'a500 a1200'
+python3 tools/ab_summary.py one-degree-final
+```
+
+The retained matrix was seeded with one identical build using KEEP_SLAVE=1.
+Reports, listings, state and first/last images remain in
+`tmp/prof/one-degree-final-turning-still-*`; traces were removed after analysis.
+An earlier stationary route stopped inside a conversation on 020 and was
+rejected, not included above. Detailed correctness and input coverage is in
+[the turning plan](one-degree-turning-plan.md).
