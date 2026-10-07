@@ -5,8 +5,9 @@
 ; The LoadSeg hook starts a task when BH is loaded. The task counts PAL fields with
 ; graphics.library WaitTOF and sends each tape entry as an IECLASS_RAWKEY event with
 ; IND_WRITEEVENT, so intuition and the game's own input handler see an ordinary key press.
-; Under DETERMINISTIC=1 the whole run then repeats exactly. When the tape ends the task
-; Wait()s forever, so it costs nothing during a measurement window.
+; Under DETERMINISTIC=1 the whole run then repeats exactly. When the tape ends (at the first
+; flight) the task Wait()s forever, so it costs nothing during a measurement window. Flight
+; input goes into BH's frame loop instead (tape_key below).
 ;
 ; The task, its stack and its I/O blocks live in the slave, not in Amiga memory, so the
 ; game's own allocations are unchanged.
@@ -23,14 +24,14 @@
 	INCLUDE	lvo/graphics_lib.i
 
 RAW_RETURN	= $44
-RAW_LEFT	= $4F			;cursor left: the controller, bank left
 RAW_UP		= $80			;or-ed into a code: key release
-TAPE_FRAME	= $8000			;or-ed into a wait: until BH's flight frame counter >= n
-BH_FRAMES	= $7ffe+26292		;BH's frame counter: data hunk + $7FFE (a4) + 26292
+BH_KEY		= $3e98			;BH: the frame's key (one IDCMP character, or 0)
+BH_KEYCALL	= $75c4			;BH: return address of the flight loop's call of it
+BH_FRAME	= 26292			;(a4).w BH's flight frame counter (bh:6e52)
+CHAR_LEFT	= 3			;BH's character for cursor left (its key table)
 
-; Tape: (wait, raw key code); 0 ends it. A wait is a number of fields (counted from the
-; LoadSeg of BH, through the menus), or TAPE_FRAME|n: until BH's flight frame counter
-; (incremented once per pass of the flight loop, bh:6e52) is at least n. The boot shows the title and the credits by itself; then each screen waits
+; Tape: (fields to wait before the event, raw key code); 0 ends it. Fields count from the
+; LoadSeg of BH. The boot shows the title and the credits by itself; then each screen waits
 ; for Return: main menu (Select Training is highlighted), Select Training Mission (the first
 ; mission), Ready Room (Begin Flight), and the Recognition Test (the manual check, shown
 ; before the first flight; any answer passes). Measured with the KickEmu slave on the
@@ -47,23 +48,6 @@ tape:	dc.w	TAPE_FIRST,RAW_RETURN, 5,RAW_RETURN|RAW_UP
 	dc.w	TAPE_GAP,RAW_RETURN, 5,RAW_RETURN|RAW_UP
 	dc.w	TAPE_GAP,RAW_RETURN, 5,RAW_RETURN|RAW_UP
 	dc.w	TAPE_GAP,RAW_RETURN, 5,RAW_RETURN|RAW_UP
-; Then, timed by BH's own flight frame counter (an entry with TAPE_FRAME set waits until the
-; counter reaches the frame), bank left so the plane flies in circles: the benchmark scene.
-; The game steps once per frame, so frame-timed input gives the same flight on every CPU and
-; the window (a frame number too) shows the same scene everywhere. A key press is one
-; character to the game, and its controller (bh:7f30) turns one character into full aileron
-; for one frame: 8 presses 3 frames apart from frame 30 give about 10 degrees of bank. The
-; plane levels its wings by itself, so one more press every 10 frames holds the circle.
-F	SET	30
-	REPT	8
-	dc.w	TAPE_FRAME|F,RAW_LEFT, TAPE_FRAME|(F+1),RAW_LEFT|RAW_UP
-F	SET	F+3
-	ENDR
-F	SET	60
-	REPT	400
-	dc.w	TAPE_FRAME|F,RAW_LEFT, TAPE_FRAME|(F+1),RAW_LEFT|RAW_UP
-F	SET	F+10
-	ENDR
 	dc.w	0
 
 ; Called from the LoadSeg hook (a task, all registers saved by the caller).
@@ -108,33 +92,16 @@ tape_task_code:
 	moveq	#0,d0
 	moveq	#0,d1
 	jsr	_LVOOpenDevice(a6)
-	move.l	tape_seglist(pc),d0	;BH's first segment: BPTR to the next one,
-	lsl.l	#2,d0			;the data hunk
-	move.l	d0,a0
-	move.l	(a0),d0
-	lsl.l	#2,d0
-	add.l	#4+BH_FRAMES,d0
-	move.l	d0,a4			;BH's frame counter (word)
 	lea	tape(pc),a3
 .next:	move.w	(a3)+,d2
 	beq.s	.done
-	bmi.s	.frame
-.wait:	bsr.s	.field
-	subq.w	#1,d2
-	bne.s	.wait
-	bra.s	.send
-.frame:	and.w	#$7fff,d2
-.fwait:	cmp.w	(a4),d2
-	bls.s	.send
-	bsr.s	.field
-	bra.s	.fwait
-.field:	exg	a5,a6
+.wait:	exg	a5,a6
 	jsr	_LVOWaitTOF(a6)
 	exg	a5,a6
 	lea	tape_fields(pc),a0
 	addq.l	#1,(a0)
-	rts
-.send:
+	subq.w	#1,d2
+	bne.s	.wait
 	lea	tape_event(pc),a0
 	move.b	#IECLASS_RAWKEY,ie_Class(a0)
 	move.w	(a3)+,ie_Code(a0)
@@ -148,6 +115,48 @@ tape_task_code:
 	jsr	_LVOWait(a6)
 	bra.s	.done
 
+; In flight the keys go straight into BH's frame loop instead (the pl_bh patch at bh:75be,
+; VERIFY only): the loop asks BH_KEY for this frame's character; when there is none, the
+; flight tape gives one on the frames it lists. The game steps once per frame, so input on
+; exact frame numbers gives the same flight on every CPU and in every run, wherever the
+; debugger stopped the emulator (its stops are not cycle-transparent, and a key typed
+; through input.device at a field could land a frame early or late).
+; The benchmark scene: bank left so the plane turns. A cursor character is full aileron for
+; one frame (the controller, bh:7f30): 8 of them 3 frames apart from frame 30 give about 10
+; degrees, then one every 10 frames keeps it banked (the bank grows into a descending spiral:
+; small banks level out by themselves, larger ones tighten).
+tape_key:
+	move.l	(sp),a0			;bh+BH_KEYCALL
+	jsr	(BH_KEY-BH_KEYCALL,a0)	;d0.w = this frame's character or 0
+	tst.w	d0
+	bne.s	.store			;a real key wins
+	lea	tape_flight(pc),a1
+	adda.w	tape_flight_pos(pc),a1
+	move.w	(a1),d1
+	beq.s	.store			;tape done
+	cmp.w	(BH_FRAME,a4),d1
+	bhi.s	.store			;not yet
+	move.w	(2,a1),d0
+	lea	tape_flight_pos(pc),a0
+	addq.w	#4,(a0)
+.store:	move.w	d0,(10280,a4)		;as the replaced move.w d0,10280(a4)
+	rts
+
+; (flight frame, character); 0 ends it.
+tape_flight:
+F	SET	30
+	REPT	8
+	dc.w	F,CHAR_LEFT
+F	SET	F+3
+	ENDR
+F	SET	60
+	REPT	400
+	dc.w	F,CHAR_LEFT
+F	SET	F+10
+	ENDR
+	dc.w	0
+tape_flight_pos:	dc.w	0		;offset of the next entry
+
 ; Read by tools/fixed_window.sh (gdb, read-only): fields counted so far, and the field of
 ; the last Return (the window anchors on the first flight frame after it). The marker locates them in memory.
 	CNOP	0,4
@@ -155,7 +164,6 @@ tape_task_code:
 tape_fields:	dc.l	0
 tape_end:	dc.l	TAPE_FIRST+5+3*(TAPE_GAP+5)
 
-tape_seglist:	dc.l	0			;BH's seglist (BPTR), set by the LoadSeg hook
 tape_name:	dc.b	"bh tape",0
 tape_gfx_name:	dc.b	"graphics.library",0
 tape_input_name:	dc.b	"input.device",0

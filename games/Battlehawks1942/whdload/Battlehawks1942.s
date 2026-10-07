@@ -75,10 +75,6 @@ _cb_dosLoadSeg
 .cmp		cmpm.b	(a0)+,(a1)+
 		dbne	d2,.cmp
 		bne.b	.done
-	IFD VERIFY
-		lea	tape_seglist(pc),a0
-		move.l	d1,(a0)
-	ENDC
 		lea	pl_bh(pc),a0
 		move.l	_resload(pc),a2
 		move.l	d1,a1			;seglist
@@ -97,6 +93,10 @@ pl_bh		PL_START
 	; always take the ok branch.
 		PL_PS	$025be,manual_check
 		PL_W	$025c4,$6078		;bra.s ok
+	IFD	VERIFY
+		PL_PS	$075be,tape_key		;flight input on exact frames (tape.s)
+		PL_NOP	$075c4,2		;the rest of move.w d0,10280(a4)
+	ENDC
 	IFD	C2P_FULL
 		PL_P	$1a2c2,c2p_full		;experiment: full-frame merge c2p
 	ENDC
