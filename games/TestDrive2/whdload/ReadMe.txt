@@ -10,9 +10,9 @@ History — 2026-10-07 (1.6b, unreleased beta of 1.6: all changes since 1.5)
   game icon to enable it by default. CUSTOM2=0 runs the original game.
 * Sideways motion (steering, lane position and mountains) and hill crests are
   smooth as well when Enhanced framerate is enabled.
-* Uses the WHDLoad 20.0 interface, official API headers and KickEmu sources.
-  Requires WHDLoad 20.0 or later. The installer source package includes them.
-* The reported A4000/68060 startup failure is still under investigation.
+* Built from the official WHDLoad 20.0 API headers and KickEmu sources, but
+  declares slave version 17 and runs with WHDLoad 17.2 or later (PL_IFCx);
+  it uses no version 20 feature. The installer source package includes them.
 * Sub-unit road and car position in both views (duel v1).
   Uses frame-latched 16.16 positions and fractional curve/hill integration;
   sprite size selection is unchanged.

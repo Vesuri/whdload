@@ -55,11 +55,11 @@ WHD_ARGS=CUSTOM2=1 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
 amiga/run-a1200.sh  # the same on an expanded A1200 (68EC020)
 ```
 
-The current slave (1.6b, an unreleased beta of 1.6) requires WHDLoad 20.0 or later. Its public-domain API
-headers and KickEmu sources are pinned to the official 20.0 developer package;
+The current slave (1.6b, an unreleased beta of 1.6) runs with WHDLoad 17.2 or later. Its public-domain API
+headers and KickEmu sources are pinned to the official 20.0 developer package, but
+it declares slave version 17 and uses no version 20 feature;
 see [source provenance](whdload/whdload/README.md). The host launcher accepts
 `WHDLOAD_BINARY` and prefers this project's cached official runtime when present.
-The reported A4000/68060 black screen is still being investigated.
 
 One option, "Enhanced framerate" (`CUSTOM2`), enables these changes together. WHDLoad
 options cannot carry a default, so add the tooltype `CUSTOM2=1` to the game icon to

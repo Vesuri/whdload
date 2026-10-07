@@ -1,8 +1,26 @@
 # WHDLoad 20.0 and 68060 compatibility
 
+## Slave version 17 (2026-10-07, slave 1.6b)
+
+The 20.0 header (below) made WHDLoad 19.x and older refuse the slave, although
+nothing needs version 20: its only additions in use were ws_MemConfig, set to
+"no alternate configurations", and KickEmu's WHDLTAG_EXPMEMSIZE_GET query, whose
+answer is then always the fixed EXPMEM. The slave now declares slv_Version=17
+and drops slv_MemConfig, so KickEmu assembles its FASTMEMSIZE branch; the result
+is the same. It still builds against the vendored 20.0 headers and KickEmu.
+
+The newest features used are PL_IFCx/PL_ENDIF (17.2) and ws_config (17). PatchSeg,
+Examine and ExNext need 15; resload_Log (18) is assembled only with SNOOPFS.
+So the runtime floor is WHDLoad 17.2, as for v1.5 (which also declared 17).
+
+VERIFY builds, A500 (512 KiB chip + 1.5 MiB slow), CUSTOM3=1 CUSTOM5=16, 100 race
+fields each: WHDLoad 19.2 build 6941 and 20.0 build 7051, CUSTOM2=0 and 1. All
+four reach the race with 129/129 assertions; both CUSTOM2=0 runs keep all 77
+disabled patch ranges original. WHDLoad 17.x and 18.x were not available to test.
+
 ## Source baseline (2026-10-06, slave 1.6b)
 
-The slave now requires WHDLoad 20.0 and builds against its official public-domain
+The slave then required WHDLoad 20.0 (since relaxed, above) and built against its official public-domain
 API headers, KickEmu sources and kick13.asm conventions. The archive SHA-256 and
 source identity are in ../whdload/whdload/README.md. Six vendored SDK files match
 the official developer package byte for byte. NDK include-name aliases are kept
@@ -25,7 +43,7 @@ no WHDLoad executable, game data, ROM or capture is committed.
 The launcher permits WHDLOAD_BINARY. With no override it prefers the official
 20.0 runtime in /path/to/WHDLoad when present (the
 official WHDLoad_dev archive, kept beside it as WHDLoad_dev-20.0.lha), then
-uses the shared installation. Users must supply WHDLoad 20.0 or later. Tests
+uses the shared installation. Users then had to supply WHDLoad 20.0. Tests
 below explicitly use official 20.0 build 7051 (27.03.2026), leaving the shared
 19.2 runtime untouched.
 

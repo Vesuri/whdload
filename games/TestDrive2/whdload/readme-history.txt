@@ -18,8 +18,7 @@
  - fixed the cars jumping 16 pixels to the left for one frame in the
    introduction (an original bug: DDFSTOP was changed too late on the line
    above the car)
- - updated the slave to the WHDLoad 20.0 interface and official KickEmu/API
-   source baseline; requires WHDLoad 20.0 or later. The installer source
-   package includes the matching public-domain headers and KickEmu sources
- - the reported A4000/68060 black screen is not fixed yet
+ - the slave is built from the official WHDLoad 20.0 KickEmu/API sources, but
+   still runs with WHDLoad 17.2 or later. The installer source package includes
+   the matching public-domain headers and KickEmu sources
 

@@ -1011,3 +1011,9 @@ startup and 100 race fields. All use official WHDLoad 20.0 build 7051. The 68060
 runs use A1200 ROM/chipset and no JIT; they are not A4000 or physical-hardware
 confirmation. The installer sources rebuild to the identical normal slave;
 both archives are rebuilt and verified. No new FPS benchmark was performed.
+
+2026-10-07: the user wants the slave to run on older WHDLoad too. It now declares
+slave version 17 (no version-20 feature was really used), so WHDLoad 17.2+ runs
+it while the 20.0 headers and KickEmu stay vendored; checked under 19.2 and 20.0
+(compatibility.md). The release notes no longer mention the 68060 report; it
+stays open here.

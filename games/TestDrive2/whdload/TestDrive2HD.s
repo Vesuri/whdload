@@ -57,9 +57,9 @@ CBDOSLOADSEG
 ;============================================================================
 
 
-; WHDLoad 20.0 interface; use the standard KickEmu memory allocation.
-slv_Version	= 20
-slv_MemConfig	= slv_base	; no alternate memory configurations
+; WHDLoad 17 interface (PL_IFCx needs 17.2): nothing here uses the version 20
+; additions (ws_MemConfig, WHDLTAG_EXPMEMSIZE_GET), so older WHDLoads run it too.
+slv_Version	= 17
 slv_Flags	= WHDLF_NoError|WHDLF_Examine
 slv_keyexit	= $5D	; num '*'
 
