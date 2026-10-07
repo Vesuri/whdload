@@ -1,6 +1,7 @@
 # Host cross-build of the Battlehawks 1942 slave.
 #   make            WHDLoad 20.0 KickEmu slave (Battlehawks1942.s, vendored whdload/ + include/)
 #   make verify     the same with VERIFY instruments (tape.s)
+#   make c2pfull    VERIFY with the full-frame merge c2p experiment (c2p_full.s)
 #   make original   Galahad's v1.0, reconstructed (original/Battlehawks1942.s); must equal the
 #                   shipped slave byte for byte
 WHDLOAD ?= $(HOME)/.local/share/amiga/WHDLoad-20.0
@@ -9,7 +10,7 @@ VASM ?= $(HOME)/.local/vasmm68k_mot
 VASMFLAGS ?=
 SHIPPED ?= ../tmp/game/Battlehawks1942/Battlehawks1942.Slave
 
-.PHONY: all original verify clean FORCE
+.PHONY: all original verify c2pfull clean FORCE
 all: Battlehawks1942.Slave
 
 # Always assemble: options must not leave a stale variant. The vendored headers come first.
@@ -24,6 +25,9 @@ original: FORCE
 
 verify:
 	$(MAKE) Battlehawks1942.Slave VASMFLAGS="$(VASMFLAGS) -DVERIFY=1"
+
+c2pfull:
+	$(MAKE) Battlehawks1942.Slave VASMFLAGS="$(VASMFLAGS) -DVERIFY=1 -DC2P_FULL=1"
 
 clean:
 	rm -f Battlehawks1942.Slave original/Battlehawks1942.Slave
