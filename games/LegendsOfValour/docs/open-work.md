@@ -5,7 +5,7 @@ and commands are in `docs/profiling.md` §8. W2 uses MEMF_PUBLIC on every CPU;
 W3–W5 select their replacements on 68000/10 and retain original code on 020+.
 W6 improves the clear on both CPUs. W1–W6 are enabled in local preferences
 (mask 63). Optional 25 Hz simulation timing and one-degree turning are implemented and
-validated separately; both remain off in persistent preferences. W7 remains deferred.
+validated separately; both remain off in persistent preferences. W7 was dropped by user decision on 2026-10-07.
 
 ## Done
 
@@ -85,7 +85,8 @@ automated validation gate.
   and final fixed-window A/B on both CPUs and both routes.
 - Source audit: `docs/w3-w6-audit.md`; full evidence and timing limits: profiling §8.
 
-W7 (column-major layout and other later work) remains deferred by user decision.
+W7 (column-major layout and other later work) was dropped by user decision on
+2026-10-07; it is no longer an open work item.
 
 Native capture blocking is resolved with the opt-in guest profiler handshake and
 explicit PC-base normalization; see [native capture notes](native-capture.md).
@@ -98,7 +99,7 @@ prefers shared files and retains verified fallbacks for ROMs not moved yet.
 The requested normal trial is open with timing and one-degree turning enabled.
 Its configuration and build hash are recorded in `simulation-audit.md`. Future
 changes based on play feedback should retain the explicit timing toggle and
-re-run the affected comparisons. W7 remains deferred.
+re-run the affected comparisons. W7 was dropped by user decision on 2026-10-07.
 
 ## One-degree turning
 
@@ -109,4 +110,4 @@ held-turn speed preserved after a 160 ms delay. Both-CPU automated table, full-a
 ray, legacy-pixel, input and allocation checks pass; profiling §8 records the cost.
 Native save/load round trips pass on both CPUs; normal interactive evaluation
 is the remaining acceptance step.
-The one-degree source commit is separate from the simulation timing feature. W7 stays deferred.
+The one-degree source commit is separate from the simulation timing feature. W7 has been dropped.

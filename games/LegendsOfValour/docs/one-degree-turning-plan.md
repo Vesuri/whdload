@@ -1,7 +1,7 @@
 # One-degree turning plan
 
 Status: implemented and automated validation complete, 7 October 2026.
-Normal interactive evaluation is the remaining acceptance step. This is separate from W7, which remains deferred.
+Normal interactive evaluation is the remaining acceptance step. This is separate from W7, which was dropped by user decision on 2026-10-07.
 
 ## Intended result
 
@@ -132,7 +132,7 @@ After the gates above pass, launch a normal-slave trial on the previously accept
 realistic 68020 setup with normal blitter timing. Let the user assess one-degree
 taps, sustained turning and wall/sprite stability before changing their defaults.
 Record the tested build, enabled options, remaining limitations and easy-to-adjust
-input-rate constants. W7 and sub-degree rendering remain deferred.
+input-rate constants. W7 has been dropped; sub-degree rendering remains deferred.
 
 ## Implementation and verification evidence
 

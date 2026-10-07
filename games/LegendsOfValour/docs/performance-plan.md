@@ -10,7 +10,7 @@ and commands are in `docs/profiling.md` §8. W1–W6 are enabled in ignored loca
 preferences (mask 63). W2 uses MEMF_PUBLIC on every CPU. W3–W5 select replacements
 on 68000/10; 020+ retain original code. W6 selects MOVEM clear on both CPUs.
 Frame-independent simulation timing (§2.3.1) is implemented and validated as
-CUSTOM2 bit 6; one-degree turning is separate on bit 7. W7 remains deferred.
+CUSTOM2 bit 6; one-degree turning is separate on bit 7. W7 was dropped by user decision on 2026-10-07.
 The candidate ideas below are retained as design context, not unfinished requirements.
 
 ## 0. Ground rules (from CLAUDE.md and the playbook, restated because they bite)
@@ -160,7 +160,7 @@ as separate constraints while investigating.
    when the design is concrete. Validate equal-time player/AI progression across rendering
    rates as well as performance, including the existing cap and display synchronization.
 
-W1 keeps its existing timing behaviour. This follow-up is now delivered separately from W1–W6; W7 remains deferred.
+W1 keeps its existing timing behaviour. This follow-up is now delivered separately from W1–W6; W7 was dropped by user decision on 2026-10-07.
 
 ### 2.4 Slave infrastructure that exists
 
@@ -387,7 +387,10 @@ Completed: Fixed-width MOVEM clear; clear costs −38–39% on A500 and −18–
 68000; check what colours are written — sky gradient rows vs floor) or skip rows fully covered
 by walls. Small but easy; good warm-up for the patch framework.
 
-### W7. Later / only with measurements
+### W7. Dropped (2026-10-07)
+
+The user dropped W7: the completed improvements are sufficient. The ideas below
+are retained only as historical design context, not planned or deferred work.
 
 - Chunky-buffer layout tricks (e.g. column-major chunky so wall/sprite columns write
   sequential bytes) would speed W3/W4 a lot but require a matching C2P (Kalms can't be used
@@ -418,4 +421,4 @@ fast RAM. The 25 fps cap remains intact; overclocked 68000 performance is unmeas
    Investigate frame-rate-independent simulation timing as required follow-up (§2.3.1).
    W1 keeps movement/AI timing, the 25 fps cap, and beam wait intact.
 3. ~~Medium/small views~~: decided — convert an enclosing 32-pixel-multiple window (W1).
-4. Decided: defer W7 beyond W0/W1.
+4. Decided (2026-10-07): drop W7, superseding the earlier deferral.
