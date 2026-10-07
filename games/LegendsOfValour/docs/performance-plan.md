@@ -5,9 +5,12 @@
 > (all of it), then this file.** Every number here is from that window unless marked
 > *estimate*; estimates must be replaced by measurements before anything is claimed.
 
-**Status 2026-10-07:** W0–W5 implemented and measured; evidence and exact commands in
-`docs/profiling.md` §8. W1–W5 are enabled in ignored local preferences (mask 31). W2 uses MEMF_PUBLIC on any CPU; W3 selects its unroll on 68000/10 and retains original 020+ code. W6 remains open and W7 is deferred.
-The remaining items below are the work plan, not implemented features.
+**Status 2026-10-07:** W0–W6 implemented, verified and measured; exact evidence
+and commands are in `docs/profiling.md` §8. W1–W6 are enabled in ignored local
+preferences (mask 63). W2 uses MEMF_PUBLIC on every CPU. W3–W5 select replacements
+on 68000/10; 020+ retain original code. W6 selects MOVEM clear on both CPUs.
+Frame-independent simulation timing (§2.3.1) remains open; W7 remains deferred.
+The candidate ideas below are retained as design context, not unfinished requirements.
 
 ## 0. Ground rules (from CLAUDE.md and the playbook, restated because they bite)
 
@@ -327,6 +330,9 @@ requirement. W2 implements the single-allocation option and leaves other pool us
 
 ### W3. Wall column loop (`h12:04c1a` family)
 
+Completed: Fixed-displacement paired loops; fixed-wall column cost −6.6% on A500. Original 020+ loop retained. Both-CPU twins and final A/B passed; profiling §8 and `docs/w3-w6-audit.md` record details.
+
+
 ~27–32% of the frame. Ideas, cheapest first (measure each):
 1. **Drop the two `not.w d4`** per step: keep a second texture pointer to a mirrored copy, or
    index the upper half with the negated position maintained by its own `sub`/`subx` (costs
@@ -346,6 +352,9 @@ Correctness: pixel twin against the original loop on the same column inputs (VER
 
 ### W4. Sprite columns (`h12:05114`, twin `h12:093f0`)
 
+Completed: Eight counted sprite rows; row costs −7.5–9.0% on A500. Original 020+ loops retained. Both-CPU twins and final A/B passed; profiling §8 and `docs/w4-audit.md` record details.
+
+
 Up to ~13% on the A500 when people/pillars are in view (scene dependent: make a route that
 looks at the townsman or a street with pillars, `tools/tapes/street.txt` as a start).
 1. Same unroll/count tricks as W3 (the `lea 192(a0),a0` + `dbf` per pixel).
@@ -356,10 +365,16 @@ looks at the townsman or a street with pillars, `tools/tapes/street.txt` as a st
 
 ### W5. Ray setup (`h12:03ec0`–`04680`, `h12:02808`)
 
+Completed: Exact tagged quotient cache; quotient costs −1.7–21.3% on A500. Original 020+ divides retained. Both-CPU twins and final A/B passed; profiling §8 and `docs/w5-audit.md` record details.
+
+
 ~7–8% A500. Analyse first: find the per-column `divu`/`mulu` (one at `h12:028f8`) and other
 per-column divides; replace by reciprocal tables or incremental stepping. Lower priority.
 
 ### W6. Chunky clear (`h12:051ee`)
+
+Completed: Fixed-width MOVEM clear; clear costs −38–39% on A500 and −18–19% on 020. Both-CPU twins and final A/B passed; profiling §8 and `docs/w6-audit.md` record details.
+
 
 ~2.4–3.2%. Replace `move.l d0,(a1)+` ×4 with `movem.l d0-d7/a2-a6,-(a1)` blocks (~2× faster on
 68000; check what colours are written — sky gradient rows vs floor) or skip rows fully covered
@@ -375,13 +390,15 @@ by walls. Small but easy; good warm-up for the patch framework.
 - 68030/040/060: run `SWAP_ONLY` windows after W0 adapts `swap_fields.py`; Kalms' bm routine
   is fine there too.
 
-## 5. Expected outcome (W1 measured; remaining items are estimates)
+## 5. Measured outcome
 
 W1 measured: C2P cycles/call −33% / −52% (68000 / 020), spin fps 2.5 → 3.0 /
 12.4 → 14.8. Fixed-wall results confirm the savings at a matching scene.
 
-W3 measured: fixed-wall column cost −6.6%, renderer cost −4.6%, A500 fps 3.1 → 3.2.
-68020 results are unchanged because its original loop is retained. Remaining estimate: sprites −~5% (W4).
+W3 fixed-wall column cost falls 6.6%, renderer cost 4.6%; A500 fps 3.1 → 3.2.
+W4 scanned-row costs fall 7.5–9.0%; W5 quotient costs fall 1.7–21.3%.
+W3–W5 retain original 020+ code because their candidates provided no measured benefit.
+W6 clear cost falls 38–39% / 18–19% (A500 / 020). FPS and scene comparisons are in §8.
 Re-measure their share after each change, because scene and frame timing affect it.
 W2 measured: 020 spin 14.9 → 16.0 fps, matching-wall 14.2 → 15.1 fps; C2P main-task
 cycles/call −15.3% at the wall. Stock 7 MHz 68000 FPS is unchanged with slow or physical
@@ -395,9 +412,3 @@ fast RAM. The 25 fps cap remains intact; overclocked 68000 performance is unmeas
    W1 keeps movement/AI timing, the 25 fps cap, and beam wait intact.
 3. ~~Medium/small views~~: decided — convert an enclosing 32-pixel-multiple window (W1).
 4. Decided: defer W7 beyond W0/W1.
-
-W4 is complete: CPU-selected counted sprite rows, both-CPU twins and final A/B.
-W6 remains pending; exact results and commands are in profiling §8.
-
-W5 is committed: exact tagged quotient cache on 68000/10, original divides on 020+.
-Exhaustive/live twins and final fixed-window A/B passed; evidence is in profiling §8.

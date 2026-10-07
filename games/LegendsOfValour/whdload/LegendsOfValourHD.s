@@ -96,6 +96,7 @@ slv_config	dc.b	"C1:B:character creation;"
 		dc.b	"C2:X:unrolled wall columns:2;"
 		dc.b	"C2:X:unrolled sprite columns:3;"
 		dc.b	"C2:X:cached ray reciprocals:4;"
+		dc.b	"C2:X:MOVEM chunky clear:5;"
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
 		dc.b	"C5:X:C2P pixel twin (verification):1;"
@@ -104,6 +105,7 @@ slv_config	dc.b	"C1:B:character creation;"
 		dc.b	"C5:X:wall-column pixel/register twin (verification):4;"
 		dc.b	"C5:X:sprite-column pixel/register twin (verification):5;"
 		dc.b	"C5:X:ray reciprocal twin (verification):6;"
+		dc.b	"C5:X:chunky-clear pixel/register twin (verification):7;"
 	ENDC
 		dc.b	0
 	EVEN
@@ -253,6 +255,7 @@ _patchgame
 		bsr	_w3_install
 		bsr	_w4_install
 		bsr	_w5_install
+		bsr	_w6_install
 	IFD VERIFY
 		bsr	_tape_install
 	ENDC
@@ -316,6 +319,7 @@ _h12		dc.l	0
 		INCLUDE	walls.s
 		INCLUDE	sprites.s
 		INCLUDE	rays.s
+		INCLUDE	clear.s
 
 	IFD VERIFY
 	IFD PROFILER_WINDOW
@@ -334,7 +338,12 @@ _c2p_edges	ds.b	4*92*4
 _c2p_scratch	ds.b	4*40*92
 	ENDC
 		CNOP 0,4
-_c2p_chunky	ds.b	192*92
+_c2p_chunky
+	IFD VERIFY
+		ds.b	20000	;W6 compares the full allocation using this staging area
+	ELSE
+		ds.b	192*92
+	ENDC
 
 ;============================================================================
 

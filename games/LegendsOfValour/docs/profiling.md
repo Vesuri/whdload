@@ -621,6 +621,43 @@ W1–W3 are enabled in local preferences (mask 7); the next interactive boot bui
 the normal slave. No interactive emulator was started or modified. W4–W6 remain open,
 frame-independent timing remains required investigation, and W7 remains deferred.
 
+### Revised W4–W6 correctness (2026-10-07)
+
+W4 now counts eight rows per block instead of retaining DBF at every row. W5
+uses a 1,024-slot exact-quotient cache with full divisor tags and guards the
+original arithmetic and continuations. Its discarded D7/CCR state is overwritten
+before use; VERIFY compares all fifteen registers and five flags after the
+canonical mathematical continuation. The source/liveness audit is in
+[w3-w6-audit.md](w3-w6-audit.md).
+
+The identical retained VERIFY SHA256 on both CPUs is
+`4690a396852cf44643a0f84c5b7d9fcc726ef5fbcda437ced5704418deeb7092`.
+`render-rescue-twin-a500` and `render-rescue-twin-a1200` reached the completion
+breakpoint after 300 large-view conversions following the anchor. All seventeen
+flag snapshots use legal SR reads on the 68000 and CCR reads on the 020.
+
+| CPU | C2P medium / large / small | Wall variants | Sprite variants | Live reciprocals | Exhaustive reciprocals | Clear widths 192 / 112 / 80 |
+|---|---|---|---|---:|---:|---|
+| 68000 | 34 / 331 / 42 | 23,574 / 23,573 / 23,573 | 10,181 / 1,095 / 1,094 | 70,720 | 262,140 | 662 / 68 / 84 |
+| 68020 | 84 / 509 / 219 | 41,552 / 41,552 / 41,552 | 10,501 / 1,233 / 1,233 | 124,656 | 262,140 | 1,018 / 168 / 438 |
+
+An earlier revised run missed its anchor: the stopped dump showed completed
+exhaustive tests and successful live twins, but the tape remained at a later
+computer-button W wait with another panel's button list active. A VERIFY-only
+`VERIFY_WAIT_RESCUE` pulse resolves that wait. Normal and ordinary VERIFY binaries
+compare byte-identical with the fixture excluded. Performance captures exclude it.
+The timed-out runs are excluded from final validation and performance results.
+
+Reproduce serial validation (one exact retained build, calibration then a startup
+breakpoint that arms abort detection before exhaustive tests):
+
+```sh
+FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" tools/render_validate.sh render-verify 63
+```
+
+Final W4–W6 measurements follow below. Preferences now enable W1–W6 (mask 63).
+Correctness counts alone establish no speed gain.
+
 ### W4 CPU-selected counted sprite rows (2026-10-07)
 
 CUSTOM2 bit 3 selects eight sprite rows per block on 68000/10. Fixed destination
@@ -752,3 +789,66 @@ traces/logs were removed after analysis. W5-only normal/VERIFY/capture builds pa
 68000/PIC checks. Preferences and the tracked example enable W1–W5 (mask 31).
 No interactive emulator was operated. W6 measurements and frame-independent timing
 remain open; W7 remains deferred.
+
+
+### W6 fixed-width MOVEM chunky clear (2026-10-07)
+
+CUSTOM2 bit 5 replaces the sky/floor row clear on every CPU. Eleven repeated-colour
+registers write 44-byte predecrement MOVEM blocks with exact tails for 192, 112 and
+80-byte widths. Row stride remains 192; colours, row counts, unused columns, all
+fifteen registers and X/N/Z/V/C match the original. Other widths retain a general
+sixteen-byte path. The mask excludes the address register. See [w6-audit.md](w6-audit.md).
+
+**Correctness:** the shared integration VERIFY build above compares the complete
+20,000-byte allocation, registers and flags against a runtime copy of the original.
+Successful width-192/112/80 counts are 662/68/84 on 68000 and 1,018/168/438 on
+020. The replacement body remains unchanged in the final measured build. Normal,
+VERIFY and capture variants pass the 68000/PIC assembler; normal builds exclude twins.
+
+The final `w6-movem` matrix uses CUSTOM2=31/63, CUSTOM5=1, 100 fields, both routes
+and CPUs, serial JOY0=none captures in amiga/.cap. The four off controls are retained
+identical-build W5-on windows, with `control-origin.txt` recording their provenance;
+four new on captures complete the pairs. All eight exact retained slave hashes are
+`9460c0eba3404bb0b79ecac15b17387d174b7fae346c45dca6042d2c726baf6f`.
+
+| Machine / route | fps off → on | Intervals / fields off → on | Clear main cycles/call | Clear inner main cycles/call | Renderer main cycles/call |
+|---|---|---|---|---|---|
+| A500 spin | 3.2 → 3.2 | 6/94 → 6/93 | 69,077 → 43,061 | 34,398 → 21,392 | 1,175,668 → 1,150,496 |
+| A500 wall | 3.2 → 3.3 | 6/93 → 6/92 | 71,217 → 43,326 | 35,465 → 21,525 | 1,202,022 → 1,160,184 |
+| 020 spin | 16.0 → 16.1 | 30/94 → 31/96 | 18,935 → 15,451 | 9,400 → 7,656 | 602,309 → 601,023 |
+| 020 wall | 15.1 → 15.3 | 29/96 → 30/98 | 19,229 → 15,644 | 9,547 → 7,752 | 629,475 → 623,910 |
+
+Clear main-task cost falls 37.7% / 39.2% on A500 spin/wall and 18.4% / 18.6%
+on 020. Unrounded FPS improves 1.1% / 1.1% and 1.2% / 1.3%, respectively. Complete
+outer clear counts are 6/6 on each A500 pair, 32/32 on 020 spin, 30/30 on 020 wall;
+inner counts are twice those. Outer inclusive costs are 73,585 → 47,574,
+76,436 → 46,328, 19,721 → 15,796 and 19,754 → 15,930. Scopes include adapter costs;
+interrupt work and independently incomplete boundary calls are excluded from main means.
+
+Position, heading and visible-object snapshots match off/on for all four pairs.
+Movement step matches except 020 spin (12 → 10). Wall first/last whole images and
+all four wall viewports match on both CPUs. Spin differs in frame phase: A500 first
+whole image matches and last differs; 020 first differs and last matches. Neither
+spin pair has all four viewports identical. Pixel twins prove the replacement on
+identical inputs; these captures do not establish equal-time simulation or AI state.
+No movement/AI timing, 25 fps cap or beam wait was changed. Both 020-on dumps pass
+all fourteen original W3–W5 hook ranges with expected mask 35 (W1/W2/W6 active).
+
+![A500 W6 spin off/on first/last](../tmp/prof/w6-movem-spin-a500-comparison.png)
+![68020 W6 spin off/on first/last](../tmp/prof/w6-movem-spin-a1200-comparison.png)
+![A500 W6 wall off/on first/last](../tmp/prof/w6-movem-wall-a500-comparison.png)
+![68020 W6 wall off/on first/last](../tmp/prof/w6-movem-wall-a1200-comparison.png)
+
+Reproduce fresh pairs with §7 settings and native capture mode:
+
+```sh
+FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" PROFILE_WINDOW=guest tools/ab_window.sh w6-movem 31 63
+python3 tools/ab_summary.py w6-movem
+FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" tools/render_validate.sh w6-verify 63
+```
+
+Retained builds, dumps, metadata, images, reports and state remain under ignored tmp;
+traces/logs were removed after analysis. Local preferences and their tracked example
+enable W1–W6 (mask 63); the next interactive boot builds the normal slave. No
+interactive emulator was operated. W3–W6 are complete in separate source commits.
+Frame-independent simulation timing remains required investigation; W7 stays deferred.

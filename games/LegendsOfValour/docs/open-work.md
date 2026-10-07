@@ -1,9 +1,11 @@
 # Open work — Legends of Valour
 
-Status 2026-10-07: playbook §1–§8 done (fixed window, frame counter, A500-eq. and 68020
-baselines; `docs/profiling.md` §6–§7). W0–W5 complete; measurements in §8. W2 uses
-MEMF_PUBLIC on every CPU. Next is W6, chunky clear. Frame-rate-independent
-simulation timing is required follow-up work (`docs/performance-plan.md` §2.3.1).
+Status 2026-10-07: playbook §1–§8 and W0–W6 complete. Fixed-window evidence
+and commands are in `docs/profiling.md` §8. W2 uses MEMF_PUBLIC on every CPU;
+W3–W5 select their replacements on 68000/10 and retain original code on 020+.
+W6 improves the clear on both CPUs. W1–W6 are enabled in local preferences
+(mask 63). Frame-rate-independent simulation timing remains required follow-up
+work (`docs/performance-plan.md` §2.3.1); W7 remains deferred.
 
 ## Done
 
@@ -29,10 +31,6 @@ simulation timing is required follow-up work (`docs/performance-plan.md` §2.3.1
   W1+W2 enabled in ignored local preferences (mask 3); audit in `docs/w2-audit.md`.
 - `swap_fields.py` agrees exactly with the full trace on the A500 fixed window.
 
-- W3: 68000/10 wall-column unroll verified across all three bodies. Fixed-wall
-  column cost −6.6%, renderer −4.6%, fps 3.1 → 3.2; 020 keeps original code
-  with identical off/on results. W1–W3 enabled locally, mask 7.
-
 ## Open questions
 
 - **Game time (§9).** Heading is `h11:08c28`, player x/y `h11:08c1c`/`08c20`;
@@ -50,15 +48,23 @@ simulation timing is required follow-up work (`docs/performance-plan.md` §2.3.1
 - Entropy: the windows are identical across boots, so VPOSR reads do not leak into this
   route; re-check for any new route.
 
-## Candidate optimisations (not started; plan in `docs/performance-plan.md`)
+## Completed rendering patches
 
-- Wall column drawer `h12:04c1a` and its setup `h12:02808`: ~38% of the A500 frame.
-- Scaled sprites `h12:05114`: up to 13% when people are in view.
+- W3: fixed-displacement wall pairs on 68000/10; fixed-wall column cost falls 6.6%.
+- W4: eight counted sprite rows on 68000/10; scanned-row costs fall 7.5–9.0%.
+- W5: tagged exact-quotient cache on 68000/10; quotient costs fall 1.7–21.3%.
+  All eight original continuations have runtime D7/CCR liveness guards.
+- W6: backwards MOVEM clear on both CPUs; clear costs fall 38–39% on the
+  A500 equivalent and 18–19% on the 020.
+- Both-CPU VERIFY runs cover every wall/sprite block, every clear width,
+  all three view geometries, all seventeen legal flag reads, and 262,140
+  exhaustive reciprocal cases per CPU. Each feature has a separate source commit
+  and final fixed-window A/B on both CPUs and both routes.
+- Source audit: `docs/w3-w6-audit.md`; full evidence and timing limits: profiling §8.
 
 W7 (column-major layout and other later work) remains deferred by user decision.
 
-W4 is committed: counted sprite rows on 68000/10, original loops on 68020+.
-All three variants pass twins on both CPUs; final fixed-window A/B is in profiling §8.
-
-W5 is committed: exact tagged quotient cache on 68000/10, original divides on 020+.
-Exhaustive/live twins and final fixed-window A/B passed; evidence is in profiling §8.
+Native capture blocking is resolved with the opt-in guest profiler handshake and
+explicit PC-base normalization; see [native capture notes](native-capture.md).
+Shared assets use ~/.local/share/amiga; projects are separate checkouts. ROM lookup
+prefers shared files and retains verified fallbacks for ROMs not moved yet.
