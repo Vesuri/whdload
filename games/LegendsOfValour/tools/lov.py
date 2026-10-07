@@ -153,7 +153,18 @@ def handle(g, line):
         g.stop()
         for address in rest.split():
             g.cmd(f'break *{address}')
-        out = g.cmd('continue', timeout=1800)
+        # Background continue leaves GDB's command channel available if the
+        # anchor never arrives. A timeout can then use the ordinary stop/dump
+        # path instead of leaving subsequent commands queued behind continue.
+        g.cont()
+        try:
+            g.read_until('Breakpoint', timeout=int(os.environ.get('UNTIL_TIMEOUT', '1800')))
+        except TimeoutError:
+            g.stop()
+            g.cmd('delete')
+            raise
+        g.running = False
+        out = 'Breakpoint ' + g.cmd('info registers pc')
         g.cmd('delete')
         return out
     if op == 'gdb':

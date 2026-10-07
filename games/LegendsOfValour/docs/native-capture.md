@@ -42,3 +42,12 @@ FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" PROFILE_WINDOW=guest \
 
 Keep the sidecar with its trace and retained slave/listing. All binaries and
 capture evidence stay in ignored tmp; never operate `amiga/.run` for captures.
+
+Breakpoint waits now continue in the background, keeping GDB's command channel
+available. `UNTIL_TIMEOUT` defaults to 1,800 seconds; an expired wait stops the
+owned capture and deletes its temporary breakpoints before reporting the error.
+This lets the caller dump the stopped state and quit normally. It avoids the old
+synchronous wait's additional ten-minute dump timeout when an input route stalls.
+The bounded check in `tmp/prof/timeout-recovery` verified an unreachable breakpoint,
+a responsive stopped-state query, a subsequent successful breakpoint, and normal
+cleanup in `.cap`. This is debugger recovery evidence, not a performance measurement.
