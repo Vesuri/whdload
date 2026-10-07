@@ -8,18 +8,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
-. "${FSUAE_COMMON:-/path/to/fsuae_common.sh}"
+. "$FSUAE_COMMON"
 
 GAME="${GAME:-../tmp/game/TestDrive2}"
-BIOS="/path/to/kickstarts"
-RTB="${RTB:-/path/to/kick34005.A500.RTB}"
-WB="${WB:-/path/to/Workbenchv2.04rev37.67Workbench.adf}"
-WHD="${WHDLOAD_BINARY:-/path/to/WHDLoad}"
-# Prefer the official 20.0 runtime, installed beside the shared 19.2 package.
-# An explicit WHDLOAD_BINARY always wins.
-if [ -z "${WHDLOAD_BINARY:-}" ] && [ -f "/path/to/WHDLoad" ]; then
-  WHD="/path/to/WHDLoad"
-fi
+# RTB, WB, WHDLOAD_BINARY and FSUAE_COMMON come from amiga/local.env (env.sh).
+BIOS="$KICKSTART_DIR"
+WHD="$WHDLOAD_BINARY"
 CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
 RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"

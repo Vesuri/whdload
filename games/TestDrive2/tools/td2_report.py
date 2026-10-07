@@ -17,6 +17,7 @@ separate stacks.  Cycles are 7.09 MHz CPU clocks; a PAL field is 142,102.
 import argparse, collections, os, struct, sys
 sys.path.insert(0, os.path.dirname(__file__))
 import barto
+from local_env import path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIELD = 142102
@@ -74,7 +75,7 @@ def locate(mem, blob, base, step=64):
 
 def regions(dump, base):
     duel = open(os.path.join(ROOT, 'tmp/game/TestDrive2/data/duel'), 'rb').read()
-    kick = open(os.path.expanduser('/path/to/kickstarts/kick34005.A500'), 'rb').read()
+    kick = open(path('KICKSTART_DIR', 'kick34005.A500'), 'rb').read()
     slave_path = os.environ.get('SLAVE') or os.path.join(ROOT, 'tmp/game/TestDrive2/TestDrive2.slave')
     slave = open(slave_path, 'rb').read()
     out = []

@@ -1,7 +1,7 @@
 # Profiling the original Test Drive II
 
 > **Read this before running, driving or tracing the game, or quoting any performance number.**
-> Everything here was measured on this machine (macOS, x86_64 FS-UAE in `/path/to/fs-uae`
+> Everything here was measured on this machine (macOS, x86_64 FS-UAE
 > with the Barto gdb stub, `m68k-amiga-elf-gdb` 2026 toolchain), 2026-10-03/04.
 
 **Slave 1.6b (2026-10-05):** the three features are one option, "Enhanced framerate"
@@ -94,7 +94,7 @@ The server holds one gdb attached to the stub and serves one command per connect
 
 `monitor profile N "" FILE` records, per instruction, `[PC words] (0xffffffff-cycles) d0-a7 sr`,
 but only PCs inside `[baseText, baseText+sizeText)`. With a `--remote_debugger_trigger` that window
-is the triggered program's first hunk (how other programs profile their own exes). Under WHDLoad no
+is the triggered program's first hunk (how a game launched as a host program is profiled). Under WHDLoad no
 host process maps onto the game, so we run **without** a trigger — and in this FS-UAE build the
 window then reads `baseText=0x0100007f, sizeText=0` (127.0.0.1 in network order has landed in
 `baseText`). The window is empty but non-zero, so records are written **with no PC at all**:
@@ -253,11 +253,11 @@ The demo made it unnecessary, but these were established:
 
 ## 8. Traps hit setting this up
 
-- **Kickstart copies were read-only**: `kickstarts` files are `r--r--r--` and `cp` keeps the
+- **Kickstart copies were read-only**: the `KICKSTART_DIR` files are `r--r--r--` and `cp` keeps the
   mode, which FS-UAE exposes as a write-protected file; WHDLoad loops on `DOS-Error #223 (file is
   write protected) on reading "devs:kickstarts/kick34005.a500"`. `run.sh` does `chmod -R u+w`.
 - The WHDLoad splash stays up while PRELOAD reads the data; that is not a hang.
-- `/path/to/fs-uae.log.txt` is shared by every project's FS-UAE and is block-buffered:
+- FS-UAE's default `Cache/Logs/fs-uae.log.txt` is shared by every FS-UAE instance and is block-buffered:
   do not read the stub's state from it. Our stdout log is `amiga/.run/fsuae.log`.
 - Two causes made early captures look like "100% STOPped CPU": the empty profiler window (§3,
   every record PC-less) and a capture that had already left the demo for the Accolade logo,
@@ -414,7 +414,7 @@ For the expanded A1200 tested here:
 ```sh
 source amiga/env.sh
 export AMIGA_MODEL=A1200 CPU=68EC020 CHIP_KB=2048 FAST_KB=4096
-export KICKSTART="/path/to/kickstarts/kick40068.A1200"
+export KICKSTART="$KICKSTART_DIR/kick40068.A1200"
 export EXTRA_ARGS='--slow_memory=0' WHD_ARGS='CUSTOM2=3'
 export SLAVE="$PWD/whdload/TestDrive2.slave"
 STATE_FIELDS=6000 STATE_ONLY=1 tools/fixed_window.sh tmp/prof/a1200-state "$SLAVE"

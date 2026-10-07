@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """disd.py DUMP BASE HUNKBASE START END: disassemble duel code by hunk offset."""
 import subprocess, sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from local_env import tool
 dump, base, hb, s, e = sys.argv[1], *[int(x, 0) for x in sys.argv[2:]]
-out = subprocess.run([os.path.expanduser('/path/to/m68k-amiga-elf-objdump'), '-D', '-b', 'binary', '-m', 'm68k:68000',
+out = subprocess.run([tool('objdump'), '-D', '-b', 'binary', '-m', 'm68k:68000',
                       f'--adjust-vma={base:#x}', f'--start-address={hb + s:#x}', f'--stop-address={hb + e:#x}', dump],
                      capture_output=True, text=True).stdout.split('\n')
 for l in out:

@@ -4,6 +4,7 @@ routines (hunk offsets), with disassembly, as % of all traced cycles."""
 import collections, os, subprocess, sys
 sys.path.insert(0, os.path.dirname(__file__))
 import barto
+from local_env import tool
 trace, dump, base, hb = sys.argv[1], sys.argv[2], int(sys.argv[3], 0), int(sys.argv[4], 0)
 offs = [int(x, 16) for x in sys.argv[5].split(',')]
 span = int(sys.argv[6], 0) if len(sys.argv) > 6 else 0x400
@@ -14,7 +15,7 @@ for f in t.fields:
         tot += c
         if pc is not None: pcs[pc - hb] += c
 dis = {}
-od = os.path.expanduser('/path/to/m68k-amiga-elf-objdump')
+od = tool('objdump')
 for o in offs:
     out = subprocess.run([od, '-D', '-b', 'binary', '-m', 'm68k:68000', f'--adjust-vma={base:#x}',
                           f'--start-address={hb + o:#x}', f'--stop-address={hb + o + span:#x}', dump],

@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 make -s -C whdload > /dev/null
 export SLAVE="$PWD/whdload/TestDrive2.slave"
 export AMIGA_MODEL=A1200 CPU="${CPU:-68EC020}" CHIP_KB=2048 FAST_KB=4096
-export KICKSTART="/path/to/kickstarts/kick40068.A1200"
+export KICKSTART="$KICKSTART_DIR/kick40068.A1200"
 export WHD_ARGS="${WHD_ARGS:-CUSTOM2=1}"
 if [ "$CPU" = 68030 ]; then
   export EXTRA_ARGS="--uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency=25000000 --uae_cpu_cycle_exact=true"

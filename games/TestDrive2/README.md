@@ -27,13 +27,12 @@ local input under `tmp/` (see `.gitignore`).
 ```
 tmp/TestDrive2_v1.5_0588.lha     pre-installed WHDLoad game     → unpack to tmp/game/
 tmp/TestDrive2.lha               WHDLoad installer (slave source) → unpack to tmp/installer/
-/path/to/kickstarts/       kick31.rom (host), kick34005.A500 (slave)
-/path/to/kick34005.A500.RTB
-/path/to/Workbenchv2.04rev37.67Workbench.adf
-/path/to/WHDLoad/    WHDLoad 19.2 package (build includes)
-/path/to/WHDLoad-20.0/  WHDLoad 20.0 package (run.sh prefers its C/WHDLoad)
-/path/to/fs-uae, /path/to/bin  FS-UAE (Barto gdb stub) and m68k-amiga-elf toolchain
 ```
+
+Everything outside the repo (Kickstart images and relocation table, the Workbench 2.04
+floppy, WHDLoad, FS-UAE with the Barto gdb stub, the m68k-amiga-elf toolchain, vasm and
+LHa) is located by `amiga/local.env`, which git ignores. Copy `amiga/local.env.example`
+and set its paths; the shell scripts, the Makefile and the Python tools all read it.
 
 ```sh
 mkdir -p tmp/game tmp/installer
@@ -111,7 +110,6 @@ and the retained `OUT/slave.slave` when analysing older traces.
 ## Testing a normal release on 68030/25 MHz
 
 ```sh
-cd "/path/to/Test Drive 2"
 source amiga/env.sh
 amiga/run-68030.sh
 ```

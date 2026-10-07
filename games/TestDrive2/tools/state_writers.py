@@ -8,13 +8,14 @@ Unknown/complex destinations are skipped; do not use absence here as proof of no
 import argparse,collections,re,subprocess,os
 from pathlib import Path
 import barto
+from local_env import tool
 from td2_report import regions
 from state_report import VARIABLES
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('trace');p.add_argument('dump');p.add_argument('base',type=lambda s:int(s,0));a=p.parse_args()
     dump=Path(a.dump).read_bytes();rr={n:lo for lo,hi,n,o in regions(dump,a.base)};hb=rr['duel'];a4=rr['duel-data']+0x7ffe
-    dis=subprocess.run([os.path.expanduser('/path/to/m68k-amiga-elf-objdump'),'-D','-b','binary','-m','m68k:68000',f'--adjust-vma={a.base}',f'--start-address={hb}',f'--stop-address={hb+0x1156c}',a.dump],capture_output=True,text=True,check=True).stdout
+    dis=subprocess.run([tool('objdump'),'-D','-b','binary','-m','m68k:68000',f'--adjust-vma={a.base}',f'--start-address={hb}',f'--stop-address={hb+0x1156c}',a.dump],capture_output=True,text=True,check=True).stdout
     stores={}
     for line in dis.splitlines():
         parts=line.split('\t')

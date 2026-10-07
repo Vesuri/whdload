@@ -24,10 +24,10 @@ import shutil
 import struct
 import subprocess
 import tempfile
+from local_env import path
 
 ROOT = Path(__file__).resolve().parents[1]
-LHA = os.environ.get('LHA') or os.path.expanduser(  # LHa for UNIX: Lhasa cannot create
-    '/path/to/lha')
+LHA = path('LHA')  # LHa for UNIX: Lhasa cannot create LH5 archives
 INSTALLER = ROOT / 'tmp/TestDrive2.lha'
 PREINSTALLED = ROOT / 'tmp/TestDrive2_v1.5_0588.lha'
 SOURCES = ['TestDrive2HD.s', 'simulation.s', 'simulation-patches.i', 'simulation-verify.s',

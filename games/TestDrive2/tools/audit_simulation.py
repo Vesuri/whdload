@@ -5,6 +5,7 @@ Whole-function PL_P replaces the tail too; operand-only PL_W/L/NOP are intention
 Indirect calls and helper return adjustments still require manual review.
 """
 import argparse, os, re, subprocess
+from local_env import tool
 from pathlib import Path
 
 p=argparse.ArgumentParser(description=__doc__)
@@ -12,7 +13,7 @@ p.add_argument('duel',type=Path)
 a=p.parse_args()
 raw=a.duel.read_bytes()
 if len(raw)!=108868: p.error('requires duel v1 (108868 bytes)')
-out=subprocess.check_output([os.path.expanduser('/path/to/m68k-amiga-elf-objdump'),
+out=subprocess.check_output([tool('objdump'),
     '-D','-b','binary','-m','m68k:68000','--start-address=40',
     '--stop-address='+str(40+0x1156c),str(a.duel)],text=True)
 ins={}

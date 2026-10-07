@@ -16,11 +16,12 @@ Commands (the emulator is left running after each unless noted):
 import os, select, signal, socket, subprocess, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import barto
+from local_env import tool
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUN = os.path.join(ROOT, 'amiga/.run')
 SOCK = os.path.join(RUN, 'td2.sock')
-GDB = os.path.expanduser('/path/to/m68k-amiga-elf-gdb')
+GDB = tool('gdb')
 SENT = '@@TD2-DONE@@'
 
 
@@ -72,7 +73,7 @@ class Gdb:
             self.running = False
 
 
-# This FS-UAE build's Barto stub (x86_64, /path/to/fs-uae) leaves the profiler's PC window
+# This FS-UAE build's Barto stub (x86_64) leaves the profiler's PC window
 # [baseText, baseText+sizeText) as [0x0100007f, +0) when no --remote_debugger_trigger is given
 # (127.0.0.1 lands in baseText), so every trace record comes out without a PC.  Under WHDLoad no
 # trigger can name the game, so set the window to everything through lldb before each capture.
