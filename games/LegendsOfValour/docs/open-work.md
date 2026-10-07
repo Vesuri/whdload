@@ -31,14 +31,25 @@ work (`docs/performance-plan.md` §2.3.1); W7 remains deferred.
   W1+W2 enabled in ignored local preferences (mask 3); audit in `docs/w2-audit.md`.
 - `swap_fields.py` agrees exactly with the full trace on the A500 fixed window.
 
+## Simulation timing goal (active)
+
+The equal-time drawing-delay experiment now confirms AI coupling on both CPUs:
+52 of 56 decoded actor records diverge within each pair despite identical
+starting world state. The welcoming townsman is now identified as actor 43;
+his initial greeting freezes all actor state and the game clock for 100 fields
+on both CPUs. See `docs/timing-investigation.md` for intervals and
+limits. Fixed simulation ticks are proposed; 25 ticks/second versus 12.5 is
+awaiting the user's choice. No timing patch is implemented or enabled yet.
+Player/input, projectile, animation and pause handling must be covered together.
+
 ## Open questions
 
 - **Game time (§9).** Heading is `h11:08c28`, player x/y `h11:08c1c`/`08c20`;
   `h12:14b78` reads movement step `h12:0cdd6` when initializing actor speed.
   `docs/timing-investigation.md` maps a persistent 56-record actor table and its
-  renderer-driven position/countdown updates; townsman identity remains open. The faster spin ends at a different heading
+  renderer-driven position/countdown updates; the welcoming townsman is actor 43. The faster spin ends at a different heading
   with unchanged position; frame coupling remains. `tools/lov_state.py` maps visible-object
-  render records but does not identify the townsman's world position. Deeper AI timing/state
+  render records and the new persistent-state observer identifies the townsman's world position. Deeper AI timing/state
   mapping remains open. W1/W2 retain existing timing; investigate a
   frame-rate-independent simulation step for movement, turning, animation and AI. Compare
   equal elapsed-field intervals across rendering rates, then evaluate elapsed-time scaling

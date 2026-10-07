@@ -852,3 +852,33 @@ traces/logs were removed after analysis. Local preferences and their tracked exa
 enable W1–W6 (mask 63); the next interactive boot builds the normal slave. No
 interactive emulator was operated. W3–W6 are complete in separate source commits.
 Frame-independent simulation timing remains required investigation; W7 stays deferred.
+
+
+### Simulation timing investigation, no timing patch (2026-10-07)
+
+The VERIFY-only TIMING_STUDY wrapper can add eight PAL fields per renderer
+entry after the tape anchor (CUSTOM5 bit 8). Two identical-build pairs with
+CUSTOM2=63 and CUSTOM5=1/257 prove AI coupling on the A500 equivalent and
+14 MHz 020: 52 of 56 decoded actor records differ at the end of each pair,
+from identical initial world state. The original sampler used 100 subsequent
+VBL-entry stops, ending at counter delta 99; no FPS is inferred from this.
+See [timing-investigation.md](timing-investigation.md) for the exact intervals,
+state comparisons, and the corrected after-increment sampler.
+
+Separate early-game pause captures identify the greeting townsman as actor 43.
+Across 100 VBL counter fields on each CPU, all 101 actor snapshots and the
+paused game clock are identical. These establish the pause behavior to retain;
+they do not establish a completed frame-independent simulation patch.
+Normal and ordinary VERIFY builds remain byte-identical to the pre-study
+builds when TIMING_STUDY is absent. All eighteen legal flag-capture sites pass
+in the retained 68000 and 020 study builds.
+
+Build with `make -C whdload verify OUT=../tmp/build-timing-study VASMFLAGS=-DTIMING_STUDY=1`.
+For coupling, retain that same slave/listing in each output directory and use
+§7 machine settings with KEEP_SLAVE=1, STATE_ONLY=1, STATE_FIELDS=100,
+TAPE_OPTIONS=1/257, WHD_ARGS=CUSTOM2=63 and tools/tapes/wall.txt. Compare with
+`python3 tools/lov_timing_compare.py NORMAL_CAPTURE DELAYED_CAPTURE`.
+For pause observation use TIMING_PAUSE=1, STATE_ONLY=1, TAPE_OPTIONS=1 and an
+early-game tape anchor followed by a stationary hold, as retained in
+`tmp/prof/timing-pause-a500/tape.txt`. All captures were serial in amiga/.cap,
+with JOY0=none; game-derived artifacts remain ignored under tmp.

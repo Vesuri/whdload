@@ -99,6 +99,10 @@ _tape_vbl	move.l	(_tapeptr,pc),a1
 		tst.w	(6,a0)
 		bpl	_tape_next
 _tape_anchor
+	IFD TIMING_STUDY
+		lea (_timing_study_armed,pc),a0
+		move.w #1,(a0)
+	ENDC
 	IFD PROFILER_WINDOW
 		bsr _profile_prepare
 _profile_ready	bsr _profile_restore

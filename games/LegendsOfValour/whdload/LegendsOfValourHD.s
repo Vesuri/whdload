@@ -257,6 +257,9 @@ _patchgame
 		bsr	_w5_install
 		bsr	_w6_install
 	IFD VERIFY
+	IFD TIMING_STUDY
+		bsr	_timing_study_install
+	ENDC
 		bsr	_tape_install
 	ENDC
 		moveq	#_args_end-_args,d0
@@ -324,6 +327,9 @@ _h12		dc.l	0
 	IFD VERIFY
 	IFD PROFILER_WINDOW
 		INCLUDE	profile_window.s
+	ENDC
+	IFD TIMING_STUDY
+		INCLUDE	timing_study.s
 	ENDC
 		INCLUDE	verify_flags.s
 		INCLUDE	tape.s

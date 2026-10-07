@@ -122,8 +122,8 @@ Consequences:
 - Not everything is compensated: the townsman reached the player far sooner on the 68020
   (see profiling.md §6), so some AI advances per frame. W1 maps the heading to `h11:08c28`. The `h12:14b78` step reader
   initializes actor speed; a renderer-driven actor update is now mapped in
-  `docs/timing-investigation.md`. The townsman's world position and deeper
-  AI timing remain open; the user accepted existing timing behaviour. Faster frames change
+  `docs/timing-investigation.md`. The welcoming townsman is now identified as actor 43, and equal-time
+  drawing-delay pairs establish AI coupling on both CPUs. Deeper timing integration remains open; the user accepted existing timing behaviour. Faster frames change
   the scene at the fixed-window anchor, which matters for §3. Evidence is in profiling §8.
 - The beam wait exists because the C2P writes **straight into the displayed bitplanes**
   (single buffer). Starting at line $98 keeps the conversion out of the beam's way in the

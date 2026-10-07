@@ -149,8 +149,11 @@ delete" > "$OUT/selftest-gdb.txt"
   python3 tools/c2p_check.py "$OUT" --base "$BASE"
   exit 0
 fi
+if [ "${TIMING_PAUSE:-0}" = 1 ]; then
+  python3 tools/lov_timing_pause.py "$OUT" "$BASE"
+fi
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
-  python3 tools/state_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT/code.bin" "$BASE"
+  python3 tools/lov_timing_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT" "$BASE"
 fi
 if [ "${STATE_ONLY:-0}" = 1 ]; then
   dump; lov quit > /dev/null; trap - EXIT; retain_log

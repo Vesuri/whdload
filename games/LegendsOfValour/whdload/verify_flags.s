@@ -83,4 +83,7 @@ _verify_ccr_offsets
         IFD _verify_sr_16
         dc.l _verify_sr_16-_verify_ccr_offsets
         ENDC
+        IFD _verify_sr_17
+        dc.l _verify_sr_17-_verify_ccr_offsets
+        ENDC
 _verify_ccr_end
