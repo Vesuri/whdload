@@ -94,7 +94,12 @@ _c2p_entry	movem.l	d0-a6,-(sp)
 		move.w	(_c2p_width,pc),d0
 		cmp.w	($2e,a5),d0
 		beq	.convert
+	IFD VERIFY
+		lea	(_c2p_function,pc),a1
+		adda.l	#_c2p_chunky-_c2p_function,a1
+	ELSE
 		lea	(_c2p_chunky,pc),a1
+	ENDC
 		move.w	(_c2p_height,pc),d6
 		subq.w	#1,d6
 .row		move.l	a0,a2
@@ -119,7 +124,12 @@ _c2p_entry	movem.l	d0-a6,-(sp)
 .next		lea	192(a0),a0
 		lea	192(a1),a1
 		dbf	d6,.row
+	IFD VERIFY
+		lea	(_c2p_function,pc),a0
+		adda.l	#_c2p_chunky-_c2p_function,a0
+	ELSE
 		lea	(_c2p_chunky,pc),a0
+	ENDC
 .convert	move.w	(_c2p_width,pc),d0
 		move.w	(_c2p_height,pc),d1
 		moveq	#0,d2

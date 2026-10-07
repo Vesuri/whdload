@@ -1,8 +1,8 @@
 # Open work — Legends of Valour
 
-Status 2026-10-06: playbook §1–§8 done (fixed window, frame counter, A500-eq. and 68020
-baselines; `docs/profiling.md` §6–§7). W0/W1/W2 complete; measurements in §8. W2 uses
-MEMF_PUBLIC on every CPU. Next is W3, the wall-column loop. Frame-rate-independent
+Status 2026-10-07: playbook §1–§8 done (fixed window, frame counter, A500-eq. and 68020
+baselines; `docs/profiling.md` §6–§7). W0–W3 complete; measurements in §8. W2 uses
+MEMF_PUBLIC on every CPU. Next is W4, sprite columns. Frame-rate-independent
 simulation timing is required follow-up work (`docs/performance-plan.md` §2.3.1).
 
 ## Done
@@ -28,6 +28,10 @@ simulation timing is required follow-up work (`docs/performance-plan.md` §2.3.1
   captures: 020 spin 14.9 → 16.0 fps, wall 14.2 → 15.1; stock 68000 FPS unchanged.
   W1+W2 enabled in ignored local preferences (mask 3); audit in `docs/w2-audit.md`.
 - `swap_fields.py` agrees exactly with the full trace on the A500 fixed window.
+
+- W3: 68000/10 wall-column unroll verified across all three bodies. Fixed-wall
+  column cost −6.6%, renderer −4.6%, fps 3.1 → 3.2; 020 keeps original code
+  with identical off/on results. W1–W3 enabled locally, mask 7.
 
 ## Open questions
 

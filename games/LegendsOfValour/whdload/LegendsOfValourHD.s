@@ -93,11 +93,13 @@ slv_info	dc.b	"Coded By CFou!",10
 slv_config	dc.b	"C1:B:character creation;"
 		dc.b	"C2:X:faster chunky-to-planar:0;"
 		dc.b	"C2:X:chunky buffer in public memory:1;"
+		dc.b	"C2:X:unrolled wall columns:2;"
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
 		dc.b	"C5:X:C2P pixel twin (verification):1;"
 		dc.b	"C5:X:force chunky PUBLIC allocation failure (verification):2;"
 		dc.b	"C5:X:chunky allocation/free cycle (verification):3;"
+		dc.b	"C5:X:wall-column pixel/register twin (verification):4;"
 	ENDC
 		dc.b	0
 	EVEN
@@ -224,6 +226,9 @@ _decrunched	movem.l	(a7)+,d0-a6
 
 _patchgame
 		bsr	_map_hunks
+	IFD VERIFY
+		bsr	_verify_ccr_install
+	ENDC
 		move.l	(_hunks+4,pc),a0
 		subq.l	#4,a0			;A0 = hunk 1 - 4
 	;skip the manual protection, two AMIGA2 versions
@@ -241,6 +246,7 @@ _patchgame
 	; Optional W1 hook, checked while disabled: PERF_RANGE h12:054ce 10
 		bsr	_c2p_install
 		bsr	_w2_install
+		bsr	_w3_install
 	IFD VERIFY
 		bsr	_tape_install
 	ENDC
@@ -301,11 +307,13 @@ _h12		dc.l	0
 
 		INCLUDE	c2p.s
 		INCLUDE	chunky.s
+		INCLUDE	walls.s
 
 	IFD VERIFY
 	IFD PROFILER_WINDOW
 		INCLUDE	profile_window.s
 	ENDC
+		INCLUDE	verify_flags.s
 		INCLUDE	tape.s
 	ENDC
 

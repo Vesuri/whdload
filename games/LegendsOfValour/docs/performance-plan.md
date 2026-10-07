@@ -5,8 +5,8 @@
 > (all of it), then this file.** Every number here is from that window unless marked
 > *estimate*; estimates must be replaced by measurements before anything is claimed.
 
-**Status 2026-10-06:** W0, W1 and W2 implemented and measured; evidence and exact commands in
-`docs/profiling.md` §8. W1+W2 are enabled in ignored local preferences (mask 3). W2 uses MEMF_PUBLIC on any CPU; W3 is next and W7 is deferred.
+**Status 2026-10-07:** W0–W3 implemented and measured; evidence and exact commands in
+`docs/profiling.md` §8. W1–W3 are enabled in ignored local preferences (mask 7). W2 uses MEMF_PUBLIC on any CPU; W3 selects its unroll on 68000/10 and retains original 020+ code. W4–W6 remain open and W7 is deferred.
 The remaining items below are the work plan, not implemented features.
 
 ## 0. Ground rules (from CLAUDE.md and the playbook, restated because they bite)
@@ -380,7 +380,8 @@ by walls. Small but easy; good warm-up for the patch framework.
 W1 measured: C2P cycles/call −33% / −52% (68000 / 020), spin fps 2.5 → 3.0 /
 12.4 → 14.8. Fixed-wall results confirm the savings at a matching scene.
 
-Remaining estimates: walls −~12% of the original A500 frame (W3), sprites −~5% (W4).
+W3 measured: fixed-wall column cost −6.6%, renderer cost −4.6%, A500 fps 3.1 → 3.2.
+68020 results are unchanged because its original loop is retained. Remaining estimate: sprites −~5% (W4).
 Re-measure their share after each change, because scene and frame timing affect it.
 W2 measured: 020 spin 14.9 → 16.0 fps, matching-wall 14.2 → 15.1 fps; C2P main-task
 cycles/call −15.3% at the wall. Stock 7 MHz 68000 FPS is unchanged with slow or physical

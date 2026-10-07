@@ -559,3 +559,64 @@ checks (28,896-byte code hunk, 28,932-byte file), and the VERIFY build also asse
 All built files and game-derived evidence remain in ignored tmp. No `.run` emulator was
 started or modified. W3 is the next performance item; simulation timing is open and W7
 remains deferred.
+
+### W3 CPU-selected wall-column unroll (2026-10-07)
+
+CUSTOM2 bit 2 selects sixteen paired pixels with fixed destination displacements
+on 68000/10. All three complete six-byte CMP/DBGE hooks are checked before writes.
+Texture indexing, NOT, ADD/ADDX, clipping and material tails remain unchanged.
+68020+ retain all original hook bytes: the CPU-independent candidate regressed
+on the fixed wall (2,276 → 3,009 main-task cycles/column, 15.1 → 13.0 fps).
+VERIFY twins can exercise the replacement on either CPU.
+
+**Correctness:** current-source wall bodies pass 38,800 A500 and 126,576 020
+pixel/register/flag comparisons, including all three replacement blocks. Those
+retained verifier builds and view-geometry limits are documented in
+`tmp/prof/render-current-twin-a500` and `render-current-twin-a1200`. The final
+CPU-selected captures pass disabled-byte checks; on the 020, checking CUSTOM2=3
+against the bit-2-on dumps also confirms all three W3 hooks remain original.
+
+**Final measurements:** `w3-cpu`, CUSTOM2=3/7, CUSTOM5=1, 100 fields, serial
+JOY0=none captures in amiga/.cap. All eight retained slave hashes are
+`0edaa8925020edffe568eabe5a525f6538e674f0d4c51fb68eb8fdd20f0cb320`.
+This build excludes pixel-twin costs from the window. The native capture fixture,
+PC-base metadata and restoration checks are described in [native-capture.md](native-capture.md).
+
+| Machine / route | fps off → on | Display intervals / fields | Wall calls | Wall main cycles/call | Renderer main cycles/call |
+|---|---|---|---|---|---|
+| A500 spin | 3.0 → 3.0 | 5/82 → 5/82 | 1,146 → 1,176 | 3,334 → 3,105 | 1,214,180 → 1,196,513 |
+| A500 wall | 3.1 → 3.2 | 6/97 → 6/94 | 1,152 → 1,186 | 4,275 → 3,993 | 1,278,355 → 1,218,920 |
+| 020 spin | 15.8 → 15.8 | 31/98 → 31/98 | 6,073 → 6,073 | 1,922 → 1,922 | 604,020 → 604,020 |
+| 020 wall | 15.1 → 15.1 | 29/96 → 29/96 | 5,760 → 5,760 | 2,278 → 2,278 | 628,295 → 628,295 |
+
+On the A500 fixed wall, column cost falls 6.6%, renderer cost falls 4.6%, and
+unrounded fps improves 3.2%. Wall inclusive costs are 4,602 → 4,299 cycles/column;
+renderer inclusive costs are 1,374,825 → 1,310,883 cycles/call. Boundary-partial calls
+are excluded independently. Counts may include columns from a partial renderer call.
+
+Off/on first and last whole screenshots match for both routes and CPUs. All four
+wall viewports match; spin first/last differ as expected while turning, with each
+corresponding off/on image matching. Player position, heading, movement step and
+visible-object snapshots agree off/on. This does not establish equal AI world state
+or frame-independent simulation. Timing code, the 25 fps cap and beam wait are unchanged.
+
+![A500 W3 wall off/on first/last](../tmp/prof/w3-cpu-wall-a500-comparison.png)
+![68020 W3 wall off/on first/last](../tmp/prof/w3-cpu-wall-a1200-comparison.png)
+![A500 W3 spin off/on first/last](../tmp/prof/w3-cpu-spin-a500-comparison.png)
+![68020 W3 spin off/on first/last](../tmp/prof/w3-cpu-spin-a1200-comparison.png)
+
+Reproduce with the §7 machine settings:
+
+```sh
+FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" PROFILE_WINDOW=guest \
+  tools/ab_window.sh w3-cpu 3 7
+python3 tools/ab_summary.py w3-cpu
+```
+
+All outputs are retained under ignored tmp: exact slave/listing, anchor, code dump,
+PC-base sidecar, first/last screenshots, FPS/profile/block/C2P/render reports and state.
+Traces and large emulator logs were deleted after the reports completed, as specified
+by the plan. Normal/VERIFY/guest feature-prefix builds pass the assembler's PIC checks.
+W1–W3 are enabled in local preferences (mask 7); the next interactive boot builds
+the normal slave. No interactive emulator was started or modified. W4–W6 remain open,
+frame-independent timing remains required investigation, and W7 remains deferred.
