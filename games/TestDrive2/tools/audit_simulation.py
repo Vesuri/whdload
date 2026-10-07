@@ -24,10 +24,13 @@ source=Path(__file__).resolve().parents[1]/'whdload/simulation-patches.i'
 lines=source.read_text().splitlines()
 lines += [line for line in (source.parent/"TestDrive2HD.s").read_text().splitlines() if "render_subunit_" in line and "PL_" in line]
 for line in lines:
-    m=re.search(r'PL_(PSS|PS|P)\s+\$([0-9a-f]+),([^;]+)',line)
+    m=re.search(r'PL_(PSS|PS|P|S)\s+\$([0-9a-f]+),([^;]+)',line)
     if not m:continue
     kind,start,args=m.groups();start=int(start,16)
-    end=start+6+(int(args.split(',')[1]) if kind=='PSS' else 0)
+    if kind=='S':  # BRA.W over the rest of a replaced span: off,distance to the target
+        end=start+eval(args.replace('$','0x'))
+    else:
+        end=start+6+(int(args.split(',')[1]) if kind=='PSS' else 0)
     spans.append((start,end,kind))
 errors=[]
 for start,end,kind in spans:

@@ -460,7 +460,8 @@ pl_main_v1
 	PL_PS $007a78,render_subunit_oncoming
 	PL_PS $00801a,render_subunit_opponent
 	PL_PS $008052,render_subunit_police
-	PL_PSS $00741e,render_subunit_road_angle,6
+	PL_PS $0073ec,render_subunit_road_angles
+	PL_S $0073f2,$742a-$73f2	; render_subunit_road_angles skips to 0742a
 	PL_PSS $008c90,render_subunit_backdrop,8
 	PL_ENDIF
 	; protection

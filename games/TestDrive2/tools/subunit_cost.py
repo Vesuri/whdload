@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measure the complete sub-unit patch's A500 self cycles in a fixed_window trace.
   subunit_cost.py CAPTURE [--limit 3]
-Conservatively includes the displaced instructions and all nine hook calls.
+Conservatively includes the displaced instructions and all nine hook calls and the walker branch.
 Use a CPU=68000 trace. Slave 1.6b always enables BLTPRI with the sub-unit code;
 do not use an A1200 trace with BLTPRI: its instruction records can be corrupt.
 """
@@ -20,8 +20,8 @@ def measure(path,limit):
     end=mem.find(end_signature,start,hi-base)
     assert start>=0 and end>=0,'normal sub-unit patch not found'
     start+=base;end+=base+len(end_signature)
-    hooks={duel+offset for offset in (0x6c66,0x6daa,0x6474,0x7a34,0x7a78,0x801a,0x8052,0x741e,0x8c90)}
-    hooks|={duel+offset for offset in (0x7424,0x7426,0x7428,0x8c96,0x8c98,0x8c9a,0x8c9c)}  # PL_PSS NOPs
+    hooks={duel+offset for offset in (0x6c66,0x6daa,0x6474,0x7a34,0x7a78,0x801a,0x8052,0x73ec,0x8c90)}
+    hooks|={duel+offset for offset in (0x73f2,0x8c96,0x8c98,0x8c9a,0x8c9c)}  # PL_S branch, PL_PSS NOPs
     trace=barto.load(path/'trace.bin')
     total=cost=calls=0
     for field in trace.fields:

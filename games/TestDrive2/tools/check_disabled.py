@@ -20,12 +20,13 @@ lines=[] if a.render_only else (root/'whdload/simulation-patches.i').read_text()
 lines += [line for line in (root/'whdload/TestDrive2HD.s').read_text().splitlines()
           if 'render_subunit_' in line and 'PL_' in line]
 for line in lines:
-    m=re.search(r'PL_(PSS|PS|P|NOP|W|L)\s+\$([0-9a-f]+),([^;]+)',line)
+    m=re.search(r'PL_(PSS|PS|P|NOP|W|L|S)\s+\$([0-9a-f]+),([^;]+)',line)
     if not m:continue
     kind,start,args=m.groups();start=int(start,16)
     if start in (0xe9f0,0xe9f2):continue
     if kind=='PSS':size=6+int(args.split(',')[1])
     elif kind in ('PS','P'):size=6
+    elif kind=='S':size=4
     elif kind=='NOP':size=int(args)
     else:size={'W':2,'L':4}[kind]
     assert mem[code+start:code+start+size]==original[40+start:40+start+size],f'optional patch still active at {start:05x}'

@@ -489,11 +489,13 @@ captures covering the opponent and both traffic directions to check actual
 x/y draw registers and a constant-gap flat-road geometry fixture. A natural
 police chase remains unrecorded; do not claim one from the traffic list.
 
-There are 127 assembly assertions in the VERIFY build (107 simulation, 12
-rendering bounds/fraction checks, 2 turned-camera straight-segment seeds and
-6 tangent-cache checks). Historical captures retain their own count markers.
-`check_disabled.py --render-only` checks the nine sub-unit ranges with CUSTOM2=0.
-The full disabled check covers 76 ranges with CUSTOM2=0 and
+There are 129 assembly assertions in the VERIFY build (107 simulation, 12
+rendering bounds/fraction checks, 2 turned-camera straight-segment seeds,
+6 tangent-cache checks and 2 walker-hook checks). Historical captures retain
+their own count markers.
+`check_disabled.py --render-only` checks the ten sub-unit ranges (nine calls
+and the walker's PL_S branch) with CUSTOM2=0.
+The full disabled check covers 77 ranges with CUSTOM2=0 and
 CUSTOM5 bit 0 off (e.g. CUSTOM5=16 to run assertions without scripted input).
 The input instrument deliberately patches two simulation entries.
 `subunit_geometry.py ORIGINAL/render SUBUNIT/render` validates the independent
@@ -517,6 +519,10 @@ earlier scratch copy of these tools) keep only their text records.
 
 Run a normal CPU=68000 100-field `tools/fixed_window.sh` window and then
 `python3 tools/subunit_cost.py OUT`. Repeat with STATE_FIELDS=1000 for the moving
-window. The cost includes all helpers, nine calls and PL_PSS NOPs; malformed
-traces are rejected and the 3% budget is enforced. These cost checks do not
+window. The cost includes all helpers, nine calls, the walker branch and
+PL_PSS NOPs; malformed traces are rejected and the 3% budget is enforced. The
+walker hook reimplements 16 original instructions per row, which the tool
+counts as patch cost: subtract 249 cycles per hook call (rows at 073ec) for
+the patch's own cost, as in subunit-rendering.md. Hills need their own
+window: STATE_FIELDS=640 reaches the first crest of the CUSTOM3 race. These cost checks do not
 establish an FPS improvement. Final provenance is in subunit-rendering.md.

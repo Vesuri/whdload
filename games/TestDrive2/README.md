@@ -71,7 +71,7 @@ make it the default; the run scripts pass it. `CUSTOM2=0` is the original game.
   nobody sees are not simulated.
 - The blitter gets bus priority (BLTPRI) and unused blitter interrupts are
   suppressed; every original wait and JOTD's display fix remain.
-- Sideways motion (steering, lane position and mountains) is smooth as well.
+- Sideways motion (steering, lane position and mountains) and hill crests are smooth as well.
 - Road and cars are projected at fractional positions, with fractional curve/hill
   integration, in both views. Car size selection remains discrete.
 

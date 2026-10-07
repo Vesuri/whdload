@@ -3,7 +3,7 @@
 Implemented 2026-10-05. Enhanced framerate (`CUSTOM2=1`, or any nonzero
 value) enables fractional road and car projection in both views, together with
 fixed-time simulation and blitter priority. `CUSTOM2=0` keeps original rendering.
-The nine optional sub-unit hooks patch duel v1 only.
+The optional sub-unit hooks (nine calls and one branch) patch duel v1 only.
 
 ## Road and first-segment integration
 
@@ -18,8 +18,8 @@ Row field 46 is 0..43; sprite size indices remain unchanged.
 Renderer-only heading/slope/height/lateral seeds account for the camera's
 fraction of the first segment before the original complete-segment walker.
 Both views use the attributes of camera.high+1. Angle fractions round to
-nearest; position fractions round down. Angles are 8.8. Heading uses the interpolated tangent table described below;
-the slope lookup still reads the signed high byte. Even a straight segment needs the lateral
+nearest; position fractions round down. Angles are 8.8. Heading and slope use the
+interpolated table described below. Even a straight segment needs the lateral
 correction when the camera heading is nonzero. F=0 bypasses seed correction.
 
 The scanline table has 117 entries of 16 bytes and ends immediately before
@@ -64,12 +64,27 @@ camera when they differ by one segment. The latch interpolates the combined
 curve-sum-minus-heading offset; the 08c90 hook rounds it to pixels. Aligning the
 two inputs removes their opposing timing steps.
 
-The road walker at 0741e and both heading seeds now interpolate the table at
--26166 using the full 8.8 angle. Index 127 clamps to its own entry. An exact
-1024-entry cache stores full angle keys and signed results in 4 KiB of private
-slave memory. Changing the table pointer invalidates it, including bucket 1023;
-negative fractions, collisions and rebinding have VERIFY fixtures. Slope stepping
-is unchanged.
+The road walker and all four seed lookups now interpolate the table at -26166
+using the full 8.8 angle, for heading (sideways) and slope (hills). Index 127
+clamps to its own entry. Integer angles (flat road, straight heading) read the
+table directly. Fractional angles use an exact 1024-entry cache of full angle
+keys and signed results in 4 KiB of private slave memory. Changing the table
+pointer invalidates it, including bucket 1023; negative fractions, collisions,
+rebinding and the walker hook have VERIFY fixtures.
+
+One walker hook, `render_subunit_road_angles` (PL_PS 073ec plus PL_S 073f2 to
+0742a), replaces the original span: curve accumulation, slope lookup, height
+accumulation and row y, and heading lookup. It reproduces the original order
+of side effects (the curve accumulator is independent of the slope work) and
+returns the heading table value in d0 with a1 = the table, as at 0742a. One
+call per row, with no NOP padding, pays for the second lookup: the slope's
+fractional path is inline. The VERIFY zero oracle (CUSTOM5 bit 3) selects the
+original high-byte reads.
+
+The slope accumulator -14932 gains each segment's slope byte in 1/256 index
+units, like the heading accumulator. Reading only its high byte made the road
+profile a chain of straight pieces whose joints moved with the camera, so far
+rows and the horizon jumped vertically on crests.
 
 To stay within the A500 budget, immutable scale tables are converted once per
 view/source pointer into 43 main and 22 mirror gradient/base records. Equal Q15
@@ -77,6 +92,40 @@ fractions reuse the previous coefficients; reset/source changes invalidate that
 reuse. Fixed coefficient rows are unrolled with the original three signed
 multiplies. A generated 0..300 lookup gives exactly width times 162. It contains
 mathematical constants, not game data. Road geometry and seeds still run each view.
+
+## Hill slope validation (2026-10-07)
+
+Normal and VERIFY builds assemble; the audit checks 73 hooks (the walker
+branch span included) with zero errors. VERIFY passes 129/129 assertions
+(two new: interpolated slope and heading through the walker hook).
+
+A1200 demo, CUSTOM2=1 CUSTOM3=1, 300 completed main views, previous build
+against this one (`tmp/slope/demo-head`, `demo-s3`): on the crest, the horizon
+moved in single-frame jumps of 6-8 px between 1 px moves; it now moves 2-3 px
+per frame. Largest per-frame vertical step: horizon 8 -> 5 px, rows 20/30/43
+7/8/8 -> 5 px. One -4/-5 step remains. Sideways results are unchanged
+(mountains at most 2 px, no reversals; lateral identical; steering tape
+`steer-s3` mountains 1 px, drawn lane at most 4.1 units).
+
+A500 normal 100-field windows (`tmp/slope/cost-*-s3`, `hill-s3`). The tool
+figure now includes the 16 original walker instructions per row that the hook
+replaces; their cost, measured in the previous build's hill trace, is 249
+cycles per row. Patch cost after subtracting them:
+
+| Window | Rows | Tool | Patch | Previous build |
+|---|---:|---:|---:|---:|
+| Initial | 952 | 3.615% | 1.947% | 2.018% |
+| Moving, after 1,000 fields (flat) | 748 | 4.010% | 2.699% | 2.917% |
+| Hill crest, after 640 fields | 704 | 4.136% | 2.902% | 2.865% |
+
+The hill window has 503 rows with a fractional slope. Frame periods match the
+previous build where comparable (7.08 and 9.40 fields per frame); these
+windows hold 9-14 frames and cannot resolve smaller differences.
+
+The A500 zero oracle (`zero4-off/on`, CUSTOM5=8) verifies 24,480 source-scale
+words and 60 matched-input frames per view with no row or drawn-line
+mismatches. The disabled capture (`disabled3`) passes 129/129 assertions and
+retains original bytes in all 77 optional ranges.
 
 ## Earlier forward/curve validation
 

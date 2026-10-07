@@ -923,10 +923,7 @@ discrete. This delivers smoother positions at unchanged measured FPS.
    clock assumes 50 per second, so on NTSC physics and clock would run 20% fast.
 2. **Natural police pursuit.** The counters are unit-tested; a chase in ordinary
    play has never been captured.
-3. **Slope stepping.** The road walker still reads the slope table at the high
-   byte of the 8.8 angle, so hills step vertically as the heading table did
-   sideways. The sideways tangent interpolation is the model; keep within 3%.
-4. **68060 black screen** (see the 2026-10-06 section): waits on the user's
+3. **68060 black screen** (see the 2026-10-06 section): waits on the user's
    accelerator/ROM/WHDLoad/MMU details.
 
 **Dropped (user decisions, 2026-10-07):** do not propose these again unless
@@ -938,6 +935,9 @@ the user reopens them.
 - **Smoother car/object sizes:** sprites are pre-drawn at fixed sizes; per-frame
   scaling is not viable, and load-time in-between sizes are not worth their chip
   RAM and appearance cost.
+
+Slope stepping was fixed on 2026-10-07: see subunit-rendering.md, "Hill slope
+validation".
 
 ### Tooling debts (fix when they bite, not before)
 

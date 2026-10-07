@@ -190,10 +190,10 @@ render_subunit_seed:
     bsr.b render_subunit_angle
     sub.w d0,-14932(a4)
     move.w -14932(a4),d0
-    bsr.b render_subunit_sine
+    bsr.b render_subunit_lookup
     add.w d0,-14928(a4)
     move.w -14936(a4),d0
-    bsr.b render_subunit_heading
+    bsr.b render_subunit_lookup
     add.w d0,-14930(a4)
 .done
     rts
@@ -204,11 +204,11 @@ render_subunit_seed:
     add.w d0,-14932(a4)
     move.w -14932(a4),d0
     sub.w d3,d0
-    bsr.b render_subunit_sine
+    bsr.b render_subunit_lookup
     sub.w d0,-14928(a4)
     move.w -14936(a4),d0
     add.w d2,d0
-    bsr.b render_subunit_heading
+    bsr.b render_subunit_lookup
     sub.w d0,-14930(a4)
     rts
 ; Round 8.8 angle fractions so f -> 1 reaches the next lookup exactly.
@@ -218,46 +218,110 @@ render_subunit_angle:
     add.l #$8000,d0
     swap d0
     rts
-render_subunit_heading:
-    bsr.b render_subunit_tangent
-    bra.b render_subunit_weight
-render_subunit_sine:
-    asr.w #8,d0              ; high byte, as in the original MOVE.B of a word
-    add.w d0,d0
-    move.w (0,a1,d0.w),d0
-render_subunit_weight:
+; Interpolated table value at the 8.8 angle d0, weighted by d4.
+render_subunit_lookup:
+    bsr render_subunit_tangent
     muls.w d4,d0
     add.l d0,d0
     swap d0
     rts
 
-; The road walker reads its heading table (a1 = -26166(a4)) at the high byte
-; of the 8.8 heading, so steering swings the far rows ~10 pixels at a time.
-; Read the table at the full angle, interpolating by the low byte.
-; d1 is free here and in the seeds: the walker reloads it at 0745a.
-render_subunit_road_angle:
-    move.w -14936(a4),d0
+; The road walker reads the table at -26166(a4) at the high byte of the 8.8
+; heading and slope angles, so steering swings the far rows ~10 pixels at a
+; time and hills step vertically. Read it at the full angle, interpolating by
+; the low byte.
+; One hook replaces the walker's 073ec..0742a: slope lookup, height and row y,
+; curve accumulation and heading lookup (PL_S skips the rest), so a row pays
+; one call. d0 = heading table value out, as at 0742a; a1 = the table, as the
+; replaced LEA set it. d1 and a2 are free: the walker reloads d1 at 0745a and
+; a2 at the next row, and the curve byte is read before a2 is reused.
+render_subunit_road_angles:
+    move.b 1(a2),d1           ; curve accumulates first (07412)
+    ext.w d1
+    add.w d1,d1
+    add.w d1,-14936(a4)
+    lea -26166(a4),a1
     IFD VERIFY
-    move.l sim_drive_enabled(pc),d1
-    btst #3,d1
-    beq.b render_subunit_tangent
-    clr.b d0
+    bsr.b render_subunit_zero_angles
+    bne.b .slope_integer
     ENDC
-; Exact memoisation of the immutable angle table. a2 is dead after the
-; walker's curve read and after the coefficient loop in both seed callers.
-; d0 = 8.8 angle in, table value out; d1/a2 destroyed.
-render_subunit_tangent:
+    tst.b -14931(a4)          ; slope fraction
+    bne.b .slope_fraction
+.slope_integer
+    move.b -14932(a4),d0      ; the original lookup
+    ext.w d0
+    add.w d0,d0
+    move.w (0,a1,d0.w),d0
+.slope
+    add.w -14928(a4),d0
+    move.w d0,-14928(a4)
+    muls.w (18,a3,d6.w),d0
+    swap d0
+    add.w -7602(a4),d0
+    move.w d0,12(a3)
+    IFD VERIFY
+    bsr.b render_subunit_zero_angles
+    bne.b .heading_integer
+    ENDC
+    tst.b -14935(a4)          ; heading fraction
+    bne.b .heading_fraction
+.heading_integer
+    move.b -14936(a4),d0
+    ext.w d0
+    add.w d0,d0
+    move.w (0,a1,d0.w),d0
+    rts
+.heading_fraction
+    move.w -14936(a4),d0
+    bra.b render_subunit_tangent_cached
+.slope_fraction
+    move.w -14932(a4),d0      ; render_subunit_tangent_cached, inline
     lea render_tangent_cache(pc),a2
     move.w d0,d1
     and.w #1023,d1
     lsl.w #2,d1
     adda.w d1,a2
     cmp.w (a2),d0
-    beq.b .cached
+    bne.b .slope_miss
+    move.w 2(a2),d0
+    bra.b .slope
+.slope_miss
+    bsr.b render_subunit_tangent_fill
+    bra.b .slope
+    IFD VERIFY
+; Zero oracle: NE selects the original high-byte reads.
+render_subunit_zero_angles:
+    move.l sim_drive_enabled(pc),d1
+    and.w #8,d1
+    rts
+    ENDC
+
+; Exact memoisation of the immutable angle table. a2 is dead after the
+; walker's curve read and after the coefficient loop in both seed callers.
+; d0 = 8.8 angle in, table value out; d1/a2 destroyed.
+render_subunit_tangent:
+    tst.b d0
+    bne.b render_subunit_tangent_cached
+    asr.w #8,d0              ; integer angle (flat road, straight heading)
+    add.w d0,d0
+    move.w (0,a1,d0.w),d0
+    rts
+; d0 has a nonzero fraction.
+render_subunit_tangent_cached:
+    lea render_tangent_cache(pc),a2
+    move.w d0,d1
+    and.w #1023,d1
+    lsl.w #2,d1
+    adda.w d1,a2
+    cmp.w (a2),d0
+    bne.b render_subunit_tangent_fill
+    move.w 2(a2),d0
+    rts
+; a2 = d0's bucket: interpolate by the low byte and store key and value.
+render_subunit_tangent_fill:
     move.w d0,(a2)
     moveq #0,d1
     move.b d0,d1
-    beq.b .integer
     asr.w #8,d0
     add.w d0,d0
     cmp.w #254,d0
@@ -271,17 +335,11 @@ render_subunit_tangent:
     asr.l #8,d0
     swap d1
     add.w d1,d0
-    bra.b .store
-.integer
-    asr.w #8,d0
-    add.w d0,d0
-.top
-    move.w (0,a1,d0.w),d0
-.store
     move.w d0,2(a2)
     rts
-.cached
-    move.w 2(a2),d0
+.top
+    move.w (0,a1,d0.w),d0
+    move.w d0,2(a2)
     rts
 ; Rebind on the first view or a new data hunk. Invalid keys differ from each
 ; bucket's index, including bucket 1023; no input can hit an empty entry.
@@ -805,7 +863,28 @@ verify_render_tangent:
     ext.l d0
     move.w #200,d1
     bsr verify_equal
+    ; Walker hook: slope index 1 + half (105 -> 110) adds 107 to the height
+    ; accumulator; the curve byte 1(a2) = 2 moves heading 0 -> 4 (index 0,
+    ; fraction 4/256 of 100 -> 105: 100).
+    lea -26166(a4),a1
+    bsr render_subunit_tangent_bind
+    move.w #$0180,-14932(a4)
+    clr.w -14928(a4)
+    clr.w -14936(a4)
+    lea verify_render_curve(pc),a2
+    lea -5702(a4),a3
+    moveq #0,d6
+    bsr render_subunit_road_angles
+    ext.l d0
+    moveq #100,d1
+    bsr verify_equal
+    move.w -14928(a4),d0
+    ext.l d0
+    moveq #107,d1
+    bsr verify_equal
     rts
+verify_render_curve: dc.b 0,2,0,0
     dc.b "TD2HORIZCHECK",0
+    dc.b "TD2SLOPECHECK",0
     even
     ENDC
