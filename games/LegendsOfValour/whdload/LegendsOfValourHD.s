@@ -97,9 +97,9 @@ slv_keyexit	= $59	;F10
 slv_CurrentDir	dc.b	"data",0
 slv_name	dc.b	"Legends Of Valour",0
 slv_copy	dc.b	"1992 US-GOLD.",0
-slv_info	dc.b	"Coded By CFou!",10
-		dc.b	"Version 1.0 (06.02.2005)",10
-		dc.b	"reconstructed by Vesuri",0
+slv_info	dc.b	"Reworked by Vesuri",10
+		dc.b	"based on the work of CFou!",10
+		dc.b	"Version 1.1 (08.10.2026)",0
 slv_config	dc.b	"C1:B:character creation;"
 		dc.b	"C2:X:faster chunky-to-planar:0;"
 		dc.b	"C2:X:chunky buffer in public memory:1;"
