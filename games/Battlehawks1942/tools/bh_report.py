@@ -56,10 +56,12 @@ class Memory:
 
 def locate(mem, blob, base, step=64):
     votes = collections.Counter()
+    windows = 0
     for off in range(0, len(blob) - 16, step):
         w = blob[off:off + 16]
         if w.count(0) > 8:
             continue
+        windows += 1
         # Vote for every occurrence (up to 4): WHDLoad's PRELOAD cache can hold a second copy.
         i, seen = mem.find(w), 0
         while i >= 0 and seen < 4:
@@ -69,7 +71,10 @@ def locate(mem, blob, base, step=64):
     # ($3F3 at file offset 0) is the cached file, not the loaded program.
     for a, n in votes.most_common():
         hdr = a - base - 0x28
-        if n >= 4 and not (hdr >= 0 and mem[hdr:hdr + 4] == b'\0\0\x03\xf3'):
+        # Most windows must match (relocations spoil some): DOS buffers in chip RAM can hold
+        # pieces of the file, which match only a few windows.
+        if n >= max(4, windows // 3) and a >= base and not (
+                hdr >= 0 and mem[hdr:hdr + 4] == b'\0\0\x03\xf3'):
             return a
     return None
 
@@ -126,8 +131,8 @@ def live_slave(dump, base, slave):
 
 
 def regions(dump, base, chip=b''):
-    """Name the memory regions: BH's code and data hunks (Amiga chip RAM: the slave's 512 KB
-    BaseMem is all the OS has), the Kickstart 1.3 image (relocated into ws_ExpMem, in the dump)
+    """Name the memory regions: BH's code and data hunks (chip RAM, or the slave's fast
+    memory in the dump), the Kickstart 1.3 image (relocated into ws_ExpMem, in the dump)
     and the running slave (in the dump)."""
     bh = bh_file()
     kick = open(os.path.expanduser('~/.local/share/amiga/Kickstarts/kick34005.A500'), 'rb').read()
@@ -136,13 +141,16 @@ def regions(dump, base, chip=b''):
     out = []
     (c_off, c_size, _), (d_off, d_size, d_alloc) = hunks(bh)[:2]
     code = bh[c_off:c_off + c_size]
-    a = locate(chip, code, 0)
-    if a:
+    # BH loads into "any" memory: chip RAM when the slave gives no fast memory, else ExpMem
+    # (in the dump). Its data hunk follows LoadSeg's BPTR chain, rather than byte-matching.
+    for mem, mbase in ((chip, 0), (dump, base)):
+        a = locate(mem, code, mbase)
+        if not a:
+            continue
         out.append((a, a + c_size, 'bh', a))
-        # Follow LoadSeg's BPTR chain rather than byte-matching the data hunk.
-        data_base = struct.unpack_from('>I', chip, a - 4)[0] * 4 + 4
-        if data_base + d_alloc <= len(chip):
-            out.append((data_base, data_base + d_alloc, 'bh-data', data_base))
+        data_base = struct.unpack_from('>I', mem, a - mbase - 4)[0] * 4 + 4
+        out.append((data_base, data_base + d_alloc, 'bh-data', data_base))
+        break
     a = locate(dump, kick[:0x40000], base, 256)
     if a: out.append((a, a + 0x40000, 'kick', a - 0xfc0000))  # name by ROM address
     s = live_slave(dump, base, slave)
@@ -276,7 +284,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('trace')
     p.add_argument('dump')
-    p.add_argument('--base', type=lambda s: int(s, 0), default=0xc00000)
+    p.add_argument('--base', type=lambda s: int(s, 0), default=0x200000)
     p.add_argument('--top', type=int, default=40)
     p.add_argument('--fields', default=None, help='a-b (0-based, inclusive)')
     a = p.parse_args()

@@ -11,8 +11,8 @@ wait to count. Level-3 interrupts are counted at the handler the
 $6C vector points to (in flight that is the game's sound sequencer, bh:1ac26, which then
 jumps into Kickstart 1.3's handler past its prologue), and the Kickstart handler's BLIT
 ($FC0D38) and VERTB ($FC0D4A) branches. DMA slot types come from the per-field DMA
-records. CODE.bin is the slow-RAM dump (Kickstart, slave); BH itself is in the trace's chip
-snapshot.
+records. CODE.bin is the dump of the "other" memory at BASE (Kickstart, slave, and BH itself
+with the slave's fast memory; with a chip-only slave BH is in the trace's chip snapshot).
 """
 import collections, os, struct, sys
 sys.path.insert(0, os.path.dirname(__file__))
