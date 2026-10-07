@@ -1,60 +1,88 @@
 # Open work
 
 State of the setup against the playbook's "ready to improve" list (§12), and what comes next.
-Read `docs/profiling.md` for how each item was measured.
+Read `docs/profiling.md` for how each item was measured. The goal (the user's): gameplay that
+does not depend on the frame rate, and 50 fps on faster Amigas.
 
-## Done (2026-10-06/07)
+## Done
 
+2026-10-06/07, first pass:
 - Repo, rules (`CLAUDE.md`), `tmp/` ignored; game, Kickstart, WHDLoad bytes and captures local only.
 - Game, version, slave type and the slave's patches documented (profiling.md §1). The slave
   had no source: reconstructed byte-identically (`whdload/original/`).
-- A WHDLoad 20 KickEmu slave (`whdload/Battlehawks1942.s`) with the same machine and the same
-  game patch, plus a VERIFY build with an input tape that reaches the first training flight.
-  It boots and flies; it has **not** been compared with v1.0 beyond that (see 2).
-- `bh_report.py` names every hot region; traces have PCs.
-- Fixed window: first 100 fields of the first training flight, anchored on the first c2p pass.
-- Frame counter: c2p passes (one displayed buffer, delta c2p). `frames.py` done;
-  `swap_fields.py` written, not validated.
-- Baseline on the A500-equivalent: 9.6 fps, c2p 16 % self, CPU-only renderer, CPU never idle.
+- A WHDLoad 20 KickEmu slave (`whdload/Battlehawks1942.s`) and a VERIFY build with an input
+  tape that reaches the first training flight.
+- `bh_report.py` names every hot region; traces have PCs. Frame counter: c2p passes.
+
+2026-10-07, second pass:
+- **Reproducibility fixed.** The JOY0DAT difference between boots was FS-UAE: with
+  `joystick_port_0=none` the port's mode stays `mouse` and the host mouse still moves the
+  counters. `run.sh` now also sets `joystick_port_N_mode=nothing` for `JOYN=none`; two
+  captures then compared `identical` (every register, DMA record and screenshot).
+- **Memory: only DMA data in chip RAM** (the user's rule). The slave gives 512 KB of fast
+  memory; BH's hunks are "any" memory and BH allocates sample data `MEMF_CHIP` and everything
+  else `MEMF_ANY` (bitplanes come from the OS), so code, data and chunky buffers moved to fast
+  memory with no patch to BH. The capture machine is now 68000 + 512 KB chip + **8 MB fast**
+  (room for the fast memory and PRELOAD of all three disks; without PRELOAD every disk read was
+  a WHDLoad OS switch: blinking, and a boot too slow for the tape).
+- **Benchmark scene: a left turn** (the user's choice). In flight the VERIFY slave feeds Left
+  characters straight into BH's frame loop on listed frame numbers (8 from frame 30, then
+  one every 10 frames); the plane ends up in a steep, descending turn (the flight model
+  levels small banks and tightens large ones). The window is 100 fields from **flight frame
+  90 by BH's own frame counter** (`26292(a4)`). Two captures armed at different tape fields:
+  `identical`.
+- **Kalms c2p: measured, rejected** (`docs/c2p.md`). The game's c2p is a delta pass and only
+  1–13 % of the view changes per frame; a full-frame Kalms-style merge c2p dropped the A500
+  from 9.7 to 5.7 fps.
+- **Game time: one simulation step per rendered frame** (profiling.md §9). No time source at
+  all; the flight loop `bh:6e48` runs input, simulation, render and c2p once per pass. Coupling
+  test: at flight frame 120 the normal slave and a slowed renderer (~9 instead of ~5.4 fields
+  per frame) leave identical game state but for 3 bytes (c2p scratch, sound sequencer).
+- **Baselines, the turn:** 68000 9.2 fps (chip-only slave 8.8), 68020 28.8 fps (§6).
 
 ## Not done yet, in order
 
-1. **Reproducibility, last step.** Two fresh captures: PCs, cycle costs and screenshots
-   identical in all 100 fields; registers/DMA differ, traced to JOY0DAT reading `$0000` vs
-   `$0101` at boot (profiling.md §7). Find where FS-UAE gets that value with `JOY0=none`
-   (host mouse over the window? power-on counter state?) or neutralise it in the VERIFY build,
-   then re-run `compare_traces.py` until it prints `identical`. Check whether BH reads the
-   mouse (it uses an input.device handler).
-2. **KickEmu slave vs v1.0.** Same fixed window, game state compared (BH data hunk). v1.0
-   needs its own tape timing (the reconstruction can take `tape.s` back if needed). Also decide
-   whether the normal (non-VERIFY) KickEmu build replaces v1.0 for players.
-3. **68020 / fast-RAM baseline** (playbook §8): `AMIGA_MODEL=A1200 ... CPU=68EC020 FAST_KB=4096`
-   with `fixed_window.sh` (BH still lands in chip: the slave gives no fast RAM; only the
-   Kickstart and the slave move). Then `SWAP_ONLY=1` on a 68030 to find the ceiling, and
-   validate `swap_fields.py` against a full trace on the same window.
-4. **Game-time model** (playbook §9) — nothing measured yet. Leads:
-   - no `VPOSR`/`VHPOSR`/CIA reads in BH hunk 0; the per-frame `timer.device` `SendIO`s seen
-     in the trace are the Kickstart's own (input.device's timer events), not BH's;
-   - BH's level-3 handler `bh:1ac26` runs every VBL (sound); check whether it or anything
-     else counts fields that the simulation reads;
-   - the frame time varies 4–6 fields: if the simulation steps once per frame, game speed
-     depends on CPU speed (Galahad's ReadMe: "the game is too fast" with fast RAM — a strong
-     hint that it does);
-   - `rand()` at `bh:1adb6`: find what seeds it (`bh:1adea`).
-   Then the state map (plane position/attitude/speed, drones), `state_*` tools adapted from
-   TD2/I500, and the coupling test (68000 vs 68020 vs slowed drawing).
-5. **CUSTOM gating** for the first patch, declared in `slv_config`, with a disabled-bytes
+1. **Seed BH's second random generator at flight start** in the VERIFY build (shift register
+   `bh:15bf8`, state `-6070/-6068(a4)`), then re-run the cross-CPU state comparison
+   (68000 vs 68020 at frame 120 now differs in 1059 bytes; profiling.md §9). With that, game
+   state can be compared between any two machines frame by frame: the tool for checking a
+   decoupling design.
+2. **The 68030 ceiling.** A 50 MHz `SWAP_ONLY` run found the flight already at frame 1539 when
+   the anchor was armed: map that machine's screens against the tape first.
+3. **The intended step length.** The simulation has no dt: every per-frame increment was tuned
+   for some frame rate. Recover it: plane position change per frame against the displayed
+   airspeed gives seconds per step. On the original A500 the game ran at 6–11 fps depending on
+   the scene, so its game speed already varied.
+4. **The state map** for the flight model (position `10908/11484/12060(a4)`, attitude
+   `14328/14952(a4)` integrated at `bh:79f0`, speed, the drones), from `STATE_ONLY` dumps.
+5. **v1.0 vs this slave.** v1.0 was chip-only by design ("too fast" with fast RAM); compare
+   the two on the same window by game state once a step-rate design exists.
+6. **CUSTOM gating** for the first patch, declared in `slv_config`, with a disabled-bytes
    checker (TD2's `check_disabled.py`).
 
-## Candidates (no claims until measured in the fixed window)
+## Decision for the user
 
-- The delta c2p (`bh:1a2c2`): 16 % self on the A500; its compare loop alone is 13 %. A
-  faster compare/convert, or skipping unchanged spans in bigger steps.
-- The fill at `bh:16114..` (5–8 %), probably the chunky-buffer clear.
-- Tearing: the c2p writes the visible bitplanes with no beam sync; a double-buffered display
-  would need chip RAM the 512 KB machine may not have.
+Game time is coupled to the frame rate, so a faster renderer, fast RAM or a faster CPU makes
+the whole game faster: on a 68020 the turn runs at 28.8 fps, so the whole game runs 3.1 times
+as fast as on the 68000. That is why Galahad shipped a chip-only slave, and the fast memory
+now in this slave speeds the game up too (5 % on the 68000). Possible designs:
 
-## Decision for the user (after item 4)
+- **A. Fixed-rate simulation, catch-up.** Run the simulation calls of the flight loop
+  (`bh:75ba`..`bh:de16`) at a fixed rate S from a field counter, as many steps per rendered
+  frame as are due, then render once. Game speed is constant and slow machines catch up, but
+  motion is only as smooth as S. Small patch (the loop is one function); S would be the
+  intended step rate (item 3; guess: near the A500's 6–11 fps), so 50 fps would show
+  repeated frames.
+- **B. Scaled step (dt).** Make every per-step increment proportional to the time since the
+  last frame: integrations of position, attitude, speed, timers, AI, sound triggers. Smooth
+  50 fps, but every rate in the simulation must be found and scaled, with fixed-point care.
+  Large reverse-engineering job; needs the state map first.
+- **C. A + interpolation.** Simulate at S, render at the display rate by interpolating object
+  and camera positions between the last two steps. Smooth 50 fps without touching the
+  simulation's rates, but the renderer must take interpolated inputs (camera, objects).
+- **D. Cap only.** Limit the frame rate to the A500's (e.g. 10 fps) so fast machines play at
+  the original speed. Trivial, but not the goal.
 
-As in TD2: whether a faster renderer may speed up the game, or game time must first be
-decoupled from the frame rate.
+Until then, keep the slave's fast memory? It follows the user's memory rule but changes game
+speed on fast machines; a `slv_MemConfig` alternative (chip-only, like v1.0) could keep the old
+behaviour selectable.
