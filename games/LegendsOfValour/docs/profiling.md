@@ -683,3 +683,72 @@ remain under ignored tmp; large traces/logs were deleted after analysis. W4-only
 normal/VERIFY/capture builds pass 68000/PIC checks. Local preferences and their
 tracked example now enable W1–W4 (mask 15). No interactive emulator was operated.
 W5–W6 and frame-independent timing remain open; W7 remains deferred.
+
+### W5 CPU-selected exact reciprocal cache (2026-10-07)
+
+CUSTOM2 bit 4 caches the exact two-DIVU quotient at eight ray-setup sites on
+68000/10. The 1,024-slot table stores Q32 and a complete divisor16 tag; collisions
+are misses, never approximations. Misses execute the original arithmetic and zero
+retains the original divide exception. The installer validates the entire skipped
+arithmetic and each continuation's D7/CCR liveness before writing any hook.
+See [w5-audit.md](w5-audit.md) and `tools/ray_liveness.py`.
+
+**Correctness:** the retained integration VERIFY SHA256
+`4690a396852cf44643a0f84c5b7d9fcc726ef5fbcda437ced5704418deeb7092` passes 262,140
+exhaustive cases per CPU: every nonzero divisor, both register orders, X clear/set,
+and varied coordinates. It also passes 70,720 A500 and 124,656 020 live comparisons.
+All fifteen registers and five flags are compared after the canonical unchanged
+continuation, which retains every quotient bit in D2. The raw optimized state is
+restored so the actual game continuation executes once. The final gated build's
+reciprocal core is byte-identical to this successful twin build. VERIFY can force
+it on either CPU. Reproduce with `tools/render_validate.sh w5-verify 31`, using
+the native FSUAE setting shown above.
+
+The CPU-independent candidate regressed on the 020: spin quotient costs
+87 → 134 main-task cycles/call; wall 86 → 105. The final installer consequently
+retains all eight original divide sequences on 68020+. Its final `w5-cpu` matrix
+uses CUSTOM2=15/31, CUSTOM5=1, 100 fields, both routes and CPUs, serial JOY0=none
+captures in amiga/.cap. All eight retained slave hashes are
+`9460c0eba3404bb0b79ecac15b17387d174b7fae346c45dca6042d2c726baf6f`.
+W6 is disabled in this retained development build.
+
+| Machine / route | fps off → on | Intervals / fields off → on | Quotient main cycles/call | Cache hit rate | Renderer main cycles/call |
+|---|---|---|---|---|---|
+| A500 spin | 3.1 → 3.2 | 5/80 → 6/94 | 291 → 286 | 71.0% | 1,190,811 → 1,175,668 |
+| A500 wall | 3.2 → 3.2 | 5/78 → 6/93 | 282 → 222 | 90.0% | 1,197,358 → 1,202,022 |
+| 020 spin | 16.0 → 16.0 | 30/94 → 30/94 | 87 → 87 | original divides | 602,309 → 602,309 |
+| 020 wall | 15.1 → 15.1 | 29/96 → 29/96 | 86 → 86 | original divides | 629,475 → 629,475 |
+
+A500 quotient cost falls 1.7% on spin and 21.3% on wall. Unrounded FPS improves
+2.1% / 0.6%. The wall renderer mean rises 0.4%; this is not a claim of overall
+renderer-cost improvement. Inclusive quotient costs are 302 → 324 on spin and
+296 → 237 on wall; interrupt timing affects those inclusive means. Counts are
+1,216/1,199 complete quotient scopes on spin, 1,309/1,195 on wall. Hit/miss totals
+are 851/348 and 1,076/119. The scopes include the whole cache adapter and exclude
+boundary-partial calls independently.
+
+Player position, heading and movement step match off/on on both routes and CPUs.
+Wall object snapshots and all four wall viewports match; spin visible-object snapshots
+change on the A500 despite corresponding whole screenshots matching. All off/on
+first/last whole screenshots match. This does not prove equal AI world state.
+The 020 on dumps pass all fifteen W3–W6 original ranges with expected mask 3,
+confirming that enabling the three CPU-gated bits leaves their hooks untouched.
+Existing movement/AI timing, the 25 fps cap and beam wait remain unchanged.
+
+![A500 W5 spin off/on first/last](../tmp/prof/w5-cpu-spin-a500-comparison.png)
+![68020 W5 spin off/on first/last](../tmp/prof/w5-cpu-spin-a1200-comparison.png)
+![A500 W5 wall off/on first/last](../tmp/prof/w5-cpu-wall-a500-comparison.png)
+![68020 W5 wall off/on first/last](../tmp/prof/w5-cpu-wall-a1200-comparison.png)
+
+Reproduce with §7 machine settings and `PROFILE_WINDOW=guest`:
+
+```sh
+FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" PROFILE_WINDOW=guest tools/ab_window.sh w5-cpu 15 31
+python3 tools/ab_summary.py w5-cpu
+```
+
+Retained builds, dumps, metadata, images, reports and state remain under ignored tmp;
+traces/logs were removed after analysis. W5-only normal/VERIFY/capture builds pass
+68000/PIC checks. Preferences and the tracked example enable W1–W5 (mask 31).
+No interactive emulator was operated. W6 measurements and frame-independent timing
+remain open; W7 remains deferred.

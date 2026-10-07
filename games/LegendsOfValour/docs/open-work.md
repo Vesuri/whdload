@@ -1,8 +1,8 @@
 # Open work — Legends of Valour
 
 Status 2026-10-07: playbook §1–§8 done (fixed window, frame counter, A500-eq. and 68020
-baselines; `docs/profiling.md` §6–§7). W0–W4 complete; measurements in §8. W2 uses
-MEMF_PUBLIC on every CPU. Next is W5, ray setup. Frame-rate-independent
+baselines; `docs/profiling.md` §6–§7). W0–W5 complete; measurements in §8. W2 uses
+MEMF_PUBLIC on every CPU. Next is W6, chunky clear. Frame-rate-independent
 simulation timing is required follow-up work (`docs/performance-plan.md` §2.3.1).
 
 ## Done
@@ -59,3 +59,6 @@ W7 (column-major layout and other later work) remains deferred by user decision.
 
 W4 is committed: counted sprite rows on 68000/10, original loops on 68020+.
 All three variants pass twins on both CPUs; final fixed-window A/B is in profiling §8.
+
+W5 is committed: exact tagged quotient cache on 68000/10, original divides on 020+.
+Exhaustive/live twins and final fixed-window A/B passed; evidence is in profiling §8.

@@ -5,8 +5,8 @@
 > (all of it), then this file.** Every number here is from that window unless marked
 > *estimate*; estimates must be replaced by measurements before anything is claimed.
 
-**Status 2026-10-07:** W0–W4 implemented and measured; evidence and exact commands in
-`docs/profiling.md` §8. W1–W4 are enabled in ignored local preferences (mask 15). W2 uses MEMF_PUBLIC on any CPU; W3 selects its unroll on 68000/10 and retains original 020+ code. W5–W6 remain open and W7 is deferred.
+**Status 2026-10-07:** W0–W5 implemented and measured; evidence and exact commands in
+`docs/profiling.md` §8. W1–W5 are enabled in ignored local preferences (mask 31). W2 uses MEMF_PUBLIC on any CPU; W3 selects its unroll on 68000/10 and retains original 020+ code. W6 remains open and W7 is deferred.
 The remaining items below are the work plan, not implemented features.
 
 ## 0. Ground rules (from CLAUDE.md and the playbook, restated because they bite)
@@ -369,7 +369,7 @@ by walls. Small but easy; good warm-up for the patch framework.
 
 - Chunky-buffer layout tricks (e.g. column-major chunky so wall/sprite columns write
   sequential bytes) would speed W3/W4 a lot but require a matching C2P (Kalms can't be used
-  as-is). Only if W1–W4 leave the renderer dominant.
+  as-is). Only if W1–W5 leave the renderer dominant.
 - Interrupt side: the module player in chip RAM (`$020124`, ~2–3% A500) — leave.
 - 25 fps cap and the beam wait in `h12:05e2a`: game design; only revisit with the user.
 - 68030/040/060: run `SWAP_ONLY` windows after W0 adapts `swap_fields.py`; Kalms' bm routine
@@ -397,4 +397,7 @@ fast RAM. The 25 fps cap remains intact; overclocked 68000 performance is unmeas
 4. Decided: defer W7 beyond W0/W1.
 
 W4 is complete: CPU-selected counted sprite rows, both-CPU twins and final A/B.
-W5–W6 remain pending; exact results and commands are in profiling §8.
+W6 remains pending; exact results and commands are in profiling §8.
+
+W5 is committed: exact tagged quotient cache on 68000/10, original divides on 020+.
+Exhaustive/live twins and final fixed-window A/B passed; evidence is in profiling §8.

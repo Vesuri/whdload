@@ -8,7 +8,7 @@ p.add_argument('capture',type=Path)
 p.add_argument('--base',type=lambda s:int(s,0),default=0xc00000)
 p.add_argument('--bits',type=lambda s:int(s,0),default=60)
 p.add_argument('--all-variants',action='store_true')
-p.add_argument('--require-current',action='store_true',help='require eight ray sites, CPU-safe flag reads and fixed-width clear coverage')
+p.add_argument('--require-current',action='store_true',help='require counted sprite rows, guarded quotient cache, CPU-safe flag reads and fixed-width clear coverage')
 a=p.parse_args();os.environ['SLAVE']=str(a.capture/'slave.slave')
 b=(a.capture/'code.bin').read_bytes();lst=(a.capture/'slave.lst').read_text(errors='replace')
 r={n:lo for lo,hi,n,o in regions(b,a.base)}
@@ -20,7 +20,11 @@ def read(n,fmt):
     return struct.unpack_from('>'+fmt,b,r['slave']-a.base+int(m[1],16))
 bits=read('_custom2','I')[0];verify=read('_custom5','I')[0]
 if a.require_current:
-    assert all(has(n) for n in ('_verify_ccr_patched','_verify_ccr_site_count','_w5_resume_7','_w6_clear_fallback','_w6_counts')),'capture is an older source revision'
+    required=['_verify_ccr_patched','_verify_ccr_site_count']
+    if a.bits & 8: required += ['_w4_chunk_0']
+    if a.bits & 16: required += ['_w5_resume_7','_w5_check_liveness','_w5_followup','_verify_sr_16']
+    if a.bits & 32: required += ['_w6_clear_fallback','_w6_counts']
+    assert all(has(n) for n in required),'capture is an older source revision'
 if re.search(r'^_verify_ccr_patched\s+00:',lst,re.M):
     newer=bool(read('_lov_attnflags','I')[0]&1)
     sites=read('_verify_ccr_site_count','H')[0] if has('_verify_ccr_site_count') else 15

@@ -52,6 +52,6 @@ PY
     "WHD_ARGS=CUSTOM2=$BITS" SELFTEST_FRAMES="${SELFTEST_FRAMES:-300}" \
     tools/fixed_window.sh "$out" tools/tapes/c2p-views.txt > "$out/capture.log" 2>&1
   python3 tools/c2p_check.py "$out" --base "$base" --require-all-views
-  python3 tools/render_check.py "$out" --base "$base" --bits "$TWINS" --all-variants > "$out/render-check.txt"
+  python3 tools/render_check.py "$out" --base "$base" --bits "$TWINS" --all-variants --require-current > "$out/render-check.txt"
   cat "$out/render-check.txt"
 done
