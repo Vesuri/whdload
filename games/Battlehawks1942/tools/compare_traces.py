@@ -6,9 +6,11 @@
 Compares each field's CPU instruction records (PC, cost and registers), DMA records and
 screenshot, and the chip RAM snapshot at the start of the trace. Whole-file `cmp` is
 meaningless: the slow-RAM snapshot holds WHDLoad/host bytes that differ between boots.
-Exit status 0 only if everything matches.
+Exit status 0 only if everything matches. Screenshots (JPEG) are compared without their
+outer strips (2 pixels left and right, the bottom 36 rows): on the 8 MB fast-RAM machine those
+differed between otherwise identical runs, outside the Amiga display.
 """
-import hashlib, os, sys
+import hashlib, io, os, sys
 sys.path.insert(0, os.path.dirname(__file__))
 import barto
 
@@ -19,11 +21,24 @@ if len(a.fields) != len(b.fields):
 if a.chip != b.chip:
     n = sum(x != y for x, y in zip(a.chip, b.chip))
     print(f'chip snapshot differs in {n} bytes'); bad += 1
+
+
+def same_shot(x, y):
+    if x == y:
+        return True
+    from PIL import Image, ImageChops
+    X, Y = (Image.open(io.BytesIO(s)).convert('RGB') for s in (x, y))
+    box = (2, 0, X.size[0] - 2, X.size[1] - 36)
+    return X.size == Y.size and not ImageChops.difference(X.crop(box), Y.crop(box)).getbbox()
+
+
 for fa, fb in zip(a.fields, b.fields):
     ia = hashlib.sha256(bytes(a.data[fa.insn_off:fa.insn_end])).digest()
     ib = hashlib.sha256(bytes(b.data[fb.insn_off:fb.insn_end])).digest()
-    diffs = [n for n, x, y in (('instructions', ia, ib), ('dma', bytes(fa.dma), bytes(fb.dma)),
-                               ('screenshot', fa.shot, fb.shot)) if x != y]
+    diffs = [n for n, x, y in (('instructions', ia, ib), ('dma', bytes(fa.dma), bytes(fb.dma)))
+             if x != y]
+    if not same_shot(fa.shot, fb.shot):
+        diffs.append('screenshot')
     if diffs:
         print(f'field {fa.index}: {", ".join(diffs)} differ'); bad += 1
 print('identical' if not bad else f'{bad} differences')

@@ -52,6 +52,12 @@ if [ -n "${PLAYBACK:-}" ]; then
   REC=(--record="$PWD/$RUN/playback.rec" --deterministic=1)
 fi
 [ "${DETERMINISTIC:-0}" = 1 ] && REC+=(--deterministic=1)
+# "none" only unplugs the host device: the port's mode stays "mouse" (FS-UAE's default for
+# port 0) and the host mouse still moves its counters (JOY0DAT differed between boots).
+PORTS=()
+for p in 0 1; do
+  v=JOY$p; [ "${!v:-}" = none ] && PORTS+=(--joystick_port_${p}_mode=nothing)
+done
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
 "${FSUAE:-fs-uae}" \
@@ -63,6 +69,6 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSE
   --joystick_port_0="${JOY0:-mouse}" --joystick_port_1="${JOY1:-keyboard}" \
   --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
   --ntsc_mode=0 --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
-  "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" ${EXTRA_ARGS:-} > "$RUN/fsuae.log" 2>&1 &
+  "${PORTS[@]}" "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" ${EXTRA_ARGS:-} > "$RUN/fsuae.log" 2>&1 &
 FSUAE_PID=$!; fsuae_track "$FSUAE_PID"
 echo "fs-uae pid $FSUAE_PID (log $RUN/fsuae.log, port $DEBUG_PORT)"
