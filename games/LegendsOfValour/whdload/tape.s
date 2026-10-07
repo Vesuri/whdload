@@ -116,6 +116,11 @@ _tape_next	lea	(_tapefield,pc),a0
 ; wait entry: look for button id (a1) at (2,a1)/(4,a1) in the last hit-tested list
 _tw_wait	btst	#5,(6,a1)		;H: wait for a heading, not a button
 		bne	_tw_heading
+	IFD VERIFY_WAIT_RESCUE
+		bsr	_tw_rescue
+		tst.w	d0
+		bne	_tape_next
+	ENDC
 		move.l	(_tapelist,pc),d0
 		moveq	#64-1,d1
 _tw_node	btst	#0,d0
@@ -142,6 +147,10 @@ _tw_anyid	move.w	(2,a1),d0
 		bgt	_tw_skip
 	;found: next entry
 _tw_advance
+	IFD VERIFY_WAIT_RESCUE
+		lea	(_tw_watch_fields,pc),a0
+		clr.w	(a0)
+	ENDC
 		lea	(_tapecnt,pc),a0
 		clr.w	(a0)
 		lea	(_tapeptr,pc),a0
@@ -153,6 +162,42 @@ _tw_advance
 _tw_skip	move.l	(a0),d0
 		dbf	d1,_tw_node
 		bra	_tape_next
+
+	IFD VERIFY_WAIT_RESCUE
+; Slow C2P twin runs can leave another panel active during a later W wait.
+; Pulse the EXIT/status-bar point only while waiting for the computer button.
+; This fixture is excluded from ordinary VERIFY and performance captures.
+_tw_rescue
+		move.l	(_custom5,pc),d0
+		btst	#1,d0
+		beq	.no
+		tst.w	(a1)
+		bne	.no
+		cmp.w	#15,(2,a1)
+		bne	.no
+		cmp.w	#188,(4,a1)
+		bne	.no
+		lea	(_tw_watch_fields,pc),a0
+		addq.w	#1,(a0)
+		cmp.w	#100,(a0)
+		blo	.no
+		cmp.w	#180,(a0)
+		bhs	.reset
+		move.l	(_h11,pc),a0
+		move.l	($5eb0,a0),d0
+		beq	.no
+		move.l	d0,a0
+		move.w	#75,($e,a0)
+		move.w	#183,($c,a0)
+		move.l	(_h12,pc),a0
+		move.w	#1,($5292,a0)
+		moveq	#1,d0
+		rts
+.reset	clr.w	(a0)
+.no		moveq	#0,d0
+		rts
+_tw_watch_fields dc.w 0
+	ENDC
 
 ; H entry: read game state, then release the turn input when the target is reached.
 ; The normal count path (including performance windows) has no additional work.

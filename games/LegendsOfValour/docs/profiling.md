@@ -620,3 +620,66 @@ by the plan. Normal/VERIFY/guest feature-prefix builds pass the assembler's PIC 
 W1–W3 are enabled in local preferences (mask 7); the next interactive boot builds
 the normal slave. No interactive emulator was started or modified. W4–W6 remain open,
 frame-independent timing remains required investigation, and W7 remains deferred.
+
+### W4 CPU-selected counted sprite rows (2026-10-07)
+
+CUSTOM2 bit 3 selects eight sprite rows per block on 68000/10. Fixed destination
+displacements replace per-row pointer stepping, with one counter update per block
+and an original-style short tail. Row-to-texel lookup, transparency, palette mapping,
+clipping and depth tests are unchanged. The replacement preserves all registers and
+X/N/Z/V/C. All three six-byte hooks are checked before writes; the boundary audit is
+in [w4-audit.md](w4-audit.md).
+
+**Correctness:** all three replacement bodies pass pixel/register/flag twins on both
+CPUs. The retained integration VERIFY SHA256 is
+`4690a396852cf44643a0f84c5b7d9fcc726ef5fbcda437ced5704418deeb7092`:
+A500 sprite variants 10,181 / 1,095 / 1,094; 020 variants 10,501 / 1,233 / 1,233.
+Both runs cover all view sizes and complete 300 large-view C2P twins after the anchor.
+The later CPU gate leaves the tested bodies unchanged; VERIFY may force them on either
+CPU. Use `FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" tools/render_validate.sh w4-verify 15`.
+
+The CPU-independent candidate changed 020 sprite-row cost by only 0.4–0.6%, with
+no measured FPS gain. The final installer consequently retains the original compact
+loops on 68020+. The final `w4-cpu` matrix uses CUSTOM2=7/15, CUSTOM5=1, 100 fields,
+both routes and both CPUs, serial JOY0=none captures in amiga/.cap. All eight retained
+slave hashes are `2aaaad468756b3090e04efe0be00b61eb8c84109398415cd26ed7a1baf4f240f`.
+Other prospective patches in this retained development build are disabled.
+
+| Machine / route | fps off → on | Intervals / fields off → on | Sprite inner main cycles/column | Main cycles/scanned pixel | Renderer main cycles/call |
+|---|---|---|---|---|---|
+| A500 spin | 3.0 → 3.1 | 5/82 → 5/80 | 5,619 → 5,111 | 63.03 → 57.34 | 1,196,465 → 1,190,811 |
+| A500 wall | 3.2 → 3.2 | 6/94 → 5/78 | 5,714 → 5,288 | 62.11 → 57.47 | 1,218,857 → 1,197,358 |
+| 020 spin | 15.8 → 15.8 | 30/95 → 30/95 | 1,637 → 1,637 | 22.23 → 22.23 | 603,849 → 603,849 |
+| 020 wall | 14.9 → 14.9 | 29/97 → 29/97 | 2,034 → 2,034 | 22.11 → 22.11 | 629,541 → 629,541 |
+
+A500 sprite-row cost falls 9.0% on spin and 7.5% on wall. Unrounded FPS improves
+2.5% / 0.4%. Complete sprite-inner counts are 335/335 (29,864 scanned pixels each)
+on spin, 231/198 (21,252/18,216 pixels) on wall. Inclusive inner costs are
+5,968 → 5,527 and 6,124 → 5,671 cycles/column. Transparent pixels count as scanned
+work. Independent boundary-partial calls are excluded from each routine.
+
+Pose, heading, movement step and visible-object snapshots match off/on on both
+routes and CPUs. All four wall viewports match on each machine. The 020 first/last
+whole screenshots match off/on; A500 whole screenshots differ outside the wall
+viewport, and spin frames differ in phase while turning. This is not equal-time AI
+world-state proof. Existing simulation timing, the 25 fps cap and beam wait remain.
+The 020 bit-3-on dumps also pass all fifteen W3–W6 disabled ranges with expected
+mask 3, confirming the wall and sprite hooks remain original despite those option bits.
+
+![A500 W4 spin off/on first/last](../tmp/prof/w4-cpu-spin-a500-comparison.png)
+![68020 W4 spin off/on first/last](../tmp/prof/w4-cpu-spin-a1200-comparison.png)
+![A500 W4 wall off/on first/last](../tmp/prof/w4-cpu-wall-a500-comparison.png)
+![68020 W4 wall off/on first/last](../tmp/prof/w4-cpu-wall-a1200-comparison.png)
+
+Reproduce with the §7 machine settings and native capture mode:
+
+```sh
+FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" PROFILE_WINDOW=guest tools/ab_window.sh w4-cpu 7 15
+python3 tools/ab_summary.py w4-cpu
+```
+
+Exact slave/listing, dumps, PC-base/restoration metadata, images, reports and state
+remain under ignored tmp; large traces/logs were deleted after analysis. W4-only
+normal/VERIFY/capture builds pass 68000/PIC checks. Local preferences and their
+tracked example now enable W1–W4 (mask 15). No interactive emulator was operated.
+W5–W6 and frame-independent timing remain open; W7 remains deferred.

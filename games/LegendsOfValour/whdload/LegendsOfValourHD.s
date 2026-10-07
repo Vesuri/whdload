@@ -94,12 +94,14 @@ slv_config	dc.b	"C1:B:character creation;"
 		dc.b	"C2:X:faster chunky-to-planar:0;"
 		dc.b	"C2:X:chunky buffer in public memory:1;"
 		dc.b	"C2:X:unrolled wall columns:2;"
+		dc.b	"C2:X:unrolled sprite columns:3;"
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
 		dc.b	"C5:X:C2P pixel twin (verification):1;"
 		dc.b	"C5:X:force chunky PUBLIC allocation failure (verification):2;"
 		dc.b	"C5:X:chunky allocation/free cycle (verification):3;"
 		dc.b	"C5:X:wall-column pixel/register twin (verification):4;"
+		dc.b	"C5:X:sprite-column pixel/register twin (verification):5;"
 	ENDC
 		dc.b	0
 	EVEN
@@ -247,6 +249,7 @@ _patchgame
 		bsr	_c2p_install
 		bsr	_w2_install
 		bsr	_w3_install
+		bsr	_w4_install
 	IFD VERIFY
 		bsr	_tape_install
 	ENDC
@@ -308,6 +311,7 @@ _h12		dc.l	0
 		INCLUDE	c2p.s
 		INCLUDE	chunky.s
 		INCLUDE	walls.s
+		INCLUDE	sprites.s
 
 	IFD VERIFY
 	IFD PROFILER_WINDOW

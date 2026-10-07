@@ -5,8 +5,8 @@
 > (all of it), then this file.** Every number here is from that window unless marked
 > *estimate*; estimates must be replaced by measurements before anything is claimed.
 
-**Status 2026-10-07:** W0–W3 implemented and measured; evidence and exact commands in
-`docs/profiling.md` §8. W1–W3 are enabled in ignored local preferences (mask 7). W2 uses MEMF_PUBLIC on any CPU; W3 selects its unroll on 68000/10 and retains original 020+ code. W4–W6 remain open and W7 is deferred.
+**Status 2026-10-07:** W0–W4 implemented and measured; evidence and exact commands in
+`docs/profiling.md` §8. W1–W4 are enabled in ignored local preferences (mask 15). W2 uses MEMF_PUBLIC on any CPU; W3 selects its unroll on 68000/10 and retains original 020+ code. W5–W6 remain open and W7 is deferred.
 The remaining items below are the work plan, not implemented features.
 
 ## 0. Ground rules (from CLAUDE.md and the playbook, restated because they bite)
@@ -395,3 +395,6 @@ fast RAM. The 25 fps cap remains intact; overclocked 68000 performance is unmeas
    W1 keeps movement/AI timing, the 25 fps cap, and beam wait intact.
 3. ~~Medium/small views~~: decided — convert an enclosing 32-pixel-multiple window (W1).
 4. Decided: defer W7 beyond W0/W1.
+
+W4 is complete: CPU-selected counted sprite rows, both-CPU twins and final A/B.
+W5–W6 remain pending; exact results and commands are in profiling §8.
