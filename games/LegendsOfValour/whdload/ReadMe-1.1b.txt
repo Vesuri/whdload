@@ -1,7 +1,8 @@
-Legends Of Valour - WHDLoad slave 1.1
+Legends Of Valour - WHDLoad slave 1.1b
+Beta release (the b suffix signifies beta).
 Reworked by Vesuri, based on the work of CFou!
 
-Changes in 1.1
+Changes in 1.1b
 -------------
 Rendering optimizations are enabled automatically, with routines selected for
 68000/68010 or 68020 and later processors. The chunky buffer uses PUBLIC memory,

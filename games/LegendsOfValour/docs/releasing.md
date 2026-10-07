@@ -9,11 +9,11 @@ Inputs and outputs:
 
 | Local input | Local output |
 |---|---|
-| `tmp/LegendsOfValour.lha` | `dist/LegendsOfValour-1.1.lha` |
-| `tmp/LegendsOfValour_v1.0_0837.lha` | `dist/LegendsOfValour_v1.1_0837.lha` |
+| `tmp/LegendsOfValour.lha` | `dist/LegendsOfValour-1.1b.lha` |
+| `tmp/LegendsOfValour_v1.0_0837.lha` | `dist/LegendsOfValour_v1.1b_0837.lha` |
 
 The command rebuilds the normal release slave with empty VASMFLAGS and checks
-its version and three-option menu. It prepends `whdload/ReadMe-1.1.txt` to each
+its version and three-option menu. It prepends `whdload/ReadMe-1.1b.txt` to each
 original ReadMe and updates the original memory requirement. Original credits
 and installation notes remain. Each archive retains exactly its original entry
 names and order. Only the Slave and ReadMe entries are replaced; every other

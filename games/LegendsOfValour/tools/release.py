@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build both local 1.1 distributions, changing only Slave and ReadMe entries."""
+"""Build both local 1.1b distributions, changing only Slave and ReadMe entries."""
 import os
 from pathlib import Path, PurePosixPath
 import shutil
@@ -12,8 +12,8 @@ from slave_info import code_hunk, header
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = (
-    ('LegendsOfValour.lha', 'LegendsOfValour-1.1.lha', 'LegendsOfValourHd'),
-    ('LegendsOfValour_v1.0_0837.lha', 'LegendsOfValour_v1.1_0837.lha', 'LegendsOfValour'),
+    ('LegendsOfValour.lha', 'LegendsOfValour-1.1b.lha', 'LegendsOfValourHd'),
+    ('LegendsOfValour_v1.0_0837.lha', 'LegendsOfValour_v1.1b_0837.lha', 'LegendsOfValour'),
 )
 
 
@@ -102,9 +102,9 @@ def main():
     info = header(code_hunk(slave_path)[0])
     expected = ('C1:B:Character creation;C2:X:Frame-independent game timing:6;'
                 'C2:X:Fine turning (1 degree):7;')
-    if info['ws_config'] != expected or 'Version 1.1 ' not in info['ws_info']:
-        raise SystemExit('Expected the version 1.1 release slave with three options')
-    notes = (ROOT / 'whdload/ReadMe-1.1.txt').read_bytes()
+    if info['ws_config'] != expected or 'Version 1.1b ' not in info['ws_info']:
+        raise SystemExit('Expected the version 1.1b release slave with three options')
+    notes = (ROOT / 'whdload/ReadMe-1.1b.txt').read_bytes()
     destination = ROOT / 'dist'
     destination.mkdir(exist_ok=True)
     # Stage and validate both before publishing either. All temporary bytes stay in tmp/.
