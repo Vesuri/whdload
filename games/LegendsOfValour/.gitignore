@@ -37,3 +37,6 @@ build/
 
 # Local performance preferences (amiga/performance.env.example is tracked).
 /amiga/performance.env
+
+# Local release archives (including original game/install contents).
+/dist/

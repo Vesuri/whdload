@@ -1,0 +1,43 @@
+Legends Of Valour - WHDLoad slave 1.1
+Reworked by Vesuri, based on the work of CFou!
+
+Changes in 1.1
+-------------
+Rendering optimizations are enabled automatically, with routines selected for
+68000/68010 or 68020 and later processors. The chunky buffer uses PUBLIC memory,
+allowing the system to use fast RAM when available. Allocation failure retains
+the original allocation path. Chunky-to-planar conversion uses routines by
+Mikael Kalms, adapted for this game.
+
+The WHDLoad options are:
+
+  Character creation             CUSTOM1=1
+  Frame-independent game timing  CUSTOM2 bit 6 (value 64)
+  Fine turning (1 degree)        CUSTOM2 bit 7 (value 128)
+
+Use CUSTOM2=192 to enable both timing and fine turning. Both are optional and
+off by default. The rendering optimizations need no custom tooltypes.
+
+Frame-independent timing advances simulation at 25 ticks per second and
+corrects animation pacing. On slower machines this can reduce rendering speed.
+The existing display cap and beam synchronization are retained.
+
+Fine turning gives one-degree taps and rendering angles while retaining the
+held-turn rate after a short initial delay. It can be selected independently
+of the timing option.
+
+Requirements and compatibility
+------------------------------
+WHDLoad 17 or later, an A500 Kickstart 1.3 image and its matching RTB file.
+The slave reserves 512 KiB chip memory and 656 KiB other memory; allow additional
+memory for WHDLoad, game allocations and optional features. Fast RAM is useful.
+This version was validated against the English game supplied in the 0837
+archive. The original release's other language/version support is recorded
+below but has not been revalidated for the new patches.
+
+F10 quits (or use the WHDLoad QuitKey tooltype).
+
+Original installation notes and credits follow. The memory requirement has
+been updated for this slave. The bundled legacy source, where present, is
+unchanged and describes the original 1.0 slave.
+
