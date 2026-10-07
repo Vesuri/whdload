@@ -4,18 +4,15 @@ Based on JOTD's public-domain v1.5 slave source. This is a local study build,
 not an official installer release. Only duel v1 receives the new options;
 v2's patch list and timing are unchanged.
 
-History — 2026-10-06 (1.6c)
-* Uses the WHDLoad 20.0 interface, official API headers and KickEmu sources.
-  Requires WHDLoad 20.0 or later. The installer source package includes them.
-* The reported A4000/68060 startup failure is still under investigation;
-  this change alone is not a verified fix.
-
-History — 2026-10-05 (1.6b)
+History — 2026-10-07 (1.6b, unreleased beta of 1.6: all changes since 1.5)
 * The enhancements below are one option, "Enhanced framerate" (CUSTOM2).
   WHDLoad options have no default value: add the tooltype CUSTOM2=1 to the
   game icon to enable it by default. CUSTOM2=0 runs the original game.
-* Sideways motion (steering, lane position and mountains) is smooth as well
-  when Enhanced framerate is enabled.
+* Sideways motion (steering, lane position and mountains) and hill crests are
+  smooth as well when Enhanced framerate is enabled.
+* Uses the WHDLoad 20.0 interface, official API headers and KickEmu sources.
+  Requires WHDLoad 20.0 or later. The installer source package includes them.
+* The reported A4000/68060 startup failure is still under investigation.
 * Sub-unit road and car position in both views (duel v1).
   Uses frame-latched 16.16 positions and fractional curve/hill integration;
   sprite size selection is unchanged.

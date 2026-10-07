@@ -9,7 +9,7 @@
 Commands and results below that name `CUSTOM2=1`/`2`/`3`/`4`/`5`/`7` predate 1.6b, when each
 feature was a separate bit; per-feature A/B runs now need a temporary build.
 
-**Current runtime requirement (1.6c):** WHDLoad 20.0 or later. The API and
+**Current runtime requirement (1.6b):** WHDLoad 20.0 or later. The API and
 KickEmu source baseline is pinned in the repo. `WHDLOAD_BINARY` selects a runtime
 without altering the shared installation; see [compatibility.md](compatibility.md)
 for 20.0 provenance and 68060 startup checks. Historical results below used 19.2.

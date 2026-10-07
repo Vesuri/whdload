@@ -1,6 +1,6 @@
 # WHDLoad 20.0 and 68060 compatibility
 
-## Source baseline (2026-10-06, slave 1.6c)
+## Source baseline (2026-10-06, slave 1.6b)
 
 The slave now requires WHDLoad 20.0 and builds against its official public-domain
 API headers, KickEmu sources and kick13.asm conventions. The archive SHA-256 and

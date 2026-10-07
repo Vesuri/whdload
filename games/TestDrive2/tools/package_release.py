@@ -26,7 +26,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-LHA = os.path.expanduser('/path/to/lha-compress')  # LHa for UNIX: Lhasa cannot create
+LHA = os.environ.get('LHA') or os.path.expanduser(  # LHa for UNIX: Lhasa cannot create
+    '/path/to/lha')
 INSTALLER = ROOT / 'tmp/TestDrive2.lha'
 PREINSTALLED = ROOT / 'tmp/TestDrive2_v1.5_0588.lha'
 SOURCES = ['TestDrive2HD.s', 'simulation.s', 'simulation-patches.i', 'simulation-verify.s',

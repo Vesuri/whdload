@@ -74,7 +74,7 @@ slv_keyexit	= $5D	; num '*'
 	ENDC
 
 DECL_VERSION:MACRO
-	dc.b	"1.6c"
+	dc.b	"1.6b"
 	IFD BARFLY
 		dc.b	" "
 		INCBIN	"T:date"

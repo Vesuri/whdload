@@ -1,12 +1,4 @@
- version 1.6c (06.10.2026) done by Vesuri:
- - updated the slave to the WHDLoad 20.0 interface and official KickEmu/API
-   source baseline; requires WHDLoad 20.0 or later
- - included the matching public-domain headers and KickEmu sources in the
-   installer source package for reproducible builds
- - this update does not yet establish a fix for the reported A4000/68060
-   black screen
-
- version 1.6b (05.10.2026) done by Vesuri:
+ version 1.6b (07.10.2026) done by Vesuri:
  - added the "Enhanced framerate" option (CUSTOM2), for the version of the game
    whose "duel" file is 108868 bytes long (the other version is unchanged):
    - the game logic runs at a fixed rate, independently of drawing: every 6
@@ -14,7 +6,8 @@
      Faster machines draw more frames without changing the game speed
    - the blitter gets bus priority and unused blitter interrupts are removed
    - the road and cars are drawn at fractional positions for smoother motion
-   - sideways motion (steering, lane position and mountains) is smooth as well
+   - sideways motion (steering, lane position and mountains) and hill crests
+     are smooth as well
    - measured in the first race: A500 7.1 fps (6.1 without the option),
      A1200 16.7 fps, 68030/25 MHz 25 fps until the car is at speed
    - after a crash or engine damage, the player's car recovers in about 5
@@ -25,4 +18,8 @@
  - fixed the cars jumping 16 pixels to the left for one frame in the
    introduction (an original bug: DDFSTOP was changed too late on the line
    above the car)
+ - updated the slave to the WHDLoad 20.0 interface and official KickEmu/API
+   source baseline; requires WHDLoad 20.0 or later. The installer source
+   package includes the matching public-domain headers and KickEmu sources
+ - the reported A4000/68060 black screen is not fixed yet
 

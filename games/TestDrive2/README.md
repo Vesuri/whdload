@@ -55,7 +55,7 @@ WHD_ARGS=CUSTOM2=1 SLAVE="$PWD/whdload/TestDrive2.slave" amiga/run.sh
 amiga/run-a1200.sh  # the same on an expanded A1200 (68EC020)
 ```
 
-The current slave (1.6c) requires WHDLoad 20.0 or later. Its public-domain API
+The current slave (1.6b, an unreleased beta of 1.6) requires WHDLoad 20.0 or later. Its public-domain API
 headers and KickEmu sources are pinned to the official 20.0 developer package;
 see [source provenance](whdload/whdload/README.md). The host launcher accepts
 `WHDLOAD_BINARY` and prefers this project's cached official runtime when present.

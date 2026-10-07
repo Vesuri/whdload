@@ -997,7 +997,8 @@ feature is committed as one coherent change.
 
 The user requires current WHDLoad 20.0 conventions and reports black-screen
 startup on A4000/68060 with both JOTD's original slave and 1.6b. The slave is
-migrated to a reproducible 20.0 source/header baseline (1.6c). KickEmu was already
+migrated to a reproducible 20.0 source/header baseline (first numbered 1.6c;
+all unreleased changes since 1.5 are now the 1.6b beta). KickEmu was already
 current; old shared API headers/runtime were 19.2. The template's version-20
 header and disabled MemConfig field are now explicit. All game patch lists are
 unchanged. See compatibility.md for source provenance, actual startup captures
@@ -1008,5 +1009,5 @@ Validation: 68000 startup plus 127/127 assertions and 76 original-byte ranges;
 68060-NOMMU off/on startup plus 127/127 assertions each; normal full-68060/MMU
 startup and 100 race fields. All use official WHDLoad 20.0 build 7051. The 68060
 runs use A1200 ROM/chipset and no JIT; they are not A4000 or physical-hardware
-confirmation. 1.6c installer sources rebuild to the identical normal slave;
+confirmation. The installer sources rebuild to the identical normal slave;
 both archives are rebuilt and verified. No new FPS benchmark was performed.
