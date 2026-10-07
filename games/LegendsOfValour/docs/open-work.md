@@ -4,8 +4,8 @@ Status 2026-10-07: playbook §1–§8 and W0–W6 complete. Fixed-window evidenc
 and commands are in `docs/profiling.md` §8. W2 uses MEMF_PUBLIC on every CPU;
 W3–W5 select their replacements on 68000/10 and retain original code on 020+.
 W6 improves the clear on both CPUs. W1–W6 are enabled in local preferences
-(mask 63). Frame-rate-independent simulation timing remains required follow-up
-work (`docs/performance-plan.md` §2.3.1); W7 remains deferred.
+(mask 63). Optional 25 Hz simulation timing and one-degree turning are implemented and
+validated separately; both remain off in persistent preferences. W7 remains deferred.
 
 ## Done
 
@@ -31,29 +31,41 @@ work (`docs/performance-plan.md` §2.3.1); W7 remains deferred.
   W1+W2 enabled in ignored local preferences (mask 3); audit in `docs/w2-audit.md`.
 - `swap_fields.py` agrees exactly with the full trace on the A500 fixed window.
 
-## Simulation timing goal (active)
+## Completed optional simulation timing
 
-The equal-time drawing-delay experiment now confirms AI coupling on both CPUs:
-52 of 56 decoded actor records diverge within each pair despite identical
-starting world state. The welcoming townsman is now identified as actor 43;
-his initial greeting freezes all actor state and the game clock for 100 fields
-on both CPUs. See `docs/timing-investigation.md` for intervals and
-limits. Fixed simulation ticks are proposed; 25 ticks/second versus 12.5 is
-awaiting the user's choice. No timing patch is implemented or enabled yet.
-Player/input, projectile, animation and pause handling must be covered together.
+CUSTOM2 bit 6 implements the user-selected 25 ticks/second, historical mouse/
+keyboard input, logical clocks, native pause/load boundaries and separate
+native-cadence combat. Shared animation pacing retains the user-accepted fix.
+Bit 7 independently enables one-degree turning. Preferences remain mask 63.
+
+Both CPUs pass matched completed-tick comparisons for world/AI, movement,
+turning, relative mouse input, collisions, animation, projectiles, daily events,
+message pauses, save/load, manual/automatic combat and keyboard escape. Native
+keyboard validation covers blocking reads, shift/repeat/ANSI, queue pressure,
+shutdown and real save-name editing. All eight W1 off/on repeated-mode captures
+pass, including negative heading wrap and no leaked motion at mode changes.
+
+Equal elapsed-field observations and completed-tick comparisons have different
+purposes: drawing can block world updates temporarily, then overdue ticks catch
+up. The tests show no lost active time, but do not promise instantaneous state
+identity or zero input latency. Maximum observed pending time in the deliberate
+slow-drawing tests is 27 PAL fields (540 ms). The final spin and wall A/B on both
+CPUs quantify the substantial A500 rendering cost. See profiling §8,
+[timing investigation](timing-investigation.md) and [source audit](simulation-audit.md).
+
+The normal interactive trial is launched in `tmp/playtest-simulation-final`:
+28,375,160 Hz 68020, 2 MB chip/8 MB fast, PAL, normal blitter timing, warp off,
+CUSTOM2=255. It uses the normal slave with no input tape or debugger. The
+previous private trial had exited; amiga/.run and persistent preferences remain
+untouched. Further subjective gameplay feedback is welcome, not an outstanding
+automated validation gate.
 
 ## Open questions
 
-- **Game time (§9).** Heading is `h11:08c28`, player x/y `h11:08c1c`/`08c20`;
-  `h12:14b78` reads movement step `h12:0cdd6` when initializing actor speed.
-  `docs/timing-investigation.md` maps a persistent 56-record actor table and its
-  renderer-driven position/countdown updates; the welcoming townsman is actor 43. The faster spin ends at a different heading
-  with unchanged position; frame coupling remains. `tools/lov_state.py` maps visible-object
-  render records and the new persistent-state observer identifies the townsman's world position. Deeper AI timing/state
-  mapping remains open. W1/W2 retain existing timing; investigate a
-  frame-rate-independent simulation step for movement, turning, animation and AI. Compare
-  equal elapsed-field intervals across rendering rates, then evaluate elapsed-time scaling
-  versus fixed ticks and A500 catch-up costs. See performance-plan §2.3.1 for the work plan.
+- **Timing follow-up is implemented.** The investigation now includes the
+  56-record actor map, clock/pause ownership, fixed ticks, native input/UI and
+  both-CPU state/performance evidence. Remaining unknown scripted-purpose labels
+  are identified as provisional; their native control flow is retained.
 - The conversation panel polls through h2, so `W` cannot wait for it; the route clicks EXIT
   blindly. A hook on its poll would make the route shorter.
 - Entropy: the windows are identical across boots, so VPOSR reads do not leak into this
@@ -81,10 +93,20 @@ Shared assets use ~/.local/share/amiga; projects are separate checkouts. ROM loo
 prefers shared files and retains verified fallbacks for ROMs not moved yet.
 
 
-## Optional one-degree turning
+## Interactive evaluation
 
-CUSTOM2 bit 7 adds one-degree rendering and taps, with the existing held-turn
-rate retained after 160 ms. Both-CPU table, full-angle ray, legacy-pixel, input
-and allocation checks pass. See [the implementation plan](one-degree-turning-plan.md)
-and profiling §8 for evidence, setup cost and interactive evaluation status.
-The feature is isolated from the unfinished simulation prototype; W7 stays deferred.
+The requested normal trial is open with timing and one-degree turning enabled.
+Its configuration and build hash are recorded in `simulation-audit.md`. Future
+changes based on play feedback should retain the explicit timing toggle and
+re-run the affected comparisons. W7 remains deferred.
+
+## One-degree turning
+
+The user requested a plan for finer turning after accepting the walking-animation
+correction. See [the one-degree turning plan](one-degree-turning-plan.md).
+CUSTOM2 bit 7 now implements optional one-degree rendering and taps, with native
+held-turn speed preserved after a 160 ms delay. Both-CPU automated table, full-angle
+ray, legacy-pixel, input and allocation checks pass; profiling §8 records the cost.
+Native save/load round trips pass on both CPUs; normal interactive evaluation
+is the remaining acceptance step.
+The one-degree source commit is separate from the simulation timing feature. W7 stays deferred.

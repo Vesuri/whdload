@@ -16,6 +16,7 @@
 ; buttons: bit 0 left, bit 1 right, bit 15 anchor (the entry's first field runs _tape_anchor),
 ; bit 14 (W): hold until the last hit-tested list has a button with id FIELDS
 ; (0: any) containing (x,y), instead of counting fields.
+; Bit 12 (D, with anchor): TIMING_STUDY drawing delay, selected at the anchor.
 ; Bit 13 (H, with bit 14): wait for heading h11:08c28 to equal FIELDS instead.
 ; The game hit-tests its current
 ; screen's list through h6:0076c (entries: next, id, x, y, w, h longs), which the tape hooks to
@@ -45,7 +46,10 @@ _tape_install	move.l	(_custom5,pc),d0
 	;load the tape
 		lea	(_tapename,pc),a0
 		lea	(_tape,pc),a1
-		move.l	(_resload,pc),a2
+
+        lea (_tape_install,pc),a2
+        adda.l #_resload-_tape_install,a2
+        move.l (a2),a2
 		jsr	(resload_LoadFile,a2)
 		cmp.l	#TAPEMAX,d0
 		bhi	.bad
@@ -62,13 +66,19 @@ _tape_install	move.l	(_custom5,pc),d0
 		move.w	#$4ef9,($76c,a0)
 		pea	(_tape_hit,pc)
 		move.l	(a7)+,($76e,a0)
-		move.l	(_resload,pc),a2
+
+        lea (_tape_install,pc),a2
+        adda.l #_resload-_tape_install,a2
+        move.l (a2),a2
 		jsr	(resload_FlushCache,a2)
 		movem.l	(a7)+,d1-d2/a1-a2
 .off		rts
 .bad		pea	(_tapebad,pc)
 		pea	TDREASON_FAILMSG
-		move.l	(_resload,pc),a2
+
+        lea (_tape_install,pc),a2
+        adda.l #_resload-_tape_install,a2
+        move.l (a2),a2
 		jmp	(resload_Abort,a2)
 
 ; replaces h12:05298 (bsr from the VBL server, which saved d0-a6 around the call)
@@ -100,7 +110,12 @@ _tape_vbl	move.l	(_tapeptr,pc),a1
 		bpl	_tape_next
 _tape_anchor
 	IFD TIMING_STUDY
-		lea (_timing_study_armed,pc),a0
+        move.l (_tapeptr,pc),a0
+        move.w (6,a0),d0
+        and.w #$1000,d0
+        lea (_timing_study_tape_delay,pc),a0
+        move.w d0,(a0)
+		lea (_timing_study_pending,pc),a0
 		move.w #1,(a0)
 	ENDC
 	IFD PROFILER_WINDOW
@@ -110,7 +125,12 @@ _profile_restored nop
 	ELSE
 		nop			;an entry marked A begins
 	ENDC
-_tape_next	lea	(_tapefield,pc),a0
+_tape_next
+	IFD TIMING_STUDY
+        bsr _timing_study_wait_ready
+        bsr _timing_study_input
+	ENDC
+        lea (_tapefield,pc),a0
 		addq.l	#1,(a0)
 		lea	(_tapelist,pc),a0
 		clr.l	(a0)
@@ -205,7 +225,32 @@ _tw_watch_fields dc.w 0
 
 ; H entry: read game state, then release the turn input when the target is reached.
 ; The normal count path (including performance windows) has no additional work.
-_tw_heading	move.l	(_h11,pc),a0
+_tw_heading
+        IFD TIMING_STUDY
+        ; A fixed tick rate can bring the greeting into an H wait. Pulse EXIT
+        ; while paused, then resume the tape's held turn. Verification only.
+        move.l (_h12,pc),a0
+        move.l a0,a2
+        adda.l #$a0c3,a0
+        tst.b (a0)
+        bne .heading_live
+        move.l (_h11,pc),a0
+        move.l ($5eb0,a0),d0
+        beq _tape_next
+        move.l d0,a0
+        move.w #75,($e,a0)
+        move.w #183,($c,a0)
+        move.l (_tapefield,pc),d0
+        and.w #63,d0
+        cmp.w #48,d0
+        scs d0
+        not.b d0
+        and.w #1,d0
+        move.w d0,($5292,a2)
+        bra _tape_next
+.heading_live
+        ENDC
+        move.l (_h11,pc),a0
 		add.l	#$8c28,a0
 		move.w	(a0),d0
 		cmp.w	(a1),d0

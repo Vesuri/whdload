@@ -18,7 +18,10 @@ _verify_ccr_install
         dbf d2,.site
         lea (_verify_ccr_patched,pc),a0
         move.w #(_verify_ccr_end-_verify_ccr_offsets)/4,(a0)
-        move.l (_resload,pc),a2
+
+        lea (_verify_ccr_install,pc),a2
+        adda.l #_resload-_verify_ccr_install,a2
+        move.l (a2),a2
         jsr (resload_FlushCache,a2)
 .done   movem.l (sp)+,d0-d2/a0-a2
         rts

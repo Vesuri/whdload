@@ -28,6 +28,16 @@
 ;
 ;---------------------------------------------------------------------------*
 
+; Optional fixed-rate simulation. Historical build-flag names are retained
+; for the recorded verification commands. Runtime CUSTOM2 bit 6 gates all
+; installation, task creation and allocation; normal builds include both parts.
+        IFND SIM_KEYBOARD_EXPERIMENT
+SIM_KEYBOARD_EXPERIMENT = 1
+        ENDC
+        IFND SIM_COMBAT_EXPERIMENT
+SIM_COMBAT_EXPERIMENT = 1
+        ENDC
+
 	IFND __VASM
 	INCDIR	Includes:
 	ENDC
@@ -97,6 +107,7 @@ slv_config	dc.b	"C1:B:character creation;"
 		dc.b	"C2:X:unrolled sprite columns:3;"
 		dc.b	"C2:X:cached ray reciprocals:4;"
 		dc.b	"C2:X:MOVEM chunky clear:5;"
+		dc.b	"C2:X:25 Hz simulation:6;"
 		dc.b	"C2:X:1 degree turning:7;"
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
@@ -257,6 +268,7 @@ _patchgame
 		bsr	_w4_install
 		bsr	_w5_install
 		bsr	_w6_install
+		bsr	_sim_install
 		bsr	_turn_install
 	IFD VERIFY
 	IFD TIMING_STUDY
@@ -325,6 +337,7 @@ _h12		dc.l	0
 		INCLUDE	sprites.s
 		INCLUDE	rays.s
 		INCLUDE	clear.s
+		INCLUDE	simulation.s
 		INCLUDE	turning.s
 
 	IFD VERIFY
@@ -355,5 +368,23 @@ _c2p_chunky
 	ENDC
 
 ;============================================================================
+
+        CNOP 0,4
+_sim_input_ring ds.b SIM_INPUT_SLOTS*SIM_INPUT_STRIDE
+	IFD SIM_COMBAT_EXPERIMENT
+_sim_combat_ring ds.b 512*12
+	ENDC
+
+	IFD VERIFY
+	IFD SIM_KEYBOARD_EXPERIMENT
+_sim_keys_readlog ds.b 64*12
+	ENDC
+	IFD TIMING_STUDY
+_timing_combat_records ds.b 64*32
+	IFD SIM_COMBAT_EXPERIMENT
+_timing_combat_clock_records ds.b 64*20
+	ENDC
+	ENDC
+	ENDC
 
 	END

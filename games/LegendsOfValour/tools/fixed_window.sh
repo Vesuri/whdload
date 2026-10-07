@@ -7,6 +7,7 @@
 # with SLAVE=$OUT/slave.slave.  One boot: the slave is in memory long before the anchor, so
 # its address is found from a dump and the anchor breakpoint armed in the same boot.
 #   FIELDS=100      fields traced          STATE_ONLY / SWAP_ONLY as in Test Drive II
+#   TAPE_CHECKPOINTS="before-save before-load" retains intermediate ordinary tape anchors
 #   CHIP_KB/FAST_KB/EXTRA_ARGS/CPU/AMIGA_MODEL/KICKSTART: machine (default A500-equivalent)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -32,6 +33,14 @@ for l in open('$OUT/slave.lst', errors='replace'):
     m = re.match(r'^$1\s+00:([0-9A-F]{8})\s*$', l)
     if m: print(hex(int(m.group(1), 16))); break"; }
 ANCHOR=$(sym _tape_anchor)
+STUDY_READY=$(sym _timing_study_ready)
+if [ -n "$STUDY_READY" ]; then ANCHOR=$STUDY_READY; fi
+if [ -n "${TAPE_CHECKPOINTS:-}" ] && { [ -n "$STUDY_READY" ] || [ "${PROFILE_WINDOW:-}" = guest ]; }; then
+  echo "TAPE_CHECKPOINTS requires ordinary VERIFY tape anchors" >&2; exit 1
+fi
+for checkpoint in ${TAPE_CHECKPOINTS:-}; do
+  [[ "$checkpoint" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "invalid checkpoint name" >&2; exit 1; }
+done
 if [ "${PROFILE_WINDOW:-}" = guest ]; then ANCHOR=$(sym _profile_ready); fi
 TAPEFIELD=$(sym _tapefield); H11=$(sym _h11)
 [ -n "$ANCHOR" ] && [ -n "$TAPEFIELD" ] || { echo "no _tape_anchor in $OUT/slave.lst" >&2; exit 1; }
@@ -82,18 +91,27 @@ echo "slave at $slave, anchor $(printf '%#x' $((slave + ANCHOR)))"
 ABORT=$(sym _c2p_abort)
 BREAKS=("$(printf '%#x' $((slave + ANCHOR)))")
 [ -z "$ABORT" ] || BREAKS+=("$(printf '%#x' $((slave + ABORT)))")
-{ echo "slave $slave"; lov until "${BREAKS[@]}"; } > "$OUT/anchor.txt"
-if [ -n "$ABORT" ] && grep -qi "$(printf '0x%08x' $((slave + ABORT)))" "$OUT/anchor.txt"; then
-  lov gdb 'x/s $a0' >> "$OUT/anchor.txt"
-  lov gdb 'info registers' > "$OUT/failure-registers.txt"
-  dump; retain_log
-  cat "$OUT/anchor.txt" >&2; exit 1
-fi
-if ! grep -Eq "^Breakpoint [0-9]+, 0x0*$(printf '%x' $((slave + ANCHOR)))[[:space:]]" "$OUT/anchor.txt"; then
-  dump; retain_log
-  cat "$OUT/anchor.txt" >&2
-  echo "tape anchor breakpoint was not reached" >&2; exit 1
-fi
+reach_anchor() {
+  { echo "slave $slave"; lov until "${BREAKS[@]}"; } > "$OUT/anchor.txt"
+  if [ -n "$ABORT" ] && grep -qi "$(printf '0x%08x' $((slave + ABORT)))" "$OUT/anchor.txt"; then
+    lov gdb 'x/s $a0' >> "$OUT/anchor.txt"
+    lov gdb 'info registers' > "$OUT/failure-registers.txt"
+    dump; retain_log
+    cat "$OUT/anchor.txt" >&2; exit 1
+  fi
+  if ! grep -Eq "^Breakpoint [0-9]+, 0x0*$(printf '%x' $((slave + ANCHOR)))[[:space:]]" "$OUT/anchor.txt"; then
+    dump; retain_log
+    cat "$OUT/anchor.txt" >&2
+    echo "tape anchor breakpoint was not reached" >&2; exit 1
+  fi
+}
+reach_anchor
+for checkpoint in ${TAPE_CHECKPOINTS:-}; do
+  dump
+  cp "$OUT/code.bin" "$OUT/$checkpoint.bin"
+  cp "$OUT/anchor.txt" "$OUT/$checkpoint-anchor.txt"
+  reach_anchor
+done
 if [ "${PROFILE_WINDOW:-}" = guest ]; then
   RESTORED=$(sym _profile_restored)
   [ -n "$RESTORED" ] || { echo "profiler restoration symbol missing" >&2; exit 1; }
@@ -159,6 +177,14 @@ delete" > "$OUT/selftest-gdb.txt"
 fi
 if [ "${TIMING_PAUSE:-0}" = 1 ]; then
   python3 tools/lov_timing_pause.py "$OUT" "$BASE"
+fi
+if [ "${KEYBOARD_EXIT:-0}" = 1 ]; then
+  python3 tools/lov_keyboard_exit.py "$OUT" --base "$BASE"
+  dump; lov quit > /dev/null; trap - EXIT; retain_log
+  echo "keyboard teardown capture complete"; exit 0
+fi
+if [ "${STATE_TICKS:-0}" -gt 0 ]; then
+  python3 tools/lov_timing_fields.py "$STATE_TICKS" "$OUT/ticks" "$OUT" "$BASE" --ticks
 fi
 if [ "${STATE_FIELDS:-0}" -gt 0 ]; then
   python3 tools/lov_timing_fields.py "$STATE_FIELDS" "$OUT/state" "$OUT" "$BASE"

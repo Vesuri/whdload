@@ -934,3 +934,99 @@ Reports, listings, state and first/last images remain in
 An earlier stationary route stopped inside a conversation on 020 and was
 rejected, not included above. Detailed correctness and input coverage is in
 [the turning plan](one-degree-turning-plan.md).
+
+### Optional 25 Hz simulation: spin cost (2026-10-07)
+
+The completed spin A/B uses `tools/tapes/timing-perf-spin.txt`, which adds 1500
+startup fields of conversation EXIT pulses to the earlier spin route. Both
+CPUs use §7 settings, normal blitter timing, JOY0=none, the guest profiler and
+100 PAL fields. W1–W6 stay enabled: CUSTOM2=63 versus 127. One-degree turning
+is off. The exact same retained PROFILE slave is used for all four windows:
+SHA256 `b9e64e62b5212c8687b4293b7491db6762a5d85b130b12453dbf51b30866c8a9`.
+
+| CPU | Timing off fps | Timing on fps | Completed C2P calls off / on | C2P main-task cycles/call off → on |
+|---|---:|---:|---:|---:|
+| A500 equivalent | 3.3 | 1.2 | 6 / 2 | 502,197 → 498,513 |
+| 14 MHz 68020 + fast RAM | 16.2 | 15.2 | 33 / 30 | 143,997 → 144,356 |
+
+FPS uses display intervals: 6 intervals/92 fields and 1/43 on A500, 32/99 and
+30/99 on 020. The short A500 timing-on window contains only two display events;
+its single interval is a limited sample, not a general frame-rate guarantee.
+Player position agrees but headings and visible objects differ within both A/B
+pairs. Original movement steps are 48 (A500) and 12 (020), versus the timing
+patch's constant 10. These are observed total costs of changing simulation
+behavior, not a rendering speedup or matched-scene comparison.
+
+`lov_simulation_cost.py` separates calls entering h12:027e6 (drawing) from
+logic-only calls. Means exclude the return instruction and boundary-partial
+calls. Main-task classification uses the existing stack-distance heuristic;
+inclusive cost includes interrupts and worker scheduling.
+
+| Timing-on scope | A500 calls | A500 main / inclusive cycles | 020 calls | 020 main / inclusive cycles |
+|---|---:|---:|---:|---:|
+| Renderer, drawing | 2 | 1,219,850 / 1,327,288 | 30 | 580,463 / 594,609 |
+| Renderer, logic only | 47 | 68,044 / 74,562 | 20 | 26,664 / 27,742 |
+| Whole tick, drawing | 2 | 2,178,431 / 2,364,518 | 29 | 867,015 / 888,605 |
+| Whole tick, logic only | 47 | 163,873 / 178,155 | 20 | 76,162 / 77,547 |
+
+A500 catch-up tick main-task costs range from 146,728 to 219,894 cycles. The
+25 Hz world updates take substantial CPU time and reduce drawing throughput.
+A renderer mean mixing drawing and logic-only calls would hide this cost;
+`render_report.py`'s aggregate is therefore insufficient by itself.
+
+All four captures pass `check_disabled.py --display-timing`: the frame cap,
+display clock call and beam-wait instruction ranges are original. Timing-off
+captures preserve all 53 declared inactive ranges (timing plus fine turning);
+timing-on captures preserve all seven inactive fine-turning ranges and pass
+W2 PUBLIC ownership. Code preservation does not by itself prove absence of
+tearing; both observed frame rates remain below the native 25 fps cap.
+
+```sh
+FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" \
+  PROFILE_WINDOW=guest KEEP_TRACE=1 \
+  tools/ab_window.sh simulation-final-long 63 127 timing-perf-spin 'a1200 a500'
+python3 tools/ab_summary.py simulation-final-long
+# For each retained capture, use --base 0xc00000 (A500) or 0x200000 (020):
+python3 tools/lov_simulation_cost.py CAPTURE --base BASE
+python3 tools/check_disabled.py CAPTURE --base BASE --custom2 MASK --display-timing
+```
+
+The broader wall matrix is incomplete: its A500 timing-on window remains in
+the townsman's conversation and contains no display events. That window is
+rejected. The first, shorter-startup matrix also caught a 020 conversation.
+Neither is included in the completed spin comparison above. Traces, listings,
+state, code-invariant reports and first/last images are retained under
+`tmp/prof/simulation-final-long-timing-perf-spin-*`.
+
+### Optional 25 Hz simulation: completed wall A/B
+
+The replacement `timing-perf-wall-clear.txt` route adds 3000 fields of native
+EXIT pulses after reaching the wall heading, then waits 1000 fields. All four
+`simulation-wall-final-timing-perf-wall-clear-*` windows show gameplay, with
+normal blitter timing and 100 PAL fields. Their PROFILE slave hash is the same
+`b9e64e62b5212c8687b4293b7491db6762a5d85b130b12453dbf51b30866c8a9` used above.
+
+| CPU | Timing off → on fps | Display intervals / fields off → on | C2P calls off / on | C2P main cycles/call off → on |
+|---|---:|---|---:|---:|
+| A500 equivalent | 3.3 → 1.3 | 6/92 → 2/76 | 7 / 3 | 503,739 → 506,227 |
+| 14 MHz 020 + fast RAM | 15.5 → 13.4 | 30/97 → 26/97 | 31 / 27 | 144,161 → 144,879 |
+
+Timing-on whole catch-up ticks average 152,623 main / 165,603 inclusive cycles
+on A500 (45 complete ticks), and 70,740 / 71,543 on 020 (23 ticks). Drawing
+ticks average 2,201,014 / 2,385,312 on A500 (2 ticks) and 973,783 / 998,563 on
+020 (26 ticks). All captures pass the cap/beam-code and inactive-hook checks;
+timing-on captures pass PUBLIC ownership.
+
+Player position stays (5216,3616), but the historical-input queue settles past
+the tape's heading threshold: off/on headings are 150/165 on A500 and 150/160
+on 020. Visible objects also differ. This is a valid fixed-window total-cost
+comparison, not a matched-pose rendering benchmark. The first/last screenshots
+were retained; the A500 comparison sheet confirms the conversation is closed.
+No direct rendering speedup is claimed.
+
+```sh
+FSUAE="$HOME/.local/share/amiga/fs-uae-arm/fs-uae" \
+  PROFILE_WINDOW=guest KEEP_TRACE=1 \
+  tools/ab_window.sh simulation-wall-final 63 127 timing-perf-wall-clear 'a500 a1200'
+python3 tools/ab_summary.py simulation-wall-final
+```

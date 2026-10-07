@@ -9,7 +9,8 @@
 and commands are in `docs/profiling.md` §8. W1–W6 are enabled in ignored local
 preferences (mask 63). W2 uses MEMF_PUBLIC on every CPU. W3–W5 select replacements
 on 68000/10; 020+ retain original code. W6 selects MOVEM clear on both CPUs.
-Frame-independent simulation timing (§2.3.1) remains open; W7 remains deferred.
+Frame-independent simulation timing (§2.3.1) is implemented and validated as
+CUSTOM2 bit 6; one-degree turning is separate on bit 7. W7 remains deferred.
 The candidate ideas below are retained as design context, not unfinished requirements.
 
 ## 0. Ground rules (from CLAUDE.md and the playbook, restated because they bite)
@@ -130,7 +131,14 @@ Consequences:
   view area (rows 16..108 of the screen). **A faster C2P reduces tearing; do not remove the
   wait** without checking a fast CPU for tearing (Test Drive II's lesson).
 
-### 2.3.1 Required follow-up: frame-rate-independent simulation timing
+### 2.3.1 Frame-rate-independent simulation timing — implemented
+
+Current result: optional 25 Hz ticks, native input/pause/load/combat ownership,
+both-CPU completed-tick and equal-field observations, W1 off/on coverage, and
+fixed-window spin/wall costs are recorded in `docs/simulation-audit.md`,
+`docs/timing-investigation.md` and profiling §8. The cap and beam wait retain
+original code. The normal 28 MHz 020 trial is launched separately. The numbered
+items below preserve the original requirements and design rationale.
 
 The user's acceptance of existing timing applies to W1 compatibility; it does not close
 this investigation. Investigate a simulation time step independent of rendered frames,
@@ -152,8 +160,7 @@ as separate constraints while investigating.
    when the design is concrete. Validate equal-time player/AI progression across rendering
    rates as well as performance, including the existing cap and display synchronization.
 
-W1 keeps its existing timing behaviour. This follow-up remains required alongside the
-remaining performance work; W7's layout deferral does not defer the timing investigation.
+W1 keeps its existing timing behaviour. This follow-up is now delivered separately from W1–W6; W7 remains deferred.
 
 ### 2.4 Slave infrastructure that exists
 
