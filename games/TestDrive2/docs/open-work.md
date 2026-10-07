@@ -923,10 +923,21 @@ discrete. This delivers smoother positions at unchanged measured FPS.
    clock assumes 50 per second, so on NTSC physics and clock would run 20% fast.
 2. **Natural police pursuit.** The counters are unit-tested; a chase in ordinary
    play has never been captured.
-3. **Beyond 25 fps (user decision).** A fast-RAM back buffer drawn by the CPU
-   and copied to chip (68030+). Unmeasured; the CPU shape results argue against it.
-4. Rendering candidates under the 3% rule (span store pairing, projection
-   caching, early DMA clear) stay skipped unless a new measurement changes that.
+3. **Slope stepping.** The road walker still reads the slope table at the high
+   byte of the 8.8 angle, so hills step vertically as the heading table did
+   sideways. The sideways tangent interpolation is the model; keep within 3%.
+4. **68060 black screen** (see the 2026-10-06 section): waits on the user's
+   accelerator/ROM/WHDLoad/MMU details.
+
+**Dropped (user decisions, 2026-10-07):** do not propose these again unless
+the user reopens them.
+- **A500 frame rate:** 7.1 fps is accepted as it is. Rendering candidates under
+  the 3% rule (span store pairing, projection caching, early DMA clear) are not
+  pursued.
+- **Beyond 25 fps:** the fast-RAM CPU back buffer (68030+) is dropped for now.
+- **Smoother car/object sizes:** sprites are pre-drawn at fixed sizes; per-frame
+  scaling is not viable, and load-time in-between sizes are not worth their chip
+  RAM and appearance cost.
 
 ### Tooling debts (fix when they bite, not before)
 
