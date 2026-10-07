@@ -6,8 +6,8 @@
 > *estimate*; estimates must be replaced by measurements before anything is claimed.
 
 **Status 2026-10-07:** W0–W6 implemented, verified and measured; exact evidence
-and commands are in `docs/profiling.md` §8. W1–W6 are enabled in ignored local
-preferences (mask 63). W2 uses MEMF_PUBLIC on every CPU. W3–W5 select replacements
+and commands are in `docs/profiling.md` §8. Release builds enable W1–W6 automatically; developer and VERIFY builds retain
+individual switches for A/B testing. W2 uses MEMF_PUBLIC on every CPU. W3–W5 select replacements
 on 68000/10; 020+ retain original code. W6 selects MOVEM clear on both CPUs.
 Frame-independent simulation timing (§2.3.1) is implemented and validated as
 CUSTOM2 bit 6; one-degree turning is separate on bit 7. W7 was dropped by user decision on 2026-10-07.
@@ -17,7 +17,9 @@ The candidate ideas below are retained as design context, not unfinished require
 
 - Every change ships as a **WHDLoad slave patch** in `whdload/LegendsOfValourHD.s`, applied in
   `_patchgame` after the PowerPacker stub has loaded the 17 hunks. No game bytes in git.
-- Every change is **gated by a CUSTOM bit** declared in `slv_config`. With the bit off, the
+- In developer/VERIFY builds, every change is **gated by a CUSTOM bit** declared in
+  `slv_config`. Release builds always enable W1–W6 and expose only the player-facing
+  options. In developer/VERIFY builds, with the bit off, the
   original bytes must be untouched (write a checker, as Test Drive II's `check_disabled.py`).
   CUSTOM1 is taken (character creation), CUSTOM5 is the VERIFY input tape. Proposal:
   **CUSTOM2 = performance patches, one bit per item** (`C2:X:faster chunky-to-planar:0;`,

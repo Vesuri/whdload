@@ -28,6 +28,14 @@
 ;
 ;---------------------------------------------------------------------------*
 
+; VERIFY keeps independent performance switches for reproducible A/B captures.
+; DEVELOPER also exposes them without including verification instruments.
+        IFD VERIFY
+        IFND DEVELOPER
+DEVELOPER = 1
+        ENDC
+        ENDC
+
 ; Optional fixed-rate simulation. Historical build-flag names are retained
 ; for the recorded verification commands. Runtime CUSTOM2 bit 6 gates all
 ; installation, task creation and allocation; normal builds include both parts.
@@ -100,15 +108,17 @@ slv_copy	dc.b	"1992 US-GOLD.",0
 slv_info	dc.b	"Reworked by Vesuri",10
 		dc.b	"based on the work of CFou!",10
 		dc.b	"Version 1.1 (08.10.2026)",0
-slv_config	dc.b	"C1:B:character creation;"
+slv_config	dc.b	"C1:B:Character creation;"
+	IFD DEVELOPER
 		dc.b	"C2:X:faster chunky-to-planar:0;"
 		dc.b	"C2:X:chunky buffer in public memory:1;"
 		dc.b	"C2:X:unrolled wall columns:2;"
 		dc.b	"C2:X:unrolled sprite columns:3;"
 		dc.b	"C2:X:cached ray reciprocals:4;"
 		dc.b	"C2:X:MOVEM chunky clear:5;"
-		dc.b	"C2:X:25 Hz simulation:6;"
-		dc.b	"C2:X:1 degree turning:7;"
+	ENDC
+		dc.b	"C2:X:Frame-independent game timing:6;"
+		dc.b	"C2:X:Fine turning (1 degree):7;"
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
 		dc.b	"C5:X:C2P pixel twin (verification):1;"
@@ -132,6 +142,13 @@ _bootdos	lea	(_saveregs,pc),a0
 
 		lea	(_tag,pc),a0
 		jsr	(resload_Control,a2)
+	IFND DEVELOPER
+	; Release builds always select W1-W6. Preserve the player-facing bits
+	; and their existing tooltype values; individual installers retain CPU
+	; selection and allocation fallback. Use an address register for the write.
+		lea	(_custom2,pc),a0
+		ori.l	#$3f,(a0)
+	ENDC
 
 	;open doslib
 		lea	(_dosname,pc),a1

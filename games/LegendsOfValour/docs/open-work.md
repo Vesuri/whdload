@@ -3,8 +3,8 @@
 Status 2026-10-07: playbook §1–§8 and W0–W6 complete. Fixed-window evidence
 and commands are in `docs/profiling.md` §8. W2 uses MEMF_PUBLIC on every CPU;
 W3–W5 select their replacements on 68000/10 and retain original code on 020+.
-W6 improves the clear on both CPUs. W1–W6 are enabled in local preferences
-(mask 63). Optional 25 Hz simulation timing and one-degree turning are implemented and
+W6 improves the clear on both CPUs. Release builds enable W1–W6 automatically;
+individual switches remain available in developer and VERIFY builds. Optional 25 Hz simulation timing and one-degree turning are implemented and
 validated separately; both remain off in persistent preferences. W7 was dropped by user decision on 2026-10-07.
 
 ## Done
@@ -111,3 +111,23 @@ ray, legacy-pixel, input and allocation checks pass; profiling §8 records the c
 Native save/load round trips pass on both CPUs; normal interactive evaluation
 is the remaining acceptance step.
 The one-degree source commit is separate from the simulation timing feature. W7 has been dropped.
+
+## Release options
+
+Normal builds expose only character creation, frame-independent game timing and
+fine turning (1 degree). W1–W6 are automatic, with existing CPU selection and
+allocation fallbacks. CUSTOM2 bits 6 and 7 retain their existing meanings and
+remain opt-in; older tooltypes still work. Bits 0–5 cannot disable release patches.
+
+`make -C whdload developer` retains the six independent performance switches
+without verification instruments. `make -C whdload verify` also retains them and
+adds the verification options. Existing A/B capture masks are unchanged in these
+builds. For `check_disabled.py`, pass the effective mask: requested CUSTOM2 OR 63
+for a release build, or the requested mask for a developer/VERIFY build.
+
+Validation: release, developer and VERIFY variants assemble successfully. Binary
+header checks confirm 3, 9 and 17 menu entries respectively, with timing/turning
+still on bits 6/7. The emitted startup code sets the low six bits only in release
+builds and targets the CUSTOM2 storage correctly. Rendering implementations are
+unchanged; no new emulator captures or performance claims accompany this UI/default
+change. Builds remain under ignored `tmp/build-*-options/`.

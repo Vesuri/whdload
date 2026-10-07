@@ -2,6 +2,7 @@
 # source; LegendsOfValourHD.s is rebuilt from its disassembly).  Not byte-identical to the
 # shipped slave: kick13.s is the vendored 2025 copy (whdload/), the original used 2005's.
 #   make            LegendsOfValour.Slave
+#   make developer  independent performance switches, no verification instruments
 #   make verify     same with -DVERIFY=1 (verification instruments; never ship)
 WHDLOAD ?= $(HOME)/.local/share/amiga/WHDLoad
 NDK ?= $(HOME)/.local/opt/m68k-amiga-elf/sys-include
@@ -10,7 +11,7 @@ NDK ?= $(HOME)/.local/opt/m68k-amiga-elf/sys-include
 VASM ?= $(if $(wildcard ../tmp/vasm-native-src/vasm/vasmm68k_mot),../tmp/vasm-native-src/vasm/vasmm68k_mot,$(HOME)/.local/vasmm68k_mot)
 VASMFLAGS ?=
 
-.PHONY: all verify clean FORCE
+.PHONY: all developer verify clean FORCE
 OUT ?= ../tmp/build
 SLAVE = $(OUT)/LegendsOfValour.Slave
 all: $(SLAVE)
@@ -19,6 +20,9 @@ all: $(SLAVE)
 $(SLAVE): LegendsOfValourHD.s FORCE
 	mkdir -p "$(OUT)"
 	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym -L $(@:.Slave=.lst) $(VASMFLAGS) -I. -I"$(WHDLOAD)/Include" -I"$(NDK)" -o $@ $<
+
+developer:
+	$(MAKE) all VASMFLAGS="$(VASMFLAGS) -DDEVELOPER=1"
 
 verify:
 	$(MAKE) all VASMFLAGS="$(VASMFLAGS) -DVERIFY=1"
