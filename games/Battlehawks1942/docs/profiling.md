@@ -248,6 +248,23 @@ A touched emulator window is input: people watching can move the mouse over it.
 **Verdict: one simulation step per rendered frame; nothing measures time.** Game speed is
 proportional to the frame rate (6–11 fps on the A500, depending on the scene).
 
+**But the step has a size: `T = 10184(a4)`**, the same design as Their Finest Hour's T
+(`Their Finest Hour'sdocs/profiling.md` §10), except that BH does not benchmark it.
+The mission setup (`bh:132cc`, at `bh:1341c`) sets `T = 10182(a4) × b / 16`, minimum 3, where
+`10182(a4) = 7` is a constant (`bh:054a`) and `b` is byte 16 of the mission's 17-byte record
+(table `-16984(a4)`, index `9835(a4)`). Over the first 40 records b is 12, 14, 15, 16 or 20,
+so T is 5–8 (7 in the turn window; 7 in both the 68000 and 68020 dumps). Derived at the same
+time: `10186(a4) = T/8 + 1`; `bh:1351e` picks 16 instead of 8 when `T > 10`.
+- 25 `divu.w 10184(a4)` sites scale per-step quantities: the stick from the controller
+  (`bh:7934`..`797a`, `bh:800e`..`8056`) and sites in `bh:c9f2`, `bh:11152`..`bh:12bf0`.
+  Other sites read T for multiplying or adding (for example `bh:e7b2`, `bh:e7d8`).
+- Timers are counted in units of T: `bh:0246` loads a countdown with `T/2` frames.
+- Two busy-wait delays are counted in CPU loops scaled by T (`bh:030a`: 1000 × T × n
+  iterations; `bh:12b8`: `10182(a4)` × n × 1000), so they shorten on faster CPUs.
+- **Working model (unverified):** a step is 1/T seconds, and T is the designers' estimate of
+  each mission's frame rate on an A500. Not yet known: whether everything time-dependent
+  goes through T (drones, bullets, AI and sound timers, gravity).
+
 Evidence:
 - **No time source.** BH's OS calls (by library base and LVO, all `movea.l N(a4),a6; jmp
   -LVO(a6)` stubs): exec (memory, signals, devices), dos (files), intuition (screens,

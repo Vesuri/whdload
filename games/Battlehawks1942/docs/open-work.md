@@ -49,10 +49,11 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
    decoupling design.
 2. **The 68030 ceiling.** A 50 MHz `SWAP_ONLY` run found the flight already at frame 1539 when
    the anchor was armed: map that machine's screens against the tape first.
-3. **The intended step length.** The simulation has no dt: every per-frame increment was tuned
-   for some frame rate. Recover it: plane position change per frame against the displayed
-   airspeed gives seconds per step. On the original A500 the game ran at 6–11 fps depending on
-   the scene, so its game speed already varied.
+3. **How far T reaches.** The simulation divides per-step quantities by `T = 10184(a4)`
+   (5–8 per mission, profiling.md §9). Test whether everything time-dependent goes through
+   it: in VERIFY, force T = 14 instead of 7 with the input on doubled frame numbers, and
+   compare game state at frame 2N against T = 7 at frame N. Matching quantities are T-scaled;
+   the rest (and truncation in the divisions) is what a dynamic T would get wrong.
 4. **The state map** for the flight model (position `10908/11484/12060(a4)`, attitude
    `14328/14952(a4)` integrated at `bh:79f0`, speed, the drones), from `STATE_ONLY` dumps.
 5. **v1.0 vs this slave.** v1.0 was chip-only by design ("too fast" with fast RAM); compare
@@ -80,6 +81,10 @@ now in this slave speeds the game up too (5 % on the 68000). Possible designs:
 - **C. A + interpolation.** Simulate at S, render at the display rate by interpolating object
   and camera positions between the last two steps. Smooth 50 fps without touching the
   simulation's rates, but the renderer must take interpolated inputs (camera, objects).
+- **E. Dynamic T** (the user's question, 2026-10-07): set `10184(a4)` each frame from the
+  measured fields per frame, one step per rendered frame as now. B with the plumbing already
+  in the game, if item 3 shows T reaches everything. Its variant: **fixed T with fixed
+  steps** (T = 50 or 25, one step per elapsed field or two, as in Stunt Car Racer and Revs).
 - **D. Cap only.** Limit the frame rate to the A500's (e.g. 10 fps) so fast machines play at
   the original speed. Trivial, but not the goal.
 
