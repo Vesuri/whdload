@@ -96,6 +96,15 @@ pl_bh		PL_START
 	IFD	VERIFY
 		PL_PS	$075be,tape_key		;flight input on exact frames (tape.s)
 		PL_NOP	$075c4,2		;the rest of move.w d0,10280(a4)
+	IFD	TSCALE
+		PL_PS	$1344e,t_scale		;experiment: T x TSCALE (tape.s)
+	ENDC
+	IFD	STICKREF
+		PL_L	$7934,$80fc0007		;experiment: stick / reference T (7, mission 0)
+		PL_L	$794a,$80fc0007		;in place of divu.w 10184(a4),d0
+		PL_L	$7966,$80fc0007
+		PL_L	$797a,$80fc0007
+	ENDC
 	ENDC
 	IFD	C2P_FULL
 		PL_P	$1a2c2,c2p_full		;experiment: full-frame merge c2p

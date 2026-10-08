@@ -143,19 +143,47 @@ tape_key:
 	rts
 
 ; (flight frame, character); 0 ends it.
+; With TSCALE (the T experiment, t_scale below) a step is 1/TSCALE as long: each press at
+; frame F becomes TSCALE presses ending at frame F*TSCALE, the same game time and the same
+; total stick (the controller divides it by T). With STICKREF the stick divides by the
+; mission's reference T instead (as a fix would), so one press per original press.
+	IFND	TSCALE
+TSCALE	= 1
+	ENDC
+FLIGHT_KEY	MACRO
+	IFD	STICKREF
+	dc.w	\1*TSCALE,CHAR_LEFT	;one press: the stick no longer divides by T
+	MEXIT
+	ENDC
+R	SET	TSCALE-1
+	REPT	TSCALE
+	dc.w	\1*TSCALE-R,CHAR_LEFT
+R	SET	R-1
+	ENDR
+	ENDM
 tape_flight:
 F	SET	30
 	REPT	8
-	dc.w	F,CHAR_LEFT
+	FLIGHT_KEY	F
 F	SET	F+3
 	ENDR
 F	SET	60
 	REPT	400
-	dc.w	F,CHAR_LEFT
+	FLIGHT_KEY	F
 F	SET	F+10
 	ENDR
 	dc.w	0
 tape_flight_pos:	dc.w	0		;offset of the next entry
+
+; The T experiment (make tscale TSCALE=n, docs/profiling.md §9): BH divides per-step
+; quantities by T = 10184(a4), set per mission at bh:1341c. Multiply it, in place of
+; move.w 10184(a4),d0; lsr.w #3,d0 at bh:1344e (10186(a4) = T/8 + 1 follows).
+t_scale:
+	move.w	(10184,a4),d0
+	mulu	#TSCALE,d0
+	move.w	d0,(10184,a4)
+	lsr.w	#3,d0
+	rts
 
 ; Read by tools/fixed_window.sh (gdb, read-only): fields counted so far, and the field of
 ; the last Return (the window anchors on the first flight frame after it). The marker locates them in memory.

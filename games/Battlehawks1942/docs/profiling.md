@@ -261,9 +261,35 @@ time: `10186(a4) = T/8 + 1`; `bh:1351e` picks 16 instead of 8 when `T > 10`.
 - Timers are counted in units of T: `bh:0246` loads a countdown with `T/2` frames.
 - Two busy-wait delays are counted in CPU loops scaled by T (`bh:030a`: 1000 × T × n
   iterations; `bh:12b8`: `10182(a4)` × n × 1000), so they shorten on faster CPUs.
-- **Working model (unverified):** a step is 1/T seconds, and T is the designers' estimate of
-  each mission's frame rate on an A500. Not yet known: whether everything time-dependent
-  goes through T (drones, bullets, AI and sound timers, gravity).
+- **Working model:** a step is 1/T seconds, and T is the designers' estimate of each
+  mission's frame rate on an A500. The coverage test below supports it for the flight model.
+
+**Coverage test** (2026-10-08, `make tscale TSCALE=2 [STICKREF=1]`, `tools/tscale_compare.py`):
+the VERIFY slave multiplies T by 2 at `bh:1344e` (14 in the turn mission) and the tape gives
+each press at frame 2F instead of F, so frame 2N is the game time of frame N at T = 7.
+`STATE_ONLY` dumps at T = 7 frames 60/120/240 and T = 14 frames 120/240; the world arrays are
+144 slots of longs, x `10908(a4)`, y `11484(a4)`, z `12060(a4)` (slot 0 the player).
+- **Drones** (slots 1–8): over game time 60→120 they move the same distance at T = 14 as at
+  T = 7 (major-axis ratios 0.98–1.02, two outliers 1.06 and 1.18 on short axes). At the same
+  number of steps they are elsewhere. Their motion goes through T.
+- **Countdowns** set from T follow it (`10320(a4)`: 3 at T = 7, 7 at T = 14).
+- **The pool at slot 128** (`bh:1351e`, 8 slots for T ≤ 10, else 16) is full at both T;
+  its objects respawn, so displacement does not compare. 16 slots is all there is (the arrays
+  end at slot 143), so at T = 50 these objects would recycle early. To find: what they are.
+- **The stick does not follow T.** `bh:0110` sets `10308(a4)` per frame: mouse counts since
+  the last frame × 128, or for a key −2112 (Left) for one step, ramping by 4096 when the same
+  key repeats within T/2 frames. `bh:7920` divides it by T into `28506(a4)`, which the
+  attitude integrator `bh:79f0` adds per step. A mouse count per frame is already a rate, and
+  a key press lasts one step whatever its length, so dividing by T again makes response fall
+  as T rises (TFH has the same: its fix scales the stick by T/8). With the doubled tape the
+  second press ramped, and the player's displacement over game time 60→120 was 46.5 % off.
+- **With `STICKREF`** the four stick divisions (`bh:7934`..`797a`) divide by the reference
+  T 7 instead, and the tape gives one press per original press (at 2F): the player's
+  displacement over game time 60→120 is within **4.1 %** of T = 7 (25,025 units), attitude
+  word `14328(a4)` within 348/65,536.
+- Not explained: a few hundred data words that follow steps, not time (`tscale_compare.py`
+  output; render scratch and the sound sequencer among them, unnamed so far) and words that
+  differ only at T = 14 (tables or the larger pool).
 
 Evidence:
 - **No time source.** BH's OS calls (by library base and LVO, all `movea.l N(a4),a6; jmp

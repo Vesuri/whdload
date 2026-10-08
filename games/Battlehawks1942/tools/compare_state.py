@@ -23,15 +23,17 @@ def data(d, base):
     return mem[lo - mbase:hi - mbase]
 
 
-base = int(sys.argv[3], 0) if len(sys.argv) > 3 else 0x200000
-a, b = data(sys.argv[1], base), data(sys.argv[2], base)
-diff = [i for i in range(min(len(a), len(b))) if a[i] != b[i]]
-print(f'bh-data: {len(a)} bytes, {len(diff)} differ')
-runs, start = [], None
-for i, o in enumerate(diff):
-    if start is None: start = o
-    if i + 1 == len(diff) or diff[i + 1] > o + 4:
-        runs.append((start, o)); start = None
-for s, e in runs[:60]:
-    # a4 = data hunk + $7FFE: print the a4 offset the code uses
-    print(f'  bh-data:{s:05x}..{e:05x} ({s - 0x7ffe:+d}(a4))  {a[s:e + 1].hex()[:32]}  {b[s:e + 1].hex()[:32]}')
+
+if __name__ == '__main__':
+    base = int(sys.argv[3], 0) if len(sys.argv) > 3 else 0x200000
+    a, b = data(sys.argv[1], base), data(sys.argv[2], base)
+    diff = [i for i in range(min(len(a), len(b))) if a[i] != b[i]]
+    print(f'bh-data: {len(a)} bytes, {len(diff)} differ')
+    runs, start = [], None
+    for i, o in enumerate(diff):
+        if start is None: start = o
+        if i + 1 == len(diff) or diff[i + 1] > o + 4:
+            runs.append((start, o)); start = None
+    for s, e in runs[:60]:
+        # a4 = data hunk + $7FFE: print the a4 offset the code uses
+        print(f'  bh-data:{s:05x}..{e:05x} ({s - 0x7ffe:+d}(a4))  {a[s:e + 1].hex()[:32]}  {b[s:e + 1].hex()[:32]}')

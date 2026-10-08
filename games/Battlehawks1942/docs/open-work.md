@@ -38,6 +38,8 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   all; the flight loop `bh:6e48` runs input, simulation, render and c2p once per pass. Coupling
   test: at flight frame 120 the normal slave and a slowed renderer (~9 instead of ~5.4 fields
   per frame) leave identical game state but for 3 bytes (c2p scratch, sound sequencer).
+- **T coverage** (2026-10-08): with T doubled and the stick divided by the reference T,
+  player and drones cover the same ground in the same game time (4.1 %, 1–2 %).
 - **Baselines, the turn:** 68000 9.2 fps (chip-only slave 8.8), 68020 28.8 fps (§6).
 
 ## Not done yet, in order
@@ -49,11 +51,13 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
    decoupling design.
 2. **The 68030 ceiling.** A 50 MHz `SWAP_ONLY` run found the flight already at frame 1539 when
    the anchor was armed: map that machine's screens against the tape first.
-3. **How far T reaches.** The simulation divides per-step quantities by `T = 10184(a4)`
-   (5–8 per mission, profiling.md §9). Test whether everything time-dependent goes through
-   it: in VERIFY, force T = 14 instead of 7 with the input on doubled frame numbers, and
-   compare game state at frame 2N against T = 7 at frame N. Matching quantities are T-scaled;
-   the rest (and truncation in the divisions) is what a dynamic T would get wrong.
+3. **Dynamic T for BH**, after TFH's `CUSTOM4` (`Their Finest Hour`,
+   `whdload/timing.s`) is finished: the coverage test (profiling.md §9) shows the flight
+   model and the drones follow T and the stick needs the reference-T division. BH also needs
+   its own field counter (no VBL count exists), T restored at mission setup (`bh:1341c`),
+   `10186(a4)` and countdowns recomputed, the slot-128 pool sized for T = 50 (16 slots is all
+   there is), the two T-scaled busy-wait delays replaced with field waits, and TFH's
+   truncation work at large T.
 4. **The state map** for the flight model (position `10908/11484/12060(a4)`, attitude
    `14328/14952(a4)` integrated at `bh:79f0`, speed, the drones), from `STATE_ONLY` dumps.
 5. **v1.0 vs this slave.** v1.0 was chip-only by design ("too fast" with fast RAM); compare
