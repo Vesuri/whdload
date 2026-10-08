@@ -107,7 +107,8 @@ def regions(dump, base, chip=b''):
         out.append((a, a + alloc, f'h{n}', a))
         link = mem.long(a - 4)
         a = link * 4 + 4 if link else None
-    kick = open(os.path.expanduser('~/.local/share/amiga/Kickstarts/kick34005.A500'), 'rb').read()
+    kick = open(os.environ.get('KICK13') or os.path.expanduser(
+        '~/.local/share/amiga/Kickstarts/kick34005.A500'), 'rb').read()
     a = locate(dump, kick[:0x40000], base, 256)
     if a: out.append((a, a + 0x40000, 'kick', a - 0xfc0000))  # name by ROM address
     slave = slave_info.code_hunk(os.environ.get('SLAVE') or SLAVE)[0]

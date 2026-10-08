@@ -4,7 +4,7 @@ Used by fixed_window.sh STATE_FIELDS with the emulator stopped at the tape ancho
 """
 import argparse, contextlib, json, os, re, shutil, socket, tempfile
 from pathlib import Path
-from lov import SOCK
+from lov import ROOT, SCRATCH, SOCK
 from lov_report import regions
 from lov_timing_state import decode, simulation_symbols, simulation_state
 
@@ -18,11 +18,11 @@ def command(s):
 
 @contextlib.contextmanager
 def retained_snapshots(out):
-    # This GDB version does not accept quoted/spaced dump filenames. Keep its
-    # paths in the system temp directory, then retain even incomplete output.
-    with tempfile.TemporaryDirectory(prefix='lov-timing-') as temp:
+    # gdb cannot quote dump file names: give it a path relative to its cwd (the repo
+    # root), then retain even incomplete output.
+    with tempfile.TemporaryDirectory(prefix='lov-timing-', dir=Path(ROOT, SCRATCH)) as temp:
         try:
-            yield temp
+            yield os.path.relpath(temp, ROOT)
         finally:
             for snapshot in Path(temp).glob('*.bin'):
                 shutil.move(str(snapshot), out/snapshot.name)
@@ -91,9 +91,9 @@ def main():
         lines += [f'delete {variable}' for variable in guards]
         (a.out/'gdb.txt').write_text(command('\n'.join(lines)))
         for i in range(a.fields+1):
-            if not all(Path(temp,f'{i:04d}-{label}.bin').exists() for label,lo,hi in spans):
+            if not all(Path(ROOT,temp,f'{i:04d}-{label}.bin').exists() for label,lo,hi in spans):
                 break
-            parts=[(lo,hi,Path(temp,f'{i:04d}-{label}.bin').read_bytes()) for label,lo,hi in spans]
+            parts=[(lo,hi,Path(ROOT,temp,f'{i:04d}-{label}.bin').read_bytes()) for label,lo,hi in spans]
             def read(at,n):
                 for lo,hi,b in parts:
                     if lo<=at and at+n<=hi:return b[at-lo:at-lo+n]

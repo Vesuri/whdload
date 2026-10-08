@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from lov import ROOT, SCRATCH
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('capture', type=Path)
@@ -28,9 +29,10 @@ def until(address, label):
     assert match and int(match[1],16)==address, text
 
 def dump(address, size, label):
-    path = Path(f'/tmp/lov-key-exit-{os.getpid()}.bin')
+    name = f'{SCRATCH}/lov-key-exit-{os.getpid()}.bin'
+    path = Path(ROOT, name)
     try:
-        lov('gdb',f'dump binary memory {path} {address:#x} {address+size:#x}')
+        lov('gdb',f'dump binary memory {name} {address:#x} {address+size:#x}')
         data = path.read_bytes()
         (root/(label+'.bin')).write_bytes(data)
         assert len(data)==size

@@ -5,6 +5,7 @@ Use only amiga/.cap; retain all game-derived material under tmp/.
 """
 import argparse, hashlib, json, os, subprocess, sys, time
 from pathlib import Path
+from lov import SCRATCH
 from lov_report import regions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,12 +45,13 @@ def boot(anchor=None):
         time.sleep(1)
     raise RuntimeError('server did not start')
 def dump(name, start, end):
-    temporary = f'/tmp/lov-behaviour-{os.getpid()}.bin'
+    temporary = f'{SCRATCH}/lov-behaviour-{os.getpid()}.bin'
     reply = command('gdb', f'dump binary memory {temporary} {start:#x} {end:#x}')
     if 'ERROR' in reply:
         raise RuntimeError(reply)
-    data = Path(temporary).read_bytes()
-    Path(temporary).unlink()
+    path = ROOT/temporary
+    data = path.read_bytes()
+    path.unlink()
     (a.out/name).write_bytes(data)
     return data
 if sock.exists():

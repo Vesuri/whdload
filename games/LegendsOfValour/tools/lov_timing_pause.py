@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from lov import ROOT, SCRATCH
 from lov_timing_fields import command
 from lov_timing_state import decode
 from lov_report import regions
@@ -35,9 +36,9 @@ def main():
         raise RuntimeError('expected a known pause entry: ' + result)
     offset = int(match[1], 16) - h12
     def snapshot(name):
-        with tempfile.TemporaryDirectory(prefix='lov-pause-') as temp:
+        with tempfile.TemporaryDirectory(prefix='lov-pause-', dir=Path(ROOT, SCRATCH)) as temp:
             path = Path(temp, 'memory.bin')
-            command(f'dump binary memory {path} {a.base:#x} {a.base+len(initial):#x}')
+            command(f'dump binary memory {os.path.relpath(path, ROOT)} {a.base:#x} {a.base+len(initial):#x}')
             data = path.read_bytes()
         (a.capture / f'{name}.bin').write_bytes(data)
         return decode(lambda at,n: data[at-a.base:at-a.base+n], h11, h12)

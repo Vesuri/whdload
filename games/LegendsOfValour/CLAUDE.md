@@ -15,6 +15,10 @@ patches.
 - Addresses in docs are **`hN:OFFSET` offsets into hunk N of the decrunched AMIGA2** (the slave's
   game patches are hunk-1 offsets), `slave+OFFSET` slave code-hunk offsets, or `kick:` ROM
   addresses — never absolute addresses.
+- **No machine-specific paths** in tracked files: no `/Users/...` or `~/Documents`-style paths, no
+  paths into other projects (name them as "Project relative/path"). Shared Amiga files come from
+  `~/.local/share/amiga` through the overridable variables in `amiga/env.sh`; scratch output goes
+  to `tmp/`. Docs describe the current state; history belongs in git.
 - Commits: author Vesa Halttunen <vesuri@jormas.com>, unsigned, no hooks, no Co-Authored-By lines.
   One commit per coherent feature.
 - Never `pkill fs-uae` or `pkill gdb` (other projects run emulators): `fsuae_common.sh` kills only
@@ -28,7 +32,10 @@ patches.
 
 | Doc | Read it when |
 |---|---|
-| `docs/open-work.md` | **First.** What is known, what blocks a gameplay window, ordered work items |
+| `docs/open-work.md` | **First.** Current state and what is still open |
 | `docs/profiling.md` | Running the game, driving it, tracing it, or quoting any performance number |
-| `docs/performance-plan.md` | Before changing any game code for speed: hot path, game-time constraints, ordered work items |
+| `docs/performance-patches.md` | Before changing any rendering code: pipeline, game time, W1–W6 hooks and invariants |
+| `docs/simulation-timing.md` | Before touching the optional game timing (CUSTOM2 bit 6) |
+| `docs/one-degree-turning.md` | Before touching the optional fine turning (CUSTOM2 bit 7) |
+| `docs/releasing.md` | Building the release archives |
 | Test Drive 2 `docs/new-game-playbook.md` | The method this repo follows (set up from Test Drive II) |

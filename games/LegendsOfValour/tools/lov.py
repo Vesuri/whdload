@@ -25,6 +25,9 @@ CAP = os.environ.get('FSUAE_RUN', '.cap')
 RUN = os.path.join(ROOT, 'amiga', CAP)
 SOCK = os.path.join(RUN, 'lov.sock')
 GDB = os.path.expanduser('~/.local/opt/bin/m68k-amiga-elf-gdb')
+# gdb runs in the repo root and cannot quote file names, so dump paths are given relative to
+# it (SCRATCH), clear of the space in the checkout path.
+SCRATCH = 'tmp/scratch'
 SENT = '@@LOV-DONE@@'
 
 
@@ -32,8 +35,9 @@ class Gdb:
     def __init__(self, port):
         env = dict(os.environ, HOME=os.path.join(RUN, 'gdbhome'))
         os.makedirs(env['HOME'], exist_ok=True)
+        os.makedirs(os.path.join(ROOT, SCRATCH), exist_ok=True)
         self.p = subprocess.Popen([GDB, '-q', '-nx'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                  stderr=subprocess.STDOUT, env=env, bufsize=0)
+                                  stderr=subprocess.STDOUT, env=env, cwd=ROOT, bufsize=0)
         self.buf = b''
         self.running = False
         self.profiler_pc_base = None

@@ -67,7 +67,7 @@ for _ in $(seq 1 "${SERVE_WAIT:-180}"); do
 done
 grep -q serving amiga/$CAP/serve.log || { echo "server did not start" >&2; exit 1; }
 
-dump() { lov gdb "dump binary memory /tmp/lov-code-$$.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv /tmp/lov-code-$$.bin "$OUT/code.bin"; }
+dump() { lov gdb "dump binary memory tmp/scratch/lov-code-$$.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv tmp/scratch/lov-code-$$.bin "$OUT/code.bin"; }
 region() { python3 -c "
 import sys; sys.path.insert(0, 'tools'); from lov_report import regions
 r = {n: lo for lo, hi, n, o in regions(open('$OUT/code.bin', 'rb').read(), $BASE)}
@@ -134,18 +134,18 @@ cat "$OUT/anchor.txt"
 # Refresh after decrunching: the early slave-location dump need not contain game hunks.
 dump
 if [ "${PROFILE_WINDOW:-}" = guest ]; then
-  lov gdb "dump binary memory /tmp/lov-profiler-chip-$$.bin 0x1000 0x1020" > /dev/null
-  mv /tmp/lov-profiler-chip-$$.bin "$OUT/profiler-chip.bin"
+  lov gdb "dump binary memory tmp/scratch/lov-profiler-chip-$$.bin 0x1000 0x1020" > /dev/null
+  mv tmp/scratch/lov-profiler-chip-$$.bin "$OUT/profiler-chip.bin"
   PROFSTATE=$(sym _profile_state)
   proftask=$(lov gdb "x/1xw $(printf '%#x' $((slave + PROFSTATE + 2)))" | awk '{print $2}')
-  lov gdb "dump binary memory /tmp/lov-profiler-task-$$.bin $(printf '%#x' $((proftask + 128))) $(printf '%#x' $((proftask + 144)))" > /dev/null
-  mv /tmp/lov-profiler-task-$$.bin "$OUT/profiler-task.bin"
+  lov gdb "dump binary memory tmp/scratch/lov-profiler-task-$$.bin $(printf '%#x' $((proftask + 128))) $(printf '%#x' $((proftask + 144)))" > /dev/null
+  mv tmp/scratch/lov-profiler-task-$$.bin "$OUT/profiler-task.bin"
   python3 tools/profile_window_check.py "$OUT" --base "$BASE"
 fi
 turning_check() {
   if [ "${TURNING_CHECK:-0}" = 1 ]; then
-    lov gdb "dump binary memory /tmp/lov-turning-chip-$$.bin 0 $(printf '%#x' $((CHIP_KB * 1024)))" > /dev/null
-    mv /tmp/lov-turning-chip-$$.bin "$OUT/chip.bin"
+    lov gdb "dump binary memory tmp/scratch/lov-turning-chip-$$.bin 0 $(printf '%#x' $((CHIP_KB * 1024)))" > /dev/null
+    mv tmp/scratch/lov-turning-chip-$$.bin "$OUT/chip.bin"
     python3 tools/turning_check.py "$OUT" --base "$BASE" ${TURNING_CHECK_ARGS:-}
   fi
 }

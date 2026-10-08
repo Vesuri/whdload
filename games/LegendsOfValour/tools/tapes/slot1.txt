@@ -1,6 +1,0 @@
-# Start screen -> load button -> slot 1 -> (whatever loading an empty slot does).
-3000 51 174 -     # wait at the load button (start screen is up by ~field 2400)
-10   51 174 L     # click: save-slot screen
-300  112 47 -     # move to slot 1
-10   112 47 L     # click slot 1
-0    112 47 -

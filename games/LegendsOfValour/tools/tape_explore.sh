@@ -26,14 +26,14 @@ until grep -q serving amiga/$CAP/serve.log 2>/dev/null; do sleep 1; done
 slave=
 for _ in $(seq 1 60); do
   python3 tools/lov.py wait 0.5 > /dev/null
-  python3 tools/lov.py gdb "dump binary memory /tmp/lov-explore-$$.bin $BASE $(printf %#x $((BASE + SIZE)))" > /dev/null
+  python3 tools/lov.py gdb "dump binary memory tmp/scratch/lov-explore-$$.bin $BASE $(printf %#x $((BASE + SIZE)))" > /dev/null
   slave=$(SLAVE="$OUT/slave.slave" python3 -c "
 import sys; sys.path.insert(0, 'tools'); from lov_report import regions
-r = {n: lo for lo, hi, n, o in regions(open('/tmp/lov-explore-$$.bin', 'rb').read(), $BASE)}
+r = {n: lo for lo, hi, n, o in regions(open('tmp/scratch/lov-explore-$$.bin', 'rb').read(), $BASE)}
 print(r.get('slave', ''))")
   [ -n "$slave" ] && break
 done
-echo "slave $slave" > "$OUT/slave.txt"; rm -f /tmp/lov-explore-$$.bin "$OUT/fields.txt"
+echo "slave $slave" > "$OUT/slave.txt"; rm -f tmp/scratch/lov-explore-$$.bin "$OUT/fields.txt"
 for i in $(seq -w 1 "$COUNT"); do
   python3 tools/lov.py wait "$STEP" > /dev/null
   python3 tools/lov.py shot "$PWD/$OUT/shot$i.png" > /dev/null

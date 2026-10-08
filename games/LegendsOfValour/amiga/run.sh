@@ -8,6 +8,7 @@
 #   TAPE=file WHD_ARGS=CUSTOM5=1  scripted mouse input (VERIFY slave, tools/tape.py)
 # Host: Kickstart 3.1 + Workbench 2.04 floppy boots DH0, which runs WHDLoad on DH1;
 # the slave itself runs Kickstart 1.3 (kick34005.A500 + .RTB) inside WHDLoad.
+# Shared ROM, floppy and WHDLoad paths and their overrides: amiga/env.sh.
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
@@ -23,9 +24,7 @@ fi
 . "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
 
 GAME="${GAME:-../tmp/game/LegendsOfValour}"
-RTB="${RTB:-$HOME/.local/share/amiga/Kickstarts/kick34005.A500.RTB}"
-WB="${WB:-$HOME/.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf}"
-WHD="$HOME/.local/share/amiga/WHDLoad/C/WHDLoad"
+RTB="${RTB:-$KICK13.RTB}"
 CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
 RUN="$FSUAE_RUN"; DH0="$RUN/dh0"; DH1="$RUN/dh1"
@@ -34,7 +33,7 @@ fsuae_claim_port
 rm -rf "$DH0" "$DH1"
 mkdir -p "$DH0/s" "$DH0/devs/Kickstarts" "$RUN/state"
 cp -R "$GAME" "$DH1"
-cp -f "$WHD" "$DH1/WHDLoad"
+cp -f "$WHDLOAD_BINARY" "$DH1/WHDLoad"
 # SLAVE= runs a rebuilt or patched slave in place of the installed one.
 [ -n "${SLAVE:-}" ] && cp -f "$SLAVE" "$DH1/LegendsOfValour.Slave"
 # TAPE= installs a VERIFY slave input tape (tools/tape.py; read with WHD_ARGS=CUSTOM5=1).
@@ -59,7 +58,7 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSE
   --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-1024}" --fast_memory="${FAST_KB:-8192}" \
   --kickstart_file="$KICKSTART" \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
-  --floppy_drive_0="$WB" \
+  --floppy_drive_0="$WORKBENCH_ADF" \
   --joystick_port_0="${JOY0:-mouse}" --joystick_port_1="${JOY1:-keyboard}" \
   --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
   --ntsc_mode=0 --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \

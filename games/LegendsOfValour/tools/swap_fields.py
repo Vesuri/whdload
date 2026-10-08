@@ -6,7 +6,7 @@ Only debugger convenience variables change; target memory/registers are read-onl
 import argparse
 from pathlib import Path
 import re
-from state_fields import command
+from lov_timing_fields import command
 from lov_report import regions
 
 p = argparse.ArgumentParser(description=__doc__)

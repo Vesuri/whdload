@@ -1,8 +1,0 @@
-# Timing study with state waits: through to the game, then stand still.
-1    51 174 W     # until the start screen's green (character) button, id 1, is live
-10   51 174 L     # click: save-slot screen
-10   132 175 W    # until the right die (id 10) is live
-10   132 175 L    # cancel -> default character
-0    75 183 W     # until any button is live at EXIT
-10   75 183 L
-0    75 183 -

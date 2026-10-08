@@ -11,7 +11,7 @@
 ;
 ; No source of CFou!'s slave is public.  This file follows WHDLoad 20.0's kick13.asm slave
 ; example and rebuilds the game-specific part of the installed LegendsOfValour.Slave v1.0 from
-; its disassembly (slave+$fa4.., docs/profiling.md §1).  It is not byte-identical: kick13.s is
+; its disassembly (slave+$fa4.., docs/profiling.md §2).  It is not byte-identical: kick13.s is
 ; the 2025 one, v1.0 used 2005's.  Equivalence is checked by behaviour.
 ;
 ; Differences from v1.0, all deliberate:
