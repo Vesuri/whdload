@@ -28,9 +28,6 @@ __pycache__/
 # --- Emulator / debugger run state --------------------------------------------
 /amiga/.run/
 
-# This machine's paths (see amiga/local.env.example)
-/amiga/local.env
-
 # --- Build output ------------------------------------------------------------
 build/
 *.o

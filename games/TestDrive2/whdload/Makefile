@@ -1,12 +1,11 @@
 # Host cross-build of JOTD's Test Drive II slave (the original uses BASM, see source/Makefile
 # in the installer).  The output is not byte-identical to the shipped v1.5 slave: kick13.s is
 # the official WHDLoad 20.0 sources/API headers are vendored, and BASM's date stamp is absent.
-# Paths: the environment or make arguments, else the repo's amiga/local.env (see
-# local.env.example), else vasmm68k_mot from PATH; outside the repo pass NDK=.
-local = $(shell [ -f ../amiga/env.sh ] && bash -c '. ../amiga/env.sh >/dev/null 2>&1 && printf %s "$$$(1)"')
-AMIGA_TOOLCHAIN ?= $(call local,AMIGA_TOOLCHAIN)
+# The shared ~/.local toolchain (as amiga/env.sh); override from the environment or make
+# arguments. Without ~/.local/vasmm68k_mot, vasmm68k_mot is taken from PATH.
+AMIGA_TOOLCHAIN ?= $(HOME)/.local/opt
 NDK ?= $(AMIGA_TOOLCHAIN)/m68k-amiga-elf/sys-include
-VASM ?= $(or $(call local,VASM),vasmm68k_mot)
+VASM ?= $(firstword $(wildcard $(HOME)/.local/vasmm68k_mot) vasmm68k_mot)
 VASMFLAGS ?=
 
 .PHONY: all verify clean FORCE

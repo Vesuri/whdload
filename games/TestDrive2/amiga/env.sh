@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
-# Source this to load this machine's paths from amiga/local.env (ignored; see
-# local.env.example) and put the Amiga toolchain on PATH. The environment wins.
-_local="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/local.env"
-if [ -f "$_local" ]; then
-  while IFS= read -r _line || [ -n "$_line" ]; do
-    case "$_line" in ''|'#'*|[!A-Za-z_]*) continue ;; esac
-    _name=${_line%%=*}
-    [ -n "${!_name:-}" ] || eval "export $_name=\"${_line#*=}\""
-  done < "$_local"
-fi
-unset _local _line _name
-for _var in KICKSTART_DIR AMIGA_TOOLCHAIN; do
-  [ -n "${!_var:-}" ] || { echo "amiga/env.sh: $_var is not set: add it to amiga/local.env" >&2; return 1 2>/dev/null || exit 1; }
-done
-unset _var
-export PATH="$AMIGA_TOOLCHAIN/bin:${AMIGA_PATH:+$AMIGA_PATH:}$PATH"
-export KICKSTART="${KICKSTART:-$KICKSTART_DIR/kick31.rom}"
+# Source this for the shared Amiga files (~/.local/share/amiga) and toolchain (~/.local).
+# Every path can be overridden from the environment; tools/local_env.py has the same defaults.
+SHARED="$HOME/.local/share/amiga"
+export KICKSTART="${KICKSTART:-$SHARED/Kickstarts/kick40063.A600}"              # host: KS 3.1
+export KICKSTART_A1200="${KICKSTART_A1200:-$SHARED/Kickstarts/kick40068.A1200}"  # A1200 host
+export KICKSTART13="${KICKSTART13:-$SHARED/Kickstarts/kick34005.A500}"          # slave's KickEmu
+export RTB="${RTB:-$SHARED/Kickstarts/kick34005.A500.RTB}"
+export WORKBENCH_ADF="${WORKBENCH_ADF:-$SHARED/Workbenchv2.04rev37.67Workbench.adf}"
+export WHDLOAD_BINARY="${WHDLOAD_BINARY:-$SHARED/WHDLoad-20.0/C/WHDLoad}"
+export FSUAE_COMMON="${FSUAE_COMMON:-$SHARED/fsuae_common.sh}"
+export LHA="${LHA:-$SHARED/lha-compressor/src/lha}"
+export AMIGA_TOOLCHAIN="${AMIGA_TOOLCHAIN:-$HOME/.local/opt}"
+export VASM="${VASM:-$HOME/.local/vasmm68k_mot}"
+export PATH="$AMIGA_TOOLCHAIN/bin:$HOME/.local:$HOME/.local/fs-uae:$PATH"
+unset SHARED

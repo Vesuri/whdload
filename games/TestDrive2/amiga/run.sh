@@ -11,8 +11,7 @@ cd "$(dirname "$0")"
 . "$FSUAE_COMMON"
 
 GAME="${GAME:-../tmp/game/TestDrive2}"
-# RTB, WB, WHDLOAD_BINARY and FSUAE_COMMON come from amiga/local.env (env.sh).
-BIOS="$KICKSTART_DIR"
+# KICKSTART13, RTB, WORKBENCH_ADF, WHDLOAD_BINARY and FSUAE_COMMON: amiga/env.sh.
 WHD="$WHDLOAD_BINARY"
 CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
@@ -25,7 +24,7 @@ cp -R "$GAME" "$DH1"
 cp -f "$WHD" "$DH1/WHDLoad"
 # SLAVE= runs a rebuilt or patched slave in place of the installed one.
 [ -n "${SLAVE:-}" ] && cp -f "$SLAVE" "$DH1/TestDrive2.slave"
-cp -f "$BIOS/kick34005.A500" "$DH0/devs/Kickstarts/"
+cp -f "$KICKSTART13" "$DH0/devs/Kickstarts/kick34005.A500"
 cp -f "$RTB" "$DH0/devs/Kickstarts/"
 chmod -R u+w "$DH0" "$DH1"
 printf 'Expert\nReadDelay=0\n' > "$DH0/s/WHDLoad.prefs"
@@ -45,7 +44,7 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSE
   --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-1024}" --fast_memory="${FAST_KB:-2048}" \
   --kickstart_file="$KICKSTART" \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
-  --floppy_drive_0="$WB" \
+  --floppy_drive_0="$WORKBENCH_ADF" \
   --joystick_port_0=mouse --joystick_port_1="${JOY1:-keyboard}" \
   --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
   --ntsc_mode=0 --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
