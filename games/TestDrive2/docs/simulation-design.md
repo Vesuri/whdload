@@ -1,114 +1,102 @@
-# Fixed-time simulation for duel v1
+# Fixed-time simulation (duel v1)
 
-CUSTOM2 bit 0 uses the existing priority-4 simulation process with a period of
-`sim_p` PAL fields, chosen from AttnFlags before PatchSeg (`sim_configure`):
-6 fields on a 68000/010 (the original 8.33 Hz, so the CPU is not spent on steps
-nobody sees) and 2 fields on a 68020+ (25 Hz, the measured rendering cap).
-Each step is 1/`sim_n` of an original step, `sim_n` = 6/`sim_p` (1 or 3). The
-text below was written for the former one-field mode (`sim_n` = 6, still the
-VERIFY unit-check default); every "six"/"sixth" in rates, Euler corrections and
-relaxation roots now reads `sim_n`, and every per-field clock quantum reads per
-`sim_p` fields. Field-timed rules (recovery 240 fields, gear holds, envelopes)
-and six-field cadence decisions are unchanged. After PatchSeg the two deadline
-`moveq`s receive `sim_p`.
+Enhanced framerate (`CUSTOM2` nonzero) keeps the game's own priority-4 simulation process
+(see [game.md](game.md)) and changes how often it steps and how each step integrates. Code:
+`whdload/simulation.s`, patch list `whdload/simulation-patches.i`.
 
-Different periods are different integrations of the same game, not the same
-trajectory: over 1,500 demo fields the 6-field period travels ~1.5% and the
-2-field period ~0.5% less than the former one-field mode; race clocks agree.
-CPUs with the same period match all 35 core variables exactly.
-The priority-minus-1 drawing task samples current state independently. Rendering
-never owns elapsed game time. The original mode remains the default; v2 is unchanged.
+## Period
+
+A step lasts `sim_p` PAL fields, chosen from AttnFlags before PatchSeg (`sim_configure`):
+
+| CPU | `sim_p` | Rate | Why |
+|---|---|---|---|
+| 68000/010 | 6 | 8.33 Hz, the original | the A500 draws ~7 fps: no CPU is spent on steps nobody sees |
+| 68020+ | 2 | 25 Hz | the measured chip-bus rendering cap |
+
+Each step is 1/`sim_n` of an original step, `sim_n` = 6/`sim_p` (1 or 3). After PatchSeg,
+`sim_set_deadline` writes `moveq #sim_p` into the two deadline instructions. The drawing task
+samples the latest state; rendering never owns elapsed game time. CPUs with the same period
+produce identical state; the two periods are different integrations of the same game.
 
 ## Rates and integration
 
-A physical update spans one sixth of the original step. Signed 32-bit division
-with independent fractional carries prevents small and negative rates from
-vanishing. Six calls with a constant signed rate sum exactly to the old increment,
-including INT_MIN and INT_MAX. Word quantities use the same division.
+- Continuous rates are divided by `sim_n` with signed 32-bit division and a private fractional
+  carry per accumulator, so small and negative rates do not vanish: `sim_n` calls with a
+  constant rate sum exactly to the original increment, including INT_MIN and INT_MAX. Word
+  quantities use the same division.
+- Scaled: player acceleration, braking, clutch drag, tyre scrub, steering forces, heat, lane
+  centring, verge movement, traffic, and physical AI motion (each AI record has its own speed,
+  lane and position carries). Not scaled: road-unit loops, collision impulses, limits and
+  thresholds. Fuel is distance-derived already.
+- The original integrates the post-force velocity in one coarse Euler step; plain subdivision
+  would give less acceleration travel and more braking travel. Player and physical AI
+  displacement therefore add (`sim_n`−1)/2 times the current continuous velocity change, so
+  constant force reproduces the coarse-step distance (up to integer quantisation). Player
+  distance keeps its low bits until the final division by 768. Throttle and drag lookups get
+  the matching velocity reference without changing velocity or RPM.
+- Heading, yaw and clutch relaxation use Q16 `sim_n`-th roots of the original retention
+  factors, with carries. Clutched free RPM uses the matching affine rise, so the decays and
+  rises compose to the original map within one word unit; unclutched rise has its own carry.
+- The race clock and average-speed sums gain 1/5 of a nominal tenth per field: race time
+  follows real PAL time (the original ran at 5/6).
+- Dashboard and background phases advance with simulation time, not with drawn frames. The
+  renderer's rare high-speed visual event uses a private RNG at its original six-field
+  cadence; gameplay RNG has no beam-position term in the enhanced mode.
 
-Player acceleration, braking, clutch drag, tyre scrub, steering forces, heat,
-lane centring, verge movement, traffic and physical AI motion use fractional rates.
-Each AI record has independent speed, lane and position carries. Road-unit loops,
-collision impulses, limits and thresholds retain their original units. Fuel is
-already distance-derived. Dashboard/effect phases and the four background phases
-advance with simulation time rather than drawings.
+## Original-cadence decisions
 
-The original integrates the post-force velocity in a coarse Euler step. Simply
-subdividing it gives less acceleration travel and more braking travel. The player
-and physical AI therefore add 2.5 times the current continuous velocity change to
-the velocity used for displacement. For constant force, six smaller updates
-recover the original coarse-step displacement, subject to integer quantisation.
-Player distance retains low bits until the final division by 768; early shifting
-would lose them. Collision/gear impulses are excluded from that correction.
-Throttle and drag lookup inputs receive the corresponding modified-Euler velocity
-reference, without changing the actual velocity or RPM.
+Police and crash script counters, automatic gear decisions, gear-lever travel and clutch
+release keep their six-field cadence. An original gear command skips a whole player-physics
+step; the replacement holds the controller for six fields. Gear audio envelopes use elapsed
+fields.
 
-Heading, yaw and clutch relaxation use Q16 sixth roots of the original retention
-factors, with fractional carries. Clutched free RPM uses the corresponding affine
-rise, so the six decays and rises compose to the original map within one word
-unit. Unclutched free RPM rise uses its own signed carry.
-
-Six fine updates are not a general byte-exact replacement for one old update:
-forces depend on changing state, finer collision checks can see different contacts,
-and AI decisions can cross thresholds between old samples. The constant-rate and
-constant-force invariants establish the units and integration correction; measured
-handling comparisons establish the practical difference.
-
-## Original-cadence decisions and prediction
-
-Police/crash script counters, automatic gear decisions, gear-lever movement and
-clutch release retain their six-field cadence. Original gear commands skip an
-entire player-physics step; their replacement holds the controller for six fields,
-rather than skipping just one. Gear audio envelopes use elapsed video fields.
-
-The demo AI record is a full-step predictor, seeded anew from player state on
-every call. Its predicted speed and distance are discarded by the caller. Scaling
-those values shortened its horizon and caused an early off-road crash. The demo
-therefore retains the full prediction acceleration/braking and distance, while
-its applied lane movement is divided by six. Opponent and police records represent
-physical cars and use fractional motion. Prediction units and integration units
-must be distinguished even inside the same original routine.
-
-The race clock and average-speed accumulators carry one fifth of a nominal tenth
-per PAL field. The original one-tenth-per-six-fields clock ran at 5/6 real time.
-The rare visual event uses a separate RNG and original six-field event cadence;
-its renderer reads cached state. Gameplay RNG excludes beam-position entropy.
-Camera and needle caches remain drawing snapshots; their age is not game time.
+The demo AI record is a full-step predictor, re-seeded from player state on every call, whose
+speed and distance outputs the caller discards. It keeps the full prediction; only its
+applied lane movement is divided. Scaling the prediction shortened its horizon and crashed
+the demo early. Prediction units and integration units must be told apart even within one
+original routine.
 
 ## Recovery
 
-The original nonfatal crash and engine-damage path blocks simulation while drawing
-animation and waiting for acknowledgement. CPU speed changes when its penalty is
-applied and motion resumes. The replacement uses 240 fields (4.8 nominal PAL
-seconds): stopped player, neutral engine, one life loss unless the trainer is on,
-and one 20-second penalty. Opponents, traffic and the race clock continue. Drawing
-shows the recovery message. Terminal damage, fatal crash and last life retain the
-original race-end path. This changes recovery presentation and acknowledgement.
+The original nonfatal crash and engine-damage path blocks the simulation while it animates
+and waits for acknowledgement, so the CPU speed decided when motion resumed. The replacement
+is field-timed: 240 fields (4.8 s) with the player stopped and the engine idling, one life
+lost (none with the `CUSTOM1` trainer) and one 20-second penalty, while opponents, traffic
+and the clock keep running and the renderer shows the message. Terminal damage, a fatal crash
+or the last life take the original race-end path; a fatal crash overrides a recovery in
+progress.
 
-## Verification
+## Handling against the original
 
-Normal builds contain optional simulation (CUSTOM2 bit 0) and unused-blitter-IRQ
-suppression (bit 1); CUSTOM2=3 enables both. VERIFY adds CUSTOM3 for original-mode
-reproducible RNG, CUSTOM4 for deliberately slow drawing, and CUSTOM5 fixtures:
+Six fine updates are not a byte-exact replacement for one coarse update: forces depend on
+changing state, finer collision checks see different contacts and AI decisions cross
+thresholds between old samples. Measured on the 6 000-field attract demo and the straight
+acceleration/braking tape (VERIFY `CUSTOM5=17`, 1 000 fields):
 
-- Bit 0: accelerate, steer both ways, brake, coast and accelerate input tape.
-- Bit 1: one engine-damage event (CUSTOM5=3).
-- Bit 2: fatal crash (CUSTOM5=5, without the trainer).
-- Bit 4: a straight acceleration/braking tape (CUSTOM5=17). This tape deliberately
-  does not follow road bends; it is a handling fixture, not the demo driver.
+| Period | Demo first crash | Demo speed / travel, field 999 | Straight speed / travel, field 399 | Stop after braking |
+|---|---|---|---|---|
+| Original | field 3474 | — | — | field 492 |
+| 6 (68000) | 3474 | +0.00% / +0.00% | +0.00% / +0.00% | 492, +0.00% |
+| 2 (68020+) | 3464 | +0.72% / +0.99% | +1.75% / +1.59% | 494, +1.84% |
 
-Fixtures execute in the slave, with no debugger memory/register writes. The
-59 assembly checks exercise signed division, independent AI carries, field
-clocks/counters, gear-hook return boundaries, relaxation, coupled clutch RPM,
-constant-force integration, gear holds and full-horizon demo prediction.
-`check_units.py` reads their results. `check_timing.py` checks consecutive fields,
-one-field deadlines and real-time race clocks. Use `--period 3` only for historical
-captures. Recovery and terminal checks test life loss, penalty, stationary time,
-idle pitch, fatal precedence and frozen terminal clocks. `compare_state.py
---assert-core` checks all 35 gameplay variables at identical VBL indices.
-`audit_simulation.py` checks hook boundaries and direct incoming branches; indirect
-entries and return adjustments also need manual review and runtime checks.
+Period 6 reproduces the original speed exactly up to the first crash (travel within
++0.0003%: the patch carries sub-unit motion the original drops); after it, the state differs
+by design (recovery and clock). PAL is validated; NTSC is not (see [open-work.md](open-work.md)).
 
-PAL is the validated timing target; NTSC has not been validated. Exact capture
-builds and ignored measurement evidence are retained under tmp/prof. Current
-release validation and handling measurements are recorded in docs/open-work.md.
+## Verification hooks
+
+`make -C whdload verify` adds `CUSTOM3` (reproducible RNG), `CUSTOM4` (deliberately slow
+drawing) and `CUSTOM5` fixtures, all run inside the slave without debugger writes:
+
+| `CUSTOM5` bit | Fixture |
+|---|---|
+| 0 | field-based joystick tape: accelerate, steer left/right, brake, coast, accelerate |
+| 1 | one forced engine-damage event (`CUSTOM5=3`) |
+| 2 | forced fatal crash during a recovery (`CUSTOM5=5`, trainer off) |
+| 3 | sub-unit rendering with zero fractions (see [subunit-rendering.md](subunit-rendering.md)) |
+| 4 | straight acceleration/braking tape (`CUSTOM5=17`); does not follow road bends |
+
+The VERIFY build also runs 129 assembly assertions before PatchSeg (107 simulation, 22
+rendering): signed division and carries, clocks and counters, gear-hook return boundaries,
+relaxation roots, coupled clutch RPM, constant-force integration, gear holds and the demo
+prediction. `CUSTOM5=16` runs them without scripted input. See [testing.md](testing.md).

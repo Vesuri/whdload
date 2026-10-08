@@ -1106,7 +1106,7 @@ sim_gear_value: dc.w 0
 sim_gear_field: dc.l 0
 sim_code: dc.l 0
 ; Period parameters, copied from sim_periods by sim_configure (68000 / 68020+).
-; The defaults are the former one-field mode, used by the VERIFY unit checks.
+; The defaults (one-field steps, sim_n = 6) are what the VERIFY unit checks use.
 sim_p: dc.w 1                 ; fields per step
 sim_n: dc.w 6                 ; steps per original six-field step
 sim_q_heading: dc.w 1442

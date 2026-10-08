@@ -9,7 +9,7 @@ from pathlib import Path
 from state_report import VARIABLES, value
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('state',type=Path)
-p.add_argument('--period',type=int,choices=(1,2,3,6),default=2,help='fields per simulation step: 6 on a 68000, 2 on a 68020+; 1 and 3 for historical captures')
+p.add_argument('--period',type=int,choices=(2,6),default=2,help='fields per simulation step: 6 on a 68000, 2 on a 68020+')
 p.add_argument('--min-fields',type=int,default=1000)
 p.add_argument('--fatal-end',action='store_true',help='without trainer: stop active checks at fatal crash 17')
 a=p.parse_args()

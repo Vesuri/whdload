@@ -3,7 +3,7 @@
 # tools/fixed_window.sh OUTDIR [SLAVE]
 # Build `make -C whdload verify`, use SLAVE=$PWD/whdload/TestDrive2.slave and
 # WHD_ARGS=CUSTOM3=1 for the reproducibility study. ANCHOR overrides the hunk offset
-# for diagnostic windows only. The old span anchor (0x789c) was already 7-8 s into a race.
+# for diagnostic windows only. See docs/testing.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}

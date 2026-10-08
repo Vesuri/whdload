@@ -1,13 +1,14 @@
-# Test Drive II (Amiga) — performance study
+# Test Drive II (Amiga) — WHDLoad slave patches
 
-Profiling the ORIGINAL 1989 Amiga game, run under JOTD's WHDLoad install (slave v1.5, `duel` v1,
-108 868 bytes). No source: work from cycle-exact FS-UAE traces and disassembly. Any change to the
-game is meant to ship as WHDLoad slave patches (`resload_PatchSeg` patch lists, like the slave's own).
+Improving the ORIGINAL 1989 Amiga game, run under JOTD's WHDLoad install (`duel` v1, 108 868
+bytes). No game source: work from cycle-exact FS-UAE traces and disassembly. Every change to the
+game ships as WHDLoad slave patches (`resload_PatchSeg` patch lists in `whdload/`).
 
 ## Rules
 
 - **Never commit game, Kickstart or WHDLoad bytes**, traces, memory dumps or screenshots. They live
-  in `tmp/` (ignored). Addresses in docs are `duel` hunk-0 offsets (the slave's patch numbering).
+  in `tmp/` (ignored). No machine-specific paths either: shared files come from `~/.local/share/amiga`
+  through the variables in `amiga/env.sh`. Addresses in docs are `duel` hunk-0 offsets (the slave's patch numbering).
 - Commits: author Vesa Halttunen <vesuri@jormas.com>, unsigned, no hooks, no Co-Authored-By lines.
   One commit per coherent feature.
 - Never `pkill fs-uae` (other projects run emulators): `fsuae_common.sh` kills only our own pid.
@@ -16,7 +17,10 @@ game is meant to ship as WHDLoad slave patches (`resload_PatchSeg` patch lists, 
 
 | Doc | Read it when |
 |---|---|
-| `docs/open-work.md` | **First.** The goal (simulation vs rendering speed), what is known, ordered work items |
-| `docs/profiling.md` | Running the game, driving it, tracing it, or quoting any performance number |
-| `docs/optimisation-plan.md` | Planning or writing any speed patch; A/B-measuring a slave |
-| `docs/subunit-rendering.md` | Making the road, objects and cars move by fractions of a road unit |
+| `docs/open-work.md` | **First.** The goal, working rules, open items and dropped decisions |
+| `docs/game.md` | Reading or patching game code: addresses, tasks, time sources, state map, frame costs |
+| `docs/simulation-design.md` | Changing the fixed-time simulation or its VERIFY fixtures |
+| `docs/subunit-rendering.md` | Changing fractional road/car projection, sideways or hill smoothing |
+| `docs/testing.md` | Running, tracing or testing the game, or quoting any performance number |
+
+Docs describe the current state only; history belongs in git history.

@@ -326,7 +326,7 @@ _bootdos	move.l	(_resload,pc),a2		;A2 = resload
 	include "render.s"
 
 	IFD VERIFY
-; W3 stress instrument: delay only drawing; VBL and task scheduling remain live.
+; Stress instrument (CUSTOM4): delay only drawing; VBL and task scheduling remain live.
 verify_slow_copper:
 	move.l d0,-(a7)
 	move.w #65535,d0

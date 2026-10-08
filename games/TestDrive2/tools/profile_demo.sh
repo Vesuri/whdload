@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Profile the original Test Drive II while its attract demo is driving.  See docs/profiling.md.
+# Profile the original Test Drive II while its attract demo is driving.  See docs/testing.md.
 #   tools/profile_demo.sh [OUTDIR]        default OUTDIR tmp/prof/run
 # Env: FIELDS (trace length, 1..100 PAL fields, default 80), CHIP_KB/FAST_KB/EXTRA_ARGS (machine;
 # default the stock-A500-equivalent 512K chip + 1.5M slow, no fast), DEMO_TIMEOUT (seconds, 300).
