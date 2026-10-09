@@ -107,7 +107,7 @@ slv_name	dc.b	"Legends Of Valour",0
 slv_copy	dc.b	"1992 US-GOLD.",0
 slv_info	dc.b	"Reworked by Vesuri",10
 		dc.b	"based on the work of CFou!",10
-		dc.b	"Version 1.1b (08.10.2026)",0
+		dc.b	"Version 1.1b (09.10.2026)",0
 slv_config	dc.b	"C1:B:Character creation;"
 	IFD DEVELOPER
 		dc.b	"C2:X:faster chunky-to-planar:0;"
