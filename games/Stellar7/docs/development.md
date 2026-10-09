@@ -38,8 +38,10 @@ Never use process-name-wide kills.
 
 `make -C whdload` builds the normal development loader. `make -C whdload verify`
 builds the menu fixture; `SLAVE=whdload/Stellar7.Slave WHD_ARGS=CUSTOM5=1`
-selects it in `amiga/run.sh`. Both retain the original CRC acceptance check.
-Only the supplied English layout has been fixture-tested; hook-byte guards
+selects it in `amiga/run.sh`. Both retain the original CRC acceptance check. `CUSTOM1=1` enables the
+experimental fixed-step timing patches; without it the game code is unchanged
+except for explicitly enabled VERIFY fixtures.
+Only the supplied English layout has been tested; hook-byte guards
 reject other layouts. This is a reconstruction of the game-specific loader
 on modern KickEmu, not a byte-identical reconstruction of the 2008 slave.
 
@@ -47,9 +49,11 @@ on modern KickEmu, not a byte-identical reconstruction of the 2008 slave.
 its exact VERIFY slave, boots with both input ports empty, waits for gameplay
 frame 90, and saves snapshots, first/last images, trace and analysis reports.
 Use a capture subdirectory without spaces; the repository path may contain
-spaces. Capture output must be under `tmp/`. Only one capture runs at a time.
+spaces. Capture output must be under `tmp/` in a new or empty directory.
+Existing captures are not overwritten. Only one capture runs at a time.
 `--state-only` saves the anchor without tracing; `--swaps-only` uses read-only
-breakpoint counting. The default window is 100 fields when `--fields` is omitted.
+breakpoint counting. The default window is 100 fields when `--fields` is omitted; the profiler
+supports at most 100 fields per capture. The driver rejects larger requests.
 
 The 68020 configuration uses `AMIGA_MODEL=A1200 KICKSTART=$KICKSTART_A1200
 CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 EXTRA_ARGS=--slow_memory=0` after sourcing
@@ -60,3 +64,35 @@ It is not a full-state equivalence test. `tools/compare_traces.py A/trace.bin
 B/trace.bin` checks whole screenshots, instruction records, DMA records and
 chip snapshots; it deliberately reports the known raw-register/DMA differences
 between the current repeated captures instead of masking them.
+
+
+## Fixed-step timing tests
+
+`WHD_ARGS='CUSTOM1=1 CUSTOM3=1' python3 tools/fixed_window.py
+ tmp/prof/fixed-a500 --frame 115 --fields 100 --checkpoints 140 160`
+uses fixed timing plus the VERIFY native movement/firing route. `CUSTOM3`
+requires the `CUSTOM5` menu fixture (enabled by the driver). It supplies forward
+input at steps 100–139, adds turning at 120–139 and holds fire at 105–134.
+The route changes input API results, not positions, velocities or RNG.
+
+`CUSTOM2` is the simulation frequency (1–25 Hz, zero/default means 5).
+The default is a provisional A500 reference, not a claim of historical intent.
+`CUSTOM4=2` in VERIFY presents every second eligible simulation step.
+`VERIFY_FLAGS=-DSLOW_DRAW=20` adds twenty VBL fields to each drawn frame,
+allowing a deliberate slow-renderer catch-up test. Neither test option exists
+in a normal build. Build normally again after running capture tests.
+
+`tools/timing_state.py CAPTURE...` reports scheduler credit and presentation
+counts. `tools/simulation_state.py A B` compares mapped state at an equal
+simulation boundary. Checkpoint folders can be passed directly. Comparisons
+include player/world/active objects (including projectiles), visibility flags,
+positions, motion, behavior counters, power timers, score, RNG and star x/y.
+Raw pointers, projected coordinates and unused allocation padding are excluded;
+this is not a complete state-equivalence proof. Input edges use simulation
+steps, while the trace independently measures simulation steps per elapsed field.
+
+The original anchor remains the pre-swap point at hunk 0:$2c16, even when that
+step will skip presentation. Actual presentation counting uses $6a0a; simulation
+completion counting uses $2d4e. Never treat anchor hits as displayed frames in
+the timing build. Profiles show completed work per window and can include one
+step of boundary jitter. Saved `metadata.json` records Custom and build options.

@@ -12,13 +12,20 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('out',type=Path)
 p.add_argument('--fields',type=int,default=100)
 p.add_argument('--frame',type=int,default=90)
+p.add_argument('--checkpoints',type=int,nargs='*',default=[],help='additional simulation frames to snapshot after the trace')
 p.add_argument('--swaps-only',action='store_true')
 p.add_argument('--state-only',action='store_true')
 a=p.parse_args()
+if not 1 <= a.fields <= 100:
+    p.error('--fields must be 1..100 (Barto capture limit); use checkpoints for longer runs')
+if a.checkpoints != sorted(set(a.checkpoints)) or any(x <= a.frame for x in a.checkpoints):
+    p.error('--checkpoints must be unique increasing simulation steps after --frame')
 root=Path(__file__).resolve().parent.parent
 os.chdir(root)
 out=a.out.resolve(); out.relative_to(root/'tmp')
 assert ' ' not in str(out.relative_to(root)), 'capture subdirectory must not contain spaces (gdb limitation)'
+if out.exists() and any(out.iterdir()):
+    p.error('capture directory is not empty; choose a new path to preserve previous measurements')
 out.mkdir(parents=True,exist_ok=True)
 def cmd(text, timeout=900):
     with socket.socket(socket.AF_UNIX) as s:
@@ -31,17 +38,18 @@ try:cmd('quit',5)
 except (OSError,RuntimeError):pass
 subprocess.run(['make','-s','-C','whdload','verify'],check=True)
 (out/'slave.slave').write_bytes(Path('whdload/Stellar7.Slave').read_bytes())
-env=dict(os.environ,SLAVE=str(out/'slave.slave'),WHD_ARGS='CUSTOM5=1',JOY0='none',JOY1='none',DETERMINISTIC='1',WARP='1')
+env=dict(os.environ,SLAVE=str(out/'slave.slave'),WHD_ARGS='CUSTOM5=1 '+os.environ.get('WHD_ARGS',''),JOY0='none',JOY1='none',DETERMINISTIC='1',WARP='1')
 os.environ['SLAVE']=env['SLAVE']
 fast=int(env.get('FAST_KB','0')); chip=int(env.get('CHIP_KB','512'))
 base=0x200000 if fast else 0xc00000
 size=fast*1024 if fast else 1536*1024
 log=(out/'serve.log').open('w')
 server=subprocess.Popen([sys.executable,'tools/stellar7.py','serve'],stdout=log,stderr=subprocess.STDOUT,env=env)
-def dump():
-    code=str((out/'code.bin').relative_to(root)); cb=str((out/'chip.bin').relative_to(root))
+def dump(destination=out):
+    destination.mkdir(parents=True,exist_ok=True)
+    code=str((destination/'code.bin').relative_to(root)); cb=str((destination/'chip.bin').relative_to(root))
     cmd(f'gdb dump binary memory {code} {base:#x} {base+size:#x}\ndump binary memory {cb} 0 {chip*1024:#x}')
-    return (out/'code.bin').read_bytes(),(out/'chip.bin').read_bytes()
+    return (destination/'code.bin').read_bytes(),(destination/'chip.bin').read_bytes()
 try:
     deadline=time.monotonic()+120
     while 'serving on' not in (out/'serve.log').read_text():
@@ -64,7 +72,7 @@ try:
     count=struct.unpack_from('>H',mem,data-base+0x1e96)[0]
     assert count==a.frame,(count,a.frame)
     (out/'anchor.txt').write_text(reply+f'\nframe={count}\ncode={h:#x}\ndata={data:#x}\nbase={base:#x}\n')
-    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=count,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast),indent=2)+'\n')
+    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=count,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast,whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS','')),indent=2)+'\n')
     (out/'state.bin').write_bytes(mem[data-base:data-base+0x823c])
     print(f'At frame {count}; capturing {a.fields} fields...',flush=True)
     if a.state_only:pass
@@ -74,11 +82,20 @@ try:
         cmd(f'profile {a.fields} {out}/trace.bin')
         import barto
         t=barto.load(out/'trace.bin')
+        if len(t.fields) != a.fields:raise RuntimeError(f'Requested {a.fields} fields, captured {len(t.fields)}')
         (out/'first.png').write_bytes(t.fields[0].shot);(out/'last.png').write_bytes(t.fields[-1].shot)
         for tool,target in [('stellar7_report.py','report.txt'),('frames.py','frames.txt')]:
             args=[sys.executable,'tools/'+tool,str(out/'trace.bin'),str(out/'code.bin')]
             args+=['--base',hex(base)] if tool=='stellar7_report.py' else [hex(base)]
             with (out/target).open('w') as f:subprocess.run(args,stdout=f,env=env,check=True)
+    for checkpoint in a.checkpoints:
+        reply=cmd(f'gdb break *{anchor:#x}\ncondition $bpnum *(unsigned short*){data+0x1e96:#x} >= {checkpoint}\ncontinue\ndelete')
+        folder=out/'checkpoints'/str(checkpoint)
+        mem,ch=dump(folder)
+        count=struct.unpack_from('>H',mem,data-base+0x1e96)[0]
+        if count != checkpoint:raise RuntimeError(f'Checkpoint {checkpoint} already passed: {count}')
+        (folder/'anchor.txt').write_text(reply+f'\nframe={count}\ncode={h:#x}\ndata={data:#x}\nbase={base:#x}\n')
+        (folder/'state.bin').write_bytes(mem[data-base:data-base+0x823c])
     print('Saved '+str(a.out),flush=True)
 finally:
     try:cmd('quit',5)

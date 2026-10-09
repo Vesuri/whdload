@@ -1,9 +1,10 @@
 ; Stellar 7 loader, reconstructed from Psygore's v1.0 game-specific startup.
 ; Shared WHDLoad 20.0 KickEmu replaces the embedded 2008 implementation.
-; No gameplay optimization. Original CRC checks and SetCPU values retained.
+; Opt-in fixed-step timing. Original CRC checks and SetCPU values retained.
         INCLUDE whdload.i
         INCLUDE whdmacros.i
         INCLUDE lvo/dos.i
+        INCLUDE exec/execbase.i
 CHIPMEMSIZE = $80000
 FASTMEMSIZE = $80000
 NUMDRIVES = 1
@@ -20,18 +21,28 @@ slv_copy: dc.b "1991 Dynamix",0
 slv_info: dc.b "Installed by Psygore",10,"Development baseline (KickEmu 20.0)",0
 slv_CurrentDir: dc.b "data",0
 slv_config:
+        dc.b "C1:B:Experimental fixed simulation;"
+        dc.b "C2:L:Simulation Hz:Default (5),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25;"
         IFD VERIFY
-        dc.b "C5:B:Deterministic menu fixture;"
+        dc.b "C3:B:Movement and firing fixture;C4:L:Draw every N steps:Default (1),1,2,3,4,5,6,7,8;C5:B:Deterministic menu fixture;"
         ENDC
         dc.b 0
 _game: dc.b "s7",0
 _args: dc.b 10,0
         EVEN
+_s7tags: dc.l WHDLTAG_CUSTOM1_GET
+_custom1: dc.l 0
+        dc.l WHDLTAG_CUSTOM2_GET
+_custom2: dc.l 0
         IFD VERIFY
-_s7tags: dc.l WHDLTAG_CUSTOM5_GET
+        dc.l WHDLTAG_CUSTOM3_GET
+_custom3: dc.l 0
+        dc.l WHDLTAG_CUSTOM4_GET
+_custom4: dc.l 0
+        dc.l WHDLTAG_CUSTOM5_GET
 _custom5: dc.l 0
-        dc.l 0
         ENDC
+        dc.l 0
 _bootdos:
         move.l #$393d,d0
         move.l #$7f3f,d1
@@ -69,16 +80,20 @@ _bootdos:
         jsr (_LVOLoadSeg,a6)
         move.l d0,d7
         beq .loaderror
-        IFD VERIFY
         movem.l d0-d7/a0-a6,-(sp)
         lea (_s7tags,pc),a0
         jsr (resload_Control,a2)
+        move.l (_custom1,pc),d0
+        beq .notiming
+        bsr timing_install
+.notiming:
+        IFD VERIFY
         move.l (_custom5,pc),d0
         beq .notape
         bsr fixture_install
 .notape:
-        movem.l (sp)+,d0-d7/a0-a6
         ENDC
+        movem.l (sp)+,d0-d7/a0-a6
         move.l d7,a1
         add.l a1,a1
         add.l a1,a1
@@ -111,3 +126,5 @@ _bootdos:
         IFD VERIFY
         INCLUDE fixture.s
         ENDC
+
+        INCLUDE timing.s

@@ -23,7 +23,25 @@ fixture_install:
         bne .bad
         lea (fixture_patches,pc),a0
         jsr (resload_Patch,a2)
-        rts
+        move.l (_custom3,pc),d0
+        beq .done
+        move.l d7,a1
+        add.l a1,a1
+        add.l a1,a1
+        addq.l #4,a1
+        move.l a1,a0
+        adda.l #$20000,a0
+        cmp.l #$2f073e2f,($2730,a0)
+        bne .bad
+        cmp.w #$0008,($2734,a0)
+        bne .bad
+        cmp.l #$4e55fffc,($2746,a0)
+        bne .bad
+        cmp.l #$48e70300,($274a,a0)
+        bne .bad
+        lea (fixture_input_patches,pc),a0
+        jsr (resload_Patch,a2)
+.done:  rts
 .bad:
         pea (TDREASON_WRONGVER).w
         jmp (resload_Abort,a2)
@@ -41,3 +59,33 @@ fixture_escape:
         moveq #$45,d0
         moveq #$45,d1
         rts
+
+; Native input API fixtures. Inputs are indexed by simulation step, so renderer
+; cadence cannot move an input edge. No positions, velocities or RNG are written.
+fixture_input_patches:
+        PL_START
+        PL_P $22730,fixture_key
+        PL_P $22746,fixture_joy
+        PL_NOP $2274c,2
+        PL_END
+fixture_joy:
+        moveq #0,d0
+        cmp.w #100,($1e96-$8000,a4)
+        bcs .done
+        cmp.w #140,($1e96-$8000,a4)
+        bcc .done
+        moveq #1,d0
+        cmp.w #120,($1e96-$8000,a4)
+        bcs .done
+        moveq #9,d0
+.done:  rts
+fixture_key:
+        moveq #0,d0
+        cmp.w #$40,(4,sp)
+        bne .done
+        cmp.w #105,($1e96-$8000,a4)
+        bcs .done
+        cmp.w #135,($1e96-$8000,a4)
+        bcc .done
+        moveq #1,d0
+.done:  rts

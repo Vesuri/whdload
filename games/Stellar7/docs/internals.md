@@ -42,7 +42,7 @@ The VERIFY-only CUSTOM5 fixture selects Escape through the intro's native
 input paths and Begin through the main menu. It does not alter simulation,
 RNG or rendering. Guarded hook ranges are hunk 0 $4582–$4587, $b1f4–$b1f9 and
 $b8c4–$b8c9. Each replaces a four-byte PC-relative call plus its following
-two-byte instruction. The release build contains none of these hooks.
+two-byte instruction. The normal build contains none of these fixture hooks.
 The original pack's idle menu enters the briefing display; that is not the
 real-gameplay route used here.
 
@@ -127,8 +127,68 @@ have identical mapped player state, energy (680), RNG state and timer scale,
 but the timer counters are 3786 and 1628 respectively (including boot).
 This confirms frame-coupled counters; it is not a complete motion-rate study.
 
-Slowed-renderer coupling measurements, moving-input routes,
-full object-state mapping and PAL/NTSC validation remain outstanding.
+The fixed-step implementation below adds a moving/firing route and controlled
+render-cost variation. Full state coverage and PAL/NTSC validation remain open.
+
+## Opt-in fixed-step simulation
+
+The chosen design is simulation timing independent of rendering. `CUSTOM1=1`
+installs guarded hooks; `CUSTOM2` chooses 1–25 updates/second (default 5).
+The default reflects the measured early A500 scene, not an established universal
+original cadence. The standard mode remains unchanged when CUSTOM1 is absent.
+
+The main-task entry at $2af6 accumulates elapsed native callback ticks multiplied
+by the chosen frequency. It consumes one field-rate unit per simulation pass
+(50 or 60 from Exec `VBlankFrequency`), retaining fractional credit. The fixed
+750-iteration delay and previous-frame tick wait at $2b96–$2bb3 are replaced.
+This is a cooperative scheduler, not interrupt-context simulation. If the
+simulation itself exceeds the CPU budget, debt can grow; it is not silently
+converted into larger physics steps or discarded.
+
+When another complete step is already owed, mesh rasterization at $132b2 and
+presentation at $6a0a are omitted. Native projection and visibility work in
+$12aa4 remains: gameplay uses that data. The starfield at $9a2a also remains
+once per simulation pass, including its calls to the shared RNG via $9bd4.
+Some HUD/background work is still performed on catch-up passes. Additional
+interpolated pictures are not implemented; presentation can be less frequent
+than simulation, but does not exceed the configured simulation frequency.
+
+The native Permit path at $313e resets clock credit following modal input.
+A restarted/reset gameplay counter reanchors the scheduler. These paths need
+explicit pause/death/transition playtesting before enabling the mode by default.
+
+Hook ranges (whole displaced instructions): $2af6–$2afb, $2b96–$2bb3,
+$2c16–$2c21, $313e–$3143, $132b2–$132b9. CRC checks precede opcode/displacement
+guards; relocated absolute operands are not compared to file addresses.
+VERIFY input hooks cover $22730–$22735 and $22746–$2274d. The native joystick
+mask and key-status APIs consume the scripted input normally.
+
+The timing entry includes a read-only debugger signature, `S7TM`. Its counters
+are decoded by `tools/timing_state.py`. The mapped-state comparator ignores the
+unused third word of each six-byte star record: allocation is uncleared, while
+$9bd4 initializes only x/y and $9a2a reads only those two words.
+
+### Moving/firing timing validation
+
+Snapshots at steps 115, 140 and 160 match mapped state for the original game
+loop (timing disabled), fixed A500 and fixed 68020 with a 20-field drawing
+delay. All use the same native-input fixture. At step 115 there are eight
+world/active objects plus player and clone; the later route turns, fires and
+returns to rest. A second 68020 test presenting every other step also matches
+at 115. These are mapped-state checks, not full machine-state equivalence.
+
+| Mode | Completed updates / 100 PAL fields | Presentation fps |
+|---|---:|---:|
+| Fixed A500, moving/firing | 10 | 5.0 |
+| Fixed 68020, independent breakpoint count | 10 | 5.0 |
+| Fixed 68020, every second presentation | 10 | 2.5 |
+| Fixed 68020, 20 extra fields per drawn frame | 9 | 1.9 |
+
+The slow run has bursty catch-up. Checkpoints 115 to 160 span 452 clock fields
+for 45 simulation starts (4.98 Hz); residual credit is retained. The invariant
+`last_field * simulation_hz - step * field_hz - credit` is unchanged at all
+three checkpoints. A short completion-count window can differ by a step while
+one slow draw is in flight. No renderer speedup is claimed.
 
 ## Original Kickstart patch list
 

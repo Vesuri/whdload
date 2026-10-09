@@ -8,4 +8,4 @@ clean:
 	rm -f Stellar7.Slave
 
 verify:
-	$(MAKE) Stellar7.Slave VASMFLAGS="-DVERIFY=1"
+	$(MAKE) Stellar7.Slave VASMFLAGS="-DVERIFY=1 $(VERIFY_FLAGS)"
