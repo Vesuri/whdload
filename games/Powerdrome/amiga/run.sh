@@ -53,6 +53,7 @@ rm -f "$RUN"/state/*.uss
 # joystick_port_0=none unplugs the host device, but port 0 stays in mouse mode and the host mouse
 # still moves its counters; also set the mode so nothing feeds JOY0DAT.
 JOY0_MODE=(); [ "${JOY0:-mouse}" = none ] && JOY0_MODE=(--joystick_port_0_mode=nothing)
+JOY1_MODE=(); [ "${JOY1:-keyboard}" = none ] && JOY1_MODE=(--joystick_port_1_mode=nothing)
 AUDIO=(); [ "${SILENT:-0}" = 1 ] && AUDIO=(--audio_driver=dummy)
 DBG=(); [ "${DEBUG:-0}" = 1 ] && DBG=(--remote_debugger=20 --remote_debugger_port="$DEBUG_PORT")
 REC=(); [ -n "${RECORD:-}" ] && REC=(--record="$RECORD" --deterministic=1)
@@ -65,7 +66,7 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$(cd .. && pwd)/tmp/shots}"; mkdir -p "$SHOTS"; 
   --kickstart_file="$KICKSTART" \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   ${FLOPPY[@]+"${FLOPPY[@]}"} \
-  --joystick_port_0="${JOY0:-mouse}" ${JOY0_MODE[@]+"${JOY0_MODE[@]}"} --joystick_port_1="${JOY1:-keyboard}" \
+  --joystick_port_0="${JOY0:-mouse}" ${JOY0_MODE[@]+"${JOY0_MODE[@]}"} --joystick_port_1="${JOY1:-keyboard}" ${JOY1_MODE[@]+"${JOY1_MODE[@]}"} \
   --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
   --ntsc_mode=0 --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
   "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" ${EXTRA_ARGS:---slow_memory=1536} > "$RUN/fsuae.log" 2>&1 &

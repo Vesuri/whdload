@@ -2,23 +2,25 @@
 
 ## Current state
 
-Initial bring-up is working. Original slave source reconstructed and byte-identical build
-verified. The A500-equivalent boot reaches menus, pits and a moving cockpit. A ten-field pit
-trace verifies instruction PCs and full-field cycle accounting. No optimization is applied.
+The original slave is reconstructed and rebuilds byte-identically. The WHDLoad 20 KickEmu
+rebase and a CUSTOM5-gated VERIFY name-entry fixture reach the moving title demo. Two fresh
+A500 captures match CPU, DMA, initial chip memory and active pixels across 100 fields.
+Independent breakpoint counters agree with both CPU traces field for field. Title-demo
+measurements are 9.7 fps on the A500 configuration and 13.2 fps on the 68020 configuration.
+No performance patch is applied. This is a renderer bring-up benchmark, not a racing baseline.
 
 ## Ordered next work
 
-1. Establish the automatic demo route and its first racing frame; distinguish it from practice.
-   Capture two fresh boots at the same state anchor and compare state, pictures and instructions.
-2. Validate racing frame completion (`$8056` is a candidate) against display changes and a
-   read-only breakpoint counter. Do not count menu/pit updates as racing frames.
-3. Capture fixed-window A500-equivalent and 68020 baselines; attribute CPU, waits, DMA and IRQs.
-4. Complete the timing/state map. The CIA TOD clock and frame-delta clamp are found statically;
+1. Build a deterministic full-screen racing route using native input paths, then repeat it
+   across fresh boots. The title demo advances a recorded camera per rendered frame.
+2. Validate racing frame completion (`$8056` is a candidate) against display changes and an
+   independent read-only breakpoint counter. Capture A500 and 68020 racing profiles.
+3. Complete the timing/state map. The CIA TOD clock and frame-delta clamp are found statically;
    measure their behavior across CPUs and under deliberately slower drawing.
-5. Build the development slave on WHDLoad 20 KickEmu, retaining original behavior and gated
-   VERIFY fixtures. Compare its fixed-window state with the byte-identical reference.
-6. Present measured candidates and the timing verdict for the user's design choice, as the
+4. Compare the development slave with the original on a shared route. Audit the legacy
+   Copylock D2 result described in internals; boot success does not establish equivalence.
+5. Present measured candidates and the timing verdict for the user's design choice, as the
    playbook requires. No performance patch should precede that decision.
 
-The project is **not yet ready to optimize** under the playbook's definition: deterministic
-race capture, validated FPS, cross-CPU baselines and the measured coupling model remain open.
+Setup is **not yet ready to optimize** under the playbook's definition: deterministic race
+capture, validated racing FPS, measured timing coupling and original/rebase equivalence remain.

@@ -78,16 +78,51 @@ writes, disk changes and LoadSeg. No source-level meanings are inferred beyond t
   It is a candidate frame marker, but multiple non-racing paths call it. Frame validation is pending.
 - The renderer waits for the VBL handshake at game `$112a6`.
 - The menu's idle timeout at `$12ec6` compares elapsed clock units with 18,000 and returns
-  12,345 to its caller. Trace its demo transition before relying on it as a gameplay route.
+  12,345 to its caller. This enters the recorded title demo, not a race.
 - RNG seeding at `$11db4` mixes the clock into `a6+$62`, then pilot-name words are XORed in.
-  Reproducibility is unproven; verification may need a deterministic seed.
+  The title route repeats without a seed override; racing remains unverified.
 
-## Measurements
+## Development slave and reproducible title-demo profile
 
-The initial ten-field capture validates the profiler only: 88,274 records with PCs,
-1,421,008 recorded cycles (approximately 142,102 per PAL field). Its screenshots show the
-pit screen, so it is **not a racing baseline**. No performance improvement or racing FPS is
-claimed. The game has also been observed rendering a moving cockpit view.
+`whdload/Powerdrome.s` uses unmodified WHDLoad 20 KickEmu sources, interface 17, one disk,
+512 KB chip for the guest and 256 KB expansion for Kickstart. It retains the EndCLI redirection
+and Copylock replacement, with a signature check at game `$843c`. No cache enablement or
+performance change is added. In VERIFY builds only, CUSTOM5 replaces the name-entry key-ready
+and key-read calls at `$13772` and `$1377c` with ready/Return responses. The shipped original
+and byte-identical rebuild both reach the name screen; the fixture-enabled modern rebase boots
+through it into the automatic title demo. State equivalence against the original is pending. The old Copylock replacement also returns
+the legacy registration tag in D2 (2001 with this WHDLoad); the development replacement only
+sets D0. Audit that side effect before claiming equivalence.
 
-A500-equivalent configuration: 68000, 512 KB chip, 1,536 KB slow, no fast RAM; PAL,
-WHDLoad 20.0, original slave. The native unmodified game's behavior on 68020 is unmeasured.
+The title demo's `$107d6` advances a recorded camera index (`a6+$292`) by its step
+(`a6+$294`, initially 2) per rendered frame. It calls the shared 3D renderer and moves an
+inset across the title background. `$1067e` is its post-render display-update call and the
+capture anchor. This demo therefore plays faster when rendering is faster, independently
+of the separate clock-delta-based racing motion; do not conflate the two timing models.
+
+Fixed title-demo windows use the development VERIFY slave with CUSTOM5=1, PAL, WHDLoad 20.0
+and 100 fields. Two fresh A500 boots have identical initial chip RAM, CPU instruction records
+and DMA records throughout. Every image matches except the three rightmost host-border columns,
+which the comparator excludes. An independent read-only breakpoint counter exactly reproduces
+both machines' complete per-field frame patterns.
+
+| Machine | Frame intervals / PAL fields | Demo fps |
+|---|---:|---:|
+| 68000, 512 KB chip, 1,536 KB slow, no fast | 18 / 93 | 9.7 |
+| A1200, 68EC020, 2 MB chip, 4 MB fast, no slow | 25 / 95 | 13.2 |
+
+The second machine still runs the game in chip RAM; fast RAM holds KickEmu and host support.
+These are demo drawing rates, not racing baselines or a performance improvement.
+
+On the A500, the trace records 100 game VBL callbacks and 408 level-3 entries. DMA slots: 31.2% free,
+27.1% CPU, 17.2% blitter, 22.5% bitplanes (remainder refresh/copper).
+Self attribution: game `$10df2` 21.8%, `$15ee8` 20.8%, `$1609c` 7.0%; verify boundaries with
+instruction hotspots before selecting a replacement. KickEmu's complete WaitBlit routine
+uses about 23.1% of recorded cycles, including its CIA delay reads. A detector counting only
+busy-bit tests and branches substantially undercounts that wait. STOP instruction records
+account for about 6.35% of cycles. These are recorded emulator costs, not hardware measurements.
+
+On the 68020, complete WaitBlit accounts for 31.9% of recorded cycles and STOP records 11.6%.
+DMA slots: 32.1% free, 20.0% CPU, 23.4% blitter, 22.5% bitplanes. There are 100 game VBL
+callbacks and 100 level-3 entries. The trace cycle scale doubles with this CPU backend; do not
+compare raw cycle totals across CPUs as elapsed PAL time. FPS comes from field counts.

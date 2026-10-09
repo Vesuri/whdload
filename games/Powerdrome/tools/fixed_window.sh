@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Calibrate, reboot and capture the attract demo from its first rendered-frame end.
+# This moving inset exercises 3D drawing; it is not a full-screen racing benchmark.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+OUT=${1:?output directory required}
+mkdir -p "$OUT" tmp/cache
+OUT=$(cd "$OUT" && pwd)
+INPUT=${2:-tmp/build/Powerdrome-verify.slave}
+cp "$INPUT" "$OUT/slave.slave"
+export SLAVE="$OUT/slave.slave"
+export JOY0=none JOY1=none DETERMINISTIC=1 WARP=1
+export WHD_ARGS="${WHD_ARGS:-CUSTOM5=1}"
+export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}"
+export EXTRA_ARGS="${EXTRA_ARGS:---slow_memory=1536}"
+FIELDS=${FIELDS:-100}
+ANCHOR=${ANCHOR:-0x1067e}
+if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB*1024))
+else BASE=0xc00000; SIZE=1572864; fi
+pd() { python3 tools/powerdrome.py "$@"; }
+cleanup() {
+  python3 - <<'PYCLEAN' >/dev/null 2>&1 || true
+import subprocess
+try: subprocess.run(['python3','tools/powerdrome.py','quit'],timeout=5)
+except subprocess.TimeoutExpired: pass
+PYCLEAN
+}
+trap cleanup EXIT
+cleanup
+KEY=$(python3 - <<'PYKEY'
+import hashlib,os
+from pathlib import Path
+h=hashlib.sha256(Path(os.environ['SLAVE']).read_bytes())
+h.update(repr([(k,os.environ.get(k)) for k in ('AMIGA_MODEL','CPU','CHIP_KB','FAST_KB','EXTRA_ARGS','KICKSTART','WHD_ARGS')]).encode())
+print(h.hexdigest()[:20])
+PYKEY
+)
+CACHE=tmp/cache/hunk-$KEY.txt
+start() {
+  : > "$OUT/serve.log"
+  python3 tools/powerdrome.py serve > "$OUT/serve.log" 2>&1 &
+  SERVER=$!
+  for ((i=0;i<${SERVE_WAIT:-300};i++)); do
+    rg -q 'serving on' "$OUT/serve.log" && return
+    kill -0 "$SERVER" 2>/dev/null || { cat "$OUT/serve.log"; return 1; }
+    sleep 1
+  done
+  echo 'Timed out waiting for capture anchor' >&2
+  return 1
+}
+dumpmem() {
+  pd gdb "dump binary memory tmp/window-chip.bin 0 $((CHIP_KB*1024))" > /dev/null
+  pd gdb "dump binary memory tmp/window-other.bin $BASE $((BASE+SIZE))" > /dev/null
+}
+locate() {
+  python3 - "$BASE" <<'PYLOC'
+from pathlib import Path
+import sys
+sys.path.insert(0,'tools')
+from powerdrome_report import regions
+r=regions(Path('tmp/window-other.bin').read_bytes(),int(sys.argv[1],0),Path('tmp/window-chip.bin').read_bytes())
+print(next((hex(lo) for lo,hi,n,o in r if n=='game'),''))
+PYLOC
+}
+if [ ! -s "$CACHE" ]; then
+  unset BOOT_BREAK
+  start
+  hunk=
+  for ((j=0;j<60;j++)); do
+    pd wait 0.5 > /dev/null
+    pd stop > /dev/null
+    dumpmem
+    hunk=$(locate)
+    [ -n "$hunk" ] && break
+  done
+  [ -n "$hunk" ] || { echo 'Game not found' >&2; exit 1; }
+  printf '%s\n' "$hunk" > "$CACHE"
+  cleanup
+fi
+hunk=$(cat "$CACHE")
+export BOOT_BREAK=$((hunk+ANCHOR))
+start
+dumpmem
+[ "$(locate)" = "$hunk" ] || { echo 'Calibration mismatch' >&2; exit 1; }
+pd gdb 'info registers pc sp' > "$OUT/anchor.txt"
+cp tmp/window-chip.bin "$OUT/chip.bin"
+cp tmp/window-other.bin "$OUT/code.bin"
+printf '%s\n' "$hunk" > "$OUT/game-base.txt"
+printf '%s\n' "$BASE" > "$OUT/dump-base.txt"
+if [ "${SWAP_ONLY:-0}" = 1 ]; then
+  python3 tools/swap_fields.py "$FIELDS" "$OUT" "$OUT/code.bin" "$BASE"
+else
+pd profile "$FIELDS" "$OUT/trace.bin" > "$OUT/capture.txt"
+python3 tools/powerdrome_report.py "$OUT/trace.bin" "$OUT/code.bin" --base "$BASE" > "$OUT/profile.txt"
+python3 tools/frames.py "$OUT/trace.bin" "$OUT/code.bin" "$BASE" > "$OUT/frames.txt"
+python3 - "$OUT" <<'PYSHOTS'
+from pathlib import Path
+import sys
+sys.path.insert(0,'tools');import barto
+p=Path(sys.argv[1]); t=barto.load(p/'trace.bin')
+(p/'first.png').write_bytes(t.fields[0].shot)
+(p/'last.png').write_bytes(t.fields[-1].shot)
+assert any(pc is not None for pc,c,r in t.instructions(t.fields[0])), 'No instruction PCs'
+PYSHOTS
+fi
+cleanup
+trap - EXIT
+printf 'Captured %s fields in %s\n' "$FIELDS" "$OUT"

@@ -30,8 +30,11 @@ SLAVE=tmp/build/Powerdrome-original.slave amiga/run.sh
 ```
 
 `original` assembles with optimizations disabled and compares the entire result with the
-installed slave. This is a reference reconstruction; the modern KickEmu development slave
-and VERIFY build are still to be made.
+installed slave. This is the reference reconstruction. `make -C whdload all` builds the WHDLoad 20 KickEmu
+development slave with interface 17. `make -C whdload verify` additionally saves
+`tmp/build/Powerdrome-verify.slave`; `CUSTOM5=1` submits an empty pilot name through the
+native name-entry routine. Normal builds do not contain those input hooks. Neither build
+contains a performance patch. Full original/rebase behavior equivalence remains unverified.
 
 The default machine is 68000, 512 KB chip and 1,536 KB slow with no fast RAM. The host boots
 Kickstart 3.1 and Workbench 2.04 provides Assign for the original slave's Kickstart files.
@@ -59,7 +62,40 @@ checks the write. Emulated time stops while attached. Screenshots come from trac
 
 The harness and parser derive from Indianapolis 500; OFS extraction and patch-list decoding
 from Battlehawks 1942. The reporting locator has been adapted to Powerdrome's single hunk
-and original slave; do not use it unchanged with a future KickEmu slave.
+and either the original or development slave.
 
 `tools/adf.py` lists/extracts the local disk image; `tools/patchlist.py` decodes original lists.
 See `docs/open-work.md` before interpreting a capture as a benchmark.
+
+## Fixed attract-demo window
+
+```sh
+make -C whdload verify
+FIELDS=100 tools/fixed_window.sh tmp/prof/demo-a
+FIELDS=100 tools/fixed_window.sh tmp/prof/demo-b
+python3 tools/compare_traces.py tmp/prof/demo-a/trace.bin tmp/prof/demo-b/trace.bin
+SWAP_ONLY=1 FIELDS=100 tools/fixed_window.sh tmp/prof/demo-swaps
+```
+
+The first run calibrates the relocated code address. Each measurement boot arms game `$1067e`
+from reset, after the first animated-inset render. The name fixture lets the native menu reach
+its idle timeout. `FIELDS`, `ANCHOR`, and `SERVE_WAIT` are overridable. An explicit second
+argument selects the input slave. Captures retain the slave, initial memory, anchor registers,
+trace, profile, frame report, and first/last images. Do not touch inputs during captures.
+
+This is the moving inset on the title screen; its pixel workload and playback timing differ
+from racing. It advances the recorded camera by two samples per rendered frame. It is useful
+for renderer bring-up, but cannot establish simulation correctness or full-screen racing FPS.
+
+For the 68020 comparison (run sequentially, after the A500 capture):
+
+```sh
+source amiga/env.sh
+AMIGA_MODEL=A1200 CPU=68EC020 KICKSTART="$KICKSTART_A1200" CHIP_KB=2048 FAST_KB=4096 \
+  EXTRA_ARGS=--slow_memory=0 FIELDS=100 tools/fixed_window.sh tmp/prof/demo-a1200
+```
+
+Add `SWAP_ONLY=1` to count the same marker with read-only debugger breakpoints instead of
+instruction tracing. Compare the complete `demo frame completions per field` line, not just
+rounded FPS. The trace comparator checks all initial chip RAM, instruction and DMA records,
+and screenshots excluding only three rightmost host-border columns.

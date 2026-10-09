@@ -8,7 +8,7 @@ TRACE is `powerdrome.py profile` output (Barto format, all PCs recorded); MEMDUM
 so the loaded addresses match; chip RAM comes from the trace's own snapshot.  Regions are
 identified by matching the relocated single-hunk pd executable, the resident original slave,
 and its patched Kickstart 1.3 image. The game is extracted from Disk.1 in memory.
-This locator currently supports the original v1.0 slave and its byte-identical reconstruction.
+The resident slave is identified through its loader and initialized resload pointer.
 
 Calls are rebuilt from the instruction stream: a jsr/bsr pushes a frame (callee = the next
 traced PC), the frame pops once SP climbs back above its return slot.  `jsr d16(a6)` is
@@ -123,13 +123,17 @@ def regions(dump, base, chip=None):
         addr = locate(mem, blob, mbase, skip=cached)
         if addr is not None:
             out.append((addr, addr + len(blob), 'game', addr))
-        # The original slave's resident loader and nonzero resload pointer distinguish it
-        # from the on-disk copy. Only original/reconstructed v1.0 is supported so far.
-        sig = slave[0x214:0x254]
+        entry = int.from_bytes(slave[24:26], 'big')
+        if slave[entry:entry+2] == b'\x60\x00':
+            entry += 2 + int.from_bytes(slave[entry+2:entry+4], 'big', signed=True)
+        if slave[entry:entry+2] != b'\x43\xfa':
+            raise ValueError('unknown slave loader signature')
+        resptr = entry + 2 + int.from_bytes(slave[entry+2:entry+4], 'big', signed=True)
+        sig = slave[entry:entry+64]
         i = mem.find(sig)
         while i >= 0:
-            start = i - 0x214
-            if start >= 0 and any(mem[start+0x60a:start+0x60e]):
+            start = i - entry
+            if start >= 0 and any(mem[start+resptr:start+resptr+4]):
                 a = mbase + start
                 out.append((a, a + len(slave), 'slave', a))
                 break
@@ -294,7 +298,7 @@ def main():
     self_c, incl, calls, edges, pcs, kinds, by_ctx = analyse(trace, mem, namer, fields)
     total = sum(kinds.values())
     nf = len(fields)
-    print(f'# {a.trace}: {nf} fields, {total} cycles ({total / nf / FIELD:.3f} of each field)')
+    print(f'# {a.trace}: {nf} fields, {total} recorded cycles ({total / nf:.0f} per field; CPU-backend scale)')
     print('regions:', ', '.join(f'{n} {lo:#x}-{hi:#x}' for lo, hi, n, _ in regs))
     print('by mode:', ', '.join(f'{k} {100 * v / total:.1f}%' for k, v in kinds.most_common()))
     reg = collections.Counter()
