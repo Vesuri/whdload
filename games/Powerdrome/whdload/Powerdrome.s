@@ -20,7 +20,7 @@ slv_info dc.b "Installed by Galahad/Fairlight",10,"Development by Vesuri",10,"Ve
 slv_CurrentDir dc.b 0
 slv_config
  IFD VERIFY
- dc.b "C5:B:Verification demo route;"
+ dc.b "C5:L:Verification route:Off,Title demo,Practice;"
  ENDC
  dc.b 0
  EVEN
@@ -75,6 +75,12 @@ launch_pd
  lea pl_verify(pc),a0
  lea 4(a3),a1
  jsr resload_Patch(a2)
+ move.l custom5(pc),d0
+ cmp.l #2,d0
+ bne.s .run
+ lea pl_practice(pc),a0
+ lea 4(a3),a1
+ jsr resload_Patch(a2)
 .run
  ENDC
  jmp (a3)
@@ -101,6 +107,40 @@ key_ready moveq #-1,d0
  rts
 key_return moveq #13,d0
  rts
+; Whole six-byte input JSRs. Only installed for CUSTOM5=2.
+; Key 3 selects the same menu item as the top-middle Practice button.
+pl_practice PL_START
+ PL_PS $12f6a,practice_ready
+ PL_PS $130a4,practice_key
+ PL_PS $13c50,pit_ready
+ PL_PS $13cde,pit_key
+ PL_END
+practice_ready
+ moveq #0,d0
+ move.w practice_sent(pc),d0
+ subq.w #1,d0
+ rts
+practice_key
+ move.l a0,-(sp)
+ lea practice_sent(pc),a0
+ move.w #1,(a0)
+ move.l (sp)+,a0
+ moveq #$33,d0
+ rts
+pit_ready
+ moveq #0,d0
+ move.w pit_sent(pc),d0
+ subq.w #1,d0
+ rts
+pit_key
+ move.l a0,-(sp)
+ lea pit_sent(pc),a0
+ move.w #1,(a0)
+ move.l (sp)+,a0
+ moveq #32,d0
+ rts
+practice_sent dc.w 0
+pit_sent dc.w 0
 tags dc.l WHDLTAG_CUSTOM5_GET
 custom5 dc.l 0
  dc.l TAG_DONE

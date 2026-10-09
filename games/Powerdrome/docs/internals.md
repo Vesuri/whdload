@@ -100,7 +100,7 @@ inset across the title background. `$1067e` is its post-render display-update ca
 capture anchor. This demo therefore plays faster when rendering is faster, independently
 of the separate clock-delta-based racing motion; do not conflate the two timing models.
 
-Fixed title-demo windows use the development VERIFY slave with CUSTOM5=1, PAL, WHDLoad 20.0
+Fixed title-demo windows at revision `02dbc27` use the development VERIFY slave with CUSTOM5=1, PAL, WHDLoad 20.0
 and 100 fields. Two fresh A500 boots have identical initial chip RAM, CPU instruction records
 and DMA records throughout. Every image matches except the three rightmost host-border columns,
 which the comparator excludes. An independent read-only breakpoint counter exactly reproduces
@@ -126,3 +126,26 @@ On the 68020, complete WaitBlit accounts for 31.9% of recorded cycles and STOP r
 DMA slots: 32.1% free, 20.0% CPU, 23.4% blitter, 22.5% bitplanes. There are 100 game VBL
 callbacks and 100 level-3 entries. The trace cycle scale doubles with this CPU backend; do not
 compare raw cycle totals across CPUs as elapsed PAL time. FPS comes from field counts.
+
+## Practice input route and movement anchor
+
+VERIFY `CUSTOM5=2` uses the same Enter hook as the title route, then replaces the native
+menu key-ready/read JSRs at `$12f6a` / `$130a4` with one `3` keypress. The game's rectangle
+table at `$432c` maps item 3 to the top-middle button; its normal dispatcher at `$1207a`
+selects Practice. At the pit, `$13c50` / `$13cde` receive one Space keypress. Each hook covers
+one complete six-byte JSR; no static branch enters an overwritten instruction's interior.
+No input fixture is present in the normal build.
+
+After accepting Space, the native code performs its stationary departure delay, then calls
+`$1475c`. The first loop iteration at `$14764` is the capture anchor: it draws the ship at
+successive vertical coordinates from `$144cc` (51, 50, 50, 45, ...), moving out of the pit.
+The later `$1020e` routine handles the cockpit departure path. A capture starting at `$14764`
+includes the visible pit launch, the screen transition and subsequent cockpit gameplay.
+
+The A500 practice-launch capture has 500 consecutive PAL fields and 500 game VBL callbacks,
+71,050,998 recorded CPU cycles, and 6,205,664 instruction records (all have PCs). Its first
+100 fields match the short-cap reference's initial chip memory and CPU/DMA records exactly,
+validating that lifting the host profiler command cap does not alter that portion of gameplay.
+Self costs over the full launch window: `$15ee8` 26.7%, `$159e8` 12.6%, `$10df2` 8.5%,
+`$15810` 5.9%; KickEmu WaitBlit 5.6%. These include departure/loading work and inferred routine
+boundaries, so they should not be presented as steady-state racing costs or a speedup.

@@ -109,14 +109,25 @@ LLDB_FIX = (
     'print("WINDOW", p.ReadMemory(a, 8, e).hex())')
 
 
-def fix_profile_window():
+def fix_profile_window(fields=100):
     # One attach that computes the slide and writes the window: each lldb attach to this
     # x86_64 (Rosetta) process costs ~40 s, so the earlier image-list-then-write pair could
     # exceed a 60 s timeout.
     pid = open(os.path.join(RUN, 'fsuae.pid')).read().strip()
-    out = subprocess.run(['lldb', '-p', pid, '--batch', '-o', LLDB_FIX % BASETEXT_VM],
+    assert 1 <= fields <= 500, 'Capture limit is 500 PAL fields'
+    fix = LLDB_FIX % BASETEXT_VM
+    if fields > 100:
+        # Command parser clamps requests to 100. Bypass that clamp only in this
+        # emulator process; do not modify the installed executable or guest code.
+        # x86_64: cmovl ecx,eax -> mov ecx,eax; nop (keep requested field count).
+        fix += ('; a=h.GetLoadAddress(t)-h.GetFileAddress()+0x5bfbe; '
+                'old=p.ReadMemory(a,3,e); assert old in (bytes.fromhex("0f4cc8"),bytes.fromhex("89c190")); '
+                'p.WriteMemory(a,bytes.fromhex("89c190"),e); '
+                'assert p.ReadMemory(a,3,e)==bytes.fromhex("89c190"); print("LONG_CAPTURE_READY")')
+    out = subprocess.run(['lldb', '-p', pid, '--batch', '-o', fix],
                          capture_output=True, text=True, timeout=300).stdout
     assert 'WINDOW 00000000ffffff7f' in out, out
+    if fields > 100: assert 'LONG_CAPTURE_READY' in out.splitlines(), out
 
 
 def serve():
@@ -186,7 +197,7 @@ def handle(g, line):
             fields, target = rest.split(None, 1)
             target = os.path.abspath(target)
         if op == 'profile':
-            fix_profile_window()
+            fix_profile_window(int(fields))
         out = g.cmd(f'monitor profile {fields} "" "{target}"', timeout=1800)
         if was: g.cont()
         if op == 'shot':

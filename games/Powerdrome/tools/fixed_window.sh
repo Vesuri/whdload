@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Calibrate, reboot and capture the attract demo from its first rendered-frame end.
-# This moving inset exercises 3D drawing; it is not a full-screen racing benchmark.
+# Calibrate, reboot and capture from a route-specific anchor.
+# Default: title inset. Practice: WHD_ARGS=CUSTOM5=2 ANCHOR=0x14764 FIELDS=500.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=${1:?output directory required}
@@ -92,12 +92,15 @@ if [ "${SWAP_ONLY:-0}" = 1 ]; then
 else
 pd profile "$FIELDS" "$OUT/trace.bin" > "$OUT/capture.txt"
 python3 tools/powerdrome_report.py "$OUT/trace.bin" "$OUT/code.bin" --base "$BASE" > "$OUT/profile.txt"
-python3 tools/frames.py "$OUT/trace.bin" "$OUT/code.bin" "$BASE" > "$OUT/frames.txt"
-python3 - "$OUT" <<'PYSHOTS'
+if [[ "$WHD_ARGS" != *CUSTOM5=2* ]]; then
+  python3 tools/frames.py "$OUT/trace.bin" "$OUT/code.bin" "$BASE" > "$OUT/frames.txt"
+fi
+python3 - "$OUT" "$FIELDS" <<'PYSHOTS'
 from pathlib import Path
 import sys
 sys.path.insert(0,'tools');import barto
 p=Path(sys.argv[1]); t=barto.load(p/'trace.bin')
+assert len(t.fields) == int(sys.argv[2]), 'Profiler returned fewer fields than requested'
 (p/'first.png').write_bytes(t.fields[0].shot)
 (p/'last.png').write_bytes(t.fields[-1].shot)
 assert any(pc is not None for pc,c,r in t.instructions(t.fields[0])), 'No instruction PCs'

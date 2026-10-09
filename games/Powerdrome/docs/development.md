@@ -33,7 +33,7 @@ SLAVE=tmp/build/Powerdrome-original.slave amiga/run.sh
 installed slave. This is the reference reconstruction. `make -C whdload all` builds the WHDLoad 20 KickEmu
 development slave with interface 17. `make -C whdload verify` additionally saves
 `tmp/build/Powerdrome-verify.slave`; `CUSTOM5=1` submits an empty pilot name through the
-native name-entry routine. Normal builds do not contain those input hooks. Neither build
+native name-entry routine. `CUSTOM5=2` also selects Practice and submits Space in the pit. Normal builds do not contain those input hooks. Neither build
 contains a performance patch. Full original/rebase behavior equivalence remains unverified.
 
 The default machine is 68000, 512 KB chip and 1,536 KB slow with no fast RAM. The host boots
@@ -99,3 +99,28 @@ Add `SWAP_ONLY=1` to count the same marker with read-only debugger breakpoints i
 instruction tracing. Compare the complete `demo frame completions per field` line, not just
 rounded FPS. The trace comparator checks all initial chip RAM, instruction and DMA records,
 and screenshots excluding only three rightmost host-border columns.
+
+## Ten-second practice launch profile
+
+```sh
+make -C whdload verify
+WHD_ARGS=CUSTOM5=2 ANCHOR=0x14764 FIELDS=500 \
+  tools/fixed_window.sh tmp/prof/practice-10s
+```
+
+The route submits Enter at name entry, then the native `3` shortcut for the top-middle
+Practice button, then Space at the pit's input loop. The capture anchor is the first
+iteration of the pit departure animation, after the Space handling and stationary delay.
+The ship then flies onto the track automatically; host inputs stay disconnected.
+
+The stock profiler command clamps requests to 100 fields. Back-to-back requests omit one
+field at each boundary (confirmed using the game's VBL counter), so they do not make a
+continuous trace. For requests of 101–500 fields, the harness lifts the command cap in the
+current emulator process during its existing debugger attachment. It verifies the exact
+instruction bytes before and after the change. The installed emulator file and guest game
+code are not modified. This workaround is specific to the documented x86_64 emulator build.
+
+The 500 fields are recorded in one request, giving ten nominal PAL seconds without internal
+gaps. The output retains the slave, anchor/memory dumps, `trace.bin`, `profile.txt` and
+first/last images. Routine boundaries in the report are inferred; display updates during
+launch are not yet a validated racing FPS counter.
