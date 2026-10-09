@@ -11,7 +11,8 @@ The pit has a different bottleneck: **47.05%** of its cycles execute KickEmu's W
 That falls to **0.17%** on track. Optimizing the launch wait would have little effect on the
 track portion. The first targets for investigation are the per-scanline polygon loop, its
 four-plane span writers and edge stepping; background clearing is a smaller, regular target.
-No optimization or speedup is claimed here.
+No optimization or speedup is claimed here. The [implementation plan](performance-plan.md)
+examines planar staging in fast RAM, measured bitmap traffic and simulation integration.
 
 ## Capture and scope
 

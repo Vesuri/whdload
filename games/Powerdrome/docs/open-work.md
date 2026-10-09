@@ -18,16 +18,25 @@ figures are separate from the practice launch profile.
 
 ## Ordered next work
 
-1. Repeat the full Practice capture across fresh boots; compare state, CPU/DMA and screenshots.
-   Its first 100 fields already match the earlier short capture on the same build.
-2. Validate racing frame completion (`$8056` is a candidate) against display changes and an
-   independent breakpoint counter. Separate pit/transition activity from cockpit rendering.
-3. Capture the same Practice route on 68020 and complete the timing/state map. Measure the
-   CIA TOD clock and clamped frame delta across CPUs and under deliberately slower drawing.
-4. Compare the development slave with the original on a shared route. Audit the legacy
-   Copylock D2 result described in internals; boot success does not establish equivalence.
-5. Present measured candidates and the timing verdict for the user's design choice, as the
-   playbook requires. No performance patch should precede that decision.
+Follow the [performance implementation plan](performance-plan.md). The selected scope is
+planar scene rendering into fast RAM followed by a CPU copy to the chip back buffer, plus
+measured drawing-loop improvements. Retain the existing elapsed-time simulation and update
+order; a new scheduler, timestep policy or frame cap is outside this work.
 
-The requested first in-game ten-second profile is captured. Full optimization readiness still
-requires repeated gameplay state comparisons, validated racing FPS and measured timing coupling.
+1. Repeat the complete Practice capture, validate the driving presentation marker, and capture
+   a 68020 baseline. Add fixed-state drawing fixtures and race/effect coverage.
+2. Resolve or isolate original/development-slave equivalence, including the legacy Copylock D2
+   result. Preserve the current native baseline while providing experimental guest fast memory.
+3. Measure CPU fast-to-chip copy and tail-seed costs with the native display active. Keep code,
+   scratch and bitmap placement separately controllable so each benefit can be attributed.
+4. Prototype a guarded wrapper at `$cee8` using the same four-plane layout in fast RAM.
+   Validate full-image equivalence before narrowing this view to rows 19–153, with preservation
+   of uncleared rows 150–153. Copy before post-render HUD work and the native presentation.
+5. Move audited CPU scratch/code to fast RAM, make span dispatch cache-safe, and optimize
+   scanline and edge loops independently. Enable only measured winning machine/path combinations.
+6. Complete longer gameplay and accelerated-hardware validation before selecting release defaults.
+
+The existing trace confirms one movement update per scene render, using the stored elapsed-time
+delta. Some other operations are per-loop; retain their native behavior. Fast planar staging is
+feasible in the identified drawing path, but end-to-end benefit awaits the prototype and A/B
+measurements on faster CPUs. The estimated chip data-traffic reduction is not a measured speedup.

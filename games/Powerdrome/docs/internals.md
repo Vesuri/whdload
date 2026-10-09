@@ -82,6 +82,15 @@ writes, disk changes and LoadSeg. No source-level meanings are inferred beyond t
 - RNG seeding at `$11db4` mixes the clock into `a6+$62`, then pilot-name words are XORed in.
   The title route repeats without a seed override; racing remains unverified.
 
+The Practice trace now confirms the normal loop's order: `$ca3e` updates movement, calls the
+scene renderer at `$cee8`, runs post-render gameplay/HUD work, then the caller presents through
+`$bc7c`/`$8056`. There are 70 player movement updates and 70 renderer entries; the 69 completed
+iterations each reach the native delta calculation. All 68 adjacent sampled presentations have
+raw delta equal to four times their PAL-field separation. Observed deltas are 12–32, without
+clamping. Simulation is coupled to rendering but its main displacement uses elapsed time.
+See the [performance plan](performance-plan.md) for the per-loop behavior and fast planar
+buffer design. The selected scope preserves the native simulation and timing policy.
+
 ## Development slave and reproducible title-demo profile
 
 `whdload/Powerdrome.s` uses unmodified WHDLoad 20 KickEmu sources, interface 17, one disk,
