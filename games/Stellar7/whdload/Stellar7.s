@@ -19,10 +19,19 @@ slv_name: dc.b "Stellar 7",0
 slv_copy: dc.b "1991 Dynamix",0
 slv_info: dc.b "Installed by Psygore",10,"Development baseline (KickEmu 20.0)",0
 slv_CurrentDir: dc.b "data",0
-slv_config: dc.b 0
+slv_config:
+        IFD VERIFY
+        dc.b "C5:B:Deterministic menu fixture;"
+        ENDC
+        dc.b 0
 _game: dc.b "s7",0
 _args: dc.b 10,0
         EVEN
+        IFD VERIFY
+_s7tags: dc.l WHDLTAG_CUSTOM5_GET
+_custom5: dc.l 0
+        dc.l 0
+        ENDC
 _bootdos:
         move.l #$393d,d0
         move.l #$7f3f,d1
@@ -60,6 +69,16 @@ _bootdos:
         jsr (_LVOLoadSeg,a6)
         move.l d0,d7
         beq .loaderror
+        IFD VERIFY
+        movem.l d0-d7/a0-a6,-(sp)
+        lea (_s7tags,pc),a0
+        jsr (resload_Control,a2)
+        move.l (_custom5,pc),d0
+        beq .notape
+        bsr fixture_install
+.notape:
+        movem.l (sp)+,d0-d7/a0-a6
+        ENDC
         move.l d7,a1
         add.l a1,a1
         add.l a1,a1
@@ -88,3 +107,7 @@ _bootdos:
         move.l (_resload,pc),-(sp)
         addq.l #resload_Abort,(sp)
         rts
+
+        IFD VERIFY
+        INCLUDE fixture.s
+        ENDC
