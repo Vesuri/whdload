@@ -146,6 +146,8 @@ The A500 practice-launch capture has 500 consecutive PAL fields and 500 game VBL
 71,050,998 recorded CPU cycles, and 6,205,664 instruction records (all have PCs). Its first
 100 fields match the short-cap reference's initial chip memory and CPU/DMA records exactly,
 validating that lifting the host profiler command cap does not alter that portion of gameplay.
-Self costs over the full launch window: `$15ee8` 26.7%, `$159e8` 12.6%, `$10df2` 8.5%,
-`$15810` 5.9%; KickEmu WaitBlit 5.6%. These include departure/loading work and inferred routine
-boundaries, so they should not be presented as steady-state racing costs or a speedup.
+The [phase-specific practice profile](practice-profile.md) identifies CPU polygon rasterization
+as the track bottleneck: edge/span work takes 54.27% of track cycles, background filling 8.45%.
+Complete WaitBlit takes 47.05% in the pit but only 0.17% on track. These use verified,
+disjoint instruction ranges; the generic report's inferred `$159e8` routine label incorrectly
+absorbs branch-entered span writers. See the profile for exact boundaries and limitations.
