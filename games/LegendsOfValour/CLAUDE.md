@@ -38,4 +38,4 @@ patches.
 | `docs/simulation-timing.md` | Before touching the optional game timing (CUSTOM2 bit 6) |
 | `docs/one-degree-turning.md` | Before touching the optional fine turning (CUSTOM2 bit 7) |
 | `docs/releasing.md` | Building the release archives |
-| Test Drive 2 `docs/new-game-playbook.md` | The method this repo follows (set up from Test Drive II) |
+| `README.md` | Setup, build/run quick start, dependencies and release overview |

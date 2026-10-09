@@ -1,8 +1,8 @@
 # Profiling the original Legends of Valour
 
 > **Read this before running, driving or tracing the game, or quoting any performance number.**
-> Method: Test Drive 2 `docs/new-game-playbook.md`. The harness is Test Drive II's (an OS game
-> under kickemu, like this one) with Indianapolis 500's lldb fix.
+> This document defines the current measurement method. The harness originated in
+> Test Drive II (also an OS game under kickemu), with Indianapolis 500's lldb fix.
 
 ## TL;DR
 
@@ -99,7 +99,7 @@ each run: **save games written during a run are lost**). `amiga/run.sh` boots it
 
 | Machine | Settings | Code base in dumps |
 |---|---|---|
-| A500-equivalent | `CHIP_KB=512 FAST_KB=0 EXTRA_ARGS=--slow_memory=1536` (the default) | `0xc00000` (slow RAM) |
+| A500-equivalent | `CHIP_KB=512 FAST_KB=0 EXTRA_ARGS=--slow_memory=1536` (fixed-window capture default) | `0xc00000` (slow RAM) |
 | 14 MHz 68020 | `AMIGA_MODEL=A1200 KICKSTART=$KICKSTART_A1200 CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 EXTRA_ARGS=--slow_memory=0` | `0x200000` |
 | 68000 + physical fast | `AMIGA_MODEL=A500 CPU=68000 CHIP_KB=1024 FAST_KB=8192 EXTRA_ARGS=--slow_memory=0` (512K chip + 4M fast fails in the game's own startup allocator) | `0x200000` |
 

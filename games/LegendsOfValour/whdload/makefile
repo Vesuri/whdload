@@ -14,12 +14,16 @@ VASMFLAGS ?=
 .PHONY: all developer verify clean FORCE
 OUT ?= ../tmp/build
 SLAVE = $(OUT)/LegendsOfValour.Slave
-all: $(SLAVE)
+empty :=
+space := $(empty) $(empty)
+# Escape spaces for make targets; shell arguments are quoted separately below.
+SLAVE_TARGET = $(subst $(space),\ ,$(SLAVE))
+all: $(SLAVE_TARGET)
 
 # Always assemble: options must not leave a stale variant.
-$(SLAVE): LegendsOfValourHD.s FORCE
+$(SLAVE_TARGET): LegendsOfValourHD.s FORCE
 	mkdir -p "$(OUT)"
-	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym -L $(@:.Slave=.lst) $(VASMFLAGS) -I. -I"$(WHDLOAD)/Include" -I"$(NDK)" -o $@ $<
+	"$(VASM)" -m68000 -pic -x -devpac -Fhunkexe -nosym -L "$(OUT)/LegendsOfValour.lst" $(VASMFLAGS) -I. -I"$(WHDLOAD)/Include" -I"$(NDK)" -o "$(SLAVE)" "$<"
 
 developer:
 	$(MAKE) all VASMFLAGS="$(VASMFLAGS) -DDEVELOPER=1"
