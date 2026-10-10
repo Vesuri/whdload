@@ -138,6 +138,82 @@ probes `$ccee/$ccf6/$cd2c/$cd3a/$cde2/$fc9e/$fcea/$fec6`. The pause route uses `
 prototype. No rendering-rate or full framerate-independence claim follows from these
 instrumented correctness runs.
 
+## Shared-clock ownership audit
+
+`tools/audit_timing_clock.py` cross-checks the native executable's relocation table
+against decoded instructions across the complete code hunk, including sound routines.
+It accounts for **85 absolute references to `$f96`: 79 read-only accesses, four stores
+and two read/modify/writes**. This inventory is independent of a textual disassembly
+search. It does not prove the absence of computed-pointer aliases or classify every
+transitive caller; those remain explicit audit work.
+
+The six direct writers must not be treated as interchangeable elapsed-time updates:
+
+| Offset | Operation | Required ownership treatment |
+| --- | --- | --- |
+| `$5414` | Reset clock to zero | Establish a new native epoch; initialize/rebase logical session time explicitly |
+| `$59f2` | Add sampled CIA TOD difference × 4 | Keep physical time advancing for waits, presentation and audio |
+| `$93d2` | Restore saved value through `a3` | Audit saved-input/playback lifecycle before translating logical time |
+| `$93fc` | Restore value from saved input state at `$4520` | Same; preserving VBL time alone does not reproduce this clock restore |
+| `$beec` | Restore pre-pause time | Existing input prototype excludes paused fields; logical/native epochs must remain consistent |
+| `$f67a` | Add a calculated gameplay time adjustment | Preserve its gameplay meaning without adding extra physics ticks |
+
+At `$f67a`, the adjustment uses `state+$2d0`, scales by 200/8 and multiplies by a
+lap-related difference. Its exact mode semantics still need runtime confirmation.
+It is evidence that the native clock is not simply a monotonic VBL counter.
+
+The directly inspected gameplay consumers establish these concrete dependencies:
+
+| Consumer offsets | Timestamp/state | Split required |
+| --- | --- | --- |
+| `$d4b6`, `$d4fe` | Opponent `+$50` start time, `+$56` active flag; elapsed / 200 compared with `+$1c` | Pair the start and expiry in one logical domain; audit initialization and every caller before patching either read |
+| `$d7f8`, `$d836`, `$d866` | Opponent `+$5c` lap timestamp, `+$60` duration; minimum interval 400 clock units | Logical crossing time, with session-start epoch and saved results preserved |
+| `$ce00` | Rescue deadline `state+$fe` | Convert its producer and consumer together; rescue may unwind the current world step |
+| `$dd36`, `$dde0`, `$e1c4`, `$e23c` | Scheduled deadlines `state+$4bc` and `+$4b8` | Logical scheduling after decomposing their nested presentation/wait paths |
+| `$dd5e`, `$ddb2` | Timestamp/duration `state+$272` | Pair both reads at their logical crossing instants |
+| `$e044`, `$e39e` | Session deadline `state+$ca` | Audit session setup and end transitions together |
+| `$fa7a` | Previous contact timestamp `state+$28a`, threshold 100 units (500 ms) | Logical collision interval; elapsed render delay currently influences recovery routing |
+| `$f108` | Display clock minus `state+$206` | Keep display derived from the selected gameplay timer domain, not raw physics cursor without an epoch conversion |
+| `$c094`, `$c266`, `$f688`, `$f6ca` | `state+$22e` result timestamp/duration | Preserve mode-specific interpretation and time adjustments |
+
+The opponent update has **seven direct native callers**: `$b76c`, `$c92c`, `$ced8`,
+`$e3bc`, `$fe40`, `$ffc2` and `$1318c`. The prototype schedules `$ced8` and removes the
+two recovery calls `$fe40/$ffc2`; it has not established ownership for the other four.
+`$b76c` is reached by setup rendering, `$c92c` is a keyboard-handler path returning to
+`$bc4a`, and `$e3bc/$1318c` sit in additional mode loops. Their exact lifecycle policies
+still need confirmation. Thus replacing just `$d4b6/$d4fe` with the bare world cursor
+would mix timestamp domains across callers; those two reads are not an isolated patch.
+Direct `a5`-relative accesses show only that pair writes/reads `+$50`, but do not rule out
+bulk initialization or saved-state restoration of opponent records.
+
+Several consumers require a clock that progresses **while the world cursor is stopped**:
+`$c518/$c532` surround a 163-unit animation wait; `$dad2/$dade` a 1,000-unit wait;
+`$db26/$db32` spin for 50 units. Sound shutdown at `$17806/$17812` spins for 40 units
+(200 ms on PAL), outside the earlier gameplay-only address range. Globally substituting
+a frozen world clock would hang these loops. The incident animations `$fdb2–$fe8e` and
+`$fea6–$1004c` additionally perform fixed position updates interleaved with rendering;
+their finite loops block the current world update and are not resolved by changing the
+clock reads alone. They include persistent position/speed/centering mutations, so they
+cannot simply be deferred as cosmetic drawing.
+
+Implementation order for this part of F6:
+
+1. Audit all callers and initialization/restoration of opponent repair timestamps, then
+   move the paired start/expiry reads to an explicitly logical clock. Verify active
+   repairs across pause, pit and session changes, including opponent arrays.
+2. Give lap, rescue and session deadlines an epoch-aware gameplay clock; apply native
+   time adjustments to timer values without manufacturing simulation debt. Verify both
+   producers and consumers and all nonlocal world exits.
+3. Represent incident motion/recovery as timed state that can advance without blocking
+   ordinary world scheduling. Separate audio/presentation waits onto physical time.
+   Preserve the native final positions, speed resets and centering changes.
+4. Rebase or clear input, partial steps and retained debt at each session boundary;
+   preserve fractional time at pause. Then run the long mode/capacity matrix.
+
+The normal timing option and prototype do **not** yet implement this clock split.
+Passing common player states on the short fixtures is insufficient evidence for these
+opponent, lap, rescue and result timer behaviors.
+
 ## Complete-world extraction pilot
 
 `TIMING_WORLD=1` is a development-only extraction experiment, not the final movement

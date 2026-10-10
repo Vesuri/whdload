@@ -177,3 +177,11 @@ calibration/capacity matrix.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.
+
+The shared-clock audit now accounts for all 85 relocated absolute references (79 reads,
+four stores, two read/modify/writes). Besides pause and reset, the native game restores
+saved clock values and adds a gameplay time adjustment. Opponent repair/lap timestamps,
+rescue deadlines and contact timing need paired logical-clock conversion. Blocking waits,
+including a 200-ms sound shutdown outside the gameplay address range, must retain advancing
+physical time. The next F6 implementation step is the paired opponent repair clock after
+its callers and state lifecycle are audited; a global frozen-clock substitution is unsafe.
