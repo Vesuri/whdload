@@ -68,6 +68,76 @@ Its tentative hooks preserve full instruction boundaries: `$ca44` for elapsed ac
 mutation while retaining the normal HUD drawing call. The prototype retains excess periodic
 debt above its per-pass work budget; complete input and mode-transition handling is pending.
 
+## Movement clock ownership during nested presentations
+
+The movement block multiplies signed speed by the current delta, divides by 24 and
+multiplies the result by the direction vector. Read-only probes at `$ccee`, `$cd2c`,
+`$cd3a` and `$cde2` check this arithmetic and the saved previous position separately
+from collision response. `tools/check_timing_movement.py` does not interpret coordinate
+resets as distance or claim trajectory equivalence from correct multiplication.
+
+`timing-movement1-a500` and `timing-movement1-030-twins`, using the fixed-seed boost
+prototype, verify 32 and 56 complete movement calculations respectively, with no wind
+adjustment in this route. The first reset incident occurs at field 128 on A500 versus
+143 on 030. The extra incident control invocation follows that reset; it is not the
+first source of the differing trajectory.
+
+A specific elapsed-time ownership defect is visible on the 030: movement occurs at
+fields 128 and 139, separated by 220 ms, but the latter uses a delta of four native
+units, or 20 ms. Native presentation `$7f7a` stores its timestamp at `state+$218` and
+its most recent interval at `state+$21c`. Intermediate failure-flash presentations call
+that same routine, overwriting the interval before ordinary movement resumes. The
+20-ms minimum alone therefore cannot make movement account for elapsed gameplay time.
+
+The separately compiled `TIMING_MOVE_CLOCK=1` prototype measures time between movement
+updates using the PAL VBL clock minus paused fields, independent of presentation calls.
+It retains the first pre-entry native interval and the 20..250-ms clamp, then replays
+the original signed speed multiplication. `PDMCLK01` exposes the raw interval, applied
+interval, update count and cumulative time discarded above the upper cap. The current
+`PDMCLK02` extends that block with the guest-observed post-multiplication CCR. It is off
+by default, requires the input/pause prototype, and leaves other shared-clock consumers
+unchanged. The checker verifies consecutive clock differences, the clamp, explicit
+upper-cap losses and the delta actually used by movement. It does not establish correct
+integration through multiple historical control changes, collision substeps or other
+mode transitions; those remain separate requirements.
+
+`timing-moveclock1-030-twins` passes 52 complete movement calculations and clock updates,
+with 51 clean renderer comparisons and unchanged raster code. It records 490 ms lost
+above the retained upper clamp and no time added by the lower clamp. This bounded run
+proves interval ownership and arithmetic, not the movement-equivalence gate. Presentation
+latency still feeds into discrete collision timing, and applying the latest speed over
+a long interval is not equivalent to integrating historical controls throughout it.
+The A500 counterpart verifies 33 intervals and records 1,460 ms lost above the cap. These
+first captures use `Powerdrome-timing-moveclock1.slave`; review subsequently corrected
+X-flag preservation around the bookkeeping in `Powerdrome-timing-moveclock2.slave`.
+The initial results establish clock arithmetic, not the original wrapper's full CCR contract.
+
+The corrected wrapper passes `timing-moveclock2-pause-030-twins`: 76 movement intervals,
+49 excluded paused fields, no upper/lower-clamp time difference, five legitimate input
+events, 15 brake events and 56 fuel updates. Its 75 renderer comparisons are clean, with
+unchanged raster code. Movement timestamps additionally agree with independently counted
+unpaused VBLs within one field of probe placement.
+
+`timing-moveclock3-reg-030-twins` verifies 52 complete register/stack/CCR contracts, as
+well as the clock arithmetic, and adds 51 clean renderer comparisons. The wrapper saves
+and restores X before replaying native MOVE/MULS. Its guest-side MOVE CCR diagnostic
+observes the expected flags, including zero products; earlier debugger-only snapshots
+reported Z clear in those cases. Use the guest record for the CCR oracle. The current
+`Powerdrome-timing-moveclock4.slave` differs from that verified binary only in the diagnostic
+marker version byte; an exact binary comparison confirms identical executable code.
+`timing-moveclock4-reg-a500` verifies all 33 corresponding arithmetic, clock and
+register/stack/CCR contracts, still recording 1,460 ms of upper-cap loss and no lower-cap
+addition. These ordinary failure/incident effects already exceed the retained cap; lost
+time cannot be dismissed as an artificial debugger stall. Handling that time safely,
+with historical controls and collision work in the right order, is required before the
+broader movement-independence gate can pass.
+
+Reproduce with the engine/heat build switches plus `TIMING_MOVE_CLOCK=1`, 250 fields and
+probes `$ccee/$ccf6/$cd2c/$cd3a/$cde2/$fc9e/$fcea/$fec6`. The pause route uses `CUSTOM5=8`,
+300 fields and additionally `$be12/$bef2/$d058/$d9a0`. The normal build excludes this clock
+prototype. No rendering-rate or full framerate-independence claim follows from these
+instrumented correctness runs.
+
 ## Cockpit liftoff: confirmed frame-driven movement
 
 The cockpit departure routine at hunk `$1020e` is separate from ordinary driving.

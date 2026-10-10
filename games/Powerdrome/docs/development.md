@@ -78,7 +78,9 @@ Debugger scripts also handle partial pipe writes. This matters for large read-on
 pipe write is not guaranteed to contain the whole script. `tools/test_command_transport.py`
 checks fragmented requests, consecutive requests over named sockets, truncated payloads
 and short pipe writes. Field captures report progress in 100-field
-chunks without changing target state.
+chunks without changing target state. Each chunk independently reads back its actual field
+counter before reporting completion; an aborted debugger loop cannot count as a completed
+window merely because its response lacks an uppercase error marker.
 
 For reproducible captures unplug host inputs (`JOY0=none`, both device and mode) and avoid
 interacting with the emulator. The debugger cannot write guest memory. `BOOT_BREAK` arms a

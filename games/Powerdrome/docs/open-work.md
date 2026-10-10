@@ -127,8 +127,14 @@ repairs and other mode transitions remain open. Boost heating now has a private 
 stream and an explicit fixed-seed test mode. Its A500/030 arithmetic checks pass, but the
 full matched-seed heat route fails equivalence after the first engine failure: an A500
 incident resets speed 407→0 and directly invokes controls outside the logical scheduler.
-The next priority is incident/control chronology and movement/collision integration; do
-not treat the passing engine arithmetic checks as full engine-history equivalence.
+Movement probes additionally show nested presentation overwriting the movement delta:
+a 220-ms gap used only 20 ms on the 030. An explicit `TIMING_MOVE_CLOCK=1` experiment now
+owns a separate unpaused movement timestamp and exposes upper-clamp losses. Its first
+030 run verifies 52 intervals but still discards 490 ms above the cap. The corrected
+wrapper also passes a 49-field pause exclusion with 76 movement intervals and 75 clean
+renderer twins. The next priority remains historical speed integration, incident/control
+chronology, collision subdivision and blocking presentation effects; do not treat passing
+arithmetic checks as full engine-history or movement equivalence.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

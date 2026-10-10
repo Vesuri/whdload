@@ -25,6 +25,14 @@ TIMING_ENGINE = 0
  FAIL "TIMING_ENGINE requires TIMING_INPUT"
  ENDC
  ENDC
+ IFND TIMING_MOVE_CLOCK
+TIMING_MOVE_CLOCK = 0
+ ENDC
+ IFNE TIMING_MOVE_CLOCK
+ IFEQ TIMING_INPUT
+ FAIL "TIMING_MOVE_CLOCK requires TIMING_INPUT"
+ ENDC
+ ENDC
 ; Development-only staged extraction. Not included unless TIMING_PERIODIC=1.
 ; An 18-unit (90 ms) cadence is 11.111 Hz on PAL, near the measured A500 routes.
 TIMING_PERIOD = 18
@@ -46,6 +54,12 @@ install_periodic
  beq.s .flags
  lea timing_frame(pc),a0
  move.w #$42e7,(a0)
+ IFNE TIMING_MOVE_CLOCK
+ lea timing_movement_clock(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_movement_read_flags(pc),a0
+ move.w #$42d0,(a0)
+ ENDC
  IFNE TIMING_BRAKE
  lea timing_brake_vbl(pc),a0
  move.w #$42e7,(a0)
@@ -81,6 +95,11 @@ install_periodic
  movem.l (sp)+,d0-d2/a0-a2
  rts
 pl_periodic PL_START
+ IFNE TIMING_MOVE_CLOCK
+ ; TIMING_RANGE h0:$ccee 8 bit=C3
+ PL_P $ccee,timing_movement_clock
+ PL_NOP $ccf4,2
+ ENDC
  ; Six-byte BTST is replayed after accounting for the current interval.
  ; TIMING_RANGE h0:$ca44 6 bit=C3
  PL_P $ca44,timing_frame
@@ -215,6 +234,9 @@ timing_frame
  addq.l #1,timing_ticks-timing_state(a1)
  bra.s .again
 .initial
+ IFNE TIMING_MOVE_CLOCK
+ clr.w timing_movement_started-timing_state(a1)
+ ENDC
  IFNE TIMING_INPUT
  bsr timing_input_initialize
  ENDC
@@ -493,6 +515,10 @@ timing_targets
  dc.l $13514
  dc.w timing_engine_native_message+2-timing_targets
  ENDC
+ IFNE TIMING_MOVE_CLOCK
+ dc.l $ccf6
+ dc.w timing_movement_continue+2-timing_targets
+ ENDC
 timing_targets_end
 
 timing_state dc.b 'PDTIME01'
@@ -520,4 +546,8 @@ timing_control_phase dc.w 1
 
  IFNE TIMING_ENGINE
  INCLUDE timing_engine.s
+ ENDC
+
+ IFNE TIMING_MOVE_CLOCK
+ INCLUDE timing_movement.s
  ENDC

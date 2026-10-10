@@ -94,6 +94,17 @@ if os.environ.get('TIMING_STATE') == '1':
                 f'*(unsigned short*){hp+12:#x}', '$d0 & 65535',
                 f'*(unsigned short*){state+0x196:#x}',f'*(unsigned short*){state+0x198:#x}']
         heat_sample='printf "PDHEAT_EVENT %d {off} ' + ' '.join(['%u']*len(hpvals)) + '\\n", $pd_field, ' + ', '.join(hpvals) + '\n'
+    movement_clocks=[m.start() for m in re.finditer(b'PDMCLK0[12]',code)
+                     if struct.unpack_from('>H',code,m.start()+8)[0]==1]
+    assert len(movement_clocks)<=1
+    movement_clock_sample=''
+    if movement_clocks:
+        mp=a.base+movement_clocks[0]
+        mv=[f'*(unsigned {kind}*){mp+off:#x}' for off,kind in
+            ((12,'int'),(16,'int'),(20,'short'),(24,'int'),(28,'int'))]
+        if code[movement_clocks[0]:movement_clocks[0]+8]==b'PDMCLK02':
+            mv.append(f'*(unsigned short*){mp+32:#x}')
+        movement_clock_sample='printf "PDMCLK_EVENT %d ' + ' '.join(['%u']*len(mv)) + '\\n", $pd_field, ' + ', '.join(mv) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
@@ -102,6 +113,21 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):
             sample += heat_sample.replace('{off}',hex(off))
+        if off in (0xccee,0xccf6):
+            contract_values=[f'(unsigned int)${reg}' for reg in
+                             ('d0','d1','d2','d3','d4','d5','d6','d7','a0','a1','a2','a3','a4','a5','a6','sp','sr')]
+            contract_values += [f'*(unsigned short*){state+x:#x}' for x in (0x21c,0x194)]
+            sample += 'printf "PDMREG_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(contract_values)) + '\\n", $pd_field, ' + ', '.join(contract_values) + '\n'
+        if off in (0xccee,0xcd2c,0xcd3a,0xcde2):
+            movement_values=[f'*(unsigned short*){state+x:#x}' for x in
+                             (0x21c,0x194)]
+            movement_values += [f'${reg} & 65535' for reg in ('d4','d5','d6','d7')]
+            movement_values += [f'*(unsigned short*){state+x:#x}' for x in
+                               (0x186,0x188,0x18a,0x12c,0x12e,0x130,0x1e0)]
+            movement_values.append(f'*(unsigned int*){state+0x1a2:#x}')
+            sample += 'printf "PDMOVE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(movement_values)) + '\\n", $pd_field, ' + ', '.join(movement_values) + '\n'
+        if off==0xcd2c:
+            sample += movement_clock_sample
         if off==0xd9a0:
             # Native resource result in d1 immediately before committing it.
             offsets=[0x194,0x1ba,0x458,0x45a,0x44e,0x450,0xe4,0x240]
@@ -127,9 +153,15 @@ printf "PDFRAME %d\\n", $pd_field
 {probe_tests}end
 end
 ''')
+        # A GDB loop can abort without an uppercase ERROR. Query its actual
+        # counter separately before claiming that this chunk completed.
+        check=command('printf "PDWINDOW %d\\n", $pd_field')
+        part+=check
         reply+=part
         with logpath.open('a') as log: log.write(part)
         assert 'ERROR' not in part, 'Debugger reported an error'
+        reached=re.findall(r'^PDWINDOW (-?\d+)$',check,re.M)
+        assert reached==[str(end)], f'Incomplete debugger field loop: expected {end}, observed {reached}'
         print(f'Counted {end}/{a.fields} PAL fields', flush=True)
         if end==a.fields: break
 finally:
