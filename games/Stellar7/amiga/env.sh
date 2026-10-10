@@ -1,17 +1,7 @@
 #!/usr/bin/env bash
-# Source this to put the shared ~/.local Amiga toolchain on PATH and name the shared assets.
-TC="$HOME/.local"
-export PATH="$TC/opt/bin:$TC:$TC/fs-uae:$PATH"
-AMIGA_SHARE="$TC/share/amiga"
-# Host Kickstart 3.1, and the Kickstart 1.3 image + RTB that KickEmu boots inside WHDLoad.
-export KICKSTART="${KICKSTART:-$AMIGA_SHARE/Kickstarts/kick40063.A600}"
-export KICK13="${KICK13:-$AMIGA_SHARE/Kickstarts/kick34005.A500}"
-export RTB="${RTB:-$AMIGA_SHARE/Kickstarts/kick34005.A500.RTB}"
-export WORKBENCH_ADF="${WORKBENCH_ADF:-$AMIGA_SHARE/Workbenchv2.04rev37.67Workbench.adf}"
-export WHDLOAD_BINARY="${WHDLOAD_BINARY:-$AMIGA_SHARE/WHDLoad-20.0/C/WHDLoad}"
-
-export WHDLOAD="${WHDLOAD:-$AMIGA_SHARE/WHDLoad-20.0}"
-export KICKSTART_A1200="${KICKSTART_A1200:-$AMIGA_SHARE/Kickstarts/kick40068.A1200}"
-export FSUAE="${FSUAE:-$TC/fs-uae/fs-uae}"
-export VASM="${VASM:-$TC/vasmm68k_mot}"
-export NDK="${NDK:-$TC/opt/m68k-amiga-elf/sys-include}"
+# Source this for the shared Amiga environment that AmigaXDev installs (~/.local/share/amiga):
+# Kickstarts, Workbench, WHDLoad, the toolchain and PATH.  Every variable can be overridden from
+# the environment; AmigaXDev's docs/environment.md describes them.  FSUAE: the x86_64 FS-UAE
+# with the Barto gdb stub.
+export FSUAE="${FSUAE:-$HOME/.local/fs-uae/fs-uae}"
+. "${AMIGA_ENV:-$HOME/.local/share/amiga/env.sh}"

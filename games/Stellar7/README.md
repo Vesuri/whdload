@@ -9,7 +9,7 @@ and [internals and measurements](docs/internals.md).
 
 The original playable pack belongs in ignored `tmp/game/Stellar7NTSC/`.
 `amiga/run.sh` boots it. `make -C whdload` builds the reconstructed development
-loader against the vendored WHDLoad 20.0 KickEmu sources.
+loader against the shared WHDLoad 20.0 KickEmu sources (`$WHDLOAD`).
 
 Run the timing prototype with
 `SLAVE=whdload/Stellar7.Slave WHD_ARGS=CUSTOM1=1 amiga/run.sh`.
