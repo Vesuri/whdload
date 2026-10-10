@@ -260,7 +260,7 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):
             sample += heat_sample.replace('{off}',hex(off))
-        if off in (0xccee,0xccf6,0x14090,0xe8d4,0x103a2,0xbfb0,0xbfb6):
+        if off in (0xccee,0xccf6,0x14090,0xe8d4,0x103a2,0xbfb0,0xbfb6,0x14764,0x147a6):
             contract_values=[f'(unsigned int)${reg}' for reg in
                              ('d0','d1','d2','d3','d4','d5','d6','d7','a0','a1','a2','a3','a4','a5','a6','sp','sr')]
             contract_values += [f'*(unsigned short*){state+x:#x}' for x in (0x21c,0x194)]

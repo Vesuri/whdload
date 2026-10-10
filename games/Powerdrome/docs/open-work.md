@@ -257,7 +257,10 @@ logical duration both 215,020 ms, removing a 60-ms physical-read delay in that r
 Corrected A500 reported/logical duration both equal 227,920 ms, removing a 40-ms delay.
 Caller registers, flags, five-pilot ordering and cleanup pass on both CPUs. Player finishes, other
 result modes and deferred-pit duration remain open. The forced-outcome test does not establish those requirements.
-Then pace the external 17-position animation, extend complete-state comparison through
+The native A500 external-animation calibration now passes all 17 table steps and stack
+checks: nine 80-ms intervals, five 60-ms intervals and three 40-ms intervals, totaling
+1,140 ms through return. Next compare the faster CPU and implement elapsed deadlines
+for this sequence. Then extend complete-state comparison through
 departure, repeat lifecycle regressions, and validate race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

@@ -631,6 +631,27 @@ not be applied to this animation without its own A500 calibration. The earlier e
 pit animation at `$14764` is a separate 17-position sequence and also needs a mode-specific
 check. Neither path is fixed by lowering the ordinary movement-delta minimum.
 
+The external sequence enters at `$1475c`, loads the position table at `$144cc`, and
+sets `d7=16`. Each iteration reads the next table word, draws at `$1432e`, calls the
+pit presentation/update routine `$e296`, then uses DBRA to advance. There is no elapsed
+scaling of the table index. Return is `$147a6`. In the current retune4 initial-pit
+captures, its 16 first-to-last intervals are 60 ms eight times, 40 ms seven times and
+20 ms once on 030 (780 ms total); A500 has 100 ms once, 80 ms eight times, 60 ms five
+times and 40 ms twice (1,120 ms total). These corrected-build observations establish
+remaining CPU dependence, not the original-game calibration target.
+
+For native calibration, capture from `$1475c` with `CUSTOM3=0`, marker `$1479e`,
+`TIMING_STATE=1`, probes `$14764 $147a6` and 100 PAL fields. The read-only register
+samples verify all 17 loop indices, position-table progression and stable stack through
+return. `tools/check_external_departure.py REFERENCE [CAPTURE...]` reports each interval
+and compares candidate geometry against the no-fast-memory 68000 reference. The native A500 capture `timing-external-native-a500` passes: its ordered intervals
+are **nine × 80 ms, five × 60 ms, three × 40 ms**, including the final interval to
+return. Total first-movement-to-return is **1,140 ms**; first-to-last is **1,100 ms**.
+This establishes a position-dependent reference cadence rather than assuming the
+cockpit animation’s uniform 100 ms. Faster-CPU native comparison, timing acceptance
+and pacing implementation remain outstanding; this checker alone does not certify
+framerate independence.
+
 
 `TIMING_DEPARTURE=1` builds a separate opt-in prototype with a 20-clock-unit / 100 ms
 presentation deadline for each native departure step. Its first deadline starts at the
