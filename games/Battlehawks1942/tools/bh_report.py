@@ -135,7 +135,7 @@ def regions(dump, base, chip=b''):
     memory in the dump), the Kickstart 1.3 image (relocated into ws_ExpMem, in the dump)
     and the running slave (in the dump)."""
     bh = bh_file()
-    kick = open(os.path.expanduser('~/.local/share/amiga/Kickstarts/kick34005.A500'), 'rb').read()
+    kick = open(os.environ.get('KICK13') or os.path.expanduser('~/.local/share/amiga/Kickstarts/kick34005.A500'), 'rb').read()
     slave_path = os.environ.get('SLAVE') or os.path.join(GAME, 'Battlehawks1942.Slave')
     slave = open(slave_path, 'rb').read()
     out = []

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Source this to put the shared ~/.local Amiga toolchain on PATH.
-TC="$HOME/.local"
-export PATH="$TC/opt/bin:$TC:$TC/fs-uae:$PATH"
-export KICKSTART="${KICKSTART:-$AMIGA_SHARE/Kickstarts/kick31.rom}"
+# Source this for the shared Amiga environment that AmigaXDev installs (~/.local/share/amiga):
+# Kickstarts, Workbench, WHDLoad, the toolchain and PATH.  Every variable can be overridden from
+# the environment.
+. "${AMIGA_ENV:-$HOME/.local/share/amiga/env.sh}"

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Boot the installed original Battlehawks 1942 under WHDLoad in FS-UAE.
 #   amiga/run.sh            windowed, real speed, with sound
-#   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger)
+#   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger); silent,
+#                           window behind the others (WINDOW=front|none, SOUND=1 to change)
 #   SLAVE=path amiga/run.sh run another slave build instead of the installed one
 #   RECORD=file / PLAYBACK=file   record input / replay a recording (both deterministic)
 # Host: Kickstart 3.1 + Workbench 2.04 floppy boots DH0, which runs WHDLoad on DH1;
@@ -10,18 +11,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
-. "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
+. "$FSUAE_COMMON"
 
 GAME="${GAME:-../tmp/game/Battlehawks1942}"
-BIOS="$AMIGA_SHARE/Kickstarts"
-RTB="${RTB:-$HOME/.local/share/amiga/Kickstarts/kick34005.A500.RTB}"
-WB="${WB:-$HOME/.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf}"
-WHD="${WHDLOAD_BINARY:-$HOME/.local/share/amiga/WHDLoad/C/WHDLoad}"
-# Prefer the official 20.0 runtime, installed beside the shared 19.2 package.
-# An explicit WHDLOAD_BINARY always wins.
-if [ -z "${WHDLOAD_BINARY:-}" ] && [ -f "$HOME/.local/share/amiga/WHDLoad-20.0/C/WHDLoad" ]; then
-  WHD="$HOME/.local/share/amiga/WHDLoad-20.0/C/WHDLoad"
-fi
+# KICKSTART, KICK13, RTB, WORKBENCH_ADF and WHDLOAD_BINARY: the shared env.sh.
+WB="${WB:-$WORKBENCH_ADF}"
+WHD="$WHDLOAD_BINARY"
 CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
 RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"
@@ -33,7 +28,7 @@ cp -R "$GAME" "$DH1"
 cp -f "$WHD" "$DH1/WHDLoad"
 # SLAVE= runs a rebuilt or patched slave in place of the installed one.
 [ -n "${SLAVE:-}" ] && cp -f "$SLAVE" "$DH1/Battlehawks1942.Slave"
-cp -f "$BIOS/kick34005.A500" "$DH0/devs/Kickstarts/"
+cp -f "$KICK13" "$DH0/devs/Kickstarts/kick34005.A500"
 cp -f "$RTB" "$DH0/devs/Kickstarts/"
 chmod -R u+w "$DH0" "$DH1"
 printf 'Expert\nReadDelay=0\n' > "$DH0/s/WHDLoad.prefs"
@@ -42,33 +37,21 @@ printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assig
   "WHDLoad Battlehawks1942.Slave PRELOAD SPLASHDELAY=0 NOREQ ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
 rm -f "$RUN"/state/*.uss
 
-AUDIO=(); [ "${SILENT:-0}" = 1 ] && AUDIO=(--audio_driver=dummy)
-DBG=(); [ "${DEBUG:-0}" = 1 ] && DBG=(--remote_debugger=20 --remote_debugger_port="$DEBUG_PORT")
-REC=(); [ -n "${RECORD:-}" ] && REC=(--record="$RECORD" --deterministic=1)
 # PLAYBACK= replays an input recording (tools/splice_rec.py). FS-UAE appends to the file it
-# plays and rewrites it on exit, so it plays a copy.
+# plays and rewrites it on exit, so it plays a copy.  It takes precedence over RECORD.
+PLAY=()
 if [ -n "${PLAYBACK:-}" ]; then
   cp -f "$PLAYBACK" "$RUN/playback.rec"
-  REC=(--record="$PWD/$RUN/playback.rec" --deterministic=1)
+  PLAY=(--record="$PWD/$RUN/playback.rec" --deterministic=1)
 fi
-[ "${DETERMINISTIC:-0}" = 1 ] && REC+=(--deterministic=1)
-# "none" only unplugs the host device: the port's mode stays "mouse" (FS-UAE's default for
-# port 0) and the host mouse still moves its counters (JOY0DAT differed between boots).
-PORTS=()
-for p in 0 1; do
-  v=JOY$p; [ "${!v:-}" = none ] && PORTS+=(--joystick_port_${p}_mode=nothing)
-done
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
-"${FSUAE:-fs-uae}" \
-  --base_dir="$PWD/$RUN/fsuae" \
-  --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-1024}" --fast_memory="${FAST_KB:-2048}" \
-  --kickstart_file="$KICKSTART" \
+# Model, memory, sound, window, DEBUG, RECORD and the rest: fsuae_options in $FSUAE_COMMON.
+# JOY0/JOY1=none also set the port's mode to nothing: "none" alone only unplugs the host
+# device, and the host mouse still moves the port's counters (JOY0DAT differed between boots).
+CHIP_KB="${CHIP_KB:-1024}" FAST_KB="${FAST_KB:-2048}" JOY0="${JOY0:-mouse}" JOY1="${JOY1:-keyboard}"
+fsuae_options
+fsuae_launch "${PLAY[@]}" \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   --floppy_drive_0="$WB" \
-  --joystick_port_0="${JOY0:-mouse}" --joystick_port_1="${JOY1:-keyboard}" \
-  --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
-  --ntsc_mode=0 --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
-  "${PORTS[@]}" "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" ${EXTRA_ARGS:-} > "$RUN/fsuae.log" 2>&1 &
-FSUAE_PID=$!; fsuae_track "$FSUAE_PID"
-echo "fs-uae pid $FSUAE_PID (log $RUN/fsuae.log, port $DEBUG_PORT)"
+  --window_width=760 --window_height=568 --state_dir="$RUN/state"

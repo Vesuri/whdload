@@ -17,7 +17,7 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
 2026-10-07, second pass:
 - **Reproducibility fixed.** The JOY0DAT difference between boots was FS-UAE: with
   `joystick_port_0=none` the port's mode stays `mouse` and the host mouse still moves the
-  counters. `run.sh` now also sets `joystick_port_N_mode=nothing` for `JOYN=none`; two
+  counters. `run.sh` (through the shared `fsuae_common.sh`) now also sets `joystick_port_N_mode=nothing` for `JOYN=none`; two
   captures then compared `identical` (every register, DMA record and screenshot).
 - **Memory: only DMA data in chip RAM** (the user's rule). The slave gives 512 KB of fast
   memory; BH's hunks are "any" memory and BH allocates sample data `MEMF_CHIP` and everything
@@ -51,7 +51,7 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
    decoupling design.
 2. **The 68030 ceiling.** A 50 MHz `SWAP_ONLY` run found the flight already at frame 1539 when
    the anchor was armed: map that machine's screens against the tape first.
-3. **Dynamic T for BH**, after TFH's `CUSTOM4` (`Their Finest Hour`,
+3. **Dynamic T for BH**, after TFH's `CUSTOM4` (the Their Finest Hour project,
    `whdload/timing.s`) is finished: the coverage test (profiling.md §9) shows the flight
    model and the drones follow T and the stick needs the reference-T division. BH also needs
    its own field counter (no VBL count exists), T restored at mission setup (`bh:1341c`),

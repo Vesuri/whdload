@@ -35,4 +35,4 @@ on faster Amigas.
 | `docs/open-work.md` | **First.** What is known, what is not, ordered work items |
 | `docs/profiling.md` | Running the game, driving it, tracing it, or quoting any performance number |
 | `docs/c2p.md` | Touching the chunky-to-planar pass |
-| `Test Drive 2'sdocs/new-game-playbook.md` | The method this repo follows |
+| AmigaXDev's `docs/playbooks/new-game-playbook.md` | The method this repo follows; AmigaXDev also installs the shared `~/.local/share/amiga` that `amiga/env.sh` sources |
