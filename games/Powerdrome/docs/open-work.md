@@ -287,8 +287,12 @@ record gate remains failing. A 50-field effective-address audit finds 55 project
 accesses only at the known drawing sites; all 17 reads follow a fresh per-view producer
 across all four pilots. Unexecuted paths and accesses outside the game hunk remain unaudited,
 so no comparison field has been masked.
-Mode-specific lap resets (`$dbe8`), pause/rescue/clock adjustments and total result clocks
-still need coverage. Next audit the projection flag and matched native animation visibility,
+The native mode-7 countdown reset now rebases the stable lap epoch at `$dbd8`, while
+preserving the native five-pilot and race-start reset. A 2,000-field 030 capture verifies
+one rebase, all five loop visits, four unchanged opponent reset stamps and eight subsequent
+lap-clock reads; it removes a measured 70-ms clock-domain mismatch. A500, alternate reset
+entry and guest flags/registers remain to verify. Pause/rescue/clock adjustments and total
+result clocks still need coverage; the result latch uses a separate sampled clock mapping. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

@@ -597,6 +597,51 @@ mode lifecycle and renderer-blocked latency remain separate F6/F7 work.
    pause and mode routes, capacity/debt measurements and the complete CPU/render matrix.
    Retain the 90-ms pilot as a diagnostic reference, not as a reduced final objective.
 
+## Native countdown lap reset
+
+At countdown completion, `$dbd8` copies native state `$206` into race-start `$22e`,
+then `$dbe8` copies that same timestamp into all five linked pilots' lap-start fields.
+The ordinary mode-7 route reaches this after the logical timeline has already started.
+Its mode update can execute with world ownership inactive; testing only the active-world
+flag would miss the reset. The separate `$da6a` branch can also enter this native reset
+sequence and still requires its own runtime case.
+
+The WORLD20 prototype hooks the six-byte `$dbd8` instruction. When the player and
+opponent timelines are initialized, it rebases the stable lap epoch to:
+
+`native reset timestamp - (retained world clock - opponent origin + 18)`
+
+Here 18 is the 90-ms opponent period in native five-millisecond clock units. The hook
+preserves registers and caller X, then replays the original memory-to-memory MOVE,
+including its NZVC behavior. It does not rewrite the native five-pilot reset, race-start
+value, simulation deadline, accumulated debt or random state. Unsupported/uninitialized
+paths simply replay the native instruction. The 010+ installation substitutes the usual
+CCR read for the helper's entry SR read; the source remains 68000-compatible.
+
+The uncorrected 030 capture `timing-lap-reset-before-030` reaches mode 7 with 4,430 ms
+of logical elapsed time. Its native reset timestamp is 70 ms ahead of the previous
+logical lap-clock mapping. The corrected `timing-lap-reset-after-030` runs 2,000 PAL
+fields from the same native reset with frozen `Powerdrome-timing-lapreset1.slave`.
+It verifies one rebase, five native reset-loop visits, four unchanged opponent reset
+stamps, and eight subsequent lap-clock reads (minimum interval and completed-lap
+calculation for each of four opponents) in the rebased domain.
+
+```sh
+python3 tools/check_timing_lap_reset.py tmp/prof/timing-lap-reset-after-030
+```
+
+Both captures use 68030/25, 2 MiB chip and 4 MiB fast memory, `CUSTOM1=1 CUSTOM3=1
+CUSTOM4=0 CUSTOM5=5 NoCache`, anchor `$dbd8` and probes `$dbde $dbe8 $dbee $dbf4 $cedc
+$d7fe $d86c $d7f0 $ca44 $bc44`, with early timing and opponent-state logging enabled.
+The frozen prototype uses the existing full WORLD20 flags and synchronized-pit test
+fixture. The normal build remains byte-identical; hook boundaries pass structural checks.
+
+A500 execution, guest-observed reset flags/registers, the alternate reset entry and
+pause/rescue transitions remain to verify. The separate result-duration latch still uses
+the sampled native opponent clock domain; this lap rebase does not establish consistent
+race-result timing across changing native/VBL offsets. That shared result-clock mapping
+remains required before declaring the timing modes complete.
+
 ## Opponent preparation on logical world ticks
 
 The WORLD20 prototype separates native opponent preparation (`$9950–$9d9e`)

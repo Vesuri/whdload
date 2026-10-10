@@ -156,6 +156,8 @@ install_periodic
  lea timing_sync_return(pc),a0
  move.w #$42e7,(a0)
  ENDC
+ lea timing_lap_reset(pc),a0
+ move.w #$42e7,(a0)
  lea timing_lap_clock_d7(pc),a0
  move.w #$42e7,(a0)
  IFD VERIFY
@@ -306,6 +308,8 @@ pl_periodic PL_START
  PL_PS $d4b6,timing_pit_clock_d7
  ; TIMING_RANGE h0:$d4fe 6 bit=C3
  PL_PS $d4fe,timing_pit_clock_d0
+ ; TIMING_RANGE h0:$dbd8 6 bit=C3
+ PL_PS $dbd8,timing_lap_reset
  ; TIMING_RANGE h0:$d7f8 6 bit=C3
  PL_PS $d7f8,timing_lap_clock_d7
  ; TIMING_RANGE h0:$d836 6 bit=C3
