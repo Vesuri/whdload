@@ -62,8 +62,30 @@ coverage_vbl
  move.w cov_buttons-coverage_status(a1),$a6e+$432(a0)
  tst.w cov_done-coverage_status(a1)
  bne.w .done
+ ; Timing fixture writes sampled native mouse inputs, never physics state.
+ move.l custom5(pc),d0
+ cmp.l #7,d0
+ bne.s .normal_axes
+ move.l $48fe(a0),d0
+ sub.l cov_epoch-coverage_status(a1),d0
+ clr.w $a6e+$42a(a0)
+ clr.w $a6e+$42e(a0)
+ cmp.l #160,d0
+ blo.s .normal_axes
+ cmp.l #220,d0
+ bhs.s .normal_axes
+ move.w #40,$a6e+$42a(a0)
+ cmp.l #190,d0
+ blo.s .normal_axes
+ move.w #-40,$a6e+$42a(a0)
+.normal_axes
  lea coverage_tape(pc),a2
  move.l custom5(pc),d0
+ cmp.l #7,d0
+ bne.s .not_timing
+ lea coverage_timing_tape(pc),a2
+ bra.s .tape
+.not_timing
  cmp.l #5,d0
  blo.s .tape
  lea coverage_cruise(pc),a2
@@ -320,3 +342,14 @@ coverage_menu_key
  move.l (sp)+,a0
  moveq #'4',d0
  rts
+
+; Short response fixture: throttle, brake, then a short left/right mouse input.
+coverage_timing_tape
+ dc.l 10
+ dc.w 0,0,1
+ dc.l 100
+ dc.w 0,0,2
+ dc.l 150
+ dc.w 0,0,0
+ dc.l 250
+ dc.w -1,0,0

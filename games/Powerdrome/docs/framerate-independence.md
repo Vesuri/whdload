@@ -1,7 +1,10 @@
 # Powerdrome framerate independence analysis and plan
 
-Status: analysis and proposed work only. No simulation changes have been implemented.
-The completed renderer work remains unchanged. This is a separate proposed project.
+Status: implementation in progress. The isolated 20 ms correction and a development-only
+control/orientation/resource cadence prototype are built; the separate brake cadence retains
+all owed input events on tested A500/030 routes. Timestamped control input and wider
+validation are still in progress. The periodic
+prototype is incomplete and must not be presented as a finished timing mode.
 
 Powerdrome is not framerate independent. Its main movement uses elapsed time, but that
 elapsed time is clamped, and other gameplay operations advance once per rendered frame.
@@ -299,8 +302,9 @@ substeps are necessary, use the same deterministic subdivision rule on every CPU
 
 ## Step by step implementation plan
 
-All steps below are **not started**. The plan uses the smaller A500-calibrated approach first.
-Implementation remains separate from the requested analysis and document revision.
+F1/F2 are in progress; F3 is built and under validation. F4/F5 have an isolated
+control/resource prototype, with remaining mutations still under audit. F6–F8 are pending.
+Implementation is authorized; the smaller A500-calibrated approach remains selected.
 
 | Step | Shortcut | Deliverable and completion gate |
 | --- | --- | --- |

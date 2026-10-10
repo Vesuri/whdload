@@ -22,11 +22,12 @@ slv_info dc.b "Installed by Galahad/Fairlight",10,"Development by Vesuri",10,"Ve
 slv_CurrentDir dc.b 0
 slv_config
  dc.b "C1:B:Render planar scene in fast RAM;"
+ dc.b "C3:B:Experimental elapsed-time correction;"
  IFD VERIFY
  dc.b "C2:L:Rendering experiment:Bitmap and code,Bitmap only,Bitmap code and scratch,Bitmap and scratch;"
  dc.b "C4:B:Twin planar drawing for verification;"
  IFD COVERAGE_INPUT
- dc.b "C5:L:Verification route:Off,Title demo,Practice,Coverage practice,Coverage race,Coverage cruise,Coverage second course;"
+ dc.b "C5:L:Verification route:Off,Title demo,Practice,Coverage practice,Coverage race,Coverage cruise,Coverage second course,Timing controls;"
  ELSE
  dc.b "C5:L:Verification route:Off,Title demo,Practice;"
  ENDC
@@ -81,6 +82,7 @@ launch_pd
  jsr resload_Control(a2)
  lea 4(a3),a1
  bsr install_planar
+ bsr install_timing
  IFD VERIFY
  move.l custom5(pc),d0
  beq.s .run
@@ -131,6 +133,8 @@ gamename dc.b "Powerdrome:PD",0
  ENDC
 tags dc.l WHDLTAG_CUSTOM1_GET
 custom1 dc.l 0
+ dc.l WHDLTAG_CUSTOM3_GET
+custom3 dc.l 0
  IFD VERIFY
  dc.l WHDLTAG_CUSTOM2_GET
 custom2 dc.l 0
@@ -143,5 +147,6 @@ custom5 dc.l 0
  IFND VERIFY
 custom2 dc.l 0
  ENDC
+ INCLUDE timing.s
  INCLUDE planar.s
  INCLUDE fast_raster.s

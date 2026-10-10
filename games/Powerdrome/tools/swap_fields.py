@@ -45,6 +45,20 @@ state_probe = ''
 if os.environ.get('COVERAGE_STATE') == '1':
     values = ', '.join(f'*(unsigned short*){state+x:#x}' for x in state_offsets)
     state_probe = 'printf \"PDSTATE %d ' + ' '.join(['%u']*len(state_offsets)) + '\\n\", $pd_field, ' + values + '\n'
+# Optional timing samples are read-only and use the same completed-frame marker.
+if os.environ.get('TIMING_STATE') == '1':
+    timing_words = [0x21c, 0x194, 0x1ba, 0x11e, 0x12c, 0x12e, 0x130,
+                    0x11a, 0x138, 0x45a, 0x196, 0x198, 0x4ce, 0x4d2,
+                    0x4c6, 0x1e0, 0x1e6, 0x432, 0x42a, 0x42e]
+    vals = [f'*(unsigned int*){r["game"][0]+0xf96:#x}',
+            f'*(unsigned int*){state+0x5e:#x}']
+    vals += [f'*(unsigned short*){state+x:#x}' for x in timing_words]
+    state_probe += 'printf "PDTIME %d ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
+    # Keep event samples separate from presentation samples used by timing_report.
+    for off in probes:
+        sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
+        probe_tests += f'if $pc == {r["game"][0]+off:#x}\n{sample}end\n'
+
 setup = f'break *{vbl:#x}\nbreak *{swap:#x}\n{probe_breaks}set $pd_field = -1\n'
 reply = command(setup)
 logpath = a.out/'swaps-gdb.txt'

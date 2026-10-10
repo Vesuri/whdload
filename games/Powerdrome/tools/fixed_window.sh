@@ -21,7 +21,7 @@ python3 - "$OUT" <<'PYCONFIG'
 import hashlib,json,os,shutil,sys
 from pathlib import Path
 out=Path(sys.argv[1])
-keys=('AMIGA_MODEL','CPU','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS','ANCHOR','FIELDS','SWAP_ONLY','SWAP_MARKER','PROBE_OFFSETS','COVERAGE_STATE','COVERAGE_PROBES')
+keys=('AMIGA_MODEL','CPU','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS','ANCHOR','FIELDS','SWAP_ONLY','SWAP_MARKER','PROBE_OFFSETS','COVERAGE_STATE','COVERAGE_PROBES','TIMING_STATE')
 config={key:os.environ.get(key) for key in keys}
 for key, filename in (('emulator_sha256', shutil.which(os.environ.get('FSUAE', 'fs-uae'))), ('kickstart_sha256', os.environ.get('KICKSTART'))):
     if filename:
@@ -126,7 +126,7 @@ printf '%s\n' "$hunk" > "$OUT/game-base.txt"
 printf '%s\n' "$BASE" > "$OUT/dump-base.txt"
 if [ "${SWAP_ONLY:-0}" = 1 ]; then
   MARKER=${SWAP_MARKER:-0x1067e}
-  [[ "$WHD_ARGS" != *CUSTOM5=[23456]* ]] || MARKER=${SWAP_MARKER:-0xbc7c}
+  [[ "$WHD_ARGS" != *CUSTOM5=[234567]* ]] || MARKER=${SWAP_MARKER:-0xbc7c}
   python3 tools/swap_fields.py "$FIELDS" "$OUT" "$OUT/code.bin" "$BASE" --marker "$MARKER"
 else
 pd profile "$FIELDS" "$OUT/trace.bin" > "$OUT/capture.txt"

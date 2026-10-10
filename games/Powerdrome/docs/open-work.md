@@ -91,7 +91,7 @@ would require a separate validation effort. The selected implementation stages p
 in fast RAM and copies them to the chip back buffer. Native elapsed-time simulation and
 update order remain intact; a new scheduler or timestep policy was outside that completed scope.
 
-## Proposed simulation timing work
+## Simulation timing work in progress
 
 The [framerate independence analysis and plan](framerate-independence.md) selects a smaller
 A500-calibrated approach first: lower the PAL movement minimum to 20 ms and move per-frame
@@ -100,5 +100,12 @@ is 20 ms; each operation runs every measured N ticks or equivalent rational peri
 independently of drawing. This does not yet promise identical variable-step trajectories.
 
 F1–F8 are `timing-map`, `timing-baseline`, `delta-20`, `periodic-split`, `a500-cadence`,
-`timing-modes`, `timing-matrix` and `timing-release`. All are not started. The document
-revision changes no game code; the user has explicitly kept implementation on hold.
+`timing-modes`, `timing-matrix` and `timing-release`. Implementation is now authorized.
+F1/F2 are in progress; the isolated F3 correction is built and being validated. The cockpit
+liftoff correction passes A500/030 checks at 100 ms per native step and is included in
+experimental `CUSTOM3`; it preserves the nine-step geometry and final speed. A separate
+F4/F5 control/orientation/resource prototype includes separately timed braking, with 15/15
+input events preserved across A500/030 and 77 additional clean renderer twins. Acceleration
+still fails an A500 response gate because catch-up uses current rather than historical input;
+timestamped input ownership is next. Other frame-counted behavior and the remaining F6–F8
+checks are still open. See [timing implementation](timing-implementation.md) for current evidence.
