@@ -23,6 +23,15 @@ GDB = os.path.join(os.environ.get('AMIGA_TOOLCHAIN') or os.path.expanduser('~/.l
 SENT = '@@POWERDROME-DONE@@'
 
 
+def receive_request(connection):
+    # A stream recv can return before the complete command arrives. Clients
+    # half-close their write direction to delimit a request while retaining replies.
+    chunks=[]
+    while chunk := connection.recv(65536):
+        chunks.append(chunk)
+    return b''.join(chunks).decode().strip()
+
+
 class Gdb:
     def __init__(self, port):
         env = dict(os.environ, HOME=os.path.join(RUN, 'gdbhome'))
@@ -53,7 +62,11 @@ class Gdb:
         return out.decode(errors='replace')
 
     def cmd(self, text, timeout=30):
-        self.p.stdin.write((text + f'\necho {SENT}\\n\n').encode())
+        payload=(text + f'\necho {SENT}\\n\n').encode()
+        while payload:
+            written=self.p.stdin.write(payload)
+            if not written: raise BrokenPipeError('Debugger command pipe closed')
+            payload=payload[written:]
         out = self.read_until(SENT, timeout)
         return out.replace('(gdb) ', '').strip()
 
@@ -157,7 +170,7 @@ def serve():
     print('serving on', SOCK, flush=True)
     while True:
         c, _ = s.accept()
-        line = c.recv(65536).decode().strip()
+        line = receive_request(c)
         try:
             reply = handle(g, line)
         except Exception as e:  # report and keep serving
@@ -220,6 +233,7 @@ def handle(g, line):
 def client(args):
     c = socket.socket(socket.AF_UNIX); c.connect(SOCK)
     c.sendall(' '.join(args).encode())
+    c.shutdown(socket.SHUT_WR)
     out = b''
     while chunk := c.recv(65536):
         out += chunk

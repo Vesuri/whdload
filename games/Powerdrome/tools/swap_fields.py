@@ -18,6 +18,7 @@ def command(text):
         client.settimeout(600)
         client.connect(SOCK)
         client.sendall(('gdb '+text).encode())
+        client.shutdown(socket.SHUT_WR)
         chunks=[]
         while data := client.recv(65536): chunks.append(data)
         return b''.join(chunks).decode()
@@ -70,6 +71,11 @@ if os.environ.get('TIMING_STATE') == '1':
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
         sample += input_sample.replace('{off}',hex(off))
+        if off==0xd9a0:
+            # Native resource result in d1 immediately before committing it.
+            offsets=[0x194,0x1ba,0x458,0x45a,0x44e,0x450,0xe4,0x240]
+            resource_values=[f'*(unsigned short*){state+x:#x}' for x in offsets]
+            sample += 'printf "PDRESOURCE %d ' + ' '.join(['%u']*9) + '\\n", $pd_field, ' + ', '.join(resource_values) + ', ($d1 & 65535)\n'
         probe_tests += f'if $pc == {r["game"][0]+off:#x}\n{sample}end\n'
 
 setup = f'break *{vbl:#x}\nbreak *{swap:#x}\n{probe_breaks}set $pd_field = -1\n'
@@ -77,7 +83,7 @@ reply = command(setup)
 logpath = a.out/'swaps-gdb.txt'
 logpath.write_text(reply)
 try:
-    for end in range(min(2000,a.fields), a.fields+2000, 2000):
+    for end in range(min(100,a.fields), a.fields+100, 100):
         end=min(end,a.fields)
         part=command(f'''while $pd_field < {end}
 continue
