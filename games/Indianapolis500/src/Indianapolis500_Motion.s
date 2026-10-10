@@ -19,6 +19,23 @@ motion_next ds.b 33*6      ; cockpit: each car's pose at the next tick, from its
 motion_follow ds.b 33      ; cockpit: 1 if the car reached the pose predicted a tick ago
 motion_predict dc.b 0      ; 1: cur is a cockpit snapshot with predictions (extrapolate)
 
+; Replaces the main loop's wait for a simulation tick (game:00152 move.w game:9832,d0;
+; beq.s game:00152), so frames are drawn between ticks. The replay transition wipe
+; (view style 2) advances one step per pass (game:00176..001d4) and draws nothing that
+; waits for the display, so it keeps the original pace of one step per CIA tick.
+motion_wait
+ move.l a0,-(sp)
+ move.l motion_game(pc),a0
+ adda.l #$24000,a0
+ cmp.b #2,$28d7(a0)
+ suba.l #$24000-$9832,a0     ; game:9832; flags still from the style test
+ bne.s .go
+.wait tst.w (a0)
+ beq.s .wait
+.go move.w (a0),d0
+ move.l (sp)+,a0
+ rts
+
 motion_cia
  move.l a0,-(sp)
  lea motion_clock(pc),a0

@@ -501,7 +501,7 @@ Apply_Enhancements
  rts
 
 PL_MOTION PL_START
-	PL_W $158,$4e71             ; whole two-byte beq.s -> nop
+	PL_PSS $152,motion_wait,2   ; whole move.w game:9832,d0 / beq.s wait
 	IFND NO_MOTION
 	PL_PS $9c06,motion_cia
 	PL_P $3af0,motion_record
