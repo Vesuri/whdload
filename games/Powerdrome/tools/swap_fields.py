@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import socket
 import struct
-from powerdrome import SOCK
+from powerdrome import SOCK, send_request
 from powerdrome_report import regions
 
 
@@ -17,8 +17,7 @@ def command(text):
     with socket.socket(socket.AF_UNIX) as client:
         client.settimeout(600)
         client.connect(SOCK)
-        client.sendall(('gdb '+text).encode())
-        client.shutdown(socket.SHUT_WR)
+        send_request(client, 'gdb '+text)
         chunks=[]
         while data := client.recv(65536): chunks.append(data)
         return b''.join(chunks).decode()

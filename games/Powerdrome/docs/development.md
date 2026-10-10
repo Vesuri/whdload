@@ -72,11 +72,12 @@ python3 tools/powerdrome.py quit
 ```
 
 The server occupies its terminal; issue clients from another. Only one server/capture per repo.
-The local command clients delimit requests by closing only their socket write direction;
-the server reads the complete request before dispatching it. Debugger scripts also handle
-partial pipe writes. This matters for large read-only probe sets: a single socket read or
+Local command requests carry an explicit byte-length header; the server reads exactly
+that payload before dispatching it, even when the client keeps the connection open.
+Debugger scripts also handle partial pipe writes. This matters for large read-only probe sets: a single socket read or
 pipe write is not guaranteed to contain the whole script. `tools/test_command_transport.py`
-checks fragmented requests and short writes. Field captures report progress in 100-field
+checks fragmented requests, consecutive requests over named sockets, truncated payloads
+and short pipe writes. Field captures report progress in 100-field
 chunks without changing target state.
 
 For reproducible captures unplug host inputs (`JOY0=none`, both device and mode) and avoid

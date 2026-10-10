@@ -23,12 +23,27 @@ GDB = os.path.join(os.environ.get('AMIGA_TOOLCHAIN') or os.path.expanduser('~/.l
 SENT = '@@POWERDROME-DONE@@'
 
 
+def send_request(connection, message):
+    payload=message.encode()
+    connection.sendall(f'PD1 {len(payload)}\n'.encode()+payload)
+
+
 def receive_request(connection):
-    # A stream recv can return before the complete command arrives. Clients
-    # half-close their write direction to delimit a request while retaining replies.
+    # Explicit byte lengths work with fragmented streams and still-open clients.
+    header=bytearray()
+    while not header.endswith(b'\n'):
+        byte=connection.recv(1)
+        if not byte: raise EOFError('Request ended before its length header')
+        header.extend(byte)
+        if len(header)>64: raise ValueError('Invalid request length header')
+    if not header.startswith(b'PD1 '): raise ValueError('Expected PD1 request framing')
+    size=int(header[4:].strip())
+    if not 0<=size<=8*1024*1024: raise ValueError('Request size outside supported range')
     chunks=[]
-    while chunk := connection.recv(65536):
-        chunks.append(chunk)
+    while size:
+        chunk=connection.recv(min(65536,size))
+        if not chunk: raise EOFError('Request ended before all payload bytes arrived')
+        chunks.append(chunk);size-=len(chunk)
     return b''.join(chunks).decode().strip()
 
 
@@ -170,8 +185,10 @@ def serve():
     print('serving on', SOCK, flush=True)
     while True:
         c, _ = s.accept()
-        line = receive_request(c)
+        line = ''
         try:
+            c.settimeout(30)
+            line = receive_request(c)
             reply = handle(g, line)
         except Exception as e:  # report and keep serving
             reply = f'ERROR {type(e).__name__}: {e}'
@@ -232,8 +249,7 @@ def handle(g, line):
 
 def client(args):
     c = socket.socket(socket.AF_UNIX); c.connect(SOCK)
-    c.sendall(' '.join(args).encode())
-    c.shutdown(socket.SHUT_WR)
+    send_request(c, ' '.join(args))
     out = b''
     while chunk := c.recv(65536):
         out += chunk
