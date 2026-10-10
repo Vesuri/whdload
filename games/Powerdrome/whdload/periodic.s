@@ -318,6 +318,11 @@ pl_periodic PL_START
  PL_P $d560,timing_retune_test_finish
  PL_NOP $d566,4
  ENDC
+ ; Separate persistent opponent preparation from model projection.
+ ; TIMING_RANGE h0:$11228 6 bit=C3
+ PL_PS $11228,timing_opponent_effects_render
+ ; TIMING_RANGE h0:$9d9e 6 bit=C3
+ PL_P $9d9e,timing_opponent_projection
  ; External pit sequence: native moves, then native MOVEM/DBRA loop tail.
  ; TIMING_RANGE h0:$14764 6 bit=C3
  PL_P $14764,timing_external_step
@@ -857,6 +862,12 @@ timing_targets
  dc.l $d56c
  dc.w timing_retune_test_move+2-timing_targets
  ENDC
+ dc.l $9950
+ dc.w timing_opponent_effects_native+2-timing_targets
+ dc.l $a268
+ dc.w timing_opponent_effects_exit+2-timing_targets
+ dc.l $9da4
+ dc.w timing_opponent_projection_continue+2-timing_targets
  dc.l $14764
  dc.w timing_external_loop+2-timing_targets
  dc.l $1476a

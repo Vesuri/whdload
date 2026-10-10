@@ -126,6 +126,7 @@ timing_world_end
  move.w (sp)+,ccr
  bra.w timing_world_render
 .ordinary_end
+ bsr timing_opponent_effects_tick
  ENDC
  IFNE TIMING_WORLD20
  lea timing_world20_state(pc),a0
@@ -214,6 +215,7 @@ timing_world_phase dc.w 0
 
  IFNE TIMING_WORLD20
  INCLUDE timing_sync_test.s
+ INCLUDE timing_opponent_effects.s
  INCLUDE timing_lap.s
  INCLUDE timing_external.s
  INCLUDE timing_result.s

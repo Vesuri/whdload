@@ -77,6 +77,7 @@ timing_opponent_initial_pit
  bne.s .done
  move.w #1,8(a0)
  bsr timing_lap_initialize
+ bsr timing_opponent_effects_initialize
  clr.w 10(a0)
  clr.w 12(a0)
  clr.w 64(a0)
@@ -106,6 +107,7 @@ timing_opponent_flight_initialize
  bne.s .done
  move.w #1,8(a0)
  bsr timing_lap_initialize
+ bsr timing_opponent_effects_initialize
  clr.w 10(a0)
  clr.w 12(a0)
  clr.w 64(a0)

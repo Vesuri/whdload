@@ -256,6 +256,13 @@ if os.environ.get('TIMING_STATE') == '1':
                 sample += f'if {count} >= {opponent}\n'
                 sample += f'printf "PDOPP_ARRAY %d {off:#x} {opponent} ' + '%04x'*95 + '\\n", $pd_field, ' + ', '.join(words) + '\nend\n'
             sample += 'end\n'
+        if off in (0x9950,0x9a08):
+            animation_values=['(unsigned int)$a5']
+            animation_values += [f'*(unsigned short*)($a5+{x})' for x in
+                                 (0,2,0x10,0x12,0x14,0x30,0x32,0x34,0x36,0x38,0x3a,0x3c,0x3e,0x40,0x42,0x54,0x56,0x64)]
+            animation_values += [f'*(unsigned short*){state+x:#x}' for x in
+                                 (0x43a,0x172,0xaa,0x2f0,0xb6,0xbe,0x11e,0x200)]
+            sample += 'printf "PDANIM_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(animation_values)) + '\\n", $pd_field, ' + ', '.join(animation_values) + '\n'
         if off in (0xd9a0,0xde0a,0xdfae,0xdffc,0xe0c0,0x10d0c,0x13514):
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):

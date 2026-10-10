@@ -276,12 +276,16 @@ differ, first in lap timers at 22,950 ms (2,580-ms discrepancy); RNG agrees thro
 From 25,650 ms, persistent opponent animation fields also differ. Native `$11228` calls
 `$9950` while drawing and advances these fields per render. The stable lap-clock
 prototype passes initial-lap checks on both CPUs. Lap timing and RNG now match across
-all 336 common snapshots; 39 still differ only in animation/projection fields, first at
-25,650 ms. Mode-specific
-lap resets (`$dbe8`), pause/rescue/clock adjustments and total result clocks still need
-coverage. Next finish the clock audit and separate animation advancement from drawing,
-while auditing
-collision/effect generation and the projection flag. Then
-repeat lifecycle regressions, and validate race reinitialization and repair
+all 336 common snapshots. The WORLD20 opponent preparation split now advances native
+animation/contact/effect preparation every six 20-ms world ticks while projection remains
+per render. Its paired run has 335 common snapshots: nine differ solely in projection word
+`$54`; all other words and RNG agree. Forty animation transitions pass on each CPU, and
+64 completed 030 renderer twins are clean. Native A500 calibration remains failing for
+pilot 1 (2,040 ms versus 920 ms for the visible nine-update prefix); both CPUs reproduce
+the same visibility gap. Pilots 2–4 take 960 ms and pass both calibration limits. The full
+record gate remains failing until the projection-field ownership audit is complete.
+Mode-specific lap resets (`$dbe8`), pause/rescue/clock adjustments and total result clocks
+still need coverage. Next audit the projection flag and matched native animation visibility,
+then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

@@ -71,3 +71,10 @@ for ins in body[:-1]:
     assert all(reg=='a6' for reg in re.findall(r'\ba[0-7]\b',ins.op_str)) and '(sp)' not in ins.op_str
     assert all(int(off,16)==0x62 for off in re.findall(r'\$([0-9a-f]+)\(a6\)',ins.op_str))
 print('Reused native heat generator touches only its private seed and d0/d1')
+
+# The opponent preparation split reuses the projection tail's native stack frame.
+prologue = list(m.disasm(bytes(code[0x9950:0x9954]), base+0x9950))
+tail = list(m.disasm(bytes(code[0xa268:0xa26e]), base+0xa268))
+assert [(i.mnemonic, i.op_str) for i in prologue] == [('movem.l', 'd0-d7/a0-a4, -(a7)')]
+assert [(i.mnemonic, i.op_str) for i in tail] == [('movem.l', '(a7)+, d0-d7/a0-a4'), ('rts', '')]
+print('Opponent projection reuses matching native save/restore frames')

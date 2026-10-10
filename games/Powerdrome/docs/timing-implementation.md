@@ -597,6 +597,73 @@ mode lifecycle and renderer-blocked latency remain separate F6/F7 work.
    pause and mode routes, capacity/debt measurements and the complete CPU/render matrix.
    Retain the 90-ms pilot as a diagnostic reference, not as a reduced final objective.
 
+## Opponent preparation on logical world ticks
+
+The WORLD20 prototype separates native opponent preparation (`$9950–$9d9e`)
+from model projection (`$9d9e–$a26c`). The sole direct rendering caller at `$11228`
+now performs projection only during supported human flight. Persistent animation,
+contact checks and their native effect generation execute every six completed 20-ms
+world ticks (120 ms), before advancing the world clock. Native repair, visibility,
+player-state and mode gates remain in place. Unsupported modes retain the native path.
+This is an experimental implementation, not completed F5/F6 calibration.
+
+The logical call enters the original `$9950` register-save prologue and returns through
+its matching `$a268` restore/return before projection. The rendering call constructs the
+same stack frame and enters projection directly. The structural audit verifies both
+native frames and complete hook instructions. The private effect-phase counter replaces
+the render counter only for preparation, including native alternating damage checks;
+the caller's counter is restored afterward. Other rendering effects still require audit.
+
+The native A500 reference `timing-opanim-native-a500` observes nine animation updates
+for each of four pilots, spanning 920 ms between the first and ninth updates. All 36
+observed transitions pass exact native arithmetic checks. This is a visible prefix,
+not a complete animation-lifetime measurement.
+
+The synchronized 18/24-second pit fixture uses the frozen `Powerdrome-timing-opanim2.slave`
+and captures `timing-opanim2-initial-a500` and `timing-opanim2-initial-030-twins`:
+
+| Check | A500 | 68030/25, renderer twins |
+| --- | ---: | ---: |
+| Logical visible preparations | 147 | 205 |
+| Projection-only drawing calls | 142 | 295 |
+| Verified active-animation transitions | 40 | 40 |
+| Pilot 1 first-nine-update span | 2,040 ms | 2,040 ms |
+| Pilots 2–4 first-nine-update span | 960 ms each | 960 ms each |
+
+Both CPUs reproduce the animation arithmetic and durations. Pilots 2–4 are 40 ms
+(4.35%) slower than the native A500 prefix, within both frozen limits. **Pilot 1 fails
+native calibration**: it leaves the visible segment range, causing a 1,200-ms interval
+between preparations instead of 120 ms. Removing that native visibility gate solely to
+pass calibration would change behavior; matching the native event history and checking
+the full lifetime remain open. CPU agreement does not establish A500 gameplay fidelity.
+
+The complete opponent comparison has 335 shared deadlines from 90 to 30,150 ms,
+including 135 after both CPUs enter flight. Nine snapshots differ, solely in record
+word `$54`; all other compared words, lap clocks and RNG match. `$54` is written during
+projection and read during drawing, but its full ownership/alias audit is unfinished.
+The whole-record comparison therefore remains failing; no field has been masked.
+The 030 run has 64 completed clean renderer comparisons and one additional scene still
+active at capture end. These instrumented runs are not performance measurements.
+
+Both runs pass the synchronized-event, initial-pit accounting and retune checks.
+A500 drains 84 old-speed updates before the 18-second retune, retains the 3,120-ms
+initial return overflow, and ends with 50 ms residual opponent time. The normal build
+remains byte-identical to the pre-prototype reference; this split requires WORLD20.
+
+Recheck the captures with:
+
+```sh
+python3 tools/check_opponent_animation.py tmp/prof/timing-opanim2-initial-a500 --logical
+python3 tools/check_opponent_animation.py tmp/prof/timing-opanim2-initial-030-twins --logical
+# Expected failure: pilot 1 does not pass native timing calibration.
+python3 tools/check_opponent_animation.py tmp/prof/timing-opanim2-initial-a500 --logical --reference tmp/prof/timing-opanim-native-a500
+python3 tools/compare_timing_opponents.py --through-departure --report-only tmp/prof/timing-opanim2-initial-030-twins tmp/prof/timing-opanim2-initial-a500
+```
+
+Next audit `$54` ownership, test matched native visibility/lifetime histories, and cover
+contact/damage/effect feedback, pause, repair, rescue and nonhuman mode transitions.
+The preparation split alone does not complete the broader effects or timing matrix.
+
 ## Cockpit liftoff: confirmed frame-driven movement
 
 The cockpit departure routine at hunk `$1020e` is separate from ordinary driving.
