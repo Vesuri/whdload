@@ -105,6 +105,17 @@ if os.environ.get('TIMING_STATE') == '1':
         if code[movement_clocks[0]:movement_clocks[0]+8]==b'PDMCLK02':
             mv.append(f'*(unsigned short*){mp+32:#x}')
         movement_clock_sample='printf "PDMCLK_EVENT %d ' + ' '.join(['%u']*len(mv)) + '\\n", $pd_field, ' + ', '.join(mv) + '\n'
+    worlds=[m.start() for m in re.finditer(b'PDWORLD1',code)
+            if struct.unpack_from('>I',code,m.start()+20)[0]]
+    assert len(worlds)<=1
+    world_sample=''
+    if worlds:
+        wp=a.base+worlds[0]
+        wv=[f'*(unsigned {kind}*){wp+off:#x}' for off,kind in
+            ((8,'short'),(16,'int'),(20,'int'))]
+        wv += [f'*(unsigned short*){state+x:#x}' for x in
+               (0x21c,0x194,0x11e,0x12c,0x12e,0x130,0x138,0x196,0x198,0x62)]
+        world_sample='printf "PDWORLD_EVENT %d {off} ' + ' '.join(['%u']*len(wv)) + '\\n", $pd_field, ' + ', '.join(wv) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
@@ -128,6 +139,8 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += 'printf "PDMOVE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(movement_values)) + '\\n", $pd_field, ' + ', '.join(movement_values) + '\n'
         if off==0xcd2c:
             sample += movement_clock_sample
+        if off in (0xccee,0xcde2,0xcedc):
+            sample += world_sample.replace('{off}',hex(off))
         if off==0xd9a0:
             # Native resource result in d1 immediately before committing it.
             offsets=[0x194,0x1ba,0x458,0x45a,0x44e,0x450,0xe4,0x240]

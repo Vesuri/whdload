@@ -138,6 +138,103 @@ probes `$ccee/$ccf6/$cd2c/$cd3a/$cde2/$fc9e/$fcea/$fec6`. The pause route uses `
 prototype. No rendering-rate or full framerate-independence claim follows from these
 instrumented correctness runs.
 
+## Complete-world extraction pilot
+
+`TIMING_WORLD=1` is a development-only extraction experiment, not the final movement
+rate. It requires the input and engine prototypes and excludes `TIMING_MOVE_CLOCK`.
+Its temporary 90-ms world step tests whether controls, movement, track transitions,
+collision response and opponents can execute together before drawing. The final plan
+still calls for 20-ms movement timing with slower A500-calibrated periodic operations;
+freezing all visible motion at 90 ms is not the release deliverable.
+
+The repeated region begins at the existing logical control/orientation entry and ends
+at `$cedc`, immediately before the pre-render helper and scene/HUD/timer drawing. Each
+owed control now receives its own movement/collision/opponent pass rather than batching
+all controls before one movement. Draws with no owed update skip that region. The
+existing 32-update budget and retained periodic debt remain; movement uses exactly 18
+native units per complete world update instead of dropping time above a frame clamp.
+Brakes are serviced at logical control boundaries, preserving queue order; response
+calibration must be repeated because movement-boundary brake servicing is disabled here.
+
+The wrapper holds no extra native call frame while the world body executes. Native
+stack unwinding remains unchanged. Temporary counter/random-state ownership is restored
+at common mode destinations `$bf32/$bfb0`, covering known exits from rescue (`$ce32`),
+pit handling (`$f83c`), incident recovery (`$fe90`), opponent completion (`$d616`), lap
+completion (`$f9e6`) and related notification helpers (`$9234/$92c8`). Native local
+unwinds that return within a helper remain untouched. This is not an exhaustive
+transitive mode-exit audit or completed debt/input rebasing policy: an interrupted world
+update and its remaining scheduled work still need explicit lifecycle handling. Native
+incident animations and shared-clock readers also remain inside the region and require
+further decomposition.
+
+The logical control phase temporarily owns `state+$5e`. Native `$53f6/$8ae6` share a
+private world random stream during the region; the outer/drawing stream is saved and
+restored around it. `TIMING_WORLD_SEED=-1` copies the natural seed at initialization;
+`TIMING_WORLD_SEED=54321` is a compile-only test override. Boost heat retains its separate
+stream. Incident drawing inside a world update is not yet fully separated from world
+randomness, and outer weather/effect generation remains outside this extraction.
+
+An audit finds only two native gameplay reads of `state+$21c`: player multiplication at
+`$ccf2` and opponent multiplication at `$d56c`. Other decoded references with the same
+negative displacement are library-vector calls, not reads of game timestep state.
+The pilot restores the interval before both groups. Recovery animations also call the
+opponent updater at `$fe40/$ffc2`; these calls immediately precede a fresh `$e8` test,
+without consuming returned registers/flags. They are removed under the world option so
+animation frames cannot advance opponents. The recovery loop changes the shared counter,
+so the logical phase is restored before the scheduled opponent pass as well.
+
+`PDWORLD1` records active ownership, saved outer counter, logical time, started-update
+count, outer/world/initial RNG seeds and the current world phase. Read-only probes at
+`$ccee/$cde2/$cedc` check ordered world boundaries; `$d56c` checks opponent intervals.
+`tools/check_timing_world.py` verifies contiguous 90-ms epochs and compares complete
+sampled state histories across CPUs. Passing this pilot establishes an extraction
+boundary, not completed F1–F8, all opponents/modes, or the final physics rate.
+
+`timing-world5-a500` and `timing-world5-030-twins` pass 56 and 55 complete epochs. Their
+**55 common sampled player/engine/RNG states match exactly**, including speed, segment, position, damage,
+temperatures and sampled RNG state. All 96 boost draws and their logical timestamps
+match, as do 55 common engine states through both thermal failures. All 224/220 observed
+opponent multiplications use the logical interval. The 030 adds 52 clean renderer twins.
+This does not compare complete opponent state arrays or every authoritative game field.
+The one-update endpoint difference is reported rather than concealed. Earlier world3
+runs fail the opponent interval check because recovery still advanced opponents per
+animation frame; they are not accepted substitutes for these corrected results.
+
+`timing-world6-pause-030-twins` validates the build with common mode-destination cleanup:
+56 complete world epochs, 224 opponent interval reads, 50 excluded paused fields, five
+input events, all 15 brake events and 56 fuel updates. It adds 77 clean renderer twins.
+Pause preserves fractional time and pending work. These captures do not exercise every
+mode-destination branch; stack/boundary checks pass, but live pit/rescue/restart lifecycle
+validation remains open. Both fixed-seed and natural-seed variants build; the normal
+slave remains byte-identical to the preceding release checkpoint and excludes the pilot.
+
+Build with `TIMING_PERIODIC=1 TIMING_ORIENTATION=1 TIMING_INPUT=1 TIMING_ENGINE=1
+TIMING_WORLD=1`. The matched boost captures additionally set `TIMING_HEAT_SEED=12345`
+and `TIMING_WORLD_SEED=54321`; normal defaults retain natural initial randomness.
+Use `CUSTOM5=10`, 250 fields, and probes `$ccee/$cd2c/$cd3a/$cde2/$cedc/$cfec/$cff8/
+$de0a/$dfae/$dffc/$fc9e/$fcea/$fec6/$d56c`. Select `CUSTOM4=1` for renderer twins.
+The current frozen build is `Powerdrome-timing-world6.slave`; the matched boost pair uses
+world5, which differs in mode-exit cleanup. The pause route uses `CUSTOM5=8`, 300 fields,
+world/movement/opponent probes plus `$d058/$d9a0/$be12/$bef2`.
+
+### Next extraction steps (`coupled-20`)
+
+1. Give the complete world its own 20-ms cursor and retained debt. Service controls and
+   orientation at the calibrated 90-ms rational cadence, without advancing future inputs
+   or applying all accumulated controls before movement. Draw only after complete updates.
+2. Keep movement and geometric contact/track checks together on that cursor. Split contact
+   detection from damage counters, fixed speed deductions and repeated sound/flash events;
+   otherwise running collision code at 50 Hz would multiply those responses.
+3. Separate falling/impulse velocity integration from their 90-ms age/decay updates. Scale
+   displacement and retain integer remainders; scheduling the counters alone is insufficient.
+   Keep opponents on their measured logical cadence while auditing incidental callers.
+4. Assign logical versus display time to shared-clock reads and all mode exits. Decompose
+   blocking incident presentations, and define pause/pit/rescue/restart rebasing so elapsed
+   gameplay is neither dropped nor charged across excluded mode time.
+5. Repeat this seeded incident/failure comparison, then response/straight-distance bounds,
+   pause and mode routes, capacity/debt measurements and the complete CPU/render matrix.
+   Retain the 90-ms pilot as a diagnostic reference, not as a reduced final objective.
+
 ## Cockpit liftoff: confirmed frame-driven movement
 
 The cockpit departure routine at hunk `$1020e` is separate from ordinary driving.

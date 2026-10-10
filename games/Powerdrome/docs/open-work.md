@@ -135,6 +135,17 @@ wrapper also passes a 49-field pause exclusion with 76 movement intervals and 75
 renderer twins. The next priority remains historical speed integration, incident/control
 chronology, collision subdivision and blocking presentation effects; do not treat passing
 arithmetic checks as full engine-history or movement equivalence.
+
+A separate `TIMING_WORLD=1` extraction pilot now couples each 90-ms control epoch with
+movement, track transitions, collisions and opponents before drawing, and isolates the
+world RNG from ordinary drawing. Recovery animation no longer advances opponents per
+frame. The corrected A500/030 boost route matches all 55 common world/engine states and
+96 timed boost draws through the incident and both thermal failures, with 52 clean 030
+renderer comparisons. The common-exit cleanup build also passes 56 world updates through
+a 50-field pause, all 15 brake events and 77 clean twins. This is an extraction milestone,
+not the final physics rate.
+Next is `coupled-20`: 20-ms world movement, slower calibrated controls/damage/decay work,
+logical mode clocks and retained debt, then the full response/capacity/coverage matrix.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

@@ -33,6 +33,20 @@ TIMING_MOVE_CLOCK = 0
  FAIL "TIMING_MOVE_CLOCK requires TIMING_INPUT"
  ENDC
  ENDC
+ IFND TIMING_WORLD
+TIMING_WORLD = 0
+ ENDC
+ IFNE TIMING_WORLD
+ IFEQ TIMING_INPUT
+ FAIL "TIMING_WORLD requires TIMING_INPUT"
+ ENDC
+ IFEQ TIMING_ENGINE
+ FAIL "TIMING_WORLD requires TIMING_ENGINE"
+ ENDC
+ IFNE TIMING_MOVE_CLOCK
+ FAIL "TIMING_WORLD owns movement time; disable TIMING_MOVE_CLOCK"
+ ENDC
+ ENDC
 ; Development-only staged extraction. Not included unless TIMING_PERIODIC=1.
 ; An 18-unit (90 ms) cadence is 11.111 Hz on PAL, near the measured A500 routes.
 TIMING_PERIOD = 18
@@ -54,6 +68,14 @@ install_periodic
  beq.s .flags
  lea timing_frame(pc),a0
  move.w #$42e7,(a0)
+ IFNE TIMING_WORLD
+ lea timing_world_begin(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_world_restore(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_world_end(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
  IFNE TIMING_MOVE_CLOCK
  lea timing_movement_clock(pc),a0
  move.w #$42e7,(a0)
@@ -95,6 +117,30 @@ install_periodic
  movem.l (sp)+,d0-d2/a0-a2
  rts
 pl_periodic PL_START
+ IFNE TIMING_WORLD
+ ; TIMING_RANGE h0:$ccee 8 bit=C3
+ PL_P $ccee,timing_world_movement
+ PL_NOP $ccf4,2
+ ; Recovery draws must not advance opponents outside scheduled world updates.
+ ; Both call sites immediately test $e8 and do not consume returned registers/CCR.
+ ; TIMING_RANGE h0:$fe40 4 bit=C3
+ PL_NOP $fe40,4
+ ; TIMING_RANGE h0:$ffc2 4 bit=C3
+ PL_NOP $ffc2,4
+ ; Restore world delta after incident helpers may have presented intermediate images.
+ ; TIMING_RANGE h0:$ced2 6 bit=C3
+ PL_P $ced2,timing_world_opponents
+ ; TST pre-render flag and its two-byte conditional branch.
+ ; TIMING_RANGE h0:$cedc 6 bit=C3
+ PL_P $cedc,timing_world_end
+ ; Restore temporary ownership at common mode destinations. Native callers keep
+ ; their own stack unwinding, including incident, opponent and lap-end exits.
+ ; TIMING_RANGE h0:$bf32 8 bit=C3
+ PL_P $bf32,timing_world_session_gate
+ PL_NOP $bf38,2
+ ; TIMING_RANGE h0:$bfb0 6 bit=C3
+ PL_P $bfb0,timing_world_result_gate
+ ENDC
  IFNE TIMING_MOVE_CLOCK
  ; TIMING_RANGE h0:$ccee 8 bit=C3
  PL_P $ccee,timing_movement_clock
@@ -234,6 +280,9 @@ timing_frame
  addq.l #1,timing_ticks-timing_state(a1)
  bra.s .again
 .initial
+ IFNE TIMING_WORLD
+ bsr timing_world_initialize
+ ENDC
  IFNE TIMING_MOVE_CLOCK
  clr.w timing_movement_started-timing_state(a1)
  ENDC
@@ -279,9 +328,16 @@ timing_frame
  move.l d0,-(sp)
  move.w timing_due(pc),d0
  movem.l (sp)+,d0
+ IFNE TIMING_WORLD
+ beq.w timing_world_render
+ ELSE
  beq.w timing_orientation_move
  ENDC
+ ENDC
 timing_orientation_again
+ IFNE TIMING_WORLD
+ bsr timing_world_begin
+ ENDC
  IFNE TIMING_ORIENTATION
  ; The original first driving loop has odd parity. Advance by control updates, not draws.
  move.l d0,-(sp)
@@ -401,14 +457,21 @@ timing_brake_parity
 timing_after_brake_parity dc.w $4ef9
  dc.l 0
 timing_orientation_end
+ IFNE TIMING_WORLD
+ ; Finish this whole world update before starting the next owed control update.
+ bra.w timing_orientation_move
+ ELSE
  move.l a0,-(sp)
  lea timing_state(pc),a0
  subq.w #1,timing_orientation_left-timing_state(a0)
  movea.l (sp)+,a0
  bne.w timing_orientation_again
+ ENDC
 timing_orientation_move
  IFNE TIMING_INPUT
+ IFEQ TIMING_WORLD
  bsr timing_brake_before_movement
+ ENDC
  ENDC
  move.w $3f4(a6),d5
  move.w $3f6(a6),d6
@@ -519,6 +582,20 @@ timing_targets
  dc.l $ccf6
  dc.w timing_movement_continue+2-timing_targets
  ENDC
+ IFNE TIMING_WORLD
+ dc.l $ccf6
+ dc.w timing_world_after_multiply+2-timing_targets
+ dc.l $ced8
+ dc.w timing_world_opponent_call+2-timing_targets
+ dc.l $cee2
+ dc.w timing_world_pre_render+2-timing_targets
+ dc.l $cee8
+ dc.w timing_world_native_render+2-timing_targets
+ dc.l $bf3a
+ dc.w timing_world_after_session_gate+2-timing_targets
+ dc.l $bfb6
+ dc.w timing_world_after_result_gate+2-timing_targets
+ ENDC
 timing_targets_end
 
 timing_state dc.b 'PDTIME01'
@@ -550,4 +627,8 @@ timing_control_phase dc.w 1
 
  IFNE TIMING_MOVE_CLOCK
  INCLUDE timing_movement.s
+ ENDC
+
+ IFNE TIMING_WORLD
+ INCLUDE timing_world.s
  ENDC
