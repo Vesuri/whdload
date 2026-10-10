@@ -90,7 +90,10 @@ motion_record
  move.w 4(a0),(a1)+
  lea 86(a0),a0
  dbf d0,.cars
- lea motion_predict(pc),a0
+ tst.b d3
+ bne.s .predict
+ bsr motion_record_nodes
+.predict lea motion_predict(pc),a0
  move.b d3,(a0)
  beq.s .stamp
  bsr motion_predict_cars
@@ -104,6 +107,38 @@ motion_record
  addq.w #1,(a0)
 .done movem.l (sp)+,d0-a6
  rte
+
+; External views draw the cars from a ring of 22-byte nodes (game:280d4 walks it
+; from the viewer node game:26698 through +0): +12 car record, +16/+18/+20 pose.
+; Replays move only the nodes, and in the demo the nodes trail the records by a
+; tick, so take each car's pose from its node. a6 = game+$24000. Clobbers d0-d2/a0-a2.
+motion_record_nodes
+ move.l $2698(a6),d0
+ beq.s .done
+ movea.l d0,a0
+ movea.l a0,a2
+ moveq #32,d2               ; a ring holds at most the 33 cars
+.node move.l 12(a2),d0
+ sub.l a6,d0
+ add.l #$18a8,d0            ; offset from car record 0 (game:22758)
+ cmp.l #33*86,d0
+ bcc.s .next
+ divu.w #86,d0
+ move.l d0,d1
+ swap d1
+ tst.w d1                   ; require an exact car-record pointer
+ bne.s .next
+ mulu.w #6,d0
+ lea motion_cur+MOTION_CARS(pc),a1
+ adda.w d0,a1
+ move.w 16(a2),(a1)+
+ move.l 18(a2),(a1)
+.next move.l (a2),d0
+ beq.s .done
+ movea.l d0,a2
+ cmpa.l a0,a2
+ dbeq d2,.node
+.done rts
 
 ; Cockpit only. The field loop (game:020d38..020d7a) moves each car by the rates in its
 ; record, and the controllers change them only after that, so at a SOFT exit an
