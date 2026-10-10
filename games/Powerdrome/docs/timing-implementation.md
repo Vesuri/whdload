@@ -1719,12 +1719,47 @@ This is a confirmed render-driven mutation that must be separated from presentat
 read by drawing (`$11644`); its complete ownership still needs audit before classification
 as harmless rendering scratch.
 
-Next fix the lap producer/consumer clock domain with explicit initialization, pause,
-mode-transition and native-time-adjustment handling. Separately audit the full `$9950`
-call for collision/effect generation and presentation side effects, then move persistent
-animation advancement to calibrated logical ticks while leaving projection usable on
-every render. Preserve these mismatches as failing gates until those changes are tested;
-matching retune/return alone is not full input/player-state or trajectory equivalence.
+The lap-clock prototype now separates `$d7f8/$d836/$d866` from the repair-clock reads.
+`timing_lap.s` captures native `state+$206` when a new opponent timeline starts, preserving
+the epoch used by the native initial lap stamps at `$babe/$bbf4`. Active lap reads return
+that fixed epoch plus the elapsed opponent deadline; they no longer add the repeatedly
+sampled physical/VBL offset. Reads outside an active scheduled opponent body retain the
+native physical value. No position, speed, random state or global clock is rewritten.
+The wrapper restores X and reproduces native MOVE.L NZVC; 010+ uses the established
+MOVE-CCR substitution. Its 24-byte `PDLAP001` diagnostic records the epoch, read count,
+last clock and guest flags.
+
+`timing-lapclock1-initial-030-twins` passes four minimum-interval and four lap-duration
+reads at exact logical deadlines, with the native guest flags. The synchronization,
+initial-pit and retune checks still pass, and 64 completed renderer comparisons report
+no failures. `timing-lapclock1-initial-a500` passes the same eight clock reads, flags,
+synchronization, initial-pit and retune checks. Across the paired **336** snapshots,
+all lap timestamps and durations now agree, as does RNG. The remaining **39** differing
+snapshots first diverge at **25,650 ms** and contain only `$36/$38/$3c/$3e/$54` differences.
+No clock differences are normalized away: the comparison still subtracts only the
+native setup epoch from absolute lap stamps and directly compares best-lap durations.
+Normal-build bytes remain unchanged.
+
+```sh
+python3 tools/check_timing_lap.py tmp/prof/timing-lapclock1-initial-030-twins tmp/prof/timing-lapclock1-initial-a500
+python3 tools/compare_timing_opponents.py --through-departure --report-only tmp/prof/timing-lapclock1-initial-030-twins tmp/prof/timing-lapclock1-initial-a500
+```
+
+This does **not** close the clock-domain audit. A separate native producer at `$dbe8`
+resets each linked pilot's lap stamp from `state+$206` after the mode path clears result
+flags; it is reached for `state+$43a >= 7`, after blocking presentation and input work.
+It requires an explicit logical reset/rebase contract and a runtime test before this
+feature can cover that mode. Pause, rescue, saved-state clock restores, native time
+adjustments, first-flight paths without an initial pit and total race-result clocks
+remain separate required checks. The cause of physical/VBL offset drift also needs a
+measurement against hardware field time rather than assuming the interrupt counter
+cannot miss fields.
+
+Separately audit the full `$9950` call for collision/effect generation and presentation
+side effects, then move persistent animation advancement to calibrated logical ticks
+while leaving projection usable on every render. Preserve remaining mismatches as
+failing gates until those changes are tested; matching retune/return alone is not full
+input/player-state or trajectory equivalence.
 
 ```sh
 python3 tools/check_timing_sync.py tmp/prof/timing-sync1-initial-030-twins tmp/prof/timing-sync1-initial-a500

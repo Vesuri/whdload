@@ -214,6 +214,7 @@ timing_world_phase dc.w 0
 
  IFNE TIMING_WORLD20
  INCLUDE timing_sync_test.s
+ INCLUDE timing_lap.s
  INCLUDE timing_external.s
  INCLUDE timing_result.s
  INCLUDE timing_retune.s

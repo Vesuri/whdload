@@ -274,8 +274,13 @@ Both CPUs reach those times exactly and pass time accounting; the 030 adds 64 co
 renderer comparisons. The synchronized comparison still fails: 82 of 336 snapshots
 differ, first in lap timers at 22,950 ms (2,580-ms discrepancy); RNG agrees throughout.
 From 25,650 ms, persistent opponent animation fields also differ. Native `$11228` calls
-`$9950` while drawing and advances these fields per render. Next establish a stable lap
-clock domain and separate this animation advancement from drawing, while auditing
+`$9950` while drawing and advances these fields per render. The stable lap-clock
+prototype passes initial-lap checks on both CPUs. Lap timing and RNG now match across
+all 336 common snapshots; 39 still differ only in animation/projection fields, first at
+25,650 ms. Mode-specific
+lap resets (`$dbe8`), pause/rescue/clock adjustments and total result clocks still need
+coverage. Next finish the clock audit and separate animation advancement from drawing,
+while auditing
 collision/effect generation and the projection flag. Then
 repeat lifecycle regressions, and validate race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing

@@ -76,6 +76,7 @@ timing_opponent_initial_pit
  tst.w $be(a6)
  bne.s .done
  move.w #1,8(a0)
+ bsr timing_lap_initialize
  clr.w 10(a0)
  clr.w 12(a0)
  clr.w 64(a0)
@@ -104,6 +105,7 @@ timing_opponent_flight_initialize
  tst.w $be(a6)
  bne.s .done
  move.w #1,8(a0)
+ bsr timing_lap_initialize
  clr.w 10(a0)
  clr.w 12(a0)
  clr.w 64(a0)

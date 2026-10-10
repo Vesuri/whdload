@@ -156,6 +156,12 @@ install_periodic
  lea timing_sync_return(pc),a0
  move.w #$42e7,(a0)
  ENDC
+ lea timing_lap_clock_d7(pc),a0
+ move.w #$42e7,(a0)
+ IFD VERIFY
+ lea timing_lap_flags(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
  lea timing_external_step(pc),a0
  move.w #$42e7,(a0)
  lea timing_external_flags(pc),a0
@@ -301,11 +307,11 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$d4fe 6 bit=C3
  PL_PS $d4fe,timing_pit_clock_d0
  ; TIMING_RANGE h0:$d7f8 6 bit=C3
- PL_PS $d7f8,timing_pit_clock_d7
+ PL_PS $d7f8,timing_lap_clock_d7
  ; TIMING_RANGE h0:$d836 6 bit=C3
- PL_PS $d836,timing_pit_clock_d7
+ PL_PS $d836,timing_lap_clock_d7
  ; TIMING_RANGE h0:$d866 6 bit=C3
- PL_PS $d866,timing_pit_clock_d7
+ PL_PS $d866,timing_lap_clock_d7
  IFNE TIMING_RETUNE_RESULT_TEST
  ; Native MOVE/TST/BPL; inject only the selected pit-boundary result outcome.
  ; TIMING_RANGE h0:$d560 10 bit=C3
