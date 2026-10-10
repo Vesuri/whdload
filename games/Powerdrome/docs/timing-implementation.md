@@ -211,7 +211,8 @@ local socket and pipe transport now handle complete requests and short writes; d
 transport regression checks pass. It is not evidence of a game timing failure or a pass.
 
 Engine heat from boost (`$cfe8/$cff4`) already follows logical controls, and extra resource
-heat (`$d974/$d978`) follows the extracted resource call. **Cooling is still frame-based**:
+heat (`$d974/$d978`) follows the extracted resource call. Without the separate
+`TIMING_ENGINE=1` experiment, **cooling is still frame-based**:
 `$dfae–$dfb6` selects every fourth rendered loop, then `$dfb8–$dff8` subtracts
 `20 - (speed >> 4)` from each undamaged engine, with a minimum temperature of 80.
 Overheat checks at `$de04–$dfae` run once per rendered HUD update. They compare temperatures
@@ -219,20 +220,53 @@ with 180/225, update previous-temperature fields, issue warnings/sounds, set dam
 halve target speed when an engine fails, and stop propulsion when both have failed.
 HUD warning blinks at `$dc5a` are a separate presentation concern.
 
-The next engine extraction must schedule cooling every four logical control ticks
-(initially 360 ms at the 90 ms reference cadence), preserve its original phase, and run
-failure detection at the logical cadence. It must separate or defer presentation calls
-rather than drawing warning messages repeatedly during catch-up. In particular, the
-engine-failure helper `$e0c0` calls `$10338` and **presents a frame through `$8056`**;
-the complete overheat block cannot safely be treated as a pure returning state mutation.
-`$10d0c` paints cockpit state, while `$13514` schedules a message expiry relative to the
-rendered-loop counter (`$64/$68`). Those effects need explicit presentation/event ownership.
-The existing logical control phase was initialized for parity only; the cooling divisor
-must retain the native initial modulo-four phase, not just its odd/even value.
-Required routes include
-sustained boost, unequal engine settings, a single engine failure, both failures and fuel
-exhaustion; native A500 baselines and cross-CPU state/event comparisons must cover those
-conditions. Merely matching short-run fuel totals does not satisfy that requirement.
+`TIMING_ENGINE=1` (requiring `TIMING_INPUT=1`) now reuses the native `$de0a–$dffc`
+engine decision/cooling body after each logical resource update. It schedules cooling every
+four logical control ticks (360 ms at the current 90 ms cadence). Its initial control phase
+uses the native loop counter's low word, preserving the original modulo-four phase as well
+as parity. The default periodic build still excludes this experiment.
+
+Failure presentation is deferred to the native HUD boundary at `$de04`. The call-site
+hooks retain damage-bit writes, message pointers and target-speed halving while queuing
+flash, cockpit redraw and message events in their original order. A 16-entry main-context
+queue records type, logical timestamp and message pointer; overflow is explicit. The native
+failure helper `$e0c0` calls `$10338` and **presents through `$8056`**, so it must not execute
+inside logical catch-up. The display service runs those calls after ticking and prevents
+recursive queue draining. `$13514` still schedules message expiry using the rendered-loop
+counter; message lifetime and failure-flash duration remain separate unfinished timing work.
+Sound decisions retain native main-context calls.
+
+`timing-engine2-a500` and `timing-engine2-030-twins` pass 55 and 56 sampled engine updates.
+Every overheat decision and cooling subtraction matches native arithmetic; the common
+55 logical cooling phases match across CPUs. The existing 55 common speed/input and fuel
+updates also match, and the 030 validates 61 clean renderer twins. Those short runs do not
+trigger thermal failure, so they do not validate deferred-event delivery. The A500 uses
+frozen `Powerdrome-timing-engine2.slave`; the 030 uses `Powerdrome-timing-engine3.slave`, whose
+additional presentation-kind diagnostic is inactive on this short route.
+
+The initial native RNG words differ (0x46fc A500, 0xa59c 030). Boost draws separate random
+heat increments for both engines. These checks validate cadence and decisions against each
+run's observed inputs, not temperature equality from unmatched random histories. Separating
+random-stream ownership and testing matched initial random state remain required.
+
+`CUSTOM5=10` supplies sustained native dual-button boost at field 10, release at 700, and
+ends at 800; it writes no physics or temperature state. Its purpose is to exercise thermal
+failures and prove that each failure produces and delivers flash/redraw/message exactly
+once, in order, outside logical ticking. `tools/check_timing_engine.py --require-failures`
+checks those conditions, plus native damage/target/propulsion decisions and cooling.
+`timing-engine3-heat-a500` and `timing-engine3-heat-030-twins` each pass **178 logical
+engine updates and both thermal failures**. Each run delivers all six presentation events
+in order, with an empty final queue and no overflow. The 030 additionally passes **211
+completed staged comparisons**, with zero reported failures and unchanged raster code.
+These are instrumented correctness runs, not performance measurements. Additional required
+cases include unequal engine settings, fuel exhaustion, repairs and mode changes. A native A500 response
+reference and matching random histories are needed before engine timing is accepted.
+
+`timing-engine3-pause-030-twins` passes 56 engine and fuel updates, excludes all 48
+observed paused PAL fields, preserves five input events and all 15 brake events, and
+retains the logical remainder. The pause verifier now checks engine entry and decision
+probes as well as control/orientation/resource probes. The run adds 78 clean staged
+comparisons with unchanged raster code. It does not cover pausing during an engine failure.
 
 ### Native A500 fuel and joystick-response calibration
 
@@ -262,6 +296,16 @@ further tuning. No braking threshold below 100 is reached by the native referenc
 the held-input interval, so the current threshold tool reports missing thresholds rather
 than a pass. Acceleration to 130 passes; acceleration to 120 remains inconclusive with
 its 60–100 ms error bound against a 90 ms tolerance. The acceptance bounds are unchanged.
+
+The native traces identify an actual cadence difference, not simply a lost input edge:
+mouse braking has 15 control calls at fixture fields 101–149 (14 intervals in 48 fields,
+68.57 ms on average). Joystick braking has eight calls at fields 100, 103, 107, 111, 120,
+128, 136 and 144; its last three intervals are 160 ms. Above cruising speed the native
+routine also halves the excess speed after each brake decrement. The changing rendered
+frame duration therefore affects both operations. A single fixed braking cadence cannot
+reproduce both native responses within the current bounds. The reference-policy choice
+between consistent representative A500 handling and reproducing scene-dependent slowdown
+is pending; do not silently relax the bounds or claim this calibration complete.
 
 ## Response measurements and next required correction
 

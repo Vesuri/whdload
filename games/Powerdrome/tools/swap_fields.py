@@ -66,10 +66,29 @@ if os.environ.get('TIMING_STATE') == '1':
                  (52,'short'),(56,'short')]
         inputs=[f'*(unsigned {kind}*){ip+off:#x}' for off,kind in offsets]
         input_sample='printf "PDINPUT_EVENT %d {off} ' + ' '.join(['%u']*len(inputs)) + '\\n", $pd_field, ' + ', '.join(inputs) + '\n'
+    engines=[m.start() for m in re.finditer(b'PDENGN01',code)
+             if struct.unpack_from('>I',code,m.start()+16)[0]]
+    assert len(engines)<=1
+    engine_sample=''
+    if engines:
+        ep=a.base+engines[0]
+        periodic=[m.start() for m in re.finditer(b'PDTIME01',code)
+                  if struct.unpack_from('>H',code,m.start()+8)[0]]
+        assert len(periodic)==1 and active_inputs
+        epvals=[f'*(unsigned int*){ip+12:#x}',
+                f'*(unsigned short*){a.base+periodic[0]+46:#x}']
+        epvals += [f'*(unsigned {kind}*){ep+off:#x}' for off,kind in
+                   ((8,'short'),(16,'int'),(20,'int'),(24,'int'),(28,'int'),(32,'int'))]
+        epvals += [f'*(unsigned short*){state+off:#x}' for off in
+                   (0x196,0x198,0x138,0x454,0xe4,0x194)]
+        epvals.append(f'*(unsigned short*){ep+10:#x}')
+        engine_sample='printf "PDENGINE_EVENT %d {off} ' + ' '.join(['%u']*len(epvals)) + '\\n", $pd_field, ' + ', '.join(epvals) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
         sample += input_sample.replace('{off}',hex(off))
+        if off in (0xd9a0,0xde0a,0xdfae,0xdffc,0xe0c0,0x10d0c,0x13514):
+            sample += engine_sample.replace('{off}',hex(off))
         if off==0xd9a0:
             # Native resource result in d1 immediately before committing it.
             offsets=[0x194,0x1ba,0x458,0x45a,0x44e,0x450,0xe4,0x240]

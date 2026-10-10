@@ -119,8 +119,11 @@ also runs after each logical control: 55 common fuel updates match exactly acros
 with another 61 clean twins; the pause regression adds 75 clean twins. A native A500
 comparison passes the 10% fuel gate for the measured 4.4-second interval. High-speed
 joystick braking still differs substantially (native settled speed 108, periodic 53),
-so response calibration is not complete. Engine cooling/failure timing remains open; failure handling includes a presentation call and cannot simply move unchanged
-into catch-up.
+so response calibration is not complete. The explicit engine prototype now schedules native cooling/failure decisions after logical
+controls and defers failure presentation until drawing. Sustained-boost A500/030 runs each
+pass 178 logical updates, both thermal failures and all six ordered presentation events;
+the 030 adds 211 clean renderer comparisons. Engine calibration, random-stream ownership,
+repairs and other mode transitions remain open.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

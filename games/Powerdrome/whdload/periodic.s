@@ -17,6 +17,14 @@ TIMING_ORIENTATION = 0
  FAIL "TIMING_INPUT requires TIMING_ORIENTATION"
  ENDC
  ENDC
+ IFND TIMING_ENGINE
+TIMING_ENGINE = 0
+ ENDC
+ IFNE TIMING_ENGINE
+ IFEQ TIMING_INPUT
+ FAIL "TIMING_ENGINE requires TIMING_INPUT"
+ ENDC
+ ENDC
 ; Development-only staged extraction. Not included unless TIMING_PERIODIC=1.
 ; An 18-unit (90 ms) cadence is 11.111 Hz on PAL, near the measured A500 routes.
 TIMING_PERIOD = 18
@@ -43,6 +51,14 @@ install_periodic
  move.w #$42e7,(a0)
  ENDC
  IFNE TIMING_INPUT
+ IFNE TIMING_ENGINE
+ lea timing_engine_tick(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_engine_enqueue(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_engine_present(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
  lea timing_resource_tick(pc),a0
  move.w #$42e7,(a0)
  lea timing_brake_before_control(pc),a0
@@ -127,6 +143,34 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$cf4e 6 bit=C3
  PL_PS $cf4e,timing_input_joy_down
  ENDC
+ IFNE TIMING_ENGINE
+ ; TIMING_RANGE h0:$de04 6 bit=C3
+ PL_P $de04,timing_engine_present
+ ; TIMING_RANGE h0:$dfae 8 bit=C3
+ PL_P $dfae,timing_engine_cooling
+ PL_NOP $dfb4,2
+ ; TIMING_RANGE h0:$dffc 8 bit=C3
+ PL_P $dffc,timing_engine_footer
+ PL_NOP $e002,2
+ ; TIMING_RANGE h0:$de7e 10 bit=C3
+ PL_P $de7e,timing_engine_flash_left
+ PL_NOP $de84,4
+ ; TIMING_RANGE h0:$df46 10 bit=C3
+ PL_P $df46,timing_engine_flash_right
+ PL_NOP $df4c,4
+ ; TIMING_RANGE h0:$de88 10 bit=C3
+ PL_P $de88,timing_engine_hud_left
+ PL_NOP $de8e,4
+ ; TIMING_RANGE h0:$df50 10 bit=C3
+ PL_P $df50,timing_engine_hud_right
+ PL_NOP $df56,4
+ ; TIMING_RANGE h0:$de92 8 bit=C3
+ PL_P $de92,timing_engine_message_left
+ PL_NOP $de98,2
+ ; TIMING_RANGE h0:$df5a 8 bit=C3
+ PL_P $df5a,timing_engine_message_right
+ PL_NOP $df60,2
+ ENDC
  PL_END
 
 timing_frame
@@ -178,7 +222,12 @@ timing_frame
  ENDC
  ENDC
  ENDC
+ IFNE TIMING_ENGINE
+ ; Preserve all low counter bits, not only the original first-loop odd parity.
+ move.w $60(a6),timing_control_phase-timing_state(a1)
+ ELSE
  move.w #1,timing_control_phase-timing_state(a1)
+ ENDC
  move.w #1,timing_started-timing_state(a1)
  clr.l timing_phase-timing_state(a1)
  move.w #1,timing_due-timing_state(a1)
@@ -240,6 +289,9 @@ timing_control
 .returned
  IFNE TIMING_INPUT
  bsr timing_resource_tick
+ IFNE TIMING_ENGINE
+ bsr timing_engine_tick
+ ENDC
  ENDC
  move.l a0,-(sp)
  lea timing_state(pc),a0
@@ -402,6 +454,32 @@ timing_targets
  dc.l $cf80
  dc.w timing_input_after_modifiers+2-timing_targets
  ENDC
+ IFNE TIMING_ENGINE
+ dc.l $de0a
+ dc.w timing_engine_native_entry+2-timing_targets
+ dc.l $dfb6
+ dc.w timing_engine_native_cooling_branch+2-timing_targets
+ dc.l $e004
+ dc.w timing_engine_native_footer+2-timing_targets
+ dc.l $de88
+ dc.w timing_engine_after_flash_left+2-timing_targets
+ dc.l $df50
+ dc.w timing_engine_after_flash_right+2-timing_targets
+ dc.l $de92
+ dc.w timing_engine_after_hud_left+2-timing_targets
+ dc.l $df5a
+ dc.w timing_engine_after_hud_right+2-timing_targets
+ dc.l $de9a
+ dc.w timing_engine_after_message_left+2-timing_targets
+ dc.l $df62
+ dc.w timing_engine_after_message_right+2-timing_targets
+ dc.l $e0c0
+ dc.w timing_engine_native_flash+2-timing_targets
+ dc.l $10d0c
+ dc.w timing_engine_native_hud+2-timing_targets
+ dc.l $13514
+ dc.w timing_engine_native_message+2-timing_targets
+ ENDC
 timing_targets_end
 
 timing_state dc.b 'PDTIME01'
@@ -425,4 +503,8 @@ timing_control_phase dc.w 1
 
  IFNE TIMING_INPUT
  INCLUDE timing_input.s
+ ENDC
+
+ IFNE TIMING_ENGINE
+ INCLUDE timing_engine.s
  ENDC

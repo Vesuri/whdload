@@ -86,6 +86,11 @@ coverage_vbl
 .normal_axes
  lea coverage_tape(pc),a2
  move.l custom5(pc),d0
+ cmp.l #10,d0
+ bne.s .not_heat
+ lea coverage_heat_tape(pc),a2
+ bra.s .tape
+.not_heat
  cmp.l #8,d0
  bne.s .not_pause
  lea coverage_timing_pause_tape(pc),a2
@@ -448,3 +453,12 @@ coverage_joystick_menu_key
 .race
  moveq #'4',d0
  rts
+
+; Sustained native dual-button boost, then release. No physics/temperature writes.
+coverage_heat_tape
+ dc.l 10
+ dc.w 0,0,3
+ dc.l 700
+ dc.w 0,0,0
+ dc.l 800
+ dc.w -1,0,0
