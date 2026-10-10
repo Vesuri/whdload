@@ -537,8 +537,6 @@ performance_tags
 performance_attn dc.l 0
 	dc.l WHDLTAG_CUSTOM1_GET
 performance_options dc.l 0
-	dc.l WHDLTAG_CUSTOM2_GET
-motion_extrapolate dc.l 0      ; unlisted: show the latest tick plus its motion
 	dc.l 0
 
 	INCLUDE "Indianapolis500_Motion.s"

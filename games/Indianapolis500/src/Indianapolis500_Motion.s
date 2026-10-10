@@ -1,5 +1,8 @@
-; Display interpolation (or, with CUSTOM2, prediction) only. All game addresses are hunk-0 offsets.
+; Display motion between simulation ticks only. All game addresses are hunk-0 offsets.
 ; SOFT owns the published state. The frame hook edits its private copies only.
+; Driving (cockpit snapshots): the camera and the player's car extrapolate from the
+; latest tick, so the display does not lag the controls, and opponents move by their
+; own per-tick rates. Demo and replays (external snapshots) interpolate.
 MOTION_SIZE = 226
 MOTION_CARS = 28
 motion_magic dc.b 'I5MO'
@@ -12,9 +15,9 @@ motion_alpha dc.w 0
 motion_track dc.w 0
 motion_prev ds.b MOTION_SIZE
 motion_cur ds.b MOTION_SIZE
-motion_next ds.b 33*6      ; CUSTOM2: each car's pose at the next tick, from its rates
-motion_follow ds.b 33      ; CUSTOM2: 1 if the car reached the pose predicted a tick ago
-motion_predict dc.b 0      ; CUSTOM2: predictions recorded (for motion_frames.py)
+motion_next ds.b 33*6      ; cockpit: each car's pose at the next tick, from its rates
+motion_follow ds.b 33      ; cockpit: 1 if the car reached the pose predicted a tick ago
+motion_predict dc.b 0      ; 1: cur is a cockpit snapshot with predictions (extrapolate)
 
 motion_cia
  move.l a0,-(sp)
@@ -87,7 +90,8 @@ motion_record
  move.w 4(a0),(a1)+
  lea 86(a0),a0
  dbf d0,.cars
- move.l motion_extrapolate(pc),d0
+ lea motion_predict(pc),a0
+ move.b d3,(a0)
  beq.s .stamp
  bsr motion_predict_cars
 .stamp bsr motion_now
@@ -101,7 +105,7 @@ motion_record
 .done movem.l (sp)+,d0-a6
  rte
 
-; CUSTOM2. The field loop (game:020d38..020d7a) moves each car by the rates in its
+; Cockpit only. The field loop (game:020d38..020d7a) moves each car by the rates in its
 ; record, and the controllers change them only after that, so at a SOFT exit an
 ; opponent's next pose is known. Mark the cars that reached last tick's prediction;
 ; the others (contacts, cars the field loop does not move) are extrapolated.
@@ -143,8 +147,6 @@ motion_predict_cars
  move.w d1,(a2)+
  lea 86(a0),a0
  dbf d0,.car
- lea motion_predict(pc),a0
- move.b #1,(a0)
  rts
 
 ; Signed word difference (shortest 16-bit angular arc), Q14 interpolation.
@@ -220,7 +222,8 @@ motion_frame
  move.w motion_valid(pc),d0
  cmp.w #2,d0
  bcs.w .done
- cmp.b #2,$28d7(a6)       ; replay owns a different time source
+ cmp.b #2,$28d7(a6)       ; transition wipe: the CIA handler (game:9bf4) skips
+                          ; SOFT and the motion clock
  beq.w .done
  lea motion_prev(pc),a4
  lea motion_cur(pc),a5
@@ -263,15 +266,15 @@ motion_frame
  move.w d0,d7
  bra.s .phase_mode
 .phase_zero moveq #0,d7
- ; CUSTOM2: extrapolate from the current tick instead of interpolating from
+ ; Cockpit: extrapolate from the current tick instead of interpolating from
  ; the previous one. Alpha 1..2 in Q14 (at most 32767 for MULS) removes the
  ; one-tick presentation delay; cuts still show the current tick. Opponents
  ; moving by their rates use alpha - 1 from their current to their next pose.
-.phase_mode move.l motion_extrapolate(pc),d2
+.phase_mode move.b motion_predict(pc),d2
  beq.s .phase_ready
  add.w #16384,d7
  bra.s .phase_ready
-.phase_late move.l motion_extrapolate(pc),d2
+.phase_late move.b motion_predict(pc),d2
  beq.s .phase_ready
  move.w #32767,d7
 .phase_ready
@@ -375,7 +378,7 @@ motion_frame
 .bias_done move.w (a3),d4
  sub.w d3,d4               ; preserve each native distance bias
  move.w d5,d7
- move.l motion_extrapolate(pc),d0
+ move.b motion_predict(pc),d0
  beq.s .pose
  tst.w d2
  beq.s .pose               ; the player's record moves with the camera
