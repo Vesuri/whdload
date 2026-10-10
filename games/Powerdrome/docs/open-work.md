@@ -18,7 +18,7 @@ sequence remain intact. See [implementation and verification](performance-implem
 
 A complete ten-second combined twin run passed 66 completed staged scenes with no pixel,
 scratch, register, condition-code or guard failures. Copied code remained unchanged.
-Independent 500-field 68020 measurements improved from 15.68 to 22.15 nominal PAL
+Independent 500-field 68020 measurements improved from 15.68 to 22.20 nominal PAL
 presentations/s. Bitmap staging alone was approximately break-even; scratch relocation
 added negligible benefit and remains a VERIFY experiment. A fresh final-build run reproduced
 the full 500-field presentation sequence. The 68000
@@ -35,8 +35,8 @@ figures are separate from the practice launch profile.
 
 The uncached 68030/040/060 timing matrix and code-write audit are complete.
 See [accelerator testing](accelerator-cache-testing.md). The driving measurements are
-19.56 → 30.02 fps on the requested 030/25 configuration, 17.91 → 41.16 on 040/25,
-and 17.91 → 42.69 on 060/50; these are emulator figures. Lower-frequency checks respond
+19.56 → 30.12 fps on the requested 030/25 configuration, 17.91 → 41.57 on 040/25,
+and 17.91 → 42.99 on 060/50, including the selected raster refinement; these are emulator figures. Lower-frequency checks respond
 to the requested clock. Physical-board validation is outside the selected scope.
 
 Cache selection is left to the user's standard WHDLoad `CACHE` and `DCACHE` options.
@@ -60,7 +60,22 @@ Relocated game text, main state after explicit allocation/timing allowances, and
 bitmaps match. Pit pixels differ only in elapsed-time digits. The loaders are not timing-
 identical: the tested 68000 development run has a longer pit/departure sequence. Continue
 performance A/B tests on the same development loader; this result does not certify all
-long-gameplay routes. Both normal binaries remain unchanged.
+long-gameplay routes.
+
+## Raster refinement
+
+The [numbered raster plan](raster-improvements.md) is complete (R1–R5). Direct plane-address
+construction removes three instructions per nonempty row on 68020+, reducing matched-shape
+fast-raster instruction costs by 1.01%. Independent 020/030/040/060 throughput gains are
+0.20% / 0.33% / 0.98% / 0.70%, with exact final-build repeats. The 68000 trial failed the
+throughput gate, so 68000/68010 retain their previous loops; the 68000 baseline sequence
+repeats exactly. Endpoint masking and fixed-point edge changes were rejected.
+
+Final ten-second twins validate 637 completed staged scenes across five CPU configurations
+and the scratch-memory experiment, with zero reported mismatches and unchanged code. All
+sixteen colour loops pass a structural audit. Option-off and no-fast-memory fallbacks retain
+native hooks. Slave size grows by 100 bytes; renderer memory and simulation/cache policy are
+unchanged. `CUSTOM1` remains off by default.
 
 ## Ordered next work
 
@@ -71,5 +86,3 @@ order; a new scheduler, timestep policy or frame cap is outside this work.
 
 1. **`coverage`** — Extend automated coverage to long races, opponents, all views, collisions, pit re-entry,
    restarts and effects before widening the guarded fast path.
-2. **`raster`** — Consider further edge/span arithmetic changes only with identical-input comparisons and
-   independently measured benefit. Do not introduce a simulation scheduler or frame cap.

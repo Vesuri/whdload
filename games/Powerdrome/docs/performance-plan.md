@@ -3,7 +3,8 @@
 The optional implementation and its completed measurements are documented in
 [performance implementation](performance-implementation.md). `CUSTOM1=1` enables it;
 the option remains off by default. This document retains the design rationale and gates
-for further expansion of the accelerated path.
+for further expansion of the accelerated path. The completed local edge/span investigation
+is tracked step by step in the [raster improvement report](raster-improvements.md).
 
 The first faster-CPU experiment should render the existing planar scene into genuine fast
 RAM, then copy the completed scene to the native chip-RAM back buffer. This is feasible

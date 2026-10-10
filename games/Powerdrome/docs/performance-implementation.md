@@ -41,7 +41,11 @@ The fast path leaves bitplane descriptors and front-buffer pointers in chip RAM.
 
 The original planar rasterizer at game `$15b68–$1609b` is copied to fast RAM. Its sixteen
 specialized span writers retain their original instructions. Sixteen copies of the native
-scanline loop select the matching writers with fixed branch displacements. A small
+scanline loop select the matching writers with fixed branch displacements. On 68020 and later each loop uses
+three direct LEAs for the remaining plane pointers, removing three MOVEA instructions from
+nonempty rows. Its fixed 124-byte slot and return offset are preserved, with three NOPs at
+polygon return. The 68000/68010 retain the previous loops. The [raster improvement report](raster-improvements.md) records the small
+measured gain and rejected arithmetic changes. A small
 per-polygon dispatcher chooses a loop and stores its continuation in data, so drawing
 never rewrites the fast code. The shared writer return uses `a6`, which is dead until the
 next scanline rebuilds the fourth-plane pointer or the native epilogue restores the state base.
@@ -123,8 +127,8 @@ rasterizer result independently of the changed gameplay cadence.
 
 ### Independent longer driving comparison
 
-A separate read-only debugger counter measured 500 PAL fields from the first driving
-presentation. All five modes used the same slave and memory layout, changing only CUSTOM
+The mode-isolation baseline uses a separate read-only debugger counter over 500 PAL fields
+from the first driving presentation, before the [address refinement](raster-improvements.md). All five modes used the same slave and memory layout, changing only CUSTOM
 settings. These runs count the native caller at `$bc7c` without instruction profiling.
 
 | Path | Complete intervals / fields | Nominal PAL fps |
@@ -135,8 +139,9 @@ settings. These runs count the native caller at `$bc7c` without instruction prof
 | Bitmap and scratch | 153 / 489 | 15.644 |
 | Bitmap, code and scratch | 218 / 491 | 22.200 |
 
-A fresh run with the final selected build repeated the complete 500-field presentation
-sequence of the bitmap-and-code run exactly. The normal option selects **bitmap plus code**
+The bitmap-and-code baseline has an exact fresh-boot repeat of its complete 500-field
+presentation sequence. The selected 68020 address refinement measures 218/491 = 22.200 fps
+and also has exact repeats. The normal option selects **bitmap plus code**
 with the block copy: about **41.3% more
 presentations/s** than the native path in this longer window. Scratch relocation adds
 only about 0.2% to that result, so it stays an experiment rather than part of the normal

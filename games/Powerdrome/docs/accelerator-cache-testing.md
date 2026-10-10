@@ -1,5 +1,8 @@
 # Accelerator and cache testing
 
+Current selected-path timings, including the completed local raster refinement, are in the
+[raster report](raster-improvements.md). The matrix below isolates the preceding base implementation.
+
 The fast planar renderer benefits the tested 68030, 68040 and 68060 emulator configurations.
 Cache selection belongs to the user's standard WHDLoad `CACHE` and `DCACHE` options.
 Neither normal nor VERIFY builds add a custom cache policy, cache toggle or control-register

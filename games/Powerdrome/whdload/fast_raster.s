@@ -11,6 +11,8 @@ RASTER_CLONES = RASTER_ARENA+RASTER_SIZE
 RASTER_TABLE = RASTER_CLONES+16*RASTER_LOOP_SIZE
 EDGE_ARENA = $9200
 EDGE_SIZE = 816
+; Compact plane-address construction; keep clone stride and return offset stable.
+RASTER_TRIM = 6
 
 install_raster
  movem.l d0-d7/a0-a6,-(sp)
@@ -49,6 +51,13 @@ install_raster
  adda.l #RASTER_CLONES,a4
  move.l perf_arena(pc),a5
  adda.l #RASTER_TABLE,a5
+ ; The 68000/68010 keep their existing loops; only 68020+ select the refinement.
+ moveq #0,d6
+ move.l (4).w,a0
+ btst #AFB_68020,AttnFlags+1(a0)
+ beq.s .cpu_selected
+ moveq #RASTER_TRIM,d6
+.cpu_selected
  moveq #0,d7
 .clone
  move.l a4,(a5)+
@@ -59,12 +68,34 @@ install_raster
 .loop_copy
  move.l (a0)+,(a1)+
  dbf d0,.loop_copy
+ tst.w d6
+ beq.s .addresses_done
+ ; LEA can read the preceding plane directly, removing three MOVEA copies.
+ lea raster_planes(pc),a0
+ lea $1604a-RASTER_LOOP(a4),a1
+ move.l (a0)+,(a1)+
+ move.l (a0)+,(a1)+
+ move.l (a0)+,(a1)+
+ lea $1605c-RASTER_LOOP(a4),a0
+ moveq #($16094-$1605c)/4-1,d0
+.compact
+ move.l (a0)+,(a1)+
+ dbf d0,.compact
+ move.w #$4e71,(a1)+
+ move.w #$4e71,(a1)+
+ move.w #$4e71,(a1)+
+ ; Empty-row branch and DBF retain their original destinations after compaction.
+ sub.b #RASTER_TRIM,$16033-RASTER_LOOP(a4)
+ add.w #RASTER_TRIM,$16092-RASTER_TRIM-RASTER_LOOP(a4)
+.addresses_done
  ; Relocate LEA mask-table(pc),a1 in this clone.
  move.l a3,d0
  add.l #$15ea8-RASTER_START,d0
  sub.l a4,d0
  subq.l #2,d0
  move.w d0,2(a4)
+ move.l a4,a1
+ suba.w d6,a1
  ; Original table entries are signed branch displacements, not addresses.
  move.l a3,a0
  adda.l #$15e68-RASTER_START,a0
@@ -74,18 +105,20 @@ install_raster
  add.l #$16080-RASTER_START,d0
  sub.l a4,d0
  sub.l #$16080-RASTER_LOOP,d0
- move.w d0,$16080-RASTER_LOOP(a4)
+ add.l d6,d0
+ move.w d0,$16080-RASTER_LOOP(a1)
  move.w 32(a0,d7.w),d0
  ext.l d0
  add.l a3,d0
  add.l #$1608a-RASTER_START,d0
  sub.l a4,d0
  sub.l #$1608a-RASTER_LOOP,d0
- move.w d0,$1608a-RASTER_LOOP(a4)
+ add.l d6,d0
+ move.w d0,$1608a-RASTER_LOOP(a1)
  adda.w #RASTER_LOOP_SIZE,a4
  addq.w #2,d7
  cmp.w #32,d7
- bne.s .clone
+ bne.w .clone
  ; Replace mutable branch selection with one static-loop selection per polygon.
  lea raster_dispatch(pc),a0
  move.l a3,a1
@@ -100,6 +133,8 @@ install_raster
  sub.l a4,d0
  subq.l #4,d0
  move.w d0,4(a4)
+ sub.w d6,12(a4)
+ add.w d6,22(a4)
  lea perf_span_resume(pc),a0
  move.l a0,16(a4)
  ; Span writers return here. a6 is dead until the next row rebuilds plane 3
@@ -114,6 +149,11 @@ install_raster
 .done
  movem.l (sp)+,d0-d7/a0-a6
  rts
+
+raster_planes
+ lea 8000(a0),a3
+ lea 8000(a3),a4
+ lea 8000(a4),a6
 
 raster_dispatch
  add.w d7,d7
