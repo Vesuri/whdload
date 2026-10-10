@@ -112,8 +112,10 @@ PAL fields. Those input and pause runs add 74 and 75 clean renderer twins. The i
 prototype now separates external mouse deltas from logical axes and reuses the native
 joystick response against historical samples. A500/030 mouse runs each pass 56 logical
 state updates; the 030 run adds 77 clean renderer twins. A500/030 joystick runs likewise
-pass 56 state updates and add 62 clean twins. Their braking transition still exposes
-incorrect ordering between brake debt and overdue controls; ordered catch-up is next.
+pass the native response check. Timestamped braking now fixes the ordering difference:
+all 55 complete common speed/input updates match across A500/030, including braking and
+release, with 15 exact brake timestamps and 61 clean 030 twins. Resource/engine chronology
+and A500 response calibration are next.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

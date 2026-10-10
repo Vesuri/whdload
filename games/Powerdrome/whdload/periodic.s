@@ -12,6 +12,11 @@ TIMING_BRAKE = TIMING_INPUT
  IFND TIMING_ORIENTATION
 TIMING_ORIENTATION = 0
  ENDC
+ IFNE TIMING_INPUT
+ IFEQ TIMING_ORIENTATION
+ FAIL "TIMING_INPUT requires TIMING_ORIENTATION"
+ ENDC
+ ENDC
 ; Development-only staged extraction. Not included unless TIMING_PERIODIC=1.
 ; An 18-unit (90 ms) cadence is 11.111 Hz on PAL, near the measured A500 routes.
 TIMING_PERIOD = 18
@@ -38,6 +43,10 @@ install_periodic
  move.w #$42e7,(a0)
  ENDC
  IFNE TIMING_INPUT
+ lea timing_brake_before_control(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_brake_before_movement(pc),a0
+ move.w #$42e7,(a0)
  lea timing_input_pause_begin(pc),a0
  move.w #$42e7,(a0)
  lea timing_input_pause_end(pc),a0
@@ -162,6 +171,9 @@ timing_frame
  clr.l timing_brake_phase-timing_state(a1)
  IFNE TIMING_BRAKE
  clr.l timing_brake_pending-timing_state(a1)
+ IFNE TIMING_INPUT
+ clr.l timing_brake_read-timing_state(a1)
+ ENDC
  ENDC
  ENDC
  move.w #1,timing_control_phase-timing_state(a1)
@@ -173,7 +185,9 @@ timing_frame
  move.l $5e(a6),timing_loop-timing_state(a1)
  addq.l #1,timing_frames-timing_state(a1)
  IFNE TIMING_BRAKE
+ IFEQ TIMING_INPUT
  bsr timing_service_brake
+ ENDC
  ENDC
  IFNE TIMING_ORIENTATION
  move.w timing_due-timing_state(a1),timing_orientation_left-timing_state(a1)
@@ -217,6 +231,7 @@ timing_control
  move.l (sp)+,a0
  IFNE TIMING_INPUT
  bsr timing_input_for_control
+ bsr timing_brake_before_control
  ENDC
  pea .returned(pc)
  bra.w timing_native_control
@@ -279,6 +294,9 @@ timing_orientation_end
  movea.l (sp)+,a0
  bne.w timing_orientation_again
 timing_orientation_move
+ IFNE TIMING_INPUT
+ bsr timing_brake_before_movement
+ ENDC
  move.w $3f4(a6),d5
  move.w $3f6(a6),d6
  bra.w timing_after_orientation

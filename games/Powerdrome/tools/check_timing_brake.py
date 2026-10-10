@@ -23,6 +23,19 @@ for root in a.captures:
     assert len(blocks)==1,'Need one initialized VBL brake diagnostic block'
     active,phase,steps,pending=blocks[0]
     assert (active,phase,steps,pending)==(0,0,expected,0),(root,blocks[0])
+    queues=[]
+    for match in re.finditer(b'PDBQUE01',data):
+        pos=match.start()
+        read,write,overflow=struct.unpack_from('>HHI',data,pos+8)
+        if read or write or overflow: queues.append((pos,read,write,overflow))
+    if b'PDBQUE01' in data:
+        assert len(queues)==1
+        pos,read,write,overflow=queues[0]
+        assert (read,write,overflow)==(expected*4,expected*4,0), 'Brake queue lost events or overflowed'
+        epoch=fixture(root/'code.bin')['epoch']
+        timestamps=list(struct.unpack_from(f'>{expected}I',data,pos+16))
+        oracle=[(epoch+101+(k*14+3)//4)*4 for k in range(expected)]
+        assert timestamps==oracle, 'Brake events do not match the independent 70 ms/VBL oracle'
     assert fixture(root/'final-code.bin')['done'],'Input fixture must finish'
     rows=samples(root)
     if 'CUSTOM5=9' not in config['WHD_ARGS']:

@@ -151,6 +151,16 @@ context applies at most 32 owed steps per pass and retains excess debt. Native e
 damaged-brake amount and zero-speed clamping are retained at application. Physics is not
 executed in the interrupt handler.
 
+With historical input enabled, the prototype now records each owed brake event in a
+separate 256-slot timestamp queue. Before a logical control update, it services only brake
+events at or before that update's timestamp (brake first on equal timestamps). Before
+movement, it services intervening events up to the frame's accounted clock, bounded strictly
+below the next unprocessed control timestamp. Thus a capped catch-up pass cannot apply a
+newer brake event ahead of an older deferred control. The queue retains unread events,
+reports overflow explicitly, and shares the input scheduler's unpaused PAL clock. This
+ordering correction passes the matched joystick route described below. Engine, fuel and
+damage eligibility remain evaluated at application; broader state-transition chronology is open.
+
 The route holds brake on fixture fields 100 through 149. Its independent count oracle is
 `1 + floor(49*4/14) = 15` owed steps. Captures `timing-brake2-a500`, `timing-brake2-030` and
 `timing-brake2-030-twins` under `tmp/prof/` each apply **15/15**, finish with no pending debt,
@@ -237,16 +247,23 @@ invokes automatic boost, so the one-second brake hold is not required to stop th
 all 15 owed brake steps must still be applied. Response calibration against an unmodified
 A500 joystick run remains separate work.
 
-`timing-joy2-a500` and `timing-joy2-030-twins` each pass **56 logical joystick-state
-updates**, exactly six events and 15 brake steps, without overflow or residual debt.
-Their first 19 acceleration updates match exactly. The 030 validates **62 clean staged
-scenes** with unchanged raster code. Both use frozen `Powerdrome-timing-axes3.slave`.
-These results validate the input/controller extraction, not whole-game chronology.
-The first different sampled speed occurs at logical elapsed 2,070 ms, at the transition
-to braking: 226 on A500 versus 231 on 030; final speeds are 58 and 57. Brake debt is still
-serviced at a movement boundary before overdue control calls, rather than merged into
-one chronological event stream. Ordered brake/control catch-up remains required; matching
-invocation totals cannot establish matching speed integration or distance.
+`timing-order1-a500` and `timing-order1-030-twins` pass 55 and 56 sampled logical
+joystick-state updates respectively, exactly six input events and 15 timestamped brake
+steps, without overflow or residual debt. All **55 complete logical speed/input updates**
+in their common interval match exactly, including the braking transition and release;
+both finish at speed **53**. The one-update endpoint difference reflects a capture stopping
+inside a rendered frame; the checker permits at most one unmatched final logical update.
+The 030 validates **61 clean staged scenes** with unchanged raster code. Both use frozen
+`Powerdrome-timing-order1.slave`. `tools/check_timing_order.py` checks this complete common
+sequence and rejects the earlier unordered prototype at its first braking transition.
+`tools/check_timing_brake.py` independently checks every queued timestamp against
+`(epoch + 101 + ceil(k*14/4))*4`, for brake events k=0..14.
+
+These results establish ordered controls/braking in the bounded route, not whole-game
+chronology. Resource/engine updates are still batched separately, collision/damage state
+can change between movement frames, and movement still integrates a variable elapsed
+interval. Queue capacity/wrapping, overload behavior and other state transitions require
+further tests before release.
 
 Mode/menu initialization writes input fields at `$b6e4`, `$b714`, `$eab2`, `$ebd0`, `$100c2`,
 `$11c6e`, `$1237e` and `$140a4`. In-flight mode changes, menu save/restore, collision
@@ -275,6 +292,8 @@ The pause test uses the frozen `Powerdrome-timing-input3.slave` artifact under i
 The expanded-axis queue also passes `timing-axes3-pause-030-twins`, using frozen
 `Powerdrome-timing-axes3.slave`: **48 actually paused PAL fields**, five legitimate input
 events, 15 brake steps, exact logical remainder and **78 clean staged comparisons**.
+The ordered-brake build also passes `timing-order1-pause-030-twins` with the same
+48 excluded fields, five input events, 15 exact brake timestamps and 78 clean twins.
 The native pause-entry timing determines the excluded count; the verifier compares it with
 the observed entry/exit boundaries rather than assuming a fixed pause duration.
 The normal build remains byte-identical to the preceding checkpoint: these new input
