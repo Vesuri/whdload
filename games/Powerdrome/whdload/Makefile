@@ -7,7 +7,7 @@ VASM ?= $(HOME)/.local/vasmm68k_mot
 .DEFAULT_GOAL := all
 VASMFLAGS ?=
 
-.PHONY: all verify original FORCE
+.PHONY: all verify original original-verify FORCE
 all: ../tmp/build/Powerdrome.slave
 
 ../tmp/build/Powerdrome.slave: Powerdrome.s FORCE
@@ -22,3 +22,8 @@ original:
 	mkdir -p ../tmp/build
 	$(VASM) -m68000 -no-opt -Fhunkexe -nosym -I$(WHDLOAD)/Include -I$(NDK) -o ../tmp/build/Powerdrome-original.slave original/Powerdrome.s
 	cmp ../tmp/build/Powerdrome-original.slave ../tmp/game/Powerdrome/Powerdrome.Slave
+
+# Input-only original loader reference; the default original target stays byte-identical.
+original-verify:
+	mkdir -p ../tmp/build
+	$(VASM) -m68000 -no-opt -pic -DVERIFY=1 -Fhunkexe -nosym -I. -I$(WHDLOAD)/Include -I$(NDK) -o ../tmp/build/Powerdrome-original-verify.slave original/Powerdrome.s

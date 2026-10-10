@@ -68,7 +68,12 @@ L1ba:	bra.s L1b0
 L1bc:	move.w #20217,(a1)+
 L1c0:	lea L1ca(pc),a2
 L1c4:	move.l a2,(a1)+
-L1c6:	jmp (a0)
+L1c6:
+ IFD VERIFY
+ bra.w original_verify_launch
+ ELSE
+ jmp (a0)
+ ENDC
 L1c8:	illegal
 L1ca:	move.l L1f2(pc),d2
 L1ce:	beq.s L202
@@ -372,3 +377,21 @@ L60a:	dc.w	$0000,$0000		;resload
 L60e:	dc.w	$0000,$0000
 
 	dc.w 0	; original hunk padding
+
+ IFD VERIFY
+; Input-only reference build. Preserve the original loader's launch registers,
+; Copylock replacement, allocation and OS patches. Never shipped as the original.
+original_verify_launch
+ movem.l d0-a6,-(sp)
+ lea 4(a0),a3
+ move.l L60a(pc),a2
+ lea pl_verify(pc),a0
+ move.l a3,a1
+ jsr resload_Patch(a2)
+ lea pl_practice(pc),a0
+ move.l a3,a1
+ jsr resload_Patch(a2)
+ movem.l (sp)+,d0-a6
+ jmp (a0)
+ INCLUDE verify_input.s
+ ENDC

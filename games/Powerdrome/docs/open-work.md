@@ -52,6 +52,16 @@ first mismatch snapshots are retained for diagnosing future failures. Simulation
 and renderer selection are unchanged. Final 68000/68020 twins, the no-fast-memory
 fallback and normal-build launches also passed.
 
+## Loader equivalence
+
+The [loader comparison](loader-equivalence.md) resolves the legacy Copylock D2 question:
+the game overwrites the value before use, and matched 68000/68020 captures converge.
+Relocated game text, main state after explicit allocation/timing allowances, and name-entry
+bitmaps match. Pit pixels differ only in elapsed-time digits. The loaders are not timing-
+identical: the tested 68000 development run has a longer pit/departure sequence. Continue
+performance A/B tests on the same development loader; this result does not certify all
+long-gameplay routes. Both normal binaries remain unchanged.
+
 ## Ordered next work
 
 Follow the [performance implementation plan](performance-plan.md). The selected scope is
@@ -61,7 +71,5 @@ order; a new scheduler, timestep policy or frame cap is outside this work.
 
 1. **`coverage`** — Extend automated coverage to long races, opponents, all views, collisions, pit re-entry,
    restarts and effects before widening the guarded fast path.
-2. **`equivalence`** — Resolve original/development-slave equivalence, including the legacy Copylock D2 result.
-   Current performance comparisons isolate this issue by using the same development loader.
-3. **`raster`** — Consider further edge/span arithmetic changes only with identical-input comparisons and
+2. **`raster`** — Consider further edge/span arithmetic changes only with identical-input comparisons and
    independently measured benefit. Do not introduce a simulation scheduler or frame cap.

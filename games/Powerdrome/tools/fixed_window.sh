@@ -21,7 +21,7 @@ python3 - "$OUT" <<'PYCONFIG'
 import hashlib,json,os,shutil,sys
 from pathlib import Path
 out=Path(sys.argv[1])
-keys=('AMIGA_MODEL','CPU','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS','ANCHOR','FIELDS','SWAP_ONLY')
+keys=('AMIGA_MODEL','CPU','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS','ANCHOR','FIELDS','SWAP_ONLY','PROBE_OFFSETS')
 config={key:os.environ.get(key) for key in keys}
 for key, filename in (('emulator_sha256', shutil.which(os.environ.get('FSUAE', 'fs-uae'))), ('kickstart_sha256', os.environ.get('KICKSTART'))):
     if filename:
@@ -93,12 +93,28 @@ if [ ! -s "$CACHE" ]; then
   cleanup
 fi
 hunk=$(cat "$CACHE")
-export BOOT_BREAK=$((hunk+ANCHOR))
+# Optional ordered, read-only checkpoints before the measured anchor.
+read -r -a PROBES <<< "${PROBE_OFFSETS:-}"
+FIRST=${PROBES[0]:-$ANCHOR}
+export BOOT_BREAK=$((hunk+FIRST))
 start
+for probe in "${PROBES[@]}"; do
+  [ "$probe" = "$FIRST" ] || pd until "$((hunk+probe))" > "$OUT/probe-$probe-stop.txt"
+  pd gdb 'info registers' > "$OUT/probe-$probe-registers.txt"
+  python3 - "$OUT/probe-$probe-registers.txt" "$((hunk+probe))" <<'PYPROBE'
+import re,sys
+m=re.search(r'^pc\s+(0x[0-9a-f]+)',open(sys.argv[1]).read(),re.M)
+assert m and int(m[1],16)==int(sys.argv[2]), 'Capture did not reach a requested probe'
+PYPROBE
+  dumpmem
+  cp tmp/window-chip.bin "$OUT/probe-$probe-chip.bin"
+  cp tmp/window-other.bin "$OUT/probe-$probe-other.bin"
+done
+if [ "${#PROBES[@]}" -gt 0 ]; then pd until "$((hunk+ANCHOR))" > "$OUT/anchor-stop.txt"; fi
 dumpmem
 [ "$(locate)" = "$hunk" ] || { echo 'Calibration mismatch' >&2; exit 1; }
 pd gdb 'info registers pc sp' > "$OUT/anchor.txt"
-python3 - "$OUT/anchor.txt" "$BOOT_BREAK" <<'PYANCHOR'
+python3 - "$OUT/anchor.txt" "$((hunk+ANCHOR))" <<'PYANCHOR'
 import re,sys
 s=open(sys.argv[1]).read()
 m=re.search(r'^pc\s+(0x[0-9a-f]+)',s,re.M)

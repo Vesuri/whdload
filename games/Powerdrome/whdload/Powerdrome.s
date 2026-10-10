@@ -103,6 +103,9 @@ launch_pd
 pl_game PL_START
  PL_P $843c,copylock
  PL_END
+; The original also returned a legacy registration value in D2. The caller
+; replaces its low word at game $173b2 before use, then MOVEQ at $16c4c replaces
+; the whole register. Matched loader captures confirm convergence; no tag needed.
 copylock move.l #$766cc95c,d0
  rts
 launch_args dc.b 10,0
@@ -110,50 +113,7 @@ dosname dc.b "dos.library",0
 gamename dc.b "Powerdrome:PD",0
  EVEN
  IFD VERIFY
-; Fixture submits an empty pilot name through the native text-entry path.
-; Only the two six-byte JSRs are replaced; normal builds have neither patch.
-pl_verify PL_START
- PL_PS $13772,key_ready
- PL_PS $1377c,key_return
- PL_END
-key_ready moveq #-1,d0
- rts
-key_return moveq #13,d0
- rts
-; Whole six-byte input JSRs. Only installed for CUSTOM5=2.
-; Key 3 selects the same menu item as the top-middle Practice button.
-pl_practice PL_START
- PL_PS $12f6a,practice_ready
- PL_PS $130a4,practice_key
- PL_PS $13c50,pit_ready
- PL_PS $13cde,pit_key
- PL_END
-practice_ready
- moveq #0,d0
- move.w practice_sent(pc),d0
- subq.w #1,d0
- rts
-practice_key
- move.l a0,-(sp)
- lea practice_sent(pc),a0
- move.w #1,(a0)
- move.l (sp)+,a0
- moveq #$33,d0
- rts
-pit_ready
- moveq #0,d0
- move.w pit_sent(pc),d0
- subq.w #1,d0
- rts
-pit_key
- move.l a0,-(sp)
- lea pit_sent(pc),a0
- move.w #1,(a0)
- move.l (sp)+,a0
- moveq #32,d0
- rts
-practice_sent dc.w 0
-pit_sent dc.w 0
+ INCLUDE verify_input.s
  ENDC
 tags dc.l WHDLTAG_CUSTOM1_GET
 custom1 dc.l 0

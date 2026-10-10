@@ -183,9 +183,10 @@ original game in an option-off or no-fast capture and audits direct hook-entry b
 intervals and native elapsed-time deltas. `tools/raster_pairs.py CAPTURE` analyzes paired
 polygon costs from a twin capture with fast rasterizer code enabled.
 
-The original/rebased-slave Copylock D2-equivalence question is isolated from these
-comparisons: both sides use the same development loader and its unchanged Copylock
-replacement. These measurements do not establish full legacy-slave equivalence.
+The [loader audit](loader-equivalence.md) resolves Copylock D2 without a runtime patch.
+The loaders have explicit allocation/timing differences, so performance comparisons continue
+to use the same development loader. The audit covers startup and Practice checkpoints;
+broader gameplay coverage remains separate.
 The emulator 68030/040/060 matrix is documented separately. Physical-board validation is
 outside scope. Long races with opponents and all view/effect combinations require further coverage before broadening supported fast paths
 or changing the default. The option remains explicit and off by default.

@@ -102,9 +102,10 @@ renderer, described in the [implementation report](performance-implementation.md
 off by default. In VERIFY builds only, CUSTOM5 replaces the name-entry key-ready
 and key-read calls at `$13772` and `$1377c` with ready/Return responses. The shipped original
 and byte-identical rebuild both reach the name screen; the fixture-enabled modern rebase boots
-through it into the automatic title demo. State equivalence against the original is pending. The old Copylock replacement also returns
-the legacy registration tag in D2 (2001 with this WHDLoad); the development replacement only
-sets D0. Audit that side effect before claiming equivalence.
+through it into the automatic title demo. The [loader audit](loader-equivalence.md) resolves
+the original's legacy registration value in D2: the successful caller overwrites it before use. Matched 68000/68020 startup/Practice
+captures agree after explicit allocation and timing allowances. OS execution and departure
+timing are not identical; performance comparisons must use the same loader.
 
 The title demo's `$107d6` advances a recorded camera index (`a6+$292`) by its step
 (`a6+$294`, initially 2) per rendered frame. It calls the shared 3D renderer and moves an

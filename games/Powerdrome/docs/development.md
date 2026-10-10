@@ -41,8 +41,9 @@ native name-entry routine. `CUSTOM5=2` also selects Practice and submits Space i
 build contains no input or twin-drawing fixtures. The slave requests 128 KiB of guest
 expansion in addition to KickEmu's 256 KiB, including when the option is off. Slow-backed
 expansion does not enable the renderer. See the [implementation and measured results](performance-implementation.md)
-for supported states, diagnostic options and limitations. Full original/rebase behavior
-equivalence remains unverified; performance A/B tests use the same development loader.
+for supported states, diagnostic options and limitations. The [loader equivalence audit](loader-equivalence.md) verifies the tested startup/Practice
+state and resolves Copylock D2, with explicit allocation and timing differences. Performance
+A/B tests continue to use the same development loader.
 
 To launch the new slave explicitly (the runner otherwise uses the installed original):
 
@@ -168,3 +169,13 @@ uncached comparisons reproducible; ordinary launches preserve the user's WHDLoad
 `tools/perf_status.py CAPTURE` checks drawing diagnostics and reports the first register
 mismatch when present. See [accelerator testing](accelerator-cache-testing.md) for measured
 results and emulator limits.
+
+## Original/development loader comparison
+
+`make -C whdload original-verify` builds a separate input-only original-loader reference.
+The ordinary `original` target remains byte-identical to the installed slave. Both VERIFY
+variants share `whdload/verify_input.s`; the original reference always selects Practice.
+`PROBE_OFFSETS` adds ordered read-only checkpoints before `ANCHOR` in the fixed-window
+runner. `tools/compare_loaders.py ORIGINAL DEVELOPMENT` checks the register lifetime,
+relocated code, state and bitmap evidence. See the [loader audit](loader-equivalence.md)
+for exact reproduction commands, explicit allowances and measured timing differences.

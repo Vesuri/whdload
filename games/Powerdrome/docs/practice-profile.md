@@ -221,8 +221,9 @@ can also alter the scene reached at a given anchor or field.
 Before selecting an implementation, repeat the complete route across fresh boots, validate
 racing frame completion, capture the same route on a 68020, and finish the timing/state
 coupling checks listed in [open work](open-work.md). Replacement loops need register/flag
-and pixel equivalence checks as well as a matched A/B capture. The development slave's
-original-slave equivalence question remains separate from this profile.
+and pixel equivalence checks as well as a matched A/B capture. The
+[loader audit](loader-equivalence.md) resolves Copylock D2 and records the remaining
+allocation/timing differences; this profile does not compare the two loaders.
 
 ## Attribution method and reproduction
 
