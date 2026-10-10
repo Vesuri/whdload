@@ -33,8 +33,20 @@ SLAVE=tmp/build/Powerdrome-original.slave amiga/run.sh
 installed slave. This is the reference reconstruction. `make -C whdload all` builds the WHDLoad 20 KickEmu
 development slave with interface 17. `make -C whdload verify` additionally saves
 `tmp/build/Powerdrome-verify.slave`; `CUSTOM5=1` submits an empty pilot name through the
-native name-entry routine. `CUSTOM5=2` also selects Practice and submits Space in the pit. Normal builds do not contain those input hooks. Neither build
-contains a performance patch. Full original/rebase behavior equivalence remains unverified.
+native name-entry routine. `CUSTOM5=2` also selects Practice and submits Space in the pit.
+`CUSTOM1=1` enables the optional fast planar renderer; it is off by default. The normal
+build contains no input or twin-drawing fixtures. The slave requests 128 KiB of guest
+expansion in addition to KickEmu's 256 KiB, including when the option is off. Slow-backed
+expansion does not enable the renderer. See the [implementation and measured results](performance-implementation.md)
+for supported states, diagnostic options and limitations. Full original/rebase behavior
+equivalence remains unverified; performance A/B tests use the same development loader.
+
+To launch the new slave explicitly (the runner otherwise uses the installed original):
+
+```sh
+make -C whdload all
+FAST_KB=4096 WHD_ARGS=CUSTOM1=1 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
+```
 
 The default machine is 68000, 512 KB chip and 1,536 KB slow with no fast RAM. The host boots
 Kickstart 3.1 and Workbench 2.04 provides Assign for the original slave's Kickstart files.
@@ -81,7 +93,7 @@ The first run calibrates the relocated code address. Each measurement boot arms 
 from reset, after the first animated-inset render. The name fixture lets the native menu reach
 its idle timeout. `FIELDS`, `ANCHOR`, and `SERVE_WAIT` are overridable. An explicit second
 argument selects the input slave. Captures retain the slave, initial memory, anchor registers,
-trace, profile, frame report, and first/last images. Do not touch inputs during captures.
+trace, profile, frame report, first/last images, and final memory dumps. Do not touch inputs during captures.
 
 This is the moving inset on the title screen; its pixel workload and playback timing differ
 from racing. It advances the recorded camera by two samples per rendered frame. It is useful
@@ -122,5 +134,7 @@ code are not modified. This workaround is specific to the documented x86_64 emul
 
 The 500 fields are recorded in one request, giving ten nominal PAL seconds without internal
 gaps. The output retains the slave, anchor/memory dumps, `trace.bin`, `profile.txt` and
-first/last images. Routine boundaries in the report are inferred; display updates during
-launch are not yet a validated racing FPS counter.
+first/last images. Routine boundaries in the generic report are inferred. For normal driving, `$bc7c` is the
+presentation marker; `tools/perf_report.py` and the independent `SWAP_ONLY=1` counter use it.
+Departure animations are not counted as driving frames. `tools/perf_status.py` checks the
+optional renderer's pixel/state/guard counters and static-code integrity.

@@ -1,5 +1,10 @@
 # Powerdrome performance implementation plan
 
+The optional implementation and its completed measurements are documented in
+[performance implementation](performance-implementation.md). `CUSTOM1=1` enables it;
+the option remains off by default. This document retains the design rationale and gates
+for further expansion of the accelerated path.
+
 The first faster-CPU experiment should render the existing planar scene into genuine fast
 RAM, then copy the completed scene to the native chip-RAM back buffer. This is feasible
 while retaining the existing four-plane representation and polygon rasterizer. It directly
@@ -44,9 +49,9 @@ span-write rows and traffic counters. Game addresses in this plan are code-hunk 
 state fields are relative to the state base at game `$a6e`. The supplied game binary and
 captured instruction stream are the primary evidence for the game-specific findings.
 
-Two setup details matter for accelerated tests. The development slave currently defines
-`FASTMEMSIZE=0`, so extra host fast RAM is not exposed as ordinary guest fast memory by
-its interface-17 KickEmu setup. The existing A1200 title test consequently still executes
+Two setup details matter for accelerated tests. The unmodified development baseline defined
+`FASTMEMSIZE=0`, so extra host fast RAM was not exposed as ordinary guest fast memory by
+its interface-17 KickEmu setup. The baseline A1200 title test consequently executes
 the game from chip RAM. Also, none of KickEmu's `CACHE`, `CACHECHIP` or `CACHECHIPDATA`
 options is defined: the loader requests caches disabled. Adding host RAM or selecting a
 faster CPU alone does not test the proposed rendering architecture.
@@ -252,9 +257,8 @@ claiming benefit from the A500 percentages or from nominal CPU MHz alone.
 
 ### Memory placement and cache safety
 
-Prototype memory provision separately from rendering. An experimental interface-20 build
-can use the already-supported KickEmu memory-configuration path to expose extra expansion
-memory; keep the current default build available. Query the actual allocation size. Reserve
+Prototype memory provision separately from rendering. The implemented interface-17 KickEmu build exposes 128 KiB of additional guest expansion
+through `FASTMEMSIZE`; the original reconstructed slave remains available separately. Query the actual allocation size. Reserve
 the guest fast pool before loading `pd`, retaining it as a private arena, so the unflagged
 single game hunk does not silently move into fast RAM during the buffer-only experiment.
 Suballocate the staging bitmap and audited scratch areas from this reservation. Do not
@@ -309,7 +313,7 @@ fields and the original/rebased-slave equivalence issue resolved or explicitly i
 
 ### Stage 2 Provide fast memory and measure transfer cost
 
-Create an experimental memory configuration and reserve the private arena as described
+Provide a guarded memory configuration and reserve the private arena as described
 above. Record actual code, scratch and bitmap memory placement in reports. Add a standalone
 VERIFY copy benchmark inside the game display mode: native front-buffer DMA active, the
 same waits, aligned source/destination and both warm and cold cache cases.

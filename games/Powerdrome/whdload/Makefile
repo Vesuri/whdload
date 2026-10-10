@@ -13,7 +13,7 @@ all: ../tmp/build/Powerdrome.slave
 	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I. -Iinclude -I$(NDK) -o $@ $<
 
 verify:
-	$(MAKE) all VASMFLAGS="-DVERIFY=1"
+	$(MAKE) all VASMFLAGS="-DVERIFY=1 $(VASMFLAGS)"
 	cp ../tmp/build/Powerdrome.slave ../tmp/build/Powerdrome-verify.slave
 
 original:

@@ -3,8 +3,10 @@
  INCLUDE whdload.i
  INCLUDE whdmacros.i
  INCLUDE lvo/dos.i
+ INCLUDE exec/memory.i
+ INCLUDE exec/execbase.i
 CHIPMEMSIZE = $80000
-FASTMEMSIZE = 0
+FASTMEMSIZE = $20000
 NUMDRIVES = 1
 WPDRIVES = 0
 DISKSONBOOT
@@ -19,7 +21,10 @@ slv_copy dc.b "1989 Electronic Arts",0
 slv_info dc.b "Installed by Galahad/Fairlight",10,"Development by Vesuri",10,"Version 1.1-dev",0
 slv_CurrentDir dc.b 0
 slv_config
+ dc.b "C1:B:Render planar scene in fast RAM;"
  IFD VERIFY
+ dc.b "C2:L:Rendering experiment:Bitmap and code,Bitmap only,Bitmap code and scratch,Bitmap and scratch;"
+ dc.b "C4:B:Twin planar drawing for verification;"
  dc.b "C5:L:Verification route:Off,Title demo,Practice;"
  ENDC
  dc.b 0
@@ -46,6 +51,7 @@ pl_endcli PL_START
  PL_END
 
 launch_pd
+ bsr reserve_arena
  move.l (4).w,a6
  moveq #0,d0
  lea dosname(pc),a1
@@ -67,9 +73,11 @@ launch_pd
  lea pl_game(pc),a0
  move.l _resload(pc),a2
  jsr resload_Patch(a2)
- IFD VERIFY
  lea tags(pc),a0
  jsr resload_Control(a2)
+ lea 4(a3),a1
+ bsr install_planar
+ IFD VERIFY
  move.l custom5(pc),d0
  beq.s .run
  lea pl_verify(pc),a0
@@ -141,7 +149,20 @@ pit_key
  rts
 practice_sent dc.w 0
 pit_sent dc.w 0
-tags dc.l WHDLTAG_CUSTOM5_GET
-custom5 dc.l 0
- dc.l TAG_DONE
  ENDC
+tags dc.l WHDLTAG_CUSTOM1_GET
+custom1 dc.l 0
+ IFD VERIFY
+ dc.l WHDLTAG_CUSTOM2_GET
+custom2 dc.l 0
+ dc.l WHDLTAG_CUSTOM4_GET
+custom4 dc.l 0
+ dc.l WHDLTAG_CUSTOM5_GET
+custom5 dc.l 0
+ ENDC
+ dc.l TAG_DONE
+ IFND VERIFY
+custom2 dc.l 0
+ ENDC
+ INCLUDE planar.s
+ INCLUDE fast_raster.s

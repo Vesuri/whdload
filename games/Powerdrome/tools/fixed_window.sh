@@ -83,16 +83,24 @@ start
 dumpmem
 [ "$(locate)" = "$hunk" ] || { echo 'Calibration mismatch' >&2; exit 1; }
 pd gdb 'info registers pc sp' > "$OUT/anchor.txt"
+python3 - "$OUT/anchor.txt" "$BOOT_BREAK" <<'PYANCHOR'
+import re,sys
+s=open(sys.argv[1]).read()
+m=re.search(r'^pc\s+(0x[0-9a-f]+)',s,re.M)
+assert m and int(m[1],16)==int(sys.argv[2]), 'Capture did not reach the requested anchor'
+PYANCHOR
 cp tmp/window-chip.bin "$OUT/chip.bin"
 cp tmp/window-other.bin "$OUT/code.bin"
 printf '%s\n' "$hunk" > "$OUT/game-base.txt"
 printf '%s\n' "$BASE" > "$OUT/dump-base.txt"
 if [ "${SWAP_ONLY:-0}" = 1 ]; then
-  python3 tools/swap_fields.py "$FIELDS" "$OUT" "$OUT/code.bin" "$BASE"
+  MARKER=${SWAP_MARKER:-0x1067e}
+  [[ "$WHD_ARGS" != *CUSTOM5=2* ]] || MARKER=${SWAP_MARKER:-0xbc7c}
+  python3 tools/swap_fields.py "$FIELDS" "$OUT" "$OUT/code.bin" "$BASE" --marker "$MARKER"
 else
 pd profile "$FIELDS" "$OUT/trace.bin" > "$OUT/capture.txt"
 python3 tools/powerdrome_report.py "$OUT/trace.bin" "$OUT/code.bin" --base "$BASE" > "$OUT/profile.txt"
-if [[ "$WHD_ARGS" != *CUSTOM5=2* ]]; then
+if [[ "$WHD_ARGS" != *CUSTOM5=2* ]] && [ "$((ANCHOR))" -eq "$((0x1067e))" ]; then
   python3 tools/frames.py "$OUT/trace.bin" "$OUT/code.bin" "$BASE" > "$OUT/frames.txt"
 fi
 python3 - "$OUT" "$FIELDS" <<'PYSHOTS'
@@ -106,6 +114,9 @@ assert len(t.fields) == int(sys.argv[2]), 'Profiler returned fewer fields than r
 assert any(pc is not None for pc,c,r in t.instructions(t.fields[0])), 'No instruction PCs'
 PYSHOTS
 fi
+dumpmem
+cp tmp/window-chip.bin "$OUT/final-chip.bin"
+cp tmp/window-other.bin "$OUT/final-code.bin"
 cleanup
 trap - EXIT
 printf 'Captured %s fields in %s\n' "$FIELDS" "$OUT"

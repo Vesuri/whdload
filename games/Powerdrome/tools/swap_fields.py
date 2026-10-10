@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Count demo frame completions over PAL fields with read-only debugger breakpoints.
+"""Count frame completions over PAL fields with read-only debugger breakpoints.
 Independent validation of the instruction-trace frame marker.
 Only debugger convenience variables change; target memory/registers are read-only.
 """
@@ -25,14 +25,15 @@ p.add_argument('fields', type=int)
 p.add_argument('out', type=Path)
 p.add_argument('dump', type=Path)
 p.add_argument('base', type=lambda x: int(x, 0))
+p.add_argument('--marker', type=lambda x: int(x, 0), default=0x1067e)
 a = p.parse_args()
 assert a.fields > 1
 code = a.dump.read_bytes()
 r = {name: (lo, hi) for lo, hi, name, origin in regions(code, a.base, (a.out/'chip.bin').read_bytes())}
-# The game installs a VBL server at 5684. Count moving-inset frame completions at
-# the same marker used by frames.py, before ScrollVPort. No guest writes.
+# The game installs a VBL server at 5684. The default marker counts the title
+# inset; bc7c counts normal driving presentations. No guest writes.
 vbl = r['game'][0]+0x5684
-swap = r['game'][0]+0x1067e
+swap = r['game'][0]+a.marker
 reply = command(f'''break *{vbl:#x}
 break *{swap:#x}
 set $pd_field = -1
@@ -57,8 +58,9 @@ first = next((i for i, n in enumerate(swaps) if n), None)
 last = max((i for i, n in enumerate(swaps) if n), default=None)
 assert first is not None and last > first, 'insufficient swaps for FPS'
 frames = sum(swaps[first+1:last+1])
-report = (f'Read-only demo frame counter ({a.fields} PAL fields)\n'
-          f'demo frame completions per field: {"".join(str(n) for n in swaps)}\n'
+kind = 'Practice' if a.marker == 0xbc7c else 'demo'
+report = (f'Read-only {kind} frame counter ({a.fields} PAL fields, marker {a.marker:#x})\n'
+          f'{kind} frame completions per field: {"".join(str(n) for n in swaps)}\n'
           f'{frames} frames in {last-first} fields: {(last-first)/frames:.2f} fields/frame, '
           f'{50*frames/(last-first):.1f} fps (PAL)\n')
 (a.out/'frames.txt').write_text(report)

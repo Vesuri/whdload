@@ -64,7 +64,7 @@ writes, disk changes and LoadSeg. No source-level meanings are inferred beyond t
 | `$3c9b6` | `PS` | `slave:05b6` |
 | `$36e4c` | `PS` | `slave:056e` |
 
-## Display and timing: static findings, pending gameplay validation
+## Display and timing
 
 - Game `$5684` is the installed VBL server. It samples mouse/input state, increments the long
   at game `$48fe`, and sets `a6+$494` as a VBL handshake. The main state base is game `$a6e`.
@@ -75,7 +75,8 @@ writes, disk changes and LoadSeg. No source-level meanings are inferred beyond t
   that delta to 8..50 and stores the word at `a6+$21c`. It then exchanges bitmap pointers.
   Physics reads this word at `$ccf2` and `$d56c`; a constant-step model would be incorrect.
 - Game `$8056` calls `$7f7a`, calls graphics.library ScrollVPort and clears the VBL handshake.
-  It is a candidate frame marker, but multiple non-racing paths call it. Frame validation is pending.
+  Multiple non-racing paths call it. Normal driving is counted at its caller `$bc7c`;
+  departure animations are excluded from driving FPS.
 - The renderer waits for the VBL handshake at game `$112a6`.
 - The menu's idle timeout at `$12ec6` compares elapsed clock units with 18,000 and returns
   12,345 to its caller. This enters the recorded title demo, not a race.
@@ -94,9 +95,11 @@ buffer design. The selected scope preserves the native simulation and timing pol
 ## Development slave and reproducible title-demo profile
 
 `whdload/Powerdrome.s` uses unmodified WHDLoad 20 KickEmu sources, interface 17, one disk,
-512 KB chip for the guest and 256 KB expansion for Kickstart. It retains the EndCLI redirection
-and Copylock replacement, with a signature check at game `$843c`. No cache enablement or
-performance change is added. In VERIFY builds only, CUSTOM5 replaces the name-entry key-ready
+512 KiB chip for the guest, 256 KiB expansion for Kickstart and 128 KiB additional guest
+expansion. It retains the EndCLI redirection and Copylock replacement, with a signature
+check at game `$843c`. Caches remain disabled. `CUSTOM1=1` enables the optional fast planar
+renderer, described in the [implementation report](performance-implementation.md); it is
+off by default. In VERIFY builds only, CUSTOM5 replaces the name-entry key-ready
 and key-read calls at `$13772` and `$1377c` with ready/Return responses. The shipped original
 and byte-identical rebuild both reach the name screen; the fixture-enabled modern rebase boots
 through it into the automatic title demo. State equivalence against the original is pending. The old Copylock replacement also returns
