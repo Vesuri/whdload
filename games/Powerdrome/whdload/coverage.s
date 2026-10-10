@@ -108,6 +108,11 @@ coverage_vbl
 .normal_axes
  lea coverage_tape(pc),a2
  move.l custom5(pc),d0
+ cmp.l #13,d0
+ bne.s .not_rescue
+ lea coverage_rescue_tape(pc),a2
+ bra.w .tape
+.not_rescue
  cmp.l #12,d0
  bne.s .not_sessions
  lea coverage_session_tape(pc),a2
@@ -575,4 +580,16 @@ coverage_session_tape
  dc.l 1120
  dc.w 0,0,0
  dc.l 1700
+ dc.w -1,0,0
+
+; Natural dual-engine failure followed by native rescue and pit repair input.
+; No damage, temperature, fuel, position or deadline writes.
+coverage_rescue_tape
+ dc.l 10
+ dc.w 0,0,3
+ dc.l 500
+ dc.w 0,0,0
+ dc.l 550
+ dc.w 'b',0,0
+ dc.l 2800
  dc.w -1,0,0

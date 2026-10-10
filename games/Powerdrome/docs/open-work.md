@@ -194,3 +194,11 @@ Menu/pit-setup time is excluded from new-session movement; queue ownership and d
 start fresh. These runs have zero pending work at closure, so nonzero discard, interrupted
 steps, same-session pit return and rescue remain unverified. Native Shift-Q publication
 is still frame/mode dependent; this is lifecycle coverage, not matched full trajectories.
+
+The new native-rescue route exposes the next concrete F6 defect: after 65.64 seconds
+in repairs/departure, the 030 prototype schedules 32 player updates and retains another
+65.08 seconds of movement debt. This is incorrect same-session pit handling, despite
+407 clean renderer twins. `check_timing_pit.py` rejects the complete 5,000-field capture;
+the shorter capture ends in repairs and is insufficient. Next: suspend/rebase flight
+time and input at the rescue call/return while preserving physical repair/audio time
+and separately scheduling opponents. The normal build is unaffected.

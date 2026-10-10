@@ -1065,6 +1065,72 @@ ending animation must not silently disappear from diagnostics. The ending animat
 own fixed frame count is also still a separate timing issue. No whole-game timer or
 mode-completeness claim follows from these two Practice restarts.
 
+## Same-session rescue: confirmed pit-time catch-up defect
+
+The development `CUSTOM5=13` fixture selects the ordinary Race menu route, applies
+native dual-button boost, releases at field 500 and requests rescue with B at field 550.
+It does not write damage, temperature, position, fuel or rescue deadlines. Both engines
+fail naturally and the stopped ship satisfies the native rescue gate. Subsequent pit
+visits use the existing native repair sequence `1,3,8,4,6,Space`.
+
+The frozen `Powerdrome-timing-rescue1.slave` capture
+`timing-rescue1-030-long-twins` spans 5,000 PAL fields on 030/25 with fast planar twins.
+It records:
+
+| Event | Field | Evidence |
+| --- | ---: | --- |
+| Accepted rescue `$c7d2` | 548 | Native eligibility gate passed |
+| Pit-return entry `$103a2` | 1,051 | Entered from inside an active world update |
+| Six native pit inputs `$13cde` | 1,630; 2,123; 2,615; 2,845; 3,470; 4,063 | Repair keys and Space use the native menu |
+| Cockpit departure `$1020e` | 4,277 | Nine paced departure steps follow |
+| Interrupted world reaches `$cedc` | 4,333 | Same session and world cursor resume |
+| Next ordinary allocation `$ca44` | 4,337 | Entire pit interval becomes player update debt |
+
+The pit entry to world return spans **3,282 fields / 65.64 seconds**. The world cursor
+remains at 6,244 native time units while the modal pit sequence executes; four assigned
+steps remain. On return, those four finish. The next allocation produces **32 assigned
+steps (640 ms)** and **65,080 ms retained debt**, or 65,720 ms combined. Only 120 ms is
+allowed by the observed work outside the pit plus two fields of sampling allowance.
+This is a confirmed failure: the repair/departure interval is subsequently treated as
+player movement time. Retaining all debt is correct for an ordinary slow render, but
+not for a mode where ordinary player flight has been suspended.
+
+The route completes **407 clean renderer comparisons** with unchanged raster code.
+That does not validate simulation timing. The earlier 3,000-field capture stops during
+repairs and cannot establish return behavior. No matched A500 rescue claim is made.
+These captures omit the opponent multiplication probe; they cannot establish opponent
+cadence during or after the pit sequence.
+
+`tools/check_timing_pit.py CAPTURE` rejects the long capture with “Pit time became player
+movement backlog.” `--report-only` prints measured boundary/debt values without converting
+that known failure into a pass. The checker requires accepted rescue, pit entry from an
+active world, a completed return, and the first subsequent allocation. It permits
+pre-existing debt and elapsed work outside the pit; it does not test complete opponent,
+repair, keyboard or result-timer behavior.
+
+Reproduce with `CUSTOM5=13`, `FIELDS=5000`, driving anchor/marker `$bc7c`, `SWAP_ONLY=1`,
+`TIMING_STATE=1` and probes `$c7d2 $ce00 $103a2 $13cde $1020e $10322 $ccee $cedc $ca44
+$bf32 $c2aa $c2b0`. Use the WORLD20/input/engine flags and fixed random seeds from the
+other timing prototypes. Add `$d56c` when validating opponent cadence in a subsequent run.
+
+The next fix must distinguish an ordinary render stall from this modal transition:
+
+1. Intercept the rescue call at `$ce1e` (the other direct `$103a2` caller at `$bc3a` is
+   initial gameplay entry), record its interrupted step and pending work, and suspend
+   flight input/physics ownership before entering native pit code.
+2. Keep physical time advancing for repairs/audio and give pit opponent updates their
+   own elapsed scheduling. Freezing the shared `$f96` clock is not a solution.
+3. Rebase player deadlines/input sampling explicitly at return, preserving or explicitly
+   discarding pre-pit pending work according to its ownership. Restore the intended
+   counter/RNG owner and reset teleport-sensitive movement fractions. Record excluded
+   modal time separately from ordinary lost work.
+4. Require this debt regression to pass, then repeat both CPUs and audit repaired engine
+   state, opponent arrays, queued input and subsequent rescue/pit interactions. Keep the
+   normal build unchanged until the broader F6/F7 gates pass.
+
+No pit-time exclusion is implemented yet; the long rescue route is a failing regression
+for the next F6 change.
+
 ## Pause ownership
 
 The input prototype hooks native pause entry `$be12` and the native clock restore at `$beec`.
