@@ -187,7 +187,7 @@ if os.environ.get('TIMING_STATE') == '1':
     pit_sample=''
     if fast_worlds:
         pits=[m.start() for m in re.finditer(b'PDPIT001',code)
-              if 0<fast_worlds[0]-m.start()<1024]
+              if 0<fast_worlds[0]-m.start()<2048]
         if pits:
             assert len(pits)==1
             pitp=a.base+pits[0]
@@ -195,12 +195,26 @@ if os.environ.get('TIMING_STATE') == '1':
             pv += [f'*(unsigned int*){pitp+x:#x}' for x in range(12,60,4)]
             pv += [f'*(unsigned short*){pitp+60:#x}',f'*(unsigned short*){wp+26:#x}',f'*(unsigned short*){hp+12:#x}',f'*(unsigned int*){hp+16:#x}',f'*(unsigned short*){tp+46:#x}']
             pit_sample='printf "PDPIT_EVENT %d {off} ' + ' '.join(['%u']*len(pv)) + '\\n", $pd_field, ' + ', '.join(pv) + '\n'
+    pit_opponent_sample=''
+    if fast_worlds:
+        popps=[m.start() for m in re.finditer(b'PDPOPP01',code)
+               if 0<fast_worlds[0]-m.start()<2048]
+        if popps:
+            assert len(popps)==1
+            op=a.base+popps[0]
+            ov=[f'*(unsigned short*){op+x:#x}' for x in (8,10,12,14)]
+            ov += [f'*(unsigned int*){op+x:#x}' for x in range(16,44,4)]
+            ov += [f'*(unsigned short*){op+44:#x}']
+            ov += [f'*(unsigned int*){op+x:#x}' for x in (48,52,56)]
+            ov += [f'*(unsigned short*){state+0x21c:#x}',f'*(unsigned short*){wp+26:#x}',f'*(unsigned short*){state+0x62:#x}',f'*(unsigned int*){state+0x5e:#x}', '(unsigned int)$d0', '(unsigned int)$d7']
+            pit_opponent_sample='printf "PDPOPP_EVENT %d {off} ' + ' '.join(['%u']*len(ov)) + '\\n", $pd_field, ' + ', '.join(ov) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
         sample += input_sample.replace('{off}',hex(off))
         sample += session_sample.replace('{off}',hex(off))
         sample += pit_sample.replace('{off}',hex(off))
+        sample += pit_opponent_sample.replace('{off}',hex(off))
         if off in (0xd9a0,0xde0a,0xdfae,0xdffc,0xe0c0,0x10d0c,0x13514):
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):

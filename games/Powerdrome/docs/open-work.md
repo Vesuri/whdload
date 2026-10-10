@@ -202,9 +202,19 @@ deadlines on return. Both 030 and A500 resume with one 20-ms step and zero debt 
 streams and logical cooling phase; the 030 passes 422 renderer twins. A500 explicitly
 discards seven assigned updates after a 100.58-second pit interval. All 1,052 sampled
 pre-pit world states match the failing reference. Native repair/audio time keeps advancing.
-Pit opponent updates remain outside the selected cadence (observed native intervals
-40–250 ms on 030); their timing, clock decisions and cross-CPU equivalence remain F6
-work. The whole pit visit still takes 65.64 seconds on 030 versus 100.58 on A500, so native
-repair/setup/presentation timing also remains open.
+The modal opponent prototype now schedules 90-ms updates with private RNG/counter
+ownership and logical repair/lap clock views, then drains the departure tail at return.
+The current 030 rescue capture verifies 737 updates over 66.36 seconds with 30 ms retained,
+2,948 fixed-delta movement samples, 682 outer-state restores and ten logical lap-gate
+clock results. Player reentry still has zero pit debt; 409 renderer comparisons pass.
+The verifier rejects an earlier implementation that omitted 19 departure-tail updates.
+The same artifact passes A500: 1,148 updates over 103.40 seconds, 80 ms residual,
+4,592 movement samples and 15 logical lap-gate clock results. The restart regression
+adds 232 clean twins (641 current-build twins total). The next handoff correction must
+carry the modal residual, elapsed flush/return time and opponent phase into an independent
+ordinary-flight deadline; the current flight path still shares player control cadence.
+Full opponent arrays, repair-clock cases, nonlocal exits, other pit paths and native
+calibration remain F6 work. Native repair/setup/
+presentation timing still makes whole pit visits CPU-dependent.
 Nonlocal pit exits and other pit-entry paths remain unverified. The final-build ordinary restart regression also passes two closures/reentries and
 232 renderer twins (654 final-build twins including rescue). The normal build is unchanged.

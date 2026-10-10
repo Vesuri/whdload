@@ -80,6 +80,16 @@ install_periodic
  lea timing_frame(pc),a0
  move.w #$42e7,(a0)
  IFNE TIMING_WORLD20
+ lea timing_pit_opponent_save_return(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_pit_opponent_allocate(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_pit_opponent_begin(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_pit_opponent_end(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_pit_opponent_restore(pc),a0
+ move.w #$42e7,(a0)
  lea timing_pit_enter(pc),a0
  move.w #$42e7,(a0)
  lea timing_pit_leave(pc),a0
@@ -194,11 +204,26 @@ pl_periodic PL_START
  ; Gate repeated contact feedback/damage at the slow cadence, after geometry.
  ; TIMING_RANGE h0:$fb64 6 bit=C3
  PL_P $fb64,timing_world20_contact
- ; TIMING_RANGE h0:$fb84 8 bit=C3
+ ; Native entry MOVE.W plus BMI.W; original return depth is preserved.
+ ; TIMING_RANGE h0:$d3d6 8 bit=C3
+ PL_P $d3d6,timing_pit_opponents
+ PL_NOP $d3dc,2
+ ; Opponent-only direct clock reads. Outside modal updates these stay native.
+ ; TIMING_RANGE h0:$d4b6 6 bit=C3
+ PL_PS $d4b6,timing_pit_clock_d7
+ ; TIMING_RANGE h0:$d4fe 6 bit=C3
+ PL_PS $d4fe,timing_pit_clock_d0
+ ; TIMING_RANGE h0:$d7f8 6 bit=C3
+ PL_PS $d7f8,timing_pit_clock_d7
+ ; TIMING_RANGE h0:$d836 6 bit=C3
+ PL_PS $d836,timing_pit_clock_d7
+ ; TIMING_RANGE h0:$d866 6 bit=C3
+ PL_PS $d866,timing_pit_clock_d7
  ; Rescue BSR plus the complete following MOVE.W. Preserve native call depth.
  ; TIMING_RANGE h0:$ce1e 10 bit=C3
  PL_P $ce1e,timing_pit_call
  PL_NOP $ce24,4
+ ; TIMING_RANGE h0:$fb84 8 bit=C3
  PL_P $fb84,timing_world20_damage
  PL_NOP $fb8a,2
  ENDC
@@ -701,6 +726,12 @@ timing_targets
  dc.w timing_session_native_cleanup+2-timing_targets
  ENDC
  IFNE TIMING_WORLD20
+ dc.l $d3d6
+ dc.w timing_pit_opponent_direct+2-timing_targets
+ dc.l $d3de
+ dc.w timing_pit_opponent_body+2-timing_targets
+ dc.l $d7f0
+ dc.w timing_pit_opponent_empty+2-timing_targets
  dc.l $103a2
  dc.w timing_pit_native+2-timing_targets
  dc.l $ce28

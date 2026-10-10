@@ -40,11 +40,11 @@ for root in a.captures:
             elif stage=='pit' and off==0xce28:
                 assert t[0]==0 and t[1]==1 and t[3]==entered[3]+1 and t[4]==entered[4]
                 assert t[7]-entered[7]==t[6]-t[5]>0
-                assert t[14]==1 and t[15:19]==entered[15:19], 'Private RNG or control phase changed in pit'
+                assert t[14]==1 and t[16:19]==entered[16:19], 'Private RNG or control phase changed in pit'
                 assert all(s[i]==0 for i in (8,9,11,12,13,16,17,18,19,20,21,22))
                 returned=t;stage='returning'
             elif stage=='pit':
-                assert t[0]==1 and t[15:19]==entered[15:19]
+                assert (t[0]==1 or t[1]==1) and t[16:19]==entered[16:19]
                 assert s[8]==s[13]==s[18]==0, 'Player ownership leaked into pit'
                 modal_samples+=1
                 modal_opponents+=off==0xd56c
@@ -62,7 +62,7 @@ for root in a.captures:
                 assert s[8]==s[9]==s[12]==s[13]==s[18]==1 and s[11]==0
                 assert s[14]==s[10] and s[15]==s[14]+18
                 assert s[16]==s[17]==0
-                assert t[14]==0 and t[15]==entered[15], 'World random stream reseeded'
+                assert t[14]==0 and t[15]==returned[15], 'World random stream reseeded'
                 n=t[17]-returned[17]
                 assert 0<=n<=2, 'Heat call counter reset at pit reentry'
                 seed=returned[16]

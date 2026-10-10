@@ -4,6 +4,27 @@ timing_pit_call
  bsr timing_pit_enter
  bsr timing_pit_native
  bsr timing_pit_leave
+ tst.w d0
+ bne.s .continue
+ ; Flat dispatcher: no extra helper frame survives a native opponent call.
+ bsr timing_pit_opponent_save_return
+.flush_batch
+ bsr timing_pit_opponent_allocate
+.flush_step
+ bsr timing_pit_opponent_test_due
+ beq.s .batch_done
+ bsr timing_pit_opponent_begin
+ bsr timing_pit_opponent_direct
+ bsr timing_pit_opponent_end
+ bra.s .flush_step
+.batch_done
+ move.l d0,-(sp)
+ move.l timing_pit_opponent_state+24(pc),d0
+ cmp.l #TIMING_PERIOD,d0
+ movem.l (sp)+,d0
+ bhs.s .flush_batch
+ bsr timing_pit_opponent_restore_return
+.continue
  move.w #0,$dc(a6)
  bra.w timing_pit_continue
 
@@ -40,6 +61,7 @@ timing_pit_enter
  add.l d0,52(a0)
  bsr timing_pit_clock
  move.l d0,24(a0)
+ bsr timing_pit_opponent_initialize
  bsr timing_session_clear_work
  movem.l (sp)+,d0-d1/a0-a1
  move.w (sp)+,ccr
@@ -59,6 +81,9 @@ timing_pit_leave
 timing_pit_abort
  move.w sr,-(sp)
  movem.l d0-d1/a0-a1,-(sp)
+ bsr timing_pit_opponent_restore
+ lea timing_pit_opponent_flushing(pc),a0
+ clr.w (a0)
  lea timing_pit_state(pc),a0
  tst.w 8(a0)
  beq.s .done
@@ -116,3 +141,5 @@ timing_pit_retiring dc.w 0 ; returning through the interrupted world tail
  dc.l 0 ; interrupted world tails retired, not completed ticks
 timing_pit_rebase dc.w 0 ; preserve world/heat streams during next initialization
  dc.w 0
+
+ INCLUDE timing_pit_opponents.s

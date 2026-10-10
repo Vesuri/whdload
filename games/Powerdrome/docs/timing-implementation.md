@@ -1191,12 +1191,76 @@ comparisons. The normal slave is byte-identical to the previous checkpoint. The 
 hook layout audit passes, including the ten-byte rescue call replacement; the existing
 native C3-off snapshots retain original bytes at that range.
 
-Native pit opponent updates remain a separate unresolved issue: 2,728 multiplication
-samples use intervals from **40 to 250 ms**, including 112 samples at the native cap.
-This is not the selected 90-ms opponent cadence, and these samples do not prove whether
-or how much time the native cap loses. Their shared-clock repair/lap decisions and
-frame-counted state require separate extraction and cross-CPU validation. No whole-pit
-or whole-game framerate independence claim follows from the player-debt fix.
+### Elapsed opponent updates during rescue pits
+
+The WORLD20 development build now schedules rescue-pit opponents every 18 native time
+units (90 ms). `timing_pit_opponents.s` intercepts the native `$d3d6` entry only for the
+pit updater's `$e3bc` call while the rescue boundary is active. Other callers retain the
+native body. Each scheduled update owns the private world RNG and an opponent counter
+phase; the outer presentation counter and RNG are restored afterward. The scheduler
+retains unassigned debt and caps individual allocations at 32 updates without dropping time.
+
+Five direct opponent clock reads at `$d4b6`, `$d4fe`, `$d7f8`, `$d836` and `$d866` receive
+the logical deadline translated into the current native clock epoch during these updates.
+Outside modal ownership they read the real native clock. The shared `$f96` clock is never
+frozen or rewritten by this scheduler, so blocking repair/audio/presentation waits can finish.
+Native opponent calls keep their original stack depth, including the nonlocal result exit.
+
+Cockpit departure does not call the pit updater. Normal pit return therefore drains all
+opponent updates due through the captured return instant before continuing at `$ce28`.
+This cutoff stays fixed while the drain runs. The native pit return registers are saved
+in private storage and restored afterward; no extra persistent stack frame is introduced.
+Nonlocal exits restore counter/RNG ownership and clear the drain flag, but their runtime
+coverage remains open.
+
+The frozen `Powerdrome-timing-pitopp3.slave` passes `timing-pitopp3-030-twins` over
+5,000 fields. The pit interval is **66,360 ms**, containing **737 completed 90-ms updates**
+and **30 ms residual** in the modal ledger. All **2,948** observed opponent movement
+samples use the 18-unit delta and logical counter. The ledger balances at every probe;
+**682** paired pit-updater calls restore their outer counter/RNG. Ten observed lap-gate
+clock results at `$d7fe` equal their logical timestamps. No repair-clock or other lap-clock
+result was exercised by this capture, so those wrappers lack runtime evidence here.
+
+`tools/check_timing_pit_opponents.py CAPTURE...` verifies these invariants and requires a
+fully drained return. It rejects the earlier `timing-pitopp2-030-twins` capture, which left
+19 updates unallocated during the departure tail. The player debt and lifecycle checkers
+also pass the current capture: four interrupted/assigned player steps are explicitly
+discarded, player control/heat state remains suspended, and flight resumes with one
+20-ms update and zero debt. The world RNG intentionally advances with modal opponents;
+player reentry preserves the stream as it stands at return. The capture adds **409 clean
+renderer comparisons**, with unchanged raster code. Instrumented runs are not FPS benchmarks.
+
+Reproduce with the WORLD20 build flags above, `CUSTOM5=13`, `FIELDS=5000` on 030,
+`TIMING_STATE=1`, and probes `$ce1e $103a2 $13cde $ce28 $ccee $cedc $ca44 $d56c $e3bc
+$e3c4 $d4b6 $d4bc $d4fe $d504 $d7f8 $d7fe $c7d2`. The same artifact passes `timing-pitopp3-a500` over 8,000 fields: **1,148 completed
+updates over 103,400 ms**, with **80 ms residual**, 4,592 scheduled movement samples,
+682 paired outer-state restores and 15 logical lap-gate clock results. Player reentry
+again allocates one 20-ms step with zero debt, explicitly discarding seven assigned steps.
+The native-return cutoff precedes the observed world return by 100 ms on this A500 run;
+the bounded flush does not extend its cutoff to include its own execution time.
+
+The modal residual and time after that cutoff are not yet transferred to an independent
+ordinary-flight opponent deadline. Ordinary flight still uses the player control cadence,
+whose phase is preserved across the pit. A continuous opponent timeline across this handoff
+therefore remains unfinished; a balanced modal ledger alone is not sufficient evidence.
+The next timing change must carry this residual, post-cutoff elapsed time and opponent
+phase into flight without advancing the suspended player's control/heat phase.
+
+The 737 common modal updates have identical sampled private/native RNG values and opponent
+indices across CPUs. Their sampled D0 values differ, including before pit entry. D0 is
+not the displacement multiplier operand (D5); this comparison establishes neither equal
+nor unequal full trajectories. Full opponent arrays and meaningful movement operands need
+explicit probes.
+
+The final-build `timing-pitopp3-session-030-twins` regression passes two session closures
+and two fresh entries over 1,800 fields with 232 clean renderer comparisons: **641** across
+the two final-build 030 runs. Normal-build bytes remain unchanged, and rebuilding the
+prototype reproduces the frozen artifact. The complete-instruction/branch-entry audit passes.
+
+Full opponent-array equivalence, repair-clock cases,
+other pit entry paths, nonlocal exits, pause/epoch changes and native A500 calibration
+remain unproven. Repair/setup/presentation duration itself is still frame dependent.
+No whole-pit or whole-game framerate independence claim follows from these bounded checks.
 
 ## Pause ownership
 
