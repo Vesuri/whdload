@@ -263,8 +263,13 @@ checks: nine 80-ms intervals, five 60-ms intervals and three 40-ms intervals, to
 this sequence using cumulative elapsed deadlines: 030 measures 1,120 ms and A500
 1,160 ms in PAL fields, both within one field of the native target at every boundary.
 The 030 guest-clock schedule matches exactly; A500 has at most 20 ms lateness. All
-17 positions and stack checks pass. The full initial-pit 030 regression is running.
-Then extend complete-state comparison through
-departure, repeat lifecycle regressions, and validate race reinitialization and repair
+17 positions and stack checks pass. Full pit-to-track checks now pass on both CPUs,
+including retune register/flag/RNG preservation and exact time accounting; 188 completed
+030 renderer comparisons report no failures. All 72 common opponent snapshots through
+6,480 ms match. The extended through-departure gate remains **failing**: 194 of 266
+snapshots differ, first at 6,570 ms after the 030 retunes earlier than A500. Their event
+histories are unequal, so whole-trajectory equivalence is not established. Next establish
+matching semantic-event/input histories and investigate remaining full-record differences,
+repeat lifecycle regressions, and validate race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

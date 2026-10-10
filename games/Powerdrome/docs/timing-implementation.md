@@ -679,7 +679,18 @@ guest-clock boundary errors between zero and **+20 ms**. The first interval over
 by one field; subsequent deadlines retain that lateness instead of adding more delay.
 Both CPU runs preserve all 17 positions and the native loop stack. The 030 capture
 contains no staged scenes, so it is not evidence of renderer equivalence or throughput.
-Full pit/opponent lifecycle regression is running; other pit callers and rendering
+The full 030 pit-to-track capture `timing-external2-initial-030-twins` also passes:
+7,620 ms in the pit; six old-speed updates (540 ms) drained before the retune at
+6,480 ms with zero residual; 1,140 ms of departure tail served as 1,080 ms plus 60 ms
+retained at first flight. Final residual is 20 ms, with no whole updates pending.
+All caller register/flag, RNG ownership and record checks pass, as do **188 completed
+renderer comparisons** with unchanged raster code. An additional scene is active at
+the final snapshot and is not counted as complete. The full A500 counterpart
+`timing-external2-initial-a500` passes: 17,080 ms in the pit, 57 old-speed updates
+(5,130 ms) drained at a 15,620-ms cutoff with 50 ms residual, and a 1,510-ms departure
+tail served as 1,440 ms plus 70 ms retained in first flight. Its final residual is
+30 ms; no allocation hits the 32-update cap. Both CPUs retain the same native speed
+mutation, **489/519/522/558 → 567/617/553/594**. Other pit callers and rendering
 configuration coverage remain separate requirements.
 
 ```sh
@@ -1633,6 +1644,32 @@ these runs or freeze the shared native clock to hide discrepancies. Recheck this
 python3 tools/check_natural_result.py --require-logical-time tmp/prof/timing-resultclock1-natural-030 tmp/prof/timing-resultclock1-natural-a500
 ```
 
+The extended `compare_timing_opponents.py --through-departure` gate now samples every
+completed four-opponent body from pit entry into flight. It requires consistent
+opponent deadline/completion counts and at least 30 shared deadlines after **both**
+pit exits. It still normalizes only the audited lap-start epoch; speed, positions,
+rendering scratch and random state remain visible. It does not cover the player record.
+
+For the paced `timing-external2-initial-030-twins` / `timing-external2-initial-a500`
+pair, **72** complete snapshots at 90–6,480 ms match, including RNG. Across the longer
+90–23,940-ms window, **194 of 266** snapshots differ and **151** have different RNG;
+93 shared snapshots occur after both CPUs enter flight. The first difference is at
+**6,570 ms**, immediately after the 030 retune cutoff (6,480 ms), while A500 does not
+retune until 15,620 ms. Speed words differ for all four opponents at that first mismatch,
+alongside movement and scratch fields. Thus event histories are demonstrably unequal;
+these runs cannot prove whole-trajectory equivalence. The result does not establish
+that retune timing explains every later difference. A controlled matching-event run is
+still required to separate history differences from simulation defects.
+
+Use `--report-only` to inspect this known mismatch; without it the extended gate fails.
+The earlier prefix-only check continues to pass and must not be cited as whole-departure
+coverage:
+
+```sh
+python3 tools/compare_timing_opponents.py --initial-pit tmp/prof/timing-external2-initial-030-twins tmp/prof/timing-external2-initial-a500
+python3 tools/compare_timing_opponents.py --through-departure --report-only tmp/prof/timing-external2-initial-030-twins tmp/prof/timing-external2-initial-a500
+```
+
 The next F6 steps are:
 
 1. **Retune ordering:** finish wider A500 lifecycle regressions. The final initial-pit
@@ -1644,9 +1681,11 @@ The next F6 steps are:
 2. **Initial pit pacing:** calibrate the external 17-position sequence against native
    A500, independently of cockpit pacing. Keep real user waiting time advancing opponents;
    do not delay CPU-only loading to manufacture matching first-flight positions.
-3. **Whole-state gate:** extend complete-record comparison through departure at matched
-   logical times and input history. Keep gameplay differences visible; the matching
-   active-pit prefix does not satisfy this gate.
+3. **Whole-state gate:** the comparison now extends through departure, but the current
+   CPU pair fails after the earlier 030 retune. Establish matching semantic-event/input
+   histories and require complete-record plus RNG agreement; investigate any differences
+   that remain under those conditions. Preserve elapsed pit time in production rather
+   than inserting loading delays to manufacture matching starts.
 4. **Lifecycle regressions:** repeat pause, rescue and session restart with the initial-pit
    hooks, then add race reinitialization (the existing restart fixture uses Practice).
 5. **Other modes:** finish repairs and other pit callers, then return to the full F7
