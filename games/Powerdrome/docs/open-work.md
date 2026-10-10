@@ -283,7 +283,10 @@ per render. Its paired run has 335 common snapshots: nine differ solely in proje
 64 completed 030 renderer twins are clean. Native A500 calibration remains failing for
 pilot 1 (2,040 ms versus 920 ms for the visible nine-update prefix); both CPUs reproduce
 the same visibility gap. Pilots 2–4 take 960 ms and pass both calibration limits. The full
-record gate remains failing until the projection-field ownership audit is complete.
+record gate remains failing. A 50-field effective-address audit finds 55 projection-word
+accesses only at the known drawing sites; all 17 reads follow a fresh per-view producer
+across all four pilots. Unexecuted paths and accesses outside the game hunk remain unaudited,
+so no comparison field has been masked.
 Mode-specific lap resets (`$dbe8`), pause/rescue/clock adjustments and total result clocks
 still need coverage. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair

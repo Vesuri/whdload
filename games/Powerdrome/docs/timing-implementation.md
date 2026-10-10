@@ -640,8 +640,9 @@ the full lifetime remain open. CPU agreement does not establish A500 gameplay fi
 The complete opponent comparison has 335 shared deadlines from 90 to 30,150 ms,
 including 135 after both CPUs enter flight. Nine snapshots differ, solely in record
 word `$54`; all other compared words, lap clocks and RNG match. `$54` is written during
-projection and read during drawing, but its full ownership/alias audit is unfinished.
-The whole-record comparison therefore remains failing; no field has been masked.
+projection and read during drawing. The bounded effective-address audit below supports
+that ownership in the sampled route; unexecuted paths remain unaudited. The whole-record
+comparison therefore remains failing; no field has been masked.
 The 030 run has 64 completed clean renderer comparisons and one additional scene still
 active at capture end. These instrumented runs are not performance measurements.
 
@@ -660,7 +661,34 @@ python3 tools/check_opponent_animation.py tmp/prof/timing-opanim2-initial-a500 -
 python3 tools/compare_timing_opponents.py --through-departure --report-only tmp/prof/timing-opanim2-initial-030-twins tmp/prof/timing-opanim2-initial-a500
 ```
 
-Next audit `$54` ownership, test matched native visibility/lifetime histories, and cover
+The 50-field instruction trace `timing-opanim-projection-access-a500` starts at `$9950`
+after the initial `$bc44` pit return, using the same frozen prototype and A500 configuration.
+`tools/audit_opponent_projection.py` decodes 4,236 executed game instructions and evaluates
+explicit memory effective addresses against all four opponent `$54` words. This includes
+copied/indexed pointers and overlapping block transfers, rather than merely matching
+field displacements in disassembly. All 55 observed accesses occur at the three native
+writers and one reader:
+
+| Site | Role | Observed accesses |
+| --- | --- | ---: |
+| `$a142` | Clear projection rejection flag | 19 |
+| `$a26e` | Set projection rejection flag | 9 |
+| `$1162e` | Select distant-model drawing | 10 |
+| `$11644` | Choose drawing path | 17 |
+
+All 17 reads follow a fresh projection write after that pilot's current `$11228` render
+entry. All four pilots are covered; no explicit memory addressing mode is unresolved.
+Other direct `$54` references at `$721c` and `$143e4` address the asset table rooted at
+hunk `$6e2`, rather than an opponent record. This trace does not cover unexecuted paths,
+implicit stack accesses, DMA or accesses from code outside the game hunk. It supports
+render-only ownership in the measured early-flight window, not a blanket normalization
+rule for every mode or capture.
+
+```sh
+python3 tools/audit_opponent_projection.py tmp/prof/timing-opanim-projection-access-a500
+```
+
+Next extend `$54` ownership coverage, test matched native visibility/lifetime histories, and cover
 contact/damage/effect feedback, pause, repair, rescue and nonhuman mode transitions.
 The preparation split alone does not complete the broader effects or timing matrix.
 
