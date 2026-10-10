@@ -20,10 +20,12 @@ A/B a patch: `tools/ab_window.sh PREFIX OFF_BITS ON_BITS [ROUTES [MACHINES]]`, t
 
 ## 1. Host setup
 
-Everything shared lives under `~/.local`: the m68k toolchain and gdb in `~/.local/opt/bin`,
-vasm at `~/.local/vasmm68k_mot`, FS-UAE with the Barto gdb stub, and the shared Amiga files
-in `~/.local/share/amiga`. `amiga/env.sh` puts the toolchain on PATH and resolves the
-shared files; each has an environment override:
+Everything shared lives under `~/.local`, installed by AmigaXDev (`make setup`): the m68k
+toolchain and gdb in `~/.local/opt/bin`, vasm at `~/.local/vasmm68k_mot`, FS-UAE with the Barto
+gdb stub, and the shared Amiga files in `~/.local/share/amiga`. `amiga/env.sh` sources the
+shared `env.sh` (AmigaXDev's `docs/environment.md` lists every variable), which puts the
+toolchain on PATH and resolves the shared files, after setting this project's own choices:
+WHDLoad 19.2 (`WHDLOAD`) and the native vasm (`VASM`). Each has an environment override:
 
 | Variable | Default | Used for |
 |---|---|---|
@@ -32,6 +34,7 @@ shared files; each has an environment override:
 | `KICKSTART_A1200` | `~/.local/share/amiga/Kickstarts/kick40068.A1200` | the 68020 capture machine (§3) |
 | `WORKBENCH_ADF` | `~/.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf` | boot floppy |
 | `WHDLOAD_BINARY` | `~/.local/share/amiga/WHDLoad/C/WHDLoad` | copied onto the game drive |
+| `SOUND`, `WINDOW` | 1, `front`; 0, `back` with `DEBUG` or `WARP` | audio on/off; FS-UAE window in front, behind the others, or `none` (no video) |
 | `FSEMU_SCREENSHOTS_DIR` | `amiga/<run dir>/shots` | FS-UAE screenshots |
 
 Build-side overrides (`whdload/makefile`): `WHDLOAD` (WHDLoad dev tree, default

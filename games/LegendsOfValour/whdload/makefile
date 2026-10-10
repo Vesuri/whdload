@@ -1,6 +1,7 @@
 # Host cross-build of the reconstructed Legends of Valour slave (CFou! v1.0 has no public
 # source; LegendsOfValourHD.s is rebuilt from its disassembly).  Not byte-identical to the
 # shipped slave: kick13.s is the vendored 2025 copy (whdload/), the original used 2005's.
+# segtracker.s comes from $(WHDLOAD)/Src/sources/whdload.
 #   make            LegendsOfValour.Slave
 #   make developer  independent performance switches, no verification instruments
 #   make verify     same with -DVERIFY=1 (verification instruments; never ship)
@@ -23,7 +24,7 @@ all: $(SLAVE_TARGET)
 # Always assemble: options must not leave a stale variant.
 $(SLAVE_TARGET): LegendsOfValourHD.s FORCE
 	mkdir -p "$(OUT)"
-	"$(VASM)" -m68000 -pic -x -devpac -Fhunkexe -nosym -L "$(OUT)/LegendsOfValour.lst" $(VASMFLAGS) -I. -I"$(WHDLOAD)/Include" -I"$(NDK)" -o "$(SLAVE)" "$<"
+	"$(VASM)" -m68000 -pic -x -devpac -Fhunkexe -nosym -L "$(OUT)/LegendsOfValour.lst" $(VASMFLAGS) -I. -I"$(WHDLOAD)/Include" -I"$(WHDLOAD)/Src/sources" -I"$(NDK)" -o "$(SLAVE)" "$<"
 
 developer:
 	$(MAKE) all VASMFLAGS="$(VASMFLAGS) -DDEVELOPER=1"

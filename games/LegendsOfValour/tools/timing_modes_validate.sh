@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 . amiga/env.sh
 prefix=${1:-sim-modes-final}
-export FSUAE="${FSUAE:-$HOME/.local/share/amiga/fs-uae-arm/fs-uae}"
+export FSUAE="${FSUAE:-$FSUAE_ARM}"
 build="tmp/build-simulation-modes"
 make -s -C whdload verify OUT="../$build" VASMFLAGS='-DTIMING_STUDY=1 -DTIMING_MODE_TEST=1'
 for machine in a1200 a500; do

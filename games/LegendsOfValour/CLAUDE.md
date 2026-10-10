@@ -17,7 +17,8 @@ patches.
   addresses — never absolute addresses.
 - **No machine-specific paths** in tracked files: no `/Users/...` or `~/Documents`-style paths, no
   paths into other projects (name them as "Project relative/path"). Shared Amiga files come from
-  `~/.local/share/amiga` through the overridable variables in `amiga/env.sh`; scratch output goes
+  `~/.local/share/amiga` (AmigaXDev) through the overridable variables of the shared `env.sh`,
+  which `amiga/env.sh` sources; scratch output goes
   to `tmp/`. Docs describe the current state; history belongs in git.
 - Commits: author Vesa Halttunen <vesuri@jormas.com>, unsigned, no hooks, no Co-Authored-By lines.
   One commit per coherent feature.

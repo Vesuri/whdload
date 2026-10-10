@@ -24,7 +24,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAP = os.environ.get('FSUAE_RUN', '.cap')
 RUN = os.path.join(ROOT, 'amiga', CAP)
 SOCK = os.path.join(RUN, 'lov.sock')
-GDB = os.path.expanduser('~/.local/opt/bin/m68k-amiga-elf-gdb')
+GDB = os.path.join(os.environ.get('AMIGA_TOOLCHAIN') or os.path.expanduser('~/.local/opt'),
+                   'bin', 'm68k-amiga-elf-gdb')
 # gdb runs in the repo root and cannot quote file names, so dump paths are given relative to
 # it (SCRATCH), clear of the space in the checkout path.
 SCRATCH = 'tmp/scratch'

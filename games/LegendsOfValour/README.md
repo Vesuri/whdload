@@ -51,7 +51,7 @@ additionally needs the Barto-enabled FS-UAE build and m68k GDB described in
 | `VASM` (make variable) | native assembler in `tmp/vasm-native-src/vasm/`, else `~/.local/vasmm68k_mot` |
 | `WHDLOAD` (make variable) | `~/.local/share/amiga/WHDLoad` (development headers) |
 | `NDK` (make variable) | `~/.local/opt/m68k-amiga-elf/sys-include` |
-| Shared runtime files | `~/.local/share/amiga`, defaults and overrides in [amiga/env.sh](amiga/env.sh) |
+| Shared runtime files | `~/.local/share/amiga`, installed by AmigaXDev (`make setup`); [amiga/env.sh](amiga/env.sh) sources its `env.sh` and sets this project's choices |
 | `FSUAE` | `fs-uae` on PATH |
 | `FSUAE_COMMON` | `~/.local/share/amiga/fsuae_common.sh` |
 | `GAME` | `tmp/game/LegendsOfValour` (use an absolute path when overriding) |
