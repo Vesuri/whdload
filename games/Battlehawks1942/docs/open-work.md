@@ -7,7 +7,7 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
 ## Done
 
 2026-10-06/07, first pass:
-- Repo, rules (`CLAUDE.md`), `tmp/` ignored; game, Kickstart, WHDLoad bytes and captures local only.
+- Repo, rules (`AGENTS.md`), `tmp/` ignored; game, Kickstart, WHDLoad bytes and captures local only.
 - Game, version, slave type and the slave's patches documented (profiling.md §1). The slave
   had no source: reconstructed byte-identically (`whdload/original/`).
 - A WHDLoad 20 KickEmu slave (`whdload/Battlehawks1942.s`) and a VERIFY build with an input
