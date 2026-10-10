@@ -246,8 +246,8 @@ additional presentation-kind diagnostic is inactive on this short route.
 
 The initial native RNG words differ (0x46fc A500, 0xa59c 030). Boost draws separate random
 heat increments for both engines. These checks validate cadence and decisions against each
-run's observed inputs, not temperature equality from unmatched random histories. Separating
-random-stream ownership and testing matched initial random state remain required.
+run's observed inputs, not temperature equality from unmatched random histories. The isolated boost stream below addresses heat ownership; matched-seed captures test its
+resulting temperature history separately from these earlier runs.
 
 `CUSTOM5=10` supplies sustained native dual-button boost at field 10, release at 700, and
 ends at 800; it writes no physics or temperature state. Its purpose is to exercise thermal
@@ -267,6 +267,65 @@ observed paused PAL fields, preserves five input events and all 15 brake events,
 retains the logical remainder. The pause verifier now checks engine entry and decision
 probes as well as control/orientation/resource probes. The run adds 78 clean staged
 comparisons with unchanged raster code. It does not cover pausing during an engine failure.
+
+### Boost random-state ownership
+
+Both native generators (`$53f6` and `$8ae6`) update the same word at `state+$62`, using
+`seed = (seed * $7ab7 + 1) mod 65536`. The former returns a shifted word; the latter
+scales its low 15 bits to the supplied bound. The shared stream includes boost heat
+(`$cfe4/$cff0`), failure audio (`$e0e4`), camera shake (`$100e6/$100f8`), rendered effects
+(`$16dec/$16e14`), and frame-counted effect generation (`$bcf0/$bd0c`). Scheduling heat
+alone therefore does not isolate it from unrelated random consumption.
+
+The explicit engine prototype now gives the two boost heat draws a private stream.
+It reuses native `$8ae6` with a temporary private seed field, then replays each original
+heat addition. Both return registers and arithmetic flags retain the native contract.
+The hook audit verifies the reused body touches only that seed and d0/d1; the native VBL
+handler establishes its own game-state base, so interrupt input does not use the temporary
+base. The private stream advances only when native boost requests heat. This deliberately
+changes the coupling between heat and the remaining shared random calls, while preserving
+the generator and heat distribution. Other gameplay and cosmetic consumers still need
+classification and separation; this is not complete RNG independence. Native control
+`$cef6` also has direct callers at `$fcea` and `$fec6` in incident handling, in addition
+to the scheduled main-loop call at `$ca74`. Those paths still need chronology/input
+ownership tests; isolating heat randomness does not by itself schedule every control call.
+
+At scheduler initialization the private seed copies the current native seed. A compile-only
+`TIMING_HEAT_SEED=0..65535` override provides repeatable tests; its default `-1` preserves
+natural initial variability. `PDHEAT02` marks the initialized live state and records initial seed, current seed and draw count.
+`tools/check_timing_heat.py` checks every observed seed/output against the native formula,
+consecutive draw counts and left/right order, and final state. Across matched-seed captures
+it compares consumption at equal logical timestamps; `--compare-engine` also requires
+identical temperature, damage, target-speed and propulsion histories. Reset/repair/mode
+lifecycle behavior remains part of the open transition audit.
+
+The fixed-seed build uses `TIMING_PERIODIC=1 TIMING_ORIENTATION=1 TIMING_INPUT=1
+TIMING_ENGINE=1 TIMING_HEAT_SEED=12345` and the `CUSTOM5=10` boost fixture. Capture 800
+fields from `$bc7c`, with heat probes `$cfec/$cff8`, engine probes `$de0a/$dfae/$dffc`,
+and presentation probes `$e0c0/$10d0c/$13514`. The frozen artifact is
+`Powerdrome-timing-heat2.slave`. `timing-heat2-a500` passes 96 consecutive heat draws,
+178 engine updates and both thermal failures. `timing-heat2-030-twins` independently
+passes 138 heat draws, 178 engine updates, both failures and 185 clean renderer twins.
+**The full matched-seed comparison fails:** the first 29 sampled engine states agree,
+including the first failure at logical time 2,610 ms. The next A500 engine state has
+speed 13 and temperatures 211/235, versus speed 369 and 204/228 on 030. At logical time
+2,700 ms the A500 consumes an extra heat pair outside the recorded logical engine update;
+the 030 consumes that pair at the following logical time. Incident/control chronology
+must be resolved before calling these histories equivalent. The strict checker retains
+this failure; passing per-run arithmetic and renderer checks do not override it.
+
+The 300-field `timing-heat2-incident-a500` repeat confirms the source: at field 128,
+`$fc9e` observes speed 407; `$fcea` observes speed zero and calls native `$cef6` while
+logical control is inactive. That extra boost pair precedes the next scheduled control.
+This happens before the queued failure flash, so flash duration alone does not explain
+the initial divergence. The repeat passes 96 random draws and 67 engine arithmetic
+updates. Incident calls, movement integration and collision outcomes must be assessed
+together; suppressing the extra random calls just to make the trace match would conceal
+the different gameplay event.
+
+The earlier `timing-heat1-a500` stopped
+before field measurement because its diagnostic did not distinguish the loaded state
+from a loader copy; it is not validation evidence.
 
 ### Native A500 fuel and joystick-response calibration
 

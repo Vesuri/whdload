@@ -62,3 +62,12 @@ for ins in body:
         targets=re.findall(r'\$([0-9a-f]+)',ins.op_str)
         assert targets and all(base+0xd26c<=int(t,16)<base+0xd382 for t in targets), 'Joystick branch leaves isolated body'
 print('Reused native joystick body has only local branches and the five private input fields')
+
+# Boost heat reuses the bounded native generator with only its seed redirected.
+body=list(m.disasm(bytes(code[0x8ae6:0x8b02]),base+0x8ae6))
+assert sum(i.size for i in body)==0x1c and body[-1].mnemonic=='rts'
+assert [i.mnemonic for i in body]==['move.w','muls.w','addq.w','move.w','andi.w','muls.w','asl.l','swap','move.w','rts']
+for ins in body[:-1]:
+    assert all(reg=='a6' for reg in re.findall(r'\ba[0-7]\b',ins.op_str)) and '(sp)' not in ins.op_str
+    assert all(int(off,16)==0x62 for off in re.findall(r'\$([0-9a-f]+)\(a6\)',ins.op_str))
+print('Reused native heat generator touches only its private seed and d0/d1')

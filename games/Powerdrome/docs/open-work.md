@@ -123,7 +123,12 @@ so response calibration is not complete. The explicit engine prototype now sched
 controls and defers failure presentation until drawing. Sustained-boost A500/030 runs each
 pass 178 logical updates, both thermal failures and all six ordered presentation events;
 the 030 adds 211 clean renderer comparisons. Engine calibration, random-stream ownership,
-repairs and other mode transitions remain open.
+repairs and other mode transitions remain open. Boost heating now has a private native RNG
+stream and an explicit fixed-seed test mode. Its A500/030 arithmetic checks pass, but the
+full matched-seed heat route fails equivalence after the first engine failure: an A500
+incident resets speed 407→0 and directly invokes controls outside the logical scheduler.
+The next priority is incident/control chronology and movement/collision integration; do
+not treat the passing engine arithmetic checks as full engine-history equivalence.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

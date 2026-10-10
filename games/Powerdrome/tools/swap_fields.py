@@ -83,12 +83,25 @@ if os.environ.get('TIMING_STATE') == '1':
                    (0x196,0x198,0x138,0x454,0xe4,0x194)]
         epvals.append(f'*(unsigned short*){ep+10:#x}')
         engine_sample='printf "PDENGINE_EVENT %d {off} ' + ' '.join(['%u']*len(epvals)) + '\\n", $pd_field, ' + ', '.join(epvals) + '\n'
+    heat=[m.start() for m in re.finditer(b'PDHEAT02',code)
+          if struct.unpack_from('>H',code,m.start()+8)[0]==1]
+    assert len(heat)<=1
+    heat_sample=''
+    if heat:
+        assert active_inputs
+        hp=a.base+heat[0]
+        hpvals=[f'*(unsigned int*){ip+12:#x}',f'*(unsigned int*){hp+16:#x}',
+                f'*(unsigned short*){hp+12:#x}', '$d0 & 65535',
+                f'*(unsigned short*){state+0x196:#x}',f'*(unsigned short*){state+0x198:#x}']
+        heat_sample='printf "PDHEAT_EVENT %d {off} ' + ' '.join(['%u']*len(hpvals)) + '\\n", $pd_field, ' + ', '.join(hpvals) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
         sample += input_sample.replace('{off}',hex(off))
         if off in (0xd9a0,0xde0a,0xdfae,0xdffc,0xe0c0,0x10d0c,0x13514):
             sample += engine_sample.replace('{off}',hex(off))
+        if off in (0xcfec,0xcff8):
+            sample += heat_sample.replace('{off}',hex(off))
         if off==0xd9a0:
             # Native resource result in d1 immediately before committing it.
             offsets=[0x194,0x1ba,0x458,0x45a,0x44e,0x450,0xe4,0x240]

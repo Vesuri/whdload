@@ -144,6 +144,12 @@ pl_periodic PL_START
  PL_PS $cf4e,timing_input_joy_down
  ENDC
  IFNE TIMING_ENGINE
+ ; TIMING_RANGE h0:$cfe4 8 bit=C3
+ PL_P $cfe4,timing_heat_left
+ PL_NOP $cfea,2
+ ; TIMING_RANGE h0:$cff0 8 bit=C3
+ PL_P $cff0,timing_heat_right
+ PL_NOP $cff6,2
  ; TIMING_RANGE h0:$de04 6 bit=C3
  PL_P $de04,timing_engine_present
  ; TIMING_RANGE h0:$dfae 8 bit=C3
@@ -223,6 +229,7 @@ timing_frame
  ENDC
  ENDC
  IFNE TIMING_ENGINE
+ bsr timing_heat_initialize
  ; Preserve all low counter bits, not only the original first-loop odd parity.
  move.w $60(a6),timing_control_phase-timing_state(a1)
  ELSE
@@ -455,6 +462,12 @@ timing_targets
  dc.w timing_input_after_modifiers+2-timing_targets
  ENDC
  IFNE TIMING_ENGINE
+ dc.l $8ae6
+ dc.w timing_heat_native_random+2-timing_targets
+ dc.l $cfec
+ dc.w timing_heat_after_left+2-timing_targets
+ dc.l $cff8
+ dc.w timing_heat_after_right+2-timing_targets
  dc.l $de0a
  dc.w timing_engine_native_entry+2-timing_targets
  dc.l $dfb6

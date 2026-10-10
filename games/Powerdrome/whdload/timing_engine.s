@@ -189,3 +189,65 @@ timing_engine_produced dc.l 0
 timing_engine_consumed dc.l 0
 timing_engine_overflow dc.l 0
 timing_engine_events ds.b 192
+
+; Heating owns a random stream independent of draw/effect calls. Reuse the native
+; bounded generator with a private a6 seed field; d0/d1 and CCR retain its contract.
+; A fixed seed is a compile-only test control, never the production default.
+ IFND TIMING_HEAT_SEED
+TIMING_HEAT_SEED = -1
+ ENDC
+ IFGT TIMING_HEAT_SEED-65535
+ FAIL "TIMING_HEAT_SEED must be -1 or an unsigned word"
+ ENDC
+ IFLT TIMING_HEAT_SEED+1
+ FAIL "TIMING_HEAT_SEED must be -1 or an unsigned word"
+ ENDC
+timing_heat_initialize
+ movem.l d0/a0,-(sp)
+ lea timing_heat_state(pc),a0
+ IFEQ TIMING_HEAT_SEED+1
+ move.w $62(a6),d0
+ ELSE
+ move.w #TIMING_HEAT_SEED,d0
+ ENDC
+ move.w #1,8(a0)
+ move.w d0,10(a0)
+ move.w d0,12(a0)
+ clr.l 16(a0)
+ movem.l (sp)+,d0/a0
+ rts
+
+timing_heat_left
+ bsr timing_heat_random
+ add.w d0,$196(a6)
+ bra.w timing_heat_after_left
+timing_heat_right
+ bsr timing_heat_random
+ add.w d0,$198(a6)
+ bra.w timing_heat_after_right
+
+timing_heat_random
+ move.l a0,-(sp)
+ lea timing_heat_state(pc),a0
+ addq.l #1,16(a0)
+ movea.l (sp)+,a0
+ move.l a6,-(sp)
+ lea timing_heat_seed(pc),a6
+ suba.w #$62,a6
+ bsr timing_heat_native_random
+ movea.l (sp)+,a6
+ rts
+
+timing_heat_native_random dc.w $4ef9
+ dc.l 0
+timing_heat_after_left dc.w $4ef9
+ dc.l 0
+timing_heat_after_right dc.w $4ef9
+ dc.l 0
+
+timing_heat_state dc.b 'PDHEAT02'
+timing_heat_initialized dc.w 0
+timing_heat_initial dc.w 0
+timing_heat_seed dc.w 0
+ dc.w 0
+timing_heat_calls dc.l 0
