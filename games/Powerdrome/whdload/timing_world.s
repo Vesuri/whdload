@@ -25,6 +25,10 @@ timing_world_initialize
  IFNE TIMING_WORLD20
  tst.w timing_pit_rebase-timing_world_state(a0)
  bne.s .seed_ready
+ move.l a0,-(sp)
+ lea timing_pit_opponent_state(pc),a0
+ clr.w 8(a0)
+ movea.l (sp)+,a0
  ENDC
  IFEQ TIMING_WORLD_SEED+1
  move.w $62(a6),d0
@@ -50,6 +54,7 @@ timing_world_begin
 .next
  IFNE TIMING_WORLD20
  bsr timing_world20_begin
+ bsr timing_opponent_flight_initialize
  ENDC
  moveq #0,d0
  move.w timing_control_phase(pc),d0
@@ -91,8 +96,12 @@ timing_world_opponents
  movem.l (sp)+,d0
  IFNE TIMING_WORLD20
  move.w #TIMING_WORLD_STEP,$21c(a6)
+ ; Practice has no opponent simulation; keep its previous end-of-step delta.
+ tst.w $be(a6)
+ beq.s .opponents_due_check
  bsr timing_world20_test_control
  beq.w timing_world_native_end
+.opponents_due_check
  ENDC
  move.w #TIMING_PERIOD,$21c(a6)
  tst.w $be(a6)

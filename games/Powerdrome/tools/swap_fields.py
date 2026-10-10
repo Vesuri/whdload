@@ -207,6 +207,8 @@ if os.environ.get('TIMING_STATE') == '1':
             ov += [f'*(unsigned short*){op+44:#x}']
             ov += [f'*(unsigned int*){op+x:#x}' for x in (48,52,56)]
             ov += [f'*(unsigned short*){state+0x21c:#x}',f'*(unsigned short*){wp+26:#x}',f'*(unsigned short*){state+0x62:#x}',f'*(unsigned int*){state+0x5e:#x}', '(unsigned int)$d0', '(unsigned int)$d7']
+            ov += [f'*(unsigned short*){op+x:#x}' for x in (64,66,132)]
+            ov += [f'*(unsigned short*){wp+8:#x}', f'*(unsigned int*){fast_worlds[0]+a.base+12:#x}', '(unsigned int)$d5']
             pit_opponent_sample='printf "PDPOPP_EVENT %d {off} ' + ' '.join(['%u']*len(ov)) + '\\n", $pd_field, ' + ', '.join(ov) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:

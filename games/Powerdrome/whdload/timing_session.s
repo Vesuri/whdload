@@ -12,6 +12,8 @@ timing_session_end
  bsr timing_pit_abort
  lea timing_pit_state(pc),a0
  clr.w 60(a0)
+ lea timing_pit_opponent_state(pc),a0
+ clr.w 8(a0)
  ENDC
  bsr timing_world_restore
  lea timing_state(pc),a1

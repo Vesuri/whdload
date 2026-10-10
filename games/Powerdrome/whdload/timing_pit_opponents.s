@@ -1,16 +1,29 @@
-; Modal scheduling at the native entry, preserving one native call frame.
-; Other callers retain the original body and its register/stack contract.
+; One opponent timeline across ordinary flight and same-session rescue pits.
+; Preserve the single native call frame, including nonlocal result exits.
 timing_pit_opponents
+ move.l a0,-(sp)
+ move.l perf_game(pc),a0
+ adda.l #$cedc,a0
+ cmpa.l 4(sp),a0
+ movea.l (sp)+,a0
+ beq.s .flight
  move.l a0,-(sp)
  move.l perf_game(pc),a0
  adda.l #$e3c0,a0
  cmpa.l 4(sp),a0
  movea.l (sp)+,a0
- bne.s .native
+ bne.w .native
  move.l d0,-(sp)
  move.w timing_pit_state+8(pc),d0
  movem.l (sp)+,d0
- beq.s .native
+ beq.w .native
+ bra.s .scheduled
+.flight
+ move.l d0,-(sp)
+ move.w timing_world_state+8(pc),d0
+ movem.l (sp)+,d0
+ beq.w .native
+.scheduled
  bsr timing_pit_opponent_allocate
  bsr timing_pit_opponent_test_due
  beq.s .no_update
@@ -47,19 +60,36 @@ timing_pit_opponent_test_due
  rts
 
 timing_pit_opponent_initialize
+ ; Entry changes clock source, not the existing deadline, phase or remainder.
+ move.l a0,-(sp)
+ lea timing_pit_opponent_state(pc),a0
+ addq.l #1,48(a0)
+ movea.l (sp)+,a0
+ rts
+
+timing_opponent_flight_initialize
  movem.l d0/a0,-(sp)
  lea timing_pit_opponent_state(pc),a0
+ tst.w 8(a0)
+ bne.s .done
+ tst.w $be(a6)
+ bne.s .done
  move.w #1,8(a0)
  clr.w 10(a0)
  clr.w 12(a0)
  clr.w 64(a0)
+ clr.w 66(a0)
  move.w timing_control_phase(pc),14(a0)
- move.l timing_pit_state+24(pc),d0
- move.l d0,16(a0)
- add.l #TIMING_PERIOD,d0
+ move.w 14(a0),132(a0)
+ move.l timing_world20_clock(pc),d0
  move.l d0,20(a0)
+ move.l d0,52(a0)
+ sub.l #TIMING_PERIOD,d0
+ move.l d0,16(a0)
  clr.l 24(a0)
- addq.l #1,48(a0)
+ clr.l 28(a0)
+ clr.l 32(a0)
+.done
  movem.l (sp)+,d0/a0
  rts
 
@@ -70,23 +100,26 @@ timing_pit_opponent_allocate
  bsr timing_pit_clock
  lea timing_pit_opponent_state(pc),a0
  tst.w 64(a0)
- beq.s .live_clock
- ; Drain only through the captured native pit-return instant. Time spent doing
- ; this work must not create an unbounded self-extending flush.
- move.l timing_pit_state+28(pc),d0
-.live_clock
- move.l d0,d1
- sub.l 16(a0),d1
- move.l d0,16(a0)
- add.l d1,24(a0)
- ; Convert each historical VBL deadline to the currently observed native epoch.
- tst.w 64(a0)
- bne.s .epoch_ready
+ bne.s .flush_clock
+ ; Native epoch is measured against physical time even when scheduling a
+ ; historical world deadline. Never subtract the delayed world cursor here.
  move.l perf_game(pc),a1
  move.l $f96(a1),d2
  sub.l d0,d2
  move.l d2,56(a0)
-.epoch_ready
+ move.w timing_world_state+8(pc),d1
+ beq.s .clock_ready
+ move.l timing_world20_clock(pc),d0
+ bra.s .clock_ready
+.flush_clock
+ ; Drain only through the captured native pit-return instant. Subsequent flight
+ ; allocations account for elapsed drain/return time using this same ledger.
+ move.l timing_pit_state+28(pc),d0
+.clock_ready
+ move.l d0,d1
+ sub.l 16(a0),d1
+ move.l d0,16(a0)
+ add.l d1,24(a0)
  clr.w 12(a0)
 .next
  cmp.l #TIMING_PERIOD,24(a0)
@@ -109,7 +142,12 @@ timing_pit_opponent_begin
  move.w #1,10(a0)
  move.l $5e(a6),40(a0)
  move.w $62(a6),44(a0)
+ clr.w 66(a0)
+ move.w timing_world_state+8(pc),d0
+ bne.s .rng_ready
+ move.w #1,66(a0)
  move.w timing_world_state+26(pc),$62(a6)
+.rng_ready
  moveq #0,d0
  move.w 14(a0),d0
  move.l d0,$5e(a6)
@@ -141,9 +179,13 @@ timing_pit_opponent_restore
  lea timing_pit_opponent_state(pc),a0
  tst.w 10(a0)
  beq.s .done
+ tst.w 66(a0)
+ beq.s .counter_only
  lea timing_world_state(pc),a1
  move.w $62(a6),26(a1)
  move.w 44(a0),$62(a6)
+.counter_only
+ clr.w 66(a0)
  move.l 40(a0),$5e(a6)
  clr.w 10(a0)
 .done
@@ -231,9 +273,11 @@ timing_pit_opponent_due dc.w 0
  dc.w 0 ; saved presentation RNG
  dc.w 0
  dc.l 0 ; visits initialized
- dc.l 0 ; reserved
+ dc.l 0 ; first ordinary-flight opponent deadline
  dc.l 0 ; native clock minus unpaused VBL clock at allocation
- dc.l 0 ; original E3C0 return address while modal update is active
+ dc.l 0 ; original native return address during a scheduled opponent call
 timing_pit_opponent_flushing dc.w 0
- dc.w 0
+ dc.w 0 ; owns a temporary presentation-to-world RNG swap
 timing_pit_opponent_saved ds.b 64
+ dc.w 0 ; initial opponent counter phase for this ordinary session
+ dc.w 0

@@ -61,7 +61,14 @@ for root in a.captures:
     moved=[v for off,v in world if off==0xcde2]
     ended=[v for off,v in world if off==0xcedc]
     assert len(ended)==len(finished) and all(v[3]==4 for v in moved), 'Movement used a non-20-ms interval'
-    assert all(v[3]==(18 if t[3] else 4) for v,t in zip(ended,finished)), 'Wrong opponent or movement interval at world end'
+    # A continuous opponent deadline no longer shares the player's control phase.
+    # Verify the actual multiplication consumers below and above; its scratch
+    # end-of-world delta is not a control-cadence signal.
+    opponent_ledger = [list(map(int, v.split())) for v in re.findall(
+        r'^PDPOPP_EVENT -?\d+ 0x[0-9a-f]+ (.+)$', log, re.M)]
+    independent_opponents = any(len(v) == 27 and v[0] for v in opponent_ledger)
+    if not independent_opponents:
+        assert all(v[3]==(18 if t[3] else 4) for v,t in zip(ended,finished)), 'Wrong opponent or movement interval at world end'
     opponents=[list(map(int,v.split())) for v in re.findall(r'^PDTIME_EVENT -?\d+ 0xd56c (.+)$',log,re.M)]
     if a.practice:
         config=json.loads((root/'configuration.json').read_text())

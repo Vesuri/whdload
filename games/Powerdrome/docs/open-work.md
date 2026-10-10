@@ -202,19 +202,25 @@ deadlines on return. Both 030 and A500 resume with one 20-ms step and zero debt 
 streams and logical cooling phase; the 030 passes 422 renderer twins. A500 explicitly
 discards seven assigned updates after a 100.58-second pit interval. All 1,052 sampled
 pre-pit world states match the failing reference. Native repair/audio time keeps advancing.
-The modal opponent prototype now schedules 90-ms updates with private RNG/counter
-ownership and logical repair/lap clock views, then drains the departure tail at return.
-The current 030 rescue capture verifies 737 updates over 66.36 seconds with 30 ms retained,
-2,948 fixed-delta movement samples, 682 outer-state restores and ten logical lap-gate
-clock results. Player reentry still has zero pit debt; 409 renderer comparisons pass.
-The verifier rejects an earlier implementation that omitted 19 departure-tail updates.
-The same artifact passes A500: 1,148 updates over 103.40 seconds, 80 ms residual,
-4,592 movement samples and 15 logical lap-gate clock results. The restart regression
-adds 232 clean twins (641 current-build twins total). The next handoff correction must
-carry the modal residual, elapsed flush/return time and opponent phase into an independent
-ordinary-flight deadline; the current flight path still shares player control cadence.
-Full opponent arrays, repair-clock cases, nonlocal exits, other pit paths and native
-calibration remain F6 work. Native repair/setup/
-presentation timing still makes whole pit visits CPU-dependent.
-Nonlocal pit exits and other pit-entry paths remain unverified. The final-build ordinary restart regression also passes two closures/reentries and
-232 renderer twins (654 final-build twins including rescue). The normal build is unchanged.
+The opponent prototype now carries an independent 90-ms deadline, phase and remainder
+from timed flight into rescue pits and back. Flight uses logical world time, pits use
+unpaused physical time, and native clock views follow the scheduled opponent deadline.
+The current 030 capture verifies the handoff: 100 ms after the pit cutoff becomes one
+90-ms update plus 10 ms residual, while the player resumes with no pit debt. It checks
+4,444 movement samples, 682 pit ownership restores, 659 resumed world counter restores
+and 32 logical lap-clock results. All 1,049 common pre-pit sampled player/engine/RNG states
+match the prior scheduler, and 416 renderer comparisons pass. The same artifact passes A500: 50 ms residual plus 200 ms after cutoff becomes two 90-ms
+updates plus 70 ms residual. Its checker validates 7,112 movement samples and 52 logical
+lap-clock results. Actual opponent multiplication operands already differ at the first
+common sampled update, so matching initial opponent state remains necessary for trajectory
+comparisons. The current restart regression passes two closures/reentries and 228 renderer twins.
+The pause regression excludes 48 fields, verifies 255 world steps and 224 opponent
+movement samples with zero outstanding debt, and adds 75 twins (719 current-build twins
+total). Full opponent arrays, repair-clock cases, initial setup,
+nonlocal exits, pause/epoch changes and native calibration remain F6 work. Native repair/
+setup/presentation timing still makes whole pit visits CPU-dependent.
+Nonlocal pit exits and other pit-entry paths remain unverified. The normal build is unchanged.
+Next, establish matching initial opponent state and complete-state probes, validate race
+opponent reinitialization (the restart fixture uses Practice), and calibrate native
+repair/setup/presentation durations; the passing deadline ledger does not close
+those F6/F7 requirements.
