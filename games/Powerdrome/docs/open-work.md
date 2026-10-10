@@ -259,8 +259,12 @@ Caller registers, flags, five-pilot ordering and cleanup pass on both CPUs. Play
 result modes and deferred-pit duration remain open. The forced-outcome test does not establish those requirements.
 The native A500 external-animation calibration now passes all 17 table steps and stack
 checks: nine 80-ms intervals, five 60-ms intervals and three 40-ms intervals, totaling
-1,140 ms through return. Next compare the faster CPU and implement elapsed deadlines
-for this sequence. Then extend complete-state comparison through
+1,140 ms through return. Unpaced 030 takes 820 ms. The WORLD20 prototype now paces
+this sequence using cumulative elapsed deadlines: 030 measures 1,120 ms and A500
+1,160 ms in PAL fields, both within one field of the native target at every boundary.
+The 030 guest-clock schedule matches exactly; A500 has at most 20 ms lateness. All
+17 positions and stack checks pass. The full initial-pit 030 regression is running.
+Then extend complete-state comparison through
 departure, repeat lifecycle regressions, and validate race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

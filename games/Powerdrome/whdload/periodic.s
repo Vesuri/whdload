@@ -136,6 +136,10 @@ install_periodic
  lea timing_retune_flags(pc),a0
  move.w #$42e7,(a0)
  ENDC
+ lea timing_external_step(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_external_flags(pc),a0
+ move.w #$42e7,(a0)
  lea timing_result_begin(pc),a0
  move.w #$42e7,(a0)
  lea timing_result_clock_d7(pc),a0
@@ -288,6 +292,12 @@ pl_periodic PL_START
  PL_P $d560,timing_retune_test_finish
  PL_NOP $d566,4
  ENDC
+ ; External pit sequence: native moves, then native MOVEM/DBRA loop tail.
+ ; TIMING_RANGE h0:$14764 6 bit=C3
+ PL_P $14764,timing_external_step
+ ; TIMING_RANGE h0:$1479e 8 bit=C3
+ PL_P $1479e,timing_external_end
+ PL_NOP $147a4,2
  ; Only ordinary result-duration accounting reads the logical winning instant.
  ; TIMING_RANGE h0:$c094 6 bit=C3
  PL_PS $c094,timing_result_clock_d7
@@ -821,6 +831,12 @@ timing_targets
  dc.l $d56c
  dc.w timing_retune_test_move+2-timing_targets
  ENDC
+ dc.l $14764
+ dc.w timing_external_loop+2-timing_targets
+ dc.l $1476a
+ dc.w timing_external_continue+2-timing_targets
+ dc.l $147a6
+ dc.w timing_external_return+2-timing_targets
  dc.l $e8d4
  dc.w timing_retune_native+2-timing_targets
  dc.l $1409a

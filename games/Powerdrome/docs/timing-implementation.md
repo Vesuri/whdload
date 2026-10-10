@@ -648,9 +648,43 @@ and compares candidate geometry against the no-fast-memory 68000 reference. The 
 are **nine × 80 ms, five × 60 ms, three × 40 ms**, including the final interval to
 return. Total first-movement-to-return is **1,140 ms**; first-to-last is **1,100 ms**.
 This establishes a position-dependent reference cadence rather than assuming the
-cockpit animation’s uniform 100 ms. Faster-CPU native comparison, timing acceptance
-and pacing implementation remain outstanding; this checker alone does not certify
-framerate independence.
+cockpit animation’s uniform 100 ms. The uncorrected 030 capture
+`timing-external-native-030` preserves the same table sequence and loop stack but takes
+**820 ms** through return (780 ms first-to-last), about **1.39 times as fast** as A500.
+All declared timing-hook bytes remain native in its initial and final snapshots.
+
+The full WORLD20 prototype now includes `timing_external.s`. Its `$14764` hook replays
+the native two position-loading instructions; `$1479e` restores the native saved loop
+registers, waits for the cumulative deadline, then reproduces DBRA and its terminal
+`$ffff` low word. All 17 draws and presentation calls remain native. The initial deadline
+comes from the physical native clock, with periods 16/12/8 clock units matching the
+measured 80/60/40 ms sequence. An overrun is retained rather than resetting the deadline
+from each observed completion. Caller registers, stack and condition flags are preserved.
+The wait is at the loop tail after native presentation; it controls the next position
+boundary and final return, not the exact scanout instant of the preceding draw.
+
+This remains an opt-in prototype under `CUSTOM3` and WORLD20; the normal build is
+unchanged. The paced 030 capture `timing-external2-030` preserves all 17 table steps
+and the loop stack. It observes **1,120 ms** through return in debugger PAL fields,
+with **1,140 ms** elapsed in the native CIA-derived clock: all subsequent field
+boundaries are one field early relative to A500, while clock deadlines match exactly.
+The clock changes in 20-ms units and is sampled at a different phase from the debugger’s
+VBL-entry breakpoint. The initial exact-field checker rejected this result; the revised
+`--require-cadence` gate explicitly checks both time sources and permits at most one
+PAL field (20 ms) at every boundary. It passes this capture and rejects the unpaced
+820-ms 030 capture. This is tighter than the frozen broader animation-response budget;
+it does not hide dropped positions or accumulated drift. The paced A500 capture
+`timing-external2-a500` also passes: **1,160 ms** through return, with all field and
+guest-clock boundary errors between zero and **+20 ms**. The first interval overruns
+by one field; subsequent deadlines retain that lateness instead of adding more delay.
+Both CPU runs preserve all 17 positions and the native loop stack. The 030 capture
+contains no staged scenes, so it is not evidence of renderer equivalence or throughput.
+Full pit/opponent lifecycle regression is running; other pit callers and rendering
+configuration coverage remain separate requirements.
+
+```sh
+python3 tools/check_external_departure.py --require-cadence tmp/prof/timing-external-native-a500 tmp/prof/timing-external2-030 tmp/prof/timing-external2-a500
+```
 
 
 `TIMING_DEPARTURE=1` builds a separate opt-in prototype with a 20-clock-unit / 100 ms

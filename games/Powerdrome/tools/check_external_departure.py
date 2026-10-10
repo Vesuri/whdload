@@ -44,18 +44,37 @@ def inspect(root):
           f'{(fields[-2]-fields[0])*20} ms first-to-last, '
           f'{(fields[-1]-fields[0])*20} ms first-to-return')
     print(f'  Per-step PAL intervals (ms: count): {dict(sorted(Counter(intervals).items()))}')
-    return positions, fields
+    clocks = [int(values.split()[0]) for _, _, values in re.findall(
+        r'^PDTIME_EVENT (-?\d+) (0x14764|0x147a6) (.+)$', text, re.M)]
+    assert len(clocks) == 18, 'Missing native clock boundary samples'
+    return positions, fields, clocks
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--require-cadence', action='store_true',
+                        help='Require native A500 cadence within one PAL field, checked against both fields and guest clock')
     parser.add_argument('reference', type=Path)
     parser.add_argument('captures', type=Path, nargs='*')
     args = parser.parse_args()
     config = json.loads((args.reference / 'configuration.json').read_text())
     assert config['CPU'] == '68000' and config['FAST_KB'] == '0'
     assert 'CUSTOM3=0' in config['WHD_ARGS'], 'Reference must disable timing corrections'
-    positions, _ = inspect(args.reference)
+    positions, reference_fields, _ = inspect(args.reference)
     for capture in args.captures:
-        actual, _ = inspect(capture)
+        actual, fields, clocks = inspect(capture)
         assert actual == positions, 'External departure geometry differs from reference'
+        if args.require_cadence:
+            target = [f-reference_fields[0] for f in reference_fields]
+            observed = [f-fields[0] for f in fields]
+            # The CIA clock is quantized at 20 ms and need not change at the
+            # debugger's VBL-entry breakpoint. Accept at most that one-field
+            # phase uncertainty, not the broader gameplay calibration budget.
+            field_errors = [(a-b)*20 for a, b in zip(observed, target)]
+            clock_errors = [(((c-clocks[0]) & 0xffffffff)*5)-f*20
+                            for c, f in zip(clocks, target)]
+            assert max(map(abs, field_errors)) <= 20, f'PAL boundary errors (ms): {field_errors}'
+            assert max(map(abs, clock_errors)) <= 20, f'Guest clock boundary errors (ms): {clock_errors}'
+            print(f'  All boundaries within one PAL field: field errors '
+                  f'{min(field_errors):+d}..{max(field_errors):+d} ms; '
+                  f'guest clock errors {min(clock_errors):+d}..{max(clock_errors):+d} ms')

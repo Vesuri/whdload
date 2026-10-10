@@ -213,6 +213,7 @@ timing_world_phase dc.w 0
  INCLUDE timing_session.s
 
  IFNE TIMING_WORLD20
+ INCLUDE timing_external.s
  INCLUDE timing_result.s
  INCLUDE timing_retune.s
  INCLUDE timing_pit.s
