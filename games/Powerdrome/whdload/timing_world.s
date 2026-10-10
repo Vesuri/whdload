@@ -11,6 +11,8 @@ TIMING_WORLD_SEED = -1
  ENDC
 timing_world_initialize
  movem.l d0/a0,-(sp)
+ lea timing_session_state(pc),a0
+ addq.l #1,8(a0)
  lea timing_world_state(pc),a0
  IFNE TIMING_WORLD20
  bsr timing_forces_initialize
@@ -129,9 +131,6 @@ timing_world_restore
  rts
 
 timing_world_session_gate
- IFNE TIMING_WORLD20
- bsr timing_world_input_disable
- ENDC
  bsr timing_world_restore
  move.w $43a(a6),d1
  cmp.w #4,d1
@@ -169,6 +168,8 @@ timing_world_state dc.b 'PDWORLD1'
  dc.w 0 ; persistent world RNG seed
  dc.w 0 ; initial world seed (test diagnostics)
 timing_world_phase dc.w 0
+
+ INCLUDE timing_session.s
 
  IFNE TIMING_WORLD20
  INCLUDE timing_world20.s

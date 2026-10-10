@@ -195,8 +195,8 @@ timing_key_state
  dc.w 0 ; +10 presentation pending
  dc.w 0 ; +12 movement's input-history cursor
 timing_key_modifiers dc.w 0 ; +14 historical Shift
- dc.w 0 ; +16 key queue read
- dc.w 0 ; +18 key queue write
+timing_key_read dc.w 0 ; +16 key queue read
+timing_key_write dc.w 0 ; +18 key queue write
  dc.l 0 ; +20 produced
  dc.l 0 ; +24 consumed
  dc.l 0 ; +28 overflow

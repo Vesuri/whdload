@@ -185,3 +185,12 @@ rescue deadlines and contact timing need paired logical-clock conversion. Blocki
 including a 200-ms sound shutdown outside the gameplay address range, must retain advancing
 physical time. The next F6 implementation step is the paired opponent repair clock after
 its callers and state lifecycle are audited; a global frozen-clock substitution is unsafe.
+
+The WORLD prototype now closes timing at `$c2aa`, after native ending animation and
+before menus. Early `$bf32` is not a reliable close point because it can resume gameplay.
+The input-only Practice restart route passes two closures and two new gameplay entries
+on both 030 (1,800 fields) and A500 (3,600 fields), with 228 clean 030 renderer twins.
+Menu/pit-setup time is excluded from new-session movement; queue ownership and deadlines
+start fresh. These runs have zero pending work at closure, so nonzero discard, interrupted
+steps, same-session pit return and rescue remain unverified. Native Shift-Q publication
+is still frame/mode dependent; this is lifecycle coverage, not matched full trajectories.

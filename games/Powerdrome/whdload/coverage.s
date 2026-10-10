@@ -108,6 +108,11 @@ coverage_vbl
 .normal_axes
  lea coverage_tape(pc),a2
  move.l custom5(pc),d0
+ cmp.l #12,d0
+ bne.s .not_sessions
+ lea coverage_session_tape(pc),a2
+ bra.w .tape
+.not_sessions
  cmp.l #11,d0
  bne.s .not_forces
  lea coverage_force_tape(pc),a2
@@ -275,6 +280,14 @@ coverage_tape
 
 ; On later pit visits, request native repairs before Space. No damage writes.
 coverage_pit_ready
+ move.l custom5(pc),d0
+ cmp.l #12,d0
+ bne.s .ordinary
+ moveq #0,d0
+ move.w pit_sent(pc),d0
+ subq.w #1,d0
+ rts
+.ordinary
  moveq #0,d0
  move.w cov_started(pc),d0
  beq.s .done
@@ -288,6 +301,16 @@ coverage_pit_ready
 .done
  rts
 coverage_pit_key
+ move.l custom5(pc),d0
+ cmp.l #12,d0
+ bne.s .ordinary
+ move.l a0,-(sp)
+ lea pit_sent(pc),a0
+ move.w #1,(a0)
+ move.l (sp)+,a0
+ moveq #32,d0
+ rts
+.ordinary
  moveq #0,d0
  move.w cov_started(pc),d0
  beq.s .done
@@ -531,4 +554,25 @@ coverage_force_tape
  dc.l 550
  dc.w 'z',0,0
  dc.l 700
+ dc.w -1,0,0
+
+; Quit and re-enter through native Practice menus. Inputs only.
+coverage_session_tape
+ dc.l 10
+ dc.w 'c',0,1
+ dc.l 40
+ dc.w 0,0,2
+ dc.l 60
+ dc.w 'q',2,2
+ dc.l 80
+ dc.w 0,0,0
+ dc.l 200
+ dc.w 'c',0,0
+ dc.l 1000
+ dc.w 'c',0,1
+ dc.l 1100
+ dc.w 'q',2,1
+ dc.l 1120
+ dc.w 0,0,0
+ dc.l 1700
  dc.w -1,0,0

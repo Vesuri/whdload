@@ -126,7 +126,7 @@ printf '%s\n' "$hunk" > "$OUT/game-base.txt"
 printf '%s\n' "$BASE" > "$OUT/dump-base.txt"
 if [ "${SWAP_ONLY:-0}" = 1 ]; then
   MARKER=${SWAP_MARKER:-0x1067e}
-  [[ "$WHD_ARGS" != *CUSTOM5=[23456789]* && "$WHD_ARGS" != *CUSTOM5=10* && "$WHD_ARGS" != *CUSTOM5=11* ]] || MARKER=${SWAP_MARKER:-0xbc7c}
+  [[ "$WHD_ARGS" != *CUSTOM5=[23456789]* && "$WHD_ARGS" != *CUSTOM5=10* && "$WHD_ARGS" != *CUSTOM5=11* && "$WHD_ARGS" != *CUSTOM5=12* ]] || MARKER=${SWAP_MARKER:-0xbc7c}
   python3 tools/swap_fields.py "$FIELDS" "$OUT" "$OUT/code.bin" "$BASE" --marker "$MARKER"
 else
 pd profile "$FIELDS" "$OUT/trace.bin" > "$OUT/capture.txt"

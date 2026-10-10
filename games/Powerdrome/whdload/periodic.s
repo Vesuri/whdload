@@ -94,6 +94,8 @@ install_periodic
  move.w #$42e7,(a0)
  lea timing_world_restore(pc),a0
  move.w #$42e7,(a0)
+ lea timing_session_end(pc),a0
+ move.w #$42e7,(a0)
  lea timing_world_end(pc),a0
  move.w #$42e7,(a0)
  ENDC
@@ -213,6 +215,9 @@ pl_periodic PL_START
  PL_NOP $bf38,2
  ; TIMING_RANGE h0:$bfb0 6 bit=C3
  PL_P $bfb0,timing_world_result_gate
+ ; Native cleanup call after the result animation and all its world updates.
+ ; TIMING_RANGE h0:$c2aa 6 bit=C3
+ PL_PS $c2aa,timing_session_finish
  ENDC
  IFNE TIMING_MOVE_CLOCK
  ; TIMING_RANGE h0:$ccee 8 bit=C3
@@ -674,6 +679,8 @@ timing_targets
  dc.w timing_world_after_session_gate+2-timing_targets
  dc.l $bfb6
  dc.w timing_world_after_result_gate+2-timing_targets
+ dc.l $17148
+ dc.w timing_session_native_cleanup+2-timing_targets
  ENDC
  IFNE TIMING_WORLD20
  dc.l $13514

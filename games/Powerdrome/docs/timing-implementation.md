@@ -238,8 +238,9 @@ at common mode destinations `$bf32/$bfb0`, covering known exits from rescue (`$c
 pit handling (`$f83c`), incident recovery (`$fe90`), opponent completion (`$d616`), lap
 completion (`$f9e6`) and related notification helpers (`$9234/$92c8`). Native local
 unwinds that return within a helper remain untouched. This is not an exhaustive
-transitive mode-exit audit or completed debt/input rebasing policy: an interrupted world
-update and its remaining scheduled work still need explicit lifecycle handling. Native
+transitive mode-exit audit. The session-completion cleanup below rebases ordinary new
+Practice sessions; interrupted world updates and their remaining scheduled work still
+need explicit lifecycle validation. Native
 incident animations and shared-clock readers also remain inside the region and require
 further decomposition.
 
@@ -991,6 +992,78 @@ Mode/menu initialization writes input fields at `$b6e4`, `$b714`, `$eab2`, `$ebd
 corrections, both-axis joystick input, held input at entry, queue wrapping/overflow and
 live input still require dedicated validation. The gameplay joystick toggle is at `$c946`.
 This is not a claim of complete input determinism or completed F5/F6.
+
+## Session completion and fresh entry
+
+| Boundary | Current prototype policy |
+| --- | --- |
+| Ordinary world update | Retain elapsed debt and input history; advance logical time only for completed updates |
+| Pause/resume | Exclude paused fields; retain fractional time, pending work and input chronology |
+| `$bf32` | Restore temporary world ownership; may return to gameplay, so do not close input or scheduler |
+| `$bfb0` | Restore world ownership and disable centering commands; retain timing for the native ending animation |
+| `$c2aa` after ending animation | Close timing and queue ownership before native cleanup and menus |
+| Next gameplay timing entry | Initialize from current unpaused time; do not replay the menu/pit-setup interval |
+| Rescue, same-session pit return and interrupted world updates | Full lifecycle policy/validation remains open |
+
+The WORLD prototype now closes its timing state at `$c2aa`, after native result/ending
+animation and before the original `$17148` cleanup call. `timing_session.s` restores
+world counter/RNG ownership, disables the VBL input/brake producer, clears allocated
+work and retained debt, resets input/brake queue ownership, and discards pending engine
+presentation. Centering publication is disabled. The next ordinary timing entry performs
+full initialization against the then-current unpaused VBL clock, including world/input
+cursor, fractional integration state, forces and per-session random seeds. Pause does
+not use this closure path; it retains its existing fractional-time/debt behavior.
+
+The closure cannot be placed at `$bf32` or `$bfb0`: `$bf32` can branch back to gameplay
+when `state+$43a > 4`, and the result path still calls `$ca3e` from the ending animation
+at `$c1b6`. Closing at the earlier gates made that animation initialize a second session
+and left input collection enabled through subsequent menus. The failed
+`timing-session1-030-twins` capture exposed this boundary mistake. The corrected build
+retains world restoration at the early gates, disables centering publication only at
+the actual result branch `$bfb0`, and closes the scheduler after the animation.
+
+`PDSESS01` records initialization and explicit closure counts, discarded assigned steps,
+unassigned clock units, queued inputs/centering keys/engine presentation events, and the
+last scheduler timestamp at closure. Counters are diagnostic and do not drive gameplay.
+`tools/check_timing_sessions.py` verifies before/after cleanup accounting, inactive
+menu/pit-entry samples and fresh world/input deadlines at reentry. It requires two
+closures and two later gameplay entries; one exit or a static menu cannot pass.
+
+The input-only `CUSTOM5=12` route exits Practice with native Shift-Q twice and re-enters
+through the ordinary menu and pit Space handling. Its first C command while outside
+gameplay is not queued for the next session. Unlike the longer repair-coverage route,
+it requests Space directly on subsequent pit visits, isolating session reentry from
+repair duration. Use 1,800 PAL fields on 030 or 3,600 on A500, the normal driving
+anchor/marker `$bc7c`,
+`TIMING_STATE=1`, and probes `$ca44 $ccee $c2aa $c2b0 $bf32 $bfb0 $12f6a $13cde`.
+
+The frozen `Powerdrome-timing-session2.slave` passes the 030/25 fast-planar twin run
+`timing-session2-030-twins`: two closures, two fresh gameplay entries, six inactive
+samples, and **228 clean completed renderer comparisons** with unchanged raster code.
+The new sessions start at fields 523 and 1,563. Each has exactly one initially due world
+step, zero retained allocator debt, world time equal to the fresh scheduler timestamp,
+and the next slow-input deadline 18 clock units later. The 8.34/8.38 seconds between the
+previous scheduler timestamps and these new entries are not replayed as movement.
+
+The same frozen artifact passes `timing-session2-a500-long` over 3,600 fields: two
+closures, two fresh entries and six inactive samples. A500 entries occur at fields
+1,455 and 2,899, with fresh world/input clocks and one initially due step. The excluded
+scheduler intervals are 26.08/26.06 seconds. The shorter 1,800-field A500 capture ended
+after the second closure but before reentry and is not counted as passing coverage.
+These captures verify the lifecycle independently on each CPU, not identical input
+trajectories: Shift-Q still uses the native keyboard queue, and the second A500 quit
+was published during pit setup and handled upon returning to gameplay. General keyboard
+ownership across modes remains open. The normal slave remains byte-identical to the
+preceding checkpoint; this cleanup is confined to the explicit WORLD prototype.
+
+The observed closures have no pending assigned work, input or engine messages; this
+route therefore validates lifecycle isolation and zero-work accounting, not nonzero
+discard paths. Unwinds in the middle of a world update, native pit return without session
+completion, rescue, repair clocks, qualifying/race transitions and title playback still
+need dedicated lifecycle tests. In particular, interrupted assigned steps before the
+ending animation must not silently disappear from diagnostics. The ending animation's
+own fixed frame count is also still a separate timing issue. No whole-game timer or
+mode-completeness claim follows from these two Practice restarts.
 
 ## Pause ownership
 
