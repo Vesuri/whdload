@@ -93,9 +93,12 @@ update order remain intact; a new scheduler or timestep policy was outside that 
 
 ## Proposed simulation timing work
 
-The user-observed speed difference on faster hardware is a separate open design problem.
-The [framerate independence analysis and plan](framerate-independence.md) maps the clamped
-movement timestep, per-frame gameplay work and mixed update/drawing paths. It proposes F1–F8:
-`timing-map`, `timing-baseline`, `tick-split`, `tick-clock`, `tick-behavior`, `timing-modes`,
-`timing-matrix` and `timing-release`. All are not started. The current request authorizes
-analysis and planning only; implementation awaits a separate instruction.
+The [framerate independence analysis and plan](framerate-independence.md) selects a smaller
+A500-calibrated approach first: lower the PAL movement minimum to 20 ms and move per-frame
+mutations to an elapsed-time cadence matching original A500 behavior. A logical base tick
+is 20 ms; each operation runs every measured N ticks or equivalent rational period,
+independently of drawing. This does not yet promise identical variable-step trajectories.
+
+F1–F8 are `timing-map`, `timing-baseline`, `delta-20`, `periodic-split`, `a500-cadence`,
+`timing-modes`, `timing-matrix` and `timing-release`. All are not started. The document
+revision changes no game code; the user has explicitly kept implementation on hold.

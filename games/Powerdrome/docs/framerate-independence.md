@@ -6,28 +6,41 @@ The completed renderer work remains unchanged. This is a separate proposed proje
 Powerdrome is not framerate independent. Its main movement uses elapsed time, but that
 elapsed time is clamped, and other gameplay operations advance once per rendered frame.
 Faster CPUs and the optional fast planar renderer therefore change more than smoothness.
-The recommended solution is a fixed simulation tick, independent of drawing and buffer
-presentation, with an explicit treatment of every gameplay side effect currently embedded
-in rendering, HUD work and the outer loop. Correcting the minimum timestep alone is an
-incomplete fix.
+The selected first approach is to lower the movement minimum to 20 ms on PAL and move
+frame-counted gameplay work onto a separate elapsed-time cadence calibrated against the
+original Amiga 500. Preserve the existing elapsed-time movement path initially. A complete
+fixed-step simulation remains a possible later step if this smaller approach cannot meet
+the measured gameplay-speed requirements.
 
 ## What success means
 
-For the same initial gameplay state, random seed and time-stamped input sequence, supported
-machines must produce the same authoritative game state at the same simulation tick,
-regardless of rendering speed, view or `CUSTOM1`. Over equal unpaused real time, simulation
-time must advance equally, within one tick of scheduling latency when the CPU can keep up.
+The immediate target is A500-paced movement, controls, resource consumption and effect
+lifetimes across supported hardware, with native or fast planar rendering. Measure these
+against matched original A500 routes over equal unpaused elapsed time. The A500 is the
+reference platform; its exact update rate varies with the scene, so calibration must use
+representative routes rather than assume a single original target FPS.
+
+Use a 20 ms logical base tick derived from elapsed time for scheduling frame-counted work.
+This is not a requirement to execute the entire movement simulation 50 times per second.
+Run each extracted periodic operation every N base ticks, using an A500-calibrated period
+that is identical across CPUs. Counting N rendered frames or N variable-duration movement
+calls would preserve the very dependency this change is meant to remove.
+
+The smaller approach does not promise bit-identical trajectories: movement and collisions
+still run at variable intervals and can differ through integration, integer rounding and
+input sampling. It must demonstrate matching real-time pace within explicit measured
+bounds. Identical authoritative state after every fixed movement tick remains the stronger
+acceptance criterion for a future full simulation split if needed.
 
 Authoritative state includes player and opponent positions, speed, orientation, collision
 and damage state, resources, race progression, gameplay random state and gameplay timers.
 Rendering scratch, bitmap pointers, displayed frames and purely visual animation state need
 not match. Smoothness and input-to-display latency can still differ across machines.
-A machine unable to sustain the simulation workload cannot be guaranteed real-time play;
-that capacity limit must be measured and reported rather than hidden by discarded time.
+A machine unable to sustain the required update workload cannot be guaranteed real-time play.
 
-This is a stronger requirement than the existing renderer twins. Those compare two drawing
-paths for the same scene input. The 30,623 successful comparisons establish drawing
-correctness, not matching gameplay trajectories across CPUs.
+This is stronger than the existing renderer twins. Those compare two drawing paths for the
+same scene input. The 30,623 successful comparisons establish drawing correctness, not
+matching gameplay pace across CPUs.
 
 ## Evidence and confidence
 
@@ -108,7 +121,7 @@ different acceleration responses. Similarly, a minimum resource decrement of one
 at least 10, 25 or 50 units per second at those invocation rates, when that branch remains
 active. These examples illustrate the mechanism; they are not complete driving models.
 
-### Why extracting a simulation tick is substantial work
+### Why extracting periodic gameplay work needs care
 
 The regular route mixes several responsibilities:
 
@@ -146,72 +159,83 @@ suppress whole functions that happen to contain drawing.
 
 | Approach | Advantages | Limitations | Decision |
 | --- | --- | --- | --- |
-| Remove or lower only the minimum delta | Small patch; directly addresses fast displacement | Leaves controls, resources, effects and randomness dependent on frames; large steps remain problematic | Useful diagnostic experiment, not completion |
-| Cap the entire loop at 25 Hz | Small containment measure for the lower clamp | Slower machines still update less often; limits smoothness; per-frame behaviors remain inconsistent | Not the requested solution |
-| Convert every operation to variable elapsed time | Can retain one update per drawing pass | Nonlinear control/decay, random events, integer truncation and collisions need different conversions; results still depend on integration step size | Possible, but harder to prove comprehensively |
-| Fixed simulation tick, independent rendering | Same update count/order and integer arithmetic per simulated second; clear replay checks | Requires separating interleaved code, input, effects and transitions | Recommended |
+| Lower only the minimum delta to 20 ms | Small change directly addressing fast displacement | Leaves frame-counted behavior dependent on drawing | First isolated experiment |
+| Lower minimum plus elapsed-time periodic updates | Retains native movement integration; restores A500-paced side effects without forcing the whole loop to one frequency | Needs careful extraction, calibration and event ordering; does not guarantee identical trajectories | Selected first approach |
+| Cap the entire loop | Small containment measure | Limits smoothness and remains inconsistent below the cap | Not selected |
+| Convert every operation algebraically to variable time | Can retain one update per draw | Nonlinear decay, rounding, random events and collisions require different conversions | Use only where justified by the audit |
+| Fixed movement simulation independent of rendering | Supports identical tick-by-tick integer state | Requires a broader separation of interleaved code and transitions | Escalation if the smaller approach fails its gates |
 
-Use one fixed tick duration across CPUs and renderer options. Do not pick a different rate
-based on hardware. Start the design investigation with **25 Hz / 40 ms** as a candidate:
-it matches the existing minimum step and is an integer eight game-clock units in PAL.
-This is a convenient candidate, **not proof of the intended original game speed**.
+## Selected architecture
 
-A500 rendering has varied around 10–16 fps in the existing routes; executing all unchanged
-per-loop operations at 25 Hz would speed some responses relative to those routes. Before
-freezing the rate, compare original A500 control response, resource consumption, impact
-recovery and race timing. Evaluate a lower common tick if necessary, or calibrate specific
-per-tick constants/counters to an agreed reference. Rates that do not divide the source
-clock need a rational accumulator, not a rounded interval that drifts. Do not select 50 Hz
-solely because PAL displays 50 fields per second; it doubles the update budget versus 25 Hz.
+### Movement minimum experiment
 
-The intended gameplay pace has no unique answer in a frame-dependent original. The proposal
-is to use the original A500 as the gameplay-feel reference, document unavoidable choices,
-and then make the selected behavior consistent across supported hardware.
+Change the minimum interval at `$7f7a` from eight to four native clock units for the tested
+PAL timing. Keep the existing maximum of 50 units in the first isolated experiment, so its
+effect can be measured independently. Do not replace every interval with four: a 100 ms
+frame still needs its measured 100 ms displacement interval. Record raw/used deltas and
+actual elapsed movement before claiming success. With the current PAL presentation wait,
+this covers movement rates up to 50 updates/s; verify the actual interval floor on each path.
 
-## Recommended architecture
+The native 250 ms maximum and next-frame delta lag remain limitations of this first step.
+Test stalls explicitly and report lost movement time. Do not call the result fully independent
+under arbitrary stalls. If normal supported gameplay exceeds that bound, the follow-up must
+retain movement time and safely subdivide movement/collisions, or adopt fixed movement ticks.
+No large unchecked movement step should be introduced just by deleting the upper clamp.
 
-### Separate timekeeping, simulation and presentation
+### A500 cadence for frame-counted operations
 
-Keep the native clock/input interrupt lightweight. Do not move physics into the VBL interrupt.
-A main-task scheduler samples a monotonic time source, accumulates unpaused elapsed time,
-runs due fixed ticks, and renders the most recent complete state when appropriate.
+Keep the native clock/input interrupt lightweight. A main-task scheduler converts raw
+unpaused elapsed time to logical 20 ms ticks with a retained remainder. Use raw elapsed time,
+not the clamped movement interval, and sample/account for each elapsed interval exactly once.
+Do not run gameplay in the interrupt and do not repeat drawing to service a due operation.
 
-The clock audit must distinguish hardware elapsed time, logical simulation time, race/event
-timers and presentation timestamps. Do not globally repurpose `$f96` before identifying all
-its readers, writers and pause adjustments. Simulation decisions based on deadlines must
-observe the time at the current logical tick during catch-up, not the same final wall-clock
-time for every overdue tick. Otherwise weather, rescue or opponent decisions can still
-vary with rendering cost despite a fixed movement delta.
+For example, a period of N=5 is 100 ms or 10 invocations/s; N=4 is 80 ms or 12.5/s;
+N=3 is 60 ms or about 16.67/s. These are examples, not selected A500 calibration values.
+Measure original per-operation counts and response curves on a stock A500 with native
+rendering. Choose the common cadence for operations formerly executed together, retaining
+their order and native once-per-two/every-sixteen-update subdivisions. Assign a different
+period only where the original timing or measurements justify it.
 
-Conceptual scheduler, not an implementation recipe:
+If the chosen A500 reference rate lies between integer N values, use a rational phase
+accumulator or an agreed nearby period after measuring the resulting error. Do not round a
+period independently each frame or choose N according to the current machine's FPS. Keep
+calibration constants fixed across hardware and document the reference routes and measured
+error, including resource consumption and time to reach target speed.
 
-```text
-sample elapsed unpaused time into accumulator
-while a complete tick is due and the per-pass work budget permits:
-    select held controls and queued edges for this tick
-    run exactly one gameplay tick with constant movement interval
-    advance logical tick/time and consume that interval
-    stop immediately on a mode transition
-if still behind:
-    service essential input/OS work and continue catch-up
-else if a presentation is due:
-    draw the latest completed state, update HUD imagery and present once
-else:
-    wait without advancing gameplay
-```
+Extract mutations, not entire mixed routines. Controls/resource changes/effect evolution
+run when due; HUD pixels, scene geometry and current control-state reads remain available
+when needed for movement or drawing. Code that computes collision inputs cannot simply be
+skipped because it shares a function with a periodic effect. Operations sharing state must
+keep a defined logical order, including during catch-up.
 
-A per-pass tick budget prevents an unresponsive unbounded loop; it must not silently discard
-the remaining elapsed time. Transient stalls should recover by reducing rendering. Sustained
-overload must be observable and must fail the real-time support gate for that configuration.
-Choosing time dilation or intentionally dropping time later would be an explicit compromise,
-not framerate independence. Blocking menus, disk loads and pause are mode boundaries with
-an explicit clock rebase, not ordinary stalls to replay as movement on return.
+At a 100 ms cadence, a 50 Hz renderer normally services one periodic update per five draws;
+a 10 Hz renderer services one per draw; a slower frame may owe more than one. Due updates
+must be counted and retained, not represented by a boolean that drops all but the first.
+For coupled operations, process due epochs in chronological order rather than running all
+resource changes first and all control changes afterward.
 
-At 25 Hz, a 50 Hz renderer may draw the same state twice. Start without interpolation;
-correctness is easier to establish that way. Optional interpolation can later improve
-smoothness using previous/current positions and orientation in presentation-only data.
-It must never feed interpolated values back into collisions, opponents or race logic.
-Native/faster rendering and full/inset/effect fallback must all consume the same tick state.
+This still leaves a coupling question: applying several historical speed changes and then
+moving the ship once at the final speed is not equivalent to advancing movement between
+those changes. Measure the resulting distance and control response. If it exceeds the A500
+matching bounds, split the elapsed movement interval at periodic-event boundaries, with
+matching input and collision handling. If that becomes a de facto full simulation split,
+use the stronger fixed-tick design rather than hide the increased scope.
+
+A work budget must not silently discard accumulated periodic updates. Pause, menus, loading
+and pit/session transitions need explicit stop/rebase rules so returning to play does not
+consume resources or apply a burst of old commands. Distinguish hardware elapsed time,
+logical periodic time, race timers and presentation timestamps. Audit `$f96` readers and
+writers before changing that shared clock; due-event decisions during catch-up must see
+the relevant logical instant rather than the same final wall-clock time for every event.
+
+### Fallback architecture if required
+
+If the smaller approach cannot produce A500-paced gameplay across rendering rates, extract
+a complete movement/gameplay tick from drawing. Choose its rate from A500 response and
+capacity measurements, not the existing clamp alone. A main-task accumulator then runs due
+complete ticks and draws the latest complete state independently. Full simulation requires
+explicit handling of the mixed routines and nonlocal exits mapped above. Optional visual
+interpolation is separate work and must not feed display positions back into gameplay.
 
 ### Input and random state
 
@@ -227,8 +251,10 @@ at equal ticks on different machines. Future deterministic tests need a tick-ind
 with exact mouse/button/modifier samples and declared handling of queue overflow.
 Use both deterministic replay tests and normal live-input checks.
 
-Inventory all `$53f6` callers and any other random generators. Gameplay random advancement
-must be identical for equal ticks. Move draw-triggered gameplay events to the tick, then
+Inventory all `$53f6` callers and any other random generators. Drawing must not consume the gameplay random stream. With the same gameplay events and
+inputs, periodic random advancement must match; variable-step collision differences can
+still produce different conditional events and must be measured. Move draw-triggered
+gameplay events to their scheduled cadence, then
 render their stored results. If cosmetic draws share the gameplay stream, cache the needed
 visual choices per tick or give presentation its own state after assessing compatibility.
 Simply restoring the seed after drawing is insufficient if drawing also mutates persistent
@@ -244,8 +270,8 @@ feedback and impulse decay belong to an audited time domain. Render-local save/r
 bookkeeping may remain per draw. Snapshot the state required by native fallback rendering
 without letting a fallback execute an extra gameplay update.
 
-Keep player, collision, opponent and post-update resource ordering stable within a tick
-until a deliberate change is validated. Handle race end, rescue, pit return and restart as
+Preserve the dependencies among player, collision, opponent and post-update resource work
+when moving periodic mutations; validate any deliberate change in their ordering. Handle race end, rescue, pit return and restart as
 explicit exits from ticking. Reset or carry accumulator, input queue, random state and
 periodic counters according to a documented transition table. Pause must not cause a burst
 of missed gameplay on resume. Pit/departure animations, title playback, repair timing and
@@ -268,47 +294,42 @@ Resource scaling must carry fractions rather than round every decrement upward o
 small decrements. Smaller movement steps also change integer division remainders and can
 alter the original trajectory; audit residual accumulation and calibrate against the chosen
 reference. Preserve explicit signedness, overflow and saturation behavior. At maximum speed,
-check that one tick cannot skip required collision or track-segment transitions. If collision
+check that one movement interval cannot skip required collision or track-segment transitions. If collision
 substeps are necessary, use the same deterministic subdivision rule on every CPU.
 
 ## Step by step implementation plan
 
-All steps below are **not started**. Each produces a reviewable result before the next gate.
-The shortcut names can be used to request a step. This plan authorizes no implementation.
+All steps below are **not started**. The plan uses the smaller A500-calibrated approach first.
+Implementation remains separate from the requested analysis and document revision.
 
 | Step | Shortcut | Deliverable and completion gate |
 | --- | --- | --- |
-| F1 | `timing-map` | Enumerate authoritative state writes, clock readers/writers, input consumption, RNG calls, render side effects and all update exits. Classify each by time domain. No reachable unknown gameplay mutation may remain on a supposedly draw-only path. |
-| F2 | `timing-baseline` | Add isolated measurement/replay tooling; capture equal-time state on 000/020/030/060 with native and fast rendering. Quantify clamp use, response/resource rates and update-only cost. Freeze reference behavior, tick duration and tolerance choices before production patches. |
-| F3 | `tick-split` | Separate update, mixed HUD/effect logic and presentation while retaining one tick per legacy loop for the first comparison. Prove the split alone preserves native state, call order and visible output on identical inputs; handle nonlocal exits explicitly. |
-| F4 | `tick-clock` | Add accumulator, logical clock, constant movement delta and render-independent scheduling. Demonstrate exact tick counts, no time loss on recoverable stalls, bounded debt, pause/rebase correctness and no extra buffer swaps. |
-| F5 | `tick-behavior` | Finish input event ownership, RNG separation, resource/control calibration, periodic counters, weather and audio/event ownership. Equal tick replay must give identical authoritative state across render cadences and views. |
-| F6 | `timing-modes` | Cover pit/departure, rescue, repairs, restart, qualifying/race transitions, title demo and menu timing. Document any deliberately excluded mode; do not claim whole-game independence with frame-driven animations left unaddressed. |
-| F7 | `timing-matrix` | Run correctness and real-time capacity matrix, native/fast renderer comparisons and long scenarios. Retain existing planar twin checks using one shared simulation tick. Meet the numerical gates below. |
-| F8 | `timing-release` | Final option/help text, diagnostics removal from release, memory and hook audit, disabled-mode equivalence, reproducible docs and commit. Keep timing mode opt-in until its support envelope is accepted. |
+| F1 | `timing-map` | Identify clock ownership, frame-counted mutations, shared counters, RNG calls, movement dependencies and exits. Classify which operations can be scheduled separately. |
+| F2 | `timing-baseline` | Capture original A500 response/resource/effect rates on representative routes and native/fast accelerated comparisons. Freeze target cadence, N or rational periods, and numerical matching tolerances. |
+| F3 | `delta-20` | Isolate the four-unit minimum change. Verify raw/used deltas and equal-time movement across CPUs, including rounding, zero/one-field intervals and retained upper-clamp limitations. |
+| F4 | `periodic-split` | Extract frame-counted mutations from drawing and shared helpers. Initially service them at their original invocation points to verify extraction without intentional timing changes. Preserve dependent computations and nonlocal exits. |
+| F5 | `a500-cadence` | Schedule extracted work on elapsed 20 ms base ticks with A500-calibrated periods, retained remainder/debt, ordered catch-up, input ownership and RNG separation. Measure speed-integration error and split movement intervals only where needed. |
+| F6 | `timing-modes` | Validate pause, pits, rescue, repairs, restart, qualifying/race transitions, weather, departure and title playback. Freeze or rebase timers explicitly; document any remaining frame-driven mode. |
+| F7 | `timing-matrix` | Meet A500-paced response/resource/effect and movement gates across CPUs and render rates; retain drawing twins. Quantify residual variable-step differences and stalls. Escalate to complete fixed simulation only if these gates cannot be met. |
+| F8 | `timing-release` | Independent opt-in timing option, disabled-mode equivalence, memory/hook checks, release isolation and reproducible documentation. State the measured support envelope and remaining limits. |
 
-F1 and F2 determine patch scope; F3 is the highest structural risk. F4 depends on F3 rather
-than attempting to repeatedly call the current combined routine. F5 may refine the split,
-so F3 equivalence checks must be rerun after such changes. F3 comparisons should replay the
-same captured native delta sequence and inputs in test builds: added wrapper overhead can
-change wall-clock deltas even before intentional timing changes. This isolates the split
-from incidental timing differences. F6 and F7 complete the claim;
-a passing straight-line movement demonstration alone does not finish this project.
+F1/F2 establish what to schedule and at what rate. F3 should produce an independently
+reviewable result before the broader extraction. F4 is the main structural risk. Compare
+its intermediate form using identical native delta sequences and inputs in test builds,
+because wrapper overhead itself can change wall-clock deltas. Reuse those checks after F5
+changes the scheduling. No new fixed-rate movement engine is presumed by this plan.
 
-This is a substantial reverse-engineering and compatibility task, not a clamp-only patch.
-The existing renderer and input harness reduce setup work, but do not supply the missing
-simulation boundary or a state-equivalence oracle. A reliable time estimate should follow
-F1/F2; the main uncertainty is how many hidden drawing and transition dependencies they
-expose. Progress should be reported as completed gates plus numbers, not a speculative
-percentage of the whole effort.
+Estimate remaining effort after the mutation map and A500 measurements. Report completed
+gates and measured errors rather than inventing a percentage or assuming all per-frame
+behavior is a safe counter to skip.
 
 ## Measurement and acceptance
 
 ### Required logs and comparisons
 
 Record hardware elapsed units, logical time/tick, raw delta, applied movement interval,
-accumulator debt, tick count per render, input events consumed, gameplay RNG state, simulation
-and rendering costs separately, and authoritative state after each tick. Count resource
+accumulator debt, base ticks and periodic invocations per render, input events consumed, gameplay RNG state, simulation
+and rendering costs separately, and authoritative state at movement/periodic boundaries. Count resource
 changes, collisions, opponent updates, weather events, mode transitions and audio triggers.
 Keep binary traces, memory dumps and screenshots under ignored `tmp/`.
 
@@ -316,8 +337,9 @@ Create an explicit state schema including opponent arrays and mutable gameplay d
 the main state block. Compare normalized values, not relocated pointers or all RAM. An
 excluded field needs a reason and a read/write audit proving it cannot influence later
 simulation. Hashes provide compact comparisons; on mismatch retain the first differing tick
-and a field-by-field snapshot. State parity should normally be exact between CPUs when
-using identical integer code and tick-indexed input; tolerance must not hide divergence.
+and a field-by-field snapshot. Extracted periodic routines should match exactly on identical input state and logical
+event sequences. Whole-world comparisons use the F2 bounds while movement remains variable
+step; publish trajectory differences rather than claiming exact cross-CPU state parity.
 
 The existing renderer twin must surround drawing only. It must never run resource updates,
 RNG-driven gameplay or simulation twice. A frozen logical state drawn natively or through
@@ -326,49 +348,48 @@ Compare at equal logical ticks, not equal rendered-frame indices or merely final
 
 ### Numerical gates
 
-- **Tick accounting:** at the proposed 25 Hz, 10 unpaused seconds require 250 ticks;
-  60 seconds require 1,500; ten minutes require 15,000. Define the initial boundary exactly.
-  A sampled endpoint can be less than one tick behind; a boundary-aligned replay must match
-  exactly. Revise these counts if F2 chooses another rate.
-- **Cross-CPU state:** identical authoritative state after every tick on the supported matrix,
-  with identical replay and seed. Check native and fast rendering separately and against
-  each other. Any intentional platform difference needs a narrowly defined exception.
-- **Render independence:** replay at controlled 10, 15, 25 and 50 presentations/s where
-  feasible, plus variable intervals and skipped drawing. These are test cadences, not
-  shipping frame caps. Tick state and gameplay events must match regardless of cadence.
-- **Stalls:** inject 100, 250 and 500 ms delays in a test build. Debt must be retained and
-  recovered without one giant movement step, duplicated input or skipped collision work.
-  Log recovery time and peak debt; pause is tested separately and must accumulate no debt.
-- **Capacity:** provisional target is average simulation utilization below 70% of the tick
-  interval, with no sustained increasing debt. For 25 Hz this leaves a 28 ms average
-  simulation budget and 12 ms reserve before drawing. Measure worst-case and high-percentile
-  cost as well; this proposed margin is not an achieved result or a guarantee of render FPS.
-- **Gameplay:** match the chosen baseline response/resource/time curves within tolerances
-  frozen in F2. Use scripted acceleration, braking, turns, engine failure, afterburner,
-  collisions, recovery, rescue, opponents and natural weather, not only constant-speed motion.
-- **Long runs:** at least ten minutes of matched tick replay, plus a complete native session
-  transition/restart and the existing coverage routes. Check timer/accumulator rollover with
-  isolated synthetic tests instead of waiting days for a live wrap.
-- **Compatibility:** timing-off behavior retains native update hooks and established captures;
-  `CUSTOM1=0/1`, fast allocation failure and unsupported scene fallbacks preserve the selected
-  timing mode. Normal build includes no deterministic input/seed fixture or debug capture.
+- **Base time:** 10, 60 and 600 unpaused seconds contain 500, 3,000 and 30,000 base ticks
+  of 20 ms. Preserve fractional time and define endpoint/initial phase precisely.
+- **Periodic accounting:** for integer N, the cumulative due count is the number of base
+  ticks divided by N, rounded down after accounting for the initial phase. With N=5,
+  10 seconds owes 100 invocations, regardless of drawing rate. Actual N comes from F2.
+  Rational periods need an equally explicit cumulative-count oracle.
+- **A500 match:** freeze numerical bounds for acceleration/braking curves, distance over
+  equal time, resource consumption and effect/impact-recovery durations from repeat baseline
+  measurements. Set bounds before evaluating the candidate, not after observing its error.
+  Report per-route results and natural A500 variation rather than claiming one universal FPS.
+- **Render independence:** use identical time-stamped controls at 10, 15, 25 and 50
+  presentations/s where feasible, variable intervals and both renderer settings. Compare
+  periodic counts exactly and gameplay response within the frozen bounds. Test steady speed
+  separately from acceleration, collisions, afterburner and engine failure.
+- **Stalls:** test 100, 250 and 500 ms delays. Periodic debt must remain accounted for,
+  without duplicated input or effects. Report the first experiment's lost movement time
+  above the retained 250 ms clamp. Strong stall independence requires safe subdivision or
+  the full simulation follow-up; it is not an achieved property of `delta-20`.
+- **Capacity:** measure extraction/scheduling cost and average/worst catch-up debt on every
+  supported CPU. Debt must not grow without bound during ordinary gameplay. Rendering can
+  slow, but target periodic rates must not silently become CPU-specific.
+- **Coverage:** repeat opponents, views, natural weather, collisions, rescue/pits, pause and
+  session transitions, including at least ten minutes and a restart. Test clock/phase wrap
+  with isolated synthetic cases. Drawing twins must still report zero mismatches.
+- **Compatibility:** timing-off behavior retains native hooks and established captures;
+  `CUSTOM1=0/1`, missing fast RAM and unsupported scene fallbacks all use the selected timing
+  policy. Deterministic replay and debug instrumentation remain absent from release builds.
 
-Start with PAL 68000/no-fast, 68000/fast, 020, 030/25, 040/25 and 060/50. If the 68000 cannot
-sustain the selected tick after drawing is decoupled, document that result before claiming
-support; do not silently lower its tick rate. If NTSC is supported, verify the actual TOD
-source frequency and use a region-independent duration conversion. Counting two VBLs is
-40 ms in PAL but about 33.3 ms in NTSC, so a VBL-count-only scheduler is insufficient for
-cross-region speed equality. Physical-board testing remains excluded as requested.
+Start with a stock PAL A500 reference, then 68000/fast, 020, 030/25, 040/25 and 060/50.
+Use the same A500-derived periodic cadence everywhere. If NTSC is supported, verify the
+actual TOD frequency and convert time appropriately: a 20 ms tick must not become one
+NTSC field (about 16.7 ms). Physical-board testing remains excluded as requested.
 
-## Decisions to resolve before implementation is accepted
+## Decisions to resolve from measurements
 
-1. Freeze the reference gameplay feel and global tick duration from F2 evidence. The current
-   proposal is A500-referenced behavior and a 25 Hz candidate, not an already approved balance.
-2. Choose which clock each existing deadline observes, especially during catch-up and pause.
-3. Finalize the overload/support policy based on measured update-only cost.
-4. Reserve the timing option independently of renderer and development fixture controls.
-5. Decide whether the first deliverable claims racing-only or whole-game timing independence.
-   F6 is required for the broader claim; optional visual interpolation can remain future work.
+1. Select representative original A500 routes and freeze the periodic reference cadence,
+   preserving native slower subdivisions. A500 is the chosen reference; N is not yet known.
+2. Classify which mutations can be separated safely and which need interleaved movement.
+3. Decide logical time ownership, pause/transition rules and input/event ordering.
+4. Reserve an independent timing option and publish the initial upper-clamp limitation.
+5. Judge the smaller approach against the frozen gameplay bounds before undertaking full
+   fixed-step simulation. Whole-game claims also require the animation/mode checks.
 
 No part of this plan requires a chunky renderer, new custom cache handling or changes to the
 validated planar raster algorithms. The essential change is who advances gameplay, how often,
