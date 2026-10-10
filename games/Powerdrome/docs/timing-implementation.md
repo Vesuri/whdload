@@ -624,19 +624,25 @@ logical lap-clock mapping. The corrected `timing-lap-reset-after-030` runs 2,000
 fields from the same native reset with frozen `Powerdrome-timing-lapreset1.slave`.
 It verifies one rebase, five native reset-loop visits, four unchanged opponent reset
 stamps, and eight subsequent lap-clock reads (minimum interval and completed-lap
-calculation for each of four opponents) in the rebased domain.
+calculation for each of four opponents) in the rebased domain. The corresponding
+`timing-lap-reset-after-a500` capture uses 68000, 512 KiB chip and 1,536 KiB slow memory
+with the same frozen slave and 2,000-field window. It passes the same checks. At its
+reset, logical elapsed time is 15,270 ms and the old mapping is **410 ms** behind the
+native shared reset, rather than the 030's 70 ms. These runs validate each clock reset;
+the different countdown/event histories do not prove matching trajectories.
 
 ```sh
 python3 tools/check_timing_lap_reset.py tmp/prof/timing-lap-reset-after-030
+python3 tools/check_timing_lap_reset.py tmp/prof/timing-lap-reset-after-a500
 ```
 
-Both captures use 68030/25, 2 MiB chip and 4 MiB fast memory, `CUSTOM1=1 CUSTOM3=1
+The 030 captures use 68030/25, 2 MiB chip and 4 MiB fast memory. All three use `CUSTOM1=1 CUSTOM3=1
 CUSTOM4=0 CUSTOM5=5 NoCache`, anchor `$dbd8` and probes `$dbde $dbe8 $dbee $dbf4 $cedc
 $d7fe $d86c $d7f0 $ca44 $bc44`, with early timing and opponent-state logging enabled.
 The frozen prototype uses the existing full WORLD20 flags and synchronized-pit test
 fixture. The normal build remains byte-identical; hook boundaries pass structural checks.
 
-A500 execution, guest-observed reset flags/registers, the alternate reset entry and
+Guest-observed reset flags/registers, the alternate reset entry and
 pause/rescue transitions remain to verify. The separate result-duration latch still uses
 the sampled native opponent clock domain; this lap rebase does not establish consistent
 race-result timing across changing native/VBL offsets. That shared result-clock mapping

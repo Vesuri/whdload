@@ -290,8 +290,9 @@ so no comparison field has been masked.
 The native mode-7 countdown reset now rebases the stable lap epoch at `$dbd8`, while
 preserving the native five-pilot and race-start reset. A 2,000-field 030 capture verifies
 one rebase, all five loop visits, four unchanged opponent reset stamps and eight subsequent
-lap-clock reads; it removes a measured 70-ms clock-domain mismatch. A500, alternate reset
-entry and guest flags/registers remain to verify. Pause/rescue/clock adjustments and total
+lap-clock reads; it removes a measured 70-ms clock-domain mismatch. The matching
+2,000-field A500 run passes the same reset/read checks and removes a 410-ms mismatch.
+Alternate reset entry and guest flags/registers remain to verify. Pause/rescue/clock adjustments and total
 result clocks still need coverage; the result latch uses a separate sampled clock mapping. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
