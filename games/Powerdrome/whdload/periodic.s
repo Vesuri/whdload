@@ -47,6 +47,17 @@ TIMING_WORLD = 0
  FAIL "TIMING_WORLD owns movement time; disable TIMING_MOVE_CLOCK"
  ENDC
  ENDC
+ IFND TIMING_WORLD20
+TIMING_WORLD20 = 0
+ ENDC
+ IFNE TIMING_WORLD20
+ IFEQ TIMING_WORLD
+ FAIL "TIMING_WORLD20 requires TIMING_WORLD"
+ ENDC
+TIMING_WORLD_STEP = 4
+ ELSE
+TIMING_WORLD_STEP = 18
+ ENDC
 ; Development-only staged extraction. Not included unless TIMING_PERIODIC=1.
 ; An 18-unit (90 ms) cadence is 11.111 Hz on PAL, near the measured A500 routes.
 TIMING_PERIOD = 18
@@ -65,9 +76,13 @@ install_periodic
  dbra d2,.fix
  move.l (4).w,a0
  btst #AFB_68010,AttnFlags+1(a0)
- beq.s .flags
+ beq.w .flags
  lea timing_frame(pc),a0
  move.w #$42e7,(a0)
+ IFNE TIMING_WORLD20
+ lea timing_world20_divide(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
  IFNE TIMING_WORLD
  lea timing_world_begin(pc),a0
  move.w #$42e7,(a0)
@@ -117,6 +132,26 @@ install_periodic
  movem.l (sp)+,d0-d2/a0-a2
  rts
 pl_periodic PL_START
+ IFNE TIMING_WORLD20
+ ; Preserve sub-step fractions in scalar and direction-vector integration.
+ ; TIMING_RANGE h0:$ccf6 8 bit=C3
+ PL_P $ccf6,timing_world20_divide
+ PL_NOP $ccfc,2
+ ; TIMING_RANGE h0:$cd32 8 bit=C3
+ PL_P $cd32,timing_world20_vectors
+ PL_NOP $cd38,2
+ ENDC
+ IFNE TIMING_WORLD20
+ ; TIMING_RANGE h0:$cde2 8 bit=C3
+ PL_P $cde2,timing_world20_age
+ PL_NOP $cde8,2
+ ; Gate repeated contact feedback/damage at the slow cadence, after geometry.
+ ; TIMING_RANGE h0:$fb64 6 bit=C3
+ PL_P $fb64,timing_world20_contact
+ ; TIMING_RANGE h0:$fb84 8 bit=C3
+ PL_P $fb84,timing_world20_damage
+ PL_NOP $fb8a,2
+ ENDC
  IFNE TIMING_WORLD
  ; TIMING_RANGE h0:$ccee 8 bit=C3
  PL_P $ccee,timing_world_movement
@@ -271,11 +306,11 @@ timing_frame
  add.l d1,timing_phase-timing_state(a1)
  clr.w timing_due-timing_state(a1)
 .again
- cmp.l #TIMING_PERIOD,timing_phase-timing_state(a1)
+ cmp.l #TIMING_WORLD_STEP,timing_phase-timing_state(a1)
  blo.s .accounted
  cmp.w #32,timing_due-timing_state(a1)
  bhs.s .accounted
- sub.l #TIMING_PERIOD,timing_phase-timing_state(a1)
+ sub.l #TIMING_WORLD_STEP,timing_phase-timing_state(a1)
  addq.w #1,timing_due-timing_state(a1)
  addq.l #1,timing_ticks-timing_state(a1)
  bra.s .again
@@ -337,6 +372,10 @@ timing_frame
 timing_orientation_again
  IFNE TIMING_WORLD
  bsr timing_world_begin
+ IFNE TIMING_WORLD20
+ bsr timing_world20_test_control
+ beq.w timing_orientation_move
+ ENDC
  ENDC
  IFNE TIMING_ORIENTATION
  ; The original first driving loop has odd parity. Advance by control updates, not draws.
@@ -585,6 +624,8 @@ timing_targets
  IFNE TIMING_WORLD
  dc.l $ccf6
  dc.w timing_world_after_multiply+2-timing_targets
+ dc.l $cedc
+ dc.w timing_world_native_end+2-timing_targets
  dc.l $ced8
  dc.w timing_world_opponent_call+2-timing_targets
  dc.l $cee2
@@ -595,6 +636,22 @@ timing_targets
  dc.w timing_world_after_session_gate+2-timing_targets
  dc.l $bfb6
  dc.w timing_world_after_result_gate+2-timing_targets
+ ENDC
+ IFNE TIMING_WORLD20
+ dc.l $ccfe
+ dc.w timing_world20_after_divide+2-timing_targets
+ dc.l $cd3a
+ dc.w timing_world20_after_vectors+2-timing_targets
+ dc.l $cdea
+ dc.w timing_world20_after_age+2-timing_targets
+ dc.l $cdf4
+ dc.w timing_world20_skip_age+2-timing_targets
+ dc.l $16f38
+ dc.w timing_world20_contact_sound+2-timing_targets
+ dc.l $fb6a
+ dc.w timing_world20_contact_continue+2-timing_targets
+ dc.l $fb8c
+ dc.w timing_world20_damage_continue+2-timing_targets
  ENDC
 timing_targets_end
 

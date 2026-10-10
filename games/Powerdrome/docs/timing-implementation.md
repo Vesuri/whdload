@@ -217,12 +217,73 @@ The current frozen build is `Powerdrome-timing-world6.slave`; the matched boost 
 world5, which differs in mode-exit cleanup. The pause route uses `CUSTOM5=8`, 300 fields,
 world/movement/opponent probes plus `$d058/$d9a0/$be12/$bef2`.
 
+### 20-ms world integration (`TIMING_WORLD20`)
+
+The next development stage adds `TIMING_WORLD20=1` to the complete-world build flags.
+Its world cursor advances four native clock units (20 ms) after each complete update.
+Controls, orientation, resources, engine decisions and opponents retain their 18-unit
+(90 ms) deadlines. A slow update runs on the first world boundary at or after its
+logical deadline, alternating 100/80 ms service intervals without cumulative drift.
+Input sampling still uses the ideal control timestamp. The 32-step outer-frame limit
+retains unassigned elapsed time; this is a work budget, not permission to discard debt.
+
+Geometric track/contact checks run every world step. The repeated contact feedback and
+fixed speed penalty at `$fb64`, damage accumulation at `$fb84`, and the `$288` age update
+at `$cde2` run only on slow-update steps. Their timing and collision coverage still need
+validation beyond the simple throttle/brake route.
+
+The scalar displacement division at `$ccf6` carries its signed remainder modulo 24.
+The three direction-vector shifts at `$cd32` carry remainders in 0..4095, preserving the
+native signed arithmetic-shift convention. This avoids repeatedly throwing away distance
+when movement is subdivided. Integrator remainders reset on world initialization;
+additional teleports and mode changes still need an explicit lifecycle audit.
+`PDW20T01` records the initialized flag, slow-update decision, world cursor and fast/slow
+counts. `PDW20I01` records the scalar and three axis remainders.
+
+`tools/check_timing_world20.py` independently checks continuous 20-ms world epochs,
+90-ms control deadlines, opponent intervals and the allocator's retained-time ledger.
+`tools/check_timing_integrator.py` reconstructs scalar and vector arithmetic from the
+initial remainder state and before/after guest probes. It rejects unexpected scalar
+changes (including wind); it is deliberately scoped to the no-wind test route. The
+existing native-movement checker remains unchanged for builds without these carries.
+
+The remainder-enabled 030 capture, `timing-world20-2-030-twins`, verifies 253
+complete movements, 506 remainder observations, 211 scalar carries and 298 axis carries.
+It has 56 slow updates, 224 opponent interval reads, no outstanding allocator debt or
+unfinished assigned steps at the endpoint, and 74 clean completed renderer twins with
+unchanged raster code. These instrumented runs establish correctness within the route,
+not rendering throughput or original-A500 distance calibration. The matched A500 run,
+`timing-world20-2-a500`, verifies 255 movements, 510 remainder observations, 213 scalar
+carries and 302 axis carries. All **253 common sampled player/engine/RNG states match**
+at equal world times across the two CPUs. Both have 56 identical fuel updates and all
+15 brake events, ending stopped with no outstanding movement debt. The two-step endpoint
+difference is retained explicitly; comparison covers only their common logical window.
+
+The matching pause regression, `timing-world20-2-pause-030-twins`, excludes 48 observed
+paused PAL fields and consumes five legitimate input edges without paused gameplay or
+leaked throttle. It verifies 255 movements, 510 remainder observations, 56 fuel updates,
+15 brake events, exact time accounting and 75 clean renderer twins. The pause verifier
+recognizes the live 20-ms world marker when selecting the scheduler period; its existing
+90-ms pilot regression still passes. No pending movement debt remains at either endpoint.
+
+The route uses `CUSTOM5=7`, 250 fields, the driving anchor `$bc7c`, and world/movement
+probes `$ccee/$cd2c/$cd3a/$cde2/$cedc`, plus `$d56c/$d058/$d9a0/$de0a/$dfae/$dffc/
+$fb64/$fb84/$fc9e`. Freeze the coverage build before restoring the normal slave. The
+normal build remains unchanged and excludes this stage.
+
+Falling displacement at `$cd5c–$cd60` and impulse displacement/decay at `$cd96–$cdc0`
+remain unscaled: neither path is exercised by this simple route. This stage is not yet
+safe to use as evidence of whole-game timing correctness. Wind arithmetic, mode clocks,
+incident presentation and the remaining calibration/matrix gates also remain open.
+
 ### Next extraction steps (`coupled-20`)
 
-1. Give the complete world its own 20-ms cursor and retained debt. Service controls and
+1. Implemented in the bounded `TIMING_WORLD20` prototype: give the complete world its
+   own 20-ms cursor and retained debt. Service controls and
    orientation at the calibrated 90-ms rational cadence, without advancing future inputs
    or applying all accumulated controls before movement. Draw only after complete updates.
-2. Keep movement and geometric contact/track checks together on that cursor. Split contact
+2. Implemented but collision coverage pending: keep movement and geometric contact/track
+   checks together on that cursor. Split contact
    detection from damage counters, fixed speed deductions and repeated sound/flash events;
    otherwise running collision code at 50 Hz would multiply those responses.
 3. Separate falling/impulse velocity integration from their 90-ms age/decay updates. Scale

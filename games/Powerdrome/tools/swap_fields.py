@@ -116,6 +116,29 @@ if os.environ.get('TIMING_STATE') == '1':
         wv += [f'*(unsigned short*){state+x:#x}' for x in
                (0x21c,0x194,0x11e,0x12c,0x12e,0x130,0x138,0x196,0x198,0x62)]
         world_sample='printf "PDWORLD_EVENT %d {off} ' + ' '.join(['%u']*len(wv)) + '\\n", $pd_field, ' + ', '.join(wv) + '\n'
+    fast_worlds=[m.start() for m in re.finditer(b'PDW20T01',code)
+                 if struct.unpack_from('>H',code,m.start()+8)[0]==1]
+    assert len(fast_worlds)<=1
+    fast_world_sample=''
+    if fast_worlds:
+        fp=a.base+fast_worlds[0]
+        fv=[f'*(unsigned {kind}*){fp+off:#x}' for off,kind in
+            ((12,'int'),(16,'int'),(20,'int'),(10,'short'))]
+        fv += [f'*(unsigned int*){ip+12:#x}',f'*(unsigned int*){state+0x1a2:#x}',
+               f'*(unsigned short*){state+0x1e0:#x}',f'*(unsigned short*){state+0xe4:#x}']
+        fast_world_sample='printf "PDW20_EVENT %d {off} ' + ' '.join(['%u']*len(fv)) + '\\n", $pd_field, ' + ', '.join(fv) + '\n'
+    integrators=[m.start() for m in re.finditer(b'PDW20I01',code)]
+    integrator_sample=''
+    if fast_worlds:
+        # The integrator follows PDW20T01 in this explicit prototype; choose the
+        # live copy in the same relocated slave, not an old loader buffer.
+        candidates=[pos for pos in integrators if 0<pos-fast_worlds[0]<2048]
+        if candidates:
+            assert len(candidates)==1
+            rp=a.base+candidates[0]
+            rv=[f'*(unsigned short*){rp+8:#x}']
+            rv += [f'*(unsigned int*){rp+off:#x}' for off in (12,16,20)]
+            integrator_sample='printf "PDR20_EVENT %d {off} ' + ' '.join(['%u']*len(rv)) + '\\n", $pd_field, ' + ', '.join(rv) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
@@ -137,10 +160,13 @@ if os.environ.get('TIMING_STATE') == '1':
                                (0x186,0x188,0x18a,0x12c,0x12e,0x130,0x1e0)]
             movement_values.append(f'*(unsigned int*){state+0x1a2:#x}')
             sample += 'printf "PDMOVE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(movement_values)) + '\\n", $pd_field, ' + ', '.join(movement_values) + '\n'
+        if off in (0xcd2c,0xcd3a):
+            sample += integrator_sample.replace('{off}',hex(off))
         if off==0xcd2c:
             sample += movement_clock_sample
         if off in (0xccee,0xcde2,0xcedc):
             sample += world_sample.replace('{off}',hex(off))
+            sample += fast_world_sample.replace('{off}',hex(off))
         if off==0xd9a0:
             # Native resource result in d1 immediately before committing it.
             offsets=[0x194,0x1ba,0x458,0x45a,0x44e,0x450,0xe4,0x240]

@@ -12,6 +12,13 @@ TIMING_WORLD_SEED = -1
 timing_world_initialize
  movem.l d0/a0,-(sp)
  lea timing_world_state(pc),a0
+ IFNE TIMING_WORLD20
+ clr.w timing_world20_initialized-timing_world_state(a0)
+ clr.w timing_world20_scalar_remainder-timing_world_state(a0)
+ clr.l timing_world20_vector_remainders-timing_world_state(a0)
+ clr.l timing_world20_vector_remainders+4-timing_world_state(a0)
+ clr.l timing_world20_vector_remainders+8-timing_world_state(a0)
+ ENDC
  IFEQ TIMING_WORLD_SEED+1
  move.w $62(a6),d0
  ELSE
@@ -33,18 +40,31 @@ timing_world_begin
  move.w $62(a6),24(a0)
  move.w 26(a0),$62(a6)
 .next
+ IFNE TIMING_WORLD20
+ bsr timing_world20_begin
+ ENDC
  moveq #0,d0
  move.w timing_control_phase(pc),d0
+ IFNE TIMING_WORLD20
+ bsr timing_world20_test_control
+ bne.s .phase_ready
+ subq.w #1,d0
+.phase_ready
+ ENDC
  move.l d0,$5e(a6)
  move.w d0,30(a0)
+ IFNE TIMING_WORLD20
+ move.l timing_world20_clock(pc),16(a0)
+ ELSE
  move.l timing_input_clock(pc),16(a0)
+ ENDC
  addq.l #1,20(a0)
  movem.l (sp)+,d0/a0
  move.w (sp)+,ccr
  rts
 
 timing_world_movement
- move.w #TIMING_PERIOD,$21c(a6)
+ move.w #TIMING_WORLD_STEP,$21c(a6)
  move.w $194(a6),d4
  muls.w $21c(a6),d4
  bra.w timing_world_after_multiply
@@ -57,14 +77,22 @@ timing_world_opponents
  move.w timing_world_phase(pc),d0
  move.l d0,$5e(a6)
  movem.l (sp)+,d0
+ IFNE TIMING_WORLD20
+ bsr timing_world20_test_control
+ beq.w timing_world_native_end
+ ENDC
  move.w #TIMING_PERIOD,$21c(a6)
  tst.w $be(a6)
  beq.w timing_world_opponent_call
- bra.w timing_world_end
+ bra.w timing_world_native_end
 
 timing_world_end
  move.w sr,-(sp)
  movem.l a0,-(sp)
+ IFNE TIMING_WORLD20
+ lea timing_world20_state(pc),a0
+ addq.l #4,12(a0)
+ ENDC
  lea timing_state(pc),a0
  subq.w #1,timing_orientation_left-timing_state(a0)
  movem.l (sp)+,a0
@@ -107,6 +135,8 @@ timing_world_result_gate
 
 timing_world_after_multiply dc.w $4ef9
  dc.l 0
+timing_world_native_end dc.w $4ef9
+ dc.l 0
 timing_world_opponent_call dc.w $4ef9
  dc.l 0
 timing_world_pre_render dc.w $4ef9
@@ -128,3 +158,7 @@ timing_world_state dc.b 'PDWORLD1'
  dc.w 0 ; persistent world RNG seed
  dc.w 0 ; initial world seed (test diagnostics)
 timing_world_phase dc.w 0
+
+ IFNE TIMING_WORLD20
+ INCLUDE timing_world20.s
+ ENDC

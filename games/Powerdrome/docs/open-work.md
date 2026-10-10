@@ -144,8 +144,15 @@ frame. The corrected A500/030 boost route matches all 55 common world/engine sta
 renderer comparisons. The common-exit cleanup build also passes 56 world updates through
 a 50-field pause, all 15 brake events and 77 clean twins. This is an extraction milestone,
 not the final physics rate.
-Next is `coupled-20`: 20-ms world movement, slower calibrated controls/damage/decay work,
-logical mode clocks and retained debt, then the full response/capacity/coverage matrix.
+`coupled-20` now has a development-only 20-ms world cursor with rational 90-ms controls,
+resources/engine and opponents. Scalar/vector division remainders preserve fractional
+movement. The matched A500/030 throttle/brake route passes all 253 common sampled world
+states, 56 fuel updates and 15 brake events, with no outstanding movement debt; the 030
+adds 74 clean renderer comparisons. Independent guest arithmetic probes verify both
+fractional carries. The pause route excludes 48 paused fields, preserves the time ledger
+and fractions, and adds 75 clean renderer comparisons. These routes have no falling or impulse activity: those displacements
+remain unscaled and are next, followed by collision coverage, logical mode clocks,
+mode/debt lifecycles and the full response/capacity/coverage matrix.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

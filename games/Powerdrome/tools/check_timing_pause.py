@@ -38,7 +38,12 @@ for root in a.captures:
     assert all(r['speed']==0 for r in rows if r['field']>=end),'Paused throttle leaked into resumed gameplay'
     before=periodic(root/'code.bin');after=periodic(root/'final-code.bin')
     elapsed=(after['last']-before['last'])&0xffffffff
-    ticks,phase=divmod(elapsed+before['phase'],18)
+    data=(root/'code.bin').read_bytes()
+    worlds=[m.start() for m in re.finditer(b'PDW20T01',data)
+            if struct.unpack_from('>H',data,m.start()+8)[0]==1]
+    assert len(worlds)<=1
+    step=4 if worlds else 18
+    ticks,phase=divmod(elapsed+before['phase'],step)
     assert after['phase']==phase and after['ticks']-before['ticks']==ticks,'Logical debt or fractional time was lost'
     assert (final['clock']-initial['clock'])&0xffffffff==(after['controls']-before['controls'])*18,'Unfinished or misaccounted control updates at endpoint'
     print(f'{root.name}: {pause["fields"]} paused PAL fields excluded; five input events; no paused gameplay or leaked throttle; logical remainder retained')
