@@ -21,6 +21,13 @@
 *** History			***
 ***********************************
 
+; 10-Oct-2026	- optional high frame rate support by Vesuri (CUSTOM1, off
+;		  by default): the 15 fps limit is removed, the cars and
+;		  the camera move smoothly between the game's ticks and
+;		  parts of the 3D view are drawn with the CPU where that is
+;		  faster than the blitter, it needs a 68020+ with the game
+;		  in fast memory, other machines run the original game
+
 ; 30-Apr-2022	- byte sized flag was passed as word sized flag when starting
 ;		  game, this caused the replay to work as intended
 ;		- all helper routines that are not used have been removed
@@ -108,7 +115,7 @@ HEADER	SLAVE_HEADER			; ws_security + ws_ID
 	IFD	DEBUG
 	dc.b	"DEBUG (do NOT release!) "
 	ENDC
-	dc.b	"Version 3.0 (30.04.2022)",0
+	dc.b	"Version 3.1 (10.10.2026)",0
 
 	CNOP	0,4
 
