@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verify carried scalar/vector fractions from independent guest movement probes.
 
-This oracle requires the no-wind route: unexpected scalar changes fail explicitly.
+This oracle requires the centering-off route: unexpected scalar changes fail explicitly.
 It verifies arithmetic and saved positions, not collision/fall/impulse timing.
 """
 import argparse
@@ -58,7 +58,7 @@ for root in a.captures:
             numerator = signed16(v[1]) * v[0] + remainder[0]
             quotient = (abs(numerator) // 24) * (-1 if numerator < 0 else 1)
             remainder[0] = numerator - quotient * 24
-            assert signed16(v[2]) == quotient, ('Scalar carry mismatch or unsupported wind adjustment', field, v[2], quotient)
+            assert signed16(v[2]) == quotient, ('Scalar carry mismatch or unsupported centering-field adjustment', field, v[2], quotient)
             scalar = v
             pending = (field, offset)
         elif off == 0xcd3a:

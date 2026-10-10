@@ -47,7 +47,7 @@ for root in a.captures:
     assert all(4<=r[2]<=50 for r in rows), 'Movement interval outside experimental clamp'
     incidents=[(int(f),off) for f,off in re.findall(r'^PDEVENT (-?\d+) (0x(?:fc9e|fcea|fec6))$',log,re.M)]
     before=[r for r in rows if not incidents or r[1]<incidents[0][0]]
-    print(f'{root.name}: {len(rows)} complete vector multiplications and saved positions verified; {len(modified)} wind/other scalar adjustments')
+    print(f'{root.name}: {len(rows)} complete vector multiplications and saved positions verified; {len(modified)} centering-field/other scalar adjustments')
     print(f'  Before first incident: {len(before)} movements, {sum(r[2] for r in before)*5} ms of applied intervals; incident probes {incidents}')
     if modified:print(f'  First scalar adjustments (field, nominal, actual): {modified[:3]}')
 

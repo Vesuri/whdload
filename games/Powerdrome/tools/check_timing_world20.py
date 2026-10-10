@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify 20-ms world steps, rational 90-ms controls, and their retained time debt."""
 import argparse
+import json
 from pathlib import Path
 import re
 import struct
@@ -17,6 +18,7 @@ def block(path, tag, initialized_offset, fmt, offset):
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('captures',type=Path,nargs='+')
+p.add_argument('--practice',action='store_true',help='Require the bounded CUSTOM5=3 practice route with no opponents')
 a=p.parse_args();histories=[]
 for root in a.captures:
     initial=block(root/'code.bin',b'PDW20T01',8,'>III',12)
@@ -48,7 +50,17 @@ for root in a.captures:
     assert len(ended)==len(finished) and all(v[3]==4 for v in moved), 'Movement used a non-20-ms interval'
     assert all(v[3]==(18 if t[3] else 4) for v,t in zip(ended,finished)), 'Wrong opponent or movement interval at world end'
     opponents=[list(map(int,v.split())) for v in re.findall(r'^PDTIME_EVENT -?\d+ 0xd56c (.+)$',log,re.M)]
-    assert opponents and all(v[2]==18 for v in opponents), 'Opponent updates escaped the slow cadence'
+    if a.practice:
+        config=json.loads((root/'configuration.json').read_text())
+        assert re.search(r'\bCUSTOM5=3\b',config['WHD_ARGS']) and int(config['FIELDS'])<=500
+        game=int((root/'game-base.txt').read_text(),0)
+        for name in ('chip.bin','final-chip.bin'):
+            data=(root/name).read_bytes()
+            assert struct.unpack_from('>H',data,game+0xa6e+0xbe)[0]!=0
+            assert struct.unpack_from('>h',data,game+0xa6e+0x340)[0]==-1
+        assert not opponents, 'Opponent movement occurred in the opponent-free practice route'
+    else:
+        assert opponents and all(v[2]==18 for v in opponents), 'Opponent updates escaped the slow cadence'
     # The frame allocator must retain everything it did not assign to world steps.
     old=block(root/'code.bin',b'PDTIME01',8,'>7I',12)
     new=block(root/'final-code.bin',b'PDTIME01',8,'>7I',12)

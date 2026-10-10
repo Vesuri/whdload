@@ -77,7 +77,7 @@ from collision response. `tools/check_timing_movement.py` does not interpret coo
 resets as distance or claim trajectory equivalence from correct multiplication.
 
 `timing-movement1-a500` and `timing-movement1-030-twins`, using the fixed-seed boost
-prototype, verify 32 and 56 complete movement calculations respectively, with no wind
+prototype, verify 32 and 56 complete movement calculations respectively, with no centering-field
 adjustment in this route. The first reset incident occurs at field 128 on A500 versus
 143 on 030. The extra incident control invocation follows that reset; it is not the
 first source of the differing trajectory.
@@ -244,7 +244,7 @@ counts. `PDW20I01` records the scalar and three axis remainders.
 90-ms control deadlines, opponent intervals and the allocator's retained-time ledger.
 `tools/check_timing_integrator.py` reconstructs scalar and vector arithmetic from the
 initial remainder state and before/after guest probes. It rejects unexpected scalar
-changes (including wind); it is deliberately scoped to the no-wind test route. The
+changes (including centering assistance); it is deliberately scoped to the centering-off route. The
 existing native-movement checker remains unchanged for builds without these carries.
 
 The remainder-enabled 030 capture, `timing-world20-2-030-twins`, verifies 253
@@ -271,10 +271,91 @@ probes `$ccee/$cd2c/$cd3a/$cde2/$cedc`, plus `$d56c/$d058/$d9a0/$de0a/$dfae/$dff
 $fb64/$fb84/$fc9e`. Freeze the coverage build before restoring the normal slave. The
 normal build remains unchanged and excludes this stage.
 
-Falling displacement at `$cd5c–$cd60` and impulse displacement/decay at `$cd96–$cdc0`
-remain unscaled: neither path is exercised by this simple route. This stage is not yet
-safe to use as evidence of whole-game timing correctness. Wind arithmetic, mode clocks,
-incident presentation and the remaining calibration/matrix gates also remain open.
+The simple throttle/brake route does not exercise falling or impulses. The separate
+force integration below extends this stage. Centering-field scalar arithmetic, mode
+clocks, incident presentation and the remaining calibration/matrix gates remain open;
+passing these bounded routes does not establish whole-game timing correctness.
+
+### Falling and impulse integration
+
+`timing_forces.s`, included only in `TIMING_WORLD20`, interprets the native fall and
+impulse increments as displacement per 90-ms epoch. Each eligible 20-ms movement step
+integrates four native time units. It splits a step at a local 18-unit age/decay boundary,
+using the old increment before that boundary and the new one afterward. Signed division
+remainders preserve sub-unit displacement. For example, an impulse of 90 units contributes
+20 units during each of its first four 20-ms steps; the fifth contributes 10 units before
+the boundary and 5 after the vector halves. Its first 100 ms therefore contribute 95 units.
+
+The fall hook at `$cd5c` retains the native engine/mode/age eligibility checks. It advances
+`state+$1a2` once per 90 ms of eligible falling, including the native signed-word doubling
+of age. The native special-case flag still decides whether falling can continue above age
+50. Initialization and repair writes at `$b390/$c59e` clear the corresponding local phase
+and fractional remainder. Ineligible time does not accrue falling age.
+
+The impulse body at `$cd96–$cdc0` integrates all three components, then advances its age
+and performs the native signed halves at each 90-ms boundary. It preserves the native
+expiry comparison and ceases integrating immediately when the impulse expires, even if
+that boundary falls inside a 20-ms step. New centering-field impulses at `$adba` and close
+opponent-contact impulses at `$9c8c` reset their local phase/remainders. Continuous
+centering can refresh the vector before expiry, as in the original code.
+
+The field at `state+$d2`, and the related forward-speed reduction at `$cd00–$cd2a`, are
+**centering assistance**, not wind. The C-key handler at `$c8b0` changes its strength and
+shows the native centering-field message; `$ca56` calls the impulse constructor. Weather
+and this input-selected assistance must not be conflated when calibrating forces.
+
+`PDW20F01` records phases, signed remainders, initialization counts and fall/impulse
+step/age counts. Read-only entry/exit probes feed `tools/check_timing_forces.py`, whose
+reference advances one native 5-ms unit at a time rather than following the guest's
+boundary-split chunks. `--require fall` or `--require impulse` requires actual activity;
+an uneventful route cannot pass. It checks displacement, ages, phases, remainders, native
+reset effects and the sampled preserved registers/stack.
+
+The corrected failure-route captures `timing-forces2-a500` and
+`timing-forces2-030-force-twins` cover 500 PAL fields with `CUSTOM5=10`. They verify 181/178
+fall steps and 40/39 age advances respectively. All **501 common sampled world states
+match** across CPUs, including position, speed, temperatures, damage and world RNG.
+The captures complete 504/501 world updates, with no unassigned or assigned movement debt
+at either endpoint. The 030 has 98 clean renderer twins and unchanged raster code.
+These runs do not reach the age-50 boundary or native fall-reset paths.
+
+The centering route (`CUSTOM5=3`) verifies 490/495 impulse steps, 54/55 decays and
+109/110 native centering resets on A500/030 respectively. The 030 adds 143 clean renderer
+twins. Impulse component ranges are X=0, Y=−2..0, Z=0: this establishes negative vertical
+fraction/decay handling, not nonzero horizontal forces or a complete unrefreshed lifetime.
+The verifier reports these ranges and zero expiries explicitly; `--require-three-axes`
+and `--require-expiry` remain stronger gates for subsequent routes. Close opponent-contact
+initialization and native fall-reset paths are also still unexercised.
+
+This practice route has no opponents. `check_timing_world20.py --practice` explicitly
+requires the bounded `CUSTOM5=3` route, at most 500 fields, native practice/no-opponent
+state in both snapshots, and zero opponent movement observations. Its default mode still
+requires active opponent interval coverage. The individual time ledgers pass with 498/503
+complete world steps and no outstanding movement debt.
+
+**The centering CPU-equivalence gate fails.** At common world index 5, logical time
+120 ms, the A500 position Z is 13720 and 030 Z is 13752, despite equal speed, direction
+and prior position. The corresponding movement probes show forward increments 28 versus
+60. The native `$cd00–$cd2a` path reads live centering state and the global Shift modifier,
+including an extra right shift of the scalar at `$cd2a`. This matches the observed
+15→7 scalar/60→28 displacement reduction. The native C-key handler changes centering
+outside the world scheduler; its effects become visible at different world boundaries.
+The arithmetic oracle passes each observed input state, but that does not establish equal
+input chronology. Keyboard-controlled centering state and movement-time modifiers need
+historical simulation-time ownership before this route can pass equivalence. Preserve
+this failed pair as regression evidence rather than relaxing the comparison.
+
+Incident presentation can overwrite the shared movement delta. The world wrapper now
+restores it on the no-opponent fast-step path as well as before slow opponent updates.
+The earlier force trial failed the strict end-of-world interval check and is not used as
+evidence that this ownership invariant held. The corrected runs pass it unchanged.
+
+The frozen artifact is `Powerdrome-timing-forces2.slave`. Use the WORLD20 build flags,
+500 fields, driving anchor `$bc7c`, and probes `$ccee/$cde2/$cedc/$d56c/$cd5c/$cd64/
+$cd96/$cdc4/$b390/$b398/$c59e/$c5a6/$9c8c/$9c92/$adba/$adc0`. This probe set fits the
+emulator breakpoint capacity; an earlier larger set was rejected before any measured
+field and is not a valid capture. Instrumented runs are correctness evidence, not FPS
+benchmarks. The normal build still excludes this prototype.
 
 ### Next extraction steps (`coupled-20`)
 
@@ -286,7 +367,8 @@ incident presentation and the remaining calibration/matrix gates also remain ope
    checks together on that cursor. Split contact
    detection from damage counters, fixed speed deductions and repeated sound/flash events;
    otherwise running collision code at 50 Hz would multiply those responses.
-3. Separate falling/impulse velocity integration from their 90-ms age/decay updates. Scale
+3. Implemented in the force prototype, with coverage/calibration still pending: separate
+   falling/impulse velocity integration from their 90-ms age/decay updates. Scale
    displacement and retain integer remainders; scheduling the counters alone is insufficient.
    Keep opponents on their measured logical cadence while auditing incidental callers.
 4. Assign logical versus display time to shared-clock reads and all mode exits. Decompose

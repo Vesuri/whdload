@@ -13,6 +13,7 @@ timing_world_initialize
  movem.l d0/a0,-(sp)
  lea timing_world_state(pc),a0
  IFNE TIMING_WORLD20
+ bsr timing_forces_initialize
  clr.w timing_world20_initialized-timing_world_state(a0)
  clr.w timing_world20_scalar_remainder-timing_world_state(a0)
  clr.l timing_world20_vector_remainders-timing_world_state(a0)
@@ -78,6 +79,7 @@ timing_world_opponents
  move.l d0,$5e(a6)
  movem.l (sp)+,d0
  IFNE TIMING_WORLD20
+ move.w #TIMING_WORLD_STEP,$21c(a6)
  bsr timing_world20_test_control
  beq.w timing_world_native_end
  ENDC

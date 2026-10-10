@@ -133,6 +133,22 @@ install_periodic
  rts
 pl_periodic PL_START
  IFNE TIMING_WORLD20
+ ; TIMING_RANGE h0:$cd5c 8 bit=C3
+ PL_P $cd5c,timing_fall_step
+ PL_NOP $cd62,2
+ ; Replace the bounded impulse body: no interior native branch remains live.
+ ; TIMING_RANGE h0:$cd96 46 bit=C3
+ PL_P $cd96,timing_impulse_step
+ PL_NOP $cd9c,40
+ ; Native initialization/repair writes reset the matching local fractions.
+ ; TIMING_RANGE h0:$b390 8 bit=C3
+ PL_PSS $b390,timing_fall_reset,2
+ ; TIMING_RANGE h0:$c59e 8 bit=C3
+ PL_PSS $c59e,timing_fall_reset,2
+ ; TIMING_RANGE h0:$9c8c 6 bit=C3
+ PL_PS $9c8c,timing_impulse_random_start
+ ; TIMING_RANGE h0:$adba 6 bit=C3
+ PL_PS $adba,timing_impulse_field_start
  ; Preserve sub-step fractions in scalar and direction-vector integration.
  ; TIMING_RANGE h0:$ccf6 8 bit=C3
  PL_P $ccf6,timing_world20_divide
@@ -638,6 +654,10 @@ timing_targets
  dc.w timing_world_after_result_gate+2-timing_targets
  ENDC
  IFNE TIMING_WORLD20
+ dc.l $cd64
+ dc.w timing_fall_continue+2-timing_targets
+ dc.l $cdc4
+ dc.w timing_impulse_continue+2-timing_targets
  dc.l $ccfe
  dc.w timing_world20_after_divide+2-timing_targets
  dc.l $cd3a

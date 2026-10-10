@@ -1,5 +1,5 @@
 ; Development stage: 20-ms movement with 90-ms controls/orientation/resources.
-; Falling and impulse displacement integration remains a separate extraction.
+; Falling and impulse integration is in timing_forces.s.
 timing_world20_begin
  movem.l d0-d1/a0,-(sp)
  lea timing_world20_state(pc),a0
@@ -119,3 +119,5 @@ timing_world20_integrator dc.b 'PDW20I01'
 timing_world20_scalar_remainder dc.w 0
  dc.w 0
 timing_world20_vector_remainders ds.l 3
+
+ INCLUDE timing_forces.s

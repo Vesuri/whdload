@@ -139,6 +139,22 @@ if os.environ.get('TIMING_STATE') == '1':
             rv=[f'*(unsigned short*){rp+8:#x}']
             rv += [f'*(unsigned int*){rp+off:#x}' for off in (12,16,20)]
             integrator_sample='printf "PDR20_EVENT %d {off} ' + ' '.join(['%u']*len(rv)) + '\\n", $pd_field, ' + ', '.join(rv) + '\n'
+    force_sample=''
+    if fast_worlds:
+        forces=[m.start() for m in re.finditer(b'PDW20F01',code)
+                if 0<m.start()-fast_worlds[0]<4096]
+        if forces:
+            assert len(forces)==1
+            force=a.base+forces[0]
+            fv=[f'*(unsigned int*){fp+12:#x}']
+            fv += [f'(unsigned int)${reg}' for reg in ('d0','d5','d6','d7','sp')]
+            fv += [f'*(unsigned int*){state+0x1a2:#x}']
+            fv += [f'*(unsigned short*){state+x:#x}' for x in
+                   (0xe4,0x43a,0x24c,0x1e0,0x1e6,0x1e4,0x1da,0x1dc,0x1de)]
+            fv += [f'*(unsigned short*){force+x:#x}' for x in (8,10,12,14,16,18)]
+            fv += [f'*(unsigned int*){force+x:#x}' for x in (20,24,28,32,36)]
+            fv += [f'*(unsigned short*)*(unsigned int*){r["game"][0]+0x5ca:#x}']
+            force_sample='printf "PDFORCE_EVENT %d {off} ' + ' '.join(['%u']*len(fv)) + '\\n", $pd_field, ' + ', '.join(fv) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
@@ -167,6 +183,8 @@ if os.environ.get('TIMING_STATE') == '1':
         if off in (0xccee,0xcde2,0xcedc):
             sample += world_sample.replace('{off}',hex(off))
             sample += fast_world_sample.replace('{off}',hex(off))
+        if off in (0xcd5c,0xcd64,0xcd96,0xcdc4,0xb390,0xb398,0xc59e,0xc5a6,0x9c8c,0x9c92,0xadba,0xadc0):
+            sample += force_sample.replace('{off}',hex(off))
         if off==0xd9a0:
             # Native resource result in d1 immediately before committing it.
             offsets=[0x194,0x1ba,0x458,0x45a,0x44e,0x450,0xe4,0x240]

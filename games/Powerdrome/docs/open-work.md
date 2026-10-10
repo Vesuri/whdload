@@ -150,9 +150,17 @@ movement. The matched A500/030 throttle/brake route passes all 253 common sample
 states, 56 fuel updates and 15 brake events, with no outstanding movement debt; the 030
 adds 74 clean renderer comparisons. Independent guest arithmetic probes verify both
 fractional carries. The pause route excludes 48 paused fields, preserves the time ledger
-and fractions, and adds 75 clean renderer comparisons. These routes have no falling or impulse activity: those displacements
-remain unscaled and are next, followed by collision coverage, logical mode clocks,
-mode/debt lifecycles and the full response/capacity/coverage matrix.
+and fractions, and adds 75 clean renderer comparisons. Falling and impulses now integrate
+20-ms displacement with signed remainders and exact local 90-ms age/decay boundaries.
+The ten-second A500/030 failure route matches 501 common sampled world states; independent
+arithmetic checks pass 181/178 falling steps, and the 030 adds 98 clean renderer comparisons.
+The centering route passes 490/495 impulse steps and 109/110 native resets, with another
+143 clean twins, but only small negative vertical impulses are covered. Horizontal forces,
+full impulse expiry, fall limit/reset and opponent-contact generation remain untested.
+The centering CPU-equivalence comparison fails at logical 120 ms: live C-key/Shift state
+reduces movement on different world boundaries. Historical ownership of these keyboard
+changes and movement modifiers is now an explicit prerequisite, followed by collision
+coverage, logical mode clocks, mode/debt lifecycles and the full calibration/capacity matrix.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.
