@@ -2,8 +2,9 @@
 
 Status: implementation in progress. The isolated 20 ms correction and a development-only
 control/orientation/resource cadence prototype are built; the separate brake cadence retains
-all owed input events on tested A500/030 routes. Timestamped control input and wider
-validation are still in progress. The periodic
+all owed input events on tested A500/030 routes. Timestamped button/modifier input and
+native-pause handling pass bounded tests; mouse/joystick ownership and wider validation
+remain in progress. The periodic
 prototype is incomplete and must not be presented as a finished timing mode.
 
 Powerdrome is not framerate independent. Its main movement uses elapsed time, but that

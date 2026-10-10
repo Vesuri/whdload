@@ -27,7 +27,7 @@ slv_config
  dc.b "C2:L:Rendering experiment:Bitmap and code,Bitmap only,Bitmap code and scratch,Bitmap and scratch;"
  dc.b "C4:B:Twin planar drawing for verification;"
  IFD COVERAGE_INPUT
- dc.b "C5:L:Verification route:Off,Title demo,Practice,Coverage practice,Coverage race,Coverage cruise,Coverage second course,Timing controls;"
+ dc.b "C5:L:Verification route:Off,Title demo,Practice,Coverage practice,Coverage race,Coverage cruise,Coverage second course,Timing controls,Timing pause;"
  ELSE
  dc.b "C5:L:Verification route:Off,Title demo,Practice;"
  ENDC

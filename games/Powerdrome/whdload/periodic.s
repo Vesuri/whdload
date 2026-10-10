@@ -1,5 +1,13 @@
+ IFND TIMING_INPUT
+TIMING_INPUT = 0
+ ENDC
  IFND TIMING_BRAKE
-TIMING_BRAKE = 0
+TIMING_BRAKE = TIMING_INPUT
+ ENDC
+ IFNE TIMING_INPUT
+ IFEQ TIMING_BRAKE
+ FAIL "TIMING_INPUT requires TIMING_BRAKE"
+ ENDC
  ENDC
  IFND TIMING_ORIENTATION
 TIMING_ORIENTATION = 0
@@ -27,6 +35,12 @@ install_periodic
  move.w #$42e7,(a0)
  IFNE TIMING_BRAKE
  lea timing_brake_vbl(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
+ IFNE TIMING_INPUT
+ lea timing_input_pause_begin(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_input_pause_end(pc),a0
  move.w #$42e7,(a0)
  ENDC
 .flags
@@ -68,6 +82,18 @@ pl_periodic PL_START
  PL_PS $5786,timing_brake_vbl
  ENDC
  ENDC
+ IFNE TIMING_INPUT
+ ; Historical buttons and modifiers; live input memory is never overwritten.
+ ; TIMING_RANGE h0:$cf66 8 bit=C3
+ PL_P $cf66,timing_input_buttons
+ PL_NOP $cf6c,2
+ ; TIMING_RANGE h0:$cf7a 6 bit=C3
+ PL_P $cf7a,timing_input_modifiers
+ ; TIMING_RANGE h0:$be12 6 bit=C3
+ PL_PS $be12,timing_input_pause_begin
+ ; TIMING_RANGE h0:$beec 6 bit=C3
+ PL_PS $beec,timing_input_pause_end
+ ENDC
  PL_END
 
 timing_frame
@@ -76,7 +102,14 @@ timing_frame
  bsr timing_clock
  lea timing_state(pc),a1
  move.l perf_game(pc),a0
+ IFNE TIMING_INPUT
+ ; One clock domain for VBL input timestamps and periodic work (PAL).
+ move.l $48fe(a0),d0
+ sub.l timing_input_paused_fields-timing_state(a1),d0
+ lsl.l #2,d0
+ ELSE
  move.l $f96(a0),d0
+ ENDC
  move.l d0,d1
  sub.l timing_last-timing_state(a1),d1
  move.l d0,timing_last-timing_state(a1)
@@ -99,6 +132,9 @@ timing_frame
  addq.l #1,timing_ticks-timing_state(a1)
  bra.s .again
 .initial
+ IFNE TIMING_INPUT
+ bsr timing_input_initialize
+ ENDC
  IFNE TIMING_BRAKE
  clr.w timing_brake_active-timing_state(a1)
  clr.l timing_brake_phase-timing_state(a1)
@@ -157,11 +193,17 @@ timing_control
  lea timing_state(pc),a0
  addq.l #1,timing_controls-timing_state(a0)
  move.l (sp)+,a0
+ IFNE TIMING_INPUT
+ bsr timing_input_for_control
+ ENDC
  pea .returned(pc)
  bra.w timing_native_control
 .returned
  move.l a0,-(sp)
  lea timing_state(pc),a0
+ IFNE TIMING_INPUT
+ add.l #TIMING_PERIOD,timing_input_clock-timing_state(a0)
+ ENDC
  addq.w #1,timing_control_phase-timing_state(a0)
  subq.w #1,timing_control_left-timing_state(a0)
  movea.l (sp)+,a0
@@ -261,6 +303,14 @@ timing_targets
  dc.l $d382
  dc.w timing_brake_joystick+2-timing_targets
  ENDC
+ IFNE TIMING_INPUT
+ dc.l $82b6
+ dc.w timing_input_native_pause+2-timing_targets
+ dc.l $cf6e
+ dc.w timing_input_after_buttons+2-timing_targets
+ dc.l $cf80
+ dc.w timing_input_after_modifiers+2-timing_targets
+ ENDC
 timing_targets_end
 
 timing_state dc.b 'PDTIME01'
@@ -280,4 +330,8 @@ timing_control_phase dc.w 1
 
  IFNE TIMING_BRAKE
  INCLUDE timing_brake.s
+ ENDC
+
+ IFNE TIMING_INPUT
+ INCLUDE timing_input.s
  ENDC

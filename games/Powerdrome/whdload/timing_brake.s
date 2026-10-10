@@ -43,7 +43,14 @@ timing_brake_vbl
  movem.l d0-d3/a0-a1,-(sp)
  lea timing_state(pc),a1
  tst.w timing_started-timing_state(a1)
- beq.s .done
+ beq.w .done
+ IFNE TIMING_INPUT
+ tst.w timing_input_paused-timing_state(a1)
+ beq.s .running
+ addq.l #1,timing_input_paused_fields-timing_state(a1)
+ bra.w .done
+.running
+ ENDC
  move.w $432(a6),d0
  tst.w $422(a6)
  beq.s .buttons
@@ -52,11 +59,17 @@ timing_brake_vbl
  btst #7,$427(a6)
  beq.s .buttons
  btst #0,$427(a6)
- bne.s .released
+ beq.s .joy_brake
+ moveq #1,d0
+ bra.s .buttons
+.joy_brake
  btst #1,$427(a6)
  beq.s .buttons
  moveq #2,d0
 .buttons
+ IFNE TIMING_INPUT
+ bsr timing_input_sample
+ ENDC
  and.w #3,d0
  cmp.w #2,d0
  bne.s .released

@@ -35,6 +35,22 @@ def summarize(rows):
         sampled_displacement=sum(distances),max_sample_displacement=max(distances),
         first=rows[0],last=rows[-1])
 
+def input_state(path):
+    data=path.read_bytes()
+    found=[]
+    for match in re.finditer(b'PDINPT01',data):
+        pos=match.start()
+        values=struct.unpack_from('>HH6I',data,pos+8)
+        if values[2]:
+            names=('read','write','clock','current','last','produced','consumed','overflow')
+            block=dict(zip(names,values))
+            pause=pos+36+2048
+            if data[pause:pause+8]==b'PDPAUS01':
+                block['pause']=dict(zip(('active','fields','entries','exits'),struct.unpack_from('>HIII',data,pause+8)))
+            found.append(block)
+    assert len(found)<=1,'Ambiguous initialized input state'
+    return found[0] if found else None
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('capture',type=Path)
@@ -68,4 +84,6 @@ if __name__=='__main__':
     if brake_blocks:
         assert len(brake_blocks)==1,'Ambiguous brake diagnostics'
         result['braking']=brake_blocks[0]
+    inputs={name:input_state(a.capture/file) for name,file in (('initial','code.bin'),('final','final-code.bin'))}
+    if inputs['initial']:result['input']=inputs
     print(json.dumps(result,indent=2))

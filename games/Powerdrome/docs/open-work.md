@@ -105,7 +105,9 @@ F1/F2 are in progress; the isolated F3 correction is built and being validated. 
 liftoff correction passes A500/030 checks at 100 ms per native step and is included in
 experimental `CUSTOM3`; it preserves the nine-step geometry and final speed. A separate
 F4/F5 control/orientation/resource prototype includes separately timed braking, with 15/15
-input events preserved across A500/030 and 77 additional clean renderer twins. Acceleration
-still fails an A500 response gate because catch-up uses current rather than historical input;
-timestamped input ownership is next. Other frame-counted behavior and the remaining F6–F8
-checks are still open. See [timing implementation](timing-implementation.md) for current evidence.
+input events preserved across A500/030. Timestamped button/modifier inputs now produce 19
+identical early logical acceleration updates across A500, 030 and twin rendering. The
+dedicated pause route preserves input debt and fractional time while excluding 49 paused
+PAL fields. Those input and pause runs add 74 and 75 clean renderer twins. Mouse/joystick
+input ownership is next; response/resource calibration, other frame-counted behavior and
+the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

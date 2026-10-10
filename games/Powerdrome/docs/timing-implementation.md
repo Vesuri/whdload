@@ -159,9 +159,9 @@ and stop the ship. `tools/check_timing_brake.py CAPTURE...` checks those conditi
 failures and unchanged raster code. The same-build A500 `CUSTOM3=0` capture preserves every
 declared timing-hook range in its initial/final snapshots.
 
-These are bounded prototype checks, not full F5/F7 acceptance. Pause/mode transitions must
-explicitly freeze/rebase input accounting before this code can be enabled in a normal build.
-Joystick behavior, damaged brakes and engine/fuel transitions need dedicated routes. The
+These are bounded prototype checks, not full F5/F7 acceptance. The newer input prototype
+passes the dedicated pause route below; other mode transitions still need explicit lifecycle
+handling. Joystick behavior, damaged brakes and engine/fuel transitions need dedicated routes. The
 separate compile-time brake option is excluded from normal builds.
 
 ## Response measurements and next required correction
@@ -172,23 +172,67 @@ and includes PAL-field quantization in its crossing intervals. It reports conser
 error bounds against the frozen 10% / 90 ms tolerance. An inconclusive bound is not a pass.
 Use `COVERAGE_PROBES='0xd058 0xccee' TIMING_STATE=1` for the finer boundary samples.
 
-The current same-build native A500 reference is `timing-brake2-a500-native`. Its sampled
-stop threshold is **980–1,000 ms** after the brake command. The timed A500 is **1,000–1,020 ms**;
-the timed 030 is **980–1,020 ms**. Those stopping bounds pass the response criterion.
-All five measured 030 acceleration/braking thresholds pass against this reference. The
-A500 acceleration-to-130 result is **1,220–1,240 ms**, versus **1,380–1,400 ms** native, and
-fails the frozen acceleration gate. Some other A500 bounds remain inconclusive.
+The native A500 reference is `timing-brake2-a500-native`. Its sampled stop threshold is
+980–1,000 ms after the brake command. With timestamped input, `timing-input1-a500` reaches
+zero in 1,000–1,020 ms and `timing-input1-030` in 980–1,000 ms. Acceleration to 130 is
+1,320–1,340 ms on both, versus 1,380–1,400 ms native. Those bounds pass the frozen criteria.
+Acceleration to 120 remains inconclusive at PAL-field resolution: the conservative error
+bound reaches 100 ms against the 90 ms limit. The slower twin-rendered stop is not observed
+within the tool's strict held-brake window, although all 15 owed brake events are applied
+and the ship stops. Do not turn those unresolved bounds into a complete response claim.
 
-Control catch-up still uses the most recently sampled input for all owed updates. In
-the matched captures, the third logical control executes at fixture field 10 on A500 and
-uses the new throttle (speed becomes 96); on 030 it executes at field 9 and retains speed
-90. Throttle is scheduled at field 10. Thus the same logical update sees different input
-across CPUs. A slow frame can apply a newly pressed throttle to an older owed update. The next required change is timestamped input ownership: retain button/modifier
-changes in the existing VBL callback, consume them at each logical control timestamp, and
-have the native speed-control reads use that historical snapshot without overwriting live
-input. Extend the same ownership rules to joystick and steering samples; preserve queued
-edges through catch-up and explicitly handle queue capacity and mode resets. Merely tuning
-the 90 ms period would hide this ordering bug rather than resolve it.
+## Timestamped control inputs
+
+`TIMING_INPUT=1` (with `TIMING_PERIODIC=1 TIMING_ORIENTATION=1`) enables the input prototype
+and implies `TIMING_BRAKE=1`. Its PAL VBL callback records button/modifier changes in a
+256-slot ring, leaving one slot empty to distinguish full and empty. Each record contains
+a clock value and the sampled buttons/modifiers. The consumer applies only records whose
+timestamp is at or before the current logical control update. The speed-control reads at
+`$cf66` and `$cf7a` use that snapshot; live input memory is not temporarily overwritten.
+A full ring preserves unread records and increments an explicit overflow counter. Overflow
+invalidates validation; a final release policy and capacity/stall tests remain required.
+
+Input timestamps and the periodic scheduler share **four units per unpaused PAL VBL**.
+The ordinary movement delta still uses its original native clock path. This prevents a
+slow frame from applying a new throttle press to an older owed control update. In
+`timing-input1-a500`, `timing-input1-030` and `timing-input1-030-twins`, **19 early logical
+acceleration updates match the timestamp-based oracle exactly**. Each consumes the same
+three button edges once, with no overflow or pending records. All retain 15/15 brake steps.
+The twin run validates **74 completed staged scenes**, with zero reported failures and
+unchanged raster code. `tools/check_timing_input.py CAPTURE...` checks this bounded route.
+
+Mouse-axis history and joystick control ownership are not yet implemented. The current
+queue covers buttons/modifiers only; this is not a claim of full input determinism.
+Native mouse samples accumulate into state `$42a/$42e` in VBL (`$56d4/$56fe`). Controls also
+write those values during collision damping (`$d082/$d086`) and joystick response
+(`$d266–$d364`), so simply replaying old absolute samples would overwrite logical corrections.
+The next extraction must distinguish external input deltas from logical axis state and
+redirect the native controller's reads/writes consistently. Mode/menu initialization also
+writes these fields at `$b6e4`, `$b714`, `$eab2`, `$ebd0`, `$100c2`, `$11c6e`, `$1237e` and
+`$140a4`; menu save/restore and mouse handlers must keep their native behavior. The gameplay
+joystick toggle is at `$c946`; its input route still needs a dedicated fixture.
+
+## Pause ownership
+
+The input prototype hooks native pause entry `$be12` and the native clock restore at `$beec`.
+Paused VBL callbacks increment a separate excluded-field counter and do not enqueue input
+or accrue brake time. Both scheduler and input timestamps use `VBL_count - paused_fields`,
+so pending events and the fractional control phase survive without rewriting the queue or
+resetting deadlines. The native clock restore is replayed with its original register/CCR
+behavior. No custom cache policy or interrupt masking is introduced.
+
+`CUSTOM5=8` is a development-only native-key fixture: the same initial throttle/brake run,
+then pause, changing throttle/brake while paused, and resume. `timing-pause1-a500` and
+`timing-pause1-030-twins` each exclude **49 PAL fields**, enter/exit pause once, consume five
+legitimate input edges, and apply only the original 15 brake steps. No gameplay updates run
+inside the pause, no paused throttle leaks into resumed play, and logical phase/debt
+accounting remains exact. `tools/check_timing_pause.py CAPTURE...` verifies those properties.
+The 030 run completes **75 clean staged comparisons**, with unchanged raster code.
+The pause test uses the frozen `Powerdrome-timing-input3.slave` artifact under ignored `tmp/`.
+
+Pits, rescue, restart, title playback and other session changes still need their own timer
+and input-lifecycle handling. These prototypes remain excluded from normal builds; normal
+`CUSTOM3` currently enables only the movement-minimum and cockpit-departure corrections.
 
 The resource, opponent, collision/falling/impulse and weather work remains open. In particular,
 scheduling a velocity decay counter alone cannot fix an unscaled displacement: the whole

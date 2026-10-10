@@ -81,6 +81,11 @@ coverage_vbl
 .normal_axes
  lea coverage_tape(pc),a2
  move.l custom5(pc),d0
+ cmp.l #8,d0
+ bne.s .not_pause
+ lea coverage_timing_pause_tape(pc),a2
+ bra.s .tape
+.not_pause
  cmp.l #7,d0
  bne.s .not_timing
  lea coverage_timing_tape(pc),a2
@@ -352,4 +357,26 @@ coverage_timing_tape
  dc.l 150
  dc.w 0,0,0
  dc.l 250
+ dc.w -1,0,0
+
+
+; Same acceleration/brake start, then native pause with input changes during the pause.
+coverage_timing_pause_tape
+ dc.l 10
+ dc.w 0,0,1
+ dc.l 100
+ dc.w 0,0,2
+ dc.l 150
+ dc.w 0,0,0
+ dc.l 160
+ dc.w 's',1,0
+ dc.l 175
+ dc.w 0,1,1
+ dc.l 190
+ dc.w 0,1,2
+ dc.l 200
+ dc.w 0,1,0
+ dc.l 210
+ dc.w 's',1,0
+ dc.l 260
  dc.w -1,0,0

@@ -16,7 +16,7 @@ a=p.parse_args()
 expected=1+((150-100-1)*4)//14
 for root in a.captures:
     config=json.loads((root/'configuration.json').read_text())
-    assert 'CUSTOM5=7' in config['WHD_ARGS']
+    assert any(route in config['WHD_ARGS'] for route in ('CUSTOM5=7','CUSTOM5=8'))
     data=(root/'final-code.bin').read_bytes()
     blocks=[struct.unpack_from('>HIII',data,m.start()+8) for m in re.finditer(b'PDBRAK02',data)]
     blocks=[b for b in blocks if b[2]]
