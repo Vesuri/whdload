@@ -75,6 +75,20 @@ TIMING_RETUNE_RESULT_TEST = 0
  FAIL "TIMING_RETUNE_RESULT_TEST requires TIMING_WORLD20"
  ENDC
  ENDC
+ IFND TIMING_PIT_SYNC_TEST
+TIMING_PIT_SYNC_TEST = 0
+ ENDC
+ IFNE TIMING_PIT_SYNC_TEST
+ IFND VERIFY
+ FAIL "TIMING_PIT_SYNC_TEST requires VERIFY"
+ ENDC
+ IFND COVERAGE_INPUT
+ FAIL "TIMING_PIT_SYNC_TEST requires COVERAGE_INPUT"
+ ENDC
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_PIT_SYNC_TEST requires TIMING_WORLD20"
+ ENDC
+ ENDC
  IFND TIMING_SETUP_SEED
 TIMING_SETUP_SEED = -1
  ENDC
@@ -134,6 +148,12 @@ install_periodic
  lea timing_result_flags(pc),a0
  move.w #$42e7,(a0)
  lea timing_retune_flags(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
+ IFNE TIMING_PIT_SYNC_TEST
+ lea timing_sync_retune(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_sync_return(pc),a0
  move.w #$42e7,(a0)
  ENDC
  lea timing_external_step(pc),a0

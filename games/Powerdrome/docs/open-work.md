@@ -268,8 +268,15 @@ including retune register/flag/RNG preservation and exact time accounting; 188 c
 030 renderer comparisons report no failures. All 72 common opponent snapshots through
 6,480 ms match. The extended through-departure gate remains **failing**: 194 of 266
 snapshots differ, first at 6,570 ms after the 030 retunes earlier than A500. Their event
-histories are unequal, so whole-trajectory equivalence is not established. Next establish
-matching semantic-event/input histories and investigate remaining full-record differences,
+histories are unequal, so whole-trajectory equivalence is not established. A VERIFY-only
+synchronization experiment holds retune/return to 18/24 seconds without rewriting state.
+Both CPUs reach those times exactly and pass time accounting; the 030 adds 64 completed
+renderer comparisons. The synchronized comparison still fails: 82 of 336 snapshots
+differ, first in lap timers at 22,950 ms (2,580-ms discrepancy); RNG agrees throughout.
+From 25,650 ms, persistent opponent animation fields also differ. Native `$11228` calls
+`$9950` while drawing and advances these fields per render. Next establish a stable lap
+clock domain and separate this animation advancement from drawing, while auditing
+collision/effect generation and the projection flag. Then
 repeat lifecycle regressions, and validate race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

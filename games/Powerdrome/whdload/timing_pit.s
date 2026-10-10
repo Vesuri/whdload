@@ -118,6 +118,9 @@ timing_pit_enter
 timing_pit_leave
  move.w sr,-(sp)
  movem.l d0-d1/a0-a1,-(sp)
+ IFNE TIMING_PIT_SYNC_TEST
+ bsr timing_sync_return
+ ENDC
  lea timing_pit_state(pc),a0
  addq.l #1,16(a0)
  bsr timing_pit_finish

@@ -3,6 +3,9 @@
 timing_pit_retune
  move.w sr,-(sp)
  movem.l d0-d7/a0-a6,-(sp)
+ IFNE TIMING_PIT_SYNC_TEST
+ bsr timing_sync_retune
+ ENDC
  IFD VERIFY
  lea timing_retune_state(pc),a0
  move.w 60(sp),18(a0)

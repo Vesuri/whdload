@@ -1670,6 +1670,67 @@ python3 tools/compare_timing_opponents.py --initial-pit tmp/prof/timing-external
 python3 tools/compare_timing_opponents.py --through-departure --report-only tmp/prof/timing-external2-initial-030-twins tmp/prof/timing-external2-initial-a500
 ```
 
+The matching-event experiment is `TIMING_PIT_SYNC_TEST=1`, which requires VERIFY,
+COVERAGE_INPUT and WORLD20. It delays only the initial-pit retune and return until
+18,000 and 24,000 ms after pit entry. It does not rewrite records, seeds, counters,
+logical cursors or physical time. Existing catch-up code accounts for the wait. Actual
+arrival/release times are recorded in `PDSYNC01`, and `check_timing_sync.py` requires
+exact release times plus agreement with the real retune cutoff and pit-exit clock.
+A late arrival fails the check. This is a **test-only causal experiment**, not a proposed
+production loading policy and not proof that the unsynchronized route is equivalent.
+
+The disabled fixture rebuilds byte-identically to `timing-external2`; the normal slave
+also remains byte-identical, and a non-VERIFY build rejects the flag. The synchronized
+030 capture `timing-sync1-initial-030-twins` arrives at retune at 6,480 ms and releases
+at exactly 18,000 ms; it arrives at return at 19,180 ms and releases at 24,000 ms.
+It drains 134 old-speed updates (12,060 ms) before retuning, with zero residual.
+At first flight, the 6,000-ms tail serves 2,880 ms and retains 3,120 ms; two capped
+allocations are needed before only fractional debt remains. Final residual is 10 ms.
+All ownership/register/flag/native-RNG checks pass, as do **64 completed renderer
+comparisons**. The A500 counterpart `timing-sync1-initial-a500` arrives at retune at
+15,620 ms and at return at 19,480 ms, releasing at the same exact **18,000 / 24,000 ms**
+boundaries. It drains 84 old-speed updates (7,560 ms), with zero residual, and has the
+same first-flight 2,880-ms service / 3,120-ms retained tail. Its final residual is 40 ms.
+Both CPUs pass the synchronization, ownership, native speed-mutation and time-conservation
+checks. These artificial waits are not included in ordinary gameplay or performance claims.
+
+The synchronized comparison covers **336** common snapshots at 90–30,240 ms, including
+136 after both pit exits. **All random states agree.** The first 254 complete four-opponent snapshots
+agree; **82 later snapshots differ**. The first difference, at **22,950 ms**, is opponent
+4’s lap-start and best-lap values (`+$5c` / `+$60`, differing low words `+$5e` / `+$62`).
+The normalized values are 4,598 versus 5,114 clock units: a **2,580-ms** discrepancy,
+despite identical logical movement deadlines. The current code repeatedly derives its
+native-epoch offset from physical `$f96` minus unpaused VBL time. This offset changes
+through the run, so logical lap reads are not in one stable elapsed-time domain. The
+first active sample puts the pit epoch 40 ms after setup on 030 versus 1,080 ms on A500;
+later epoch drift adds to that initial difference. The cause of the changing physical/VBL
+offset is not yet established. Do not assume all of it is ordinary loading time, and
+do not subtract a measured constant from reported results as a fix.
+
+From **25,650 ms**, non-clock differences appear at record `+$36`, `+$38`, `+$3e` and
+`+$54`; `+$3c` first differs at 26,550 ms. The only differing words in the whole paired
+window are `$36/$38/$3c/$3e/$54/$5e/$62`. Movement-record fields and RNG therefore
+remain equal in these sampled bodies, but complete-state equivalence still fails.
+The native opponent drawing path calls `$9950` at `$11228`, conditionally for opponents
+selected by the visible track range. `$999a–$9a04` advances persistent animation offsets
+`+$36..+$3a`, increments/stores age `+$3e`, and clears active `+$3c` at its limit.
+This is a confirmed render-driven mutation that must be separated from presentation.
+`+$54` is also written by projection/model-selection code (`$a142/$a26e/$1162e`) and
+read by drawing (`$11644`); its complete ownership still needs audit before classification
+as harmless rendering scratch.
+
+Next fix the lap producer/consumer clock domain with explicit initialization, pause,
+mode-transition and native-time-adjustment handling. Separately audit the full `$9950`
+call for collision/effect generation and presentation side effects, then move persistent
+animation advancement to calibrated logical ticks while leaving projection usable on
+every render. Preserve these mismatches as failing gates until those changes are tested;
+matching retune/return alone is not full input/player-state or trajectory equivalence.
+
+```sh
+python3 tools/check_timing_sync.py tmp/prof/timing-sync1-initial-030-twins tmp/prof/timing-sync1-initial-a500
+python3 tools/compare_timing_opponents.py --through-departure --report-only tmp/prof/timing-sync1-initial-030-twins tmp/prof/timing-sync1-initial-a500
+```
+
 The next F6 steps are:
 
 1. **Retune ordering:** finish wider A500 lifecycle regressions. The final initial-pit

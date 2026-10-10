@@ -7,6 +7,7 @@ setup epoch. Other differences are reported, including rendering scratch data.
 This deliberately fails on unequal starts; it is not a trajectory tolerance test.
 """
 import argparse
+from collections import Counter
 import json
 from pathlib import Path
 import re
@@ -107,6 +108,10 @@ if __name__ == '__main__':
         assert len(common_flight) >= 30, 'Need at least 30 shared deadlines after both pit exits'
         print(f'  {len(common_flight)} common snapshots after both CPUs entered flight')
     if bad:
+        words = Counter(off for k in bad for a, b in zip(left[k][2], right[k][2])
+                        for off in range(0, 190, 2) if a[off:off+2] != b[off:off+2])
+        print('All differing words (offset: record count): ' +
+              ', '.join(f'${off:02x}: {count}' for off, count in sorted(words.items())))
         key = bad[0]
         domain = 'initial-pit elapsed time' if args.initial_pit else 'fixture-relative world time'
         print(f'First difference at {domain} {key * 5} ms; '
