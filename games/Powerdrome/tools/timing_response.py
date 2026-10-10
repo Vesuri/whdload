@@ -13,7 +13,7 @@ THRESHOLDS=(('accelerate_120',10,120,True),('accelerate_130',10,130,True),
 
 def response(root):
     config=json.loads((root/'configuration.json').read_text())
-    assert 'CUSTOM5=7' in config['WHD_ARGS'],'Requires the timing control input route'
+    assert any(route in config['WHD_ARGS'] for route in ('CUSTOM5=7','CUSTOM5=9')),'Requires a timing control input route'
     game=int((root/'game-base.txt').read_text(),0)
     anchor_vbl=struct.unpack_from('>I',(root/'chip.bin').read_bytes(),game+0x48fe)[0]
     epoch=fixture(root/'code.bin')['epoch']
@@ -54,6 +54,9 @@ if __name__=='__main__':
     p.add_argument('reference',type=Path)
     p.add_argument('captures',type=Path,nargs='+')
     a=p.parse_args()
+    def route(root):
+        return next(word for word in json.loads((root/'configuration.json').read_text())['WHD_ARGS'].split() if word.startswith('CUSTOM5='))
+    assert all(route(root)==route(a.reference) for root in a.captures), 'Compare matching input routes'
     ref=response(a.reference)
     out={'reference':ref,'candidates':{}}
     for root in a.captures:

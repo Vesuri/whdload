@@ -114,8 +114,13 @@ joystick response against historical samples. A500/030 mouse runs each pass 56 l
 state updates; the 030 run adds 77 clean renderer twins. A500/030 joystick runs likewise
 pass the native response check. Timestamped braking now fixes the ordering difference:
 all 55 complete common speed/input updates match across A500/030, including braking and
-release, with 15 exact brake timestamps and 61 clean 030 twins. Resource/engine chronology
-and A500 response calibration are next.
+release, with 15 exact brake timestamps and 61 clean 030 twins. Resource mutation now
+also runs after each logical control: 55 common fuel updates match exactly across A500/030,
+with another 61 clean twins; the pause regression adds 75 clean twins. A native A500
+comparison passes the 10% fuel gate for the measured 4.4-second interval. High-speed
+joystick braking still differs substantially (native settled speed 108, periodic 53),
+so response calibration is not complete. Engine cooling/failure timing remains open; failure handling includes a presentation call and cannot simply move unchanged
+into catch-up.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

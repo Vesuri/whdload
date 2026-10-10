@@ -43,6 +43,8 @@ install_periodic
  move.w #$42e7,(a0)
  ENDC
  IFNE TIMING_INPUT
+ lea timing_resource_tick(pc),a0
+ move.w #$42e7,(a0)
  lea timing_brake_before_control(pc),a0
  move.w #$42e7,(a0)
  lea timing_brake_before_movement(pc),a0
@@ -236,6 +238,9 @@ timing_control
  pea .returned(pc)
  bra.w timing_native_control
 .returned
+ IFNE TIMING_INPUT
+ bsr timing_resource_tick
+ ENDC
  move.l a0,-(sp)
  lea timing_state(pc),a0
  IFNE TIMING_INPUT
@@ -251,6 +256,10 @@ timing_control
  bra.w timing_after_control
 
 timing_resource
+ IFNE TIMING_INPUT
+ ; Resource mutation belongs to each logical control update; HUD drawing stays here.
+ bra.w timing_resource_draw_due
+ ELSE
  movem.l d0/a0,-(sp)
  lea timing_state(pc),a0
  move.w timing_due(pc),d0
@@ -265,18 +274,41 @@ timing_resource_next
  addq.l #1,timing_resources-timing_state(a0)
  movea.l (sp)+,a0
  bra.w timing_native_resource
+ ENDC
 timing_resource_draw_due
  pea timing_resource_continuation(pc)
  bra.w timing_resource_draw
 
 timing_resource_end
  move.w d1,$1ba(a6)
+ IFNE TIMING_INPUT
+ rts
+ ELSE
  move.l a0,-(sp)
  lea timing_state(pc),a0
  subq.w #1,timing_resource_left-timing_state(a0)
  movea.l (sp)+,a0
  bne.s timing_resource_next
  bra.s timing_resource_draw_due
+ ENDC
+
+ IFNE TIMING_INPUT
+; Preserve the control caller's full machine state, including X. Native depletion
+; sound calls remain in the main context and return through timing_resource_end.
+timing_resource_tick
+ move.w sr,-(sp)
+ movem.l d0-d7/a0-a6,-(sp)
+ tst.w $240(a6)
+ bne.s .done
+ lea timing_state(pc),a0
+ addq.l #1,timing_resources-timing_state(a0)
+ pea .done(pc)
+ bra.w timing_native_resource
+.done
+ movem.l (sp)+,d0-d7/a0-a6
+ move.w (sp)+,ccr
+ rts
+ ENDC
 
  IFNE TIMING_ORIENTATION
 timing_brake_parity

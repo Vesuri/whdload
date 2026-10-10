@@ -32,7 +32,7 @@ for root in a.captures:
     start,end=starts[0],ends[0]
     assert pause['fields']==end-start,(pause,start,end)
     for field,offset in re.findall(r'^PDEVENT (-?\d+) (0x[0-9a-f]+)$',log,re.M):
-        if int(offset,16) in (0xd058,0xccee):
+        if int(offset,16) in (0xd058,0xccee,0xd9a0):
             assert not start<int(field)<end,'Gameplay ran during native pause'
     rows=samples(root)
     assert all(r['speed']==0 for r in rows if r['field']>=end),'Paused throttle leaked into resumed gameplay'

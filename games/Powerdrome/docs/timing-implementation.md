@@ -174,6 +174,95 @@ passes the dedicated pause route below; other mode transitions still need explic
 handling. Joystick behavior, damaged brakes and engine/fuel transitions need dedicated routes. The
 separate compile-time brake option is excluded from normal builds.
 
+## Logical resource updates and remaining engine timing
+
+With `TIMING_INPUT=1`, the resource mutation body `$d92a–$d9a0` now runs after each
+logical control call, before advancing its timestamp. The native body still computes fuel
+use from speed, doubles consumption for boost, adds the native extra consumption/heating
+when `$44e != $450`, clamps depletion, and stops engine audio on exhaustion. Its only
+external calls in the depletion path are the returning DMA-audio stop helper `$17b0c`.
+The wrapper preserves all data/address registers and condition flags. The normal HUD call
+at `$d9a4` stays in the render path, without repeating resource mutations there.
+The standalone periodic prototype without historical input retains its older batch path.
+
+This corrects reuse of one rendered frame's final speed/boost state across multiple owed
+resource updates. It does not settle ordering relative to variable-step collisions, or
+establish A500 consumption calibration. `timing-resource1-a500` and
+`timing-resource1-030-twins` validate 55 and 56 logical resource calls respectively. All
+**55 complete common fuel updates match exactly** in timestamp, speed, boost, settings,
+and before/after fuel. Each subtraction independently matches native word arithmetic;
+there are no intervening fuel writes in the sampled sequence. All 55 common speed/input
+updates and all 15 brake timestamps also match; the 030 passes **61 clean renderer twins**.
+The binaries are frozen as `Powerdrome-timing-resource1.slave` under ignored `tmp/`.
+
+`tools/check_timing_resource.py CAPTURE...` consumes `PDRESOURCE` records from the read-only
+`$d9a0` probe. It checks the native low-word multiplication/shifts, minimum consumption,
+boost and unequal-setting charges, continuous fuel state and cross-CPU logical sequence.
+The short route keeps the engine running with ample fuel; it does not exercise exhaustion
+or unequal-setting heat. The whole-game ordering relative to collision/engine transitions
+and A500 consumption calibration remain open.
+
+`timing-resource2-pause-030-twins` passes 56 continuous fuel updates, 49 excluded paused
+PAL fields, five legitimate input events, 15 brake timestamps and 75 clean renderer twins.
+No resource, control or movement probe executes during the native pause interval.
+`timing-resource1-pause-030-twins` is an invalid, interrupted capture: a truncated debugger
+request left GDB waiting for the rest of its command script before capture began. The
+local socket and pipe transport now handle complete requests and short writes; dedicated
+transport regression checks pass. It is not evidence of a game timing failure or a pass.
+
+Engine heat from boost (`$cfe8/$cff4`) already follows logical controls, and extra resource
+heat (`$d974/$d978`) follows the extracted resource call. **Cooling is still frame-based**:
+`$dfae–$dfb6` selects every fourth rendered loop, then `$dfb8–$dff8` subtracts
+`20 - (speed >> 4)` from each undamaged engine, with a minimum temperature of 80.
+Overheat checks at `$de04–$dfae` run once per rendered HUD update. They compare temperatures
+with 180/225, update previous-temperature fields, issue warnings/sounds, set damage bits,
+halve target speed when an engine fails, and stop propulsion when both have failed.
+HUD warning blinks at `$dc5a` are a separate presentation concern.
+
+The next engine extraction must schedule cooling every four logical control ticks
+(initially 360 ms at the 90 ms reference cadence), preserve its original phase, and run
+failure detection at the logical cadence. It must separate or defer presentation calls
+rather than drawing warning messages repeatedly during catch-up. In particular, the
+engine-failure helper `$e0c0` calls `$10338` and **presents a frame through `$8056`**;
+the complete overheat block cannot safely be treated as a pure returning state mutation.
+`$10d0c` paints cockpit state, while `$13514` schedules a message expiry relative to the
+rendered-loop counter (`$64/$68`). Those effects need explicit presentation/event ownership.
+The existing logical control phase was initialized for parity only; the cooling divisor
+must retain the native initial modulo-four phase, not just its odd/even value.
+Required routes include
+sustained boost, unequal engine settings, a single engine failure, both failures and fuel
+exhaustion; native A500 baselines and cross-CPU state/event comparisons must cover those
+conditions. Merely matching short-run fuel totals does not satisfy that requirement.
+
+### Native A500 fuel and joystick-response calibration
+
+`timing-resource1-a500-native` uses the same frozen input fixture with `CUSTOM1=0 CUSTOM3=0`.
+All timing-hook bytes remain native in both snapshots. Over fixture fields 20–240 (4.4 s),
+`tools/timing_fuel_compare.py` brackets one resource update at each interval endpoint:
+
+| Route | Fuel used, bounded units |
+| --- | ---: |
+| Native A500 | 121–123 |
+| Periodic A500 | 126–128 |
+| Periodic 030, twin rendering | 125–127 |
+
+Both candidates pass the frozen 10% resource bound: their maximum differences are seven
+and six units, below 12.2 allowed units. Wall-clock endpoint bounds differ slightly even
+though the complete common logical resource sequence matches exactly. This short-running,
+eligible-engine route does not certify fuel exhaustion or all settings.
+
+The same reference **does not establish acceptable high-speed joystick braking**. Its
+post-command speed settles at 108, versus 53 for both periodic candidates. The original
+joystick enters native automatic boost before braking; at around fixture field 100 the
+sampled speeds are 329 native, 316 periodic A500 and 329 periodic 030. Matching 15 owed
+brake events across CPUs is not equivalent to matching native A500 response. The separate
+70 ms brake cadence was calibrated on the lower-speed mouse route and needs assessment
+against this route's native invocation times, overspeed damping and entry speed before
+further tuning. No braking threshold below 100 is reached by the native reference during
+the held-input interval, so the current threshold tool reports missing thresholds rather
+than a pass. Acceleration to 130 passes; acceleration to 120 remains inconclusive with
+its 60–100 ms error bound against a 90 ms tolerance. The acceptance bounds are unchanged.
+
 ## Response measurements and next required correction
 
 `tools/timing_response.py REFERENCE CAPTURE...` normalizes observations to the input
@@ -260,7 +349,8 @@ sequence and rejects the earlier unordered prototype at its first braking transi
 `(epoch + 101 + ceil(k*14/4))*4`, for brake events k=0..14.
 
 These results establish ordered controls/braking in the bounded route, not whole-game
-chronology. Resource/engine updates are still batched separately, collision/damage state
+chronology. The older brake-only captures leave resource updates batched separately; the resource
+extraction described above tests those at each control tick. Collision/damage state
 can change between movement frames, and movement still integrates a variable elapsed
 interval. Queue capacity/wrapping, overload behavior and other state transitions require
 further tests before release.
