@@ -25,7 +25,11 @@ slv_config
  IFD VERIFY
  dc.b "C2:L:Rendering experiment:Bitmap and code,Bitmap only,Bitmap code and scratch,Bitmap and scratch;"
  dc.b "C4:B:Twin planar drawing for verification;"
+ IFD COVERAGE_INPUT
+ dc.b "C5:L:Verification route:Off,Title demo,Practice,Coverage practice,Coverage race,Coverage cruise,Coverage second course;"
+ ELSE
  dc.b "C5:L:Verification route:Off,Title demo,Practice;"
+ ENDC
  ENDC
  dc.b 0
  EVEN
@@ -85,10 +89,17 @@ launch_pd
  jsr resload_Patch(a2)
  move.l custom5(pc),d0
  cmp.l #2,d0
+ IFD COVERAGE_INPUT
+ blo.s .run
+ ELSE
  bne.s .run
+ ENDC
  lea pl_practice(pc),a0
  lea 4(a3),a1
  jsr resload_Patch(a2)
+ IFD COVERAGE_INPUT
+ bsr install_coverage_patches
+ ENDC
 .run
  ENDC
  ; resload calls may poison scratch registers, especially with MMU checks.
@@ -114,6 +125,9 @@ gamename dc.b "Powerdrome:PD",0
  EVEN
  IFD VERIFY
  INCLUDE verify_input.s
+ IFD COVERAGE_INPUT
+ INCLUDE coverage.s
+ ENDC
  ENDC
 tags dc.l WHDLTAG_CUSTOM1_GET
 custom1 dc.l 0

@@ -191,7 +191,8 @@ polygon costs from a twin capture with fast rasterizer code enabled.
 The [loader audit](loader-equivalence.md) resolves Copylock D2 without a runtime patch.
 The loaders have explicit allocation/timing differences, so performance comparisons continue
 to use the same development loader. The audit covers startup and Practice checkpoints;
-broader gameplay coverage remains separate.
+the completed [gameplay campaign](gameplay-coverage.md) covers longer routes separately.
 The emulator 68030/040/060 matrix is documented separately. Physical-board validation is
-outside scope. Long races with opponents and all view/effect combinations require further coverage before broadening supported fast paths
-or changing the default. The option remains explicit and off by default.
+outside scope. The bounded gameplay campaign passes 30,623 staged twins and checks native
+view/effect fallbacks; it does not certify every combination or justify widening supported
+paths. The option remains explicit and off by default.

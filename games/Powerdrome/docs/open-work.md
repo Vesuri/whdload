@@ -77,12 +77,16 @@ sixteen colour loops pass a structural audit. Option-off and no-fast-memory fall
 native hooks. Slave size grows by 100 bytes; renderer memory and simulation/cache policy are
 unchanged. `CUSTOM1` remains off by default.
 
-## Ordered next work
+## Gameplay coverage and remaining scope
 
-Follow the [performance implementation plan](performance-plan.md). The selected scope is
-planar scene rendering into fast RAM followed by a CPU copy to the chip back buffer, plus
-measured drawing-loop improvements. Retain the existing elapsed-time simulation and update
-order; a new scheduler, timestep policy or frame cap is outside this work.
+The [coverage campaign](gameplay-coverage.md) is complete (C1–C5): 30,623 staged scene twins
+pass with zero mismatches, including longer races, moving opponents, views, collisions,
+rescue/repairs, pit re-entry, restarts and natural weather routing. Exact repeats, title
+inset, option-off and no-fast-memory checks pass. Normal and ordinary VERIFY builds remain
+byte-identical; the input fixture is a separate development build.
 
-1. **`coverage`** — Extend automated coverage to long races, opponents, all views, collisions, pit re-entry,
-   restarts and effects before widening the guarded fast path.
+No work remains in the selected performance plan. Coverage is bounded to the documented
+routes; guards and the off-by-default option remain unchanged. Widening supported paths
+would require a separate validation effort. The selected implementation stages planar scenes
+in fast RAM and copies them to the chip back buffer. Native elapsed-time simulation and
+update order remain intact; a new scheduler, timestep policy or frame cap is outside scope.

@@ -328,6 +328,9 @@ scene_guards_ok
  move.w (sp)+,ccr
  rts
 scene_native
+ IFD COVERAGE_INPUT
+ bsr coverage_fallback
+ ENDC
  movem.l (sp)+,d0-d7/a0-a6
  move.w (sp)+,ccr
  bra native_scene

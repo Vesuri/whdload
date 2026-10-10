@@ -411,7 +411,9 @@ completed scene cost, copy/seed cost, memory use, state/pixel comparisons and en
 Use the title demo as a separate rendering fixture, not as simulation validation. Require
 longer gameplay sessions covering pit re-entry, restarts, pause, all views, opponents,
 collisions and effects before widening the accelerated path. Emulator traces establish
-where work goes; the acceleration option remains off by default.
+where work goes; the acceleration option remains off by default. The completed
+[coverage campaign](gameplay-coverage.md) passes 30,623 staged twins with observed native
+view/effect fallbacks. Its bounded routes do not justify widening those guards.
 
 ## Recommended first implementation batch
 

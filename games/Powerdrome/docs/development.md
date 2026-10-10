@@ -170,6 +170,24 @@ uncached comparisons reproducible; ordinary launches preserve the user's WHDLoad
 mismatch when present. See [accelerator testing](accelerator-cache-testing.md) for measured
 results and emulator limits.
 
+## Gameplay coverage
+
+`make -C whdload coverage` produces a separate `tmp/build/Powerdrome-coverage.slave`.
+`CUSTOM5=3/4` replay native inputs in Practice or qualifying/racing respectively.
+`CUSTOM5=5/6` select centering/acceleration cruise routes on the default course or track
+index 2. The natural-weather twin capture uses the first effect draw (`$112f4`) as its anchor.
+The fixture exercises views, overlays, pause, collisions, rescue, native pit repairs and
+session transitions. Its controls and diagnostic counters are absent from ordinary
+`all` and `verify` builds. Keep `CUSTOM4=1` for drawing equivalence checks.
+
+Follow the [coverage checklist and commands](gameplay-coverage.md). Read-only execution
+probes and state samples are enabled with `COVERAGE_PROBES` and `COVERAGE_STATE=1`.
+The field counter saves progress in 2,000-field chunks without advancing the game between
+chunks. Use `coverage_status.py --require-long` to reject missing scenarios and
+`--require-effects` to require natural weather rendering. Always run `perf_status.py`
+as well to check pixels, registers, CCR, scratch, guards and copied-code immutability.
+Coverage timings are not performance results.
+
 ## Original/development loader comparison
 
 `make -C whdload original-verify` builds a separate input-only original-loader reference.

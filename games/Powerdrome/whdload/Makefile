@@ -7,7 +7,7 @@ VASM ?= $(HOME)/.local/vasmm68k_mot
 .DEFAULT_GOAL := all
 VASMFLAGS ?=
 
-.PHONY: all verify original original-verify FORCE
+.PHONY: all verify coverage original original-verify FORCE
 all: ../tmp/build/Powerdrome.slave
 
 ../tmp/build/Powerdrome.slave: Powerdrome.s FORCE
@@ -17,6 +17,10 @@ all: ../tmp/build/Powerdrome.slave
 verify:
 	$(MAKE) all VASMFLAGS="-DVERIFY=1 $(VASMFLAGS)"
 	cp ../tmp/build/Powerdrome.slave ../tmp/build/Powerdrome-verify.slave
+
+coverage:
+	$(MAKE) all VASMFLAGS="-DVERIFY=1 -DCOVERAGE_INPUT=1 $(VASMFLAGS)"
+	cp ../tmp/build/Powerdrome.slave ../tmp/build/Powerdrome-coverage.slave
 
 original:
 	mkdir -p ../tmp/build

@@ -9,7 +9,7 @@ key_ready moveq #-1,d0
  rts
 key_return moveq #13,d0
  rts
-; Whole six-byte input JSRs. Only installed for CUSTOM5=2.
+; Whole six-byte input JSRs. Installed for CUSTOM5=2 and the coverage routes.
 ; Key 3 selects the same menu item as the top-middle Practice button.
 pl_practice PL_START
  PL_PS $12f6a,practice_ready
@@ -18,23 +18,49 @@ pl_practice PL_START
  PL_PS $13cde,pit_key
  PL_END
 practice_ready
+ IFD COVERAGE_INPUT
+ move.l custom5(pc),d0
+ cmp.l #6,d0
+ beq.w coverage_menu_ready
+ ENDC
  moveq #0,d0
  move.w practice_sent(pc),d0
  subq.w #1,d0
  rts
 practice_key
+ IFD COVERAGE_INPUT
+ move.l custom5(pc),d0
+ cmp.l #6,d0
+ beq.w coverage_menu_key
+ ENDC
  move.l a0,-(sp)
  lea practice_sent(pc),a0
  move.w #1,(a0)
  move.l (sp)+,a0
+ IFD COVERAGE_INPUT
+ move.l custom5(pc),d0
+ cmp.l #4,d0
+ shs d0
+ andi.l #1,d0
+ add.l #$33,d0
+ ELSE
  moveq #$33,d0
+ ENDC
  rts
 pit_ready
+ IFD COVERAGE_INPUT
+ move.w cov_started(pc),d0
+ bne.w coverage_pit_ready
+ ENDC
  moveq #0,d0
  move.w pit_sent(pc),d0
  subq.w #1,d0
  rts
 pit_key
+ IFD COVERAGE_INPUT
+ move.w cov_started(pc),d0
+ bne.w coverage_pit_key
+ ENDC
  move.l a0,-(sp)
  lea pit_sent(pc),a0
  move.w #1,(a0)

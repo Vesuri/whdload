@@ -27,7 +27,7 @@ inputs, so scene-average costs alone do not establish an identical-work speedup.
 Every retained candidate must have zero pixel, register/CCR, scratch and guard failures,
 unchanged copied code during playback, and intact option-off/fallback hooks. Arithmetic
 changes also need boundary tests beyond the one observed route. Unsupported routes remain
-native; longer gameplay coverage is a separate work item.
+native; the completed [gameplay campaign](gameplay-coverage.md) documents longer coverage.
 
 ## Starting evidence
 
@@ -189,7 +189,7 @@ their sizes. The added CPU selection runs at installation, not once per polygon 
 Final-build validation passes all selected CPU paths. Separate 100-field option-off and
 no-fast-memory runs retain every audited native hook byte, with no decoded direct branch
 entering a hook interior. The 68000's complete timing sequence is unchanged. This closes
-R1–R5; broader race/view/effect coverage remains the separate `coverage` work item.
+R1–R5; the separate [race/view/effect campaign](gameplay-coverage.md) also passes.
 
 ### Local evidence
 
