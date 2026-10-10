@@ -85,8 +85,17 @@ rescue/repairs, pit re-entry, restarts and natural weather routing. Exact repeat
 inset, option-off and no-fast-memory checks pass. Normal and ordinary VERIFY builds remain
 byte-identical; the input fixture is a separate development build.
 
-No work remains in the selected performance plan. Coverage is bounded to the documented
-routes; guards and the off-by-default option remain unchanged. Widening supported paths
+No work remains in the completed renderer performance plan. Coverage is bounded to the
+documented routes; guards and the off-by-default option remain unchanged. Widening supported paths
 would require a separate validation effort. The selected implementation stages planar scenes
 in fast RAM and copies them to the chip back buffer. Native elapsed-time simulation and
-update order remain intact; a new scheduler, timestep policy or frame cap is outside scope.
+update order remain intact; a new scheduler or timestep policy was outside that completed scope.
+
+## Proposed simulation timing work
+
+The user-observed speed difference on faster hardware is a separate open design problem.
+The [framerate independence analysis and plan](framerate-independence.md) maps the clamped
+movement timestep, per-frame gameplay work and mixed update/drawing paths. It proposes F1–F8:
+`timing-map`, `timing-baseline`, `tick-split`, `tick-clock`, `tick-behavior`, `timing-modes`,
+`timing-matrix` and `timing-release`. All are not started. The current request authorizes
+analysis and planning only; implementation awaits a separate instruction.
