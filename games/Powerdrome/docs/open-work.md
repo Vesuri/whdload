@@ -33,20 +33,16 @@ figures are separate from the practice launch profile.
 
 ## Accelerator and cache validation
 
-The uncached 68030/040/060 timing matrix, code-write audit and isolated-cache emulator
-checks are complete. See [accelerator and cache testing](accelerator-cache-testing.md).
-The final driving measurements are 19.56 → 30.02 fps on the requested 030/25 configuration,
-17.91 → 41.16 on 040/25, and 17.91 → 42.69 on 060/50; these are emulator figures.
-Lower-frequency checks respond to the requested clock. No real-board speed claim follows.
+The uncached 68030/040/060 timing matrix and code-write audit are complete.
+See [accelerator testing](accelerator-cache-testing.md). The driving measurements are
+19.56 → 30.02 fps on the requested 030/25 configuration, 17.91 → 41.16 on 040/25,
+and 17.91 → 42.69 on 060/50; these are emulator figures. Lower-frequency checks respond
+to the requested clock. Physical-board validation is outside the selected scope.
 
-The native fallback still rewrites two branch displacements. Normal cache policy remains
-unchanged. VERIFY `CUSTOM3=1` isolates expansion/slave caches while leaving chip memory
-non-cacheable and the 060 branch cache off. Ten-second 030/040/060 MMU twins, the 030
-no-MMU fallback and the 040 NoCache override passed all pixel, register/flag, scratch,
-guard and code-immutability checks. Actual cache/MMU settings are recorded and checked.
-The 040/060 emulator MMU path does not model real cache coherency, so cache enablement
-remains a verification experiment. Physical-board validation is outside the selected scope;
-the completed emulator matrix is sufficient for the current work.
+Cache selection is left to the user's standard WHDLoad `CACHE` and `DCACHE` options.
+There is no custom cache toggle or policy in either build. The native fallback still
+rewrites two branch displacements; these results do not certify every user-selected
+cache configuration. Shared KickEmu startup remains unmodified.
 
 MMU testing also corrected the development loader's invalid DOS launch arguments and
 exposed two register-comparison cases: an already-identical numeric value resembling a
@@ -54,7 +50,7 @@ bitmap pointer, and an empty-scanline colour-table pointer in `a4`. The verifier
 exact matches; return normalization now includes the relocated `a4` code pointer. The
 first mismatch snapshots are retained for diagnosing future failures. Simulation timing
 and renderer selection are unchanged. Final 68000/68020 twins, the no-fast-memory
-fallback and normal-build launches also passed; production cache enablement remains off.
+fallback and normal-build launches also passed.
 
 ## Ordered next work
 

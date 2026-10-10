@@ -97,7 +97,7 @@ buffer design. The selected scope preserves the native simulation and timing pol
 `whdload/Powerdrome.s` uses unmodified WHDLoad 20 KickEmu sources, interface 17, one disk,
 512 KiB chip for the guest, 256 KiB expansion for Kickstart and 128 KiB additional guest
 expansion. It retains the EndCLI redirection and Copylock replacement, with a signature
-check at game `$843c`. Caches remain disabled. `CUSTOM1=1` enables the optional fast planar
+check at game `$843c`. Cache selection is left to standard WHDLoad options. `CUSTOM1=1` enables the optional fast planar
 renderer, described in the [implementation report](performance-implementation.md); it is
 off by default. In VERIFY builds only, CUSTOM5 replaces the name-entry key-ready
 and key-read calls at `$13772` and `$1377c` with ready/Return responses. The shipped original

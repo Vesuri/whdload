@@ -48,10 +48,10 @@ next scanline rebuilds the fourth-plane pointer or the native epilogue restores 
 
 This replaces the original branch-displacement writes at `$16080/$1608a` in the fast path.
 Verification checks that the entire copied rasterizer, loops and dispatch table remain
-unchanged during captures. Normal CPU cache policy remains disabled: removing this rasterizer's
-self-modification does not establish cache safety for every other part of the game.
-The [accelerator/cache checks](accelerator-cache-testing.md) exercise a VERIFY-only
-isolated-cache policy and document the remaining native branch rewriting.
+unchanged during captures. Cache selection belongs to the user's WHDLoad `CACHE` and
+`DCACHE` options; neither build adds a custom cache policy. The
+[accelerator checks](accelerator-cache-testing.md) document the remaining native branch
+rewriting and the limits of the measured configurations.
 
 The original game hunk and other allocations stay in chip RAM. The normal option moves only the audited bitmap and copied rasterizer.
 The optional VERIFY scratch experiment also moves the CPU-only edge table. This keeps their contributions separately measurable.
@@ -186,7 +186,6 @@ polygon costs from a twin capture with fast rasterizer code enabled.
 The original/rebased-slave Copylock D2-equivalence question is isolated from these
 comparisons: both sides use the same development loader and its unchanged Copylock
 replacement. These measurements do not establish full legacy-slave equivalence.
-The emulator 68030/040/060 matrix and isolated-cache tests are documented separately.
-Real boards, global cache enablement, long races with opponents and all
-view/effect combinations require further coverage before broadening supported fast paths
+The emulator 68030/040/060 matrix is documented separately. Physical-board validation is
+outside scope. Long races with opponents and all view/effect combinations require further coverage before broadening supported fast paths
 or changing the default. The option remains explicit and off by default.

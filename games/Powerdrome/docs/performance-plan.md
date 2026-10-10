@@ -53,8 +53,8 @@ Two setup details matter for accelerated tests. The unmodified development basel
 `FASTMEMSIZE=0`, so extra host fast RAM was not exposed as ordinary guest fast memory by
 its interface-17 KickEmu setup. The baseline A1200 title test consequently executes
 the game from chip RAM. Also, none of KickEmu's `CACHE`, `CACHECHIP` or `CACHECHIPDATA`
-options is defined: the loader requests caches disabled. Adding host RAM or selecting a
-faster CPU alone does not test the proposed rendering architecture.
+build symbols is defined. Standard WHDLoad user cache options remain available. Adding
+host RAM or selecting a faster CPU alone does not test the proposed rendering architecture.
 
 ## Simulation and rendering are coupled
 
@@ -282,9 +282,9 @@ The polygon dispatcher rewrites branch displacement words at `$16080/$1608a` for
 polygon. Simply enabling an instruction cache risks stale code. Prefer replacing that
 frequently modified dispatch with cache-safe static/indirect dispatch, then test its cost
 on each CPU. Use cache flushes for installation-time changes; do not assume flushing the
-whole cache per polygon is a performance solution. Audit other executed self-modification
-before enabling caches generally. Keep DMA-visible chip data coherent and configure caching
-through WHDLoad rather than changing CPU control registers directly.
+whole cache per polygon is a performance solution. Keep DMA-visible chip data coherent.
+Leave cache selection to the user through WHDLoad; do not configure CPU caches in the
+game-specific patches.
 [WHDLoad cache handling](https://www.whdload.de/docs/en/cache.html)
 
 ## Implementation stages and acceptance gates
@@ -389,10 +389,11 @@ accidental clock changes. No new physics scheduler, timestep policy or frame cap
 
 ### Stage 6 Choose defaults and release coverage
 
-Use developer switches for memory placement, staging, each loop replacement, cache policy
+Use developer switches for memory placement, staging, each loop replacement
 and copy extent. The shipping choice should be a simple acceleration option or automatic
 selection among verified paths, with clean native fallback. CPU type alone is insufficient:
-require genuine fast RAM, a tested cache policy, supported view/state and measured benefit.
+require genuine fast RAM, supported view/state and measured benefit. Cache selection belongs
+to standard WHDLoad user options; do not add a game-specific cache policy.
 Do not dynamically benchmark during play or add simulation steps when switching a
 renderer. Test option-off byte/state equivalence and allocation failure explicitly.
 
@@ -402,14 +403,14 @@ renderer. Test option-off byte/state equivalence and allocation failure explicit
 | 68020 with chip RAM only | Measure loop/cache work; staging is unavailable |
 | 68020 with genuine fast RAM | First feasibility test; copy overhead may erase savings |
 | 68030 with fast RAM | Test CPU-local code/data and cache effects; staging is a strong candidate |
-| 68040/68060 with fast RAM | Test streaming stores, cache coherence and the chip-transfer ceiling on real hardware |
+| 68040/68060 with fast RAM | Measure CPU/copy costs in the emulator; physical-board validation is outside scope |
 
 For every supported class record displayed FPS, simulation ticks/s, frame-time distribution,
 completed scene cost, copy/seed cost, memory use, state/pixel comparisons and enabled options.
 Use the title demo as a separate rendering fixture, not as simulation validation. Require
 longer gameplay sessions covering pit re-entry, restarts, pause, all views, opponents,
 collisions and effects before widening the accelerated path. Emulator traces establish
-where work goes; real-machine timing decides accelerated hardware defaults.
+where work goes; the acceleration option remains off by default.
 
 ## Recommended first implementation batch
 
