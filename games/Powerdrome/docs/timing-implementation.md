@@ -1387,25 +1387,141 @@ on A500; the 030 counts are 248/1,064 and 40/834. The 030 also passes **192 rend
 comparisons**, with no pixel, scratch, register or guard failures and unchanged raster code.
 These heavily instrumented captures are not performance benchmarks.
 
-**Remaining chronological defect:** `$14090` calls the native opponent-speed retune
-`$e8d4`, before `$1409a` enters cockpit departure. The last active-pit allocation precedes
-this change, while the deferred tail is currently served in first flight. In these runs,
-opponent zero changes speed from 489 in the active pit to 567 at return on both CPUs.
-Consequently, pending historical updates can incorrectly use the later speed. Conservation
-alone does not establish correct integration. The previous rescue-return drain crosses
-the same native mutation boundary and also needs this audit.
+**Retune boundary under validation:** `$14090` calls the native opponent-speed retune
+`$e8d4`, before `$1409a` enters cockpit departure. The initial-pit prototype originally
+served the deferred tail in first flight, allowing historical updates to use the later
+speed. The experimental `timing_retune.s` now captures a fixed unpaused cutoff at this
+boundary, drains all whole opponent updates through that cutoff with the old speeds,
+and then runs the native retune. Time spent doing the drain remains for subsequent
+allocations; no opponent time is discarded. Player updates remain inactive.
 
-A safe boundary correction must account for native nonlocal exits: `$14008` clears the
-pit flag `state+$da` before retuning. With that flag clear, opponent code at `$d616` can
-unwind eight stack bytes into the race-result path. The initial pit has no ordinary world
-call frame, so calling the body from an arbitrary helper here is unsafe. Do not clear
-backlog, reset positions, or normalize this gameplay difference away.
+The final `timing-retune4-030-twins` (1,200 fields) and `timing-retune4-a500`
+(1,600 fields) use the same ordinary prototype with result injection disabled.
+
+| Retune and handoff measurement | 030/25, renderer twins | A500, no fast RAM |
+| --- | ---: | ---: |
+| Old-speed updates drained before retune | 6 / 540 ms | 57 / 5,130 ms |
+| Fixed cutoff since pit entry | 6,180 ms | 15,620 ms |
+| Residual at retune | 60 ms | 50 ms |
+| Remaining tail at pit return | 1,200 ms | 1,510 ms |
+| First flight serves / retains | 1,170 / 30 ms | 1,440 / 70 ms |
+| Final completed-world residual | 40 ms | 30 ms |
+| Modal / total movement samples | 272 / 1,064 | 692 / 1,420 |
+| Pit / flight ownership restores | 40 / 834 | 40 / 746 |
+
+On both CPUs, speeds change from **489, 519, 522, 558** to **567, 617, 553, 594**.
+The checker verifies every drained full record, restored caller registers and native
+stack depth, outer random/counter ownership, and that the native retune changes only
+record speed words using its four original random draws. All **68 common complete
+four-opponent snapshots**, through 6,120 ms, and their random states match. Neither
+first-flight allocation reaches its 32-update cap. The 030 passes **192 renderer
+comparisons**, with unchanged raster code and no pixel, scratch, register or guard
+failures. These instrumented captures establish the bounded initial-pit boundary and
+handoff, not a throughput benchmark or whole-game equivalence.
+
+The retune state occupies 44 static bytes; it makes no new allocation and does not
+change the requested memory or cache policy. The ordinary seeded coverage prototype is
+23,256 bytes, 476 more than the initial-pit predecessor. Each explicit result-test variant
+is 23,340 bytes. All three final artifacts rebuild byte-identically, and the normal slave
+remains byte-identical. An attempted non-VERIFY result-test build is rejected.
+
+Condition codes use guest-side input/output samples in VERIFY builds. As already observed
+for the movement wrapper, the 030 debugger SR can be stale. A focused instruction-step
+check found the saved word unchanged (20) across the drain although the initial debugger
+snapshot reported 8. The direct guest samples agree; `check_timing_retune.py` requires
+those samples rather than treating debugger SR equality as a flag oracle.
+
+The new helper also intercepts the native `$d606` race-result decision during its drain.
+`$14008` has already cleared `state+$da`, so the original `$d616` path would unwind eight
+bytes from an incompatible pit-helper stack. The prototype records the first winner and
+delivers it from the flat pit-return context, removing the ordinary world return slot only
+for rescue visits. The current revision returns immediately from the winning native
+opponent body, restores counter/random ownership, and retires all assigned and unassigned
+remaining work explicitly. A partial update is not counted as completed. No later
+opponents are processed after the winner.
+
+`TIMING_RETUNE_RESULT_TEST=1/2` is an explicit VERIFY-only outcome fixture for the initial
+or rescue boundary. It injects the native winning decision at opponent movement entry;
+it does not prove natural lap detection or final ranking arithmetic. Values outside 0–2,
+non-VERIFY builds, and builds without WORLD20 are rejected. The default is zero and has
+no result-injection patch.
+
+`timing-retune4-initial-result-030` completes 1,000 fields. Exactly one winner is delivered
+at the initial pit return, with the expected native result stack depth (four bytes above
+native pit entry). **Six assigned updates, including the interrupted one, plus 60 ms of
+unassigned time** are explicitly retired. The checker proves that no later opponent
+moves, the partial update is not counted complete, caller flags and counter/random
+ownership are restored, and the result gate clears pending modal ownership. Native
+session cleanup at `$c2aa` and later setup at `$e8d4` are reached with opponent ownership
+cleared. At field 639, fresh driving initializes both player and opponent clocks: one
+first opponent update, zero inherited debt and a new origin. Mode snapshots confirm a
+transition from qualifying (`state+$c0=$ffff`) to an ordinary race (`+$c0=0`, with
+`+$b6/+$be/+$c4/+$c8=0`). Its **52 renderer comparisons**
+pass with unchanged raster code and zero reported mismatches.
+
+`timing-retune4-rescue-result-030` completes 6,000 fields. The injected rescue result also
+stops after the first winning body and enters native results at the correct stack depth:
+eight bytes above the native rescue-pit entry, including removal of the world-call return.
+It retires **six assigned updates plus 80 ms unassigned time**, restores guest flags and
+counter/random ownership, clears modal/input/engine ownership, and reaches native cleanup
+and a fresh ordinary race with new player/opponent clocks and no inherited debt. Its
+**437 renderer comparisons** pass without reported mismatches or copied-code changes.
+Both forced-outcome tests therefore pass their bounded control-flow/cleanup checks. They
+still do not prove natural race finishing, final standings or result-duration correctness.
+The ordinary initial-pit CPU pair also passes on this revision. Ordinary rescue handoff,
+pause and session-lifecycle regressions remain; an injected result does not exercise a
+normal rescue return.
+
+```sh
+python3 tools/check_timing_retune_result.py tmp/prof/timing-retune4-initial-result-030
+python3 tools/check_timing_retune_result.py --rescue tmp/prof/timing-retune4-rescue-result-030
+```
+
+### Natural result timing and ranking gate
+
+The forced winner proves an exit decision and its call-stack handling, not a natural
+finish. The `CUSTOM5=13` Race-menu fixture initially enters **qualifying**, not the race
+itself: `state+$c0=$ffff`, and the natural lap-target winning decision is disabled by
+that flag. The injected outcome tests qualifying cleanup followed by race setup. A
+separate natural race-finish fixture is required for the ranking/duration branches. Native `$d7f2` first requires at least 400 clock units since the opponent lap
+start; it then advances the lap count at record `+$22`, compares the race target at
+`state+$266`, and checks that ending animation is not already active (`state+$e6`).
+The body updates lap-start/best-lap fields and, for the ordinary race mode, resets track
+progress before returning the winning decision. The injected movement-entry outcome
+intentionally bypasses these mutations. Its delivered opponent id alone cannot establish
+that the race standings identify the same winner.
+
+The native result path calls `$f5a6` at `$c0a2`. That routine sorts the linked pilot list
+headed by `state+$33c` using lap/segment comparisons, with separate repair branches at `$f5d6` and `$f5ec`.
+The native second repair branch at `$f5f2` adds `state+$280` to `d0`, not `d1`; preserve
+and test the actual instructions rather than assuming a symmetric abstract sort key. Links are record `+$28` / `+$2c`. In the ordinary human race, the five-node list contains
+opponents 1–4 and player 0 at **state-relative `$11c`** (hunk `$b8a`); its segment and
+lap words are therefore `state+$11e` and `state+$13e`. The current complete opponent
+capture omits this player node. `state+$346` is a separate optional pilot pointer used
+by other modes and is zero in the observed human race; it must not be used to locate
+the human player record. Sorting retains the existing order for equal scores. `$c164` then takes
+the first record id as the result winner. A natural-finish test must therefore capture
+the player record as well as all four opponents, audit the complete linked order, and
+compare lap/progress mutations and the resulting winner. Four opponent arrays alone do
+not cover this gate.
+
+Result duration also has a separate clock boundary. `$c094` reads physical `$f96` and
+subtracts `state+$22e` in one result mode. Other mode branches read `$f96` at `$c240`,
+`$c250` and `$c266` for result waiting and elapsed-time accounting. Deferring a historical
+win through cockpit departure can let additional physical time enter the reported race
+duration, even with correct opponent movement and stack delivery. Audit the mode flags
+and capture the logical winning deadline alongside these reads. Use logical event time
+for race-duration accounting; keep actual display/input waits on the physical clock.
+This **result-clock** work remains open. Do not infer completion from the forced exit or
+freeze the shared native clock to hide the discrepancy.
 
 The next F6 steps are:
 
-1. **Retune ordering:** finish pending opponent updates with the old speed before its
-   native mutation, with explicitly correct pit/result semantics and native stack depth.
-   Probe immediately before and after retune, including both initial and rescue visits.
+1. **Retune ordering:** repeat ordinary rescue handoff, pause and session regressions.
+   The final initial-pit A500/030 pair and both injected result paths now pass. Verify natural finishing,
+   ranking (including the player record), result-clock ownership and a fresh driving
+   session; the injected initial-result test covers control flow and cleanup, not these
+   broader requirements.
 2. **Initial pit pacing:** calibrate the external 17-position sequence against native
    A500, independently of cockpit pacing. Keep real user waiting time advancing opponents;
    do not delay CPU-only loading to manufacture matching first-flight positions.

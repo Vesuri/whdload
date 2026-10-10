@@ -62,6 +62,8 @@ timing_pit_opponent_test_due
 timing_pit_opponent_initialize
  ; Entry changes clock source, not the existing deadline, phase or remainder.
  move.l a0,-(sp)
+ lea timing_retune_state(pc),a0
+ clr.l 8(a0)
  lea timing_pit_opponent_state(pc),a0
  addq.l #1,48(a0)
  movea.l (sp)+,a0
@@ -126,6 +128,8 @@ timing_pit_opponent_allocate
  bsr timing_clock
  bsr timing_pit_clock
  lea timing_pit_opponent_state(pc),a0
+ move.w timing_retune_state+8(pc),d1
+ bne.s .retune_clock
  tst.w 64(a0)
  bne.s .flush_clock
  ; Native epoch is measured against physical time even when scheduling a
@@ -137,6 +141,9 @@ timing_pit_opponent_allocate
  move.w timing_world_state+8(pc),d1
  beq.s .clock_ready
  move.l timing_world20_clock(pc),d0
+ bra.s .clock_ready
+.retune_clock
+ move.l timing_retune_state+12(pc),d0
  bra.s .clock_ready
 .flush_clock
  ; Drain only through the captured native pit-return instant. Subsequent flight

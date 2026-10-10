@@ -233,11 +233,21 @@ deadlines (90–5,580 ms). The 030 adds 192 clean renderer comparisons. Player w
 inactive before flight. A500 retains a 6,560-ms departure tail and serves it over three
 capped allocations without losing time; the 030 tail is 1,720 ms.
 
-The immediate remaining defect is chronological: native departure retunes opponent speeds
-before the deferred tail is processed. Historical updates must use the earlier speed.
-Correct this before claiming whole-handoff equivalence, respecting the native nonlocal
-result exits and missing world frame on initial entry. Then pace the external 17-position
-animation, extend complete-state comparison through departure, repeat lifecycle regressions,
-and validate race reinitialization and repair pacing. See the numbered F6 steps and measured
-phase table in timing-implementation. Normal-build bytes remain unchanged; broader timing
+The final ordinary retune boundary passes the A500/030 pair: six old-speed updates (540 ms)
+on 030 and 57 (5,130 ms) on A500 complete before native speed changes. All 68 common complete
+opponent snapshots and random states through 6.12 seconds match, with guest-observed flags,
+caller registers and stack depth preserved. The later first-winner revision stops the
+interrupted opponent body and explicitly retires unfinished time. A VERIFY-injected initial
+result passes correct native stack delivery, six retired assigned updates plus 60 ms debt,
+no subsequent opponent movement, and native cleanup followed by fresh player/opponent clocks with zero inherited debt;
+52 renderer comparisons pass. Mode snapshots confirm this is a qualifying-to-race transition,
+so natural race-finish ranking and duration remain separate requirements. The rescue-result fixture also passes: six retired updates plus 80 ms residual, correct
+additional stack unwinding, fresh race clocks without debt, and 437 clean renderer
+comparisons. The final ordinary 030 regression adds 192 clean renderer comparisons (681 across the
+ordinary and two result fixtures), and its A500 counterpart passes timing/ownership checks.
+Repeat ordinary rescue, pause and session regressions, then test natural finishes, ranking
+and result-clock ownership. The forced-outcome test does not establish those requirements.
+Then pace the external 17-position animation, extend complete-state comparison through
+departure, repeat lifecycle regressions, and validate race reinitialization and repair
+pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

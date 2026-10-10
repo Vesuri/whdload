@@ -7,6 +7,10 @@ timing_pit_call
 timing_pit_run
  bsr timing_pit_native
  bsr timing_pit_leave
+ move.l d0,-(sp)
+ move.w timing_retune_state+10(pc),d0
+ movem.l (sp)+,d0
+ bne.w timing_retune_deliver_result
  tst.w d0
  bne.s .continue
  bsr timing_pit_is_initial
@@ -129,6 +133,8 @@ timing_pit_abort
  move.w sr,-(sp)
  movem.l d0-d1/a0-a1,-(sp)
  bsr timing_pit_opponent_restore
+ lea timing_retune_state(pc),a0
+ clr.l 8(a0)
  lea timing_pit_opponent_flushing(pc),a0
  clr.w (a0)
  lea timing_pit_state(pc),a0

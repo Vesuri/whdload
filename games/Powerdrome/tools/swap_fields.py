@@ -182,7 +182,7 @@ if os.environ.get('TIMING_STATE') == '1':
     session_sample=''
     if fast_worlds:
         sessions=[m.start() for m in re.finditer(b'PDSESS01',code)
-                  if 0<fast_worlds[0]-m.start()<2048]
+                  if 0<fast_worlds[0]-m.start()<4096]
         if sessions:
             assert len(sessions)==1 and len(periodic)==1 and keys and engines
             sptr=a.base+sessions[0]
@@ -200,7 +200,7 @@ if os.environ.get('TIMING_STATE') == '1':
     initial_pit_sample=''
     if fast_worlds:
         pits=[m.start() for m in re.finditer(b'PDPIT001',code)
-              if 0<fast_worlds[0]-m.start()<2048]
+              if 0<fast_worlds[0]-m.start()<4096]
         if pits:
             assert len(pits)==1
             pitp=a.base+pits[0]
@@ -214,7 +214,7 @@ if os.environ.get('TIMING_STATE') == '1':
     pit_opponent_sample=''
     if fast_worlds:
         popps=[m.start() for m in re.finditer(b'PDPOPP01',code)
-               if 0<fast_worlds[0]-m.start()<2048]
+               if 0<fast_worlds[0]-m.start()<4096]
         if popps:
             assert len(popps)==1
             op=a.base+popps[0]
@@ -226,6 +226,16 @@ if os.environ.get('TIMING_STATE') == '1':
             ov += [f'*(unsigned short*){op+x:#x}' for x in (64,66,132)]
             ov += [f'*(unsigned short*){wp+8:#x}', f'*(unsigned int*){fast_worlds[0]+a.base+12:#x}', '(unsigned int)$d5']
             pit_opponent_sample='printf "PDPOPP_EVENT %d {off} ' + ' '.join(['%u']*len(ov)) + '\\n", $pd_field, ' + ', '.join(ov) + '\n'
+    retune_sample=''
+    if fast_worlds:
+        retunes=[m.start() for m in re.finditer(b'PDRETUNE',code)
+                 if 0<fast_worlds[0]-m.start()<4096]
+        if retunes:
+            assert len(retunes)==1
+            rp=a.base+retunes[0]
+            rv=[f'*(unsigned {kind}*){rp+x:#x}' for x,kind in
+                ((8,'short'),(10,'short'),(12,'int'),(16,'short'),(20,'int'),(24,'int'),(18,'short'),(28,'short'),(32,'int'),(36,'int'),(40,'int'))]
+            retune_sample='printf "PDRETUNE_EVENT %d {off} ' + ' '.join(['%u']*len(rv)) + '\\n", $pd_field, ' + ', '.join(rv) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
@@ -233,8 +243,9 @@ if os.environ.get('TIMING_STATE') == '1':
         sample += session_sample.replace('{off}',hex(off))
         sample += pit_sample.replace('{off}',hex(off))
         sample += initial_pit_sample.replace('{off}',hex(off))
+        sample += retune_sample.replace('{off}',hex(off))
         sample += pit_opponent_sample.replace('{off}',hex(off))
-        if os.environ.get('OPPONENT_STATE') == '1' and off in (0xe976,0xca3e,0xcedc,0xe3c4,0xbc44,0xd7f0):
+        if os.environ.get('OPPONENT_STATE') == '1' and off in (0xe976,0xca3e,0xcedc,0xe3c4,0xbc44,0xd7f0,0x14090,0xe8d4):
             # Four native records, all 190 bytes each. Guard the native count
             # and relocated bank before reading; never write game state.
             pointer=f'*(unsigned int*){state+0x342:#x}'
@@ -249,7 +260,7 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):
             sample += heat_sample.replace('{off}',hex(off))
-        if off in (0xccee,0xccf6):
+        if off in (0xccee,0xccf6,0x14090,0xe8d4,0x103a2,0xbfb0,0xbfb6):
             contract_values=[f'(unsigned int)${reg}' for reg in
                              ('d0','d1','d2','d3','d4','d5','d6','d7','a0','a1','a2','a3','a4','a5','a6','sp','sr')]
             contract_values += [f'*(unsigned short*){state+x:#x}' for x in (0x21c,0x194)]

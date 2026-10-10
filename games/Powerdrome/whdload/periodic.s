@@ -58,6 +58,23 @@ TIMING_WORLD_STEP = 4
  ELSE
 TIMING_WORLD_STEP = 18
  ENDC
+ IFND TIMING_RETUNE_RESULT_TEST
+TIMING_RETUNE_RESULT_TEST = 0
+ ENDC
+ IFLT TIMING_RETUNE_RESULT_TEST
+ FAIL "TIMING_RETUNE_RESULT_TEST must be 0, 1 (initial), or 2 (rescue)"
+ ENDC
+ IFGT TIMING_RETUNE_RESULT_TEST-2
+ FAIL "TIMING_RETUNE_RESULT_TEST must be 0, 1 (initial), or 2 (rescue)"
+ ENDC
+ IFNE TIMING_RETUNE_RESULT_TEST
+ IFND VERIFY
+ FAIL "TIMING_RETUNE_RESULT_TEST requires VERIFY"
+ ENDC
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_RETUNE_RESULT_TEST requires TIMING_WORLD20"
+ ENDC
+ ENDC
  IFND TIMING_SETUP_SEED
 TIMING_SETUP_SEED = -1
  ENDC
@@ -112,6 +129,12 @@ install_periodic
  lea timing_pit_opponent_end(pc),a0
  move.w #$42e7,(a0)
  lea timing_pit_opponent_restore(pc),a0
+ move.w #$42e7,(a0)
+ IFD VERIFY
+ lea timing_retune_flags(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
+ lea timing_pit_retune(pc),a0
  move.w #$42e7,(a0)
  lea timing_initial_pit_enter(pc),a0
  move.w #$42e7,(a0)
@@ -253,6 +276,19 @@ pl_periodic PL_START
  PL_PS $d836,timing_pit_clock_d7
  ; TIMING_RANGE h0:$d866 6 bit=C3
  PL_PS $d866,timing_pit_clock_d7
+ IFNE TIMING_RETUNE_RESULT_TEST
+ ; Native MOVE/TST/BPL; inject only the selected pit-boundary result outcome.
+ ; TIMING_RANGE h0:$d560 10 bit=C3
+ PL_P $d560,timing_retune_test_finish
+ PL_NOP $d566,4
+ ENDC
+ ; Departure retune BSR plus following MOVE.W; preserve native continuation.
+ ; TIMING_RANGE h0:$14090 10 bit=C3
+ PL_P $14090,timing_pit_retune
+ PL_NOP $14096,4
+ ; Native pit-result decision; only boundary catch-up defers its nonlocal exit.
+ ; TIMING_RANGE h0:$d606 6 bit=C3
+ PL_P $d606,timing_retune_result_gate
  ; Initial BSR plus MOVE.W; no world frame exists on this path.
  ; TIMING_RANGE h0:$bc3a 10 bit=C3
  PL_P $bc3a,timing_initial_pit_call
@@ -770,6 +806,22 @@ timing_targets
  dc.l $bade
  dc.w timing_setup_after_reseed+2-timing_targets
  ENDC
+ IFNE TIMING_RETUNE_RESULT_TEST
+ dc.l $d600
+ dc.w timing_retune_test_result+2-timing_targets
+ dc.l $d56c
+ dc.w timing_retune_test_move+2-timing_targets
+ ENDC
+ dc.l $e8d4
+ dc.w timing_retune_native+2-timing_targets
+ dc.l $1409a
+ dc.w timing_retune_continue+2-timing_targets
+ dc.l $d60c
+ dc.w timing_retune_modal_result+2-timing_targets
+ dc.l $d616
+ dc.w timing_retune_native_result+2-timing_targets
+ dc.l $bfb0
+ dc.w timing_retune_result+2-timing_targets
  dc.l $d3d6
  dc.w timing_pit_opponent_direct+2-timing_targets
  dc.l $d3de
