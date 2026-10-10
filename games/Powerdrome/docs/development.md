@@ -6,7 +6,9 @@ Keep both supplied archives in ignored `tmp/`. Extract the installer to `tmp/ins
 and Retroplay pack to `tmp/game/`; the playable tree is `tmp/game/Powerdrome/`.
 `tmp/archive.sha256` records local input hashes. Never commit proprietary inputs or captures.
 
-Source `amiga/env.sh` for the existing Amiga toolchain. Shared inputs use these overrides:
+Source `amiga/env.sh` for the shared Amiga environment that AmigaXDev installs (`make setup`);
+it sources the shared `env.sh`, whose variables AmigaXDev's `docs/environment.md` describes.
+Shared inputs use these overrides:
 
 | Variable | Default under the shared Amiga directory |
 |---|---|
@@ -19,7 +21,8 @@ Source `amiga/env.sh` for the existing Amiga toolchain. Shared inputs use these 
 
 `FSUAE` overrides the executable, `FSUAE_COMMON` the shared process/port helper.
 The shared directory convention is `~/.local/share/amiga`. `VASM` and `NDK` override the
-assembler and Amiga include directory in the makefile.
+assembler and Amiga include directory in the makefile; `WHDLOAD` also supplies the API headers
+and KickEmu sources the slave builds with.
 
 ## Build and run
 
@@ -51,7 +54,9 @@ FAST_KB=4096 WHD_ARGS=CUSTOM1=1 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
 The default machine is 68000, 512 KB chip and 1,536 KB slow with no fast RAM. The host boots
 Kickstart 3.1 and Workbench 2.04 provides Assign for the original slave's Kickstart files.
 Windowed, real speed, sound enabled. `CPU`, `CHIP_KB`, `FAST_KB`, `AMIGA_MODEL`, `EXTRA_ARGS`,
-`WHD_ARGS`, `WB`, `SILENT`, `WARP`, `JOY0` and `JOY1` override the setup.
+`WHD_ARGS`, `WB`, `SILENT`, `WARP`, `JOY0` and `JOY1` override the setup. `DEBUG` and `WARP` runs
+are silent with the window behind the others; `SOUND=0|1` and `WINDOW=front|back|none` (none:
+no video) choose explicitly.
 
 ## Inspection
 

@@ -17,8 +17,8 @@
 - **No performance claim without a measurement**, and only from the right instrument (§7, §8).
 - **No local paths in the repo**: no home directories, usernames, `~/Documents/...`, RetroPie or
   amiberry locations, and no paths into other projects. Name another project without its location
-  ("Test Drive 2 `docs/new-game-playbook.md`"). Shared files come from `~/.local/share/amiga`
-  through overridable variables in `amiga/env.sh` (§1); scratch output goes to the repo's ignored
+  ("AmigaXDev `docs/playbooks/new-game-playbook.md`"). Shared files come from `~/.local/share/amiga`
+  (AmigaXDev) through the overridable variables of the shared `env.sh`, which `amiga/env.sh` sources (§1); scratch output goes to the repo's ignored
   `tmp/`, never `/tmp`. `~/.local` and `fsuae_common.sh` are the allowed convention.
 - **History belongs in git.** Docs describe the current state (how to build, run and measure; how
   the game and the patches work; current numbers; open items). When a finding changes, update the

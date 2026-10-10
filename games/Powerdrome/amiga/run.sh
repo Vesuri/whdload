@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Boot the installed original Powerdrome under WHDLoad in FS-UAE.
 #   amiga/run.sh            windowed, real speed, with sound
-#   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger)
+#   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger); silent,
+#                           window behind the others (WINDOW=front|none, SOUND=1 to change)
 #   SLAVE=path amiga/run.sh run another slave build instead of the installed one
 #   WHD_SPLASH=1 amiga/run.sh show WHDLoad options and wait for Start
 #   WB=1 amiga/run.sh       also insert the Workbench floppy
-# Host: Kickstart 3.1 boots DH0, which runs WHDLoad on DH1. Host files come from
-# ~/.local/share/amiga (see env.sh for KICKSTART, WHDLOAD, WHDLOAD_BINARY, WORKBENCH_ADF) and fsuae_common.sh.
+# Host: Kickstart 3.1 boots DH0, which runs WHDLoad on DH1. Host files come from the shared
+# environment (env.sh: KICKSTART, WHDLOAD, WHDLOAD_BINARY, WORKBENCH_ADF) and fsuae_common.sh.
 # FS-UAE screenshots go to the ignored tmp/shots.
 # The original slave boots Disk.1 through a patched Kickstart 1.3 image.
 set -euo pipefail
@@ -15,7 +16,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
 [ -r "$KICKSTART" ] || { echo "Kickstart image is unreadable: $KICKSTART" >&2; exit 1; }
-. "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
+. "$FSUAE_COMMON"
 
 GAME="${GAME:-../tmp/game/Powerdrome}"
 WHD="$WHDLOAD_BINARY"
@@ -50,25 +51,15 @@ printf '%s\n' ${ASSIGNS[@]+"${ASSIGNS[@]}"} 'Stack 16384' 'FailAt 999' 'CD DH1:'
   "WHDLoad Powerdrome.Slave PRELOAD $WHD_UI ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
 rm -f "$RUN"/state/*.uss
 
-# joystick_port_0=none unplugs the host device, but port 0 stays in mouse mode and the host mouse
-# still moves its counters; also set the mode so nothing feeds JOY0DAT.
-JOY0_MODE=(); [ "${JOY0:-mouse}" = none ] && JOY0_MODE=(--joystick_port_0_mode=nothing)
-JOY1_MODE=(); [ "${JOY1:-keyboard}" = none ] && JOY1_MODE=(--joystick_port_1_mode=nothing)
-AUDIO=(); [ "${SILENT:-0}" = 1 ] && AUDIO=(--audio_driver=dummy)
-DBG=(); [ "${DEBUG:-0}" = 1 ] && DBG=(--remote_debugger=20 --remote_debugger_port="$DEBUG_PORT")
-REC=(); [ -n "${RECORD:-}" ] && REC=(--record="$RECORD" --deterministic=1)
-[ "${DETERMINISTIC:-0}" = 1 ] && REC+=(--deterministic=1)
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$(cd .. && pwd)/tmp/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
-"${FSUAE:-fs-uae}" \
-  --base_dir="$PWD/$RUN/fsuae" \
-  --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-512}" --fast_memory="${FAST_KB:-0}" \
-  --kickstart_file="$KICKSTART" \
+# Model, memory, sound, window, DEBUG, RECORD and the rest: fsuae_options in $FSUAE_COMMON
+# (JOY0/JOY1=none also unplug the port's mode, so the host mouse feeds nothing).  Slow memory
+# defaults to 1.5 MB unless EXTRA_ARGS is given.
+CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" JOY0="${JOY0:-mouse}" JOY1="${JOY1:-keyboard}"
+[ -n "${EXTRA_ARGS:-}" ] || SLOW_KB="${SLOW_KB:-1536}"
+fsuae_options
+fsuae_launch \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   ${FLOPPY[@]+"${FLOPPY[@]}"} \
-  --joystick_port_0="${JOY0:-mouse}" ${JOY0_MODE[@]+"${JOY0_MODE[@]}"} --joystick_port_1="${JOY1:-keyboard}" ${JOY1_MODE[@]+"${JOY1_MODE[@]}"} \
-  --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
-  --ntsc_mode=0 --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
-  "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" ${EXTRA_ARGS:---slow_memory=1536} > "$RUN/fsuae.log" 2>&1 &
-FSUAE_PID=$!; fsuae_track "$FSUAE_PID"
-echo "fs-uae pid $FSUAE_PID (log $RUN/fsuae.log, port $DEBUG_PORT)"
+  --window_width=760 --window_height=568 --state_dir="$RUN/state"

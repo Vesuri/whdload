@@ -1,3 +1,5 @@
+# The shared environment (as amiga/env.sh): WHDLoad 20.0 supplies the API headers and the KickEmu
+# sources (kick13.s and its includes); include/lvo/ adapts their LVO include names to the NDK.
 WHDLOAD ?= $(HOME)/.local/share/amiga/WHDLoad-20.0
 NDK ?= $(HOME)/.local/opt/m68k-amiga-elf/sys-include
 VASM ?= $(HOME)/.local/vasmm68k_mot
@@ -10,7 +12,7 @@ all: ../tmp/build/Powerdrome.slave
 
 ../tmp/build/Powerdrome.slave: Powerdrome.s FORCE
 	mkdir -p ../tmp/build
-	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I. -Iinclude -I$(NDK) -o $@ $<
+	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I. -Iinclude -I$(WHDLOAD)/Include -I$(WHDLOAD)/Src/sources -I$(NDK) -o $@ $<
 
 verify:
 	$(MAKE) all VASMFLAGS="-DVERIFY=1 $(VASMFLAGS)"
