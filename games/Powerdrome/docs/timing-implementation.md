@@ -1537,12 +1537,46 @@ for race-duration accounting; keep actual display/input waits on the physical cl
 `tools/check_pilot_list.py` now validates the five-node topology, reciprocal links,
 mode-specific bank and record ids in the captured dumps. Its optional sorted check must
 only be used at an audited native sort-completion point. `tools/check_natural_result.py`
-is prepared for ordered `$c094`, `$c09e` and `$c0a6` snapshots: it will compare the committed
+uses ordered `$c094`, `$c09e` and `$c0a6` snapshots to compare the committed
 race duration with the logical winning instant while checking all five sorted records.
-Its natural-finish capture and strict logical-time gate are still outstanding.
+`--require-logical-time` additionally requires exact duration, preserved caller registers
+and stack, native MOVE.L flags, and cleared result-clock ownership after cleanup.
 
-This **result-clock** work remains open. Do not infer completion from the forced exit or
-freeze the shared native clock to hide the discrepancy.
+The baseline natural runs now reach an unforced ten-lap finish with all five reciprocal
+pilot links and the native sorted comparisons intact. `timing-retune4-natural-result-030`
+reports **215,140 ms** for a logical winning duration of **215,120 ms** (**+20 ms**), with
+opponent 2 winning. `timing-retune4-natural-result-a500` reports **227,960 ms** versus
+**227,920 ms** (**+40 ms**), with opponent 4 winning. These are independent result-clock
+observations, not trajectory equivalence: the winners and complete starting histories
+are not established as matching across CPUs. The 030 reaches the result with 2,415
+cumulative renderer twins and no reported failures; the 200-field result window adds
+no staged scenes. Do not count those cumulative twins as new window comparisons.
+
+An experimental `timing_result.s` now latches an active opponent or deferred pit opponent
+winning instant before ownership cleanup, and supplies it only to the ordinary duration
+read at `$c094`. Unclassified sources still use the native physical value. The 36-byte
+static state is cleared at native session cleanup; the helper reproduces MOVE.L flags,
+including X preservation, and records guest flags for verification. The global native
+clock and display/input waits are unchanged. The corrected 030 natural finish
+(`timing-resultclock1-natural-030`) reports **215,020 ms**, exactly its logical winning
+duration, while the native physical read is **60 ms later**. All five sorted pilot
+records, preserved caller registers/stack, MOVE.L flags and cleared ownership at cleanup
+pass the strict checker. Its 200-field result window contains no new staged scenes;
+2,391 cumulative clean twins are not additional window comparisons. The corrected A500
+run (`timing-resultclock1-natural-a500`) reports **227,920 ms**, exactly its logical
+winning duration, while the physical read is **40 ms later**. It passes the same strict
+clock, five-pilot ordering, register/flag and cleanup checks. These CPU runs have different
+winners and do not establish cross-CPU trajectory equivalence. Player-originated finishes,
+other result modes and deferred-pit duration still need explicit validation. The normal
+build remains byte-identical.
+
+The ordinary opponent-result clock correction is validated on this CPU pair. Broader
+**result-clock** work remains open: do not infer player/deferred-pit/mode coverage from
+these runs or freeze the shared native clock to hide discrepancies. Recheck this pair with:
+
+```sh
+python3 tools/check_natural_result.py --require-logical-time tmp/prof/timing-resultclock1-natural-030 tmp/prof/timing-resultclock1-natural-a500
+```
 
 The next F6 steps are:
 

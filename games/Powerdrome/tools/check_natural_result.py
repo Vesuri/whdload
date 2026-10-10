@@ -64,6 +64,25 @@ def check(root, require_logical_time=False):
           f'error {error * 5:+d} ms')
     if require_logical_time:
         assert error == 0, 'Result duration is not tied to the logical winning instant'
+        result_state = live_tag(b'PDRSLT01')
+        output = (root / 'probe-0xc0a6-other.bin').read_bytes()
+        assert u16(output, result_state + 8) == u16(output, result_state + 10) == 1
+        assert u32(output, result_state + 12) == u32(output, result_state + 32) == logical
+        assert u32(output, result_state + 20) > 0
+        input_ccr = u16(output, result_state + 28)
+        expected_ccr = (input_ccr & 16) | (8 if logical & 0x80000000 else 0) | (4 if logical == 0 else 0)
+        assert u16(output, result_state + 30) & 31 == expected_ccr, 'Guest clock-read flags differ from native MOVE.L'
+        def registers_at(point):
+            text = (root / f'probe-{point}-registers.txt').read_text()
+            return {name: int(value, 16) for name, value in re.findall(r'^(d[0-7]|a[0-6]|sp)\s+0x([0-9a-f]+)', text, re.M)}
+        first, last = registers_at('0xc094'), registers_at('0xc09e')
+        preserved = [f'd{i}' for i in range(7)] + [f'a{i}' for i in range(7)] + ['sp']
+        assert all(first[name] == last[name] for name in preserved), 'Duration-clock wrapper changed a native caller register or stack'
+        final = (root / 'final-code.bin').read_bytes()
+        assert u16(final, result_state + 8) == u16(final, result_state + 10) == 0, 'Winning clock leaked past session cleanup'
+        physical_gap = u32(output, result_state + 24) - logical
+        print(f'  Latched opponent time, preserved registers/stack and guest MOVE.L flags verified; native read was {physical_gap * 5:+d} ms later')
+        print('  Winning-clock ownership cleared by native session cleanup')
 
 
 if __name__ == '__main__':

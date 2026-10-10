@@ -174,6 +174,7 @@ timing_world_session_gate
  bra.w timing_world_after_session_gate
 timing_world_result_gate
  IFNE TIMING_WORLD20
+ bsr timing_result_begin
  bsr timing_pit_abort
  ENDC
  IFNE TIMING_WORLD20
@@ -212,6 +213,7 @@ timing_world_phase dc.w 0
  INCLUDE timing_session.s
 
  IFNE TIMING_WORLD20
+ INCLUDE timing_result.s
  INCLUDE timing_retune.s
  INCLUDE timing_pit.s
  INCLUDE timing_world20.s

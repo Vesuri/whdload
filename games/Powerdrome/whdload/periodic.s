@@ -131,9 +131,15 @@ install_periodic
  lea timing_pit_opponent_restore(pc),a0
  move.w #$42e7,(a0)
  IFD VERIFY
+ lea timing_result_flags(pc),a0
+ move.w #$42e7,(a0)
  lea timing_retune_flags(pc),a0
  move.w #$42e7,(a0)
  ENDC
+ lea timing_result_begin(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_result_clock_d7(pc),a0
+ move.w #$42e7,(a0)
  lea timing_pit_retune(pc),a0
  move.w #$42e7,(a0)
  lea timing_initial_pit_enter(pc),a0
@@ -282,6 +288,9 @@ pl_periodic PL_START
  PL_P $d560,timing_retune_test_finish
  PL_NOP $d566,4
  ENDC
+ ; Only ordinary result-duration accounting reads the logical winning instant.
+ ; TIMING_RANGE h0:$c094 6 bit=C3
+ PL_PS $c094,timing_result_clock_d7
  ; Departure retune BSR plus following MOVE.W; preserve native continuation.
  ; TIMING_RANGE h0:$14090 10 bit=C3
  PL_P $14090,timing_pit_retune

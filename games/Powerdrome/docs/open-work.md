@@ -249,8 +249,14 @@ Ordinary 030 rescue and pause now pass: rescue carries 50 ms residual into an
 80-ms return interval and serves 90 ms, retaining 40 ms; pause excludes 50 PAL fields
 with no queued input leakage or time debt. They add 414 and 76 clean renderer comparisons.
 Session restart also passes two native closures and two fresh entries, adding 232 clean
-renderer comparisons. Wider A500 lifecycle checks remain. An unforced race-finish capture
-is running to test five-pilot ranking and result-clock ownership. The forced-outcome test does not establish those requirements.
+renderer comparisons. Wider A500 lifecycle checks remain. Unforced ten-lap finishes now validate the five-pilot list and native ordering. Result
+duration is 20 ms late on 030 and 40 ms late on A500 relative to each logical winning
+instant; different winners mean these runs are not trajectory-equivalence evidence.
+The opponent result-clock latch passes the corrected 030 natural finish: reported and
+logical duration both 215,020 ms, removing a 60-ms physical-read delay in that run.
+Corrected A500 reported/logical duration both equal 227,920 ms, removing a 40-ms delay.
+Caller registers, flags, five-pilot ordering and cleanup pass on both CPUs. Player finishes, other
+result modes and deferred-pit duration remain open. The forced-outcome test does not establish those requirements.
 Then pace the external 17-position animation, extend complete-state comparison through
 departure, repeat lifecycle regressions, and validate race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
