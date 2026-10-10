@@ -245,8 +245,12 @@ so natural race-finish ranking and duration remain separate requirements. The re
 additional stack unwinding, fresh race clocks without debt, and 437 clean renderer
 comparisons. The final ordinary 030 regression adds 192 clean renderer comparisons (681 across the
 ordinary and two result fixtures), and its A500 counterpart passes timing/ownership checks.
-Repeat ordinary rescue, pause and session regressions, then test natural finishes, ranking
-and result-clock ownership. The forced-outcome test does not establish those requirements.
+Ordinary 030 rescue and pause now pass: rescue carries 50 ms residual into an
+80-ms return interval and serves 90 ms, retaining 40 ms; pause excludes 50 PAL fields
+with no queued input leakage or time debt. They add 414 and 76 clean renderer comparisons.
+Session restart also passes two native closures and two fresh entries, adding 232 clean
+renderer comparisons. Wider A500 lifecycle checks remain. An unforced race-finish capture
+is running to test five-pilot ranking and result-clock ownership. The forced-outcome test does not establish those requirements.
 Then pace the external 17-position animation, extend complete-state comparison through
 departure, repeat lifecycle regressions, and validate race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing

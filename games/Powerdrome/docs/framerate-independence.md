@@ -50,8 +50,8 @@ matching gameplay pace across CPUs.
 
 Game addresses below are offsets into the code hunk. State offsets are relative to the
 state base at hunk `$a6e`. Evidence consists of the supplied game, existing captures and
-read-only inspection of their saved code. No new emulator run or implementation experiment
-was performed for this document.
+read-only inspection of their saved code. Subsequent prototype runs and their measured
+limits are recorded in [timing implementation](timing-implementation.md).
 
 The [performance plan](performance-plan.md#simulation-and-rendering-are-coupled) contains the
 original timing trace and per-update findings. [Internals](internals.md#display-and-timing)
@@ -304,7 +304,8 @@ substeps are necessary, use the same deterministic subdivision rule on every CPU
 ## Step by step implementation plan
 
 F1/F2 are in progress; F3 is built and under validation. F4/F5 have an isolated
-control/resource prototype, with remaining mutations still under audit. F6–F8 are pending.
+control/resource prototype, with remaining mutations still under audit. F6 is in progress
+with bounded pause, pit, retune and result-exit checks; F7/F8 completion gates remain open.
 Implementation is authorized; the smaller A500-calibrated approach remains selected.
 
 | Step | Shortcut | Deliverable and completion gate |

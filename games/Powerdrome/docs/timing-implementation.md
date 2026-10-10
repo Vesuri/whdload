@@ -1477,6 +1477,28 @@ python3 tools/check_timing_retune_result.py tmp/prof/timing-retune4-initial-resu
 python3 tools/check_timing_retune_result.py --rescue tmp/prof/timing-retune4-rescue-result-030
 ```
 
+### Retune revision lifecycle regressions
+
+The final ordinary `timing-retune4-rescue-030-twins` completes 5,000 fields with result
+injection disabled. Rescue return preserves 1,049 completed opponent updates, phase 1,050
+and 50 ms residual. The next allocation accounts for 80 ms elapsed after return:
+**80 + 50 = 90 ms served + 40 ms retained**. The checker verifies 4,444 scheduled opponent
+movement samples (572 after return), 682 modal ownership restores, 1,691 world counter
+restores (642 after return), and 16 samples each of the logical lap-gate and lap-duration
+clocks. The rescue retune drains six old-speed updates (540 ms), retains 10 ms, and changes
+speeds from 567/617/553/594 to 622/549/603/508 with the original native random arithmetic.
+There are **414 clean renderer comparisons**, with unchanged raster code.
+
+The final `timing-retune4-pause-030-twins` excludes **50 paused PAL fields**, accounts for
+all five input events, and checks 254 consecutive 20-ms movement steps, 56 rational 90-ms
+slow updates and 224 opponent reads. It finishes with zero allocator debt, unfinished
+assigned steps or pending started controls. All **76 renderer comparisons** pass, with
+unchanged raster code. The final `timing-retune4-sessions-030-twins` completes 1,800
+fields, verifies two native closures and two fresh gameplay entries, and checks six
+inactive menu/pit probes. No assigned steps, allocator debt, inputs or engine events are
+left to discard at those two sampled boundaries. It adds **232 clean renderer comparisons**
+with unchanged code. These results do not replace wider A500/mode/CPU validation.
+
 ### Natural result timing and ranking gate
 
 The forced winner proves an exit decision and its call-stack handling, not a natural
@@ -1512,13 +1534,21 @@ win through cockpit departure can let additional physical time enter the reporte
 duration, even with correct opponent movement and stack delivery. Audit the mode flags
 and capture the logical winning deadline alongside these reads. Use logical event time
 for race-duration accounting; keep actual display/input waits on the physical clock.
+`tools/check_pilot_list.py` now validates the five-node topology, reciprocal links,
+mode-specific bank and record ids in the captured dumps. Its optional sorted check must
+only be used at an audited native sort-completion point. `tools/check_natural_result.py`
+is prepared for ordered `$c094`, `$c09e` and `$c0a6` snapshots: it will compare the committed
+race duration with the logical winning instant while checking all five sorted records.
+Its natural-finish capture and strict logical-time gate are still outstanding.
+
 This **result-clock** work remains open. Do not infer completion from the forced exit or
 freeze the shared native clock to hide the discrepancy.
 
 The next F6 steps are:
 
-1. **Retune ordering:** repeat ordinary rescue handoff, pause and session regressions.
-   The final initial-pit A500/030 pair and both injected result paths now pass. Verify natural finishing,
+1. **Retune ordering:** finish wider A500 lifecycle regressions. The final initial-pit
+   CPU pair, 030 ordinary rescue/pause/session restart, and both injected result paths
+   now pass their bounded checks. Verify natural finishing,
    ranking (including the player record), result-clock ownership and a fresh driving
    session; the injected initial-result test covers control flow and cleanup, not these
    broader requirements.

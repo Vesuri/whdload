@@ -43,7 +43,7 @@ def check(root):
     b, n, a = [e['PDPOPP_EVENT'] for e in (before, native, after)]
     br, nr, ar = [e['PDRETUNE_EVENT'] for e in (before, native, after)]
     assert br[0:2] == nr[0:2] == ar[0:2] == [0, 0]
-    assert nr[4] == ar[4] == br[4] + 1 == 1 and ar[5] == 0
+    assert nr[4] == ar[4] == br[4] + 1 and ar[5] == 0
     cutoff = nr[2]
     assert n[4] == cutoff and n[6] < 18 and n[1] == n[2] == n[22] == 0
     available = b[6] + cutoff - b[4]
@@ -82,7 +82,7 @@ def check(root):
         bases.append(speed - (seed >> 9) + 48)
     assert len(set(bases)) == 1 and seed == a[17], 'Native speed/random arithmetic changed'
     print(f'{root.name}: {served} old-speed updates ({served * 90} ms) before retune; '
-          f'{n[6] * 5} ms residual; cutoff {(cutoff - n[13] + 18) * 5} ms from pit entry')
+          f'{n[6] * 5} ms residual; cutoff {(cutoff - n[13] + 18) * 5} ms from opponent timeline start')
     print(f'  Speeds {old} -> {speeds(after)}; complete records, caller registers/CCR/stack and native RNG verified')
 
 
