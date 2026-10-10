@@ -22,6 +22,10 @@ timing_world_initialize
  clr.l timing_world20_vector_remainders+4-timing_world_state(a0)
  clr.l timing_world20_vector_remainders+8-timing_world_state(a0)
  ENDC
+ IFNE TIMING_WORLD20
+ tst.w timing_pit_rebase-timing_world_state(a0)
+ bne.s .seed_ready
+ ENDC
  IFEQ TIMING_WORLD_SEED+1
  move.w $62(a6),d0
  ELSE
@@ -29,6 +33,7 @@ timing_world_initialize
  ENDC
  move.w d0,26(a0)
  move.w d0,28(a0)
+.seed_ready
  movem.l (sp)+,d0/a0
  rts
 
@@ -73,6 +78,10 @@ timing_world_movement
  bra.w timing_world_after_multiply
 
 timing_world_opponents
+ IFNE TIMING_WORLD20
+ bsr timing_pit_is_retiring
+ bne.w timing_world_native_end
+ ENDC
  ; The native interval has exactly two gameplay readers: player and opponents.
  ; Incident presentation can change it after player movement but before this call.
  movem.l d0,-(sp)
@@ -93,6 +102,17 @@ timing_world_opponents
 timing_world_end
  move.w sr,-(sp)
  movem.l a0,-(sp)
+ IFNE TIMING_WORLD20
+ bsr timing_pit_is_retiring
+ beq.s .ordinary_end
+ lea timing_pit_state(pc),a0
+ clr.w 10(a0)
+ addq.l #1,56(a0)
+ movem.l (sp)+,a0
+ move.w (sp)+,ccr
+ bra.w timing_world_render
+.ordinary_end
+ ENDC
  IFNE TIMING_WORLD20
  lea timing_world20_state(pc),a0
  addq.l #4,12(a0)
@@ -131,11 +151,17 @@ timing_world_restore
  rts
 
 timing_world_session_gate
+ IFNE TIMING_WORLD20
+ bsr timing_pit_abort
+ ENDC
  bsr timing_world_restore
  move.w $43a(a6),d1
  cmp.w #4,d1
  bra.w timing_world_after_session_gate
 timing_world_result_gate
+ IFNE TIMING_WORLD20
+ bsr timing_pit_abort
+ ENDC
  IFNE TIMING_WORLD20
  bsr timing_world_input_disable
  ENDC
@@ -172,5 +198,6 @@ timing_world_phase dc.w 0
  INCLUDE timing_session.s
 
  IFNE TIMING_WORLD20
+ INCLUDE timing_pit.s
  INCLUDE timing_world20.s
  ENDC

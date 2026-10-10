@@ -195,10 +195,16 @@ start fresh. These runs have zero pending work at closure, so nonzero discard, i
 steps, same-session pit return and rescue remain unverified. Native Shift-Q publication
 is still frame/mode dependent; this is lifecycle coverage, not matched full trajectories.
 
-The new native-rescue route exposes the next concrete F6 defect: after 65.64 seconds
-in repairs/departure, the 030 prototype schedules 32 player updates and retains another
-65.08 seconds of movement debt. This is incorrect same-session pit handling, despite
-407 clean renderer twins. `check_timing_pit.py` rejects the complete 5,000-field capture;
-the shorter capture ends in repairs and is insufficient. Next: suspend/rebase flight
-time and input at the rescue call/return while preserving physical repair/audio time
-and separately scheduling opponents. The normal build is unaffected.
+The native-rescue regression first exposed 65.64 seconds of pit time becoming player
+movement debt. The corrected WORLD20 boundary now suspends flight input, records four
+discarded assigned updates, retires the interrupted tail and initializes fresh player
+deadlines on return. Both 030 and A500 resume with one 20-ms step and zero debt and preserve random
+streams and logical cooling phase; the 030 passes 422 renderer twins. A500 explicitly
+discards seven assigned updates after a 100.58-second pit interval. All 1,052 sampled
+pre-pit world states match the failing reference. Native repair/audio time keeps advancing.
+Pit opponent updates remain outside the selected cadence (observed native intervals
+40–250 ms on 030); their timing, clock decisions and cross-CPU equivalence remain F6
+work. The whole pit visit still takes 65.64 seconds on 030 versus 100.58 on A500, so native
+repair/setup/presentation timing also remains open.
+Nonlocal pit exits and other pit-entry paths remain unverified. The final-build ordinary restart regression also passes two closures/reentries and
+232 renderer twins (654 final-build twins including rescue). The normal build is unchanged.

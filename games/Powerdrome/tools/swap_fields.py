@@ -170,7 +170,7 @@ if os.environ.get('TIMING_STATE') == '1':
     session_sample=''
     if fast_worlds:
         sessions=[m.start() for m in re.finditer(b'PDSESS01',code)
-                  if 0<fast_worlds[0]-m.start()<512]
+                  if 0<fast_worlds[0]-m.start()<2048]
         if sessions:
             assert len(sessions)==1 and len(periodic)==1 and keys and engines
             sptr=a.base+sessions[0]
@@ -184,11 +184,23 @@ if os.environ.get('TIMING_STATE') == '1':
             sv += [f'*(unsigned short*){kp+8:#x}']
             sv += [f'*(unsigned short*){ep+x:#x}' for x in (8,10,12,14)]
             session_sample='printf "PDSESSION_EVENT %d {off} ' + ' '.join(['%u']*len(sv)) + '\\n", $pd_field, ' + ', '.join(sv) + '\n'
+    pit_sample=''
+    if fast_worlds:
+        pits=[m.start() for m in re.finditer(b'PDPIT001',code)
+              if 0<fast_worlds[0]-m.start()<1024]
+        if pits:
+            assert len(pits)==1
+            pitp=a.base+pits[0]
+            pv=[f'*(unsigned short*){pitp+x:#x}' for x in (8,10)]
+            pv += [f'*(unsigned int*){pitp+x:#x}' for x in range(12,60,4)]
+            pv += [f'*(unsigned short*){pitp+60:#x}',f'*(unsigned short*){wp+26:#x}',f'*(unsigned short*){hp+12:#x}',f'*(unsigned int*){hp+16:#x}',f'*(unsigned short*){tp+46:#x}']
+            pit_sample='printf "PDPIT_EVENT %d {off} ' + ' '.join(['%u']*len(pv)) + '\\n", $pd_field, ' + ', '.join(pv) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
         sample += input_sample.replace('{off}',hex(off))
         sample += session_sample.replace('{off}',hex(off))
+        sample += pit_sample.replace('{off}',hex(off))
         if off in (0xd9a0,0xde0a,0xdfae,0xdffc,0xe0c0,0x10d0c,0x13514):
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):

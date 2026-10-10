@@ -1003,7 +1003,8 @@ This is not a claim of complete input determinism or completed F5/F6.
 | `$bfb0` | Restore world ownership and disable centering commands; retain timing for the native ending animation |
 | `$c2aa` after ending animation | Close timing and queue ownership before native cleanup and menus |
 | Next gameplay timing entry | Initialize from current unpaused time; do not replay the menu/pit-setup interval |
-| Rescue, same-session pit return and interrupted world updates | Full lifecycle policy/validation remains open |
+| Rescue via `$ce1e` | Suspend flight, explicitly discard interrupted work, then start a fresh player epoch; preserve logical phase/RNG streams |
+| Other pit entries and nonlocal interruption paths | Full lifecycle validation remains open |
 
 The WORLD prototype now closes its timing state at `$c2aa`, after native result/ending
 animation and before the original `$17148` cleanup call. `timing_session.s` restores
@@ -1065,7 +1066,7 @@ ending animation must not silently disappear from diagnostics. The ending animat
 own fixed frame count is also still a separate timing issue. No whole-game timer or
 mode-completeness claim follows from these two Practice restarts.
 
-## Same-session rescue: confirmed pit-time catch-up defect
+## Same-session rescue boundary
 
 The development `CUSTOM5=13` fixture selects the ordinary Race menu route, applies
 native dual-button boost, releases at field 500 and requests rescue with B at field 550.
@@ -1128,8 +1129,74 @@ The next fix must distinguish an ordinary render stall from this modal transitio
    state, opponent arrays, queued input and subsequent rescue/pit interactions. Keep the
    normal build unchanged until the broader F6/F7 gates pass.
 
-No pit-time exclusion is implemented yet; the long rescue route is a failing regression
-for the next F6 change.
+### Player timing correction
+
+`timing_pit.s` now wraps the rescue call at `$ce1e`, preserving the native call depth and
+the following complete `MOVE.W` instruction. Entry restores native counter/RNG ownership,
+stops timed flight input, and records/discards the interrupted batch and any pending
+player debt or input/presentation work. Native physical time continues through repairs,
+audio and departure. The original return value and post-pit native tail still execute.
+That tail skips an extra ordinary opponent update and is explicitly retired rather than
+counted as a completed 20-ms simulation step. The next ordinary frame initializes player
+time and input against the current unpaused VBL clock and resets movement/force fractions.
+
+This is a new player timing epoch within the same game session. It preserves the existing
+world and heat random streams and the logical control/cooling phase. An ordinary new
+session still initializes those normally; the session-completion hook clears any pending
+pit rebase. Nonlocal pit exits have explicit abort cleanup, but that path is not yet
+runtime-validated. `PDPIT001` records entry/return/abort counts, elapsed modal time,
+discarded work and retired partial updates separately from ordinary session closures.
+
+The frozen `Powerdrome-timing-pit2.slave` passes `timing-pit2-030-twins` over 5,000 fields.
+The same rescue and pit return occur at fields 1,051 and 4,333. Instead of scheduling
+32 steps plus 65.08 seconds of debt, the next frame schedules **one 20-ms step and zero
+retained debt**. Four assigned updates, including the interrupted update, are explicitly
+discarded; its return tail does not advance the old world cursor. The next fresh input
+deadline is 18 units after the new world timestamp. All **1,052 common sampled world
+states before pit entry match** the failing reference, so the boundary change does not
+alter the tested pre-rescue flight. The corrected 030 run completes **422 clean renderer
+comparisons**, with unchanged raster code.
+
+`check_timing_pit_lifecycle.py` additionally checks stopped player ownership throughout
+2,735 pit samples, exact discard accounting, return retirement, fresh input/deadlines,
+preserved world/heat random streams and preserved control/cooling phase. It verifies
+that the interrupted flight tail does not advance opponents a second time. Run both it
+and `check_timing_pit.py` on the corrected capture. Include `$ce1e`, `$ce28` and `$d56c`
+in the probes; the full corrected set is `$c7d2 $ce1e $103a2 $13cde $1020e $ce28 $ccee
+$cedc $ca44 $bf32 $c2aa $c2b0 $d56c`.
+
+The same artifact passes `timing-pit2-a500` over 8,000 fields. Rescue pit entry at field
+1,050 returns at field 6,079: **100.58 seconds**. Seven assigned updates are explicitly
+discarded. The next ordinary allocation at field 6,084 again schedules one 20-ms update
+and zero debt; the stronger lifecycle/RNG/phase checks pass all 2,735 inactive pit samples.
+The earlier failing reference is still rejected by the debt checker. This proves the
+bounded player rebase on both CPUs, not equivalent complete post-pit trajectories.
+
+| Corrected player boundary | 030/25 + fast planar twins | A500, no fast RAM |
+| --- | ---: | ---: |
+| Pit interval | 65,640 ms | 100,580 ms |
+| Assigned interrupted/unstarted steps discarded | 4 | 7 |
+| First new player batch | 1 step / 20 ms | 1 step / 20 ms |
+| Retained pit-related player backlog | 0 ms | 0 ms |
+| Native modal opponent multiplication samples | 2,728 | 2,728 |
+
+The whole pit interval is still CPU-dependent. Repair, setup and presentation timing
+must be separated/calibrated before claiming that the complete pit experience has the
+same duration across hardware; the clock boundary fixes the player catch-up defect only.
+
+The final-build ordinary-session regression `timing-pit2-session-030-twins` also passes
+two closures and two fresh entries over 1,800 fields, with **232 clean renderer twins**.
+Together the final-build 030 rescue and restart runs validate 654 completed renderer
+comparisons. The normal slave is byte-identical to the previous checkpoint. The timing
+hook layout audit passes, including the ten-byte rescue call replacement; the existing
+native C3-off snapshots retain original bytes at that range.
+
+Native pit opponent updates remain a separate unresolved issue: 2,728 multiplication
+samples use intervals from **40 to 250 ms**, including 112 samples at the native cap.
+This is not the selected 90-ms opponent cadence, and these samples do not prove whether
+or how much time the native cap loses. Their shared-clock repair/lap decisions and
+frame-counted state require separate extraction and cross-CPU validation. No whole-pit
+or whole-game framerate independence claim follows from the player-debt fix.
 
 ## Pause ownership
 

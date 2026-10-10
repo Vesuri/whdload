@@ -80,6 +80,12 @@ install_periodic
  lea timing_frame(pc),a0
  move.w #$42e7,(a0)
  IFNE TIMING_WORLD20
+ lea timing_pit_enter(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_pit_leave(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_pit_abort(pc),a0
+ move.w #$42e7,(a0)
  lea timing_world20_divide(pc),a0
  move.w #$42e7,(a0)
  lea timing_center_present(pc),a0
@@ -189,6 +195,10 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$fb64 6 bit=C3
  PL_P $fb64,timing_world20_contact
  ; TIMING_RANGE h0:$fb84 8 bit=C3
+ ; Rescue BSR plus the complete following MOVE.W. Preserve native call depth.
+ ; TIMING_RANGE h0:$ce1e 10 bit=C3
+ PL_P $ce1e,timing_pit_call
+ PL_NOP $ce24,4
  PL_P $fb84,timing_world20_damage
  PL_NOP $fb8a,2
  ENDC
@@ -378,11 +388,19 @@ timing_frame
  ENDC
  ENDC
  IFNE TIMING_ENGINE
+ IFNE TIMING_WORLD20
+ tst.w timing_pit_rebase-timing_state(a1)
+ bne.s .keep_engine_phase
+ ENDC
  bsr timing_heat_initialize
  ; Preserve all low counter bits, not only the original first-loop odd parity.
  move.w $60(a6),timing_control_phase-timing_state(a1)
+.keep_engine_phase
  ELSE
  move.w #1,timing_control_phase-timing_state(a1)
+ ENDC
+ IFNE TIMING_WORLD20
+ clr.w timing_pit_rebase-timing_state(a1)
  ENDC
  move.w #1,timing_started-timing_state(a1)
  clr.l timing_phase-timing_state(a1)
@@ -683,6 +701,10 @@ timing_targets
  dc.w timing_session_native_cleanup+2-timing_targets
  ENDC
  IFNE TIMING_WORLD20
+ dc.l $103a2
+ dc.w timing_pit_native+2-timing_targets
+ dc.l $ce28
+ dc.w timing_pit_continue+2-timing_targets
  dc.l $13514
  dc.w timing_center_message+2-timing_targets
  dc.l $bc4a

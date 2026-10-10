@@ -8,6 +8,11 @@ timing_session_native_cleanup dc.w $4ef9
 timing_session_end
  move.w sr,-(sp)
  movem.l d0/a0-a1,-(sp)
+ IFNE TIMING_WORLD20
+ bsr timing_pit_abort
+ lea timing_pit_state(pc),a0
+ clr.w 60(a0)
+ ENDC
  bsr timing_world_restore
  lea timing_state(pc),a1
  tst.w timing_started-timing_state(a1)
@@ -40,6 +45,14 @@ timing_session_end
  lsr.w #3,d0
  add.l d0,28(a0)
  ENDC
+ bsr timing_session_clear_work
+.done
+ movem.l (sp)+,d0/a0-a1
+ move.w (sp)+,ccr
+ rts
+
+; Caller owns saved registers/CCR; producer must already be stopped.
+timing_session_clear_work
  clr.w timing_due-timing_state(a1)
  clr.l timing_phase-timing_state(a1)
  clr.w timing_control_left-timing_state(a1)
@@ -54,13 +67,10 @@ timing_session_end
  clr.l timing_brake_read-timing_state(a1)
  clr.l timing_engine_active-timing_state(a1)
  clr.l timing_engine_count-timing_state(a1)
-.done
- movem.l (sp)+,d0/a0-a1
- move.w (sp)+,ccr
  rts
 
 timing_session_state dc.b 'PDSESS01'
- dc.l 0 ; sessions initialized
+ dc.l 0 ; player timing epochs initialized
  dc.l 0 ; active sessions explicitly closed
  dc.l 0 ; assigned unfinished world steps discarded at exit
  dc.l 0 ; unassigned time debt discarded (native clock units)

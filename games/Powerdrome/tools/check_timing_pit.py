@@ -21,6 +21,7 @@ assert re.search(r'^PDEVENT \d+ 0xc7d2$',log,re.M), 'No accepted native rescue'
 last_frame = None
 pit = returned = first_frame = None
 reports = []
+entry_offset=0xce1e if re.search(r'^PDSESSION_EVENT -?\d+ 0xce1e ',log,re.M) else 0x103a2
 for field, off, values in re.findall(r'^PDSESSION_EVENT (-?\d+) (0x[0-9a-f]+) (.+)$',log,re.M):
     field, off = int(field), int(off,16)
     v = list(map(int,values.split()))
@@ -29,7 +30,7 @@ for field, off, values in re.findall(r'^PDSESSION_EVENT (-?\d+) (0x[0-9a-f]+) (.
         if returned is not None:
             first_frame = field
         last_frame = field
-    elif off == 0x103a2:
+    elif off == entry_offset:
         assert pit is None and last_frame is not None
         assert v[13] == 1, 'Pit entry was not inside an active world update'
         pit = (field, last_frame, v)
