@@ -34,7 +34,7 @@ infinite-lives trainer.
 | `whdload/TestDrive2HD.s` | the slave: JOTD's v1.5 source plus the patch lists |
 | `whdload/simulation*.s`, `simulation-patches.i` | fixed-time simulation; `simulation-verify.s` holds the VERIFY assertions and fixtures |
 | `whdload/render.s` | sub-unit rendering |
-| `whdload/whdload/`, `whdload/include/` | the official WHDLoad 20.0 KickEmu sources and API headers ([provenance](whdload/whdload/README.md)) |
+| `whdload/include/lvo/`, `whdload/whdload/README.md` | NDK aliases for the KickEmu sources, and the [notes](whdload/whdload/README.md) shipped with them |
 | `whdload/readme-history.txt` | release notes added to the archive ReadMe |
 | `amiga/` | run the game in FS-UAE: `run.sh`, `run-a1200.sh`, `run-68030.sh`, `env.sh` |
 | `tools/` | tracing, state capture, checks and release packaging ([testing.md](docs/testing.md)) |
@@ -49,9 +49,10 @@ tmp/TestDrive2_v1.5_0588.lha     pre-installed WHDLoad game        → unpack to
 tmp/TestDrive2.lha               WHDLoad installer (slave source)  → unpack to tmp/installer/
 ```
 
-Common Amiga files come from the shared `~/.local/share/amiga` and the toolchain from
-`~/.local`. `amiga/env.sh` sets each default (the Makefile and `tools/local_env.py` use the
-same ones); set the variable to override it:
+Common Amiga files and the toolchain come from the shared environment that AmigaXDev installs
+(`make setup` there): `amiga/env.sh` sources its `~/.local/share/amiga/env.sh`, and the Makefile
+and `tools/local_env.py` use the same defaults. Set a variable to override it; AmigaXDev's
+`docs/environment.md` describes them all. The ones used here:
 
 | Variable | Default | Used for |
 |---|---|---|
@@ -60,6 +61,7 @@ same ones); set the variable to override it:
 | `KICKSTART13` | `~/.local/share/amiga/Kickstarts/kick34005.A500` | the slave's KickEmu image |
 | `RTB` | `~/.local/share/amiga/Kickstarts/kick34005.A500.RTB` | its relocation table |
 | `WORKBENCH_ADF` | `~/.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf` | host boot floppy (C:, Libs:) |
+| `WHDLOAD` | `~/.local/share/amiga/WHDLoad-20.0` | API headers and KickEmu sources the slave builds with |
 | `WHDLOAD_BINARY` | `~/.local/share/amiga/WHDLoad-20.0/C/WHDLoad` | WHDLoad run by the emulated Amiga |
 | `FSUAE_COMMON` | `~/.local/share/amiga/fsuae_common.sh` | port claim; kills only our emulator |
 | `LHA` | `~/.local/share/amiga/lha-compressor/src/lha` | LHa for UNIX (release archives) |

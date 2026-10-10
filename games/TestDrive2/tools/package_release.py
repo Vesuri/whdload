@@ -12,7 +12,8 @@ Retroplay preinstalled archive tmp/TestDrive2_v1.5_0588.lha. Outputs:
 Only these members change: the slave (a fresh normal build of whdload/), the ReadMe (JOTD's
 text with whdload/readme-history.txt added at the top of its History), the game icon (gains the
 tooltype CUSTOM2=1, since WHDLoad options have no default) and, in the installer, source/
-(the new TestDrive2HD.s plus the files it includes). Everything else is copied byte for byte
+(the new TestDrive2HD.s plus the files it includes; the KickEmu sources and API headers are
+copied from the shared $WHDLOAD). Everything else is copied byte for byte
 (LHa for UNIX stores members sorted by name); the archives are re-extracted and checked. 0588 is
 Retroplay's variant number, not a checksum; it is kept because the game data is unchanged. The preinstalled archive holds
 the game itself: dist/ output is *.lha, which git ignores.
@@ -30,11 +31,19 @@ ROOT = Path(__file__).resolve().parents[1]
 LHA = path('LHA')  # LHa for UNIX: Lhasa cannot create LH5 archives
 INSTALLER = ROOT / 'tmp/TestDrive2.lha'
 PREINSTALLED = ROOT / 'tmp/TestDrive2_v1.5_0588.lha'
+WHDLOAD = Path(path('WHDLOAD'))  # the KickEmu sources and API headers the slave builds with
 SOURCES = ['TestDrive2HD.s', 'simulation.s', 'simulation-patches.i', 'simulation-verify.s',
            'render.s', 'Makefile', 'whdload/kick13.s', 'whdload/kickfs.s',
            'whdload/segtracker.s', 'whdload/kick.readme', 'whdload/README.md', 'include/whdload.i',
            'include/whdmacros.i', 'include/lvo/dos.i', 'include/lvo/exec.i',
            'include/lvo/graphics.i', 'include/lvo/expansion.i']
+# Shipped source files that come from $WHDLOAD rather than whdload/.
+SHARED_SOURCES = {'whdload/kick13.s': 'Src/sources/whdload/kick13.s',
+                  'whdload/kickfs.s': 'Src/sources/whdload/kickfs.s',
+                  'whdload/segtracker.s': 'Src/sources/whdload/segtracker.s',
+                  'whdload/kick.readme': 'Src/sources/whdload/kick.readme',
+                  'include/whdload.i': 'Include/whdload.i',
+                  'include/whdmacros.i': 'Include/whdmacros.i'}
 TOOLTYPE = b'CUSTOM2=1'
 
 
@@ -115,7 +124,8 @@ def main():
         for s in SOURCES:
             destination = top / 'source' / s
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(ROOT / 'whdload' / s, destination)
+            source = WHDLOAD / SHARED_SOURCES[s] if s in SHARED_SOURCES else ROOT / 'whdload' / s
+            shutil.copyfile(source, destination)
         archive(stage, names, ROOT / f'dist/TestDrive2-{version}.lha')
 
         stage = Path(tmp) / 'preinstalled'

@@ -1,10 +1,11 @@
-"""Shared Amiga paths with environment overrides: the defaults of amiga/env.sh."""
+"""Shared Amiga paths with environment overrides: the defaults of the shared env.sh (amiga/env.sh)."""
 import os
 
 DEFAULTS = {
     'KICKSTART13': '~/.local/share/amiga/Kickstarts/kick34005.A500',
     'LHA': '~/.local/share/amiga/lha-compressor/src/lha',
     'AMIGA_TOOLCHAIN': '~/.local/opt',
+    'WHDLOAD': '~/.local/share/amiga/WHDLoad-20.0',
 }
 
 def path(name):

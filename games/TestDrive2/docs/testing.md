@@ -22,6 +22,7 @@ under it. The slave needs WHDLoad 17.2 or later.
 | `SLAVE` | the installed slave | run another build (absolute path) |
 | `WHD_ARGS` | — | WHDLoad options, e.g. `CUSTOM2=1` |
 | `WARP`, `SILENT`, `DEBUG`, `DETERMINISTIC` | 0 | warp speed, no audio, gdb stub, FS-UAE `--deterministic` |
+| `SOUND`, `WINDOW` | 1, `front`; 0, `back` with `DEBUG` or `WARP` | audio on/off; window in front, behind the others, or `none` (no video) |
 | `RECORD` | — | FS-UAE input recording file (see Input) |
 
 Reference machines (`tools/fixed_window.sh` uses the first by default):
