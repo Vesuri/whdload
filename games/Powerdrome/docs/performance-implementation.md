@@ -48,12 +48,15 @@ next scanline rebuilds the fourth-plane pointer or the native epilogue restores 
 
 This replaces the original branch-displacement writes at `$16080/$1608a` in the fast path.
 Verification checks that the entire copied rasterizer, loops and dispatch table remain
-unchanged during captures. CPU caches remain disabled: removing this rasterizer's
+unchanged during captures. Normal CPU cache policy remains disabled: removing this rasterizer's
 self-modification does not establish cache safety for every other part of the game.
+The [accelerator/cache checks](accelerator-cache-testing.md) exercise a VERIFY-only
+isolated-cache policy and document the remaining native branch rewriting.
 
 The original game hunk and other allocations stay in chip RAM. The normal option moves only the audited bitmap and copied rasterizer.
 The optional VERIFY scratch experiment also moves the CPU-only edge table. This keeps their contributions separately measurable.
 The native polygon trampoline remains available for unsupported scenes and verification.
+Return normalization also handles `a4` retaining the colour-table pointer after empty scanlines.
 On 68010 and later, the wrapper uses `MOVE CCR` rather than privileged `MOVE SR` when saving
 condition codes; installation changes are flushed through WHDLoad's patch service.
 
@@ -79,7 +82,7 @@ intentionally relocated edge-table pointer. The combined block-copy experiment p
 66 completed staged scenes and zero failures in every pixel, scratch, register, flag and
 guard check. The selected bitmap-and-code path also passed 66 completed scenes in a fresh
 full run, with code unchanged and no failures. Its verifier normalizes a separate register
-snapshot and returns the raw fast outputs, so comparisons cannot alter the normal path's
+snapshot, preserves already-identical values before interpreting pointer ranges, and returns the raw fast outputs, so comparisons cannot alter the normal path's
 intra-renderer behavior. That trace contains 500 VBL callbacks, 67 movement updates,
 67 normal scene entries and 66 completed post-render updates; the last scene is incomplete. Verification timing is not gameplay performance.
 
@@ -183,6 +186,7 @@ polygon costs from a twin capture with fast rasterizer code enabled.
 The original/rebased-slave Copylock D2-equivalence question is isolated from these
 comparisons: both sides use the same development loader and its unchanged Copylock
 replacement. These measurements do not establish full legacy-slave equivalence.
-Real 68030/040/060 boards, global cache enablement, long races with opponents and all
+The emulator 68030/040/060 matrix and isolated-cache tests are documented separately.
+Real boards, global cache enablement, long races with opponents and all
 view/effect combinations require further coverage before broadening supported fast paths
 or changing the default. The option remains explicit and off by default.

@@ -24,6 +24,7 @@ slv_config
  dc.b "C1:B:Render planar scene in fast RAM;"
  IFD VERIFY
  dc.b "C2:L:Rendering experiment:Bitmap and code,Bitmap only,Bitmap code and scratch,Bitmap and scratch;"
+ dc.b "C3:B:Verify isolated fast-memory caches;"
  dc.b "C4:B:Twin planar drawing for verification;"
  dc.b "C5:L:Verification route:Off,Title demo,Practice;"
  ENDC
@@ -90,7 +91,12 @@ launch_pd
  lea 4(a3),a1
  jsr resload_Patch(a2)
 .run
+ bsr verify_cache_setup
  ENDC
+ ; resload calls may poison scratch registers, especially with MMU checks.
+ ; DOS program entry requires a valid argument pointer and length.
+ lea launch_args(pc),a0
+ moveq #0,d0
  jmp (a3)
 .error
  pea TDREASON_WRONGVER
@@ -101,6 +107,7 @@ pl_game PL_START
  PL_END
 copylock move.l #$766cc95c,d0
  rts
+launch_args dc.b 10,0
 dosname dc.b "dos.library",0
 gamename dc.b "Powerdrome:PD",0
  EVEN
@@ -155,6 +162,8 @@ custom1 dc.l 0
  IFD VERIFY
  dc.l WHDLTAG_CUSTOM2_GET
 custom2 dc.l 0
+ dc.l WHDLTAG_CUSTOM3_GET
+custom3 dc.l 0
  dc.l WHDLTAG_CUSTOM4_GET
 custom4 dc.l 0
  dc.l WHDLTAG_CUSTOM5_GET
@@ -166,3 +175,6 @@ custom2 dc.l 0
  ENDC
  INCLUDE planar.s
  INCLUDE fast_raster.s
+ IFD VERIFY
+ INCLUDE cache_verify.s
+ ENDC

@@ -143,3 +143,27 @@ first/last images. Routine boundaries in the generic report are inferred. For no
 presentation marker; `tools/perf_report.py` and the independent `SWAP_ONLY=1` counter use it.
 Departure animations are not counted as driving frames. `tools/perf_status.py` checks the
 optional renderer's pixel/state/guard counters and static-code integrity.
+
+## Accelerator and cache checks
+
+The shared environment is sourced by `tools/fixed_window.sh` and the matrix runner.
+Captures record the effective CPU/memory/options, slave/emulator/ROM hashes, emulator log
+and optional final screenshot (`CAPTURE_SHOT=1`). The screenshot is taken after the measured
+window and final memory dumps.
+
+```sh
+source amiga/env.sh
+make -C whdload verify
+tools/accelerator_matrix.sh cache tmp/prof/cache-matrix
+tools/accelerator_matrix.sh timing tmp/prof/accelerator-matrix
+make -C whdload all
+```
+
+Use fresh output directories. Each matrix freezes its input slave and runs sequentially.
+VERIFY `CUSTOM3=1` requests caches only for expansion/slave memory, with chip memory
+non-cacheable and the 68060 branch cache disabled. The normal build has no cache toggle
+and keeps caches disabled for game/slave memory. `CUSTOM4=1` enables drawing twins;
+`CUSTOM5=2` selects Practice. `tools/cache_status.py CAPTURE` reports the actual startup
+control registers; `tools/perf_status.py CAPTURE` checks drawing diagnostics and reports
+the first register mismatch when present. See [accelerator and cache testing](accelerator-cache-testing.md)
+for the matrix, code-write audit and emulator versus real-hardware limits.

@@ -52,6 +52,18 @@ def main():
         after = (args.capture/'final-code.bin').read_bytes()[offset:offset+size]
         result['raster_code_unchanged'] = len(before) == size and before == after
         assert result['raster_code_unchanged'], 'Fast rasterizer code changed during the run'
+    data = (args.capture/'final-code.bin').read_bytes()
+    pos = 0
+    while (pos := data.find(b'PDMISM01', pos)) >= 0:
+        snapshots = [struct.unpack_from('>15IH', data, pos+8+i*62) for i in range(4)]
+        if any(snapshots[0]):
+            names = [f'd{i}' for i in range(8)] + [f'a{i}' for i in range(7)] + ['ccr']
+            result['first_register_mismatch'] = {
+                name: dict(zip(('normalized', 'raw', 'reference', 'input'), map(hex, values)))
+                for name, values in zip(names, zip(*snapshots))
+                if (values[0] ^ values[2]) & (31 if name == 'ccr' else 0xffffffff)
+            }
+        pos += 8
     print(json.dumps(result, indent=2))
     assert not (result['final']['pixel_failures'] or result['final']['guard_failures'] or result['final'].get('scratch_failures', 0) or result['final'].get('register_failures', 0)), 'Planar verification failed'
 

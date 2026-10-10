@@ -3,6 +3,7 @@
 # Default: title inset. Practice: WHD_ARGS=CUSTOM5=2 ANCHOR=0x14764 FIELDS=500.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source amiga/env.sh
 OUT=${1:?output directory required}
 mkdir -p "$OUT" tmp/cache
 OUT=$(cd "$OUT" && pwd)
@@ -14,7 +15,21 @@ export WHD_ARGS="${WHD_ARGS:-CUSTOM5=1}"
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}"
 export EXTRA_ARGS="${EXTRA_ARGS:---slow_memory=1536}"
 FIELDS=${FIELDS:-100}
-ANCHOR=${ANCHOR:-0x1067e}
+export FIELDS ANCHOR=${ANCHOR:-0x1067e}
+export CPU=${CPU:-68000} AMIGA_MODEL=${AMIGA_MODEL:-A500}
+python3 - "$OUT" <<'PYCONFIG'
+import hashlib,json,os,shutil,sys
+from pathlib import Path
+out=Path(sys.argv[1])
+keys=('AMIGA_MODEL','CPU','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS','ANCHOR','FIELDS','SWAP_ONLY')
+config={key:os.environ.get(key) for key in keys}
+for key, filename in (('emulator_sha256', shutil.which(os.environ.get('FSUAE', 'fs-uae'))), ('kickstart_sha256', os.environ.get('KICKSTART'))):
+    if filename:
+        config[key]=hashlib.sha256(Path(filename).read_bytes()).hexdigest()
+config['slave_sha256']=hashlib.sha256((out/'slave.slave').read_bytes()).hexdigest()
+(out/'configuration.json').write_text(json.dumps(config,indent=2)+'\n')
+PYCONFIG
+
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB*1024))
 else BASE=0xc00000; SIZE=1572864; fi
 pd() { python3 tools/powerdrome.py "$@"; }
@@ -117,6 +132,8 @@ fi
 dumpmem
 cp tmp/window-chip.bin "$OUT/final-chip.bin"
 cp tmp/window-other.bin "$OUT/final-code.bin"
+if [ "${CAPTURE_SHOT:-0}" = 1 ]; then pd shot "$OUT/last.png" > "$OUT/shot.txt"; fi
+cp amiga/.run/fsuae.log "$OUT/emulator.log"
 cleanup
 trap - EXIT
 printf 'Captured %s fields in %s\n' "$FIELDS" "$OUT"

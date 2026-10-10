@@ -345,13 +345,11 @@ normalize_registers
  bsr normalize_pointer
  lea 48(a1),a0
  bsr normalize_pointer
- move.l 36(a1),d0
- sub.l perf_code(pc),d0
- cmp.l #RASTER_SIZE,d0
- bhs.s .edge
- add.l perf_game(pc),d0
- add.l #RASTER_START,d0
- move.l d0,36(a1)
+ lea 36(a1),a0
+ bsr normalize_code_pointer
+ ; Empty scanlines can leave a4 pointing at the rasterizer's colour table.
+ lea 48(a1),a0
+ bsr normalize_code_pointer
 .edge
  move.w perf_edge_active(pc),d0
  beq.s .done
@@ -359,6 +357,19 @@ normalize_registers
  bsr normalize_edge_pointer
  lea 52(a1),a0
  bsr normalize_edge_pointer
+.done
+ rts
+
+normalize_code_pointer
+ move.l perf_code(pc),d0
+ beq.s .done
+ move.l (a0),d0
+ sub.l perf_code(pc),d0
+ cmp.l #RASTER_SIZE,d0
+ bhs.s .done
+ add.l perf_game(pc),d0
+ add.l #RASTER_START,d0
+ move.l d0,(a0)
 .done
  rts
 
@@ -447,6 +458,20 @@ poly_actual_ccr
  dbf d0,.snapshot
  move.l sp,a0
  bsr normalize_registers
+ ; A word-sized result can retain pointer-like high bits from its input.
+ ; Never relocate a value that already matches the native output exactly.
+ move.l sp,a0
+ lea 62(sp),a1
+ lea 124(sp),a2
+ moveq #14,d0
+.exact
+ move.l (a1)+,d1
+ cmp.l (a2)+,d1
+ bne.s .translated
+ move.l d1,(a0)
+.translated
+ addq.l #4,a0
+ dbf d0,.exact
  move.l sp,a0
  lea 124(sp),a1
  moveq #14,d0
@@ -461,6 +486,16 @@ poly_actual_ccr
  beq.s .checked
 .bad
  lea perf_register_failures(pc),a0
+ tst.l (a0)
+ bne.s .count_bad
+ ; Preserve the first mismatch: normalized, raw, reference and input snapshots.
+ move.l sp,a1
+ lea poly_mismatch+8(pc),a2
+ moveq #123,d0
+.save_bad
+ move.w (a1)+,(a2)+
+ dbf d0,.save_bad
+.count_bad
  addq.l #1,(a0)
 .checked
  lea 62(sp),sp
@@ -473,6 +508,8 @@ twin_poly_native
  move.w (sp)+,ccr
  bra routed_poly
 
+poly_mismatch dc.b "PDMISM01"
+ ds.b 248
  ENDC
 
 perf_status dc.b 'PDPERF03'

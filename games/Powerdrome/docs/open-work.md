@@ -31,6 +31,30 @@ The title-demo baseline at revision `02dbc27` has two matching fresh-boot A500 t
 independently verified frame counts on A500 and 68020 (9.7 and 13.2 demo fps). Those title-demo
 figures are separate from the practice launch profile.
 
+## Accelerator and cache validation
+
+The uncached 68030/040/060 timing matrix, code-write audit and isolated-cache emulator
+checks are complete. See [accelerator and cache testing](accelerator-cache-testing.md).
+The final driving measurements are 19.56 → 30.02 fps on the requested 030/25 configuration,
+17.91 → 41.16 on 040/25, and 17.91 → 42.69 on 060/50; these are emulator figures.
+Lower-frequency checks respond to the requested clock. No real-board speed claim follows.
+
+The native fallback still rewrites two branch displacements. Normal cache policy remains
+unchanged. VERIFY `CUSTOM3=1` isolates expansion/slave caches while leaving chip memory
+non-cacheable and the 060 branch cache off. Ten-second 030/040/060 MMU twins, the 030
+no-MMU fallback and the 040 NoCache override passed all pixel, register/flag, scratch,
+guard and code-immutability checks. Actual cache/MMU settings are recorded and checked.
+The 040/060 emulator MMU path does not model real cache coherency, so cache enablement
+remains a verification experiment.
+
+MMU testing also corrected the development loader's invalid DOS launch arguments and
+exposed two register-comparison cases: an already-identical numeric value resembling a
+bitmap pointer, and an empty-scanline colour-table pointer in `a4`. The verifier preserves
+exact matches; return normalization now includes the relocated `a4` code pointer. The
+first mismatch snapshots are retained for diagnosing future failures. Simulation timing
+and renderer selection are unchanged. Final 68000/68020 twins, the no-fast-memory
+fallback and normal-build launches also passed; production cache enablement remains off.
+
 ## Ordered next work
 
 Follow the [performance implementation plan](performance-plan.md). The selected scope is
@@ -40,8 +64,9 @@ order; a new scheduler, timestep policy or frame cap is outside this work.
 
 1. Extend automated coverage to long races, opponents, all views, collisions, pit re-entry,
    restarts and effects before widening the guarded fast path.
-2. Audit remaining game self-modification before enabling caches; test real 68030/040/060
-   accelerator memory/cache configurations. CPU type alone is not a bandwidth guarantee.
+2. Validate real 68030/040/060 board memory/cache configurations before promoting the
+   VERIFY-only cache policy. Keep global caches off while native self-modification remains;
+   CPU type alone is not a bandwidth guarantee. The available emulator matrix is complete.
 3. Resolve original/development-slave equivalence, including the legacy Copylock D2 result.
    Current performance comparisons isolate this issue by using the same development loader.
 4. Consider further edge/span arithmetic changes only with identical-input comparisons and
