@@ -1351,21 +1351,79 @@ these runs: **all 501 common four-opponent snapshots differ**, beginning at fixt
 world time 20 ms. This is a reproduced initial-pit regression, not opponent equivalence.
 The final artifact rebuilds exactly; default prototype and normal bytes remain unchanged.
 
+### Initial pit opponent timeline
+
+The WORLD20 prototype now starts the independent opponent timeline at the initial pit
+call (`$bc3a`), before player simulation begins. It carries the same origin, phase, random
+stream and residual into flight. Player controls, input queues and heat updates remain
+inactive throughout this first pit visit. The first flight initializes those player
+systems without resetting the already-running opponents. Normal builds are unchanged.
+
+`timing-initialpit1-030-twins` (1,200 fields) and `timing-initialpit1-a500` (1,600 fields)
+use the same frozen prototype, controlled initialization and `CUSTOM5=13`. Read-only
+`TIMING_EARLY=1` diagnostics start at `$bc3a`, retaining `$bc7c` as the driving marker.
+All **62 common complete four-opponent records**, at matching elapsed opponent deadlines
+from 90 to 5,580 ms, agree after only the audited lap-epoch normalization. Their random
+states also agree. This proves the sampled active-pit prefix, not the departure handoff
+or whole-race trajectory equivalence.
+
+| Initial-pit measurement | 030/25, fast-render twins | A500, no fast RAM |
+| --- | ---: | ---: |
+| Complete pit visit | 7,300 ms | 17,000 ms |
+| External animation, first to last of 17 positions | 780 ms | 1,120 ms |
+| External last position to cockpit routine entry | 560 ms | 5,200 ms |
+| Cockpit routine entry to pit return (includes setup) | 1,120 ms | 1,380 ms |
+| Unserved opponent time at pit return | 1,720 ms | 6,560 ms |
+| First world batch serves / retains | 1,710 / 10 ms | 2,880 / 3,680 ms |
+| Capped world allocations while draining departure tail | 0 | 2 |
+| Final completed-world residual | 20 ms | 80 ms |
+
+The A500 retains 820 ms after its second capped allocation and drains the remaining
+whole updates in its third allocation. `check_timing_initial_pit.py` verifies every
+allocation against the production limit of 32 updates, exact elapsed-time conservation,
+unchanged origin/phase, private random ownership and eventual removal of whole-step debt.
+It checks 464/1,420 modal/total movement samples and 40/748 pit/flight ownership restores
+on A500; the 030 counts are 248/1,064 and 40/834. The 030 also passes **192 renderer
+comparisons**, with no pixel, scratch, register or guard failures and unchanged raster code.
+These heavily instrumented captures are not performance benchmarks.
+
+**Remaining chronological defect:** `$14090` calls the native opponent-speed retune
+`$e8d4`, before `$1409a` enters cockpit departure. The last active-pit allocation precedes
+this change, while the deferred tail is currently served in first flight. In these runs,
+opponent zero changes speed from 489 in the active pit to 567 at return on both CPUs.
+Consequently, pending historical updates can incorrectly use the later speed. Conservation
+alone does not establish correct integration. The previous rescue-return drain crosses
+the same native mutation boundary and also needs this audit.
+
+A safe boundary correction must account for native nonlocal exits: `$14008` clears the
+pit flag `state+$da` before retuning. With that flag clear, opponent code at `$d616` can
+unwind eight stack bytes into the race-result path. The initial pit has no ordinary world
+call frame, so calling the body from an arbitrary helper here is unsafe. Do not clear
+backlog, reset positions, or normalize this gameplay difference away.
+
 The next F6 steps are:
 
-1. **Initial records:** controlled native initialization and full-record comparison are
-   in place. Preserve the failing first-flight comparison as a regression.
-2. **Initial pit timeline:** start the independent opponent clock for the first pit visit,
-   then carry its origin, phase, RNG and residual into flight. Keep player controls/input
-   inactive before flight; do not force equal starts by resetting opponent positions.
-3. **Initial pit pacing:** measure separate setup, external departure and cockpit handoff
-   intervals against native A500. Pace finite animation mutations at that measured rate,
-   while actual user waiting time continues to advance opponents.
-4. **Whole-state gate:** repeat the full-record comparison with matched logical times and
-   input history. Classify remaining clock/pointer/presentation fields from native readers
-   and writers before normalizing them; keep gameplay mismatches visible.
-5. **Other modes:** apply the same clock ownership and measured pacing to repairs, race
-   restarts and other pit callers, then return to the broader F7 calibration matrix.
+1. **Retune ordering:** finish pending opponent updates with the old speed before its
+   native mutation, with explicitly correct pit/result semantics and native stack depth.
+   Probe immediately before and after retune, including both initial and rescue visits.
+2. **Initial pit pacing:** calibrate the external 17-position sequence against native
+   A500, independently of cockpit pacing. Keep real user waiting time advancing opponents;
+   do not delay CPU-only loading to manufacture matching first-flight positions.
+3. **Whole-state gate:** extend complete-record comparison through departure at matched
+   logical times and input history. Keep gameplay differences visible; the matching
+   active-pit prefix does not satisfy this gate.
+4. **Lifecycle regressions:** repeat pause, rescue and session restart with the initial-pit
+   hooks, then add race reinitialization (the existing restart fixture uses Practice).
+5. **Other modes:** finish repairs and other pit callers, then return to the full F7
+   calibration/configuration matrix and F8 release checks.
+
+Reproduce the bounded checks with:
+
+```sh
+python3 tools/check_timing_initial_pit.py tmp/prof/timing-initialpit1-030-twins tmp/prof/timing-initialpit1-a500
+python3 tools/compare_timing_opponents.py --initial-pit tmp/prof/timing-initialpit1-030-twins tmp/prof/timing-initialpit1-a500
+python3 tools/perf_status.py tmp/prof/timing-initialpit1-030-twins
+```
 
 ## Pause ownership
 

@@ -48,6 +48,24 @@ if os.environ.get('COVERAGE_STATE') == '1':
     state_probe = 'printf \"PDSTATE %d ' + ' '.join(['%u']*len(state_offsets)) + '\\n\", $pd_field, ' + values + '\n'
 # Optional timing samples are read-only and use the same completed-frame marker.
 if os.environ.get('TIMING_STATE') == '1':
+    early = os.environ.get('TIMING_EARLY') == '1'
+    live_frame = None
+    if early:
+        chip = (a.out/'chip.bin').read_bytes()
+        patch = r['game'][0] + 0xca44
+        assert struct.unpack_from('>H', chip, patch)[0] == 0x4ef9, 'Early timing capture needs installed C3 hooks'
+        live_frame = struct.unpack_from('>I', chip, patch+2)[0] - a.base
+        assert 0 <= live_frame < len(code)
+
+    def timing_locations(tag, initialized):
+        hits = [m.start() for m in re.finditer(tag, code)]
+        if early:
+            # The installed JMP selects the live relocated slave before its
+            # counters initialize. Its first following tag is authoritative;
+            # stale loader copies elsewhere are never selected by zero values.
+            hits = [off for off in hits if live_frame < off < live_frame+16384]
+            return [min(hits)] if hits else []
+        return [off for off in hits if initialized(off)]
     timing_words = [0x21c, 0x194, 0x1ba, 0x11e, 0x12c, 0x12e, 0x130,
                     0x11a, 0x138, 0x45a, 0x196, 0x198, 0x4ce, 0x4d2,
                     0x4c6, 0x1e0, 0x1e6, 0x432, 0x42a, 0x42e]
@@ -56,8 +74,7 @@ if os.environ.get('TIMING_STATE') == '1':
     vals += [f'*(unsigned short*){state+x:#x}' for x in timing_words]
     state_probe += 'printf "PDTIME %d ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
     # Private logical input state is read-only evidence of event ownership.
-    active_inputs=[m.start() for m in re.finditer(b'PDINPT02',code)
-                   if struct.unpack_from('>I',code,m.start()+12)[0]]
+    active_inputs=timing_locations(b'PDINPT02', lambda off: struct.unpack_from('>I',code,off+12)[0])
     assert len(active_inputs)<=1, 'Ambiguous initialized logical input state'
     input_sample=''
     if active_inputs:
@@ -66,14 +83,12 @@ if os.environ.get('TIMING_STATE') == '1':
                  (52,'short'),(56,'short')]
         inputs=[f'*(unsigned {kind}*){ip+off:#x}' for off,kind in offsets]
         input_sample='printf "PDINPUT_EVENT %d {off} ' + ' '.join(['%u']*len(inputs)) + '\\n", $pd_field, ' + ', '.join(inputs) + '\n'
-    engines=[m.start() for m in re.finditer(b'PDENGN01',code)
-             if struct.unpack_from('>I',code,m.start()+16)[0]]
+    engines=timing_locations(b'PDENGN01', lambda off: struct.unpack_from('>I',code,off+16)[0])
     assert len(engines)<=1
     engine_sample=''
     if engines:
         ep=a.base+engines[0]
-        periodic=[m.start() for m in re.finditer(b'PDTIME01',code)
-                  if struct.unpack_from('>H',code,m.start()+8)[0]]
+        periodic=timing_locations(b'PDTIME01', lambda off: struct.unpack_from('>H',code,off+8)[0])
         assert len(periodic)==1 and active_inputs
         epvals=[f'*(unsigned int*){ip+12:#x}',
                 f'*(unsigned short*){a.base+periodic[0]+46:#x}']
@@ -83,8 +98,7 @@ if os.environ.get('TIMING_STATE') == '1':
                    (0x196,0x198,0x138,0x454,0xe4,0x194)]
         epvals.append(f'*(unsigned short*){ep+10:#x}')
         engine_sample='printf "PDENGINE_EVENT %d {off} ' + ' '.join(['%u']*len(epvals)) + '\\n", $pd_field, ' + ', '.join(epvals) + '\n'
-    heat=[m.start() for m in re.finditer(b'PDHEAT02',code)
-          if struct.unpack_from('>H',code,m.start()+8)[0]==1]
+    heat=timing_locations(b'PDHEAT02', lambda off: struct.unpack_from('>H',code,off+8)[0]==1)
     assert len(heat)<=1
     heat_sample=''
     if heat:
@@ -105,8 +119,7 @@ if os.environ.get('TIMING_STATE') == '1':
         if code[movement_clocks[0]:movement_clocks[0]+8]==b'PDMCLK02':
             mv.append(f'*(unsigned short*){mp+32:#x}')
         movement_clock_sample='printf "PDMCLK_EVENT %d ' + ' '.join(['%u']*len(mv)) + '\\n", $pd_field, ' + ', '.join(mv) + '\n'
-    worlds=[m.start() for m in re.finditer(b'PDWORLD1',code)
-            if struct.unpack_from('>I',code,m.start()+20)[0]]
+    worlds=timing_locations(b'PDWORLD1', lambda off: struct.unpack_from('>I',code,off+20)[0])
     assert len(worlds)<=1
     world_sample=''
     if worlds:
@@ -116,8 +129,7 @@ if os.environ.get('TIMING_STATE') == '1':
         wv += [f'*(unsigned short*){state+x:#x}' for x in
                (0x21c,0x194,0x11e,0x12c,0x12e,0x130,0x138,0x196,0x198,0x62)]
         world_sample='printf "PDWORLD_EVENT %d {off} ' + ' '.join(['%u']*len(wv)) + '\\n", $pd_field, ' + ', '.join(wv) + '\n'
-    fast_worlds=[m.start() for m in re.finditer(b'PDW20T01',code)
-                 if struct.unpack_from('>H',code,m.start()+8)[0]==1]
+    fast_worlds=timing_locations(b'PDW20T01', lambda off: struct.unpack_from('>H',code,off+8)[0]==1)
     assert len(fast_worlds)<=1
     fast_world_sample=''
     if fast_worlds:
@@ -185,6 +197,7 @@ if os.environ.get('TIMING_STATE') == '1':
             sv += [f'*(unsigned short*){ep+x:#x}' for x in (8,10,12,14)]
             session_sample='printf "PDSESSION_EVENT %d {off} ' + ' '.join(['%u']*len(sv)) + '\\n", $pd_field, ' + ', '.join(sv) + '\n'
     pit_sample=''
+    initial_pit_sample=''
     if fast_worlds:
         pits=[m.start() for m in re.finditer(b'PDPIT001',code)
               if 0<fast_worlds[0]-m.start()<2048]
@@ -195,6 +208,9 @@ if os.environ.get('TIMING_STATE') == '1':
             pv += [f'*(unsigned int*){pitp+x:#x}' for x in range(12,60,4)]
             pv += [f'*(unsigned short*){pitp+60:#x}',f'*(unsigned short*){wp+26:#x}',f'*(unsigned short*){hp+12:#x}',f'*(unsigned int*){hp+16:#x}',f'*(unsigned short*){tp+46:#x}']
             pit_sample='printf "PDPIT_EVENT %d {off} ' + ' '.join(['%u']*len(pv)) + '\\n", $pd_field, ' + ', '.join(pv) + '\n'
+            iv=[f'*(unsigned short*){pitp+62:#x}', f'*(unsigned int*){r["game"][0]+0x48fe:#x}']
+            iv += [f'*(unsigned short*){state+x:#x}' for x in (0xda,0xdc,0xbe)]
+            initial_pit_sample='printf "PDINITIAL_EVENT %d {off} ' + ' '.join(['%u']*len(iv)) + '\\n", $pd_field, ' + ', '.join(iv) + '\n'
     pit_opponent_sample=''
     if fast_worlds:
         popps=[m.start() for m in re.finditer(b'PDPOPP01',code)
@@ -216,8 +232,9 @@ if os.environ.get('TIMING_STATE') == '1':
         sample += input_sample.replace('{off}',hex(off))
         sample += session_sample.replace('{off}',hex(off))
         sample += pit_sample.replace('{off}',hex(off))
+        sample += initial_pit_sample.replace('{off}',hex(off))
         sample += pit_opponent_sample.replace('{off}',hex(off))
-        if os.environ.get('OPPONENT_STATE') == '1' and off in (0xe976,0xca3e,0xcedc):
+        if os.environ.get('OPPONENT_STATE') == '1' and off in (0xe976,0xca3e,0xcedc,0xe3c4,0xbc44,0xd7f0):
             # Four native records, all 190 bytes each. Guard the native count
             # and relocated bank before reading; never write game state.
             pointer=f'*(unsigned int*){state+0x342:#x}'

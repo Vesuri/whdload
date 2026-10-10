@@ -113,6 +113,8 @@ install_periodic
  move.w #$42e7,(a0)
  lea timing_pit_opponent_restore(pc),a0
  move.w #$42e7,(a0)
+ lea timing_initial_pit_enter(pc),a0
+ move.w #$42e7,(a0)
  lea timing_pit_enter(pc),a0
  move.w #$42e7,(a0)
  lea timing_pit_leave(pc),a0
@@ -251,6 +253,10 @@ pl_periodic PL_START
  PL_PS $d836,timing_pit_clock_d7
  ; TIMING_RANGE h0:$d866 6 bit=C3
  PL_PS $d866,timing_pit_clock_d7
+ ; Initial BSR plus MOVE.W; no world frame exists on this path.
+ ; TIMING_RANGE h0:$bc3a 10 bit=C3
+ PL_P $bc3a,timing_initial_pit_call
+ PL_NOP $bc40,4
  ; Rescue BSR plus the complete following MOVE.W. Preserve native call depth.
  ; TIMING_RANGE h0:$ce1e 10 bit=C3
  PL_P $ce1e,timing_pit_call
@@ -774,6 +780,8 @@ timing_targets
  dc.w timing_pit_native+2-timing_targets
  dc.l $ce28
  dc.w timing_pit_continue+2-timing_targets
+ dc.l $bc44
+ dc.w timing_initial_pit_continue+2-timing_targets
  dc.l $13514
  dc.w timing_center_message+2-timing_targets
  dc.l $bc4a

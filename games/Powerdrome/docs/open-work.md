@@ -226,12 +226,18 @@ It establishes matching complete records immediately after initialization on A50
 but they already differ before timed flight: initialization-to-flight takes 7.14 seconds
 on 030 versus 16.90 on A500, with matching speeds but different track positions. This
 localizes the next work to the initial setup/pit interval; unequal-time snapshots alone
-are not proof of unequal movement rates. Start the continuous opponent timeline during
-the initial pit and calibrate finite setup/departure pacing against A500, then repeat
-complete-state comparisons. Also validate race reinitialization (the restart fixture
-uses Practice) and repair pacing. See the numbered next steps in timing-implementation.
-The final seeded ten-second pair is complete: 501 common player/engine/RNG states match,
-but all 501 complete opponent snapshots differ from the first sampled world time. Both
-runs retain zero final debt; the 030 adds 97 clean renderer comparisons. The strict
-opponent comparator rejects this pair, preserving the initial-pit gap as a regression.
-Default prototype and normal-build bytes remain unchanged.
+are not proof of unequal movement rates. The initial-pit prototype now starts the opponent
+timeline before flight and preserves it across the handoff. All 62 common complete
+four-opponent records and random states match during the active pit at equal elapsed
+deadlines (90–5,580 ms). The 030 adds 192 clean renderer comparisons. Player work remains
+inactive before flight. A500 retains a 6,560-ms departure tail and serves it over three
+capped allocations without losing time; the 030 tail is 1,720 ms.
+
+The immediate remaining defect is chronological: native departure retunes opponent speeds
+before the deferred tail is processed. Historical updates must use the earlier speed.
+Correct this before claiming whole-handoff equivalence, respecting the native nonlocal
+result exits and missing world frame on initial entry. Then pace the external 17-position
+animation, extend complete-state comparison through departure, repeat lifecycle regressions,
+and validate race reinitialization and repair pacing. See the numbered F6 steps and measured
+phase table in timing-implementation. Normal-build bytes remain unchanged; broader timing
+is still an experimental build, not a completed framerate-independence feature.

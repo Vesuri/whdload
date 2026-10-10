@@ -67,6 +67,33 @@ timing_pit_opponent_initialize
  movea.l (sp)+,a0
  rts
 
+timing_opponent_initial_pit
+ movem.l d0-d1/a0,-(sp)
+ lea timing_pit_opponent_state(pc),a0
+ clr.w 8(a0)
+ tst.w $be(a6)
+ bne.s .done
+ move.w #1,8(a0)
+ clr.w 10(a0)
+ clr.w 12(a0)
+ clr.w 64(a0)
+ clr.w 66(a0)
+ move.w $60(a6),d1
+ addq.w #1,d1
+ move.w d1,14(a0)
+ move.w d1,132(a0)
+ move.l timing_pit_state+24(pc),d0
+ move.l d0,16(a0)
+ add.l #TIMING_PERIOD,d0
+ move.l d0,20(a0)
+ move.l d0,52(a0)
+ clr.l 24(a0)
+ clr.l 28(a0)
+ clr.l 32(a0)
+.done
+ movem.l (sp)+,d0-d1/a0
+ rts
+
 timing_opponent_flight_initialize
  movem.l d0/a0,-(sp)
  lea timing_pit_opponent_state(pc),a0

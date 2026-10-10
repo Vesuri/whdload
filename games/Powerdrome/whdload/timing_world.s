@@ -25,6 +25,8 @@ timing_world_initialize
  IFNE TIMING_WORLD20
  tst.w timing_pit_rebase-timing_world_state(a0)
  bne.s .seed_ready
+ tst.w timing_pit_initial-timing_world_state(a0)
+ bne.s .seed_ready
  move.l a0,-(sp)
  lea timing_pit_opponent_state(pc),a0
  clr.w 8(a0)
@@ -38,6 +40,9 @@ timing_world_initialize
  move.w d0,26(a0)
  move.w d0,28(a0)
 .seed_ready
+ IFNE TIMING_WORLD20
+ clr.w timing_pit_initial-timing_world_state(a0)
+ ENDC
  movem.l (sp)+,d0/a0
  rts
 

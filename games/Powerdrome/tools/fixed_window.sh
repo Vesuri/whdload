@@ -21,7 +21,7 @@ python3 - "$OUT" <<'PYCONFIG'
 import hashlib,json,os,shutil,sys
 from pathlib import Path
 out=Path(sys.argv[1])
-keys=('AMIGA_MODEL','CPU','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS','ANCHOR','FIELDS','SWAP_ONLY','SWAP_MARKER','PROBE_OFFSETS','COVERAGE_STATE','COVERAGE_PROBES','TIMING_STATE','OPPONENT_STATE')
+keys=('AMIGA_MODEL','CPU','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS','ANCHOR','FIELDS','SWAP_ONLY','SWAP_MARKER','PROBE_OFFSETS','COVERAGE_STATE','COVERAGE_PROBES','TIMING_STATE','OPPONENT_STATE','TIMING_EARLY')
 config={key:os.environ.get(key) for key in keys}
 for key, filename in (('emulator_sha256', shutil.which(os.environ.get('FSUAE', 'fs-uae'))), ('kickstart_sha256', os.environ.get('KICKSTART'))):
     if filename:
