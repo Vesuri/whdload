@@ -165,7 +165,9 @@ fetches use MMU-translated memory reads, and the data access path similarly is n
 physical copyback-cache model. A successful MMU run tests CPU/MMU setup and game logic,
 not real 040/060 cache coherency. Its timing must not be compared with the table above.
 
-Real-board sign-off requires separate runs on 68030/040/060 machines with their actual
+Physical-board validation is outside the selected project scope. Results remain emulator-only,
+and the cache experiment remains VERIFY-only. Any future real-board sign-off would require
+separate runs on 68030/040/060 machines with their actual
 memory and cache configurations. Record board/clock, chip and fast RAM, WHDLoad version,
 MMU use, cache options and slave hash; compare option off/on from the same Practice route.
 Run the VERIFY drawing twins first, then measure the non-twin build. Check title/pit/native

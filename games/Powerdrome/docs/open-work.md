@@ -45,7 +45,8 @@ non-cacheable and the 060 branch cache off. Ten-second 030/040/060 MMU twins, th
 no-MMU fallback and the 040 NoCache override passed all pixel, register/flag, scratch,
 guard and code-immutability checks. Actual cache/MMU settings are recorded and checked.
 The 040/060 emulator MMU path does not model real cache coherency, so cache enablement
-remains a verification experiment.
+remains a verification experiment. Physical-board validation is outside the selected scope;
+the completed emulator matrix is sufficient for the current work.
 
 MMU testing also corrected the development loader's invalid DOS launch arguments and
 exposed two register-comparison cases: an already-identical numeric value resembling a
@@ -62,12 +63,9 @@ planar scene rendering into fast RAM followed by a CPU copy to the chip back buf
 measured drawing-loop improvements. Retain the existing elapsed-time simulation and update
 order; a new scheduler, timestep policy or frame cap is outside this work.
 
-1. Extend automated coverage to long races, opponents, all views, collisions, pit re-entry,
+1. **`coverage`** — Extend automated coverage to long races, opponents, all views, collisions, pit re-entry,
    restarts and effects before widening the guarded fast path.
-2. Validate real 68030/040/060 board memory/cache configurations before promoting the
-   VERIFY-only cache policy. Keep global caches off while native self-modification remains;
-   CPU type alone is not a bandwidth guarantee. The available emulator matrix is complete.
-3. Resolve original/development-slave equivalence, including the legacy Copylock D2 result.
+2. **`equivalence`** — Resolve original/development-slave equivalence, including the legacy Copylock D2 result.
    Current performance comparisons isolate this issue by using the same development loader.
-4. Consider further edge/span arithmetic changes only with identical-input comparisons and
+3. **`raster`** — Consider further edge/span arithmetic changes only with identical-input comparisons and
    independently measured benefit. Do not introduce a simulation scheduler or frame cap.
