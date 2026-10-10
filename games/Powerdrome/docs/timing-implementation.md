@@ -1289,6 +1289,84 @@ changes, capacity/overload and mode transitions remain unproven. Repair/setup/pr
 itself is still frame dependent. No whole-game framerate independence claim follows from
 these bounded checks.
 
+
+### Matched initialization exposes the initial pit gap
+
+`TIMING_WORLD_SEED` starts at timed flight entry, after native race initialization. It
+therefore cannot make initial opponents identical. Native `$bad6` reseeds `$62(a6)` from
+clock-low-word `$f98`, and `$e910` subsequently generates each opponent speed from that
+stream. Different clock values can produce different starting speeds without proving a
+simulation-timing defect.
+
+The explicit development flag `TIMING_SETUP_SEED=54321` now supplies a controlled input
+to native initialization. It seeds before initialization's random draws at `$b9a0` and
+replaces the clock reseed at `$bad6`. The game still executes its original initialization,
+random generator and speed arithmetic. It neither overwrites opponent records nor changes
+the native later speed retunes. The flag defaults to -1 (disabled), requires VERIFY and
+WORLD20, and remains behind CUSTOM3. Both hooks preserve X/other required registers and
+replay complete displaced instructions. 010+ builds use the existing MOVE-CCR adaptation.
+With the flag omitted, the entire prototype is byte-identical to the preceding checkpoint;
+the normal build is also unchanged.
+
+`OPPONENT_STATE=1` adds read-only snapshots of all four **190-byte** native opponent
+records at selected checkpoints. `check_timing_setup.py` verifies one initialization and
+reseed, the selected seed and native random arithmetic, then reports complete-record
+differences at `$e976` (initial speed generation finished) and `$ca3e` (first world entry).
+Use `--require-initial-equal` to assert the first checkpoint or `--require-equal` to require
+both checkpoints. It normalizes only the
+known absolute lap-start field `+$5c` against its constructor's `$206(a6)` epoch; it does
+not silently omit other mismatches. `compare_timing_opponents.py` compares all four records
+at matching fixture-relative 20-ms world times and fails on unequal records. Its explicit
+`--report-only` mode is for describing a known failing regression, not declaring equivalence.
+
+The final fixture `Powerdrome-timing-setup2.slave` reproduces matching native initialization
+on 030 and A500: seed **54,321**, native speed baseline **533**, and four speeds
+**489, 519, 522, 558**. All four complete records match at `$e976` after the documented
+lap-epoch normalization. Before the first timed world update they differ:
+
+| Checkpoint fact | 030/25 + fast renderer | A500, no fast RAM |
+| --- | ---: | ---: |
+| PAL fields from `$e976` to `$ca3e` | 357 | 845 |
+| Nominal elapsed time | 7,140 ms | 16,900 ms |
+| Opponent segments at first world entry | 7, 7, 7, 8 | 9, 9, 10, 10 |
+| Opponent speeds at first world entry | 502, 544, 588, 517 | 502, 544, 588, 517 |
+
+Every record differs at words `+$02`, `+$10`, `+$14`, `+$20`, `+$48`, `+$4e`, `+$68`.
+The segment and X/Z differences are gameplay state, not merely a clock offset. This
+localizes the loss of matching starting conditions to the interval before timed flight.
+It does not prove that opponents moved at different rates over equal elapsed time: the
+setup/pit windows themselves are different lengths. Initial pit updates still use the
+native `$e3bc` caller while the continuous opponent timeline has not yet started.
+
+Reproduce with the WORLD20 flags plus `-DTIMING_SETUP_SEED=54321`, `CUSTOM5=13`, 500 fields,
+`TIMING_STATE=1 OPPONENT_STATE=1`, and ordered `PROBE_OFFSETS='0xb9a0 0xbade 0xe976 0xca3e'`.
+Keep the usual `$bc7c` driving anchor/marker. Use live probes `$ccee $cde2 $cedc $d3de
+$d56c $ced8 $d4bc $d504 $d7fe $d83c $d86c`. The current final-build 030 capture
+`timing-setup2-030-twins` passes 501 consecutive world steps, 111 slow updates and 444
+opponent movement samples with no outstanding time debt and **97 clean renderer comparisons**.
+The completed `timing-setup2-a500-repeat` has 502 world steps and the same 111 slow updates
+and 444 opponent samples, also with no outstanding time debt. All **501 common sampled
+player/engine/RNG states match**. In contrast, the strict full-record comparator rejects
+these runs: **all 501 common four-opponent snapshots differ**, beginning at fixture-relative
+world time 20 ms. This is a reproduced initial-pit regression, not opponent equivalence.
+The final artifact rebuilds exactly; default prototype and normal bytes remain unchanged.
+
+The next F6 steps are:
+
+1. **Initial records:** controlled native initialization and full-record comparison are
+   in place. Preserve the failing first-flight comparison as a regression.
+2. **Initial pit timeline:** start the independent opponent clock for the first pit visit,
+   then carry its origin, phase, RNG and residual into flight. Keep player controls/input
+   inactive before flight; do not force equal starts by resetting opponent positions.
+3. **Initial pit pacing:** measure separate setup, external departure and cockpit handoff
+   intervals against native A500. Pace finite animation mutations at that measured rate,
+   while actual user waiting time continues to advance opponents.
+4. **Whole-state gate:** repeat the full-record comparison with matched logical times and
+   input history. Classify remaining clock/pointer/presentation fields from native readers
+   and writers before normalizing them; keep gameplay mismatches visible.
+5. **Other modes:** apply the same clock ownership and measured pacing to repairs, race
+   restarts and other pit callers, then return to the broader F7 calibration matrix.
+
 ## Pause ownership
 
 The input prototype hooks native pause entry `$be12` and the native clock restore at `$beec`.

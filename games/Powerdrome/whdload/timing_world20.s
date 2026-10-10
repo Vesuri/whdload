@@ -124,3 +124,5 @@ timing_world20_vector_remainders ds.l 3
  INCLUDE timing_forces.s
 
  INCLUDE timing_keys.s
+
+ INCLUDE timing_setup.s

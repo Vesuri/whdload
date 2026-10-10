@@ -220,7 +220,18 @@ total). Full opponent arrays, repair-clock cases, initial setup,
 nonlocal exits, pause/epoch changes and native calibration remain F6 work. Native repair/
 setup/presentation timing still makes whole pit visits CPU-dependent.
 Nonlocal pit exits and other pit-entry paths remain unverified. The normal build is unchanged.
-Next, establish matching initial opponent state and complete-state probes, validate race
-opponent reinitialization (the restart fixture uses Practice), and calibrate native
-repair/setup/presentation durations; the passing deadline ledger does not close
-those F6/F7 requirements.
+Controlled native initialization is now available through the explicit VERIFY-only
+`TIMING_SETUP_SEED` flag, with read-only capture of all four 190-byte opponent records.
+It establishes matching complete records immediately after initialization on A500/030,
+but they already differ before timed flight: initialization-to-flight takes 7.14 seconds
+on 030 versus 16.90 on A500, with matching speeds but different track positions. This
+localizes the next work to the initial setup/pit interval; unequal-time snapshots alone
+are not proof of unequal movement rates. Start the continuous opponent timeline during
+the initial pit and calibrate finite setup/departure pacing against A500, then repeat
+complete-state comparisons. Also validate race reinitialization (the restart fixture
+uses Practice) and repair pacing. See the numbered next steps in timing-implementation.
+The final seeded ten-second pair is complete: 501 common player/engine/RNG states match,
+but all 501 complete opponent snapshots differ from the first sampled world time. Both
+runs retain zero final debt; the 030 adds 97 clean renderer comparisons. The strict
+opponent comparator rejects this pair, preserving the initial-pit gap as a regression.
+Default prototype and normal-build bytes remain unchanged.

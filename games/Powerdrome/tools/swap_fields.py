@@ -217,6 +217,17 @@ if os.environ.get('TIMING_STATE') == '1':
         sample += session_sample.replace('{off}',hex(off))
         sample += pit_sample.replace('{off}',hex(off))
         sample += pit_opponent_sample.replace('{off}',hex(off))
+        if os.environ.get('OPPONENT_STATE') == '1' and off in (0xe976,0xca3e,0xcedc):
+            # Four native records, all 190 bytes each. Guard the native count
+            # and relocated bank before reading; never write game state.
+            pointer=f'*(unsigned int*){state+0x342:#x}'
+            count=f'*(short*){state+0x340:#x}'
+            sample += f'if ({pointer} == {r["game"][0]+0x1ab0:#x} || {pointer} == {r["game"][0]+0x1da8:#x}) && {count} >= 0 && {count} <= 3\n'
+            for opponent in range(4):
+                words=[f'*(unsigned short*)({pointer}+{opponent*190+x})' for x in range(0,190,2)]
+                sample += f'if {count} >= {opponent}\n'
+                sample += f'printf "PDOPP_ARRAY %d {off:#x} {opponent} ' + '%04x'*95 + '\\n", $pd_field, ' + ', '.join(words) + '\nend\n'
+            sample += 'end\n'
         if off in (0xd9a0,0xde0a,0xdfae,0xdffc,0xe0c0,0x10d0c,0x13514):
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):

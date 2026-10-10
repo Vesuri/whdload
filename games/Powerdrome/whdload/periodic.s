@@ -58,6 +58,23 @@ TIMING_WORLD_STEP = 4
  ELSE
 TIMING_WORLD_STEP = 18
  ENDC
+ IFND TIMING_SETUP_SEED
+TIMING_SETUP_SEED = -1
+ ENDC
+ IFGT TIMING_SETUP_SEED-65535
+ FAIL "TIMING_SETUP_SEED must be -1 or an unsigned word"
+ ENDC
+ IFLT TIMING_SETUP_SEED+1
+ FAIL "TIMING_SETUP_SEED must be -1 or an unsigned word"
+ ENDC
+ IFNE TIMING_SETUP_SEED+1
+ IFND VERIFY
+ FAIL "TIMING_SETUP_SEED requires VERIFY"
+ ENDC
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_SETUP_SEED requires TIMING_WORLD20"
+ ENDC
+ ENDC
 ; Development-only staged extraction. Not included unless TIMING_PERIODIC=1.
 ; An 18-unit (90 ms) cadence is 11.111 Hz on PAL, near the measured A500 routes.
 TIMING_PERIOD = 18
@@ -80,6 +97,12 @@ install_periodic
  lea timing_frame(pc),a0
  move.w #$42e7,(a0)
  IFNE TIMING_WORLD20
+ IFNE TIMING_SETUP_SEED+1
+ lea timing_setup_begin(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_setup_reseed(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
  lea timing_pit_opponent_save_return(pc),a0
  move.w #$42e7,(a0)
  lea timing_pit_opponent_allocate(pc),a0
@@ -204,6 +227,15 @@ pl_periodic PL_START
  ; Gate repeated contact feedback/damage at the slow cadence, after geometry.
  ; TIMING_RANGE h0:$fb64 6 bit=C3
  PL_P $fb64,timing_world20_contact
+ IFNE TIMING_SETUP_SEED+1
+ ; Fixed test seed before native initialization random draws.
+ ; TIMING_RANGE h0:$b9a0 6 bit=C3
+ PL_P $b9a0,timing_setup_begin
+ ; Whole native MOVE.W clock-low-word to RNG seed.
+ ; TIMING_RANGE h0:$bad6 8 bit=C3
+ PL_P $bad6,timing_setup_reseed
+ PL_NOP $badc,2
+ ENDC
  ; Native entry MOVE.W plus BMI.W; original return depth is preserved.
  ; TIMING_RANGE h0:$d3d6 8 bit=C3
  PL_P $d3d6,timing_pit_opponents
@@ -726,6 +758,12 @@ timing_targets
  dc.w timing_session_native_cleanup+2-timing_targets
  ENDC
  IFNE TIMING_WORLD20
+ IFNE TIMING_SETUP_SEED+1
+ dc.l $b9a6
+ dc.w timing_setup_after_begin+2-timing_targets
+ dc.l $bade
+ dc.w timing_setup_after_reseed+2-timing_targets
+ ENDC
  dc.l $d3d6
  dc.w timing_pit_opponent_direct+2-timing_targets
  dc.l $d3de
