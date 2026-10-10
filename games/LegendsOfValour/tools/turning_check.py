@@ -9,6 +9,8 @@ from turning_tables import VIEWS, row
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('capture', type=Path)
 p.add_argument('--base', type=lambda x: int(x, 0), default=0x200000)
+p.add_argument('--native-buttons-only', action='store_true',
+               help='check the native UI dispatcher without requiring a ray-table dump')
 p.add_argument('--fallback', action='store_true')
 p.add_argument('--require-all-views', action='store_true')
 p.add_argument('--require-wall-twins', action='store_true')
@@ -29,6 +31,15 @@ def word(address):
 
 def long(address):
     return struct.unpack_from('>I', mem, address-a.base)[0]
+
+# Precision must not intercept the native UI command dispatcher.
+h1 = long(symbol('_hunks') + 4)
+h5 = long(symbol('_hunks') + 5*4)
+assert word(h1+0x2c00) == 0x4ef9 and long(h1+0x2c02) == h5+0x1a74, \
+    'UI button dispatcher no longer calls the native handler'
+print('UI command dispatcher retains its native target')
+if a.native_buttons_only:
+    raise SystemExit(0)
 
 owned, active = long(symbol('_turn_owned')), long(symbol('_turn_active'))
 h11 = long(symbol('_h11'))

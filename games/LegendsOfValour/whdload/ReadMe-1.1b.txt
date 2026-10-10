@@ -14,18 +14,17 @@ The WHDLoad options are:
 
   Character creation             CUSTOM1=1
   Frame-independent game timing  CUSTOM2 bit 6 (value 64)
-  Fine turning (1 degree)        CUSTOM2 bit 7 (value 128)
 
-Use CUSTOM2=192 to enable both timing and fine turning. Both are optional and
-off by default. The rendering optimizations need no custom tooltypes.
+Use CUSTOM2=64 to enable timing; it is optional and off by default. Rendering
+optimizations and one-degree mouse precision need no custom tooltypes.
 
 Frame-independent timing advances simulation at 25 ticks per second and
 corrects animation pacing. On slower machines this can reduce rendering speed.
 The existing display cap and beam synchronization are retained.
 
-Fine turning gives one-degree taps and rendering angles while retaining the
-held-turn rate after a short initial delay. It can be selected independently
-of the timing option.
+Direct mouse control always uses one-degree heading and rendering precision
+when the finer ray table can be allocated. UI turn buttons retain their native
+increments and repeat behavior. This works with or without the timing option.
 
 Requirements and compatibility
 ------------------------------

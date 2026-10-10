@@ -100,10 +100,9 @@ def main():
     slave_path = build / 'LegendsOfValour.Slave'
     slave = slave_path.read_bytes()
     info = header(code_hunk(slave_path)[0])
-    expected = ('C1:B:Character creation;C2:X:Frame-independent game timing:6;'
-                'C2:X:Fine turning (1 degree):7;')
+    expected = 'C1:B:Character creation;C2:X:Frame-independent game timing:6;'
     if info['ws_config'] != expected or 'Version 1.1b ' not in info['ws_info']:
-        raise SystemExit('Expected the version 1.1b release slave with three options')
+        raise SystemExit('Expected the version 1.1b release slave with two options')
     notes = (ROOT / 'whdload/ReadMe-1.1b.txt').read_bytes()
     destination = ROOT / 'dist'
     destination.mkdir(exist_ok=True)

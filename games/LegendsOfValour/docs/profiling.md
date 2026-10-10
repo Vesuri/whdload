@@ -87,8 +87,8 @@ planes (only the Intuition pointer colour differs).
 
 | Build | Command | Contents |
 |---|---|---|
-| release | `make -C whdload` | W1–W6 always on; menu: character creation, game timing, fine turning |
-| developer | `make -C whdload developer` | individual CUSTOM2 switches for W1–W6, no instruments |
+| release | `make -C whdload` | W1–W6 and mouse precision always on; menu: character creation, game timing |
+| developer | `make -C whdload developer` | individual CUSTOM2 switches for W1–W6 and mouse precision, no instruments |
 | VERIFY | `make -C whdload verify` | developer + input tape, pixel twins and other CUSTOM5 instruments; never ship |
 
 The `slv_config` string in `LegendsOfValourHD.s` is the authoritative bit map.
@@ -214,7 +214,7 @@ view changes. `frames.py` counts entries of `h12:05ea6`; `swap_fields.py` watche
 ## 8. Measuring a change
 
 1. Build once; vary only CUSTOM2 (`WHD_ARGS=CUSTOM2=…`). Developer/VERIFY builds honour every
-   bit; release builds force W1–W6 on (pass `--custom2 (mask|63)` to `check_disabled.py`).
+   bit; release builds force W1–W6 and mouse precision on (pass `--custom2 (mask|191)` to `check_disabled.py`).
 2. Capture off and on, on the A500-equivalent **and** the 68020, one at a time, on `spin` and
    `wall`. `tools/ab_window.sh PREFIX OFF ON [ROUTES [MACHINES]]` does this and runs the analysis
    chain on each capture: `check_disabled.py` (off: patched ranges are original) or
@@ -247,9 +247,9 @@ Spin route, large view, 100 fields. Baseline is the original game; each row adds
 | + W3 wall unroll (7) | 3.0 | 15.8 |
 | + W4 sprite rows (15) | 3.1 | 15.8 |
 | + W5 reciprocal cache (31) | 3.2 | 16.0 |
-| + W6 MOVEM clear (63) = release | 3.2 | 16.1 |
+| + W6 MOVEM clear (63) | 3.2 | 16.1 |
 
-On the scene-stable wall route the release build runs 3.3 fps (A500-equivalent) and 15.3 fps
+On the scene-stable wall route the measured W1–W6 build (mask 63) runs 3.3 fps (A500-equivalent) and 15.3 fps
 (68020), from 2.8 and 11.9. Differences under ~0.2 fps between rows are scene/phase noise; the
 per-routine cycle savings are the evidence. The 25 fps cap and beam wait are unchanged.
 

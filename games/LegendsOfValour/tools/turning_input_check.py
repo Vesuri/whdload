@@ -41,16 +41,19 @@ else:
     assert len(starts) == 1, starts
     i = starts[0]
     before = samples[i-1]['player']['heading']
-    assert samples[i]['player']['heading'] == (before+1)%360
+    assert samples[i]['player']['heading'] == (before+5)%360
     if a.hold:
         end = next(j for j in range(i+1,len(samples)) if samples[j]['input_sample']['buttons'] == 0)
         assert end-i == 20, (i,end)
         changes = [(samples[j]['player']['heading']-samples[j-1]['player']['heading'])%360 for j in range(i,end)]
-        assert changes == [1,0,0,0]+[5]*16, changes
+        assert changes == [5]*20, changes
         assert all(s['player']['heading'] == samples[end-1]['player']['heading'] for s in samples[end:])
-        print('Held right press: 1 degree, 160 ms repeat delay, then 5 degrees/tick; release stops')
+        print('Held right press: native 5 degrees/tick from the first tick; release stops')
     else:
-        assert all(s['player']['heading'] == (before+1)%360 for s in samples[i:])
+        end = next(j for j in range(i+1,len(samples)) if samples[j]['input_sample']['buttons'] == 0)
+        changes = [(samples[j]['player']['heading']-samples[j-1]['player']['heading'])%360 for j in range(i,end)]
+        assert changes == [5]*(end-i), changes
+        assert all(s['player']['heading'] == samples[end-1]['player']['heading'] for s in samples[end:])
     assert len(samples)-i >= 10 and samples[-1]['input_sample']['buttons'] == 0
     if not a.hold:
-        print('Short right press: exactly one degree; no repeat or movement after release')
+        print('Short right press: native 5 degrees/tick; no movement after release')

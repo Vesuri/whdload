@@ -118,7 +118,9 @@ slv_config	dc.b	"C1:B:Character creation;"
 		dc.b	"C2:X:MOVEM chunky clear:5;"
 	ENDC
 		dc.b	"C2:X:Frame-independent game timing:6;"
-		dc.b	"C2:X:Fine turning (1 degree):7;"
+	IFD DEVELOPER
+		dc.b	"C2:X:One-degree mouse precision:7;"
+	ENDC
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
 		dc.b	"C5:X:C2P pixel twin (verification):1;"
@@ -143,11 +145,12 @@ _bootdos	lea	(_saveregs,pc),a0
 		lea	(_tag,pc),a0
 		jsr	(resload_Control,a2)
 	IFND DEVELOPER
-	; Release builds always select W1-W6. Preserve the player-facing bits
-	; and their existing tooltype values; individual installers retain CPU
+	; Release builds always select W1-W6 and one-degree mouse precision.
+	; Preserve the optional timing bit and existing tooltype values.
+	; Individual installers retain CPU
 	; selection and allocation fallback. Use an address register for the write.
 		lea	(_custom2,pc),a0
-		ori.l	#$3f,(a0)
+		ori.l	#$bf,(a0)
 	ENDC
 
 	;open doslib

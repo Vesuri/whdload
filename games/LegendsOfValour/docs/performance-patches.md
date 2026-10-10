@@ -1,7 +1,7 @@
 # Performance patches (W1–W6)
 
 > Read before changing game code for speed. Measurement method: `docs/profiling.md` §8.
-> Optional gameplay changes on CUSTOM2 bits 6 and 7: `docs/simulation-timing.md`,
+> Optional timing on bit 6 and automatic mouse precision (developer bit 7): `docs/simulation-timing.md`,
 > `docs/one-degree-turning.md`.
 
 ## Rules for every patch
@@ -13,7 +13,7 @@
   character-creation mode (CUSTOM1).
 - Hooks replace **complete instructions** only. Before choosing a range, check that no
   relocation (`tools/xref.py`) or branch targets its interior.
-- Each patch has a CUSTOM2 bit. Release builds force bits 0–5 on; developer/VERIFY builds honour
+- Each patch has a CUSTOM2 bit. Release builds force bits 0–5 and mouse-precision bit 7 on; developer/VERIFY builds honour
   each bit. With a bit off, the original bytes stay untouched: declare each hook range with a
   `PERF_RANGE hN:OFFSET LEN bit=B` comment next to it, and `tools/check_disabled.py` verifies
   every declared range against `tmp/unpacked/AMIGA2` (with relocations applied).
@@ -65,7 +65,7 @@ without checking a fast CPU for tearing.
 | 4 | W5 exact reciprocal cache | 68000/10 | `rays.s` |
 | 5 | W6 MOVEM chunky clear | all | `clear.s` |
 | 6 | frame-independent game timing (opt-in) | all | `simulation*.s` |
-| 7 | one-degree turning (opt-in) | all | `turning*.s` |
+| 7 | one-degree mouse precision (automatic in release) | all | `turning*.s` |
 
 VERIFY twins (`*_verify.s`, CUSTOM5 bits 1 and 4–7) may force W3–W5 bodies on either CPU.
 

@@ -37,6 +37,6 @@ patches.
 | `docs/profiling.md` | Running the game, driving it, tracing it, or quoting any performance number |
 | `docs/performance-patches.md` | Before changing any rendering code: pipeline, game time, W1–W6 hooks and invariants |
 | `docs/simulation-timing.md` | Before touching the optional game timing (CUSTOM2 bit 6) |
-| `docs/one-degree-turning.md` | Before touching the optional fine turning (CUSTOM2 bit 7) |
+| `docs/one-degree-turning.md` | Before touching automatic mouse precision (developer CUSTOM2 bit 7) |
 | `docs/releasing.md` | Building the release archives |
 | `README.md` | Setup, build/run quick start, dependencies and release overview |

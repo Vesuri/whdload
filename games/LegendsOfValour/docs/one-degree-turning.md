@@ -1,9 +1,10 @@
-# One-degree turning (CUSTOM2 bit 7)
+# One-degree mouse precision
 
-Optional slave patch, labelled "1 degree turning", read once at launch. The player can face
-and render every whole-degree heading. A tap turns one degree; held turning keeps the game's
-original speed. With the bit off, every hooked byte stays original and turning stays at five
-degrees. The bit is independent of the 25 Hz simulation (bit 6); both combinations work.
+Release builds always enable whole-degree headings and rendering for direct mouse
+control. The UI turn buttons use the original handler and view-specific increments;
+there is no tap override or added repeat delay. Precision is independent of the
+optional 25 Hz simulation. Developer/VERIFY builds retain CUSTOM2 bit 7 for A/B
+checks; with it off, the turning hooks and five-degree units remain original.
 
 ## How the game turns
 
@@ -44,11 +45,11 @@ degrees. The bit is independent of the 25 Hz simulation (bit 6); both combinatio
 - **Memory reserve.** KickEmu's expansion pool cannot fit the table, so `FASTMEMSIZE` in
   `LegendsOfValourHD.s` is 512 KiB + 144 KiB. The reserve applies even with the bit off.
   Physical host fast RAM does not enlarge KickEmu's fixed pool.
-- **Input.** The first press turns one degree. Repeats are suppressed for `TURN_REPEAT_FIELDS`
-  = 8 PAL fields (160 ms), measured in consumed simulation fields when bit 6 is on. After that,
-  the view's original held increment applies. A 40-field press gives steps `[1,0,0,0]` followed
-  by five-degree steps, so taps do not slow sustained turning to a fifth. Mouse headings
-  normalise to 0–359 in both directions. The displayed heading equals the raw heading.
+- **Input.** The native button dispatcher at `h1:02c00` is untouched, as is the
+  turn increment at `h11:06012`. Button presses apply that increment immediately
+  and on subsequent ticks. With 25 Hz timing this is five degrees per tick.
+  Direct mouse headings normalize to 0–359 in both directions, and the displayed
+  heading equals the raw heading when the finer table is active.
 
 ## Source files
 
@@ -57,7 +58,7 @@ degrees. The bit is independent of the 25 Hz simulation (bit 6); both combinatio
 | `whdload/turning.s` | Bit-7 install, allocation/free, publishing table and units; hooks guarded by signatures |
 | `whdload/turning_generate.s` | `_turn_generate`: D0 width, D1 focal length, A0 180-row destination, A1 36-row legacy table |
 | `whdload/turning_trig.s` | Q22 sine constants 0..90°, computed from mathematics |
-| `whdload/turning_input.s` | Tap/repeat policy (`TURN_REPEAT_FIELDS`) |
+| `whdload/turning_input.s` | Signed direct-mouse heading normalization |
 | `whdload/turning_verify.s` | VERIFY table oracle: checks copied rows, and new rows against a host-model checksum |
 | `whdload/turning_pixels.s` | VERIFY wall twin (CUSTOM5 bit 19): runs `h12:02808` with the new and the original table at legacy headings and compares all chunky bytes |
 | `whdload/turning_sweep.s` | VERIFY ray sweep (CUSTOM5 bit 21): all 360 headings through the real ray walker in every view |
@@ -67,7 +68,8 @@ They need no turning-specific code.
 
 ## Invariants a change must keep
 
-- Bit off: all six turning hook ranges stay original. `check_disabled.py` checks them.
+- Developer bit off: all five turning hook ranges stay original. `check_disabled.py` checks them.
+- The native button dispatcher and its target remain unpatched by the precision feature.
 - Legacy rows (every fifth angle) are byte-identical to the original tables, padding included.
 - Table pointer, stride and both units change together, or none of them change.
 - No slope word below 2; the zero word stays the octant marker.
@@ -97,9 +99,28 @@ copy the slave and listing into each OUT, and pass `KEEP_SLAVE=1`.
   run the spin route with `STATE_ONLY=1 TAPE_OPTIONS=4194305 TURNING_CHECK_ARGS=--require-lifecycle`.
 - **Forced allocation failure** (CUSTOM5 bit 18): `TAPE_OPTIONS=262145 TURNING_CHECK_ARGS=--fallback`.
   Both units must stay at five and the table pointer null.
-- **Input.** `python3 tools/turning_input_check.py --sweep forward|reverse` reads completed-tick
-  observations from a timing-enabled capture. It requires exactly 360 unit steps, every
-  heading, one wrap, and agreement with the historical mouse-counter deltas.
+- **Input.** `tools/turning_input_validate.sh PREFIX` runs serial captures on both CPUs
+  with 25 Hz timing. A 40-field UI press must produce twenty five-degree ticks with
+  no added initial delay and no movement after release. The mouse route explicitly
+  enters direct control before its anchor; a reverse sweep must produce exactly
+  360 one-degree steps, every heading, one wrap, and agreement with historical
+  mouse-counter deltas. `turning_check.py --native-buttons-only` also checks the
+  actual dispatcher still targets the original game handler. These are correctness
+  captures, not frame-rate measurements.
+
+## Current input validation
+
+The native-button and direct-mouse checks pass on both reference CPUs. Captures
+are `tmp/prof/mouse-native-{a1200,a500}-{hold,mouse}`: 51 completed-tick samples
+per button run and 381 per mouse run. Each button run produces twenty immediate
+five-degree steps; each mouse run produces 360 exact reverse one-degree steps,
+all headings and one wrap. All four retain the original UI dispatcher target.
+Reproduce with `tools/turning_input_validate.sh PREFIX`.
+
+Release, developer and VERIFY builds assemble. Binary menu/default checks confirm
+2/9/17 menu options respectively, with the release forcing CUSTOM2 mask 191 and
+developer/VERIFY builds keeping independent bit selection. Both beta archives pass
+packaging CRC and replacement-content checks. No new performance claim is made.
 
 ## Cost
 

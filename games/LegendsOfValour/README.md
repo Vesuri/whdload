@@ -17,11 +17,11 @@ The player-facing options are:
 |---|---|
 | Character creation | `CUSTOM1=1` |
 | Frame-independent game timing (25 ticks/second) | `CUSTOM2=64` |
-| Fine turning (one-degree taps and rendering) | `CUSTOM2=128` |
-| Both timing and fine turning | `CUSTOM2=192` |
 
-Timing and fine turning are off by default. Fixed-rate simulation can reduce rendering
-speed on slow machines. Fine turning preserves the held-turn rate after a short delay.
+Timing is off by default. Fixed-rate simulation can reduce rendering speed on slow
+machines. Direct mouse control automatically uses one-degree precision; UI turn buttons
+retain their native increments and repeat behavior. Allocation failure falls back to
+the original five-degree precision.
 F10 quits, or use WHDLoad's `QuitKey` tooltype.
 
 ## Setup
@@ -72,8 +72,8 @@ make -C whdload
 SLAVE="$PWD/tmp/build/LegendsOfValour.Slave" WHD_ARGS=CUSTOM2=0 amiga/run.sh
 ```
 
-This explicitly selects the new release with optional timing and fine turning off.
-Use `WHD_ARGS=CUSTOM2=192` to try both. The launcher defaults to a 68000 with 1 MiB
+This explicitly selects the new release with optional timing off.
+Use `WHD_ARGS=CUSTOM2=64` to enable timing. The launcher defaults to a 68000 with 1 MiB
 chip and 8 MiB fast RAM; reference capture machines are specified separately in
 [profiling.md §3](docs/profiling.md#3-the-machine).
 
@@ -82,7 +82,7 @@ An expanded 68020 trial can be launched with:
 ```sh
 AMIGA_MODEL=A1200 CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 \
 KICKSTART="$KICKSTART_A1200" EXTRA_ARGS=--slow_memory=0 \
-SLAVE="$PWD/tmp/build/LegendsOfValour.Slave" WHD_ARGS=CUSTOM2=192 amiga/run.sh
+SLAVE="$PWD/tmp/build/LegendsOfValour.Slave" WHD_ARGS=CUSTOM2=64 amiga/run.sh
 ```
 
 The launcher uses `amiga/.run` and copies the game into a fresh run directory each time.
@@ -98,7 +98,7 @@ make -C whdload developer OUT='../tmp/build developer'
 make -C whdload verify OUT='../tmp/build verify'
 ```
 
-Developer builds retain individual W1–W6 switches. VERIFY adds input tapes, pixel twins,
+Developer builds retain individual W1–W6 and mouse-precision switches. VERIFY adds input tapes, pixel twins,
 and simulation checks; it must not ship. `OUT` is relative to `whdload/` unless absolute;
 paths containing spaces are supported. All build variants are assembled afresh.
 
@@ -124,8 +124,9 @@ and `dist/`. The preinstalled distribution contains game data; archives are not 
 
 ## Remaining acceptance and limitations
 
-Automated checks pass on both reference CPUs. One-degree turning still needs normal
-interactive acceptance; timing may receive further adjustments from play feedback.
+Automated checks pass on both reference CPUs. One-degree mouse precision has been accepted in
+play testing; the UI buttons retain native behavior. Timing may receive further
+adjustments from play feedback.
 The tape cannot wait for a conversation panel's input poll, so affected routes dismiss
 it with repeated EXIT clicks. See [open-work.md](docs/open-work.md) for current items.
 W7's further renderer redesign was dropped by user decision.

@@ -1,5 +1,6 @@
-; Optional one-degree turning: CUSTOM2 bit 7. Original table ownership stays
-; with the game; the renderer alone selects our separately owned PUBLIC table.
+; One-degree mouse precision: automatic in release, developer CUSTOM2 bit 7.
+; Original table ownership stays with the game; only the renderer selects our
+; separately owned PUBLIC table. The UI command dispatcher remains untouched.
 TURN_TABLE_BYTES = 144000
 _turn_install
         movem.l d0-a6,-(sp)
@@ -34,13 +35,6 @@ _turn_install
         bne .bad
         cmp.l #$302c0c28,($1e88,a2)
         bne .bad
-        lea ($1a74,a2),a4
-        cmp.w #$4ef9,($2c00,a0)
-        bne .bad
-        cmp.l ($2c02,a0),a4
-        bne .bad
-        lea (_turn_input_original,pc),a2
-        move.l a4,(a2)
         lea (_turn_setup_original,pc),a2
         move.l ($2bba,a0),(a2)
         lea (_turn_free_resume+2,pc),a2
@@ -49,9 +43,6 @@ _turn_install
         lea (_turn_pool_free+2,pc),a2
         lea ($2a4a,a0),a4
         move.l a4,(a2)
-        ; PERF_RANGE h1:02c00 6 bit=7
-        lea (_turn_input,pc),a2
-        move.l a2,($2c02,a0)
         ; PERF_RANGE h1:02bb8 6 bit=7
         lea (_turn_setup,pc),a2
         move.l a2,($2bba,a0)
@@ -165,14 +156,6 @@ _turn_setup
         ENDC
         move.l (a5),(4,a5)
         move.w #1,($6010,a4)
-        lea (_turn_hold_step,pc),a0
-        move.w ($6012,a4),d0
-        cmp.w #5,d0
-        bcs .keep_hold
-        move.w d0,(a0)
-.keep_hold
-        lea (_turn_press,pc),a0
-        clr.l (a0)
         IFD VERIFY
         addq.l #1,(8,a5)
         move.w ($8ca,a4),(12,a5)

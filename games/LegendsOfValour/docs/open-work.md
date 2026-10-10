@@ -9,12 +9,13 @@
   developer/VERIFY builds (`docs/performance-patches.md`). Spin route: 2.5 → 3.2 fps on the
   A500-equivalent, 12.4 → 16.1 fps on a 14 MHz 68020 (`docs/profiling.md` §9).
 - Optional, off by default: frame-independent game timing, CUSTOM2 bit 6
-  (`docs/simulation-timing.md`), and one-degree turning, bit 7 (`docs/one-degree-turning.md`).
+  (`docs/simulation-timing.md`). One-degree direct mouse precision is automatic in
+  release builds; UI turn buttons retain native behavior (`docs/one-degree-turning.md`).
 
 ## Open
 
-- **One-degree turning:** automated checks pass on both CPUs; normal interactive play is the
-  remaining acceptance step.
+- **Mouse precision:** accepted in play testing. The requested native-button behavior
+  replaces one-degree button taps; further play feedback is welcome.
 - **Game timing:** automated checks pass; subjective play feedback may still lead to changes.
   Re-run the affected comparisons in `docs/simulation-timing.md` after any change.
 - **Conversation panel:** it polls through h2, so a tape `W` entry cannot wait for it and routes
