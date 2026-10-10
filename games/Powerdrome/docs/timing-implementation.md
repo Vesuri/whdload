@@ -324,12 +324,13 @@ The centering route (`CUSTOM5=3`) verifies 490/495 impulse steps, 54/55 decays a
 twins. Impulse component ranges are X=0, Y=−2..0, Z=0: this establishes negative vertical
 fraction/decay handling, not nonzero horizontal forces or a complete unrefreshed lifetime.
 The verifier reports these ranges and zero expiries explicitly; `--require-three-axes`
-and `--require-expiry` remain stronger gates for subsequent routes. Close opponent-contact
-initialization and native fall-reset paths are also still unexercised.
+and `--require-expiry` are exercised by the mixed route below. Close opponent-contact
+initialization and native fall-reset paths are still unexercised.
 
 This practice route has no opponents. `check_timing_world20.py --practice` explicitly
-requires the bounded `CUSTOM5=3` route, at most 500 fields, native practice/no-opponent
-state in both snapshots, and zero opponent movement observations. Its default mode still
+requires either the bounded `CUSTOM5=3` route (at most 500 fields) or `CUSTOM5=11`
+(at most 750 fields), native practice/no-opponent state in both snapshots, and zero
+opponent movement observations. Its default mode still
 requires active opponent interval coverage. The individual time ledgers pass with 498/503
 complete world steps and no outstanding movement debt.
 
@@ -419,10 +420,84 @@ twins, for **220 final-build comparisons** across centering and pause. This does
 exercise a centering command arriving while paused. Both the ordinary coverage build
 and the normal slave still build; the normal slave is byte-identical to the prior checkpoint.
 
-Remaining keyboard gates include X/Z behavior, queue wrapping/overflow, live hardware
+Remaining keyboard gates include the C-key upper cap, queue wrapping/overflow, live hardware
 publication and keys across pause/pit/rescue/restart. Input fixtures exercise the common
 enqueue logic but bypass the hardware publication wrapper. Other keyboard-controlled
 settings and presentation-owned mutations still require extraction before release.
+
+### Mixed commands, three-axis impulses and native calibration
+
+`CUSTOM5=11` selects Practice and publishes 13 C/X/Z commands, including X at zero,
+plus opposing mouse pulses on both axes and one Shift interval. It writes only native
+input fields; it does not seed velocity, position or force state. The final Z allows
+an unrefreshed impulse to expire. All three observed complete impulses start after a
+recorded native centering reset and end at age 10.
+
+The frozen `Powerdrome-timing-force-route1.slave` produces these 750-field captures:
+
+| Capture suffix (`timing-force-route1-`) | Complete world steps | Slow updates | Impulse steps / decays | Centering resets | Clean renderer twins |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `a500` | 755 | 167 | 531 / 74 | 91 | — |
+| `030-twins` | 754 | 167 | 531 / 74 | 91 | 244 |
+
+All **754 common sampled player/engine/RNG states and centering/modifier histories match**
+at identical logical times. Both captures verify all 13 producer timestamps, finish
+without queue loss, allocator debt or assigned unfinished steps, and use the expected
+20-ms movement / rational 90-ms slow cadence. The centering arithmetic audit verifies
+396 actual scalar adjustments per capture; scalar remainder observations number 729/728.
+This route has no nonzero ordinary axis carries, so it does not replace the earlier
+fractional vector tests. Impulse component ranges are **X −1..177, Y −2..3, Z −341..1**.
+Each capture verifies three complete integrated lifetimes of **900 logical ms**.
+The force checker now enforces continuity between observed resets and steps, and requires
+an observed age-zero reset before crediting a complete lifetime. No falling occurs here.
+
+The native A500 reference uses the same frozen artifact and input route with
+`CUSTOM1=0 CUSTOM3=0 CUSTOM4=0`. Its initial and final timing hooks retain native bytes.
+Equivalent first-impulse-entry to expiry-decision boundaries give:
+
+| Episode in route | Native A500 VBL ms | Timed A500 VBL ms | Timed 030 VBL ms | Timed logical ms |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 800 | 880 | 940 | 880 |
+| 2 | 900 | 800 | 880 | 880 |
+| 3 | 1,120 | 1,060 | 880 | 880 |
+
+These are **boundary durations**, excluding the last represented movement interval.
+The prototype's 45 × 20-ms integrated lifetime is 900 ms, whereas its first-to-last
+entry boundary is 44 × 20 = 880 ms. Native episodes each contain ten frame-driven
+increments. VBL observations have less than one PAL field (20 ms) of endpoint-difference
+quantization. Logical time and physical observation time can differ while work waits
+for rendering or catches up; zero debt at the capture endpoint does not prove zero
+latency throughout the run. Instrumented twins are not throughput benchmarks.
+
+The third native boundary duration differs from the timed logical duration by 240 ms
+(21.4%), and from the 030 observed duration by the same amount. This exceeds the frozen
+10% or 90-ms duration tolerance even allowing field quantization. Therefore **A500
+impulse calibration is not passed**. The first two logical differences are within that
+bound. The runs share the input tape, but native and timed trajectories are not proven
+equal; this is a calibration warning, not proof that one replacement period fixes every
+scene. Do not change the 90-ms period solely to fit one episode or relax the gate.
+
+Recheck the bounded results with:
+
+```sh
+python3 tools/check_timing_keys.py --forces CAPTURE...
+python3 tools/check_timing_world20.py --practice CAPTURE...
+python3 tools/check_timing_integrator.py --centering CAPTURE...
+python3 tools/check_timing_forces.py --require impulse --require-three-axes --require-expiry CAPTURE...
+python3 tools/timing_impulse_durations.py NATIVE_CAPTURE TIMED_CAPTURE...
+```
+
+Use `CUSTOM5=11 FIELDS=750`, `ANCHOR=0xbc7c`, `SWAP_MARKER=0xbc7c`, `SWAP_ONLY=1`
+and `TIMING_STATE=1`. The timed capture probes are `$ccee $cd2c $cd3a $cde2 $cedc $d56c
+$cd5c $cd64 $cd96 $cdc4 $adba $adc0 $9c8c $9c92 $fc9e $1003a $10046`.
+The native duration capture needs `$adba $adc0 $cd96 $cdc4`; the recorded reference also
+observes `$ccee $cde2 $c88e $c89a $c8b0 $fc9e $1003a $10046`. Pass these as hexadecimal
+`COVERAGE_PROBES` offsets. The timing prototype uses the same WORLD20/input/engine flags
+as the centering experiment and fixed heat/world seeds 12345/54321.
+
+Remaining force coverage includes close-opponent impulse generation, native falling
+resets and both sides of the age-50 eligibility boundary. Logical clock ownership,
+mode lifecycle and renderer-blocked latency remain separate F6/F7 work.
 
 ### Next extraction steps (`coupled-20`)
 
@@ -873,8 +948,8 @@ Pits, rescue, restart, title playback and other session changes still need their
 and input-lifecycle handling. These prototypes remain excluded from normal builds; normal
 `CUSTOM3` currently enables only the movement-minimum and cockpit-departure corrections.
 
-The resource, opponent, collision/falling/impulse and weather work remains open. In particular,
-scheduling a velocity decay counter alone cannot fix an unscaled displacement: the whole
-fall/impulse increment must advance at its selected logical cadence or be integrated over
-the elapsed interval. Keep native mode/rendering consumers of the shared loop counter until
+Resources, opponents and falling/impulses have bounded development coverage above; their
+full mode lifecycles and calibration remain open alongside weather and other effects.
+Fall/impulse displacement is integrated over elapsed logical time, separately from its
+90-ms age/decay cadence. Keep native mode/rendering consumers of the shared loop counter until
 each gameplay read has an explicit replacement.

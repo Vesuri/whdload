@@ -18,7 +18,7 @@ def block(path, tag, initialized_offset, fmt, offset):
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('captures',type=Path,nargs='+')
-p.add_argument('--practice',action='store_true',help='Require the bounded CUSTOM5=3 practice route with no opponents')
+p.add_argument('--practice',action='store_true',help='Require a bounded CUSTOM5=3 or 11 practice route with no opponents')
 a=p.parse_args();histories=[]
 for root in a.captures:
     initial=block(root/'code.bin',b'PDW20T01',8,'>III',12)
@@ -65,7 +65,8 @@ for root in a.captures:
     opponents=[list(map(int,v.split())) for v in re.findall(r'^PDTIME_EVENT -?\d+ 0xd56c (.+)$',log,re.M)]
     if a.practice:
         config=json.loads((root/'configuration.json').read_text())
-        assert re.search(r'\bCUSTOM5=3\b',config['WHD_ARGS']) and int(config['FIELDS'])<=500
+        route=re.search(r'\bCUSTOM5=(3|11)\b',config['WHD_ARGS'])
+        assert route and int(config['FIELDS'])<=(500 if route[1]=='3' else 750)
         game=int((root/'game-base.txt').read_text(),0)
         for name in ('chip.bin','final-chip.bin'):
             data=(root/name).read_bytes()

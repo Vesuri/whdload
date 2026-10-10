@@ -102,6 +102,8 @@ for root in a.captures:
     pending_fall = pending_impulse = pending_reset = None
     falls = impulses = fall_ages = decays = resets = expiries = 0
     vectors=[]
+    known_generations=set(); generation=None; generation_start=None
+    previous_impulse=None; lifetime_units=[]
     previous_force=force_state(root/'code.bin')
     for field, off, values in re.findall(r'^PDFORCE_EVENT (-?\d+) (0x[0-9a-f]+) (.+)$',
                                         (root/'swaps-gdb.txt').read_text(), re.M):
@@ -121,12 +123,25 @@ for root in a.captures:
             fall_ages += advances
         elif off == 0xcd96:
             assert pending_impulse is None and v[10]
+            if generation==v[22] and previous_impulse is not None:
+                assert previous_impulse[10] and v[10:16]==previous_impulse[10:16], 'Impulse state changed outside a recorded reset or decay'
+                assert v[0]==previous_impulse[0]+4, 'An active impulse skipped a world step'
+            else:
+                generation=v[22]
+                generation_start=v[0] if generation in known_generations else None
+                if generation_start is not None:
+                    assert v[11]==v[18]==0, 'A new impulse did not start at age/phase zero'
             pending_impulse = v
             vectors.append(list(map(signed,v[13:16])))
         elif off == 0xcdc4 and pending_impulse is not None:
             expected, advances = impulse(pending_impulse)
             assert v[:27] == expected, (root.name, field, 'impulse', [(i,x,y) for i,(x,y) in enumerate(zip(expected,v)) if x!=y])
             expiries += not v[10]
+            if not v[10] and generation_start is not None:
+                duration=v[0]-generation_start+4
+                assert duration==18*v[12], 'Impulse lifetime disagrees with its native age limit'
+                lifetime_units.append(duration)
+            previous_impulse=v
             pending_impulse = None
             impulses += 1
             decays += advances
@@ -143,6 +158,7 @@ for root in a.captures:
             else:
                 expected[18:22] = [0]*4
                 expected[22] += 1
+                known_generations.add(expected[22])
                 if entry == 0x9c8c:
                     expected[11] = 0
                 else:
@@ -156,7 +172,7 @@ for root in a.captures:
         assert force_state(root/'final-code.bin')==previous_force, 'Unobserved force mutation after final probe'
     ranges=[(min(v[i] for v in vectors),max(v[i] for v in vectors)) for i in range(3)] if vectors else []
     if a.require_expiry:
-        assert expiries, 'No complete unrefreshed impulse lifetime observed'
+        assert lifetime_units, 'No complete unrefreshed impulse lifetime observed from a recorded reset'
     if a.require_three_axes:
         assert vectors and all(lo!=0 or hi!=0 for lo,hi in ranges), 'Missing nonzero impulse axis coverage'
     if a.require in ('fall','both'):
@@ -166,4 +182,4 @@ for root in a.captures:
     print(f'{root.name}: {falls} fall steps / {fall_ages} age advances; '
           f'{impulses} impulse steps / {decays} decays; {resets} native resets verified; '
           f'{unfinished} unfinished probe pairs')
-    print(f'  Impulse component ranges {ranges}; completed impulse expiries {expiries}')
+    print(f'  Impulse component ranges {ranges}; completed impulse expiries {expiries}; observed full lifetimes {[x*5 for x in lifetime_units]} ms')

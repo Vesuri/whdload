@@ -66,8 +66,10 @@ coverage_vbl
  bne.w .done
  ; Timing fixture writes sampled native mouse inputs, never physics state.
  move.l custom5(pc),d0
+ cmp.l #11,d0
+ beq.s .force_axes
  cmp.l #7,d0
- bne.s .normal_axes
+ bne.w .normal_axes
  move.l $48fe(a0),d0
  sub.l cov_epoch-coverage_status(a1),d0
  cmp.l #160,d0
@@ -83,9 +85,34 @@ coverage_vbl
  cmp.l #220,d0
  bne.s .normal_axes
  add.w #40,$a6e+$42a(a0)
+ bra.s .normal_axes
+.force_axes
+ move.l $48fe(a0),d0
+ sub.l cov_epoch-coverage_status(a1),d0
+ cmp.l #60,d0
+ bne.s .force_reverse
+ add.w #40,$a6e+$42a(a0)
+ add.w #24,$a6e+$42e(a0)
+ bra.s .normal_axes
+.force_reverse
+ cmp.l #120,d0
+ bne.s .force_center
+ sub.w #80,$a6e+$42a(a0)
+ sub.w #48,$a6e+$42e(a0)
+ bra.s .normal_axes
+.force_center
+ cmp.l #180,d0
+ bne.s .normal_axes
+ add.w #40,$a6e+$42a(a0)
+ add.w #24,$a6e+$42e(a0)
 .normal_axes
  lea coverage_tape(pc),a2
  move.l custom5(pc),d0
+ cmp.l #11,d0
+ bne.s .not_forces
+ lea coverage_force_tape(pc),a2
+ bra.w .tape
+.not_forces
  cmp.l #10,d0
  bne.s .not_heat
  lea coverage_heat_tape(pc),a2
@@ -470,4 +497,38 @@ coverage_heat_tape
  dc.l 700
  dc.w 0,0,0
  dc.l 800
+ dc.w -1,0,0
+
+; Centering C/X/Z, both sampled mouse axes, and a final unrefreshed impulse.
+; Practice mode. All writes are ordinary keyboard/modifier/mouse input only.
+coverage_force_tape
+ dc.l 10
+ dc.w 'c',0,1
+ dc.l 30
+ dc.w 'c',0,1
+ dc.l 50
+ dc.w 'c',0,1
+ dc.l 80
+ dc.w 0,0,0
+ dc.l 90
+ dc.w 'x',0,0
+ dc.l 110
+ dc.w 'x',0,0
+ dc.l 130
+ dc.w 'x',0,0
+ dc.l 150
+ dc.w 'x',0,0
+ dc.l 170
+ dc.w 'c',0,0
+ dc.l 190
+ dc.w 'c',1,0
+ dc.l 230
+ dc.w 'z',0,0
+ dc.l 320
+ dc.w 'c',0,0
+ dc.l 340
+ dc.w 'c',0,0
+ dc.l 550
+ dc.w 'z',0,0
+ dc.l 700
  dc.w -1,0,0

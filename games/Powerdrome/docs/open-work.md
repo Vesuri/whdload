@@ -155,8 +155,8 @@ and fractions, and adds 75 clean renderer comparisons. Falling and impulses now 
 The ten-second A500/030 failure route matches 501 common sampled world states; independent
 arithmetic checks pass 181/178 falling steps, and the 030 adds 98 clean renderer comparisons.
 The centering route passes 490/495 impulse steps and 109/110 native resets, with another
-143 clean twins, but only small negative vertical impulses are covered. Horizontal forces,
-full impulse expiry, fall limit/reset and opponent-contact generation remain untested.
+143 clean twins. The subsequent mixed command route below covers nonzero impulses on
+all axes and full expiry; fall limit/reset and opponent-contact generation remain untested.
 Timestamped C/X/Z publication and historical movement modifiers now fix the centering
 route's earlier CPU divergence. The final C-key A500/030 pair matches all 501 common
 centering/modifier histories and sampled world states, with nine exact command timestamps
@@ -164,9 +164,16 @@ and another 144 clean renderer comparisons. The final pause regression verifies 
 movement-modifier states, excludes 50 paused fields, retains all 56 fuel/15 brake updates
 and adds 76 clean twins. The A500 centering capture ends with two assigned
 unfinished steps (one control started); strict endpoint accounting distinguishes these
-from completed work. X/Z input routes, hardware publication, queue wrapping and keys
-across mode changes remain untested. Those and the remaining force coverage precede
-logical mode clocks, mode/debt lifecycles and the full calibration/capacity matrix.
+from completed work. The mixed C/X/Z route now matches 754 common sampled world and
+command/modifier states across A500/030, verifies 13 command timestamps, and adds 244
+clean twins. It covers nonzero impulse components on all axes and three complete
+900-ms logical impulse lifetimes. Native A500 comparison measures boundary durations
+of 800/900/1,120 ms versus 880 logical ms: the third exceeds the frozen duration tolerance,
+so impulse calibration remains open. Physical observation latency also varies despite
+matching logical states and zero final debt. The C-key upper cap, hardware publication,
+queue wrapping and keys across mode changes remain untested. Those and the remaining
+force coverage precede logical mode clocks, mode/debt lifecycles and the full
+calibration/capacity matrix.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

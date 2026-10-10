@@ -197,7 +197,7 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += fast_world_sample.replace('{off}',hex(off))
         if off in (0xcd5c,0xcd64,0xcd96,0xcdc4,0xb390,0xb398,0xc59e,0xc5a6,0x9c8c,0x9c92,0xadba,0xadc0):
             sample += force_sample.replace('{off}',hex(off))
-        if off in (0xccee,0xcd2c,0xcd3a,0xcedc):
+        if off in (0xccee,0xcd2c,0xcd3a,0xcedc,0x1003a,0x10046):
             sample += key_sample.replace('{off}',hex(off))
         if off==0xd9a0:
             # Native resource result in d1 immediately before committing it.

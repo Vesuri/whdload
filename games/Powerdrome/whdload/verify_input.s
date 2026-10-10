@@ -43,6 +43,11 @@ practice_key
  move.l (sp)+,a0
  IFD COVERAGE_INPUT
  move.l custom5(pc),d0
+ cmp.l #11,d0
+ bne.s .default_route
+ moveq #'3',d0
+ rts
+.default_route
  cmp.l #4,d0
  shs d0
  andi.l #1,d0
