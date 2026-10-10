@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Verify carried scalar/vector fractions from independent guest movement probes.
 
-This oracle requires the centering-off route: unexpected scalar changes fail explicitly.
+The default oracle requires centering off. --centering additionally checks the native
+strength/mode/modifier adjustment against explicit guest input-state probes.
 It verifies arithmetic and saved positions, not collision/fall/impulse timing.
 """
 import argparse
@@ -27,13 +28,16 @@ def initial_remainders(path):
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('captures', type=Path, nargs='+')
+p.add_argument('--centering',action='store_true',help='Verify native centering scalar adjustment using PDKEY probes')
 a = p.parse_args()
 for root in a.captures:
     remainder = initial_remainders(root / 'code.bin')
+    log=(root/'swaps-gdb.txt').read_text()
+    key_scalars=iter([list(map(int,v.split())) for v in re.findall(r'^PDKEY_EVENT -?\d+ 0xcd2c (.+)$',log,re.M)])
     start = scalar = vector = None
     pending = None
-    completed = carried_scalar = carried_vector = checks = 0
-    for line in (root / 'swaps-gdb.txt').read_text().splitlines():
+    completed = carried_scalar = carried_vector = checks = adjustments = 0
+    for line in log.splitlines():
         parts = line.split()
         if not parts or parts[0] not in ('PDMOVE_EVENT', 'PDR20_EVENT'):
             continue
@@ -58,7 +62,20 @@ for root in a.captures:
             numerator = signed16(v[1]) * v[0] + remainder[0]
             quotient = (abs(numerator) // 24) * (-1 if numerator < 0 else 1)
             remainder[0] = numerator - quotient * 24
-            assert signed16(v[2]) == quotient, ('Scalar carry mismatch or unsupported centering-field adjustment', field, v[2], quotient)
+            adjusted=quotient
+            if a.centering:
+                key=next(key_scalars)
+                assert len(key)==15
+                modifier,on,strength,mode,disabled=key[4],*key[11:15]
+                if on and not disabled:
+                    product=signed16(quotient)*signed16(strength)
+                    denominator=540 if mode else 360
+                    reduction=(abs(product)//denominator)*(-1 if product<0 else 1)
+                    if not mode:reduction=signed16(reduction)>>1
+                    adjusted=signed16(quotient-reduction)
+                    if modifier&1:adjusted >>= 1
+            adjustments += adjusted != quotient
+            assert signed16(v[2]) == adjusted, ('Scalar carry/centering mismatch',field,v[2],adjusted)
             scalar = v
             pending = (field, offset)
         elif off == 0xcd3a:
@@ -78,8 +95,12 @@ for root in a.captures:
             completed += 1
             start = scalar = vector = None
     assert pending is None
+    if a.centering:assert next(key_scalars,None) is None, 'Unmatched scalar input-state probes'
     assert completed >= 50 and checks >= 2 * completed
-    assert carried_scalar and carried_vector, 'Capture did not exercise both fractional carries'
+    if a.centering:
+        assert adjustments>=20, 'Capture did not exercise centering scalar adjustments'
+    else:
+        assert carried_scalar and carried_vector, 'Capture did not exercise both fractional carries'
     assert initial_remainders(root / 'final-code.bin') == remainder, 'Unobserved remainder mutation'
     print(f'{root.name}: {completed} complete movements, {checks} remainder observations; '
-          f'{carried_scalar} scalar and {carried_vector} axis carries verified')
+          f'{carried_scalar} scalar and {carried_vector} axis carries verified; {adjustments} centering adjustments')

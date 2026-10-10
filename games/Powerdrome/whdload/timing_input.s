@@ -43,6 +43,9 @@ timing_input_initialize
  move.w $42e(a6),timing_input_y-timing_state(a1)
  move.w $422(a6),timing_input_mode-timing_state(a1)
  move.w $422(a6),timing_input_last_mode-timing_state(a1)
+ IFNE TIMING_WORLD20
+ bsr timing_world_input_initialize
+ ENDC
  rts
 
 timing_input_sample

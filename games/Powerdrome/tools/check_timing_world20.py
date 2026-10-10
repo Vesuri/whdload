@@ -42,7 +42,20 @@ for root in a.captures:
     assert 0<=final[1]-initial[1]-len(finished)<=1
     assert 0<=final[2]-slow<=1
     assert final[0]-initial[0]==4*len(finished), 'World time lost during a completed step'
-    assert input_state(root/'final-code.bin')['clock']-input_state(root/'code.bin')['clock']==18*(final[2]-initial[2])
+    input_advance=input_state(root/'final-code.bin')['clock']-input_state(root/'code.bin')['clock']
+    assert input_advance%18==0
+    pending_controls=final[2]-initial[2]-input_advance//18
+    assert 0<=pending_controls<=final[1]-initial[1]-len(finished)<=1
+    if pending_controls:
+        # A field boundary may stop inside centering/orientation before the
+        # started slow update reaches its control completion. Prove that exact
+        # endpoint from independent ownership/due/clock state, not a tolerance.
+        assert final[2]==slow+1
+        assert block(root/'final-code.bin',b'PDW20T01',8,'>H',10)==(1,)
+        assert block(root/'final-code.bin',b'PDWORLD1',8,'>H',8)==(1,)
+        assert input_state(root/'final-code.bin')['clock']==control_clock
+    else:
+        assert input_advance==18*(final[2]-initial[2])
     world=[(int(off,16),list(map(int,v.split()))) for off,v in
            re.findall(r'^PDWORLD_EVENT -?\d+ (0x[0-9a-f]+) (.+)$',log,re.M)]
     moved=[v for off,v in world if off==0xcde2]
@@ -71,7 +84,7 @@ for root in a.captures:
     fall_steps=sum(bool(v[5]) for v in finished);impulse_steps=sum(bool(v[6]) for v in finished)
     histories.append([(v[1]-epoch,*v[3:]) for v in ended])
     print(f'{root.name}: {len(finished)} consecutive 20-ms steps; {slow-initial[2]} slow updates at rational 90-ms deadlines; {len(opponents)} opponent reads at 90 ms')
-    print(f'  Retained allocator debt {new[1]*5} ms; assigned unfinished steps {outstanding}; nonzero fall-age samples {fall_steps}, impulse samples {impulse_steps}')
+    print(f'  Retained allocator debt {new[1]*5} ms; assigned unfinished steps {outstanding}; pending started controls {pending_controls}; nonzero fall-age samples {fall_steps}, impulse samples {impulse_steps}')
 if len(histories)>1:
     length=min(map(len,histories))
     for root,rows in zip(a.captures[1:],histories[1:]):

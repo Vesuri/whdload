@@ -157,10 +157,16 @@ arithmetic checks pass 181/178 falling steps, and the 030 adds 98 clean renderer
 The centering route passes 490/495 impulse steps and 109/110 native resets, with another
 143 clean twins, but only small negative vertical impulses are covered. Horizontal forces,
 full impulse expiry, fall limit/reset and opponent-contact generation remain untested.
-The centering CPU-equivalence comparison fails at logical 120 ms: live C-key/Shift state
-reduces movement on different world boundaries. Historical ownership of these keyboard
-changes and movement modifiers is now an explicit prerequisite, followed by collision
-coverage, logical mode clocks, mode/debt lifecycles and the full calibration/capacity matrix.
+Timestamped C/X/Z publication and historical movement modifiers now fix the centering
+route's earlier CPU divergence. The final C-key A500/030 pair matches all 501 common
+centering/modifier histories and sampled world states, with nine exact command timestamps
+and another 144 clean renderer comparisons. The final pause regression verifies 253
+movement-modifier states, excludes 50 paused fields, retains all 56 fuel/15 brake updates
+and adds 76 clean twins. The A500 centering capture ends with two assigned
+unfinished steps (one control started); strict endpoint accounting distinguishes these
+from completed work. X/Z input routes, hardware publication, queue wrapping and keys
+across mode changes remain untested. Those and the remaining force coverage precede
+logical mode clocks, mode/debt lifecycles and the full calibration/capacity matrix.
 The expanded input queue also passes the 030 pause regression with 78 clean twins.
 Response/resource calibration, collision/input mode lifecycles, other frame-counted behavior
 and the remaining F6–F8 checks are still open. See [timing implementation](timing-implementation.md) for current evidence.

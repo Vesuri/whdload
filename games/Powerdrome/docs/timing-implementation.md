@@ -333,17 +333,13 @@ state in both snapshots, and zero opponent movement observations. Its default mo
 requires active opponent interval coverage. The individual time ledgers pass with 498/503
 complete world steps and no outstanding movement debt.
 
-**The centering CPU-equivalence gate fails.** At common world index 5, logical time
-120 ms, the A500 position Z is 13720 and 030 Z is 13752, despite equal speed, direction
-and prior position. The corresponding movement probes show forward increments 28 versus
-60. The native `$cd00–$cd2a` path reads live centering state and the global Shift modifier,
-including an extra right shift of the scalar at `$cd2a`. This matches the observed
-15→7 scalar/60→28 displacement reduction. The native C-key handler changes centering
-outside the world scheduler; its effects become visible at different world boundaries.
-The arithmetic oracle passes each observed input state, but that does not establish equal
-input chronology. Keyboard-controlled centering state and movement-time modifiers need
-historical simulation-time ownership before this route can pass equivalence. Preserve
-this failed pair as regression evidence rather than relaxing the comparison.
+The live-input force prototype exposed a centering chronology defect: at logical time
+120 ms, the A500 advanced 28 forward units while the 030 advanced 60 with the same prior
+position, direction and speed. The centering path at `$cd00–$cd2a` read live assistance
+state and Shift, so a post-render C-key handler could change movement between logical
+control epochs. The keyboard extraction below addresses that defect. The earlier failed
+pair remains useful regression evidence; force arithmetic alone does not prove input
+chronology.
 
 Incident presentation can overwrite the shared movement delta. The world wrapper now
 restores it on the no-opponent fast-step path as well as before slow opponent updates.
@@ -356,6 +352,77 @@ $cd96/$cdc4/$b390/$b398/$c59e/$c5a6/$9c8c/$9c92/$adba/$adc0`. This probe set fit
 emulator breakpoint capacity; an earlier larger set was rejected before any measured
 field and is not a valid capture. Instrumented runs are correctness evidence, not FPS
 benchmarks. The normal build still excludes this prototype.
+
+### Timestamped centering and movement modifiers
+
+`timing_keys.s` is included only in WORLD20. It records native C/X/Z keyboard publication
+at `$5816` into a 256-slot, eight-byte timestamp/key queue with one empty slot. Hardware
+arrival is rounded up to the next PAL boundary, preventing a key interrupt from publishing
+into an already executed world step. The input-only fixture calls the same enqueue helper
+for the VBL it is about to publish. Each world step applies commands whose timestamps
+have arrived: C adds 40 up to 360, X subtracts 40 with a zero floor, and Z switches assistance
+off. The corresponding native post-render handlers no longer mutate assistance.
+
+Movement has its own cursor through the existing timestamped input ring. It reads Shift
+history before the slower control consumer can release those slots. The centering/orientation
+read at `$ca5a` and movement read at `$cd20` use that history; the existing control read at
+`$cf7a` retains its own control-time history. These are all three decoded modifier reads in
+the ordinary simulation region. The BTST wrappers preserve every native condition flag
+except Z, which is defined by the historical bit test, and use the existing 68000/010+
+status-read convention.
+
+Centering text is emitted once from the outer drawing path after logical updates, using
+the native message helper at `$13514`; multiple changes during catch-up coalesce to the
+latest level. It does not run from the logical mutation loop. Initializing a world clears
+the private queue and readers; the common session/result exits disable publication. Paused
+keys are excluded. Full pit/menu/restart ownership and live-keyboard coverage still require
+the wider mode audit; this does not yet move every keyboard command into simulation time.
+
+`PDKEY001` records enable/presentation flags, the movement input cursor and modifier,
+queue offsets/counts/overflow and the last applied key timestamp. `check_timing_keys.py`
+checks the nine C-key fixture timestamps independently, then every observed movement's
+centering state and modifier against those histories. `check_timing_integrator.py
+--centering` additionally checks the signed strength/mode reduction and Shift halving
+before direction multiplication. Its ordinary mode still requires nonzero scalar and
+axis carries; centering mode requires actual centering adjustments and reports the
+observed carry counts without implying axis coverage.
+
+The world ledger now distinguishes a completed slow control from a merely started one
+at the capture endpoint. An uncompleted control is accepted only with one started but
+unfinished world step, live world ownership, slow-update due set, and an unchanged input
+deadline matching the last completed epoch. All completed epochs retain the strict
+accounting check; an unfinished update is reported explicitly, not counted as completed.
+
+The final centering pair, `timing-keys3-centering-a500` and
+`timing-keys3-centering-030-twins`, uses the frozen `Powerdrome-timing-keys3.slave`,
+`CUSTOM5=3`, 500 fields and probes `$ccee/$cd2c/$cd3a/$cde2/$cedc/$d56c/$cd5c/$cd64/
+$cd96/$cdc4/$adba/$adc0`. Both publish and consume the same nine commands at the exact
+fixture timestamps. All **501 common centering/modifier histories and sampled world
+states match**, resolving the earlier 120-ms divergence. Final feedback displays level 9.
+The A500/030 complete 503/501 movements, with 407/406 scalar remainder carries and
+493/491 centering scalar adjustments. This route has zero nonzero axis carries; the
+separate centering-off fraction route retains that coverage requirement.
+
+Impulse checks pass 490/488 steps, 54/54 decays and 110/109 native resets. The 030 adds
+144 clean completed renderer twins with unchanged raster code. Both retain zero unassigned
+time debt; the A500 endpoint has two assigned unfinished world steps, including one
+started slow control, and the 030 has none. These endpoint differences are explicit and
+excluded from the completed-state comparison. They are not lost updates or evidence of
+completed work. The snapshots and deadline/ownership checks prove the partial endpoint.
+
+The final pause regression, `timing-keys3-pause-030-twins` (`CUSTOM5=8`, 300 fields),
+excludes 50 observed paused PAL fields. It verifies 253 historical movement-modifier
+states with zero centering commands, five legitimate input events, 56 fuel updates and
+all 15 brake timestamps. The fraction audit verifies 211 scalar and 298 axis carries;
+the world ledger has no outstanding debt or unfinished steps. It adds 76 clean renderer
+twins, for **220 final-build comparisons** across centering and pause. This does not
+exercise a centering command arriving while paused. Both the ordinary coverage build
+and the normal slave still build; the normal slave is byte-identical to the prior checkpoint.
+
+Remaining keyboard gates include X/Z behavior, queue wrapping/overflow, live hardware
+publication and keys across pause/pit/rescue/restart. Input fixtures exercise the common
+enqueue logic but bypass the hardware publication wrapper. Other keyboard-controlled
+settings and presentation-owned mutations still require extraction before release.
 
 ### Next extraction steps (`coupled-20`)
 

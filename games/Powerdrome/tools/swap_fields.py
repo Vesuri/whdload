@@ -155,6 +155,18 @@ if os.environ.get('TIMING_STATE') == '1':
             fv += [f'*(unsigned int*){force+x:#x}' for x in (20,24,28,32,36)]
             fv += [f'*(unsigned short*)*(unsigned int*){r["game"][0]+0x5ca:#x}']
             force_sample='printf "PDFORCE_EVENT %d {off} ' + ' '.join(['%u']*len(fv)) + '\\n", $pd_field, ' + ', '.join(fv) + '\n'
+    key_sample=''
+    if fast_worlds:
+        keys=[m.start() for m in re.finditer(b'PDKEY001',code)
+              if 0<m.start()-fast_worlds[0]<4096]
+        if keys:
+            assert len(keys)==1
+            kp=a.base+keys[0]
+            kv=[f'*(unsigned int*){fp+12:#x}']
+            kv += [f'*(unsigned short*){kp+x:#x}' for x in (8,10,12,14,16,18)]
+            kv += [f'*(unsigned int*){kp+x:#x}' for x in (20,24,28,32)]
+            kv += [f'*(unsigned short*){state+x:#x}' for x in (0xd2,0xd4,0x334,0x240)]
+            key_sample='printf "PDKEY_EVENT %d {off} ' + ' '.join(['%u']*len(kv)) + '\\n", $pd_field, ' + ', '.join(kv) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
@@ -185,6 +197,8 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += fast_world_sample.replace('{off}',hex(off))
         if off in (0xcd5c,0xcd64,0xcd96,0xcdc4,0xb390,0xb398,0xc59e,0xc5a6,0x9c8c,0x9c92,0xadba,0xadc0):
             sample += force_sample.replace('{off}',hex(off))
+        if off in (0xccee,0xcd2c,0xcd3a,0xcedc):
+            sample += key_sample.replace('{off}',hex(off))
         if off==0xd9a0:
             # Native resource result in d1 immediately before committing it.
             offsets=[0x194,0x1ba,0x458,0x45a,0x44e,0x450,0xe4,0x240]

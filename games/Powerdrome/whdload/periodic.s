@@ -82,6 +82,12 @@ install_periodic
  IFNE TIMING_WORLD20
  lea timing_world20_divide(pc),a0
  move.w #$42e7,(a0)
+ lea timing_center_present(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_key_publish(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_world_shift_test(pc),a0
+ move.w #$42e7,(a0)
  ENDC
  IFNE TIMING_WORLD
  lea timing_world_begin(pc),a0
@@ -133,6 +139,22 @@ install_periodic
  rts
 pl_periodic PL_START
  IFNE TIMING_WORLD20
+ ; Timestamp centering at native keyboard publication, before drawing consumes it.
+ ; TIMING_RANGE h0:$5816 6 bit=C3
+ PL_PS $5816,timing_key_publish
+ ; Native post-render C/X/Z handlers no longer mutate simulation state.
+ ; TIMING_RANGE h0:$c88e 8 bit=C3
+ PL_P $c88e,timing_center_skip
+ PL_NOP $c894,2
+ ; TIMING_RANGE h0:$c89a 6 bit=C3
+ PL_P $c89a,timing_center_skip
+ ; TIMING_RANGE h0:$c8b0 6 bit=C3
+ PL_P $c8b0,timing_center_skip
+ ; Both centering/orientation and displacement use movement-time Shift history.
+ ; TIMING_RANGE h0:$ca5a 8 bit=C3
+ PL_PSS $ca5a,timing_world_shift_test,2
+ ; TIMING_RANGE h0:$cd20 8 bit=C3
+ PL_PSS $cd20,timing_world_shift_test,2
  ; TIMING_RANGE h0:$cd5c 8 bit=C3
  PL_P $cd5c,timing_fall_step
  PL_NOP $cd62,2
@@ -654,6 +676,10 @@ timing_targets
  dc.w timing_world_after_result_gate+2-timing_targets
  ENDC
  IFNE TIMING_WORLD20
+ dc.l $13514
+ dc.w timing_center_message+2-timing_targets
+ dc.l $bc4a
+ dc.w timing_center_skip+2-timing_targets
  dc.l $cd64
  dc.w timing_fall_continue+2-timing_targets
  dc.l $cdc4

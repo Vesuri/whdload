@@ -105,6 +105,9 @@ timing_world_end
  move.w (sp)+,ccr
  bsr timing_world_restore
 timing_world_render
+ IFNE TIMING_WORLD20
+ bsr timing_center_present
+ ENDC
  ; Replay the entire displaced TST/BEQ, preserving its condition flags.
  tst.w $2be(a6)
  beq.w timing_world_native_render
@@ -126,11 +129,17 @@ timing_world_restore
  rts
 
 timing_world_session_gate
+ IFNE TIMING_WORLD20
+ bsr timing_world_input_disable
+ ENDC
  bsr timing_world_restore
  move.w $43a(a6),d1
  cmp.w #4,d1
  bra.w timing_world_after_session_gate
 timing_world_result_gate
+ IFNE TIMING_WORLD20
+ bsr timing_world_input_disable
+ ENDC
  bsr timing_world_restore
  move.w #0,$b0(a6)
  bra.w timing_world_after_result_gate

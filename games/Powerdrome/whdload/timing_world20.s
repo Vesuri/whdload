@@ -8,6 +8,7 @@ timing_world20_begin
  move.w #1,8(a0)
  move.l timing_input_clock(pc),12(a0)
 .clock_ready
+ bsr timing_input_for_world
  addq.l #1,16(a0)
  clr.w 10(a0)
  move.l 12(a0),d0
@@ -121,3 +122,5 @@ timing_world20_scalar_remainder dc.w 0
 timing_world20_vector_remainders ds.l 3
 
  INCLUDE timing_forces.s
+
+ INCLUDE timing_keys.s

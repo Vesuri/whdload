@@ -132,6 +132,15 @@ coverage_vbl
  moveq #0,d1
 .head
  move.w d1,$461a(a0)
+ IFD TIMING_WORLD20
+ IFNE TIMING_WORLD20
+ ; Same publication as hardware, at the VBL about to be counted below.
+ move.w d2,d0
+ move.l $48fe(a0),d1
+ addq.l #1,d1
+ bsr timing_key_enqueue
+ ENDC
+ ENDC
  addq.l #1,cov_keys-coverage_status(a1)
 .advance
  add.l #10,cov_index-coverage_status(a1)
