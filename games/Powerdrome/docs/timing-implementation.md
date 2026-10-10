@@ -1753,7 +1753,13 @@ feature can cover that mode. Pause, rescue, saved-state clock restores, native t
 adjustments, first-flight paths without an initial pit and total race-result clocks
 remain separate required checks. The cause of physical/VBL offset drift also needs a
 measurement against hardware field time rather than assuming the interrupt counter
-cannot miss fields.
+cannot miss fields. A read-only audit of the existing original-loader
+`practice-continuous-10s` hardware trace counts **500 hardware fields, 500 native VBL
+entries, 500 counter-site executions and 2,000 CIA-derived clock units** (10,000 ms).
+No field lacks a VBL entry and none has multiple entries. This confirms agreement in
+that bounded Practice launch window; it does not explain the synchronized qualifying
+pit’s offset drift or validate the interrupted/stalled cases. The per-field audit is
+saved as `clock-field-audit.json` beside that ignored capture.
 
 Separately audit the full `$9950` call for collision/effect generation and presentation
 side effects, then move persistent animation advancement to calibrated logical ticks
