@@ -3,6 +3,8 @@ pl_coverage PL_START
  ; Whole six-byte instructions; original VBL ADDQ is copied below.
  PL_PS $5780,coverage_vbl
  PL_PS $ca3e,coverage_start
+ ; Native sampled joystick byte followed by RTS; no physics fixture writes.
+ PL_P $d3d0,coverage_joystick_sample
  PL_END
 install_coverage_patches
  movem.l d0/a0-a2,-(sp)
@@ -68,16 +70,19 @@ coverage_vbl
  bne.s .normal_axes
  move.l $48fe(a0),d0
  sub.l cov_epoch-coverage_status(a1),d0
- clr.w $a6e+$42a(a0)
- clr.w $a6e+$42e(a0)
  cmp.l #160,d0
- blo.s .normal_axes
- cmp.l #220,d0
- bhs.s .normal_axes
- move.w #40,$a6e+$42a(a0)
+ bne.s .timing_right
+ add.w #40,$a6e+$42a(a0)
+ bra.s .normal_axes
+.timing_right
  cmp.l #190,d0
- blo.s .normal_axes
- move.w #-40,$a6e+$42a(a0)
+ bne.s .timing_center
+ sub.w #80,$a6e+$42a(a0)
+ bra.s .normal_axes
+.timing_center
+ cmp.l #220,d0
+ bne.s .normal_axes
+ add.w #40,$a6e+$42a(a0)
 .normal_axes
  lea coverage_tape(pc),a2
  move.l custom5(pc),d0
@@ -86,8 +91,11 @@ coverage_vbl
  lea coverage_timing_pause_tape(pc),a2
  bra.s .tape
 .not_pause
+ cmp.l #9,d0
+ beq.s .timing_tape
  cmp.l #7,d0
  bne.s .not_timing
+.timing_tape
  lea coverage_timing_tape(pc),a2
  bra.s .tape
 .not_timing
@@ -380,3 +388,63 @@ coverage_timing_pause_tape
  dc.w 's',1,0
  dc.l 260
  dc.w -1,0,0
+
+; Route 9 selects joystick via the native menu, then supplies the sampled byte.
+; Native d382 has already read hardware and used d0-d3. Preserve a0 and d0-d2.
+coverage_joystick_sample
+ movem.l d0-d2/a0,-(sp)
+ move.l custom5(pc),d0
+ cmp.l #9,d0
+ bne.s .done
+ moveq #0,d3
+ move.w cov_started(pc),d0
+ beq.s .done
+ move.l perf_game(pc),a0
+ move.l $48fe(a0),d0
+ sub.l cov_epoch(pc),d0
+ ; VBL fixture decisions happen before 5780 increments this count. Sampler runs after.
+ subq.l #1,d0
+ cmp.l #10,d0
+ blo.s .done
+ move.w #$81,d3
+ cmp.l #100,d0
+ blo.s .done
+ move.w #$82,d3
+ cmp.l #150,d0
+ blo.s .done
+ moveq #0,d3
+ cmp.l #160,d0
+ blo.s .done
+ moveq #4,d3
+ cmp.l #190,d0
+ blo.s .done
+ moveq #8,d3
+ cmp.l #220,d0
+ blo.s .done
+ moveq #0,d3
+.done
+ movem.l (sp)+,d0-d2/a0
+ move.b d3,$427(a6)
+ rts
+
+coverage_joystick_menu_ready
+ move.w practice_sent(pc),d0
+ cmp.w #2,d0
+ blo.s .ready
+ moveq #0,d0
+ rts
+.ready
+ moveq #-1,d0
+ rts
+coverage_joystick_menu_key
+ move.l a0,-(sp)
+ lea practice_sent(pc),a0
+ addq.w #1,(a0)
+ cmp.w #1,(a0)
+ movea.l (sp)+,a0
+ bne.s .race
+ moveq #'7',d0
+ rts
+.race
+ moveq #'4',d0
+ rts

@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import socket
+import struct
 from powerdrome import SOCK
 from powerdrome_report import regions
 
@@ -54,9 +55,21 @@ if os.environ.get('TIMING_STATE') == '1':
             f'*(unsigned int*){state+0x5e:#x}']
     vals += [f'*(unsigned short*){state+x:#x}' for x in timing_words]
     state_probe += 'printf "PDTIME %d ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
+    # Private logical input state is read-only evidence of event ownership.
+    active_inputs=[m.start() for m in re.finditer(b'PDINPT02',code)
+                   if struct.unpack_from('>I',code,m.start()+12)[0]]
+    assert len(active_inputs)<=1, 'Ambiguous initialized logical input state'
+    input_sample=''
+    if active_inputs:
+        ip=a.base+active_inputs[0]
+        offsets=[(12,'int'),(28,'int'),(44,'short'),(46,'short'),(48,'short'),
+                 (52,'short'),(56,'short')]
+        inputs=[f'*(unsigned {kind}*){ip+off:#x}' for off,kind in offsets]
+        input_sample='printf "PDINPUT_EVENT %d {off} ' + ' '.join(['%u']*len(inputs)) + '\\n", $pd_field, ' + ', '.join(inputs) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
+        sample += input_sample.replace('{off}',hex(off))
         probe_tests += f'if $pc == {r["game"][0]+off:#x}\n{sample}end\n'
 
 setup = f'break *{vbl:#x}\nbreak *{swap:#x}\n{probe_breaks}set $pd_field = -1\n'

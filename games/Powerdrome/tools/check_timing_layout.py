@@ -48,3 +48,17 @@ for ins in m.disasm(bytes(code[0x4fc0:]),base+0x4fc0):
             assert not off<target<off+n,f'Direct branch at {ins.address-base:#x} enters hook interior {target:#x}'
 print('No decoded direct branch enters a timing hook interior')
 if a.off_capture:print('All declared timing hooks are native in both C3-off snapshots')
+
+# The input prototype reuses this body with a private a6 input structure. It must
+# neither call other game code nor reference fields outside that structure.
+body=list(m.disasm(bytes(code[0xd26c:0xd382]),base+0xd26c))
+assert sum(i.size for i in body)==0xd382-0xd26c
+for ins in body:
+    assert ins.mnemonic not in ('jsr','bsr','bsr.w','bsr.b','jmp'), 'Joystick body gained an external call/jump'
+    assert all(reg=='a6' for reg in re.findall(r'\ba[0-7]\b',ins.op_str)) and '(sp)' not in ins.op_str, 'Joystick body accesses memory outside private input state'
+    for offset in re.findall(r'\$([0-9a-f]+)\(a6\)',ins.op_str):
+        assert int(offset,16) in (0x427,0x428,0x42a,0x42e,0x432), 'Joystick body accesses non-input state'
+    if ins.mnemonic.startswith(('b','db')) and not ins.mnemonic.startswith('btst'):
+        targets=re.findall(r'\$([0-9a-f]+)',ins.op_str)
+        assert targets and all(base+0xd26c<=int(t,16)<base+0xd382 for t in targets), 'Joystick branch leaves isolated body'
+print('Reused native joystick body has only local branches and the five private input fields')

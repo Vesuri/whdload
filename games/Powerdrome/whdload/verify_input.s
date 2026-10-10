@@ -20,6 +20,8 @@ pl_practice PL_START
 practice_ready
  IFD COVERAGE_INPUT
  move.l custom5(pc),d0
+ cmp.l #9,d0
+ beq.w coverage_joystick_menu_ready
  cmp.l #6,d0
  beq.w coverage_menu_ready
  ENDC
@@ -30,6 +32,8 @@ practice_ready
 practice_key
  IFD COVERAGE_INPUT
  move.l custom5(pc),d0
+ cmp.l #9,d0
+ beq.w coverage_joystick_menu_key
  cmp.l #6,d0
  beq.w coverage_menu_key
  ENDC

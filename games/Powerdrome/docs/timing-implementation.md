@@ -184,9 +184,11 @@ and the ship stops. Do not turn those unresolved bounds into a complete response
 ## Timestamped control inputs
 
 `TIMING_INPUT=1` (with `TIMING_PERIODIC=1 TIMING_ORIENTATION=1`) enables the input prototype
-and implies `TIMING_BRAKE=1`. Its PAL VBL callback records button/modifier changes in a
-256-slot ring, leaving one slot empty to distinguish full and empty. Each record contains
-a clock value and the sampled buttons/modifiers. The consumer applies only records whose
+and implies `TIMING_BRAKE=1`. Its PAL VBL callback records input changes in a
+256-slot ring, leaving one slot empty to distinguish full and empty. Each 16-byte record
+contains a clock value, buttons/modifiers, external mouse deltas, raw joystick bits and
+the native mouse/joystick mode. `PDINPT02` diagnostics include private logical axes; the
+reporting tools also accept older `PDINPT01` button-only captures. The consumer applies only records whose
 timestamp is at or before the current logical control update. The speed-control reads at
 `$cf66` and `$cf7a` use that snapshot; live input memory is not temporarily overwritten.
 A full ring preserves unread records and increments an explicit overflow counter. Overflow
@@ -201,16 +203,56 @@ three button edges once, with no overflow or pending records. All retain 15/15 b
 The twin run validates **74 completed staged scenes**, with zero reported failures and
 unchanged raster code. `tools/check_timing_input.py CAPTURE...` checks this bounded route.
 
-Mouse-axis history and joystick control ownership are not yet implemented. The current
-queue covers buttons/modifiers only; this is not a claim of full input determinism.
+### Mouse and joystick axes
+
 Native mouse samples accumulate into state `$42a/$42e` in VBL (`$56d4/$56fe`). Controls also
 write those values during collision damping (`$d082/$d086`) and joystick response
-(`$d266–$d364`), so simply replaying old absolute samples would overwrite logical corrections.
-The next extraction must distinguish external input deltas from logical axis state and
-redirect the native controller's reads/writes consistently. Mode/menu initialization also
-writes these fields at `$b6e4`, `$b714`, `$eab2`, `$ebd0`, `$100c2`, `$11c6e`, `$1237e` and
-`$140a4`; menu save/restore and mouse handlers must keep their native behavior. The gameplay
-joystick toggle is at `$c946`; its input route still needs a dedicated fixture.
+(`$d266–$d380`), so replaying old absolute samples would overwrite logical corrections.
+The prototype queues external deltas and maintains separate logical axes. Its control
+reads and damping writes use those logical axes only while the scheduled control call is
+active. Other callers retain live input behavior. Mode, fire and direction tests within
+that call use the matching historical sample. Live input memory is never temporarily
+replaced with old values.
+
+The joystick response reuses the original `$d26c–$d380` instruction body with a private
+input structure. The body contains only local branches and references to five input
+fields; it has no external calls or stack-relative data. The hook audit verifies that
+contract. It retains the native nonlinear response and automatic boost behavior. Startup
+samples and normalizes joystick input rather than inheriting stale native mouse buttons.
+
+The mouse fixture (`CUSTOM5=7`) adds three native input deltas: +40 at PAL field 160,
+−80 at 190, and +40 at 220. It no longer forces absolute axis values every VBL.
+`timing-axes1-a500` and `timing-axes1-030-twins` each pass **56 logical mouse-state updates**
+against an independent timestamp/delta oracle, including exactly six events consumed once,
+19 matching early acceleration updates and 15 brake steps. The 030 run validates **77
+completed staged scenes** with zero reported failures and unchanged raster code. These
+bounded tests do not establish collision-damping or live-input equivalence.
+
+The joystick fixture (`CUSTOM5=9`) selects joystick with native menu key 7, then Race
+with key 4. It supplies the native sampled joystick byte at `$d3d0`, preserving the native
+controller. Fire/up, fire/down, release, left, right and release have the same timed edges
+as the mouse fixture. `tools/check_timing_joystick.py` checks historical event ownership
+and the original horizontal response arithmetic at each logical update. Joystick fire/up
+invokes automatic boost, so the one-second brake hold is not required to stop this route;
+all 15 owed brake steps must still be applied. Response calibration against an unmodified
+A500 joystick run remains separate work.
+
+`timing-joy2-a500` and `timing-joy2-030-twins` each pass **56 logical joystick-state
+updates**, exactly six events and 15 brake steps, without overflow or residual debt.
+Their first 19 acceleration updates match exactly. The 030 validates **62 clean staged
+scenes** with unchanged raster code. Both use frozen `Powerdrome-timing-axes3.slave`.
+These results validate the input/controller extraction, not whole-game chronology.
+The first different sampled speed occurs at logical elapsed 2,070 ms, at the transition
+to braking: 226 on A500 versus 231 on 030; final speeds are 58 and 57. Brake debt is still
+serviced at a movement boundary before overdue control calls, rather than merged into
+one chronological event stream. Ordered brake/control catch-up remains required; matching
+invocation totals cannot establish matching speed integration or distance.
+
+Mode/menu initialization writes input fields at `$b6e4`, `$b714`, `$eab2`, `$ebd0`, `$100c2`,
+`$11c6e`, `$1237e` and `$140a4`. In-flight mode changes, menu save/restore, collision
+corrections, both-axis joystick input, held input at entry, queue wrapping/overflow and
+live input still require dedicated validation. The gameplay joystick toggle is at `$c946`.
+This is not a claim of complete input determinism or completed F5/F6.
 
 ## Pause ownership
 
@@ -229,6 +271,14 @@ inside the pause, no paused throttle leaks into resumed play, and logical phase/
 accounting remains exact. `tools/check_timing_pause.py CAPTURE...` verifies those properties.
 The 030 run completes **75 clean staged comparisons**, with unchanged raster code.
 The pause test uses the frozen `Powerdrome-timing-input3.slave` artifact under ignored `tmp/`.
+
+The expanded-axis queue also passes `timing-axes3-pause-030-twins`, using frozen
+`Powerdrome-timing-axes3.slave`: **48 actually paused PAL fields**, five legitimate input
+events, 15 brake steps, exact logical remainder and **78 clean staged comparisons**.
+The native pause-entry timing determines the excluded count; the verifier compares it with
+the observed entry/exit boundaries rather than assuming a fixed pause duration.
+The normal build remains byte-identical to the preceding checkpoint: these new input
+hooks and fixtures are confined to explicit development builds.
 
 Pits, rescue, restart, title playback and other session changes still need their own timer
 and input-lifecycle handling. These prototypes remain excluded from normal builds; normal

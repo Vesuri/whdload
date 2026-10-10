@@ -42,6 +42,10 @@ install_periodic
  move.w #$42e7,(a0)
  lea timing_input_pause_end(pc),a0
  move.w #$42e7,(a0)
+ lea timing_input_joy_fire(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_input_joy_down(pc),a0
+ move.w #$42e7,(a0)
  ENDC
 .flags
  lea pl_periodic(pc),a0
@@ -93,6 +97,24 @@ pl_periodic PL_START
  PL_PS $be12,timing_input_pause_begin
  ; TIMING_RANGE h0:$beec 6 bit=C3
  PL_PS $beec,timing_input_pause_end
+ ; TIMING_RANGE h0:$d092 8 bit=C3
+ PL_P $d092,timing_input_read_axes
+ PL_NOP $d098,2
+ ; TIMING_RANGE h0:$d082 8 bit=C3
+ PL_P $d082,timing_input_write_axes
+ PL_NOP $d088,2
+ ; TIMING_RANGE h0:$d266 6 bit=C3
+ PL_P $d266,timing_input_joystick
+ ; TIMING_RANGE h0:$cf24 6 bit=C3
+ PL_P $cf24,timing_input_poll_mode
+ ; TIMING_RANGE h0:$cf40 6 bit=C3
+ PL_P $cf40,timing_input_speed_mode
+ ; TIMING_RANGE h0:$d0a2 6 bit=C3
+ PL_P $d0a2,timing_input_axis_mode
+ ; TIMING_RANGE h0:$cf46 6 bit=C3
+ PL_PS $cf46,timing_input_joy_fire
+ ; TIMING_RANGE h0:$cf4e 6 bit=C3
+ PL_PS $cf4e,timing_input_joy_down
  ENDC
  PL_END
 
@@ -202,6 +224,7 @@ timing_control
  move.l a0,-(sp)
  lea timing_state(pc),a0
  IFNE TIMING_INPUT
+ clr.w timing_input_control_active-timing_state(a0)
  add.l #TIMING_PERIOD,timing_input_clock-timing_state(a0)
  ENDC
  addq.w #1,timing_control_phase-timing_state(a0)
@@ -304,6 +327,24 @@ timing_targets
  dc.w timing_brake_joystick+2-timing_targets
  ENDC
  IFNE TIMING_INPUT
+ dc.l $d09a
+ dc.w timing_input_after_read_axes+2-timing_targets
+ dc.l $d08a
+ dc.w timing_input_after_write_axes+2-timing_targets
+ dc.l $d26c
+ dc.w timing_input_joystick_body+2-timing_targets
+ dc.l $cf2e
+ dc.w timing_input_skip_poll+2-timing_targets
+ dc.l $cf2a
+ dc.w timing_input_do_poll+2-timing_targets
+ dc.l $cf66
+ dc.w timing_input_speed_mouse+2-timing_targets
+ dc.l $cf46
+ dc.w timing_input_speed_joy+2-timing_targets
+ dc.l $d0a8
+ dc.w timing_input_axis_mouse+2-timing_targets
+ dc.l $d0b4
+ dc.w timing_input_axis_joy+2-timing_targets
  dc.l $82b6
  dc.w timing_input_native_pause+2-timing_targets
  dc.l $cf6e

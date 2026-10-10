@@ -38,13 +38,20 @@ def summarize(rows):
 def input_state(path):
     data=path.read_bytes()
     found=[]
-    for match in re.finditer(b'PDINPT01',data):
+    for match in re.finditer(b'PDINPT0[12]',data):
         pos=match.start()
         values=struct.unpack_from('>HH6I',data,pos+8)
         if values[2]:
             names=('read','write','clock','current','last','produced','consumed','overflow')
             block=dict(zip(names,values))
-            pause=pos+36+2048
+            block['version']=int(match.group()[-1:])
+            if block['version']==2:
+                extra=struct.unpack_from('>8HhHhHHH',data,pos+36)
+                block.update(zip(('sample_x','sample_y','last_joy','last_mode','mode','control_active',
+                                  'joy','roll','x','gap_x','y','gap_y','joy_buttons','padding'),extra))
+                pause=pos+64+4096
+            else:
+                pause=pos+36+2048
             if data[pause:pause+8]==b'PDPAUS01':
                 block['pause']=dict(zip(('active','fields','entries','exits'),struct.unpack_from('>HIII',data,pause+8)))
             found.append(block)

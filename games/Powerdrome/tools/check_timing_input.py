@@ -20,7 +20,8 @@ for root in a.captures:
     assert after['read']==after['write'],'Input events remain unconsumed at the endpoint'
     assert after['produced']==after['consumed']
     if 'CUSTOM5=7' in config['WHD_ARGS']:
-        assert after['produced']==3,'Expected throttle, brake and release edges'
+        expected_events=6 if after['version']==2 else 3
+        assert after['produced']==expected_events,'Expected button edges and, for V2, three mouse deltas'
     game=int((root/'game-base.txt').read_text(),0)
     chip=(root/'chip.bin').read_bytes()
     target=struct.unpack_from('>H',chip,game+0xa6e+0x454)[0]
@@ -41,4 +42,20 @@ for root in a.captures:
         clock+=18
     assert len(expected)>=15 and len(observed)>=len(expected)
     assert observed[:len(expected)]==expected,(root.name,observed[:len(expected)],expected)
+    if after['version']==2 and 'CUSTOM5=7' in config['WHD_ARGS']:
+        log=(root/'swaps-gdb.txt').read_text()
+        axes=[]
+        for values in re.findall(r'^PDINPUT_EVENT -?\d+ 0xd058 (.+)$',log,re.M):
+            tick,consumed,mode,active,joy,x,y=map(int,values.split())
+            expected_x=sum(delta for field,delta in ((161,40),(191,-80),(221,40))
+                           if tick>=(epoch+field)*4)
+            expected_consumed=sum(tick>=(epoch+field)*4 for field in (11,101,151,161,191,221))
+            assert (mode,active,joy)==(0,1,0),'Wrong logical input mode/ownership'
+            assert (x,y)==(expected_x&0xffff,0),'Mouse delta applied at wrong logical time or overwritten'
+            assert consumed==expected_consumed,'Input event applied at wrong logical time'
+            axes.append(tick)
+        assert len(axes)>=50 and all(b-a==18 for a,b in zip(axes,axes[1:])), 'Missing or repeated logical control updates'
+        for values in re.findall(r'^PDINPUT_EVENT -?\d+ 0xccee (.+)$',log,re.M):
+            assert int(values.split()[3])==0,'Historical control state leaked outside its update'
+        print(f'{root.name}: {len(axes)} mouse-state updates match the independent timestamp/delta oracle')
     print(f'{root.name}: {len(expected)} logical acceleration updates match timestamped input; {after["consumed"]} events consumed; no overflow or pending events')

@@ -16,7 +16,7 @@ a=p.parse_args()
 expected=1+((150-100-1)*4)//14
 for root in a.captures:
     config=json.loads((root/'configuration.json').read_text())
-    assert any(route in config['WHD_ARGS'] for route in ('CUSTOM5=7','CUSTOM5=8'))
+    assert any(route in config['WHD_ARGS'] for route in ('CUSTOM5=7','CUSTOM5=8','CUSTOM5=9'))
     data=(root/'final-code.bin').read_bytes()
     blocks=[struct.unpack_from('>HIII',data,m.start()+8) for m in re.finditer(b'PDBRAK02',data)]
     blocks=[b for b in blocks if b[2]]
@@ -25,5 +25,7 @@ for root in a.captures:
     assert (active,phase,steps,pending)==(0,0,expected,0),(root,blocks[0])
     assert fixture(root/'final-code.bin')['done'],'Input fixture must finish'
     rows=samples(root)
-    assert rows[-1]['speed']==0,'Brake must stop the ship and remain stopped after release'
-    print(f'{root.name}: {steps}/{expected} owed brake events applied; no residual debt; stopped')
+    if 'CUSTOM5=9' not in config['WHD_ARGS']:
+        assert rows[-1]['speed']==0,'Brake must stop the ship and remain stopped after release'
+    # Joystick fire/up invokes native auto-boost: the same hold need not stop it.
+    print(f'{root.name}: {steps}/{expected} owed brake events applied; no residual debt; final speed {rows[-1]["speed"]}')
