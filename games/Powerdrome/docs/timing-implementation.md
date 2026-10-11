@@ -3259,7 +3259,18 @@ code unchanged and no draw active at the final snapshot. These are instrumented 
 measurements, not release throughput. No fall-age or impulse samples are nonzero, so this
 run supplies no new evidence for those effects. The ship comes to rest after the initial
 maneuver; this is predominantly stationary accounting coverage, not sustained-driving
-capacity. Full opponent/effect state and a restart remain outside this comparison. The 30,000-field `timing-endurance600-1` pair is pending.
+capacity. Full opponent/effect state and a restart remain outside this comparison. The 030/fast half of `timing-endurance600-1` now passes all per-run gates over exactly
+30,000 physical PAL fields (600 seconds). It completes 30,000 consecutive world steps,
+6,666 control/resource updates and 60,000 fractional-remainder observations. Initial and
+final unsampled elapsed time are both 80 ms, explaining why the completed-step count is
+exactly 30,000. Maximum sampled world-end delay is 260 ms, maximum retained debt is zero
+and maximum allocation is 12 steps. Both endpoints have zero retained/assigned debt.
+All six input events and three contact responses pass. There are 7,069 clean renderer
+twins, unchanged raster code and no draw active at the endpoint. The run has no nonzero
+fall-age, impulse or centering-adjustment observations. Its 25,634 opponent multiplication
+reads are checked individually for the 90 ms interval, not treated as full-record opponent
+equivalence. The A500 half and cross-CPU comparison remain pending. This is predominantly
+stationary long-window accounting evidence, not sustained-driving or whole-lifecycle proof.
 
 Native contact handling at hunk `$d058–$d090` multiplies saved steering axes `$436/$438`
 by 230 and shifts right eight bits when `$24a` is nonzero, then replaces logical axes
