@@ -1,6 +1,6 @@
 # Powerdrome internals
 
-Project status: timing work is paused at the user’s request and remains incomplete.
+Project status: completion-plan Phase A is complete; work is stopped before Phase B.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Inputs and loader

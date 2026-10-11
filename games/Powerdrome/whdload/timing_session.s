@@ -8,7 +8,6 @@ timing_session_native_cleanup dc.w $4ef9
 timing_session_end
  move.w sr,-(sp)
  movem.l d0/a0-a1,-(sp)
- IFNE TIMING_WORLD20
  bsr timing_pit_abort
  bsr timing_player_lap_invalidate
  lea timing_result_state(pc),a0
@@ -19,7 +18,6 @@ timing_session_end
  clr.w 62(a0)
  lea timing_pit_opponent_state(pc),a0
  clr.w 8(a0)
- ENDC
  bsr timing_world_restore
  lea timing_state(pc),a1
  tst.w timing_started-timing_state(a1)
@@ -43,7 +41,6 @@ timing_session_end
  sub.w timing_engine_read-timing_state(a1),d0
  add.l d0,32(a0)
  move.l timing_last-timing_state(a1),36(a0)
- IFNE TIMING_WORLD20
  bsr timing_world_input_disable
  moveq #0,d0
  move.w timing_key_write(pc),d0
@@ -51,7 +48,6 @@ timing_session_end
  and.w #TIMING_KEY_MASK,d0
  lsr.w #3,d0
  add.l d0,28(a0)
- ENDC
  bsr timing_session_clear_work
 .done
  movem.l (sp)+,d0/a0-a1

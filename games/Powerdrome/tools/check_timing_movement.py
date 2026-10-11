@@ -51,31 +51,6 @@ for root in a.captures:
     print(f'  Before first incident: {len(before)} movements, {sum(r[2] for r in before)*5} ms of applied intervals; incident probes {incidents}')
     if modified:print(f'  First scalar adjustments (field, nominal, actual): {modified[:3]}')
 
-    diagnostics=[list(map(int,v.split())) for v in re.findall(r'^PDMCLK_EVENT (.+)$',log,re.M)]
-    if diagnostics:
-        data=(root/'code.bin').read_bytes()
-        blocks=[m.start() for m in re.finditer(b'PDMCLK0[12]',data)
-                if struct.unpack_from('>H',data,m.start()+8)[0]==1]
-        assert len(blocks)==1
-        previous,raw,applied,steps,clipped=struct.unpack_from('>IIH2xII',data,blocks[0]+12)
-        for field,clock,raw,applied,count,lost,*flags in diagnostics:
-            assert count==steps+1, 'Unobserved or repeated movement-clock update'
-            assert raw==((clock-previous)&0xffffffff), 'Movement clock lost elapsed time'
-            assert applied==max(4,min(50,raw)), 'Incorrect movement clamp'
-            assert lost==clipped+max(0,raw-50), 'Unaccounted movement time above cap'
-            previous=clock;steps=count;clipped=lost
-        assert [d[3] for d in diagnostics[:len(rows)]]==[r[2] for r in rows], 'Movement used a different delta than its clock'
-        starts=[int(f) for f in re.findall(r'^PDEVENT (-?\d+) 0xbe12$',log,re.M)]
-        ends=[int(f) for f in re.findall(r'^PDEVENT (-?\d+) 0xbef2$',log,re.M)]
-        assert len(starts)==len(ends)
-        offsets=[]
-        for field,clock,*rest in diagnostics:
-            paused=sum(max(0,min(field,end)-start) for start,end in zip(starts,ends))
-            offsets.append(clock-4*(field-paused))
-        assert max(offsets)-min(offsets)<=4, 'Movement clock disagrees with independently counted unpaused VBLs'
-        floor_added=sum(max(0,4-d[2]) for d in diagnostics)
-        print(f'  {len(diagnostics)} independent movement-clock intervals verified; upper-clamp loss {clipped*5} ms; lower-clamp addition {floor_added*5} ms')
-
     before=None;contracts=0
     for offset,values in re.findall(r'^PDMREG_EVENT -?\d+ (0x[0-9a-f]+) (.+)$',log,re.M):
         v=list(map(int,values.split()));assert len(v)==19

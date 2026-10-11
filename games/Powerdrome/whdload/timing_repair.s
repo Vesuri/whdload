@@ -9,9 +9,7 @@ timing_repair_enter_first
  moveq #0,d0
  bsr timing_repair_initialize
 .done
- IFNE TIMING_REPAIR_DROP
  bsr timing_repair_choose_draw
- ENDC
  movem.l (sp)+,d0-d2/a0-a1
  move.w (sp)+,ccr
  movem.l d4-d7/a1-a2,-(sp)
@@ -47,9 +45,7 @@ timing_repair_enter_second
  add.l d0,12(a1)
  add.l d0,36(a1)
 .done
- IFNE TIMING_REPAIR_DROP
  bsr timing_repair_choose_draw
- ENDC
  movem.l (sp)+,d0-d2/a0-a1
  move.w (sp)+,ccr
  movem.l d4-d7/a1-a2,-(sp)
@@ -241,6 +237,4 @@ timing_repair_state dc.b 'PDREPR01'
  dc.l 0 ; selected cumulative step table (prefix diagnostics remain unchanged)
  dc.w 0 ; completed first-stage deadline available to second-stage initialization
 
- IFNE TIMING_REPAIR_DROP
  INCLUDE timing_repair_drop.s
- ENDC

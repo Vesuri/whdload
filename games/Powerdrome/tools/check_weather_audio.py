@@ -118,36 +118,35 @@ def check(root, require_mute=False, require_unavailable=False):
     assert clocks and len(clocks) == len(effects), 'Missing sound-request observations'
     assert first['cleanup_pending'] == 0, 'Unobserved request before capture'
     effect_address = effect_locate(chip, code, game, base)
-    direct = code[effect_address-base:effect_address-base+8] == b'PDWEFX03'
-    if direct:
-        # Audio probes do not repeat PDW20. Use the most recent world boundary
-        # in log order; the end probe precedes the weather update in that step.
-        audio_worlds = []
-        world_cursor = None
-        for line in text.splitlines():
-            if line.startswith('PDW20_EVENT '):
-                world_cursor = int(line.split()[3])
-            elif line.startswith('PDWAUDIO_EVENT '):
-                parts = line.split()
-                if int(parts[2], 16) in (0x17836, 0x178e6):
-                    audio_worlds.append((int(parts[1]), int(parts[2], 16), world_cursor))
-        audio_rows = [row for row in events if row[1] in (0x17836, 0x178e6)]
-        audio_clocks = [row for row in clocks if row[1] in (0x17836, 0x178e6)]
-        audio_effects = [row for row in effects if row[1] in (0x17836, 0x178e6)]
-        assert len(audio_rows) == len(audio_clocks) == len(audio_effects) == len(audio_worlds)
-        logical_entry = None
-        for (f, o, a), (cf, co, c), (ef, eo, e), (wf, wo, w) in zip(audio_rows, audio_clocks, audio_effects, audio_worlds):
-            assert (f, o) == (cf, co) == (ef, eo) == (wf, wo)
-            if a['return_address'] != returns[0]:
-                continue
-            assert c['generation_clock'] == c['next_generation'] == w, 'Sound call escaped its logical generation boundary'
-            assert e['delay'] == e['cleanup_pending'] == 0
-            if o == 0x17836:
-                logical_entry = c, e
-            else:
-                assert logical_entry == (c, e), 'Audio helper mutated logical weather state'
-                logical_entry = None
-        assert logical_entry is None
+    assert code[effect_address-base:effect_address-base+8] == b'PDWEFX03', 'Current direct-sound implementation required'
+    # Audio probes do not repeat PDW20. Use the most recent world boundary
+    # in log order; the end probe precedes the weather update in that step.
+    audio_worlds = []
+    world_cursor = None
+    for line in text.splitlines():
+        if line.startswith('PDW20_EVENT '):
+            world_cursor = int(line.split()[3])
+        elif line.startswith('PDWAUDIO_EVENT '):
+            parts = line.split()
+            if int(parts[2], 16) in (0x17836, 0x178e6):
+                audio_worlds.append((int(parts[1]), int(parts[2], 16), world_cursor))
+    audio_rows = [row for row in events if row[1] in (0x17836, 0x178e6)]
+    audio_clocks = [row for row in clocks if row[1] in (0x17836, 0x178e6)]
+    audio_effects = [row for row in effects if row[1] in (0x17836, 0x178e6)]
+    assert len(audio_rows) == len(audio_clocks) == len(audio_effects) == len(audio_worlds)
+    logical_entry = None
+    for (f, o, a), (cf, co, c), (ef, eo, e), (wf, wo, w) in zip(audio_rows, audio_clocks, audio_effects, audio_worlds):
+        assert (f, o) == (cf, co) == (ef, eo) == (wf, wo)
+        if a['return_address'] != returns[0]:
+            continue
+        assert c['generation_clock'] == c['next_generation'] == w, 'Sound call escaped its logical generation boundary'
+        assert e['delay'] == e['cleanup_pending'] == 0
+        if o == 0x17836:
+            logical_entry = c, e
+        else:
+            assert logical_entry == (c, e), 'Audio helper mutated logical weather state'
+            logical_entry = None
+    assert logical_entry is None
     fixture = code.find(b'PDWEFT03', effect_address - base + 48, effect_address - base + 4096)
     fixture_clock = None
     fixture_requests = 0
@@ -159,7 +158,7 @@ def check(root, require_mute=False, require_unavailable=False):
     request_clocks = []
     for (field, offset, clock), (efield, eoffset, effect) in zip(clocks, effects):
         assert (field, offset) == (efield, eoffset)
-        if direct and offset in (0x17836, 0x178e6):
+        if offset in (0x17836, 0x178e6):
             # V3 calls audio before the generation RNG/phase commit. The native
             # call contract is checked above; reconcile requests at complete world
             # observations, never interpreting an in-progress generation as final.

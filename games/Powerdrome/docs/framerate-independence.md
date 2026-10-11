@@ -1,9 +1,9 @@
 # Powerdrome framerate independence analysis and plan
 
-Project status: timing work is paused at the user’s request and remains incomplete.
+Project status: completion-plan Phase A is complete; work is stopped before Phase B.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
-Status: implementation paused at user request; F1–F8 remains incomplete. Normal
+Status: completion-plan Phase A is complete; later phases remain unimplemented. Normal
 CUSTOM3 includes the 20 ms PAL movement minimum and paced cockpit liftoff. The broader
 20 ms world scheduler and periodic gameplay changes are compile-only prototypes with
 bounded A500/030 validation. Weather scheduling, sound calls, fade colour arithmetic,

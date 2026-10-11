@@ -25,14 +25,6 @@ TIMING_ENGINE = 0
  FAIL "TIMING_ENGINE requires TIMING_INPUT"
  ENDC
  ENDC
- IFND TIMING_MOVE_CLOCK
-TIMING_MOVE_CLOCK = 0
- ENDC
- IFNE TIMING_MOVE_CLOCK
- IFEQ TIMING_INPUT
- FAIL "TIMING_MOVE_CLOCK requires TIMING_INPUT"
- ENDC
- ENDC
  IFND TIMING_WORLD
 TIMING_WORLD = 0
  ENDC
@@ -43,12 +35,14 @@ TIMING_WORLD = 0
  IFEQ TIMING_ENGINE
  FAIL "TIMING_WORLD requires TIMING_ENGINE"
  ENDC
- IFNE TIMING_MOVE_CLOCK
- FAIL "TIMING_WORLD owns movement time; disable TIMING_MOVE_CLOCK"
- ENDC
  ENDC
  IFND TIMING_WORLD20
 TIMING_WORLD20 = 0
+ ENDC
+ IFNE TIMING_WORLD
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_WORLD requires TIMING_WORLD20; only the 20-ms world scheduler is supported"
+ ENDC
  ENDC
  IFNE TIMING_WORLD20
  IFEQ TIMING_WORLD
@@ -78,7 +72,7 @@ TIMING_REPAIR = 0
  ENDC
  ENDC
  IFND TIMING_REPAIR_DROP
-TIMING_REPAIR_DROP = 0
+TIMING_REPAIR_DROP = TIMING_REPAIR
  ENDC
  IFLT TIMING_REPAIR_DROP
  FAIL "TIMING_REPAIR_DROP must be 0 or 1"
@@ -86,43 +80,14 @@ TIMING_REPAIR_DROP = 0
  IFGT TIMING_REPAIR_DROP-1
  FAIL "TIMING_REPAIR_DROP must be 0 or 1"
  ENDC
+ IFNE TIMING_REPAIR
+ IFEQ TIMING_REPAIR_DROP
+ FAIL "TIMING_REPAIR requires TIMING_REPAIR_DROP; repair always skips late drawing"
+ ENDC
+ ENDC
  IFNE TIMING_REPAIR_DROP
  IFEQ TIMING_REPAIR
  FAIL "TIMING_REPAIR_DROP requires TIMING_REPAIR"
- ENDC
- ENDC
- IFND TIMING_MESSAGE_WRAP_TEST
-TIMING_MESSAGE_WRAP_TEST = 0
- ENDC
- IFNE TIMING_MESSAGE_WRAP_TEST
- IFND VERIFY
- FAIL "TIMING_MESSAGE_WRAP_TEST requires VERIFY"
- ENDC
- IFEQ TIMING_WORLD20
- FAIL "TIMING_MESSAGE_WRAP_TEST requires TIMING_WORLD20"
- ENDC
- IFNE TIMING_MESSAGE_WRAP_TEST-1
- FAIL "TIMING_MESSAGE_WRAP_TEST must be 0 or 1"
- ENDC
- ENDC
- IFND TIMING_REPAIR_INPUT_TEST
-TIMING_REPAIR_INPUT_TEST = 0
- ENDC
- IFLT TIMING_REPAIR_INPUT_TEST
- FAIL "TIMING_REPAIR_INPUT_TEST must be 0 or 1"
- ENDC
- IFGT TIMING_REPAIR_INPUT_TEST-1
- FAIL "TIMING_REPAIR_INPUT_TEST must be 0 or 1"
- ENDC
- IFNE TIMING_REPAIR_INPUT_TEST
- IFND VERIFY
- FAIL "TIMING_REPAIR_INPUT_TEST requires VERIFY"
- ENDC
- IFND COVERAGE_INPUT
- FAIL "TIMING_REPAIR_INPUT_TEST requires COVERAGE_INPUT"
- ENDC
- IFEQ TIMING_REPAIR_DROP
- FAIL "TIMING_REPAIR_INPUT_TEST requires TIMING_REPAIR_DROP"
  ENDC
  ENDC
  IFND TIMING_RETUNE_RESULT_TEST
@@ -350,12 +315,6 @@ install_periodic
  lea timing_world_end(pc),a0
  move.w #$42e7,(a0)
  ENDC
- IFNE TIMING_MOVE_CLOCK
- lea timing_movement_clock(pc),a0
- move.w #$42e7,(a0)
- lea timing_movement_read_flags(pc),a0
- move.w #$42d0,(a0)
- ENDC
  IFNE TIMING_BRAKE
  lea timing_brake_vbl(pc),a0
  move.w #$42e7,(a0)
@@ -566,7 +525,6 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$14a9a 12 bit=C3
  PL_P $14a9a,timing_repair_present_second
  PL_NOP $14aa0,6
- IFNE TIMING_REPAIR_DROP
  ; TIMING_RANGE h0:$176c6 10 bit=C3
  PL_P $176c6,timing_repair_bitmap
  PL_NOP $176cc,4
@@ -574,7 +532,6 @@ pl_periodic PL_START
  PL_P $e2fc,timing_repair_present_gate
  ; TIMING_RANGE h0:$e378 6 bit=C3
  PL_P $e378,timing_repair_service_gate
- ENDC
  ENDC
  ; Only ordinary result-duration accounting reads the logical winning instant.
  ; TIMING_RANGE h0:$c094 6 bit=C3
@@ -624,11 +581,6 @@ pl_periodic PL_START
  ; Native cleanup call after the result animation and all its world updates.
  ; TIMING_RANGE h0:$c2aa 6 bit=C3
  PL_PS $c2aa,timing_session_finish
- ENDC
- IFNE TIMING_MOVE_CLOCK
- ; TIMING_RANGE h0:$ccee 8 bit=C3
- PL_P $ccee,timing_movement_clock
- PL_NOP $ccf4,2
  ENDC
  ; Six-byte BTST is replayed after accounting for the current interval.
  ; TIMING_RANGE h0:$ca44 6 bit=C3
@@ -773,9 +725,6 @@ timing_frame
  IFNE TIMING_WORLD
  bsr timing_world_initialize
  ENDC
- IFNE TIMING_MOVE_CLOCK
- clr.w timing_movement_started-timing_state(a1)
- ENDC
  IFNE TIMING_INPUT
  bsr timing_input_initialize
  ENDC
@@ -797,9 +746,6 @@ timing_frame
  bsr timing_heat_initialize
  ; Preserve all low counter bits, not only the original first-loop odd parity.
  move.w $60(a6),timing_control_phase-timing_state(a1)
- IFNE TIMING_MESSAGE_WRAP_TEST
- move.w #65401,timing_control_phase-timing_state(a1)
- ENDC
 .keep_engine_phase
  ELSE
  move.w #1,timing_control_phase-timing_state(a1)
@@ -1093,10 +1039,6 @@ timing_targets
  dc.l $13514
  dc.w timing_engine_native_message+2-timing_targets
  ENDC
- IFNE TIMING_MOVE_CLOCK
- dc.l $ccf6
- dc.w timing_movement_continue+2-timing_targets
- ENDC
  IFNE TIMING_WORLD
  dc.l $ccf6
  dc.w timing_world_after_multiply+2-timing_targets
@@ -1137,7 +1079,6 @@ timing_targets
  IFNE TIMING_REPAIR
  dc.l $148d8
  dc.w timing_repair_first_continue+2-timing_targets
- IFNE TIMING_REPAIR_DROP
  dc.l $1762e
  dc.w timing_repair_clip+2-timing_targets
  dc.l $176d0
@@ -1152,7 +1093,6 @@ timing_targets
  dc.w timing_repair_service_draw+2-timing_targets
  dc.l $e388
  dc.w timing_repair_service_continue+2-timing_targets
- ENDC
  dc.l $14a20
  dc.w timing_repair_second_continue+2-timing_targets
  dc.l $e296
@@ -1312,9 +1252,6 @@ timing_control_phase dc.w 1
  INCLUDE timing_engine.s
  ENDC
 
- IFNE TIMING_MOVE_CLOCK
- INCLUDE timing_movement.s
- ENDC
 
  IFNE TIMING_WORLD
  INCLUDE timing_world.s

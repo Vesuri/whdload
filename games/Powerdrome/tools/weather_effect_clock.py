@@ -10,7 +10,7 @@ FIELDS=(('initialized',8,2),('pending',10,2),('next_generation',12,4),
 
 def locate(chip,code,game,base):
     address=effect_locate(chip,code,game,base)
-    if address is None or code[address-base:address-base+8]==b'PDWEFX01':return None
+    if address is None:return None
     assert code[address-base+48:address-base+56]==b'PDWECLK1'
     return address+48
 

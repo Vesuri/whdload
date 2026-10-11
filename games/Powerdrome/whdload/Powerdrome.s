@@ -151,6 +151,11 @@ launch_args dc.b 10,0
 dosname dc.b "dos.library",0
 gamename dc.b "Powerdrome:PD",0
  EVEN
+ ; Configuration emits no bytes here; coverage needs WORLD20 before its key hook.
+TIMING_FLAGS_ONLY SET 1
+ INCLUDE timing.s
+TIMING_FLAGS_ONLY SET 0
+
  IFD VERIFY
  INCLUDE verify_input.s
  IFD COVERAGE_INPUT

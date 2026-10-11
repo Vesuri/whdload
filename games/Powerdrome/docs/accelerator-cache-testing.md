@@ -1,6 +1,6 @@
 # Accelerator and cache testing
 
-Project status: timing work is paused at the user’s request and remains incomplete.
+Project status: completion-plan Phase A is complete; work is stopped before Phase B.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Current selected-path timings, including the completed local raster refinement, are in the

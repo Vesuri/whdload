@@ -1,7 +1,7 @@
 """Read the installed experimental weather-effect record, never a stale loader copy."""
 import struct
 
-# Legacy schema: cleanup_pending queues audio; cleanups counts helper calls, not playback.
+# Fixed record layout: cleanup_pending is reserved zero; cleanups counts native sound calls.
 NAMES=('visible','visual_seed','drawing','saved_seed','cleanup_pending','reserved',
        'ticks','visual_events','attempts','selections','draws','clock','cleanups')
 NATIVE=(('rng',0x62),('lifetime',0x4ce),('delay',0x4d2),('enabled',0x4cc),
@@ -13,7 +13,7 @@ def locate(chip,code,game,base):
         return None
     draw=struct.unpack_from('>I',chip,game+0x112e8)[0]-base
     assert 0<=draw<len(code) and code[draw:draw+2]==bytes.fromhex('48e7')
-    tags=[i for magic in (b'PDWEFX01',b'PDWEFX02',b'PDWEFX03')
+    tags=[i for magic in (b'PDWEFX03',)
           for i in range(draw,min(draw+4096,len(code)-7)) if code[i:i+8]==magic]
     assert len(tags)==1
     tag=tags[0]

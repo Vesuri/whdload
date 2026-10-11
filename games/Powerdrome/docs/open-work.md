@@ -2,25 +2,28 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
-## Handoff status — paused at user request
+## Phase A complete — stopped at the requested boundary
 
-All captures have finished; no Powerdrome validation job is left running. The latest
-normal slave is restored byte-identical to its saved reference. Current changes are
-committed; resume work only when requested.
+D1–D5 in the completion plan are confirmed. Phase A is complete; B–F have not started.
+No emulator captures were run. The normal build is restored and byte-identical to the
+pre-A baseline. No release-default changes have been made.
 
-- Normal `CUSTOM1` fast planar rendering remains optional. Normal `CUSTOM3` provides
-  the 20 ms PAL minimum and 100 ms cockpit liftoff steps only.
-- The broader 20 ms movement scheduler and periodic gameplay changes remain compile-only
-  prototypes. F1–F8 is incomplete; do not describe the released timing toggle as full
-  framerate independence.
-- Completed latest weather checks: direct-sound full-cycle A500/030 comparison, all 31
-  fade colour calls on both CPUs, active-effect draw/publication accounting and palette
-  restoration on both CPUs. Prepared Copper-list endpoints also match both scene buffers.
-- Remaining: displayed-frame/active Copper evidence, natural weather and mode lifecycles,
-  braking and impulse calibration, opponent projection/animation ownership, finish/restart
-  paths, broader presentation-rate/capacity coverage, and final off-mode/release validation.
-- Braking reference policy is unresolved: representative consistent A500 handling versus
-  reproducing scene-dependent slowdown. No policy change or tolerance relaxation was made.
+- A1: `TIMING_FULL=1` coverage is byte-identical to fixture-free cadence2 individual flags.
+- A2: full coverage and normal builds are byte-identical before/after removing the old
+  movement-clock/world pilot, repair without drawing skips, obsolete diagnostic fixtures
+  and their exclusive checkers. Deferred weather sound is unsupported; direct delivery
+  and its reserved record layout remain unchanged.
+- Retained: pause/session/rescue/finish routes, stall/render-rate/pit-sync fixtures, seed
+  overrides and directed weather fade/cycle/effect fixtures. They stay off by default.
+- Resume with Phase B only when requested. Phase E owns the finite timing release gates;
+  the detailed older investigations below do not add release gates or override D1–D5.
+
+Byte evidence (SHA-256, full files; ignored output in `tmp/phase-a/`):
+
+| Build | Before, umbrella and after-pruning result |
+| --- | --- |
+| Fixture-free full coverage | `167a586ba1dbfcfdf0097de0a1a87e077d3601701ebb10386a3c6cbed0246aae` |
+| Normal | `4eeb5d12994ca6582fbc37488cf1cabdd7443de87b66e4a5e64c84826a972b0f` |
 
 ## Current state
 
@@ -149,23 +152,9 @@ repairs and other mode transitions remain open. Boost heating now has a private 
 stream and an explicit fixed-seed test mode. Its A500/030 arithmetic checks pass, but the
 full matched-seed heat route fails equivalence after the first engine failure: an A500
 incident resets speed 407→0 and directly invokes controls outside the logical scheduler.
-Movement probes additionally show nested presentation overwriting the movement delta:
-a 220-ms gap used only 20 ms on the 030. An explicit `TIMING_MOVE_CLOCK=1` experiment now
-owns a separate unpaused movement timestamp and exposes upper-clamp losses. Its first
-030 run verifies 52 intervals but still discards 490 ms above the cap. The corrected
-wrapper also passes a 49-field pause exclusion with 76 movement intervals and 75 clean
-renderer twins. The next priority remains historical speed integration, incident/control
-chronology, collision subdivision and blocking presentation effects; do not treat passing
-arithmetic checks as full engine-history or movement equivalence.
-
-A separate `TIMING_WORLD=1` extraction pilot now couples each 90-ms control epoch with
-movement, track transitions, collisions and opponents before drawing, and isolates the
-world RNG from ordinary drawing. Recovery animation no longer advances opponents per
-frame. The corrected A500/030 boost route matches all 55 common world/engine states and
-96 timed boost draws through the incident and both thermal failures, with 52 clean 030
-renderer comparisons. The common-exit cleanup build also passes 56 world updates through
-a 50-field pause, all 15 brake events and 77 clean twins. This is an extraction milestone,
-not the final physics rate.
+Movement time is owned by the 20-ms world scheduler with retained debt. The independent
+frame-delta and 90-ms-only world experiments are no longer compiled. The retained
+configuration combines 20-ms movement with 90-ms control/resource/engine/opponent epochs.
 `coupled-20` now has a development-only 20-ms world cursor with rational 90-ms controls,
 resources/engine and opponents. Scalar/vector division remainders preserve fractional
 movement. The matched A500/030 throttle/brake route passes all 253 common sampled world
@@ -579,7 +568,7 @@ and 030/fast rendering. Earlier frozen captures must not be treated as current-c
 | Capture | Result and scope |
 | --- | --- |
 | `timing-weather-cycle-cadence1` | Deferred-sound version: full 170-second pair, 4,217 common weather boundaries, 8,503 common movements and 1,889 controls. Warning-to-onset 25,020 ms, selected duration 117,480 ms, expiry 60 ms late; all 30 fades match. Eleven selections and 23 logical visual events versus 53/23 actual draws. 2,476 completed renderer twins. A500 retained debt peaks at 160 ms and clears. |
-| `timing-weather-audio-stall1` | Preserved failing regression: deferred sound coalesces two requests 320 ms apart during a 500 ms stall on both CPUs. The request-accounting checker still rejects both captures. |
+| `timing-weather-audio-stall1` | Preserved failing regression: deferred sound coalesces two requests 320 ms apart during a 500 ms stall on both CPUs. Current readers reject this superseded sound format. |
 | `timing-weather-audio-stall2` | Current direct sound: all four requests at 4,000/4,320/8,460/11,740 ms delivered on both CPUs. Helper duration 0–40 ms; no queue loss. 485 common weather boundaries, 1,002 movements, 222 controls and 241 renderer twins pass. Maximum world-end delay 580/1,240 ms; A500 retained debt peaks at 480 ms, endpoint debt zero. |
 | `timing-weather-audio-keys2` | Current direct sound: native Tab mute/unmute gives one suppressed request and two starts on both CPUs at matching 4,860/15,740/18,840 ms logical times. Native arguments and suppressed-call register preservation pass. |
 | `timing-weather-audio-nosample1` | Current direct sound: both CPUs exercise delay expiry and a 500 ms stall with optional resources absent. No owned audio call or queued request. 485 common weather boundaries, 1,002 movements and 222 controls pass. Maximum delay 560/1,200 ms, endpoint debt zero. |

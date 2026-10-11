@@ -1,6 +1,6 @@
 # Development
 
-Project status: timing work is paused at the user’s request and remains incomplete.
+Project status: completion-plan Phase A is complete; work is stopped before Phase B.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Inputs and shared tools
@@ -61,6 +61,21 @@ Windowed, real speed, sound enabled. `CPU`, `CHIP_KB`, `FAST_KB`, `AMIGA_MODEL`,
 `WHD_ARGS`, `WB`, `SILENT`, `WARP`, `JOY0` and `JOY1` override the setup. `DEBUG` and `WARP` runs
 are silent with the window behind the others; `SOUND=0|1` and `WINDOW=front|back|none` (none:
 no video) choose explicitly.
+
+### Full timing development configuration
+
+```sh
+make -C whdload coverage VASMFLAGS='-DTIMING_FULL=1'
+```
+
+This selects the fixture-free cadence2 feature set: periodic controls, orientation,
+historical input, engine, WORLD/WORLD20, repair/drop and weather effects/fade/cycle.
+All test defaults are zero and seed defaults are -1 (native initialization). Add the
+retained VERIFY-only pit-sync, stall, render-rate or seed options explicitly for Phase E.
+Individual feature flags still work without the umbrella; WORLD requires WORLD20 and
+repair requires drawing suppression. Explicit per-feature overrides retain the existing
+dependency checks. Normal `make -C whdload all` is unchanged; promotion/defaults are Phase F.
+The Phase A full/normal byte-equivalence checks are recorded in [open work](open-work.md).
 
 ### Verification-only guest chip-memory override
 

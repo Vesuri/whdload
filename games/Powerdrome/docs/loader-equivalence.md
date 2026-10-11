@@ -1,6 +1,6 @@
 # Original/development loader equivalence
 
-Project status: timing work is paused at the user’s request and remains incomplete.
+Project status: completion-plan Phase A is complete; work is stopped before Phase B.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 The Copylock D2 question is resolved: its different return value has no effect on the

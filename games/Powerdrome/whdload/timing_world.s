@@ -1,4 +1,4 @@
-; Development-only full-world cadence pilot. No additional native call frame is
+; 20-ms world scheduler. No additional native call frame is
 ; held while the world body executes: native nonlocal stack exits remain valid.
  IFND TIMING_WORLD_SEED
 TIMING_WORLD_SEED = -1
@@ -14,7 +14,6 @@ timing_world_initialize
  lea timing_session_state(pc),a0
  addq.l #1,8(a0)
  lea timing_world_state(pc),a0
- IFNE TIMING_WORLD20
  bsr timing_forces_initialize
  IFNE TIMING_WEATHER_EFFECTS
  bsr timing_weather_reset
@@ -28,8 +27,6 @@ timing_world_initialize
  clr.l timing_world20_vector_remainders-timing_world_state(a0)
  clr.l timing_world20_vector_remainders+4-timing_world_state(a0)
  clr.l timing_world20_vector_remainders+8-timing_world_state(a0)
- ENDC
- IFNE TIMING_WORLD20
  tst.w timing_pit_rebase-timing_world_state(a0)
  bne.s .seed_ready
  tst.w timing_pit_initial-timing_world_state(a0)
@@ -38,7 +35,6 @@ timing_world_initialize
  lea timing_pit_opponent_state(pc),a0
  clr.w 8(a0)
  movea.l (sp)+,a0
- ENDC
  IFEQ TIMING_WORLD_SEED+1
  move.w $62(a6),d0
  ELSE
@@ -47,9 +43,7 @@ timing_world_initialize
  move.w d0,26(a0)
  move.w d0,28(a0)
 .seed_ready
- IFNE TIMING_WORLD20
  clr.w timing_pit_initial-timing_world_state(a0)
- ENDC
  movem.l (sp)+,d0/a0
  rts
 
@@ -64,26 +58,18 @@ timing_world_begin
  move.w $62(a6),24(a0)
  move.w 26(a0),$62(a6)
 .next
- IFNE TIMING_WORLD20
  bsr timing_world20_begin
  bsr timing_opponent_flight_initialize
- ENDC
  moveq #0,d0
  move.w timing_control_phase(pc),d0
- IFNE TIMING_WORLD20
  bsr timing_world20_test_control
  bne.s .phase_ready
  subq.w #1,d0
 .phase_ready
- ENDC
  move.l d0,$5e(a6)
  move.w d0,30(a0)
- IFNE TIMING_WORLD20
  bsr timing_message_phase_update
  move.l timing_world20_clock(pc),16(a0)
- ELSE
- move.l timing_input_clock(pc),16(a0)
- ENDC
  addq.l #1,20(a0)
  movem.l (sp)+,d0/a0
  move.w (sp)+,ccr
@@ -96,10 +82,8 @@ timing_world_movement
  bra.w timing_world_after_multiply
 
 timing_world_opponents
- IFNE TIMING_WORLD20
  bsr timing_pit_is_retiring
  bne.w timing_world_native_end
- ENDC
  ; The native interval has exactly two gameplay readers: player and opponents.
  ; Incident presentation can change it after player movement but before this call.
  movem.l d0,-(sp)
@@ -107,7 +91,6 @@ timing_world_opponents
  move.w timing_world_phase(pc),d0
  move.l d0,$5e(a6)
  movem.l (sp)+,d0
- IFNE TIMING_WORLD20
  move.w #TIMING_WORLD_STEP,$21c(a6)
  ; Practice has no opponent simulation; keep its previous end-of-step delta.
  tst.w $be(a6)
@@ -115,7 +98,6 @@ timing_world_opponents
  bsr timing_world20_test_control
  beq.w timing_world_native_end
 .opponents_due_check
- ENDC
  move.w #TIMING_PERIOD,$21c(a6)
  tst.w $be(a6)
  beq.w timing_world_opponent_call
@@ -124,7 +106,6 @@ timing_world_opponents
 timing_world_end
  move.w sr,-(sp)
  movem.l a0,-(sp)
- IFNE TIMING_WORLD20
  bsr timing_pit_is_retiring
  beq.s .ordinary_end
  lea timing_pit_state(pc),a0
@@ -145,11 +126,8 @@ timing_world_end
  ; Native outer-loop generation precedes the fade mutation at the same boundary.
  bsr timing_weather_fade_tick
  ENDC
- ENDC
- IFNE TIMING_WORLD20
  lea timing_world20_state(pc),a0
  addq.l #4,12(a0)
- ENDC
  lea timing_state(pc),a0
  subq.w #1,timing_orientation_left-timing_state(a0)
  movem.l (sp)+,a0
@@ -163,9 +141,7 @@ timing_world_render
  IFNE TIMING_WEATHER_CYCLE
  bsr timing_weather_cycle_present
  ENDC
- IFNE TIMING_WORLD20
  bsr timing_center_present
- ENDC
  ; Replay the entire displaced TST/BEQ, preserving its condition flags.
  tst.w $2be(a6)
  beq.w timing_world_native_render
@@ -187,21 +163,15 @@ timing_world_restore
  rts
 
 timing_world_session_gate
- IFNE TIMING_WORLD20
  bsr timing_pit_abort
- ENDC
  bsr timing_world_restore
  move.w $43a(a6),d1
  cmp.w #4,d1
  bra.w timing_world_after_session_gate
 timing_world_result_gate
- IFNE TIMING_WORLD20
  bsr timing_result_begin
  bsr timing_pit_abort
- ENDC
- IFNE TIMING_WORLD20
  bsr timing_world_input_disable
- ENDC
  bsr timing_world_restore
  move.w #0,$b0(a6)
  bra.w timing_world_after_result_gate
@@ -234,7 +204,6 @@ timing_world_phase dc.w 0
 
  INCLUDE timing_session.s
 
- IFNE TIMING_WORLD20
  INCLUDE timing_sync_test.s
  INCLUDE timing_opponent_effects.s
  INCLUDE timing_lap.s
@@ -247,4 +216,3 @@ timing_world_phase dc.w 0
  INCLUDE timing_retune.s
  INCLUDE timing_pit.s
  INCLUDE timing_world20.s
- ENDC

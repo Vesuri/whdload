@@ -121,17 +121,6 @@ if os.environ.get('TIMING_STATE') == '1':
                 f'*(unsigned short*){hp+12:#x}', '$d0 & 65535',
                 f'*(unsigned short*){state+0x196:#x}',f'*(unsigned short*){state+0x198:#x}']
         heat_sample='printf "PDHEAT_EVENT %d {off} ' + ' '.join(['%u']*len(hpvals)) + '\\n", $pd_field, ' + ', '.join(hpvals) + '\n'
-    movement_clocks=[m.start() for m in re.finditer(b'PDMCLK0[12]',code)
-                     if struct.unpack_from('>H',code,m.start()+8)[0]==1]
-    assert len(movement_clocks)<=1
-    movement_clock_sample=''
-    if movement_clocks:
-        mp=a.base+movement_clocks[0]
-        mv=[f'*(unsigned {kind}*){mp+off:#x}' for off,kind in
-            ((12,'int'),(16,'int'),(20,'short'),(24,'int'),(28,'int'))]
-        if code[movement_clocks[0]:movement_clocks[0]+8]==b'PDMCLK02':
-            mv.append(f'*(unsigned short*){mp+32:#x}')
-        movement_clock_sample='printf "PDMCLK_EVENT %d ' + ' '.join(['%u']*len(mv)) + '\\n", $pd_field, ' + ', '.join(mv) + '\n'
     worlds=timing_locations(b'PDWORLD1', lambda off: struct.unpack_from('>I',code,off+20)[0])
     assert len(worlds)<=1
     world_sample=''
@@ -287,15 +276,6 @@ if os.environ.get('TIMING_STATE') == '1':
             rv=[f'*(unsigned {kind}*){rp+x:#x}' for x,kind in
                 ((8,'short'),(10,'short'),(12,'int'),(16,'short'),(20,'int'),(24,'int'),(18,'short'),(28,'short'),(32,'int'),(36,'int'),(40,'int'))]
             retune_sample='printf "PDRETUNE_EVENT %d {off} ' + ' '.join(['%u']*len(rv)) + '\\n", $pd_field, ' + ', '.join(rv) + '\n'
-    repair_key_sample = ''
-    repair_keys = timing_locations(b'PDRKEY01', lambda off: True)
-    if repair_keys:
-        assert len(repair_keys) == 1
-        rk = a.base + repair_keys[0]
-        kv = [f'*(unsigned short*){rk+x:#x}' for x in (8,10,12,14,16)]
-        kv += [f'*(unsigned short*){r["game"][0]+x:#x}' for x in (0x461a,0x461c,0x4608)]
-        kv += [f'*(unsigned char*){state+0x10e:#x}', '(unsigned int)$d0', '(unsigned int)$sp']
-        repair_key_sample = 'printf "PDRKEY_EVENT %d {off} ' + ' '.join(['%u']*len(kv)) + '\\n", $pd_field, ' + ', '.join(kv) + '\n'
     message_clocks = timing_locations(b'PDMSGCLK', lambda off: struct.unpack_from('>H',code,off+8)[0]==1)
     assert len(message_clocks) <= 1
     weather_effect_address=weather_effect_locate((a.out/'chip.bin').read_bytes(),code,r['game'][0],a.base)
@@ -326,7 +306,6 @@ if os.environ.get('TIMING_STATE') == '1':
         sample += initial_pit_sample.replace('{off}',hex(off))
         sample += retune_sample.replace('{off}',hex(off))
         sample += pit_opponent_sample.replace('{off}',hex(off))
-        sample += repair_key_sample.replace('{off}',hex(off))
         if os.environ.get('OPPONENT_STATE') == '1' and off in (0xe976,0xca3e,0xcedc,0xe3c4,0xbc44,0xd7f0,0x14090,0xe8d4):
             # Four native records, all 190 bytes each. Guard the native count
             # and relocated bank before reading; never write game state.
@@ -418,8 +397,6 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += 'printf "PDMOVE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(movement_values)) + '\\n", $pd_field, ' + ', '.join(movement_values) + '\n'
         if off in (0xcd2c,0xcd3a):
             sample += integrator_sample.replace('{off}',hex(off))
-        if off==0xcd2c:
-            sample += movement_clock_sample
         if off in (0xccee,0xcde2,0xcedc):
             sample += world_sample.replace('{off}',hex(off))
             sample += fast_world_sample.replace('{off}',hex(off))

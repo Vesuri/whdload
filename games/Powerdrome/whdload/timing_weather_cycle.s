@@ -51,9 +51,6 @@ timing_weather_cycle_tick
  beq.w .done
  bsr timing_world20_test_control
  beq.w .done
- IFNE TIMING_WEATHER_TRANSFER_TEST
- bsr timing_weather_transfer_test
- ENDC
  lea timing_weather_cycle_state(pc),a0
  tst.w 10(a0)
  bne.s .owned
@@ -289,65 +286,4 @@ timing_weather_cycle_test
  rts
 timing_weather_cycle_test_state dc.b 'PDWCTS01'
  dc.l 0,0,0
- ENDC
-
-
- IFNE TIMING_WEATHER_TRANSFER_TEST
-; Exercise the actual assembled transfer helper on private cells, once per process.
-; No native deadline, clock, seed or input field is changed by these vectors.
-timing_weather_transfer_test
- lea timing_weather_transfer_test_state(pc),a2
- tst.l 8(a2)
- bne.s .done
- move.l #1,8(a2)
- lea 20(a2),a0
- moveq #10,d3
-.next
- move.l (a0),16(a0)
- lea 16(a0),a1
- move.l 4(a0),d1
- move.l 8(a0),d2
- bsr timing_weather_cycle_transfer
- move.l d1,20(a0)
- move.l d2,24(a0)
- move.l a1,28(a0)
- addq.l #1,12(a2)
- move.l 16(a0),d0
- cmp.l 12(a0),d0
- beq.s .matched
- addq.l #1,16(a2)
-.matched
- lea 32(a0),a0
- dbra d3,.next
-.done
- rts
-
-timing_weather_transfer_test_state dc.b 'PDWTFR01'
- dc.l 0 ; invocation count
- dc.l 0 ; case count
- dc.l 0 ; result mismatches
- ; Each row: deadline, physical now, logical now, expected result;
- ; then result, preserved physical/logical registers and destination pointer.
- dc.l -1,1000,200,-1
- dc.l 0,0,0,0
- dc.l $80000000,1000,200,$80000000
- dc.l 0,0,0,0
- dc.l 1500,1000,200,700
- dc.l 0,0,0,0
- dc.l 1000,1000,200,200
- dc.l 0,0,0,0
- dc.l 999,1000,200,200
- dc.l 0,0,0,0
- dc.l 1,10000,200,200
- dc.l 0,0,0,0
- dc.l 0,10,0,0
- dc.l 0,0,0,0
- dc.l 1,0,0,1
- dc.l 0,0,0,0
- dc.l $7fffffff,$7ffffffe,100,101
- dc.l 0,0,0,0
- dc.l $7fffffff,$7fffffff,100,100
- dc.l 0,0,0,0
- dc.l $7ffffffe,$7fffffff,100,100
- dc.l 0,0,0,0
  ENDC

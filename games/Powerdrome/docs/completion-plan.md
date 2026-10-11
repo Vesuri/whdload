@@ -90,6 +90,10 @@ which has opponents on screen and is the heavier scene.
 
 ## Phase A: Consolidate the timing prototype (no behaviour change)
 
+Status: **A1 and A2 complete**, byte-equivalence gates passed. Work stopped at the
+user-requested Phase A boundary; no emulator capture or Phase B–F work was performed.
+See [open work](open-work.md) for the exact configuration and file hashes.
+
 **A1. Pick one release configuration.** Find the flag set behind the most recent complete
 prototype: the `timing-weather-cycle-cadence2` slave. It includes WORLD20, input, engine,
 repair with drop, laps, messages and weather. The flags are in the commit messages and in

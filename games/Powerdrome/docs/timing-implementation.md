@@ -1,17 +1,29 @@
 # Timing implementation and validation
 
-Project status: timing work is paused at the user’s request and remains incomplete.
+Project status: completion-plan Phase A is complete; work is stopped before Phase B.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
-Implementation paused at user request; F1–F8 remains incomplete. `CUSTOM3=1` currently enables the isolated four-clock-unit minimum
-movement interval (20 ms on the measured PAL setup) and 100 ms cockpit-departure steps. It is independent of `CUSTOM1` and off
-by default. This is not yet a finished framerate-independence feature.
+Phase A of the [completion plan](completion-plan.md) is complete. `TIMING_FULL=1`
+selects the fixture-free cadence2 configuration for development builds. The normal build
+is unchanged: CUSTOM3 still enables only the 20 ms minimum and cockpit departure pacing.
+Promotion and option-default changes belong to Phase F and have not started.
 
-The separately compiled `TIMING_PERIODIC=1` development prototype schedules control and
-resource updates at an 18-unit / 90 ms interval. `TIMING_ORIENTATION=1` additionally tests
-steering integration at that cadence. It does not yet schedule
-opponent recovery/randomness, collision damage, weather or all animation counters. Do not
-ship or describe this prototype as complete. No cache policy changes are made.
+```sh
+make -C whdload coverage VASMFLAGS='-DTIMING_FULL=1'
+```
+
+The umbrella defaults periodic controls, orientation, historical input, engine, WORLD,
+WORLD20, repair/drop and weather effects/fade/cycle on. Individual feature flags remain
+available. All test fixtures remain off by default; heat/world/setup seed defaults are
+`-1`, meaning native initialization. Explicit VERIFY fixture/seed overrides remain usable
+for Phase E. WORLD requires WORLD20; repair includes late-drawing suppression.
+
+Phase A byte gates pass: umbrella coverage equals the fixture-free per-flag baseline,
+and both full coverage and normal output are byte-identical before/after pruning.
+The retained record padding keeps binary layout unchanged; reserved weather sound-queue
+fields stay zero. Sound delivery is direct at logical generation, with no deferred path.
+Current weather readers require that implementation rather than accepting obsolete dumps.
+No emulator captures were run for Phase A.
 
 ## A500 calibration
 
@@ -71,75 +83,14 @@ Its tentative hooks preserve full instruction boundaries: `$ca44` for elapsed ac
 mutation while retaining the normal HUD drawing call. The prototype retains excess periodic
 debt above its per-pass work budget; complete input and mode-transition handling is pending.
 
-## Movement clock ownership during nested presentations
+## Movement clock ownership
 
-The movement block multiplies signed speed by the current delta, divides by 24 and
-multiplies the result by the direction vector. Read-only probes at `$ccee`, `$cd2c`,
-`$cd3a` and `$cde2` check this arithmetic and the saved previous position separately
-from collision response. `tools/check_timing_movement.py` does not interpret coordinate
-resets as distance or claim trajectory equivalence from correct multiplication.
-
-`timing-movement1-a500` and `timing-movement1-030-twins`, using the fixed-seed boost
-prototype, verify 32 and 56 complete movement calculations respectively, with no centering-field
-adjustment in this route. The first reset incident occurs at field 128 on A500 versus
-143 on 030. The extra incident control invocation follows that reset; it is not the
-first source of the differing trajectory.
-
-A specific elapsed-time ownership defect is visible on the 030: movement occurs at
-fields 128 and 139, separated by 220 ms, but the latter uses a delta of four native
-units, or 20 ms. Native presentation `$7f7a` stores its timestamp at `state+$218` and
-its most recent interval at `state+$21c`. Intermediate failure-flash presentations call
-that same routine, overwriting the interval before ordinary movement resumes. The
-20-ms minimum alone therefore cannot make movement account for elapsed gameplay time.
-
-The separately compiled `TIMING_MOVE_CLOCK=1` prototype measures time between movement
-updates using the PAL VBL clock minus paused fields, independent of presentation calls.
-It retains the first pre-entry native interval and the 20..250-ms clamp, then replays
-the original signed speed multiplication. `PDMCLK01` exposes the raw interval, applied
-interval, update count and cumulative time discarded above the upper cap. The current
-`PDMCLK02` extends that block with the guest-observed post-multiplication CCR. It is off
-by default, requires the input/pause prototype, and leaves other shared-clock consumers
-unchanged. The checker verifies consecutive clock differences, the clamp, explicit
-upper-cap losses and the delta actually used by movement. It does not establish correct
-integration through multiple historical control changes, collision substeps or other
-mode transitions; those remain separate requirements.
-
-`timing-moveclock1-030-twins` passes 52 complete movement calculations and clock updates,
-with 51 clean renderer comparisons and unchanged raster code. It records 490 ms lost
-above the retained upper clamp and no time added by the lower clamp. This bounded run
-proves interval ownership and arithmetic, not the movement-equivalence gate. Presentation
-latency still feeds into discrete collision timing, and applying the latest speed over
-a long interval is not equivalent to integrating historical controls throughout it.
-The A500 counterpart verifies 33 intervals and records 1,460 ms lost above the cap. These
-first captures use `Powerdrome-timing-moveclock1.slave`; review subsequently corrected
-X-flag preservation around the bookkeeping in `Powerdrome-timing-moveclock2.slave`.
-The initial results establish clock arithmetic, not the original wrapper's full CCR contract.
-
-The corrected wrapper passes `timing-moveclock2-pause-030-twins`: 76 movement intervals,
-49 excluded paused fields, no upper/lower-clamp time difference, five legitimate input
-events, 15 brake events and 56 fuel updates. Its 75 renderer comparisons are clean, with
-unchanged raster code. Movement timestamps additionally agree with independently counted
-unpaused VBLs within one field of probe placement.
-
-`timing-moveclock3-reg-030-twins` verifies 52 complete register/stack/CCR contracts, as
-well as the clock arithmetic, and adds 51 clean renderer comparisons. The wrapper saves
-and restores X before replaying native MOVE/MULS. Its guest-side MOVE CCR diagnostic
-observes the expected flags, including zero products; earlier debugger-only snapshots
-reported Z clear in those cases. Use the guest record for the CCR oracle. The current
-`Powerdrome-timing-moveclock4.slave` differs from that verified binary only in the diagnostic
-marker version byte; an exact binary comparison confirms identical executable code.
-`timing-moveclock4-reg-a500` verifies all 33 corresponding arithmetic, clock and
-register/stack/CCR contracts, still recording 1,460 ms of upper-cap loss and no lower-cap
-addition. These ordinary failure/incident effects already exceed the retained cap; lost
-time cannot be dismissed as an artificial debugger stall. Handling that time safely,
-with historical controls and collision work in the right order, is required before the
-broader movement-independence gate can pass.
-
-Reproduce with the engine/heat build switches plus `TIMING_MOVE_CLOCK=1`, 250 fields and
-probes `$ccee/$ccf6/$cd2c/$cd3a/$cde2/$fc9e/$fcea/$fec6`. The pause route uses `CUSTOM5=8`,
-300 fields and additionally `$be12/$bef2/$d058/$d9a0`. The normal build excludes this clock
-prototype. No rendering-rate or full framerate-independence claim follows from these
-instrumented correctness runs.
+The full configuration uses the 20-ms world cursor for movement, retaining unserved time
+and scalar/vector remainders. Nested presentation calls cannot replace that cursor with
+an outer frame delta. The isolated frame-delta experiment is no longer compiled; its
+upper-clamp loss is superseded by bounded world-step catch-up. Native-reference arithmetic
+can still be audited with `check_timing_movement.py`; full timing uses
+`check_timing_world20.py`, `check_timing_integrator.py` and `check_timing_capacity.py`.
 
 ## Shared-clock ownership audit
 
@@ -217,85 +168,15 @@ The normal timing option and prototype do **not** yet implement this clock split
 Passing common player states on the short fixtures is insufficient evidence for these
 opponent, lap, rescue and result timer behaviors.
 
-## Complete-world extraction pilot
+## Complete-world scheduler
 
-`TIMING_WORLD=1` is a development-only extraction experiment, not the final movement
-rate. It requires the input and engine prototypes and excludes `TIMING_MOVE_CLOCK`.
-Its temporary 90-ms world step tests whether controls, movement, track transitions,
-collision response and opponents can execute together before drawing. The final plan
-still calls for 20-ms movement timing with slower A500-calibrated periodic operations;
-freezing all visible motion at 90 ms is not the release deliverable.
-
-The repeated region begins at the existing logical control/orientation entry and ends
-at `$cedc`, immediately before the pre-render helper and scene/HUD/timer drawing. Each
-owed control now receives its own movement/collision/opponent pass rather than batching
-all controls before one movement. Draws with no owed update skip that region. The
-existing 32-update budget and retained periodic debt remain; movement uses exactly 18
-native units per complete world update instead of dropping time above a frame clamp.
-Brakes are serviced at logical control boundaries, preserving queue order; response
-calibration must be repeated because movement-boundary brake servicing is disabled here.
-
-The wrapper holds no extra native call frame while the world body executes. Native
-stack unwinding remains unchanged. Temporary counter/random-state ownership is restored
-at common mode destinations `$bf32/$bfb0`, covering known exits from rescue (`$ce32`),
-pit handling (`$f83c`), incident recovery (`$fe90`), opponent completion (`$d616`), lap
-completion (`$f9e6`) and related notification helpers (`$9234/$92c8`). Native local
-unwinds that return within a helper remain untouched. This is not an exhaustive
-transitive mode-exit audit. The session-completion cleanup below rebases ordinary new
-Practice sessions; interrupted world updates and their remaining scheduled work still
-need explicit lifecycle validation. Native
-incident animations and shared-clock readers also remain inside the region and require
-further decomposition.
-
-The logical control phase temporarily owns `state+$5e`. Native `$53f6/$8ae6` share a
-private world random stream during the region; the outer/drawing stream is saved and
-restored around it. `TIMING_WORLD_SEED=-1` copies the natural seed at initialization;
-`TIMING_WORLD_SEED=54321` is a compile-only test override. Boost heat retains its separate
-stream. Incident drawing inside a world update is not yet fully separated from world
-randomness, and outer weather/effect generation remains outside this extraction.
-
-An audit finds only two native gameplay reads of `state+$21c`: player multiplication at
-`$ccf2` and opponent multiplication at `$d56c`. Other decoded references with the same
-negative displacement are library-vector calls, not reads of game timestep state.
-The pilot restores the interval before both groups. Recovery animations also call the
-opponent updater at `$fe40/$ffc2`; these calls immediately precede a fresh `$e8` test,
-without consuming returned registers/flags. They are removed under the world option so
-animation frames cannot advance opponents. The recovery loop changes the shared counter,
-so the logical phase is restored before the scheduled opponent pass as well.
-
-`PDWORLD1` records active ownership, saved outer counter, logical time, started-update
-count, outer/world/initial RNG seeds and the current world phase. Read-only probes at
-`$ccee/$cde2/$cedc` check ordered world boundaries; `$d56c` checks opponent intervals.
-`tools/check_timing_world.py` verifies contiguous 90-ms epochs and compares complete
-sampled state histories across CPUs. Passing this pilot establishes an extraction
-boundary, not completed F1–F8, all opponents/modes, or the final physics rate.
-
-`timing-world5-a500` and `timing-world5-030-twins` pass 56 and 55 complete epochs. Their
-**55 common sampled player/engine/RNG states match exactly**, including speed, segment, position, damage,
-temperatures and sampled RNG state. All 96 boost draws and their logical timestamps
-match, as do 55 common engine states through both thermal failures. All 224/220 observed
-opponent multiplications use the logical interval. The 030 adds 52 clean renderer twins.
-This does not compare complete opponent state arrays or every authoritative game field.
-The one-update endpoint difference is reported rather than concealed. Earlier world3
-runs fail the opponent interval check because recovery still advanced opponents per
-animation frame; they are not accepted substitutes for these corrected results.
-
-`timing-world6-pause-030-twins` validates the build with common mode-destination cleanup:
-56 complete world epochs, 224 opponent interval reads, 50 excluded paused fields, five
-input events, all 15 brake events and 56 fuel updates. It adds 77 clean renderer twins.
-Pause preserves fractional time and pending work. These captures do not exercise every
-mode-destination branch; stack/boundary checks pass, but live pit/rescue/restart lifecycle
-validation remains open. Both fixed-seed and natural-seed variants build; the normal
-slave remains byte-identical to the preceding release checkpoint and excludes the pilot.
-
-Build with `TIMING_PERIODIC=1 TIMING_ORIENTATION=1 TIMING_INPUT=1 TIMING_ENGINE=1
-TIMING_WORLD=1`. The matched boost captures additionally set `TIMING_HEAT_SEED=12345`
-and `TIMING_WORLD_SEED=54321`; normal defaults retain natural initial randomness.
-Use `CUSTOM5=10`, 250 fields, and probes `$ccee/$cd2c/$cd3a/$cde2/$cedc/$cfec/$cff8/
-$de0a/$dfae/$dffc/$fc9e/$fcea/$fec6/$d56c`. Select `CUSTOM4=1` for renderer twins.
-The current frozen build is `Powerdrome-timing-world6.slave`; the matched boost pair uses
-world5, which differs in mode-exit cleanup. The pause route uses `CUSTOM5=8`, 300 fields,
-world/movement/opponent probes plus `$d058/$d9a0/$be12/$bef2`.
+`TIMING_WORLD=1` requires `TIMING_WORLD20=1`; the 90-ms-only world pilot is not supported.
+`TIMING_FULL=1` selects both, along with their input/engine/orientation prerequisites.
+Movement/collision steps run every 20 ms, while controls and opponents retain their
+rational 90-ms epochs. The world wrapper preserves native nonlocal stack exits and
+restores temporary counter/RNG ownership before rendering or leaving the session.
+The allocator retains excess debt after its 32-step budget. No separate movement-clock
+mode or 90-ms-only world checker remains.
 
 ### 20-ms world integration (`TIMING_WORLD20`)
 
@@ -1809,50 +1690,12 @@ attempt stopped before its first field after the debugger rejected its larger br
 setup and supplies no runtime evidence. Existing 030 pause and A500 rescue ledger checks
 still pass with the added repair-only verifier mode.
 
-A separate input-only fixture, `TIMING_REPAIR_INPUT_TEST=1`, is compiled only with
-VERIFY, COVERAGE_INPUT and TIMING_REPAIR_DROP. It publishes one ordinary `x` into the
-native keyboard ring on the first eligible dropped step, after the coverage tape finishes
-and while the native queue is empty. It changes no physics, clock, mode or repair geometry
-fields. Pit entry has already disabled the private world-key queue; this fixture targets
-the native pit consumer. It is a directed main-context input publication, not a test of
-hardware interrupt concurrency. The test remains absent when its build flag is zero.
-
-The complete A500 `timing-repairinput1-a500` route passes all 264 service/poll pairs:
-**236 drawn / 28 dropped**, with 263 empty polls and **one nonempty poll**. At field 150,
-a dropped step publishes `x` (120), advancing the native writer from slot 1 to 2 while
-the reader remains at 1. Native `$581e` reports availability; `$5838` returns exactly 120
-and advances the reader to slot 2. `$e422` / `$e426` pass it to `state+$10e`. The original
-key-reader call restores its caller's stack depth, and the repair post restores its
-24-byte MOVEM frame with suppression cleared and the native queue empty. There is exactly
-one observed consumption across the complete route. This does not prove special-command
-handlers, nonlocal exits, wrapping/capacity or competing producers. The test changes the
-run's drop count, so it supplies service/input evidence rather than a new timing or FPS
-claim. With the fixture disabled, both the full repairdrop3 slave and the normal slave
-remain byte-identical to their frozen references; requesting it outside the required
-development configuration is rejected.
-
-Build the repairdrop3 coverage configuration with the additional
-`-DTIMING_REPAIR_INPUT_TEST=1` and freeze it as a separate test slave. Reuse the A500
-2,000-field repair service configuration with probes
-`0x148d8 0x14962 0x14a20 0x14aa6 0xe3bc 0xe3c4 0xe3d0 0xe3d6 0xe3e6 0xe3ec 0xe422 0xe426`.
-PDRKEY_EVENT records the publication metadata, current native queue indices/capacity,
-command latch, D0 and SP. The checker requires the publication to begin on a dropped
-step, follows its ordered native call/return/latch boundaries, and rejects repeated or
-missing consumption. It also runs the full repair-service checker.
-
-The drop-disabled build was
-byte-identical before the additional stage-bridge correction; the normal build remains
-byte-identical afterward. A build requesting DROP without REPAIR is rejected.
-
-```sh
-python3 tools/check_repair_drop.py tmp/prof/timing-repairdrop3-a500
-python3 tools/check_repair_drop.py --allow-no-drops tmp/prof/timing-repairdrop3-030-twins
-python3 tools/check_repair_buffers.py --complete-route tmp/prof/timing-repairdrop3-buffers-full-a500
-python3 tools/check_repair_service.py tmp/prof/timing-repairdrop3-service2-a500
-python3 tools/check_repair_input.py tmp/prof/timing-repairinput1-a500
-python3 tools/check_timing_opponent_continuity.py --repair-only --stable-lap-domain tmp/prof/timing-repairdrop3-service2-a500
-python3 tools/check_repair_pacing.py --native-steps --continuous-stages tmp/prof/timing-repairloop3-native-a500 tmp/prof/timing-repairdrop3-a500
-```
+Repair drawing suppression preserves native service and keyboard polling. Phase E uses
+the retained rescue/session input routes and their existing service/ownership checkers.
+The separate dropped-step key-injection diagnostic is not part of the retained fixture set.
+Repair always uses measured cumulative deadlines and skips late drawing; there is no
+uniform/non-dropping repair build. `check_repair_pacing.py` remains applicable to the
+retained repair implementation.
 
 #### Logical flight-message publication and expiry
 
@@ -2021,44 +1864,9 @@ it. Rescue deadline conversion uses the extended upcoming phase, not a zero-exte
 word. Native control cadence and phase-mask behavior remain unchanged in production.
 The containing world/frame wrappers preserve registers and CCR around clock maintenance.
 
-`TIMING_MESSAGE_WRAP_TEST=1` is an explicit VERIFY/WORLD20-only fixture. It selects
-initial control phase **65,401** to exercise rollover quickly; it is absent by default
-and is not a gameplay policy or an A500 handling calibration. At 90 ms per increment,
-a natural full word rollover spans **98.304 minutes**, so ordinary ten-minute runs do
-not provide this evidence. The fixture changes initial control-phase bits and therefore
-cannot certify unchanged full gameplay trajectories.
-
-`timing-messagewrap1-030` passes **13 publications, 241 expiry branch/register checks
-and two native clears at exactly 45 phases**. The second unrefreshed message publishes
-at extended phase **65,523** and expires at **65,568**, when the native phase is **32**.
-The completed 850-field window adds **294 clean renderer twins**, with unchanged raster
-code. The A500/native-renderer counterpart `timing-messagewrap1-a500` passes
-**13 publications, 203 expiry checks and two 45-phase clears**, including the same
-**65,523 → 65,568** rollover-spanning lifetime. These are directed message checks,
-not full gameplay equivalence. The 030 final active draw is not teardown evidence.
-`PDMSGPHASE_EVENT` records the
-three clock fields beside each domain sample; the checker requires matching low words,
-a monotonic extended phase, and a publication-to-clear lifetime spanning rollover.
-Older captures without the new clock retain their original bounded phase checks.
-
-The fixture-free synchronized-pit build also passes
-`timing-messageclock1-handoff-030`: the extended clock preserves the rescue message's
-26 remaining counts, clears at phase 319, passes 32 expiry/register checks and adds
-117 clean renderer twins. That run does not cross rollover. Explicitly disabling the
-wrap fixture produces byte-identical output to omitting it; enabling it without VERIFY
-is rejected. The normal build remains byte-identical and the option-off hook audit passes.
-
-Use the ordinary full timing/repair build with `TIMING_MESSAGE_WRAP_TEST=1`, C5=11,
-anchor `$bc7c`, 850 fields and the ordinary flight-message probes above. The fixture
-must not be used as a throughput benchmark. Thirty-two-bit signed-clock rollover,
-negative sentinels and rollover combined with rescue, lap/session resets or other
-publishers remain separate requirements.
-
-```sh
-python3 tools/check_flight_message.py --require-wrap tmp/prof/timing-messagewrap1-030
-python3 tools/check_flight_message.py --require-wrap tmp/prof/timing-messagewrap1-a500
-python3 tools/check_message_handoff.py tmp/prof/timing-messageclock1-handoff-030
-```
+The extended message clock keeps its 16-bit carry handling. The separate forced-wrap
+initialization experiment is no longer compiled. Ordinary message publication and
+session/rescue handoff probes remain available through the retained coverage routes.
 
 This is a bounded flight-message correction. The direct `$c990` publisher and flight
 `$d8ca` context still need directed runtime coverage. Broader lap contexts and
@@ -3942,41 +3750,13 @@ separate from the explicitly seeded branch test below.
 
 ### Successful selection fixture
 
-`TIMING_WEATHER_EFFECT_TEST=2` uses the same activation boundary and prerequisites as
-mode 1, but sets lifetime and delay to zero and sets the logical RNG seed to 3705.
-The native recurrence produces 640, selecting lifetime `(640 >> 7) & 5 = 5`, then
-51585, selecting delay `(51585 >> 14) + 4 = 7`. This deliberate seed write belongs
-only to the directed fixture. Clocks and input scheduling remain untouched. Mode 1
-and the normal slave still rebuild byte-identically; invalid mode 3 is rejected.
-
-`check_weather_effect_selection.py CAPTURE...` locates the live fixture record via the
-installed effect hook. It requires the first selected publication at the recorded
-activation clock, checks its seed/lifetime/delay and every subsequent logical publication
-through delay expiry, then requires the next generation attempt. Cross-capture comparison
-checks the relative publication clocks as well as lifetime/delay/visibility. Corrupted
-seed, lifetime, missing-publication and delay-release evidence is rejected. This checks
-the first selection lifecycle; it does not claim arithmetic coverage of every later
-selection, native weather cadence or sound trigger.
-
-The 1,000-field (20-second) `timing-weather-effect-test2` A500/native and 030/fast pair
-passes. Both activate once at step 204 and show the exact first-selection sequence above.
-Both finish with **five selections and 18 logical visual RNG events**, while actual draws
-are **25 on 030 and 10 on A500**. All complete draws pass seed installation, four native
-advances and restoration; seven 030 draws repeat a published logical visual state.
-Neither endpoint retains effect draw ownership. **1,003 common player/engine/RNG states
-and 222 common control/input/fuel updates match exactly**.
-
-The 030 completes 1,003 movements and the A500 1,006. Their initial unsampled time is
-80/140 ms and final unsampled time 20/20 ms, accounting for the three-step difference
-without endpoint retained debt or assigned unfinished work. The 030 has **239 completed
-renderer twins**, unchanged raster code and zero reported pixel/guard/register/scratch
-failures; an additional scene is active at the endpoint and is not counted complete.
-Effect draws use the native fallback, outside those twins.
-
-Both runs still have zero actual sound-trigger calls. Cleanup, forecast/expiry,
-fade/gear scheduling, natural integrated weather and mode/lifecycle validation remain
-open. Neither directed fixture establishes the final weather cadence policy.
-
+`TIMING_WEATHER_EFFECT_TEST=2` retains the VERIFY-only directed seed fixture: seed 3705
+selects lifetime five and delay seven using the native recurrence. The current
+`check_weather_effect_schedule.py` checks the 80/140-ms loop and +20-ms visual phase,
+including first publication, last decrement, clear and next selection. Mode 1 preserves
+the seed; mode 3 supplies the sound-stress seed. All modes default off, including under
+`TIMING_FULL`. The obsolete 90-ms effect-selection checker has been deleted.
+Current direct-sound captures and publication/restoration results are described below.
 
 ## Experimental logical weather fades
 
@@ -4206,35 +3986,12 @@ Calibration across tracks and varied modes still needs evidence. This is an impl
 not final cadence acceptance for all gameplay.
 
 
-### Direct deadline-transfer helper fixture
+### Deadline transfer
 
-`TIMING_WEATHER_TRANSFER_TEST=1` requires VERIFY, COVERAGE_INPUT and the cycle prototype.
-It invokes the actual assembled transfer helper on eleven private data cells once during
-the first eligible logical control update. Cases cover two negative sentinels, future,
-exactly due, recently and long-overdue deadlines, zero logical time, and values near the
-native positive signed-clock boundary. It never changes native deadlines, clocks, RNG
-or input data. `PDWTFR01` records the invocation/case/mismatch counts, inputs, results,
-clock-register preservation and destination pointers.
-
-`check_weather_transfer.py` follows the installed cycle hook to locate the live test
-record in both snapshots. It requires every declared case, exact explicit expected
-results, preserved physical/logical input registers and unchanged destination pointers.
-This tests the transfer helper on emulated CPUs; it does not establish correct ownership
-transfer through real pit/resume paths or beyond the native signed deadline domain.
-The test-disabled build reproduces the corrected cycle candidate byte for byte, and the
-normal build remains unchanged. The 650-field / 13-second
-`timing-weather-transfer-test1` A500/native and 030/fast pair passes all eleven cases in
-both initial and final snapshots, with one invocation and zero mismatches. It preserves
-the input clock registers and destination pointers. Missing invocation, the old overdue
-result, changed clock register, changed pointer and altered case-table evidence are all
-rejected independently of the fixture's mismatch counter.
-
-The surrounding timing run also passes: 653 common movement states and 145 common
-control/input/fuel updates match exactly. Both end without retained/assigned simulation
-work. This validates the corrected helper's arithmetic and its integration into the
-inactive-deadline startup path; it still does not exercise actual pit/resume ownership
-with live native deadlines.
-
+The current helper preserves inactive sentinels, converts future deadlines to the logical
+clock and maps due/overdue values to the current cursor. Its private-cell diagnostic
+fixture and checker are no longer retained; the deadline-transfer implementation is
+unchanged. Phase E uses the retained session/rescue and natural-weather routes.
 
 ### Calibrated effect schedule: first matched runtime result
 

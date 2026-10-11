@@ -62,7 +62,7 @@ def check(root,seeded=True):
     code=(root/'final-code.bin').read_bytes();chip=(root/'final-chip.bin').read_bytes()
     game=int((root/'game-base.txt').read_text(),0);base=int((root/'dump-base.txt').read_text(),0)
     address=locate(chip,code,game,base)
-    assert code[address-base:address-base+8] in (b'PDWEFX02', b'PDWEFX03')
+    assert code[address-base:address-base+8] == b'PDWEFX03'
     start=clock_snapshot(root)['generation_clock']
     if seeded:
         tag=code.find(b'PDWEFT01',address-base+48,address-base+4096)
