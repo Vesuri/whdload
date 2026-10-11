@@ -4310,6 +4310,16 @@ are rejected. The module also expresses `$17306` signed integer interpolation fo
 next runtime comparison; that arithmetic helper is not yet validated against per-phase
 native calls.
 
+`weather_palette_state.probe_command` now prepares read-only entry/return probes for
+`$17306/$173a8` and `$17062/$1708c`. Each row includes all general registers, stack
+return address, source weather colour, track/view/transition state, live palette pointers
+and the saved/current/restoration-source arrays. Nested pointer bounds and alignment
+checks guard each dereference against the captured chip/expansion regions; invalid
+pointers emit `PDWPALETTE_INVALID` instead of stale or unbounded data. Only debugger
+convenience variables are assigned. Command formatting/schema checks pass against the
+completed pair's memory layout. Live GDB execution, caller classification and per-call
+verification remain pending; the running full-cycle sampler has not been modified.
+
 The next presentation checks should proceed in this order:
 
 1. Observe `$17306/$173a8` around each owned fade call, recording source/target/phase/index,

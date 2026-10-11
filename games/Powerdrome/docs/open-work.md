@@ -727,3 +727,10 @@ reproducible. Both cadence1 CPU captures pass initial/final snapshots; wrong wea
 another palette colour and unfinished transition are rejected. Its interpolation helper
 still needs the planned per-phase native-call comparison; endpoint success is not pixel
 or scanout acceptance.
+
+
+Palette entry/return probes are prepared in `weather_palette_state.py` for native
+interpolation and restoration. They include caller/arguments and all 16 source/destination
+colours, follow live pointers and guard reads by captured memory bounds. Formatting/schema
+checks pass; live integration remains pending after the ongoing full-cycle pair. No
+running capture tool or observation scheme was changed.

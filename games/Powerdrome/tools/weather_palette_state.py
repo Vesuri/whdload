@@ -87,5 +87,57 @@ def main():
     print('Stored palette endpoints only; intermediate writes, publication and scanout remain separate.')
 
 
+PROBES = (0x17306, 0x173a8, 0x17062, 0x1708c)
+REGISTERS = ('d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7',
+             'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'sp')
+EVENT_FIELDS = ('clock', 'track', 'view', 'transition', 'transient', 'source_colour',
+                'saved_pointer', 'current_pointer', 'restore_source', 'return_address',
+                *REGISTERS, *(f'saved_{i}' for i in range(16)),
+                *(f'current_{i}' for i in range(16)), *(f'restore_{i}' for i in range(16)))
+
+
+def probe_command(game, offset, chip_bytes, other_base, other_bytes):
+    """Generate guarded read-only probes; only debugger convenience variables change."""
+    assert offset in PROBES
+    assert 0 <= game and game + 0x18548 <= chip_bytes
+    assert 0 < chip_bytes <= other_base and other_bytes > 0
+
+    def valid(address, size):
+        return (f'({address} > 0 && ({address} & 1) == 0 && '
+                f'({address} <= {chip_bytes - size} || '
+                f'({address} >= {other_base} && {address} <= {other_base + other_bytes - size})))')
+
+    state = game + 0xa6e
+    restore = offset in (0x17062, 0x1708c)
+    lines = [f'set $pwp_saved = *(unsigned int*){state + 0x4b0:#x}',
+             f'set $pwp_map = *(unsigned int*){game + 0x4790:#x}',
+             'if ' + valid('$pwp_map', 8),
+             'set $pwp_current = *(unsigned int*)($pwp_map+4)',
+             'set $pwp_restore = ' + ('(unsigned int)$a2' if restore else '0')]
+    guard = valid('$pwp_saved', 32) + ' && ' + valid('$pwp_current', 32) + ' && ' + valid('(unsigned int)$sp', 4)
+    if restore:
+        guard += ' && ' + valid('$pwp_restore', 32)
+    lines += ['if ' + guard]
+    values = [f'*(unsigned int*){game + 0xf96:#x}']
+    values += [f'*(unsigned short*){state + off:#x}' for off in (0x118, 0xaa, 0x4c6, 0x4d0, 0x4b6)]
+    values += ['$pwp_saved', '$pwp_current', '$pwp_restore', '*(unsigned int*)$sp']
+    values += [f'(unsigned int)${reg}' for reg in REGISTERS]
+    values += [f'*(unsigned short*)($pwp_saved+{2*i})' for i in range(16)]
+    values += [f'*(unsigned short*)($pwp_current+{2*i})' for i in range(16)]
+    values += [f'*(unsigned short*)($pwp_restore+{2*i})' if restore else '0' for i in range(16)]
+    assert len(values) == len(EVENT_FIELDS)
+    lines += ['printf "PDWPALETTE_EVENT %d ' + hex(offset) + ' ' +
+              ' '.join(['%u'] * len(values)) + '\\n", $pd_field, ' + ', '.join(values)]
+    invalid = 'printf "PDWPALETTE_INVALID %d ' + hex(offset) + '\\n", $pd_field'
+    lines += ['else', invalid, 'end', 'else', invalid, 'end']
+    return '\n'.join(lines) + '\n'
+
+
+def parse_values(text):
+    values = list(map(int, text.split()))
+    assert len(values) == len(EVENT_FIELDS), 'Incomplete palette probe row'
+    return dict(zip(EVENT_FIELDS, values))
+
+
 if __name__ == '__main__':
     main()
