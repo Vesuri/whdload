@@ -4301,6 +4301,14 @@ initial and final snapshots have track 0, transition zero and view zero; entry 5
 its original source colour in both stored palettes, and all 16 entries of the saved
 palette and colour table agree on each CPU. This does not validate intermediate phases,
 all track/view choices or physical palette delivery.
+`tools/weather_palette_state.py --require-restored CAPTURE...` reproduces this stored
+endpoint check using live saved-palette and colour-map pointers in the captured chip or
+expansion memory. It rejects out-of-range pointers/colour values, mismatched weather or
+other palette entries and nonzero transition/effect state. The completed pair passes
+all four snapshots; altered weather colour, another palette colour and transition state
+are rejected. The module also expresses `$17306` signed integer interpolation for the
+next runtime comparison; that arithmetic helper is not yet validated against per-phase
+native calls.
 
 The next presentation checks should proceed in this order:
 
@@ -4414,6 +4422,8 @@ starts at the original three request times. Earlier green captures
 exercised the deferred implementation. Broader lifecycle acceptance remains required.
 The audio checker's `--require-unavailable` mode requires absent optional samples, an
 observed delay expiry, no weather helper call and zero queue/call counters across sampled
-boundaries. The completed 030 no-resource side passes that guard, a measured 500-ms stall,
-world hold/resume and 485 weather boundaries; maximum world-end delay is 560 ms and
-endpoint debt is zero. A500 and the queued full-cycle regression remain pending.
+boundaries. Both no-resource CPUs pass that guard, a measured 500-ms stall, world hold/resume
+and 485 common weather boundaries. They match 1,002 movement states and 222 control/
+input/fuel updates. Maximum world-end delay is 560/1,200 ms (030/A500), with maximum
+retained debt 0/480 ms; both endpoints have zero retained/assigned work. The corrected
+full-cycle pair is now running.

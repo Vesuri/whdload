@@ -706,10 +706,11 @@ Direct-delivery isolation now passes a byte comparison of the full weather-disab
 prototype against pre-fix source, plus the current native hook-boundary/branch audit.
 Normal build bytes remain unchanged. Both `audio-keys2` CPUs now pass native
 mute/unmute, one suppressed request and two resumed starts at unchanged logical times.
-The completed 030 `audio-nosample1` side exercises delay expiry with optional samples
-absent and no queued/native weather audio call; its 500-ms stall, world hold/resume and
-485 weather boundaries pass, with no endpoint debt. A500 and the queued full-cycle pair
-remain pending.
+Both `audio-nosample1` CPUs exercise delay expiry with optional samples absent and no
+queued/native weather audio call. The 500-ms stall, world hold/resume and 485 weather
+boundaries pass, with 1,002 matching movement states and 222 control/input/fuel updates.
+A500 peaks at 1,200 ms world-end delay and 480 ms retained debt, clearing all endpoint
+work. The corrected full-cycle pair is now running.
 
 
 Palette audit identifies the actual remaining presentation checks: `$17306` interpolates
@@ -719,3 +720,10 @@ entry-5 colour and has identical saved/current palettes at both endpoints on bot
 This is only stored endpoint evidence. Per-phase arithmetic, restoration callers and
 actual displayed palette/buffer pairing remain open; the implementation document gives
 ordered probes for those checks without altering the current capture sequence.
+
+
+`weather_palette_state.py --require-restored` makes the stored palette endpoint check
+reproducible. Both cadence1 CPU captures pass initial/final snapshots; wrong weather colour,
+another palette colour and unfinished transition are rejected. Its interpolation helper
+still needs the planned per-phase native-call comparison; endpoint success is not pixel
+or scanout acceptance.
