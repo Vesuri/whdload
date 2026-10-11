@@ -8,7 +8,8 @@ import argparse
 import json
 import re
 from pathlib import Path
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 
 GUARDS = {0x13978:'4e55ffec', 0x139d4:'2948df4c',
           0x13a0e:'21acdf447800', 0x13a84:'21807800',

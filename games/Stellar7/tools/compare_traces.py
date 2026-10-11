@@ -10,7 +10,8 @@ Exit status 0 only if everything matches. Screenshots are compared over the comp
 """
 import hashlib, io, os, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 
 a, b = barto.load(sys.argv[1]), barto.load(sys.argv[2])
 bad = 0

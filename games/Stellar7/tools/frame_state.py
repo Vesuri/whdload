@@ -13,7 +13,8 @@ import re
 import struct
 from pathlib import Path
 from PIL import Image
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 from stellar7_report import locate
 
 

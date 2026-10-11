@@ -8,7 +8,8 @@ Aztec C link-a5 prologues and observed call targets name functions.
 """
 import argparse, collections, os, struct, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

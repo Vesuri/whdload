@@ -10,7 +10,8 @@ import collections
 import json
 import struct
 from pathlib import Path
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 from routine_cost import measure
 
 

@@ -6,7 +6,8 @@ import re
 import struct
 from pathlib import Path
 import sim60_state
-from patchlist import slave_code
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev.patchlist import slave_code
 from stellar7_report import locate
 
 

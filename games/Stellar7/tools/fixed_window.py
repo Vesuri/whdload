@@ -149,7 +149,7 @@ try:
         subprocess.run([sys.executable,'tools/swap_fields.py',str(a.fields),str(out),str(out/'code.bin'),hex(base),str(out/'chip.bin'),'--field-hz',str(field_hz)],check=True,env=env)
     else:
         cmd(f'profile {a.fields} {out}/trace.bin')
-        import barto
+        from amigaxdev import barto
         t=barto.load(out/'trace.bin')
         if len(t.fields) != a.fields:raise RuntimeError(f'Requested {a.fields} fields, captured {len(t.fields)}')
         (out/'first.png').write_bytes(t.fields[0].shot);(out/'last.png').write_bytes(t.fields[-1].shot)

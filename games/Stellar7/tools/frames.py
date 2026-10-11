@@ -4,7 +4,8 @@ Validate against breakpoint counts in an identical fixed window before quoting a
 """
 import argparse, collections, os, struct, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 from stellar7_report import regions
 C2P = 0x6a0a
 

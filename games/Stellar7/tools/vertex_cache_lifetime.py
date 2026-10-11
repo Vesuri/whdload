@@ -10,7 +10,8 @@ import json
 import re
 import struct
 from pathlib import Path
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 
 READS = {0x17b5e:0, 0x17b6e:1, 0x17b7e:2,
          0x17c22:0, 0x17c32:1, 0x17c42:2,

@@ -14,7 +14,8 @@ import struct
 from pathlib import Path
 import capstone
 from check_disabled import hunks, patch_size
-from patchlist import decode, slave_code
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev.patchlist import decode, slave_code
 from stellar7_report import GAME, locate
 
 

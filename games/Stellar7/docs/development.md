@@ -207,7 +207,12 @@ Source `amiga/env.sh`, which loads AmigaXDev's shared environment through
 `KICKSTART_A1200`, `WORKBENCH_ADF`, `WHDLOAD`, `WHDLOAD_BINARY`, `FSUAE`, `VASM`,
 `NDK`, and `FSUAE_COMMON`. See AmigaXDev `docs/environment.md`. The shared
 Python environment and cross tools are added to PATH; source it before running
-the tools. The makefile takes API headers and KickEmu sources directly from
+the tools. The trace reader, patch-list decoder, gdb server and disassembly
+helpers are AmigaXDev's `amigaxdev` package (`tools/_amigaxdev.py` finds it
+under any python3): `python3 -m amigaxdev.disasm disd DUMP BASE HUNKBASE START
+END` disassembles by hunk offset, `python3 -m amigaxdev.disasm hotspots --label
+s7 TRACE DUMP BASE HUNKBASE OFF[,OFF...]` lists the hottest instructions, and
+`python3 -m amigaxdev.patchlist SLAVE LIST_OFFSET` decodes a patch list. The makefile takes API headers and KickEmu sources directly from
 `$WHDLOAD/Include` and `$WHDLOAD/Src/sources`; do not use removed vendored paths.
 Missing inputs are reported explicitly. There are no fallbacks into another
 project. The SIM60 type-10 combat build has also been checked byte-identical

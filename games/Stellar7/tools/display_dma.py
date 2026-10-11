@@ -12,7 +12,8 @@ import hashlib
 import json
 import struct
 from pathlib import Path
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 from frame_state import inspect as inspect_frame
 
 CONTROLS = (0x8e, 0x90, 0x92, 0x94, 0x100, 0x102, 0x104, 0x108, 0x10a)

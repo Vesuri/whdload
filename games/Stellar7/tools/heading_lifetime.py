@@ -15,8 +15,9 @@ import struct
 from pathlib import Path
 import capstone
 from capstone import m68k_const as mc
-import barto
-from patchlist import slave_code
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
+from amigaxdev.patchlist import slave_code
 from stellar7_report import locate
 
 

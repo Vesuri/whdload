@@ -8,7 +8,8 @@ import argparse
 import json
 import re
 from pathlib import Path
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 
 
 def inspect(folder):

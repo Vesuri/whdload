@@ -9,7 +9,8 @@ import json
 import re
 import struct
 from pathlib import Path
-import barto
+import _amigaxdev  # noqa: F401 (finds amigaxdev)
+from amigaxdev import barto
 from sim60_state import read
 from stellar7_report import locate
 
