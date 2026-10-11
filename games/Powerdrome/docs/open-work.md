@@ -707,3 +707,12 @@ prototype against pre-fix source, plus the current native hook-boundary/branch a
 Normal build bytes remain unchanged. The completed 030 `audio-keys2` side passes native
 mute/unmute, one suppressed request and two resumed starts at unchanged logical times.
 Its A500 counterpart and the queued no-resource/full-cycle pairs remain pending.
+
+
+Palette audit identifies the actual remaining presentation checks: `$17306` interpolates
+entry 5 into both saved palette and current colour table; `$17062` deliberately preserves
+that entry while restoring the other 15. The completed cadence1 pair restores the original
+entry-5 colour and has identical saved/current palettes at both endpoints on both CPUs.
+This is only stored endpoint evidence. Per-phase arithmetic, restoration callers and
+actual displayed palette/buffer pairing remain open; the implementation document gives
+ordered probes for those checks without altering the current capture sequence.

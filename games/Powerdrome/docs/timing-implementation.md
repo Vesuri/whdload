@@ -4280,6 +4280,45 @@ The normal slave and effects-disabled full timing build remain byte-identical to
 references. Hook boundaries and C3-off native snapshots pass; legacy effect draw/selection
 captures still pass their version-specific readers. No cache policy changes were made.
 
+## Palette data flow and remaining presentation proof
+
+Native fade helpers `$8a1a/$8a60` pass source colour `state+$4b6`, the target colour
+from table `$203e` (track index, or index zero for nonzero `state+$aa`), palette index 5,
+and phase `15-transition` or `-transition` to `$17306`. The helper interpolates each
+4-bit component using signed multiply/divide and arithmetic shifts. It writes entry 5
+both through `state+$4b0` and through the colour-table pointer at `game+$4790` then `+4`.
+Its final visibility gate controls whether `$16fe8` publishes the palette immediately.
+Thus the fade is not just a diagnostic counter: it changes stored palette data.
+
+Native restoration `$17062`, used by `$f914/$f948`, copies the other 15 palette entries
+but deliberately skips entry 5. This preserves the current weather colour. `$f914`
+selects its source table by track (special tables for tracks 1 and 3); `$f948` uses
+`state+$4b0`. The renderer's `$117c8–$117d4` restoration and the fade's completion calls
+must be checked separately from the weather audio helper.
+
+The completed `timing-weather-cycle-cadence1` pair provides an endpoint check only:
+initial and final snapshots have track 0, transition zero and view zero; entry 5 equals
+its original source colour in both stored palettes, and all 16 entries of the saved
+palette and colour table agree on each CPU. This does not validate intermediate phases,
+all track/view choices or physical palette delivery.
+
+The next presentation checks should proceed in this order:
+
+1. Observe `$17306/$173a8` around each owned fade call, recording source/target/phase/index,
+   stored entry 5 and the active colour-table pointer. Independently reproduce the native
+   signed integer arithmetic, and verify both writes without changing persistent timing.
+2. Observe `$17062/$1708c` around restoration, checking entries 0–4 and 6–15 against the
+   selected source while entry 5 stays unchanged. Classify caller return addresses so
+   renderer restoration, positive completion and expiry are not conflated.
+3. Check palette publication and scene-buffer identity together, then capture displayed
+   frames at selected phases. Palette-memory agreement alone is insufficient scanout proof.
+4. Repeat for both CPUs, active effects, both fade directions, relevant views/tracks,
+   and a catch-up interval that skips intermediate presentations. Logical phase deadlines
+   remain independently checked by the existing fade/cycle gates.
+
+Do not add these probes to an already running capture. The direct-delivery full-cycle
+regression intentionally retains its frozen observation scheme.
+
 ## Revised weather cadence: complete cycle regression
 
 The frozen `timing-weather-cycle-cadence1` A500/030 pair completes 8,500 PAL fields per
