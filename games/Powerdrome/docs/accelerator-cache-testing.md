@@ -1,5 +1,8 @@
 # Accelerator and cache testing
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
 Current selected-path timings, including the completed local raster refinement, are in the
 [raster report](raster-improvements.md). The matrix below isolates the preceding base implementation.
 

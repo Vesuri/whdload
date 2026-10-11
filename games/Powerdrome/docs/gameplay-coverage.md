@@ -1,5 +1,8 @@
 # Gameplay coverage
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
 The coverage campaign is complete for the existing guarded fast planar renderer. Across
 seven selected twin captures, **30,623 completed staged scenes** passed with zero pixel,
 register/CCR, scratch or guard mismatches. Copied fast raster code remained unchanged.

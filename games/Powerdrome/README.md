@@ -1,5 +1,8 @@
 # Powerdrome
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](docs/open-work.md) for completed checks, open gates and resume priorities.
+
 Local reverse-engineering and performance work on the Amiga PAL release.
 Start with [open work](docs/open-work.md), then [development](docs/development.md) and
 [internals](docs/internals.md). The [practice profile](docs/practice-profile.md) breaks down

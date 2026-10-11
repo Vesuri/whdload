@@ -1,5 +1,8 @@
 # Powerdrome internals
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
 ## Inputs and loader
 
 Supported input: PAL original, Retroplay `Powerdrome_v1.0_0140.lha`, Galahad/Fairlight slave 1.0 (22 May 2003).
@@ -74,7 +77,7 @@ writes, disk changes and LoadSeg. No source-level meanings are inferred beyond t
 - Game `$7f7a` updates the clock, differences the previous frame timestamp (`a6+$218`), clamps
   that delta to 8..50 and stores the word at `a6+$21c`. It then exchanges bitmap pointers.
   Physics reads this word at `$ccf2` and `$d56c`; a constant-step model would be incorrect.
-- Game `$8056` calls `$7f7a`, calls graphics.library ScrollVPort and clears the VBL handshake.
+- Game `$8056` calls `$7f7a`, calls graphics.library LoadView and clears the VBL handshake.
   Multiple non-racing paths call it. Normal driving is counted at its caller `$bc7c`;
   departure animations are excluded from driving FPS.
 - The renderer waits for the VBL handshake at game `$112a6`.

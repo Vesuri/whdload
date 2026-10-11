@@ -1,6 +1,9 @@
 # Timing implementation and validation
 
-Work in progress. `CUSTOM3=1` currently enables the isolated four-clock-unit minimum
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
+Implementation paused at user request; F1–F8 remains incomplete. `CUSTOM3=1` currently enables the isolated four-clock-unit minimum
 movement interval (20 ms on the measured PAL setup) and 100 ms cockpit-departure steps. It is independent of `CUSTOM1` and off
 by default. This is not yet a finished framerate-independence feature.
 
@@ -1646,7 +1649,7 @@ incomplete tail. Their segment means are:
 | Body bitmap composition, through `$148e0` | 47.308 ms | 46.442 ms |
 | Moving parts, through `$14956` | 3.776 ms | 3.864 ms |
 | Presentation preparation, through `$e334` | 19.878 ms | 20.214 ms |
-| ScrollVPort interval, `$e33a–$e34a` | 7.866 ms | 8.526 ms |
+| WaitBOVP interval, `$e33a–$e34a` | 7.866 ms | 8.526 ms |
 | WaitTOF interval, `$e35a–$e364` | 5.038 ms | 5.067 ms |
 | Bitmap copy, `$e364–$e378` | 20.659 ms | 20.681 ms |
 | HUD/input, `$e378–$e3bc` | 2.971 ms | 3.112 ms |
@@ -1693,7 +1696,7 @@ counter ownership before selecting a correction. Do not shorten messages merely 
 make an animation timing test pass, or treat all measured overhead as scheduler cost.
 
 Display phase also matters. Native complete steps cluster near 100 and 120 ms; the
-ScrollVPort interval ranges from 0.053 to 14.280 ms. WORLD20 has a 111.133-ms first
+WaitBOVP interval ranges from 0.053 to 14.280 ms. WORLD20 has a 111.133-ms first
 complete step and subsequent steps spanning 99.873–121.807 ms. These observations
 motivate checking refresh-boundary crossings across the whole stage, but do not yet
 prove that missed refreshes explain the full 100–820-ms unpaced invocation penalty.
@@ -4145,7 +4148,7 @@ Build checks pass: normal and explicit cycle-disabled fade-fixture bytes match t
 saved references; a missing fade dependency is rejected. All new hook ranges contain
 complete instructions, no decoded direct branches enter their interiors, and both C3-off
 native-weather snapshots retain all declared native hook bytes. These checks do not
-replace the running cycle captures or the outstanding migration/lifecycle work.
+replace runtime cycle validation or the outstanding migration/lifecycle work.
 
 
 ### Native effect-lifetime cadence gate
@@ -4196,10 +4199,10 @@ published visual state. Clear the last visible publication on the following scen
 visual boundary. This gives generation-to-last-step values 20, 440 and 580 ms for
 lifetimes 1, 4 and 5, respectively, close to this reference.
 
-The seeded active-effect comparison now passes as described below. The full-cycle
-comparison is running. RNG ownership, final-visible-state fallback and both buffers'
-cleanup checks remain necessary; actual sound trigger is still unobserved. Calibration
-across tracks and varied modes still needs evidence. This is an implemented candidate,
+The seeded active-effect and full-cycle comparisons pass as described below. Current
+checks cover RNG ownership, actual sound-helper calls, omitted/repeated effects and native
+palette restoration. Displayed pixels and broader lifecycle handling remain open.
+Calibration across tracks and varied modes still needs evidence. This is an implemented candidate,
 not final cadence acceptance for all gameplay.
 
 
@@ -4273,8 +4276,8 @@ lost work or a completed publication.
 Generation is now serviced before a simultaneous fade mutation, matching the native
 outer-loop ordering. The frozen full candidate `Powerdrome-timing-weather-cycle-cadence1.slave`
 includes this ordering and the corrected deadline-transfer helper. Its unshortened
-8,500-field / 170-second full-cycle A500/030 pair is running. Until that completes, the
-previous full-cycle results refer to the older 90-ms effect schedule.
+8,500-field / 170-second full-cycle A500/030 pair passes with the corrected 80/140-ms
+schedule. The later cadence2 pair also passes with direct sound delivery.
 
 The normal slave and effects-disabled full timing build remain byte-identical to saved
 references. Hook boundaries and C3-off native snapshots pass; legacy effect draw/selection
@@ -4289,6 +4292,24 @@ and phase `15-transition` or `-transition` to `$17306`. The helper interpolates 
 both through `state+$4b0` and through the colour-table pointer at `game+$4790` then `+4`.
 Its final visibility gate controls whether `$16fe8` publishes the palette immediately.
 Thus the fade is not just a diagnostic counter: it changes stored palette data.
+
+The native publisher `$16fe8` calls `LoadRGB4` (graphics.library vector -192), then
+`$8078`. This saves the four old long/short Copper-list pointers, frees the viewport's
+intermediate lists, builds and merges a list for each of the two scene bitmaps, waits
+with `WaitBOVP` (-402), selects the View with `LoadView` (-222), then frees the old
+hardware lists. Native `$8056` also uses `LoadView`, not `ScrollVPort`; the repair interval
+at `$e33a–$e34a` is `WaitBOVP`. These identities are checked against the local NDK vector
+headers and game call sites. The wait timing measurements are unchanged, but they
+measure waiting for the viewport beam position rather than scrolling work.
+
+`check_weather_copper.py` follows both prepared non-interlaced scene lists through live
+pointers in captured memory, requires a bounded terminated instruction stream, and checks
+all 16 colour moves and four bitplane pointers against the current colour map and their
+native bitmap. It rejects chained lists, interlace and repeated colour/plane writes rather
+than treating those as simple scenes. The directed fade pair passes initial/final lists
+on both CPUs, including the selected View belonging to that pair. This is prepared-display
+state evidence only: active hardware Copper selection, intermediate phases and screenshots
+still need their own observations.
 
 Native restoration `$17062`, used by `$f914/$f948`, copies the other 15 palette entries
 but deliberately skips entry 5. This preserves the current weather colour. `$f914`
@@ -4445,7 +4466,7 @@ the pre-fix source byte for byte. The current instruction-boundary/direct-branch
 passes. Both old failing captures still fail request accounting.
 Direct-delivery mute (`timing-weather-audio-keys2`), no-resource
 (`timing-weather-audio-nosample1`) and full-cycle (`timing-weather-cycle-cadence2`)
-regressions are queued in sequence, stopping on a failed gate. The corrected mute
+regressions are complete and pass on both CPUs. The corrected mute
 pair passes on both CPUs: native flag transitions, one suppressed call and two resumed
 starts at the original three request times. Earlier green captures
 exercised the deferred implementation. Broader lifecycle acceptance remains required.
@@ -4459,7 +4480,10 @@ full-cycle 030 side now passes warning/onset/expiry, native duration arithmetic,
 30 fade steps and 4,217 weather boundaries. Its normalized weather history also matches
 the preceding deferred 030 capture. Stored palette endpoints are restored; maximum
 world-end delay is 280 ms, with zero endpoint debt and 2,520 completed renderer twins.
-A500 is running; full cross-CPU direct-delivery cycle acceptance is still pending.
+The A500 counterpart also passes: 4,217 weather states, 8,503 common movement states
+and 1,889 controls match. Its maximum world-end delay is 780 ms, retained debt peaks at
+160 ms and clears at the endpoint. This closes the seeded direct-delivery cycle pair,
+not the remaining lifecycle or display acceptance gates.
 
 
 The directed `timing-weather-palette-test1` 030 capture completes 46 seconds with all
@@ -4472,5 +4496,9 @@ negative-completion zero phase. Missing and duplicate calls are rejected. The co
 counterpart passes the same 31 calls, 30 logical publications and one restoration;
 normalized phase/source/target/colour histories match across CPUs. The pair also matches
 2,304 common movements and 512 controls, with zero endpoint simulation debt. This is
-stored palette evidence, not scanout acceptance. Current-code effect coalescing and
-restoration are being checked separately by `timing-weather-effect-publication1`.
+stored palette evidence, not scanout acceptance. The completed current-code `timing-weather-effect-publication1` pair checks effect
+coalescing and restoration separately: ten visible logical states produce 21/9 draws on
+030/A500, with eleven repeats on 030 and one omitted state on A500. All draws use the
+latest completed logical publication. All 42/18 restoration calls preserve entry 5 and
+copy the other 15 entries. The pair matches 1,003 common movements and 222 controls;
+maximum world-end delay is 260/760 ms and endpoint debt is zero. No capture remains running.

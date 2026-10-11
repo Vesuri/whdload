@@ -1,5 +1,8 @@
 # Development
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
 ## Inputs and shared tools
 
 Keep both supplied archives in ignored `tmp/`. Extract the installer to `tmp/installer/`

@@ -1,5 +1,8 @@
 # Powerdrome performance implementation plan
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
 The optional implementation and its completed measurements are documented in
 [performance implementation](performance-implementation.md). `CUSTOM1=1` enables it;
 the option remains off by default. This document retains the design rationale and gates
@@ -75,7 +78,7 @@ $bc4e  call $ca3e
          $cef0  call $f0dc: timer and other display work
 $bc7c  call $8056
          $7f7a  sample clock, compute the NEXT timestep, exchange buffers
-                  ScrollVPort and clear VBL handshake
+                  LoadView and clear VBL handshake
 $bc86  increment per-loop counter
          process further state/input and repeat
 ```

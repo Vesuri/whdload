@@ -1,5 +1,8 @@
 # Raster improvement plan and results
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
 Scope: further optimize the existing planar fast-memory rasterizer behind `CUSTOM1=1`.
 Keep the native fallback, CPU compatibility, WHDLoad cache selection and simulation timing.
 No chunky rewrite or scheduler changes. The pre-change source reference is `ee3e90f`.

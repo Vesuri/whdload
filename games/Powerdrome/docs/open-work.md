@@ -1,5 +1,25 @@
 # Open work
 
+## Handoff status — paused at user request
+
+All captures have finished; no Powerdrome validation job is left running. The latest
+normal slave is restored byte-identical to its saved reference. Current changes are
+committed; resume work only when requested.
+
+- Normal `CUSTOM1` fast planar rendering remains optional. Normal `CUSTOM3` provides
+  the 20 ms PAL minimum and 100 ms cockpit liftoff steps only.
+- The broader 20 ms movement scheduler and periodic gameplay changes remain compile-only
+  prototypes. F1–F8 is incomplete; do not describe the released timing toggle as full
+  framerate independence.
+- Completed latest weather checks: direct-sound full-cycle A500/030 comparison, all 31
+  fade colour calls on both CPUs, active-effect draw/publication accounting and palette
+  restoration on both CPUs. Prepared Copper-list endpoints also match both scene buffers.
+- Remaining: displayed-frame/active Copper evidence, natural weather and mode lifecycles,
+  braking and impulse calibration, opponent projection/animation ownership, finish/restart
+  paths, broader presentation-rate/capacity coverage, and final off-mode/release validation.
+- Braking reference policy is unresolved: representative consistent A500 handling versus
+  reproducing scene-dependent slowdown. No policy change or tolerance relaxation was made.
+
 ## Current state
 
 The original slave is reconstructed and rebuilds byte-identically. The WHDLoad 20 KickEmu
@@ -568,7 +588,7 @@ Audio fixtures with 1 MiB guest chip memory exercise actual optional sample allo
 normal 512 KiB fixtures exercise the native missing-resource guard. Native helper checks
 do not prove audible output or recover sound time lost during an external stall.
 
-### Active validation and next steps
+### Completed validation and next steps
 
 The current direct-sound `timing-weather-cycle-cadence2` 170-second pair passes the
 complete cycle, all 30 fades and 4,217 common weather boundaries, with 8,503 common
@@ -586,29 +606,26 @@ histories. All 30 pending logical publications are consumed exactly. The pair ma
 is 280/780 ms on 030/A500; endpoint debt is zero. Stored palette calls are verified;
 physical palette/buffer pairing and scanout remain open.
 
-1. Complete `timing-weather-effect-publication1`, now running the current direct-sound
-   mode-2 fixture for 20 seconds per CPU with draw-entry/body/return and palette-copy
-   probes. `check_weather_effect_publication.py` checks latest-state drawing and counts
-   omitted/repeated publications. `check_weather_palette.py --copies-only` checks native
-   restoration independently, without claiming fade validation. The completed 030 side
-   passes 21 owned draws over ten visible publications, including eleven repeats; every
-   draw uses the latest completed logical state. All 42 observed palette restorations
-   preserve entry 5 and copy the other entries. Corrupted weather colour, copied colour,
-   saved palette and source-pointer evidence are rejected. Maximum world-end delay is
-   260 ms and endpoint debt is zero. A500 remains in progress. The normal build was
-   restored byte-identical before starting this frozen-artifact capture.
-2. Check active-effect presentation coalescing and displayed palette/buffer pairing.
-   Ordinary flight allocates at most 32 movement steps (640 ms) before rendering;
-   the shortest regular fade interval is 1,160 ms. A longer physical stall alone does
-   not force multiple fade steps into one ordinary batch. Mode transfers remain separate.
-   `check_weather_effect_publication.py` audits the shorter effect publications instead:
-   the earlier cadence-test1 A500 omitted one of ten visible states; 030 repeated states
-   eleven times. Every draw uses the latest completed logical publication. That pair uses
-   deferred sound; current direct-sound coverage with draw probes remains required.
-   Stored palette agreement is not scanout evidence. `weather_palette_state.py --require-restored` passes both cadence1 and current cadence2 CPU
-   endpoints; invalid colours and unfinished transitions are rejected. Guarded probe
-   generation and installed positive/negative/negative-zero caller identification are
-   prepared, but those preparation checks do not replace live observations.
+The completed current-code `timing-weather-effect-publication1` pair matches 1,003
+common movement states and 222 controls. Of ten visible logical states, A500 draws nine
+and omits one; 030 draws 21 times, including eleven repeats. Every observed draw uses the
+latest completed publication and preserves RNG ownership. All 42/18 observed native
+palette restorations on 030/A500 preserve entry 5 and copy the other entries. Maximum
+world-end delay is 260/760 ms; both endpoints have zero debt. Corrupted weather colour,
+copied colour, saved palette and source-pointer evidence are rejected.
+
+Next work when resumed:
+
+1. Check active display selection and captured pixels through weather transitions.
+   Prepared scene Copper lists pass initial/final palette and bitmap pairing checks on
+   both CPUs in the directed fade pair. This does not prove intermediate publication or
+   scanout. `check_weather_copper.py` deliberately rejects unsupported interlaced/chained
+   lists and repeated colour/plane writes.
+2. Extend skipped/repeated effect coverage to stalls and mode transitions. Ordinary flight
+   allocates at most 32 movement steps (640 ms) before rendering, shorter than the 1,160 ms
+   minimum regular fade interval; a longer physical stall alone does not force multiple
+   fade steps into one ordinary batch. Shorter effects already exercise omitted/repeated
+   presentations in the completed current-code pair.
 3. Validate natural unseeded weather and pause, pit, rescue, restart and shared-transition
    lifecycle handling, including clock/domain handoff and message/palette publication.
    Extend A500 calibration beyond this native episode and validate the 90/720 ms cycle

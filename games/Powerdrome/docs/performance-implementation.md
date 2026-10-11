@@ -1,5 +1,8 @@
 # Optional fast planar renderer
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
 `CUSTOM1=1` enables the fast-RAM renderer. The option is off by default, including on
 68000 systems. It retains the game's planar format, native double buffering and original
 simulation/update order. It does not introduce chunky pixels, a new timestep or a frame cap.

@@ -1,5 +1,8 @@
 # Original/development loader equivalence
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
 The Copylock D2 question is resolved: its different return value has no effect on the
 supported game's successful startup path. No registration-tag compatibility patch is
 needed. Matched original/development captures pass on 68000 and 68EC020 with `CUSTOM1=0`.

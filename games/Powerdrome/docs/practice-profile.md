@@ -1,5 +1,8 @@
 # Powerdrome practice departure profile
 
+Project status: timing work is paused at the user’s request and remains incomplete.
+See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
 CPU polygon drawing is the principal bottleneck during the track portion of this A500 run.
 Edge construction and span filling take **54.27% of recorded track cycles**. Background filling
 adds **8.45%**, viewport clipping **5.25%**, and camera transformation, near-plane clipping,
