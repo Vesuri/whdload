@@ -250,7 +250,7 @@ A touched emulator window is input: people watching can move the mouse over it.
 proportional to the frame rate (6–11 fps on the A500, depending on the scene).
 
 **But the step has a size: `T = 10184(a4)`**, the same design as Their Finest Hour's T
-(the Their Finest Hour project's `docs/profiling.md` §10), except that BH does not benchmark it.
+(AmigaXDev `docs/playbooks/fixed-time-simulation.md`), except that BH does not benchmark it.
 The mission setup (`bh:132cc`, at `bh:1341c`) sets `T = 10182(a4) × b / 16`, minimum 3, where
 `10182(a4) = 7` is a constant (`bh:054a`) and `b` is byte 16 of the mission's 17-byte record
 (table `-16984(a4)`, index `9835(a4)`). Over the first 40 records b is 12, 14, 15, 16 or 20,

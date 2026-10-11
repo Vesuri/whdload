@@ -51,8 +51,8 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
    decoupling design.
 2. **The 68030 ceiling.** A 50 MHz `SWAP_ONLY` run found the flight already at frame 1539 when
    the anchor was armed: map that machine's screens against the tape first.
-3. **Dynamic T for BH**, after TFH's `CUSTOM4` (the Their Finest Hour project,
-   `whdload/timing.s`) is finished: the coverage test (profiling.md §9) shows the flight
+3. **Dynamic T for BH**, after Their Finest Hour's `CUSTOM4` is finished (the
+   lessons are in AmigaXDev `docs/playbooks/fixed-time-simulation.md`): the coverage test (profiling.md §9) shows the flight
    model and the drones follow T and the stick needs the reference-T division. BH also needs
    its own field counter (no VBL count exists), T restored at mission setup (`bh:1341c`),
    `10186(a4)` and countdowns recomputed, the slot-128 pool sized for T = 50 (16 slots is all
@@ -63,7 +63,7 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
 5. **v1.0 vs this slave.** v1.0 was chip-only by design ("too fast" with fast RAM); compare
    the two on the same window by game state once a step-rate design exists.
 6. **CUSTOM gating** for the first patch, declared in `slv_config`, with a disabled-bytes
-   checker (TD2's `check_disabled.py`).
+   checker (AmigaXDev `docs/playbooks/new-game-playbook.md` §10; Test Drive 2 has one).
 
 ## Decision for the user
 
