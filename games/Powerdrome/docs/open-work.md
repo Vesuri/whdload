@@ -404,3 +404,14 @@ clamp/damping arithmetic passes, and input/brake queues retain no debt or overfl
 render time; the representative-handling versus scene-dependent reference policy remains
 unresolved, and the native response gate remains failing. Cadences and tolerances are
 unchanged. See the current brake arithmetic audit in timing-implementation.
+
+The extended opponent projection audit now covers six A500 seconds and all nine
+mismatching raw-record timestamps. All 382 accesses to opponent word `$54` are confined
+to the known drawing sites; 117 reads follow fresh projection writes across all four
+pilots. The attempted 030 instruction capture contains no PCs and is rejected, so
+accelerated effective-address evidence remains missing. Strict comparison still reports
+nine `$54` differences, with all other compared words and RNG equal; no field is masked.
+Pilot 1's animation timing agrees between corrected CPUs but differs from the native
+reference's visibility history. The track-range endpoint is updated by movement, so
+there is no established stale-render visibility bug to fix. Matched native event histories
+and accelerated field-ownership evidence remain required.

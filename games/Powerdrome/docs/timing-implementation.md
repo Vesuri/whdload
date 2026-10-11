@@ -738,8 +738,46 @@ rule for every mode or capture.
 python3 tools/audit_opponent_projection.py tmp/prof/timing-opanim-projection-access-a500
 ```
 
-Next extend `$54` ownership coverage, test matched native visibility/lifetime histories, and cover
-contact/damage/effect feedback, pause, repair, rescue and nonhuman mode transitions.
+The extended `timing-opanim-projection-long-a500` instruction capture covers **300 PAL
+fields (six seconds)** from the same `$9950` anchor after `$bc44`, with the same frozen
+opanim2 slave and route. It decodes **5,168 distinct game instructions** and resolves all
+explicit memory addressing modes. Its **382 accesses** remain confined to the same four
+sites: 120 writes at `$a142`, 67 writes at `$a26e`, 78 writes at `$1162e`, and **117 reads**
+at `$11644`. Every read follows a fresh projection write; all four pilots are covered
+(17 / 37 / 26 / 37 reads). `$1162e` is a writer selecting distant-model drawing, not a
+simulation reader.
+
+The audit now reports a conservative opponent-deadline interval from completed-update
+counts in the installed continuous ledger, requiring the same retained origin at both
+snapshots. The longer A500 trace covers **25,560–30,060 ms**; the earlier 50-field trace
+covers **25,560–26,460 ms**. All nine raw-record mismatches occur within the longer
+interval: 25,650, 25,740, 27,270, 27,360, 27,450, 28,260, 28,350, 28,440 and 28,530 ms.
+This strengthens ownership evidence for the A500 path but does not establish it for
+every accelerated execution path.
+
+The attempted 300-field `timing-opanim-projection-long-030-twins` instruction capture
+terminates with **no instruction PCs**; sampled fields 0, 1, 10, 100 and 299 all contain
+zero PCs. The harness correctly rejects it before terminal memory snapshots, so it is
+not a successful instruction or renderer audit. Shared tooling notes also report that
+hardware watchpoints can fail to fire; a counted breakpoint at the four known sites
+would not rule out other aliased accesses. Accelerated effective-address coverage still
+needs a usable instruction/access trace. No opponent comparison field has been masked,
+and the strict full-record gate still reports nine `$54` differences and zero RNG
+differences across 335 common deadlines (135 after both CPUs enter flight).
+
+The animation-duration mismatch is separate: both corrected CPUs agree on pilot 1's
+2,040-ms span. The native segment-range endpoint `state+$200` is loaded from the track
+lookup at `$f85a–$f866`, following player-segment selection in the movement path; it is
+not simply a stale value computed by rendering. Removing the visibility gate would
+change native behavior. Match the original event/visibility history before treating the
+920-ms native prefix as the same animation-lifetime case.
+
+```sh
+python3 tools/audit_opponent_projection.py tmp/prof/timing-opanim-projection-long-a500
+```
+
+Next obtain accelerated `$54` access coverage, test matched native visibility/lifetime
+histories, and cover contact/damage/effect feedback, pause, repair, rescue and nonhuman mode transitions.
 The preparation split alone does not complete the broader effects or timing matrix.
 
 ## Cockpit liftoff: confirmed frame-driven movement

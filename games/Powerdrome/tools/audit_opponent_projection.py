@@ -36,11 +36,8 @@ def address(op, registers, width, pc):
     raise ValueError(mode)
 
 
-def main():
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('capture', type=Path)
-    a = p.parse_args()
-    root = a.capture
+def audit(root):
+    assert (root/'final-code.bin').is_file(), 'Capture must be terminal'
     game = int((root/'game-base.txt').read_text(), 0)
     chip = (root/'chip.bin').read_bytes()
     end_chip = (root/'final-chip.bin').read_bytes()
@@ -111,6 +108,29 @@ def main():
     assert set(consumed) == set(targets.values()), 'Need fresh producer/consumer coverage for all four pilots'
     print(f'{sum(consumed.values())} drawing reads follow fresh projection writes across all four pilots')
     print('Observed explicit accesses are confined to known projection/drawing sites; unexecuted paths remain unaudited')
+    # Express the conservative observed interval in the same elapsed opponent
+    # deadlines as the complete-record comparison. Ignore a partial final update.
+    base = int((root/'dump-base.txt').read_text(), 0)
+    frame = struct.unpack_from('>I', chip, game+0xca46)[0]-base
+    interval = []
+    origins = []
+    for name in ('code.bin', 'final-code.bin'):
+        data = (root/name).read_bytes()
+        pos = data.find(b'PDPOPP01', frame, frame+16384)
+        assert pos >= 0, 'Need the installed continuous opponent ledger'
+        origins.append(struct.unpack_from('>I', data, pos+52)[0])
+        interval.append(struct.unpack_from('>I', data, pos+32)[0]*18)
+    assert origins[0] == origins[1] and interval[1] > interval[0]
+    return {'game': game, 'deadline_min': interval[0]+18,
+            'deadline_max': interval[1], 'drawing_reads': sum(consumed.values())}
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('capture', type=Path)
+    a = p.parse_args()
+    result = audit(a.capture)
+    print(f'Conservative opponent-deadline interval: {result["deadline_min"]*5}..{result["deadline_max"]*5} ms')
 
 
 if __name__ == '__main__':
