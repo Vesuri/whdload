@@ -34,6 +34,22 @@ fixture_install:
         addq.l #4,a1
         move.l a1,a0
         adda.l #$20000,a0
+        IFD SIM60
+        move.l (_custom1,pc),d0
+        beq .native_input_guard
+        cmp.w #$4ef9,($2730,a0)
+        bne .bad
+        lea (s60_history_key,pc),a3
+        cmp.l ($2732,a0),a3
+        bne .bad
+        cmp.w #$4ef9,($2746,a0)
+        bne .bad
+        lea (s60_history_joy,pc),a3
+        cmp.l ($2748,a0),a3
+        bne .bad
+        bra .input_guarded
+.native_input_guard:
+        ENDC
         cmp.l #$2f073e2f,($2730,a0)
         bne .bad
         cmp.w #$0008,($2734,a0)
@@ -42,6 +58,9 @@ fixture_install:
         bne .bad
         cmp.l #$48e70300,($274a,a0)
         bne .bad
+        IFD SIM60
+.input_guarded:
+        ENDC
         IFD PICKUP_USE
         IFND PICKUP_ENCOUNTER
         FAIL "PICKUP_USE requires PICKUP_ENCOUNTER"

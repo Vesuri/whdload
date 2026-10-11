@@ -16,7 +16,8 @@ and tradeoff to the user rather than silently reducing the rate.
 
 Each implementation step ends with measurements in `docs/internals.md`,
 commands in `docs/development.md` and a coherent commit following AGENTS.md.
-The source default is N=12. Step 1 is complete; input history is the next step.
+The source default is N=12. Steps 1 and 2 are complete; simulation cost is
+the next step.
 
 ### Existing evidence and limitations
 
@@ -40,8 +41,9 @@ Re-measure through the updated toolchain before making new performance claims.
 
 ### Step 1: Restore and verify the 60 Hz baseline
 
-Status: complete. Restored default release/VERIFY match the retained N=12
-bytes. All 72 fresh baseline cells, A500 heavy-combat capture, 56 cross-CPU/PAL
+Status: complete. The restoration reference release/VERIFY match the retained
+N=12 bytes; current input-history builds add ABI 30 and new hooks. All 72
+reference baseline cells, A500 heavy-combat capture, 56 cross-CPU/PAL
 and 64 retained-baseline state comparisons pass. The 16 SLOW_DRAW/lifecycle
 comparisons, disabled-code preservation, hook audits, actual play60 smoke and
 19 tooling tests pass. Accepted emulator settings and observed clocks cover
@@ -66,16 +68,24 @@ all eight configurations. Evidence and measurements are in internals and
 
 ### Step 2: Input belonging to each tick
 
-Record input against emulated field time and consume the sample belonging to
-each 60 Hz tick. Live joystick reads at $22750–$22756 and key state through
-$22730 currently feed overdue updates with present input. Preserve native input
-semantics, queues, mouse deltas, mode switches, overflow, modal ownership,
-pause and resets. Follow AmigaXDev `docs/playbooks/fixed-time-simulation.md`.
+Status: complete. The native field callback records controls, and each tick
+selects its own field sample. The native key queue retains its capacity and
+ordering while deferring future presses. Modal entry/return atomically exclude
+paused fields from both clocks; menus keep live controls. Session resets and
+finite-history recovery are explicit and instrumented.
 
-Gate: an input edge at a fixed elapsed field affects the same simulation tick
-with normal rendering and SLOW_DRAW, across CPU paths. Test held inputs,
-press/release edges and modal transitions. Measure event-to-simulation and
-visible response; a 16.67 ms timestep alone is not an end-to-end latency bound.
+Elapsed-field held, press/release and firing edges pass across A500, stock
+A1200, 68020 + fast RAM, 68060/50, delayed drawing and PAL compatibility checks.
+Native-reference queue, decoding, direction and button checks pass. Long-pause,
+overflow, preference, death/Continue/No, exit, disabled-byte, hook and actual
+launcher checks are recorded in internals. No unexplained mapped gameplay
+differences remain in these comparisons; deferred projection scratch varies.
+
+Input-consumption and render-handoff delays are measured in fields. They are
+not physical-device or display-scanout latency bounds. Input history fixes
+which controls overdue ticks receive; reducing catch-up delay remains part of
+the performance work. Physical-control and visible-response playtesting remains
+in step 6. No interpolation has been added.
 
 ### Step 3: Reduce the cost of the 60 Hz simulation
 
@@ -137,7 +147,7 @@ the normal loader. Update current docs and remove unused tools.
 ## Remaining release validation
 
 The conversion remains experimental. The plan above replaces lower-rate
-selection and interpolation. Input history is step 2; broader coverage includes:
+selection and interpolation. Input history is complete; broader coverage includes:
 
 - Broaden full-encounter coverage at 60 Hz: boss kills and ending,
   later natural deaths, level and UI transitions, lethal shield/type-43 hits,

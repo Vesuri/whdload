@@ -2,32 +2,74 @@
 
 ## Active performance work
 
-The SIM60 default is **60 Hz (N=12), with no interpolation**. Restoration
-step 1 is complete. Release and VERIFY are byte-identical to the retained
-N=12 binaries. The migrated shared launcher/debugger/readers pass 72 fresh
-baseline cells, the A500 heavy window, 56 cross-CPU/PAL comparisons, 64
-retained-baseline endpoint comparisons and 16 SLOW_DRAW/lifecycle comparisons.
-Accepted emulator settings confirm all eight machine configurations, including
-stock A1200 chip-only memory; observed Exec clocks match NTSC/PAL requests.
+The SIM60 default is **60 Hz (N=12), with no interpolation**. Input history
+now separates the controls consumed by each tick from the time spent drawing.
+Held controls come from the tick's recorded field; queued keypresses cannot
+reach earlier ticks. Native modal input stays live.
 
-Death/Continue, No/restart, normal/early exits, disabled-byte preservation,
-static and installed hook audits and the actual play60 release/menu smoke pass.
-The 19 tooling tests pass. Evidence is under `tmp/restore60`. These checks
-restore the 60 Hz implementation; they do not solve the A500 performance limit.
-Input history and CPU-specific optimizations remain later steps.
+The conversion remains experimental. Sustained A500 performance, rendering
+cost and broader physical-control/gameplay validation remain open. The
+restoration reference under `tmp/restore60` predates input history; its binary
+identity and performance numbers do not describe the new release binary.
 
-## Reproducing the restored baseline
+## Input-history validation
+
+Use `HISTORY_TEST=1` without CUSTOM3: its device samples change at active fields
+20,40,60,80,100,120,140,160. The native gameplay readers must consume them at
+NTSC ticks 21,41,61,81,101,121,141,161, irrespective of drawing. CUSTOM3's older
+pilot is indexed by completed ticks and cannot establish this property.
+`HISTORY_QUEUE_TEST=1` adds private native-reference assertions, including
+future-key filtering, LIFO order, pressure, modifiers, register independence,
+all electrical joystick directions and button states. It restores its state.
+
+Run one capture at a time, with a fresh prefix. Automated serial runners use
+`tmp/rate-matrix.lock`:
+
+```sh
+source amiga/env.sh
+WHD_ARGS='CUSTOM1=1' \
+VERIFY_FLAGS='-DSIM60=1 -DHISTORY_TEST=1 -DHISTORY_QUEUE_TEST=1 -L ../tmp/input-edge.lst' \
+python3 tools/fixed_window.py tmp/input-edge --tick 200 --tick-checkpoints 220 --state-only --fields 1
+cp tmp/input-edge/slave.slave tmp/input-edge.slave
+python3 tools/input_history_state.py tmp/input-edge/checkpoints/220 --fixture
+python3 tools/audit_hooks.py tmp/input-edge.lst
+```
+
+Repeat with `SLOW_DRAW=20`, the usual CPU/memory configurations and PAL clock
+compatibility. Retain exact listings and slaves; `audit_hooks.installed` checks
+real reader hooks and explicitly selected CUSTOM3 fixture overrides.
+Compare tick 200 and 220 with `simulation_state.py --projection --presentation`.
+Only deferred projection scratch may differ. `input_history_state.py` also
+checks recorded-field identity and input/simulation clock accounting at
+completed-tick boundaries.
+
+`PAUSE_TEST=100 PAUSE_FIELDS=600 SLOW_DRAW=20` exercises a long real native pause.
+Capture ticks 100,101,200,220. The VERIFY `PH60` record contains independent
+native dialog entry/return fields; supply their difference to `pause_state.py`,
+not just PAUSE_FIELDS, since native dialog cleanup also takes time.
+`S60_HISTORY_COUNT=16 SLOW_DRAW=80 HISTORY_TEST=1` deliberately exhausts history:
+require a nonzero missing-sample count and continued owed ticks. It must fail
+the ordinary exact-input fixture gate. The release default is 256 fields.
+`HISTORY_LIVE_TEST=1` is a negative control that consumes the newest sample;
+the delayed-render fixture must reject it.
+
+The field fixture reports event-to-input-consumption and first subsequent
+render-completion fields. Render completion is not a scanout or physical-input
+measurement. Evidence and retained serial runners are under `tmp/input-history`.
+Normal and playable release builds are restored after validation.
+
+## Reproducing the performance matrix
 
 Use fresh prefixes and one capture at a time:
 
 ```sh
 source amiga/env.sh
-tools/rate_matrix.sh tmp/restore60-new/matrix
-python3 tools/rate_matrix_report.py tmp/restore60-new/matrix
-tools/rate_matrix.sh tmp/restore60-new/native-combat --routes native-type10-early native-type10-late native-boss
-python3 tools/rate_matrix_report.py tmp/restore60-new/native-combat --routes native-type10-early native-type10-late native-boss
-tools/rate_matrix.sh tmp/restore60-new/heavy --machines a500 --routes type10-heavy
-python3 tools/rate_matrix_report.py tmp/restore60-new/heavy --partial --routes type10-heavy
+tools/rate_matrix.sh tmp/current60/matrix
+python3 tools/rate_matrix_report.py tmp/current60/matrix
+tools/rate_matrix.sh tmp/current60/native-combat --routes native-type10-early native-type10-late native-boss
+python3 tools/rate_matrix_report.py tmp/current60/native-combat --routes native-type10-early native-type10-late native-boss
+tools/rate_matrix.sh tmp/current60/heavy --machines a500 --routes type10-heavy
+python3 tools/rate_matrix_report.py tmp/current60/heavy --partial --routes type10-heavy
 ```
 
 The heavy report intentionally requests only A500. Main/native-combat reports
@@ -47,14 +89,16 @@ LEVEL_EARLY=1 for alternate paths. Capture restarted ticks 600→1500, and level
 six for exits. Compare both endpoints with `simulation_state.py --projection
 --presentation`; only deferred projection scratch may differ. Run death_state
 and level_state as appropriate. Use exact retained listings for hook and
-CUSTOM1-off code audits. The fresh evidence is under `tmp/restore60`.
+CUSTOM1-off code audits. The restoration reference is under `tmp/restore60`; input-history lifecycle
+evidence is under `tmp/input-history/lifecycle`.
 
 ## Substep validation
 
 Build an explicit rate with `make -C whdload sim60 VASMFLAGS=-DS60_SUBSTEPS=12`
 or a diagnostic with `make -C whdload verify VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=12 ...'`.
-The ABI version word keeps layout 29 in its low byte and encodes 12-N in its
-high byte, preserving the N=12 binaries. Readers must decode it through
+The current ABI version word keeps layout 30 in its low byte and encodes 12-N
+in its high byte. Layout 29 remains readable for the restoration reference.
+Readers must decode it through
 `sim60_state.decode_version`; `sim60_state.read` reports `substeps` and `rate_hz`.
 
 `tools/substeps_fixtures.py GROUP CAPTURE --listing LISTING --substeps N`
@@ -85,8 +129,8 @@ with `-L ../tmp/NAME.lst` and the corresponding `tmp/NAME.slave`. Capture with
 `fixed_window.py tmp/NAME --prebuilt tmp/NAME.slave --tick 101 --state-only
 --fields 1`, supplying the same VERIFY_FLAGS and only `CUSTOM1=1 CUSTOM3=1`
 in WHD_ARGS. Run one capture at a time. Validate with the group reader above;
-repeat all thirteen groups for each of N=1,2,3,4,6,12. N=12 fixture builds
-must also compare byte-for-byte with the baseline before parameterization.
+repeat all thirteen groups for each of N=1,2,3,4,6,12. The byte-identity gate applied to the parameterization reference; current
+input-history builds use native-state, field-input and hook checks instead.
 
 `tools/cross_substeps.py REFERENCE CANDIDATE` requires equal native-update
 boundaries and session identity. It reports every mapped difference, keeping
@@ -1878,7 +1922,7 @@ build with `tools/terrain_friction_state.py CAPTURE --listing LISTING`.
 both flags' diagnostic behavior. The direct contact observer's retained captures
 are checked by `tools/terrain_friction_encounter.py CAPTURE --listing LISTING`;
 these use explicit boss-state selection followed by native allocation/contact.
-ABI 29 adds the independent friction clock to mapped-state comparisons. Unknown
+ABI 29 and later include the independent friction clock to mapped-state comparisons. Unknown
 SIM60 state ABI versions fail instead of silently dropping private timing state.
 
 

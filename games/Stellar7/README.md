@@ -7,10 +7,10 @@ The experimental SIM60 conversion targets **60 Hz fixed simulation with no
 interpolation**, independent of rendering. Separate 68000 and 68020+ paths
 may improve performance while preserving the same timing and gameplay.
 
-**The conversion is unfinished.** The default is restored to N=12 (60 Hz),
-with release and VERIFY bytes matching the retained N=12 reference. Fresh
-baseline and regression validation through the updated shared toolchain passes.
-Input history, sustained A500 performance and broader gameplay validation remain open.
+**The conversion is unfinished.** The default is N=12 (60 Hz). Input during
+catch-up now belongs to each tick's recorded time, with live native menus and
+a timestamped key queue. Sustained A500 performance and broader gameplay and
+physical-control validation remain open.
 
 Source the shared environment and launch the separate experimental build:
 

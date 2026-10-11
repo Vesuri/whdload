@@ -72,8 +72,16 @@ s60_dialog:
         bne s60_dialog_native
         movem.l d2/a2,-(sp)
         lea (s60_last,pc),a2
+        bsr s60_history_lock
         bsr s60_clock ; retain active time accrued before entering the modal
         move.w #1,(s60_modal_depth-s60_last,a2)
+        IFD VERIFY
+        IFD PAUSE_TEST
+        lea (s60_test_pause_observation+4,pc),a0
+        move.l ($24a8-S60_DATA,a4),(a0)
+        ENDC
+        ENDC
+        bsr s60_history_unlock
         move.w (s60_rendering-s60_last,a2),d2
         move.w #1,(s60_rendering-s60_last,a2)
         ; Native dialog takes three long arguments. Copy in reverse order.
@@ -90,12 +98,27 @@ s60_preferences:
         bne s60_preferences_native
         movem.l d2/a2,-(sp)
         lea (s60_last,pc),a2
+        bsr s60_history_lock
         bsr s60_clock ; retain active time accrued before entering the modal
         move.w #1,(s60_modal_depth-s60_last,a2)
+        IFD VERIFY
+        IFD PAUSE_TEST
+        lea (s60_test_pause_observation+4,pc),a0
+        move.l ($24a8-S60_DATA,a4),(a0)
+        ENDC
+        ENDC
+        bsr s60_history_unlock
         move.w (s60_rendering-s60_last,a2),d2
         move.w #1,(s60_rendering-s60_last,a2)
         bsr s60_preferences_native
 s60_modal_return:
+        bsr s60_history_lock
+        IFD VERIFY
+        IFD PAUSE_TEST
+        lea (s60_test_pause_observation+8,pc),a0
+        move.l ($24a8-S60_DATA,a4),(a0)
+        ENDC
+        ENDC
         move.w d2,(s60_rendering-s60_last,a2)
         move.l ($24a8-S60_DATA,a4),(a2)
         IFD VERIFY
@@ -109,6 +132,7 @@ s60_modal_return:
         ; is excluded by moving last_field forward without adding that time.
         clr.w (s60_modal_depth-s60_last,a2)
         addq.w #1,(s60_modal_resumes-s60_last,a2)
+        bsr s60_history_unlock
         movem.l (sp)+,d2/a2
         rts
 
@@ -116,12 +140,20 @@ s60_modal_return:
         IFD S60_MODAL_TEST
 s60_test_pause_deadline: dc.l 0
         IFD PAUSE_TEST
+s60_test_pause_observation:
+        dc.b 'PH60'
+        dc.l 0,0 ; independently observed native dialog entry/return fields
+        ENDC
+        IFD PAUSE_TEST
 s60_test_pause:
         move.l (s60_ticks,pc),d0
         cmp.l #PAUSE_TEST,d0
         bne .done
         move.l ($24a8-S60_DATA,a4),d0
-        add.l #60,d0
+        IFND PAUSE_FIELDS
+PAUSE_FIELDS EQU 60
+        ENDC
+        add.l #PAUSE_FIELDS,d0
         lea (s60_test_pause_deadline,pc),a0
         move.l d0,(a0)
         S60_CALL $3148 ; native input dispatcher enters Forbid

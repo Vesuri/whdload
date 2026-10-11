@@ -2,24 +2,150 @@
 
 ## Active performance work
 
-The SIM60 default is **60 Hz (N=12), with no interpolation**. Restoration
-step 1 is complete. Release and VERIFY are byte-identical to the retained
-N=12 binaries. The migrated shared launcher/debugger/readers pass 72 fresh
-baseline cells, the A500 heavy window, 56 cross-CPU/PAL comparisons, 64
-retained-baseline endpoint comparisons and 16 SLOW_DRAW/lifecycle comparisons.
-Accepted emulator settings confirm all eight machine configurations, including
-stock A1200 chip-only memory; observed Exec clocks match NTSC/PAL requests.
+The SIM60 default is **60 Hz (N=12), with no interpolation**. Input history
+now separates the controls consumed by each tick from the time spent drawing.
+Held controls come from the tick's recorded field; queued keypresses cannot
+reach earlier ticks. Native modal input stays live.
 
-Death/Continue, No/restart, normal/early exits, disabled-byte preservation,
-static and installed hook audits and the actual play60 release/menu smoke pass.
-The 19 tooling tests pass. Evidence is under `tmp/restore60`. These checks
-restore the 60 Hz implementation; they do not solve the A500 performance limit.
-Input history and CPU-specific optimizations remain later steps.
+The conversion remains experimental. Sustained A500 performance, rendering
+cost and broader physical-control/gameplay validation remain open. The
+restoration reference under `tmp/restore60` predates input history; its binary
+identity and performance numbers do not describe the new release binary.
 
-## Restored 60 Hz baseline
+## Input during catch-up
 
-These fresh captures use the migrated AmigaXDev launcher, debugger and shared
-trace/patch readers. Builds use the default N=12; the release and VERIFY
+`history60.s` records controls in the native field callback at $11748. Each
+world tick consumes the sample at `floor((tick-1)*field_hz/S60_RATE)`, using an
+integer accumulator. The initial tick uses the session-entry sample. This
+keeps 60 Hz simulation on PAL as well as NTSC; PAL samples may serve two ticks.
+There is no interpolation or deliberate presentation delay.
+
+The collector copies the native 128-byte held-key array, both joystick port
+words and CIA button bits. It never drains the key queue or runs gameplay.
+The readers at $22730/$22746, port decoder at $1d20e, button-pointer load at
+$1d2ee and modifier reads at $19600/$19606/$1960e use the selected copy while
+world logic owns input. The input APIs preserve their native callee-saved
+registers and do not require callers to retain the game data register.
+
+The native keyboard interrupt still decodes presses/releases and updates its
+held-key array. The accepted-press path at $19506 timestamps each existing
+queue slot with its first eligible field. The reader at $195c8 removes the
+newest eligible entry, leaving future entries in order. The native 32-entry
+LIFO capacity and producer drop policy remain; the collector adds no repeat
+or dequeue behavior. Native key translation uses the tick's modifier state.
+Main-context copies and queue removals use short nested Disable/Enable pairs.
+
+Modal entry/return atomically change both clock ownership and history ownership.
+The native field clock continues for UI deadlines while the active-field
+sequence stops. Menus, preferences and shutdown use live native input; the
+pre-modal debt survives. Session entry resets the history epoch and reanchors
+queued keys. Preferences remain simulation state, so historical raw controls
+are interpreted by the mode active at that tick.
+
+The game's gameplay analogue fallback calls the joystick driver at $1968c;
+its raw-port path is covered by history. The separate input.device mouse
+handler at $1dbb4–$1dde6 and pointer APIs at $1df1a/$1df80/$1df9c retain native
+relative-event accumulation, clipping and pointer positioning for the UI.
+The collector neither consumes mouse deltas nor changes those native modes.
+Physical mouse/keyboard/joystick playtesting remains release work.
+
+### Capacity and debugger state
+
+The default ring holds 256 active fields in 36864 bytes allocated once before
+play. It is reused across sessions, with no interrupt-time allocation. Allocation
+failure reports an explicit message. Pauses do not consume ring capacity. If
+an owed field has been overwritten, that tick receives neutral held controls,
+directions and button bits; timestamped queued commands retain their own
+eligibility. No simulation debt is discarded, no rate is lowered and the game
+does not abort. Every affected tick increments a recovery counter. Such recovery
+is intentionally distinguishable from an exact replay and may change gameplay.
+
+ABI 30 preserves the previous prefix and rate tag. Entry+136/+138 describe the
+32-byte `IH60` state: signature at +0, buffer pointer +4, produced active field
++8, next field +12, fractional field credit +16, capacity +18, missing-sample
+ticks +20, native queue drops +24 and selected field +28. A selected 144-byte
+sample follows: field +0, port words +4/+6, CIA byte +8, 128 held-key bytes +12.
+Ring samples use the same layout. Readers retain support for ABI 29 references.
+
+### Validation and response timing
+
+The elapsed-field fixture changes held left/right, hardware direction and fire
+at fields 20,40,60,80,100,120,140,160, through real gameplay readers with CUSTOM3
+off. All six final configurations pass 200 recorded ticks and **96 private
+native-reference assertions each**. NTSC edges reach ticks
+21,41,61,81,101,121,141,161; PAL edges reach 25,49,73,97,121,145,169,193.
+Mapped gameplay/HUD/fresh-projection comparisons across NTSC CPUs and delayed
+drawing agree; only deferred projection scratch differs. The deliberate live-
+sample negative control is rejected at tick 2 (field 29 instead of field 1).
+
+Private cases cover queue ordering, removing old entries underneath future ones, full
+capacity and one dropped press, all eight modifier combinations, live modal
+and inactive ownership, keyboard direction precedence, all sixteen electrical
+joystick direction combinations, twelve button cases and caller register
+independence. These checks enter the native accepted-press tail after CIA
+hardware decoding; they do not test physical keyboard hardware.
+
+For these eight edges, the observed delays are in emulated fields:
+
+| Configuration | Event to input consumption | Event to first subsequent render completion |
+|---|---:|---:|
+| A500 | 17–38 | 50–75 |
+| 68020 + fast RAM | 3–11 | 10–22 |
+| 68020 + fast RAM, SLOW_DRAW=20 | 8–31 | 35–64 |
+| Stock A1200 | 7–20 | 19–39 |
+| 68060/50 | 0–3 | 3–7 |
+| PAL 68060/50 | 0–3 | 3–6 |
+
+NTSC fields are 1/60 s; the PAL row uses 1/50 s fields while simulating at 60 Hz.
+These are window-local observations, not maximum latency bounds. The second
+column records completion of input handling; the third records the first render
+completed after that tick. It does not prove physical-device latency, scanout
+completion or pixel-level visibility of every press/release edge. Slow drawing
+can span both edges. History corrects input assignment; it cannot remove the
+rendering and simulation backlog shown here.
+
+The long-pause test observes native dialog entry/return at fields 1250/1856:
+606 excluded fields, including cleanup after the 600-field requested wait.
+Pending updates change 31→30 while one tick completes and no active field
+passes. History remains intact. Forced capacity 16 with SLOW_DRAW=80 reports
+190 recovered samples by tick 200, continues the owed updates and fails the
+ordinary exact-input gate as intended.
+
+Movement-quanta/braking and preference fixtures pass. SOL checkpoints 600/1500
+match the restoration reference on A500 and 68020. Death/Continue, No/restart
+and normal/early exits pass on A500 and delayed 68020, with eight matched-state
+comparisons. Disabled code and relocations match with only the explicit menu
+fixture allowed. Static release auditing finds 104 patches in 79 ranges,
+663 relocated code pointers and no detected native interior entries. Installed
+hooks, all six rate builds, diagnostic exclusion, default/explicit N=12 identity,
+19 tool tests and the actual play60 release/menu smoke pass. Release and VERIFY
+now intentionally differ from the pre-history restoration binaries.
+
+### A500 heavy-combat check
+
+The current type-10 600→5400 fixture takes 4924 NTSC fields (82.066667 s),
+averaging **58.489033 updates/s and 0.767669 presentations/s**. Pending updates
+grow 24→148; checkpoint samples are
+`24,27,36,73,100,120,74,65,79,70,43,52,124,174,203,159,148`.
+The pre-history reference was 59.113300 updates/s, 0.948276 presentations/s,
+pending 23→95. This remains an unresolved performance deficit, not sustained
+real-time simulation. No optimization or rate reduction is part of this change.
+
+At tick 5400, cumulative missing-sample and queue-drop counts remain zero; matched
+600/5400 gameplay state agrees with the reference apart from deferred projection
+scratch. The performance route retains the existing tick-indexed CUSTOM3 pilot,
+so it measures that fixture's whole-scene throughput and history usage, not
+physical-control latency or isolated history-handler cycles.
+
+Evidence is under `tmp/input-history`: `verified/validation.json`,
+`final/validation.json`, `lifecycle/validation.json`, `heavy/matrix.json`,
+`heavy/history.json`, `build-validation.json`, `play60-smoke/validation.json`
+and the exact per-capture listings, slaves and records. Captures remain ignored.
+
+## 60 Hz reference before input history
+
+These retained reference captures use the migrated AmigaXDev launcher,
+debugger and shared trace/patch readers. Builds use the default N=12; the release and VERIFY
 SHA-256 values remain those in the parameterization section. The accepted
 UAE memory/timing options are retained in `emulator-settings.log`; Exec
 VBlankFrequency independently agrees with every requested display standard.
@@ -215,7 +341,7 @@ not proof of every indirect entry or replacement semantic.
 Evidence: `tmp/rate-selected-n1/build-validation.json`, `validation.json`,
 `release-audit.json`, individual lifecycle/disabled reports and
 `play60-smoke/validation.json`. The 19 tooling tests pass. Normal and playable
-builds are restored after validation. The active 60 Hz plan, input-history, performance and release work is in
+builds are restored after validation. The remaining 60 Hz performance and release work is in
 `docs/open-work.md`; interpolation is excluded.
 
 ### Before → after presentation matrix

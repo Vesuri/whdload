@@ -196,6 +196,7 @@ timing_install:
         IFNE AI_GEOMETRY_FUSED
         bsr s60_geometry_install
         ENDC
+        bsr s60_history_install
         bsr s60_modal_install
         bsr s60_sort_install
         IFNE DISTANCE_FAST
@@ -270,7 +271,7 @@ s60_code: dc.l 0
 s60_boundary_offset: dc.w s60_loop_complete-s60_entry
         dc.w s60_motion_table-s60_entry
         dc.w s60_star_remainders-s60_entry
-        dc.w 29+((12-S60_SUBSTEPS)<<8) ; layout version low byte; 12-N high byte
+        dc.w 30+((12-S60_SUBSTEPS)<<8) ; layout version low byte; 12-N high byte
         dc.w s60_jump_state-s60_entry
         dc.w s60_jump_state_end-s60_jump_state
         dc.w s60_cooldown_state-s60_entry
@@ -510,6 +511,9 @@ s60_modal_depth: dc.w 0 ; ABI 106: outer modal owns the pause interval
         dc.w s60_friction_state-s60_entry ; ABI 132
         dc.w 8 ; ABI 134
 
+        dc.w s60_history_state-s60_entry ; ABI 136
+        dc.w s60_history_state_end-s60_history_state ; ABI 138
+
 s60_loop:
         movem.l d2-d7/a2-a6,-(sp)
         lea (s60_last,pc),a2
@@ -552,6 +556,7 @@ s60_loop_rate:  move.w d0,(s60_field_hz-s60_last,a2)
         bsr s60_test_level_resume
         ENDC
         ENDC
+        bsr s60_history_reset
 s60_loop_poll:
         ; Snapshot elapsed time once per catch-up batch. Time spent updating
         ; and drawing is added by the next poll, never discarded. Refreshing
@@ -571,7 +576,8 @@ s60_loop_batch:
         tst.w (s60_phase-s60_last,a2)
         bne s60_loop_step
         move.w #1,(s60_logic-s60_last,a2)
-s60_loop_step:  bsr s60_update
+s60_loop_step:  bsr s60_history_select
+        bsr s60_update
         addq.l #1,(s60_ticks-s60_last,a2)
         addq.w #1,(s60_phase-s60_last,a2)
         cmp.w #S60_LEGACY_DIV,(s60_phase-s60_last,a2)
@@ -604,6 +610,11 @@ s60_loop_delay: cmp.l ($24a8-S60_DATA,a4),d0
         ENDC
         move.w #1,(s60_rendering-s60_last,a2)
         bsr s60_render
+        IFD VERIFY
+        IFD HISTORY_TEST
+        bsr s60_test_history_presented
+        ENDC
+        ENDC
         clr.w (s60_rendering-s60_last,a2)
         addq.l #1,(s60_renders-s60_last,a2)
         move.l (s60_ticks-s60_last,a2),(s60_last_render-s60_last,a2)
@@ -857,6 +868,11 @@ s60_update:
         ENDC
         bsr s60_input_quanta
         S60_CALL $fcf4
+        IFD VERIFY
+        IFD HISTORY_TEST
+        bsr s60_test_history_consumed
+        ENDC
+        ENDC
         bsr s60_jump_update
         bsr s60_pickup_update
         bsr s60_knock_update
@@ -929,6 +945,8 @@ s60_project:
         INCLUDE draw60.s
         INCLUDE events60.s
         INCLUDE terrain60_test.s
+        INCLUDE history60.s
+        INCLUDE history60_test.s
         INCLUDE modal60.s
         INCLUDE level60_test.s
         INCLUDE boss_gate60_test.s

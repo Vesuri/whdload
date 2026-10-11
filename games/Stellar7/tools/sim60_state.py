@@ -11,10 +11,10 @@ def decode_version(raw):
     """Decode the compatible layout byte and the 12-N substep tag."""
     version, tag = raw & 255, raw >> 8
     substeps = 12-tag
-    if not 1 <= version <= 29 or substeps not in (1, 2, 3, 4, 6, 12):
+    if not 1 <= version <= 30 or substeps not in (1, 2, 3, 4, 6, 12):
         raise ValueError(f'Unsupported SIM60 ABI word {raw:#x}')
-    if tag and version != 29:
-        raise ValueError('Substep tag requires ABI layout 29')
+    if tag and version < 29:
+        raise ValueError('Substep tag requires ABI layout 29 or later')
     return version, substeps
 
 

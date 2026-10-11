@@ -137,6 +137,22 @@ def installed(folder, listing):
     slave = slave_code(folder/'slave.slave')
     base = locate(memory, slave, meta['base'], header=32)
     assert base is not None, 'loaded slave not found'
+    # VERIFY's explicit control pilot is installed after SIM60. Validate its
+    # exact replacement bytes too, rather than silently skipping those hooks.
+    metadata_path = folder/'metadata.json'
+    metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
+    args = metadata.get('whd_args', '').upper().split()
+    if 'CUSTOM5=1' in args and 'CUSTOM3=1' in args:
+        match = re.search(r'^fixture_input_patches\s+00:([0-9A-F]+)',
+                          listing.read_text(encoding='latin1'), re.M)
+        assert match, 'input fixture requested without its patch list'
+        for offset, command, argument in decode(slave, int(match[1], 16)):
+            if command == 'END':
+                continue
+            end = offset+patch_size(command, argument)
+            patches = [p for p in patches if not (offset <= p['start'] and p['end'] <= end)]
+            assert not any(p['start'] < end and offset < p['end'] for p in patches), 'partial fixture override'
+            patches.append(dict(start=offset, end=end, command=command, argument=argument))
     for patch in patches:
         command, argument = patch['command'], patch['argument']
         if command in ('P', 'PS', 'PSS'):
