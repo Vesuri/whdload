@@ -194,6 +194,13 @@ delete''')
         captured_tick=checkpoint if a.tick is not None else None
         (folder/'anchor.txt').write_text(reply+f'\nframe={legacy_count}\ntick={captured_tick}\ncode={h:#x}\ndata={data:#x}\nbase={base:#x}\n')
         (folder/'state.bin').write_bytes(mem[data-base:data-base+0x823c])
+    # Retain the emulator configuration log for comparison with observed state.
+    emulator_log = root/'amiga/.run/fsuae/Cache/Logs/fs-uae.log.txt'
+    if emulator_log.exists():
+        with emulator_log.open(errors='replace') as source:
+            settings = [line for line in source if 'Set option ' in line or
+                        re.match(r'^(chip_memory|slow_memory|fast_memory|cpu|ntsc_mode|uae_ntsc) = ', line)]
+        (out/'emulator-settings.log').write_text(''.join(settings))
     print('Saved '+str(a.out),flush=True)
 finally:
     try:cmd('quit',5)

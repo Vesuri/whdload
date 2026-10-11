@@ -3,18 +3,14 @@
 A source-only WHDLoad development and profiling workspace for the supplied
 English NTSC Stellar 7 install.
 
-The experimental SIM60 conversion uses a **5 Hz fixed simulation timestep**
-(N=1), independent of rendering and identical on every machine. Measurements
-selected this rate: higher supported rates failed the A500 native presentation
-threshold, while 5 Hz sustained the heavy-combat window without accumulating
-pending updates. N=12 (60 Hz) remains buildable for reference checks.
+The experimental SIM60 conversion targets **60 Hz fixed simulation with no
+interpolation**, independent of rendering. Separate 68000 and 68020+ paths
+may improve performance while preserving the same timing and gameplay.
 
-It is playable, but **the conversion is unfinished**. The timestep is 200 ms;
-faster rendering repeats poses between ticks until interpolation is added.
-Steps 0–2 are complete; work stops before
-step 3 for the user's pace playtest. Live input is still sampled during catch-up
-rather than preserved by tick. Broader gameplay and original-reference pace
-validation remain open.
+**The conversion is unfinished.** The default is restored to N=12 (60 Hz),
+with release and VERIFY bytes matching the retained N=12 reference. Fresh
+baseline and regression validation through the updated shared toolchain passes.
+Input history, sustained A500 performance and broader gameplay validation remain open.
 
 Source the shared environment and launch the separate experimental build:
 

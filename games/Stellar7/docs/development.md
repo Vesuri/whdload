@@ -2,22 +2,52 @@
 
 ## Active performance work
 
-Steps 0–1 are complete: 72 native/N=12 baseline cells, all 78 private
-native-reference fixture combinations, six full-duration power runs and six
-jump runs pass. The 285 cross-N comparisons are classified in internals.
-Explicit N=12 release and VERIFY builds remain byte-identical to the baseline.
+The SIM60 default is **60 Hz (N=12), with no interpolation**. Restoration
+step 1 is complete. Release and VERIFY are byte-identical to the retained
+N=12 binaries. The migrated shared launcher/debugger/readers pass 72 fresh
+baseline cells, the A500 heavy window, 56 cross-CPU/PAL comparisons, 64
+retained-baseline endpoint comparisons and 16 SLOW_DRAW/lifecycle comparisons.
+Accepted emulator settings confirm all eight machine configurations, including
+stock A1200 chip-only memory; observed Exec clocks match NTSC/PAL requests.
 
-Step 2 selects **N=1 (5 Hz)** for every machine. All 160 lower-rate matrix
-cells and 280 cross-CPU/PAL comparisons pass their strict checks. N=2,3,4,6
-all fail at least one A500 native presentation threshold; the additional
-supported N=1 fallback passes both and sustains the 80-second heavy-combat
-window with sampled pending updates of 0–1 and no accumulating backlog.
-The timestep is 200 ms. Faster rendering currently repeats poses between ticks.
-Interpolation is not implemented; stop here for the user's pace playtest.
-Selected-default checks pass: 16 matched-tick SLOW_DRAW/lifecycle comparisons,
-death/Continue and No/restart, normal/early exits, disabled-code preservation,
-static/installed hook audits and the actual `play60.sh` release smoke test.
-The 19 tooling tests pass. Evidence is under `tmp/rate-selected-n1`.
+Death/Continue, No/restart, normal/early exits, disabled-byte preservation,
+static and installed hook audits and the actual play60 release/menu smoke pass.
+The 19 tooling tests pass. Evidence is under `tmp/restore60`. These checks
+restore the 60 Hz implementation; they do not solve the A500 performance limit.
+Input history and CPU-specific optimizations remain later steps.
+
+## Reproducing the restored baseline
+
+Use fresh prefixes and one capture at a time:
+
+```sh
+source amiga/env.sh
+tools/rate_matrix.sh tmp/restore60-new/matrix
+python3 tools/rate_matrix_report.py tmp/restore60-new/matrix
+tools/rate_matrix.sh tmp/restore60-new/native-combat --routes native-type10-early native-type10-late native-boss
+python3 tools/rate_matrix_report.py tmp/restore60-new/native-combat --routes native-type10-early native-type10-late native-boss
+tools/rate_matrix.sh tmp/restore60-new/heavy --machines a500 --routes type10-heavy
+python3 tools/rate_matrix_report.py tmp/restore60-new/heavy --partial --routes type10-heavy
+```
+
+The heavy report intentionally requests only A500. Main/native-combat reports
+require all eight machines. Successful fresh captures retain the emulator's
+accepted settings separately from requested metadata. The initial two restored
+A500 cells predate that logging addition; the remaining A500 cells confirm its
+configuration. Chip and slow memory core units are 512 KB and 256 KB; fast
+memory units are 1024 KB. Observed Exec frequency is checked during capture.
+Cross-check the supplementary log against that observed clock and requested
+settings; PAL may omit the core `ntsc` option while logging `ntsc_mode = 0`.
+
+At the N=12 default, the delayed-render regression uses SLOW_DRAW=20 on 68020
+with 2 MB chip/4 MB fast/SLOW_KB=0. Use the matrix route fixtures and unscaled
+endpoints (600→1500, 1800→2400, 4500→5400, 3500→4100). Death and exit tests
+use DEATH_TEST=200 or LEVEL_TEST=200 LEVEL_LAST=6; add DEATH_DECLINE=1 or
+LEVEL_EARLY=1 for alternate paths. Capture restarted ticks 600→1500, and level
+six for exits. Compare both endpoints with `simulation_state.py --projection
+--presentation`; only deferred projection scratch may differ. Run death_state
+and level_state as appropriate. Use exact retained listings for hook and
+CUSTOM1-off code audits. The fresh evidence is under `tmp/restore60`.
 
 ## Substep validation
 
@@ -78,7 +108,7 @@ performance baseline retains its separately specified fixture and windows.
 ## Rate matrix
 
 `S60_SUBSTEPS` accepts 1, 2, 3, 4, 6 or 12; the simulation rate is five times
-that value. The default is N=1 (5 Hz) on every machine. The matrix driver scales route windows and level setup to equivalent game time
+that value. The default is N=12 (60 Hz) on every machine. The matrix driver scales route windows and level setup to equivalent game time
 with `--substeps`, rounding up to the next completed tick. `LEVEL_TEST=T`
 executes inside update T+1, so its scaled definition is
 `ceil((T+1)*N/12)-1`; the 200 baseline trigger remains in native update 17
@@ -87,7 +117,8 @@ at every N. The explicit
 ticks and retains per-segment pending counts. All five lower-rate matrices and heavy windows are complete.
 
 
-Run each candidate serially, with a fresh prefix per build:
+To reproduce the retained lower-rate experiments, run serially with a fresh
+prefix per build:
 
 ```sh
 source amiga/env.sh
@@ -102,8 +133,8 @@ done
 The heavy report deliberately uses `--partial`: only its A500 cell is requested;
 the ordinary candidate report still requires all eight machines.
 
-The selected-default regression uses no explicit S60_SUBSTEPS definition:
-`SIM60=1` alone must report N=1 through the debugger ABI. Retain a release
+The retained N=1 regression below requires explicit `S60_SUBSTEPS=1`.
+The current default regression uses `SIM60=1` alone and must report N=12. Retain a release
 listing with `make -C whdload sim60 VASMFLAGS='-L ../tmp/selected-release.lst'`
 and copy its slave to `tmp/selected-release.slave`; run
 `python3 tools/audit_hooks.py tmp/selected-release.lst` against that exact build.
@@ -126,7 +157,7 @@ the native menu using its default release/CUSTOM1 setting with VERIFY absent.
 These selected-rate checks do not establish physical-input or audible-output
 playtesting. Evidence is retained under `tmp/rate-selected-n1`.
 
-For the A500 acceptance gate, also record the exact corresponding native frame
+For matched A500 presentation comparisons, record the corresponding native frame
 windows, rather than comparing only the shorter 100-field spot references:
 
 ```sh
@@ -142,8 +173,9 @@ hold the exclusive `tmp/rate-matrix.lock`, as the matrix driver does;
 anchor at $2c16 using debugger variables only. Its contiguous counter log
 rejects skipped presentations or resets. The reader checks original-code
 preservation, the exact retained slave, raw debugger observations and saved
-checkpoint clocks. Its full-window rates determine the matching-scene gate;
-the original spot measurements remain useful local references.
+checkpoint clocks. Its full-window rates provide matching-scene comparisons; the active plan
+keeps 60 Hz even where presentation rates fall below native. The original
+spot measurements remain useful local references.
 
 The initial matrix has 48 cells. Capture the additional native combat
 comparators in a separate directory:
@@ -253,7 +285,7 @@ with sampled pending counts of 0–1; broader encounter validation remains open.
 and open behind other windows; `SOUND=` and `WINDOW=` override). Defaults: 68000,
 512 KB chip, 1536 KB slow RAM, no fast RAM, NTSC. This is an A500-equivalent
 bus configuration with enough memory for WHDLoad. The supplied game is NTSC;
-the simulation uses 5*N Hz (default N=1) regardless of display mode. `NTSC_MODE=1` uses the emulator's `uae_ntsc=true` core option.
+the simulation uses 5*N Hz (default N=12) regardless of display mode. `NTSC_MODE=1` uses the emulator's `uae_ntsc=true` core option.
 The older `ntsc_mode` option did not alter this emulator's PAL scan timing.
 The driver now rejects a requested mode that disagrees with Exec's observed
 field frequency. NTSC boot and scan timing are verified. Use `NTSC_MODE=0` to reproduce
@@ -380,8 +412,8 @@ builds the menu fixture; `SLAVE=whdload/Stellar7.Slave WHD_ARGS=CUSTOM5=1`
 selects it in `amiga/run.sh`. Both retain the original CRC acceptance check. `CUSTOM1=1` enables the
 experimental fixed-step timing patches; without it the game code is unchanged
 except for explicitly enabled VERIFY fixtures.
-SIM60 labels CUSTOM1 with its compiled rate (“Experimental 05 Hz simulation”
-at N=1, preserving the two-digit layout and N=12 bytes) and omits the legacy
+SIM60 labels CUSTOM1 with its compiled rate (“Experimental 60 Hz simulation”
+at the default N=12; explicit lower-rate builds display their own rate) and omits the legacy
 CUSTOM2 rate selector, which the replacement does not use. The legacy build
 retains that selector.
 Only the supplied English layout has been tested; hook-byte guards
@@ -501,7 +533,7 @@ update after the snapshot; do not derive its absolute ticks by simply adding
 observed update-entry counts to that earlier snapshot.
 
 `VERIFY_FLAGS=-DSIM60=1` selects the incomplete replacement implementation;
-`CUSTOM1=1` enables it at runtime. Its rate is fixed at 5*N Hz (default 5 Hz); the older
+`CUSTOM1=1` enables it at runtime. Its rate is fixed at 5*N Hz (default 60 Hz); the older
 `CUSTOM2` rate selection does not configure this path. Normal builds still
 select the older opt-in timing prototype.
 
