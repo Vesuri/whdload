@@ -511,247 +511,88 @@ unsampled and fully accounted for. Higher achieved rates, variable intervals and
 effect routes remain open; this bounded result does not close the rate gate.
 
 
-The remaining weather audit maps forecast/start/expiry, outer-loop effect generation,
-16-counter transition steps and renderer-owned lifetime changes. The transition also
-changes steering and target gear, so correcting only its visual fade is insufficient.
-Shared transition-word animation/reset paths require separate lifecycle handling. Natural
-A500 weather calibration and directed runtime probes are the next prerequisites. The
-existing track-2 `CUSTOM5=6` weather capture proves the route but starts after onset and
-contains no warning/start events; the calibration capture must anchor at `$e1a2` instead.
-The forecast RNG argument is a shift count, so it must not be treated as a one-in-four
-trigger. Exact sites, fields, existing evidence and gates are in timing-implementation.
+## Weather timing: current prototype and remaining gates
 
-Weather probes are integrated into the capture tool, with native-command generation
-verified and existing timing-route debugger commands unchanged. The first native A500
-route-6 attempt reached forecast entry on track 2, but the debugger rejected part of the
-35-probe set and aborted before any measured fields completed. That failure is retained.
-`timing-weather-native-a500-2` retries the requested 400-second window with 14 probes for
-deadlines, fades and effect lifetime; generation/palette/gear need another pass. The new
-weather analyzer verifies paired mutations and reports missing observations explicitly;
-its synthetic examples and the complete 400-second native capture pass. All 30 fade
-steps, expiry resets and 90 lifetime decrements are checked. Fade-in takes 20.58 seconds,
-fade-out 17.26 seconds; their mean 16-loop intervals are 1,401.4/1,148.6 ms. A uniform
-90 ms × 16 cadence would slow the observed fade-out by about 25%, so the calibrated
-period/phase policy remains to be chosen. Forecast activation is 120 ms late and expiry
-370 ms late against their native deadlines. Final native state retains forecast flag 1
-and nonzero steering offsets despite inactive deadlines/effects.
-The complementary `timing-weather-native-a500-effects1` pass is complete. All 4,836
-shared effect observations and all initial/final weather fields match the first pass.
-Its 36 generation/delay updates, 90 palette activations and both track-specific gear
-changes pass. Generation runs over 2,992 consecutive eligible loops, with an 83.283 ms
-mean interval. Each of 90 effect draws also advances the shared RNG exactly four times.
-Those advances must be accounted for in logical simulation, with a saved visual seed
-for presentation, otherwise rendering remains coupled to weather randomness. Palette
-cleanup remains per actual draw. Weather scheduling, presentation wrappers and mode/reset
-handling remain required. The first logical effect split is now implemented behind
-`TIMING_WEATHER_EFFECTS=1` and CUSTOM3, disabled by default. It moves lifetime,
-generation and four-per-effect-draw RNG advances into logical control updates, replays
-saved visual seeds for drawing, defers sound trigger, and adds last-visible-tick
-fast-renderer fallback protection. Forecast/start/expiry remain frame-dependent. The separate experimental fade/gear
-scheduler now has the bounded validation described below.
-Disabled/normal bytes and hook boundaries pass. Its dry-weather A500/030 pair matches
-652 common world states and 144 control/input/fuel updates against both unchanged
-references, with 158 completed renderer twins. Active-effect replay/cleanup, cadence
-acceptance and mode/lifecycle validation remain open; this is not completed weather timing.
+Weather timing remains compile-only behind `TIMING_WEATHER_EFFECTS`,
+`TIMING_WEATHER_FADE`, `TIMING_WEATHER_CYCLE` and CUSTOM3; all three are off by default.
+The normal CUSTOM3 build still contains only the minimum movement delta and cockpit
+liftoff correction. Weather does not close F1–F8.
 
-The preliminary natural active-effect run was intentionally stopped before its draw
-anchor to prioritize a repeatable fixture; its log supplies no active-weather validation.
-`TIMING_WEATHER_EFFECT_TEST=1` is now a VERIFY-only, once-per-process effect fixture,
-without simulation/input clock or seed rewrites. Its 20-second A500/030 pair passes:
-1,004 common world states and 223 control/input/fuel updates match. Both have five logical
-visual events and 176 unsuccessful generation attempts. Drawing executes six times on
-030 versus three on A500, with seed replay/restoration and unchanged lifetime/publication
-verified in every observed draw. The 030 adds 256 completed renderer twins and ends with
-no active draw. That first fixture does not exercise successful new selection or actual sound trigger.
-The explicitly seeded mode-2 fixture now validates the first successful selection:
-lifetime five, delay seven and each subsequent logical publication through the next
-trial. Its matched 20-second pair produces five selections and 18 logical visual events
-on both CPUs, versus 25 actual draws on 030 and 10 on A500. Draw RNG ownership passes;
-1,003 common movement states and 222 control/input/fuel updates match exactly. The 030
-adds 239 completed renderer twins, with one additional unfinished scene excluded.
-Different endpoint step counts are fully accounted for by initial/final unsampled time;
-no retained or assigned simulation debt remains. The checker rejects wrong seed/lifetime,
-missing-publication and wrong delay-release evidence. Mode 1 and normal builds remain
-byte-identical. Actual sound trigger is still unobserved. Natural integrated weather,
-forecast/start/expiry scheduling, cadence acceptance and mode/lifecycle work remain open.
+The current `PDWEFX03` effect scheduler uses 80 ms weather-loop periods without an
+upcoming effect, 140 ms with one, and visual publication 20 ms after generation.
+Generation precedes drawing and fade updates. Logical simulation owns lifetime and
+RNG advances; actual rendering replays the saved visual seed and restores outer state.
+Sound calls execute at logical delay expiry, before selection RNG, with native resource
+availability and mute checks. The obsolete pending flag stays zero. Helper `$17836`
+is audio-channel start, not bitmap cleanup; per-draw palette restoration is separate.
 
+These periods come from two matching 400-second native A500 track-2 captures:
+`timing-weather-native-a500-2` and `timing-weather-native-a500-effects1`. They match
+4,836 shared observations, with 36 generation/delay updates, 30 fade steps and 90 effect
+draws. Eligible loops average 81.489 ms without an upcoming effect and 141.111 ms with
+one. Within-effect intervals average 139 ms (median 140); first draw follows generation
+by 20–40 ms. The former uniform 90 ms candidate shortened effects by about 35% despite
+cross-CPU equality, so it is not the accepted cadence. Broader native calibration remains
+open; these numbers describe one measured route/configuration.
 
-`TIMING_WEATHER_FADE=1` now moves weather transition steps and native target-gear commits
-onto 20-ms simulation ticks, leaving palette helpers in presentation. It remains disabled
-by default, requires the effect prototype and uses CUSTOM3. Candidate A500 calibration is
-first 960/1,180 ms then 1,400/1,160 ms per entering/leaving step, giving 20,560/17,420 ms
-for each complete transition. This approximates the measured native track-2 episode;
-other episodes/tracks and physical palette latency still need acceptance evidence.
+The fade scheduler retains native gear commits and uses first-step delays of 960/1,180 ms,
+then 1,400/1,160 ms per entering/leaving step. Complete transitions take 20,560/17,420 ms,
+against measured native 20,580/17,260 ms. Palette helpers publish the latest logical phase
+in presentation. The directed 46-second `timing-weather-fade-test1` pair checks 30 logical
+steps and publications, 2,301 common movements, 511 controls and 652 renderer twins.
+It does not prove intermediate palette arithmetic or displayed colours.
 
-The VERIFY-only two-transition fixture passes a 46-second A500/native and 030/fast pair:
-all 30 logical fade deadlines, native gear-table commits and 30 palette publications match.
-Presentation preserves logical state. There are 2,301 matching common movement states,
-511 common control/input/fuel updates and 652 completed 030 renderer twins with no failures
-or active endpoint draw. Endpoint step-count differences are explained by unsampled time;
-there is no retained/assigned simulation debt. Wrong deadline/gear, missing step and
-presentation mutation evidence is rejected. Disabled bytes, normal build, hook boundaries
-and C3-off native hook snapshots pass. Next move forecast/start/expiry into the same logical
-RNG/time ownership, then validate natural weather, effect sound trigger, palette pixels
-and pause/pit/restart/reused-transition lifecycles. This does not close F1–F8 or weather.
+The cycle scheduler reuses native forecast/duration arithmetic with local clock hooks,
+90 ms control checks and the eight-control expiry gate. It defers messages and expiry
+palette work. Native deadline migration preserves inactive sentinels and maps due/overdue
+values to the current logical cursor. Its assembled helper passes eleven future, due,
+overdue, sentinel and boundary cases on A500/030, with preserved registers/pointers;
+five damaged cases are rejected. This is arithmetic evidence, not mode-transfer coverage.
 
+### Completed bounded runtime evidence
 
-`TIMING_WEATHER_CYCLE=1` now prototypes logical forecast/onset/expiry behind CUSTOM3,
-requiring the fade/effect prototypes and remaining off by default. It reuses native
-forecast and randomized duration code with local clock hooks, preserves the eight-control
-expiry gate, and defers forecast messages/expiry palette work. Claimed logical deadlines
-are protected from physical outer-loop comparisons. Session cleanup releases ownership;
-pit/rescue/pause/restart domain handling still needs validation.
+All capture names below are under ignored `tmp/prof/`. “Pair” means A500/native rendering
+and 030/fast rendering. Earlier frozen captures must not be treated as current-code tests.
 
-The unshortened, seeded 170-second 030/fast cycle test passes warning/onset/expiry,
-native duration arithmetic and all 30 fade steps: 25,020 ms warning-to-onset, 117,480 ms
-selected active duration, 60 ms expiry lateness. It completes 8,502 movements and 1,889
-controls with no retained/assigned debt; 2,472 renderer twins pass, with one additional
-unfinished scene excluded. Wrong warning/RNG/duration/reset/fade evidence is rejected.
-The A500 counterpart now passes the full cycle with identical weather timing, duration,
-RNG inputs/results and fade steps. There are 8,502 matching common movement states and
-1,889 common control/input/fuel updates. Both execute 34 logical visual events but draw
-52 times on 030 versus 25 on A500. A500 temporarily retains up to 160 ms of debt and drains
-it by the endpoint. Normal and cycle-disabled binaries and C3-off hook audits pass.
+| Capture | Result and scope |
+| --- | --- |
+| `timing-weather-cycle-cadence1` | Deferred-sound version: full 170-second pair, 4,217 common weather boundaries, 8,503 common movements and 1,889 controls. Warning-to-onset 25,020 ms, selected duration 117,480 ms, expiry 60 ms late; all 30 fades match. Eleven selections and 23 logical visual events versus 53/23 actual draws. 2,476 completed renderer twins. A500 retained debt peaks at 160 ms and clears. |
+| `timing-weather-audio-stall1` | Preserved failing regression: deferred sound coalesces two requests 320 ms apart during a 500 ms stall on both CPUs. The request-accounting checker still rejects both captures. |
+| `timing-weather-audio-stall2` | Current direct sound: all four requests at 4,000/4,320/8,460/11,740 ms delivered on both CPUs. Helper duration 0–40 ms; no queue loss. 485 common weather boundaries, 1,002 movements, 222 controls and 241 renderer twins pass. Maximum world-end delay 580/1,240 ms; A500 retained debt peaks at 480 ms, endpoint debt zero. |
+| `timing-weather-audio-keys2` | Current direct sound: native Tab mute/unmute gives one suppressed request and two starts on both CPUs at matching 4,860/15,740/18,840 ms logical times. Native arguments and suppressed-call register preservation pass. |
+| `timing-weather-audio-nosample1` | Current direct sound: both CPUs exercise delay expiry and a 500 ms stall with optional resources absent. No owned audio call or queued request. 485 common weather boundaries, 1,002 movements and 222 controls pass. Maximum delay 560/1,200 ms, endpoint debt zero. |
 
-A static migration defect was fixed in the newer `timing-weather-cycle-test2` candidate:
-due/overdue native deadlines now map to the logical cursor instead of possibly becoming
-negative/inactive. The completed test1 pair uses the earlier frozen artifact and starts with
-inactive deadlines, so it does not cover that fix. A guarded private-cell fixture now
-exercises the assembled helper on eleven future/due/overdue/sentinel/boundary cases,
-checking results and preserved clock registers/destination pointers. Its corrected-build
-A500/030 650-field pair passes all eleven cases in both snapshots, plus 653 common movement
-states and 145 control/input/fuel updates. Five corruptions, including the former overdue
-result, are rejected. Helper arithmetic does not replace actual mode-transfer integration
-coverage. Natural unseeded
-weather, calibration acceptance, message/palette pixels, effect sound trigger and
-mode/lifecycle integration remain open. The full F1–F8 goal is not complete.
+Normal build bytes are unchanged. The current full weather-disabled prototype is
+byte-identical to the pre-sound-fix build; native hook boundaries/direct branches pass.
+Audio fixtures with 1 MiB guest chip memory exercise actual optional sample allocation;
+normal 512 KiB fixtures exercise the native missing-resource guard. Native helper checks
+do not prove audible output or recover sound time lost during an external stall.
 
+### Active validation and next steps
 
-The native effect-cadence analysis drives the current candidate:
-30 complete A500 episodes / 90 draws contain 60 within-episode intervals averaging
-139 ms (median 140), not the generator's overall 83.283-ms average. The first prototype's 90-ms
-visual cadence was about 35% too short and failed the A500 speed gate despite passing
-cross-CPU state equality. Generation-to-first-draw is 20–40 ms; mean generation-to-last
-lifetime decrements are 26.667/443.333/586.667 ms for lengths 1/4/5. Deadline-transfer
-validation is complete for the helper. The new candidate implements the measured
-weather-loop split: post-generation observations show
-81.489-ms intervals without an effect and 141.111-ms intervals with an effect. Candidate
-loop periods are therefore 80/140 ms by the upcoming scene, with visual publication 20 ms
-after generation. It preserves generation-before-draw and delay/RNG ordering, and clears
-the last publication at the following scene boundary. This replaces the failed
-90-ms approximation; general cadence/lifecycle acceptance still needs evidence.
+1. Finish `timing-weather-cycle-cadence2`, the current direct-sound 170-second pair.
+   The 030 side passes the complete cycle, all 30 fades and 4,217 schedule boundaries,
+   matching the prior logical weather history. It restores stored palettes, peaks at
+   280 ms world-end delay, ends with zero debt and passes 2,520 completed renderer twins.
+   A500 is still running; the full pair is not yet accepted. Keep its frozen sampler
+   and artifact unchanged until the process finishes.
+2. Integrate the prepared palette-call probes after that capture. Run the frozen
+   `Powerdrome-timing-weather-palette-test1.slave` directed fade fixture for 46 seconds
+   on both CPUs. `check_weather_palette.py` requires all 31 owned interpolation calls,
+   exact native integer arithmetic and both palette writes, plus restoration of the
+   other 15 colours while preserving entry 5. Positive live validation is pending;
+   endpoint-only captures correctly fail its missing-probe gate.
+3. Check deliberate presentation coalescing and displayed palette/buffer pairing.
+   Stored palette agreement is not scanout evidence. `weather_palette_state.py --require-restored` passes both cadence1 CPU endpoints and current cadence2 030
+   endpoints; invalid colours and unfinished transitions are rejected. Guarded probe
+   generation and installed positive/negative/negative-zero caller identification are
+   prepared, but those preparation checks do not replace live observations.
+4. Validate natural unseeded weather and pause, pit, rescue, restart and shared-transition
+   lifecycle handling, including clock/domain handoff and message/palette publication.
+   Extend A500 calibration beyond this native episode and validate the 90/720 ms cycle
+   check policy. Complete off-mode, memory/configuration and sustained-driving coverage
+   before promoting the broader timing prototype into the normal CUSTOM3 feature.
 
-
-`PDWEFX02` now implements that 80/140-ms weather loop and +20-ms visual phase. The seeded
-20-second A500/030 pair passes exact world deadlines, RNG ownership and the first effect's
-20/580/720-ms first/last/clear boundaries. There are 485 matching weather event states,
-1,001 matching movement states and 222 control/input/fuel updates. Both have ten logical
-visual events, despite 21 actual 030 draws versus nine A500 draws. The 030 adds 245 completed
-renderer twins; its additional unfinished draw is excluded. No endpoint simulation debt
-or draw seed ownership remains. A500's pending next-cursor visual event is explicitly
-accounted for. Five corrupted timing/state cases are rejected; disabled/normal bytes and
-C3-off hook checks pass. The full 170-second `timing-weather-cycle-cadence1` pair now passes with
-generation-before-fade ordering and the corrected deadline-transfer helper. Both CPUs
-match all 4,217 common weather boundaries, 8,503 movement states and 1,889 control/input/fuel
-updates. Warning-to-onset is 25,020 ms, selected duration 117,480 ms and expiry lateness
-60 ms; all 30 fade steps match. Both have 11 selections and 23 logical visual events,
-with 53 actual 030 draws versus 23 A500 draws. The 030 passes 2,476 completed renderer
-twins; its additional unfinished scene is excluded. A500 peaks at 160 ms retained debt
-but finishes with no retained/assigned work. Its pending visual publication is due at the
-next world cursor, not overdue. The two extra A500 movements are explained by different
-initial/final unsampled elapsed time. This closes this seeded full-cycle regression,
-not natural weather, lifecycle, palette pixels or broader A500 calibration acceptance.
-
-The deferred helper `$17836` is an audio-channel start, not bitmap cleanup. Existing
-`cleanups` fields count sound-helper calls, not audible output. The 20-second larger-memory `timing-weather-audio-test1` pair passes on both CPUs.
-Native allocation and optional sample loading succeed without forced flags (5,087 sample
-words, period 895, channel 3, volume 63). Each CPU delivers three observed delay-expiry
-requests at 4,860/15,740/18,840 ms from initial generation, with three complete native
-starts and no coalescing. Sample/channel arguments, preserved registers and call/queue
-accounting pass; malformed length, stack and pending-request evidence are rejected.
-The pair also matches 485 weather boundaries, 1,001 movement states and 222 control/input/fuel
-updates. The 030 completes 245 renderer twins. Suppressed calls, deliberate stalls with
-closely spaced sounds, audible output, palette restoration, unseeded weather and
-mode/lifecycle acceptance remain open. The earlier full-cycle evidence used the old
-90-ms effect cadence.
-
-
-The native Tab mute/unmute pair `timing-weather-audio-keys1` passes on both CPUs:
-both native flag transitions, one suppressed weather helper with preserved registers,
-and two resumed starts. The three request times match, as do 485 weather boundaries,
-1,001 movement states and 222 control/input/fuel updates. Fixture guards and
-disabled/normal byte equivalence pass. The next pair, `timing-weather-audio-stall1`, uses
-guarded mode 3 to arrange two native sound requests 320 ms apart, with a 500-ms stall
-intended to cover both. The completed 030 run confirms the bug: the second request arrives while the first
-is pending and is coalesced. Its 500-ms stall, held/resumed world clock, 487 weather
-boundaries and eventual zero debt pass. A500 reproduces the same loss. Both original
-failing captures remain rejected by the request-accounting gate.
-
-`PDWEFX03` now calls the native sound helper directly at the logical delay expiry, before
-selection RNG, preserving registers and native availability/suppression checks. The
-corrected `timing-weather-audio-stall2` 030 side delivers all four requests, including
-the 4,000/4,320-ms pair, at their exact world boundaries. Native helper duration is
-0–40 ms; maximum world-end delay is 580 ms, with no endpoint debt. The 500-ms stall,
-world hold/resume and 485 common weather boundaries pass. The completed A500 side
-also delivers all four requests at matching logical times, with 0–40-ms helper calls.
-Its maximum world-end delay is 1,240 ms and retained debt peaks at 480 ms, but both
-retained and assigned work clear by the endpoint. The pair matches 1,002 movement
-states and 222 control/input/fuel updates; 030 adds 241 passing renderer twins.
-Direct-delivery mute (`audio-keys2`), no-resource (`audio-nosample1`) and full-cycle
-(`cycle-cadence2`) pairs are running sequentially, each conditional on prior checks
-passing. Earlier mute/full-cycle captures used deferral. The full F1–F8 goal remains open.
-
-
-Direct-delivery isolation now passes a byte comparison of the full weather-disabled timing
-prototype against pre-fix source, plus the current native hook-boundary/branch audit.
-Normal build bytes remain unchanged. Both `audio-keys2` CPUs now pass native
-mute/unmute, one suppressed request and two resumed starts at unchanged logical times.
-Both `audio-nosample1` CPUs exercise delay expiry with optional samples absent and no
-queued/native weather audio call. The 500-ms stall, world hold/resume and 485 weather
-boundaries pass, with 1,002 matching movement states and 222 control/input/fuel updates.
-A500 peaks at 1,200 ms world-end delay and 480 ms retained debt, clearing all endpoint
-work. The corrected full-cycle pair is now running.
-
-
-Palette audit identifies the actual remaining presentation checks: `$17306` interpolates
-entry 5 into both saved palette and current colour table; `$17062` deliberately preserves
-that entry while restoring the other 15. The completed cadence1 pair restores the original
-entry-5 colour and has identical saved/current palettes at both endpoints on both CPUs.
-This is only stored endpoint evidence. Per-phase arithmetic, restoration callers and
-actual displayed palette/buffer pairing remain open; the implementation document gives
-ordered probes for those checks without altering the current capture sequence.
-
-
-`weather_palette_state.py --require-restored` makes the stored palette endpoint check
-reproducible. Both cadence1 CPU captures pass initial/final snapshots; wrong weather colour,
-another palette colour and unfinished transition are rejected. Its interpolation helper
-still needs the planned per-phase native-call comparison; endpoint success is not pixel
-or scanout acceptance.
-
-
-Palette entry/return probes are prepared in `weather_palette_state.py` for native
-interpolation and restoration. They include caller/arguments and all 16 source/destination
-colours, follow live pointers and guard reads by captured memory bounds. Formatting/schema
-checks pass; live integration remains pending after the ongoing full-cycle pair. No
-running capture tool or observation scheme was changed.
-
-
-Palette caller identification now follows the installed fade hook and finds the three
-owned positive/negative/negative-zero calls in both CPU snapshots. The probe schema
-includes the guarded parent return needed to distinguish these from unrelated native
-interpolation calls. Damaged hook/target/restore evidence is rejected. Per-call colour
-validation remains pending after the running full-cycle regression.
-
-
-`check_weather_palette.py` is prepared for the directed full-fade run: all 31 owned
-interpolations, exact component arithmetic and both palette writes, plus restoration
-that preserves entry 5 while copying the other 15 colours. The existing endpoint-only
-capture is rejected for missing call probes. Positive runtime validation and deliberate
-coalescing/scanout checks remain pending.
-
-
-The corrected `cycle-cadence2` 030 side completes 170 seconds and passes the complete
-weather cycle, all 30 fades and 4,217 schedule boundaries. Its logical weather history
-matches the prior deferred 030 capture. Stored palettes restore correctly at both
-endpoints; maximum world-end delay is 280 ms, endpoint debt zero, and 2,520 renderer
-twins pass. A500 is running; do not claim the full pair before its checks finish.
+Other unresolved F1–F8 gates above remain open, including braking/impulse calibration,
+opponent projection/animation ownership, finish/restart paths and presentation-rate
+coverage. Passing this weather subset cannot establish full framerate independence.

@@ -72,9 +72,10 @@ under `tmp/` before restoring `make -C whdload all`.
 The override requires `VERIFY` and accepts only 524288 or 1048576 bytes. Both invalid-build
 guards have been checked; explicit 524288 produces the same verification binary as the
 default. The normal production build remains byte-identical. Larger-memory runtime
-validation is pending: allocation flags and loaded sample descriptors must be observed,
-not forced. This configuration is for testing the weather audio path and is not a
-production loader memory change or evidence of sound playback.
+checks pass on A500/030: native allocation, the loaded sample descriptor, helper arguments,
+mute/unmute and request delivery are observed rather than forced. The normal 512-KiB
+configuration separately passes the missing-resource guard. This is a weather audio test
+configuration, not a production loader memory change or evidence of audible playback.
 
 ### Native audio mute input fixture
 
