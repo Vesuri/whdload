@@ -50,7 +50,9 @@ python3 tools/td2.py quit                        # kills gdb and our FS-UAE only
 ```
 
 The server holds one gdb on FS-UAE's Barto stub and serves one command per connection on
-`amiga/.run/td2.sock`.
+`amiga/.run/td2.sock`. It is AmigaXDev's shared server (`amigaxdev.gdbserve`); the tools find
+that package through `tools/_amigaxdev.py`, and `python3 -m amigaxdev...` needs `. amiga/env.sh`
+first.
 
 - **Attach within 20 s of launch.** With no trigger, the stub stops servicing its port for
   good after 20 s. `serve` connects as soon as the port listens, finds the CPU halted at the
@@ -95,8 +97,8 @@ open road 7.2), so **never compare two `profile_demo.sh` runs**: use the fixed w
 ```sh
 python3 tools/td2_report.py OUT/trace.bin OUT/code.bin --base 0xc00000   # routines, inclusive/self
 python3 tools/frames.py     OUT/trace.bin OUT/code.bin 0xc00000           # fps, blitter waits, interrupts, DMA
-python3 tools/hotspots.py   OUT/trace.bin OUT/code.bin 0xc00000 HUNK 0f114,0789c
-python3 tools/disd.py       OUT/code.bin 0xc00000 HUNK 0x0f114 0x0f2c0
+python3 -m amigaxdev.disasm hotspots --label duel OUT/trace.bin OUT/code.bin 0xc00000 HUNK 0f114,0789c
+python3 -m amigaxdev.disasm disd OUT/code.bin 0xc00000 HUNK 0x0f114 0x0f2c0
 ```
 
 Use `--base 0x200000` with fast RAM (the code is loaded into fast RAM when there is any, else
@@ -113,12 +115,12 @@ COP1LC write and report zero frames.
   (through `jmp abs.l` trampolines; `jsr d16(a6)` is named after the library LVO), giving
   inclusive time. Self time goes to the nearest preceding function start (`link a5` or an
   observed call target); a function without `link` merges into its predecessor, so check
-  `hotspots.py` before trusting a big self number.
+  `hotspots` before trusting a big self number.
 - **Frames** are counted at the slave's COP1LC write; **blitter waits** are cycles on
   `btst #6,2(a6)` polls; **interrupts** at Kickstart's level-3 handler `$FC0D14` and its BLIT
   (`$FC0D38`) / VERTB (`$FC0D4A`) branches; **DMA** from the per-field DMA records.
 
-Trace format (`tools/barto.py`), little-endian uint32: `fields`, `nsections`, section bases,
+Trace format (AmigaXDev's `amigaxdev.barto`), little-endian uint32: `fields`, `nsections`, section bases,
 16 bytes of stack bounds; ROM, chip and slow-RAM snapshots (no fast RAM, hence the separate
 dump); base clock, cycle unit. Per field: custom registers (520 bytes), AGA colours (1024),
 DMA records, resource records, `cycles`, `idle`, instruction words, screenshot. An

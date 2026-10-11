@@ -25,7 +25,8 @@ import shutil
 import struct
 import subprocess
 import tempfile
-from local_env import path
+import _amigaxdev  # noqa: F401
+from amigaxdev.env import path
 
 ROOT = Path(__file__).resolve().parents[1]
 LHA = path('LHA')  # LHa for UNIX: Lhasa cannot create LH5 archives

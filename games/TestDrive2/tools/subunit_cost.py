@@ -7,7 +7,8 @@ do not use an A1200 trace with BLTPRI: its instruction records can be corrupt.
 """
 import argparse,os
 from pathlib import Path
-import barto
+import _amigaxdev  # noqa: F401
+from amigaxdev import barto
 from td2_report import regions
 
 def measure(path,limit):

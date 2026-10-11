@@ -7,8 +7,9 @@ Unknown/complex destinations are skipped; do not use absence here as proof of no
 """
 import argparse,collections,re,subprocess,os
 from pathlib import Path
-import barto
-from local_env import tool
+import _amigaxdev  # noqa: F401
+from amigaxdev import barto
+from amigaxdev.env import tool
 from td2_report import regions
 from state_report import VARIABLES
 

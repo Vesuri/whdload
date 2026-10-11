@@ -51,7 +51,7 @@ tmp/TestDrive2.lha               WHDLoad installer (slave source)  → unpack to
 
 Common Amiga files and the toolchain come from the shared environment that AmigaXDev installs
 (`make setup` there): `amiga/env.sh` sources its `~/.local/share/amiga/env.sh`, and the Makefile
-and `tools/local_env.py` use the same defaults. Set a variable to override it; AmigaXDev's
+and the tools (through AmigaXDev's `amigaxdev.env`) use the same defaults. Set a variable to override it; AmigaXDev's
 `docs/environment.md` describes them all. The ones used here:
 
 | Variable | Default | Used for |

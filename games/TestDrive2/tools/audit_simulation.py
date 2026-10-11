@@ -5,7 +5,8 @@ Whole-function PL_P replaces the tail too; operand-only PL_W/L/NOP are intention
 Indirect calls and helper return adjustments still require manual review.
 """
 import argparse, os, re, subprocess
-from local_env import tool
+import _amigaxdev  # noqa: F401
+from amigaxdev.env import tool
 from pathlib import Path
 
 p=argparse.ArgumentParser(description=__doc__)
