@@ -748,3 +748,10 @@ interpolations, exact component arithmetic and both palette writes, plus restora
 that preserves entry 5 while copying the other 15 colours. The existing endpoint-only
 capture is rejected for missing call probes. Positive runtime validation and deliberate
 coalescing/scanout checks remain pending.
+
+
+The corrected `cycle-cadence2` 030 side completes 170 seconds and passes the complete
+weather cycle, all 30 fades and 4,217 schedule boundaries. Its logical weather history
+matches the prior deferred 030 capture. Stored palettes restore correctly at both
+endpoints; maximum world-end delay is 280 ms, endpoint debt zero, and 2,520 renderer
+twins pass. A500 is running; do not claim the full pair before its checks finish.

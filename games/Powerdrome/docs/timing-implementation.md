@@ -4455,4 +4455,8 @@ boundaries. Both no-resource CPUs pass that guard, a measured 500-ms stall, worl
 and 485 common weather boundaries. They match 1,002 movement states and 222 control/
 input/fuel updates. Maximum world-end delay is 560/1,200 ms (030/A500), with maximum
 retained debt 0/480 ms; both endpoints have zero retained/assigned work. The corrected
-full-cycle pair is now running.
+full-cycle 030 side now passes warning/onset/expiry, native duration arithmetic, all
+30 fade steps and 4,217 weather boundaries. Its normalized weather history also matches
+the preceding deferred 030 capture. Stored palette endpoints are restored; maximum
+world-end delay is 280 ms, with zero endpoint debt and 2,520 completed renderer twins.
+A500 is running; full cross-CPU direct-delivery cycle acceptance is still pending.
