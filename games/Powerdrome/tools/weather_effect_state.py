@@ -13,7 +13,7 @@ def locate(chip,code,game,base):
         return None
     draw=struct.unpack_from('>I',chip,game+0x112e8)[0]-base
     assert 0<=draw<len(code) and code[draw:draw+2]==bytes.fromhex('48e7')
-    tags=[i for magic in (b'PDWEFX01',b'PDWEFX02')
+    tags=[i for magic in (b'PDWEFX01',b'PDWEFX02',b'PDWEFX03')
           for i in range(draw,min(draw+4096,len(code)-7)) if code[i:i+8]==magic]
     assert len(tags)==1
     tag=tags[0]

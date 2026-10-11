@@ -684,5 +684,13 @@ disabled/normal byte equivalence pass. The next pair, `timing-weather-audio-stal
 guarded mode 3 to arrange two native sound requests 320 ms apart, with a 500-ms stall
 intended to cover both. The completed 030 run confirms the bug: the second request arrives while the first
 is pending and is coalesced. Its 500-ms stall, held/resumed world clock, 487 weather
-boundaries and eventual zero debt pass. A500 remains running. Fix sound delivery and
-rerun this failing regression; do not relax the request-accounting gate.
+boundaries and eventual zero debt pass. A500 reproduces the same loss. Both original
+failing captures remain rejected by the request-accounting gate.
+
+`PDWEFX03` now calls the native sound helper directly at the logical delay expiry, before
+selection RNG, preserving registers and native availability/suppression checks. The
+corrected `timing-weather-audio-stall2` 030 side delivers all four requests, including
+the 4,000/4,320-ms pair, at their exact world boundaries. Native helper duration is
+0–40 ms; maximum world-end delay is 580 ms, with no endpoint debt. The 500-ms stall,
+world hold/resume and 485 weather boundaries pass. A500 is running. Repeat mute,
+no-resource and full-cycle regressions for direct delivery; earlier tests used deferral.

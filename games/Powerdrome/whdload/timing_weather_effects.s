@@ -124,7 +124,7 @@ timing_weather_tick
  beq.s .attempt
  subq.w #1,$4d2(a6)
  bne.w .scheduled
- move.w #1,16(a0)
+ bsr.w timing_weather_sound
 .attempt
  addq.l #1,28(a0)
  moveq #7,d1
@@ -155,18 +155,25 @@ timing_weather_tick
  movem.l (sp)+,d0-d7/a0-a6
  rts
 
-; The outer loop still performs native sound trigger, but no owned RNG work.
+; Sound requests execute at their logical generation boundary, before selection RNG.
+; No per-render flag can merge two due requests during a catch-up allocation.
 timing_weather_outer
  movem.l d0-d7/a0-a6,-(sp)
  bsr timing_weather_enabled
  beq.s .native
- lea timing_weather_state(pc),a0
- tst.w 16(a0)
- beq.s .owned_done
- clr.w 16(a0)
+ movem.l (sp)+,d0-d7/a0-a6
+ bra.w timing_weather_fade
+.native
+ movem.l (sp)+,d0-d7/a0-a6
+ tst.w $4cc(a6)
+ beq.w timing_weather_fade
+ bra.w timing_weather_generation
+
+timing_weather_sound
+ movem.l d0-d7/a0-a6,-(sp)
  move.l perf_game(pc),a0
  tst.l $4f74(a0)
- beq.s .owned_done
+ beq.s .done
  lea timing_weather_state(pc),a1
  addq.l #1,44(a1)
  movea.l $5ae(a0),a0
@@ -177,14 +184,9 @@ timing_weather_outer
  moveq #3,d3
  movea.l (a0),a0
  bsr timing_weather_cleanup
-.owned_done
+.done
  movem.l (sp)+,d0-d7/a0-a6
- bra.w timing_weather_fade
-.native
- movem.l (sp)+,d0-d7/a0-a6
- tst.w $4cc(a6)
- beq.w timing_weather_fade
- bra.w timing_weather_generation
+ rts
 
 timing_weather_draw
  movem.l d0/a0,-(sp)
@@ -239,12 +241,12 @@ timing_weather_after_draw dc.w $4ef9
 timing_weather_present dc.w $4ef9
  dc.l 0
 
-timing_weather_state dc.b 'PDWEFX02'
+timing_weather_state dc.b 'PDWEFX03'
  dc.w 0 ; +8 latest logical pre-decrement lifetime (visible state)
  dc.w 0 ; +10 visual pre-draw seed
  dc.w 0 ; +12 temporary render seed ownership
  dc.w 0 ; +14 saved outer seed
- dc.w 0 ; +16 pending sound trigger
+ dc.w 0 ; +16 reserved legacy pending sound trigger (always zero)
  dc.w 0 ; +18 reserved
  dc.l 0 ; +20 logical weather-loop generations
  dc.l 0 ; +24 logical visual RNG events

@@ -3768,7 +3768,7 @@ timing: forecast and start/expiry still follow their existing paths. Fade/gear t
 has a separate disabled-by-default prototype described below.
 No cache policy changes are made.
 
-During supported human flight, the current `PDWEFX02` implementation uses separate
+During supported human flight, the current `PDWEFX03` implementation uses separate
 weather-loop and visual deadlines, serviced by 20-ms world updates:
 
 1. At generation, apply native eligibility, decrement delay, and perform shift-7 lifetime
@@ -3777,8 +3777,9 @@ weather-loop and visual deadlines, serviced by 20-ms world updates:
 2. At generation +20 ms, publish the current lifetime and pre-draw seed, decrement
    lifetime once and advance logical RNG four times when an effect is present. A blank
    scene clears the previous visible publication at this same visual boundary.
-3. Queue sound trigger for presentation. Retain cumulative deadlines and all logical
-   mutations during ordinary catch-up; actual repeated draws do not consume logical RNG.
+3. On delay expiry, invoke the native sound helper immediately at the logical generation
+   boundary, before selection RNG, when its sample resources exist. Retain cumulative
+   deadlines; actual repeated draws do not consume logical RNG.
 
 The earlier `PDWEFX01` prototype used a uniform 90-ms control cadence with visual work
 before generation. It passed cross-CPU ownership checks but failed A500 active-effect
@@ -3789,14 +3790,14 @@ transitions and natural weather acceptance remain open.
 The renderer uses the latest published lifetime/seed. It temporarily installs the saved
 visual seed around the native draw helper, then restores the outer seed. Repeated draws
 therefore do not advance simulation RNG or decrement persistent lifetime. Palette state
-and native presentation calls remain per actual draw. The outer loop performs pending
-native sound trigger and skips its original generation block while logical ownership
-is enabled. Outside the supported flight predicate, native effect behavior is retained;
+and native presentation calls remain per actual draw. The outer loop skips its original
+generation block while logical ownership is enabled; sound delivery is part of logical
+generation and has no per-render queue. Outside the supported flight predicate, native effect behavior is retained;
 those mode paths are not yet framerate-independent. Initialization/session cleanup clears
 pending visual ownership. Pause, pit/recovery and full lifecycle contracts remain to be
 validated with active effects.
 
-The deferred call at game `$bce0` targets `$17836`, an **audio-channel start** routine,
+The native call at game `$bce0` targets `$17836`, an **audio-channel start** routine,
 not bitmap cleanup. It checks `state+$2f4`, stops the selected audio DMA channel,
 programs its sample pointer/length/volume/period, updates audio bookkeeping at
 `$48c4/$48dc`, and enables its interrupt and DMA. The weather caller passes channel 3,
@@ -3805,7 +3806,8 @@ The guard `$4f74` is set after the larger 404,000-byte chip allocation succeeds;
 the same guard controls allocation/loading of this extra sample table. Earlier
 512-KiB guest captures left it clear and therefore did not exercise this sound path.
 The diagnostic field names `cleanup_pending` and `cleanups` remain for capture-schema
-compatibility; they mean a queued sound request and wrapper calls, respectively.
+compatibility. `PDWEFX01/02` used the first as a queued sound request; in `PDWEFX03`
+it remains zero. `cleanups` counts native sound-wrapper calls.
 The latter increments before the native helper and does not prove audible playback:
 the helper can return immediately when `state+$2f4` is nonzero.
 
@@ -3851,11 +3853,11 @@ Fast-planar eligibility additionally checks the published visual lifetime. This 
 necessary on the last visible tick, when persistent lifetime is already zero: the scene
 must still take the native effect path. The coverage fallback classification includes
 that published state as well. Native hook bytes are checked before installation at
-`$bc8a`, `$112e6` and `$112f4`. Diagnostics tagged `PDWEFX02` track publication/temporary
+`$bc8a`, `$112e6` and `$112f4`. Diagnostics tagged `PDWEFX03` track publication/temporary
 seed ownership, weather-loop generations, visual RNG events, generation attempts/selections,
-actual draws and deferred cleanup. `PDWECLK1` adds generation/visual deadlines and counts.
+actual draws and sound calls. `PDWECLK1` adds generation/visual deadlines and counts.
 The installed draw JMP locates the live record; readers also accept the earlier
-`PDWEFX01` capture format.
+`PDWEFX01/02` capture formats.
 
 Build and integration checks pass:
 
@@ -4342,8 +4344,28 @@ placement is measured from the live fixture. The completed 030 side of
 world time held and then resumed without lost movement time. The sound-request checker
 **fails**: the first pending request is still occupied when the second expires. The
 single flag coalesces them. The weather schedule itself passes 487 observed boundaries;
-maximum world-end delay is 560 ms and endpoint simulation debt is zero. A500 is still
-running. The sound delivery implementation therefore needs correction. The audio checker recognizes
+maximum world-end delay is 560 ms and endpoint simulation debt is zero. The completed A500 side reproduces the same coalescing
+failure. Both frozen failing captures are retained. The audio checker recognizes
 the explicitly tagged first fixture request and still rejects an occupied queue when
 another request arrives. Existing mode-2 and normal binaries remain byte-identical;
 mode 4 is rejected. This fixture does not establish natural-weather cadence acceptance.
+
+## Weather sound delivery at logical generation
+
+`PDWEFX03` removes the lossy presentation flag. On an eligible delay expiry, the logical
+weather routine calls `$17836` through a full-register-preserving wrapper before the
+native selection RNG. It retains native resource availability and suppression checks.
+The native helper may wait for audio DMA synchronization; that elapsed time enters the
+existing time ledger. Catch-up can replay historical requests close together in physical
+time; this does not reconstruct sound that would have played during an external stall.
+
+The corrected `timing-weather-audio-stall2` 030 capture passes all four generated requests
+at 4,000/4,320/8,460/11,740 ms relative to initial generation, including the previously
+coalesced pair. Each native call lies at the current logical world/generation boundary,
+with unchanged weather state across the helper. Sample/channel/register checks pass.
+Calls take 0–40 ms in PAL fields; measured maximum world-end delay is 580 ms, maximum
+allocation 30 steps, and endpoint retained/assigned debt is zero. The measured stall
+is 500 ms, world hold/resume and all 485 weather boundaries pass. A500 is running.
+The normal build is byte-identical. Both old failing captures still fail request accounting.
+New direct-delivery mute, no-resource, full-cycle and broader lifecycle regression remain
+required; the earlier green captures exercised the deferred implementation.
