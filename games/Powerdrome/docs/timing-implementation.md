@@ -1904,6 +1904,34 @@ Practice initialization/HUD independence from opponents, not completed Practice 
 python3 tools/check_player_lap_baseline.py --logical --practice tmp/prof/timing-player-clock-practice-030
 ```
 
+### Player lap/HUD hook register and flag contracts
+
+VERIFY-only `PDPLC001` diagnostics record the physical subtraction's guest CCR and result,
+its native clock/start operands, the final displaced MOVE's guest CCR, and separate lap
+and HUD call counts. The observation helper preserves A0 and CCR; 68010+ installation
+substitutes the user-mode CCR read, as for the existing timing diagnostics. This does not
+change normal-build bytes. The `PDPLAP01` layout remains unchanged.
+
+`timing-playercontract1-030-twins` uses the frozen playercontract1 slave, the ordinary
+`CUSTOM5=13` route, 300 fields from `$f952`, and probes `$10bf8/$10c00/$f110/$f118`.
+`check_player_lap_contract.py` independently computes subtraction flags from the original
+operands, verifies final native MOVE flags, and compares all D0–D7/A0–A6 registers and SP
+across each hook, allowing only the specified logical D0 result and HUD D1 low word.
+It ignores debugger SR and reads architectural condition codes recorded by guest code.
+
+The 030 run passes **one initial lap hook and 75 HUD hooks**, with native shared timestamp
+semantics intact. It adds **39** completed clean renderer comparisons, with one further
+scene active at the end. This initial boundary establishes the lap origin and deliberately
+keeps its physical subtraction result; it does **not** exercise a completed logical lap
+duration. A500, completed-lap register contracts, external-reset fallback, other modes and
+unobserved arithmetic/flag cases remain to validate. Hook boundaries pass and the normal
+slave is byte-identical to the reference.
+
+```sh
+python3 tools/check_player_lap_contract.py tmp/prof/timing-playercontract1-030-twins
+python3 tools/perf_status.py tmp/prof/timing-playercontract1-030-twins
+```
+
 ### Player-result timestamp and directed validation
 
 The WORLD20 hook at `$f9ec` captures the current player's logical world timestamp after

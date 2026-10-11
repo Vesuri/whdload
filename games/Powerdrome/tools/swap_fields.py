@@ -237,6 +237,15 @@ if os.environ.get('TIMING_STATE') == '1':
             lv=[f'*(unsigned short*){lp+8:#x}']
             lv += [f'*(unsigned int*){lp+x:#x}' for x in range(12,44,4)]
             player_lap_sample='printf "PDPLAP_EVENT %d {off} ' + ' '.join(['%u']*len(lv)) + '\\n", $pd_field, ' + ', '.join(lv) + '\n'
+    player_contract_sample=''
+    if fast_worlds:
+        contracts=timing_locations(b'PDPLC001', lambda off: 0<fast_worlds[0]-off<16384)
+        assert len(contracts)<=1
+        if contracts:
+            cp=a.base+contracts[0]
+            cv=[f'*(unsigned short*){cp+x:#x}' for x in (8,10,12)]
+            cv += [f'*(unsigned int*){cp+x:#x}' for x in (16,20,24,28,32)]
+            player_contract_sample='printf "PDPLCON_EVENT %d {off} ' + ' '.join(['%u']*len(cv)) + '\\n", $pd_field, ' + ', '.join(cv) + '\n'
     retune_sample=''
     if fast_worlds:
         retunes=[m.start() for m in re.finditer(b'PDRETUNE',code)
@@ -267,14 +276,16 @@ if os.environ.get('TIMING_STATE') == '1':
                 sample += f'if {count} >= {opponent}\n'
                 sample += f'printf "PDOPP_ARRAY %d {off:#x} {opponent} ' + '%04x'*95 + '\\n", $pd_field, ' + ', '.join(words) + '\nend\n'
             sample += 'end\n'
-        if off in (0xbe12,0xbef2,0xf118,0x10c00,0xc2aa,0xc2b0,0xc7d2,0xce28,0xe3bc,0xe3c4,0x1020e,0xca3e):
+        if off in (0x10bf8,0xf110,0xbe12,0xbef2,0xf118,0x10c00,0xc2aa,0xc2b0,0xc7d2,0xce28,0xe3bc,0xe3c4,0x1020e,0xca3e):
             sample += player_lap_sample.replace('{off}',hex(off))
-        if off in (0xbe12,0xbef2,0xf952,0xf974,0xf9a2,0xf9ec,0x10bf0,0x10bf6,0x10bfc,0x10c00,0x10c10,0xf108,0xf10e,0xf118,0xc7d2,0xce28,0xe3bc,0xe3c4,0x1020e,0xca3e):
+        if off in (0x10bf8,0xf110,0xbe12,0xbef2,0xf952,0xf974,0xf9a2,0xf9ec,0x10bf0,0x10bf6,0x10bfc,0x10c00,0x10c10,0xf108,0xf10e,0xf118,0xc7d2,0xce28,0xe3bc,0xe3c4,0x1020e,0xca3e):
             clock_values=[f'*(unsigned int*){r["game"][0]+0xf96:#x}']
             clock_values += [f'*(unsigned int*){state+x:#x}' for x in (0x206,0x202,0x1b2,0x17c)]
             clock_values += [f'*(unsigned short*){state+x:#x}' for x in (0x13e,0x43a,0xbe,0xb6)]
             clock_values += [f'(unsigned int)${reg}' for reg in ('d0','d7','sp','a5')]
             sample += 'printf "PDPLAYER_CLOCK %d ' + hex(off) + ' ' + ' '.join(['%u']*len(clock_values)) + '\\n", $pd_field, ' + ', '.join(clock_values) + '\n'
+        if off in (0x10bf8,0x10c00,0xf110,0xf118):
+            sample += player_contract_sample.replace('{off}',hex(off))
         if off in (0x9950,0x9a08):
             animation_values=['(unsigned int)$a5']
             animation_values += [f'*(unsigned short*)($a5+{x})' for x in
@@ -286,7 +297,7 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):
             sample += heat_sample.replace('{off}',hex(off))
-        if off in (0xccee,0xccf6,0x14090,0xe8d4,0x103a2,0xbfb0,0xbfb6,0x14764,0x147a6):
+        if off in (0x10bf8,0x10c00,0xf110,0xf118,0xccee,0xccf6,0x14090,0xe8d4,0x103a2,0xbfb0,0xbfb6,0x14764,0x147a6):
             contract_values=[f'(unsigned int)${reg}' for reg in
                              ('d0','d1','d2','d3','d4','d5','d6','d7','a0','a1','a2','a3','a4','a5','a6','sp','sr')]
             contract_values += [f'*(unsigned short*){state+x:#x}' for x in (0x21c,0x194)]

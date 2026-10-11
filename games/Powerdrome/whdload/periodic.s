@@ -184,6 +184,8 @@ install_periodic
  IFD VERIFY
  lea timing_lap_flags(pc),a0
  move.w #$42e7,(a0)
+ lea timing_player_lap_flags(pc),a0
+ move.w #$42e7,(a0)
  ENDC
  lea timing_external_step(pc),a0
  move.w #$42e7,(a0)

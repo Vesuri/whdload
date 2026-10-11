@@ -30,11 +30,23 @@ timing_player_lap_commit
  sub.l $206(a6),d0
  bsr timing_player_lap_prepare
  move.l d7,$206(a6)
+ IFD VERIFY
+ bsr timing_player_lap_flags
+ ENDC
  rts
 
 timing_player_lap_prepare
  move.w sr,-(sp)
  movem.l d1/a0,-(sp)
+ IFD VERIFY
+ lea timing_player_contract(pc),a0
+ move.w 8(sp),8(a0)
+ move.w #1,12(a0)
+ move.l d0,16(a0)
+ move.l d7,20(a0)
+ move.l $206(a6),24(a0)
+ addq.l #1,28(a0)
+ ENDC
  lea timing_player_lap_state(pc),a0
  move.w timing_started(pc),d1
  beq.s .invalidate
@@ -77,11 +89,23 @@ timing_player_lap_hud
  sub.l $206(a6),d0
  bsr timing_player_lap_display
  move.w #$12,d1
+ IFD VERIFY
+ bsr timing_player_lap_flags
+ ENDC
  rts
 
 timing_player_lap_display
  move.w sr,-(sp)
  movem.l d1/a0,-(sp)
+ IFD VERIFY
+ lea timing_player_contract(pc),a0
+ move.w 8(sp),8(a0)
+ move.w #2,12(a0)
+ move.l d0,16(a0)
+ move.l d7,20(a0)
+ move.l $206(a6),24(a0)
+ addq.l #1,32(a0)
+ ENDC
  lea timing_player_lap_state(pc),a0
  tst.w 8(a0)
  beq.s .done
@@ -125,3 +149,25 @@ timing_player_lap_state dc.b 'PDPLAP01'
  dc.l 0 ; most recent logical lap duration
  dc.l 0 ; external-reset detections
  dc.l 0 ; most recent logical HUD duration
+
+ IFD VERIFY
+; Observe architectural guest flags after the displaced final MOVE. Save/restore
+; A0 and CCR so the observation has no additional native register/flag effect.
+timing_player_lap_flags
+ move.w sr,-(sp)
+ move.l a0,-(sp)
+ lea timing_player_contract(pc),a0
+ move.w 4(sp),10(a0)
+ movea.l (sp)+,a0
+ move.w (sp)+,ccr
+ rts
+
+timing_player_contract dc.b 'PDPLC001'
+ dc.w 0,0 ; physical SUB CCR, final native MOVE CCR
+ dc.w 0,0 ; site: 1 lap commit, 2 HUD; padding
+ dc.l 0 ; physical subtraction result before logical selection
+ dc.l 0 ; native physical D7 clock
+ dc.l 0 ; native shared lap start before any commit
+ dc.l 0 ; observed lap hook calls
+ dc.l 0 ; observed HUD hook calls
+ ENDC
