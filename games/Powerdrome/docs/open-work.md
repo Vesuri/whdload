@@ -561,6 +561,15 @@ without simulation/input clock or seed rewrites. Its 20-second A500/030 pair pas
 visual events and 176 unsuccessful generation attempts. Drawing executes six times on
 030 versus three on A500, with seed replay/restoration and unchanged lifetime/publication
 verified in every observed draw. The 030 adds 256 completed renderer twins and ends with
-no active draw. No successful new selection or actual rectangle cleanup occurs, so those
-branches remain unvalidated. Natural integrated weather, forecast/fade scheduling and
-mode/lifecycle work remain open. The fixture-disabled and normal builds remain unchanged.
+no active draw. That first fixture does not exercise successful new selection or actual rectangle cleanup.
+The explicitly seeded mode-2 fixture now validates the first successful selection:
+lifetime five, delay seven and each subsequent logical publication through the next
+trial. Its matched 20-second pair produces five selections and 18 logical visual events
+on both CPUs, versus 25 actual draws on 030 and 10 on A500. Draw RNG ownership passes;
+1,003 common movement states and 222 control/input/fuel updates match exactly. The 030
+adds 239 completed renderer twins, with one additional unfinished scene excluded.
+Different endpoint step counts are fully accounted for by initial/final unsampled time;
+no retained or assigned simulation debt remains. The checker rejects wrong seed/lifetime,
+missing-publication and wrong delay-release evidence. Mode 1 and normal builds remain
+byte-identical. Actual rectangle cleanup is still unobserved. Natural integrated weather,
+forecast/fade/gear scheduling, cadence policy and mode/lifecycle work remain open.

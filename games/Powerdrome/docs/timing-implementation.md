@@ -3881,8 +3881,43 @@ ownership, pending cleanup, simulation debt or unfinished assigned work. The 030
 **256 clean completed renderer twins**, with unchanged raster code and no draw active at
 the final snapshot. Effect draws themselves take the native fallback and are not those twins.
 
-There are zero actual rectangle cleanups and zero successful new effect selections, so
-this result does not validate those branches. Next use a separately identified directed
-selection case, inspect logical generation and cleanup, then complete forecast/expiry,
-fade/gear, native natural-weather and mode/lifecycle validation. Keep this first fixture's
-seed-preserving evidence distinct from any future explicitly seeded branch test.
+This first fixture has zero actual rectangle cleanups and zero successful new effect
+selections, so it does not validate those branches. Its seed-preserving evidence is
+separate from the explicitly seeded branch test below.
+
+### Successful selection fixture
+
+`TIMING_WEATHER_EFFECT_TEST=2` uses the same activation boundary and prerequisites as
+mode 1, but sets lifetime and delay to zero and sets the logical RNG seed to 3705.
+The native recurrence produces 640, selecting lifetime `(640 >> 7) & 5 = 5`, then
+51585, selecting delay `(51585 >> 14) + 4 = 7`. This deliberate seed write belongs
+only to the directed fixture. Clocks and input scheduling remain untouched. Mode 1
+and the normal slave still rebuild byte-identically; invalid mode 3 is rejected.
+
+`check_weather_effect_selection.py CAPTURE...` locates the live fixture record via the
+installed effect hook. It requires the first selected publication at the recorded
+activation clock, checks its seed/lifetime/delay and every subsequent logical publication
+through delay expiry, then requires the next generation attempt. Cross-capture comparison
+checks the relative publication clocks as well as lifetime/delay/visibility. Corrupted
+seed, lifetime, missing-publication and delay-release evidence is rejected. This checks
+the first selection lifecycle; it does not claim arithmetic coverage of every later
+selection, native weather cadence or rectangle cleanup.
+
+The 1,000-field (20-second) `timing-weather-effect-test2` A500/native and 030/fast pair
+passes. Both activate once at step 204 and show the exact first-selection sequence above.
+Both finish with **five selections and 18 logical visual RNG events**, while actual draws
+are **25 on 030 and 10 on A500**. All complete draws pass seed installation, four native
+advances and restoration; seven 030 draws repeat a published logical visual state.
+Neither endpoint retains effect draw ownership. **1,003 common player/engine/RNG states
+and 222 common control/input/fuel updates match exactly**.
+
+The 030 completes 1,003 movements and the A500 1,006. Their initial unsampled time is
+80/140 ms and final unsampled time 20/20 ms, accounting for the three-step difference
+without endpoint retained debt or assigned unfinished work. The 030 has **239 completed
+renderer twins**, unchanged raster code and zero reported pixel/guard/register/scratch
+failures; an additional scene is active at the endpoint and is not counted complete.
+Effect draws use the native fallback, outside those twins.
+
+Both runs still have zero actual rectangle cleanups. Cleanup, forecast/expiry,
+fade/gear scheduling, natural integrated weather and mode/lifecycle validation remain
+open. Neither directed fixture establishes the final weather cadence policy.

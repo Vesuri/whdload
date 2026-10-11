@@ -207,7 +207,8 @@ timing_weather_state dc.b 'PDWEFX01'
  dc.l 0 ; +44 actual rectangle cleanups
 
  IFNE TIMING_WEATHER_EFFECT_TEST
-; Directed effect-only fixture. No clock/input/seed rewrite and no cache changes.
+; Directed effect-only fixtures. No clock/input rewrite or cache changes.
+; Mode 1 publishes an existing effect; mode 2 seeds a successful native selection.
 ; Suppress native forecasts so this isolates generation, drawing and RNG ownership,
 ; not forecast/fade/steering calibration. Trigger once per process on a control tick.
 timing_weather_effect_test
@@ -225,8 +226,15 @@ timing_weather_effect_test
  move.l #-1,$4bc(a6)
  clr.w $4c6(a6)
  move.w #$ffff,$4cc(a6)
+ IFEQ TIMING_WEATHER_EFFECT_TEST-2
+ ; LCG: 3705 -> 640 (>>7 = 5), then 51585 (>>14 + 4 = 7).
+ move.w #3705,$62(a6)
+ clr.w $4ce(a6)
+ clr.w $4d2(a6)
+ ELSE
  move.w #5,$4ce(a6)
  move.w #4,$4d2(a6)
+ ENDC
 .done
  rts
 timing_weather_effect_test_state dc.b 'PDWEFT01'
