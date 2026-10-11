@@ -450,6 +450,7 @@ opponent histories; no compared fields are excluded to conceal that difference.
 | 100 ms stall pair plus unstalled references | 652 | 144 | 155 new |
 | 250 ms request (260 ms PAL hold), plus references | 652 | 144 | 153 new |
 | 500 ms stall pair plus unstalled references | 652 | 144 | 151 new |
+| 10 Hz request pair plus unpaced references | 652 | 144 | 132 new |
 
 The ten configurations include A500 without fast RAM, 68000 with fast RAM and native/fast
 rendering, 020 native/fast, 030/25 fast, 040/25 native/fast and 060/50 native/fast. All
@@ -488,9 +489,13 @@ A controlled render-rate fixture is prepared for requested 10/15/25/50 Hz, with 
 PAL pacing, explicit late-deadline accounting and no changes to simulation clocks/debt.
 The build guards, direct record decoding and disabled/normal byte comparisons pass.
 The checker now derives presentation intervals from guest-clock-aligned markers and
-reproduces the existing unpaced frame reports. Controlled-rate runtime validation, achieved
-presentation-rate measurements and cross-rate state comparison remain pending. The next steps are listed in timing-implementation; this preparation does
-not close the controlled-render-rate gate.
+reproduces the existing unpaced frame reports. The first 10 Hz requested pair passes,
+including exact comparison with both unpaced references. Actual marker rates are 9.572/s
+on 030 and 8.200/s on A500, with 4/27 late deadlines; neither achieves steady 10 Hz.
+Both account for all elapsed work and finish with no retained/assigned simulation debt.
+The 030 adds 132 completed twins, with a draw still active at the endpoint. Requests of
+15/25/50 Hz, native-rendered accelerators, variable intervals and other effect routes
+remain open; this bounded result does not close the controlled-render-rate gate.
 
 
 The remaining weather audit maps forecast/start/expiry, outer-loop effect generation,

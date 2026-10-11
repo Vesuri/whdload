@@ -3427,14 +3427,44 @@ observations, not achieved controlled-rate results or release performance.
 All four variants assemble and their direct record references/initial states decode.
 Non-VERIFY, unsupported-rate and combined stall/rate configurations are rejected. The
 explicit zero fixture is byte-identical to the existing full prototype, and the restored
-normal build is unchanged. Runtime validation is pending; no rate-independence result is
-claimed from these build checks.
+normal build is unchanged. These build checks alone establish no rate-independence result.
+
+The first runtime pair, `timing-rate10-1`, passes all arithmetic/input, pacing-accounting
+and CPU-comparison checks over 650 PAL fields (13 seconds). Against both unpaced
+`timing-contact13-1` references, **652 common world states and 144 common control/input/fuel
+updates match exactly**. The pacing fixture starts after 200 world steps, so its rate
+measurements cover the paced region rather than the whole capture.
+
+| Requested 10 Hz observation | 030/25 fast with twins | A500 native |
+| --- | ---: | ---: |
+| Allocator releases / measured rate | 87 / 9.534 per second | 74 / 8.166 per second |
+| Driving-marker intervals / measured rate | 85 / 9.572 per second | 72 / 8.200 per second |
+| Measured marker span | 8,880 ms | 8,780 ms |
+| Late deadlines / maximum lateness | 4 / 140 ms | 27 / 700 ms |
+| Total lateness / pacing wait | 420 / 2,400 ms | 1,640 / 700 ms |
+| Complete world steps / controls | 654 / 145 | 657 / 146 |
+| Initial → final unsampled time | 80 → 0 ms | 140 → 0 ms |
+| Maximum sampled world-end delay / retained debt | 240 / 0 ms | 780 / 160 ms |
+
+The exact endpoint accounting explains the different completed-step/control counts.
+Both endpoints have zero retained/assigned simulation debt and pending controls. The
+030 contributes 132 clean completed renderer twins; one draw is active at the endpoint
+and is not counted as complete. Raster code and all renderer failure counters are unchanged.
+
+The marker interval histograms in milliseconds are 030 `{80:3, 100:78, 180:2, 240:2}`
+and A500 `{80:1, 100:44, 120:23, 140:2, 460:1, 800:1}`. Pacing occurs at allocator entry,
+whereas these markers observe the driving-loop boundary; neither requested rate nor
+allocator-release spacing proves exact display spacing. These measured intervals establish
+changed presentation timing with equal sampled simulation state for this route, not a
+steady achieved 10 Hz, distinct displayed images, release FPS or whole-game independence.
+Requests of 15/25/50 Hz, native-rendered accelerators, variable intervals and other effect
+routes remain to be checked.
 
 Next steps:
 
-1. Capture the 10 Hz requested route on 030/fast; check actual completed presentations,
-   aggregate pacing accounting, retained debt and the existing arithmetic/input gates.
-2. Compare every common logical world/control/fuel state with the unstalled reference.
+1. Completed the bounded 10 Hz requested pair on 030/fast and A500/native, including
+   measured presentation markers, pacing/debt accounting and arithmetic/input gates.
+2. Completed exact common logical world/control/fuel comparison with both unpaced references.
 3. Repeat 15/25/50 Hz requests. Report missed deadlines and actual rates; explicitly mark
    infeasible targets instead of treating requested rates as measured coverage.
 4. Repeat on A500/native and native-rendered accelerators where feasible. Keep the same
