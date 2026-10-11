@@ -493,3 +493,13 @@ states and 144 control/input/fuel states at common logical times. The 030 adds 1
 renderer twins. Sampled maximum delays are 560/760 ms (030/A500), with zero endpoint
 retained/assigned debt. The 100/250 ms cases, repeated stalls and controlled render rates
 remain open; this is a bounded single-stall result, not complete F7 coverage.
+
+
+The 100 ms pair now verifies exact five-field holds and recovery on both CPUs, matching
+652 common world states and 144 control/input/fuel states against both unstalled references,
+with 155 clean 030 twins. It exposed an overly narrow endpoint-count heuristic: A500
+completed two more controls, fully explained by 100 ms more serviced logical time within
+the equal physical window. The matrix now derives expected endpoint counts from physical,
+world and control clocks, with complete boundary controls and unchanged session ledgers;
+common state comparisons remain exact. This stronger check also passes all ten prior CPU
+configurations and the 60-second/500 ms pairs. The requested-250 ms pair is pending.

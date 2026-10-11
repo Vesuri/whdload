@@ -71,6 +71,6 @@ if [ "$CASE_SET" = endurance ]; then
  run a500-native 68000 0 0 A500 512 0 1536
 fi
 python3 tools/check_timing_world20.py "${runs[@]}" > "$OUT/world-comparison.txt"
-python3 tools/check_timing_order.py "${runs[@]}" > "$OUT/control-comparison.txt"
-python3 tools/check_timing_resource.py "${runs[@]}" > "$OUT/resource-comparison.txt"
+python3 tools/check_timing_order.py --accounted-endpoints "${runs[@]}" > "$OUT/control-comparison.txt"
+python3 tools/check_timing_resource.py --accounted-endpoints "${runs[@]}" > "$OUT/resource-comparison.txt"
 echo "All ${#runs[@]} bounded CPU/renderer comparisons passed"

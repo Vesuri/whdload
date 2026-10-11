@@ -3320,7 +3320,7 @@ frozen fixture builds pass this direct-reference decoding check.
 All three fixture variants assemble. Non-VERIFY and invalid-duration builds are rejected.
 An explicit zero fixture produces bytes identical to the frozen full timing prototype;
 the restored normal build also remains byte-identical. The runtime checker accepts
-WHDLoad's SR-to-CCR instruction rewrite at the saved-status prologue, while retaining
+the timing installer's SR-to-CCR rewrite for 68010+ at the saved-status prologue, retaining
 exact checks on the following call and record-reference instructions. Stall duration uses
 paired guest VBL-counter observations, not an inferred mapping from debugger field numbers.
 
@@ -3342,5 +3342,37 @@ are reported separately. The runs complete 654/656 world steps respectively; the
 
 This supports recovery from one 500 ms interruption on the matched route, including
 historical input processing. It does not establish arbitrary/repeated-stall independence,
-all effects or lifecycle handling. The 100 and requested-250 ms runtime cases remain open,
-as do controlled presentation rates and the ten-minute/restart requirement.
+all effects or lifecycle handling. The 100 ms result and endpoint accounting are recorded below. The requested-250 ms case,
+controlled presentation rates and the ten-minute/restart requirement remain open.
+
+
+### Exact endpoint accounting and the 100 ms pair
+
+The 100 ms pair (`timing-stall100-1`) records one exact five-field hold on each CPU and
+passes each per-run arithmetic/input/debt check. Its initial cross-control comparison
+fails the old heuristic permitting at most one extra endpoint update: 030 completes 144
+controls and A500 completes 146. No common sampled state differs. The clocks explain the
+count difference: initial/final unsampled elapsed is 80/40 ms on 030 and 140/0 ms on A500,
+so A500 services 100 ms more logical time inside the equal 13-second physical window.
+
+The optional `--accounted-endpoints` mode replaces that guessed count allowance with an
+independent proof, not a larger numerical tolerance. It requires equal physical capture
+durations, an unchanged session/discard ledger, unpaused and complete boundary controls,
+continuous world-clock observations and the physical elapsed/debt identity. If `S` is the
+initial next-control deadline and `E` is the final next-world cursor, the expected count
+is `max(0, floor((E - 4 - S) / 18) + 1)`, in native 5-ms clock units. Every observed deadline
+must equal `S + 18*i`, and the final control cursor must equal `S + 18*count`. Every common
+state still compares exactly. This mode is used by the CPU matrix; legacy checks retain
+the original one-update allowance unless explicitly selecting the stronger accounting.
+
+With this proof the 100 ms pair and both unstalled references match 652 common sampled
+player/engine/RNG states and 144 control/input/fuel states. Both retain all six input events
+and the three contact responses. The 030 adds 155 clean renderer twins. Observed maximum
+world-end delay is 260 ms on 030 and 780 ms on A500; neither has retained debt at sampled
+world ends or unfinished debt at the endpoints. Maximum allocation is 12/32 steps.
+
+The stronger endpoint oracle also passes the existing ten-configuration 10-second matrix
+(111 common control/fuel updates), the full 60-second pair (667), and the 500 ms pair (145).
+The original endpoint-limit failure remains in the raw batch log; the clock-based checks
+and strict reference comparisons are saved separately. No game timing, field exclusions
+or gameplay-value tolerances changed.

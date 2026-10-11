@@ -9,6 +9,7 @@ from timing_report import input_state
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('captures',type=Path,nargs='+')
+p.add_argument('--accounted-endpoints',action='store_true',help='Derive endpoint counts from WORLD20 and physical clock accounting')
 a=p.parse_args()
 def signed16(value): return ((value&65535)^32768)-32768
 runs=[]
@@ -41,11 +42,17 @@ for root in a.captures:
     assert rows and rows[0][0]==initial_tick, 'First owed resource update was skipped'
     if configs[-1]=='9': assert any(row[4] for row in rows), 'Joystick route did not exercise boost consumption'
     assert len(rows)>=50 and all(b[0]-a[0]==18 for a,b in zip(rows,rows[1:])), 'Missing or repeated resource updates'
+    if a.accounted_endpoints:
+        from timing_control_window import check_control_window
+        check_control_window(root,[row[0] for row in rows],epoch)
     runs.append(rows)
     print(f'{root.name}: {len(rows)} logical fuel updates match native arithmetic and form one continuous state sequence')
 assert len(set(configs))==1, 'Compare the same input route across captures'
+if a.accounted_endpoints:
+    assert len({int(json.loads((root/'configuration.json').read_text())['FIELDS']) for root in a.captures})==1, 'Physical capture durations differ'
 length=min(map(len,runs))
-assert max(map(len,runs))-length<=1, 'Logical windows differ beyond one endpoint update'
+if not a.accounted_endpoints:
+    assert max(map(len,runs))-length<=1, 'Logical windows differ beyond one endpoint update'
 for root,rows in zip(a.captures[1:],runs[1:]):
     for expected,actual in zip(runs[0][:length],rows[:length]):
         assert expected==actual,(root.name,'first different logical resource update',expected,actual)

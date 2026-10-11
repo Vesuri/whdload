@@ -20,7 +20,7 @@ def stall_tag(data, frame):
     # Follow the installed timing_frame's first BSR.W and the fixture's LEA.
     # The growing prototype can exceed a fixed tag-search window, and stale
     # loader copies must not be selected by a matching tag alone.
-    # WHDLoad may rewrite MOVE SR,-(SP) to MOVE CCR,-(SP) on later CPUs.
+    # install_periodic rewrites MOVE SR,-(SP) to MOVE CCR,-(SP) on 68010+.
     assert data[frame:frame+2] in (bytes.fromhex('40e7'),bytes.fromhex('42e7'))
     assert data[frame+2:frame+8]==bytes.fromhex('48e7e0c06100'), 'Missing stall call in live allocator'
     routine=frame+8+struct.unpack_from('>h',data,frame+8)[0]
