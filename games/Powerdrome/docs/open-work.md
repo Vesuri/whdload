@@ -469,7 +469,9 @@ elapsed-work recovery. Peak sampled delay is 260/780 ms, 320/780 ms and 560/760 
 at a sampled world end, then clears it. The fixture is verification-only; disabled
 prototype and normal-build bytes remain unchanged.
 
-The 30,000-field `timing-endurance600-1` A500/030 pair is pending. Ten-minute/restart,
+The 30,000-field `timing-endurance600-1` A500/030 pair is pending. This tape brings the
+ship to rest after its initial maneuver, so the extended window tests mostly stationary
+accounting and cannot establish sustained-driving capacity or active-weather coverage. Ten-minute/restart,
 controlled rendering rates, repeated stalls, full opponent/effect state, further CPU
 configurations, calibration, lifecycle and release gates remain open. See the current
 measurement tables and checker contracts in timing-implementation. Bounded passes do
@@ -482,3 +484,11 @@ The build guards, direct record decoding and disabled/normal byte comparisons pa
 Runtime validation, achieved presentation-rate measurements and cross-rate state comparison
 remain pending. The next steps are listed in timing-implementation; this preparation does
 not close the controlled-render-rate gate.
+
+
+The remaining weather audit maps forecast/start/expiry, outer-loop effect generation,
+16-counter transition steps and renderer-owned lifetime changes. The transition also
+changes steering and target gear, so correcting only its visual fade is insufficient.
+Shared transition-word animation/reset paths require separate lifecycle handling. Natural
+A500 weather calibration and directed runtime probes are the next prerequisites; the
+exact sites, fields and implementation gates are in timing-implementation.

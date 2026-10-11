@@ -3257,8 +3257,9 @@ Maximum sampled world-end delay is 260 ms on 030 and 780 ms on A500; maximum ret
 debt is respectively 0 and 160 ms. The 030 completes 851 clean renderer twins, with raster
 code unchanged and no draw active at the final snapshot. These are instrumented correctness
 measurements, not release throughput. No fall-age or impulse samples are nonzero, so this
-run supplies no new evidence for those effects. Full opponent/effect state and a restart
-remain outside this comparison. The 30,000-field `timing-endurance600-1` pair is pending.
+run supplies no new evidence for those effects. The ship comes to rest after the initial
+maneuver; this is predominantly stationary accounting coverage, not sustained-driving
+capacity. Full opponent/effect state and a restart remain outside this comparison. The 30,000-field `timing-endurance600-1` pair is pending.
 
 Native contact handling at hunk `$d058–$d090` multiplies saved steering axes `$436/$438`
 by 230 and shifts right eight bits when `$24a` is nonzero, then replaces logical axes
@@ -3401,3 +3402,51 @@ Next steps:
    logical input tape and cadence, and retain fast-renderer drawing twins.
 5. Collect per-presentation interval evidence before claiming exact achieved cadence;
    extend to variable intervals and other response/effect routes after the bounded checks.
+
+
+## Remaining weather and effect ownership
+
+Static inspection identifies coupled simulation and presentation work that cannot be
+fixed by pacing only the visible effect. The following offsets are game-hunk offsets;
+field offsets are relative to the native state block. These are native control-flow
+findings, not measured A500 cadence or completed runtime coverage.
+
+| Native sites | Ownership/dependency to preserve |
+| --- | --- |
+| `$d91e → $dc5a`, `$dd0e–$dd42` | HUD/status path reaches forecast eligibility and RNG selection. `$e1a2` sets a forecast flag at `+$4c0` and deadline `+$4bc = clock + 5000`; `$dd36/$dd3c` test that deadline. |
+| `$e1f8–$e25c` | Starts the transition at `+$4c6 = 15`, clears steering offsets `+$4c2/$4c4`, computes an active deadline `+$4b8` from a track-dependent duration, RNG and the clock, and may enable effects at `+$4cc`. |
+| `$ddd4–$ddf8`, `$e25e–$e28e` | Expiry is checked only when the low three loop-counter bits are zero. Exit sets `+$4c6 = -15`, resets both deadlines and disables effect generation. |
+| `$bc8a–$bd16` | Eligible effect generation decrements delay `+$4d2` once per outer loop, then makes RNG calls and sets lifetime `+$4ce` and the next delay. |
+| `$bd1a–$bd52` | Transition `+$4c6` advances toward zero only when the low four loop-counter bits are zero. Palette helpers `$8a1a/$8a60` draw the fade, but completion helpers `$8a4c/$8a8e` also change target gear `+$450`. |
+| `$d0b6–$d11a` | Active weather affects handling: RNG updates steering offsets; negative transition phase scales those offsets into controls. Transition timing therefore changes gameplay even if pixels are ignored. |
+| `$112e6–$112fa` | The renderer decrements effect lifetime `+$4ce`, runs an effect helper and changes transient palette state `+$4d0`. Separate lifetime evolution from per-buffer presentation and cleanup. |
+| `$a8dc/$a936`, `$b60a`, `$c2dc` | The same transition word is also used/reset by animation, initialization and mode cleanup. A global hook on every write would incorrectly merge distinct lifecycles. |
+
+The world wrapper owns logical counter/seed state during movement and restores the outer
+counter/RNG afterward. Its native clock reads are not globally replaced. Scheduling the
+remaining weather blocks must therefore explicitly choose logical versus physical time,
+RNG ownership and publication order. Pacing the fade alone leaves handling, target-gear
+changes, effect generation and lifetime tied to different clocks. `+$4ce/$4d0` also gate
+fast-planar fallback, so the native and fast render paths both need these checks.
+
+Next implementation gates:
+
+1. Capture an eligible natural weather episode on the original A500 and the full prototype.
+   Probe `$dd14/$dd2c/$e1c0/$e200/$e242/$ddf8/$e278` and outer generation/fade boundaries;
+   record both deadlines, all fields in the table, outer/logical counters and RNG. Verify
+   the actual callers and eligibility before assigning a cadence.
+2. Freeze A500 transition, active-duration and effect-lifetime bounds. Do not assume that
+   a native low-bit gate maps directly to the current 90 ms control phase without measuring
+   its caller frequency and counter behavior.
+3. Extract forecast/start/expiry and generation mutations into logical updates. Preserve
+   queued palette/sound/message presentation, target-gear effects and the selected RNG
+   stream; replace the relevant clock reads locally rather than changing the global clock.
+4. Move effect lifetime out of the renderer, then validate both buffers' draw/cleanup and
+   native fallback. Preserve transient draw bookkeeping separately from persistent state.
+5. Check matched logical state and physical duration across CPU/render configurations,
+   catch-up, pause, pit, restart and the reused transition-word animation paths.
+
+The 60-second matched-input captures have zero forecast/transition/effect fields at both
+endpoints, inactive deadlines and no nonzero sampled transition phase. The completed
+portion of the ten-minute route likewise has not established a weather episode. Those
+runs must not be used to close this weather gate.
