@@ -3246,133 +3246,112 @@ python3 tools/check_timing_capacity.py CAPTURE...
 
 ## Longer-window contact-response validation
 
-The first 3,000-field run (`timing-endurance60-1/030-25-fast`) completes a physical
-60-second window with 3,004 consecutive world steps, 667 logical control/resource
-updates and no endpoint retained or assigned debt. Independent scalar/vector arithmetic
-and fuel checks pass. Maximum sampled world-end delay is 260 ms, including instrumented
-renderer comparisons. All 851 completed renderer twins are clean; final drawing is
-inactive. These are correctness observations, not release throughput measurements.
+The synchronized A500/native and 030/fast pair `timing-endurance60-2` passes a physical
+60-second window on each machine. Both complete 3,004 world steps and 667 control/resource
+updates. All 3,004 common sampled player/engine/RNG states and 667 control/input/fuel
+states match exactly. The four extra steps service 80 ms carried into the window:
+initial/final unsampled elapsed time is 80/0 ms on 030 and 140/60 ms on A500. Neither
+endpoint has retained or assigned unfinished debt.
 
-The batch stops at the joystick oracle, before starting A500: at field 547 (10.94 seconds),
-its horizontal prediction is 75 while the guest reports 67. The old oracle models only
-the joystick body. Native contact handling at hunk `$d058–$d090` additionally multiplies
-saved steering axes `$436/$438` by 230 and shifts right eight bits when `$24a` is nonzero,
-then replaces the logical axes through the existing `$d082` hook. This can produce
-75 → 67 → 60 → 53. The original capture lacks the branch-condition/saved-axis probes,
-so that explanation is not accepted as a runtime proof or a passing joystick result.
+Maximum sampled world-end delay is 260 ms on 030 and 780 ms on A500; maximum retained
+debt is respectively 0 and 160 ms. The 030 completes 851 clean renderer twins, with raster
+code unchanged and no draw active at the final snapshot. These are instrumented correctness
+measurements, not release throughput. No fall-age or impulse samples are nonzero, so this
+run supplies no new evidence for those effects. Full opponent/effect state and a restart
+remain outside this comparison. The 30,000-field `timing-endurance600-1` pair is pending.
 
-New read-only `PDSTEER_EVENT` observations at `$d058` record the branch flag and both
-saved axes. The joystick oracle checks their continuity and independently applies the
-native signed damping arithmetic after checking each current joystick response, then
-checks the next response and final logical axes. No production behavior or tolerance
-changes. `CASE_SET=endurance FIELDS=3000 tools/timing_cpu_matrix.sh` selects a sequential
-030-fast/A500-native pair; shorter windows can isolate a newly reached transition.
-The failed 60-second evidence is retained. A matched passing pair and the 600-second,
-controlled-render-rate/stall and broader lifecycle gates remain outstanding.
+Native contact handling at hunk `$d058–$d090` multiplies saved steering axes `$436/$438`
+by 230 and shifts right eight bits when `$24a` is nonzero, then replaces logical axes
+through the existing `$d082` hook. The joystick checker includes this response as well
+as direct input: `PDSTEER_EVENT` observes the branch flag and both saved axes at `$d058`;
+the independent arithmetic oracle verifies saved-axis continuity, the next response and
+final logical axes. Both CPUs observe three damping updates, including 75 → 67 → 60 → 53.
+The 650-field `timing-contact13-1` reference also passes, with 652 common world states,
+144 common control/input/fuel updates and 156 clean 030 twins. The earlier
+`timing-endurance60-1` log lacks these branch observations and remains insufficient evidence
+for the contact gate; it is not counted as a passing run. No production behavior changed.
 
-The directed 650-field pair (`timing-contact13-1`) now passes: both CPUs observe exactly
-three contact-damping updates and the oracle verifies each, including saved-axis
-continuity and final logical axes. There are 652 common sampled player/engine/RNG states
-and 144 common control/input/fuel updates; all compare exactly. The 030 adds 156 clean
-renderer twins. Maximum sampled delay remains 260 ms on 030 and 780 ms on A500; A500
-reaches 160 ms retained debt and both finish with zero retained/assigned debt. This
-13-second check validates the newly observed contact transition, not the full endurance
-requirement. The original 60-second joystick failure remains recorded as insufficiently
-instrumented evidence. The repeated `timing-endurance60-2/030-25-fast` run passes all
-per-run checks, including 667 joystick updates with three independently verified contact
-responses. The corresponding A500 run now also passes: both configurations complete 3,004 world
-steps and 667 control/resource updates in exactly 3,000 physical PAL fields. All 3,004
-common sampled player/engine/RNG states and 667 control/input/fuel states match exactly.
-Both observe three contact-damping updates. The four extra completed world steps service
-80 ms carried into the sampled window: initial/final unsampled elapsed time is 80/0 ms
-on 030 and 140/60 ms on A500. Neither endpoint has retained or assigned unfinished debt.
+Use `CASE_SET=endurance FIELDS=3000 bash tools/timing_cpu_matrix.sh NEW_OUT FROZEN_SLAVE`
+for the sequential 030-fast/A500-native comparison; `FIELDS=30000` selects ten minutes.
+The frozen coverage slave must include the documented fixed seeds and initial-pit sync.
 
-Maximum sampled world-end delay remains 260 ms on 030 and 780 ms on A500; maximum retained
-debt is respectively 0 and 160 ms. The 030 completes 851 clean renderer twins, with
-raster code unchanged and no draw active at the final snapshot. These observations extend
-the matched input route to 60 seconds. They do not cover a restart, the required ten-minute
-window, full opponent/effect state, or release performance. No fall-age or impulse samples
-are nonzero in this run, so it supplies no new evidence for those effects.
+## Controlled simulation-stall fixture and measured recovery
 
+`TIMING_STALL_TEST=100|250|500` adds a VERIFY-only delay at the next flight allocator entry
+after at least 200 world updates. Native VBL/input interrupts continue while simulation
+waits. The fixture does not rewrite simulation data, timestamps, debt or input queues;
+the normal allocator must account for elapsed time afterward. It injects once per process,
+so restart does not repeat it. It is not a pause or a production render-rate limiter.
 
-## Controlled simulation-stall fixture and 500 ms comparison
+All three A500/native and 030/fast pairs pass. Each observes one hold of the specified
+PAL duration, resumes at the saved next-world cursor, and services elapsed work through
+release. Relative to both unstalled `timing-contact13-1` references, each pair matches
+652 common sampled player/engine/RNG states and 144 common control/input/fuel states
+exactly. All six input events are consumed once and all three contact responses pass.
+Movement, brake, fuel, input and allocator checks pass. Every endpoint has zero retained
+or assigned unfinished debt. The captured 030 drawing comparisons are clean with unchanged
+raster code. The 100 and 250 ms captures end with drawing still active; only completed
+twins are counted, and these endpoints do not establish drawing teardown. The 500 ms
+capture ends with drawing inactive.
 
-`TIMING_STALL_TEST=100|250|500` adds a VERIFY-only delay at the next flight allocator
-entry after at least 200 world updates. It holds the simulation while native VBL/input
-interrupts continue. It does not change simulation data, timestamps, debt or input queues;
-the following normal allocator call must account for the elapsed interval. The fixture
-injects once per process, so restart does not repeat it. It is not a pause or a production
-render-rate limiter. Requested delays are in milliseconds; PAL-field polling produces
-100, 260 and 500 ms respectively, with the 250 ms request rounded up explicitly.
+| Requested delay | Observed delay | Capture pair under `tmp/prof/` | World steps 030/A500 | Controls 030/A500 | Clean 030 twins |
+| --- | --- | --- | ---: | ---: | ---: |
+| 100 ms | 100 ms / 5 PAL fields | `timing-stall100-1` | 652 / 657 | 144 / 146 | 155 |
+| 250 ms | 260 ms / 13 PAL fields | `timing-stall250-1` | 652 / 655 | 144 / 145 | 153 |
+| 500 ms | 500 ms / 25 PAL fields | `timing-stall500-1` | 654 / 656 | 145 / 145 | 151 |
 
-The `PDSTALL1` record stores injection count, absolute physical field at entry/release,
-logical world cursor and allocated tick count at entry, and requested milliseconds.
-`tools/check_timing_stall.py CAPTURE` independently verifies duration, absence of world-end
-observations inside the stall, the exact resume cursor and consecutive 20-ms updates
-through recovery. It also invokes the existing elapsed-time/debt accounting check. Pair
-this with world/input/brake/resource checks and strict cross-CPU state comparisons; it
-does not establish full input/effect ownership or state equivalence by itself.
+The 250 ms request rounds up to the first PAL field at or after the requested duration.
+All windows span exactly 13 physical seconds. Differences in completed work at their
+endpoints are explicitly accounted for below; they are not silent drops or relaxed state
+comparisons.
 
-The checker follows the installed allocator's first BSR and the fixture's PC-relative
-LEA to locate its live record; it does not assume a fixed tag-search distance. All three
-frozen fixture builds pass this direct-reference decoding check.
+| Requested delay | Max sampled delay 030/A500 | Max retained debt 030/A500 | Max allocated steps 030/A500 | Unsampled elapsed start→end, 030 / A500 |
+| --- | ---: | ---: | ---: | --- |
+| 100 ms | 260 / 780 ms | 0 / 0 ms | 12 / 32 | 80→40 / 140→0 ms |
+| 250 ms | 320 / 780 ms | 0 / 160 ms | 17 / 32 | 80→40 / 140→40 ms |
+| 500 ms | 560 / 760 ms | 0 / 0 ms | 29 / 32 | 80→0 / 140→20 ms |
 
-All three fixture variants assemble. Non-VERIFY and invalid-duration builds are rejected.
-An explicit zero fixture produces bytes identical to the frozen full timing prototype;
-the restored normal build also remains byte-identical. The runtime checker accepts
-the timing installer's SR-to-CCR rewrite for 68010+ at the saved-status prologue, retaining
-exact checks on the following call and record-reference instructions. Stall duration uses
-paired guest VBL-counter observations, not an inferred mapping from debugger field numbers.
+These maxima are sampled at world-end probes and can occur later than stall release;
+they are not bounds on all rendering latency or release performance. The results support
+one interruption on this matched route. Repeated/arbitrary stalls, other effects/lifecycle
+states, controlled presentation rates and the ten-minute/restart requirement remain open.
 
-The first 500 ms pair (`timing-stall500-1`) passes on A500/native and 030/fast. Each records
-one exact 25-PAL-field hold after 200 allocated world ticks, resumes at the saved next-world
-cursor and services all elapsed work through release. Both execute six input events once,
-145 logical control/fuel updates and three verified contact-damping responses. Independent
-movement, brake, resource and allocator checks pass. The 030 adds 151 clean completed
-renderer twins, with unchanged raster code and drawing inactive at the endpoint.
+### Stall evidence and build isolation
 
-Compared with both unstalled `timing-contact13-1` references, all four runs match 652 common
-sampled player/engine/RNG states and 144 control/input/fuel updates exactly. Endpoint
-retained/assigned debt is zero. The 030 observes at most 560 ms world-end delay and allocates
-up to 29 steps at once; A500 observes at most 760 ms and allocates up to its 32-step budget.
-The A500 maximum occurs later in the route, not necessarily at release. No retained debt
-is observed at these world-end probes, although unsampled elapsed time and assigned work
-are reported separately. The runs complete 654/656 world steps respectively; their exact
-13-second physical windows include initial/final unsampled time of 80/0 and 140/20 ms.
+`PDSTALL1` records injection count, physical entry/release fields, logical world cursor,
+allocated tick count at entry and requested milliseconds. `tools/check_timing_stall.py`
+checks duration, absence of world-end observations inside the stall, exact resume cursor,
+consecutive 20-ms steps through recovery and independent elapsed-time/debt accounting.
+Input/resource/world comparisons remain separate required gates.
 
-This supports recovery from one 500 ms interruption on the matched route, including
-historical input processing. It does not establish arbitrary/repeated-stall independence,
-all effects or lifecycle handling. The 100 ms result and endpoint accounting are recorded below. The requested-250 ms case,
-controlled presentation rates and the ten-minute/restart requirement remain open.
+The checker follows the installed allocator's first BSR and the fixture's PC-relative LEA
+to locate the live record, avoiding stale loader copies and fixed search-range assumptions.
+It accepts the timing installer's SR-to-CCR rewrite for 68010+ at the saved-status prologue,
+retaining exact checks on subsequent call/reference instructions. Duration uses paired
+guest VBL-counter observations, not an inferred debugger-field offset.
 
+All three variants assemble. Non-VERIFY and invalid-duration builds are rejected. An
+explicit zero fixture is byte-identical to the frozen full timing prototype; the restored
+normal build is also unchanged. Reproduce each pair with `CASE_SET=endurance FIELDS=650`,
+then run `tools/check_timing_stall.py` on both outputs and compare them with the unstalled
+reference using the world, control and resource tools. Use `--accounted-endpoints` for the
+control and resource comparisons.
 
-### Exact endpoint accounting and the 100 ms pair
+### Exact endpoint accounting
 
-The 100 ms pair (`timing-stall100-1`) records one exact five-field hold on each CPU and
-passes each per-run arithmetic/input/debt check. Its initial cross-control comparison
-fails the old heuristic permitting at most one extra endpoint update: 030 completes 144
-controls and A500 completes 146. No common sampled state differs. The clocks explain the
-count difference: initial/final unsampled elapsed is 80/40 ms on 030 and 140/0 ms on A500,
-so A500 services 100 ms more logical time inside the equal 13-second physical window.
+The optional `--accounted-endpoints` mode requires equal physical durations, an unchanged
+session/discard ledger, unpaused and complete boundary controls, continuous world-clock
+observations and the physical elapsed/debt identity. If `S` is the initial next-control
+deadline and `E` is the final next-world cursor, the expected count is
+`max(0, floor((E - 4 - S) / 18) + 1)`, in native 5-ms units. Every observed deadline must
+be `S + 18*i`, and the final control cursor must be `S + 18*count`. Every common state
+still compares exactly. The CPU matrix uses this mode. Legacy callers retain the old
+one-update endpoint allowance unless selecting this stronger proof.
 
-The optional `--accounted-endpoints` mode replaces that guessed count allowance with an
-independent proof, not a larger numerical tolerance. It requires equal physical capture
-durations, an unchanged session/discard ledger, unpaused and complete boundary controls,
-continuous world-clock observations and the physical elapsed/debt identity. If `S` is the
-initial next-control deadline and `E` is the final next-world cursor, the expected count
-is `max(0, floor((E - 4 - S) / 18) + 1)`, in native 5-ms clock units. Every observed deadline
-must equal `S + 18*i`, and the final control cursor must equal `S + 18*count`. Every common
-state still compares exactly. This mode is used by the CPU matrix; legacy checks retain
-the original one-update allowance unless explicitly selecting the stronger accounting.
-
-With this proof the 100 ms pair and both unstalled references match 652 common sampled
-player/engine/RNG states and 144 control/input/fuel states. Both retain all six input events
-and the three contact responses. The 030 adds 155 clean renderer twins. Observed maximum
-world-end delay is 260 ms on 030 and 780 ms on A500; neither has retained debt at sampled
-world ends or unfinished debt at the endpoints. Maximum allocation is 12/32 steps.
-
-The stronger endpoint oracle also passes the existing ten-configuration 10-second matrix
-(111 common control/fuel updates), the full 60-second pair (667), and the 500 ms pair (145).
-The original endpoint-limit failure remains in the raw batch log; the clock-based checks
-and strict reference comparisons are saved separately. No game timing, field exclusions
-or gameplay-value tolerances changed.
+This matters for the 100 ms pair: A500 services 100 ms more logical time inside the equal
+physical window and legitimately completes two extra controls. The raw batch log retains
+the original one-update-limit failure; the clock-based checks and reference comparisons
+are saved separately. This is a change to endpoint verification, not to game cadence,
+field exclusions or gameplay tolerances. The stronger oracle also passes the ten-CPU
+10-second matrix (111 common control/fuel updates), 60-second pair (667), and 500 ms pair
+(145). The ten-minute, full-state, lifecycle and calibration gates remain unproven.

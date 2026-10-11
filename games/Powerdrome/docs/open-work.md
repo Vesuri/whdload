@@ -437,69 +437,40 @@ there is no established stale-render visibility bug to fix. Matched native event
 and accelerated field-ownership evidence remain required.
 
 
-The bounded F7 accelerator matrix now compares the current full timing prototype on
-030/25 fast rendering, 040/25 native/fast and 060/50 native/fast. With the existing
-VERIFY-only 18/24-second initial-pit synchronization fixture, all five configurations
-match 502 common sampled player/engine/RNG states, 111 control/input updates and 111
-fuel updates. Arithmetic/input/debt checks pass, with 358 clean renderer twins. Each
-capture spans exactly 500 physical PAL fields; 502–504 completed world steps account
-for the measured initial/final unsampled elapsed time, with zero endpoint retained debt.
-The corresponding unsynchronized batch matches control/fuel samples but fails RNG
-comparison from the first step: different initial-pit durations produced different
-opponent/RNG histories. No fields are excluded to obtain a pass. This does not finish
-F7 or certify full opponent/effect equivalence, longer windows, stalls, capacity or
-remaining CPU configurations. See the bounded accelerator matrix in timing-implementation.
+Current bounded F7 coverage uses the full experimental timing prototype with fixed seeds
+and the VERIFY-only 18/24-second initial-pit synchronization fixture. The unsynchronized
+batch still fails RNG equality because different initial-pit durations produce different
+opponent histories; no compared fields are excluded to conceal that difference.
 
-The synchronized matrix now also covers A500 without fast RAM, 68000 with 4 MB fast
-RAM and both renderer paths, and A1200/68EC020 native/fast. All ten configurations
-match 502 common sampled player/engine/RNG states and 111 control/input/fuel updates.
-The five new cases add 96 clean twins (454 across both synchronized batches). New
-per-step delay accounting exposes responsiveness limits hidden by zero endpoint debt:
-A500 reaches 780 ms observed delay and 160 ms retained debt; 68000 fast rendering with
-twins reaches 1,120 ms and 380 ms. Both retain the elapsed work and return to zero
-retained debt, although unsampled elapsed time can remain at the endpoint. The 020
-native/fast-twin maxima are 400/580 ms. These instrumented maxima are not release
-performance figures or proof of long-run capacity. Controlled stalls, 60/600-second
-routes, further configurations and the remaining calibration/lifecycle work stay open.
+| Completed check | Exact common sampled world states | Exact control/input/fuel updates | Clean renderer twins |
+| --- | ---: | ---: | ---: |
+| Ten CPU/renderer configurations, 10 seconds | 502 | 111 | 454 |
+| A500/native and 030/fast, 60 seconds | 3,004 | 667 | 851 |
+| 100 ms stall pair plus unstalled references | 652 | 144 | 155 new |
+| 250 ms request (260 ms PAL hold), plus references | 652 | 144 | 153 new |
+| 500 ms stall pair plus unstalled references | 652 | 144 | 151 new |
 
+The ten configurations include A500 without fast RAM, 68000 with fast RAM and native/fast
+rendering, 020 native/fast, 030/25 fast, 040/25 native/fast and 060/50 native/fast. All
+completed windows have zero endpoint retained/assigned debt, but sampled delay is material:
+A500 reaches 780 ms and 68000 fast rendering with twins reaches 1,120 ms. These are
+instrumented observations, not release performance. The 60-second pair accounts explicitly
+for 80 ms carried into the window, producing four extra completed world steps.
 
-A first 60-second 030 capture completes 3,004 world steps, 667 control/fuel updates and
-851 clean renderer twins, but stops the batch at a joystick oracle gap after 10.94 seconds.
-Native contact response damps saved steering axes by 230/256; the old oracle omitted it.
-New read-only contact observations and independent arithmetic/continuity checks pass a
-13-second A500/030 pair with three damping updates each, 652 identical sampled world
-states and 144 identical control/input/fuel updates. No production code or acceptance
-tolerance changed. The repeat of the full 60-second pair is recorded below; the 600-second and controlled
-rate/stall tests remain open.
-
-
-The repeated 60-second A500/030 pair now passes every per-run gate and the cross-CPU
-comparison: 3,004 common sampled player/engine/RNG states and 667 control/input/fuel
-updates match exactly. Both observe three contact responses; the 030 completes 851 clean
-renderer twins. The four world steps beyond 3,000 account for 80 ms brought into the
-window, with no endpoint retained/assigned debt. Sampled delay maxima remain 260 ms on
-030 and 780 ms on A500. This closes the bounded 60-second route comparison, not the
-600-second/restart, full-state, effect calibration or controlled-stall requirements. A VERIFY-only single-stall fixture
-and independent duration/resume/debt checker are prepared for the next F7 experiment.
-Requested 100/250/500 ms delays produce 100/260/500 ms PAL waits. Build isolation passes,
-including byte-identical disabled and normal builds; stall runtime coverage is not yet
-established. See the controlled simulation-stall fixture in timing-implementation.
-
-
-The first 500 ms controlled-stall pair now passes on A500/native and 030/fast. Each holds
-for exactly 25 PAL fields, resumes at its saved logical cursor, preserves input ownership
-and catches up. Both stalled runs and both unstalled references match 652 sampled world
-states and 144 control/input/fuel states at common logical times. The 030 adds 151 clean
-renderer twins. Sampled maximum delays are 560/760 ms (030/A500), with zero endpoint
-retained/assigned debt. The 100/250 ms cases, repeated stalls and controlled render rates
-remain open; this is a bounded single-stall result, not complete F7 coverage.
-
-
-The 100 ms pair now verifies exact five-field holds and recovery on both CPUs, matching
-652 common world states and 144 control/input/fuel states against both unstalled references,
-with 155 clean 030 twins. It exposed an overly narrow endpoint-count heuristic: A500
-completed two more controls, fully explained by 100 ms more serviced logical time within
-the equal physical window. The matrix now derives expected endpoint counts from physical,
+The joystick oracle verifies native contact steering damping by 230/256, including saved
+axis continuity and final state. Endpoint control/fuel counts are derived from physical,
 world and control clocks, with complete boundary controls and unchanged session ledgers;
-common state comparisons remain exact. This stronger check also passes all ten prior CPU
-configurations and the 60-second/500 ms pairs. The requested-250 ms pair is pending.
+common values must match exactly. This replaces a guessed one-update endpoint limit in
+the matrix, without changing game behavior or gameplay tolerances.
+
+All three single-stall pairs verify exact holds, resume cursors, input ownership and
+elapsed-work recovery. Peak sampled delay is 260/780 ms, 320/780 ms and 560/760 ms
+(030/A500 for 100/250/500 ms requests). The 250 ms A500 case retains up to 160 ms debt
+at a sampled world end, then clears it. The fixture is verification-only; disabled
+prototype and normal-build bytes remain unchanged.
+
+The 30,000-field `timing-endurance600-1` A500/030 pair is pending. Ten-minute/restart,
+controlled rendering rates, repeated stalls, full opponent/effect state, further CPU
+configurations, calibration, lifecycle and release gates remain open. See the current
+measurement tables and checker contracts in timing-implementation. Bounded passes do
+not establish whole-game framerate independence.
