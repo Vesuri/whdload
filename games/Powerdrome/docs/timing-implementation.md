@@ -1441,8 +1441,19 @@ logical timestamps. Repair-clock and lap-start results were not exercised in thi
 
 `tools/check_timing_opponent_continuity.py CAPTURE...` checks the continuous ledger at
 every probe, verifies live world RNG is preserved on entry, verifies counter ownership,
-and checks full allocation through each completed world timestamp. It requires a completed
-rescue and at least ten resumed world updates. It does not establish full opponent-array
+and checks exact bounded service through each completed world timestamp: the smaller of
+all owed updates and 32 updates, with every unserved clock unit retained as debt. It
+requires a completed rescue and at least ten resumed world updates. The historical
+`timing-retune4-rescue-030-twins` still passes the ledger/ownership checks. The current
+`timing-playerresult4-pause-030-twins` passes 254 completed world-call checks and 364
+movement samples in `--flight-only --stable-lap-domain` mode, including its initially
+capped backlog. That pause window has no lap-clock reads and is not lap-domain evidence.
+
+For current WORLD20 captures, add `--stable-lap-domain`: lap readers use the retained lap
+epoch while repair readers retain their sampled physical mapping. This mode requires
+unchanged epoch/reset diagnostics between terminal snapshots; a countdown reset requires
+a separate reset-boundary audit. The A500 rescue counterpart is still pending. These
+checks do not establish full opponent-array
 equivalence or native A500 calibration. `check_timing_pit.py` and
 `check_timing_pit_lifecycle.py` independently verify the suspended player's boundary:
 four assigned player steps are discarded, then flight resumes with one 20-ms step and

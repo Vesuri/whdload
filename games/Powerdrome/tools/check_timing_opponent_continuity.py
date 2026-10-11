@@ -8,11 +8,24 @@ opponent state equivalence, native A500 calibration, or arbitrary mode exits.
 import argparse
 import json
 import re
+import struct
 from collections import Counter
 from pathlib import Path
 
 
-def check(root, flight_only=False):
+def check(root, flight_only=False, stable_lap_domain=False):
+    lap_epoch = None
+    if stable_lap_domain:
+        game = int((root / "game-base.txt").read_text(), 0)
+        base = int((root / "dump-base.txt").read_text(), 0)
+        chip = (root / "chip.bin").read_bytes()
+        before_code = (root / "code.bin").read_bytes()
+        after_code = (root / "final-code.bin").read_bytes()
+        frame = struct.unpack_from(">I", chip, game+0xca46)[0]-base
+        lap = before_code.find(b"PDLAP001", frame, frame+16384)
+        assert lap >= 0, "Stable lap diagnostics missing"
+        lap_epoch, reset_count = [struct.unpack_from(">I", before_code, lap+i)[0] for i in (8, 24)]
+        assert [struct.unpack_from(">I", after_code, lap+i)[0] for i in (8, 24)] == [lap_epoch, reset_count], "Lap epoch changed: use a capture with reset-boundary observations"
     if flight_only:
         cfg = json.loads((root / 'configuration.json').read_text())
         assert re.search(r'\bCUSTOM5=8\b', cfg['WHD_ARGS']) and int(cfg['FIELDS']) == 300
@@ -74,7 +87,10 @@ def check(root, flight_only=False):
             register = {0xd4bc: 20, 0xd504: 19, 0xd7fe: 20,
                         0xd83c: 20, 0xd86c: 20}.get(off)
             if register is not None:
-                assert t[register] == t[9], f'Incorrect logical clock at {off:#x}'
+                expected = t[9]
+                if lap_epoch is not None and off in (0xd7fe, 0xd83c, 0xd86c):
+                    expected = (lap_epoch+t[5]-origin+18) & 0xffffffff
+                assert t[register] == expected, f'Incorrect logical clock at {off:#x}'
                 clocks[off] += 1
         if off == 0xce28:
             assert entered is not None and returned is None and before is None
@@ -90,7 +106,11 @@ def check(root, flight_only=False):
             assert t[1] == t[2] == t[22] == 0
             assert t[18] == flight_before[18], 'Player world counter not restored'
             assert t[4] == t[25], 'Flight allocation did not reach world time'
-            assert t[8] == (t[25] - origin) // 18 + 1 and t[6] < 18
+            # One flight call serves at most 32 owed updates. Initial-pit or
+            # stalled-render backlog remains explicit instead of vanishing.
+            owed = (t[25] - origin) // 18 + 1
+            assert t[8] == min(owed, flight_before[8]+32), 'Incorrect bounded flight service'
+            assert t[6] == t[25]-origin+18-t[8]*18, 'Flight lost retained opponent debt'
             if t[8] == flight_before[8]:
                 assert t[17] == flight_before[17], 'No-update call changed RNG'
             if returned is not None and post_updates and flight_restores == 0:
@@ -119,6 +139,8 @@ if __name__ == '__main__':
     parser.add_argument('captures', type=Path, nargs='+')
     parser.add_argument('--flight-only', action='store_true',
                         help='Check the bounded 300-field CUSTOM5=8 pause route without requiring a pit')
+    parser.add_argument("--stable-lap-domain", action="store_true",
+                        help="Check lap reads against the retained logical epoch; repair reads retain sampled mapping")
     args = parser.parse_args()
     for capture in args.captures:
-        check(capture, args.flight_only)
+        check(capture, args.flight_only, args.stable_lap_domain)
