@@ -3,6 +3,8 @@
 #   amiga/run.sh            windowed, real speed, with sound
 #   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger)
 #   JOY0=none amiga/run.sh  leave port 0 empty (the host mouse otherwise injects input)
+#   WINDOW=back|none        keep the window behind others / run headless (default: back for
+#                           DEBUG=1 or warp runs, front otherwise)
 #   SLAVE=path amiga/run.sh run another slave build instead of the installed one
 # Shared files (amiga/env.sh; each variable overrides): KICKSTART, KICK13, RTB, WORKBENCH_ADF,
 # WHDLOAD_BINARY.
@@ -63,7 +65,12 @@ for p in 0 1; do
 done
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
-"${FSUAE:-fs-uae}" \
+# Window placement from the shared helper: debug/warp runs open behind the active window
+# (WINDOW=front|back|none overrides). Only FSUAE_WINDOW is used; the options below are our own.
+fsuae_options
+WINDOW_ARGS=(); [ "$FSUAE_WINDOW" = none ] && WINDOW_ARGS=(--video_driver=null)
+# The subshell execs, so $! is the emulator itself.
+( fsuae_env; exec "${FSUAE:-fs-uae}" \
   --base_dir="$PWD/$RUN/fsuae" \
   --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-512}" --fast_memory="${FAST_KB:-0}" \
   --kickstart_file="$KICKSTART" \
@@ -72,6 +79,6 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSE
   --joystick_port_0="${JOY0:-mouse}" --joystick_port_1="${JOY1:-keyboard}" \
   --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
   --uae_ntsc="$UAE_NTSC" --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
-  "${PORTS[@]}" "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" ${EXTRA_ARGS:---slow_memory=1536} > "$RUN/fsuae.log" 2>&1 &
+  "${PORTS[@]}" "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" "${WINDOW_ARGS[@]}" ${EXTRA_ARGS:---slow_memory=1536} ) > "$RUN/fsuae.log" 2>&1 &
 fsuae_track $!
 echo "fs-uae pid $FSUAE_PID (log $RUN/fsuae.log, port $DEBUG_PORT)"
