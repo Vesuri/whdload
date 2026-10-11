@@ -1,6 +1,6 @@
 # Powerdrome internals
 
-Project status: completion-plan Phase C is in progress. Phases A and B are complete.
+Project status: completion-plan Phase C is complete. Work stopped before Phase D.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Current measurements
@@ -130,8 +130,24 @@ above its p95; these are measured values, not a stationary scene benchmark.
 
 ## Phase C measurements and decisions
 
-Phase C is in progress. C1 passes its performance and correctness gates and is retained.
+Phase C is complete. C1 and C2 are retained; C3 needs no change; C4 is rejected.
+Work stopped before Phase D. Release defaults and WHDLoad cache policy are unchanged.
 The Phase B table above remains the frozen comparison baseline.
+
+Final full-timing Practice throughput, NoCache, 500-field driving windows:
+
+| Machine | Phase B fps | Retained Phase C fps | Change |
+| --- | ---: | ---: | ---: |
+| M4 | 21.881 | 24.291 | +11.01% |
+| M5 | 31.552 | 39.178 | +24.17% |
+| M6 | 41.984 | 45.291 | +7.88% |
+| M7 | 42.886 | 45.792 | +6.78% |
+
+With CACHE, M5 also reaches 39.178 fps; M6/M7 remain at 49.098 fps. These gains
+are end-to-end route throughput, not fixed-scene instruction-cost comparisons.
+The retained defaults are unchanged; this is not a claim that every machine now
+reaches 50 fps.
+
 
 ### Wait-overlap candidate performance (C1)
 
@@ -224,6 +240,29 @@ HUD in that extent; it also uses the blitter. Leave it native. B2 measures the w
 presentation call, including LoadView, at about 0.11 ms on M6/M7, below 1% of a frame
 and therefore below the 3% investigation threshold. No MOVE16 or cache-policy change
 is introduced.
+
+### Stock A1200 chip-code trial (C4, rejected)
+
+M3 with WHDLoad CACHE, full timing, Practice, 500 fields from `$bc7c`:
+
+| Configuration | Intervals/fields | fps | Fields 1/2/3+ |
+| --- | ---: | ---: | --- |
+| Native raster control | 144/494 | 14.575 | 0/13/131 |
+| Static raster code in chip RAM, no staging | 139/495 | 14.040 | 0/8/131 |
+
+The candidate is 3.67% slower, failing the required 3% gain. Its live snapshot confirms
+that static code is in chip RAM, the bitmap pointer is zero, and copied code remains
+unchanged. Only the code portion of the existing chip-backed private arena was used;
+there was no production staging bitmap. The experiment and its assembly flag are
+removed. M3 keeps native raster routing. No twin acceptance is claimed or needed for
+a candidate rejected by its performance gate. Evidence: `tmp/phase-c/c4/decision.json`
+and the two matched captures.
+
+The chip-only capture helper now selects chip memory for its slave snapshot and
+rejects missing/short dumps. Older M3 auxiliary dumps could retain unrelated scratch
+contents after an unmapped slow-memory read; they are not used for C4 diagnostics.
+The earlier M3 driving counts used live chip-resident game/VBL addresses and the
+new control reproduces the full-timing 144/494 count.
 
 ## Inputs and loader
 

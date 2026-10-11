@@ -1,6 +1,6 @@
 # Raster improvement plan and results
 
-Project status: completion-plan Phase C is in progress. Phases A and B are complete.
+Project status: completion-plan Phase C is complete. Work stopped before Phase D.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Scope: further optimize the existing planar fast-memory rasterizer behind `CUSTOM1=1`.

@@ -100,7 +100,7 @@ which has opponents on screen and is the heavier scene.
 
 ## Phase A: Consolidate the timing prototype (no behaviour change)
 
-Status: **A1 and A2 complete**, byte-equivalence gates passed. Phase B is also complete; Phase C is in progress and Phases D–F remain untouched.
+Status: **A1 and A2 complete**, byte-equivalence gates passed. Phase B is also complete; Phase C is complete and Phases D–F remain untouched.
 See [open work](open-work.md) for the exact configuration and file hashes.
 
 **A1. Pick one release configuration.** Find the flag set behind the most recent complete
@@ -131,7 +131,7 @@ captures are complete, all six existing native references match exactly, and all
 8 MHz checks are slower. B3 measures 10,357.86 mean / 18,778 p95 cycles per complete
 A500 world body; the 8.23% Practice fps loss retains D2's native 68000/68010 timing.
 See [Current measurements](internals.md#current-measurements) and [open work](open-work.md).
-Phase C is now in progress.
+Phase C is now complete.
 
 **B1. Guest phase timer (VERIFY only).** Add a ring of `PDPHASE` records. Each holds the
 VBL count, `VPOSR`/`VHPOSR` and a phase id, written at hooks that already exist, plus these:
@@ -163,10 +163,13 @@ Commit B1–B3: "Add frame phase timer and baseline performance matrix".
 
 ## Phase C: 50 fps on 68020+ with fast RAM
 
-Status: **in progress**. C1 passes and is retained. C3 is assessed with no change:
-copy already uses aligned MOVEM blocks, HUD exceeds the staging extent, and LoadView
-is below threshold. C2 passes its specific code-write, twin and screenshot gates and is retained;
-its modest throughput gains are reported separately. C4 remains. See [measurements](internals.md#phase-c-measurements-and-decisions).
+Status: **complete; stopped before Phase D**. C1's performance, 308-copy beam-ordering
+and M4/M5/M7 twin gates pass. C2's specific code-write, twin and screenshot gates
+pass, with modest throughput gains. Both are retained in separate commits. C3
+needs no change: copy already uses aligned MOVEM blocks, HUD exceeds the staging
+extent, and presentation is below threshold. C4 is dropped after M3/CACHE slows
+from 144/494 (14.575 fps) to 139/495 (14.040 fps), failing its 3% improvement gate.
+The chip-code experiment is removed. See [measurements](internals.md#phase-c-measurements-and-decisions).
 
 Work through these in order of their B2 phase share. Measure each one on M4–M7 and keep it
 only if it measures better.

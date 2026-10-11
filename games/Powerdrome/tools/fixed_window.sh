@@ -31,6 +31,9 @@ config['slave_sha256']=hashlib.sha256((out/'slave.slave').read_bytes()).hexdiges
 PYCONFIG
 
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB*1024))
+elif [[ "$EXTRA_ARGS" == *--slow_memory=0* ]]; then
+  # Chip-only A1200: WHDLoad's expansion and the slave live in chip RAM.
+  BASE=0; SIZE=$((CHIP_KB*1024))
 else BASE=0xc00000; SIZE=1572864; fi
 pd() { python3 tools/powerdrome.py "$@"; }
 cleanup() {
@@ -64,8 +67,12 @@ start() {
   return 1
 }
 dumpmem() {
+  rm -f tmp/window-chip.bin tmp/window-other.bin
   pd gdb "dump binary memory tmp/window-chip.bin 0 $((CHIP_KB*1024))" > /dev/null
   pd gdb "dump binary memory tmp/window-other.bin $BASE $((BASE+SIZE))" > /dev/null
+  # gdb command text can contain an error even when the transport exits zero.
+  [ "$(wc -c < tmp/window-chip.bin)" -eq "$((CHIP_KB*1024))" ]
+  [ "$(wc -c < tmp/window-other.bin)" -eq "$SIZE" ]
 }
 locate() {
   python3 - "$BASE" <<'PYLOC'

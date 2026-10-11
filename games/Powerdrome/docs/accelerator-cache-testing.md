@@ -1,6 +1,6 @@
 # Accelerator and cache testing
 
-Project status: completion-plan Phase C is in progress. Phases A and B are complete.
+Project status: completion-plan Phase C is complete. Work stopped before Phase D.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Completion-plan C2 now routes fallback polygons through installed static raster

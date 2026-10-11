@@ -1,6 +1,6 @@
 # Development
 
-Project status: completion-plan Phase C is in progress. Phases A and B are complete.
+Project status: completion-plan Phase C is complete. Work stopped before Phase D.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Inputs and shared tools
@@ -144,6 +144,14 @@ CPU destination coverage does not imply DMA coverage or cover unexecuted paths.
 with a preceding presentation follows a recorded completed wait and a later VBL.
 Use an ordinary C4=0 phase build for this ordering gate. C4=1 twins intentionally
 wait before their native reference drawing, which writes into chip memory early.
+
+For chip-only M3 (`FAST_KB=0`, `--slow_memory=0`), `fixed_window.sh` stores the chip
+snapshot as `code.bin` too, with `dump-base.txt` equal to zero. WHDLoad's slave and
+reserved expansion are physically chip-backed in this configuration. The helper
+removes old scratch dumps before reading and checks both file sizes so a failed
+debugger read cannot silently reuse an earlier machine's snapshot. Older M3
+auxiliary `code.bin` dumps are not valid slave-diagnostic evidence; use their chip
+snapshots. Their driving counts came from the live game/VBL addresses in chip RAM.
 
 ### Full timing development configuration
 

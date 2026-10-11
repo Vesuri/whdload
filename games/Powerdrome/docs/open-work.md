@@ -2,10 +2,10 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
-## Phase C in progress
+## Phase C complete — stopped before Phase D
 
-D1–D5 are confirmed. Phases A and B are complete. Phase C is now authorized;
-Phases D–F and release-default changes remain outside the active goal.
+D1–D5 are confirmed. Phases A–C are complete. No Phase D–F work or release-default
+change has been made. The next phase, when requested, is D (A500 candidates).
 
 C1 is complete and retained. Its normal/weather write audits have no unhandled
 operations. Staged drawing now defers the handshake until immediately before copy;
@@ -26,8 +26,19 @@ are pixel-identical; M4/M5/M7 twins pass with nonzero staged-scene coverage. All
 NoCache throughput comparisons improve; cached M6/M7 remain at 49.098 fps.
 C2 is retained for its specific no-SMC correctness gate, with modest performance
 gains reported rather than claiming the general 3% optimization threshold.
-Evidence is under `tmp/phase-c/c2/`. C4 remains open.
-No Phase C gate has failed.
+Evidence is under `tmp/phase-c/c2/`.
+
+C4 is complete and rejected: M3/CACHE with code-only chip placement slows from
+144/494 = 14.575 fps to 139/495 = 14.040 fps (3.67% slower), failing the required
+3% gain. The snapshot proves code in chip RAM and no bitmap staging. The experiment
+and its assembly flag are removed; no twin acceptance is claimed for the rejected
+candidate. Evidence is under `tmp/phase-c/c4/`, including `decision.json`.
+
+The chip-only capture correction is retained: the slave snapshot comes from chip
+RAM, and missing/short dumps fail instead of reusing scratch files. Older M3
+auxiliary dumps are not used as diagnostic evidence. All retained C1/C2 gates pass;
+C4's single performance failure is resolved by dropping it as the plan directs.
+The normal build is restored. Cache policy and option defaults remain unchanged.
 
 ### Completed baseline gates
 
