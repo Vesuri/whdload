@@ -3476,6 +3476,23 @@ word shifted right by two. The zero test at `$dd28` succeeds only for updated se
 analyzing the actual seed stream and other callers. A directed seed test could exercise
 native transitions but would not replace the required natural A500 episode.
 
+### Weather sampling schema
+
+`tools/weather_state.py` defines 20 native clock/state fields plus D0/D1/D7/SP for
+`PDWEATHER_EVENT`, including both deadlines, forecast/transition state, steering offsets,
+effect generation/lifetime, current/target gear and RNG. Its probe builder contains only
+read-only `printf` expressions. The 35 selected PCs cover native eligibility, deadline
+arithmetic/commit boundaries, positive/negative fade updates, target-gear changes and
+effect rendering. Their instruction boundaries have been checked against the native code.
+Snapshot extraction also reproduces the existing weather capture's active initial and
+inactive final state. Printf escaping matches the current capture-tool convention.
+
+Capture-tool integration and runtime event validation are pending. The module is kept
+separate while the ten-minute capture runs, so that capture retains its unchanged sampling
+schema. Once integrated, require paired before/after observations and original A500 cadence
+measurements before implementing weather scheduling. The module itself is not a weather
+correctness or calibration gate.
+
 Next implementation gates:
 
 1. Capture an eligible natural weather episode on the original A500 and the full prototype.
