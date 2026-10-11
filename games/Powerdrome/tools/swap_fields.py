@@ -286,6 +286,12 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += 'printf "PDPLAYER_CLOCK %d ' + hex(off) + ' ' + ' '.join(['%u']*len(clock_values)) + '\\n", $pd_field, ' + ', '.join(clock_values) + '\n'
         if off in (0x10bf8,0x10c00,0xf110,0xf118):
             sample += player_contract_sample.replace('{off}',hex(off))
+        if off in (0x148d0,0x14962,0x14970,0x14a18,0x14aa6,0x14ac4):
+            repair_values=[f'(unsigned int)${reg}' for reg in ('d4','d5','d6','d7')]
+            repair_values += [f'*(unsigned short*){state+x:#x}' for x in (0x46e,0x470,0x472,0x474,0x47c)]
+            repair_values += [f'*(unsigned int*){r["game"][0]+x:#x}' for x in (0xf96,0x48fe)]
+            repair_values += [f'*(unsigned short*){state+x:#x}' for x in (0xb6,0xdc,0x13e)]
+            sample += 'printf "PDREPAIR_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(repair_values)) + '\\n", $pd_field, ' + ', '.join(repair_values) + '\n'
         if off in (0x9950,0x9a08):
             animation_values=['(unsigned int)$a5']
             animation_values += [f'*(unsigned short*)($a5+{x})' for x in

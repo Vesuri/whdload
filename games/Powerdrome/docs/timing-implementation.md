@@ -1402,6 +1402,57 @@ comparisons. The normal slave is byte-identical to the previous checkpoint. The 
 hook layout audit passes, including the ten-byte rescue call replacement; the existing
 native C3-off snapshots retain original bytes at that range.
 
+### Repair animation pacing: measured baseline and next correction
+
+The native item-0/item-1 branch of `$147a8` performs two 33-step drawing loops. The first
+runs from `$148d0` through `$14962`; the second from `$14970` through `$14aa6`, with its
+drawing body at `$14a18`. Word position increments are applied once per iteration. The
+second stage also performs a sound/display sequence before counter 31, so a longer
+post-draw interval there must not be treated as ordinary movement work.
+
+Read-only `PDREPAIR_EVENT` probes record D4–D7, the five position/item words at
+`state+$46e/$470/$472/$474/$47c`, native clock/VBL counters and mode/pit/lap words.
+`timing_repair_loops.py` requires all counters 32 through 0 in both stages before crediting
+a complete invocation. The initial entry timestamp comes from the stopped anchor snapshot;
+later entry/exit probes separate drawing-body duration from intervening waits. Unfinished
+trailing stages are reported explicitly. The presentation marker `$e296` only drives the
+capture tool; its derived frame rate is not a performance benchmark for this experiment.
+
+`timing-repairloop2-native-a500` uses the frozen playercontract1 slave with
+`CUSTOM1=0 CUSTOM3=0 CUSTOM4=0 CUSTOM5=13 NoCache`, no fast RAM, and 1,000 fields from
+`$148d0`. All declared C3 hook bytes remain native in both snapshots. The corresponding
+current WORLD20 030 capture is `timing-repairloop2-before-030-twins`.
+
+| Item 1, direction | Native A500 stage 1 | Native A500 stage 2, including wait | Native A500 full invocation | Current 030 full invocation |
+| --- | ---: | ---: | ---: | ---: |
+| 0 | 3,760 ms | 4,500 ms | 8,260 ms | 6,120 ms |
+| 1 | 3,820 ms | 5,020 ms | 8,840 ms | 6,200 ms |
+
+Each invocation retains all 66 recorded word-geometry states across CPUs. Native ordinary
+drawing-body samples are 100–120 ms; the current 030 samples are 40–80 ms. The native
+second-stage wait before counter 31 is **1,140 ms** in both directions, producing a
+1,240-ms post-draw interval. On 030 that wait is 1,100/1,180 ms. These sound/display waits
+must retain their native event ordering. Item 0 has only a partial native reference in
+this window; its extended A500 measurement is pending.
+
+```sh
+python3 tools/timing_repair_loops.py tmp/prof/timing-repairloop2-native-a500 tmp/prof/timing-repairloop2-before-030-twins
+python3 tools/check_timing_layout.py --off-capture tmp/prof/timing-repairloop2-native-a500
+```
+
+Next steps for this correction:
+
+1. Finish native A500 measurements of both item variants and directions, retaining the
+   full geometry sequence and separately measured sound/display pause.
+2. Add opt-in elapsed deadlines for the drawing steps. Retain lateness and native step
+   order; start a new timing segment after the deliberate sound/display pause so it is
+   not serviced as movement catch-up. Select periods from the measured A500 stages.
+3. Verify full geometry, stage/invocation duration, native stack/nonlocal-exit contracts
+   and opponent-time accounting on A500 and 030. Apply the existing calibration bounds;
+   do not count a CPU overrun or partial sequence as a pass.
+4. Extend to the other repair-animation branches and complete pit/lifecycle regressions.
+   These two loops alone do not cover every repair or the full F6/F7 scope.
+
 ### Continuous opponent time across flight and rescue
 
 The WORLD20 development build gives opponents an independent 18-unit (90-ms) deadline
