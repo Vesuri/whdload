@@ -471,3 +471,11 @@ New read-only contact observations and independent arithmetic/continuity checks 
 states and 144 identical control/input/fuel updates. No production code or acceptance
 tolerance changed. Repeat the full 60-second pair with these observations before claiming
 endurance coverage; 600-second and controlled rate/stall tests remain open.
+
+
+The repeated 60-second 030 run now passes every per-run gate, including the three contact
+responses; its paired A500 run/comparison is pending. A VERIFY-only single-stall fixture
+and independent duration/resume/debt checker are prepared for the next F7 experiment.
+Requested 100/250/500 ms delays produce 100/260/500 ms PAL waits. Build isolation passes,
+including byte-identical disabled and normal builds; stall runtime coverage is not yet
+established. See the controlled simulation-stall fixture in timing-implementation.

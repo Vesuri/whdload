@@ -3278,4 +3278,31 @@ renderer twins. Maximum sampled delay remains 260 ms on 030 and 780 ms on A500; 
 reaches 160 ms retained debt and both finish with zero retained/assigned debt. This
 13-second check validates the newly observed contact transition, not the full endurance
 requirement. The original 60-second joystick failure remains recorded as insufficiently
-instrumented evidence pending a new capture.
+instrumented evidence. The repeated `timing-endurance60-2/030-25-fast` run passes all
+per-run checks, including 667 joystick updates with three independently verified contact
+responses. The corresponding A500 run and full-window cross-CPU comparison are pending.
+
+
+## Controlled simulation-stall fixture (runtime validation pending)
+
+`TIMING_STALL_TEST=100|250|500` adds a VERIFY-only delay at the next flight allocator
+entry after at least 200 world updates. It holds the simulation while native VBL/input
+interrupts continue. It does not change simulation data, timestamps, debt or input queues;
+the following normal allocator call must account for the elapsed interval. The fixture
+injects once per process, so restart does not repeat it. It is not a pause or a production
+render-rate limiter. Requested delays are in milliseconds; PAL-field polling produces
+100, 260 and 500 ms respectively, with the 250 ms request rounded up explicitly.
+
+The `PDSTALL1` record stores injection count, absolute physical field at entry/release,
+logical world cursor and allocated tick count at entry, and requested milliseconds.
+`tools/check_timing_stall.py CAPTURE` independently verifies duration, absence of world-end
+observations inside the stall, the exact resume cursor and consecutive 20-ms updates
+through recovery. It also invokes the existing elapsed-time/debt accounting check. Pair
+this with world/input/brake/resource checks and strict cross-CPU state comparisons; it
+does not establish full input/effect ownership or state equivalence by itself.
+
+All three fixture variants assemble. Non-VERIFY and invalid-duration builds are rejected.
+An explicit zero fixture produces bytes identical to the frozen full timing prototype;
+the restored normal build also remains byte-identical. Runtime captures and validation
+of register/interrupt assumptions remain pending. No stall-independence claim is made
+from these build checks.

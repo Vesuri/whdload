@@ -154,6 +154,24 @@ TIMING_PLAYER_RESULT_TEST = 0
  FAIL "TIMING_PLAYER_RESULT_TEST must be 0 or 1"
  ENDC
  ENDC
+ IFND TIMING_STALL_TEST
+TIMING_STALL_TEST = 0
+ ENDC
+ IFNE TIMING_STALL_TEST
+ IFND VERIFY
+ FAIL "TIMING_STALL_TEST requires VERIFY"
+ ENDC
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_STALL_TEST requires TIMING_WORLD20"
+ ENDC
+ IFNE TIMING_STALL_TEST-100
+ IFNE TIMING_STALL_TEST-250
+ IFNE TIMING_STALL_TEST-500
+ FAIL "TIMING_STALL_TEST must be 0, 100, 250 or 500 milliseconds"
+ ENDC
+ ENDC
+ ENDC
+ ENDC
  IFND TIMING_PIT_SYNC_TEST
 TIMING_PIT_SYNC_TEST = 0
  ENDC
@@ -649,6 +667,9 @@ pl_periodic PL_START
 timing_frame
  move.w sr,-(sp)
  movem.l d0-d2/a0-a1,-(sp)
+ IFNE TIMING_STALL_TEST
+ bsr timing_stall_test
+ ENDC
  bsr timing_clock
  lea timing_state(pc),a1
  move.l perf_game(pc),a0
@@ -1179,3 +1200,5 @@ timing_control_phase dc.w 1
  IFNE TIMING_WORLD
  INCLUDE timing_world.s
  ENDC
+
+ INCLUDE timing_stall_test.s
