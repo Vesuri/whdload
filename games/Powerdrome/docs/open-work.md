@@ -394,3 +394,13 @@ pilot stays disabled by default; the normal build is unchanged. Next audit the p
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.
+
+The current high-speed brake audit confirms a remaining calibration mismatch rather
+than a duplicate-decrement bug. Native A500 executes eight decrements and finishes at
+speed 108; both current WORLD20 A500/030 builds execute all fifteen owed brake events and
+finish at 53. All eleven held-command logical control states match across CPUs, native
+clamp/damping arithmetic passes, and input/brake queues retain no debt or overflow. The
+030 adds 72 clean completed renderer comparisons. The original slowdown depends on scene
+render time; the representative-handling versus scene-dependent reference policy remains
+unresolved, and the native response gate remains failing. Cadences and tolerances are
+unchanged. See the current brake arithmetic audit in timing-implementation.

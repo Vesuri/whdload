@@ -325,6 +325,11 @@ if os.environ.get('TIMING_STATE') == '1':
             message_values += [f'*(unsigned int*){r["game"][0]+x:#x}' for x in (0xf96,0x48fe)]
             message_values += [f'(unsigned int)${reg}' for reg in ('d0','d7','sp')]
             sample += 'printf "PDMESSAGE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(message_values)) + '\\n", $pd_field, ' + ', '.join(message_values) + '\n'
+        if off in (0xcf2e, 0xd000, 0xd022, 0xd038, 0xd058):
+            bv = [f'*(unsigned short*){state+x:#x}' for x in
+                  (0x194,0x454,0x1f0,0x138,0x1ba,0xe4,0x432,0x422)]
+            bv += [f'*(unsigned char*){state+0x427:#x}', '(unsigned int)$d7']
+            sample += 'printf "PDBCTL_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(bv)) + '\\n", $pd_field, ' + ', '.join(bv) + '\n'
         if off in (0x148d0,0x148d8,0x14962,0x14970,0x14a18,0x14a20,0x14aa6,0x14ac4):
             sample += repair_pace_sample.replace('{off}',hex(off))
             sample += repair_drop_sample.replace('{off}',hex(off))

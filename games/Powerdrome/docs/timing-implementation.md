@@ -1106,6 +1106,65 @@ reproduce both native responses within the current bounds. The reference-policy 
 between consistent representative A500 handling and reproducing scene-dependent slowdown
 is pending; do not silently relax the bounds or claim this calibration complete.
 
+### Current high-speed brake arithmetic audit
+
+The current full WORLD20 build, with repair pacing/drop enabled and all repair-input,
+result and initial-pit synchronization fixtures disabled, reproduces this distinction.
+`timing-brakeaudit1-native-a500`, `timing-brakeaudit1-periodic-a500` and
+`timing-brakeaudit1-periodic-030-twins` use the same frozen input fixture and a 300-field
+window from `$bc7c`. The native run disables CUSTOM3; the candidates enable it. These
+read-only control-boundary captures are not throughput measurements.
+
+| Measured behavior | Native A500 | Periodic A500 | Periodic 030/25 |
+| --- | ---: | ---: | ---: |
+| Brake decrements during held command | 8 native | 15 queued | 15 queued |
+| Control calls during held logical command | 8 | 11 | 11 |
+| Cruise speed | 140 | 140 | 140 |
+| Post-command speed | 108 | 53 | 53 |
+| Brake/input queue overflow or remaining debt | Not applicable | 0 | 0 |
+
+At native fixture fields **100, 103, 107, 111, 120, 128, 136, 144**, entry speeds are
+329, 230, 181, 156, 144, 135, 126, 117. Each brake body subtracts **9**. The native
+`$d038–$d058` operation first clamps negative speed to zero, then subtracts half of any
+excess over cruise (integer division), yielding 230, 181, 156, 144, 135, 126, 117, **108**.
+All eight brake decrements and 52 exercised clamp/damping calls pass exact arithmetic.
+The last three native inter-call intervals are 160 ms.
+
+Both corrected CPUs have **identical eleven held-command control states** at logical
+2,070–2,970 ms in 90-ms increments. Entry speeds are 320, 212, 167, 145, 134, 116, 107,
+98, 89, 71, 62; control exit speeds are 230, 176, 154, 143, 134, 116, 107, 98, 89, 71, 62.
+The final queued brake event brings speed to **53**. The native brake body makes **no**
+additional speed subtraction in either candidate: its decrement sites are NOPed, so the
+faster braking is not a duplicated native decrement. All 58 sampled damping operations
+on each CPU retain native arithmetic. The separate existing brake verifier proves 15/15
+owed events, and the joystick verifier checks 67 logical updates and six timestamped
+input events per CPU. The 030 adds **72 completed clean renderer comparisons**, with no
+pixel/guard/scratch/register failures and unchanged raster code; its ending snapshot is
+inside an active staged draw, so it is not a completed teardown check.
+
+Physical observation fields differ and are retained in the audit report. Only the
+hardware-independent logical timestamps and full recorded brake-control states are
+compared across CPUs; deferred controls are not reassigned to their observation time.
+This confirms the bounded scheduling/arithmetic behavior but **does not pass the native
+high-speed response calibration**. The outstanding reference-policy choice is whether
+representative normal A500 handling should define one stable cadence or whether the
+original scene-dependent slowdown should also be reproduced. No period, brake strength,
+acceptance tolerance or production behavior was changed by this audit.
+
+`PDBCTL_EVENT` records speed, cruise limit, brake amount, damage, fuel, engine state,
+buttons, input mode, sampled joystick and D7. Add probes
+`0xcf2e 0xd000 0xd022 0xd038 0xd058 0xccee` with TIMING_STATE; candidates also use
+TIMING_EARLY. The checker distinguishes native per-call decrements from the disabled
+native body in periodic builds and verifies clamp/damping arithmetic independently.
+It rejects unscheduled control calls rather than hiding them in cadence statistics.
+
+```sh
+python3 tools/check_brake_control.py tmp/prof/timing-brakeaudit1-native-a500
+python3 tools/check_brake_control.py tmp/prof/timing-brakeaudit1-periodic-a500 tmp/prof/timing-brakeaudit1-periodic-030-twins
+python3 tools/check_timing_brake.py tmp/prof/timing-brakeaudit1-periodic-a500 tmp/prof/timing-brakeaudit1-periodic-030-twins
+python3 tools/check_timing_joystick.py tmp/prof/timing-brakeaudit1-periodic-a500 tmp/prof/timing-brakeaudit1-periodic-030-twins
+```
+
 ## Response measurements and next required correction
 
 `tools/timing_response.py REFERENCE CAPTURE...` normalizes observations to the input
