@@ -271,6 +271,7 @@ timing_weather_clock dc.b 'PDWECLK1'
  IFNE TIMING_WEATHER_EFFECT_TEST
 ; Directed effect-only fixtures. No clock/input rewrite or cache changes.
 ; Mode 1 publishes an existing effect; mode 2 seeds a successful native selection.
+; Mode 3 seeds an immediate sound plus a four-cycle delay for a second request.
 ; Suppress native forecasts so this isolates generation, drawing and RNG ownership,
 ; not forecast/fade/steering calibration. Trigger once per process on a weather-loop boundary.
 timing_weather_effect_test
@@ -294,12 +295,24 @@ timing_weather_effect_test
  clr.w $4ce(a6)
  clr.w $4d2(a6)
  ELSE
+ IFEQ TIMING_WEATHER_EFFECT_TEST-3
+ ; 557 -> 44 (lifetime 0), then 6005 (delay 4). Native generation owns both calls.
+ move.w #557,$62(a6)
+ clr.w $4ce(a6)
+ move.w #1,$4d2(a6)
+ ELSE
  move.w #5,$4ce(a6)
  move.w #4,$4d2(a6)
  ENDC
+ ENDC
 .done
  rts
-timing_weather_effect_test_state dc.b 'PDWEFT01'
+timing_weather_effect_test_state
+ IFEQ TIMING_WEATHER_EFFECT_TEST-3
+ dc.b 'PDWEFT03'
+ ELSE
+ dc.b 'PDWEFT01'
+ ENDC
  dc.l 0 ; activation count
  dc.l 0 ; world-step count at activation
  dc.l 0 ; logical timestamp at activation

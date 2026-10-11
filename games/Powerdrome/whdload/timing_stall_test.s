@@ -1,4 +1,5 @@
 ; VERIFY-only single simulation stall after 200 completed 20-ms world steps.
+; Directed weather sound mode 3 starts it after 190 steps instead.
 ; Called inside timing_frame's saved CCR/d0-d2/a0-a1 envelope. IRQs continue;
 ; no simulation state, clocks, input queues or debt are rewritten by the fixture.
  IFNE TIMING_STALL_TEST
@@ -7,7 +8,12 @@ timing_stall_test
  tst.l 8(a1)
  bne.s .done
  move.l timing_world20_state+16(pc),d0
+ IFEQ TIMING_WEATHER_EFFECT_TEST-3
+ ; Put the 500-ms stall across the mode-3 fixture's first two sound deadlines.
+ cmp.l #190,d0
+ ELSE
  cmp.l #200,d0
+ ENDC
  blo.s .done
  move.w timing_started(pc),d0
  beq.s .done

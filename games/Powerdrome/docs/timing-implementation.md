@@ -4318,10 +4318,27 @@ Native `$c5fc` toggles `state+$2f4`; before/after probes at `$c5fc/$c600` check 
 0→65535 and 65535→0 transitions and unchanged general registers. No fixture directly
 writes the sound flag. The extra audio probes are read-only.
 
-The completed 030 capture passes `check_weather_audio.py --require-mute`: the first
+Both completed captures pass `check_weather_audio.py --require-mute`: the first
 request at 4,860 ms is suppressed with all general registers preserved; requests at
 15,740 and 18,840 ms complete native channel starts. All three generated requests are
-accounted for, without coalescing. A500 is running; cross-CPU mute acceptance remains
-pending. Build guards reject missing VERIFY/COVERAGE and invalid values, while disabled
+accounted for, without coalescing. The pair matches 485 weather boundaries, 1,001 common
+movement states and 222 control/input/fuel updates. Build guards reject missing VERIFY/COVERAGE and invalid values, while disabled
 fixture and normal-build artifacts remain byte-identical. Deliberate stalls with closely
 spaced requests and audible-output checks remain separate.
+
+## Closely spaced weather sound stress fixture
+
+`TIMING_WEATHER_EFFECT_TEST=3` is a VERIFY/COVERAGE-only fixture tagged `PDWEFT03`.
+At the first weather generation with at least 200 world steps started, it sets delay 1,
+zero lifetime and seed 557. Native generation decrements the delay to zero (request one),
+then advances 557→44→6005, selecting lifetime zero and delay four. With four 80-ms
+weather loops, the next delay expiry requests sound again 320 ms later. No clock, input,
+resource-availability flag or native sample pointer is forced.
+
+When combined with the existing `TIMING_STALL_TEST=500`, the stall starts after at least
+190 steps rather than the usual 200, aiming to straddle those two requests. Actual stall
+placement and request coalescing must be measured; this is not proof of a runtime fault.
+The frozen `timing-weather-audio-stall1` pair is running. The audio checker recognizes
+the explicitly tagged first fixture request and still rejects an occupied queue when
+another request arrives. Existing mode-2 and normal binaries remain byte-identical;
+mode 4 is rejected. This fixture does not establish natural-weather cadence acceptance.

@@ -8,8 +8,9 @@ only after identification by the installed weather wrapper's exact return addres
 import argparse
 from pathlib import Path
 import re
+import struct
 from weather_audio_state import snapshot, owned_return, parse_values, REGISTERS
-from weather_effect_state import snapshot as effect_snapshot, parse_values as effect_values
+from weather_effect_state import snapshot as effect_snapshot, parse_values as effect_values, locate as effect_locate
 from weather_effect_clock import parse_values as clock_values, snapshot as clock_snapshot
 
 
@@ -99,6 +100,13 @@ def check(root, require_mute=False):
         r'^PDWEFX_EVENT (-?\d+) (0x[0-9a-f]+) (.+)$', text, re.M)]
     assert clocks and len(clocks) == len(effects), 'Missing sound-request observations'
     assert first['cleanup_pending'] == 0, 'Unobserved request before capture'
+    effect_address = effect_locate(chip, code, game, base)
+    fixture = code.find(b'PDWEFT03', effect_address - base + 48, effect_address - base + 4096)
+    fixture_clock = None
+    fixture_requests = 0
+    if fixture >= 0:
+        count, step, fixture_clock = struct.unpack_from('>3I', code, fixture + 8)
+        assert count == 1 and step >= 200, 'Sound stress fixture did not activate'
     previous = None
     pending = requests = 0
     request_clocks = []
@@ -110,7 +118,11 @@ def check(root, require_mute=False):
             pc, pe = previous
             generated = clock['generations'] - pc['generations']
             assert generated in (0, 1), 'Missing generation boundary or lifecycle reset'
-            if generated and pe['delay'] == 1 and effect['attempts'] == pe['attempts'] + 1:
+            injected_first = generated and fixture_clock == clock['generation_clock']
+            if injected_first:
+                assert (clock['generation_seed'], effect['lifetime'], effect['delay']) == (6005, 0, 4), 'Wrong seeded sound stress selection'
+                fixture_requests += 1
+            if generated and (injected_first or (pe['delay'] == 1 and effect['attempts'] == pe['attempts'] + 1)):
                 assert pending == 0, 'Weather sound requests coalesced before delivery'
                 pending += 1
                 requests += 1
@@ -120,6 +132,7 @@ def check(root, require_mute=False):
             pending -= calls
             assert effect['cleanup_pending'] == pending, 'Sound request ledger disagrees with queue'
         previous = clock, effect
+    assert fixture_requests == int(fixture_clock is not None), 'Missing directed first sound request'
     assert pending == last['cleanup_pending'] == 0, 'Undelivered sound request at endpoint'
     assert requests == completed, 'Generated sounds and complete calls differ'
     origin = clock_snapshot(root)['generation_clock']

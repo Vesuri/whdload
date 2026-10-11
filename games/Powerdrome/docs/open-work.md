@@ -676,7 +676,11 @@ mode/lifecycle acceptance remain open. The earlier full-cycle evidence used the 
 90-ms effect cadence.
 
 
-The native Tab mute/unmute fixture is now running as `timing-weather-audio-keys1`.
-The 030 side passes both native flag transitions, one suppressed weather helper with
-preserved registers, and two resumed starts. Its three request times remain unchanged.
-A500 is pending. Fixture build guards and disabled/normal byte equivalence pass.
+The native Tab mute/unmute pair `timing-weather-audio-keys1` passes on both CPUs:
+both native flag transitions, one suppressed weather helper with preserved registers,
+and two resumed starts. The three request times match, as do 485 weather boundaries,
+1,001 movement states and 222 control/input/fuel updates. Fixture guards and
+disabled/normal byte equivalence pass. The next pair, `timing-weather-audio-stall1`, uses
+guarded mode 3 to arrange two native sound requests 320 ms apart, with a 500-ms stall
+intended to cover both. Runtime coalescing evidence is pending; no production fix has
+been made on the strength of static suspicion alone.
