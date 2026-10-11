@@ -256,7 +256,7 @@ if os.environ.get('TIMING_STATE') == '1':
                 sample += f'if {count} >= {opponent}\n'
                 sample += f'printf "PDOPP_ARRAY %d {off:#x} {opponent} ' + '%04x'*95 + '\\n", $pd_field, ' + ', '.join(words) + '\nend\n'
             sample += 'end\n'
-        if off in (0xf952,0xf974,0xf9a2,0xf9ec,0x10bf0,0x10bf6,0x10bfc,0x10c00,0x10c10,0xf108,0xf10e):
+        if off in (0xf952,0xf974,0xf9a2,0xf9ec,0x10bf0,0x10bf6,0x10bfc,0x10c00,0x10c10,0xf108,0xf10e,0xf118):
             clock_values=[f'*(unsigned int*){r["game"][0]+0xf96:#x}']
             clock_values += [f'*(unsigned int*){state+x:#x}' for x in (0x206,0x202,0x1b2,0x17c)]
             clock_values += [f'*(unsigned short*){state+x:#x}' for x in (0x13e,0x43a,0xbe,0xb6)]

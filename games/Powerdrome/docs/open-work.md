@@ -304,8 +304,12 @@ must keep lap storage (`$10bf0`), displayed elapsed time (`$f108`) and result en
 A 300-field 030 baseline confirms the first natural player crossing is inside a logical
 world step and starts lap zero without charging a lap duration. Its 118 cockpit clock
 reads differ from retained-world elapsed time by -20 to +680 ms, ending at zero. This
-is baseline evidence, not a player-clock correction or completed-lap validation. Use a
-private logical lap-start field so native menus/waits can retain shared `$206` semantics. Next audit the projection flag and matched native animation visibility,
+is baseline evidence, not completed-lap validation. The WORLD20 prototype now keeps a
+private logical lap start while retaining native `$206`. Corrected 300-field first-crossing
+captures verify 118 exact logical HUD outputs on 030 and 37 on A500, with preserved native
+starts and no reset fallback. The A500 physical/simulation-progress gap reaches 1,580 ms;
+the timer correction does not prove real-time throughput. Completed player laps, Practice,
+pause/rescue, external-reset fallback, flags/registers and player finishes remain unverified. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

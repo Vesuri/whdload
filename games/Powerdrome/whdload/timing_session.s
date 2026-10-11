@@ -10,6 +10,7 @@ timing_session_end
  movem.l d0/a0-a1,-(sp)
  IFNE TIMING_WORLD20
  bsr timing_pit_abort
+ bsr timing_player_lap_invalidate
  lea timing_result_state(pc),a0
  clr.l 8(a0)
  lea timing_pit_state(pc),a0

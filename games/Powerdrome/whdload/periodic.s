@@ -156,6 +156,10 @@ install_periodic
  lea timing_sync_return(pc),a0
  move.w #$42e7,(a0)
  ENDC
+ lea timing_player_lap_prepare(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_player_lap_display(pc),a0
+ move.w #$42e7,(a0)
  lea timing_lap_reset(pc),a0
  move.w #$42e7,(a0)
  lea timing_lap_clock_d7(pc),a0
@@ -308,6 +312,12 @@ pl_periodic PL_START
  PL_PS $d4b6,timing_pit_clock_d7
  ; TIMING_RANGE h0:$d4fe 6 bit=C3
  PL_PS $d4fe,timing_pit_clock_d0
+ ; TIMING_RANGE h0:$10bf8 8 bit=C3
+ PL_PS $10bf8,timing_player_lap_commit
+ PL_NOP $10bfe,2
+ ; TIMING_RANGE h0:$f110 8 bit=C3
+ PL_PS $f110,timing_player_lap_hud
+ PL_NOP $f116,2
  ; TIMING_RANGE h0:$dbd8 6 bit=C3
  PL_PS $dbd8,timing_lap_reset
  ; TIMING_RANGE h0:$d7f8 6 bit=C3

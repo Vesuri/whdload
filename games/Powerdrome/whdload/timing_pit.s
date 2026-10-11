@@ -47,6 +47,7 @@ timing_pit_run
 timing_initial_pit_enter
  move.w sr,-(sp)
  movem.l d0-d1/a0-a1,-(sp)
+ bsr timing_player_lap_invalidate
  bsr timing_world_restore
  lea timing_state(pc),a1
  clr.w timing_started-timing_state(a1)

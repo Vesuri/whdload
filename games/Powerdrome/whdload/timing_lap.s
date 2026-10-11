@@ -21,6 +21,7 @@ timing_lap_initialize
 timing_lap_reset
  move.w sr,-(sp)
  movem.l d0/a0,-(sp)
+ bsr timing_player_lap_reset
  move.w timing_started(pc),d0
  beq.s .done
  move.w timing_world20_initialized(pc),d0

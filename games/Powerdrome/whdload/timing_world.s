@@ -217,6 +217,7 @@ timing_world_phase dc.w 0
  INCLUDE timing_sync_test.s
  INCLUDE timing_opponent_effects.s
  INCLUDE timing_lap.s
+ INCLUDE timing_player_lap.s
  INCLUDE timing_external.s
  INCLUDE timing_result.s
  INCLUDE timing_retune.s

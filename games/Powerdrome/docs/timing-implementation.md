@@ -1843,13 +1843,47 @@ HUD reads, not a completed player lap, finish, or correction.
 python3 tools/check_player_lap_baseline.py tmp/prof/timing-player-clock-before-030
 ```
 
-The proposed implementation should keep a private logical lap-start timestamp while
-leaving the native multipurpose `$206` field intact. Initialize the private start at the
-observed first crossing and shared countdown reset; consume the same private elapsed
-time for lap storage and the HUD. Explicitly handle new sessions, pause, rescue and
-unexpected native resets before enabling the private timestamp in those paths. Preserve
-native fallback for unaudited non-driving callers. Player result latching must capture
-the winning logical step before the native stack-unwinding branch reaches `$bfb0`.
+The WORLD20 prototype now includes `timing_player_lap.s`, with a private logical
+lap-start timestamp and a copy of the associated native physical start. Hooks at
+`$10bf8` and `$f110` select logical lap/HUD elapsed time while retaining the physical
+clock in D7 and native `$206`. They replay the displaced native subtraction first,
+preserve its X flag, and reproduce the final native MOVE flags. The private timestamp
+starts at the natural first crossing or shared countdown reset; session cleanup and
+new initial-pit entry invalidate it. The HUD uses the last completed world-step time
+(the retained next-step cursor minus 20 ms outside active world ownership), clamped to
+zero immediately after a reset. It does not display accumulated unserved simulation debt.
+
+If a native writer unexpectedly changes `$206`, the HUD invalidates the private timestamp.
+Lap accounting retains the native duration for that boundary and establishes a new private
+start. Unsupported non-driving or nonhuman lap-helper calls invalidate the private state
+and preserve native behavior. These fallbacks prevent accidental clock-domain mixing;
+they do not establish framerate independence for those unaudited paths.
+
+The frozen `Powerdrome-timing-playerlap1.slave` passes matching 300-field first-crossing
+captures on 030/25 and A500, with native rendering on A500 and fast rendering on 030:
+
+| Capture | Exact logical HUD outputs | Physical minus retained-world elapsed | Native reset fallbacks |
+| --- | ---: | --- | ---: |
+| `timing-player-clock-after-030` | 118 | -20..680 ms; final 0 ms | 0 |
+| `timing-player-clock-after-a500` | 37 | -60..1,580 ms; final 1,500 ms | 0 |
+
+Both preserve the native shared start, private logical start, zero initial lap duration
+and accumulated total. These heavily instrumented captures are not FPS measurements.
+The A500 clock/simulation-progress gap remains visible in the audit; displaying logical
+progress does not fix simulation backlog or prove adequate real-time throughput.
+Completed player-lap accounting is implemented but **not exercised by these captures**.
+Practice, pause/rescue, native-reset fallback, guest-observed flags/registers and player
+finish latching still need explicit tests. The normal slave remains byte-identical and
+all new hook ranges pass the structural boundary/branch audit.
+
+```sh
+python3 tools/check_player_lap_baseline.py --logical tmp/prof/timing-player-clock-after-030
+python3 tools/check_player_lap_baseline.py --logical tmp/prof/timing-player-clock-after-a500
+```
+
+The corrected probes replace displaced `$10bfc` with post-hook `$10c00`, and add `$f118`
+after the HUD hook. Player result latching must still capture the winning logical step
+before the native stack-unwinding branch reaches `$bfb0`.
 
 Implement and test player lap storage, displayed elapsed time and final-result latching
 as one consistent contract. Practice has no initialized opponent timeline, so it needs
