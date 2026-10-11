@@ -25,13 +25,18 @@ rendering as fast and as smooth as the machine allows, shipped as WHDLoad slave 
    machine.
 2. **Natural police chase.** The police counters are unit-tested and the police car has its
    own latched render position, but a chase in ordinary play has never been captured.
-3. **A4000/68060 black screen.** A user reports that both JOTD's original slave and 1.6b stop
-   at a black screen on an A4000/68060. Emulated 68060 configurations (A1200 ROM and chipset,
-   with and without MMU) reach the race, so this is not reproduced. Waiting for the
-   accelerator, ROM, WHDLoad version and MMU configuration. Then: find whether it stops before
-   KickEmu, before LoadSeg, in the intro or on race entry; compare both slaves there; capture
-   the stopped PC, stack and cache/MMU state; patch the demonstrated cause. Only a hardware
-   test confirms a fix.
+3. **68040/68060 black screen.** A real A1200/68040 at 40 MHz with 32 MB RAM,
+   MMU and WHDLoad 19.2 black-screens with 1.6b; the quit key works. Its supplied
+   `tmp/testdrive2dump.lha` exposes a stale overlay call stub: memory already holds a JMP,
+   but the saved loader stack uses a byte of that JMP target as overlay index 205 and
+   requests the invalid seek `$67504879`. See [game.md](game.md#overlay-loader-and-caches).
+   The user confirmed that flushing caches at both overlay rewrite exits fixes the
+   real 68040. The production change is submitted as
+   [upstream PR #25](https://github.com/jotd666/whdload_slaves/pull/25), enabled automatically
+   for v1 independently of Enhanced framerate. Final PR builds reach the race with an
+   emulated 68040/MMU in both modes; 129 VERIFY assertions and the timing check pass.
+   The earlier A4000/68060 report affects both JOTD's original slave and 1.6b. Whether it
+   has the same cause remains unverified; accelerator/ROM/WHDLoad details are still needed.
 4. **duel v2.** Its patch list is JOTD's v1.5 one; porting the patches needs a v2 `duel` to
    find the offsets.
 

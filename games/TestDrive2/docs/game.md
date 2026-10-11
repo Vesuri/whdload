@@ -113,3 +113,26 @@ example a fast-RAM back buffer on 68030+) could pass 25 fps.
 - Mountains are drawn from the curve sum -13398 minus heading's high byte (`duel:08c90`, in
   four-pixel steps); the sum is updated at `072b8` via `08898`, and -17234 names its segment.
 - Car sprites are pre-drawn at fixed sizes; size selection is discrete.
+
+## Overlay loader and caches
+
+The Aztec overlay manager modifies executable stubs in the data hunk. Unloading rewrites
+JMPs into BSRs at `duel:0fe7e..0fe86`; loading rewrites them into JMPs at
+`duel:0ff0c..0ff12`. The completed paths restore registers and return at `duel:0fe90`
+and `duel:0ff1a`. KickEmu flushes caches after DOS LoadSeg, but the game's stub writes
+happen afterward and need their own flush before executing the rewritten stub.
+
+The supplied A1200/68040 hardware dump shows the startup call through `-31662(a4)` already
+rewritten to JMP in RAM, while the saved overlay-loader context has consumed byte 4 of
+that JMP as index 205. Its computed table entry contains `$67504879` rather than a valid
+file offset, and the saved call returns to the Seek retry at `duel:0ff42`. The dump records
+an ordinary quit, not an exception; its PC of `$FFFFFFFF` is not a game fault address.
+The main game is loaded and patched, but the drawing task has not been created.
+
+The fix replaces the two six-byte restore/return sequences with slave helpers
+that call the official KickEmu `_flushcache` wrapper, then perform the displaced register
+restore and return. WHDLoad's `resload_FlushCache` preserves all registers and flushes both
+caches on 68040/68060. The user confirmed the diagnostic on the real A1200/68040.
+[Upstream PR #25](https://github.com/jotd666/whdload_slaves/pull/25) applies it automatically
+to v1 independently of Enhanced framerate; the diagnostic CUSTOM1 bit 2 toggle is removed.
+Real 68060 hardware remains unverified.
