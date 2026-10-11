@@ -242,18 +242,27 @@ timing_pit_opponent_restore
 ; Flight message publication/expiry share the completed logical control phase.
 ; Pit publications retain the saved outer pit counter rule. Other modes stay native.
 ; Only D0 is an output; the selection itself never changes X.
+timing_message_uses_logical
+ move.w timing_started(pc),d0
+ beq.s .native
+ move.w timing_pit_state+8(pc),d0
+ bne.s .native
+ move.w timing_world20_initialized(pc),d0
+ beq.s .native
+ tst.w $b6(a6)
+ bne.s .native
+ tst.w $43a(a6)
+ bpl.s .native
+ moveq #1,d0
+ rts
+.native
+ moveq #0,d0
+ rts
+
 timing_message_counter_source
  move.l a0,-(sp)
- move.w timing_started(pc),d0
+ bsr.s timing_message_uses_logical
  beq.s .outer
- move.w timing_pit_state+8(pc),d0
- bne.s .outer
- move.w timing_world20_initialized(pc),d0
- beq.s .outer
- tst.w $b6(a6)
- bne.s .outer
- tst.w $43a(a6)
- bpl.s .outer
  moveq #0,d0
  move.w timing_world_state+30(pc),d0
  bra.s .done
@@ -278,6 +287,25 @@ timing_pit_message_counter
  bsr timing_message_counter_source
  move.l d0,$64(a6)
  movem.l (sp)+,d0
+ rts
+
+; Native lap rebase still supplies D1 and CCR to its continuation, but a
+; continuous logical message deadline must not lose the native lap counter.
+; Replay all three instructions, then restore only the deadline in that domain.
+timing_message_lap_rebase
+ move.l $64(a6),-(sp)
+ move.l $64(a6),d1
+ sub.l $5e(a6),d1
+ move.l d1,$64(a6)
+ move.w sr,-(sp)
+ move.l d0,-(sp)
+ bsr timing_message_uses_logical
+ beq.s .done
+ move.l 6(sp),$64(a6)
+.done
+ movem.l (sp)+,d0
+ move.w (sp)+,ccr
+ lea 4(sp),sp
  rts
 
 ; Replay CMP.L counter,D0 / BGT, selecting the same domain as publication.

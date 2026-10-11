@@ -1896,8 +1896,76 @@ identical. The legacy engine-only prototype still builds, and WORLD20 without EN
 is rejected by its existing dependency guard. The hook-layout checker verifies complete
 instructions and native bytes at all sites in both C3-off reference snapshots.
 
+The lap hook at `$10c16` now preserves the message deadline in the selected logical
+flight domain. The native three-instruction MOVE/SUB/MOVE sequence still determines
+D1 and CCR, including subtraction's X; the wrapper saves that CCR and restores only
+state+$64 before returning. The following native clear of state+$5e remains in place.
+The same domain predicate is shared with publication and expiry. Unsupported contexts
+retain the original rebase. This hook is WORLD20/CUSTOM3-only.
+
+The 030 natural-lap route gives paired read-only observations at `$10c16`, `$10c22`
+and `$10c2a`. In `timing-messagelap-before-pair-030`, the native rebase changes deadline
+**1,045 → 693** while logical phase remains **352**. The corrected
+`timing-messagelap1-pair-030` preserves **1,044 → 1,044** at phase **352**, with the native
+D1 subtraction result, all other D/A registers, stack depth, speed and movement delta
+unchanged. The native counter still clears to zero. The one-phase arrival difference
+means these runs are not full trajectory equivalence evidence. Both captures enter from
+the existing rescue route; the captured message's publisher precedes the window, so
+this does **not** establish its lifetime or correct pit-to-flight deadline conversion.
+The corrected ten-field window completes two clean renderer twins; its final snapshot
+is inside another draw, not a teardown check.
+
+The corresponding A500/native-renderer run `timing-messagelap1-pair-a500-long` passes
+one lap boundary with deadline **849 → 849** and phase **352**, retaining the same
+native register/stack/subtraction contract. Its message flag is zero, so it covers an
+inactive deadline, not a live message lifetime. Use 100 fields on A500: the initial
+ten-field attempt reached the boundary but failed the harness's minimum-presentation
+requirement and has no final snapshots; it is not a completed validation run.
+
+The corrected ordinary-flight regression `timing-messagelap1-flight-030` (850 fields,
+C5=11 without the synchronized-pit fixture) passes **13 publications, 240 expiry
+branch/register checks and two clears at 45 logical phases**. It completes **293 clean
+renderer twins**, with unchanged raster code. The shared domain-predicate refactor therefore
+retains the bounded publication/expiry contract. Normal-build bytes remain identical;
+the expanded hook-layout check also passes against both snapshots of the C3-off reference.
+
+Reproduce with the full timing/repair build plus `TIMING_PIT_SYNC_TEST=1`, C5=13,
+the documented 030 configuration, TIMING_STATE/TIMING_EARLY, anchor `$10c10`, ten fields
+and probes `0x10c16 0x10c22 0x10c2a 0x13536 0x1353c 0x13558 0xda54 0xda5a 0xda64`.
+The anchor precedes the entry probe; anchoring at `$10c16` skips its initial observation
+and is insufficient for the checker. The abandoned C5=11 anchor attempt supplied no
+lap evidence. `check_message_lap.py` verifies register and memory contracts; guest CCR
+edge cases remain a separate requirement.
+
+```sh
+python3 tools/check_message_lap.py --expect-native-rebase tmp/prof/timing-messagelap-before-pair-030
+python3 tools/check_message_lap.py tmp/prof/timing-messagelap1-pair-030
+python3 tools/check_message_lap.py tmp/prof/timing-messagelap1-pair-a500-long
+python3 tools/check_flight_message.py tmp/prof/timing-messagelap1-flight-030
+```
+
+The message deadline is also mutated outside its ordinary publisher. A static audit of
+explicit state+$64 operands identifies these additional contracts (indirect aliases are
+not excluded by this inventory):
+
+| Native sites | Deadline operation | Timing ownership still needed |
+| --- | --- | --- |
+| `$b116`, `$c196` | Store -1 sentinel | Initialization/ending lifecycle |
+| `$c772` | Extend by 15 after calling `$13514` | Suppressed-publication and extension cases |
+| `$10c16–$10c1e` | Subtract state+$5e at player lap completion | Preserve a continuous logical deadline |
+| `$e2ba`, `$13ac0` | Publish native counter minus 1 | Pit expiration/sentinel semantics |
+| `$13ada`, `$13af4`, `$14138`, `$141aa`, `$141ec`, `$14210` | Publish native counter plus 30 | Pit modes and flight handoff |
+| `$14156` | Publish native counter plus 45 | Pit mode and flight handoff |
+| `$da50`, `$e2a2` | Read for flight/pit expiry | Paired consumer domains |
+
+The logical phase is currently only 16 bits. At 90 ms per increment, a complete wrap
+spans 5,898,240 ms (98.304 minutes); initialization and mode transitions can change the
+starting phase. A ten-minute normal session cannot establish full wrap correctness.
+A directed wrap test must cover publication before wrap, expiry after wrap, and negative
+sentinels without treating signed native comparisons as modular arithmetic.
+
 This is a bounded flight-message correction. The direct `$c990` publisher and flight
-`$d8ca` context still need directed runtime coverage. Native lap rebasing at `$10c16–$10c28`,
+`$d8ca` context still need directed runtime coverage. Broader lap contexts and
 16-bit phase wrap, pause/rescue/result handoffs, other publishers and unsupported modes
 remain to audit before release. The current checker explicitly rejects phase resets or
 wrap instead of counting those cases as covered. Runtime guest CCR edge cases and native

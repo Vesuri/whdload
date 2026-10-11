@@ -391,7 +391,13 @@ experimental repair switches stay disabled by default. Ordinary flight-message p
 and expiry now share the logical control phase in WORLD20: A500/030 each pass thirteen
 publications and two clears at 45 phases (4,050 ms), with 204/241 expiry branch/register
 checks and 294 clean completed 030 renderer comparisons. The three pit publication
-contracts still pass. Direct/less common publishers, native lap rebasing, phase wrap,
+contracts still pass. The WORLD20 lap hook now preserves the logical message deadline
+while retaining native D1/register/stack results; a paired 030 natural-lap check observes
+the old 1,045 → 693 subtraction and the corrected 1,044 → 1,044 preservation at phase 352.
+A500 also passes one inactive deadline at 849 → 849. The ordinary 030 flight regression
+passes thirteen publications, two 45-phase clears, 240 expiry checks and 293 clean twins.
+The differing arrival values and unobserved pre-window publisher do not establish
+trajectory equivalence or rescue-message lifetime. Direct/less common publishers, broader lap contexts, phase wrap,
 mode handoffs and A500 message-duration calibration remain open; pit expiry still uses
 the outer pit counter. Do not treat this bounded correction as complete message timing. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The

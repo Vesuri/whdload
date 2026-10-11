@@ -404,6 +404,9 @@ pl_periodic PL_START
  ; Whole four-byte comparison and two-byte signed branch.
  ; TIMING_RANGE h0:$da54 6 bit=C3
  PL_P $da54,timing_message_expiry
+ ; Native lap counter resets do not rebase continuous logical messages.
+ ; TIMING_RANGE h0:$10c16 12 bit=C3
+ PL_PSS $10c16,timing_message_lap_rebase,6
  ; Opponent-only direct clock reads. Outside modal updates these stay native.
  ; TIMING_RANGE h0:$d4b6 6 bit=C3
  PL_PS $d4b6,timing_pit_clock_d7
