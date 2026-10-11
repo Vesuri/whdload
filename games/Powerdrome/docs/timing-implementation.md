@@ -3645,7 +3645,8 @@ The retry `timing-weather-native-a500-2` uses 14 weather probes: `$e1ca/$e1d4/$e
 It targets forecast/deadline publication, start/expiry, both fade directions and renderer
 lifetime decrement. Additional generation, palette and gear probes need a separate pass;
 they are not implicitly covered by this reduced set. The reduced set is accepted by the
-debugger and has produced runtime records; the full capture remains in progress.
+debugger and completes exactly 20,000 PAL fields (400 seconds), with 4,904 weather
+observations. All observed mutation pairs pass.
 
 The observed A500 onset has forecast clock 195,624 and deadline 200,624: exactly
 5,000 native units / 25 seconds. Start occurs at clock 200,648, **120 ms after the deadline**,
@@ -3654,16 +3655,38 @@ fields versus 25,120 ms in the game clock; these time sources differ by one PAL 
 The active-duration RNG changes **18,177 → 15,288** through the native recurrence.
 Its base duration is 36,750 units and randomized result 53,894 units, producing deadline
 254,542: **269,470 ms** after start. Both RNG arithmetic and deadline publication pass.
-This is the selected duration, not yet an observed completed active episode.
+Expiry is observed at clock 254,616, **370 ms after the selected deadline**.
+Physical start-to-expiry spans fields 1,254–14,747, or **269,860 ms**; the game-clock
+difference is 269,840 ms. The native low-three-bit loop gate and polling delay remain
+part of the original behavior to account for explicitly.
 
 All 15 positive fade decrements are observed and verified, from loop counter 2,496 through
 2,720 in increments of 16. First decrement is at field 1,302, last at 2,283. Start-to-first
 is 960 ms; start-to-final is **20,580 ms** in physical fields (20,560 ms in the native
 clock). Fourteen first-to-last intervals span 19,620 ms, averaging **1,401.4 ms**, with
-individual intervals 1,180–1,900 ms. This supports measuring a 16-update cadence separately
-from initial phase; it does not yet freeze a corrected cadence or prove fade-out timing.
-The first observed renderer lifetime decrement also passes. Expiry, negative fade and
-longer effect-lifetime observations remain pending in the running capture.
+individual intervals 1,180–1,900 ms. The negative transition is published at field 14,747. Its 15 increments occur at loop
+counters 5,728–5,952, again every 16 loops, from fields 14,806–15,610. Start-to-first is
+1,180 ms; start-to-final is **17,260 ms** (17,280 ms in the game clock). Fourteen
+first-to-last intervals average **1,148.6 ms**, ranging from 1,040 to 1,400 ms. Thus simply
+using the existing 90 ms control period times 16 for both fades would make the negative
+fade's steady interval about 25% slower than this native reference. The different observed
+rates follow the native frame-driven paths; this single episode does not establish an
+intentional direction-dependent design. Corrected periods and initial-phase policy still
+need to be selected explicitly against these measured bounds.
+
+All 30 fade mutations, native RNG/deadline arithmetic, expiry resets and **90 effect-lifetime
+decrements** pass. There are 4,746 effect-entry observations; the final unpaired entry has
+zero lifetime, so no decrement is expected. The final snapshot has both deadlines inactive,
+transition/effect/palette/delay fields zero, and target gear 3. Forecast flag remains 1 and
+steering offsets remain nonzero, reflecting native retained state rather than an assumed
+all-zero cleanup. Target gear at expiry is 1, establishing a gameplay-visible difference
+across the transition, but helper-level ownership needs its separate probes.
+
+`timing-weather-native-a500-effects1` is the next native pass on the same route/artifact:
+14 probes cover generation delay/RNG, lifetime, palette presentation/cleanup and both gear
+helpers. It requests the same 400-second window from forecast entry. Compare shared
+lifetime observations and initial state to establish whether the natural episode repeats
+before combining evidence; do not assume matching histories solely from equal settings.
 
 `tools/report_weather.py CAPTURE` checks observed before/after arithmetic for forecast
 and active deadlines (including native duration RNG arithmetic), fade increments/decrements
