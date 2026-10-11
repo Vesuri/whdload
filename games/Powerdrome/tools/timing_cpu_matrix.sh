@@ -9,7 +9,7 @@ OUT=${1:?new output directory}
 INPUT=${2:?frozen coverage slave}
 [ ! -e "$OUT" ] || { echo 'Use a new output directory' >&2; exit 1; }
 CASE_SET=${CASE_SET:-accelerators}
-[[ "$CASE_SET" = accelerators || "$CASE_SET" = baseline || "$CASE_SET" = all || "$CASE_SET" = endurance ]]
+[[ "$CASE_SET" = accelerators || "$CASE_SET" = baseline || "$CASE_SET" = all || "$CASE_SET" = endurance || "$CASE_SET" = rate-native ]]
 mkdir -p "$OUT"
 cp "$INPUT" "$OUT/input.slave"
 source amiga/env.sh
@@ -69,6 +69,10 @@ fi
 if [ "$CASE_SET" = endurance ]; then
  run 030-25-fast 68030 25000000 1
  run a500-native 68000 0 0 A500 512 0 1536
+fi
+if [ "$CASE_SET" = rate-native ]; then
+ run 030-25-native 68030 25000000 0
+ run 060-50-native 68060-NOMMU 50000000 0
 fi
 python3 tools/check_timing_world20.py "${runs[@]}" > "$OUT/world-comparison.txt"
 python3 tools/check_timing_order.py --accounted-endpoints "${runs[@]}" > "$OUT/control-comparison.txt"

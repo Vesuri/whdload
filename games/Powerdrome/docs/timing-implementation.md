@@ -3457,20 +3457,45 @@ whereas these markers observe the driving-loop boundary; neither requested rate 
 allocator-release spacing proves exact display spacing. These measured intervals establish
 changed presentation timing with equal sampled simulation state for this route, not a
 steady achieved 10 Hz, distinct displayed images, release FPS or whole-game independence.
-Requests of 15/25/50 Hz, native-rendered accelerators, variable intervals and other effect
-routes remain to be checked.
+The additional `timing-rate15-1`, `timing-rate25-1` and `timing-rate50-1` pairs also pass.
+A combined comparison of all eight requested-rate captures and the two unpaced references
+finds **652 identical common sampled world states and 144 identical common control/input/fuel
+updates across ten captures**. Each added pair completes 652/654 world steps and 144/145
+controls (030/A500), with initial/final unsampled time 80→40/140→60 ms. All finish with
+zero retained/assigned simulation debt and pending controls. Their maximum sampled delay
+is 260/780 ms and retained debt 0/160 ms. Each adds 156 clean 030 renderer twins, for
+**600 new completed twins across the four pairs**. Each 030 endpoint interrupts another
+draw; these are not completed-draw teardown tests.
+
+| Requested rate | 030 marker rate | A500 marker rate | Pacing wait, 030/A500 | Late deadlines, 030/A500 | Maximum lateness, 030/A500 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 10 Hz | 9.572/s | 8.200/s | 2,400 / 700 ms | 4 / 27 | 140 / 700 ms |
+| 15 Hz | 12.275/s | 9.039/s | 280 / 0 ms | 49 / 67 | 180 / 720 ms |
+| 25 Hz | 12.275/s | 9.039/s | 0 / 0 ms | 110 / 80 | 200 / 760 ms |
+| 50 Hz | 12.275/s | 9.039/s | 0 / 0 ms | 110 / 80 | 220 / 780 ms |
+
+For each 15/25/50 request, the 030 marker histogram is
+`{60:30, 80:62, 100:13, 160:1, 180:1, 240:2}` over 109 intervals / 8,880 ms;
+A500 is `{80:38, 100:14, 120:23, 140:2, 460:1, 800:1}` over 79 intervals / 8,740 ms.
+Allocator release rates are 12.249/s and 9.009/s, respectively. Requests of 25/50 Hz
+add no wait on either machine, so they validate late-deadline behavior, not simulation
+independence at achieved 25/50 Hz. The 15 Hz request adds only 280 ms of waiting on 030.
+None establishes a steady requested display rate. The 10 Hz request supplies the meaningful
+slower-cadence comparison for both configurations. These remain correctness-instrumented
+observations, not release throughput measurements.
 
 Next steps:
 
-1. Completed the bounded 10 Hz requested pair on 030/fast and A500/native, including
-   measured presentation markers, pacing/debt accounting and arithmetic/input gates.
-2. Completed exact common logical world/control/fuel comparison with both unpaced references.
-3. Repeat 15/25/50 Hz requests. Report missed deadlines and actual rates; explicitly mark
-   infeasible targets instead of treating requested rates as measured coverage.
-4. Repeat on A500/native and native-rendered accelerators where feasible. Keep the same
-   logical input tape and cadence, and retain fast-renderer drawing twins.
-5. Use the paired presentation-interval evidence before claiming exact achieved cadence;
-   extend to variable intervals and other response/effect routes after the bounded checks.
+1. Use `CASE_SET=rate-native` with the same frozen rate fixture and `FIELDS=650` to
+   test 030/25 and 060/50 with native rendering. This runs the same per-run and exact
+   cross-CPU checks without twin drawing, then needs the rate checker and comparison
+   with the existing timed-input references. Report actual rates and missed deadlines.
+2. Where higher actual rates are feasible, repeat lower requested rates on that same
+   configuration to establish a wider measured cadence range. Do not equate a fixture
+   setting with achieved coverage.
+3. Extend to variable presentation intervals and other response/effect routes. Preserve
+   both native and fast-rendered state checks and keep rendering correctness separate
+   from the measured cadence claim.
 
 
 ## Remaining weather and effect ownership
