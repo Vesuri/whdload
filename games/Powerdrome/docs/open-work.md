@@ -570,24 +570,28 @@ do not prove audible output or recover sound time lost during an external stall.
 
 ### Active validation and next steps
 
-1. Finish `timing-weather-cycle-cadence2`, the current direct-sound 170-second pair.
-   The 030 side passes the complete cycle, all 30 fades and 4,217 schedule boundaries,
-   matching the prior logical weather history. It restores stored palettes, peaks at
-   280 ms world-end delay, ends with zero debt and passes 2,520 completed renderer twins.
-   A500 is still running; the full pair is not yet accepted. Keep its frozen sampler
-   and artifact unchanged until the process finishes.
-2. Integrate the prepared palette-call probes after that capture. Run the frozen
-   `Powerdrome-timing-weather-palette-test1.slave` directed fade fixture for 46 seconds
+The current direct-sound `timing-weather-cycle-cadence2` 170-second pair passes the
+complete cycle, all 30 fades and 4,217 common weather boundaries, with 8,503 common
+movement states and 1,889 control/input/fuel updates. Warning delay, duration and expiry
+lateness remain 25,020/117,480/60 ms. Actual draws are 54/23 on 030/A500. Maximum
+world-end delay is 280/780 ms; A500 retained debt peaks at 160 ms and both endpoints
+have zero assigned/retained debt. Both stored palettes restore at both endpoints.
+The 030 passes 2,520 completed renderer twins. Its 8,503 steps versus A500's 8,505 are
+accounted for by initial/final unsampled time of 80/20 versus 140/40 ms.
+
+1. Complete the running `timing-weather-palette-test1` pair. The guarded palette-call
+   probes are integrated into the sampler and the frozen
+   `Powerdrome-timing-weather-palette-test1.slave` directed fade fixture runs for 46 seconds
    on both CPUs. `check_weather_palette.py` requires all 31 owned interpolation calls,
    exact native integer arithmetic and both palette writes, plus restoration of the
    other 15 colours while preserving entry 5. Positive live validation is pending;
    endpoint-only captures correctly fail its missing-probe gate.
-3. Check deliberate presentation coalescing and displayed palette/buffer pairing.
-   Stored palette agreement is not scanout evidence. `weather_palette_state.py --require-restored` passes both cadence1 CPU endpoints and current cadence2 030
+2. Check deliberate presentation coalescing and displayed palette/buffer pairing.
+   Stored palette agreement is not scanout evidence. `weather_palette_state.py --require-restored` passes both cadence1 and current cadence2 CPU
    endpoints; invalid colours and unfinished transitions are rejected. Guarded probe
    generation and installed positive/negative/negative-zero caller identification are
    prepared, but those preparation checks do not replace live observations.
-4. Validate natural unseeded weather and pause, pit, rescue, restart and shared-transition
+3. Validate natural unseeded weather and pause, pit, rescue, restart and shared-transition
    lifecycle handling, including clock/domain handoff and message/palette publication.
    Extend A500 calibration beyond this native episode and validate the 90/720 ms cycle
    check policy. Complete off-mode, memory/configuration and sustained-driving coverage
