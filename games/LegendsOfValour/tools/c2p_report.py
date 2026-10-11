@@ -5,7 +5,8 @@ Exclude partial calls at the trace boundaries. Analyse with the capture's exact 
 """
 import argparse, os, re, statistics, struct
 from pathlib import Path
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from lov_report import regions
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('capture',type=Path)

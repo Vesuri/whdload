@@ -2,7 +2,8 @@
 """Top 64-byte instruction blocks in a retained fixed-window capture."""
 import argparse, bisect, collections, os
 from pathlib import Path
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from lov_report import regions
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('capture',type=Path)

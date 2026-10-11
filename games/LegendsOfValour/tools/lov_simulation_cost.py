@@ -12,7 +12,8 @@ import os
 import re
 import statistics
 from pathlib import Path
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from lov_report import regions
 
 

@@ -16,7 +16,9 @@ separate stacks.  Cycles are 7.09 MHz CPU clocks; a PAL field is 142,102.
 """
 import argparse, collections, os, struct, subprocess, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto, slave_info, unpack
+import _amigaxdev
+from amigaxdev import barto
+import slave_info, unpack
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SLAVE = os.path.join(ROOT, 'tmp/game/LegendsOfValour/LegendsOfValour.Slave')

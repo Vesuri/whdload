@@ -74,8 +74,8 @@ that decruncher and writes `tmp/unpacked/AMIGA2` (199 436 bytes, byte-exact) and
 | 4–8 | code | `$B0`..`$2700` | | 13–16 | code | `$14`..`$184` (library stubs) |
 
 Hunks 0–10 are **Lattice/SAS C** (`link a5` prologues); hunk 12 is hand-written. Docs name code
-as `hN:OFFSET`. `tools/xref.py` lists relocations into a range; `tools/disd.py` disassembles a
-dump by hunk offset.
+as `hN:OFFSET`. `tools/xref.py` lists relocations into a range; `python3 -m amigaxdev.disasm disd`
+(AmigaXDev's shared package) disassembles a dump by hunk offset.
 
 **The rebuilt slave.** `whdload/LegendsOfValourHD.s` rebuilds CFou!'s v1.0 on WHDLoad 20.0's
 `kick13.asm` example and the vendored 2025 `kick13.s`, with the example's options (`IOCACHE =
@@ -115,14 +115,15 @@ game is mouse-driven.
 
 ## 4. Driving and tracing (`tools/lov.py`)
 
-Test Drive II's server: `serve` boots `amiga/run.sh DEBUG=1` and attaches gdb; then `stop`,
-`cont`, `gdb <text>`, `shot <png>`, `profile <fields> <bin>`, `wait`, `until <addr>`, `quit`.
-Socket `amiga/<run dir>/lov.sock`. Captures run in `amiga/.cap` (`FSUAE_RUN`), interactive
-sessions in `amiga/.run`; **never stop an emulator in `.run`, and run one capture at a time**
-(two parallel captures broke both debugger sessions). gdb runs in the repo root and cannot quote
-file names, so dump paths are relative (`tmp/scratch/...`). `until` waits in the background
-(`UNTIL_TIMEOUT`, default 1 800 s) and stops the capture cleanly on expiry; a `profile` is capped
-at 100 fields.
+AmigaXDev's shared server (`amigaxdev.gdbserve`) with this game's `until`, `gdb` and capture:
+`serve` boots `amiga/run.sh DEBUG=1` and attaches gdb; then `stop`, `cont`, `gdb <text>`,
+`shot <png>`, `profile <fields> <bin>`, `wait`, `until <addr>`, `quit`. Socket
+`amiga/<run dir>/lov.sock`. Captures run in `amiga/.cap` (`FSUAE_RUN`), interactive sessions in
+`amiga/.run`; **never stop an emulator in `.run`, and run one capture at a time** (two parallel
+captures broke both debugger sessions). gdb runs in the repo root and cannot quote file names,
+so dump paths are relative (`tmp/scratch/...`). `until` waits in the background
+(`UNTIL_TIMEOUT`, default 1 800 s) and stops the capture cleanly on expiry; a `profile` is
+capped at 100 fields.
 
 **Native captures** (`FSUAE=$HOME/.local/share/amiga/fs-uae-arm/fs-uae PROFILE_WINDOW=guest`).
 The arm64 FS-UAE (revision `b70b1180`) cannot be attached by host LLDB, so the VERIFY-only
@@ -131,8 +132,8 @@ context, it saves SR, the current process's segment-list/task-number fields and 
 bytes, presents a synthetic segment, and restores everything before tracing.
 `profile_window_check.py` (run by `fixed_window.sh`) checks the restoration. Barto stores RAM
 PCs relative to the profiler start (ROM PCs and IRQ markers stay absolute); `lov.py` saves the
-acknowledged base in `trace.pc-base` and `barto.py` normalizes RAM PCs. Keep the sidecar with
-its trace.
+acknowledged base in `trace.pc-base` and the shared `amigaxdev.barto` normalizes RAM PCs. Keep
+the sidecar with its trace.
 
 ## 5. What the game does, and how it reads input and time
 

@@ -2,7 +2,8 @@
 """Completed-call and inner-loop costs for W3–W6; boundary-partial calls are excluded."""
 import argparse, os, re, statistics
 from pathlib import Path
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from lov_report import regions
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('capture',type=Path)

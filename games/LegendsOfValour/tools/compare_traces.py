@@ -9,7 +9,8 @@ that change between boots), so only these per-field parts are compared.  Exits 1
 difference and names the first differing field of each kind.
 """
 import sys
-import barto
+import _amigaxdev
+from amigaxdev import barto
 
 a, b = barto.load(sys.argv[1]), barto.load(sys.argv[2])
 if len(a.fields) != len(b.fields):
