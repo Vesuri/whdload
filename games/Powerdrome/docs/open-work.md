@@ -700,3 +700,10 @@ states and 222 control/input/fuel updates; 030 adds 241 passing renderer twins.
 Direct-delivery mute (`audio-keys2`), no-resource (`audio-nosample1`) and full-cycle
 (`cycle-cadence2`) pairs are running sequentially, each conditional on prior checks
 passing. Earlier mute/full-cycle captures used deferral. The full F1–F8 goal remains open.
+
+
+Direct-delivery isolation now passes a byte comparison of the full weather-disabled timing
+prototype against pre-fix source, plus the current native hook-boundary/branch audit.
+Normal build bytes remain unchanged. The completed 030 `audio-keys2` side passes native
+mute/unmute, one suppressed request and two resumed starts at unchanged logical times.
+Its A500 counterpart and the queued no-resource/full-cycle pairs remain pending.

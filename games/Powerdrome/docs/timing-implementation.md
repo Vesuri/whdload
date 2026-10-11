@@ -3797,57 +3797,50 @@ those mode paths are not yet framerate-independent. Initialization/session clean
 pending visual ownership. Pause, pit/recovery and full lifecycle contracts remain to be
 validated with active effects.
 
-The native call at game `$bce0` targets `$17836`, an **audio-channel start** routine,
-not bitmap cleanup. It checks `state+$2f4`, stops the selected audio DMA channel,
-programs its sample pointer/length/volume/period, updates audio bookkeeping at
-`$48c4/$48dc`, and enables its interrupt and DMA. The weather caller passes channel 3,
-volume 63, and the fifth 12-byte sample descriptor from the table at `$5ae`.
-The guard `$4f74` is set after the larger 404,000-byte chip allocation succeeds;
-the same guard controls allocation/loading of this extra sample table. Earlier
-512-KiB guest captures left it clear and therefore did not exercise this sound path.
-The diagnostic field names `cleanup_pending` and `cleanups` remain for capture-schema
-compatibility. `PDWEFX01/02` used the first as a queued sound request; in `PDWEFX03`
-it remains zero. `cleanups` counts native sound-wrapper calls.
-The latter increments before the native helper and does not prove audible playback:
-the helper can return immediately when `state+$2f4` is nonzero.
+The native call at game `$bce0` targets `$17836`, an audio-channel start routine.
+It checks `state+$2f4`, stops the selected DMA channel, programs sample pointer/length/
+volume/period, updates `$48c4/$48dc` bookkeeping and enables its interrupt and DMA.
+Weather uses channel 3, volume 63, and the fifth 12-byte descriptor from `$5ae`.
+The availability guard `$4f74` is set only after the larger 404,000-byte chip allocation
+succeeds; it also controls allocation/loading of the extra sample table. Normal 512-KiB
+guest captures use the smaller 266,400-byte allocation and lack this table. A verification
+1-MiB guest configuration loads it naturally, without forced flags or sample pointers.
 
-`tools/weather_audio_state.py CAPTURE...` reads initial/final native allocation,
-optional sample availability, suppression and channel-3 bookkeeping. With
-`--require-available`, absence of the extra samples is a failure. For available samples,
-it checks the 404,000-byte allocation, table extent and the fifth descriptor's sample
-pointer/word length/period, rejecting reads outside the captured allocation. This is a
-resource precondition check, not an audio playback or timing test. The completed
-`timing-weather-cadence-test1` pair has the smaller 266,400-byte allocation and a null
-optional sample table at both endpoints on both CPUs; the availability gate rejects it.
-The completed 030 side of `timing-weather-audio-test1` validates the positive resource
-path: the larger allocation and optional fifth sample descriptor are present at both
-endpoints (5,087 sample words, period 895). The completed A500 counterpart validates the same resource path.
-The same module prepares read-only entry/exit probes at `$17836/$178e6`, including
-all general registers and the stack return address. It identifies the installed weather
-wrapper from the live `$bc8a` and `$112e6` hooks, its branch to the native audio helper,
-and its full-register restore. Initial/final snapshots on both CPUs identify one caller;
-corrupted hook, target and restore evidence are rejected. This avoids classifying other
-channel-3 sounds as weather solely by arguments. The sampler now emits these probes when the two offsets are requested. Both completed larger-memory CPU runs observe three complete weather calls and three
-native starts, with no suppression. Integration followed completion of the full-cycle
-capture.
-`tools/check_weather_audio.py CAPTURE` is prepared to pair those weather entry/return
-observations, check sample/channel arguments, distinguish the native suppression return
-from channel start, check the registers preserved by each path, and reconcile complete
-calls with the wrapper counter. It rejects the unavailable-sample baseline. Both captures pass sample/channel arguments, preserved registers, native-start
-register results and wrapper-call accounting; eight other audio boundary rows per CPU are
-excluded by caller identity. Each observed call stays within one PAL field, which is
-not a zero-cost measurement. Observed delay-expiry requests are reconciled against the pending flag and completed
-wrapper calls: both CPUs deliver three requests, at 4,860/15,740/18,840 ms relative to
-initial generation, without coalescing. Wrong sample length, changed return stack and
-missing pending-request evidence are rejected. This does not certify audible output,
-suppression, closely spaced sounds during deliberate stalls or general mode lifecycles. Captures ending inside the helper are explicitly rejected.
+The legacy diagnostic names remain compatible: `cleanup_pending` was the deferred sound
+flag in `PDWEFX01/02`, and stays zero in `PDWEFX03`; `cleanups` counts wrapper calls before
+the native suppression check. Neither field proves audible playback. The renderer's
+palette restoration at `$117c8–$117d4`, calling `$f914` under `state+$4d0`, is a separate
+operation and still needs palette/buffer/scanout validation.
 
-This is separate from the renderer's palette restoration at `$117c8–$117d4`, which
-calls `$f914` when `state+$4d0` is set. Sound validation must check sample/period/volume,
-channel state and request timing, including whether multiple logical requests are
-coalesced by the single pending flag during catch-up. Palette/buffer validation remains
-an independent requirement. A larger-memory fixture must let native allocation and
-sample loading succeed; manually forcing the availability flag is not valid evidence.
+Audio validation uses these independent checks:
+
+- `weather_audio_state.py CAPTURE...` reads allocation, optional samples, suppression and
+  channel bookkeeping. `--require-available` rejects absent samples. Available resources
+  must have the larger allocation, an in-bounds table and valid sample pointer/word length/
+  period. The measured weather sample is 5,087 words with period 895.
+- Read-only probes `$17836/$178e6` capture registers and return addresses. The reader follows
+  the installed weather hooks, native-call branch and register restore to identify the
+  actual weather caller, excluding other channel-3 sounds. Damaged hook/target/restore
+  evidence is rejected.
+- `check_weather_audio.py CAPTURE...` pairs native calls, checks arguments, distinguishes
+  suppression from channel start, verifies preserved registers and reconciles delay-expiry
+  requests with deliveries. With `PDWEFX03`, each call must occur at the current logical
+  world/generation boundary and leave logical weather state unchanged. In-progress
+  generation observations inside the audio helper are not mistaken for committed RNG state.
+- `--require-mute` additionally requires native Tab handler probes `$c5fc/$c600`, both flag
+  transitions, one suppressed weather request and two subsequent starts.
+- `--require-unavailable` requires absent resources, an observed delay expiry, zero weather
+  calls/queue counters and no entry into the owned native helper. It cannot pass an idle
+  capture that never exercises the guard.
+
+The deferred baseline `timing-weather-audio-test1` and native-mute `audio-keys1` pairs
+validate resource loading and helper contracts, but their implementation fails the
+closely spaced `audio-stall1` regression on both CPUs. The corrected `audio-stall2` pair
+validates direct delivery of all four requests, including two 320 ms apart during a
+500-ms stall. Native calls take 0–40 ms in PAL fields, which is a synchronization cost,
+not a throughput measurement or proof of audible output. The detailed results and
+remaining direct-delivery regressions are below. Wrong sample length, changed return
+stack, missing pending evidence and both original coalescing captures are rejected.
 
 Fast-planar eligibility additionally checks the published visual lifetime. This is
 necessary on the last visible tick, when persistent lifetime is already zero: the scene
@@ -4371,10 +4364,14 @@ A500 counterpart delivers the same four requests at identical logical times, als
 peaks at 480 ms; both retained and assigned work are zero at the endpoint. The pair
 matches 1,002 common movement states and 222 control/input/fuel updates. The 030
 completes 241 renderer twins with unchanged raster code and zero failures.
-The normal build is byte-identical. Both old failing captures still fail request accounting.
+The normal build is byte-identical. A full weather-disabled timing prototype also matches
+the pre-fix source byte for byte. The current instruction-boundary/direct-branch audit
+passes. Both old failing captures still fail request accounting.
 Direct-delivery mute (`timing-weather-audio-keys2`), no-resource
 (`timing-weather-audio-nosample1`) and full-cycle (`timing-weather-cycle-cadence2`)
-regressions are queued in sequence, stopping on a failed gate. Earlier green captures
+regressions are queued in sequence, stopping on a failed gate. The corrected 030 mute
+side now passes the native flag transitions, one suppressed call and two resumed starts
+at the original three request times; A500 remains pending. Earlier green captures
 exercised the deferred implementation. Broader lifecycle acceptance remains required.
 The audio checker's `--require-unavailable` mode requires absent optional samples, an
 observed delay expiry, no weather helper call and zero queue/call counters across sampled
