@@ -319,8 +319,13 @@ Practice route schedules pause after the natural first lap start. On 030, it exc
 49 PAL fields while preserving private/native starts and logical clocks; 70 logical HUD
 outputs (26 resumed) pass, with no reset fallback and 61 clean renderer comparisons.
 The A500 counterpart also passes: 47 excluded fields, 53 exact logical HUD outputs
-(16 resumed), unchanged timestamps and no fallback. Wider non-forced regressions, natural completed laps/results,
-rescue, external-reset fallback and lap/HUD guest flags/registers remain to verify. Next audit the projection flag and matched native animation visibility,
+(16 resumed), unchanged timestamps and no fallback. The latest 030 rescue regression
+preserves initialized lap starts across 67,520 ms in the pit, passes 437 logical HUD outputs
+(179 resumed) and 32 stable-domain opponent lap reads, and adds 394 clean renderer twins.
+It also verifies one **natural completed player lap of 92,220 ms**, including native total,
+best time and lap index, with all three synthetic finish predicates disabled. A500 rescue,
+additional natural laps/modes, natural player victory, external-reset fallback and lap/HUD
+guest flags/registers remain to verify. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

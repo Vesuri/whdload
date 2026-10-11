@@ -1975,7 +1975,40 @@ with no reset fallback or input overflow.
 python3 tools/check_player_lap_pause.py tmp/prof/timing-playerpause2-a500
 ```
 
-Rescue, external-reset fallback and natural completed laps/results remain open.
+The 030 rescue/natural-lap check below passes. A500 rescue, external-reset fallback,
+other natural laps and natural player results remain open.
+
+### Player lap clock through rescue and a natural completed lap
+
+`timing-playerlap-rescue-030-twins` uses the frozen playerpause2 prototype with
+`CUSTOM1=1 CUSTOM3=1 CUSTOM4=1 CUSTOM5=13 NoCache`. It captures 5,000 PAL fields
+from the first natural `$f952` boundary, with read-only private/player clock probes at
+`$c7d2`, `$e3bc/$e3c4`, `$ce28`, `$10c00` and `$f118`. The native rescue is accepted
+at field 456 and the pit returns at field 4,333. The measured pit interval is **67,520 ms**;
+1,364 inactive pit observations preserve both private logical and native physical lap
+starts. The resumed player clock includes the pit interval rather than excluding it.
+
+All **437** active logical HUD outputs pass, including **179 after return**, with no
+external-reset fallback. The run reaches a natural completed player lap at field 4,608:
+its logical duration is **92,220 ms**, and the following HUD observation confirms the
+native lap duration, accumulated total, best time and lap index. The checker verifies
+that all three synthetic boundary/checkpoint/finish predicate sites retain native bytes;
+this is not the forced-result fixture. It also checks 32 opponent lap-clock reads against
+an unchanged stable lap epoch. There are **394** new completed clean renderer comparisons,
+no pending scene at the end, and unchanged raster code. These are instrumented correctness
+observations, not an FPS measurement or a matched-trajectory comparison.
+
+```sh
+python3 tools/check_player_lap_rescue.py tmp/prof/timing-playerlap-rescue-030-twins
+python3 tools/perf_status.py tmp/prof/timing-playerlap-rescue-030-twins
+```
+
+The checker distinguishes a legitimate observed lap boundary from an unexpected timestamp
+reset: it verifies logical subtraction and native timestamp storage at `$10c00`, followed
+by native duration/total/best/index accounting at `$f118`. It requires terminal snapshots
+and an unchanged opponent epoch; captures with a countdown reset need separate reset
+observations. A500 rescue, additional natural laps and modes, external-reset fallback and
+natural player victory remain unverified.
 
 The read-only capture locator now uses the installed frame JMP to find live session
 metadata in early captures: added helpers had put PDSESS01 exactly 4,096 bytes before
