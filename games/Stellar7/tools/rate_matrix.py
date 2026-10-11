@@ -89,12 +89,12 @@ def run(args):
         try:
             for machine in args.machines:
                 cpu, model, chip, fast, slow, frequency, ntsc = MACHINES[machine]
-                extra = f'--slow_memory={slow}'
-                if frequency:
-                    extra += (' --uae_cpu_speed=real --uae_cpu_multiplier=0'
-                              f' --uae_cpu_frequency={frequency} --uae_cpu_cycle_exact=true')
+                extra = ('--uae_cpu_speed=real --uae_cpu_multiplier=0'
+                         f' --uae_cpu_frequency={frequency} --uae_cpu_cycle_exact=true'
+                         if frequency else '')
                 env = dict(os.environ, CPU=cpu, AMIGA_MODEL=model, CHIP_KB=str(chip),
-                           FAST_KB=str(fast), EXTRA_ARGS=extra, NTSC_MODE=str(ntsc))
+                           FAST_KB=str(fast), SLOW_KB=str(slow), EXTRA_ARGS=extra,
+                           NTSC_MODE=str(ntsc))
                 if model == 'A1200':
                     env['KICKSTART'] = os.environ['KICKSTART_A1200']
                 for route in args.routes:

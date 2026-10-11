@@ -7,6 +7,8 @@
 #   WINDOW=back|none        keep the window behind others / run headless (default: back for
 #                           DEBUG=1 or warp runs, front otherwise)
 #   SLAVE=path amiga/run.sh run another slave build instead of the installed one
+#   NTSC_MODE=0|1           PAL or NTSC timing (default 1, NTSC)
+#   CHIP_KB, FAST_KB, SLOW_KB  memory in KB (default 512, 0, 1536)
 # Shared files (amiga/env.sh; each variable overrides): KICKSTART, KICK13, RTB, WORKBENCH_ADF,
 # WHDLOAD_BINARY.
 # Host: Kickstart 3.1 + Workbench 2.04 floppy boots DH0, which runs WHDLoad on DH1;
@@ -26,8 +28,7 @@ CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
 NTSC_MODE="${NTSC_MODE:-1}"
 case "$NTSC_MODE" in
-  0) UAE_NTSC=false ;;
-  1) UAE_NTSC=true ;;
+  0|1) ;;
   *) echo "NTSC_MODE must be 0 (PAL) or 1 (NTSC)." >&2; exit 1 ;;
 esac
 RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"
@@ -60,13 +61,12 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSE
 
 # The shared launcher (fsuae_common.sh) builds the common options from these: debug and warp
 # runs are silent and open behind the active window (SOUND=, WINDOW=front|back|none override).
-# Slow memory comes from the EXTRA_ARGS default, which the tools set explicitly.
-CHIP_KB="${CHIP_KB:-512}"; FAST_KB="${FAST_KB:-0}"
+# NTSC=1 sets both ntsc_mode and the uae_ntsc core option (NTSC timing).
+CHIP_KB="${CHIP_KB:-512}"; FAST_KB="${FAST_KB:-0}"; SLOW_KB="${SLOW_KB:-1536}"
 JOY0="${JOY0:-mouse}"; JOY1="${JOY1:-keyboard}"
 NTSC="$NTSC_MODE"
-EXTRA_ARGS="${EXTRA_ARGS:---slow_memory=1536}"
 fsuae_options
 fsuae_launch \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   --floppy_drive_0="$WB" --window_width=760 --window_height=568 \
-  --uae_ntsc="$UAE_NTSC" --state_dir="$RUN/state"
+  --state_dir="$RUN/state"

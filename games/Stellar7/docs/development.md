@@ -131,7 +131,7 @@ windows, rather than comparing only the shorter 100-field spot references:
 
 ```sh
 source amiga/env.sh
-CPU=68000 AMIGA_MODEL=A500 CHIP_KB=512 FAST_KB=0 EXTRA_ARGS='--slow_memory=1536' NTSC_MODE=1 VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=12 -DNATIVE_SCENE=6 -DAPPROACH_TYPE=10 -L ../tmp/native-exact.lst' WHD_ARGS='CUSTOM3=1' python3 tools/fixed_window.py tmp/native-exact --frame 150 --level 6 --checkpoints 200 375 450 --state-only --native-events --fields 1
+CPU=68000 AMIGA_MODEL=A500 CHIP_KB=512 FAST_KB=0 SLOW_KB=1536 NTSC_MODE=1 VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=12 -DNATIVE_SCENE=6 -DAPPROACH_TYPE=10 -L ../tmp/native-exact.lst' WHD_ARGS='CUSTOM3=1' python3 tools/fixed_window.py tmp/native-exact --frame 150 --level 6 --checkpoints 200 375 450 --state-only --native-events --fields 1
 cp tmp/native-exact/slave.slave tmp/native-exact.slave
 python3 tools/native_rate.py tmp/native-exact --listing tmp/native-exact.lst --scene type10 --window 150 200 --window 375 450
 ```
@@ -419,7 +419,7 @@ installed bytes and destinations. Computed indirect entries and replacement
 semantics require separate evidence.
 
 The 68020 configuration uses `AMIGA_MODEL=A1200 KICKSTART=$KICKSTART_A1200
-CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 EXTRA_ARGS=--slow_memory=0` after sourcing
+CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 SLOW_KB=0` after sourcing
 `amiga/env.sh`. This is an A1200 with fast RAM, not a stock A1200.
 
 `tools/state_summary.py CAPTURE...` reports only mapped player/RNG/timer state.

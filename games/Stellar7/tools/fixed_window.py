@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Capture a fixed SOL gameplay window with the VERIFY/CUSTOM5 menu fixture.
 Usage: tools/fixed_window.py tmp/prof/base [--fields 100] [--frame 90] [--swaps-only]
-CPU, CHIP_KB, FAST_KB, EXTRA_ARGS, AMIGA_MODEL and KICKSTART remain overridable.
+CPU, CHIP_KB, FAST_KB, SLOW_KB, EXTRA_ARGS, AMIGA_MODEL and KICKSTART remain overridable.
 """
 import argparse, os, socket, subprocess, sys, time, struct, json, re
 from pathlib import Path
@@ -65,7 +65,7 @@ if ntsc_mode not in (0, 1):
 field_hz = 60 if ntsc_mode else 50
 fast=int(env.get('FAST_KB','0')); chip=int(env.get('CHIP_KB','512'))
 slow_match = re.search(r'--slow_memory=(\d+)', env.get('EXTRA_ARGS', ''))
-slow = int(slow_match[1]) if slow_match else 1536
+slow = int(slow_match[1]) if slow_match else int(env.get('SLOW_KB', '1536'))
 base = 0x200000 if fast else 0xc00000 if slow else 0
 size = (fast or slow or chip)*1024
 log=(out/'serve.log').open('w')
