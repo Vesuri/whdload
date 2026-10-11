@@ -1,6 +1,6 @@
 ; Per-actor effect clocks: last explosion tick at 128, mesh animation at 132,
 ; oscillator at 140; validity bits 0/1/2 in byte 136. First callback is
-; immediate, then >=12 ticks.
+; immediate, then >=N ticks.
 ; Initializers clear validity even when restarting the same callback/counter.
 s60_animation_start:
         movem.l d0-d1/a0/a6,-(sp)

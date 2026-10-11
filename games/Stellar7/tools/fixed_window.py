@@ -12,6 +12,7 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('out',type=Path)
 p.add_argument('--fields',type=int,default=100)
 p.add_argument('--frame',type=int,default=90)
+p.add_argument('--level',type=int,choices=range(7),help='wait for this level before matching the requested boundary')
 p.add_argument('--tick',type=int,help='capture a completed SIM60 tick instead of a legacy frame')
 p.add_argument('--tick-checkpoints',type=int,nargs='*',default=[],help='additional completed SIM60 tick boundaries')
 p.add_argument('--checkpoints',type=int,nargs='*',default=[],help='additional simulation frames to snapshot after the trace')
@@ -107,13 +108,16 @@ try:
         counter=entry+16; counter_type='unsigned int'; requested=a.tick
     def boundary_count(memory):
         return struct.unpack_from('>I' if a.tick is not None else '>H',memory,counter-base)[0]
+    def level_matches(memory):
+        return a.level is None or struct.unpack_from('>H',memory,data-base+0x46a0)[0] == a.level
+    level_condition = '' if a.level is None else f' && *(unsigned short*){data+0x46a0:#x} == {a.level}'
     count=boundary_count(mem)
-    if count>requested:raise RuntimeError(f'Already passed boundary {requested}: {count}')
+    if level_matches(mem) and count>requested:raise RuntimeError(f'Already passed boundary {requested}: {count}')
     print(f'Waiting for gameplay {"tick" if a.tick is not None else "frame"} {requested}...',flush=True)
-    reply=cmd(f'gdb break *{anchor:#x}\ncondition $bpnum *({counter_type}*){counter:#x} >= {requested}\ncontinue\ndelete')
+    reply=cmd(f'gdb break *{anchor:#x}\ncondition $bpnum *({counter_type}*){counter:#x} >= {requested}{level_condition}\ncontinue\ndelete')
     mem,ch=dump()
     count=boundary_count(mem)
-    assert count==requested,(count,requested)
+    assert count==requested and level_matches(mem),(count,requested,a.level)
     exec_base=struct.unpack_from('>I',ch,4)[0]
     exec_memory,exec_offset=(ch,exec_base) if exec_base < len(ch) else (mem,exec_base-base)
     observed_hz=exec_memory[exec_offset+530] # ExecBase.VBlankFrequency (NDK)
@@ -123,7 +127,7 @@ try:
         raise RuntimeError(f'Requested {field_hz} Hz display but Exec reports {observed_hz}; verify scan timing before reporting FPS')
     legacy_count=struct.unpack_from('>H',mem,data-base+0x1e96)[0]
     (out/'anchor.txt').write_text(reply+f'\nframe={legacy_count}\ntick={a.tick}\ncode={h:#x}\ndata={data:#x}\nbase={base:#x}\n')
-    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=struct.unpack_from('>H',mem,data-base+0x1e96)[0],tick=a.tick,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast,slow_kb=slow,extra_args=env.get('EXTRA_ARGS',''),whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS',''),ntsc_mode=ntsc_mode,field_hz=field_hz,observed_exec_hz=observed_hz),indent=2)+'\n')
+    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=struct.unpack_from('>H',mem,data-base+0x1e96)[0],tick=a.tick,level_filter=a.level,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast,slow_kb=slow,extra_args=env.get('EXTRA_ARGS',''),whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS',''),ntsc_mode=ntsc_mode,field_hz=field_hz,observed_exec_hz=observed_hz),indent=2)+'\n')
     (out/'state.bin').write_bytes(mem[data-base:data-base+0x823c])
     print(f'At {"tick" if a.tick is not None else "frame"} {count}; capturing {a.fields} fields...',flush=True)
     if a.latency_listing:
@@ -151,11 +155,11 @@ try:
             args+=['--base',hex(base)] if tool=='stellar7_report.py' else [hex(base),'--field-hz',str(field_hz)]
             with (out/target).open('w') as f:subprocess.run(args,stdout=f,env=env,check=True)
     for checkpoint in (a.tick_checkpoints if a.tick is not None else a.checkpoints):
-        reply=cmd(f'gdb break *{anchor:#x}\ncondition $bpnum *({counter_type}*){counter:#x} >= {checkpoint}\ncontinue\ndelete')
+        reply=cmd(f'gdb break *{anchor:#x}\ncondition $bpnum *({counter_type}*){counter:#x} >= {checkpoint}{level_condition}\ncontinue\ndelete')
         folder=out/'checkpoints'/str(checkpoint)
         mem,ch=dump(folder)
         count=boundary_count(mem)
-        if count != checkpoint:raise RuntimeError(f'Expected checkpoint {checkpoint}, stopped at {count}')
+        if count != checkpoint or not level_matches(mem):raise RuntimeError(f'Expected checkpoint {checkpoint} in level {a.level}, stopped at {count}')
         legacy_count=struct.unpack_from('>H',mem,data-base+0x1e96)[0]
         captured_tick=checkpoint if a.tick is not None else None
         (folder/'anchor.txt').write_text(reply+f'\nframe={legacy_count}\ntick={captured_tick}\ncode={h:#x}\ndata={data:#x}\nbase={base:#x}\n')

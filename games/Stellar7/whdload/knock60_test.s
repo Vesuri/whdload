@@ -1,6 +1,6 @@
         IFD VERIFY
         IFD KNOCK_TEST
-; Compare native knockback speed/pending impulse at four twelve-tick boundaries.
+; Compare native knockback speed/pending impulse at four N-tick boundaries.
 ; While active, speed must equal the native interval's speed on every substep;
 ; once inactive, allow the existing input quantization and check its endpoint.
 s60_knock_results:
@@ -66,18 +66,18 @@ s60_test_knock:
 .tick:
         move.w d7,d0
         muls d3,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         move.w d0,d1
         move.w d7,d0
         subq.w #1,d0
         muls d3,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         sub.w d0,d1
         add.w d1,($40,a3)
         bsr s60_knock_update
         tst.w d4
         bne .check_speed
-        cmp.w #12,d7
+        cmp.w #S60_SUBSTEPS,d7
         bne .check_pending
 .check_speed:
         move.w ($40,a3),d0
@@ -95,7 +95,7 @@ s60_test_knock:
         bsr s60_knock_error
 .next_tick:
         addq.w #1,d7
-        cmp.w #13,d7
+        cmp.w #S60_SUBSTEPS+1,d7
         bne .tick
         addq.l #4,a6
         addq.w #1,d6
@@ -110,7 +110,7 @@ s60_test_knock:
         ; cannot distinguish it. Exercise the actual replacement store hook.
         bsr s60_knock_reset
         move.w #100,($026c-S60_DATA,a4)
-        moveq #5,d6
+        moveq #(S60_SUBSTEPS+1)/2-1,d6
 .refresh_start:
         bsr s60_knock_update
         dbf d6,.refresh_start
@@ -124,7 +124,7 @@ s60_test_knock:
         cmp.w #25,($026c-S60_DATA,a4)
         bne .refresh_error
         move.w (s60_knock_state,pc),d0
-        cmp.w #11,d0
+        cmp.w #S60_SUBSTEPS-1,d0
         beq .restore
 .refresh_error:
         addq.w #1,(8,a0)

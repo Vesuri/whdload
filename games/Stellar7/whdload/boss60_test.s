@@ -367,7 +367,7 @@ s60_test_boss:
         move.w (s60_boss_speed_delta,pc),d0
         beq .speed_checked
         muls d7,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         add.w (s60_boss_speed_start,pc),d0
         cmp.w ($40,a3),d0
         beq .speed_checked
@@ -378,7 +378,7 @@ s60_test_boss:
         cmp.w #1,d7
         bne .sixth
         move.l ($10,a3),(4,a5)
-.sixth: cmp.w #6,d7
+.sixth: cmp.w #(S60_SUBSTEPS+1)/2,d7
         bne .position
         move.l ($10,a3),(8,a5)
 .position:
@@ -394,7 +394,7 @@ s60_test_boss:
 .linear_axis:
         sub.l d3,d0
         muls d7,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         ext.l d0
         add.l d3,d0
 .axis_compare:
@@ -408,7 +408,7 @@ s60_test_boss:
         move.w ($16,a2),d0
         sub.w (s60_boss_bank_start,pc),d0
         muls d7,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         add.w (s60_boss_bank_start,pc),d0
         cmp.w ($16,a3),d0
         beq .bank_ok
@@ -417,14 +417,14 @@ s60_test_boss:
         move.w ($14,a2),d0
         sub.w (s60_boss_pitch_start,pc),d0
         muls d7,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         add.w (s60_boss_pitch_start,pc),d0
         cmp.w ($14,a3),d0
         beq .pitch_ok
         bsr s60_boss_mark_error
 .pitch_ok:
         addq.w #1,d7
-        cmp.w #13,d7
+        cmp.w #S60_SUBSTEPS+1,d7
         bne .tick
         move.l a3,a0
         move.l a2,a1
@@ -625,7 +625,7 @@ s60_boss_test_acceleration:
         bsr s60_ai
         move.w (s60_boss_speed_delta,pc),d0
         muls d7,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         add.w (s60_boss_speed_start,pc),d0
         cmp.w ($40,a3),d0
         beq .speed_ok
@@ -636,11 +636,11 @@ s60_boss_test_acceleration:
         cmp.w #1,d7
         bne .sixth
         move.l (12,a3),(4,a5)
-.sixth: cmp.w #6,d7
+.sixth: cmp.w #(S60_SUBSTEPS+1)/2,d7
         bne .next
         move.l (12,a3),(8,a5)
 .next:  addq.w #1,d7
-        cmp.w #13,d7
+        cmp.w #S60_SUBSTEPS+1,d7
         bne .tick
         move.l a3,a0
         move.l a2,a1
@@ -693,8 +693,8 @@ s60_boss_exit_saved: ds.b 112+S60_REC
         IFD BOSS_PATH_TEST
 s60_boss_path_results:
         dc.b 'BP60'
-        dc.w 8,48
-        ds.l 8*48*3
+        dc.w 8,4*S60_SUBSTEPS
+        ds.l 8*4*S60_SUBSTEPS*3
         ENDC
 s60_boss_test_exit_rollback:
         moveq #0,d5
@@ -811,7 +811,7 @@ s60_boss_test_exit_rollback:
         bsr s60_ai
         move.w d7,d0
         mulu #50,d0
-        divu #12,d0
+        divu #S60_SUBSTEPS,d0
         add.w (a2),d0
         cmp.w ($40,a3),d0
         beq .speed_ok
@@ -819,7 +819,7 @@ s60_boss_test_exit_rollback:
         bset #3,(1,a0)
 .speed_ok:
         move.w d7,d0
-        mulu #12,d0
+        mulu #144/S60_SUBSTEPS,d0
         add.w (4,a2),d0
         cmp.w ($14,a3),d0
         beq .pitch_ok
@@ -828,7 +828,7 @@ s60_boss_test_exit_rollback:
 .pitch_ok:
         IFD BOSS_PATH_TEST
         move.w d5,d0
-        mulu #48,d0
+        mulu #4*S60_SUBSTEPS,d0
         add.w d7,d0
         subq.w #1,d0
         mulu #12,d0
@@ -841,11 +841,11 @@ s60_boss_test_exit_rollback:
         cmp.w #1,d7
         bne .sixth
         move.l (12,a3),(4,a5)
-.sixth: cmp.w #6,d7
+.sixth: cmp.w #(S60_SUBSTEPS+1)/2,d7
         bne .next
         move.l (12,a3),(8,a5)
 .next:  addq.w #1,d7
-        cmp.w #49,d7
+        cmp.w #4*S60_SUBSTEPS+1,d7
         bne .tick
         move.l (12,a3),(12,a5)
         move.w (s60_boss_case_error,pc),d0

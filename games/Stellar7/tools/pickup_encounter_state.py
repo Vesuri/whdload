@@ -77,17 +77,19 @@ def capture(folder, listing):
 def validate(folder, listing):
     folder = Path(folder)
     initial = capture(folder, listing)
+    n = initial['clock']['substeps']
+    setup_tick = sim60_state.build_constant(listing, 'PICKUP_ENCOUNTER')
     spawn = capture(folder/'spawn', listing)
     acquired = capture(folder/'acquired', listing)
-    assert initial['setup']['setups'] == 0 and initial['clock']['ticks'] == 200
+    assert initial['setup']['setups'] == 0 and initial['clock']['ticks'] == setup_tick
     setup = spawn['setup']
-    assert setup['setups'] == 1 and setup['setup_tick'] == 200
+    assert setup['setups'] == 1 and setup['setup_tick'] == setup_tick
     assert setup['session'] == 1 and setup['level'] == 0
     assert setup['world_after'] == setup['world_before']+1
     assert setup['energy_before'] == initial['energy'] == 680
     assert setup['inventory_before'] == initial['inventory'][0]
     assert setup['inventory_assigned'] == 1
-    assert spawn['clock']['ticks'] == 201 and spawn['energy'] == 300
+    assert spawn['clock']['ticks'] == setup_tick+1 and spawn['energy'] == 300
     expected_inventory = bytes([1])+initial['inventory'][1:]
     assert spawn['inventory'] == expected_inventory
     actor = setup['actor']
@@ -113,7 +115,7 @@ def validate(folder, listing):
         assert before['setup'] == after['setup'] == setup
         assert before['pc'] == before['meta']['code']+0x3d2a
         assert after['pc'] == after['meta']['code']+0x3dc2
-        assert before['clock']['ticks'] == after['clock']['ticks'] == tick+12*number, 'pickup callback cadence changed'
+        assert before['clock']['ticks'] == after['clock']['ticks'] == tick+n*number, 'pickup callback cadence changed'
         assert before['pointer'] == actor and before['counters'][0] == number-1
         assert before['ui_active'] == 1
         assert before['inventory'] == expected_inventory
@@ -139,7 +141,7 @@ def validate(folder, listing):
         assert before['selected'] == after['selected'] == setup['selected_before'], 'unexpected power selection change'
         rows.append(dict(number=number, tick=before['clock']['ticks'], height=height, yaw=yaw,
                          energy_before=before['energy'], energy_after=after['energy']))
-    for name, elapsed in (('complete', 361), ('later', 481)):
+    for name, elapsed in (('complete', 30*n+1), ('later', 40*n+1)):
         state = capture(folder/name, listing)
         assert state['pc'] == state['completed_pc']
         assert state['clock']['ticks'] == tick+elapsed
@@ -151,7 +153,7 @@ def validate(folder, listing):
         table, = struct.unpack('>I', state['read'](state['slave']+state['symbols']['s60_motion_table'], 4))
         records = state['read'](table, 272*144)
         assert all(struct.unpack_from('>I', records, at)[0] != actor for at in range(0, len(records), 144))
-    return dict(acquired_tick=tick, complete_tick=tick+361, later_tick=tick+481,
+    return dict(acquired_tick=tick, complete_tick=tick+30*n+1, later_tick=tick+40*n+1,
                 events=rows, inventory_before=expected_inventory.hex(),
                 inventory_after=(bytes([3])+expected_inventory[1:]).hex(),
                 selected_power=setup['selected_before'],

@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 
 
 def read(folder, listing):
@@ -25,16 +26,17 @@ def read(folder, listing):
     assert memory[code+0x2af6:code+0x2af8] == bytes.fromhex('4ef9')
     entry = struct.unpack_from('>I', memory, code+0x2af8)[0]-meta['base']
     assert memory[entry+4:entry+8] == b'S760'
-    assert struct.unpack_from('>H', memory, entry+50)[0] >= 29
+    version, n = sim60_state.decode_version(struct.unpack_from('>H', memory, entry+50)[0])
+    assert version >= 29
     at = entry-symbols['s60_entry']+symbols['s60_friction_results']
     assert memory[at:at+4] == b'TF60'
     checked, errors = struct.unpack_from('>II', memory, at+4)
-    return dict(checked=checked, mismatches=errors,
-                scope='Native damping fragment on private signed velocities: 24 start ticks, 108 observations each, contact gaps, rendering, inactive behavior and unsigned tick rollover. Not a full encounter.')
+    return dict(tick_substeps=n, checked=checked, mismatches=errors,
+                scope='Native damping fragment on private signed velocities: 2*N start ticks, 9*N observations each, contact gaps, rendering, inactive behavior and unsigned tick rollover. Not a full encounter.')
 
 
 def validate(result):
-    assert result['checked'] == 2592 and result['mismatches'] == 0, result
+    assert result['checked'] == 18*result['tick_substeps']**2 and result['mismatches'] == 0, result
 
 
 if __name__ == '__main__':

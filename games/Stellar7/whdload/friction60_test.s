@@ -6,7 +6,42 @@ s60_friction_results:
 s60_friction_actor: ds.b 112
 s60_friction_view: dc.l 0
 s60_friction_fragment: ds.b 48
-s60_friction_expected: dc.w 0,13,25,44,56,68,80,92,96,104,-1
+; Independent compile-time event schedule. Rendering/contact gaps suppress
+; clock consumption; the inactive native call does not consume its clock.
+s60_friction_expected:
+s60_friction_tick SET 0
+s60_friction_last SET -S60_SUBSTEPS
+        REPT 9*S60_SUBSTEPS
+s60_friction_contact SET 1
+        IFGE s60_friction_tick-3*S60_SUBSTEPS
+        IFLT s60_friction_tick-11*S60_SUBSTEPS/3
+s60_friction_contact SET 0
+        ENDC
+        ENDC
+        IFGE s60_friction_tick-6*S60_SUBSTEPS
+        IFLT s60_friction_tick-19*S60_SUBSTEPS/3
+s60_friction_contact SET 0
+        ENDC
+        ENDC
+s60_friction_emit SET 0
+        IFEQ s60_friction_tick-8*S60_SUBSTEPS
+s60_friction_emit SET 1
+        ELSE
+        IFNE s60_friction_tick-S60_SUBSTEPS
+        IFNE s60_friction_contact
+        IFGE s60_friction_tick-s60_friction_last-S60_SUBSTEPS
+s60_friction_emit SET 1
+s60_friction_last SET s60_friction_tick
+        ENDC
+        ENDC
+        ENDC
+        ENDC
+        IFNE s60_friction_emit
+        dc.w s60_friction_tick
+        ENDC
+s60_friction_tick SET s60_friction_tick+1
+        ENDR
+        dc.w -1
 s60_test_friction:
         move.l (s60_ticks,pc),d0
         cmp.l #FRICTION_TEST,d0
@@ -47,9 +82,9 @@ s60_test_friction:
         bsr s60_friction_reset
         lea (s60_friction_expected,pc),a5
         move.l d5,d4
-        cmp.w #12,d5
+        cmp.w #S60_SUBSTEPS,d5
         bcs .base
-        sub.l #20,d4 ; exercise unsigned tick rollover
+        sub.l #S60_SUBSTEPS+8,d4 ; exercise unsigned tick rollover
 .base:  moveq #0,d6
 .step:
         lea (s60_ticks,pc),a0
@@ -60,24 +95,24 @@ s60_test_friction:
         move.w #1,(a0)
         lea (s60_rendering,pc),a0
         clr.w (a0)
-        cmp.w #12,d6
+        cmp.w #S60_SUBSTEPS,d6
         bne .render_ready
         move.w #1,(a0)
 .render_ready:
-        cmp.w #96,d6
+        cmp.w #8*S60_SUBSTEPS,d6
         bne .active_ready
         move.w #1,(a0) ; inactive native path ignores rendering and clock
         lea (s60_running,pc),a0
         clr.w (a0)
 .active_ready:
         move.w #1,($46d8-S60_DATA,a4)
-        cmp.w #36,d6
+        cmp.w #3*S60_SUBSTEPS,d6
         bcs .contact_ready
-        cmp.w #44,d6
+        cmp.w #11*S60_SUBSTEPS/3,d6
         bcs .no_contact
-        cmp.w #72,d6
+        cmp.w #6*S60_SUBSTEPS,d6
         bcs .contact_ready
-        cmp.w #76,d6
+        cmp.w #19*S60_SUBSTEPS/3,d6
         bcc .contact_ready
 .no_contact:
         clr.w ($46d8-S60_DATA,a4)
@@ -102,10 +137,10 @@ s60_test_friction:
 .passed:
         addq.l #1,(4,a6)
         addq.w #1,d6
-        cmp.w #108,d6
+        cmp.w #9*S60_SUBSTEPS,d6
         bcs .step
         addq.w #1,d5
-        cmp.w #24,d5
+        cmp.w #2*S60_SUBSTEPS,d5
         bcs .case
         lea (s60_friction_state,pc),a0
         move.l (sp)+,(4,a0)

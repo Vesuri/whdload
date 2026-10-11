@@ -1,4 +1,4 @@
-; Boss decisions execute once per twelve active callback ticks. Only audited
+; Boss decisions execute once per N active callback ticks. Only audited
 ; continuous increments are distributed: bank, level-2 ascent/descent,
 ; level-4 sideways X/Z, type-7 exit pitch. Clamps, temporary collision positions,
 ; spawn placement, discrete speed assignments and state transitions remain native.
@@ -34,7 +34,7 @@ s60_boss_ai:
 .exit_state:
         cmp.b #4,($59,a3)
         bne .sample
-        moveq #12,d7
+        moveq #(1<<2)|(1<<3),d7 ; pitch and acceleration flags, independent of N
         bra .sample
 .level: cmp.w #4,($46a0-S60_DATA,a4)
         bne .height
@@ -141,8 +141,8 @@ s60_boss_fraction:
 
 ; Native movement precedes AI. For each axis, project interval speeds V and
 ; V+A through the untouched native movement routine at the same current angles.
-; Integrate [24*D(V) + (2*k-13)*(D(V+A)-D(V))]/288 at substep k=1..12.
-; For a fixed direction, the correction sums to zero and all twelve substeps
+; Integrate [2*N*D(V) + (2*k-N-1)*(D(V+A)-D(V))]/(2*N*N) at k=1..N.
+; For a fixed direction, the correction sums to zero and all N substeps
 ; total exactly D(V), including native trigonometric rounding and signed wraps.
 ; Record 104 acceleration, 106 interval V, 108 published-speed remainder,
 ; 110 substep coefficient, 112 saved speed, 114 reserved;
@@ -168,10 +168,10 @@ s60_boss_speed_enter:
 .phase: clr.w (110,a6)
         tst.w (104,a6)
         beq .done
-        moveq #-11,d0
+        moveq #1-S60_SUBSTEPS,d0
         tst.w (4,a6)
         beq .adjust
-        moveq #13,d0
+        moveq #S60_SUBSTEPS+1,d0
         sub.w (4,a6),d0
         sub.w (4,a6),d0
 .adjust:
@@ -230,17 +230,31 @@ s60_boss_move_finish:
         add.l d3,d0
         dbf d4,.multiply
 .base:  move.l (a2)+,d3
+        IFEQ S60_SUBSTEPS-12
         move.l d3,d4
         lsl.l #4,d3
         lsl.l #3,d4
         add.l d3,d0
-        add.l d4,d0 ; 24*D(V) plus substep correction
+        add.l d4,d0 ; 2*N*D(V) plus substep correction
+        ELSE
+        moveq #2*S60_SUBSTEPS-1,d4
+.scale: add.l d3,d0
+        dbf d4,.scale
+        ENDC
         move.w (a1),d1
         ext.l d1
         add.l d1,d0
-        divs #288,d0
+        IFEQ S60_SUBSTEPS-1
+        asr.l #1,d0 ; zero correction/remainder; preserve a full long D(V)
+        move.l d0,d1
+        swap d0
+        clr.w d0
+        swap d0
+        ELSE
+        divs #2*S60_SUBSTEPS*S60_SUBSTEPS,d0
         move.w d0,d1
         ext.l d1
+        ENDC
         move.l d1,(a3)+
         add.l (a5)+,d1
         move.l d1,(a0)+

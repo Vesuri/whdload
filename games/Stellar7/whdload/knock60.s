@@ -1,5 +1,5 @@
 ; Native knockback overrides input for one legacy movement interval, then
-; halves (toward zero, with the native -32768 wrap). Movement itself is 60 Hz.
+; halves (toward zero, with the native -32768 wrap). Movement itself uses S60_RATE.
 ; State: ticks left, current applied speed, last published pending impulse.
 s60_knock_state: dc.w 0,0,0
 s60_knock_reset:

@@ -1,5 +1,5 @@
 ; Damage shake uses native units and its own byte RNG at data $3558.
-; First post-impact sample is immediate; subsequent samples require 12 ticks.
+; First post-impact sample is immediate; subsequent samples require N ticks.
 ; Reset/menu callers still enter untouched $40ae directly with counter 1.
 s60_shake_state: dc.l 0
         dc.w 0,0 ; last native counter, validity

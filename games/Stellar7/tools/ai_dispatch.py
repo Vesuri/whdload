@@ -11,6 +11,7 @@ import re
 import struct
 from pathlib import Path
 import barto
+import sim60_state
 from stellar7_report import locate
 
 
@@ -35,6 +36,7 @@ def gate_sites(body, offsets):
 
 def inspect(folder, listing):
     folder, listing = Path(folder), Path(listing)
+    n = sim60_state.read(folder)['substeps']
     slave = (folder/'slave.slave').read_bytes()
     assert slave == listing.with_suffix('.slave').read_bytes(), 'listing build mismatch'
     symbols = listing.read_text(encoding='latin1')
@@ -136,14 +138,14 @@ def inspect(folder, listing):
     due_indices = [i for i, update in enumerate(updates) if update['due']]
     assert updates and offered and executed, 'insufficient generic AI coverage'
     assert len(due_indices) >= 2, 'need at least two decision boundaries'
-    assert all(b-a == 12 for a, b in zip(due_indices, due_indices[1:])), due_indices
+    assert all(b-a == n for a, b in zip(due_indices, due_indices[1:])), due_indices
     return dict(complete_updates=len(updates), incomplete_at_end=active is not None,
                 offered_callbacks={hex(k): v for k, v in sorted(callbacks.items())},
                 generic_offers=len(offered), generic_calls=len(executed),
                 generic_actors=len({actor for actor, callback in offered}),
                 decision_update_indices=due_indices,
                 native_f136_firing_observations=dict(sorted(firing.items())),
-                matches_shared_twelve_tick_gate_and_actor_order=True)
+                tick_substeps=n, matches_shared_decision_gate_and_actor_order=True)
 
 
 

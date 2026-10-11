@@ -1,5 +1,5 @@
 ; Discrete native timers keep their original time units. Geometry and collision
-; are evaluated every tick, while countdowns advance once per twelve ticks.
+; are evaluated every tick, while countdowns advance once per N ticks.
 s60_events_install:
         bsr s60_friction_install
         move.l (s60_code,pc),a1
@@ -163,9 +163,9 @@ s60_oscillator_native:
         move.l (8,sp),a3
         S60_TAIL $3952
 
-; Jump state: active, last native velocity, velocity*12, position remainder,
+; Jump state: active, last native velocity, velocity*N, position remainder,
 ; reserved. Integer integration of the parabola through the original 5 Hz
-; samples. At tick k, y(k)=y(0)+(2700*k-5*k*k)/144 for a native 220 launch.
+; samples. At tick k, y(k)=y(0)+(225*N*k-5*k*k)/(N*N) for a native 220 launch.
 s60_jump_state:
 s60_jump_active: dc.w 0
 s60_jump_last: dc.w 0
@@ -219,11 +219,11 @@ s60_jump_update:
         move.w #1,(a2)
 .integrate:
         move.l (4,a2),d2
-        add.l #55,d2 ; discrete-reference correction: g*(12-1)/2
+        add.l #5*(S60_SUBSTEPS-1),d2 ; native gravity*(N-1)/2
         move.w (8,a2),d0
         ext.l d0
         add.l d0,d2
-        divs #144,d2
+        divs #S60_SUBSTEPS*S60_SUBSTEPS,d2
         move.w d2,d3
         ext.l d3
         add.l d3,($10,a3)
@@ -247,7 +247,7 @@ s60_jump_update:
 .done:  movem.l (sp)+,d2-d3/a2-a3
         rts
 
-; Three player timers: remaining 60 Hz ticks, last published native byte, pad.
+; Three player timers: remaining simulation ticks, last published native byte, pad.
 ; Reset at the actual native setter, including a refresh to the same value.
 s60_cooldown_state: ds.b 12
 s60_cooldown5:

@@ -1,5 +1,9 @@
         IFD VERIFY
         IFD ANIMATION_TEST
+S60_ANIM_STAGGER SET (S60_SUBSTEPS-1)/2
+        IFEQ S60_SUBSTEPS-2
+S60_ANIM_STAGGER SET 1
+        ENDC
 ; Two mesh animations, two explosion lifetimes and four frame oscillators.
 ; Four native intervals versus 48 updates, with duplicate and render callbacks.
 s60_animation_results:
@@ -217,7 +221,7 @@ s60_test_animation:
         lea (s60_ticks,pc),a0
         addq.l #1,(a0)
         addq.w #1,d7
-        cmp.w #12,d7
+        cmp.w #S60_SUBSTEPS,d7
         bne .tick
         adda.w #368,a2
         addq.w #1,d6
@@ -245,7 +249,9 @@ s60_test_animation:
         move.l d0,(a0)
         bsr s60_anim_replacement
         lea (s60_ticks,pc),a0
-        addq.l #5,(a0)
+        IFNE S60_ANIM_STAGGER
+        addq.l #S60_ANIM_STAGGER,(a0)
+        ENDC
         bsr s60_anim_replacement
         lea (s60_anim_expected,pc),a2
         lea (s60_anim_case_error,pc),a0
@@ -255,7 +261,7 @@ s60_test_animation:
         bsr s60_anim_replacement
         adda.w #368,a2
         bsr s60_anim_check
-        cmp.l #15,(132,a6)
+        cmp.l #10+S60_ANIM_STAGGER,(132,a6)
         beq .refresh_ok
         bsr s60_anim_error
 .refresh_ok:
@@ -300,11 +306,11 @@ s60_anim_independence:
         lea (s60_anim_actor,pc),a3
         bsr s60_anim_replacement
         lea (s60_ticks,pc),a0
-        move.l #15,(a0)
+        move.l #10+S60_ANIM_STAGGER,(a0)
         lea (s60_anim_second,pc),a3
         bsr s60_anim_replacement
         lea (s60_ticks,pc),a0
-        move.l #22,(a0)
+        move.l #10+S60_SUBSTEPS,(a0)
         lea (s60_anim_actor,pc),a3
         bsr s60_anim_replacement
         cmp.b #2,(112,a3)
@@ -312,29 +318,37 @@ s60_anim_independence:
         bsr s60_anim_error
 .first_ok:
         bsr s60_motion_record
-        cmp.l #22,(132,a6)
+        cmp.l #10+S60_SUBSTEPS,(132,a6)
         beq .first_clock_ok
         bsr s60_anim_error
 .first_clock_ok:
         lea (s60_anim_second,pc),a3
         bsr s60_anim_replacement
+        IFEQ S60_SUBSTEPS-1
+        cmp.b #2,(112,a3) ; at N=1 both independent clocks are due this tick
+        ELSE
         cmp.b #1,(112,a3)
+        ENDC
         beq .second_ok
         bsr s60_anim_error
 .second_ok:
         bsr s60_motion_record
-        cmp.l #15,(132,a6)
+        IFEQ S60_SUBSTEPS-1
+        cmp.l #10+S60_SUBSTEPS,(132,a6)
+        ELSE
+        cmp.l #10+S60_ANIM_STAGGER,(132,a6)
+        ENDC
         beq .second_clock_ok
         bsr s60_anim_error
 .second_clock_ok:
         lea (s60_ticks,pc),a0
-        move.l #27,(a0)
+        move.l #10+S60_SUBSTEPS+S60_ANIM_STAGGER,(a0)
         bsr s60_anim_replacement
         cmp.b #2,(112,a3)
         beq .last_ok
         bsr s60_anim_error
 .last_ok:
-        cmp.l #27,(132,a6)
+        cmp.l #10+S60_SUBSTEPS+S60_ANIM_STAGGER,(132,a6)
         beq .last_clock_ok
         bsr s60_anim_error
 .last_clock_ok:
@@ -357,7 +371,9 @@ s60_anim_osc_refresh:
         move.l #10,(a0)
         bsr s60_anim_replacement
         lea (s60_ticks,pc),a0
-        addq.l #5,(a0)
+        IFNE S60_ANIM_STAGGER
+        addq.l #S60_ANIM_STAGGER,(a0)
+        ENDC
         bsr s60_anim_replacement
         cmp.b #3,($56,a3)
         bne .error
@@ -371,7 +387,7 @@ s60_anim_osc_refresh:
         bsr s60_anim_replacement
         cmp.b #3,($56,a3)
         bne .error
-        cmp.l #15,(140,a6)
+        cmp.l #10+S60_ANIM_STAGGER,(140,a6)
         bne .error
         cmp.l #77,(132,a6)
         bne .error

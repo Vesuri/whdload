@@ -1,5 +1,5 @@
 ; Exercise the actual native joystick-neutral braking fragment, privately.
-; Compare twelve fixed substeps with one original 80-unit step for every phase.
+; Compare N fixed substeps with one original 80-unit step for every phase.
         IFD VERIFY
         IFD INPUT_NEUTRAL_TEST
 s60_input_neutral_results:
@@ -39,7 +39,7 @@ s60_test_input_neutral:
         move.w (56,a3),d3 ; native expected endpoint
         move.w (a5),(56,a3)
         move.w d5,d4
-        moveq #11,d7
+        moveq #S60_SUBSTEPS-1,d7
 .step:
         lea (s60_phase,pc),a0
         move.w d4,(a0)
@@ -48,7 +48,7 @@ s60_test_input_neutral:
         bsr s60_input_neutral_flush
         bsr s60_input_neutral_fragment
         addq.w #1,d4
-        cmp.w #12,d4
+        cmp.w #S60_SUBSTEPS,d4
         bcs .next_step
         moveq #0,d4
 .next_step:
@@ -69,7 +69,7 @@ s60_test_input_neutral:
         addq.l #2,a5
         dbf d6,.case
         addq.w #1,d5
-        cmp.w #12,d5
+        cmp.w #S60_SUBSTEPS,d5
         bcs .phase
         lea (s60_phase,pc),a0
         move.w (sp)+,(a0)

@@ -10,10 +10,11 @@ import json
 from pathlib import Path
 
 import audit_hooks
-from rate_matrix import MACHINES, ROUTES, CAPTURE_ROUTES, NATIVE_COMBAT_ROUTES
+from rate_matrix import MACHINES, ROUTES, CAPTURE_ROUTES, NATIVE_COMBAT_ROUTES, route_window
 import native_scene_state
 import simulation_latency
 import simulation_rate
+import sim60_state
 
 
 def inspect(prefix, partial=False, routes=None):
@@ -41,7 +42,9 @@ def inspect(prefix, partial=False, routes=None):
             assert meta['whd_args'].strip() == ('CUSTOM5=1 '+config['whd_args']).strip()
             native = route.startswith('native-')
             assert meta['verify_flags'] == config['flags'], (name, 'build flags')
-            start = CAPTURE_ROUTES[route][0]
+            start, end, _, checkpoints = route_window(route, config.get('substeps') or 12)
+            if 'start' in config:
+                assert (config['start'],config['end'],config['checkpoints']) == (start,end,checkpoints)
             assert meta['frame' if native else 'tick'] == start, (name, 'capture boundary')
             events = json.loads((folder/'field-events.json').read_text())
             assert events['field_hz'] == meta['observed_exec_hz'] == meta['field_hz']
@@ -62,8 +65,12 @@ def inspect(prefix, partial=False, routes=None):
                 assert updates == report['measurement']['updates_hz']
                 growth = None
             else:
-                end = ROUTES[route][1]
                 measured = simulation_rate.interval(folder,folder/'checkpoints'/str(end))
+                assert sim60_state.read(folder)['substeps'] == (config.get('substeps') or 12), name
+                if route == 'type10-heavy':
+                    boundaries = [folder]+[folder/'checkpoints'/str(tick) for tick in checkpoints]
+                    measured['segments'] = [simulation_rate.interval(a,b)
+                                            for a,b in zip(boundaries,boundaries[1:])]
                 assert measured == report['measurement'], name
                 audit_hooks.installed(folder,prefix/(name+'.lst'))
                 fps = measured['presentation_hz']

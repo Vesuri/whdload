@@ -99,7 +99,7 @@ s60_test_idle:
         cmp.w #6,d4
         bcs .small
         subq.w #6,d4
-        muls #12,d7 ; also test out-of-normal-range accumulated fractions
+        muls #S60_SUBSTEPS,d7 ; also test out-of-normal-range accumulated fractions
 .small: add.w d4,d4
         lea (8,a6),a0
         move.w d7,(a0,d4.w)

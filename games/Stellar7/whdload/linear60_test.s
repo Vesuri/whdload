@@ -18,11 +18,11 @@ s60_linear_yaws:
         dc.w 0,1,15,16,$3fff,$4000,$4001,$7fff
 s60_linear_speeds: dc.w $8000,-1,0,1,500,$7fff
 s60_linear_fractions:
-        dc.w 0,0,1,-1,-1,1,11,-11,-11,11,11,11,-11,-11,5,-5
-        dc.w -5,5,0,11,0,-11,11,0,-11,0,7,3,-7,-3,3,-7
+        dc.w 0,0,((S60_SUBSTEPS+10)/12),-((S60_SUBSTEPS+10)/12),-((S60_SUBSTEPS+10)/12),((S60_SUBSTEPS+10)/12),(S60_SUBSTEPS-1),-(S60_SUBSTEPS-1),-(S60_SUBSTEPS-1),(S60_SUBSTEPS-1),(S60_SUBSTEPS-1),(S60_SUBSTEPS-1),-(S60_SUBSTEPS-1),-(S60_SUBSTEPS-1),((S60_SUBSTEPS-1)/2),-((S60_SUBSTEPS-1)/2)
+        dc.w -((S60_SUBSTEPS-1)/2),((S60_SUBSTEPS-1)/2),0,(S60_SUBSTEPS-1),0,-(S60_SUBSTEPS-1),(S60_SUBSTEPS-1),0,-(S60_SUBSTEPS-1),0,(7*(S60_SUBSTEPS-1)/11),(3*(S60_SUBSTEPS-1)/11),-(7*(S60_SUBSTEPS-1)/11),-(3*(S60_SUBSTEPS-1)/11),(3*(S60_SUBSTEPS-1)/11),-(7*(S60_SUBSTEPS-1)/11)
 ; Positive offsets are actor fields; negative offsets are private record words.
 s60_linear_offsets: dc.w -8,-12,-18,-14,-16,20,20,58,60,62,56,52,54,2,-8,-18
-s60_linear_values: dc.w 1,1,1,12,-12,1,-1,1,-1,$7fff,1,-1,1,7,$8000,$8000
+s60_linear_values: dc.w 1,1,1,S60_SUBSTEPS,-S60_SUBSTEPS,1,-1,1,-1,$7fff,1,-1,1,7,$8000,$8000
 s60_linear_invoke:
         move.l a0,-(sp)
         movem.l d5-d7/a4,-(sp)

@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 
 
 def read(folder, listing):
@@ -25,18 +26,19 @@ def read(folder, listing):
     assert memory[code+0x2af6:code+0x2af8] == bytes.fromhex('4ef9')
     entry = struct.unpack_from('>I', memory, code+0x2af8)[0]-meta['base']
     assert memory[entry+4:entry+8] == b'S760'
-    assert struct.unpack_from('>H', memory, entry+50)[0] >= 29
+    version, n = sim60_state.decode_version(struct.unpack_from('>H', memory, entry+50)[0])
+    assert version >= 29
     at = entry-symbols['s60_entry']+symbols['s60_quanta_results']
     assert memory[at:at+4] == b'QI60'
     checked, errors = struct.unpack_from('>II', memory, at+4)
     phase, offset = struct.unpack_from('>HH', memory, at+12)
-    return dict(checked=checked, mismatches=errors,
+    return dict(tick_substeps=n, checked=checked, mismatches=errors,
                 first_failure=dict(phase=phase, region_offset=offset),
-                scope='Full 558-byte native input region compared against the preceding table-loop updater at all twelve phases, restoring original constants before each candidate call. Not a full input-dispatch encounter.')
+                scope='Full 558-byte native input region compared against the preceding table-loop updater at all N phases, restoring original constants before each candidate call. Not a full input-dispatch encounter.')
 
 
 def validate(result):
-    assert result['checked'] == 12 and result['mismatches'] == 0, result
+    assert result['checked'] == result['tick_substeps'] and result['mismatches'] == 0, result
 
 
 if __name__ == '__main__':

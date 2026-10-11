@@ -31,6 +31,22 @@ s60_test_preferences:
         move.w (s60_preferences_results+4,pc),d0
         bne .done
         movem.l d0-d7/a0-a6,-(sp)
+        IFNE S60_SUBSTEPS-12
+        ; Lower rates can reach this tick with zero credit. Accrue one real
+        ; tick of field time before the modal wrapper samples the clock;
+        ; never inject private debt. N12 retains its byte-identical fixture.
+        moveq #0,d2
+        move.w (s60_field_hz,pc),d2
+        add.w #S60_RATE-1,d2
+        divu #S60_RATE,d2
+        and.l #$ffff,d2
+        move.l ($24a8-S60_DATA,a4),d1
+.debt_wait:
+        move.l ($24a8-S60_DATA,a4),d0
+        sub.l d1,d0
+        cmp.l d2,d0
+        bcs .debt_wait
+        ENDC
         lea (s60_preferences_results,pc),a0
         move.w #1,(4,a0)
         IFD PREFERENCES_CHOICE

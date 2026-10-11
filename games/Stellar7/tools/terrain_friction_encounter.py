@@ -6,7 +6,7 @@ import re
 import struct
 from pathlib import Path
 from encounter_state import read as encounter, validate_terrain
-from sim60_state import read as clock
+from sim60_state import read as clock, build_constant
 from simulation_state import snapshot
 
 
@@ -26,7 +26,11 @@ def validate(folder, listing):
     folder, listing = Path(folder), Path(listing)
     assert (folder/'slave.slave').read_bytes() == listing.with_suffix('.slave').read_bytes()
     paths = sorted((folder/'events').iterdir())
-    assert len(paths) == 29
+    assert paths
+    n = clock(paths[0])['substeps']
+    count = (28*n+11)//12+1
+    first_tick = build_constant(listing, 'BOSS_TERRAIN_TEST')+(3*n+11)//12
+    assert len(paths) == count
     validate_terrain(encounter(paths[0], listing))
     results = []
     last = None
@@ -39,7 +43,8 @@ def validate(folder, listing):
         bs, ast = snapshot(before), snapshot(after)
         bc, ac = clock(before), clock(after)
         tick = bc['ticks']
-        assert tick == ac['ticks'] == 3603+index
+        assert bc['substeps'] == ac['substeps'] == n
+        assert tick == ac['ticks'] == first_tick+index
         assert bc['running'] == ac['running'] == 1
         assert bc['rendering'] == ac['rendering'] == 0
         assert bs['level'] == ast['level'] == 5
@@ -48,7 +53,7 @@ def validate(folder, listing):
         new = struct.unpack('>HHI', bytes.fromhex(ast['terrain_friction_clock']))
         assert old == ((0, 0, 0) if last is None else (1, 0, last))
         contact = bool(bs['terrain_contact'])
-        due = contact and (last is None or tick-last >= 12)
+        due = contact and (last is None or tick-last >= n)
         expected = bytearray(ba)
         speeds = [struct.unpack_from('>h', ba, offset)[0] for offset in (56, 64)]
         if due:
@@ -62,7 +67,7 @@ def validate(folder, listing):
         results.append(dict(tick=tick, contact=contact, damping=due, before=speeds,
                             after=[struct.unpack_from('>h', aa, offset)[0] for offset in (56, 64)]))
     due_ticks = [row['tick'] for row in results if row['damping']]
-    assert len(due_ticks) >= 2 and meaningful_skips >= 2, (due_ticks, meaningful_skips)
+    assert len(due_ticks) >= 2 and (meaningful_skips >= 2 if n > 1 else meaningful_skips == 0), (due_ticks, meaningful_skips)
     return dict(events=results, damping_ticks=due_ticks, meaningful_skips=meaningful_skips,
                 scope='Explicit boss-state setup; native type-46 contact and complete player actor comparison across the input damping block.')
 

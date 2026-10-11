@@ -5,6 +5,7 @@ import re
 import struct
 import sys
 from pathlib import Path
+from sim60_state import decode_version
 
 
 def read(folder):
@@ -15,7 +16,7 @@ def read(folder):
     assert memory[code+0x2af6:code+0x2af8] == bytes.fromhex('4ef9')
     entry = struct.unpack_from('>I', memory, code+0x2af8)[0]-meta['base']
     assert memory[entry+4:entry+8] == b'S760'
-    assert struct.unpack_from('>H', memory, entry+50)[0] >= 24
+    assert decode_version(struct.unpack_from('>H', memory, entry+50)[0])[0] >= 24
     offset = struct.unpack_from('>H', memory, entry+118)[0]
     assert offset, 'PROJECT_TEST fixture is absent'
     at = entry+offset

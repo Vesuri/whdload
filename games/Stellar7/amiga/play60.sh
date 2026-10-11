@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and play the experimental 60 Hz conversion with normal input and sound.
+# Build and play the experimental fixed-rate conversion with normal input and sound.
 # CPU/memory/display overrides are the same as run.sh; WHD_ARGS defaults to CUSTOM1=1.
 set -euo pipefail
 cd "$(dirname "$0")"

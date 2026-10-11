@@ -12,7 +12,7 @@ from sim60_state import read
 
 def interval(before, after):
     a, b = read(before), read(after)
-    for key in ('session', 'field_hz', 'clock_origin'):
+    for key in ('session', 'field_hz', 'substeps', 'clock_origin'):
         if a.get(key) != b.get(key):
             raise ValueError(f'{key} changed; interval crosses a reset or clock rebase')
     if not a['running'] or not b['running'] or a.get('modal_depth', 0) or b.get('modal_depth', 0):

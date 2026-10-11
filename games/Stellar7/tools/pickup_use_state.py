@@ -6,15 +6,32 @@ import struct
 from pathlib import Path
 import pickup_encounter_state
 import simulation_state
+import sim60_state
 
-POINTS = [1318, 1400, 1401, 1402, 1403, 1413, 1414, 1415, 1426, 1500]
+def configuration(folder, listing):
+    clock = sim60_state.read(folder)
+    n = clock['substeps']
+    use = sim60_state.build_constant(listing, 'PICKUP_USE')
+    return n, use, clock['ticks']
+
+
+def nominal(tick, n):
+    """Round a retained 60 Hz observation time up to an actual tick."""
+    return (tick*n+11)//12
+
+
+def ordered(initial, points):
+    return [initial]+sorted(set(points)-{initial})
 
 
 def validate(folder, listing):
     folder = Path(folder)
+    n, use, initial = configuration(folder, listing)
+    activation = use+2
+    points = ordered(initial, [use, use+1, activation, activation+1, activation+n-1, activation+n, activation+n+1, activation+2*n, nominal(1500,n)])
     rows = []
-    for tick in POINTS:
-        point = folder if tick == POINTS[0] else folder/'checkpoints'/str(tick)
+    for tick in points:
+        point = folder if tick == initial else folder/'checkpoints'/str(tick)
         raw = pickup_encounter_state.capture(point, listing)
         state = simulation_state.snapshot(point, True, True)
         assert raw['pc'] == raw['completed_pc'] and raw['clock']['ticks'] == tick
@@ -24,28 +41,30 @@ def validate(folder, listing):
         target = raw['slave']+raw['symbols']['fixture_power_buttons']
         assert raw['read'](code+0x196d0, 6) == bytes.fromhex('4ef9')+struct.pack('>I', target)
         assert raw['read'](data+0x2114, 4) == struct.pack('>I', code+0x3e32)
-        selected = 65535 if tick < 1402 else 0
+        selected = 65535 if tick < activation else 0
         assert raw['selected'] == selected, 'native selection edge differs'
-        active = tick >= 1403
+        active = tick > activation
         expected_inventory = bytes([254 if active else 3])+bytes([1])*6
         assert raw['inventory'] == expected_inventory, 'native charge consumption differs'
         timers = struct.unpack('>7H', bytes.fromhex(state['power_timers']))
         phases = struct.unpack('>10H', bytes.fromhex(state['power_phases']))
-        elapsed = max(0, tick-1402)
-        timer = 900-elapsed//12 if active else 0
-        phase = 12-elapsed % 12 if active else 0
+        elapsed = max(0, tick-activation)
+        timer = 900-elapsed//n if active else 0
+        phase = n-elapsed % n if active else 0
         assert timers == (timer, 0, 0, 0, 0, 0, 0), 'native power timer differs'
         assert phases == (phase, timer)+(0,)*8, 'power decrement phase differs'
         assert state['clone_active'] == 0, 'clone became active before native deadline'
         rows.append(dict(tick=tick, selected=selected, inventory=raw['inventory'].hex(),
                          timer=timer, phase=phase))
-    return dict(points=rows, scope='Controlled pickup scene; native second-button release selects power zero, simultaneous buttons activate it. Checks consumption and initial twelve-tick timer cadence, not expiry or audible output.')
+    return dict(points=rows, scope='Controlled pickup scene; native second-button release selects power zero, simultaneous buttons activate it. Checks consumption and initial N-tick timer cadence, not expiry or audible output.')
 
 
 def validate_clone(folder, listing):
     result = validate(folder, listing)
+    n, use, _ = configuration(folder, listing)
+    activation, clone_tick = use+2, use+2+40*n
     rows = []
-    for tick in (1500, 1881, 1882, 1883, 2000):
+    for tick in sorted({nominal(1500,n), clone_tick-1, clone_tick, clone_tick+1, nominal(2000,n)}):
         point = Path(folder)/'checkpoints'/str(tick)
         raw = pickup_encounter_state.capture(point, listing)
         state = simulation_state.snapshot(point, True, True)
@@ -55,11 +74,11 @@ def validate_clone(folder, listing):
         # active word; guard both instructions rather than inferring from time.
         assert raw['read'](code+0x3e80, 10) == bytes.fromhex('217c')+struct.pack('>I', data+0x4598)+bytes.fromhex('0016')+bytes.fromhex('33fc')
         assert raw['read'](code+0x3e88, 8) == bytes.fromhex('33fc0001')+struct.pack('>I', data+0x34c)
-        elapsed = tick-1402
-        timer, phase = 900-elapsed//12, 12-elapsed % 12
+        elapsed = tick-activation
+        timer, phase = 900-elapsed//n, n-elapsed % n
         assert state['power_timers'] == struct.pack('>7H', timer, 0, 0, 0, 0, 0, 0).hex(), 'clone timer differs'
         assert state['power_phases'] == struct.pack('>10H', phase, timer, *(0,)*8).hex(), 'clone phase differs'
-        active = int(tick >= 1882)
+        active = int(tick >= clone_tick)
         assert state['clone_active'] == active, 'native clone activation edge differs'
         view, = struct.unpack('>I', raw['read'](data+0x43b4, 4))
         mesh, = struct.unpack('>I', raw['read'](view+22, 4))
@@ -68,18 +87,22 @@ def validate_clone(folder, listing):
         rows.append(dict(tick=tick, timer=timer, phase=phase, clone_active=active,
                          view_mesh_data_offset=hex(mesh-data)))
     result['clone_points'] = rows
-    result['scope'] += ' Also checks native clone activation at completed tick 1882 and its mesh switch through tick 2000; no expiry or depletion claim.'
+    result['scope'] += ' Also checks native clone activation at 40-native-update deadline and its sampled mesh switch; no expiry or depletion claim.'
     return result
 
 
-EXPIRY_POINTS = (2000, 3000, 6000, 9000, 12201, 12202, 12203)
+
 
 
 def validate_expiry(folder, listing):
     """Check native expiry after pickup, selection and use, without timer writes."""
+    n, use, initial = configuration(folder, listing)
+    activation = use+2
+    expiry = activation+900*n
+    points = ordered(initial, [nominal(t,n) for t in (3000,6000,9000)]+[expiry-1,expiry,expiry+1])
     rows = []
-    for tick in EXPIRY_POINTS:
-        point = Path(folder) if tick == 2000 else Path(folder)/'checkpoints'/str(tick)
+    for tick in points:
+        point = Path(folder) if tick == initial else Path(folder)/'checkpoints'/str(tick)
         raw = pickup_encounter_state.capture(point, listing)
         state = simulation_state.snapshot(point, True, True)
         assert raw['pc'] == raw['completed_pc'] and raw['clock']['ticks'] == tick
@@ -87,10 +110,10 @@ def validate_expiry(folder, listing):
         code, data = raw['meta']['code'], raw['meta']['data']
         assert raw['read'](code+0x3eb2, 8) == bytes.fromhex('217c')+struct.pack('>I', data+0x4498)+bytes.fromhex('0016')
         assert raw['read'](code+0x3eba, 6) == bytes.fromhex('4279')+struct.pack('>I', data+0x34c)
-        elapsed = tick-1402
-        expired = tick >= 12202
-        timer = max(0, 900-elapsed//12)
-        phase = 12 if expired else 12-elapsed % 12
+        elapsed = tick-activation
+        expired = tick >= expiry
+        timer = max(0, 900-elapsed//n)
+        phase = n if expired else n-elapsed % n
         assert state['power_timers'] == struct.pack('>7H', timer, *(0,)*6).hex(), 'expiry timer differs'
         assert state['power_phases'] == struct.pack('>10H', phase, timer, *(0,)*8).hex(), 'expiry phase differs'
         assert state['clone_active'] == int(not expired), 'native clone expiry edge differs'
@@ -102,18 +125,18 @@ def validate_expiry(folder, listing):
         rows.append(dict(tick=tick, timer=timer, phase=phase,
                          clone_active=state['clone_active'], inventory=raw['inventory'].hex(),
                          mesh_data_offset=hex(mesh-data)))
-    return dict(points=rows, scope='Controlled real pickup and input-only activation; native clone expiry at tick 12202, 10800 simulation ticks after activation. Mesh checked only at sampled points; no animation, audio or depletion claim.')
+    return dict(points=rows, scope='Controlled real pickup and input-only activation; native clone expiry 900 native updates after activation. Mesh checked only at sampled points; no animation, audio or depletion claim.')
 
-
-SPEED_POINTS = (1318, 1402, 1404, 1406, 1408, 1410, 1412, 1414,
-                1415, 1425, 1426, 1500, 3813, 3814, 3815)
 
 
 def validate_speed(folder, listing):
     """Seven native selection edges, last-charge speed use and native expiry."""
+    n, use, initial = configuration(folder, listing)
+    activation, expiry = use+14, use+14+200*n
+    points = ordered(initial, [use+2*i for i in range(1,8)]+[activation+1,activation+n-1,activation+n,nominal(1500,n),expiry-1,expiry,expiry+1])
     rows = []
-    for tick in SPEED_POINTS:
-        point = Path(folder) if tick == SPEED_POINTS[0] else Path(folder)/'checkpoints'/str(tick)
+    for tick in points:
+        point = Path(folder) if tick == initial else Path(folder)/'checkpoints'/str(tick)
         raw = pickup_encounter_state.capture(point, listing)
         state = simulation_state.snapshot(point, True, True)
         assert raw['pc'] == raw['completed_pc'] and raw['clock']['ticks'] == tick
@@ -125,54 +148,55 @@ def validate_speed(folder, listing):
         assert raw['read'](data+0x2114+6*4, 4) == struct.pack('>I', code+0xecae)
         # Expiry invokes native inventory/UI cleanup for slot six.
         assert raw['read'](code+0xed8e, 8) == bytes.fromhex('70063f006100fbb4')
-        selected = 65535 if tick < 1402 else min(6, (tick-1402)//2)
-        if tick >= 3814:
+        selected = 65535 if tick < use+2 else min(6, (tick-use-2)//2)
+        if tick >= expiry:
             selected = 0  # Exhausted slot six advances to the first available slot.
         assert raw['selected'] == selected, ('speed selection', tick, raw['selected'])
-        used = tick >= 1415
+        used = tick > activation
         inventory = bytes([3])+bytes([1])*5+bytes([0 if used else 1])
         assert raw['inventory'] == inventory, ('speed inventory', tick)
-        elapsed = max(0, tick-1414)
-        timer = max(0, 200-elapsed//12) if used else 0
-        phase = (12 if tick >= 3814 else 12-elapsed % 12) if used else 0
+        elapsed = max(0, tick-activation)
+        timer = max(0, 200-elapsed//n) if used else 0
+        phase = (n if tick >= expiry else n-elapsed % n) if used else 0
         assert state['power_timers'] == struct.pack('>7H', *(0,)*6, timer).hex(), ('speed timer', tick)
         assert state['power_phases'] == struct.pack('>10H', *(0,)*8, phase, timer).hex(), ('speed phase', tick)
         assert state['clone_active'] == 0
         # Guard the actual native boost addition and 400-unit cap. The only
-        # changed instruction here is the 40/12 per-tick acceleration quantum.
+        # changed instruction here is the 40/N per-tick acceleration quantum.
         view, = struct.unpack('>I', raw['read'](data+0x43c0, 4))
         for offset in (0x10082, 0x1008c, 0x1009e):
             assert raw['read'](code+offset, 6) == bytes.fromhex('2079')+struct.pack('>I', data+0x43c0)
         assert raw['read'](code+0x10088, 4) == bytes.fromhex('d1680040')
         assert raw['read'](code+0x10092, 12) == bytes.fromhex('0c68019000406f0e303c0190')
         assert raw['read'](code+0x100a4, 4) == bytes.fromhex('31400040')
-        # Completed-tick snapshots follow phase (tick-1)%12. Derive the
+        # Completed-tick snapshots follow phase (tick-1)%N. Derive the
         # expected integrated native acceleration without reading the table.
-        quantum = tick*40//12-(tick-1)*40//12
+        quantum = tick*40//n-(tick-1)*40//n
         assert raw['read'](code+0x10080, 2) == bytes((0x70, quantum))
         speed, = struct.unpack('>h', raw['read'](view+64, 2))
-        expected_speed = min(400, tick*40//12-1414*40//12) if 1414 < tick <= 3814 else 0
+        expected_speed = min(400, tick*40//n-activation*40//n) if activation < tick <= expiry else 0
         assert speed == expected_speed, ('boost speed', tick, speed, expected_speed)
         rows.append(dict(tick=tick, selected=selected, inventory=inventory.hex(), timer=timer,
                          phase=phase, speed=speed, acceleration_quantum=quantum))
-    return dict(points=rows, scope='Controlled pickup scene with native button selection across all seven slots. Uses the existing single speed charge; activation at tick 1414 and expiry at 3814 span 2400 simulation ticks (40 seconds). Checks native 40-unit acceleration integrated over twelve ticks, the 400-unit cap, and return to zero speed with neutral mouse input after expiry at sampled points. Does not independently establish displacement or audible output.')
+    return dict(points=rows, scope='Controlled pickup scene with native button selection across all seven slots. Uses the existing single speed charge; activation and expiry span 200 native updates (40 seconds). Checks native 40-unit acceleration integrated over N ticks, the 400-unit cap, and return to zero speed with neutral mouse input after expiry at sampled points. Does not independently establish displacement or audible output.')
 
 
-def timed_points(slot):
+def timed_points(slot, n=12, use=1400, initial=1318):
     assert slot in (1, 4, 5)
-    activation = 1400+2*(slot+1)
-    return [1318]+[1402+2*i for i in range(slot+1)]+[
-        activation+1, activation+11, activation+12, activation+13,
-        activation+120, activation+5999, activation+6000, activation+6001]
+    activation = use+2*(slot+1)
+    return ordered(initial, [use+2+2*i for i in range(slot+1)]+[
+        activation+1, activation+n-1, activation+n, activation+n+1,
+        activation+10*n, activation+500*n-1, activation+500*n, activation+500*n+1])
 
 
 def validate_timed(folder, listing, slot):
     """Native input-driven activation and full lifetime of the 500-unit powers."""
-    activation = 1400+2*(slot+1)
+    n, use, initial = configuration(folder, listing)
+    activation = use+2*(slot+1)
     callback, record = {1: (0xec62, 1), 4: (0xec86, 2), 5: (0xec9c, 3)}[slot]
     rows = []
-    for tick in timed_points(slot):
-        point = Path(folder) if tick == 1318 else Path(folder)/'checkpoints'/str(tick)
+    for tick in timed_points(slot,n,use,initial):
+        point = Path(folder) if tick == initial else Path(folder)/'checkpoints'/str(tick)
         raw = pickup_encounter_state.capture(point, listing)
         state = simulation_state.snapshot(point, True, True)
         assert raw['pc'] == raw['completed_pc'] and raw['clock']['ticks'] == tick
@@ -182,8 +206,8 @@ def validate_timed(folder, listing, slot):
         target = raw['slave']+raw['symbols']['fixture_power_buttons']
         assert raw['read'](code+0x196d0, 6) == bytes.fromhex('4ef9')+struct.pack('>I', target)
         assert raw['read'](data+0x2114+slot*4, 4) == struct.pack('>I', code+callback)
-        selected = 65535 if tick < 1402 else min(slot, (tick-1402)//2)
-        if tick >= activation+6000:
+        selected = 65535 if tick < use+2 else min(slot, (tick-use-2)//2)
+        if tick >= activation+500*n:
             selected = slot+1
         assert raw['selected'] == selected, ('timed selection', slot, tick, raw['selected'])
         used = tick > activation
@@ -192,8 +216,8 @@ def validate_timed(folder, listing, slot):
             inventory[slot] = 0
         assert raw['inventory'] == inventory, ('timed inventory', slot, tick)
         elapsed = max(0, tick-activation)
-        timer = max(0, 500-elapsed//12) if used else 0
-        phase = (12 if elapsed >= 6000 else 12-elapsed % 12) if used else 0
+        timer = max(0, 500-elapsed//n) if used else 0
+        phase = (n if elapsed >= 500*n else n-elapsed % n) if used else 0
         timers, phases = [0]*7, [0]*10
         timers[slot] = timer
         phases[record*2:record*2+2] = [phase, timer]
@@ -201,19 +225,20 @@ def validate_timed(folder, listing, slot):
         assert state['power_phases'] == struct.pack('>10H', *phases).hex(), ('timed phase', slot, tick)
         assert state['clone_active'] == 0
         rows.append(dict(tick=tick, selected=selected, inventory=inventory.hex(), timer=timer, phase=phase))
-    return dict(slot=slot, activation=activation, expiry=activation+6000, points=rows,
-                scope='Controlled pickup scene; native input selection consumes the existing last charge. Full 6000-tick (100-second) lifetime and exhausted-slot reselection. Effect-specific combat and audible output are outside this check.')
+    return dict(slot=slot, activation=activation, expiry=activation+500*n, points=rows,
+                scope='Controlled pickup scene; native input selection consumes the existing last charge. Full 500-native-update (100-second) lifetime and exhausted-slot reselection. Effect-specific combat and audible output are outside this check.')
 
-
-JUMP_POINTS = [1318]+sorted({1402, 1404, 1406, 1407,
-    *[1406+12*k for k in range(1, 46)], 1675, 1676, 1677, 1945, 1947})
 
 
 def validate_jump(folder, listing):
     """Input-driven jump reproduces all 45 native height boundaries and lands."""
+    n, use, initial = configuration(folder, listing)
+    activation = use+6
+    apex, landing = activation+45*n//2, activation+45*n
+    points = ordered(initial, [use+2,use+4,activation,activation+1]+[activation+n*k for k in range(1,46)]+[apex-1,apex,apex+1,landing-1,landing+1])
     rows = []
-    for tick in JUMP_POINTS:
-        point = Path(folder) if tick == 1318 else Path(folder)/'checkpoints'/str(tick)
+    for tick in points:
+        point = Path(folder) if tick == initial else Path(folder)/'checkpoints'/str(tick)
         raw = pickup_encounter_state.capture(point, listing)
         state = simulation_state.snapshot(point, True, True)
         assert raw['pc'] == raw['completed_pc'] and raw['clock']['ticks'] == tick
@@ -228,10 +253,10 @@ def validate_jump(folder, listing):
         assert raw['read'](code+0xed02, 12) == bytes.fromhex('d1a80010700a9179')+struct.pack('>I', data+0x1ea0)
         player, = struct.unpack('>I', raw['read'](data+0x43c0, 4))
         height, = struct.unpack('>i', raw['read'](player+16, 4))
-        elapsed = max(0, tick-1406)
-        airborne = 0 < elapsed < 540
-        selected = 65535 if tick < 1402 else min(2, (tick-1402)//2)
-        if elapsed >= 540:
+        elapsed = max(0, tick-activation)
+        airborne = 0 < elapsed < 45*n
+        selected = 65535 if tick < use+2 else min(2, (tick-use-2)//2)
+        if elapsed >= 45*n:
             selected = 3
         assert raw['selected'] == selected, ('jump selection', tick)
         inventory = bytes([3, 1, 0 if elapsed else 1, 1, 1, 1, 1])
@@ -239,15 +264,15 @@ def validate_jump(folder, listing):
         valid, last, velocity, remainder, reserved = struct.unpack('>HhihH', bytes.fromhex(state['jump_integrator']))
         if airborne:
             assert valid == 1 and reserved == 0
-            assert velocity == 2640-10*elapsed, ('jump velocity', tick)
-            expected_velocity = (abs(velocity)//12)*(1 if velocity >= 0 else -1)
+            assert velocity == 220*n-10*elapsed, ('jump velocity', tick)
+            expected_velocity = (abs(velocity)//n)*(1 if velocity >= 0 else -1)
             assert last == expected_velocity
             # Interpolated rational trajectory through native 5 Hz positions.
-            numerator = elapsed*(2700-5*elapsed)
-            assert height*144+remainder == numerator, ('jump integral', tick)
-            assert abs(remainder) < 144
-            if elapsed % 12 == 0:
-                native_steps = elapsed//12
+            numerator = elapsed*(225*n-5*elapsed)
+            assert height*n*n+remainder == numerator, ('jump integral', tick)
+            assert abs(remainder) < n*n
+            if elapsed % n == 0:
+                native_steps = elapsed//n
                 native_height = 220*native_steps-5*native_steps*(native_steps-1)
                 assert height == native_height and remainder == 0, ('native jump boundary', tick)
         else:
@@ -259,18 +284,19 @@ def validate_jump(folder, listing):
         assert state['power_phases'] == bytes(20).hex()
         rows.append(dict(tick=tick, height=height, velocity=expected_velocity,
                          remainder=remainder, selected=selected, inventory=inventory.hex()))
-    return dict(points=rows, scope='Controlled pickup scene; native button selection and last-charge jump activation. Checks all 45 native height boundaries, fractional samples around apex/landing, 540-tick flight and native exhausted-slot reselection. No arbitrary terrain, midair impacts or audio claim.')
+    return dict(points=rows, scope='Controlled pickup scene; native button selection and last-charge jump activation. Checks all 45 native height boundaries, fractional samples around apex/landing, 45-native-update flight and native exhausted-slot reselection. No arbitrary terrain, midair impacts or audio claim.')
 
-
-MINE_POINTS = (1318, 1402, 1404, 1406, 1408, 1409, 1410, 1420, 1500, 1800, 2400)
 
 
 def validate_mine(folder, listing):
     """Native slot-three placement must retain a full, untimed displacement."""
+    n, use, initial = configuration(folder, listing)
+    activation = use+8
+    points = ordered(initial, [use+2,use+4,use+6,activation,activation+1,activation+2,activation+n]+[nominal(t,n) for t in (1500,1800,2400)])
     rows = []
     expected_position = None
-    for tick in MINE_POINTS:
-        point = Path(folder) if tick == 1318 else Path(folder)/'checkpoints'/str(tick)
+    for tick in points:
+        point = Path(folder) if tick == initial else Path(folder)/'checkpoints'/str(tick)
         raw = pickup_encounter_state.capture(point, listing)
         state = simulation_state.snapshot(point, True, True)
         assert raw['pc'] == raw['completed_pc'] and raw['clock']['ticks'] == tick
@@ -294,15 +320,15 @@ def validate_mine(folder, listing):
             if index & 2048:
                 index = 4096-index
             return struct.unpack('>h', raw['read'](code+0x14e88+index*2, 2))[0]
-        if tick == 1408:
+        if tick == activation:
             sine = cosine(angles[2]+0xc000)
             negative_sine = ((-sine+32768) % 65536)-32768
             dx, dz = (negative_sine*-1000) >> 14, (cosine(angles[2])*-1000) >> 14
             expected_position = (position[0]+dx, position[1]+dz, 0)
         mines = [a for a in raw['world'] if struct.unpack('>H', raw['read'](a+2, 2))[0] == 43]
-        used = tick >= 1409
+        used = tick > activation
         assert len(mines) == int(used), ('mine allocation', tick)
-        selected = (65535 if tick < 1402 else min(3, (tick-1402)//2)) if not used else 4
+        selected = (65535 if tick < use+2 else min(3, (tick-use-2)//2)) if not used else 4
         assert raw['selected'] == selected, ('mine selection', tick)
         inventory = bytes([3, 1, 1, 0 if used else 1, 1, 1, 1])
         assert raw['inventory'] == inventory, ('mine charge', tick)
@@ -316,7 +342,7 @@ def validate_mine(folder, listing):
             assert raw['read'](actor+85, 1) == bytes([1])
         assert state['power_timers'] == bytes(14).hex() and state['power_phases'] == bytes(20).hex()
         rows.append(dict(tick=tick, selected=selected, inventory=inventory.hex(), position=mine_position))
-    return dict(points=rows, scope='Controlled pickup scene; native slot-three selection, last-charge use, type-43 allocation and full -1000-speed placement using guarded native trig tables. Stable placement through tick 2400. This checks placement is not divided into twelve timestep increments; no mine impact or detonation claim.')
+    return dict(points=rows, scope='Controlled pickup scene; native slot-three selection, last-charge use, type-43 allocation and full -1000-speed placement using guarded native trig tables. Stable placement through the requested observation window. This checks placement is not divided into N timestep increments; no mine impact or detonation claim.')
 
 
 if __name__ == '__main__':

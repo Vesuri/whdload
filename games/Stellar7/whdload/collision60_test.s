@@ -99,7 +99,7 @@ s60_test_collision:
         clr.l (20,a6)
         move.w ($40,a3),d0
         ext.l d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         ext.l d0
         move.l d0,(24,a6)
         clr.l (28,a6)

@@ -5,11 +5,13 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 from stellar7_report import locate
 
 
 def read(folder, listing):
     folder, listing = Path(folder), Path(listing)
+    n = sim60_state.read(folder)['substeps']
     binary = (folder/'slave.slave').read_bytes()
     assert binary == listing.with_suffix('.slave').read_bytes(), 'listing build mismatch'
     symbols = listing.read_text(encoding='latin1')
@@ -29,6 +31,7 @@ def read(folder, listing):
         return struct.unpack_from(fmt, memory, base-meta['base']+off)[0]
     result['motion_table_restored'] = value('s60_motion_table', '>I') == value('s60_batch_saved_table', '>I')
     result['mesh_entry_restored'] = struct.unpack_from('>H', memory, meta['code']-meta['base']+0x132b2)[0] == value('s60_batch_saved_mesh', '>H')
+    result['tick_substeps'] = n
     return result
 
 

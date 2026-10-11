@@ -5,10 +5,109 @@
 Step 0 of the performance plan in docs/open-work.md is complete: 48 initial
 native/SIM60 cells and 24 native combat comparators pass their strict checks.
 The game still uses N=12 (60 Hz); no lower default has been selected.
-Step 1 will parameterize the common tick rate with an N=12 byte-identity gate;
+Step 1 is complete: all 78 private fixture combinations, six full-duration
+power runs and six jump runs pass. The 285 cross-N comparisons are classified in internals.
+N=12 release and VERIFY builds pass the byte-identity gate;
 step 2 will select the highest measured rate the A500 sustains in heavy combat
 without reducing presentations below native. Interpolation and input-history
 work are deferred to later steps and are outside the current request.
+
+## Substep parameterization (step 1)
+
+`S60_SUBSTEPS` supports N=1,2,3,4,6,12; `S60_RATE=5*N`. N=12 remains
+the default. The release and VERIFY binaries are byte-identical to the
+baseline (SHA-256 `c2a1d0ad93a0f3255155a14950fb2b74a7cced43a52fb8cefca94dbf54a82628`
+and `d6f8107c3211089f06b03491e4489f2b292c432c379605ea1d678c449c7cb6f4`).
+All six rates compile. Thirteen private native-reference fixture groups
+compile at each rate, and all thirteen N=12 variants retain baseline bytes.
+
+Runtime results are retained in
+`tmp/substeps-prototype/fixture-runtime-validation.json`. All 78 group/rate
+combinations pass against current builds. All matched-boundary gameplay
+captures and their difference-family review are complete. The boss
+pitch/acceleration mask 12 denotes bits 2 and 3, not a timestep.
+No unexplained first divergence or unclassified difference family remains;
+full encounters are not asserted identical across rates.
+The input-play group checks the preferences modal, not its later control gesture.
+At lower rates it waits one tick of actual field time before modal entry,
+so the unchanged checker verifies nonzero pending-credit preservation. All
+six rates pass this nested-dialog check; N=12 retains its original fixture bytes.
+Full-duration power checks pass at all six rates;
+they bracket clone activation, same-value speed-power refresh, and the
+200/500/900-unit expiry deadlines. The extended refresh checker passes six
+retained N=12 boundaries and the fresh lower-rate runs.
+The power runs check 85 captured samples. Six direct jump builds additionally
+check all 45 native height boundaries and apex/landing neighbors; all 298
+captured samples pass. The 15 existing tooling tests and static native input
+inventory pass. Both step-0 matrices still pass the rate-aware report checker.
+Cross-N scene builds use trigger 17*N (executed inside the next update),
+aligning the count of prior native decisions across rates. All 18 scene/rate
+captures are complete: SOL, type-10 and boss at native boundaries 1–16, 50,
+125 and 300, yielding 285 comparisons against N=12. This correctness setup is
+separate from the baseline performance route. The first gameplay divergence is
+at native boundary 1 for every lower N in every scene; no unsampled interval
+precedes that first divergence. These routes are not bit-identical across rates.
+
+The first actual SOL tick has identical mapped gameplay at all six rates.
+Substep snapshots explain the initial divergence:
+
+| N | SOL type-1 X/Z at boundary 1 | Boss carrier Z at boundary 1 | Type-10 player yaw / yaw velocity at boundary 1 |
+|---:|---:|---:|---:|
+| 1 | -2048 / 2048 | -28672 | 0 / 0 |
+| 2 | -1945 / 2005 | -28672 | 0 / 0 |
+| 3 | -1910 / 1990 | -28539 | 9 / 27 |
+| 4 | -1893 / 1983 | -28472 | 15 / 40 |
+| 6 | -1876 / 1976 | -28406 | 22 / 54 |
+| 12 | -1859 / 1969 | -28339 | 30 / 67 |
+
+These are captured values, independently checked against integer formulas:
+
+- The SOL enemy is born on tick 1. Its native movement is (+207, -87), so
+  boundary 1 includes only N-1 movement substeps. At tick N+1, after a full
+  actor-relative interval, every rate reaches exactly (-1841, 1961).
+- The carrier is created by the post-update boss gate on tick 1, admitted to
+  the active list on tick 2 and first moved on tick 3. Its native Z step is
+  +400; boundary 1 includes max(0,N-2) substeps.
+- The type-10 pilot finds no target on tick 1 and a zero distance before
+  tick 2. Turning starts on tick 3. Summing the native 80-unit input quanta
+  and integrating them with signed remainders gives the yaw/velocity table.
+- Star respawn $9bd4 consumes two draws from native RNG $116ec. Its signed
+  remainders can produce another out-of-bounds star, so another simulation
+  pass retries it. All 80 observed startup intervals replay exactly against
+  the guarded native RNG and stationary-star rules. At N=12, retries finish
+  on tick 5 before the next generic decision. At lower rates AI calls can
+  intervene between retries. All 342 scene-boundary RNG tables and indices
+  lie on the same native random stream, within 1813 draws of the common
+  first-tick state; no altered generator or unexplained RNG state is observed.
+
+The remaining difference families follow the already different simulated
+states. Position, angle and velocity differ through birth/admission timing,
+input sampling, curved-path sampling and integer rounding. Native heading,
+distance, fresh projection and behavior values are recomputed from those
+states. Collision/contact timing and native AI branches then change damage,
+shake, kills, score, spawn progress and later actor membership. Once membership
+differs, normalized object indices can name different actors, explaining type,
+radius, owner/link and world/active-list differences. This is not a claim that
+arbitrary encounter branches stay identical across N. The independent curved
+boss model passes at every N, with maximum coordinate error 0, 7/8, 8/9,
+31/32, 71/72 and 287/288 world units for N=1,2,3,4,6,12 respectively.
+
+Internal records retain tick-valued clocks, last-substep rollback positions,
+remainders and cached vectors; they are reported separately and are not expected
+to be byte-identical across N. Deferred projection scratch also retains render
+history. All 285 comparisons keep equal frame counters, level/session, game
+activity/counters, preferences, inactive power state/inventory/selection and
+HUD oscillator. No difference family is silently removed from the report.
+Full-duration active power and jump checks also pass at every N.
+
+Evidence: `tmp/substeps-prototype/cross-runtime-validation.json`,
+`cross-summary.json`, `startup-cross-validation.json`, `startup-n*-replay.json`,
+`rng-stream-validation.json`, `birth-boundary-validation.json`,
+`carrier-boundary-validation.json` and `input-boundary-validation.json`.
+No sustainable lower-rate default is claimed before step-2 measurements.
+The HUD installer always copies 48 native instruction bytes. Its twelve-longword
+copy count is not a timestep constant. Input/HUD and knockback/shake
+runtime groups pass at every supported N.
 
 <!-- rate-matrix-baseline:start -->
 ## Performance-plan baseline matrix (step 0)
@@ -327,7 +426,11 @@ for 45 simulation starts (4.98 Hz); residual credit is retained. The invariant
 three checkpoints. A short completion-count window can differ by a step while
 one slow draw is in flight. No renderer speedup is claimed.
 
-## 60 Hz replacement validation in progress
+## Replacement behavior and retained N=12 validation
+
+The numerical captures in this section use N=12 unless explicitly stated
+otherwise. Current parameterized formulas use N; lower-rate acceptance and
+performance results are recorded in the active sections above.
 
 The `SIM60` build has its own update/draw loop and debugger ABI. It is still
 experimental; remaining requirements are listed in `docs/open-work.md`.
@@ -451,7 +554,7 @@ initialize other actors. The full placement calls returning at $11262/$1138e
 are deliberately absent from `s60_is_motion` and must retain full displacement.
 
 Type-7 state 1 subtracts five from forward speed at $114f8. Its exit state adds
-144 to pitch at $115ac and fifty to speed at $115b2. Pitch is now distributed over twelve ticks, including signed-word wraparound.
+144 to pitch at $115ac and fifty to speed at $115b2. Pitch is distributed over N ticks, including signed-word wraparound.
 Speed now advances by signed fractions of -5 or +50 per tick. Discrete speed
 assignments in the other handlers remain immediate. The beam transition at $1157a
 calls $93fc, which creates the actual type-44 boss and stores it at hunk 1:$1e48;
@@ -484,8 +587,8 @@ The gameplay path moves active actors in $352e before calling their AI through
 $4154/$ee08. For interval-start speed V, acceleration A and substep k=1..12,
 published speed after AI is V + trunc(A*k/12). Movement computes native axis
 increments D(V) and D(V+A) at the current substep orientation, then integrates
-[24*D(V) + (2*k-13)*(D(V+A)-D(V))]/288 with signed per-axis remainders.
-The twelve correction coefficients sum to zero. At fixed orientation, the
+[2*N*D(V) + (2*k-N-1)*(D(V+A)-D(V))]/(2*N*N) with signed per-axis remainders.
+The N correction coefficients sum to zero. At fixed orientation, the
 interval therefore travels exactly D(V), including native trig rounding and
 signed speed wraparound. The second native call applies no additional rotation;
 both speed and angular velocities are restored afterward. Constant-speed type-7
@@ -560,18 +663,18 @@ Both also invoke sound and set the flash timer at hunk 1:$026a to eight.
 | $333a | Projectile damage from a type-indexed table, scaled by four | Projectile lifetime cleared at $330e, then removed; immediate impact |
 | $36d6 | 200 energy damage from types 14–16 | Actor removed at $36c8; immediate impact |
 | $372a | 20 energy damage from type 48 | Actor removed at $370e; immediate impact |
-| $373a | 100 energy damage from type 4 before player separation | Repeated contact; independent twelve-tick clock |
-| $382a | 100 energy damage from type 4 in the active-actor pass | Repeated contact; separate twelve-tick clock |
+| $373a | 100 energy damage from type 4 before player separation | Repeated contact; independent N-tick clock |
+| $382a | 100 energy damage from type 4 in the active-actor pass | Repeated contact; separate N-tick clock |
 | $3874 | 128 energy damage from types 13/47 | Actor removed at $384e; immediate impact |
 | $32ba | One/five actor-health damage from player projectile | Projectile lifetime cleared at $32f6; immediate impact |
-| $35a8 | Five/fifteen actor-health damage from shield ramming | Repeated contact; independent twelve-tick clock |
-| $38b2 | Ten actor-health damage when touching type 43 | Repeated contact; independent twelve-tick clock |
+| $35a8 | Five/fifteen actor-health damage from shield ramming | Repeated contact; independent N-tick clock |
+| $38b2 | Ten actor-health damage when touching type 43 | Repeated contact; independent N-tick clock |
 | $3902 | Damage equal to the actor's remaining health | Level-1 type-13/47 contact with type 47; destruction event |
-| $3cb8 → $112cc | Level-zero actor-health damage and player energy damage on boss contact | Independent twelve-tick contact clock |
+| $3cb8 → $112cc | Level-zero actor-health damage and player energy damage on boss contact | Independent N-tick contact clock |
 
 Actor-health damage is handled by $3f04, including death/removal, animations and
 sounds. The five contact call-site wrappers now gate each actor/path independently: the first
-contact applies immediately, then another effect is allowed after twelve ticks.
+contact applies immediately, then another effect is allowed after N ticks.
 Unsigned elapsed subtraction tolerates tick wraparound; validity bits distinguish
 an unused clock from a hit at tick zero. Suppressed actor-health calls return
 zero, preventing spurious kill score. Movement, overlap checks, separation and
@@ -750,7 +853,7 @@ debt is six versus sixteen ticks; this is not a sustained-rate measurement.
 
 Each power counter has a two-word record: remaining ticks to its next decrement
 and the last native counter value. Setters at $3e3e, $ec6a, $ec8e, $eca4 and $ecc0
-reset that phase to twelve, including same-value refreshes. The corresponding
+reset that phase to N, including same-value refreshes. The corresponding
 decrements at $3dcc, $ecd2, $ed38, $ed6c and $ed86 execute only when due. Native
 expiry, blink, visibility and sound paths remain in place; inactive timer blocks
 are skipped. Other initialization is detected by a changed counter value.
@@ -777,11 +880,11 @@ the timer and elapsed-clock behavior of that build, not full-game equivalence.
 
 ### Jump, modal and sorting checks
 
-The continuous jump retains an integer velocity scaled by twelve and a position
-remainder modulo 144. For a native launch velocity of 220, the reference curve
-is `y(k) = (2700*k - 5*k*k)/144`, with integer remainder accumulation. It passes
-through the native 5 Hz samples and lands after 540 ticks. Jump integration runs
-before collision/projection. Normal and 20-field-delayed rendering match at
+The continuous jump retains an integer velocity scaled by N and a position
+remainder modulo N². For a native launch velocity of 220, the reference curve
+is `y(k) = (225*N*k - 5*k*k)/(N*N)`, with integer remainder accumulation. It passes
+through the native 5 Hz samples and lands after 45*N ticks. Jump integration runs
+before collision/projection. Retained N=12 normal and 20-field-delayed rendering match at
 12, 24, 270 and 540 ticks after activation, including cooldown and RNG state.
 
 The replacement wraps actual modal entry points $df32 (dialogs) and $d3a8
@@ -792,8 +895,8 @@ cannot charge paused fields. ABI version 18 exposes that flag at entry+106.
 The earlier wrapper cleared credit and therefore discarded existing simulation
 debt. The delayed-rendering pause test exposed this: its clock origin shifted
 by 97 fields for a 60-field pause, silently losing 37 owed ticks. The corrected
-wrapper shifts the origin by only 60 fields. Preferences and nested-dialog
-runtime coverage remain outstanding.
+wrapper shifts the origin by only 60 fields. The private preferences fixture also checks the real nested-dialog return and
+retention of nonzero pending credit; current rate coverage is listed above.
 
 The pointer-walk sorter's `SORT_INLINE_DISTANCE=1` path evaluates the same
 wrapped arithmetic directly using D0/D1/D2, the current actor and the view

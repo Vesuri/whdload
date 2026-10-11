@@ -1,4 +1,4 @@
-; Continuous 1/60 s integration. Speeds keep their original units per 200 ms.
+; Continuous 1/(5*N) s integration. Speeds keep their original units per 200 ms.
 ; Signed remainders prevent low speeds/turn rates being rounded to zero.
 S60_SLOTS = 272
 S60_REC = 144
@@ -406,9 +406,16 @@ s60_move:
         move.w (a1),d1
         ext.l d1
         add.l d1,d0
+        IFEQ S60_SUBSTEPS-1
+        move.l d0,d1 ; native displacement can exceed a signed word
+        swap d0
+        clr.w d0
+        swap d0 ; packed remainder must remain zero
+        ELSE
         S60_DIV12 d0
         move.w d0,d1
         ext.l d1
+        ENDC
         move.l d1,(a3)+ ; exact displacement, for collision rollback
         add.l (a5)+,d1
         move.l d1,(a0)+
@@ -518,7 +525,7 @@ S60_INPUT_SITE MACRO
         IFEQ \3
         move.b d0,(\1-$10000+1,a0)
         ELSE
-        IFEQ \3-12
+        IFEQ \3-S60_SUBSTEPS
         move.b d1,(\1-$10000+1,a0)
         ELSE
         move.b d2,(\1-$10000+1,a0)
@@ -534,11 +541,11 @@ S60_INPUT_ENTRIES MACRO
         S60_INPUT_SITE $ff02,$7050,0
         S60_INPUT_SITE $ff1e,$7450,0
         S60_INPUT_SITE $ff26,$7450,0
-        S60_INPUT_SITE $ffa2,$700a,12
-        S60_INPUT_SITE $ffb0,$700a,12
-        S60_INPUT_SITE $1000e,$720a,12
-        S60_INPUT_SITE $1002a,$760a,12
-        S60_INPUT_SITE $10032,$720a,12
+        S60_INPUT_SITE $ffa2,$700a,S60_SUBSTEPS
+        S60_INPUT_SITE $ffb0,$700a,S60_SUBSTEPS
+        S60_INPUT_SITE $1000e,$720a,S60_SUBSTEPS
+        S60_INPUT_SITE $1002a,$760a,S60_SUBSTEPS
+        S60_INPUT_SITE $10032,$720a,S60_SUBSTEPS
         IFNE S60_INPUT_NEUTRAL_FIXED
         ; No direction and disabled analogue fallback take this separate turn
         ; braking path. It uses the same 80-units-per-native-step schedule.
@@ -546,18 +553,25 @@ S60_INPUT_ENTRIES MACRO
         S60_INPUT_SITE $1006a,$7450,0
         S60_INPUT_SITE $10072,$7050,0
         ENDC
-        S60_INPUT_SITE $10080,$7028,24
+        S60_INPUT_SITE $10080,$7028,2*S60_SUBSTEPS
         ENDM
 S60_INPUT_EMIT_STORES SET 0
 s60_input_sites:
         S60_INPUT_ENTRIES
         dc.l 0
-; floor((phase+1)*increment/12) - floor(phase*increment/12).
-; Exactly 80, 10 and 40 native velocity units over each 12-tick interval.
+; floor((phase+1)*increment/N) - floor(phase*increment/N).
+; Exactly 80, 10 and 40 native velocity units over each N-tick interval.
 s60_input_values:
-        dc.b 6,7,7,6,7,7,6,7,7,6,7,7
-        dc.b 0,1,1,1,1,1,0,1,1,1,1,1
-        dc.b 3,3,4,3,3,4,3,3,4,3,3,4
+S60_QUANTA_ROW MACRO
+s60_quanta_index SET 0
+        REPT S60_SUBSTEPS
+        dc.b ((s60_quanta_index+1)*\1)/S60_SUBSTEPS-(s60_quanta_index*\1)/S60_SUBSTEPS
+s60_quanta_index SET s60_quanta_index+1
+        ENDR
+        ENDM
+        S60_QUANTA_ROW 80
+        S60_QUANTA_ROW 10
+        S60_QUANTA_ROW 40
         EVEN
 s60_input_guard:
         movem.l d0-d1/a0/a3,-(sp)
@@ -583,8 +597,8 @@ s60_input_quanta:
         move.w (s60_phase,pc),d0
         adda.w d0,a1
         move.b (a1),d0
-        move.b (12,a1),d1
-        move.b (24,a1),d2
+        move.b (S60_SUBSTEPS,a1),d1
+        move.b (2*S60_SUBSTEPS,a1),d2
 S60_INPUT_EMIT_STORES SET 1
         S60_INPUT_ENTRIES
 S60_INPUT_EMIT_STORES SET 0

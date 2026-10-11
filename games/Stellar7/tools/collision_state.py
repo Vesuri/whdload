@@ -11,6 +11,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 
 
 def read(folder):
@@ -22,6 +23,7 @@ def read(folder):
     assert memory[code+0x2af6:code+0x2af8] == bytes.fromhex('4ef9')
     entry = struct.unpack_from('>I', memory, code+0x2af8)[0]-meta['base']
     assert memory[entry+4:entry+8] == b'S760'
+    version, n = sim60_state.decode_version(struct.unpack_from('>H', memory, entry+50)[0])
     offset = struct.unpack_from('>H', memory, entry+64)[0]
     assert offset, 'COLLISION_TEST fixture is absent'
     at = entry+offset
@@ -40,7 +42,7 @@ def read(folder):
                           expected_position=expected_position, actual_position=actual_position,
                           expected_bounce=expected_bounce, actual_bounce=actual_bounce,
                           rollback_check=struct.unpack_from('>H',memory,pos+36)[0]))
-    return dict(completed=completed, failed=failed, cases=cases)
+    return dict(tick_substeps=n, completed=completed, failed=failed, cases=cases)
 
 
 if __name__ == '__main__':

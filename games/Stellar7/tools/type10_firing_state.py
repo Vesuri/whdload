@@ -49,12 +49,13 @@ def validate(folder, listing):
             entry = struct.unpack('>I', read(meta['code']+0x2af8, 4))[0]
             completed = entry+struct.unpack('>H', read(entry+44, 2))[0]
             assert regs['pc'] == completed
-            assert state['ticks'] == 5400, 'did not reach the bounded route endpoint'
+            assert state['ticks'] == 450*state['substeps'], 'did not reach the bounded route endpoint'
             assert struct.unpack('>H', read(meta['data']+0x1e90, 2))[0] == 0, 'route ended in death'
             stop = dict(tick=state['ticks'], path=path.name)
             continue
         assert read(regs['pc'], 2) == bytes.fromhex('5c4f')
         assert state['running'] and state['event_due'] == 1 and state['phase'] == 0
+        assert state['ticks'] % state['substeps'] == 0, 'firing outside decision cadence'
         assert struct.unpack('>H', read(meta['data']+0x46a0, 2))[0] == 6
         actor = read(regs['a3'], 112)
         assert struct.unpack_from('>H', actor, 2)[0] == 10
@@ -90,7 +91,6 @@ def validate(folder, listing):
         sites[hex(pc)] += 1
         events.append(item)
     assert stop is not None and set(sites) == {hex(site) for site in RETURNS}, 'incomplete firing-branch coverage'
-    assert all(event['tick'] % 12 == 0 for event in events), 'firing outside twelve-tick cadence'
     return dict(events=events, sites=dict(sites), allocation_failures=sum(not e['allocated'] for e in events),
                 stop=stop, scope='Input-only route; native spawn returns, owner, actor state, projectile yaw, decision gate')
 

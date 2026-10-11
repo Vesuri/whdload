@@ -5,11 +5,13 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 from stellar7_report import locate
 
 
 def read(folder, listing):
     folder, listing = Path(folder), Path(listing)
+    n = sim60_state.read(folder)['substeps']
     binary = (folder/'slave.slave').read_bytes()
     assert binary == listing.with_suffix('.slave').read_bytes(), 'listing build mismatch'
     symbols = listing.read_text(encoding='latin1')
@@ -25,7 +27,7 @@ def read(folder, listing):
     assert signature == b'RC60'
     completed, failed = struct.unpack_from('>2H', memory, at+4)
     errors = list(struct.unpack_from('>128H', memory, at+8))
-    return dict(cases=completed, failed=failed, errors=errors)
+    return dict(tick_substeps=n, cases=completed, failed=failed, errors=errors)
 
 
 def validate(result):

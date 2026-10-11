@@ -26,6 +26,7 @@ def word(value):
 def inspect(folder, listing, omit_acceleration=False):
     folder, listing = Path(folder), Path(listing)
     fixture = boss_state.read(folder)
+    n = fixture['tick_substeps']
     assert fixture['signature'] == 'B767' and fixture['completed'] == 60 and fixture['failed'] == 0
     binary = (folder/'slave.slave').read_bytes()
     assert binary == listing.with_suffix('.slave').read_bytes(), 'listing build mismatch'
@@ -41,7 +42,7 @@ def inspect(folder, listing, omit_acceleration=False):
     at = origin+symbols['s60_boss_path_results']
     assert memory[at:at+4] == b'BP60'
     cases, ticks = struct.unpack_from('>2H', memory, at+4)
-    assert (cases, ticks) == (8, 48)
+    assert (cases, ticks) == (8, 4*n)
     starts = [struct.unpack_from('>3h', memory, origin+symbols['s60_boss_exit_cases']+6*i)
               for i in range(cases)]
     positions = struct.unpack_from('>'+str(cases*ticks*3)+'i', memory, at+8)
@@ -74,16 +75,16 @@ def inspect(folder, listing, omit_acceleration=False):
     for case, (initial_speed, initial_yaw, initial_pitch) in enumerate(starts):
         exact = [Fraction(0), Fraction(0), Fraction(0)]
         for tick in range(1, ticks+1):
-            interval, phase = divmod(tick-1, 12)
+            interval, phase = divmod(tick-1, n)
             speed = word(initial_speed+speed_step*interval)
-            pitch = word(initial_pitch+pitch_step*(tick-1)//12)
+            pitch = word(initial_pitch+pitch_step*(tick-1)//n)
             # The first native AI call sets turn velocity after movement.
-            yaw = word(initial_yaw+turn_step*(tick-1)//12)
+            yaw = word(initial_yaw+turn_step*(tick-1)//n)
             before = vector(speed, pitch, yaw)
             after = vector(word(speed+speed_step), pitch, yaw)
-            lower, upper = Fraction(phase, 12)-Fraction(1, 2), Fraction(phase+1, 12)-Fraction(1, 2)
+            lower, upper = Fraction(phase, n)-Fraction(1, 2), Fraction(phase+1, n)-Fraction(1, 2)
             for axis in range(3):
-                integral = Fraction(before[axis], 12)
+                integral = Fraction(before[axis], n)
                 if not omit_acceleration:
                     integral += (after[axis]-before[axis])*(upper*upper-lower*lower)/2
                 exact[axis] += integral
@@ -93,12 +94,12 @@ def inspect(folder, listing, omit_acceleration=False):
                 if error >= 1:
                     failures.append(dict(case=case, tick=tick, axis=('X','Z','Y')[axis],
                                          observed=observed, expected=str(exact[axis]), error=str(error)))
-    return dict(cases=cases, ticks_per_case=ticks, checked_coordinates=cases*ticks*3,
+    return dict(tick_substeps=n, cases=cases, ticks_per_case=ticks, checked_coordinates=cases*ticks*3,
                 maximum_error=str(maximum), failed_coordinates=len(failures), failures=failures)
 
 
 def validate(result):
-    assert result['checked_coordinates'] == 1152 and not result['failed_coordinates'], result
+    assert result['checked_coordinates'] == 8*4*result['tick_substeps']*3 and not result['failed_coordinates'], result
 
 
 if __name__ == '__main__':

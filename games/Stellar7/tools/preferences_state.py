@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 from stellar7_report import locate
 
 
@@ -32,6 +33,7 @@ def read(folder, listing):
     if signature == b'PF61':
         result.update(zip(('selections', 'setting_before', 'setting_after', 'option'),
                           struct.unpack_from('>4H', memory, at+72)))
+    result['tick_substeps'] = sim60_state.read(folder)['substeps']
     return result
 
 

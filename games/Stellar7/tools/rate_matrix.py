@@ -45,7 +45,24 @@ NATIVE_COMBAT_ROUTES = {
     'native-type10-late': (375, None, '-DSIM60=1 -DNATIVE_SCENE=6 -DAPPROACH_TYPE=10'),
     'native-boss': (292, None, '-DSIM60=1 -DNATIVE_SCENE=0 -DBOSS_ENCOUNTER=1 -DAPPROACH_TYPE=0 -DAPPROACH_FIRE=1'),
 }
-CAPTURE_ROUTES = {**ROUTES, **NATIVE_COMBAT_ROUTES}
+HEAVY_ROUTES = {
+    'type10-heavy': (600, 5400, ROUTES['type10-early'][2]),
+}
+CAPTURE_ROUTES = {**ROUTES, **NATIVE_COMBAT_ROUTES, **HEAVY_ROUTES}
+
+
+def route_window(route, substeps):
+    """Convert the N=12 schedule to the first tick at/after the same game time."""
+    start, end, fixture = CAPTURE_ROUTES[route]
+    if route.startswith('native-'):
+        return start, end, fixture, []
+    scale = lambda tick: (tick * substeps + 11) // 12
+    # LEVEL_TEST=T runs inside update T+1, before its completion counter advances.
+    fixture = re.sub(r'-DLEVEL_TEST=(\d+)',
+                     lambda match: '-DLEVEL_TEST='+str(scale(int(match[1])+1)-1), fixture)
+    checkpoints = ([scale(tick) for tick in range(900, 5401, 300)]
+                   if route == 'type10-heavy' else [scale(end)])
+    return scale(start), scale(end), fixture, checkpoints
 
 
 def run(args):
@@ -54,6 +71,9 @@ def run(args):
         source = (ROOT/'whdload/sim60.s').read_text()
         if not re.search(r'^S60_SUBSTEPS\s*=', source, re.M):
             raise ValueError('This source does not implement S60_SUBSTEPS; finish step 1 before measuring another rate')
+    default_match = re.search(r'^S60_SUBSTEPS\s*=\s*(\d+)',
+                              (ROOT/'whdload/sim60.s').read_text(), re.M)
+    substeps = args.substeps if args.substeps is not None else int(default_match[1])
     prefix = args.prefix.resolve()
     prefix.relative_to(ROOT/'tmp')
     prefix.mkdir(parents=True, exist_ok=True)
@@ -78,7 +98,7 @@ def run(args):
                 if model == 'A1200':
                     env['KICKSTART'] = os.environ['KICKSTART_A1200']
                 for route in args.routes:
-                    start, end, fixture = CAPTURE_ROUTES[route]
+                    start, end, fixture, checkpoints = route_window(route, substeps)
                     native = route.startswith('native-')
                     name = machine+'-'+route
                     cell = prefix/name
@@ -94,7 +114,7 @@ def run(args):
                     config = dict(machine=machine, route=route, source_id=source_id,
                                   cpu=cpu, model=model, chip_kb=chip, fast_kb=fast,
                                   slow_kb=slow, extra_args=extra, ntsc_mode=ntsc,
-                                  substeps=args.substeps, flags=flags,
+                                  substeps=substeps, start=start, end=end, checkpoints=checkpoints, flags=flags,
                                   whd_args=env['WHD_ARGS'])
                     report_path = prefix/(name+'.json')
                     if report_path.exists():
@@ -110,8 +130,10 @@ def run(args):
                     if native:
                         command += ['--frame', str(start), '--swaps-only']
                     else:
-                        command += ['--tick', str(start), '--tick-checkpoints', str(end),
+                        command += ['--tick', str(start), '--tick-checkpoints', *map(str, checkpoints),
                                     '--state-only', '--latency-listing', str(listing.relative_to(ROOT))]
+                    if route.startswith('type10-'):
+                        command += ['--level', '6']
                     print('Capturing '+name, flush=True)
                     with (prefix/(name+'.log')).open('w') as log:
                         subprocess.run(command, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
@@ -132,6 +154,10 @@ def run(args):
                     else:
                         measurement = simulation_rate.interval(cell, cell/'checkpoints'/str(end))
                         latency = simulation_latency.inspect(cell, listing)
+                        if route == 'type10-heavy':
+                            boundaries = [cell]+[cell/'checkpoints'/str(tick) for tick in checkpoints]
+                            measurement['segments'] = [simulation_rate.interval(a,b)
+                                                       for a,b in zip(boundaries,boundaries[1:])]
                     report = dict(config=config, measurement=measurement, latency=latency,
                                   slave_sha256=hashlib.sha256((cell/'slave.slave').read_bytes()).hexdigest(),
                                   cache_policy='Loader SetCPU value 0x393d/mask 0x7f3f; live CACR not yet independently observed.')

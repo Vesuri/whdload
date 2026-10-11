@@ -80,7 +80,7 @@ s60_test_hud:
         btst #5,d5
         bne .update
         move.l d4,d0
-        divu #12,d0
+        divu #S60_SUBSTEPS,d0
         swap d0
         tst.w d0
         bne .update
@@ -110,7 +110,7 @@ s60_test_hud:
         clr.w (a0)
         addq.l #1,(8,a5)
         addq.w #1,d4
-        cmp.w #36,d4
+        cmp.w #3*S60_SUBSTEPS,d4
         bne .tick
         lea (s60_running,pc),a0
         clr.w (a0)

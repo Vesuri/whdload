@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 from stellar7_report import locate
 
 
@@ -27,6 +28,7 @@ def read(folder, listing):
                       struct.unpack_from('>4H', memory, at+4)))
     if signature == b'L861':
         result['register_errors'] = struct.unpack_from('>H', memory, at+12)[0]
+    result['tick_substeps'] = sim60_state.read(folder)['substeps']
     return result
 
 

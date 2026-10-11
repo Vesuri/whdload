@@ -187,7 +187,7 @@ s60_test_contact:
         moveq #0,d0
         move.w d7,d0
         subq.w #1,d0
-        divu #12,d0
+        divu #S60_SUBSTEPS,d0
         addq.w #1,d0
         cmp.w #4,d5
         beq .boss_effect
@@ -229,7 +229,7 @@ s60_test_contact:
         bsr s60_contact_error
 .next_tick:
         addq.w #1,d7
-        cmp.w #49,d7
+        cmp.w #4*S60_SUBSTEPS+1,d7
         bne .tick
         cmp.w ($46c4-S60_DATA,a4),d4
         bne .end_error
@@ -259,7 +259,7 @@ s60_test_contact:
         bne .clock_error
         bsr s60_contact_test_sound
         lea (s60_ticks,pc),a0
-        add.l #12,(a0)
+        add.l #S60_SUBSTEPS,(a0)
         bsr s60_contact_test_sound
         ; Same actor/path is throttled; another path/actor is independent.
         moveq #0,d1
@@ -284,7 +284,7 @@ s60_test_contact:
         cmp.w #1,d0
         bne .clock_error
         lea (s60_ticks,pc),a0
-        move.l #11,(a0)
+        move.l #S60_SUBSTEPS-1,(a0)
         bsr s60_contact_due
         cmp.w #1,d0
         beq .restore

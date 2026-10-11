@@ -1,4 +1,4 @@
-; Integrate each pickup motion interval before its native event at tick twelve.
+; Integrate each pickup motion interval before its native event at tick N.
 ; State: actor pointer, remaining ticks, Y increment, yaw increment, remainders.
 s60_pickup_state: ds.b 16
 s60_pickup_reset:
@@ -61,15 +61,15 @@ s60_pickup_update:
         move.w d0,(12,a6)
         bra .done
 .event:
-        ; Undo only our first eleven substeps. The untouched native routine
+        ; Undo only our first N-1 substeps. The untouched native routine
         ; applies the full increment, completing this interval exactly once.
         move.w (6,a6),d0
-        muls #11,d0
+        muls #S60_SUBSTEPS-1,d0
         divs #S60_LEGACY_DIV,d0
         ext.l d0
         sub.l d0,($10,a3)
         move.w (8,a6),d0
-        muls #11,d0
+        muls #S60_SUBSTEPS-1,d0
         divs #S60_LEGACY_DIV,d0
         sub.w d0,($18,a3)
         clr.w (10,a6)

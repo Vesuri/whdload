@@ -60,8 +60,7 @@ A1200 memory capture and field-based update-start observations are implemented.
 All 48 initial cells under `tmp/rate-baseline` and all 24 native combat cells
 under `tmp/rate-native-combat` pass the strict report checker. All 56 sampled
 cross-CPU/PAL gameplay comparisons match, apart from deferred projection scratch.
-The 15 existing tooling tests pass. The game remains N=12; step 1 and step 2
-are still outstanding. See internals for both complete tables and development
+The 15 existing tooling tests pass. N=12 remains the default pending step-2 rate selection. See internals for both complete tables and development
 for the capture and verification commands.
 
 Native frame-90/240 cells are SOL references. The native combat routes provide
@@ -102,15 +101,27 @@ share the exclusive matrix lock and run one at a time.
 
 ### Step 1: Make the substep count a build constant
 
-`S60_RATE = 60` and `S60_LEGACY_DIV = 12` exist, but 12 is also written out
-in many places. Introduce `S60_SUBSTEPS` (N ∈ {1, 2, 3, 4, 6, 12};
-`S60_RATE = 5 × N`). Then rewrite every N-dependent constant as an expression
-of it, at least:
+Status: complete. Parameterized sources and ABI-aware readers are in place.
+All six rates compile; N=12 release and VERIFY are byte-identical to
+the baseline. Thirteen private fixture groups (78 builds) compile, with every
+N=12 fixture build identical to its unmodified baseline build. All 78 private
+fixture combinations pass on A500. Six full-duration power runs and six jump
+runs pass.
+The 285 cross-N comparisons and startup replays classify the observed
+differences as substep timing, native branch consequences and rounding;
+fixed-direction actor-relative native endpoints remain exact. See internals
+for the measured examples and limits.
+No lower default has been selected. Retained evidence is under
+`tmp/substeps-prototype`.
+
+`S60_SUBSTEPS` is the build constant (N ∈ {1, 2, 3, 4, 6, 12});
+`S60_RATE = 5 × N` and `S60_LEGACY_DIV = N`. The parameterization and
+acceptance audit cover every N-dependent constant, including:
 
 - `s60_clock`: elapsed × 60 becomes elapsed × S60_RATE (keep the long
   arithmetic). Credit consumption per tick stays `field_hz`.
 - `linear60.s`: `divs #12` and the remainder ranges ±11 / ±12.
-- `boss60.s`: `moveq #12`, the 288 = 2N² divisor and the (2k − 13) term,
+- `boss60.s`: the 288 = 2N² divisor and the (2k − 13) term,
   which becomes (2k − N − 1).
 - `events60.s`: jump 144 = N², 55 = g(N − 1)/2 and velocity × 12.
 - `motion60.s`: the `S60_INPUT_SITE …,12` quanta and the 80/10/40 schedules
@@ -118,7 +129,10 @@ of it, at least:
 - `pickup60.s`: `muls #11` (N − 1).
 - Every "twelve-tick" clock: powers, animation, contact, terrain, shake, HUD,
   knockback, cooldowns, AI decisions, spawning, frame counter.
-- `hud60.s` `moveq #11`, and the input-quanta unroll tables.
+- HUD cadence and input-quanta unroll tables. The HUD installation loop
+  copies exactly 48 native instruction bytes (12 longwords); that copy count
+  is independent of N and must remain fixed. The boss pitch/acceleration
+  bit mask `(1<<2)|(1<<3)` is also independent of N.
 
 Grep for 11, 12, 13, 24, 55, 144 and 288 in every `*60.s`, and in the `*_test.s`
 fixtures and Python checkers that assume 12. Add N to the debugger ABI and

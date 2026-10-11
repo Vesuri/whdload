@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 
 
 def read(folder):
@@ -24,7 +25,7 @@ def read(folder):
     assert completed <= 4
     cases = [dict(case=i, failed=struct.unpack_from('>H', memory, at+12+i*2)[0])
              for i in range(completed)]
-    return dict(completed=completed, failed=failed, refresh_errors=refresh,
+    return dict(tick_substeps=sim60_state.read(folder)['substeps'], completed=completed, failed=failed, refresh_errors=refresh,
                 reset_errors=reset, cases=cases)
 
 

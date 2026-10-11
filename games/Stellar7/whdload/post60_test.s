@@ -170,7 +170,7 @@ s60_test_post:
         lea (s60_post_results,pc),a0
         addq.w #1,(4,a0)
         addq.w #1,d6
-        cmp.w #12,d6
+        cmp.w #S60_SUBSTEPS,d6
         bne .phase
         addq.w #1,d5
         cmp.w #4,d5
@@ -206,14 +206,14 @@ s60_test_post:
         lea (s60_post_results,pc),a0
         addq.w #1,(6,a0)
         addq.w #1,d6
-        cmp.w #12,d6
+        cmp.w #S60_SUBSTEPS,d6
         bne .quit_phase
         addq.w #1,d5
         cmp.w #2,d5
         bne .guard
         ; Native periodic branch reference: 64 calls spanning word-counter wrap.
         ; Both frame masks (15/63), low-energy warning and callback counts are
-        ; compared after every one of 768 fractional calls below.
+        ; compared after every one of 64*N fractional calls below.
         bsr s60_post_setup
         move.w #199,($46c4-S60_DATA,a4)
         move.w #$ffe0,($1e96-S60_DATA,a4)
@@ -250,7 +250,7 @@ s60_test_post:
         lea (s60_post_results,pc),a0
         addq.w #1,(8,a0)
         addq.w #1,d6
-        cmp.w #12,d6
+        cmp.w #S60_SUBSTEPS,d6
         bne .substep
         adda.w #16,a2
         dbf d7,.interval

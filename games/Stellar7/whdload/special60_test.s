@@ -157,7 +157,7 @@ s60_test_special:
         cmp.w #1,d7
         bne .sixth
         move.l ($10,a3),(4,a5)
-.sixth: cmp.w #6,d7
+.sixth: cmp.w #(S60_SUBSTEPS+1)/2,d7
         bne .position
         move.l ($10,a3),(8,a5)
 .position:
@@ -168,7 +168,7 @@ s60_test_special:
         move.l (8,a2,d2.w),d0
         sub.l d3,d0
         muls d7,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         ext.l d0
         add.l d3,d0
         cmp.l (8,a3,d2.w),d0
@@ -179,7 +179,7 @@ s60_test_special:
         cmp.w #12,d2
         bne .axis
         addq.w #1,d7
-        cmp.w #13,d7
+        cmp.w #S60_SUBSTEPS+1,d7
         bne .tick
         move.l a3,a0
         move.l a2,a1

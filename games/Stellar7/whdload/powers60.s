@@ -1,5 +1,5 @@
 ; Per-activation timer phases. Native words retain 5 Hz units for existing
-; gameplay/HUD readers; their decrement and expiry paths run every 12 ticks.
+; gameplay/HUD readers; their decrement and expiry paths run every N ticks.
 ; Each record is {ticks until decrement, last native word}.
 s60_power_state: ds.b 20
 s60_powers_reset:

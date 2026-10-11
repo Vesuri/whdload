@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 from patchlist import slave_code
 from stellar7_report import locate
 
@@ -27,13 +28,13 @@ def read(folder, listing):
     assert memory[offset:offset+4] == b'NI60'
     count, errors = struct.unpack_from('>II', memory, offset+4)
     phase, initial, expected, actual = struct.unpack_from('>Hhhh', memory, offset+12)
-    return dict(cases=count, mismatches=errors,
+    return dict(tick_substeps=sim60_state.read(folder)['substeps'], cases=count, mismatches=errors,
                 first_failure=dict(phase=phase, initial=initial, expected=expected, actual=actual),
-                scope='Fifteen signed neutral-turn velocities at all twelve starting phases; twelve substeps compared with one original native 80-unit braking fragment. Private actors; not a complete native input dispatch test.')
+                scope='Fifteen signed neutral-turn velocities at all N starting phases; N substeps compared with one original native 80-unit braking fragment. Private actors; not a complete native input dispatch test.')
 
 
 def validate(result):
-    assert result['cases'] == 180 and result['mismatches'] == 0, result
+    assert result['cases'] == 15*result['tick_substeps'] and result['mismatches'] == 0, result
 
 
 if __name__ == '__main__':

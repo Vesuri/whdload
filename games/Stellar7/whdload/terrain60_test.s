@@ -12,7 +12,7 @@ s60_terrain_render_saved: ds.l 2
 s60_terrain_expected_tick: dc.l 0
 s60_terrain_actors: ds.b 224
 s60_terrain_energies: dc.w 1000,1,0,$8000
-s60_terrain_contacts: dc.w 0,1,1,0,11,0,12,1,17,0,24,1,36,1,50,1
+s60_terrain_contacts: dc.w 0,1,S60_SUBSTEPS/12,0,S60_SUBSTEPS-1,0,S60_SUBSTEPS,1,17*S60_SUBSTEPS/12,0,2*S60_SUBSTEPS,1,3*S60_SUBSTEPS,1,50*S60_SUBSTEPS/12,1
 s60_terrain_test_flush:
         movem.l d0-d1/a0-a2,-(sp)
         move.l (_resload,pc),a2
@@ -84,7 +84,7 @@ s60_test_terrain:
         addq.w #1,(14,a6)
         moveq #0,d0
         move.w d4,d0
-        divu #12,d0
+        divu #S60_SUBSTEPS,d0
         move.w d0,d7
         and.w #3,d7
         add.w d7,d7
@@ -96,7 +96,7 @@ s60_test_terrain:
         move.w d0,d3
         lea (s60_phase,pc),a0
         move.w d3,(a0)
-        cmp.w #48,d4
+        cmp.w #4*S60_SUBSTEPS,d4
         bcs .base_ready
         add.l #$fffffff8,d3
 .base_ready:
@@ -129,7 +129,7 @@ s60_test_terrain:
         bsr s60_terrain_test_reference
         lea (s60_terrain_expected_tick,pc),a0
         move.l (s60_ticks,pc),(a0)
-        moveq #12,d7
+        moveq #S60_SUBSTEPS,d7
 .not_due:
         bsr s60_terrain_test_hook
         bsr s60_terrain_test_hook ; duplicate contact at this tick
@@ -145,11 +145,11 @@ s60_test_terrain:
         addq.l #1,(8,a6)
         subq.w #1,d7
         addq.w #1,d2
-        cmp.w #36,d2
+        cmp.w #3*S60_SUBSTEPS,d2
         bne .step
         addq.w #1,(4,a6)
         addq.w #1,d4
-        cmp.w #96,d4
+        cmp.w #8*S60_SUBSTEPS,d4
         bne .case
         ; Gaps need elapsed-time comparison, not a count of contact calls.
         bsr s60_terrain_reset

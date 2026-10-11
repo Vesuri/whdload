@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 
 
 def read(folder):
@@ -21,7 +22,7 @@ def read(folder):
     at = entry+offset
     assert memory[at:at+4] == b'P761'
     completed, errors, substeps, boundaries = struct.unpack_from('>4H', memory, at+4)
-    return dict(completed=completed, errors=errors, substeps=substeps, boundaries=boundaries)
+    return dict(tick_substeps=sim60_state.read(folder)['substeps'], completed=completed, errors=errors, substeps=substeps, boundaries=boundaries)
 
 
 if __name__ == '__main__':
@@ -32,5 +33,5 @@ if __name__ == '__main__':
     for folder in args.captures:
         result = read(folder)
         print(folder, json.dumps(result))
-        ok &= result == dict(completed=4, errors=0, substeps=504, boundaries=42)
+        ok &= all(result[k] == v for k,v in dict(completed=4, errors=0, substeps=42*result['tick_substeps'], boundaries=42).items())
     raise SystemExit(0 if ok else 1)

@@ -26,7 +26,7 @@ def validate(folder, listing):
             assert index == len(paths)-1 and not (path/'after').exists()
             entry, = struct.unpack('>I', read(code+0x2af8, 4))
             completed = entry+struct.unpack('>H', read(entry+44, 2))[0]
-            assert regs['pc'] == completed and state['ticks'] == 3600, 'route endpoint not reached'
+            assert regs['pc'] == completed and state['ticks'] == 300*state['substeps'], 'route endpoint not reached'
             assert read(data+0x1e90, 2) == bytes(2), 'route ended in death'
             stop = dict(tick=state['ticks'], path=path.name)
             continue
@@ -40,7 +40,7 @@ def validate(folder, listing):
         for offset, destination in ((0xf65e,0x11ba), (0xf6fe,0x1242), (0xf70c,0x12df)):
             assert read(code+offset, 6) == bytes.fromhex('41f9')+struct.pack('>I',data+destination)
         assert state['running'] and state['event_due'] == 1 and state['phase'] == 0
-        assert state['ticks'] % 12 == 0, 'firing outside decision cadence'
+        assert state['ticks'] % state['substeps'] == 0, 'firing outside decision cadence'
         assert read(data+0x46a0, 2) == struct.pack('>H', 5)
         actor = read(regs['a3'], 112)
         assert struct.unpack_from('>H', actor, 2)[0] == 9
@@ -79,7 +79,7 @@ def validate(folder, listing):
                            fired_channel=matches[0], cooldown=actor[0x61], channel_lifetime=life))
     assert events and stop is not None
     return dict(events=events, stop=stop, installed=installed,
-                scope='Successful native type-9 shot returns: ownership, position, lifetime, cooldown, channel-loop effects and twelve-tick decision cadence. No allocation-failure claim.')
+                scope='Successful native type-9 shot returns: ownership, position, lifetime, cooldown, channel-loop effects and N-tick decision cadence. No allocation-failure claim.')
 
 
 if __name__ == '__main__':

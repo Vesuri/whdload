@@ -1,5 +1,5 @@
 ; Continuous motion for the native $f328 enemy callback. Decisions retain one
-; update per twelve calls; vertical and charge motion are integrated each tick.
+; update per N calls; vertical and charge motion are integrated each tick.
 ; These non-projectile records reuse word 4 for phase (bit 15 = extra charge),
 ; word 6 for the signed native vertical increment, and word 62 for its remainder.
 s60_special_install:

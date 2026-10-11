@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 from stellar7_report import locate
 
 
@@ -22,8 +23,10 @@ def read(folder, listing):
     assert base is not None
     at = base-meta['base']+offset
     assert memory[at:at+4] == b'I760'
-    return dict(zip(('cases', 'actor_errors', 'record_errors', 'ccr_errors'),
+    result = dict(zip(('cases', 'actor_errors', 'record_errors', 'ccr_errors'),
                     struct.unpack_from('>4H', memory, at+4)))
+    result['tick_substeps'] = sim60_state.read(folder)['substeps']
+    return result
 
 
 def validate(result):

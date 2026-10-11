@@ -10,7 +10,7 @@ SHORT_BRANCHES = 1 ; native-reference checks and measured savings on both CPUs
         OPT o1+
         ENDC
 ; Work-in-progress replacement loop. Compile only with -DSIM60 while validating.
-; One simulation tick is 1/60 s. Native frame counters retain their 5 Hz meaning.
+; One simulation tick is 1/(5*N) s. Native frame counters retain their 5 Hz meaning.
 ; Unlike timing.s, the scheduler calls an update path and a separate draw path.
 S60_CALL MACRO
         move.l (s60_code,pc),a0
@@ -91,20 +91,33 @@ RECENTER_FAST = 1 ; native twins, cross-render state and measured savings
         IFND AI_GEOMETRY_FUSED
 AI_GEOMETRY_FUSED = 1 ; native twins, cross-render state and measured savings
         ENDC
-S60_RATE = 60
-S60_LEGACY_DIV = 12
+        IFND S60_SUBSTEPS
+S60_SUBSTEPS = 12
+        ENDC
+        IFNE (S60_SUBSTEPS-1)*(S60_SUBSTEPS-2)*(S60_SUBSTEPS-3)*(S60_SUBSTEPS-4)*(S60_SUBSTEPS-6)*(S60_SUBSTEPS-12)
+        FAIL "S60_SUBSTEPS must be 1, 2, 3, 4, 6 or 12"
+        ENDC
+S60_RATE = 5*S60_SUBSTEPS
+S60_LEGACY_DIV = S60_SUBSTEPS
         IFND DIV_ZERO
 DIV_ZERO = 1 ; measured zero-numerator shortcut; zero retains DIVS at every site
         ENDC
-; TST zero has the same NZVC as DIVS #12, and neither changes X. A nonzero
-; numerator always uses the original division, including overflow behavior.
+; For N>1, TST zero has the same NZVC as DIVS #N; neither changes X.
+; Nonzero numerators use DIVS, including its overflow behavior. N=1 uses
+; native word wrapping and a zero remainder instead.
 S60_DIV12 MACRO
+        IFEQ S60_SUBSTEPS-1
+        ; Word destinations retain native wrapping even when the full star
+        ; displacement does not fit a signed DIVS quotient. Remainder is zero.
+        and.l #$ffff,\1
+        ELSE
         IFNE DIV_ZERO
         tst.l \1
         beq .div_done\@
         ENDC
         divs #S60_LEGACY_DIV,\1
 .div_done\@:
+        ENDC
         ENDM
         IFND SCAN_HOIST
 SCAN_HOIST = 1 ; native comparisons and measured scan savings on both CPUs
@@ -234,8 +247,8 @@ s60_patches:
         PL_NOP $2c52,2   ; cover the remaining BSR displacement
         PL_W $2d54,$4e75 ; gameplay post-update range returns to scheduler
         PL_NOP $2d56,4   ; cover the remaining TST.W operand
-        PL_NOP $2c84,4 ; input is sampled by each 1/60 s update
-        PL_NOP $2c92,4 ; recenter once per 1/60 s update
+        PL_NOP $2c84,4 ; input is sampled by each 1/(5*N) s update
+        PL_NOP $2c92,4 ; recenter once per 1/(5*N) s update
         PL_END
 
 ; Read-only capture ABI. Entry+4 signature, Entry+8 fields below.
@@ -257,7 +270,7 @@ s60_code: dc.l 0
 s60_boundary_offset: dc.w s60_loop_complete-s60_entry
         dc.w s60_motion_table-s60_entry
         dc.w s60_star_remainders-s60_entry
-        dc.w 29 ; fractional-state ABI version
+        dc.w 29+((12-S60_SUBSTEPS)<<8) ; layout version low byte; 12-N high byte
         dc.w s60_jump_state-s60_entry
         dc.w s60_jump_state_end-s60_jump_state
         dc.w s60_cooldown_state-s60_entry
@@ -625,10 +638,33 @@ s60_clock:
         sub.l (a2),d0
         add.l d0,(a2)
         ; Do not truncate a long elapsed interval to the MULU word operand.
+        IFEQ S60_SUBSTEPS-12
         move.l d0,d1
         lsl.l #6,d0
         lsl.l #2,d1
-        sub.l d1,d0 ; elapsed * (64 - 4) = elapsed * 60
+        sub.l d1,d0 ; elapsed * (64 - 4) = elapsed * S60_RATE
+        ELSE
+        move.l d0,d1
+        lsl.l #2,d0
+        add.l d1,d0 ; elapsed * 5, retaining the full long operand
+        IFEQ S60_SUBSTEPS-2
+        lsl.l #1,d0
+        ENDC
+        IFEQ S60_SUBSTEPS-4
+        lsl.l #2,d0
+        ENDC
+        IFEQ S60_SUBSTEPS-3
+        move.l d0,d1
+        lsl.l #1,d0
+        add.l d1,d0
+        ENDC
+        IFEQ S60_SUBSTEPS-6
+        move.l d0,d1
+        lsl.l #1,d0
+        add.l d1,d0
+        lsl.l #1,d0
+        ENDC
+        ENDC
         add.l d0,(s60_credit-s60_last,a2)
         rts
 
@@ -675,7 +711,7 @@ s60_update:
         bsr s60_test_idle
         ENDC
         ENDC
-        ; Continuous input and collision integration are 60 Hz. Native AI
+        ; Continuous input and collision integration use S60_RATE. Native AI
         ; decisions and legacy counters are separately scheduled at 5 Hz.
         IFD VERIFY
         IFD JUMP_TEST

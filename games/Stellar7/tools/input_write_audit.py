@@ -53,8 +53,8 @@ def inspect():
     assert {int(row['offset'], 16) for row in rows} == set.union(*GROUPS.values())
     source = (Path(__file__).resolve().parent.parent/'whdload/motion60.s').read_text()
     table = source.split('S60_INPUT_ENTRIES MACRO', 1)[1].split('        ENDM', 1)[0]
-    entries = {int(site, 16): (int(opcode, 16), int(row)) for site, opcode, row in
-               re.findall(r'S60_INPUT_SITE \$([0-9a-f]+),\$([0-9a-f]+),(\d+)', table)}
+    entries = {int(site, 16): (int(opcode, 16), row) for site, opcode, row in
+               re.findall(r'S60_INPUT_SITE \$([0-9a-f]+),\$([0-9a-f]+),(0|S60_SUBSTEPS|2\*S60_SUBSTEPS)', table)}
     expected = dict(THRESHOLDS)
     expected.update(value for value in SCALED.values())
     assert set(entries) == set(expected) and len(entries) == 16
@@ -62,11 +62,13 @@ def inspect():
         opcode, row = entries[site]
         assert struct.unpack_from('>H', code, site)[0] == opcode
         assert opcode & 0xf100 == 0x7000 and opcode & 0xff == amount
-        assert row == {80: 0, 10: 12, 40: 24}[amount]
+        assert row == {80: '0', 10: 'S60_SUBSTEPS', 40: '2*S60_SUBSTEPS'}[amount]
     quanta = source.split('s60_input_values:', 1)[1].split('EVEN', 1)[0]
-    values = [list(map(int, row.split(','))) for row in re.findall(r'dc\.b ([\d,]+)', quanta)]
-    assert values == [[((phase+1)*amount)//12-(phase*amount)//12 for phase in range(12)]
-                      for amount in (80, 10, 40)]
+    assert re.findall(r'^\s+S60_QUANTA_ROW (\d+)$', quanta, re.M) == ['80','10','40']
+    assert 'REPT S60_SUBSTEPS' in quanta
+    assert r'dc.b ((s60_quanta_index+1)*\1)/S60_SUBSTEPS-(s60_quanta_index*\1)/S60_SUBSTEPS' in quanta
+    assert 's60_quanta_index SET 0' in quanta
+    assert 's60_quanta_index SET s60_quanta_index+1' in quanta
     return dict(writes=rows, counts={name: len(sites) for name, sites in GROUPS.items()},
                 scaled_constant_sites=len(entries),
                 scope='Static native input routine $fcf4–$100dc and the current quanta table. Direct device values, keyboard callbacks and real controls require separate evidence.')

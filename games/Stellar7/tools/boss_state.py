@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Read the native-callback oracle for 60 Hz boss enemy motion.
+"""Read the native-callback oracle for fixed-rate boss enemy motion.
 
 The guest compares XYZ, bank and pitch on every substep and full actor/RNG state after each
-of four twelve-tick intervals. Cases cover all seven level handlers, height, bank, sideways movement and
+of four N-tick intervals. Cases cover all seven level handlers, height, bank, sideways movement and
 type-7 pitch/acceleration. Eighteen coupled move-before-AI braking cases check native
 distance and actor boundaries, including rollback of vector remainders.
 Eight coupled curved-exit cases additionally check speed/pitch and spatial rollback/replay.
@@ -13,6 +13,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 
 
 def read(folder):
@@ -24,6 +25,7 @@ def read(folder):
     assert memory[code+0x2af6:code+0x2af8] == bytes.fromhex('4ef9')
     entry = struct.unpack_from('>I', memory, code+0x2af8)[0]-meta['base']
     assert memory[entry+4:entry+8] == b'S760'
+    _, n = sim60_state.decode_version(struct.unpack_from('>H', memory, entry+50)[0])
     offset = struct.unpack_from('>H', memory, entry+88)[0]
     assert offset, 'BOSS_TEST fixture is absent'
     at = entry+offset
@@ -41,8 +43,8 @@ def read(folder):
                      'replay_record', 'speed', 'pitch', 'rollback_rotation')) if error & (1 << bit)]
                     if check == 'exit_rollback_replay' else [])
         cases.append(dict(case=index, type=kind, failed=error, failure_checks=failures, check=check, axis="Z" if index >= callback_cases else "Y",
-                          first_tick_position=first, sixth_tick_position=sixth, final_position=final))
-    return dict(signature=signature, expected_cases=expected_cases, completed=completed,
+                          first_tick_position=first, midpoint_tick=(n+1)//2, midpoint_tick_position=sixth, final_position=final))
+    return dict(tick_substeps=n, signature=signature, expected_cases=expected_cases, completed=completed,
                 failed=failed, cases=cases)
 
 

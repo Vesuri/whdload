@@ -146,7 +146,7 @@ fixture_joy:
         move.l (s60_ticks,pc),d0
         cmp.l #INPUT_NEUTRAL_PLAY,d0
         bcs .neutral
-        cmp.l #INPUT_NEUTRAL_PLAY+120,d0
+        cmp.l #INPUT_NEUTRAL_PLAY+2*S60_RATE,d0
         bcc .neutral
         moveq #4,d0 ; turn through the native joystick API for two seconds
         rts

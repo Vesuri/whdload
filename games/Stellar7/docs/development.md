@@ -5,15 +5,80 @@
 Step 0 of the performance plan in docs/open-work.md is complete: 48 initial
 native/SIM60 cells and 24 native combat comparators pass their strict checks.
 The game still uses N=12 (60 Hz); no lower default has been selected.
-Step 1 will parameterize the common tick rate with an N=12 byte-identity gate;
+Step 1 is complete: all 78 private fixture combinations, six full-duration
+power runs and six jump runs pass. The 285 cross-N comparisons are classified in internals.
+N=12 release and VERIFY builds pass the byte-identity gate;
 step 2 will select the highest measured rate the A500 sustains in heavy combat
 without reducing presentations below native. Interpolation and input-history
 work are deferred to later steps and are outside the current request.
 
+## Substep validation
+
+Build an explicit rate with `make -C whdload sim60 VASMFLAGS=-DS60_SUBSTEPS=12`
+or a diagnostic with `make -C whdload verify VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=12 ...'`.
+The ABI version word keeps layout 29 in its low byte and encodes 12-N in its
+high byte, preserving the N=12 binaries. Readers must decode it through
+`sim60_state.decode_version`; `sim60_state.read` reports `substeps` and `rate_hz`.
+
+`tools/substeps_fixtures.py GROUP CAPTURE --listing LISTING --substeps N`
+checks exact retained build identity, ABI rate, and all native-reference
+results in that fixture group. The serial validation run and its build
+inventory are under `tmp/substeps-prototype`. The recorded runtime checks
+pass for all 78 combinations.
+The private groups use tick 100 for injection and tick 101 for capture:
+
+| Group | VERIFY definitions (in addition to SIM60 and S60_SUBSTEPS) |
+|---|---|
+| input-hud | QUANTA_TEST=100 INPUT_NEUTRAL_TEST=100 HUD_TEST=100 |
+| knock-shake | KNOCK_TEST=100 SHAKE_TEST=100 |
+| contact-terrain | CONTACT_TEST=100 TERRAIN_TEST=100 |
+| motion | FLYING_TEST=100 SPECIAL_TEST=100 PICKUP_TEST=100 |
+| animation | ANIMATION_TEST=100 |
+| post-friction | POST_TEST=100 COLLISION_TEST=100 FRICTION_TEST=100 |
+| boss | BOSS_TEST=100 BOSS_PATH_TEST=1 |
+| linear-idle | LINEAR_TEST=100 IDLE_TEST=100 |
+| input-play | INPUT_NEUTRAL_PLAY=200 PREFERENCES_TEST=100 PREFERENCES_CHOICE=2 |
+| geometry-flat | GEOMETRY_TWIN=1 GEOMETRY_TEST=100 HEADING_TEST=100 FLAT_TEST=100 |
+| projection | RADIUS_TWIN=1 RADIUS_TEST=100 PROJECT_TEST=100 BATCH_TEST=100 |
+| ai-recenter | AI_STACK_TEST=100 RECENTER_TEST=100 BOSS_GATE_TEST=100 |
+| scan-sort | SCAN_TWIN=1 SCAN_TEST=100 SCAN_FLAG_TEST=1 SHOT_TEST=100 SORT_TWIN=1 SORT_TEST=100 DISTANCE_TWIN=1 DISTANCE_TEST=100 |
+
+Prefix each definition with `-D` in `VERIFY_FLAGS`. Retain the exact listing
+with `-L ../tmp/NAME.lst` and the corresponding `tmp/NAME.slave`. Capture with
+`fixed_window.py tmp/NAME --prebuilt tmp/NAME.slave --tick 101 --state-only
+--fields 1`, supplying the same VERIFY_FLAGS and only `CUSTOM1=1 CUSTOM3=1`
+in WHD_ARGS. Run one capture at a time. Validate with the group reader above;
+repeat all thirteen groups for each of N=1,2,3,4,6,12. N=12 fixture builds
+must also compare byte-for-byte with the baseline before parameterization.
+
+`tools/cross_substeps.py REFERENCE CANDIDATE` requires equal native-update
+boundaries and session identity. It reports every mapped difference, keeping
+internal integrator records and deferred projection scratch separately visible.
+No cross-rate divergence is automatically accepted.
+`power_state.py --activation TICK --refresh TICK CAPTURE...` also checks the
+separate speed-power clock after a native same-value refresh. Omit `--refresh`
+for the ordinary full-duration fixture.
+`jump_state.py --activation TICK CAPTURE...` checks the direct `JUMP_TEST`
+fixture against the native height equation and landing at 45*N ticks. It does
+not replace the input-driven pickup/jump selection check.
+Use `fixed_window.py --level 6` when an early tick must be captured after
+entering type-10 combat. The boundary condition checks both level and tick;
+the captured state is checked against the requested level again. Cross-N
+correctness builds use `LEVEL_TEST=17*N` (triggering inside update 17*N+1)
+to align prior native decision counts across rates; the
+performance baseline retains its separately specified fixture and windows.
+
 ## Rate matrix
 
-`--substeps` is reserved for step 1 and fails before capture until the source
-implements `S60_SUBSTEPS`. The current game remains fixed at N=12.
+`S60_SUBSTEPS` accepts 1, 2, 3, 4, 6 or 12; the simulation rate is five times
+that value. The default remains N=12 until the step-2 performance gates select a lower rate. The matrix driver scales route windows and level setup to equivalent game time
+with `--substeps`, rounding up to the next completed tick. `LEVEL_TEST=T`
+executes inside update T+1, so its scaled definition is
+`ceil((T+1)*N/12)-1`; the 200 baseline trigger remains in native update 17
+at every N. The explicit
+`type10-heavy` route samples the 600–5400 nominal window every 300 nominal
+ticks and retains per-segment pending counts. Lower-rate matrix captures remain
+pending step-2 measurement.
 
 The initial matrix has 48 cells. Capture the additional native combat
 comparators in a separate directory:
@@ -100,7 +165,7 @@ not expose the FS-UAE process even while it is alive. Use the existing VERIFY
 fixtures for scripted gameplay controls; they do not require host app access.
 Physical input and audible output still need a separate check.
 
-`amiga/play60.sh` builds and starts the experimental 60 Hz conversion with
+`amiga/play60.sh` builds and starts the experimental fixed-rate conversion with
 normal controls and sound. It uses a separate `whdload/Stellar7-Sim60.Slave`
 and defaults to CUSTOM1=1; CPU/memory/display overrides match `amiga/run.sh`.
 To build without launching, source `amiga/env.sh` and run `make -C whdload sim60`.
@@ -115,8 +180,8 @@ simulation backlog; this launcher does not imply sustained realtime performance.
 
 `amiga/run.sh` boots the shipped slave windowed with sound. Defaults: 68000,
 512 KB chip, 1536 KB slow RAM, no fast RAM, NTSC. This is an A500-equivalent
-bus configuration with enough memory for WHDLoad. The supplied game is NTSC; the new simulation target is 60 Hz regardless of
-display mode. `NTSC_MODE=1` uses the emulator's `uae_ntsc=true` core option.
+bus configuration with enough memory for WHDLoad. The supplied game is NTSC;
+the simulation uses 5*N Hz (currently N=12) regardless of display mode. `NTSC_MODE=1` uses the emulator's `uae_ntsc=true` core option.
 The older `ntsc_mode` option did not alter this emulator's PAL scan timing.
 The driver now rejects a requested mode that disagrees with Exec's observed
 field frequency. NTSC boot and scan timing are verified. Use `NTSC_MODE=0` to reproduce
@@ -511,8 +576,9 @@ steering supplies the subsequent approach. Health, terrain positions, allocation
 contact and damage are not injected. Use `tools/encounter_state.py CAPTURE
 --listing EXACT.lst --terrain` to require the completed setup and
 `tools/terrain_contact_state.py CAPTURE --listing EXACT.lst` to check raw
-before/after native allocation/contact snapshots. The latter requires 25
-consecutive contacts and damage on the first, thirteenth and twenty-fifth.
+before/after native allocation/contact snapshots. The latter reads N from the
+ABI and requires 2*N+1 consecutive contacts, with damage at offsets 0, N and
+2*N. The retained N=12 run has 25 contacts.
 This validates the path after an explicit state selection, not the boss's
 random decision to select it. A500, normal 68020 and delayed 68020 pass native
 allocation at tick 3603 and 25 contacts at 3604–3628, with damage at

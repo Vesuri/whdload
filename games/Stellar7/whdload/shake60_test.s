@@ -120,7 +120,7 @@ s60_test_shake:
         lea (s60_shake_expected,pc),a2
         moveq #7,d6
 .period:
-        moveq #11,d7
+        moveq #S60_SUBSTEPS-1,d7
 .tick:
         bsr s60_shake_update
         bsr s60_shake_update ; duplicate update must not draw random numbers
@@ -168,7 +168,7 @@ s60_shake_refresh_test:
         move.w #1,(6,a2)
         move.w #8,($026a-S60_DATA,a4)
         lea (s60_ticks,pc),a0
-        move.l #15,(a0)
+        move.l #10+(S60_SUBSTEPS-1)/2,(a0)
         tst.w d5
         bne .positive
         S60_CALL $3ce6
@@ -183,7 +183,7 @@ s60_shake_refresh_test:
         bsr s60_shake_update
         cmp.w #7,($026a-S60_DATA,a4)
         bne .bad_refresh
-        cmp.l #15,(a2)
+        cmp.l #10+(S60_SUBSTEPS-1)/2,(a2)
         bne .bad_refresh
         cmp.w #7,(4,a2)
         bne .bad_refresh

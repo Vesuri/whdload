@@ -54,7 +54,7 @@ s60_test_quanta:
         dbf d6,.compare
         addq.l #1,(4,a6)
         addq.w #1,d5
-        cmp.w #12,d5
+        cmp.w #S60_SUBSTEPS,d5
         bcs .phase
         lea (s60_phase,pc),a0
         move.w (sp)+,(a0)

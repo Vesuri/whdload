@@ -6,6 +6,10 @@
         ENDC
 s60_linear_cache: ds.b 16*16 ; yaw:speed key, packed DIVS X/Z, reserved
 s60_linear_move:
+        IFEQ S60_SUBSTEPS-1
+        moveq #0,d0 ; the ordinary N=1 path preserves full long displacements
+        rts
+        ENDC
         cmp.w #7,(2,a3)
         beq .fallback
         tst.w (20,a3)
@@ -20,12 +24,12 @@ s60_linear_move:
         tst.l d0 ; OR.W alone does not test the upper pitch-remainder word
         bne .fallback ; no angular or vertical fractional displacement
         move.w (14,a6),d0
-        add.w #11,d0
-        cmp.w #22,d0
+        add.w #S60_SUBSTEPS-1,d0
+        cmp.w #2*(S60_SUBSTEPS-1),d0
         bhi .fallback
         move.w (16,a6),d0
-        add.w #11,d0
-        cmp.w #22,d0
+        add.w #S60_SUBSTEPS-1,d0
+        cmp.w #2*(S60_SUBSTEPS-1),d0
         bhi .fallback ; malformed/out-of-range fractions retain ordinary DIVS
         moveq #0,d1
         move.w (24,a3),d1 ; yaw, not bank
@@ -69,9 +73,9 @@ s60_linear_move:
         blt .fallback
         cmp.l #32768,d2
         bgt .fallback
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         move.l d0,(4,a5)
-        divs #12,d2
+        divs #S60_SUBSTEPS,d2
         move.l d2,(8,a5)
         move.l d1,(a5)
 .integrate:
@@ -95,15 +99,15 @@ s60_linear_move:
 .fallback:
         moveq #0,d0
         rts
-; D0 = packed native DIVS remainder:quotient; D1 = old remainder (-11..11).
+; D0 = packed native DIVS remainder:quotient; D1 = old remainder (1-N..N-1).
 ; Return D2.W quotient and D0.W remainder for truncation toward zero.
 s60_linear_divide:
         move.w d0,d2
         swap d0
         add.w d1,d0
-        cmp.w #12,d0
+        cmp.w #S60_SUBSTEPS,d0
         bge .increment
-        cmp.w #-12,d0
+        cmp.w #-S60_SUBSTEPS,d0
         ble .decrement
         tst.w d2
         beq .done
@@ -120,13 +124,13 @@ s60_linear_divide:
         ELSE
         subq.w #1,d2
         ENDC
-        add.w #12,d0
+        add.w #S60_SUBSTEPS,d0
         rts
 .negative:
         tst.w d0
         ble .done
 .increment:
         addq.w #1,d2
-        sub.w #12,d0
+        sub.w #S60_SUBSTEPS,d0
 .done:  rts
         ENDC

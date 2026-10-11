@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+from sim60_state import decode_version
 
 
 def read(folder):
@@ -16,6 +17,7 @@ def read(folder):
     assert memory[code+0x2af6:code+0x2af8] == bytes.fromhex('4ef9')
     entry = struct.unpack_from('>I', memory, code+0x2af8)[0]-meta['base']
     assert memory[entry+4:entry+8] == b'S760'
+    decode_version(struct.unpack_from('>H', memory, entry+50)[0])
     offset = struct.unpack_from('>H', memory, entry+68)[0]
     assert offset, 'AI_STACK_TEST fixture is absent'
     at = entry+offset

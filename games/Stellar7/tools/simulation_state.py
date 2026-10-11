@@ -12,6 +12,7 @@ import json
 import re
 import struct
 from pathlib import Path
+from sim60_state import decode_version
 
 
 def snapshot(folder, include_projection=False, include_presentation=False, include_render_scratch=False):
@@ -115,44 +116,44 @@ def snapshot(folder, include_projection=False, include_presentation=False, inclu
         entry = struct.unpack_from('>I', hook, 2)[0]
         abi = read(entry, 52)
         if abi[4:8] == b'S760':
-            assert 1 <= struct.unpack_from('>H', abi, 50)[0] <= 29, 'Unsupported SIM60 state ABI'
+            version, substeps = decode_version(struct.unpack_from('>H', abi, 50)[0])
             motion_offset, stars_offset = struct.unpack_from('>2H', abi, 46)
             table = struct.unpack('>I', read(entry+motion_offset, 4))[0]
-            stride = struct.unpack('>H', read(entry+70, 2))[0] if struct.unpack_from('>H', abi, 50)[0] >= 5 else 64
+            stride = struct.unpack('>H', read(entry+70, 2))[0] if version >= 5 else 64
             records = read(table, 272*stride)
             by_actor = {struct.unpack_from('>I', records, i)[0]: records[i+4:i+stride].hex()
                         for i in range(0, len(records), stride)
                         if struct.unpack_from('>I', records, i)[0]}
-            if struct.unpack_from('>H', abi, 50)[0] >= 6:
+            if version >= 6:
                 knock_offset,knock_size=struct.unpack('>2H',read(entry+74,4))
                 result['knockback_phase']=read(entry+knock_offset,knock_size).hex()
-            if struct.unpack_from('>H', abi, 50)[0] >= 8:
+            if version >= 8:
                 pickup_offset,pickup_size=struct.unpack('>2H',read(entry+82,4))
                 pickup=read(entry+pickup_offset,pickup_size)
                 result['pickup_integrator']=[reference(struct.unpack_from('>I',pickup)[0]),pickup[4:].hex()]
-            if struct.unpack_from('>H', abi, 50)[0] >= 15:
+            if version >= 15:
                 shake_offset,shake_size=struct.unpack('>2H',read(entry+92,4))
                 result['shake_phase']=read(entry+shake_offset,shake_size).hex()
                 result['shake_rng']=data[0x3558]
                 result['shake_offsets']=struct.unpack_from('>2h',data,0x7156)
-            if struct.unpack_from('>H', abi, 50)[0] >= 25:
+            if version >= 25:
                 terrain_offset,terrain_size=struct.unpack('>2H',read(entry+120,4))
                 assert terrain_size == 8
                 result['terrain_clock']=read(entry+terrain_offset,terrain_size).hex()
-            if struct.unpack_from('>H', abi, 50)[0] >= 29:
+            if version >= 29:
                 friction_offset,friction_size=struct.unpack('>2H',read(entry+132,4))
                 assert friction_size == 8
                 result['terrain_friction_clock']=read(entry+friction_offset,friction_size).hex()
             result['fractional_motion'] = [by_actor.get(actor) for actor in addresses]
             result['fractional_stars'] = read(entry+stars_offset, 200).hex()
             result['tick_phase'] = struct.unpack_from('>H', abi, 30)[0]
-            if struct.unpack_from('>H', abi, 50)[0] >= 2:
+            if version >= 2:
                 jump_offset,jump_size=struct.unpack('>2H',read(entry+52,4))
                 result['jump_integrator']=read(entry+jump_offset,jump_size).hex()
-            if struct.unpack_from('>H', abi, 50)[0] >= 4:
+            if version >= 4:
                 timer_offset,timer_size=struct.unpack('>2H',read(entry+60,4))
                 result['power_phases']=read(entry+timer_offset,timer_size).hex()
-            if struct.unpack_from('>H', abi, 50)[0] >= 3:
+            if version >= 3:
                 timer_offset,timer_size=struct.unpack('>2H',read(entry+56,4))
                 result['player_cooldowns']=read(entry+timer_offset,timer_size).hex()
     if include_render_scratch:

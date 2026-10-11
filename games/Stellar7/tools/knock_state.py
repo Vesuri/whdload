@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 
 
 def read(folder):
@@ -21,24 +22,25 @@ def read(folder):
     at = entry+offset
     assert memory[at:at+4] == b'K760'
     completed, errors, refresh_errors = struct.unpack_from('>3H', memory, at+4)
-    return dict(completed=completed, errors=errors, refresh_errors=refresh_errors)
+    return dict(tick_substeps=sim60_state.read(folder)['substeps'], completed=completed, errors=errors, refresh_errors=refresh_errors)
 
 
 def check_play(folder, activation):
     """Validate the -160 KNOCK_PLAY route; additional impacts must be absent."""
     from sim60_state import read as scheduler
     from simulation_state import snapshot
-    tick = scheduler(folder)['ticks']
+    clock = scheduler(folder)
+    tick, n = clock['ticks'], clock['substeps']
     elapsed = tick - activation
     if elapsed < 1:
         raise ValueError('Capture must follow diagnostic activation')
     state = snapshot(folder)
     impulses = (-160, -80, -40, -20, -10, -5, -2, -1)
-    period, substep = divmod(elapsed-1, 12)
+    period, substep = divmod(elapsed-1, n)
     active = period < len(impulses)
     current = impulses[period] if active else -1
     pending = impulses[period+1] if period+1 < len(impulses) else 0
-    remaining = 11-substep if active else 0
+    remaining = n-1-substep if active else 0
     expected = struct.pack('>3h', remaining, current, pending).hex()
     speed = struct.unpack_from('>h', bytes.fromhex(state['objects'][0]['motion']), 12)[0]
     errors = []
@@ -61,5 +63,5 @@ if __name__ == '__main__':
     for folder in args.captures:
         result = check_play(folder, args.activation) if args.play else read(folder)
         print(folder, json.dumps(result))
-        ok &= not result['errors'] if args.play else result == dict(completed=8, errors=0, refresh_errors=0)
+        ok &= not result['errors'] if args.play else all(result[k] == v for k,v in dict(completed=8, errors=0, refresh_errors=0).items())
     raise SystemExit(0 if ok else 1)

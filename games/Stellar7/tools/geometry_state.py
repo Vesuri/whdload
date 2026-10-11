@@ -5,12 +5,14 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 from patchlist import slave_code
 from stellar7_report import locate
 
 
 def read(folder, listing):
     folder, listing = Path(folder), Path(listing)
+    n = sim60_state.read(folder)['substeps']
     root = folder
     while not (root/'slave.slave').exists():
         assert root != root.parent, 'retained slave missing'
@@ -28,7 +30,7 @@ def read(folder, listing):
     count, errors = struct.unpack_from('>II', memory, offset+4)
     cases_symbol = re.search(r'^s60_geometry_cases\s+00:([0-9A-F]+)', listing.read_text(encoding='latin1'), re.M)
     cases = struct.unpack_from('>H', memory, base-meta['base']+int(cases_symbol[1],16))[0] if cases_symbol else 0
-    return dict(comparisons=count, mismatches=errors, boundary_cases=cases,
+    return dict(tick_substeps=n, comparisons=count, mismatches=errors, boundary_cases=cases,
                 scope='Fifteen register outputs, CCR, actor distance and target heading; includes synthetic cases only when boundary_cases is nonzero. No performance claim.')
 
 

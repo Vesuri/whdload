@@ -42,7 +42,7 @@ s60_hud_install:
         cmp.l (38,a0),d0
         bne s60_bad
         lea (s60_hud_native,pc),a3
-        moveq #11,d0
+        moveq #(48/4)-1,d0 ; fixed native-code byte count, independent of N
 .copy:  move.l (a0)+,(a3)+ ; all native branches remain within these 48 bytes
         dbf d0,.copy
         move.w #$4e75,(a3)

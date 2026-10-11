@@ -5,6 +5,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import sim60_state
 
 
 def read(folder):
@@ -16,7 +17,7 @@ def read(folder):
     assert memory[code+0x2af6:code+0x2af8] == bytes.fromhex('4ef9')
     entry = struct.unpack_from('>I', memory, code+0x2af8)[0]-meta['base']
     assert memory[entry+4:entry+8] == b'S760'
-    assert struct.unpack_from('>H', memory, entry+50)[0] >= 25
+    assert sim60_state.decode_version(struct.unpack_from('>H', memory, entry+50)[0])[0] >= 25
     offset = struct.unpack_from('>H', memory, entry+124)[0]
     assert offset, 'TERRAIN_TEST fixture absent'
     at = entry+offset
@@ -26,8 +27,10 @@ def read(folder):
     assert struct.unpack_from('>I', native, 2)[0] == meta['data']+0x46c4
     assert memory[code+0x36f8:code+0x36fa] == bytes.fromhex('4eb9')
     assert memory[code+0x36fe:code+0x3702] == bytes.fromhex('600000a6')
-    return dict(zip(('cases', 'errors', 'substeps', 'inactive', 'resets', 'intermittent'),
+    result = dict(zip(('cases', 'errors', 'substeps', 'inactive', 'resets', 'intermittent'),
                     struct.unpack_from('>2HI3H', memory, at+4)))
+    result['tick_substeps'] = sim60_state.read(folder)['substeps']
+    return result
 
 
 if __name__ == '__main__':
@@ -36,5 +39,6 @@ if __name__ == '__main__':
     for folder in p.parse_args().captures:
         result = read(folder)
         print(folder, json.dumps(result, sort_keys=True))
-        assert result == dict(cases=96, errors=0, substeps=3456, inactive=4,
-                              resets=96, intermittent=8)
+        n = result['tick_substeps']
+        assert result == dict(tick_substeps=n, cases=8*n, errors=0, substeps=24*n*n, inactive=4,
+                              resets=8*n, intermittent=8)

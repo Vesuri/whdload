@@ -1,5 +1,5 @@
 ; Native terrain friction is an immediate discrete velocity quartering, followed
-; by at most one quartering per twelve simulation ticks. Its contact flag also
+; by at most one quartering per N simulation ticks. Its contact flag also
 ; applies outside level five, so this clock is independent of terrain damage.
 s60_friction_install:
         move.l (s60_code,pc),a1

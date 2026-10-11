@@ -1,4 +1,4 @@
-; Keep native flying-AI decisions at one call per twelve active ticks. Capture
+; Keep native flying-AI decisions at one call per N active ticks. Capture
 ; its height/bank increments, then distribute those increments with integers.
 ; Record: 4 phase, 6 height delta, 62 height remainder, 64 bank delta,
 ; 66 bank remainder. Native decisions/side effects execute only once.

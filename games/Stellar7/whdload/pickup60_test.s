@@ -136,7 +136,7 @@ s60_test_pickup:
         move.l ($10,a2),d0
         sub.l (s60_pickup_start,pc),d0
         muls d7,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         ext.l d0
         add.l (s60_pickup_start,pc),d0
         cmp.l ($10,a3),d0
@@ -146,13 +146,13 @@ s60_test_pickup:
         move.w ($18,a2),d0
         sub.w (s60_pickup_start+4,pc),d0
         muls d7,d0
-        divs #12,d0
+        divs #S60_SUBSTEPS,d0
         add.w (s60_pickup_start+4,pc),d0
         cmp.w ($18,a3),d0
         beq .deadline
         bsr s60_pickup_error
 .deadline:
-        cmp.w #12,d7
+        cmp.w #S60_SUBSTEPS,d7
         beq .next_tick
         ; Native counter/deletion/first healing must wait for the boundary.
         lea (s60_pickup_cases,pc),a0
@@ -175,7 +175,7 @@ s60_test_pickup:
         lea (s60_pickup_results,pc),a0
         addq.w #1,(8,a0)
         addq.w #1,d7
-        cmp.w #13,d7
+        cmp.w #S60_SUBSTEPS+1,d7
         bne .tick
         lea (s60_pickup_actual,pc),a1
         bsr s60_pickup_snapshot
