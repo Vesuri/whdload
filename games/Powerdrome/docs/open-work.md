@@ -494,5 +494,8 @@ The remaining weather audit maps forecast/start/expiry, outer-loop effect genera
 16-counter transition steps and renderer-owned lifetime changes. The transition also
 changes steering and target gear, so correcting only its visual fade is insufficient.
 Shared transition-word animation/reset paths require separate lifecycle handling. Natural
-A500 weather calibration and directed runtime probes are the next prerequisites; the
-exact sites, fields and implementation gates are in timing-implementation.
+A500 weather calibration and directed runtime probes are the next prerequisites. The
+existing track-2 `CUSTOM5=6` weather capture proves the route but starts after onset and
+contains no warning/start events; the calibration capture must anchor at `$e1a2` instead.
+The forecast RNG argument is a shift count, so it must not be treated as a one-in-four
+trigger. Exact sites, fields, existing evidence and gates are in timing-implementation.

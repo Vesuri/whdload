@@ -3451,6 +3451,31 @@ RNG ownership and publication order. Pacing the fade alone leaves handling, targ
 changes, effect generation and lifetime tied to different clocks. `+$4ce/$4d0` also gate
 fast-planar fallback, so the native and fast render paths both need these checks.
 
+### Available weather evidence and calibration entry point
+
+The existing input-only `CUSTOM5=6` route selects track index 2 through native menu keys.
+`coverage-weather-twin` already proves that this route reaches natural effects with timing
+off on 060/50: 139 native effect draws/fallbacks and 5,129 staged renderer twins. Its
+16,000-field capture starts at `$112f4`, after onset. It contains zero `$e1a2` warning
+or `$e1f8` start events, so it cannot establish forecast delay, fade-in timing or their
+A500 reference. At its initial snapshot the transition word is already zero, effects
+are enabled, and the active deadline is 46,778 native clock units (233,890 ms) ahead.
+At the final snapshot both deadlines/effect flags are inactive. This is reusable routing
+and rendering evidence, not A500 timing calibration.
+
+Start the new A500 baseline at `$e1a2`, not the first effect draw. Retain input route 6,
+C3/C1/C4 off and the original game timing; capture the warning flag/deadline publication,
+start, fade steps, active expiry, fade-out, steering/gear and effect mutations listed
+above. Repeat on the full prototype with the same input route and explicitly record
+whether histories and eligibility match before comparing durations.
+
+The forecast RNG call at `$dd20` passes `d1=2` to `$53f6`. This argument is a right-shift
+count, not a random range of two: the helper updates its 16-bit seed, then returns the
+word shifted right by two. The zero test at `$dd28` succeeds only for updated seed values
+0–3. Do not model this as a one-in-four trial or infer a waiting-time distribution without
+analyzing the actual seed stream and other callers. A directed seed test could exercise
+native transitions but would not replace the required natural A500 episode.
+
 Next implementation gates:
 
 1. Capture an eligible natural weather episode on the original A500 and the full prototype.
