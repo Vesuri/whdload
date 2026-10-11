@@ -4468,6 +4468,9 @@ palettes. One complete restoration preserves entry 5 while copying the other 15 
 `weather_palette_publication.check_publications` links calls in log order to pending
 logical phases at `$bd1a`, checks consumption at `$bd58`, and verifies presentation does
 not mutate persistent fade state. All 30 publications match, including the additional
-negative-completion zero phase. Missing and duplicate calls are rejected. The A500
-counterpart is running; this is not yet cross-CPU or scanout acceptance. Deliberate
-coalescing still requires a run that actually skips presentation phases.
+negative-completion zero phase. Missing and duplicate calls are rejected. The completed A500
+counterpart passes the same 31 calls, 30 logical publications and one restoration;
+normalized phase/source/target/colour histories match across CPUs. The pair also matches
+2,304 common movements and 512 controls, with zero endpoint simulation debt. This is
+stored palette evidence, not scanout acceptance. Current-code effect coalescing and
+restoration are being checked separately by `timing-weather-effect-publication1`.

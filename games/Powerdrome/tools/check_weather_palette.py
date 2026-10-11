@@ -50,15 +50,16 @@ def check_copy(before, after):
     assert palette(after, 'saved') == saved_expected, 'Restoration changed unrelated saved palette'
 
 
-def check(root):
+def check(root, copies_only=False):
     game = int((root / 'game-base.txt').read_text(), 0)
     base = int((root / 'dump-base.txt').read_text(), 0)
     chip = (root / 'chip.bin').read_bytes()
     code = (root / 'code.bin').read_bytes()
     final_chip = (root / 'final-chip.bin').read_bytes()
     final_code = (root / 'final-code.bin').read_bytes()
-    callers = owned_fade_returns(chip, code, game, base)
-    assert owned_fade_returns(final_chip, final_code, game, base) == callers
+    callers = {} if copies_only else owned_fade_returns(chip, code, game, base)
+    if not copies_only:
+        assert owned_fade_returns(final_chip, final_code, game, base) == callers
     targets = struct.unpack_from('>7H', chip, game + 0x203e)
     assert struct.unpack_from('>7H', final_chip, game + 0x203e) == targets
     text = (root / 'swaps-gdb.txt').read_text()
@@ -99,6 +100,11 @@ def check(root):
         phases[kind, phase] += 1
         history.append((kind, phase, before['source_colour'], targets[index], colour))
     assert not any(pending.values()), 'Capture ended inside palette helper'
+    assert copies > 0, 'No complete palette restoration observed'
+    if copies_only:
+        assert not phases and unowned == 0, 'Copies-only capture contains unvalidated interpolation'
+        print(f'{root.name}: {copies} complete palette restorations preserve entry 5 and copy the other 15 entries; stored memory only')
+        return None
     expected = Counter({('positive', i): 1 for i in range(15)})
     expected.update({('negative', i): 1 for i in range(1, 16)})
     expected['negative_zero', 0] = 1
@@ -115,5 +121,8 @@ def check(root):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('captures', type=Path, nargs='+')
-    histories = [check(root) for root in parser.parse_args().captures]
-    assert all(h == histories[0] for h in histories), 'Cross-CPU palette histories differ'
+    parser.add_argument('--copies-only', action='store_true', help='Check effect palette restoration without claiming fade validation')
+    args = parser.parse_args()
+    histories = [check(root, copies_only=args.copies_only) for root in args.captures]
+    if not args.copies_only:
+        assert all(h == histories[0] for h in histories), 'Cross-CPU palette histories differ'

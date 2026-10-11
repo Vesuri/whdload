@@ -579,15 +579,19 @@ have zero assigned/retained debt. Both stored palettes restore at both endpoints
 The 030 passes 2,520 completed renderer twins. Its 8,503 steps versus A500's 8,505 are
 accounted for by initial/final unsampled time of 80/20 versus 140/40 ms.
 
-1. Complete the running `timing-weather-palette-test1` pair. The guarded palette-call
-   probes are integrated into the sampler and the frozen
-   `Powerdrome-timing-weather-palette-test1.slave` directed fade fixture runs for 46 seconds
-   on both CPUs. `check_weather_palette.py` requires all 31 owned interpolation calls,
-   exact native integer arithmetic and both palette writes, plus restoration of the
-   other 15 colours while preserving entry 5. The completed 030 side passes all 31
-   interpolation calls and one restoration. Its 30 pending logical publications match
-   the observed native calls exactly; missing and duplicate calls are rejected. A500
-   remains in progress. Endpoint-only captures fail the missing-probe gate.
+The completed `timing-weather-palette-test1` 46-second pair passes all 31 owned
+interpolations and one restoration on each CPU, with identical phase/source/target/colour
+histories. All 30 pending logical publications are consumed exactly. The pair matches
+2,304 common movement states and 512 control/input/fuel updates. Maximum world-end delay
+is 280/780 ms on 030/A500; endpoint debt is zero. Stored palette calls are verified;
+physical palette/buffer pairing and scanout remain open.
+
+1. Complete `timing-weather-effect-publication1`, now running the current direct-sound
+   mode-2 fixture for 20 seconds per CPU with draw-entry/body/return and palette-copy
+   probes. `check_weather_effect_publication.py` checks latest-state drawing and counts
+   omitted/repeated publications. `check_weather_palette.py --copies-only` checks native
+   restoration independently, without claiming fade validation. The normal build was
+   restored byte-identical before starting this frozen-artifact capture.
 2. Check active-effect presentation coalescing and displayed palette/buffer pairing.
    Ordinary flight allocates at most 32 movement steps (640 ms) before rendering;
    the shortest regular fade interval is 1,160 ms. A longer physical stall alone does
