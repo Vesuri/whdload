@@ -3355,3 +3355,49 @@ are saved separately. This is a change to endpoint verification, not to game cad
 field exclusions or gameplay tolerances. The stronger oracle also passes the ten-CPU
 10-second matrix (111 common control/fuel updates), 60-second pair (667), and 500 ms pair
 (145). The ten-minute, full-state, lifecycle and calibration gates remain unproven.
+
+
+## Controlled render-rate fixture (runtime validation pending)
+
+`TIMING_RENDER_HZ_TEST=10|15|25|50` is VERIFY-only and mutually exclusive with the
+single-stall fixture. After at least 200 world updates, it paces allocator entry using
+physical PAL fields. The first release is immediate; later deadlines advance from the
+previous actual release by rational 50/Hz periods. At 15 Hz the period repeats 4,3,3 fields;
+10/25/50 Hz use 5/2/1 fields. If rendering arrives late, the fixture records lateness and
+releases immediately, then bases the next presentation deadline on that actual release.
+Only presentation deadlines are rebased. Simulation clocks, input queues and elapsed debt
+are untouched; the ordinary allocator still services all elapsed simulation work.
+
+This is a requested pacing rate, not a guarantee that the CPU can render at that rate.
+Late deadlines and actual completed-frame measurements must be reported. The experiment
+must not label a run as 25 or 50 presentations/s solely because that build option was set.
+It is scoped to the existing unpaused, single-epoch matched flight route. It does not
+establish pause, pit or restart behavior for the fixture itself.
+
+`PDRATE01` stores initialization/rate, pacing origin, release count, last arrival/deadline/
+release, rational remainder, total waiting fields, late count, maximum/cumulative lateness
+and a pending-deadline flag. The caller already saves CCR and all registers the fixture
+uses. `tools/check_timing_render_rate.py` follows direct code references to the live record
+and checks the aggregate identity
+`last_release - origin = ceil((release_count - 1)*50/Hz) + cumulative_lateness`, the rational
+phase, endpoint state and independent world/physical-time accounting. It reports allocator
+release rate separately from actual completed presentations in `frames.txt`. Aggregate
+counters alone do not prove every individual presentation interval or gameplay equality.
+
+All four variants assemble and their direct record references/initial states decode.
+Non-VERIFY, unsupported-rate and combined stall/rate configurations are rejected. The
+explicit zero fixture is byte-identical to the existing full prototype, and the restored
+normal build is unchanged. Runtime validation is pending; no rate-independence result is
+claimed from these build checks.
+
+Next steps:
+
+1. Capture the 10 Hz requested route on 030/fast; check actual completed presentations,
+   aggregate pacing accounting, retained debt and the existing arithmetic/input gates.
+2. Compare every common logical world/control/fuel state with the unstalled reference.
+3. Repeat 15/25/50 Hz requests. Report missed deadlines and actual rates; explicitly mark
+   infeasible targets instead of treating requested rates as measured coverage.
+4. Repeat on A500/native and native-rendered accelerators where feasible. Keep the same
+   logical input tape and cadence, and retain fast-renderer drawing twins.
+5. Collect per-presentation interval evidence before claiming exact achieved cadence;
+   extend to variable intervals and other response/effect routes after the bounded checks.

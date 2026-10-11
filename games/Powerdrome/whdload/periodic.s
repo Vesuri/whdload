@@ -172,6 +172,29 @@ TIMING_STALL_TEST = 0
  ENDC
  ENDC
  ENDC
+ IFND TIMING_RENDER_HZ_TEST
+TIMING_RENDER_HZ_TEST = 0
+ ENDC
+ IFNE TIMING_RENDER_HZ_TEST
+ IFND VERIFY
+ FAIL "TIMING_RENDER_HZ_TEST requires VERIFY"
+ ENDC
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_RENDER_HZ_TEST requires TIMING_WORLD20"
+ ENDC
+ IFNE TIMING_STALL_TEST
+ FAIL "Run render pacing and single-stall fixtures separately"
+ ENDC
+ IFNE TIMING_RENDER_HZ_TEST-10
+ IFNE TIMING_RENDER_HZ_TEST-15
+ IFNE TIMING_RENDER_HZ_TEST-25
+ IFNE TIMING_RENDER_HZ_TEST-50
+ FAIL "TIMING_RENDER_HZ_TEST must be 0, 10, 15, 25 or 50"
+ ENDC
+ ENDC
+ ENDC
+ ENDC
+ ENDC
  IFND TIMING_PIT_SYNC_TEST
 TIMING_PIT_SYNC_TEST = 0
  ENDC
@@ -669,6 +692,9 @@ timing_frame
  movem.l d0-d2/a0-a1,-(sp)
  IFNE TIMING_STALL_TEST
  bsr timing_stall_test
+ ENDC
+ IFNE TIMING_RENDER_HZ_TEST
+ bsr timing_render_rate_test
  ENDC
  bsr timing_clock
  lea timing_state(pc),a1
@@ -1202,3 +1228,4 @@ timing_control_phase dc.w 1
  ENDC
 
  INCLUDE timing_stall_test.s
+ INCLUDE timing_render_rate_test.s

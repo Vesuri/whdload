@@ -474,3 +474,11 @@ controlled rendering rates, repeated stalls, full opponent/effect state, further
 configurations, calibration, lifecycle and release gates remain open. See the current
 measurement tables and checker contracts in timing-implementation. Bounded passes do
 not establish whole-game framerate independence.
+
+
+A controlled render-rate fixture is prepared for requested 10/15/25/50 Hz, with rational
+PAL pacing, explicit late-deadline accounting and no changes to simulation clocks/debt.
+The build guards, direct record decoding and disabled/normal byte comparisons pass.
+Runtime validation, achieved presentation-rate measurements and cross-rate state comparison
+remain pending. The next steps are listed in timing-implementation; this preparation does
+not close the controlled-render-rate gate.
