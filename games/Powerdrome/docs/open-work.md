@@ -553,8 +553,14 @@ Disabled/normal bytes and hook boundaries pass. Its dry-weather A500/030 pair ma
 references, with 158 completed renderer twins. Active-effect replay/cleanup, cadence
 acceptance and mode/lifecycle validation remain open; this is not completed weather timing.
 
-The active effect run `timing-weather-effects1-active030` is waiting for its first natural
-effect draw before a requested 60-second 030/25 capture. Live effect-record probes and a
-seed replay/restoration checker are prepared; synthetic positive and corrupted-boundary
-cases pass/reject as expected. Active runtime validation is pending. This checker covers
-draw ownership only, not logical generation, cleanup, pixels or whole weather timing.
+The preliminary natural active-effect run was intentionally stopped before its draw
+anchor to prioritize a repeatable fixture; its log supplies no active-weather validation.
+`TIMING_WEATHER_EFFECT_TEST=1` is now a VERIFY-only, once-per-process effect fixture,
+without simulation/input clock or seed rewrites. Its 20-second A500/030 pair passes:
+1,004 common world states and 223 control/input/fuel updates match. Both have five logical
+visual events and 176 unsuccessful generation attempts. Drawing executes six times on
+030 versus three on A500, with seed replay/restoration and unchanged lifetime/publication
+verified in every observed draw. The 030 adds 256 completed renderer twins and ends with
+no active draw. No successful new selection or actual rectangle cleanup occurs, so those
+branches remain unvalidated. Natural integrated weather, forecast/fade scheduling and
+mode/lifecycle work remain open. The fixture-disabled and normal builds remain unchanged.

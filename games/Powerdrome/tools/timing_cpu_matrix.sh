@@ -18,7 +18,7 @@ FIELDS=${FIELDS:-500}
 [[ "$FIELDS" =~ ^[1-9][0-9]*$ ]] && [ "$FIELDS" -le 30000 ]
 export FIELDS SWAP_ONLY=1 TIMING_STATE=1 TIMING_EARLY=1 ANCHOR=0xbc7c
 export SERVE_WAIT=${SERVE_WAIT:-600}
-export COVERAGE_PROBES='0xccee 0xcd2c 0xcd3a 0xcde2 0xcedc 0xd56c 0xd058 0xd9a0'
+export COVERAGE_PROBES="0xccee 0xcd2c 0xcd3a 0xcde2 0xcedc 0xd56c 0xd058 0xd9a0 ${TIMING_EXTRA_PROBES:-}"
 REQUIRE_PIT_SYNC=${REQUIRE_PIT_SYNC:-1}
 [[ "$REQUIRE_PIT_SYNC" = 0 || "$REQUIRE_PIT_SYNC" = 1 ]]
 runs=()

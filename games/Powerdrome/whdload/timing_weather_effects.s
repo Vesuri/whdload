@@ -60,6 +60,9 @@ timing_weather_tick
 .enabled
  bsr timing_world20_test_control
  beq.w .done
+ IFNE TIMING_WEATHER_EFFECT_TEST
+ bsr timing_weather_effect_test
+ ENDC
  lea timing_weather_state(pc),a0
  addq.l #1,20(a0)
  move.l timing_world20_clock(pc),40(a0)
@@ -202,3 +205,32 @@ timing_weather_state dc.b 'PDWEFX01'
  dc.l 0 ; +36 actual effect draws
  dc.l 0 ; +40 most recent logical update timestamp
  dc.l 0 ; +44 actual rectangle cleanups
+
+ IFNE TIMING_WEATHER_EFFECT_TEST
+; Directed effect-only fixture. No clock/input/seed rewrite and no cache changes.
+; Suppress native forecasts so this isolates generation, drawing and RNG ownership,
+; not forecast/fade/steering calibration. Trigger once per process on a control tick.
+timing_weather_effect_test
+ lea timing_weather_effect_test_state(pc),a0
+ tst.l 8(a0)
+ bne.s .done
+ move.l timing_world20_state+16(pc),d0
+ cmp.l #200,d0
+ blo.s .done
+ move.l #1,8(a0)
+ move.l d0,12(a0)
+ move.l timing_world20_clock(pc),16(a0)
+ move.w #1,$4c0(a6)
+ move.l #-1,$4b8(a6)
+ move.l #-1,$4bc(a6)
+ clr.w $4c6(a6)
+ move.w #$ffff,$4cc(a6)
+ move.w #5,$4ce(a6)
+ move.w #4,$4d2(a6)
+.done
+ rts
+timing_weather_effect_test_state dc.b 'PDWEFT01'
+ dc.l 0 ; activation count
+ dc.l 0 ; world-step count at activation
+ dc.l 0 ; logical timestamp at activation
+ ENDC

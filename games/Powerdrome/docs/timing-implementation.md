@@ -3841,8 +3841,48 @@ arithmetic, pixels, cleanup or full weather timing. Explicit synthetic complete/
 cases pass; wrong installation, native advance, restoration and lifetime mutation are
 rejected. Runtime evidence remains required.
 
-`timing-weather-effects1-active030` is running on 030/25 with fast rendering/twins,
-input route 6 and the frozen effect prototype. It waits naturally for `$112f0`, then
-requests 3,000 PAL fields (60 seconds) with logical world/control and effect draw/outer
-boundary probes. It has not yet reached the measured anchor, so active replay and cleanup
-are not claimed validated. The normal build remains restored and unchanged.
+The preliminary `timing-weather-effects1-active030` run on 030/25, route 6, was
+intentionally stopped before reaching its first natural `$112f0` effect draw. Its log
+is retained; it supplies no active-weather result. This was a deliberate switch to the
+repeatable fixture below, not an inferred emulator failure or passing natural episode.
+Natural integrated weather validation remains open after forecast/fade scheduling.
+The normal build remains restored and unchanged.
+
+### Repeatable effect-only fixture and first runtime result
+
+`TIMING_WEATHER_EFFECT_TEST=1` requires VERIFY, COVERAGE_INPUT and
+`TIMING_WEATHER_EFFECTS=1`. Once per process, on the first eligible logical control update
+at or after 200 world steps, it enables effects with lifetime five and generation delay
+four. It sets the forecast flag, clears transition and makes the two weather deadlines
+inactive, isolating effect generation/drawing from forecast, fades and wind handling.
+It does not rewrite simulation/input clocks or the random seed. `PDWEFT01` records the
+activation count, world-step count and logical timestamp. This is directed branch coverage,
+not a natural episode or A500 weather calibration.
+
+The fixture builds; explicit zero reproduces the frozen effect prototype byte for byte,
+a non-VERIFY request is rejected, and the restored normal slave still matches its saved
+reference. `TIMING_EXTRA_PROBES` appends optional probes to the CPU matrix's mandatory
+world/control probes, retaining all ordinary checks. No capture schema was changed while
+a capture was running.
+
+The 1,000-field (20-second) `timing-weather-effect-test1` A500/native and 030/fast pair
+passes all existing per-run and cross-CPU checks. **1,004 common sampled player/engine/RNG
+states and 223 control/input/fuel updates match exactly**. Both activate the fixture
+exactly once at world-step count 204, logical timestamp 812 native units after the input
+fixture epoch. Both execute 223 logical effect updates, including **five visual RNG events
+and 176 unsuccessful generation attempts**. No new random effect is selected in this run.
+
+The draw-ownership checker verifies **six complete owned draws on 030 and three on A500**.
+The 030 repeats one logical visual state. Every observed draw installs its published seed,
+performs the native four advances, preserves persistent lifetime/publication and restores
+the outer seed. Thus the differing number of actual draws leaves matching sampled simulation
+RNG/state and five logical visual events on both machines. Neither endpoint retains draw
+ownership, pending cleanup, simulation debt or unfinished assigned work. The 030 adds
+**256 clean completed renderer twins**, with unchanged raster code and no draw active at
+the final snapshot. Effect draws themselves take the native fallback and are not those twins.
+
+There are zero actual rectangle cleanups and zero successful new effect selections, so
+this result does not validate those branches. Next use a separately identified directed
+selection case, inspect logical generation and cleanup, then complete forecast/expiry,
+fade/gear, native natural-weather and mode/lifecycle validation. Keep this first fixture's
+seed-preserving evidence distinct from any future explicitly seeded branch test.
