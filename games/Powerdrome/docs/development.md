@@ -59,6 +59,21 @@ Windowed, real speed, sound enabled. `CPU`, `CHIP_KB`, `FAST_KB`, `AMIGA_MODEL`,
 are silent with the window behind the others; `SOUND=0|1` and `WINDOW=front|back|none` (none:
 no video) choose explicitly.
 
+### Verification-only guest chip-memory override
+
+`make -C whdload verify VASMFLAGS='-DVERIFY_CHIPMEMSIZE=1048576'` exposes 1 MiB
+of guest chip memory to exercise native resources unavailable in the normal 512-KiB
+configuration. Use a host with at least `CHIP_KB=1024`; the existing A500 timing-matrix
+case supplies only 512 KiB and cannot run this artifact. Freeze the verification slave
+under `tmp/` before restoring `make -C whdload all`.
+
+The override requires `VERIFY` and accepts only 524288 or 1048576 bytes. Both invalid-build
+guards have been checked; explicit 524288 produces the same verification binary as the
+default. The normal production build remains byte-identical. Larger-memory runtime
+validation is pending: allocation flags and loaded sample descriptors must be observed,
+not forced. This configuration is for testing the weather audio path and is not a
+production loader memory change or evidence of sound playback.
+
 ## Inspection
 
 ```sh
