@@ -3682,28 +3682,44 @@ steering offsets remain nonzero, reflecting native retained state rather than an
 all-zero cleanup. Target gear at expiry is 1, establishing a gameplay-visible difference
 across the transition, but helper-level ownership needs its separate probes.
 
-`timing-weather-native-a500-effects1` is the next native pass on the same route/artifact:
-14 probes cover generation delay/RNG, lifetime, palette presentation/cleanup and both gear
-helpers. It requests the same 400-second window from forecast entry. Compare shared
-lifetime observations and initial state to establish whether the natural episode repeats
-before combining evidence; do not assume matching histories solely from equal settings.
-The live complementary pass now matches all 20 initial weather fields and its first
-**854 shared effect-entry/decrement observations**, including physical fields, clocks,
-state and captured registers, exactly against the completed transition pass. At that
-checkpoint the analyzer verifies the positive-transition target-gear table lookup,
-seven successful generation/lifetime assignments, seven delay selections/commits and
-twelve lifetime decrements/palette activations. Full-window equivalence and negative
-completion remain pending.
+The complementary `timing-weather-native-a500-effects1` pass completes the same 400-second
+window with 17,613 observations. **All 4,836 shared effect-entry/decrement observations**
+match the first capture exactly, including physical fields, clocks, state and captured
+registers. All 20 initial and final weather fields match as well. This establishes the
+same observed native episode across the two probe sets, rather than assuming it from
+configuration alone.
+
+The analyzer verifies **36 successful generation/lifetime assignments**, **36 random
+delay selections and commits**, **90 lifetime decrements**, **90 palette activations**
+and both track-specific target-gear helper commits. Generation executes on 2,992
+consecutive eligible native loop values, 2,721–5,712, from fields 2,288–14,743. Its 2,991
+first-to-last intervals average **83.283 ms**. There are 2,828 RNG-selection attempts and
+200 delay decrements; 36 iterations do both when delay expires. This supplies the native
+reference for generation scheduling, separately from the longer fade-step measurements.
 
 Generation at `$bcea→$bd02` advances the native seed once, accepts the shifted result
 only when it is at most six, then masks it with five for the lifetime. `$bd02→$bd16`
 advances the seed a second time and selects delay `(seed >> 14) + 4`; `$bd1a` observes
-the committed delay. The analyzer checks both RNG advances and stored values. Target-gear
-helpers `$8a4c/$8a8e` load the track-indexed native tables at hunk `$2068/$204c`; their
-return probes are checked against the captured table words, not hardcoded gear values.
-Palette activation is separately checked at `$112f4→$112fa`. The completed transition
-report remains byte-identical after these analyzer extensions; runtime checks are being
-applied to the complementary pass as its observations arrive.
+the committed delay. Both RNG advances and stored values pass. Target-gear helpers
+`$8a4c/$8a8e` load the track-indexed native tables at hunk `$2068/$204c`; their return
+probes match the captured table words, not hardcoded gear expectations. Palette activation
+is separately checked at `$112f4→$112fa`.
+
+**Drawing itself also consumes simulation-visible randomness in the native game.**
+The effect helper `$16de6` calls `$53f6` once, then its `$16e0a` helper three times; each
+of the 90 observed draws advances the shared RNG exactly four times between `$112f0`
+and `$112f4`. For example, seed 20,001 becomes 58,289. The analyzer now verifies these
+four advances for every observed draw. Moving only lifetime decrement or generation
+would therefore leave a rendering-dependent RNG path.
+
+For the correction, account for those four visual RNG advances when a logical effect
+update is due, and save the pre-draw seed/state for presentation. Repeated rendering of
+that state must not consume additional simulation randomness. Keep palette activation
+and cleanup associated with actual drawing separately: the native trace has palette
+state set through `$11300` and cleared before the next outer generation observation.
+Do not infer that the helper call itself immediately clears it. Implementation still
+needs an explicit presentation wrapper and mode/reset handling; these measurements do
+not establish corrected weather timing.
 
 `tools/report_weather.py CAPTURE` checks observed before/after arithmetic for forecast
 and active deadlines (including native duration RNG arithmetic), fade increments/decrements

@@ -535,10 +535,12 @@ fade-out 17.26 seconds; their mean 16-loop intervals are 1,401.4/1,148.6 ms. A u
 period/phase policy remains to be chosen. Forecast activation is 120 ms late and expiry
 370 ms late against their native deadlines. Final native state retains forecast flag 1
 and nonzero steering offsets despite inactive deadlines/effects.
-`timing-weather-native-a500-effects1` is running the complementary generation/palette/gear
-probe set. Its first 854 shared effect observations and initial weather state match the
-completed pass exactly. The observed positive target-gear lookup, seven successful
-generation/delay updates and twelve palette activations pass the native arithmetic/table
-checks. Full-window equality and negative completion remain pending.
-Both weather RNG helpers share the seed restored around logical world updates, so
-scheduling must preserve that ownership consistently. No weather correction is claimed yet.
+The complementary `timing-weather-native-a500-effects1` pass is complete. All 4,836
+shared effect observations and all initial/final weather fields match the first pass.
+Its 36 generation/delay updates, 90 palette activations and both track-specific gear
+changes pass. Generation runs over 2,992 consecutive eligible loops, with an 83.283 ms
+mean interval. Each of 90 effect draws also advances the shared RNG exactly four times.
+Those advances must be accounted for in logical simulation, with a saved visual seed
+for presentation, otherwise rendering remains coupled to weather randomness. Palette
+cleanup remains per actual draw. Weather scheduling, presentation wrappers and mode/reset
+handling are the next implementation work; no corrected weather result is claimed yet.

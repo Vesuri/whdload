@@ -12,6 +12,12 @@ import re
 import struct
 from weather_state import FIELDS, PROBES, parse_values
 
+def advance_seed(seed, count):
+    for _ in range(count):
+        seed=(seed*31415+1)&0xffff
+    return seed
+
+
 # Before/after instruction boundaries, expected mutated field(s).
 PAIRS = {
     0xe23c: (0xe1f8, 'rng', lambda b: (b['rng']*31415+1)&0xffff),
@@ -21,6 +27,7 @@ PAIRS = {
     0xbd36: (0xbd32, 'transition', lambda b: (b['transition']-1)&0xffff),
     0xbd4c: (0xbd48, 'transition', lambda b: (b['transition']+1)&0xffff),
     0x112f0: (0x112e6, 'effect_lifetime', lambda b: (b['effect_lifetime']-1)&0xffff),
+    0x112f4: (0x112f0, 'rng', lambda b: advance_seed(b['rng'],4)),
     0x112fa: (0x112f4, 'palette_active', lambda b: 0xffff),
     0xbd02: (0xbcea, 'rng', lambda b: (b['rng']*31415+1)&0xffff),
     0xbd16: (0xbd02, 'effect_lifetime', lambda b: b['d0']&0xffff),
