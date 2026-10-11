@@ -1452,7 +1452,7 @@ capped backlog. That pause window has no lap-clock reads and is not lap-domain e
 For current WORLD20 captures, add `--stable-lap-domain`: lap readers use the retained lap
 epoch while repair readers retain their sampled physical mapping. This mode requires
 unchanged epoch/reset diagnostics between terminal snapshots; a countdown reset requires
-a separate reset-boundary audit. The A500 rescue counterpart is still pending. These
+a separate reset-boundary audit. The A500 rescue counterpart below passes this stable-domain mode. These
 checks do not establish full opponent-array
 equivalence or native A500 calibration. `check_timing_pit.py` and
 `check_timing_pit_lifecycle.py` independently verify the suspended player's boundary:
@@ -1986,7 +1986,7 @@ with no reset fallback or input overflow.
 python3 tools/check_player_lap_pause.py tmp/prof/timing-playerpause2-a500
 ```
 
-The 030 rescue/natural-lap check below passes. A500 rescue, external-reset fallback,
+The 030 and A500 rescue/natural-lap checks below pass. External-reset fallback,
 other natural laps and natural player results remain open.
 
 ### Player lap clock through rescue and a natural completed lap
@@ -2018,8 +2018,27 @@ The checker distinguishes a legitimate observed lap boundary from an unexpected 
 reset: it verifies logical subtraction and native timestamp storage at `$10c00`, followed
 by native duration/total/best/index accounting at `$f118`. It requires terminal snapshots
 and an unchanged opponent epoch; captures with a countdown reset need separate reset
-observations. A500 rescue, additional natural laps and modes, external-reset fallback and
-natural player victory remain unverified.
+observations. The A500 counterpart `timing-playerlap-rescue-a500`, using the same frozen
+slave without fast RAM or twin rendering, captures 8,000 fields. Rescue returns at field
+6,132 after **103,540 ms** in the pit. Both lap origins survive 1,364 inactive pit
+observations; **556** logical HUD readings pass, including **404 after return**. A natural
+lap at field 6,407 records **128,300 ms**, with matching total, best time and lap index.
+All 52 sampled opponent lap reads use the stable domain, with no external-reset fallback.
+
+The full opponent continuity check also passes on A500: 1,651 updates are complete at pit
+return with 30 ms residual. The first resumed allocation accounts for 120 ms after that
+cutoff plus the residual as 90 ms served and 60 ms retained. There are 7,116 movement
+samples (1,656 after return), 682 pit counter/RNG restores and 2,819 world restores
+(1,860 after return). Different pit and lap durations across CPUs mean these are bounded
+accounting/lifecycle checks, not matched-event-history or real-time throughput evidence.
+
+```sh
+python3 tools/check_player_lap_rescue.py tmp/prof/timing-playerlap-rescue-a500
+python3 tools/check_timing_opponent_continuity.py --stable-lap-domain tmp/prof/timing-playerlap-rescue-a500
+```
+
+Additional natural laps and modes, external-reset fallback and natural player victory
+remain unverified.
 
 The read-only capture locator now uses the installed frame JMP to find live session
 metadata in early captures: added helpers had put PDSESS01 exactly 4,096 bytes before

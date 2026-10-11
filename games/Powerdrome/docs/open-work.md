@@ -323,9 +323,13 @@ The A500 counterpart also passes: 47 excluded fields, 53 exact logical HUD outpu
 preserves initialized lap starts across 67,520 ms in the pit, passes 437 logical HUD outputs
 (179 resumed) and 32 stable-domain opponent lap reads, and adds 394 clean renderer twins.
 It also verifies one **natural completed player lap of 92,220 ms**, including native total,
-best time and lap index, with all three synthetic finish predicates disabled. A500 rescue,
-additional natural laps/modes, natural player victory, external-reset fallback and lap/HUD
-guest flags/registers remain to verify. Next audit the projection flag and matched native animation visibility,
+best time and lap index, with all three synthetic finish predicates disabled. The A500
+counterpart passes a 103,540-ms pit interval, 556 HUD readings (404 resumed), 52 stable
+opponent lap reads and one natural 128,300-ms lap with matching records. Its full opponent
+continuity check passes 7,116 movement samples and 2,819 world restores. The different
+CPU histories are not trajectory equivalence or throughput evidence. Additional natural
+laps/modes, natural player victory, external-reset fallback and lap/HUD guest flags/registers
+remain to verify. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.
