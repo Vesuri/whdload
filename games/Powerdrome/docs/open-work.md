@@ -1,5 +1,7 @@
 # Open work
 
+The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
+
 ## Handoff status — paused at user request
 
 All captures have finished; no Powerdrome validation job is left running. The latest

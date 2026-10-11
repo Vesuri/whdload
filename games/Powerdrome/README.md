@@ -1,7 +1,8 @@
 # Powerdrome
 
 Project status: timing work is paused at the user’s request and remains incomplete.
-See the [current handoff](docs/open-work.md) for completed checks, open gates and resume priorities.
+See the [current handoff](docs/open-work.md) for completed checks, open gates and resume priorities,
+and the [completion plan](docs/completion-plan.md) for the steps that finish and ship the work.
 
 Local reverse-engineering and performance work on the Amiga PAL release.
 Start with [open work](docs/open-work.md), then [development](docs/development.md) and
