@@ -280,6 +280,15 @@ if os.environ.get('TIMING_STATE') == '1':
             rv=[f'*(unsigned {kind}*){rp+x:#x}' for x,kind in
                 ((8,'short'),(10,'short'),(12,'int'),(16,'short'),(20,'int'),(24,'int'),(18,'short'),(28,'short'),(32,'int'),(36,'int'),(40,'int'))]
             retune_sample='printf "PDRETUNE_EVENT %d {off} ' + ' '.join(['%u']*len(rv)) + '\\n", $pd_field, ' + ', '.join(rv) + '\n'
+    repair_key_sample = ''
+    repair_keys = timing_locations(b'PDRKEY01', lambda off: True)
+    if repair_keys:
+        assert len(repair_keys) == 1
+        rk = a.base + repair_keys[0]
+        kv = [f'*(unsigned short*){rk+x:#x}' for x in (8,10,12,14,16)]
+        kv += [f'*(unsigned short*){r["game"][0]+x:#x}' for x in (0x461a,0x461c,0x4608)]
+        kv += [f'*(unsigned char*){state+0x10e:#x}', '(unsigned int)$d0', '(unsigned int)$sp']
+        repair_key_sample = 'printf "PDRKEY_EVENT %d {off} ' + ' '.join(['%u']*len(kv)) + '\\n", $pd_field, ' + ', '.join(kv) + '\n'
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
@@ -289,6 +298,7 @@ if os.environ.get('TIMING_STATE') == '1':
         sample += initial_pit_sample.replace('{off}',hex(off))
         sample += retune_sample.replace('{off}',hex(off))
         sample += pit_opponent_sample.replace('{off}',hex(off))
+        sample += repair_key_sample.replace('{off}',hex(off))
         if os.environ.get('OPPONENT_STATE') == '1' and off in (0xe976,0xca3e,0xcedc,0xe3c4,0xbc44,0xd7f0,0x14090,0xe8d4):
             # Four native records, all 190 bytes each. Guard the native count
             # and relocated bank before reading; never write game state.

@@ -1682,7 +1682,7 @@ requires exercised drawn and idle-blitter dropped paths, validates each planar d
 compares all three bitmaps on idle-entry drops, and checks part-bank updates and the native
 outer service counter. `--complete-route` additionally requires all 264 pairs. Busy-entry
 drops are reported and excluded from pixel claims. These instrumented runs are not FPS
-measurements. Skipped drawing-register/HUD scratch state, queued-input consumption,
+measurements. Skipped drawing-register/HUD scratch state, broader input coverage,
 full opponent-record equivalence, native exits and broader branches remain open.
 
 `timing-repairdrop3-service2-a500` covers all **264 repair steps**, including all **30
@@ -1709,6 +1709,37 @@ attempt stopped before its first field after the debugger rejected its larger br
 setup and supplies no runtime evidence. Existing 030 pause and A500 rescue ledger checks
 still pass with the added repair-only verifier mode.
 
+A separate input-only fixture, `TIMING_REPAIR_INPUT_TEST=1`, is compiled only with
+VERIFY, COVERAGE_INPUT and TIMING_REPAIR_DROP. It publishes one ordinary `x` into the
+native keyboard ring on the first eligible dropped step, after the coverage tape finishes
+and while the native queue is empty. It changes no physics, clock, mode or repair geometry
+fields. Pit entry has already disabled the private world-key queue; this fixture targets
+the native pit consumer. It is a directed main-context input publication, not a test of
+hardware interrupt concurrency. The test remains absent when its build flag is zero.
+
+The complete A500 `timing-repairinput1-a500` route passes all 264 service/poll pairs:
+**236 drawn / 28 dropped**, with 263 empty polls and **one nonempty poll**. At field 150,
+a dropped step publishes `x` (120), advancing the native writer from slot 1 to 2 while
+the reader remains at 1. Native `$581e` reports availability; `$5838` returns exactly 120
+and advances the reader to slot 2. `$e422` / `$e426` pass it to `state+$10e`. The original
+key-reader call restores its caller's stack depth, and the repair post restores its
+24-byte MOVEM frame with suppression cleared and the native queue empty. There is exactly
+one observed consumption across the complete route. This does not prove special-command
+handlers, nonlocal exits, wrapping/capacity or competing producers. The test changes the
+run's drop count, so it supplies service/input evidence rather than a new timing or FPS
+claim. With the fixture disabled, both the full repairdrop3 slave and the normal slave
+remain byte-identical to their frozen references; requesting it outside the required
+development configuration is rejected.
+
+Build the repairdrop3 coverage configuration with the additional
+`-DTIMING_REPAIR_INPUT_TEST=1` and freeze it as a separate test slave. Reuse the A500
+2,000-field repair service configuration with probes
+`0x148d8 0x14962 0x14a20 0x14aa6 0xe3bc 0xe3c4 0xe3d0 0xe3d6 0xe3e6 0xe3ec 0xe422 0xe426`.
+PDRKEY_EVENT records the publication metadata, current native queue indices/capacity,
+command latch, D0 and SP. The checker requires the publication to begin on a dropped
+step, follows its ordered native call/return/latch boundaries, and rejects repeated or
+missing consumption. It also runs the full repair-service checker.
+
 The drop-disabled build was
 byte-identical before the additional stage-bridge correction; the normal build remains
 byte-identical afterward. A build requesting DROP without REPAIR is rejected.
@@ -1718,6 +1749,7 @@ python3 tools/check_repair_drop.py tmp/prof/timing-repairdrop3-a500
 python3 tools/check_repair_drop.py --allow-no-drops tmp/prof/timing-repairdrop3-030-twins
 python3 tools/check_repair_buffers.py --complete-route tmp/prof/timing-repairdrop3-buffers-full-a500
 python3 tools/check_repair_service.py tmp/prof/timing-repairdrop3-service2-a500
+python3 tools/check_repair_input.py tmp/prof/timing-repairinput1-a500
 python3 tools/check_timing_opponent_continuity.py --repair-only --stable-lap-domain tmp/prof/timing-repairdrop3-service2-a500
 python3 tools/check_repair_pacing.py --native-steps --continuous-stages tmp/prof/timing-repairloop3-native-a500 tmp/prof/timing-repairdrop3-a500
 ```

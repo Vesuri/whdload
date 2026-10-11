@@ -379,8 +379,12 @@ passes all geometry and timing gates, with no incomplete or busy-entry exclusion
 The dedicated service capture also passes: all 264 steps call opponent service and poll
 keyboard availability once, including all 30 dropped pictures. The ledger verifies 1,772
 movement samples, 298 restored pit calls and twelve stable-domain lap-clock reads, with
-exact bounded service and retained debt. All keyboard polls are empty: queued-input
-consumption and input-triggered exits remain to test. Independent native pixel equivalence,
+exact bounded service and retained debt. Those keyboard polls are empty. A separate
+input-only fixture now verifies one `x` published on a dropped step: native availability,
+exactly-once consumption, writer/reader indices, command handoff and key-reader/repair
+stack restoration pass. Its complete route has 236 drawn / 28 dropped steps and 263 empty /
+one nonempty poll; it is input evidence, not a new timing claim. Special commands,
+queue wrap/capacity, concurrent producers and exits remain to test. Independent native pixel equivalence,
 skipped drawing-register/HUD scratch state, full opponent-record equivalence, native exits
 and broader modes still remain open; both
 experimental repair switches stay disabled by default. Message lifetime itself still needs elapsed-time calibration, and ordinary world

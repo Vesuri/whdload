@@ -30,6 +30,9 @@ timing_repair_choose_draw
  blt.s .draw
  move.w #1,8(a0)
  addq.l #1,12(a0)
+ IFNE TIMING_REPAIR_INPUT_TEST
+ bsr timing_repair_input_test
+ ENDC
  rts
 .draw
  addq.l #1,24(a0)
@@ -113,3 +116,44 @@ timing_repair_drop_state dc.b 'PDRDROP1'
  dc.l 0 ; native service-only continuations
  dc.l 0 ; steps selected for drawing
  dc.l 0 ; last signed lateness at step entry
+
+ IFNE TIMING_REPAIR_INPUT_TEST
+; Input-only directed fixture: publish one ordinary key into the native ring
+; on the first dropped repair step. No physics, timing or mode fields are set.
+; Wait for the regular coverage tape to finish and an empty native queue.
+timing_repair_input_test
+ movem.l d0-d2/a0-a2,-(sp)
+ move.l custom5(pc),d0
+ cmp.l #13,d0
+ bne.s .done
+ move.w cov_done(pc),d0
+ beq.s .done
+ lea timing_repair_input_state(pc),a1
+ tst.w 8(a1)
+ bne.s .done
+ move.l perf_game(pc),a0
+ move.w $461a(a0),d0
+ cmp.w $461c(a0),d0
+ bne.s .done
+ move.w d0,12(a1)
+ move.w d0,14(a1)
+ lea $460a(a0),a2
+ move.b #'x',(a2,d0.w)
+ addq.w #1,d0
+ cmp.w $4608(a0),d0
+ blo.s .head
+ moveq #0,d0
+.head
+ move.w d0,$461a(a0)
+ move.w d0,16(a1)
+ move.w #'x',10(a1)
+ move.w #1,8(a1)
+.done
+ movem.l (sp)+,d0-d2/a0-a2
+ rts
+
+timing_repair_input_state dc.b 'PDRKEY01'
+ dc.w 0,0 ; publications, key
+ dc.w 0,0,0 ; old reader, old writer, new writer
+ even
+ ENDC
