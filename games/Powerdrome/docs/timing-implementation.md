@@ -3526,10 +3526,34 @@ ownership/due flags, extra started-step/control counts, removed boundary probe a
 duplicate control rows) are rejected without modifying any frozen capture. Gameplay code,
 cadences and equality tolerances are unchanged.
 
+The matched lower-rate native-renderer pair `timing-rate10-native1` also passes. Both
+machines measure **9.707 driving markers/s** over 86 intervals / 8,860 ms, compared with
+18.568/s (030) and 16.629/s (060) in their native-rendered 50 Hz request runs. Across
+these four captures, **649 common world states and 144 common control/input/fuel updates
+match exactly**, with all per-run arithmetic, clock, input and pacing checks passing.
+
+| Native-rendered 10 Hz request | 030/25 | 060/50 |
+| --- | ---: | ---: |
+| Allocator releases / rate | 88 / 9.688 per second | 87 / 9.663 per second |
+| Late deadlines / maximum lateness | 5 / 120 ms | 4 / 120 ms |
+| Total lateness / pacing wait | 280 / 4,880 ms | 300 / 4,320 ms |
+| Completed world steps / controls | 652 / 144 | 649 / 144 |
+| Initial → final unsampled time | 60 → 20 ms | 60 → 80 ms |
+| Maximum sampled world-end delay / retained debt | 240 / 0 ms | 200 / 0 ms |
+
+Both finish with no assigned/retained simulation debt or pending controls. The 060 ends
+inside a presentation wait, independently checked by its pending-deadline flag and
+rational phase; that wait has not yet become allocated simulation work. Its 649 completed
+steps plus the increase in unsampled time account for the full 13-second physical window.
+The 030 marker histogram is `{60:1, 80:2, 100:78, 140:3, 200:1, 220:1}` and the 060 is
+`{60:1, 80:6, 100:71, 120:4, 140:1, 160:1, 220:2}`. This establishes equal sampled
+simulation state over a measured high/low cadence change on each native-rendered CPU,
+not exact 10 Hz scanout, high-rate target achievement or coverage of other effect routes.
+
 Next steps:
 
-1. Repeat a lower requested cadence on the same native-rendered accelerator configurations
-   to establish a matched high/low measured-rate comparison without twin drawing.
+1. Completed the matched high/low measured-rate comparison on native-rendered 030/25
+   and 060/50. Extend beyond this same bounded timed-input route as gameplay work proceeds.
 2. Report higher requested rates as unattained where measured intervals cannot support
    them; do not equate a fixture setting with achieved coverage.
 3. Extend to variable presentation intervals and other response/effect routes. Preserve

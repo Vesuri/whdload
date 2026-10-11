@@ -503,8 +503,12 @@ control inside one unfinished movement. The comparison checker now requires expl
 clock/counter/ownership and post-control probe evidence for that case; seven contradictory
 or missing-evidence cases are rejected, with earlier long/stall checks still passing.
 The original failing runner log is retained. No gameplay code or tolerances changed.
-Matched native-renderer low/high cadence, higher achieved rates, variable intervals and
-other effect routes remain open; this bounded result does not close the rate gate.
+The matched native-renderer 10 Hz pair also passes: both CPUs measure 9.707 markers/s,
+versus 18.568/16.629 in the higher-rate runs. Across those four captures, 649 common world
+states and 144 controls/input/fuel updates match. Both lower-rate endpoints have no
+assigned/retained simulation debt; the 060 is inside a presentation wait with 80 ms still
+unsampled and fully accounted for. Higher achieved rates, variable intervals and other
+effect routes remain open; this bounded result does not close the rate gate.
 
 
 The remaining weather audit maps forecast/start/expiry, outer-loop effect generation,
