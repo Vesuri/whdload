@@ -3821,3 +3821,28 @@ with the same fixed-seed WORLD20/repair/pit-sync flags as the matched timing pro
 active lifetime/RNG publication and draw-seed restoration, verify cleanup and both render
 paths, then move forecast/expiry and fade/gear progression to logical scheduling. Do not
 report weather or the full F1–F8 feature complete from this bounded result.
+
+### Active effect replay observations
+
+`weather_effect_state.py` follows the installed `$112e6` JMP into the live slave and
+locates its nearby `PDWEFX01` record, avoiding stale loader copies. `swap_fields.py`
+now emits `PDWEFX_EVENT` for timing probes when that hook is installed, including private
+publication/counter fields and native RNG, lifetime, delay, enable, transition and palette
+state. Native builds without this hook acquire no extra effect-record samples.
+
+`check_weather_effect_draw.py CAPTURE` checks owned draws at `$112f0/$112f4/$112fa`:
+the published visual seed must be installed at entry, the native helper must advance it
+four times without changing lifetime or publication, and the wrapper must restore the
+saved outer seed and release ownership before native palette presentation. It counts
+repeated draws of the same logical visual state, explicitly handles a first-draw anchor
+snapshot and reports an observed partial final draw without counting it complete. Missing
+boundaries and inconsistent state fail; the checker does not establish logical generation
+arithmetic, pixels, cleanup or full weather timing. Explicit synthetic complete/anchor
+cases pass; wrong installation, native advance, restoration and lifetime mutation are
+rejected. Runtime evidence remains required.
+
+`timing-weather-effects1-active030` is running on 030/25 with fast rendering/twins,
+input route 6 and the frozen effect prototype. It waits naturally for `$112f0`, then
+requests 3,000 PAL fields (60 seconds) with logical world/control and effect draw/outer
+boundary probes. It has not yet reached the measured anchor, so active replay and cleanup
+are not claimed validated. The normal build remains restored and unchanged.

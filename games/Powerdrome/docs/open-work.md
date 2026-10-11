@@ -552,3 +552,9 @@ Disabled/normal bytes and hook boundaries pass. Its dry-weather A500/030 pair ma
 652 common world states and 144 control/input/fuel updates against both unchanged
 references, with 158 completed renderer twins. Active-effect replay/cleanup, cadence
 acceptance and mode/lifecycle validation remain open; this is not completed weather timing.
+
+The active effect run `timing-weather-effects1-active030` is waiting for its first natural
+effect draw before a requested 60-second 030/25 capture. Live effect-record probes and a
+seed replay/restoration checker are prepared; synthetic positive and corrupted-boundary
+cases pass/reject as expected. Active runtime validation is pending. This checker covers
+draw ownership only, not logical generation, cleanup, pixels or whole weather timing.
