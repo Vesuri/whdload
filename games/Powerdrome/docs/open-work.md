@@ -332,7 +332,11 @@ laps/modes, natural player victory and external-reset fallback remain to verify.
 Guest flag/register/stack checks now pass the initial lap boundary plus 75 HUD hooks
 on 030 and 37 on A500. A separate natural completed-lap window passes the 030 logical
 92,220-ms duration, native records and 82 HUD contracts, adding 73 clean renderer twins.
-The A500 completed-lap contract and broader mode/arithmetic cases remain open. Next audit the projection flag and matched native animation visibility,
+The A500 completed-lap contract also passes: 128,380 ms, matching native records and
+55 HUD hooks. Broader mode/arithmetic cases remain open. The next concrete timing
+correction is the native repair-animation loop, whose 33 position updates at `$148d0`
+and second 33-update stage at `$14970` remain tied to drawing; first measure its native
+A500 cadence before selecting elapsed-time deadlines. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

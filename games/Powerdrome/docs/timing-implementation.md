@@ -1934,8 +1934,12 @@ anchors at the next `$f952` (`PROBE_OFFSETS='0xf952 0x10c00'`). The 300-field 03
 **92,220 ms**; the following HUD sample confirms matching native lap duration, total,
 best time and lap index. `--natural-completed-lap` requires all these observations and
 native bytes at the three synthetic boundary/checkpoint/finish predicate sites. It
-correctly rejects the initial-boundary-only capture. A500 completed-lap contracts,
-external-reset fallback, other modes and unobserved arithmetic/flag cases remain open.
+correctly rejects the initial-boundary-only capture. The A500 counterpart
+`timing-playercontract1-natural-a500` passes one completed logical lap of **128,380 ms**,
+its committed native records and **55 HUD hooks**, including registers, stack and guest
+flags. This diagnostic run's observed duration differs from the earlier rescue capture;
+the checks prove internal accounting, not identical trajectories or instrument-free speed.
+External-reset fallback, other modes and unobserved arithmetic/flag cases remain open.
 
 ```sh
 python3 tools/check_player_lap_contract.py tmp/prof/timing-playercontract1-030-twins
@@ -1943,6 +1947,7 @@ python3 tools/perf_status.py tmp/prof/timing-playercontract1-030-twins
 python3 tools/check_player_lap_contract.py tmp/prof/timing-playercontract1-a500
 python3 tools/check_player_lap_contract.py --natural-completed-lap tmp/prof/timing-playercontract1-natural-030-twins
 python3 tools/perf_status.py tmp/prof/timing-playercontract1-natural-030-twins
+python3 tools/check_player_lap_contract.py --natural-completed-lap tmp/prof/timing-playercontract1-natural-a500
 ```
 
 ### Player-result timestamp and directed validation
