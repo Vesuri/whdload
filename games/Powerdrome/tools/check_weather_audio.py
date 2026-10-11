@@ -9,7 +9,8 @@ import argparse
 from pathlib import Path
 import re
 from weather_audio_state import snapshot, owned_return, parse_values, REGISTERS
-from weather_effect_state import snapshot as effect_snapshot
+from weather_effect_state import snapshot as effect_snapshot, parse_values as effect_values
+from weather_effect_clock import parse_values as clock_values, snapshot as clock_snapshot
 
 
 def check(root):
@@ -71,12 +72,48 @@ def check(root):
     first = effect_snapshot(root)
     last = effect_snapshot(root, True)
     assert last['cleanups'] - first['cleanups'] == completed, 'Unobserved weather wrapper calls'
+    text = (root / 'swaps-gdb.txt').read_text()
+    clocks = [(int(f), int(o, 16), clock_values(v)) for f, o, v in re.findall(
+        r'^PDWECLK_EVENT (-?\d+) (0x[0-9a-f]+) (.+)$', text, re.M)]
+    effects = [(int(f), int(o, 16), effect_values(v)) for f, o, v in re.findall(
+        r'^PDWEFX_EVENT (-?\d+) (0x[0-9a-f]+) (.+)$', text, re.M)]
+    assert clocks and len(clocks) == len(effects), 'Missing sound-request observations'
+    assert first['cleanup_pending'] == 0, 'Unobserved request before capture'
+    previous = None
+    pending = requests = 0
+    request_clocks = []
+    for (field, offset, clock), (efield, eoffset, effect) in zip(clocks, effects):
+        assert (field, offset) == (efield, eoffset)
+        if previous is None:
+            assert effect['cleanups'] == first['cleanups'] and effect['cleanup_pending'] == 0, 'Unobserved initial audio work'
+        else:
+            pc, pe = previous
+            generated = clock['generations'] - pc['generations']
+            assert generated in (0, 1), 'Missing generation boundary or lifecycle reset'
+            if generated and pe['delay'] == 1 and effect['attempts'] == pe['attempts'] + 1:
+                assert pending == 0, 'Weather sound requests coalesced before delivery'
+                pending += 1
+                requests += 1
+                request_clocks.append(clock['generation_clock'])
+            calls = effect['cleanups'] - pe['cleanups']
+            assert calls in (0, 1) and calls <= pending, 'Unaccounted sound helper call'
+            pending -= calls
+            assert effect['cleanup_pending'] == pending, 'Sound request ledger disagrees with queue'
+        previous = clock, effect
+    assert pending == last['cleanup_pending'] == 0, 'Undelivered sound request at endpoint'
+    assert requests == completed, 'Generated sounds and complete calls differ'
+    origin = clock_snapshot(root)['generation_clock']
+    relative_requests = tuple((clock - origin) * 5 for clock in request_clocks)
+    print(f'  {requests} observed delay-expiry requests delivered without coalescing; request times from initial generation: {relative_requests} ms')
     print(f'{root.name}: {completed} weather audio calls, {started} native starts, {suppressed} suppressed')
     print(f'  Sample/channel arguments match; helper duration {min(waits)}–{max(waits)} ms in PAL fields; {other} other audio boundary rows excluded')
-    print('  Native helper contract only; audible output, request loss/coalescing and timing acceptance remain separate.')
+    print('  Native helper contract only; audible output, unobserved stalls/modes and timing acceptance remain separate.')
+    return relative_requests
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('capture', type=Path)
-    check(parser.parse_args().capture)
+    parser.add_argument('captures', type=Path, nargs='+')
+    histories = [check(root) for root in parser.parse_args().captures]
+    assert all(history == histories[0] for history in histories), 'Weather audio request timelines differ'
+    print('All supplied observed sound-request timelines match.')

@@ -3819,23 +3819,26 @@ resource precondition check, not an audio playback or timing test. The completed
 optional sample table at both endpoints on both CPUs; the availability gate rejects it.
 The completed 030 side of `timing-weather-audio-test1` validates the positive resource
 path: the larger allocation and optional fifth sample descriptor are present at both
-endpoints (5,087 sample words, period 895). The A500 counterpart is running.
+endpoints (5,087 sample words, period 895). The completed A500 counterpart validates the same resource path.
 The same module prepares read-only entry/exit probes at `$17836/$178e6`, including
 all general registers and the stack return address. It identifies the installed weather
 wrapper from the live `$bc8a` and `$112e6` hooks, its branch to the native audio helper,
 and its full-register restore. Initial/final snapshots on both CPUs identify one caller;
 corrupted hook, target and restore evidence are rejected. This avoids classifying other
-channel-3 sounds as weather solely by arguments. The sampler now emits these probes when the two offsets are requested. The completed larger-memory 030 run observes three complete weather calls and three
+channel-3 sounds as weather solely by arguments. The sampler now emits these probes when the two offsets are requested. Both completed larger-memory CPU runs observe three complete weather calls and three
 native starts, with no suppression. Integration followed completion of the full-cycle
 capture.
 `tools/check_weather_audio.py CAPTURE` is prepared to pair those weather entry/return
 observations, check sample/channel arguments, distinguish the native suppression return
 from channel start, check the registers preserved by each path, and reconcile complete
-calls with the wrapper counter. It rejects the unavailable-sample baseline. The 030 capture passes sample/channel arguments, preserved registers, native-start
-register results and wrapper-call accounting; eight other audio boundary rows are
+calls with the wrapper counter. It rejects the unavailable-sample baseline. Both captures pass sample/channel arguments, preserved registers, native-start
+register results and wrapper-call accounting; eight other audio boundary rows per CPU are
 excluded by caller identity. Each observed call stays within one PAL field, which is
-not a zero-cost measurement. It does not certify audible output or logical request
-timing/coalescing. Captures ending inside the helper are explicitly rejected.
+not a zero-cost measurement. Observed delay-expiry requests are reconciled against the pending flag and completed
+wrapper calls: both CPUs deliver three requests, at 4,860/15,740/18,840 ms relative to
+initial generation, without coalescing. Wrong sample length, changed return stack and
+missing pending-request evidence are rejected. This does not certify audible output,
+suppression, closely spaced sounds during deliberate stalls or general mode lifecycles. Captures ending inside the helper are explicitly rejected.
 
 This is separate from the renderer's palette restoration at `$117c8–$117d4`, which
 calls `$f914` when `state+$4d0` is set. Sound validation must check sample/period/volume,

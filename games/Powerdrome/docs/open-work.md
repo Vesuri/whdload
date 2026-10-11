@@ -663,12 +663,14 @@ initial/final unsampled elapsed time. This closes this seeded full-cycle regress
 not natural weather, lifecycle, palette pixels or broader A500 calibration acceptance.
 
 The deferred helper `$17836` is an audio-channel start, not bitmap cleanup. Existing
-`cleanups` fields count sound-helper calls, not audible output. The larger-memory audio
-pair is running with read-only helper entry/exit probes. Its initial 030 snapshot confirms
-native 404,000-byte allocation and optional sample loading without forced flags: the
-weather descriptor has 5,087 sample words and period 895, using channel 3 and volume 63.
-The completed 030 side passes three complete native sound starts with correct sample/channel
-arguments and preserved-register/call accounting; its 485 weather boundaries also pass.
-A500 is still running. Catch-up sound coalescing, suppressed calls, palette restoration,
-unseeded weather and mode/lifecycle acceptance remain open. The earlier full-cycle evidence used the old
+`cleanups` fields count sound-helper calls, not audible output. The 20-second larger-memory `timing-weather-audio-test1` pair passes on both CPUs.
+Native allocation and optional sample loading succeed without forced flags (5,087 sample
+words, period 895, channel 3, volume 63). Each CPU delivers three observed delay-expiry
+requests at 4,860/15,740/18,840 ms from initial generation, with three complete native
+starts and no coalescing. Sample/channel arguments, preserved registers and call/queue
+accounting pass; malformed length, stack and pending-request evidence are rejected.
+The pair also matches 485 weather boundaries, 1,001 movement states and 222 control/input/fuel
+updates. The 030 completes 245 renderer twins. Suppressed calls, deliberate stalls with
+closely spaced sounds, audible output, palette restoration, unseeded weather and
+mode/lifecycle acceptance remain open. The earlier full-cycle evidence used the old
 90-ms effect cadence.
