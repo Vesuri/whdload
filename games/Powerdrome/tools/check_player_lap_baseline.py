@@ -10,7 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 
 
-def check(root, logical=False):
+def check(root, logical=False, practice=False):
     rows = defaultdict(list)
     session = None
     for line in (root/'swaps-gdb.txt').read_text().splitlines():
@@ -32,7 +32,7 @@ def check(root, logical=False):
     first, read, stored, committed = [rows[o][0] for o in (0x10bf0, 0x10bf6, 0x10c00, 0xf9a2)]
     old, clock = first[1], read[1][10]
     assert first[2][8] == first[2][13] == 1, 'Lap boundary must execute inside a logical world step'
-    assert old[5:9] == [65535, 65535, 0, 0], 'Expected first human qualifying lap'
+    assert old[5:9] == [65535, 65535, 65535 if practice else 0, 0], 'Expected first human lap in the requested mode'
     assert read[1][0] == clock
     if not logical:
         assert rows[0x10bfc][0][1][9] == (clock-old[1]) & 0xffffffff
@@ -56,6 +56,9 @@ def check(root, logical=False):
         frame = struct.unpack_from('>I', chip, game+0xca46)[0]-base
         pos = after.find(b'PDPLAP01', frame, frame+16384)
         assert pos >= 0
+        if practice:
+            opp = after.find(b'PDPOPP01', frame, frame+16384)
+            assert opp >= 0 and struct.unpack_from('>H', after, opp+8)[0] == 0, 'Practice must not borrow an initialized opponent timeline'
         assert struct.unpack_from('>H', after, pos+8)[0] == 1
         assert struct.unpack_from('>II', after, pos+12) == (start, clock)
         reads = struct.unpack_from('>I', after, pos+28)[0]-struct.unpack_from('>I', before, pos+28)[0]
@@ -85,5 +88,6 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('capture', type=Path)
     p.add_argument('--logical', action='store_true', help='Check corrected HUD output at F118 and private lap state')
+    p.add_argument('--practice', action='store_true', help='Require Practice mode and an uninitialized opponent timeline')
     a = p.parse_args()
-    check(a.capture, a.logical)
+    check(a.capture, a.logical, a.practice)

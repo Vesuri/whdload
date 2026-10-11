@@ -13,6 +13,7 @@ timing_session_end
  bsr timing_player_lap_invalidate
  lea timing_result_state(pc),a0
  clr.l 8(a0)
+ clr.w 36(a0)
  lea timing_pit_state(pc),a0
  clr.w 60(a0)
  clr.w 62(a0)

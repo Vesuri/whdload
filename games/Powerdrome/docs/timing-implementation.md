@@ -1769,8 +1769,8 @@ read at `$c094`. Each opponent step now records its stable lap-domain instant in
 `PDLAP001+$28` before native execution; the result latch uses that saved instant even
 when a retune winner is delivered later. Repair/native-clock sampling remains separate.
 The stable epoch follows the shared countdown reset, so lap and race durations share
-the same start mapping rather than repeatedly sampling the native/VBL offset. Unclassified sources still use the native physical value. The 36-byte
-static state is cleared at native session cleanup; the helper reproduces MOVE.L flags,
+the same start mapping rather than repeatedly sampling the native/VBL offset. Unclassified sources still use the native physical value. The 64-byte
+result state clears its ownership flags at native session cleanup; the helper reproduces MOVE.L flags,
 including X preservation, and records guest flags for verification. The global native
 clock and display/input waits are unchanged. The corrected 030 natural finish
 (`timing-resultclock1-natural-030`) reports **215,020 ms**, exactly its logical winning
@@ -1814,8 +1814,8 @@ The next player-result correction must account for the complete native clock pat
    `$206`, then commit lap duration `$202`. `$f9a2` reads that duration for the lap table
    and accumulated total. The helper also updates best-lap state and lap frame counters.
 3. `$f9ec–$f9f0` supplies the player-result sentinel and enters `$bfb0` after native
-   stack unwinding. The current result latch deliberately leaves this source on its
-   native fallback; opponent-result tests do not validate it.
+   stack unwinding. The player-result hook now captures a classified logical winning
+   instant here; opponent-result tests do not validate this separate source.
 4. The cockpit timer independently reads the physical clock at `$f108` and subtracts
    `$206` at `$f110`. Moving player lap-start timestamps into a logical domain without
    updating this consumer would mix domains in the displayed lap timer.
@@ -1872,8 +1872,9 @@ and accumulated total. These heavily instrumented captures are not FPS measureme
 The A500 clock/simulation-progress gap remains visible in the audit; displaying logical
 progress does not fix simulation backlog or prove adequate real-time throughput.
 Completed player-lap accounting is implemented but **not exercised by these captures**.
-Practice, pause/rescue, native-reset fallback, guest-observed flags/registers and player
-finish latching still need explicit tests. The normal slave remains byte-identical and
+Pause/rescue, native-reset fallback, guest-observed lap/HUD flags/registers and natural
+player finishes still need explicit tests. Practice initialization and a directed
+player-result test are described below. The normal slave remains byte-identical and
 all new hook ranges pass the structural boundary/branch audit.
 
 ```sh
@@ -1882,8 +1883,55 @@ python3 tools/check_player_lap_baseline.py --logical tmp/prof/timing-player-cloc
 ```
 
 The corrected probes replace displaced `$10bfc` with post-hook `$10c00`, and add `$f118`
-after the HUD hook. Player result latching must still capture the winning logical step
-before the native stack-unwinding branch reaches `$bfb0`.
+after the HUD hook. `timing-player-clock-practice-030` uses the same frozen playerlap1
+prototype with `CUSTOM5=2`. Its 182 logical HUD outputs pass, with an explicitly
+uninitialized opponent timeline, unchanged native/private starts and no reset fallback.
+The physical-minus-retained-world gap is -60..120 ms, ending at -40 ms. This proves
+Practice initialization/HUD independence from opponents, not completed Practice laps.
+
+```sh
+python3 tools/check_player_lap_baseline.py --logical --practice tmp/prof/timing-player-clock-practice-030
+```
+
+### Player-result timestamp and directed validation
+
+The WORLD20 hook at `$f9ec` captures the current player's logical world timestamp after
+native stack unwinding but before `$bfb0` restores ownership. It requires active player
+world timing, an initialized opponent timeline, ordinary human race mode and a recorded
+shared countdown reset. It translates the world instant through that stable lap/race
+epoch, then replays the native player sentinel and result branch. Result entry consumes
+the pending timestamp as source 3, distinct from active/deferred opponents; session
+cleanup clears both pending and active result ownership. Unclassified paths keep their
+native result clock. This supports the ordinary race clock contract; it does not use an
+opponent's most recent step as a player's winning instant.
+
+The explicit `TIMING_PLAYER_RESULT_TEST=1` fixture requires VERIFY, COVERAGE_INPUT and
+WORLD20. After at least 500 ms of logical post-countdown time, it forces three counted
+native decisions: admission to a lap boundary at `$f7a0`, admission past the checkpoint
+predicate at `$f96c`, and the finish decision at `$f9d8`. It calls native `$f952` with its
+original caller stack; native code performs the lap-record mutations and result unwind.
+The no-input route's player is stationary after countdown, so waiting for a real later
+boundary would not exercise this path. The fixture is disabled by default; explicit zero
+and omission build byte-identically. It is not evidence of a naturally completed lap,
+winning rank or player victory.
+
+`timing-playerresult4-forced-030-complete`, using the frozen playerresult4-forced slave,
+passes a 200-field result/cleanup window. Synthetic lap duration, native accumulated
+player total and final reported duration all equal **500 ms**. One player source is
+consumed, native sentinel/registers/stack depth survive the entry hook, duration-read
+guest flags match, all five pilot records pass native sorting, and ownership clears at
+cleanup. There are 79 cumulative clean renderer twins; the result window adds zero
+staged scenes. The normal slave remains byte-identical and hook boundaries pass.
+
+```sh
+python3 tools/check_player_result.py tmp/prof/timing-playerresult4-forced-030-complete
+```
+
+The read-only capture locator now uses the installed frame JMP to find live session
+metadata in early captures: added helpers had put PDSESS01 exactly 4,096 bytes before
+WORLD20, outside the former strict proximity test. The completed fixture includes the
+cleanup evidence that the earlier aborted capture lacked. A500 directed results,
+non-forced regressions, natural player laps/results and lifecycle coverage remain open.
 
 Implement and test player lap storage, displayed elapsed time and final-result latching
 as one consistent contract. Practice has no initialized opponent timeline, so it needs

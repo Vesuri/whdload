@@ -308,8 +308,14 @@ is baseline evidence, not completed-lap validation. The WORLD20 prototype now ke
 private logical lap start while retaining native `$206`. Corrected 300-field first-crossing
 captures verify 118 exact logical HUD outputs on 030 and 37 on A500, with preserved native
 starts and no reset fallback. The A500 physical/simulation-progress gap reaches 1,580 ms;
-the timer correction does not prove real-time throughput. Completed player laps, Practice,
-pause/rescue, external-reset fallback, flags/registers and player finishes remain unverified. Next audit the projection flag and matched native animation visibility,
+the timer correction does not prove real-time throughput. Practice now passes 182 logical
+HUD outputs with no initialized opponent timeline. A guarded player-finish latch captures
+the actual player world step as source 3. The explicit forced boundary/checkpoint/finish
+fixture verifies a 500-ms synthetic lap, accumulated total and result duration, native
+sentinel/registers/stack, duration flags, sorting and cleanup on 030. The fixture is off
+by default and does not prove natural laps or victory. A500 directed player results,
+non-forced regressions, natural completed laps/results, pause/rescue, external-reset
+fallback and lap/HUD guest flags/registers remain to verify. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

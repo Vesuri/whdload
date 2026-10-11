@@ -75,6 +75,23 @@ TIMING_RETUNE_RESULT_TEST = 0
  FAIL "TIMING_RETUNE_RESULT_TEST requires TIMING_WORLD20"
  ENDC
  ENDC
+ IFND TIMING_PLAYER_RESULT_TEST
+TIMING_PLAYER_RESULT_TEST = 0
+ ENDC
+ IFNE TIMING_PLAYER_RESULT_TEST
+ IFND VERIFY
+ FAIL "TIMING_PLAYER_RESULT_TEST requires VERIFY"
+ ENDC
+ IFND COVERAGE_INPUT
+ FAIL "TIMING_PLAYER_RESULT_TEST requires COVERAGE_INPUT"
+ ENDC
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_PLAYER_RESULT_TEST requires TIMING_WORLD20"
+ ENDC
+ IFNE TIMING_PLAYER_RESULT_TEST-1
+ FAIL "TIMING_PLAYER_RESULT_TEST must be 0 or 1"
+ ENDC
+ ENDC
  IFND TIMING_PIT_SYNC_TEST
 TIMING_PIT_SYNC_TEST = 0
  ENDC
@@ -171,6 +188,16 @@ install_periodic
  lea timing_external_step(pc),a0
  move.w #$42e7,(a0)
  lea timing_external_flags(pc),a0
+ move.w #$42e7,(a0)
+ IFNE TIMING_PLAYER_RESULT_TEST
+ lea timing_result_player_test_checkpoint(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_result_player_test_boundary(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_result_player_test(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
+ lea timing_result_player(pc),a0
  move.w #$42e7,(a0)
  lea timing_result_begin(pc),a0
  move.w #$42e7,(a0)
@@ -318,6 +345,18 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$f110 8 bit=C3
  PL_PS $f110,timing_player_lap_hud
  PL_NOP $f116,2
+ IFNE TIMING_PLAYER_RESULT_TEST
+ ; TIMING_RANGE h0:$f96c 8 bit=C3
+ PL_P $f96c,timing_result_player_test_checkpoint
+ PL_NOP $f972,2
+ ; TIMING_RANGE h0:$f7a0 6 bit=C3
+ PL_P $f7a0,timing_result_player_test_boundary
+ ; TIMING_RANGE h0:$f9d8 6 bit=C3
+ PL_P $f9d8,timing_result_player_test
+ ENDC
+ ; TIMING_RANGE h0:$f9ec 8 bit=C3
+ PL_P $f9ec,timing_result_player
+ PL_NOP $f9f2,2
  ; TIMING_RANGE h0:$dbd8 6 bit=C3
  PL_PS $dbd8,timing_lap_reset
  ; TIMING_RANGE h0:$d7f8 6 bit=C3
@@ -898,6 +937,24 @@ timing_targets
  dc.w timing_retune_native_result+2-timing_targets
  dc.l $bfb0
  dc.w timing_retune_result+2-timing_targets
+ dc.l $bfb0
+ dc.w timing_result_player_native+2-timing_targets
+ IFNE TIMING_PLAYER_RESULT_TEST
+ dc.l $f974
+ dc.w timing_result_player_test_account+2-timing_targets
+ dc.l $fa12
+ dc.w timing_result_player_test_reject+2-timing_targets
+ dc.l $f7ae
+ dc.w timing_result_player_test_lap+2-timing_targets
+ dc.l $f7e8
+ dc.w timing_result_player_test_no_lap+2-timing_targets
+ dc.l $f7a6
+ dc.w timing_result_player_test_advance+2-timing_targets
+ dc.l $f9de
+ dc.w timing_result_player_test_won+2-timing_targets
+ dc.l $f9f4
+ dc.w timing_result_player_test_continue+2-timing_targets
+ ENDC
  dc.l $d3d6
  dc.w timing_pit_opponent_direct+2-timing_targets
  dc.l $d3de

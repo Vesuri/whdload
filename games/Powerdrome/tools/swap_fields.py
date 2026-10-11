@@ -181,8 +181,10 @@ if os.environ.get('TIMING_STATE') == '1':
             key_sample='printf "PDKEY_EVENT %d {off} ' + ' '.join(['%u']*len(kv)) + '\\n", $pd_field, ' + ', '.join(kv) + '\n'
     session_sample=''
     if fast_worlds:
-        sessions=[m.start() for m in re.finditer(b'PDSESS01',code)
-                  if 0<fast_worlds[0]-m.start()<4096]
+        # Result/lap helpers can put this block more than 4 KiB before WORLD20.
+        # Early captures select the live slave through its installed frame JMP;
+        # other captures require proximity to the already selected live world.
+        sessions=timing_locations(b'PDSESS01', lambda off: 0<fast_worlds[0]-off<16384)
         if sessions:
             assert len(sessions)==1 and len(periodic)==1 and keys and engines
             sptr=a.base+sessions[0]
