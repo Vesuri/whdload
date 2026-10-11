@@ -4460,3 +4460,14 @@ full-cycle 030 side now passes warning/onset/expiry, native duration arithmetic,
 the preceding deferred 030 capture. Stored palette endpoints are restored; maximum
 world-end delay is 280 ms, with zero endpoint debt and 2,520 completed renderer twins.
 A500 is running; full cross-CPU direct-delivery cycle acceptance is still pending.
+
+
+The directed `timing-weather-palette-test1` 030 capture completes 46 seconds with all
+31 native interpolation calls matching component arithmetic and both destination
+palettes. One complete restoration preserves entry 5 while copying the other 15 colours.
+`weather_palette_publication.check_publications` links calls in log order to pending
+logical phases at `$bd1a`, checks consumption at `$bd58`, and verifies presentation does
+not mutate persistent fade state. All 30 publications match, including the additional
+negative-completion zero phase. Missing and duplicate calls are rejected. The A500
+counterpart is running; this is not yet cross-CPU or scanout acceptance. Deliberate
+coalescing still requires a run that actually skips presentation phases.

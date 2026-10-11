@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import struct
 from weather_palette_state import interpolate, owned_fade_returns, parse_values
+from weather_palette_publication import check_publications
 
 
 def palette(row, name):
@@ -103,7 +104,10 @@ def check(root):
     expected['negative_zero', 0] = 1
     assert phases == expected, 'Missing, duplicate or coalesced directed fade phase'
     assert copies > 0, 'No complete palette restoration observed'
+    publication = check_publications(text, callers)
+    assert publication == dict(publications=30, calls=31, coalesced_steps=0, logical_steps=30), 'Incomplete directed publication ledger'
     print(f'{root.name}: 31 owned interpolation calls match native integer arithmetic; {copies} restoration calls preserve entry 5')
+    print(f'  {publication["publications"]} pending logical publications consumed exactly; no missing, stale or extra owned phases')
     print(f'  {unowned} unrelated interpolation calls excluded by caller identity; palette memory only, not scanout')
     return history
 

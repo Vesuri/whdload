@@ -584,8 +584,10 @@ accounted for by initial/final unsampled time of 80/20 versus 140/40 ms.
    `Powerdrome-timing-weather-palette-test1.slave` directed fade fixture runs for 46 seconds
    on both CPUs. `check_weather_palette.py` requires all 31 owned interpolation calls,
    exact native integer arithmetic and both palette writes, plus restoration of the
-   other 15 colours while preserving entry 5. Positive live validation is pending;
-   endpoint-only captures correctly fail its missing-probe gate.
+   other 15 colours while preserving entry 5. The completed 030 side passes all 31
+   interpolation calls and one restoration. Its 30 pending logical publications match
+   the observed native calls exactly; missing and duplicate calls are rejected. A500
+   remains in progress. Endpoint-only captures fail the missing-probe gate.
 2. Check deliberate presentation coalescing and displayed palette/buffer pairing.
    Stored palette agreement is not scanout evidence. `weather_palette_state.py --require-restored` passes both cadence1 and current cadence2 CPU
    endpoints; invalid colours and unfinished transitions are rejected. Guarded probe
