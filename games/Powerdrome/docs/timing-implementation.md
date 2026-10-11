@@ -3768,22 +3768,23 @@ timing: forecast and start/expiry still follow their existing paths. Fade/gear t
 has a separate disabled-by-default prototype described below.
 No cache policy changes are made.
 
-During supported human flight, each logical 90 ms control update at world end:
+During supported human flight, the current `PDWEFX02` implementation uses separate
+weather-loop and visual deadlines, serviced by 20-ms world updates:
 
-1. Publishes the current nonzero effect lifetime and its pre-draw seed, decrements the
-   persistent lifetime once, and advances the logical RNG four times to account for the
-   native effect draw.
-2. Applies the native generation eligibility gates, decrements its delay, and performs
-   the native shift-7 selection and shift-14 delay selection through `$53f6` when due.
-3. Queues rectangle cleanup for presentation instead of repeating the native drawing
-   operation during catch-up. The existing world wrapper retains the resulting logical seed.
+1. At generation, apply native eligibility, decrement delay, and perform shift-7 lifetime
+   and shift-14 delay selection through `$53f6` when due. Schedule the next generation
+   80 ms later for a scene without an effect, or 140 ms later for a scene with one.
+2. At generation +20 ms, publish the current lifetime and pre-draw seed, decrement
+   lifetime once and advance logical RNG four times when an effect is present. A blank
+   scene clears the previous visible publication at this same visual boundary.
+3. Queue rectangle cleanup for presentation. Retain cumulative deadlines and all logical
+   mutations during ordinary catch-up; actual repeated draws do not consume logical RNG.
 
-The 90 ms period is an initial candidate shared with the existing control cadence,
-about 8.1% longer than the measured native generation interval of 83.283 ms. **It fails
-active-effect cadence calibration:** complete native episodes below have about 139-ms
-intervals between lifetime/draw updates. This remains an ownership prototype, not an
-accepted A500 effect-speed correction. Generation cadence and visual lifetime/phase
-must be separated or explicitly scheduled in native order before acceptance.
+The earlier `PDWEFX01` prototype used a uniform 90-ms control cadence with visual work
+before generation. It passed cross-CPU ownership checks but failed A500 active-effect
+speed calibration: the native intervals are about 139 ms. The native ordering/cadence
+measurements and the current candidate's bounded results appear below. General mode
+transitions and natural weather acceptance remain open.
 
 The renderer uses the latest published lifetime/seed. It temporarily installs the saved
 visual seed around the native draw helper, then restores the outer seed. Repeated draws
@@ -3799,9 +3800,11 @@ Fast-planar eligibility additionally checks the published visual lifetime. This 
 necessary on the last visible tick, when persistent lifetime is already zero: the scene
 must still take the native effect path. The coverage fallback classification includes
 that published state as well. Native hook bytes are checked before installation at
-`$bc8a`, `$112e6` and `$112f4`. Diagnostics tagged `PDWEFX01` track publication/temporary
-seed ownership, logical updates, visual RNG events, generation attempts/selections,
-actual draws and deferred cleanup. The installed draw JMP locates the live record.
+`$bc8a`, `$112e6` and `$112f4`. Diagnostics tagged `PDWEFX02` track publication/temporary
+seed ownership, weather-loop generations, visual RNG events, generation attempts/selections,
+actual draws and deferred cleanup. `PDWECLK1` adds generation/visual deadlines and counts.
+The installed draw JMP locates the live record; readers also accept the earlier
+`PDWEFX01` capture format.
 
 Build and integration checks pass:
 
@@ -4123,7 +4126,7 @@ last lifetime decrement depends on the selected length:
 | 4 | 12 | 443.333 ms | 420–460 ms |
 | 5 | 6 | 586.667 ms | 520–680 ms |
 
-The existing 90-ms logical visual interval is about 35% shorter than the 139-ms native
+The earlier 90-ms logical visual interval was about 35% shorter than the 139-ms native
 interval. Its cross-CPU equality tests establish independence of render count, but **do
 not pass the A500 speed gate**. The 83.283-ms generation-loop average includes the many
 frames without an effect and must not be substituted for the active-effect cadence.
@@ -4138,7 +4141,7 @@ Together these give the earlier 83.283-ms aggregate. A five-life example selects
 subsequent loop's draw. Its delay reaches zero at loop 3,637 before the final lifetime
 decrement. No new selection interrupts a nonzero episode in this capture.
 
-Next implement a separate weather-loop schedule: **80 ms after an effect-free scene,
+The current candidate implements a separate weather-loop schedule: **80 ms after an effect-free scene,
 140 ms after an effect-bearing scene**, with visual publication **20 ms after generation**.
 Generation eligibility/delay/trials come first; the next visual publication decrements
 lifetime and accounts for four logical visual RNG advances. Preserve that order rather
@@ -4147,10 +4150,11 @@ published visual state. Clear the last visible publication on the following scen
 visual boundary. This gives generation-to-last-step values 20, 440 and 580 ms for
 lifetimes 1, 4 and 5, respectively, close to this reference.
 
-Then repeat seeded active-effect and full-cycle CPU comparisons, with RNG ownership,
-final-visible-state fallback and both buffers' cleanup checks intact. Calibration across
-tracks and varied modes still needs evidence. This is a concrete next candidate, not an
-implemented or accepted cadence correction.
+The seeded active-effect comparison now passes as described below. The full-cycle
+comparison is running. RNG ownership, final-visible-state fallback and both buffers'
+cleanup checks remain necessary; actual rectangle cleanup is still unobserved. Calibration
+across tracks and varied modes still needs evidence. This is an implemented candidate,
+not final cadence acceptance for all gameplay.
 
 
 ### Direct deadline-transfer helper fixture
@@ -4181,3 +4185,51 @@ control/input/fuel updates match exactly. Both end without retained/assigned sim
 work. This validates the corrected helper's arithmetic and its integration into the
 inactive-deadline startup path; it still does not exercise actual pit/resume ownership
 with live native deadlines.
+
+
+### Calibrated effect schedule: first matched runtime result
+
+`timing-weather-cadence-test1` uses the seeded mode-2 effect fixture and the new schedule
+on A500/native and 030/fast for 1,000 PAL fields / 20 seconds. The fixture activates on a
+weather-loop generation boundary at or after step 200, rather than an ordinary control
+boundary. `PDWEFX02` keeps the earlier 48-byte record shape, but its tick count now means
+generation boundaries and its clock means the latest visual publication. `PDWECLK1`
+records both deadlines, both event clocks/counts, selected loop period and RNG results.
+Capture readers identify the version through the installed hook; the old selection
+checker explicitly rejects v2, while the draw-ownership checker supports both versions.
+
+`check_weather_effect_schedule.py` pairs effect/clock observations with consecutive
+20-ms world-step observations. It requires each mutation at its actual world deadline,
+80/140-ms periods based on the upcoming scene, +20-ms publication, exact lifetime/delay
+ownership and four logical RNG advances per positive visual publication. It also checks
+that no logical weather field changes between scheduled boundaries. The seeded case
+requires generation seed 51,585, lifetime five and delay seven, then verifies first
+publication at 20 ms, last lifetime decrement at 580 ms, clearing at 720 ms and the next
+generation trial at 860 ms. The last visible state must survive the intervening generation
+boundary. Incorrect visual deadline, period, RNG, early clearing and world-clock evidence
+are rejected. `--general` checks the same schedule invariants without substituting them
+for the seeded first-episode checks.
+
+Both CPUs pass. **485 common generation/visual states, 1,001 common movement states and
+222 common control/input/fuel updates match exactly.** Both select three effects and
+execute ten logical visual RNG events. Actual draws are **21 on 030 and nine on A500**;
+all complete draws pass seed installation/four advances/restoration and persistent-state
+checks. The 030 repeats eleven logical visual states. No draw owns the endpoint seed.
+
+The 030 completes 1,001 movements versus A500's 1,006, fully accounted for by initial/final
+unsampled time 80/60 ms and 140/20 ms. Both finish with no retained/assigned simulation
+work. Maximum sampled world-end delay is 280/760 ms. The 030 adds **245 completed renderer
+twins**, unchanged raster code and zero reported failures; another scene is active at the
+endpoint and excluded. A500 has one scheduled visual publication at its next world cursor;
+the checker verifies that it is not overdue and precedes the next generation. It is not
+lost work or a completed publication.
+
+Generation is now serviced before a simultaneous fade mutation, matching the native
+outer-loop ordering. The frozen full candidate `Powerdrome-timing-weather-cycle-cadence1.slave`
+includes this ordering and the corrected deadline-transfer helper. Its unshortened
+8,500-field / 170-second full-cycle A500/030 pair is running. Until that completes, the
+previous full-cycle results refer to the older 90-ms effect schedule.
+
+The normal slave and effects-disabled full timing build remain byte-identical to saved
+references. Hook boundaries and C3-off native snapshots pass; legacy effect draw/selection
+captures still pass their version-specific readers. No cache policy changes were made.

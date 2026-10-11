@@ -20,6 +20,7 @@ def check(root):
     base = int((root / 'dump-base.txt').read_text(), 0)
     record = locate(chip, code, game, base)
     assert record is not None
+    assert code[record-base:record-base+8]==b'PDWEFX01', 'Use check_weather_effect_schedule.py for the 80/140-ms schedule'
     tag = code.find(b'PDWEFT01', record - base + 48, record - base + 4096)
     assert tag >= 0, 'Missing live directed fixture record'
     activation, step, clock = struct.unpack_from('>3I', code, tag + 8)

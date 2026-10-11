@@ -627,16 +627,30 @@ weather, calibration acceptance, message/palette pixels, effect rectangle cleanu
 mode/lifecycle integration remain open. The full F1–F8 goal is not complete.
 
 
-A newly completed native effect-cadence analysis changes the next implementation step:
+The native effect-cadence analysis drives the current candidate:
 30 complete A500 episodes / 90 draws contain 60 within-episode intervals averaging
-139 ms (median 140), not the generator's overall 83.283-ms average. The current 90-ms
-visual cadence is about 35% too short and fails the A500 speed gate despite passing
+139 ms (median 140), not the generator's overall 83.283-ms average. The first prototype's 90-ms
+visual cadence was about 35% too short and failed the A500 speed gate despite passing
 cross-CPU state equality. Generation-to-first-draw is 20–40 ms; mean generation-to-last
-lifetime decrements are 26.667/443.333/586.667 ms for lengths 1/4/5. After deadline-transfer
-validation, implement the measured weather-loop split: post-generation observations show
+lifetime decrements are 26.667/443.333/586.667 ms for lengths 1/4/5. Deadline-transfer
+validation is complete for the helper. The new candidate implements the measured
+weather-loop split: post-generation observations show
 81.489-ms intervals without an effect and 141.111-ms intervals with an effect. Candidate
 loop periods are therefore 80/140 ms by the upcoming scene, with visual publication 20 ms
-after generation. Preserve native generation-before-draw and delay/RNG ordering, and
-clear the last publication at the following scene boundary. Retest active effects and
-full cycles. This is measured unfinished work, not
-an accepted 90-ms approximation.
+after generation. It preserves generation-before-draw and delay/RNG ordering, and clears
+the last publication at the following scene boundary. This replaces the failed
+90-ms approximation; general cadence/lifecycle acceptance still needs evidence.
+
+
+`PDWEFX02` now implements that 80/140-ms weather loop and +20-ms visual phase. The seeded
+20-second A500/030 pair passes exact world deadlines, RNG ownership and the first effect's
+20/580/720-ms first/last/clear boundaries. There are 485 matching weather event states,
+1,001 matching movement states and 222 control/input/fuel updates. Both have ten logical
+visual events, despite 21 actual 030 draws versus nine A500 draws. The 030 adds 245 completed
+renderer twins; its additional unfinished draw is excluded. No endpoint simulation debt
+or draw seed ownership remains. A500's pending next-cursor visual event is explicitly
+accounted for. Five corrupted timing/state cases are rejected; disabled/normal bytes and
+C3-off hook checks pass. The full 170-second `timing-weather-cycle-cadence1` pair is running
+with generation-before-fade ordering and the corrected deadline-transfer helper. Next
+finish that comparison, then address actual cleanup, unseeded weather and mode/lifecycle
+acceptance. The earlier full-cycle evidence used the old 90-ms effect cadence.

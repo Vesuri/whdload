@@ -138,11 +138,12 @@ timing_world_end
  IFNE TIMING_WEATHER_CYCLE
  bsr timing_weather_cycle_tick
  ENDC
- IFNE TIMING_WEATHER_FADE
- bsr timing_weather_fade_tick
- ENDC
  IFNE TIMING_WEATHER_EFFECTS
  bsr timing_weather_tick
+ ENDC
+ IFNE TIMING_WEATHER_FADE
+ ; Native outer-loop generation precedes the fade mutation at the same boundary.
+ bsr timing_weather_fade_tick
  ENDC
  ENDC
  IFNE TIMING_WORLD20

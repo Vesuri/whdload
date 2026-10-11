@@ -1,6 +1,7 @@
 ; Experimental normal-flight effect ownership. Forecast scheduling remains separate.
 ; TIMING_WEATHER_FADE optionally schedules the transition alongside these effects.
-; Logical 90-ms updates own lifetime and both generation/visual RNG advances.
+; Separate weather-loop and visual deadlines own generation/lifetime RNG advances.
+; A500 candidate: 80/140-ms loops without/with an effect, visual phase +20 ms.
 ; Presentation replays the latest pre-draw seed without changing simulation RNG.
 timing_weather_check
  move.l perf_game(pc),a0
@@ -52,6 +53,14 @@ timing_weather_reset
  clr.l 8(a0)
  clr.l 12(a0)
  clr.l 16(a0)
+ lea timing_weather_clock(pc),a0
+ clr.l 8(a0)
+ clr.l 12(a0)
+ clr.l 16(a0)
+ clr.l 20(a0)
+ clr.l 24(a0)
+ clr.l 36(a0)
+ clr.l 40(a0)
  movea.l (sp)+,a0
  rts
 
@@ -62,17 +71,25 @@ timing_weather_tick
  bsr timing_weather_reset
  bra.w .done
 .enabled
- bsr timing_world20_test_control
- beq.w .done
- IFNE TIMING_WEATHER_EFFECT_TEST
- bsr timing_weather_effect_test
- ENDC
  lea timing_weather_state(pc),a0
- addq.l #1,20(a0)
- move.l timing_world20_clock(pc),40(a0)
+ lea timing_weather_clock(pc),a1
+ tst.w 8(a1)
+ bne.s .visual_check
+ move.w #1,8(a1)
+ move.l timing_world20_clock(pc),12(a1)
+.visual_check
+ tst.w 10(a1)
+ beq.s .generation_check
+ move.l timing_world20_clock(pc),d0
+ sub.l 16(a1),d0
+ bmi.s .generation_check
+ clr.w 10(a1)
+ addq.l #1,32(a1)
+ move.l 16(a1),24(a1)
+ move.l 16(a1),40(a0)
  clr.w 8(a0)
  tst.w $4ce(a6)
- beq.s .generation
+ beq.s .visual_seed_done
  move.w $4ce(a6),8(a0)
  move.w $62(a6),10(a0)
  subq.w #1,$4ce(a6)
@@ -82,24 +99,38 @@ timing_weather_tick
 .visual_rng
  bsr timing_weather_random
  dbra d7,.visual_rng
+.visual_seed_done
+ move.w $62(a6),40(a1)
+.generation_check
+ move.l timing_world20_clock(pc),d0
+ sub.l 12(a1),d0
+ bmi.w .done
+ IFNE TIMING_WEATHER_EFFECT_TEST
+ bsr timing_weather_effect_test
+ lea timing_weather_state(pc),a0
+ lea timing_weather_clock(pc),a1
+ ENDC
+ addq.l #1,20(a0)
+ addq.l #1,28(a1)
+ move.l 12(a1),20(a1)
 .generation
  tst.w $4cc(a6)
- beq.w .done
+ beq.w .scheduled
  tst.w $4c6(a6)
- bne.w .done
+ bne.w .scheduled
  tst.w $104(a6)
- bne.w .done
+ bne.w .scheduled
  tst.w $4d2(a6)
  beq.s .attempt
  subq.w #1,$4d2(a6)
- bne.w .done
- move.w #1,16(a0) ; native rectangle cleanup belongs to presentation
+ bne.w .scheduled
+ move.w #1,16(a0)
 .attempt
  addq.l #1,28(a0)
  moveq #7,d1
  bsr timing_weather_random
  cmp.w #6,d0
- bgt.s .done
+ bgt.s .scheduled
  and.w #5,d0
  move.w d0,$4ce(a6)
  addq.l #1,32(a0)
@@ -107,6 +138,19 @@ timing_weather_tick
  bsr timing_weather_random
  addq.w #4,d0
  move.w d0,$4d2(a6)
+.scheduled
+ move.w $62(a6),38(a1)
+ move.w #1,10(a1)
+ move.l 20(a1),d0
+ addq.l #4,d0
+ move.l d0,16(a1)
+ moveq #16,d0
+ tst.w $4ce(a6)
+ beq.s .period_ready
+ moveq #28,d0
+.period_ready
+ move.w d0,36(a1)
+ add.l d0,12(a1)
 .done
  movem.l (sp)+,d0-d7/a0-a6
  rts
@@ -195,26 +239,40 @@ timing_weather_after_draw dc.w $4ef9
 timing_weather_present dc.w $4ef9
  dc.l 0
 
-timing_weather_state dc.b 'PDWEFX01'
+timing_weather_state dc.b 'PDWEFX02'
  dc.w 0 ; +8 latest logical pre-decrement lifetime (visible state)
  dc.w 0 ; +10 visual pre-draw seed
  dc.w 0 ; +12 temporary render seed ownership
  dc.w 0 ; +14 saved outer seed
  dc.w 0 ; +16 pending rectangle cleanup
  dc.w 0 ; +18 reserved
- dc.l 0 ; +20 logical control updates
+ dc.l 0 ; +20 logical weather-loop generations
  dc.l 0 ; +24 logical visual RNG events
  dc.l 0 ; +28 generation attempts
  dc.l 0 ; +32 successful selections (including zero lifetime)
  dc.l 0 ; +36 actual effect draws
- dc.l 0 ; +40 most recent logical update timestamp
+ dc.l 0 ; +40 most recent visual publication timestamp
  dc.l 0 ; +44 actual rectangle cleanups
+
+timing_weather_clock dc.b 'PDWECLK1'
+ dc.w 0 ; +8 initialized
+ dc.w 0 ; +10 visual publication pending
+ dc.l 0 ; +12 next generation deadline
+ dc.l 0 ; +16 visual deadline
+ dc.l 0 ; +20 last generation clock
+ dc.l 0 ; +24 last visual clock
+ dc.l 0 ; +28 generation boundaries
+ dc.l 0 ; +32 visual publications, including blank scenes
+ dc.w 0 ; +36 upcoming scene period, native clock units
+ dc.w 0 ; +38 RNG immediately after generation
+ dc.w 0 ; +40 RNG immediately after visual publication
+ dc.w 0 ; +42 reserved
 
  IFNE TIMING_WEATHER_EFFECT_TEST
 ; Directed effect-only fixtures. No clock/input rewrite or cache changes.
 ; Mode 1 publishes an existing effect; mode 2 seeds a successful native selection.
 ; Suppress native forecasts so this isolates generation, drawing and RNG ownership,
-; not forecast/fade/steering calibration. Trigger once per process on a control tick.
+; not forecast/fade/steering calibration. Trigger once per process on a weather-loop boundary.
 timing_weather_effect_test
  lea timing_weather_effect_test_state(pc),a0
  tst.l 8(a0)
