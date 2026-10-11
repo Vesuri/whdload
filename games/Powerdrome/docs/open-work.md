@@ -318,7 +318,8 @@ passes the same 500-ms accounting and contract checks. A new input-only `CUSTOM5
 Practice route schedules pause after the natural first lap start. On 030, it excludes
 49 PAL fields while preserving private/native starts and logical clocks; 70 logical HUD
 outputs (26 resumed) pass, with no reset fallback and 61 clean renderer comparisons.
-A500 private-lap pause, wider non-forced regressions, natural completed laps/results,
+The A500 counterpart also passes: 47 excluded fields, 53 exact logical HUD outputs
+(16 resumed), unchanged timestamps and no fallback. Wider non-forced regressions, natural completed laps/results,
 rescue, external-reset fallback and lap/HUD guest flags/registers remain to verify. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing

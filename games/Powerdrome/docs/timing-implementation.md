@@ -1965,8 +1965,17 @@ python3 tools/perf_status.py tmp/prof/timing-playerpause2-030-twins
 Read-only `PDPLAP_EVENT` probes expose validity, both lap starts, reset/lap/HUD counters,
 last durations and fallback count at the pause boundaries and HUD output. The checker
 requires an initialized lap at pause entry; it does not relax that condition for routes
-that have not reached the first crossing. A500 private-lap pause, rescue, external-reset
-fallback and natural completed laps/results remain open.
+that have not reached the first crossing. The A500 counterpart
+`timing-playerpause2-a500` uses the same frozen slave and 300-field route, with no fast
+RAM and verification rendering disabled. It excludes **47 PAL fields**, preserves both
+lap starts and logical clocks, and passes **53** exact HUD readings (**16 after resume**)
+with no reset fallback or input overflow.
+
+```sh
+python3 tools/check_player_lap_pause.py tmp/prof/timing-playerpause2-a500
+```
+
+Rescue, external-reset fallback and natural completed laps/results remain open.
 
 The read-only capture locator now uses the installed frame JMP to find live session
 metadata in early captures: added helpers had put PDSESS01 exactly 4,096 bytes before
