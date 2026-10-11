@@ -13,6 +13,7 @@ from weather_state import FIELDS, PROBES, parse_values
 
 # Before/after instruction boundaries, expected mutated field(s).
 PAIRS = {
+    0xe23c: (0xe1f8, 'rng', lambda b: (b['rng']*31415+1)&0xffff),
     0xe1d4: (0xe1ca, 'forecast_deadline', lambda b: (b['d7']+5000)&0xffffffff),
     0xe242: (0xe23c, 'd0', lambda b: (b['d0']+b['clock'])&0xffffffff),
     0xe246: (0xe242, 'active_deadline', lambda b: b['d0']),
@@ -47,6 +48,15 @@ def report(root):
             if before not in pending: continue # capture may begin inside a mutation
             oldfield,b=pending.pop(before)
             assert s[key]==expected(b),(hex(off),key,b[key],s[key],expected(b))
+            if off==0xe23c:
+                # Native 8ae6 multiplies signed 16-bit operands, doubles the
+                # 32-bit product, and returns its high word. The caller masks
+                # that random result to unsigned before multiplying by four.
+                base=s['d1'] if s['d1']<0x80000000 else s['d1']-0x100000000
+                limit=(base>>2)&0xffff
+                if limit>=0x8000: limit-=0x10000
+                random_word=(((s['rng']&0x7fff)*limit*2)&0xffffffff)>>16
+                assert s['d0']==(base+4*random_word)&0xffffffff, 'Incorrect native weather duration'
             if off in (0xbd36,0xbd4c):
                 assert b['loop']&15==0, 'Native fade escaped its 16-counter gate'
                 assert (0<b['transition']<0x8000) if off==0xbd36 else (b['transition']>=0x8000)

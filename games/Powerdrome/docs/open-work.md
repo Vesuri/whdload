@@ -528,5 +528,10 @@ route-6 attempt reached forecast entry on track 2, but the debugger rejected par
 `timing-weather-native-a500-2` retries the requested 400-second window with 14 probes for
 deadlines, fades and effect lifetime; generation/palette/gear need another pass. The new
 weather analyzer verifies paired mutations and reports missing observations explicitly;
-its synthetic examples pass, but runtime event validation and A500 calibration remain
-pending. No weather scheduling correction is claimed yet.
+its synthetic examples and the observed native onset pass. The reduced probe set records
+all 15 positive fade steps: 20.58 seconds from start to completion, with 16 native loop
+increments between steps. Forecast activation is 120 ms late against its 25-second deadline;
+the selected active duration is 269.47 seconds. The first lifetime decrement passes.
+The capture continues toward expiry/fade-out; complete A500 calibration remains pending.
+Both native weather RNG helpers share the seed restored around logical world updates,
+so scheduling must preserve that ownership consistently. No weather correction is claimed yet.
