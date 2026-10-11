@@ -667,6 +667,8 @@ The deferred helper `$17836` is an audio-channel start, not bitmap cleanup. Exis
 pair is running with read-only helper entry/exit probes. Its initial 030 snapshot confirms
 native 404,000-byte allocation and optional sample loading without forced flags: the
 weather descriptor has 5,087 sample words and period 895, using channel 3 and volume 63.
-Complete call contracts, catch-up sound coalescing, palette restoration, unseeded weather
-and mode/lifecycle acceptance remain open. The earlier full-cycle evidence used the old
+The completed 030 side passes three complete native sound starts with correct sample/channel
+arguments and preserved-register/call accounting; its 485 weather boundaries also pass.
+A500 is still running. Catch-up sound coalescing, suppressed calls, palette restoration,
+unseeded weather and mode/lifecycle acceptance remain open. The earlier full-cycle evidence used the old
 90-ms effect cadence.
