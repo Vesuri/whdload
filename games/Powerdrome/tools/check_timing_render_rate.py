@@ -5,6 +5,8 @@ Use world/control/resource comparisons separately. Actual completed presentation
 reported by frames.txt; fixture release rate is not itself a presentation-rate measurement.
 """
 import argparse
+from collections import Counter
+import re
 from pathlib import Path
 import struct
 from check_timing_capacity import check as check_capacity
@@ -18,6 +20,29 @@ def record(data,frame):
     tag=routine+2+struct.unpack_from('>h',data,routine+2)[0]
     assert 0<=tag<=len(data)-60 and data[tag:tag+8]==b'PDRATE01'
     return struct.unpack_from('>13I',data,tag+8)
+
+
+def presentation_intervals(root, origin, lastwall):
+    log=(root/'swaps-gdb.txt').read_text()
+    # Infer alignment from independently observed guest VBL values, not from
+    # the initial snapshot: the debugger starts counting at an IRQ boundary.
+    clocks=re.findall(r'^PDINITIAL_EVENT (-?\d+) 0x[0-9a-f]+ (.+)$',log,re.M)
+    offsets={int(values.split()[1])-int(field) for field,values in clocks}
+    assert len(offsets)==1, 'Guest/debugger field alignment is missing or changed'
+    offset=offsets.pop()
+    markers=[int(field)+offset for field in re.findall(r'^PDFRAME (-?\d+)$',log,re.M)]
+    # Exclude the origin field: a marker there may precede first fixture entry.
+    markers=[field for field in markers if origin<field<=lastwall]
+    assert len(markers)>=10 and markers[-1]>markers[0], 'Insufficient paced presentation observations'
+    gaps=[b-a for a,b in zip(markers,markers[1:])]
+    assert all(gap>=0 for gap in gaps), 'Presentation markers went backward'
+    counts=Counter(gap*20 for gap in gaps)
+    rate=len(gaps)*50/(markers[-1]-markers[0])
+    print(f'  Paced-region driving presentation markers: {len(gaps)} intervals, '
+          f'{rate:.3f}/s over {(markers[-1]-markers[0])*20} ms; '
+          f'interval_ms/count={dict(sorted(counts.items()))}')
+    print('  Marker intervals have 20-ms PAL resolution; they do not establish distinct displayed images or release throughput.')
+    return markers,counts
 
 
 def check(root):
@@ -50,7 +75,8 @@ def check(root):
     print(f'{root.name}: {hz} Hz requested; {count} allocator releases, {measured:.3f}/s; '
           f'{late} late deadlines, max {maxlate*20} ms, total {sumlate*20} ms; '
           f'{waited*20} ms pacing wait; pending={pending}')
-    print('  Aggregate pacing proof only. Inspect completed-frame measurements and exact gameplay comparisons separately.')
+    presentation_intervals(root,origin,lastwall)
+    print('  Pacing and presentation timing only; exact gameplay comparisons remain separate.')
 
 
 if __name__=='__main__':

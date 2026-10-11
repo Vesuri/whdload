@@ -3382,8 +3382,19 @@ uses. `tools/check_timing_render_rate.py` follows direct code references to the 
 and checks the aggregate identity
 `last_release - origin = ceil((release_count - 1)*50/Hz) + cumulative_lateness`, the rational
 phase, endpoint state and independent world/physical-time accounting. It reports allocator
-release rate separately from actual completed presentations in `frames.txt`. Aggregate
-counters alone do not prove every individual presentation interval or gameplay equality.
+release rate separately from driving-presentation markers. It derives the debugger-field
+offset from paired guest VBL observations, requires that alignment to remain constant,
+and reports every observed marker interval after the pacing-origin field, its histogram
+and measured rate. This excludes any marker that could precede fixture entry in the same
+PAL field. Aggregate counters alone do not prove presentation cadence or gameplay equality;
+marker observations have 20-ms resolution and do not prove distinct displayed images.
+`frames.txt` retains the separate whole-window frame report.
+
+The presentation extractor passes a regression against the existing unpaced
+`timing-contact13-1` captures: 155 intervals over 12,840 ms on 030 (12.072/s), and 111 over
+12,760 ms on A500 (8.699/s), matching the independent whole-window report. Their interval
+ranges are 60–240 ms and 60–800 ms respectively. These are instrumented reference
+observations, not achieved controlled-rate results or release performance.
 
 All four variants assemble and their direct record references/initial states decode.
 Non-VERIFY, unsupported-rate and combined stall/rate configurations are rejected. The
@@ -3400,7 +3411,7 @@ Next steps:
    infeasible targets instead of treating requested rates as measured coverage.
 4. Repeat on A500/native and native-rendered accelerators where feasible. Keep the same
    logical input tape and cadence, and retain fast-renderer drawing twins.
-5. Collect per-presentation interval evidence before claiming exact achieved cadence;
+5. Use the paired presentation-interval evidence before claiming exact achieved cadence;
    extend to variable intervals and other response/effect routes after the bounded checks.
 
 
