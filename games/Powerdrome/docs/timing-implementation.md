@@ -1823,6 +1823,34 @@ The next player-result correction must account for the complete native clock pat
    State `$206` also serves other modes and waits. Gate any logical substitution by an
    audited lifecycle/domain contract; do not globally replace this shared timestamp.
 
+A read-only 030 baseline, `timing-player-clock-before-030`, captures 300 PAL fields
+from the first natural `$f952` crossing with `CUSTOM5=13` and the frozen resultdomain1
+prototype. The player has lap index -1 at entry, the scheduler is started, and world
+ownership is active. The native helper reads clock 6,148, subtracts the old start 976,
+and stores the new clock; the negative-lap branch correctly discards that preliminary
+duration. Lap index then becomes zero, with lap duration and accumulated total still zero.
+These values are five-millisecond native clock units, not addresses.
+
+All 118 sampled cockpit clock-read pairs use the physical clock and that unchanged lap
+start. Physical elapsed minus elapsed retained-world time ranges from **-20 to +680 ms**,
+ending at zero. The retained world timestamp is the scheduler cursor; outside a world
+step it can point at the next step, so the -20-ms endpoint is not evidence of a reversed
+clock. Positive differences expose display/clock versus simulation progress, and require
+an explicit display-time contract. This baseline covers first-lap initialization and
+HUD reads, not a completed player lap, finish, or correction.
+
+```sh
+python3 tools/check_player_lap_baseline.py tmp/prof/timing-player-clock-before-030
+```
+
+The proposed implementation should keep a private logical lap-start timestamp while
+leaving the native multipurpose `$206` field intact. Initialize the private start at the
+observed first crossing and shared countdown reset; consume the same private elapsed
+time for lap storage and the HUD. Explicitly handle new sessions, pause, rescue and
+unexpected native resets before enabling the private timestamp in those paths. Preserve
+native fallback for unaudited non-driving callers. Player result latching must capture
+the winning logical step before the native stack-unwinding branch reaches `$bfb0`.
+
 Implement and test player lap storage, displayed elapsed time and final-result latching
 as one consistent contract. Practice has no initialized opponent timeline, so it needs
 an explicit player-clock origin rather than borrowing an absent opponent origin. Validate

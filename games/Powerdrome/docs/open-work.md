@@ -300,7 +300,12 @@ The A500 stable-domain finish also passes at exactly 226,290 ms; its sampled map
 120 ms behind. Winners differ, so these are timing-accounting checks, not trajectory
 equivalence. Player/deferred/mode-specific results remain to validate. The player path
 must keep lap storage (`$10bf0`), displayed elapsed time (`$f108`) and result entry
-(`$f9f0`) in one clock domain; Practice needs an origin independent of opponents. Next audit the projection flag and matched native animation visibility,
+(`$f9f0`) in one clock domain; Practice needs an origin independent of opponents.
+A 300-field 030 baseline confirms the first natural player crossing is inside a logical
+world step and starts lap zero without charging a lap duration. Its 118 cockpit clock
+reads differ from retained-world elapsed time by -20 to +680 ms, ending at zero. This
+is baseline evidence, not a player-clock correction or completed-lap validation. Use a
+private logical lap-start field so native menus/waits can retain shared `$206` semantics. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.
