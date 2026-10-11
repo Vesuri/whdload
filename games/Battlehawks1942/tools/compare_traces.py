@@ -12,7 +12,8 @@ differed between otherwise identical runs, outside the Amiga display.
 """
 import hashlib, io, os, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto
+import _amigaxdev  # noqa: F401
+from amigaxdev import barto
 
 a, b = barto.load(sys.argv[1]), barto.load(sys.argv[2])
 bad = 0

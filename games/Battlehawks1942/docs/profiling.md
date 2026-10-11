@@ -27,7 +27,7 @@ A capture takes about 10 minutes (one boot, ~4800 fields to the window in warp) 
 | Game | PAL v1.0, three AmigaDOS OFS disks: `Disk.1` "BHawk1" (boot, `BH`, sounds), `Disk.2` "BHawk2" (screens, `FDAT/` plane data), `Disk.3` "BHPilots" (pilot records) |
 | Code | `BH` on `Disk.1` (167 936 bytes), Aztec C (`link a5` prologues, `jsr d16(a4)` jump table, small data `a4` = data hunk + `$7FFE`). Hunk 0 code `$1C794` bytes at file `$28` (3 relocs); hunk 1 data `$A664` file-backed / `$F1EC` allocated (2146 relocs); hunk 2 BSS 4 bytes. `Disk.1:s/startup-sequence` is just `BH`. |
 | Shipped slave | Galahad of Fairlight v1.0 (12/05/03), 1512 bytes, WHDLoad v15 header, no source. `ws_BaseMemSize` `$80000`, `ws_ExpMem` `$40000` (exactly the Kickstart image), flags `NoError\|EmulPriv`, quit F10. The archive is the "SLOW" slave (no fast RAM); the ReadMe mentions a "FAST" one, not included. |
-| Reconstruction | `whdload/original/Battlehawks1942.s` rebuilds the shipped slave byte-identically. Old-style Kick 1.3 boot: `resload_LoadKick` into ExpMem, a `resload_Patch` list on the Kickstart image (trackdisk → `Disk.N` via `resload_DiskLoad`, disk change, copper, a dos `LoadSeg` hook), and in the hook one patch to `BH`. Decode its list with `tools/patchlist.py SLAVE 0x206`. |
+| Reconstruction | `whdload/original/Battlehawks1942.s` rebuilds the shipped slave byte-identically. Old-style Kick 1.3 boot: `resload_LoadKick` into ExpMem, a `resload_Patch` list on the Kickstart image (trackdisk → `Disk.N` via `resload_DiskLoad`, disk change, copper, a dos `LoadSeg` hook), and in the hook one patch to `BH`. Decode its list with `python3 -m amigaxdev.patchlist SLAVE 0x206`. |
 | Game patch | The manual check ("Recognition Test", shown before the first flight): `bh:025be move.b (0,a0,d1.l),d2; cmp.w d2,d0; beq.s` becomes `jsr fix; bra.s` — any answer passes, but Return must still be pressed. |
 | Built slave | `whdload/Battlehawks1942.s`: WHDLoad 20 KickEmu (`kick13.s` and the 20.0 headers from the shared `$WHDLOAD`, see `whdload/README.md`). 512 KB chip **plus 512 KB fast memory** (v1.0: chip only), `DISKSONBOOT`, `NUMDRIVES=3` (no swaps), `WPDRIVES=%1111` (as v1.0), the same `BH` patch via `_cb_dosLoadSeg` + `resload_PatchSeg`. `make verify` adds `tape.s`; `make c2pfull` the c2p experiment (`docs/c2p.md`). |
 
@@ -59,9 +59,11 @@ only") used the old A500-equivalent: `FAST_KB=0 EXTRA_ARGS=--slow_memory=1536`, 
 
 `bh.py serve` boots (`DEBUG=1 amiga/run.sh`: silent, its window behind the others; `WINDOW=none`
 runs with no video), attaches gdb within the stub's 20 s window,
-and serves `stop/cont/gdb/shot/profile/wait/until/quit` on `amiga/.run/bh.sock`. The
-profiler's PC window is fixed per capture by one lldb attach (`LLDB_FIX`, link-time
-`0x32dea04`, unchanged FS-UAE binary; ~35 s).
+and serves `stop/cont/gdb/shot/profile/wait/until/quit` on `amiga/.run/bh.sock` (the shared
+server, AmigaXDev `amigaxdev.gdbserve`; the shared tools are run under `. amiga/env.sh` or
+through `tools/_amigaxdev.py`). The profiler's PC window is fixed before each capture through
+one lldb kept attached for the session (link-time `0x32dea04`, unchanged FS-UAE binary): the
+first capture takes ~30 s for the attach, later ones none.
 
 **There is no attract demo**, and posted host key events never reach FS-UAE. Two ways were tried:
 
@@ -138,8 +140,9 @@ two captures. Counting by BH's own counter removes that. The window is 100 field
 - `compare_state.py`: BH's data hunk between two `STATE_ONLY` dumps (§9).
 - `fixed_window.sh` writes `armed.txt` (the tape field the anchor was armed at) and
   `anchor.txt` (the frame counter when the window opened).
-- `hotspots.py`, `disd.py`, `dis.sh`: instruction-level views (`HUNKBASE` = the `bh` region).
-- Disassemble `BH` without a dump: `tools/adf.py tmp/game/Battlehawks1942/Disk.1 BH tmp/BH`,
+- `python3 -m amigaxdev.disasm hotspots --label bh|disd|dis`: instruction-level views
+  (`HUNKBASE` = the `bh` region).
+- Disassemble `BH` without a dump: `python3 -m amigaxdev.adf tmp/game/Battlehawks1942/Disk.1 BH tmp/BH`,
   then hunk 0 is file `$28`..`$28+$1C794`.
 
 ## 5. Display and frame counting

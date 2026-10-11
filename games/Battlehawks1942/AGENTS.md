@@ -13,7 +13,9 @@ on faster Amigas.
 
 The shared environment comes from AmigaXDev, the repository next to this one: `make setup`
 there installs `~/.local` and `~/.local/share/amiga`, and `amiga/env.sh` sources
-`~/.local/share/amiga/env.sh`. The method and the lessons the projects share are in AmigaXDev:
+`~/.local/share/amiga/env.sh`. The generic tools (trace reader, disassembly, ADF, patch lists,
+the gdb server under `tools/bh.py`) are AmigaXDev's `amigaxdev` Python package; `tools/` holds
+only this game's. The method and the lessons the projects share are in AmigaXDev:
 
 | AmigaXDev doc | Holds |
 |---|---|

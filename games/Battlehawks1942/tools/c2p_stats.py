@@ -11,7 +11,8 @@ conversion and the rest, so a replacement can be sized against the measured chan
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto
+import _amigaxdev  # noqa: F401
+from amigaxdev import barto
 from bh_report import C2P, regions
 
 trace, code, base = barto.load(sys.argv[1]), open(sys.argv[2], 'rb').read(), int(sys.argv[3], 0)
