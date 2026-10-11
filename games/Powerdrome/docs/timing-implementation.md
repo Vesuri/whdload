@@ -1484,14 +1484,34 @@ All **264** recorded word-geometry/deadline samples agree, every stage initializ
 completes exactly once, and all four full invocation durations equal the native reference:
 **8,260 / 8,840 / 7,900 / 7,960 ms**. Every stage and full invocation passes the strict
 10% and 90-ms bounds, including a conservative 40-ms two-capture endpoint allowance.
-The A500 counterpart remains pending. Renderer diagnostics remain clean with unchanged
-raster code, but this pit window adds **zero** staged scenes; it is not new scene-equivalence
-or FPS evidence.
+The A500 counterpart **fails** calibration, as detailed below. Renderer diagnostics
+remain clean with unchanged raster code, but this pit window adds **zero** staged scenes;
+it is not new scene-equivalence or FPS evidence.
 
 ```sh
 python3 tools/check_repair_pacing.py tmp/prof/timing-repairloop3-native-a500 tmp/prof/timing-repairpace3-030-twins
 python3 tools/perf_status.py tmp/prof/timing-repairpace3-030-twins
 ```
+
+The 2,000-field `timing-repairpace3-a500` preserves all 264 geometry/deadline observations,
+but its invocation timing exceeds the native A500 reference by **120–860 ms**. Passing
+030 results therefore do not establish the required cross-CPU cadence. A matched-config
+run with the repair pilot disabled (`timing-repairpace3-off-a500`, frozen playercontract1)
+shows most of the cost is already present in the full timing prototype:
+
+| Item / direction | Native A500 | WORLD20, repair pilot off | WORLD20, repair pilot on |
+| --- | ---: | ---: | ---: |
+| 1 / 0 | 8,260 ms | 8,840 ms | 8,960 ms |
+| 1 / 1 | 8,840 ms | 8,940 ms | 8,960 ms |
+| 0 / 0 | 7,900 ms | 8,700 ms | 8,720 ms |
+| 0 / 1 | 7,960 ms | 8,780 ms | 8,820 ms |
+
+Waiting cannot recover the extra body time. Even without the new pacing, these cases are
+100–820 ms slower than the native reference. Equal-spaced deadlines also remove some of
+the headroom provided by cheaper native iterations before expensive ones, so they cannot
+be assumed free on A500. The next step is CPU-cycle attribution of the unpaced WORLD20
+repair body versus native code, followed by reducing or separating the identified work.
+Do not relax calibration bounds, disable the A500 gate or enable this pilot by default.
 
 `PDREPR01` records active stage, epoch, total units, latest deadline/completion time,
 stage/step counts, excluded pause time and lateness. The read-only `$14a20` continuation

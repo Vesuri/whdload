@@ -338,9 +338,12 @@ correction is the repair-animation pilot. Both variants/directions now have comp
 native A500 baselines. `TIMING_REPAIR=1` (default off, requires WORLD20 and CUSTOM3)
 paces both 33-step stages with cumulative deadlines and measured minimum sound/display
 pauses. The 030 run passes all 264 word-geometry/deadline samples and exactly matches
-native invocation times of 8,260 / 8,840 / 7,900 / 7,960 ms. A500 cadence, register/stack
-and nonlocal-result contracts, opponent continuity and the other repair branches remain
-open. Normal and pilot-disabled builds are unchanged. Next audit the projection flag and matched native animation visibility,
+native invocation times of 8,260 / 8,840 / 7,900 / 7,960 ms. The A500 counterpart fails
+by 120–860 ms. With repair pacing disabled, the same full timing prototype is already
+100–820 ms slower than native, so adding waits cannot close that gap. Profile the repair
+body to identify work that needs optimization or separation. Register/stack and nonlocal
+result contracts, opponent continuity and the other repair branches remain open. The
+pilot stays disabled by default; normal and pilot-disabled builds are unchanged. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.
