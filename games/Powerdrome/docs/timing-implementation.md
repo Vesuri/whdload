@@ -1906,7 +1906,8 @@ native result clock. This supports the ordinary race clock contract; it does not
 opponent's most recent step as a player's winning instant.
 
 The explicit `TIMING_PLAYER_RESULT_TEST=1` fixture requires VERIFY, COVERAGE_INPUT and
-WORLD20. After at least 500 ms of logical post-countdown time, it forces three counted
+WORLD20. Separate negative builds reject omission of each guard with its intended
+assembler error; the normal build is restored byte-identically afterward. After at least 500 ms of logical post-countdown time, it forces three counted
 native decisions: admission to a lap boundary at `$f7a0`, admission past the checkpoint
 predicate at `$f96c`, and the finish decision at `$f9d8`. It calls native `$f952` with its
 original caller stack; native code performs the lap-record mutations and result unwind.
@@ -1927,11 +1928,51 @@ staged scenes. The normal slave remains byte-identical and hook boundaries pass.
 python3 tools/check_player_result.py tmp/prof/timing-playerresult4-forced-030-complete
 ```
 
+The A500 counterpart `timing-playerresult4-forced-a500` passes the same directed
+500-ms lap/accumulated/result-duration checks, source-3 consumption, sentinel/registers,
+stack depth, duration flags, five-pilot sorting and cleanup. This closes the bounded
+CPU pair for the synthetic branch, not natural player-victory coverage.
+
+```sh
+python3 tools/check_player_result.py tmp/prof/timing-playerresult4-forced-a500
+```
+
+### Initialized player lap clock through pause
+
+The input-only `CUSTOM5=14` fixture selects Practice and waits for the native lap index
+to become nonnegative. It then schedules native pause/resume keys 160/210 PAL fields
+from that observed first-lap start, without early throttle/braking or writes to simulation
+state. This event-relative start matters: the existing `CUSTOM5=8` pause can occur before
+the private lap clock initializes, so its passing scheduler checks alone do not validate
+private-lap preservation. Its current regression still passes 50 excluded fields, five
+input events and exact remainder accounting, with 75 new clean renderer comparisons.
+
+`timing-playerpause2-030-twins` uses the frozen playerpause2 normal timing prototype,
+`CUSTOM1=1 CUSTOM3=1 CUSTOM4=1 CUSTOM5=14 NoCache`, 300 fields anchored at `$f952`, driving
+marker `$bc7c`, and the normal pause probes plus `$f118/$f10e/$f9a2`. The measured native
+pause excludes **49 PAL fields**. Private logical and native physical lap starts, logical
+world/input clocks and lap-accounting state remain unchanged across it. All **70** observed
+logical HUD outputs, including **26 after resume**, equal elapsed completed-world time;
+there is no native-reset fallback and the input queues drain without overflow. The run
+adds **61** completed clean renderer comparisons, with one further scene active at capture
+end. These instrumented counts are correctness evidence, not a performance measurement.
+
+```sh
+python3 tools/check_player_lap_pause.py tmp/prof/timing-playerpause2-030-twins
+python3 tools/perf_status.py tmp/prof/timing-playerpause2-030-twins
+```
+
+Read-only `PDPLAP_EVENT` probes expose validity, both lap starts, reset/lap/HUD counters,
+last durations and fallback count at the pause boundaries and HUD output. The checker
+requires an initialized lap at pause entry; it does not relax that condition for routes
+that have not reached the first crossing. A500 private-lap pause, rescue, external-reset
+fallback and natural completed laps/results remain open.
+
 The read-only capture locator now uses the installed frame JMP to find live session
 metadata in early captures: added helpers had put PDSESS01 exactly 4,096 bytes before
 WORLD20, outside the former strict proximity test. The completed fixture includes the
-cleanup evidence that the earlier aborted capture lacked. A500 directed results,
-non-forced regressions, natural player laps/results and lifecycle coverage remain open.
+cleanup evidence that the earlier aborted capture lacked. Wider non-forced regressions,
+natural player laps/results and lifecycle coverage remain open.
 
 Implement and test player lap storage, displayed elapsed time and final-result latching
 as one consistent contract. Practice has no initialized opponent timeline, so it needs

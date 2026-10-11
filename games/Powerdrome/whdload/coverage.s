@@ -108,6 +108,11 @@ coverage_vbl
 .normal_axes
  lea coverage_tape(pc),a2
  move.l custom5(pc),d0
+ cmp.l #14,d0
+ bne.s .not_lap_pause
+ lea coverage_lap_pause_tape(pc),a2
+ bra.w .tape
+.not_lap_pause
  cmp.l #13,d0
  bne.s .not_rescue
  lea coverage_rescue_tape(pc),a2
@@ -147,7 +152,21 @@ coverage_vbl
 .tape
  adda.l cov_index-coverage_status(a1),a2
  move.l $48fe(a0),d0
+ move.l custom5(pc),d3
+ cmp.l #14,d3
+ bne.s .flight_epoch
+ ; Pause-only timing starts after the native first lap crossing, not launch.
+ tst.w $a6e+$13e(a0)
+ bmi.w .done
+ tst.l coverage_lap_pause_epoch-coverage_status(a1)
+ bne.s .lap_epoch
+ move.l d0,coverage_lap_pause_epoch-coverage_status(a1)
+.lap_epoch
+ sub.l coverage_lap_pause_epoch-coverage_status(a1),d0
+ bra.s .due
+.flight_epoch
  sub.l cov_epoch-coverage_status(a1),d0
+.due
  cmp.l (a2),d0
  blo.s .done
  move.w $461a(a0),d1
@@ -436,6 +455,16 @@ coverage_timing_tape
  dc.l 250
  dc.w -1,0,0
 
+
+; Pause-only Practice route: allow the natural first lap start before pausing.
+coverage_lap_pause_epoch dc.l 0
+coverage_lap_pause_tape
+ dc.l 160
+ dc.w 's',1,0
+ dc.l 210
+ dc.w 's',1,0
+ dc.l 260
+ dc.w -1,0,0
 
 ; Same acceleration/brake start, then native pause with input changes during the pause.
 coverage_timing_pause_tape

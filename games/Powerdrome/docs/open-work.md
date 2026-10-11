@@ -313,9 +313,13 @@ HUD outputs with no initialized opponent timeline. A guarded player-finish latch
 the actual player world step as source 3. The explicit forced boundary/checkpoint/finish
 fixture verifies a 500-ms synthetic lap, accumulated total and result duration, native
 sentinel/registers/stack, duration flags, sorting and cleanup on 030. The fixture is off
-by default and does not prove natural laps or victory. A500 directed player results,
-non-forced regressions, natural completed laps/results, pause/rescue, external-reset
-fallback and lap/HUD guest flags/registers remain to verify. Next audit the projection flag and matched native animation visibility,
+by default and does not prove natural laps or victory. The A500 directed counterpart
+passes the same 500-ms accounting and contract checks. A new input-only `CUSTOM5=14`
+Practice route schedules pause after the natural first lap start. On 030, it excludes
+49 PAL fields while preserving private/native starts and logical clocks; 70 logical HUD
+outputs (26 resumed) pass, with no reset fallback and 61 clean renderer comparisons.
+A500 private-lap pause, wider non-forced regressions, natural completed laps/results,
+rescue, external-reset fallback and lap/HUD guest flags/registers remain to verify. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

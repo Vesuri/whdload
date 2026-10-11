@@ -228,6 +228,15 @@ if os.environ.get('TIMING_STATE') == '1':
             ov += [f'*(unsigned short*){op+x:#x}' for x in (64,66,132)]
             ov += [f'*(unsigned short*){wp+8:#x}', f'*(unsigned int*){fast_worlds[0]+a.base+12:#x}', '(unsigned int)$d5']
             pit_opponent_sample='printf "PDPOPP_EVENT %d {off} ' + ' '.join(['%u']*len(ov)) + '\\n", $pd_field, ' + ', '.join(ov) + '\n'
+    player_lap_sample=''
+    if fast_worlds:
+        player_laps=timing_locations(b'PDPLAP01', lambda off: struct.unpack_from('>H',code,off+8)[0]==1)
+        assert len(player_laps)<=1
+        if player_laps:
+            lp=a.base+player_laps[0]
+            lv=[f'*(unsigned short*){lp+8:#x}']
+            lv += [f'*(unsigned int*){lp+x:#x}' for x in range(12,44,4)]
+            player_lap_sample='printf "PDPLAP_EVENT %d {off} ' + ' '.join(['%u']*len(lv)) + '\\n", $pd_field, ' + ', '.join(lv) + '\n'
     retune_sample=''
     if fast_worlds:
         retunes=[m.start() for m in re.finditer(b'PDRETUNE',code)
@@ -258,7 +267,9 @@ if os.environ.get('TIMING_STATE') == '1':
                 sample += f'if {count} >= {opponent}\n'
                 sample += f'printf "PDOPP_ARRAY %d {off:#x} {opponent} ' + '%04x'*95 + '\\n", $pd_field, ' + ', '.join(words) + '\nend\n'
             sample += 'end\n'
-        if off in (0xf952,0xf974,0xf9a2,0xf9ec,0x10bf0,0x10bf6,0x10bfc,0x10c00,0x10c10,0xf108,0xf10e,0xf118):
+        if off in (0xbe12,0xbef2,0xf118,0x10c00,0xc2aa,0xc2b0):
+            sample += player_lap_sample.replace('{off}',hex(off))
+        if off in (0xbe12,0xbef2,0xf952,0xf974,0xf9a2,0xf9ec,0x10bf0,0x10bf6,0x10bfc,0x10c00,0x10c10,0xf108,0xf10e,0xf118):
             clock_values=[f'*(unsigned int*){r["game"][0]+0xf96:#x}']
             clock_values += [f'*(unsigned int*){state+x:#x}' for x in (0x206,0x202,0x1b2,0x17c)]
             clock_values += [f'*(unsigned short*){state+x:#x}' for x in (0x13e,0x43a,0xbe,0xb6)]

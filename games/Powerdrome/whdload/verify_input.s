@@ -43,6 +43,8 @@ practice_key
  move.l (sp)+,a0
  IFD COVERAGE_INPUT
  move.l custom5(pc),d0
+ cmp.l #14,d0
+ beq.s .practice_timing
  cmp.l #12,d0
  beq.s .practice_timing
  cmp.l #11,d0
