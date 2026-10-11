@@ -3295,7 +3295,7 @@ window, full opponent/effect state, or release performance. No fall-age or impul
 are nonzero in this run, so it supplies no new evidence for those effects.
 
 
-## Controlled simulation-stall fixture (runtime validation pending)
+## Controlled simulation-stall fixture and 500 ms comparison
 
 `TIMING_STALL_TEST=100|250|500` adds a VERIFY-only delay at the next flight allocator
 entry after at least 200 world updates. It holds the simulation while native VBL/input
@@ -3319,6 +3319,28 @@ frozen fixture builds pass this direct-reference decoding check.
 
 All three fixture variants assemble. Non-VERIFY and invalid-duration builds are rejected.
 An explicit zero fixture produces bytes identical to the frozen full timing prototype;
-the restored normal build also remains byte-identical. Runtime captures and validation
-of register/interrupt assumptions remain pending. No stall-independence claim is made
-from these build checks.
+the restored normal build also remains byte-identical. The runtime checker accepts
+WHDLoad's SR-to-CCR instruction rewrite at the saved-status prologue, while retaining
+exact checks on the following call and record-reference instructions. Stall duration uses
+paired guest VBL-counter observations, not an inferred mapping from debugger field numbers.
+
+The first 500 ms pair (`timing-stall500-1`) passes on A500/native and 030/fast. Each records
+one exact 25-PAL-field hold after 200 allocated world ticks, resumes at the saved next-world
+cursor and services all elapsed work through release. Both execute six input events once,
+145 logical control/fuel updates and three verified contact-damping responses. Independent
+movement, brake, resource and allocator checks pass. The 030 adds 151 clean completed
+renderer twins, with unchanged raster code and drawing inactive at the endpoint.
+
+Compared with both unstalled `timing-contact13-1` references, all four runs match 652 common
+sampled player/engine/RNG states and 144 control/input/fuel updates exactly. Endpoint
+retained/assigned debt is zero. The 030 observes at most 560 ms world-end delay and allocates
+up to 29 steps at once; A500 observes at most 760 ms and allocates up to its 32-step budget.
+The A500 maximum occurs later in the route, not necessarily at release. No retained debt
+is observed at these world-end probes, although unsampled elapsed time and assigned work
+are reported separately. The runs complete 654/656 world steps respectively; their exact
+13-second physical windows include initial/final unsampled time of 80/0 and 140/20 ms.
+
+This supports recovery from one 500 ms interruption on the matched route, including
+historical input processing. It does not establish arbitrary/repeated-stall independence,
+all effects or lifecycle handling. The 100 and requested-250 ms runtime cases remain open,
+as do controlled presentation rates and the ten-minute/restart requirement.

@@ -484,3 +484,12 @@ and independent duration/resume/debt checker are prepared for the next F7 experi
 Requested 100/250/500 ms delays produce 100/260/500 ms PAL waits. Build isolation passes,
 including byte-identical disabled and normal builds; stall runtime coverage is not yet
 established. See the controlled simulation-stall fixture in timing-implementation.
+
+
+The first 500 ms controlled-stall pair now passes on A500/native and 030/fast. Each holds
+for exactly 25 PAL fields, resumes at its saved logical cursor, preserves input ownership
+and catches up. Both stalled runs and both unstalled references match 652 sampled world
+states and 144 control/input/fuel states at common logical times. The 030 adds 151 clean
+renderer twins. Sampled maximum delays are 560/760 ms (030/A500), with zero endpoint
+retained/assigned debt. The 100/250 ms cases, repeated stalls and controlled render rates
+remain open; this is a bounded single-stall result, not complete F7 coverage.

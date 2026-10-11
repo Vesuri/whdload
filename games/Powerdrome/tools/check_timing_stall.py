@@ -20,7 +20,9 @@ def stall_tag(data, frame):
     # Follow the installed timing_frame's first BSR.W and the fixture's LEA.
     # The growing prototype can exceed a fixed tag-search window, and stale
     # loader copies must not be selected by a matching tag alone.
-    assert data[frame:frame+8]==bytes.fromhex('40e748e7e0c06100'), 'Missing stall call in live allocator'
+    # WHDLoad may rewrite MOVE SR,-(SP) to MOVE CCR,-(SP) on later CPUs.
+    assert data[frame:frame+2] in (bytes.fromhex('40e7'),bytes.fromhex('42e7'))
+    assert data[frame+2:frame+8]==bytes.fromhex('48e7e0c06100'), 'Missing stall call in live allocator'
     routine=frame+8+struct.unpack_from('>h',data,frame+8)[0]
     assert 0 <= routine < len(data)-4 and data[routine:routine+2]==bytes.fromhex('43fa')
     tag=routine+2+struct.unpack_from('>h',data,routine+2)[0]
@@ -48,10 +50,16 @@ def check(root):
     origin=u32(chip,game+0x48fe)
     assert origin<=start<end<=origin+int(config['FIELDS'])
     assert ticks>=200
+    log=(root/'swaps-gdb.txt').read_text()
+    world=re.findall(r'^PDW20_EVENT (-?\d+) 0xcedc (.+)$',log,re.M)
+    physical=re.findall(r'^PDINITIAL_EVENT (-?\d+) 0xcedc (.+)$',log,re.M)
+    assert len(world)==len(physical), 'Missing physical-clock observation'
     rows=[]
-    for field,values in re.findall(r'^PDW20_EVENT (-?\d+) 0xcedc (.+)$',
-                                 (root/'swaps-gdb.txt').read_text(),re.M):
-        rows.append((origin+int(field),int(values.split()[0])))
+    for (field,values),(physical_field,physical_values) in zip(world,physical):
+        assert field==physical_field, 'Misordered world/physical-clock observations'
+        # Read the guest VBL counter at the same world-end stop. The debugger's
+        # field counter starts at its own interrupt boundary, not at snapshot time.
+        rows.append((int(physical_values.split()[1]),int(values.split()[0])))
     assert rows
     assert not any(start<field<end for field,_ in rows), 'World progressed inside the stall'
     resumed=[(field,tick) for field,tick in rows if field>=end]
