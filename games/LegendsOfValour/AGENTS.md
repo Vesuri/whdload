@@ -7,6 +7,29 @@ the game is `data/AMIGA2`, a PowerPacker-crunched 17-hunk executable that `tools
 decrunches into `tmp/unpacked/AMIGA2`. Any change to the game is meant to ship as WHDLoad slave
 patches.
 
+## Shared environment and knowledge
+
+The shared environment comes from AmigaXDev, the repository next to this one: `make setup`
+there installs `~/.local` and `~/.local/share/amiga`, and `amiga/env.sh` sources
+`~/.local/share/amiga/env.sh`. The method and the lessons the projects share are in AmigaXDev:
+
+| AmigaXDev doc | Holds |
+|---|---|
+| `docs/playbooks/new-game-playbook.md` | the method this repo follows |
+| `docs/playbooks/new-game-playbook-hardware.md` | black screens and dumps on real Amigas, CPU caches |
+| `docs/playbooks/whdload-mmu.md` | MMU compatibility and crash diagnosis |
+| `docs/playbooks/fixed-time-simulation.md` | game time, fixed ticks, input per tick, raising the update rate |
+| `docs/playbooks/simulation-and-presentation.md` | uncapped drawing, interpolation, smaller timesteps |
+| `docs/environment.md` | the shared variables |
+| `docs/reference/headless-fsuae.md` | the shared launcher, FS-UAE builds, the gdb stub |
+| `docs/reference/measurement-method.md` | instruments, A/B discipline, pricing a change |
+| `docs/reference/m68k-optimisation.md` | 68000/68020 cost model and code rules |
+| `docs/reference/amiga-hardware.md` | Chip bus, FMODE, copper, blitter, caches |
+
+Generic lessons go into those docs (edit them in AmigaXDev); this repository keeps what is
+specific to this game.
+
+
 ## Rules
 
 - **Never commit game, Kickstart or WHDLoad bytes**, or anything made from them: unpacked
@@ -16,7 +39,7 @@ patches.
   game patches are hunk-1 offsets), `slave+OFFSET` slave code-hunk offsets, or `kick:` ROM
   addresses — never absolute addresses.
 - **No machine-specific paths** in tracked files: no `/Users/...` or `~/Documents`-style paths, no
-  paths into other projects (name them as "Project relative/path"). Shared Amiga files come from
+  paths into other projects (name them by project name only). Shared Amiga files come from
   `~/.local/share/amiga` (AmigaXDev) through the overridable variables of the shared `env.sh`,
   which `amiga/env.sh` sources; scratch output goes
   to `tmp/`. Docs describe the current state; history belongs in git.
