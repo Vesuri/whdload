@@ -222,6 +222,9 @@ coverage_fallback
 .effect
  move.w $4ce(a6),d0
  or.w $4d0(a6),d0
+ IFNE TIMING_WEATHER_EFFECTS
+ or.w timing_weather_state+8(pc),d0
+ ENDC
  beq.s .animation
  addq.l #1,cov_effect-coverage_status(a0)
 .animation

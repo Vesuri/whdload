@@ -3759,3 +3759,65 @@ The 60-second matched-input captures have zero forecast/transition/effect fields
 endpoints, inactive deadlines and no nonzero sampled transition phase. The completed
 portion of the ten-minute route likewise has not established a weather episode. Those
 runs must not be used to close this weather gate.
+
+## Experimental logical weather-effect ownership
+
+`TIMING_WEATHER_EFFECTS=1` now builds the first effect-ownership split in
+`timing_weather_effects.s`. It requires `TIMING_PERIODIC=1` and WORLD20, remains disabled
+by default, and installs its hooks only under `CUSTOM3`. This is not complete weather
+timing: forecast, start/expiry and fade/gear timing still follow their existing paths.
+No cache policy changes are made.
+
+During supported human flight, each logical 90 ms control update at world end:
+
+1. Publishes the current nonzero effect lifetime and its pre-draw seed, decrements the
+   persistent lifetime once, and advances the logical RNG four times to account for the
+   native effect draw.
+2. Applies the native generation eligibility gates, decrements its delay, and performs
+   the native shift-7 selection and shift-14 delay selection through `$53f6` when due.
+3. Queues rectangle cleanup for presentation instead of repeating the native drawing
+   operation during catch-up. The existing world wrapper retains the resulting logical seed.
+
+The 90 ms period is an initial candidate shared with the existing control cadence,
+about 8.1% longer than the measured native generation interval of 83.283 ms. Active-effect
+response/lifetime calibration has not yet established acceptance of that candidate.
+
+The renderer uses the latest published lifetime/seed. It temporarily installs the saved
+visual seed around the native draw helper, then restores the outer seed. Repeated draws
+therefore do not advance simulation RNG or decrement persistent lifetime. Palette state
+and native presentation calls remain per actual draw. The outer loop performs pending
+native rectangle cleanup and skips its original generation block while logical ownership
+is enabled. Outside the supported flight predicate, native effect behavior is retained;
+those mode paths are not yet framerate-independent. Initialization/session cleanup clears
+pending visual ownership. Pause, pit/recovery and full lifecycle contracts remain to be
+validated with active effects.
+
+Fast-planar eligibility additionally checks the published visual lifetime. This is
+necessary on the last visible tick, when persistent lifetime is already zero: the scene
+must still take the native effect path. The coverage fallback classification includes
+that published state as well. Native hook bytes are checked before installation at
+`$bc8a`, `$112e6` and `$112f4`. Diagnostics tagged `PDWEFX01` track publication/temporary
+seed ownership, logical updates, visual RNG events, generation attempts/selections,
+actual draws and deferred cleanup. The installed draw JMP locates the live record.
+
+Build and integration checks pass:
+
+- All new hooks replace complete instructions; no decoded native direct branch enters
+  their interiors. Both original-weather C3-off snapshots retain every declared native
+  timing-hook byte.
+- Explicit `TIMING_WEATHER_EFFECTS=0` reproduces the frozen full timing prototype byte
+  for byte. The restored normal build reproduces its saved reference exactly.
+- An invalid flag value and enabling effects without the periodic scheduler are rejected.
+- `timing-weather-effects1-dry` passes 650-field A500/native and 030/fast runs. Against both
+  unchanged `timing-contact13-1` references, 652 common world states and 144 common
+  control/input/fuel updates match exactly. Diagnostics show 144/145 logical effect
+  updates (030/A500), with zero effect events, attempts, selections, draws or cleanup
+  and no pending visual state. The 030 adds 158 clean completed renderer twins with
+  unchanged raster code; another draw is active at the endpoint and is not counted.
+
+The frozen development artifact is `tmp/Powerdrome-timing-weather-effects1.slave`, built
+with the same fixed-seed WORLD20/repair/pit-sync flags as the matched timing prototype plus
+`TIMING_WEATHER_EFFECTS=1`. The dry-weather result validates integration only. Next observe
+active lifetime/RNG publication and draw-seed restoration, verify cleanup and both render
+paths, then move forecast/expiry and fade/gear progression to logical scheduling. Do not
+report weather or the full F1–F8 feature complete from this bounded result.

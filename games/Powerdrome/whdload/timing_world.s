@@ -16,6 +16,9 @@ timing_world_initialize
  lea timing_world_state(pc),a0
  IFNE TIMING_WORLD20
  bsr timing_forces_initialize
+ IFNE TIMING_WEATHER_EFFECTS
+ bsr timing_weather_reset
+ ENDC
  tst.w timing_pit_rebase-timing_world_state(a0)
  bne.s .keep_message_clock
  clr.w timing_message_clock+8-timing_world_state(a0)
@@ -132,6 +135,9 @@ timing_world_end
  bra.w timing_world_render
 .ordinary_end
  bsr timing_opponent_effects_tick
+ IFNE TIMING_WEATHER_EFFECTS
+ bsr timing_weather_tick
+ ENDC
  ENDC
  IFNE TIMING_WORLD20
  lea timing_world20_state(pc),a0

@@ -137,6 +137,10 @@ scene_entry
  bne.w scene_native
  tst.w $2ea(a6)
  bne.w scene_native
+ IFNE TIMING_WEATHER_EFFECTS
+ move.w timing_weather_state+8(pc),d0
+ bne.w scene_native
+ ENDC
  tst.w $4ce(a6)
  bne.w scene_native
  tst.w $4d0(a6)

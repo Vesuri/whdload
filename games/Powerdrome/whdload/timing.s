@@ -4,6 +4,17 @@ TIMING_DEPARTURE = 1
  IFND TIMING_PERIODIC
 TIMING_PERIODIC = 0
  ENDC
+ IFND TIMING_WEATHER_EFFECTS
+TIMING_WEATHER_EFFECTS = 0
+ ENDC
+ IFNE TIMING_WEATHER_EFFECTS
+ IFNE TIMING_WEATHER_EFFECTS-1
+ FAIL "TIMING_WEATHER_EFFECTS must be 0 or 1"
+ ENDC
+ IFEQ TIMING_PERIODIC
+ FAIL "TIMING_WEATHER_EFFECTS requires TIMING_PERIODIC"
+ ENDC
+ ENDC
 ; C3: elapsed-time timing correction, independent of fast planar rendering.
 ; Current corrections: PAL minimum delta and A500-paced cockpit departure.
 ; Broader periodic gameplay scheduling remains a separately compiled prototype.

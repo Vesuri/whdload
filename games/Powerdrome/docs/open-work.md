@@ -543,4 +543,12 @@ mean interval. Each of 90 effect draws also advances the shared RNG exactly four
 Those advances must be accounted for in logical simulation, with a saved visual seed
 for presentation, otherwise rendering remains coupled to weather randomness. Palette
 cleanup remains per actual draw. Weather scheduling, presentation wrappers and mode/reset
-handling are the next implementation work; no corrected weather result is claimed yet.
+handling remain required. The first logical effect split is now implemented behind
+`TIMING_WEATHER_EFFECTS=1` and CUSTOM3, disabled by default. It moves lifetime,
+generation and four-per-effect-draw RNG advances into logical control updates, replays
+saved visual seeds for drawing, defers rectangle cleanup, and adds last-visible-tick
+fast-renderer fallback protection. Forecast/expiry and fade/gear remain frame-dependent.
+Disabled/normal bytes and hook boundaries pass. Its dry-weather A500/030 pair matches
+652 common world states and 144 control/input/fuel updates against both unchanged
+references, with 158 completed renderer twins. Active-effect replay/cleanup, cadence
+acceptance and mode/lifecycle validation remain open; this is not completed weather timing.

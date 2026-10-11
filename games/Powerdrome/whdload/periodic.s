@@ -58,6 +58,11 @@ TIMING_WORLD_STEP = 4
  ELSE
 TIMING_WORLD_STEP = 18
  ENDC
+ IFNE TIMING_WEATHER_EFFECTS
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_WEATHER_EFFECTS requires TIMING_WORLD20"
+ ENDC
+ ENDC
  IFND TIMING_REPAIR
 TIMING_REPAIR = 0
  ENDC
@@ -380,12 +385,24 @@ install_periodic
  move.w #$42e7,(a0)
  ENDC
 .flags
+ IFNE TIMING_WEATHER_EFFECTS
+ bsr timing_weather_check
+ ENDC
  lea pl_periodic(pc),a0
  move.l _resload(pc),a2
  jsr resload_Patch(a2)
  movem.l (sp)+,d0-d2/a0-a2
  rts
 pl_periodic PL_START
+ IFNE TIMING_WEATHER_EFFECTS
+ ; TIMING_RANGE h0:$bc8a 8 bit=C3
+ PL_P $bc8a,timing_weather_outer
+ PL_NOP $bc90,2
+ ; TIMING_RANGE h0:$112e6 6 bit=C3
+ PL_P $112e6,timing_weather_draw
+ ; TIMING_RANGE h0:$112f4 6 bit=C3
+ PL_P $112f4,timing_weather_draw_end
+ ENDC
  IFNE TIMING_WORLD20
  ; Timestamp centering at native keyboard publication, before drawing consumes it.
  ; TIMING_RANGE h0:$5816 6 bit=C3
@@ -1190,6 +1207,22 @@ timing_targets
  dc.l $fb8c
  dc.w timing_world20_damage_continue+2-timing_targets
  ENDC
+ IFNE TIMING_WEATHER_EFFECTS
+ dc.l $53f6
+ dc.w timing_weather_random+2-timing_targets
+ dc.l $17836
+ dc.w timing_weather_cleanup+2-timing_targets
+ dc.l $bd1a
+ dc.w timing_weather_fade+2-timing_targets
+ dc.l $bc92
+ dc.w timing_weather_generation+2-timing_targets
+ dc.l $112f0
+ dc.w timing_weather_draw_body+2-timing_targets
+ dc.l $11300
+ dc.w timing_weather_after_draw+2-timing_targets
+ dc.l $112fa
+ dc.w timing_weather_present+2-timing_targets
+ ENDC
 timing_targets_end
 
 timing_state dc.b 'PDTIME01'
@@ -1229,3 +1262,7 @@ timing_control_phase dc.w 1
 
  INCLUDE timing_stall_test.s
  INCLUDE timing_render_rate_test.s
+
+ IFNE TIMING_WEATHER_EFFECTS
+ INCLUDE timing_weather_effects.s
+ ENDC

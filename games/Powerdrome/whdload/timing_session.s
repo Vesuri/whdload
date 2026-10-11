@@ -60,6 +60,9 @@ timing_session_end
 
 ; Caller owns saved registers/CCR; producer must already be stopped.
 timing_session_clear_work
+ IFNE TIMING_WEATHER_EFFECTS
+ bsr timing_weather_reset
+ ENDC
  clr.w timing_due-timing_state(a1)
  clr.l timing_phase-timing_state(a1)
  clr.w timing_control_left-timing_state(a1)
