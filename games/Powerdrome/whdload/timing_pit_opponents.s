@@ -239,29 +239,65 @@ timing_pit_opponent_restore
  move.w (sp)+,ccr
  rts
 
-; D8CA publishes a message whose native expiry is checked by the outer pit.
-; A scheduled pit update temporarily replaces $5e with its opponent phase, so
-; use the saved outer counter for this escaping deadline. Flight messages keep
-; their existing world-counter behavior until their elapsed lifetime is split.
-; Replay MOVE.L flags and preserve all registers, including D0 and A0.
-timing_pit_message_counter
- move.l d0,-(sp)
+; Flight message publication/expiry share the completed logical control phase.
+; Pit publications retain the saved outer pit counter rule. Other modes stay native.
+; Only D0 is an output; the selection itself never changes X.
+timing_message_counter_source
  move.l a0,-(sp)
+ move.w timing_started(pc),d0
+ beq.s .outer
+ move.w timing_pit_state+8(pc),d0
+ bne.s .outer
+ move.w timing_world20_initialized(pc),d0
+ beq.s .outer
+ tst.w $b6(a6)
+ bne.s .outer
+ tst.w $43a(a6)
+ bpl.s .outer
+ moveq #0,d0
+ move.w timing_world_state+30(pc),d0
+ bra.s .done
+.outer
  move.l $5e(a6),d0
  lea timing_pit_opponent_state(pc),a0
  tst.w 10(a0)
- beq.s .store
+ beq.s .done
  move.w timing_world_state+8(pc),d0
  bne.s .native
  move.l 40(a0),d0
- bra.s .store
+ bra.s .done
 .native
  move.l $5e(a6),d0
-.store
+.done
  movea.l (sp)+,a0
+ rts
+
+; Whole MOVE.L at D8CA/13536/C990. Preserve its flags and every register.
+timing_pit_message_counter
+ move.l d0,-(sp)
+ bsr timing_message_counter_source
  move.l d0,$64(a6)
  movem.l (sp)+,d0
  rts
+
+; Replay CMP.L counter,D0 / BGT, selecting the same domain as publication.
+; MOVEM restores D1 without changing the CMP flags; both native successors
+; receive their original register values and stack depth.
+timing_message_expiry
+ move.l d1,-(sp)
+ move.l d0,-(sp)
+ bsr timing_message_counter_source
+ move.l d0,d1
+ move.l (sp)+,d0
+ cmp.l d1,d0
+ movem.l (sp)+,d1
+ bgt.w timing_message_alive
+ bra.w timing_message_expired
+
+timing_message_alive dc.w $4ef9
+ dc.l 0
+timing_message_expired dc.w $4ef9
+ dc.l 0
 
 ; MOVE.L wrappers reproduce NZVC and preserve X and every other register.
 timing_pit_clock_d7

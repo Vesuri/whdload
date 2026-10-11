@@ -395,6 +395,15 @@ pl_periodic PL_START
  ; A pit result message outlives the temporary opponent counter ownership.
  ; TIMING_RANGE h0:$d8ca 6 bit=C3
  PL_PS $d8ca,timing_pit_message_counter
+ ; Queued flight text and its expiry reader both run outside world ownership.
+ ; TIMING_RANGE h0:$13536 6 bit=C3
+ PL_PS $13536,timing_pit_message_counter
+ ; Direct 15-phase screen/message refresh publication.
+ ; TIMING_RANGE h0:$c990 6 bit=C3
+ PL_PS $c990,timing_pit_message_counter
+ ; Whole four-byte comparison and two-byte signed branch.
+ ; TIMING_RANGE h0:$da54 6 bit=C3
+ PL_P $da54,timing_message_expiry
  ; Opponent-only direct clock reads. Outside modal updates these stay native.
  ; TIMING_RANGE h0:$d4b6 6 bit=C3
  PL_PS $d4b6,timing_pit_clock_d7
@@ -963,6 +972,12 @@ timing_targets
  dc.w timing_engine_native_flash+2-timing_targets
  dc.l $10d0c
  dc.w timing_engine_native_hud+2-timing_targets
+ IFNE TIMING_WORLD20
+ dc.l $da64
+ dc.w timing_message_alive+2-timing_targets
+ dc.l $da5a
+ dc.w timing_message_expired+2-timing_targets
+ ENDC
  dc.l $13514
  dc.w timing_engine_native_message+2-timing_targets
  ENDC

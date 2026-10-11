@@ -387,8 +387,13 @@ one nonempty poll; it is input evidence, not a new timing claim. Special command
 queue wrap/capacity, concurrent producers and exits remain to test. Independent native pixel equivalence,
 skipped drawing-register/HUD scratch state, full opponent-record equivalence, native exits
 and broader modes still remain open; both
-experimental repair switches stay disabled by default. Message lifetime itself still needs elapsed-time calibration, and ordinary world
-messages/other setters remain open; do not treat the ownership fix as full message timing. Register/stack and nonlocal
+experimental repair switches stay disabled by default. Ordinary flight-message publication
+and expiry now share the logical control phase in WORLD20: A500/030 each pass thirteen
+publications and two clears at 45 phases (4,050 ms), with 204/241 expiry branch/register
+checks and 294 clean completed 030 renderer comparisons. The three pit publication
+contracts still pass. Direct/less common publishers, native lap rebasing, phase wrap,
+mode handoffs and A500 message-duration calibration remain open; pit expiry still uses
+the outer pit counter. Do not treat this bounded correction as complete message timing. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The
 pilot stays disabled by default; the normal build is unchanged. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair

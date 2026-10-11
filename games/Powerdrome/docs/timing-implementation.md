@@ -1851,6 +1851,71 @@ python3 tools/check_timing_opponent_continuity.py --repair-only --stable-lap-dom
 python3 tools/check_repair_pacing.py --native-steps --continuous-stages tmp/prof/timing-repairloop3-native-a500 tmp/prof/timing-repairdrop3-a500
 ```
 
+#### Logical flight-message publication and expiry
+
+The WORLD20 prototype now uses one logical counter domain for ordinary human-flight
+message publication and expiry. Both queued text presentation and native `$da50–$da64`
+expiry run **outside** temporary world ownership, so changing a publisher alone is
+incorrect. The prior `timing-flightmessage-before-a500` trace observes ten publications,
+eight with different render and logical phases; at field 227 the publisher uses render
+counter 103 while the last logical phase is 110. The consumer also uses the render
+counter. Thus these ordinary messages are frame-counted even though controls are timed.
+
+The shared counter selector now chooses the most recently completed logical control
+phase when timing has started, WORLD20 has initialized, no pit owns the context, and the
+native mode is human flight. `$13536` and `$c990` publish into that domain; the existing
+`$d8ca` opponent-message hook uses it in flight too. Native additions of 15/30/45 phases
+remain in place. The `$da54` CMP/BGT pair compares against the same selected domain and
+rejoins the original alive/expired successors. All registers and stack depth are preserved;
+MOVE/CMP define their native flags, with X unchanged. Pits keep the previously corrected
+saved-outer-counter behavior; unsupported modes select their native counter. The new
+hooks are inside WORLD20 and CUSTOM3, not the normal minimum/liftoff-only build.
+
+The frozen `Powerdrome-timing-flightmessage2.slave` uses the full timing/repair prototype,
+fixed test seeds and **no** initial-pit synchronization or input/result predicate fixture.
+The input-only CUSTOM5=11 centering route runs for 850 fields from `$bc7c`:
+
+| Check | A500 | 68030/25, renderer twins |
+| --- | ---: | ---: |
+| Logical message publications | 13 | 13 |
+| Publications differing from the render counter | 11 | 13 |
+| Expiry branch and register/SP checks | 204 | 241 |
+| Unrefreshed native clears | 2 | 2 |
+| Observed age at each clear | 45 logical phases | 45 logical phases |
+
+Both unrefreshed messages expire at **4,050 ms of logical control time** on both CPUs.
+This is elapsed simulation time, not a claim of identical physical display latency or
+original A500 message-duration calibration. The 030 completes **294 clean renderer
+comparisons**, with unchanged raster code and no pixel/guard/scratch/register failures;
+its final snapshot is inside another staged draw and is not a teardown check.
+
+`timing-flightmessage2-pit-a500`, built with the existing synchronized pit fixture,
+regresses all three differing-domain pit publications, their native MOVE/ADD boundaries,
+register/SP preservation and following outer consumers. Normal-build bytes remain
+identical. The legacy engine-only prototype still builds, and WORLD20 without ENGINE
+is rejected by its existing dependency guard. The hook-layout checker verifies complete
+instructions and native bytes at all sites in both C3-off reference snapshots.
+
+This is a bounded flight-message correction. The direct `$c990` publisher and flight
+`$d8ca` context still need directed runtime coverage. Native lap rebasing at `$10c16–$10c28`,
+16-bit phase wrap, pause/rescue/result handoffs, other publishers and unsupported modes
+remain to audit before release. The current checker explicitly rejects phase resets or
+wrap instead of counting those cases as covered. Runtime guest CCR edge cases and native
+A500 lifetime calibration also remain open. Pit expiry is still in its outer counter domain.
+
+Use TIMING_STATE, TIMING_EARLY and probes
+`0x13536 0x1353c 0x13558 0xda50 0xda54 0xda5a 0xda64 0x134ba` with the usual 850-field
+C5=11 A500/030 configurations. Do not probe `$da58` in the corrected build: it lies inside
+the replaced comparison/branch pair. PDMSGDOMAIN_EVENT records timing/pit/world ownership,
+last logical phase, opponent ownership, message flag and native mode. PDMESSAGE/PDMREG
+provide independent native deadline, clock, register and stack observations.
+
+```sh
+python3 tools/check_flight_message.py tmp/prof/timing-flightmessage2-a500
+python3 tools/check_flight_message.py tmp/prof/timing-flightmessage2-030-twins
+python3 tools/check_pit_message.py tmp/prof/timing-flightmessage2-pit-a500
+```
+
 #### Pit message counter ownership correction
 
 The read-only `timing-message-ledger-world-a500` capture directly establishes the leak.

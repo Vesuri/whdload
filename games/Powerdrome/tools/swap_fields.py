@@ -320,11 +320,16 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += 'printf "PDPLAYER_CLOCK %d ' + hex(off) + ' ' + ' '.join(['%u']*len(clock_values)) + '\\n", $pd_field, ' + ', '.join(clock_values) + '\n'
         if off in (0x10bf8,0x10c00,0xf110,0xf118):
             sample += player_contract_sample.replace('{off}',hex(off))
-        if off in (0xd8ca,0xd8d0,0xd8d8,0xe2a6,0xe2ac,0xe330,0x148d0,0x13536,0x13558,0x141aa,0x141b8):
+        if off in (0xd8ca,0xd8d0,0xd8d8,0xe2a6,0xe2ac,0xe330,0x148d0,0x13536,0x1353c,0x13558,0xda50,0xda54,0xda58,0xda5a,0xda64,0x134ba,0x141aa,0x141b8):
             message_values=[f'*(unsigned int*){state+x:#x}' for x in (0x5e,0x64,0xee)]
             message_values += [f'*(unsigned int*){r["game"][0]+x:#x}' for x in (0xf96,0x48fe)]
             message_values += [f'(unsigned int)${reg}' for reg in ('d0','d7','sp')]
             sample += 'printf "PDMESSAGE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(message_values)) + '\\n", $pd_field, ' + ', '.join(message_values) + '\n'
+        if fast_worlds and off in (0x13536,0x1353c,0x13558,0xda50,0xda54,0xda58,0xda5a,0xda64,0x134ba,0xd8ca,0xd8d0,0xd8d8):
+            domain_values = [f'*(unsigned short*){ptr+off2:#x}' for ptr, off2 in
+                             ((tp,8),(pitp,8),(wp,8),(wp,30),(op,10))]
+            domain_values += [f'*(unsigned short*){state+x:#x}' for x in (0x68,0xb6,0x43a)]
+            sample += 'printf "PDMSGDOMAIN_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(domain_values)) + '\\n", $pd_field, ' + ', '.join(domain_values) + '\n'
         if off in (0xcf2e, 0xd000, 0xd022, 0xd038, 0xd058):
             bv = [f'*(unsigned short*){state+x:#x}' for x in
                   (0x194,0x454,0x1f0,0x138,0x1ba,0xe4,0x432,0x422)]
@@ -361,7 +366,7 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):
             sample += heat_sample.replace('{off}',hex(off))
-        if off in (0xd8ca,0xd8d0,0xd8d8,0x10bf8,0x10c00,0xf110,0xf118,0xccee,0xccf6,0x14090,0xe8d4,0x103a2,0xbfb0,0xbfb6,0x14764,0x147a6):
+        if off in (0x13536,0x1353c,0x13558,0xda50,0xda54,0xda58,0xda5a,0xda64,0x134ba,0xd8ca,0xd8d0,0xd8d8,0x10bf8,0x10c00,0xf110,0xf118,0xccee,0xccf6,0x14090,0xe8d4,0x103a2,0xbfb0,0xbfb6,0x14764,0x147a6):
             contract_values=[f'(unsigned int)${reg}' for reg in
                              ('d0','d1','d2','d3','d4','d5','d6','d7','a0','a1','a2','a3','a4','a5','a6','sp','sr')]
             contract_values += [f'*(unsigned short*){state+x:#x}' for x in (0x21c,0x194)]
