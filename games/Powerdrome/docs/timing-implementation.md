@@ -3809,6 +3809,16 @@ compatibility; they mean a queued sound request and wrapper calls, respectively.
 The latter increments before the native helper and does not prove audible playback:
 the helper can return immediately when `state+$2f4` is nonzero.
 
+`tools/weather_audio_state.py CAPTURE...` reads initial/final native allocation,
+optional sample availability, suppression and channel-3 bookkeeping. With
+`--require-available`, absence of the extra samples is a failure. For available samples,
+it checks the 404,000-byte allocation, table extent and the fifth descriptor's sample
+pointer/word length/period, rejecting reads outside the captured allocation. This is a
+resource precondition check, not an audio playback or timing test. The completed
+`timing-weather-cadence-test1` pair has the smaller 266,400-byte allocation and a null
+optional sample table at both endpoints on both CPUs; the availability gate rejects it.
+The positive larger-memory path remains unvalidated until a corresponding run completes.
+
 This is separate from the renderer's palette restoration at `$117c8–$117d4`, which
 calls `$f914` when `state+$4d0` is set. Sound validation must check sample/period/volume,
 channel state and request timing, including whether multiple logical requests are
