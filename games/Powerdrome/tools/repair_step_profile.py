@@ -58,6 +58,12 @@ def profile(root):
                     partial.append(current['counter'])
                 current = {'counter': regs[7] & 0xffff, 'boundaries': {},
                            'opponent_body_entries': 0}
+            if current is not None and offset == 0xe2a6:
+                current['message_deadline'] = regs[0]
+            if current is not None and offset == 0xe2ac:
+                current['message_expired'] = True
+            if current is not None and offset == 0xe330:
+                current['message_hunk_offset'] = regs[11] - base
             if current is not None and offset == 0xd3de:
                 assert 'opponents_begin' in current['boundaries']
                 assert 'opponents_end' not in current['boundaries']
@@ -84,7 +90,12 @@ def profile(root):
     assert complete, 'No complete repair steps; capture a longer unpaced window'
     counters = [row['counter'] for row in complete]
     assert counters == list(range(counters[0], counters[-1] - 1, -1)), counters
+    state = base + 0xa6e
+    assert state + 0x68 <= len(trace.chip), 'A500 state must reside in chip memory'
+    initial_counter = int.from_bytes(trace.chip[state + 0x5e:state + 0x62], 'big')
+    initial_deadline = int.from_bytes(trace.chip[state + 0x64:state + 0x68], 'big')
     return {'capture': root.name, 'complete_steps': complete,
+            'initial_counter': initial_counter, 'initial_message_deadline': initial_deadline,
             'partial_step_counters': partial,
             'opening_prefix_excluded': counters[0] != 32,
             'cycle_scale_per_ms': CYCLES_PER_MS}
@@ -105,6 +116,14 @@ def main():
               f"{rows[0]['counter']}..{rows[-1]['counter']}; "
               f"partial counters {report['partial_step_counters']}; "
               f"opening prefix excluded={report['opening_prefix_excluded']}")
+        print(f"initial frame counter={report['initial_counter']}, "
+              f"message deadline={report['initial_message_deadline']}")
+        print('message transitions (counter, hunk offset, expired): ' + ', '.join(
+            f"{r['counter']}, ${r.get('message_hunk_offset', 0):x}, "
+            f"{bool(r.get('message_expired'))}"
+            for i, r in enumerate(rows) if i == 0 or
+            (r.get('message_hunk_offset'), bool(r.get('message_expired'))) !=
+            (rows[i-1].get('message_hunk_offset'), bool(rows[i-1].get('message_expired')))))
         print('segment                 mean_ms    min_ms    max_ms')
         for label in [s[0] for s in SEGMENTS] + ['total']:
             values = [(r['total_cycles'] if label == 'total' else r['cycles'][label])

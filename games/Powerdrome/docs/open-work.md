@@ -345,9 +345,12 @@ instruction traces now isolate eight complete first-stage steps: their WORLD20 t
 13.277 ms longer, with 10.121 ms added in opponent service. Body composition and copying
 remain large existing costs; display waits vary with refresh phase. Extend the complete-step
 attribution across the stage and reduce or separate work without dropping simulation time.
-The eight-step subset runs ten opponent updates versus native's eight, so part of the
-extra cost is necessary catch-up. A longer WORLD20 trace now has 32 complete steps and
-42 opponent updates; its matched native comparison remains to finish. Register/stack and nonlocal
+The matched longer traces now cover 32 complete steps: WORLD20 executes 42 opponent
+updates versus native's 32 and takes 113.172 ms longer. A message-lifetime mismatch
+also keeps costly text drawing active: native has 27 counter increments remaining at
+repair entry, WORLD20 254; native expires the message for the final five steps while
+WORLD20 does not. Trace the message creation/counter ownership and correct its elapsed
+time before attributing the whole slowdown to scheduling or changing the repair cadence. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The
 pilot stays disabled by default; normal and pilot-disabled builds are unchanged. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair

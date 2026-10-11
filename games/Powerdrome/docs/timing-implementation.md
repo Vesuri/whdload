@@ -1553,12 +1553,32 @@ wrapper overhead. The six single-update WORLD20 calls still take 2.837–2.880 m
 matching body paths and state is necessary before attributing this remaining difference
 solely to the scheduler.
 
-The longer `timing-repair-stagecost-world-a500` capture completes 32 first-stage steps,
-counters 31 through zero, excluding the same opening partial step. Their mean is
-117.890 ms; 42 native opponent-body entries are recorded, with ten steps serving two
-updates. Body composition averages 46.516 ms, copying 20.698 ms, and opponent service
-3.507 ms. These are the unpaced WORLD20 measurements; the matching native stage is
-needed before extending the eight-step comparison or explaining the full-stage penalty.
+The paired 200-field `timing-repair-stagecost-native-a500` and
+`timing-repair-stagecost-world-a500` captures complete 32 first-stage steps, counters
+31 through zero, excluding the same opening partial step. Native averages **114.353 ms**
+per step and WORLD20 **117.890 ms**, totaling **113.172 ms** of extra time. WORLD20
+executes 42 native opponent-body entries versus 32, with ten steps serving two updates;
+opponent service adds **44.764 ms** over this subset. Body composition averages
+47.176 / 46.516 ms and bitmap copying 20.658 / 20.698 ms respectively. This covers
+one first-stage item/direction, not the remaining seven stages.
+
+The last five native steps, counters 4 through zero, take approximately **100 ms**;
+WORLD20 continues taking approximately **120 ms**. The trace identifies a message
+lifetime mismatch: the native expiry path at `$e2ac` executes from counter 4 onward,
+changing the message pointer drawn at `$e330` from hunk `$3d20` to `$3bd5`. WORLD20
+keeps drawing `$3d20` through counter zero and never takes that expiry path in the
+measured stage. Presentation preparation alone adds **36.499 ms** across the 32 steps;
+display waits then contribute additional phase-dependent differences.
+
+At the repair anchor, native `state+$5e` (frame counter) is **665** and `state+$64`
+(message deadline) **692**, a remaining difference of 27. WORLD20 has counter **585**
+and deadline **839**, a difference of 254. `$e2a6` compares those fields directly;
+`$e388` increments the counter once per presentation. Thus this message still has a
+frame-dependent lifetime and the matched repair entry does not have matched remaining
+message time. The expiry/drawing difference is observed, not inferred from aggregate
+profile percentages. Its origin must be traced through message creation and temporary
+counter ownership before selecting a correction. Do not shorten messages merely to
+make an animation timing test pass, or treat all measured overhead as scheduler cost.
 
 Display phase also matters. Native complete steps cluster near 100 and 120 ms; the
 ScrollVPort interval ranges from 0.053 to 14.280 ms. WORLD20 has a 111.133-ms first
