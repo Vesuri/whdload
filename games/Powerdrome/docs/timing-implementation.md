@@ -1509,9 +1509,67 @@ shows most of the cost is already present in the full timing prototype:
 Waiting cannot recover the extra body time. Even without the new pacing, these cases are
 100–820 ms slower than the native reference. Equal-spaced deadlines also remove some of
 the headroom provided by cheaper native iterations before expensive ones, so they cannot
-be assumed free on A500. The next step is CPU-cycle attribution of the unpaced WORLD20
-repair body versus native code, followed by reducing or separating the identified work.
-Do not relax calibration bounds, disable the A500 gate or enable this pilot by default.
+be assumed free on A500. The complete-step cycle attribution below separates graphics work, display waits and
+opponent service. Extend this across the stage before choosing an optimization; a short
+window cannot explain all four invocation overruns. Do not relax calibration bounds,
+disable the A500 gate or enable this pilot by default.
+
+The paired 50-field instruction profiles `timing-repair-cost-native-a500` and
+`timing-repair-cost-world-a500` use the same frozen playercontract1 slave, A500 memory
+configuration, emulator and Kickstart hashes, and repair-entry anchor. The native run has
+CUSTOM1/CUSTOM3 off; WORLD20 has both on, with no fast memory and repair pacing disabled.
+The whole-window profiles spend respectively **40.30% / 38.66%** of recorded cycles in
+the blitter-wait helper. This is substantial existing drawing cost, not proof that timing
+patches added that cost. Routine averages at the trace edges can include incomplete calls.
+
+`tools/repair_step_profile.py` instead pairs the ordered native boundaries from `$148d0`
+through `$1495e`, excluding the opening and closing partial steps. Each measured segment
+includes intervening interrupts and stopped time on the A500 CPU-backend scale of
+142,102 cycles per PAL field. Both captures contain eight complete first-stage steps,
+counters 31 through 24; counter 32 is an incomplete opening prefix and counter 23 an
+incomplete tail. Their segment means are:
+
+| Complete-step segment | Native A500 | WORLD20 A500 |
+| --- | ---: | ---: |
+| Body bitmap composition, through `$148e0` | 47.308 ms | 46.442 ms |
+| Moving parts, through `$14956` | 3.776 ms | 3.864 ms |
+| Presentation preparation, through `$e334` | 19.878 ms | 20.214 ms |
+| ScrollVPort interval, `$e33a–$e34a` | 7.866 ms | 8.526 ms |
+| WaitTOF interval, `$e35a–$e364` | 5.038 ms | 5.067 ms |
+| Bitmap copy, `$e364–$e378` | 20.659 ms | 20.681 ms |
+| HUD/input, `$e378–$e3bc` | 2.971 ms | 3.112 ms |
+| Opponent service, `$e3bc–$e3c0` | 2.108 ms | 3.373 ms |
+| Whole complete step, including remaining small segments | 109.959 ms | 111.619 ms |
+
+The eight WORLD20 steps total **13.277 ms** more than their native counterparts.
+Opponent service accounts for **10.121 ms** of added time in this subset, while body
+composition is slightly faster. This corrects the impression from the whole-window
+opponent percentage: a small share of total cost can still explain much of the local
+increase. Native opponent calls take 2.088–2.124 ms; the scheduled calls take
+2.837–4.908 ms. Counting entries to the native opponent body at `$d3de` finds eight
+updates in the native subset and ten in WORLD20: counters 27 and 24 each service two
+updates. Thus the extra service time includes required elapsed-time catch-up, not only
+wrapper overhead. The six single-update WORLD20 calls still take 2.837–2.880 ms;
+matching body paths and state is necessary before attributing this remaining difference
+solely to the scheduler.
+
+The longer `timing-repair-stagecost-world-a500` capture completes 32 first-stage steps,
+counters 31 through zero, excluding the same opening partial step. Their mean is
+117.890 ms; 42 native opponent-body entries are recorded, with ten steps serving two
+updates. Body composition averages 46.516 ms, copying 20.698 ms, and opponent service
+3.507 ms. These are the unpaced WORLD20 measurements; the matching native stage is
+needed before extending the eight-step comparison or explaining the full-stage penalty.
+
+Display phase also matters. Native complete steps cluster near 100 and 120 ms; the
+ScrollVPort interval ranges from 0.053 to 14.280 ms. WORLD20 has a 111.133-ms first
+complete step and subsequent steps spanning 99.873–121.807 ms. These observations
+motivate checking refresh-boundary crossings across the whole stage, but do not yet
+prove that missed refreshes explain the full 100–820-ms unpaced invocation penalty.
+No display wait has been removed and these captures are not rendering FPS evidence.
+
+```sh
+python3 tools/repair_step_profile.py tmp/prof/timing-repair-cost-native-a500 tmp/prof/timing-repair-cost-world-a500
+```
 
 `PDREPR01` records active stage, epoch, total units, latest deadline/completion time,
 stage/step counts, excluded pause time and lateness. The read-only `$14a20` continuation

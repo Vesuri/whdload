@@ -340,8 +340,14 @@ paces both 33-step stages with cumulative deadlines and measured minimum sound/d
 pauses. The 030 run passes all 264 word-geometry/deadline samples and exactly matches
 native invocation times of 8,260 / 8,840 / 7,900 / 7,960 ms. The A500 counterpart fails
 by 120–860 ms. With repair pacing disabled, the same full timing prototype is already
-100–820 ms slower than native, so adding waits cannot close that gap. Profile the repair
-body to identify work that needs optimization or separation. Register/stack and nonlocal
+100–820 ms slower than native, so adding waits cannot close that gap. Paired 50-field
+instruction traces now isolate eight complete first-stage steps: their WORLD20 total is
+13.277 ms longer, with 10.121 ms added in opponent service. Body composition and copying
+remain large existing costs; display waits vary with refresh phase. Extend the complete-step
+attribution across the stage and reduce or separate work without dropping simulation time.
+The eight-step subset runs ten opponent updates versus native's eight, so part of the
+extra cost is necessary catch-up. A longer WORLD20 trace now has 32 complete steps and
+42 opponent updates; its matched native comparison remains to finish. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The
 pilot stays disabled by default; normal and pilot-disabled builds are unchanged. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
