@@ -96,6 +96,23 @@ TIMING_WEATHER_CYCLE_TEST = 0
  FAIL "Weather cycle fixture must run without other weather fixtures"
  ENDC
  ENDC
+ IFND TIMING_WEATHER_TRANSFER_TEST
+TIMING_WEATHER_TRANSFER_TEST = 0
+ ENDC
+ IFNE TIMING_WEATHER_TRANSFER_TEST
+ IFNE TIMING_WEATHER_TRANSFER_TEST-1
+ FAIL "TIMING_WEATHER_TRANSFER_TEST must be 0 or 1"
+ ENDC
+ IFND VERIFY
+ FAIL "TIMING_WEATHER_TRANSFER_TEST requires VERIFY"
+ ENDC
+ IFND COVERAGE_INPUT
+ FAIL "TIMING_WEATHER_TRANSFER_TEST requires COVERAGE_INPUT"
+ ENDC
+ IFEQ TIMING_WEATHER_CYCLE
+ FAIL "TIMING_WEATHER_TRANSFER_TEST requires TIMING_WEATHER_CYCLE"
+ ENDC
+ ENDC
 ; C3: elapsed-time timing correction, independent of fast planar rendering.
 ; Current corrections: PAL minimum delta and A500-paced cockpit departure.
 ; Broader periodic gameplay scheduling remains a separately compiled prototype.

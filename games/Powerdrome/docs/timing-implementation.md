@@ -3779,8 +3779,11 @@ During supported human flight, each logical 90 ms control update at world end:
    operation during catch-up. The existing world wrapper retains the resulting logical seed.
 
 The 90 ms period is an initial candidate shared with the existing control cadence,
-about 8.1% longer than the measured native generation interval of 83.283 ms. Active-effect
-response/lifetime calibration has not yet established acceptance of that candidate.
+about 8.1% longer than the measured native generation interval of 83.283 ms. **It fails
+active-effect cadence calibration:** complete native episodes below have about 139-ms
+intervals between lifetime/draw updates. This remains an ownership prototype, not an
+accepted A500 effect-speed correction. Generation cadence and visual lifetime/phase
+must be separated or explicitly scheduled in native order before acceptance.
 
 The renderer uses the latest published lifetime/seed. It temporarily installs the saved
 visual seed around the native draw helper, then restores the outer seed. Repeated draws
@@ -4035,12 +4038,13 @@ Initial ownership preserves negative sentinel deadlines and transfers the remain
 physical interval to the logical cursor. Due/overdue deadlines become due immediately;
 the transfer clamps negative remaining time before adding the logical cursor. This fixes
 a static edge case in the first candidate, where adding a negative clock offset could
-turn a sufficiently overdue live deadline into an inactive sentinel. The ongoing
-`timing-weather-cycle-test1` capture uses that first frozen candidate and enters ownership
+turn a sufficiently overdue live deadline into an inactive sentinel. The completed
+`timing-weather-cycle-test1` pair uses that first frozen candidate and enters ownership
 with both deadlines inactive, so it cannot validate the corrected migration path. The
 corrected source builds as `timing-weather-cycle-test2`; directed future/due/overdue and
-clock-boundary runtime tests remain required, along with resume rebasing and lifecycle
-handling. The full weather-cycle observations from test1 apply to its inactive-deadline
+clock-boundary runtime tests of actual mode ownership remain required, along with resume
+rebasing and lifecycle handling. The private-cell helper test below now validates the
+arithmetic itself on both emulated CPUs. The full weather-cycle observations from test1 apply to its inactive-deadline
 entry path, not to all ownership transfers.
 
 `TIMING_WEATHER_CYCLE_TEST=1` requires VERIFY, COVERAGE_INPUT and the cycle owner, and
@@ -4070,11 +4074,110 @@ world-end delay is 260 ms. It adds 2,472 clean completed renderer twins with unc
 raster code; a further scene is active at the endpoint and is excluded. Palette pixels
 and actual weather-effect draw ownership are not checked by these scene twins. The effect
 record shows 13 selections, 34 logical visual events and 52 actual draws, with zero actual
-rectangle cleanups and no final effect ownership/pending cleanup. The A500 counterpart
-is running; cross-CPU equality is not yet established for the full cycle.
+rectangle cleanups and no final effect ownership/pending cleanup.
+
+The A500 counterpart also completes the entire 170-second cycle. Both have the exact
+25,020-ms warning-to-onset interval, 117,480-ms selected duration, 60-ms expiry lateness,
+onset RNG inputs/results, all 30 fade deadlines and one delivery of each deferred event.
+**8,502 common player/engine/RNG states and 1,889 common control/input/fuel updates match
+exactly.** Both effect records have 1,890 logical updates, 1,020 generation attempts,
+13 selections and 34 logical visual events, while actual draws differ: 52 on 030 versus
+25 on A500. Draw ownership and rectangle cleanup are not directly observed by this probe
+set, so their prior isolated tests and remaining gaps still apply.
+
+A500 completes 8,504 movements, with 140/60-ms initial/final unsampled time explaining
+its two-step endpoint difference from 030. Its maximum sampled world-end delay is 780 ms,
+maximum retained debt 160 ms and maximum allocation 32 steps; all endpoint retained/assigned
+work is drained. This is bounded full-cycle state equality, not final A500 cadence or
+lifecycle acceptance. In particular, the effect-lifetime cadence gate below fails the
+90-ms visual period despite this equality result.
 
 Build checks pass: normal and explicit cycle-disabled fade-fixture bytes match their
 saved references; a missing fade dependency is rejected. All new hook ranges contain
 complete instructions, no decoded direct branches enter their interiors, and both C3-off
 native-weather snapshots retain all declared native hook bytes. These checks do not
 replace the running cycle captures or the outstanding migration/lifecycle work.
+
+
+### Native effect-lifetime cadence gate
+
+`report_weather_effect_cadence.py` reconstructs complete native effect episodes from
+`$bd16` generation publication, `$112e6` positive-lifetime entry and `$112f0` final
+lifetime decrement. It checks declining lifetimes and consecutive native loop counters,
+rejects the experimental effect hook and requires the original 68000 capture. These are
+mutation/draw-entry timings, not measured visible scanout durations.
+
+`timing-weather-native-a500-effects1` contains 30 complete nonzero episodes, six zero-life
+selections, 90 effect draws and no interrupted/pending episode. The **60 within-episode
+intervals** average **139 ms in debugger PAL fields** (median 140, range 120–200 ms), or
+140.667 ms in the game's sampled clock. The physical histogram is ten × 120, forty-five
+× 140, four × 160 and one × 200 ms. An interval between separate adjacent episodes is
+excluded; treating every adjacent draw as one episode would incorrectly count 61 gaps.
+
+Generation-to-first-draw latency is 20–40 ms (mean 27.333, median 20 ms). Generation to
+last lifetime decrement depends on the selected length:
+
+| Native lifetime | Complete episodes | Mean | Range |
+| --- | ---: | ---: | ---: |
+| 1 | 12 | 26.667 ms | 20–40 ms |
+| 4 | 12 | 443.333 ms | 420–460 ms |
+| 5 | 6 | 586.667 ms | 520–680 ms |
+
+The existing 90-ms logical visual interval is about 35% shorter than the 139-ms native
+interval. Its cross-CPU equality tests establish independence of render count, but **do
+not pass the A500 speed gate**. The 83.283-ms generation-loop average includes the many
+frames without an effect and must not be substituted for the active-effect cadence.
+
+The `$bd1a` post-generation observations also resolve the generator ordering. Generation
+precedes the upcoming draw with the same native loop counter; group the next generator
+interval by that published lifetime, not the following interval's lifetime. There are
+2,901 intervals without an upcoming effect, averaging **81.489 ms** (median 80, range
+60–160), and 90 with an effect, averaging **141.111 ms** (median 140, range 120–200).
+Together these give the earlier 83.283-ms aggregate. A five-life example selects at loop
+3,633, decrements once in that loop's draw, then decrements generation delay before each
+subsequent loop's draw. Its delay reaches zero at loop 3,637 before the final lifetime
+decrement. No new selection interrupts a nonzero episode in this capture.
+
+Next implement a separate weather-loop schedule: **80 ms after an effect-free scene,
+140 ms after an effect-bearing scene**, with visual publication **20 ms after generation**.
+Generation eligibility/delay/trials come first; the next visual publication decrements
+lifetime and accounts for four logical visual RNG advances. Preserve that order rather
+than independently advancing delay at 90 ms. Repeated rendering still uses only the
+published visual state. Clear the last visible publication on the following scene's
+visual boundary. This gives generation-to-last-step values 20, 440 and 580 ms for
+lifetimes 1, 4 and 5, respectively, close to this reference.
+
+Then repeat seeded active-effect and full-cycle CPU comparisons, with RNG ownership,
+final-visible-state fallback and both buffers' cleanup checks intact. Calibration across
+tracks and varied modes still needs evidence. This is a concrete next candidate, not an
+implemented or accepted cadence correction.
+
+
+### Direct deadline-transfer helper fixture
+
+`TIMING_WEATHER_TRANSFER_TEST=1` requires VERIFY, COVERAGE_INPUT and the cycle prototype.
+It invokes the actual assembled transfer helper on eleven private data cells once during
+the first eligible logical control update. Cases cover two negative sentinels, future,
+exactly due, recently and long-overdue deadlines, zero logical time, and values near the
+native positive signed-clock boundary. It never changes native deadlines, clocks, RNG
+or input data. `PDWTFR01` records the invocation/case/mismatch counts, inputs, results,
+clock-register preservation and destination pointers.
+
+`check_weather_transfer.py` follows the installed cycle hook to locate the live test
+record in both snapshots. It requires every declared case, exact explicit expected
+results, preserved physical/logical input registers and unchanged destination pointers.
+This tests the transfer helper on emulated CPUs; it does not establish correct ownership
+transfer through real pit/resume paths or beyond the native signed deadline domain.
+The test-disabled build reproduces the corrected cycle candidate byte for byte, and the
+normal build remains unchanged. The 650-field / 13-second
+`timing-weather-transfer-test1` A500/native and 030/fast pair passes all eleven cases in
+both initial and final snapshots, with one invocation and zero mismatches. It preserves
+the input clock registers and destination pointers. Missing invocation, the old overdue
+result, changed clock register, changed pointer and altered case-table evidence are all
+rejected independently of the fixture's mismatch counter.
+
+The surrounding timing run also passes: 653 common movement states and 145 common
+control/input/fuel updates match exactly. Both end without retained/assigned simulation
+work. This validates the corrected helper's arithmetic and its integration into the
+inactive-deadline startup path; it still does not exercise actual pit/resume ownership
+with live native deadlines.

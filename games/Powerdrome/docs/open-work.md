@@ -607,13 +607,36 @@ native duration arithmetic and all 30 fade steps: 25,020 ms warning-to-onset, 11
 selected active duration, 60 ms expiry lateness. It completes 8,502 movements and 1,889
 controls with no retained/assigned debt; 2,472 renderer twins pass, with one additional
 unfinished scene excluded. Wrong warning/RNG/duration/reset/fade evidence is rejected.
-A500 capture `timing-weather-cycle-test1/a500-native` is running; the paired comparison
-remains pending. Normal and cycle-disabled binaries and C3-off hook audits pass.
+The A500 counterpart now passes the full cycle with identical weather timing, duration,
+RNG inputs/results and fade steps. There are 8,502 matching common movement states and
+1,889 common control/input/fuel updates. Both execute 34 logical visual events but draw
+52 times on 030 versus 25 on A500. A500 temporarily retains up to 160 ms of debt and drains
+it by the endpoint. Normal and cycle-disabled binaries and C3-off hook audits pass.
 
 A static migration defect was fixed in the newer `timing-weather-cycle-test2` candidate:
 due/overdue native deadlines now map to the logical cursor instead of possibly becoming
-negative/inactive. The ongoing test1 pair uses the earlier frozen artifact and starts with
-inactive deadlines, so it does not cover that fix. Next finish the pair, then directly
-exercise future/due/overdue/sentinel transfers on the corrected build. Natural unseeded
+negative/inactive. The completed test1 pair uses the earlier frozen artifact and starts with
+inactive deadlines, so it does not cover that fix. A guarded private-cell fixture now
+exercises the assembled helper on eleven future/due/overdue/sentinel/boundary cases,
+checking results and preserved clock registers/destination pointers. Its corrected-build
+A500/030 650-field pair passes all eleven cases in both snapshots, plus 653 common movement
+states and 145 control/input/fuel updates. Five corruptions, including the former overdue
+result, are rejected. Helper arithmetic does not replace actual mode-transfer integration
+coverage. Natural unseeded
 weather, calibration acceptance, message/palette pixels, effect rectangle cleanup and
 mode/lifecycle integration remain open. The full F1–F8 goal is not complete.
+
+
+A newly completed native effect-cadence analysis changes the next implementation step:
+30 complete A500 episodes / 90 draws contain 60 within-episode intervals averaging
+139 ms (median 140), not the generator's overall 83.283-ms average. The current 90-ms
+visual cadence is about 35% too short and fails the A500 speed gate despite passing
+cross-CPU state equality. Generation-to-first-draw is 20–40 ms; mean generation-to-last
+lifetime decrements are 26.667/443.333/586.667 ms for lengths 1/4/5. After deadline-transfer
+validation, implement the measured weather-loop split: post-generation observations show
+81.489-ms intervals without an effect and 141.111-ms intervals with an effect. Candidate
+loop periods are therefore 80/140 ms by the upcoming scene, with visual publication 20 ms
+after generation. Preserve native generation-before-draw and delay/RNG ordering, and
+clear the last publication at the following scene boundary. Retest active effects and
+full cycles. This is measured unfinished work, not
+an accepted 90-ms approximation.
