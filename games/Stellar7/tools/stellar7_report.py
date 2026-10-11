@@ -92,6 +92,8 @@ def loaded_game_regions(dump, base, chip=None):
                     candidates.append([(address, address+CODE_SIZE, 's7', address),
                                        (data, data+DATA_SIZE, 's7-data', data)])
             offset = memory.find(prefix, offset+1)
+    # Chip-only captures can supply the same region twice.
+    candidates = list({candidate[0][0]: candidate for candidate in candidates}.values())
     if len(candidates) != 1:
         raise ValueError(f'Expected one relocated game hunk, found {len(candidates)}')
     return candidates[0]

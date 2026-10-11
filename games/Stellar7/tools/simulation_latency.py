@@ -27,6 +27,15 @@ def summarize(fields, total_fields, hz):
                     total_fields-fields[-1]-1 if fields else total_fields))
 
 
+def inspect_fields(folder):
+    observed = json.loads((Path(folder)/'field-events.json').read_text())
+    assert observed['field_hz'] in (50, 60)
+    return dict(fields=observed['fields'], field_hz=observed['field_hz'],
+                updates=summarize(observed['events']['update_starts'], observed['fields'], observed['field_hz']),
+                presentations=summarize(observed['events']['presentations'], observed['fields'], observed['field_hz']),
+                scope='Read-only breakpoint observations at display-field resolution; complete intervals only, not a game-wide latency bound.')
+
+
 def inspect(folder, listing):
     folder, listing = Path(folder), Path(listing)
     binary = (folder/'slave.slave').read_bytes()
@@ -42,6 +51,10 @@ def inspect(folder, listing):
     base = locate((folder/'code.bin').read_bytes(), binary[32:32+size],
                   meta['base'], header=32)
     assert base is not None, 'retained slave not found'
+    if (folder/'field-events.json').exists():
+        result = inspect_fields(folder)
+        assert result['field_hz'] == read(folder)['field_hz']
+        return result
     trace = barto.load(folder/'trace.bin')
     hz = read(folder)['field_hz']
     assert hz in (50, 60)

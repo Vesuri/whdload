@@ -112,7 +112,7 @@ def patch_size(command, argument):
     return {'B': 1, 'W': 2, 'L': 4}[command]
 
 
-def inspect(folder, listing, allow_menu_fixture=False):
+def inspect(folder, listing, allow_menu_fixture=False, allow_input_fixture=False):
     folder, listing = Path(folder), Path(listing)
     binary = (folder/'slave.slave').read_bytes()
     assert binary == listing.with_suffix('.slave').read_bytes(), 'listing build mismatch'
@@ -146,9 +146,14 @@ def inspect(folder, listing, allow_menu_fixture=False):
         value = struct.unpack_from('>I', expected, offset)[0]
         struct.pack_into('>I', expected, offset, (value+bases[target]) & 0xffffffff)
     patches = []
+    input_patches = []
+    assert not allow_input_fixture or allow_menu_fixture, 'input allowance requires menu fixture verification'
     if allow_menu_fixture:
         assert re.search(r'\bCUSTOM5=1(?:\s|$)', metadata['whd_args'])
-        assert not re.search(r'\bCUSTOM3=(?!0(?:\s|$))\S+', metadata['whd_args']), 'input fixture unsupported'
+        if allow_input_fixture:
+            assert re.search(r'\bCUSTOM3=1(?:\s|$)', metadata['whd_args']), 'CUSTOM3=1 required'
+        else:
+            assert not re.search(r'\bCUSTOM3=(?!0(?:\s|$))\S+', metadata['whd_args']), 'input fixture unsupported'
         loaded = locate(memory, slave, meta['base'], header=32)
         assert loaded is not None, 'loaded slave not found'
         start = symbols['fixture_patches']
@@ -162,6 +167,20 @@ def inspect(folder, listing, allow_menu_fixture=False):
             expected[offset:offset+6] = b'\x4e\xb9'+struct.pack('>I', loaded+target)
             patches.append(offset)
         assert sorted(patches) == [0x4582, 0xb1f4, 0xb8c4]
+        if allow_input_fixture:
+            for offset, command, argument in decode(slave, symbols['fixture_input_patches']):
+                if command == 'END':
+                    break
+                if command == 'P':
+                    assert offset in (0x22730,0x22746), 'unexpected native input hook'
+                    target = int(argument.removeprefix('slave:'),16)
+                    assert target == symbols[{0x22730:'fixture_key',0x22746:'fixture_joy'}[offset]]
+                    expected[offset:offset+6] = b'\x4e\xf9'+struct.pack('>I',loaded+target)
+                else:
+                    assert (offset,command,int(argument,16)) == (0x2274c,'NOP',2)
+                    expected[offset:offset+2] = b'\x4e\x71'
+                input_patches.append(offset)
+            assert sorted(input_patches) == [0x22730,0x22746,0x2274c]
     actual = memory[meta['code']-meta['base']:meta['code']-meta['base']+len(expected)]
     assert len(actual) == len(expected)
     differences = [i for i, (a, b) in enumerate(zip(expected, actual)) if a != b and i not in excluded]
@@ -170,7 +189,8 @@ def inspect(folder, listing, allow_menu_fixture=False):
                 native_mutable_data=[dict(offset=hex(start), bytes=size, purpose=purpose)
                                      for start, size, purpose in NATIVE_DATA],
                 relocated_longs=len(relocations), simulation_patch_ranges=len(simulation_patches),
-                exact_menu_fixture_offsets=[hex(i) for i in patches], unexpected_bytes=0)
+                exact_menu_fixture_offsets=[hex(i) for i in patches],
+                exact_input_fixture_offsets=[hex(i) for i in input_patches], unexpected_bytes=0)
 
 
 if __name__ == '__main__':
@@ -178,5 +198,6 @@ if __name__ == '__main__':
     parser.add_argument('capture', type=Path)
     parser.add_argument('--listing', type=Path, required=True)
     parser.add_argument('--allow-menu-fixture', action='store_true')
+    parser.add_argument('--allow-input-fixture', action='store_true')
     args = parser.parse_args()
-    print(json.dumps(inspect(args.capture, args.listing, args.allow_menu_fixture), indent=2))
+    print(json.dumps(inspect(args.capture, args.listing, args.allow_menu_fixture, args.allow_input_fixture), indent=2))

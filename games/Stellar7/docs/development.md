@@ -1,14 +1,68 @@
 # Development
 
-## Checkpoint status
+## Active performance work
 
-Work is paused by request. The separate SIM60 build is playable and experimental;
-the normal build retains the earlier timing prototype. The conversion is not
-complete: live inputs are not yet recorded against the simulation clock, heavy
-A500 scenes can accumulate debt, and reference-pace/broader gameplay validation
-remains open. See `docs/open-work.md` for the ordered continuation work.
-Use the existing VERIFY fixtures for scripted input; host UI access is not a
-prerequisite. Retained evidence under `tmp/` is local and is not committed.
+Step 0 of the performance plan in docs/open-work.md is complete: 48 initial
+native/SIM60 cells and 24 native combat comparators pass their strict checks.
+The game still uses N=12 (60 Hz); no lower default has been selected.
+Step 1 will parameterize the common tick rate with an N=12 byte-identity gate;
+step 2 will select the highest measured rate the A500 sustains in heavy combat
+without reducing presentations below native. Interpolation and input-history
+work are deferred to later steps and are outside the current request.
+
+## Rate matrix
+
+`--substeps` is reserved for step 1 and fails before capture until the source
+implements `S60_SUBSTEPS`. The current game remains fixed at N=12.
+
+The initial matrix has 48 cells. Capture the additional native combat
+comparators in a separate directory:
+
+```sh
+tools/rate_matrix.sh tmp/rate-native-combat --routes native-type10-early native-type10-late native-boss
+python3 tools/rate_matrix_report.py tmp/rate-native-combat --routes native-type10-early native-type10-late native-boss
+```
+
+These use `NATIVE_SCENE=6` for type-10 frames 150/375 and `NATIVE_SCENE=0`
+with the controlled boss setup at frame 292. CUSTOM1 is disabled; CUSTOM3
+provides the same approach pilot. The fixture removes its own setup hooks
+before capture. `native_scene_state.py` verifies native code preservation,
+zero simulation ticks and scene identity for every cell. Ordinary release
+and VERIFY builds omit this fixture. Do not resume a pre-fixture baseline
+under changed source identity; retain its directory and use a fresh prefix.
+
+
+Source `amiga/env.sh`, then run `tools/rate_matrix.sh tmp/rate-baseline`.
+The driver runs one capture at a time and restores the normal development build.
+Use `--machines a500 a1200-stock` or `--routes sol native-90` for a subset;
+rerunning the same prefix skips completed cells with matching source/configuration.
+Incomplete cells are retained and reported, never silently replaced.
+`--boot-timeout 1800` is a wall-clock deadline for the same boot, not a dump
+count. A stock A1200 is captured from chip RAM; the other configurations use
+their actual slow/fast RAM regions.
+For a retained diagnostic build, `fixed_window.py --prebuilt SLAVE` skips
+rebuilding and copies those exact bytes into the capture. Supply its matching
+flags/listing and do not mix it with another emulator run.
+
+Each SIM60 cell captures completed-tick endpoints for `simulation_rate.py`
+and a 100-field read-only breakpoint window for `simulation_latency.py`.
+The latter measures update-start gaps on CPU backends without instruction traces.
+Its largest complete gap applies only to that observation window. The boss
+window starts at tick 3500 and ends at 4100. Native baseline cells use frames
+90 and 240 and measure complete inter-presentation intervals; these are not
+matched native heavy-combat scenes.
+
+Validate and render the table with
+`python3 tools/rate_matrix_report.py tmp/rate-baseline`. It checks captured
+settings, slave hashes/listings, observed fields, completed-tick rates and
+installed SIM60 hooks. Missing cells fail unless `--partial` is requested.
+A partial table is not the step-0 acceptance result.
+
+Per-cell JSON and `matrix.json` retain settings, exact slave hashes, endpoint
+debt and cache policy. Live cache registers are not yet independently verified.
+The driver passes CUSTOM1/CUSTOM3 only for SIM60; `fixed_window.py` supplies
+CUSTOM5. Measurements and exact binaries/listings remain in `tmp/`.
+
 
 Keep supplied archives and all derived game material in ignored `tmp/`.
 The installer is `tmp/Stellar7.lha`; the Retroplay pack is

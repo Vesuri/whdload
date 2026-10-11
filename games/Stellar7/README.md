@@ -5,7 +5,10 @@ English NTSC Stellar 7 install.
 
 The experimental conversion uses a 60 Hz simulation timestep independently
 of rendering, with integer remainders to preserve movement precision.
-It is playable, but **the conversion is unfinished and work is paused**.
+It is playable, but **the conversion is unfinished**. The active performance
+plan will select one lower fixed tick rate for every machine, based on A500
+heavy-combat measurements. The complete native/SIM60 baseline is recorded
+in internals; the game still runs at 60 Hz.
 Live input is still sampled during catch-up rather than preserved by tick;
 heavy A500 combat can accumulate simulation debt. Broader gameplay and
 original-reference pace validation also remain open.

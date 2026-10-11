@@ -55,6 +55,30 @@ $f5de), so pictures are already capped at the field rate.
 
 ### Step 0: Baseline matrix (no game change)
 
+Status: complete. The serial driver, seconds-based boot deadline, chip-only
+A1200 memory capture and field-based update-start observations are implemented.
+All 48 initial cells under `tmp/rate-baseline` and all 24 native combat cells
+under `tmp/rate-native-combat` pass the strict report checker. All 56 sampled
+cross-CPU/PAL gameplay comparisons match, apart from deferred projection scratch.
+The 15 existing tooling tests pass. The game remains N=12; step 1 and step 2
+are still outstanding. See internals for both complete tables and development
+for the capture and verification commands.
+
+Native frame-90/240 cells are SOL references. The native combat routes provide
+the scene-specific presentation threshold needed by step 2: A500 NTSC early
+and late type-10 are 4.444 and 4.110 presentations/s; boss is 1.818.
+
+The VERIFY-only `NATIVE_SCENE` fixture has passed runtime validation on every requested
+machine for type-10 and boss scenes. It requests native exits into level six for
+type-10, or reuses the controlled boss setup while CUSTOM1 stays disabled.
+Setup hooks restore native instructions before measurement. The checker
+verifies 151969 original code bytes, all relocated longs, removed setup hooks,
+zero SIM60 ticks and the intended level/actor state. Omitting the diagnostic
+leaves the ordinary VERIFY slave byte-identical. The matrix driver now includes
+native type-10 frames 150/375 and boss frame 292, selected explicitly with
+`--routes native-type10-early native-type10-late native-boss`. All captures
+share the exclusive matrix lock and run one at a time.
+
 1. Commit the `amiga/run.sh` window fix: debug and warp runs use the shared
    `fsuae_options`/`fsuae_env` window mode and open behind other windows.
 2. Add `tools/rate_matrix.sh PREFIX` (single capture at a time, like LoV's
@@ -67,8 +91,8 @@ $f5de), so pictures are already capped at the field rate.
    Routes: SOL ticks 600→1500; type-10 combat 1800→2400 and 4500→5400 (the
    `LEVEL_TEST=200 LEVEL_LAST=6 APPROACH_TYPE=10` fixture); the boss route at
    3500. Pass only `CUSTOM1=1 CUSTOM3=1`: the driver adds CUSTOM5 itself, and a
-   duplicate stops the boot at an AmigaDOS argument error. The boot poll is 120
-   dumps, which a cycle-exact 68040 can exceed; make it a deadline in seconds.
+   duplicate stops the boot at an AmigaDOS argument error. The boot poll uses
+   a seconds-based deadline (1800 seconds by default).
 3. Measure native presentation fps for the same machines with `--swaps-only`
    at frames 90 and 240. Record the cache state (the slave calls SetCPU
    $393d/$7f3f).

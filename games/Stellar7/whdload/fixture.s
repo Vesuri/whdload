@@ -21,6 +21,9 @@ fixture_install:
         bne .bad
         cmp.w #$7245,($b8c8-$10000,a0)
         bne .bad
+        IFD NATIVE_SCENE
+        bsr native_scene_install
+        ENDC
         lea (fixture_patches,pc),a0
         jsr (resload_Patch,a2)
         move.l (_custom3,pc),d0
@@ -354,5 +357,134 @@ fixture_approach:
 .negative:
         moveq #8,d0 ; native $fee6 decreases yaw velocity
 .done:  movem.l (sp)+,d1-d2/a0-a2
+        rts
+        ENDC
+
+; Native-timing performance scene. All hooks are VERIFY/CUSTOM5 only.
+; SIM60 is compiled to reuse the encounter setup, but CUSTOM1 must stay off.
+        IFD NATIVE_SCENE
+        IFND SIM60
+        FAIL "NATIVE_SCENE requires SIM60 compiled, with CUSTOM1 disabled"
+        ENDC
+        IFNE NATIVE_SCENE
+        IFNE NATIVE_SCENE-6
+        FAIL "NATIVE_SCENE supports level zero boss or level six type-10"
+        ENDC
+        ENDC
+        IFD BOSS_ENCOUNTER
+        IFNE NATIVE_SCENE
+        FAIL "Native boss setup requires NATIVE_SCENE=0"
+        ENDC
+        ELSE
+        IFEQ NATIVE_SCENE
+        FAIL "NATIVE_SCENE=0 requires BOSS_ENCOUNTER"
+        ENDC
+        ENDC
+        IFD LEVEL_TEST
+        FAIL "Native scene uses its own level setup, not LEVEL_TEST"
+        ENDC
+native_scene_results:
+        dc.b 'NR60'
+        dc.w 0,0,NATIVE_SCENE,0 ; requested exits, restored flag, target, reserved
+native_scene_saved: ds.b 6
+native_scene_install:
+        movem.l d0-d2/a0-a3,-(sp)
+        move.l (_custom1,pc),d0
+        bne .bad ; never combine native observation hooks with SIM60 timing
+        move.l (_custom3,pc),d0
+        beq .bad ; scene requires its native input pilot
+        move.l (14,a1),d0 ; native startup's relocated A4 value
+        sub.l #$8000,d0
+        move.l d0,d1
+        add.l #$1e53,d1
+        cmp.w #$4a39,($2af6,a1)
+        bne .bad
+        cmp.l ($2af8,a1),d1
+        bne .bad
+        add.l #$1e96,d0
+        cmp.w #$5279,($2d4e,a1)
+        bne .bad
+        cmp.l ($2d50,a1),d0
+        bne .bad
+        lea (native_scene_saved,pc),a0
+        IFD BOSS_ENCOUNTER
+        move.l ($2af6,a1),(a0)
+        move.w ($2afa,a1),(4,a0)
+        ELSE
+        move.l ($2d4e,a1),(a0)
+        move.w ($2d52,a1),(4,a0)
+        ENDC
+        lea (s60_code,pc),a0
+        move.l a1,(a0)
+        lea (s60_sessions,pc),a0
+        move.l #1,(a0)
+        lea (native_scene_patches,pc),a0
+        jsr (resload_Patch,a2)
+        movem.l (sp)+,d0-d2/a0-a3
+        rts
+.bad:
+        pea (TDREASON_WRONGVER).w
+        jmp (resload_Abort,a2)
+native_scene_patches:
+        PL_START
+        IFD BOSS_ENCOUNTER
+        PL_PS $2af6,native_scene_begin
+        ENDC
+        IFNE NATIVE_SCENE
+        PL_PS $2d4e,native_scene_finish
+        ENDC
+        PL_END
+        IFD BOSS_ENCOUNTER
+native_scene_begin:
+        move.l d0,-(sp)
+        moveq #0,d0
+        addx.w d0,d0 ; retain incoming X without privileged SR access
+        move.w d0,-(sp)
+        bsr s60_test_encounter ; controlled setup only; no SIM60 tick executes
+        bsr native_scene_restore
+        move.w (sp)+,d0
+        lsr.w #1,d0 ; restore incoming X
+        move.l (sp)+,d0
+        tst.b ($1e53-$8000,a4) ; exact displaced native test/CCR
+        rts
+        ENDC
+        IFNE NATIVE_SCENE
+native_scene_finish:
+        movem.l d0/a0,-(sp)
+        cmp.w #NATIVE_SCENE,($46a0-$8000,a4)
+        blt .earlier
+        bsr native_scene_restore ; remove setup overhead before measured gameplay
+        bra .done
+.earlier:
+        cmp.w #16,($1e96-$8000,a4) ; after this update: native frame 17
+        bne .done
+        tst.b ($1e53-$8000,a4)
+        beq .done
+        tst.w ($1e90-$8000,a4)
+        bne .done
+        clr.b ($1e53-$8000,a4) ; native cleanup/load/increment takes the exit
+        lea (native_scene_results,pc),a0
+        addq.w #1,(4,a0)
+.done:
+        movem.l (sp)+,d0/a0
+        addq.w #1,($1e96-$8000,a4) ; exact displaced increment/CCR
+        rts
+        ENDC
+native_scene_restore:
+        movem.l d0-d1/a0-a2,-(sp)
+        move.l (s60_code,pc),a0
+        IFD BOSS_ENCOUNTER
+        adda.l #$2af6,a0
+        ELSE
+        adda.l #$2d4e,a0
+        ENDC
+        lea (native_scene_saved,pc),a1
+        move.l (a1),(a0)
+        move.w (4,a1),(4,a0)
+        lea (native_scene_results,pc),a1
+        move.w #1,(6,a1)
+        move.l (_resload,pc),a2
+        jsr (resload_FlushCache,a2)
+        movem.l (sp)+,d0-d1/a0-a2
         rts
         ENDC

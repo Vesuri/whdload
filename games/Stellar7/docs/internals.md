@@ -1,20 +1,141 @@
 # Stellar 7 internals
 
-## Checkpoint status
+## Active performance work
 
-The documented 60 Hz replacement is implemented but experimental; work is
-paused by request. It preserves elapsed-time debt and decouples updates from
-drawing, but does not guarantee sustained 60 updates/s in every heavy A500
-scene. Native control reads still occur during catch-up: code $fd02 calls
-$10892, whose trampoline reaches $22746; $22750–$22756 read live joystick
-hardware, while $22730 reads current key-state bytes. The exact playable
-release retains this path (`tmp/live-input-timing-audit.json`).
-Tick-indexed input fixtures prove deterministic simulation for their supplied
-history, not correct assignment of real input edges to overdue ticks.
-Clock-indexed input capture/consumption is the next correctness priority.
-See `docs/open-work.md` for remaining scope and `docs/development.md` for
-build/test instructions. Measurements below have their stated capture scope;
-they are not a claim that the entire conversion is complete.
+Step 0 of the performance plan in docs/open-work.md is complete: 48 initial
+native/SIM60 cells and 24 native combat comparators pass their strict checks.
+The game still uses N=12 (60 Hz); no lower default has been selected.
+Step 1 will parameterize the common tick rate with an N=12 byte-identity gate;
+step 2 will select the highest measured rate the A500 sustains in heavy combat
+without reducing presentations below native. Interpolation and input-history
+work are deferred to later steps and are outside the current request.
+
+<!-- rate-matrix-baseline:start -->
+## Performance-plan baseline matrix (step 0)
+
+The current build is still N=12 (60 Hz). All 48 initial cells are complete and pass
+the strict report checker. The additional 24 native combat cells below also pass.
+Exact builds, settings and observations are retained under
+`tmp/rate-baseline`. The table is regenerated with
+`tools/rate_matrix_report.py`; its strict mode rejects missing cells.
+
+| Machine | Route | Updates/s | Presentations/s | Pending growth | Largest observed update-start gap (fields) |
+|---|---|---:|---:|---:|---:|
+| a500 | sol | 61.224 | 2.517 | -18 | 26 |
+| a500 | type10-early | 63.830 | 0.745 | -36 | 14 |
+| a500 | type10-late | 64.516 | 0.430 | -63 | 1 |
+| a500 | boss | 68.311 | 1.025 | -73 | 36 |
+| a500 | native-90 | 4.800 | 5.000 | — | 12 |
+| a500 | native-240 | 3.600 | 4.000 | — | 17 |
+| a1200-stock | sol | 61.155 | 5.504 | -17 | 11 |
+| a1200-stock | type10-early | 60.504 | 3.832 | -5 | 8 |
+| a1200-stock | type10-late | 61.433 | 3.345 | -21 | 13 |
+| a1200-stock | boss | 61.644 | 2.774 | -16 | 22 |
+| a1200-stock | native-90 | 7.800 | 8.000 | — | 8 |
+| a1200-stock | native-240 | 5.400 | 6.000 | — | 11 |
+| a1200-fast | sol | 60.134 | 8.953 | -2 | 9 |
+| a1200-fast | type10-early | 60.201 | 9.231 | -2 | 6 |
+| a1200-fast | type10-late | 60.134 | 9.087 | -2 | 6 |
+| a1200-fast | boss | 60.606 | 5.859 | -6 | 13 |
+| a1200-fast | native-90 | 12.000 | 12.000 | — | 5 |
+| a1200-fast | native-240 | 7.800 | 7.912 | — | 10 |
+| 030-50 | sol | 60.134 | 18.909 | -2 | 5 |
+| 030-50 | type10-early | 59.900 | 22.662 | 1 | 3 |
+| 030-50 | type10-late | 59.933 | 22.375 | 1 | 3 |
+| 030-50 | boss | 60.403 | 14.396 | -4 | 6 |
+| 030-50 | native-90 | 19.800 | 20.000 | — | 3 |
+| 030-50 | native-240 | 15.600 | 15.464 | — | 5 |
+| 040-25 | sol | 60.067 | 23.626 | -1 | 4 |
+| 040-25 | type10-early | 59.900 | 29.052 | 1 | 3 |
+| 040-25 | type10-late | 59.933 | 29.101 | 1 | 3 |
+| 040-25 | boss | 60.100 | 19.132 | -1 | 4 |
+| 040-25 | native-90 | 30.000 | 30.000 | — | 2 |
+| 040-25 | native-240 | 18.600 | 18.947 | — | 4 |
+| 060-50 | sol | 60.000 | 23.933 | 0 | 4 |
+| 060-50 | type10-early | 60.000 | 29.400 | 0 | 3 |
+| 060-50 | type10-late | 60.067 | 29.499 | -1 | 3 |
+| 060-50 | boss | 59.900 | 19.368 | 1 | 4 |
+| 060-50 | native-90 | 30.000 | 30.000 | — | 2 |
+| 060-50 | native-240 | 18.600 | 18.947 | — | 4 |
+| a500-pal | sol | 61.141 | 2.514 | -17 | 21 |
+| a500-pal | type10-early | 64.103 | 0.748 | -38 | 11 |
+| a500-pal | type10-late | 62.762 | 0.488 | -40 | 17 |
+| a500-pal | boss | 69.124 | 1.037 | -79 | 21 |
+| a500-pal | native-90 | 5.000 | 5.000 | — | 10 |
+| a500-pal | native-240 | 3.500 | 3.896 | — | 15 |
+| 060-50-pal | sol | 60.080 | 25.300 | -1 | 3 |
+| 060-50-pal | type10-early | 59.880 | 30.739 | 1 | 2 |
+| 060-50-pal | type10-late | 60.000 | 28.600 | 0 | 2 |
+| 060-50-pal | boss | 60.120 | 18.938 | -1 | 4 |
+| 060-50-pal | native-90 | 25.000 | 25.000 | — | 2 |
+| 060-50-pal | native-240 | 20.500 | 20.408 | — | 3 |
+
+SIM60 rates use completed-tick endpoints; native presentations use complete inter-presentation intervals in a 100-field window. Gap values are window-local, not game-wide maxima. Pending growth is not applicable to native timing.
+
+Negative pending growth means the sampled interval repays earlier debt.
+Update averages above 60 Hz therefore do not imply a faster game clock or
+prove sustained real time across the complete heavy-combat route.
+The native frame-90/240 references use SOL, not matching type-10/boss scenes.
+The native type-10 and boss setup fixtures pass A500 runtime validation:
+151969 original code bytes and 4833 relocations match with no unexpected
+changes, setup hooks are removed, and SIM60 has executed zero ticks. The
+intended scene and live enemy types are checked. The full 24-cell native
+combat matrix is retained under `tmp/rate-native-combat`. These scenes supply
+the presentation comparators; their actor trajectories need not equal SIM60
+because the native simulation advances only once per rendered frame.
+
+The completed SIM60 cells pass 56 matched-tick comparisons against the NTSC
+A500, covering the other CPUs and the completed PAL routes. Mapped gameplay,
+HUD and fresh projection state match; only deferred projection scratch from
+the preceding draw differs. The retained comparison report is
+`tmp/rate-baseline/cross-cpu-validation.json`. These checks establish state
+equality at sampled ticks, not sustained throughput.
+
+Cache policy: the loader requests SetCPU value $393d with mask $7f3f:
+BaseMem non-cacheable, expansion/slave copyback, instruction cache requested
+and data cache off. WHDLoad's documented policy disables both caches when
+an uncached region is requested without MMU use. The 68020 and NOMMU rows
+therefore must not be described as cached benchmarks. Live CACR has not
+been independently sampled; the reports retain the requested policy.
+
+<!-- rate-matrix-native-combat:start -->
+### Native combat comparators
+
+All 24 cells pass the strict checker. Frames 150/375 select early/late type-10
+combat; frame 292 selects the boss scene. These are original-timing runs,
+with the native approach pilot and no active setup hook during measurement.
+
+| Machine | Route | Updates/s | Presentations/s | Pending growth | Largest observed update-start gap (fields) |
+|---|---|---:|---:|---:|---:|
+| a500 | native-type10-early | 4.200 | 4.444 | — | 14 |
+| a500 | native-type10-late | 3.600 | 4.110 | — | 15 |
+| a500 | native-boss | 1.800 | 1.818 | — | 35 |
+| a1200-stock | native-type10-early | 7.200 | 7.500 | — | 8 |
+| a1200-stock | native-type10-late | 7.200 | 7.021 | — | 9 |
+| a1200-stock | native-boss | 3.000 | 3.117 | — | 22 |
+| a1200-fast | native-type10-early | 9.600 | 10.000 | — | 6 |
+| a1200-fast | native-type10-late | 9.000 | 9.545 | — | 8 |
+| a1200-fast | native-boss | 6.000 | 5.783 | — | 13 |
+| 030-50 | native-type10-early | 19.800 | 20.000 | — | 3 |
+| 030-50 | native-type10-late | 18.000 | 18.125 | — | 4 |
+| 030-50 | native-boss | 13.800 | 13.548 | — | 6 |
+| 040-25 | native-type10-early | 19.800 | 20.000 | — | 3 |
+| 040-25 | native-type10-late | 19.800 | 20.000 | — | 3 |
+| 040-25 | native-boss | 16.800 | 16.875 | — | 4 |
+| 060-50 | native-type10-early | 19.800 | 20.000 | — | 3 |
+| 060-50 | native-type10-late | 19.800 | 20.000 | — | 3 |
+| 060-50 | native-boss | 16.800 | 17.053 | — | 4 |
+| a500-pal | native-type10-early | 4.500 | 4.545 | — | 11 |
+| a500-pal | native-type10-late | 4.000 | 4.070 | — | 13 |
+| a500-pal | native-boss | 2.000 | 1.852 | — | 29 |
+| 060-50-pal | native-type10-early | 25.000 | 25.000 | — | 2 |
+| 060-50-pal | native-type10-late | 25.000 | 25.000 | — | 2 |
+| 060-50-pal | native-boss | 16.500 | 16.489 | — | 4 |
+
+SIM60 rates use completed-tick endpoints; native presentations use complete inter-presentation intervals in a 100-field window. Gap values are window-local, not game-wide maxima. Pending growth is not applicable to native timing.
+<!-- rate-matrix-native-combat:end -->
+
+<!-- rate-matrix-baseline:end -->
 
 ## Supplied version
 

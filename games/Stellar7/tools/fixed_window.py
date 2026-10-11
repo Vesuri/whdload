@@ -3,7 +3,7 @@
 Usage: tools/fixed_window.py tmp/prof/base [--fields 100] [--frame 90] [--swaps-only]
 CPU, CHIP_KB, FAST_KB, EXTRA_ARGS, AMIGA_MODEL and KICKSTART remain overridable.
 """
-import argparse, os, socket, subprocess, sys, time, struct, json
+import argparse, os, socket, subprocess, sys, time, struct, json, re
 from pathlib import Path
 from stellar7 import SOCK
 from stellar7_report import loaded_game_regions
@@ -17,7 +17,12 @@ p.add_argument('--tick-checkpoints',type=int,nargs='*',default=[],help='addition
 p.add_argument('--checkpoints',type=int,nargs='*',default=[],help='additional simulation frames to snapshot after the trace')
 p.add_argument('--swaps-only',action='store_true')
 p.add_argument('--state-only',action='store_true')
+p.add_argument('--prebuilt', type=Path, help='capture this retained VERIFY slave instead of rebuilding; caller supplies matching flags/listing')
+p.add_argument('--boot-timeout', type=float, default=1800, help='seconds allowed for this boot to expose the loaded game')
+p.add_argument('--latency-listing', type=Path, help='exact VERIFY listing; observe update starts over --fields even with --state-only')
 a=p.parse_args()
+if a.boot_timeout <= 0:
+    p.error('--boot-timeout must be positive')
 if not 1 <= a.fields <= 100:
     p.error('--fields must be 1..100 (Barto capture limit); use checkpoints for longer runs')
 if a.tick is not None and (a.tick < 1 or a.checkpoints):
@@ -42,8 +47,12 @@ def cmd(text, timeout=900):
     return result
 try:cmd('quit',5)
 except (OSError,RuntimeError):pass
-subprocess.run(['make','-s','-C','whdload','verify'],check=True)
-(out/'slave.slave').write_bytes(Path('whdload/Stellar7.Slave').read_bytes())
+if a.prebuilt is None:
+    subprocess.run(['make','-s','-C','whdload','verify'],check=True)
+    selected_slave = Path('whdload/Stellar7.Slave')
+else:
+    selected_slave = a.prebuilt
+(out/'slave.slave').write_bytes(selected_slave.read_bytes())
 env=dict(os.environ,SLAVE=str(out/'slave.slave'),WHD_ARGS='CUSTOM5=1 '+os.environ.get('WHD_ARGS',''),JOY0='none',JOY1='none',DETERMINISTIC='1',WARP='1')
 os.environ['SLAVE']=env['SLAVE']
 ntsc_mode = int(env.get('NTSC_MODE', '1'))
@@ -51,8 +60,10 @@ if ntsc_mode not in (0, 1):
     raise ValueError('NTSC_MODE must be 0 or 1')
 field_hz = 60 if ntsc_mode else 50
 fast=int(env.get('FAST_KB','0')); chip=int(env.get('CHIP_KB','512'))
-base=0x200000 if fast else 0xc00000
-size=fast*1024 if fast else 1536*1024
+slow_match = re.search(r'--slow_memory=(\d+)', env.get('EXTRA_ARGS', ''))
+slow = int(slow_match[1]) if slow_match else 1536
+base = 0x200000 if fast else 0xc00000 if slow else 0
+size = (fast or slow or chip)*1024
 log=(out/'serve.log').open('w')
 server=subprocess.Popen([sys.executable,'tools/stellar7.py','serve'],stdout=log,stderr=subprocess.STDOUT,env=env)
 def dump(destination=out):
@@ -67,7 +78,8 @@ try:
         if time.monotonic()>deadline:raise TimeoutError('server startup')
         time.sleep(.2)
     print('Booting to loaded game...',flush=True)
-    for attempt in range(120):
+    boot_deadline = time.monotonic()+a.boot_timeout
+    while time.monotonic() < boot_deadline:
         cmd('wait 0.1');cmd('stop');mem,ch=dump()
         try:r={n:lo for lo,hi,n,o in loaded_game_regions(mem,base,ch)}
         except ValueError:continue
@@ -84,7 +96,7 @@ try:
             if mem[entry-base+4:entry-base+8] != b'S760':
                 continue
         break
-    else:raise RuntimeError('game/SIM60 patch did not become ready during this boot')
+    else:raise TimeoutError(f'game/SIM60 patch not ready after {a.boot_timeout:g} seconds in this boot')
     h=r['s7']; data=r['s7-data']; anchor=h+0x2c16
     counter=data+0x1e96; counter_type='unsigned short'; requested=a.frame
     if a.tick is not None:
@@ -111,10 +123,21 @@ try:
         raise RuntimeError(f'Requested {field_hz} Hz display but Exec reports {observed_hz}; verify scan timing before reporting FPS')
     legacy_count=struct.unpack_from('>H',mem,data-base+0x1e96)[0]
     (out/'anchor.txt').write_text(reply+f'\nframe={legacy_count}\ntick={a.tick}\ncode={h:#x}\ndata={data:#x}\nbase={base:#x}\n')
-    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=struct.unpack_from('>H',mem,data-base+0x1e96)[0],tick=a.tick,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast,whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS',''),ntsc_mode=ntsc_mode,field_hz=field_hz,observed_exec_hz=observed_hz),indent=2)+'\n')
+    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=struct.unpack_from('>H',mem,data-base+0x1e96)[0],tick=a.tick,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast,slow_kb=slow,extra_args=env.get('EXTRA_ARGS',''),whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS',''),ntsc_mode=ntsc_mode,field_hz=field_hz,observed_exec_hz=observed_hz),indent=2)+'\n')
     (out/'state.bin').write_bytes(mem[data-base:data-base+0x823c])
     print(f'At {"tick" if a.tick is not None else "frame"} {count}; capturing {a.fields} fields...',flush=True)
-    if a.state_only:pass
+    if a.latency_listing:
+        symbols = a.latency_listing.read_text(encoding='latin1')
+        match = re.search(r'^s60_update\s+00:([0-9A-F]+)', symbols, re.M)
+        if a.tick is None or match is None:
+            raise ValueError('--latency-listing requires a SIM60 tick capture and matching symbols')
+        # Offset is relative to the slave code hunk; s60_entry is not offset zero.
+        entry_symbol = int(re.search(r'^s60_entry\s+00:([0-9A-F]+)', symbols, re.M)[1],16)
+        update_offset = int(match[1],16)-entry_symbol
+        subprocess.run([sys.executable,'tools/swap_fields.py',str(a.fields),str(out),
+                        str(out/'code.bin'),hex(base),str(out/'chip.bin'),
+                        '--field-hz',str(field_hz),'--update-offset',str(update_offset)],check=True,env=env)
+    elif a.state_only:pass
     elif a.swaps_only:
         subprocess.run([sys.executable,'tools/swap_fields.py',str(a.fields),str(out),str(out/'code.bin'),hex(base),str(out/'chip.bin'),'--field-hz',str(field_hz)],check=True,env=env)
     else:

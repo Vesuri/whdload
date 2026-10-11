@@ -6,7 +6,7 @@ Only debugger convenience variables change; target memory/registers are read-onl
 
   swap_fields.py FIELDS OUTDIR CODE.bin BASE CHIP.bin
 """
-import argparse, os, re, socket, struct, sys
+import argparse, os, re, socket, struct, sys, json
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(__file__))
 from stellar7 import SOCK
@@ -30,6 +30,7 @@ p.add_argument('dump', type=Path)
 p.add_argument('base', type=lambda x: int(x, 0))
 p.add_argument('chip', type=Path)
 p.add_argument('--field-hz', type=int, choices=(50, 60), default=50)
+p.add_argument('--update-offset', type=int, help='SIM60 update offset relative to ABI entry')
 a = p.parse_args()
 hz = a.field_hz
 standard = 'NTSC' if hz == 60 else 'PAL'
@@ -44,10 +45,22 @@ if code[hook:hook+2] == bytes.fromhex('4ef9'):
     offset = entry-a.base
     if code[offset+4:offset+8] == b'S760':
         step = entry + struct.unpack_from('>H',code,offset+44)[0]
+start_commands = ''
+start_branch = ''
+start_address = None
+if code[hook:hook+2] == bytes.fromhex('4a39'):
+    start_address = r['s7'][0]+0x2af6
+if a.update_offset is not None:
+    assert code[offset+4:offset+8] == b'S760', 'SIM60 ABI required'
+    start_address = entry+a.update_offset
+if start_address is not None:
+    start_commands = f'break *{start_address:#x}'
+    start_branch = f'if $pc == {start_address:#x}\nprintf "S7START %d\\n", $s7_field\nelse\n'
 vbl = 0xfc0d4a + r['kick'][1]
 reply = command(f'''break *{vbl:#x}
 break *{frame:#x}
 break *{step:#x}
+{start_commands}
 set $s7_field = -1
 while $s7_field < {a.fields}
 continue
@@ -57,7 +70,8 @@ else
 if $pc == {frame:#x}
 printf "S7FRAME %d\\n", $s7_field
 else
-printf "S7STEP %d\\n", $s7_field
+{start_branch}printf "S7STEP %d\\n", $s7_field
+{'end' if start_branch else ''}
 end
 end
 end
@@ -87,3 +101,9 @@ else:
     report += f'{sum(swaps)} presentations; no complete inter-presentation interval for FPS.\n'
 (a.out / 'frames.txt').write_text(report)
 print(report, end='')
+
+events = {}
+for label, marker in (('presentations','S7FRAME'),('updates','S7STEP'),('update_starts','S7START')):
+    events[label] = [int(v) for v in re.findall(r'^'+marker+r' (-?\d+)$', reply, re.M)
+                     if 0 <= int(v) < a.fields]
+(a.out/'field-events.json').write_text(json.dumps(dict(fields=a.fields,field_hz=hz,events=events),indent=2)+'\n')
