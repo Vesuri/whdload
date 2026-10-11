@@ -92,7 +92,7 @@ RECENTER_FAST = 1 ; native twins, cross-render state and measured savings
 AI_GEOMETRY_FUSED = 1 ; native twins, cross-render state and measured savings
         ENDC
         IFND S60_SUBSTEPS
-S60_SUBSTEPS = 12
+S60_SUBSTEPS = 1
         ENDC
         IFNE (S60_SUBSTEPS-1)*(S60_SUBSTEPS-2)*(S60_SUBSTEPS-3)*(S60_SUBSTEPS-4)*(S60_SUBSTEPS-6)*(S60_SUBSTEPS-12)
         FAIL "S60_SUBSTEPS must be 1, 2, 3, 4, 6 or 12"

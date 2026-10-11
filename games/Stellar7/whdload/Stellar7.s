@@ -22,7 +22,7 @@ slv_info: dc.b "Installed by Psygore",10,"Development baseline (KickEmu 20.0)",0
 slv_CurrentDir: dc.b "data",0
 slv_config:
         IFD SIM60
-        dc.b "C1:B:Experimental 60 Hz simulation;"
+        dc.b "C1:B:Experimental ",48+S60_RATE/10,48+S60_RATE-(S60_RATE/10)*10," Hz simulation;"
         ELSE
         dc.b "C1:B:Experimental fixed simulation;"
         dc.b "C2:L:Simulation Hz:Default (5),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25;"

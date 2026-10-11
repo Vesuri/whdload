@@ -18,6 +18,7 @@ p.add_argument('--tick-checkpoints',type=int,nargs='*',default=[],help='addition
 p.add_argument('--checkpoints',type=int,nargs='*',default=[],help='additional simulation frames to snapshot after the trace')
 p.add_argument('--swaps-only',action='store_true')
 p.add_argument('--state-only',action='store_true')
+p.add_argument('--native-events',action='store_true',help='record every native presentation boundary between --frame and --checkpoints; requires --state-only')
 p.add_argument('--prebuilt', type=Path, help='capture this retained VERIFY slave instead of rebuilding; caller supplies matching flags/listing')
 p.add_argument('--boot-timeout', type=float, default=1800, help='seconds allowed for this boot to expose the loaded game')
 p.add_argument('--latency-listing', type=Path, help='exact VERIFY listing; observe update starts over --fields even with --state-only')
@@ -32,6 +33,8 @@ if a.tick_checkpoints and (a.tick is None or a.tick_checkpoints != sorted(set(a.
     p.error('--tick-checkpoints require --tick and unique increasing tick numbers after it')
 if a.checkpoints != sorted(set(a.checkpoints)) or any(x <= a.frame for x in a.checkpoints):
     p.error('--checkpoints must be unique increasing simulation steps after --frame')
+if a.native_events and (a.tick is not None or not a.state_only or a.swaps_only or a.latency_listing or not a.checkpoints):
+    p.error('--native-events requires native --frame/--checkpoints and --state-only, without another field observer')
 root=Path(__file__).resolve().parent.parent
 os.chdir(root)
 out=a.out.resolve(); out.relative_to(root/'tmp')
@@ -154,8 +157,35 @@ try:
             args=[sys.executable,'tools/'+tool,str(out/'trace.bin'),str(out/'code.bin')]
             args+=['--base',hex(base)] if tool=='stellar7_report.py' else [hex(base),'--field-hz',str(field_hz)]
             with (out/target).open('w') as f:subprocess.run(args,stdout=f,env=env,check=True)
+    native_events = []
+    if a.native_events:
+        native_events.append(dict(frame=count, field=struct.unpack_from('>I',mem,data-base+0x24a8)[0]))
     for checkpoint in (a.tick_checkpoints if a.tick is not None else a.checkpoints):
-        reply=cmd(f'gdb break *{anchor:#x}\ncondition $bpnum *({counter_type}*){counter:#x} >= {checkpoint}{level_condition}\ncontinue\ndelete')
+        if a.native_events:
+            # Debugger variables only. Observing every presentation anchor proves
+            # that frame deltas contain no skipped draws or counter resets.
+            previous = native_events[-1]['frame']
+            reply=cmd(f'''gdb break *{anchor:#x}
+set $s7_native_frame = {previous}
+set $s7_native_valid = 1
+while $s7_native_frame < {checkpoint} && $s7_native_valid
+continue
+set $s7_native_next = *(unsigned short*){counter:#x}
+if $s7_native_next != $s7_native_frame + 1
+set $s7_native_valid = 0
+end
+set $s7_native_frame = $s7_native_next
+printf "S7NATIVE %u %u\\n", $s7_native_frame, *(unsigned int*){data+0x24a8:#x}
+end
+delete''')
+            observed=[dict(frame=int(frame),field=int(field)) for frame,field in
+                      re.findall(r'^S7NATIVE (\d+) (\d+)$',reply,re.M)]
+            (out/f'native-events-{checkpoint}.txt').write_text(reply)
+            assert [e['frame'] for e in observed] == list(range(previous+1,checkpoint+1)), 'Native frame reset or skipped presentation'
+            native_events.extend(observed)
+            (out/'native-events.json').write_text(json.dumps(dict(field_hz=field_hz,anchor_offset='0x2c16',events=native_events),indent=2)+'\n')
+        else:
+            reply=cmd(f'gdb break *{anchor:#x}\ncondition $bpnum *({counter_type}*){counter:#x} >= {checkpoint}{level_condition}\ncontinue\ndelete')
         folder=out/'checkpoints'/str(checkpoint)
         mem,ch=dump(folder)
         count=boundary_count(mem)

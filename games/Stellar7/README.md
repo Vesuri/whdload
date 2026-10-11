@@ -3,15 +3,18 @@
 A source-only WHDLoad development and profiling workspace for the supplied
 English NTSC Stellar 7 install.
 
-The experimental conversion uses a 60 Hz simulation timestep independently
-of rendering, with integer remainders to preserve movement precision.
-It is playable, but **the conversion is unfinished**. The active performance
-plan will select one lower fixed tick rate for every machine, based on A500
-heavy-combat measurements. The complete native/SIM60 baseline is recorded
-in internals; the game still runs at 60 Hz.
-Live input is still sampled during catch-up rather than preserved by tick;
-heavy A500 combat can accumulate simulation debt. Broader gameplay and
-original-reference pace validation also remain open.
+The experimental SIM60 conversion uses a **5 Hz fixed simulation timestep**
+(N=1), independent of rendering and identical on every machine. Measurements
+selected this rate: higher supported rates failed the A500 native presentation
+threshold, while 5 Hz sustained the heavy-combat window without accumulating
+pending updates. N=12 (60 Hz) remains buildable for reference checks.
+
+It is playable, but **the conversion is unfinished**. The timestep is 200 ms;
+faster rendering repeats poses between ticks until interpolation is added.
+Steps 0–2 are complete; work stops before
+step 3 for the user's pace playtest. Live input is still sampled during catch-up
+rather than preserved by tick. Broader gameplay and original-reference pace
+validation remain open.
 
 Source the shared environment and launch the separate experimental build:
 
@@ -32,7 +35,7 @@ The original playable pack belongs in ignored `tmp/game/Stellar7NTSC/`.
 `amiga/run.sh` boots it. `make -C whdload` builds the reconstructed development
 loader against the shared WHDLoad 20.0 KickEmu sources (`$WHDLOAD`).
 That normal build retains the earlier opt-in five-Hz timing prototype; it
-does not contain the new 60 Hz conversion.
+does not contain the fixed-rate conversion.
 
 Game data, Kickstarts, WHDLoad executables, built slaves and captures are
 never committed. Local evidence referenced by the documents remains in

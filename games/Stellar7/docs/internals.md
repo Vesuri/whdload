@@ -2,20 +2,353 @@
 
 ## Active performance work
 
-Step 0 of the performance plan in docs/open-work.md is complete: 48 initial
-native/SIM60 cells and 24 native combat comparators pass their strict checks.
-The game still uses N=12 (60 Hz); no lower default has been selected.
-Step 1 is complete: all 78 private fixture combinations, six full-duration
-power runs and six jump runs pass. The 285 cross-N comparisons are classified in internals.
-N=12 release and VERIFY builds pass the byte-identity gate;
-step 2 will select the highest measured rate the A500 sustains in heavy combat
-without reducing presentations below native. Interpolation and input-history
-work are deferred to later steps and are outside the current request.
+Steps 0–1 are complete: 72 native/N=12 baseline cells, all 78 private
+native-reference fixture combinations, six full-duration power runs and six
+jump runs pass. The 285 cross-N comparisons are classified in the parameterization section.
+Explicit N=12 release and VERIFY builds remain byte-identical to the baseline.
+
+Step 2 selects **N=1 (5 Hz)** for every machine. All 160 lower-rate matrix
+cells and 280 cross-CPU/PAL comparisons pass their strict checks. N=2,3,4,6
+all fail at least one A500 native presentation threshold; the additional
+supported N=1 fallback passes both and sustains the 80-second heavy-combat
+window with sampled pending updates of 0–1 and no accumulating backlog.
+The timestep is 200 ms. Faster rendering currently repeats poses between ticks.
+Interpolation is not implemented; stop here for the user's pace playtest.
+Selected-default checks pass: 16 matched-tick SLOW_DRAW/lifecycle comparisons,
+death/Continue and No/restart, normal/early exits, disabled-code preservation,
+static/installed hook audits and the actual `play60.sh` release smoke test.
+The 19 tooling tests pass. Evidence is under `tmp/rate-selected-n1`.
+
+<!-- rate-candidates:start -->
+## Lower-rate matrix (step 2)
+
+**Selected: N=1, 5 Hz on all CPUs and both display standards.** The full
+N=2,3,4,6 matrices rejected every requested candidate on presentation rate,
+so the remaining supported lower value N=1 was measured with the same gates.
+N=12 also fails the presentation gate. N=1 is therefore the largest supported
+N that meets both conditions in these captures. The simple cost model did
+not predict the measured scene-dependent presentation rates accurately enough
+to select N=3 or N=4. Selection uses measurements, not that prediction.
+
+Route names retain the nominal N=12 schedule; captures scale tick numbers to
+the same game-time windows at each N. Cross-N encounters can differ as
+classified below; these are matched route/time windows, not identical actor
+trajectories across rates. Every machine within one N shares identical
+matched-tick gameplay, HUD and fresh projection state.
+
+Native A500 frame ranges 150–200 and 375–450 measure **4.411765 and
+4.083485 presentations/s** (50/680 and 75/1102 presentations/fields at 60 Hz).
+Their 301 contiguous presentation-anchor observations pass original-code,
+setup-removal, exact-slave and initial mapped-state checks. The step-0
+100-field spot references remain 4.444/4.110; both reference methods give
+the same pass/fail decisions. Native game pace remains variable.
+
+| N | Tick rate | A500 early fps | A500 late fps | At least native in both? |
+|---:|---:|---:|---:|---|
+| 1 | 5 Hz | 4.723618 | 4.385382 | yes |
+| 2 | 10 Hz | 3.953871 | 4.342984 | no |
+| 3 | 15 Hz | 4.300000 | 3.656885 | no |
+| 4 | 20 Hz | 3.624161 | 2.793792 | no |
+| 6 | 30 Hz | 3.517588 | 3.203560 | no |
+
+N=1 heavy combat completes 400 ticks in 4811 NTSC fields (80.183333 s):
+4.988568 updates/s and 4.340054 presentations/s. Endpoint pending is 0→1;
+five-simulation-second samples remain 0–1 with no accumulating trend.
+The finite observation ends with one owed update; it does not indicate a
+different configured timestep. These samples are not an instantaneous global
+backlog bound. All candidate heavy-window samples are retained below.
+
+The tick is 200 ms. Faster CPUs can present more often than 5 Hz, but poses
+repeat between ticks until step 3. No interpolation or renderer optimisation
+is included. Pace and feel await user playtesting before that next step.
+
+### Selected-default regression
+
+The default release is identical to explicit N=1 and differs from the measured
+N=1 release only in its displayed rate digits. Explicit N=12 release and VERIFY
+still match the original SHA-256 values in the parameterization section.
+All four SLOW_DRAW=20 routes match the N=1 A500 at both completed-tick
+endpoints. Death/Continue, No/menu/new game, normal exits and early exits
+also pass on A500 and delayed 68020; all 16 endpoint comparisons agree in
+mapped gameplay, HUD and fresh projection, allowing only deferred projection
+scratch. The normal/early fixtures reach level six.
+
+The CUSTOM1-off capture passes the original-code/relocation checker with only
+its explicit menu fixture allowed. The release audit covers 89 patch commands,
+69 merged ranges and 663 relocated code pointers, with no detected native
+interior entries. All 89 simulation hooks are installed in the actual
+`play60.sh` release smoke capture; the native menu is reached, menu fixtures
+are absent, and the ABI reports N=1. The menu image is also visually checked.
+The smoke uses debug/warp/silent observation and disconnected input, so it does
+not establish physical controls or audible output. Static hook coverage is
+not proof of every indirect entry or replacement semantic.
+
+Evidence: `tmp/rate-selected-n1/build-validation.json`, `validation.json`,
+`release-audit.json`, individual lifecycle/disabled reports and
+`play60-smoke/validation.json`. The 19 tooling tests pass. Normal and playable
+builds are restored after validation. Steps 0–2 end here; later encounter,
+input-history, interpolation and release work remains in `docs/open-work.md`.
+
+### Before → after presentation matrix
+
+Each entry is N=12 → N=1 presentations/s, from completed-tick endpoints.
+Full updates/s, pending growth and window-local update-start gaps appear in
+the candidate and baseline tables. Machine settings and cache policy are
+unchanged; these are emulator measurements under the documented SetCPU policy.
+
+| Machine | SOL | Type-10 early | Type-10 late | Boss |
+|---|---:|---:|---:|---:|
+| a500 | 2.517 → 5.479 | 0.745 → 4.724 | 0.430 → 4.385 | 1.025 → 2.517 |
+| a1200-stock | 5.504 → 12.428 | 3.832 → 11.900 | 3.345 → 10.733 | 2.774 → 4.214 |
+| a1200-fast | 8.953 → 18.976 | 9.231 → 18.200 | 9.087 → 17.219 | 5.859 → 7.005 |
+| 030-50 | 18.909 → 35.533 | 22.662 → 35.058 | 22.375 → 34.572 | 14.396 → 18.869 |
+| 040-25 | 23.626 → 40.800 | 29.052 → 40.568 | 29.101 → 40.200 | 19.132 → 25.158 |
+| 060-50 | 23.933 → 41.000 | 29.400 → 40.800 | 29.499 → 40.467 | 19.368 → 25.957 |
+| a500-pal | 2.514 → 5.653 | 0.748 → 4.771 | 0.488 → 4.424 | 1.037 → 2.532 |
+| 060-50-pal | 25.300 → 44.467 | 30.739 → 38.700 | 28.600 → 38.451 | 18.938 → 26.347 |
+
+The heavy route covers nominal 600–5400 (80 simulation seconds), with
+pending sampled every five simulation seconds. Update-start gaps below
+cover only the separate 100-field observation at each route start.
+
+Native reference binaries remain byte-identical after parameterization
+(`tmp/native-rate-baseline-reuse.json`). Evidence: `tmp/rate-nN`,
+`tmp/rate-nN-heavy`, `tmp/rate-native-exact` and
+`tmp/rate-selection-evidence.json`. Selected release code differs from the
+measured N=1 code only in the two menu-label rate digits; explicit N=12
+release and VERIFY bytes still match the step-0 baseline.
+
+### N=1: 5 Hz
+
+A500 heavy window: 4.988568 updates/s, 4.340054
+presentations/s over 80.183333 observed seconds. Sampled pending updates:
+`0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1`.
+All 56 matched-tick cross-CPU/PAL comparisons pass, allowing only deferred
+projection scratch; gameplay, HUD and fresh projection state match.
+
+| Machine | Route | Updates/s | Presentations/s | Pending growth | Largest observed update-start gap (fields) |
+|---|---|---:|---:|---:|---:|
+| a500 | sol | 5.073 | 5.479 | -1 | 15 |
+| a500 | type10-early | 5.025 | 4.724 | -1 | 13 |
+| a500 | type10-late | 4.983 | 4.385 | 1 | 14 |
+| a500 | boss | 5.245 | 2.517 | -2 | 35 |
+| a1200-stock | sol | 5.011 | 12.428 | 0 | 14 |
+| a1200-stock | type10-early | 5.000 | 11.900 | 0 | 14 |
+| a1200-stock | type10-late | 5.000 | 10.733 | 0 | 15 |
+| a1200-stock | boss | 5.017 | 4.214 | 0 | 21 |
+| a1200-fast | sol | 5.011 | 18.976 | 0 | 14 |
+| a1200-fast | type10-early | 5.000 | 18.200 | 0 | 13 |
+| a1200-fast | type10-late | 5.006 | 17.219 | 0 | 14 |
+| a1200-fast | boss | 5.076 | 7.005 | -1 | 19 |
+| 030-50 | sol | 5.000 | 35.533 | 0 | 13 |
+| 030-50 | type10-early | 5.008 | 35.058 | 0 | 12 |
+| 030-50 | type10-late | 5.006 | 34.572 | 0 | 12 |
+| 030-50 | boss | 4.992 | 18.869 | 0 | 14 |
+| 040-25 | sol | 5.000 | 40.800 | 0 | 13 |
+| 040-25 | type10-early | 5.008 | 40.568 | 0 | 13 |
+| 040-25 | type10-late | 5.000 | 40.200 | 0 | 12 |
+| 040-25 | boss | 4.992 | 25.158 | 0 | 13 |
+| 060-50 | sol | 5.000 | 41.000 | 0 | 13 |
+| 060-50 | type10-early | 5.000 | 40.800 | 0 | 13 |
+| 060-50 | type10-late | 5.000 | 40.467 | 0 | 13 |
+| 060-50 | boss | 4.992 | 25.957 | 0 | 13 |
+| a500-pal | sol | 5.047 | 5.653 | -1 | 12 |
+| a500-pal | type10-early | 4.970 | 4.771 | 1 | 11 |
+| a500-pal | type10-late | 5.027 | 4.424 | 0 | 12 |
+| a500-pal | boss | 5.274 | 2.532 | -2 | 22 |
+| 060-50-pal | sol | 5.000 | 44.467 | 0 | 11 |
+| 060-50-pal | type10-early | 5.000 | 38.700 | 0 | 11 |
+| 060-50-pal | type10-late | 5.007 | 38.451 | 0 | 11 |
+| 060-50-pal | boss | 4.990 | 26.347 | 0 | 11 |
+
+SIM60 rates use completed-tick endpoints; native presentations use complete inter-presentation intervals in a 100-field window. Gap values are window-local, not game-wide maxima. Pending growth is not applicable to native timing.
+
+### N=2: 10 Hz
+
+A500 heavy window: 9.995835 updates/s, 4.085798
+presentations/s over 80.033333 observed seconds. Sampled pending updates:
+`1, 1, 1, 0, 0, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 0, 1`.
+All 56 matched-tick cross-CPU/PAL comparisons pass, allowing only deferred
+projection scratch; gameplay, HUD and fresh projection state match.
+
+| Machine | Route | Updates/s | Presentations/s | Pending growth | Largest observed update-start gap (fields) |
+|---|---|---:|---:|---:|---:|
+| a500 | sol | 10.022 | 3.808 | 0 | 19 |
+| a500 | type10-early | 9.885 | 3.954 | 1 | 15 |
+| a500 | type10-late | 10.022 | 4.343 | 0 | 14 |
+| a500 | boss | 10.417 | 2.396 | -4 | 33 |
+| a1200-stock | sol | 10.147 | 6.967 | -2 | 11 |
+| a1200-stock | type10-early | 9.934 | 7.351 | 0 | 9 |
+| a1200-stock | type10-late | 10.033 | 7.960 | -1 | 8 |
+| a1200-stock | boss | 9.983 | 4.093 | 0 | 21 |
+| a1200-fast | sol | 10.022 | 9.688 | 0 | 9 |
+| a1200-fast | type10-early | 9.967 | 11.860 | 0 | 8 |
+| a1200-fast | type10-late | 10.000 | 13.000 | 0 | 8 |
+| a1200-fast | boss | 10.017 | 6.611 | 0 | 13 |
+| 030-50 | sol | 9.989 | 26.371 | 0 | 7 |
+| 030-50 | type10-early | 10.000 | 30.800 | 0 | 7 |
+| 030-50 | type10-late | 10.000 | 31.733 | 0 | 7 |
+| 030-50 | boss | 10.000 | 16.900 | 0 | 9 |
+| 040-25 | sol | 9.989 | 33.496 | 0 | 6 |
+| 040-25 | type10-early | 10.000 | 37.500 | 0 | 7 |
+| 040-25 | type10-late | 10.000 | 38.000 | 0 | 7 |
+| 040-25 | boss | 10.017 | 23.139 | 0 | 8 |
+| 060-50 | sol | 10.000 | 33.800 | 0 | 6 |
+| 060-50 | type10-early | 10.017 | 37.863 | 0 | 7 |
+| 060-50 | type10-late | 10.000 | 38.400 | 0 | 7 |
+| 060-50 | boss | 10.000 | 23.900 | 0 | 8 |
+| a500-pal | sol | 10.302 | 3.915 | -4 | 16 |
+| a500-pal | type10-early | 9.960 | 3.984 | 0 | 13 |
+| a500-pal | type10-late | 9.973 | 4.388 | 0 | 11 |
+| a500-pal | boss | 10.395 | 2.391 | -4 | 28 |
+| 060-50-pal | sol | 10.000 | 36.667 | 0 | 6 |
+| 060-50-pal | type10-early | 10.000 | 40.800 | 0 | 5 |
+| 060-50-pal | type10-late | 10.000 | 41.467 | 0 | 6 |
+| 060-50-pal | boss | 10.000 | 23.900 | 0 | 6 |
+
+SIM60 rates use completed-tick endpoints; native presentations use complete inter-presentation intervals in a 100-field window. Gap values are window-local, not game-wide maxima. Pending growth is not applicable to native timing.
+
+### N=3: 15 Hz
+
+A500 heavy window: 15.018773 updates/s, 3.754693
+presentations/s over 79.900000 observed seconds. Sampled pending updates:
+`2, 1, 2, 4, 1, 2, 1, 4, 2, 1, 3, 0, 2, 4, 2, 0, 0`.
+All 56 matched-tick cross-CPU/PAL comparisons pass, allowing only deferred
+projection scratch; gameplay, HUD and fresh projection state match.
+
+| Machine | Route | Updates/s | Presentations/s | Pending growth | Largest observed update-start gap (fields) |
+|---|---|---:|---:|---:|---:|
+| a500 | sol | 15.393 | 3.558 | -5 | 25 |
+| a500 | type10-early | 15.000 | 4.300 | 0 | 13 |
+| a500 | type10-late | 15.237 | 3.657 | -4 | 21 |
+| a500 | boss | 15.075 | 2.211 | -1 | 35 |
+| a1200-stock | sol | 15.017 | 6.407 | 0 | 15 |
+| a1200-stock | type10-early | 14.925 | 8.060 | 0 | 8 |
+| a1200-stock | type10-late | 15.186 | 6.952 | -2 | 13 |
+| a1200-stock | boss | 15.203 | 3.953 | -2 | 21 |
+| a1200-fast | sol | 15.169 | 8.966 | -2 | 8 |
+| a1200-fast | type10-early | 15.025 | 11.920 | 0 | 6 |
+| a1200-fast | type10-late | 15.050 | 10.903 | -1 | 8 |
+| a1200-fast | boss | 15.254 | 6.508 | -3 | 13 |
+| 030-50 | sol | 15.017 | 19.488 | 0 | 5 |
+| 030-50 | type10-early | 14.975 | 29.850 | 0 | 4 |
+| 030-50 | type10-late | 15.017 | 28.365 | 0 | 5 |
+| 030-50 | boss | 15.075 | 14.774 | 0 | 6 |
+| 040-25 | sol | 15.000 | 28.200 | 0 | 5 |
+| 040-25 | type10-early | 14.975 | 36.439 | 0 | 5 |
+| 040-25 | type10-late | 15.000 | 35.533 | 0 | 5 |
+| 040-25 | boss | 15.000 | 20.900 | 0 | 6 |
+| 060-50 | sol | 15.000 | 28.600 | 0 | 5 |
+| 060-50 | type10-early | 15.000 | 36.800 | 0 | 5 |
+| 060-50 | type10-late | 15.000 | 36.000 | 0 | 5 |
+| 060-50 | boss | 15.050 | 21.472 | 0 | 6 |
+| a500-pal | sol | 15.306 | 3.537 | -5 | 21 |
+| a500-pal | type10-early | 14.881 | 4.365 | 1 | 11 |
+| a500-pal | type10-late | 15.162 | 3.706 | -2 | 17 |
+| a500-pal | boss | 14.881 | 2.183 | 1 | 27 |
+| 060-50-pal | sol | 15.000 | 31.133 | 0 | 5 |
+| 060-50-pal | type10-early | 15.000 | 39.800 | 0 | 4 |
+| 060-50-pal | type10-late | 15.000 | 35.600 | 0 | 5 |
+| 060-50-pal | boss | 15.030 | 20.541 | 0 | 5 |
+
+SIM60 rates use completed-tick endpoints; native presentations use complete inter-presentation intervals in a 100-field window. Gap values are window-local, not game-wide maxima. Pending growth is not applicable to native timing.
+
+### N=4: 20 Hz
+
+A500 heavy window: 19.975031 updates/s, 3.295880
+presentations/s over 80.100000 observed seconds. Sampled pending updates:
+`2, 4, 2, 3, 4, 7, 2, 3, 4, 5, 1, 4, 3, 3, 2, 3, 4`.
+All 56 matched-tick cross-CPU/PAL comparisons pass, allowing only deferred
+projection scratch; gameplay, HUD and fresh projection state match.
+
+| Machine | Route | Updates/s | Presentations/s | Pending growth | Largest observed update-start gap (fields) |
+|---|---|---:|---:|---:|---:|
+| a500 | sol | 20.293 | 3.720 | -4 | 26 |
+| a500 | type10-early | 20.134 | 3.624 | -2 | 13 |
+| a500 | type10-late | 19.956 | 2.794 | 1 | 20 |
+| a500 | boss | 20.067 | 2.107 | 0 | 34 |
+| a1200-stock | sol | 20.247 | 6.952 | -4 | 11 |
+| a1200-stock | type10-early | 19.900 | 7.065 | 1 | 8 |
+| a1200-stock | type10-late | 19.934 | 5.581 | 1 | 13 |
+| a1200-stock | boss | 20.168 | 3.832 | -2 | 21 |
+| a1200-fast | sol | 20.022 | 9.611 | 0 | 9 |
+| a1200-fast | type10-early | 20.000 | 11.000 | 0 | 6 |
+| a1200-fast | type10-late | 19.978 | 8.923 | 1 | 7 |
+| a1200-fast | boss | 20.270 | 6.385 | -2 | 13 |
+| 030-50 | sol | 20.022 | 19.689 | 0 | 4 |
+| 030-50 | type10-early | 20.000 | 25.400 | 0 | 4 |
+| 030-50 | type10-late | 19.978 | 20.377 | 0 | 4 |
+| 030-50 | boss | 20.000 | 14.700 | 0 | 6 |
+| 040-25 | sol | 19.978 | 25.172 | 0 | 4 |
+| 040-25 | type10-early | 20.000 | 33.500 | 0 | 4 |
+| 040-25 | type10-late | 19.978 | 28.701 | 0 | 4 |
+| 040-25 | boss | 19.967 | 19.268 | 0 | 4 |
+| 060-50 | sol | 20.000 | 25.467 | 0 | 4 |
+| 060-50 | type10-early | 20.000 | 33.900 | 0 | 4 |
+| 060-50 | type10-late | 20.000 | 29.267 | 0 | 4 |
+| 060-50 | boss | 20.033 | 19.533 | 0 | 4 |
+| a500-pal | sol | 20.270 | 3.784 | -4 | 21 |
+| a500-pal | type10-early | 19.881 | 3.678 | 1 | 11 |
+| a500-pal | type10-late | 20.027 | 2.804 | 0 | 17 |
+| a500-pal | boss | 20.080 | 2.108 | -1 | 27 |
+| 060-50-pal | sol | 20.027 | 27.637 | 0 | 3 |
+| 060-50-pal | type10-early | 20.040 | 32.064 | 0 | 4 |
+| 060-50-pal | type10-late | 20.000 | 27.800 | 0 | 3 |
+| 060-50-pal | boss | 19.960 | 19.860 | 0 | 4 |
+
+SIM60 rates use completed-tick endpoints; native presentations use complete inter-presentation intervals in a 100-field window. Gap values are window-local, not game-wide maxima. Pending growth is not applicable to native timing.
+
+### N=6: 30 Hz
+
+A500 heavy window: 29.950083 updates/s, 3.107321
+presentations/s over 80.133333 observed seconds. Sampled pending updates:
+`4, 4, 4, 7, 7, 7, 5, 13, 4, 6, 11, 3, 7, 9, 7, 5, 8`.
+All 56 matched-tick cross-CPU/PAL comparisons pass, allowing only deferred
+projection scratch; gameplay, HUD and fresh projection state match.
+
+| Machine | Route | Updates/s | Presentations/s | Pending growth | Largest observed update-start gap (fields) |
+|---|---|---:|---:|---:|---:|
+| a500 | sol | 30.134 | 3.214 | -2 | 19 |
+| a500 | type10-early | 30.151 | 3.518 | -2 | 13 |
+| a500 | type10-late | 30.033 | 3.204 | -1 | 14 |
+| a500 | boss | 31.088 | 1.865 | -10 | 36 |
+| a1200-stock | sol | 30.337 | 6.202 | -5 | 11 |
+| a1200-stock | type10-early | 30.252 | 7.160 | -3 | 7 |
+| a1200-stock | type10-late | 30.067 | 6.548 | -1 | 8 |
+| a1200-stock | boss | 30.050 | 3.606 | 0 | 21 |
+| a1200-fast | sol | 29.967 | 9.057 | 1 | 9 |
+| a1200-fast | type10-early | 29.900 | 11.462 | 1 | 5 |
+| a1200-fast | type10-late | 29.967 | 10.855 | 0 | 6 |
+| a1200-fast | boss | 30.100 | 6.321 | -1 | 13 |
+| 030-50 | sol | 30.000 | 18.533 | 0 | 4 |
+| 030-50 | type10-early | 30.050 | 24.040 | 0 | 3 |
+| 030-50 | type10-late | 30.000 | 23.467 | 0 | 3 |
+| 030-50 | boss | 30.050 | 15.025 | 0 | 6 |
+| 040-25 | sol | 30.033 | 23.359 | 0 | 4 |
+| 040-25 | type10-early | 30.000 | 30.000 | 0 | 2 |
+| 040-25 | type10-late | 30.000 | 29.533 | 0 | 3 |
+| 040-25 | boss | 29.950 | 19.567 | 1 | 5 |
+| 060-50 | sol | 30.033 | 23.560 | 0 | 4 |
+| 060-50 | type10-early | 30.000 | 30.000 | 0 | 3 |
+| 060-50 | type10-late | 29.967 | 29.767 | 0 | 2 |
+| 060-50 | boss | 30.050 | 19.933 | 0 | 4 |
+| a500-pal | sol | 30.949 | 3.301 | -14 | 16 |
+| a500-pal | type10-early | 29.940 | 3.593 | 1 | 10 |
+| a500-pal | type10-late | 30.283 | 3.230 | -4 | 11 |
+| a500-pal | boss | 32.120 | 1.820 | -20 | 27 |
+| 060-50-pal | sol | 30.040 | 26.435 | -1 | 3 |
+| 060-50-pal | type10-early | 30.000 | 30.000 | 0 | 3 |
+| 060-50-pal | type10-late | 30.000 | 29.733 | 0 | 3 |
+| 060-50-pal | boss | 30.000 | 19.500 | 0 | 4 |
+
+SIM60 rates use completed-tick endpoints; native presentations use complete inter-presentation intervals in a 100-field window. Gap values are window-local, not game-wide maxima. Pending growth is not applicable to native timing.
+
+<!-- rate-candidates:end -->
 
 ## Substep parameterization (step 1)
 
-`S60_SUBSTEPS` supports N=1,2,3,4,6,12; `S60_RATE=5*N`. N=12 remains
-the default. The release and VERIFY binaries are byte-identical to the
+`S60_SUBSTEPS` supports N=1,2,3,4,6,12; `S60_RATE=5*N`. N=1 is
+the default. Explicit N=12 release and VERIFY binaries are byte-identical to the
 baseline (SHA-256 `c2a1d0ad93a0f3255155a14950fb2b74a7cced43a52fb8cefca94dbf54a82628`
 and `d6f8107c3211089f06b03491e4489f2b292c432c379605ea1d678c449c7cb6f4`).
 All six rates compile. Thirteen private native-reference fixture groups
@@ -104,7 +437,7 @@ Evidence: `tmp/substeps-prototype/cross-runtime-validation.json`,
 `cross-summary.json`, `startup-cross-validation.json`, `startup-n*-replay.json`,
 `rng-stream-validation.json`, `birth-boundary-validation.json`,
 `carrier-boundary-validation.json` and `input-boundary-validation.json`.
-No sustainable lower-rate default is claimed before step-2 measurements.
+The selected N=1 performance evidence is in the step-2 section above.
 The HUD installer always copies 48 native instruction bytes. Its twelve-longword
 copy count is not a timestep constant. Input/HUD and knockback/shake
 runtime groups pass at every supported N.
@@ -112,7 +445,7 @@ runtime groups pass at every supported N.
 <!-- rate-matrix-baseline:start -->
 ## Performance-plan baseline matrix (step 0)
 
-The current build is still N=12 (60 Hz). All 48 initial cells are complete and pass
+This reference uses N=12 (60 Hz). All 48 initial cells are complete and pass
 the strict report checker. The additional 24 native combat cells below also pass.
 Exact builds, settings and observations are retained under
 `tmp/rate-baseline`. The table is regenerated with
