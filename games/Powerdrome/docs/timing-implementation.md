@@ -4337,8 +4337,13 @@ resource-availability flag or native sample pointer is forced.
 
 When combined with the existing `TIMING_STALL_TEST=500`, the stall starts after at least
 190 steps rather than the usual 200, aiming to straddle those two requests. Actual stall
-placement and request coalescing must be measured; this is not proof of a runtime fault.
-The frozen `timing-weather-audio-stall1` pair is running. The audio checker recognizes
+placement is measured from the live fixture. The completed 030 side of
+`timing-weather-audio-stall1` confirms one 500-ms stall after 191 allocated ticks, with
+world time held and then resumed without lost movement time. The sound-request checker
+**fails**: the first pending request is still occupied when the second expires. The
+single flag coalesces them. The weather schedule itself passes 487 observed boundaries;
+maximum world-end delay is 560 ms and endpoint simulation debt is zero. A500 is still
+running. The sound delivery implementation therefore needs correction. The audio checker recognizes
 the explicitly tagged first fixture request and still rejects an occupied queue when
 another request arrives. Existing mode-2 and normal binaries remain byte-identical;
 mode 4 is rejected. This fixture does not establish natural-weather cadence acceptance.

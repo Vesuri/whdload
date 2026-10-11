@@ -682,5 +682,7 @@ and two resumed starts. The three request times match, as do 485 weather boundar
 1,001 movement states and 222 control/input/fuel updates. Fixture guards and
 disabled/normal byte equivalence pass. The next pair, `timing-weather-audio-stall1`, uses
 guarded mode 3 to arrange two native sound requests 320 ms apart, with a 500-ms stall
-intended to cover both. Runtime coalescing evidence is pending; no production fix has
-been made on the strength of static suspicion alone.
+intended to cover both. The completed 030 run confirms the bug: the second request arrives while the first
+is pending and is coalesced. Its 500-ms stall, held/resumed world clock, 487 weather
+boundaries and eventual zero debt pass. A500 remains running. Fix sound delivery and
+rerun this failing regression; do not relax the request-accounting gate.

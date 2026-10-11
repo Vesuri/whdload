@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import struct
 from check_timing_capacity import check as check_capacity
+from weather_effect_state import locate as effect_locate
 
 
 def u32(data, offset):
@@ -49,7 +50,16 @@ def check(root):
     assert end-start==fields, 'Stall did not have the specified PAL duration'
     origin=u32(chip,game+0x48fe)
     assert origin<=start<end<=origin+int(config['FIELDS'])
-    assert ticks>=200
+    routine = frame + 8 + struct.unpack_from('>h', final, frame + 8)[0]
+    assert final[routine + 14:routine + 16] == bytes.fromhex('b0bc'), 'Missing stall step threshold'
+    threshold = u32(final, routine + 16)
+    assert threshold in (190, 200), 'Unexpected stall threshold'
+    if threshold == 190:
+        address = effect_locate(chip, final, game, base)
+        assert address is not None
+        fixture = final.find(b'PDWEFT03', address - base + 48, address - base + 4096)
+        assert fixture >= 0 and u32(final, fixture + 8) == 1, 'Early stall without active sound stress fixture'
+    assert ticks >= threshold
     log=(root/'swaps-gdb.txt').read_text()
     world=re.findall(r'^PDW20_EVENT (-?\d+) 0xcedc (.+)$',log,re.M)
     physical=re.findall(r'^PDINITIAL_EVENT (-?\d+) 0xcedc (.+)$',log,re.M)
