@@ -2,6 +2,7 @@
 # Boot the installed original Stellar 7 under WHDLoad in FS-UAE.
 #   amiga/run.sh            windowed, real speed, with sound
 #   DEBUG=1 amiga/run.sh    also open the Barto gdb stub on $DEBUG_PORT (no trigger)
+#   SOUND=0|1               sound off/on (default: off for DEBUG=1 or warp runs; SILENT=1 = off)
 #   JOY0=none amiga/run.sh  leave port 0 empty (the host mouse otherwise injects input)
 #   WINDOW=back|none        keep the window behind others / run headless (default: back for
 #                           DEBUG=1 or warp runs, front otherwise)
@@ -55,30 +56,17 @@ printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assig
   "WHDLoad Stellar7NTSC.Slave PRELOAD SPLASHDELAY=0 NOREQ ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
 rm -f "$RUN"/state/*.uss
 
-AUDIO=(); [ "${SILENT:-0}" = 1 ] && AUDIO=(--audio_driver=dummy)
-DBG=(); [ "${DEBUG:-0}" = 1 ] && DBG=(--remote_debugger=20 --remote_debugger_port="$DEBUG_PORT")
-REC=(); [ -n "${RECORD:-}" ] && REC=(--record="$RECORD" --deterministic=1)
-[ "${DETERMINISTIC:-0}" = 1 ] && REC+=(--deterministic=1)
-PORTS=()
-for p in 0 1; do
-  v=JOY$p; [ "${!v:-}" = none ] && PORTS+=(--joystick_port_${p}_mode=nothing)
-done
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
-# Window placement from the shared helper: debug/warp runs open behind the active window
-# (WINDOW=front|back|none overrides). Only FSUAE_WINDOW is used; the options below are our own.
+# The shared launcher (fsuae_common.sh) builds the common options from these: debug and warp
+# runs are silent and open behind the active window (SOUND=, WINDOW=front|back|none override).
+# Slow memory comes from the EXTRA_ARGS default, which the tools set explicitly.
+CHIP_KB="${CHIP_KB:-512}"; FAST_KB="${FAST_KB:-0}"
+JOY0="${JOY0:-mouse}"; JOY1="${JOY1:-keyboard}"
+NTSC="$NTSC_MODE"
+EXTRA_ARGS="${EXTRA_ARGS:---slow_memory=1536}"
 fsuae_options
-WINDOW_ARGS=(); [ "$FSUAE_WINDOW" = none ] && WINDOW_ARGS=(--video_driver=null)
-# The subshell execs, so $! is the emulator itself.
-( fsuae_env; exec "${FSUAE:-fs-uae}" \
-  --base_dir="$PWD/$RUN/fsuae" \
-  --amiga_model="$AMIGA_MODEL" --cpu="$CPU" --chip_memory="${CHIP_KB:-512}" --fast_memory="${FAST_KB:-0}" \
-  --kickstart_file="$KICKSTART" \
+fsuae_launch \
   --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
-  --floppy_drive_0="$WB" \
-  --joystick_port_0="${JOY0:-mouse}" --joystick_port_1="${JOY1:-keyboard}" \
-  --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
-  --uae_ntsc="$UAE_NTSC" --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
-  "${PORTS[@]}" "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" "${WINDOW_ARGS[@]}" ${EXTRA_ARGS:---slow_memory=1536} ) > "$RUN/fsuae.log" 2>&1 &
-fsuae_track $!
-echo "fs-uae pid $FSUAE_PID (log $RUN/fsuae.log, port $DEBUG_PORT)"
+  --floppy_drive_0="$WB" --window_width=760 --window_height=568 \
+  --uae_ntsc="$UAE_NTSC" --state_dir="$RUN/state"

@@ -244,7 +244,8 @@ or audible output. If overriding WHD_ARGS, include CUSTOM1=1 to enable the
 replacement. The selected N=1 A500 heavy-combat measurement sustains game time
 with sampled pending counts of 0–1; broader encounter validation remains open.
 
-`amiga/run.sh` boots the shipped slave windowed with sound. Defaults: 68000,
+`amiga/run.sh` boots the shipped slave windowed with sound (debug and warp runs are silent
+and open behind other windows; `SOUND=` and `WINDOW=` override). Defaults: 68000,
 512 KB chip, 1536 KB slow RAM, no fast RAM, NTSC. This is an A500-equivalent
 bus configuration with enough memory for WHDLoad. The supplied game is NTSC;
 the simulation uses 5*N Hz (default N=1) regardless of display mode. `NTSC_MODE=1` uses the emulator's `uae_ntsc=true` core option.
