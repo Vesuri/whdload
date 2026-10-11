@@ -692,5 +692,11 @@ selection RNG, preserving registers and native availability/suppression checks. 
 corrected `timing-weather-audio-stall2` 030 side delivers all four requests, including
 the 4,000/4,320-ms pair, at their exact world boundaries. Native helper duration is
 0–40 ms; maximum world-end delay is 580 ms, with no endpoint debt. The 500-ms stall,
-world hold/resume and 485 weather boundaries pass. A500 is running. Repeat mute,
-no-resource and full-cycle regressions for direct delivery; earlier tests used deferral.
+world hold/resume and 485 common weather boundaries pass. The completed A500 side
+also delivers all four requests at matching logical times, with 0–40-ms helper calls.
+Its maximum world-end delay is 1,240 ms and retained debt peaks at 480 ms, but both
+retained and assigned work clear by the endpoint. The pair matches 1,002 movement
+states and 222 control/input/fuel updates; 030 adds 241 passing renderer twins.
+Direct-delivery mute (`audio-keys2`), no-resource (`audio-nosample1`) and full-cycle
+(`cycle-cadence2`) pairs are running sequentially, each conditional on prior checks
+passing. Earlier mute/full-cycle captures used deferral. The full F1–F8 goal remains open.

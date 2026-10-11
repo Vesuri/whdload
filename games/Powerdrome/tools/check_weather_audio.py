@@ -14,7 +14,7 @@ from weather_effect_state import snapshot as effect_snapshot, parse_values as ef
 from weather_effect_clock import parse_values as clock_values, snapshot as clock_snapshot
 
 
-def check(root, require_mute=False):
+def check(root, require_mute=False, require_unavailable=False):
     game = int((root / 'game-base.txt').read_text(), 0)
     base = int((root / 'dump-base.txt').read_text(), 0)
     states = []
@@ -23,14 +23,19 @@ def check(root, require_mute=False):
         chip = (root / (prefix + 'chip.bin')).read_bytes()
         code = (root / (prefix + 'code.bin')).read_bytes()
         state = snapshot(chip, game)
-        assert state['available'], 'Optional weather samples absent'
+        if require_unavailable:
+            assert state['available'] == state['sample_table'] == 0, 'Expected absent optional weather samples'
+        else:
+            assert state['available'], 'Optional weather samples absent'
         assert chip[game + 0x17836:game + 0x1783e] == bytes.fromhex('4a6e02f4660000aa')
         assert chip[game + 0x178e6:game + 0x178e8] == bytes.fromhex('4e75')
         states.append(state)
         returns.append(owned_return(chip, code, game, base))
     assert returns[0] == returns[1], 'Installed caller changed during capture'
-    for key in ('allocation_base', 'allocation_size', 'sample_table',
-                'sample_pointer', 'sample_words', 'sample_period'):
+    resource_keys = ('allocation_base', 'allocation_size', 'sample_table')
+    if not require_unavailable:
+        resource_keys += ('sample_pointer', 'sample_words', 'sample_period')
+    for key in resource_keys:
         assert states[0][key] == states[1][key], f'Resources changed: {key}'
     events = [(int(field), int(offset, 16), parse_values(values))
               for field, offset, values in re.findall(
@@ -38,6 +43,18 @@ def check(root, require_mute=False):
                   (root / 'swaps-gdb.txt').read_text(), re.M)]
     assert events, 'Audio boundary probes missing'
     assert all(a[0] <= b[0] for a, b in zip(events, events[1:])), 'Unordered audio probes'
+    if require_unavailable:
+        assert all(s['return_address'] != returns[0] and s['available'] == 0 for _, _, s in events), 'Unavailable weather sample was used'
+        effects = [effect_values(v) for v in re.findall(
+            r'^PDWEFX_EVENT -?\d+ 0x[0-9a-f]+ (.+)$',
+            (root / 'swaps-gdb.txt').read_text(), re.M)]
+        assert effects, 'No effect observations'
+        assert any(a['delay'] == 1 and b['ticks'] == a['ticks'] + 1 and b['attempts'] == a['attempts'] + 1 for a, b in zip(effects, effects[1:])), 'No observed delay expiry exercised the missing-resource guard'
+        effects += [effect_snapshot(root), effect_snapshot(root, True)]
+        assert all(s['cleanup_pending'] == s['cleanups'] == 0 for s in effects), 'Unavailable sound was queued or called'
+        print(f'{root.name}: optional samples absent; no weather audio call or queued request across observed boundaries')
+        print('  Missing-resource guard only; generation/stall accounting must be checked separately.')
+        return ('unavailable',)
     before = None
     completed = started = suppressed = other = 0
     waits = []
@@ -182,8 +199,10 @@ def check(root, require_mute=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('captures', type=Path, nargs='+')
-    parser.add_argument('--require-mute', action='store_true', help='Require native Tab mute/unmute and suppressed-then-resumed weather sounds')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--require-mute', action='store_true', help='Require native Tab mute/unmute and suppressed-then-resumed weather sounds')
+    mode.add_argument('--require-unavailable', action='store_true', help='Require absent optional resources and no weather audio delivery')
     args = parser.parse_args()
-    histories = [check(root, args.require_mute) for root in args.captures]
+    histories = [check(root, args.require_mute, args.require_unavailable) for root in args.captures]
     assert all(history == histories[0] for history in histories), 'Weather audio request timelines differ'
     print('All supplied observed sound-request timelines match.')

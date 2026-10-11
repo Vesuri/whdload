@@ -4365,7 +4365,17 @@ coalesced pair. Each native call lies at the current logical world/generation bo
 with unchanged weather state across the helper. Sample/channel/register checks pass.
 Calls take 0–40 ms in PAL fields; measured maximum world-end delay is 580 ms, maximum
 allocation 30 steps, and endpoint retained/assigned debt is zero. The measured stall
-is 500 ms, world hold/resume and all 485 weather boundaries pass. A500 is running.
+is 500 ms, world hold/resume and all 485 common weather boundaries pass. The completed
+A500 counterpart delivers the same four requests at identical logical times, also with
+0–40-ms helper durations. Its maximum world-end delay is 1,240 ms and retained debt
+peaks at 480 ms; both retained and assigned work are zero at the endpoint. The pair
+matches 1,002 common movement states and 222 control/input/fuel updates. The 030
+completes 241 renderer twins with unchanged raster code and zero failures.
 The normal build is byte-identical. Both old failing captures still fail request accounting.
-New direct-delivery mute, no-resource, full-cycle and broader lifecycle regression remain
-required; the earlier green captures exercised the deferred implementation.
+Direct-delivery mute (`timing-weather-audio-keys2`), no-resource
+(`timing-weather-audio-nosample1`) and full-cycle (`timing-weather-cycle-cadence2`)
+regressions are queued in sequence, stopping on a failed gate. Earlier green captures
+exercised the deferred implementation. Broader lifecycle acceptance remains required.
+The audio checker's `--require-unavailable` mode requires absent optional samples, an
+observed delay expiry, no weather helper call and zero queue/call counters across sampled
+boundaries. Its positive runtime validation is pending in the no-resource run.
