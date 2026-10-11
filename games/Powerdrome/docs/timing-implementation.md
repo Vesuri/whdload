@@ -3825,6 +3825,12 @@ and its full-register restore. Initial/final snapshots on both CPUs identify one
 corrupted hook, target and restore evidence are rejected. This avoids classifying other
 channel-3 sounds as weather solely by arguments. Probe integration and live entry/exit
 validation remain pending; the running full-cycle sampler has not been changed.
+`tools/check_weather_audio.py CAPTURE` is prepared to pair those weather entry/return
+observations, check sample/channel arguments, distinguish the native suppression return
+from channel start, check the registers preserved by each path, and reconcile complete
+calls with the wrapper counter. It rejects the unavailable-sample baseline. Its positive
+runtime path is not yet validated, and it does not certify audible output or logical
+request timing/coalescing. Captures ending inside the helper are explicitly rejected.
 
 This is separate from the renderer's palette restoration at `$117c8–$117d4`, which
 calls `$f914` when `state+$4d0` is set. Sound validation must check sample/period/volume,
