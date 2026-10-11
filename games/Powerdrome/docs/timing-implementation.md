@@ -1861,8 +1861,8 @@ eight with different render and logical phases; at field 227 the publisher uses 
 counter 103 while the last logical phase is 110. The consumer also uses the render
 counter. Thus these ordinary messages are frame-counted even though controls are timed.
 
-The shared counter selector now chooses the most recently completed logical control
-phase when timing has started, WORLD20 has initialized, no pit owns the context, and the
+The shared counter selector now chooses the extended logical message phase
+when timing has started, WORLD20 has initialized, no pit owns the context, and the
 native mode is human flight. `$13536` and `$c990` publish into that domain; the existing
 `$d8ca` opponent-message hook uses it in flight too. Native additions of 15/30/45 phases
 remain in place. The `$da54` CMP/BGT pair compares against the same selected domain and
@@ -2008,17 +2008,59 @@ not excluded by this inventory):
 | `$14156` | Publish native counter plus 45 | Pit mode and flight handoff |
 | `$da50`, `$e2a2` | Read for flight/pit expiry | Paired consumer domains |
 
-The logical phase is currently only 16 bits. At 90 ms per increment, a complete wrap
-spans 5,898,240 ms (98.304 minutes); initialization and mode transitions can change the
-starting phase. A ten-minute normal session cannot establish full wrap correctness.
-A directed wrap test must cover publication before wrap, expiry after wrap, and negative
-sentinels without treating signed native comparisons as modular arithmetic.
+The native control phase remains 16 bits, but message deadlines now use a private
+32-bit extension (`PDMSGCLK`: valid word +8, last native phase word +10, extended phase
+long +12). Each world step adds the unsigned word difference from the previous observed
+control phase. Repeated movement steps in the same phase add zero; `$ffff → 0` adds one.
+Initialization takes the outer counter's high word and the selected control phase's low
+word. Ordinary new timing epochs invalidate this clock; rescue reinitialization preserves
+it. Rescue deadline conversion uses the extended upcoming phase, not a zero-extended
+word. Native control cadence and phase-mask behavior remain unchanged in production.
+The containing world/frame wrappers preserve registers and CCR around clock maintenance.
+
+`TIMING_MESSAGE_WRAP_TEST=1` is an explicit VERIFY/WORLD20-only fixture. It selects
+initial control phase **65,401** to exercise rollover quickly; it is absent by default
+and is not a gameplay policy or an A500 handling calibration. At 90 ms per increment,
+a natural full word rollover spans **98.304 minutes**, so ordinary ten-minute runs do
+not provide this evidence. The fixture changes initial control-phase bits and therefore
+cannot certify unchanged full gameplay trajectories.
+
+`timing-messagewrap1-030` passes **13 publications, 241 expiry branch/register checks
+and two native clears at exactly 45 phases**. The second unrefreshed message publishes
+at extended phase **65,523** and expires at **65,568**, when the native phase is **32**.
+The completed 850-field window adds **294 clean renderer twins**, with unchanged raster
+code. The A500/native-renderer counterpart `timing-messagewrap1-a500` passes
+**13 publications, 203 expiry checks and two 45-phase clears**, including the same
+**65,523 → 65,568** rollover-spanning lifetime. These are directed message checks,
+not full gameplay equivalence. The 030 final active draw is not teardown evidence.
+`PDMSGPHASE_EVENT` records the
+three clock fields beside each domain sample; the checker requires matching low words,
+a monotonic extended phase, and a publication-to-clear lifetime spanning rollover.
+Older captures without the new clock retain their original bounded phase checks.
+
+The fixture-free synchronized-pit build also passes
+`timing-messageclock1-handoff-030`: the extended clock preserves the rescue message's
+26 remaining counts, clears at phase 319, passes 32 expiry/register checks and adds
+117 clean renderer twins. That run does not cross rollover. Explicitly disabling the
+wrap fixture produces byte-identical output to omitting it; enabling it without VERIFY
+is rejected. The normal build remains byte-identical and the option-off hook audit passes.
+
+Use the ordinary full timing/repair build with `TIMING_MESSAGE_WRAP_TEST=1`, C5=11,
+anchor `$bc7c`, 850 fields and the ordinary flight-message probes above. The fixture
+must not be used as a throughput benchmark. Thirty-two-bit signed-clock rollover,
+negative sentinels and rollover combined with rescue, lap/session resets or other
+publishers remain separate requirements.
+
+```sh
+python3 tools/check_flight_message.py --require-wrap tmp/prof/timing-messagewrap1-030
+python3 tools/check_flight_message.py --require-wrap tmp/prof/timing-messagewrap1-a500
+python3 tools/check_message_handoff.py tmp/prof/timing-messageclock1-handoff-030
+```
 
 This is a bounded flight-message correction. The direct `$c990` publisher and flight
 `$d8ca` context still need directed runtime coverage. Broader lap contexts and
-16-bit phase wrap, pause/rescue/result handoffs, other publishers and unsupported modes
-remain to audit before release. The current checker explicitly rejects phase resets or
-wrap instead of counting those cases as covered. Runtime guest CCR edge cases and native
+wrap combined with mode changes, pause/rescue/result handoffs, other publishers and unsupported modes
+remain to audit before release. The current checker explicitly rejects extended-clock resets instead of counting them as covered. Runtime guest CCR edge cases and native
 A500 lifetime calibration also remain open. Pit expiry is still in its outer counter domain.
 
 Use TIMING_STATE, TIMING_EARLY and probes

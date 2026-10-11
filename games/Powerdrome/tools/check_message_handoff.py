@@ -7,7 +7,7 @@ The route must start after rescue acceptance and include the departure publisher
 """
 import argparse
 from pathlib import Path
-from check_flight_message import read, registers_equal
+from check_flight_message import read, registers_equal, phase as message_phase
 
 
 def signed(value):
@@ -23,7 +23,7 @@ def check(root, expect_leak=False, inactive=False):
         off, msg, domain = row['off'], row['PDMESSAGE_EVENT'], row['domain']
         assert len(msg) == len(domain) == 8
         if handoff is not None:
-            last_phase = domain[3]
+            last_phase = message_phase(row)
         if off == 0x14090:
             retune = row
         if inactive and handoff is not None:
@@ -69,7 +69,7 @@ def check(root, expect_leak=False, inactive=False):
             old = start['PDMESSAGE_EVENT']
             assert old[1] == returned['PDMESSAGE_EVENT'][1]
             remaining = signed((old[1] - old[0]) & 0xffffffff)
-            phase = domain[3]
+            phase = message_phase(row)
             target = 0xffffffff if old[1] == 0xffffffff else (phase + remaining) & 0xffffffff
             assert target != old[1], 'Fixture did not exercise different clock domains'
             assert msg[1] == (old[1] if expect_leak else target)
@@ -85,7 +85,7 @@ def check(root, expect_leak=False, inactive=False):
             compare = row
         elif off in (0xda5a, 0xda64) and compare is not None:
             deadline = signed(compare['PDMESSAGE_EVENT'][1])
-            phase = compare['domain'][3]
+            phase = message_phase(compare)
             expired = deadline <= phase
             assert off == (0xda5a if expired else 0xda64)
             registers_equal(compare, row)

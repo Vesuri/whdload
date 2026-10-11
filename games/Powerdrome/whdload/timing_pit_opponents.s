@@ -239,6 +239,33 @@ timing_pit_opponent_restore
  move.w (sp)+,ccr
  rts
 
+; Extend consecutive world control phases without changing native cadence bits.
+; D0 holds the current word phase; A0 remains the world-state base.
+timing_message_phase_update
+ movem.l d0-d1/a1,-(sp)
+ lea timing_message_clock(pc),a1
+ tst.w 8(a1)
+ bne.s .advance
+ move.w #1,8(a1)
+ move.l 12(a0),d1
+ and.l #$ffff0000,d1
+ or.w d0,d1
+ move.l d1,12(a1)
+ bra.s .store
+.advance
+ moveq #0,d1
+ move.w d0,d1
+ sub.w 10(a1),d1
+ add.l d1,12(a1)
+.store
+ move.w d0,10(a1)
+ movem.l (sp)+,d0-d1/a1
+ rts
+
+timing_message_clock dc.b 'PDMSGCLK'
+ dc.w 0,0 ; valid, last observed word phase
+ dc.l 0 ; extended message phase
+
 ; Flight message publication/expiry share the completed logical control phase.
 ; Pit publications retain the saved outer pit counter rule. Other modes stay native.
 ; Only D0 is an output; the selection itself never changes X.
@@ -263,8 +290,7 @@ timing_message_counter_source
  move.l a0,-(sp)
  bsr.s timing_message_uses_logical
  beq.s .outer
- moveq #0,d0
- move.w timing_world_state+30(pc),d0
+ move.l timing_message_clock+12(pc),d0
  bra.s .done
 .outer
  move.l $5e(a6),d0
@@ -304,6 +330,8 @@ timing_message_resume
  sub.l $5e(a6),d0
  moveq #0,d1
  move.w timing_control_phase(pc),d1
+ sub.w timing_message_clock+10(pc),d1
+ add.l timing_message_clock+12(pc),d1
  add.l d1,d0
  move.l d0,$64(a6)
 .done

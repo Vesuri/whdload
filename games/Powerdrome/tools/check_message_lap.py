@@ -6,7 +6,7 @@ prototype. Debugger SR does not prove guest flags; those need a guest contract.
 """
 import argparse
 from pathlib import Path
-from check_flight_message import read
+from check_flight_message import read, phase as message_phase
 
 
 def check(root, expect_native_rebase=False):
@@ -44,7 +44,7 @@ def check(root, expect_native_rebase=False):
             assert before[:16] == after[:16] and before[17:] == after[17:]
             assert row['domain'] == pending['domain']
             old = pending['PDMESSAGE_EVENT']
-            phase = pending['domain'][3]
+            phase = message_phase(pending)
             live = pending['domain'][5] != 0 and old[1] > phase
             active += live
             print(f'  field {row["field"]}: phase={phase}, deadline={old[1]} -> {row["PDMESSAGE_EVENT"][1]}, native counter={old[0]}, live={live}')

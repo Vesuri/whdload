@@ -401,7 +401,12 @@ trajectory equivalence or rescue-message lifetime. Rescue reinitialization now t
 remaining message counts into the resumed flight clock: 030 preserves 26 remaining counts
 and clears exactly 26 phases later (32 expiry checks, 117 clean twins); A500 preserves an
 already expired -55-count deadline without reviving it. These different histories do not
-calibrate native pit durations. Direct/less common publishers, broader lap contexts, phase wrap,
+calibrate native pit durations. A private 32-bit message clock now extends the unchanged
+native 16-bit control phase. Directed A500/030 rollover fixtures each pass thirteen
+publications and two exact 45-phase clears, including 65,523 → 65,568 across rollover;
+203/241 expiry checks pass, with 294 clean 030 twins. The fixture-free rescue regression
+retains its 26-count lifetime and adds 117 clean twins. Normal-build bytes remain unchanged.
+Direct/less common publishers, broader lap contexts, wrap combined with mode changes,
 mode handoffs and A500 message-duration calibration remain open; pit expiry still uses
 the outer pit counter. Do not treat this bounded correction as complete message timing. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The

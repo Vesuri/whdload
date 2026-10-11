@@ -16,6 +16,10 @@ timing_world_initialize
  lea timing_world_state(pc),a0
  IFNE TIMING_WORLD20
  bsr timing_forces_initialize
+ tst.w timing_pit_rebase-timing_world_state(a0)
+ bne.s .keep_message_clock
+ clr.w timing_message_clock+8-timing_world_state(a0)
+.keep_message_clock
  clr.w timing_world20_initialized-timing_world_state(a0)
  clr.w timing_world20_scalar_remainder-timing_world_state(a0)
  clr.l timing_world20_vector_remainders-timing_world_state(a0)
@@ -72,6 +76,7 @@ timing_world_begin
  move.l d0,$5e(a6)
  move.w d0,30(a0)
  IFNE TIMING_WORLD20
+ bsr timing_message_phase_update
  move.l timing_world20_clock(pc),16(a0)
  ELSE
  move.l timing_input_clock(pc),16(a0)

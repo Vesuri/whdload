@@ -86,6 +86,20 @@ TIMING_REPAIR_DROP = 0
  FAIL "TIMING_REPAIR_DROP requires TIMING_REPAIR"
  ENDC
  ENDC
+ IFND TIMING_MESSAGE_WRAP_TEST
+TIMING_MESSAGE_WRAP_TEST = 0
+ ENDC
+ IFNE TIMING_MESSAGE_WRAP_TEST
+ IFND VERIFY
+ FAIL "TIMING_MESSAGE_WRAP_TEST requires VERIFY"
+ ENDC
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_MESSAGE_WRAP_TEST requires TIMING_WORLD20"
+ ENDC
+ IFNE TIMING_MESSAGE_WRAP_TEST-1
+ FAIL "TIMING_MESSAGE_WRAP_TEST must be 0 or 1"
+ ENDC
+ ENDC
  IFND TIMING_REPAIR_INPUT_TEST
 TIMING_REPAIR_INPUT_TEST = 0
  ENDC
@@ -695,6 +709,9 @@ timing_frame
  bsr timing_heat_initialize
  ; Preserve all low counter bits, not only the original first-loop odd parity.
  move.w $60(a6),timing_control_phase-timing_state(a1)
+ IFNE TIMING_MESSAGE_WRAP_TEST
+ move.w #65401,timing_control_phase-timing_state(a1)
+ ENDC
 .keep_engine_phase
  ELSE
  move.w #1,timing_control_phase-timing_state(a1)

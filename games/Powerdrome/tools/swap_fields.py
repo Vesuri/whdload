@@ -289,6 +289,8 @@ if os.environ.get('TIMING_STATE') == '1':
         kv += [f'*(unsigned short*){r["game"][0]+x:#x}' for x in (0x461a,0x461c,0x4608)]
         kv += [f'*(unsigned char*){state+0x10e:#x}', '(unsigned int)$d0', '(unsigned int)$sp']
         repair_key_sample = 'printf "PDRKEY_EVENT %d {off} ' + ' '.join(['%u']*len(kv)) + '\\n", $pd_field, ' + ', '.join(kv) + '\n'
+    message_clocks = timing_locations(b'PDMSGCLK', lambda off: struct.unpack_from('>H',code,off+8)[0]==1)
+    assert len(message_clocks) <= 1
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
@@ -330,6 +332,10 @@ if os.environ.get('TIMING_STATE') == '1':
                              ((tp,8),(pitp,8),(wp,8),(wp,30),(op,10))]
             domain_values += [f'*(unsigned short*){state+x:#x}' for x in (0x68,0xb6,0x43a)]
             sample += 'printf "PDMSGDOMAIN_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(domain_values)) + '\\n", $pd_field, ' + ', '.join(domain_values) + '\n'
+            if message_clocks:
+                mc = a.base + message_clocks[0]
+                mv = [f'*(unsigned {kind}*){mc+x:#x}' for x,kind in ((8,'short'),(10,'short'),(12,'int'))]
+                sample += 'printf "PDMSGPHASE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(mv)) + '\\n", $pd_field, ' + ', '.join(mv) + '\n'
         if off in (0xcf2e, 0xd000, 0xd022, 0xd038, 0xd058):
             bv = [f'*(unsigned short*){state+x:#x}' for x in
                   (0x194,0x454,0x1f0,0x138,0x1ba,0xe4,0x432,0x422)]
