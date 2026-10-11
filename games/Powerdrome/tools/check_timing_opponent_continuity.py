@@ -2,7 +2,9 @@
 """Audit a continuous opponent deadline across flight, rescue and flight return.
 
 Checks 27-value PDPOPP events against independent pit/world snapshots. Requires
-one completed rescue and subsequent flight updates. Does not certify complete
+one completed rescue and subsequent flight updates by default. The repair-only mode
+checks the same ledger/ownership invariants over the full directed repair route.
+Does not certify complete
 opponent state equivalence, native A500 calibration, or arbitrary mode exits.
 """
 import argparse
@@ -13,7 +15,13 @@ from collections import Counter
 from pathlib import Path
 
 
-def check(root, flight_only=False, stable_lap_domain=False):
+def check(root, flight_only=False, stable_lap_domain=False, repair_only=False):
+    assert (root / "final-code.bin").is_file(), "Capture must be terminal"
+    assert not (flight_only and repair_only)
+    if repair_only:
+        cfg = json.loads((root / "configuration.json").read_text())
+        assert re.search(r"\bCUSTOM5=13\b", cfg["WHD_ARGS"])
+        assert int(cfg["ANCHOR"], 0) == 0x148d0
     lap_epoch = None
     if stable_lap_domain:
         game = int((root / "game-base.txt").read_text(), 0)
@@ -69,6 +77,9 @@ def check(root, flight_only=False, stable_lap_domain=False):
         if off == 0xe3c4 and before is not None:
             assert t[1] == t[2] == t[22] == 0
             assert t[17:19] == before[17:19], 'Pit presentation RNG/counter not restored'
+            if repair_only:
+                owed = (t[4] - origin) // 18 + 1
+                assert t[8] == min(owed, before[8]+32), 'Repair service lost scheduled opponent work'
             restores += 1
             before = None
         if off == 0xced8 and t[24] and not p[1]:
@@ -123,8 +134,15 @@ def check(root, flight_only=False, stable_lap_domain=False):
             if returned is not None and post_updates:
                 flight_restores += 1
             flight_before = None
-    assert origin is not None and samples and world_restores >= 10
-    if flight_only:
+    assert origin is not None and samples
+    if repair_only:
+        assert restores >= 264 and clocks, "Need complete repair service and exercised clock readers"
+        assert before is None and flight_before is None, "Incomplete service boundary"
+    else:
+        assert world_restores >= 10
+    if repair_only:
+        print("  Repair-window ledger/ownership only; no rescue-return or input-consumption claim")
+    elif flight_only:
         assert entered is None and returned is None
     else:
         assert entered and returned and restores and flight_restores >= 10
@@ -141,6 +159,8 @@ if __name__ == '__main__':
                         help='Check the bounded 300-field CUSTOM5=8 pause route without requiring a pit')
     parser.add_argument("--stable-lap-domain", action="store_true",
                         help="Check lap reads against the retained logical epoch; repair reads retain sampled mapping")
+    parser.add_argument("--repair-only", action="store_true",
+                        help="Check the full CUSTOM5=13 repair window without requiring rescue or flight")
     args = parser.parse_args()
     for capture in args.captures:
-        check(capture, args.flight_only, args.stable_lap_domain)
+        check(capture, args.flight_only, args.stable_lap_domain, args.repair_only)

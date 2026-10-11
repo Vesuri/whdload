@@ -376,8 +376,13 @@ all 30 dropped steps preserve both screen buffers and the pit background byte-fo
 and all 180 part-bank selections survive. All 234 drawn steps exchange buffers normally;
 the native outer service counter advances exactly once in every step. The same capture
 passes all geometry and timing gates, with no incomplete or busy-entry exclusions.
-Independent native pixel equivalence, skipped drawing-register/HUD scratch state,
-input/opponent continuity, native exits and broader modes still remain open; both
+The dedicated service capture also passes: all 264 steps call opponent service and poll
+keyboard availability once, including all 30 dropped pictures. The ledger verifies 1,772
+movement samples, 298 restored pit calls and twelve stable-domain lap-clock reads, with
+exact bounded service and retained debt. All keyboard polls are empty: queued-input
+consumption and input-triggered exits remain to test. Independent native pixel equivalence,
+skipped drawing-register/HUD scratch state, full opponent-record equivalence, native exits
+and broader modes still remain open; both
 experimental repair switches stay disabled by default. Message lifetime itself still needs elapsed-time calibration, and ordinary world
 messages/other setters remain open; do not treat the ownership fix as full message timing. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The

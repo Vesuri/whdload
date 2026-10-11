@@ -1682,8 +1682,34 @@ requires exercised drawn and idle-blitter dropped paths, validates each planar d
 compares all three bitmaps on idle-entry drops, and checks part-bank updates and the native
 outer service counter. `--complete-route` additionally requires all 264 pairs. Busy-entry
 drops are reported and excluded from pixel claims. These instrumented runs are not FPS
-measurements. Skipped drawing-register/HUD scratch state, service/input/opponent continuity,
-native exits and broader branches remain open. The drop-disabled build was
+measurements. Skipped drawing-register/HUD scratch state, queued-input consumption,
+full opponent-record equivalence, native exits and broader branches remain open.
+
+`timing-repairdrop3-service2-a500` covers all **264 repair steps**, including all **30
+suppressed pictures**. Each step reaches `$e3bc` / `$e3c4` around opponent service, then
+`$e3d0` / `$e3d6` around keyboard availability polling, exactly once and in that order.
+Drawing suppression is clear at each post. All **264 keyboard results are empty**;
+this proves polling continuity, not key consumption or input-triggered exits.
+The opponent-ledger check passes **1,772 movement samples and 298 pit service restores**
+across the 2,000-field window. It verifies the unchanged epoch/phase, elapsed-time
+accounting, logical movement delta, scheduled clock values, RNG/counter ownership and
+exact bounded service: each pit call serves the smaller of the total owed updates and
+32 additional updates, retaining the remaining elapsed debt. Six lap-gate and six
+lap-duration reads use the retained stable epoch. No opponent repair-clock or lap-start
+reader is exercised. This covers the ledger and ownership, not complete-record trajectory
+agreement or a rescue-return cycle.
+
+The capture uses `ANCHOR=0x148d0`, `FIELDS=2000`, `SWAP_MARKER=0xe296`, `SWAP_ONLY=1`,
+`TIMING_STATE=1`, `TIMING_EARLY=1`, and probes
+`0x148d8 0x14962 0x14a20 0x14aa6 0xe3bc 0xe3c4 0xe3d0 0xe3d6 0xd56c 0xd4bc 0xd504 0xd7fe 0xd83c 0xd86c`.
+Other CPU/slave/input settings match the A500 repairdrop3 route. These reduced probes
+intentionally omit the geometry-stage entry/return sites; use the separately completed
+buffer/pacing capture for those gates. The earlier `timing-repairdrop3-service-a500`
+attempt stopped before its first field after the debugger rejected its larger breakpoint
+setup and supplies no runtime evidence. Existing 030 pause and A500 rescue ledger checks
+still pass with the added repair-only verifier mode.
+
+The drop-disabled build was
 byte-identical before the additional stage-bridge correction; the normal build remains
 byte-identical afterward. A build requesting DROP without REPAIR is rejected.
 
@@ -1691,6 +1717,8 @@ byte-identical afterward. A build requesting DROP without REPAIR is rejected.
 python3 tools/check_repair_drop.py tmp/prof/timing-repairdrop3-a500
 python3 tools/check_repair_drop.py --allow-no-drops tmp/prof/timing-repairdrop3-030-twins
 python3 tools/check_repair_buffers.py --complete-route tmp/prof/timing-repairdrop3-buffers-full-a500
+python3 tools/check_repair_service.py tmp/prof/timing-repairdrop3-service2-a500
+python3 tools/check_timing_opponent_continuity.py --repair-only --stable-lap-domain tmp/prof/timing-repairdrop3-service2-a500
 python3 tools/check_repair_pacing.py --native-steps --continuous-stages tmp/prof/timing-repairloop3-native-a500 tmp/prof/timing-repairdrop3-a500
 ```
 
