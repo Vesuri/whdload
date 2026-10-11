@@ -3280,7 +3280,19 @@ reaches 160 ms retained debt and both finish with zero retained/assigned debt. T
 requirement. The original 60-second joystick failure remains recorded as insufficiently
 instrumented evidence. The repeated `timing-endurance60-2/030-25-fast` run passes all
 per-run checks, including 667 joystick updates with three independently verified contact
-responses. The corresponding A500 run and full-window cross-CPU comparison are pending.
+responses. The corresponding A500 run now also passes: both configurations complete 3,004 world
+steps and 667 control/resource updates in exactly 3,000 physical PAL fields. All 3,004
+common sampled player/engine/RNG states and 667 control/input/fuel states match exactly.
+Both observe three contact-damping updates. The four extra completed world steps service
+80 ms carried into the sampled window: initial/final unsampled elapsed time is 80/0 ms
+on 030 and 140/60 ms on A500. Neither endpoint has retained or assigned unfinished debt.
+
+Maximum sampled world-end delay remains 260 ms on 030 and 780 ms on A500; maximum retained
+debt is respectively 0 and 160 ms. The 030 completes 851 clean renderer twins, with
+raster code unchanged and no draw active at the final snapshot. These observations extend
+the matched input route to 60 seconds. They do not cover a restart, the required ten-minute
+window, full opponent/effect state, or release performance. No fall-age or impulse samples
+are nonzero in this run, so it supplies no new evidence for those effects.
 
 
 ## Controlled simulation-stall fixture (runtime validation pending)
@@ -3300,6 +3312,10 @@ observations inside the stall, the exact resume cursor and consecutive 20-ms upd
 through recovery. It also invokes the existing elapsed-time/debt accounting check. Pair
 this with world/input/brake/resource checks and strict cross-CPU state comparisons; it
 does not establish full input/effect ownership or state equivalence by itself.
+
+The checker follows the installed allocator's first BSR and the fixture's PC-relative
+LEA to locate its live record; it does not assume a fixed tag-search distance. All three
+frozen fixture builds pass this direct-reference decoding check.
 
 All three fixture variants assemble. Non-VERIFY and invalid-duration builds are rejected.
 An explicit zero fixture produces bytes identical to the frozen full timing prototype;

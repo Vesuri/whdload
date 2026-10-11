@@ -469,12 +469,17 @@ Native contact response damps saved steering axes by 230/256; the old oracle omi
 New read-only contact observations and independent arithmetic/continuity checks pass a
 13-second A500/030 pair with three damping updates each, 652 identical sampled world
 states and 144 identical control/input/fuel updates. No production code or acceptance
-tolerance changed. Repeat the full 60-second pair with these observations before claiming
-endurance coverage; 600-second and controlled rate/stall tests remain open.
+tolerance changed. The repeat of the full 60-second pair is recorded below; the 600-second and controlled
+rate/stall tests remain open.
 
 
-The repeated 60-second 030 run now passes every per-run gate, including the three contact
-responses; its paired A500 run/comparison is pending. A VERIFY-only single-stall fixture
+The repeated 60-second A500/030 pair now passes every per-run gate and the cross-CPU
+comparison: 3,004 common sampled player/engine/RNG states and 667 control/input/fuel
+updates match exactly. Both observe three contact responses; the 030 completes 851 clean
+renderer twins. The four world steps beyond 3,000 account for 80 ms brought into the
+window, with no endpoint retained/assigned debt. Sampled delay maxima remain 260 ms on
+030 and 780 ms on A500. This closes the bounded 60-second route comparison, not the
+600-second/restart, full-state, effect calibration or controlled-stall requirements. A VERIFY-only single-stall fixture
 and independent duration/resume/debt checker are prepared for the next F7 experiment.
 Requested 100/250/500 ms delays produce 100/260/500 ms PAL waits. Build isolation passes,
 including byte-identical disabled and normal builds; stall runtime coverage is not yet

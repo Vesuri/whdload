@@ -16,6 +16,18 @@ def u32(data, offset):
     return struct.unpack_from('>I', data, offset)[0]
 
 
+def stall_tag(data, frame):
+    # Follow the installed timing_frame's first BSR.W and the fixture's LEA.
+    # The growing prototype can exceed a fixed tag-search window, and stale
+    # loader copies must not be selected by a matching tag alone.
+    assert data[frame:frame+8]==bytes.fromhex('40e748e7e0c06100'), 'Missing stall call in live allocator'
+    routine=frame+8+struct.unpack_from('>h',data,frame+8)[0]
+    assert 0 <= routine < len(data)-4 and data[routine:routine+2]==bytes.fromhex('43fa')
+    tag=routine+2+struct.unpack_from('>h',data,routine+2)[0]
+    assert 0 <= tag <= len(data)-32 and data[tag:tag+8]==b'PDSTALL1'
+    return tag
+
+
 def check(root):
     config=json.loads((root/'configuration.json').read_text())
     game=int((root/'game-base.txt').read_text(),0)
@@ -25,8 +37,8 @@ def check(root):
     initial=(root/'code.bin').read_bytes()
     final=(root/'final-code.bin').read_bytes()
     assert 0 <= frame < len(initial)
-    tag=initial.find(b'PDSTALL1',frame,frame+16384)
-    assert tag>=0 and final[tag:tag+8]==b'PDSTALL1', 'Missing live stall fixture'
+    tag=stall_tag(initial,frame)
+    assert stall_tag(final,frame)==tag, 'Live stall fixture moved'
     before=struct.unpack_from('>6I',initial,tag+8)
     count,start,end,clock,ticks,requested=struct.unpack_from('>6I',final,tag+8)
     assert before[:5]==(0,0,0,0,0) and before[5]==requested, 'Stall already occurred before capture'
