@@ -27,6 +27,7 @@ class Field:
     insn_end: int
     shot_kind: int
     shot: bytes
+    aga_colors: bytes = b''
 
 
 @dataclass
@@ -39,8 +40,13 @@ class Trace:
     fields: list = field(default_factory=list)
 
     def instructions(self, f):
-        """Yield (pc, cost, regs) for every record of field f; pc is None while the CPU is
-        stopped (STOP) and 0x7fffffff for interrupt entry."""
+        """Yield (pc, cost, regs) for every record of field f.
+
+        None means no PC was recorded. 0x7fffffff denotes cycles between
+        instrumented instructions (IRQ handling or other CPU overhead), not
+        necessarily an interrupt. The gap and following instruction share the
+        same register snapshot in the pinned FS-UAE cpu_profiler constructor.
+        """
         d, off, end = self.data, f.insn_off, f.insn_end
         u = struct.unpack_from
         regs = struct.Struct('<17I').unpack_from
@@ -85,7 +91,7 @@ def load(path):
     t = Trace(data, sections, rom, chip, slow)
     for i in range(nfields):
         custom = blob()
-        blob()
+        aga_colors = blob()
         dsize, dcount = w(), w()
         dma = data[off:off + dsize * dcount]
         off += dsize * dcount
@@ -97,6 +103,6 @@ def load(path):
         ssize, skind = w(), w()
         shot = bytes(data[off:off + ssize])
         off += ssize
-        t.fields.append(Field(i, custom, dsize, dma, cycles, idle, ioff, ioff + 4 * n, skind, shot))
+        t.fields.append(Field(i, custom, dsize, dma, cycles, idle, ioff, ioff + 4 * n, skind, shot, aga_colors))
     assert off == len(data), (off, len(data))
     return t

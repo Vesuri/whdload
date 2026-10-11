@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Read the native-callback oracle for 60 Hz special enemy motion.
+
+The guest compares XYZ on every substep and full actor/RNG state after each
+of four twelve-tick intervals. Cases cover types 13, 47 and 48, clamping,
+charge expiry, steering, transformation, player contact and an unused type.
+"""
+import argparse
+import json
+import re
+import struct
+from pathlib import Path
+
+
+def read(folder):
+    folder = Path(folder)
+    meta = {k: int(v, 0) for k, v in re.findall(
+        r'^(code|base)=(\S+)', (folder/'anchor.txt').read_text(), re.M)}
+    memory = (folder/'code.bin').read_bytes()
+    code = meta['code']-meta['base']
+    assert memory[code+0x2af6:code+0x2af8] == bytes.fromhex('4ef9')
+    entry = struct.unpack_from('>I', memory, code+0x2af8)[0]-meta['base']
+    assert memory[entry+4:entry+8] == b'S760'
+    offset = struct.unpack_from('>H', memory, entry+66)[0]
+    assert offset, 'SPECIAL_TEST fixture is absent'
+    at = entry+offset
+    assert memory[at:at+4] == b'T760'
+    completed, failed = struct.unpack_from('>2H', memory, at+4)
+    assert completed <= 12
+    cases = []
+    for index in range(completed):
+        kind, error, first, sixth, final = struct.unpack_from('>2H3i', memory, at+8+16*index)
+        cases.append(dict(case=index, type=kind, failed=error,
+                          first_tick_height=first, sixth_tick_height=sixth, final_height=final))
+    return dict(completed=completed, failed=failed, cases=cases)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('captures', nargs='+')
+    args = parser.parse_args()
+    ok = True
+    for folder in args.captures:
+        result = read(folder)
+        print(folder, json.dumps(result, indent=2))
+        ok &= result['completed'] == 12 and result['failed'] == 0
+        ok &= all(not c['failed'] for c in result['cases'])
+    raise SystemExit(0 if ok else 1)

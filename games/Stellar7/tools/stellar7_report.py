@@ -11,7 +11,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 import barto
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FIELD = 142102
 
 
 class Memory:
@@ -70,6 +69,34 @@ KICK13 = os.environ.get('KICK13') or os.path.expanduser('~/.local/share/amiga/Ki
 CODE_FILE, CODE_SIZE, DATA_SIZE = 0x24, 0x25360, 0x823c
 
 
+
+def loaded_game_regions(dump, base, chip=None):
+    """Find this supplied game's loaded hunk without scanning ROM/slave images.
+
+    The unpatched entry prefix identifies candidates; the relocated A4 and DOS
+    next-segment link must agree on the data hunk. Preload file copies fail that
+    relocation check. Used only for startup detection, not patch validation.
+    """
+    prefix = open(GAME, 'rb').read()[CODE_FILE:CODE_FILE+12]
+    candidates = []
+    for memory, origin in [(dump, base)] + ([(chip, 0)] if chip is not None else []):
+        offset = memory.find(prefix)
+        while offset >= 0:
+            if offset >= 4 and offset+CODE_SIZE <= len(memory):
+                data = struct.unpack_from('>I', memory, offset-4)[0]*4+4
+                a4 = struct.unpack_from('>I', memory, offset+14)[0]
+                if a4 == data+0x8000 and any(
+                        start <= data and data+DATA_SIZE <= start+len(blob)
+                        for blob, start in [(dump, base)] + ([(chip, 0)] if chip is not None else [])):
+                    address = origin+offset
+                    candidates.append([(address, address+CODE_SIZE, 's7', address),
+                                       (data, data+DATA_SIZE, 's7-data', data)])
+            offset = memory.find(prefix, offset+1)
+    if len(candidates) != 1:
+        raise ValueError(f'Expected one relocated game hunk, found {len(candidates)}')
+    return candidates[0]
+
+
 def regions(dump, base, chip=None):
     game = open(GAME, 'rb').read()
     code = game[CODE_FILE:CODE_FILE + CODE_SIZE]
@@ -117,9 +144,9 @@ class Namer:
 
     def addr(self, pc):
         if pc is None:
-            return '[stopped]'
+            return '[missing PC]'
         if pc == 0x7fffffff:
-            return '[irq entry]'
+            return '[between-instruction gap]'
         for lo, hi, name, origin in self.regs:
             if lo <= pc < hi:
                 return f'{name}:{pc - origin:05x}' if name != 'kick' else f'kick:{pc - origin:06x}'
@@ -167,29 +194,35 @@ def analyse(trace, mem, namer, fields):
     leafpcs = collections.Counter()
     kinds = collections.Counter()
     stacks = collections.defaultdict(list)  # context -> [(sp_before, name)]
-    pending = None  # (sp_before, label or None) for the call just executed
+    pending = {}  # context -> (sp_before, label) for its last executed call
     starts = set(namer.starts)
     for f in fields:
         for pc, cost, r in trace.instructions(f):
             sp = r[15]
             sup = ctx_of(sp)  # execution context = which stack SP lies in
             if pc is None or pc == 0x7fffffff:
-                kinds['stopped' if pc is None else 'irq-entry'] += cost
+                kinds['missing-pc' if pc is None else 'between-instruction-gap'] += cost
                 self_c[namer.addr(pc)] += cost
                 incl[namer.addr(pc)] += cost
-                pending = None
                 continue
             st = stacks[sup]
-            if pending is not None:
-                psp, plabel, psup = pending
-                if psup == sup and sp == psp - 4:
+            # Interrupts can occur between a call and its first instruction.
+            # Retain that call until the same stack context resumes.
+            waiting = pending.pop(sup, None)
+            if waiting is not None:
+                psp, plabel = waiting
+                if sp == psp - 4:
+                    # Keep the original entry as a range boundary even when
+                    # its prologue was replaced by a jump. A trampoline can
+                    # later execute that routine's native continuation; without
+                    # this boundary its self time leaks into the preceding one.
+                    starts.add(pc)
                     target = pc
                     if mem.word(pc) == 0x4ef9:  # jmp abs.l trampoline (jump table)
                         target = mem.long(pc + 2)
                     starts.add(target)
                     st.append((psp, plabel or namer.addr(target)))
                     calls[st[-1][1]] += 1
-                pending = None
             while st and sp >= st[-1][0]:
                 st.pop()
             if len(st) > 200:
@@ -213,7 +246,7 @@ def analyse(trace, mem, namer, fields):
                 if op == 0x4eae:  # jsr d16(a6)
                     disp = struct.unpack('>h', mem.read(pc + 2, 2))[0]
                     label = f'{namer.lib(r[14])}{disp}'
-                pending = (sp, label, sup)
+                pending[sup] = (sp, label)
     ordered = sorted(starts)
     import bisect
     by_ctx = collections.defaultdict(collections.Counter)
@@ -246,7 +279,8 @@ def main():
     self_c, incl, calls, edges, pcs, kinds, by_ctx = analyse(trace, mem, namer, fields)
     total = sum(kinds.values())
     nf = len(fields)
-    print(f'# {a.trace}: {nf} fields, {total} cycles ({total / nf / FIELD:.3f} of each field)')
+    recorded_cycles = sum(f.cycles for f in fields)
+    print(f'# {a.trace}: {nf} fields, {total} cycles ({total / recorded_cycles:.3f} of recorded field cycles)')
     print('regions:', ', '.join(f'{n} {lo:#x}-{hi:#x}' for lo, hi, n, _ in regs))
     print('by mode:', ', '.join(f'{k} {100 * v / total:.1f}%' for k, v in kinds.most_common()))
     reg = collections.Counter()

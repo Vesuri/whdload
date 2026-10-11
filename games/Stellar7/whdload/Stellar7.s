@@ -21,8 +21,12 @@ slv_copy: dc.b "1991 Dynamix",0
 slv_info: dc.b "Installed by Psygore",10,"Development baseline (KickEmu 20.0)",0
 slv_CurrentDir: dc.b "data",0
 slv_config:
+        IFD SIM60
+        dc.b "C1:B:Experimental 60 Hz simulation;"
+        ELSE
         dc.b "C1:B:Experimental fixed simulation;"
         dc.b "C2:L:Simulation Hz:Default (5),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25;"
+        ENDC
         IFD VERIFY
         dc.b "C3:B:Movement and firing fixture;C4:L:Draw every N steps:Default (1),1,2,3,4,5,6,7,8;C5:B:Deterministic menu fixture;"
         ENDC
@@ -127,4 +131,8 @@ _bootdos:
         INCLUDE fixture.s
         ENDC
 
+        IFD SIM60
+        INCLUDE sim60.s
+        ELSE
         INCLUDE timing.s
+        ENDC

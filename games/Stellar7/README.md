@@ -1,22 +1,36 @@
 # Stellar 7
 
 A source-only WHDLoad development and profiling workspace for the supplied
-English Stellar 7 install. An experimental fixed-step simulation mode is
-available with `CUSTOM1=1`; it is disabled by default.
+English NTSC Stellar 7 install.
 
-Read [current work](docs/open-work.md), [development](docs/development.md),
-and [internals and measurements](docs/internals.md).
+The experimental conversion uses a 60 Hz simulation timestep independently
+of rendering, with integer remainders to preserve movement precision.
+It is playable, but **the conversion is unfinished and work is paused**.
+Live input is still sampled during catch-up rather than preserved by tick;
+heavy A500 combat can accumulate simulation debt. Broader gameplay and
+original-reference pace validation also remain open.
+
+Source the shared environment and launch the separate experimental build:
+
+```sh
+source amiga/env.sh
+amiga/play60.sh
+```
+
+`make -C whdload sim60` builds `whdload/Stellar7-Sim60.Slave` without launching.
+The launcher enables `CUSTOM1=1` and uses normal controls and sound.
+Scripted gameplay tests use the existing VERIFY input fixtures.
+
+Read [current status and remaining work](docs/open-work.md),
+[build and validation instructions](docs/development.md), and
+[internals and measurements](docs/internals.md).
 
 The original playable pack belongs in ignored `tmp/game/Stellar7NTSC/`.
 `amiga/run.sh` boots it. `make -C whdload` builds the reconstructed development
 loader against the shared WHDLoad 20.0 KickEmu sources (`$WHDLOAD`).
+That normal build retains the earlier opt-in five-Hz timing prototype; it
+does not contain the new 60 Hz conversion.
 
-Run the timing prototype with
-`SLAVE=whdload/Stellar7.Slave WHD_ARGS=CUSTOM1=1 amiga/run.sh`.
-The provisional default is five simulation updates per second;
-`CUSTOM2=1..25` selects another fixed rate. See the validation limits in
-[current work](docs/open-work.md).
-
-`python3 tools/fixed_window.py tmp/prof/base --fields 50` captures a fixed
-SOL gameplay window using a verification-only menu fixture. Game data,
-Kickstarts, WHDLoad executables, built slaves and captures are never committed.
+Game data, Kickstarts, WHDLoad executables, built slaves and captures are
+never committed. Local evidence referenced by the documents remains in
+ignored `tmp/`; the repository contains source and validation tools.

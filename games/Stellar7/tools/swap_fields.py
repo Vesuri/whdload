@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Count frames (gameplay swaps, s7:6a0a) over PAL fields with read-only debugger breakpoints.
+"""Count frames (gameplay swaps, s7:6a0a) over video fields with read-only debugger breakpoints.
 Used by fixed_window.py when a CPU backend provides no instruction trace (68030).
 Fields are counted at Kickstart 1.3's VERTB branch ($FC0D4A in the relocated image).
 Only debugger convenience variables change; target memory/registers are read-only.
 
   swap_fields.py FIELDS OUTDIR CODE.bin BASE CHIP.bin
 """
-import argparse, os, re, socket, sys
+import argparse, os, re, socket, struct, sys
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(__file__))
 from stellar7 import SOCK
@@ -29,11 +29,21 @@ p.add_argument('out', type=Path)
 p.add_argument('dump', type=Path)
 p.add_argument('base', type=lambda x: int(x, 0))
 p.add_argument('chip', type=Path)
+p.add_argument('--field-hz', type=int, choices=(50, 60), default=50)
 a = p.parse_args()
+hz = a.field_hz
+standard = 'NTSC' if hz == 60 else 'PAL'
 assert a.fields > 1
 r = {name: (lo, origin) for lo, hi, name, origin in regions(a.dump.read_bytes(), a.base, a.chip.read_bytes())}
 frame = r['s7'][0] + C2P
 step = r['s7'][0] + 0x2d4e
+code = a.dump.read_bytes()
+hook = r['s7'][0] - a.base + 0x2af6
+if code[hook:hook+2] == bytes.fromhex('4ef9'):
+    entry = struct.unpack_from('>I', code, hook+2)[0]
+    offset = entry-a.base
+    if code[offset+4:offset+8] == b'S760':
+        step = entry + struct.unpack_from('>H',code,offset+44)[0]
 vbl = 0xfc0d4a + r['kick'][1]
 reply = command(f'''break *{vbl:#x}
 break *{frame:#x}
@@ -66,12 +76,14 @@ for field in re.findall(r'^S7STEP (-?\d+)$', reply, re.M):
         steps[index] += 1
 first = next((i for i, n in enumerate(swaps) if n), None)
 last = max((i for i, n in enumerate(swaps) if n), default=None)
-assert first is not None and last > first, 'insufficient frames for FPS'
-frames = sum(swaps[first + 1:last + 1])
-report = (f'Read-only frame counter ({a.fields} PAL fields)\n'
-          f'Simulation steps: {sum(steps)} over {a.fields} PAL fields ({50 * sum(steps) / a.fields:.2f} steps/s)\n'
-          f'gameplay swaps per field: {"".join(str(n) for n in swaps)}\n'
-          f'{frames} frames in {last - first} fields: {(last - first) / frames:.2f} fields/frame, '
-          f'{50 * frames / (last - first):.1f} fps (PAL)\n')
+report = (f'Read-only frame counter ({a.fields} {standard} fields)\n'
+          f'Simulation steps: {sum(steps)} over {a.fields} {standard} fields ({hz * sum(steps) / a.fields:.2f} steps/s)\n'
+          f'gameplay swaps per field: {"".join(str(n) for n in swaps)}\n')
+if first is not None and last > first:
+    frames = sum(swaps[first + 1:last + 1])
+    report += (f'{frames} frames in {last - first} fields: {(last - first) / frames:.2f} fields/frame, '
+               f'{hz * frames / (last - first):.1f} fps ({standard})\n')
+else:
+    report += f'{sum(swaps)} presentations; no complete inter-presentation interval for FPS.\n'
 (a.out / 'frames.txt').write_text(report)
 print(report, end='')

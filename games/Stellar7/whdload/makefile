@@ -6,12 +6,16 @@
 VASM ?= $(HOME)/.local/vasmm68k_mot
 WHDLOAD ?= $(HOME)/.local/share/amiga/WHDLoad-20.0
 NDK ?= $(HOME)/.local/opt/m68k-amiga-elf/sys-include
-.PHONY: all clean verify FORCE
+.PHONY: all clean verify sim60 FORCE
 all: Stellar7.Slave
 Stellar7.Slave: FORCE
 	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I. -Iinclude -I"$(WHDLOAD)/Include" -I"$(WHDLOAD)/Src/sources" -I"$(NDK)" -o $@ Stellar7.s
+# Separate playable build; keep the original-timing development slave available.
+sim60: Stellar7-Sim60.Slave
+Stellar7-Sim60.Slave: FORCE
+	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -DSIM60=1 -I. -Iinclude -I"$(WHDLOAD)/Include" -I"$(WHDLOAD)/Src/sources" -I"$(NDK)" -o $@ Stellar7.s
 clean:
-	rm -f Stellar7.Slave
+	rm -f Stellar7.Slave Stellar7-Sim60.Slave
 
 verify:
 	$(MAKE) Stellar7.Slave VASMFLAGS="-DVERIFY=1 $(VERIFY_FLAGS)"

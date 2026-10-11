@@ -21,6 +21,12 @@ WB="$WORKBENCH_ADF"
 WHD="$WHDLOAD_BINARY"
 CPU="${CPU:-68000}"
 AMIGA_MODEL="${AMIGA_MODEL:-A500}"
+NTSC_MODE="${NTSC_MODE:-1}"
+case "$NTSC_MODE" in
+  0) UAE_NTSC=false ;;
+  1) UAE_NTSC=true ;;
+  *) echo "NTSC_MODE must be 0 (PAL) or 1 (NTSC)." >&2; exit 1 ;;
+esac
 RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"
 
 # Fail on a occupied port rather than risk another project's emulator.
@@ -65,7 +71,7 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/$RUN/shots}"; mkdir -p "$SHOTS"; export FSE
   --floppy_drive_0="$WB" \
   --joystick_port_0="${JOY0:-mouse}" --joystick_port_1="${JOY1:-keyboard}" \
   --automatic_input_grab=0 --fullscreen=0 --window_width=760 --window_height=568 \
-  --ntsc_mode=0 --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
+  --uae_ntsc="$UAE_NTSC" --warp_mode="${WARP:-0}" --state_dir="$RUN/state" \
   "${PORTS[@]}" "${AUDIO[@]}" "${DBG[@]}" "${REC[@]}" ${EXTRA_ARGS:---slow_memory=1536} > "$RUN/fsuae.log" 2>&1 &
 fsuae_track $!
 echo "fs-uae pid $FSUAE_PID (log $RUN/fsuae.log, port $DEBUG_PORT)"
