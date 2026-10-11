@@ -4327,6 +4327,18 @@ negative-zero restore evidence are rejected. This enables classification of inte
 calls by both native and wrapper return addresses, instead of assuming every `$17306`
 call belongs to logical weather. Live interpolation validation remains pending.
 
+`tools/check_weather_palette.py CAPTURE...` is prepared as a strict directed-fade
+checker: pair complete entry/return records, classify the installed fade callers,
+reproduce RGB4 component arithmetic, require exactly the 15 positive phases (0–14),
+15 negative phases (15–1) and final zero phase, and compare both stored palette writes.
+Restoration calls must copy entries 0–4 and 6–15 while preserving entry 5. Cross-CPU
+histories are compared after pointer normalization through caller identity. Invalid
+pointer markers, partial/missing calls, unexpected phase counts and changed palettes
+fail. Endpoint-only cadence1 evidence is correctly rejected for lacking per-call probes.
+Positive runtime validation remains pending. This strict full-phase gate must not be
+used to certify deliberately coalesced presentation; that needs separate due/published
+phase accounting. Neither form proves physical scanout.
+
 The next presentation checks should proceed in this order:
 
 1. Observe `$17306/$173a8` around each owned fade call, recording source/target/phase/index,

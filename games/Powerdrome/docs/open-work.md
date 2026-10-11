@@ -741,3 +741,10 @@ owned positive/negative/negative-zero calls in both CPU snapshots. The probe sch
 includes the guarded parent return needed to distinguish these from unrelated native
 interpolation calls. Damaged hook/target/restore evidence is rejected. Per-call colour
 validation remains pending after the running full-cycle regression.
+
+
+`check_weather_palette.py` is prepared for the directed full-fade run: all 31 owned
+interpolations, exact component arithmetic and both palette writes, plus restoration
+that preserves entry 5 while copying the other 15 colours. The existing endpoint-only
+capture is rejected for missing call probes. Positive runtime validation and deliberate
+coalescing/scanout checks remain pending.
