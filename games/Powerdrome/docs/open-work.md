@@ -296,7 +296,11 @@ Alternate reset entry and guest flags/registers remain to verify. Pause/rescue/c
 result clocks still need coverage. The result latch now uses each opponent step's stable
 lap-domain instant. The corrected 030 natural finish reports exactly 215,060 ms and passes
 ranking, caller registers/flags and cleanup; the sampled mapping would be 60 ms later.
-A500 stable-domain finish and player/deferred/mode-specific results remain to validate. Next audit the projection flag and matched native animation visibility,
+The A500 stable-domain finish also passes at exactly 226,290 ms; its sampled mapping is
+120 ms behind. Winners differ, so these are timing-accounting checks, not trajectory
+equivalence. Player/deferred/mode-specific results remain to validate. The player path
+must keep lap storage (`$10bf0`), displayed elapsed time (`$f108`) and result entry
+(`$f9f0`) in one clock domain; Practice needs an origin independent of opponents. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

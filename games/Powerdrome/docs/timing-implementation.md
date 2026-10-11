@@ -1793,12 +1793,42 @@ The stricter `--require-stable-domain` gate verifies the shared countdown start,
 winning-step latch, all five ranked records, preserved registers/stack, guest MOVE.L
 flags and cleared result ownership. There are 2,408 cumulative completed renderer twins
 with no failures; the 200-field result window adds zero staged scenes. This is not a
-performance measurement. The matching A500 stable-domain finish remains pending, as do
-player/deferred-pit/mode-specific result durations.
+performance measurement. The matching A500 run `timing-resultdomain1-natural-a500`
+reports **226,290 ms**, exactly the logical winning duration, with opponent 1 reaching
+ten laps. Its sampled native mapping is 120 ms behind the stable lap mapping; the
+physical duration read is 90 ms behind. The same strict ranking, register/stack,
+guest-flag and cleanup checks pass. A negative physical-clock offset is a difference
+between the clock mappings, not a negative race duration. Different winners and event
+histories mean these runs do not establish trajectory equivalence. Player, deferred-pit
+and other mode-specific result durations remain open.
 
 ```sh
-python3 tools/check_natural_result.py --require-stable-domain tmp/prof/timing-resultdomain1-natural-030
+python3 tools/check_natural_result.py --require-stable-domain tmp/prof/timing-resultdomain1-natural-030 tmp/prof/timing-resultdomain1-natural-a500
 ```
+
+The next player-result correction must account for the complete native clock path:
+
+1. `$f7ae` calls `$f952` when player movement wraps the track segment range. `$f974`
+   invokes the lap-accounting helper `$10bec` before checking the winning lap.
+2. `$10bf0` reads the physical clock; `$10bf8–$10c0c` subtract and replace lap-start
+   `$206`, then commit lap duration `$202`. `$f9a2` reads that duration for the lap table
+   and accumulated total. The helper also updates best-lap state and lap frame counters.
+3. `$f9ec–$f9f0` supplies the player-result sentinel and enters `$bfb0` after native
+   stack unwinding. The current result latch deliberately leaves this source on its
+   native fallback; opponent-result tests do not validate it.
+4. The cockpit timer independently reads the physical clock at `$f108` and subtracts
+   `$206` at `$f110`. Moving player lap-start timestamps into a logical domain without
+   updating this consumer would mix domains in the displayed lap timer.
+5. `$b796` is another direct caller of `$10bec`, outside the ordinary player-lap caller.
+   State `$206` also serves other modes and waits. Gate any logical substitution by an
+   audited lifecycle/domain contract; do not globally replace this shared timestamp.
+
+Implement and test player lap storage, displayed elapsed time and final-result latching
+as one consistent contract. Practice has no initialized opponent timeline, so it needs
+an explicit player-clock origin rather than borrowing an absent opponent origin. Validate
+ordinary race, Practice, pause/rescue and the non-driving helper caller, with natural
+lap progression and a separately labelled forced-finish fixture if needed. A forced branch
+alone cannot prove natural winning rank or race duration.
 
 The earlier sampled-domain opponent-result correction was validated on this CPU pair. Broader
 **result-clock** work remains open: do not infer player/deferred-pit/mode coverage from

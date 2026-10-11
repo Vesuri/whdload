@@ -91,8 +91,10 @@ def check(root, require_logical_time=False, require_stable_domain=False):
         assert all(first[name] == last[name] for name in preserved), 'Duration-clock wrapper changed a native caller register or stack'
         final = (root / 'final-code.bin').read_bytes()
         assert u16(final, result_state + 8) == u16(final, result_state + 10) == 0, 'Winning clock leaked past session cleanup'
-        physical_gap = u32(output, result_state + 24) - logical
-        print(f'  Latched opponent time, preserved registers/stack and guest MOVE.L flags verified; native read was {physical_gap * 5:+d} ms later')
+        physical_gap = (u32(output, result_state + 24) - logical) & 0xffffffff
+        if physical_gap & 0x80000000:
+            physical_gap -= 1 << 32
+        print(f'  Latched opponent time, preserved registers/stack and guest MOVE.L flags verified; native clock offset was {physical_gap * 5:+d} ms')
         print('  Winning-clock ownership cleared by native session cleanup')
 
 
