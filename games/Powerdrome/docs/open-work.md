@@ -435,3 +435,17 @@ Pilot 1's animation timing agrees between corrected CPUs but differs from the na
 reference's visibility history. The track-range endpoint is updated by movement, so
 there is no established stale-render visibility bug to fix. Matched native event histories
 and accelerated field-ownership evidence remain required.
+
+
+The bounded F7 accelerator matrix now compares the current full timing prototype on
+030/25 fast rendering, 040/25 native/fast and 060/50 native/fast. With the existing
+VERIFY-only 18/24-second initial-pit synchronization fixture, all five configurations
+match 502 common sampled player/engine/RNG states, 111 control/input updates and 111
+fuel updates. Arithmetic/input/debt checks pass, with 358 clean renderer twins. Each
+capture spans exactly 500 physical PAL fields; 502–504 completed world steps account
+for the measured initial/final unsampled elapsed time, with zero endpoint retained debt.
+The corresponding unsynchronized batch matches control/fuel samples but fails RNG
+comparison from the first step: different initial-pit durations produced different
+opponent/RNG histories. No fields are excluded to obtain a pass. This does not finish
+F7 or certify full opponent/effect equivalence, longer windows, stalls, capacity or
+remaining CPU configurations. See the bounded accelerator matrix in timing-implementation.

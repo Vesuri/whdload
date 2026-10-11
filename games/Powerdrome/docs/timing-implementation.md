@@ -3074,3 +3074,86 @@ full mode lifecycles and calibration remain open alongside weather and other eff
 Fall/impulse displacement is integrated over elapsed logical time, separately from its
 90-ms age/decay cadence. Keep native mode/rendering consumers of the shared loop counter until
 each gameplay read has an explicit replacement.
+
+
+## Bounded accelerator timing matrix
+
+`tools/timing_cpu_matrix.sh` freezes one supplied WORLD20 coverage artifact and runs
+five sequential C5=9 windows: 030/25 fast planar with twins, 040/25 native and fast,
+and 060/50 native and fast. Each window counts 500 PAL fields from `$bc7c`, with
+read-only movement/control/resource/opponent probes. Every run checks 20-ms world
+accounting, rational 90-ms controls, scalar/vector remainder arithmetic, all 15 owed
+brake events, six timestamped joystick events, and native fuel arithmetic. Fast-renderer
+runs additionally require the existing pixel/register/CCR/scratch/guard comparisons.
+The cross-run checks retain every existing sampled player/engine/RNG field; no differing
+field is masked. These instrumented results are not rendering-throughput measurements.
+
+The unsynchronized `timing-cpumatrix1` batch passes the individual arithmetic/accounting
+checks on all five configurations and matches **111 common control/input and fuel
+updates**. Its strict sampled-world comparison **fails at the first logical step**:
+030 RNG is **33,537**, versus **12,305** on both 040 and 060 renderer paths. Across all
+500–502 common samples in each comparison, RNG is the only differing sampled field;
+this is a diagnostic finding, not permission to exclude RNG or claim world equivalence.
+Full opponent records and unsampled effects are not compared by this checker.
+
+The initial-pit histories differ before flight. The 030 pit lasts **7,680 ms** and has
+completed **85** opponent updates at the initial snapshot; 040 lasts **7,040 ms** and
+has completed **78**; 060 lasts **7,020 ms** and also has completed **78**. Thus fixed
+random seeds alone do not establish matched gameplay history at the first rendered
+flight frame. Renderer path does not change these initial counts within the tested
+040/060 pairs. The unsynchronized failures remain recorded and do not pass F7.
+
+The matching experiment uses the existing VERIFY-only `TIMING_PIT_SYNC_TEST=1`
+fixture, which waits for the same 18-second retune and 24-second pit-return events.
+It changes no simulation records or random seeds. `check_timing_sync.py --flight-window`
+requires the actual cutoff/return times to match the requested events in **both**
+endpoint snapshots and requires identical synchronization diagnostics across the window.
+The original initial-pit mode of this checker remains unchanged and still passes its
+established reference. Production loading/pit behavior is not changed by this experiment.
+
+The matched `timing-cpumatrix2-sync` batch passes all five individual and cross-run
+gates: **502 common sampled player/engine/RNG states**, **111 common control/input
+updates**, and **111 common fuel updates** match exactly. Each configuration applies
+all 15 brake events, consumes all six input events without overflow, verifies carried
+scalar/vector arithmetic, and observes **584 opponent multiplication reads at 90 ms**.
+Those reads include initial-pit catch-up; they are not one opponent update per player
+control. Complete opponent arrays and their trajectories remain outside this comparison.
+
+| CPU / renderer | Completed 20-ms steps | 90-ms controls | Initial → final unsampled elapsed time | Clean completed twins |
+| --- | ---: | ---: | ---: | ---: |
+| 030/25, fast | 504 | 112 | 80 → 0 ms | 112 |
+| 040/25, native | 503 | 111 | 60 → 0 ms | — |
+| 040/25, fast | 504 | 112 | 80 → 0 ms | 122 |
+| 060/50, native | 502 | 111 | 60 → 20 ms | — |
+| 060/50, fast | 504 | 112 | 80 → 0 ms | 124 |
+
+Every pair of initial/final game VBL snapshots differs by exactly **500 fields**, or
+10,000 ms. The table's unsampled time is `(unpaused VBL × 4 - allocator last sample) × 5`
+ms, distinct from already retained allocator debt. Both endpoint debt and assigned
+unfinished-step counts are zero in these runs. Therefore the complete-step count is
+`(10,000 + initial unsampled time - final unsampled time) / 20`, explaining 502–504
+without duplicated or discarded time. These endpoint checks do not establish worst-case
+latency or long-term catch-up capacity. The three fast runs total **358 clean twins**,
+with unchanged raster code; all finish inside a further draw, so they are not teardown
+proofs. The unsynchronized batch separately has 365 clean twins but still fails RNG
+state equivalence. The matched test fixture is not evidence that production initial-pit
+histories are identical across hardware.
+
+Reproduce with the full periodic/orientation/input/engine/WORLD/WORLD20/repair/drop
+coverage build, heat seed 12345, world/setup seeds 54321, and `TIMING_PIT_SYNC_TEST=1`.
+Leave the wrap, input-injection and result-injection fixtures off. The driver uses
+2 MB chip, 4 MB fast, Kickstart A1200, uncached cycle-exact 030/25, 040-NOMMU/25 and
+060-NOMMU/50 configurations. `CUSTOM3=1` is independent of `CUSTOM1`; native-renderer
+runs have `CUSTOM1=0`. Cache selection remains a WHDLoad option.
+
+```sh
+bash tools/timing_cpu_matrix.sh tmp/prof/timing-cpumatrix2-sync FROZEN_SLAVE
+```
+
+`REQUIRE_PIT_SYNC=0` permits reproducing the unsynchronized diagnostic batch; it does
+not relax the cross-state gates. The driver stops at a failed check and keeps the
+completed captures. Use new output directories and never run two captures concurrently.
+This bounded matrix does not complete F7: 68000/020 and further renderer combinations,
+60/600-second routes, controlled render rates, deliberate stalls, long-run capacity,
+full opponent/effect states and lifecycle coverage remain. A500 response/resource/effect
+calibration remains an independent requirement.

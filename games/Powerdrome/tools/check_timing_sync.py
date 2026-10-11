@@ -10,10 +10,14 @@ def u32(data, off):
     return struct.unpack_from('>I', data, off)[0]
 
 
-def check(root):
+def check(root, flight_window=False):
     cfg = json.loads((root / 'configuration.json').read_text())
-    assert cfg['TIMING_EARLY'] == '1' and cfg['OPPONENT_STATE'] == '1'
-    assert int(cfg['ANCHOR'], 0) == 0xbc3a
+    assert cfg['TIMING_EARLY'] == '1'
+    if flight_window:
+        assert int(cfg['ANCHOR'], 0) == 0xbc7c
+    else:
+        assert cfg['OPPONENT_STATE'] == '1'
+        assert int(cfg['ANCHOR'], 0) == 0xbc3a
     game = int((root / 'game-base.txt').read_text(), 0)
     base = int((root / 'dump-base.txt').read_text(), 0)
     chip = (root / 'chip.bin').read_bytes()
@@ -33,6 +37,13 @@ def check(root):
     origin = u32(data, opponent+52)-18
     assert u32(data, retune+12)-origin == release, 'Actual retune cutoff differs from fixture release'
     assert u32(data, pit+28)-origin == return_release, 'Actual pit exit differs from fixture release'
+    if flight_window:
+        initial = (root / 'code.bin').read_bytes()
+        assert initial[sync+8:sync+32] == data[sync+8:sync+32], 'Synchronization changed during flight window'
+        for image in (initial, data):
+            assert struct.unpack_from('>H', image, pit+8)[0] == 0, 'Window endpoint is inside the pit'
+            assert u32(image, pit+28)-origin == return_release
+            assert u32(image, retune+12)-origin == release
     print(f'{root.name}: retune arrived {arrival*5} ms, released {release*5} ms; '
           f'pit return arrived {return_arrival*5} ms, released {return_release*5} ms')
     print('  Native retune cutoff and pit exit match both requested logical event times')
@@ -41,5 +52,7 @@ def check(root):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('captures', type=Path, nargs='+')
-    for root in parser.parse_args().captures:
-        check(root)
+    parser.add_argument('--flight-window', action='store_true', help='Verify retained synchronization in both snapshots of a later flight window')
+    args = parser.parse_args()
+    for root in args.captures:
+        check(root, args.flight_window)
