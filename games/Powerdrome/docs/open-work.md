@@ -590,7 +590,12 @@ physical palette/buffer pairing and scanout remain open.
    mode-2 fixture for 20 seconds per CPU with draw-entry/body/return and palette-copy
    probes. `check_weather_effect_publication.py` checks latest-state drawing and counts
    omitted/repeated publications. `check_weather_palette.py --copies-only` checks native
-   restoration independently, without claiming fade validation. The normal build was
+   restoration independently, without claiming fade validation. The completed 030 side
+   passes 21 owned draws over ten visible publications, including eleven repeats; every
+   draw uses the latest completed logical state. All 42 observed palette restorations
+   preserve entry 5 and copy the other entries. Corrupted weather colour, copied colour,
+   saved palette and source-pointer evidence are rejected. Maximum world-end delay is
+   260 ms and endpoint debt is zero. A500 remains in progress. The normal build was
    restored byte-identical before starting this frozen-artifact capture.
 2. Check active-effect presentation coalescing and displayed palette/buffer pairing.
    Ordinary flight allocates at most 32 movement steps (640 ms) before rendering;

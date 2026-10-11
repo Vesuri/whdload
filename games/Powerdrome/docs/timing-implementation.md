@@ -4306,9 +4306,8 @@ endpoint check using live saved-palette and colour-map pointers in the captured 
 expansion memory. It rejects out-of-range pointers/colour values, mismatched weather or
 other palette entries and nonzero transition/effect state. The completed pair passes
 all four snapshots; altered weather colour, another palette colour and transition state
-are rejected. The module also expresses `$17306` signed integer interpolation for the
-next runtime comparison; that arithmetic helper is not yet validated against per-phase
-native calls.
+are rejected. The module also expresses `$17306` signed integer interpolation. The completed directed
+palette pair described below validates it against all 31 native calls on both CPUs.
 
 `weather_palette_state.probe_command` now prepares read-only entry/return probes for
 `$17306/$173a8` and `$17062/$1708c`. Each row includes all general registers, stack
@@ -4317,15 +4316,16 @@ and the saved/current/restoration-source arrays. Nested pointer bounds and align
 checks guard each dereference against the captured chip/expansion regions; invalid
 pointers emit `PDWPALETTE_INVALID` instead of stale or unbounded data. Only debugger
 convenience variables are assigned. Command formatting/schema checks pass against the
-completed pair's memory layout. Live GDB execution, caller classification and per-call
-verification remain pending; the running full-cycle sampler has not been modified.
+completed pair's memory layout. Live GDB execution, caller classification and per-call verification pass in the completed
+directed palette pair described below. Probes were integrated after the full-cycle run
+finished, preserving its observation scheme.
 The prepared schema also reads the guarded parent return address at stack `+4`.
 `owned_fade_returns` follows the live `$bd1a` hook and identifies exactly the installed
 positive, negative and negative-zero native helper calls. Initial/final snapshots on
 both CPUs identify all three; altered installed hook, positive native target and
 negative-zero restore evidence are rejected. This enables classification of interpolation
 calls by both native and wrapper return addresses, instead of assuming every `$17306`
-call belongs to logical weather. Live interpolation validation remains pending.
+call belongs to logical weather. Live interpolation validation passes for the directed pair below.
 
 `tools/check_weather_palette.py CAPTURE...` is prepared as a strict directed-fade
 checker: pair complete entry/return records, classify the installed fade callers,
@@ -4335,7 +4335,7 @@ Restoration calls must copy entries 0–4 and 6–15 while preserving entry 5. C
 histories are compared after pointer normalization through caller identity. Invalid
 pointer markers, partial/missing calls, unexpected phase counts and changed palettes
 fail. Endpoint-only cadence1 evidence is correctly rejected for lacking per-call probes.
-Positive runtime validation remains pending. This strict full-phase gate must not be
+Positive runtime validation passes for the directed pair below. This strict full-phase gate must not be
 used to certify deliberately coalesced presentation; that needs separate due/published
 phase accounting. Neither form proves physical scanout.
 
