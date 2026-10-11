@@ -2,7 +2,7 @@
 """Native weather state schema and read-only GDB probe builder.
 
 Snapshot summaries locate calibration material; they do not prove duration/cadence.
-Import probe_command from the capture tool after the active capture has finished.
+The capture tool emits this schema at matching TIMING_STATE probe boundaries.
 """
 import argparse
 import json

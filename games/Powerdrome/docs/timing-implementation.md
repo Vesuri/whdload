@@ -3622,16 +3622,24 @@ effect rendering. Their instruction boundaries have been checked against the nat
 Snapshot extraction also reproduces the existing weather capture's active initial and
 inactive final state. Printf escaping matches the current capture-tool convention.
 
-Capture-tool integration and runtime event validation are pending. The module is kept
-separate while the ten-minute capture runs, so that capture retains its unchanged sampling
-schema. Once integrated, require paired before/after observations and original A500 cadence
-measurements before implementing weather scheduling. The module itself is not a weather
-correctness or calibration gate.
+`swap_fields.py` now emits this schema for matching `COVERAGE_PROBES` offsets when
+`TIMING_STATE=1`. A dry run against the frozen native weather capture generates all 35
+read-only commands without needing installed timing hooks. A separate dry run against the
+current timing fixture produces byte-identical debugger commands before and after this
+integration for the existing eight-probe timing route. These checks verify command
+construction only; paired runtime observations and original A500 cadence measurements
+remain required before weather scheduling can be accepted.
+
+The native A500 capture `timing-weather-native-a500-1` is started with input route 6,
+C1/C3/C4 disabled, 512 KiB chip plus 1,536 KiB slow memory and no fast RAM. It reuses the
+frozen native-weather coverage slave, anchors at `$e1a2`, and requests 20,000 PAL fields
+(400 seconds) with all 35 weather probes. Natural forecast arrival and runtime event
+validation are pending; no calibration result is claimed from merely starting this run.
 
 Next implementation gates:
 
 1. Capture an eligible natural weather episode on the original A500 and the full prototype.
-   Probe `$dd14/$dd2c/$e1c0/$e200/$e242/$ddf8/$e278` and outer generation/fade boundaries;
+   Probe `$dd14/$dd2c/$e1ca/$e200/$e242/$ddf8/$e278` and outer generation/fade boundaries;
    record both deadlines, all fields in the table, outer/logical counters and RNG. Verify
    the actual callers and eligibility before assigning a cadence.
 2. Freeze A500 transition, active-duration and effect-lifetime bounds. Do not assume that
