@@ -1923,13 +1923,26 @@ The 030 run passes **one initial lap hook and 75 HUD hooks**, with native shared
 semantics intact. It adds **39** completed clean renderer comparisons, with one further
 scene active at the end. This initial boundary establishes the lap origin and deliberately
 keeps its physical subtraction result; it does **not** exercise a completed logical lap
-duration. A500, completed-lap register contracts, external-reset fallback, other modes and
-unobserved arithmetic/flag cases remain to validate. Hook boundaries pass and the normal
-slave is byte-identical to the reference.
+duration. The A500 counterpart `timing-playercontract1-a500` passes the same initial
+boundary and **37 HUD hooks**, including guest flags and all register/stack checks.
+Hook boundaries pass and the normal slave is byte-identical to the reference.
+
+The natural completed-lap capture first observes `$f952` and post-hook `$10c00`, then
+anchors at the next `$f952` (`PROBE_OFFSETS='0xf952 0x10c00'`). The 300-field 030 run
+`timing-playercontract1-natural-030-twins` passes **one logical-duration lap hook and
+82 HUD hooks**, plus **73** completed clean renderer comparisons. The duration is
+**92,220 ms**; the following HUD sample confirms matching native lap duration, total,
+best time and lap index. `--natural-completed-lap` requires all these observations and
+native bytes at the three synthetic boundary/checkpoint/finish predicate sites. It
+correctly rejects the initial-boundary-only capture. A500 completed-lap contracts,
+external-reset fallback, other modes and unobserved arithmetic/flag cases remain open.
 
 ```sh
 python3 tools/check_player_lap_contract.py tmp/prof/timing-playercontract1-030-twins
 python3 tools/perf_status.py tmp/prof/timing-playercontract1-030-twins
+python3 tools/check_player_lap_contract.py tmp/prof/timing-playercontract1-a500
+python3 tools/check_player_lap_contract.py --natural-completed-lap tmp/prof/timing-playercontract1-natural-030-twins
+python3 tools/perf_status.py tmp/prof/timing-playercontract1-natural-030-twins
 ```
 
 ### Player-result timestamp and directed validation

@@ -328,8 +328,11 @@ counterpart passes a 103,540-ms pit interval, 556 HUD readings (404 resumed), 52
 opponent lap reads and one natural 128,300-ms lap with matching records. Its full opponent
 continuity check passes 7,116 movement samples and 2,819 world restores. The different
 CPU histories are not trajectory equivalence or throughput evidence. Additional natural
-laps/modes, natural player victory, external-reset fallback and lap/HUD guest flags/registers
-remain to verify. Next audit the projection flag and matched native animation visibility,
+laps/modes, natural player victory and external-reset fallback remain to verify.
+Guest flag/register/stack checks now pass the initial lap boundary plus 75 HUD hooks
+on 030 and 37 on A500. A separate natural completed-lap window passes the 030 logical
+92,220-ms duration, native records and 82 HUD contracts, adding 73 clean renderer twins.
+The A500 completed-lap contract and broader mode/arithmetic cases remain open. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

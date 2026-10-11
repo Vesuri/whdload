@@ -17,8 +17,14 @@ def sub_flags(a, b):
     return (17 if borrow else 0) | (8 if value & 0x80000000 else 0) | (4 if value == 0 else 0) | (2 if overflow else 0)
 
 
-def check(root):
+def check(root, natural_completed_lap=False):
     assert (root/'final-code.bin').is_file(), 'Need a terminal capture'
+    if natural_completed_lap:
+        game = int((root/'game-base.txt').read_text(), 0)
+        chip = (root/'chip.bin').read_bytes()
+        original = Path('tmp/extracted/pd').read_bytes()[32:]
+        for off, length in ((0xf7a0, 6), (0xf96c, 8), (0xf9d8, 6)):
+            assert chip[game+off:game+off+length] == original[off:off+length], 'Synthetic lap/finish predicate installed'
     rows = []
     current = None
     names = ('PDPLAP_EVENT', 'PDPLAYER_CLOCK', 'PDSESSION_EVENT', 'PDPLCON_EVENT', 'PDMREG_EVENT')
@@ -35,6 +41,8 @@ def check(root):
     pending = None
     counts = {1: 0, 2: 0}
     logical_laps = 0
+    pending_records = None
+    recorded_laps = 0
     for row in rows:
         off = row['off']
         if off in (0x10bf8, 0xf110):
@@ -69,6 +77,15 @@ def check(root):
             cursor = session[14]-(4 if site == 2 and not session[13] else 0)
             expected[0] = (cursor-private[1]) & MASK if site == 1 else max(0, cursor-private[1])
             logical_laps += site == 1
+            if site == 1 and natural_completed_lap:
+                assert pending_records is None and native[5] != 65535
+                duration = expected[0]
+                pending_records = (duration, native[3]+duration, min(native[4], duration), native[5]+1)
+        if site == 2 and pending_records is not None:
+            assert tuple(row['PDPLAYER_CLOCK'][2:6]) == pending_records, 'Native lap records differ from the logical duration'
+            print(f'  Natural completed lap records: {pending_records[0]*5} ms')
+            recorded_laps += 1
+            pending_records = None
         if site == 2:
             expected[1] = (x[1] & 0xffff0000) | 0x12
         assert y[:16] == expected, f'Register or stack contract changed at {off:#x}'
@@ -80,6 +97,8 @@ def check(root):
         counts[site] += 1
         pending = None
     assert pending is None and counts[1] >= 1 and counts[2] >= 20, 'Insufficient complete lap/HUD pairs'
+    if natural_completed_lap:
+        assert logical_laps >= 1 and recorded_laps == logical_laps and pending_records is None, 'Need an observed completed logical lap and committed records'
     print(f'{root.name}: {counts[1]} lap hooks ({logical_laps} logical durations), {counts[2]} HUD hooks')
     print('  All native registers/stack, shared timestamp, physical SUB and final MOVE guest flags pass')
     print('  Coverage is limited to observed values and modes; this is not a complete timing gate')
@@ -88,4 +107,6 @@ def check(root):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('capture', type=Path)
-    check(parser.parse_args().capture)
+    parser.add_argument('--natural-completed-lap', action='store_true', help='Require logical lap duration, native record commit and unmodified lap/finish predicates')
+    args = parser.parse_args()
+    check(args.capture, args.natural_completed_lap)
