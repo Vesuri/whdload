@@ -3998,3 +3998,83 @@ clock. Moving these into the same logical RNG/time ownership is the next impleme
 step. Actual effect rectangle cleanup, natural onset/expiry integration, palette pixel
 validation, pause/pit/restart and reused-transition lifecycle checks remain open. The
 new weather flag predicate and reset hooks alone do not prove those lifecycle contracts.
+
+
+## Experimental logical forecast/onset/expiry
+
+`TIMING_WEATHER_CYCLE=1` requires the fade and effect prototypes, remains disabled by
+default and uses CUSTOM3. During supported human flight it runs forecast trials and
+onset checks on the logical 90-ms control schedule. Expiry retains an eight-control
+phase gate (nominally 720 ms). Both consume the world owner's RNG/time, not render-loop
+RNG or the physical clock. Those candidate polling cadences still need broader original
+A500 calibration; this implementation does not establish final cadence acceptance.
+
+The native `$e1a2` forecast and `$e1f8` onset routines are reused. Local hooks at `$e1c4`
+and `$e23c` supply the logical clock only while the scheduler owns those calls; physical
+clock reads remain intact for native callers. Forecast warning remains 5,000 native
+units / 25 seconds. The onset retains the track table, native signed duration RNG math,
+steering reset, transition and effect-enable selection. Expiry performs the native
+persistent reset and queues its palette call. The human-flight predicate excludes the
+positive-mode communications branch of `$e25e`.
+
+The `$dd0e/$dde6` wrappers skip only the claimed forecast/deadline work, preserving the
+surrounding HUD/status paths. Once claimed, the deadline domain remains protected from
+physical outer-loop comparisons even when ordinary flight is temporarily suspended.
+Session cleanup releases ownership. This prevents accidental physical reads of logical
+deadlines; it does not yet establish correct progression through pit, rescue or restart.
+
+The forecast's terminal message call is deferred through a hook on `$e1f0`'s ADDA/BSR,
+leaving the shared `$e1f6` RTS available to the native early-return branch. Its queued
+message pointer and logical message phase are delivered at world presentation; the
+message-deadline helper uses that saved phase while delivering it. Message rendering
+still applies the native visibility gates at delivery. Expiry's palette call is also
+deferred to presentation. `PDWCYC01` records logical ownership, pending/delivered events,
+trial/forecast/onset/expiry counts, clocks, selected duration and onset RNG inputs/results.
+
+Initial ownership preserves negative sentinel deadlines and transfers the remaining
+physical interval to the logical cursor. Due/overdue deadlines become due immediately;
+the transfer clamps negative remaining time before adding the logical cursor. This fixes
+a static edge case in the first candidate, where adding a negative clock offset could
+turn a sufficiently overdue live deadline into an inactive sentinel. The ongoing
+`timing-weather-cycle-test1` capture uses that first frozen candidate and enters ownership
+with both deadlines inactive, so it cannot validate the corrected migration path. The
+corrected source builds as `timing-weather-cycle-test2`; directed future/due/overdue and
+clock-boundary runtime tests remain required, along with resume rebasing and lifecycle
+handling. The full weather-cycle observations from test1 apply to its inactive-deadline
+entry path, not to all ownership transfers.
+
+`TIMING_WEATHER_CYCLE_TEST=1` requires VERIFY, COVERAGE_INPUT and the cycle owner, and
+rejects either other weather fixture. Once at a control update after world step 200 it
+clears the seed so the native shift-2 trial returns zero (seed 0 becomes 1), with inactive
+deadlines and no existing weather. It does not shorten warning or active duration or
+rewrite a clock. The requested matched capture is 8,500 PAL fields / 170 seconds, enough
+for this track's native maximum active duration and both fades.
+
+`check_weather_cycle.py CAPTURE...` requires a single complete warning/onset/expiry,
+checks the forecast deadline against the native D7 input, recomputes the unchanged
+track-dependent native duration and RNG advance, checks onset/expiry polling bounds,
+requires both deferred deliveries, and checks all 30 fade-step deadlines. It compares
+logical histories across captures. Native cadence acceptance, actual message/palette
+pixels, physical presentation latency and lifecycle transfers are outside its scope.
+The first 170-second 030/fast run of `timing-weather-cycle-test1` passes: one warning,
+onset and expiry, unchanged native RNG/duration arithmetic, all 30 fade steps and one
+delivery each of the deferred warning message and expiry palette. Warning-to-onset is
+25,020 ms, selected active duration 117,480 ms and expiry lateness 60 ms. Onset RNG is
+47,712 → 64,161. No warning or active duration was shortened. The checker rejects wrong
+warning time, onset RNG, active deadline, expiry reset and fade-step deadline evidence.
+
+The run completes 8,502 movement steps and 1,889 control/resource updates, with no endpoint
+retained debt, assigned unfinished movement or pending control. Initial/final unsampled
+time 80/40 ms explains the two steps beyond the 170-second window. Maximum sampled
+world-end delay is 260 ms. It adds 2,472 clean completed renderer twins with unchanged
+raster code; a further scene is active at the endpoint and is excluded. Palette pixels
+and actual weather-effect draw ownership are not checked by these scene twins. The effect
+record shows 13 selections, 34 logical visual events and 52 actual draws, with zero actual
+rectangle cleanups and no final effect ownership/pending cleanup. The A500 counterpart
+is running; cross-CPU equality is not yet established for the full cycle.
+
+Build checks pass: normal and explicit cycle-disabled fade-fixture bytes match their
+saved references; a missing fade dependency is rejected. All new hook ranges contain
+complete instructions, no decoded direct branches enter their interiors, and both C3-off
+native-weather snapshots retain all declared native hook bytes. These checks do not
+replace the running cycle captures or the outstanding migration/lifecycle work.

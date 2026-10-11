@@ -60,6 +60,9 @@ timing_session_end
 
 ; Caller owns saved registers/CCR; producer must already be stopped.
 timing_session_clear_work
+ IFNE TIMING_WEATHER_CYCLE
+ bsr timing_weather_cycle_reset
+ ENDC
  IFNE TIMING_WEATHER_EFFECTS
  bsr timing_weather_reset
  ENDC

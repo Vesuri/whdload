@@ -593,3 +593,27 @@ presentation mutation evidence is rejected. Disabled bytes, normal build, hook b
 and C3-off native hook snapshots pass. Next move forecast/start/expiry into the same logical
 RNG/time ownership, then validate natural weather, effect rectangle cleanup, palette pixels
 and pause/pit/restart/reused-transition lifecycles. This does not close F1–F8 or weather.
+
+
+`TIMING_WEATHER_CYCLE=1` now prototypes logical forecast/onset/expiry behind CUSTOM3,
+requiring the fade/effect prototypes and remaining off by default. It reuses native
+forecast and randomized duration code with local clock hooks, preserves the eight-control
+expiry gate, and defers forecast messages/expiry palette work. Claimed logical deadlines
+are protected from physical outer-loop comparisons. Session cleanup releases ownership;
+pit/rescue/pause/restart domain handling still needs validation.
+
+The unshortened, seeded 170-second 030/fast cycle test passes warning/onset/expiry,
+native duration arithmetic and all 30 fade steps: 25,020 ms warning-to-onset, 117,480 ms
+selected active duration, 60 ms expiry lateness. It completes 8,502 movements and 1,889
+controls with no retained/assigned debt; 2,472 renderer twins pass, with one additional
+unfinished scene excluded. Wrong warning/RNG/duration/reset/fade evidence is rejected.
+A500 capture `timing-weather-cycle-test1/a500-native` is running; the paired comparison
+remains pending. Normal and cycle-disabled binaries and C3-off hook audits pass.
+
+A static migration defect was fixed in the newer `timing-weather-cycle-test2` candidate:
+due/overdue native deadlines now map to the logical cursor instead of possibly becoming
+negative/inactive. The ongoing test1 pair uses the earlier frozen artifact and starts with
+inactive deadlines, so it does not cover that fix. Next finish the pair, then directly
+exercise future/due/overdue/sentinel transfers on the corrected build. Natural unseeded
+weather, calibration acceptance, message/palette pixels, effect rectangle cleanup and
+mode/lifecycle integration remain open. The full F1–F8 goal is not complete.

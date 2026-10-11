@@ -287,6 +287,14 @@ timing_message_uses_logical
  rts
 
 timing_message_counter_source
+ IFNE TIMING_WEATHER_CYCLE
+ move.w timing_weather_cycle_state+12(pc),d0
+ cmp.w #2,d0
+ bne.s .ordinary
+ move.l timing_weather_cycle_state+20(pc),d0
+ rts
+.ordinary
+ ENDC
  move.l a0,-(sp)
  bsr.s timing_message_uses_logical
  beq.s .outer

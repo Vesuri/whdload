@@ -391,12 +391,28 @@ install_periodic
  IFNE TIMING_WEATHER_FADE
  bsr timing_weather_fade_check
  ENDC
+ IFNE TIMING_WEATHER_CYCLE
+ bsr timing_weather_cycle_check
+ ENDC
  lea pl_periodic(pc),a0
  move.l _resload(pc),a2
  jsr resload_Patch(a2)
  movem.l (sp)+,d0-d2/a0-a2
  rts
 pl_periodic PL_START
+ IFNE TIMING_WEATHER_CYCLE
+ ; TIMING_RANGE h0:$dd0e 6 bit=C3
+ PL_P $dd0e,timing_weather_cycle_outer
+ ; TIMING_RANGE h0:$dde6 6 bit=C3
+ PL_P $dde6,timing_weather_cycle_expiry_outer
+ ; TIMING_RANGE h0:$e1c4 6 bit=C3
+ PL_PS $e1c4,timing_weather_cycle_clock
+ ; TIMING_RANGE h0:$e23c 6 bit=C3
+ PL_PS $e23c,timing_weather_cycle_add_clock
+ ; Replay ADDA and defer the following BSR, leaving its shared RTS intact.
+ ; TIMING_RANGE h0:$e1f0 6 bit=C3
+ PL_PS $e1f0,timing_weather_cycle_message
+ ENDC
  IFNE TIMING_WEATHER_FADE
  ; TIMING_RANGE h0:$bd1a 8 bit=C3
  PL_P $bd1a,timing_weather_fade_outer
@@ -1247,6 +1263,26 @@ timing_targets
  dc.l $f914
  dc.w timing_weather_fade_palette+2-timing_targets
  ENDC
+ IFNE TIMING_WEATHER_CYCLE
+ dc.l $dd14
+ dc.w timing_weather_cycle_native_trial+2-timing_targets
+ dc.l $dd30
+ dc.w timing_weather_cycle_native_deadline+2-timing_targets
+ dc.l $dd46
+ dc.w timing_weather_cycle_after_forecast+2-timing_targets
+ dc.l $ddec
+ dc.w timing_weather_cycle_native_expiry+2-timing_targets
+ dc.l $ddfc
+ dc.w timing_weather_cycle_after_expiry+2-timing_targets
+ dc.l $e1a2
+ dc.w timing_weather_cycle_forecast+2-timing_targets
+ dc.l $e1f8
+ dc.w timing_weather_cycle_start+2-timing_targets
+ dc.l $13514
+ dc.w timing_weather_cycle_native_message+2-timing_targets
+ dc.l $f948
+ dc.w timing_weather_cycle_native_palette+2-timing_targets
+ ENDC
 timing_targets_end
 
 timing_state dc.b 'PDTIME01'
@@ -1293,4 +1329,8 @@ timing_control_phase dc.w 1
 
  IFNE TIMING_WEATHER_FADE
  INCLUDE timing_weather_fade.s
+ ENDC
+
+ IFNE TIMING_WEATHER_CYCLE
+ INCLUDE timing_weather_cycle.s
  ENDC
