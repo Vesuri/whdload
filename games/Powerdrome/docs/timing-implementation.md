@@ -3242,3 +3242,40 @@ or proof that uninstrumented fast rendering has the same delays.
 ```sh
 python3 tools/check_timing_capacity.py CAPTURE...
 ```
+
+
+## Longer-window contact-response validation
+
+The first 3,000-field run (`timing-endurance60-1/030-25-fast`) completes a physical
+60-second window with 3,004 consecutive world steps, 667 logical control/resource
+updates and no endpoint retained or assigned debt. Independent scalar/vector arithmetic
+and fuel checks pass. Maximum sampled world-end delay is 260 ms, including instrumented
+renderer comparisons. All 851 completed renderer twins are clean; final drawing is
+inactive. These are correctness observations, not release throughput measurements.
+
+The batch stops at the joystick oracle, before starting A500: at field 547 (10.94 seconds),
+its horizontal prediction is 75 while the guest reports 67. The old oracle models only
+the joystick body. Native contact handling at hunk `$d058–$d090` additionally multiplies
+saved steering axes `$436/$438` by 230 and shifts right eight bits when `$24a` is nonzero,
+then replaces the logical axes through the existing `$d082` hook. This can produce
+75 → 67 → 60 → 53. The original capture lacks the branch-condition/saved-axis probes,
+so that explanation is not accepted as a runtime proof or a passing joystick result.
+
+New read-only `PDSTEER_EVENT` observations at `$d058` record the branch flag and both
+saved axes. The joystick oracle checks their continuity and independently applies the
+native signed damping arithmetic after checking each current joystick response, then
+checks the next response and final logical axes. No production behavior or tolerance
+changes. `CASE_SET=endurance FIELDS=3000 tools/timing_cpu_matrix.sh` selects a sequential
+030-fast/A500-native pair; shorter windows can isolate a newly reached transition.
+The failed 60-second evidence is retained. A matched passing pair and the 600-second,
+controlled-render-rate/stall and broader lifecycle gates remain outstanding.
+
+The directed 650-field pair (`timing-contact13-1`) now passes: both CPUs observe exactly
+three contact-damping updates and the oracle verifies each, including saved-axis
+continuity and final logical axes. There are 652 common sampled player/engine/RNG states
+and 144 common control/input/fuel updates; all compare exactly. The 030 adds 156 clean
+renderer twins. Maximum sampled delay remains 260 ms on 030 and 780 ms on A500; A500
+reaches 160 ms retained debt and both finish with zero retained/assigned debt. This
+13-second check validates the newly observed contact transition, not the full endurance
+requirement. The original 60-second joystick failure remains recorded as insufficiently
+instrumented evidence pending a new capture.

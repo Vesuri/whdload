@@ -461,3 +461,13 @@ retained debt, although unsampled elapsed time can remain at the endpoint. The 0
 native/fast-twin maxima are 400/580 ms. These instrumented maxima are not release
 performance figures or proof of long-run capacity. Controlled stalls, 60/600-second
 routes, further configurations and the remaining calibration/lifecycle work stay open.
+
+
+A first 60-second 030 capture completes 3,004 world steps, 667 control/fuel updates and
+851 clean renderer twins, but stops the batch at a joystick oracle gap after 10.94 seconds.
+Native contact response damps saved steering axes by 230/256; the old oracle omitted it.
+New read-only contact observations and independent arithmetic/continuity checks pass a
+13-second A500/030 pair with three damping updates each, 652 identical sampled world
+states and 144 identical control/input/fuel updates. No production code or acceptance
+tolerance changed. Repeat the full 60-second pair with these observations before claiming
+endurance coverage; 600-second and controlled rate/stall tests remain open.

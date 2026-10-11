@@ -336,6 +336,11 @@ if os.environ.get('TIMING_STATE') == '1':
                 mc = a.base + message_clocks[0]
                 mv = [f'*(unsigned {kind}*){mc+x:#x}' for x,kind in ((8,'short'),(10,'short'),(12,'int'))]
                 sample += 'printf "PDMSGPHASE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(mv)) + '\\n", $pd_field, ' + ', '.join(mv) + '\n'
+        if off == 0xd058:
+            # Before native contact damping at d05e..d090; logical axes above
+            # still contain this tick's joystick response.
+            steering = [f'*(unsigned short*){state+x:#x}' for x in (0x24a,0x436,0x438)]
+            sample += 'printf "PDSTEER_EVENT %d 0xd058 %u %u %u\\n", $pd_field, ' + ', '.join(steering) + '\n'
         if off in (0xcf2e, 0xd000, 0xd022, 0xd038, 0xd058):
             bv = [f'*(unsigned short*){state+x:#x}' for x in
                   (0x194,0x454,0x1f0,0x138,0x1ba,0xe4,0x432,0x422)]
