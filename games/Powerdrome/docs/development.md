@@ -76,6 +76,20 @@ validation is pending: allocation flags and loaded sample descriptors must be ob
 not forced. This configuration is for testing the weather audio path and is not a
 production loader memory change or evidence of sound playback.
 
+### Native audio mute input fixture
+
+`COVERAGE_AUDIO_KEYS=1` requires `VERIFY` and `COVERAGE_INPUT`. It adds native Tab
+characters to timing routes 7/9 at PAL fields 50 and 600, retaining their existing
+throttle/brake input and finishing the tape at field 650. The normal keyboard handler
+performs mute/unmute; the fixture does not write the sound-suppression flag. Only 0/1
+are accepted. Fixture-off and normal build bytes have been compared unchanged.
+
+For the larger-memory seeded weather test, request audio probes `$17836/$178e6` and
+native toggle boundaries `$c5fc/$c600`. `check_weather_audio.py --require-mute CAPTURE...`
+requires two native toggles, one suppressed weather call followed by two resumed starts,
+and complete request accounting. This is directed input coverage, not audible-output
+validation or proof that every mode's sound controls are framerate independent.
+
 ## Inspection
 
 ```sh

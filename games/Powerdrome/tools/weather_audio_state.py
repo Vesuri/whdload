@@ -56,7 +56,7 @@ def main():
 
 # Native helper boundaries. Sample both to pair calls by stack and return address;
 # other audio callers use this helper too, so arguments alone do not identify weather.
-PROBES = (0x17836, 0x178e6)
+PROBES = (0x17836, 0x178e6, 0xc5fc, 0xc600)
 REGISTERS = ('d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7',
              'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'sp')
 EVENT_FIELDS = ('clock', 'available', 'suppressed', 'channel3_status',

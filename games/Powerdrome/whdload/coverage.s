@@ -451,11 +451,22 @@ coverage_menu_key
 coverage_timing_tape
  dc.l 10
  dc.w 0,0,1
+ IFNE COVERAGE_AUDIO_KEYS
+ ; Native Tab: mute through the normal keyboard handler, retaining input order.
+ dc.l 50
+ dc.w 9,0,1
+ ENDC
  dc.l 100
  dc.w 0,0,2
  dc.l 150
  dc.w 0,0,0
+ IFNE COVERAGE_AUDIO_KEYS
+ dc.l 600
+ dc.w 9,0,0
+ dc.l 650
+ ELSE
  dc.l 250
+ ENDC
  dc.w -1,0,0
 
 

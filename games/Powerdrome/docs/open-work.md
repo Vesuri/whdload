@@ -674,3 +674,9 @@ updates. The 030 completes 245 renderer twins. Suppressed calls, deliberate stal
 closely spaced sounds, audible output, palette restoration, unseeded weather and
 mode/lifecycle acceptance remain open. The earlier full-cycle evidence used the old
 90-ms effect cadence.
+
+
+The native Tab mute/unmute fixture is now running as `timing-weather-audio-keys1`.
+The 030 side passes both native flag transitions, one suppressed weather helper with
+preserved registers, and two resumed starts. Its three request times remain unchanged.
+A500 is pending. Fixture build guards and disabled/normal byte equivalence pass.

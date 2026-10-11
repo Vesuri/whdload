@@ -4309,3 +4309,19 @@ and unchanged raster code. Its final additional active scene is unfinished and e
 This is a seeded full-cycle regression, not unseeded weather, audio playback, palette
 pixel/scanout, general mode-transfer or whole-game framerate-independence acceptance.
 Reports are saved as `cycle-check.txt` and `schedule-check.txt` within the capture pair.
+
+## Weather sound suppression through native input
+
+`timing-weather-audio-keys1` uses the same 1-MiB guest-memory seeded effect configuration
+with `COVERAGE_AUDIO_KEYS=1`. The input tape publishes Tab at PAL fields 50 and 600.
+Native `$c5fc` toggles `state+$2f4`; before/after probes at `$c5fc/$c600` check both
+0→65535 and 65535→0 transitions and unchanged general registers. No fixture directly
+writes the sound flag. The extra audio probes are read-only.
+
+The completed 030 capture passes `check_weather_audio.py --require-mute`: the first
+request at 4,860 ms is suppressed with all general registers preserved; requests at
+15,740 and 18,840 ms complete native channel starts. All three generated requests are
+accounted for, without coalescing. A500 is running; cross-CPU mute acceptance remains
+pending. Build guards reject missing VERIFY/COVERAGE and invalid values, while disabled
+fixture and normal-build artifacts remain byte-identical. Deliberate stalls with closely
+spaced requests and audible-output checks remain separate.

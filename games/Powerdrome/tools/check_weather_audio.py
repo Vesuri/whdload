@@ -13,7 +13,7 @@ from weather_effect_state import snapshot as effect_snapshot, parse_values as ef
 from weather_effect_clock import parse_values as clock_values, snapshot as clock_snapshot
 
 
-def check(root):
+def check(root, require_mute=False):
     game = int((root / 'game-base.txt').read_text(), 0)
     base = int((root / 'dump-base.txt').read_text(), 0)
     states = []
@@ -40,7 +40,22 @@ def check(root):
     before = None
     completed = started = suppressed = other = 0
     waits = []
+    outcomes = []
+    key_before = None
+    toggles = []
     for field, offset, state in events:
+        if offset == 0xc5fc:
+            assert key_before is None, 'Missing native mute-key completion'
+            assert state['a6'] == game + 0xa6e
+            key_before = state
+            continue
+        if offset == 0xc600:
+            assert key_before is not None, 'Mute-key completion without entry'
+            assert state['suppressed'] == (key_before['suppressed'] ^ 65535)
+            assert all(state[r] == key_before[r] for r in REGISTERS), 'Native sound toggle changed registers'
+            toggles.append((key_before['suppressed'], state['suppressed']))
+            key_before = None
+            continue
         assert offset in (0x17836, 0x178e6)
         if state['return_address'] != returns[0]:
             other += 1
@@ -64,9 +79,14 @@ def check(root):
                 assert (state['d0'], state['d1'], state['d4']) == (0x8208, 0x8400, 48), 'Native channel-start path not completed'
                 assert all(state[r] == entry[r] for r in ('d2', 'd3', 'd6', 'd7', 'a0', 'a2', 'a3', 'a4', 'a5', 'a6'))
                 started += 1
+            outcomes.append(bool(entry['suppressed']))
             waits.append((field - entry_field) * 20)
             completed += 1
             before = None
+    assert key_before is None, 'Capture ended inside native sound toggle'
+    if require_mute:
+        assert toggles == [(0, 65535), (65535, 0)], 'Missing native mute/unmute sequence'
+        assert outcomes == [True, False, False], 'Expected first weather sound suppressed and two resumed starts'
     assert before is None, 'Capture ended inside weather audio helper'
     assert completed > 0, 'No complete weather audio calls'
     first = effect_snapshot(root)
@@ -108,12 +128,14 @@ def check(root):
     print(f'{root.name}: {completed} weather audio calls, {started} native starts, {suppressed} suppressed')
     print(f'  Sample/channel arguments match; helper duration {min(waits)}–{max(waits)} ms in PAL fields; {other} other audio boundary rows excluded')
     print('  Native helper contract only; audible output, unobserved stalls/modes and timing acceptance remain separate.')
-    return relative_requests
+    return relative_requests, tuple(outcomes)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('captures', type=Path, nargs='+')
-    histories = [check(root) for root in parser.parse_args().captures]
+    parser.add_argument('--require-mute', action='store_true', help='Require native Tab mute/unmute and suppressed-then-resumed weather sounds')
+    args = parser.parse_args()
+    histories = [check(root, args.require_mute) for root in args.captures]
     assert all(history == histories[0] for history in histories), 'Weather audio request timelines differ'
     print('All supplied observed sound-request timelines match.')
