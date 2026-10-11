@@ -1,6 +1,6 @@
 # Timing implementation and validation
 
-Project status: completion-plan Phase D is complete. Work stopped before Phase E.
+Project status: Phases A–D and E1 are complete. Phase E2 stopped at the steady A500 handling gate; Phase E remains incomplete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Phase A of the [completion plan](completion-plan.md) is complete. `TIMING_FULL=1`
@@ -46,27 +46,44 @@ rather than rounding to four or five ticks. This is a measured reference choice,
 that the original game had one intended constant frame rate. Other modes need their own
 baseline evidence before their timing can be accepted.
 
-## Initial acceptance bounds
+## Release acceptance under representative A500 policy
 
-Freeze these before evaluating the periodic candidate. They supplement, not replace, the
-[plan](framerate-independence.md#numerical-gates).
+The confirmed D1–D5 decisions in [the completion plan](completion-plan.md) govern
+release acceptance. Use 20 ms world ticks and rational 90 ms control/resource/engine/
+opponent epochs. Keep native timing on 68000/68010; test the scheduler on 68020+.
+The target is representative A500 handling, not exact reproduction of scene-dependent
+A500 histories. No cadence or numerical tolerance is changed by this policy update.
 
-- Steady straight-line movement: within 5% across CPUs over matched collision-free elapsed
-  intervals. Report integer displacement and measured raw/applied delta; do not use FPS alone.
-- Acceleration/braking: time to chosen speed thresholds within 10% of the A500 route or one
-  90 ms cadence interval, whichever is greater. Use matching timed controls and initial state.
-- Resource consumption: within 10% of the matched A500 route while eligibility/controls are
-  equal. Across CPUs, periodic invocation counts must match elapsed-time accounting within
-  one boundary event; any conditional resource difference must be explained by input/state.
-- Effect/recovery duration: match the selected A500 baseline within 10% or one periodic
-  interval, whichever is greater. A baseline for each conditional effect is still required.
-- Renderer correctness: zero pixel/register/CCR/scratch/guard mismatches. Timing-off hooks
-  must remain native. Pause and mode transitions must not produce catch-up bursts.
+Accepted policy outcomes are the native brake history ending at speed 108 versus
+53 at steady cadence, native impulses lasting 800/900/1,120 ms versus logical 900 ms,
+and pilot 1's visibility difference. These are not release failures. Opponent record
+word `$54` is presentation-owned and recomputed by projection; do not demand it match
+between render cadences as persistent simulation state. All other logical-state,
+random-stream and elapsed-time checks retain their existing requirements.
 
-These bounds do not excuse untested paths or turn coordinate discontinuities into distance.
-`timing_report.py` reports sampled coordinate travel and the largest jump for diagnosis;
-track-origin changes, resets, rescue and coordinate wrapping make it unsuitable as a lap
-or unqualified total-distance metric.
+Run these finite gates once with `TIMING_FULL=1`, using the existing fixtures/checkers:
+
+| Gate | Required evidence | Machines |
+| --- | --- | --- |
+| Logical equivalence | `timing_cpu_matrix.sh`, fixed seeds and pit sync; exact common logical state | M4–M7; native M1 is the handling reference |
+| Elapsed accounting | `check_timing_world20.py` and `check_timing_capacity.py` on the equivalence runs | M4–M7 |
+| Steady A500 handling | Collision-free straight-line speed within 5%; acceleration to 130 and stop within 10% or 90 ms; fuel within 10%; weather onset/duration/fade within 10% | M5 versus native M1 |
+| Lifecycles | Pause C5=8, rescue C5=13, restart C5=12, initialized-lap pause C5=14, and natural ten-lap finish with existing checkers | M5 |
+| Stalls | 100/250/500 ms fixture, no lost or duplicated work | M5 |
+| Render cadence | 10/15/25/50 Hz fixture and unpaced, with logical-state comparison | M5, M7 |
+| Endurance | 600-second pair; bounded retained debt, zero at end | M5; M1 scheduler excluded by D2 |
+| Visible weather | Directed fade; screenshots at three logical phases agree with expected Copper palette | M5 |
+| Natural weather | Ten-minute unseeded race; debt stays bounded, effects expire and palette restores | M5 |
+| Renderer equivalence | Applicable gates above with C4=1: zero pixel/register/CCR/scratch/guard mismatches | M4, M5, M7 |
+
+The optional title-demo correction has its own gate: M7 demo duration within 5% of
+M1, using the measured 18 frames / 93 PAL fields reference with a carried remainder.
+These are the complete Phase E gates. Historical exploratory requirements elsewhere
+in this design record do not add release gates or override these accepted outcomes.
+A gate failure must be fixed or escalated; after two failures, record the finding in
+`open-work.md` and stop. Never widen tolerances, mask unexplained state differences,
+or substitute frame rate for motion measurements. Coordinates must be checked over
+matched intervals: resets, rescue and origin changes are not traveled distance.
 
 ## Tools and binary boundaries
 
@@ -430,13 +447,11 @@ quantization. Logical time and physical observation time can differ while work w
 for rendering or catches up; zero debt at the capture endpoint does not prove zero
 latency throughout the run. Instrumented twins are not throughput benchmarks.
 
-The third native boundary duration differs from the timed logical duration by 240 ms
-(21.4%), and from the 030 observed duration by the same amount. This exceeds the frozen
-10% or 90-ms duration tolerance even allowing field quantization. Therefore **A500
-impulse calibration is not passed**. The first two logical differences are within that
-bound. The runs share the input tape, but native and timed trajectories are not proven
-equal; this is a calibration warning, not proof that one replacement period fixes every
-scene. Do not change the 90-ms period solely to fit one episode or relax the gate.
+The third native boundary duration differs from the timed logical boundary by
+240 ms (21.4%). Under confirmed D1 this scene-dependent native impulse history is
+an accepted policy outcome, not a failed release calibration. The selected lifetime
+remains 900 ms integrated / 880 ms between entry boundaries. No cadence or duration
+tolerance is changed; the finite release gates above govern acceptance.
 
 Recheck the bounded results with:
 
@@ -565,18 +580,19 @@ and captures `timing-opanim2-initial-a500` and `timing-opanim2-initial-030-twins
 | Pilots 2–4 first-nine-update span | 960 ms each | 960 ms each |
 
 Both CPUs reproduce the animation arithmetic and durations. Pilots 2–4 are 40 ms
-(4.35%) slower than the native A500 prefix, within both frozen limits. **Pilot 1 fails
-native calibration**: it leaves the visible segment range, causing a 1,200-ms interval
-between preparations instead of 120 ms. Removing that native visibility gate solely to
-pass calibration would change behavior; matching the native event history and checking
-the full lifetime remain open. CPU agreement does not establish A500 gameplay fidelity.
+(4.35%) slower than the native A500 prefix, within both frozen limits. Pilot 1 leaves
+the visible segment range, causing a 1,200-ms interval between preparations instead
+of 120 ms. D1 accepts this visibility-history difference. Retain the native
+visibility gate; exact native event-history matching is not a release requirement.
+CPU agreement alone does not establish the separate steady A500 handling tolerances.
 
 The complete opponent comparison has 335 shared deadlines from 90 to 30,150 ms,
 including 135 after both CPUs enter flight. Nine snapshots differ, solely in record
 word `$54`; all other compared words, lap clocks and RNG match. `$54` is written during
 projection and read during drawing. The bounded effective-address audit below supports
-that ownership in the sampled route; unexecuted paths remain unaudited. The whole-record
-comparison therefore remains failing; no field has been masked.
+that ownership in the sampled route; unexecuted paths remain unaudited. The nine
+raw-record differences are accepted presentation differences under D1:
+`$54` is recomputed by projection and is not persistent logical simulation state.
 The 030 run has 64 completed clean renderer comparisons and one additional scene still
 active at capture end. These instrumented runs are not performance measurements.
 
@@ -590,7 +606,7 @@ Recheck the captures with:
 ```sh
 python3 tools/check_opponent_animation.py tmp/prof/timing-opanim2-initial-a500 --logical
 python3 tools/check_opponent_animation.py tmp/prof/timing-opanim2-initial-030-twins --logical
-# Expected failure: pilot 1 does not pass native timing calibration.
+# Diagnostic only: pilot 1 native visibility history is accepted under D1.
 python3 tools/check_opponent_animation.py tmp/prof/timing-opanim2-initial-a500 --logical --reference tmp/prof/timing-opanim-native-a500
 python3 tools/compare_timing_opponents.py --through-departure --report-only tmp/prof/timing-opanim2-initial-030-twins tmp/prof/timing-opanim2-initial-a500
 ```
@@ -645,9 +661,10 @@ zero PCs. The harness correctly rejects it before terminal memory snapshots, so 
 not a successful instruction or renderer audit. Shared tooling notes also report that
 hardware watchpoints can fail to fire; a counted breakpoint at the four known sites
 would not rule out other aliased accesses. Accelerated effective-address coverage still
-needs a usable instruction/access trace. No opponent comparison field has been masked,
-and the strict full-record gate still reports nine `$54` differences and zero RNG
-differences across 335 common deadlines (135 after both CPUs enter flight).
+has no successful instruction trace from that attempt. The raw full-record report
+contains nine presentation-owned `$54` differences and zero RNG differences across
+335 common deadlines (135 after both CPUs enter flight). Those `$54` differences
+are accepted under D1; an additional accelerated access audit is not a release gate.
 
 The animation-duration mismatch is separate: both corrected CPUs agree on pilot 1's
 2,040-ms span. The native segment-range endpoint `state+$200` is loaded from the track
@@ -660,9 +677,8 @@ change native behavior. Match the original event/visibility history before treat
 python3 tools/audit_opponent_projection.py tmp/prof/timing-opanim-projection-long-a500
 ```
 
-Next obtain accelerated `$54` access coverage, test matched native visibility/lifetime
-histories, and cover contact/damage/effect feedback, pause, repair, rescue and nonhuman mode transitions.
-The preparation split alone does not complete the broader effects or timing matrix.
+Pilot 1 visibility and `$54` projection differences are accepted under D1. Release
+validation uses the finite lifecycle, logical-state and effect gates above.
 
 ## Cockpit liftoff: confirmed frame-driven movement
 
@@ -1006,14 +1022,14 @@ and six units, below 12.2 allowed units. Wall-clock endpoint bounds differ sligh
 though the complete common logical resource sequence matches exactly. This short-running,
 eligible-engine route does not certify fuel exhaustion or all settings.
 
-The same reference **does not establish acceptable high-speed joystick braking**. Its
+The same reference demonstrates the **accepted scene-dependent high-speed braking difference**. Its
 post-command speed settles at 108, versus 53 for both periodic candidates. The original
 joystick enters native automatic boost before braking; at around fixture field 100 the
 sampled speeds are 329 native, 316 periodic A500 and 329 periodic 030. Matching 15 owed
 brake events across CPUs is not equivalent to matching native A500 response. The separate
-70 ms brake cadence was calibrated on the lower-speed mouse route and needs assessment
-against this route's native invocation times, overspeed damping and entry speed before
-further tuning. No braking threshold below 100 is reached by the native reference during
+70 ms brake cadence was calibrated on the lower-speed mouse route and remains
+unchanged. D1 accepts this high-speed history difference; steady-route acceleration
+and stopping still require the frozen tolerance checks. No braking threshold below 100 is reached by the native reference during
 the held-input interval, so the current threshold tool reports missing thresholds rather
 than a pass. Acceleration to 130 passes; acceleration to 120 remains inconclusive with
 its 60–100 ms error bound against a 90 ms tolerance. The acceptance bounds are unchanged.
@@ -1087,7 +1103,7 @@ python3 tools/check_timing_brake.py tmp/prof/timing-brakeaudit1-periodic-a500 tm
 python3 tools/check_timing_joystick.py tmp/prof/timing-brakeaudit1-periodic-a500 tmp/prof/timing-brakeaudit1-periodic-030-twins
 ```
 
-## Response measurements and next required correction
+## Response measurement contract and current blocker
 
 `tools/timing_response.py REFERENCE CAPTURE...` normalizes observations to the input
 fixture's native VBL epoch, combines presentation and control/movement-boundary samples,
@@ -1095,7 +1111,18 @@ and includes PAL-field quantization in its crossing intervals. It reports conser
 error bounds against the frozen 10% / 90 ms tolerance. An inconclusive bound is not a pass.
 Use `COVERAGE_PROBES='0xd058 0xccee' TIMING_STATE=1` for the finer boundary samples.
 
-The native A500 reference is `timing-brake2-a500-native`. Its sampled stop threshold is
+The current Phase E full-build pair is `tmp/phase-e/steady-a500-retry/` and
+`steady-030-twins/`. Acceleration to 130 passes (native 1,400–1,420 ms versus
+1,360–1,380 ms). Stop cannot pass: the native C5=7 hold leaves speed 7 through
+the endpoint, while M5 applies all 15 owed events and reaches zero after the
+field-150 measurement cutoff. Fuel is inconclusive at 72–74 versus 63–65 units
+(7–11 units difference, 7.3 allowed). The first native attempt had rejected an
+incorrect early-diagnostic setting; the unsuccessful retry triggers the plan's
+stop rule. See [the current finding](open-work.md#handling-blocker-and-resume-boundary).
+Do not substitute the older passing reference without resolving the route/build
+assumptions or count missing thresholds as a pass.
+
+The older native A500 reference is `timing-brake2-a500-native`. Its sampled stop threshold is
 980–1,000 ms after the brake command. With timestamped input, `timing-input1-a500` reaches
 zero in 1,000–1,020 ms and `timing-input1-030` in 980–1,000 ms. Acceleration to 130 is
 1,320–1,340 ms on both, versus 1,380–1,400 ms native. Those bounds pass the frozen criteria.

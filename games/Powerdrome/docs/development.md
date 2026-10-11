@@ -1,6 +1,6 @@
 # Development
 
-Project status: completion-plan Phase D is complete. Work stopped before Phase E.
+Project status: Phases A–D and E1 are complete. Phase E2 stopped at the steady A500 handling gate; Phase E remains incomplete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Inputs and shared tools

@@ -1,6 +1,6 @@
 # Powerdrome internals
 
-Project status: completion-plan Phase D is complete. Work stopped before Phase E.
+Project status: Phases A–D and E1 are complete. Phase E2 stopped at the steady A500 handling gate; Phase E remains incomplete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Current measurements
@@ -267,7 +267,7 @@ new control reproduces the full-timing 144/494 count.
 ## Phase D: A500 measurements and decisions
 
 Phase D is complete. **A500 unchanged at 11.404 fps.** No renderer, timing, option
-or cache-policy change is retained. Phase E has not started.
+or cache-policy change is retained by Phase D. Phase E status is in the current handoff.
 
 ### Pipelined blitter clear (D1, rejected)
 

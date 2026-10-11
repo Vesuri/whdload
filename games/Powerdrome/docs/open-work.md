@@ -2,10 +2,77 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
-## Phase D complete — stopped before Phase E
+## Phase E stopped: steady A500 handling gate
 
-D1–D5 are confirmed. Phases A–D are complete. No Phase E–F work or release-default
-change has been made. The next phase, when requested, is E (bounded timing gates).
+D1–D5 are confirmed. Phases A–D and E1 are complete. E2 passed CPU equivalence
+and elapsed accounting, then stopped after two unsuccessful handling-gate attempts
+as the completion plan requires. Phase E is incomplete. E1 accepts the specified native
+brake/impulse/visibility histories and classifies opponent `$54` as presentation-owned;
+no cadence, tolerance or game code changed. Evidence is under `tmp/phase-e/`.
+`CUSTOM5=14` is the existing initialized-lap pause fixture; natural finish uses the
+separate ten-lap route and checker. Phase F and release defaults remain untouched.
+
+### Phase E gate ledger
+
+| Gate | Current result |
+| --- | --- |
+| E1 policy | Complete; fixed 20/90 ms policy and original tolerances retained |
+| Cross-CPU equivalence and accounting | Pass: six M4–M7 captures, 501 exact common world states and 111 control/input/fuel updates |
+| Steady A500 handling | Not passed: no native stop threshold; fuel inconclusive; acceleration to 130 passes; straight-line speed not evaluated |
+| Lifecycle, stalls, render cadence, endurance, visible/natural weather | Not yet run for Phase E |
+| E3 optional title demo | Not started |
+
+Equivalence evidence: `tmp/phase-e/equivalence/`, `equivalence-020-fast/` and
+`equivalence-060-fast-retry/`. All six physical windows cover 500 PAL fields.
+Retained allocator debt is zero throughout the sampled world ends. M4 finishes
+inside an allocated batch with two unfinished steps, exactly accounted for;
+the other five endpoints have no assigned unfinished steps. Peak sampled
+world-end delay is 400 ms on M4 and 140–220 ms on M5–M7. These are instrumented
+correctness captures, not throughput measurements. The fast-renderer runs pass
+pixel, register/CCR, scratch, guard and unchanged-raster checks.
+
+The first M7 fast capture was invalid: GDB returned `Invalid hex digit 79`
+in the first field's weather-state read and the strict field counter rejected
+0/100 fields. Its single fresh-boot retry passed, as did the subsequent
+six-way comparisons. Preserve the invalid evidence; do not count it as a pass.
+
+### Handling blocker and resume boundary
+
+The first handling attempt, `tmp/phase-e/steady-a500/`, aborted before measurement:
+the scratch helper incorrectly requested `TIMING_EARLY=1` with C3 disabled.
+The diagnostic correctly rejected the missing scheduler hooks. The helper now
+uses `TIMING_EARLY=0` for native timing; no tracked tool or game code changed.
+
+The allowed retry and its M5 pair completed all 300 fields:
+`tmp/phase-e/steady-a500-retry/` and `steady-030-twins/`. Both use C5=7,
+NoCache and the same frozen full coverage slave, with C3 off on M1 and on on M5.
+The existing response and fuel reports are `steady-response.json` and
+`steady-fuel.json`. Their JSON statuses matter; successful script exit is not
+acceptance of an inconclusive result.
+
+| Required measurement | Result |
+| --- | --- |
+| Acceleration to 130 | Pass: native 1,400–1,420 ms, M5 1,360–1,380 ms; conservative error 20–60 ms against 141 ms allowed |
+| Stop | No reference threshold: native speed remains 7 after brake release, through the capture endpoint. M5 applies all 15 owed events and reaches zero, first presentation at fixture field 155, beyond the checker's field-150 window. Both report missing stop thresholds. |
+| Fuel, fixture fields 20–240 | Native 72–74 units, M5 63–65; bounded difference 7–11 against 7.3 allowed. Existing checker reports `needs finer sampling`; not a pass. |
+| Straight-line speed | Not evaluated before the stop rule applied |
+| M5 renderer correctness | 89 completed staged scenes inside the capture; zero pixel/register/CCR/scratch/guard failures, unchanged raster code |
+
+The setup rejection and unsuccessful retry exhaust this gate's two attempts.
+No third capture, weakened tolerance, changed brake hold or silently substituted
+native reference was used. This identifies insufficient acceptance evidence, not
+a proven scheduler defect: the native route does not stop, while the candidate
+does. On an explicitly authorized continuation, resolve the reference/measurement
+contract for stop and fuel before rerunning this gate. Preserve the fixed numerical
+bounds. The existing frozen native reference and the fresh reference have different
+stop outcomes; establish which route/build assumptions explain that difference.
+
+Lifecycle, stalls, requested render rates, both endurance runs, three visible fade
+phases and the unseeded weather race remain unrun for Phase E. Weather handling
+bounds also remain open. E3 is optional and unstarted. Phase F is untouched.
+No game code, cache policy, runtime defaults or tracked checker changed. The normal
+build remains byte-identical to the Phase D control (SHA-256
+`ca8639921c1d8c2781578a62a42003a6ba888990a4a22b8d4f82cc829be061f3`).
 
 **A500 unchanged at 11.404 fps**, reproducing 104 intervals in 456 fields in the
 prescribed 500-field Practice window. D1's four pipelined blitter clears regress

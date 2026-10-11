@@ -213,7 +213,7 @@ Commit each retained item separately, for example "Overlap flip wait with fast-R
 
 ## Phase D: A500 (68000, chip only)
 
-Status: **complete; stopped before Phase E**. A500 unchanged at **11.404 fps**
+Status: **complete**. A500 unchanged at **11.404 fps**
 (104/456). D1’s pipelined blitter fill regresses to 104/494 = 10.526 fps and is
 removed. D2 has no individual OS call above 3%. D3’s removable dispatch setup is
 only 0.181% of track time, so the conditional chip-code trial is not pursued.
@@ -237,6 +237,11 @@ because game time depends on frame time there.
 
 ## Phase E: Close the timing work under the D1 policy
 
+Status: **incomplete; stopped under the two-attempt rule**. E1 is complete.
+E2 CPU equivalence and accounting pass on M4–M7. The steady A500 handling gate
+has no valid stop threshold and an inconclusive fuel bound after its allowed retry.
+The remaining E2 rows and optional E3 are unrun. See the [finding and evidence](open-work.md#handling-blocker-and-resume-boundary).
+
 **E1. Replace the unbounded gates.** In `docs/timing-implementation.md`, rewrite the
 acceptance section as the release gates below. Mark the brake-history, impulse-history
 and pilot 1 visibility differences as accepted policy outcomes. Treat opponent word `$54`
@@ -251,7 +256,7 @@ and checkers only:
 | Cross-CPU logical equivalence | `timing_cpu_matrix.sh` with pit sync | M5, M6, M7 (and M1, M4 when D2 enables timing there) |
 | Equal elapsed time accounting | `check_timing_world20.py` and `check_timing_capacity.py` on every run above | same |
 | Steady A500 tolerances | Existing frozen bounds: straight-line speed within 5%; acceleration to 130 and stop within 10% or 90 ms; fuel within 10%; weather onset, duration and fade within 10% | M5 vs native M1 |
-| Pause, rescue, restart, finish | `CUSTOM5=8`, `13`, `12`, `14` and natural ten-lap finish with their existing checkers | M5 |
+| Pause, rescue, restart, finish | `CUSTOM5=8` pause, `13` rescue, `12` restart, `14` initialized-lap pause, plus natural ten-lap finish with existing checkers | M5 |
 | Stalls | 100/250/500 ms stall fixture, no lost or duplicated work | M5 |
 | Render-rate independence | 10/15/25/50 Hz fixture plus unpaced | M5, M7 |
 | Endurance | 600 s pair, debt bounded, zero at end | M5 (and M1 if timing is on there) |
