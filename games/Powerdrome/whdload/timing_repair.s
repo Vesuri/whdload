@@ -9,6 +9,9 @@ timing_repair_enter_first
  moveq #0,d0
  bsr timing_repair_initialize
 .done
+ IFNE TIMING_REPAIR_DROP
+ bsr timing_repair_choose_draw
+ ENDC
  movem.l (sp)+,d0-d2/a0-a1
  move.w (sp)+,ccr
  movem.l d4-d7/a1-a2,-(sp)
@@ -44,6 +47,9 @@ timing_repair_enter_second
  add.l d0,12(a1)
  add.l d0,36(a1)
 .done
+ IFNE TIMING_REPAIR_DROP
+ bsr timing_repair_choose_draw
+ ENDC
  movem.l (sp)+,d0-d2/a0-a1
  move.w (sp)+,ccr
  movem.l d4-d7/a1-a2,-(sp)
@@ -55,6 +61,10 @@ timing_repair_initialize
  lea timing_repair_state(pc),a1
  clr.w 8(a1)
  move.w d0,10(a1)
+ tst.w d0
+ bne.s .stage_ready
+ clr.w 52(a1)
+.stage_ready
  tst.w $b6(a6)
  bne.s .done
  move.w timing_pit_state+8(pc),d1
@@ -82,8 +92,18 @@ timing_repair_initialize
  move.l a0,48(a1)
  bsr timing_clock
  move.l perf_game(pc),a0
- move.l $f96(a0),12(a1)
- move.l 12(a1),24(a1)
+ move.l $f96(a0),d2
+ move.l d2,24(a1)
+ ; Stage two continues stage one's intended endpoint, retaining lateness.
+ ; Only a completed supported first stage can supply this one-shot bridge.
+ tst.w 10(a1)
+ beq.s .epoch_ready
+ tst.w 52(a1)
+ beq.s .epoch_ready
+ move.l 20(a1),d2
+.epoch_ready
+ move.l d2,12(a1)
+ clr.w 52(a1)
  move.w #1,8(a1)
  addq.l #1,28(a1)
 .done
@@ -137,6 +157,10 @@ timing_repair_wait
  addq.l #1,32(a1)
  tst.w d7
  bne.s .done
+ tst.w 10(a1)
+ bne.s .stage_complete
+ move.w #1,52(a1)
+.stage_complete
  clr.w 8(a1)
 .done
  movem.l (sp)+,d0-d1/a0-a1
@@ -215,3 +239,8 @@ timing_repair_state dc.b 'PDREPR01'
  dc.l 0 ; latest lateness
  dc.l 0 ; maximum lateness
  dc.l 0 ; selected cumulative step table (prefix diagnostics remain unchanged)
+ dc.w 0 ; completed first-stage deadline available to second-stage initialization
+
+ IFNE TIMING_REPAIR_DROP
+ INCLUDE timing_repair_drop.s
+ ENDC

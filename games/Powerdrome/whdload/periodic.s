@@ -72,6 +72,20 @@ TIMING_REPAIR = 0
  FAIL "TIMING_REPAIR requires TIMING_WORLD20"
  ENDC
  ENDC
+ IFND TIMING_REPAIR_DROP
+TIMING_REPAIR_DROP = 0
+ ENDC
+ IFLT TIMING_REPAIR_DROP
+ FAIL "TIMING_REPAIR_DROP must be 0 or 1"
+ ENDC
+ IFGT TIMING_REPAIR_DROP-1
+ FAIL "TIMING_REPAIR_DROP must be 0 or 1"
+ ENDC
+ IFNE TIMING_REPAIR_DROP
+ IFEQ TIMING_REPAIR
+ FAIL "TIMING_REPAIR_DROP requires TIMING_REPAIR"
+ ENDC
+ ENDC
  IFND TIMING_RETUNE_RESULT_TEST
 TIMING_RETUNE_RESULT_TEST = 0
  ENDC
@@ -424,6 +438,15 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$14a9a 12 bit=C3
  PL_P $14a9a,timing_repair_present_second
  PL_NOP $14aa0,6
+ IFNE TIMING_REPAIR_DROP
+ ; TIMING_RANGE h0:$176c6 10 bit=C3
+ PL_P $176c6,timing_repair_bitmap
+ PL_NOP $176cc,4
+ ; TIMING_RANGE h0:$e2fc 6 bit=C3
+ PL_P $e2fc,timing_repair_present_gate
+ ; TIMING_RANGE h0:$e378 6 bit=C3
+ PL_P $e378,timing_repair_service_gate
+ ENDC
  ENDC
  ; Only ordinary result-duration accounting reads the logical winning instant.
  ; TIMING_RANGE h0:$c094 6 bit=C3
@@ -967,6 +990,22 @@ timing_targets
  IFNE TIMING_REPAIR
  dc.l $148d8
  dc.w timing_repair_first_continue+2-timing_targets
+ IFNE TIMING_REPAIR_DROP
+ dc.l $1762e
+ dc.w timing_repair_clip+2-timing_targets
+ dc.l $176d0
+ dc.w timing_repair_bitmap_continue+2-timing_targets
+ dc.l $e302
+ dc.w timing_repair_present_continue+2-timing_targets
+ dc.l $e378
+ dc.w timing_repair_service_entry+2-timing_targets
+ dc.l $e37e
+ dc.w timing_repair_service_return+2-timing_targets
+ dc.l $e384
+ dc.w timing_repair_service_draw+2-timing_targets
+ dc.l $e388
+ dc.w timing_repair_service_continue+2-timing_targets
+ ENDC
  dc.l $14a20
  dc.w timing_repair_second_continue+2-timing_targets
  dc.l $e296

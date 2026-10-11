@@ -139,6 +139,11 @@ timing_pit_abort
  IFNE TIMING_REPAIR
  lea timing_repair_state(pc),a0
  clr.w 8(a0)
+ clr.w 52(a0)
+ IFNE TIMING_REPAIR_DROP
+ lea timing_repair_drop_state(pc),a0
+ clr.w 8(a0)
+ ENDC
  ENDC
  bsr timing_pit_opponent_restore
  lea timing_retune_state(pc),a0

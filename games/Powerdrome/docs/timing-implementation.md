@@ -1602,6 +1602,71 @@ motivate checking refresh-boundary crossings across the whole stage, but do not 
 prove that missed refreshes explain the full 100–820-ms unpaced invocation penalty.
 No display wait has been removed and these captures are not rendering FPS evidence.
 
+#### Experimental late-presentation extraction
+
+`TIMING_REPAIR_DROP=1` requires `TIMING_REPAIR=1` and defaults to zero. It suppresses
+only late pictures in supported human repair stages; the normal build is unchanged.
+At step entry, lateness of at least one PAL field relative to the preceding deadline
+selects a dropped picture. Stage endpoints and stage-two counter 31 (the first frame
+after the native repair/sound event) always draw. EC=0 and DA=0 retain native drawing.
+
+The native buffer audit rules out suppressing only sprite draws: `$7f7a` exchanges the
+display/drawing bitmaps and `$e372` restores the background from `state+$3d2` into the
+new drawing bitmap. That source is the separate pit background (`$06ae` in this route),
+not a copy of the currently displayed ship. A skipped sprite frame followed by an
+ordinary presentation could therefore expose an empty background.
+
+The prototype instead retains the native `$1432e` part-bank pointer updates and every
+repair geometry mutation, while gating `$176c6` during the selected drawing interval.
+The normal clipping call preserves its original return-slot depth, including its native
+clipped-out return. The `$e2fc` gate runs after native message expiry and refuel updates;
+when suppressing a picture, it samples the clock and bypasses drawing, buffer exchange,
+display waits and background copying. The `$e378` gate clears suppression before native
+counter/timeout/input/opponent/keyboard service, skipping the HUD draw for that picture.
+All native E296 register-save frames remain at their original depth. Pit abort also
+clears suppression. This is an extraction prototype, not a demonstrated full state or
+pixel-equivalence contract: skipped drawing-register outputs, HUD scratch fields,
+clipped calls, input/result histories and nonlocal exits still require verification.
+
+`PDRDROP1` reports suppression activity, selected dropped steps, suppressed bitmap calls,
+service-only continuations, rendered steps and last entry lateness. The read-only
+`check_repair_drop.py` pairs all 264 post-step observations and checks exact accounting,
+endpoint protection, nine suppressed bitmap calls per dropped step on this measured
+route, and cleared suppression after every step.
+
+The first guarded run (`timing-repairdrop2-a500`) preserves all **264 native geometry
+and deadline observations**: **234 steps draw, 30 presentations drop**, suppressing 270
+bitmap calls. All 30 drops rejoin native service and all step exits have suppression
+cleared. Whole invocation times are **8,260 / 8,840 / 7,960 / 7,980 ms** versus native
+**8,260 / 8,840 / 7,900 / 7,960 ms**. Three cases pass; item 0/direction 0 is 60 ms long,
+whose conservative 100-ms error still exceeds the unchanged 90-ms gate. It is a failure,
+not a rounded pass. All eight individual stage durations pass.
+
+The current candidate retains stage-one lateness across the stage transition: only a
+completed supported first stage can supply its intended endpoint as stage two's epoch.
+This one-shot bridge clears on consumption, fresh stage-one initialization and pit abort.
+The deliberate stage-two pause remains separately excluded, including any longer native
+wait. `--continuous-stages` checks this epoch transfer independently. The A500 `timing-repairdrop3-a500` run **passes all four complete cadence cases and all
+eight stage gates**, retaining all 264 native word-geometry/deadline observations and
+all four exact stage-epoch transfers. Whole durations are **8,240 / 8,840 / 7,860 /
+7,940 ms**, versus native **8,260 / 8,840 / 7,900 / 7,960 ms**. Maximum absolute whole
+error is 40 ms; with the unchanged conservative endpoint allowance, all errors are
+40–80 ms and also within 10%. Accounting remains 234 drawn / 30 dropped, 270 suppressed
+bitmap calls and 30 service-only continuations, with suppression clear at every post.
+Drops per stage are 2/5, 0/1, 4/6 and 6/6. No input or game-state fixture was added.
+
+This is a bounded cadence/geometry pass. Visual/buffer, skipped drawing-register/HUD
+scratch state, service/input/opponent continuity, native exit and 030 checks remain open.
+The 030 twin-selected run is in progress; this pit route must not be counted as new 3D
+renderer equivalence merely because CUSTOM4 is selected. The drop-disabled build was
+byte-identical before the additional stage-bridge correction; the normal build remains
+byte-identical afterward. A build requesting DROP without REPAIR is rejected.
+
+```sh
+python3 tools/check_repair_drop.py tmp/prof/timing-repairdrop3-a500
+python3 tools/check_repair_pacing.py --native-steps --continuous-stages tmp/prof/timing-repairloop3-native-a500 tmp/prof/timing-repairdrop3-a500
+```
+
 #### Pit message counter ownership correction
 
 The read-only `timing-message-ledger-world-a500` capture directly establishes the leak.

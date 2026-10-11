@@ -360,8 +360,18 @@ all 264 measured native per-step deadlines instead of uniformly dividing stage t
 all geometry/deadline checks pass, but A500 timing still fails in three cases (160–520 ms
 long). The next step is reducing or separating repair drawing while retaining logical
 updates, input/opponent service and nonlocal stack behavior; changing the deadline
-schedule alone did not remove the throughput constraint. The 030 pacing and message
-contracts remain open. Message lifetime itself still needs elapsed-time calibration, and ordinary world
+schedule alone did not remove the throughput constraint. A disabled-by-default
+TIMING_REPAIR_DROP prototype now separates late presentation from native service:
+234 rendered plus 30 dropped pictures preserve all 264 geometry/deadline observations,
+with suppression cleared at every step. Three A500 invocation gates pass; the fourth
+is 60 ms long and still fails the conservative gate. Carrying lateness across stage
+transitions resolves that measured failure: repairdrop3 passes all four A500 invocation
+and eight stage gates, all 264 geometry/deadline observations and exact stage-epoch
+transfers. Whole durations are within 0–40 ms of native, including the unchanged
+conservative uncertainty gate. It draws 234 presentations and drops 30. The 030 run is
+in progress. Visual/buffer equivalence, skipped drawing-register/HUD scratch state,
+input/opponent continuity, native exits and broader modes still remain open; both
+experimental repair switches stay disabled by default. Message lifetime itself still needs elapsed-time calibration, and ordinary world
 messages/other setters remain open; do not treat the ownership fix as full message timing. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The
 pilot stays disabled by default; the normal build is unchanged. Next audit the projection flag and matched native animation visibility,

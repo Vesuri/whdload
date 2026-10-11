@@ -17,7 +17,7 @@ def pause(stages):
     return 20*(stages[1][1]['body_entry_vbl']-stages[1][0]['v'][10])
 
 
-def check(reference, capture, native_steps=False):
+def check(reference, capture, native_steps=False, continuous_stages=False):
     refs, ref_tail = read(reference)
     actual, tail = read(capture)
     assert len(refs) == len(actual) == 4 and ref_tail == tail == 0, 'Need all four complete item/direction cases'
@@ -65,6 +65,8 @@ def check(reference, capture, native_steps=False):
             print(f'{key}, stage {index+1}: native {span(rstage)} ms, paced {span(stage)} ms, conservative error {error} ms')
             if not passed:
                 failures.append((key, index, error))
+        if continuous_stages:
+            assert ss[1][0]['pace'][2] == ss[0][-1]['pace'][4], 'Stage transition discarded accumulated lateness'
         original = 20*(ref['returned_vbl']-rs[0][0]['entry_vbl'])
         observed = 20*(run['returned_vbl']-ss[0][0]['entry_vbl'])
         error = abs(observed-original)+40
@@ -85,5 +87,7 @@ if __name__ == '__main__':
     parser.add_argument('capture', type=Path)
     parser.add_argument('--native-steps', action='store_true',
                         help='Require native per-step cumulative deadlines instead of the earlier uniform prototype')
+    parser.add_argument('--continuous-stages', action='store_true',
+                        help='Require stage two to inherit stage one’s intended completion time')
     args = parser.parse_args()
-    check(args.reference, args.capture, args.native_steps)
+    check(args.reference, args.capture, args.native_steps, args.continuous_stages)
