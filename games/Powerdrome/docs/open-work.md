@@ -588,7 +588,14 @@ accounted for by initial/final unsampled time of 80/20 versus 140/40 ms.
    interpolation calls and one restoration. Its 30 pending logical publications match
    the observed native calls exactly; missing and duplicate calls are rejected. A500
    remains in progress. Endpoint-only captures fail the missing-probe gate.
-2. Check deliberate presentation coalescing and displayed palette/buffer pairing.
+2. Check active-effect presentation coalescing and displayed palette/buffer pairing.
+   Ordinary flight allocates at most 32 movement steps (640 ms) before rendering;
+   the shortest regular fade interval is 1,160 ms. A longer physical stall alone does
+   not force multiple fade steps into one ordinary batch. Mode transfers remain separate.
+   `check_weather_effect_publication.py` audits the shorter effect publications instead:
+   the earlier cadence-test1 A500 omitted one of ten visible states; 030 repeated states
+   eleven times. Every draw uses the latest completed logical publication. That pair uses
+   deferred sound; current direct-sound coverage with draw probes remains required.
    Stored palette agreement is not scanout evidence. `weather_palette_state.py --require-restored` passes both cadence1 and current cadence2 CPU
    endpoints; invalid colours and unfinished transitions are rejected. Guarded probe
    generation and installed positive/negative/negative-zero caller identification are
