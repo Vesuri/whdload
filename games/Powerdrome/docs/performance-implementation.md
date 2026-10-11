@@ -1,6 +1,6 @@
 # Optional fast planar renderer
 
-Project status: completion-plan Phase C is complete. Work stopped before Phase D.
+Project status: completion-plan Phase D is complete. Work stopped before Phase E.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Completion-plan C1 retains a later display handshake for staged scenes: drawing

@@ -2,10 +2,22 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
-## Phase C complete — stopped before Phase D
+## Phase D complete — stopped before Phase E
 
-D1–D5 are confirmed. Phases A–C are complete. No Phase D–F work or release-default
-change has been made. The next phase, when requested, is D (A500 candidates).
+D1–D5 are confirmed. Phases A–D are complete. No Phase E–F work or release-default
+change has been made. The next phase, when requested, is E (bounded timing gates).
+
+**A500 unchanged at 11.404 fps**, reproducing 104 intervals in 456 fields in the
+prescribed 500-field Practice window. D1's four pipelined blitter clears regress
+to 104/494 = 10.526 fps (7.69% lower); the candidate is removed. It has no accepted
+twin result. D2's largest individual graphics call is BltBitMap at 2.580%; LoadView
+is 0.186%, and no traced VBL callback reaches 3%. D3's entire mutable dispatch setup
+is only 0.181% of track time, below the prerequisite even if removed for free.
+No A500 code change is retained. Measurements and reproduction details are in
+[Phase D](internals.md#phase-d-a500-measurements-and-decisions), with evidence under
+`tmp/phase-d/`. The normal build is restored byte-identically to the Phase D control.
+
+### Retained Phase C work
 
 C1 is complete and retained. Its normal/weather write audits have no unhandled
 operations. Staged drawing now defers the handshake until immediately before copy;

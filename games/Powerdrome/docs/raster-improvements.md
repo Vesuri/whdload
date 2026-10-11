@@ -1,6 +1,6 @@
 # Raster improvement plan and results
 
-Project status: completion-plan Phase C is complete. Work stopped before Phase D.
+Project status: completion-plan Phase D is complete. Work stopped before Phase E.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Scope: further optimize the existing planar fast-memory rasterizer behind `CUSTOM1=1`.
@@ -178,6 +178,11 @@ on 68000 and the address-only candidate sequence on 020/030/040/060.
 These small changes are supported by the matching-geometry raster cost comparison, but are
 not claims about physical accelerators or all racing workloads. The existing elapsed-time
 simulation, chip copy extent, guard/fallback decisions and WHDLoad cache policy are unchanged.
+
+Phase D also leaves native M1 spans unchanged. The entire mutable dispatch setup
+is only 0.181% of track time, so removing branch rewriting alone cannot meet its
+3% frame threshold. No qualifying M1 twin result justifies the conditional chip-code
+trial; see [Phase D measurements](internals.md#phase-d-a500-measurements-and-decisions).
 
 ## R5: selected change
 

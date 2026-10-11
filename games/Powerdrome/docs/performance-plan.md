@@ -1,6 +1,6 @@
 # Powerdrome performance implementation plan
 
-Project status: completion-plan Phase C is complete. Work stopped before Phase D.
+Project status: completion-plan Phase D is complete. Work stopped before Phase E.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 The optional implementation and its completed measurements are documented in
@@ -363,6 +363,10 @@ Investigate reusable endpoint/mask/address work, narrow versus wide spans and lo
 The two fixed-point extraction shifts alone cost 3.44% on the A500; preserve negative-value
 rounding and overflow semantics. Background filling is 8.45%; on the native chip route a
 blitter-fill experiment is separate from the fast-RAM route, where CPU filling is required.
+Completion-plan Phase D rejects the pipelined native-chip fill: 104/494 = 10.526 fps
+versus 104/456 = 11.404 fps, with 3.88% higher mean frame-cycle cost. Its early display
+wait consumes the clear saving; no blitter optimization is retained. See
+[Phase D measurements](internals.md#phase-d-a500-measurements-and-decisions).
 
 Keep geometry arithmetic/clipping changes behind separate switches. They are smaller than
 the scanline work and require signed/overflow equivalence models. Keep planar bitmap

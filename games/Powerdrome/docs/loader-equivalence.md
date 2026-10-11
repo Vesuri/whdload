@@ -1,6 +1,6 @@
 # Original/development loader equivalence
 
-Project status: completion-plan Phase C is complete. Work stopped before Phase D.
+Project status: completion-plan Phase D is complete. Work stopped before Phase E.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 The Copylock D2 question is resolved: its different return value has no effect on the

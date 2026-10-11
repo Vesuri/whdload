@@ -1,6 +1,6 @@
 # Powerdrome internals
 
-Project status: completion-plan Phase C is complete. Work stopped before Phase D.
+Project status: completion-plan Phase D is complete. Work stopped before Phase E.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Current measurements
@@ -131,7 +131,7 @@ above its p95; these are measured values, not a stationary scene benchmark.
 ## Phase C measurements and decisions
 
 Phase C is complete. C1 and C2 are retained; C3 needs no change; C4 is rejected.
-Work stopped before Phase D. Release defaults and WHDLoad cache policy are unchanged.
+Phase D is also complete. Release defaults and WHDLoad cache policy are unchanged.
 The Phase B table above remains the frozen comparison baseline.
 
 Final full-timing Practice throughput, NoCache, 500-field driving windows:
@@ -263,6 +263,126 @@ rejects missing/short dumps. Older M3 auxiliary dumps could retain unrelated scr
 contents after an unmapped slow-memory read; they are not used for C4 diagnostics.
 The earlier M3 driving counts used live chip-resident game/VBL addresses and the
 new control reproduces the full-timing 144/494 count.
+
+## Phase D: A500 measurements and decisions
+
+Phase D is complete. **A500 unchanged at 11.404 fps.** No renderer, timing, option
+or cache-policy change is retained. Phase E has not started.
+
+### Pipelined blitter clear (D1, rejected)
+
+The trial fills the four separate planar extents (rows 19–149, 5,240 bytes each)
+with D-only constant-color blits. It starts plane 0 at renderer entry, then planes
+1–3 after camera transformation, near clipping and projection. It owns the blitter,
+waits before reprogramming it, and drains the last plane before polygon drawing.
+Only the normal cockpit clear is eligible; the special-color early return stays
+native. Because this draws directly into the old front buffer, the display
+handshake must happen **before** the first blit, rather than after geometry.
+
+Both measurements use M1: PAL 68000, 512 KiB chip, 1.5 MiB slow, no fast RAM,
+WHDLoad NoCache, native timing and fixed Practice input (`CUSTOM5=2`). The trial
+was selected through `CUSTOM1=1`; the normal control has it off. Playback uses
+`SWAP_ONLY=1`, 500 fields from `$bc7c`; traces are separate 100-field captures
+from the same anchor. No trace-derived fps is used.
+
+| Configuration | Driving intervals/fields | fps | Complete traced frames | Mean cycles/frame | p95 cycles/frame |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Native control | 104/456 | 11.404 | 21 | 641,039.43 | 754,546 |
+| Pipelined blitter clear | 104/494 | 10.526 | 20 | 665,936.60 | 808,556 |
+
+Playback is **7.69% slower**, and mean completed-frame cost is **3.88% higher**,
+failing the required 3% improvement and non-regressing fps gate. Both windows
+have fixed input, but native frame-dependent simulation changes later scenes;
+these are route/frame costs, not an identical-polygon instruction comparison.
+
+The trace confirms 80 plane blits in the 20 complete trial intervals, with no
+native clear calls in the full trial trace. The work was replaced, not bypassed
+by a dormant option. Exclusive CPU instruction costs per complete frame explain
+why removing the clear does not help:
+
+| Work | Native cycles/frame | Trial cycles/frame |
+| --- | ---: | ---: |
+| CPU background clear | 52,964.19 | 0 |
+| Original display wait | 4,823.24 | 21.80 |
+| Earlier display wait | 0 | 57,788.10 |
+| Trial blitter polling | 0 | 8,767.30 |
+| Other trial wrapper/setup instructions | 0 | 2,975.30 |
+| Geometry instructions | 83,333.33 | 93,041.40 |
+
+The extra early handshake nearly consumes the whole removed CPU-clear cost.
+Blitter polling and setup add more work. Geometry also costs more in this route;
+the trace does not separate contention from changed scene inputs. Frame totals
+include interrupts; these instruction buckets are exclusive and do not include
+interrupt time inside the waits.
+
+The candidate was dropped after this one performance evaluation. No twin gate
+was run or passed for the rejected implementation. Its source and frozen slave
+remain only in ignored scratch evidence; the trial hooks and assembly flag are
+removed from the repository. The normal build is byte-identical to the Phase D
+control: SHA-256 `ca8639921c1d8c2781578a62a42003a6ba888990a4a22b8d4f82cc829be061f3`.
+
+### Individual Kickstart calls (D2, below threshold)
+
+The original A500 trace's complete track fields 191–499 contain 43,909,542 CPU
+cycles. The existing call-stack report splits the approximately 9.6% Kickstart
+share as follows. Figures are inclusive call costs; nested rows must not be summed.
+VBL server identities were checked against the snapshot's Exec VERTB list.
+
+| Call | Calls | Cycles | Mean cycles/call | Share of track window |
+| --- | ---: | ---: | ---: | ---: |
+| BltBitMap | 138 | 1,132,852 | 8,209.07 | 2.580% |
+| MakeVPort | 32 | 588,782 | 18,399.44 | 1.341% |
+| gameport.device VBL server | 309 | 517,616 | 1,675.13 | 1.179% |
+| LoadRGB4 | 16 | 460,792 | 28,799.50 | 1.049% |
+| MrgCop | 32 | 431,802 | 13,493.81 | 0.983% |
+| WaitBOVP | 16 | 240,596 | 15,037.25 | 0.548% |
+| Game VBL callback at `$5684` | 309 | 222,914 | 721.40 | 0.508% |
+| Unnamed VBL server | 309 | 134,716 | 435.97 | 0.307% |
+| VBeamPos | 1,425 | 126,292 | 88.63 | 0.288% |
+| LoadView | 85 | 81,598 | 959.98 | 0.186% |
+
+Interrupt-stack execution totals 1,604,382 cycles (3.654%), but contains several
+servers, game work and dispatch overhead; it is not one replaceable call.
+No individual identified OS call or VBL callback meets 3%, so D2 retains the OS
+paths. In particular, narrowing LoadView cannot recover the aggregate 9.6%.
+
+### Static chip-RAM span dispatch (D3, below prerequisite)
+
+The existing static implementation preserves the native span writers and the
+68000 row arithmetic. The difference is color dispatch and its return path.
+In the original trace, all mutable dispatch setup at `$1600c–$16020` costs
+79,494 of 43,948,270 track cycles: **0.181%**. The two branch writes at `$16012`
+and `$1601c` account for 48,684 cycles across 2,558 writes (0.111%). Even deleting
+the entire setup for free cannot meet the 3% frame threshold, and static dispatch
+still needs replacement setup and indirect span returns. This is an upper bound,
+not a measured static-raster speedup.
+
+There is no qualifying M1 twin result, so the plan's conditional chip-code trial
+is not pursued. The earlier 68000 address-loop refinement also failed its playback
+gate, but that fast-RAM result is not treated as a measurement of this M1 path.
+No static chip-code or further arithmetic experiment is retained.
+
+### Evidence and reproduction
+
+Evidence is under `tmp/phase-d/`: `baseline-fps`, `d1-fps`, `baseline-trace`,
+`d1-trace`, their frame/fill cost JSON, `d2-calls.json`, `kick-calls.txt`, and
+`d3-upper-bound.json`. Captures retain effective configuration and binary hashes.
+The D2/D3 input is `tmp/prof/practice-continuous-10s/trace.bin`.
+
+For the current unchanged M1 rate, freeze a fresh VERIFY build and run:
+
+```sh
+source amiga/env.sh
+make -C whdload verify
+SWAP_ONLY=1 FIELDS=500 ANCHOR=0xbc7c WHD_ARGS='CUSTOM5=2 NoCache' \
+  tools/fixed_window.sh tmp/phase-d-repeat tmp/build/Powerdrome-verify.slave
+make -C whdload all
+```
+
+The per-call attribution uses `tools/powerdrome_report.py` with the existing
+capture's slave, memory dump and `--fields 191-499 --top 90`. Frame-cycle evidence
+sums every instruction between successive `$bc7c` hits, excluding incomplete
+edge intervals. No further A500 optimization is queued by this phase.
 
 ## Inputs and loader
 

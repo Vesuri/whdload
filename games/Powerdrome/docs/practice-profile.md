@@ -1,6 +1,6 @@
 # Powerdrome practice departure profile
 
-Project status: completion-plan Phase C is complete. Work stopped before Phase D.
+Project status: completion-plan Phase D is complete. Work stopped before Phase E.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 CPU polygon drawing is the principal bottleneck during the track portion of this A500 run.
@@ -100,6 +100,11 @@ control, simulation, display updates, additional drawing and interrupt work. Kic
 includes library/system execution and interrupt handling. No individual unidentified track
 instruction exceeds 0.2% of the track total; the residual cost is distributed. The 0.09%
 interrupt-entry row is just the entry records, not the full cost of interrupt handlers.
+
+Phase D attributes the Kickstart share per call: BltBitMap is 2.580%, LoadView
+0.186%, and no individual traced VBL callback reaches 3%. Its pipelined blitter
+clear is rejected after lower fps and higher frame-cycle cost. The A500 remains
+at 104/456 = 11.404 fps; see [Phase D measurements](internals.md#phase-d-a500-measurements-and-decisions).
 
 ## Why polygon drawing is expensive
 

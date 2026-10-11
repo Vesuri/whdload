@@ -100,7 +100,7 @@ which has opponents on screen and is the heavier scene.
 
 ## Phase A: Consolidate the timing prototype (no behaviour change)
 
-Status: **A1 and A2 complete**, byte-equivalence gates passed. Phase B is also complete; Phase C is complete and Phases D–F remain untouched.
+Status: **A1 and A2 complete**, byte-equivalence gates passed. Phase B is also complete; Phases C and D are complete and Phases E–F remain untouched.
 See [open work](open-work.md) for the exact configuration and file hashes.
 
 **A1. Pick one release configuration.** Find the flag set behind the most recent complete
@@ -163,7 +163,7 @@ Commit B1–B3: "Add frame phase timer and baseline performance matrix".
 
 ## Phase C: 50 fps on 68020+ with fast RAM
 
-Status: **complete; stopped before Phase D**. C1's performance, 308-copy beam-ordering
+Status: **complete**. C1's performance, 308-copy beam-ordering
 and M4/M5/M7 twin gates pass. C2's specific code-write, twin and screenshot gates
 pass, with modest throughput gains. Both are retained in separate commits. C3
 needs no change: copy already uses aligned MOVEM blocks, HUD exceeds the staging
@@ -212,6 +212,12 @@ better with `CACHE`, and twins are clean. Otherwise drop it.
 Commit each retained item separately, for example "Overlap flip wait with fast-RAM drawing".
 
 ## Phase D: A500 (68000, chip only)
+
+Status: **complete; stopped before Phase E**. A500 unchanged at **11.404 fps**
+(104/456). D1’s pipelined blitter fill regresses to 104/494 = 10.526 fps and is
+removed. D2 has no individual OS call above 3%. D3’s removable dispatch setup is
+only 0.181% of track time, so the conditional chip-code trial is not pursued.
+See [Phase D measurements](internals.md#phase-d-a500-measurements-and-decisions).
 
 The aim is no regression and a correct feel. 50 fps is not reachable with this renderer on
 a 7 MHz 68000. Judge candidates by cycles per completed frame on a fixed-input M1 route,

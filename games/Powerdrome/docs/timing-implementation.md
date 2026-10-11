@@ -1,6 +1,6 @@
 # Timing implementation and validation
 
-Project status: completion-plan Phase C is complete. Work stopped before Phase D.
+Project status: completion-plan Phase D is complete. Work stopped before Phase E.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Phase A of the [completion plan](completion-plan.md) is complete. `TIMING_FULL=1`

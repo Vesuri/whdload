@@ -1,6 +1,6 @@
 # Gameplay coverage
 
-Project status: completion-plan Phase C is complete. Work stopped before Phase D.
+Project status: completion-plan Phase D is complete. Work stopped before Phase E.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 The coverage campaign is complete for the existing guarded fast planar renderer. Across
