@@ -536,6 +536,9 @@ period/phase policy remains to be chosen. Forecast activation is 120 ms late and
 370 ms late against their native deadlines. Final native state retains forecast flag 1
 and nonzero steering offsets despite inactive deadlines/effects.
 `timing-weather-native-a500-effects1` is running the complementary generation/palette/gear
-probe set. Its shared observations must match before treating it as the same episode.
+probe set. Its first 854 shared effect observations and initial weather state match the
+completed pass exactly. The observed positive target-gear lookup, seven successful
+generation/delay updates and twelve palette activations pass the native arithmetic/table
+checks. Full-window equality and negative completion remain pending.
 Both weather RNG helpers share the seed restored around logical world updates, so
 scheduling must preserve that ownership consistently. No weather correction is claimed yet.

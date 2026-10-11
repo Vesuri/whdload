@@ -3687,6 +3687,23 @@ across the transition, but helper-level ownership needs its separate probes.
 helpers. It requests the same 400-second window from forecast entry. Compare shared
 lifetime observations and initial state to establish whether the natural episode repeats
 before combining evidence; do not assume matching histories solely from equal settings.
+The live complementary pass now matches all 20 initial weather fields and its first
+**854 shared effect-entry/decrement observations**, including physical fields, clocks,
+state and captured registers, exactly against the completed transition pass. At that
+checkpoint the analyzer verifies the positive-transition target-gear table lookup,
+seven successful generation/lifetime assignments, seven delay selections/commits and
+twelve lifetime decrements/palette activations. Full-window equivalence and negative
+completion remain pending.
+
+Generation at `$bcea→$bd02` advances the native seed once, accepts the shifted result
+only when it is at most six, then masks it with five for the lifetime. `$bd02→$bd16`
+advances the seed a second time and selects delay `(seed >> 14) + 4`; `$bd1a` observes
+the committed delay. The analyzer checks both RNG advances and stored values. Target-gear
+helpers `$8a4c/$8a8e` load the track-indexed native tables at hunk `$2068/$204c`; their
+return probes are checked against the captured table words, not hardcoded gear values.
+Palette activation is separately checked at `$112f4→$112fa`. The completed transition
+report remains byte-identical after these analyzer extensions; runtime checks are being
+applied to the complementary pass as its observations arrive.
 
 `tools/report_weather.py CAPTURE` checks observed before/after arithmetic for forecast
 and active deadlines (including native duration RNG arithmetic), fade increments/decrements

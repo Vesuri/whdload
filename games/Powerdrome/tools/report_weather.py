@@ -9,6 +9,7 @@ from collections import Counter
 import json
 from pathlib import Path
 import re
+import struct
 from weather_state import FIELDS, PROBES, parse_values
 
 # Before/after instruction boundaries, expected mutated field(s).
@@ -21,6 +22,8 @@ PAIRS = {
     0xbd4c: (0xbd48, 'transition', lambda b: (b['transition']+1)&0xffff),
     0x112f0: (0x112e6, 'effect_lifetime', lambda b: (b['effect_lifetime']-1)&0xffff),
     0x112fa: (0x112f4, 'palette_active', lambda b: 0xffff),
+    0xbd02: (0xbcea, 'rng', lambda b: (b['rng']*31415+1)&0xffff),
+    0xbd16: (0xbd02, 'effect_lifetime', lambda b: b['d0']&0xffff),
     0xbd1a: (0xbd16, 'effect_delay', lambda b: b['d0']&0xffff),
 }
 
@@ -40,7 +43,7 @@ def report(root):
     alignment={s['vbl']-field for field,_,s in events}
     assert len(alignment)==1, 'Guest/debugger field alignment changed'
     pending={};counts=Counter();transitions=[]
-    starts={v[0] for v in PAIRS.values()} | {0xe278}
+    starts={v[0] for v in PAIRS.values()} | {0xe278,0x8a4c,0x8a8e}
     for field,off,s in events:
         if off in starts: pending[off]=(field,s)
         if off in PAIRS:
@@ -48,7 +51,14 @@ def report(root):
             if before not in pending: continue # capture may begin inside a mutation
             oldfield,b=pending.pop(before)
             assert s[key]==expected(b),(hex(off),key,b[key],s[key],expected(b))
+            if off==0xbd02:
+                candidate=s['rng']>>7
+                assert candidate<=6 and s['d0']&0xffff==candidate&5, 'Incorrect accepted effect selection'
+            if off==0xbd16:
+                assert s['rng']==(b['rng']*31415+1)&0xffff, 'Incorrect effect-delay RNG'
+                assert s['d0']&0xffff==(s['rng']>>14)+4, 'Incorrect effect-delay selection'
             if off==0xe23c:
+
                 # Native 8ae6 multiplies signed 16-bit operands, doubles the
                 # 32-bit product, and returns its high word. The caller masks
                 # that random result to unsigned before multiplying by four.
@@ -64,6 +74,15 @@ def report(root):
                                         loop=b['loop'],before=b['transition'],after=s['transition']))
             if off==0x112f0: assert b['effect_lifetime']>0
             counts[f'{before:x}->{off:x}']+=1
+        if off in (0x8a5e,0x8aa0):
+            before,table=(0x8a4c,0x2068) if off==0x8a5e else (0x8a8e,0x204c)
+            if before in pending:
+                _,b=pending.pop(before)
+                assert s['track']==b['track']
+                game=int((root/'game-base.txt').read_text(),0)
+                expected=struct.unpack_from('>H',(root/'chip.bin').read_bytes(),game+table+2*s['track'])[0]
+                assert s['target_gear']==expected, 'Gear differs from native track table'
+                counts[f'{before:x}->{off:x}']+=1
         if off==0xe294 and 0xe278 in pending:
             pending.pop(0xe278)
             assert (s['transition'],s['active_deadline'],s['forecast_deadline'],s['effects_enabled'])==(0xfff1,0xffffffff,0xffffffff,0)
