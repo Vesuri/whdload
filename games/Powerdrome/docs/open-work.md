@@ -449,3 +449,15 @@ comparison from the first step: different initial-pit durations produced differe
 opponent/RNG histories. No fields are excluded to obtain a pass. This does not finish
 F7 or certify full opponent/effect equivalence, longer windows, stalls, capacity or
 remaining CPU configurations. See the bounded accelerator matrix in timing-implementation.
+
+The synchronized matrix now also covers A500 without fast RAM, 68000 with 4 MB fast
+RAM and both renderer paths, and A1200/68EC020 native/fast. All ten configurations
+match 502 common sampled player/engine/RNG states and 111 control/input/fuel updates.
+The five new cases add 96 clean twins (454 across both synchronized batches). New
+per-step delay accounting exposes responsiveness limits hidden by zero endpoint debt:
+A500 reaches 780 ms observed delay and 160 ms retained debt; 68000 fast rendering with
+twins reaches 1,120 ms and 380 ms. Both retain the elapsed work and return to zero
+retained debt, although unsampled elapsed time can remain at the endpoint. The 020
+native/fast-twin maxima are 400/580 ms. These instrumented maxima are not release
+performance figures or proof of long-run capacity. Controlled stalls, 60/600-second
+routes, further configurations and the remaining calibration/lifecycle work stay open.

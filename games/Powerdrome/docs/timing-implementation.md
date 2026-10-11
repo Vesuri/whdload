@@ -3153,7 +3153,92 @@ bash tools/timing_cpu_matrix.sh tmp/prof/timing-cpumatrix2-sync FROZEN_SLAVE
 `REQUIRE_PIT_SYNC=0` permits reproducing the unsynchronized diagnostic batch; it does
 not relax the cross-state gates. The driver stops at a failed check and keeps the
 completed captures. Use new output directories and never run two captures concurrently.
-This bounded matrix does not complete F7: 68000/020 and further renderer combinations,
+This bounded matrix does not complete F7: further renderer/memory combinations,
 60/600-second routes, controlled render rates, deliberate stalls, long-run capacity,
 full opponent/effect states and lifecycle coverage remain. A500 response/resource/effect
 calibration remains an independent requirement.
+
+
+### A500 and 68020 matrix extension
+
+`CASE_SET=baseline` adds five cases using the same frozen synchronized-pit artifact.
+`TIMING_REFERENCE` reuses a completed reference only after comparing its slave bytes
+against the frozen matrix input. The baseline run uses the existing 030 fast reference;
+no new production code or calibration constants are introduced.
+
+| Configuration | 20-ms steps | 90-ms controls | Initial → final unsampled time | Maximum sampled step delay | Maximum retained debt | Clean twins |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A500, 512 KB chip / 1.5 MB slow, native | 504 | 112 | 140 → 60 ms | 780 ms | 160 ms | — |
+| 68000, same plus 4 MB fast, native | 507 | 112 | 140 → 0 ms | 780 ms | 0 ms | — |
+| 68000, same plus 4 MB fast, fast/twins | 505 | 112 | 320 → 220 ms | 1,120 ms | 380 ms | 27 |
+| A1200 / 68EC020, 2 MB chip / 4 MB fast, native | 504 | 112 | 80 → 0 ms | 400 ms | 0 ms | — |
+| A1200 / 68EC020, same, fast/twins | 505 | 112 | 140 → 40 ms | 580 ms | 0 ms | 69 |
+
+The 68000 and 020 cases use their model-default CPU clocks; effective configurations
+and emulator logs are retained with the captures. All five windows span exactly 500
+physical PAL fields. Initial/final retained debt and final assigned unfinished steps
+are zero. The 504–507 completed steps follow the same initial/final unsampled-time
+identity as the accelerator table. Maximum allocations are 32 steps on all three
+68000 cases, 16 on 020 native and 25 on 020 fast/twins.
+
+`timing-cpumatrix3-baseline` passes **504 common sampled player/engine/RNG states**
+and **112 common control/input and fuel updates** against the existing 030 reference.
+All 15 brake events and six input events are accounted for, and independent scalar/vector
+arithmetic checks pass. The new fast-renderer cases add **96 clean twins**, with unchanged
+raster code; both final snapshots are inside further draws, not teardown checks.
+Combining this batch with the five synchronized accelerator cases also passes the strict
+comparison: **502 common simulation-state samples and 111 common control/input and fuel
+updates across all ten configurations**, with **454** clean twins in the synchronized
+batches. Full opponent arrays and unobserved state still require their own comparisons.
+
+```sh
+CASE_SET=baseline TIMING_REFERENCE=tmp/prof/timing-cpumatrix2-sync/030-25-fast \
+  bash tools/timing_cpu_matrix.sh tmp/prof/timing-cpumatrix3-baseline FROZEN_SLAVE
+```
+
+`CASE_SET=accelerators` remains the default; `CASE_SET=all` runs all ten cases from
+scratch. A supplied reference is optional. The same initial-pit synchronization caveat
+and remaining F7 requirements apply. These runs show retained-time correctness even
+when the slow configurations fall behind temporarily; they do not prove acceptable
+interactive latency or sustained capacity over 60/600 seconds. The fast/twin workload
+must not be mistaken for an uninstrumented renderer performance comparison.
+
+### Sampled delay accounting
+
+`tools/check_timing_capacity.py` pairs each `$cedc` world-end observation with the
+actual guest VBL count (`PDINITIAL_EVENT`), allocator state (`PDSESSION_EVENT`) and
+world cursor (`PDW20_EVENT`). It requires a complete unpaused single-epoch capture,
+an unchanged session/discard ledger, consecutive world timestamps, and a physical VBL
+window matching the configured field count. At every observed world-end boundary it
+independently checks this identity, in the game's 5-ms clock units:
+
+`physical_clock - step_timestamp = physical_clock - last_allocator_sample + retained_debt + (assigned_steps_left - 1) × 4`
+
+The current step is observed before the world-end hook advances its cursor. Thus the
+reported delay measures how far that step's timestamp trails physical time, not how
+long the step took to execute. The checker reports maximum observed delay, retained
+debt, allocation size and the three components at the peak. A zero endpoint debt does
+not imply zero latency: elapsed time since the last allocation has not entered that
+debt counter yet. Per-step maxima do not bound unobserved rendering intervals or prove
+long-term capacity; fast paths here include the extra workload of drawing twins.
+
+The earlier synchronized accelerator captures pass this ledger: maximum sampled delay
+is **260 ms** on 030 fast, **220/240 ms** on 040 native/fast, and **200/200 ms** on
+060 native/fast. Retained debt is zero at every sampled boundary, with maximum
+allocations of 12, 10, 12, 11 and 11 steps respectively.
+
+The synchronized A500 extension exercises the actual allocation cap. `a500-native`
+reaches **780 ms** of sampled delay at field 451: **0 ms** since the last allocation,
+**160 ms** retained beyond the work cap and **620 ms** in later assigned steps.
+It reaches the 32-step cap, then has zero retained debt at the endpoint. With 4 MB fast
+RAM and native rendering, maximum sampled delay is also **780 ms**; that peak consists
+of **180 ms** since allocation plus **600 ms** in later assigned steps, with no sampled
+retained debt. The 68000 fast-renderer/twin run reaches **1,120 ms** at field 458:
+**160 ms** since allocation, **380 ms** retained debt and **580 ms** in later assigned
+steps. It also ends with zero retained debt but still has **220 ms** since its last
+allocation. These are significant responsiveness limits, not a loss of logical time
+or proof that uninstrumented fast rendering has the same delays.
+
+```sh
+python3 tools/check_timing_capacity.py CAPTURE...
+```
