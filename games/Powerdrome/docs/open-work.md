@@ -734,3 +734,10 @@ interpolation and restoration. They include caller/arguments and all 16 source/d
 colours, follow live pointers and guard reads by captured memory bounds. Formatting/schema
 checks pass; live integration remains pending after the ongoing full-cycle pair. No
 running capture tool or observation scheme was changed.
+
+
+Palette caller identification now follows the installed fade hook and finds the three
+owned positive/negative/negative-zero calls in both CPU snapshots. The probe schema
+includes the guarded parent return needed to distinguish these from unrelated native
+interpolation calls. Damaged hook/target/restore evidence is rejected. Per-call colour
+validation remains pending after the running full-cycle regression.

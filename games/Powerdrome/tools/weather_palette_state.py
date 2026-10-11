@@ -91,7 +91,7 @@ PROBES = (0x17306, 0x173a8, 0x17062, 0x1708c)
 REGISTERS = ('d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7',
              'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'sp')
 EVENT_FIELDS = ('clock', 'track', 'view', 'transition', 'transient', 'source_colour',
-                'saved_pointer', 'current_pointer', 'restore_source', 'return_address',
+                'saved_pointer', 'current_pointer', 'restore_source', 'return_address', 'parent_return',
                 *REGISTERS, *(f'saved_{i}' for i in range(16)),
                 *(f'current_{i}' for i in range(16)), *(f'restore_{i}' for i in range(16)))
 
@@ -114,13 +114,13 @@ def probe_command(game, offset, chip_bytes, other_base, other_bytes):
              'if ' + valid('$pwp_map', 8),
              'set $pwp_current = *(unsigned int*)($pwp_map+4)',
              'set $pwp_restore = ' + ('(unsigned int)$a2' if restore else '0')]
-    guard = valid('$pwp_saved', 32) + ' && ' + valid('$pwp_current', 32) + ' && ' + valid('(unsigned int)$sp', 4)
+    guard = valid('$pwp_saved', 32) + ' && ' + valid('$pwp_current', 32) + ' && ' + valid('(unsigned int)$sp', 8)
     if restore:
         guard += ' && ' + valid('$pwp_restore', 32)
     lines += ['if ' + guard]
     values = [f'*(unsigned int*){game + 0xf96:#x}']
     values += [f'*(unsigned short*){state + off:#x}' for off in (0x118, 0xaa, 0x4c6, 0x4d0, 0x4b6)]
-    values += ['$pwp_saved', '$pwp_current', '$pwp_restore', '*(unsigned int*)$sp']
+    values += ['$pwp_saved', '$pwp_current', '$pwp_restore', '*(unsigned int*)$sp', '*(unsigned int*)($sp+4)']
     values += [f'(unsigned int)${reg}' for reg in REGISTERS]
     values += [f'*(unsigned short*)($pwp_saved+{2*i})' for i in range(16)]
     values += [f'*(unsigned short*)($pwp_current+{2*i})' for i in range(16)]
@@ -137,6 +137,41 @@ def parse_values(text):
     values = list(map(int, text.split()))
     assert len(values) == len(EVENT_FIELDS), 'Incomplete palette probe row'
     return dict(zip(EVENT_FIELDS, values))
+
+
+def owned_fade_returns(chip, code, game, base):
+    """Identify installed positive/negative/negative-zero presentation call sites."""
+    from weather_fade_state import locate
+    record = locate(chip, code, game, base)
+    assert record is not None, 'Logical fade hook absent'
+    start = struct.unpack_from('>I', chip, game + 0xbd1c)[0] - base
+    end = record - base
+    assert 0 <= start < end < len(code) and end - start < 1024
+    matches = {}
+    for pos in range(start, end, 2):
+        if code[pos] != 0x61:
+            continue
+        short = struct.unpack_from('>b', code, pos + 1)[0]
+        displacement = short or struct.unpack_from('>h', code, pos + 2)[0]
+        target = pos + 2 + displacement
+        ret = pos + (2 if short else 4)
+        if not 0 <= target <= len(code) - 6 or code[target:target + 2] != b'\x4e\xf9':
+            continue
+        native = struct.unpack_from('>I', code, target + 2)[0] - game
+        if native == 0x8a1a:
+            kind = 'positive'
+        elif native == 0x8a60:
+            if code[ret:ret + 2] == bytes.fromhex('301f'):
+                kind = 'negative'
+            else:
+                assert code[ret:ret + 4] == bytes.fromhex('3d5f04c6'), 'Unknown negative-finish restore'
+                kind = 'negative_zero'
+        else:
+            continue
+        assert kind not in matches.values(), 'Ambiguous owned fade call'
+        matches[base + ret] = kind
+    assert set(matches.values()) == {'positive', 'negative', 'negative_zero'}, 'Incomplete owned fade caller set'
+    return matches
 
 
 if __name__ == '__main__':

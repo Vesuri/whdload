@@ -4319,6 +4319,13 @@ pointers emit `PDWPALETTE_INVALID` instead of stale or unbounded data. Only debu
 convenience variables are assigned. Command formatting/schema checks pass against the
 completed pair's memory layout. Live GDB execution, caller classification and per-call
 verification remain pending; the running full-cycle sampler has not been modified.
+The prepared schema also reads the guarded parent return address at stack `+4`.
+`owned_fade_returns` follows the live `$bd1a` hook and identifies exactly the installed
+positive, negative and negative-zero native helper calls. Initial/final snapshots on
+both CPUs identify all three; altered installed hook, positive native target and
+negative-zero restore evidence are rejected. This enables classification of interpolation
+calls by both native and wrapper return addresses, instead of assuming every `$17306`
+call belongs to logical weather. Live interpolation validation remains pending.
 
 The next presentation checks should proceed in this order:
 
