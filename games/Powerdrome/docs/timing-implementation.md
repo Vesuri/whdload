@@ -3818,6 +3818,13 @@ resource precondition check, not an audio playback or timing test. The completed
 `timing-weather-cadence-test1` pair has the smaller 266,400-byte allocation and a null
 optional sample table at both endpoints on both CPUs; the availability gate rejects it.
 The positive larger-memory path remains unvalidated until a corresponding run completes.
+The same module prepares read-only entry/exit probes at `$17836/$178e6`, including
+all general registers and the stack return address. It identifies the installed weather
+wrapper from the live `$bc8a` and `$112e6` hooks, its branch to the native audio helper,
+and its full-register restore. Initial/final snapshots on both CPUs identify one caller;
+corrupted hook, target and restore evidence are rejected. This avoids classifying other
+channel-3 sounds as weather solely by arguments. Probe integration and live entry/exit
+validation remain pending; the running full-cycle sampler has not been changed.
 
 This is separate from the renderer's palette restoration at `$117c8–$117d4`, which
 calls `$f914` when `state+$4d0` is set. Sound validation must check sample/period/volume,
