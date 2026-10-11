@@ -18,8 +18,15 @@ Evidence is under `tmp/phase-c/`; the full table and gate counts are in internal
 
 C3 is complete with no code change: copy already uses aligned ten-register MOVEM
 blocks; HUD writes rows 156–199 outside the copied rows 19–153 and uses blits;
-presentation including LoadView is below the 3% threshold. C2 (static raster
-routing for native fallbacks) and C4 (stock A1200 code placement) remain open.
+presentation including LoadView is below the 3% threshold.
+C2 is complete and retained. Every polygon uses installed static code on 68020+,
+including native bitmap fallbacks. The 200-field departure/track audit reports
+zero game-code writes and explicit pit/render/driving coverage. Pit/title images
+are pixel-identical; M4/M5/M7 twins pass with nonzero staged-scene coverage. All
+NoCache throughput comparisons improve; cached M6/M7 remain at 49.098 fps.
+C2 is retained for its specific no-SMC correctness gate, with modest performance
+gains reported rather than claiming the general 3% optimization threshold.
+Evidence is under `tmp/phase-c/c2/`. C4 remains open.
 No Phase C gate has failed.
 
 ### Completed baseline gates
@@ -102,9 +109,10 @@ and 17.91 → 42.99 on 060/50, including the selected raster refinement; these a
 to the requested clock. Physical-board validation is outside the selected scope.
 
 Cache selection is left to the user's standard WHDLoad `CACHE` and `DCACHE` options.
-There is no custom cache toggle or policy in either build. The native fallback still
-rewrites two branch displacements; these results do not certify every user-selected
-cache configuration. Shared KickEmu startup remains unmodified.
+There is no custom cache toggle or policy in either build. Native routing still
+rewrites two branch displacements when static code is disabled; C2 removes those
+writes from 68020+ fallbacks with installed static code. These results do not
+certify every user-selected cache configuration. Shared KickEmu startup remains unmodified.
 
 MMU testing also corrected the development loader's invalid DOS launch arguments and
 exposed two register-comparison cases: an already-identical numeric value resembling a

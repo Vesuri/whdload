@@ -3,6 +3,12 @@
 Project status: completion-plan Phase C is in progress. Phases A and B are complete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
+Completion-plan C2 now routes fallback polygons through installed static raster
+code on 68020+, keeping their native bitmap pointers. Its M4 departure/track audit
+has zero observed game-code writes; pit/title images and M4/M5/M7 twins pass.
+This does not change WHDLoad cache selection or certify physical hardware.
+
+
 Current selected-path timings, including the completed local raster refinement, are in the
 [raster report](raster-improvements.md). The matrix below isolates the preceding base implementation.
 
@@ -40,8 +46,11 @@ All three reported only these instruction modifications, with no unhandled memor
 
 The twin capture intentionally exercises the native writers as its reference. The copied
 fast rasterizer uses fixed span loops and remains byte-identical across its captures.
-The fallback is still needed for title/pit/unsupported scenes. The audit describes where
-native self-modification remains; it does not change the user's cache selection.
+Title/pit/unsupported scenes retain native bitmap rendering, but C2 routes their
+polygons through static code on 68020+ when that code is installed. Its 200-field
+Practice trace reports zero game-code writes. Native self-modification remains
+with the option off, on 68000/68010 fallbacks and in deliberate twin references.
+The user's cache selection is unchanged.
 
 A static review of absolute writes also found embedded mutable data, including the word at
 `$17510` and audio state near `$17b18`, `$17efa` and `$18036`. Data inside a code hunk is not

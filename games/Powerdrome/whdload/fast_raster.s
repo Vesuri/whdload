@@ -146,6 +146,15 @@ install_raster
  move.l a3,d0
  add.l #$15ee8-RASTER_START,d0
  move.l d0,2(a0)
+ ; Once static code exists, 68020+ fallbacks must use it too. Their native
+ ; bitmap/edge pointers remain unchanged; only staged scenes redirect pixels.
+ ; This removes the original per-polygon branch writes from pit/title/weather.
+ move.l (4).w,a0
+ btst #AFB_68020,AttnFlags+1(a0)
+ beq.s .done
+ lea routed_poly(pc),a0
+ lea raster_always(pc),a1
+ move.l a1,2(a0)
 .done
  movem.l (sp)+,d0-d7/a0-a6
  rts
@@ -164,9 +173,11 @@ raster_dispatch
  dc.l 0
  jmp RASTER_LOOP-$1608c(a1)
 
+raster_always dc.w 1
+
 routed_poly
  ; Polygon entry overwrites NZVC before its first conditional branch; X is retained.
- dc.w $4a79 ; tst.w perf_active, address filled at installation
+ dc.w $4a79 ; tst.w perf_active (68000) or raster_always (020+ with code)
  dc.l 0
  beq.w native_poly
 fast_poly

@@ -31,6 +31,8 @@ decoded = {}
 executed = set()
 writes = Counter()
 unsupported = Counter()
+route_offsets = {0x14764: 'pit_motion', 0x10df2: 'scene_render', 0xbc7c: 'driving_present', 0x1067e: 'title_present', 0x112f4: 'weather_draw'}
+route_hits = Counter()
 # All memory-writing 68000 operations with an explicit destination.
 writers = set('move movem movep clr neg negx not add addi addq addx sub subi subq subx and andi or ori eor eori bchg bclr bset tas asl asr lsl lsr rol ror roxl roxr abcd sbcd nbcd'.split())
 readonly = set('cmp cmpa cmpi cmpm tst btst muls mulu divs divu chk lea pea jmp jsr'.split())
@@ -56,6 +58,8 @@ for field in trace.fields:
     for pc, cycles, regs in trace.instructions(field):
         if pc is None or not base <= pc < base+size:
             continue
+        if pc-base in route_offsets:
+            route_hits[route_offsets[pc-base]] += 1
         if pc not in decoded:
             ins = next(md.disasm(chip[pc:pc+22], pc), None)
             assert ins, f'Undecodable executed instruction {pc-base:#x}'
@@ -88,6 +92,7 @@ for field in trace.fields:
                 writes[(pc-base, byte-base)] += 1
 hits = [(pc, dest, n) for (pc, dest), n in writes.items() if base+dest in executed]
 print(json.dumps({'fields':len(trace.fields), 'executed_instructions':len(decoded),
+ 'route_anchors': dict(route_hits),
  'instruction_write_bytes':[{'writer':hex(pc),'target':hex(dest),'count':n} for pc,dest,n in sorted(hits)],
  'other_written_hunk_bytes':len({dest for pc,dest in writes if base+dest not in executed}),
  'unhandled_memory_operations':[{'pc':hex(pc),'instruction':name,'count':n} for (pc,name),n in sorted(unsupported.items())]}, indent=2))

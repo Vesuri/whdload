@@ -186,11 +186,39 @@ VERIFY path retains the early wait. Production staged drawing defers it to copy.
 The CPU audit separately reports blitter-register writes; it does not claim CPU
 trace coverage of DMA or unexecuted routes.
 
+### Static raster routing (C2, retained)
+
+The candidate uses static raster code for every polygon on 68020+ when that code
+is installed, including scenes that retain native chip bitmap and edge pointers.
+68000/68010 retain their previous staged-only routing. Bitmap-only diagnostic
+modes do not claim that static code is installed.
+
+The M4 200-field Practice trace from `$14764` contains 16 subsequent pit-motion
+entries, 28 renderer entries and 17 driving presentations. The code-write audit
+reports zero writes to executed game instructions and no unhandled operations;
+the reference rewrites each native branch displacement 313 times. The initial
+pit and title screenshots are pixel-identical. Evidence is under `tmp/phase-c/c2/`.
+M4/M5/M7 twins complete 16/26/29 staged scenes in 100 fields each, with zero
+pixel, register/CCR, scratch or guard failures and unchanged copied raster code.
+All NoCache throughput comparisons improve; CACHE improves on M5 and holds the
+M6/M7 baseline. These small gains are not claimed as a 3% performance optimization:
+C2 is retained under its specific no-self-modifying-code correctness gate.
+
+| Machine | WHDLoad | C1 intervals/fields | C2 intervals/fields | fps | Change |
+| --- | --- | ---: | ---: | ---: | ---: |
+| M4 | NoCache | 238/495 | 240/494 | 24.040 → 24.291 | +1.04% |
+| M5 | CACHE | 382/499 | 391/499 | 38.277 → 39.178 | +2.36% |
+| M5 | NoCache | 382/499 | 391/499 | 38.277 → 39.178 | +2.36% |
+| M6 | CACHE | 490/499 | 490/499 | 49.098 → 49.098 | +0.00% |
+| M6 | NoCache | 443/499 | 452/499 | 44.389 → 45.291 | +2.03% |
+| M7 | CACHE | 490/499 | 490/499 | 49.098 → 49.098 | +0.00% |
+| M7 | NoCache | 448/499 | 457/499 | 44.890 → 45.792 | +2.01% |
+
 ### Copy, HUD and presentation assessment (C3)
 
 No C3 code change is justified by the prescribed candidates. Copy already uses
-ten-register, 40-byte MOVEM blocks for the 21,600-byte extent. Both observed bitmap
-bases, the 760-byte copy offset and the 8,000-byte plane stride are longword-aligned.
+ten-register, 40-byte MOVEM blocks for the 21,600-byte extent. Both bitmap bases in all seven M4–M7 C1 performance captures, the 760-byte copy
+offset and the 8,000-byte plane stride are longword-aligned (`c3-alignment.json`).
 HUD writes extend outside rows 19–153, failing the plan's prerequisite for staging
 HUD in that extent; it also uses the blitter. Leave it native. B2 measures the whole
 presentation call, including LoadView, at about 0.11 ms on M6/M7, below 1% of a frame

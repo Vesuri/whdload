@@ -13,6 +13,10 @@ ordering checks and accelerator gains are in [Current measurements](internals.md
 68000 systems. It retains the game's planar format, native double buffering and original
 simulation/update order. It does not introduce chunky pixels, a new timestep or a frame cap.
 
+On 68020+ with static code installed, fallback scenes also use that raster code,
+drawing directly to their native chip bitmap. Only supported cockpit scenes stage
+pixels. On 68000/68010 the previous staged-only code routing is retained.
+
 ## Implemented path
 
 The slave requests 128 KiB of guest expansion in addition to KickEmu's 256 KiB. Before
@@ -34,7 +38,7 @@ The enabled sequence is:
 3. Keep the native edge table. VERIFY can optionally stage its 816 bytes and redirect
    the pointer at game `$12` for isolated experiments.
 4. Invoke the native scene renderer once, with its CPU polygon routine routed to fast code.
-5. Transfer rows 19–153 to the native chip back buffer: 21,600 bytes. The block-copy loop
+5. Complete the display handshake, then transfer rows 19–153 to the native chip back buffer: 21,600 bytes. The block-copy loop
    uses ten registers per `MOVEM`, retaining the 8,000-byte plane stride.
 6. Restore the draw pointer, clear-cache pointer and relocated output pointers. The
    scratch experiment also restores the native edge table and pointer.
@@ -63,12 +67,13 @@ This replaces the original branch-displacement writes at `$16080/$1608a` in the 
 Verification checks that the entire copied rasterizer, loops and dispatch table remain
 unchanged during captures. Cache selection belongs to the user's WHDLoad `CACHE` and
 `DCACHE` options; neither build adds a custom cache policy. The
-[accelerator checks](accelerator-cache-testing.md) document the remaining native branch
-rewriting and the limits of the measured configurations.
+[accelerator checks](accelerator-cache-testing.md) document native branch rewriting
+with static routing disabled, C2’s write-free route and the measurement limits.
 
 The original game hunk and other allocations stay in chip RAM. The normal option moves only the audited bitmap and copied rasterizer.
 The optional VERIFY scratch experiment also moves the CPU-only edge table. This keeps their contributions separately measurable.
-The native polygon trampoline remains available for unsupported scenes and verification.
+The native polygon trampoline remains for 68000/68010 fallbacks, diagnostic modes
+without static code and verification references.
 Return normalization also handles `a4` retaining the colour-table pointer after empty scanlines.
 On 68010 and later, the wrapper uses `MOVE CCR` rather than privileged `MOVE SR` when saving
 condition codes; installation changes are flushed through WHDLoad's patch service.

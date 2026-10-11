@@ -165,7 +165,8 @@ Commit B1–B3: "Add frame phase timer and baseline performance matrix".
 
 Status: **in progress**. C1 passes and is retained. C3 is assessed with no change:
 copy already uses aligned MOVEM blocks, HUD exceeds the staging extent, and LoadView
-is below threshold. C2 and C4 remain. See [measurements](internals.md#phase-c-measurements-and-decisions).
+is below threshold. C2 passes its specific code-write, twin and screenshot gates and is retained;
+its modest throughput gains are reported separately. C4 remains. See [measurements](internals.md#phase-c-measurements-and-decisions).
 
 Work through these in order of their B2 phase share. Measure each one on M4–M7 and keep it
 only if it measures better.
