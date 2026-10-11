@@ -26,7 +26,8 @@ scene. One heavy render costs about 1.03M main-context cycles (13 fields).
 | SIM60 A500, type-10 route 600–9212, per interval | 52.3–64.5 | 0.43–1.60 |
 | SIM60 68020 + fast RAM, type-10 1800–2400 | 60.20 | 9.23 |
 | Native 68020 + fast RAM, frame 90 | 11.4 (game runs 2.3× fast) | 11.4 |
-| SIM60 68040/25, 68060/50 | see internals (step 0) | |
+| SIM60 68040/25 + fast RAM, type-10 1800–2400 | 59.90 | 29.05 |
+| SIM60 68060/50 + fast RAM, type-10 1800–2400 | 59.90 | 29.35 |
 
 The model `fps ≈ (60 × 97.4k − R × 90.0k) / 1.03M` for tick rate R reproduces
 the measured A500 rate at R = 60 (0.43). It predicts 3.1 / 3.9 / 4.4 / 4.8 fps
@@ -194,8 +195,13 @@ replacement is not faster.
 
 ### Step 6: Fast-CPU ceiling
 
-On the 68030/68040/68060 matrix, check whether pictures hit the field cap.
-If not, find out whether chip RAM or the blitter limits them (playbook §11: a
+The 68040/25 and 68060/50 both present about 29 pictures/s (above) with
+pending updates 0→1. Doubling the CPU gains 0.3 fps, so each picture takes two
+fields for a reason other than CPU speed. The suspects are a frame just over
+one field (blitter or chip RAM), or the VBL wait at $1c84c plus the buffer
+handshake costing an extra field. Profile one 68060 frame against the field
+boundary first: this is the main obstacle to 50/60 fps. Also run the
+68030/68040/68060 matrix, and find out whether chip RAM or the blitter limits it (playbook §11: a
 faster CPU does not make chip RAM faster). Profile with `SWAP_ONLY`. Check
 caches. Do not chase CPU savings that the bus erases.
 
