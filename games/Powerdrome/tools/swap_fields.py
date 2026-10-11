@@ -4,6 +4,7 @@ Independent validation of the instruction-trace frame marker.
 Only debugger convenience variables change; target memory/registers are read-only.
 """
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -43,6 +44,11 @@ probe_tests = ''.join(f'if $pc == {r["game"][0]+x:#x}\nprintf "PDEVENT %d {x:#x}
 state = r['game'][0] + 0xa6e
 state_offsets = [0xbe, 0x5c, 0x11e, 0x138, 0x194, 0x1ba, 0x2ea, 0x2f2, 0x4ce, 0x4d0, 0xaa, 0xe6, 0xfc, 0xf6]
 state_probe = ''
+repair_buffers = os.environ.get('REPAIR_BUFFER_STATE') == '1'
+if repair_buffers:
+    assert os.environ.get('TIMING_STATE') == '1'
+    assert {0x148d8, 0x14962, 0x14a20, 0x14aa6} <= set(probes), 'Need paired repair buffer boundaries'
+    chip_bytes = len((a.out/'chip.bin').read_bytes())
 if os.environ.get('COVERAGE_STATE') == '1':
     values = ', '.join(f'*(unsigned short*){state+x:#x}' for x in state_offsets)
     state_probe = 'printf \"PDSTATE %d ' + ' '.join(['%u']*len(state_offsets)) + '\\n\", $pd_field, ' + values + '\n'
@@ -309,7 +315,7 @@ if os.environ.get('TIMING_STATE') == '1':
             message_values += [f'*(unsigned int*){r["game"][0]+x:#x}' for x in (0xf96,0x48fe)]
             message_values += [f'(unsigned int)${reg}' for reg in ('d0','d7','sp')]
             sample += 'printf "PDMESSAGE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(message_values)) + '\\n", $pd_field, ' + ', '.join(message_values) + '\n'
-        if off in (0x148d0,0x14962,0x14970,0x14a18,0x14a20,0x14aa6,0x14ac4):
+        if off in (0x148d0,0x148d8,0x14962,0x14970,0x14a18,0x14a20,0x14aa6,0x14ac4):
             sample += repair_pace_sample.replace('{off}',hex(off))
             sample += repair_drop_sample.replace('{off}',hex(off))
             repair_values=[f'(unsigned int)${reg}' for reg in ('d4','d5','d6','d7')]
@@ -317,6 +323,18 @@ if os.environ.get('TIMING_STATE') == '1':
             repair_values += [f'*(unsigned int*){r["game"][0]+x:#x}' for x in (0xf96,0x48fe)]
             repair_values += [f'*(unsigned short*){state+x:#x}' for x in (0xb6,0xdc,0x13e)]
             sample += 'printf "PDREPAIR_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(repair_values)) + '\\n", $pd_field, ' + ', '.join(repair_values) + '\n'
+        if repair_buffers and off in (0x148d8,0x14962,0x14a20,0x14aa6):
+            entry = off in (0x148d8,0x14a20)
+            if entry:
+                sample += 'set $pd_repair_image = $pd_repair_image + 1\n'
+            label = 'entry' if entry else 'post'
+            # GDB has no Python support here. Dump chip RAM in one read-only
+            # transfer; decode descriptors and hash bitplanes on the host.
+            filename = str(a.out/f'repair-%04d-{label}.bin')
+            command_text = f'dump binary memory {filename} 0 {chip_bytes:#x}'
+            assert '%' not in str(a.out), 'Capture path cannot contain printf conversions'
+            sample += f'eval {json.dumps(command_text)}, $pd_repair_image\n'
+            sample += 'printf "PDRBUFFER_EVENT %d ' + hex(off) + ' %u %u\\n", $pd_field, $pd_repair_image, *(unsigned short*)0xdff002\n'
         if off in (0x9950,0x9a08):
             animation_values=['(unsigned int)$a5']
             animation_values += [f'*(unsigned short*)($a5+{x})' for x in
@@ -360,6 +378,8 @@ if os.environ.get('TIMING_STATE') == '1':
         probe_tests += f'if $pc == {r["game"][0]+off:#x}\n{sample}end\n'
 
 setup = f'break *{vbl:#x}\nbreak *{swap:#x}\n{probe_breaks}set $pd_field = -1\n'
+if repair_buffers:
+    setup += 'set $pd_repair_image = 0\n'
 reply = command(setup)
 logpath = a.out/'swaps-gdb.txt'
 logpath.write_text(reply)

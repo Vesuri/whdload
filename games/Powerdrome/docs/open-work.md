@@ -368,8 +368,15 @@ is 60 ms long and still fails the conservative gate. Carrying lateness across st
 transitions resolves that measured failure: repairdrop3 passes all four A500 invocation
 and eight stage gates, all 264 geometry/deadline observations and exact stage-epoch
 transfers. Whole durations are within 0–40 ms of native, including the unchanged
-conservative uncertainty gate. It draws 234 presentations and drops 30. The 030 run is
-in progress. Visual/buffer equivalence, skipped drawing-register/HUD scratch state,
+conservative uncertainty gate. It draws 234 presentations and drops 30. The 030 counterpart
+passes all geometry, deadline, stage-transfer and timing checks, matching all four native
+invocation durations exactly and drawing all 264 presentations. This pit window adds no
+3D renderer comparisons. The complete A500 buffer capture now verifies all 264 step pairs:
+all 30 dropped steps preserve both screen buffers and the pit background byte-for-byte,
+and all 180 part-bank selections survive. All 234 drawn steps exchange buffers normally;
+the native outer service counter advances exactly once in every step. The same capture
+passes all geometry and timing gates, with no incomplete or busy-entry exclusions.
+Independent native pixel equivalence, skipped drawing-register/HUD scratch state,
 input/opponent continuity, native exits and broader modes still remain open; both
 experimental repair switches stay disabled by default. Message lifetime itself still needs elapsed-time calibration, and ordinary world
 messages/other setters remain open; do not treat the ownership fix as full message timing. Register/stack and nonlocal

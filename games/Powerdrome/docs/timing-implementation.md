@@ -1655,15 +1655,42 @@ error is 40 ms; with the unchanged conservative endpoint allowance, all errors a
 bitmap calls and 30 service-only continuations, with suppression clear at every post.
 Drops per stage are 2/5, 0/1, 4/6 and 6/6. No input or game-state fixture was added.
 
-This is a bounded cadence/geometry pass. Visual/buffer, skipped drawing-register/HUD
-scratch state, service/input/opponent continuity, native exit and 030 checks remain open.
-The 030 twin-selected run is in progress; this pit route must not be counted as new 3D
-renderer equivalence merely because CUSTOM4 is selected. The drop-disabled build was
+The 030 `timing-repairdrop3-030-twins` counterpart also passes all 264 geometry/deadline
+samples, all four exact stage-epoch transfers and all eight stage/four invocation gates.
+Its complete durations exactly match native: **8,260 / 8,840 / 7,900 / 7,960 ms**.
+It draws all 264 presentations, with zero suppression or service-only continuations;
+this exercises the normal path, not the drop path. Renderer diagnostics show zero new
+staged comparisons during this pit window, no new failures and unchanged raster code.
+Selecting CUSTOM4 here does not provide new 3D renderer equivalence evidence.
+
+Read-only paired chip-memory snapshots in `timing-repairdrop3-buffers-full-a500`
+cover all **264 steps across all eight stages**. All **30 dropped steps** preserve both
+32,000-byte screen buffers and the separate 32,000-byte pit background exactly, including
+bitmap descriptors and drawing/display roles. Every dropped entry has an idle blitter
+(DMACONR busy is word bit 14); all **180 native part-bank selections** still occur.
+The **234 rendered steps** exchange drawing/display descriptors normally, with 221
+changed displayed pictures. The native outer service counter advances exactly once in
+every one of the 264 steps. There are no busy-entry exclusions or incomplete pairs.
+The same capture passes all geometry, deadline, stage-transfer and cadence gates, with
+the same durations and drop counts as the earlier A500 run. This is endpoint buffer
+preservation, not independent native-render pixel equivalence or proof against transient
+writes. The shorter `timing-repairdrop3-buffers-a500` capture also passes its 34 pairs.
+
+`REPAIR_BUFFER_STATE=1` with TIMING_STATE and probes `$148d8`, `$14962`, `$14a20`,
+`$14aa6` saves paired full chip snapshots around each logical repair step. The checker
+requires exercised drawn and idle-blitter dropped paths, validates each planar descriptor,
+compares all three bitmaps on idle-entry drops, and checks part-bank updates and the native
+outer service counter. `--complete-route` additionally requires all 264 pairs. Busy-entry
+drops are reported and excluded from pixel claims. These instrumented runs are not FPS
+measurements. Skipped drawing-register/HUD scratch state, service/input/opponent continuity,
+native exits and broader branches remain open. The drop-disabled build was
 byte-identical before the additional stage-bridge correction; the normal build remains
 byte-identical afterward. A build requesting DROP without REPAIR is rejected.
 
 ```sh
 python3 tools/check_repair_drop.py tmp/prof/timing-repairdrop3-a500
+python3 tools/check_repair_drop.py --allow-no-drops tmp/prof/timing-repairdrop3-030-twins
+python3 tools/check_repair_buffers.py --complete-route tmp/prof/timing-repairdrop3-buffers-full-a500
 python3 tools/check_repair_pacing.py --native-steps --continuous-stages tmp/prof/timing-repairloop3-native-a500 tmp/prof/timing-repairdrop3-a500
 ```
 
