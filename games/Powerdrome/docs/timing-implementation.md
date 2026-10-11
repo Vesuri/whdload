@@ -3777,7 +3777,7 @@ weather-loop and visual deadlines, serviced by 20-ms world updates:
 2. At generation +20 ms, publish the current lifetime and pre-draw seed, decrement
    lifetime once and advance logical RNG four times when an effect is present. A blank
    scene clears the previous visible publication at this same visual boundary.
-3. Queue rectangle cleanup for presentation. Retain cumulative deadlines and all logical
+3. Queue sound trigger for presentation. Retain cumulative deadlines and all logical
    mutations during ordinary catch-up; actual repeated draws do not consume logical RNG.
 
 The earlier `PDWEFX01` prototype used a uniform 90-ms control cadence with visual work
@@ -3790,11 +3790,31 @@ The renderer uses the latest published lifetime/seed. It temporarily installs th
 visual seed around the native draw helper, then restores the outer seed. Repeated draws
 therefore do not advance simulation RNG or decrement persistent lifetime. Palette state
 and native presentation calls remain per actual draw. The outer loop performs pending
-native rectangle cleanup and skips its original generation block while logical ownership
+native sound trigger and skips its original generation block while logical ownership
 is enabled. Outside the supported flight predicate, native effect behavior is retained;
 those mode paths are not yet framerate-independent. Initialization/session cleanup clears
 pending visual ownership. Pause, pit/recovery and full lifecycle contracts remain to be
 validated with active effects.
+
+The deferred call at game `$bce0` targets `$17836`, an **audio-channel start** routine,
+not bitmap cleanup. It checks `state+$2f4`, stops the selected audio DMA channel,
+programs its sample pointer/length/volume/period, updates audio bookkeeping at
+`$48c4/$48dc`, and enables its interrupt and DMA. The weather caller passes channel 3,
+volume 63, and the fifth 12-byte sample descriptor from the table at `$5ae`.
+The guard `$4f74` is set after the larger 404,000-byte chip allocation succeeds;
+the same guard controls allocation/loading of this extra sample table. Earlier
+512-KiB guest captures left it clear and therefore did not exercise this sound path.
+The diagnostic field names `cleanup_pending` and `cleanups` remain for capture-schema
+compatibility; they mean a queued sound request and wrapper calls, respectively.
+The latter increments before the native helper and does not prove audible playback:
+the helper can return immediately when `state+$2f4` is nonzero.
+
+This is separate from the renderer's palette restoration at `$117c8–$117d4`, which
+calls `$f914` when `state+$4d0` is set. Sound validation must check sample/period/volume,
+channel state and request timing, including whether multiple logical requests are
+coalesced by the single pending flag during catch-up. Palette/buffer validation remains
+an independent requirement. A larger-memory fixture must let native allocation and
+sample loading succeed; manually forcing the availability flag is not valid evidence.
 
 Fast-planar eligibility additionally checks the published visual lifetime. This is
 necessary on the last visible tick, when persistent lifetime is already zero: the scene
@@ -3887,7 +3907,7 @@ ownership, pending cleanup, simulation debt or unfinished assigned work. The 030
 **256 clean completed renderer twins**, with unchanged raster code and no draw active at
 the final snapshot. Effect draws themselves take the native fallback and are not those twins.
 
-This first fixture has zero actual rectangle cleanups and zero successful new effect
+This first fixture has zero actual sound-trigger calls and zero successful new effect
 selections, so it does not validate those branches. Its seed-preserving evidence is
 separate from the explicitly seeded branch test below.
 
@@ -3907,7 +3927,7 @@ through delay expiry, then requires the next generation attempt. Cross-capture c
 checks the relative publication clocks as well as lifetime/delay/visibility. Corrupted
 seed, lifetime, missing-publication and delay-release evidence is rejected. This checks
 the first selection lifecycle; it does not claim arithmetic coverage of every later
-selection, native weather cadence or rectangle cleanup.
+selection, native weather cadence or sound trigger.
 
 The 1,000-field (20-second) `timing-weather-effect-test2` A500/native and 030/fast pair
 passes. Both activate once at step 204 and show the exact first-selection sequence above.
@@ -3924,7 +3944,7 @@ renderer twins**, unchanged raster code and zero reported pixel/guard/register/s
 failures; an additional scene is active at the endpoint and is not counted complete.
 Effect draws use the native fallback, outside those twins.
 
-Both runs still have zero actual rectangle cleanups. Cleanup, forecast/expiry,
+Both runs still have zero actual sound-trigger calls. Cleanup, forecast/expiry,
 fade/gear scheduling, natural integrated weather and mode/lifecycle validation remain
 open. Neither directed fixture establishes the final weather cadence policy.
 
@@ -4001,7 +4021,7 @@ palette latency, longer stalls and capacity limits remain separate measurements.
 
 Forecast selection/start/expiry still use the original outer-loop paths and physical
 clock. Moving these into the same logical RNG/time ownership is the next implementation
-step. Actual effect rectangle cleanup, natural onset/expiry integration, palette pixel
+step. Actual effect sound trigger, natural onset/expiry integration, palette pixel
 validation, pause/pit/restart and reused-transition lifecycle checks remain open. The
 new weather flag predicate and reset hooks alone do not prove those lifecycle contracts.
 
@@ -4077,7 +4097,7 @@ world-end delay is 260 ms. It adds 2,472 clean completed renderer twins with unc
 raster code; a further scene is active at the endpoint and is excluded. Palette pixels
 and actual weather-effect draw ownership are not checked by these scene twins. The effect
 record shows 13 selections, 34 logical visual events and 52 actual draws, with zero actual
-rectangle cleanups and no final effect ownership/pending cleanup.
+sound-trigger calls and no final effect ownership/pending cleanup.
 
 The A500 counterpart also completes the entire 170-second cycle. Both have the exact
 25,020-ms warning-to-onset interval, 117,480-ms selected duration, 60-ms expiry lateness,
@@ -4085,7 +4105,7 @@ onset RNG inputs/results, all 30 fade deadlines and one delivery of each deferre
 **8,502 common player/engine/RNG states and 1,889 common control/input/fuel updates match
 exactly.** Both effect records have 1,890 logical updates, 1,020 generation attempts,
 13 selections and 34 logical visual events, while actual draws differ: 52 on 030 versus
-25 on A500. Draw ownership and rectangle cleanup are not directly observed by this probe
+25 on A500. Draw ownership and sound trigger are not directly observed by this probe
 set, so their prior isolated tests and remaining gaps still apply.
 
 A500 completes 8,504 movements, with 140/60-ms initial/final unsampled time explaining
@@ -4152,7 +4172,7 @@ lifetimes 1, 4 and 5, respectively, close to this reference.
 
 The seeded active-effect comparison now passes as described below. The full-cycle
 comparison is running. RNG ownership, final-visible-state fallback and both buffers'
-cleanup checks remain necessary; actual rectangle cleanup is still unobserved. Calibration
+cleanup checks remain necessary; actual sound trigger is still unobserved. Calibration
 across tracks and varied modes still needs evidence. This is an implemented candidate,
 not final cadence acceptance for all gameplay.
 

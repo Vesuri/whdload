@@ -2,7 +2,7 @@
 """Check the explicitly seeded mode-2 weather-selection fixture.
 
 Requires the first selected publication and every tick of its lifetime/delay.
-This proves one generation branch, not natural weather or rectangle cleanup.
+This proves one generation branch, not natural weather or sound trigger.
 """
 import argparse
 from pathlib import Path

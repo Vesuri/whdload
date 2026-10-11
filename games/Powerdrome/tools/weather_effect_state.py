@@ -1,6 +1,7 @@
 """Read the installed experimental weather-effect record, never a stale loader copy."""
 import struct
 
+# Legacy schema: cleanup_pending queues audio; cleanups counts helper calls, not playback.
 NAMES=('visible','visual_seed','drawing','saved_seed','cleanup_pending','reserved',
        'ticks','visual_events','attempts','selections','draws','clock','cleanups')
 NATIVE=(('rng',0x62),('lifetime',0x4ce),('delay',0x4d2),('enabled',0x4cc),

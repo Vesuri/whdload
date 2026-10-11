@@ -546,7 +546,7 @@ cleanup remains per actual draw. Weather scheduling, presentation wrappers and m
 handling remain required. The first logical effect split is now implemented behind
 `TIMING_WEATHER_EFFECTS=1` and CUSTOM3, disabled by default. It moves lifetime,
 generation and four-per-effect-draw RNG advances into logical control updates, replays
-saved visual seeds for drawing, defers rectangle cleanup, and adds last-visible-tick
+saved visual seeds for drawing, defers sound trigger, and adds last-visible-tick
 fast-renderer fallback protection. Forecast/start/expiry remain frame-dependent. The separate experimental fade/gear
 scheduler now has the bounded validation described below.
 Disabled/normal bytes and hook boundaries pass. Its dry-weather A500/030 pair matches
@@ -562,7 +562,7 @@ without simulation/input clock or seed rewrites. Its 20-second A500/030 pair pas
 visual events and 176 unsuccessful generation attempts. Drawing executes six times on
 030 versus three on A500, with seed replay/restoration and unchanged lifetime/publication
 verified in every observed draw. The 030 adds 256 completed renderer twins and ends with
-no active draw. That first fixture does not exercise successful new selection or actual rectangle cleanup.
+no active draw. That first fixture does not exercise successful new selection or actual sound trigger.
 The explicitly seeded mode-2 fixture now validates the first successful selection:
 lifetime five, delay seven and each subsequent logical publication through the next
 trial. Its matched 20-second pair produces five selections and 18 logical visual events
@@ -572,7 +572,7 @@ adds 239 completed renderer twins, with one additional unfinished scene excluded
 Different endpoint step counts are fully accounted for by initial/final unsampled time;
 no retained or assigned simulation debt remains. The checker rejects wrong seed/lifetime,
 missing-publication and wrong delay-release evidence. Mode 1 and normal builds remain
-byte-identical. Actual rectangle cleanup is still unobserved. Natural integrated weather,
+byte-identical. Actual sound trigger is still unobserved. Natural integrated weather,
 forecast/start/expiry scheduling, cadence acceptance and mode/lifecycle work remain open.
 
 
@@ -591,7 +591,7 @@ or active endpoint draw. Endpoint step-count differences are explained by unsamp
 there is no retained/assigned simulation debt. Wrong deadline/gear, missing step and
 presentation mutation evidence is rejected. Disabled bytes, normal build, hook boundaries
 and C3-off native hook snapshots pass. Next move forecast/start/expiry into the same logical
-RNG/time ownership, then validate natural weather, effect rectangle cleanup, palette pixels
+RNG/time ownership, then validate natural weather, effect sound trigger, palette pixels
 and pause/pit/restart/reused-transition lifecycles. This does not close F1–F8 or weather.
 
 
@@ -623,7 +623,7 @@ A500/030 650-field pair passes all eleven cases in both snapshots, plus 653 comm
 states and 145 control/input/fuel updates. Five corruptions, including the former overdue
 result, are rejected. Helper arithmetic does not replace actual mode-transfer integration
 coverage. Natural unseeded
-weather, calibration acceptance, message/palette pixels, effect rectangle cleanup and
+weather, calibration acceptance, message/palette pixels, effect sound trigger and
 mode/lifecycle integration remain open. The full F1–F8 goal is not complete.
 
 
@@ -651,6 +651,10 @@ renderer twins; its additional unfinished draw is excluded. No endpoint simulati
 or draw seed ownership remains. A500's pending next-cursor visual event is explicitly
 accounted for. Five corrupted timing/state cases are rejected; disabled/normal bytes and
 C3-off hook checks pass. The full 170-second `timing-weather-cycle-cadence1` pair is running
-with generation-before-fade ordering and the corrected deadline-transfer helper. Next
-finish that comparison, then address actual cleanup, unseeded weather and mode/lifecycle
-acceptance. The earlier full-cycle evidence used the old 90-ms effect cadence.
+with generation-before-fade ordering and the corrected deadline-transfer helper. Its completed
+030 capture passes the full cycle and 4,217 generation/visual boundaries on exact world
+deadlines (11 selections, 23 logical visual events, 53 draws); A500 is still running.
+The deferred helper `$17836` is now identified as audio-channel start, not bitmap cleanup.
+Existing `cleanups` fields count sound-helper calls, not audible output. Next finish the
+comparison, then validate native sample allocation, channel arguments and catch-up sound
+coalescing, alongside palette restoration, unseeded weather and mode/lifecycle acceptance. The earlier full-cycle evidence used the old 90-ms effect cadence.

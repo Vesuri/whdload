@@ -155,7 +155,7 @@ timing_weather_tick
  movem.l (sp)+,d0-d7/a0-a6
  rts
 
-; The outer loop still performs native rectangle cleanup, but no owned RNG work.
+; The outer loop still performs native sound trigger, but no owned RNG work.
 timing_weather_outer
  movem.l d0-d7/a0-a6,-(sp)
  bsr timing_weather_enabled
@@ -244,7 +244,7 @@ timing_weather_state dc.b 'PDWEFX02'
  dc.w 0 ; +10 visual pre-draw seed
  dc.w 0 ; +12 temporary render seed ownership
  dc.w 0 ; +14 saved outer seed
- dc.w 0 ; +16 pending rectangle cleanup
+ dc.w 0 ; +16 pending sound trigger
  dc.w 0 ; +18 reserved
  dc.l 0 ; +20 logical weather-loop generations
  dc.l 0 ; +24 logical visual RNG events
@@ -252,7 +252,7 @@ timing_weather_state dc.b 'PDWEFX02'
  dc.l 0 ; +32 successful selections (including zero lifetime)
  dc.l 0 ; +36 actual effect draws
  dc.l 0 ; +40 most recent visual publication timestamp
- dc.l 0 ; +44 actual rectangle cleanups
+ dc.l 0 ; +44 actual sound-trigger calls
 
 timing_weather_clock dc.b 'PDWECLK1'
  dc.w 0 ; +8 initialized
