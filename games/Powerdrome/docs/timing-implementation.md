@@ -1423,27 +1423,34 @@ capture tool; its derived frame rate is not a performance benchmark for this exp
 `$148d0`. All declared C3 hook bytes remain native in both snapshots. The corresponding
 current WORLD20 030 capture is `timing-repairloop2-before-030-twins`.
 
-| Item 1, direction | Native A500 stage 1 | Native A500 stage 2, including wait | Native A500 full invocation | Current 030 full invocation |
+| Item / direction | Native A500 stage 1 | Native A500 stage 2, including wait | Native A500 full invocation | Current 030 full invocation |
 | --- | ---: | ---: | ---: | ---: |
-| 0 | 3,760 ms | 4,500 ms | 8,260 ms | 6,120 ms |
-| 1 | 3,820 ms | 5,020 ms | 8,840 ms | 6,200 ms |
+| 1 / 0 | 3,760 ms | 4,500 ms | 8,260 ms | 6,120 ms |
+| 1 / 1 | 3,820 ms | 5,020 ms | 8,840 ms | 6,200 ms |
+| 0 / 0 | 3,400 ms | 4,500 ms | 7,900 ms | 5,240 ms |
+| 0 / 1 | 3,500 ms | 4,460 ms | 7,960 ms | Incomplete |
 
 Each invocation retains all 66 recorded word-geometry states across CPUs. Native ordinary
 drawing-body samples are 100–120 ms; the current 030 samples are 40–80 ms. The native
 second-stage wait before counter 31 is **1,140 ms** in both directions, producing a
 1,240-ms post-draw interval. On 030 that wait is 1,100/1,180 ms. These sound/display waits
-must retain their native event ordering. Item 0 has only a partial native reference in
-this window; its extended A500 measurement is pending.
+must retain their native event ordering. The 2,000-field extension
+`timing-repairloop3-native-a500` completes all four invocations with no trailing samples
+and reproduces both item-1 measurements exactly. Item-0 pauses are 1,100/1,160 ms. Its
+ordinary second-stage drawing totals are therefore 3,400/3,300 ms; item 1 totals are
+3,360/3,880 ms. All declared timing hooks remain native in both extended snapshots.
 
 ```sh
 python3 tools/timing_repair_loops.py tmp/prof/timing-repairloop2-native-a500 tmp/prof/timing-repairloop2-before-030-twins
 python3 tools/check_timing_layout.py --off-capture tmp/prof/timing-repairloop2-native-a500
+python3 tools/timing_repair_loops.py tmp/prof/timing-repairloop3-native-a500
+python3 tools/check_timing_layout.py --off-capture tmp/prof/timing-repairloop3-native-a500
 ```
 
 Next steps for this correction:
 
-1. Finish native A500 measurements of both item variants and directions, retaining the
-   full geometry sequence and separately measured sound/display pause.
+1. Native A500 measurements of both item variants and directions are complete for this
+   route, with all 33 positions per stage and separately measured sound/display pauses.
 2. Add opt-in elapsed deadlines for the drawing steps. Retain lateness and native step
    order; start a new timing segment after the deliberate sound/display pause so it is
    not serviced as movement catch-up. Select periods from the measured A500 stages.
