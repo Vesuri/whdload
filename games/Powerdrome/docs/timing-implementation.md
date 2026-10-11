@@ -3717,9 +3717,8 @@ update is due, and save the pre-draw seed/state for presentation. Repeated rende
 that state must not consume additional simulation randomness. Keep palette activation
 and cleanup associated with actual drawing separately: the native trace has palette
 state set through `$11300` and cleared before the next outer generation observation.
-Do not infer that the helper call itself immediately clears it. Implementation still
-needs an explicit presentation wrapper and mode/reset handling; these measurements do
-not establish corrected weather timing.
+Do not infer that the helper call itself immediately clears it. The effect presentation wrapper below now separates visual RNG ownership. Full mode/reset
+handling remains open; these native measurements alone do not establish corrected weather timing.
 
 `tools/report_weather.py CAPTURE` checks observed before/after arithmetic for forecast
 and active deadlines (including native duration RNG arithmetic), fade increments/decrements
@@ -3765,7 +3764,8 @@ runs must not be used to close this weather gate.
 `TIMING_WEATHER_EFFECTS=1` now builds the first effect-ownership split in
 `timing_weather_effects.s`. It requires `TIMING_PERIODIC=1` and WORLD20, remains disabled
 by default, and installs its hooks only under `CUSTOM3`. This is not complete weather
-timing: forecast, start/expiry and fade/gear timing still follow their existing paths.
+timing: forecast and start/expiry still follow their existing paths. Fade/gear timing
+has a separate disabled-by-default prototype described below.
 No cache policy changes are made.
 
 During supported human flight, each logical 90 ms control update at world end:
@@ -3921,3 +3921,80 @@ Effect draws use the native fallback, outside those twins.
 Both runs still have zero actual rectangle cleanups. Cleanup, forecast/expiry,
 fade/gear scheduling, natural integrated weather and mode/lifecycle validation remain
 open. Neither directed fixture establishes the final weather cadence policy.
+
+
+## Experimental logical weather fades
+
+`TIMING_WEATHER_FADE=1` requires the experimental weather-effect owner and therefore
+WORLD20. It remains disabled by default and uses the existing independent `CUSTOM3`
+opt-in. The normal build and explicit fade-disabled effect fixture are byte-identical
+to their saved references. A missing dependency is rejected. The new `$bd1a` hook covers
+two complete instructions; no decoded native direct branch enters its interior. Both
+snapshots of the native C3-off weather capture retain the declared native hook bytes.
+
+`timing_weather_fade.s` moves transition mutations and native target-gear helper calls
+into 20-ms world updates. It recognizes a changed weather transition, assigns a logical
+deadline, and advances that deadline after each step. Every due simulation step runs
+during catch-up. Only the latest absolute palette phase is published for presentation;
+intermediate palette phases can be coalesced without coalescing transition/gear work.
+The native palette helpers temporarily see their pre-mutation transition value, after
+which the wrapper restores persistent state. Positive completion applies the native
+weather palette; negative completion also draws the native zero-transition endpoint.
+Native behavior is replayed outside supported human-flight weather ownership.
+
+The candidate cadence is expressed in whole 20-ms simulation ticks:
+
+| Direction | First step | Following steps | Fifteen-step logical duration | Measured native A500 episode |
+| --- | ---: | ---: | ---: | ---: |
+| Enter weather | 48 ticks / 960 ms | 70 ticks / 1,400 ms | 20,560 ms | 20,580 ms |
+| Leave weather | 59 ticks / 1,180 ms | 58 ticks / 1,160 ms | 17,420 ms | 17,260 ms |
+
+These are explicit calibration choices from one native track-2 episode, not proof of
+an intended direction-dependent rule or a validated cadence across all tracks. The first
+step delays deliberately reproduce that observed phase; the native global loop-counter
+phase could differ in another episode. The steady periods approximate the measured
+1,401.4/1,148.6-ms averages. This avoids silently applying the ordinary 90-ms control
+period times sixteen, which would slow the measured exit fade by about 25%. Acceptance
+still needs natural integrated weather and broader A500 reference coverage. Logical
+deadlines do not guarantee that palette scanout occurs at exactly those physical times.
+
+`PDWFAD01` records expected transition, deadline ownership, next deadline, pending palette
+phase/kind, logical step/gear/presentation counts and transition start/latest-step clocks.
+`weather_fade_state.py` locates that live record through the installed `$bd1a` jump.
+Timing captures emit read-only `PDWFADE_EVENT` observations only when this hook exists.
+The collector was updated before the capture and left unchanged during it.
+
+`TIMING_WEATHER_FADE_TEST=1` requires VERIFY, COVERAGE_INPUT and the fade prototype, and
+rejects simultaneous use of the effect fixture. At world step 200 it starts a positive
+15-step transition with native forecasts/effect generation suppressed; one logical
+second after completion it starts the negative transition. It changes no clocks, RNG
+seed or input state. This is branch coverage on the regular track-0 input route, not a
+natural weather episode or a track-2 reference replacement.
+
+`check_weather_fade.py CAPTURE...` requires all 30 logical steps at their exact deadlines,
+checks transition/deadline/gear state, and verifies each native gear-helper return against
+the captured track table. Paired `$bd1a/$bd58` observations must preserve all logical fade
+fields and native transition/target gear while consuming pending palette work exactly
+once. Missing steps, changed deadlines, incorrect gear and presentation mutations are
+rejected. Palette pixels and physical presentation latency are outside this checker.
+
+The 46-second `timing-weather-fade-test1` A500/native and 030/fast pair passes all
+30 steps and two native gear commits (targets 4 then 2 for track 0) at identical logical
+deadlines. Both observe all 30 palette publications and finish without pending fade work.
+**2,301 common player/engine/RNG states and 511 common control/input/fuel updates match
+exactly.** The 030 adds **652 completed renderer twins**, unchanged raster code, zero
+reported pixel/guard/register/scratch failures and no active endpoint draw. These scene
+comparisons do not establish palette pixel equivalence.
+
+The 030 completes 2,301 movements and A500 2,306. Initial/final unsampled time is
+80/60 ms on 030 and 140/20 ms on A500, fully accounting for the five-step endpoint
+difference. Neither retains simulation debt, unfinished assigned movement or a pending
+control. Maximum sampled world-end delay is 240/780 ms; maximum allocations are 12/32
+steps. Thus logical fade equality is established for this bounded route, while physical
+palette latency, longer stalls and capacity limits remain separate measurements.
+
+Forecast selection/start/expiry still use the original outer-loop paths and physical
+clock. Moving these into the same logical RNG/time ownership is the next implementation
+step. Actual effect rectangle cleanup, natural onset/expiry integration, palette pixel
+validation, pause/pit/restart and reused-transition lifecycle checks remain open. The
+new weather flag predicate and reset hooks alone do not prove those lifecycle contracts.

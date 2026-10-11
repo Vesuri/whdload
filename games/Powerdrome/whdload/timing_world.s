@@ -135,6 +135,9 @@ timing_world_end
  bra.w timing_world_render
 .ordinary_end
  bsr timing_opponent_effects_tick
+ IFNE TIMING_WEATHER_FADE
+ bsr timing_weather_fade_tick
+ ENDC
  IFNE TIMING_WEATHER_EFFECTS
  bsr timing_weather_tick
  ENDC

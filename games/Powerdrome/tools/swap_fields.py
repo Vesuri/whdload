@@ -14,6 +14,7 @@ from powerdrome import SOCK, send_request
 from powerdrome_report import regions
 from weather_state import PROBES as WEATHER_PROBES, probe_command as weather_probe_command
 from weather_effect_state import locate as weather_effect_locate, probe_command as weather_effect_probe
+from weather_fade_state import locate as weather_fade_locate, probe_command as weather_fade_probe
 
 
 def command(text):
@@ -294,6 +295,7 @@ if os.environ.get('TIMING_STATE') == '1':
     message_clocks = timing_locations(b'PDMSGCLK', lambda off: struct.unpack_from('>H',code,off+8)[0]==1)
     assert len(message_clocks) <= 1
     weather_effect_address=weather_effect_locate((a.out/'chip.bin').read_bytes(),code,r['game'][0],a.base)
+    weather_fade_address=weather_fade_locate((a.out/'chip.bin').read_bytes(),code,r['game'][0],a.base)
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
@@ -301,6 +303,8 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += weather_probe_command(r['game'][0],off)
         if weather_effect_address is not None:
             sample += weather_effect_probe(weather_effect_address,r['game'][0],off)
+        if weather_fade_address is not None:
+            sample += weather_fade_probe(weather_fade_address,r['game'][0],off)
         sample += input_sample.replace('{off}',hex(off))
         sample += session_sample.replace('{off}',hex(off))
         sample += pit_sample.replace('{off}',hex(off))

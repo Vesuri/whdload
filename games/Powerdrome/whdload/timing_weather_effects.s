@@ -1,4 +1,5 @@
-; Experimental normal-flight effect ownership. Forecast/fade scheduling is separate.
+; Experimental normal-flight effect ownership. Forecast scheduling remains separate.
+; TIMING_WEATHER_FADE optionally schedules the transition alongside these effects.
 ; Logical 90-ms updates own lifetime and both generation/visual RNG advances.
 ; Presentation replays the latest pre-draw seed without changing simulation RNG.
 timing_weather_check
@@ -43,6 +44,9 @@ timing_weather_enabled
  rts
 
 timing_weather_reset
+ IFNE TIMING_WEATHER_FADE
+ bsr timing_weather_fade_reset
+ ENDC
  move.l a0,-(sp)
  lea timing_weather_state(pc),a0
  clr.l 8(a0)

@@ -547,7 +547,8 @@ handling remain required. The first logical effect split is now implemented behi
 `TIMING_WEATHER_EFFECTS=1` and CUSTOM3, disabled by default. It moves lifetime,
 generation and four-per-effect-draw RNG advances into logical control updates, replays
 saved visual seeds for drawing, defers rectangle cleanup, and adds last-visible-tick
-fast-renderer fallback protection. Forecast/expiry and fade/gear remain frame-dependent.
+fast-renderer fallback protection. Forecast/start/expiry remain frame-dependent. The separate experimental fade/gear
+scheduler now has the bounded validation described below.
 Disabled/normal bytes and hook boundaries pass. Its dry-weather A500/030 pair matches
 652 common world states and 144 control/input/fuel updates against both unchanged
 references, with 158 completed renderer twins. Active-effect replay/cleanup, cadence
@@ -572,4 +573,23 @@ Different endpoint step counts are fully accounted for by initial/final unsample
 no retained or assigned simulation debt remains. The checker rejects wrong seed/lifetime,
 missing-publication and wrong delay-release evidence. Mode 1 and normal builds remain
 byte-identical. Actual rectangle cleanup is still unobserved. Natural integrated weather,
-forecast/fade/gear scheduling, cadence policy and mode/lifecycle work remain open.
+forecast/start/expiry scheduling, cadence acceptance and mode/lifecycle work remain open.
+
+
+`TIMING_WEATHER_FADE=1` now moves weather transition steps and native target-gear commits
+onto 20-ms simulation ticks, leaving palette helpers in presentation. It remains disabled
+by default, requires the effect prototype and uses CUSTOM3. Candidate A500 calibration is
+first 960/1,180 ms then 1,400/1,160 ms per entering/leaving step, giving 20,560/17,420 ms
+for each complete transition. This approximates the measured native track-2 episode;
+other episodes/tracks and physical palette latency still need acceptance evidence.
+
+The VERIFY-only two-transition fixture passes a 46-second A500/native and 030/fast pair:
+all 30 logical fade deadlines, native gear-table commits and 30 palette publications match.
+Presentation preserves logical state. There are 2,301 matching common movement states,
+511 common control/input/fuel updates and 652 completed 030 renderer twins with no failures
+or active endpoint draw. Endpoint step-count differences are explained by unsampled time;
+there is no retained/assigned simulation debt. Wrong deadline/gear, missing step and
+presentation mutation evidence is rejected. Disabled bytes, normal build, hook boundaries
+and C3-off native hook snapshots pass. Next move forecast/start/expiry into the same logical
+RNG/time ownership, then validate natural weather, effect rectangle cleanup, palette pixels
+and pause/pit/restart/reused-transition lifecycles. This does not close F1–F8 or weather.

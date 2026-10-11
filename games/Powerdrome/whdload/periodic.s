@@ -388,12 +388,20 @@ install_periodic
  IFNE TIMING_WEATHER_EFFECTS
  bsr timing_weather_check
  ENDC
+ IFNE TIMING_WEATHER_FADE
+ bsr timing_weather_fade_check
+ ENDC
  lea pl_periodic(pc),a0
  move.l _resload(pc),a2
  jsr resload_Patch(a2)
  movem.l (sp)+,d0-d2/a0-a2
  rts
 pl_periodic PL_START
+ IFNE TIMING_WEATHER_FADE
+ ; TIMING_RANGE h0:$bd1a 8 bit=C3
+ PL_P $bd1a,timing_weather_fade_outer
+ PL_NOP $bd20,2
+ ENDC
  IFNE TIMING_WEATHER_EFFECTS
  ; TIMING_RANGE h0:$bc8a 8 bit=C3
  PL_P $bc8a,timing_weather_outer
@@ -1223,6 +1231,22 @@ timing_targets
  dc.l $112fa
  dc.w timing_weather_present+2-timing_targets
  ENDC
+ IFNE TIMING_WEATHER_FADE
+ dc.l $bd22
+ dc.w timing_weather_fade_native+2-timing_targets
+ dc.l $bd58
+ dc.w timing_weather_fade_after+2-timing_targets
+ dc.l $8a1a
+ dc.w timing_weather_fade_positive+2-timing_targets
+ dc.l $8a60
+ dc.w timing_weather_fade_negative+2-timing_targets
+ dc.l $8a4c
+ dc.w timing_weather_fade_positive_gear+2-timing_targets
+ dc.l $8a8e
+ dc.w timing_weather_fade_negative_gear+2-timing_targets
+ dc.l $f914
+ dc.w timing_weather_fade_palette+2-timing_targets
+ ENDC
 timing_targets_end
 
 timing_state dc.b 'PDTIME01'
@@ -1265,4 +1289,8 @@ timing_control_phase dc.w 1
 
  IFNE TIMING_WEATHER_EFFECTS
  INCLUDE timing_weather_effects.s
+ ENDC
+
+ IFNE TIMING_WEATHER_FADE
+ INCLUDE timing_weather_fade.s
  ENDC
