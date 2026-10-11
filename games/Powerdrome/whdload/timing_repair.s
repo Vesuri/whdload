@@ -1,4 +1,4 @@
-; Measured A500 drawing time, distributed over each native 33-step stage.
+; Measured A500 cumulative drawing deadlines for each native 33-step stage.
 ; The sound/display pause is added to the epoch, preserving existing lateness.
 ; Only supported human pit sequences are paced. No player simulation is run here.
 timing_repair_enter_first
@@ -75,6 +75,11 @@ timing_repair_initialize
  move.w (a0,d1.w),16(a1)
  lea timing_repair_pauses(pc),a0
  move.w (a0,d1.w),18(a1)
+ ; D1 is twice the case index; each schedule holds 33 words.
+ mulu.w #33,d1
+ lea timing_repair_steps(pc),a0
+ adda.w d1,a0
+ move.l a0,48(a1)
  bsr timing_clock
  move.l perf_game(pc),a0
  move.l $f96(a0),12(a1)
@@ -108,11 +113,13 @@ timing_repair_wait
  beq.s .done
  cmp.w #32,d7
  bhi.s .done
- moveq #33,d0
+ ; Retain the measured cheap/expensive-step cadence instead of flattening
+ ; the total. Otherwise early waits remove headroom needed by later draws.
+ moveq #32,d0
  sub.w d7,d0
- mulu.w 16(a1),d0
- divu.w #33,d0
- and.l #$ffff,d0
+ add.w d0,d0
+ movea.l 48(a1),a0
+ move.w (a0,d0.w),d0
  add.l 12(a1),d0
  move.l d0,20(a1)
  move.l perf_game(pc),a0
@@ -159,6 +166,43 @@ timing_repair_pauses
  dc.w 0,228 ; item 1, direction 0: 1140 ms
  dc.w 0,228 ; item 1, direction 1: 1140 ms
 
+; Cumulative 5-ms units, measured from native first entry to each post.
+; Stage-two sound/display pause is excluded here and added to the epoch.
+; Source: timing-repairloop3-native-a500, all four item/direction cases.
+timing_repair_steps
+ ; item 0, direction 0, stage 1
+ dc.w 20,40,60,80,100,120,140,160,180,204,228
+ dc.w 252,276,300,320,340,360,380,400,420,440,460
+ dc.w 480,500,520,540,560,580,600,620,640,660,680
+ ; item 0, direction 0, stage 2
+ dc.w 20,40,60,80,100,120,140,160,180,200,220
+ dc.w 240,260,280,300,320,340,360,380,400,420,444
+ dc.w 468,492,516,540,560,580,600,620,640,660,680
+ ; item 0, direction 1, stage 1
+ dc.w 20,40,60,80,100,120,140,160,180,204,228
+ dc.w 252,276,300,324,348,372,396,420,440,460,480
+ dc.w 500,520,540,560,580,600,620,640,660,680,700
+ ; item 0, direction 1, stage 2
+ dc.w 20,40,60,80,100,120,140,160,180,200,220
+ dc.w 240,260,280,300,320,340,360,380,400,420,440
+ dc.w 460,480,500,520,540,560,580,600,620,640,660
+ ; item 1, direction 0, stage 1
+ dc.w 20,40,60,80,100,124,148,172,196,220,244
+ dc.w 268,292,316,340,364,388,412,436,460,484,508
+ dc.w 532,556,580,604,628,652,672,692,712,732,752
+ ; item 1, direction 0, stage 2
+ dc.w 20,40,64,84,104,124,148,168,188,208,232
+ dc.w 252,272,292,312,332,352,372,392,412,432,452
+ dc.w 472,492,512,532,552,572,592,612,632,652,672
+ ; item 1, direction 1, stage 1
+ dc.w 20,40,60,80,100,120,140,164,188,212,236
+ dc.w 260,284,308,332,356,380,404,428,452,476,500
+ dc.w 524,548,572,596,620,644,668,692,716,740,764
+ ; item 1, direction 1, stage 2
+ dc.w 24,44,68,92,116,140,164,188,212,236,260
+ dc.w 284,308,332,356,380,404,428,452,476,500,524
+ dc.w 548,572,596,620,644,668,692,716,736,756,776
+
 timing_repair_state dc.b 'PDREPR01'
  dc.w 0,0 ; paced stage active, stage index
  dc.l 0 ; stage epoch, adjusted by the deliberate pause
@@ -170,3 +214,4 @@ timing_repair_state dc.b 'PDREPR01'
  dc.l 0 ; cumulative excluded sound/display pause units
  dc.l 0 ; latest lateness
  dc.l 0 ; maximum lateness
+ dc.l 0 ; selected cumulative step table (prefix diagnostics remain unchanged)

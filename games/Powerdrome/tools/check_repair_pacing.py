@@ -17,7 +17,7 @@ def pause(stages):
     return 20*(stages[1][1]['body_entry_vbl']-stages[1][0]['v'][10])
 
 
-def check(reference, capture):
+def check(reference, capture, native_steps=False):
     refs, ref_tail = read(reference)
     actual, tail = read(capture)
     assert len(refs) == len(actual) == 4 and ref_tail == tail == 0, 'Need all four complete item/direction cases'
@@ -40,7 +40,15 @@ def check(reference, capture):
                 counter = b[3] & 65535
                 assert p is not None and p[0] == int(counter != 0) and p[1] == index
                 assert p[3] == expected_units, 'Period differs from independent native body measurement'
-                assert p[4] == p[2]+((33-counter)*expected_units)//33, 'Deadline lost fractional time'
+                if native_steps:
+                    elapsed = 20*(r['v'][10]-rstage[0]['entry_vbl'])
+                    if index and counter < 32:
+                        elapsed -= pause(rs)
+                    assert elapsed % 5 == 0
+                    offset = elapsed//5
+                else:
+                    offset = ((33-counter)*expected_units)//33
+                assert p[4] == p[2]+offset, 'Deadline differs from the selected independent native reference'
                 assert p[5] >= p[4] and p[9] == p[5]-p[4] and p[10] >= p[9]
                 sequence.append((p[6], p[7]))
                 epochs.append(p[2])
@@ -75,5 +83,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('reference', type=Path)
     parser.add_argument('capture', type=Path)
+    parser.add_argument('--native-steps', action='store_true',
+                        help='Require native per-step cumulative deadlines instead of the earlier uniform prototype')
     args = parser.parse_args()
-    check(args.reference, args.capture)
+    check(args.reference, args.capture, args.native_steps)

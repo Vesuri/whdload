@@ -354,8 +354,14 @@ escapes into the outer pit's message deadline. The new WORLD20 helper uses the s
 outer counter for that pit publication; three A500 register/SP/deadline contracts pass,
 and native message expiry now occurs. The complete unpaced A500 repair regression
 preserves all 264 geometry states and shortens the four invocations by 400–960 ms,
-but durations still fail calibration. Test cumulative repair pacing on the corrected
-baseline next; 030 message contracts remain open. Message lifetime itself still needs elapsed-time calibration, and ordinary world
+but durations still fail calibration. Uniform pacing on the corrected baseline passes
+one full case, with the other invocations 120–520 ms long. The next candidate preserves
+all 264 measured native per-step deadlines instead of uniformly dividing stage totals;
+all geometry/deadline checks pass, but A500 timing still fails in three cases (160–520 ms
+long). The next step is reducing or separating repair drawing while retaining logical
+updates, input/opponent service and nonlocal stack behavior; changing the deadline
+schedule alone did not remove the throughput constraint. The 030 pacing and message
+contracts remain open. Message lifetime itself still needs elapsed-time calibration, and ordinary world
 messages/other setters remain open; do not treat the ownership fix as full message timing. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The
 pilot stays disabled by default; the normal build is unchanged. Next audit the projection flag and matched native animation visibility,

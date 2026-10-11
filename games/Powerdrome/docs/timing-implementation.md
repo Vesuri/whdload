@@ -1466,17 +1466,31 @@ The pre-message-correction measurements use frozen playercontract1 with the repa
 pilot omitted. The corrected full timing baseline is now pitmessage1, described below;
 it intentionally changes pit message ownership. The normal slave is unchanged.
 
-For completed step `k=1..33`, the deadline is `epoch + floor(k*T/33)`, where `T` is the
-measured native A500 drawing total in five-millisecond clock units. This retains fractional
-time across steps and never adds a fresh period to an already-late completion. Four whole
+For completed step `k=1..33`, the current deadline is `epoch + native_cumulative[k]`.
+The eight 33-word tables come directly from the complete native A500 stage observations,
+in five-millisecond clock units, excluding the separate second-stage pause. They preserve
+the measured 100/120-ms step pattern instead of flattening each stage into equal intervals.
+The tables total 528 bytes. Their final values equal the existing measured stage totals;
+all 264 source entries have been checked against the independent native field capture.
+Deadlines retain lateness and never add a fresh period to a late completion. Four whole
 instruction hooks preserve the native save/presentation-call/restore depth and continue
 at the native loop tails. Only human active-pit paths for these two item variants are
 paced; unsupported modes keep the native path. The repair state clears on stage completion
 and pit abort. The full hook boundary/direct-entry audit passes.
 
+The earlier uniform prototype used `epoch + floor(k*T/33)`. Its frozen measurements
+below remain valid evidence for that implementation. The current per-step schedule is
+not a calibration pass: the A500 runtime result below still fails, and 030 regression
+remains open.
+`check_repair_pacing.py --native-steps` requires every deadline to match the native step
+reference; without that option it checks the earlier uniform prototype. The native-step
+mode rejects the old uniform capture, and the timing tolerances are unchanged. Both the
+normal slave and the repair-disabled full timing build remain byte-identical to their
+respective pre-schedule artifacts.
+
 The native sound/display work still executes in its original order before counter 31 of
 stage two. The helper then enforces its measured A500 minimum, preserving longer native
-waits, and shifts the epoch by the actual pause. This keeps both fractional deadlines and
+waits, and shifts the epoch by the actual pause. This keeps both absolute deadlines and
 pre-pause lateness without interpreting the pause as owed movement. Clock sampling
 clobbers D0/D1, so the minimum-wait deadline is held in saved D2.
 
@@ -1630,8 +1644,39 @@ partial invocation. With repair pacing still off, the changed message lifetime r
 
 These unpaced durations still fail the strict calibration gate. They demonstrate that
 message ownership was a material contributor to the animation cost; they do not establish
-elapsed-time message equivalence or repaired animation cadence. The next test combines
-this corrected baseline with the existing cumulative repair deadlines and minimum pauses.
+elapsed-time message equivalence or repaired animation cadence. The corrected baseline with uniform pacing (`timing-pitmessage-pace1-a500`)
+preserves all 264 word-geometry/deadline observations, but only item 1/direction 1 passes
+both stage and whole-invocation gates. Whole durations are **8,420 / 8,840 / 8,420 /
+8,080 ms**, respectively **160 / 0 / 520 / 120 ms** above native. Several individual
+stages pass, but the remaining cases must not be counted as calibrated. The current
+per-step schedule above tests whether retaining the measured cheap/expensive-step order
+avoids waiting away the headroom needed for later drawing. It does not change message
+lifetime, opponent cadence, required native updates or the separate minimum pause.
+
+The native-step candidate `timing-pitmessage-pace2-a500` passes all **264** exact
+word-geometry and native-cumulative-deadline observations, including stage ownership
+and pause exclusion, but still fails overall calibration. Whole invocation times are
+**8,420 / 8,820 / 8,420 / 8,120 ms** versus native **8,260 / 8,840 / 7,900 / 7,960 ms**.
+Only item 1/direction 1 passes both stage and whole-invocation bounds. The per-step
+schedule has not removed the A500 throughput constraint; do not infer an improvement
+from matching its deadline arithmetic. The pilot remains off by default.
+
+The next correction must reduce drawing work or allow presentation to fall behind the
+logical animation while preserving every native state update. The native call audit
+identifies two substantial costs: `$176c6` draws each masked bitmap with two graphics
+calls (mask then image), and `$15878` copies the complete 320×200 bitmap at each pit
+presentation. Neither can simply be skipped: `$1432e` also refreshes mutable part-bank
+pointers, and `$e296` combines drawing with message/refuel state, the outer counter,
+input polling, scheduled opponents and native nonlocal exits. A presentation split must
+preserve those operations and original stack depth, and must validate both bitmap buffers
+at displayed boundaries. Whole-stage timing, all 264 logical states, opponent continuity,
+input/result paths and image checks are required before treating reduced drawing as a fix.
+Do not remove blitter/display waits without proving the corresponding ownership contract.
+
+```sh
+python3 tools/check_repair_pacing.py --native-steps tmp/prof/timing-repairloop3-native-a500 tmp/prof/timing-pitmessage-pace2-a500
+# Geometry/deadline assertions pass; final cadence assertion deliberately reports failure.
+```
 
 This fixes an escaping deadline's counter domain, not its remaining frame dependence.
 Elapsed-time calibration of message lifetimes, ordinary world message ownership,
@@ -1650,7 +1695,8 @@ python3 tools/repair_step_profile.py tmp/prof/timing-repair-cost-native-a500 tmp
 ```
 
 `PDREPR01` records active stage, epoch, total units, latest deadline/completion time,
-stage/step counts, excluded pause time and lateness. The read-only `$14a20` continuation
+stage/step counts, excluded pause time and lateness. The per-step implementation appends
+its selected table pointer after the unchanged diagnostic prefix. The read-only `$14a20` continuation
 probe distinguishes the enforced minimum pause from the drawing body. These checks cover
 only the two item variants, not all repair branches, nonlocal result exits or complete
 pit duration. The pilot is not enabled by default until the remaining gates pass.
