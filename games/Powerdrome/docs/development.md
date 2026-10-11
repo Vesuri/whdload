@@ -63,8 +63,10 @@ no video) choose explicitly.
 
 `make -C whdload verify VASMFLAGS='-DVERIFY_CHIPMEMSIZE=1048576'` exposes 1 MiB
 of guest chip memory to exercise native resources unavailable in the normal 512-KiB
-configuration. Use a host with at least `CHIP_KB=1024`; the existing A500 timing-matrix
-case supplies only 512 KiB and cannot run this artifact. Freeze the verification slave
+configuration. Use a host with at least `CHIP_KB=1024`; the default A500 timing-matrix
+case supplies only 512 KiB and cannot run this artifact. `CASE_SET=weather-audio` selects
+030/fast and a 1-MiB-chip A500 for a frozen larger-memory coverage slave. Use
+`TIMING_EXTRA_PROBES='0x17836 0x178e6'` for the read-only audio call checks. Freeze the verification slave
 under `tmp/` before restoring `make -C whdload all`.
 
 The override requires `VERIFY` and accepts only 524288 or 1048576 bytes. Both invalid-build

@@ -3823,8 +3823,9 @@ all general registers and the stack return address. It identifies the installed 
 wrapper from the live `$bc8a` and `$112e6` hooks, its branch to the native audio helper,
 and its full-register restore. Initial/final snapshots on both CPUs identify one caller;
 corrupted hook, target and restore evidence are rejected. This avoids classifying other
-channel-3 sounds as weather solely by arguments. Probe integration and live entry/exit
-validation remain pending; the running full-cycle sampler has not been changed.
+channel-3 sounds as weather solely by arguments. The sampler now emits these probes when the two offsets are requested. Live entry/exit
+validation is pending in the larger-memory run; integration followed completion of the
+full-cycle capture.
 `tools/check_weather_audio.py CAPTURE` is prepared to pair those weather entry/return
 observations, check sample/channel arguments, distinguish the native suppression return
 from channel start, check the registers preserved by each path, and reconcile complete
@@ -4276,3 +4277,28 @@ previous full-cycle results refer to the older 90-ms effect schedule.
 The normal slave and effects-disabled full timing build remain byte-identical to saved
 references. Hook boundaries and C3-off native snapshots pass; legacy effect draw/selection
 captures still pass their version-specific readers. No cache policy changes were made.
+
+## Revised weather cadence: complete cycle regression
+
+The frozen `timing-weather-cycle-cadence1` A500/030 pair completes 8,500 PAL fields per
+CPU with `PDWEFX02` generation-before-fade ordering and the corrected deadline transfer.
+Both pass `check_weather_cycle.py` and `check_weather_effect_schedule.py --general`:
+4,217 common generation/visual states match on exact world deadlines. Warning-to-onset
+is 25,020 ms, native selected duration is 117,480 ms, expiry is 60 ms late, and all 30
+fade steps match. One deferred warning and expiry palette are delivered per CPU.
+Both select 11 effects and execute 23 logical visual events, with 53 actual 030 draws
+versus 23 A500 draws. These probes do not independently check every draw's seed restore.
+
+The movement comparison matches 8,503 common states and 1,889 common control/input/fuel
+updates. A500 executes 8,505 steps: initial/final unsampled time is 140/40 ms versus
+80/20 ms on 030, accounting for the extra 40 ms. Maximum world-end delay is 780/260 ms
+(A500/030), maximum allocation 32/12 steps, and maximum retained debt 160/0 ms.
+Both finish with zero retained or assigned simulation work. A500's pending visual phase
+is due exactly at its next world cursor; the 030 has no pending phase and its next
+generation is 20 ms ahead. Thus neither endpoint contains overdue weather work.
+
+The 030 completes 2,476 renderer twins with zero pixel/register/scratch/guard failures
+and unchanged raster code. Its final additional active scene is unfinished and excluded.
+This is a seeded full-cycle regression, not unseeded weather, audio playback, palette
+pixel/scanout, general mode-transfer or whole-game framerate-independence acceptance.
+Reports are saved as `cycle-check.txt` and `schedule-check.txt` within the capture pair.

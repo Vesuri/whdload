@@ -650,11 +650,23 @@ visual events, despite 21 actual 030 draws versus nine A500 draws. The 030 adds 
 renderer twins; its additional unfinished draw is excluded. No endpoint simulation debt
 or draw seed ownership remains. A500's pending next-cursor visual event is explicitly
 accounted for. Five corrupted timing/state cases are rejected; disabled/normal bytes and
-C3-off hook checks pass. The full 170-second `timing-weather-cycle-cadence1` pair is running
-with generation-before-fade ordering and the corrected deadline-transfer helper. Its completed
-030 capture passes the full cycle and 4,217 generation/visual boundaries on exact world
-deadlines (11 selections, 23 logical visual events, 53 draws); A500 is still running.
-The deferred helper `$17836` is now identified as audio-channel start, not bitmap cleanup.
-Existing `cleanups` fields count sound-helper calls, not audible output. Next finish the
-comparison, then validate native sample allocation, channel arguments and catch-up sound
-coalescing, alongside palette restoration, unseeded weather and mode/lifecycle acceptance. The earlier full-cycle evidence used the old 90-ms effect cadence.
+C3-off hook checks pass. The full 170-second `timing-weather-cycle-cadence1` pair now passes with
+generation-before-fade ordering and the corrected deadline-transfer helper. Both CPUs
+match all 4,217 common weather boundaries, 8,503 movement states and 1,889 control/input/fuel
+updates. Warning-to-onset is 25,020 ms, selected duration 117,480 ms and expiry lateness
+60 ms; all 30 fade steps match. Both have 11 selections and 23 logical visual events,
+with 53 actual 030 draws versus 23 A500 draws. The 030 passes 2,476 completed renderer
+twins; its additional unfinished scene is excluded. A500 peaks at 160 ms retained debt
+but finishes with no retained/assigned work. Its pending visual publication is due at the
+next world cursor, not overdue. The two extra A500 movements are explained by different
+initial/final unsampled elapsed time. This closes this seeded full-cycle regression,
+not natural weather, lifecycle, palette pixels or broader A500 calibration acceptance.
+
+The deferred helper `$17836` is an audio-channel start, not bitmap cleanup. Existing
+`cleanups` fields count sound-helper calls, not audible output. The larger-memory audio
+pair is running with read-only helper entry/exit probes. Its initial 030 snapshot confirms
+native 404,000-byte allocation and optional sample loading without forced flags: the
+weather descriptor has 5,087 sample words and period 895, using channel 3 and volume 63.
+Complete call contracts, catch-up sound coalescing, palette restoration, unseeded weather
+and mode/lifecycle acceptance remain open. The earlier full-cycle evidence used the old
+90-ms effect cadence.

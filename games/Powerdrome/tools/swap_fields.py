@@ -13,6 +13,7 @@ import struct
 from powerdrome import SOCK, send_request
 from powerdrome_report import regions
 from weather_state import PROBES as WEATHER_PROBES, probe_command as weather_probe_command
+from weather_audio_state import PROBES as AUDIO_PROBES, probe_command as audio_probe_command
 from weather_effect_state import locate as weather_effect_locate, probe_command as weather_effect_probe
 from weather_fade_state import locate as weather_fade_locate, probe_command as weather_fade_probe
 from weather_cycle_state import locate as weather_cycle_locate, probe_command as weather_cycle_probe
@@ -303,6 +304,8 @@ if os.environ.get('TIMING_STATE') == '1':
     # Keep event samples separate from presentation samples used by timing_report.
     for off in probes:
         sample = 'printf "PDTIME_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(vals)) + '\\n", $pd_field, ' + ', '.join(vals) + '\n'
+        if off in AUDIO_PROBES:
+            sample += audio_probe_command(r['game'][0],off)
         if off in WEATHER_PROBES:
             sample += weather_probe_command(r['game'][0],off)
         if weather_effect_address is not None:
