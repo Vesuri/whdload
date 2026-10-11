@@ -700,6 +700,10 @@ timing_frame
  move.w #1,timing_control_phase-timing_state(a1)
  ENDC
  IFNE TIMING_WORLD20
+ tst.w timing_pit_rebase-timing_state(a1)
+ beq.s .message_ready
+ bsr timing_message_resume
+.message_ready
  clr.w timing_pit_rebase-timing_state(a1)
  ENDC
  move.w #1,timing_started-timing_state(a1)

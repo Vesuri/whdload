@@ -289,6 +289,26 @@ timing_pit_message_counter
  movem.l (sp)+,d0
  rts
 
+; Called once after a rescue return, inside timing_frame's saved-register/CCR
+; initialization. The outer counter still owns the deadline here. Preserve its
+; remaining count in the newly resumed control phase; -1 stays a sentinel.
+; D0/D1 are scratch, covered by the caller's save frame.
+timing_message_resume
+ tst.w $b6(a6)
+ bne.s .done
+ tst.w $43a(a6)
+ bpl.s .done
+ move.l $64(a6),d0
+ cmp.l #-1,d0
+ beq.s .done
+ sub.l $5e(a6),d0
+ moveq #0,d1
+ move.w timing_control_phase(pc),d1
+ add.l d1,d0
+ move.l d0,$64(a6)
+.done
+ rts
+
 ; Native lap rebase still supplies D1 and CCR to its continuation, but a
 ; continuous logical message deadline must not lose the native lap counter.
 ; Replay all three instructions, then restore only the deadline in that domain.

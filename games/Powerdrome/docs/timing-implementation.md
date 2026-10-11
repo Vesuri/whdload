@@ -1944,6 +1944,56 @@ python3 tools/check_message_lap.py tmp/prof/timing-messagelap1-pair-a500-long
 python3 tools/check_flight_message.py tmp/prof/timing-messagelap1-flight-030
 ```
 
+The rescue return also needs an explicit change of message-counter domain. In
+`timing-messagehandoff-before-030`, departure publishes a message through `$13536`
+while the pit opponent scheduler owns the native counter: its temporary counter is
+1,343, but the saved outer source is 999, correctly producing deadline 1,044 after the
+native +45. At first resumed flight the outer counter is 1,018, so **26 counts remain**.
+The logical clock resumes at phase 293. Previously deadline 1,044 survived unchanged;
+71 observed expiry branches leave the message alive until a new publication replaces it
+at phase 352, already past its intended remaining count.
+
+`timing_message_resume` now translates the deadline once during the existing rescue
+reinitialization, after selecting the resumed control phase and before clearing the
+pit-rebase flag: `deadline = phase + (old_deadline - outer_counter)`. The -1 sentinel
+is preserved explicitly. Human-flight mode guards retain native behavior elsewhere;
+initial pit entry and ordinary frames do not call the conversion. Registers and CCR
+are protected by the containing `timing_frame` save frame. Negative remaining counts
+stay expired instead of being clamped into a fresh positive lifetime.
+
+The corrected `timing-messagehandoff1-030` observes **1,044 → 319** at the phase-293
+handoff, preserving those **26 remaining counts**, and the native expiry/clear occurs
+at phase **319**. The checker verifies the pit publication, paired first-update
+register/stack contract, 32 expiry branch/register decisions and one native clear.
+It stops tracking that message at the next publication rather than mixing lifetimes.
+The completed 500-field capture adds **117 clean renderer twins**, with unchanged raster
+code; the final in-progress draw is not a teardown proof. The normal build remains
+byte-identical, and the option-off hook audit still passes.
+
+The same build on A500 (`timing-messagehandoff1-a500`) exercises an already inactive
+message. At retune its deadline is 849; no publisher changes it before first resumed
+flight. The outer counter reaches 904 and the logical phase resumes at 293, so the
+conversion yields **849 → 238**, preserving **-55 remaining counts**. The message stays
+inactive until a later publication. The check verifies the paired register/stack
+contract and rejects revival; it makes no claim about the unobserved original publisher
+or an active A500 message lifetime. The different 030/A500 message histories are not
+matched trajectory evidence.
+
+Use the lap-correction synchronized-pit configuration (C5=13), ordered pre-anchor
+probe `$c7d2`, anchor `$1408a`, 500 fields and probes
+`0x14090 0x140d0 0xce28 0xca3e 0xca4a 0x13536 0x1353c 0x13558 0xda54 0xda5a 0xda64`.
+The pre-anchor probe selects rescue departure instead of the initial pit departure.
+This establishes count-domain ownership, not original A500 pit-message duration:
+those pit counts are still tied to native presentations and need their own cadence
+calibration. Other result/nonlocal handoffs, the sentinel branch, wrap and guest CCR
+edge cases remain separate runtime requirements.
+
+```sh
+python3 tools/check_message_handoff.py --expect-leak tmp/prof/timing-messagehandoff-before-030
+python3 tools/check_message_handoff.py tmp/prof/timing-messagehandoff1-030
+python3 tools/check_message_handoff.py --inactive tmp/prof/timing-messagehandoff1-a500
+```
+
 The message deadline is also mutated outside its ordinary publisher. A static audit of
 explicit state+$64 operands identifies these additional contracts (indirect aliases are
 not excluded by this inventory):

@@ -397,7 +397,11 @@ the old 1,045 → 693 subtraction and the corrected 1,044 → 1,044 preservation
 A500 also passes one inactive deadline at 849 → 849. The ordinary 030 flight regression
 passes thirteen publications, two 45-phase clears, 240 expiry checks and 293 clean twins.
 The differing arrival values and unobserved pre-window publisher do not establish
-trajectory equivalence or rescue-message lifetime. Direct/less common publishers, broader lap contexts, phase wrap,
+trajectory equivalence or rescue-message lifetime. Rescue reinitialization now translates
+remaining message counts into the resumed flight clock: 030 preserves 26 remaining counts
+and clears exactly 26 phases later (32 expiry checks, 117 clean twins); A500 preserves an
+already expired -55-count deadline without reviving it. These different histories do not
+calibrate native pit durations. Direct/less common publishers, broader lap contexts, phase wrap,
 mode handoffs and A500 message-duration calibration remain open; pit expiry still uses
 the outer pit counter. Do not treat this bounded correction as complete message timing. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The
