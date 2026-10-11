@@ -3484,15 +3484,54 @@ None establishes a steady requested display rate. The 10 Hz request supplies the
 slower-cadence comparison for both configurations. These remain correctness-instrumented
 observations, not release throughput measurements.
 
+The `timing-rate50-native1` extension uses `CASE_SET=rate-native` for 030/25 and 060/50
+with native rendering, the same frozen 50 Hz request fixture and 650-field input window.
+Both per-run gates and the 652 common sampled world states pass. The original endpoint
+control checker rejects the 060 capture because it assumes every completed control belongs
+to a completed movement; the failed runner log is retained. Inspection proves a completed
+control/resource update inside its one unfinished movement step. After the independently
+verified boundary correction below, 145 common controls/resources match between these two
+runs. Combining them with all four requested-rate pairs and both unpaced references gives
+**652 identical common world states and 144 identical common control/input/fuel updates
+across twelve captures**.
+
+| Native-rendered 50 Hz request | 030/25 | 060/50 |
+| --- | ---: | ---: |
+| Allocator releases / rate | 168 / 18.556 per second | 150 / 16.592 per second |
+| Marker intervals / rate | 166 / 18.568 per second | 148 / 16.629 per second |
+| Marker span | 8,940 ms | 8,900 ms |
+| Late deadlines / maximum lateness | 167 / 200 ms | 149 / 200 ms |
+| Total lateness / pacing wait | 5,660 / 0 ms | 6,000 / 0 ms |
+| Completed movement steps / completed controls | 653 / 145 | 652 / 145 |
+| Assigned unfinished movement steps at endpoint | 0 | 1 |
+| Initial → final unsampled time | 60 → 0 ms | 60 → 0 ms |
+| Maximum sampled world-end delay / retained debt | 220 / 0 ms | 200 / 0 ms |
+
+The 030 histogram is `{40:75, 60:86, 140:4, 220:1}`; 060 is
+`{40:26, 60:113, 80:4, 120:2, 140:1, 160:1, 220:1}`. Neither reaches 50 Hz or waits
+for pacing. The 060 endpoint retains no unallocated time but has one assigned movement
+unfinished, so it is not a zero-outstanding-work endpoint. No renderer twins are performed
+on these native paths. These configured emulator results extend measured cadence coverage;
+they are not physical accelerator rankings or release-performance benchmarks.
+
+`timing_control_window.py` now recognizes a completed control in an unfinished movement
+only when independent evidence agrees: active world ownership, the control-due flag,
+exactly one extra started world step, the exact started-control count, a deadline due in
+that movement, an advanced completed-input clock with control ownership released, and a
+unique post-control `$ccee` observation agreeing with the live clock and counters. It does
+not infer an extra allowance from the observed row count. Exact deadline sequence and final
+clock checks still apply to all compared rows, including resources. The combined twelve
+captures, ten-minute pair and 100 ms stall pair pass. Seven in-memory corruptions (cleared
+ownership/due flags, extra started-step/control counts, removed boundary probe and missing/
+duplicate control rows) are rejected without modifying any frozen capture. Gameplay code,
+cadences and equality tolerances are unchanged.
+
 Next steps:
 
-1. Use `CASE_SET=rate-native` with the same frozen rate fixture and `FIELDS=650` to
-   test 030/25 and 060/50 with native rendering. This runs the same per-run and exact
-   cross-CPU checks without twin drawing, then needs the rate checker and comparison
-   with the existing timed-input references. Report actual rates and missed deadlines.
-2. Where higher actual rates are feasible, repeat lower requested rates on that same
-   configuration to establish a wider measured cadence range. Do not equate a fixture
-   setting with achieved coverage.
+1. Repeat a lower requested cadence on the same native-rendered accelerator configurations
+   to establish a matched high/low measured-rate comparison without twin drawing.
+2. Report higher requested rates as unattained where measured intervals cannot support
+   them; do not equate a fixture setting with achieved coverage.
 3. Extend to variable presentation intervals and other response/effect routes. Preserve
    both native and fast-rendered state checks and keep rendering correctness separate
    from the measured cadence claim.

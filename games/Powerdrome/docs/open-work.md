@@ -496,9 +496,15 @@ has another draw active. The 10 Hz request measures 9.572/s on 030 and 8.200/s o
 Requests of 15/25/50 Hz all measure 12.275/s and 9.039/s; 25/50 add no pacing wait and
 therefore supply no achieved high-rate coverage. Every run accounts for elapsed work
 with no endpoint retained/assigned simulation debt. `CASE_SET=rate-native` now selects
-030/25 and 060/50 native rendering for the next measured-rate extension. Higher achieved
-rates, variable intervals and other effect routes remain open; this bounded result does
-not close the controlled-render-rate gate.
+030/25 and 060/50 native rendering. That extension passes at measured marker rates
+18.568/s and 16.629/s, respectively; all twelve captures share 652 exact common world
+states and 144 exact control/input/fuel updates. The 060 endpoint contains a completed
+control inside one unfinished movement. The comparison checker now requires explicit
+clock/counter/ownership and post-control probe evidence for that case; seven contradictory
+or missing-evidence cases are rejected, with earlier long/stall checks still passing.
+The original failing runner log is retained. No gameplay code or tolerances changed.
+Matched native-renderer low/high cadence, higher achieved rates, variable intervals and
+other effect routes remain open; this bounded result does not close the rate gate.
 
 
 The remaining weather audit maps forecast/start/expiry, outer-loop effect generation,
