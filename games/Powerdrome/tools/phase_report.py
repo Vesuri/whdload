@@ -96,7 +96,8 @@ def frames(events, clock_key='clocks'):
 
 
 def trace_times(path, pc, address, events):
-    import barto
+    import _amigaxdev
+    from amigaxdev import barto
     trace = barto.load(path / 'trace.bin')
     wanted = {(e['vbl'], e['beam'], e['event']): e for e in events}
     total = 0
@@ -188,7 +189,8 @@ def handshake_report(path):
 
 def world_cost(path, listing):
     """B3: uninstrumented 68000 steps, entry through committed world clock."""
-    import barto
+    import _amigaxdev
+    from amigaxdev import barto
     cfg = json.loads((path/'configuration.json').read_text())
     assert cfg['CPU'] == '68000', 'B3 cost is defined for M1'
     # VASM listings include the shared include files' Latin-1 copyright text.

@@ -11,7 +11,8 @@ import json
 import re
 import struct
 from pathlib import Path
-import adf
+import _amigaxdev
+from amigaxdev import adf
 
 PROBES = (0x8962, 0x173b2, 0x173b6, 0x16c4c, 0x16c4e, 0x11d70)
 PATCHES = (0x843c, 0x13772, 0x1377c, 0x12f6a, 0x130a4, 0x13c50, 0x13cde)

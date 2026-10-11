@@ -10,7 +10,8 @@ from pathlib import Path
 import struct
 from capstone import Cs, CS_ARCH_M68K, CS_MODE_BIG_ENDIAN, CS_MODE_M68K_000
 from capstone.m68k_const import M68K_OP_MEM
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from powerdrome_report import regions
 
 p = argparse.ArgumentParser(description=__doc__)

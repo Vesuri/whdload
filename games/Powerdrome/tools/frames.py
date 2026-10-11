@@ -6,7 +6,8 @@ Usage: SLAVE=capture/slave.slave python3 tools/frames.py TRACE DUMP BASE
 """
 import collections, os, struct, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from powerdrome_report import regions
 
 SWAP = 0x1067e  # attract-demo completed frame

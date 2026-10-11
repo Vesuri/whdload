@@ -12,7 +12,8 @@ the active Amiga image, instruction records, DMA and initial chip snapshot match
 """
 import hashlib, io, os, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto
+import _amigaxdev
+from amigaxdev import barto
 
 a, b = barto.load(sys.argv[1]), barto.load(sys.argv[2])
 bad = 0

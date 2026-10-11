@@ -11,7 +11,8 @@ import json
 from pathlib import Path
 import statistics
 
-import barto
+import _amigaxdev
+from amigaxdev import barto
 
 # Ordered boundaries in the native repair loop and its E296 presenter.
 BOUNDARIES = (

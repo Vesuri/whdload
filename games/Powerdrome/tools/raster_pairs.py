@@ -6,7 +6,8 @@ import argparse
 import json
 from pathlib import Path
 import statistics
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from perf_status import status
 
 p = argparse.ArgumentParser(description=__doc__)

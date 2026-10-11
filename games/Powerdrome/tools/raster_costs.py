@@ -8,7 +8,8 @@ import argparse
 from collections import Counter
 import json
 from pathlib import Path
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from perf_status import status
 
 p = argparse.ArgumentParser(description=__doc__)

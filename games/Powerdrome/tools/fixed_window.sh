@@ -144,7 +144,7 @@ fi
 python3 - "$OUT" "$FIELDS" <<'PYSHOTS'
 from pathlib import Path
 import sys
-sys.path.insert(0,'tools');import barto
+sys.path.insert(0,'tools');import _amigaxdev;from amigaxdev import barto
 p=Path(sys.argv[1]); t=barto.load(p/'trace.bin')
 assert len(t.fields) == int(sys.argv[2]), 'Profiler returned fewer fields than requested'
 (p/'first.png').write_bytes(t.fields[0].shot)

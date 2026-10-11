@@ -8,7 +8,8 @@ import collections
 import json
 from pathlib import Path
 import sys
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from powerdrome_report import Memory
 
 MARKS = {

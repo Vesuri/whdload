@@ -10,7 +10,8 @@ from collections import defaultdict
 import json
 from pathlib import Path
 from statistics import median
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from perf_status import status
 
 

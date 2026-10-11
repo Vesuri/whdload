@@ -229,11 +229,13 @@ read-only breakpoint from reset, but must be calibrated against the current buil
 The x86_64 profiler window uses the existing single-attach LLDB workaround; its assertion
 checks the write. Emulated time stops while attached. Screenshots come from trace captures.
 
-The harness and parser derive from Indianapolis 500; OFS extraction and patch-list decoding
-from Battlehawks 1942. The reporting locator has been adapted to Powerdrome's single hunk
+The server, trace parser, OFS extraction and patch-list decoding are AmigaXDev's shared
+`amigaxdev` package (`gdbserve`, `barto`, `adf`, `patchlist`); `tools/_amigaxdev.py` puts it on
+the path under any `python3`. `tools/powerdrome.py` adds the request framing and long captures. The reporting locator has been adapted to Powerdrome's single hunk
 and either the original or development slave.
 
-`tools/adf.py` lists/extracts the local disk image; `tools/patchlist.py` decodes original lists.
+`python3 -m amigaxdev.adf` lists/extracts the local disk image; `python3 -m amigaxdev.patchlist`
+decodes original lists (AmigaXDev's shared package, on the path after sourcing `amiga/env.sh`).
 See `docs/open-work.md` before interpreting a capture as a benchmark.
 
 ## Fixed attract-demo window

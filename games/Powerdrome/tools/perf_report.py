@@ -8,7 +8,8 @@ import json
 from pathlib import Path
 import statistics
 import struct
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from perf_status import status
 
 

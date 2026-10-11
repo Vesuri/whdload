@@ -9,7 +9,8 @@ import json
 import os
 from pathlib import Path
 import sys
-import barto
+import _amigaxdev
+from amigaxdev import barto
 from powerdrome_report import Memory, regions
 
 RANGES = [

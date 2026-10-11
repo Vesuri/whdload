@@ -71,6 +71,7 @@ class TransportTests(unittest.TestCase):
         writer=PartialWriter()
         debugger=Gdb.__new__(Gdb)
         debugger.p=SimpleNamespace(stdin=writer)
+        debugger.sent=SENT
         debugger.read_until=lambda token,timeout: 'done'
         command='print $pc\n'*10000
         self.assertEqual(debugger.cmd(command),'done')

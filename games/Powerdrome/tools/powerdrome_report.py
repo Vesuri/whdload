@@ -17,7 +17,8 @@ separate stacks.  Cycles are 7.09 MHz CPU clocks; a PAL field is 142,102.
 """
 import argparse, collections, os, struct, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import barto
+import _amigaxdev
+from amigaxdev import barto
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIELD = 142102
@@ -102,7 +103,7 @@ GAME = os.path.join(ROOT, 'tmp/game/Powerdrome')
 
 
 def game_code():
-    import adf
+    from amigaxdev import adf
     disk = open(os.path.join(GAME, 'Disk.1'), 'rb').read()
     hdr = next(h for p, h, n in adf.walk(disk) if p.lower() == 'pd')
     exe = adf.read(disk, hdr)
@@ -111,7 +112,7 @@ def game_code():
 
 
 def regions(dump, base, chip=None):
-    from patchlist import slave_code
+    from amigaxdev.patchlist import slave_code
     out = []
     blob = game_code()
     slave = slave_code(os.environ.get('SLAVE') or os.path.join(GAME, 'Powerdrome.Slave'))
