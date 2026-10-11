@@ -5,6 +5,14 @@
  INCLUDE lvo/dos.i
  INCLUDE exec/memory.i
  INCLUDE exec/execbase.i
+ IFND VERIFY_PHASE
+VERIFY_PHASE = 0
+ ENDC
+ IFNE VERIFY_PHASE
+ IFND VERIFY
+ FAIL "VERIFY_PHASE requires VERIFY"
+ ENDC
+ ENDC
  IFND COVERAGE_AUDIO_KEYS
 COVERAGE_AUDIO_KEYS = 0
  ENDC
@@ -32,7 +40,11 @@ CHIPMEMSIZE = $80000
  ENDC
 CHIPMEMSIZE = VERIFY_CHIPMEMSIZE
  ENDC
+ IFNE VERIFY_PHASE
+FASTMEMSIZE = $60000 ; private 256 KiB phase ring in addition to normal arena
+ ELSE
 FASTMEMSIZE = $20000
+ ENDC
 NUMDRIVES = 1
 WPDRIVES = 0
 DISKSONBOOT
@@ -82,6 +94,9 @@ pl_endcli PL_START
  PL_END
 
 launch_pd
+ IFNE VERIFY_PHASE
+ bsr phase_allocate
+ ENDC
  bsr reserve_arena
  move.l (4).w,a6
  moveq #0,d0
@@ -129,6 +144,10 @@ launch_pd
  bsr install_coverage_patches
  ENDC
 .run
+ IFNE VERIFY_PHASE
+ ; Chain the final installed coverage entry as well as the planar/timing hooks.
+ bsr install_phase
+ ENDC
  ENDC
  ; resload calls may poison scratch registers, especially with MMU checks.
  ; DOS program entry requires a valid argument pointer and length.
@@ -181,3 +200,7 @@ custom2 dc.l 0
  INCLUDE timing.s
  INCLUDE planar.s
  INCLUDE fast_raster.s
+
+ IFNE VERIFY_PHASE
+ INCLUDE phase.s
+ ENDC

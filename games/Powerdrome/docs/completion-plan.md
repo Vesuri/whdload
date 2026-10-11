@@ -7,27 +7,37 @@ Do not add new verification work that the gates below do not ask for.
 
 ## Where the project stands
 
-Measured in the emulator, Practice route, 500 PAL fields from the first driving
-presentation (`$bc7c`), `SWAP_ONLY`, caches off:
+The complete Phase B baseline is in [Current measurements](internals.md#current-measurements):
+60 uninstrumented route measurements, 14 separate phase captures and three frequency
+sanity runs. These are emulator results; cache labels are requested WHDLoad options.
 
-| Machine | Native fps | `CUSTOM1` fast planar fps | Source |
-| --- | ---: | ---: | --- |
-| A500, 68000, 512 KB chip, 1.5 MB slow | about 11.4 | not available (no fast RAM) | timing-implementation, A500 calibration |
-| 68000 with 4 MB fast | 11.33 | 9.36 (slower) | performance-implementation |
-| A1200 68EC020, 2 MB chip, 4 MB fast | 15.68 | 22.20 | raster-improvements |
-| 68030/25 | 19.56 | 30.12 | accelerator-cache-testing |
-| 68040/25 NOMMU | 17.91 | 41.57 | same |
-| 68060/50 NOMMU | 17.91 | 42.99 | same |
+| Machine | Native fps | Fast planar fps | Full timing + fast fps | Cache |
+| --- | ---: | ---: | ---: | --- |
+| M1 A500 | 11.404 | 11.404 (fallback) | 10.465 | NoCache |
+| M2 A500 + fast | 11.325 | 9.355 | 8.710 | NoCache |
+| M3 stock A1200 | 15.423 | 15.392 (fallback) | 14.575 | NoCache |
+| M4 A1200 + fast | 15.682 | 22.110 | 21.881 | NoCache |
+| M5 030/25 | 19.556 | 30.221 | 31.552 | NoCache / CACHE |
+| M6 040/25 | 17.907 | 41.566 | 41.984 | NoCache |
+| M6 040/25 | 36.948 | 49.098 | 49.098 | CACHE |
+| M7 060/50 | 17.907 | 42.986 | 42.886 | NoCache |
+| M7 060/50 | 40.481 | 49.098 | 49.098 | CACHE |
 
-- **Rendering.** Fast planar rendering works and has been checked against the native
-  renderer in 30,623 twin comparisons, but it is off by default. Nothing reaches 50 fps.
-  The 040/25 and 060/50 results are almost the same, so they are limited by chip RAM or by
-  waiting, not by the CPU. Nobody has measured where their frame time goes. The A500 has
-  not been sped up at all. On the track its frame time is 54% polygon rasterization, 8.5%
-  CPU background fill and 9.6% Kickstart, and the blitter is idle (0.24% of DMA slots).
+These are Practice rates from 500 PAL fields at `$bc7c`, using `SWAP_ONLY`.
+Timing changes motion, so comparisons represent route throughput rather than identical
+scene workloads. The full interval counts, histograms and race results are in internals.
+
+- **Rendering.** Fast planar rendering remains off by default. Its existing coverage
+  campaign passed 30,623 twins. With CACHE, M7 now measures 50.000 fps on the race route
+  and M6 measures 49.900. B1/B2 attribute the remaining time: rendering is the largest
+  active cost; copy and HUD exceed the Phase C candidate threshold; presentation
+  including LoadView is below 1% on M6/M7. At near-50 fps the handshake also provides
+  display pacing, so its entire measured share is not available as a throughput gain.
+  The A500 has not been sped up: its original track profile is 54% polygon rasterization,
+  8.5% CPU fill and 9.6% Kickstart, with the blitter idle (0.24% of DMA slots).
 - **Timing.** The normal `CUSTOM3` build contains only the 20 ms minimum delta and the
-  cockpit liftoff pacing. Everything else is a compile-only prototype spread over about 30
-  `timing_*.s` files and about 40 assembly flags: the 20 ms world tick (`TIMING_WORLD20`),
+  cockpit liftoff pacing. The complete scheduler remains a compile-only prototype, consolidated by Phase A
+  under `TIMING_FULL=1`: the 20 ms world tick (`TIMING_WORLD20`),
   90 ms controls, carried movement remainders, logical opponents, laps, messages, repair
   pacing and weather. Cross-CPU logical equivalence and pause/rescue/restart regressions
   pass. Work stalled on gates that ask for an exact match with native A500 *histories*,
@@ -46,7 +56,7 @@ presentation (`$bc7c`), `SWAP_ONLY`, caches off:
 | # | Decision | Reason |
 | --- | --- | --- |
 | D1 | **Reference policy: representative A500 handling.** Fixed 20 ms world ticks and 90 ms control/resource/engine/opponent epochs, the cadences already measured. Scene-dependent A500 slowdown is not reproduced. | The goal is that the game always feels the same. Native A500 histories are a tolerance reference on steady routes, never an exact oracle. The brake (108 vs 53), impulse (1,120 ms) and pilot 1 visibility differences are expected results of this policy. Document them and do not gate on them. |
-| D2 | **68000/68010 keep native timing; 68020+ uses the world scheduler.** Step B3 can overturn this if it measures an A500 cost of 3% or less. | The A500 is the reference, so native timing on it is correct by definition. On the measured Practice route its frame deltas (60–160 ms) never reach the 40 ms clamp. LoV's fixed tick cut A500 fps by about 60%, and TD2 kept the native period on the 68000. |
+| D2 | **68000/68010 keep native timing; 68020+ uses the world scheduler.** B3 retains this decision: full timing loses 8.23% fps in Practice and 6.64% in race, above the 3% limit. | The A500 is the reference, so native timing on it is correct by definition. On the measured Practice route its frame deltas (60–160 ms) never reach the 40 ms clamp. LoV's fixed tick cut A500 fps by about 60%, and TD2 kept the native period on the 68000. |
 | D3 | **Ship defaults: fast planar on for 68020+ with real fast RAM, and the world scheduler on for 68020+.** The options become opt-outs: `C1` original renderer, `C3` original timing. | This is the LoV release shape. On the 68000 the renderer measures slower (9.36 vs 11.33 fps), so it stays off there. |
 | D4 | **No render interpolation.** | The world tick (20 ms) equals the PAL field, so every 50 fps frame shows a new tick, and at lower rates every frame shows the latest tick. Interpolation would add latency for no visible gain. |
 | D5 | **Finite gates.** Use only the gates in this plan. New checker scripts are allowed only when a listed gate cannot be evaluated without one. | This stops the validation spiral. |
@@ -90,8 +100,7 @@ which has opponents on screen and is the heavier scene.
 
 ## Phase A: Consolidate the timing prototype (no behaviour change)
 
-Status: **A1 and A2 complete**, byte-equivalence gates passed. Work stopped at the
-user-requested Phase A boundary; no emulator capture or Phase B–F work was performed.
+Status: **A1 and A2 complete**, byte-equivalence gates passed. Phase B is also complete; Phases C–F remain untouched.
 See [open work](open-work.md) for the exact configuration and file hashes.
 
 **A1. Pick one release configuration.** Find the flag set behind the most recent complete
@@ -115,6 +124,14 @@ which proves that only dead code went. Commit: "Consolidate timing prototype int
 release configuration".
 
 ## Phase B: The instrument and an honest baseline
+
+Status: **B1–B3 complete**. B1 phase/trace disagreement is at most 0.00571%
+(2% gate); normal and uninstrumented full coverage bytes are unchanged. All 77 B2
+captures are complete, all six existing native references match exactly, and all
+8 MHz checks are slower. B3 measures 10,357.86 mean / 18,778 p95 cycles per complete
+A500 world body; the 8.23% Practice fps loss retains D2's native 68000/68010 timing.
+See [Current measurements](internals.md#current-measurements) and [open work](open-work.md).
+**Stopped here; Phase C has not started.**
 
 **B1. Guest phase timer (VERIFY only).** Add a ring of `PDPHASE` records. Each holds the
 VBL count, `VPOSR`/`VHPOSR` and a phase id, written at hooks that already exist, plus these:

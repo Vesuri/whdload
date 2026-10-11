@@ -2,21 +2,41 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
-## Phase A complete — stopped at the requested boundary
+## Phase B complete — stopped before Phase C
 
-D1–D5 in the completion plan are confirmed. Phase A is complete; B–F have not started.
-No emulator captures were run. The normal build is restored and byte-identical to the
-pre-A baseline. No release-default changes have been made.
+D1–D5 are confirmed. Phases A and B are complete. No Phase C–F implementation or
+release-default change has been made. The next authorized work, when requested,
+is Phase C using the measured priorities in [internals](internals.md#current-measurements).
 
-- A1: `TIMING_FULL=1` coverage is byte-identical to fixture-free cadence2 individual flags.
-- A2: full coverage and normal builds are byte-identical before/after removing the old
-  movement-clock/world pilot, repair without drawing skips, obsolete diagnostic fixtures
-  and their exclusive checkers. Deferred weather sound is unsupported; direct delivery
-  and its reserved record layout remain unchanged.
-- Retained: pause/session/rescue/finish routes, stall/render-rate/pit-sync fixtures, seed
-  overrides and directed weather fade/cycle/effect fixtures. They stay off by default.
-- Resume with Phase B only when requested. Phase E owns the finite timing release gates;
-  the detailed older investigations below do not add release gates or override D1–D5.
+- **B1 passes.** `VERIFY_PHASE=1` adds a 16,384-record beam-clock ring in an
+  additional 256 KiB of requested expansion. It records actual renderer returns,
+  preserves staged-render eligibility and accounts for incident/aborted world steps.
+  The M4 trace compares 46 common complete present intervals. Eleven initial
+  snapshot records precede the trace and are excluded from both sides; none are
+  missing inside it. Maximum phase-sum disagreement is 0.00571%, against the 2%
+  gate. Evidence: `tmp/phase-b/b1-m4-final-trace/` and `b1-final-comparison.json`.
+- **B2 passes.** All 77 captures are complete: 60 baseline, 14 separate full-timing
+  phase captures, and three 8 MHz checks. All six published native Practice
+  references reproduce exactly. M3 has no prior reference and supplies a new
+  baseline. All frequency checks are slower. The complete table, including cache
+  settings, intervals/fields, histograms and phase mean/p95, is in internals.
+  Evidence: `tmp/phase-b/b2-gates.json` and each capture's `baseline.json`.
+- **B3 complete; D2 retained.** The uninstrumented M1 trace measures 100 complete
+  world bodies: 10,357.86 mean and 18,778 p95 cycles, including interrupts but
+  excluding frame allocation, rendering/HUD-owned work and post-commit tails.
+  M1 full timing loses 8.23% fps in Practice (99/473 versus 104/456) and 6.64% in
+  race (104/485 versus 113/492). Keep native timing on 68000/68010. Evidence:
+  `tmp/phase-b/b3-m1-world-trace/` and `b3-world-cost.json`.
+- The normal and uninstrumented full coverage builds remain byte-identical to
+  Phase A (hashes below). The ordinary normal build is restored in `tmp/build/`.
+- No unresolved failed gate remains. The M4 phase-boundary correction passed
+  its single 500-field retry; the B3 listing reader accepts VASM's Latin-1 text
+  and successfully reports the original capture. No tolerance was widened.
+
+Full timing with WHDLoad CACHE reaches 49.098 fps in Practice on M6/M7 and
+49.900/50.000 fps in race. Rendering remains the largest active cost. Copy and
+HUD clear Phase C's candidate threshold; presentation including LoadView is below
+1%. These emulator measurements do not change the user's WHDLoad cache policy.
 
 Byte evidence (SHA-256, full files; ignored output in `tmp/phase-a/`):
 

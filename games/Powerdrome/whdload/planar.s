@@ -130,7 +130,16 @@ scene_entry
  ENDC
  move.l perf_game(pc),d0
  add.l #$ceec,d0
+ IFNE VERIFY_PHASE
+ ; The diagnostic renderer wrapper adds one return address. Preserve the
+ ; original cockpit-only eligibility check, including native fallbacks.
+ lea phase_render_return(pc),a0
+ cmpa.l 62(sp),a0
+ bne.w scene_native
+ cmp.l 66(sp),d0
+ ELSE
  cmp.l 62(sp),d0
+ ENDC
  bne.w scene_native
  ; Initial supported mode: normal cockpit with a complete background clear.
  tst.w $2f2(a6)
@@ -264,6 +273,10 @@ scene_bad_pixel
 scene_copy
  ENDC
 scene_copy_begin
+ IFNE VERIFY_PHASE
+ bsr phase_record
+ dc.w 7
+ ENDC
  move.l perf_bitmap(pc),a0
  move.l perf_chip(pc),a1
  IFNE FULL_PLANAR
@@ -292,6 +305,10 @@ scene_copy_row
  dbf d1,scene_copy_plane
  ENDC
 scene_copy_end
+ IFNE VERIFY_PHASE
+ bsr phase_record
+ dc.w 8
+ ENDC
 scene_restore
  bsr restore_edge
  lea perf_status(pc),a2

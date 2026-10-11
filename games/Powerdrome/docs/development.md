@@ -1,6 +1,6 @@
 # Development
 
-Project status: completion-plan Phase A is complete; work is stopped before Phase B.
+Project status: completion-plan Phase B (B1–B3) is complete. Work stopped before Phase C.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Inputs and shared tools
@@ -61,6 +61,75 @@ Windowed, real speed, sound enabled. `CPU`, `CHIP_KB`, `FAST_KB`, `AMIGA_MODEL`,
 `WHD_ARGS`, `WB`, `SILENT`, `WARP`, `JOY0` and `JOY1` override the setup. `DEBUG` and `WARP` runs
 are silent with the window behind the others; `SOUND=0|1` and `WINDOW=front|back|none` (none:
 no video) choose explicitly.
+
+### Phase B timing instrument
+
+`make -C whdload coverage VASMFLAGS="-DTIMING_FULL=1 -DVERIFY_PHASE=1"`
+adds the diagnostic phase ring. `VERIFY_PHASE` is rejected outside VERIFY builds.
+Use the ordinary coverage/verify builds for baseline fps: the ring adds hook overhead
+and 256 KiB of requested expansion, but never changes the normal build.
+
+`python3 tools/phase_report.py CAPTURE` reads the initial/final chip and expansion
+snapshots produced by `fixed_window.sh`. It prints mean and nearest-rank p95 exclusive
+milliseconds per complete `$8056` presentation interval (including incidents), a
+1/2/3+ field histogram, and completed world ticks. Driving fps remains the separate
+`$bc7c` counter, so interval counts can differ.
+`--trace` additionally compares each phase with summed instruction costs from the
+same capture. Instruction units are normalized by the trace's cycles per field.
+Only the common contiguous trace/ring window is compared; missing interior samples,
+ring overflow and ambiguous live headers fail explicitly.
+
+The guest reads VBL count, beam twice, then VBL count again, retrying vertical/VBL
+crossings. Each `PDPHASE1` record stores sequence, VBL count, raw beam, event and
+completed-world-tick count. The ring contains 16,384 sixteen-byte records. Its header
+stores the buffer pointer, next sequence, capacity, sampling PC and tick counter.
+Phase costs are exclusive; render excludes the nested handshake wait and chip copy.
+Render completion is recorded at the actual return, including incident paths that
+skip the HUD. The wrapper preserves the original caller test for staged rendering.
+World steps can contain incident presentations; step and scheduler scopes nest,
+and the existing world-restore path explicitly closes aborted steps.
+Other covers work between instrumented phases, including hook overhead. Presentation
+wraps the native `$8056` call, including its time bookkeeping and LoadView.
+
+`tools/baseline_matrix.py tmp/phase-b` runs the prescribed machine/cache/route matrix
+sequentially using frozen slaves in that output directory; `--only REGEX` selects a
+subset. Completed captures can be resumed. Incomplete captures require inspection
+and a distinct retry directory. It stops on a native reference mismatch rather than
+silently accepting new numbers. The A500 calibration supplies an exact 104/456 reference; M3 has no published
+reference, so historical reproduction cannot be claimed for that machine.
+
+To freeze a fresh matrix set (use a new ignored output directory):
+
+```sh
+set -e
+source amiga/env.sh
+out=tmp/phase-b-repeat
+mkdir -p "$out"
+for target in verify coverage; do
+  make -C whdload "$target" VASMFLAGS=
+  cp "tmp/build/Powerdrome-$target.slave" "$out/$target.slave"
+  make -C whdload "$target" VASMFLAGS=-DTIMING_FULL=1
+  cp "tmp/build/Powerdrome-$target.slave" "$out/full-$target.slave"
+done
+make -C whdload coverage VASMFLAGS="-DTIMING_FULL=1 -DVERIFY_PHASE=1"
+cp tmp/build/Powerdrome-coverage.slave "$out/full-phase.slave"
+make -C whdload all
+python3 tools/baseline_matrix.py "$out"
+python3 tools/baseline_matrix.py "$out" --report
+python3 tools/baseline_matrix.py "$out" --gates
+```
+
+For B3, generate a listing with the exact uninstrumented full-verify flags:
+`make -C whdload verify VASMFLAGS="-DTIMING_FULL=1 -L ../tmp/phase-b/full-verify.lst"`.
+Compare that slave with the frozen `full-verify.slave` before capturing. Then
+`phase_report.py CAPTURE --world-listing tmp/phase-b/full-verify.lst` attributes
+instruction costs from world-step entry through the committed world-clock update.
+The listing reader accepts VASM’s Latin-1 text and checks the live game patch targets.
+The B3 capture uses M1, 100 fields, `SWAP_ONLY=0`, anchor `$bc7c`, and
+`WHD_ARGS="CUSTOM5=2 NoCache CUSTOM1=1 CUSTOM3=1"`. Costs include interrupts;
+frame allocation, rendering/HUD-owned work and the post-commit restore tail are outside
+that explicitly bounded body. B3's fps decision uses the uninstrumented 500-field
+matrix, which includes all costs.
 
 ### Full timing development configuration
 

@@ -50,6 +50,10 @@ timing_world_initialize
 timing_world_begin
  move.w sr,-(sp)
  movem.l d0/a0,-(sp)
+ IFNE VERIFY_PHASE
+ bsr phase_record
+ dc.w 16
+ ENDC
  lea timing_world_state(pc),a0
  tst.w 8(a0)
  bne.s .next
@@ -128,6 +132,10 @@ timing_world_end
  ENDC
  lea timing_world20_state(pc),a0
  addq.l #4,12(a0)
+ IFNE VERIFY_PHASE
+ bsr phase_record
+ dc.w 15
+ ENDC
  lea timing_state(pc),a0
  subq.w #1,timing_orientation_left-timing_state(a0)
  movem.l (sp)+,a0
@@ -138,6 +146,10 @@ timing_world_end
  move.w (sp)+,ccr
  bsr timing_world_restore
 timing_world_render
+ IFNE VERIFY_PHASE
+ bsr phase_record
+ dc.w 2
+ ENDC
  IFNE TIMING_WEATHER_CYCLE
  bsr timing_weather_cycle_present
  ENDC
@@ -158,6 +170,14 @@ timing_world_restore
  move.w 24(a0),$62(a6)
  clr.w 8(a0)
 .done
+ IFNE VERIFY_PHASE
+ ; Close an abandoned step without incrementing its completed-tick count.
+ ; Normal completion already emitted 15; these closes then become no-ops.
+ bsr phase_record
+ dc.w 17
+ bsr phase_record
+ dc.w 2
+ ENDC
  movem.l (sp)+,a0
  move.w (sp)+,ccr
  rts

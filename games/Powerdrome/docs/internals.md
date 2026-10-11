@@ -1,7 +1,132 @@
 # Powerdrome internals
 
-Project status: completion-plan Phase A is complete; work is stopped before Phase B.
+Project status: completion-plan Phase B (B1–B3) is complete. Work stopped before Phase C.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
+## Current measurements
+
+The complete B2 matrix contains 60 baseline captures, 14 phase captures and three
+8 MHz sanity captures. All fps figures use uninstrumented builds, 500 PAL fields from `$bc7c`, and
+complete first-to-last driving presentation intervals. These are end-to-end route
+rates: changing timing also changes motion, so they are not fixed-scene opcode
+speedups. `native` disables C1/C3;
+`fast` enables C1; `full` enables C1/C3 with `TIMING_FULL=1`. Cache labels are WHDLoad
+options. Machines M1–M7 are defined in the completion plan. C1 falls back to native
+on M1/M3 because there is no real fast RAM.
+
+Phase columns use separate `VERIFY_PHASE` captures of the full configuration.
+The pairs are mean/p95 milliseconds: W world, R render excluding nested work,
+V VBL handshake wait, C chip copy, H HUD, T timer display, P presentation, O other.
+Instrumented fps is not substituted for the baseline. Phase averages use all
+complete `$8056` presentation intervals, including incident presentations, while
+driving fps and its histogram use `$bc7c`. Their interval counts can differ.
+
+| Machine | Cache | Route | Configuration | Intervals/fields | fps | Fields 1/2/3+ | Phase mean/p95 ms (W/R/V/C/H/T/P/O) |
+| --- | --- | --- | --- | ---: | ---: | --- | --- |
+| M1 | NoCache | practice | native | 104/456 | 11.404 | 0/0/104 | — |
+| M1 | NoCache | practice | fast | 104/456 | 11.404 | 0/0/104 | — |
+| M1 | NoCache | practice | full | 99/473 | 10.465 | 0/0/99 | — |
+| M1 | NoCache | race | native | 113/492 | 11.484 | 0/0/113 | — |
+| M1 | NoCache | race | fast | 113/492 | 11.484 | 0/0/113 | — |
+| M1 | NoCache | race | full | 104/485 | 10.722 | 0/0/104 | — |
+| M2 | NoCache | practice | native | 106/468 | 11.325 | 0/0/106 | — |
+| M2 | NoCache | practice | fast | 87/465 | 9.355 | 0/0/87 | — |
+| M2 | NoCache | practice | full | 81/465 | 8.710 | 0/0/81 | — |
+| M2 | NoCache | race | native | 114/495 | 11.515 | 0/0/114 | — |
+| M2 | NoCache | race | fast | 94/490 | 9.592 | 0/0/94 | — |
+| M2 | NoCache | race | full | 85/484 | 8.781 | 0/0/85 | — |
+| M3 | NoCache | practice | native | 153/496 | 15.423 | 0/20/133 | — |
+| M3 | NoCache | practice | fast | 153/497 | 15.392 | 0/20/133 | — |
+| M3 | NoCache | practice | full | 144/494 | 14.575 | 0/13/131 | — |
+| M3 | NoCache | race | native | 162/495 | 16.364 | 0/26/136 | — |
+| M3 | NoCache | race | fast | 163/497 | 16.398 | 0/25/138 | — |
+| M3 | NoCache | race | full | 161/494 | 16.296 | 0/24/137 | — |
+| M4 | NoCache | practice | native | 154/491 | 15.682 | 0/24/130 | — |
+| M4 | NoCache | practice | fast | 218/493 | 22.110 | 0/192/26 | — |
+| M4 | NoCache | practice | full | 214/489 | 21.881 | 0/186/28 | 3.14/2.97; 27.48/35.20; 3.51/10.30; 5.17/5.54; 3.38/3.06; 1.09/1.10; 0.16/0.16; 0.83/0.32 |
+| M4 | NoCache | race | native | 166/495 | 16.768 | 0/35/131 | — |
+| M4 | NoCache | race | fast | 229/497 | 23.038 | 0/198/31 | — |
+| M4 | NoCache | race | full | 234/496 | 23.589 | 0/209/25 | 3.08/4.94; 24.94/34.51; 4.01/8.96; 5.43/5.57; 3.14/3.13; 1.09/1.10; 0.16/0.16; 0.84/9.53 |
+| M5 | CACHE | practice | native | 194/496 | 19.556 | 0/118/76 | — |
+| M5 | CACHE | practice | fast | 301/498 | 30.221 | 137/147/17 | — |
+| M5 | CACHE | practice | full | 313/496 | 31.552 | 166/128/19 | 1.84/1.45; 16.02/20.35; 5.74/14.56; 3.80/4.01; 2.29/2.24; 0.93/1.09; 0.12/0.14; 0.57/0.39 |
+| M5 | CACHE | race | native | 212/497 | 21.328 | 0/147/65 | — |
+| M5 | CACHE | race | fast | 303/497 | 30.483 | 117/178/8 | — |
+| M5 | CACHE | race | full | 373/498 | 37.450 | 252/117/4 | 1.30/3.05; 14.33/19.96; 3.71/14.17; 3.92/4.03; 2.23/2.22; 0.92/1.10; 0.12/0.12; 0.54/0.21 |
+| M5 | NoCache | practice | native | 194/496 | 19.556 | 0/118/76 | — |
+| M5 | NoCache | practice | fast | 301/498 | 30.221 | 137/147/17 | — |
+| M5 | NoCache | practice | full | 313/496 | 31.552 | 166/128/19 | 1.84/1.45; 16.02/20.35; 5.74/14.56; 3.80/4.01; 2.29/2.24; 0.93/1.09; 0.12/0.14; 0.57/0.39 |
+| M5 | NoCache | race | native | 212/497 | 21.328 | 0/147/65 | — |
+| M5 | NoCache | race | fast | 303/497 | 30.483 | 117/178/8 | — |
+| M5 | NoCache | race | full | 373/498 | 37.450 | 252/117/4 | 1.30/3.05; 14.33/19.96; 3.71/14.17; 3.92/4.03; 2.23/2.22; 0.92/1.10; 0.12/0.12; 0.54/0.21 |
+| M5 @ 8 MHz | NoCache | practice | full | 201/488 | 20.594 | 0/150/51 | — |
+| M6 | CACHE | practice | native | 368/498 | 36.948 | 248/110/10 | — |
+| M6 | CACHE | practice | fast | 490/499 | 49.098 | 481/9/0 | — |
+| M6 | CACHE | practice | full | 490/499 | 49.098 | 481/9/0 | 0.58/0.88; 8.37/10.86; 5.75/8.69; 3.19/3.26; 1.42/1.50; 0.41/0.41; 0.11/0.12; 0.16/0.15 |
+| M6 | CACHE | race | native | 325/497 | 32.696 | 158/162/5 | — |
+| M6 | CACHE | race | fast | 494/499 | 49.499 | 489/5/0 | — |
+| M6 | CACHE | race | full | 498/499 | 49.900 | 497/1/0 | 0.72/1.91; 7.64/10.80; 6.21/8.59; 3.25/3.26; 1.46/1.55; 0.40/0.41; 0.11/0.12; 0.20/0.15 |
+| M6 | NoCache | practice | native | 178/497 | 17.907 | 0/69/109 | — |
+| M6 | NoCache | practice | fast | 414/498 | 41.566 | 350/54/10 | — |
+| M6 | NoCache | practice | full | 419/499 | 41.984 | 358/51/10 | 0.66/1.13; 13.62/16.87; 2.47/12.49; 3.18/3.26; 1.94/2.09; 1.13/1.24; 0.11/0.12; 0.38/0.15 |
+| M6 | NoCache | race | native | 198/496 | 19.960 | 0/108/90 | — |
+| M6 | NoCache | race | fast | 373/498 | 37.450 | 250/121/2 | — |
+| M6 | NoCache | race | full | 445/498 | 44.679 | 392/53/0 | 1.08/2.73; 11.93/17.34; 2.47/9.86; 3.25/3.26; 2.04/2.16; 1.13/1.24; 0.11/0.11; 0.47/0.15 |
+| M6 @ 8 MHz | NoCache | practice | full | 382/498 | 38.353 | 288/84/10 | — |
+| M7 | CACHE | practice | native | 404/499 | 40.481 | 319/75/10 | — |
+| M7 | CACHE | practice | fast | 490/499 | 49.098 | 481/9/0 | — |
+| M7 | CACHE | practice | full | 490/499 | 49.098 | 481/9/0 | 0.56/0.84; 7.92/10.31; 6.31/9.13; 3.19/3.26; 1.37/1.44; 0.39/0.40; 0.11/0.11; 0.15/0.15 |
+| M7 | CACHE | race | native | 333/499 | 33.367 | 168/164/1 | — |
+| M7 | CACHE | race | fast | 499/499 | 50.000 | 499/0/0 | — |
+| M7 | CACHE | race | full | 499/499 | 50.000 | 499/0/0 | 0.66/1.79; 7.23/10.33; 6.75/9.05; 3.25/3.26; 1.42/1.51; 0.39/0.40; 0.11/0.11; 0.23/0.15 |
+| M7 | NoCache | practice | native | 178/497 | 17.907 | 0/70/108 | — |
+| M7 | NoCache | practice | fast | 429/499 | 42.986 | 378/41/10 | — |
+| M7 | NoCache | practice | full | 428/499 | 42.886 | 377/41/10 | 0.60/1.12; 13.31/16.47; 2.35/12.47; 3.18/3.26; 1.93/2.08; 1.12/1.23; 0.11/0.12; 0.38/0.15 |
+| M7 | NoCache | race | native | 199/497 | 20.020 | 0/110/89 | — |
+| M7 | NoCache | race | fast | 376/497 | 37.827 | 256/119/1 | — |
+| M7 | NoCache | race | full | 450/498 | 45.181 | 402/48/0 | 1.03/2.55; 11.69/16.75; 2.59/10.30; 3.25/3.26; 1.99/2.17; 1.13/1.24; 0.11/0.11; 0.50/0.15 |
+| M7 @ 8 MHz | NoCache | practice | full | 382/498 | 38.353 | 288/84/10 | — |
+
+All six published native Practice references (M1, M2, M4–M7) reproduce exactly:
+zero interval error per 500 fields, against the one-interval tolerance. M3 supplies
+a new baseline. The 8 MHz full/NoCache Practice checks are slower: M5 20.594 versus
+31.552 fps, M6 38.353 versus 41.984, and M7 38.353 versus 42.886.
+
+M1 full timing measures 99/473 = 10.465 fps versus 104/456 = 11.404 native,
+an 8.23% loss; race loses 6.64% (104/485 versus 113/492). D2 therefore retains
+native timing on 68000/68010. This phase does not implement the release defaults.
+B3's 100-field uninstrumented M1 instruction trace contains 100 complete 20 ms
+world steps. Mean cost is **10,357.86 cycles**, p95 **18,778**, range 7,406–23,162.
+At 142,102 clocks per nominal 20 ms PAL field, that is 1.458 ms mean and 2.643 ms
+p95 (7.29% and 13.21% of the field budget). The measured body starts at
+`timing_world_begin` and ends after the committed +4 world-clock update. It includes
+interrupts, but excludes frame allocation, rendering/HUD-owned work and the
+post-commit loop/restore tail. This body cost alone is not the total scheduler
+overhead; the 500-field fps comparison includes all work and decides D2.
+Evidence: `tmp/phase-b/b3-m1-world-trace/`, matching `full-verify.lst`, and
+`b3-world-cost.json`.
+
+On M6/M7 with NoCache, exclusive rendering takes about 13.62/13.31 ms per
+Practice presentation, roughly 58% of the measured frame. Copy costs about
+3.18 ms (13.5–13.8%), HUD 1.94/1.93 ms (8.2–8.4%), and handshake wait
+2.47/2.35 ms (10.5/10.2%). With CACHE, rendering drops to 8.37/7.92 ms;
+copy stays at 3.19 ms and HUD costs 1.42/1.37 ms. These identify copy and HUD
+as candidates above Phase C's 3% threshold, not proven achievable savings.
+Presentation including LoadView is only about 0.11 ms, below 1%, so the B2
+measurements do not justify a narrower LoadView replacement.
+
+CACHE full timing reaches 49.098 fps in Practice on both M6 and M7, and
+49.900/50.000 in race. At that rate the roughly 5.75/6.31 ms Practice wait
+also paces the display; removing its full cost cannot lift PAL presentation
+above 50 fps. M5's CACHE and NoCache baseline counts match on both routes.
+These are results of the requested emulator/WHDLoad configurations, not a
+new cache policy or physical-board certification. Phase C remains unstarted.
+
+The final B1 M4 trace covers 46 common complete intervals; all exclusive phase sums
+agree with instruction-cost attribution within 0.00571%. The actual render-return
+hook includes incident paths that skip the HUD. The corrected 500-field M4 phase
+capture also completes successfully. Long-tail incidents can put a phase's mean
+above its p95; these are measured values, not a stationary scene benchmark.
 
 ## Inputs and loader
 
