@@ -239,6 +239,30 @@ timing_pit_opponent_restore
  move.w (sp)+,ccr
  rts
 
+; D8CA publishes a message whose native expiry is checked by the outer pit.
+; A scheduled pit update temporarily replaces $5e with its opponent phase, so
+; use the saved outer counter for this escaping deadline. Flight messages keep
+; their existing world-counter behavior until their elapsed lifetime is split.
+; Replay MOVE.L flags and preserve all registers, including D0 and A0.
+timing_pit_message_counter
+ move.l d0,-(sp)
+ move.l a0,-(sp)
+ move.l $5e(a6),d0
+ lea timing_pit_opponent_state(pc),a0
+ tst.w 10(a0)
+ beq.s .store
+ move.w timing_world_state+8(pc),d0
+ bne.s .native
+ move.l 40(a0),d0
+ bra.s .store
+.native
+ move.l $5e(a6),d0
+.store
+ movea.l (sp)+,a0
+ move.l d0,$64(a6)
+ movem.l (sp)+,d0
+ rts
+
 ; MOVE.L wrappers reproduce NZVC and preserve X and every other register.
 timing_pit_clock_d7
  move.l a0,-(sp)

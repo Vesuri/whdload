@@ -1462,8 +1462,9 @@ Next steps for this correction:
 
 `TIMING_REPAIR=1` enables this isolated pilot in a WORLD20 build; its default is zero,
 and installation still requires `CUSTOM3`. Unsupported build combinations are rejected.
-With the pilot omitted, the full timing slave reproduces the frozen playercontract1
-artifact byte-for-byte. The normal slave is also unchanged.
+The pre-message-correction measurements use frozen playercontract1 with the repair
+pilot omitted. The corrected full timing baseline is now pitmessage1, described below;
+it intentionally changes pit message ownership. The normal slave is unchanged.
 
 For completed step `k=1..33`, the deadline is `epoch + floor(k*T/33)`, where `T` is the
 measured native A500 drawing total in five-millisecond clock units. This retains fractional
@@ -1586,6 +1587,63 @@ complete step and subsequent steps spanning 99.873–121.807 ms. These observati
 motivate checking refresh-boundary crossings across the whole stage, but do not yet
 prove that missed refreshes explain the full 100–820-ms unpaced invocation penalty.
 No display wait has been removed and these captures are not rendering FPS evidence.
+
+#### Pit message counter ownership correction
+
+The read-only `timing-message-ledger-world-a500` capture directly establishes the leak.
+At `$d8ca`, the scheduled opponent body uses counter 508 and writes deadline 538;
+the next outer `$e2a6` reader has counter 198 and sees that unchanged deadline. Two
+further fully paired publications reproduce the mismatch. A stopped snapshot at the
+first setter independently has active opponent ownership, phase 503 and saved outer
+counter 198. Selecting the live `PDPOPP01` inside the installed slave is essential;
+the preload cache also contains an uninitialized copy of the same diagnostic tag.
+
+WORLD20 now replaces the six-byte native MOVE at `$d8ca` with
+`timing_pit_message_counter`. During scheduled pit ownership, with no active world
+body, it publishes the saved outer counter to `state+$64`. The native following
+ADD #30 remains unchanged. Other contexts replay the existing native counter source.
+The helper preserves D0/A0 and the caller's stack, and its final MOVE recreates NZVC
+while preserving X. It does not change the opponent phase, update count, RNG or clocks.
+The new hook is installed only with the experimental WORLD20 build and CUSTOM3;
+the normal build remains byte-identical to its reference.
+
+The frozen pitmessage1 build passes `timing-pitmessage1-a500`: **three** complete
+entry/MOVE/ADD observations all use the correct outer deadline and preserve all
+D/A registers and SP, plus the sampled movement delta and speed. Three subsequent
+outer readers observe those deadlines. For example, phase 508 now publishes
+**198 + 30 = 228**. The final observed publication sets **200 + 30 = 230**; the native
+strict-greater expiry path runs at outer counter 231, at field 152 (2,520 ms after
+that publication at field 26). The earlier leading publication is only partially
+observed at the capture anchor and is excluded from the three complete contracts.
+
+The complete 2,000-field `timing-pitmessage1-repairs-a500` regression preserves all
+**264 native word-geometry states**, with all four invocations complete and no trailing
+partial invocation. With repair pacing still off, the changed message lifetime removes
+400–960 ms per invocation relative to the earlier unpaced WORLD20 build:
+
+| Item / direction | Native A500 | Earlier WORLD20 | Corrected message ownership |
+| --- | ---: | ---: | ---: |
+| 1 / 0 | 8,260 ms | 8,840 ms | 7,980 ms |
+| 1 / 1 | 8,840 ms | 8,940 ms | 7,980 ms |
+| 0 / 0 | 7,900 ms | 8,700 ms | 8,300 ms |
+| 0 / 1 | 7,960 ms | 8,780 ms | 7,880 ms |
+
+These unpaced durations still fail the strict calibration gate. They demonstrate that
+message ownership was a material contributor to the animation cost; they do not establish
+elapsed-time message equivalence or repaired animation cadence. The next test combines
+this corrected baseline with the existing cumulative repair deadlines and minimum pauses.
+
+This fixes an escaping deadline's counter domain, not its remaining frame dependence.
+Elapsed-time calibration of message lifetimes, ordinary world message ownership,
+other writers, inactive/native fallback paths, guest CCR runtime coverage, 030
+validation and repair-duration calibration remain open. Debugger SR is
+not used as guest flag evidence. The hook-boundary audit passes; no decoded direct
+branch enters its interior. The full repair pilot remains disabled by default.
+
+```sh
+python3 tools/check_pit_message.py --expect-leak tmp/prof/timing-message-ledger-world-a500
+python3 tools/check_pit_message.py tmp/prof/timing-pitmessage1-a500
+```
 
 ```sh
 python3 tools/repair_step_profile.py tmp/prof/timing-repair-cost-native-a500 tmp/prof/timing-repair-cost-world-a500

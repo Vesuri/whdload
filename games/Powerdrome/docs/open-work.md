@@ -349,10 +349,16 @@ The matched longer traces now cover 32 complete steps: WORLD20 executes 42 oppon
 updates versus native's 32 and takes 113.172 ms longer. A message-lifetime mismatch
 also keeps costly text drawing active: native has 27 counter increments remaining at
 repair entry, WORLD20 254; native expires the message for the final five steps while
-WORLD20 does not. Trace the message creation/counter ownership and correct its elapsed
-time before attributing the whole slowdown to scheduling or changing the repair cadence. Register/stack and nonlocal
+WORLD20 does not. A read-only setter/consumer trace confirms that an opponent phase
+escapes into the outer pit's message deadline. The new WORLD20 helper uses the saved
+outer counter for that pit publication; three A500 register/SP/deadline contracts pass,
+and native message expiry now occurs. The complete unpaced A500 repair regression
+preserves all 264 geometry states and shortens the four invocations by 400–960 ms,
+but durations still fail calibration. Test cumulative repair pacing on the corrected
+baseline next; 030 message contracts remain open. Message lifetime itself still needs elapsed-time calibration, and ordinary world
+messages/other setters remain open; do not treat the ownership fix as full message timing. Register/stack and nonlocal
 result contracts, opponent continuity and the other repair branches remain open. The
-pilot stays disabled by default; normal and pilot-disabled builds are unchanged. Next audit the projection flag and matched native animation visibility,
+pilot stays disabled by default; the normal build is unchanged. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

@@ -295,6 +295,11 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += 'printf "PDPLAYER_CLOCK %d ' + hex(off) + ' ' + ' '.join(['%u']*len(clock_values)) + '\\n", $pd_field, ' + ', '.join(clock_values) + '\n'
         if off in (0x10bf8,0x10c00,0xf110,0xf118):
             sample += player_contract_sample.replace('{off}',hex(off))
+        if off in (0xd8ca,0xd8d0,0xd8d8,0xe2a6,0xe2ac,0xe330,0x148d0,0x13536,0x13558,0x141aa,0x141b8):
+            message_values=[f'*(unsigned int*){state+x:#x}' for x in (0x5e,0x64,0xee)]
+            message_values += [f'*(unsigned int*){r["game"][0]+x:#x}' for x in (0xf96,0x48fe)]
+            message_values += [f'(unsigned int)${reg}' for reg in ('d0','d7','sp')]
+            sample += 'printf "PDMESSAGE_EVENT %d ' + hex(off) + ' ' + ' '.join(['%u']*len(message_values)) + '\\n", $pd_field, ' + ', '.join(message_values) + '\n'
         if off in (0x148d0,0x14962,0x14970,0x14a18,0x14a20,0x14aa6,0x14ac4):
             sample += repair_pace_sample.replace('{off}',hex(off))
             repair_values=[f'(unsigned int)${reg}' for reg in ('d4','d5','d6','d7')]
@@ -313,7 +318,7 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += engine_sample.replace('{off}',hex(off))
         if off in (0xcfec,0xcff8):
             sample += heat_sample.replace('{off}',hex(off))
-        if off in (0x10bf8,0x10c00,0xf110,0xf118,0xccee,0xccf6,0x14090,0xe8d4,0x103a2,0xbfb0,0xbfb6,0x14764,0x147a6):
+        if off in (0xd8ca,0xd8d0,0xd8d8,0x10bf8,0x10c00,0xf110,0xf118,0xccee,0xccf6,0x14090,0xe8d4,0x103a2,0xbfb0,0xbfb6,0x14764,0x147a6):
             contract_values=[f'(unsigned int)${reg}' for reg in
                              ('d0','d1','d2','d3','d4','d5','d6','d7','a0','a1','a2','a3','a4','a5','a6','sp','sr')]
             contract_values += [f'*(unsigned short*){state+x:#x}' for x in (0x21c,0x194)]

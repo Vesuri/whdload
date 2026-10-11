@@ -358,6 +358,9 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$d3d6 8 bit=C3
  PL_P $d3d6,timing_pit_opponents
  PL_NOP $d3dc,2
+ ; A pit result message outlives the temporary opponent counter ownership.
+ ; TIMING_RANGE h0:$d8ca 6 bit=C3
+ PL_PS $d8ca,timing_pit_message_counter
  ; Opponent-only direct clock reads. Outside modal updates these stay native.
  ; TIMING_RANGE h0:$d4b6 6 bit=C3
  PL_PS $d4b6,timing_pit_clock_d7
