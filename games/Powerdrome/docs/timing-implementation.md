@@ -4408,10 +4408,12 @@ the pre-fix source byte for byte. The current instruction-boundary/direct-branch
 passes. Both old failing captures still fail request accounting.
 Direct-delivery mute (`timing-weather-audio-keys2`), no-resource
 (`timing-weather-audio-nosample1`) and full-cycle (`timing-weather-cycle-cadence2`)
-regressions are queued in sequence, stopping on a failed gate. The corrected 030 mute
-side now passes the native flag transitions, one suppressed call and two resumed starts
-at the original three request times; A500 remains pending. Earlier green captures
+regressions are queued in sequence, stopping on a failed gate. The corrected mute
+pair passes on both CPUs: native flag transitions, one suppressed call and two resumed
+starts at the original three request times. Earlier green captures
 exercised the deferred implementation. Broader lifecycle acceptance remains required.
 The audio checker's `--require-unavailable` mode requires absent optional samples, an
 observed delay expiry, no weather helper call and zero queue/call counters across sampled
-boundaries. Its positive runtime validation is pending in the no-resource run.
+boundaries. The completed 030 no-resource side passes that guard, a measured 500-ms stall,
+world hold/resume and 485 weather boundaries; maximum world-end delay is 560 ms and
+endpoint debt is zero. A500 and the queued full-cycle regression remain pending.

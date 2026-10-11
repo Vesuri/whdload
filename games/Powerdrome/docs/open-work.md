@@ -704,9 +704,12 @@ passing. Earlier mute/full-cycle captures used deferral. The full F1–F8 goal r
 
 Direct-delivery isolation now passes a byte comparison of the full weather-disabled timing
 prototype against pre-fix source, plus the current native hook-boundary/branch audit.
-Normal build bytes remain unchanged. The completed 030 `audio-keys2` side passes native
+Normal build bytes remain unchanged. Both `audio-keys2` CPUs now pass native
 mute/unmute, one suppressed request and two resumed starts at unchanged logical times.
-Its A500 counterpart and the queued no-resource/full-cycle pairs remain pending.
+The completed 030 `audio-nosample1` side exercises delay expiry with optional samples
+absent and no queued/native weather audio call; its 500-ms stall, world hold/resume and
+485 weather boundaries pass, with no endpoint debt. A500 and the queued full-cycle pair
+remain pending.
 
 
 Palette audit identifies the actual remaining presentation checks: `$17306` interpolates
