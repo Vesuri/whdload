@@ -1,10 +1,222 @@
 # Stellar 7: current work
 
-## Paused checkpoint
+## Performance plan (active)
 
-Convert gameplay to a true 60 Hz timestep with simulation updates independent
-of rendering, while preserving reference gameplay pace. The goal is not complete. Work is paused at the user’s request; resume only
-when asked. This checkpoint contains the experimental implementation and
+Goal: play as smoothly as each machine allows, from an A500 up to an AGA
+68040/68060 with fast RAM, capped at the display rate (50 fps PAL, 60 NTSC).
+Game time is a fixed timestep, independent of drawing, and identical on every
+machine. Follow the steps in order. Each step ends with its measurement in
+`docs/internals.md`, its commands in `docs/development.md`, and one commit
+(author, unsigned, no hooks, no trailers: see AGENTS.md).
+
+### Diagnosis
+
+The current SIM60 design runs the whole native update 60 times a second, as
+12 substeps of each original 5 Hz update. Each substep costs about one
+original update: 90004 cycles on the A500 in heavy combat (the
+`scan-order-profile` default), against 97.4k main-context cycles available per
+NTSC field. The other contexts take 18.3% (21.9k cycles/field). The sound
+handler at $1126 alone takes 10.08% in combat and 4.49% in the native early
+scene. One heavy render costs about 1.03M main-context cycles (13 fields).
+
+| Machine, route | Updates/s | Presentations/s |
+|---|---:|---:|
+| Native A500, frame 90/120 (stationary SOL) | 5.0 (game pace varies) | 5.0 |
+| Native A500, frame 180/240 | 3.3/4.0 | 3.3/4.0 |
+| SIM60 A500, type-10 route 600–9212, per interval | 52.3–64.5 | 0.43–1.60 |
+| SIM60 68020 + fast RAM, type-10 1800–2400 | 60.20 | 9.23 |
+| Native 68020 + fast RAM, frame 90 | 11.4 (game runs 2.3× fast) | 11.4 |
+| SIM60 68040/25, 68060/50 | see internals (step 0) | |
+
+The model `fps ≈ (60 × 97.4k − R × 90.0k) / 1.03M` for tick rate R reproduces
+the measured A500 rate at R = 60 (0.43). It predicts 3.1 / 3.9 / 4.4 / 4.8 fps
+at R = 30 / 20 / 15 / 10. At 60 Hz the A500 is now 5–10× slower to present than
+the original game. Further micro-optimisation of the 60 Hz tick cannot fix
+that: two dozen adopted changes took the tick from 137k to 90k cycles, and the
+target for 3 fps at 60 Hz would be under 40k. The problems that remain are
+structural:
+
+1. The tick rate is too high for a 68000. Run fewer, equally exact ticks.
+2. Pictures between ticks are identical. Interpolate the rendered poses.
+3. The A500 renderer is the ceiling (about 5 fps even with zero simulation).
+   Profile it once traces contain several renders.
+
+Native A500 frame-90 profile (`tmp/prof/base`, inclusive shares of all
+cycles): actor pass $12aa4 45.4%, of which model draw $13b96 37.0% and polygon
+pipeline $14a9e 34.2%. Inside that pipeline, $17e88→$1d51c (blitter) takes
+10.0%, $17d48 6.0%, the vertex cache $17c02 4.8%, $14df8 3.5% and the
+perspective division $17cea 3.4%. The star/sprite path $18340→$1bc94 takes
+11.5%, HUD $0bf8a 8.4%, a RectFill (graphics −306) background fill from $0c1ba
+7.1% and WaitBlit (−228) from $1bc94 3.2%. Interrupt context is 21.4%,
+including 1844 blitter-finished interrupts in 50 fields. The presentation
+routine $1c84c waits for the next VBL when its argument is nonzero (flag
+$f5de), so pictures are already capped at the field rate.
+
+### Step 0: Baseline matrix (no game change)
+
+1. Commit the `amiga/run.sh` window fix: debug and warp runs use the shared
+   `fsuae_options`/`fsuae_env` window mode and open behind other windows.
+2. Add `tools/rate_matrix.sh PREFIX` (single capture at a time, like LoV's
+   `ab_window.sh`). It runs `fixed_window.py --state-only` with
+   `--tick-checkpoints`, then `simulation_rate.py`, on these machines:
+   A500 (68000, 512K chip + 1.5M slow); stock A1200 (68EC020, 2M chip, no fast);
+   A1200 + 4M fast; 68030/50; 68040/25 and 68060/50 as `68040-NOMMU`/`68060-NOMMU`
+   with the cycle-exact options from the shared playbook §8. All runs are NTSC
+   with `uae_ntsc`, plus one PAL A500 and one PAL 68060.
+   Routes: SOL ticks 600→1500; type-10 combat 1800→2400 and 4500→5400 (the
+   `LEVEL_TEST=200 LEVEL_LAST=6 APPROACH_TYPE=10` fixture); the boss route at
+   3500. Pass only `CUSTOM1=1 CUSTOM3=1`: the driver adds CUSTOM5 itself, and a
+   duplicate stops the boot at an AmigaDOS argument error. The boot poll is 120
+   dumps, which a cycle-exact 68040 can exceed; make it a deadline in seconds.
+3. Measure native presentation fps for the same machines with `--swaps-only`
+   at frames 90 and 240. Record the cache state (the slave calls SetCPU
+   $393d/$7f3f).
+4. Record the matrix in internals as the reference table. Every later step
+   re-runs it, and reports must state updates/s, presentations/s, pending
+   growth and the largest update-start gap (`simulation_latency.py`).
+
+### Step 1: Make the substep count a build constant
+
+`S60_RATE = 60` and `S60_LEGACY_DIV = 12` exist, but 12 is also written out
+in many places. Introduce `S60_SUBSTEPS` (N ∈ {1, 2, 3, 4, 6, 12};
+`S60_RATE = 5 × N`). Then rewrite every N-dependent constant as an expression
+of it, at least:
+
+- `s60_clock`: elapsed × 60 becomes elapsed × S60_RATE (keep the long
+  arithmetic). Credit consumption per tick stays `field_hz`.
+- `linear60.s`: `divs #12` and the remainder ranges ±11 / ±12.
+- `boss60.s`: `moveq #12`, the 288 = 2N² divisor and the (2k − 13) term,
+  which becomes (2k − N − 1).
+- `events60.s`: jump 144 = N², 55 = g(N − 1)/2 and velocity × 12.
+- `motion60.s`: the `S60_INPUT_SITE …,12` quanta and the 80/10/40 schedules
+  (`floor((phase+1)·inc/N) − floor(phase·inc/N)`).
+- `pickup60.s`: `muls #11` (N − 1).
+- Every "twelve-tick" clock: powers, animation, contact, terrain, shake, HUD,
+  knockback, cooldowns, AI decisions, spawning, frame counter.
+- `hud60.s` `moveq #11`, and the input-quanta unroll tables.
+
+Grep for 11, 12, 13, 24, 55, 144 and 288 in every `*60.s`, and in the `*_test.s`
+fixtures and Python checkers that assume 12. Add N to the debugger ABI and
+have `sim60_state.py` and every checker read it.
+
+Gate: the N = 12 build is byte-identical to the current release and VERIFY
+slaves. Build N = 1, 2, 3, 4 and 6 and run every native-reference fixture with
+N taken from the ABI. Then compare across N at native boundaries: the state at
+completed tick k·N should match the N = 12 state at tick 12k wherever an
+integrator is exact at native boundaries. Report the first divergence per N
+and classify it (sub-update collision timing, rounding, real bug). Do not
+accept unexplained differences.
+
+### Step 2: Choose one tick rate for every machine
+
+Run the step-0 matrix for N = 2, 3, 4 and 6. Choose the largest N that meets
+both conditions:
+
+- A500 heavy combat 600→5400 sustains real time: bounded pending updates with
+  no upward trend.
+- A500 presentations/s is at least the native rate in the same scene.
+
+The model predicts N = 4 (20 Hz) or N = 3 (15 Hz). Input sampling then takes
+50–67 ms and interpolation adds one tick of display delay. That is still well
+under the original 200 ms update. Set it as the SIM60 default, keeping
+N = 12 buildable. Keep one rate for every machine. A per-CPU rate (60 Hz on a
+68060) would change only collision sub-timing and input latency, at the cost
+of a second validation matrix. Revisit it only after step 6, as a separate
+measured option.
+
+### Step 3: Interpolated presentation
+
+The renderer re-projects every actor from its record each frame ($2bb4 →
+$12aa4), so pose interpolation can be done in place:
+
+1. Snapshot inventory. Trace render-time reads of actor and player pose
+   fields: x/y/z, yaw +$18, pitch, bank, camera, damage-shake viewport
+   offsets $7156/$7158 and star records. Use the existing
+   `render_write_inventory.py` approach and list the readers.
+2. At each completed tick, keep previous and current poses per active actor
+   in a slave table keyed by actor address and tag-checked like
+   RECORD_CACHE. Snap (prev = cur) on spawn, removal, recenter ($3ab8 shifts
+   every coordinate: apply its delta to prev), level/session reset, death,
+   modal return and when a pose jumps further than a bound.
+3. In `s60_render`: poll the clock, set α = credit / field_hz (0…1). Save the
+   current poses, write `prev + (cur − prev)·α` (shortest arc for angles,
+   signed wrap for coordinates), render, then restore the saved poses
+   byte-for-byte. RNG is already saved and restored here; extend that pattern.
+   Do not interpolate discrete state: animation frames, explosions, HUD
+   values, radar.
+4. Pacing: present with the native VBL wait, so at most one picture per field
+   (50 PAL, 60 NTSC). When α has not changed since the last picture (fast CPU,
+   no new field), wait for the next field instead of drawing a duplicate.
+5. Validation, all on A500 and 68060:
+   - Matched-tick gameplay/HUD/fresh-projection with interpolation on and
+     off, and with SLOW_DRAW, must be identical; render must not change
+     state (restore check).
+   - A VERIFY observer at render entry compares every written pose with the
+     formula, using the saved prev/cur and α.
+   - At α = 0, a lossless display-DMA comparison (`display_dma.py`) against
+     the non-interpolated picture.
+   - On the 68060, successive pictures within one tick must differ.
+   - Snap cases (spawn, recenter, death/Continue, level exit) must not smear.
+
+### Step 4: Input belonging to each tick
+
+This is the existing correctness item (live input at $22750–$22756 and
+$22730 is applied to overdue ticks). Sample joystick, mouse and key state in
+the VBL into a ring buffer stamped with the field. Each tick consumes the
+sample that belongs to its time, through the native input calls, preserving
+modal ownership, key queues, mouse deltas, overflow and pause. Follow AmigaXDev
+`fixed-time-simulation.md`. The test is a fixed elapsed-field input edge that
+lands on the same tick with and without SLOW_DRAW.
+
+### Step 5: Renderer cost (A500 and stock A1200)
+
+After step 2 an A500 trace holds several complete renders. Profile 100-field
+windows on SOL, combat and boss, using complete-call costs from
+`routine_cost.py`. Candidates in order of measured share (re-measure first):
+
+1. Polygon pipeline $14a9e: transforms $16c52, vertex cache $17c02,
+   perspective DIVS $17cea, the blitter path $17e88/$1d51c, and per-blit
+   interrupt overhead (37 blitter interrupts per field). Use 68000/68020
+   variants, pixel twins (playbook §10) and the display-DMA check.
+2. Star/sprite path $18340/$1bc94, including its WaitBlit.
+3. Background RectFill from $0c1ba: direct blitter or CPU fill, and
+   overlap with other work.
+4. HUD $0bf8a: redraw only what changed, per buffer (two buffers).
+5. Render-side projection when the simulation pass already projected the
+   same poses (only at α = 0).
+6. Sound handler $1126: model it and twin its Paula register writes.
+   Optimise only if audio writes are identical.
+7. MrgCop in shake/boss frames (the rejected cache's lesson: measure
+   frequency first).
+
+Apply the 3% full-frame rule. Keep the original code on any CPU where a
+replacement is not faster.
+
+### Step 6: Fast-CPU ceiling
+
+On the 68030/68040/68060 matrix, check whether pictures hit the field cap.
+If not, find out whether chip RAM or the blitter limits them (playbook §11: a
+faster CPU does not make chip RAM faster). Profile with `SWAP_ONLY`. Check
+caches. Do not chase CPU savings that the bus erases.
+
+### Step 7: Release
+
+Run the full correctness suite at the chosen N: native twins, encounter
+routes, death/Continue, level exits, ending, preferences, PAL. Then the
+disabled-bytes check, `audit_hooks.py`, diagnostic exclusion and the
+`play60.sh` smoke test. A user playtest on real controls confirms pace and
+feel. Only then consider making SIM60 the default loader option. Update
+README/docs to the current state and delete tools nothing uses.
+
+### Rejected direction
+
+Do not continue tuning the 60 Hz tick for the A500. The measured returns per
+change are 0.3–3%, and the gap is a factor of five or more.
+
+## Checkpoint before the performance plan
+
+The 60 Hz conversion below is the base for the plan above.
+This checkpoint contains the experimental implementation and
 validation tools, not a completed release.
 The current build includes input timing corrections, unrolled input constants
 and X-distance rejection before collision candidate classification. It reaches
