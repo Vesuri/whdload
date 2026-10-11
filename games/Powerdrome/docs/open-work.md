@@ -522,7 +522,11 @@ The forecast RNG argument is a shift count, so it must not be treated as a one-i
 trigger. Exact sites, fields, existing evidence and gates are in timing-implementation.
 
 Weather probes are integrated into the capture tool, with native-command generation
-verified and existing timing-route debugger commands unchanged. The native A500 route-6
-capture `timing-weather-native-a500-1` has started, waiting for forecast entry `$e1a2`
-before a requested 400-second episode window. Runtime probe validation and A500 weather
-calibration remain pending; no weather scheduling correction is claimed yet.
+verified and existing timing-route debugger commands unchanged. The first native A500
+route-6 attempt reached forecast entry on track 2, but the debugger rejected part of the
+35-probe set and aborted before any measured fields completed. That failure is retained.
+`timing-weather-native-a500-2` retries the requested 400-second window with 14 probes for
+deadlines, fades and effect lifetime; generation/palette/gear need another pass. The new
+weather analyzer verifies paired mutations and reports missing observations explicitly;
+its synthetic examples pass, but runtime event validation and A500 calibration remain
+pending. No weather scheduling correction is claimed yet.

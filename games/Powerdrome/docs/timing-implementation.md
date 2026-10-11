@@ -3630,11 +3630,31 @@ integration for the existing eight-probe timing route. These checks verify comma
 construction only; paired runtime observations and original A500 cadence measurements
 remain required before weather scheduling can be accepted.
 
-The native A500 capture `timing-weather-native-a500-1` is started with input route 6,
-C1/C3/C4 disabled, 512 KiB chip plus 1,536 KiB slow memory and no fast RAM. It reuses the
-frozen native-weather coverage slave, anchors at `$e1a2`, and requests 20,000 PAL fields
-(400 seconds) with all 35 weather probes. Natural forecast arrival and runtime event
-validation are pending; no calibration result is claimed from merely starting this run.
+The native A500 route uses input route 6, C1/C3/C4 disabled, 512 KiB chip plus
+1,536 KiB slow memory and no fast RAM. It reuses the frozen native-weather coverage
+slave, anchors at `$e1a2`, and requests 20,000 PAL fields (400 seconds). The first capture
+`timing-weather-native-a500-1` reaches natural forecast entry on track 2, with both
+deadlines inactive, forecast/transition/effect fields zero, gate `$104` zero and RNG seed
+1. Its debugger rejects multiple breakpoints with a `Z0` insertion error, aborting at
+field -1 before any measured fields complete. The log and initial snapshot are retained;
+this is routing evidence only, not a weather-duration or mutation measurement. Generating
+35 valid commands does not establish that the debugger supports all 35 concurrently.
+
+The retry `timing-weather-native-a500-2` uses 14 weather probes: `$e1ca/$e1d4/$e1f8`,
+`$e23c/$e242/$e246`, `$e278/$e294`, `$bd32/$bd36/$bd48/$bd4c` and `$112e6/$112f0`.
+It targets forecast/deadline publication, start/expiry, both fade directions and renderer
+lifetime decrement. Additional generation, palette and gear probes need a separate pass;
+they are not implicitly covered by this reduced set. Runtime acquisition and calibration
+remain pending.
+
+`tools/report_weather.py CAPTURE` checks observed before/after arithmetic for forecast
+and active deadlines, fade increments/decrements and their native 16-counter gate, effect
+lifetime, palette activation, generation delay and expiry resets. It reports every probe
+count, checked pair count, unpaired boundary and each fade step's physical field, clock
+and loop counter. Missing event families are explicit and are not reported as passes;
+the report is not a complete-episode or corrected-timing acceptance gate. Nine explicit
+synthetic mutation examples pass and nine incorrect results are rejected. These synthetic
+checks validate the analyzer only; native runtime observations remain required.
 
 Next implementation gates:
 
