@@ -142,14 +142,9 @@ phase_render_native
  dcb.w 3,0
  jmp $0.l
 phase_wait
- bsr phase_record
- dc.w 5
-.wait
- tst.w $494(a6)
- beq.s .wait
- bsr phase_record
- dc.w 6
- rts
+ ; Use the same conditional/deferred handshake as the production wrapper.
+ bra.w scene_wait
+
 phase_hud
  bsr phase_record
  dc.w 9

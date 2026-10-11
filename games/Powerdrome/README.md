@@ -1,6 +1,6 @@
 # Powerdrome
 
-Project status: completion-plan Phase B (B1–B3) is complete. Work stopped before Phase C.
+Project status: completion-plan Phase C is in progress. Phases A and B are complete.
 See the [current handoff](docs/open-work.md) for completed checks, open gates and resume priorities,
 and the [completion plan](docs/completion-plan.md) for the steps that finish and ship the work.
 

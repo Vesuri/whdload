@@ -1,6 +1,6 @@
 # Original/development loader equivalence
 
-Project status: completion-plan Phase B (B1–B3) is complete. Work stopped before Phase C.
+Project status: completion-plan Phase C is in progress. Phases A and B are complete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 The Copylock D2 question is resolved: its different return value has no effect on the

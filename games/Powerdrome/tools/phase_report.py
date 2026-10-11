@@ -162,6 +162,30 @@ def report(path, compare=False):
     return result
 
 
+def handshake_report(path):
+    """C1: each staged copy follows a completed wait and the next display VBL."""
+    _, _, events = records(path)
+    present = wait = None
+    copies = []
+    for event in events:
+        if event['event'] == 14:
+            present = event
+            wait = None
+        elif event['event'] == 6:
+            wait = event
+        elif event['event'] == 7 and present is not None:
+            assert wait is not None, 'Copy without completed handshake'
+            assert wait['clocks'] <= event['clocks'], 'Copy precedes wait completion'
+            assert wait['vbl'] > present['vbl'], 'Copy handshake did not cross presentation VBL'
+            copies.append(dict(sequence=event['sequence'],
+                fields_since_present=event['vbl']-present['vbl'],
+                clocks_after_wait=event['clocks']-wait['clocks']))
+    assert copies, 'No staged copies with a preceding presentation'
+    return dict(passed=True, checked_copies=len(copies),
+                minimum_fields_since_present=min(c['fields_since_present'] for c in copies),
+                minimum_clocks_after_wait=min(c['clocks_after_wait'] for c in copies))
+
+
 def world_cost(path, listing):
     """B3: uninstrumented 68000 steps, entry through committed world clock."""
     import barto
@@ -209,9 +233,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('capture', type=Path)
     parser.add_argument('--trace', action='store_true')
+    parser.add_argument('--handshake', action='store_true', help='C1 staged-copy/handshake ordering gate')
     parser.add_argument('--world-listing', type=Path, help='B3: matching uninstrumented full-verify assembler listing')
     args = parser.parse_args()
-    result = world_cost(args.capture, args.world_listing) if args.world_listing else report(args.capture, args.trace)
+    result = (world_cost(args.capture, args.world_listing) if args.world_listing else
+              handshake_report(args.capture) if args.handshake else report(args.capture, args.trace))
     print(json.dumps(result, indent=2))
     if args.trace and not result['trace_gate_passed']:
         raise SystemExit('Phase/trace 2% gate failed')

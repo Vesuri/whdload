@@ -2,11 +2,27 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
-## Phase B complete — stopped before Phase C
+## Phase C in progress
 
-D1–D5 are confirmed. Phases A and B are complete. No Phase C–F implementation or
-release-default change has been made. The next authorized work, when requested,
-is Phase C using the measured priorities in [internals](internals.md#current-measurements).
+D1–D5 are confirmed. Phases A and B are complete. Phase C is now authorized;
+Phases D–F and release-default changes remain outside the active goal.
+
+C1 is complete and retained. Its normal/weather write audits have no unhandled
+operations. Staged drawing now defers the handshake until immediately before copy;
+native fallbacks and VERIFY twin reference drawing keep the original early wait.
+NoCache Practice gains versus Phase B are 9.87% / 21.31% / 5.73% / 4.67% on M4–M7.
+CACHE improves on M5 and retains 49.098 fps on M6/M7. All 308 checked copies follow
+the required VBL; the M4/M5/M7 twins complete 16/26/29 staged scenes with zero
+pixel, register/CCR, scratch or guard failures and unchanged raster code.
+Evidence is under `tmp/phase-c/`; the full table and gate counts are in internals.
+
+C3 is complete with no code change: copy already uses aligned ten-register MOVEM
+blocks; HUD writes rows 156–199 outside the copied rows 19–153 and uses blits;
+presentation including LoadView is below the 3% threshold. C2 (static raster
+routing for native fallbacks) and C4 (stock A1200 code placement) remain open.
+No Phase C gate has failed.
+
+### Completed baseline gates
 
 - **B1 passes.** `VERIFY_PHASE=1` adds a 16,384-record beam-clock ring in an
   additional 256 KiB of requested expansion. It records actual renderer returns,
@@ -27,8 +43,9 @@ is Phase C using the measured priorities in [internals](internals.md#current-mea
   M1 full timing loses 8.23% fps in Practice (99/473 versus 104/456) and 6.64% in
   race (104/485 versus 113/492). Keep native timing on 68000/68010. Evidence:
   `tmp/phase-b/b3-m1-world-trace/` and `b3-world-cost.json`.
-- The normal and uninstrumented full coverage builds remain byte-identical to
-  Phase A (hashes below). The ordinary normal build is restored in `tmp/build/`.
+- At the completion of Phase B, normal and uninstrumented full coverage builds
+  were byte-identical to Phase A (baseline hashes below). Phase C changes the
+  optional renderer; the ordinary normal build is restored after candidate builds.
 - No unresolved failed gate remains. The M4 phase-boundary correction passed
   its single 500-field retry; the B3 listing reader accepts VASM's Latin-1 text
   and successfully reports the original capture. No tolerance was widened.
@@ -38,7 +55,7 @@ Full timing with WHDLoad CACHE reaches 49.098 fps in Practice on M6/M7 and
 HUD clear Phase C's candidate threshold; presentation including LoadView is below
 1%. These emulator measurements do not change the user's WHDLoad cache policy.
 
-Byte evidence (SHA-256, full files; ignored output in `tmp/phase-a/`):
+Phase A/B baseline byte evidence (SHA-256; ignored output in `tmp/phase-a/`):
 
 | Build | Before, umbrella and after-pruning result |
 | --- | --- |

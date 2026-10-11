@@ -1,6 +1,6 @@
 # Powerdrome internals
 
-Project status: completion-plan Phase B (B1–B3) is complete. Work stopped before Phase C.
+Project status: completion-plan Phase C is in progress. Phases A and B are complete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Current measurements
@@ -120,13 +120,82 @@ CACHE full timing reaches 49.098 fps in Practice on both M6 and M7, and
 also paces the display; removing its full cost cannot lift PAL presentation
 above 50 fps. M5's CACHE and NoCache baseline counts match on both routes.
 These are results of the requested emulator/WHDLoad configurations, not a
-new cache policy or physical-board certification. Phase C remains unstarted.
+new cache policy or physical-board certification. Phase C findings follow below.
 
 The final B1 M4 trace covers 46 common complete intervals; all exclusive phase sums
 agree with instruction-cost attribution within 0.00571%. The actual render-return
 hook includes incident paths that skip the HUD. The corrected 500-field M4 phase
 capture also completes successfully. Long-tail incidents can put a phase's mean
 above its p95; these are measured values, not a stationary scene benchmark.
+
+## Phase C measurements and decisions
+
+Phase C is in progress. C1 passes its performance and correctness gates and is retained.
+The Phase B table above remains the frozen comparison baseline.
+
+### Wait-overlap candidate performance (C1)
+
+Uninstrumented full timing, Practice, 500 fields at `$bc7c`, `SWAP_ONLY=1`.
+The candidate passes: all NoCache accelerator gains exceed 3%, CACHE improves on M5
+and holds the near-50-fps M6/M7 baseline.
+
+| Machine | WHDLoad | Before intervals/fields | C1 intervals/fields | fps | Change |
+| --- | --- | ---: | ---: | ---: | ---: |
+| M4 | NoCache | 214/489 | 238/495 | 21.881 → 24.040 | +9.87% |
+| M5 | CACHE | 313/496 | 382/499 | 31.552 → 38.277 | +21.31% |
+| M5 | NoCache | 313/496 | 382/499 | 31.552 → 38.277 | +21.31% |
+| M6 | CACHE | 490/499 | 490/499 | 49.098 → 49.098 | +0.00% |
+| M6 | NoCache | 419/499 | 443/499 | 41.984 → 44.389 | +5.73% |
+| M7 | CACHE | 490/499 | 490/499 | 49.098 → 49.098 | +0.00% |
+| M7 | NoCache | 428/499 | 448/499 | 42.886 → 44.890 | +4.67% |
+
+The C1 beam-ordering gate passes on all four machines (100 fields each), with
+308 checked staged copies. Each wait completes in a VBL later than the preceding
+presentation; each copy sample follows the completed wait sample. Costs below are
+beam-clock units, not CPU-frequency-scaled cycles. The 100-field M4/M5/M7 twin
+runs complete 16/26/29 staged scenes, with zero pixel, register/CCR, scratch or guard
+failures and unchanged copied raster code. C1 is retained.
+
+| Machine | Copies checked | Minimum fields after present | Minimum beam clocks after wait |
+| --- | ---: | ---: | ---: |
+| M4 | 48 | 1 | 156 |
+| M5 | 78 | 1 | 92 |
+| M6 | 90 | 1 | 46 |
+| M7 | 92 | 1 | 46 |
+
+### Buffer ownership before moving the wait (C1)
+
+`audit_buffer_writes.py` lists every observed CPU bitmap writer and extent in
+`tmp/phase-c/c1-buffer-audit.json` and `c1-weather-buffer-audit.json`.
+The normal M4 full-timing trace covers 47 scene entries in 100 fields. The directed
+weather trace covers 31 scene entries and eight effect draws in 100 fields.
+Neither audit has an unhandled memory operation. The accompanying code-write audits
+find no game-code writes in the staged trace, but weather fallback rewrites each
+native span branch displacement 203 times.
+
+| Work | Observed chip writes | Consequence |
+| --- | --- | --- |
+| Staged scene | Final MOVEM transfer only, rows 19–153 in each plane | Wait may move immediately before this copy. |
+| Native weather fallback | Clear at `$1582c`, span writers in `$15b68`–`$15e68`, plus KickEmu blitter setup during the weather draw path | Keep the original wait at `$112a6` whenever staging is inactive. |
+| HUD and post-render work | Writers in `$15612`–`$175c6`, rows 156–199, plus blitter setup | Remain after the completed copy/handshake. |
+| Timer | Writers at `$16d4e`/`$16d60` and `$173e4`–`$173f0`, rows 4–12 | Remain on chip RAM after the handshake. |
+
+The weather path through `$112f4` is excluded by the existing effect/lifetime
+staging checks. Twin reference blocks write chip RAM inside the renderer; their
+VERIFY path retains the early wait. Production staged drawing defers it to copy.
+The CPU audit separately reports blitter-register writes; it does not claim CPU
+trace coverage of DMA or unexecuted routes.
+
+### Copy, HUD and presentation assessment (C3)
+
+No C3 code change is justified by the prescribed candidates. Copy already uses
+ten-register, 40-byte MOVEM blocks for the 21,600-byte extent. Both observed bitmap
+bases, the 760-byte copy offset and the 8,000-byte plane stride are longword-aligned.
+HUD writes extend outside rows 19–153, failing the plan's prerequisite for staging
+HUD in that extent; it also uses the blitter. Leave it native. B2 measures the whole
+presentation call, including LoadView, at about 0.11 ms on M6/M7, below 1% of a frame
+and therefore below the 3% investigation threshold. No MOVE16 or cache-policy change
+is introduced.
 
 ## Inputs and loader
 

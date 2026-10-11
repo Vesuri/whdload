@@ -1,6 +1,6 @@
 # Development
 
-Project status: completion-plan Phase B (B1–B3) is complete. Work stopped before Phase C.
+Project status: completion-plan Phase C is in progress. Phases A and B are complete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Inputs and shared tools
@@ -130,6 +130,20 @@ The B3 capture uses M1, 100 fields, `SWAP_ONLY=0`, anchor `$bc7c`, and
 frame allocation, rendering/HUD-owned work and the post-commit restore tail are outside
 that explicitly bounded body. B3's fps decision uses the uninstrumented 500-field
 matrix, which includes all costs.
+
+### Phase C buffer audit
+
+`python3 tools/audit_buffer_writes.py CAPTURE` decodes every observed explicit CPU
+memory destination from render entry through presentation, including relocated
+slave and KickEmu instructions. It lists bitmap writers, plane-relative rows and
+bytes outside the copied extent, and separately lists blitter-register writes.
+Unhandled operations fail explicitly. It complements `audit_code_writes.py`;
+CPU destination coverage does not imply DMA coverage or cover unexecuted paths.
+
+`python3 tools/phase_report.py CAPTURE --handshake` checks that every staged copy
+with a preceding presentation follows a recorded completed wait and a later VBL.
+Use an ordinary C4=0 phase build for this ordering gate. C4=1 twins intentionally
+wait before their native reference drawing, which writes into chip memory early.
 
 ### Full timing development configuration
 

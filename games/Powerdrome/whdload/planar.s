@@ -108,6 +108,8 @@ pl_planar PL_START
  PL_P $10df2,scene_entry
  ; PERF_RANGE h0:$15ee8 6 bit=C1
  PL_P $15ee8,routed_poly
+ ; Staged drawing touches only fast RAM until scene_copy_begin.
+ PL_PS $112a6,scene_wait
  PL_END
  IFD VERIFY
 pl_twin PL_START
@@ -273,6 +275,7 @@ scene_bad_pixel
 scene_copy
  ENDC
 scene_copy_begin
+ bsr scene_handshake
  IFNE VERIFY_PHASE
  bsr phase_record
  dc.w 7
@@ -355,6 +358,36 @@ scene_native
  movem.l (sp)+,d0-d7/a0-a6
  move.w (sp)+,ccr
  bra native_scene
+
+; Native fallback still waits before clear/weather drawing. A staged scene may
+; draw while the previous LoadView is pending, but must wait before its chip copy.
+scene_wait
+ move.l d0,-(sp)
+ move.w perf_active(pc),d0
+ beq.s .native
+ IFD VERIFY
+ ; Twin reference blocks write chip RAM during the renderer itself.
+ move.l custom4(pc),d0
+ bne.s .native
+ ENDC
+ movem.l (sp)+,d0
+ rts
+.native
+ movem.l (sp)+,d0
+
+scene_handshake
+ IFNE VERIFY_PHASE
+ bsr phase_record
+ dc.w 5
+ ENDC
+.wait
+ tst.w $494(a6)
+ beq.s .wait
+ IFNE VERIFY_PHASE
+ bsr phase_record
+ dc.w 6
+ ENDC
+ rts
 
 normalize_registers
  ; a0 points at saved d0-d7/a0-a6. Only known pointer outputs are translated.

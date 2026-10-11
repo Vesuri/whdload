@@ -100,7 +100,7 @@ which has opponents on screen and is the heavier scene.
 
 ## Phase A: Consolidate the timing prototype (no behaviour change)
 
-Status: **A1 and A2 complete**, byte-equivalence gates passed. Phase B is also complete; Phases C–F remain untouched.
+Status: **A1 and A2 complete**, byte-equivalence gates passed. Phase B is also complete; Phase C is in progress and Phases D–F remain untouched.
 See [open work](open-work.md) for the exact configuration and file hashes.
 
 **A1. Pick one release configuration.** Find the flag set behind the most recent complete
@@ -131,7 +131,7 @@ captures are complete, all six existing native references match exactly, and all
 8 MHz checks are slower. B3 measures 10,357.86 mean / 18,778 p95 cycles per complete
 A500 world body; the 8.23% Practice fps loss retains D2's native 68000/68010 timing.
 See [Current measurements](internals.md#current-measurements) and [open work](open-work.md).
-**Stopped here; Phase C has not started.**
+Phase C is now in progress.
 
 **B1. Guest phase timer (VERIFY only).** Add a ring of `PDPHASE` records. Each holds the
 VBL count, `VPOSR`/`VHPOSR` and a phase id, written at hooks that already exist, plus these:
@@ -162,6 +162,10 @@ D2:* if the M1 fps loss is above 3%, the 68000 keeps native timing, which is the
 Commit B1–B3: "Add frame phase timer and baseline performance matrix".
 
 ## Phase C: 50 fps on 68020+ with fast RAM
+
+Status: **in progress**. C1 passes and is retained. C3 is assessed with no change:
+copy already uses aligned MOVEM blocks, HUD exceeds the staging extent, and LoadView
+is below threshold. C2 and C4 remain. See [measurements](internals.md#phase-c-measurements-and-decisions).
 
 Work through these in order of their B2 phase share. Measure each one on M4–M7 and keep it
 only if it measures better.

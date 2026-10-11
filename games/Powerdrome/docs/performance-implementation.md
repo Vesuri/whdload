@@ -1,7 +1,13 @@
 # Optional fast planar renderer
 
-Project status: completion-plan Phase B (B1–B3) is complete. Work stopped before Phase C.
+Project status: completion-plan Phase C is in progress. Phases A and B are complete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+
+Completion-plan C1 retains a later display handshake for staged scenes: drawing
+runs in fast RAM first, then waits immediately before copying to chip RAM. Native
+fallbacks and twin reference blocks keep the early wait. The write audit, beam
+ordering checks and accelerator gains are in [Current measurements](internals.md#phase-c-measurements-and-decisions).
+
 
 `CUSTOM1=1` enables the fast-RAM renderer. The option is off by default, including on
 68000 systems. It retains the game's planar format, native double buffering and original
