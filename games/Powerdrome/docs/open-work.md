@@ -446,6 +446,7 @@ opponent histories; no compared fields are excluded to conceal that difference.
 | --- | ---: | ---: | ---: |
 | Ten CPU/renderer configurations, 10 seconds | 502 | 111 | 454 |
 | A500/native and 030/fast, 60 seconds | 3,004 | 667 | 851 |
+| A500/native and 030/fast, 600 seconds | 30,000 | 6,666 | 7,069 |
 | 100 ms stall pair plus unstalled references | 652 | 144 | 155 new |
 | 250 ms request (260 ms PAL hold), plus references | 652 | 144 | 153 new |
 | 500 ms stall pair plus unstalled references | 652 | 144 | 151 new |
@@ -469,14 +470,16 @@ elapsed-work recovery. Peak sampled delay is 260/780 ms, 320/780 ms and 560/760 
 at a sampled world end, then clears it. The fixture is verification-only; disabled
 prototype and normal-build bytes remain unchanged.
 
-The 030 half of the 30,000-field `timing-endurance600-1` pair passes: exactly 600 seconds,
-30,000 consecutive world steps, 6,666 control/fuel updates and 7,069 clean renderer twins.
-Sampled maximum delay remains 260 ms, with no sampled retained debt and no unfinished work
-at the endpoints. The A500 half and cross-CPU comparison remain pending. This tape brings the
-ship to rest after its initial maneuver, so the extended window tests mostly stationary
-accounting and cannot establish sustained-driving capacity or active-weather coverage. Ten-minute/restart,
-controlled rendering rates, repeated stalls, full opponent/effect state, further CPU
-configurations, calibration, lifecycle and release gates remain open. See the current
+The 30,000-field `timing-endurance600-1` pair passes all per-run and cross-CPU gates:
+30,000 common world states and 6,666 common control/input/fuel updates match exactly,
+with 7,069 clean 030 renderer twins. The physical windows are each 600 seconds. A500's
+30,003 steps versus 030's 30,000 are accounted for by initial/final unsampled time
+(140→80 ms versus 80→80 ms). Both finish with zero retained/assigned debt or pending
+controls. Peak sampled delay is 780/260 ms and retained debt 160/0 ms (A500/030).
+This tape brings the ship to rest after its initial maneuver, so the extended window tests
+mostly stationary accounting and cannot establish sustained-driving capacity or active
+weather. Restart, controlled rendering rates, repeated stalls, full opponent/effect state,
+further CPU configurations, calibration, lifecycle and release gates remain open. See the current
 measurement tables and checker contracts in timing-implementation. Bounded passes do
 not establish whole-game framerate independence.
 

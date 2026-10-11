@@ -3259,18 +3259,35 @@ code unchanged and no draw active at the final snapshot. These are instrumented 
 measurements, not release throughput. No fall-age or impulse samples are nonzero, so this
 run supplies no new evidence for those effects. The ship comes to rest after the initial
 maneuver; this is predominantly stationary accounting coverage, not sustained-driving
-capacity. Full opponent/effect state and a restart remain outside this comparison. The 030/fast half of `timing-endurance600-1` now passes all per-run gates over exactly
-30,000 physical PAL fields (600 seconds). It completes 30,000 consecutive world steps,
-6,666 control/resource updates and 60,000 fractional-remainder observations. Initial and
-final unsampled elapsed time are both 80 ms, explaining why the completed-step count is
-exactly 30,000. Maximum sampled world-end delay is 260 ms, maximum retained debt is zero
-and maximum allocation is 12 steps. Both endpoints have zero retained/assigned debt.
-All six input events and three contact responses pass. There are 7,069 clean renderer
-twins, unchanged raster code and no draw active at the endpoint. The run has no nonzero
-fall-age, impulse or centering-adjustment observations. Its 25,634 opponent multiplication
-reads are checked individually for the 90 ms interval, not treated as full-record opponent
-equivalence. The A500 half and cross-CPU comparison remain pending. This is predominantly
-stationary long-window accounting evidence, not sustained-driving or whole-lifecycle proof.
+capacity. Full opponent/effect state and a restart remain outside this comparison. The synchronized ten-minute pair `timing-endurance600-1` passes all per-run and
+cross-CPU gates over exactly 30,000 physical PAL fields (600 seconds) on each machine.
+All **30,000 common sampled player/engine/RNG states** and **6,666 common control/input/fuel
+updates** match exactly at their logical timestamps.
+
+| Ten-minute observation | 030/25, fast renderer with twins | A500, native renderer |
+| --- | ---: | ---: |
+| Consecutive 20 ms world steps | 30,000 | 30,003 |
+| Logical control/resource updates | 6,666 | 6,667 |
+| Fractional-remainder observations | 60,000 | 60,006 |
+| Initial → final unsampled elapsed time | 80 → 80 ms | 140 → 80 ms |
+| Maximum sampled world-end delay | 260 ms | 780 ms |
+| Maximum sampled retained debt | 0 ms | 160 ms |
+| Maximum allocation | 12 steps | 32 steps |
+| Opponent multiplication reads checked at 90 ms | 25,634 | 25,638 |
+
+A500's three additional steps service the 60 ms difference between initial and final
+unsampled time. The independent physical/world/control-clock checks account for the
+extra endpoint control; no counts or state values are discarded to force equality.
+Both CPUs finish with zero retained debt, assigned unfinished steps and pending controls.
+All six input events and three contact responses pass on each CPU. The A500 integrator
+checks 29,928 scalar and 89,629 axis carries; both runs have no nonzero fall-age, impulse
+or centering-adjustment observations.
+
+The 030 completes 7,069 clean renderer twins, with unchanged raster code and no draw
+active at the endpoint. Opponent multiplication reads are checked individually for the
+90 ms interval, not treated as full-record opponent equivalence. This is predominantly
+stationary long-window accounting evidence, not sustained-driving, active-weather,
+release-throughput or whole-lifecycle proof. No restart occurs in this window.
 
 Native contact handling at hunk `$d058–$d090` multiplies saved steering axes `$436/$438`
 by 230 and shifts right eight bits when `$24a` is nonzero, then replaces logical axes
