@@ -246,6 +246,15 @@ if os.environ.get('TIMING_STATE') == '1':
             cv=[f'*(unsigned short*){cp+x:#x}' for x in (8,10,12)]
             cv += [f'*(unsigned int*){cp+x:#x}' for x in (16,20,24,28,32)]
             player_contract_sample='printf "PDPLCON_EVENT %d {off} ' + ' '.join(['%u']*len(cv)) + '\\n", $pd_field, ' + ', '.join(cv) + '\n'
+    repair_pace_sample=''
+    if fast_worlds:
+        repairs=timing_locations(b'PDREPR01', lambda off: 0<fast_worlds[0]-off<16384)
+        assert len(repairs)<=1
+        if repairs:
+            rp=a.base+repairs[0]
+            rv=[f'*(unsigned {kind}*){rp+x:#x}' for x,kind in
+                ((8,'short'),(10,'short'),(12,'int'),(16,'short'),(20,'int'),(24,'int'),(28,'int'),(32,'int'),(36,'int'),(40,'int'),(44,'int'))]
+            repair_pace_sample='printf "PDREPR_EVENT %d {off} ' + ' '.join(['%u']*len(rv)) + '\\n", $pd_field, ' + ', '.join(rv) + '\n'
     retune_sample=''
     if fast_worlds:
         retunes=[m.start() for m in re.finditer(b'PDRETUNE',code)
@@ -286,7 +295,8 @@ if os.environ.get('TIMING_STATE') == '1':
             sample += 'printf "PDPLAYER_CLOCK %d ' + hex(off) + ' ' + ' '.join(['%u']*len(clock_values)) + '\\n", $pd_field, ' + ', '.join(clock_values) + '\n'
         if off in (0x10bf8,0x10c00,0xf110,0xf118):
             sample += player_contract_sample.replace('{off}',hex(off))
-        if off in (0x148d0,0x14962,0x14970,0x14a18,0x14aa6,0x14ac4):
+        if off in (0x148d0,0x14962,0x14970,0x14a18,0x14a20,0x14aa6,0x14ac4):
+            sample += repair_pace_sample.replace('{off}',hex(off))
             repair_values=[f'(unsigned int)${reg}' for reg in ('d4','d5','d6','d7')]
             repair_values += [f'*(unsigned short*){state+x:#x}' for x in (0x46e,0x470,0x472,0x474,0x47c)]
             repair_values += [f'*(unsigned int*){r["game"][0]+x:#x}' for x in (0xf96,0x48fe)]

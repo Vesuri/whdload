@@ -219,6 +219,9 @@ timing_world_phase dc.w 0
  INCLUDE timing_lap.s
  INCLUDE timing_player_lap.s
  INCLUDE timing_external.s
+ IFNE TIMING_REPAIR
+ INCLUDE timing_repair.s
+ ENDC
  INCLUDE timing_result.s
  INCLUDE timing_retune.s
  INCLUDE timing_pit.s

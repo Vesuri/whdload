@@ -136,6 +136,10 @@ timing_pit_leave
 timing_pit_abort
  move.w sr,-(sp)
  movem.l d0-d1/a0-a1,-(sp)
+ IFNE TIMING_REPAIR
+ lea timing_repair_state(pc),a0
+ clr.w 8(a0)
+ ENDC
  bsr timing_pit_opponent_restore
  lea timing_retune_state(pc),a0
  clr.l 8(a0)

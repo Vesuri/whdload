@@ -58,6 +58,20 @@ TIMING_WORLD_STEP = 4
  ELSE
 TIMING_WORLD_STEP = 18
  ENDC
+ IFND TIMING_REPAIR
+TIMING_REPAIR = 0
+ ENDC
+ IFLT TIMING_REPAIR
+ FAIL "TIMING_REPAIR must be 0 or 1"
+ ENDC
+ IFGT TIMING_REPAIR-1
+ FAIL "TIMING_REPAIR must be 0 or 1"
+ ENDC
+ IFNE TIMING_REPAIR
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_REPAIR requires TIMING_WORLD20"
+ ENDC
+ ENDC
  IFND TIMING_RETUNE_RESULT_TEST
 TIMING_RETUNE_RESULT_TEST = 0
  ENDC
@@ -185,6 +199,14 @@ install_periodic
  lea timing_lap_flags(pc),a0
  move.w #$42e7,(a0)
  lea timing_player_lap_flags(pc),a0
+ move.w #$42e7,(a0)
+ ENDC
+ IFNE TIMING_REPAIR
+ lea timing_repair_enter_first(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_repair_enter_second(pc),a0
+ move.w #$42e7,(a0)
+ lea timing_repair_wait(pc),a0
  move.w #$42e7,(a0)
  ENDC
  lea timing_external_step(pc),a0
@@ -384,6 +406,22 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$1479e 8 bit=C3
  PL_P $1479e,timing_external_end
  PL_NOP $147a4,2
+ IFNE TIMING_REPAIR
+ ; Native entry save plus first coordinate load; no extra frame in game code.
+ ; TIMING_RANGE h0:$148d0 8 bit=C3
+ PL_P $148d0,timing_repair_enter_first
+ PL_NOP $148d6,2
+ ; TIMING_RANGE h0:$14a18 8 bit=C3
+ PL_P $14a18,timing_repair_enter_second
+ PL_NOP $14a1e,2
+ ; Whole save/BSR/restore triplets; post-loop DBRA instructions stay native.
+ ; TIMING_RANGE h0:$14956 12 bit=C3
+ PL_P $14956,timing_repair_present_first
+ PL_NOP $1495c,6
+ ; TIMING_RANGE h0:$14a9a 12 bit=C3
+ PL_P $14a9a,timing_repair_present_second
+ PL_NOP $14aa0,6
+ ENDC
  ; Only ordinary result-duration accounting reads the logical winning instant.
  ; TIMING_RANGE h0:$c094 6 bit=C3
  PL_PS $c094,timing_result_clock_d7
@@ -923,6 +961,18 @@ timing_targets
  dc.w timing_opponent_effects_exit+2-timing_targets
  dc.l $9da4
  dc.w timing_opponent_projection_continue+2-timing_targets
+ IFNE TIMING_REPAIR
+ dc.l $148d8
+ dc.w timing_repair_first_continue+2-timing_targets
+ dc.l $14a20
+ dc.w timing_repair_second_continue+2-timing_targets
+ dc.l $e296
+ dc.w timing_repair_native_present+2-timing_targets
+ dc.l $14962
+ dc.w timing_repair_first_post+2-timing_targets
+ dc.l $14aa6
+ dc.w timing_repair_second_post+2-timing_targets
+ ENDC
  dc.l $14764
  dc.w timing_external_loop+2-timing_targets
  dc.l $1476a

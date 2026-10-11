@@ -334,9 +334,13 @@ on 030 and 37 on A500. A separate natural completed-lap window passes the 030 lo
 92,220-ms duration, native records and 82 HUD contracts, adding 73 clean renderer twins.
 The A500 completed-lap contract also passes: 128,380 ms, matching native records and
 55 HUD hooks. Broader mode/arithmetic cases remain open. The next concrete timing
-correction is the native repair-animation loop, whose 33 position updates at `$148d0`
-and second 33-update stage at `$14970` remain tied to drawing; first measure its native
-A500 cadence before selecting elapsed-time deadlines. Next audit the projection flag and matched native animation visibility,
+correction is the repair-animation pilot. Both variants/directions now have complete
+native A500 baselines. `TIMING_REPAIR=1` (default off, requires WORLD20 and CUSTOM3)
+paces both 33-step stages with cumulative deadlines and measured minimum sound/display
+pauses. The 030 run passes all 264 word-geometry/deadline samples and exactly matches
+native invocation times of 8,260 / 8,840 / 7,900 / 7,960 ms. A500 cadence, register/stack
+and nonlocal-result contracts, opponent continuity and the other repair branches remain
+open. Normal and pilot-disabled builds are unchanged. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

@@ -23,8 +23,13 @@ def read(root):
     # The first entry breakpoint is the capture anchor; its initial timestamp
     # comes from the stopped memory snapshot, before the debugger continues.
     pending = [(32, anchor_vbl), None]
+    pace = None
     for line in (root/'swaps-gdb.txt').read_text().splitlines():
         v = line.split()
+        if v and v[0] == 'PDTIME_EVENT':
+            pace = None
+        if v and v[0] == 'PDREPR_EVENT':
+            pace = (int(v[1]), int(v[2], 16), list(map(int, v[3:])))
         if not v or v[0] != 'PDREPAIR_EVENT':
             continue
         field, off = int(v[1]), int(v[2], 16)
@@ -34,10 +39,15 @@ def read(root):
             stage = int(off == 0x14a18)
             assert pending[stage] is None, 'Unpaired repair entry'
             pending[stage] = (values[3] & 65535, values[10])
+        if off == 0x14a20:
+            assert pending[1] is not None and pending[1][0] == values[3] & 65535
+            pending[1] = (*pending[1][:2], values[10])
         if off in (0x14962, 0x14aa6):
             stage = int(off == 0x14aa6)
             assert pending[stage] is not None and pending[stage][0] == values[3] & 65535
-            stages[stage].append(dict(field=field, v=values, entry_vbl=pending[stage][1]))
+            if pace is not None:
+                assert pace[:2] == (field, off) and len(pace[2]) == 11
+            stages[stage].append(dict(field=field, v=values, entry_vbl=pending[stage][1], body_entry_vbl=pending[stage][-1], pace=None if pace is None else pace[2]))
             pending[stage] = None
         elif off == 0x14ac4:
             for stage in stages:
@@ -64,10 +74,10 @@ def report(root):
             intervals = [20*(y['v'][10]-x['v'][10]) for x, y in zip(stage, stage[1:])]
             entry['stages'].append(dict(post_draw_samples=len(stage), first_to_last_post_ms=sum(intervals),
                                         first_entry_to_last_post_ms=20*(stage[-1]['v'][10]-stage[0]['entry_vbl']),
-                                        body_histogram_ms=dict(sorted(Counter(20*(r['v'][10]-r['entry_vbl']) for r in stage).items())),
+                                        body_histogram_ms=dict(sorted(Counter(20*(r['v'][10]-r['body_entry_vbl']) for r in stage).items())),
                                         intervals_ms=intervals, histogram_ms=dict(sorted(Counter(intervals).items()))))
         entry['between_stages_ms'] = 20*(stages[1][0]['v'][10]-stages[0][-1]['v'][10])
-        entry['second_stage_wait_before_counter31_ms'] = 20*(stages[1][1]['entry_vbl']-stages[1][0]['v'][10])
+        entry['second_stage_wait_before_counter31_ms'] = 20*(stages[1][1]['body_entry_vbl']-stages[1][0]['v'][10])
         entry['last_post_to_return_ms'] = 20*(invocation['returned_vbl']-stages[1][-1]['v'][10])
         entry['complete_invocation_ms'] = 20*(invocation['returned_vbl']-stages[0][0]['entry_vbl'])
         result.append(entry)

@@ -1451,14 +1451,53 @@ Next steps for this correction:
 
 1. Native A500 measurements of both item variants and directions are complete for this
    route, with all 33 positions per stage and separately measured sound/display pauses.
-2. Add opt-in elapsed deadlines for the drawing steps. Retain lateness and native step
-   order; start a new timing segment after the deliberate sound/display pause so it is
-   not serviced as movement catch-up. Select periods from the measured A500 stages.
-3. Verify full geometry, stage/invocation duration, native stack/nonlocal-exit contracts
-   and opponent-time accounting on A500 and 030. Apply the existing calibration bounds;
-   do not count a CPU overrun or partial sequence as a pass.
+2. The opt-in elapsed-deadline pilot is implemented and passes the 030 cadence/geometry
+   gate below. It retains native step order and lateness, and shifts the stage epoch by
+   the separately measured sound/display pause.
+3. A500 cadence, native register/stack/nonlocal-exit contracts and opponent-time
+   accounting remain to verify. Apply the existing calibration bounds; do not count a
+   CPU overrun or partial sequence as a pass.
 4. Extend to the other repair-animation branches and complete pit/lifecycle regressions.
    These two loops alone do not cover every repair or the full F6/F7 scope.
+
+`TIMING_REPAIR=1` enables this isolated pilot in a WORLD20 build; its default is zero,
+and installation still requires `CUSTOM3`. Unsupported build combinations are rejected.
+With the pilot omitted, the full timing slave reproduces the frozen playercontract1
+artifact byte-for-byte. The normal slave is also unchanged.
+
+For completed step `k=1..33`, the deadline is `epoch + floor(k*T/33)`, where `T` is the
+measured native A500 drawing total in five-millisecond clock units. This retains fractional
+time across steps and never adds a fresh period to an already-late completion. Four whole
+instruction hooks preserve the native save/presentation-call/restore depth and continue
+at the native loop tails. Only human active-pit paths for these two item variants are
+paced; unsupported modes keep the native path. The repair state clears on stage completion
+and pit abort. The full hook boundary/direct-entry audit passes.
+
+The native sound/display work still executes in its original order before counter 31 of
+stage two. The helper then enforces its measured A500 minimum, preserving longer native
+waits, and shifts the epoch by the actual pause. This keeps both fractional deadlines and
+pre-pause lateness without interpreting the pause as owed movement. Clock sampling
+clobbers D0/D1, so the minimum-wait deadline is held in saved D2.
+
+The frozen repairpace3 slave passes `timing-repairpace3-030-twins` over 2,000 fields.
+All **264** recorded word-geometry/deadline samples agree, every stage initializes and
+completes exactly once, and all four full invocation durations equal the native reference:
+**8,260 / 8,840 / 7,900 / 7,960 ms**. Every stage and full invocation passes the strict
+10% and 90-ms bounds, including a conservative 40-ms two-capture endpoint allowance.
+The A500 counterpart remains pending. Renderer diagnostics remain clean with unchanged
+raster code, but this pit window adds **zero** staged scenes; it is not new scene-equivalence
+or FPS evidence.
+
+```sh
+python3 tools/check_repair_pacing.py tmp/prof/timing-repairloop3-native-a500 tmp/prof/timing-repairpace3-030-twins
+python3 tools/perf_status.py tmp/prof/timing-repairpace3-030-twins
+```
+
+`PDREPR01` records active stage, epoch, total units, latest deadline/completion time,
+stage/step counts, excluded pause time and lateness. The read-only `$14a20` continuation
+probe distinguishes the enforced minimum pause from the drawing body. These checks cover
+only the two item variants, not all repair branches, nonlocal result exits or complete
+pit duration. The pilot is not enabled by default until the remaining gates pass.
 
 ### Continuous opponent time across flight and rescue
 
