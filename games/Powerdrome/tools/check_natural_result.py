@@ -20,7 +20,7 @@ def u16(data, offset):
     return struct.unpack_from('>H', data, offset)[0]
 
 
-def check(root, require_logical_time=False):
+def check(root, require_logical_time=False, require_stable_domain=False):
     game = int((root / 'game-base.txt').read_text(), 0)
     base = int((root / 'dump-base.txt').read_text(), 0)
     state = game + 0xa6e
@@ -43,6 +43,17 @@ def check(root, require_logical_time=False):
     assert u16(other, opp + 12) > 0, 'Expected a winning opponent update interrupted by native results'
     start = u32(before, state + 0x22e)
     logical = u32(other, opp + 36)
+    if require_stable_domain:
+        lap = live_tag(b'PDLAP001')
+        assert u32(other, lap+24) == 1, 'Need the natural countdown epoch reset'
+        assert start == u32(other, lap+32), 'Race start differs from the shared native lap reset'
+        stable = (u32(other, lap+8)+u32(other, opp+20)-u32(other, opp+52)+18) & 0xffffffff
+        assert u32(other, lap+40) == stable, 'Winning step did not latch the stable lap-domain instant'
+        mapping_gap = (logical-stable) & 0xffffffff
+        if mapping_gap & 0x80000000:
+            mapping_gap -= 1 << 32
+        print(f'  Sampled native mapping differs from stable lap mapping by {mapping_gap*5:+d} ms')
+        logical = stable
     assert u32(compute, state + 0x22e) == start
     duration = u32(ranked, state + 0x22e)
     registers = (root / 'probe-0xc09e-registers.txt').read_text()
@@ -89,6 +100,7 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('captures', type=Path, nargs='+')
     p.add_argument('--require-logical-time', action='store_true')
+    p.add_argument('--require-stable-domain', action='store_true', help='Require countdown-rebased lap/race domain as well as logical result timing')
     a = p.parse_args()
     for capture in a.captures:
-        check(capture, a.require_logical_time)
+        check(capture, a.require_logical_time or a.require_stable_domain, a.require_stable_domain)

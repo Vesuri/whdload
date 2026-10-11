@@ -643,10 +643,9 @@ The frozen prototype uses the existing full WORLD20 flags and synchronized-pit t
 fixture. The normal build remains byte-identical; hook boundaries pass structural checks.
 
 Guest-observed reset flags/registers, the alternate reset entry and
-pause/rescue transitions remain to verify. The separate result-duration latch still uses
-the sampled native opponent clock domain; this lap rebase does not establish consistent
-race-result timing across changing native/VBL offsets. That shared result-clock mapping
-remains required before declaring the timing modes complete.
+pause/rescue transitions remain to verify. The result-duration latch now uses the stable lap/race domain as described below.
+The lap-reset tests alone do not establish consistent race-result timing; each result
+source still requires its own finish and cleanup validation.
 
 ## Opponent preparation on logical world ticks
 
@@ -1764,9 +1763,13 @@ are not established as matching across CPUs. The 030 reaches the result with 2,4
 cumulative renderer twins and no reported failures; the 200-field result window adds
 no staged scenes. Do not count those cumulative twins as new window comparisons.
 
-An experimental `timing_result.s` now latches an active opponent or deferred pit opponent
+The experimental `timing_result.s` latches an active opponent or deferred pit opponent
 winning instant before ownership cleanup, and supplies it only to the ordinary duration
-read at `$c094`. Unclassified sources still use the native physical value. The 36-byte
+read at `$c094`. Each opponent step now records its stable lap-domain instant in
+`PDLAP001+$28` before native execution; the result latch uses that saved instant even
+when a retune winner is delivered later. Repair/native-clock sampling remains separate.
+The stable epoch follows the shared countdown reset, so lap and race durations share
+the same start mapping rather than repeatedly sampling the native/VBL offset. Unclassified sources still use the native physical value. The 36-byte
 static state is cleared at native session cleanup; the helper reproduces MOVE.L flags,
 including X preservation, and records guest flags for verification. The global native
 clock and display/input waits are unchanged. The corrected 030 natural finish
@@ -1782,7 +1785,22 @@ winners and do not establish cross-CPU trajectory equivalence. Player-originated
 other result modes and deferred-pit duration still need explicit validation. The normal
 build remains byte-identical.
 
-The ordinary opponent-result clock correction is validated on this CPU pair. Broader
+The current stable-domain prototype's unforced 030 run
+`timing-resultdomain1-natural-030` reports **215,060 ms**, exactly the logical winning
+duration, with opponent 2 reaching ten laps. At that instant, the sampled native mapping
+is 60 ms ahead of the stable lap mapping and the physical duration read is 100 ms ahead.
+The stricter `--require-stable-domain` gate verifies the shared countdown start, the
+winning-step latch, all five ranked records, preserved registers/stack, guest MOVE.L
+flags and cleared result ownership. There are 2,408 cumulative completed renderer twins
+with no failures; the 200-field result window adds zero staged scenes. This is not a
+performance measurement. The matching A500 stable-domain finish remains pending, as do
+player/deferred-pit/mode-specific result durations.
+
+```sh
+python3 tools/check_natural_result.py --require-stable-domain tmp/prof/timing-resultdomain1-natural-030
+```
+
+The earlier sampled-domain opponent-result correction was validated on this CPU pair. Broader
 **result-clock** work remains open: do not infer player/deferred-pit/mode coverage from
 these runs or freeze the shared native clock to hide discrepancies. Recheck this pair with:
 

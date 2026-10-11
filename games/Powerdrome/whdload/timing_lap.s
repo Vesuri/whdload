@@ -10,6 +10,7 @@ timing_lap_initialize
  clr.l 28(a0)
  clr.l 32(a0)
  clr.l 36(a0)
+ clr.l 40(a0)
  movea.l (sp)+,a0
  rts
 
@@ -94,3 +95,4 @@ timing_lap_state dc.b 'PDLAP001'
  dc.l 0 ; logical world timestamp at last reset
  dc.l 0 ; native shared timestamp at last reset
  dc.l 0 ; previous stable lap epoch
+timing_lap_current dc.l 0 ; stable lap-domain instant of the current opponent update

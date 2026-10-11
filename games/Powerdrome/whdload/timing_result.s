@@ -18,7 +18,7 @@ timing_result_begin
 .latch
  move.w #1,8(a0)
  move.w d0,10(a0)
- move.l timing_pit_opponent_state+36(pc),12(a0)
+ move.l timing_lap_current(pc),12(a0)
 .done
  movem.l (sp)+,d0/a0
  move.w (sp)+,ccr
@@ -63,7 +63,7 @@ timing_result_flags
 timing_result_state dc.b 'PDRSLT01'
  dc.w 0 ; logical winning instant valid until session cleanup
  dc.w 0 ; source: 0 native, 1 active opponent, 2 deferred pit opponent
- dc.l 0 ; logical winning instant in the native clock epoch
+ dc.l 0 ; logical winning instant in the stable lap/race epoch
  dc.l 0 ; result entries
  dc.l 0 ; ordinary race-duration clock reads
  dc.l 0 ; native physical clock observed at the duration read

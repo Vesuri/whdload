@@ -293,7 +293,10 @@ one rebase, all five loop visits, four unchanged opponent reset stamps and eight
 lap-clock reads; it removes a measured 70-ms clock-domain mismatch. The matching
 2,000-field A500 run passes the same reset/read checks and removes a 410-ms mismatch.
 Alternate reset entry and guest flags/registers remain to verify. Pause/rescue/clock adjustments and total
-result clocks still need coverage; the result latch uses a separate sampled clock mapping. Next audit the projection flag and matched native animation visibility,
+result clocks still need coverage. The result latch now uses each opponent step's stable
+lap-domain instant. The corrected 030 natural finish reports exactly 215,060 ms and passes
+ranking, caller registers/flags and cleanup; the sampled mapping would be 60 ms later.
+A500 stable-domain finish and player/deferred/mode-specific results remain to validate. Next audit the projection flag and matched native animation visibility,
 then collision/effect feedback and lifecycle regressions, race reinitialization and repair
 pacing. See the numbered F6 steps and measurements in timing-implementation. Normal-build bytes remain unchanged; broader timing
 is still an experimental build, not a completed framerate-independence feature.

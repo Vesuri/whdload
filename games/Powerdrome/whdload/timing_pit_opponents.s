@@ -193,6 +193,14 @@ timing_pit_opponent_begin
  move.l 20(a0),d0
  add.l 56(a0),d0
  move.l d0,36(a0)
+ ; Keep repair/native-clock sampling separate from the stable lap/race domain.
+ ; Latch before native execution so a deferred first winner retains its instant.
+ move.l 20(a0),d0
+ sub.l 52(a0),d0
+ add.l #TIMING_PERIOD,d0
+ add.l timing_lap_state+8(pc),d0
+ lea timing_lap_state(pc),a0
+ move.l d0,40(a0)
  movem.l (sp)+,d0/a0
  move.w (sp)+,ccr
  rts
