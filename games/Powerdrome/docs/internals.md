@@ -1,6 +1,6 @@
 # Powerdrome internals
 
-Project status: Phases A–D and E1 are complete. Phase E2 is stopped at the natural-weather gate; steady A500 handling is deferred by the user.
+Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is untouched.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Current measurements
@@ -482,8 +482,8 @@ clock for repair starts and expiry (`$d4b6/$d4fe`), eliminating a sampled-clock
 threshold difference found during endurance. Focused comparison and the corrected
 600-second pair pass: 30,001 common world/RNG states and 6,666 control/input/fuel
 updates match exactly, with zero endpoint debt. Natural-weather validation
-is stopped after a ten-minute retry without a weather episode; expiry and restoration
-remain untested. The normal build
+is deferred by the user after a ten-minute retry without a weather episode; expiry
+and restoration remain untested. The normal build
 has not adopted the full scheduler; see the [current gate ledger](open-work.md#phase-e-gate-ledger).
 
 ## Development slave and reproducible title-demo profile

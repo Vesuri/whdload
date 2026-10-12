@@ -100,7 +100,7 @@ which has opponents on screen and is the heavier scene.
 
 ## Phase A: Consolidate the timing prototype (no behaviour change)
 
-Status: **A1 and A2 complete**, byte-equivalence gates passed. Phases B–D are also complete. Phase E is in progress; Phase F remains untouched.
+Status: **A1 and A2 complete**, byte-equivalence gates passed. Phases B–D are also complete. Phase E is complete with user-deferred handling and natural-weather validation; Phase F remains untouched.
 See [open work](open-work.md) for the exact configuration and file hashes.
 
 **A1. Pick one release configuration.** Find the flag set behind the most recent complete
@@ -237,13 +237,13 @@ because game time depends on frame time there.
 
 ## Phase E: Close the timing work under the D1 policy
 
-Status: **stopped at the natural-weather gate; steady A500 handling deferred by the user**.
+Status: **complete within the agreed scope, with two user-deferred validations**.
 E1, CPU equivalence/accounting, lifecycle, stalls, render cadence, corrected endurance
-and visible weather have passed. The natural-weather gate exhausts two attempts:
-the first fails setup, and the retry completes ten minutes without any weather episode,
-leaving expiry/restoration untested. No third capture is authorized by this plan's stop
-rule. E3 was evaluated and not selected. Phase E remains incomplete and Phase F is
-untouched. See the [current evidence ledger](open-work.md#phase-e-gate-ledger).
+and visible weather have passed. Steady A500 handling and natural-weather validation
+are deferred by the user, not passed. The natural-weather retry completes ten minutes
+without an episode, leaving expiry/restoration untested. E3 was evaluated and not
+selected. No further Phase E work is scheduled; Phase F remains untouched. See the
+[current evidence ledger](open-work.md#phase-e-gate-ledger).
 
 **E1. Replace the unbounded gates.** In `docs/timing-implementation.md`, rewrite the
 acceptance section as the release gates below. Mark the brake-history, impulse-history
@@ -267,8 +267,9 @@ and checkers only:
 | Natural weather race | 10 min unseeded race: no debt growth, effects expire, palette restored | M5 |
 | Renderer twins | All of the above with `CUSTOM4=1` report zero mismatches | M4, M5, M7 |
 
-*Gate:* every row passes. A failure is fixed in code or escalated. Never weaken a tolerance
-to make a row pass.
+*Gate:* every non-deferred row passes. The user explicitly deferred steady A500
+handling and natural weather; their unmet requirements remain recorded, not passed.
+A failure is fixed in code or escalated. Never weaken a tolerance to make a row pass.
 
 **E3. Title demo pacing (small, optional).** `$107d6` advances the recorded camera by 2 per
 rendered frame, so the demo plays faster on every machine faster than the A500. Advance it by elapsed PAL fields

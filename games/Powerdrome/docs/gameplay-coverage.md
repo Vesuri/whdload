@@ -1,6 +1,6 @@
 # Gameplay coverage
 
-Project status: Phases A–D and E1 are complete. Phase E2 is stopped at the natural-weather gate; steady A500 handling is deferred by the user.
+Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is untouched.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 The coverage campaign is complete for the existing guarded fast planar renderer. Across

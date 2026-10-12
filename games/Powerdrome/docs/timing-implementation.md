@@ -1,6 +1,6 @@
 # Timing implementation and validation
 
-Project status: Phases A–D and E1 are complete. Phase E2 is stopped at the natural-weather gate; steady A500 handling is deferred by the user.
+Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is untouched.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Phase A of the [completion plan](completion-plan.md) is complete. `TIMING_FULL=1`
@@ -34,8 +34,8 @@ an RNG divergence at 287,040 ms in the endurance pair. The two-byte correction
 passes the focused four-opponent/RNG boundary comparison and the corrected
 600-second pair: 30,001 common world/RNG states and 6,666 control/input/fuel
 updates match exactly, with zero endpoint debt. Natural-weather validation is
-stopped after a ten-minute retry without a weather episode; expiry and restoration
-remain untested. Normal output is unchanged. See the [current evidence](open-work.md#endurance-accounting-and-equivalence-finding).
+deferred by the user after a ten-minute retry without a weather episode; expiry
+and restoration remain untested. Normal output is unchanged. See the [current evidence](open-work.md#endurance-accounting-and-equivalence-finding).
 
 ## A500 calibration
 
@@ -90,6 +90,9 @@ Run these finite gates once with `TIMING_FULL=1`, using the existing fixtures/ch
 
 The optional title-demo correction has its own gate: M7 demo duration within 5% of
 M1, using the measured 18 frames / 93 PAL fields reference with a carried remainder.
+The user has deferred steady A500 handling and natural-weather validation. All
+other required Phase E gates passed; optional title-demo pacing was not selected.
+The two deferred rows remain unverified and are not counted as passes.
 These are the complete Phase E gates. Historical exploratory requirements elsewhere
 in this design record do not add release gates or override these accepted outcomes.
 A gate failure must be fixed or escalated; after two failures, record the finding in

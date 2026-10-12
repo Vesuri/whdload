@@ -2,18 +2,19 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
-## Phase E stopped: natural-weather evidence missing
+## Phase E complete with two deferred validations
 
-D1–D5 are confirmed. Phases A–D and E1 are complete. E2 passed CPU equivalence
-and elapsed accounting. The user has deferred the steady A500 handling gate and
-authorized continuing the remaining E2 gates. Those gates are complete except natural
-weather: its second attempt completes the ten-minute window without a weather episode.
-The two-attempt stop rule now applies. Deferred or unobserved checks are not passes;
-Phase E is incomplete. E1 accepts the specified native
-brake/impulse/visibility histories and classifies opponent `$54` as presentation-owned;
-no cadence, tolerance or game code changed. Evidence is under `tmp/phase-e/`.
-`CUSTOM5=14` is the existing initialized-lap pause fixture; natural finish uses the
-separate ten-lap route and checker. Phase F and release defaults remain untouched.
+D1–D5 are confirmed. Phases A–E are complete within the agreed scope. The user
+has deferred steady A500 handling and natural-weather validation; neither gate is
+counted as passed. All other required E2 gates passed. E3 optional title-demo pacing
+was evaluated and not selected. No further Phase E work is scheduled.
+
+E1 accepts the specified native brake/impulse/visibility histories and classifies
+opponent `$54` as presentation-owned; that policy update changed no cadence,
+tolerance or game code. Evidence is under `tmp/phase-e/`. `CUSTOM5=14` is the
+initialized-lap pause fixture; natural finish uses the separate ten-lap route and
+checker. Phase F is the next planned phase, but is not started or authorized by
+this deferral. Release defaults remain unchanged.
 
 ### Phase E gate ledger
 
@@ -27,7 +28,7 @@ separate ten-lap route and checker. Phase F and release defaults remain untouche
 | Render cadence | Pass: ten requested-rate/unpaced captures, 651 exact common world states and 144 control/input/fuel updates |
 | Endurance | Pass: corrected 600-second pair matches 30,001 common world/RNG states and 6,666 control/input/fuel updates; zero endpoint debt |
 | Visible weather | Pass: directed fade/memory checks and three visible logical phases on the startup-only Practice retry |
-| Natural weather race | Stopped after two attempts: setup failure, then a complete ten-minute capture with no natural weather episode; expiry/restoration untested |
+| Natural weather race | Deferred by the user; not passed: the ten-minute retry has no natural weather episode, leaving expiry/restoration untested |
 | E3 optional title demo | Evaluated, not selected: recorded camera remains frame-driven; no M7 duration pass claimed |
 
 Equivalence evidence: `tmp/phase-e/equivalence/`, `equivalence-020-fast/` and
@@ -179,7 +180,7 @@ checkpoints. These narrow tools are needed because the existing palette/Copper
 checkers inspect stored memory only. Screenshots use the pre-repair-fix frozen fade
 slave; the two-byte opponent repair-clock change is outside this Practice route.
 
-### Natural-weather gate: stopped after the retry
+### Deferred natural-weather validation
 
 `tmp/phase-e/natural-weather-030/` aborts before its first measured field: 33
 requested observation/field breakpoints exceed the emulator's 20-breakpoint limit,
@@ -213,10 +214,10 @@ copied raster code is unchanged. One additional draw is active at the endpoint.
 
 The initial setup failure and unsuccessful retry exhaust this gate's two attempts.
 No third run, seed injection, longer substitute window or relaxed acceptance is made.
-Further natural-weather work requires the user's decision on this missing evidence.
-A possible follow-up is to wait for a naturally occurring forecast before beginning
-an explicitly approved observation window; that follow-up has not been run. Handling
-remains deferred, optional title-demo pacing remains unselected, and Phase F is untouched.
+The user has deferred this validation. Natural effect expiry and palette restoration
+remain unverified by this unseeded route, without blocking completion of the agreed
+Phase E scope. No additional capture is scheduled. Handling also remains deferred,
+optional title-demo pacing remains unselected, and Phase F is untouched.
 
 ### Deferred handling findings
 
@@ -249,8 +250,9 @@ When handling is resumed, resolve the reference/measurement contract for stop an
 fuel before rerunning it; preserve the fixed numerical bounds. The existing frozen native reference and the fresh reference have different
 stop outcomes; establish which route/build assumptions explain that difference.
 
-The remaining Phase E runtime gate is the unseeded weather race. Corrected endurance
-and visible fade phases have passed. Lifecycle,
+The unseeded weather race is deferred by the user. No required Phase E runtime
+gates remain in the agreed scope. Corrected endurance and visible fade phases
+have passed. Lifecycle,
 stalls and requested render rates have passed as recorded above. Weather handling
 bounds are included in the user-deferred handling row. The optional E3 title patch
 is not selected: it is a separate recorded-camera animation, not an E2 gameplay gate.
