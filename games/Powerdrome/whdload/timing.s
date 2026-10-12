@@ -148,7 +148,7 @@ TIMING_WEATHER_CYCLE_TEST = 0
 
  IFEQ TIMING_FLAGS_ONLY
 ; Full elapsed-time scheduler, independent of fast planar rendering.
-; Enabled on 68020+ unless the user selects C3 original timing.
+; Enabled on 68020+ with real fast RAM unless C3 selects original timing.
 install_timing
  movem.l d0/a0-a2,-(sp)
  move.l custom3(pc),d0

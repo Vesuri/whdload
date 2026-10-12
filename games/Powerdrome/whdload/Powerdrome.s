@@ -162,15 +162,17 @@ launch_pd
  ; Resolve user opt-outs once. The internal custom1/custom3 values remain
  ; enable flags for installers and diagnostics; WHDLoad cache policy is untouched.
 select_features
- movem.l d0-d1/a0,-(sp)
+ movem.l d0-d2/a0,-(sp)
  lea custom1(pc),a0
  move.l (a0),d0
  clr.l (a0)
  move.l custom3(pc),d1
  clr.l custom3-custom1(a0)
- move.l cpu_attn(pc),-(sp)
- btst #AFB_68020,3(sp)
- addq.l #4,sp
+ move.l cpu_attn(pc),d2
+ btst #AFB_68020,d2
+ beq.s .done
+ ; Both enhancements require real fast RAM. Otherwise keep native timing too.
+ move.l perf_bitmap(pc),d2
  beq.s .done
  tst.l d1
  bne.s .renderer
@@ -178,11 +180,9 @@ select_features
 .renderer
  tst.l d0
  bne.s .done
- move.l perf_bitmap(pc),d0
- beq.s .done
  move.l #1,(a0)
 .done
- movem.l (sp)+,d0-d1/a0
+ movem.l (sp)+,d0-d2/a0
  rts
 
 pl_game PL_START
