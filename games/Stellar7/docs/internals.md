@@ -72,7 +72,7 @@ midair impacts, audible output and physical controls remain separate checks.
 Both playable releases exclude all new pilot options byte-for-byte
 (`tmp/release60/pilot-builds/exclusion.json`).
 
-Input-only full-wave SOL attempts reach a full-strength boss at both rates,
+Unpowered input-only full-wave SOL attempts reach a full-strength boss at both rates,
 then end in natural death. The target-lock pilot initially retained the carrier
 as a non-firing spacing target after boss deployment. It now leaves carriers
 unlocked so a nearer live boss can be selected. In the corrected N=3 attempt,
@@ -82,6 +82,21 @@ Evidence: `tmp/release60/long-encounters`, `carrier-target-finding.json` and
 `boss-target-encounters/sol-n3-observations.json`. The pilot correction is
 VERIFY-only; playable release exclusion still passes
 (`carrier-fix-build-exclusion.log`).
+
+The powered N=3 input-only pilot clears the full SOL wave, kills its full-strength
+boss and takes the native exit into level 1. Existing inventory powers activate
+through button input from tick 5500; no wave, health, inventory or level setup is
+used. Read-only stops at $10c58/$10c5c observe a player-owned type-23 projectile
+at height 2525 deal 15 damage to the type-44 boss at tick 5666: health goes
+15→0 and score 525→1525. At $3610/$3616, tick 5760, native type-25 exit
+collision clears active while death stays zero. Session-2 tick 150 is level 1,
+energy 400, with the warp charge still unused. The binary matches the full-wave
+capture and all 108 installed hooks pass. Evidence:
+`tmp/release60/powered-boss-events/n3-validation.json`. The N=12 powered attempt
+also reaches an inactive, non-death state with a type-25 exit; direct native
+kill/transition verification remains pending. Later full encounters and ending
+remain open. These observations establish a native cannon projectile kill and
+normal exit, not all power effects or audible output.
 
 Natural combat death and Continue pass on both selected paths in level 6,
 after six fixture-controlled earlier exits. Death occurs at tick 1860 on N=3

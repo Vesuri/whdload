@@ -206,11 +206,12 @@ Status: in progress. All 26 native-reference fixture groups pass on the
 selected 15 Hz A500 and 60 Hz 68020 paths. Combined preference changes and
 re-enabling pass through the native menus at both rates. Input-driven cycling
 through six overlapping powers and a jump/landing also pass at both rates;
-combat effects and terrain/midair interactions remain open. Full-wave input-only
-combat runs reach full-strength SOL bosses at both rates but end in natural
-death; boss victories and the ending remain open. The corrected A500 pilot
-damages the boss from 15 to 11 health before dying. Natural combat death and
-Continue pass at both rates in level 6 after fixture-controlled earlier exits. Evidence is retained under
+combat effects and terrain/midair interactions remain open. The powered input-only A500 pilot now clears the full SOL wave, kills its
+full-strength boss and takes the native exit to level 1; direct native-event
+verification passes. The powered 60 Hz attempt reaches an apparent exit, with
+direct verification pending. Later bosses and ending remain open. Natural
+combat death and Continue pass at both rates in level 6 after fixture-controlled
+earlier exits. Evidence is retained under
 `tmp/release60`; completed step-5 measurements remain the current performance
 reference. The normal loader still excludes SIM60.
 
@@ -250,9 +251,9 @@ The conversion remains experimental. The plan above includes lower-rate
   later natural deaths, level and UI transitions, lethal shield/type-43 hits,
   boss helpers and mine detonation. Controlled placement, native twins and
   sampled mapped-state comparisons do not cover every encounter branch.
-- Extend power checks to active-power cycling and combat effects, and jump
-  checks to arbitrary terrain and midair impacts. Check combined preference
-  changes, re-enabling settings and additional native dialog paths.
+- Extend the passing input-driven power-cycle checks to combat effects, and
+  jump checks to arbitrary terrain and midair impacts. Combined preference
+  changes and re-enabling pass; additional native dialog paths remain.
 - Confirm original-reference gameplay pace and the reconstructed loader's
   behavior through playtesting. The modern KickEmu loader is not a byte-identical
   rebuild of the supplied 2008 slave.

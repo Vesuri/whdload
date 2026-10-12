@@ -479,13 +479,13 @@ with normal controls and sound. It selects `Stellar7-Sim68000.Slave` or
 `Stellar7-Sim60.Slave` and defaults to CUSTOM1=1; CPU/memory/display overrides
 match `amiga/run.sh`.
 To build without launching, source `amiga/env.sh` and run `make -C whdload sim60`.
-This build contains no VERIFY fixtures. The selected-default launcher smoke
-check passes with all 89 hooks installed and the native menu reached. It uses
-debug/warp/silent mode and disconnected input; results are under
-`tmp/rate-selected-n1/play60-smoke`. It does not verify interactive gameplay
-or audible output. If overriding WHD_ARGS, include CUSTOM1=1 to enable the
-replacement. The selected N=1 A500 heavy-combat measurement sustains game time
-with sampled pending counts of 0–1; broader encounter validation remains open.
+These builds contain no VERIFY fixtures. The selected N=3/N=12 launcher smoke
+checks reach the native menu with 107/106 installed hooks and release bytes
+matching the audited builds. They use debug/warp/silent mode and disconnected
+input; results are under `tmp/fast60/corrected/play60-smoke-68000` and
+`play60-smoke-68020`. They do not verify interactive gameplay or audible output.
+If overriding WHD_ARGS, include CUSTOM1=1 to enable the replacement. Current
+selected-rate performance and its scene limits are recorded in internals.
 
 `amiga/run.sh` boots the shipped slave windowed with sound (debug and warp runs are silent
 and open behind other windows; `SOUND=` and `WINDOW=` override). Defaults: 68000,
@@ -960,6 +960,13 @@ Carriers (type 7) remain unlocked: they are temporary spacing targets before
 boss deployment. Exit pursuit still takes priority. `APPROACH_AIM=1..2048` selects the steering
 deadband (default 2048); 512 is used by the current full-wave pilot. These options
 change only the VERIFY input pilot, not gameplay state or playable builds.
+
+The verified N=3 full-wave SOL route uses APPROACH_TYPE=0, APPROACH_FIRE=1,
+APPROACH_STANDOFF=6000, APPROACH_LOCK=1, APPROACH_AIM=512 and POWER_ROUTE=5500.
+Do not add BOSS_ENCOUNTER, LEVEL_TEST or JUMP_TEST: this route completes the
+opening wave and activates existing powers through input. Direct native kill
+and exit evidence is under `tmp/release60/powered-boss-events`; see internals
+for the observed boundaries and the remaining coverage limits.
 
 `POWER_ROUTE=TICK` supplies native second-button and both-button input for six
 seconds starting at TICK. It selects clone, shield, jump, cloak, cannon and speed
