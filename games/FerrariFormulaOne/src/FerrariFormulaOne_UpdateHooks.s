@@ -1,7 +1,7 @@
-; Ferrari Formula One, SPS 0481: candidate 68020 all-car update hooks.
+; Ferrari Formula One, SPS 0481: candidate 68020 update hooks.
 ; S2 VERIFY split. Not included by FerrariFormulaOne_WHD.s; default-off.
-; The final 020+Fast path still needs Plan B opponent bypass and presentation
-; separation. This module is not the selected production scheduling policy.
+; FF1_PLAN_B selects player-only conversion with native opponent updates.
+; The ordinary slave does not activate this candidate scheduling policy.
 ;
 ; Include with Games on the assembler include path, after the host's native
 ; patch/entry plumbing and data symbols: start, modeval, installed, error,
@@ -568,6 +568,13 @@ install_velocity:
  movem.l (sp)+,d0-d7/a0-a6
  rts
 velocity_671e6:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33d0,$0003,$2f96
+ jmp $671ec
+.b3_player:
+ ENDC
  dc.w $33d0,$0003,$2f96
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -577,6 +584,13 @@ velocity_671e6:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $671ec
 velocity_685a6:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $30b9,$0003,$2f96
+ jmp $685ac
+.b3_player:
+ ENDC
  dc.w $30b9,$0003,$2f96
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -586,6 +600,13 @@ velocity_685a6:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $685ac
 velocity_67bcc:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33ee,$fff2,$0003,$2f94
+ jmp $67bd4
+.b3_player:
+ ENDC
  dc.w $33ee,$fff2,$0003,$2f94
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -595,6 +616,13 @@ velocity_67bcc:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67bd4
 velocity_6dc96:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $3039,$0003,$2f94
+ jmp $6dc9c
+.b3_player:
+ ENDC
  dc.w $3039,$0003,$2f94
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -604,6 +632,13 @@ velocity_6dc96:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6dc9c
 velocity_6dd44:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $3239,$0003,$2fbc
+ jmp $6dd4a
+.b3_player:
+ ENDC
  dc.w $3239,$0003,$2fbc
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -613,6 +648,13 @@ velocity_6dd44:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6dd4a
 velocity_6e084:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $3039,$0003,$2fbc
+ jmp $6e08a
+.b3_player:
+ ENDC
  dc.w $3039,$0003,$2fbc
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -622,6 +664,14 @@ velocity_6e084:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6e08a
 velocity_6e2ae:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $302e,$000e
+ dc.w $4cdf,$000c
+ jmp $6e2b6
+.b3_player:
+ ENDC
  dc.w $302e,$000e,$4cdf,$000c
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -631,6 +681,14 @@ velocity_6e2ae:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6e2b6
 velocity_68990:
+ IFD FF1_PLAN_B
+ cmpa.l #$6f13c,a0
+ beq.b .b3_player
+ dc.w $3080
+ dc.w $202f,$0000
+ jmp $68996
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -640,6 +698,14 @@ velocity_68990:
  dc.w $3080,$202f,$0000
  jmp $68996
 velocity_689a0:
+ IFD FF1_PLAN_B
+ cmpa.l #$6f14c,a0
+ beq.b .b3_player
+ dc.w $4250
+ dc.w $206f,$0000
+ jmp $689a6
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -649,6 +715,14 @@ velocity_689a0:
  dc.w $4250,$206f,$0000
  jmp $689a6
 velocity_68b98:
+ IFD FF1_PLAN_B
+ cmpa.l #$6f13c,a0
+ beq.b .b3_player
+ dc.w $3081
+ dc.w $322f,$0000
+ jmp $68b9e
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -658,6 +732,14 @@ velocity_68b98:
  dc.w $3081,$322f,$0000
  jmp $68b9e
 velocity_68baa:
+ IFD FF1_PLAN_B
+ cmpa.l #$6f14c,a0
+ beq.b .b3_player
+ dc.w $30bc,$00c8
+ dc.w $4a6f,$0000
+ jmp $68bb2
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -667,6 +749,15 @@ velocity_68baa:
  dc.w $30bc,$00c8,$4a6f,$0000
  jmp $68bb2
 velocity_6e95e:
+ IFD FF1_PLAN_B
+ cmpa.l #$6f13c,a0
+ beq.b .b3_player
+ dc.w $3081
+ dc.w $2040
+ dc.w $d1fc,$0006,$f14c
+ jmp $6e968
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -676,6 +767,14 @@ velocity_6e95e:
  dc.w $3081,$2040,$d1fc,$0006,$f14c
  jmp $6e968
 velocity_6e968:
+ IFD FF1_PLAN_B
+ cmpa.l #$6f14c,a0
+ beq.b .b3_player
+ dc.w $3081
+ dc.w $202e,$fffc
+ jmp $6e96e
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -685,6 +784,13 @@ velocity_6e968:
  dc.w $3081,$202e,$fffc
  jmp $6e96e
 velocity_6917a:
+ IFD FF1_PLAN_B
+ tst.w -6(a6)
+ beq.b .b3_player
+ dc.w $3084,$3d44,$fff6
+ jmp $69180
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -694,6 +800,13 @@ velocity_6917a:
  dc.w $3084,$3d44,$fff6
  jmp $69180
 velocity_68386:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2f94
+ jmp $6838c
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2f94
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -703,6 +816,13 @@ velocity_68386:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6838c
 velocity_6e2a4:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2f96
+ jmp $6e2aa
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2f96
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -712,6 +832,13 @@ velocity_6e2a4:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6e2aa
 velocity_6e2ec:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2f96
+ jmp $6e2f2
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2f96
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -721,6 +848,13 @@ velocity_6e2ec:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6e2f2
 velocity_69b36:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2f96
+ jmp $69b3c
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2f96
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -730,6 +864,13 @@ velocity_69b36:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69b3c
 velocity_69b50:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2f96
+ jmp $69b56
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2f96
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -739,6 +880,14 @@ velocity_69b50:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69b56
 velocity_6ee00:
+ IFD FF1_PLAN_B
+ cmpa.l #$6f13c,a0
+ beq.b .b3_player
+ dc.w $3081
+ dc.w $322e,$000e
+ jmp $6ee06
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -748,6 +897,14 @@ velocity_6ee00:
  dc.w $3081,$322e,$000e
  jmp $6ee06
 velocity_6ee16:
+ IFD FF1_PLAN_B
+ cmpa.l #$6f13c,a0
+ beq.b .b3_player
+ dc.w $3081
+ dc.w $0c6e,$00c8,$0012
+ jmp $6ee1e
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -757,6 +914,13 @@ velocity_6ee16:
  dc.w $3081,$0c6e,$00c8,$0012
  jmp $6ee1e
 velocity_6993a:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2f94
+ jmp $69940
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2f94
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -766,6 +930,13 @@ velocity_6993a:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69940
 velocity_69a0a:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2f94
+ jmp $69a10
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2f94
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -775,6 +946,13 @@ velocity_69a0a:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69a10
 velocity_6998e:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c1,$0003,$2f96
+ jmp $69994
+.b3_player:
+ ENDC
  dc.w $33c1,$0003,$2f96
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -784,6 +962,13 @@ velocity_6998e:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69994
 velocity_69a5e:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c1,$0003,$2f96
+ jmp $69a64
+.b3_player:
+ ENDC
  dc.w $33c1,$0003,$2f96
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -793,6 +978,13 @@ velocity_69a5e:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69a64
 velocity_68576:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $30b9,$0003,$2fbe
+ jmp $6857c
+.b3_player:
+ ENDC
  dc.w $30b9,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -802,6 +994,14 @@ velocity_68576:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6857c
 velocity_6897e:
+ IFD FF1_PLAN_B
+ cmpa.l #$2275a,a0
+ beq.b .b3_player
+ dc.w $3080
+ dc.w $202f,$0000
+ jmp $68984
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -811,6 +1011,14 @@ velocity_6897e:
  dc.w $3080,$202f,$0000
  jmp $68984
 velocity_68b84:
+ IFD FF1_PLAN_B
+ cmpa.l #$2275a,a0
+ beq.b .b3_player
+ dc.w $3080
+ dc.w $302f,$0000
+ jmp $68b8a
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d7
@@ -820,6 +1028,13 @@ velocity_68b84:
  dc.w $3080,$302f,$0000
  jmp $68b8a
 velocity_672f0:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $672f6
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -829,6 +1044,13 @@ velocity_672f0:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $672f6
 velocity_673fc:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $67402
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -838,6 +1060,13 @@ velocity_673fc:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67402
 velocity_67426:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $6742c
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -847,6 +1076,13 @@ velocity_67426:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6742c
 velocity_67438:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $6743e
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -856,6 +1092,13 @@ velocity_67438:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6743e
 velocity_6744a:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $67450
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -865,6 +1108,13 @@ velocity_6744a:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67450
 velocity_67476:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $6747c
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -874,6 +1124,13 @@ velocity_67476:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6747c
 velocity_675c0:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $675c6
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -883,6 +1140,13 @@ velocity_675c0:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $675c6
 velocity_6766c:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $67672
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -892,6 +1156,13 @@ velocity_6766c:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67672
 velocity_6768e:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $67694
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -901,6 +1172,13 @@ velocity_6768e:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67694
 velocity_676e0:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $676e6
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -910,6 +1188,13 @@ velocity_676e0:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $676e6
 velocity_69970:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c1,$0003,$2fbe
+ jmp $69976
+.b3_player:
+ ENDC
  dc.w $33c1,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -919,6 +1204,13 @@ velocity_69970:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69976
 velocity_69a42:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c1,$0003,$2fbe
+ jmp $69a48
+.b3_player:
+ ENDC
  dc.w $33c1,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -928,6 +1220,13 @@ velocity_69a42:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69a48
 velocity_6721c:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33d0,$0003,$2fc0
+ jmp $67222
+.b3_player:
+ ENDC
  dc.w $33d0,$0003,$2fc0
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -937,6 +1236,13 @@ velocity_6721c:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67222
 velocity_679fe:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $67a04
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -946,6 +1252,13 @@ velocity_679fe:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67a04
 velocity_6838c:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $68392
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -955,6 +1268,13 @@ velocity_6838c:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $68392
 velocity_694ce:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33fc,$0064,$0003,$2fbe
+ jmp $694d6
+.b3_player:
+ ENDC
  dc.w $33fc,$0064,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -964,6 +1284,13 @@ velocity_694ce:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $694d6
 velocity_69b30:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $69b36
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -973,6 +1300,13 @@ velocity_69b30:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69b36
 velocity_69b4a:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fbe
+ jmp $69b50
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fbe
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -1510,6 +1844,28 @@ velocity_array_context:
  adda.l d0,a0
  rts
 velocity_swap_z:
+ IFD FF1_PLAN_B
+ ; Native has already swapped speed and the first velocity word. The second
+ ; velocity write follows this callback. Only the player owns fractional state.
+ tst.w d3
+ beq.b .b3_first
+ cmpa.l #$6f14c,a0
+ bne.b .b3_done
+ move.w d4,d0
+ bra.b .b3_reset
+.b3_first:
+ move.w $6f14c,d0
+.b3_reset:
+ lea velocity_shadow+4(pc),a1
+ move.w d0,(a1)
+ clr.w 2(a1)
+ clr.w 6(a1)
+ lea speed_shadow(pc),a1
+ move.w $2275a,(a1)
+ clr.l 2(a1)
+.b3_done:
+ rts
+ ELSE
  bsr.w velocity_speed_swap
  move.l a0,d6
  subi.l #$6f14c,d6
@@ -1529,6 +1885,7 @@ velocity_swap_z:
  addq.l #1,(a0)
  ENDC
  rts
+ ENDC
 velocity_cold_writes: dc.l 0
 velocity_swaps: dc.l 0
 velocity_reset_work:
@@ -2111,6 +2468,13 @@ bridge_install_done:
  movem.l (sp)+,d0-d2/a0-a1
  rts
 bridge_6720e:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33d0,$0003,$2fc4
+ jmp $67214
+.b3_player:
+ ENDC
  dc.w $33d0,$0003,$2fc4
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2123,6 +2487,13 @@ bridge_6720e:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67214
 bridge_68546:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $30b9,$0003,$2fc4
+ jmp $6854c
+.b3_player:
+ ENDC
  dc.w $30b9,$0003,$2fc4
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2135,6 +2506,13 @@ bridge_68546:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6854c
 bridge_67b52:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c1,$0003,$2fc4
+ jmp $67b58
+.b3_player:
+ ENDC
  dc.w $33c1,$0003,$2fc4
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2147,6 +2525,13 @@ bridge_67b52:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67b58
 bridge_67a12:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fc2
+ jmp $67a18
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fc2
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2159,6 +2544,13 @@ bridge_67a12:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67a18
 bridge_67a26:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fc4
+ jmp $67a2c
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fc4
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2171,6 +2563,13 @@ bridge_67a26:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67a2c
 bridge_67a30:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $4279,$0003,$2fc4
+ jmp $67a36
+.b3_player:
+ ENDC
  dc.w $4279,$0003,$2fc4
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2183,6 +2582,13 @@ bridge_67a30:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67a36
 bridge_68306:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fc2
+ jmp $6830c
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fc2
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2195,6 +2601,13 @@ bridge_68306:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6830c
 bridge_68352:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fc2
+ jmp $68358
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fc2
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2207,6 +2620,13 @@ bridge_68352:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $68358
 bridge_68376:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33fc,$015e,$0003,$2fc2
+ jmp $6837e
+.b3_player:
+ ENDC
  dc.w $33fc,$015e,$0003,$2fc2
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2219,6 +2639,13 @@ bridge_68376:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6837e
 bridge_683b8:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fc4
+ jmp $683be
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fc4
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2231,6 +2658,13 @@ bridge_683b8:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $683be
 bridge_694c8:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $4279,$0003,$2fc4
+ jmp $694ce
+.b3_player:
+ ENDC
  dc.w $4279,$0003,$2fc4
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2243,6 +2677,13 @@ bridge_694c8:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $694ce
 bridge_6956a:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $33c0,$0003,$2fc2
+ jmp $69570
+.b3_player:
+ ENDC
  dc.w $33c0,$0003,$2fc2
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2255,6 +2696,13 @@ bridge_6956a:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69570
 bridge_691c4:
+ IFD FF1_PLAN_B
+ cmpa.l #$6a62a,a0
+ beq.b .b3_player
+ dc.w $3080,$202f,$0010
+ jmp $691ca
+.b3_player:
+ ENDC
  dc.w $3080,$202f,$0010
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2264,6 +2712,13 @@ bridge_691c4:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $691ca
 bridge_692ae:
+ IFD FF1_PLAN_B
+ cmpa.l #$6a62a,a0
+ beq.b .b3_player
+ dc.w $3081,$222f,$0018
+ jmp $692b4
+.b3_player:
+ ENDC
  dc.w $3081,$222f,$0018
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2273,6 +2728,13 @@ bridge_692ae:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $692b4
 bridge_6886e:
+ IFD FF1_PLAN_B
+ cmpa.l #$6a61a,a0
+ beq.b .b3_player
+ dc.w $3081
+ jmp $6895e
+.b3_player:
+ ENDC
  dc.w $3081
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2282,6 +2744,14 @@ bridge_6886e:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6895e
 bridge_688e2:
+ IFD FF1_PLAN_B
+ cmpa.l #$6a62a,a0
+ beq.b .b3_player
+ dc.w $3080
+ dc.w $202f,$0000
+ jmp $688e8
+.b3_player:
+ ENDC
  dc.w $3080,$202f,$0000
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2291,6 +2761,14 @@ bridge_688e2:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $688e8
 bridge_68918:
+ IFD FF1_PLAN_B
+ cmpa.l #$6a61a,a0
+ beq.b .b3_player
+ dc.w $3080
+ dc.w $3039,$0001,$c1e0
+ jmp $68920
+.b3_player:
+ ENDC
  dc.w $3080,$3039,$0001,$c1e0
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2300,6 +2778,14 @@ bridge_68918:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $68920
 bridge_68ab8:
+ IFD FF1_PLAN_B
+ cmpa.l #$6a61a,a0
+ beq.b .b3_player
+ dc.w $3080
+ dc.w $3039,$0001,$c1e0
+ jmp $68ac0
+.b3_player:
+ ENDC
  dc.w $3080,$3039,$0001,$c1e0
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2309,6 +2795,14 @@ bridge_68ab8:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $68ac0
 bridge_68b26:
+ IFD FF1_PLAN_B
+ cmpa.l #$6a62a,a0
+ beq.b .b3_player
+ dc.w $4250
+ dc.w $302f,$0000
+ jmp $68b2c
+.b3_player:
+ ENDC
  dc.w $4250,$302f,$0000
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2425,6 +2919,17 @@ bridge_contact_first:
 bridge_contact_second:
  move.w -6(a6),d2
 bridge_contact:
+ IFD FF1_PLAN_B
+ ; Native contact placement is an integer offset from a native opponent.
+ ; Never copy a dormant opponent shadow into the player fraction.
+ cmpa.l #$6a62a,a0
+ bne.b .b3_done
+ move.w (a0),d0
+ lea position_shadow+6(pc),a0
+ bsr.w FF1PositionReset
+.b3_done:
+ rts
+ ELSE
  move.w (a0),d4
  move.l a0,d1
  subi.l #$6a62a,d1
@@ -2458,6 +2963,7 @@ bridge_contact:
  lea (error.l,pc),a1
  move.l #9,(a1)
  rts
+ ENDC
 ; Pointer-based cold writers do not depend on main-loop car index.
 bridge_array_x:
  moveq #0,d2
@@ -2489,6 +2995,12 @@ bridge_array_reset:
  ENDC
  rts
 bridge_snapshot:
+ IFD FF1_PLAN_B
+ cmpa.l #$227ca,a0
+ beq.b .b3_player
+ rts
+.b3_player:
+ ENDC
  move.w (a0),d0
  move.l a0,d3
  subi.l #$227ca,d3
@@ -2514,6 +3026,12 @@ bridge_snapshot:
  ENDC
  rts
 bridge_restore:
+ IFD FF1_PLAN_B
+ cmpa.l #$6a62a,a0
+ beq.b .b3_player
+ rts
+.b3_player:
+ ENDC
  move.w (a0),d0
  move.l a0,d3
  subi.l #$6a62a,d3
@@ -2591,6 +3109,13 @@ install_fine_position:
  rts
 
 fine_advance:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $3039,$0003,$2fc2
+ jmp $67a0a
+.b3_player:
+ ENDC
  IFD VERIFY
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2728,6 +3253,13 @@ fine_stop:
  bra.w velocity_stop
 
 fine_boundary:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $3039,$0003,$2fca
+ jmp $67a3c
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  bsr.w bridge_context
@@ -2783,6 +3315,13 @@ fine_boundary:
  jmp $68292
 
 fine_bounds:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $3039,$0003,$2fbc
+ jmp $68298
+.b3_player:
+ ENDC
  move.w $32fbc,d0
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -2995,6 +3534,13 @@ install_heading:
  movem.l (sp)+,d0-d7/a0-a6
  rts
 heading_67280:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $23d0,$0003,$2fb8
+ jmp $67286
+.b3_player:
+ ENDC
  dc.w $23d0,$0003,$2fb8
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3005,6 +3551,13 @@ heading_67280:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67286
 heading_6860e:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $20b9,$0003,$2fb8
+ jmp $68614
+.b3_player:
+ ENDC
  dc.w $20b9,$0003,$2fb8
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3015,6 +3568,13 @@ heading_6860e:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $68614
 heading_678de:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $d1b9,$0003,$2fb4
+ jmp $678e4
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
@@ -3024,6 +3584,13 @@ heading_678de:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $678e4
 heading_67900:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $d1b9,$0003,$2fb8
+ jmp $67906
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
@@ -3033,6 +3600,13 @@ heading_67900:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67906
 heading_67948:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $d1b9,$0003,$2fb4
+ jmp $6794e
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
@@ -3042,6 +3616,13 @@ heading_67948:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6794e
 heading_67976:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $d1b9,$0003,$2fb8
+ jmp $6797c
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
@@ -3051,6 +3632,14 @@ heading_67976:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6797c
 heading_67320:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $91b9,$0003,$2fb8
+ dc.w $42b9,$0003,$2fb4
+ jmp $6732c
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
@@ -3060,6 +3649,14 @@ heading_67320:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6732c
 heading_683ac:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $93b9,$0003,$2fb8
+ dc.w $42b9,$0003,$2fb4
+ jmp $683b8
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
@@ -3069,6 +3666,13 @@ heading_683ac:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $683b8
 heading_69590:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $23c0,$0003,$2fb4
+ jmp $69596
+.b3_player:
+ ENDC
  dc.w $23c0,$0003,$2fb4
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3079,6 +3683,13 @@ heading_69590:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $69596
 heading_695e8:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $23c0,$0003,$2fb8
+ jmp $695ee
+.b3_player:
+ ENDC
  dc.w $23c0,$0003,$2fb8
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3089,6 +3700,14 @@ heading_695e8:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $695ee
 heading_68a5e:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $4290
+ dc.w $202f,$0000
+ jmp $68a64
+.b3_player:
+ ENDC
  dc.w $4290,$202f,$0000
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3099,6 +3718,15 @@ heading_68a5e:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $68a64
 heading_68c24:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $4290
+ dc.w $2040
+ dc.w $d1fc,$0006,$a60a
+ jmp $68c2e
+.b3_player:
+ ENDC
  dc.w $4290,$2040,$d1fc,$0006,$a60a
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3109,6 +3737,15 @@ heading_68c24:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $68c2e
 heading_68d0e:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $202e,$fff6
+ dc.w $d091
+ dc.w $2080
+ jmp $68d16
+.b3_player:
+ ENDC
  dc.w $202e,$fff6,$d091,$2080
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3300,6 +3937,15 @@ install_steering:
  movem.l (sp)+,d0-d7/a0-a6
  rts
 steering_6773c:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $d240
+ dc.w $e241
+ dc.w $3081
+ jmp $67742
+.b3_player:
+ ENDC
  move.w ccr,-(sp)
  cmpi.w #8,modeval(pc)
  beq.b .fine
@@ -3317,6 +3963,15 @@ steering_6773c:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67742
 steering_68788:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $7000
+ dc.w $3080
+ dc.w $4a79,$0001,$c222
+ jmp $68792
+.b3_player:
+ ENDC
  dc.w $7000,$3080,$4a79,$0001,$c222
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3527,6 +4182,13 @@ install_wear:
  movem.l (sp)+,d0-d7/a0-a6
  rts
 wear_6de74:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $4eb9,$0002,$9500
+ jmp $6de7a
+.b3_player:
+ ENDC
  dc.w $4c01,$0800,$4e71
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3538,6 +4200,13 @@ wear_6de74:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6de7a
 wear_6defa:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $4eb9,$0002,$9500
+ jmp $6df00
+.b3_player:
+ ENDC
  dc.w $4c01,$0800,$4e71
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3549,6 +4218,14 @@ wear_6defa:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6df00
 wear_6de96:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $2236,$08d8
+ dc.w $9390
+ jmp $6de9c
+.b3_player:
+ ENDC
  dc.w $2236,$08d8
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3561,6 +4238,14 @@ wear_6de96:
  dc.w $9390
  jmp $6de9c
 wear_6ded4:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $2236,$08d8
+ dc.w $9390
+ jmp $6deda
+.b3_player:
+ ENDC
  dc.w $2236,$08d8
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3573,6 +4258,15 @@ wear_6ded4:
  dc.w $9390
  jmp $6deda
 wear_6df2a:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $2236,$08d8
+ dc.w $e381
+ dc.w $9390
+ jmp $6df32
+.b3_player:
+ ENDC
  dc.w $2236,$08d8,$e381
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -3585,6 +4279,15 @@ wear_6df2a:
  dc.w $9390
  jmp $6df32
 wear_6e018:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $9190
+ dc.w $2041
+ dc.w $d1fc,$0002,$2356
+ jmp $6e022
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
@@ -3643,6 +4346,17 @@ wear_context:
  adda.l d2,a1
  rts
 wear_reset:
+ IFD FF1_PLAN_B
+ ; Only the four player tyre slots own 20 ms wear remainders. Opponent
+ ; repair/refill writes remain native and must not touch dormant fractions.
+ cmpa.l #$66c52,a0
+ blo.b .b3_native
+ cmpa.l #$66c62,a0
+ blo.b .b3_player
+.b3_native:
+ rts
+.b3_player:
+ ENDC
  cmpi.w #8,modeval(pc)
  bne.b .done
  bsr.w wear_context
@@ -3774,6 +4488,13 @@ events_quantum:
 .done:
  rts
 events_6d5f2:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ jsr $6ea3e
+ jmp $6d684
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  moveq #0,d6
@@ -3793,6 +4514,14 @@ events_6d5f2:
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6d684
 events_6d67e:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ jsr $6ee70
+ dc.w $588f
+ jmp $6d684
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  moveq #1,d6
@@ -4328,6 +5057,14 @@ install_fuel:
  movem.l (sp)+,d0-d7/a0-a6
  rts
 fuel_6d164:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $9190
+ dc.w $2d40,$fffc
+ jmp $6d16a
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
@@ -4396,6 +5133,12 @@ fuel_context:
  adda.l d2,a1
  rts
 fuel_reset:
+ IFD FF1_PLAN_B
+ cmpa.l #$22376,a0
+ beq.b .b3_player
+ rts
+.b3_player:
+ ENDC
  cmpi.w #8,modeval(pc)
  bne.b .done
  bsr.w fuel_context
@@ -4646,6 +5389,13 @@ recovery_6c7c8:
  move.w $6a694,d0
  jmp $6c7ce
 recovery_682c0:
+ IFD FF1_PLAN_B
+ tst.w $32fbc
+ beq.b .b3_player
+ dc.w $3010,$5340,$3080
+ jmp $682c6
+.b3_player:
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  IFD VERIFY
@@ -4948,4 +5698,8 @@ schedule_context: ds.b FF1T_SIZE
 
  IFD FF1_PRESENTATION_SPLIT
  include "FerrariFormulaOne_Presentation.s"
+ ENDC
+
+ IFD FF1_PLAN_B
+ include "FerrariFormulaOne_Opponents.s"
  ENDC
