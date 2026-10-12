@@ -35,8 +35,8 @@ def compare(control, candidate):
             raise ValueError('unmatched CPU settings: '+key)
     for key in ('machine', 'nommu_core', 'mmu_core', 'options', 'audit_cacr',
                 'emulator_sha256', 'hunks', 'slave',
-                'profiles', 'raw_chunky', 'host_warp', 'dma', 'idle', 'irq_scopes', 'irq_trace', 'names'):
-        if left.get(key, False if key in ("irq_scopes", "irq_trace") else None) != right.get(key, False if key in ("irq_scopes", "irq_trace") else None):
+                'profiles', 'raw_chunky', 'host_warp', 'dma', 'idle', 'irq_scopes', 'irq_trace', 'irq_beam', 'names'):
+        if left.get(key, False if key in ("irq_scopes", "irq_trace", "irq_beam") else None) != right.get(key, False if key in ("irq_scopes", "irq_trace", "irq_beam") else None):
             raise ValueError('unmatched configuration: '+key)
     binaries = []
     for run, meta in zip(runs, metadata):

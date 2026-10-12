@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 from cd32_runtime import ROOT
+from matrix_irq_beam_check import check as beam_check
 from matrix_irq_check import check as irq_check
 from matrix_idle_check import check as idle_check
 from matrix_dma_check import check as dma_check
@@ -18,7 +19,7 @@ from matrix_dma_effect import compare as dma_effect
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--kind',choices=['dma-idle','irq'],default='dma-idle',help='IRQ mode records only the matched bare/callback pair')
+    parser.add_argument('--kind',choices=['dma-idle','irq','irq-beam'],default='dma-idle',help='IRQ records a matched pair; irq-beam records diagnostic beam calibration')
     parser.add_argument('--plan',required=True,type=Path,help='JSON list of {name,reference} completed layout/cell captures')
     parser.add_argument('--output',required=True,type=Path)
     parser.add_argument('--audit-slave',required=True)
@@ -65,11 +66,16 @@ def main():
                     '--audit',str((out/'audit/result.json').relative_to(ROOT)),'--layout',cell['reference']]
                 arms=(('bare',[]),('irq',['--irq-scopes'])) if args.kind=='irq' else (
                     ('bare',[]),('idle',['--idle']),('dma',['--idle','--dma']))
+                if args.kind=='irq-beam':arms=(('beam',['--irq-scopes','--irq-beam']),)
                 for arm,flags in arms:
                     run('matrix_capture.py',common+flags+['--output',str((out/arm).relative_to(ROOT))],arm)
-                    save(arm+'-raw.json',raw_check(out/arm))
+                    if arm!='beam':save(arm+'-raw.json',raw_check(out/arm))
                     if arm in ('idle','dma'):save(arm+'-idle.json',idle_check(out/arm))
-                if args.kind=='irq':
+                if args.kind=='irq-beam':
+                    measured=beam_check(out/'beam')
+                    save('beam-report.json',measured)
+                    result=dict(name=name,complete=True,independent_beam_duration_pass=True)
+                elif args.kind=='irq':
                     save('irq-report.json',irq_check(out/'irq'))
                     neutrality=neutral_check(out/'bare',out/'irq')
                     save('irq-neutrality.json',neutrality)

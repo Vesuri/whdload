@@ -1711,3 +1711,32 @@ launch without stopping that process. Their failed records remain in
 `tmp/phase4-irq-matrix/`; fresh audited retries are running in
 `tmp/phase4-irq-retry/`. The unaffected original lane continues. No failed or
 pending cell counts as a completed callback measurement.
+
+### Independent beam calibration of callback intervals
+
+`--irq-beam` applies Stellar 7's read-only VPOSR/VHPOSR method to three complete
+calls of each known VBL callback at credits entry. GDB records entry PC, stack,
+saved return address and beam position, then stops at the actual return address
+and checks stack restoration. Samples align to the first matching callback after
+the preceding observed return, starting at scene 15; duration similarity is not
+used to select calls. The PAL decoder handles UAE's HP=0/1 convention and field
+wrap explicitly. Each interval must be shorter than one field.
+
+The completed `tmp/phase4-irq-beam-020/` uses the already audited v2 callback
+debugger. All nine independently sampled intervals agree within one colour clock
+(512 emulator units, about 0.282 microseconds). Maximum absolute disagreement is
+384 units, about 0.211 microseconds. Every complete-run callback interval,
+publication/census record, raw source buffer, allocated game hunk and menu pixel
+matches the uninterrupted 020 control exactly. Evidence:
+`tmp/phase4-irq-beam-check-020.json`. Negative fixtures in
+`tmp/phase4-irq-beam-negative/` reject changed beam time, return stack and callback
+order; PAL line/field rollover cases are also checked.
+
+This calibrates beam observations against the 020 instrument whose durations
+already match an instruction trace. The remaining ten machine/cache cells are
+being calibrated under `tmp/phase4-irq-beam-matrix/`, with fresh cache audits.
+Their completed beam reports must still be compared with matching uninterrupted
+callback controls before acceptance. The diagnostic breakpoint flag remains set;
+these runs do not replace uninterrupted FPS baselines. Measured intervals include
+callees and preemption, and still exclude interrupt entry/dispatch outside the
+selected callbacks.

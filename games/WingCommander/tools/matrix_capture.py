@@ -20,6 +20,7 @@ def main():
     cores.add_argument('--nommu-core',action='store_true')
     cores.add_argument('--mmu-core',action='store_true',help='030 MMU-interpreter counter capture; no instruction profiling')
     p.add_argument('--instant-blitter',action='store_true',help='VERIFY ceiling: complete blits immediately; requires audit readback')
+    p.add_argument('--irq-beam',action='store_true',help='diagnostic read-only beam timestamps at nine callback entry/return pairs')
     p.add_argument('--irq-trace',action='store_true',help='diagnostic five-field callback instruction trace at credits entry')
     p.add_argument('--irq-scopes',action='store_true',help='experimental complete-call VBL callback intervals')
     p.add_argument('--idle',action='store_true',help='record actual stopped-CPU state; requires --matrix-idle debugger')
@@ -30,6 +31,8 @@ def main():
     p.add_argument('--no-profiles', action='store_true', help='counter/census control with aggregate profiling disabled')
     a=p.parse_args();out=(ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():raise ValueError('new tmp output required')
+    if a.irq_beam and (not a.irq_scopes or not a.no_profiles or a.irq_trace):
+        raise ValueError('--irq-beam requires scopes, no aggregate profiles, and no IRQ trace')
     if a.irq_trace and (not a.irq_scopes or not a.no_profiles or a.machine!='a1200-fast'):
         raise ValueError('--irq-trace requires 020, --irq-scopes and --no-profiles')
     if os.environ.get('EXTRA_ARGS'):raise ValueError('fixed measurement configuration required')
@@ -96,6 +99,24 @@ def main():
             until(h[0]+0x1fdd6)
             cmd('monitor trace-window-all')
             cmd(f'monitor profile 5 \"\" \"{out}/irq-trace.bin\"',180)
+        if a.irq_beam:
+            until(h[0]+0x1fdd6)
+            samples=[]
+            def beam_sample():
+                reply=cmd('printf "WC_BEAM %u %u %u %u\\n", $pc, $sp, *(unsigned int*)$sp, *(unsigned int*)0xdff004')
+                match=re.search(r'WC_BEAM (\d+) (\d+) (\d+) (\d+)',reply)
+                if not match:raise ValueError('beam observation missing')
+                pc,sp,ret,beam=map(int,match.groups())
+                return dict(pc=pc,sp=sp,ret=ret,beam=beam)
+            for kind,offset in enumerate((0x34162,0x27810,0x33e62)):
+                for repeat in range(3):
+                    until(h[0]+offset)
+                    begin=beam_sample()
+                    until(begin['ret'])
+                    end=beam_sample()
+                    if end['sp']!=begin['sp']+4:raise ValueError('beam callback return stack differs')
+                    samples.append(dict(kind=kind,begin=begin,end=end))
+            (out/'irq-beam.json').write_text(json.dumps(samples,indent=2)+'\n')
         until(h[0]+0x1fe48)
         print('all credits pages complete',flush=True)
         until(h[0]+0x1898a);cmd('monitor key 45 1')
@@ -117,7 +138,7 @@ def main():
         if a.idle and not (out/'idle-events.txt').is_file():raise ValueError('idle observer unavailable')
         if a.dma and not (out/'dma-events.txt').is_file():raise ValueError('DMA observer unavailable')
         boot=next((out/'run').glob('boot.*'))
-        result=dict(layout,complete=True,names=names,machine=a.machine,nommu_core=a.nommu_core,mmu_core=a.mmu_core,ceiling=ceiling,instant_blitter=a.instant_blitter,irq_scopes=a.irq_scopes,irq_trace=a.irq_trace,idle=a.idle,dma=a.dma,host_warp=a.warp,clock_validated=a.machine=='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle or a.irq_trace,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
+        result=dict(layout,complete=True,names=names,machine=a.machine,nommu_core=a.nommu_core,mmu_core=a.mmu_core,ceiling=ceiling,instant_blitter=a.instant_blitter,irq_scopes=a.irq_scopes,irq_trace=a.irq_trace,irq_beam=a.irq_beam,idle=a.idle,dma=a.dma,host_warp=a.warp,clock_validated=a.machine=='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle or a.irq_trace or a.irq_beam,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
             boot_cpu=cpu,live_cpu=live,audit_cacr=audit['cacr'],
             slave_sha256=hashlib.sha256((boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()).hexdigest(),
             emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())

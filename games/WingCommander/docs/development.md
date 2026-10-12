@@ -1123,3 +1123,41 @@ python3 tools/matrix_accounting_batch.py --kind irq \
   --audit-slave tmp/phase4-cache-slave/WingCommanderCD32.Slave \
   --ports 2470 2471
 ```
+
+### Callback beam calibration
+
+The same callback debugger supports independent read-only beam observations,
+including configurations without Barto instruction records. Calibrate first on
+the covered 020 core; use the matching audit and an uninterrupted callback control.
+
+```sh
+export FSUAE="$PWD/tmp/phase4-irq-v2-debugger/fs-uae"
+export DEBUG_PORT=2472
+python3 tools/matrix_capture.py --machine a1200-fast --no-profiles \
+  --warp --raw-chunky --irq-scopes --irq-beam \
+  --audit tmp/phase4-irq-v2-audit-020/result.json \
+  --layout tmp/phase4-profile-on-no-raw/result.json \
+  --output tmp/phase4-irq-beam-020
+python3 tools/matrix_irq_beam_check.py tmp/phase4-irq-beam-020 \
+  --control tmp/phase4-irq-pair-020/on
+python3 tools/matrix_irq_beam_negative.py tmp/phase4-irq-beam-020 \
+  --output tmp/phase4-irq-beam-negative
+```
+
+For the machine matrix, `--kind irq-beam` performs fresh audits and one diagnostic
+beam capture per cell using the normal matrix-plan format. It checks scene/scope
+accounting and the nine beam intervals; it does not claim recorder neutrality or
+perform the ordinary uninterrupted raw-source report on a diagnostic capture.
+
+```sh
+python3 tools/matrix_accounting_batch.py --kind irq-beam \
+  --plan tmp/accounting-plan.json --output tmp/irq-beam-matrix \
+  --audit-slave tmp/phase4-cache-slave/WingCommanderCD32.Slave \
+  --ports 2472 2473
+```
+
+Choose free ports. The retained `tmp/phase4-irq-beam-matrix/` excludes the already
+calibrated 020 default cell. For each completed cell, rerun
+`matrix_irq_beam_check.py CELL/beam --control MATCHING_IRQ_CONTROL` to require
+identical callback intervals, full publication/census ledger, raw source buffers,
+game hunks and menu pixels. Beam agreement alone does not satisfy that control.

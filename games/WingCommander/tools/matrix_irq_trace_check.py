@@ -105,7 +105,7 @@ def compare_control(run, control):
     scope_check(control)
     left = json.loads((control/'result.json').read_text())
     right = json.loads((run/'result.json').read_text())
-    if left.get('diagnostic_stops') or not right.get('irq_trace'):
+    if left.get('diagnostic_stops') or not (right.get('irq_trace') or right.get('irq_beam')):
         raise ValueError('uninterrupted scope control and diagnostic trace required')
     for key in ('machine', 'options', 'audit_cacr', 'hunks', 'slave', 'slave_sha256',
                 'boot_cpu', 'live_cpu', 'nommu_core', 'mmu_core', 'raw_chunky',
