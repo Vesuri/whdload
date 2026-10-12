@@ -28,6 +28,16 @@ FF1InstallNativeExact:
  bne.w .bad
  dbra d1,.caller_check
  endc
+ ifgt FF1_NATIVE_EXACT-3
+ lea FF1TrigSignature(pc),a0
+ lea $24fe0,a1
+ moveq #31,d1
+.trig_check:
+ move.w (a0)+,d2
+ cmp.w (a1)+,d2
+ bne.w .bad
+ dbra d1,.trig_check
+ endc
  lea FF1NativeSites(pc),a0
 .check:
  move.l (a0)+,d0
@@ -73,6 +83,14 @@ FF1InstallNativeExact:
  move.w #$4e71,4(a1)
  bra.b .patch
 .complete:
+ ifgt FF1_NATIVE_EXACT-3
+ lea FF1TrigReplacement(pc),a0
+ lea $24fe0,a1
+ moveq #15,d1
+.trig_copy:
+ move.l (a0)+,(a1)+
+ dbra d1,.trig_copy
+ endc
  ifgt FF1_NATIVE_EXACT-2
  lea FF1NativeLookahead(pc),a0
  move.w #$4ef9,$6977a
@@ -135,6 +153,38 @@ FF1NativeLookahead:
 FF1TrackSignature:
  dc.w $4e56,$fff8,$42ae,$fffa,$4a79,$0001,$ed8a,$665c,$3d7c,$000a,$fffe,$546e,$000a,$302e,$fffe,$536e,$fffe,$4a40,$6730,$3039,$0002,$268c,$322e,$000a,$b240,$6d04,$916e,$000a,$302e,$000a,$526e,$000a,$48c0,$e380,$2040,$d1fc,$0001,$dc24,$3010,$48c0,$d1ae,$fffa,$60c4,$4aae,$fffa,$6a08,$202e,$fffa,$4480,$6004,$202e,$fffa,$4e5e,$4e75,$3d7c,$0008,$fffe,$3039,$0003,$2fbc,$48c0,$e380,$2040,$d1fc,$0002,$275a,$3010,$0c40,$015e,$6f04,$586e,$000a,$302e,$fffe,$536e,$fffe,$4a40,$676c,$3039,$0002,$268c,$322e,$000a,$b240,$6d04,$916e,$000a,$302e,$000a,$3f40,$0000,$5240,$322f,$0000,$48c1,$e381,$2041,$d1fc,$0001,$dc24,$3210,$3d40,$000a,$4a41,$6a18,$526e,$000a,$48c0,$e380,$2040,$d1fc,$0001,$dc24,$3010,$48c0,$4480,$6018,$302e,$000a,$526e,$000a,$48c0,$e380,$2040,$d1fc,$0001,$dc24,$3010,$48c0,$d1ae,$fffa,$6088,$202e,$fffa,$e380,$4e5e,$4e75
  dc.w $6100,$2264,$588f,$23c0,$0003,$2f8a,$3039,$0003,$2fbc,$48c0,$e380
+ endc
+
+ ifgt FF1_NATIVE_EXACT-3
+; Direct indexed Q15 table lookup. Unlike the initially proposed CCR-dead-only
+; version, keep the two original logical shifts: D0 (including upper bits),
+; A0 and all five CCR bits exactly match native for every input. Thus existing
+; callers and return flags stay valid, including conversion-hook opponents.
+; Only the low argument words matter. Masking the angle word is sufficient
+; for the signed word index (0..1023); MULS.W replaces the whole D0 afterward.
+FF1TrigReplacement:
+FF1NativeSine:
+ move.w 6(sp),d0
+ andi.w #1023,d0
+ lea ($2180c,d0.w*2),a0
+ move.w 10(sp),d0
+ muls.w (a0),d0
+ lsr.l #8,d0
+ lsr.l #7,d0
+ rts
+ dcb.b 32-(*-FF1NativeSine),0
+FF1NativeCosine:
+ move.w 6(sp),d0
+ andi.w #1023,d0
+ lea ($21a0c,d0.w*2),a0
+ move.w 10(sp),d0
+ muls.w (a0),d0
+ lsr.l #8,d0
+ lsr.l #7,d0
+ rts
+ dcb.b 32-(*-FF1NativeCosine),0
+FF1TrigSignature:
+ dc.w $302f,$0006,$0280,$0000,$03ff,$e380,$0680,$0002,$180c,$2040,$302f,$000a,$c1d0,$e088,$ee88,$4e75,$302f,$0006,$0280,$0000,$03ff,$e380,$0680,$0002,$1a0c,$2040,$302f,$000a,$c1d0,$e088,$ee88,$4e75
  endc
 
 FF1NativeSites:
