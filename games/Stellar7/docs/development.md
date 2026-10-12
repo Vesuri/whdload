@@ -486,8 +486,9 @@ To build without launching, source `amiga/env.sh` and run `make -C whdload sim60
 These builds contain no VERIFY fixtures. The selected N=3/N=12 launcher smoke
 checks reach the native menu with 107/106 installed hooks and release bytes
 matching the audited builds. They use debug/warp/silent mode and disconnected
-input; results are under `tmp/fast60/corrected/play60-smoke-68000` and
-`play60-smoke-68020`. They do not verify interactive gameplay or audible output.
+input; fresh results are under `tmp/release60/play60-smoke-68000` and
+`play60-smoke-68020`. The latter checks AMIGA_SETUP=a1200-fast overriding a
+contradictory CPU=68000 before build selection. They do not verify interactive gameplay or audible output.
 If overriding WHD_ARGS, include CUSTOM1=1 to enable the replacement. Current
 selected-rate performance and its scene limits are recorded in internals.
 

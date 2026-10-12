@@ -46,6 +46,14 @@ selection regression rejects the prior order and passes all seven presets,
 explicit/default CPUs and an invalid-preset case. This argument-level test does
 not replace an actual launcher smoke test.
 
+Fresh actual-launcher smoke checks reach the native menu at N=3 and N=12,
+with 107/106 installed hooks and byte identity against the audited releases.
+The fast check supplies AMIGA_SETUP=a1200-fast with a contradictory CPU=68000;
+the preset correctly selects N=12. Evidence:
+`tmp/release60/play60-smoke-68000/validation.json` and
+`play60-smoke-68020/validation.json`. These debug/warp/silent runs disconnect
+controls and do not establish playable controls, audible output or pace.
+
 The PF62 combined-preferences fixture passes on N=3 A500 and N=12 68020.
 Native menu buttons toggle Mouse, Joystick, Music and Sounds off in that order,
 then restore each to one. All nine intermediate setting snapshots match the
@@ -103,6 +111,13 @@ Evidence: `tmp/release60/powered-boss-events/n3-validation.json` and
 cross-rate state-equality check; trajectories and pre-boss scores differ.
 Later full encounters and ending remain open. The observed native cannon
 projectile kills and normal exits do not cover all power effects or audible output.
+
+The level-1 full-wave pilots select that level with one earlier fixture-controlled
+exit, then leave its waves, health and inventory native. Both attempts end in
+natural death before carrier deployment: tick 6434 at N=3 (energy -44) and
+12745 at N=12 (energy -60). They do not establish a completed level-1 encounter
+or exercise the carrier-triggered power route. Evidence:
+`tmp/release60/level1-carrier-encounters/level1-n*-observations.json`.
 
 Natural combat death and Continue pass on both selected paths in level 6,
 after six fixture-controlled earlier exits. Death occurs at tick 1860 on N=3
