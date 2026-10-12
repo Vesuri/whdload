@@ -1431,5 +1431,20 @@ seconds (21.950923/s). Same-core NoMMU/default records the same count over
 152.658910 seconds (21.950897/s). This 180-microsecond difference over the entire
 intro is not evidence of a meaningful physical accelerator advantage; the two
 are effectively tied. The nominally fastest MMU/default cell is selected for the
-matched ceiling experiments. Its equal-size control and c2p-bypass runs are in
-progress; no ceiling gain has yet been accepted.
+matched ceiling experiments. The equal-size control repeats all 6,741 ledger records, final game hunks and
+menu pixels of the matrix capture exactly. The matched c2p-bypass run completes
+with the same 3,351 publications over 152.649027 seconds (21.952318/s), saving
+0.009703 seconds across the declared window: a rate ratio of 1.00006356.
+
+The retained boot fixtures differ only at the three declared converter entry
+words, and all six control/bypass entry words agree with the final live memory
+captures. The bypass replaces code-hunk offsets `$17f6`, `$195e`, `$1ac6`
+(file offsets `$1816`, `$197e`, `$1ae6`) with `RTS`. The original limiter and
+publication path remain active; this small measured gain is not the converter's
+CPU cost. Planar output is intentionally invalid in this ceiling arm. This is
+one matched pair, not a variability estimate or a physical accelerator claim.
+
+`tmp/phase4-ceiling-c2p-comparison.json` records every scene and the complete
+window; `tmp/phase4-ceiling-repeat-check-030-mmu.json` records the control repeat.
+The checker rejects reversed arms and mismatched emulator builds. Drawing and
+instant-blitter ceilings remain outstanding.

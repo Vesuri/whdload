@@ -745,8 +745,34 @@ words. `matrix_capture.py --ceiling-slave PATH` accepts only these verified
 fixtures, checks their digest/size, and records the arm in the result. Use the
 same machine, cache audit and options for both arms once the fastest matrix cell
 has been selected. This is a ceiling experiment, not a release rendering patch or
-a picture-equivalence comparison. These fixtures have not yet passed a runtime
-ceiling gate.
+a picture-equivalence comparison.
+
+The selected cell is 030 MMU/default. With the MMU-counter debugger above built
+and `FSUAE` set to its executable, reproduce the matched pair as follows (each
+output directory must be new):
+
+```sh
+python3 tools/matrix_capture.py --machine a1200-030 --mmu-core --no-profiles \
+  --warp --options MMU --audit tmp/phase4-mmu-audit-030/result.json \
+  --layout tmp/phase4-mmu-scenes-030/result.json \
+  --ceiling-slave tmp/ceiling-control-slave/WingCommanderCD32.Slave \
+  --output tmp/ceiling-control-030-mmu
+python3 tools/matrix_capture.py --machine a1200-030 --mmu-core --no-profiles \
+  --warp --options MMU --audit tmp/phase4-mmu-audit-030/result.json \
+  --layout tmp/phase4-mmu-scenes-030/result.json \
+  --ceiling-slave tmp/ceiling-c2p-slave/WingCommanderCD32.Slave \
+  --output tmp/ceiling-c2p-030-mmu
+python3 tools/matrix_ceiling_report.py tmp/ceiling-control-030-mmu \
+  tmp/ceiling-c2p-030-mmu > tmp/ceiling-c2p-comparison.json
+```
+
+`matrix_ceiling_report.py` validates both scene ledgers, matched settings,
+retained fixture hashes, exact allowed byte differences and the three live
+converter entry words in each arm. It compares scene 2 entry through scene 33
+entry, excluding startup and the second-cycle/menu exit. A separate
+`matrix_raw_check.py --compare-only --control` comparison of the original matrix
+capture with the ceiling control verifies repeatability; do not use that
+picture-equivalence checker on the intentionally incorrect bypass output.
 
 ### DMA summaries and the 030 MMU interpreter
 
