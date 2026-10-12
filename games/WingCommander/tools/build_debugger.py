@@ -25,7 +25,10 @@ def main():
     p.add_argument('--matrix-dma',action='store_true',help='experimental per-field DMA summary; requires --matrix-observer')
     p.add_argument('--matrix-mmu030-counters',action='store_true',help='read-only scene counters on the cycle-exact 030 MMU interpreter')
     p.add_argument('--dma-cia-unsplit', action='store_true', help='diagnostic: preserve unrecorded CIA wait stepping; omit CIA wait-phase annotations')
+    p.add_argument('--matrix-irq', action='store_true', help='diagnostic complete-call intervals for game VBL callbacks')
     a = p.parse_args()
+    if a.matrix_irq and not a.matrix_observer:
+        raise ValueError('--matrix-irq requires --matrix-observer')
     if a.dma_cia_unsplit and not a.matrix_dma:
         raise ValueError('--dma-cia-unsplit requires --matrix-dma')
     if a.matrix_mmu030_counters and not a.matrix_observer:
@@ -129,6 +132,15 @@ int record_key_debug(int kc) {
             at=body.rfind('}')
             body=body[:at]+'    wc_matrix_idle_wait(wc_idle_start,wc_idle_was_stopped);\n'+body[at:]
             code=code[:start]+body+code[end:]
+
+        if a.matrix_irq:
+            code=code.replace('#include "wc_matrix_observer.inc"', '#include "wc_matrix_irq.inc"\n#include "wc_matrix_observer.inc"')
+            shutil.copyfile(ROOT/'tools/matrix_irq.inc',out/'src/wc_matrix_irq.inc')
+            observer=out/'src/wc_matrix_observer.inc'
+            observer_code=observer.read_text().replace('scene=id; previous.clear();','scene=id; previous.clear();\n        wc_matrix_irq_cut(id);')
+            anchor='if (scene<0 || scene>=34) return;'
+            assert observer_code.count(anchor)==1
+            observer.write_text(observer_code.replace(anchor,anchor+'\n    wc_matrix_irq_pc(pc,h0);'))
 
         if a.matrix_nommu_counters:
             # 040/060 use this interpreter without the Barto instruction profiler.

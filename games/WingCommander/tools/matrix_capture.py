@@ -20,6 +20,7 @@ def main():
     cores.add_argument('--nommu-core',action='store_true')
     cores.add_argument('--mmu-core',action='store_true',help='030 MMU-interpreter counter capture; no instruction profiling')
     p.add_argument('--instant-blitter',action='store_true',help='VERIFY ceiling: complete blits immediately; requires audit readback')
+    p.add_argument('--irq-scopes',action='store_true',help='experimental complete-call VBL callback intervals')
     p.add_argument('--idle',action='store_true',help='record actual stopped-CPU state; requires --matrix-idle debugger')
     p.add_argument('--dma',action='store_true',help='experimental DMA summary, requires a --matrix-dma debugger build')
     p.add_argument('--warp',action='store_true',help='collect faster in host time; report all durations in emulated time')
@@ -56,7 +57,7 @@ def main():
     env=dict(os.environ,FSUAE_RUN=run,AMIGA_SETUP=a.machine,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',
         WC_NOMMU_CORE='1' if a.nommu_core else '0',WC_INSTANT_BLITTER='1' if a.instant_blitter else '0',SLAVE=slave,
         WHD_ARGS='CUSTOM5=0 '+a.options,WARP='1' if a.warp else '0',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',
-        DETERMINISTIC='1',WC_MATRIX_IDLE='1' if a.idle else '0',WC_MATRIX_DMA='1' if a.dma else '0',WC_MATRIX_CONFIG=str(config),WC_MATRIX_DIR=str(out),WC_MATRIX_RAW='1' if a.raw_chunky else '0',WC_MATRIX_PROFILES='0' if a.no_profiles else '1')
+        DETERMINISTIC='1',WC_MATRIX_IRQ='1' if a.irq_scopes else '0',WC_MATRIX_IDLE='1' if a.idle else '0',WC_MATRIX_DMA='1' if a.dma else '0',WC_MATRIX_CONFIG=str(config),WC_MATRIX_DIR=str(out),WC_MATRIX_RAW='1' if a.raw_chunky else '0',WC_MATRIX_PROFILES='0' if a.no_profiles else '1')
     for key in ('WC_OBSERVER_CONFIG','WC_OBSERVER_OUTPUT'):env.pop(key,None)
     g=None; chunky_oracle=[]
     def cmd(s,timeout=60):
@@ -105,10 +106,11 @@ def main():
         if locate((out/'fast.bin').read_bytes())!=layout:raise ValueError('layout mismatch')
         for i in range(34):
             if not a.no_profiles and not (out/f'scene-{i:02d}.aprof').is_file():raise ValueError('missing scene profile '+str(i))
+        if a.irq_scopes and not (out/'irq-events.txt').is_file():raise ValueError('IRQ scope observer unavailable')
         if a.idle and not (out/'idle-events.txt').is_file():raise ValueError('idle observer unavailable')
         if a.dma and not (out/'dma-events.txt').is_file():raise ValueError('DMA observer unavailable')
         boot=next((out/'run').glob('boot.*'))
-        result=dict(layout,complete=True,names=names,machine=a.machine,nommu_core=a.nommu_core,mmu_core=a.mmu_core,ceiling=ceiling,instant_blitter=a.instant_blitter,idle=a.idle,dma=a.dma,host_warp=a.warp,clock_validated=a.machine=='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
+        result=dict(layout,complete=True,names=names,machine=a.machine,nommu_core=a.nommu_core,mmu_core=a.mmu_core,ceiling=ceiling,instant_blitter=a.instant_blitter,irq_scopes=a.irq_scopes,idle=a.idle,dma=a.dma,host_warp=a.warp,clock_validated=a.machine=='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
             boot_cpu=cpu,live_cpu=live,audit_cacr=audit['cacr'],
             slave_sha256=hashlib.sha256((boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()).hexdigest(),
             emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())

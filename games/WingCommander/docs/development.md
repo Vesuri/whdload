@@ -1016,3 +1016,41 @@ To check the remaining cores, filter the full `tmp/accounting-plan.json` from
 above for names that do not start with `020-`, write it to a fresh plan file, and
 run `matrix_accounting_batch.py` with the corrected debugger and a new output
 root. The retained run uses `tmp/phase4-dma-cia-accelerated/`.
+
+### Complete game VBL callback scopes
+
+Build the read-only callback observer and obtain a fresh cache audit:
+
+```sh
+. amiga/env.sh
+python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
+  --matrix-mmu030-counters --frequency-clock --matrix-dma --matrix-idle \
+  --dma-cia-unsplit --matrix-irq --output tmp/phase4-irq-debugger
+export FSUAE="$PWD/tmp/phase4-irq-debugger/fs-uae"
+export DEBUG_PORT=2460
+python3 tools/cache_audit.py --machine a1200-fast \
+  --slave tmp/phase4-cache-slave/WingCommanderCD32.Slave \
+  --output tmp/phase4-irq-pair-020/audit
+for arm in off on; do
+  flags=()
+  if [ "$arm" = on ]; then flags=(--irq-scopes); fi
+  python3 tools/matrix_capture.py --machine a1200-fast --no-profiles \
+    --warp --raw-chunky --audit tmp/phase4-irq-pair-020/audit/result.json \
+    --layout tmp/phase4-profile-on-no-raw/result.json "${flags[@]}" \
+    --output "tmp/phase4-irq-pair-020/$arm"
+  python3 tools/matrix_raw_check.py "tmp/phase4-irq-pair-020/$arm"
+done
+python3 tools/matrix_irq_test.py
+python3 tools/matrix_irq_check.py tmp/phase4-irq-pair-020/on \
+  --profile-control tmp/phase4-profile-on-no-raw
+python3 tools/matrix_raw_check.py tmp/phase4-irq-pair-020/on --compare-only \
+  --control tmp/phase4-irq-pair-020/off
+```
+
+Use an available port and fresh output paths. The optional independent profile
+must have identical scene/publication/census records and matching effective CPU
+settings. That comparison validates entry counts only. The interval checker
+separately checks matched returns, scene accounting and nested-scope totals;
+recording neutrality is reported explicitly as `irq_scope_neutrality_pass`.
+Do not call these elapsed scopes self CPU cost or total interrupt cost. Independent
+trace validation of their durations remains open.

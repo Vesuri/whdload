@@ -1633,3 +1633,35 @@ This accepts the corrected recorder for these 020 cells; it does not validate
 routine attribution or prove equivalent behaviour on other CPU cores. The nine
 accelerated cells are being checked in `tmp/phase4-dma-cia-accelerated/`.
 The original matrix continues with its original binary as diagnostic evidence.
+
+### Game VBL callback interval validation
+
+The read-only `--matrix-irq` observer brackets the three known game VBL
+callbacks by entry PC, saved return address and stack slot. A return closes only
+when both the return PC and the restored stack pointer match. Scene boundaries
+split elapsed intervals without closing a callback; an unfinished callback at
+the menu endpoint is an error. This applies the complete-call approach used in
+Stellar 7, with stack-slot checks rather than a reconstructed general call tree.
+
+| Callback | Hunk 0 offset | English file offset | 020 default entries, reset to menu |
+|---|---|---|---:|
+| Game clock VBL | `$34162` | `$3418e` | 8,329 |
+| Music VBL | `$27810` | `$2783c` | 8,289 |
+| Joypad VBL | `$33e62` | `$33e8e` | 8,327 |
+
+The completed `tmp/phase4-irq-pair-020/{off,on}/` pair uses debugger digest
+`bdadc9da8d89d4d6d6f21c8c155f0ca315e8eb38324467353d6b8810b5fd98ba`
+and a fresh CACR `$00000001` audit. Every one of 3,409 ledger records, all raw
+source buffers, final allocated game hunks and menu pixels match exactly.
+All entries have matched returns. Entry instruction counts independently match
+`tmp/phase4-profile-on-no-raw/` in every post-startup scene, whose complete event
+ledger is also identical. Evidence: `neutrality.log`, `irq-check.log` and
+`profile-crosscheck.json` within the pair directory.
+
+Synthetic checks cover nested callbacks and a call spanning a scene boundary;
+malformed ordering, wrong return stack, wrong entry PC, changed scene clock,
+backward time and incomplete coverage are rejected. These checks and independent
+entry counts do not yet validate elapsed costs. An independent instruction-trace
+cross-check remains required. Scope elapsed time includes callees and preemption;
+innermost selected callback time is not routine self time. Exception entry,
+dispatcher work and other handlers remain outside these three callback scopes.
