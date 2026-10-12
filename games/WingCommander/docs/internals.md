@@ -971,13 +971,40 @@ Evidence: `tmp/phase4-raw-census/`, `tmp/phase4-raw-control/`,
 The full CPU/cache matrix, caller attribution and ceiling experiments still have
 not passed the phase 4 gate.
 
+### Aggregate-profiler on/off controls
+
+Two isolated comparisons now pass on the original 020 route. The default-cache
+pair disables raw recording in both arms; the NoCache pair enables it in both.
+Only aggregate profiling changes within each pair, using the same local emulator.
+
+| Cache state | CACR | Identical B/P/C records | Final game hunks / menu pixels | Raw sources |
+|---|---|---:|---|---|
+| Default | `00000001` | 3,409 | exact / exact | disabled in both arms |
+| `NoCache` | `00000000` | 2,885 | exact / exact | every byte identical |
+
+The disabled controls contain no aggregate profile files. This establishes the
+aggregate profiler's neutrality for scene progression, clocks and the compared
+state/picture under both effective 020 cache states. It does **not** repair the
+calling-context attribution. The earlier comparison that disabled both profiling
+and raw recording is retained as a combined control, not mislabelled as an isolated
+profiler test. The comparison tool records exactly which features changed.
+
+Default evidence: `tmp/phase4-profile-on-no-raw/`, `tmp/phase4-profile-off/` and
+`tmp/phase4-profiler-isolated-check.json`. NoCache evidence:
+`tmp/phase4-nocache-on/`, `tmp/phase4-nocache-off/` and
+`tmp/phase4-nocache-profiler-check.json`. Both use local emulator SHA-256
+`95329265de9f948787a6494fd8029d3e3516113b315f14dd586c00b37764494f`.
+The NoCache source census independently recomputes every recorded change, just as
+the default census does. Its buffers are compared with its own matching control;
+no equality between different cache-state trajectories is assumed.
+
 ### Outstanding phase 4 gate work
 
 - Establish calibrated timing and instruction coverage for the requested accelerated
   configurations, or obtain an explicit change to the matrix requirement.
-- Resolve return/context attribution and validate a matched aggregate-profiler-off
-  run. Raw-recording neutrality and the full 020 default-cache chunky census pass;
-  this does not validate other machine/cache configurations.
+- Resolve general return/context attribution. Isolated aggregate-profiler-off
+  controls pass for 020 default and NoCache; full source-census recomputation passes
+  for both. This does not validate accelerated machine configurations.
 - Complete per-scene self/inclusive CPU, waits, interrupts, DMA and idle accounting
   for every accepted cell and differing cache state.
 - Run matched c2p/drawing/instant-blitter ceiling experiments on the fastest valid

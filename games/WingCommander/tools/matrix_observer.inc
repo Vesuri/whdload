@@ -4,6 +4,7 @@ static void wc_matrix_observe(uae_u32 pc) {
     static bool initialized = false;
     static FILE* ledger = nullptr;
     static FILE* raw_sources = nullptr;
+    static bool profiles = true;
     static unsigned h0;
     static int scene = -1;
     static std::string directory;
@@ -27,6 +28,8 @@ static void wc_matrix_observe(uae_u32 pc) {
         directory=dir;
         ledger=fopen((directory+"/matrix-events.txt").c_str(), "wx");
         if (!ledger) abort();
+        const char* profile_mode = getenv("WC_MATRIX_PROFILES");
+        profiles = !profile_mode || strcmp(profile_mode,"0")!=0;
         const char* raw = getenv("WC_MATRIX_RAW");
         if (raw && strcmp(raw,"1")==0) {
             raw_sources=fopen((directory+"/chunky-sources.bin").c_str(), "wbx");
@@ -39,7 +42,7 @@ static void wc_matrix_observe(uae_u32 pc) {
         unsigned id=cut.second==100 ? 15+(regs.regs[5]&65535) : cut.second;
         if (id<=static_cast<unsigned>(scene) && scene>=0) continue;
         if (id>34 || id!=static_cast<unsigned>(scene+1)) abort();
-        if (scene>=0) {
+        if (scene>=0 && profiles) {
             char filename[64]; snprintf(filename,sizeof(filename),"/scene-%02d.aprof",scene);
             if (!aprof_stop((directory+filename).c_str())) abort();
         }
@@ -48,7 +51,7 @@ static void wc_matrix_observe(uae_u32 pc) {
                 (unsigned long long)get_cycles(),regs.cacr);
         fflush(ledger);
         if (raw_sources && fflush(raw_sources)) abort();
-        if (id<34 && !aprof_start()) abort();
+        if (id<34 && profiles && !aprof_start()) abort();
         break;
     }
     if (scene<0 || scene>=34) return;

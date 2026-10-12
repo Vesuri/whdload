@@ -82,17 +82,33 @@ def compare(control, candidate):
     for key in ('machine', 'options', 'audit_cacr', 'emulator_sha256', 'slave_sha256', 'hunks', 'slave'):
         if left[key] != right[key]:
             raise ValueError('unmatched configuration: '+key)
-    if not left['complete'] or left.get('diagnostic_stops') or right.get('diagnostic_stops'):
+    if not left['complete'] or not right['complete'] or left.get('diagnostic_stops') or right.get('diagnostic_stops'):
         raise ValueError('neutrality comparison requires complete runs without oracle stops')
     a = (control/'matrix-events.txt').read_text().splitlines()
     b = (candidate/'matrix-events.txt').read_text().splitlines()
     if a != b:
         at = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
         raise ValueError(f'observer ledger differs at record {at}; lengths {len(a)}/{len(b)}')
+    if not right.get('profiles',True):
+        raise ValueError('candidate must have aggregate profiles enabled')
+    profiles = left.get('profiles', True)
     for index in range(34):
         name = f'scene-{index:02d}.aprof'
-        if (control/name).read_bytes() != (candidate/name).read_bytes():
-            raise ValueError('scene profile differs: '+name)
+        if profiles:
+            if (control/name).read_bytes() != (candidate/name).read_bytes():
+                raise ValueError('scene profile differs: '+name)
+        elif (control/name).exists():
+            raise ValueError('unexpected aggregate profile in disabled control')
+    raw_sources_identical = None
+    if left.get('raw_chunky') and right.get('raw_chunky'):
+        with (control/'chunky-sources.bin').open('rb') as raw_a, (candidate/'chunky-sources.bin').open('rb') as raw_b:
+            while True:
+                block_a, block_b = raw_a.read(1 << 20), raw_b.read(1 << 20)
+                if block_a != block_b:
+                    raise ValueError('recorded source buffers differ')
+                if not block_a:
+                    break
+        raw_sources_identical = True
     memory_a = (control/'fast.bin').read_bytes()
     memory_b = (candidate/'fast.bin').read_bytes()
     for base, size in zip(left['hunks'], (0x35ea4, 0xfda0, 4, 0x1590)):
@@ -102,8 +118,13 @@ def compare(control, candidate):
     with Image.open(control/'menu.png') as image_a, Image.open(candidate/'menu.png') as image_b:
         if image_a.size != image_b.size or image_a.convert('RGB').tobytes() != image_b.convert('RGB').tobytes():
             raise ValueError('menu pixels differ')
-    return dict(recording_neutrality_pass=True, ledger_records=len(a),
-                profile_files_identical=True, final_game_hunks_identical=True, menu_pixels_identical=True)
+    changed = [key for key, default in (('raw_chunky',False),('profiles',True))
+               if left.get(key,default) != right.get(key,default)]
+    return dict(matched_execution_pass=True, changed_features=changed,
+                recording_neutrality_pass=changed==['raw_chunky'],
+                aggregate_profiler_neutrality_pass=changed==['profiles'],
+                ledger_records=len(a), profile_files_identical=profiles, raw_sources_identical=raw_sources_identical,
+                final_game_hunks_identical=True, menu_pixels_identical=True)
 
 
 def main():
@@ -111,8 +132,11 @@ def main():
     parser.add_argument('run', type=Path)
     parser.add_argument('--control', type=Path)
     parser.add_argument('--oracle', type=Path)
+    parser.add_argument('--compare-only', action='store_true')
     args = parser.parse_args()
-    result = check(args.run, args.oracle)
+    if args.compare_only and not args.control:
+        parser.error('--compare-only requires --control')
+    result = {} if args.compare_only else check(args.run, args.oracle)
     if args.control:
         result['comparison'] = compare(args.control, args.run)
     print(json.dumps(result, indent=2))

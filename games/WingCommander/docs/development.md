@@ -568,3 +568,43 @@ active. A changed-byte and a changed-profile negative control are retained under
 The census is useful source-change evidence even while calling-context costs are
 unvalidated. Do not reinterpret a passing raw-recording check as a complete
 machine-matrix or aggregate-profiler-off gate.
+
+
+### Isolating aggregate profiling from the counter/census
+
+`--no-profiles` keeps the state-cut, publication and chunky census hooks but never
+starts the aggregate profiler. It produces no `.aprof` files; `matrix_report.py`
+explicitly rejects such a control as a routine-cost input. Change exactly one
+feature within a comparison. For the default-cache pair, leave raw recording off
+in both arms:
+
+```sh
+python3 tools/build_debugger.py --matrix-observer --output tmp/profile-control-debugger
+export FSUAE="$PWD/tmp/profile-control-debugger/fs-uae"
+python3 tools/matrix_capture.py --layout tmp/probe-020/result.json \
+  --audit tmp/cache-020-default/result.json --output tmp/profile-on
+python3 tools/matrix_capture.py --layout tmp/probe-020/result.json \
+  --audit tmp/cache-020-default/result.json --no-profiles --output tmp/profile-off
+python3 tools/matrix_raw_check.py tmp/profile-on --control tmp/profile-off \
+  --compare-only > tmp/profiler-control.json
+```
+
+For NoCache, keep raw recording on in both arms to compare every source buffer as
+well as the ledger, final hunks and menu pixels:
+
+```sh
+python3 tools/matrix_capture.py --layout tmp/probe-020/result.json \
+  --audit tmp/cache-020-nocache/result.json --options NoCache --raw-chunky \
+  --output tmp/nocache-profile-on
+python3 tools/matrix_capture.py --layout tmp/probe-020/result.json \
+  --audit tmp/cache-020-nocache/result.json --options NoCache --raw-chunky \
+  --no-profiles --output tmp/nocache-profile-off
+python3 tools/matrix_raw_check.py tmp/nocache-profile-on \
+  --control tmp/nocache-profile-off > tmp/nocache-profiler-control.json
+```
+
+`aggregate_profiler_neutrality_pass` requires that only the `profiles` feature
+changes. `recording_neutrality_pass` requires that only `raw_chunky` changes.
+A combined comparison can pass `matched_execution_pass` without certifying either
+isolated control. When both arms retain raw sources, the checker compares every
+byte of those streams. None of these checks certifies the calling-context tree.

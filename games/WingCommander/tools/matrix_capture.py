@@ -15,6 +15,7 @@ def main():
     p.add_argument('--audit',required=True);p.add_argument('--options',default='')
     p.add_argument('--chunky-oracle', action='store_true', help='six independent GDB source snapshots; diagnostic run only')
     p.add_argument('--raw-chunky', action='store_true', help='retain every observed source buffer for independent census recomputation')
+    p.add_argument('--no-profiles', action='store_true', help='counter/census control with aggregate profiling disabled')
     a=p.parse_args();out=(ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():raise ValueError('new tmp output required')
     if os.environ.get('EXTRA_ARGS'):raise ValueError('fixed measurement configuration required')
@@ -31,7 +32,7 @@ def main():
     run='../'+str(out.relative_to(ROOT))+'/run'
     env=dict(os.environ,FSUAE_RUN=run,AMIGA_SETUP='a1200-fast',INTRO_STOCK_CLOCK='1',SLAVE='',
         WHD_ARGS='CUSTOM5=0 '+a.options,WARP='0',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',
-        DETERMINISTIC='1',WC_MATRIX_CONFIG=str(config),WC_MATRIX_DIR=str(out),WC_MATRIX_RAW='1' if a.raw_chunky else '0')
+        DETERMINISTIC='1',WC_MATRIX_CONFIG=str(config),WC_MATRIX_DIR=str(out),WC_MATRIX_RAW='1' if a.raw_chunky else '0',WC_MATRIX_PROFILES='0' if a.no_profiles else '1')
     for key in ('WC_OBSERVER_CONFIG','WC_OBSERVER_OUTPUT'):env.pop(key,None)
     g=None; chunky_oracle=[]
     def cmd(s,timeout=60):
@@ -71,9 +72,9 @@ def main():
         cmd(f'dump binary memory {out.relative_to(ROOT)}/fast.bin {BASE:#x} {BASE+0x800000:#x}')
         if locate((out/'fast.bin').read_bytes())!=layout:raise ValueError('layout mismatch')
         for i in range(34):
-            if not (out/f'scene-{i:02d}.aprof').is_file():raise ValueError('missing scene profile '+str(i))
+            if not a.no_profiles and not (out/f'scene-{i:02d}.aprof').is_file():raise ValueError('missing scene profile '+str(i))
         boot=next((out/'run').glob('boot.*'))
-        result=dict(layout,complete=True,names=names,machine='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle,raw_chunky=a.raw_chunky,
+        result=dict(layout,complete=True,names=names,machine='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
             boot_cpu=cpu,live_cpu=live,audit_cacr=audit['cacr'],
             slave_sha256=hashlib.sha256((boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()).hexdigest(),
             emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())

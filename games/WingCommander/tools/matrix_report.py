@@ -31,6 +31,7 @@ def read_aprof(path):
 def report(run):
     meta=json.loads((run/'result.json').read_text())
     if not meta['complete']:raise ValueError('incomplete capture')
+    if not meta.get('profiles',True):raise ValueError('aggregate profiling was disabled for this control')
     boundaries=[];publications=collections.Counter();changes=collections.defaultdict(list)
     for line in (run/'matrix-events.txt').read_text().splitlines():
         p=line.split();kind=p[0];i=int(p[1])
@@ -82,7 +83,7 @@ def report(run):
     return dict(machine=meta['machine'],options=meta['options'],audit_cacr=meta['audit_cacr'],
                 validated_baseline=False,
                 limitations=['Inclusive/self routine contexts require unmatched-return investigation.',
-                             'Repeat and observer-off comparisons have not passed.',
+                             'Repeat and observer-off comparisons require separate checks.',
                              'Whole-scene DMA, waits, interrupt cost and idle attribution remain incomplete.'],
                 scenes=scenes)
 
