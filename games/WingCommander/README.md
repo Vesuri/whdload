@@ -14,7 +14,7 @@ FAST chunky storage and FMODE 3 were already present in the observed setup.
 Exact intro duration neutrality is not claimed: the final 020 intro is about
 0.63 seconds longer with the display-end wait. Music/text deadlines stay unchanged;
 intended movement rates and further timing investigation remain deferred.
-Phase 7 has not started. See the evidence and limits in [internals](docs/internals.md).
+**Phase 7 gameplay timing and state investigation is in progress.** See the evidence and limits in [internals](docs/internals.md).
 
 **Phase 4 is complete under the approved practical-baseline scope.**
 The eleven-configuration CPU/cache baseline, source-change census, DMA/STOP idle

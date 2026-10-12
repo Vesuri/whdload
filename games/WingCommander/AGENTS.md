@@ -1,10 +1,10 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 6 CD32 intro rendering work is complete, with measured
-converter selection and documented timing gaps. Stop at the phase 6 gate.
-Further timing calibration is deferred to in-game investigation; do not start
-phase 7, release or OCS work until requested. Derived material stays in `tmp/`.
+Current scope: phase 7 CD32 gameplay timing and state investigation is in progress.
+Establish reproducible flight windows, classify state cadence and calibrate speed
+against range. Stop at the phase 7 gate; do not start phase 7b, release or OCS work.
+Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 
 ## Rules

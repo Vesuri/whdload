@@ -19,7 +19,8 @@ complete, using the supplied PC video for visible motion cadence and displacemen
 Phase 6 rendering work is complete: measured converter selection, native/live
 output checks, cache-preserving gating and display-end publication are recorded.
 The user deferred further timing investigation to gameplay; exact scene-duration
-neutrality remains an explicit gap. Stop at this checkpoint; phase 7 has not started.
+neutrality remains an explicit gap. Phase 7 gameplay timing and state investigation is in progress. Stop at its gate;
+phase 7b and later work remain deferred.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
