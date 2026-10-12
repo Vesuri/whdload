@@ -2,12 +2,15 @@
 
 ## Current state
 
-Phases 1 and 2 are complete. The reconstructed slave is byte-identical. Original
+Phases 1–3 are complete. The reconstructed slave is byte-identical. Original
 and reconstructed English boots match all four live game hunks and every screenshot
 pixel at the menu and simulator/name prompt for Custom5=0–3. VERIFY off/on marker
 checks and equal-size control comparisons pass at both endpoints.
 Derived source, executable bytes, disassemblies and captures remain under `tmp/`.
-**Phase 3 is authorised and in progress. Stop at its gate; phase 4 is not authorised.**
+The unskipped intro has 31 identical milestone captures across two fresh boots.
+The publication ledger, full traces and independent SWAP_ONLY check agree. The
+stock 020 multiplier is verified; numeric-frequency presets require calibration.
+**Stopped at the phase 3 gate. Phase 4 is not authorised.**
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.
@@ -107,7 +110,7 @@ Gate: original and reconstructed slaves boot to the main menu with identical scr
 and state at matched points. The authorised extension also passes through the
 simulator to the first pilot-name input prompt, without entering a name.
 
-### Phase 3 — The intro window and a trusted frame counter
+### Phase 3 — The intro window and a trusted frame counter (gate complete)
 
 1. Define the window: boot, Origin logo, the fight/credits sequence, title, main menu.
    Mark its milestones by game state (scene/script index), not by field number.

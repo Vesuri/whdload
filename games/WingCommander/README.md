@@ -3,11 +3,14 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 3 in progress: reproducible unskipped intro and validated frame counter.**
+**Phase 3 complete: reproducible unskipped intro and validated publication counter.**
+Two fresh boots match all 31 milestone screenshots, live game hunks and the
+reset-to-menu event ledger. Full traces and independent SWAP_ONLY counts agree.
+Stopped at the phase 3 gate; phase 4 has not started.
 The original and reconstructed slaves match at the menu and pilot-name prompt
 for Custom5=0–3. Phase 2 is complete.
 Phase 1 static findings are documented. Runtime timing and display hypotheses
-remain unconfirmed except where an explicit phase 2 boot check records evidence.
+remain hypotheses except for the scoped runtime findings recorded in the internals.
 
 See [open work](docs/open-work.md), [development](docs/development.md) and
 [known internals](docs/internals.md). Agent rules are in [AGENTS.md](AGENTS.md).

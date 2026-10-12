@@ -2,12 +2,11 @@
 
 ## Phase 1 gate: CD32 static identification complete
 
-Evidence is static only: verified archive extraction, hunk/relocation parsing,
-slave patch-list decoding and inspection of 68020 disassembly. No emulator,
-reconstructed slave, game patch, timing measurement or gameplay validation exists.
-The time-source and display descriptions below are **hypotheses to confirm at run
-time**, supported by the stated instruction sites; presence is not execution.
-Phase 2 requires a separate request. The OCS executable has not been analysed.
+The identification sections record static evidence from verified extraction,
+hunk/relocation parsing, slave patch lists and 68020 disassembly. Their time-source
+and display-path descriptions remain hypotheses except for the explicitly scoped
+runtime confirmations in the phase 2 and phase 3 sections below. The OCS executable
+has not been analysed.
 
 Notation: `E:` and `G:` mean English and German **game code hunk 0 offsets**;
 `S:` means **slave code hunk 0 offset**; `D:` means **English data hunk 1 offset**.
@@ -355,8 +354,8 @@ Main layout evidence:
   then MrgCop for each BitMap. `E:33caa` selects the generated copper list and
   `E:33ce2` writes COP2LC after updating graphics-library copper pointers.
   `E:33772` alternates indices modulo two; `E:3378e` publishes the completed
-  index through `E:33a12`. This is a candidate frame-publication marker, not
-  yet a validated frame counter.
+  index through `E:33a12`. This is the static frame-publication candidate; the scoped phase 3
+  runtime validation appears below.
 - The normal software branch at `E:31fee` converts, advances the buffer index,
   then publishes. The original blitter branch at `E:31fcc` starts asynchronous
   conversion; its interrupt/completion path can publish at `E:3264e`.
@@ -524,6 +523,178 @@ The ordinary reconstruction remains the byte-identical original-size build.
 
 This gate covers the English install and this emulator preset only. It does not
 validate German runtime behaviour, other CPUs, OCS, intended game speed, or the
-phase 1 time-source/display-path hypotheses. No trusted frame counter, unskipped
-intro window or instruction-cost profile has been established. Phase 3 has not
-started.
+phase 1 time-source/display-path hypotheses. The phase 2 checks establish no frame counter or instruction-cost profile.
+Phase 3 evidence follows separately.
+
+## Phase 3: unskipped intro and publication counter
+
+The runtime window uses the original English slave, `CUSTOM5=0`, PAL,
+cycle-exact 68EC020 at the A1200-fast preset with stock CPU multiplier 4,
+2 MiB chip and 8 MiB fast RAM.
+It includes reset/startup, the full Origin animation, the title animation,
+all 18 flight/credits pages, and the main menu. The credits loop indefinitely;
+a single Escape press is therefore sent **after** `E:1fe48` completes page 17,
+at the next input poll. Release occurs at menu entry. Nothing is skipped on the
+first cycle and no earlier input is sent.
+
+### Milestones and the counted event
+
+| State or event | Hunk offset | English executable file offset |
+|---|---|---|
+| Game startup | hunk 3:`0000` | `42dec` |
+| Origin load | hunk 3:`0d12` | `43afe` |
+| Origin reveal | hunk 3:`0eb0` | `43c9c` |
+| Origin animation | hunk 3:`0ee0` | `43ccc` |
+| Origin expression | hunk 3:`0fb4` | `43da0` |
+| Origin separation | hunk 3:`10cc` | `43eb8` |
+| Origin flight/hold | hunk 3:`11a8` | `43f94` |
+| Origin particles/logo | hunk 3:`12c0` | `440ac` |
+| Origin fade/cleanup | hunk 3:`0de0` | `43bcc` |
+| Title load | `E:1fbba` | `1fbe6` |
+| Title preamble | `E:1fcfc` | `1fd28` |
+| Title arrival | `E:1fd3a` | `1fd66` |
+| Title departure | `E:1fd46` | `1fd72` |
+| Flight/credits load | `E:1fd96` | `1fdc2` |
+| Credits page entry, D5 = 0…17 | `E:1fdd6` | `1fe02` |
+| Complete credits cycle | `E:1fe48` | `1fe74` |
+| Menu ready | `E:20214` | `20240` |
+| Publication entry | `E:3378e` | `337ba` |
+| Publication return from display helper | `E:3379a` | `337c6` |
+| COP2LC longword store | `E:33ce2` | `33d0e` |
+| Game VBL handler entry | `E:34162` | `3418e` |
+
+Scene cuts use the routine/state transitions above; the title screenshot uses
+animation index D2=185 within the arrival state. Credits screenshots follow the
+first completed publication for each page. Other scene pictures follow their
+first publication; load/fade pictures can consequently be black. These are exact
+state checkpoints, not screenshots selected by elapsed field number.
+
+For this software-c2p route, every observed publication entry has exactly one
+COP2LC store before `E:3379a`. The engine has finished conversion and selected
+its completed buffer before this helper. Counting all COP2LC stores would be
+wrong: the run also contains 68 writes outside publication calls (display setup
+and palette-related paths). A buffer index/pointer can repeat across display
+reinitialisation, so pointer inequality is not the counter either.
+
+The counter measures **completed buffer publications**, including cleared/setup
+frames. It does not count palette-only changes or require visually unique images.
+It is not a proof that a mid-field publication is tear-free. The blitter path
+`CUSTOM5=4`, other CPUs and German/OCS remain outside this validation.
+
+### Instrument agreement and clock calibration
+
+A local native debugger explicitly sets its profiler PC window; an unconfigured
+native trace can have instruction records without usable RAM PCs. The read-only
+host ledger records selected instructions, full register snapshots, physical
+field numbers, monotonic emulator cycle stamps and music variables. It adds no
+guest code and remains active across screenshot captures.
+
+The 20-field Origin window contains **4 publications**; the 20-field
+flight/credits window contains **6**. Full instruction traces and the ledger agree
+on every watched PC/register tuple and its physical field, including window
+edges. Both windows contain one game VBL entry per physical field, and each
+publication agrees with its helper return and COP2LC store. An independent GDB
+**SWAP_ONLY** run, with the host ledger disabled, gives the identical Origin
+pattern and game-clock interval: publications at relative fields 3, 8, 12, 17.
+
+Across the whole captured run, all 8,322 consecutive game-VBL intervals advance
+both the physical-field number and `D:7f02` by one. This confirms that counter's
+cadence in this run only. VBL entry has small interrupt latency: adjacent observed
+entry scanline differences can be 312/314 around the normal 313, so entry position
+is not treated as a perfect beam boundary. UAE uses 512 units per chip clock and
+`baseclock = 8 × CHIPSET_CLOCK`; the observed PAL baseclock is 28,375,160.
+
+The stock 020 multiplier is important: in the pinned emulator's `newcpu.cpp`,
+`CYCLE_UNIT * baseclock / cpu_frequency` uses 32-bit arithmetic. For the shared
+preset's numeric frequency, the product 14,528,081,920 overflows; this binary
+reports a CPU cycle unit of **115**. The core's stock 020 configuration in
+`cfgfile.cpp` uses multiplier 4, yielding **128** without that calculation.
+The phase 3 launcher applies this locally and checks the actual emulator log;
+all accepted ledger records also require 128. The shared installation is unchanged.
+Phase 2 remains an equivalence test under its recorded preset, not a calibrated
+CPU-speed baseline. Numeric-frequency matrix presets need separate validation
+before phase 4 measurements.
+
+Elapsed seconds below use cycle-stamp differences divided by 512 and 3,546,895,
+not host duration or an assumed exact 50 fields/s.
+
+### Per-scene observations
+
+Music position is `(cue16, order, row, tick)`, with active/stopped recorded in the
+machine-readable report. `D:4bbc` (file `3ec04`) is the cue counter incremented
+when the tracker row reaches a multiple of 16 (`E:28156–2815e`). Order is the byte
+at `D:519f` (file `3f1e7`), row the word at `D:51ac` (file `3f1f4`), tick the byte
+at `D:519e` (file `3f1e6`), and active the byte at `D:51a5` (file `3f1ed`).
+`E:27f36–27f48` advances the tick/row path; `E:281a8–281c6` advances/selects the
+order. These identify tracker state, not elapsed audio samples or an intended-rate
+estimate. Loading a new track resets its position.
+
+Fields are the physical-field difference between state entries. Seconds include
+loading/holds. F/P is the mean gap between consecutive publications **within** the
+scene, absent if fewer than two occur; it deliberately does not divide a long
+hold by an unrelated frame count. Full gap histograms and both music endpoints
+are retained by `intro_report.py`. The last row ends at menu ready.
+
+| Scene | Fields | Emulated s | Publications | F/P | Music at entry |
+|---|---:|---:|---:|---:|---|
+| reset | 601 | 12.038 | 0 | — | stopped |
+| game-startup | 72 | 1.455 | 4 | 5.333 | stopped |
+| origin-load | 39 | 0.776 | 5 | 5.000 | stopped |
+| origin-reveal | 60 | 1.197 | 1 | — | 0/0/0/0 |
+| origin-animation | 133 | 2.672 | 30 | 4.448 | 0/0/10/0 |
+| origin-expression | 265 | 5.300 | 21 | 4.450 | 2/0/32/1 |
+| origin-separation | 71 | 1.431 | 17 | 4.188 | 4/1/0/0 |
+| origin-flight | 506 | 10.127 | 42 | 3.878 | 4/1/0/71 |
+| origin-particles | 321 | 6.449 | 100 | 3.222 | 9/2/16/0 |
+| origin-fade | 226 | 4.513 | 6 | 5.200 | stopped |
+| title-load | 99 | 1.985 | 5 | 5.250 | stopped |
+| title-animation | 307 | 6.147 | 67 | 4.576 | 0/0/0/3 |
+| title-arrival | 225 | 4.505 | 50 | 4.531 | 3/0/51/4 |
+| title-departure | 150 | 3.019 | 31 | 4.733 | 5/1/25/1 |
+| credits-load | 11 | 0.223 | 0 | — | 7/2/26/3 |
+| credits-00 | 322 | 6.448 | 81 | 3.987 | 7/2/29/2 |
+| credits-01 | 322 | 6.442 | 74 | 4.342 | 12/4/14/0 |
+| credits-02 | 320 | 6.414 | 75 | 4.270 | 17/5/46/2 |
+| credits-03 | 323 | 6.469 | 74 | 4.356 | 22/7/20/4 |
+| credits-04 | 320 | 6.417 | 73 | 4.375 | 26/9/15/1 |
+| credits-05 | 322 | 6.436 | 73 | 4.403 | 31/10/47/1 |
+| credits-06 | 324 | 6.490 | 72 | 4.507 | 36/12/31/3 |
+| credits-07 | 323 | 6.485 | 72 | 4.493 | 41/14/15/3 |
+| credits-08 | 322 | 6.443 | 71 | 4.529 | 46/15/36/0 |
+| credits-09 | 320 | 6.415 | 71 | 4.500 | 49/17/1/1 |
+| credits-10 | 322 | 6.446 | 69 | 4.662 | 51/17/41/1 |
+| credits-11 | 322 | 6.457 | 73 | 4.417 | 54/18/17/3 |
+| credits-12 | 323 | 6.456 | 69 | 4.676 | 56/18/57/5 |
+| credits-13 | 320 | 6.424 | 71 | 4.500 | 59/19/34/0 |
+| credits-14 | 320 | 6.401 | 72 | 4.437 | 61/20/10/0 |
+| credits-15 | 320 | 6.403 | 72 | 4.437 | 64/20/50/0 |
+| credits-16 | 322 | 6.458 | 72 | 4.479 | 66/21/26/0 |
+| credits-17 | 321 | 6.431 | 75 | 4.284 | 70/23/6/1 |
+| cycle-complete | 50 | 0.999 | 8 | 4.714 | 74/24/22/2 |
+
+The complete reset-to-menu interval contains **1,696 publications in 178.771
+emulated seconds**. This is a description of this unmodified route, not a
+performance improvement, intended game rate, or machine-matrix baseline. Music
+coupling, presentation geometry, cache policy and all other phase 1 timing/display
+hypotheses remain open except for the scoped publication/VBL observations above.
+
+
+### Phase 3 gate
+
+Two independent fresh boots (`tmp/intro-pal-a/` and `tmp/intro-pal-b/`) give the
+same 31 screenshot milestones, every RGB pixel, and every allocated game-hunk
+byte at each checkpoint. All **13,594** observer records from reset through the
+first menu-ready instruction are identical, including clocks, registers and
+music positions. Per-scene reports match exactly. Emulator shutdown after the
+endpoint is outside this comparison; the menu screenshot is checked separately.
+
+Both boots' Origin and flight/credits traces agree with their ledgers. The
+independent `tmp/intro-pal-counter/` SWAP_ONLY run agrees with the Origin trace
+at game-clock entries 175…195. `tmp/phase3-gate.json` records the combined pass.
+Negative controls reject a missing publication, wrong field, changed pixel and
+changed game-hunk byte (`tmp/intro-negative.json`). The original slave digest is
+unchanged. No reconstructed slave change was needed.
+
+The phase 3 gate is complete. These are measurements of this observed original
+intro route, not a CPU performance profile or proof of intended timing. Phase 4,
+performance patches, the blitter route, German runtime and OCS remain deferred.

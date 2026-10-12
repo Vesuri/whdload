@@ -1,10 +1,10 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 3, the unskipped CD32 intro window and trusted frame counter.
-Runtime observation, instrument validation and repeated boots are authorised.
-Derived material stays in ignored `tmp/`. Stop at the phase 3 gate; do not start
-phase 4, performance patches or OCS analysis.
+Current scope: phases 1–3 complete; stopped at the phase 3 gate.
+The unskipped CD32 intro and publication counter are validated on the documented
+stock-clock 020 preset. Derived material stays in ignored `tmp/`. Do not start
+phase 4, further emulator runs, performance patches or OCS analysis until requested.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 
 ## Rules

@@ -271,3 +271,89 @@ Phase 2 gate complete: all four Custom5 cases pass at both endpoints; VERIFY
 off/on match the equal-size control and their markers are 0/1 respectively.
 The full retained matrix is `tmp/phase2-ab/`. Scope and code/file offsets are
 recorded in `internals.md`. Phase 3 is now separately authorised.
+
+## Phase 3: unskipped intro and frame counter
+
+Use the original English slave, `CUSTOM5=0`, and PAL A1200-fast with its stock
+020 multiplier (4).
+The phase 3 tools set `INTRO_STOCK_CLOCK=1`: the project launcher replaces numeric
+frequency with multiplier 4/frequency 0 in the shared preset result. It neither
+modifies shared files nor changes the phase 2 default. The pinned core overflows
+its numeric-frequency calculation (observed cycle unit 115); the stock setting
+yields 128. Both tools reject a boot whose emulator log does not confirm 128.
+Do not use duplicate `EXTRA_ARGS` CPU options: this core reparses even options
+that the frontend reports as ignored.
+
+The route plays the complete Origin animation, title animation and all 18
+flight/credits pages. The credits repeat indefinitely without input: after
+page 17 completes at `E:1fe48`, the harness waits for the next input poll, presses
+Escape, and releases it on menu entry. No earlier input is sent.
+
+Build a fresh local debugger with the read-only observer. Shared files and game
+bytes are unchanged. The added source input is pinned in `manifest/debugger.tsv`.
+The `trace-window-all` monitor command explicitly enables RAM instruction PCs;
+its acknowledgement is mandatory. The observer runs in the cycle-exact 68020
+interpreter and records selected PCs, registers, physical fields, emulator cycle
+stamps and game music state. It does not insert guest instructions or change
+registers, memory, clocks or inputs. Other CPU backends are not validated.
+
+From the project root, with new output names:
+
+```sh
+. amiga/env.sh
+python3 tools/build_debugger.py --intro-observer --output tmp/intro-debugger
+export FSUAE="$PWD/tmp/intro-debugger/fs-uae"
+INTRO_STOCK_CLOCK=1 python3 tools/boot_gate.py --calibrate --output tmp/intro-layout
+python3 tools/intro_counter.py --layout tmp/intro-layout/layout.json \
+  --output tmp/swap-only
+python3 tools/intro_capture.py --layout tmp/intro-layout/layout.json \
+  --output tmp/intro-one
+python3 tools/intro_capture.py --layout tmp/intro-layout/layout.json \
+  --output tmp/intro-two
+python3 tools/intro_check.py tmp/intro-one --repeat tmp/intro-two \
+  --counter tmp/swap-only > tmp/intro-check.json
+python3 tools/intro_report.py tmp/intro-one > tmp/intro-report.json
+python3 tools/intro_negative.py tmp/intro-one --output tmp/intro-negative \
+  > tmp/intro-negative.json
+```
+
+Run sequentially. Each tool stops its owned emulator even on failure. A missing
+checkpoint times out and cannot pass. The default full-trace windows are 20
+fields each, in Origin animation and the first flight/credits page. Keep
+`intro_counter.py --fields` and `intro_capture.py --trace-fields` equal when
+changing the validation window.
+
+`intro_counter.py` is the independent **SWAP_ONLY** arm: GDB observes the game
+VBL entry and publication entry with read-only breakpoints, using debugger-local
+variables only. The host observer is disabled for this run. `intro_check.py`
+requires the same game-clock interval and identical per-field publication counts
+as the full trace. It also compares all watched PCs/registers against the host
+ledger, with one constant physical-field offset and no missing edge events.
+
+The long-run ledger counts publications without stopping at each frame. Scene
+screenshots advance emulation normally while the ledger keeps recording, so those
+intervals are included. The title image is sampled at animation index 185, not at
+a wall-clock delay. All 18 credits pages are checked against the game's page
+index. Each screenshot retains its full one-field trace (20 fields at validation
+points) and fast-RAM snapshot. The repeat gate compares every ledger row from
+reset through the first menu-ready instruction, every RGB pixel at all milestones
+and all 291,288 allocated game-hunk bytes per snapshot. Debugger-disconnect and
+shutdown events are outside that window; the separate menu screenshot is still
+checked exactly.
+
+`intro_report.py` rejects broken entry/store/return accounting, missing VBLs,
+nonmonotonic timestamps and unexpected video clocks. It reports each scene's
+physical-field span, emulated seconds, publication count, within-scene field-gap
+histogram, other copper writes and tracker position at both cuts. Seconds use
+UAE's cycle stamps and clock conversion, not host time or an assumed exact 50 Hz.
+Loading and holds are included in scene duration; the gap mean uses consecutive
+publications inside that scene and is absent with fewer than two publications.
+Palette-only changes are not buffer publications.
+
+`intro_negative.py` requires rejection after removing a publication event, moving
+one to the wrong field, changing one screenshot pixel, or changing one allocated
+game-hunk byte. It writes damaged fixture copies only below its new `tmp/` output.
+
+All captures, generated observer configuration, input logs, register records and
+reports stay in `tmp/`. Retained phase 3 evidence uses `tmp/intro-pal-a/`,
+`tmp/intro-pal-b/`, and `tmp/intro-pal-counter/`. Phase 4 profiling is a separate gate.
