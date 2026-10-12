@@ -1192,7 +1192,7 @@ The first completed consolidation and negative reports use the `-01` and
 `phase4-instrument-negative` output directories recorded in the internals.
 
 The representative cost figures use the existing leaf reports documented above;
-no fresh boot is required. To inspect the failed 040 beam check and its original
+no fresh boot is required. To check the 040 beam capture with its explicit endpoint model and inspect its original
 samples:
 
 ```sh
@@ -1201,8 +1201,21 @@ python3 tools/matrix_irq_beam_check.py \
 cat tmp/phase4-irq-beam-matrix/040-default/beam/irq-beam.json
 ```
 
-The first command intentionally fails the strict duration check. Match the nine
+The reviewed 040/060 build permits one extra colour clock of debugger endpoint
+skew, reported separately from beam quantisation. Other builds require source
+review before using that model. Match the nine
 samples in order to callback entries after scene 15 in `irq-events.txt`, as the
 checker does; subtract entry from return clocks and compare with the decoded
 beam interval times 512. Do not treat a diagnostic residual census as acceptance
 or increase the tolerance solely to make the fixture pass.
+
+To reproduce the 040 control comparison and corruption checks without a boot:
+
+```sh
+python3 tools/matrix_irq_beam_check.py \
+  tmp/phase4-irq-beam-matrix/040-default/beam \
+  --control tmp/phase4-irq-retry/040-default/irq
+python3 tools/matrix_irq_beam_negative.py \
+  tmp/phase4-irq-beam-matrix/040-default/beam \
+  --output tmp/phase4-040-beam-boundary-negative-02
+```

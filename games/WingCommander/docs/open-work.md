@@ -19,9 +19,9 @@ Consolidated instrument checks pass on 020 default/NoCache and 030 MMU
 default/NoCache: exact idle and DMA neutrality, raw-source recomputation, callback
 neutrality and independent beam calibration. This validates only DMA slots,
 stopped-CPU idle and three callback elapsed scopes. It does not validate general
-routine self/inclusive time or interrupt entry/dispatch. A 040 default beam check
-and a 060 default callback-neutrality check failed; those measurements remain
-unaccepted. Remaining acquisitions already in flight are not proof of completion.
+routine self/inclusive time or interrupt entry/dispatch. The 040 default beam check passes with the reviewed debugger-boundary
+allowance. The 060 default and NoCache callback-neutrality checks failed and
+remain unaccepted. Remaining acquisitions already in flight are not proof of completion.
 
 The immediate work is to consolidate existing evidence and use short,
 representative profiles for unresolved costs that affect the next engineering

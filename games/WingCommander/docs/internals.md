@@ -1756,12 +1756,11 @@ a pending row is not evidence that a subsequently completed capture passes.
 Negative fixtures reject stale debugger hashes, CACR and options and preserve
 missing captures as pending (`tmp/phase4-instrument-negative/result.json`).
 
-Two later acquisitions have explicit failures: the 040 default beam duration
-check disagrees at colour-clock resolution; the 060 default callback on/off
+The 040 default beam duration check needs the explicit endpoint model below.
+The 060 default callback on/off
 ledgers differ at record 2327 despite both containing 6739 records. Evidence is
 retained in `tmp/phase4-irq-beam-matrix/040-default/` and
-`tmp/phase4-irq-retry/060-default/`. Neither is an accepted timing result. No
-cause is established yet. These failures do not invalidate the four independently
+`tmp/phase4-irq-retry/060-default/`. The 060 discrepancy remains unaccepted and unexplained. It does not invalidate the four independently
 accepted cells, and must not be hidden by aggregate matrix completion flags.
 
 The outstanding general routine attribution problem concerns interrupt/task
@@ -1793,7 +1792,19 @@ Inspection of the existing 040 default beam samples narrows its failed check:
 all three music and all three joypad samples have zero residual. Only the three
 short game-VBL samples differ, by -512, +512 and -512 emulator units (one colour
 clock). Their observer durations are respectively 1024, 1536 and 1024 units;
-the independent beam intervals are 3, 2 and 3 colour clocks. This identifies a
-small endpoint discrepancy, not its cause. The strict check remains failed;
-its tolerance has not been widened to accept these data. No new capture was
-needed for this diagnosis.
+the independent beam intervals are 3, 2 and 3 colour clocks. The pinned emulator source explains a possible endpoint skew: `m68k_run_3ce`
+calls `do_specialties` (which services debugger stops) before the cached-access
+workaround may advance one `CYCLE_UNIT`. The next callback observation occurs
+after that adjustment. Each debugger endpoint can therefore precede its ledger
+endpoint by zero or 512 units. The difference of the two endpoint adjustments
+is between -512 and +512, in addition to beam quantisation below 512 units.
+
+The checker applies a strict residual bound below 1024 units only to 040/060
+captures from the reviewed debugger digest `c30ad609…`. It reports the extra
+512-unit endpoint uncertainty separately; the 020/030 bound stays below 512.
+This is bounded agreement, not exact endpoint equality. The existing 040 default
+capture passes, and its complete callback intervals, event ledger, raw sources,
+final hunks and pixels match the uninterrupted control. Evidence:
+`tmp/phase4-040-beam-boundary-check.json`. Corrupted beam (+4 clocks), stack and
+callback-order fixtures still fail (`tmp/phase4-040-beam-boundary-negative/`).
+No new emulator capture was needed.

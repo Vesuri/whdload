@@ -28,6 +28,16 @@ def check(run):
     meta = json.loads((run/'result.json').read_text())
     if not meta.get('irq_beam') or not meta.get('diagnostic_stops'):
         raise ValueError('explicit diagnostic beam capture required')
+    # In this pinned build, m68k_run_3ce services debugger stops inside
+    # do_specialties, then may advance one CYCLE_UNIT for cached instructions
+    # before the next wc_matrix_observe. Each beam endpoint can therefore
+    # precede its ledger endpoint by 0 or 512 units. This is separate from
+    # beam quantisation; do not infer it from the observed residual.
+    endpoint_skew = 0
+    if meta['machine'] in ('a1200-040', 'a1200-060'):
+        if meta['emulator_sha256'] != 'c30ad609dc1141b47d3b9cfbf7d5a86666445fee7985907beef60b095679d940':
+            raise ValueError('unreviewed 040/060 debugger endpoint ordering')
+        endpoint_skew = 512
     samples = json.loads((run/'irq-beam.json').read_text())
     if [sample['kind'] for sample in samples] != [0]*3+[1]*3+[2]*3:
         raise ValueError('expected three consecutive observations of each callback')
@@ -68,15 +78,16 @@ def check(run):
             raise ValueError('field geometry changed without a beam wrap')
         clocks = stop-start if stop >= start else length-start+stop
         residual = elapsed-clocks*512
-        if abs(residual) >= 512:
-            raise ValueError('callback duration disagrees with beam at colour-clock resolution')
+        if abs(residual) >= 512 + endpoint_skew:
+            raise ValueError('callback duration exceeds beam quantisation and endpoint-skew bounds')
         rows.append(dict(callback=NAMES[kind],serial=entry['serial'],elapsed_units=elapsed,
                          beam_clocks=clocks,residual_units=residual))
         after = finish
         last_serial = entry['serial']
     return dict(independent_beam_duration_pass=True, calls=len(rows),rows=rows,
                 maximum_absolute_residual_units=max(abs(r['residual_units']) for r in rows),
-                resolution_units=512,
+                resolution_units=512, debugger_endpoint_skew_units=endpoint_skew,
+                residual_bound_exclusive_units=512+endpoint_skew,
                 scope='Nine complete callbacks at credits entry; inclusive emulated elapsed time.')
 
 

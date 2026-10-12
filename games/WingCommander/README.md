@@ -8,8 +8,9 @@ The CPU/cache scene baseline and matched c2p, instant-blitter and scoped
 bitmap-drawing ceilings are recorded. Consolidated checks validate DMA slots,
 stopped-CPU idle and three VBL callback scopes on both 020 cache states and both
 030 MMU cache states. These are scoped measurements, not complete CPU accounting.
-General routine attribution remains unresolved; the 040 callback beam check and
-060 default callback neutrality check have failed and are not accepted evidence.
+General routine attribution remains unresolved. The 040 callback beam check
+passes with an explicit debugger-boundary allowance; 060 callback neutrality
+remains unaccepted.
 Work now prioritises consolidation and representative profiles over further
 full-matrix instrument development. Phase 5 remains unauthorised.
 Phase 3 completed the reproducible intro and publication counter.
