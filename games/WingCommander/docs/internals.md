@@ -1745,12 +1745,20 @@ selected callbacks.
 
 ### Consolidated instrument evidence and limits
 
-`tmp/phase4-instrument-accept-01/` rechecks existing captures without emulator
-runs. It validates 020 default, 020 NoCache, 030 MMU default and 030 MMU NoCache.
-For each accepted cell it matches the effective cache/core audit and debugger
-hash, recomputes raw-source changes, checks isolated idle/DMA/callback controls,
-and compares the beam diagnostic with its uninterrupted callback control. The
-DMA and callback bare runs also have identical complete event ledgers.
+Completed rechecks use existing captures without emulator runs:
+
+| Report | Cells accepted for the stated scope |
+|---|---|
+| `tmp/phase4-instrument-accept-01/` | 020 default, 020 NoCache, 030 MMU default, 030 MMU NoCache |
+| `tmp/phase4-instrument-accept-02/` | 030 NoMMU NoCache, 040 default |
+
+For each accepted cell the checker matches the effective cache/core audit and
+debugger hash, recomputes raw-source changes, checks isolated idle/DMA/callback
+controls, and compares the beam diagnostic with its uninterrupted callback
+control. The DMA and callback bare runs also have identical complete event
+ledgers. The second report rejects 030 NoMMU default because the diagnostic
+publication/census ledger differs from its uninterrupted control. Its other
+individual instrument checks do not override that failed comparison.
 
 Acceptance covers DMA slot ownership, stopped-CPU idle and the three selected
 VBL callbacks only. Missing runs remain pending. The summary is a snapshot;
@@ -1762,7 +1770,7 @@ The 040 default beam duration check needs the explicit endpoint model below.
 The 060 default callback on/off
 ledgers differ at record 2327 despite both containing 6739 records. Evidence is
 retained in `tmp/phase4-irq-beam-matrix/040-default/` and
-`tmp/phase4-irq-retry/060-default/`. The 060 discrepancy remains unaccepted and unexplained. It does not invalidate the four independently
+`tmp/phase4-irq-retry/060-default/`. The 060 discrepancy remains unaccepted and unexplained. It does not invalidate the independently
 accepted cells, and must not be hidden by aggregate matrix completion flags.
 
 The outstanding general routine attribution problem concerns interrupt/task
@@ -1865,3 +1873,11 @@ those two mechanisms as direct consumers in these windows, while leaving busy
 waits and system work unclassified. The limited callback share and large measured
 020 converter cost support investigating software rendering first. Bus averages
 alone do not establish whether individual CPU accesses suffer contention.
+
+The completed beam-only rechecks for 040 DCache and all three 060 cache states
+pass the source-derived endpoint bound (maximum residual 512 units). Their
+`endpoint-check.json` reports remain under `tmp/phase4-irq-beam-matrix/`.
+040 DCache and 060 NoCache also match their uninterrupted callback controls in
+full. The 060 default diagnostic ledger differs; the 060 DCache control is still
+in flight. These are individual checks, not additional consolidated cell passes;
+in particular, 060 NoCache still fails bare/IRQ exact recorder neutrality.

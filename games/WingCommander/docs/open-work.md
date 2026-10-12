@@ -15,8 +15,8 @@ Phase 5 is not authorised. The CPU/cache scene baseline, source-change census,
 cache audits and matched c2p, instant-blitter and scoped bitmap-drawing ceilings
 are recorded. Blanket clear bypass is invalid and excluded.
 
-Consolidated instrument checks pass on 020 default/NoCache and 030 MMU
-default/NoCache: exact idle and DMA neutrality, raw-source recomputation, callback
+Consolidated instrument checks pass on 020 default/NoCache, 030 MMU
+default/NoCache, 030 NoMMU NoCache and 040 default: exact idle and DMA neutrality, raw-source recomputation, callback
 neutrality and independent beam calibration. This validates only DMA slots,
 stopped-CPU idle and three callback elapsed scopes. It does not validate general
 routine self/inclusive time or interrupt entry/dispatch. The 040 default beam check passes with the reviewed debugger-boundary
