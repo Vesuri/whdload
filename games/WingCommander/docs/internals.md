@@ -1740,3 +1740,32 @@ callback controls before acceptance. The diagnostic breakpoint flag remains set;
 these runs do not replace uninterrupted FPS baselines. Measured intervals include
 callees and preemption, and still exclude interrupt entry/dispatch outside the
 selected callbacks.
+
+### Consolidated instrument evidence and limits
+
+`tmp/phase4-instrument-accept-01/` rechecks existing captures without emulator
+runs. It validates 020 default, 020 NoCache, 030 MMU default and 030 MMU NoCache.
+For each accepted cell it matches the effective cache/core audit and debugger
+hash, recomputes raw-source changes, checks isolated idle/DMA/callback controls,
+and compares the beam diagnostic with its uninterrupted callback control. The
+DMA and callback bare runs also have identical complete event ledgers.
+
+Acceptance covers DMA slot ownership, stopped-CPU idle and the three selected
+VBL callbacks only. Missing runs remain pending. The summary is a snapshot;
+a pending row is not evidence that a subsequently completed capture passes.
+Negative fixtures reject stale debugger hashes, CACR and options and preserve
+missing captures as pending (`tmp/phase4-instrument-negative/result.json`).
+
+Two later acquisitions have explicit failures: the 040 default beam duration
+check disagrees at colour-clock resolution; the 060 default callback on/off
+ledgers differ at record 2327 despite both containing 6739 records. Evidence is
+retained in `tmp/phase4-irq-beam-matrix/040-default/` and
+`tmp/phase4-irq-retry/060-default/`. Neither is an accepted timing result. No
+cause is established yet. These failures do not invalidate the four independently
+accepted cells, and must not be hidden by aggregate matrix completion flags.
+
+The outstanding general routine attribution problem concerns interrupt/task
+stack transitions and synthetic returns. Callback elapsed times include callees
+and preemption and cannot stand in for routine self times or complete interrupt
+cost. Further diagnosis should use a short representative window before any
+additional matrix acquisition.

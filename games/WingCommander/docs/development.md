@@ -1161,3 +1161,32 @@ calibrated 020 default cell. For each completed cell, rerun
 `matrix_irq_beam_check.py CELL/beam --control MATCHING_IRQ_CONTROL` to require
 identical callback intervals, full publication/census ledger, raw source buffers,
 game hunks and menu pixels. Beam agreement alone does not satisfy that control.
+
+### Consolidate existing instrument captures without rerunning the emulator
+
+`tools/matrix_instrument_accept.py` takes a JSON array of cell mappings and
+writes a fresh report directory under `tmp/`. Each mapping names a reference
+`result.json`, six capture directories (`dma_bare`, `idle`, `dma`, `irq_bare`,
+`irq`, `beam`) and three audit `result.json` files (`dma_audit`, `irq_audit`,
+`beam_audit`), plus a simple unique `name`. Paths are repository-relative.
+The saved manifest in the report directory preserves the exact inputs.
+
+With the existing capture manifest:
+
+```sh
+python3 tools/matrix_instrument_accept.py \
+  --manifest tmp/phase4-instrument-manifest.json \
+  --output tmp/phase4-instrument-accept-02
+python3 tools/matrix_instrument_negative.py \
+  --manifest tmp/phase4-instrument-manifest.json \
+  --output tmp/phase4-instrument-negative-02
+```
+
+Use fresh output names. This recomputes every raw source buffer and can take
+several minutes; do not repeat it when inputs are unchanged. No emulator is
+launched. `validated` means only the stated DMA/idle/callback scope, not the
+phase 4 gate. Missing captures produce `pending`; rejected evidence produces
+`invalid` and a nonzero exit. A zero exit alone does not mean all cells passed:
+inspect `summary.json`. The negative check requires a complete first cell.
+The first completed consolidation and negative reports use the `-01` and
+`phase4-instrument-negative` output directories recorded in the internals.

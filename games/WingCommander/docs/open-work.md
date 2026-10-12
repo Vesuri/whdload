@@ -11,27 +11,23 @@ The unskipped intro has 31 identical milestone captures across two fresh boots.
 The publication ledger, full traces and independent SWAP_ONLY check agree. The
 stock 020 multiplier is verified; numeric-frequency presets require calibration.
 **Phase 4 is authorised and in progress; its complete accounting gate remains open.**
-Its full-matrix gate remains unchanged; phase 5 is not authorised.
-Fifteen cache audits and five functional/instrumentation preflights are complete.
-Both effective 020 cache states pass isolated profiler-on/off controls. Full
-source-change recomputation and verified leaf converter/limiter costs are recorded.
-Corrected NOMMU-core scene captures cover all distinct accelerated cache states.
-Numeric-clock scaling matches the stock 020 reference, with documented integer
-quantisation. The 030 default passes profiler neutrality; its DMA capture passes
-independent accounting checks with a quantified timing effect. The same-core 030
-MMU pair is captured with translation-state readback. Matched c2p, instant-blitter
-and scoped bitmap-drawing ceilings are recorded. Blanket clear bypass fails and
-is excluded; broader drawing bounds must preserve pixel-readback dependencies.
-CPU STOP accounting passes the 020 control and independent instruction-count
-check. Both 020 cache states and 030 MMU default pass exact idle neutrality.
-The original DMA recorder changes publication counts and state on both 020
-states. Preserving CIA wait stepping passes exact DMA neutrality and slot checks
-on both and on the default 030 MMU-enabled/disabled pair. Remaining accelerated
-controls with the corrected recorder are in progress. The three game VBL callback
-scopes pass exact neutrality, independent entry counts and a five-field duration
-trace check on 020; matching controls for the remaining cells are running.
-Full-matrix DMA/idle/source-census captures are in progress; general
-return attribution and remaining instrument validation are incomplete. The matrix gate has not passed.
+Phase 5 is not authorised. The CPU/cache scene baseline, source-change census,
+cache audits and matched c2p, instant-blitter and scoped bitmap-drawing ceilings
+are recorded. Blanket clear bypass is invalid and excluded.
+
+Consolidated instrument checks pass on 020 default/NoCache and 030 MMU
+default/NoCache: exact idle and DMA neutrality, raw-source recomputation, callback
+neutrality and independent beam calibration. This validates only DMA slots,
+stopped-CPU idle and three callback elapsed scopes. It does not validate general
+routine self/inclusive time or interrupt entry/dispatch. A 040 default beam check
+and a 060 default callback-neutrality check failed; those measurements remain
+unaccepted. Remaining acquisitions already in flight are not proof of completion.
+
+The immediate work is to consolidate existing evidence and use short,
+representative profiles for unresolved costs that affect the next engineering
+decision. Do not expand or repeat the full matrix while developing instruments.
+The exhaustive accounting requirement below remains unfulfilled; this change in
+working approach does not declare that gate passed.
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.

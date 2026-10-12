@@ -4,18 +4,14 @@ Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
 **Phase 4 is in progress; the full-matrix gate has not passed.**
-Cache audits, corrected-clock NOMMU scene figures and scoped 020/030 costs are
-recorded. Both 020 cache states and the 030 default pass profiler-neutrality
-controls. DMA accounting has an independently checked 030 capture with a measured
-small timing effect. The CPU/cache scene matrix is captured and the matched c2p
-and instant-blitter ceilings are recorded, along with a scoped bitmap-drawing
-ceiling. Blanket clear bypass is invalid. CPU STOP accounting passes a neutral
-020 control and independent instruction-count check; full-matrix accounting
-captures are running. Preserving CIA wait stepping makes DMA recording exactly
-neutral on both 020 cache states and the default 030 MMU pair. The three game
-VBL callback scopes have validated 020 durations; remaining matrix controls are
-running. General routine/interrupt costs and remaining validation
-are still open.
+The CPU/cache scene baseline and matched c2p, instant-blitter and scoped
+bitmap-drawing ceilings are recorded. Consolidated checks validate DMA slots,
+stopped-CPU idle and three VBL callback scopes on both 020 cache states and both
+030 MMU cache states. These are scoped measurements, not complete CPU accounting.
+General routine attribution remains unresolved; the 040 callback beam check and
+060 default callback neutrality check have failed and are not accepted evidence.
+Work now prioritises consolidation and representative profiles over further
+full-matrix instrument development. Phase 5 remains unauthorised.
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the
 reset-to-menu event ledger. Full traces and independent SWAP_ONLY counts agree.
