@@ -1808,3 +1808,28 @@ final hunks and pixels match the uninterrupted control. Evidence:
 `tmp/phase4-040-beam-boundary-check.json`. Corrupted beam (+4 clocks), stack and
 callback-order fixtures still fail (`tmp/phase4-040-beam-boundary-negative/`).
 No new emulator capture was needed.
+
+### Bounded 060 callback-recording differences
+
+The existing bare/IRQ pairs in `tmp/phase4-irq-retry/` have identical scene
+boundary times, scene publication counts and scene field counts on both 060
+default and 060 NoCache. Every event payload apart from its clock/field matches;
+all raw source bytes, four final allocated game hunks and menu pixels match.
+
+| Cache option | Changed event clocks | Largest absolute clock difference | Changed event fields |
+|---|---:|---:|---:|
+| default | 29 of 6,739 | 0.729370 ms | one event, one field |
+| NoCache | 8 of 6,739 | 0.235981 ms | none |
+
+Evidence: `tmp/phase4-060-default-irq-effect.json` and
+`tmp/phase4-060-nocache-irq-effect.json`. These comparisons bound differences in
+this recorded route; they do not identify their cause, prove callback-duration
+accuracy or establish a universal error bound. Exact neutrality still fails.
+The already measured scene-level rates and durations agree across these pairs;
+the local discrepancies must not be hidden by that aggregate agreement.
+
+The effect reporter now supports isolated callback recording as well as DMA.
+It compares event payloads before pairing timing differences, so frame/census
+changes cannot be mistaken for clock-only changes. Its original DMA path still
+reports exact equality on the corrected 020 default pair
+(`tmp/phase4-dma-effect-regression.json`).

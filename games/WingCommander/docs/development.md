@@ -1219,3 +1219,20 @@ python3 tools/matrix_irq_beam_negative.py \
   tmp/phase4-irq-beam-matrix/040-default/beam \
   --output tmp/phase4-040-beam-boundary-negative-02
 ```
+
+Quantify the existing 060 callback-recorder differences without another capture:
+
+```sh
+python3 tools/matrix_dma_effect.py \
+  tmp/phase4-irq-retry/060-default/bare \
+  tmp/phase4-irq-retry/060-default/irq --feature irq_scopes \
+  > tmp/phase4-060-default-irq-effect.json
+python3 tools/matrix_dma_effect.py \
+  tmp/phase4-irq-retry/060-nocache/bare \
+  tmp/phase4-irq-retry/060-nocache/irq --feature irq_scopes \
+  > tmp/phase4-060-nocache-irq-effect.json
+```
+
+The default feature remains DMA for existing commands. Configuration checks
+require only the selected recording feature to change. Effect reports describe
+observed differences and do not override failed exact-neutrality checks.
