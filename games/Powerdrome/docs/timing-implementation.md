@@ -1,6 +1,6 @@
 # Timing implementation and validation
 
-Project status: Phases A–D and E1 are complete. Phase E2 stopped at the steady A500 handling gate; Phase E remains incomplete.
+Project status: Phases A–D and E1 are complete. Phase E2 is stopped at the natural-weather gate; steady A500 handling is deferred by the user.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Phase A of the [completion plan](completion-plan.md) is complete. `TIMING_FULL=1`
@@ -24,6 +24,18 @@ The retained record padding keeps binary layout unchanged; reserved weather soun
 fields stay zero. Sound delivery is direct at logical generation, with no deferred path.
 Current weather readers require that implementation rather than accepting obsolete dumps.
 No emulator captures were run for Phase A.
+
+The current Phase E candidate also makes opponent repair start/expiry at
+`$d4b6/$d4fe` read the continuous opponent deadline while scheduled ownership is
+active. Both ends use the same unpaused domain across drawing, pits and lap resets;
+outside ownership they retain the native clock. The former resampled native/VBL
+offset changed a repair threshold by 40 ms between render configurations, causing
+an RNG divergence at 287,040 ms in the endurance pair. The two-byte correction
+passes the focused four-opponent/RNG boundary comparison and the corrected
+600-second pair: 30,001 common world/RNG states and 6,666 control/input/fuel
+updates match exactly, with zero endpoint debt. Natural-weather validation is
+stopped after a ten-minute retry without a weather episode; expiry and restoration
+remain untested. Normal output is unchanged. See the [current evidence](open-work.md#endurance-accounting-and-equivalence-finding).
 
 ## A500 calibration
 
@@ -1118,7 +1130,8 @@ the endpoint, while M5 applies all 15 owed events and reaches zero after the
 field-150 measurement cutoff. Fuel is inconclusive at 72–74 versus 63–65 units
 (7–11 units difference, 7.3 allowed). The first native attempt had rejected an
 incorrect early-diagnostic setting; the unsuccessful retry triggers the plan's
-stop rule. See [the current finding](open-work.md#handling-blocker-and-resume-boundary).
+stop rule. The user subsequently deferred handling and authorized the remaining
+Phase E gates. See [the current finding](open-work.md#deferred-handling-findings).
 Do not substitute the older passing reference without resolving the route/build
 assumptions or count missing thresholds as a pass.
 

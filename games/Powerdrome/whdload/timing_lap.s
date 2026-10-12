@@ -1,5 +1,5 @@
 ; Opponent lap timestamps use a stable setup epoch plus elapsed logical time.
-; Physical/native epoch resampling remains separate for repair/result callers.
+; Opponent repairs use their continuous deadline; native diagnostic sampling is separate.
 timing_lap_initialize
  move.l a0,-(sp)
  lea timing_lap_state(pc),a0

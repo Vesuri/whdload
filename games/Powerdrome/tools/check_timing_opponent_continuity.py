@@ -22,6 +22,26 @@ def check(root, flight_only=False, stable_lap_domain=False, repair_only=False):
         cfg = json.loads((root / "configuration.json").read_text())
         assert re.search(r"\bCUSTOM5=13\b", cfg["WHD_ARGS"])
         assert int(cfg["ANCHOR"], 0) == 0x148d0
+    # Resolve the live repair wrappers. Older captures used a sampled native
+    # offset (record +36); current builds use the continuous deadline (+20).
+    # Require both start and expiry to read the same domain, in both snapshots.
+    game = int((root/'game-base.txt').read_text(), 0)
+    base = int((root/'dump-base.txt').read_text(), 0)
+    repair_domains = []
+    for prefix in ('', 'final-'):
+        chip = (root/(prefix+'chip.bin')).read_bytes()
+        code = (root/(prefix+'code.bin')).read_bytes()
+        for offset, opcode in ((0xd4b6, b'\x2e\x28'), (0xd4fe, b'\x20\x28')):
+            assert chip[game+offset:game+offset+2] == bytes.fromhex('4eb9')
+            entry = struct.unpack_from('>I', chip, game+offset+2)[0]-base
+            assert 0 <= entry < len(code)-24
+            body = code[entry:entry+24]
+            matches = [domain for domain in (20, 36)
+                       if opcode+struct.pack('>H', domain) in body]
+            assert len(matches) == 1, 'Unknown opponent repair clock wrapper'
+            repair_domains.extend(matches)
+    assert len(set(repair_domains)) == 1, 'Repair start/expiry clock domains differ'
+    repair_deadlines = repair_domains[0] == 20
     lap_epoch = None
     if stable_lap_domain:
         game = int((root / "game-base.txt").read_text(), 0)
@@ -98,7 +118,7 @@ def check(root, flight_only=False, stable_lap_domain=False, repair_only=False):
             register = {0xd4bc: 20, 0xd504: 19, 0xd7fe: 20,
                         0xd83c: 20, 0xd86c: 20}.get(off)
             if register is not None:
-                expected = t[9]
+                expected = t[5] if repair_deadlines and off in (0xd4bc, 0xd504) else t[9]
                 if lap_epoch is not None and off in (0xd7fe, 0xd83c, 0xd86c):
                     expected = (lap_epoch+t[5]-origin+18) & 0xffffffff
                 assert t[register] == expected, f'Incorrect logical clock at {off:#x}'
@@ -158,7 +178,7 @@ if __name__ == '__main__':
     parser.add_argument('--flight-only', action='store_true',
                         help='Check the bounded 300-field CUSTOM5=8 pause route without requiring a pit')
     parser.add_argument("--stable-lap-domain", action="store_true",
-                        help="Check lap reads against the retained logical epoch; repair reads retain sampled mapping")
+                        help="Check lap reads against the retained logical epoch; repair domain follows the installed wrappers")
     parser.add_argument("--repair-only", action="store_true",
                         help="Check the full CUSTOM5=13 repair window without requiring rescue or flight")
     args = parser.parse_args()

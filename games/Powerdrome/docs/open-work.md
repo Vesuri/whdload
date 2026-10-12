@@ -2,11 +2,14 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
-## Phase E stopped: steady A500 handling gate
+## Phase E stopped: natural-weather evidence missing
 
 D1–D5 are confirmed. Phases A–D and E1 are complete. E2 passed CPU equivalence
-and elapsed accounting, then stopped after two unsuccessful handling-gate attempts
-as the completion plan requires. Phase E is incomplete. E1 accepts the specified native
+and elapsed accounting. The user has deferred the steady A500 handling gate and
+authorized continuing the remaining E2 gates. Those gates are complete except natural
+weather: its second attempt completes the ten-minute window without a weather episode.
+The two-attempt stop rule now applies. Deferred or unobserved checks are not passes;
+Phase E is incomplete. E1 accepts the specified native
 brake/impulse/visibility histories and classifies opponent `$54` as presentation-owned;
 no cadence, tolerance or game code changed. Evidence is under `tmp/phase-e/`.
 `CUSTOM5=14` is the existing initialized-lap pause fixture; natural finish uses the
@@ -18,9 +21,14 @@ separate ten-lap route and checker. Phase F and release defaults remain untouche
 | --- | --- |
 | E1 policy | Complete; fixed 20/90 ms policy and original tolerances retained |
 | Cross-CPU equivalence and accounting | Pass: six M4–M7 captures, 501 exact common world states and 111 control/input/fuel updates |
-| Steady A500 handling | Not passed: no native stop threshold; fuel inconclusive; acceleration to 130 passes; straight-line speed not evaluated |
-| Lifecycle, stalls, render cadence, endurance, visible/natural weather | Not yet run for Phase E |
-| E3 optional title demo | Not started |
+| Steady A500 handling | Deferred by the user; not passed: no native stop threshold; fuel inconclusive; acceleration to 130 passes; straight-line speed not evaluated |
+| Lifecycle | Pass: pause, restart, initialized-lap pause, rescue and natural ten-lap finish |
+| Stalls | Pass: 100/260/500 ms observed holds; exact recovered state and zero endpoint retained debt |
+| Render cadence | Pass: ten requested-rate/unpaced captures, 651 exact common world states and 144 control/input/fuel updates |
+| Endurance | Pass: corrected 600-second pair matches 30,001 common world/RNG states and 6,666 control/input/fuel updates; zero endpoint debt |
+| Visible weather | Pass: directed fade/memory checks and three visible logical phases on the startup-only Practice retry |
+| Natural weather race | Stopped after two attempts: setup failure, then a complete ten-minute capture with no natural weather episode; expiry/restoration untested |
+| E3 optional title demo | Evaluated, not selected: recorded camera remains frame-driven; no M7 duration pass claimed |
 
 Equivalence evidence: `tmp/phase-e/equivalence/`, `equivalence-020-fast/` and
 `equivalence-060-fast-retry/`. All six physical windows cover 500 PAL fields.
@@ -36,7 +44,181 @@ in the first field's weather-state read and the strict field counter rejected
 0/100 fields. Its single fresh-boot retry passed, as did the subsequent
 six-way comparisons. Preserve the invalid evidence; do not count it as a pass.
 
-### Handling blocker and resume boundary
+### Current lifecycle evidence
+
+`tmp/phase-e/pause-030/` excludes 48 paused fields, consumes all five input events,
+and preserves the logical remainder without resumed throttle leakage. It passes
+75 completed renderer twins. `restart-030/` observes two explicit closures and two
+fresh gameplay entries, with six inactive menu/pit probes and exact discard accounting.
+`lap-pause-030/` excludes 49 fields and checks 72 exact logical HUD outputs, including
+28 after resume, with unchanged private/native lap starts and no reset fallback.
+`rescue-030/` covers one 77,040 ms pit visit: four interrupted assigned steps are
+explicitly discarded, 3,444 inactive pit observations preserve player ownership,
+and reentry assigns one 20 ms step with no retained debt (120 ms outside-pit allowance).
+All 281 completed renderer twins pass.
+`natural-finish-030/` reaches a natural opponent-3 victory on lap 10. Reported
+and stable logical winning duration both equal 225,620 ms, with preserved native
+pilot sorting, registers/stack/flags and cleared result-clock ownership. Its
+result-only 200-field window adds no staged scenes; the pre-result counter records
+2,489 completed clean twins from the same boot.
+
+### Stall evidence
+
+`unpaced-030/` and `stall-100-030/`, `stall-250-030/`, `stall-500-030/` under
+`tmp/phase-e/` cover 650 fields each. The requested 250 ms hold rounds to 260 ms
+on PAL; the others measure exactly 100/500 ms. All world clocks hold and resume
+at the same logical cursor, with every elapsed step serviced afterward. The four
+captures match 653 common player/engine/RNG states and 145 control/input/fuel
+updates. Peak sampled world-end delay is 180/320/560 ms for the three stalls;
+retained debt is zero throughout these sampled ends and at every endpoint.
+All renderer checks pass. These measurements include verifier overhead.
+
+### Render-cadence evidence
+
+The four requested rates plus unpaced run on both M5 and M7, all with renderer
+twins and 650 PAL fields. `tmp/phase-e/rate-*-030/`, `rate-*-060/` and
+`unpaced-030/`, `unpaced-060/` match 651 common player/engine/RNG states and
+144 control/input/fuel updates. All per-run rational pacing, elapsed accounting,
+input, integrator and renderer checks pass.
+
+| Requested Hz | M5 measured presentation markers/s | M7 measured presentation markers/s |
+| --- | ---: | ---: |
+| 10 | 9.753 | 9.888 |
+| 15 | 12.472 | 13.205 |
+| 25 | 12.472 | 13.708 |
+| 50 | 12.472 | 13.708 |
+
+These are instrumented correctness rates with late-deadline accounting, not
+release throughput or evidence of achieved 25/50 Hz scanout. The 25/50 Hz cases
+have no pacing wait. Retained allocator debt is zero at all endpoints; unfinished
+steps and presentation waits are explicitly accounted for by the existing checkers.
+
+### Endurance accounting and equivalence finding
+
+`tmp/phase-e/endurance-native-030/` completes 30,000 physical PAL fields
+(600,000 nominal ms). All per-run checks pass: 30,002 consecutive 20 ms steps,
+6,667 rational 90 ms controls and fuel updates, and 25,167 opponent reads.
+Retained debt is zero at every sampled world end and both endpoints; the final
+snapshot has no assigned unfinished steps or pending controls. Peak sampled
+world-end delay is 240 ms. The extra two completed steps are exactly explained
+by initial/final unsampled elapsed time of 60/20 ms.
+
+`endurance-twins-030/` also completes 30,002 steps and passes every individual
+checker, with zero retained debt throughout and at both endpoints. Its peak sampled
+delay is 180 ms; initial/final unsampled time is 80/40 ms. It adds 7,077 clean completed
+renderer twins. The two runs match all 6,667 control/input and fuel updates.
+
+The extra paired world-state comparison fails first at index 14,351, logical time
+287,040 ms: player/engine fields still agree, but RNG is 59,896 versus 51,905. At
+opponent update 3,456, the fourth opponent reaches movement in the native-renderer
+run and skips it in the twin run. Read-only boundary snapshots in `endurance-{native,twins}-boundary/` confirm the
+cause: repair elapsed time is 4,202 versus 4,194 native units (21,010/20,970 ms).
+Integer division by 200 yields 21 versus 20, so only the former clears the repair.
+The stored repair starts are 59,014/59,002 and sampled clocks 63,216/63,196.
+These are clock values, not memory addresses. Preserve both captures;
+no comparison field is masked and no tolerance is changed. This is the first failed
+comparison attempt. The candidate fix makes the existing `$d4b6/$d4fe` wrappers
+read the continuous opponent deadline for both repair start and expiry. Native
+fallback, register/flag behavior and race/lap clocks remain unchanged. The frozen
+`sync-repair.slave` passes focused before/after boundary comparison: all four
+opponent records match byte-for-byte and both RNG values end at 51,905. The
+native-renderer retry in `endurance-native-030-retry/` passes all individual checks:
+30,001 movement steps, 6,666 control/fuel updates, 25,166 opponent reads, zero retained
+debt throughout, and zero assigned unfinished steps or pending controls at the end.
+Peak sampled delay is 240 ms. Initial/final unsampled time of 60/40 ms accounts
+exactly for the one extra completed step. The corrected twin run in `endurance-twins-030-retry/` passes 30,002 movement
+steps, 6,667 controls/fuel updates and 7,077 completed renderer twins. Its maximum
+sampled delay is 180 ms, retained debt stays zero, and there are no assigned unfinished
+steps or pending controls at the endpoint. Its 80/40 ms initial/final unsampled time
+accounts for two extra completed steps. The pair matches all 30,001 common
+player/engine/RNG states and 6,666 complete common control/input/fuel updates exactly.
+Normal build bytes remain unchanged. The existing continuity checker identifies the live wrapper's
+clock domain so old captures remain readable without weakening the new assertion. The corrected pair passes the finite endurance gate and its exact logical-state
+comparison; the initial failed pair is retained as regression evidence.
+
+This mostly stationary input tape is an accounting endurance test, not sustained
+race/weather coverage; the separate unseeded race gate remains required.
+
+### Visible-weather evidence
+
+`fade-030/` passes all 30 fade steps, two native gear commits, 31 owned palette
+interpolations, restoration and both prepared Copper lists. Enter/leave durations
+are 20,560/17,420 ms. `weather-screens-retry/` passes the separate visible gate:
+phases 3/8/13 from one directed fade show RGB4 colours `$46c/$247/$112`.
+The checker finds 8/8/11 complete 16×16 JPEG blocks within the unchanged
+5/5/5 RGB-channel bound, with flat palette-index-5 regions in both source bitmaps.
+The palettes and logical phases remain unchanged during each two-field capture.
+All three images were also visually inspected.
+
+The first `weather-screens/` route drives into a wall, leaving too little flat sky
+for a defensible colour measurement; its dominant non-black colour was the grey wall.
+The single retry uses existing `CUSTOM5=2` startup-only Practice. The corrected
+checker identifies the unique weather palette colour and requires whole flat image
+blocks rather than the largest colour in the scene. Neither palette arithmetic nor
+colour tolerance changed. Wrong-phase images and removed bitmap weather regions
+are rejected (`weather-screen-negative/`). Preserve both attempts.
+
+Barto stores JPEG images, even where older capture filenames end in `.png`.
+`check_weather_screen.py` derives a flat-colour DC quantization bound from the JPEG
+tables; it does not claim exact whole-image RGB equality. All 4,096 RGB4 flat colours
+passed the independent encoder/decoder check at the observed quality: maximum R/G/B
+errors 3/3/4 levels, within the derived 5/5/5 bound
+(`weather-jpeg-bound-check.json`). All paths above are under `tmp/phase-e/`.
+
+Reproduce from a completed directed-fade calibration with its frozen slave:
+
+```sh
+source amiga/env.sh
+python3 tools/capture_weather_screens.py tmp/phase-e/fade-030 tmp/phase-e/weather-screens-new
+python3 tools/check_weather_screen.py tmp/phase-e/weather-screens-new
+```
+
+The capture driver validates the slave, emulator and Kickstart hashes, waits for both
+alternating display buffers to receive each phase, and writes no game state at its
+checkpoints. These narrow tools are needed because the existing palette/Copper
+checkers inspect stored memory only. Screenshots use the pre-repair-fix frozen fade
+slave; the two-byte opponent repair-clock change is outside this Practice route.
+
+### Natural-weather gate: stopped after the retry
+
+`tmp/phase-e/natural-weather-030/` aborts before its first measured field: 33
+requested observation/field breakpoints exceed the emulator's 20-breakpoint limit,
+producing conflicting Z0 insertion responses and `PDWINDOW -1`. This is an invalid
+capture, not gameplay evidence. Preserve it as the first attempt.
+
+The single retry retains 18 observation sites plus the VBL and presentation markers:
+world entry/movement/end and allocator entry; session/pit transitions; palette
+presentation and interpolation/restoration entry/returns; and weather effect drawing.
+Those observations cover every natural-race requirement. Dedicated brake, resource,
+opponent-movement, gear and native forecast-arithmetic probes are omitted here;
+their separate gates have already run. No required natural-race observation or
+acceptance tolerance is removed. The unseeded fixed slave is unchanged.
+
+The retry `natural-weather-030-retry/` completes all 30,000 PAL fields (600,000 ms).
+Its 6,574 additional forecast trials produce no forecast, onset or expiry. Effect
+selections, visual events and both fade-direction counters remain zero. Consequently,
+an inactive final palette is not evidence of restoration after weather; the required
+natural episode is missing. This is insufficient coverage, not proof of a weather-code
+failure. The runner's “supplied checks passed” only reports capture/renderer checks;
+it does not certify this gate.
+
+The read-only observations retain one session ledger and 30,007 consecutive world-end
+samples, including samples before field zero. Every sampled delay is exactly explained
+by unsampled time, retained debt and assigned later steps. Peak retained debt is 60 ms,
+peak world-end delay is 680 ms, and endpoint retained debt is zero. These are
+instrumented accounting observations, not release frame-time measurements. All 5,940
+completed renderer twins have zero pixel/register/CCR/scratch/guard failures, and the
+copied raster code is unchanged. One additional draw is active at the endpoint.
+`natural-gate-result.json` records the evidence beside the capture.
+
+The initial setup failure and unsuccessful retry exhaust this gate's two attempts.
+No third run, seed injection, longer substitute window or relaxed acceptance is made.
+Further natural-weather work requires the user's decision on this missing evidence.
+A possible follow-up is to wait for a naturally occurring forecast before beginning
+an explicitly approved observation window; that follow-up has not been run. Handling
+remains deferred, optional title-demo pacing remains unselected, and Phase F is untouched.
+
+### Deferred handling findings
 
 The first handling attempt, `tmp/phase-e/steady-a500/`, aborted before measurement:
 the scratch helper incorrectly requested `TIMING_EARLY=1` with C3 disabled.
@@ -62,15 +244,20 @@ The setup rejection and unsuccessful retry exhaust this gate's two attempts.
 No third capture, weakened tolerance, changed brake hold or silently substituted
 native reference was used. This identifies insufficient acceptance evidence, not
 a proven scheduler defect: the native route does not stop, while the candidate
-does. On an explicitly authorized continuation, resolve the reference/measurement
-contract for stop and fuel before rerunning this gate. Preserve the fixed numerical
-bounds. The existing frozen native reference and the fresh reference have different
+does. The user has now deferred this gate and authorized the other Phase E work.
+When handling is resumed, resolve the reference/measurement contract for stop and
+fuel before rerunning it; preserve the fixed numerical bounds. The existing frozen native reference and the fresh reference have different
 stop outcomes; establish which route/build assumptions explain that difference.
 
-Lifecycle, stalls, requested render rates, both endurance runs, three visible fade
-phases and the unseeded weather race remain unrun for Phase E. Weather handling
-bounds also remain open. E3 is optional and unstarted. Phase F is untouched.
-No game code, cache policy, runtime defaults or tracked checker changed. The normal
+The remaining Phase E runtime gate is the unseeded weather race. Corrected endurance
+and visible fade phases have passed. Lifecycle,
+stalls and requested render rates have passed as recorded above. Weather handling
+bounds are included in the user-deferred handling row. The optional E3 title patch
+is not selected: it is a separate recorded-camera animation, not an E2 gameplay gate.
+Its current per-frame index advance remains documented in internals; no M7 duration
+comparison or correction is claimed. Phase F is untouched.
+Handling validation changed no game code, cache policy, runtime defaults or existing
+checker. The new visible-weather checker is separate. The normal
 build remains byte-identical to the Phase D control (SHA-256
 `ca8639921c1d8c2781578a62a42003a6ba888990a4a22b8d4f82cc829be061f3`).
 

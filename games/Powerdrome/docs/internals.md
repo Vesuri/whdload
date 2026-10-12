@@ -1,6 +1,6 @@
 # Powerdrome internals
 
-Project status: Phases A–D and E1 are complete. Phase E2 stopped at the steady A500 handling gate; Phase E remains incomplete.
+Project status: Phases A–D and E1 are complete. Phase E2 is stopped at the natural-weather gate; steady A500 handling is deferred by the user.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Current measurements
@@ -475,6 +475,16 @@ raw delta equal to four times their PAL-field separation. Observed deltas are 12
 clamping. Simulation is coupled to rendering but its main displacement uses elapsed time.
 See the [performance plan](performance-plan.md) for the per-loop behavior and fast planar
 buffer design. The selected scope preserves the native simulation and timing policy.
+
+The `TIMING_FULL` prototype separates those native frame duties into logical
+20/90 ms updates. Its current Phase E candidate uses the continuous opponent
+clock for repair starts and expiry (`$d4b6/$d4fe`), eliminating a sampled-clock
+threshold difference found during endurance. Focused comparison and the corrected
+600-second pair pass: 30,001 common world/RNG states and 6,666 control/input/fuel
+updates match exactly, with zero endpoint debt. Natural-weather validation
+is stopped after a ten-minute retry without a weather episode; expiry and restoration
+remain untested. The normal build
+has not adopted the full scheduler; see the [current gate ledger](open-work.md#phase-e-gate-ledger).
 
 ## Development slave and reproducible title-demo profile
 

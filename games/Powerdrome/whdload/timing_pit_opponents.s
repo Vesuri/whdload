@@ -193,7 +193,7 @@ timing_pit_opponent_begin
  move.l 20(a0),d0
  add.l 56(a0),d0
  move.l d0,36(a0)
- ; Keep repair/native-clock sampling separate from the stable lap/race domain.
+ ; Retain the native-clock diagnostic separately from stable gameplay clocks.
  ; Latch before native execution so a deferred first winner retains its instant.
  move.l 20(a0),d0
  sub.l 52(a0),d0
@@ -383,13 +383,17 @@ timing_message_alive dc.w $4ef9
 timing_message_expired dc.w $4ef9
  dc.l 0
 
+; Opponent repair durations use the continuous opponent deadline, including pits.
+; Resampling a native/VBL offset here made completion depend on render cadence.
+; Both the stored start and comparison use this domain; race/lap resets cannot
+; rebase it. Outside scheduled ownership, preserve the original native clock.
 ; MOVE.L wrappers reproduce NZVC and preserve X and every other register.
 timing_pit_clock_d7
  move.l a0,-(sp)
  lea timing_pit_opponent_state(pc),a0
  tst.w 10(a0)
  beq.s .native
- move.l 36(a0),d7
+ move.l 20(a0),d7
  bra.s .done
 .native
  move.l perf_game(pc),a0
@@ -403,7 +407,7 @@ timing_pit_clock_d0
  lea timing_pit_opponent_state(pc),a0
  tst.w 10(a0)
  beq.s .native
- move.l 36(a0),d0
+ move.l 20(a0),d0
  bra.s .done
 .native
  move.l perf_game(pc),a0

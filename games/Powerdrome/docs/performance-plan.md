@@ -1,6 +1,6 @@
 # Powerdrome performance implementation plan
 
-Project status: Phases A–D and E1 are complete. Phase E2 stopped at the steady A500 handling gate; Phase E remains incomplete.
+Project status: Phases A–D and E1 are complete. Phase E2 is stopped at the natural-weather gate; steady A500 handling is deferred by the user.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 The optional implementation and its completed measurements are documented in

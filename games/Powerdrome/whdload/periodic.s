@@ -462,7 +462,7 @@ pl_periodic PL_START
  ; Native lap counter resets do not rebase continuous logical messages.
  ; TIMING_RANGE h0:$10c16 12 bit=C3
  PL_PSS $10c16,timing_message_lap_rebase,6
- ; Opponent-only direct clock reads. Outside modal updates these stay native.
+ ; Opponent repair start/expiry use one continuous deadline; outside ownership stay native.
  ; TIMING_RANGE h0:$d4b6 6 bit=C3
  PL_PS $d4b6,timing_pit_clock_d7
  ; TIMING_RANGE h0:$d4fe 6 bit=C3

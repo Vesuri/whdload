@@ -100,7 +100,7 @@ which has opponents on screen and is the heavier scene.
 
 ## Phase A: Consolidate the timing prototype (no behaviour change)
 
-Status: **A1 and A2 complete**, byte-equivalence gates passed. Phase B is also complete; Phases C and D are complete and Phases E–F remain untouched.
+Status: **A1 and A2 complete**, byte-equivalence gates passed. Phases B–D are also complete. Phase E is in progress; Phase F remains untouched.
 See [open work](open-work.md) for the exact configuration and file hashes.
 
 **A1. Pick one release configuration.** Find the flag set behind the most recent complete
@@ -237,10 +237,13 @@ because game time depends on frame time there.
 
 ## Phase E: Close the timing work under the D1 policy
 
-Status: **incomplete; stopped under the two-attempt rule**. E1 is complete.
-E2 CPU equivalence and accounting pass on M4–M7. The steady A500 handling gate
-has no valid stop threshold and an inconclusive fuel bound after its allowed retry.
-The remaining E2 rows and optional E3 are unrun. See the [finding and evidence](open-work.md#handling-blocker-and-resume-boundary).
+Status: **stopped at the natural-weather gate; steady A500 handling deferred by the user**.
+E1, CPU equivalence/accounting, lifecycle, stalls, render cadence, corrected endurance
+and visible weather have passed. The natural-weather gate exhausts two attempts:
+the first fails setup, and the retry completes ten minutes without any weather episode,
+leaving expiry/restoration untested. No third capture is authorized by this plan's stop
+rule. E3 was evaluated and not selected. Phase E remains incomplete and Phase F is
+untouched. See the [current evidence ledger](open-work.md#phase-e-gate-ledger).
 
 **E1. Replace the unbounded gates.** In `docs/timing-implementation.md`, rewrite the
 acceptance section as the release gates below. Mark the brake-history, impulse-history
