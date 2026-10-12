@@ -1247,3 +1247,18 @@ python3 tools/matrix_raw_check.py \
   tmp/phase4-dma-cia-accelerated/060-dcache/dma \
   --control tmp/phase4-dma-cia-accelerated/060-dcache/idle --compare-only
 ```
+
+The last corrected DMA cell, 060 NoCache, is complete. Its existing-data checks
+use the same commands as the other cells:
+
+```sh
+python3 tools/matrix_dma_check.py \
+  tmp/phase4-dma-cia-accelerated/060-nocache/dma
+python3 tools/matrix_raw_check.py \
+  tmp/phase4-dma-cia-accelerated/060-nocache/dma \
+  --control tmp/phase4-dma-cia-accelerated/060-nocache/idle --compare-only
+```
+
+Both corrected batch roots now contain completed per-cell `dma-report.json`,
+`dma-effect.json` and audited capture metadata for all eleven configurations.
+DMA completion does not certify general CPU/interrupt attribution.

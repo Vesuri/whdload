@@ -13,7 +13,8 @@ stock 020 multiplier is verified; numeric-frequency presets require calibration.
 **Phase 4 is authorised and in progress; its complete accounting gate remains open.**
 Phase 5 is not authorised. The CPU/cache scene baseline, source-change census,
 cache audits and matched c2p, instant-blitter and scoped bitmap-drawing ceilings
-are recorded. Blanket clear bypass is invalid and excluded.
+are recorded. Corrected DMA slot accounting and exact recorder controls now pass
+on all eleven machine/cache configurations. Blanket clear bypass is invalid and excluded.
 
 Consolidated instrument checks pass on 020 default/NoCache, 030 MMU
 default/NoCache, 030 NoMMU NoCache and 040 default: exact idle and DMA neutrality, raw-source recomputation, callback
