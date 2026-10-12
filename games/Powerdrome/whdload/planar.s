@@ -1,5 +1,5 @@
 ; Optional planar staging. Native entry instructions are copied at runtime.
-; C1 enables staging; VERIFY C4=1 twins pure clear/polygon blocks.
+; C1 opts out of automatic staging; VERIFY C4=1 twins pure clear/polygon blocks.
 ; The private guest expansion pool is reserved even when C1 is off, keeping PD in chip RAM.
 PERF_BITMAP = 32000
 PERF_GUARD = $a55aa55a
@@ -109,6 +109,7 @@ pl_planar PL_START
  ; PERF_RANGE h0:$15ee8 6 bit=C1
  PL_P $15ee8,routed_poly
  ; Staged drawing touches only fast RAM until scene_copy_begin.
+ ; PERF_RANGE h0:$112a6 6 bit=C1
  PL_PS $112a6,scene_wait
  PL_END
  IFD VERIFY

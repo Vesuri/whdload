@@ -6,10 +6,13 @@ import argparse
 from pathlib import Path
 import re
 import struct
+import subprocess
+import sys
 from capstone import Cs, CS_ARCH_M68K, CS_MODE_BIG_ENDIAN, CS_MODE_M68K_000
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('capture', type=Path)
+p.add_argument('--timing', action='store_true', help='Also prove all declared timing hooks retain native bytes')
 p.add_argument('--game', type=Path, default=Path('tmp/extracted/pd'))
 a = p.parse_args()
 b = a.game.read_bytes()
@@ -37,11 +40,15 @@ md = Cs(CS_ARCH_M68K, CS_MODE_BIG_ENDIAN | CS_MODE_M68K_000)
 for offset, length in sorted(ranges):
     decoded = list(md.disasm(bytes(code[offset:offset+length]), base+offset))
     assert sum(i.size for i in decoded) == length, f'Partial instruction at {offset:#x}'
-    assert len(decoded) == 1, 'Review multi-instruction hook boundaries separately'
+    if offset == 0x112a6:
+        # The display handshake replaces the complete TST/BEQ polling loop.
+        assert length == 6 and [i.mnemonic for i in decoded] == ['tst.w', 'beq.b']
+    else:
+        assert len(decoded) == 1, 'Review multi-instruction hook boundaries separately'
     for name in ('chip.bin', 'final-chip.bin'):
         image = (a.capture/name).read_bytes()
         assert image[base+offset:base+offset+length] == code[offset:offset+length], f'{name}: modified hook at {offset:#x}'
-    print(f'h0:{offset:#x}: {length} native bytes intact; one complete instruction')
+    print(f'h0:{offset:#x}: {length} native bytes intact; {len(decoded)} complete instructions')
 # Direct-branch audit over the disassembled original code. Embedded data can produce
 # false candidates, so any hit must be inspected rather than silently ignored.
 md.skipdata = True
@@ -53,3 +60,7 @@ for insn in md.disasm(bytes(code[0x4fc0:]), base+0x4fc0):
         for offset, length in ranges:
             assert not offset < relative < offset+length, f'Inspect branch at {insn.address-base:#x} into hook {relative:#x}'
 print('No decoded direct branch enters a hook interior')
+
+if a.timing:
+    subprocess.run([sys.executable, str(Path(__file__).with_name('check_timing_layout.py')),
+                    '--off-capture', str(a.capture), '--game', str(a.game)], check=True)

@@ -1,4 +1,4 @@
-; Powerdrome development slave. Original install by Galahad/Fairlight.
+; Powerdrome release slave. Original install by Galahad/Fairlight.
 ; WHDLoad 20 KickEmu supplies the OS; interface 17 requires no v20-only feature.
  INCLUDE whdload.i
  INCLUDE whdmacros.i
@@ -56,11 +56,11 @@ slv_keyexit = $59
  INCLUDE whdload/kick13.s
 slv_name dc.b "Powerdrome",0
 slv_copy dc.b "1989 Electronic Arts",0
-slv_info dc.b "Installed by Galahad/Fairlight",10,"Development by Vesuri",10,"Version 1.1-dev",0
+slv_info dc.b "Installed by Galahad/Fairlight",10,"Enhancements by Vesuri",10,"Version 1.1",0
 slv_CurrentDir dc.b 0
 slv_config
- dc.b "C1:B:Render planar scene in fast RAM;"
- dc.b "C3:B:Experimental elapsed-time correction;"
+ dc.b "C1:B:Original renderer;"
+ dc.b "C3:B:Original timing;"
  IFD VERIFY
  dc.b "C2:L:Rendering experiment:Bitmap and code,Bitmap only,Bitmap code and scratch,Bitmap and scratch;"
  dc.b "C4:B:Twin planar drawing for verification;"
@@ -121,6 +121,7 @@ launch_pd
  jsr resload_Patch(a2)
  lea tags(pc),a0
  jsr resload_Control(a2)
+ bsr select_features
  lea 4(a3),a1
  bsr install_planar
  bsr install_timing
@@ -158,6 +159,32 @@ launch_pd
  pea TDREASON_WRONGVER
  move.l _resload(pc),a2
  jmp resload_Abort(a2)
+ ; Resolve user opt-outs once. The internal custom1/custom3 values remain
+ ; enable flags for installers and diagnostics; WHDLoad cache policy is untouched.
+select_features
+ movem.l d0-d1/a0,-(sp)
+ lea custom1(pc),a0
+ move.l (a0),d0
+ clr.l (a0)
+ move.l custom3(pc),d1
+ clr.l custom3-custom1(a0)
+ move.l cpu_attn(pc),-(sp)
+ btst #AFB_68020,3(sp)
+ addq.l #4,sp
+ beq.s .done
+ tst.l d1
+ bne.s .renderer
+ move.l #1,custom3-custom1(a0)
+.renderer
+ tst.l d0
+ bne.s .done
+ move.l perf_bitmap(pc),d0
+ beq.s .done
+ move.l #1,(a0)
+.done
+ movem.l (sp)+,d0-d1/a0
+ rts
+
 pl_game PL_START
  PL_P $843c,copylock
  PL_END
@@ -181,7 +208,9 @@ TIMING_FLAGS_ONLY SET 0
  INCLUDE coverage.s
  ENDC
  ENDC
-tags dc.l WHDLTAG_CUSTOM1_GET
+tags dc.l WHDLTAG_ATTNFLAGS_GET
+cpu_attn dc.l 0
+ dc.l WHDLTAG_CUSTOM1_GET
 custom1 dc.l 0
  dc.l WHDLTAG_CUSTOM3_GET
 custom3 dc.l 0

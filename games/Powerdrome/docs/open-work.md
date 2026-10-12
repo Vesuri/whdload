@@ -2,6 +2,32 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
+## Phase F in progress
+
+The user has authorized F1–F4. The current candidate promotes `TIMING_FULL` into
+normal builds and resolves C1/C3 as opt-outs at installation: 68000/68010 stay
+native, 68020+ enables timing, and 68020+ with real fast RAM enables planar staging.
+WHDLoad cache policy is unchanged. Normal, VERIFY and coverage candidates build;
+the original reconstruction still matches the installed original slave.
+
+F1 passes on normal builds: all declared rendering and timing hook ranges remain
+native on M1 defaults and M7 with `CUSTOM1=1 CUSTOM3=1`. The declared wait hook
+explicitly checks its complete six-byte TST/BEQ pair. F2 normal builds reach name
+entry on M1/M3/M4/M7. Saved snapshots prove native M1, timing-only M3, both features
+on M4/M7, and both disabled on opted-out M7. The matching VERIFY M7 Practice run
+confirms initialized world scheduling and completed staged scenes, with no C1/C3
+options: 490/499 fields = 49.098 fps with CACHE. This is the first release-matrix
+measurement, not a claim for the remaining machines.
+
+The first M1 capture used an unsupported one-field window; its two-field retry
+passes. The first F1 checker rejected the display-wait hook under its old
+single-instruction assumption; the explicit pair check passes on the saved capture.
+Both invalid attempts are preserved under `tmp/phase-f/`, with `boot-defaults.json`
+and the individual gate reports. No game-code fix was needed for either issue.
+
+F1–F2 are complete. The remaining release matrix, final documentation consolidation
+and F3–F4 commit are outstanding.
+
 ## Phase E complete with two deferred validations
 
 D1–D5 are confirmed. Phases A–E are complete within the agreed scope. The user
@@ -13,8 +39,8 @@ E1 accepts the specified native brake/impulse/visibility histories and classifie
 opponent `$54` as presentation-owned; that policy update changed no cadence,
 tolerance or game code. Evidence is under `tmp/phase-e/`. `CUSTOM5=14` is the
 initialized-lap pause fixture; natural finish uses the separate ten-lap route and
-checker. Phase F is the next planned phase, but is not started or authorized by
-this deferral. Release defaults remain unchanged.
+checker. Phase E deferrals remain in force during the separately authorized
+Phase F integration above.
 
 ### Phase E gate ledger
 

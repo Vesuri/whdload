@@ -2,7 +2,7 @@
  IFND TIMING_CONFIG_READY
 TIMING_CONFIG_READY = 1
  IFND TIMING_FULL
-TIMING_FULL = 0
+TIMING_FULL = 1
  ENDC
  IFNE TIMING_FULL
  IFNE TIMING_FULL-1
@@ -147,9 +147,8 @@ TIMING_WEATHER_CYCLE_TEST = 0
  ENDC ; TIMING_CONFIG_READY
 
  IFEQ TIMING_FLAGS_ONLY
-; C3: elapsed-time timing correction, independent of fast planar rendering.
-; Current corrections: PAL minimum delta and A500-paced cockpit departure.
-; Broader periodic gameplay scheduling remains a separately compiled prototype.
+; Full elapsed-time scheduler, independent of fast planar rendering.
+; Enabled on 68020+ unless the user selects C3 original timing.
 install_timing
  movem.l d0/a0-a2,-(sp)
  move.l custom3(pc),d0
