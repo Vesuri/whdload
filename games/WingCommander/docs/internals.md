@@ -457,3 +457,22 @@ each Custom5; chunky/planar placement and geometry; generated copper/FMODE/BPLCO
 values; buffer publication versus completed frames; the VBL clock users and the per-pass drawing divisor in each scene; music cadence and game-time
 coupling. Exact compiler and KickEmu source release remain unknown metadata.
 Do not start reconstruction, boots, patches or phase 2 from this hand-off alone.
+
+## Phase 2 reconstruction (boot gate in progress)
+
+`tools/reconstruct.py` reconstructs 1,758 instructions (5,008 bytes) from the
+original slave's code islands; the remaining payload is data. The whole assembled
+file is byte-identical: 7,728 bytes, SHA-256
+`5fbbb774bba3c794a776acc25f33c3f47c579449e1ba1a21c31418716aa74986`.
+This includes the original KickEmu, patch tables and cache policy. All generated
+source and binaries stay under `tmp/`.
+
+Two disassembler details require explicit correction: the PC-relative 020
+memory-indirect jump at `S:0072` has a signed base displacement, and MOVEM at
+`S:14e4` bases its displacement after the register-mask word. The generator
+corrects their textual targets and the full-file comparison checks the result.
+
+An original English `Custom5=0` boot on the shared A1200-fast preset reached the
+Origin logo and animated credits. Main-menu state/screenshot equivalence and the
+remaining Custom5 boots are still pending. These observations do not confirm the
+phase 1 timing hypotheses or establish a frame counter.

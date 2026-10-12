@@ -29,7 +29,7 @@ Install shared prerequisites through AmigaXDev; ROM/OS sources are user supplied
 
 Fetch, checksum verification, archive preparation and CD32 static identification
 are implemented.
-No build, run, tracing or release target exists yet. All shell tooling is written
+The phase 2 launcher and byte-identical reconstruction are available; the boot gate is in progress. All shell tooling is written
 for `/bin/bash` 3.2 and supports the project name's space.
 
 ## Phase 1: reproducible CD32 static identification
@@ -134,5 +134,39 @@ Existing-output/outside-tmp refusal and a deliberately bad archive digest are
 checked without changing the real inputs. These checks validate static tooling
 and provenance; they do not validate game behavior or measure speed.
 
-Stop at the phase 1 gate in `internals.md`. No run/build/reconstruction target is
-introduced; phase 2 needs a separate request.
+## Phase 2: reconstruction and first boots
+
+The reconstruction generator verifies the original slave SHA-256 before decoding
+its code islands with Capstone and emitting Motorola source under a new `tmp/`
+directory. vasm assembles every instruction with optimisation disabled; offset
+assertions and a full-file comparison reject any drift. Data islands remain data,
+including the original KickEmu tables. No replacement KickEmu version is used.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --output tmp/reconstructed
+SLAVE="$PWD/tmp/reconstructed/WingCommanderCD32.Slave" /bin/bash amiga/run.sh
+/bin/bash amiga/run.sh stop
+WHD_ARGS=CUSTOM5=0 WINDOW=front python3 tools/wc.py serve
+# In a second shell with the same environment:
+python3 tools/wc.py shot tmp/boot.png
+python3 tools/wc.py quit
+```
+
+`amiga/run.sh` is adapted from Legends of Valour. Defaults: native `FSUAE_ARM`,
+shared `AMIGA_SETUP=a1200-fast`, PAL, 68EC020, 2 MiB chip plus 8 MiB fast, windowed,
+real speed. `WHD_ARGS` selects the original Custom options. Each boot extracts a
+fresh pinned CD32 archive into a new scratch drive directory; no existing game
+or boot tree is replaced. `KICKSTART_A1200`, `RTB_A1200` (default ROM path + `.RTB`),
+`WORKBENCH_ADF` and `WHDLOAD_BINARY` come from the supplied shared environment.
+`FSUAE_RUN` must resolve below project `tmp/`; interactive and debugger defaults
+are `tmp/run` and `tmp/cap`. Process cleanup uses `FSUAE_COMMON`.
+
+The `wc.py` adapter uses `amigaxdev.gdbserve`; disassembly and trace readers remain
+shared modules. `until` is bounded by `UNTIL_TIMEOUT` (60 seconds by default).
+The installed native build supports one-field trace screenshots but rejects
+`monitor key` with E01. AmigaXDev currently lists shared debugger input as open
+work; do not silently substitute host input or write game control variables.
+Instruction profiling on the native build needs a separately validated profiler
+window; phase 2 does not make performance claims.
+
