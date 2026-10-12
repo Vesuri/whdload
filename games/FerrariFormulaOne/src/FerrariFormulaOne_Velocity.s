@@ -11,7 +11,11 @@
 ; All registers except D1/CCR preserved. All eight output bytes commit together;
 ; failure leaves output unchanged. Output may alias either input. 68000-safe.
 FF1VelocityDerivative20:
+        ifd FF1_HELPERS_020
+        movem.l d0/d2-d3,-(sp)
+        else
         movem.l d0/d2-d4,-(sp)
+        endc
         move.l  (a1),d2
         sub.l   (a0),d2
         bvs.b   .overflow
@@ -39,7 +43,11 @@ FF1VelocityDerivative20:
 .overflow:
         moveq   #-1,d1
 .done:
+        ifd FF1_HELPERS_020
+        movem.l (sp)+,d0/d2-d3
+        else
         movem.l (sp)+,d0/d2-d4
+        endc
         rts
 
 ; A0 vector, D0.w signed Q15 cosine, D1.w signed Q15 sine from native tables.
@@ -49,8 +57,16 @@ FF1VelocityDerivative20:
 ; Error from this operation is < 1/65536 native velocity unit per component,
 ; excluding native coefficient quantization. 68020+ (signed 64-bit products).
 FF1VelocityRotate020:
+        ifd FF1_HELPERS_020
+        movem.l d2-d7,-(sp)
+        else
         movem.l d0/d2-d7,-(sp)
+        endc
+        ifd FF1_HELPERS_020
+        suba.w  #4,sp
+        else
         suba.w  #8,sp
+        endc
         move.w  d0,d2
         ext.l   d2
         move.w  d1,d3
@@ -74,17 +90,47 @@ FF1VelocityRotate020:
         bsr.w   FF1VelocityShift15
         tst.l   d1
         bne.b   .done
+        ifd FF1_HELPERS_020
+        move.l  d4,4(a0)
+        move.l  (sp),(a0)
+        else
         move.l  d4,4(sp)
         move.l  (sp),(a0)
         move.l  4(sp),4(a0)
+        endc
 .done:
+        ifd FF1_HELPERS_020
+        adda.w  #4,sp
+        else
         adda.w  #8,sp
+        endc
+        ifd FF1_HELPERS_020
+        movem.l (sp)+,d2-d7
+        else
         movem.l (sp)+,d0/d2-d7
+        endc
         rts
 
 ; D5:D4 signed 64-bit input, D4 signed 32-bit floor(input / 32768).
 ; D1 status 0/-1. D5-D6 scratch. Internal helper checks discarded sign bits.
 FF1VelocityShift15:
+        ifd FF1_HELPERS_020
+        ; Double then shift by a word. Check both signed overflow and the
+        ; discarded high word before committing either output component.
+        add.l   d4,d4
+        addx.l  d5,d5
+        bvs.b   .overflow
+        move.w  d5,d6
+        ext.l   d6
+        cmp.l   d5,d6
+        bne.b   .overflow
+        swap    d4
+        swap    d5
+        move.w  d4,d5
+        move.l  d5,d4
+        moveq   #0,d1
+        rts
+        else
         move.l  d5,d6
         asr.l   #8,d6
         asr.l   #7,d6
@@ -105,6 +151,7 @@ FF1VelocityShift15:
 .success:
         moveq   #0,d1
         rts
+        endc
 .overflow:
         moveq   #-1,d1
         rts
@@ -132,8 +179,16 @@ FF1VelocityReset:
 ; overflow leaves the output unchanged. 68020+. This deliberately retains
 ; the supplied native coefficient quantization; no angle interpolation implied.
 FF1VelocityProject020:
+        ifd FF1_HELPERS_020
+        movem.l d2-d6,-(sp)
+        else
         movem.l d0/d2-d7,-(sp)
+        endc
+        ifd FF1_HELPERS_020
+        suba.w  #4,sp
+        else
         suba.w  #8,sp
+        endc
         move.w  d1,d3
         ext.l   d3
         ext.l   d2
@@ -148,12 +203,25 @@ FF1VelocityProject020:
         bsr.w   FF1VelocityShift15
         tst.l   d1
         bne.b   .done
+        ifd FF1_HELPERS_020
+        move.l  d4,4(a0)
+        move.l  (sp),(a0)
+        else
         move.l  d4,4(sp)
         move.l  (sp),(a0)
         move.l  4(sp),4(a0)
+        endc
 .done:
+        ifd FF1_HELPERS_020
+        adda.w  #4,sp
+        else
         adda.w  #8,sp
+        endc
+        ifd FF1_HELPERS_020
+        movem.l (sp)+,d2-d6
+        else
         movem.l (sp)+,d0/d2-d7
+        endc
         rts
 
 ; Integrate a continuous native-reference Q16 response over 20 ms.
@@ -164,6 +232,38 @@ FF1VelocityProject020:
 ; state is unchanged. Requires FF1Step20Delta/FF1Divide020. Callers must rotate,
 ; transfer or reset remainders with the associated velocity state. This applies
 ; only to continuous response; collision impulses are not divided by five.
+        ifd FF1_HELPERS_020
+FF1VelocityApply20:
+        movem.l d0/d2-d4,-(sp)
+        move.l  (a2),d0
+        move.w  (a1),d2
+        ext.l   d2
+        add.l   d2,d0
+        bvs.b   .bad
+        divsl.l #5,d2:d0
+        add.l   (a0),d0
+        bvs.b   .bad
+        move.l  d0,d4
+        move.l  4(a2),d0
+        move.w  2(a1),d3
+        ext.l   d3
+        add.l   d3,d0
+        bvs.b   .bad
+        divsl.l #5,d3:d0
+        add.l   4(a0),d0
+        bvs.b   .bad
+        move.l  d4,(a0)
+        move.l  d0,4(a0)
+        move.w  d2,(a1)
+        move.w  d3,2(a1)
+        moveq   #0,d1
+        bra.b   .done
+.bad:
+        moveq   #-1,d1
+.done:
+        movem.l (sp)+,d0/d2-d4
+        rts
+        else
 FF1VelocityApply20:
         movem.l d0/d2-d7/a0-a3,-(sp)
         suba.w  #12,sp
@@ -198,6 +298,8 @@ FF1VelocityApply20:
         movem.l (sp)+,d0/d2-d7/a0-a3
         rts
 
+        endc
+
 ; Rotate Q16 velocity AND signed /5 response remainders as one quantity.
 ; A0 vector (8 bytes), A1 remainders (4 bytes, each -4..4), disjoint.
 ; D0.w Q15 cosine, D1.w Q15 sine. D1 status 0/-1; other registers preserved.
@@ -206,7 +308,11 @@ FF1VelocityApply20:
 ; Error per component <1/(5*65536) native velocity unit per rotation, excluding
 ; native coefficient quantization. 68020+, MEMF_PUBLIC state.
 FF1VelocityRotateCarry020:
+        ifd FF1_HELPERS_020
+        movem.l d2-d7,-(sp)
+        else
         movem.l d0/d2-d7,-(sp)
+        endc
         suba.w  #12,sp
         move.w  d0,d2
         ext.l   d2
@@ -275,7 +381,11 @@ FF1VelocityRotateCarry020:
         move.l  8(sp),(a1)
 .done:
         adda.w  #12,sp
+        ifd FF1_HELPERS_020
+        movem.l (sp)+,d2-d7
+        else
         movem.l (sp)+,d0/d2-d7
+        endc
         rts
 
 ; Signed D5:D4 / 32768 floored, then signed 64/32 division by five.
@@ -305,7 +415,11 @@ FF1VelocityTailDivide:
 ; Reject invalid inputs or a result outside a native signed word; on failure
 ; D0 is unchanged. D2-D7/A0-A6 preserved, CCR scratch. 68020+.
 FF1VelocityLimit020:
+        ifd FF1_HELPERS_020
+        movem.l d3,-(sp)
+        else
         movem.l d2-d3,-(sp)
+        endc
         move.l  d0,d3
         tst.w   d1
         bmi.b   .bad
@@ -325,5 +439,9 @@ FF1VelocityLimit020:
         move.l  d3,d0
         moveq   #-1,d1
 .done:
+        ifd FF1_HELPERS_020
+        movem.l (sp)+,d3
+        else
         movem.l (sp)+,d2-d3
+        endc
         rts

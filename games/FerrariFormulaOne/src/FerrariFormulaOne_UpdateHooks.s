@@ -1,3 +1,8 @@
+; VERIFY capacity may be reduced by an isolated capture build to fit Chip RAM.
+; Allocation and overflow guard always share this value; default ABI is unchanged.
+ IFND FF1_SPEED_RECORD_CAPACITY
+FF1_SPEED_RECORD_CAPACITY equ 4096
+ ENDC
 ; Ferrari Formula One, SPS 0481: candidate 68020 update hooks.
 ; S2 VERIFY split. Not included by FerrariFormulaOne_WHD.s; default-off.
 ; FF1_PLAYER_HOOKS requires FF1_PLAN_B and consolidates player state/hooks.
@@ -72,7 +77,7 @@ velocity_target_speeds: ds.l 800
 velocity_target_speeds: ds.b 0
  ENDC
  IFD VERIFY
-speed_records: ds.b 131072
+speed_records: ds.b FF1_SPEED_RECORD_CAPACITY*32
  ELSE
 speed_records: ds.b 0
  ENDC
@@ -2479,7 +2484,7 @@ velocity_speed_swap:
 velocity_speed_rate:
  IFD VERIFY
  move.l speed_records_count(pc),d3
- cmpi.l #4096,d3
+ cmpi.l #FF1_SPEED_RECORD_CAPACITY,d3
  IFD VERIFY
  bhs.w velocity_fault
  ENDC
