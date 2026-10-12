@@ -5,7 +5,7 @@ from pathlib import Path
 from intro_capture import SCENES
 
 
-def report(run):
+def report(run, strict_tod=True):
     meta=json.loads((run/'result.json').read_text());h=meta['hunks'];s=meta['slave']
     if not meta['complete']:raise ValueError('incomplete capture')
     events=[]
@@ -16,7 +16,7 @@ def report(run):
         e=[int(v,16 if i==0 or 8<=i<24 else 10) for i,v in enumerate(p)]
         events.append(e)
         if e[0]==h[0]+0x20214:break
-    expected=128 if meta['machine']=='a1200-fast' else 36
+    expected=128 if meta['machine']=='a1200-fast' else 72 if meta['machine']=='a1200-040' else 36
     if not events or events[-1][0]!=h[0]+0x20214:raise ValueError('missing menu')
     if any(e[5]!=312 or e[6]!=28375160 or e[7]!=expected for e in events):raise ValueError('clock mismatch')
     if any(b[3]<a[3] for a,b in zip(events,events[1:])):raise ValueError('nonmonotonic timestamps')
@@ -47,7 +47,7 @@ def report(run):
     limiter=[e for e in events if e[0]==s+0x17e6]
     # D1 holds the absolute CIA-A TOD sample; D0 the delta after the first call.
     tod_errors=[i for i,(a,b) in enumerate(zip(limiter,limiter[1:])) if ((b[9]-a[9])&0xffffff)!=b[1]-a[1]]
-    if len(limiter)<100 or tod_errors or any(e[8]<2 for e in limiter[1:]):
+    if len(limiter)<100 or (strict_tod and tod_errors) or any(e[8]<2 for e in limiter[1:]):
         raise ValueError('CIA-A limiter cadence/threshold differs')
     def pairs(begin,end):
         spans=[];a=None

@@ -20,6 +20,8 @@ def main():
     a=p.parse_args(); out=(ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists(): raise ValueError('new tmp output required')
     if os.environ.get('EXTRA_ARGS'): raise ValueError('fixed timing configuration required')
+    if a.mmu and a.machine!='a1200-030': raise ValueError('MMU capture requires 030')
+    if any(x.startswith('CUSTOM5') for x in a.options.upper().split()): raise ValueError('capture fixes CUSTOM5=0')
     slave,fixture=load_render_fixture(a.fixture)
     syms={name:int(off,16) for off,name in re.findall(r'^([0-9A-F]{8}) (\S+)$',(slave.parent/'slave.lst').read_text(),re.M)}
     meta=json.loads((ROOT/a.layout).read_text()); layout={k:meta[k] for k in ('hunks','slave')}; h=layout['hunks']; s=layout['slave']
@@ -70,7 +72,8 @@ def main():
         if fixture.get('render_verify'):
             verified=int.from_bytes((out/'fast.bin').read_bytes()[s-BASE+syms['render_verified']:s-BASE+syms['render_verified']+4],'big')
             if verified<100: raise ValueError('native twin did not execute')
-        result=dict(layout,verified_frames=verified,options=a.options,mmu=a.mmu,symbols=syms,complete=True,machine=a.machine,fixture=fixture,custom5=0,boot_cpu=boot,live_cpu=live,slave_sha256=sha,emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())
+        selected=int.from_bytes((out/'fast.bin').read_bytes()[s-BASE+syms['render_selected']:s-BASE+syms['render_selected']+2],'big') if 'render_selected' in syms else None
+        result=dict(layout,selected_converter=selected,verified_frames=verified,options=a.options,mmu=a.mmu,symbols=syms,complete=True,machine=a.machine,fixture=fixture,custom5=0,boot_cpu=boot,live_cpu=live,slave_sha256=sha,emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())
         (out/'result.json').write_text(json.dumps(result,indent=2)+'\n')
     finally:
         if g: g.p.kill()

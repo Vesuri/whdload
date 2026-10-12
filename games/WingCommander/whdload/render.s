@@ -13,10 +13,26 @@ render_entry:
 .convert:
         cmpi.w  #320,d0
         bne.w   render_bad
-        move.l  $4.w,a6
-        move.w  296(a6),d7
-        andi.w  #$0088,d7
-        bne.s   .later
+        move.w  render_selected(pc),d7
+        cmpi.w  #30,d7
+        beq.s   .early
+        cmpi.w  #40,d7
+        beq.w   .later
+        cmpi.w  #128,d3
+        beq.s   .original128
+        cmpi.w  #166,d3
+        beq.s   .original166
+        cmpi.w  #200,d3
+        bne.w   render_bad
+        bsr.w   slave+$1ac6
+        bra.w   render_converted
+.original128:
+        bsr.w   slave+$17f6
+        bra.w   render_converted
+.original166:
+        bsr.w   slave+$195e
+        bra.w   render_converted
+.early:
         cmpi.w  #128,d3
         beq.w   .early128
         cmpi.w  #166,d3
@@ -96,6 +112,35 @@ render_setcpu:
         beq.s   .keep
         jmp     96(a2)
 .keep:
+        ; Query only: zero change mask. WHDLoad reports effective cache policy,
+        ; including NoCache. Never change CACR to suit a converter.
+        movem.l d0-d1/a0-a1/a6,-(sp)
+        moveq   #0,d0
+        moveq   #0,d1
+        jsr     96(a2)
+        lea     render_selected(pc),a0
+        clr.w   (a0)
+        ifeq RENDER_FAMILY
+        btst    #8,d0                ; WCPUF_IC
+        else
+        ori.w   #256,d0              ; same-size diagnostic override
+        endif
+        beq.s   .selected
+        move.l  $4.w,a6
+        move.w  296(a6),d0
+        ifeq RENDER_FAMILY
+        andi.w  #$0088,d0            ; 040/060: measured original is faster
+        else
+        andi.w  #0,d0
+        endif
+        bne.s   .selected
+        ifeq RENDER_FAMILY
+        move.w  #30,(a0)
+        else
+        move.w  #RENDER_FAMILY,(a0)
+        endif
+.selected:
+        movem.l (sp)+,d0-d1/a0-a1/a6
         ifne RENDER_VERIFY
         movem.l d0-d1/a0-a1/a6,-(sp)
         move.l  #64000,d0
@@ -124,3 +169,6 @@ render_bad:
 render_scratch: dc.l 0
 render_verified: dc.l 0
         endif
+
+render_selected:
+        dc.w    0                    ; 0 existing slave, 30 Kalms 030, 40 Kalms 040

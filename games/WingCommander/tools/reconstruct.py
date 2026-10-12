@@ -28,14 +28,16 @@ def main():
     p.add_argument('--output', required=True)
     modes = p.add_mutually_exclusive_group()
     modes.add_argument('--render', action='store_true', help='experimental CUSTOM1=2 English rendering adapter')
-    modes.add_argument('--render-control', action='store_true', help='same-size original rendering control')
+    modes.add_argument('--render-control', action='store_true', help='same-size original converter with the same gated WHDLoad cache policy')
     modes.add_argument('--verify', action='store_true', help='build the CUSTOM1=2 diagnostic seam')
     modes.add_argument('--verify-control', action='store_true', help='original code with the same unused diagnostic tail/size')
     modes.add_argument('--ceiling',choices=['control','c2p','drawing-control','drawing','drawing-bitmap','drawing-clear'],help='VERIFY-only equal-size rendering ceiling fixture; never a release build')
     modes.add_argument('--cache-audit', action='store_true', help='VERIFY-only terminating hardware CACR audit')
+    p.add_argument('--render-family', choices=('auto','030','040'), default='auto', help='diagnostic converter-family override')
     p.add_argument('--render-verify', action='store_true', help='native original/replacement twin on every conversion; requires --render')
     p.add_argument('--input', default='tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')
     a = p.parse_args()
+    if a.render_family!='auto' and not a.render: p.error('--render-family requires --render')
     if a.render_verify and not a.render: p.error('--render-verify requires --render')
     out = (ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():
@@ -83,7 +85,7 @@ def main():
         lines += [f'\tifne *-slave-${pos:x}', '\tfail "offset drift"', '\tendif', f'S_{pos:04x}:']
         if pos in decoded:
             size, source = decoded[pos]
-            if a.render and pos in (0x178a,0x1422):
+            if (a.render and pos==0x178a) or ((a.render or a.render_control) and pos==0x1422):
                 lines.append('\t'+('bra.w render_entry' if pos==0x178a else 'bsr.w render_setcpu'))
             elif pos == 0x1422 and a.cache_audit:
                 lines.append('\tbsr.w cache_audit')
@@ -107,6 +109,7 @@ def main():
         pos += size
     if a.render or a.render_control:
         lines.append('RENDER_VERIFY equ '+str(int(a.render_verify)))
+        lines.append('RENDER_FAMILY equ '+str({'auto':0,'030':30,'040':40}[a.render_family]))
         lines.append(render_source(ROOT))
     if a.verify or a.verify_control:
         lines.append((ROOT/'whdload/verify.s').read_text())
@@ -122,9 +125,9 @@ def main():
     binary = out/'payload.bin'
     subprocess.run([os.environ['VASM'], '-m68020','-spaces','-no-opt','-Fbin','-L',str(out/'slave.lst'),'-o',str(binary),str(source)],check=True)
     built = binary.read_bytes()
-    if a.render:
+    if a.render or a.render_control:
         expected=bytearray(code)
-        for offset in (0x1422,0x178a): expected[offset:offset+4]=built[offset:offset+4]
+        for offset in ((0x1422,0x178a) if a.render else (0x1422,)): expected[offset:offset+4]=built[offset:offset+4]
         if built[:len(code)] != expected: raise ValueError('render build differs outside declared seams')
     if a.cache_audit:
         if built[:0x1422] != code[:0x1422] or built[0x1426:len(code)] != code[0x1426:]:
@@ -139,7 +142,7 @@ def main():
             if len(built)<=len(code) or len(built)%4 or built[:len(code)]!=expected:
                 raise ValueError('drawing fixture changed original code outside the PatchSeg detour')
         elif built!=expected:raise ValueError('ceiling fixture differs outside declared converter entry words')
-    if not (a.render or a.verify or a.cache_audit or a.ceiling) and built[:len(code)] != code:
+    if not (a.render or a.render_control or a.verify or a.cache_audit or a.ceiling) and built[:len(code)] != code:
         differences = [hex(i) for i,(x,y) in enumerate(zip(built,code)) if x != y]
         raise ValueError(f'reassembly differs: size {len(built)}; first offsets {differences[:20]}')
     if a.verify:
@@ -155,7 +158,7 @@ def main():
     (out/'WingCommanderCD32.Slave').write_bytes(result)
     report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
-              'code_ranges':CODE, 'byte_identical':result == original, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
+              'code_ranges':CODE, 'byte_identical':result == original, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
     if a.ceiling and a.ceiling.startswith('drawing'):
         report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')

@@ -360,15 +360,14 @@ Main layout evidence:
   then publishes. The original blitter branch at `E:31fcc` starts asynchronous
   conversion; its interrupt/completion path can publish at `E:3264e`.
 
-**FMODE/BPLCON remain unresolved runtime values.** No direct game FMODE write
-or explicit main-renderer BPLCON register write was identified in the resolved
-hardware-base code. Graphics.library emits the lists from the mode/depth
-structures (`E:33ab2`, `E:33b16`); eight planes require the AGA depth encoding.
-The slave's generic graphics hook `S:0554` writes BPLCON0 during ROM setup,
-while `S:05dc` restores COP2LC/BEAMCON0/DIWHIGH on WHDLoad switches. These are
-not a measurement of the main display's BPLCON0/1/2/3/4, FMODE, DDF or modulos.
-Read both generated lists and the actual writes before changing fetch mode;
-eight-byte allocation alignment alone does not prove FMODE=3.
+**Runtime update (phase 6):** the captured credits and menu copper lists use
+FMODE 3, DDF `0038/00d8` and modulos `fff8`, with aligned CHIP planes. The phase-6
+section records the evidence and scope. Other display states remain unverified.
+No direct game FMODE write was identified statically: graphics.library generates
+the lists from the mode/depth structures at `E:33ab2` and `E:33b16`. The slave's
+generic graphics hook `S:0554` writes BPLCON0 during ROM setup; `S:05dc` restores
+COP2LC/BEAMCON0/DIWHIGH on WHDLoad switches. These hooks alone do not establish
+the active display registers.
 
 ## Complete KickEmu ROM patch inventory
 
@@ -2069,61 +2068,147 @@ cap**, and preserve the native music/text deadlines in either case. The user
 chooses at this gate; no rate is installed by phase 5. Flight calibration remains
 phase 7. These limitations do not reopen the phase 4 profiling matrix.
 
-## Phase 6 rendering implementation (validation in progress)
+## Phase 6 rendering implementation
 
-The user authorised phase 6 while deferring further intended-speed investigation
-until gameplay. No new motion target is installed. The existing `Custom5=0–3`
-limiter remains; music and text deadlines are not patched. Frame-coupled scene
-lengths can still change with rendering cost, and are to be reported explicitly.
+Rendering work is complete; intended-speed calibration and exact duration
+neutrality remain deferred under the user's instruction to investigate timing
+in-game later. No new motion rate is installed. `Custom5=0–3` retains the existing
+limiter. Music and credit-text deadlines are not patched. This is an experimental
+English intro build, not a release or a gameplay timing fix.
 
-The experimental English renderer uses `Custom1=2`; `Custom1=0/1` retains the
-original English/German paths. The only original slave seams are the four-byte
-instructions at `S:1422` (SetCPU) and `S:178a` (converter wrapper). The gate is
-checked at runtime. Normal reconstruction is still byte-identical; an equal-size
-control includes the unused rendering tail without redirecting either seam.
-Enabled mode rejects `Custom5>=4` rather than silently selecting the old blitter
-converter. This is not an Akiko implementation/removal: no Akiko path was found.
+### Gating, converter selection and cache policy
 
-Mikael Kalms' public-domain 030 routine serves 020/030; his 040 routine explicitly
-supports 040/060. Full-frame conversion is selected because the intro census
-shows extensive changes. Three immutable specialisations cover 320×128, 320×166
-and 320×200. Their plane strides are 5120, 6640 and 8000 bytes. Build-time constants
-replace the upstream init routines and geometry storage. No converter performs
-SMC, copies code, allocates workspace, or changes cache state. `Custom1=2` bypasses
-Psygore's SetCPU request, leaving WHDLoad and its options in charge.
+`Custom1=2` enables the renderer; `Custom1=0/1` retains the original
+English/German paths. The only original slave seams are four-byte instructions
+at `S:1422` (SetCPU) and `S:178a` (converter wrapper). Normal reconstruction is
+still byte-identical. An equal-size control redirects only the cache-policy
+seam and retains the original converter. Both builds restore the original
+SetCPU request when disabled. Enabled mode rejects `Custom5>=4`; that option
+selects the old blitter converter, not Akiko. No Akiko implementation was found.
 
-After conversion, graphics.library WaitBOVP waits for the existing ViewPort
-(`E:33afe` establishes it from hunk-1 data) before the original index change and
-single publication at `E:3378e`. Double buffering is retained; no measurement
-justifies a third buffer. The native twin build allocates a separate 64000-byte
-FAST reference destination, executes the original converter on the same source,
-and compares every output longword before publication. This diagnostic overhead
-must never be included in performance claims.
+The embedded converter's authorship has not been established: “existing slave
+converter” identifies its location, not its author. Mikael Kalms' public-domain
+030 and 040/060 routines are vendored unmodified and pinned in
+`manifest/kalms-c2p.tsv`. The build generates immutable specialisations for
+320×128, 320×166 and 320×200, with plane strides 5120, 6640 and 8000 bytes.
+Full-frame conversion follows the intro change census. No new converter performs
+SMC, copies code, or allocates workspace.
 
-### Initial correctness and existing display state
+**Selection follows measurements, not the routine's CPU suffix:**
 
-The native oracle covers all three heights, zero/one/pixel-ramp/random inputs,
-and one retained real source from each of 31 intro scenes. It executes original,
-replacement and enabled/disabled wrapper paths. The initial 688 comparisons pass,
-including every destination store, exact once-only coverage, source integrity,
-guards and wrapper register preservation. Unicorn's 060 model rejects MOVEM;
-060 selection is checked with its flag on the 040 ISA model, and requires live
-060 validation separately. Unicorn results establish semantics, not speed.
+- 020/030 with instruction caching enabled: Kalms 030 family.
+- Instruction caching disabled, or 040/060: retain the existing slave converter.
+- `--render-family 030/040` is an explicit diagnostic override, not the default.
 
-The first live 020 probe reaches the credits. Both generated copper lists have
-FMODE `0003`, DDFSTRT `0038`, DDFSTOP `00d8`, and BPL1MOD/BPL2MOD `fff8`.
-The retained unmodified phase-4 menu trace has the same values in both lists.
-The active chunky source is in FAST memory; the eight planar pointers are in
-CHIP, eight-byte aligned, with the expected plane spacing. FMODE 3 and its
-modulos are therefore already configured by graphics.library in these observed
-states: there is no new fetch-mode patch and no claimed chip-slot saving.
-Sprites and OS-generated lists remain untouched. These observations supersede
-the earlier unresolved FMODE hypothesis for the captured states only.
+At startup a zero-mask `resload_SetCPU` query reads WHDLoad's effective policy
+(`WCPUF_IC`, bit 8). It changes no settings; the API performs its normal one-time
+cache flush. The selected family is stored as data at `S:1f3e` in the final
+non-VERIFY build. No cache setting is forced and no flush occurs per frame.
+Unmeasured cache/CPU combinations conservatively retain the existing converter;
+no speed improvement is claimed for those cells.
 
-Current development evidence: `tmp/phase6-probe-v1/`,
-`tmp/phase6-twin-probe-v3/`, and `tmp/phase6-native-real-v4.json`.
-The latter also rejects missing-converter, wrong-mask and wrong-geometry fixtures.
-The full 020 native-twin intro (`tmp/phase6-twin-020/`) reaches the menu with
-**1106 verified frames and zero differing output longwords**. Normal reconstruction
-still matches the original SHA-256. Matched timing, live 040/060 and final gate
-checks are still outstanding.
+The final wrapper is at `S:1e0c`, the display wait at `S:1ebe`, and the cache-policy
+adapter at `S:1ed4`. After conversion, graphics.library WaitBOVP waits for the
+existing ViewPort (established at `E:33afe`) before the original index change and
+single publication at `E:3378e`. This protects reuse of the old front buffer.
+Double buffering remains; no measurement justifies a third buffer.
+
+### Correctness
+
+`tmp/phase6-native-final-policy.json` records **688 native comparisons**, all
+three heights, zero/one/ramp/random sources, and real sources from 31 intro
+scenes. The checker runs the existing converter, both applicable converter
+bodies and enabled/disabled wrappers against an independent pixel model. Every
+destination store is hooked: exact once-only coverage, bounds, source integrity
+and wrapper register preservation pass. **60 cache/option-gate cases** pass,
+including rejection of the unsupported blitter option. Missing-converter,
+wrong-mask and wrong-geometry negative fixtures are rejected.
+
+Unicorn's 060 model rejects MOVEM. Its dispatch is therefore tested on the 040
+ISA model, with actual 060 execution checked separately in FS-UAE. These native
+checks establish semantics, not speed. The live twin build allocates a separate
+64000-byte FAST reference destination, executes the existing converter on the
+same source, and compares every output longword before publication:
+
+| Live intro through menu | Verified frames | Output differences |
+|---|---:|---:|
+| 020, cached Kalms candidate | 1106 | 0 |
+| 060, Kalms 040 diagnostic candidate | 2291 | 0 |
+| Final 060 NoCache selection (existing converter) | 2314 | 0 |
+
+The captures are `tmp/phase6-twin-020/`, `tmp/phase6-twin-060/`, and
+`tmp/phase6-final-twin-060/`. The final selector reports 30 in the cached 020 run
+and 0 in the 060 NoCache run, as intended. Twin overhead is excluded from all
+performance comparisons. The final enabled 020 and both 030 core runs preserve
+296 ship updates / 148 title publications, the scene/page sequence, game/music
+interrupt cadence and one copper publication per completed frame. Their matched
+menu screenshots are pixel-identical (`tmp/phase6-menu-pixels.json`); the comparison
+report also enforces this check.
+
+### Measured converter choice
+
+Matched controls use the same slave allocation size, CPU backend and live CACR.
+Figures below are median elapsed service time for the 320×128 converter over
+an uninterrupted intro. They include interrupts inside the interval, exclude
+the limiter and display wait, and describe the calibrated **emulator model**,
+not physical accelerators. There is no claim of a corresponding FPS increase.
+
+| Configuration | Existing, ms | Candidate, ms | Decision |
+|---|---:|---:|---|
+| Final 020, instruction cache | 41.777 | 38.726 (Kalms 030) | Select; 7.3% less time |
+| 030 NoMMU interpreter, caches | 16.150 | 11.375 (Kalms 030) | Select; 29.6% less time |
+| 030 MMU interpreter + WHDLoad MMU, caches | 9.027 | 6.142 (Kalms 030) | Select; 32.0% less time |
+| 020 NoCache | 42.022 | 48.774 (Kalms 030) | Reject; retain existing |
+| 040, caches | 18.919 | 21.884 (Kalms 040), 22.509 (Kalms 030) | Reject both |
+| 060, caches | 18.918 | 21.908 (Kalms 040), 22.506 (Kalms 030) | Reject both |
+
+Evidence: `tmp/phase6-final-render-020/report.json`,
+`tmp/phase6-render-030/report.json`, `tmp/phase6-render-030-mmu/report.json`,
+`tmp/phase6-render-020-nocache/report.json`, `tmp/phase6-render-040/report.json`,
+`tmp/phase6-render-060/report.json`, and `tmp/phase6-030-on-040/report.json` /
+`tmp/phase6-030-on-060/report.json`. Earlier candidate measurements determine the
+selection; the final 020 pair rechecks the completed selector. The converter
+bodies remain unchanged. Full fresh timing matrices for every retained-original
+cache cell, optional 060 BranchCache/StoreBuffer/SuperScalar combinations and
+physical hardware are **not** claimed complete. 320×166 has native correctness
+coverage but does not occur in this intro window; its live use belongs to gameplay.
+
+### Existing FAST placement and FMODE 3
+
+The observed chunky sources and loaded game hunks are already in FAST memory in
+the 8 MiB FAST setup. The 128 KiB workspace pointer (hunk 1 offset `7b9e`, written
+at `E:31f58`) also points into FAST at the credits probe. The unused old c2p
+workspace pointer is zero on this software path. No broad AllocMem flag patch
+is introduced; smaller-memory configurations remain untested.
+
+Both captured generated copper lists have FMODE `0003`, DDFSTRT `0038`, DDFSTOP
+`00d8`, and BPL1MOD/BPL2MOD `fff8`. The original phase-4 menu trace has the same
+values in both lists. Planar buffers are CHIP, eight-byte aligned, with the
+expected plane spacing. Graphics.library already configures FMODE 3 in these
+states: no new fetch patch is needed and **no freed chip-bus slots are claimed**.
+Sprites and OS-generated lists stay untouched. Evidence is the credits memory
+in `tmp/phase6-probe-v1/` and original menu trace in
+`tmp/phase4-dma-cia-matrix/020-default/bare/`. These observations resolve the
+previous FMODE hypothesis for the captured states only.
+
+### Timing limitation and phase gate
+
+The existing limiter is not an intended-speed calibration. Converter savings
+and the display-end wait still interact with per-frame motion. In the final
+020 comparison the title animation is **0.638 s longer**, and reset-to-menu is
+**0.631 s longer**. Individual credit-page differences are at most 0.075 s in
+that pair. The cached 030 candidate title differs by +0.010 s (NoMMU interpreter)
+and +0.006 s (MMU); their whole-window differences are -0.008 s and +0.002 s.
+The title update count, music driver, 320-tick credit deadlines and 220-tick text
+threshold remain unchanged. Thus **exact scene-duration neutrality is not
+claimed**, despite the retained limiter.
+
+Four TOD/field-sample discrepancies in the final 020 ledger are recorded rather
+than hidden: adjacent samples straddling an interrupt/field boundary can differ
+because the TOD read precedes observation at `S:17e6`. The minimum two-tick
+limiter threshold still holds. No new timing-backend calibration is claimed.
+
+Phase 6 stops here with measured converter selection, bit-exact output evidence,
+cache-preserving gating and safe publication. The original gate's exact-duration
+requirement remains deferred with the user's timing investigation. No universal
+motion rate, phase-7 gameplay analysis, release archive or OCS work is included.

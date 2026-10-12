@@ -28,7 +28,8 @@ Install shared prerequisites through AmigaXDev; ROM/OS sources are user supplied
 ## Current commands
 
 Fetch, input verification, archive preparation, static identification, reconstruction,
-windowed boots and a state-driven A/B gate are implemented.
+windowed boots, a state-driven A/B gate and experimental phase-6 rendering
+builds/checks are implemented.
 The phase 2 launcher and byte-identical reconstruction are available; the phase 2 boot gate is complete. All shell tooling is written
 for `/bin/bash` 3.2 and supports the project name's space.
 
@@ -1373,14 +1374,16 @@ separate. The decision and limitations are recorded in `internals.md`.
 
 These are experimental English-only builds, not release archives. `CUSTOM1=2`
 enables rendering changes and leaves cache configuration to WHDLoad; `CUSTOM1=0/1`
-keeps the original language/rendering behaviour. `CUSTOM5=0–3` retains the existing
+keeps the original language/rendering behaviour. Automatic selection uses Kalms
+030 only on cached 020/030 and retains the existing converter elsewhere.
+`CUSTOM5=0–3` retains the existing
 limiter choices. Enabled rendering rejects `CUSTOM5=4` (old blitter converter).
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --render --output tmp/render
-python3 tools/reconstruct.py --render-control --output tmp/render-control
-python3 tools/reconstruct.py --render --render-verify --output tmp/render-twin
+make render-slave OUT=tmp/render
+make render-control OUT=tmp/render-control
+make render-verify OUT=tmp/render-twin
 python3 tools/c2p_check.py tmp/render \
   --capture tmp/phase4-dma-cia-matrix/020-default/bare \
   --output tmp/render-native.json
@@ -1413,9 +1416,54 @@ python3 tools/render_capture.py --fixture tmp/render/WingCommanderCD32.Slave \
   --options 'CUSTOM1=2 DCache'
 ```
 
-Use the equal-size control with `CUSTOM1=0` for comparison. Record and match live
+Use the equal-size control with `CUSTOM1=2` for comparison: it retains the
+existing converter while applying the same WHDLoad cache policy. `CUSTOM1=0`
+also restores the original SetCPU request. Record and match live
 CACR rather than assuming identical option names imply identical cache states.
 The capture logs converter boundaries, original scene/music/publication markers,
 CPU settings, a menu screenshot, hashes and final memory. A twin capture additionally
 requires a nonzero verified-frame count. Its timings include reference conversion
 and comparison and are unsuitable for performance comparisons.
+
+Compare uninterrupted ledgers with matched CPU/cache state:
+
+```sh
+python3 tools/render_report.py tmp/render-intro --control tmp/control-intro \
+  > tmp/render-comparison.json
+```
+
+Converter figures are **elapsed service time**, including any interrupt that
+occurs between the native converter entry and return. They exclude the original
+limiter and the new display-end wait. They are not self/inclusive CPU attribution
+and are not hardware benchmarks. The full-intro report also records the unchanged
+296 title updates / 148 publications, game/music interrupt cadence, one copper
+publication per completed frame, source/destination placement, scene durations,
+and wait duration. CPU-bound scene durations remain subject to frame coupling.
+
+Unlike the stricter phase-5 calibration report, this report records CIA-TOD versus
+field-sample disagreements without rejecting the entire capture: an interrupt can
+separate the TOD read from the observation at `S:17e6`. It still requires the
+existing limiter's minimum two-tick threshold on every completed wait. These
+observations are not presented as a new timing-backend calibration.
+
+To evaluate the other Kalms family on the same CPU without changing allocation
+size or the control, use `--render-family 030` or `--render-family 040` with
+`--render`. These are diagnostic overrides, recorded in `build.json`. Never infer
+a routine's suitability from its upstream CPU suffix; compare actual measurements.
+
+
+The completed selection is based on the scoped measurements in `internals.md`.
+For 030 MMU, calibrate with `render_probe.py --machine a1200-030 --options
+'CUSTOM1=2 DCache MMU' --warp`, then capture with `--machine a1200-030 --mmu
+--options 'CUSTOM1=2 DCache'`. Other accelerated captures select the NoMMU timing
+interpreter; pass `--machine a1200-040` or `a1200-060` and `NoMMU` in options.
+Use `NoCache` to check the conservative original-converter selection. Calibration
+is specific to build size and MMU setup; do not transplant a different layout.
+
+Final normal/control/twin fixtures are `tmp/phase6-render-v6/`,
+`tmp/phase6-control-v6/` and `tmp/phase6-twin-v6/`. Rebuilding the renderer after
+the source-only diagnostic adjustment is byte-identical (`tmp/phase6-render-repro/`).
+The final cached 020 pair uses `tmp/phase6-final-probe/result.json` and lives in
+`tmp/phase6-final-{control,render}-020/`. Final 060 NoCache twin calibration and
+capture are `tmp/phase6-final-twin-probe/` and `tmp/phase6-final-twin-060/`.
+These fixtures and every derived capture remain ignored.

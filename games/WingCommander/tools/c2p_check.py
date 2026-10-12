@@ -21,6 +21,7 @@ def ck(e):
 
 class CPU:
     def __init__(self,blob,model):
+        self.selected=None; self.forced=0
         self.h=P(); ck(u.uc_open(7,1<<30,C.byref(self.h)))
         ck(u.uc_ctl(self.h,7|(1<<26)|(1<<30),I(model)))
         ck(u.uc_mem_map(self.h,0,0x100000,7)); self.write(BASE,blob)
@@ -45,6 +46,7 @@ class CPU:
         self.write(0x3000-402,bytes.fromhex('4e75')) # WaitBOVP: semantics tested live
         if custom is not None:
             self.write(BASE+0x1de4,struct.pack('>I',custom))
+            if self.selected is not None: self.write(BASE+self.selected,struct.pack('>H',self.forced or (30 if cpu<4 else 0)))
             self.write(BASE+0x1e04,struct.pack('>I',1)) # limiter bypass in CPU-only test
             self.write(4,struct.pack('>I',0x2000))
             self.write(0x2000+296,struct.pack('>H',0x80 if cpu==5 else 8 if cpu==4 else 2))
@@ -76,6 +78,8 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('build');p.add_argument('--output',required=True)
     p.add_argument('--capture',help='retained matrix directory with raw sources')
     a=p.parse_args(); build=Path(a.build); blob=(build/'payload.bin').read_bytes()
+    family=json.loads((build/'build.json').read_text()).get('render_family','auto')
+    forced=0 if family=='auto' else int(family)
     syms={m[1]:int(m[0],16) for m in re.findall(r'^([0-9A-F]{8}) (\S+)$',(build/'slave.lst').read_text(),re.M)}
     rng=random.Random(0xCD32); count=stores=0
     captured={128:[],166:[],200:[]}
@@ -94,6 +98,7 @@ def main():
 
     for model in (2,3,4,5):
         c=CPU(blob,min(model,4)) # Unicorn 060 lacks MOVEM; test 060 dispatch on 040 ISA.
+        c.selected=syms.get('render_selected'); c.forced=forced
         for height,original in ((128,0x17f6),(166,0x195e),(200,0x1ac6)):
             size=320*height
             fixtures=[bytes(size),b'\xff'*size,bytes(range(256))*(size//256),bytes(rng.randrange(256) for _ in range(size))]
@@ -106,6 +111,29 @@ def main():
                     assert got==want, (model,height,hex(entry),custom,next(i for i,(x,y) in enumerate(zip(got,want)) if x!=y))
                     count+=1; stores+=n
         c.close()
+    cache_cases=0
+    for flags,setup in ((2,0),(2,256),(8,256),(128,256)):
+        for custom in (0,1,2):
+            for custom5 in (0,1,2,3,4):
+                c=CPU(blob,2)
+                c.write(BASE+0x1de4,struct.pack('>I',custom))
+                c.write(BASE+0x1e04,struct.pack('>I',custom5))
+                c.write(BASE+0x121e,struct.pack('>I',0x80000))
+                c.write(0x80000+96,bytes.fromhex('203c')+struct.pack('>I',setup)+bytes.fromhex('4e75'))
+                c.write(4,struct.pack('>I',0x2000)); c.write(0x2000+296,struct.pack('>H',flags))
+                c.write(0x80000+4,bytes.fromhex('4ef900001000')) # Abort stops
+                c.write(STACK,struct.pack('>I',STOP)); c.reg(8,STACK)
+                c.reg(3,0x80000); c.reg(9,0x123); c.reg(11,0x7654)
+                ck(u.uc_emu_start(c.h,BASE+syms['render_setcpu'],STOP,1000000,1000))
+                assert c.reg(18)==STOP and c.reg(11)==0x7654
+                if custom==2 and custom5==4:
+                    assert c.read(c.reg(8),4)==struct.pack('>I',9), 'unsupported blitter option accepted'
+                else:
+                    assert c.reg(9)==(setup if custom in (0,1) else 0x123), 'cache-policy gate failed'
+                    assert c.reg(8)==STACK+4
+                if custom==2 and 'render_selected' in syms:
+                    assert int.from_bytes(c.read(BASE+syms['render_selected'],2),'big')==(forced or (30 if setup&256 and not flags&0x88 else 0))
+                cache_cases+=1; c.close()
     rejected=[]
     # Deliberately damaged local code proves coverage and pixel checks can fail.
     for name in ('missing-converter','wrong-mask','wrong-geometry'):
@@ -124,6 +152,6 @@ def main():
     assert len(rejected)==3, 'negative oracle fixture unexpectedly accepted'
     out=Path(a.output)
     assert Path('tmp').resolve() in out.resolve().parents and not out.exists()
-    out.write_text(json.dumps(dict(passed=True,cases=count,hooked_stores=stores,negative_fixtures_rejected=rejected,captured_frames=sum(map(len,captured.values())),cpu_models=[68020,68030,68040],note='060 dispatch executed on 040 ISA because Unicorn 060 rejects MOVEM',build_sha256=hashlib.sha256(blob).hexdigest()),indent=2)+'\n')
+    out.write_text(json.dumps(dict(passed=True,cases=count,hooked_stores=stores,cache_gate_cases=cache_cases,negative_fixtures_rejected=rejected,captured_frames=sum(map(len,captured.values())),cpu_models=[68020,68030,68040],note='060 dispatch executed on 040 ISA because Unicorn 060 rejects MOVEM',build_sha256=hashlib.sha256(blob).hexdigest()),indent=2)+'\n')
     print(out.read_text())
 if __name__=='__main__': main()

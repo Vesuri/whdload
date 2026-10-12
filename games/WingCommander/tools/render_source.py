@@ -2,15 +2,16 @@
 import hashlib
 from pathlib import Path
 
-HASHES = {'030':'31bf210db133f206a262f54443d5470c6454be5dcc80806064fe04a1c89e4bf5',
-          '040':'9fb2c00184c0a69edb41b9d234648ea8f0f1d478b02c745e6f377d36984df716'}
-
 
 def source(root):
     parts = [(root/'whdload/render.s').read_text()]
-    for cpu, sha in HASHES.items():
+    for row in (root/'manifest/kalms-c2p.tsv').read_text().splitlines():
+        if not row or row.startswith('#'): continue
+        path,sha,upstream=row.split('\t')
+        cpu=Path(path).stem.rsplit('_',1)[1]
+        if cpu not in ('030','040'): raise ValueError('unexpected converter in manifest')
         name = 'c2p1x1_8_c5_'+cpu
-        raw = (root/'whdload/kalms'/f'{name}.s').read_bytes()
+        raw = (root/path).read_bytes()
         if hashlib.sha256(raw).hexdigest() != sha:
             raise ValueError('vendored Kalms source changed')
         body = raw.decode().split('\n'+name+'\n',1)[1]
