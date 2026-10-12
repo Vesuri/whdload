@@ -1082,3 +1082,21 @@ continue to reject diagnostic captures. The trace checker explicitly permits
 that ledger for calibration, requires exact callback duration agreement, and
 optionally compares all callback intervals and final state with the uninterrupted
 control. The trace file and all mutation fixtures stay under `tmp/`.
+
+For matching callback controls across the machine matrix, use the full matrix
+plan format above and select IRQ mode. This mode performs a fresh cache audit,
+bare and `--irq-scopes` captures, full raw-source checks, callback-scope accounting
+and exact on/off comparison. It does not repeat the DMA/idle arms.
+
+```sh
+export FSUAE="$PWD/tmp/phase4-irq-v2-debugger/fs-uae"
+python3 tools/matrix_accounting_batch.py --kind irq \
+  --plan tmp/accounting-plan.json --output tmp/irq-matrix \
+  --audit-slave tmp/phase4-cache-slave/WingCommanderCD32.Slave \
+  --ports 2460 2461
+```
+
+Use free ports. The retained `tmp/phase4-irq-matrix/` plan excludes the already
+validated 020 default cell. `settings.json` records mode and ports; each cell
+retains exact commands, fresh audit and comparison results. IRQ acquisition and
+neutrality do not replace independent timing validation for each interpreter.

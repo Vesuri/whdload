@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture cache-audited bare/idle/DMA pairs for an explicit matrix plan in fresh tmp output."""
+"""Capture cache-audited DMA/idle or IRQ-scope pairs for an explicit matrix plan in fresh tmp output."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 from cd32_runtime import ROOT
+from matrix_irq_check import check as irq_check
 from matrix_idle_check import check as idle_check
 from matrix_dma_check import check as dma_check
 from matrix_raw_check import check as raw_check, compare as neutral_check
@@ -17,6 +18,7 @@ from matrix_dma_effect import compare as dma_effect
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--kind',choices=['dma-idle','irq'],default='dma-idle',help='IRQ mode records only the matched bare/callback pair')
     parser.add_argument('--plan',required=True,type=Path,help='JSON list of {name,reference} completed layout/cell captures')
     parser.add_argument('--output',required=True,type=Path)
     parser.add_argument('--audit-slave',required=True)
@@ -36,6 +38,7 @@ def main():
         cell['metadata']=meta
     if not plan:raise ValueError('nonempty matrix plan required')
     root.mkdir()
+    (root/'settings.json').write_text(json.dumps(dict(kind=args.kind,ports=args.ports),indent=2)+'\n')
     (root/'plan.json').write_text(json.dumps(plan,indent=2)+'\n')
     def lane(cells,port):
         results=[]
@@ -60,14 +63,22 @@ def main():
                 selector=['--nommu-core'] if nommu else ['--mmu-core'] if meta.get('mmu_core') else []
                 common=options+selector+['--no-profiles','--warp','--raw-chunky',
                     '--audit',str((out/'audit/result.json').relative_to(ROOT)),'--layout',cell['reference']]
-                for arm,flags in (('bare',[]),('idle',['--idle']),('dma',['--idle','--dma'])):
+                arms=(('bare',[]),('irq',['--irq-scopes'])) if args.kind=='irq' else (
+                    ('bare',[]),('idle',['--idle']),('dma',['--idle','--dma']))
+                for arm,flags in arms:
                     run('matrix_capture.py',common+flags+['--output',str((out/arm).relative_to(ROOT))],arm)
                     save(arm+'-raw.json',raw_check(out/arm))
-                    if arm!='bare':save(arm+'-idle.json',idle_check(out/arm))
-                save('idle-neutrality.json',neutral_check(out/'bare',out/'idle'))
-                save('dma-report.json',dma_check(out/'dma'))
-                effect=dma_effect(out/'idle',out/'dma');save('dma-effect.json',effect)
-                result=dict(name=name,complete=True,dma_records_equal_except_clock=effect['records_equal_except_clock'])
+                    if arm in ('idle','dma'):save(arm+'-idle.json',idle_check(out/arm))
+                if args.kind=='irq':
+                    save('irq-report.json',irq_check(out/'irq'))
+                    neutrality=neutral_check(out/'bare',out/'irq')
+                    save('irq-neutrality.json',neutrality)
+                    result=dict(name=name,complete=True,irq_scope_neutrality_pass=neutrality['irq_scope_neutrality_pass'])
+                else:
+                    save('idle-neutrality.json',neutral_check(out/'bare',out/'idle'))
+                    save('dma-report.json',dma_check(out/'dma'))
+                    effect=dma_effect(out/'idle',out/'dma');save('dma-effect.json',effect)
+                    result=dict(name=name,complete=True,dma_records_equal_except_clock=effect['records_equal_except_clock'])
             except Exception as error:
                 result=dict(name=name,complete=False,error=type(error).__name__+': '+str(error))
             save('result.json',result);results.append(result)

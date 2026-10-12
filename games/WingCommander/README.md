@@ -12,7 +12,9 @@ and instant-blitter ceilings are recorded, along with a scoped bitmap-drawing
 ceiling. Blanket clear bypass is invalid. CPU STOP accounting passes a neutral
 020 control and independent instruction-count check; full-matrix accounting
 captures are running. Preserving CIA wait stepping makes DMA recording exactly
-neutral on both 020 cache states; accelerated recorder controls are running. General routine/interrupt costs and remaining validation
+neutral on both 020 cache states and the default 030 MMU pair. The three game
+VBL callback scopes have validated 020 durations; remaining matrix controls are
+running. General routine/interrupt costs and remaining validation
 are still open.
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the

@@ -26,7 +26,10 @@ CPU STOP accounting passes the 020 control and independent instruction-count
 check. Both 020 cache states and 030 MMU default pass exact idle neutrality.
 The original DMA recorder changes publication counts and state on both 020
 states. Preserving CIA wait stepping passes exact DMA neutrality and slot checks
-on both; accelerated controls with the corrected recorder are in progress.
+on both and on the default 030 MMU-enabled/disabled pair. Remaining accelerated
+controls with the corrected recorder are in progress. The three game VBL callback
+scopes pass exact neutrality, independent entry counts and a five-field duration
+trace check on 020; matching controls for the remaining cells are running.
 Full-matrix DMA/idle/source-census captures are in progress; general
 return attribution and remaining instrument validation are incomplete. The matrix gate has not passed.
 

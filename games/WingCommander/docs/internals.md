@@ -1632,6 +1632,12 @@ DMA histogram and complete-field accounting pass. Evidence is each cell's
 This accepts the corrected recorder for these 020 cells; it does not validate
 routine attribution or prove equivalent behaviour on other CPU cores. The nine
 accelerated cells are being checked in `tmp/phase4-dma-cia-accelerated/`.
+The completed 030 default pair also passes exact neutrality, raw-source and
+independent DMA checks with both WHDLoad MMU enabled and disabled on the same
+MMU interpreter. Both fresh audits read CACR `$00002111`; live TC is `$80c07760`
+and `$00000000` respectively. Every scene's duration/publication/field difference
+is zero, all game hunks and pixels match, and the separate `dma-neutrality.json`
+checks pass. Other accelerated cells remain pending.
 The original matrix continues with its original binary as diagnostic evidence.
 
 ### Game VBL callback interval validation
@@ -1690,3 +1696,10 @@ default run (all 34 scene rows are reproduced by `matrix_irq_check.py`):
 Scope elapsed time includes callees and preemption;
 innermost selected callback time is not routine self time. Exception entry,
 dispatcher work and other handlers remain outside these three callback scopes.
+
+The remaining ten callback-control cells are being captured under
+`tmp/phase4-irq-matrix/`, with fresh cache audits and separate bare/IRQ arms.
+A completed acquisition validates callback event accounting and exact recorder
+neutrality only; it does not by itself extend the 020 instruction-duration
+calibration to the accelerated interpreters. General routine self/inclusive
+attribution and the interrupt work outside these callback scopes remain open.
