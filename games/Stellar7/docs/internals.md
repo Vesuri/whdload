@@ -119,6 +119,24 @@ natural death before carrier deployment: tick 6434 at N=3 (energy -44) and
 or exercise the carrier-triggered power route. Evidence:
 `tmp/release60/level1-carrier-encounters/level1-n*-observations.json`.
 
+Actor-triggered input-pilot power use passes its runtime checks at both selected
+rates. In the full-health final-boss setup, the private trigger remains zero
+before boss deployment, then records tick 660 at N=3 and 2643 at N=12, once
+within session 7. Native button input consumes one charge of each of the six
+selected powers; the mine remains unused. Input history and installed hooks pass.
+Evidence: `tmp/release60/trigger-runtime.json`. Twelve build comparisons cover
+proximity, actor-type and single-slot options, unchanged ordinary power-fixture
+bytes against the current committed source, and playable-release exclusion
+(`tmp/release60/trigger-builds/validation.json`).
+
+These final-boss attempts use fixture-controlled earlier exits and wave completion,
+leaving boss health unchanged. Both end in player death (ticks 844/3356, energy
+-20) and do not verify victory or ending. Early-power carrier and shield/mine
+probes are not passing encounter evidence: one stayed in carrier approach, and
+others expired before contact or consumed charges during earlier level setup.
+Corrected contact probes arm only after those setup exits; lethal shield/mine
+and terrain/midair coverage remain open.
+
 Natural combat death and Continue pass on both selected paths in level 6,
 after six fixture-controlled earlier exits. Death occurs at tick 1860 on N=3
 and tick 9212 on N=12. The native Continue dialog resumes level 6 in session 8

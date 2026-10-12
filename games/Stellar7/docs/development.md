@@ -974,6 +974,23 @@ uses the same flags with POWER_ROUTE=34200. Both pass direct native kill
 and exit evidence is under `tmp/release60/powered-boss-events`; see internals
 for the observed boundaries and the remaining coverage limits.
 
+`APPROACH_RAM=1` removes the approach route's stopping distance without firing;
+it requires APPROACH_TYPE and excludes APPROACH_FIRE/APPROACH_CONTACT. It does
+not place actors or force a collision.
+
+`POWER_TRIGGER_TYPE=TYPE` makes POWER_ROUTE the earliest arming tick, then waits
+for a live actor of TYPE in the native active list. Optional
+`POWER_TRIGGER_DISTANCE=D` also requires its recorded distance to be at most D.
+The trigger is private input-pilot state and resets each simulation session.
+`POWER_SLOT=0..6` selects a single one-second power stage instead of the default
+six-stage route; slot 3 is the mine. These options are checked on the selected
+N=3/N=12 paths and remain VERIFY/CUSTOM3-only. With forced earlier level exits,
+arm after LEVEL_TEST so ordinary enemies cannot consume inventory in an earlier
+level: for example POWER_ROUTE=150 with LEVEL_TEST=50 at N=3, or 600/200 at N=12.
+Capture before activation and check the required charge is still present. Carrier
+arrival is not boss deployment; use POWER_TRIGGER_TYPE=44 to wait for the boss.
+Contact and final-boss outcome checks remain separate from trigger validation.
+
 `POWER_ROUTE=TICK` supplies native second-button and both-button input for six
 seconds starting at TICK. It selects clone, shield, jump, cloak, cannon and speed
 in order, using the current inventory; it leaves the mine unused. It requires

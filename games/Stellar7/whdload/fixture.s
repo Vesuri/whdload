@@ -75,6 +75,27 @@ fixture_install:
         cmp.w #$0008,(4,a0)
         bne .bad
         ENDC
+        IFD POWER_TRIGGER_TYPE
+        IFND POWER_ROUTE
+        FAIL "POWER_TRIGGER_TYPE requires POWER_ROUTE"
+        ENDC
+        ENDC
+        IFD POWER_SLOT
+        IFND POWER_ROUTE
+        FAIL "POWER_SLOT requires POWER_ROUTE"
+        ENDC
+        IFLT POWER_SLOT
+        FAIL "POWER_SLOT must be 0..6"
+        ENDC
+        IFGT POWER_SLOT-6
+        FAIL "POWER_SLOT must be 0..6"
+        ENDC
+        ENDC
+        IFD POWER_TRIGGER_DISTANCE
+        IFND POWER_TRIGGER_TYPE
+        FAIL "POWER_TRIGGER_DISTANCE requires POWER_TRIGGER_TYPE"
+        ENDC
+        ENDC
         IFD POWER_ROUTE
         IFND SIM60
         FAIL "POWER_ROUTE requires SIM60"
@@ -171,14 +192,73 @@ fixture_power_buttons:
 ; Input-only combat sequence: select/activate clone, shield, jump, cloak,
 ; cannon and speed through the native two-button API. The mine is omitted;
 ; its placement and detonation use separate encounter checks.
-fixture_power_route_slots: dc.b 0,1,2,4,5,6
+fixture_power_route_slots:
+        IFD POWER_SLOT
+        dc.b POWER_SLOT
+        ELSE
+        dc.b 0,1,2,4,5,6
+        ENDC
+fixture_power_route_slots_end:
         even
+        IFD POWER_TRIGGER_TYPE
+; Start once per session when a live actor of the requested type appears.
+; Only private input state changes; deployment, health and inventory are native.
+fixture_power_trigger_session: dc.l 0
+fixture_power_trigger_tick: dc.l 0
+fixture_power_trigger_elapsed:
+        move.l a1,-(sp)
+        lea (fixture_power_trigger_session,pc),a0
+        move.l (s60_sessions,pc),d0
+        cmp.l (a0),d0
+        beq .session
+        move.l d0,(a0)
+        clr.l (4,a0)
+.session:
+        move.l (s60_ticks,pc),d0
+        cmp.l #POWER_ROUTE,d0
+        bcs .waiting
+        tst.l (4,a0)
+        bne .elapsed
+        move.w ($43b2-$8000,a4),d1
+        ble .waiting
+        cmp.w #256,d1
+        bhi .waiting
+        subq.w #1,d1
+        lea ($3fb2-$8000,a4),a1
+.scan:  move.l (a1)+,d2
+        move.l a1,-(sp)
+        move.l d2,a1
+        cmp.w #POWER_TRIGGER_TYPE,(2,a1)
+        bne .next
+        tst.b ($55,a1)
+        ble .next
+        IFD POWER_TRIGGER_DISTANCE
+        cmp.l #POWER_TRIGGER_DISTANCE,($50,a1)
+        bgt .next
+        ENDC
+        move.l (sp)+,a1
+        move.l d0,(4,a0)
+        bra .elapsed
+.next:  move.l (sp)+,a1
+        dbf d1,.scan
+.waiting:
+        moveq #-1,d0
+        bra .done
+.elapsed:
+        sub.l (4,a0),d0
+.done:  move.l (sp)+,a1
+        rts
+        ENDC
 fixture_power_route:
         movem.l d1-d2/a0,-(sp)
+        IFD POWER_TRIGGER_TYPE
+        bsr fixture_power_trigger_elapsed
+        ELSE
         move.l (s60_ticks,pc),d0
         sub.l #POWER_ROUTE,d0
         bcs .released
-        cmp.l #6*S60_RATE,d0
+        ENDC
+        cmp.l #(fixture_power_route_slots_end-fixture_power_route_slots)*S60_RATE,d0
         bcc .released
         divu #S60_RATE,d0
         move.w d0,d1
@@ -266,6 +346,17 @@ fixture_key:
         moveq #1,d0
 .done:  rts
 
+        IFD APPROACH_RAM
+        IFND APPROACH_TYPE
+        FAIL "APPROACH_RAM requires APPROACH_TYPE"
+        ENDC
+        IFD APPROACH_FIRE
+        FAIL "APPROACH_RAM does not fire"
+        ENDC
+        IFD APPROACH_CONTACT
+        FAIL "APPROACH_RAM and APPROACH_CONTACT are separate routes"
+        ENDC
+        ENDC
         IFD APPROACH_CONTACT
         IFND APPROACH_TYPE
         FAIL "APPROACH_CONTACT requires APPROACH_TYPE=31 or 46"
@@ -306,6 +397,7 @@ fixture_key:
 ; The 2048-angle deadband allows native turn-rate braking; stop accelerating
 ; inside 18000 distance units, below the native enemy firing limit of 24576.
 ; APPROACH_FIRE instead keeps steering and fires while aligned, closing to 4000.
+; APPROACH_RAM continues to contact distance without firing or changing actors.
 ; APPROACH_CONTACT targets type-31 pickups or type-46 terrain regardless of health,
 ; keeps approaching to contact distance and never fires.
 ; APPROACH_TYPE=0 selects the nearest grounded hostile (or a boss), prioritizing
@@ -412,8 +504,10 @@ fixture_approach:
         ENDC
         IFND APPROACH_FIRE
         IFND APPROACH_CONTACT
+        IFND APPROACH_RAM
         cmp.l #18000,($50,a1)
         ble .done
+        ENDC
         ENDC
         ENDC
         move.l ($43c0-$8000,a4),a2
