@@ -191,6 +191,8 @@ FF1PresentClock:
  move.w $2360e,d2
  add.w $2360c,d1
 .draw:
+ ; Native blitter code also clobbers D7/A2-A5; retain our table state.
+ movem.l d7/a2-a3,-(sp)
  ext.l d1
  ext.l d2
  move.l d2,-(sp)
@@ -198,6 +200,7 @@ FF1PresentClock:
  move.l d0,-(sp)
  jsr $23288
  lea 12(sp),sp
+ movem.l (sp)+,d7/a2-a3
  dbra d7,.next
  move.w (sp)+,$235c8
  move.l (sp)+,$23bb0
