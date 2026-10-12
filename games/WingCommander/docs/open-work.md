@@ -11,6 +11,9 @@ The unskipped intro has 31 identical milestone captures across two fresh boots.
 The publication ledger, full traces and independent SWAP_ONLY check agree. The
 stock 020 multiplier is verified; numeric-frequency presets require calibration.
 **Phase 4 is authorised and in progress. Stop at its gate; phase 5 is not authorised.**
+Fifteen cache audits and five functional/instrumentation preflights are complete.
+Accelerated backends lack covered, calibrated timing; the 020 scene diagnostics
+have unresolved return attribution. The measured matrix gate has not passed.
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.

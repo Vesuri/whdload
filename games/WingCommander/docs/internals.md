@@ -696,5 +696,126 @@ changed game-hunk byte (`tmp/intro-negative.json`). The original slave digest is
 unchanged. No reconstructed slave change was needed.
 
 The phase 3 gate is complete. These are measurements of this observed original
-intro route, not a CPU performance profile or proof of intended timing. Phase 4,
-performance patches, the blitter route, German runtime and OCS remain deferred.
+intro route, not a CPU performance profile or proof of intended timing. Phase 4 is separately authorised below. Performance patches, the blitter route,
+German runtime and OCS remain deferred.
+
+
+## Phase 4: cache audit and profiler eligibility
+
+Phase 4 is **in progress; its gate has not passed**. The cache audit is complete,
+but the accelerated matrix does not yet have a calibrated, covered CPU timing
+instrument. The 020 whole-scene captures are diagnostic material, not accepted
+routine-cost measurements. No phase 5 work or rendering changes have started.
+
+### Hardware cache audit
+
+The separate terminating VERIFY build detours the original `SetCPU` call at
+`S:1422` (slave file `1442`). It executes that call unchanged, queries `SetCPU`
+and `SetCACR` with zero change masks, reads hardware CACR through Exec Supervisor,
+and writes one `resload_Log` record before normal termination. Only this build
+raises the slave API version from 17 to 18 for the logging API. It does not supply
+performance timings. Ordinary reconstruction still matches the pinned original
+byte for byte.
+
+All 15 fresh audit boots completed with `CUSTOM5=0`:
+
+| CPU/configuration | Default CACR | With `DCache` | With `NoCache` |
+|---|---:|---:|---:|
+| A1200 fast, 020 | `00000001` | `00000001` | `00000000` |
+| 030, no WHDLoad MMU option | `00002111` | `00002111` | `00002000` |
+| 030, WHDLoad `MMU` | `00002111` | `00002111` | `00002000` |
+| 040, WHDLoad `NoMMU` | `00000000` | `80008000` | `00000000` |
+| 060, WHDLoad `NoMMU` | `20800000` | `a0808000` | `00000000` |
+
+`DCache` therefore makes no observed cache-state change on this original 020/030
+slave, but enables instruction/data caching on the 040/060 audits. `NoCache`
+disables those caches on 020/030. Other CACR bits must not be conflated with the
+instruction/data enable bits. These are observations immediately after the
+original slave's cache request; a later timing run must also check its live state.
+
+The audit slave is 7,860 bytes, SHA-256
+`99512207a79b3b4558787b156f53f85566fb0afacdfa656b3880ef6c36985cd6`.
+Retained records are `tmp/phase4-audit-{020,030,030-mmu,040,060}-{default,dcache,nocache}/`.
+The original performance-run slave remains SHA-256
+`5fbbb774bba3c794a776acc25f33c3f47c579449e1ba1a21c31418716aa74986`.
+
+### Instrument coverage is a prerequisite
+
+Five original-slave preflight boots reach the flight/credits checkpoint
+`E:1fdd6` (file `1fe02`). They explicitly enable the whole-RAM trace PC window,
+then request a five-field instruction trace and aggregate profile. Emulator
+configuration is read back at reset and at the checkpoint.
+
+| Requested cell | Observed backend | Preflight result |
+|---|---|---|
+| A1200 fast, 020 | cycle-exact, no hardware MMU model, cycle unit 128 | 427,130 instruction records; aggregate profile available |
+| 030/50 | cycle-exact, hardware MMU model 030, cycle unit 32 | zero instruction records; aggregate profiler rejects backend |
+| 030/50, WHDLoad `MMU` | same hardware backend | zero instruction records; aggregate profiler rejects backend |
+| 040/25, WHDLoad `NoMMU` | non-cycle-exact, hardware MMU model 040, cycle unit 32 | zero instruction records; aggregate profiler rejects backend |
+| 060/50, WHDLoad `NoMMU` | non-cycle-exact, hardware MMU model 060, cycle unit 32 | zero instruction records; aggregate profiler rejects backend |
+
+Zero coverage is **unavailable data**, not zero CPU cost, publications or interrupts.
+A WHDLoad `NoMMU` option does not remove the emulator's configured MMU model;
+configured hardware capability alone also does not prove guest translation is on.
+The shared source dispatches an MMU-model 030 through `m68k_run_mmu030`; the
+aggregate profiler instruments `m68k_run_2ce` and explicitly rejects MMU models.
+Its instruction-trace hooks likewise do not cover the accelerated backends used
+here. The 040/060 probes report memory and blitter cycle-exact modes disabled and
+multiplier 2048. Their nominal MHz labels are not calibrated timing evidence.
+The numeric-frequency arithmetic issue recorded in phase 3 also remains relevant.
+Adding counters alone would not establish a valid accelerated timing model.
+
+Retained preflights are `tmp/phase4-probe-{020,030,030-mmu,040,060}/`.
+The local audit/probe debugger SHA-256 is
+`c3292762b619d735182d68ee60326dc9950284a90ce575b84873aa5887b38352`;
+shared tools were not modified. The source revision and modified source inputs
+are checked by `manifest/debugger.tsv` before each local build.
+
+### 020 whole-scene diagnostics
+
+A read-only host observer starts/stops the aggregate profiler at the phase 3
+state cuts without debugger stops inside a scene. At the existing c2p entry
+`E:32028` (file `32054`) it compares all 320 × height chunky bytes against the
+previous same-size call within that scene, recording changed bytes and 32-byte
+blocks. Heights are restricted to 128, 166 or 200; a scene's first call is not a
+comparison. This is a proposed change-rate instrument awaiting independent
+validation, not a choice of full-frame or delta conversion.
+
+Fresh default and `NoCache` runs both complete the entire credits cycle and reach
+the menu, with live CACR matching their separate audits. All 34 scene profiles
+reconcile their PC/context unit sums and boundary clocks, with zero residual and
+zero high-address cost. Nevertheless, the default run reports 43,154 unmatched
+RTS/RTR/RTD returns and 10,455 unmatched RTE returns; `NoCache` reports 44,510 and
+10,561 respectively. Until their cause and attribution are validated, neither
+inclusive nor context-based self routine costs are accepted. Between-instruction
+cost is not automatically idle or interrupt cost.
+
+The default diagnostic has 1,697 publications over 178.891181 emulated seconds,
+versus phase 3's 1,696 over 178.771040. The capture protocols differ; this has not
+passed a matched observer-off comparison or a repeat check. It must not be treated
+as an improvement or a trusted baseline. NoCache diagnostics are likewise
+unaccepted. Raw data and reports are retained in
+`tmp/phase4-profile-020-{default,nocache}/`, with `validated_baseline=false` in the
+report. Local profiler SHA-256:
+`9123cf986fe75e2a8f45beacf1f8b67d4b554a00a7076aeec1185f8ea32b3f94`.
+
+The independent five-field 020 slice provides nonempty instruction and DMA
+records. `matrix_trace.py` rejects the uncovered accelerated traces. Its DMA
+fractions describe that slice only, not whole-scene idle time or CPU utilisation.
+Parser negative controls reject a missing scene, wrong CACR, invalid change count
+and wrong CPU clock (`tmp/phase4-negative-checked/`). These structural checks do not resolve
+the instrument-accuracy issues above.
+
+### Outstanding phase 4 gate work
+
+- Establish calibrated timing and instruction coverage for the requested accelerated
+  configurations, or obtain an explicit change to the matrix requirement.
+- Resolve return/context attribution and validate matched observer-off and repeat
+  runs; independently validate the chunky change census.
+- Complete per-scene self/inclusive CPU, waits, interrupts, DMA and idle accounting
+  for every accepted cell and differing cache state.
+- Run matched c2p/drawing/instant-blitter ceiling experiments on the fastest valid
+  matrix cell. None has yet been selected or measured.
+
+The phase 4 gate remains open; functional boots and cache audits do not substitute
+for its measured accounting requirements.

@@ -3,7 +3,9 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 4 in progress: calibrated intro profiles across the CPU/cache matrix.**
+**Phase 4 in progress: cache audits complete; matrix profiling gate still open.**
+Accelerated timing coverage and 020 call attribution need instrument work before
+routine-cost measurements can be accepted.
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the
 reset-to-menu event ledger. Full traces and independent SWAP_ONLY counts agree.

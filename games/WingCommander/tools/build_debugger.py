@@ -15,6 +15,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
     p.add_argument('--intro-observer', action='store_true', help='read-only phase 3 PC/field observer')
+    p.add_argument('--matrix-observer', action='store_true', help='phase 4 scene profiles and chunky change census')
     a = p.parse_args()
     source = Path(os.environ.get('FSUAE_SOURCE', os.environ['AMIGA_SHARE']+'/fs-uae-aprof-build/fs-uae'))
     out = (ROOT/a.output).resolve()
@@ -48,6 +49,10 @@ int record_key_debug(int kc) {
     } else if(cmd == "trace-window-all") {
         baseText = 0; sizeText = 0x7fffffff;
         response += to_hex("profile-window 00000000 7fffffff");
+    } else if(cmd == "wc-audit") {
+        char info[512];
+        snprintf(info, sizeof(info), "WC_CPU model=%d mmu=%d exact=%d memory_exact=%d blitter_exact=%d multiplier=%d frequency=%d unit=%d cacr=%08x", currprefs.cpu_model, currprefs.mmu_model, currprefs.cpu_cycle_exact, currprefs.cpu_memory_cycle_exact, currprefs.blitter_cycle_exact, currprefs.cpu_clock_multiplier, currprefs.cpu_frequency, cpucycleunit, regs.cacr);
+        response += to_hex(info);
     } else if(cmd.substr(0, 4) == "key ") {
         unsigned key = 0; int pressed = -1; char extra;
         if(sscanf(cmd.c_str(), "key %x %d %c", &key, &pressed, &extra) == 2
@@ -57,7 +62,7 @@ int record_key_debug(int kc) {
         } else response += "E01";
     '''+anchor)
     p.write_text(s)
-    if a.intro_observer:
+    if a.intro_observer or a.matrix_observer:
         target = out/'src/newcpu.cpp'
         code = target.read_text()
         anchor = 'struct cpu_profiler {'
@@ -66,6 +71,11 @@ int record_key_debug(int kc) {
         anchor = 'explicit cpu_profiler(uae_u32 pc) {'
         assert code.count(anchor) == 1
         code = code.replace(anchor, anchor+'\n        wc_observe(pc);')
+        if a.matrix_observer:
+            code=code.replace('struct cpu_profiler {','static void wc_matrix_observe(uae_u32 pc);\nstruct cpu_profiler {')
+            code=code.replace('wc_observe(pc);','wc_observe(pc);\n        wc_matrix_observe(pc);')
+            code=code.replace('// AITD-PROF-END','// AITD-PROF-END\n#include "wc_matrix_observer.inc"')
+            shutil.copyfile(ROOT/'tools/matrix_observer.inc', out/'src/wc_matrix_observer.inc')
         target.write_text(code)
         shutil.copyfile(ROOT/'tools/intro_observer.inc', out/'src/wc_intro_observer.inc')
     # Existing configured dependencies and objects are shared-build inputs; make
