@@ -58,6 +58,7 @@ static void wc_matrix_observe(uae_u32 pc) {
     if (pc==h0+0x3378e) {
         fprintf(ledger,"P %d %u %llu %08x\n",scene,vsync_counter,
                 (unsigned long long)get_cycles(),regs.cacr);
+        fflush(ledger);
     }
     if (pc==h0+0x32028) {
         unsigned width=regs.regs[0]&65535, height=regs.regs[3]&65535;
@@ -75,5 +76,6 @@ static void wc_matrix_observe(uae_u32 pc) {
                 (unsigned long long)get_cycles(),size,compared,bytes,blocks,regs.cacr);
         if (raw_sources && fwrite(current.data(),1,size,raw_sources)!=size) abort();
         previous.swap(current);
+        fflush(ledger);
     }
 }
