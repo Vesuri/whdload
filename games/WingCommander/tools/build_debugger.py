@@ -21,11 +21,14 @@ def main():
     p.add_argument('--aprof-stack-returns', action='store_true', help='diagnostic tracking of returns by their saved stack slot')
     p.add_argument('--matrix-nommu-counters', action='store_true', help='read-only scene/census hooks on the 040/060 NOMMU interpreter; no instruction-cost claims')
     p.add_argument('--frequency-clock', action='store_true', help='experimental numeric-clock scaling in colour-clock units; requires calibration')
+    p.add_argument('--matrix-idle',action='store_true',help='read-only stopped-CPU transitions and STOP wait-loop accounting')
     p.add_argument('--matrix-dma',action='store_true',help='experimental per-field DMA summary; requires --matrix-observer')
     p.add_argument('--matrix-mmu030-counters',action='store_true',help='read-only scene counters on the cycle-exact 030 MMU interpreter')
     a = p.parse_args()
     if a.matrix_mmu030_counters and not a.matrix_observer:
         raise ValueError('--matrix-mmu030-counters requires --matrix-observer')
+    if a.matrix_idle and not a.matrix_observer:
+        raise ValueError('--matrix-idle requires --matrix-observer')
     if a.matrix_dma and not a.matrix_observer:
         raise ValueError('--matrix-dma requires --matrix-observer')
     if a.matrix_nommu_counters and not a.matrix_observer:
@@ -100,6 +103,29 @@ int record_key_debug(int kc) {
                 assert server_code.count(anchor)==1
                 server_code=server_code.replace(anchor,anchor+'\n        wc_matrix_dma_vsync();')
                 server.write_text(server_code)
+
+        if a.matrix_idle:
+            code=code.replace('#include "wc_matrix_observer.inc"', '#include "wc_matrix_idle.inc"\n#include "wc_matrix_observer.inc"')
+            shutil.copyfile(ROOT/'tools/matrix_idle.inc',out/'src/wc_matrix_idle.inc')
+            observer=out/'src/wc_matrix_observer.inc'
+            observer_code=observer.read_text().replace('scene=id; previous.clear();','scene=id; previous.clear();\n        wc_matrix_idle_cut(id);')
+            anchor='if (scene<0 || scene>=34) return;'
+            assert observer_code.count(anchor)==1
+            observer.write_text(observer_code.replace(anchor,anchor+'\n    wc_matrix_idle_pc(pc,h0);'))
+            # Includes normal STOP/resume, reset and savestate restore assignments.
+            assert code.count('regs.stopped = 1;')==2 and code.count('regs.stopped = 0;')==3
+            for state in (0,1):
+                assignment='regs.stopped = %d;' % state
+                code=code.replace(assignment,assignment+'\n    wc_matrix_idle_event();')
+            assert code.count('r->stopped = cputrace.stopped;')==3
+            code=code.replace('r->stopped = cputrace.stopped;','r->stopped = cputrace.stopped;\n    wc_matrix_idle_event();')
+            start=code.index('void do_cycles_stop(int c)')
+            end=code.index('void m68k_setstopped (void)',start)
+            body=code[start:end]
+            body=body.replace('{\n','{\n    const uae_u64 wc_idle_start = get_cycles();\n    const bool wc_idle_was_stopped = regs.stopped != 0;\n',1)
+            at=body.rfind('}')
+            body=body[:at]+'    wc_matrix_idle_wait(wc_idle_start,wc_idle_was_stopped);\n'+body[at:]
+            code=code[:start]+body+code[end:]
 
         if a.matrix_nommu_counters:
             # 040/060 use this interpreter without the Barto instruction profiler.

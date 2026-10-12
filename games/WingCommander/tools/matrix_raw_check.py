@@ -88,6 +88,9 @@ def compare(control, candidate):
             raise ValueError('unmatched configuration: '+key)
     if not left['complete'] or not right['complete'] or left.get('diagnostic_stops') or right.get('diagnostic_stops'):
         raise ValueError('neutrality comparison requires complete runs without oracle stops')
+    for directory,metadata in ((control,left),(candidate,right)):
+        if not metadata.get('idle') and (directory/'idle-events.txt').exists():
+            raise ValueError('unexpected idle ledger in recording-off run')
     a = (control/'matrix-events.txt').read_text().splitlines()
     b = (candidate/'matrix-events.txt').read_text().splitlines()
     if a != b:
@@ -121,13 +124,14 @@ def compare(control, candidate):
     with Image.open(control/'menu.png') as image_a, Image.open(candidate/'menu.png') as image_b:
         if image_a.size != image_b.size or image_a.convert('RGB').tobytes() != image_b.convert('RGB').tobytes():
             raise ValueError('menu pixels differ')
-    changed = [key for key, default in (('raw_chunky',False),('profiles',True),('host_warp',False),('dma',False))
+    changed = [key for key, default in (('raw_chunky',False),('profiles',True),('host_warp',False),('dma',False),('idle',False))
                if left.get(key,default) != right.get(key,default)]
     return dict(matched_execution_pass=True, changed_features=changed,
                 recording_neutrality_pass=changed==['raw_chunky'],
                 aggregate_profiler_neutrality_pass=changed==['profiles'],
                 warp_neutrality_pass=changed==['host_warp'],
                 dma_neutrality_pass=changed==['dma'],
+                idle_neutrality_pass=changed==['idle'],
                 ledger_records=len(a), profile_files_identical=profiles, raw_sources_identical=raw_sources_identical,
                 final_game_hunks_identical=True, menu_pixels_identical=True)
 

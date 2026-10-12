@@ -9,8 +9,10 @@ recorded. Both 020 cache states and the 030 default pass profiler-neutrality
 controls. DMA accounting has an independently checked 030 capture with a measured
 small timing effect. The CPU/cache scene matrix is captured and the matched c2p
 and instant-blitter ceilings are recorded, along with a scoped bitmap-drawing
-ceiling. Blanket clear bypass is invalid. Remaining validation and full timing
-accounting are still open.
+ceiling. Blanket clear bypass is invalid. CPU STOP accounting passes a neutral
+020 control and independent instruction-count check; full-matrix accounting
+captures are running. General routine/interrupt costs and remaining validation
+are still open.
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the
 reset-to-menu event ledger. Full traces and independent SWAP_ONLY counts agree.

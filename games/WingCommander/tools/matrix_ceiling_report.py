@@ -35,7 +35,7 @@ def compare(control, candidate):
             raise ValueError('unmatched CPU settings: '+key)
     for key in ('machine', 'nommu_core', 'mmu_core', 'options', 'audit_cacr',
                 'emulator_sha256', 'hunks', 'slave',
-                'profiles', 'raw_chunky', 'host_warp', 'dma', 'names'):
+                'profiles', 'raw_chunky', 'host_warp', 'dma', 'idle', 'names'):
         if left.get(key) != right.get(key):
             raise ValueError('unmatched configuration: '+key)
     binaries = []

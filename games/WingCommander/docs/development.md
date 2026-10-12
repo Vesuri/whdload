@@ -885,3 +885,85 @@ retained **failed diagnostic arms**, not accepted performance comparisons. The
 clear bypass permits an invalid pixel-derived rectangle and a destructive stack
 clear during title loading; see internals. Do not report its partial ledger as a
 ceiling. The accepted bitmap comparison leaves surface clearing enabled.
+
+
+### CPU STOP accounting and matrix collection
+
+```sh
+python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
+  --matrix-mmu030-counters --frequency-clock --matrix-dma --matrix-idle \
+  --output tmp/accounting-debugger
+export FSUAE="$PWD/tmp/accounting-debugger/fs-uae"
+```
+
+Add `--idle` to a normal `matrix_capture.py` invocation. Its exact recording-off
+control uses the same emulator, slave, layout, audit, core and options, omitting
+only `--idle`. Verify it with:
+
+```sh
+python3 tools/matrix_idle_check.py tmp/phase4-idle-on-020 \
+  --profile-control tmp/phase4-profile-on-no-raw > tmp/idle-crosscheck.json
+python3 tools/matrix_raw_check.py tmp/phase4-idle-on-020 --compare-only \
+  --control tmp/phase4-idle-off-020 > tmp/idle-neutrality.json
+python3 tools/matrix_idle_negative.py tmp/phase4-idle-on-020 \
+  --output tmp/idle-negative
+```
+
+`--profile-control` is optional and only applies to a supported stable-PC
+instruction capture with an identical full ledger. New builds also write the
+two game STOP PC counts into each idle boundary, checked against entries plus
+wait calls after startup. The reset interval remains a separate STOP-state
+measurement because game code is not loaded throughout it. Wait-loop units must
+be a lower bound on stopped-state units; the report retains their difference.
+
+For the complete matrix, provide a JSON list of objects with `name` and
+`reference` fields. Each reference is a completed scene capture's `result.json`,
+whose machine, core, options and verified layout define the cell. Use fresh batch
+output; existing captures are never overwritten. The runner uses two separate
+ports and project-owned run directories, preserving the launcher's strict
+ownership checks. It continues unaffected cells after a failed cell and retains
+per-command logs and error results.
+
+```sh
+python3 - <<'PYPLAN'
+import json
+from pathlib import Path
+cells = [
+    ('020-default', 'profile-on-no-raw'),
+    ('030-mmu-default', 'mmu-scenes-030'),
+    ('020-nocache', 'nocache-on'),
+    ('030-nommu-default', 'mmu-off-scenes-030'),
+    ('030-mmu-nocache', 'mmu-nocache-scenes-030'),
+    ('030-nommu-nocache', 'mmu-off-nocache-scenes-030'),
+    ('040-default', 'frequency-scenes-040'),
+    ('040-dcache', 'frequency-scenes-040-dcache'),
+    ('060-default', 'frequency-scenes-060'),
+    ('060-dcache', 'frequency-scenes-060-dcache'),
+    ('060-nocache', 'frequency-scenes-060-nocache'),
+]
+plan = [{'name': name, 'reference': 'tmp/phase4-'+ref+'/result.json'}
+        for name, ref in cells]
+with Path('tmp/accounting-plan.json').open('x') as output:
+    json.dump(plan, output, indent=2)
+PYPLAN
+python3 tools/matrix_accounting_batch.py --plan tmp/accounting-plan.json \
+  --output tmp/accounting-matrix --ports 2456 2457 \
+  --audit-slave tmp/phase4-cache-slave/WingCommanderCD32.Slave
+```
+
+The current plan covers 020 default/NoCache; 030 MMU/NoMMU with default/NoCache;
+040 NoMMU default/DCache; and 060 NoMMU default/DCache/NoCache. Each cell receives
+a new cache audit, then `bare`, `idle` and `dma` runs with full raw chunky sources.
+The latter two use STOP accounting; only `dma` enables DMA recording. The batch
+recomputes source changes, checks STOP accounting, compares bare/idle exactly,
+checks DMA against the independent menu trace, and quantifies DMA effects:
+
+```sh
+python3 tools/matrix_dma_effect.py tmp/phase4-dma-off-030 tmp/phase4-dma-on-030 \
+  > tmp/dma-effect-check.json
+```
+
+A completed batch cell means acquisition and its listed checks finished; it does
+not certify the entire phase 4 gate. Inspect the DMA effect report, including
+state/source equality and any changed fields or publications. A changed clock
+is reported as a measured effect, not an exact-neutrality pass.

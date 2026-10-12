@@ -22,8 +22,9 @@ independent accounting checks with a quantified timing effect. The same-core 030
 MMU pair is captured with translation-state readback. Matched c2p, instant-blitter
 and scoped bitmap-drawing ceilings are recorded. Blanket clear bypass fails and
 is excluded; broader drawing bounds must preserve pixel-readback dependencies.
-General return attribution, full-matrix DMA/idle accounting and remaining
-instrument validation are incomplete. The matrix gate has not passed.
+CPU STOP accounting passes the 020 control and independent instruction-count
+check. Full-matrix DMA/idle/source-census captures are in progress; general
+return attribution and remaining instrument validation are incomplete. The matrix gate has not passed.
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.

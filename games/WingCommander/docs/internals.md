@@ -1533,3 +1533,64 @@ and the first corrupting write are retained in `tmp/phase4-drawing-watch-clear/`
 This is evidence that drawing data is consumed by later work; broader drawing
 bypass requires preserving that dependency, rather than silently accepting a
 crashed or shortened window. Full-matrix accounting also remains incomplete.
+
+
+### STOP-state idle accounting
+
+`--matrix-idle` observes each assignment to the emulator's stopped-CPU state,
+including reset and CPU-tracer restore paths. `idle-events.txt` records state
+transitions and the exact scene clocks. A separate counter measures elapsed
+units inside `do_cycles_stop` only when the CPU was already stopped at entry;
+the first invocation belongs to the STOP instruction before the stopped flag
+is set. The report integrates transitions independently and retains the gap
+between stopped-state duration and that narrower wait-loop counter.
+
+The completed 020 default pair uses local debugger digest
+`6b6678b68b153f704f06e798b061189b5cd13b70e3fbd9ac9401da451c0eda21`
+and a fresh VERIFY audit with CACR `$00000001`. Recording on/off matches every
+one of 3,409 scene/publication/census records, all final allocated game hunks and
+menu pixels exactly. Evidence: `tmp/phase4-idle-{on,off}-020/` and
+`tmp/phase4-idle-neutrality-020.json`.
+
+| Scene | Stopped seconds | Stopped share | STOP entries |
+|---|---:|---:|---:|
+| reset/loading | 7.673017 | 63.741% | 1,378 |
+| game-startup | 0.372302 | 25.592% | 27 |
+| origin-load | 0.304465 | 39.255% | 22 |
+| origin-reveal | 0.661638 | 55.277% | 51 |
+| origin-fade | 2.750912 | 60.683% | 197 |
+| title-load | 0.302045 | 15.214% | 23 |
+| second-cycle/menu exit | 0.316669 | 31.648% | 23 |
+
+All other measured scenes have zero stopped-CPU duration. This measures the
+emulator's STOP state, not unclaimed DMA slots or busy-wait time. The original
+TOD limiter remains executing CPU work. Stopped time outside the narrow wait
+call is retained explicitly (for example, 0.009430 seconds in origin-load);
+it is not silently discarded or assigned to an interrupt/routine cost.
+
+The prior stable-PC 020 instruction capture has the identical complete ledger.
+For every post-startup scene, its game STOP execution count equals the new
+state-entry count plus repeated wait-loop calls. The active game instruction is
+`E:34074` (file `$340a0`); the second checked STOP is `E:3408e` (file `$340ba`).
+The report checks both live opcodes. The independent comparison is in
+`tmp/phase4-idle-profile-check-020.json`. Negative fixtures reject duplicate
+transitions, missing scene boundaries and impossible wait totals.
+
+The matrix build additionally counts those STOP PCs directly, independently of
+the state assignments and wait function, for cores without aggregate instruction
+profiles. Its digest is
+`9816cb9879d4521a54521ac8de2dd6171b5e4a8870b6c829e2e1e8cc2a86ee6a`.
+Its completed 020 default `bare`/`idle` pair passes exact neutrality including
+all raw source bytes, and repeats every STOP duration/counter in the table above.
+Direct STOP-PC counts agree both with entries plus waits and with the prior
+independent instruction profile. The added negative fixture rejects a changed
+STOP-PC count. Evidence: `tmp/phase4-idle-v3-neutrality-020.json`,
+`tmp/phase4-idle-v3-profile-check-020.json` and
+`tmp/phase4-idle-v3-negative-020/`.
+
+The 11-cell run in `tmp/phase4-accounting-matrix/` is in progress. Each cell gets
+a fresh cache audit and three matching captures: raw-source baseline, idle
+recording, then idle plus DMA recording. This will validate idle neutrality,
+full source-change recomputation and DMA recording effects per cell. No pending
+cell is counted as completed, and general routine/interrupt accounting remains
+open.
