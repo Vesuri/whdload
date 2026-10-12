@@ -11,6 +11,23 @@ FF1_NATIVE_EXACT equ 0
  ifgt FF1_NATIVE_EXACT
 FF1InstallNativeExact:
  movem.l d0-d2/a0-a2,-(sp)
+ ifgt FF1_NATIVE_EXACT-2
+ lea FF1TrackSignature(pc),a0
+ lea $6977a,a1
+ move.w #136,d1
+.track_check:
+ move.w (a0)+,d2
+ cmp.w (a1)+,d2
+ bne.w .bad
+ dbra d1,.track_check
+ lea $67514,a1
+ moveq #10,d1
+.caller_check:
+ move.w (a0)+,d2
+ cmp.w (a1)+,d2
+ bne.w .bad
+ dbra d1,.caller_check
+ endc
  lea FF1NativeSites(pc),a0
 .check:
  move.l (a0)+,d0
@@ -29,7 +46,7 @@ FF1InstallNativeExact:
  lea FF1NativeSites(pc),a0
 .patch:
  move.l (a0)+,d0
- beq.b .done
+ beq.w .complete
  move.l d0,a1
  move.w (a0)+,d1
  move.w (a0)+,d2
@@ -55,6 +72,14 @@ FF1InstallNativeExact:
  move.l #$4c010800,(a1)       ; muls.l d1,d0 (low signed product)
  move.w #$4e71,4(a1)
  bra.b .patch
+.complete:
+ ifgt FF1_NATIVE_EXACT-2
+ lea FF1NativeLookahead(pc),a0
+ move.w #$4ef9,$6977a
+ move.l a0,$6977c
+ move.w #$4e71,$69780
+ endc
+ bra.b .done
 .bad:
  lea error(pc),a0
  move.l #39,(a0)
@@ -79,6 +104,38 @@ FF1NativeDivide:
  clr.l d0
  clr.l d1
  rts
+
+ ifgt FF1_NATIVE_EXACT-2
+; Only native caller $67514: drops argument, consumes D0, overwrites A0 and
+; XNZVC by $67528, overwrites D1 at $6755e on both intervening branch paths.
+; The native argument-slot mutation and D1/A0 scratch outputs are dead there.
+FF1NativeLookahead:
+ tst.w $1ed8a
+ bne.b .native
+ moveq #0,d1
+ move.w $2268c,d1
+ cmpi.w #12,d1
+ blo.b .native
+ ; At count 32767 the last segment +2 wraps the native signed word.
+ ; Keep native behavior for that whole boundary domain.
+ cmpi.w #32766,d1
+ bhi.b .native
+ move.w 6(sp),d0
+ ext.l d0
+ bmi.b .native
+ cmp.l d1,d0
+ bhs.b .native
+ lea $1dc24,a0
+ bra.w FF1TrackLookaheadNormal
+.native:
+ link a6,#-8
+ clr.l -6(a6)
+ jmp $69782
+ include "FerrariFormulaOne_Track.s"
+FF1TrackSignature:
+ dc.w $4e56,$fff8,$42ae,$fffa,$4a79,$0001,$ed8a,$665c,$3d7c,$000a,$fffe,$546e,$000a,$302e,$fffe,$536e,$fffe,$4a40,$6730,$3039,$0002,$268c,$322e,$000a,$b240,$6d04,$916e,$000a,$302e,$000a,$526e,$000a,$48c0,$e380,$2040,$d1fc,$0001,$dc24,$3010,$48c0,$d1ae,$fffa,$60c4,$4aae,$fffa,$6a08,$202e,$fffa,$4480,$6004,$202e,$fffa,$4e5e,$4e75,$3d7c,$0008,$fffe,$3039,$0003,$2fbc,$48c0,$e380,$2040,$d1fc,$0002,$275a,$3010,$0c40,$015e,$6f04,$586e,$000a,$302e,$fffe,$536e,$fffe,$4a40,$676c,$3039,$0002,$268c,$322e,$000a,$b240,$6d04,$916e,$000a,$302e,$000a,$3f40,$0000,$5240,$322f,$0000,$48c1,$e381,$2041,$d1fc,$0001,$dc24,$3210,$3d40,$000a,$4a41,$6a18,$526e,$000a,$48c0,$e380,$2040,$d1fc,$0001,$dc24,$3010,$48c0,$4480,$6018,$302e,$000a,$526e,$000a,$48c0,$e380,$2040,$d1fc,$0001,$dc24,$3010,$48c0,$d1ae,$fffa,$6088,$202e,$fffa,$e380,$4e5e,$4e75
+ dc.w $6100,$2264,$588f,$23c0,$0003,$2f8a,$3039,$0003,$2fbc,$48c0,$e380
+ endc
 
 FF1NativeSites:
 ; $22fe0: $22fe6 move.w $2360c.l, d1; $22fec ext.l d1; $22fee addq.l #$3, d1
