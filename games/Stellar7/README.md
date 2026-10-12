@@ -25,7 +25,8 @@ source amiga/env.sh
 amiga/play60.sh
 ```
 
-The launcher selects by `CPU` (default 68000), enables `CUSTOM1=1` and uses
+The launcher resolves `AMIGA_SETUP` before selecting by `CPU` (default 68000),
+enables `CUSTOM1=1` and uses
 normal controls and sound. Build both variants with `make -C whdload sim`, or
 use `sim68000` / `sim60` separately. The resulting files are
 `whdload/Stellar7-Sim68000.Slave` and `whdload/Stellar7-Sim60.Slave`.

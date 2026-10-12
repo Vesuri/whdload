@@ -5,6 +5,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
+. "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
+# Resolve a named machine before choosing its fixed-rate slave.
+fsuae_setup
 case "${CPU:-68000}" in
   68000|68010)
     target=sim68000

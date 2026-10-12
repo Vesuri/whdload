@@ -3,7 +3,7 @@
 ## Active performance work
 
 The experimental launcher selects **15 Hz (N=3) for 68000/68010 and
-60 Hz (N=12) for 68020+**, without interpolation. Selection uses the launcher's
+60 Hz (N=12) for 68020+**, without interpolation. Selection resolves `AMIGA_SETUP` first, then uses the launcher's
 `CPU` setting, defaulting to 68000, and builds a separate slave for each path.
 Each build keeps one fixed rate and scales movement and clocks to real time.
 Input history supplies each tick's recorded controls; native modal input is live.
@@ -20,7 +20,10 @@ CPU=68020 AMIGA_MODEL=A1200 CHIP_KB=2048 FAST_KB=4096 SLOW_KB=0 \
 
 `sim68000` builds `Stellar7-Sim68000.Slave`, default N=3; `sim60` builds
 `Stellar7-Sim60.Slave`, default N=12. `SIM68000_SUBSTEPS=4` selects N=4 for
-the former. Explicit `VASMFLAGS=-DS60_SUBSTEPS=N` still selects diagnostic
+the former. Named machine presets take precedence over an explicit `CPU`,
+matching the shared launcher. `tools/test_play60_launcher.py` checks selection
+without booting, including contradictory CPU settings and invalid presets.
+Explicit `VASMFLAGS=-DS60_SUBSTEPS=N` still selects diagnostic
 rates for the latter. For actual hardware select the appropriate slave file;
 there is no runtime CPU dispatch or rate switching inside a slave. The source
 and matrix-driver default remain N=12, so use `--substeps 3` for A500 matrix runs.
