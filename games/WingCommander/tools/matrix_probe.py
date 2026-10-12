@@ -12,13 +12,16 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output',required=True);p.add_argument('--machine',required=True,
         choices=['a1200-fast','a1200-030','a1200-040','a1200-060'])
+    p.add_argument('--nommu-core',action='store_true',help='select the emulator NOMMU timing core')
     p.add_argument('--options',default='');a=p.parse_args()
+    if a.nommu_core and (a.machine=='a1200-fast' or 'MMU' in a.options.upper().split()):
+        raise ValueError('NOMMU core requires an accelerated preset without WHDLoad MMU')
     out=(ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():raise ValueError('new tmp output required')
     if os.environ.get('EXTRA_ARGS'):raise ValueError('fixed preflight configuration required')
     out.mkdir(parents=True);os.chdir(ROOT)
     run='../'+str(out.relative_to(ROOT))+'/run'
-    env=dict(os.environ,FSUAE_RUN=run,AMIGA_SETUP=a.machine,SLAVE='',
+    env=dict(os.environ,WC_NOMMU_CORE='1' if a.nommu_core else '0',FSUAE_RUN=run,AMIGA_SETUP=a.machine,SLAVE='',
         WHD_ARGS='CUSTOM5=0 '+a.options,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',
         WARP='0',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',DETERMINISTIC='1')
     for key in ('WC_OBSERVER_CONFIG','WC_OBSERVER_OUTPUT','WC_MATRIX_CONFIG','WC_MATRIX_DIR'):env.pop(key,None)
@@ -28,6 +31,9 @@ def main():
         g=Server('wc-matrix-probe',root=str(ROOT),run_dir='amiga/'+run,profile_window=False).boot(env)
         boot_config=command('monitor wc-audit')
         if 'WC_CPU ' not in boot_config:raise ValueError('capability command unavailable')
+        (out/'boot-cpu.txt').write_text(boot_config+'\n')
+        if a.nommu_core and not all(word in boot_config for word in ('mmu=0','exact=1','memory_exact=1')):
+            raise ValueError('NOMMU timing configuration did not take effect: '+boot_config)
         for attempt in range(45):
             g.cont();time.sleep(1);g.stop()
             memory=out/f'calibration-{attempt}.bin'
@@ -53,7 +59,7 @@ def main():
         pcs=[pc for f in t.fields for pc,cost,regs in t.instructions(f) if pc not in (None,0x7fffffff)]
         (out/'credits.png').write_bytes(t.fields[-1].shot)
         boot=next((out/'run').glob('boot.*'))
-        result=dict(layout,machine=a.machine,options=a.options,complete=True,boot_cpu=boot_config,live_cpu=live,
+        result=dict(layout,machine=a.machine,nommu_core=a.nommu_core,options=a.options,complete=True,boot_cpu=boot_config,live_cpu=live,
                     aprof_reply=aprof,aprof_supported=enabled,fields=len(t.fields),instruction_records=len(pcs),
                     game_instruction_records=sum(h0<=pc<h0+0x35ea4 for pc in pcs),
                     publications=pcs.count(h0+0x3378e),vbls=pcs.count(h0+0x34162),

@@ -61,6 +61,29 @@ if [ "${INTRO_STOCK_CLOCK:-0}" = 1 ]; then
     done
   }
 fi
+# Timing-core selection is independent of WHDLoad's NoMMU tooltype.
+if [ "${WC_NOMMU_CORE:-0}" = 1 ]; then
+  setup_function=$(declare -f fsuae_setup)
+  eval "${setup_function/fsuae_setup/wc_mmu_base_setup}"
+  fsuae_setup() {
+    wc_mmu_base_setup || return 1
+    case "$AMIGA_SETUP" in
+      a1200-030) CPU=68EC030 ;;
+      a1200-040) CPU=68040-NOMMU ;;
+      a1200-060) CPU=68060-NOMMU ;;
+      *) echo "NOMMU timing core requires an accelerated preset" >&2; return 1 ;;
+    esac
+    local i
+    for i in "${!FSUAE_SETUP_ARGS[@]}"; do
+      case "${FSUAE_SETUP_ARGS[$i]}" in
+        --cpu=*) FSUAE_SETUP_ARGS[$i]=--cpu="$CPU" ;;
+        --uae_mmu_model=*) FSUAE_SETUP_ARGS[$i]=--uae_mmu_model=0 ;;
+        --uae_cpu_cycle_exact=*|--uae_cpu_memory_cycle_exact=*|--uae_blitter_cycle_exact=*)
+          FSUAE_SETUP_ARGS[$i]="${FSUAE_SETUP_ARGS[$i]%%=*}=true" ;;
+      esac
+    done
+  }
+fi
 fsuae_options
 fsuae_launch --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   --floppy_drive_0="$WORKBENCH_ADF" --state_dir="$BOOT/state"

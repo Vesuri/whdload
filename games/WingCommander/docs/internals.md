@@ -702,7 +702,7 @@ German runtime and OCS remain deferred.
 
 ## Phase 4: cache audit and profiler eligibility
 
-Phase 4 is **blocked at its full-matrix timing gate; the gate has not passed**. The cache audit is complete,
+Phase 4 is **in progress; the full-matrix gate has not passed**. The initial cache audit is complete,
 but the accelerated matrix does not yet have a calibrated, covered CPU timing
 instrument. General 020 calling-context costs remain unvalidated. The source-range leaf
 instruction costs below have a separately verified path. No phase 5 work or rendering changes have started.
@@ -770,6 +770,20 @@ The local audit/probe debugger SHA-256 is
 `c3292762b619d735182d68ee60326dc9950284a90ce575b84873aa5887b38352`;
 shared tools were not modified. The source revision and modified source inputs
 are checked by `manifest/debugger.tsv` before each local build.
+
+### Corrected NOMMU-core coverage
+
+The `68EC030` preflight in `tmp/phase4-nommu-probe-030/` reaches the same
+`E:1fdd6` checkpoint with the original slave. Effective settings report model
+68030, MMU zero, CPU/memory/blitter exact enabled, requested frequency 50 MHz,
+multiplier zero, cycle unit 32 and live CACR `$00002111`. Its five-field sample
+contains 802,766 instruction records, including 201,773 in the executable's first
+hunk, three publication entries and five VBL entries. Aggregate profiling is
+available. The emulator digest is
+`95329265de9f948787a6494fd8029d3e3516113b315f14dd586c00b37764494f`.
+This establishes instruction coverage on the corrected 030 core, not validated
+50 MHz costs, calling-context attribution or a completed matrix baseline. The
+WHDLoad-MMU cell remains separate; 040/060 corrected coverage is still pending.
 
 ### 020 whole-scene diagnostics
 
@@ -1113,26 +1127,32 @@ for its measured accounting requirements.
 
 ### Full-matrix gate audit
 
-The accelerated timing prerequisite remains unsatisfied after repeated source and
-runtime checks. The four accelerated preflight results still contain zero
-instruction records and reject aggregate profiling. Their configured frequency
-labels do not establish calibrated timing. The installed comparison workflow also
-leaves accelerated instruction costs unavailable. Adding counters or extrapolating
-020 costs would not validate the requested accelerated measurements.
+The initial accelerated preflights tested the shared presets' MMU cores, not the
+NOMMU timing configurations required by the plan. WHDLoad `NoMMU` does not select
+an emulator core. Hard Drivin' and Red Baron explicitly use `68040-NOMMU` and
+`68060-NOMMU` with cycle-exact settings for timing, and separate MMU functional
+runs. Hard Drivin' retains accelerated frame counts and ceiling experiments while
+marking unsupported instruction costs unavailable. Thus the initial missing
+instruction records do not justify blocking all accelerated measurement work.
+
+`WC_NOMMU_CORE=1` now replaces the project launcher's preset CPU/MMU/exact settings
+in place: `68EC030`, `68040-NOMMU` or `68060-NOMMU`, MMU model zero and CPU/memory/
+blitter exact requested. It leaves shared presets untouched. This selects an
+instrumentation path; it does not validate the requested MHz, guarantee that all
+exact settings survive emulator fixups, or replace the WHDLoad-MMU matrix cell.
+Corrected probes must read back the effective settings. The numeric-frequency
+issue and each instrument's coverage still require explicit checks.
 
 | Requirement | Authoritative evidence / remaining gap |
 |---|---|
-| CPU/cache matrix and CACR audits | All 15 cache audits pass. Calibrated accelerated timing/instruction coverage is missing. |
-| Per-scene FPS, routine self/inclusive cost, waits, interrupts, DMA and idle in every cell | Scoped 020 publication/census and verified leaf costs pass their controls. General caller attribution and full DMA/idle accounting remain open; accelerated cost coverage is absent. |
+| CPU/cache matrix and CACR audits | All 15 initial cache audits pass; corrected timing cores require matching audits. The NOMMU 030 has instruction coverage; accelerated clock validation remains open. |
+| Per-scene FPS, routine self/inclusive cost, waits, interrupts, DMA and idle in every cell | Scoped 020 publication/census and verified leaf costs pass their controls. General caller attribution and full DMA/idle accounting remain open; corrected 030 coverage is present but accelerated costs are not yet validated. |
 | Matched c2p, drawing and instant-blitter ceilings on the fastest valid cell | Not performed; the requested matrix has no validated fastest-cell comparison. |
 | Per-scene c2p change rate | Full 020 default/NoCache source recomputation passes. No extrapolation to unsupported accelerated timing configurations or future cockpit windows is made. |
 | Findings, reproducible commands and coherent commits | Recorded in this document and `development.md`; derived material stays in `tmp/`. |
 | Phase boundary | No phase 5 work or rendering release patch has started. |
 
-The full requested objective cannot pass with the available validated timing
-instruments. The next prerequisite is a suitable calibrated accelerated backend,
-or an explicit user decision permitting unavailable results where measurement is
-unsupported. That decision has been requested; no reduced gate is assumed. The
-remaining accounting and ceiling work listed above still has to be completed after
-that prerequisite is resolved. Further 020-only results cannot stand in for the
-missing matrix cells.
+The remaining accounting and ceiling experiments are still required. Reuse the
+sibling timing configurations and available instruments, retain explicit limits
+on unsupported results, and assess the full gate against the resulting evidence.
+No user-supplied emulator or gate waiver is a prerequisite to that work.

@@ -634,3 +634,22 @@ missing PCs without inferring STOP. Its zero `application_idle_marker_units` is
 not a measured zero for CPU idle; `cpu_idle_measured` remains false. No idle claim
 may be based on that optional trace field without a validated marker/hardware
 instrument.
+
+### Accelerated NOMMU-core preflight
+
+The WHDLoad `NoMMU` option does not select the emulator CPU core. Use the explicit
+project-local selector, following Hard Drivin' and Red Baron's timing setups:
+
+```sh
+. amiga/env.sh
+export FSUAE="$PWD/tmp/phase4-profile-control-debugger/fs-uae"
+python3 tools/matrix_probe.py --machine a1200-030 --nommu-core --output tmp/nommu-probe-030
+python3 tools/matrix_probe.py --machine a1200-040 --nommu-core --options NoMMU --output tmp/nommu-probe-040
+python3 tools/matrix_probe.py --machine a1200-060 --nommu-core --options NoMMU --output tmp/nommu-probe-060
+```
+
+`--nommu-core` sets `WC_NOMMU_CORE=1`; it replaces preset arguments instead of
+adding duplicate options. The same switch is accepted by `cache_audit.py` for
+separate matching VERIFY boots. It rejects WHDLoad `MMU` and the stock 020 preset.
+The probe records effective settings, coverage and the selector in `result.json`.
+Nominal frequency is still uncalibrated; these are preflights, not baseline FPS.
