@@ -800,7 +800,7 @@ neutrality are not yet validated. Its digest is
 A matching terminating 040 `NoMMU` audit reports CACR zero in
 `tmp/phase4-nommu-audit-040/`. This does not replace audits for other cores/options.
 
-### 040 NOMMU scene-counter validation
+### 040/060 NOMMU scene-counter validation
 
 The first complete counter-only capture, `tmp/phase4-nommu-scenes-040/`, reaches
 all 35 boundaries in order and passes the independent ledger checks. Raw-source
@@ -827,6 +827,56 @@ and source-recording neutrality. They do not independently validate the observer
 PC acquisition or calibrate the requested CPU MHz. No accelerated timing baseline
 or instruction-cost claim follows from them. The negative results are in
 `tmp/phase4-scene-negative/negative-results.json`.
+
+The first 060 counter capture `tmp/phase4-nommu-scenes-060/` also completes the
+35 boundaries. Its separate audit reports CACR `$20800000`; full raw recomputation
+passes all 3,342 calls, covering 136,957,440 source bytes. Its repetition and
+independent observer checks are still pending. The digest is the same NOMMU-counter
+build listed above. These are diagnostics under the original numeric-clock
+scaling, not a corrected-clock baseline.
+
+### Numeric CPU-clock scaling
+
+The optional local `--frequency-clock` build corrects the numeric-frequency path
+without changing the shared installation. `get_cycles()` uses 512 units per PAL
+colour clock (3,546,895 Hz), whereas the source's `baseclock` is eight times that
+clock. The replacement widens the multiplication and computes
+`floor(512 * (baseclock / 8) / requested_frequency)`. The existing multiplier
+path is unchanged. Merely widening the original multiplication would preserve an
+eightfold scale disagreement with the verified stock 020 multiplier.
+
+The candidate digest is
+`44b8e4f44798af096e6c72da94999c6a726dba192fb985cc746f7195c2126ac0`.
+At numeric 14,187,580 Hz its five-field original-slave trace matches the stock
+multiplier reference exactly: all 427,130 PC/cost/register records, trace memory,
+pixels, DMA bytes and custom-register bytes. The aggregate profile independently
+covers all trace PCs and costs. Evidence is in `tmp/phase4-frequency-probe-020/`
+and `tmp/phase4-frequency-stock-check.json`, against
+`tmp/phase4-stablepc-probe/`. This validates the numeric scaling at the stock
+reference, not the physical accuracy of every CPU's instruction/memory model.
+
+| Requested frequency | Internal unit | Implied internal-cycle frequency |
+|---|---:|---:|
+| 14.187580 MHz | 128 | 14.187580 MHz |
+| 25 MHz | 72 | 25.222364 MHz |
+| 50 MHz | 36 | 50.444729 MHz |
+
+The integer unit quantises the accelerated settings. The corrected 030 probe
+reads back unit 36, reaches the checkpoint, and records 684,458 instructions in
+five fields, including 207,121 game-hunk instructions, three publications and five
+VBL entries. Both trace and aggregate instrumentation are available. The 040/060
+unit values in the table follow the formula; corrected-core readbacks still need
+to be collected. Their per-instruction costs remain unsupported.
+
+The corrected 030 full capture `tmp/phase4-frequency-scenes-030/` passes scene,
+profile accounting, live leaf-byte/entry checks and raw-source recomputation
+(3,342 calls, 3,310 comparisons, 136,957,440 source bytes). The report now supports
+covered NOMMU 030 profiles; the established 020 leaf report remains byte-identical.
+General caller attribution is still unresolved. The first profiler-off control
+lost the emulator connection in the credits and has no success record; its partial
+output is retained in `tmp/phase4-frequency-control-030/`. A fresh control is
+required before accepting profiler neutrality. No failed run is included as a
+baseline or a successful comparison.
 
 ### 020 whole-scene diagnostics
 

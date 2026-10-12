@@ -698,3 +698,36 @@ python3 tools/matrix_raw_check.py tmp/nommu-warp-040 --compare-only \
 
 The changed-feature list must contain only `host_warp` and
 `warp_neutrality_pass` must be true.
+
+### Numeric-clock reference check
+
+Build a local correction candidate and compare its numeric 020 clock to the
+existing stock-multiplier trace:
+
+```sh
+. amiga/env.sh
+python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
+  --frequency-clock --output tmp/frequency-debugger
+export FSUAE="$PWD/tmp/frequency-debugger/fs-uae"
+python3 tools/matrix_probe.py --machine a1200-fast --numeric-clock \
+  --output tmp/frequency-probe-020
+python3 tools/matrix_pc_check.py tmp/phase4-stablepc-probe tmp/frequency-probe-020 \
+  > tmp/frequency-stock-check.json
+python3 tools/matrix_probe.py --machine a1200-030 --nommu-core --warp \
+  --layout tmp/phase4-nommu-probe-030/result.json --output tmp/frequency-probe-030
+```
+
+`--layout` rechecks the previously verified segment chain with one dump at the
+checkpoint, avoiding repeated boot dumps. `--numeric-clock` bypasses the stock
+020 multiplier override. The successful reference comparison must report identical
+instruction/memory/picture streams and zero DMA/custom differences. Clock units
+are integer-quantised; see internals for the realised rates and model limits.
+
+For the corrected 030 full capture, use the same binary for a fresh
+`cache_audit.py --machine a1200-030 --nommu-core` run, then
+`matrix_capture.py --machine a1200-030 --nommu-core --warp --raw-chunky` with its
+matching audit and layout. `matrix_report.py` and `matrix_leaf_report.py` accept
+covered 030 profiles; all reports retain incomplete-baseline status. Repeat with
+only `--no-profiles` added and use `matrix_raw_check.py --compare-only --control`
+to test aggregate-profiler neutrality. Failed runs have no `result.json` and must
+never be substituted for a completed control.

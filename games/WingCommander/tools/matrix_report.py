@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Diagnostic scene accounting; this is not a validated phase 4 baseline."""
-import argparse,collections,json
+import argparse,collections,json,re
 from pathlib import Path
 
 
@@ -32,6 +32,9 @@ def report(run):
     meta=json.loads((run/'result.json').read_text())
     if not meta['complete']:raise ValueError('incomplete capture')
     if not meta.get('profiles',True):raise ValueError('aggregate profiling was disabled for this control')
+    cpu=dict(re.findall(r'(\w+)=(\w+)',meta['boot_cpu']))
+    if meta['machine'] not in ('a1200-fast','a1200-030') or cpu.get('mmu')!='0':
+        raise ValueError('instruction report requires a covered 020/030 NOMMU core')
     boundaries=[];publications=collections.Counter();changes=collections.defaultdict(list)
     for line in (run/'matrix-events.txt').read_text().splitlines():
         p=line.split();kind=p[0];i=int(p[1])
@@ -61,8 +64,12 @@ def report(run):
     for a,b in zip(boundaries,boundaries[1:]):
         i=a[0];h,pcs,nodes,inc,residual=read_aprof(run/f'scene-{i:02d}.aprof')
         if h['units']!=b[3]-a[3]:raise ValueError('scene clock/profile disagreement')
-        if h['cpu_model']!=68020 or h['cycleunit']!=128 or h['CYCLE_UNIT']!=512 or h['colorclock_hz']!=3546895:
-            raise ValueError('unvalidated CPU/clock conversion')
+        expected_model=68020 if meta['machine']=='a1200-fast' else 68030
+        expected_unit=128 if expected_model==68020 else int(cpu['unit'])
+        if h['cpu_model']!=expected_model or h['cycleunit']!=expected_unit or h['CYCLE_UNIT']!=512 or h['colorclock_hz']!=3546895:
+            raise ValueError('CPU/clock conversion differs from capture')
+        if expected_model==68030 and not meta.get('nommu_core'):
+            raise ValueError('explicit NOMMU 030 capture required')
         if h['cacr']!=meta['audit_cacr'] and i>0:raise ValueError('profile cache audit mismatch')
         if h['vsyncs']!=b[2]-a[2]:raise ValueError('scene field/profile disagreement')
         seconds=h['units']/h['CYCLE_UNIT']/h['colorclock_hz']

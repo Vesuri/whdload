@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exact PC-range instruction costs for verified leaf c2p/limiter routines on the 020."""
+"""Exact PC-range instruction costs for verified leaf c2p/limiter routines on covered 020/030 cores."""
 import argparse
 import collections
 import hashlib
@@ -41,8 +41,8 @@ def main():
     args = parser.parse_args()
     original_code = verify_leaves()
     base = json.loads((args.run/'result.json').read_text())
-    if base['machine'] != 'a1200-fast':
-        raise ValueError('only calibrated 020 is covered')
+    if base['machine'] not in ('a1200-fast','a1200-030'):
+        raise ValueError('only covered 020/030 cores are supported')
     memory = (args.run/'fast.bin').read_bytes()
     for name, start, end in LEAVES:
         at = base['slave']-0x200000

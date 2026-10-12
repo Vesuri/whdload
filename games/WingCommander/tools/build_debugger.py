@@ -20,6 +20,7 @@ def main():
     p.add_argument('--aprof-stable-pc', action='store_true', help='retain the executing PC/opcode before a control transfer changes it')
     p.add_argument('--aprof-stack-returns', action='store_true', help='diagnostic tracking of returns by their saved stack slot')
     p.add_argument('--matrix-nommu-counters', action='store_true', help='read-only scene/census hooks on the 040/060 NOMMU interpreter; no instruction-cost claims')
+    p.add_argument('--frequency-clock', action='store_true', help='experimental numeric-clock scaling in colour-clock units; requires calibration')
     a = p.parse_args()
     if a.matrix_nommu_counters and not a.matrix_observer:
         raise ValueError('--matrix-nommu-counters requires --matrix-observer')
@@ -159,6 +160,17 @@ int record_key_debug(int kc) {
         code = code.replace('aprof_depth = 0;\n\taprof_hi_cyc', 'aprof_depth = 0;\n    aprof_adjusted_returns = 0;\n\taprof_hi_cyc')
         code = code.replace('fprintf(f, "AITDPROF 1\\nsource_pc_stable 1\\n");',
                             'fprintf(f, "AITDPROF 1\\nsource_pc_stable 1\\nstack_return_slots 1\\nadjusted_returns %llu\\n", (unsigned long long)aprof_adjusted_returns);')
+        target.write_text(code)
+    if a.frequency_clock:
+        target = out/'src/newcpu.cpp'
+        code = target.read_text()
+        old = 'cpucycleunit = CYCLE_UNIT * baseclock / currprefs.cpu_frequency;'
+        assert code.count(old) == 1
+        # get_cycles uses CYCLE_UNIT units per colour clock. The known stock
+        # 020 multiplier yields 128 units at four colour clocks per CPU clock.
+        # baseclock is eight colour clocks; widen before multiplying.
+        new = 'cpucycleunit = (uae_u64)CYCLE_UNIT * (baseclock / 8) / currprefs.cpu_frequency;'
+        code = code.replace(old, new)
         target.write_text(code)
     # Existing configured dependencies and objects are shared-build inputs; make
     # recompiles the changed translation units and links a new local binary.
