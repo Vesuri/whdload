@@ -905,6 +905,16 @@ random decision to select it. A500, normal 68020 and delayed 68020 pass native
 allocation at tick 3603 and 25 contacts at 3604–3628, with damage at
 3604/3616/3628. All 53 before/after gameplay/HUD/fresh-projection snapshots
 match across configurations; deferred projection scratch is reported separately.
+For jump/contact coverage, `--airborne` instead reads `spawn`, `air-contact`
+and `land-contact` before/after snapshot pairs. Each pair must retain native
+breakpoint PC/register transcripts in `anchor.txt` and the exact captured slave.
+Use an existing jump charge via POWER_SLOT=2, with POWER_ROUTE before the
+BOSS_TERRAIN_TEST attack. This mode checks positive height at allocation and
+first contact, zero height after landing, consumed charge and the same raw
+energy/private-clock rules. It does not require consecutive contacts or prove
+that jumping avoids terrain. Selected-rate evidence is in
+`tmp/release60/air-terrain`, including corrupted-snapshot controls.
+
 Results are in `tmp/terrain-contact-cross-validation.json`; omitted-damage and
 no-contact controls are rejected. All setup code is excluded without VERIFY.
 

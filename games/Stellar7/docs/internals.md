@@ -134,7 +134,7 @@ leaving boss health unchanged. Both end in player death (ticks 844/3356, energy
 -20) and do not verify victory or ending. Early-power carrier and shield/mine
 probes are not passing encounter evidence: one stayed in carrier approach, and
 others expired before contact or consumed charges during earlier level setup.
-Corrected contact probes arm only after those setup exits; mine destruction and terrain/midair coverage remain open.
+Corrected contact probes arm only after those setup exits; mine destruction and broader terrain/midair coverage remain open.
 
 Lethal shield ramming passes at both selected rates using the existing shield
 charge and ordinary approach/button inputs in level 6 (earlier exits are fixture
@@ -152,6 +152,27 @@ This earlier observer did not retain the return-PC transcript required by the
 new independent checker; a stronger repeat is pending. The analogous N=12
 attempt ends in death without contact, with its placed mine still intact.
 These captures do not establish mine destruction or detonation.
+
+Input-driven jump and controlled native terrain contact pass at both selected
+rates. The existing jump charge is consumed through normal button input;
+BE64 explicitly selects the level-5 boss terrain attack, so this is not evidence
+for the random decision to attack. Native allocation at $11472/$11476 creates
+type 46, and $36f8/$36fe is observed while airborne and after landing:
+
+| Path | Spawn tick | Air-contact tick / height | Landing-contact tick | Air-contact energy |
+|---|---|---|---|---|
+| N=3 A500 | 900 | 901 / 2274 | 990 | 580→579 |
+| N=12 68020 | 3603 | 3604 / 2356 | 3945 | 580→579 |
+
+Airborne contact still applies native terrain damage; this is not proof that
+jumping avoids that attack. At the sampled landed contact, the damage clock
+suppresses another decrement (energy 550/551 respectively). The independent
+raw-snapshot checker verifies native call/return PCs, same-tick execution,
+allocated type, height, consumed jump charge and N-dependent damage clock.
+The existing 25-contact check still passes; grounded, unspent-charge and
+omitted-damage corruptions are rejected. Evidence:
+`tmp/release60/air-terrain/n*-validation.json` and `negative-validation.json`.
+Arbitrary terrain and incoming-projectile midair impacts remain separate coverage.
 
 Natural combat death and Continue pass on both selected paths in level 6,
 after six fixture-controlled earlier exits. Death occurs at tick 1860 on N=3
