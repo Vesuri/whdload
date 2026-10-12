@@ -1361,7 +1361,7 @@ reset/loading (142,597 recorded slots) and has no recorded slots after game star
 in this `Custom5=0` run; this does not cover the original blitter converter option.
 DMA results for other matrix cells are still outstanding.
 
-### 030 MMU counter path under validation
+### 030 MMU counter path and paired scene captures
 
 `--matrix-mmu030-counters` adds the same read-only scene observer to the 030 MMU
 interpreter before its internal instruction-retry label. Internal MMU retries do
@@ -1373,5 +1373,63 @@ Counter capture requires explicit `--mmu-core --no-profiles`; it does not claim
 instruction-profiler support. The `MMU` capture in `tmp/phase4-mmu-scenes-030/` completes and passes the scene
 ledger check. Its actual translation control is `$80c07760` (enabled), with CACR
 `$00002111` and unit 36. The checker now requires the TC enable bit to agree with
-an explicit `MMU`/`NoMMU` option. The same-interpreter `NoMMU` control is still
-being collected, separately from the NOMMU-interpreter figures.
+an explicit `MMU`/`NoMMU` option. The same-interpreter `NoMMU` control also completes with TC zero. Both NoCache
+variants complete with CACR `$00002000`; the MMU option still controls TC as
+requested. Their scene ledgers pass. These rows remain separate from the
+NOMMU-interpreter figures to avoid attributing a core implementation difference
+to the WHDLoad option.
+
+| Scene | MMU default | NoMMU default | MMU NoCache | NoMMU NoCache |
+|---|---:|---:|---:|---:|
+| game-startup | 4.835 | 4.848 | 3.878 | 3.871 |
+| origin-load | 10.465 | 10.462 | 8.969 | 8.965 |
+| origin-reveal | 1.176 | 1.176 | 1.153 | 1.153 |
+| origin-animation | 25.217 | 25.217 | 25.193 | 25.193 |
+| origin-expression | 3.963 | 3.963 | 3.950 | 3.950 |
+| origin-separation | 26.147 | 26.148 | 26.050 | 26.049 |
+| origin-flight | 3.850 | 3.850 | 3.851 | 3.851 |
+| origin-particles | 25.091 | 25.091 | 25.078 | 25.078 |
+| origin-fade | 1.733 | 1.733 | 1.732 | 1.732 |
+| title-load | 6.699 | 6.700 | 4.325 | 4.326 |
+| title-animation | 25.326 | 25.322 | 25.213 | 25.209 |
+| title-arrival | 24.965 | 24.965 | 24.967 | 24.967 |
+| title-departure | 25.014 | 25.014 | 24.655 | 24.655 |
+| credits-load | 0.000 | 0.000 | 0.000 | 0.000 |
+| credits-00 | 25.111 | 25.110 | 25.097 | 25.096 |
+| credits-01 | 24.960 | 24.960 | 24.959 | 24.959 |
+| credits-02 | 24.960 | 24.960 | 24.962 | 24.962 |
+| credits-03 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-04 | 24.960 | 24.960 | 24.958 | 24.958 |
+| credits-05 | 24.960 | 24.960 | 24.962 | 24.962 |
+| credits-06 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-07 | 24.960 | 24.960 | 24.958 | 24.958 |
+| credits-08 | 24.960 | 24.960 | 24.962 | 24.962 |
+| credits-09 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-10 | 24.958 | 24.958 | 24.960 | 24.960 |
+| credits-11 | 24.963 | 24.963 | 24.960 | 24.960 |
+| credits-12 | 24.958 | 24.958 | 24.960 | 24.960 |
+| credits-13 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-14 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-15 | 24.963 | 24.963 | 24.960 | 24.960 |
+| credits-16 | 24.958 | 24.958 | 24.960 | 24.960 |
+| credits-17 | 24.960 | 24.960 | 24.960 | 24.960 |
+| cycle-complete | 14.122 | 14.122 | 12.748 | 12.748 |
+
+Values are publications per emulated second. Evidence is in
+`tmp/phase4-{mmu,mmu-off,mmu-nocache,mmu-off-nocache}-scenes-030/`.
+The byte-identical ceiling control on the same-core NoMMU/default cell repeats
+all 6,741 ledger records, final game hunks and menu pixels exactly;
+`tmp/phase4-ceiling-repeat-check-030.json` records the pass.
+
+### Ceiling comparison cell
+
+The declared ranking window is `origin-load` entry through `cycle-complete`
+entry: one complete intro, excluding reset and the second-cycle/menu exit.
+`tmp/phase4-ceiling-cell-ranking.json` covers all measured CPU/cache cells.
+The 030 MMU/default cell records 3,351 publications over 152.658730 emulated
+seconds (21.950923/s). Same-core NoMMU/default records the same count over
+152.658910 seconds (21.950897/s). This 180-microsecond difference over the entire
+intro is not evidence of a meaningful physical accelerator advantage; the two
+are effectively tied. The nominally fastest MMU/default cell is selected for the
+matched ceiling experiments. Its equal-size control and c2p-bypass runs are in
+progress; no ceiling gain has yet been accepted.

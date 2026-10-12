@@ -7,7 +7,7 @@ WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 Cache audits, corrected-clock NOMMU scene figures and scoped 020/030 costs are
 recorded. Both 020 cache states and the 030 default pass profiler-neutrality
 controls. DMA accounting has an independently checked 030 capture with a measured
-small timing effect. The MMU pair, remaining validation, general caller/idle
+small timing effect. The CPU/cache scene matrix is captured; remaining validation, general caller/idle
 accounting and ceiling experiments remain open.
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the

@@ -19,7 +19,8 @@ Corrected NOMMU-core scene captures cover all distinct accelerated cache states.
 Numeric-clock scaling matches the stock 020 reference, with documented integer
 quantisation. The 030 default passes profiler neutrality; its DMA capture passes
 independent accounting checks with a quantified timing effect. The same-core 030
-MMU pair and remaining validation are in progress. General return attribution,
+MMU pair is captured with translation-state readback. Remaining validation and
+the matched ceiling experiments are in progress. General return attribution,
 full-matrix DMA/idle accounting and ceilings remain incomplete. The matrix gate
 has not passed.
 
