@@ -3,6 +3,7 @@
 static void wc_matrix_observe(uae_u32 pc) {
     static bool initialized = false;
     static FILE* ledger = nullptr;
+    static FILE* raw_sources = nullptr;
     static unsigned h0;
     static int scene = -1;
     static std::string directory;
@@ -26,6 +27,11 @@ static void wc_matrix_observe(uae_u32 pc) {
         directory=dir;
         ledger=fopen((directory+"/matrix-events.txt").c_str(), "wx");
         if (!ledger) abort();
+        const char* raw = getenv("WC_MATRIX_RAW");
+        if (raw && strcmp(raw,"1")==0) {
+            raw_sources=fopen((directory+"/chunky-sources.bin").c_str(), "wbx");
+            if (!raw_sources) abort();
+        }
     }
     if (!ledger) return;
     for (const auto& cut:cuts) {
@@ -41,6 +47,7 @@ static void wc_matrix_observe(uae_u32 pc) {
         fprintf(ledger,"B %d %x %u %llu %08x\n",scene,pc,vsync_counter,
                 (unsigned long long)get_cycles(),regs.cacr);
         fflush(ledger);
+        if (raw_sources && fflush(raw_sources)) abort();
         if (id<34 && !aprof_start()) abort();
         break;
     }
@@ -63,6 +70,7 @@ static void wc_matrix_observe(uae_u32 pc) {
         }
         fprintf(ledger,"C %d %u %llu %u %u %u %u %08x\n",scene,vsync_counter,
                 (unsigned long long)get_cycles(),size,compared,bytes,blocks,regs.cacr);
+        if (raw_sources && fwrite(current.data(),1,size,raw_sources)!=size) abort();
         previous.swap(current);
     }
 }

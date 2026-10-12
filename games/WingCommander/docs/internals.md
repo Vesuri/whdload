@@ -900,12 +900,84 @@ contains debugger stops and is not an accepted timing baseline.
 Evidence: `tmp/phase4-census-oracle/`, `tmp/phase4-census-check.json` and
 `tmp/phase4-census-negative/`. All raw source buffers remain in `tmp/`.
 
+### Whole-route chunky census and recording neutrality
+
+The corrected-PC 020 observer now optionally retains every source buffer after
+reading it. A separate Python implementation recomputes byte and 32-byte-block
+changes from that stream, resetting comparisons at scene and geometry changes.
+All **1,677 calls**, **1,645 comparable pairs** and **68,759,040 source bytes** agree
+with the native census. Calls occur in 31 scenes; the recorded geometries are
+320×128 and 320×200. No 166-line input occurs in this route. The first six Origin
+source buffers also match the independently acquired GDB snapshots byte for byte.
+A changed raw byte is rejected at its first affected comparison.
+
+A fresh matched control uses the same local emulator, original slave, stock 020
+clock, `CUSTOM5=0`, PAL and CACR `00000001`, with raw recording disabled. All
+**3,409 B/P/C ledger records**, **34 complete aggregate profile files**, final
+allocated game-hunk bytes and menu RGB pixels match exactly. A deliberately
+changed profile instruction count fails the comparison. This establishes repeat
+agreement and the neutrality of the **additional raw recording** on this route;
+it is not an aggregate-profiler-off test and does not validate the remaining
+calling-context errors. The two runs each observe 1,697 publications over
+178.891181 emulated seconds, including loading and holds. Their agreement does
+not remove the separately recorded difference from the phase 3 capture protocol.
+
+Percentages below use only same-size, consecutive source pairs within a scene.
+Unpaired first calls and geometry changes are excluded, not counted as zero
+change. Block percentage is the fraction of compared 32-byte source blocks with
+at least one changed byte. These measurements do not include palette changes,
+conversion cost, or a recommendation for delta c2p.
+
+| Scene | c2p calls | Pairs | Changed bytes % | Changed blocks % |
+|---|---:|---:|---:|---:|
+| origin-load | 1 | 0 | — | — |
+| origin-reveal | 1 | 0 | — | — |
+| origin-animation | 30 | 29 | 0.771 | 9.246 |
+| origin-expression | 21 | 20 | 0.445 | 3.543 |
+| origin-separation | 17 | 16 | 9.267 | 30.098 |
+| origin-flight | 42 | 41 | 13.160 | 26.265 |
+| origin-particles | 100 | 99 | 2.783 | 13.404 |
+| origin-fade | 2 | 1 | 0.000 | 0.000 |
+| title-load | 1 | 0 | — | — |
+| title-animation | 67 | 66 | 6.041 | 13.640 |
+| title-arrival | 50 | 49 | 2.546 | 4.904 |
+| title-departure | 31 | 30 | 7.640 | 15.365 |
+| credits-00 | 81 | 80 | 1.659 | 5.798 |
+| credits-01 | 74 | 73 | 2.893 | 7.276 |
+| credits-02 | 75 | 74 | 1.039 | 4.298 |
+| credits-03 | 74 | 73 | 1.051 | 3.924 |
+| credits-04 | 73 | 72 | 1.062 | 4.332 |
+| credits-05 | 73 | 72 | 1.683 | 6.367 |
+| credits-06 | 72 | 71 | 1.916 | 6.306 |
+| credits-07 | 72 | 71 | 1.916 | 6.773 |
+| credits-08 | 71 | 70 | 3.567 | 8.790 |
+| credits-09 | 71 | 70 | 1.033 | 4.075 |
+| credits-10 | 69 | 68 | 1.823 | 5.958 |
+| credits-11 | 73 | 72 | 2.081 | 6.377 |
+| credits-12 | 69 | 68 | 1.538 | 6.018 |
+| credits-13 | 71 | 70 | 1.570 | 5.631 |
+| credits-14 | 72 | 71 | 1.588 | 6.005 |
+| credits-15 | 73 | 72 | 1.802 | 6.870 |
+| credits-16 | 72 | 71 | 1.766 | 6.199 |
+| credits-17 | 75 | 74 | 0.896 | 3.806 |
+| cycle-complete | 4 | 2 | 6.763 | 7.600 |
+
+The cycle-complete row contains one 128-line and three 200-line calls; its two
+comparisons are between the 200-line sources. Other rows contain 128-line calls.
+Evidence: `tmp/phase4-raw-census/`, `tmp/phase4-raw-control/`,
+`tmp/phase4-raw-comparison.json`, `tmp/phase4-raw-negative/` and
+`tmp/phase4-raw-profile-negative/`. Local emulator SHA-256:
+`bfef8b4d91f0a68eabff32e8a16e21d80f21b67fa75bfa4a2da94d4014c34237`.
+The full CPU/cache matrix, caller attribution and ceiling experiments still have
+not passed the phase 4 gate.
+
 ### Outstanding phase 4 gate work
 
 - Establish calibrated timing and instruction coverage for the requested accelerated
   configurations, or obtain an explicit change to the matrix requirement.
-- Resolve return/context attribution and validate matched observer-off and repeat
-  runs; independently validate the chunky change census.
+- Resolve return/context attribution and validate a matched aggregate-profiler-off
+  run. Raw-recording neutrality and the full 020 default-cache chunky census pass;
+  this does not validate other machine/cache configurations.
 - Complete per-scene self/inclusive CPU, waits, interrupts, DMA and idle accounting
   for every accepted cell and differing cache state.
 - Run matched c2p/drawing/instant-blitter ceiling experiments on the fastest valid

@@ -536,3 +536,35 @@ not be used as a timing baseline. The checker compares independent source bytes
 and blocks with the corresponding observer records; its verified scope is the
 sampled 320×128 inputs. The retained negative control changes one source byte and
 must fail at that sample.
+
+
+### Recomputing every source-buffer change
+
+The current observer can save all chunky inputs in one sequential stream. This
+adds no debugger stops. It writes only under the run's `tmp/` directory and flushes
+at scene cuts, including the final cut. Use the same local binary for the raw arm
+and its control:
+
+```sh
+python3 tools/build_debugger.py --matrix-observer --output tmp/raw-debugger
+export FSUAE="$PWD/tmp/raw-debugger/fs-uae"
+python3 tools/matrix_capture.py --layout tmp/probe-020/result.json \
+  --audit tmp/cache-020-default/result.json --raw-chunky --output tmp/raw-census
+python3 tools/matrix_capture.py --layout tmp/probe-020/result.json \
+  --audit tmp/cache-020-default/result.json --output tmp/raw-control
+python3 tools/matrix_raw_check.py tmp/raw-census --control tmp/raw-control \
+  --oracle tmp/census-oracle > tmp/raw-check.json
+```
+
+`--oracle` cross-checks the six independently captured GDB source buffers from the
+preceding section. The full-stream checker separately recomputes every native
+byte/block count, checks exact stream consumption, and rejects a truncated,
+changed or extra buffer. The control comparison requires identical configuration,
+every ledger record, every scene profile, final allocated game hunks and menu RGB
+pixels. It tests raw-recording neutrality; both arms still have aggregate profiling
+active. A changed-byte and a changed-profile negative control are retained under
+`tmp/phase4-raw-negative/` and `tmp/phase4-raw-profile-negative/`.
+
+The census is useful source-change evidence even while calling-context costs are
+unvalidated. Do not reinterpret a passing raw-recording check as a complete
+machine-matrix or aggregate-profiler-off gate.
