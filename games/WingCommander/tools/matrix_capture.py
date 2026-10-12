@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Whole-scene phase 4 profiles and change census; no stops inside scene windows."""
+"""Phase 4 scene diagnostics; optional oracle stops independently read chunky input."""
 import argparse,hashlib,json,os,re,subprocess
 from pathlib import Path
 import _amigaxdev
@@ -13,6 +13,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output',required=True);p.add_argument('--layout',required=True)
     p.add_argument('--audit',required=True);p.add_argument('--options',default='')
+    p.add_argument('--chunky-oracle', action='store_true', help='six independent GDB source snapshots; diagnostic run only')
     a=p.parse_args();out=(ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():raise ValueError('new tmp output required')
     if os.environ.get('EXTRA_ARGS'):raise ValueError('fixed measurement configuration required')
@@ -31,7 +32,7 @@ def main():
         WHD_ARGS='CUSTOM5=0 '+a.options,WARP='0',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',
         DETERMINISTIC='1',WC_MATRIX_CONFIG=str(config),WC_MATRIX_DIR=str(out))
     for key in ('WC_OBSERVER_CONFIG','WC_OBSERVER_OUTPUT'):env.pop(key,None)
-    g=None
+    g=None; chunky_oracle=[]
     def cmd(s,timeout=60):
         result=g.cmd(s,timeout=timeout)
         if any(x in result for x in ('Remote connection closed','Cannot access','Error','Invalid hex','Protocol error')):raise RuntimeError(result)
@@ -43,6 +44,19 @@ def main():
         g=Server('wc-matrix',root=str(ROOT),run_dir='amiga/'+run,profile_window=False).boot(env)
         cpu=cmd('monitor wc-audit')
         if not all(word in cpu for word in ('model=68020','mmu=0','exact=1','unit=128')):raise ValueError('unvalidated backend/clock: '+cpu)
+        if a.chunky_oracle:
+            until(h[3]+0xee0)
+            for index in range(6):
+                until(h[0]+0x32028)
+                raw=cmd('printf "WC_CHUNK %u %u %x\\n", $d0 & 65535, $d3 & 65535, $a0')
+                match=re.search(r'WC_CHUNK (\d+) (\d+) ([0-9a-f]+)',raw)
+                if not match:raise ValueError('chunky source registers missing')
+                width,height,address=int(match[1]),int(match[2]),int(match[3],16)
+                if (width,height)!=(320,128):raise ValueError('unexpected Origin geometry')
+                name=f'chunky-{index:02d}.bin'
+                cmd(f'dump binary memory {out.relative_to(ROOT)}/{name} {address:#x} {address+width*height:#x}')
+                chunky_oracle.append(dict(scene=4,index=index,width=width,height=height,file=name))
+            print('captured six independent chunky-source snapshots',flush=True)
         until(h[0]+0x1fe48)
         print('all credits pages complete',flush=True)
         until(h[0]+0x1898a);cmd('monitor key 45 1')
@@ -58,7 +72,7 @@ def main():
         for i in range(34):
             if not (out/f'scene-{i:02d}.aprof').is_file():raise ValueError('missing scene profile '+str(i))
         boot=next((out/'run').glob('boot.*'))
-        result=dict(layout,complete=True,names=names,machine='a1200-fast',options=a.options,
+        result=dict(layout,complete=True,names=names,machine='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle,
             boot_cpu=cpu,live_cpu=live,audit_cacr=audit['cacr'],
             slave_sha256=hashlib.sha256((boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()).hexdigest(),
             emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())

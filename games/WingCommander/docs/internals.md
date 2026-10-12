@@ -874,6 +874,32 @@ Evidence: `tmp/phase4-stack-probe/` and `tmp/phase4-stack-check.json`.
 The diagnostic emulator SHA-256 is
 `4dae329f0844f4a00f882f77232a39f1573d27e323c28a067646cd085321c2b6`.
 
+### Independent chunky-census sample
+
+A separate original-slave boot stops at each of the first six c2p entries in
+Origin animation (`E:32028`, file `32054`). GDB independently reads D0/D3/A0 and
+dumps the full 40,960-byte source before the host observer sees that call. The
+observer then runs normally. Python compares the saved buffers byte for byte and
+by 32-byte block, without using the observer's change counts as inputs.
+
+| Source sample | Changed bytes | Changed 32-byte blocks |
+|---|---:|---:|
+| First (unpaired) | not compared | not compared |
+| 1 | 614 | 202 |
+| 2 | 588 | 205 |
+| 3 | 9 | 8 |
+| 4 | 655 | 176 |
+| 5 | 770 | 212 |
+
+All six observer records agree with the independent snapshots, including the
+unpaired first sample. A deliberately changed byte in sample 1 is rejected.
+This verifies the sampled 320×128 census only; it does not yet validate 166/200-line
+inputs, every scene, or a full-frame-versus-delta design choice. The oracle run
+contains debugger stops and is not an accepted timing baseline.
+
+Evidence: `tmp/phase4-census-oracle/`, `tmp/phase4-census-check.json` and
+`tmp/phase4-census-negative/`. All raw source buffers remain in `tmp/`.
+
 ### Outstanding phase 4 gate work
 
 - Establish calibrated timing and instruction coverage for the requested accelerated

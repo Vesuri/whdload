@@ -513,3 +513,26 @@ slot to be consumed, the successor to advance four bytes, exactly five recovered
 returns, and unchanged aggregate clocks/chip accounting. The other unmatched
 returns remain explicit. Do not enable this experimental option to claim a
 passing whole-scene call-context gate.
+
+
+### Independently checking a chunky-census sample
+
+Build the current matrix observer, which includes the stable-PC correction. Use
+fresh output names and the existing completed 020 layout/cache audit:
+
+```sh
+python3 tools/build_debugger.py --matrix-observer --output tmp/census-debugger
+FSUAE="$PWD/tmp/census-debugger/fs-uae" python3 tools/matrix_capture.py \
+  --layout tmp/probe-020/result.json --audit tmp/cache-020-default/result.json \
+  --chunky-oracle --output tmp/census-oracle
+python3 tools/matrix_census_check.py tmp/census-oracle > tmp/census-check.json
+```
+
+`--chunky-oracle` takes six GDB memory snapshots at the first six Origin-animation
+c2p entries, before the read-only observer processes each call. It then finishes
+the same intro/credits/menu route. The snapshots and metadata stay under the
+output directory. This option deliberately introduces debugger stops and must
+not be used as a timing baseline. The checker compares independent source bytes
+and blocks with the corresponding observer records; its verified scope is the
+sampled 320×128 inputs. The retained negative control changes one source byte and
+must fail at that sample.
