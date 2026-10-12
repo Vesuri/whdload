@@ -16,7 +16,8 @@ DMA/STOP idle controls and matched c2p, instant-blitter and scoped bitmap-drawin
 ceilings are recorded. Eight configurations pass combined callback validation.
 All phase 4 captures and consolidation jobs are terminal. Phase 5 analysis is
 complete, using the supplied PC video for visible motion cadence and displacement.
-The intro-rate decision is pending; phase 6 has not started.
+Phase 6 is authorised and in progress. The user deferred further timing
+investigation to gameplay; intro-rate uncertainty does not block rendering work.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -166,7 +167,7 @@ Gate passed: the measured baseline and representative bottlenecks are recorded i
 costs, full interrupt/blitter-wait accounting, unresolved callback-control
 failures and broader drawing bounds remain explicit gaps, not gate blockers
 under this approved scope. Accelerated figures describe the emulator model.
-Phase 5 has subsequently been authorised; phase 6 remains outside scope.
+Phase 5 analysis is complete; phase 6 is now authorised.
 
 ### Phase 5 — Game-time model for the intro (analysis complete; rate choice pending)
 
@@ -182,8 +183,9 @@ Phase 5 has subsequently been authorised; phase 6 remains outside scope.
 
 Gate reached: the mixed time model, measured motion references and a ship-update
 rate candidate are documented. A uniform rate is not established by the video;
-the asteroid native-step mapping is an explicit limit. **Stopped for the user's
-decision on the intro's motion targets.**
+the asteroid native-step mapping is an explicit limit. The user subsequently authorised phase 6 and deferred further timing
+investigation to gameplay. Preserve the existing limiter and record remaining
+frame coupling; do not install the candidate rates as established facts.
 
 ### Phase 6 — Rendering, first pass (intro scope, behaviour-neutral)
 

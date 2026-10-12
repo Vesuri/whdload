@@ -3,7 +3,10 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 5 analysis is complete; the intro-rate decision is pending.**
+**Phase 6 rendering work is in progress.** Further timing calibration is
+deferred to in-game investigation; no new intended motion rate is assumed.
+
+Phase 5 analysis is complete.
 The supplied PC video gives approximately 14–15 visible ship/explosion advances
 per second and 20–25 asteroid advances per second. The Amiga ship loop runs two
 updates per drawn frame; asteroids use one. Motion displacement, clock sources
@@ -23,7 +26,7 @@ gaps. Accelerated timings describe the emulator model, not physical hardware.
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the
 reset-to-menu event ledger. Full traces and independent SWAP_ONLY counts agree.
-Phase 6 and rendering release changes are not authorised.
+Phase 6 is authorised; release changes remain outside scope.
 The original and reconstructed slaves match at the menu and pilot-name prompt
 for Custom5=0–3. Phase 2 is complete.
 Phase 1 static findings are documented. Runtime timing and display hypotheses
