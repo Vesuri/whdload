@@ -702,7 +702,7 @@ German runtime and OCS remain deferred.
 
 ## Phase 4: cache audit and profiler eligibility
 
-Phase 4 is **in progress; its gate has not passed**. The cache audit is complete,
+Phase 4 is **blocked at its full-matrix timing gate; the gate has not passed**. The cache audit is complete,
 but the accelerated matrix does not yet have a calibrated, covered CPU timing
 instrument. General 020 calling-context costs remain unvalidated. The source-range leaf
 instruction costs below have a separately verified path. No phase 5 work or rendering changes have started.
@@ -1109,3 +1109,30 @@ CPU/debugger source inputs. They remain shared read-only build inputs.
 
 The phase 4 gate remains open; functional boots and cache audits do not substitute
 for its measured accounting requirements.
+
+
+### Full-matrix gate audit
+
+The accelerated timing prerequisite remains unsatisfied after repeated source and
+runtime checks. The four accelerated preflight results still contain zero
+instruction records and reject aggregate profiling. Their configured frequency
+labels do not establish calibrated timing. The installed comparison workflow also
+leaves accelerated instruction costs unavailable. Adding counters or extrapolating
+020 costs would not validate the requested accelerated measurements.
+
+| Requirement | Authoritative evidence / remaining gap |
+|---|---|
+| CPU/cache matrix and CACR audits | All 15 cache audits pass. Calibrated accelerated timing/instruction coverage is missing. |
+| Per-scene FPS, routine self/inclusive cost, waits, interrupts, DMA and idle in every cell | Scoped 020 publication/census and verified leaf costs pass their controls. General caller attribution and full DMA/idle accounting remain open; accelerated cost coverage is absent. |
+| Matched c2p, drawing and instant-blitter ceilings on the fastest valid cell | Not performed; the requested matrix has no validated fastest-cell comparison. |
+| Per-scene c2p change rate | Full 020 default/NoCache source recomputation passes. No extrapolation to unsupported accelerated timing configurations or future cockpit windows is made. |
+| Findings, reproducible commands and coherent commits | Recorded in this document and `development.md`; derived material stays in `tmp/`. |
+| Phase boundary | No phase 5 work or rendering release patch has started. |
+
+The full requested objective cannot pass with the available validated timing
+instruments. The next prerequisite is a suitable calibrated accelerated backend,
+or an explicit user decision permitting unavailable results where measurement is
+unsupported. That decision has been requested; no reduced gate is assumed. The
+remaining accounting and ceiling work listed above still has to be completed after
+that prerequisite is resolved. Further 020-only results cannot stand in for the
+missing matrix cells.

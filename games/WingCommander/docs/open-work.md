@@ -10,7 +10,8 @@ Derived source, executable bytes, disassemblies and captures remain under `tmp/`
 The unskipped intro has 31 identical milestone captures across two fresh boots.
 The publication ledger, full traces and independent SWAP_ONLY check agree. The
 stock 020 multiplier is verified; numeric-frequency presets require calibration.
-**Phase 4 is authorised and in progress. Stop at its gate; phase 5 is not authorised.**
+**Phase 4 is authorised but blocked on validated accelerated timing coverage.**
+Its full-matrix gate remains unchanged; phase 5 is not authorised.
 Fifteen cache audits and five functional/instrumentation preflights are complete.
 Both effective 020 cache states pass isolated profiler-on/off controls. Full
 source-change recomputation and verified leaf converter/limiter costs are recorded.
@@ -310,6 +311,10 @@ Repeat from phase 1 for the OCS disk version as a separate variant: different
 executable, display, c2p (none expected) and timing. Reuse designs, not assumptions.
 
 ## Decisions pending
+
+- Phase 4 timing support: obtain a backend with calibrated coverage for the accelerated
+  cells, or explicitly approve unavailable entries for unsupported measurements.
+  The current gate still requires measured accounting in every cell.
 
 - The intro's intended rate, after phase 5; flight's, after phase 7.
 - Decoupling design B, C or D, after phase 8's pricing.

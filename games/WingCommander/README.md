@@ -3,7 +3,8 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 4 in progress: cache audits and scoped 020 measurements are verified.**
+**Phase 4 is blocked at the full-matrix timing gate.**
+Cache audits and scoped 020 measurements are verified.
 Both 020 cache states pass profiler-neutrality controls; source-change counts and
 converter/limiter instruction costs are recorded. Accelerated timing coverage,
 general caller attribution, DMA/idle accounting and ceiling experiments remain open.
