@@ -653,3 +653,22 @@ adding duplicate options. The same switch is accepted by `cache_audit.py` for
 separate matching VERIFY boots. It rejects WHDLoad `MMU` and the stock 020 preset.
 The probe records effective settings, coverage and the selector in `result.json`.
 Nominal frequency is still uncalibrated; these are preflights, not baseline FPS.
+
+For a diagnostic 040 scene/census capture without instruction costs:
+
+```sh
+python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
+  --output tmp/nommu-counter-debugger
+export FSUAE="$PWD/tmp/nommu-counter-debugger/fs-uae"
+python3 tools/cache_audit.py --machine a1200-040 --nommu-core --options NoMMU \
+  --slave tmp/phase4-cache-slave/WingCommanderCD32.Slave --output tmp/nommu-audit-040
+python3 tools/matrix_capture.py --machine a1200-040 --nommu-core --no-profiles \
+  --options NoMMU --layout tmp/nommu-probe-040/result.json \
+  --audit tmp/nommu-audit-040/result.json --raw-chunky --output tmp/nommu-scenes-040
+```
+
+This instrumentation is under validation. `matrix_capture.py` requires matching
+core/cache options; 040/060 require `--no-profiles`. Accelerated results explicitly
+record `clock_validated=false`. The existing 020 profile report cannot be used to
+certify these counter-only captures. Repeat and counter-neutrality checks remain
+required before using the new observer as a baseline instrument.

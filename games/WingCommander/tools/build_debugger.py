@@ -19,7 +19,10 @@ def main():
     p.add_argument('--aprof-diagnostics', action='store_true', help='log unmatched context returns during diagnostic profiles')
     p.add_argument('--aprof-stable-pc', action='store_true', help='retain the executing PC/opcode before a control transfer changes it')
     p.add_argument('--aprof-stack-returns', action='store_true', help='diagnostic tracking of returns by their saved stack slot')
+    p.add_argument('--matrix-nommu-counters', action='store_true', help='read-only scene/census hooks on the 040/060 NOMMU interpreter; no instruction-cost claims')
     a = p.parse_args()
+    if a.matrix_nommu_counters and not a.matrix_observer:
+        raise ValueError('--matrix-nommu-counters requires --matrix-observer')
     source = Path(os.environ.get('FSUAE_SOURCE', os.environ['AMIGA_SHARE']+'/fs-uae-aprof-build/fs-uae'))
     out = (ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():
@@ -79,6 +82,16 @@ int record_key_debug(int kc) {
             code=code.replace('wc_observe(pc);','wc_observe(pc);\n        wc_matrix_observe(pc);')
             code=code.replace('// AITD-PROF-END','// AITD-PROF-END\n#include "wc_matrix_observer.inc"')
             shutil.copyfile(ROOT/'tools/matrix_observer.inc', out/'src/wc_matrix_observer.inc')
+        if a.matrix_nommu_counters:
+            # 040/060 use this interpreter without the Barto instruction profiler.
+            # Observe the next PC before fetch, without changing emulated cycles.
+            start = code.index('static void m68k_run_3ce (void)')
+            end = code.index('static void m68k_run_3p(void)', start)
+            body = code[start:end]
+            anchor = 'r->instruction_pc = m68k_getpc();'
+            assert body.count(anchor) == 1
+            body = body.replace(anchor, anchor+'\n                wc_observe(r->instruction_pc);\n                wc_matrix_observe(r->instruction_pc);')
+            code = code[:start]+body+code[end:]
         target.write_text(code)
         shutil.copyfile(ROOT/'tools/intro_observer.inc', out/'src/wc_intro_observer.inc')
     if a.aprof_stable_pc or a.matrix_observer or a.aprof_stack_returns:

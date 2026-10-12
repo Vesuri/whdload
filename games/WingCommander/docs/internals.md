@@ -783,7 +783,22 @@ available. The emulator digest is
 `95329265de9f948787a6494fd8029d3e3516113b315f14dd586c00b37764494f`.
 This establishes instruction coverage on the corrected 030 core, not validated
 50 MHz costs, calling-context attribution or a completed matrix baseline. The
-WHDLoad-MMU cell remains separate; 040/060 corrected coverage is still pending.
+WHDLoad-MMU cell remains separate.
+
+The corrected 040 and 060 probes also reach the checkpoint. Both report MMU
+zero and CPU/memory/blitter exact enabled. At requested 25/50 MHz they report
+cycle units 65/32 respectively, live CACR `$00000000`/`$20800000`, and zero
+instruction records; aggregate profiling rejects both. This establishes that the
+core-selection correction alone does not add instruction-cost coverage on these
+CPUs. Data are in `tmp/phase4-nommu-probe-{040,060}/`.
+
+A local debugger with `--matrix-nommu-counters` adds scene/census observations at
+the 040/060 NOMMU interpreter's pre-fetch PC, separately from the unavailable
+instruction profiler. The build succeeds; full-run reproducibility and observer
+neutrality are not yet validated. Its digest is
+`b624c41c58053e7012de18f9e48c1c0e9cb366b34c3fcb57c037cb9c5499885f`.
+A matching terminating 040 `NoMMU` audit reports CACR zero in
+`tmp/phase4-nommu-audit-040/`. This does not replace audits for other cores/options.
 
 ### 020 whole-scene diagnostics
 
