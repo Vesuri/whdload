@@ -2,16 +2,19 @@
 
 ## Current state
 
-Repository scaffold and shared-environment entry point are present. The original
-installer and both full installs are pinned by SHA-256 and held in ignored local
-storage, with separate extracted reference trees. No binary analysis has started.
+Phase 1 is complete: the CD32 English/German executables, original slave,
+patch maps and static time/display hypotheses are recorded in `internals.md`.
+`development.md` gives the verified static reproduction commands. The originals
+remain unchanged; extracted hunks and disassemblies are confined to ignored
+`tmp/`. No emulator was run and no slave reconstruction or game patch was made.
+**Stopped at the phase 1 gate; phase 2 requires a separate request.**
 
-Known from the installer's ReadMe only (not yet verified in code): the CD32 slave
-requires a Kickstart 3.1 A1200/A4000 image, replaces the Akiko chunky-to-planar
-conversion with a software one, patches `lowlevel` and `nonvolatile` library calls,
-and has a `Custom5` game-speed option (0 normal, 1 full, 2 slow, 3 more slow,
-4 original c2p). The game itself appears to be one executable per language
-(`data/wing.english`, `data/wing.german`) plus `data/wing256/` resources.
+The executable uses the Manx/Aztec C runtime and a View/copper display path with
+two eight-plane buffers. The original slave explicitly requests cache settings.
+Its normal c2p limiter waits two CIA-A TOD increments; that is not an intended-rate
+measurement. `Custom5=4` selects the original blitter c2p path, not Akiko. These
+findings refine the implementation assumptions below; the intended-rate and design
+decisions still wait for the later gates. The OCS version remains unanalysed.
 
 ## Goal
 
@@ -27,9 +30,12 @@ A definitive CD32 edition, OCS afterwards and separately:
 ## Decisions made
 
 - **Hardware envelope.** Fast RAM is required; a stock CD32 or an A1200 without fast
-  RAM is not a target. The Akiko c2p path (`Custom5=4`) is removed.
-- **Caches.** The slave does not change cache state; WHDLoad and its user options
-  decide. Every measurement records the hardware cache state (`CACR`) it ran under.
+  RAM is not a target. Akiko support and the existing `Custom5=4` option are to be removed.
+  Phase 1 identifies the latter as the original blitter path in the existing
+  slave; it must not be used as an Akiko baseline.
+- **Caches (future slave policy).** Leave cache state to WHDLoad and its user
+  options. The original slave explicitly calls SetCPU (phase 1 finding). Every
+  measurement records the hardware cache state (`CACR`) it ran under.
 - **Design.** A fixed tick with only presentation interpolation is rejected. The
   choice between designs B, C and D (phase 8) waits for the flight time model and the
   framerate audit.
@@ -64,7 +70,7 @@ Each phase ends with a gate. Do not start the next phase until its gate passes a
 its results are in `docs/internals.md` (state) and `docs/development.md` (commands).
 AmigaXDev's playbooks are the method; this list says what applies to Wing Commander.
 
-### Phase 1 — Identify the CD32 install (static only)
+### Phase 1 — Identify the CD32 install (static only; gate complete)
 
 1. Identify `wing.english`: hunk layout, packing/compression, compiler and runtime
    (library usage, startup code), symbols if any. Compare with `wing.german`.
