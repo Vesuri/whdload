@@ -40,7 +40,7 @@ semantics or unseen paths. Exact-build indirect and stack-return audits also
 pass these windows. Evidence: `tmp/release60/a500-sol-all-entry-audit.json` and
 `entry-audits/*.json`.
 
-All 42 host-tool tests pass (`tmp/release60/host-tests-expanded.log`). Named machine
+All 46 host-tool tests pass (`tmp/release60/host-tests-powers.log`). Named machine
 presets now resolve before the launcher chooses a fixed-rate slave; the
 selection regression rejects the prior order and passes all seven presets,
 explicit/default CPUs and an invalid-preset case. This argument-level test does
@@ -57,6 +57,20 @@ including when the sequence definitions are supplied without VERIFY. Existing
 single-toggle fixture bytes also match at both rates. Evidence:
 `tmp/release60/preferences/validation.json` and `build-validation.json`.
 These settings checks do not establish audible output.
+
+The input-only POWER_ROUTE passes at both selected rates during SOL combat.
+Existing inventory supplies clone, shield, jump, cloak, cannon and speed; no
+pickup or inventory setup is used. All six powers overlap in the snapshots,
+one charge per power is consumed, and the warp charge remains unused. The
+player jumps and lands, with all five timed powers still active at the final
+22-second checkpoint. First observed activation ticks are
+153/173/188/203/218/233 at N=3 and 603/663/723/788/843/903 at N=12; sampling
+does not establish each exact activation tick. Input history and 108/107
+installed hooks pass. Evidence: `tmp/release60/power-route/n3-validation.json`
+and `n12-validation.json`. Shield hits, cannon damage, arbitrary terrain,
+midair impacts, audible output and physical controls remain separate checks.
+Both playable releases exclude all new pilot options byte-for-byte
+(`tmp/release60/pilot-builds/exclusion.json`).
 
 ## Fast-CPU presentation and sustained combat
 

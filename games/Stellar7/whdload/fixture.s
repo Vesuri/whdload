@@ -75,6 +75,20 @@ fixture_install:
         cmp.w #$0008,(4,a0)
         bne .bad
         ENDC
+        IFD POWER_ROUTE
+        IFND SIM60
+        FAIL "POWER_ROUTE requires SIM60"
+        ENDC
+        IFD PICKUP_USE
+        FAIL "POWER_ROUTE and PICKUP_USE are separate input routes"
+        ENDC
+        move.l a1,a0
+        adda.l #$196d0,a0
+        cmp.l #$2f073e2f,(a0)
+        bne .bad
+        cmp.w #$0008,(4,a0)
+        bne .bad
+        ENDC
         lea (fixture_input_patches,pc),a0
         jsr (resload_Patch,a2)
 .done:  rts
@@ -107,6 +121,9 @@ fixture_escape:
 ; cadence cannot move an input edge. No positions, velocities or RNG are written.
 fixture_input_patches:
         PL_START
+        IFD POWER_ROUTE
+        PL_P $196d0,fixture_power_route
+        ENDC
         IFD PICKUP_USE
         PL_P $196d0,fixture_power_buttons
         ENDC
@@ -148,6 +165,39 @@ fixture_power_buttons:
         rts
 .released:
         moveq #0,d0
+        rts
+        ENDC
+        IFD POWER_ROUTE
+; Input-only combat sequence: select/activate clone, shield, jump, cloak,
+; cannon and speed through the native two-button API. Warp is omitted so
+; encounter completion cannot come from a deliberately selected warp exit.
+fixture_power_route_slots: dc.b 0,1,2,4,5,6
+        even
+fixture_power_route:
+        movem.l d1-d2/a0,-(sp)
+        move.l (s60_ticks,pc),d0
+        sub.l #POWER_ROUTE,d0
+        bcs .released
+        cmp.l #6*S60_RATE,d0
+        bcc .released
+        divu #S60_RATE,d0
+        move.w d0,d1
+        lea (fixture_power_route_slots,pc),a0
+        moveq #0,d2
+        move.b (a0,d1.w),d2
+        swap d0
+        btst #0,d0
+        bne .released
+        cmp.w #1,(16,sp)
+        beq .pressed ; second button selects on release
+        cmp.w ($20be-$8000,a4),d2
+        bne .released
+.pressed:
+        moveq #1,d0
+        bra .done
+.released:
+        moveq #0,d0
+.done:  movem.l (sp)+,d1-d2/a0
         rts
         ENDC
 fixture_joy:
@@ -265,6 +315,21 @@ fixture_key:
         IFD APPROACH_FIRE
 fixture_approach_fire: dc.w 0
         ENDC
+        IFD APPROACH_LOCK
+        IFNE APPROACH_TYPE
+        FAIL "APPROACH_LOCK requires APPROACH_TYPE=0"
+        ENDC
+fixture_approach_target: dc.l 0
+        ENDC
+        IFND APPROACH_AIM
+APPROACH_AIM EQU 2048
+        ENDC
+        IFLT APPROACH_AIM-1
+        FAIL "APPROACH_AIM must be 1..2048"
+        ENDC
+        IFGT APPROACH_AIM-2048
+        FAIL "APPROACH_AIM must be 1..2048"
+        ENDC
 fixture_approach:
         movem.l d1-d2/a0-a2,-(sp)
         moveq #0,d0
@@ -299,6 +364,16 @@ fixture_approach:
         cmp.l #300,(16,a1)
         bgt .scan_next
 .candidate:
+        IFD APPROACH_LOCK
+        ; Retain a live target only while it is still in the active list and
+        ; passes the native hostility/health/height checks above. Exits win.
+        cmpa.l (fixture_approach_target,pc),a1
+        bne .nearest
+        moveq #-1,d2
+        move.l a1,a2
+        bra .scan_next
+.nearest:
+        ENDC
         cmp.l ($50,a1),d2
         ble .scan_next
         move.l ($50,a1),d2
@@ -327,6 +402,10 @@ fixture_approach:
         ENDC
         bra .done
 .found:
+        IFD APPROACH_LOCK
+        lea (fixture_approach_target,pc),a0
+        move.l a1,(a0)
+        ENDC
         IFND APPROACH_FIRE
         IFND APPROACH_CONTACT
         cmp.l #18000,($50,a1)
@@ -337,9 +416,9 @@ fixture_approach:
         move.w ($5e,a1),d2 ; enemy-to-player heading, reverse for the approach
         add.w #$8000,d2
         sub.w ($18,a2),d2
-        cmp.w #2048,d2
+        cmp.w #APPROACH_AIM,d2
         bgt .positive
-        cmp.w #-2048,d2
+        cmp.w #-APPROACH_AIM,d2
         blt .negative
         IFD APPROACH_FIRE
         lea (fixture_approach_fire,pc),a0

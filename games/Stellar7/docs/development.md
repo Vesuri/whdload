@@ -949,6 +949,25 @@ The flag is byte-excluded from non-VERIFY builds. A level-5 encounter uses
 BOSS_ENCOUNTER_LEVEL=5 with the explicit wave shortcut, LEVEL_LAST=5 and
 LEVEL_TEST=200; contact is not established merely by reaching that scene.
 
+`APPROACH_LOCK=1`, with APPROACH_TYPE=0, retains a target while it remains
+in the active list and passes the existing hostility, health and height checks.
+Exit pursuit still takes priority. `APPROACH_AIM=1..2048` selects the steering
+deadband (default 2048); 512 is used by the current full-wave pilot. These options
+change only the VERIFY input pilot, not gameplay state or playable builds.
+
+`POWER_ROUTE=TICK` supplies native second-button and both-button input for six
+seconds starting at TICK. It selects clone, shield, jump, cloak, cannon and speed
+in order, using the current inventory; it never activates warp. It requires
+SIM60/VERIFY/CUSTOM3 and cannot combine with PICKUP_USE. No pickup, health,
+position or inventory setup is performed. Use TICK=150 at N=3 or 600 at N=12
+for the current ten-second entry point. Retain snapshots around each one-second
+stage and after landing. `tools/power_route_state.py CAPTURE --listing EXACT.lst`
+checks exact build/input-hook identity, ordered activation, simultaneous powers,
+charge consumption, jump/landing, unchanged warp charge and input-history
+integrity. It does not establish individual combat effects or full timer lifetimes.
+Current paired captures and exact sample points are under
+`tmp/release60/power-route`; release exclusion is under `pilot-builds`.
+
 `APPROACH_STANDOFF=12000` additionally selects the arriving carrier as a spacing
 target and uses native reverse input below 11000, forward input above 13000
 for ordinary targets, and neither in between. It does not fire at the carrier
