@@ -3947,7 +3947,11 @@ clocks_65dca:
  beq.b .skip
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
+ IFD FF1_PRESENTATION_SPLIT
+ bsr.w FF1ClockTick
+ ELSE
  jsr $22c3a
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
 .skip:
@@ -3966,7 +3970,11 @@ clocks_65dd8:
  beq.b .skip
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
+ IFD FF1_PRESENTATION_SPLIT
+ bsr.w FF1ClockTick
+ ELSE
  jsr $22c3a
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
 .skip:
@@ -4922,6 +4930,11 @@ schedule_end:
  ENDC
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
+ ; Optional host presentation hook: preserve every register and CCR.
+ ; It runs after consumption, outside the measured simulation body.
+ IFD FF1_PRESENTATION_CALLBACK
+ bsr.w FF1PresentationAfterTick
+ ENDC
  jmp $65174
 schedule_stop:
  bra.b schedule_stop
@@ -4932,3 +4945,7 @@ schedule_completed equ schedule_context+FF1T_TICKS
  ENDC
  include "FerrariFormulaOne_Time.s"
 schedule_context: ds.b FF1T_SIZE
+
+ IFD FF1_PRESENTATION_SPLIT
+ include "FerrariFormulaOne_Presentation.s"
+ ENDC
