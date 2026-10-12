@@ -202,6 +202,30 @@ is a performance comparison; retain 60 Hz on the 68020+ path. Any unresolved A50
 
 ### Step 6: Release validation and playtest
 
+Status: in progress. All 26 native-reference fixture groups pass on the
+selected 15 Hz A500 and 60 Hz 68020 paths. Combined preference changes and
+re-enabling pass through the native menus at both rates. Full-wave input-only
+combat runs are in progress; completed attempts have not yet reached a boss. Evidence is retained under
+`tmp/release60`; completed step-5 measurements remain the current performance
+reference. The normal loader still excludes SIM60.
+
+Completion requires the following evidence on both selected paths:
+
+- Native-reference replacement checks and full encounter runs, including
+  full-strength boss kills, ending, natural deaths and Continue/No. Existing
+  shortened-wave and reduced-health fixtures retain their narrower scope.
+- Level/UI transitions, combined preference changes and re-enabling, active
+  power cycling and combat effects, jumps over terrain and midair impacts,
+  lethal shield/type-43 hits, boss helpers and mine detonation.
+- Exact-build disabled-code, hook and indirect-entry checks, diagnostic
+  exclusion and actual playable-launcher checks after any fixes.
+- Playable controls, visible response, sound and original-reference pace.
+  Automated input/state checks alone do not establish subjective control feel
+  or audible output; record the actual observation used for each conclusion.
+- Current documentation, removal of unused tools, a release decision supported
+  by those checks, and commits following the repository conventions.
+
+
 Run native twins, full encounters, boss kills/ending, natural deaths,
 Continue/No, level/UI transitions, powers, jump and preferences at each selected rate on
 its CPU path. Repeat disabled-byte preservation, hook/indirect-entry checks,

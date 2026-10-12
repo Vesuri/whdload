@@ -15,6 +15,49 @@ Fast-CPU timing diagnostics and extended-combat checks pass within the scopes be
 the corrected selected-rate matrix and its 350 state comparisons pass. Broader encounters and physical-control
 playtesting remain open. The normal loader still omits this experimental conversion.
 
+## Release validation
+
+Step 6 is in progress. All thirteen native-reference fixture groups pass on both the
+selected N=3 A500 and N=12 68020 paths, for 26 completed groups with the
+displayed-buffer correction enabled. Exact captures, listings, installed-hook results
+and checker output are under `tmp/release60/native-fixtures`. These private
+oracles are distinct from full encounters and physical-control playtesting.
+
+The current-build A500 SOL trace also passes 4971 observed indirect JSR/JMP
+executions and 21768 verified RTS/RTR/RTD transitions. Twenty-two return
+boundaries have discontinuous register snapshots and remain unverified.
+The source trace is the retained 100-field step-5 normal-speed preflight;
+this is a new audit of that trace, not a fresh capture or whole-program proof.
+Exceptions, external-source returns and unobserved paths remain outside this
+check. Evidence: `tmp/release60/a500-sol-entry-audit.json`.
+
+The complementary all-PC audit passes 7288722 observed instruction PCs across
+five retained current-build windows: A500 SOL, late combat and boss, and 68020
+with fast RAM SOL and late combat. It checks destinations irrespective of their
+origin, admitting only installed entries and declared NOP padding inside patch
+ranges. The 1591757 missing-PC records remain gaps, and this does not prove exception-stack
+semantics or unseen paths. Exact-build indirect and stack-return audits also
+pass these windows. Evidence: `tmp/release60/a500-sol-all-entry-audit.json` and
+`entry-audits/*.json`.
+
+All 42 host-tool tests pass (`tmp/release60/host-tests-expanded.log`). Named machine
+presets now resolve before the launcher chooses a fixed-rate slave; the
+selection regression rejects the prior order and passes all seven presets,
+explicit/default CPUs and an invalid-preset case. This argument-level test does
+not replace an actual launcher smoke test.
+
+The PF62 combined-preferences fixture passes on N=3 A500 and N=12 68020.
+Native menu buttons toggle Mouse, Joystick, Music and Sounds off in that order,
+then restore each to one. All nine intermediate setting snapshots match the
+expected sequence. Entry and return remain at tick 100; modal credit stays
+150 on A500 and 480 on 68020. Settings remain restored at completed ticks
+101, 150 and 300, with no missing input samples or queue drops. Installed-hook
+checks pass (109/108). Both playable releases remain byte-identical to step 5,
+including when the sequence definitions are supplied without VERIFY. Existing
+single-toggle fixture bytes also match at both rates. Evidence:
+`tmp/release60/preferences/validation.json` and `build-validation.json`.
+These settings checks do not establish audible output.
+
 ## Fast-CPU presentation and sustained combat
 
 ### Displayed-buffer reuse finding

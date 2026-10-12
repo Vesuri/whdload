@@ -1871,7 +1871,20 @@ settings/gameplay/HUD/fresh projection at all three checkpoints. Every modal
 entry/return remains at tick 200 and retains its existing 32/30 owed updates.
 Those six captures and eighteen checkpoints are recorded in
 `tmp/preferences-remaining-validation.json`. These checks cover turning each
-setting off independently; combined changes and re-enabling are not exercised.
+setting off independently.
+
+`PREFERENCES_SEQUENCE=1`, together with `PREFERENCES_TEST`, supplies native
+buttons 2..5 twice, toggling all four settings and then restoring them. It is
+mutually exclusive with `PREFERENCES_CHOICE`. The PF62 record contains nine
+four-setting snapshots (initial and after every action); `preferences_state.py`
+requires exactly the selected bit to change at each step, eight selections,
+restored original settings and the existing nested-modal clock/debt invariants.
+Capture tick TEST+1 and later gameplay checkpoints to check persistence.
+The fixture writes only its record and supplies button selections. Build
+exclusion and checker negative controls pass. Both selected CPU paths pass the
+native dialog sequence, preserve tick 100 and modal credit, and retain the
+restored preferences at ticks 101, 150 and 300. Evidence is under
+`tmp/release60/preferences`.
 The extension is byte-excluded from release; historical PF60 captures remain readable.
 
 `PREFERENCES_BAD_CREDIT=1` deliberately clears that credit at modal return.
@@ -1957,6 +1970,13 @@ operands; this is not a whole-program control-flow proof. Returns, exceptions
 and unobserved paths are excluded. Four retained combat traces cover 12116
 executions, with no interior destination; a corrupted register target is
 rejected (`tmp/indirect-entry-validation.json`).
+
+`tools/patch_entry_trace.py CAPTURE --listing EXACT.lst` additionally checks
+every observed PC against compiled patch interiors, without filtering by the
+origin of a call, return or exception. It permits installed NOP padding,
+including the explicitly guarded MULS/NOP flat-motion replacements. Missing-PC
+records are counted as gaps. This verifies observed instruction destinations;
+it does not validate exception-frame semantics or prove unobserved paths safe.
 
 `tools/type9_firing_state.py CAPTURE --listing EXACT.lst` validates successful
 native type-9 shot returns and the following channel-loop exit in the level-5

@@ -2,6 +2,11 @@
 ; supplied; native drawing, modal wrappers and return paths remain active.
         IFD VERIFY
         IFD PREFERENCES_TEST
+        IFD PREFERENCES_SEQUENCE
+        IFD PREFERENCES_CHOICE
+        FAIL "PREFERENCES_SEQUENCE and PREFERENCES_CHOICE are separate fixtures"
+        ENDC
+        ENDC
         IFD PREFERENCES_CHOICE
         IFLT PREFERENCES_CHOICE-1
         FAIL "PREFERENCES_CHOICE must be 1..4"
@@ -11,10 +16,14 @@
         ENDC
         ENDC
 s60_preferences_results:
+        IFD PREFERENCES_SEQUENCE
+        dc.b 'PF62'
+        ELSE
         IFD PREFERENCES_CHOICE
         dc.b 'PF61'
         ELSE
         dc.b 'PF60'
+        ENDC
         ENDC
         dc.w 0,0 ; stage, errors
         ds.l 11 ; tick, entry field, outer last/credit, first poll, nested start/end,
@@ -23,6 +32,10 @@ s60_preferences_results:
         ds.l 2 ; nested last/credit after return
         IFD PREFERENCES_CHOICE
         dc.w 0,0,0,PREFERENCES_CHOICE ; selections, before, after, option
+        ENDC
+        IFD PREFERENCES_SEQUENCE
+        dc.w 0 ; number of native toggle selections supplied
+        ds.w 9*4 ; initial settings and settings after each of eight toggles
         ENDC
 s60_test_preferences:
         move.l (s60_ticks,pc),d0
@@ -108,6 +121,26 @@ s60_test_preferences_poll:
 .outer_wait:
         cmp.l #90,d0
         bcs .wait
+        IFD PREFERENCES_SEQUENCE
+        ; Observe all four settings before supplying the next button. Native
+        ; handlers alone change settings: toggle each off, then each back on.
+        moveq #0,d1
+        move.w (72,a0),d1
+        move.w d1,d2
+        lsl.w #3,d2
+        lea (74,a0),a1
+        adda.w d2,a1
+        move.l ($1e74-S60_DATA,a4),(a1)
+        move.l ($1e78-S60_DATA,a4),(4,a1)
+        cmp.w #8,d1
+        bcc .sequence_done
+        move.w d1,d0
+        and.w #3,d0
+        addq.w #2,d0 ; native buttons 2..5, twice
+        addq.w #1,(72,a0)
+        bra .return
+.sequence_done:
+        ENDC
         IFD PREFERENCES_CHOICE
         tst.w (72,a0)
         bne .selected

@@ -23,7 +23,7 @@ def read(folder, listing):
     assert base is not None
     at = base-meta['base']+offset
     signature = memory[at:at+4]
-    assert signature in (b'PF60', b'PF61')
+    assert signature in (b'PF60', b'PF61', b'PF62')
     names = ('stage', 'errors', 'entry_tick', 'entry_field', 'outer_last', 'outer_credit',
              'first_poll', 'nested_start', 'nested_end', 'return_field', 'return_last',
              'return_credit', 'return_tick', 'resumes_before', 'resumes_after',
@@ -33,11 +33,27 @@ def read(folder, listing):
     if signature == b'PF61':
         result.update(zip(('selections', 'setting_before', 'setting_after', 'option'),
                           struct.unpack_from('>4H', memory, at+72)))
+    if signature == b'PF62':
+        result['selections'] = struct.unpack_from('>H', memory, at+72)[0]
+        result['sequence'] = [list(struct.unpack_from('>4H', memory, at+74+8*i))
+                              for i in range(9)]
     result['tick_substeps'] = sim60_state.read(folder)['substeps']
     return result
 
 
+def validate_sequence(rows, selections):
+    assert selections == 8 and len(rows) == 9, 'incomplete preference sequence'
+    assert all(len(row) == 4 and all(x in (0, 1) for x in row) for row in rows)
+    for index, (before, after) in enumerate(zip(rows, rows[1:])):
+        expected = before.copy()
+        expected[index % 4] ^= 1
+        assert after == expected, ('native toggle sequence differs', index, before, after)
+    assert rows[-1] == rows[0], 'preferences were not restored'
+
+
 def validate(r):
+    if 'sequence' in r:
+        validate_sequence(r['sequence'], r['selections'])
     if 'option' in r:
         assert 1 <= r['option'] <= 4 and r['selections'] == 1, r
         assert r['setting_before'] in (0, 1), r
