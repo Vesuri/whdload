@@ -131,6 +131,7 @@ FF1ClockDigit:
 FF1PresentComponents:
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
+ bsr.w FF1PresentFlag
  ; Retain the native instrument/opponent renderer, including all DMA waits.
  move.w $6a66a,d0
  andi.w #1023,d0
@@ -149,6 +150,47 @@ FF1PresentComponents:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  rts
+
+FF1FlagEntry:
+ link a6,#0
+ tst.w FF1FlagPresentation(pc)
+ bne.b .present
+ move.w $1c1e0,d0
+ jmp $6680c
+.present:
+ move.w FF1FlagGraphic(pc),10(a6)
+ jmp $66840
+
+FF1FlagBody:
+ tst.w FF1FlagPresentation(pc)
+ bne.b .present
+ ; Keep the native flag selection and its session counter on the update.
+ ; Only latch the resulting graphic; the two plane blits belong to drawing.
+ move.w 10(a6),d0
+ lea FF1FlagGraphic(pc),a0
+ move.w d0,(a0)
+ unlk a6
+ rts
+.present:
+ move.w 10(a6),d0
+ ext.l d0
+ jmp $66846
+
+FF1PresentFlag:
+ move.w FF1FlagGraphic(pc),d0
+ beq.b .done
+ ext.l d0
+ move.l d0,-(sp)
+ lea FF1FlagPresentation(pc),a0
+ move.w #1,(a0)
+ jsr $66802
+ addq.l #4,sp
+ lea FF1FlagPresentation(pc),a0
+ clr.w (a0)
+.done:
+ rts
+FF1FlagPresentation: dc.w 0
+FF1FlagGraphic: dc.w 0
 
 FF1PresentClock:
  movem.l d0-d7/a0-a6,-(sp)
@@ -268,6 +310,22 @@ FF1InstallPresentation:
  bne.w .bad
  cmpi.w #$6f94,$6c2d0
  bne.w .bad
+ cmpi.w #$4e56,$66802
+ bne.w .bad
+ cmpi.w #$0000,$66804
+ bne.w .bad
+ cmpi.w #$3039,$66806
+ bne.w .bad
+ cmpi.w #$0001,$66808
+ bne.w .bad
+ cmpi.w #$c1e0,$6680a
+ bne.w .bad
+ cmpi.w #$302e,$66840
+ bne.w .bad
+ cmpi.w #$000a,$66842
+ bne.w .bad
+ cmpi.w #$48c0,$66844
+ bne.w .bad
  lea FF1BoostEntry(pc),a0
  move.l a0,$6bbfe
  move.w #$4ef9,$6bbfc
@@ -290,6 +348,14 @@ FF1InstallPresentation:
  move.w #$4ef9,$6c0d8
  move.l #$6c310,$6c2ce
  move.w #$4ef9,$6c2cc
+ lea FF1FlagEntry(pc),a0
+ move.l a0,$66804
+ move.w #$4ef9,$66802
+ move.w #$4e71,$66808
+ move.w #$4e71,$6680a
+ lea FF1FlagBody(pc),a0
+ move.l a0,$66842
+ move.w #$4ef9,$66840
  lea FF1PresentationInstalled(pc),a0
  move.l #1,(a0)
  bra.b .done
