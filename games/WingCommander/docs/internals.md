@@ -704,8 +704,8 @@ German runtime and OCS remain deferred.
 
 Phase 4 is **in progress; its gate has not passed**. The cache audit is complete,
 but the accelerated matrix does not yet have a calibrated, covered CPU timing
-instrument. The 020 whole-scene captures are diagnostic material, not accepted
-routine-cost measurements. No phase 5 work or rendering changes have started.
+instrument. General 020 calling-context costs remain unvalidated. The source-range leaf
+instruction costs below have a separately verified path. No phase 5 work or rendering changes have started.
 
 ### Hardware cache audit
 
@@ -997,6 +997,103 @@ Default evidence: `tmp/phase4-profile-on-no-raw/`, `tmp/phase4-profile-off/` and
 The NoCache source census independently recomputes every recorded change, just as
 the default census does. Its buffers are compared with its own matching control;
 no equality between different cache-state trajectories is assumed.
+
+### Verified 020 converter and limiter instruction costs
+
+The four routines below contain no subroutine calls or jumps out of their own
+ranges; every decoded branch stays inside its range and the final instruction is
+RTS. The original slave digest is checked, and all four live ranges still match
+the original bytes in the menu snapshot. This permits direct instruction-PC
+accounting without the unresolved calling-context tree.
+
+| Routine | Slave code range (end exclusive) | Slave file range (end exclusive) |
+|---|---|---|
+| TOD limiter | `17b8–17ee` | `17d8–180e` |
+| 128-line converter | `17f6–195e` | `1816–197e` |
+| 166-line converter | `195e–1ac6` | `197e–1ae6` |
+| 200-line converter | `1ac6–1c2e` | `1ae6–1c4e` |
+
+For every scene after game entry, each converter's entry count equals the
+independent census count for its height, and limiter entries equal all converter
+calls. The 166-line entry is never observed in this intro route. An uncorrected-PC
+profile is rejected. Default-cache leaf reports reproduce exactly in independent
+fresh boots, and isolated aggregate-profiler-off controls pass for both cache states.
+
+**Definition:** costs below sum instruction-body cycle units at the verified PCs,
+including memory stalls charged to those instructions. They exclude interrupt
+service and between-instruction gaps. The routines have no synchronous callees,
+so these are their own instruction costs without a separate callee contribution;
+they are not full entry-to-return elapsed times. No general inclusive-call-tree
+accuracy is claimed. Percentages use the complete scene duration as denominator.
+
+D/N means default CACR `00000001` / NoCache CACR `00000000` on the calibrated stock
+020 emulator. Publication rate includes scene holds and loading; it is not an
+instantaneous animation rate. Converter share sums the three height-specific
+bodies. Reset/boot is excluded because the future slave address range is not yet
+established throughout that interval.
+
+| Scene | Publications/s D / N | Converter instruction % D / N | Limiter instruction % D / N |
+|---|---:|---:|---:|
+| game-startup | 2.750 / 1.878 | 0.000 / 0.000 | 0.000 / 0.000 |
+| origin-load | 6.447 / 4.474 | 5.098 / 3.561 | 0.002 / 0.001 |
+| origin-reveal | 0.835 / 0.688 | 3.312 / 2.743 | 0.001 / 0.001 |
+| origin-animation | 11.228 / 7.807 | 44.480 / 31.103 | 0.017 / 0.012 |
+| origin-expression | 3.962 / 3.978 | 15.691 / 15.845 | 0.006 / 0.006 |
+| origin-separation | 11.884 / 8.384 | 47.080 / 33.404 | 0.018 / 0.013 |
+| origin-flight | 4.147 / 4.407 | 16.420 / 17.558 | 0.006 / 0.006 |
+| origin-particles | 15.506 / 12.973 | 61.409 / 51.680 | 0.023 / 0.020 |
+| origin-fade | 1.324 / 1.323 | 1.746 / 1.756 | 0.001 / 0.001 |
+| title-load | 2.519 / 1.486 | 1.996 / 1.183 | 0.001 / 0.000 |
+| title-animation | 10.900 / 9.306 | 43.159 / 37.056 | 0.015 / 0.013 |
+| title-arrival | 11.099 / 8.384 | 43.959 / 33.401 | 0.015 / 0.012 |
+| title-departure | 10.266 / 8.696 | 40.675 / 34.651 | 0.014 / 0.012 |
+| credits-load | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 |
+| credits-00 | 12.563 / 10.661 | 49.741 / 42.468 | 0.017 / 0.015 |
+| credits-01 | 11.487 / 9.365 | 45.490 / 37.303 | 0.015 / 0.013 |
+| credits-02 | 11.693 / 9.110 | 46.302 / 36.291 | 0.016 / 0.013 |
+| credits-03 | 11.438 / 9.073 | 45.311 / 36.147 | 0.015 / 0.013 |
+| credits-04 | 11.375 / 9.220 | 45.050 / 36.724 | 0.015 / 0.013 |
+| credits-05 | 11.342 / 8.953 | 44.911 / 35.672 | 0.015 / 0.012 |
+| credits-06 | 11.094 / 9.118 | 43.931 / 36.327 | 0.015 / 0.013 |
+| credits-07 | 11.103 / 9.406 | 43.979 / 37.474 | 0.015 / 0.013 |
+| credits-08 | 11.020 / 9.135 | 43.643 / 36.393 | 0.015 / 0.013 |
+| credits-09 | 11.068 / 8.682 | 43.818 / 34.582 | 0.015 / 0.012 |
+| credits-10 | 10.702 / 8.809 | 42.386 / 35.083 | 0.014 / 0.012 |
+| credits-11 | 11.303 / 9.634 | 44.755 / 38.365 | 0.015 / 0.013 |
+| credits-12 | 10.689 / 9.041 | 42.331 / 36.006 | 0.014 / 0.012 |
+| credits-13 | 11.044 / 8.550 | 43.741 / 34.051 | 0.015 / 0.012 |
+| credits-14 | 11.234 / 9.135 | 44.481 / 36.396 | 0.015 / 0.013 |
+| credits-15 | 11.250 / 9.631 | 44.564 / 38.369 | 0.015 / 0.013 |
+| credits-16 | 11.150 / 9.105 | 44.154 / 36.272 | 0.015 / 0.013 |
+| credits-17 | 11.666 / 9.507 | 46.210 / 37.875 | 0.016 / 0.013 |
+| cycle-complete | 7.995 / 6.400 | 22.776 / 18.296 | 0.006 / 0.005 |
+
+On these two 020 runs the limiter's instruction cost stays below 0.024% of each
+scene. This is a measured cost in these configurations, not a statement of the
+intended game rate or a prediction for faster CPUs. The default converter occupies
+44.480% of Origin animation and 61.409% of the particle scene. No rendering patch
+or performance improvement is claimed.
+
+Evidence: `tmp/phase4-leaf-costs.json`,
+`tmp/phase4-profile-on-no-raw/leaf-costs.json`,
+`tmp/phase4-nocache-on/leaf-costs.json` and `tmp/phase4-leaf-negative.json`.
+The unresolved remainder includes other instructions, exception/idle gaps and
+unvalidated general caller attribution. These leaf measurements do not fill the
+other CPU matrix cells or substitute for the ceiling experiments.
+
+### Idle-field interpretation
+
+The pinned Barto `Field.idle` comes from explicit `barto_cmd_set_idle` application
+markers in `debug.cpp`; it is not an automatic measurement of CPU STOP or scheduler
+idle. The unmodified-game slice has zero such marker units, which must not be
+reported as zero CPU idle. A missing instruction PC is likewise labelled
+`no-recorded-PC`, not automatically STOP. `matrix_trace.py` explicitly reports
+`cpu_idle_measured: false`. Between-instruction cycles remain unclassified until
+an appropriate idle/interrupt instrument accounts for them.
+
+The debug record layout and idle-marker implementation, plus the custom-chip
+recording source, are now pinned in `manifest/debugger.tsv` alongside the existing
+CPU/debugger source inputs. They remain shared read-only build inputs.
 
 ### Outstanding phase 4 gate work
 

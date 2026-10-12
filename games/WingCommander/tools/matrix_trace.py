@@ -16,11 +16,13 @@ def report(path):
             if not 0<=kind<=9:raise ValueError('invalid DMA type')
             slots[kind]+=1
         for pc,cost,regs in t.instructions(f):
-            kind='STOP/no-PC' if pc is None else 'between-instructions' if pc==0x7fffffff else 'instructions'
+            kind='no-recorded-PC' if pc is None else 'between-instructions' if pc==0x7fffffff else 'instructions'
             costs[kind]+=cost;counts[kind]+=1
     if not counts['instructions']:raise ValueError('no instruction coverage; timing unavailable')
     names=['unclaimed','refresh','CPU','copper','audio','blitter','bitplanes','sprites','disk','conflict']
     return dict(fields=len(t.fields),cost_units=dict(costs),record_counts=dict(counts),
+                application_idle_marker_units=sum(f.idle for f in t.fields),
+                cpu_idle_measured=False,
                 dma_slots={names[i]:slots[i] for i in range(10)},
                 dma_fractions={names[i]:slots[i]/sum(slots.values()) for i in range(10)})
 

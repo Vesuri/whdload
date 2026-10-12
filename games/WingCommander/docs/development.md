@@ -608,3 +608,29 @@ changes. `recording_neutrality_pass` requires that only `raw_chunky` changes.
 A combined comparison can pass `matched_execution_pass` without certifying either
 isolated control. When both arms retain raw sources, the checker compares every
 byte of those streams. None of these checks certifies the calling-context tree.
+
+
+### Source-range costs for the call-free routines
+
+After the preceding controls pass, compute the converter/limiter instruction
+costs without using the unvalidated context tree:
+
+```sh
+python3 tools/matrix_leaf_report.py tmp/profile-on > tmp/default-leaf-costs.json
+python3 tools/matrix_leaf_report.py tmp/nocache-profile-on > tmp/nocache-leaf-costs.json
+```
+
+The reporter verifies the pinned original, fully decoded leaf boundaries and
+internal branches, absence of calls/external jumps, unchanged live routine bytes,
+corrected executing-PC accounting, and entry counts against the per-height source
+census. It deliberately excludes reset, when the slave's eventual address range
+is not established. It reports instruction-body cost including its memory stalls,
+not entry-to-return time including asynchronous work. All per-scene raw units and
+entry counts remain in the output. The old pre-correction profile is retained as
+a negative control and must be rejected.
+
+`matrix_trace.py` now exposes application idle-marker units separately and labels
+missing PCs without inferring STOP. Its zero `application_idle_marker_units` is
+not a measured zero for CPU idle; `cpu_idle_measured` remains false. No idle claim
+may be based on that optional trace field without a validated marker/hardware
+instrument.
