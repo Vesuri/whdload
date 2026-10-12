@@ -19,12 +19,12 @@ def integrate(lines, cuts, h0):
     rows = []
     for line in lines:
         p = line.split()
-        if not p or p[0] not in ('B', 'E', 'R'):
+        if not p or p[0] not in ('B', 'E', 'R', 'F'):
             raise ValueError('unknown IRQ record')
-        expected = {'B': 3, 'E': 7, 'R': 5}[p[0]]
+        expected = {'B': 3, 'E': 7, 'R': 5, 'F': 4}[p[0]]
         if len(p) != expected:
             raise ValueError('malformed IRQ record')
-        at = int(p[2] if p[0] != 'E' else p[3])
+        at = int(p[3] if p[0] in ('E', 'F') else p[2])
         if at < 0 or (last is not None and at < last):
             raise ValueError('nonmonotonic IRQ clock')
         if last is not None:
@@ -44,6 +44,9 @@ def integrate(lines, cuts, h0):
             if index < len(cuts)-1:
                 rows.append(dict(inclusive_units=[0]*3, innermost_selected_callback_units=[0]*3,
                                  callback_union_units=0, entries=[0]*3, returns=[0]*3))
+        elif p[0] == 'F':
+            if int(p[1]) not in (0, 1) or int(p[2]) < 0:
+                raise ValueError('invalid trace boundary')
         elif p[0] == 'E':
             number, kind = map(int, p[1:3])
             pc, sp, ret = (int(v, 16) for v in p[4:])
@@ -77,11 +80,11 @@ def integrate(lines, cuts, h0):
     return rows
 
 
-def check(run):
+def check(run, *, allow_diagnostic=False):
     meta = json.loads((run/'result.json').read_text())
     if not meta.get('irq_scopes'):
         raise ValueError('IRQ scope-enabled capture required')
-    scenes = scene_report(run)['scenes']
+    scenes = scene_report(run, allow_diagnostic=allow_diagnostic)['scenes']
     cuts = []
     for line in (run/'matrix-events.txt').read_text().splitlines():
         p = line.split()

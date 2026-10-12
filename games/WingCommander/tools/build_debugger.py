@@ -136,6 +136,15 @@ int record_key_debug(int kc) {
         if a.matrix_irq:
             code=code.replace('#include "wc_matrix_observer.inc"', '#include "wc_matrix_irq.inc"\n#include "wc_matrix_observer.inc"')
             shutil.copyfile(ROOT/'tools/matrix_irq.inc',out/'src/wc_matrix_irq.inc')
+            server=out/'src/barto_gdbserver.cpp'
+            server_code=server.read_text().replace('#include "sysconfig.h"', '#include "sysconfig.h"\nextern void wc_matrix_irq_trace(unsigned,unsigned);',1)
+            for anchor,state,index in (
+                ('profile_start_cycles = static_cast<uae_u32>(get_cycles() / cpucycleunit);',0,'profile_frame_count'),
+                ('uae_u32 profile_end_cycles = static_cast<uae_u32>(get_cycles() / cpucycleunit);',1,'profile_frame_count-1')):
+                assert server_code.count(anchor)==1
+                server_code=server_code.replace(anchor,anchor+'\n            wc_matrix_irq_trace(%d,%s);' % (state,index))
+            server.write_text(server_code)
+
             observer=out/'src/wc_matrix_observer.inc'
             observer_code=observer.read_text().replace('scene=id; previous.clear();','scene=id; previous.clear();\n        wc_matrix_irq_cut(id);')
             anchor='if (scene<0 || scene>=34) return;'

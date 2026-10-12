@@ -14,8 +14,8 @@ def compare(control,candidate):
     left,right=metadata
     if left.get('dma') or not right.get('dma'):raise ValueError('DMA off/on pair required')
     for key in ('machine','options','audit_cacr','emulator_sha256','slave_sha256','hunks','slave',
-                'boot_cpu','live_cpu','nommu_core','mmu_core','idle','irq_scopes','raw_chunky','profiles','host_warp'):
-        if left.get(key)!=right.get(key):raise ValueError('unmatched DMA configuration: '+key)
+                'boot_cpu','live_cpu','nommu_core','mmu_core','idle','irq_scopes', 'irq_trace','raw_chunky','profiles','host_warp'):
+        if left.get(key, False if key in ("irq_scopes", "irq_trace") else None) != right.get(key, False if key in ("irq_scopes", "irq_trace") else None):raise ValueError('unmatched DMA configuration: '+key)
     scenes=[scene_report(p)['scenes'] for p in runs]
     ledgers=[(p/'matrix-events.txt').read_text().splitlines() for p in runs]
     def without_clock(lines):

@@ -1660,8 +1660,33 @@ ledger is also identical. Evidence: `neutrality.log`, `irq-check.log` and
 
 Synthetic checks cover nested callbacks and a call spanning a scene boundary;
 malformed ordering, wrong return stack, wrong entry PC, changed scene clock,
-backward time and incomplete coverage are rejected. These checks and independent
-entry counts do not yet validate elapsed costs. An independent instruction-trace
-cross-check remains required. Scope elapsed time includes callees and preemption;
+backward time and incomplete coverage are rejected. A separate five-field 020
+instruction trace now validates 15 complete callbacks (five of each kind), with
+exactly zero elapsed-unit residual for every call. Entry PC/SP order is matched
+within independently timestamped trace fields; each return is an observed RTS
+restoring the saved slot. The checker requires exact agreement for this fixture,
+not merely agreement within the trace format's per-record rounding bound.
+
+`tmp/phase4-irq-v2-trace-020/` uses debugger digest
+`c30ad609dc1141b47d3b9cfbf7d5a86666445fee7985907beef60b095679d940` and
+fresh cache audit `tmp/phase4-irq-v2-audit-020/`. Its complete callback intervals,
+publication/census ledger, raw source bytes, final game hunks and menu pixels
+match the uninterrupted 020 control exactly. The diagnostic retains its explicit
+breakpoint flag; it is not substituted for the uninterrupted baseline. Evidence:
+`tmp/phase4-irq-v2-trace-check.json`. Negative fixtures in
+`tmp/phase4-irq-v2-negative-clock/` reject a one-unit decrease or increase in
+callback duration and a changed trace-field clock.
+
+Representative accumulated callback elapsed time from the uninterrupted 020
+default run (all 34 scene rows are reproduced by `matrix_irq_check.py`):
+
+| Scene | Game VBL ms | Music VBL ms | Joypad VBL ms | Callback union / scene |
+|---|---:|---:|---:|---:|
+| origin-animation | 1.509207 | 24.147811 | 40.607630 | 2.480156% |
+| title-arrival | 2.552444 | 26.746704 | 68.720247 | 2.175811% |
+| credits-00 | 3.652631 | 51.711215 | 98.312045 | 2.383403% |
+| credits-15 | 3.673001 | 33.082880 | 98.933010 | 2.091169% |
+
+Scope elapsed time includes callees and preemption;
 innermost selected callback time is not routine self time. Exception entry,
 dispatcher work and other handlers remain outside these three callback scopes.

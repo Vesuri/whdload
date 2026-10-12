@@ -8,9 +8,9 @@ from pathlib import Path
 from intro_capture import SCENES
 
 
-def report(run):
+def report(run, *, allow_diagnostic=False):
     meta = json.loads((run/'result.json').read_text())
-    if not meta['complete'] or meta.get('diagnostic_stops'):
+    if not meta['complete'] or (meta.get('diagnostic_stops') and not allow_diagnostic):
         raise ValueError('complete uninterrupted scene capture required')
     cpu = dict(re.findall(r'(\w+)=(\w+)', meta['boot_cpu']))
     models = {'a1200-fast': '68020', 'a1200-030': '68030',
@@ -101,6 +101,7 @@ def report(run):
                            compared_bytes=compared, changed_bytes=sum(c[2] for c in pairs),
                            changed_32byte_blocks=sum(c[3] for c in pairs)))
     return dict(scene_ledger_pass=True, validated_timing_baseline=False,
+                diagnostic_capture=bool(meta.get("diagnostic_stops")),
                 cpu_clock_validated=meta.get('clock_validated', meta['machine']=='a1200-fast'),
                 machine=meta['machine'], options=meta['options'], scenes=scenes,
                 limitations=['Ledger structure is checked; repeatability and independent observer checks are separate.',

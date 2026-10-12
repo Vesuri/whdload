@@ -20,6 +20,7 @@ def main():
     cores.add_argument('--nommu-core',action='store_true')
     cores.add_argument('--mmu-core',action='store_true',help='030 MMU-interpreter counter capture; no instruction profiling')
     p.add_argument('--instant-blitter',action='store_true',help='VERIFY ceiling: complete blits immediately; requires audit readback')
+    p.add_argument('--irq-trace',action='store_true',help='diagnostic five-field callback instruction trace at credits entry')
     p.add_argument('--irq-scopes',action='store_true',help='experimental complete-call VBL callback intervals')
     p.add_argument('--idle',action='store_true',help='record actual stopped-CPU state; requires --matrix-idle debugger')
     p.add_argument('--dma',action='store_true',help='experimental DMA summary, requires a --matrix-dma debugger build')
@@ -29,6 +30,8 @@ def main():
     p.add_argument('--no-profiles', action='store_true', help='counter/census control with aggregate profiling disabled')
     a=p.parse_args();out=(ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():raise ValueError('new tmp output required')
+    if a.irq_trace and (not a.irq_scopes or not a.no_profiles or a.machine!='a1200-fast'):
+        raise ValueError('--irq-trace requires 020, --irq-scopes and --no-profiles')
     if os.environ.get('EXTRA_ARGS'):raise ValueError('fixed measurement configuration required')
     if a.mmu_core and (a.machine!='a1200-030' or not a.no_profiles):
         raise ValueError('--mmu-core requires 030 and --no-profiles')
@@ -89,6 +92,10 @@ def main():
                 cmd(f'dump binary memory {out.relative_to(ROOT)}/{name} {address:#x} {address+width*height:#x}')
                 chunky_oracle.append(dict(scene=4,index=index,width=width,height=height,file=name))
             print('captured six independent chunky-source snapshots',flush=True)
+        if a.irq_trace:
+            until(h[0]+0x1fdd6)
+            cmd('monitor trace-window-all')
+            cmd(f'monitor profile 5 \"\" \"{out}/irq-trace.bin\"',180)
         until(h[0]+0x1fe48)
         print('all credits pages complete',flush=True)
         until(h[0]+0x1898a);cmd('monitor key 45 1')
@@ -110,7 +117,7 @@ def main():
         if a.idle and not (out/'idle-events.txt').is_file():raise ValueError('idle observer unavailable')
         if a.dma and not (out/'dma-events.txt').is_file():raise ValueError('DMA observer unavailable')
         boot=next((out/'run').glob('boot.*'))
-        result=dict(layout,complete=True,names=names,machine=a.machine,nommu_core=a.nommu_core,mmu_core=a.mmu_core,ceiling=ceiling,instant_blitter=a.instant_blitter,irq_scopes=a.irq_scopes,idle=a.idle,dma=a.dma,host_warp=a.warp,clock_validated=a.machine=='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
+        result=dict(layout,complete=True,names=names,machine=a.machine,nommu_core=a.nommu_core,mmu_core=a.mmu_core,ceiling=ceiling,instant_blitter=a.instant_blitter,irq_scopes=a.irq_scopes,irq_trace=a.irq_trace,idle=a.idle,dma=a.dma,host_warp=a.warp,clock_validated=a.machine=='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle or a.irq_trace,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
             boot_cpu=cpu,live_cpu=live,audit_cacr=audit['cacr'],
             slave_sha256=hashlib.sha256((boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()).hexdigest(),
             emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())

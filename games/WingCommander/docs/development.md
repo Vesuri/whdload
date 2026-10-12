@@ -1052,5 +1052,33 @@ must have identical scene/publication/census records and matching effective CPU
 settings. That comparison validates entry counts only. The interval checker
 separately checks matched returns, scene accounting and nested-scope totals;
 recording neutrality is reported explicitly as `irq_scope_neutrality_pass`.
-Do not call these elapsed scopes self CPU cost or total interrupt cost. Independent
-trace validation of their durations remains open.
+Do not call these elapsed scopes self CPU cost or total interrupt cost. A separate
+020 instruction trace checks durations against complete instruction/gap sums.
+The debugger writes `F` field clocks beside scope records so alignment is by field,
+entry PC and stack slot, not by searching for similar durations.
+
+```sh
+python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
+  --matrix-mmu030-counters --frequency-clock --matrix-dma --matrix-idle \
+  --dma-cia-unsplit --matrix-irq --output tmp/phase4-irq-v2-debugger
+export FSUAE="$PWD/tmp/phase4-irq-v2-debugger/fs-uae"
+python3 tools/cache_audit.py --machine a1200-fast \
+  --slave tmp/phase4-cache-slave/WingCommanderCD32.Slave \
+  --output tmp/phase4-irq-v2-audit-020
+python3 tools/matrix_capture.py --machine a1200-fast --no-profiles \
+  --warp --raw-chunky --irq-scopes --irq-trace \
+  --audit tmp/phase4-irq-v2-audit-020/result.json \
+  --layout tmp/phase4-profile-on-no-raw/result.json \
+  --output tmp/phase4-irq-v2-trace-020
+python3 tools/matrix_irq_trace_check.py tmp/phase4-irq-v2-trace-020 \
+  --control tmp/phase4-irq-pair-020/on
+python3 tools/matrix_irq_trace_negative.py tmp/phase4-irq-v2-trace-020 \
+  --output tmp/phase4-irq-v2-negative-clock
+```
+
+The trace capture is explicitly diagnostic: it stops at credits entry and records
+five fields, then completes the usual route. Ordinary baseline/neutrality reports
+continue to reject diagnostic captures. The trace checker explicitly permits
+that ledger for calibration, requires exact callback duration agreement, and
+optionally compares all callback intervals and final state with the uninterrupted
+control. The trace file and all mutation fixtures stay under `tmp/`.

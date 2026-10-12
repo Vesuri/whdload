@@ -23,6 +23,13 @@ static void wc_matrix_irq_cut(unsigned scene) {
         fclose(wc_irq_output); wc_irq_output = nullptr;
     }
 }
+// Barto field boundaries anchor a separate instruction trace in this ledger.
+void wc_matrix_irq_trace(unsigned state, unsigned index) {
+    if (!wc_irq_output) return;
+    fprintf(wc_irq_output,"F %u %u %llu\n",state,index,
+            (unsigned long long)get_cycles());
+    fflush(wc_irq_output);
+}
 static void wc_matrix_irq_pc(unsigned pc, unsigned h0) {
     if (!wc_irq_output) return;
     const unsigned sp = m68k_areg(regs,7);
