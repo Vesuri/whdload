@@ -7,6 +7,7 @@ lists missing cells explicitly. No emulator is launched or modified.
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import audit_hooks
@@ -15,6 +16,41 @@ import native_scene_state
 import simulation_latency
 import simulation_rate
 import sim60_state
+
+
+
+def settings(folder, meta):
+    """Check accepted UAE settings, independently of requested metadata."""
+    log=(Path(folder)/'emulator-settings.log').read_text()
+    options=dict(re.findall(r'Set option (\w+) = "([^"\n]*)"',log))
+    # FS-UAE copies a shared startup log into its private log. Concurrent
+    # boots can contaminate frontend "cpu ="/"ntsc_mode =" lines; the UAE
+    # Set option records are written after switching to the private file.
+    # PAL is the default; corroborate it with the observed Exec clock.
+    if 'ntsc' not in options and meta['ntsc_mode']==0 and meta['observed_exec_hz']==50:
+        options['ntsc']='false'
+    expected=dict(cpu_model=meta['cpu'].replace('68EC020','68020').replace('-NOMMU',''),
+                  cpu_speed='real',cpu_cycle_exact='true',
+                  chipmem_size=str(meta['chip_kb']//512),
+                  bogomem_size=str(meta['slow_kb']//256),
+                  fastmem_size=str(meta['fast_kb']//1024),
+                  ntsc='true' if meta['ntsc_mode'] else 'false')
+    if 'NOMMU' in meta['cpu']:expected['mmu_model']='0'
+    for option,value in re.findall(r'--uae_(\w+)=([^ ]+)',meta['extra_args']):
+        expected[option]=value
+    for key,value in expected.items():
+        assert options.get(key)==value,(str(folder),key,options.get(key),value)
+    assert meta['observed_exec_hz']==(60 if meta['ntsc_mode'] else 50)
+    effective=Path(folder)/'emulator-effective.uae'
+    if effective.exists():
+        values=dict(re.findall(r'^(\w+)=([^\n]+)$',effective.read_text(),re.M))
+        for key,value in expected.items():
+            # UAE omits disabled MMU and may omit the multiplier. Explicit
+            # fixed frequency, CPU model and timing options remain checked.
+            if key=='mmu_model' and value=='0' and key not in values:continue
+            if key=='cpu_multiplier' and key not in values:continue
+            assert values.get(key)==value,(str(folder),'effective',key,values.get(key),value)
+    return {key:options.get(key) for key in (*expected,'blitter_cycle_exact','waiting_blits','immediate_blits')}
 
 
 def inspect(prefix, partial=False, routes=None):
@@ -36,6 +72,7 @@ def inspect(prefix, partial=False, routes=None):
             assert hashlib.sha256(binary).hexdigest() == report['slave_sha256']
             assert binary == (prefix/(name+'.slave')).read_bytes()
             meta = json.loads((folder/'metadata.json').read_text())
+            settings(folder,meta)
             for key in ('cpu','chip_kb','fast_kb','slow_kb','ntsc_mode','extra_args'):
                 assert meta[key] == config[key], (name,key)
             assert meta['whd_args'].split().count('CUSTOM5=1') == 1

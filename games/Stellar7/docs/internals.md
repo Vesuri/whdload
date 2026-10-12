@@ -8,14 +8,421 @@ the launcher selects using its CPU setting. A slave's timestep does not change
 at runtime. Movement, input quanta and game clocks scale with N, retaining
 real-time game speed. History assigns controls to their tick; native menus stay live.
 
-Builds, rendering optimization and selected-rate regression pass.
-Fast-CPU presentation limits, broader encounters and physical-control playtesting
-remain open. The normal loader still omits this experimental conversion.
+The displayed-buffer reuse correction is enabled in both playable source paths.
+Build, matrix, extended-combat, input, delayed-draw and lifecycle checks pass.
+Both actual-launcher smoke checks also pass.
+Fast-CPU timing diagnostics and extended-combat checks pass within the scopes below;
+the corrected selected-rate matrix and its 350 state comparisons pass. Broader encounters and physical-control
+playtesting remain open. The normal loader still omits this experimental conversion.
+
+## Fast-CPU presentation and sustained combat
+
+### Displayed-buffer reuse finding
+
+The retained 68060 SOL trace has nine consecutive-field pairs with unchanged
+bitmap addresses but changed fetched words (32–1003 words per affected pair).
+Each affected field is the last field scanning that bitmap before the buffer
+switch. The matching phase capture starts the next draw in the same field as
+the preceding presentation, with the old displayed bitmap selected for drawing.
+The A1200-with-fast-RAM trace contains no same-buffer word changes in its
+50-field window. Evidence: `tmp/fast60/scanout-word-stability.json` and the
+retained `probes/*-sol-trace` / phase captures.
+
+Native $2b96–$2ba0 waits for the field counter to differ from the value saved
+after the previous presentation at $2c1a. SIM60 bypasses that wait. These
+observations identify premature buffer reuse in the captured 68060 path;
+complete scanout addresses alone did not establish an untouched visible buffer.
+The correction restores this field check before drawing while continuing the
+simulation poll. Installation checks the native compare/store instructions and
+their shared field-counter operand. No tick is discarded and neither fixed rate
+changes. The matrix below compares unfixed and corrected builds; the drawing
+and handoff diagnostics explicitly describe the unfixed reference.
+
+A matched scratch candidate checks the current field against native `-22(a5)`
+before starting another draw, returning to the simulation poll while they are
+equal. Both arms retain identical layout and differ only in the four-byte
+BEQ/NOP sequence. In the first 50-field 68060 SOL scanout capture, the control
+has eleven unstable same-bitmap fields; the candidate has zero. All eight mapped
+state comparisons across both arms and observers at ticks 600 and 1500 pass,
+allowing only deferred projection scratch. Across that 900-tick interval, presentation falls from 23.893 to
+20.579 FPS. Candidate debt falls 2→0 over 898 fields, so its 60.134 updates/s
+average includes repayment, not a faster simulation clock. The independent phase
+capture observes 16/16 next draws in the presentation field for the control;
+the candidate starts all 12 observed next draws in the following field.
+The uninterrupted normal-speed comparison captures 100 fields per arm: native
+and candidate each have zero unstable same-bitmap fields, while the control has
+20. Recorded running commands establish warp-off, and mapped candidate/control
+state agrees apart from deferred projection scratch. This is fixture-controlled
+gameplay, not physical-control or audible-output validation.
+Evidence: `tmp/fast60/buffer-reuse/validation.json`,
+`tmp/fast60/buffer-reuse/normal-speed-validation.json`, the scanout reports and
+exact matched binaries/listings.
+
+`BUFFER_REUSE=1` now enables the correction in the source. All six rate builds,
+both playable targets, the 20 Hz override, diagnostic exclusion and static hook
+audits pass. Disabling only this guard reproduces the preceding release/VERIFY
+bytes; the normal loader stays byte-identical. Native comparison fixtures rebuilt
+with the guard disabled also match the previously measured binaries exactly.
+Evidence: `tmp/fast60/corrected/builds/validation.json`.
+
+The final-source normal-speed checks pass on A500 and 68060: each captures 100
+uninterrupted fields with zero unstable same-bitmap fields, and mapped gameplay
+matches the reference at both endpoints, allowing deferred projection scratch.
+The actual process command confirms warp-off. SOL presentation is 4.023 FPS on
+A500 and 20.646 FPS on 68060 in these windows. Both repay initial debt (5→0
+and 2→0 respectively), so their above-target average update rates are not
+sustained-throughput claims. Evidence: `tmp/fast60/corrected/preflight/validation.json`.
+
+### Corrected selected-rate matrix
+
+All 40 corrected SIM60 captures pass runtime-setting and installed-hook checks.
+The 40 native comparator captures are retained measurements: fresh guard-off
+fixture builds reproduce their exact bytes. All 150 same-rate CPU/PAL and
+200 before/after mapped-state comparisons pass, allowing only deferred projection
+scratch. Missing input samples and queue drops are zero at every heavy checkpoint.
+Evidence: `tmp/fast60/corrected/matrix-validation.json` and `matrix.md`.
+
+Presentation rates below are unfixed → corrected. SOL spans nominal ticks
+600→1500, early type-10 1800→2400, late type-10 4500→5400, boss 3500→4100,
+and heavy type-10 600→5400; N=3 tick numbers scale by one quarter.
+
+| Configuration | Fixed Hz | SOL FPS | Early type-10 FPS | Late type-10 FPS | Boss FPS | Heavy FPS |
+|---|---|---|---|---|---|---|
+| A500 | 15 | 4.023 → 4.023 | 4.684 → 4.684 | 3.946 → 3.955 | 2.412 → 2.416 | 4.031 → 4.033 |
+| Stock A1200 | 60 | 5.174 → 5.174 | 3.458 → 3.452 | 2.959 → 2.959 | 2.600 → 2.600 | 3.409 → 3.409 |
+| A1200 + fast RAM | 60 | 8.812 → 8.667 | 9.045 → 9.070 | 8.906 → 8.923 | 5.700 → 5.752 | 8.988 → 8.988 |
+| 68030/50 | 60 | 18.800 → 17.305 | 22.575 → 19.800 | 22.267 → 19.756 | 14.348 → 13.746 | 22.175 → 19.512 |
+| 68040/25 | 60 | 23.653 → 20.401 | 29.052 → 20.268 | 29.000 → 20.044 | 19.132 → 15.947 | 28.594 → 20.883 |
+| 68060/50 | 60 | 23.893 → 20.646 | 29.300 → 21.100 | 29.465 → 20.200 | 19.400 → 17.186 | 29.012 → 21.254 |
+| PAL A500 | 15 | 4.043 → 4.038 | 4.771 → 4.771 | 3.995 → 4.016 | 2.410 → 2.515 | 4.100 → 4.103 |
+| PAL 68060/50 | 60 | 25.300 → 18.467 | 29.341 → 24.950 | 28.628 → 24.967 | 18.900 → 16.499 | 29.443 → 24.587 |
+
+The guard has a measurable presentation cost on the fast CPUs. Heavy-combat
+throughput remains near the selected fixed rate; the observed pending counts
+fluctuate within the sampled ranges below. Positive endpoint growth is included
+in the reported average. Stock A1200 retains substantial catch-up bursts, with
+38 updates owed at the sampled peak. These are scene measurements, not bounds
+for every encounter or continuous response-time maxima.
+
+| Configuration | Seconds | Updates/s | Presentations/s | Pending range | Pending start→end |
+|---|---|---|---|---|---|
+| A500 | 80.083 | 14.984 | 4.033 | 1–3 | 1→2 |
+| Stock A1200 | 80.083 | 59.938 | 3.409 | 5–38 | 5→10 |
+| A1200 + fast RAM | 80.000 | 60.000 | 8.988 | 1–6 | 5→5 |
+| 68030/50 | 80.000 | 60.000 | 19.512 | 0–2 | 2→2 |
+| 68040/25 | 80.017 | 59.988 | 20.883 | 0–2 | 1→2 |
+| 68060/50 | 80.033 | 59.975 | 21.254 | 0–2 | 0→2 |
+| PAL A500 | 79.940 | 15.011 | 4.103 | 0–4 | 1→0 |
+| PAL 68060/50 | 80.000 | 60.000 | 24.587 | 1–3 | 1→1 |
+
+Native reference presentation rates follow. These corresponding scene windows
+have different trajectories and measurement lengths from the fixed-rate runs;
+they are not identical per-frame workloads.
+
+| Configuration | SOL frame 90 FPS | SOL frame 240 FPS | Early type-10 FPS | Late type-10 FPS | Boss FPS |
+|---|---|---|---|---|---|
+| A500 | 5.000 | 4.000 | 4.444 | 4.054 | 1.765 |
+| Stock A1200 | 8.000 | 6.000 | 7.500 | 7.021 | 3.117 |
+| A1200 + fast RAM | 12.000 | 7.912 | 10.000 | 9.545 | 5.783 |
+| 68030/50 | 20.000 | 15.464 | 20.000 | 18.125 | 13.548 |
+| 68040/25 | 30.000 | 18.947 | 20.000 | 20.000 | 16.875 |
+| 68060/50 | 30.000 | 18.947 | 20.000 | 20.000 | 17.053 |
+| PAL A500 | 5.000 | 3.896 | 4.545 | 4.070 | 1.852 |
+| PAL 68060/50 | 25.000 | 20.408 | 25.000 | 25.000 | 16.489 |
+
+All 18 corrected scanout windows are reviewed: SOL and late combat on all eight
+configurations, plus boss on A500 and 68060, with 100 complete fields per window.
+Sixteen pass strict unchanged-bitmap checks; two are individually classified
+native HUD updates. Exact build/settings/hook checks and mapped starting-state
+comparisons pass, allowing deferred projection scratch. A500/68060 SOL reuse
+the exact normal-speed preflight captures; 68060 late combat and boss also run
+at normal speed with recorded process commands. Other captures use accelerated
+host execution. Evidence: `tmp/fast60/corrected/scanout/validation.json`.
+
+The normal-speed
+68060 boss window has one classified native cockpit update: 23 words change in
+field 20, confined to x=243–263, y=170–174. Native $d2be–$d334 redraws the
+24×10 indicator at (243,170); read-only breakpoints observe that routine's copy
+in field 20. A normal-speed native boss capture changes the same indicator in
+four fields and another cockpit region in two fields. Corrected fields 19 and
+21 match exact native indicator images; field 20 contains a partial transition.
+This is preserved native HUD behavior, not an unchanged-bitmap pass or evidence
+that every visible write has been eliminated. The strict scanner remains
+unchanged: only this retained capture is classified, with no general HUD mask.
+Build identities, runtime settings, mapped state, native opcode guards and
+normal-speed commands pass. Evidence: `tmp/fast60/corrected/boss-hud-classification.json`,
+`boss-pixel-comparison.json`, `boss-icon-states.json` and `boss-hud-phase`.
+PAL A500 SOL also passes strict stability. PAL A500 late combat has a second
+classified native HUD update: 28 words change in field 10 within the energy bar
+at x=158–164, y=189–195. The read-only observer sees five native bar-line draws
+across fields 9–10 and the $c1a4 copy in field 10. Coordinate/operation guards
+match the native comparator; exact builds, settings and mapped state pass. The
+native PAL comparison window itself is stable, so it does not establish the same
+event timing. The first normal-speed observer timed out and is excluded; the
+successful observer uses accelerated host execution, as did the original failed
+pixel check. This retained capture is classified individually, not accepted by
+a general energy-bar mask. Evidence: `tmp/fast60/corrected/pal-energy-classification.json`,
+`pal-late-pixel-comparison.json` and `pal-energy-phase-retry`.
+No unexplained fetched-pixel changes remain in these windows. The scanout test
+does not rule out writes restored before fetch and does not cover every scene.
+Extended-combat, input, delayed-draw and lifecycle validation pass.
+Both actual-launcher smoke checks also pass.
+
+### Native drawing and handoff observations
+
+Read-only native breakpoints retain beam positions and field epochs over
+50 NTSC fields, starting at tick 600 in SOL or 4500 in late combat. Timings
+below include interrupt execution and wrapper overhead;
+the parent drawing scope overlaps its children. Partial boundary calls are
+excluded, so scope call counts can differ. Hunk $2bb4 starts drawing, $2bec–$2bf0
+brackets actors and $6a0a–$2c1a brackets presentation.
+
+| Configuration / scene | Complete draws | Before actors ms | Actors ms | After actors ms | Drawing before presentation ms | Presentation call ms |
+|---|---:|---:|---:|---:|---:|---:|
+| A1200 + fast / SOL | 5 | 21.525 | 94.084 | 20.050 | 135.671 | 0.086 |
+| 68030/50 / SOL | 11 | 14.628 | 40.317 | 11.953 | 66.896 | 0.026 |
+| 68040/25 / SOL | 14 | 13.640 | 28.657 | 10.084 | 52.378 | 0.013 |
+| 68060/50 / SOL | 15 | 13.611 | 28.286 | 10.026 | 51.964 | 0.013 |
+| 68030/50 / late type-10 | 17 | 14.434 | 14.399 | 12.826 | 41.708 | 0.025 |
+| 68040/25 / late type-10 | 23 | 13.494 | 9.686 | 10.353 | 33.561 | 0.013 |
+| 68060/50 / late type-10 | 23 | 13.489 | 9.336 | 10.023 | 32.816 | 0.016 |
+
+None of these windows enters the optional VBL handoff at $1c986–$1c996 or the
+copper-build branch at $1c8c0–$1c8da. The request remains clear while native
+front/back indices alternate. Presentation is a small part of the observed
+cost, not a mandatory multi-field wait. On 68060, work outside the actor pass
+is about 23.5 ms in both sampled scenes; this is a scene-window observation,
+not a universal lower bound for every frame.
+
+In 68060 SOL, complete graphics WaitBlit wrappers ($2510c–$2511a) account for
+144.222 ms and polygon waits ($1db8c–$1dbb2) for 272.347 ms of the 833.333 ms
+window. The late-combat values are 201.315 and 94.772 ms. These elapsed scopes
+include polling instructions, wrapper overhead and interrupts: they must not
+be labeled pure blitter DMA cost. Clock/blitter sensitivity diagnostics provide
+separate evidence about causation.
+
+The 68020 calibration uses an independent Barto instruction trace of the same
+exact binary and route. Every presentation field matches; mapped gameplay and
+reticle state agree at ticks 600 and 1500. Mean whole-draw time differs by
+0.115%; small helper means differ by up to 2.083%, with boundary call-count
+variation in the polygon wait. The observer is therefore suitable for the
+large stage differences here, not sub-percent optimization claims.
+
+Actual bitplane DMA in separate 68020/68060 SOL traces fetches all 16000 words
+of one native four-plane bitmap in every one of 50 fields. Buffer changes
+match presentation calls in the following field. This checks complete scanout
+addresses, not writes to displayed memory between fetches. Mixed-buffer,
+missing-fetch and repeated-address negative controls are rejected
+(`tmp/fast60/buffer-controls.json`). The 68060 trace has
+zero CPU instruction records and no blitter DMA records: its backend does not
+supply validated instruction timing and has non-cycle-exact blitter recording.
+Absence of those records is not evidence of zero CPU or blitter work.
+
+Evidence: `tmp/fast60/probes/*-report.json`, `calibration.json`, both
+`*-sol-buffers.json` reports and their exact listings/binaries, raw beam events,
+GDB scripts, retained trace files and endpoint states. Milliseconds use the
+repository's nominal 60-fields/s NTSC convention; this is emulator evidence,
+not a measured real-accelerator performance bound.
+
+### Clock and blitter sensitivity
+
+These are whole SOL 600→1500 field/counter intervals on the identical ordinary
+N=12 VERIFY binary. Only the requested emulator frequency or instant-blitter
+setting changes. Runtime options are checked and mapped gameplay state matches
+at both boundaries, with only deferred projection scratch differing.
+
+| 68060 diagnostic configuration | Updates/s | Presentations/s | Pending start→end |
+|---|---:|---:|---:|
+| 50 MHz, ordinary blitter | 60.067 | 23.893 | 2→1 |
+| 8 MHz, ordinary blitter | 60.201 | 22.609 | 3→0 |
+| 50 MHz, instant blitter | 60.000 | 46.600 | 0→0 |
+
+Above-target update averages repay initial debt; they do not change game time.
+The 8 MHz check is slower, but the modest response must not be extrapolated
+into physical accelerator scaling. Instant blits nearly double presentation
+rate. In its separate 50-field beam window, mean drawing before presentation
+falls from 51.964 to 24.886 ms; before/after-actor work falls from approximately
+23.6 to 5.0 ms. Complete graphics/polygon wait scopes total 11.860/22.638 ms,
+compared with 144.222/272.347 ms in the ordinary window. Presentation itself
+remains approximately 0.012 ms, with no optional VBL handoff observed.
+
+This identifies modeled blitter-side drawing as a major limit, alongside the
+remaining actor work. It does not separate serial blit latency from Chip-bus
+contention on the fast backend, whose blitter DMA records are unavailable.
+The instant setting is a counterfactual diagnostic, not a hardware result or a
+playable optimization. Short-window stage times and whole-route FPS cover
+different spans and must not be substituted for one another.
+
+Evidence: `tmp/fast60/probes/060-50-sol-{trace,8mhz,instant}` and their retained
+settings, beam reports, exact common binary and matched endpoint states.
+The incomplete instant-blitter attempt ending with a debugger protocol error
+is preserved separately and excluded; the accepted retry contains all 50 fields.
+
+### Matched presentation-only controls
+
+The scratch SWAP_ONLY experiment retains the simulation, RNG save/restore and
+native presentation call, including its signed word argument. Both arms contain
+the same wrapper and all code. Each retained pair differs in exactly one
+two-byte instruction: a NOP for full rendering or a short branch to the
+presentation-only path. The control, not the ordinary differently laid-out
+slave, is the timing reference. The bypass deliberately displays stale pixels.
+
+| CPU / scene | Matched full-render control FPS | Presentation-only FPS |
+|---|---:|---:|
+| 68030/50 / SOL | 18.800 | 60.000 |
+| 68030/50 / late type-10 | 22.284 | 60.000 |
+| 68060/50 / SOL | 23.920 | 60.000 |
+| 68060/50 / late type-10 | 29.467 | 60.000 |
+
+All four bypass intervals complete at exactly 60 updates and presentations per
+second, with zero pending debt at both boundaries. Both CPUs can therefore
+run this simulation and native handoff at the display rate in these scenes;
+full drawing imposes the lower observed presentation rate. This is a ceiling
+experiment, not a candidate to ship. Together with the instant-blitter result,
+it identifies drawing, substantially blitter-side work, rather than a mandatory
+multi-field publication wait as the limit in the measured fast-CPU scenes.
+
+Twenty mapped-state comparisons across the matched arms, clock and blitter
+variants pass at both interval boundaries; only deferred projection scratch
+differs. All four pairs pass exact two-byte-difference checks and installed-hook
+audits. Evidence: `tmp/fast60/swap`, `diagnostic-validation.json` and the paired
+field observations, settings, listings and binaries. Probe code is excluded from
+the normal and playable builds. The diagnostic reference builds match the
+rendering-optimization baseline (`tmp/fast60/builds/validation.json`); the new
+buffer guard is independently checked in `tmp/fast60/corrected/builds/validation.json`.
+All 31 host-tool tests pass, including beam rollover, delayed VBL
+entry, invalid scope nesting, displayed-bitmap pixel changes and contradictory runtime settings
+(`tmp/fast60/tool-tests-final.log`). These checks validate the measurement tools;
+they do not replace the gameplay-state and runtime observations below.
+
+### Extended active combat and input timing
+
+These are current corrected-build combat and input measurements.
+The type-10 route starts at nominal tick 600 and continues through natural
+death, stopping at the first inactive completed update before menu time or a
+session reset. Checkpoints are five nominal seconds apart, plus the terminal
+update. No invulnerability is used. Active-actor samples range from seven to
+twelve across these runs; terminal energy is negative. Rates use native
+observed fields and completed tick/presentation counters, not host wall time.
+
+| Configuration | Fixed Hz | Active seconds measured | Updates/s | Presentations/s | Sampled pending range | Pending start→end | Death tick |
+|---|---|---|---|---|---|---|---|
+| A500 | 15 | 114.133 | 14.982 | 3.934 | 1–3 | 1→3 | 1860 |
+| Stock A1200 | 60 | 143.750 | 59.910 | 3.353 | 5–38 | 5→18 | 9212 |
+| A1200 + fast RAM | 60 | 143.567 | 59.986 | 8.818 | 1–7 | 5→7 | 9212 |
+| 68030/50 | 60 | 143.517 | 60.007 | 19.461 | 0–2 | 2→1 | 9212 |
+| 68040/25 | 60 | 143.550 | 59.993 | 20.529 | 0–2 | 1→2 | 9212 |
+| 68060/50 | 60 | 143.533 | 60.000 | 20.824 | 0–2 | 0→0 | 9212 |
+| PAL A500 | 15 | 114.020 | 14.997 | 3.999 | 0–5 | 1→1 | 1860 |
+| PAL 68060/50 | 60 | 143.520 | 60.006 | 24.714 | 0–3 | 1→0 | 9212 |
+
+All eight runs sustain the selected average game speed in this encounter;
+pending samples fluctuate and recover rather than showing persistent growth.
+Stock A1200 is a responsiveness concern: its sampled peak is 38 owed ticks
+(about 0.63 s), followed later by recovery to seven, and it ends at 18. The
+small endpoint growth is shown rather than hidden by rounding the average to
+60 Hz. These sampled ranges are not continuous latency maxima, and this
+encounter is not a bound for every level or boss.
+
+All 174 same-rate CPU/PAL mapped-state comparisons pass through natural death,
+including the reticle and fresh projection. Only deferred projection scratch
+differs. N=3 and N=12 follow different encounter trajectories; these checks
+compare CPUs at the same rate, not cross-rate equivalence. All 228 before/after
+comparisons also pass, including unchanged lethal ticks and terminal state.
+Each extended binary matches its corrected heavy-matrix binary. Input-history
+missing-sample and queue-drop counts remain zero at every extended checkpoint.
+
+The separate elapsed-field input fixture passes 200 recorded ticks, eight
+held/press/release/fire edges and 96 native key-queue assertions on each of the
+eight configurations. Eight NTSC same-rate and sixteen before/after mapped-state
+comparisons also pass. PAL
+fixtures are checked against their own elapsed-field schedule. Delays below
+are the ranges among those eight synthetic edges, not combat-wide maxima or
+physical-device latency. Render handoff ends at render completion, before
+actual scanout. One field is nominally 16.667 ms NTSC or 20 ms PAL.
+
+| Configuration | Input consumption delay, fields | Render handoff delay, fields | Render handoff delay, ms |
+|---|---|---|---|
+| A500 | 7–16 | 32–37 | 533.3–616.7 |
+| Stock A1200 | 7–21 | 19–40 | 316.7–666.7 |
+| A1200 + fast RAM | 3–11 | 10–22 | 166.7–366.7 |
+| 68030/50 | 1–4 | 4–9 | 66.7–150.0 |
+| 68040/25 | 0–3 | 3–7 | 50.0–116.7 |
+| 68060/50 | 1–3 | 4–7 | 66.7–116.7 |
+| PAL A500 | 2–14 | 17–30 | 340.0–600.0 |
+| PAL 68060/50 | 0–2 | 1–5 | 20.0–100.0 |
+
+Correct historical input does not eliminate catch-up and drawing delay. The
+slow configurations can sustain average game speed while still handing off a
+visible response several hundred milliseconds after its synthetic input edge.
+
+Extended evidence: `tmp/fast60/corrected/extended-validation.json` and the exact
+per-machine captures/listings/binaries. Corrected input evidence is
+`tmp/fast60/corrected/input/validation.json`. The first 68060 input capture failed
+at tick zero after a debugger “Invalid hex digit 79” condition error; it is
+retained and excluded. The successful retry has identical slave bytes.
+The effective clocks, private UAE CPU/memory options, input integrity and
+terminal boundaries are checked independently. FS-UAE's logger first writes
+a shared startup file and then copies it into its private log; simultaneous
+project boots can contaminate only that copied frontend header. The current
+checker uses private runtime option records and the observed Exec clock;
+new captures also retain the effective `debug.uae` configuration. The shared
+logger source (`libfsemu/src/log.c`) explains the discrepant headers in two
+extended captures; their private options and observed clocks agree.
+
+### Corrected-build regression checks
+
+All 38 delayed-draw mapped-state comparisons pass: N=3 SOL, boss and heavy
+combat, plus N=12 heavy combat, with SLOW_DRAW=20 on the 68020. Reticle and
+fresh projection are included; only deferred projection scratch differs.
+Death/Continue, declining Continue, normal level exit and early exit pass at
+both selected rates, with sixteen endpoint state comparisons. N=3 compares
+A500 against delayed 68020 drawing; N=12 compares delayed 68020 captures with
+the retained input-history reference. Both CUSTOM1-off preservation checks pass.
+Evidence: `tmp/fast60/corrected/cross/validation.json`,
+`lifecycle-n3/validation.json` and `lifecycle-n12/validation.json`.
+Both actual `play60.sh` paths reach the native menu with their selected rate,
+installed hooks and no menu-test fixture. Their release bytes match the audited
+builds. Evidence: `tmp/fast60/corrected/play60-smoke-68000/validation.json` and
+`play60-smoke-68020/validation.json`. These smoke tests use silent, accelerated
+execution and disconnected controls; they establish neither audible output nor
+physical-control behavior. Final source identities match all forty fresh matrix
+cells, and retained audited build hashes match their binaries.
+These fixtures do not replace step 6's full-encounter and physical-control tests.
+
+### Observed cache configuration
+
+A scratch-only probe samples CACR immediately after SetCPU and at completed
+SIM60 tick 200. It preserves registers and uses Exec Supervisor to execute
+MOVEC CACR,D0 and RTE; no cache-control write is added. The 68000 guard never
+executes MOVEC. The probe adds timing overhead, so its captures supply no
+performance measurements. Normal and playable sources do not include it.
+
+| Configuration | After SetCPU / tick 200 CACR | Instruction cache | Data cache |
+|---|---|---|---|
+| A500 | unsupported / unsupported | absent | absent |
+| Stock A1200 | $00000000 / $00000000 | disabled | disabled |
+| A1200 + fast RAM | $00000000 / $00000000 | disabled | disabled |
+| 68030/50 | $00002000 / $00002000 | disabled | disabled |
+| 68040/25, NOMMU | $00008000 / $00008000 | enabled | disabled |
+| 68060/50, NOMMU | $20808000 / $20808000 | enabled | disabled |
+| PAL 68060/50, NOMMU | $20808000 / $20808000 | enabled | disabled |
+
+The relevant enable bits are CACR bit 0 for 020/030 instruction cache, bit 8
+for 030 data cache, and bits 15/31 for 040/060 instruction/data caches. The
+030 value $2000 is not a cache-enable bit. Interpretation is corroborated by
+the emulator's MOVEC masks and cache-enable checks in `newcpu.cpp` and
+`newcpu_common.cpp`. The observed enable bits do not establish hardware cache
+coherency or validate the emulator's fast-CPU instruction timing.
+Evidence: `tmp/fast60/cache/validation.json`, the separate captures and the
+exact scratch probe listing/binary under `tmp/fast60/cache-build`.
 
 ## Rendering cost and presentation
 
-Both paths draw only newly completed ticks (`RENDER_NEW_TICK=1`) and keep the
-native VBL/buffer presentation. The 68000 target additionally enables
+Both paths draw only newly completed ticks (`RENDER_NEW_TICK=1`) and call the
+native presentation routine. The `BUFFER_REUSE=1` field-counter guard also
+protects the displayed bitmap while simulation polling continues. Its matrix,
+scanout and gameplay regression results are recorded above. The 68000 target additionally enables
 `POLYGON_BLIT_IRQ=1`; 68020+ retains the native polygon call. No interpolation,
 extrapolation, intentional pose delay or simulation-rate change is involved.
 
@@ -82,7 +489,8 @@ Stock A1200 (2 MB chip, no fast/slow RAM, N=12) heavy combat changes from
 3.38468 to 3.40895 FPS (+0.72%, unresolved noise). The current run completes
 4800 updates in 4805 fields (59.938 updates/s), pending 5→10 with an intermediate
 peak of 38 followed by recovery to 10. This is not a worst-case response bound.
-The fast-CPU ceiling/full-matrix investigation remains open.
+The fast-CPU investigation and buffer-reuse correction are described above;
+these polygon-optimization comparisons precede that correction.
 
 Evidence: `tmp/render60/baseline-*`, `baseline-cost-summary.json`,
 `irq-bound-sol.json`, `perf-0`, `final-reference`, `final-perf`, `stock-{0,1}`
@@ -148,21 +556,23 @@ the stale reticle flag described above. Same-rate final state includes input his
 HUD and fresh actor projection. Cross-rate trajectory classifications remain
 unchanged; this work does not equate different N trajectories.
 
-Final input fixtures, death/Continue, No/restart, normal/early exits, disabled
-native-code preservation, release diagnostic exclusion, all six rate builds,
-20 Hz override and both actual launcher paths pass. Current playable static
+The polygon/reticle implementation passes input fixtures, death/Continue,
+No/restart, normal/early exits, disabled native-code preservation, release
+diagnostic exclusion, all six rate builds, the 20 Hz override and both actual
+launcher paths. Its static
 audits cover 107 patches / 81 ranges on 68000 and 106 / 80 on 68020+, with
 663 native relocated code pointers and no detected interior entries. With all
-three rendering switches off, N=12 release/VERIFY reproduce the preceding
-input-history bytes; the normal loader is unchanged. Nineteen host-tool tests pass. Launcher checks use
+four rendering switches off, N=12 release/VERIFY reproduce the preceding
+input-history bytes; the normal loader is unchanged. Launcher checks use
 silent warp mode and disconnected controls, and do not replace audible-output
 or physical-control playtesting.
 
 Evidence: `tmp/render60/reticle-frames`, `reticle-fixtures`, `pacing`,
 `final-display-controls.json`, `irq-checker-controls.json`, `final-cross`,
 `final-input`, `final-lifecycle-n3`, `final-builds`, `play60-smoke-*` and
-`final-tool-tests.log`. Broader encounters, real controls/audio and fast-CPU
-presentation limits remain the next plan steps.
+`final-tool-tests.log`. These captures precede the buffer-reuse correction;
+its validation is described above. Broader encounters and real controls/audio
+remain release work.
 
 ## CPU-rate selection
 
@@ -433,12 +843,12 @@ debugger and shared trace/patch readers. Builds use the default N=12; the releas
 SHA-256 values remain those in the parameterization section. The accepted
 UAE memory/timing options are retained in `emulator-settings.log`; Exec
 VBlankFrequency independently agrees with every requested display standard.
-Live cache registers remain unverified; the documented SetCPU policy applies.
-One native A500 late-combat cell was repeated after its supplementary log
-conflicted with its observed NTSC clock. The replacement has consistent
-configuration evidence and an identical measurement report. The excluded
-log/capture and recheck record remain under `tmp/restore60/log-mismatch`;
-the cause of that logging discrepancy is not established.
+These reference captures retain the requested SetCPU policy; current live register
+observations are documented under Fast-CPU presentation and sustained combat.
+Configuration checks use private UAE options and the observed clock; the
+shared startup-log race described in the current investigation can contaminate
+copied frontend headers. The retained reference uses its checked replacement
+capture rather than the excluded log-mismatch artifact.
 
 A500 heavy combat 600→5400: **59.113300 updates/s**,
 **0.948276 presentations/s**, 4872 fields over
@@ -1063,12 +1473,13 @@ the preceding draw differs. The retained comparison report is
 `tmp/rate-baseline/cross-cpu-validation.json`. These checks establish state
 equality at sampled ticks, not sustained throughput.
 
-Cache policy: the loader requests SetCPU value $393d with mask $7f3f:
+Cache request: the loader calls SetCPU with value $393d and mask $7f3f:
 BaseMem non-cacheable, expansion/slave copyback, instruction cache requested
-and data cache off. WHDLoad's documented policy disables both caches when
-an uncached region is requested without MMU use. The 68020 and NOMMU rows
-therefore must not be described as cached benchmarks. Live CACR has not
-been independently sampled; the reports retain the requested policy.
+and data cache off. This request alone does not establish live cache state.
+The current diagnostic observations below find instruction caching enabled
+on the 68040/060 NOMMU configurations and disabled on 68020/030. Data caching
+is disabled in all observed configurations. These readings do not retroactively
+measure the register state of the retained baseline runs.
 
 <!-- rate-matrix-native-combat:start -->
 ### Native combat comparators
@@ -1130,8 +1541,8 @@ CRC16 $b9ea or $fcc4, frees the temporary file buffer, and LoadSegs `s7`.
 It passes a newline argument and calls the loaded program. It applies no
 patches to the game's hunks. Its patch list at slave:$60 instead adapts the
 Kickstart image and filesystem. The game-specific loader is slave:$eb4–$f64.
-It explicitly calls SetCPU with value $393d and mask $7f3f; actual cache state
-must be checked before comparing fast-CPU measurements.
+It explicitly calls SetCPU with value $393d and mask $7f3f; the current
+fast-CPU investigation separately records actual CACR state.
 
 ## Executable
 

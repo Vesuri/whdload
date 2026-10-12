@@ -28,17 +28,24 @@ and matrix-driver default remain N=12, so use `--substeps 3` for A500 matrix run
 The stationary-star experiment is not retained: its selected-rate presentation
 gains were below the retention threshold. The ordinary star simulation remains
 unchanged. Rate-selection evidence is under `tmp/optimize60`; current rendering
-evidence is under `tmp/render60`. The normal loader remains byte-identical.
+optimization evidence is under `tmp/render60`; buffer-reuse correction and
+current validation evidence are under `tmp/fast60/corrected`. The normal loader
+remains byte-identical.
 
 ## Rendering validation
 
-Both playable builds enable `RENDER_NEW_TICK=1` and `RETICLE_CLOCK=1`.
+Both playable builds enable `BUFFER_REUSE=1`, `RENDER_NEW_TICK=1` and
+`RETICLE_CLOCK=1`. `BUFFER_REUSE` keeps simulation polling while the native
+post-presentation field saved at `-22(a5)` still equals the current field.
+Drawing resumes after the field advances, allowing the display handoff to
+finish before reusing the old bitmap. This adds no interpolation and does not defer owed simulation updates.
+`BUFFER_REUSE=0` is an unsafe diagnostic reference, not a playable setting.
 `sim68000` additionally enables `POLYGON_BLIT_IRQ=1`; the `sim60` source default
 is zero. The matrix driver matches this CPU policy for non-native 68000 cells,
 including PAL; explicit route flags can select the reference arm.
 For direct VERIFY captures, add `-DPOLYGON_BLIT_IRQ=1 -DS60_SUBSTEPS=3`
 when testing the playable 68000 path. The all-off diagnostic definitions
-`-DRENDER_NEW_TICK=0 -DRETICLE_CLOCK=0 -DPOLYGON_BLIT_IRQ=0` reproduce the
+`-DBUFFER_REUSE=0 -DRENDER_NEW_TICK=0 -DRETICLE_CLOCK=0 -DPOLYGON_BLIT_IRQ=0` reproduce the
 preceding input-history N=12 release/VERIFY bytes.
 
 ```sh
@@ -68,11 +75,15 @@ fields per window. Performance uses field/counter intervals, not screenshot
 counts or a single held frame. Complete-call CPU costs exclude interrupts and
 boundary partials; inclusive helper costs must not be summed.
 
-Current serial runners and exact evidence are in `tmp/render60`: the final
+Polygon, reticle and redundant-draw evidence is in `tmp/render60`: the
 throughput/reference matrices, `reticle-frames`, `reticle-fixtures`, `final-cross`,
 `final-input`, `final-lifecycle-n3`, `final-builds` and both `play60-smoke-*`.
-Run only one capture at a time with the shared project lock. Full fast-CPU
-ceiling work remains separate from these selected-path checks.
+Run only one capture at a time with the shared project lock. Fast-CPU timing diagnostics are under `tmp/fast60`; current corrected-build
+measurements and regressions are under `tmp/fast60/corrected`. The corrected matrix, scanout, extended combat, input, delayed-draw and lifecycle
+checks and both actual launcher smoke tests pass. Current evidence includes
+`cross/validation.json`, both `lifecycle-n*/validation.json` reports and both
+`play60-smoke-*/validation.json` reports. Earlier rendering checks alone do not
+validate the buffer guard.
 
 ## Input-history validation
 
@@ -331,10 +342,88 @@ installed SIM60 hooks. Missing cells fail unless `--partial` is requested.
 A partial table is not the step-0 acceptance result.
 
 Per-cell JSON and `matrix.json` retain settings, exact slave hashes, endpoint
-debt and cache policy. Live cache registers are not yet independently verified.
+debt and requested cache policy. Separate live CACR observations and their
+limits are recorded in internals; do not infer cache enables from SetCPU alone. Captures
+also retain the effective `debug.uae` as `emulator-effective.uae`. Verify private
+UAE option records and the observed Exec clock; FS-UAE first writes to a shared
+startup log, so simultaneous project boots can contaminate the copied frontend
+`cpu =` / `ntsc_mode =` header. That header is not authoritative runtime evidence.
+PAL defaults and an omitted disabled MMU are checked with the serializer's
+conventions rather than treated as missing enabled settings.
 The driver passes CUSTOM1/CUSTOM3 only for SIM60; `fixed_window.py` supplies
 CUSTOM5. Measurements and exact binaries/listings remain in `tmp/`.
 
+
+### Fast-CPU and extended-combat instruments
+
+`tools/rate_matrix.sh tmp/rate-selected --selected-rates` selects N=3 on
+68000 and N=12 on the other configurations. Add the native combat and
+`type10-heavy` routes with `--routes` for the full selected-rate matrix.
+For the complete set use:
+
+```sh
+tools/rate_matrix.sh tmp/rate-selected --selected-rates --routes sol type10-early type10-late boss native-90 native-240 native-type10-early native-type10-late native-boss type10-heavy
+```
+
+For normal-speed field captures, put `--warp_mode=0` in `EXTRA_ARGS`; the shared
+launcher puts those options first, and FS-UAE uses the first occurrence. This
+overrides the capture tool's usual warp boot. Such captures automatically retain
+`emulator-command.txt` from the running project PID to verify frontend options;
+`--retain-command` enables the same check for other captures. The field capture
+itself runs without per-field debugger stops.
+
+The report checker accepts the same route list. Completed cells resume only
+when their source identity and settings match exactly; preserve incomplete
+captures separately before retrying. Run one capture at a time.
+
+`python3 tools/sustained_combat.py tmp/combat-extended` runs the selected rates
+serially through nominal tick 9600, sampling every 300 nominal ticks. It stops
+at the first inactive completed tick, before death or exit can reset the
+scheduler. Checkpoint directory names retain the requested boundary;
+`terminal.json` records the actual terminal tick. Reports contain active actor
+counts, energy, pending debt and input-history integrity. No invulnerability
+is added, and modal/menu time is excluded.
+
+For native render scopes, retain a matching listing and binary and pass
+`fixed_window.py --presentation-listing LISTING --state-only --tick T`.
+`presentation_fields.py` guards the native sites and records VBL epochs, beam
+positions, native field counter, buffer indices and the handoff request.
+`presentation_report.py CAPTURE` accounts for alternating NTSC long lines and
+the emulator's VPOSR/VHPOSR read convention. Complete-call times include
+interrupts and wrapper overhead; overlapping scopes cannot be summed.
+These are beam elapsed times, not instruction-cycle profiles or pure DMA costs.
+
+`fixed_window.py --raw-trace` retains Barto fields without requiring CPU
+instruction records. `presentation_buffers.py CAPTURE` maps every bitplane
+fetch to the native bitmap allocation and rejects mixed or incomplete fields.
+It also reports changed fetched words across consecutive fields using the same
+bitmap; `--require-stable` rejects such changes. This catches unstable displayed
+content, but cannot exclude writes restored before the next fetch. Use it with
+the phase observer to distinguish buffer reuse from a legitimate buffer switch.
+The fast-CPU backend has no validated instruction timing; with non-cycle-exact
+blitter settings, missing blitter DMA records do not mean zero blitter cost.
+
+The presentation-only probe preserves the saved presentation field required by
+`BUFFER_REUSE`. To reproduce the retained pre-guard diagnostic binaries, pass
+`--define BUFFER_REUSE=0` to both arms. Neither arm is a playable renderer.
+
+`python3 tools/swap_only_probe.py tmp/swap-check/probe` builds a separate
+N=12 VERIFY diagnostic that calls native presentation at hunk $6a0a in place
+of full rendering. Additional `--define NAME=VALUE` arguments select scene
+fixtures. Build its matched full-render arm with `--control`; the two binaries
+must have identical size/layout and differ only in the two-byte NOP/branch
+word. Run both as retained `--prebuilt` captures with matching
+`--latency-listing` and compare their field/counter endpoints. The bypass
+deliberately presents stale pixels; it is a ceiling experiment, not
+an optimization or playable target.
+
+`python3 tools/cache_probe.py build tmp/cache-check/probe` generates a separate
+scratch-only VERIFY slave and listing. Capture that exact slave with
+`fixed_window.py --prebuilt tmp/cache-check/probe.slave --tick 201 --state-only`,
+using CUSTOM1 and the desired machine configuration. Read it with
+`cache_probe.py read CAPTURE --listing tmp/cache-check/probe.lst`. The probe
+records CACR after SetCPU and at tick 200; it changes no cache enables and must
+never be used for performance comparisons. Its 68000 guard is separately tested.
 
 Keep supplied archives and all derived game material in ignored `tmp/`.
 The installer is `tmp/Stellar7.lha`; the Retroplay pack is

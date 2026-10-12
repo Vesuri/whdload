@@ -18,7 +18,8 @@ cross-rate trajectory differences must be identified and explained.
 Each implementation step ends with measurements in `docs/internals.md`,
 commands in `docs/development.md` and a coherent commit following AGENTS.md.
 The source default remains N=12; the 68000 playable build explicitly selects
-N=3. Steps 1–4 are complete. Fast-CPU presentation and sustained-load checks are next.
+N=3. Steps 1–5 are complete. Step 6 remains: broader release validation and
+physical-control, pace and audio playtesting.
 
 ### Existing evidence and limitations
 
@@ -37,8 +38,9 @@ performance evidence.
 Fresh N=12 profiling measures about 90258 cycles per A500 heavy-combat update.
 The lower 68000 rate resolves the measured update-debt problem in this route,
 with current early/late presentation comparisons recorded in internals.
-Sustained-load coverage outside these fixtures and the fast-CPU presentation
-ceiling remain open in steps 5–6.
+Step 5 now measures the fast-CPU drawing limit and extended combat through
+natural death. The corrected selected-rate matrix passes; broader encounters
+and physical-control playtesting remain in step 6.
 
 ### Step 1: Restore and verify the 60 Hz baseline
 
@@ -124,8 +126,8 @@ completing 1200 updates in 80.133 seconds; pending samples remain bounded and
 recovering (1–5). Lossless held-display comparisons pass SOL, boss and combat,
 with the reticle included. Same-rate CPU/delayed-draw state, reticle native
 fixtures and negative controls pass. Final build, input, lifecycle, disabled-byte,
-hook and launcher evidence is recorded in internals. The 68030/040/060
-presentation ceiling and full sustained-load matrix remain step 5.
+hook and launcher evidence is recorded in internals. Step 5 records the
+68030/040/060 presentation investigation and sustained-load evidence.
 
 Render the latest completed state. Avoid an extra draw of the same completed
 state on fast machines, using measured pacing that still advances the simulation
@@ -142,6 +144,50 @@ writes and separate audio validation. Apply the measured 3% whole-frame rule;
 retain original code where a replacement is slower.
 
 ### Step 5: Fast-CPU presentation ceiling and sustained-load checks
+
+Status: complete. Read-only beam timing, independent scanout traces and
+live CACR observations are recorded in internals. SOL and late-combat windows
+on 030/040/060 do not enter the optional VBL wait; drawing dominates the
+observed presentation call. The 040/060 configurations have instruction caching
+enabled and data caching disabled. These are emulator observations, not real
+accelerator timing guarantees.
+
+All eight corrected extended-combat runs reach natural death at the selected
+average rate, with 174 same-rate CPU/PAL and 228 before/after comparisons passing.
+A500 covers 114.133 active seconds at 14.982 updates/s and 3.934 presentations/s;
+sampled debt is 1–3, starting at 1 and ending at 3. Stock A1200 maintains average game speed but shows large catch-up
+bursts and low presentation rate. All eight corrected input fixtures pass their recorded-control and native queue
+assertions, with eight same-rate and sixteen before/after state comparisons.
+Corrected build identities, hook checks, 38 delayed-draw comparisons and sixteen
+lifecycle comparisons pass, including both disabled-code checks. Matched rendering-bypass and instant-blitter diagnostics also pass: the native
+handoff can sustain 60 presentations/s without full drawing, and instant blits
+nearly double ordinary 68060 SOL presentation. The corrected matrix passes all 40 SIM60 cells and 350 same-rate/before-after
+comparisons, with 40 native measurements reused after exact-byte verification.
+The buffer-reuse correction is enabled. The boss display check exposed a native
+cockpit update with a partial scanout transition: exact native icon images and
+read-only routine timing classify the 23 changed words. It is explicitly not a
+stable-pixel pass; no general HUD mask is added. A second finding in
+PAL A500 late combat is classified as the native energy-bar draw/copy (28 words),
+confirmed by routine timing and native instruction guards. All 18 display windows are reviewed (16 strict stable, two classified native HUD
+updates). Extended combat, input, lifecycle and both actual-launcher smoke checks pass.
+Both fixed rates remain unchanged.
+
+The reported blinking has a captured buffer-reuse hazard: in the 68060 SOL
+trace, nine consecutive-field pairs still fetching the same bitmap contain
+changed pixel words. The phase observer starts the next draw in the presentation
+field, before scanout changes bitmap in the following field. Native code
+$2b96–$2ba0 waits for the field counter to advance before drawing; SIM60 bypasses
+that wait. Complete bitmap addresses per field therefore did not prove safe
+buffer ownership. The normal-speed comparison has zero unstable fields for native/candidate
+and 20 for the control across 100 fields each. The source now defers the next
+draw until the native saved field changes, without stopping simulation polling.
+Build/off-byte identities and final-source normal-speed checks on A500/68060
+pass, with 100 stable displayed fields each and matching endpoint gameplay.
+The completed matrix records both current corrected performance and
+the measured presentation cost against the unfixed build. The final source
+identity matches all forty fresh matrix cells; both launcher releases match
+the audited builds. Broader encounter, physical-control and audio checks remain
+in step 6.
 
 Measure field boundaries, buffer handshakes, blitter/chip-bus contention and
 cache policy on 68030/040/060 at N=12. Determine the cause of the presentation

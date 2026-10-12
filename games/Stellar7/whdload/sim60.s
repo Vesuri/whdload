@@ -1,3 +1,6 @@
+        IFND BUFFER_REUSE
+BUFFER_REUSE = 1 ; wait for native display handoff before reusing the old bitmap
+        ENDC
         IFND RETICLE_CLOCK
 RETICLE_CLOCK = 1 ; native reticle refresh belongs to the simulation schedule
         ENDC
@@ -169,6 +172,19 @@ timing_install:
         bne s60_bad
         cmp.w #$2039,($2b96,a1)
         bne s60_bad
+        IFNE BUFFER_REUSE
+        ; Drawing relies on the native post-presentation field saved at -22(a5).
+        ; Check its store and the field source against the native wait we replace.
+        cmp.l #$b0adffea,($2b9c,a1)
+        bne s60_bad
+        cmp.w #$2b79,($2c1a,a1)
+        bne s60_bad
+        move.l ($2b98,a1),d0
+        cmp.l ($2c1c,a1),d0
+        bne s60_bad
+        cmp.w #$ffea,($2c20,a1)
+        bne s60_bad
+        ENDC
         cmp.l #$61001172,($2c50,a1)
         bne s60_bad
         cmp.l #$4eba1558,($2c54,a1)
@@ -604,6 +620,14 @@ s60_loop_complete:
         ENDC
         bra s60_loop_batch
 s60_loop_draw:
+        IFNE BUFFER_REUSE
+        ; Native presentation saves this field at -22(a5). The display still
+        ; scans the old bitmap until the following field. Keep simulation and
+        ; input polling active while waiting to reuse that bitmap for drawing.
+        move.l ($24a8-S60_DATA,a4),d0
+        cmp.l (-22,a5),d0
+        beq s60_loop_poll
+        ENDC
         IFNE RENDER_NEW_TICK
         ; No interpolation: only a newly completed state earns another draw.
         ; Poll the field clock again so waiting never discards elapsed time.

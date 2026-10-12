@@ -89,6 +89,8 @@ def run(args):
         try:
             for machine in args.machines:
                 cpu, model, chip, fast, slow, frequency, ntsc = MACHINES[machine]
+                if getattr(args, 'selected_rates', False):
+                    substeps = 3 if cpu == '68000' else 12
                 extra = ('--uae_cpu_speed=real --uae_cpu_multiplier=0'
                          f' --uae_cpu_frequency={frequency} --uae_cpu_cycle_exact=true'
                          if frequency else '')
@@ -104,8 +106,8 @@ def run(args):
                     cell = prefix/name
                     listing = prefix/(name+'.lst')
                     flags = fixture if native else '-DSIM60=1 '+fixture
-                    if not native and args.substeps is not None:
-                        flags += f' -DS60_SUBSTEPS={args.substeps}'
+                    if not native and (args.substeps is not None or getattr(args, 'selected_rates', False)):
+                        flags += f' -DS60_SUBSTEPS={substeps}'
                     # Match the playable CPU-specific rendering path. Explicit
                     # route flags retain the reference arm for paired tests.
                     if not native and cpu == '68000' and '-DPOLYGON_BLIT_IRQ=' not in flags:
@@ -164,7 +166,7 @@ def run(args):
                                                        for a,b in zip(boundaries,boundaries[1:])]
                     report = dict(config=config, measurement=measurement, latency=latency,
                                   slave_sha256=hashlib.sha256((cell/'slave.slave').read_bytes()).hexdigest(),
-                                  cache_policy='Loader SetCPU value 0x393d/mask 0x7f3f; live CACR not yet independently observed.')
+                                  cache_policy='Loader SetCPU value 0x393d/mask 0x7f3f; see separate live CACR observations in docs/internals.md.')
                     report_path.write_text(json.dumps(report, indent=2)+'\n')
                     results[name] = report
                     (prefix/'matrix.json').write_text(json.dumps(results, indent=2)+'\n')
@@ -180,6 +182,8 @@ if __name__ == '__main__':
     parser.add_argument('prefix', type=Path)
     parser.add_argument('--machines', nargs='+', choices=MACHINES, default=list(MACHINES))
     parser.add_argument('--routes', nargs='+', choices=CAPTURE_ROUTES, default=list(ROUTES))
-    parser.add_argument('--substeps', type=int, choices=(1,2,3,4,6,12))
+    rates = parser.add_mutually_exclusive_group()
+    rates.add_argument('--substeps', type=int, choices=(1,2,3,4,6,12))
+    rates.add_argument('--selected-rates', action='store_true', help='use playable N=3 on 68000 and N=12 on 68020+')
     parser.add_argument('--boot-timeout', type=float, default=1800)
     run(parser.parse_args())
