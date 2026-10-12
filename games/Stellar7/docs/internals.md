@@ -61,7 +61,7 @@ These settings checks do not establish audible output.
 The input-only POWER_ROUTE passes at both selected rates during SOL combat.
 Existing inventory supplies clone, shield, jump, cloak, cannon and speed; no
 pickup or inventory setup is used. All six powers overlap in the snapshots,
-one charge per power is consumed, and the warp charge remains unused. The
+one charge per power is consumed, and the mine charge remains unused. The
 player jumps and lands, with all five timed powers still active at the final
 22-second checkpoint. First observed activation ticks are
 153/173/188/203/218/233 at N=3 and 603/663/723/788/843/903 at N=12; sampling
@@ -90,7 +90,7 @@ used. Read-only stops at $10c58/$10c5c observe a player-owned type-23 projectile
 at height 2525 deal 15 damage to the type-44 boss at tick 5666: health goes
 15→0 and score 525→1525. At $3610/$3616, tick 5760, native type-25 exit
 collision clears active while death stays zero. Session-2 tick 150 is level 1,
-energy 400, with the warp charge still unused. The binary matches the full-wave
+energy 400, with the mine charge still unused. The binary matches the full-wave
 capture and all 108 installed hooks pass. Evidence:
 `tmp/release60/powered-boss-events/n3-validation.json`. The N=12 powered attempt
 also reaches an inactive, non-death state with a type-25 exit; direct native

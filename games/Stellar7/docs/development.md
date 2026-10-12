@@ -974,13 +974,13 @@ for the observed boundaries and the remaining coverage limits.
 
 `POWER_ROUTE=TICK` supplies native second-button and both-button input for six
 seconds starting at TICK. It selects clone, shield, jump, cloak, cannon and speed
-in order, using the current inventory; it never activates warp. It requires
+in order, using the current inventory; it leaves the mine unused. It requires
 SIM60/VERIFY/CUSTOM3 and cannot combine with PICKUP_USE. No pickup, health,
 position or inventory setup is performed. Use TICK=150 at N=3 or 600 at N=12
 for the current ten-second entry point. Retain snapshots around each one-second
 stage and after landing. `tools/power_route_state.py CAPTURE --listing EXACT.lst`
 checks exact build/input-hook identity, ordered activation, simultaneous powers,
-charge consumption, jump/landing, unchanged warp charge and input-history
+charge consumption, jump/landing, unchanged mine charge and input-history
 integrity. It does not establish individual combat effects or full timer lifetimes.
 Current paired captures and exact sample points are under
 `tmp/release60/power-route`; release exclusion is under `pilot-builds`.

@@ -21,7 +21,7 @@ def validate_rows(rows):
     assert len(initial)==7 and initial[0]>=2 and all(initial), 'missing initial charges'
     assert rows[0]['timers']==[0]*7 and rows[0]['selected']==65535
     assert all(r['level']==rows[0]['level'] for r in rows), 'level shortcut or transition'
-    assert all(bytes.fromhex(r['inventory'])[3]==initial[3] and r['timers'][3]==0 for r in rows), 'warp was used'
+    assert all(bytes.fromhex(r['inventory'])[3]==initial[3] and r['timers'][3]==0 for r in rows), 'mine was used'
     order=[]
     for slot in (0,1,2,4,5,6):
         activations=[r['tick'] for r in rows if r['timers'][slot]!=0]

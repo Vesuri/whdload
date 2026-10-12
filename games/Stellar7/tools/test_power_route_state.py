@@ -16,7 +16,7 @@ class PowerRoute(unittest.TestCase):
 
     def test_complete(self):validate_rows(self.rows())
 
-    def test_reject_warp_or_missing_charge(self):
+    def test_reject_mine_or_missing_charge(self):
         for field,value in [('inventory','fe000000000000'),('inventory','fe000001000001')]:
             r=self.rows();r[-1][field]=value
             with self.assertRaises(AssertionError):validate_rows(r)

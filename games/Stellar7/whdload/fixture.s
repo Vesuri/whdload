@@ -169,8 +169,8 @@ fixture_power_buttons:
         ENDC
         IFD POWER_ROUTE
 ; Input-only combat sequence: select/activate clone, shield, jump, cloak,
-; cannon and speed through the native two-button API. Warp is omitted so
-; encounter completion cannot come from a deliberately selected warp exit.
+; cannon and speed through the native two-button API. The mine is omitted;
+; its placement and detonation use separate encounter checks.
 fixture_power_route_slots: dc.b 0,1,2,4,5,6
         even
 fixture_power_route:
