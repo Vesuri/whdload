@@ -35,6 +35,50 @@ optimization evidence is under `tmp/render60`; buffer-reuse correction and
 current validation evidence are under `tmp/fast60/corrected`. The normal loader
 remains byte-identical.
 
+## Release playtest still required
+
+Automated captures do not establish physical controls, audible output or
+acceptable gameplay pace. Use normal-speed launches with sound and real input,
+one at a time, after debugger captures have stopped. From a fresh shell:
+
+```sh
+source amiga/env.sh
+AMIGA_SETUP=a500 NTSC_MODE=1 DEBUG=0 WARP=0 SOUND=1 SILENT=0 \
+  WINDOW=front JOY0=mouse JOY1=keyboard WHD_ARGS='' SLAVE='' amiga/run.sh
+AMIGA_SETUP=a500 NTSC_MODE=1 DEBUG=0 WARP=0 SOUND=1 SILENT=0 \
+  WINDOW=front JOY0=mouse JOY1=keyboard amiga/play60.sh
+AMIGA_SETUP=a1200-fast NTSC_MODE=1 DEBUG=0 WARP=0 SOUND=1 SILENT=0 \
+  WINDOW=front JOY0=mouse JOY1=keyboard amiga/play60.sh
+```
+
+The first launch uses the installed original slave as the pace/loader reference.
+The next two use the selected 15 Hz and 60 Hz conversion builds. Do not add
+CUSTOM3/CUSTOM5, VERIFY pilots or emulator warp to these observations. Keep the
+chosen physical device and native Mouse/Joystick preferences consistent;
+record a real joystick mapping if testing that instead of keyboard emulation.
+Original timing depends on presentation speed, so comparing native fast-CPU
+pace alone does not establish the intended real-time conversion pace.
+
+For each conversion path, record the machine preset, slave identity, device,
+preferences and actual observations for:
+
+- Steering, release/braking, firing and short taps during busy combat; delayed
+  responses or repeated actions after a catch-up burst.
+- SOL traversal and combat pace against the original A500 reference; power
+  duration, jump/landing and enemy movement, without using emulator warp.
+- Music and effects while firing, selecting powers, taking damage and destroying
+  a mine; Music/Sounds off and on, and audio after menus or Continue.
+- Viewport/cockpit stability during turns, damage and power changes; distinguish
+  native hit flashes from repeated whole-buffer flashing.
+- A later full encounter, natural death and Continue/No, recording the reached
+  level, outcome and any control or sound defect rather than just elapsed time.
+
+Keep screenshots, recordings and raw notes in `tmp/`. Reconcile confirmed
+findings into internals and open-work; do not turn unchecked items into a pass.
+The current release decision is to keep SIM60 experimental and the normal
+loader unchanged until these observations and the remaining encounter checks
+support release.
+
 ## Rendering validation
 
 Both playable builds enable `BUFFER_REUSE=1`, `RENDER_NEW_TICK=1` and
