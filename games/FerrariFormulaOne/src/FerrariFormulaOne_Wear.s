@@ -1,3 +1,5 @@
+; FF1_PLAYER_HOOKS stores the unsigned 0..4 carry in a byte; no adjacent
+; byte may be read or written. The default word ABI is unchanged.
 ; Continuous condition loss at the 20 ms quantum (68020+).
 ; D0.l nonnegative native 100 ms decrement, A0 -> nonnegative condition.l,
 ; A1 -> unsigned remainder.w (0..4), owned by this condition in MEMF_PUBLIC.
@@ -13,7 +15,11 @@ FF1Wear20Delta:
         move.l  (a0),d3
         bmi.b   .bad
         moveq   #0,d2
+ IFD FF1_PLAYER_HOOKS
+        move.b  (a1),d2
+ ELSE
         move.w  (a1),d2
+ ENDC
         cmpi.w  #4,d2
         bhi.b   .bad
         add.l   d2,d0
@@ -24,7 +30,11 @@ FF1Wear20Delta:
         move.l  d3,d0
         moveq   #0,d2
 .store:
+ IFD FF1_PLAYER_HOOKS
+        move.b  d2,(a1)
+ ELSE
         move.w  d2,(a1)
+ ENDC
         moveq   #0,d1
         bra.b   .done
 .bad:

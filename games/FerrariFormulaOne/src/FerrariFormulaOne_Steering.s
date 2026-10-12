@@ -1,3 +1,5 @@
+; FF1_PLAYER_HOOKS uses cursor.b at +10; byte +11 belongs to fuel and
+; must survive both sampling and reset. History and quantum fields are unchanged.
 ; Fine controller history: sample raw steering every 20 ms, retain the native
 ; two-tap mean with a 100 ms (five-quantum) separation. Native word addition
 ; wraps before arithmetic shift, matching the original filter arithmetic.
@@ -15,7 +17,11 @@ FF1SteeringReset:
         move.w  d0,4(a0)
         move.w  d0,6(a0)
         move.w  d0,8(a0)
+ IFD FF1_PLAYER_HOOKS
+        clr.b   10(a0)
+ ELSE
         clr.w   10(a0)
+ ENDC
         move.l  d3,12(a0)
         move.w  d0,16(a0)
         rts
@@ -27,7 +33,11 @@ FF1SteeringReset:
 FF1SteeringSample20:
         movem.l d4-d6,-(sp)
         moveq   #0,d5
+ IFD FF1_PLAYER_HOOKS
+        move.b  10(a0),d5
+ ELSE
         move.w  10(a0),d5
+ ENDC
         cmpi.w  #4,d5
         bhi.w   .bad
         move.l  d3,d4
@@ -68,7 +78,11 @@ FF1SteeringSample20:
         bne.b   .cursor
         moveq   #0,d5
 .cursor:
+ IFD FF1_PLAYER_HOOKS
+        move.b  d5,10(a0)
+ ELSE
         move.w  d5,10(a0)
+ ENDC
         add.w   d2,d0
         asr.w   #1,d0
         ext.l   d0

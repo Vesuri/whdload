@@ -1,5 +1,6 @@
 ; Ferrari Formula One, SPS 0481: candidate 68020 update hooks.
 ; S2 VERIFY split. Not included by FerrariFormulaOne_WHD.s; default-off.
+; FF1_PLAYER_HOOKS requires FF1_PLAN_B and consolidates player state/hooks.
 ; FF1_PLAN_B selects player-only conversion with native opponent updates.
 ; The ordinary slave does not activate this candidate scheduling policy.
 ;
@@ -19,6 +20,42 @@
 ;
 ; Local startup controls, captures and build harness remain under tmp/dev.
 ; No game data, ROMs or captured state is included in this source.
+
+ IFD FF1_PLAYER_HOOKS
+ IFND FF1_PLAN_B
+ fail "FF1_PLAYER_HOOKS requires FF1_PLAN_B"
+ ENDC
+ IFND VERIFY
+FF1_LEAN_PLAYER equ 1
+ ENDC
+ ENDC
+
+; B4 is the mode-8 player path only. Its native opponent guards precede these
+; callbacks. VERIFY retains the broad trace ABI; lean saves each callback's
+; clobbered registers. D0/D1 remain first when a callback returns through the
+; saved frame. Component helpers keep their original arithmetic contracts.
+FF1PlayerContext macro
+ IFD FF1_PLAYER_HOOKS
+ lea (\1.l,pc),a0
+ moveq #0,d0
+ ELSE
+ bsr.w \2
+ ENDC
+ endm
+FF1PlayerSave macro
+ IFD FF1_LEAN_PLAYER
+ movem.l \1,-(sp)
+ ELSE
+ movem.l d0-d7/a0-a6,-(sp)
+ ENDC
+ endm
+FF1PlayerRestore macro
+ IFD FF1_LEAN_PLAYER
+ movem.l (sp)+,\1
+ ELSE
+ movem.l (sp)+,d0-d7/a0-a6
+ ENDC
+ endm
 
 FF1UpdateWorkspace macro
  IFND VERIFY
@@ -405,12 +442,16 @@ install_velocity:
  bne.w .bad
  cmpi.w #$2fbe,$69b4e
  bne.w .bad
+ IFND FF1_PLAYER_HOOKS
  lea (velocity_671e6.l,pc),a0
  move.w #$4ef9,$671e6
  move.l a0,$671e8
+ ENDC
+ IFND FF1_PLAYER_HOOKS
  lea (velocity_685a6.l,pc),a0
  move.w #$4ef9,$685a6
  move.l a0,$685a8
+ ENDC
  lea (velocity_67bcc.l,pc),a0
  move.w #$4ef9,$67bcc
  move.l a0,$67bce
@@ -486,9 +527,11 @@ install_velocity:
  lea (velocity_69a5e.l,pc),a0
  move.w #$4ef9,$69a5e
  move.l a0,$69a60
+ IFND FF1_PLAYER_HOOKS
  lea (velocity_68576.l,pc),a0
  move.w #$4ef9,$68576
  move.l a0,$68578
+ ENDC
  lea (velocity_6897e.l,pc),a0
  move.w #$4ef9,$6897e
  move.l a0,$68980
@@ -531,12 +574,16 @@ install_velocity:
  lea (velocity_69a42.l,pc),a0
  move.w #$4ef9,$69a42
  move.l a0,$69a44
+ IFND FF1_PLAYER_HOOKS
  lea (velocity_6721c.l,pc),a0
  move.w #$4ef9,$6721c
  move.l a0,$6721e
+ ENDC
+ IFND FF1_LEAN_PLAYER
  lea (velocity_679fe.l,pc),a0
  move.w #$4ef9,$679fe
  move.l a0,$67a00
+ ENDC
  lea (velocity_6838c.l,pc),a0
  move.w #$4ef9,$6838c
  move.l a0,$6838e
@@ -552,7 +599,11 @@ install_velocity:
  move.l a0,$69b4c
  lea $2275a,a0
  lea (speed_shadow.l,pc),a1
+ IFD FF1_PLAYER_HOOKS
+ moveq #0,d0
+ ELSE
  moveq #7,d0
+ ENDC
 .init_speed:
  move.w (a0)+,(a1)+
  clr.w (a1)+
@@ -576,12 +627,14 @@ velocity_671e6:
 .b3_player:
  ENDC
  dc.w $33d0,$0003,$2f96
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d2/a0-a1
  move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d7
+ ENDC
  bsr.w velocity_load
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/a0-a1
  jmp $671ec
 velocity_685a6:
  IFD FF1_PLAN_B
@@ -592,12 +645,14 @@ velocity_685a6:
 .b3_player:
  ENDC
  dc.w $30b9,$0003,$2f96
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d7
+ ENDC
  bsr.w velocity_store
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $685ac
 velocity_67bcc:
  IFD FF1_PLAN_B
@@ -608,12 +663,14 @@ velocity_67bcc:
 .b3_player:
  ENDC
  dc.w $33ee,$fff2,$0003,$2f94
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d2/a0-a2
  move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d7
+ ENDC
  bsr.w velocity_rotate
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/a0-a2
  jmp $67bd4
 velocity_6dc96:
  IFD FF1_PLAN_B
@@ -624,12 +681,14 @@ velocity_6dc96:
 .b3_player:
  ENDC
  dc.w $3039,$0003,$2f94
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d2/a0-a2/a4
  move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d7
+ ENDC
  bsr.w velocity_project
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/a0-a2/a4
  jmp $6dc9c
 velocity_6dd44:
  IFD FF1_PLAN_B
@@ -640,12 +699,12 @@ velocity_6dd44:
 .b3_player:
  ENDC
  dc.w $3239,$0003,$2fbc
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d1/d7/a4
  move.w ccr,-(sp)
  move.l d0,d7
  bsr.w velocity_raw
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d1/d7/a4
  jmp $6dd4a
 velocity_6e084:
  IFD FF1_PLAN_B
@@ -656,12 +715,14 @@ velocity_6e084:
 .b3_player:
  ENDC
  dc.w $3039,$0003,$2fbc
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d2/a4
  move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d7
+ ENDC
  bsr.w velocity_limit
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/a4
  jmp $6e08a
 velocity_6e2ae:
  IFD FF1_PLAN_B
@@ -673,12 +734,14 @@ velocity_6e2ae:
 .b3_player:
  ENDC
  dc.w $302e,$000e,$4cdf,$000c
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d2/a0-a2/a4
  move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d7
+ ENDC
  bsr.w velocity_returned
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/a0-a2/a4
  jmp $6e2b6
 velocity_68990:
  IFD FF1_PLAN_B
@@ -986,12 +1049,14 @@ velocity_68576:
 .b3_player:
  ENDC
  dc.w $30b9,$0003,$2fbe
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0-a1
  move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d7
+ ENDC
  bsr.w velocity_speed_store
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0-a1
  jmp $6857c
 velocity_6897e:
  IFD FF1_PLAN_B
@@ -1028,6 +1093,24 @@ velocity_68b84:
  dc.w $3080,$302f,$0000
  jmp $68b8a
 velocity_672f0:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $672f6
+.native:
+ move.w d0,$32fbe
+ jmp $672f6
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1043,7 +1126,26 @@ velocity_672f0:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $672f6
+ ENDC
 velocity_673fc:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $67402
+.native:
+ move.w d0,$32fbe
+ jmp $67402
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1059,7 +1161,26 @@ velocity_673fc:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67402
+ ENDC
 velocity_67426:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $6742c
+.native:
+ move.w d0,$32fbe
+ jmp $6742c
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1075,7 +1196,26 @@ velocity_67426:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6742c
+ ENDC
 velocity_67438:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $6743e
+.native:
+ move.w d0,$32fbe
+ jmp $6743e
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1091,7 +1231,26 @@ velocity_67438:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6743e
+ ENDC
 velocity_6744a:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $67450
+.native:
+ move.w d0,$32fbe
+ jmp $67450
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1107,7 +1266,26 @@ velocity_6744a:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67450
+ ENDC
 velocity_67476:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $6747c
+.native:
+ move.w d0,$32fbe
+ jmp $6747c
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1123,7 +1301,26 @@ velocity_67476:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6747c
+ ENDC
 velocity_675c0:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $675c6
+.native:
+ move.w d0,$32fbe
+ jmp $675c6
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1139,7 +1336,26 @@ velocity_675c0:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $675c6
+ ENDC
 velocity_6766c:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $67672
+.native:
+ move.w d0,$32fbe
+ jmp $67672
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1155,7 +1371,26 @@ velocity_6766c:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67672
+ ENDC
 velocity_6768e:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $67694
+.native:
+ move.w d0,$32fbe
+ jmp $67694
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1171,7 +1406,26 @@ velocity_6768e:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67694
+ ENDC
 velocity_676e0:
+ IFD FF1_LEAN_PLAYER
+ tst.w $32fbc
+ bne.b .native
+ move.w d0,$32fbe
+ movem.l d1/a0,-(sp)
+ move.w ccr,-(sp)
+ lea speed_work(pc),a0
+ bsr.w FF1SpeedRate20
+ move.w (a0),d0
+ ext.l d0
+ move.w d0,$32fbe
+ move.w (sp)+,ccr
+ movem.l (sp)+,d1/a0
+ jmp $676e6
+.native:
+ move.w d0,$32fbe
+ jmp $676e6
+ ELSE
  IFD FF1_PLAN_B
  tst.w $32fbc
  beq.b .b3_player
@@ -1187,6 +1441,7 @@ velocity_676e0:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $676e6
+ ENDC
 velocity_69970:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -1228,12 +1483,14 @@ velocity_6721c:
 .b3_player:
  ENDC
  dc.w $33d0,$0003,$2fc0
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0-a1
  move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d7
+ ENDC
  bsr.w velocity_speed_load
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0-a1
  jmp $67222
 velocity_679fe:
  IFD FF1_PLAN_B
@@ -1327,7 +1584,7 @@ velocity_context:
  adda.l d0,a0
  rts
 velocity_sync:
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  move.w $32f94,d0
  move.w $32f96,d1
  bsr.w FF1VelocityReset
@@ -1339,7 +1596,7 @@ velocity_load:
  ENDC
  cmpi.w #8,modeval(pc)
  bne.w velocity_sync
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  move.w $32fbc,d2
  lea (velocity_initialized.l,pc),a1
  bset d2,(a1)
@@ -1354,7 +1611,7 @@ velocity_store:
  ENDC
  cmpi.w #8,modeval(pc)
  bne.w velocity_sync
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  bra.w velocity_check
 velocity_rotate:
  IFD VERIFY
@@ -1363,7 +1620,7 @@ velocity_rotate:
  ENDC
  cmpi.w #8,modeval(pc)
  bne.w velocity_sync
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  lea 8(a0),a1
  moveq #0,d2
  move.w -16(a6),d2
@@ -1455,7 +1712,7 @@ velocity_project:
  IFD VERIFY
  bne.w velocity_fault
  ENDC
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  move.l (a0),40(a4)
  move.l 4(a0),44(a4)
  move.l 8(a0),48(a4)
@@ -1520,7 +1777,7 @@ velocity_project:
  IFD VERIFY
  bne.w velocity_fault
  ENDC
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  move.l (a0),40(a4)
  move.l 4(a0),44(a4)
  move.l 8(a0),48(a4)
@@ -1665,7 +1922,7 @@ velocity_returned:
  ENDC
  cmpi.w #8,modeval(pc)
  bne.w .native
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  move.l 68(a4),(a0)
  move.l 72(a4),4(a0)
  move.l 76(a4),8(a0)
@@ -1743,7 +2000,7 @@ velocity_returned:
  ENDC
  cmpi.w #8,modeval(pc)
  bne.w .native
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  move.l 68(a4),(a0)
  move.l 72(a4),4(a0)
  move.l 76(a4),8(a0)
@@ -1805,7 +2062,26 @@ velocity_rotations: dc.l 0
 velocity_projects: dc.l 0
 velocity_raws: dc.l 0
 velocity_records_count: dc.l 0
+ IFD FF1_PLAYER_HOOKS
+; Persistent player state, exactly 64 bytes. Cursor and condition carries are
+; unsigned 0..4, so bytes retain their complete domains. The steering helper
+; leaves byte 11 (fuel carry) alone. Scratch and saved contact state are separate.
+player_state:
+velocity_shadow: ds.b 12
+position_shadow: ds.b 12
+heading_shadow: ds.b 12
+speed_shadow: ds.b 6
+steering_shadow: ds.b 11
+fuel_remainders: ds.b 1
+ ds.b 6
+wear_remainders: ds.b 4
+player_state_end:
+ ifne player_state_end-player_state-64
+ fail "B4 player state must be 64 bytes"
+ ENDC
+ ELSE
 velocity_shadow: ds.b 96
+ ENDC
 velocity_cold_x:
  suba.l #$6f13c,a0
  moveq #0,d4
@@ -1821,7 +2097,7 @@ velocity_cold_z_common:
  moveq #4,d4
 velocity_cold:
  move.l a0,d0
- bsr.w velocity_array_context
+ FF1PlayerContext velocity_shadow,velocity_array_context
  move.l d5,(a0,d4.w)
  lsr.w #1,d4
  clr.w 8(a0,d4.w)
@@ -1870,10 +2146,10 @@ velocity_swap_z:
  move.l a0,d6
  subi.l #$6f14c,d6
  move.l d3,d0
- bsr.w velocity_array_context
+ FF1PlayerContext velocity_shadow,velocity_array_context
  move.l a0,a2
  move.l d6,d0
- bsr.w velocity_array_context
+ FF1PlayerContext velocity_shadow,velocity_array_context
  move.l 4(a0),d0
  move.w 10(a0),d1
  move.l 4(a2),4(a0)
@@ -1897,7 +2173,7 @@ velocity_reset_work:
  ENDC
  rts
 velocity_clamp_z:
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  move.w $32f96,4(a0)
  clr.w 6(a0)
  clr.w 10(a0)
@@ -1911,7 +2187,7 @@ velocity_impulse_x:
  move.w d1,d4
  move.l a0,d0
  subi.l #$6f13c,d0
- bsr.w velocity_array_context
+ FF1PlayerContext velocity_shadow,velocity_array_context
  move.w d4,(a0)
  IFD VERIFY
  lea (velocity_impulses.l,pc),a0
@@ -1937,7 +2213,7 @@ velocity_offroad_z:
  neg.l d4
  moveq #4,d5
 velocity_offroad:
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  cmpi.w #8,modeval(pc)
  beq.b .fine
  lea $32f94,a1
@@ -2109,7 +2385,7 @@ velocity_speed_reset:
 velocity_speed_load:
  cmpi.w #8,modeval(pc)
  bne.b .native
- bsr.w velocity_speed_context
+ FF1PlayerContext speed_shadow,velocity_speed_context
  move.w (a0),d0
  cmp.w $32fc0,d0
  IFD VERIFY
@@ -2144,7 +2420,7 @@ velocity_speed_feedback:
 velocity_speed_store:
  cmpi.w #8,modeval(pc)
  bne.b .done
- bsr.w velocity_speed_context
+ FF1PlayerContext speed_shadow,velocity_speed_context
  lea (speed_work.l,pc),a1
  move.w (a1),d0
  cmp.w $32fbe,d0
@@ -2164,7 +2440,7 @@ velocity_speed_cold:
  bne.b .done
  move.l a0,d0
  subi.l #$2275a,d0
- bsr.w velocity_speed_array
+ FF1PlayerContext speed_shadow,velocity_speed_array
  move.w d7,d0
  swap d0
  clr.w d0
@@ -2183,10 +2459,10 @@ velocity_speed_swap:
  move.l a0,d2
  subi.l #$6f14c,d2
  move.l d3,d0
- bsr.w velocity_speed_array
+ FF1PlayerContext speed_shadow,velocity_speed_array
  move.l a0,a2
  move.l d2,d0
- bsr.w velocity_speed_array
+ FF1PlayerContext speed_shadow,velocity_speed_array
  move.l (a0),d0
  move.w 4(a0),d1
  move.l (a2),(a0)
@@ -2247,7 +2523,9 @@ velocity_speed_rate:
  rts
  ENDC
 speed_work: ds.b 6
+ IFND FF1_PLAYER_HOOKS
 speed_shadow: ds.b 48
+ ENDC
 speed_records_count: dc.l 0
 speed_loads: dc.l 0
 speed_stores: dc.l 0
@@ -2392,12 +2670,16 @@ install_position_bridge:
  bne.w bridge_install_bad
  cmpi.w #$0000,$68c16
  bne.w bridge_install_bad
+ IFND FF1_PLAYER_HOOKS
  lea (bridge_6720e.l,pc),a1
  move.w #$4ef9,$6720e
  move.l a1,$67210
+ ENDC
+ IFND FF1_PLAYER_HOOKS
  lea (bridge_68546.l,pc),a1
  move.w #$4ef9,$68546
  move.l a1,$68548
+ ENDC
  lea (bridge_67b52.l,pc),a1
  move.w #$4ef9,$67b52
  move.l a1,$67b54
@@ -2476,15 +2758,15 @@ bridge_6720e:
 .b3_player:
  ENDC
  dc.w $33d0,$0003,$2fc4
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0-a1
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_load
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0-a1
  jmp $67214
 bridge_68546:
  IFD FF1_PLAN_B
@@ -2495,15 +2777,15 @@ bridge_68546:
 .b3_player:
  ENDC
  dc.w $30b9,$0003,$2fc4
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_store
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $6854c
 bridge_67b52:
  IFD FF1_PLAN_B
@@ -2516,7 +2798,7 @@ bridge_67b52:
  dc.w $33c1,$0003,$2fc4
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_rotate
@@ -2533,15 +2815,15 @@ bridge_67a12:
 .b3_player:
  ENDC
  dc.w $33c0,$0003,$2fc2
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_sync_x
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $67a18
 bridge_67a26:
  IFD FF1_PLAN_B
@@ -2552,15 +2834,15 @@ bridge_67a26:
 .b3_player:
  ENDC
  dc.w $33c0,$0003,$2fc4
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_sync_z
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $67a2c
 bridge_67a30:
  IFD FF1_PLAN_B
@@ -2571,15 +2853,15 @@ bridge_67a30:
 .b3_player:
  ENDC
  dc.w $4279,$0003,$2fc4
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_reset_z
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $67a36
 bridge_68306:
  IFD FF1_PLAN_B
@@ -2590,15 +2872,15 @@ bridge_68306:
 .b3_player:
  ENDC
  dc.w $33c0,$0003,$2fc2
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_reset_x
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $6830c
 bridge_68352:
  IFD FF1_PLAN_B
@@ -2609,15 +2891,15 @@ bridge_68352:
 .b3_player:
  ENDC
  dc.w $33c0,$0003,$2fc2
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_reset_x
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $68358
 bridge_68376:
  IFD FF1_PLAN_B
@@ -2628,15 +2910,15 @@ bridge_68376:
 .b3_player:
  ENDC
  dc.w $33fc,$015e,$0003,$2fc2
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_reset_x
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $6837e
 bridge_683b8:
  IFD FF1_PLAN_B
@@ -2647,15 +2929,15 @@ bridge_683b8:
 .b3_player:
  ENDC
  dc.w $33c0,$0003,$2fc4
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_reset_z
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $683be
 bridge_694c8:
  IFD FF1_PLAN_B
@@ -2666,15 +2948,15 @@ bridge_694c8:
 .b3_player:
  ENDC
  dc.w $4279,$0003,$2fc4
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_reset_z
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $694ce
 bridge_6956a:
  IFD FF1_PLAN_B
@@ -2685,15 +2967,15 @@ bridge_6956a:
 .b3_player:
  ENDC
  dc.w $33c0,$0003,$2fc2
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0/a0
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  bmi.b .done
  bsr.w bridge_reset_x
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0/a0
  jmp $69570
 bridge_691c4:
  IFD FF1_PLAN_B
@@ -3070,7 +3352,9 @@ bridge_loads: dc.l 0
 bridge_stores: dc.l 0
 bridge_rotations: dc.l 0
 bridge_resets: dc.l 0
+ IFND FF1_PLAYER_HOOKS
 position_shadow: ds.b 96
+ ENDC
  include "FerrariFormulaOne_Position.s"
 ; VERIFY-only position conversion. Other physics still executes native ticks.
 install_fine_position:
@@ -3117,9 +3401,9 @@ fine_advance:
 .b3_player:
  ENDC
  IFD VERIFY
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d2/a0/a2-a3/a5
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  IFD VERIFY
  bmi.w fine_fault
@@ -3148,7 +3432,7 @@ fine_advance:
  move.l 4(a0),12(a4)
  move.l 8(a0),16(a4)
  move.l a0,a5
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  move.l a0,a2
  move.l a5,a0
  move.l fine_steps(pc),d0
@@ -3190,12 +3474,12 @@ fine_advance:
  addq.l #1,(a0)
  ENDC
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/a0/a2-a3/a5
  jmp $67a36
  ELSE
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d2/a0/a2-a3/a5
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  IFD VERIFY
  bmi.w fine_fault
@@ -3208,7 +3492,7 @@ fine_advance:
  move.l 4(a3),4(a0)
  move.l 8(a3),8(a0)
  move.l a0,a5
- bsr.w velocity_context
+ FF1PlayerContext velocity_shadow,velocity_context
  move.l a0,a2
  move.l a5,a0
  move.l (a2),d0
@@ -3239,7 +3523,7 @@ fine_advance:
  addq.l #1,(a0)
  ENDC
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/a0/a2-a3/a5
  jmp $67a36
  ENDC
 fine_record_overflow:
@@ -3260,9 +3544,9 @@ fine_boundary:
  jmp $67a3c
 .b3_player:
  ENDC
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d1/d4/a0-a1
  move.w ccr,-(sp)
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  IFD VERIFY
  bmi.w fine_fault
@@ -3307,11 +3591,11 @@ fine_boundary:
  bhi.w fine_fault
  ENDC
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d1/d4/a0-a1
  jmp $67aac
 .inside:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d1/d4/a0-a1
  jmp $68292
 
 fine_bounds:
@@ -3323,14 +3607,14 @@ fine_bounds:
 .b3_player:
  ENDC
  move.w $32fbc,d0
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d1/d4/a0-a1
  move.w ccr,-(sp)
  lea (fine_cross_pending.l,pc),a1
  tst.w (a1)
  beq.b .bounds
  clr.w (a1)
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d1/d4/a0-a1
  jmp $67a36
 .bounds:
  moveq #0,d0
@@ -3343,7 +3627,7 @@ fine_bounds:
  lea $32f30,a1
  tst.w (a1,d0.l)
  ble.b .done
- bsr.w bridge_context
+ FF1PlayerContext position_shadow,bridge_context
  tst.l d0
  IFD VERIFY
  bmi.w fine_fault
@@ -3368,7 +3652,7 @@ fine_bounds:
  move.w (a0),$32fc2
 .done:
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d1/d4/a0-a1
  jmp $68298
 fine_installed: dc.l 0
 fine_steps: dc.l 0
@@ -3541,15 +3825,59 @@ heading_67280:
  jmp $67286
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
  dc.w $23d0,$0003,$2fb8
- movem.l d0-d7/a0-a6,-(sp)
+ movem.l d0-d1/a0-a1,-(sp)
  move.w ccr,-(sp)
+ lea velocity_initialized(pc),a0
+ bset #0,(a0)
+ bne.b .loaded
+ lea velocity_shadow(pc),a0
+ move.w $32f94,d0
+ move.w $32f96,d1
+ bsr.w FF1VelocityReset
+ clr.l 8(a0)
+.loaded:
+ lea fine_cross_pending(pc),a0
+ clr.w (a0)
+ lea fine_car_crosses(pc),a0
+ clr.w (a0)
+ lea position_shadow(pc),a0
+ move.w $32fc2,(a0)
+ move.w $32fc4,6(a0)
+ lea speed_shadow(pc),a0
+ lea speed_work(pc),a1
+ move.l (a0),(a1)
+ move.w 4(a0),4(a1)
+ lea heading_shadow(pc),a0
+ move.l $32fb4,(a0)
+ move.l $32fb8,6(a0)
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d1/a0-a1
+ jmp $67286
+ ELSE
+ dc.w $23d0,$0003,$2fb8
+ FF1PlayerSave d0-d2/a0-a1
+ move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d4
+ ENDC
+ IFD FF1_PLAYER_HOOKS
+ ; Shared save frame for the adjacent native state loads/stores.
+ bsr.w velocity_load
+ lea position_shadow(pc),a0
+ bsr.w bridge_load
+ bsr.w velocity_speed_load
+ lea (heading_shadow.l,pc),a0
+ moveq #0,d0
+ ELSE
  bsr.w heading_context
+ ENDC
  bsr.w heading_sync
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/a0-a1
  jmp $67286
+ ENDC
 heading_6860e:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -3558,15 +3886,46 @@ heading_6860e:
  jmp $68614
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
  dc.w $20b9,$0003,$2fb8
- movem.l d0-d7/a0-a6,-(sp)
+ movem.l d0-d1/a0-a1,-(sp)
  move.w ccr,-(sp)
+ lea position_shadow(pc),a0
+ move.w $32fc2,(a0)
+ move.w $32fc4,6(a0)
+ lea speed_work(pc),a0
+ lea speed_shadow(pc),a1
+ move.l (a0),(a1)
+ move.w 4(a0),4(a1)
+ lea heading_shadow(pc),a0
+ move.l $32fb4,(a0)
+ move.l $32fb8,6(a0)
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d1/a0-a1
+ jmp $68614
+ ELSE
+ dc.w $20b9,$0003,$2fb8
+ FF1PlayerSave d0-d2/a0-a1
+ move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d4
+ ENDC
+ IFD FF1_PLAYER_HOOKS
+ ; Shared save frame for the adjacent native state loads/stores.
+ bsr.w velocity_store
+ lea position_shadow(pc),a0
+ bsr.w bridge_store
+ bsr.w velocity_speed_store
+ lea (heading_shadow.l,pc),a0
+ moveq #0,d0
+ ELSE
  bsr.w heading_context
+ ENDC
  bsr.w heading_sync
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/a0-a1
  jmp $68614
+ ENDC
 heading_678de:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -3575,14 +3934,31 @@ heading_678de:
  jmp $678e4
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ movem.l d0-d2/a0,-(sp)
+ move.w ccr,-(sp)
+ lea heading_shadow+0(pc),a0
+ move.l $32fb4,(a0)
+ addq.l #4,a0
+ bsr.w FF1Step20Delta
+ tst.l d1
+ bne.b .unchanged
+ add.l d0,-4(a0)
+.unchanged:
+ move.l -4(a0),$32fb4
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a0
+ jmp $678e4
+ ELSE
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_step_a
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $678e4
+ ENDC
 heading_67900:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -3591,14 +3967,31 @@ heading_67900:
  jmp $67906
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ movem.l d0-d2/a0,-(sp)
+ move.w ccr,-(sp)
+ lea heading_shadow+6(pc),a0
+ move.l $32fb8,(a0)
+ addq.l #4,a0
+ bsr.w FF1Step20Delta
+ tst.l d1
+ bne.b .unchanged
+ add.l d0,-4(a0)
+.unchanged:
+ move.l -4(a0),$32fb8
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a0
+ jmp $67906
+ ELSE
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_step_b
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67906
+ ENDC
 heading_67948:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -3607,14 +4000,31 @@ heading_67948:
  jmp $6794e
 .b3_player:
  ENDC
- movem.l d0-d7/a0-a6,-(sp)
+ IFD FF1_LEAN_PLAYER
+ movem.l d0-d2/a0,-(sp)
+ move.w ccr,-(sp)
+ lea heading_shadow+0(pc),a0
+ move.l $32fb4,(a0)
+ addq.l #4,a0
+ bsr.w FF1Step20Delta
+ tst.l d1
+ bne.b .unchanged
+ add.l d0,-4(a0)
+.unchanged:
+ move.l -4(a0),$32fb4
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a0
+ jmp $6794e
+ ELSE
+ FF1PlayerSave d0-d2/d4-d5/a0/a2-a3
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_step_a
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/d4-d5/a0/a2-a3
  jmp $6794e
+ ENDC
 heading_67976:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -3623,14 +4033,31 @@ heading_67976:
  jmp $6797c
 .b3_player:
  ENDC
- movem.l d0-d7/a0-a6,-(sp)
+ IFD FF1_LEAN_PLAYER
+ movem.l d0-d2/a0,-(sp)
+ move.w ccr,-(sp)
+ lea heading_shadow+6(pc),a0
+ move.l $32fb8,(a0)
+ addq.l #4,a0
+ bsr.w FF1Step20Delta
+ tst.l d1
+ bne.b .unchanged
+ add.l d0,-4(a0)
+.unchanged:
+ move.l -4(a0),$32fb8
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a0
+ jmp $6797c
+ ELSE
+ FF1PlayerSave d0-d2/d4-d5/a0/a2-a3
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_step_b
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d2/d4-d5/a0/a2-a3
  jmp $6797c
+ ENDC
 heading_67320:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -3643,7 +4070,7 @@ heading_67320:
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_zero
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
@@ -3657,13 +4084,15 @@ heading_683ac:
  jmp $683b8
 .b3_player:
  ENDC
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d1/a0
  move.w ccr,-(sp)
+ IFND FF1_LEAN_PLAYER
  move.l d0,d4
- bsr.w heading_context
+ ENDC
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_zero
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d1/a0
  jmp $683b8
 heading_69590:
  IFD FF1_PLAN_B
@@ -3677,7 +4106,7 @@ heading_69590:
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_reset_a
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
@@ -3694,7 +4123,7 @@ heading_695e8:
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_reset_b
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
@@ -3712,7 +4141,7 @@ heading_68a5e:
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_reset_a
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
@@ -3731,7 +4160,7 @@ heading_68c24:
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_reset_a
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
@@ -3750,7 +4179,7 @@ heading_68d0e:
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
- bsr.w heading_context
+ FF1PlayerContext heading_shadow,heading_context
  bsr.w heading_assign_b
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
@@ -3887,7 +4316,9 @@ heading_steps: dc.l 0
 heading_zeroes: dc.l 0
 heading_resets: dc.l 0
 heading_assignments: dc.l 0
+ IFND FF1_PLAYER_HOOKS
 heading_shadow: ds.b 96
+ ENDC
  include "FerrariFormulaOne_Heading.s"
 install_steering:
  movem.l d0-d7/a0-a6,-(sp)
@@ -3921,7 +4352,11 @@ install_steering:
  lea $32f7a,a1
  move.l ticks(pc),d3
  subq.l #1,d3
+ IFD FF1_PLAYER_HOOKS
+ moveq #0,d7
+ ELSE
  moveq #7,d7
+ ENDC
 .init:
  move.w (a1)+,d0
  bsr.w FF1SteeringReset
@@ -3954,13 +4389,13 @@ steering_6773c:
  jmp $67742
 .fine:
  move.w (sp)+,ccr
- movem.l d0-d7/a0-a6,-(sp)
+ FF1PlayerSave d0-d6/a0/a5
  move.w ccr,-(sp)
  move.l d0,d4
  move.l a0,a5
  bsr.w steering_sample
  move.w (sp)+,ccr
- movem.l (sp)+,d0-d7/a0-a6
+ FF1PlayerRestore d0-d6/a0/a5
  jmp $67742
 steering_68788:
  IFD FF1_PLAN_B
@@ -3992,7 +4427,7 @@ steering_context:
  rts
 steering_sample:
  IFD VERIFY
- bsr.w steering_context
+ FF1PlayerContext steering_shadow,steering_context
  move.l steering_samples(pc),d0
  cmpi.l #800,d0
  IFD VERIFY
@@ -4034,7 +4469,7 @@ steering_sample:
  ENDC
  rts
  ELSE
- bsr.w steering_context
+ FF1PlayerContext steering_shadow,steering_context
  move.l ticks(pc),d3
  move.w d4,d0
  bsr.w FF1SteeringSample20
@@ -4062,7 +4497,7 @@ steering_sample:
 steering_reset:
  cmpi.w #8,modeval(pc)
  bne.b .done
- bsr.w steering_context
+ FF1PlayerContext steering_shadow,steering_context
  moveq #0,d0
  move.l ticks(pc),d3
  subq.l #1,d3
@@ -4076,7 +4511,9 @@ steering_reset:
 steering_installed: dc.l 0
 steering_samples: dc.l 0
 steering_resets: dc.l 0
+ IFND FF1_PLAYER_HOOKS
 steering_shadow: ds.b 144
+ ENDC
  include "FerrariFormulaOne_Steering.s"
 install_wear:
  movem.l d0-d7/a0-a6,-(sp)
@@ -4189,6 +4626,22 @@ wear_6de74:
  jmp $6de7a
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ dc.w $4c01,$0800,$4e71
+ movem.l d0-d2/a1,-(sp)
+ move.w ccr,-(sp)
+ move.l a0,d2
+ subi.l #$66c52,d2
+ lsr.l #2,d2
+ lea wear_remainders(pc),a1
+ adda.l d2,a1
+ bsr.w FF1Wear20Delta
+ move.l d0,2(sp)
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a1
+
+ jmp $6de7a
+ ELSE
  dc.w $4c01,$0800,$4e71
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -4199,6 +4652,7 @@ wear_6de74:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6de7a
+ ENDC
 wear_6defa:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -4207,6 +4661,22 @@ wear_6defa:
  jmp $6df00
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ dc.w $4c01,$0800,$4e71
+ movem.l d0-d2/a1,-(sp)
+ move.w ccr,-(sp)
+ move.l a0,d2
+ subi.l #$66c52,d2
+ lsr.l #2,d2
+ lea wear_remainders(pc),a1
+ adda.l d2,a1
+ bsr.w FF1Wear20Delta
+ move.l d0,2(sp)
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a1
+
+ jmp $6df00
+ ELSE
  dc.w $4c01,$0800,$4e71
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -4217,6 +4687,7 @@ wear_6defa:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6df00
+ ENDC
 wear_6de96:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -4226,6 +4697,23 @@ wear_6de96:
  jmp $6de9c
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ dc.w $2236,$08d8
+ movem.l d0-d2/a1,-(sp)
+ move.w ccr,-(sp)
+ move.l a0,d2
+ subi.l #$66c52,d2
+ lsr.l #2,d2
+ lea wear_remainders(pc),a1
+ adda.l d2,a1
+ move.l d1,d0
+ bsr.w FF1Wear20Delta
+ move.l d0,6(sp)
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a1
+ dc.w $9390
+ jmp $6de9c
+ ELSE
  dc.w $2236,$08d8
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -4237,6 +4725,7 @@ wear_6de96:
  movem.l (sp)+,d0-d7/a0-a6
  dc.w $9390
  jmp $6de9c
+ ENDC
 wear_6ded4:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -4246,6 +4735,23 @@ wear_6ded4:
  jmp $6deda
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ dc.w $2236,$08d8
+ movem.l d0-d2/a1,-(sp)
+ move.w ccr,-(sp)
+ move.l a0,d2
+ subi.l #$66c52,d2
+ lsr.l #2,d2
+ lea wear_remainders(pc),a1
+ adda.l d2,a1
+ move.l d1,d0
+ bsr.w FF1Wear20Delta
+ move.l d0,6(sp)
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a1
+ dc.w $9390
+ jmp $6deda
+ ELSE
  dc.w $2236,$08d8
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -4257,6 +4763,7 @@ wear_6ded4:
  movem.l (sp)+,d0-d7/a0-a6
  dc.w $9390
  jmp $6deda
+ ENDC
 wear_6df2a:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -4267,6 +4774,23 @@ wear_6df2a:
  jmp $6df32
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ dc.w $2236,$08d8,$e381
+ movem.l d0-d2/a1,-(sp)
+ move.w ccr,-(sp)
+ move.l a0,d2
+ subi.l #$66c52,d2
+ lsr.l #2,d2
+ lea wear_remainders(pc),a1
+ adda.l d2,a1
+ move.l d1,d0
+ bsr.w FF1Wear20Delta
+ move.l d0,6(sp)
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a1
+ dc.w $9390
+ jmp $6df32
+ ELSE
  dc.w $2236,$08d8,$e381
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
@@ -4278,6 +4802,7 @@ wear_6df2a:
  movem.l (sp)+,d0-d7/a0-a6
  dc.w $9390
  jmp $6df32
+ ENDC
 wear_6e018:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -4359,8 +4884,20 @@ wear_reset:
  ENDC
  cmpi.w #8,modeval(pc)
  bne.b .done
+ IFD FF1_PLAYER_HOOKS
+ move.l a0,d2
+ subi.l #$66c52,d2
+ lsr.l #2,d2
+ lea wear_remainders(pc),a1
+ adda.l d2,a1
+ ELSE
  bsr.w wear_context
+ ENDC
+ IFD FF1_PLAYER_HOOKS
+ clr.b (a1)
+ ELSE
  clr.w (a1)
+ ENDC
  IFD VERIFY
  lea wear_resets(pc),a1
  addq.l #1,(a1)
@@ -4371,7 +4908,15 @@ wear_sample:
  IFD VERIFY
  cmpi.w #8,modeval(pc)
  bne.w .done
+ IFD FF1_PLAYER_HOOKS
+ move.l a0,d2
+ subi.l #$66c52,d2
+ lsr.l #2,d2
+ lea wear_remainders(pc),a1
+ adda.l d2,a1
+ ELSE
  bsr.w wear_context
+ ENDC
  move.l wear_samples(pc),d2
  cmpi.l #4096,d2
  IFD VERIFY
@@ -4384,7 +4929,12 @@ wear_sample:
  move.l a0,4(a4)
  move.l (a0),8(a4)
  move.l d4,12(a4)
+ IFD FF1_PLAYER_HOOKS
+ clr.w 20(a4)
+ move.b (a1),21(a4)
+ ELSE
  move.w (a1),20(a4)
+ ENDC
  move.l ticks(pc),24(a4)
  move.l d4,d0
  bsr.w FF1Wear20Delta
@@ -4393,7 +4943,12 @@ wear_sample:
  bne.w velocity_fault
  ENDC
  move.l d0,16(a4)
+ IFD FF1_PLAYER_HOOKS
+ clr.w 22(a4)
+ move.b (a1),23(a4)
+ ELSE
  move.w (a1),22(a4)
+ ENDC
  move.l d0,(sp,d7.l)
  IFD VERIFY
  lea wear_samples(pc),a1
@@ -4404,7 +4959,15 @@ wear_sample:
  ELSE
  cmpi.w #8,modeval(pc)
  bne.b .done
+ IFD FF1_PLAYER_HOOKS
+ move.l a0,d2
+ subi.l #$66c52,d2
+ lsr.l #2,d2
+ lea wear_remainders(pc),a1
+ adda.l d2,a1
+ ELSE
  bsr.w wear_context
+ ENDC
  move.l d4,d0
  bsr.w FF1Wear20Delta
  tst.l d1
@@ -4418,7 +4981,9 @@ wear_sample:
 wear_installed: dc.l 0
 wear_samples: dc.l 0
 wear_resets: dc.l 0
+ IFND FF1_PLAYER_HOOKS
 wear_remainders: ds.w 12
+ ENDC
  include "FerrariFormulaOne_Wear.s"
 install_events:
  movem.l d0-d7/a0-a6,-(sp)
@@ -4495,6 +5060,17 @@ events_6d5f2:
  jmp $6d684
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ move.w ccr,-(sp)
+ tst.w events_pulse(pc)
+ beq.b .skip
+ move.w (sp)+,ccr
+ jsr $6ea3e
+ jmp $6d684
+.skip:
+ move.w (sp)+,ccr
+ jmp $6d684
+ ELSE
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  moveq #0,d6
@@ -4513,6 +5089,7 @@ events_6d5f2:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6d684
+ ENDC
 events_6d67e:
  IFD FF1_PLAN_B
  tst.w $32fbc
@@ -4522,6 +5099,19 @@ events_6d67e:
  jmp $6d684
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ move.w ccr,-(sp)
+ tst.w events_pulse(pc)
+ beq.b .skip
+ move.w (sp)+,ccr
+ jsr $6ee70
+ dc.w $588f
+ jmp $6d684
+.skip:
+ move.w (sp)+,ccr
+ dc.w $588f
+ jmp $6d684
+ ELSE
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  moveq #1,d6
@@ -4541,6 +5131,7 @@ events_6d67e:
  movem.l (sp)+,d0-d7/a0-a6
  addq.l #4,sp
  jmp $6d684
+ ENDC
 events_24eec:
  IFD VERIFY
  move.w ccr,-(sp)
@@ -5065,6 +5656,14 @@ fuel_6d164:
  jmp $6d16a
 .b3_player:
  ENDC
+ IFD FF1_LEAN_PLAYER
+ movem.l d1/a1,-(sp)
+ lea fuel_remainders(pc),a1
+ bsr.w FF1Wear20Delta
+ movem.l (sp)+,d1/a1
+ dc.w $9190,$2d40,$fffc
+ jmp $6d16a
+ ELSE
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
  move.l d0,d4
@@ -5075,6 +5674,7 @@ fuel_6d164:
  movem.l (sp)+,d0-d7/a0-a6
  dc.w $9190,$2d40,$fffc
  jmp $6d16a
+ ENDC
 fuel_64ae6:
  dc.w $23c0,$0002,$2376
  movem.l d0-d7/a0-a6,-(sp)
@@ -5141,8 +5741,16 @@ fuel_reset:
  ENDC
  cmpi.w #8,modeval(pc)
  bne.b .done
+ IFD FF1_PLAYER_HOOKS
+ lea fuel_remainders(pc),a1
+ ELSE
  bsr.w fuel_context
+ ENDC
+ IFD FF1_PLAYER_HOOKS
+ clr.b (a1)
+ ELSE
  clr.w (a1)
+ ENDC
  IFD VERIFY
  lea fuel_resets(pc),a1
  addq.l #1,(a1)
@@ -5153,7 +5761,11 @@ fuel_sample:
  IFD VERIFY
  cmpi.w #8,modeval(pc)
  bne.w .done
+ IFD FF1_PLAYER_HOOKS
+ lea fuel_remainders(pc),a1
+ ELSE
  bsr.w fuel_context
+ ENDC
  move.l fuel_samples(pc),d2
  cmpi.l #4096,d2
  IFD VERIFY
@@ -5166,7 +5778,12 @@ fuel_sample:
  move.l a0,4(a4)
  move.l (a0),8(a4)
  move.l d4,12(a4)
+ IFD FF1_PLAYER_HOOKS
+ clr.w 20(a4)
+ move.b (a1),21(a4)
+ ELSE
  move.w (a1),20(a4)
+ ENDC
  move.l ticks(pc),24(a4)
  move.l d4,d0
  bsr.w FF1Wear20Delta
@@ -5175,7 +5792,12 @@ fuel_sample:
  bne.w velocity_fault
  ENDC
  move.l d0,16(a4)
+ IFD FF1_PLAYER_HOOKS
+ clr.w 22(a4)
+ move.b (a1),23(a4)
+ ELSE
  move.w (a1),22(a4)
+ ENDC
  move.l d0,(sp,d7.l)
  IFD VERIFY
  lea fuel_samples(pc),a1
@@ -5186,7 +5808,11 @@ fuel_sample:
  ELSE
  cmpi.w #8,modeval(pc)
  bne.b .done
+ IFD FF1_PLAYER_HOOKS
+ lea fuel_remainders(pc),a1
+ ELSE
  bsr.w fuel_context
+ ENDC
  move.l d4,d0
  bsr.w FF1Wear20Delta
  tst.l d1
@@ -5200,7 +5826,9 @@ fuel_sample:
 fuel_installed: dc.l 0
 fuel_samples: dc.l 0
 fuel_resets: dc.l 0
+ IFND FF1_PLAYER_HOOKS
 fuel_remainders: ds.w 8
+ ENDC
 boost_record:
  IFD VERIFY
  move.l boost_samples(pc),d0
@@ -5498,6 +6126,14 @@ recovery_snapshot:
 .flags:
  move.b (a0)+,(a1)+
  dbra d0,.flags
+ IFD FF1_PLAYER_HOOKS
+ clr.w (a1)+
+ move.b fuel_remainders(pc),-1(a1)
+ moveq #14,d0
+.emptycarry:
+ clr.w (a1)+
+ dbra d0,.emptycarry
+ ELSE
  lea fuel_remainders(pc),a0
  moveq #7,d0
 .fuelcarry:
@@ -5508,6 +6144,7 @@ recovery_snapshot:
 .tyrecarry:
  move.w (a0)+,(a1)+
  dbra d0,.tyrecarry
+ ENDC
  rts
  ELSE
  rts
