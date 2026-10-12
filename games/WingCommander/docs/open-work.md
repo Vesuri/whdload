@@ -7,7 +7,7 @@ and reconstructed English boots match all four live game hunks and every screens
 pixel at the menu and simulator/name prompt for Custom5=0–3. VERIFY off/on marker
 checks and equal-size control comparisons pass at both endpoints.
 Derived source, executable bytes, disassemblies and captures remain under `tmp/`.
-**Stopped at the phase 2 gate; phase 3 is not authorised.**
+**Phase 3 is authorised and in progress. Stop at its gate; phase 4 is not authorised.**
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.

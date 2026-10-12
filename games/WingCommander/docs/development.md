@@ -29,7 +29,7 @@ Install shared prerequisites through AmigaXDev; ROM/OS sources are user supplied
 
 Fetch, input verification, archive preparation, static identification, reconstruction,
 windowed boots and a state-driven A/B gate are implemented.
-The phase 2 launcher and byte-identical reconstruction are available; the boot gate is in progress. All shell tooling is written
+The phase 2 launcher and byte-identical reconstruction are available; the phase 2 boot gate is complete. All shell tooling is written
 for `/bin/bash` 3.2 and supports the project name's space.
 
 ## Phase 1: reproducible CD32 static identification
@@ -270,4 +270,4 @@ pixel must fail its respective gate.
 Phase 2 gate complete: all four Custom5 cases pass at both endpoints; VERIFY
 off/on match the equal-size control and their markers are 0/1 respectively.
 The full retained matrix is `tmp/phase2-ab/`. Scope and code/file offsets are
-recorded in `internals.md`. Stop here; phase 3 needs separate authorisation.
+recorded in `internals.md`. Phase 3 is now separately authorised.
