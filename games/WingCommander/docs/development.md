@@ -358,10 +358,12 @@ All captures, generated observer configuration, input logs, register records and
 reports stay in `tmp/`. Retained phase 3 evidence uses `tmp/intro-pal-a/`,
 `tmp/intro-pal-b/`, and `tmp/intro-pal-counter/`. Phase 4 profiling is a separate gate.
 
-## Phase 4: cache audits and profiling preflight
+## Phase 4: practical baseline and reproducibility
 
-The phase 4 gate is open. The tools below collect cache evidence and diagnose
-instrument coverage; they do **not** establish calibrated accelerated timing.
+The practical-baseline gate is complete under the scope approved on 2026-10-12.
+The commands below include both accepted measurements and diagnostic preflights;
+read their stated limits before reusing a result. Early preflights alone do not
+establish calibrated accelerated timing.
 See `internals.md` for the observed limitations. Use fresh output names and run
 emulators sequentially. Shared source files, CPU presets and game inputs remain
 unchanged; all generated files stay below `tmp/`.
@@ -462,7 +464,7 @@ Independent scene counters support the separately checked ceiling comparisons. T
 fixtures below its fresh `tmp/` output and requires rejection of every one.
 
 Retained phase 4 results, per-instrument validation and binary digests are listed
-in `internals.md`. The full phase 4 gate remains open.
+in `internals.md`. General routine accounting remains a documented deferred gap.
 
 
 ### Diagnosing aggregate instruction addresses
@@ -1262,3 +1264,34 @@ python3 tools/matrix_raw_check.py \
 Both corrected batch roots now contain completed per-cell `dma-report.json`,
 `dma-effect.json` and audited capture metadata for all eleven configurations.
 DMA completion does not certify general CPU/interrupt attribution.
+
+### Practical-baseline closeout
+
+Phase 4 is complete for the user-approved practical scope. No further emulator
+runs are needed for closeout. The gate audit and explicit deferrals are in
+`internals.md`; the next phase requires a separate request.
+
+The accepted corrected baseline is under `tmp/phase4-dma-cia-matrix/` (two 020
+cells) and `tmp/phase4-dma-cia-accelerated/` (nine accelerated cells). Each cell
+retains `audit/result.json`, bare/idle/DMA captures, per-arm raw-census checks,
+`idle-neutrality.json`, `dma-report.json` and `dma-effect.json`. Existing commands
+above reproduce their scene, source-change, DMA and idle measurements.
+Consolidated callback acceptance is recorded in `phase4-instrument-accept-01/`,
+`phase4-instrument-accept-02/`, `phase4-instrument-040-dcache.json` and
+`phase4-instrument-060-dcache.json`, all under `tmp/`. Only rows marked
+`validated` count; failed/pending rows are retained as limitations.
+
+Recheck the three accepted ceiling pairs from existing captures:
+
+```sh
+python3 tools/matrix_ceiling_report.py \
+  tmp/phase4-ceiling-control-030-mmu tmp/phase4-ceiling-c2p-030-mmu
+python3 tools/matrix_ceiling_report.py \
+  tmp/phase4-instant-control-030-mmu tmp/phase4-instant-on-030-mmu
+python3 tools/matrix_ceiling_report.py \
+  tmp/phase4-drawing-v2-control-030-mmu tmp/phase4-drawing-bitmap-030-mmu
+```
+
+All three were rechecked at closeout. Their fixture/readback checks pass, while
+the original limiter and the stated drawing scope remain part of the experiment.
+They establish neither a release-patch speedup nor complete routine accounting.

@@ -9,29 +9,18 @@ checks and equal-size control comparisons pass at both endpoints.
 Derived source, executable bytes, disassemblies and captures remain under `tmp/`.
 The unskipped intro has 31 identical milestone captures across two fresh boots.
 The publication ledger, full traces and independent SWAP_ONLY check agree. The
-stock 020 multiplier is verified; numeric-frequency presets require calibration.
-**Phase 4 is authorised and in progress; its complete accounting gate remains open.**
-Phase 5 is not authorised. The CPU/cache scene baseline, source-change census,
-cache audits and matched c2p, instant-blitter and scoped bitmap-drawing ceilings
-are recorded. Corrected DMA slot accounting and exact recorder controls now pass
-on all eleven machine/cache configurations, as do STOP idle accounting and its
-exact on/off controls. Blanket clear bypass is invalid and excluded.
+stock 020 multiplier and numeric-frequency scaling are calibrated for the emulator.
+**Phase 4 is complete under the user-approved practical-baseline scope.**
+The eleven-configuration scene baseline, cache audits, source-change census,
+DMA/STOP idle controls and matched c2p, instant-blitter and scoped bitmap-drawing
+ceilings are recorded. Eight configurations pass combined callback validation.
+All captures and consolidation jobs are terminal. No phase 5 work is authorised.
 
-Consolidated instrument checks pass on 020 default/NoCache, 030 MMU
-default/NoCache, 030 NoMMU NoCache, both 040 cache states and 060 DCache: exact idle and DMA neutrality, raw-source recomputation, callback
-neutrality and independent beam calibration. This validates only DMA slots,
-stopped-CPU idle and three callback elapsed scopes. It does not validate general
-routine self/inclusive time or interrupt entry/dispatch. The 040 default beam check passes with the reviewed debugger-boundary
-allowance. The 060 default and NoCache callback-neutrality checks failed and
-remain unaccepted. All existing acquisition and consolidation jobs are terminal;
-no further captures have been launched. The practical-baseline versus exhaustive
-accounting scope decision is pending; the original gate below has not passed.
-
-The immediate work is to consolidate existing evidence and use short,
-representative profiles for unresolved costs that affect the next engineering
-decision. Do not expand or repeat the full matrix while developing instruments.
-The exhaustive accounting requirement below remains unfulfilled; this change in
-working approach does not declare that gate passed.
+The user accepted the practical baseline with documented gaps on 2026-10-12.
+General routine self/inclusive attribution, complete interrupt and blitter-wait
+accounting, unaccepted callback controls and a broader drawing ceiling are
+explicitly deferred. These are not claimed complete. Revisit a gap when a future
+change requires that evidence; do not expand the matrix merely to fill it.
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.
@@ -145,21 +134,30 @@ simulator to the first pilot-name input prompt, without entering a name.
 Gate: two boots give the same milestone sequence, same screenshots at milestones,
 and frame counts that match between instruments.
 
-### Phase 4 — Baseline profile on the machine matrix
+### Phase 4 — Practical baseline on the machine matrix (gate complete)
 
-1. Matrix: A1200 with fast RAM, cycle-exact 68030/50 with and without WHDLoad `MMU`,
-   68040/25 and 68060/50 `-NOMMU`, each under WHDLoad's default cache handling and,
-   where it differs, with the user options (`DCache` and similar). Record `CACR` from
-   a VERIFY-only audit behind every figure.
-2. Per cell: fps per intro scene, CPU share per routine (inclusive and self),
-   blitter waits, interrupt handlers and cost, DMA slot shares, idle time.
-3. Hard Drivin'-style ceiling on the fastest cell: matched control versus bypassed
-   c2p, bypassed drawing and instant blitter.
-4. Measure the c2p change rate per scene (and later in the cockpit) before choosing a
-   c2p design.
+Scope approved by the user on 2026-10-12: finish with the practical baseline and
+documented gaps, rather than exhaustive routine/interrupt accounting in every cell.
 
-Gate: a measured statement of where frame time goes in each scene and cell, with the
-commands that reproduce it.
+1. Retain the A1200 fast-RAM, 030/50 WHDLoad MMU/NoMMU, 040/25 NOMMU and
+   060/50 NOMMU matrix, including distinct cache options. Record VERIFY `CACR`
+   audits and effective emulator settings behind each configuration.
+2. Record per-scene publication rates and source-change census, validated DMA
+   slots and STOP idle accounting; use validated representative routine and
+   callback measurements to identify major costs. State coverage and uncertainty.
+3. Record matched fastest-cell c2p, instant-blitter and scoped bitmap-drawing
+   ceiling experiments. Exclude the invalid blanket-clear bypass and retain its
+   failure as a limitation; do not claim a complete drawing ceiling.
+4. Document reproducible commands, instrument failures and deferred accounting.
+   Cockpit change rates, intended game speed and rendering implementation remain
+   later-phase work.
+
+Gate passed: the measured baseline and representative bottlenecks are recorded in
+`internals.md`, with commands in `development.md`. General routine self/inclusive
+costs, full interrupt/blitter-wait accounting, unresolved callback-control
+failures and broader drawing bounds remain explicit gaps, not gate blockers
+under this approved scope. Accelerated figures describe the emulator model.
+**Stop here; phase 5 requires a separate request.**
 
 ### Phase 5 — Game-time model for the intro
 

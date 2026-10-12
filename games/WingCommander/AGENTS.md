@@ -1,10 +1,9 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 4 baseline profiling of the CD32 intro machine matrix.
-Runtime measurements, VERIFY-only cache audits and controlled rendering-ceiling
-experiments are authorised. Derived material stays in ignored `tmp/`. Stop at
-the phase 4 gate; do not start phase 5, release patches or OCS analysis.
+Current scope: phase 4 practical CD32 baseline is complete, with documented gaps.
+Stop at the phase 4 gate. Do not start phase 5, further profiling, release patches
+or OCS analysis until requested. Derived material stays in ignored `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 
 ## Rules

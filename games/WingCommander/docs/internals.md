@@ -700,12 +700,15 @@ intro route, not a CPU performance profile or proof of intended timing. Phase 4 
 German runtime and OCS remain deferred.
 
 
-## Phase 4: cache audit and profiler eligibility
+## Phase 4: practical baseline (gate complete)
 
-Phase 4 is **in progress; the full-matrix gate has not passed**. The initial cache audit is complete,
-but the accelerated matrix does not yet have a calibrated, covered CPU timing
-instrument. General 020 calling-context costs remain unvalidated. The source-range leaf
-instruction costs below have a separately verified path. No phase 5 work or rendering changes have started.
+The user approved closing phase 4 with the practical baseline and documented
+gaps on 2026-10-12. All eleven configurations have cache-audited scene and
+source-change measurements plus validated DMA and STOP idle controls. Eight
+have consolidated callback validation. Representative leaf costs and the three
+scoped ceiling experiments provide the optimisation evidence below. General
+routine and complete interrupt/wait attribution remain deferred. No phase 5
+work or rendering release patch has started.
 
 ### Hardware cache audit
 
@@ -830,8 +833,8 @@ or instruction-cost claim follows from them. The negative results are in
 
 The first 060 counter capture `tmp/phase4-nommu-scenes-060/` also completes the
 35 boundaries. Its separate audit reports CACR `$20800000`; full raw recomputation
-passes all 3,342 calls, covering 136,957,440 source bytes. Its repetition and
-independent observer checks are still pending. The digest is the same NOMMU-counter
+passes all 3,342 calls, covering 136,957,440 source bytes. Repetition and independent observer checks of this superseded capture are
+not pursued; accepted corrected-clock evidence is recorded below. The digest is the same NOMMU-counter
 build listed above. These are diagnostics under the original numeric-clock
 scaling, not a corrected-clock baseline.
 
@@ -1211,21 +1214,28 @@ The debug record layout and idle-marker implementation, plus the custom-chip
 recording source, are now pinned in `manifest/debugger.tsv` alongside the existing
 CPU/debugger source inputs. They remain shared read-only build inputs.
 
-### Outstanding phase 4 gate work
+### Deferred gaps after practical-baseline closeout
 
-The scene-rate matrix, effective-cache audits, numeric clock calibration and
-matched c2p/instant-blitter/scoped bitmap-drawing ceilings are measured. Remaining
-work under the exhaustive gate is general routine self/inclusive attribution,
-complete interrupt and wait accounting, and completion of the outstanding
-instrument checks. The bitmap ceiling excludes unsafe blanket clearing.
+- General routine self/inclusive attribution remains invalid around system
+  returns and task/interrupt stack transitions. Verified leaf instruction costs
+  do not depend on that call tree.
+- Complete interrupt entry/dispatch, other handlers and blitter-wait attribution
+  are unavailable. Three VBL callback scopes and STOP idle have narrower meanings.
+- 030 NoMMU default's beam diagnostic differs from its uninterrupted control.
+  060 default/NoCache fail exact callback-recorder neutrality; their scene-level
+  rates and final state agree, with the local differences quantified below.
+  Those callback results are not silently promoted to accepted measurements.
+- The drawing ceiling covers TM6 bitmap drawing only. Blanket clear bypass is
+  invalid because later work reads its pixels. A broader ceiling needs preserved
+  data dependencies.
+- Accelerated timings are emulator-model measurements, not physical accelerator
+  validation. Intended game speed, timing coupling and cockpit evidence belong
+  to later phases; no rendering improvement has yet been delivered.
 
-Representative converter costs already identify a substantial 020 bottleneck.
-Those results and the measured ceilings remain useful while broader accounting
-is incomplete. No additional matrix acquisitions should be launched to develop
-an instrument; use existing captures or a short representative diagnostic first.
-The phase 4 gate remains open.
+These gaps are accepted deferrals under the user-approved practical scope.
+Revisit them only when needed for a subsequently authorised engineering decision.
 
-### Full-matrix gate audit
+### Practical-baseline gate audit
 
 The initial accelerated preflights tested the shared presets' MMU cores, not the
 NOMMU timing configurations required by the plan. WHDLoad `NoMMU` does not select
@@ -1243,19 +1253,21 @@ exact settings survive emulator fixups, or replace the WHDLoad-MMU matrix cell.
 Corrected probes must read back the effective settings. The numeric-frequency
 issue and each instrument's coverage still require explicit checks.
 
-| Requirement | Authoritative evidence / remaining gap |
+| Approved requirement | Evidence and disposition |
 |---|---|
-| CPU/cache matrix and CACR audits | Corrected NOMMU cells and same-core 030 MMU/NoMMU cells have scene ledgers, matching cache audits and effective-state readback. Numeric scaling matches the stock 020 reference; physical accelerated timing is not claimed. |
-| Per-scene FPS, routine self/inclusive cost, waits, interrupts, DMA and idle in every cell | Scene FPS covers the matrix. Scoped 020/030 leaf costs are recorded. Corrected DMA controls pass on all eleven cells; STOP and selected callback accounting have scoped validation. General caller attribution and complete interrupt/wait accounting remain incomplete. |
-| Matched c2p, drawing and instant-blitter ceilings on the fastest valid cell | 030 MMU/default is the nominal fastest model cell. Its c2p pair passes fixture/ledger checks and the control repeats exactly. The instant-blitter and scoped bitmap-drawing pairs also pass. Blanket clear bypass fails and is excluded. |
-| Per-scene c2p change rate | Full 020 default/NoCache and corrected NOMMU 030 default source recomputation passes. All scene captures retain census counts; independent validation does not yet cover every cell. Cockpit measurements belong to later phases. |
-| Findings, reproducible commands and coherent commits | Recorded in this document and `development.md`; derived material stays in `tmp/`. |
-| Phase boundary | No phase 5 work or rendering release patch has started. |
+| CPU/cache matrix and VERIFY audits | All eleven corrected cells have complete captures, matching CACR/configuration/debugger audits and effective-state readback. Numeric scaling is calibrated to the stock 020 reference. Pass for the emulator model. |
+| Per-scene baseline and source-change census | All eleven bare captures parse into 34 intervals; each cell's bare/idle/DMA raw-source recomputation passes. Scene figures and commands are recorded below. Pass. |
+| Validated representative costs, DMA and idle | Verified 020/030 leaf costs identify software c2p; all eleven cells pass DMA accounting, independent menu histograms and exact recording controls, plus STOP accounting and exact idle controls. Eight pass consolidated callback checks. Pass with the deferred coverage limits above. |
+| Controlled ceilings on the nominal fastest cell | 030 MMU/default has matched c2p, instant-blitter and scoped bitmap-drawing comparisons, fixture/readback checks and repeated controls. Blanket clear bypass is rejected. Pass for the approved scoped experiments. |
+| Findings and reproducibility | Findings, code-hunk/file offsets and limitations are in this document; commands are in `development.md`. Derived material remains in ignored `tmp/`; changes are committed in coherent steps. Pass. |
+| Phase boundary | All acquisition jobs are terminal. No phase 5 or release rendering work has started. Stop at this gate. |
 
-The remaining accounting is still required by the exhaustive gate. Reuse the
-sibling timing configurations and available instruments, retain explicit limits
-on unsupported results, and assess the full gate against the resulting evidence.
-No user-supplied emulator or gate waiver is a prerequisite to that work.
+Closeout verification inspected the eleven corrected cells' capture/audit
+metadata, reparsed their scene ledgers and checked their retained raw-census,
+DMA and idle results. It also inspected the c2p/instant/bitmap comparison reports
+and consolidated callback reports. No new emulator run was needed. Completion
+is for this approved practical baseline, not the superseded exhaustive accounting
+gate. Detailed evidence and failure reports remain available below.
 
 ### Prepared c2p ceiling fixtures
 
