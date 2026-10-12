@@ -1368,3 +1368,54 @@ Bounding boxes and short displacements use the recorded crop/thresholds; they
 are approximate projected-motion evidence. Do not infer world velocity, a flight
 tick rate or a uniform FPS cap from them. Music and text deadlines are kept
 separate. The decision and limitations are recorded in `internals.md`.
+
+## Phase 6 rendering builds and checks
+
+These are experimental English-only builds, not release archives. `CUSTOM1=2`
+enables rendering changes and leaves cache configuration to WHDLoad; `CUSTOM1=0/1`
+keeps the original language/rendering behaviour. `CUSTOM5=0–3` retains the existing
+limiter choices. Enabled rendering rejects `CUSTOM5=4` (old blitter converter).
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --render --output tmp/render
+python3 tools/reconstruct.py --render-control --output tmp/render-control
+python3 tools/reconstruct.py --render --render-verify --output tmp/render-twin
+python3 tools/c2p_check.py tmp/render \
+  --capture tmp/phase4-dma-cia-matrix/020-default/bare \
+  --output tmp/render-native.json
+```
+
+The checker uses the shared fixed Unicorn library (`AMIGA_UNICORN`), executes
+both native algorithms and an independent pixel model, and hooks every write.
+It also rejects three deliberately damaged local converter fixtures. The optional
+capture supplies the first recorded source of each intro scene. The 060 dispatch
+is exercised on Unicorn's 040 ISA because the 060 model rejects MOVEM; this does
+not replace an FS-UAE 060 run. No native-harness result measures performance.
+
+Calibrate the task-owned build and inspect a short credits trace:
+
+```sh
+FSUAE="$PWD/tmp/phase4-irq-v2-debugger/fs-uae" \
+python3 tools/render_probe.py --render-slave tmp/render/WingCommanderCD32.Slave \
+  --output tmp/render-probe --machine a1200-fast --options 'CUSTOM1=2 DCache' --warp
+```
+
+The probe records boot/live cache state, chip/fast memory and a five-field
+instruction trace. Use a separate calibration for the twin build: its reference
+allocation changes the live layout. Full intro capture, without profiling stops
+inside the intro:
+
+```sh
+FSUAE="$PWD/tmp/phase4-irq-v2-debugger/fs-uae" \
+python3 tools/render_capture.py --fixture tmp/render/WingCommanderCD32.Slave \
+  --layout tmp/render-probe/result.json --output tmp/render-intro \
+  --options 'CUSTOM1=2 DCache'
+```
+
+Use the equal-size control with `CUSTOM1=0` for comparison. Record and match live
+CACR rather than assuming identical option names imply identical cache states.
+The capture logs converter boundaries, original scene/music/publication markers,
+CPU settings, a menu screenshot, hashes and final memory. A twin capture additionally
+requires a nonzero verified-frame count. Its timings include reference conversion
+and comparison and are unsuitable for performance comparisons.

@@ -2068,3 +2068,62 @@ examples above. **Prefer matching motion per subject over a blanket publication
 cap**, and preserve the native music/text deadlines in either case. The user
 chooses at this gate; no rate is installed by phase 5. Flight calibration remains
 phase 7. These limitations do not reopen the phase 4 profiling matrix.
+
+## Phase 6 rendering implementation (validation in progress)
+
+The user authorised phase 6 while deferring further intended-speed investigation
+until gameplay. No new motion target is installed. The existing `Custom5=0–3`
+limiter remains; music and text deadlines are not patched. Frame-coupled scene
+lengths can still change with rendering cost, and are to be reported explicitly.
+
+The experimental English renderer uses `Custom1=2`; `Custom1=0/1` retains the
+original English/German paths. The only original slave seams are the four-byte
+instructions at `S:1422` (SetCPU) and `S:178a` (converter wrapper). The gate is
+checked at runtime. Normal reconstruction is still byte-identical; an equal-size
+control includes the unused rendering tail without redirecting either seam.
+Enabled mode rejects `Custom5>=4` rather than silently selecting the old blitter
+converter. This is not an Akiko implementation/removal: no Akiko path was found.
+
+Mikael Kalms' public-domain 030 routine serves 020/030; his 040 routine explicitly
+supports 040/060. Full-frame conversion is selected because the intro census
+shows extensive changes. Three immutable specialisations cover 320×128, 320×166
+and 320×200. Their plane strides are 5120, 6640 and 8000 bytes. Build-time constants
+replace the upstream init routines and geometry storage. No converter performs
+SMC, copies code, allocates workspace, or changes cache state. `Custom1=2` bypasses
+Psygore's SetCPU request, leaving WHDLoad and its options in charge.
+
+After conversion, graphics.library WaitBOVP waits for the existing ViewPort
+(`E:33afe` establishes it from hunk-1 data) before the original index change and
+single publication at `E:3378e`. Double buffering is retained; no measurement
+justifies a third buffer. The native twin build allocates a separate 64000-byte
+FAST reference destination, executes the original converter on the same source,
+and compares every output longword before publication. This diagnostic overhead
+must never be included in performance claims.
+
+### Initial correctness and existing display state
+
+The native oracle covers all three heights, zero/one/pixel-ramp/random inputs,
+and one retained real source from each of 31 intro scenes. It executes original,
+replacement and enabled/disabled wrapper paths. The initial 688 comparisons pass,
+including every destination store, exact once-only coverage, source integrity,
+guards and wrapper register preservation. Unicorn's 060 model rejects MOVEM;
+060 selection is checked with its flag on the 040 ISA model, and requires live
+060 validation separately. Unicorn results establish semantics, not speed.
+
+The first live 020 probe reaches the credits. Both generated copper lists have
+FMODE `0003`, DDFSTRT `0038`, DDFSTOP `00d8`, and BPL1MOD/BPL2MOD `fff8`.
+The retained unmodified phase-4 menu trace has the same values in both lists.
+The active chunky source is in FAST memory; the eight planar pointers are in
+CHIP, eight-byte aligned, with the expected plane spacing. FMODE 3 and its
+modulos are therefore already configured by graphics.library in these observed
+states: there is no new fetch-mode patch and no claimed chip-slot saving.
+Sprites and OS-generated lists remain untouched. These observations supersede
+the earlier unresolved FMODE hypothesis for the captured states only.
+
+Current development evidence: `tmp/phase6-probe-v1/`,
+`tmp/phase6-twin-probe-v3/`, and `tmp/phase6-native-real-v4.json`.
+The latter also rejects missing-converter, wrong-mask and wrong-geometry fixtures.
+The full 020 native-twin intro (`tmp/phase6-twin-020/`) reaches the menu with
+**1106 verified frames and zero differing output longwords**. Normal reconstruction
+still matches the original SHA-256. Matched timing, live 040/060 and final gate
+checks are still outstanding.
