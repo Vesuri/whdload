@@ -1190,3 +1190,19 @@ phase 4 gate. Missing captures produce `pending`; rejected evidence produces
 inspect `summary.json`. The negative check requires a complete first cell.
 The first completed consolidation and negative reports use the `-01` and
 `phase4-instrument-negative` output directories recorded in the internals.
+
+The representative cost figures use the existing leaf reports documented above;
+no fresh boot is required. To inspect the failed 040 beam check and its original
+samples:
+
+```sh
+python3 tools/matrix_irq_beam_check.py \
+  tmp/phase4-irq-beam-matrix/040-default/beam
+cat tmp/phase4-irq-beam-matrix/040-default/beam/irq-beam.json
+```
+
+The first command intentionally fails the strict duration check. Match the nine
+samples in order to callback entries after scene 15 in `irq-events.txt`, as the
+checker does; subtract entry from return clocks and compare with the decoded
+beam interval times 512. Do not treat a diagnostic residual census as acceptance
+or increase the tolerance solely to make the fixture pass.

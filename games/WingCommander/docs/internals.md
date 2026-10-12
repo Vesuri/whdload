@@ -1769,3 +1769,31 @@ stack transitions and synthetic returns. Callback elapsed times include callees
 and preemption and cannot stand in for routine self times or complete interrupt
 cost. Further diagnosis should use a short representative window before any
 additional matrix acquisition.
+
+### Representative profile: what already informs the next change
+
+The validated 020 leaf profile identifies software c2p as a substantial cost:
+44.480% of total Origin-animation time, 61.409% of Origin-particles time and
+49.741% of credits-00 time with default caches. These are direct instruction
+costs in the verified converter ranges above, independent of the broken general
+calling-context tree. The corresponding TOD-limiter instruction costs are only
+0.017%, 0.023% and 0.017%. The three measured VBL callbacks occupy 2.480% of
+Origin-animation time and 2.383% of credits-00 time, including their callees and
+preemption. These differently defined measurements must not be summed as a
+complete partition of time.
+
+This evidence supports prioritising c2p in the later rendering phase. It does
+not predict a speedup: the fastest-cell bypass saves only 9.703 ms across the
+whole intro with the original limiter active. Timing coupling and pacing still
+need the separately authorised later phases. Complete attribution of system
+returns is not needed to establish the observed converter cost; it remains
+necessary for the exhaustive accounting gate as currently written.
+
+Inspection of the existing 040 default beam samples narrows its failed check:
+all three music and all three joypad samples have zero residual. Only the three
+short game-VBL samples differ, by -512, +512 and -512 emulator units (one colour
+clock). Their observer durations are respectively 1024, 1536 and 1024 units;
+the independent beam intervals are 3, 2 and 3 colour clocks. This identifies a
+small endpoint discrepancy, not its cause. The strict check remains failed;
+its tolerance has not been widened to accept these data. No new capture was
+needed for this diagnosis.
