@@ -18,12 +18,14 @@ on all eleven machine/cache configurations, as do STOP idle accounting and its
 exact on/off controls. Blanket clear bypass is invalid and excluded.
 
 Consolidated instrument checks pass on 020 default/NoCache, 030 MMU
-default/NoCache, 030 NoMMU NoCache and both 040 cache states: exact idle and DMA neutrality, raw-source recomputation, callback
+default/NoCache, 030 NoMMU NoCache, both 040 cache states and 060 DCache: exact idle and DMA neutrality, raw-source recomputation, callback
 neutrality and independent beam calibration. This validates only DMA slots,
 stopped-CPU idle and three callback elapsed scopes. It does not validate general
 routine self/inclusive time or interrupt entry/dispatch. The 040 default beam check passes with the reviewed debugger-boundary
 allowance. The 060 default and NoCache callback-neutrality checks failed and
-remain unaccepted. Remaining acquisitions already in flight are not proof of completion.
+remain unaccepted. All existing acquisition and consolidation jobs are terminal;
+no further captures have been launched. The practical-baseline versus exhaustive
+accounting scope decision is pending; the original gate below has not passed.
 
 The immediate work is to consolidate existing evidence and use short,
 representative profiles for unresolved costs that affect the next engineering

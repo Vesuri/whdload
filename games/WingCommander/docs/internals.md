@@ -1706,7 +1706,7 @@ dispatcher work and other handlers remain outside these three callback scopes.
 The callback controls use `tmp/phase4-irq-matrix/` and its retry root, with
 fresh cache audits and separate bare/IRQ arms. All 020, 030 and 040 cells pass
 exact callback recording neutrality. The 060 default and NoCache pairs have
-the bounded differences documented below; 060 DCache is still in flight.
+the bounded differences documented below; 060 DCache passes exact neutrality.
 A completed acquisition validates callback event accounting and exact recorder
 neutrality only; it does not by itself extend the 020 instruction-duration
 calibration to the accelerated interpreters. General routine self/inclusive
@@ -1717,7 +1717,7 @@ selected debugger port was held by Red Baron: 020 NoCache, 030 MMU NoCache,
 040 default, 060 default and 060 NoCache. The strict ownership check refused the
 launch without stopping that process. Their failed records remain in
 `tmp/phase4-irq-matrix/`; completed audited retries are in
-`tmp/phase4-irq-retry/`. The unaffected original lane is finishing 060 DCache. No failed or
+`tmp/phase4-irq-retry/`. The original lane and all retries are terminal. No failed or
 pending cell counts as a completed callback measurement.
 
 ### Independent beam calibration of callback intervals
@@ -1758,6 +1758,7 @@ Completed rechecks use existing captures without emulator runs:
 | `tmp/phase4-instrument-accept-01/` | 020 default, 020 NoCache, 030 MMU default, 030 MMU NoCache |
 | `tmp/phase4-instrument-accept-02/` | 030 NoMMU NoCache, 040 default |
 | `tmp/phase4-instrument-040-dcache.json` | 040 DCache |
+| `tmp/phase4-instrument-060-dcache.json` | 060 DCache |
 
 For each accepted cell the checker matches the effective cache/core audit and
 debugger hash, recomputes raw-source changes, checks isolated idle/DMA/callback
@@ -1884,7 +1885,7 @@ alone do not establish whether individual CPU accesses suffer contention.
 The completed beam-only rechecks for 040 DCache and all three 060 cache states
 pass the source-derived endpoint bound (maximum residual 512 units). Their
 `endpoint-check.json` reports remain under `tmp/phase4-irq-beam-matrix/`.
-040 DCache and 060 NoCache also match their uninterrupted callback controls in
-full. The 060 default diagnostic ledger differs; the 060 DCache control is still
-in flight. These are individual checks, not additional consolidated cell passes;
+040 DCache, 060 DCache and 060 NoCache also match their uninterrupted callback
+controls in full. The 060 default diagnostic ledger differs. The first two also
+have consolidated passes listed above; the NoCache comparison alone is not one;
 in particular, 060 NoCache still fails bare/IRQ exact recorder neutrality.

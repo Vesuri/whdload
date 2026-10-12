@@ -9,12 +9,12 @@ bitmap-drawing ceilings are recorded. DMA slot accounting and exact recorder
 controls pass on all eleven configurations; STOP idle accounting and its exact
 on/off controls also pass throughout. Consolidated checks validate DMA slots,
 stopped-CPU idle and three VBL callback scopes on both 020 cache states, both
-030 MMU cache states, 030 NoMMU NoCache and both 040 cache states. These are scoped measurements, not complete CPU accounting.
+030 MMU cache states, 030 NoMMU NoCache, both 040 cache states and 060 DCache. These are scoped measurements, not complete CPU accounting.
 General routine attribution remains unresolved. The 040 callback beam check
 passes with an explicit debugger-boundary allowance; 060 callback neutrality
 remains unaccepted.
-Work now prioritises consolidation and representative profiles over further
-full-matrix instrument development. Phase 5 remains unauthorised.
+All existing captures and consolidation jobs are finished. Closing phase 4 with
+the practical baseline or retaining exhaustive accounting awaits the scope decision. Phase 5 remains unauthorised.
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the
 reset-to-menu event ledger. Full traces and independent SWAP_ONLY counts agree.
