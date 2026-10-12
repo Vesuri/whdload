@@ -816,6 +816,12 @@ pixel. The two runs use the same effective core settings and emulator/slave
 hashes; raw-source recording is the sole changed feature. The comparison passes
 in `tmp/phase4-nommu-recording-check-040.json`.
 
+The isolated warp control `tmp/phase4-nommu-warp-040/` likewise matches all
+6,739 records, final game hunks and menu pixels against the recording-off control.
+Only host warp changes. `tmp/phase4-nommu-warp-check-040.json` records the pass;
+warp may now be used for this capture path without converting host elapsed time
+into an emulated timing claim.
+
 These checks establish record integrity, census arithmetic, scoped repeatability
 and source-recording neutrality. They do not independently validate the observer's
 PC acquisition or calibrate the requested CPU MHz. No accelerated timing baseline

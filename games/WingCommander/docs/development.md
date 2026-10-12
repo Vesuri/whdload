@@ -686,3 +686,15 @@ The comparison now supports two counter-only runs and requires matching effectiv
 CPU settings, ledgers, final game hunks and menu pixels. It does not infer CPU costs.
 `--warp` changes host collection speed only; it is recorded separately and needs
 its own matched comparison before being used for faster matrix collection.
+
+The isolated 040 warp check passed with identical ledger/state/pixels. Reproduce
+by repeating the recording-off capture with `--warp`, then comparing it against
+the real-speed recording-off run:
+
+```sh
+python3 tools/matrix_raw_check.py tmp/nommu-warp-040 --compare-only \
+  --control tmp/nommu-control-040 > tmp/nommu-warp-check-040.json
+```
+
+The changed-feature list must contain only `host_warp` and
+`warp_neutrality_pass` must be true.
