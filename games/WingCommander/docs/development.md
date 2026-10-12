@@ -747,3 +747,33 @@ same machine, cache audit and options for both arms once the fastest matrix cell
 has been selected. This is a ceiling experiment, not a release rendering patch or
 a picture-equivalence comparison. These fixtures have not yet passed a runtime
 ceiling gate.
+
+### DMA summaries and the 030 MMU interpreter
+
+```sh
+python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
+  --matrix-mmu030-counters --frequency-clock --matrix-dma --output tmp/matrix-dma-debugger
+export FSUAE="$PWD/tmp/matrix-dma-debugger/fs-uae"
+```
+
+Add `--dma` to `matrix_capture.py` for experimental per-field DMA recording, then
+run `matrix_dma_check.py RUN`. This checks coverage and the final field against
+`RUN/menu.bin`; malformed totals, missing scene coverage and altered histograms
+must be rejected. Compare a same-binary capture without `--dma` separately. The
+current 030 pair fails exact timing neutrality but matches fields, publications,
+change counts, game hunks and pixels; see the measured timing effect in internals.
+Do not substitute an exact-neutrality pass for that result or label free bus slots
+as CPU idle.
+
+For the 030 MMU-capable interpreter, obtain separate cache audits for `MMU` and
+`NoMMU` without `--nommu-core`, then capture with
+`--machine a1200-030 --mmu-core --no-profiles --options MMU` (or `NoMMU`). Use the
+corresponding previously verified layout: the MMU option changes placement.
+The `tc030` audit field records actual translation control. These counter hooks
+are under validation; general instruction profiling remains unavailable on this
+interpreter.
+
+Independent runs may use distinct `FSUAE_RUN` directories and explicit
+`DEBUG_PORT` values. The strict ownership check must remain enabled; a busy port
+must fail without stopping its listener. Current MMU diagnostics use port 2457,
+separate from the NOMMU batch on 2456.

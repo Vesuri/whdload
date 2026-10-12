@@ -15,12 +15,21 @@ def report(run):
     cpu = dict(re.findall(r'(\w+)=(\w+)', meta['boot_cpu']))
     models = {'a1200-fast': '68020', 'a1200-030': '68030',
               'a1200-040': '68040', 'a1200-060': '68060'}
-    if cpu.get('model') != models[meta['machine']] or cpu.get('mmu') != '0':
+    if cpu.get('model') != models[meta['machine']] or cpu.get('mmu') != ('68030' if meta.get('mmu_core') else '0'):
         raise ValueError('unexpected counter interpreter')
     if cpu.get('exact') != '1' or cpu.get('memory_exact') != '1':
         raise ValueError('cycle-exact configuration required')
-    if meta['machine'] != 'a1200-fast' and not meta.get('nommu_core'):
-        raise ValueError('accelerated counter capture needs explicit NOMMU core')
+    if meta['machine'] != 'a1200-fast' and not (meta.get('nommu_core') or meta.get('mmu_core')):
+        raise ValueError('accelerated counter capture needs an explicit core')
+    if meta.get('mmu_core') and meta['machine']!='a1200-030':
+        raise ValueError('only the 030 MMU counter interpreter is covered')
+    if meta.get('mmu_core'):
+        live=dict(re.findall(r'(\w+)=(\w+)',meta['live_cpu']))
+        if 'tc030' not in live:raise ValueError('actual MMU translation state missing')
+        enabled=bool(int(live['tc030'],16)&0x80000000)
+        options=meta['options'].upper().split()
+        if ('MMU' in options and not enabled) or ('NOMMU' in options and enabled):
+            raise ValueError('actual translation state disagrees with requested option')
     h = meta['hunks']
     cuts = [0xf800d2, h[3]]+[h[n]+pc for n, pc, _ in SCENES]
     cuts += [h[0]+0x1fdd6]*18+[h[0]+0x1fe48, h[0]+0x20214]

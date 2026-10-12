@@ -1274,3 +1274,104 @@ The c2p-arm digest is
 `ec089eabbc6b869d3ec96fcc54a110d94e2fb3c362fe980ee1965b4f2f52ec53`.
 Fixtures and generated assembly are under `tmp/phase4-ceiling-{control,c2p}-slave/`.
 Drawing and instant-blitter arms and the fastest-cell choice remain outstanding.
+
+### Corrected-clock NOMMU scene figures
+
+These are original-slave, `Custom5=0` counter measurements on the corrected
+numeric-clock model. Frequencies are requested values with the quantisation
+listed above; they are not predictions for physical accelerators. Each cell has
+a separate cache audit and a completed ledger check. The 030 default also has
+an isolated profiler-neutrality check. Repetition of the other corrected cells
+and the MMU pair remain separate checks.
+
+Values are publications per emulated second. Reset/loading has no published game
+frames and is omitted. Reports retain counts, elapsed units and change census.
+
+| Scene | 030 default | 030 NoCache | 040 default | 040 DCache | 060 default | 060 DCache | 060 NoCache |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| game-startup | 4.345 | 3.745 | 4.016 | 4.015 | 4.048 | 4.048 | 4.048 |
+| origin-load | 9.595 | 8.325 | 9.027 | 9.028 | 9.229 | 9.229 | 9.229 |
+| origin-reveal | 1.158 | 1.157 | 1.136 | 1.136 | 1.136 | 1.136 | 1.136 |
+| origin-animation | 25.159 | 25.004 | 25.133 | 25.133 | 25.133 | 25.133 | 25.133 |
+| origin-expression | 3.953 | 3.967 | 3.955 | 3.955 | 3.955 | 3.955 | 3.955 |
+| origin-separation | 25.886 | 25.165 | 25.770 | 25.770 | 25.770 | 25.770 | 25.770 |
+| origin-flight | 3.853 | 3.860 | 3.854 | 3.854 | 3.854 | 3.854 | 3.854 |
+| origin-particles | 25.060 | 25.065 | 25.049 | 25.049 | 25.049 | 25.049 | 25.049 |
+| origin-fade | 1.736 | 1.734 | 1.737 | 1.737 | 1.738 | 1.738 | 1.738 |
+| title-load | 5.398 | 4.002 | 4.515 | 4.515 | 4.519 | 4.519 | 4.519 |
+| title-animation | 25.053 | 25.108 | 25.034 | 25.034 | 25.028 | 25.028 | 25.028 |
+| title-arrival | 24.969 | 24.426 | 24.103 | 24.103 | 24.202 | 24.202 | 24.202 |
+| title-departure | 24.281 | 24.010 | 24.497 | 24.496 | 24.327 | 24.327 | 24.327 |
+| credits-load | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| credits-00 | 25.065 | 25.073 | 25.077 | 25.077 | 25.077 | 25.077 | 25.077 |
+| credits-01 | 24.960 | 24.959 | 24.958 | 24.958 | 24.958 | 24.958 | 24.958 |
+| credits-02 | 24.962 | 24.961 | 24.963 | 24.963 | 24.962 | 24.962 | 24.962 |
+| credits-03 | 24.959 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-04 | 24.960 | 24.959 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-05 | 24.962 | 24.961 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-06 | 24.959 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-07 | 24.960 | 24.959 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-08 | 24.962 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-09 | 24.959 | 24.962 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-10 | 24.961 | 24.959 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-11 | 24.960 | 24.961 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-12 | 24.959 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-13 | 24.961 | 24.959 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-14 | 24.960 | 24.961 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-15 | 24.959 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-16 | 24.961 | 24.959 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| credits-17 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 | 24.960 |
+| cycle-complete | 13.096 | 12.310 | 12.253 | 12.253 | 12.254 | 12.254 | 12.254 |
+
+Evidence: `tmp/phase4-frequency-scenes-CELL/scene-report.json`, where CELL is
+`030`, `030-nocache`, `040`, `040-dcache`, `060`, `060-dcache` or `060-nocache`.
+All seven runs publish 3,362 frames over the reset-to-menu window. This does not
+establish equal per-instruction performance. Corrected readbacks are unit 36 for
+030/060 and unit 72 for 040. Live CACR is respectively `$00002111`, `$00002000`,
+`$00000000`, `$80008000`, `$20800000`, `$a0808000` and `$00000000`.
+Additional corrected-core audits confirm 030 `DCache` has the default `$00002111`
+and 040 `NoCache` has the default `$00000000`; no separate timing improvement is
+inferred from those option names.
+
+### DMA instrumentation check
+
+`--matrix-dma` records completed DMA fields and assigns slots to the current
+scene at the slot's left boundary. It keeps only counts in `dma-events.txt`;
+full derived records stay in the separate Barto validation capture. The first
+030 run in `tmp/phase4-dma-on-030/` records 8,221 complete fields. Its final
+field histogram agrees exactly with the independently parsed full `menu.bin`
+trace. Scene coverage after reset differs from the PC-clock interval by at most
+432 units, below one 512-unit DMA slot. Negative fixtures reject an incorrect
+field total, missing scene coverage and an altered histogram.
+
+The local recorder binary is
+`7e4388b891d7d9973e4c8f7a7b7958c6a49811d8bab7e8fc53ca999ddf59715b`.
+A same-binary recording-off control in `tmp/phase4-dma-off-030/` shows that enabling
+DMA recording is **not exactly timing-neutral**. All 6,739 records agree after
+removing cycle timestamps, including field numbers, publications and source-change
+counts. Final game hunks and menu pixels are identical. The largest absolute
+scene-duration change is 82.568 microseconds. The exact comparator correctly
+rejects the pair; the quantified effect is retained in
+`tmp/phase4-dma-effect-030.json`.
+
+DMA shares therefore describe the explicitly instrumented run, while CPU timing
+continues to use recording-off captures. They are bus-slot shares, not CPU-time
+shares. Unclaimed slots do not measure CPU idle. The hardware blitter appears in
+reset/loading (142,597 recorded slots) and has no recorded slots after game startup
+in this `Custom5=0` run; this does not cover the original blitter converter option.
+DMA results for other matrix cells are still outstanding.
+
+### 030 MMU counter path under validation
+
+`--matrix-mmu030-counters` adds the same read-only scene observer to the 030 MMU
+interpreter before its internal instruction-retry label. Internal MMU retries do
+not create duplicate observer entries. The debugger audit now reports `tc030`,
+so configured MMU capability can be distinguished from enabled translation.
+The local build succeeds with digest
+`c2fb09ab6f3d5dbb2102ff6f3df5ce1b458792f22f55a05172f057defdfba4a6`.
+Counter capture requires explicit `--mmu-core --no-profiles`; it does not claim
+instruction-profiler support. The `MMU` capture in `tmp/phase4-mmu-scenes-030/` completes and passes the scene
+ledger check. Its actual translation control is `$80c07760` (enabled), with CACR
+`$00002111` and unit 36. The checker now requires the TC enable bit to agree with
+an explicit `MMU`/`NoMMU` option. The same-interpreter `NoMMU` control is still
+being collected, separately from the NOMMU-interpreter figures.

@@ -121,12 +121,13 @@ def compare(control, candidate):
     with Image.open(control/'menu.png') as image_a, Image.open(candidate/'menu.png') as image_b:
         if image_a.size != image_b.size or image_a.convert('RGB').tobytes() != image_b.convert('RGB').tobytes():
             raise ValueError('menu pixels differ')
-    changed = [key for key, default in (('raw_chunky',False),('profiles',True),('host_warp',False))
+    changed = [key for key, default in (('raw_chunky',False),('profiles',True),('host_warp',False),('dma',False))
                if left.get(key,default) != right.get(key,default)]
     return dict(matched_execution_pass=True, changed_features=changed,
                 recording_neutrality_pass=changed==['raw_chunky'],
                 aggregate_profiler_neutrality_pass=changed==['profiles'],
                 warp_neutrality_pass=changed==['host_warp'],
+                dma_neutrality_pass=changed==['dma'],
                 ledger_records=len(a), profile_files_identical=profiles, raw_sources_identical=raw_sources_identical,
                 final_game_hunks_identical=True, menu_pixels_identical=True)
 

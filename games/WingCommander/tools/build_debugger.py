@@ -21,7 +21,13 @@ def main():
     p.add_argument('--aprof-stack-returns', action='store_true', help='diagnostic tracking of returns by their saved stack slot')
     p.add_argument('--matrix-nommu-counters', action='store_true', help='read-only scene/census hooks on the 040/060 NOMMU interpreter; no instruction-cost claims')
     p.add_argument('--frequency-clock', action='store_true', help='experimental numeric-clock scaling in colour-clock units; requires calibration')
+    p.add_argument('--matrix-dma',action='store_true',help='experimental per-field DMA summary; requires --matrix-observer')
+    p.add_argument('--matrix-mmu030-counters',action='store_true',help='read-only scene counters on the cycle-exact 030 MMU interpreter')
     a = p.parse_args()
+    if a.matrix_mmu030_counters and not a.matrix_observer:
+        raise ValueError('--matrix-mmu030-counters requires --matrix-observer')
+    if a.matrix_dma and not a.matrix_observer:
+        raise ValueError('--matrix-dma requires --matrix-observer')
     if a.matrix_nommu_counters and not a.matrix_observer:
         raise ValueError('--matrix-nommu-counters requires --matrix-observer')
     source = Path(os.environ.get('FSUAE_SOURCE', os.environ['AMIGA_SHARE']+'/fs-uae-aprof-build/fs-uae'))
@@ -48,7 +54,7 @@ int record_key_debug(int kc) {
 '''
     p.write_text(s)
     p = out/'src/barto_gdbserver.cpp'
-    s = p.read_text().replace('#include "sysconfig.h"', '#include "sysconfig.h"\nextern int record_key_debug(int);', 1)
+    s = p.read_text().replace('#include "sysconfig.h"', '#include "sysconfig.h"\nextern int record_key_debug(int);\nextern uae_u32 tc_030;', 1)
     anchor = '} else if(cmd == "aprof start") {'
     assert s.count(anchor) == 1
     s = s.replace(anchor, '''} else if(cmd == "inputcaps") {
@@ -58,7 +64,7 @@ int record_key_debug(int kc) {
         response += to_hex("profile-window 00000000 7fffffff");
     } else if(cmd == "wc-audit") {
         char info[512];
-        snprintf(info, sizeof(info), "WC_CPU model=%d mmu=%d exact=%d memory_exact=%d blitter_exact=%d multiplier=%d frequency=%d unit=%d cacr=%08x", currprefs.cpu_model, currprefs.mmu_model, currprefs.cpu_cycle_exact, currprefs.cpu_memory_cycle_exact, currprefs.blitter_cycle_exact, currprefs.cpu_clock_multiplier, currprefs.cpu_frequency, cpucycleunit, regs.cacr);
+        snprintf(info, sizeof(info), "WC_CPU model=%d mmu=%d exact=%d memory_exact=%d blitter_exact=%d multiplier=%d frequency=%d unit=%d cacr=%08x tc030=%08x", currprefs.cpu_model, currprefs.mmu_model, currprefs.cpu_cycle_exact, currprefs.cpu_memory_cycle_exact, currprefs.blitter_cycle_exact, currprefs.cpu_clock_multiplier, currprefs.cpu_frequency, cpucycleunit, regs.cacr, tc_030);
         response += to_hex(info);
     } else if(cmd.substr(0, 4) == "key ") {
         unsigned key = 0; int pressed = -1; char extra;
@@ -83,6 +89,18 @@ int record_key_debug(int kc) {
             code=code.replace('wc_observe(pc);','wc_observe(pc);\n        wc_matrix_observe(pc);')
             code=code.replace('// AITD-PROF-END','// AITD-PROF-END\n#include "wc_matrix_observer.inc"')
             shutil.copyfile(ROOT/'tools/matrix_observer.inc', out/'src/wc_matrix_observer.inc')
+            if a.matrix_dma:
+                code=code.replace('#include "wc_matrix_observer.inc"', '#include "wc_matrix_dma.inc"\n#include "wc_matrix_observer.inc"')
+                shutil.copyfile(ROOT/'tools/matrix_dma.inc',out/'src/wc_matrix_dma.inc')
+                observer=out/'src/wc_matrix_observer.inc'
+                observer.write_text(observer.read_text().replace('scene=id; previous.clear();','scene=id; previous.clear();\n        wc_matrix_dma_cut(id);'))
+                server=out/'src/barto_gdbserver.cpp'
+                server_code=server.read_text().replace('#include "sysconfig.h"','#include "sysconfig.h"\nextern void wc_matrix_dma_vsync();',1)
+                anchor='void vsync_pre() {'
+                assert server_code.count(anchor)==1
+                server_code=server_code.replace(anchor,anchor+'\n        wc_matrix_dma_vsync();')
+                server.write_text(server_code)
+
         if a.matrix_nommu_counters:
             # 040/060 use this interpreter without the Barto instruction profiler.
             # Observe the next PC before fetch, without changing emulated cycles.
@@ -93,6 +111,16 @@ int record_key_debug(int kc) {
             assert body.count(anchor) == 1
             body = body.replace(anchor, anchor+'\n                wc_observe(r->instruction_pc);\n                wc_matrix_observe(r->instruction_pc);')
             code = code[:start]+body+code[end:]
+        if a.matrix_mmu030_counters:
+            start=code.index('static void m68k_run_mmu030 (void)')
+            end=code.index('static void m68k_run_3ce (void)',start)
+            body=code[start:end]
+            anchor='insretry:\n'
+            assert body.count(anchor)==1
+            # Internal MMU retries jump past the observer, so a retried
+            # instruction does not add another scene/publication/census event.
+            body=body.replace(anchor,'                wc_observe(m68k_getpc());\n                wc_matrix_observe(m68k_getpc());\n'+anchor)
+            code=code[:start]+body+code[end:]
         target.write_text(code)
         shutil.copyfile(ROOT/'tools/intro_observer.inc', out/'src/wc_intro_observer.inc')
     if a.aprof_stable_pc or a.matrix_observer or a.aprof_stack_returns:

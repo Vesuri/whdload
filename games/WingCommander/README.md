@@ -4,10 +4,11 @@ Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
 **Phase 4 is in progress; the full-matrix gate has not passed.**
-Cache audits and scoped 020 measurements are verified.
-Both 020 cache states pass profiler-neutrality controls; source-change counts and
-converter/limiter instruction costs are recorded. Accelerated timing coverage,
-general caller attribution, DMA/idle accounting and ceiling experiments remain open.
+Cache audits, corrected-clock NOMMU scene figures and scoped 020/030 costs are
+recorded. Both 020 cache states and the 030 default pass profiler-neutrality
+controls. DMA accounting has an independently checked 030 capture with a measured
+small timing effect. The MMU pair, remaining validation, general caller/idle
+accounting and ceiling experiments remain open.
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the
 reset-to-menu event ledger. Full traces and independent SWAP_ONLY counts agree.

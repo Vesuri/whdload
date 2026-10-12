@@ -15,9 +15,12 @@ Its full-matrix gate remains unchanged; phase 5 is not authorised.
 Fifteen cache audits and five functional/instrumentation preflights are complete.
 Both effective 020 cache states pass isolated profiler-on/off controls. Full
 source-change recomputation and verified leaf converter/limiter costs are recorded.
-The original accelerated preflights selected MMU cores; corrected NOMMU-core
-coverage and clock calibration are being checked. General return attribution,
-whole-scene DMA/idle accounting and ceilings remain incomplete. The matrix gate
+Corrected NOMMU-core scene captures cover all distinct accelerated cache states.
+Numeric-clock scaling matches the stock 020 reference, with documented integer
+quantisation. The 030 default passes profiler neutrality; its DMA capture passes
+independent accounting checks with a quantified timing effect. The same-core 030
+MMU pair and remaining validation are in progress. General return attribution,
+full-matrix DMA/idle accounting and ceilings remain incomplete. The matrix gate
 has not passed.
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
