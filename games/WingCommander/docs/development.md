@@ -1236,3 +1236,14 @@ python3 tools/matrix_dma_effect.py \
 The default feature remains DMA for existing commands. Configuration checks
 require only the selected recording feature to change. Effect reports describe
 observed differences and do not override failed exact-neutrality checks.
+
+The completed corrected 060 DMA pairs also support the unchanged exact check:
+
+```sh
+python3 tools/matrix_raw_check.py \
+  tmp/phase4-dma-cia-accelerated/060-default/dma \
+  --control tmp/phase4-dma-cia-accelerated/060-default/idle --compare-only
+python3 tools/matrix_raw_check.py \
+  tmp/phase4-dma-cia-accelerated/060-dcache/dma \
+  --control tmp/phase4-dma-cia-accelerated/060-dcache/idle --compare-only
+```

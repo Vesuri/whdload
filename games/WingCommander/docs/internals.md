@@ -1213,19 +1213,17 @@ CPU/debugger source inputs. They remain shared read-only build inputs.
 
 ### Outstanding phase 4 gate work
 
-- Establish calibrated timing and instruction coverage for the requested accelerated
-  configurations, or obtain an explicit change to the matrix requirement.
-- Resolve general return/context attribution. Isolated aggregate-profiler-off
-  controls pass for 020 default and NoCache; full source-census recomputation passes
-  for both. This does not validate accelerated machine configurations.
-- Complete per-scene self/inclusive CPU, waits, interrupts, DMA and idle accounting
-  for every accepted cell and differing cache state.
-- Run matched c2p/drawing/instant-blitter ceiling experiments on the fastest valid
-  matrix cell. None has yet been selected or measured.
+The scene-rate matrix, effective-cache audits, numeric clock calibration and
+matched c2p/instant-blitter/scoped bitmap-drawing ceilings are measured. Remaining
+work under the exhaustive gate is general routine self/inclusive attribution,
+complete interrupt and wait accounting, and completion of the outstanding
+instrument checks. The bitmap ceiling excludes unsafe blanket clearing.
 
-The phase 4 gate remains open; functional boots and cache audits do not substitute
-for its measured accounting requirements.
-
+Representative converter costs already identify a substantial 020 bottleneck.
+Those results and the measured ceilings remain useful while broader accounting
+is incomplete. No additional matrix acquisitions should be launched to develop
+an instrument; use existing captures or a short representative diagnostic first.
+The phase 4 gate remains open.
 
 ### Full-matrix gate audit
 
@@ -1248,13 +1246,13 @@ issue and each instrument's coverage still require explicit checks.
 | Requirement | Authoritative evidence / remaining gap |
 |---|---|
 | CPU/cache matrix and CACR audits | Corrected NOMMU cells and same-core 030 MMU/NoMMU cells have scene ledgers, matching cache audits and effective-state readback. Numeric scaling matches the stock 020 reference; physical accelerated timing is not claimed. |
-| Per-scene FPS, routine self/inclusive cost, waits, interrupts, DMA and idle in every cell | Scene FPS covers the matrix. Scoped 020/030 leaf costs and one independently checked DMA capture are recorded. General caller attribution, full-matrix DMA, interrupt/wait and actual CPU-idle accounting remain incomplete. |
+| Per-scene FPS, routine self/inclusive cost, waits, interrupts, DMA and idle in every cell | Scene FPS covers the matrix. Scoped 020/030 leaf costs are recorded. Corrected DMA controls pass on ten of eleven cells; STOP and selected callback accounting have scoped validation. General caller attribution and complete interrupt/wait accounting remain incomplete. |
 | Matched c2p, drawing and instant-blitter ceilings on the fastest valid cell | 030 MMU/default is the nominal fastest model cell. Its c2p pair passes fixture/ledger checks and the control repeats exactly. The instant-blitter and scoped bitmap-drawing pairs also pass. Blanket clear bypass fails and is excluded. |
 | Per-scene c2p change rate | Full 020 default/NoCache and corrected NOMMU 030 default source recomputation passes. All scene captures retain census counts; independent validation does not yet cover every cell. Cockpit measurements belong to later phases. |
 | Findings, reproducible commands and coherent commits | Recorded in this document and `development.md`; derived material stays in `tmp/`. |
 | Phase boundary | No phase 5 work or rendering release patch has started. |
 
-The remaining accounting and ceiling experiments are still required. Reuse the
+The remaining accounting is still required by the exhaustive gate. Reuse the
 sibling timing configurations and available instruments, retain explicit limits
 on unsupported results, and assess the full gate against the resulting evidence.
 No user-supplied emulator or gate waiver is a prerequisite to that work.
@@ -1637,8 +1635,12 @@ independent DMA checks with both WHDLoad MMU enabled and disabled on the same
 MMU interpreter. Both fresh audits read CACR `$00002111`; live TC is `$80c07760`
 and `$00000000` respectively. Every scene's duration/publication/field difference
 is zero, all game hunks and pixels match, and the separate `dma-neutrality.json`
-checks pass. Other accelerated cells remain pending.
-The original matrix continues with its original binary as diagnostic evidence.
+checks pass. Corrected controls also complete for both 030 NoCache states,
+both 040 states and 060 default/DCache: all have exact ledgers, raw sources,
+final hunks and menu pixels. Ten of eleven corrected DMA cells are therefore
+complete; 060 NoCache remains in flight. Newly checked exact 060 comparisons
+are retained in their `dma-neutrality.json` reports. The completed original
+matrix remains diagnostic evidence of the earlier recorder behaviour.
 
 ### Game VBL callback interval validation
 
