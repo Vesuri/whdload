@@ -28,7 +28,7 @@ def main():
     modes = p.add_mutually_exclusive_group()
     modes.add_argument('--verify', action='store_true', help='build the CUSTOM1=2 diagnostic seam')
     modes.add_argument('--verify-control', action='store_true', help='original code with the same unused diagnostic tail/size')
-    modes.add_argument('--ceiling',choices=['control','c2p'],help='VERIFY-only equal-size rendering ceiling fixture; never a release build')
+    modes.add_argument('--ceiling',choices=['control','c2p','drawing-control','drawing','drawing-bitmap','drawing-clear'],help='VERIFY-only equal-size rendering ceiling fixture; never a release build')
     modes.add_argument('--cache-audit', action='store_true', help='VERIFY-only terminating hardware CACR audit')
     p.add_argument('--input', default='tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')
     a = p.parse_args()
@@ -86,6 +86,8 @@ def main():
                 lines.append('\trts')
                 if size > 2:
                     lines.append('\tdc.b '+','.join(f'${b:02x}' for b in code[pos+2:pos+size]))
+            elif pos == 0x14da and a.ceiling and a.ceiling.startswith('drawing'):
+                lines.append('\tbsr.w drawing_patchseg')
             elif pos == 0x14da and a.verify:
                 lines.append('\tbsr.w verify_patchseg')
             else:
@@ -98,6 +100,10 @@ def main():
         pos += size
     if a.verify or a.verify_control:
         lines.append((ROOT/'whdload/verify.s').read_text())
+    if a.ceiling and a.ceiling.startswith('drawing'):
+        bitmap='$4e75' if a.ceiling in ('drawing','drawing-bitmap') else '$48e7'
+        clear='$4e75' if a.ceiling in ('drawing','drawing-clear') else '$48e7'
+        lines.append((ROOT/'whdload/drawing_ceiling.s').read_text().replace('BITMAP_OPCODE',bitmap).replace('CLEAR_OPCODE',clear))
     if a.cache_audit:
         lines.append((ROOT/'whdload/cache_audit.s').read_text())
     out.mkdir(parents=True)
@@ -114,7 +120,11 @@ def main():
         expected=bytearray(code)
         if a.ceiling=='c2p':
             for offset in (0x17f6,0x195e,0x1ac6):expected[offset:offset+2]=bytes.fromhex('4e75')
-        if built!=expected:raise ValueError('ceiling fixture differs outside declared converter entry words')
+        if a.ceiling and a.ceiling.startswith('drawing'):
+            expected[0x14da:0x14de]=struct.pack('>Hh',0x6100,len(code)-(0x14da+2))
+            if len(built)<=len(code) or len(built)%4 or built[:len(code)]!=expected:
+                raise ValueError('drawing fixture changed original code outside the PatchSeg detour')
+        elif built!=expected:raise ValueError('ceiling fixture differs outside declared converter entry words')
     if not (a.verify or a.cache_audit or a.ceiling) and built[:len(code)] != code:
         differences = [hex(i) for i,(x,y) in enumerate(zip(built,code)) if x != y]
         raise ValueError(f'reassembly differs: size {len(built)}; first offsets {differences[:20]}')
@@ -132,6 +142,8 @@ def main():
     report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
               'code_ranges':CODE, 'byte_identical':result == original, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
+    if a.ceiling and a.ceiling.startswith('drawing'):
+        report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
 

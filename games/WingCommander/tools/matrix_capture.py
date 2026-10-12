@@ -7,6 +7,7 @@ from amigaxdev.gdbserve import Server
 from amigaxdev import barto
 from cd32_runtime import ROOT,BASE,locate
 from intro_capture import SCENES
+from ceiling_fixture import load as load_ceiling_fixture
 
 
 def main():
@@ -40,13 +41,7 @@ def main():
         raise ValueError('matching completed cache audit required')
     ceiling=None;slave=''
     if a.ceiling_slave:
-        target=(ROOT/a.ceiling_slave).resolve()
-        if (ROOT/'tmp').resolve() not in target.parents:raise ValueError('ceiling slave must stay in tmp/')
-        fixture=json.loads((target.parent/'build.json').read_text())
-        if not fixture.get('verify_only') or fixture.get('ceiling') not in ('control','c2p'):
-            raise ValueError('verified ceiling fixture required')
-        if hashlib.sha256(target.read_bytes()).hexdigest()!=fixture['sha256'] or fixture['bytes']!=7728:
-            raise ValueError('ceiling fixture hash/size mismatch')
+        target,fixture=load_ceiling_fixture(a.ceiling_slave)
         ceiling=fixture['ceiling'];slave=str(target)
     if a.instant_blitter and ceiling!='control':raise ValueError('instant blitter requires the verified control slave')
     m=json.loads((ROOT/a.layout).read_text());layout={k:m[k] for k in ('hunks','slave')};h=layout['hunks']

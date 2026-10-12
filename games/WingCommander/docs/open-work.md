@@ -19,11 +19,11 @@ Corrected NOMMU-core scene captures cover all distinct accelerated cache states.
 Numeric-clock scaling matches the stock 020 reference, with documented integer
 quantisation. The 030 default passes profiler neutrality; its DMA capture passes
 independent accounting checks with a quantified timing effect. The same-core 030
-MMU pair is captured with translation-state readback. Remaining validation and
-the drawing ceiling experiment are in progress. The matched c2p and instant-blitter
-ceilings are recorded. General return attribution and full-matrix DMA/idle
-accounting remain incomplete. The matrix gate
-has not passed.
+MMU pair is captured with translation-state readback. Matched c2p, instant-blitter
+and scoped bitmap-drawing ceilings are recorded. Blanket clear bypass fails and
+is excluded; broader drawing bounds must preserve pixel-readback dependencies.
+General return attribution, full-matrix DMA/idle accounting and remaining
+instrument validation are incomplete. The matrix gate has not passed.
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.

@@ -1249,7 +1249,7 @@ issue and each instrument's coverage still require explicit checks.
 |---|---|
 | CPU/cache matrix and CACR audits | Corrected NOMMU cells and same-core 030 MMU/NoMMU cells have scene ledgers, matching cache audits and effective-state readback. Numeric scaling matches the stock 020 reference; physical accelerated timing is not claimed. |
 | Per-scene FPS, routine self/inclusive cost, waits, interrupts, DMA and idle in every cell | Scene FPS covers the matrix. Scoped 020/030 leaf costs and one independently checked DMA capture are recorded. General caller attribution, full-matrix DMA, interrupt/wait and actual CPU-idle accounting remain incomplete. |
-| Matched c2p, drawing and instant-blitter ceilings on the fastest valid cell | 030 MMU/default is the nominal fastest model cell. Its c2p pair passes fixture/ledger checks and the control repeats exactly. The instant-blitter pair also passes; the drawing ceiling remains outstanding. |
+| Matched c2p, drawing and instant-blitter ceilings on the fastest valid cell | 030 MMU/default is the nominal fastest model cell. Its c2p pair passes fixture/ledger checks and the control repeats exactly. The instant-blitter and scoped bitmap-drawing pairs also pass. Blanket clear bypass fails and is excluded. |
 | Per-scene c2p change rate | Full 020 default/NoCache and corrected NOMMU 030 default source recomputation passes. All scene captures retain census counts; independent validation does not yet cover every cell. Cockpit measurements belong to later phases. |
 | Findings, reproducible commands and coherent commits | Recorded in this document and `development.md`; derived material stays in `tmp/`. |
 | Phase boundary | No phase 5 work or rendering release patch has started. |
@@ -1273,7 +1273,7 @@ Both size and all bytes outside those three words are checked during the build.
 The c2p-arm digest is
 `ec089eabbc6b869d3ec96fcc54a110d94e2fb3c362fe980ee1965b4f2f52ec53`.
 Fixtures and generated assembly are under `tmp/phase4-ceiling-{control,c2p}-slave/`.
-The selected comparison cell and accepted c2p result are recorded below. The instant-blitter pair also passes; the drawing ceiling remains outstanding.
+The selected comparison cell and accepted c2p result are recorded below. The instant-blitter and scoped bitmap-drawing pairs also pass. Blanket clear bypass fails and is excluded.
 
 ### Corrected-clock NOMMU scene figures
 
@@ -1446,8 +1446,7 @@ one matched pair, not a variability estimate or a physical accelerator claim.
 
 `tmp/phase4-ceiling-c2p-comparison.json` records every scene and the complete
 window; `tmp/phase4-ceiling-repeat-check-030-mmu.json` records the control repeat.
-The checker rejects reversed arms and mismatched emulator builds. The drawing
-ceiling remains outstanding; the instant-blitter result follows.
+The checker rejects reversed arms and mismatched emulator builds. The instant-blitter and scoped bitmap-drawing results follow.
 
 
 ### Instant-blitter ceiling result
@@ -1477,4 +1476,60 @@ Evidence is in `tmp/phase4-instant-{control,on}-030-mmu/`,
 The ceiling checker validates retained binary identity, placement, scene ledgers
 and effective settings; a negative fixture with the instant flag claimed but
 readback disabled is rejected. These two completed ceiling comparisons do not
-close the drawing or full-matrix accounting gaps.
+close the broader drawing or full-matrix accounting gaps.
+
+
+### Bitmap-drawing ceiling and unsafe clear bypass
+
+The TM6 bitmap drawing entry is English code-hunk 0 offset `$2efe8` (file
+`$2f014`). It validates TM6 image data, clips the requested rectangle and writes
+pixels into the destination surface. It is used by the Origin sequence and the
+credits text renderer (the latter calls it from `E:13ff0`). The surface-clear
+entry is `E:31cd6` (file `$31d02`). These are distinct drawing operations.
+
+The accepted drawing comparison bypasses **TM6 bitmap drawing only**, retaining
+surface clearing, other drawing/projection, c2p, the limiter and publication.
+Both 7,836-byte VERIFY fixtures use the same PatchSeg detour at `S:14da`
+(file `$14fa`), preserve registers/CCR, install their entry words, and flush the
+CPU cache before returning. They differ only in the bitmap patch word at slave
+code-hunk offset `$1e74` (file `$1e94`). The control retains both MOVEM entries;
+the bitmap arm uses RTS at `E:2efe8`. An installation counter at `S:1e70`
+(file `$1e90`) reads one in both completed captures, and all live entry words
+match their intended arms. No release slave is produced.
+
+| Selected 030 MMU/default cell | Publications | Complete intro seconds | Publications/s |
+|---|---:|---:|---:|
+| Equal-size drawing control | 3,351 | 152.658729642 | 21.950922871 |
+| Bitmap drawing bypass | 3,351 | 152.658729642 | 21.950922871 |
+
+All per-scene publication counts match. The largest absolute scene-duration
+change is 103.083 microseconds; the complete-window difference is zero.
+Origin animation and particle source-change counts drop to zero in the bypass,
+and menu pixels differ, confirming an effective rendering intervention. This
+is a measured zero whole-window gain with the original limiter active, not a
+zero bitmap-drawing CPU cost. The new control's complete-intro scene rows,
+including census counts, match the prior original-byte control exactly.
+
+Evidence: `tmp/phase4-drawing-v2-control-030-mmu/`,
+`tmp/phase4-drawing-bitmap-030-mmu/` and
+`tmp/phase4-drawing-bitmap-comparison.json`. Fixture digests are
+`0825f64aa762ad77aff01682c20a2eeb73e816d73cfa0c6f46c1b4e5e3631138`
+(control) and
+`c182473a52bccafc275547163ffe063466076eab3713ec3e25559e39b200321a`
+(bitmap). Emulator and cache audit are the same as the instant-blitter pair.
+The checker rejects a negative memory fixture in which the claimed bitmap
+bypass was not installed. Rebuilding the ordinary slave still produces the
+pinned original bytes exactly.
+
+A blanket RTS replacement of surface clear is **not a valid ceiling arm**.
+The combined and clear-only diagnostics fail during title loading; the bitmap-only
+diagnostic reaches credits. A write watchpoint on the clear-only run identifies
+`E:2cd00` (file `$2cd2c`) clearing beyond its stack buffer into the game hunk.
+The preceding pixel scan stores rectangle bounds at `E:2ccc0`; the failed run's
+bounds are `(319,199,0,0)`. Subtracting the vertical bounds produces `$ff39`, so
+the DBF loop clears 65,338 bytes instead of a valid small rectangle. The capture
+has no completed result and supplies no performance figure. Registers, memory
+and the first corrupting write are retained in `tmp/phase4-drawing-watch-clear/`.
+This is evidence that drawing data is consumed by later work; broader drawing
+bypass requires preserving that dependency, rather than silently accepting a
+crashed or shortened window. Full-matrix accounting also remains incomplete.

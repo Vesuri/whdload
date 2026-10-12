@@ -6,12 +6,14 @@ import _amigaxdev
 from amigaxdev.gdbserve import Server
 from amigaxdev import barto
 from cd32_runtime import ROOT,BASE,locate
+from ceiling_fixture import load as load_ceiling_fixture
 
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output',required=True);p.add_argument('--machine',required=True,
         choices=['a1200-fast','a1200-030','a1200-040','a1200-060'])
+    p.add_argument('--ceiling-slave',help='calibrate the layout of a verified ceiling fixture')
     p.add_argument('--layout',help='previous verified layout; recheck once at the checkpoint instead of repeated boot dumps')
     p.add_argument('--warp',action='store_true')
     p.add_argument('--numeric-clock',action='store_true',help='diagnose the numeric frequency path instead of the stock 020 multiplier')
@@ -22,9 +24,10 @@ def main():
     out=(ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():raise ValueError('new tmp output required')
     if os.environ.get('EXTRA_ARGS'):raise ValueError('fixed preflight configuration required')
+    slave,fixture=load_ceiling_fixture(a.ceiling_slave) if a.ceiling_slave else ('',{})
     out.mkdir(parents=True);os.chdir(ROOT)
     run='../'+str(out.relative_to(ROOT))+'/run'
-    env=dict(os.environ,WC_NOMMU_CORE='1' if a.nommu_core else '0',FSUAE_RUN=run,AMIGA_SETUP=a.machine,SLAVE='',
+    env=dict(os.environ,WC_NOMMU_CORE='1' if a.nommu_core else '0',FSUAE_RUN=run,AMIGA_SETUP=a.machine,SLAVE=str(slave),
         WHD_ARGS='CUSTOM5=0 '+a.options,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' and not a.numeric_clock else '0',
         WARP='1' if a.warp else '0',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',DETERMINISTIC='1')
     for key in ('WC_OBSERVER_CONFIG','WC_OBSERVER_OUTPUT','WC_MATRIX_CONFIG','WC_MATRIX_DIR'):env.pop(key,None)
@@ -70,7 +73,7 @@ def main():
         pcs=[pc for f in t.fields for pc,cost,regs in t.instructions(f) if pc not in (None,0x7fffffff)]
         (out/'credits.png').write_bytes(t.fields[-1].shot)
         boot=next((out/'run').glob('boot.*'))
-        result=dict(layout,machine=a.machine,nommu_core=a.nommu_core,numeric_clock=a.numeric_clock,host_warp=a.warp,options=a.options,complete=True,boot_cpu=boot_config,live_cpu=live,
+        result=dict(layout,ceiling=fixture.get("ceiling"),machine=a.machine,nommu_core=a.nommu_core,numeric_clock=a.numeric_clock,host_warp=a.warp,options=a.options,complete=True,boot_cpu=boot_config,live_cpu=live,
                     aprof_reply=aprof,aprof_supported=enabled,fields=len(t.fields),instruction_records=len(pcs),
                     game_instruction_records=sum(h0<=pc<h0+0x35ea4 for pc in pcs),
                     publications=pcs.count(h0+0x3378e),vbls=pcs.count(h0+0x34162),

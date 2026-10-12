@@ -848,3 +848,40 @@ the complete ledgers directly:
 cmp tmp/phase4-ceiling-control-030-mmu/matrix-events.txt \
   tmp/phase4-instant-control-030-mmu/matrix-events.txt
 ```
+
+
+### Bitmap drawing ceiling
+
+Build the matched drawing fixtures and calibrate their layout separately:
+
+```sh
+python3 tools/reconstruct.py --ceiling drawing-control --output tmp/drawing-control-slave
+python3 tools/reconstruct.py --ceiling drawing-bitmap --output tmp/drawing-bitmap-slave
+python3 tools/matrix_probe.py --machine a1200-030 --options MMU --warp \
+  --ceiling-slave tmp/drawing-control-slave/WingCommanderCD32.Slave \
+  --output tmp/drawing-layout
+python3 tools/matrix_capture.py --machine a1200-030 --mmu-core --no-profiles \
+  --warp --options MMU --audit tmp/phase4-instant-audit-030/result.json \
+  --layout tmp/drawing-layout/result.json \
+  --ceiling-slave tmp/drawing-control-slave/WingCommanderCD32.Slave \
+  --output tmp/drawing-control
+python3 tools/matrix_capture.py --machine a1200-030 --mmu-core --no-profiles \
+  --warp --options MMU --audit tmp/phase4-instant-audit-030/result.json \
+  --layout tmp/drawing-layout/result.json \
+  --ceiling-slave tmp/drawing-bitmap-slave/WingCommanderCD32.Slave \
+  --output tmp/drawing-bitmap
+python3 tools/matrix_ceiling_report.py tmp/drawing-control tmp/drawing-bitmap \
+  > tmp/drawing-bitmap-comparison.json
+```
+
+Use the same instant-blitter-audit-capable debugger and cache audit as above.
+The probe is diagnostic and is not a timed ceiling capture. The checker verifies
+same size/placement, the allowed patch-table difference, unchanged original
+code outside the installation detour, one installation in each arm, and the
+actual game entry words. It checks c2p entries remain unchanged as well.
+
+`--ceiling drawing-clear` and `--ceiling drawing` (both drawing entries) are
+retained **failed diagnostic arms**, not accepted performance comparisons. The
+clear bypass permits an invalid pixel-derived rectangle and a destructive stack
+clear during title loading; see internals. Do not report its partial ledger as a
+ceiling. The accepted bitmap comparison leaves surface clearing enabled.
