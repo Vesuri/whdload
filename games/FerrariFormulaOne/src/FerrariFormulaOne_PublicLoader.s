@@ -4,6 +4,41 @@
 FF1_PUBLIC_LOADER equ 0
  endc
  ifne FF1_PUBLIC_LOADER
+; A0 = resident BPTR hunk table (SPS 0481). Returns 0 / -1.
+; Public memory exposes Fast RAM to the original startup query. That enables
+; a second file cache in RAM:, whose DOS Write stalls under the 68000 KickEmu
+; profile. WHDLoad already owns file caching; keep native file reads on FF1:.
+; Hunk 3+$4e writes the cache-enable flag in hunk 5+$474. Its only two readers
+; choose whether to copy files to RAM: and whether to read them from RAM:.
+; Keep the native overlay-allocation policy and truthful Exec memory attributes.
+; Validate the relocated operand before changing the immediate, then host flushes.
+FF1PreparePublicResident:
+ movem.l d1-d2/a0-a2,-(sp)
+ move.l 3*4(a0),d1
+ lsl.l #2,d1
+ addi.l #4+$4e,d1
+ move.l d1,a1
+ move.l 5*4(a0),d2
+ lsl.l #2,d2
+ addi.l #4+$474,d2
+ cmpi.w #$33fc,(a1)
+ bne.b .bad
+ cmp.l 4(a1),d2
+ bne.b .bad
+ cmpi.w #1,2(a1)
+ beq.b .write
+ tst.w 2(a1)
+ bne.b .bad
+.write:
+ clr.w 2(a1)
+ moveq #0,d0
+ bra.b .done
+.bad:
+ moveq #-1,d0
+.done:
+ movem.l (sp)+,d1-d2/a0-a2
+ rts
+
 ; A0 = native BPTR hunk table; A1 = original screen-pointer repair callback;
 ; A2 = original timing callback; D0 = Disable Timing Fix (CUSTOM1).
 ; Caller has established race HEADER file:$22f30 / entry hunk 160.
