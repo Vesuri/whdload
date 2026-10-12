@@ -14,7 +14,8 @@ stock 020 multiplier and numeric-frequency scaling are calibrated for the emulat
 The eleven-configuration scene baseline, cache audits, source-change census,
 DMA/STOP idle controls and matched c2p, instant-blitter and scoped bitmap-drawing
 ceilings are recorded. Eight configurations pass combined callback validation.
-All captures and consolidation jobs are terminal. No phase 5 work is authorised.
+All phase 4 captures and consolidation jobs are terminal. Phase 5 is authorised
+and in progress, using the supplied PC video as an external timing reference.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -52,9 +53,9 @@ A definitive CD32 edition, OCS afterwards and separately:
 - **Design.** A fixed tick with only presentation interpolation is rejected. The
   choice between designs B, C and D (phase 8) waits for the flight time model and the
   framerate audit.
-- **No PC reference.** No particular 386 defines the intended experience, so a DOS
-  measurement would only move the guess. The intended rate comes from the game's own
-  evidence.
+- **PC reference.** Use the supplied 86Box/eXoDOS recording as a practical external
+  pace reference alongside the Amiga time sources and music. It represents the
+  recorded experience, not proof of an original design rate or identical port code.
 
 ## Intended speed: working estimate
 
@@ -157,7 +158,7 @@ Gate passed: the measured baseline and representative bottlenecks are recorded i
 costs, full interrupt/blitter-wait accounting, unresolved callback-control
 failures and broader drawing bounds remain explicit gaps, not gate blockers
 under this approved scope. Accelerated figures describe the emulator model.
-**Stop here; phase 5 requires a separate request.**
+Phase 5 has subsequently been authorised; phase 6 remains outside scope.
 
 ### Phase 5 — Game-time model for the intro
 

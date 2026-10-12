@@ -12,12 +12,13 @@ cost; eight configurations pass the combined callback checks.
 General routine self/inclusive attribution, full interrupt/wait accounting,
 unaccepted callback controls and a broader drawing ceiling remain documented
 gaps. Accelerated timings describe the emulator model, not physical hardware.
-All runs are finished. Stop here; phase 5 is not authorised.
+Phase 5 is now authorised: establish the intro time model using the supplied
+PC video as an external timing reference, then stop for the intro-rate decision.
 
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the
 reset-to-menu event ledger. Full traces and independent SWAP_ONLY counts agree.
-Stop at the phase 4 gate; phase 5 is not authorised.
+Phase 6 and rendering release changes are not authorised.
 The original and reconstructed slaves match at the menu and pilot-name prompt
 for Custom5=0–3. Phase 2 is complete.
 Phase 1 static findings are documented. Runtime timing and display hypotheses
