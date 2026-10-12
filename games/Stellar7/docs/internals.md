@@ -2,22 +2,145 @@
 
 ## Active performance work
 
-The SIM60 default is **60 Hz (N=12), with no interpolation**. Input history
-now separates the controls consumed by each tick from the time spent drawing.
-Held controls come from the tick's recorded field; queued keypresses cannot
-reach earlier ticks. Native modal input stays live.
+The experimental launcher selects **15 Hz (N=3) on 68000/68010 and 60 Hz
+(N=12) on 68020+**, without interpolation. These are separate compiled slaves;
+the launcher selects using its CPU setting. A slave's timestep does not change
+at runtime. Movement, input quanta and game clocks scale with N, retaining
+real-time game speed. History assigns controls to their tick; native menus stay live.
 
-The conversion remains experimental. Sustained A500 performance, rendering
-cost and broader physical-control/gameplay validation remain open. The
-restoration reference under `tmp/restore60` predates input history; its binary
-identity and performance numbers do not describe the new release binary.
+Builds, measurements and selected-rate regression pass.
+Rendering optimization, broader encounters and physical-control playtesting
+remain open. The normal loader still omits this experimental conversion.
+
+## CPU-rate selection
+
+The rate-selection A500 captures use 512 KB chip and 1536 KB slow RAM, NTSC,
+with input history and the stationary-star candidate enabled. The final 15 Hz
+build uses the ordinary star pass; its separate measurements follow the table.
+SOL covers nominal 600→1500 ticks,
+boss 3500→4100, and type-10 combat 600→5400 with checkpoints every 300 nominal
+ticks. Boundaries and fixture triggers scale to each N. Each heavy window is
+80 seconds of intended game time. Measured rates near the target and bounded,
+recovering pending counts establish real-time throughput in this fixture.
+They are not game-wide latency or performance guarantees.
+
+| Fixed rate | SOL FPS | Combat FPS (80 s) | Early combat ms/frame | Late combat ms/frame | Boss FPS | Pending start→end |
+|---|---:|---:|---:|---:|---:|---:|
+| 10 Hz | 3.763 | 4.002 | 259.4 | 236.0 | 2.339 | 1→0 |
+| 15 Hz | 3.400 | 3.690 | 234.5 | 279.2 | 2.195 | 1→1 |
+| 20 Hz | 3.694 | 3.197 | 281.0 | 368.3 | 2.055 | 3→4 |
+| 30 Hz | 3.115 | 3.037 | 288.6 | 319.5 | 1.837 | 8→8 |
+
+The retained pre-optimization 60 Hz run averages 0.768 FPS over the same
+nominal combat route; early/late presentation intervals are 1594/2913 ms.
+Native early/late spot references are 225/243 ms, with boss presentation at
+1.818 FPS. These are corresponding route windows, not identical trajectories;
+the native figures use complete intervals from 100-field observations, whereas
+the new early/late values aggregate the contiguous combat checkpoints.
+
+**15 Hz is the selected playtest default.** Its 66.7 ms step gives better combat
+and boss presentation than 20 or 30 Hz in these runs. Twenty Hz is faster in SOL.
+Ten Hz gains about 8.5% in whole-combat presentation over 15 Hz but increases the
+step by 50% to 100 ms. This is a measured tradeoff, not proof of a universal optimum.
+An explicit N=4 build remains available for 20 Hz playtesting. The 200 ms N=1
+step is not selected. No ticks are discarded and no interpolation is added.
+
+The **final 15 Hz build** completes 1200 updates in 4800 fields (80.0 s):
+15.0 updates/s, 294 presentations (3.675 FPS), pending 1→1. Its early/late
+combat presentation intervals are 239.8/278.4 ms. SOL averages 3.446 FPS and
+boss 2.143 FPS. The 17 pending samples are
+`1,2,2,1,3,3,1,3,3,2,2,2,2,1,4,3,1`.
+All 84 checked boundaries across the four rates have complete input history
+and no queue drops. All 84 same-rate comparisons against the retained lower-rate
+captures agree for mapped gameplay, HUD and fresh projection; only deferred
+projection scratch differs. The existing cross-N birth/admission, integration,
+collision and RNG-order difference classifications therefore still apply to
+these boundaries. The routes are not asserted identical across different rates.
+
+Evidence: `tmp/optimize60/rates-n{2,3,4,6}`, `rate-comparison.json` and
+`retained-rate-comparisons.json`. Final-build evidence is `baseline-n3/`. Each
+capture retains the exact binary, listing,
+accepted emulator settings, field observations and endpoint state.
+
+### Selected-rate validation
+
+At N=3, all eight matched-tick scene comparisons pass against delayed 68020
+rendering, covering SOL, early/late type-10 and boss. Death/Continue, No/restart
+and normal/early level exits pass on A500 and delayed 68020, with eight further
+matched-state comparisons. Only deferred projection scratch differs. Disabled
+simulation preserves the audited native bytes with the explicit menu fixture
+allowance. Input checks pass in all eight configurations listed below.
+
+All six rates build. Both playable releases pass the 104-hook static audit
+(79 ranges, 663 relocated code pointers, no detected native interior entries).
+The 20 Hz override matches the explicit N=4 build. The actual launcher reaches
+the native menu at N=3 on 68000 and N=12 on 68020, with the audited release
+bytes, default CUSTOM1 and no VERIFY menu fixtures. These smoke tests use silent
+warp mode and disconnected input, so they do not establish audible output or
+physical-control behavior. Nineteen host-tool tests pass. The normal loader,
+N=12 release and N=12 VERIFY remain byte-identical to the preceding versions.
+
+Evidence: `tmp/optimize60/input/validation.json`, `routes-n3/validation.json`,
+`lifecycle-n3/validation.json`, `final-builds/validation.json`, the two
+`play60-smoke-*` records, and `tool-tests.log`. Normal and playable builds are
+restored after checking. Rendering optimization and broader playtesting remain.
+
+## Simulation cost and stationary-star decision
+
+Complete-call profiles cover SOL 600→1200, type-10 4500→5100 and boss
+3500→4100 at N=12. Mean update costs include attributable same-context gaps
+and exclude interrupts. These helpers overlap; their inclusive costs cannot
+be summed as independent shares.
+
+| CPU | SOL update cycles | Type-10 update cycles | Boss update cycles |
+|---|---:|---:|---:|
+| A500 / 68000 | 40860.2 | 90258.1 | 62153.4 |
+| 68020 + 4 MB fast | 24560.5 | 52682.3 | 36834.2 |
+
+The 68020 configuration uses the emulator's default CPU timing, not a fixed-MHz
+hardware claim. In the A500 combat profile the native collision pass averages
+50382.5 cycles, AI geometry 874.8 per call, sorting 4031.6 per update and stars
+4489.4 per update. Input handling/history selection also consume time outside
+the measured update entry. These are complete observed calls, not static bounds
+or frame-rate predictions. Exact traces and cost reports are in
+`tmp/optimize60/baseline-*`.
+
+A writer-invalidated stationary-star shortcut is **not retained**. It reduced
+N=12 complete-update means by 3.05/4.49/7.91% on A500 and 2.93/2.94/6.69% on
+68020 in SOL/combat/boss. However, 68020 presentation changes were only
+0.34/1.27/0.27%. At the selected A500 15 Hz, the same-build comparison is:
+
+| Scene | Ordinary pass FPS | Shortcut FPS | Change |
+|---|---:|---:|---:|
+| SOL | 3.446 | 3.400 | -1.33% |
+| Type-10, 80 seconds | 3.675 | 3.690 | +0.40% |
+| Boss | 2.143 | 2.195 | +2.44% |
+
+Those effects do not establish the playbook's required 3% frame benefit on
+the selected paths. The ordinary pass is therefore retained, with no new
+star cache, native hooks or memory requirements. Small FPS changes should not
+be treated as resolved gains or regressions. The 15 Hz rate change, rather
+than this shortcut, supplies the substantial A500 improvement.
+
+The experiment passed 240 differential cases and three native/reset writer
+checks on both N=12 CPUs and at all five lower rates. Its deliberate invalidation
+failure and four altered-result controls were rejected. Twenty-six native-reference
+groups passed on the tested N=3/N=12 candidate; the final builds remove the
+candidate and preserve the prior ordinary implementation exactly. Twenty-one
+selected-rate off/on gameplay/HUD/fresh-projection comparisons pass, allowing
+only deferred projection scratch. The N=12 release is byte-identical to the
+preceding input-history release, and N=3 is byte-identical to the measured
+ordinary-pass build. Evidence is in `tmp/optimize60/low-n3-comparison.json`,
+`profile-comparison.json`, `regress/` and `fixed-star-prototype/`; experimental
+source and diagnostics remain in ignored scratch, not the active code.
 
 ## Input during catch-up
 
 `history60.s` records controls in the native field callback at $11748. Each
 world tick consumes the sample at `floor((tick-1)*field_hz/S60_RATE)`, using an
 integer accumulator. The initial tick uses the session-entry sample. This
-keeps 60 Hz simulation on PAL as well as NTSC; PAL samples may serve two ticks.
+keeps the selected simulation rate on PAL as well as NTSC; at 60 Hz, a PAL
+sample may serve two ticks.
 There is no interpolation or deliberate presentation delay.
 
 The collector copies the native 128-byte held-key array, both joystick port
@@ -70,13 +193,15 @@ Ring samples use the same layout. Readers retain support for ABI 29 references.
 ### Validation and response timing
 
 The elapsed-field fixture changes held left/right, hardware direction and fire
-at fields 20,40,60,80,100,120,140,160, through real gameplay readers with CUSTOM3
-off. All six final configurations pass 200 recorded ticks and **96 private
-native-reference assertions each**. NTSC edges reach ticks
-21,41,61,81,101,121,141,161; PAL edges reach 25,49,73,97,121,145,169,193.
-Mapped gameplay/HUD/fresh-projection comparisons across NTSC CPUs and delayed
-drawing agree; only deferred projection scratch differs. The deliberate live-
-sample negative control is rejected at tick 2 (field 29 instead of field 1).
+at fields 20,40,60,80,100,120,140,160 through real gameplay readers with CUSTOM3
+off. All eight selected-rate configurations pass 200 recorded ticks and **96
+private native-reference assertions each**. At N=3, NTSC edges reach ticks
+6,11,16,21,26,31,36,41; at N=12 they reach 21,41,61,81,101,121,141,161.
+PAL N=12 edges reach 25,49,73,97,121,145,169,193. Same-rate NTSC gameplay/HUD/
+fresh-projection comparisons agree across CPUs and delayed drawing; only deferred
+projection scratch differs. The N=3 preference fixture also retains input/clock
+accounting after modal return. The retained deliberate live-sample negative
+control is rejected at tick 2 (field 29 instead of field 1).
 
 Private cases cover queue ordering, removing old entries underneath future ones, full
 capacity and one dropped press, all eight modifier combinations, live modal
@@ -87,14 +212,16 @@ hardware decoding; they do not test physical keyboard hardware.
 
 For these eight edges, the observed delays are in emulated fields:
 
-| Configuration | Event to input consumption | Event to first subsequent render completion |
-|---|---:|---:|
-| A500 | 17–38 | 50–75 |
-| 68020 + fast RAM | 3–11 | 10–22 |
-| 68020 + fast RAM, SLOW_DRAW=20 | 8–31 | 35–64 |
-| Stock A1200 | 7–20 | 19–39 |
-| 68060/50 | 0–3 | 3–7 |
-| PAL 68060/50 | 0–3 | 3–6 |
+| Configuration | Rate | Event to input consumption | Event to first subsequent render completion |
+|---|---:|---:|---:|
+| A500 | 15 Hz | 3–26 | 25–53 |
+| 68020 + fast RAM, diagnostic N=3 | 15 Hz | 0–8 | 9–17 |
+| 68020 + fast RAM, diagnostic N=3, SLOW_DRAW=20 | 15 Hz | 2–22 | 32–52 |
+| 68020 + fast RAM | 60 Hz | 3–11 | 10–22 |
+| 68020 + fast RAM, SLOW_DRAW=20 | 60 Hz | 8–31 | 35–64 |
+| Stock A1200 | 60 Hz | 7–20 | 19–39 |
+| 68060/50 | 60 Hz | 0–3 | 3–7 |
+| PAL 68060/50 | 60 Hz | 0–3 | 3–6 |
 
 NTSC fields are 1/60 s; the PAL row uses 1/50 s fields while simulating at 60 Hz.
 These are window-local observations, not maximum latency bounds. The second
@@ -104,7 +231,7 @@ completion or pixel-level visibility of every press/release edge. Slow drawing
 can span both edges. History corrects input assignment; it cannot remove the
 rendering and simulation backlog shown here.
 
-The long-pause test observes native dialog entry/return at fields 1250/1856:
+The retained N=12 long-pause test observes native dialog entry/return at fields 1250/1856:
 606 excluded fields, including cleanup after the 600-field requested wait.
 Pending updates change 31→30 while one tick completes and no active field
 passes. History remains intact. Forced capacity 16 with SLOW_DRAW=80 reports
@@ -123,13 +250,13 @@ now intentionally differ from the pre-history restoration binaries.
 
 ### A500 heavy-combat check
 
-The current type-10 600→5400 fixture takes 4924 NTSC fields (82.066667 s),
+The retained N=12 input-history reference takes 4924 NTSC fields (82.066667 s),
 averaging **58.489033 updates/s and 0.767669 presentations/s**. Pending updates
 grow 24→148; checkpoint samples are
 `24,27,36,73,100,120,74,65,79,70,43,52,124,174,203,159,148`.
 The pre-history reference was 59.113300 updates/s, 0.948276 presentations/s,
-pending 23→95. This remains an unresolved performance deficit, not sustained
-real-time simulation. No optimization or rate reduction is part of this change.
+pending 23→95. This is not sustained real-time simulation. The selected 15 Hz A500
+measurements above replace it as the playable throughput target.
 
 At tick 5400, cumulative missing-sample and queue-drop counts remain zero; matched
 600/5400 gameplay state agrees with the reference apart from deferred projection
@@ -276,7 +403,7 @@ SIM60 rates use completed-tick endpoints; native presentations use complete inte
 <!-- rate-candidates:start -->
 ## Lower-rate comparison evidence
 
-**Lower-rate comparison: N=1, 5 Hz; current default: N=12, 60 Hz.** The full
+**Retained lower-rate references; current CPU defaults are N=3 and N=12.** The full
 N=2,3,4,6 matrices rejected every requested candidate on presentation rate,
 so the remaining supported lower value N=1 was measured with the same gates.
 N=12 also fails the presentation gate. N=1 is therefore the largest supported
@@ -315,7 +442,7 @@ backlog bound. All candidate heavy-window samples are retained below.
 
 The tick is 200 ms. Faster CPUs can present more often than 5 Hz, but poses
 repeat between ticks. This 200 ms timestep is rejected as the target; the
-active plan restores 60 Hz and excludes interpolation.
+active plan selects 15 Hz on 68000 and 60 Hz on 68020+, excluding interpolation.
 
 ### Retained N=1 regression
 
@@ -603,7 +730,8 @@ SIM60 rates use completed-tick endpoints; native presentations use complete inte
 ## Substep parameterization
 
 `S60_SUBSTEPS` supports N=1,2,3,4,6,12; `S60_RATE=5*N`. N=12 is
-the default. Explicit N=12 release and VERIFY binaries are byte-identical to the
+the source default; the 68000 target explicitly selects N=3. The retained
+parameterization-reference N=12 release and VERIFY were byte-identical to their
 baseline (SHA-256 `c2a1d0ad93a0f3255155a14950fb2b74a7cced43a52fb8cefca94dbf54a82628`
 and `d6f8107c3211089f06b03491e4489f2b292c432c379605ea1d678c449c7cb6f4`).
 All six rates compile. Thirteen private native-reference fixture groups
@@ -611,7 +739,7 @@ compile at each rate, and all thirteen N=12 variants retain baseline bytes.
 
 Runtime results are retained in
 `tmp/substeps-prototype/fixture-runtime-validation.json`. All 78 group/rate
-combinations pass against current builds. All matched-boundary gameplay
+combinations pass against their retained exact builds. All matched-boundary gameplay
 captures and their difference-family review are complete. The boss
 pitch/acceleration mask 12 denotes bits 2 and 3, not a timestep.
 No unexplained first divergence or unclassified difference family remains;
@@ -692,7 +820,7 @@ Evidence: `tmp/substeps-prototype/cross-runtime-validation.json`,
 `cross-summary.json`, `startup-cross-validation.json`, `startup-n*-replay.json`,
 `rng-stream-validation.json`, `birth-boundary-validation.json`,
 `carrier-boundary-validation.json` and `input-boundary-validation.json`.
-The selected N=1 performance evidence is in the step-2 section above.
+The retained N=1 comparison evidence is above; N=1 is not a playable default.
 The HUD installer always copies 48 native instruction bytes. Its twelve-longword
 copy count is not a timestep constant. Input/HUD and knockback/shake
 runtime groups pass at every supported N.
@@ -2476,9 +2604,9 @@ optimization helps but does not achieve sustained 60 Hz. The delayed 68020 spans
 903 versus 910 fields (59.80 versus 59.34 updates/second); this short checkpoint
 interval and differing draw phases do not establish an overall rate gain there.
 Mapped gameplay at ticks 600/1500 matches between implementations and CPUs, and
-real death/retry checks pass. The current default VERIFY build is byte-identical
-to the retained fast 68020 slave; explicit SCAN_FAST=0 reproduces its native pair.
-The normal build is restored and remains the legacy-loop prototype.
+real death/retry checks pass in these retained pairs. SCAN_FAST defaults on;
+zero selects the native scan for comparisons. The normal build remains the
+legacy-loop prototype.
 
 ### Scalar projection optimization
 
@@ -3549,7 +3677,7 @@ Default compilation reproduces the measured enabled binary.
 
 ### Later-level update and presentation gaps
 
-The current default SIM60 A500 build is profiled in
+A retained N=12 A500 reference build is profiled in
 `sim60-latency-level5-a500`: LEVEL_TEST=200, LEVEL_LAST=5, no SLOW_DRAW,
 100 fields starting after the tick-600 snapshot. The retained slave matches
 `tmp/latency-level5-a500.{lst,slave}` and the starting gameplay/projection

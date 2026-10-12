@@ -2,21 +2,41 @@
 
 ## Active performance work
 
-The SIM60 default is **60 Hz (N=12), with no interpolation**. Input history
-now separates the controls consumed by each tick from the time spent drawing.
-Held controls come from the tick's recorded field; queued keypresses cannot
-reach earlier ticks. Native modal input stays live.
+The experimental launcher selects **15 Hz (N=3) for 68000/68010 and
+60 Hz (N=12) for 68020+**, without interpolation. Selection uses the launcher's
+`CPU` setting, defaulting to 68000, and builds a separate slave for each path.
+Each build keeps one fixed rate and scales movement and clocks to real time.
+Input history supplies each tick's recorded controls; native modal input is live.
+Selected-rate checks pass. The normal loader remains unchanged.
 
-The conversion remains experimental. Sustained A500 performance, rendering
-cost and broader physical-control/gameplay validation remain open. The
-restoration reference under `tmp/restore60` predates input history; its binary
-identity and performance numbers do not describe the new release binary.
+```sh
+source amiga/env.sh
+make -C whdload sim                         # both playable variants
+amiga/play60.sh                             # default A500, 15 Hz
+SIM68000_SUBSTEPS=4 amiga/play60.sh          # A500 playtest at 20 Hz
+CPU=68020 AMIGA_MODEL=A1200 CHIP_KB=2048 FAST_KB=4096 SLOW_KB=0 \
+  KICKSTART="$KICKSTART_A1200" amiga/play60.sh # 60 Hz
+```
+
+`sim68000` builds `Stellar7-Sim68000.Slave`, default N=3; `sim60` builds
+`Stellar7-Sim60.Slave`, default N=12. `SIM68000_SUBSTEPS=4` selects N=4 for
+the former. Explicit `VASMFLAGS=-DS60_SUBSTEPS=N` still selects diagnostic
+rates for the latter. For actual hardware select the appropriate slave file;
+there is no runtime CPU dispatch or rate switching inside a slave. The source
+and matrix-driver default remain N=12, so use `--substeps 3` for A500 matrix runs.
+
+The stationary-star experiment is not retained: its selected-rate presentation
+gains were below the retention threshold. The ordinary simulation remains
+unchanged. The final N=12 release is byte-identical to the preceding input-history
+release; the N=3 playable target matches the measured ordinary-pass build.
+Evidence is under `tmp/optimize60`.
 
 ## Input-history validation
 
 Use `HISTORY_TEST=1` without CUSTOM3: its device samples change at active fields
 20,40,60,80,100,120,140,160. The native gameplay readers must consume them at
-NTSC ticks 21,41,61,81,101,121,141,161, irrespective of drawing. CUSTOM3's older
+NTSC ticks 21,41,61,81,101,121,141,161 at N=12, or
+6,11,16,21,26,31,36,41 at N=3, irrespective of drawing. CUSTOM3's older
 pilot is indexed by completed ticks and cannot establish this property.
 `HISTORY_QUEUE_TEST=1` adds private native-reference assertions, including
 future-key filtering, LIFO order, pressure, modifiers, register independence,
@@ -35,7 +55,7 @@ python3 tools/input_history_state.py tmp/input-edge/checkpoints/220 --fixture
 python3 tools/audit_hooks.py tmp/input-edge.lst
 ```
 
-Repeat with `SLOW_DRAW=20`, the usual CPU/memory configurations and PAL clock
+Repeat with `S60_SUBSTEPS=3` for the 68000 path, `SLOW_DRAW=20`, the usual CPU/memory configurations and PAL clock
 compatibility. Retain exact listings and slaves; `audit_hooks.installed` checks
 real reader hooks and explicitly selected CUSTOM3 fixture overrides.
 Compare tick 200 and 220 with `simulation_state.py --projection --presentation`.
@@ -152,7 +172,7 @@ performance baseline retains its separately specified fixture and windows.
 ## Rate matrix
 
 `S60_SUBSTEPS` accepts 1, 2, 3, 4, 6 or 12; the simulation rate is five times
-that value. The default is N=12 (60 Hz) on every machine. The matrix driver scales route windows and level setup to equivalent game time
+that value. The source default is N=12 (60 Hz); the 68000 playable target explicitly selects N=3 (15 Hz). The matrix driver scales route windows and level setup to equivalent game time
 with `--substeps`, rounding up to the next completed tick. `LEVEL_TEST=T`
 executes inside update T+1, so its scaled definition is
 `ceil((T+1)*N/12)-1`; the 200 baseline trigger remains in native update 17
@@ -178,7 +198,8 @@ The heavy report deliberately uses `--partial`: only its A500 cell is requested;
 the ordinary candidate report still requires all eight machines.
 
 The retained N=1 regression below requires explicit `S60_SUBSTEPS=1`.
-The current default regression uses `SIM60=1` alone and must report N=12. Retain a release
+The source-default regression uses `SIM60=1` alone and must report N=12;
+the 68000 regression adds `S60_SUBSTEPS=3` and must report N=3. Retain a release
 listing with `make -C whdload sim60 VASMFLAGS='-L ../tmp/selected-release.lst'`
 and copy its slave to `tmp/selected-release.slave`; run
 `python3 tools/audit_hooks.py tmp/selected-release.lst` against that exact build.
@@ -218,7 +239,7 @@ anchor at $2c16 using debugger variables only. Its contiguous counter log
 rejects skipped presentations or resets. The reader checks original-code
 preservation, the exact retained slave, raw debugger observations and saved
 checkpoint clocks. Its full-window rates provide matching-scene comparisons; the active plan
-keeps 60 Hz even where presentation rates fall below native. The original
+uses 15 Hz on 68000 and retains 60 Hz on 68020+. The original
 spot measurements remain useful local references.
 
 The initial matrix has 48 cells. Capture the additional native combat
@@ -313,9 +334,10 @@ not expose the FS-UAE process even while it is alive. Use the existing VERIFY
 fixtures for scripted gameplay controls; they do not require host app access.
 Physical input and audible output still need a separate check.
 
-`amiga/play60.sh` builds and starts the experimental fixed-rate conversion with
-normal controls and sound. It uses a separate `whdload/Stellar7-Sim60.Slave`
-and defaults to CUSTOM1=1; CPU/memory/display overrides match `amiga/run.sh`.
+`amiga/play60.sh` builds and starts the CPU-selected experimental conversion
+with normal controls and sound. It selects `Stellar7-Sim68000.Slave` or
+`Stellar7-Sim60.Slave` and defaults to CUSTOM1=1; CPU/memory/display overrides
+match `amiga/run.sh`.
 To build without launching, source `amiga/env.sh` and run `make -C whdload sim60`.
 This build contains no VERIFY fixtures. The selected-default launcher smoke
 check passes with all 89 hooks installed and the native menu reached. It uses

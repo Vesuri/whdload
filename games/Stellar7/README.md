@@ -3,14 +3,13 @@
 A source-only WHDLoad development and profiling workspace for the supplied
 English NTSC Stellar 7 install.
 
-The experimental SIM60 conversion targets **60 Hz fixed simulation with no
-interpolation**, independent of rendering. Separate 68000 and 68020+ paths
-may improve performance while preserving the same timing and gameplay.
+The experimental SIM60 conversion runs **15 Hz on 68000 and 60 Hz on
+68020+**, with fixed real-time game speed and no interpolation. Rendering
+uses the latest completed state and runs independently of simulation timing.
 
-**The conversion is unfinished.** The default is N=12 (60 Hz). Input during
-catch-up now belongs to each tick's recorded time, with live native menus and
-a timestamped key queue. Sustained A500 performance and broader gameplay and
-physical-control validation remain open.
+**The conversion is unfinished.** Input during catch-up belongs to each tick's
+recorded time. Selected-rate checks pass; rendering optimization,
+broader gameplay and physical-control validation remain open.
 
 Source the shared environment and launch the separate experimental build:
 
@@ -19,9 +18,15 @@ source amiga/env.sh
 amiga/play60.sh
 ```
 
-`make -C whdload sim60` builds `whdload/Stellar7-Sim60.Slave` without launching.
-The launcher enables `CUSTOM1=1` and uses normal controls and sound.
-Scripted gameplay tests use the existing VERIFY input fixtures.
+The launcher selects by `CPU` (default 68000), enables `CUSTOM1=1` and uses
+normal controls and sound. Build both variants with `make -C whdload sim`, or
+use `sim68000` / `sim60` separately. The resulting files are
+`whdload/Stellar7-Sim68000.Slave` and `whdload/Stellar7-Sim60.Slave`.
+For real hardware, copy the appropriate variant; the slaves do not switch
+rates at runtime. Scripted tests use the existing VERIFY fixtures.
+
+To try 20 Hz on the 68000, use `SIM68000_SUBSTEPS=4 amiga/play60.sh`.
+Without that override the next launch rebuilds the selected 15 Hz default.
 
 Read [current status and remaining work](docs/open-work.md),
 [build and validation instructions](docs/development.md), and

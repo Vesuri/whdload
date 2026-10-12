@@ -2,22 +2,23 @@
 
 ## Performance plan (active)
 
-Target: **60 Hz simulation (N=12), no interpolation**, on the supplied NTSC
-Stellar 7. Every machine uses the same 1/60-second simulation timestep.
-Rendering consumes the latest completed simulation state and runs as fast as
-hardware permits, capped at the display rate. Do not add a previous/current
-pose blend, extrapolation or an intentional one-tick display delay.
+Target: **fixed real-time simulation, with separate CPU rates and no
+interpolation**, on the supplied NTSC Stellar 7. The 68020+ path retains
+60 Hz (N=12). The selected 68000 default is
+15 Hz (N=3), preserving real-time game speed; 20 Hz remains an explicit
+playtest option. A rate is fixed for a session;
+it does not vary with rendering speed. The 5 Hz / 200 ms timestep is rejected.
 
-Separate 68000 and 68020+ implementation paths are allowed where measurements
-justify them. They must preserve the same simulation timing and mapped gameplay
-state. A slower CPU does not automatically select a lower tick rate. If the
-A500 cannot meet the target after measured changes, report the remaining cost
-and tradeoff to the user rather than silently reducing the rate.
+Rendering consumes the latest completed state and runs as fast as hardware
+permits, capped at the display rate. Do not add a previous/current pose blend,
+extrapolation or an intentional one-tick display delay. Owed ticks must still
+run with their recorded controls. CPU paths must preserve elapsed game time;
+cross-rate trajectory differences must be identified and explained.
 
 Each implementation step ends with measurements in `docs/internals.md`,
 commands in `docs/development.md` and a coherent commit following AGENTS.md.
-The source default is N=12. Steps 1 and 2 are complete; simulation cost is
-the next step.
+The source default remains N=12; the 68000 playable build explicitly selects
+N=3. Steps 1–3 are complete. Rendering optimization is next.
 
 ### Existing evidence and limitations
 
@@ -28,16 +29,16 @@ baseline bytes. All 78 private fixture combinations across six rates passed;
 encounter trajectories, not just presentation frequency.
 
 N=1 met the former A500 native-presentation threshold, but its 200 ms timestep
-is rejected for responsiveness. Native FPS remains a comparison, not a gate
-that permits lowering the required 60 Hz simulation rate. The lower-rate
-measurements remain useful cost evidence, not the active gameplay design.
+is rejected for responsiveness. Native FPS remains a comparison. Fresh
+selected-rate measurements establish real-time A500 throughput in the tested
+heavy route; older lower-rate captures remain state references, not current
+performance evidence.
 
-Retained N=12 heavy-combat profiling reports about 90004 main-context cycles
-per A500 update, 97.4k main-context cycles available per NTSC field and about
-1.03M cycles for a heavy render. Those captures show a substantial cost problem;
-they do not prove that a different 60 Hz implementation is impossible. Small
-isolated instruction savings alone are unlikely to close that measured gap.
-Re-measure through the updated toolchain before making new performance claims.
+Fresh N=12 profiling measures about 90258 cycles per A500 heavy-combat update.
+The lower 68000 rate resolves the measured update-debt problem in this route,
+but presentation remains below native in the early/late combat comparisons.
+Sustained-load coverage outside these fixtures and the fast-CPU presentation
+ceiling remain open in steps 4–6.
 
 ### Step 1: Restore and verify the 60 Hz baseline
 
@@ -87,21 +88,27 @@ which controls overdue ticks receive; reducing catch-up delay remains part of
 the performance work. Physical-control and visible-response playtesting remains
 in step 6. No interpolation has been added.
 
-### Step 3: Reduce the cost of the 60 Hz simulation
+### Step 3: CPU-specific fixed rates and simulation optimization
 
-Profile complete updates in SOL, type-10 combat and boss scenes on 68000 and
-68020+. Separate integration, collision/geometry, AI, native-cadence work,
-projection and presentation bookkeeping. Identify repeated work and dependencies
-before caching, moving or eliminating any of it. Preserve collision frequency,
-RNG ordering, native decision cadence, rounding and all gameplay effects.
-Do not make the simulation cheaper by skipping owed ticks or slowing game time.
+Status: complete. Fresh 10/15/20/30 Hz A500 measurements select 15 Hz (N=3)
+for combat throughput and tick granularity; 20 Hz remains a playtest override.
+The final heavy route sustains 15.0 updates/s and 3.675 presentations/s over
+80 seconds, with pending updates 1→1. The launcher selects separate 68000 and
+68020+ builds; the latter remains 60 Hz and byte-identical to the preceding
+release. No interpolation, discarded ticks or render-dependent rate is added.
 
-Prioritize structural savings established by profiles. Use separate 68000 and
-68020+ paths when beneficial; dispatch safely and retain a correct fallback.
-Validate each path with native-reference fixtures, matched-tick gameplay/HUD/
-fresh-projection state and SLOW_DRAW. Compare against the N=12 reference;
-no unexplained gameplay divergence is accepted. Report complete-update and
-whole-scene effects, including drawing and interrupt costs.
+Complete-update profiles cover SOL, type-10 and boss on both CPUs. The
+stationary-star candidate is not retained: its selected-rate presentation
+benefit does not justify the extra state/hooks. Measurements and the retained
+ordinary implementation are described in internals. Cross-rate encounter
+trajectories remain different for the classified timing/integration reasons;
+no new unexplained same-rate differences occur at the checked boundaries.
+
+Selected-rate input, delayed-render state, death/Continue/No, normal/early exits,
+disabled bytes, hook audits, diagnostic exclusion and both actual launcher
+paths pass. All six rate builds and the 20 Hz override pass. Full-encounter,
+physical-control and audible-output playtesting remain release work. The next
+implementation step is rendering optimization, without interpolation.
 
 ### Step 4: Reduce rendering cost without interpolation
 
@@ -126,17 +133,17 @@ cache policy on 68030/040/060 at N=12. Determine the cause of the presentation
 ceiling rather than extrapolating from CPU clock speed. Use SWAP_ONLY and
 complete-call timing where applicable; check actual cache configuration.
 
-Re-run the full matrix and extended combat. Require sustained 60 Hz game time
-with no accumulating pending-update trend, preserving gameplay across CPUs.
+Re-run the full matrix and extended combat. Require sustained real-time game speed at each selected fixed rate
+with no accumulating pending-update trend, preserving gameplay across CPUs
+at the same rate.
 Report presentation rates and input latency alongside that result. Native FPS
-is a performance comparison; do not trade away the 60 Hz requirement to match
-it. Any unresolved A500 limitation must be explicit before release decisions.
+is a performance comparison; retain 60 Hz on the 68020+ path. Any unresolved A500 limitation must be explicit before release decisions.
 
 ### Step 6: Release validation and playtest
 
 Run native twins, full encounters, boss kills/ending, natural deaths,
-Continue/No, level/UI transitions, powers, jump and preferences at N=12 on
-both CPU paths. Repeat disabled-byte preservation, hook/indirect-entry checks,
+Continue/No, level/UI transitions, powers, jump and preferences at each selected rate on
+its CPU path. Repeat disabled-byte preservation, hook/indirect-entry checks,
 diagnostic exclusion and play60 smoke tests. Keep PAL timing coverage separate
 from claims about the supplied NTSC game's audiovisual behavior.
 
@@ -146,10 +153,10 @@ the normal loader. Update current docs and remove unused tools.
 
 ## Remaining release validation
 
-The conversion remains experimental. The plan above replaces lower-rate
-selection and interpolation. Input history is complete; broader coverage includes:
+The conversion remains experimental. The plan above includes lower-rate
+68000 selection and excludes interpolation. Input history is complete; broader coverage includes:
 
-- Broaden full-encounter coverage at 60 Hz: boss kills and ending,
+- Broaden full-encounter coverage at both selected rates: boss kills and ending,
   later natural deaths, level and UI transitions, lethal shield/type-43 hits,
   boss helpers and mine detonation. Controlled placement, native twins and
   sampled mapped-state comparisons do not cover every encounter branch.
