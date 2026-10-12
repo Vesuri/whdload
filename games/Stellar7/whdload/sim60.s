@@ -1,3 +1,12 @@
+        IFND RETICLE_CLOCK
+RETICLE_CLOCK = 1 ; native reticle refresh belongs to the simulation schedule
+        ENDC
+        IFND RENDER_NEW_TICK
+RENDER_NEW_TICK = 1 ; draw each completed simulation state at most once
+        ENDC
+        IFND POLYGON_BLIT_IRQ
+POLYGON_BLIT_IRQ = 0 ; enabled by the 68000 target; 68020+ retains native drawing
+        ENDC
         IFND SCAN_GEOMETRY_FIRST
 SCAN_GEOMETRY_FIRST = 1 ; native twins, boundary cases and extended combat verified
         ENDC
@@ -195,6 +204,9 @@ timing_install:
         bsr s60_ai_random_install
         IFNE AI_GEOMETRY_FUSED
         bsr s60_geometry_install
+        ENDC
+        IFNE RETICLE_CLOCK
+        bsr s60_reticle_install
         ENDC
         bsr s60_history_install
         bsr s60_modal_install
@@ -592,6 +604,13 @@ s60_loop_complete:
         ENDC
         bra s60_loop_batch
 s60_loop_draw:
+        IFNE RENDER_NEW_TICK
+        ; No interpolation: only a newly completed state earns another draw.
+        ; Poll the field clock again so waiting never discards elapsed time.
+        move.l (s60_ticks-s60_last,a2),d0
+        cmp.l (s60_last_render-s60_last,a2),d0
+        beq s60_loop_poll
+        ENDC
         IFD VERIFY
         move.l (_custom4,pc),d0
         cmp.l #1,d0
@@ -866,6 +885,11 @@ s60_update:
         bsr s60_test_linear
         ENDC
         ENDC
+        IFD VERIFY
+        IFD RETICLE_TEST
+        bsr s60_test_reticle
+        ENDC
+        ENDC
         bsr s60_input_quanta
         S60_CALL $fcf4
         IFD VERIFY
@@ -882,6 +906,9 @@ s60_update:
         beq .inactive
         ENDC
         bsr s60_project
+        IFNE RETICLE_CLOCK
+        bsr s60_reticle_update
+        ENDC
         bsr s60_stars_update
         bsr s60_cooldowns_update
         bsr s60_shake_update
@@ -1009,6 +1036,9 @@ s60_project:
         INCLUDE project_batch60_test.s
 
         INCLUDE frame60_test.s
+
+        INCLUDE reticle60.s
+        INCLUDE reticle60_test.s
 
         INCLUDE hud60.s
 

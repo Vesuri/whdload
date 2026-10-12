@@ -76,11 +76,44 @@ s60_draw_install:
         bne s60_bad
         cmp.l #$2548001a,($3a4a,a1)
         bne s60_bad
+        IFNE POLYGON_BLIT_IRQ
+        ; The replacement is valid only inside this exact native ownership
+        ; sequence: WaitBlit, OwnBlitter, polygon, DisownBlitter.
+        move.l a1,a0
+        adda.l #$14c50,a0
+        cmp.w #$4eb9,(a0)
+        bne s60_bad
+        move.l (2,a0),d0
+        sub.l a1,d0
+        cmp.l #$2510c,d0
+        bne s60_bad
+        cmp.w #$4eb9,(6,a0)
+        bne s60_bad
+        move.l (8,a0),d0
+        sub.l a1,d0
+        cmp.l #$25288,d0
+        bne s60_bad
+        cmp.w #$4eb9,(12,a0)
+        bne s60_bad
+        move.l (14,a0),d0
+        sub.l a1,d0
+        cmp.l #$17e88,d0
+        bne s60_bad
+        cmp.w #$4eb9,(18,a0)
+        bne s60_bad
+        move.l (20,a0),d0
+        sub.l a1,d0
+        cmp.l #$25298,d0
+        bne s60_bad
+        ENDC
         lea (s60_draw_patches,pc),a0
         jsr (resload_Patch,a2)
         rts
 s60_draw_patches:
         PL_START
+        IFNE POLYGON_BLIT_IRQ
+        PL_PS $14c5c,s60_polygon
+        ENDC
         PL_P $132b2,s60_mesh
         PL_NOP $132b8,2
         PL_P $397e,s60_explosion
@@ -323,3 +356,30 @@ s60_stars_update:
 .done:
         movem.l (sp)+,d2-d7/a2-a3
         rts
+
+; Batch blitter completion notifications only while the native polygon caller
+; owns the blitter. VBL and audio interrupt enables are never changed.
+        IFNE POLYGON_BLIT_IRQ
+s60_polygon:
+        subq.l #2,sp
+        movem.l d0-d1/a0-a1,-(sp)
+        ; OwnBlitter may return before the previous owner's last blit ends.
+        S60_CALL $2510c
+        move.w $dff01c,d0
+        and.w #$0040,d0
+        move.w d0,(16,sp)
+s60_polygon_mask:
+        move.w #$0040,$dff09a
+        movem.l (sp)+,d0-d1/a0-a1
+        S60_CALL $17e88
+        ; Keep the native asynchronous final blit and pending request. Restore
+        ; only the saved enable bit before the caller invokes DisownBlitter.
+        move.l d0,-(sp)
+        move.w (4,sp),d0
+        or.w #$8000,d0
+s60_polygon_restore:
+        move.w d0,$dff09a
+        move.l (sp)+,d0
+        addq.l #2,sp
+        rts
+        ENDC

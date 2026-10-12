@@ -8,8 +8,8 @@ The experimental SIM60 conversion runs **15 Hz on 68000 and 60 Hz on
 uses the latest completed state and runs independently of simulation timing.
 
 **The conversion is unfinished.** Input during catch-up belongs to each tick's
-recorded time. Selected-rate checks pass; rendering optimization,
-broader gameplay and physical-control validation remain open.
+recorded time. Selected-rate rendering optimization and regression checks pass. Fast-CPU
+presentation limits, broader gameplay and physical-control validation remain open.
 
 Source the shared environment and launch the separate experimental build:
 

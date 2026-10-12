@@ -18,7 +18,7 @@ cross-rate trajectory differences must be identified and explained.
 Each implementation step ends with measurements in `docs/internals.md`,
 commands in `docs/development.md` and a coherent commit following AGENTS.md.
 The source default remains N=12; the 68000 playable build explicitly selects
-N=3. Steps 1–3 are complete. Rendering optimization is next.
+N=3. Steps 1–4 are complete. Fast-CPU presentation and sustained-load checks are next.
 
 ### Existing evidence and limitations
 
@@ -36,9 +36,9 @@ performance evidence.
 
 Fresh N=12 profiling measures about 90258 cycles per A500 heavy-combat update.
 The lower 68000 rate resolves the measured update-debt problem in this route,
-but presentation remains below native in the early/late combat comparisons.
+with current early/late presentation comparisons recorded in internals.
 Sustained-load coverage outside these fixtures and the fast-CPU presentation
-ceiling remain open in steps 4–6.
+ceiling remain open in steps 5–6.
 
 ### Step 1: Restore and verify the 60 Hz baseline
 
@@ -92,10 +92,10 @@ in step 6. No interpolation has been added.
 
 Status: complete. Fresh 10/15/20/30 Hz A500 measurements select 15 Hz (N=3)
 for combat throughput and tick granularity; 20 Hz remains a playtest override.
-The final heavy route sustains 15.0 updates/s and 3.675 presentations/s over
+The rate-selection reference sustains 15.0 updates/s and 3.675 presentations/s over
 80 seconds, with pending updates 1→1. The launcher selects separate 68000 and
-68020+ builds; the latter remains 60 Hz and byte-identical to the preceding
-release. No interpolation, discarded ticks or render-dependent rate is added.
+68020+ builds; the latter remains 60 Hz. No interpolation, discarded ticks or
+render-dependent rate is added.
 
 Complete-update profiles cover SOL, type-10 and boss on both CPUs. The
 stationary-star candidate is not retained: its selected-rate presentation
@@ -107,10 +107,25 @@ no new unexplained same-rate differences occur at the checked boundaries.
 Selected-rate input, delayed-render state, death/Continue/No, normal/early exits,
 disabled bytes, hook audits, diagnostic exclusion and both actual launcher
 paths pass. All six rate builds and the 20 Hz override pass. Full-encounter,
-physical-control and audible-output playtesting remain release work. The next
-implementation step is rendering optimization, without interpolation.
+physical-control and audible-output playtesting remain release work. Rendering
+measurements and validation follow in step 4.
 
 ### Step 4: Reduce rendering cost without interpolation
+
+Status: complete. The 68000 build batches BLIT completion interrupts inside
+native polygon ownership, restoring the saved enable bit before DisownBlitter.
+The 68020+ polygon path stays native: stock A1200 traces contain no BLIT IRQs.
+Both builds avoid drawing an already-presented tick and refresh the native
+reticle cache on its simulation clock, removing a render-dependent stale flag.
+No interpolation, pose delay, sound-handler change or rate change is added.
+
+Current A500 heavy-combat presentation rises from 3.675 to 4.031 FPS while
+completing 1200 updates in 80.133 seconds; pending samples remain bounded and
+recovering (1–5). Lossless held-display comparisons pass SOL, boss and combat,
+with the reticle included. Same-rate CPU/delayed-draw state, reticle native
+fixtures and negative controls pass. Final build, input, lifecycle, disabled-byte,
+hook and launcher evidence is recorded in internals. The 68030/040/060
+presentation ceiling and full sustained-load matrix remain step 5.
 
 Render the latest completed state. Avoid an extra draw of the same completed
 state on fast machines, using measured pacing that still advances the simulation

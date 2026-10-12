@@ -26,10 +26,53 @@ there is no runtime CPU dispatch or rate switching inside a slave. The source
 and matrix-driver default remain N=12, so use `--substeps 3` for A500 matrix runs.
 
 The stationary-star experiment is not retained: its selected-rate presentation
-gains were below the retention threshold. The ordinary simulation remains
-unchanged. The final N=12 release is byte-identical to the preceding input-history
-release; the N=3 playable target matches the measured ordinary-pass build.
-Evidence is under `tmp/optimize60`.
+gains were below the retention threshold. The ordinary star simulation remains
+unchanged. Rate-selection evidence is under `tmp/optimize60`; current rendering
+evidence is under `tmp/render60`. The normal loader remains byte-identical.
+
+## Rendering validation
+
+Both playable builds enable `RENDER_NEW_TICK=1` and `RETICLE_CLOCK=1`.
+`sim68000` additionally enables `POLYGON_BLIT_IRQ=1`; the `sim60` source default
+is zero. The matrix driver matches this CPU policy for non-native 68000 cells,
+including PAL; explicit route flags can select the reference arm.
+For direct VERIFY captures, add `-DPOLYGON_BLIT_IRQ=1 -DS60_SUBSTEPS=3`
+when testing the playable 68000 path. The all-off diagnostic definitions
+`-DRENDER_NEW_TICK=0 -DRETICLE_CLOCK=0 -DPOLYGON_BLIT_IRQ=0` reproduce the
+preceding input-history N=12 release/VERIFY bytes.
+
+```sh
+source amiga/env.sh
+tools/rate_matrix.sh tmp/render-check --substeps 3 --machines a500 --routes type10-heavy sol boss
+tools/rate_matrix.sh tmp/render-stock --substeps 12 --machines a1200-stock --routes type10-heavy
+WHD_ARGS='CUSTOM1=1 CUSTOM3=1' \
+VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=3 -DPOLYGON_BLIT_IRQ=1 -DRETICLE_TEST=100 -L ../tmp/reticle.lst' \
+python3 tools/fixed_window.py tmp/reticle --tick 101 --state-only --fields 1
+cp tmp/reticle/slave.slave tmp/reticle.slave
+python3 tools/reticle_state.py tmp/reticle --listing tmp/reticle.lst
+```
+
+Retain exact binary/listing pairs. Repeat the reticle fixture at N=12 on
+68020+, omitting the polygon flag. The VERIFY-only `RETICLE_BAD_RENDER=1`
+negative must fail; neither fixture is present in release builds.
+Use `simulation_state.py --projection --presentation` for matched-tick state;
+this now includes the native target-reticle flag as well as HUD state.
+
+For a `FRAME_TEST` held-render capture, `display_dma.py CAPTURE --listing LISTING`
+compares all settled fields' fetched bitplane words, beam positions, palette
+and display controls. It accepts bounded native viewport shake, including equal
+fine-scroll nibbles, and rejects unsupported modes. `polygon_irq_trace.py`
+with the same arguments checks ownership, masking/restoration and caller
+preservation when the polygon wrapper is compiled. Capture at most 100 Barto
+fields per window. Performance uses field/counter intervals, not screenshot
+counts or a single held frame. Complete-call CPU costs exclude interrupts and
+boundary partials; inclusive helper costs must not be summed.
+
+Current serial runners and exact evidence are in `tmp/render60`: the final
+throughput/reference matrices, `reticle-frames`, `reticle-fixtures`, `final-cross`,
+`final-input`, `final-lifecycle-n3`, `final-builds` and both `play60-smoke-*`.
+Run only one capture at a time with the shared project lock. Full fast-CPU
+ceiling work remains separate from these selected-path checks.
 
 ## Input-history validation
 
@@ -1486,7 +1529,7 @@ and target controls are rejected. The earlier combat trace still reports its
 
 `HUD_CLOCK=1` moves the cockpit indicator off the rendering clock within SIM60.
 It executes the guarded native arithmetic immediately when visible and then
-once per twelve simulation ticks. Native visibility condition and signed-word
+once per N simulation ticks (twelve in the N=12 reference). Native visibility condition and signed-word
 bounds/step remain unchanged. Rendering does not advance it; inactive callers
 retain native behavior. HUD_CLOCK=0 reproduces the preceding render-driven path.
 `HUD_TEST=100` compares 64 cases and 2304 substeps with the copied native code,

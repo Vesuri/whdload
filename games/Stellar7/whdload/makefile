@@ -19,7 +19,7 @@ Stellar7-Sim60.Slave: FORCE
 sim: sim68000 sim60
 sim68000: Stellar7-Sim68000.Slave
 Stellar7-Sim68000.Slave: FORCE
-	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -DSIM60=1 -DS60_SUBSTEPS=$(SIM68000_SUBSTEPS) -I. -Iinclude -I"$(WHDLOAD)/Include" -I"$(WHDLOAD)/Src/sources" -I"$(NDK)" -o $@ Stellar7.s
+	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -DSIM60=1 -DS60_SUBSTEPS=$(SIM68000_SUBSTEPS) -DPOLYGON_BLIT_IRQ=1 -I. -Iinclude -I"$(WHDLOAD)/Include" -I"$(WHDLOAD)/Src/sources" -I"$(NDK)" -o $@ Stellar7.s
 clean:
 	rm -f Stellar7.Slave Stellar7-Sim60.Slave Stellar7-Sim68000.Slave
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare lossless display fetches in settled FRAME_TEST captures.
 
-Scope: the observed 320x200, four-plane, non-scrolling OCS-compatible display
+Scope: the observed 320x200, four-plane OCS-compatible display, including fixed viewport shake
 with no hardware sprites, conflicts or CPU display writes. Unsupported modes
 fail closed. Addresses are not pixels: compare fetched words, beam positions,
 and effective palette/control state instead of allocation-dependent pointers.
@@ -37,6 +37,21 @@ def field_state(field):
             rgb = ((v >> 8 & 15)*17 << 16) | ((v >> 4 & 15)*17 << 8) | (v & 15)*17
             assert struct.unpack_from('>I', field.aga_colors, 4*i)[0] == rgb, 'non-OCS-compatible AGA palette'
     assert all(word(0x144+8*i) == word(0x146+8*i) == 0 for i in range(8)), 'live sprite data'
+    # Damage shake changes the native viewport origin and equal fine-scroll
+    # nibbles. Compare their exact values, rather than normalizing the pose.
+    # The first settled field can start with the previous viewport registers.
+    # With no planes/sprites enabled those values cannot affect output. Every
+    # control must be written by copper before the first fetch (checked below).
+    viewport = {}
+    for off in range(0, len(field.dma), 58):
+        reg, value = struct.unpack_from('<HQ', field.dma, off)
+        if struct.unpack_from('<h', field.dma, off+29)[0] == 3 and reg in (0x8e, 0x90, 0x102):
+            viewport.setdefault(reg, value)
+    assert set(viewport) == {0x8e, 0x90, 0x102}, 'viewport setup missing'
+    diwstart, diwstop, scroll = (viewport[r] for r in (0x8e, 0x90, 0x102))
+    assert diwstart & 0xff00 == 0x0500 and 0x80 <= (diwstart & 255) <= 0x90, 'unsupported horizontal display origin'
+    assert diwstop == diwstart+0x3b40, 'unsupported display window extent'
+    assert scroll <= 0xff and scroll >> 4 == scroll & 15, 'unsupported plane scrolling'
     palette = {}
     controls = {}
     rows = collections.defaultdict(list)
@@ -53,8 +68,8 @@ def field_state(field):
             assert reg not in CONTROLS and not 0xe0 <= reg <= 0x1fe, 'CPU display access'
         if kind == 3:
             if reg in CONTROLS:
-                expected = {0x8e: 0x581, 0x90: 0x40c1, 0x92: 0x38, 0x94: 0xd0,
-                            0x102: 0, 0x104: 0x24, 0x108: 0, 0x10a: 0}
+                expected = {0x8e: diwstart, 0x90: diwstop, 0x92: 0x38, 0x94: 0xd0,
+                            0x102: scroll, 0x104: 0x24, 0x108: 0, 0x10a: 0}
                 assert value in ((0x200, 0x4200) if reg == 0x100 else (expected[reg],)), 'unsupported display control'
                 controls[reg] = value
                 control_writes.append((y, x, reg, value))
@@ -68,15 +83,17 @@ def field_state(field):
             assert reg in PLANES and size == 2 and value <= 65535, 'unsupported bitplane fetch'
             assert set(CONTROLS) <= controls.keys(), 'display setup missing before fetch'
             assert set(range(16)) <= palette.keys(), 'palette setup missing before fetch'
-            assert controls[0x100] == 0x4200 and controls[0x102] == 0, 'unsupported pixel mode'
+            assert controls[0x100] == 0x4200 and controls[0x102] == scroll, 'unsupported pixel mode'
             rows[y].append((x, reg, value, tuple(palette[i] for i in range(16)),
                             tuple(controls[i] for i in CONTROLS)))
-    assert sorted(rows) == list(range(44, 244)), 'unexpected display lines'
+    assert rows, 'no display fetches'
+    first_line = min(rows)
+    assert 40 <= first_line <= 48 and sorted(rows) == list(range(first_line, first_line+200)), 'unexpected display lines'
     digest = hashlib.sha256()
     word_digest = hashlib.sha256()
     assert word(0x100) == 0x200, 'display not blank at field start'
-    assert [(y, v) for y, x, r, v in control_writes if r == 0x100] == [(42, 0x200), (44, 0x4200), (244, 0x200)], 'unexpected display enable window'
-    digest.update(struct.pack('>25H', *(word(r) for r in CONTROLS), *(word(0x180+2*i) for i in range(16))))
+    assert [(y, v) for y, x, r, v in control_writes if r == 0x100] == [(first_line-2, 0x200), (first_line, 0x4200), (first_line+200, 0x200)], 'unexpected display enable window'
+    digest.update(struct.pack('>25H', *(viewport.get(r, word(r)) for r in CONTROLS), *(word(0x180+2*i) for i in range(16))))
     for entry in control_writes:
         digest.update(struct.pack('>4H', *entry))
     # Keep every background-color write and every visible palette write at

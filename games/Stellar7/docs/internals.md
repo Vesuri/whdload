@@ -8,15 +8,168 @@ the launcher selects using its CPU setting. A slave's timestep does not change
 at runtime. Movement, input quanta and game clocks scale with N, retaining
 real-time game speed. History assigns controls to their tick; native menus stay live.
 
-Builds, measurements and selected-rate regression pass.
-Rendering optimization, broader encounters and physical-control playtesting
+Builds, rendering optimization and selected-rate regression pass.
+Fast-CPU presentation limits, broader encounters and physical-control playtesting
 remain open. The normal loader still omits this experimental conversion.
+
+## Rendering cost and presentation
+
+Both paths draw only newly completed ticks (`RENDER_NEW_TICK=1`) and keep the
+native VBL/buffer presentation. The 68000 target additionally enables
+`POLYGON_BLIT_IRQ=1`; 68020+ retains the native polygon call. No interpolation,
+extrapolation, intentional pose delay or simulation-rate change is involved.
+
+### Measured opportunity and implementation
+
+One hundred Barto fields per scene contain these complete `s60_render` calls.
+Main-context cycles include attributable gaps, exclude interrupt execution and
+boundary partials. Inclusive helper costs overlap. The two CPUs have different
+field-cycle budgets, so these cycle counts are not cross-CPU speed ratios.
+
+| CPU / selected rate | SOL calls / mean cycles | Type-10 calls / mean cycles | Boss calls / mean cycles |
+|---|---:|---:|---:|
+| A500 / N=3 | 4 / 1626920 | 3 / 1729340 | 2 / 2666654 |
+| Stock A1200 / N=12 | 6 / 2429054 | 3 / 2226416 | 3 / 3833014 |
+
+The A500 SOL window records 2421 BLIT interrupts inside 90 polygon scopes.
+All interrupt cycles inside those scopes total 1794240 of 11966452 recorded
+cycles (14.99%). This is an opportunity upper bound, including unrelated
+interrupts, not the measured saving. Stock A1200 records zero BLIT interrupts
+in all three scenes; its observed BLIT enable bit is already clear.
+
+The guarded caller at hunk $14c50 waits, owns the blitter, calls the polygon
+routine at $17e88, then disowns. Only the $14c5c call is redirected. The wrapper
+waits again after ownership (the previous owner's final blit may remain), saves
+the BLIT enable bit, masks that bit during the unchanged polygon routine, and
+restores its saved value before native DisownBlitter at $14c62. It neither clears
+the pending request nor synchronizes away the native asynchronous final blit.
+Other interrupt enables, native geometry, blitter commands and buffer ownership
+remain unchanged. No sound-handler patch is made.
+
+### Whole-route measurements
+
+These are field/counter interval measurements, not instruction-profile FPS.
+A500 uses NTSC, 512 KB chip / 1536 KB slow RAM, N=3. Nominal N=12 route ticks
+scale to N=3: SOL 150→375, heavy type-10 150→1350, early 450→600, late
+1125→1350, boss 875→1025. Early/late are intervals within the contiguous heavy
+run. `Previous` is the preceding playable implementation. `Corrected reference`
+adds the simulation-clock reticle and duplicate-draw guard but leaves polygon
+interrupts untouched. `Optimized` enables the polygon wrapper too. This third
+build isolates the speedup from the corrected reticle workload.
+
+| A500 scene | Previous ms/presentation | Corrected reference ms/presentation | Optimized ms/presentation | Optimized FPS |
+|---|---:|---:|---:|---:|
+| SOL | 290.196 | 294.333 | 248.588 | 4.023 |
+| Type-10, nominal 80 s | 272.109 | 272.981 | 248.091 | 4.031 |
+| Early type-10 | 239.837 | 238.889 | 213.475 | 4.684 |
+| Late type-10 | 278.395 | 278.704 | 253.390 | 3.946 |
+| Boss | 466.667 | 461.905 | 414.583 | 2.412 |
+
+Whole-combat presentation improves 9.68% against the previous build and 10.03%
+against the corrected reference, exceeding the 3% retention gate. The final
+run completes 1200 updates in 4808 fields (80.133 s), 14.975 updates/s, with
+323 presentations. Pending samples are
+`1,1,2,3,2,1,3,3,5,2,2,2,2,3,1,2,3`: bounded and recovering, without a
+sustained upward trend. Short SOL/boss windows include backlog repayment and
+must not be used to claim a faster simulation clock.
+
+Native early/late spot references remain 225/243 ms. Current early presentation
+is faster and late presentation slower, but these are corresponding scene
+windows with different trajectories and measurement lengths, not identical
+per-frame workloads. No universal native-frame-rate claim follows.
+
+Stock A1200 (2 MB chip, no fast/slow RAM, N=12) heavy combat changes from
+3.38468 to 3.40895 FPS (+0.72%, unresolved noise). The current run completes
+4800 updates in 4805 fields (59.938 updates/s), pending 5→10 with an intermediate
+peak of 38 followed by recovery to 10. This is not a worst-case response bound.
+The fast-CPU ceiling/full-matrix investigation remains open.
+
+Evidence: `tmp/render60/baseline-*`, `baseline-cost-summary.json`,
+`irq-bound-sol.json`, `perf-0`, `final-reference`, `final-perf`, `stock-{0,1}`
+and `final-comparison.json`. All matrices retain exact builds/listings, accepted
+machine settings, field observations and endpoint state. The preceding A500
+reference reproduces the rate-selection reference's three route results.
+
+### Reticle state and redundant drawing
+
+Pixel validation exposed a native render-dependent cache: hunk $bd02 refreshes
+data-hunk $46e0 only when counter $1e96 is divisible by eight. Skipping that
+render leaves a stale target-reticle flag. The first uncorrected SOL pair differed
+by 162 reticle pixels, despite agreement in the older mapped-state checker.
+`RETICLE_CLOCK=1` now runs the unchanged native target test $f954 after simulation
+projection, on the native logic boundary with the same counter gate. Rendering
+reads the cache. Inactive callers retain the native gate. The eight-native-update
+cadence (1.6 s), counter wrapping and native reset behavior remain; no private
+clock or RNG change is added. `simulation_state --presentation` now includes
+`target_reticle`; older comparisons did not check it.
+
+The native-reference fixture passes 64 cases / 128 comparisons at both selected
+rates, spanning counter boundaries/wrap and running/rendering/logic gates. It
+uses the actual original gate and unchanged target test with an empty active
+list, then restores code and globals. The deliberately wrong render gate gives
+16 errors and is rejected. This checks clock routing, not every target-test
+input; live scene/state and pixel comparisons provide separate coverage.
+
+On 68020 + 4 MB fast RAM, a diagnostic N=1 pacing trace changes ten renders
+(six duplicates) to three (zero duplicates), with three observed updates in
+both. The 75-update interval remains exactly 900 fields; presentations fall
+283→75 because stale states are no longer redrawn. N=1 is diagnostic only and
+remains rejected as a playable rate. At N=12 neither arm has duplicate draws;
+131 presentations in 893→895 fields is within noise (-0.22%). The guard keeps
+polling the elapsed-field clock and discards no ticks. This is correctness of
+pacing, not a measured N=12 speedup. A 68060 instruction-capture attempt returned
+no instruction records, so it supplies no attribution evidence.
+
+### Validation and limits
+
+Lossless held-display pairs pass A500 SOL/boss/type-10 and stock-A1200 type-10:
+all 16000 fetched words, beam positions, effective palette/control state and
+matched presentation state agree. Both comparison arms include the reticle fix.
+The checker accepts bounded native viewport shake and equal scroll nibbles;
+it replaces stale initial viewport register values only while display output
+is blank and before copper programs every control ahead of pixel fetches.
+Actual writes and all fetched pixels remain compared. Pixel/palette/valid-scroll
+changes are detected; unsupported plane counts, unequal scroll and nonblank
+starts are rejected. The old reticle mismatch is still detected.
+
+Observed ownership checks pass 29 SOL, 34 boss and 16 combat polygons on A500;
+all restore the originally enabled BLIT bit with unchanged callee-saved
+registers/stack, and no BLIT IRQ inside the masked scope. Earlier stock-A1200
+wrapper diagnostics cover 15 already-disabled entries, although that wrapper
+is not selected there. Wrong restoration, stack imbalance and an injected BLIT
+IRQ fail the checker. These are observed-path checks, not proof of every
+possible external graphics-library caller.
+
+Thirty-eight final matched-tick CPU/delayed-draw comparisons pass, including
+reticle state. Fifty-nine previous/reference/optimized and stock comparisons
+have only deferred projection scratch differences, with no reticle differences
+at these sampled boundaries. The separate uncorrected held-display pair exposes
+the stale reticle flag described above. Same-rate final state includes input history,
+HUD and fresh actor projection. Cross-rate trajectory classifications remain
+unchanged; this work does not equate different N trajectories.
+
+Final input fixtures, death/Continue, No/restart, normal/early exits, disabled
+native-code preservation, release diagnostic exclusion, all six rate builds,
+20 Hz override and both actual launcher paths pass. Current playable static
+audits cover 107 patches / 81 ranges on 68000 and 106 / 80 on 68020+, with
+663 native relocated code pointers and no detected interior entries. With all
+three rendering switches off, N=12 release/VERIFY reproduce the preceding
+input-history bytes; the normal loader is unchanged. Nineteen host-tool tests pass. Launcher checks use
+silent warp mode and disconnected controls, and do not replace audible-output
+or physical-control playtesting.
+
+Evidence: `tmp/render60/reticle-frames`, `reticle-fixtures`, `pacing`,
+`final-display-controls.json`, `irq-checker-controls.json`, `final-cross`,
+`final-input`, `final-lifecycle-n3`, `final-builds`, `play60-smoke-*` and
+`final-tool-tests.log`. Broader encounters, real controls/audio and fast-CPU
+presentation limits remain the next plan steps.
 
 ## CPU-rate selection
 
 The rate-selection A500 captures use 512 KB chip and 1536 KB slow RAM, NTSC,
-with input history and the stationary-star candidate enabled. The final 15 Hz
-build uses the ordinary star pass; its separate measurements follow the table.
+with input history and the stationary-star candidate enabled. The ordinary-pass
+rate-selection reference measurements follow the table; current rendering
+measurements are in the rendering section above.
 SOL covers nominal 600→1500 ticks,
 boss 3500→4100, and type-10 combat 600→5400 with checkpoints every 300 nominal
 ticks. Boundaries and fixture triggers scale to each N. Each heavy window is
@@ -45,7 +198,8 @@ step by 50% to 100 ms. This is a measured tradeoff, not proof of a universal opt
 An explicit N=4 build remains available for 20 Hz playtesting. The 200 ms N=1
 step is not selected. No ticks are discarded and no interpolation is added.
 
-The **final 15 Hz build** completes 1200 updates in 4800 fields (80.0 s):
+The **15 Hz reference before rendering optimization** completes 1200 updates
+in 4800 fields (80.0 s):
 15.0 updates/s, 294 presentations (3.675 FPS), pending 1→1. Its early/late
 combat presentation intervals are 239.8/278.4 ms. SOL averages 3.446 FPS and
 boss 2.143 FPS. The 17 pending samples are
@@ -58,7 +212,8 @@ collision and RNG-order difference classifications therefore still apply to
 these boundaries. The routes are not asserted identical across different rates.
 
 Evidence: `tmp/optimize60/rates-n{2,3,4,6}`, `rate-comparison.json` and
-`retained-rate-comparisons.json`. Final-build evidence is `baseline-n3/`. Each
+`retained-rate-comparisons.json`. Ordinary-pass reference evidence is
+`baseline-n3/`. Each
 capture retains the exact binary, listing,
 accepted emulator settings, field observations and endpoint state.
 
@@ -71,19 +226,20 @@ matched-state comparisons. Only deferred projection scratch differs. Disabled
 simulation preserves the audited native bytes with the explicit menu fixture
 allowance. Input checks pass in all eight configurations listed below.
 
-All six rates build. Both playable releases pass the 104-hook static audit
+The rate-selection reference builds all six rates and passes the 104-hook static audit
 (79 ranges, 663 relocated code pointers, no detected native interior entries).
 The 20 Hz override matches the explicit N=4 build. The actual launcher reaches
 the native menu at N=3 on 68000 and N=12 on 68020, with the audited release
 bytes, default CUSTOM1 and no VERIFY menu fixtures. These smoke tests use silent
 warp mode and disconnected input, so they do not establish audible output or
-physical-control behavior. Nineteen host-tool tests pass. The normal loader,
-N=12 release and N=12 VERIFY remain byte-identical to the preceding versions.
+physical-control behavior. Nineteen host-tool tests pass. The normal loader
+remains byte-identical. The all-off rendering reference
+reproduces the input-history N=12 release and VERIFY bytes.
 
 Evidence: `tmp/optimize60/input/validation.json`, `routes-n3/validation.json`,
 `lifecycle-n3/validation.json`, `final-builds/validation.json`, the two
 `play60-smoke-*` records, and `tool-tests.log`. Normal and playable builds are
-restored after checking. Rendering optimization and broader playtesting remain.
+restored after checking. Current rendering checks are above; broader playtesting remains.
 
 ## Simulation cost and stationary-star decision
 
@@ -128,9 +284,10 @@ failure and four altered-result controls were rejected. Twenty-six native-refere
 groups passed on the tested N=3/N=12 candidate; the final builds remove the
 candidate and preserve the prior ordinary implementation exactly. Twenty-one
 selected-rate off/on gameplay/HUD/fresh-projection comparisons pass, allowing
-only deferred projection scratch. The N=12 release is byte-identical to the
-preceding input-history release, and N=3 is byte-identical to the measured
-ordinary-pass build. Evidence is in `tmp/optimize60/low-n3-comparison.json`,
+only deferred projection scratch. The reference without the rendering changes
+is byte-identical to the
+preceding input-history release at N=12 and the measured ordinary-pass build
+at N=3. Evidence is in `tmp/optimize60/low-n3-comparison.json`,
 `profile-comparison.json`, `regress/` and `fixed-star-prototype/`; experimental
 source and diagnostics remain in ignored scratch, not the active code.
 
@@ -4540,8 +4697,10 @@ also rejected. Results are in per-capture `disabled-check.json` and
 This establishes disabled-code preservation for the captured default SIM60
 build on both CPUs. It does not validate the values of excluded native data,
 all optional diagnostic configurations, enabled-hook instruction boundaries or
-interior branch targets. Normal legacy and non-VERIFY SIM60 binaries remain
-identical to their preceding retained releases, and the normal build is restored.
+interior branch targets. The normal loader remains identical to its retained
+reference. Current SIM60
+release identities and optional-rendering reference checks are recorded in the
+rendering validation section; the normal build is restored after captures.
 
 
 ### World recenter loop

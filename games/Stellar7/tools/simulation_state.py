@@ -95,6 +95,7 @@ def snapshot(folder, include_projection=False, include_presentation=False, inclu
                   stars=hashlib.sha256(b''.join(stars[i:i+4] for i in range(0, len(stars), 6))).hexdigest(), objects=objects,
                   world=[identities[x] for x in world], active=[identities[x] for x in active])
     if include_presentation:
+        result['target_reticle'] = data[0x46e0]
         # Unpatched $c3ba..$c3e4 advances this indicator once per draw.
         # Compare its phase explicitly, including the installed clock if any.
         result['hud_oscillator'] = [word(0x1f5c), word(0x1f5e)]

@@ -106,6 +106,10 @@ def run(args):
                     flags = fixture if native else '-DSIM60=1 '+fixture
                     if not native and args.substeps is not None:
                         flags += f' -DS60_SUBSTEPS={args.substeps}'
+                    # Match the playable CPU-specific rendering path. Explicit
+                    # route flags retain the reference arm for paired tests.
+                    if not native and cpu == '68000' and '-DPOLYGON_BLIT_IRQ=' not in flags:
+                        flags += ' -DPOLYGON_BLIT_IRQ=1'
                     flags += ' -L '+str(listing.relative_to(ROOT))
                     # make runs in whdload, so the listing path is relative to it.
                     flags = flags.replace(' -L tmp/', ' -L ../tmp/')
