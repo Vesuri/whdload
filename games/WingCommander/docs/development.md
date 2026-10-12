@@ -491,3 +491,25 @@ not certify context accuracy or complete observer neutrality. As a negative
 control, use `tmp/pc-control` as both arguments: the old aggregate must fail the
 PC-coverage check. Raw traces do not include fast RAM, so trace snapshot equality
 must not be described as a full-memory comparison.
+
+
+### Checking modified slave return addresses
+
+Continue from the stable-PC diagnostic control above. This is still a short
+instrument check, not a routine-cost baseline:
+
+```sh
+python3 tools/build_debugger.py --aprof-diagnostics --aprof-stack-returns \
+  --output tmp/stack-return-debugger
+FSUAE="$PWD/tmp/stack-return-debugger/fs-uae" python3 tools/matrix_probe.py \
+  --machine a1200-fast --output tmp/stack-return-probe
+python3 tools/matrix_stack_check.py tmp/pc-fixed tmp/stack-return-probe \
+  > tmp/stack-return-check.json
+```
+
+The checker combines unchanged trace execution with direct inspection of each
+observed call/return around `S:0596–05b6`. It requires the original saved stack
+slot to be consumed, the successor to advance four bytes, exactly five recovered
+returns, and unchanged aggregate clocks/chip accounting. The other unmatched
+returns remain explicit. Do not enable this experimental option to claim a
+passing whole-scene call-context gate.

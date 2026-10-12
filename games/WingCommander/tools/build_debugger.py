@@ -18,6 +18,7 @@ def main():
     p.add_argument('--matrix-observer', action='store_true', help='phase 4 scene profiles and chunky change census')
     p.add_argument('--aprof-diagnostics', action='store_true', help='log unmatched context returns during diagnostic profiles')
     p.add_argument('--aprof-stable-pc', action='store_true', help='retain the executing PC/opcode before a control transfer changes it')
+    p.add_argument('--aprof-stack-returns', action='store_true', help='diagnostic tracking of returns by their saved stack slot')
     a = p.parse_args()
     source = Path(os.environ.get('FSUAE_SOURCE', os.environ['AMIGA_SHARE']+'/fs-uae-aprof-build/fs-uae'))
     out = (ROOT/a.output).resolve()
@@ -80,7 +81,7 @@ int record_key_debug(int kc) {
             shutil.copyfile(ROOT/'tools/matrix_observer.inc', out/'src/wc_matrix_observer.inc')
         target.write_text(code)
         shutil.copyfile(ROOT/'tools/intro_observer.inc', out/'src/wc_intro_observer.inc')
-    if a.aprof_stable_pc or a.matrix_observer:
+    if a.aprof_stable_pc or a.matrix_observer or a.aprof_stack_returns:
         target = out/'src/newcpu.cpp'
         code = target.read_text()
         start = '\t\t\t\tif (aprof_on) aprof_before();'
@@ -109,6 +110,42 @@ int record_key_debug(int kc) {
             write_log("WC_FRAME ret=%08x kind=%u target=%08x\n", fr.ret, fr.kind, aprof_nodes[fr.node].target);
         }
 ''' + anchor)
+        target.write_text(code)
+    if a.aprof_stack_returns:
+        target = out/'src/newcpu.cpp'
+        code = target.read_text()
+        old = 'struct aprof_frame { uae_u32 ret; uae_u32 node; uae_u8 kind; };'
+        assert code.count(old) == 1
+        code = code.replace(old, 'static uae_u32 aprof_entry_sp;\nstatic uae_u64 aprof_adjusted_returns;\n'
+                                'struct aprof_frame { uae_u32 ret; uae_u32 node; uae_u8 kind; uae_u32 slot; };')
+        code = code.replace('aprof_stack[aprof_depth++] = {ret, node, kind};',
+                            'aprof_stack[aprof_depth++] = {ret, node, kind, m68k_areg(regs,7)};')
+        if a.aprof_diagnostics:
+            code = code.replace('bool rte, uae_u32 pc)', 'bool rte, uae_u32 pc, uae_u32 slot)')
+            code = code.replace('aprof_pop(m68k_getpc(), false, pc);',
+                                'aprof_pop(m68k_getpc(), false, pc, aprof_entry_sp + (opcode == 0x4e77 ? 2 : 0));')
+            code = code.replace('aprof_pop(m68k_getpc(), true, pc);',
+                                'aprof_pop(m68k_getpc(), true, pc, aprof_entry_sp);')
+        else:
+            code = code.replace('bool rte)', 'bool rte, uae_u32 slot)', 1)
+            code = code.replace('aprof_pop(m68k_getpc(), false);',
+                                'aprof_pop(m68k_getpc(), false, aprof_entry_sp + (opcode == 0x4e77 ? 2 : 0));')
+            code = code.replace('aprof_pop(m68k_getpc(), true);',
+                                'aprof_pop(m68k_getpc(), true, aprof_entry_sp);')
+        old = '\t\tif (fr.ret == newpc || ((fr.kind == 10 || fr.kind == 11) && fr.ret + 2 == newpc)) {'
+        assert code.count(old) == 1
+        code = code.replace(old, r'''        const bool saved_slot = !rte && fr.kind == 0 && fr.slot == slot;
+        if (saved_slot || fr.ret == newpc || ((fr.kind == 10 || fr.kind == 11) && fr.ret + 2 == newpc)) {
+            if (saved_slot && fr.ret != newpc) {
+                ++aprof_adjusted_returns;
+                write_log("WC_ADJUSTED slot=%08x saved=%08x next=%08x target=%08x\n", slot, fr.ret, newpc, aprof_nodes[fr.node].target);
+            }
+''')
+        code = code.replace('if (aprof_on) aprof_before();',
+                            'aprof_entry_sp = m68k_areg(regs,7);\n                if (aprof_on) aprof_before();')
+        code = code.replace('aprof_depth = 0;\n\taprof_hi_cyc', 'aprof_depth = 0;\n    aprof_adjusted_returns = 0;\n\taprof_hi_cyc')
+        code = code.replace('fprintf(f, "AITDPROF 1\\nsource_pc_stable 1\\n");',
+                            'fprintf(f, "AITDPROF 1\\nsource_pc_stable 1\\nstack_return_slots 1\\nadjusted_returns %llu\\n", (unsigned long long)aprof_adjusted_returns);')
         target.write_text(code)
     # Existing configured dependencies and objects are shared-build inputs; make
     # recompiles the changed translation units and links a new local binary.

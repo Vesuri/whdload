@@ -846,6 +846,34 @@ The corrected diagnostic emulator SHA-256 is
 `e5434cfd84f60d5497687102226e6ee01477ae676e22730ee4093101f525a044`.
 The old profile is a negative control and must fail the coverage check.
 
+### Saved-slot return diagnostic
+
+`--aprof-stack-returns` additionally records the stack slot where each JSR/BSR
+saved its return address. An ordinary RTS/RTD/RTR consuming that same slot can
+return from the call even if the saved address was modified. Hardware exception
+frames are excluded from this additional rule. The stable executing-PC correction
+is required and included by this option.
+
+In the same five-field 020 window, an independent trace check observes five calls
+to `S:0596`, each returning at `S:05b6` through the original saved stack slot to
+four bytes beyond the JSR's normal successor. The diagnostic recognises exactly
+five adjusted returns; unmatched ordinary returns fall from 21 to 16. Both
+unmatched RTEs remain. All 427,130 instruction PC/cost/register records, field
+cycles, screenshots and captured ROM/chip memory still match the control. The
+previously observed INTREQ snapshot differences remain visible. Total units,
+gap, chip costs and zero residual are unchanged.
+
+This validates the observed modified-return case only. The remaining trace also
+shows interrupt forwarding via a manually stacked RTS destination, software-created
+RTE frames, and an RTE switching to a different stack. Those transfers need
+separate context handling; the five recovered returns do not certify general
+inclusive/self routine attribution. The option remains experimental and is not
+automatically enabled in scene captures.
+
+Evidence: `tmp/phase4-stack-probe/` and `tmp/phase4-stack-check.json`.
+The diagnostic emulator SHA-256 is
+`4dae329f0844f4a00f882f77232a39f1573d27e323c28a067646cd085321c2b6`.
+
 ### Outstanding phase 4 gate work
 
 - Establish calibrated timing and instruction coverage for the requested accelerated
