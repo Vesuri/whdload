@@ -4898,7 +4898,9 @@ schedule_begin:
 schedule_end:
  movem.l d0-d7/a0-a6,-(sp)
  move.w ccr,-(sp)
+ IFD VERIFY
  bsr.w schedule_record
+ ENDC
  lea (schedule_context.l,pc),a0
  IFD VERIFY
  move.l FF1T_FIELDS(a0),4(a4)
