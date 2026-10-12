@@ -404,7 +404,11 @@ fixture_approach:
 .found:
         IFD APPROACH_LOCK
         lea (fixture_approach_target,pc),a0
+        clr.l (a0)
+        cmp.w #7,(2,a1)
+        beq .target_saved ; carrier is only a temporary spacing target
         move.l a1,(a0)
+.target_saved:
         ENDC
         IFND APPROACH_FIRE
         IFND APPROACH_CONTACT

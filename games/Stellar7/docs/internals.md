@@ -72,6 +72,18 @@ midair impacts, audible output and physical controls remain separate checks.
 Both playable releases exclude all new pilot options byte-for-byte
 (`tmp/release60/pilot-builds/exclusion.json`).
 
+Input-only full-wave SOL attempts reach a full-strength boss at both rates,
+then end in natural death. The target-lock pilot initially retained the carrier
+as a non-firing spacing target after boss deployment. It now leaves carriers
+unlocked so a nearer live boss can be selected. In the corrected N=3 attempt,
+the boss starts at 15 health and reaches 11 before player death at tick 5773;
+this demonstrates boss damage, not victory. The corresponding N=12 corrected
+attempt is pending. No wave, health, level or inventory injection is used.
+Evidence: `tmp/release60/long-encounters`, `carrier-target-finding.json` and
+`boss-target-encounters/sol-n3-observations.json`. The pilot correction is
+VERIFY-only; playable release exclusion still passes
+(`carrier-fix-build-exclusion.log`).
+
 ## Fast-CPU presentation and sustained combat
 
 ### Displayed-buffer reuse finding

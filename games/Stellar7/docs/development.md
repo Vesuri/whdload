@@ -951,7 +951,8 @@ LEVEL_TEST=200; contact is not established merely by reaching that scene.
 
 `APPROACH_LOCK=1`, with APPROACH_TYPE=0, retains a target while it remains
 in the active list and passes the existing hostility, health and height checks.
-Exit pursuit still takes priority. `APPROACH_AIM=1..2048` selects the steering
+Carriers (type 7) remain unlocked: they are temporary spacing targets before
+boss deployment. Exit pursuit still takes priority. `APPROACH_AIM=1..2048` selects the steering
 deadband (default 2048); 512 is used by the current full-wave pilot. These options
 change only the VERIFY input pilot, not gameplay state or playable builds.
 

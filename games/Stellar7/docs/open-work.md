@@ -207,7 +207,9 @@ selected 15 Hz A500 and 60 Hz 68020 paths. Combined preference changes and
 re-enabling pass through the native menus at both rates. Input-driven cycling
 through six overlapping powers and a jump/landing also pass at both rates;
 combat effects and terrain/midair interactions remain open. Full-wave input-only
-combat runs are in progress; completed attempts have not yet reached a boss. Evidence is retained under
+combat runs reach full-strength SOL bosses at both rates but end in natural
+death; boss victories and the ending remain open. The corrected A500 pilot
+damages the boss from 15 to 11 health before dying. Evidence is retained under
 `tmp/release60`; completed step-5 measurements remain the current performance
 reference. The normal loader still excludes SIM60.
 
