@@ -28,6 +28,7 @@ def main():
     modes = p.add_mutually_exclusive_group()
     modes.add_argument('--verify', action='store_true', help='build the CUSTOM1=2 diagnostic seam')
     modes.add_argument('--verify-control', action='store_true', help='original code with the same unused diagnostic tail/size')
+    modes.add_argument('--ceiling',choices=['control','c2p'],help='VERIFY-only equal-size rendering ceiling fixture; never a release build')
     modes.add_argument('--cache-audit', action='store_true', help='VERIFY-only terminating hardware CACR audit')
     p.add_argument('--input', default='tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')
     a = p.parse_args()
@@ -79,6 +80,12 @@ def main():
             size, source = decoded[pos]
             if pos == 0x1422 and a.cache_audit:
                 lines.append('\tbsr.w cache_audit')
+            elif a.ceiling == 'c2p' and pos in (0x17f6,0x195e,0x1ac6):
+                # Return from the leaf converter call. The wrapper still saves
+                # registers, runs the original limiter and publishes normally.
+                lines.append('\trts')
+                if size > 2:
+                    lines.append('\tdc.b '+','.join(f'${b:02x}' for b in code[pos+2:pos+size]))
             elif pos == 0x14da and a.verify:
                 lines.append('\tbsr.w verify_patchseg')
             else:
@@ -103,7 +110,12 @@ def main():
         if built[:0x1422] != code[:0x1422] or built[0x1426:len(code)] != code[0x1426:]:
             raise ValueError('cache audit changed bytes outside the SetCPU detour')
         built = built[:0xc]+struct.pack('>H',18)+built[0xe:]
-    if not (a.verify or a.cache_audit) and built[:len(code)] != code:
+    if a.ceiling:
+        expected=bytearray(code)
+        if a.ceiling=='c2p':
+            for offset in (0x17f6,0x195e,0x1ac6):expected[offset:offset+2]=bytes.fromhex('4e75')
+        if built!=expected:raise ValueError('ceiling fixture differs outside declared converter entry words')
+    if not (a.verify or a.cache_audit or a.ceiling) and built[:len(code)] != code:
         differences = [hex(i) for i,(x,y) in enumerate(zip(built,code)) if x != y]
         raise ValueError(f'reassembly differs: size {len(built)}; first offsets {differences[:20]}')
     if a.verify:
@@ -114,12 +126,12 @@ def main():
     # Standard one-code-hunk container; no original byte blob is embedded.
     header = struct.pack('>8I',0x3f3,0,1,0,0,len(built)//4,0x3e9,len(built)//4)
     result = header+built+struct.pack('>I',0x3f2)
-    if not (a.verify or a.verify_control or a.cache_audit):
+    if not (a.verify or a.verify_control or a.cache_audit or a.ceiling):
         assert result == original
     (out/'WingCommanderCD32.Slave').write_bytes(result)
     report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
-              'code_ranges':CODE, 'byte_identical':result == original, 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
+              'code_ranges':CODE, 'byte_identical':result == original, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
 

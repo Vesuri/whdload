@@ -731,3 +731,19 @@ covered 030 profiles; all reports retain incomplete-baseline status. Repeat with
 only `--no-profiles` added and use `matrix_raw_check.py --compare-only --control`
 to test aggregate-profiler neutrality. Failed runs have no `result.json` and must
 never be substituted for a completed control.
+
+### Prepare the VERIFY c2p ceiling fixture
+
+```sh
+python3 tools/reconstruct.py --ceiling control --output tmp/ceiling-control-slave
+python3 tools/reconstruct.py --ceiling c2p --output tmp/ceiling-c2p-slave
+```
+
+Both builds have identical size/alignment; the control is the original bytes.
+The builder rejects any unexpected difference outside the three converter entry
+words. `matrix_capture.py --ceiling-slave PATH` accepts only these verified
+fixtures, checks their digest/size, and records the arm in the result. Use the
+same machine, cache audit and options for both arms once the fastest matrix cell
+has been selected. This is a ceiling experiment, not a release rendering patch or
+a picture-equivalence comparison. These fixtures have not yet passed a runtime
+ceiling gate.

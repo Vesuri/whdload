@@ -12,6 +12,7 @@ from intro_capture import SCENES
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output',required=True);p.add_argument('--layout',required=True)
+    p.add_argument('--ceiling-slave',help='equal-size VERIFY ceiling fixture built by reconstruct.py')
     p.add_argument('--audit',required=True);p.add_argument('--options',default='')
     p.add_argument('--machine',default='a1200-fast',choices=['a1200-fast','a1200-030','a1200-040','a1200-060'])
     p.add_argument('--nommu-core',action='store_true')
@@ -31,6 +32,16 @@ def main():
     audit=json.loads((ROOT/a.audit).read_text())
     if audit['machine']!=a.machine or audit.get('nommu_core',False)!=a.nommu_core or audit['options']!=a.options or not audit['complete']:
         raise ValueError('matching completed cache audit required')
+    ceiling=None;slave=''
+    if a.ceiling_slave:
+        target=(ROOT/a.ceiling_slave).resolve()
+        if (ROOT/'tmp').resolve() not in target.parents:raise ValueError('ceiling slave must stay in tmp/')
+        fixture=json.loads((target.parent/'build.json').read_text())
+        if not fixture.get('verify_only') or fixture.get('ceiling') not in ('control','c2p'):
+            raise ValueError('verified ceiling fixture required')
+        if hashlib.sha256(target.read_bytes()).hexdigest()!=fixture['sha256'] or fixture['bytes']!=7728:
+            raise ValueError('ceiling fixture hash/size mismatch')
+        ceiling=fixture['ceiling'];slave=str(target)
     m=json.loads((ROOT/a.layout).read_text());layout={k:m[k] for k in ('hunks','slave')};h=layout['hunks']
     cuts=[(0xf800d2,0),(h[3],1)]+[(h[n]+pc,i+2) for i,(n,pc,name) in enumerate(SCENES)]
     cuts += [(h[0]+0x1fdd6,100),(h[0]+0x1fe48,33),(h[0]+0x20214,34)]
@@ -40,7 +51,7 @@ def main():
     config=out/'matrix.cfg';config.write_text(f'{h[0]:x} {len(cuts)}\n'+''.join(f'{pc:x} {index}\n' for pc,index in cuts))
     run='../'+str(out.relative_to(ROOT))+'/run'
     env=dict(os.environ,FSUAE_RUN=run,AMIGA_SETUP=a.machine,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',
-        WC_NOMMU_CORE='1' if a.nommu_core else '0',SLAVE='',
+        WC_NOMMU_CORE='1' if a.nommu_core else '0',SLAVE=slave,
         WHD_ARGS='CUSTOM5=0 '+a.options,WARP='1' if a.warp else '0',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',
         DETERMINISTIC='1',WC_MATRIX_CONFIG=str(config),WC_MATRIX_DIR=str(out),WC_MATRIX_RAW='1' if a.raw_chunky else '0',WC_MATRIX_PROFILES='0' if a.no_profiles else '1')
     for key in ('WC_OBSERVER_CONFIG','WC_OBSERVER_OUTPUT'):env.pop(key,None)
@@ -88,7 +99,7 @@ def main():
         for i in range(34):
             if not a.no_profiles and not (out/f'scene-{i:02d}.aprof').is_file():raise ValueError('missing scene profile '+str(i))
         boot=next((out/'run').glob('boot.*'))
-        result=dict(layout,complete=True,names=names,machine=a.machine,nommu_core=a.nommu_core,host_warp=a.warp,clock_validated=a.machine=='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
+        result=dict(layout,complete=True,names=names,machine=a.machine,nommu_core=a.nommu_core,ceiling=ceiling,host_warp=a.warp,clock_validated=a.machine=='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
             boot_cpu=cpu,live_cpu=live,audit_cacr=audit['cacr'],
             slave_sha256=hashlib.sha256((boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()).hexdigest(),
             emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())

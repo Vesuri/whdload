@@ -874,9 +874,18 @@ profile accounting, live leaf-byte/entry checks and raw-source recomputation
 covered NOMMU 030 profiles; the established 020 leaf report remains byte-identical.
 General caller attribution is still unresolved. The first profiler-off control
 lost the emulator connection in the credits and has no success record; its partial
-output is retained in `tmp/phase4-frequency-control-030/`. A fresh control is
-required before accepting profiler neutrality. No failed run is included as a
-baseline or a successful comparison.
+output is retained in `tmp/phase4-frequency-control-030/`. The fresh retry in
+`tmp/phase4-frequency-control-030-retry/` completes and matches all 6,739 ledger
+records, every raw source byte, final allocated game hunks and menu RGB pixels.
+Only aggregate profiling changes; `tmp/phase4-frequency-profiler-check-030.json`
+records the isolated neutrality pass. No failed run is included as a baseline.
+
+The verified 030 instruction-body shares illustrate the current cost split:
+Origin animation spends 39.571% in the 128-line converter and 23.490% in its TOD
+limiter; the particle scene spends 39.429% and 40.663%, respectively. These use
+whole-scene duration as denominator, include instruction memory stalls, and
+exclude interrupt service and between-instruction gaps. They do not price general
+calling contexts or establish an intended game rate.
 
 ### 020 whole-scene diagnostics
 
@@ -1249,3 +1258,19 @@ The remaining accounting and ceiling experiments are still required. Reuse the
 sibling timing configurations and available instruments, retain explicit limits
 on unsupported results, and assess the full gate against the resulting evidence.
 No user-supplied emulator or gate waiver is a prerequisite to that work.
+
+### Prepared c2p ceiling fixtures
+
+The VERIFY-only equal-size `reconstruct.py --ceiling` fixtures are built and
+byte-checked, but no ceiling measurement has yet been accepted. The control is
+byte-identical to the original 7,728-byte slave. The c2p arm changes only the first
+word of the three leaf converter entries to `RTS`: `S:17f6/195e/1ac6` (file
+`1816/197e/1ae6`). The wrapper at `S:178a` still saves/restores registers, runs
+the existing TOD limiter and returns to the normal publication path. The arm
+intentionally omits planar conversion; visual equivalence is not expected.
+
+Both size and all bytes outside those three words are checked during the build.
+The c2p-arm digest is
+`ec089eabbc6b869d3ec96fcc54a110d94e2fb3c362fe980ee1965b4f2f52ec53`.
+Fixtures and generated assembly are under `tmp/phase4-ceiling-{control,c2p}-slave/`.
+Drawing and instant-blitter arms and the fastest-cell choice remain outstanding.
