@@ -64,7 +64,7 @@ int record_key_debug(int kc) {
         response += to_hex("profile-window 00000000 7fffffff");
     } else if(cmd == "wc-audit") {
         char info[512];
-        snprintf(info, sizeof(info), "WC_CPU model=%d mmu=%d exact=%d memory_exact=%d blitter_exact=%d multiplier=%d frequency=%d unit=%d cacr=%08x tc030=%08x", currprefs.cpu_model, currprefs.mmu_model, currprefs.cpu_cycle_exact, currprefs.cpu_memory_cycle_exact, currprefs.blitter_cycle_exact, currprefs.cpu_clock_multiplier, currprefs.cpu_frequency, cpucycleunit, regs.cacr, tc_030);
+        snprintf(info, sizeof(info), "WC_CPU model=%d mmu=%d exact=%d memory_exact=%d blitter_exact=%d multiplier=%d frequency=%d unit=%d cacr=%08x tc030=%08x immediate_blits=%d", currprefs.cpu_model, currprefs.mmu_model, currprefs.cpu_cycle_exact, currprefs.cpu_memory_cycle_exact, currprefs.blitter_cycle_exact, currprefs.cpu_clock_multiplier, currprefs.cpu_frequency, cpucycleunit, regs.cacr, tc_030, currprefs.immediate_blits);
         response += to_hex(info);
     } else if(cmd.substr(0, 4) == "key ") {
         unsigned key = 0; int pressed = -1; char extra;

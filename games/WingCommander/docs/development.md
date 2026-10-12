@@ -428,8 +428,8 @@ this negative control. `NoMMU` here is a WHDLoad option, not an emulator-model o
 
 ### Experimental 020 scene census
 
-Only the stock-multiplier 020 backend is admitted by this collector. It checks
-model, MMU backend, cycle-exact mode and actual cycle unit 128. Its cache audit
+The stock-multiplier 020 capture checks model, MMU backend, cycle-exact mode
+and actual cycle unit 128. Accelerated capture modes are documented below. Its cache audit
 must match the requested options. The same original slave plays the complete
 intro and credits cycle, then takes the phase 3 state-driven Escape route to the
 menu. There are no debugger stops inside individual scene windows.
@@ -457,13 +457,12 @@ conversion, cache state and change-count bounds. They retain raw self/inclusive
 contexts and unmatched-return counters but explicitly report
 `validated_baseline: false`. Structural agreement alone cannot certify the context
 attribution, interrupt/idle classification or observer neutrality. The current
-unmatched returns and difference from phase 3 must be resolved before accepting
-routine percentages or a rendering ceiling. The negative test creates damaged
+unmatched returns must be resolved before accepting general routine percentages.
+Independent scene counters support the separately checked ceiling comparisons. The negative test creates damaged
 fixtures below its fresh `tmp/` output and requires rejection of every one.
 
-Retained phase 4 results and binary digests are listed in `internals.md`. No
-accelerated FPS, routine-cost comparison, full-scene DMA/idle result or rendering
-ceiling has yet passed the phase 4 gate.
+Retained phase 4 results, per-instrument validation and binary digests are listed
+in `internals.md`. The full phase 4 gate remains open.
 
 
 ### Diagnosing aggregate instruction addresses
@@ -747,7 +746,7 @@ same machine, cache audit and options for both arms once the fastest matrix cell
 has been selected. This is a ceiling experiment, not a release rendering patch or
 a picture-equivalence comparison.
 
-The selected cell is 030 MMU/default. With the MMU-counter debugger above built
+The selected cell is 030 MMU/default. With the MMU-counter debugger described below built
 and `FSUAE` set to its executable, reproduce the matched pair as follows (each
 output directory must be new):
 
@@ -803,3 +802,49 @@ Independent runs may use distinct `FSUAE_RUN` directories and explicit
 `DEBUG_PORT` values. The strict ownership check must remain enabled; a busy port
 must fail without stopping its listener. Current MMU diagnostics use port 2457,
 separate from the NOMMU batch on 2456.
+
+
+### Instant-blitter ceiling
+
+Rebuild the local debugger using the matrix flags above to include
+`immediate_blits` in `wc-audit`. Obtain a fresh matching cache audit, then run two
+captures with the same control slave, emulator, audit, layout and options. Add
+`--instant-blitter` only to the intervention arm. The runner explicitly requests
+normal blits for the control and checks the effective setting at boot and the
+menu. CPU and memory cycle-exact settings remain enabled in both arms.
+
+```sh
+python3 tools/cache_audit.py --machine a1200-030 --options MMU \
+  --slave tmp/phase4-cache-slave/WingCommanderCD32.Slave \
+  --output tmp/phase4-instant-audit-030
+python3 tools/matrix_capture.py --machine a1200-030 --mmu-core --no-profiles \
+  --warp --options MMU --audit tmp/phase4-instant-audit-030/result.json \
+  --layout tmp/phase4-mmu-scenes-030/result.json \
+  --ceiling-slave tmp/ceiling-control-slave/WingCommanderCD32.Slave \
+  --output tmp/instant-control-030-mmu
+python3 tools/matrix_capture.py --machine a1200-030 --mmu-core --no-profiles \
+  --warp --options MMU --audit tmp/phase4-instant-audit-030/result.json \
+  --layout tmp/phase4-mmu-scenes-030/result.json \
+  --ceiling-slave tmp/ceiling-control-slave/WingCommanderCD32.Slave \
+  --instant-blitter --output tmp/instant-on-030-mmu
+python3 tools/matrix_ceiling_report.py tmp/instant-control-030-mmu \
+  tmp/instant-on-030-mmu > tmp/instant-comparison.json
+```
+
+The checker requires identical original slave bytes and CPU settings except for
+`immediate_blits=0/1`. It does not accept a command-line request without effective
+readback. The pinned emulator permits immediate blits with cycle-exact CPU/memory;
+its blitter start path copies the preference and completes the operation
+immediately when blitter DMA is enabled. The intervention is a diagnostic bound,
+not a supported hardware configuration.
+
+The completed pair is retained under `tmp/phase4-instant-{control,on}-030-mmu/`.
+The same report also compares final allocated game hunks and menu pixels; those
+are observed equal for the instant-blitter pair, while incorrect converter-bypass
+pixels are expected. For the debugger-readback extension's control repeat, compare
+the complete ledgers directly:
+
+```sh
+cmp tmp/phase4-ceiling-control-030-mmu/matrix-events.txt \
+  tmp/phase4-instant-control-030-mmu/matrix-events.txt
+```

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Check matched VERIFY c2p fixtures and compare the complete intro window."""
+"""Check matched VERIFY c2p or instant-blitter fixtures and compare the complete intro window."""
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
+from PIL import Image
 from matrix_scene_report import report as scene_report
 
 ORIGINAL = '5fbbb774bba3c794a776acc25f33c3f47c579449e1ba1a21c31418716aa74986'
@@ -15,10 +17,20 @@ def compare(control, candidate):
     metadata = [json.loads((run/'result.json').read_text()) for run in runs]
     reports = [scene_report(run) for run in runs]
     left, right = metadata
-    if (left.get('ceiling'), right.get('ceiling')) != ('control', 'c2p'):
-        raise ValueError('explicit control and c2p arms required')
+    instant = right.get('instant_blitter', False)
+    if left.get('instant_blitter', False):
+        raise ValueError('control must use normal blitter timing')
+    if (left.get('ceiling'), right.get('ceiling')) != ('control', 'control' if instant else 'c2p'):
+        raise ValueError('explicit matched ceiling arms required')
+    for key in ('boot_cpu', 'live_cpu'):
+        a, b = [dict(re.findall(r'(\w+)=(\w+)', meta[key])) for meta in metadata]
+        if instant:
+            if a.pop('immediate_blits', None) != '0' or b.pop('immediate_blits', None) != '1':
+                raise ValueError('effective instant-blitter intervention missing')
+        if a != b:
+            raise ValueError('unmatched CPU settings: '+key)
     for key in ('machine', 'nommu_core', 'mmu_core', 'options', 'audit_cacr',
-                'emulator_sha256', 'hunks', 'slave', 'boot_cpu', 'live_cpu',
+                'emulator_sha256', 'hunks', 'slave',
                 'profiles', 'raw_chunky', 'host_warp', 'dma', 'names'):
         if left.get(key) != right.get(key):
             raise ValueError('unmatched configuration: '+key)
@@ -39,10 +51,18 @@ def compare(control, candidate):
     if left['slave_sha256'] != ORIGINAL:
         raise ValueError('control must be the pinned original slave')
     expected = bytearray(binaries[0])
-    for offset in ENTRIES:
-        expected[32+offset:34+offset] = bytes.fromhex('4e75')
+    if not instant:
+        for offset in ENTRIES:
+            expected[32+offset:34+offset] = bytes.fromhex('4e75')
     if binaries[1] != expected:
         raise ValueError('unexpected fixture differences')
+    memory_a, memory_b = [(run/'fast.bin').read_bytes() for run in runs]
+    final_hunks_equal = []
+    for base, size in zip(left['hunks'], (0x35ea4, 0xfda0, 4, 0x1590)):
+        at = base-0x200000
+        final_hunks_equal.append(memory_a[at:at+size] == memory_b[at:at+size])
+    with Image.open(control/'menu.png') as a, Image.open(candidate/'menu.png') as b:
+        menu_equal = a.size == b.size and a.convert('RGB').tobytes() == b.convert('RGB').tobytes()
     scenes = []
     for a, b in zip(reports[0]['scenes'][2:33], reports[1]['scenes'][2:33]):
         scenes.append(dict(scene=a['scene'], control=a, bypass=b,
@@ -57,11 +77,12 @@ def compare(control, candidate):
                            publication_hz=publications/seconds)
     totals['seconds_saved'] = totals['control']['seconds']-totals['bypass']['seconds']
     totals['publication_rate_ratio'] = totals['bypass']['publication_hz']/totals['control']['publication_hz']
-    return dict(matched_c2p_fixture_pass=True, live_entry_checks=6,
+    return dict(matched_ceiling_fixture_pass=True, experiment="instant-blitter" if instant else "c2p", live_entry_checks=6,
                 window='origin-load entry through cycle-complete entry',
                 totals=totals, scenes=scenes,
+                final_game_hunks_equal=final_hunks_equal, menu_pixels_equal=menu_equal,
                 limitations=['The original limiter remains active.',
-                             'Bypassed conversion intentionally invalidates planar output.',
+                             'Instant blits alter hardware timing.' if instant else 'Bypassed conversion intentionally invalidates planar output.',
                              'A single matched pair does not establish variability or physical CPU performance.',
                              'This comparison does not complete the phase 4 matrix gate.'])
 

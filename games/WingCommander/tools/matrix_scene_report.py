@@ -30,6 +30,11 @@ def report(run):
         options=meta['options'].upper().split()
         if ('MMU' in options and not enabled) or ('NOMMU' in options and enabled):
             raise ValueError('actual translation state disagrees with requested option')
+    for key in ('boot_cpu', 'live_cpu'):
+        actual = dict(re.findall(r'(\w+)=(\w+)', meta[key]))
+        if meta.get('instant_blitter') or 'immediate_blits' in actual:
+            if actual.get('immediate_blits') != ('1' if meta.get('instant_blitter') else '0'):
+                raise ValueError('instant-blitter state disagrees with capture arm')
     h = meta['hunks']
     cuts = [0xf800d2, h[3]]+[h[n]+pc for n, pc, _ in SCENES]
     cuts += [h[0]+0x1fdd6]*18+[h[0]+0x1fe48, h[0]+0x20214]

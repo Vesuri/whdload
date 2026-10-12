@@ -84,6 +84,24 @@ if [ "${WC_NOMMU_CORE:-0}" = 1 ]; then
     done
   }
 fi
+# Set the ceiling intervention explicitly, including the normal control value.
+setup_function=$(declare -f fsuae_setup)
+eval "${setup_function/fsuae_setup/wc_blitter_base_setup}"
+fsuae_setup() {
+  wc_blitter_base_setup || return 1
+  local immediate=false i found=0
+  case "${WC_INSTANT_BLITTER:-0}" in
+    0) ;;
+    1) immediate=true ;;
+    *) echo "WC_INSTANT_BLITTER must be 0 or 1" >&2; return 1 ;;
+  esac
+  for i in "${!FSUAE_SETUP_ARGS[@]}"; do
+    case "${FSUAE_SETUP_ARGS[$i]}" in
+      --uae_immediate_blits=*) FSUAE_SETUP_ARGS[$i]=--uae_immediate_blits="$immediate"; found=1 ;;
+    esac
+  done
+  if [ "$found" = 0 ]; then FSUAE_SETUP_ARGS+=(--uae_immediate_blits="$immediate"); fi
+}
 fsuae_options
 fsuae_launch --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   --floppy_drive_0="$WORKBENCH_ADF" --state_dir="$BOOT/state"

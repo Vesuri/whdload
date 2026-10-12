@@ -10,7 +10,7 @@ Derived source, executable bytes, disassemblies and captures remain under `tmp/`
 The unskipped intro has 31 identical milestone captures across two fresh boots.
 The publication ledger, full traces and independent SWAP_ONLY check agree. The
 stock 020 multiplier is verified; numeric-frequency presets require calibration.
-**Phase 4 is authorised and in progress. Accelerated timing configurations are being corrected.**
+**Phase 4 is authorised and in progress; its complete accounting gate remains open.**
 Its full-matrix gate remains unchanged; phase 5 is not authorised.
 Fifteen cache audits and five functional/instrumentation preflights are complete.
 Both effective 020 cache states pass isolated profiler-on/off controls. Full
@@ -20,8 +20,9 @@ Numeric-clock scaling matches the stock 020 reference, with documented integer
 quantisation. The 030 default passes profiler neutrality; its DMA capture passes
 independent accounting checks with a quantified timing effect. The same-core 030
 MMU pair is captured with translation-state readback. Remaining validation and
-the matched ceiling experiments are in progress. General return attribution,
-full-matrix DMA/idle accounting and ceilings remain incomplete. The matrix gate
+the drawing ceiling experiment are in progress. The matched c2p and instant-blitter
+ceilings are recorded. General return attribution and full-matrix DMA/idle
+accounting remain incomplete. The matrix gate
 has not passed.
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with

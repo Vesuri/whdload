@@ -1247,10 +1247,10 @@ issue and each instrument's coverage still require explicit checks.
 
 | Requirement | Authoritative evidence / remaining gap |
 |---|---|
-| CPU/cache matrix and CACR audits | All 15 initial cache audits pass; corrected timing cores require matching audits. The NOMMU 030 has instruction coverage; accelerated clock validation remains open. |
-| Per-scene FPS, routine self/inclusive cost, waits, interrupts, DMA and idle in every cell | Scoped 020 publication/census and verified leaf costs pass their controls. General caller attribution and full DMA/idle accounting remain open; corrected 030 coverage is present but accelerated costs are not yet validated. |
-| Matched c2p, drawing and instant-blitter ceilings on the fastest valid cell | Not performed; the requested matrix has no validated fastest-cell comparison. |
-| Per-scene c2p change rate | Full 020 default/NoCache source recomputation passes. No extrapolation to unsupported accelerated timing configurations or future cockpit windows is made. |
+| CPU/cache matrix and CACR audits | Corrected NOMMU cells and same-core 030 MMU/NoMMU cells have scene ledgers, matching cache audits and effective-state readback. Numeric scaling matches the stock 020 reference; physical accelerated timing is not claimed. |
+| Per-scene FPS, routine self/inclusive cost, waits, interrupts, DMA and idle in every cell | Scene FPS covers the matrix. Scoped 020/030 leaf costs and one independently checked DMA capture are recorded. General caller attribution, full-matrix DMA, interrupt/wait and actual CPU-idle accounting remain incomplete. |
+| Matched c2p, drawing and instant-blitter ceilings on the fastest valid cell | 030 MMU/default is the nominal fastest model cell. Its c2p pair passes fixture/ledger checks and the control repeats exactly. The instant-blitter pair also passes; the drawing ceiling remains outstanding. |
+| Per-scene c2p change rate | Full 020 default/NoCache and corrected NOMMU 030 default source recomputation passes. All scene captures retain census counts; independent validation does not yet cover every cell. Cockpit measurements belong to later phases. |
 | Findings, reproducible commands and coherent commits | Recorded in this document and `development.md`; derived material stays in `tmp/`. |
 | Phase boundary | No phase 5 work or rendering release patch has started. |
 
@@ -1262,7 +1262,7 @@ No user-supplied emulator or gate waiver is a prerequisite to that work.
 ### Prepared c2p ceiling fixtures
 
 The VERIFY-only equal-size `reconstruct.py --ceiling` fixtures are built and
-byte-checked, but no ceiling measurement has yet been accepted. The control is
+byte-checked; the matched c2p runtime result is recorded below. The control is
 byte-identical to the original 7,728-byte slave. The c2p arm changes only the first
 word of the three leaf converter entries to `RTS`: `S:17f6/195e/1ac6` (file
 `1816/197e/1ae6`). The wrapper at `S:178a` still saves/restores registers, runs
@@ -1273,7 +1273,7 @@ Both size and all bytes outside those three words are checked during the build.
 The c2p-arm digest is
 `ec089eabbc6b869d3ec96fcc54a110d94e2fb3c362fe980ee1965b4f2f52ec53`.
 Fixtures and generated assembly are under `tmp/phase4-ceiling-{control,c2p}-slave/`.
-Drawing and instant-blitter arms and the fastest-cell choice remain outstanding.
+The selected comparison cell and accepted c2p result are recorded below. The instant-blitter pair also passes; the drawing ceiling remains outstanding.
 
 ### Corrected-clock NOMMU scene figures
 
@@ -1446,5 +1446,35 @@ one matched pair, not a variability estimate or a physical accelerator claim.
 
 `tmp/phase4-ceiling-c2p-comparison.json` records every scene and the complete
 window; `tmp/phase4-ceiling-repeat-check-030-mmu.json` records the control repeat.
-The checker rejects reversed arms and mismatched emulator builds. Drawing and
-instant-blitter ceilings remain outstanding.
+The checker rejects reversed arms and mismatched emulator builds. The drawing
+ceiling remains outstanding; the instant-blitter result follows.
+
+
+### Instant-blitter ceiling result
+
+The selected 030 MMU/default cell uses the same original-byte control slave for
+both arms. The local debugger digest is
+`0984e6365a6bebe9c9d0909e2c8d10216516cf0404896959a75bd88515bf2951`.
+Its fresh VERIFY audit records CACR `$00002111`. At both boot and menu,
+`wc-audit` confirms `immediate_blits=0` in the control and `1` in the intervention;
+CPU/memory/blitter exact settings, unit 36 and MMU configuration otherwise match.
+Live translation control is `$80c07760` in both arms.
+
+| Complete intro window | Publications | Emulated seconds | Publications/s |
+|---|---:|---:|---:|
+| Matched control | 3,351 | 152.658729642 | 21.950922871 |
+| Instant blitter | 3,351 | 152.658722312 | 21.950923925 |
+
+The full-window difference is 7.330 microseconds; the largest absolute individual
+scene difference is 47.083 microseconds. This is no meaningful measured
+whole-intro benefit for `Custom5=0`; it is not a claim about the unmeasured
+`Custom5=4` blitter converter. The existing limiter remains active. Final allocated
+game hunks and menu pixels match in both arms. The new control also repeats the
+prior control's complete ledger, final game hunks and menu pixels exactly.
+
+Evidence is in `tmp/phase4-instant-{control,on}-030-mmu/`,
+`tmp/phase4-instant-comparison.json` and `tmp/phase4-instant-state-check.json`.
+The ceiling checker validates retained binary identity, placement, scene ledgers
+and effective settings; a negative fixture with the instant flag claimed but
+readback disabled is rejected. These two completed ceiling comparisons do not
+close the drawing or full-matrix accounting gaps.
