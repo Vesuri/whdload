@@ -1586,12 +1586,14 @@ STOP-PC count. Evidence: `tmp/phase4-idle-v3-neutrality-020.json`,
 `tmp/phase4-idle-v3-profile-check-020.json` and
 `tmp/phase4-idle-v3-negative-020/`.
 
-The 11-cell run in `tmp/phase4-accounting-matrix/` is in progress. Each cell gets
-a fresh cache audit and three matching captures: raw-source baseline, idle
-recording, then idle plus DMA recording. This will validate idle neutrality,
-full source-change recomputation and DMA recording effects per cell. No pending
-cell is counted as completed, and general routine/interrupt accounting remains
-open.
+The original 11-cell acquisition in `tmp/phase4-accounting-matrix/` is complete.
+The corrected batches in `tmp/phase4-dma-cia-matrix/` and
+`tmp/phase4-dma-cia-accelerated/` also complete all eleven cells. Each has a fresh
+cache audit and separate bare, idle and idle-plus-DMA captures. Every corrected
+cell's `idle-neutrality.json` passes exact on/off comparison; `idle-idle.json`
+passes STOP-state accounting and STOP instruction-count checks. The idle
+measurement requirement is covered for this route, with busy waits explicitly
+excluded. General routine and complete interrupt attribution remain open.
 
 ### DMA recording neutrality: matrix controls
 
@@ -1701,8 +1703,10 @@ Scope elapsed time includes callees and preemption;
 innermost selected callback time is not routine self time. Exception entry,
 dispatcher work and other handlers remain outside these three callback scopes.
 
-The remaining ten callback-control cells are being captured under
-`tmp/phase4-irq-matrix/`, with fresh cache audits and separate bare/IRQ arms.
+The callback controls use `tmp/phase4-irq-matrix/` and its retry root, with
+fresh cache audits and separate bare/IRQ arms. All 020, 030 and 040 cells pass
+exact callback recording neutrality. The 060 default and NoCache pairs have
+the bounded differences documented below; 060 DCache is still in flight.
 A completed acquisition validates callback event accounting and exact recorder
 neutrality only; it does not by itself extend the 020 instruction-duration
 calibration to the accelerated interpreters. General routine self/inclusive
@@ -1712,8 +1716,8 @@ Five initial callback-control cells failed before emulator launch because their
 selected debugger port was held by Red Baron: 020 NoCache, 030 MMU NoCache,
 040 default, 060 default and 060 NoCache. The strict ownership check refused the
 launch without stopping that process. Their failed records remain in
-`tmp/phase4-irq-matrix/`; fresh audited retries are running in
-`tmp/phase4-irq-retry/`. The unaffected original lane continues. No failed or
+`tmp/phase4-irq-matrix/`; completed audited retries are in
+`tmp/phase4-irq-retry/`. The unaffected original lane is finishing 060 DCache. No failed or
 pending cell counts as a completed callback measurement.
 
 ### Independent beam calibration of callback intervals
@@ -1737,8 +1741,8 @@ matches the uninterrupted 020 control exactly. Evidence:
 order; PAL line/field rollover cases are also checked.
 
 This calibrates beam observations against the 020 instrument whose durations
-already match an instruction trace. The remaining ten machine/cache cells are
-being calibrated under `tmp/phase4-irq-beam-matrix/`, with fresh cache audits.
+already match an instruction trace. All ten additional machine/cache beam
+captures are complete under `tmp/phase4-irq-beam-matrix/`, with fresh cache audits.
 Their completed beam reports must still be compared with matching uninterrupted
 callback controls before acceptance. The diagnostic breakpoint flag remains set;
 these runs do not replace uninterrupted FPS baselines. Measured intervals include
@@ -1753,6 +1757,7 @@ Completed rechecks use existing captures without emulator runs:
 |---|---|
 | `tmp/phase4-instrument-accept-01/` | 020 default, 020 NoCache, 030 MMU default, 030 MMU NoCache |
 | `tmp/phase4-instrument-accept-02/` | 030 NoMMU NoCache, 040 default |
+| `tmp/phase4-instrument-040-dcache.json` | 040 DCache |
 
 For each accepted cell the checker matches the effective cache/core audit and
 debugger hash, recomputes raw-source changes, checks isolated idle/DMA/callback

@@ -14,10 +14,11 @@ stock 020 multiplier is verified; numeric-frequency presets require calibration.
 Phase 5 is not authorised. The CPU/cache scene baseline, source-change census,
 cache audits and matched c2p, instant-blitter and scoped bitmap-drawing ceilings
 are recorded. Corrected DMA slot accounting and exact recorder controls now pass
-on all eleven machine/cache configurations. Blanket clear bypass is invalid and excluded.
+on all eleven machine/cache configurations, as do STOP idle accounting and its
+exact on/off controls. Blanket clear bypass is invalid and excluded.
 
 Consolidated instrument checks pass on 020 default/NoCache, 030 MMU
-default/NoCache, 030 NoMMU NoCache and 040 default: exact idle and DMA neutrality, raw-source recomputation, callback
+default/NoCache, 030 NoMMU NoCache and both 040 cache states: exact idle and DMA neutrality, raw-source recomputation, callback
 neutrality and independent beam calibration. This validates only DMA slots,
 stopped-CPU idle and three callback elapsed scopes. It does not validate general
 routine self/inclusive time or interrupt entry/dispatch. The 040 default beam check passes with the reviewed debugger-boundary

@@ -6,9 +6,10 @@ WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 **Phase 4 is in progress; the full-matrix gate has not passed.**
 The CPU/cache scene baseline and matched c2p, instant-blitter and scoped
 bitmap-drawing ceilings are recorded. DMA slot accounting and exact recorder
-controls pass on all eleven configurations. Consolidated checks validate DMA slots,
+controls pass on all eleven configurations; STOP idle accounting and its exact
+on/off controls also pass throughout. Consolidated checks validate DMA slots,
 stopped-CPU idle and three VBL callback scopes on both 020 cache states, both
-030 MMU cache states, 030 NoMMU NoCache and 040 default. These are scoped measurements, not complete CPU accounting.
+030 MMU cache states, 030 NoMMU NoCache and both 040 cache states. These are scoped measurements, not complete CPU accounting.
 General routine attribution remains unresolved. The 040 callback beam check
 passes with an explicit debugger-boundary allowance; 060 callback neutrality
 remains unaccepted.
