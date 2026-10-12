@@ -672,3 +672,17 @@ core/cache options; 040/060 require `--no-profiles`. Accelerated results explici
 record `clock_validated=false`. The existing 020 profile report cannot be used to
 certify these counter-only captures. Repeat and counter-neutrality checks remain
 required before using the new observer as a baseline instrument.
+
+Validate a completed counter-only run and recompute its raw census:
+
+```sh
+python3 tools/matrix_scene_report.py tmp/nommu-scenes-040 > tmp/nommu-scenes-040/scene-report.json
+python3 tools/matrix_raw_check.py tmp/nommu-scenes-040 > tmp/nommu-scenes-040/raw-check.json
+```
+
+Repeat the same capture into a fresh output directory without `--raw-chunky`, then
+compare it with the raw capture using `matrix_raw_check.py --compare-only --control`.
+The comparison now supports two counter-only runs and requires matching effective
+CPU settings, ledgers, final game hunks and menu pixels. It does not infer CPU costs.
+`--warp` changes host collection speed only; it is recorded separately and needs
+its own matched comparison before being used for faster matrix collection.

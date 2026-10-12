@@ -12,7 +12,11 @@ def check(run, oracle=None):
     meta = json.loads((run/'result.json').read_text())
     if not meta['complete'] or not meta.get('raw_chunky'):
         raise ValueError('completed raw-source capture required')
-    report(run)  # Keep the ordinary clock/cache/scene structural checks.
+    if meta.get('profiles', True) and meta['machine']=='a1200-fast':
+        report(run)  # Retain the stronger established 020 profile checks.
+    else:
+        from matrix_scene_report import report as scene_report
+        scene_report(run)
     scenes = collections.defaultdict(lambda: dict(calls=0, pairs=0, compared_bytes=0,
                                                  changed_bytes=0, changed_blocks=0, sizes=set()))
     oracle_sources = {}
@@ -79,7 +83,7 @@ def check(run, oracle=None):
 def compare(control, candidate):
     left = json.loads((control/'result.json').read_text())
     right = json.loads((candidate/'result.json').read_text())
-    for key in ('machine', 'options', 'audit_cacr', 'emulator_sha256', 'slave_sha256', 'hunks', 'slave'):
+    for key in ('machine', 'options', 'audit_cacr', 'emulator_sha256', 'slave_sha256', 'hunks', 'slave', 'boot_cpu', 'live_cpu'):
         if left[key] != right[key]:
             raise ValueError('unmatched configuration: '+key)
     if not left['complete'] or not right['complete'] or left.get('diagnostic_stops') or right.get('diagnostic_stops'):
@@ -89,16 +93,15 @@ def compare(control, candidate):
     if a != b:
         at = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
         raise ValueError(f'observer ledger differs at record {at}; lengths {len(a)}/{len(b)}')
-    if not right.get('profiles',True):
-        raise ValueError('candidate must have aggregate profiles enabled')
-    profiles = left.get('profiles', True)
+    profiles = left.get('profiles', True) and right.get('profiles', True)
     for index in range(34):
         name = f'scene-{index:02d}.aprof'
         if profiles:
             if (control/name).read_bytes() != (candidate/name).read_bytes():
                 raise ValueError('scene profile differs: '+name)
-        elif (control/name).exists():
-            raise ValueError('unexpected aggregate profile in disabled control')
+        for directory, metadata in ((control,left),(candidate,right)):
+            if not metadata.get('profiles',True) and (directory/name).exists():
+                raise ValueError('unexpected aggregate profile in disabled run')
     raw_sources_identical = None
     if left.get('raw_chunky') and right.get('raw_chunky'):
         with (control/'chunky-sources.bin').open('rb') as raw_a, (candidate/'chunky-sources.bin').open('rb') as raw_b:
@@ -118,11 +121,12 @@ def compare(control, candidate):
     with Image.open(control/'menu.png') as image_a, Image.open(candidate/'menu.png') as image_b:
         if image_a.size != image_b.size or image_a.convert('RGB').tobytes() != image_b.convert('RGB').tobytes():
             raise ValueError('menu pixels differ')
-    changed = [key for key, default in (('raw_chunky',False),('profiles',True))
+    changed = [key for key, default in (('raw_chunky',False),('profiles',True),('host_warp',False))
                if left.get(key,default) != right.get(key,default)]
     return dict(matched_execution_pass=True, changed_features=changed,
                 recording_neutrality_pass=changed==['raw_chunky'],
                 aggregate_profiler_neutrality_pass=changed==['profiles'],
+                warp_neutrality_pass=changed==['host_warp'],
                 ledger_records=len(a), profile_files_identical=profiles, raw_sources_identical=raw_sources_identical,
                 final_game_hunks_identical=True, menu_pixels_identical=True)
 

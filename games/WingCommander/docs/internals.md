@@ -800,6 +800,28 @@ neutrality are not yet validated. Its digest is
 A matching terminating 040 `NoMMU` audit reports CACR zero in
 `tmp/phase4-nommu-audit-040/`. This does not replace audits for other cores/options.
 
+### 040 NOMMU scene-counter validation
+
+The first complete counter-only capture, `tmp/phase4-nommu-scenes-040/`, reaches
+all 35 boundaries in order and passes the independent ledger checks. Raw-source
+recomputation matches all 3,342 c2p entries (3,310 comparisons in 31 scenes),
+covering 136,957,440 recorded bytes. The scene validator checks exact cut offsets,
+chronological records, cache audit agreement and census bounds; it also accepts
+the established 020 capture. Negative fixtures reject a missing boundary, a wrong
+CACR, a backwards timestamp and a c2p event assigned to the wrong scene.
+
+The fresh recording-off control `tmp/phase4-nommu-control-040/` matches all
+6,739 ledger records, every final allocated game-hunk byte and every menu RGB
+pixel. The two runs use the same effective core settings and emulator/slave
+hashes; raw-source recording is the sole changed feature. The comparison passes
+in `tmp/phase4-nommu-recording-check-040.json`.
+
+These checks establish record integrity, census arithmetic, scoped repeatability
+and source-recording neutrality. They do not independently validate the observer's
+PC acquisition or calibrate the requested CPU MHz. No accelerated timing baseline
+or instruction-cost claim follows from them. The negative results are in
+`tmp/phase4-scene-negative/negative-results.json`.
+
 ### 020 whole-scene diagnostics
 
 A read-only host observer starts/stops the aggregate profiler at the phase 3
