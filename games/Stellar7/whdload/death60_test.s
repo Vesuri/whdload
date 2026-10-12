@@ -1,14 +1,9 @@
         IFD VERIFY
         IFD DEATH_TEST
-; A single injected lethal energy value drives the complete native death path.
+; Observe natural combat death, or inject one lethal energy value.
 ; Only dialog/menu inputs are supplied; cleanup/retry/new-game allocation is native.
 ; DEATH_DECLINE selects No and observes the native main menu before Begin.
 ; DEATH_NATURAL arms observation at DEATH_TEST without writing player energy.
-        IFD DEATH_NATURAL
-        IFD DEATH_DECLINE
-        FAIL "DEATH_NATURAL currently checks Continue only"
-        ENDC
-        ENDC
 s60_death_results:
         dc.b 'R760'
         dc.w 0,0 ; stage: 0 idle, 1 armed/lethal, 2 answered, 3 resumed; errors
@@ -22,6 +17,7 @@ s60_death_results:
         dc.w 0 ; level when armed (offset 74)
         ENDC
         IFD DEATH_DECLINE
+s60_death_menu_record:
         dc.b 'ND60'
         dc.w 0,0 ; post-death menu count, running state
         dc.l 0,0 ; menu tick, field
@@ -31,12 +27,12 @@ s60_test_death_menu:
         lea (s60_death_results,pc),a0
         cmp.w #2,(4,a0)
         bne .done
-        addq.w #1,(70,a0)
-        move.w (s60_running,pc),(72,a0)
-        move.l (s60_ticks,pc),(74,a0)
-        move.l ($24a8-S60_DATA,a4),(78,a0)
+        addq.w #1,(s60_death_menu_record-s60_death_results+4,a0)
+        move.w (s60_running,pc),(s60_death_menu_record-s60_death_results+6,a0)
+        move.l (s60_ticks,pc),(s60_death_menu_record-s60_death_results+8,a0)
+        move.l ($24a8-S60_DATA,a4),(s60_death_menu_record-s60_death_results+12,a0)
         move.l (s60_sessions,pc),d0
-        move.w d0,(82,a0)
+        move.w d0,(s60_death_menu_record-s60_death_results+16,a0)
 .done:  movem.l (sp)+,d0/a0
         rts
         ENDC
@@ -126,7 +122,7 @@ s60_test_death_poll:
         ELSE
         moveq #2,d0 ; native No selection; the original game returns to its menu
         ENDC
-        move.w d0,(84,a0)
+        move.w d0,(s60_death_menu_record-s60_death_results+18,a0)
         ELSE
         moveq #1,d0 ; select Yes using the native dialog polling result
         ENDC
@@ -155,7 +151,7 @@ s60_test_death_resume:
         bne .done
         move.w #3,(4,a2)
         IFD DEATH_DECLINE
-        cmp.w #1,(70,a2)
+        cmp.w #1,(s60_death_menu_record-s60_death_results+4,a2)
         beq .menu_seen
         bsr s60_death_error
 .menu_seen:
@@ -187,11 +183,15 @@ s60_test_death_resume:
         bne .bad
         cmp.w #680,(50,a2)
         bne .bad
+        IFD DEATH_DECLINE
+        tst.w (52,a2)
+        ELSE
         IFD DEATH_NATURAL
         move.w (74,a2),d0
         cmp.w (52,a2),d0
         ELSE
         tst.w (52,a2)
+        ENDC
         ENDC
         bne .bad
         tst.w (54,a2)

@@ -40,7 +40,7 @@ semantics or unseen paths. Exact-build indirect and stack-return audits also
 pass these windows. Evidence: `tmp/release60/a500-sol-all-entry-audit.json` and
 `entry-audits/*.json`.
 
-All 46 host-tool tests pass (`tmp/release60/host-tests-powers.log`). Named machine
+All 50 host-tool tests pass (`tmp/release60/host-tests-natural-death.log`). Named machine
 presets now resolve before the launcher chooses a fixed-rate slave; the
 selection regression rejects the prior order and passes all seven presets,
 explicit/default CPUs and an invalid-preset case. This argument-level test does
@@ -105,7 +105,19 @@ with energy 680, reset tick/render/phase state and the expected clock credit.
 Two post-resume snapshots per path have no missing input samples or queue drops;
 installed hooks pass. Session-filtered captures ensure those snapshots belong
 to the restarted game. Evidence: `tmp/release60/natural-continue/validation.json`.
-This does not establish completion of the preceding levels or choosing No.
+Choosing No after the same natural deaths also passes at both rates: one native
+menu return retains session 7 with the scheduler inactive, then Begin starts
+SOL in session 8 with energy 680, zero ticks/renders/phase and initial credit 60.
+Snapshots at ticks 25/40 (N=3) and 100/160 (N=12) have no missing input samples
+or queue drops; 108/107 installed hooks pass. These boundaries precede the
+level-selection fixture's next trigger. Evidence:
+`tmp/release60/natural-decline-before-exit/validation.json`. The earlier
+`natural-decline` capture was interrupted because its requested snapshots came
+after that trigger; it is not passing evidence. Existing Continue/No fixture
+bytes remain identical, and both playable releases exclude the combined natural
+No observer (`tmp/release60/death-builds/validation.json`). Four negative-control
+tests reject incorrect level, menu/session, answer and reset observations.
+These checks do not establish completion of the preceding levels.
 
 ## Fast-CPU presentation and sustained combat
 

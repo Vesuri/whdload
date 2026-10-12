@@ -210,8 +210,8 @@ combat effects and terrain/midair interactions remain open. The powered input-on
 full-strength boss and takes the native exit to level 1; direct native-event
 verification passes. The powered 60 Hz attempt reaches an apparent exit, with
 direct verification pending. Later bosses and ending remain open. Natural
-combat death and Continue pass at both rates in level 6 after fixture-controlled
-earlier exits. Evidence is retained under
+combat death, Continue and No/menu/new-game pass at both rates after
+fixture-controlled earlier exits to level 6. Evidence is retained under
 `tmp/release60`; completed step-5 measurements remain the current performance
 reference. The normal loader still excludes SIM60.
 

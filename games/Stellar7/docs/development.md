@@ -170,7 +170,11 @@ waits for a specific simulation session, preventing a pre-death tick from
 matching a post-Continue capture. Combine it with `--level`; the session must
 be positive and requires `--tick`. The natural Continue check uses session 8,
 level 6 after six fixture-controlled earlier exits, with DEATH_NATURAL=1.
-It observes actual combat death without writing energy. Use exact retained listings for hook and
+It observes actual combat death without writing energy. Combine DEATH_NATURAL=1
+with DEATH_DECLINE=1 to check No, native menu return and a new SOL game, then
+validate with `death_state.py --natural --decline`. Capture session 8, level 0
+at ticks 25/40 for N=3 or 100/160 for N=12: these precede LEVEL_TEST=50/200,
+which would otherwise force exits again in the new game. Use exact retained listings for hook and
 CUSTOM1-off code audits. The restoration reference is under `tmp/restore60`; input-history lifecycle
 evidence is under `tmp/input-history/lifecycle`.
 
