@@ -2,13 +2,12 @@
 
 ## Current state
 
-Phase 1 is complete: the CD32 English/German executables, original slave,
-patch maps and static time/display hypotheses are recorded in `internals.md`.
-`development.md` gives the verified static reproduction commands. The originals
-remain unchanged; extracted hunks and disassemblies are confined to ignored
-`tmp/`. No emulator was run and no slave reconstruction or game patch was made.
-**Phase 2 is authorised and in progress: harness, reconstruction and matched boots.
-Stop at its gate; phase 3 is not authorised.**
+Phases 1 and 2 are complete. The reconstructed slave is byte-identical. Original
+and reconstructed English boots match all four live game hunks and every screenshot
+pixel at the menu and simulator/name prompt for Custom5=0–3. VERIFY off/on marker
+checks and equal-size control comparisons pass at both endpoints.
+Derived source, executable bytes, disassemblies and captures remain under `tmp/`.
+**Stopped at the phase 2 gate; phase 3 is not authorised.**
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.
@@ -90,7 +89,7 @@ AmigaXDev's playbooks are the method; this list says what applies to Wing Comman
 Gate: a written description of the slave and the executable, with the time sources and
 display path listed as hypotheses to confirm at run time.
 
-### Phase 2 — Harness and a reconstructed slave
+### Phase 2 — Harness and a reconstructed slave (gate complete)
 
 1. Take the harness from Legends of Valour (OS game, KickEmu, no slave source, Kalms
    c2p with CPU-selected renderer patches, state-tape waits, A/B driver), retargeted to
@@ -105,7 +104,8 @@ display path listed as hypotheses to confirm at run time.
    speed, through `Custom5` settings 0–3.
 
 Gate: original and reconstructed slaves boot to the main menu with identical screenshots
-and state at matched points.
+and state at matched points. The authorised extension also passes through the
+simulator to the first pilot-name input prompt, without entering a name.
 
 ### Phase 3 — The intro window and a trusted frame counter
 

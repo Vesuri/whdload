@@ -3,7 +3,9 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 2 in progress: CD32 harness, slave reconstruction and boot equivalence.**
+**Phase 2 complete: CD32 reconstruction and simulator equivalence verified.**
+The original and reconstructed slaves match at the menu and pilot-name prompt
+for Custom5=0–3. Work is stopped at the phase 2 gate.
 Phase 1 static findings are documented. Runtime timing and display hypotheses
 remain unconfirmed except where an explicit phase 2 boot check records evidence.
 

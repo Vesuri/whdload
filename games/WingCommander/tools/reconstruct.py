@@ -25,6 +25,9 @@ CODE = [(0,4), (0x34,0x7a), (0x4fa,0x4fe), (0x500,0x75a),
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
+    modes = p.add_mutually_exclusive_group()
+    modes.add_argument('--verify', action='store_true', help='build the CUSTOM1=2 diagnostic seam')
+    modes.add_argument('--verify-control', action='store_true', help='original code with the same unused diagnostic tail/size')
     p.add_argument('--input', default='tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')
     a = p.parse_args()
     out = (ROOT/a.output).resolve()
@@ -73,30 +76,41 @@ def main():
         lines += [f'\tifne *-slave-${pos:x}', '\tfail "offset drift"', '\tendif', f'S_{pos:04x}:']
         if pos in decoded:
             size, source = decoded[pos]
-            lines.append('\t'+source)
+            if pos == 0x14da and a.verify:
+                lines.append('\tbsr.w verify_patchseg')
+            else:
+                lines.append('\t'+source)
         else:
             size = min(16, len(code)-pos)
             while any(pos < x < pos+size for x in decoded):
                 size -= 1
             lines.append('\tdc.b '+','.join(f'${b:02x}' for b in code[pos:pos+size]))
         pos += size
+    if a.verify or a.verify_control:
+        lines.append((ROOT/'whdload/verify.s').read_text())
     out.mkdir(parents=True)
     source = out/'WingCommanderCD32.s'
     source.write_text('\n'.join(lines)+'\n')
     binary = out/'payload.bin'
     subprocess.run([os.environ['VASM'], '-m68020','-spaces','-no-opt','-Fbin','-o',str(binary),str(source)],check=True)
     built = binary.read_bytes()
-    if built != code:
+    if not a.verify and built[:len(code)] != code:
         differences = [hex(i) for i,(x,y) in enumerate(zip(built,code)) if x != y]
         raise ValueError(f'reassembly differs: size {len(built)}; first offsets {differences[:20]}')
+    if a.verify:
+        # The only original instruction replaced is S:14da..14dd. Everything
+        # before/after it through the original end must still match exactly.
+        if built[:0x14da] != code[:0x14da] or built[0x14de:len(code)] != code[0x14de:]:
+            raise ValueError('VERIFY changed bytes outside its declared detour')
     # Standard one-code-hunk container; no original byte blob is embedded.
     header = struct.pack('>8I',0x3f3,0,1,0,0,len(built)//4,0x3e9,len(built)//4)
     result = header+built+struct.pack('>I',0x3f2)
-    assert result == original
+    if not (a.verify or a.verify_control):
+        assert result == original
     (out/'WingCommanderCD32.Slave').write_bytes(result)
     report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
-              'code_ranges':CODE, 'byte_identical':True}
+              'code_ranges':CODE, 'byte_identical':result == original, 'verify':a.verify, 'verify_control':a.verify_control}
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
 

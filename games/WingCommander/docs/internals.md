@@ -443,7 +443,7 @@ return. The final two are A4000-specific ROM workarounds; their subsystem names
 are not established here. All lists terminate explicitly. There is no ROM
 patch at an invented runtime base in this inventory.
 
-## Gate hand-off
+## Phase 1 gate
 
 Written executable/slave identification, both language patch maps, all three
 KickEmu ROM patch maps, and the static time/display hypotheses are present.
@@ -456,9 +456,9 @@ register traffic (including library code); TOD cadence and wrap; c2p branch for
 each Custom5; chunky/planar placement and geometry; generated copper/FMODE/BPLCON
 values; buffer publication versus completed frames; the VBL clock users and the per-pass drawing divisor in each scene; music cadence and game-time
 coupling. Exact compiler and KickEmu source release remain unknown metadata.
-Do not start reconstruction, boots, patches or phase 2 from this hand-off alone.
+These remain outside the phase 2 equivalence checks below.
 
-## Phase 2 reconstruction (boot gate in progress)
+## Phase 2 reconstruction (gate complete)
 
 `tools/reconstruct.py` reconstructs 1,758 instructions (5,008 bytes) from the
 original slave's code islands; the remaining payload is data. The whole assembled
@@ -472,7 +472,58 @@ memory-indirect jump at `S:0072` has a signed base displacement, and MOVEM at
 `S:14e4` bases its displacement after the register-mask word. The generator
 corrects their textual targets and the full-file comparison checks the result.
 
-An original English `Custom5=0` boot on the shared A1200-fast preset reached the
-Origin logo and animated credits. Main-menu state/screenshot equivalence and the
-remaining Custom5 boots are still pending. These observations do not confirm the
-phase 1 timing hypotheses or establish a frame counter.
+### Runtime route and coverage
+
+English boots use PAL A1200-fast, 68EC020, 2 MiB chip and 8 MiB fast RAM,
+windowed at real speed. Native debugger keyboard input skips the logo and credits
+with two separate Escape presses, selects the Vega campaign with Return, then
+provides no input through the simulator's automatic destruction. The endpoint is
+the first name-input loop, showing the name/callsign request; no name is entered.
+
+| Checkpoint | English hunk 0 | Executable file |
+|---|---|---|
+| Intro/credits input poll | `1898a` | `189b6` |
+| Credits entry | `1fbba` | `1fbe6` |
+| Menu entry | `20164` | `20190` |
+| Menu ready | `20214` | `20240` |
+| Selection accepted | `20226` | `20252` |
+| Name prompt call | `1744c` | `17478` |
+| First name-input iteration | `16fc6` | `16ff2` |
+
+The live patched LoadSeg chain is calibrated separately from PRELOAD/file copies.
+Each endpoint retains all four allocated game hunks (291,288 bytes total), fast
+RAM, input/checkpoint logs and a one-field screenshot. Comparisons require equal
+placements and input routes, and apply no masks or pixel tolerance.
+
+| Custom5 | Menu: game bytes / RGB pixels | Name prompt: game bytes / RGB pixels |
+|---|---|---|
+| 0 | identical / identical | identical / identical |
+| 1 | identical / identical | identical / identical |
+| 2 | identical / identical | identical / identical |
+| 3 | identical / identical | identical / identical |
+
+Evidence is retained in `tmp/phase2-ab/`, including all eight fresh boots and
+`menu-0..3.json` / `name-0..3.json` comparison reports. Deliberately changing one
+data byte or one screenshot pixel makes the gate fail. A damaged input digest
+and a missing live slave patch are also rejected by their respective checks.
+
+### Diagnostic control
+
+The VERIFY build changes only the call at `S:14da` (slave file `14fa`) to enter
+an appended seam at `S:1e0c` (file `1e2c`). It calls the original PatchSeg and
+preserves its register/CCR outputs. `CUSTOM1=2` selects English and sets a marker
+at `S:1e34` (file `1e54`); default English and German selection retain their
+original values, 0 and 1. No new game patches are installed.
+
+An equal-size control retains every original payload byte and appends the unused
+seam, avoiding different slave placements in the comparison. At both endpoints,
+its marker and VERIFY-off's marker are zero; VERIFY-on's marker is one. Both
+VERIFY modes match every game-hunk byte and screenshot pixel of the control.
+Evidence: `tmp/verify-reference/`, `tmp/verify-off/`, `tmp/verify-on/`.
+The ordinary reconstruction remains the byte-identical original-size build.
+
+This gate covers the English install and this emulator preset only. It does not
+validate German runtime behaviour, other CPUs, OCS, intended game speed, or the
+phase 1 time-source/display-path hypotheses. No trusted frame counter, unskipped
+intro window or instruction-cost profile has been established. Phase 3 has not
+started.

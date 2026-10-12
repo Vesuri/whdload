@@ -6,18 +6,31 @@ if [ -n "${SLAVE:-}" ]; then SLAVE="$(cd "$(dirname "$SLAVE")" && pwd)/$(basenam
 cd "$ROOT/amiga"
 . ./env.sh
 export FSUAE="${FSUAE:-$FSUAE_ARM}"
-export FSUAE_RUN="${FSUAE_RUN:-../tmp/run}"
-export AMIGA_SETUP="${AMIGA_SETUP:-a1200-fast}"
-. "$FSUAE_COMMON"
-case "${1:-}" in stop) fsuae_stop_previous; exit ;; esac
-# Constrain all emulator products, including shared launcher logs, to ignored scratch.
-python3 - "$ROOT" "$FSUAE_RUN" <<'PY'
+FSUAE_RUN="${FSUAE_RUN:-../tmp/run}"
+# The shared launcher expects a path relative to amiga/. Canonicalise overrides
+# before it constructs its pid/log paths, and reject symlink escapes from tmp/.
+FSUAE_RUN="$(python3 - "$ROOT" "$FSUAE_RUN" <<'PYRUN'
 from pathlib import Path
-import sys
+import os, sys
 root, run = Path(sys.argv[1]), Path(sys.argv[2]).resolve()
 if (root/'tmp').resolve() not in run.parents:
     raise SystemExit('FSUAE_RUN must be below this project tmp/')
-PY
+print(os.path.relpath(run, Path.cwd()))
+PYRUN
+)"
+export FSUAE_RUN
+export AMIGA_SETUP="${AMIGA_SETUP:-a1200-fast}"
+. "$FSUAE_COMMON"
+# A pidfile alone is insufficient if a PID was reused by another project's UAE.
+if [ -f "$FSUAE_PIDFILE" ]; then
+  tracked=$(cat "$FSUAE_PIDFILE")
+  if fsuae_is_a "$tracked" fs-uae && ! fsuae_is_ours "$tracked"; then
+    echo "recorded emulator belongs to another directory; refusing to stop it" >&2
+    exit 1
+  fi
+fi
+case "${1:-}" in stop) fsuae_stop_previous; exit ;; esac
+FSUAE_CLAIM_STRICT=1
 fsuae_prepare
 mkdir -p "$FSUAE_RUN"
 BOOT=$(mktemp -d "$FSUAE_RUN/boot.XXXXXX")
