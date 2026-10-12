@@ -40,7 +40,7 @@ semantics or unseen paths. Exact-build indirect and stack-return audits also
 pass these windows. Evidence: `tmp/release60/a500-sol-all-entry-audit.json` and
 `entry-audits/*.json`.
 
-All 54 host-tool tests pass (`tmp/release60/host-tests-contact-effects.log`). Named machine
+All 54 host-tool tests pass (`tmp/release60/host-tests-mine.log`). Named machine
 presets now resolve before the launcher chooses a fixed-rate slave; the
 selection regression rejects the prior order and passes all seven presets,
 explicit/default CPUs and an invalid-preset case. This argument-level test does
@@ -146,12 +146,25 @@ health, energy and installed hooks. Four negative-control tests reject wrong
 boundaries, inactive effects and missing lethal outcomes. Evidence:
 `tmp/release60/shield-only-events/n3-validation.json` and `n12-validation.json`.
 
-An A500 input-only mine placement also reaches a native type-43 contact at tick
-905: a type-6 enemy takes 10 damage, health 2→0, while energy remains 440.
-This earlier observer did not retain the return-PC transcript required by the
-new independent checker; a stronger repeat is pending. The analogous N=12
-attempt ends in death without contact, with its placed mine still intact.
-These captures do not establish mine destruction or detonation.
+Lethal type-43 mine contact passes at both rates. Earlier exits select level 6;
+normal button input places the existing mine charge, and the pilot approaches a
+type-6 enemy. Read-only stops at $38b2/$38b8 observe 10 native damage, health
+2→0 and unchanged player energy: tick 905 / energy 440 at N=3, and tick 8428 /
+energy 480 at N=12. Placement triggers at distance 5000 and 1000 respectively;
+these are independent successful routes, not cross-rate trajectory equivalence.
+Raw call/return transcripts, actor arguments and installed hooks pass
+`contact_effect_state.py`. Evidence: `tmp/release60/mine-close-events/n*-validation.json`.
+
+A separate SOL run places the existing mine and destroys it with ordinary
+player gunfire, without level, wave, health or inventory shortcuts. Native
+projectile damage call $32ba, entry $3f04 and return $32be are checked against
+raw opcodes, stack arguments and stopped PCs. Mine health changes 1→0 from
+one damage at tick 354 (N=3) or 1387 (N=12), within the same update; the mine
+inventory charge is consumed. Exact-build and installed-hook checks pass.
+Wrong actor type, nonlethal damage, unspent inventory and wrong return-address
+controls are rejected. Evidence: `tmp/release60/mine-shoot-events/n*-validation.json`
+and `negative-validation.json`. These checks establish contact kills and mine
+destruction, not the rendered explosion or audible detonation.
 
 Input-driven jump and controlled native terrain contact pass at both selected
 rates. The existing jump charge is consumed through normal button input;

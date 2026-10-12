@@ -1001,6 +1001,15 @@ Capture before activation and check the required charge is still present. Carrie
 arrival is not boss deployment; use POWER_TRIGGER_TYPE=44 to wait for the boss.
 Contact and final-boss outcome checks remain separate from trigger validation.
 
+`contact_effect_state.py --kind mine-destruction` reads `mine-damage-before`
+and `mine-damage-after`, retaining raw memory and `registers.txt` at native
+$3f04 and return $32be. It verifies the projectile caller, type-43 health
+1→0 or another lethal positive-damage result, same tick, consumed mine charge,
+SOL level and exact-build hooks. Use APPROACH_TYPE=43, APPROACH_FIRE=1,
+POWER_ROUTE=150/600 and POWER_SLOT=3 for the selected N=3/N=12 routes.
+No wave or level shortcut is needed. This establishes native destruction;
+visual and audible detonation still require observation.
+
 For lethal shield contact, use APPROACH_TYPE=10, APPROACH_RAM=1,
 POWER_TRIGGER_TYPE=10, POWER_TRIGGER_DISTANCE=5000 and POWER_SLOT=1. Select
 level 6 with LEVEL_TEST/LEVEL_LAST and arm after earlier exits as above. Retain

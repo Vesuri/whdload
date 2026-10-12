@@ -47,6 +47,41 @@ def inspect(folder,listing,kind):
     validate_rows(kind,rows)
     return dict(kind=kind,rows=rows,hooks=audit_hooks.installed(folder,listing),scope='Observed native contact and lethal actor damage; scene setup is recorded in capture metadata. No audible-output, mine-destruction or full-encounter claim.')
 
+def inspect_mine_destruction(folder, listing):
+    folder, listing = Path(folder), Path(listing)
+    assert (folder/'slave.slave').read_bytes() == listing.with_suffix('.slave').read_bytes(), 'exact build mismatch'
+    meta = json.loads((folder/'metadata.json').read_text())
+    base, code, data = (meta[k] for k in ('base', 'code_base', 'data_base'))
+    before = (folder/'mine-damage-before/code.bin').read_bytes()
+    after = (folder/'mine-damage-after/code.bin').read_bytes()
+    def regs(name):
+        text = (folder/name/'registers.txt').read_text()
+        assert 'SIGINT' not in text and 'Program received signal' not in text
+        assert re.search(r'^Breakpoint \d+,', text, re.M)
+        return {k: int(v, 16) for k, v in re.findall(r'^(pc|sp)\s+0x([0-9a-f]+)', text, re.M)}
+    b, a = regs('mine-damage-before'), regs('mine-damage-after')
+    def u(memory, address, fmt):
+        assert base <= address and address+struct.calcsize(fmt) <= base+len(memory)
+        return struct.unpack_from(fmt, memory, address-base)[0]
+    assert b['pc'] == code+0x3f04 and a['pc'] == code+0x32be
+    assert before[code-base+0x3f04:code-base+0x3f0c] == bytes.fromhex('48e70310266f0010')
+    assert before[code-base+0x32ba:code-base+0x32be] == bytes.fromhex('61000c48')
+    assert u(before, b['sp'], '>I') == a['pc'], 'wrong projectile damage caller'
+    actor = u(before, b['sp']+4, '>I')
+    damage = u(before, b['sp']+8, '>H')
+    entry = u(before, code+0x2af8, '>I')
+    assert before[entry-base+4:entry-base+8] == b'S760'
+    tick = u(before, entry+16, '>I')
+    assert u(after, entry+16, '>I') == tick
+    assert u(before, actor+2, '>H') == 43
+    health = u(before, actor+0x55, '>B')
+    assert 0 < health <= damage and u(after, actor+0x55, '>B') == 0
+    assert u(before, data+0x20fb, '>B') == 0, 'mine charge not consumed'
+    assert u(before, data+0x46a0, '>H') == u(after, data+0x46a0, '>H') == 0
+    return dict(tick=tick, health_before=health, health_after=0, damage=damage,
+                caller_offset='0x32ba', hooks=audit_hooks.installed(folder, listing),
+                scope='Native projectile damage destroys a normally placed SOL mine. No rendered-explosion or audible-output claim.')
+
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('capture',type=Path);p.add_argument('--listing',type=Path,required=True);p.add_argument('--kind',choices=SITES,required=True);a=p.parse_args()
-    print(json.dumps(inspect(a.capture,a.listing,a.kind),indent=2))
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('capture',type=Path);p.add_argument('--listing',type=Path,required=True);p.add_argument('--kind',choices=(*SITES, 'mine-destruction'),required=True);a=p.parse_args()
+    print(json.dumps(inspect_mine_destruction(a.capture,a.listing) if a.kind=='mine-destruction' else inspect(a.capture,a.listing,a.kind),indent=2))
