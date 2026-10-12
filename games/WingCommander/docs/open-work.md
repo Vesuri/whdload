@@ -14,8 +14,9 @@ stock 020 multiplier and numeric-frequency scaling are calibrated for the emulat
 The eleven-configuration scene baseline, cache audits, source-change census,
 DMA/STOP idle controls and matched c2p, instant-blitter and scoped bitmap-drawing
 ceilings are recorded. Eight configurations pass combined callback validation.
-All phase 4 captures and consolidation jobs are terminal. Phase 5 is authorised
-and in progress, using the supplied PC video as an external timing reference.
+All phase 4 captures and consolidation jobs are terminal. Phase 5 analysis is
+complete, using the supplied PC video for visible motion cadence and displacement.
+The intro-rate decision is pending; phase 6 has not started.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -59,17 +60,24 @@ A definitive CD32 edition, OCS afterwards and separately:
 
 ## Intended speed: working estimate
 
-**Working estimate: 15 game ticks per second** in space flight and in the intro's
-animated sequences. This is a prior, not a measurement: the game logic is expected to
-advance once per rendered frame, no contemporary machine sustained a stable rate, and
-roughly 15 fps is a plausible design target for the period. The rate will be a
-constant so it can change without redesign.
+**Flight working estimate: 15 game ticks per second**, still an unmeasured prior
+until phase 7. Do not transfer intro evidence to flight.
 
-It is replaced by evidence from the game itself before anything depends on it:
+**Intro phase 5 candidate: approximately 15 native ship updates/s** (roughly
+15–17/s from the short projected-motion comparison). The unmodified ship loop
+updates twice per picture, so this is about 7.5 pictures/s, not a 15 FPS cap.
+The PC clip shows about 14–15 visible ship/explosion advances/s and a faster
+20–25/s asteroid cadence. Asteroids update once per Amiga draw; their cross-port
+native-step equivalence remains unproved. These are separate motion targets for
+the user's decision, not a silently installed universal rate. Keep music and
+text deadlines unchanged. See the phase 5 findings in `internals.md`.
+
+Rate choices use the following evidence before implementation:
 
 - **Intro against music.** The music player runs from an interrupt at a fixed rate;
-  the intro's scripted animation was cut to the score. The rate at which picture cues
-  line up with musical cues is the intro's intended rate.
+  phase 5 confirms music-anchored holds but also per-pass movement inside them.
+  Music alone does not uniquely determine that movement rate. Use the supplied
+  PC ship/explosion/asteroid cadence **and displacement**, not credit durations.
 - **Flight units.** The HUD shows speed in kps and target range. The tick rate at
   which displayed range closes at the displayed speed is the rate the designers'
   units assume.
@@ -160,18 +168,22 @@ failures and broader drawing bounds remain explicit gaps, not gate blockers
 under this approved scope. Accelerated figures describe the emulator model.
 Phase 5 has subsequently been authorised; phase 6 remains outside scope.
 
-### Phase 5 — Game-time model for the intro
+### Phase 5 — Game-time model for the intro (analysis complete; rate choice pending)
 
 1. Confirm the time sources from phase 1 with traces.
 2. Coupling test: the same window on several CPUs and with VERIFY-only slowed drawing.
    Compare scene durations in emulated seconds and music position at scene cuts.
    A scene whose duration scales with draw time is frame-coupled; a scene that stays in
    step with the music is clocked.
-3. Derive the intro's intended rate from the music anchor (above).
+3. Establish motion-rate candidates using the music anchor and the supplied PC
+   video. Per the user's clarification, measure moving ships, explosions and
+   asteroids, including displacement per advance; preserve music/text timing.
 4. Document what the main loop does per frame: input, update, draw, wait, publish.
 
-Gate: the intro time model and an intended-rate figure from evidence. **Stop for the
-user's decision on the intro's rate.**
+Gate reached: the mixed time model, measured motion references and a ship-update
+rate candidate are documented. A uniform rate is not established by the video;
+the asteroid native-step mapping is an explicit limit. **Stopped for the user's
+decision on the intro's motion targets.**
 
 ### Phase 6 — Rendering, first pass (intro scope, behaviour-neutral)
 
@@ -194,7 +206,9 @@ picture-for-picture against the original.
 
 Because game time is still frame-coupled here, a faster renderer also speeds up the
 game. Until phase 9 exists, these builds run behind a frame limiter at the intended
-rate (as `Custom5=0` does now) so the speed stays correct where the CPU keeps up.
+rate so the speed stays correct where the CPU keeps up. Account for the two-update
+ship loop versus one-update asteroid loop; the existing `Custom5=0` publication
+cap is not itself a calibrated motion target.
 
 Gate: measured improvement per cell, picture identity with the original in the intro,
 and no change in intro scene durations with the limiter on.

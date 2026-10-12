@@ -1,10 +1,10 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 5 CD32 intro time model, using the supplied PC video as a
-timing reference. Targeted traces and VERIFY-only timing experiments are
-authorised. Stop at the intro-rate decision gate; do not start phase 6, release
-patches or OCS analysis. Derived material stays in ignored `tmp/`.
+Current scope: phase 5 CD32 intro motion/time-model analysis is complete, with
+PC video motion references recorded. Stop at the intro-rate decision gate;
+await the user's rate choice and phase 6 authorisation. Do not start rendering
+changes, release patches or OCS analysis. Derived material stays in ignored `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 
 ## Rules

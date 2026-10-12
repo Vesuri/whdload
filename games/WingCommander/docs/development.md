@@ -1295,3 +1295,76 @@ python3 tools/matrix_ceiling_report.py \
 All three were rechecked at closeout. Their fixture/readback checks pass, while
 the original limiter and the stated drawing scope remain part of the experiment.
 They establish neither a release-patch speedup nor complete routine accounting.
+
+## Phase 5: motion timing and the supplied PC video
+
+Use the existing calibrated phase 4 debugger; the retained phase 5 captures use
+`tmp/phase4-irq-v2-debugger/fs-uae`, SHA-256
+`c30ad609dc1141b47d3b9cfbf7d5a86666445fee7985907beef60b095679d940`.
+There is no new emulator instrument or matrix. All captures below use original
+`CUSTOM5=0`, PAL, explicit cycle-exact CPU settings, and warp only to shorten host
+time. Durations come from emulated cycle stamps. Choose free debugger ports;
+the shared launcher refuses foreign listeners and stops only owned processes.
+Every output directory must be new and below `tmp/`.
+
+```sh
+. amiga/env.sh
+export FSUAE="$PWD/tmp/phase4-irq-v2-debugger/fs-uae"
+export DEBUG_PORT=2483
+python3 tools/intro_timing_fixture.py --iterations 0 \
+  --output tmp/phase5-control-slave
+python3 tools/intro_timing_fixture.py --iterations 100000 \
+  --output tmp/phase5-slow-slave
+SLAVE="$PWD/tmp/phase5-control-slave/WingCommanderCD32.Slave" \
+  INTRO_STOCK_CLOCK=1 WHD_ARGS=CUSTOM5=0 \
+  python3 tools/boot_gate.py --calibrate --output tmp/phase5-fixture-layout
+python3 tools/intro_timing_capture.py --output tmp/phase5-control \
+  --layout tmp/phase5-fixture-layout/layout.json \
+  --fixture tmp/phase5-control-slave/WingCommanderCD32.Slave
+python3 tools/intro_timing_capture.py --output tmp/phase5-slow \
+  --layout tmp/phase5-fixture-layout/layout.json \
+  --fixture tmp/phase5-slow-slave/WingCommanderCD32.Slave
+python3 tools/intro_timing_capture.py --machine a1200-030 \
+  --output tmp/phase5-030 --layout tmp/phase4-mmu-scenes-030/result.json
+for arm in control slow 030; do
+  python3 tools/intro_timing_report.py "tmp/phase5-$arm" \
+    > "tmp/phase5-$arm/timing-report.json"
+done
+```
+
+The fixtures preserve the original slave except for the declared c2p-wrapper
+call and equal-size appended diagnostic tail. Both are VERIFY-only; ordinary
+reconstruction and release behaviour are unchanged. The runner verifies fixture
+hashes and the final live layout, records effective CPU/cache/MMU state, and sends
+Escape only after all eighteen credit pages. The reporter rejects missing or
+reordered pages, incorrect title update/publication counts, clock drift,
+unpaired publications or waits, and CIA-A TOD/field disagreement. No screenshot
+matrix or DMA collection is performed. A zero-delay fixture still has call
+overhead and is not claimed exactly timing-neutral against the original slave.
+
+For the external motion reference, set `VIDEO` to the user-supplied `wcpc.mov`.
+The tool verifies its SHA-256 before decoding. It requires ffmpeg, NumPy and Pillow. The existing
+phase 4 raw-source capture supplies the original Amiga pictures and timestamps;
+this analysis does not boot an emulator.
+
+```sh
+: "${VIDEO:?set VIDEO to the supplied wcpc.mov}"
+python3 tools/intro_motion_reference.py "$VIDEO" \
+  --amiga-run tmp/phase4-dma-cia-matrix/020-default/bare \
+  --output tmp/phase5-motion-evidence
+```
+
+Inspect `ships.jpg`, `explosion.jpg`, `asteroids.jpg`, `asteroid-poses.jpg`,
+`amiga-motion.jpg` and `motion.json` in that output. Contacts are labelled in video
+seconds; the Amiga contact is labelled with source-frame indices and emulated
+seconds. Amiga indexed pixels are shown in grayscale solely to inspect geometry,
+not as a faithful palette rendering. Source frames 21–26 and 29–36 refer to the
+`title-animation` scene, not the entire intro's frame index.
+
+The asteroid cadence uses the explicitly selected distinct poses, reviewed
+visually. Its whole-image change scores are retained for diagnosis but must not
+be counted as frames: optical refresh mixtures make that count unreliable.
+Bounding boxes and short displacements use the recorded crop/thresholds; they
+are approximate projected-motion evidence. Do not infer world velocity, a flight
+tick rate or a uniform FPS cap from them. Music and text deadlines are kept
+separate. The decision and limitations are recorded in `internals.md`.

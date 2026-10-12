@@ -1901,3 +1901,170 @@ pass the source-derived endpoint bound (maximum residual 512 units). Their
 controls in full. The 060 default diagnostic ledger differs. The first two also
 have consolidated passes listed above; the NoCache comparison alone is not one;
 in particular, 060 NoCache still fails bare/IRQ exact recorder neutrality.
+
+## Phase 5: intro motion model and PC reference
+
+Phase 5 analysis is complete; **the rate decision remains with the user**.
+No phase 6 renderer or release timing change has been made. The user's clarified
+reference is the movement of ships, explosions and asteroids: visible advances
+per second **and distance/size change**, not total intro length or credit duration.
+Keep the existing music and text deadlines. Their cadence is not a motion-rate
+calibration.
+
+### Optical motion reference
+
+The supplied `wcpc.mov` is 96.611667 seconds, SHA-256
+`53942f67631e30868a214a92fae45776193306bcc805ecf27c54e5279c7be8f3`.
+The user identifies the configuration as eXoDOS's 86Box 4.2, 486SX/16 MHz.
+That configuration and sustained emulator speed are user-reported, not independently
+verified by the clip. The last frames do show the opening caption starting again;
+the recording is not cut off partway through the credits.
+
+`intro_motion_reference.py` samples three one-second passages at 60 samples/s.
+This is the analysis sampling rate, **not game FPS**. The handheld recording can
+contain mixed screen refreshes, so adjacent changed camera frames are not each
+counted as a game advance. Ship/explosion foreground changes tolerate two pixels
+of translation and are grouped across adjacent mixed samples. Four thresholds
+are retained; contacts and the selected asteroid poses allow visual review.
+All decoded media, colour masks/measurements and contacts remain in `tmp/`.
+
+| Moving subject | Video window | Approximate visible cadence | Projected movement in the sampled passage |
+|---|---|---|---|
+| Approaching ships | 28.0–29.0 s | **14–15 advances/s**; 14 change groups at every tested threshold | Upper ship's box centre moves about **7% of viewport width left in 0.20 s**; its left edge moves 41 analysis pixels, about 23 pixels on a 320-wide view |
+| Explosion | 29.0–30.0 s | **about 14 advances/s**; 12–14 automatic groups, 14 at the two stricter thresholds | Bright burst width grows from about **21% to 42% of viewport width in 0.40 s** (29.133–29.533 s) |
+| Asteroid approaching below the caption | 36.2–37.2 s | **roughly 20–25 advances/s**, less certain than the ships | From 36.200 to 36.333 s, its bright component moves down about **8% of viewport height** and grows from 30 to 39 analysis pixels high |
+
+The asteroid estimate uses six visibly distinct poses at 36.233, 36.300, 36.333,
+36.383, 36.417 and 36.467 s: five advances in 0.233 s, about 21/s. The automatic
+whole-image change groups are deliberately **not** used as an asteroid frame
+counter: mixed refresh images join consecutive advances. This short optical
+sample supports an approximate range, not a precise constant for the whole game.
+
+Coordinates refer to a 640×360 analysis image, with approximately 560×224 pixels
+covering the game viewport. Camera motion, threshold edges, perspective and sprite
+rotation limit precision; these are screen-space examples at those depths, not
+constant world velocities. The asteroid component is isolated from the adjacent
+smaller rock. Explosion growth is reported as width, not translational speed.
+No audio waveform/synchronisation claim is made from the phone recording.
+
+The existing original 020 raw-source capture supplies the Amiga comparison,
+without another emulator run. In title-animation source frames 21–26, five
+intervals take 0.623497 s: **8.02 drawn frames/s**. Explosion frames 29–36 give
+**8.32 drawn frames/s**. The first asteroid page averages **12.52 source frames/s**
+over its consecutive-frame intervals. These source timestamps precede conversion;
+they are not monitor refresh measurements. The retained raw stream was independently
+validated in phase 4.
+
+Low drawn FPS does not by itself mean slow movement. The Amiga upper ship's left
+edge moves from native x=95 to x=67 between source frames 21 and 23, in 0.243820 s:
+about **115 native pixels/s**. The PC sample's 41 analysis pixels in 0.20 s,
+normalised to 320-wide coordinates, is about **117 pixels/s**. These are similar
+short portions of the approaching ship's path, not pixel-identical cross-port
+states. The agreement is approximate, but shows why doubling drawn FPS while
+keeping every old movement increment would be wrong.
+
+### Update, draw, wait and publish
+
+Offsets below are hunk-relative (`E` = executable hunk 0, `H3` = hunk 3,
+`S` = slave code hunk). Add `0x2c`, `0x42dec` and `0x20`, respectively, for file
+offsets. Data `D` is hunk 1, with file base `0x3a048` where stored.
+
+| Path | Native work and timing |
+|---|---|
+| Ships/title, `E:1fd00–1fd8e` (file `1fd2c–1fdba`) | Calls update `E:02a8` on every pass; `E:1fd06` draws only on odd D2. Exactly **296 update calls and 148 publications**. D2 and title geometry advance per pass, with no elapsed-time factor. |
+| Asteroids/credits, `E:1fdd6–1fe48` (file `1fe02–1fe74`) | Saves the VBL clock, then update `E:1fdda`, draw `E:1fde0`, publish through `E:1fe14`, input `E:1fe1a`, deadline `E:1fe2a`. **One update per draw** on this captured path. The page ends at 320 VBL counts; its text stops being drawn at 220. These are VBL deadlines, not direct tracker-row comparisons. |
+| Shared update, `E:02a8–02da` (file `02d4–0306`) | Services `E:0260`, dispatches `E:76e4`, `E:7b4e`, `E:680e`, conditionally `E:1568`, and increments the update counter. No elapsed-time argument at this boundary. This is not a complete flight-system audit. |
+| Draw, `E:02e4–0342`; finish `E:0c40–0c66` | Drawing divisor/clear/world drawing, overlay handling, then `E:02dc` → `E:31fc2`. |
+| Software conversion/publish, `E:31fee–31ff6` | Sets source/destination, calls patched `E:32028` → `S:178a`, waits in the original limiter, converts, selects the buffer and calls `E:3378e`. Exactly one COP2LC store per observed publication. |
+| Input | Ship/title poll `E:1fd76`, asteroid poll `E:1fe1a`, both call `E:1898a`. No input is injected before the completed credits cycle. |
+
+Origin also mixes clocks: `H3:0f2a/0f98` exits the opening animation at music cue 2;
+`H3:1066` holds the expression at cue 4; `H3:0db2` holds after flight until cue 9.
+Separation `H3:1194–11a2` and flight `H3:129a–12a4` advance by loop iterations.
+Particles change behaviour at cue 10 (`H3:12dc`), stop spawning at cue 12
+(`H3:13d4`), then drain per-frame work. Consequently a music-anchored cut can stay
+correct while motion inside it speeds up, or its final drain takes longer.
+
+### Targeted coupling and time-source checks
+
+Only three full timing captures were added: an equal-size 020 control/slow pair
+and an original-slave 030/50 MMU comparison. No new debugger build, DMA matrix or
+profiling campaign. A separate short boot located the diagnostic slave. The
+read-only instruction observer records scene cuts, publications, VBL entries,
+tracker positions, limiter samples and delay endpoints without stopping the
+measured intro. All three complete the full cycle and reach the menu.
+
+The VERIFY-only slowdown adds 100,000 decrement-loop iterations inside the c2p
+wrapper at `S:178e` (file `17ae`). The original instruction is replayed by a
+20-byte tail at `S:1e0c`; interrupts remain enabled and registers are preserved by
+the existing wrapper. The equal-size control uses zero iterations. Original
+bytes differ only at the declared four-byte detour; the two fixtures differ only
+in the delay immediate. They are not release slaves or new CUSTOM behaviour.
+The measured added-call span is approximately **31.94 ms median** on the 020
+(control 2.75 microseconds), rather than an assumed delay from instruction counts.
+The control and slow slaves are 7,748 bytes, SHA-256 respectively
+`345e82b1fa5c14ab1a9b74c8776fd170b9318b04d5a904bb85048e3aae122eca`
+and `730deb71df55e2b29b12dc721964b8ad03dab5125c91d79381a9c409bbd4e24d`.
+All three ledgers pass the timing reporter. Wrong CPU clock units, a corrupted
+VBL counter and a missing publication are rejected by deliberate negative checks.
+The fixture pair's only differing file bytes are `1e2f–1e31`, within the delay
+immediate, and the slowdown retains the same 296/148 title update/draw counts.
+
+| Window | 020 control seconds / publications | 020 slowed seconds / publications | 030 MMU seconds / publications |
+|---|---:|---:|---:|
+| Origin separation | 1.431 / 17 | 1.971 / 17 | 0.650 / 17 |
+| Origin flight plus music hold | 10.127 / 42 | 9.587 / 42 | 10.908 / 42 |
+| Ship preamble/action before title arrival | 6.148 / 67 | 8.249 / 67 | 2.646 / 67 |
+| Title arrival | 4.505 / 50 | 6.116 / 50 | 2.003 / 50 |
+| Title departure | 3.020 / 31 | 4.012 / 31 | 1.239 / 31 |
+| First asteroid/credit page | 6.446 / 81 | 6.464 / 60 | 6.412 / 161 |
+
+The two-update ship loop is frame-coupled. Credits deadlines stay clocked while
+asteroid updates/publications change. The complete expression interval remains
+5.300/5.278/5.300 s and reaches music `(cue,order,row,tick)=(4,1,0,0)` in all
+three runs. Flight-plus-hold ends at `(9,2,16,0)` in all three. In contrast, ship
+preamble/action ends at `(3,0,51,4)`, `(4,1,5,0)` and `(1,0,22,1)`: motion is not
+kept in musical step. Full per-scene music endpoints remain in the JSON reports.
+
+Runtime confirmations, limited to this English PAL software-c2p intro:
+
+- Game VBL `E:34162` and counter `D:7f02` agree one-for-one over 8,328 / 8,616 /
+  7,689 consecutive intervals. Music callback `E:27810` likewise runs once per
+  field over 8,288 / 8,576 / 7,662 intervals. The music clock does not depend on
+  render speed. The cadence and existing tracker cue checks do not uniquely fix
+  a motion rate inside a scene.
+- `S:17b8–17e6` samples CIA-A TOD. Consecutive D1 samples agree exactly with elapsed
+  fields at every limiter exit, in all three runs. Deltas never fall below two.
+  On the fast 030, 3,333 of 3,342 intervals are exactly two: the normal limiter
+  caps conversion at approximately 25/s on PAL. This is a cap, not proof of the
+  intended ship-motion rate.
+- The active patched music delay `S:1774–1784` executes four times per capture;
+  observed spans are 0.264–0.319 ms across the runs, consistent with its five
+  changing VHPOSR-line waits. The original CIA-B TOD short-delay routines are
+  replaced on this path. Previously validated STOP/VBL and blitter waits remain
+  display/idle synchronisation, not an independent motion tick.
+- No inference about flight's mission clock, unvisited modal paths, NTSC, German
+  or OCS follows from these observations.
+
+### Rate-decision gate
+
+**Recommended practical ship-motion candidate: about 15 native updates/s**, with
+an approximate **15–17/s** range supported by the short displacement comparison.
+The measured 020 ship portion executes about 16.4 updates/s while producing about
+8.2 pictures/s and a similar projected travel speed to the PC sample. In the
+unmodified two-update-per-draw loop, 15 updates/s means about **7.5 drawn frames/s**,
+not a 15 FPS cap. Better rendering must eventually show intermediate motion
+without doubling the distance travelled per second.
+
+For asteroids the PC reference is faster, approximately **20–25 visible advances/s**.
+Treat this as a separate visual target. A one-to-one PC/Amiga native-step mapping
+has **not** been established for the differently populated asteroid trajectories;
+calling 22 native updates/s a proved intended rate would overstate the evidence.
+The video also does not establish a universal historical design rate.
+
+The decision is therefore concrete: retain a common approximately 15-update/s
+working target, or use separate motion targets with the PC displacement/cadence
+examples above. **Prefer matching motion per subject over a blanket publication
+cap**, and preserve the native music/text deadlines in either case. The user
+chooses at this gate; no rate is installed by phase 5. Flight calibration remains
+phase 7. These limitations do not reopen the phase 4 profiling matrix.
