@@ -1594,3 +1594,35 @@ recording, then idle plus DMA recording. This will validate idle neutrality,
 full source-change recomputation and DMA recording effects per cell. No pending
 cell is counted as completed, and general routine/interrupt accounting remains
 open.
+
+### DMA recording neutrality: matrix controls
+
+The completed `020-default`, `020-nocache` and `030-mmu-default` cells in
+`tmp/phase4-accounting-matrix/` pass exact bare/idle neutrality, including raw
+source bytes. Their DMA arms pass slot-ledger accounting, but this does not
+establish neutrality:
+
+| Cell | Largest absolute scene-time change | Publication change | Final game hunks / raw source |
+|---|---:|---|---|
+| 020 default | 85.272400 ms | credits-15 loses one | differ |
+| 020 NoCache | 112.459630 ms | credits-03 gains one; credits-04 loses one | differ |
+| 030 MMU default | 0.098114 ms | none | identical |
+
+All three menu images match. The 030 MMU ledger matches after removing only
+cycle timestamps; the 020 ledgers do not. The 020 DMA arms are diagnostic
+captures, not accepted neutral baseline measurements. Each cell retains
+`dma-effect.json`, `dma-report.json` and `idle-neutrality.json`.
+
+The pinned emulator's `cia_cycles` changes its CPU delay calls when `debug_dma`
+is enabled: it advances in `CYCLE_UNIT` chunks, while `cia_wait_pre` also splits
+synchronisation from access delay. This is a candidate cause, not yet a confirmed
+explanation of the observed differences. `--dma-cia-unsplit` keeps those calls
+identical to DMA-off, omitting intermediate CIA wait-phase annotations while
+retaining actual CIA-access annotations and DMA ownership records. The latter
+use separate fields in the recorder. This diagnostic does not change game code.
+
+A matched two-cell experiment is running in `tmp/phase4-dma-cia-matrix/`, using
+new cache audits and fresh bare/idle/DMA arms. Its debugger digest is
+`5fc6bc292433e60b788b8f14af09613ea2734c2cbc5476c0ac4024dfa474482d`.
+The build succeeds; runtime neutrality and slot accounting remain unproven until
+those controls complete. The original matrix continues with its original binary.

@@ -967,3 +967,37 @@ A completed batch cell means acquisition and its listed checks finished; it does
 not certify the entire phase 4 gate. Inspect the DMA effect report, including
 state/source equality and any changed fields or publications. A changed clock
 is reported as a measured effect, not an exact-neutrality pass.
+
+### Isolating CIA wait changes during DMA recording
+
+This diagnostic preserves the DMA-off CIA delay stepping. It omits wait-phase
+annotations, not actual CIA access or DMA ownership records. It is experimental;
+do not accept its DMA figures until matched controls and slot checks pass.
+Use a fresh output directory and debugger ports not owned by another capture.
+
+```sh
+. amiga/env.sh
+python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
+  --matrix-mmu030-counters --frequency-clock --matrix-dma --matrix-idle \
+  --aprof-stable-pc --dma-cia-unsplit --output tmp/phase4-dma-cia-debugger
+export FSUAE="$PWD/tmp/phase4-dma-cia-debugger/fs-uae"
+python3 - <<'PYPLAN'
+import json
+from pathlib import Path
+plan = [
+    {'name': '020-default', 'reference': 'tmp/phase4-profile-on-no-raw/result.json'},
+    {'name': '020-nocache', 'reference': 'tmp/phase4-nocache-on/result.json'},
+]
+with Path('tmp/phase4-dma-cia-plan.json').open('x') as output:
+    json.dump(plan, output, indent=2)
+    output.write('\n')
+PYPLAN
+python3 tools/matrix_accounting_batch.py \
+  --plan tmp/phase4-dma-cia-plan.json --output tmp/phase4-dma-cia-matrix \
+  --audit-slave tmp/phase4-cache-slave/WingCommanderCD32.Slave --ports 2458 2459
+```
+
+The batch creates fresh cache audits, recomputes all raw source-change records,
+checks STOP accounting and exact idle neutrality, and reports DMA recording
+changes. A cell's `complete` flag means acquisition/checks finished; inspect
+`dma-effect.json` before treating its DMA arm as baseline evidence.

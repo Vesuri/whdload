@@ -11,7 +11,8 @@ small timing effect. The CPU/cache scene matrix is captured and the matched c2p
 and instant-blitter ceilings are recorded, along with a scoped bitmap-drawing
 ceiling. Blanket clear bypass is invalid. CPU STOP accounting passes a neutral
 020 control and independent instruction-count check; full-matrix accounting
-captures are running. General routine/interrupt costs and remaining validation
+captures are running. DMA recording changes both 020 controls; those captures
+remain diagnostic while a CIA wait-stepping control runs. General routine/interrupt costs and remaining validation
 are still open.
 Phase 3 completed the reproducible intro and publication counter.
 Two fresh boots match all 31 milestone screenshots, live game hunks and the

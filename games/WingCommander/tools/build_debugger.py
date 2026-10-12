@@ -24,7 +24,10 @@ def main():
     p.add_argument('--matrix-idle',action='store_true',help='read-only stopped-CPU transitions and STOP wait-loop accounting')
     p.add_argument('--matrix-dma',action='store_true',help='experimental per-field DMA summary; requires --matrix-observer')
     p.add_argument('--matrix-mmu030-counters',action='store_true',help='read-only scene counters on the cycle-exact 030 MMU interpreter')
+    p.add_argument('--dma-cia-unsplit', action='store_true', help='diagnostic: preserve unrecorded CIA wait stepping; omit CIA wait-phase annotations')
     a = p.parse_args()
+    if a.dma_cia_unsplit and not a.matrix_dma:
+        raise ValueError('--dma-cia-unsplit requires --matrix-dma')
     if a.matrix_mmu030_counters and not a.matrix_observer:
         raise ValueError('--matrix-mmu030-counters requires --matrix-observer')
     if a.matrix_idle and not a.matrix_observer:
@@ -226,6 +229,22 @@ int record_key_debug(int kc) {
         new = 'cpucycleunit = (uae_u64)CYCLE_UNIT * (baseclock / 8) / currprefs.cpu_frequency;'
         code = code.replace(old, new)
         target.write_text(code)
+    if a.dma_cia_unsplit:
+        target = out/'src/cia.cpp'
+        code = target.read_text()
+        start = code.index('static int cia_cycles(')
+        end = code.index('static void cia_wait_post(', start)
+        part = code[start:end]
+        # Record actual CIA accesses as before, but leave the CPU's delay
+        # calls identical to DMA-off. Wait-phase annotations are diagnostic
+        # metadata and are not bus ownership records.
+        old = 'if (currprefs.cpu_memory_cycle_exact && debug_dma) {'
+        assert part.count(old) == 1
+        part = part.replace(old, 'if (false) { // WC: preserve CIA wait stepping')
+        old = 'if (debug_dma) {'
+        assert part.count(old) == 1
+        part = part.replace(old, 'if (false) { // WC: keep sync and access delay combined')
+        target.write_text(code[:start] + part + code[end:])
     # Existing configured dependencies and objects are shared-build inputs; make
     # recompiles the changed translation units and links a new local binary.
     env = dict(os.environ, TMPDIR=str(out))
