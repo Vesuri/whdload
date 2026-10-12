@@ -1615,14 +1615,21 @@ captures, not accepted neutral baseline measurements. Each cell retains
 
 The pinned emulator's `cia_cycles` changes its CPU delay calls when `debug_dma`
 is enabled: it advances in `CYCLE_UNIT` chunks, while `cia_wait_pre` also splits
-synchronisation from access delay. This is a candidate cause, not yet a confirmed
-explanation of the observed differences. `--dma-cia-unsplit` keeps those calls
+synchronisation from access delay. Preserving the DMA-off stepping removes the
+recording effect on both tested 020 states. `--dma-cia-unsplit` keeps those calls
 identical to DMA-off, omitting intermediate CIA wait-phase annotations while
 retaining actual CIA-access annotations and DMA ownership records. The latter
 use separate fields in the recorder. This diagnostic does not change game code.
 
-A matched two-cell experiment is running in `tmp/phase4-dma-cia-matrix/`, using
+The matched two-cell experiment in `tmp/phase4-dma-cia-matrix/` is complete, using
 new cache audits and fresh bare/idle/DMA arms. Its debugger digest is
 `5fc6bc292433e60b788b8f14af09613ea2734c2cbc5476c0ac4024dfa474482d`.
-The build succeeds; runtime neutrality and slot accounting remain unproven until
-those controls complete. The original matrix continues with its original binary.
+Both effective cache states pass exact idle/DMA ledger neutrality, including all
+cycle timestamps, raw source bytes, final allocated game hunks and menu pixels.
+Every scene has zero duration/publication/field difference. The independent menu
+DMA histogram and complete-field accounting pass. Evidence is each cell's
+`dma-neutrality.json`, `dma-report.json`, `dma-effect.json` and raw/idle checks.
+This accepts the corrected recorder for these 020 cells; it does not validate
+routine attribution or prove equivalent behaviour on other CPU cores. The nine
+accelerated cells are being checked in `tmp/phase4-dma-cia-accelerated/`.
+The original matrix continues with its original binary as diagnostic evidence.

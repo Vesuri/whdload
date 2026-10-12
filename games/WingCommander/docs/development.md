@@ -970,9 +970,10 @@ is reported as a measured effect, not an exact-neutrality pass.
 
 ### Isolating CIA wait changes during DMA recording
 
-This diagnostic preserves the DMA-off CIA delay stepping. It omits wait-phase
-annotations, not actual CIA access or DMA ownership records. It is experimental;
-do not accept its DMA figures until matched controls and slot checks pass.
+This recorder variant preserves the DMA-off CIA delay stepping. It omits wait-phase
+annotations, not actual CIA access or DMA ownership records. Both 020 cache states
+pass exact recording neutrality and independent slot checks. Other cores require
+their own matched controls before accepting their DMA figures.
 Use a fresh output directory and debugger ports not owned by another capture.
 
 ```sh
@@ -1001,3 +1002,17 @@ The batch creates fresh cache audits, recomputes all raw source-change records,
 checks STOP accounting and exact idle neutrality, and reports DMA recording
 changes. A cell's `complete` flag means acquisition/checks finished; inspect
 `dma-effect.json` before treating its DMA arm as baseline evidence.
+
+For each completed corrected cell, also require exact recording neutrality:
+
+```sh
+python3 tools/matrix_raw_check.py tmp/phase4-dma-cia-matrix/020-default/dma \
+  --compare-only --control tmp/phase4-dma-cia-matrix/020-default/idle
+python3 tools/matrix_raw_check.py tmp/phase4-dma-cia-matrix/020-nocache/dma \
+  --compare-only --control tmp/phase4-dma-cia-matrix/020-nocache/idle
+```
+
+To check the remaining cores, filter the full `tmp/accounting-plan.json` from
+above for names that do not start with `020-`, write it to a fresh plan file, and
+run `matrix_accounting_batch.py` with the corrected debugger and a new output
+root. The retained run uses `tmp/phase4-dma-cia-accelerated/`.

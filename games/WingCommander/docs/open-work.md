@@ -24,8 +24,9 @@ and scoped bitmap-drawing ceilings are recorded. Blanket clear bypass fails and
 is excluded; broader drawing bounds must preserve pixel-readback dependencies.
 CPU STOP accounting passes the 020 control and independent instruction-count
 check. Both 020 cache states and 030 MMU default pass exact idle neutrality.
-DMA recording changes publication counts and game state on both 020 states;
-these arms are diagnostic only, and a CIA wait-stepping control is in progress.
+The original DMA recorder changes publication counts and state on both 020
+states. Preserving CIA wait stepping passes exact DMA neutrality and slot checks
+on both; accelerated controls with the corrected recorder are in progress.
 Full-matrix DMA/idle/source-census captures are in progress; general
 return attribution and remaining instrument validation are incomplete. The matrix gate has not passed.
 
