@@ -16,8 +16,10 @@ DMA/STOP idle controls and matched c2p, instant-blitter and scoped bitmap-drawin
 ceilings are recorded. Eight configurations pass combined callback validation.
 All phase 4 captures and consolidation jobs are terminal. Phase 5 analysis is
 complete, using the supplied PC video for visible motion cadence and displacement.
-Phase 6 is authorised and in progress. The user deferred further timing
-investigation to gameplay; intro-rate uncertainty does not block rendering work.
+Phase 6 rendering work is complete: measured converter selection, native/live
+output checks, cache-preserving gating and display-end publication are recorded.
+The user deferred further timing investigation to gameplay; exact scene-duration
+neutrality remains an explicit gap. Stop at this checkpoint; phase 7 has not started.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -187,33 +189,37 @@ the asteroid native-step mapping is an explicit limit. The user subsequently aut
 investigation to gameplay. Preserve the existing limiter and record remaining
 frame coupling; do not install the candidate rates as established facts.
 
-### Phase 6 — Rendering, first pass (intro scope, behaviour-neutral)
+### Phase 6 — Rendering, first pass (rendering complete; timing gap documented)
 
-All changes CUSTOM-gated, measured A/B against the matched control, validated
-picture-for-picture against the original.
+All rendering changes are CUSTOM-gated and retain the original path. Results and
+reproducible commands are in `internals.md` and `development.md`.
 
-1. Fast RAM: chunky buffers, drawing workspace and hot tables in fast RAM; keep only
-   what DMA reads in chip RAM.
-2. c2p: replace Psygore's software c2p with Kalms routines selected by CPU
-   (`c2p1x1_8_c5` family for 020/030, the 040/060 variants), full-frame or delta per
-   the measured change rate; verify bit-exactly against a reference with every
-   destination store hooked. Remove the Akiko path.
-3. Display fetch: FMODE 3 with 64-bit aligned bitplanes, adjusted DDF and modulos,
-   sprites checked; measure the freed chip-bus slots.
-4. Buffering and pacing: one publication per completed frame at the display-end edge,
-   triple buffering if memory and measurement justify it.
-5. Caches stay as WHDLoad sets them. Where a routine is sensitive to cache state
-   (self-modifying code, code copied at run time), make it correct under every state
-   rather than changing the state; report results per cache state.
+1. **FAST RAM:** verified active chunky sources, loaded game hunks and the 128 KiB
+   workspace in FAST in the 8 MiB setup; planar buffers remain aligned CHIP.
+   Avoid a broad allocation patch where the observed placement is already right.
+2. **c2p:** immutable, bit-exact Kalms specialisations; select the 030 family on
+   cached 020/030. Both Kalms candidates regressed on the measured 040/060 setups,
+   and Kalms 030 regressed on uncached 020, so retain the existing converter there.
+   Conservative original selection covers unmeasured configurations. The enabled
+   renderer rejects `Custom5=4`, the old blitter path; no Akiko path was found.
+3. **Display fetch:** FMODE 3, eight-byte alignment and the corresponding modulos
+   already exist in the observed copper lists. No fetch patch or freed-slot claim.
+4. **Buffering:** WaitBOVP before the existing swap protects old-buffer reuse;
+   retain two buffers and one publication per completed frame.
+5. **Caches:** preserve WHDLoad's policy, using a zero-change-mask startup query
+   for selection. No converter SMC or per-frame cache manipulation.
 
-Because game time is still frame-coupled here, a faster renderer also speeds up the
-game. Until phase 9 exists, these builds run behind a frame limiter at the intended
-rate so the speed stays correct where the CPU keeps up. Account for the two-update
-ship loop versus one-update asteroid loop; the existing `Custom5=0` publication
-cap is not itself a calibrated motion target.
+Rendering checkpoint: native store-level checks, live twin comparisons, the
+intro state/publication ledger and matched converter measurements pass in the
+recorded configurations. Rejected candidates are not selected automatically.
+Fresh speed measurements for every retained-original cache cell, optional 060
+cache/setup combinations and real hardware remain unclaimed.
 
-Gate: measured improvement per cell, picture identity with the original in the intro,
-and no change in intro scene durations with the limiter on.
+**Timing part of the original gate is deferred**, following the user's request
+to investigate timing further in-game. The existing limiter and music/text
+thresholds are retained, but CPU-bound scene durations can change. The final
+020 reset-to-menu window is 0.631 s longer; no universal intended rate or exact
+duration neutrality is claimed. Stop here; do not start phase 7 automatically.
 
 ### Phase 7 — Gameplay windows
 
@@ -341,5 +347,5 @@ executable, display, c2p (none expected) and timing. Reuse designs, not assumpti
 
 ## Decisions pending
 
-- The intro's intended rate, after phase 5; flight's, after phase 7.
+- Intended intro/flight rates, deferred to the in-game timing investigation.
 - Decoupling design B, C or D, after phase 8's pricing.
