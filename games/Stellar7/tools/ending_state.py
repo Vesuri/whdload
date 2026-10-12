@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Check native final-boss/ending snapshots; the one-health setup is explicit."""
+"""Check native final-boss/ending snapshots with explicit reduced-health or unchanged-health setup."""
 import argparse
 import json
 import re
 import struct
 from pathlib import Path
-from encounter_state import read as encounter, validate_finish
+from encounter_state import read as encounter, validate_finish, validate as validate_encounter
 from sim60_state import read as clock
 
 
-def validate(folder, listing):
+def validate(folder, listing, native_health=False):
     folder = Path(folder)
     slave = Path(listing).with_suffix('.slave').read_bytes()
 
@@ -39,16 +39,53 @@ def validate(folder, listing):
             r'^(a2|a3|sp)\s+0x([0-9a-f]+)', anchor, re.M)}
         return path, meta, read, value, regs, clock(path)
 
-    hit, meta, read, value, regs, hc = capture('before-hit', 0x11202)
+    hit_pc = 0x11202
+    if native_health:
+        anchor = (folder/'before-hit/anchor.txt').read_text()
+        code = int(re.search(r'^code=(\S+)', anchor, re.M)[1], 0)
+        hit_pc = int(re.search(r'^pc\s+0x([0-9a-f]+)', anchor, re.M)[1], 16)-code
+        assert hit_pc in (0x3f04, 0x11202), 'unsupported native damage boundary'
+    hit, meta, read, value, regs, hc = capture('before-hit', hit_pc)
     setup = encounter(hit, listing)
-    validate_finish(setup)
-    assert read(meta['code']+0x11202, 4) == bytes.fromhex('4eba04c8')
-    boss, shot = regs['a3'], regs['a2']
-    assert value(boss+2, '>H') == 44 and value(boss+0x55, '>B') == 1
-    assert value(shot+2, '>H') == 23
-    assert value(shot+0x6a, '>I') == value(meta['data']+0x43c0, '>I')
-    damage = value(regs['sp']+4, '>H')
-    assert damage >= 1 and hc['ticks'] >= setup['finish_tick']
+    if native_health:
+        validate_encounter(setup)
+        assert setup['requested_level'] == 6
+        assert 'finish_setups' not in setup, 'reduced-health fixture is present'
+        symbols = Path(listing).read_text(encoding='latin1')
+        assert not re.search(r'^BOSS_FINISH_TEST\s+E:', symbols, re.M)
+        if hit_pc == 0x3f04:
+            assert read(meta['code']+0x3f04, 8) == bytes.fromhex('48e70310266f0010')
+            boss = value(regs['sp']+4, '>I')
+            damage = value(regs['sp']+8, '>H')
+            caller = value(regs['sp'], '>I')-meta['code']
+            if not 0 <= caller < 0x25360:
+                table = {k: int(v, 16) for k, v in re.findall(r'^(\S+)\s+00:([0-9A-F]+)', symbols, re.M)}
+                slave_base = value(meta['code']+0x2af8, '>I')-table['s60_entry']
+                wrapper_return = value(regs['sp'], '>I')-slave_base
+                assert table['s60_contact_health'] <= wrapper_return < table['s60_contact_shield_sound']
+                caller = value(regs['sp']+10, '>I')-meta['code']
+                assert caller == 0x35ae and value(meta['data']+0x1e9e, '>H') > 0, 'unverified contact caller'
+
+        else:
+            assert read(meta['code']+0x11202, 4) == bytes.fromhex('4eba04c8')
+            boss, shot = regs['a3'], regs['a2']
+            assert value(shot+2, '>H') == 23
+            assert value(shot+0x6a, '>I') == value(meta['data']+0x43c0, '>I')
+            damage = value(regs['sp']+4, '>H')
+            caller = 0x11206
+        health = value(boss+0x55, '>B')
+        assert value(boss+2, '>H') == 44 and 0 < health <= damage
+    else:
+        validate_finish(setup)
+        assert read(meta['code']+0x11202, 4) == bytes.fromhex('4eba04c8')
+        boss, shot = regs['a3'], regs['a2']
+        health = value(boss+0x55, '>B')
+        assert value(boss+2, '>H') == 44 and health == 1
+        assert value(shot+2, '>H') == 23
+        assert value(shot+0x6a, '>I') == value(meta['data']+0x43c0, '>I')
+        damage = value(regs['sp']+4, '>H')
+        caller = 0x11206
+        assert damage >= 1 and hc['ticks'] >= setup['finish_tick']
     assert hc['running'] == 1 and hc['session'] == 7
 
     _, cm, read, value, _, cc = capture('before-final-clear', 0x3ff4)
@@ -80,7 +117,7 @@ def validate(folder, listing):
         if name == 'ending-entry':
             assert read(em['code']+0x2eb6, 10) == bytes.fromhex('426770063f004eba7fbc')
             assert value(regs['sp'], '>H') == 6
-    return dict(setup=setup, hit_tick=hc['ticks'], damage=damage,
+    return dict(setup=setup, native_health=native_health, health_before=health, caller_offset=hex(caller), hit_tick=hc['ticks'], damage=damage,
                 completed_tick=ec['ticks'], renders=ec['renders'], ending_returned=True)
 
 
@@ -88,5 +125,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('capture', type=Path)
     parser.add_argument('--listing', type=Path, required=True)
+    parser.add_argument('--native-health', action='store_true', help='require no boss-health shortcut and observe the native damage entry')
     args = parser.parse_args()
-    print(json.dumps(validate(args.capture, args.listing), indent=2))
+    print(json.dumps(validate(args.capture, args.listing, args.native_health), indent=2))

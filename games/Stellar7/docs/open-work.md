@@ -210,7 +210,9 @@ lethal shield contact and controlled airborne/landed terrain contacts pass at
 both rates. Lethal mine contact and native mine destruction also pass; visual/audio
 detonation, arbitrary terrain and projectile midair impacts remain open. Powered input-only pilots now clear the full SOL wave, kill its full-strength
 boss and take the native exit to level 1 at both rates; direct native-event
-verification passes. Later bosses and ending remain open. Natural
+verification passes. Full-health final-boss kills and native ending entry/return
+also pass at both rates after explicit earlier-level/wave shortcuts. Later full
+waves remain open. Natural
 combat death, Continue and No/menu/new-game pass at both rates after
 fixture-controlled earlier exits to level 6. Evidence is retained under
 `tmp/release60`; completed step-5 measurements remain the current performance

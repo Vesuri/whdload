@@ -40,7 +40,7 @@ semantics or unseen paths. Exact-build indirect and stack-return audits also
 pass these windows. Evidence: `tmp/release60/a500-sol-all-entry-audit.json` and
 `entry-audits/*.json`.
 
-All 54 host-tool tests pass (`tmp/release60/host-tests-mine.log`). Named machine
+All 54 host-tool tests pass (`tmp/release60/host-tests-ending.log`). Named machine
 presets now resolve before the launcher chooses a fixed-rate slave; the
 selection regression rejects the prior order and passes all seven presets,
 explicit/default CPUs and an invalid-preset case. This argument-level test does
@@ -109,7 +109,7 @@ Both binaries match their full-wave captures and installed hooks pass (108/107).
 Evidence: `tmp/release60/powered-boss-events/n3-validation.json` and
 `n12-validation.json`. These are independent encounter completions, not a
 cross-rate state-equality check; trajectories and pre-boss scores differ.
-Later full encounters and ending remain open. The observed native cannon
+Later full encounters remain open. The observed native cannon
 projectile kills and normal exits do not cover all power effects or audible output.
 
 The level-1 full-wave pilots select that level with one earlier fixture-controlled
@@ -129,12 +129,34 @@ proximity, actor-type and single-slot options, unchanged ordinary power-fixture
 bytes against the current committed source, and playable-release exclusion
 (`tmp/release60/trigger-builds/validation.json`).
 
-These final-boss attempts use fixture-controlled earlier exits and wave completion,
-leaving boss health unchanged. Both end in player death (ticks 844/3356, energy
--20) and do not verify victory or ending. Early-power carrier and shield/mine
-probes are not passing encounter evidence: one stayed in carrier approach, and
-others expired before contact or consumed charges during earlier level setup.
-Corrected contact probes arm only after those setup exits; mine destruction and broader terrain/midair coverage remain open.
+Full-health final-boss kills and native ending entry/return pass at both selected
+rates. Earlier exits and wave completion are explicitly fixture controlled;
+BOSS_FINISH_TEST is absent, leaving native boss health unchanged. These are
+full-health boss encounters, not full-wave final-level or full-game playthroughs.
+Both pilots use normal approach/fire buttons and a 12000-unit standoff. N=3
+cycles six existing powers on deployment; N=12 selects only its cannon charge.
+
+| Path | Lethal hit tick | Native damage | Completed exit / ending tick | Native caller |
+|---|---|---|---|---|
+| N=3 A500 | 1148 | Health 8→0, damage 15 | 1149 | Shield contact $35a8/$35ae through the contact wrapper |
+| N=12 68020 | 3317 | Health 4→0, damage 5 | 3318 | Player-owned type-23 hit $11202/$11206 |
+
+Read-only stops at $3ff4 verify health zero, level 6, active still one and death
+zero before the native final clear. At ending entry $2ebc and return $2ec0,
+level is 7, victory is one and the scheduler stays stopped with unchanged
+completed ticks/renders; native sequence argument is six. Exact snapshots and
+hook audits pass. `ending_state.py --native-health` rejects the reduced-health
+fixture, a missing victory flag and an interrupted ending return; its existing
+reduced-health checks still pass. Evidence: `tmp/release60/full-ending-any/n3-validation.json`
+and `full-ending-cannon/n12-validation.json`. The earlier projectile-only A500
+observer missed the shield kill; its incomplete capture is not ending evidence.
+A six-power N=12 pilot instead died, so the successful paths are independent
+encounter completions rather than a cross-rate state-equality comparison.
+
+Corrected contact probes arm only after setup exits. Early-power probes that
+spent charges in prior levels or stayed in carrier approach are not passing
+encounter evidence. Later full waves, arbitrary terrain and projectile midair
+coverage remain open.
 
 Lethal shield ramming passes at both selected rates using the existing shield
 charge and ordinary approach/button inputs in level 6 (earlier exits are fixture

@@ -935,6 +935,14 @@ breakpoint PCs, a player-owned projectile, the explicit BE63 health setup,
 zero death, and unchanged update/presentation counts during the ending.
 Manually interrupted debugger stops are rejected.
 
+For a boss with unchanged native health, add `--native-health`. Retain the
+lethal hit at native $11202 (player projectile) or damage entry $3f04, then
+$3ff4, the completed exit, ending entry $2ebc and return $2ec0. This mode
+rejects BOSS_FINISH_TEST and the reduced-health setup record; it validates
+shield-wrapper callers through the original native return address. Earlier
+level/wave shortcuts remain explicit in capture metadata. Selected-rate
+captures are under `tmp/release60/full-ending-any` and `full-ending-cannon`.
+
 `LEVEL_TEST=200 LEVEL_OBSERVE=1` selects passive transition observation instead
 of the requested exit: it records the first inactive, non-death update and checks
 native resume/reset state. The W762 result distinguishes this mode from W761
