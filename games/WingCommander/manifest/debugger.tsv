@@ -1,4 +1,5 @@
-# Shared aprof source files required by the local input extension (no downloads).
+# Shared aprof source files required by the local debugger input/observer extensions (no downloads).
 # source commit: b70b1180b44ab25b97cd66466c70879897d8a362 + AmigaXDev aprof patch
 src/barto_gdbserver.cpp	15c794e725802117fbb11e1cc43715d41b8adb9a3b3882f8b1af3c1ac9257e22
 src/keybuf.cpp	9eb1b3d807231cbe17cd884d9e335de3ce43d09a3586a9ee766d59ffe675878e
+src/newcpu.cpp	aa0c13afc172cb5dc8f0eab8611c5987d57b47f7cc63b41326166730e689f12c

@@ -44,6 +44,23 @@ printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assig
 mkdir -p "$BOOT/state" "$BOOT/shots"
 export FSEMU_SCREENSHOTS_DIR="$PWD/$BOOT/shots"
 JOY0="${JOY0:-mouse}" JOY1="${JOY1:-keyboard}"
+# The launcher rebuilds its preset at launch, so wrap that preset function.
+# Numeric frequency overflows in the pinned core; stock 020 uses multiplier 4.
+if [ "${INTRO_STOCK_CLOCK:-0}" = 1 ]; then
+  setup_function=$(declare -f fsuae_setup)
+  eval "${setup_function/fsuae_setup/wc_base_setup}"
+  fsuae_setup() {
+    wc_base_setup || return 1
+    [ "$AMIGA_SETUP" = a1200-fast ] || { echo "intro clock requires a1200-fast" >&2; return 1; }
+    local i
+    for i in "${!FSUAE_SETUP_ARGS[@]}"; do
+      case "${FSUAE_SETUP_ARGS[$i]}" in
+        --uae_cpu_multiplier=*) FSUAE_SETUP_ARGS[$i]=--uae_cpu_multiplier=4 ;;
+        --uae_cpu_frequency=*) FSUAE_SETUP_ARGS[$i]=--uae_cpu_frequency=0 ;;
+      esac
+    done
+  }
+fi
 fsuae_options
 fsuae_launch --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   --floppy_drive_0="$WORKBENCH_ADF" --state_dir="$BOOT/state"

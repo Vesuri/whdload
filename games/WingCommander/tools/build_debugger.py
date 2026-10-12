@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
+    p.add_argument('--intro-observer', action='store_true', help='read-only phase 3 PC/field observer')
     a = p.parse_args()
     source = Path(os.environ.get('FSUAE_SOURCE', os.environ['AMIGA_SHARE']+'/fs-uae-aprof-build/fs-uae'))
     out = (ROOT/a.output).resolve()
@@ -44,6 +45,9 @@ int record_key_debug(int kc) {
     assert s.count(anchor) == 1
     s = s.replace(anchor, '''} else if(cmd == "inputcaps") {
         response += to_hex("key-raw-v1");
+    } else if(cmd == "trace-window-all") {
+        baseText = 0; sizeText = 0x7fffffff;
+        response += to_hex("profile-window 00000000 7fffffff");
     } else if(cmd.substr(0, 4) == "key ") {
         unsigned key = 0; int pressed = -1; char extra;
         if(sscanf(cmd.c_str(), "key %x %d %c", &key, &pressed, &extra) == 2
@@ -53,8 +57,19 @@ int record_key_debug(int kc) {
         } else response += "E01";
     '''+anchor)
     p.write_text(s)
+    if a.intro_observer:
+        target = out/'src/newcpu.cpp'
+        code = target.read_text()
+        anchor = 'struct cpu_profiler {'
+        assert code.count(anchor) == 1
+        code = code.replace(anchor, '#include "wc_intro_observer.inc"\n'+anchor)
+        anchor = 'explicit cpu_profiler(uae_u32 pc) {'
+        assert code.count(anchor) == 1
+        code = code.replace(anchor, anchor+'\n        wc_observe(pc);')
+        target.write_text(code)
+        shutil.copyfile(ROOT/'tools/intro_observer.inc', out/'src/wc_intro_observer.inc')
     # Existing configured dependencies and objects are shared-build inputs; make
-    # recompiles both touched translation units and links a new local binary.
+    # recompiles the changed translation units and links a new local binary.
     env = dict(os.environ, TMPDIR=str(out))
     subprocess.run(['/usr/bin/make','-j4','fs-uae'],cwd=out,env=env,check=True)
     subprocess.run([str(out/'fs-uae'),'--version'],check=True)
