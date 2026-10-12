@@ -1,3 +1,7 @@
+; Host code size is supplied by relocated-loader builds; legacy default exact.
+ ifnd FF1_HOST_CODE_SIZE
+FF1_HOST_CODE_SIZE equ 5440
+ endc
 ; VERIFY capacity may be reduced by an isolated capture build to fit Chip RAM.
 ; Allocation and overflow guard always share this value; default ABI is unchanged.
  IFND FF1_SPEED_RECORD_CAPACITY
@@ -6236,7 +6240,7 @@ schedule_install:
  move.w #$4eb9,$24946
  move.l a0,$24948
  lea (start.l,pc),a2
- suba.l #5440,a2
+ suba.l #FF1_HOST_CODE_SIZE,a2
  move.l $1180(a2),a2
  jsr $20(a2)
  move.l $4.w,a6
