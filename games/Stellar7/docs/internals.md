@@ -83,20 +83,26 @@ Evidence: `tmp/release60/long-encounters`, `carrier-target-finding.json` and
 VERIFY-only; playable release exclusion still passes
 (`carrier-fix-build-exclusion.log`).
 
-The powered N=3 input-only pilot clears the full SOL wave, kills its full-strength
-boss and takes the native exit into level 1. Existing inventory powers activate
-through button input from tick 5500; no wave, health, inventory or level setup is
-used. Read-only stops at $10c58/$10c5c observe a player-owned type-23 projectile
-at height 2525 deal 15 damage to the type-44 boss at tick 5666: health goes
-15→0 and score 525→1525. At $3610/$3616, tick 5760, native type-25 exit
-collision clears active while death stays zero. Session-2 tick 150 is level 1,
-energy 400, with the mine charge still unused. The binary matches the full-wave
-capture and all 108 installed hooks pass. Evidence:
-`tmp/release60/powered-boss-events/n3-validation.json`. The N=12 powered attempt
-also reaches an inactive, non-death state with a type-25 exit; direct native
-kill/transition verification remains pending. Later full encounters and ending
-remain open. These observations establish a native cannon projectile kill and
-normal exit, not all power effects or audible output.
+The powered input-only pilots clear the full SOL wave, kill its full-strength
+boss and take the native exit into level 1 at both selected rates. Existing
+inventory powers activate through button input from tick 5500 (N=3) or 34200
+(N=12); no wave, health, inventory or level setup is used. Read-only stops at
+$10c58/$10c5c observe a player-owned type-23 projectile deal 15 damage to a
+full-health type-44 boss, reducing health 15→0 and awarding 1000 points.
+Stops at $3610/$3616 observe native type-25 exit collision clear active while
+death stays zero; session 2 is then level 1, with the mine charge still unused.
+
+| Path | Boss-kill tick | Projectile height | Score before→after | Exit-collision tick | Session-2 tick 150 energy |
+|---|---|---|---|---|---|
+| N=3 A500 | 5666 | 2525 | 525→1525 | 5760 | 400 |
+| N=12 68020 | 34778 | 2330 | 570→1570 | 35239 | 296 |
+
+Both binaries match their full-wave captures and installed hooks pass (108/107).
+Evidence: `tmp/release60/powered-boss-events/n3-validation.json` and
+`n12-validation.json`. These are independent encounter completions, not a
+cross-rate state-equality check; trajectories and pre-boss scores differ.
+Later full encounters and ending remain open. The observed native cannon
+projectile kills and normal exits do not cover all power effects or audible output.
 
 Natural combat death and Continue pass on both selected paths in level 6,
 after six fixture-controlled earlier exits. Death occurs at tick 1860 on N=3

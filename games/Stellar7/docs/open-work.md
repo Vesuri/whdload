@@ -206,10 +206,9 @@ Status: in progress. All 26 native-reference fixture groups pass on the
 selected 15 Hz A500 and 60 Hz 68020 paths. Combined preference changes and
 re-enabling pass through the native menus at both rates. Input-driven cycling
 through six overlapping powers and a jump/landing also pass at both rates;
-combat effects and terrain/midair interactions remain open. The powered input-only A500 pilot now clears the full SOL wave, kills its
-full-strength boss and takes the native exit to level 1; direct native-event
-verification passes. The powered 60 Hz attempt reaches an apparent exit, with
-direct verification pending. Later bosses and ending remain open. Natural
+combat effects and terrain/midair interactions remain open. Powered input-only pilots now clear the full SOL wave, kill its full-strength
+boss and take the native exit to level 1 at both rates; direct native-event
+verification passes. Later bosses and ending remain open. Natural
 combat death, Continue and No/menu/new-game pass at both rates after
 fixture-controlled earlier exits to level 6. Evidence is retained under
 `tmp/release60`; completed step-5 measurements remain the current performance

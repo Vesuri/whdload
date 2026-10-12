@@ -968,7 +968,8 @@ change only the VERIFY input pilot, not gameplay state or playable builds.
 The verified N=3 full-wave SOL route uses APPROACH_TYPE=0, APPROACH_FIRE=1,
 APPROACH_STANDOFF=6000, APPROACH_LOCK=1, APPROACH_AIM=512 and POWER_ROUTE=5500.
 Do not add BOSS_ENCOUNTER, LEVEL_TEST or JUMP_TEST: this route completes the
-opening wave and activates existing powers through input. Direct native kill
+opening wave and activates existing powers through input. The N=12 SOL route
+uses the same flags with POWER_ROUTE=34200. Both pass direct native kill
 and exit evidence is under `tmp/release60/powered-boss-events`; see internals
 for the observed boundaries and the remaining coverage limits.
 
