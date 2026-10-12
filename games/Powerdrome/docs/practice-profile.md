@@ -1,7 +1,6 @@
 # Powerdrome practice departure profile
 
-Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is stopped at the stock-A1200 throughput gate; release validation is incomplete.
-See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+Current release status and validation limits are in [open work](open-work.md).
 
 CPU polygon drawing is the principal bottleneck during the track portion of this A500 run.
 Edge construction and span filling take **54.27% of recorded track cycles**. Background filling
@@ -14,8 +13,9 @@ The pit has a different bottleneck: **47.05%** of its cycles execute KickEmu's W
 That falls to **0.17%** on track. Optimizing the launch wait would have little effect on the
 track portion. The first targets for investigation are the per-scanline polygon loop, its
 four-plane span writers and edge stepping; background clearing is a smaller, regular target.
-No optimization or speedup is claimed here. The [implementation plan](performance-plan.md)
-examines planar staging in fast RAM, measured bitmap traffic and simulation integration.
+This profile describes the original rendering path. The [renderer design](performance-implementation.md)
+covers implemented planar staging, and the [timing design](timing-implementation.md)
+covers simulation integration. Current release measurements are in [internals](internals.md).
 
 ## Capture and scope
 
@@ -32,8 +32,8 @@ emulated A500 execution, not host CPU usage or measurements from physical hardwa
 The trace contains **500 consecutive fields**, ten nominal PAL seconds, **71,050,998
 recorded CPU cycles**, **6,205,664 instruction records**, and **500 game VBL callbacks**.
 Every instruction record has a PC. The first 100 fields match the earlier short capture's
-initial chip memory and CPU/DMA records exactly. A second complete 500-field fresh-boot
-comparison is still pending. The older capture assembled from short chunks has gaps and
+initial chip memory and CPU/DMA records exactly. The complete baseline repeat and drawing comparisons are recorded in
+[renderer verification](performance-implementation.md#verification). The older capture assembled from short chunks has gaps and
 is not used for these measurements.
 
 ## Four distinct phases
@@ -104,7 +104,7 @@ interrupt-entry row is just the entry records, not the full cost of interrupt ha
 Phase D attributes the Kickstart share per call: BltBitMap is 2.580%, LoadView
 0.186%, and no individual traced VBL callback reaches 3%. Its pipelined blitter
 clear is rejected after lower fps and higher frame-cycle cost. The A500 remains
-at 104/456 = 11.404 fps; see [Phase D measurements](internals.md#phase-d-a500-measurements-and-decisions).
+at 104/456 = 11.404 fps; see [A500 measurements](internals.md#a500-and-chip-only-limits).
 
 ## Why polygon drawing is expensive
 
@@ -200,7 +200,7 @@ runs in departure paths, and frame completion still needs comparison with displa
 and an independent counter. The route changes view during these six seconds, so neither
 this cadence nor a mean call cost represents every racing scene.
 
-## Optimization priorities and constraints
+## Bottlenecks and constraints
 
 1. **Polygon scanlines and span writers, 39.84% together.** First investigate repeated
    endpoint/mask/address setup and the four-plane write loops. Measure narrow and wide
@@ -226,10 +226,9 @@ cap its standalone ratio at about 1.09. These are arithmetic bounds, not predict
 This game's racing motion uses a clock-derived, clamped frame delta, so rendering changes
 can also alter the scene reached at a given anchor or field.
 
-Before selecting an implementation, repeat the complete route across fresh boots, validate
-racing frame completion, capture the same route on a 68020, and finish the timing/state
-coupling checks listed in [open work](open-work.md). Replacement loops need register/flag
-and pixel equivalence checks as well as a matched A/B capture. The
+Replacement loops require register/flag and pixel equivalence checks as well as a
+matched A/B capture. The implemented choices and their measurements are described
+in [the renderer design](performance-implementation.md) and [internals](internals.md). The
 [loader audit](loader-equivalence.md) resolves Copylock D2 and records the remaining
 allocation/timing differences; this profile does not compare the two loaders.
 

@@ -1,21 +1,22 @@
 # Optional fast planar renderer
 
-Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is stopped at the stock-A1200 throughput gate; release validation is incomplete.
-See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+Current release status and validation limits are in [open work](open-work.md).
 
-Completion-plan C1 retains a later display handshake for staged scenes: drawing
+The renderer uses a later display handshake for staged scenes: drawing
 runs in fast RAM first, then waits immediately before copying to chip RAM. Native
 fallbacks and twin reference blocks keep the early wait. The write audit, beam
-ordering checks and accelerator gains are in [Current measurements](internals.md#phase-c-measurements-and-decisions).
+ordering checks and accelerator gains are in [Current measurements](internals.md#rendering-costs-and-retained-choices).
 
 
-`CUSTOM1=1` enables the fast-RAM renderer. The option is off by default, including on
-68000 systems. It retains the game's planar format, native double buffering and original
-simulation/update order. It does not introduce chunky pixels, a new timestep or a frame cap.
+The fast-RAM renderer is enabled automatically on 68020+ with real fast RAM.
+`CUSTOM1=1` opts out. All other configurations use native rendering. The renderer
+retains the planar format and native double buffering. Timing is selected separately
+by the same CPU/memory eligibility rule and can be disabled with `CUSTOM3=1`.
+There is no chunky conversion, render interpolation or extra display buffer.
 
 On 68020+ with static code installed, fallback scenes also use that raster code,
 drawing directly to their native chip bitmap. Only supported cockpit scenes stage
-pixels. On 68000/68010 the previous staged-only code routing is retained.
+pixels. 68000/68010 retain the original renderer.
 
 ## Implemented path
 
@@ -57,7 +58,8 @@ specialized span writers retain their original instructions. Sixteen copies of t
 scanline loop select the matching writers with fixed branch displacements. On 68020 and later each loop uses
 three direct LEAs for the remaining plane pointers, removing three MOVEA instructions from
 nonempty rows. Its fixed 124-byte slot and return offset are preserved, with three NOPs at
-polygon return. The 68000/68010 retain the previous loops. The [raster improvement report](raster-improvements.md) records the small
+polygon return. Legacy loops remain in the source, but the runtime selector does
+not enable the staged renderer on 68000/68010. The [raster improvement report](raster-improvements.md) records the small
 measured gain and rejected arithmetic changes. A small
 per-polygon dispatcher chooses a loop and stores its continuation in data, so drawing
 never rewrites the fast code. The shared writer return uses `a6`, which is dead until the
@@ -166,8 +168,8 @@ separately rather than combined into one FPS number.
 
 On a 68000 with 512 KiB chip and 4 MiB fast RAM, the independent 500-field comparison
 measured **106 complete intervals / 468 fields (11.325 fps)** with the option off and
-**87 / 465 (9.355 fps)** with it on. That is about **17.4% slower**. The option therefore
-remains off by default; enabling it is an explicit choice, not automatic CPU selection.
+**87 / 465 (9.355 fps)** with it on. That is about **17.4% slower**. The current selector therefore retains original rendering on 68000/68010,
+even when real fast RAM is present.
 
 A 500-field 68000 twin capture with fast bitmap, code and experimental scratch completed
 24 staged scenes with no pixel, scratch, register, flag or guard failures. Its fast code
@@ -183,7 +185,8 @@ check establishes unchanged hooks, imagery and presentation cadence, not whole-t
 
 ## Reproduction and limits
 
-Build the normal slave with `make -C whdload all`; enable `CUSTOM1=1` in WHDLoad.
+Build with `make -C whdload all`; rendering is enabled automatically on 68020+
+with real fast RAM. `CUSTOM1=1` opts out.
 `make -C whdload verify` includes the input and comparison fixtures. The additional VERIFY
 settings are `CUSTOM2=0` (the normal bitmap-and-code path), `1` (bitmap only), `2` (bitmap, code
 and scratch), or `3` (bitmap and scratch); `CUSTOM4=1` enables twins, and `CUSTOM5=2` enters Practice.
@@ -209,4 +212,4 @@ the completed [gameplay campaign](gameplay-coverage.md) covers longer routes sep
 The emulator 68030/040/060 matrix is documented separately. Physical-board validation is
 outside scope. The bounded gameplay campaign passes 30,623 staged twins and checks native
 view/effect fallbacks; it does not certify every combination or justify widening supported
-paths. The option remains explicit and off by default.
+paths. Current release validation is recorded in [open work](open-work.md).

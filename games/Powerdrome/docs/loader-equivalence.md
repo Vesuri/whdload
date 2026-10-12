@@ -1,11 +1,10 @@
 # Original/development loader equivalence
 
-Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is stopped at the stock-A1200 throughput gate; release validation is incomplete.
-See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+Current release status and validation limits are in [open work](open-work.md).
 
 The Copylock D2 question is resolved: its different return value has no effect on the
 supported game's successful startup path. No registration-tag compatibility patch is
-needed. Matched original/development captures pass on 68000 and 68EC020 with `CUSTOM1=0`.
+needed. Matched original/development captures pass on 68000 and 68EC020 with both enhancements disabled.
 The normal development binary is unchanged by this work.
 
 This establishes the tested startup, name-entry and Practice-state compatibility. It does
@@ -70,7 +69,7 @@ and Space responses. The original reference always takes this Practice route.
   The 68000 pair differs in seven bytes in each bitmap; the 68020 pair differs in seven
   bytes in one bitmap and zero in the other. The comparator retains those counts and
   rejects pixels outside that clock area.
-- Native performance-hook bytes remain intact with `CUSTOM1=0`, checked separately by
+- Native performance-hook bytes remain intact with rendering disabled, checked separately by
   `tools/check_disabled.py` against the supported executable.
 
 The checksum differences follow from relocation; the game's checksum covers relocated
@@ -118,7 +117,7 @@ slaves and capture bytes in ignored `tmp/`. The checkpoints do not write guest s
 source amiga/env.sh
 make -C whdload original original-verify verify
 export PROBE_OFFSETS='0x8962 0x173b2 0x173b6 0x16c4c 0x16c4e 0x11d70'
-export WHD_ARGS='CUSTOM1=0 CUSTOM5=2 NoCache'
+export WHD_ARGS='CUSTOM1=1 CUSTOM3=1 CUSTOM5=2 NoCache'
 export ANCHOR=0x14764 FIELDS=500 SWAP_ONLY=1
 
 tools/fixed_window.sh tmp/prof/equivalence-original-new tmp/build/Powerdrome-original-verify.slave

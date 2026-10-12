@@ -1,7 +1,6 @@
 # Development
 
-Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is stopped at the stock-A1200 throughput gate; release validation is incomplete.
-See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+Current release status and validation limits are in [open work](open-work.md).
 
 ## Inputs and shared tools
 
@@ -41,8 +40,9 @@ slave with interface 17 and the full timing scheduler. `make -C whdload verify` 
 `tmp/build/Powerdrome-verify.slave`; `CUSTOM5=1` submits an empty pilot name through the
 native name-entry routine. `CUSTOM5=2` also selects Practice and submits Space in the pit.
 `CUSTOM1=1` selects the original renderer; `CUSTOM3=1` selects original timing.
-Without these opt-outs, 68020+ enables the scheduler, and 68020+ with real fast RAM
-also enables planar staging. 68000/68010 keep both native paths. The normal
+Without these opt-outs, 68020+ with real fast RAM enables both the scheduler and
+planar staging. 68000/68010 and all configurations without real fast RAM keep both
+native paths, including original frame-dependent timing. The normal
 build contains no input or twin-drawing fixtures. The slave requests 128 KiB of guest
 expansion in addition to KickEmu's 256 KiB, including when the option is off. Slow-backed
 expansion does not enable the renderer. See the [implementation and measured results](performance-implementation.md)
@@ -64,7 +64,7 @@ Windowed, real speed, sound enabled. `CPU`, `CHIP_KB`, `FAST_KB`, `AMIGA_MODEL`,
 are silent with the window behind the others; `SOUND=0|1` and `WINDOW=front|back|none` (none:
 no video) choose explicitly.
 
-### Phase B timing instrument
+### Timing instrument
 
 `make -C whdload coverage VASMFLAGS="-DTIMING_FULL=1 -DVERIFY_PHASE=1"`
 adds the diagnostic phase ring. `VERIFY_PHASE` is rejected outside VERIFY builds.
@@ -93,47 +93,45 @@ and the existing world-restore path explicitly closes aborted steps.
 Other covers work between instrumented phases, including hook overhead. Presentation
 wraps the native `$8056` call, including its time bookkeeping and LoadView.
 
-`tools/baseline_matrix.py tmp/phase-b` runs the prescribed machine/cache/route matrix
-sequentially using frozen slaves in that output directory; `--only REGEX` selects a
-subset. Completed captures can be resumed. Incomplete captures require inspection
-and a distinct retry directory. It stops on a native reference mismatch rather than
-silently accepting new numbers. The A500 calibration supplies an exact 104/456 reference; M3 has no published
-reference, so historical reproduction cannot be claimed for that machine.
+### Release matrix
 
-To freeze a fresh matrix set (use a new ignored output directory):
+`tools/release_matrix.py` runs the current default configuration sequentially on
+M1–M7, with Practice and race routes. M5–M7 run with both WHDLoad CACHE and NoCache.
+It compares complete driving intervals against the matching frozen native baseline,
+then checks renderer twins on M4/M5/M7 and a CACHE pit/departure/track smoke on M6.
+Twins use NoCache on M4/M7 and CACHE on M5; M7's cached native reference has an
+observed comparison failure described in [accelerator testing](accelerator-cache-testing.md).
+The M6 smoke disables twins to exercise production static routing.
+The specific M3 Practice result 153/497 versus 153/496 is a user-accepted exception;
+`no_regression` remains false and `accepted_exception` records the decision. Other
+comparisons have no tolerance. Completed captures are reused only when their
+configuration and slave hash match.
+An incomplete capture is preserved and rejected; inspect it before a distinct retry.
+
+Freeze a fresh build set in an ignored directory:
 
 ```sh
 set -e
 source amiga/env.sh
-out=tmp/phase-b-repeat
+out=tmp/release-repeat
 mkdir -p "$out"
-for target in verify coverage; do
-  make -C whdload "$target" VASMFLAGS=
-  cp "tmp/build/Powerdrome-$target.slave" "$out/$target.slave"
-  make -C whdload "$target" VASMFLAGS=-DTIMING_FULL=1
-  cp "tmp/build/Powerdrome-$target.slave" "$out/full-$target.slave"
-done
-make -C whdload coverage VASMFLAGS="-DTIMING_FULL=1 -DVERIFY_PHASE=1"
-cp tmp/build/Powerdrome-coverage.slave "$out/full-phase.slave"
+make -C whdload verify
+cp tmp/build/Powerdrome-verify.slave "$out/verify.slave"
+make -C whdload coverage
+cp tmp/build/Powerdrome-coverage.slave "$out/coverage.slave"
 make -C whdload all
-python3 tools/baseline_matrix.py "$out"
-python3 tools/baseline_matrix.py "$out" --report
-python3 tools/baseline_matrix.py "$out" --gates
+cp tmp/build/Powerdrome.slave "$out/normal.slave"
+python3 tools/release_matrix.py "$out" --reference tmp/phase-b
 ```
 
-For B3, generate a listing with the exact uninstrumented full-verify flags:
-`make -C whdload verify VASMFLAGS="-DTIMING_FULL=1 -L ../tmp/phase-b/full-verify.lst"`.
-Compare that slave with the frozen `full-verify.slave` before capturing. Then
-`phase_report.py CAPTURE --world-listing tmp/phase-b/full-verify.lst` attributes
-instruction costs from world-step entry through the committed world-clock update.
-The listing reader accepts VASM’s Latin-1 text and checks the live game patch targets.
-The B3 capture uses M1, 100 fields, `SWAP_ONLY=0`, anchor `$bc7c`, and
-`WHD_ARGS="CUSTOM5=2 NoCache CUSTOM1=1 CUSTOM3=1"`. Costs include interrupts;
-frame allocation, rendering/HUD-owned work and the post-commit restore tail are outside
-that explicitly bounded body. B3's fps decision uses the uninstrumented 500-field
-matrix, which includes all costs.
+The reference directory holds the frozen native `baseline.json` results; it is
+local evidence, not a repository dependency supplied to players. `--only REGEX`
+selects individual cases. `normal.slave` is retained alongside the input fixtures
+for normal-build boot checks; measured routes use VERIFY/coverage input fixtures
+with drawing twins and phase instrumentation disabled. Machine definitions and
+current measurements are in [internals](internals.md#current-measurements).
 
-### Phase C buffer audit
+### Buffer audit
 
 `python3 tools/audit_buffer_writes.py CAPTURE` decodes every observed explicit CPU
 memory destination from render entry through presentation, including relocated
@@ -155,7 +153,7 @@ debugger read cannot silently reuse an earlier machine's snapshot. Older M3
 auxiliary `code.bin` dumps are not valid slave-diagnostic evidence; use their chip
 snapshots. Their driving counts came from the live game/VBL addresses in chip RAM.
 
-### Full timing development configuration
+### Timing feature configuration
 
 ```sh
 make -C whdload coverage VASMFLAGS='-DTIMING_FULL=1'
@@ -164,20 +162,19 @@ make -C whdload coverage VASMFLAGS='-DTIMING_FULL=1'
 This selects the fixture-free cadence2 feature set: periodic controls, orientation,
 historical input, engine, WORLD/WORLD20, repair/drop and weather effects/fade/cycle.
 All test defaults are zero and seed defaults are -1 (native initialization). Add the
-retained VERIFY-only pit-sync, stall, render-rate or seed options explicitly for Phase E.
-Individual feature flags still work without the umbrella; WORLD requires WORLD20 and
+retained VERIFY-only pit-sync, stall, render-rate or seed options explicitly for timing regression checks.
+`TIMING_FULL=0` permits explicit individual-feature experiments; WORLD requires WORLD20 and
 repair requires drawing suppression. Explicit per-feature overrides retain the existing
-dependency checks. Normal `make -C whdload all` is unchanged; promotion/defaults are Phase F.
-The Phase A full/normal byte-equivalence checks are recorded in [open work](open-work.md).
+dependency checks. Normal `make -C whdload all` includes `TIMING_FULL=1` by default. Runtime selection
+requires 68020+ with real fast RAM and no C3 opt-out.
 
 ### Verification-only guest chip-memory override
 
 `make -C whdload verify VASMFLAGS='-DVERIFY_CHIPMEMSIZE=1048576'` exposes 1 MiB
 of guest chip memory to exercise native resources unavailable in the normal 512-KiB
-configuration. Use a host with at least `CHIP_KB=1024`; the default A500 timing-matrix
-case supplies only 512 KiB and cannot run this artifact. `CASE_SET=weather-audio` selects
-030/fast and a 1-MiB-chip A500 for a frozen larger-memory coverage slave. Use
-`TIMING_EXTRA_PROBES='0x17836 0x178e6'` for the read-only audio call checks. Freeze the verification slave
+configuration. Use a host with at least `CHIP_KB=1024`; the default A500 has
+only 512 KiB and cannot run this artifact. Use 030/fast for enhanced timing checks.
+Set `PROBE_OFFSETS='0x17836 0x178e6'` for ordered read-only audio call checks. Freeze the verification slave
 under `tmp/` before restoring `make -C whdload all`.
 
 The override requires `VERIFY` and accepts only 524288 or 1048576 bytes. Both invalid-build
@@ -307,19 +304,10 @@ Captures record the effective CPU/memory/options, slave/emulator/ROM hashes, emu
 and optional final screenshot (`CAPTURE_SHOT=1`). The screenshot is taken after the measured
 window and final memory dumps.
 
-```sh
-source amiga/env.sh
-make -C whdload verify
-tools/accelerator_matrix.sh timing tmp/prof/accelerator-matrix
-make -C whdload all
-```
-
-Use fresh output directories. Each matrix freezes its input slave and runs sequentially.
-Cache selection belongs to WHDLoad: users can supply its standard `CACHE` or `DCACHE`
-options through tooltypes or launch arguments (`WHD_ARGS` in the emulator runner).
-Neither normal nor VERIFY builds add a custom cache policy or cache toggle. Shared KickEmu
-startup remains unmodified. The timing matrix explicitly supplies `NoCache` to keep its
-uncached comparisons reproducible; ordinary launches preserve the user's WHDLoad options.
+Use the release matrix above for current accelerator measurements. Cache selection
+belongs to WHDLoad: supply standard `CACHE` or `DCACHE` tooltypes or launch arguments
+(`WHD_ARGS` in the emulator runner). Neither normal nor VERIFY builds add a cache
+policy or cache toggle. Shared KickEmu startup remains unmodified.
 `CUSTOM4=1` enables drawing twins; `CUSTOM5=2` selects Practice.
 `tools/perf_status.py CAPTURE` checks drawing diagnostics and reports the first register
 mismatch when present. See [accelerator testing](accelerator-cache-testing.md) for measured

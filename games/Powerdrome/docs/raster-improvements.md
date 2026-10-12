@@ -1,9 +1,8 @@
 # Raster improvement plan and results
 
-Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is stopped at the stock-A1200 throughput gate; release validation is incomplete.
-See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+Current release status and validation limits are in [open work](open-work.md).
 
-Scope: further optimize the existing planar fast-memory rasterizer behind `CUSTOM1=1`.
+Scope: further optimize the existing planar fast-memory rasterizer selected on 68020+ with real fast RAM.
 Keep the native fallback, CPU compatibility, WHDLoad cache selection and simulation timing.
 No chunky rewrite or scheduler changes. The pre-change source reference is `ee3e90f`.
 
@@ -108,7 +107,7 @@ does not establish that the local instructions alone became slower. It does fail
 end-to-end acceptance test. The selected implementation therefore preserves the previous
 loops on 68000/68010 and selects the refinement only when Exec reports 68020 capability.
 This selection happens once during installation; no CPU test is added to the drawing loop.
-`CUSTOM1` remains off by default. Cache selection remains entirely WHDLoad's responsibility.
+The current release selector enables this path on 68020+ with real fast RAM. Cache selection remains entirely WHDLoad's responsibility.
 
 The final CPU-selected build passes these 500-field drawing twins:
 
@@ -139,27 +138,27 @@ Build and freeze baseline and candidate slaves separately. For the 68020 trace a
 source amiga/env.sh
 export AMIGA_MODEL=A1200 CPU=68EC020 KICKSTART="$KICKSTART_A1200"
 export CHIP_KB=2048 FAST_KB=4096 EXTRA_ARGS=--slow_memory=0 ANCHOR=0xbc7c
-WHD_ARGS='CUSTOM1=1 CUSTOM4=1 CUSTOM5=2 NoCache' FIELDS=100 \
+WHD_ARGS='CUSTOM4=1 CUSTOM5=2 NoCache' FIELDS=100 \
   tools/fixed_window.sh tmp/prof/raster-twin tmp/build/Powerdrome-verify.slave
 python3 tools/perf_status.py tmp/prof/raster-twin
 python3 tools/raster_pairs.py tmp/prof/raster-twin
 python3 tools/raster_costs.py tmp/prof/raster-twin
 python3 tools/check_raster_layout.py tmp/prof/raster-twin
-WHD_ARGS='CUSTOM1=1 CUSTOM5=2 NoCache' FIELDS=500 SWAP_ONLY=1 \
+WHD_ARGS='CUSTOM5=2 NoCache' FIELDS=500 SWAP_ONLY=1 \
   tools/fixed_window.sh tmp/prof/raster-timing tmp/build/Powerdrome-verify.slave
 ```
 
 For long twins use `CUSTOM4=1 FIELDS=500 SWAP_ONLY=1`; the diagnostic counters still compare
 every completed drawing twin without generating a large instruction trace. For 030/040/060
-use the CPU, frequency and exact-cycle arguments in `tools/accelerator_matrix.sh`, with
-`68040-NOMMU` and `68060-NOMMU`. For 68000 use A500, 512 KB chip, 1,536 KB slow and 4 MB fast,
-with the shared default A600 Kickstart. Each before/after pair must retain the same settings.
+use the CPU, frequency and exact-cycle arguments in `tools/release_matrix.py`, with
+`68040-NOMMU` and `68060-NOMMU`. The current selector retains native rendering on 68000/68010; the older 68000
+staged-raster trials above are not reachable through the current user options. Each before/after pair must retain the same settings.
 All captures use the first driving presentation; pit-departure animation is outside this
 raster comparison. Never interpret twin playback rate as game performance.
 
 ### Selected-build timing matrix
 
-All rows below compare the same loader and machine with `CUSTOM1=1 NoCache`, over a
+All rows below compare the same loader and machine with fast rendering and NoCache, over a
 500-field window. The selected build includes the 68000/68010 exclusion.
 Numbers use complete presentation intervals within the window, not the count of all
 marker hits. Later scene inputs can differ when elapsed-time simulation advances differently.
@@ -182,12 +181,12 @@ simulation, chip copy extent, guard/fallback decisions and WHDLoad cache policy 
 Phase D also leaves native M1 spans unchanged. The entire mutable dispatch setup
 is only 0.181% of track time, so removing branch rewriting alone cannot meet its
 3% frame threshold. No qualifying M1 twin result justifies the conditional chip-code
-trial; see [Phase D measurements](internals.md#phase-d-a500-measurements-and-decisions).
+trial; see [A500 measurements](internals.md#a500-and-chip-only-limits).
 
 ## R5: selected change
 
 Retain only direct plane-address construction on 68020+. The 68000/68010 use the previous
-fast loops, and `CUSTOM1=0` continues to use native drawing. Endpoint masking and all edge
+fast loops, and `CUSTOM1=1` selects native drawing. Endpoint masking and all edge
 arithmetic remain native. No cache-control, simulation, clipping, scheduler or presentation
 changes are included.
 

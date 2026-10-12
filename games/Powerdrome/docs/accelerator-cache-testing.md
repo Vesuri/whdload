@@ -1,7 +1,6 @@
 # Accelerator and cache testing
 
-Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is stopped at the stock-A1200 throughput gate; release validation is incomplete.
-See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
+Current release status and validation limits are in [open work](open-work.md).
 
 Completion-plan C2 now routes fallback polygons through installed static raster
 code on 68020+, keeping their native bitmap pointers. Its M4 departure/track audit
@@ -9,18 +8,13 @@ has zero observed game-code writes; pit/title images and M4/M5/M7 twins pass.
 This does not change WHDLoad cache selection or certify physical hardware.
 
 
-Current selected-path timings, including the completed local raster refinement, are in the
-[raster report](raster-improvements.md). The matrix below isolates the preceding base implementation.
+Current end-to-end figures and machine configurations are in
+[internals](internals.md#current-measurements). Standard WHDLoad `CACHE` and
+`DCACHE` options belong to the user; neither build changes cache policy or samples
+control registers. Shared KickEmu startup remains unmodified.
 
-The fast planar renderer benefits the tested 68030, 68040 and 68060 emulator configurations.
-Cache selection belongs to the user's standard WHDLoad `CACHE` and `DCACHE` options.
-Neither normal nor VERIFY builds add a custom cache policy, cache toggle or control-register
-sampler. Shared KickEmu startup is unmodified. The timing runner supplies `NoCache` only to
-make its uncached benchmark configuration explicit.
-
-These results cover emulated Practice departure and driving. They do not certify an
-accelerator board, every user-selected cache configuration or untested gameplay routes.
-Physical-board validation is outside the selected project scope.
+Emulator runs do not certify physical accelerator boards or all cache settings.
+Physical-board validation is outside the selected scope.
 
 ## Native code modification audit
 
@@ -89,43 +83,11 @@ otherwise compared exactly, with only documented pointer relocation allowed.
 The first failing normalized/raw/reference/input snapshots are retained in VERIFY builds
 and decoded by `tools/perf_status.py`.
 
-`tools/accelerator_matrix.sh timing NEW_OUTPUT [VERIFY_SLAVE]` runs the uncached timing
-matrix. Build with `make -C whdload verify` first. Captures retain a frozen slave,
-configuration, memory, renderer diagnostics and a final screenshot. Reuse a new output
-directory for each matrix.
-
-## Uncached timing matrix
-
-The measurements below were captured at revision `4c79767`, before removal of the VERIFY
-cache experiment. They have not been remeasured for the current build. Each row uses a fresh
-boot, A1200 chipset configuration, 2 MiB chip and 4 MiB fast RAM,
-real-speed cycle-exact settings, no JIT, and the same frozen VERIFY slave. `CUSTOM5=2`
-selects Practice. The window begins at the first normal driving presentation (`$bc7c`),
-and the read-only breakpoint counter runs for 500 PAL fields. FPS uses complete
-presentation intervals only. Simulation remains the native elapsed-time-driven loop.
-
-| CPU configuration | Native intervals / fields | Fast intervals / fields | Native fps | Fast fps |
-| --- | ---: | ---: | ---: | ---: |
-| 68030, requested 25 MHz | 194 / 496 | 299 / 498 | 19.56 | 30.02 |
-| 68040 without MMU, requested 25 MHz | 178 / 497 | 410 / 498 | 17.91 | 41.16 |
-| 68060 without MMU, requested 50 MHz | 178 / 497 | 426 / 499 | 17.91 | 42.69 |
-
-Frequency sanity checks with fast rendering and requested 8 MHz measured:
-
-| CPU configuration | Intervals / fields | Nominal PAL fps |
-| --- | ---: | ---: |
-| 68030 | 210 / 497 | 21.13 |
-| 68040 without MMU | 367 / 497 | 36.92 |
-| 68060 without MMU | 367 / 497 | 36.92 |
-
-All nine timing captures confirm instruction/data caches disabled. The 030 TC is zero;
-the 040/060 retain TC `$8000`, but their explicit `-NOMMU` configuration disables emulator
-translation. Their frequency checks therefore exercise the non-MMU execution path.
-
-The requested frequency affects each configuration. This is a sanity check, not cycle
-accuracy certification. The 040/060 native results are identical in this window, and their
-8 MHz fast results are also identical: the emulator shares execution infrastructure and
-chip-bus limits. These figures cannot rank real accelerator boards or predict their gains.
+Use `tools/release_matrix.py` as described in [development](development.md#release-matrix).
+It freezes each input slave with its capture metadata, uses read-only counters for
+throughput, and separately runs renderer twins and a 040 CACHE route smoke.
+Requested emulator frequencies are configuration inputs, not physical-board timing
+certification. Compare each machine with its own native baseline.
 
 ## Emulator cache coverage limits
 
@@ -137,22 +99,36 @@ not real 040/060 cache coherency. Its timing must not be compared with the table
 
 ## Compatibility and release policy
 
-The current VERIFY build passed a 500-PAL-field 68EC020 Practice departure run with
-`CUSTOM1=1 CUSTOM4=1 CUSTOM5=2 NoCache`: 66 completed staged scenes, zero pixel,
-register/CCR, scratch or guard failures, and unchanged copied code. Evidence is retained
-in `tmp/prof/cache-removal-twin-020-500`. Normal and VERIFY builds both compile without a
-cache experiment record or CUSTOM3 toggle. The normal build remains byte-identical to
-the previously validated normal build.
+Both the full timing scheduler and fast planar renderer are selected automatically
+on 68020+ with real fast RAM. All other machines keep original timing and rendering.
+`CUSTOM1=1` and `CUSTOM3=1` independently select original rendering and timing.
+Normal builds have no automated input, twin drawing or mismatch fixtures.
 
-The VERIFY build at revision `4c79767` passed 500-field departure twins on 68000 (24 completed staged
-scenes) and 68EC020 (66), with zero pixel, register/flag, scratch or guard failures and
-unchanged fast code. The original slave still rebuilds byte-identically against the
-installed reference. All three final accelerator option-off captures retain the native
-performance-hook bytes. A 100-field 68000 check with 512 KiB chip and 1,536 KiB slow RAM
-(no fast RAM) also retains every native hook and performs zero staged renders.
+Read [open work](open-work.md) for release gate status and remaining limits.
+`check_disabled.py CAPTURE --timing` checks original relocated hook bytes in both
+initial and final snapshots. `perf_status.py CAPTURE` checks staged renderer
+pixels, registers/CCR, scratch, guards and copied-code immutability in twin runs.
+The pit/departure/track CACHE smoke checks that the route executes; it is not a
+physical copyback-cache coherency test.
 
-The normal build was also booted to the native name-entry screen on 68000 and 68EC020.
-It includes the launch-argument and return-pointer corrections, but no custom cache
-policy, automatic input, twin drawing, control-register diagnostics or mismatch buffers.
-`CUSTOM1=1` remains the only exposed performance toggle, off by default. No simulation
-scheduler, timing clamp or rendering order was changed.
+## Release twin and smoke results
+
+The current release completes 17 M4 NoCache, 26 M5 CACHE and 29 M7 NoCache twins
+without pixel, register/CCR, scratch or guard failures. Their copied code remains
+unchanged. M6 CACHE reaches ordered pit/departure/track checkpoints and completes
+100 staged scenes with twins disabled; this exercises production static routing.
+
+M7 CACHE twins failed: 50 pixel mismatches during the window, 186 total register
+mismatches, first normalized/reference a0 differing by two bytes, and zero guard
+or scratch failures. Copied code stayed unchanged. The first failure is already
+present at the driving anchor. Its NoCache retry passes all comparison checks.
+Evidence remains in `tmp/phase-f/fast-required/M7-CACHE-practice-twins` and
+`M7-NoCache-practice-twins`; the failed run is not discarded or counted as a pass.
+
+`VERIFY` twins call `native_poly` for their reference before `routed_poly` draws
+into fast memory. That reference executes the original branch-displacement writes;
+the installed production path uses static loops. This is a cache-sensitive twin
+comparison failure, consistent with the native reference's self-modification.
+No particular emulator/cache instruction cause has been isolated. Do not claim
+cached pixel equivalence from the passing NoCache twins, cached fps runs or the
+production-path smoke. Normal cache selection still belongs entirely to WHDLoad.
