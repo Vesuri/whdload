@@ -35,6 +35,20 @@ optimization evidence is under `tmp/render60`; buffer-reuse correction and
 current validation evidence are under `tmp/fast60/corrected`. The normal loader
 remains byte-identical.
 
+## Scratch retention
+
+Raw instruction traces from superseded profiling/rendering experiments are
+pruned, along with disposable failed-run and negative-control memory copies.
+Their reports, scripts, listings and measurement summaries remain available;
+re-running a checker that needs a pruned trace requires a fresh capture.
+Current `tmp/fast60` evidence and successful `tmp/release60` captures are retained,
+as are installed game files and build references. The local deletion inventory
+is `tmp/cleanup-manifest.json`.
+
+Retain raw traces only for unresolved findings or current release evidence.
+After a candidate is superseded, keep its measured report and reproduction
+settings rather than accumulating large instruction traces and duplicate dumps.
+
 ## Release playtest still required
 
 Automated captures do not establish physical controls, audible output or
