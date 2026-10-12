@@ -806,6 +806,46 @@ Parser negative controls reject a missing scene, wrong CACR, invalid change coun
 and wrong CPU clock (`tmp/phase4-negative-checked/`). These structural checks do not resolve
 the instrument-accuracy issues above.
 
+### Profiler address-accounting correction
+
+The shared aggregate profiler calls `aprof_after(r->instruction_pc, r->opcode)`
+after executing an instruction. The emulator's `m68k_setpc` changes
+`instruction_pc` during control transfers, so a return can be charged to its
+**destination** instead of its executing address. This makes the original
+per-PC profile unsuitable for exact source-range costs even when total units
+reconcile. The local builder now snapshots PC/opcode before execution with
+`--aprof-stable-pc`; `--matrix-observer` includes this correction automatically.
+It does not change the emulated instruction or the Barto trace hook.
+
+Two separate original-slave 020 boots, with the unmatched-return diagnostic
+logger enabled in both, provide a five-field before/after check. All 427,130
+instruction PC/cost/register records, field cycle/idle totals, screenshots, AGA
+colours and the trace's ROM/chip snapshots match. The corrected aggregate covers
+all 3,829 instruction PCs and their cycle costs in the enclosed trace; the old
+aggregate undercovers 145 count PCs and 146 cost PCs. Its additional edge
+instructions are outside the five-field trace, so this is a lower-bound coverage
+check, not exact equality of the two differently bounded windows. Total aggregate
+accounting remains exact, with zero residual.
+
+Full raw trace identity **does not** pass: the five fields have 18 differing DMA
+bytes and 10 differing custom-register snapshot bytes, all observed differences
+in the pending INTREQ bit `0800`. Instruction execution and slot ownership in
+this slice are unchanged; the cause of that pending-bit difference has not been
+established. It is retained rather than masked by the checker.
+
+The corrected aggregate still has 21 unmatched RTS/RTR/RTD and two unmatched RTE
+returns. The log identifies nonstandard system transfers and a concrete slave
+case: `S:05b4` (file `05d4`) advances the stacked return address by four before
+`S:05b6` returns. Exact saved-return-address matching cannot recognise that call's
+return. A PC correction alone does not repair calling contexts, and all earlier
+whole-scene diagnostics remain unaccepted.
+
+Evidence: `tmp/phase4-return-probe/`, `tmp/phase4-stablepc-probe/`,
+`tmp/phase4-stablepc-check.json` and `tmp/phase4-stablepc-negative.json`.
+The corrected diagnostic emulator SHA-256 is
+`e5434cfd84f60d5497687102226e6ee01477ae676e22730ee4093101f525a044`.
+The old profile is a negative control and must fail the coverage check.
+
 ### Outstanding phase 4 gate work
 
 - Establish calibrated timing and instruction coverage for the requested accelerated

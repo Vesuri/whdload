@@ -464,3 +464,30 @@ fixtures below its fresh `tmp/` output and requires rejection of every one.
 Retained phase 4 results and binary digests are listed in `internals.md`. No
 accelerated FPS, routine-cost comparison, full-scene DMA/idle result or rendering
 ceiling has yet passed the phase 4 gate.
+
+
+### Diagnosing aggregate instruction addresses
+
+`--matrix-observer` now includes the stable executing-PC correction described in
+`internals.md`. Standalone probes can request it with `--aprof-stable-pc`.
+`--aprof-diagnostics` logs unmatched returns and the top four saved contexts to
+the run's `fsuae/Cache/Logs/fs-uae.log.txt`; use it only for short diagnostic runs.
+This logger does not resolve context attribution.
+
+```sh
+. amiga/env.sh
+python3 tools/build_debugger.py --aprof-diagnostics --output tmp/pc-control-debugger
+FSUAE="$PWD/tmp/pc-control-debugger/fs-uae" python3 tools/matrix_probe.py   --machine a1200-fast --output tmp/pc-control
+python3 tools/build_debugger.py --aprof-diagnostics --aprof-stable-pc   --output tmp/pc-fixed-debugger
+FSUAE="$PWD/tmp/pc-fixed-debugger/fs-uae" python3 tools/matrix_probe.py   --machine a1200-fast --output tmp/pc-fixed
+python3 tools/matrix_pc_check.py tmp/pc-control tmp/pc-fixed > tmp/pc-check.json
+```
+
+The checker requires identical instruction PC/cost/register streams, field
+cycle/idle totals, screenshots, colours and the trace's memory snapshots. Every
+trace PC's instruction count and cost must be covered by the wider aggregate
+window. It records DMA/custom snapshot differences without erasing them and does
+not certify context accuracy or complete observer neutrality. As a negative
+control, use `tmp/pc-control` as both arguments: the old aggregate must fail the
+PC-coverage check. Raw traces do not include fast RAM, so trace snapshot equality
+must not be described as a full-memory comparison.

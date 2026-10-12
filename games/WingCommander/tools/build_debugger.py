@@ -16,6 +16,8 @@ def main():
     p.add_argument('--output', required=True)
     p.add_argument('--intro-observer', action='store_true', help='read-only phase 3 PC/field observer')
     p.add_argument('--matrix-observer', action='store_true', help='phase 4 scene profiles and chunky change census')
+    p.add_argument('--aprof-diagnostics', action='store_true', help='log unmatched context returns during diagnostic profiles')
+    p.add_argument('--aprof-stable-pc', action='store_true', help='retain the executing PC/opcode before a control transfer changes it')
     a = p.parse_args()
     source = Path(os.environ.get('FSUAE_SOURCE', os.environ['AMIGA_SHARE']+'/fs-uae-aprof-build/fs-uae'))
     out = (ROOT/a.output).resolve()
@@ -78,6 +80,36 @@ int record_key_debug(int kc) {
             shutil.copyfile(ROOT/'tools/matrix_observer.inc', out/'src/wc_matrix_observer.inc')
         target.write_text(code)
         shutil.copyfile(ROOT/'tools/intro_observer.inc', out/'src/wc_intro_observer.inc')
+    if a.aprof_stable_pc or a.matrix_observer:
+        target = out/'src/newcpu.cpp'
+        code = target.read_text()
+        start = '\t\t\t\tif (aprof_on) aprof_before();'
+        end = '\t\t\t\tif (aprof_on) aprof_after(r->instruction_pc, r->opcode);'
+        assert code.count(start) == code.count(end) == 1
+        # A local block keeps the core's existing goto-cont path outside these
+        # initializations. Guest execution and the Barto hook stay unchanged.
+        code = code.replace(start, '\t\t\t\t{ const uae_u32 wc_pc = r->instruction_pc;\n'
+                                  '\t\t\t\t  const uae_u16 wc_opcode = r->opcode;\n'+start)
+        code = code.replace(end, '\t\t\t\tif (aprof_on) aprof_after(wc_pc, wc_opcode);\n\t\t\t\t}')
+        code = code.replace('fprintf(f, "AITDPROF 1\\n");',
+                            'fprintf(f, "AITDPROF 1\\nsource_pc_stable 1\\n");')
+        target.write_text(code)
+    if a.aprof_diagnostics:
+        target = out/'src/newcpu.cpp'
+        code = target.read_text()
+        anchor = '\tif (rte) aprof_unmatched_rte++; else aprof_unmatched_rts++;'
+        assert code.count(anchor) == 1
+        code = code.replace('static void aprof_pop(uae_u32 newpc, bool rte)', 'static void aprof_pop(uae_u32 newpc, bool rte, uae_u32 pc)')
+        code = code.replace('aprof_pop(m68k_getpc(), false);', 'aprof_pop(m68k_getpc(), false, pc);')
+        code = code.replace('aprof_pop(m68k_getpc(), true);', 'aprof_pop(m68k_getpc(), true, pc);')
+        code = code.replace(anchor, r'''	write_log("WC_UNMATCH rte=%d pc=%08x next=%08x sp=%08x depth=%d\n",
+            rte, pc, newpc, m68k_areg(regs,7), aprof_depth);
+        for (int i=aprof_depth-1; i>=0 && i>=aprof_depth-4; --i) {
+            const auto& fr=aprof_stack[i];
+            write_log("WC_FRAME ret=%08x kind=%u target=%08x\n", fr.ret, fr.kind, aprof_nodes[fr.node].target);
+        }
+''' + anchor)
+        target.write_text(code)
     # Existing configured dependencies and objects are shared-build inputs; make
     # recompiles the changed translation units and links a new local binary.
     env = dict(os.environ, TMPDIR=str(out))
