@@ -14,6 +14,7 @@ p.add_argument('--fields',type=int,default=100)
 p.add_argument('--frame',type=int,default=90)
 p.add_argument('--level',type=int,choices=range(7),help='wait for this level before matching the requested boundary')
 p.add_argument('--tick',type=int,help='capture a completed SIM60 tick instead of a legacy frame')
+p.add_argument('--session',type=int,help='match this SIM60 session as well as the tick, e.g. after Continue or a level exit')
 p.add_argument('--tick-checkpoints',type=int,nargs='*',default=[],help='additional completed SIM60 tick boundaries')
 p.add_argument('--checkpoints',type=int,nargs='*',default=[],help='additional simulation frames to snapshot after the trace')
 p.add_argument('--swaps-only',action='store_true')
@@ -27,6 +28,8 @@ p.add_argument('--stop-on-inactive', action='store_true', help='stop checkpoints
 p.add_argument('--raw-trace', action='store_true', help='retain Barto display/DMA trace without requiring CPU instruction records')
 p.add_argument('--retain-command', action='store_true', default='--warp_mode=0' in os.environ.get('EXTRA_ARGS','').split(), help='retain the running project emulator command for frontend-option verification (automatic for explicit --warp_mode=0)')
 a=p.parse_args()
+if a.session is not None and (a.tick is None or a.session < 1):
+    p.error('--session requires --tick and a positive session number')
 if a.raw_trace and (a.state_only or a.swaps_only or a.latency_listing or a.presentation_listing or a.native_events):
     p.error('--raw-trace cannot be combined with another observer or --state-only')
 if a.stop_on_inactive and (a.tick is None or not a.state_only or not a.tick_checkpoints or a.latency_listing or a.presentation_listing):
@@ -122,8 +125,14 @@ try:
     def boundary_count(memory):
         return struct.unpack_from('>I' if a.tick is not None else '>H',memory,counter-base)[0]
     def level_matches(memory):
-        return a.level is None or struct.unpack_from('>H',memory,data-base+0x46a0)[0] == a.level
+        return (a.level is None or struct.unpack_from('>H',memory,data-base+0x46a0)[0] == a.level) and (a.session is None or struct.unpack_from('>I',memory,entry-base+100)[0] == a.session)
     level_condition = '' if a.level is None else f' && *(unsigned short*){data+0x46a0:#x} == {a.level}'
+    if a.session is not None:
+        from sim60_state import decode_version
+        assert decode_version(struct.unpack_from('>H',mem,entry-base+50)[0])[0] >= 17
+        session=struct.unpack_from('>I',mem,entry-base+100)[0]
+        if session>a.session:raise RuntimeError(f'Already passed session {a.session}: {session}')
+        level_condition += f' && *(unsigned int*){entry+100:#x} == {a.session}'
     count=boundary_count(mem)
     if level_matches(mem) and count>requested:raise RuntimeError(f'Already passed boundary {requested}: {count}')
     print(f'Waiting for gameplay {"tick" if a.tick is not None else "frame"} {requested}...',flush=True)
@@ -141,7 +150,7 @@ try:
         raise RuntimeError(f'Requested {field_hz} Hz display but Exec reports {observed_hz}; verify scan timing before reporting FPS')
     legacy_count=struct.unpack_from('>H',mem,data-base+0x1e96)[0]
     (out/'anchor.txt').write_text(reply+f'\nframe={legacy_count}\ntick={a.tick}\ncode={h:#x}\ndata={data:#x}\nbase={base:#x}\n')
-    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=struct.unpack_from('>H',mem,data-base+0x1e96)[0],tick=a.tick,level_filter=a.level,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast,slow_kb=slow,extra_args=env.get('EXTRA_ARGS',''),whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS',''),ntsc_mode=ntsc_mode,field_hz=field_hz,observed_exec_hz=observed_hz),indent=2)+'\n')
+    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=struct.unpack_from('>H',mem,data-base+0x1e96)[0],tick=a.tick,level_filter=a.level,session_filter=a.session,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast,slow_kb=slow,extra_args=env.get('EXTRA_ARGS',''),whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS',''),ntsc_mode=ntsc_mode,field_hz=field_hz,observed_exec_hz=observed_hz),indent=2)+'\n')
     (out/'state.bin').write_bytes(mem[data-base:data-base+0x823c])
     if a.retain_command:
         pid=int((root/'amiga/.run/fsuae.pid').read_text().strip())
@@ -211,6 +220,7 @@ delete''')
         count=boundary_count(mem)
         inactive = a.stop_on_inactive and mem[data-base+0x1e53] == 0
         if inactive:
+            assert level_matches(mem), 'inactive boundary is outside requested level/session'
             assert previous_boundary < count <= checkpoint, 'inactive boundary reset or skipped'
         if not inactive and (count != checkpoint or not level_matches(mem)):raise RuntimeError(f'Expected checkpoint {checkpoint} in level {a.level}, stopped at {count}')
         legacy_count=struct.unpack_from('>H',mem,data-base+0x1e96)[0]

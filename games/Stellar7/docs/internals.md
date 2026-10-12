@@ -77,12 +77,20 @@ then end in natural death. The target-lock pilot initially retained the carrier
 as a non-firing spacing target after boss deployment. It now leaves carriers
 unlocked so a nearer live boss can be selected. In the corrected N=3 attempt,
 the boss starts at 15 health and reaches 11 before player death at tick 5773;
-this demonstrates boss damage, not victory. The corresponding N=12 corrected
-attempt is pending. No wave, health, level or inventory injection is used.
+this demonstrates boss damage, not victory. At N=12 the boss reaches 13 health before player death at tick 34969. No wave, health, level or inventory injection is used.
 Evidence: `tmp/release60/long-encounters`, `carrier-target-finding.json` and
 `boss-target-encounters/sol-n3-observations.json`. The pilot correction is
 VERIFY-only; playable release exclusion still passes
 (`carrier-fix-build-exclusion.log`).
+
+Natural combat death and Continue pass on both selected paths in level 6,
+after six fixture-controlled earlier exits. Death occurs at tick 1860 on N=3
+and tick 9212 on N=12. The native Continue dialog resumes level 6 in session 8
+with energy 680, reset tick/render/phase state and the expected clock credit.
+Two post-resume snapshots per path have no missing input samples or queue drops;
+installed hooks pass. Session-filtered captures ensure those snapshots belong
+to the restarted game. Evidence: `tmp/release60/natural-continue/validation.json`.
+This does not establish completion of the preceding levels or choosing No.
 
 ## Fast-CPU presentation and sustained combat
 

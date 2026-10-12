@@ -165,7 +165,12 @@ use DEATH_TEST=200 or LEVEL_TEST=200 LEVEL_LAST=6; add DEATH_DECLINE=1 or
 LEVEL_EARLY=1 for alternate paths. Capture restarted ticks 600→1500, and level
 six for exits. Compare both endpoints with `simulation_state.py --projection
 --presentation`; only deferred projection scratch may differ. Run death_state
-and level_state as appropriate. Use exact retained listings for hook and
+and level_state as appropriate. `fixed_window.py --session S --tick T`
+waits for a specific simulation session, preventing a pre-death tick from
+matching a post-Continue capture. Combine it with `--level`; the session must
+be positive and requires `--tick`. The natural Continue check uses session 8,
+level 6 after six fixture-controlled earlier exits, with DEATH_NATURAL=1.
+It observes actual combat death without writing energy. Use exact retained listings for hook and
 CUSTOM1-off code audits. The restoration reference is under `tmp/restore60`; input-history lifecycle
 evidence is under `tmp/input-history/lifecycle`.
 

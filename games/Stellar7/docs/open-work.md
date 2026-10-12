@@ -209,7 +209,8 @@ through six overlapping powers and a jump/landing also pass at both rates;
 combat effects and terrain/midair interactions remain open. Full-wave input-only
 combat runs reach full-strength SOL bosses at both rates but end in natural
 death; boss victories and the ending remain open. The corrected A500 pilot
-damages the boss from 15 to 11 health before dying. Evidence is retained under
+damages the boss from 15 to 11 health before dying. Natural combat death and
+Continue pass at both rates in level 6 after fixture-controlled earlier exits. Evidence is retained under
 `tmp/release60`; completed step-5 measurements remain the current performance
 reference. The normal loader still excludes SIM60.
 
