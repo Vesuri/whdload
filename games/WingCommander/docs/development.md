@@ -1100,3 +1100,26 @@ Use free ports. The retained `tmp/phase4-irq-matrix/` plan excludes the already
 validated 020 default cell. `settings.json` records mode and ports; each cell
 retains exact commands, fresh audit and comparison results. IRQ acquisition and
 neutrality do not replace independent timing validation for each interpreter.
+
+If a cell's launcher rejects a busy debugger port, keep its failed result and
+choose free ports for a fresh retry. `matrix_capture.py` retains the launcher's
+captured stdout/stderr, including ownership errors. Never stop another project's
+emulator to free a port. Build a retry plan only from terminal failed cell results;
+missing results can still belong to active captures.
+
+```sh
+python3 - <<'PYRETRY'
+import json
+from pathlib import Path
+root = Path('tmp/phase4-irq-matrix')
+failed = {p.parent.name for p in root.glob('*/result.json')
+          if not json.loads(p.read_text())['complete']}
+plan = json.loads(Path('tmp/phase4-irq-matrix-plan.json').read_text())
+with Path('tmp/phase4-irq-retry-plan.json').open('x') as output:
+    json.dump([cell for cell in plan if cell['name'] in failed], output, indent=2)
+PYRETRY
+python3 tools/matrix_accounting_batch.py --kind irq \
+  --plan tmp/phase4-irq-retry-plan.json --output tmp/phase4-irq-retry \
+  --audit-slave tmp/phase4-cache-slave/WingCommanderCD32.Slave \
+  --ports 2470 2471
+```

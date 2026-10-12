@@ -1703,3 +1703,11 @@ A completed acquisition validates callback event accounting and exact recorder
 neutrality only; it does not by itself extend the 020 instruction-duration
 calibration to the accelerated interpreters. General routine self/inclusive
 attribution and the interrupt work outside these callback scopes remain open.
+
+Five initial callback-control cells failed before emulator launch because their
+selected debugger port was held by Red Baron: 020 NoCache, 030 MMU NoCache,
+040 default, 060 default and 060 NoCache. The strict ownership check refused the
+launch without stopping that process. Their failed records remain in
+`tmp/phase4-irq-matrix/`; fresh audited retries are running in
+`tmp/phase4-irq-retry/`. The unaffected original lane continues. No failed or
+pending cell counts as a completed callback measurement.

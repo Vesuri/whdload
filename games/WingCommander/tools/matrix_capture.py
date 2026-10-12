@@ -122,6 +122,12 @@ def main():
             slave_sha256=hashlib.sha256((boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()).hexdigest(),
             emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())
         (out/'result.json').write_text(json.dumps(result,indent=2)+'\n')
+    except subprocess.CalledProcessError as error:
+        # Server.boot captures the launcher's ownership/port diagnostics.
+        # Preserve them in the capture log instead of reporting only exit 1.
+        if error.stdout:print(error.stdout, end='', flush=True)
+        if error.stderr:print(error.stderr, end='', flush=True)
+        raise
     finally:
         if g:g.p.kill()
         subprocess.run(['/bin/bash','amiga/run.sh','stop'],env=env,check=True)
