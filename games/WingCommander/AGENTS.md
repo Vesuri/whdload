@@ -1,10 +1,10 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 1, static identification of the CD32 install. Static game/slave
-analysis and disassembly are authorised; derived material stays in ignored `tmp/`.
-Stop at the phase 1 gate. No emulator runs, reconstruction, profiling or patches;
-phase 2 and OCS analysis require a separate request.
+Current scope: phase 2, the CD32 harness and reconstructed slave. Reconstruction,
+vasm builds and windowed, real-speed A1200/fast-RAM boots are authorised, including
+original/reconstructed equivalence checks for Custom5=0–3. Derived material stays
+in ignored `tmp/`. Stop at the phase 2 gate; do not start phase 3 or OCS analysis.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 
 ## Rules

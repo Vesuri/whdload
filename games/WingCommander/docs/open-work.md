@@ -7,7 +7,8 @@ patch maps and static time/display hypotheses are recorded in `internals.md`.
 `development.md` gives the verified static reproduction commands. The originals
 remain unchanged; extracted hunks and disassemblies are confined to ignored
 `tmp/`. No emulator was run and no slave reconstruction or game patch was made.
-**Stopped at the phase 1 gate; phase 2 requires a separate request.**
+**Phase 2 is authorised and in progress: harness, reconstruction and matched boots.
+Stop at its gate; phase 3 is not authorised.**
 
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.
