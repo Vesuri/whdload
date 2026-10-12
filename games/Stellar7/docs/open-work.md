@@ -206,7 +206,8 @@ Status: in progress. All 26 native-reference fixture groups pass on the
 selected 15 Hz A500 and 60 Hz 68020 paths. Combined preference changes and
 re-enabling pass through the native menus at both rates. Input-driven cycling
 through six overlapping powers and a jump/landing also pass at both rates;
-combat effects and terrain/midair interactions remain open. Powered input-only pilots now clear the full SOL wave, kill its full-strength
+lethal shield contact passes at both rates. Mine effects and terrain/midair
+interactions remain open. Powered input-only pilots now clear the full SOL wave, kill its full-strength
 boss and take the native exit to level 1 at both rates; direct native-event
 verification passes. Later bosses and ending remain open. Natural
 combat death, Continue and No/menu/new-game pass at both rates after
@@ -247,8 +248,8 @@ The conversion remains experimental. The plan above includes lower-rate
 68000 selection and excludes interpolation. Input history is complete; broader coverage includes:
 
 - Broaden full-encounter coverage at both selected rates: boss kills and ending,
-  later natural deaths, level and UI transitions, lethal shield/type-43 hits,
-  boss helpers and mine detonation. Controlled placement, native twins and
+  later natural deaths, level and UI transitions, type-43 hits,
+  boss helpers and mine detonation. Lethal shield ramming passes at both rates. Controlled placement, native twins and
   sampled mapped-state comparisons do not cover every encounter branch.
 - Extend the passing input-driven power-cycle checks to combat effects, and
   jump checks to arbitrary terrain and midair impacts. Combined preference

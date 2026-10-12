@@ -40,7 +40,7 @@ semantics or unseen paths. Exact-build indirect and stack-return audits also
 pass these windows. Evidence: `tmp/release60/a500-sol-all-entry-audit.json` and
 `entry-audits/*.json`.
 
-All 50 host-tool tests pass (`tmp/release60/host-tests-natural-death.log`). Named machine
+All 54 host-tool tests pass (`tmp/release60/host-tests-contact-effects.log`). Named machine
 presets now resolve before the launcher chooses a fixed-rate slave; the
 selection regression rejects the prior order and passes all seven presets,
 explicit/default CPUs and an invalid-preset case. This argument-level test does
@@ -134,8 +134,24 @@ leaving boss health unchanged. Both end in player death (ticks 844/3356, energy
 -20) and do not verify victory or ending. Early-power carrier and shield/mine
 probes are not passing encounter evidence: one stayed in carrier approach, and
 others expired before contact or consumed charges during earlier level setup.
-Corrected contact probes arm only after those setup exits; lethal shield/mine
-and terrain/midair coverage remain open.
+Corrected contact probes arm only after those setup exits; mine destruction and terrain/midair coverage remain open.
+
+Lethal shield ramming passes at both selected rates using the existing shield
+charge and ordinary approach/button inputs in level 6 (earlier exits are fixture
+controlled). At $35a8/$35ae, a type-10 enemy takes 5 native damage and changes
+health 1→0 at tick 502 (N=3) or 1999 (N=12). The shield timer is 481/480 and
+player energy stays 616 across the call. `contact_effect_state.py` independently
+checks raw snapshots, actor arguments, exact call/return PCs, tick identity,
+health, energy and installed hooks. Four negative-control tests reject wrong
+boundaries, inactive effects and missing lethal outcomes. Evidence:
+`tmp/release60/shield-only-events/n3-validation.json` and `n12-validation.json`.
+
+An A500 input-only mine placement also reaches a native type-43 contact at tick
+905: a type-6 enemy takes 10 damage, health 2→0, while energy remains 440.
+This earlier observer did not retain the return-PC transcript required by the
+new independent checker; a stronger repeat is pending. The analogous N=12
+attempt ends in death without contact, with its placed mine still intact.
+These captures do not establish mine destruction or detonation.
 
 Natural combat death and Continue pass on both selected paths in level 6,
 after six fixture-controlled earlier exits. Death occurs at tick 1860 on N=3

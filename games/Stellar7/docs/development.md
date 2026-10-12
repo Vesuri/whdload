@@ -991,6 +991,20 @@ Capture before activation and check the required charge is still present. Carrie
 arrival is not boss deployment; use POWER_TRIGGER_TYPE=44 to wait for the boss.
 Contact and final-boss outcome checks remain separate from trigger validation.
 
+For lethal shield contact, use APPROACH_TYPE=10, APPROACH_RAM=1,
+POWER_TRIGGER_TYPE=10, POWER_TRIGGER_DISTANCE=5000 and POWER_SLOT=1. Select
+level 6 with LEVEL_TEST/LEVEL_LAST and arm after earlier exits as above. Retain
+raw before/after snapshots and stopped PCs at $35a8/$35ae. The checker accepts
+the recorded hit-directory format under `tmp/release60/shield-only-events`:
+
+```sh
+python3 tools/contact_effect_state.py CAPTURE --listing EXACT.lst --kind shield
+```
+
+The same checker supports mine contact at $38b2/$38b8 with `--kind mine`;
+a missing return-PC transcript fails validation. Neither kind alone proves mine
+destruction, audible output, or a completed encounter.
+
 `POWER_ROUTE=TICK` supplies native second-button and both-button input for six
 seconds starting at TICK. It selects clone, shield, jump, cloak, cannon and speed
 in order, using the current inventory; it leaves the mine unused. It requires
