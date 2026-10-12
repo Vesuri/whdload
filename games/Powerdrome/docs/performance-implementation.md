@@ -1,6 +1,6 @@
 # Optional fast planar renderer
 
-Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is untouched.
+Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is stopped at the stock-A1200 throughput gate; release validation is incomplete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 Completion-plan C1 retains a later display handshake for staged scenes: drawing

@@ -280,11 +280,13 @@ Commit E1–E3: "Close timing gates under representative A500 policy".
 
 ## Phase F: Integrate, set defaults, release
 
-Status: **F1–F2 complete; F3–F4 in progress**. Normal-build native-hook gates pass
+Status: **F1–F2 complete; F3 stopped after two M3 throughput failures; F4 pending**. Normal-build native-hook gates pass
 on M1 defaults and M7 opt-outs. M1/M3/M4/M7 normal boots and automatic selection
 pass; M7 default gameplay initializes timing and staging. Its first release Practice
-measurement is 490/499 = 49.098 fps with CACHE. The remaining release matrix and
-documentation cleanup are pending; see [current work](open-work.md#phase-f-in-progress).
+measurement is 490/499 = 49.098 fps with CACHE. M3 NoCache Practice measures 144/494 = 14.575 fps in both attempts, 5.50% below
+native B2 153/496 = 15.423 fps. The stop rule applies; changing D3 or accepting this
+regression needs the user's decision. The remaining release matrix and documentation
+cleanup are pending; see [current work](open-work.md#phase-f-stopped-at-stock-a1200-throughput).
 
 **F1. Promote.** Make the `TIMING_FULL` code part of the normal build behind the timing
 option. Every hook carries its `TIMING_RANGE` comment. *Gate:* `check_disabled.py` proves

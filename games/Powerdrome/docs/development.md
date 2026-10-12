@@ -1,6 +1,6 @@
 # Development
 
-Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is untouched.
+Project status: Phases A–E are complete within the agreed scope, with steady A500 handling and natural-weather validation deferred by the user. Neither deferred gate is counted as passed. Phase F is stopped at the stock-A1200 throughput gate; release validation is incomplete.
 See the [current handoff](open-work.md) for completed checks, open gates and resume priorities.
 
 ## Inputs and shared tools
@@ -37,10 +37,12 @@ SLAVE=tmp/build/Powerdrome-original.slave amiga/run.sh
 
 `original` assembles with optimizations disabled and compares the entire result with the
 installed slave. This is the reference reconstruction. `make -C whdload all` builds the WHDLoad 20 KickEmu
-development slave with interface 17. `make -C whdload verify` additionally saves
+slave with interface 17 and the full timing scheduler. `make -C whdload verify` additionally saves
 `tmp/build/Powerdrome-verify.slave`; `CUSTOM5=1` submits an empty pilot name through the
 native name-entry routine. `CUSTOM5=2` also selects Practice and submits Space in the pit.
-`CUSTOM1=1` enables the optional fast planar renderer; it is off by default. The normal
+`CUSTOM1=1` selects the original renderer; `CUSTOM3=1` selects original timing.
+Without these opt-outs, 68020+ enables the scheduler, and 68020+ with real fast RAM
+also enables planar staging. 68000/68010 keep both native paths. The normal
 build contains no input or twin-drawing fixtures. The slave requests 128 KiB of guest
 expansion in addition to KickEmu's 256 KiB, including when the option is off. Slow-backed
 expansion does not enable the renderer. See the [implementation and measured results](performance-implementation.md)
@@ -52,7 +54,7 @@ To launch the new slave explicitly (the runner otherwise uses the installed orig
 
 ```sh
 make -C whdload all
-FAST_KB=4096 WHD_ARGS=CUSTOM1=1 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
+CPU=68030 FAST_KB=4096 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
 ```
 
 The default machine is 68000, 512 KB chip and 1,536 KB slow with no fast RAM. The host boots

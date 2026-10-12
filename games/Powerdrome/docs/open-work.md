@@ -2,7 +2,7 @@
 
 The step-by-step plan to finish and ship this work is in [the completion plan](completion-plan.md).
 
-## Phase F in progress
+## Phase F stopped at stock-A1200 throughput
 
 The user has authorized F1–F4. The current candidate promotes `TIMING_FULL` into
 normal builds and resolves C1/C3 as opt-outs at installation: 68000/68010 stay
@@ -25,8 +25,29 @@ single-instruction assumption; the explicit pair check passes on the saved captu
 Both invalid attempts are preserved under `tmp/phase-f/`, with `boot-defaults.json`
 and the individual gate reports. No game-code fix was needed for either issue.
 
-F1–F2 are complete. The remaining release matrix, final documentation consolidation
-and F3–F4 commit are outstanding.
+F1–F2 are committed in `170de0c`. F3's first stock-A1200/no-fast-RAM Practice
+measurement and its fresh-run retry both fail the no-regression gate: 144 intervals / 494 fields = 14.575 fps,
+versus native B2 153/496 = 15.423 fps (5.50% slower). It exactly reproduces B2's
+full-timing count. The normal boot snapshots confirm the intended timing-only
+selection on this machine. The retry in
+`tmp/phase-f/M3-NoCache-practice-retry/` completes all 500 fields and repeats the
+144/494 count and 0/13/131 one/two/three-plus-field histogram exactly. Configuration
+and slave hashes match the first run. Both are valid measurements; the lower fps
+is a repeatable cost of the selected configuration, not a capture setup failure.
+
+F3's two-failure stop rule applies. No more runs or code changes are scheduled
+without a user decision. D3 requires timing on every 68020+, while F3 requires no
+machine to be slower than its native B2 result. The current stock-A1200 result
+cannot satisfy both. Possible decisions are to accept the measured M3 slowdown,
+retain native timing on 020 without fast RAM, or authorize a further M3 optimization
+phase. None has been selected; no cadence, default or tolerance has been changed
+to hide the regression.
+
+The rest of the release matrix (including twins and the M6 CACHE smoke test),
+final documentation consolidation and the planned F3–F4 release commit remain
+outstanding. The completion plan is retained because Phase F is incomplete.
+README/development now describe the implemented opt-out semantics, but the broader
+historical-document/tool cleanup has not been represented as complete.
 
 ## Phase E complete with two deferred validations
 
