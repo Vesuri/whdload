@@ -72,6 +72,15 @@ in size too; never apply a global language offset to arbitrary code. The late
 platform routines cited below were compared separately: their German sites
 are English +`1c2`, but earlier patch sites use the explicit table.
 
+**Hunk 3 is the program's top level**, kept apart from the main code hunk. Its
+strings are the `Origin&tonic` version banner, the `Wing256/`/`WING256:` data
+paths and `harddisk.dat`, the "no campaigns installed" abort, and animation-demo
+diagnostics ("Memory free before/after animation", "Animation demo over.").
+Thirteen 32-letter rows at English hunk 3:`0b80–0cc8` look like campaign series
+tables, one per star system (the slave's `Custom3` also offers 13 systems); their
+meaning is unverified. Relocations: hunk 3 to hunk 0 205, hunk 0 to hunk 3 5,
+data hunk 1 to hunk 3 10.
+
 Resources in `wing256/` were not unpacked. The music loader recognises both
 ordinary tracker data and a `COMP` representation (`E:277a8`, `E:27af4`);
 that is resource compression, not executable packing. The resource formats,
@@ -212,7 +221,7 @@ There is no claim that an absent literal proves no possible indirect time source
 
 | Candidate | Static sites / evidence | Runtime question |
 |---|---|---|
-| VBL game clock | Exec AddIntServer(5) at `E:340e4`; handler `E:34162` increments `D:7f02`, decrements `D:7f06`; removal `E:34154` | Which scenes consume the counter, actual handler cadence, pause behavior? |
+| VBL game clock | Exec AddIntServer(5) at `E:340e4`; handler `E:34162` increments `D:7f02`, decrements `D:7f06`; removal `E:34154`. Static users: see the VBL clock inventory below | Actual handler cadence, pause behavior, which users run in which scenes |
 | VBL wait | `E:33fbe` → `E:34002` → supervisor wait `E:3406c`, STOP until the counter changes; countdown wait `E:340b8` | Which waits execute on each display path; any lost/extra waits? |
 | Music VBL server | AddIntServer(5) `E:27720`, handler `E:27810` calls `E:27d52`; initial PAL/NTSC constants 125/104 at `E:27740–27770`, accumulator at `E:27d66–27d80` | Music cadence and cue alignment; tempo is not simply one rendered frame |
 | Music short delay | CIA-B TOD low reads `E:27e64/27e70` and `E:27e8e/27e9a`, eight and two changes around audio DMA enable | How these line-clock waits behave under PAL/NTSC and interrupts |
@@ -255,6 +264,65 @@ the wait, and subtraction is not explicitly masked to a 24-bit wrap. Field rate,
 render/update coupling and intended rate remain unmeasured. The 15 Hz estimate
 in the plan is still only a prior; do not replace it with an FPS inference from
 this static threshold.
+
+**Expected limiter rates (hypothesis).** On standard Amiga hardware CIA-A TOD
+counts vertical syncs. The loop (`S:17c0–17e4`) repeats until the TOD difference
+from the previous exit reaches the threshold, then stores the current reading.
+If TOD counts fields, conversions therefore start at most every 2, 3 or 5 fields:
+at most 25, 16.7 or 10 per second on PAL (30, 20 or 12 on NTSC) for `Custom5`
+0, 2 and 3. A frame that takes longer than the threshold is not delayed. This
+caps the conversion rate the slave allows; it says nothing about the intended
+game rate. Confirm the TOD clock and the rates at run time.
+
+## VBL clock users — static inventory
+
+`tools/clock_refs.py` lists every A4-relative and relocated-absolute reference
+from hunk 0 to the VBL counter (`D:7f02` longword, `D:7f04` its low word) and the
+countdown (`D:7f06`). English and German have the same **32 sites** in the same
+order (German counter `D:7f2e`, countdown `D:7f32`). No hunk 1 or hunk 3 code
+references them. A linear sweep can miss computed or pointer-passed accesses;
+the counter's address is taken only by the wait at `E:3406c`.
+
+The counter is real time in fields: it is read by **timed sequences, waits,
+animation phases and a game clock**. Field-based durations run 20% faster on
+NTSC unless something compensates; nothing in these sites checks the video mode.
+
+| English | German | Classification | Static behaviour |
+|---|---|---|---|
+| `E:0e64` (`e6e`, `e84`) | `G:0e98`, `0eae` | Deadline wait with service | Deadline = counter + argument; calls `E:70ae`, then loops calling `E:02a8` and `E:0510` until the deadline passes. One caller, `E:1396` |
+| `E:1a78` | `G:1aa2` | Animation phase | `(counter / 40) % 3` selects between two values (a 0.8 s phase on PAL); callers `E:1b3e`, `1bd0` |
+| `E:1c952` (`1c9a8`, `1c9b6`) | `G:1ca52`, `1ca60` | Timed sequence player | Table of (event, duration) word pairs; advances when elapsed fields exceed the duration. A second table advances per loop pass (`-2(a5)`). Drawing runs every N passes (`-32624(a4)` reloaded from `-32622(a4)`); `E:1898a` can end the loop |
+| `E:1d016` (`1d076`, `1d082`) | `G:1d120`, `1d12c` | Timed sequence player | Same pattern; the start is advanced by each duration (`E:1d09e`), so the schedule does not drift |
+| `E:1dc2a` (`1ddf0/1ddf6`, `1df20/1df26`) | `G:1de9a/1dea0`, `1dfca/1dfd0` | Fixed-duration scene, per-pass animation | Two loops run until counter + argument; inside, animation advances per pass with the same N-pass drawing divisor. Scene length is real time, animation progress is per pass |
+| `E:1fbba` (`1fdd6`, `1fde6`, `1fe2a`) | `G:1feda`, `1feea`, `1ff2e` | Timed pages | Up to 18 pages; each is shown for 320 fields, with a second element at 220 fields; `E:1898a` skips. A credits-like sequence; unverified which |
+| `E:22c32` | `G:22d58` | Game clock (read) | `(counter − D:base) / 3300 % 60` gives minutes: one game minute is 3300 fields (66 s PAL). Base at `20432(a4)` |
+| `E:254ac` | `G:2562c` | Game clock (set) | Base = counter − (hours × 60 + minutes) × 3300, from bytes `4390/4391(a4)` |
+| `E:23154` | `G:232b0` | Snapshot | Stores the counter in `1538(a4)` at the end of an initialisation loop |
+| `E:23164` | `G:232c0` | Rate limiter | Acts at most once per 7 fields (low word − snapshot ≥ 7). Mixes a sign-extended word with the stored longword: a wrap candidate after 32768 fields (about 11 min PAL); unverified. Callers `E:23316`, `233fc` |
+| `E:23392` | `G:234ee` | Animation phase | `counter / 15` passed to `E:141b4` (a 3.3 Hz step on PAL) |
+| `E:239f2` (`23a6c`, `23a74`) | `G:23be2`, `23bea` | Timed sequence player | Same (event, duration) pattern as `E:1c952` |
+| `E:262a2` | `G:2644e` | Animation phase | `counter / 3` (16.7 Hz on PAL); in the routine at `E:26292`, called from `E:264c6` |
+| `E:32658` | `G:3281a` | Publication timestamp | Original blitter-c2p completion path stores the counter in `-920(a4)` after publishing; no reader in hunk 0 |
+| `E:33fca/33fcc` | `G:3418c/3418e` | Countdown set | Clears, then sets `D:7f06` to the argument; 10 callers |
+| `E:33fd4/33fd6` | `G:34196/34198` | Countdown test | Returns 1 when the countdown is zero; callers `E:179ae`, `18a84`, `1dbfa`, `1ee0e`, `209c6`, `23c98`, `2538e` |
+| `E:33fe0`, `33ff2` | `G:341a2`, `341b4` | Countdown busy wait, clear | Spins until zero; no direct caller found |
+| `E:3406c` (via `E:33fbe`, `34002`) | `G:3422e` | One-field wait | Supervisor `STOP` until the counter changes; 10 callers of `E:33fbe`, including the c2p and display setup |
+| `E:340be` (via `E:3402e`) | `G:34280` | Countdown wait | `STOP` while the countdown is non-negative. The handler never makes it negative, so this would not return unless something else writes it; its only caller, `E:33fec`, has no direct caller |
+| `E:34166`, `3416c`, `34174` | `G:34328`, `3432e`, `34336` | VBL handler | Increment, then decrement the countdown towards zero |
+
+**The per-pass drawing divisor** `-32622(a4)` is set at `E:0b4e` from a computed
+value and copied into the working counter `-32624(a4)` at nine sites (`E:02ee`,
+`1ca48`, `1db92`, `1de0c`, `1df3a`, `1e3ee`, `1ec6e`, `242f4`, `246a0`). `E:02e4`
+is the generic form: it returns 0 until the counter expires, then reloads it,
+increments `4434(a4)` and continues to the drawing path. Whether this divisor is a
+user setting, a detail level or a speed compensation is unresolved; it is the
+first candidate for frame coupling inside the real-time sequences.
+
+Consequences to confirm at run time: sequence and scene lengths should be
+independent of drawing speed, while animation inside `E:1dc2a`-style loops and
+everything driven by `E:02e4` is per pass. None of these sites has been
+identified as part of space flight's world update; flight may be entirely
+per-frame apart from the game clock.
 
 ## Display path — runtime hypotheses
 
@@ -386,6 +454,6 @@ When runtime work is separately authorised, confirm: selected CRC/language and
 Kickstart; CACR after the original SetCPU call; actual interrupt/vector and CIA
 register traffic (including library code); TOD cadence and wrap; c2p branch for
 each Custom5; chunky/planar placement and geometry; generated copper/FMODE/BPLCON
-values; buffer publication versus completed frames; music cadence and game-time
+values; buffer publication versus completed frames; the VBL clock users and the per-pass drawing divisor in each scene; music cadence and game-time
 coupling. Exact compiler and KickEmu source release remain unknown metadata.
 Do not start reconstruction, boots, patches or phase 2 from this hand-off alone.

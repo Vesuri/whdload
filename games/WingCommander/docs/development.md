@@ -89,6 +89,18 @@ python3 -m amigaxdev.patchlist \
   tmp/cd32-static/cd32/WingCommanderCD32/WingCommanderCD32.Slave 0x1cf4
 ```
 
+To list every reference to the VBL counter and countdown (A4-relative and
+relocated absolute), for the inventory in `internals.md`:
+
+```sh
+python3 -I tools/clock_refs.py tmp/cd32-static/cd32/WingCommanderCD32/data/wing.english \
+  tmp/cd32-static/wing.english.h0.dis 7f00 7f07
+python3 -I tools/clock_refs.py tmp/cd32-static/cd32/WingCommanderCD32/data/wing.german \
+  tmp/cd32-static/wing.german.h0.dis 7f2c 7f33
+```
+
+Both print 32 lines. Any data-hunk range works the same way.
+
 Do not run the shared patch-list CLI over the Custom5 prefixes: its decoder
 prints NEXT but continues linearly with the old base. The inventory tool stops
 at NEXT and records the destination common list separately.
