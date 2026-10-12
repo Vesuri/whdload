@@ -1835,3 +1835,33 @@ It compares event payloads before pairing timing differences, so frame/census
 changes cannot be mistaken for clock-only changes. Its original DMA path still
 reports exact equality on the corrected 020 default pair
 (`tmp/phase4-dma-effect-regression.json`).
+
+### Representative idle, callback and chip-bus measurements
+
+These rows come from the four accepted cells in
+`tmp/phase4-instrument-accept-01/`, using exact recorder controls. STOP and
+callback percentages use scene elapsed time; CPU/bitplane/blitter percentages
+use available chip-bus slots. They have different denominators and must not be
+added. CPU bus share is not CPU utilisation, and unclaimed slots are not idle.
+Callback share covers the three named VBL callbacks, not complete IRQ dispatch.
+
+| Cell | Scene | STOP % time | Callback % time | CPU % slots | Bitplanes % slots | Blitter % slots |
+|---|---|---:|---:|---:|---:|---:|
+| 020-default | origin-animation | 0.000 | 2.480 | 3.329 | 8.579 | 0.000 |
+| 020-default | origin-particles | 0.000 | 2.458 | 4.565 | 8.581 | 0.000 |
+| 020-default | credits-00 | 0.000 | 2.383 | 4.245 | 8.583 | 0.000 |
+| 020-nocache | origin-animation | 0.000 | 2.661 | 2.341 | 8.585 | 0.000 |
+| 020-nocache | origin-particles | 0.000 | 2.477 | 3.833 | 8.585 | 0.000 |
+| 020-nocache | credits-00 | 0.000 | 2.569 | 3.405 | 8.579 | 0.000 |
+| 030-mmu-default | origin-animation | 0.000 | 1.909 | 7.369 | 8.572 | 0.000 |
+| 030-mmu-default | origin-particles | 0.000 | 2.084 | 7.335 | 8.576 | 0.000 |
+| 030-mmu-default | credits-00 | 0.000 | 1.633 | 7.936 | 8.582 | 0.000 |
+| 030-mmu-nocache | origin-animation | 0.000 | 1.949 | 7.362 | 8.588 | 0.000 |
+| 030-mmu-nocache | origin-particles | 0.000 | 2.123 | 7.332 | 8.582 | 0.000 |
+| 030-mmu-nocache | credits-00 | 0.000 | 1.687 | 7.932 | 8.589 | 0.000 |
+
+The selected scenes have no STOP idle and no blitter slot use. This excludes
+those two mechanisms as direct consumers in these windows, while leaving busy
+waits and system work unclassified. The limited callback share and large measured
+020 converter cost support investigating software rendering first. Bus averages
+alone do not establish whether individual CPU accesses suffer contention.
