@@ -40,7 +40,7 @@ semantics or unseen paths. Exact-build indirect and stack-return audits also
 pass these windows. Evidence: `tmp/release60/a500-sol-all-entry-audit.json` and
 `entry-audits/*.json`.
 
-All 54 host-tool tests pass (`tmp/release60/host-tests-ending.log`). Named machine
+All 54 host-tool tests pass (`tmp/release60/host-tests-airborne.log`). Named machine
 presets now resolve before the launcher chooses a fixed-rate slave; the
 selection regression rejects the prior order and passes all seven presets,
 explicit/default CPUs and an invalid-preset case. This argument-level test does
@@ -155,8 +155,7 @@ encounter completions rather than a cross-rate state-equality comparison.
 
 Corrected contact probes arm only after setup exits. Early-power probes that
 spent charges in prior levels or stayed in carrier approach are not passing
-encounter evidence. Later full waves, arbitrary terrain and projectile midair
-coverage remain open.
+encounter evidence. Later full waves and arbitrary terrain coverage remain open.
 
 Lethal shield ramming passes at both selected rates using the existing shield
 charge and ordinary approach/button inputs in level 6 (earlier exits are fixture
@@ -207,7 +206,20 @@ allocated type, height, consumed jump charge and N-dependent damage clock.
 The existing 25-contact check still passes; grounded, unspent-charge and
 omitted-damage corruptions are rejected. Evidence:
 `tmp/release60/air-terrain/n*-validation.json` and `negative-validation.json`.
-Arbitrary terrain and incoming-projectile midair impacts remain separate coverage.
+Incoming-projectile midair impacts pass at both selected rates. First-impact
+reference runs keep the jump charge unused; normal jump input is then scheduled
+13 ticks before each measured impact, without changing positions, health or
+inventory. Earlier exits select level 6. Native $3cc2 entry and return $333e
+observe a positive damage argument of 16, shield/death flags zero, consumed
+jump charge and energy 680→616 within the same tick. N=3 hits at tick 326 /
+height 564; N=12 at tick 1479 / height 147. These independently timed routes
+do not imply equal cross-rate trajectories. Raw opcodes, native return address,
+height, energy, exact build and 108/107 installed hooks pass the checker.
+Grounded, shielded, unspent-charge and omitted-damage controls are rejected.
+Evidence: `tmp/release60/air-hit-timed-events/n*-validation.json` and
+`negative-validation.json`. The earlier proximity-triggered pilots did not
+observe an airborne hit and are not positive evidence. Arbitrary terrain and
+physical-control observations remain open.
 
 Natural combat death and Continue pass on both selected paths in level 6,
 after six fixture-controlled earlier exits. Death occurs at tick 1860 on N=3

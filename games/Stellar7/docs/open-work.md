@@ -208,7 +208,8 @@ re-enabling pass through the native menus at both rates. Input-driven cycling
 through six overlapping powers and a jump/landing also pass at both rates;
 lethal shield contact and controlled airborne/landed terrain contacts pass at
 both rates. Lethal mine contact and native mine destruction also pass; visual/audio
-detonation, arbitrary terrain and projectile midair impacts remain open. Powered input-only pilots now clear the full SOL wave, kill its full-strength
+detonation and arbitrary terrain remain open. Incoming-projectile midair impacts
+also pass at both rates. Powered input-only pilots now clear the full SOL wave, kill its full-strength
 boss and take the native exit to level 1 at both rates; direct native-event
 verification passes. Full-health final-boss kills and native ending entry/return
 also pass at both rates after explicit earlier-level/wave shortcuts. Later full
@@ -256,7 +257,8 @@ The conversion remains experimental. The plan above includes lower-rate
   and native mine destruction pass at both rates. Controlled placement, native twins and
   sampled mapped-state comparisons do not cover every encounter branch.
 - Extend the passing input-driven power-cycle checks to combat effects, and
-  jump checks to arbitrary terrain and midair impacts. Combined preference
+  jump checks to arbitrary terrain. Incoming-projectile midair impacts pass at
+  both rates. Combined preference
   changes and re-enabling pass; additional native dialog paths remain.
 - Confirm original-reference gameplay pace and the reconstructed loader's
   behavior through playtesting. The modern KickEmu loader is not a byte-identical

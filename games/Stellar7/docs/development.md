@@ -1053,6 +1053,16 @@ Capture before activation and check the required charge is still present. Carrie
 arrival is not boss deployment; use POWER_TRIGGER_TYPE=44 to wait for the boss.
 Contact and final-boss outcome checks remain separate from trigger validation.
 
+`contact_effect_state.py --kind airborne-projectile` reads `before`/`after`
+raw dumps and `registers.txt` at native damage entry $3cc2 and return $333e.
+It requires positive player height and damage, a consumed jump charge, inactive
+shield/death flags, exact native caller/opcodes and the expected same-tick energy
+loss. Selected-rate captures use APPROACH_TYPE=10, APPROACH_RAM=1,
+POWER_SLOT=2 and POWER_ROUTE=313/1466 at N=3/N=12 after earlier fixture-controlled
+exits to level 6. These timings come from separate no-jump impact observations,
+not a position or health injection. Evidence and negative controls are in
+`tmp/release60/air-hit-timed-events`.
+
 `contact_effect_state.py --kind mine-destruction` reads `mine-damage-before`
 and `mine-damage-after`, retaining raw memory and `registers.txt` at native
 $3f04 and return $32be. It verifies the projectile caller, type-43 health

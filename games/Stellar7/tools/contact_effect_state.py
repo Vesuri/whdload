@@ -82,6 +82,44 @@ def inspect_mine_destruction(folder, listing):
                 caller_offset='0x32ba', hooks=audit_hooks.installed(folder, listing),
                 scope='Native projectile damage destroys a normally placed SOL mine. No rendered-explosion or audible-output claim.')
 
+def inspect_airborne_projectile(folder, listing):
+    folder, listing = Path(folder), Path(listing)
+    assert (folder/'slave.slave').read_bytes() == listing.with_suffix('.slave').read_bytes(), 'exact build mismatch'
+    meta = json.loads((folder/'metadata.json').read_text())
+    base, code, data = (meta[k] for k in ('base', 'code_base', 'data_base'))
+    before, after = ((folder/name/'code.bin').read_bytes() for name in ('before', 'after'))
+    def regs(name):
+        text = (folder/name/'registers.txt').read_text()
+        assert 'SIGINT' not in text and 'Program received signal' not in text
+        assert re.search(r'^Breakpoint \d+,', text, re.M)
+        return {k: int(v, 16) for k, v in re.findall(r'^(pc|sp)\s+0x([0-9a-f]+)', text, re.M)}
+    b, a = regs('before'), regs('after')
+    def u(memory, address, fmt):
+        assert base <= address and address+struct.calcsize(fmt) <= base+len(memory)
+        return struct.unpack_from(fmt, memory, address-base)[0]
+    assert (b['pc']-code, a['pc']-code) == (0x3cc2, 0x333e)
+    assert before[code-base+0x3cc2:code-base+0x3cc8] == bytes.fromhex('2f073e2f0008')
+    assert before[code-base+0x333a:code-base+0x333e] == bytes.fromhex('61000986')
+    assert u(before, b['sp'], '>I') == code+0x333e
+    player = u(before, data+0x43c0, '>I')
+    height = u(before, player+16, '>i')
+    damage = u(before, b['sp']+4, '>h')
+    assert height > 0 and damage > 0
+    assert u(before, data+0x20fa, '>B') == 0, 'jump charge not consumed'
+    assert u(before, data+0x1e9e, '>H') == u(before, data+0x1e90, '>H') == 0
+    entry = u(before, code+0x2af8, '>I')
+    assert before[entry-base+4:entry-base+8] == b'S760'
+    tick = u(before, entry+16, '>I')
+    assert u(after, entry+16, '>I') == tick
+    energy = u(before, data+0x46c4, '>h')
+    remaining = u(after, data+0x46c4, '>h')
+    assert remaining == energy-4*damage
+    return dict(tick=tick, height=height, damage_argument=damage,
+                energy_before=energy, energy_after=remaining,
+                hooks=audit_hooks.installed(folder, listing),
+                scope='Observed incoming native projectile damage while airborne after ordinary jump input. Scene setup remains explicit in capture metadata.')
+
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('capture',type=Path);p.add_argument('--listing',type=Path,required=True);p.add_argument('--kind',choices=(*SITES, 'mine-destruction'),required=True);a=p.parse_args()
-    print(json.dumps(inspect_mine_destruction(a.capture,a.listing) if a.kind=='mine-destruction' else inspect(a.capture,a.listing,a.kind),indent=2))
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('capture',type=Path);p.add_argument('--listing',type=Path,required=True);p.add_argument('--kind',choices=(*SITES, 'mine-destruction', 'airborne-projectile'),required=True);a=p.parse_args()
+    reader = {'mine-destruction': inspect_mine_destruction, 'airborne-projectile': inspect_airborne_projectile}.get(a.kind)
+    print(json.dumps(reader(a.capture,a.listing) if reader else inspect(a.capture,a.listing,a.kind),indent=2))
