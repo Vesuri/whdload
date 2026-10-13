@@ -3,13 +3,19 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 9 implementation is in progress for D, the hybrid.**
+**Phase 9 is complete: D's decoupled simulation and responsive controls.**
+The separate experimental timing build uses `CUSTOM1=3`. World timing stays within
+0.4% of 10 updates/s across normal, delayed and diagnostic one-field schedules;
+PAL/NTSC, input history, pause, targeting and draw/RNG separation are checked.
+The accelerated run shows player/camera motion between world ticks. Option-off
+game code remains unchanged. See the [gate evidence](docs/internals.md#phase-9-decoupled-simulation-gate).
+Stopped before phase 10; world-object extrapolation is not implemented.
 
 **Phase 8 is complete: the user selected D, the hybrid.**
 The [design](docs/timing-design.md) uses a 10 Hz world with responsive per-render
 player orientation/camera and bounded world-object extrapolation to validate.
 Eleven combat configurations are priced with explicit overhead and instrument
-gaps. Phase 9 adds the simulation/player path; world-object presentation remains
+gaps. Phase 9 implements the simulation/player path; world-object presentation remains
 phase 10.
 
 **Phase 7b framerate-dependency audit is complete.**
@@ -22,7 +28,7 @@ Phase 8 uses this audit to compare B/C/D.
 **Phase 7 gameplay timing investigation is complete.** Flight motion is coupled
 to rendering; the native speed/range units imply 10 world updates/s. Reproducible
 coast, combat-input and pause windows, a state/cadence map and CPU/drawing coupling
-measurements are recorded. Timing fixes remain deferred.
+measurements are recorded. The phase-9 adapter implements the selected timing policy.
 
 **Phase 6 rendering work is complete.**
 `CUSTOM1=2` enables the experimental English renderer. Measured selection uses

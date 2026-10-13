@@ -84,6 +84,28 @@ if [ "${WC_NOMMU_CORE:-0}" = 1 ]; then
     done
   }
 fi
+# Diagnostic compatibility with the established 030 measurement baseline.
+# New shared presets enable data caching plus an indirect UAE board which the
+# retained observer build does not boot. Preserve shipping/default setup unless
+# this explicitly selected capture requests the prior model.
+if [ "${WC_BASELINE_CACHE_MODEL:-0}" = 1 ]; then
+  setup_function=$(declare -f fsuae_setup)
+  eval "${setup_function/fsuae_setup/wc_cache_base_setup}"
+  fsuae_setup() {
+    wc_cache_base_setup || return 1
+    [ "$AMIGA_SETUP" = a1200-030 ] || { echo "baseline cache model requires a1200-030" >&2; return 1; }
+    local arg
+    local baseline_args=()
+    for arg in "${FSUAE_SETUP_ARGS[@]}"; do
+      case "$arg" in
+        --uae_cpu_data_cache=*) baseline_args+=(--uae_cpu_data_cache=false) ;;
+        --uae_uaeboard=full+indirect) ;;
+        *) baseline_args+=("$arg") ;;
+      esac
+    done
+    FSUAE_SETUP_ARGS=("${baseline_args[@]}")
+  }
+fi
 # Set the ceiling intervention explicitly, including the normal control value.
 setup_function=$(declare -f fsuae_setup)
 eval "${setup_function/fsuae_setup/wc_blitter_base_setup}"

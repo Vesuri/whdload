@@ -1,5 +1,5 @@
-; Experimental English CUSTOM1=3 simulation adapter. Not a completed phase-9
-; implementation until player/input/presentation dependencies pass their gates.
+; Experimental English CUSTOM1=3 simulation adapter; phase-9 gate complete.
+; World-object extrapolation and combined-renderer release work remain separate.
 ; Original language choices CUSTOM1=0/1 install no new game patches.
 timing_patchseg:
         jsr     116(a2)

@@ -3,27 +3,33 @@
 import argparse,hashlib,json,struct
 from pathlib import Path
 from cd32_runtime import BASE,ROOT
-from flight_report import HZ,SIZE,STATE_RANGES
+from flight_report import SIZE,STATE_RANGES
 from simulation_capture import cpu
 
 def read(run):
     m=json.loads((run/'result.json').read_text());h=m['hunks'][0];s=m['slave'];sy=m['symbols']
     if not m['complete'] or m['off']:raise ValueError('completed enabled capture required')
+    config=(run/'run/fsuae/Cache/Logs/debug.uae').read_text()
+    if 'cpu_data_cache=false' not in config:raise ValueError('capture differs from baseline emulator cache model')
     ev=[]
     for line in (run/'events.txt').read_text().splitlines():
         if line.startswith('#'):continue
         p=line.split()
         if len(p)!=31:raise ValueError('truncated observer row')
-        ev.append(dict(pc=int(p[0],16),cycles=int(p[3]),field=int(p[1]),sp=int(p[23],16)))
+        ev.append(dict(pc=int(p[0],16),cycles=int(p[3]),baseclock=int(p[6]),field=int(p[1]),sp=int(p[23],16)))
     selected=[w for w in m['windows'] if w['name'].startswith('window-')][2:]
     if not selected:raise ValueError('warmup plus measured windows required')
     a,b=selected[0]['first_event'],selected[-1]['end_event'];ee=ev[a:b]
     vb=[e for e in ee if e['pc']==h+0x34162];done=[e for e in ee if e['pc']==s+sy['timing_world_done']]
     if len(done)<200:raise ValueError('at least 200 measured completed updates required')
-    field_hz=(len(vb)-1)*HZ/(vb[-1]['cycles']-vb[0]['cycles'])
-    elapsed=(vb[-1]['cycles']-vb[0]['cycles'])/HZ
+    clocks={e['baseclock'] for e in ee}
+    if len(clocks)!=1:raise ValueError('emulated base clock changed')
+    clock_units=clocks.pop()*64 # baseclock is eight times the chipset clock
+    field_hz=(len(vb)-1)*clock_units/(vb[-1]['cycles']-vb[0]['cycles'])
+    elapsed=(vb[-1]['cycles']-vb[0]['cycles'])/clock_units
     # Count over the same closed VBL interval, not profiler labels or host time.
     counted=sum(vb[0]['cycles']<=q['cycles']<vb[-1]['cycles'] for q in done)
+    publications=sum(q['pc']==h+0x3378e and vb[0]['cycles']<=q['cycles']<vb[-1]['cycles'] for q in ee)
     rate=counted/elapsed
     end=(run/'end-fast.bin').read_bytes()
     def val(name,fmt='I'):return struct.unpack_from('>'+fmt,end,s-BASE+sy[name])[0]
@@ -43,12 +49,15 @@ def read(run):
         state=raw[n*SIZE:(n+1)*SIZE];tick=struct.unpack_from('>H',state,0x914c)[0]
         if last and last[0]==tick:
             between+=1
-            if state[0xa148:0xa154]!=last[1][0xa148:0xa154]:responsive+=1
+            if state[0xa148:0xa154]!=last[1][0xa148:0xa154]:
+                responsive+=1
+                if struct.unpack_from('>H',state,0x3896)[0]==0 and state[0xa424:0xa430]!=state[0xa148:0xa154]:raise ValueError('forward camera did not follow responsive player basis')
             # Responsive orientation may change; world positions may not.
             for slot in range(61):
                 kind=struct.unpack_from('>h',state,0x96fe+2*slot)[0]
                 if kind>=8 and state[0x919a+12*slot:0x91a6+12*slot]!=last[1][0x919a+12*slot:0x91a6+12*slot]:raise ValueError('collidable positions changed between updates')
         states[tick]=state;last=(tick,state)
+    if m['presentation_states'] and cpu(m['live_cpu']).get('model')=='68030' and m['held_key']=='4e' and not responsive:raise ValueError('no between-tick responsive publication observed on fast preset')
     pauses=[]
     for w in m['windows']:
         if w['name']!='pause':continue
@@ -57,11 +66,11 @@ def read(run):
         same={k:before[d+o:d+o+n]==after[d+o:d+o+n] for k,(o,n) in STATE_RANGES.items()}
         if not all(v for k,v in same.items() if k!='draw_counter'):raise ValueError('paused world state changed')
         pauses.append(dict(fields=w['fields'],world_unchanged=True))
-    result=dict(run=run.name,schedule=m['schedule'],cpu=cpu(m['live_cpu']),ntsc=m['ntsc'],field_hz=field_hz,clock_hz=observed,
-        elapsed_seconds=elapsed,completed_ticks=counted,world_hz=rate,error_percent=(rate/10-1)*100,clock=list(clock),
+    result=dict(run=run.name,schedule=m['schedule'],cpu=cpu(m['live_cpu']),ntsc=m['ntsc'],clock_units_per_second=clock_units,field_hz=field_hz,clock_hz=observed,
+        elapsed_seconds=elapsed,completed_ticks=counted,publications=publications,publication_hz=publications/elapsed,world_hz=rate,error_percent=(rate/10-1)*100,clock=list(clock),
         input_overflows=val('timing_input_overflows'),dropped_active_fields=val('timing_input_dropped_fields'),
         pauses=pauses,between_tick_publications=between,responsive_publications=responsive,
-        hashes={f:hashlib.sha256((run/f).read_bytes()).hexdigest() for f in ('result.json','events.txt','states.bin')})
+        hashes={f:hashlib.sha256((run/f).read_bytes()).hexdigest() for f in ('result.json','events.txt','states.bin','run/fsuae/Cache/Logs/debug.uae')})
     return result,states,m
 
 def main():

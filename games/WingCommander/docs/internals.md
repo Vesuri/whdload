@@ -2461,9 +2461,9 @@ phase-6 renderer budgets and previously documented live gameplay paths remain
 explicit gaps. The 10 Hz rate is inferred from native speed/displacement units;
 the original world is frame-coupled. Bounded extrapolation is the initial
 world-object presentation approach to validate, separate from authoritative
-collision and lifecycle state. Phase 8 is complete; no timing fix is installed.
+collision and lifecycle state. Phase 8 is complete; the selected policy is implemented below.
 
-## Phase 9: implementation evidence so far (gate incomplete)
+## Phase 9: decoupled simulation gate
 
 The experimental `CUSTOM1=3` adapter replaces the ordinary loop entry `E:0698`
 (file `06c4`) and returns to its original exit at `E:06c8` (file `06f4`).
@@ -2473,16 +2473,57 @@ other displaced instruction operand before the first code write. Native installe
 checks preserve the whole code hunk and registers/CCR with the option off and
 reject a deliberately changed operand with no partial installation.
 
-The first live scheduler prototype reached Nav-1 held-fire combat. Its measured
-field rate was 49.9204 Hz and its beam classification selected 50 Hz. The retained
-window after warm-up contained 61 completed world calls and 303 observed VBLs;
-the complete-call interval rate was 10.0423 updates/s, with no dropped scheduler
-time at the end dump. This short prototype is **not** the phase-9 acceptance gate:
-normal/slow/one-field comparisons, NTSC, modal transitions and input equivalence
-remain to run on the completed implementation. Observer rows after the final
-window are excluded: detaching GDB may resume the guest before the owned process
-is stopped. Trace-window field counts are not interchangeable with observer VBL
-counts around debugger boundaries.
+Phase 9 is complete for the separate English timing build. The final report is
+`tmp/phase9-complete-verified-report.json`; the source fixture is
+`tmp/phase9-flight-final-normal/`, with equal-size slow/one-field siblings.
+The non-VERIFY candidate is `tmp/phase9-final-candidate/` (slave SHA-256
+`0cc3c731c7a0b6de3e19e3281423ad1adee45a1ff6dd227c6491ae737f6ec5f7`).
+It is not combined with the phase-6 renderer or packaged as a release.
+
+Each capture has 20 windows of 100 fields; the first two are warm-up. Elapsed
+seconds come from the observer's emulated cycle count and recorded base clock,
+not host time or assumed exact PAL/NTSC rates. Complete world returns are counted
+within the same measured VBL interval. Debugger detach events after the final
+window are excluded. No exclusive instruction/DMA or physical-CPU claim follows.
+
+| Final capture | Measured fields/s | World updates/s | Error from 10 Hz | Published pictures/s |
+|---|---:|---:|---:|---:|
+| `phase9-final-normal`, PAL 020, held fire | 49.92041 | 9.98963 | −0.104% | 6.60 |
+| `phase9-final-slow`, PAL 020, ten-field draw floor | 49.92041 | 10.01738 | +0.174% | 3.39 |
+| `phase9-final-one-field`, PAL 020, VERIFY wait replacing drawing | 49.92041 | 9.96188 | −0.381% | no drawing |
+| `phase9-final-ntsc-020-turn`, NTSC 020, held turn | 59.82609 | 9.97656 | −0.234% | 7.48 |
+| `phase9-final-pal-030-baseline`, PAL 030, held turn | 49.92041 | 9.96188 | −0.381% | 24.97 |
+
+All five captures have zero input-history overflow. The beam classifier selects
+50 or 60 as appropriate. These are scoped runtime measurements, not a new CPU
+matrix or a claim of one-field rendering throughput. The diagnostic one-field
+fixture replaces drawing with a field wait; its native world and input path run.
+
+The 360 normal/slow and 359 normal/one-field matched world snapshots agree in
+ship/projectile positions and velocities, forward vectors, classes, actions,
+set speed, fuel, energy, shields, armour, targets and gameplay RNG. Whole-array
+position/velocity residuals are limited to cosmetic debris slots 34–41; draw
+counts differ as intended. Native regeneration `E:28c86–28f94` (file
+`28cb2–28fc0`) scans slots 34–48 and creates replacement debris when presented.
+Its private visual RNG and regeneration pictures remain render-dependent;
+phase 10 must account for this presentation residual. No blanket state identity
+is claimed.
+
+The 030 publication snapshots contain **540 pairs within an unchanged world
+counter with a changed player forward basis**. The forward camera matches that
+basis, while collidable positions remain fixed. This is responsive input/camera
+motion, not interpolation of old pictures. The slower 020 runs do not publish
+extra pictures inside a tick; elapsed-field integration still feeds every world
+boundary. Both PAL and NTSC native pauses freeze the mapped world state and
+resume without accumulated paused time. Unread pre-pause active history is
+explicitly discarded/counted; no such drop occurs in the uninterrupted schedules.
+
+The shared accelerated emulator preset changed since phase 8. Its new data-cache
+and indirect-UAE-board combination did not boot with the retained observer build.
+The 030 capture explicitly selects the established phase-8 emulation setting
+(`WC_BASELINE_CACHE_MODEL=1`, emulated data cache off). The effective configuration
+and native CPU audit are checked; WHDLoad's original requested cache policy is
+unchanged. This compatibility choice is confined to the measurement harness.
 
 Input is not a pure device poll. `E:19330` copies input latches, polls devices,
 runs `18daa` (steering ramps, throttle and held fire), maps rates at `0742`, and
@@ -2557,5 +2598,14 @@ Draw dependencies now have explicit owners:
 Native component checks cover FIFO wrap, overflow, inactive producer, register/CCR
 preservation, captured command boundaries, two pad edges between world ticks,
 negative copy controls, and timer/RNG invariance across four draw schedules.
-Elapsed-time acceptance is still being collected; phase 9 is not yet at its gate.
-World-object extrapolation remains phase 10.
+The final native checks are retained under `tmp/phase9-final-*check/`,
+`tmp/phase9-flight-final-{install,input,modal}/` and the candidate check directories.
+The unmodified reconstruction still matches the original slave SHA-256 exactly.
+
+Remaining limits: native free/external camera mode 8 and scripted/death cameras
+retain their original world cadence; no world-object extrapolation is present.
+Complete comms, missile-lock, ordinary-damage, autopilot/landing/campaign and
+physical mouse/pad play-throughs remain release coverage. Native modal wrappers
+prove the clock boundary, not every mission outcome. Original point-sampled
+collision and integer world-effect quantisation remain unchanged. These are
+explicit limits, not claims of completed release validation. Stop at phase 9.

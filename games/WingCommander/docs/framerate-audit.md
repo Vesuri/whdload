@@ -397,7 +397,43 @@ The audit is complete for the world root and dispatch inventory at the stated
 subsystem boundaries. It identifies each clock family and the work each design
 would require. It does **not** claim complete mission-path execution, physical CPU
 performance, a proven gameplay replay contract, high-bit Unicorn shift fidelity,
-or live validation of comms, missile locking, ordinary damage, autopilot, landing
-and campaign progression. These limits do not conceal an unidentified world
+or complete live validation of comms, missile locking, ordinary damage, autopilot,
+landing and campaign progression. These limits do not conceal an unidentified world
 callback: they distinguish static inventory/native reproduction from later live
-validation of a chosen fix. Stop at phase 7b.
+validation of a chosen fix. Phase-9 clock ownership is recorded below.
+
+## Phase 9 D closure
+
+Closure here means the D clock/ownership policy is implemented and checked. It
+is not a claim to repair original point-sampled collision, prove every campaign
+branch, or complete phase-10 object presentation. Native checks use original
+instructions and controlled state; the live gate uses measured emulated time.
+
+| Item | D implementation and evidence |
+|---|---|
+| FR-01 | Translation/acceleration remain one native step per 10 Hz world tick. Equal-time schedule captures compare all entity positions/velocities; ship and weapon motion match. Cosmetic debris regeneration is a recorded render residual. |
+| FR-02 | Field-stamped steering preview, signed fractional angle carry, original axis order, one world ramp commit, no duplicate player rotation. 664 native mask/ramp/rate cases and live between-tick turning. AI damping remains world-owned. |
+| FR-03 | Native world fuel charge retained; afterburn commands commit on tick boundaries. Held-fire schedule captures match fuel; event-time quantisation is deliberately up to one tick. |
+| FR-04 | Native afterburn duration and expiry retained without widening counters. Native audit boundary checks remain applicable; no per-render fuel/action write is introduced. |
+| FR-05 | Native lifecycle/death/shrink calls stay in the fixed world root. Equal-tick object types/actions match; visual smoothing is phase 10. |
+| FR-06 | Native signed missile-delay byte unchanged. Commands are delivered once; delay is never multiplied by a new rate. Signed/sentinel audit tests remain applicable. |
+| FR-07 | Recovery and held fire run once per world tick. Matched combat schedules retain energy, shields and weapon/entity state. Preview suppresses all fire side effects. |
+| FR-08 | Damage response and death bytes remain native world work. Matched combat state includes armour and actions; full ordinary-damage play-testing remains a release gap. |
+| FR-09 | World AI/modulo/RNG order retained. Drawing has a separate random seed; matched gameplay RNG is verified across normal/slow/one-field schedules. |
+| FR-10 | All native action-table and elapsed-state writers retain 10 Hz ownership; no callback duration is rescaled. Matched action state and prior dispatch/sentinel checks apply. |
+| FR-11 | Native view geometry and target selection commit once at a world boundary; selection's modulo-eight gate uses the world counter. Extra draws cannot commit locks. Native ownership checks and equal-tick target comparisons pass; full missile-lock scenarios remain play-test coverage. |
+| FR-12 | Collision uses authoritative native positions at a fixed native step. No predicted position enters overlap/damage. Collision's original point-sampling limitation remains; D does not enlarge the displacement step. |
+| FR-13 | Range/angle predicates retain native fixed sampling. Targeting geometry is refreshed at the world hand-off, not inherited from arbitrary render cadence. Original narrow-region sampling limitations remain. |
+| FR-14 | Effects' opcode/countdown/size work remains on native world ticks. Debris pictures/regeneration can differ with rendering; this is explicitly separated from ships/weapons and deferred presentation work. |
+| FR-15 | Damaged-ship emission uses world modulo four, with authoritative view geometry refreshed before the world. Native mask checks and matching gameplay RNG/object state validate the separation. |
+| FR-16 | Messages, simulator score/exit timers and subsystem fault/repair polling run on the world clock. Cockpit visual expiry consumes elapsed ticks; missed pictures coalesce. Portrait and renderer randomness are private. Native schedule tests and the live comparison cover these owners. |
+| FR-17 | Mission/encounter modulo-32/16 polls remain native world work. No extra render invokes the world root. Full mission/landing progression remains a release play-test gap. |
+| FR-18 | Ordinary camera modes 0–3 follow the responsive player basis. Scripted actions, death and external/free-camera mode 8 retain native world timing; no script opcode runs on extra camera refreshes. |
+| FR-19 | VBL-stamped pad/keyboard history, native command producer clipping, pad transition queue and event pulses. Native wrap/overflow/edge tests and live held input validate the boundary. Native pad-encoded device values are preserved; physical mouse/pad coverage and replay-format compatibility are not claimed. |
+| FR-20 | Common pause and autopilot entry wrappers suspend/rebase the clock. Ordinary-loop exit excludes outer menus, briefing and landing. Live pause plus native wrapper/stack/CCR checks pass; complete modal play-throughs remain coverage gaps. |
+| FR-21 | Existing VBL clock/music/calendar producers remain untouched except a preserving RAM-sampling tail. Measured field cadence supplies the scheduler; no music or credit deadline is rescaled. |
+| FR-22 | Original per-event amounts are unchanged. Only tick/command delivery controls event frequency; extra draws cannot charge fire energy or apply another action. |
+| FR-23 | Native byte/word widths and sentinels stay unchanged. New elapsed state uses wrapping longs, bounded batches, counted discarded debt and signed angular remainders. Native wrap, overload, resume and negative controls pass. |
+
+Commands and retained gate evidence are in [development](development.md) and
+[internals](internals.md#phase-9-decoupled-simulation-gate).

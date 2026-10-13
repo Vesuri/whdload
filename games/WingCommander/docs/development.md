@@ -1698,82 +1698,96 @@ Do not label them exclusive CPU utilisation or measured B/C/D frame rates.
 The [design comparison](timing-design.md) defines formulas, assumed overhead and
 limits; full interrupt subtraction and real-hardware timing remain gaps.
 
-## Phase 9 scheduler arithmetic (implementation in progress)
+## Phase 9 decoupled simulation
 
-The standalone clock kernel is not a completed D implementation. It schedules
-10 world updates/s from a wrapping field count and a caller-supplied observed
-50/60 Hz field rate. A batch issues at most four ticks, explicitly accounts for
-dropped debt, and excludes modal time after a rebase. The connected adapter, player path and input history have native component checks;
-the final live gate also checks draw schedules and modal boundaries.
+Phase 9 is complete. The separate experimental `--timing` build enables the
+10 Hz world and elapsed-field player/camera path with English `CUSTOM1=3`.
+It is not combined with the phase-6 renderer or enabled by default. See the
+[gate results and remaining coverage](internals.md#phase-9-decoupled-simulation-gate).
+All commands require fresh output directories under `tmp/`.
+
+Build the candidate and run native component checks:
 
 ```sh
 . amiga/env.sh
+python3 tools/reconstruct.py --timing --output tmp/timing-candidate
 python3 tools/timing_clock_check.py --output tmp/timing-clock-check
+python3 tools/timing_adapter_check.py tmp/timing-candidate --output tmp/timing-install-check
+python3 tools/timing_player_check.py tmp/timing-candidate --output tmp/timing-player-check
+python3 tools/timing_input_check.py tmp/timing-candidate --output tmp/timing-input-check
+python3 tools/timing_presentation_check.py tmp/timing-candidate --output tmp/timing-presentation-check
+python3 tools/timing_modal_check.py tmp/timing-candidate --output tmp/timing-modal-check
 ```
 
-The retained `tmp/phase9-clock-verified/report.json` covers 4,400 native assembly
-steps on Unicorn 68020/68040 at 50/60 Hz, varying render schedules, clock wrap,
-modal resume and overload. A wrong-rate mutation is rejected by the independent
-elapsed-time ledger. This is arithmetic correctness evidence, not game-speed or
-performance acceptance. All generated binaries/reports stay in `tmp/`.
+The clock check covers 4,400 native assembly steps on Unicorn 68020/68040,
+including 50/60 Hz, wrap, modal resume and overload, with a wrong-rate negative
+control. Installer checks cover eight option/model cases and changed-operand
+rejection before writes. Player checks cover 664 preview/isolation/signed-rate
+cases. Input checks cover publication, wrap, overflow, captured command boundaries
+and multiple pad edges. Presentation checks vary draws per world tick and verify
+native timers, targeting and gameplay RNG isolation. Modal checks verify both
+pause and autopilot wrappers. These establish native correctness, not performance.
+Player checks use the retained phase-7 memory dump; generated native code and
+reports remain in `tmp/`.
 
-The experimental adapter and isolated player helpers can be rebuilt and checked:
-
-```sh
-. amiga/env.sh
-python3 tools/reconstruct.py --timing --output tmp/timing-foundation
-python3 tools/timing_adapter_check.py tmp/timing-foundation \
-  --output tmp/timing-install-check
-python3 tools/timing_player_check.py tmp/timing-foundation \
-  --output tmp/timing-player-check
-```
-
-Retained final component checks are in `tmp/phase9-foundation-guarded-install/`
-and `tmp/phase9-foundation-guarded-player/`: eight installer option/model cases
-plus changed-operand rejection, and 664 preview/isolation/signed-rate cases.
-The installer fixture stubs the already-applied original PatchSeg, cache flush
-and beam-rate result; live beam behaviour is separate evidence. Player checks
-execute original control/rotation code from the retained phase-7 memory dump.
-They isolate controller arithmetic; the live captures verify the connected pipeline.
-
-For a bounded diagnostic flight (not the phase-9 acceptance gate), use a fresh
-fixture/layout and the retained phase-7 read-only observer build:
+Build equal-size VERIFY fixtures for the live scheduling gate:
 
 ```sh
-python3 tools/flight_fixture.py --timing --nav 1 --output tmp/timing-flight
+for schedule in normal slow one-field; do
+  python3 tools/flight_fixture.py --timing --timing-verify --nav 1 \
+    --schedule "$schedule" --output "tmp/timing-flight-$schedule"
+done
 export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
-SLAVE="$PWD/tmp/timing-flight/WingCommanderCD32.Slave" \
+SLAVE="$PWD/tmp/timing-flight-normal/WingCommanderCD32.Slave" \
 WHD_ARGS='CUSTOM1=3 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
-WARP=0 INTRO_STOCK_CLOCK=1 \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
 python3 tools/boot_gate.py --calibrate --output tmp/timing-layout
+for schedule in normal slow one-field; do
+  python3 tools/timing_capture.py \
+    --fixture "tmp/timing-flight-$schedule/WingCommanderCD32.Slave" \
+    --layout tmp/timing-layout/layout.json --schedule "$schedule" \
+    --windows 20 --held-key 40 --output "tmp/timing-run-$schedule"
+done
 python3 tools/timing_capture.py \
-  --fixture tmp/timing-flight/WingCommanderCD32.Slave \
-  --layout tmp/timing-layout/layout.json --output tmp/timing-flight-window
+  --fixture tmp/timing-flight-normal/WingCommanderCD32.Slave \
+  --layout tmp/timing-layout/layout.json --windows 20 --held-key 4e \
+  --ntsc --pause --output tmp/timing-run-ntsc
+python3 tools/timing_capture.py \
+  --fixture tmp/timing-flight-normal/WingCommanderCD32.Slave \
+  --layout tmp/timing-layout/layout.json --windows 20 --held-key 4e \
+  --machine a1200-030 --presentation-states --output tmp/timing-run-responsive
+python3 tools/timing_report.py tmp/timing-run-normal tmp/timing-run-slow \
+  tmp/timing-run-one-field tmp/timing-run-ntsc tmp/timing-run-responsive \
+  --output tmp/timing-report.json
 ```
 
-The initial live evidence is `tmp/phase9-live-prototype/` with its own fixture
-hash, layout and window bounds. Later component changes require fresh calibration
-and captures; do not reuse that layout blindly. `--timing` is a separate experimental
-build mode, not a release default or the phase-6 combined renderer build.
+The retained observer executable has SHA-256
+`08360549c392f07b1fb3393bf1e071cd0bd5ffcb4048f229d528a1ce628c1313`.
+Verify it before use. Captures check the live layout and effective CPU settings;
+recalibrate if a changed build no longer matches. The final gate additionally
+used `--pause` on the normal PAL capture. The report excludes two warm-up windows,
+uses the observer's PAL/NTSC clock, requires at least 200 completed updates,
+rejects clock errors above 1%, input overflow and schedule mismatch, and compares
+state at matching world ticks. Publication snapshots establish responsive camera
+movement while collidable positions stay at world boundaries.
 
-Additional native checks for the connected implementation:
+Schedules are pinned in fixture bytes and metadata. Normal draws the native scene
+and HUD; slow imposes a ten-field minimum. One-field replaces drawing with a wait
+only in VERIFY: it tests the scheduler and makes no renderer frame-rate claim.
+The default capture retains compact observer events; use `--trace` only when
+full instruction profiles are needed. WARP changes host execution speed, not the
+observed emulated-time denominator.
 
-```sh
-python3 tools/timing_input_check.py tmp/timing-foundation --output tmp/timing-input-check
-python3 tools/timing_presentation_check.py tmp/timing-foundation --output tmp/timing-presentation-check
-python3 tools/timing_modal_check.py tmp/timing-foundation --output tmp/timing-modal-check
-```
+The current shared 030 preset's emulated data-cache/indirect-board combination
+does not boot with the retained observer. The 030 capture automatically selects
+`WC_BASELINE_CACHE_MODEL=1`, restoring the established phase-8 emulation settings
+(data cache off, no indirect board). Effective configuration is checked and
+hashed; WHDLoad's requested cache policy is unchanged. This is confined to the
+measurement harness, and default setup is unchanged.
 
-For scheduling acceptance, build with `--timing --timing-verify` and use
-`flight_fixture.py --schedule normal`, `--schedule slow` or `--schedule one-field`.
-The schedule is pinned in the fixture bytes and metadata, not written by GDB.
-Normal draws both native scene and HUD. Slow imposes a ten-field minimum per draw.
-One-field replaces drawing with a one-field wait **only in VERIFY**; it is a
-scheduler stress test, not a claim that the original renderer achieves 50/60 FPS.
-Equal-size schedules share a calibrated layout, which every capture verifies.
-`timing_capture.py --schedule <same-name> --windows 20` collects compact read-only
-observer events and state snapshots. Add `--trace` only when full instruction
-profiles are needed. `timing_report.py <run> ... --output tmp/timing-report.json`
-excludes the first two windows, measures completed world time against observed
-emulated time, rejects schedule mismatch/overflow or >1% error, and reports
-per-range state residuals at matching world ticks. All derived output stays in `tmp/`.
+Final evidence is retained in `tmp/phase9-final-normal/`,
+`tmp/phase9-final-slow/`, `tmp/phase9-final-one-field/`,
+`tmp/phase9-final-ntsc-020-turn/` and `tmp/phase9-final-pal-030-baseline/`.
+The consolidated report is `tmp/phase9-complete-verified-report.json`.
+Native checks and the non-VERIFY candidate are recorded in the internals gate.
+Stop here; world-object extrapolation belongs to phase 10.

@@ -4,7 +4,7 @@
 at 10 updates/s and advance player orientation/camera from elapsed render time.
 Try bounded extrapolation for other objects between world ticks. This preserves
 most existing gameplay clock policies while addressing control response. Phase 8
-is complete; phase 9 has not begun.
+is complete; phase 9 now implements the selected clock/ownership policy.
 
 The original world advances once per rendered frame; 10 Hz is an inferred intended
 pace, not an existing fixed timer. At a displayed 200 kps, native displacement is
@@ -102,10 +102,10 @@ in [the framerate audit](framerate-audit.md).
 
 D still requires a real responsive player path. It must not degenerate into the
 rejected design that only interpolates pictures while controls remain at 10 Hz.
-Proposed ownership contract for the later implementation:
+Selected ownership contract, implemented with field-stamped input in phase 9:
 
-- Sample held controls each rendered frame and integrate player orientation with
-  elapsed time, bounded steps and carried fractions. Keep a separate authoritative
+- Sample held controls each elapsed field, consume that history before rendering,
+  and integrate player orientation with bounded steps and carried fractions. Keep a separate authoritative
   world snapshot; never write predicted or interpolated object poses into simulation.
 - Consume accumulated player orientation/control input once at the world boundary;
   avoid applying native player steering a second time. Define thrust/afterburner
@@ -121,9 +121,10 @@ Proposed ownership contract for the later implementation:
 - Separate draw-bound emissions (FR-15) and HUD/gameplay RNG (FR-16). Rebase both
   clocks at pause and modal transitions; loading creates no catch-up debt.
 
-The exact input history, pose transfer and presentation storage are phase-9/10
-implementation choices to validate against this contract. Do not claim they are
-already implemented or that the measured old-world costs prove their overhead.
+Phase 9 implements input history and the player/world hand-off; its gate is in
+[internals](internals.md#phase-9-decoupled-simulation-gate). World-object prediction
+and presentation storage remain phase 10. These original-world prices do not
+measure the new implementation overhead.
 
 ## Evidence and gate
 
@@ -139,5 +140,5 @@ Commands are in [development](development.md#phase-8-design-pricing).
 The user selected D after discussing interpolation, extrapolation and the 10 Hz
 unit evidence. This completes the decision gate in
 [open work](open-work.md#phase-8--choose-the-decoupling-design-user-decision).
-Pricing gaps remain documented above. No timing patch is installed; stop before
-phase 9 and release work.
+Pricing gaps remain documented above. Phase 9 is complete in the separate
+experimental timing build; stop before phase 10 and release work.

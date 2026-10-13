@@ -26,8 +26,9 @@ the world-update dispatch inventory, FR-01–FR-23 and B/C/D audit costs are rec
 in [the framerate audit](framerate-audit.md). Native 68000/68040 reproductions pass
 with steady/changing rates and explicit runtime/instrument gaps. Phase 8 is
 complete: the user selected D on 2026-10-13, with the explicit pricing gaps in
-[the design comparison](timing-design.md). Phase 9 implementation is in progress;
-stop before phase 10.
+[the design comparison](timing-design.md). Phase 9 is complete: the gated 10 Hz
+world, responsive player/camera path and required clock owners pass the scoped
+[native/live gate](internals.md#phase-9-decoupled-simulation-gate). Stop before phase 10.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -320,12 +321,12 @@ eleven-cell busy-combat root costs, B/C20/C25/C50/D10 budgets, FR item counts an
 the proposed D ownership contract. Full exclusive IRQ subtraction and new-code
 overhead remain explicit gaps; elapsed world reservations are not exclusive CPU
 utilisation or measured shipping frame rates. A fresh 020 repeat is identical.
-**Gate complete: the user selected D on 2026-10-13. Stop before phase 9.**
+**Gate complete: the user selected D on 2026-10-13.**
 The world rate is the inferred 10 updates/s pace, not an existing native timer.
 Try bounded extrapolation for world-object presentation; validate prediction
 errors without changing authoritative collision, damage or lifecycle state.
 
-### Phase 9 — Decoupled simulation (D; in progress)
+### Phase 9 — Decoupled simulation (D; complete)
 
 Common to every design:
 
@@ -347,6 +348,17 @@ Design-specific: B introduces and smooths the step value and carries fractions p
 object; C runs bounded batches of fixed updates and rescales by quantity (what
 integrates over the step, timers by where they run); D runs the world from a fixed-tick
 accumulator and the player path per frame.
+
+**Gate complete.** The separate `--timing` build gates D with `CUSTOM1=3`.
+Completed world rates are 9.962–10.017 updates/s in the final captures, with no
+input-history overflow. Normal/slow/one-field held-fire comparisons match ship,
+weapon, target, damage and gameplay-RNG state; cosmetic debris and draw counts
+are recorded residuals. PAL and NTSC pause tests rebase without catch-up. The
+030 run demonstrates 540 between-tick responsive player/camera publications.
+[FR closure](framerate-audit.md#phase-9-d-closure) records each item's policy and
+limits. Full modal/campaign and physical-device play-throughs, the original
+point-sampled collision limitation, and combined-renderer release validation remain
+explicit gaps. Do not start phase 10 until requested.
 
 ### Phase 10 — Presentation between updates (C and D)
 
