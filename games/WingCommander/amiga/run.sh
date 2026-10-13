@@ -93,7 +93,7 @@ if [ "${WC_BASELINE_CACHE_MODEL:-0}" = 1 ]; then
   eval "${setup_function/fsuae_setup/wc_cache_base_setup}"
   fsuae_setup() {
     wc_cache_base_setup || return 1
-    [ "$AMIGA_SETUP" = a1200-030 ] || { echo "baseline cache model requires a1200-030" >&2; return 1; }
+    case "$AMIGA_SETUP" in a1200-030|a1200-040|a1200-060) ;; *) echo "baseline cache model requires an accelerated preset" >&2; return 1 ;; esac
     local arg
     local baseline_args=()
     for arg in "${FSUAE_SETUP_ARGS[@]}"; do
@@ -104,6 +104,23 @@ if [ "${WC_BASELINE_CACHE_MODEL:-0}" = 1 ]; then
       esac
     done
     FSUAE_SETUP_ARGS=("${baseline_args[@]}")
+  }
+fi
+# Diagnostic CPU-speed bracket: "max" runs the non-cycle-exact CPU as fast as
+# the host allows against unchanged emulated chipset timing.
+if [ -n "${WC_CPU_SPEED:-}" ]; then
+  case "$WC_CPU_SPEED" in real|max) ;; *) echo "WC_CPU_SPEED must be real or max" >&2; exit 1 ;; esac
+  setup_function=$(declare -f fsuae_setup)
+  eval "${setup_function/fsuae_setup/wc_speed_base_setup}"
+  fsuae_setup() {
+    wc_speed_base_setup || return 1
+    local i
+    for i in "${!FSUAE_SETUP_ARGS[@]}"; do
+      case "${FSUAE_SETUP_ARGS[$i]}" in
+        --uae_cpu_cycle_exact=true) echo "WC_CPU_SPEED requires a non-cycle-exact preset" >&2; return 1 ;;
+        --uae_cpu_speed=*) FSUAE_SETUP_ARGS[$i]=--uae_cpu_speed="$WC_CPU_SPEED" ;;
+      esac
+    done
   }
 fi
 # Set the ceiling intervention explicitly, including the normal control value.

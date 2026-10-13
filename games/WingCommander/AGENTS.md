@@ -2,8 +2,9 @@
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
 Current scope: phase 11b CD32 frame-rate recovery (work items A1–E2 in
-`docs/open-work.md`). Every gate reports end-to-end frames/s on the 030 model and
-the calibrated 040. Phase 12 release work is paused until 11b passes; do not start
+`docs/open-work.md`). Every gate reports end-to-end frames/s from the
+`--frame-stats` recorder on the 030 model and the cycle-exact 040 core, and on a
+calibrated 040 once A2 provides one. Phase 12 release work is paused until 11b passes; do not start
 OCS work until requested.
 Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.

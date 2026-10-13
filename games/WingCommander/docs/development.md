@@ -1950,3 +1950,47 @@ candidate. All captured/derived material stays in `tmp/`.
 
 Stop at the phase-11 gate. Full campaign, visual/hardware acceptance, unified
 options and release packaging are phase 12.
+
+## Phase 11b frame budget (A1–A3)
+
+`--frame-stats` (with `--timing`) adds a diagnostic recorder to the slave. Each
+frame part writes one longword: event id, the game's VBL count relative to the
+start, and the beam line. After 150 active fields it fills 16384 records and the
+next loop entry saves `framestats.bin` with `resload_SaveFile`. The normal timing
+build is unchanged byte for byte. Because the slave records and saves the data
+itself, it works with any emulator configuration, and on real hardware with
+WHDLoad's `NoWriteCache` option (WHDLoad otherwise keeps saved files in memory
+until exit).
+
+```sh
+. amiga/env.sh
+python3 tools/flight_fixture.py --timing --frame-stats --nav 1 --output tmp/a1-fixture
+# Shared preset, emulated data cache and indirect board off (they do not boot here):
+python3 tools/frame_capture.py --fixture tmp/a1-fixture/WingCommanderCD32.Slave \
+  --machine a1200-040 --baseline-cache-model --custom5 1 --output tmp/a3-040-c5-1
+# Debugger builds wait for gdb: use --debugger with a calibrated layout.
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+SLAVE="$PWD/tmp/a1-fixture/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=3 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=1' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/a1-layout
+python3 tools/frame_capture.py --fixture tmp/a1-fixture/WingCommanderCD32.Slave \
+  --machine a1200-040 --timing-core --options NoMMU --custom5 1 \
+  --debugger --layout tmp/a1-layout/layout.json --output tmp/a3-040core-c5-1
+python3 tools/frame_report.py tmp/a3-*/ --output tmp/a3-report.json
+```
+
+A1 cross-check against the read-only observer (030, held fire):
+
+```sh
+python3 tools/frame_capture.py --fixture tmp/a1-fixture/WingCommanderCD32.Slave \
+  --machine a1200-030 --baseline-cache-model --custom5 1 --debugger --observer \
+  --layout tmp/a1-layout/layout.json --held-key 40 --output tmp/a1-030-observer-fire
+python3 tools/frame_check.py tmp/a1-030-observer-fire --output tmp/a1-030-observer-fire/check.json
+```
+
+The check requires the same number of pictures per displayed field as observed
+publications (`E:3378e`). The only exceptions allowed are pictures published
+exactly on a field edge, which the recorder flags as ambiguous. Elapsed time
+must agree within one field. `WC_CPU_SPEED=max` (`--cpu-speed max`) is available
+but is not an upper bound: in these runs it was slower than `real`.

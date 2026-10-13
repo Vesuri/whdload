@@ -2,6 +2,7 @@
 ; Each planar destination has its own last-source image in MEMF_FAST storage.
 flight_render_entry:
         movem.l d0-a6,-(sp)
+        FSTAT   9
         move.l  slave+$1de4(pc),d7
         cmpi.l  #3,d7
         bne.w   flight_render_original
@@ -19,9 +20,12 @@ flight_render_entry:
         move.l  slave+$1e04(pc),d7
         subq.l  #1,d7
         beq.s   .work
+        FSTAT   10
         bsr.w   slave+$17b8
+        FSTAT   11
 .work:
 flight_render_work:
+        FSTAT   12
         lea     flight_destinations(pc),a3
         move.l  flight_history(pc),a2
         moveq   #1,d7
@@ -57,6 +61,7 @@ flight_render_work:
         endif
         bsr.w   flight_delta
 flight_render_work_done:
+        FSTAT   13
         ifne FLIGHT_VERIFY
         move.l  32(sp),a0
         move.l  flight_reference(pc),a1
@@ -74,10 +79,12 @@ flight_reference_done:
         addq.l  #1,(a0)
         endif
         ; Same safe display-end publication policy as phase 6.
+        FSTAT   14
         move.l  48(sp),a4
         lea     -660(a4),a0
         move.l  -778(a4),a6
         jsr     -402(a6)
+        FSTAT   15
         movem.l (sp)+,d0-a6
         rts
 flight_render_invalidate:
@@ -142,6 +149,9 @@ flight_render_init:
         bne.s   .allocated
         move.l  #-1,(a0)        ; no memory: retain original converter
 .allocated:
+        ifne FRAME_STATS
+        bsr.w   frame_stats_init
+        endif
         ifne FLIGHT_VERIFY
         move.l  #64000,d0
         move.l  #$10003,d1       ; CHIP reference: compare equal memory classes

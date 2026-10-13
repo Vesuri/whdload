@@ -32,8 +32,9 @@ world, responsive player/camera path and required clock owners pass the scoped
 isolation and real-flight validation pass the [presentation gate](internals.md#phase-10-renderer-only-prediction-gate).
 Phase 11 is complete: changed-block flight conversion passes native/live output,
 measured conversion-time and PAL/NTSC timing gates. Phase 11b frame-rate
-recovery is required before release: the default pacing still caps flight at
-25 FPS and no gate measured end-to-end frame rate on a credible 040. Phase 12
+recovery is required before release. A1/A3 measured the frame budget:
+Psygore's default limiter caps flight at 25 FPS, the emulated machines reach
+40–50 with it off, and no credible 040 model exists yet (A2). Phase 12
 release polish is paused behind it; OCS remains out of scope.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
@@ -80,7 +81,7 @@ A definitive CD32 edition, OCS afterwards and separately:
   recorded experience, not proof of an original design rate or identical port code.
 - **Frame-rate recovery (user, 2026-10-13).** Under D the enhanced modes render as
   fast as they can with vsync on and no frame cap; game logic stays at its own rate.
-  Psygore's `Custom5` limiter is retained only in the original modes. The player's
+  Psygore's `Custom5` limiter is retained only in Psygore's modes. The player's
   translation, not only orientation, advances every field. Other objects are
   extrapolated (not interpolated), along their predicted heading. See phase 11b.
 
@@ -446,7 +447,13 @@ Diagnosis (2026-10-13):
 Work items, in order. Every item's gate reports end-to-end frames/s and the
 fields-per-frame histogram on the 030 model and the calibrated 040 (A2).
 
-**A. Measurement**
+**A. Measurement** — A1 and A3 done; A2 is blocked on a real-hardware reference.
+Results are in [internals](internals.md#phase-11b-measured-frame-budget-a1a3).
+With the limiter off, the emulated 030/040/060 reach 40–50 pictures/s.
+`Custom5=0` holds every one at 24.96. The remaining drops are world-tick frames
+(cycle-exact 040: 26.6 ms with a tick, 15.7 ms without) and the post-conversion
+display wait (6–7 ms of idle per frame).
+
 
 - **A1.** Frame instrument in a diagnostic build: per published frame its display
   field and the time in input/player, world, prediction save/restore, drawing,
@@ -455,20 +462,28 @@ fields-per-frame histogram on the 030 model and the calibrated 040 (A2).
 - **A2.** Credible 040 reference: calibrate an emulator 040/25 configuration
   (CPU model, cache emulation, speed) against published 040/25 figures or the
   user's hardware, within 10% on the same window. No 040/060 claims before this.
+  Status: no emulator configuration here models those CPUs. The non-cycle-exact
+  040 and 060 match each other, and the cycle-exact 040 ignores cache state. The
+  recorder runs unchanged on real hardware (`NOWRITECACHE`); a real 040 capture
+  is the remaining step. Psygore's cache request leaves a 040 at CACR 0 unless
+  the user adds `DCache`.
 - **A3.** Baseline the release build with `Custom5=1` (limiter off) on 030 and
   calibrated 040: Nav-1 held fire, hard turn, afterburner. This is the real budget.
 
 **B. Pacing and buffering**
 
-- **B1.** Remove the limiter call from both enhanced renderers. `Custom5` keeps
-  Psygore's meaning only in the original modes; the enhanced modes ignore it and
-  the option label says so.
+- **B1.** Remove the limiter call from both enhanced renderers and make the mode a
+  `Custom5` choice (user, 2026-10-13): 0 enhanced (default; WHDLoad's unset value),
+  1–4 Psygore normal/unlimited/relaxed/slow (his 0–3, shifted; his blitter option is
+  dropped). `Custom1` selects only the language. German with 0 falls back to Psygore
+  normal until the German port exists; outside flight, 0 keeps Psygore's normal
+  limiter until those scenes have fixed rates. The ReadMe states both and the
+  changed numbering. Psygore's modes stay for now.
 - **B2.** Vsync without idle: publish immediately after conversion, swaps take
   effect at vertical blank, and wait only before converting into a buffer whose
   swap-away has not yet been displayed. Drawing into the FAST chunky buffer overlaps.
-- **B3.** Triple buffering (one more 64000-byte aligned CHIP buffer) so the CPU
-  renders ahead instead of waiting for vsync. Adopt it if A3/B2 measurements show
-  vsync waits; keep double buffering as the low-memory fallback.
+- **B3.** No triple buffering (user, 2026-10-13): keep two buffers; B2 removes
+  the idle wait instead.
 
 **C. Smoothness**
 
@@ -486,8 +501,8 @@ fields-per-frame histogram on the 030 model and the calibrated 040 (A2).
   Gate: hard-turn full-tick forecast error well below the phase-10 p95 4.357 km /
   max 8.982 km; constant-velocity classes stay exact.
 - **C4.** Frame-time spikes: measure frame intervals around world ticks and
-  catch-up batches; resolve with B3 or tick placement until frame-interval p95
-  equals the median in steady flight.
+  catch-up batches; resolve with tick placement or cheaper ticks until
+  frame-interval p95 equals the median in steady flight.
 
 **D. Rendering cost (driven by A3/D1)**
 

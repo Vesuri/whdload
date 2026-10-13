@@ -2826,3 +2826,85 @@ speedup is promised. Full campaign, every ship/asteroid/camera/effect, transitio
 small-memory configurations and physical-hardware visual checks remain phase-12
 coverage. The earlier hard-turn prediction correction and unified intro/flight
 options remain documented release work. No release or OCS work starts here.
+
+## Phase 11b: measured frame budget (A1–A3)
+
+### A1 instrument
+
+The `--frame-stats` diagnostic build records 15 frame-part events in the slave.
+Each records the game's VBL count (`D:7f02`) and the beam line. It saves 16384
+records through WHDLoad, so it does not depend on the emulator core or a debugger.
+The normal timing build stays byte-identical to the phase-11 candidate. In flight,
+`$510` does the native drawing, then calls the converter (limiter, conversion,
+WaitBOVP) and publishes. `$46e6` runs after publication.
+
+The gate passes on the established 030 model with held fire
+(`tmp/a1-030-observer-fire/check.json`). For every displayed field, the number of
+recorded pictures equals the observer's publications at `E:3378e`, apart from
+three pictures published on the last line of a field. The recorder flags those as
+ambiguous by one field. Recorder and observer elapsed time agree to 0.0 ms over
+30.5 s (PAL line 227/3546895 s, 313 lines). Samples in the first lines of a field,
+taken before the game's VBL handler has counted it, are corrected by one field;
+the report lists how many.
+
+### A2 status: no credible 040 or 060 model
+
+No emulator configuration available here models those CPUs. The real-hardware
+reference is still missing:
+
+- The shared non-cycle-exact 040 and 060 presets run at a fixed multiplier (8).
+  Their records differ only in noise: 49.09 pictures/s and an identical
+  distribution.
+- On the cycle-exact 040 core, cache state makes no difference: CACR `00000000`
+  and `80008000` give the same results.
+- `cpu_speed=max` is slower than `real` in these runs (39.95 against 49.09
+  pictures/s), so it is not an upper bound.
+- The shared presets' emulated data cache requires the indirect UAE board, and
+  this fixture does not boot with it, using either the shared or the debugger
+  binary. All accelerated cells use the phase-8 compatibility setting (emulated
+  data cache off, no indirect board).
+
+The recorder runs unchanged on real hardware with `NOWRITECACHE`; that is the
+route to a calibrated 040. With Psygore's cache request and no WHDLoad option,
+the 040 runs with CACR `00000000` (caches off). This emulator does not model the
+cost; real hardware would.
+
+### A3 baseline
+
+Nav-1 combat, no input except the observer run (held fire). There are 1166–1416
+measured frames per cell after 20 warm-up frames. "Busy" is frame time excluding
+the limiter and the post-conversion display wait. Times are emulated elapsed time
+and include interrupts. Report: `tmp/a3-report.json`.
+
+| Cell | Custom5 | Pictures/s | Fields per picture | Busy p50 / p95 ms | Limiter / display wait ms (mean) |
+|---|---:|---:|---|---:|---:|
+| 020 stock, cycle-exact | 1 | 10.75 | mostly 4–5 | 86.6 / 99.3 | 0 / 8.1 |
+| 030/50 cycle-exact | 0 | 24.96 | all 2 | 12.5 / 19.8 | 11.2 / 14.1 |
+| 030/50 cycle-exact | 1 | 49.92 | all 1 | 11.8 / 17.7 | 0 / 7.1 |
+| 030/50, held fire (A1 run) | 1 | 46.80 | 1315×1, 94×2 | 13.4 / 22.0 | 0 / 6.1 |
+| 040 shared preset | 0 | 24.96 | all 2 | 12.5 / 25.1 | 11.6 / 12.1 |
+| 040 shared preset | 1 | 49.09 | 1390×1, 24×2 | 11.7 / 21.8 | 0 / 6.8 |
+| 040/25 cycle-exact core | 0 | 24.96 | all 2 | 16.3 / 30.3 | 7.3 / 12.1 |
+| 040/25 cycle-exact core | 1 | 39.95 | 1053×1, 350×2 | 15.9 / 29.7 | 0 / 6.4 |
+| 060 shared preset | 1 | 49.09 | as 040 shared | 11.7 / 21.8 | 0 / 6.8 |
+
+The world rate is 9.96–9.98 updates/s in every cell.
+
+Findings:
+
+- `Custom5=0`, Psygore normal, holds every accelerated cell at exactly
+  24.96 pictures/s. Frames need 12–16 ms of work and then wait out two fields.
+  Turning the limiter off gives 40–50 pictures/s on the same models.
+- The remaining drops come from frames that carry a world tick. On the 040
+  cycle-exact core, frames without a tick need 15.7 ms (p95 16.6). Frames with a
+  tick need 26.6 ms (p95 31.2), of which the world update is 5.8 ms (p95 8.8); the
+  rest is tick-time input, geometry and targeting work. On the 030: 11.6 against
+  17.3 ms, world 2.8 ms.
+- The post-conversion WaitBOVP idles 6–7 ms per frame even unlimited. When
+  conversion ends after the bottom of the display, the picture is published in
+  the next field and replaced before display (3 of 1413 in the held-fire run).
+- Per-frame parts on the 040 cycle-exact core (mean ms): prediction save 0.6,
+  native drawing 6.8, conversion 4.5, after-publication `$46e6` 3.6, restore 0.3.
+- None of these configurations reproduces the user's below-25 report with
+  standard pacing; all hold exactly 25. A slower emulated CPU or modelled
+  cache-off cost would produce it.

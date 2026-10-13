@@ -1,0 +1,102 @@
+; Diagnostic frame-part recorder, assembled only with --frame-stats.
+; Record: event id (bits 31-27), field relative to the first recorded field
+; (bits 26-9) and beam line (bits 8-0). The field is the game's VBL count.
+; Recording starts FS_SKIP active fields after the first active event, fills
+; the buffer once, and the next loop entry saves it with resload_SaveFile.
+; Header: 'WCFS', field Hz, record count, skipped fields.
+FS_RECORDS = 16384
+FS_SKIP = 150
+
+frame_stats_init:
+        movem.l d0-d1/a0-a1/a6,-(sp)
+        move.l  #16+FS_RECORDS*4,d0
+        move.l  #$10005,d1       ; MEMF_CLEAR | MEMF_FAST | MEMF_PUBLIC
+        move.l  $4.w,a6
+        jsr     -198(a6)
+        lea     frame_stats_buffer(pc),a0
+        move.l  d0,(a0)
+        movem.l (sp)+,d0-d1/a0-a1/a6
+        rts
+
+; Stack: return address, then the event id word pushed by FSTAT.
+; Preserves every register and the condition codes.
+frame_stat:
+        movem.l d0-d2/a0,-(sp)
+        move.w  ccr,-(sp)
+        tst.w   timing_active(pc)
+        beq.s   .done
+        move.l  frame_stats_buffer(pc),d0
+        beq.s   .done
+        move.l  frame_stats_count(pc),d1
+        cmpi.l  #FS_RECORDS,d1
+        bhs.s   .done
+        move.l  timing_data(pc),a0
+.sample:
+        ; A field change between the two counter reads retries the sample.
+        move.l  $7f02(a0),d2
+        move.l  $dff004,d0
+        cmp.l   $7f02(a0),d2
+        bne.s   .sample
+        lsr.l   #8,d0
+        andi.l  #$1ff,d0
+        tst.w   frame_stats_started(pc)
+        bne.s   .started
+        lea     frame_stats_started(pc),a0
+        move.w  #1,(a0)
+        addi.l  #FS_SKIP,d2
+        lea     frame_stats_first(pc),a0
+        move.l  d2,(a0)
+        bra.s   .done
+.started:
+        sub.l   frame_stats_first(pc),d2
+        bmi.s   .done
+        andi.l  #$3ffff,d2
+        lsl.l   #8,d2
+        add.l   d2,d2
+        or.l    d2,d0
+        moveq   #0,d2
+        move.w  22(sp),d2
+        ror.l   #5,d2
+        or.l    d2,d0
+        move.l  frame_stats_buffer(pc),a0
+        move.l  d0,16(a0,d1.l*4)
+        addq.l  #1,d1
+        lea     frame_stats_count(pc),a0
+        move.l  d1,(a0)
+.done:
+        move.w  (sp)+,ccr
+        movem.l (sp)+,d0-d2/a0
+        rts
+
+frame_stats_flush:
+        movem.l d0-d1/a0-a2,-(sp)
+        move.w  ccr,-(sp)
+        move.l  frame_stats_count(pc),d0
+        cmpi.l  #FS_RECORDS,d0
+        blo.s   .done
+        tst.w   frame_stats_saved(pc)
+        bne.s   .done
+        lea     frame_stats_saved(pc),a0
+        move.w  #1,(a0)
+        move.l  frame_stats_buffer(pc),a1
+        move.l  #'WCFS',(a1)
+        move.l  timing_hz(pc),4(a1)
+        move.l  #FS_RECORDS,8(a1)
+        move.l  #FS_SKIP,12(a1)
+        lea     frame_stats_name(pc),a0
+        move.l  #16+FS_RECORDS*4,d0
+        move.l  slave+$121e(pc),a2
+        jsr     12(a2)           ; resload_SaveFile
+.done:
+        move.w  (sp)+,ccr
+        movem.l (sp)+,d0-d1/a0-a2
+        rts
+
+        cnop    0,4
+frame_stats_buffer:  dc.l 0
+frame_stats_count:   dc.l 0
+frame_stats_first:   dc.l 0
+frame_stats_started: dc.w 0
+frame_stats_saved:   dc.w 0
+frame_stats_name:    dc.b 'framestats.bin',0
+        cnop    0,4

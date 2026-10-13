@@ -29,6 +29,7 @@ def main():
     p.add_argument('--output', required=True)
     modes = p.add_mutually_exclusive_group()
     modes.add_argument('--timing', action='store_true', help='experimental CUSTOM1=3 English hybrid timing adapter')
+    p.add_argument('--frame-stats', action='store_true', help='diagnostic frame-part recorder saved as framestats.bin; requires --timing')
     modes.add_argument('--render', action='store_true', help='experimental CUSTOM1=2 English rendering adapter')
     modes.add_argument('--render-control', action='store_true', help='same-size original converter with the same gated WHDLoad cache policy')
     modes.add_argument('--verify', action='store_true', help='build the CUSTOM1=2 diagnostic seam')
@@ -43,6 +44,7 @@ def main():
     p.add_argument('--input', default='tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')
     a = p.parse_args()
     if (a.flight_verify or a.flight_control) and not a.timing:p.error('flight diagnostics require --timing')
+    if a.frame_stats and not a.timing:p.error('--frame-stats requires --timing')
     if a.timing_verify and not a.timing: p.error('--timing-verify requires --timing')
     if a.render_family!='auto' and not a.render: p.error('--render-family requires --render')
     if a.render_verify and not a.render: p.error('--render-verify requires --render')
@@ -124,7 +126,9 @@ def main():
         lines.append(render_source(ROOT))
     if a.timing:
         lines.append('TIMING_VERIFY equ '+str(int(a.timing_verify)))
+        lines.append('FRAME_STATS equ '+str(int(a.frame_stats)))
         lines.append(timing_source(ROOT))
+        if a.frame_stats:lines.append((ROOT/'whdload/frame_stats.s').read_text())
         lines.append(flight_source(ROOT,a.flight_verify,a.flight_control))
     if a.verify or a.verify_control:
         lines.append((ROOT/'whdload/verify.s').read_text())
@@ -175,7 +179,7 @@ def main():
     (out/'WingCommanderCD32.Slave').write_bytes(result)
     report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
-              'code_ranges':CODE, 'byte_identical':result == original, 'flight_verify':a.flight_verify, 'flight_control':a.flight_control, 'timing':a.timing, 'timing_verify':a.timing_verify, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling or a.timing_verify or a.flight_verify or a.flight_control), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
+              'code_ranges':CODE, 'byte_identical':result == original, 'flight_verify':a.flight_verify, 'flight_control':a.flight_control, 'timing':a.timing, 'timing_verify':a.timing_verify, 'frame_stats':a.frame_stats, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling or a.timing_verify or a.frame_stats or a.flight_verify or a.flight_control), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
     if a.ceiling and a.ceiling.startswith('drawing'):
         report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')

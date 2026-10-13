@@ -1,6 +1,15 @@
 ; Experimental English CUSTOM1=3 simulation and renderer-prediction adapter.
 ; Flight delta conversion is separate from the intro renderer/release options.
 ; Original language choices CUSTOM1=0/1 install no new game patches.
+
+; Diagnostic frame-part record (--frame-stats); expands to nothing otherwise.
+FSTAT   macro
+        ifne FRAME_STATS
+        move.w  #\1,-(sp)
+        bsr.w   frame_stat
+        addq.l  #2,sp
+        endif
+        endm
 timing_patchseg:
         jsr     116(a2)
         movem.l d0-d7/a0-a6,-(sp)
@@ -83,6 +92,10 @@ timing_loop:
         lea     timing_active(pc),a0
         move.w  #1,(a0)
 .loop:
+        FSTAT   1
+        ifne FRAME_STATS
+        bsr.w   frame_stats_flush
+        endif
         tst.w   -32628(a4)
         bne.w   timing_leave
         tst.w   timing_input_lost(pc)
@@ -153,6 +166,7 @@ timing_loop:
         lea     timing_abort(pc),a0
         clr.w   (a0)
 .draw:
+        FSTAT   4
         lea     timing_selection_last(pc),a0
         move.w  4430(a4),d0
         move.w  d0,d1
@@ -171,16 +185,20 @@ timing_render:
         beq.s   .wait
         endc
         bsr.w   timing_scene_begin
+        FSTAT   5
         move.l  -4326(a4),-(sp)
         move.l  timing_render_seed(pc),-4326(a4)
         move.l  timing_game(pc),a6
         jsr     $510(a6)
+        FSTAT   6
         move.l  timing_game(pc),a6
         jsr     $46e6(a6)
+        FSTAT   7
         lea     timing_render_seed(pc),a0
         move.l  -4326(a4),(a0)
         move.l  (sp)+,-4326(a4)
         bsr.w   timing_scene_end
+        FSTAT   8
         ifne TIMING_VERIFY
 .wait:
         moveq   #0,d0
@@ -206,6 +224,7 @@ timing_native_input:
         rts
 
 timing_world:
+        FSTAT   2
         move.l  timing_game(pc),a6
         jsr     $2a8(a6)
         tst.w   timing_active(pc)
@@ -213,6 +232,7 @@ timing_world:
         bsr.w   timing_presentation_tick
         bsr.w   timing_scene_tick
 timing_world_done:
+        FSTAT   3
         lea     timing_completed(pc),a0
         addq.l  #1,(a0)
         lea     timing_abort(pc),a0
