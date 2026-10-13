@@ -144,3 +144,7 @@ make prepare
 The installer and both full installs are pinned in `manifest/inputs.tsv`.
 Archives and separate extracted originals live under ignored `tmp/`.
 The shared development tools come from AmigaXDev's installed environment.
+
+Intro timing work is in progress: the enhanced English intro will use the same
+10 Hz world clock and extrapolated motion as flight, preserving music and credit
+deadlines. The PC recording is a secondary visual reference.

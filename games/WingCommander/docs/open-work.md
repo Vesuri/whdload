@@ -79,7 +79,7 @@ Its normal c2p limiter waits two CIA-A TOD increments; that is not an intended-r
 measurement. In the original slave, `Custom5=4` selects the blitter c2p path, not Akiko.
 The public-option candidate removes it and uses 4 for Psygore slow. These
 findings refine the implementation assumptions below; flight now uses the selected
-10 Hz design, while the final intro motion-rate choice remains separate. The OCS version remains unanalysed.
+10 Hz design, and the intro is being adapted to the same 10 Hz behavior. The OCS version remains unanalysed.
 
 ## Goal
 
@@ -123,14 +123,12 @@ displayed 200 kps corresponds to 20 km per update. This supersedes the unmeasure
 15/s prior. The experimental timing build uses this rate; it does not establish every
 animation/AI cadence. Do not transfer intro evidence to flight.
 
-**Intro phase 5 candidate: approximately 15 native ship updates/s** (roughly
-15–17/s from the short projected-motion comparison). The unmodified ship loop
-updates twice per picture, so this is about 7.5 pictures/s, not a 15 FPS cap.
-The PC clip shows about 14–15 visible ship/explosion advances/s and a faster
-20–25/s asteroid cadence. Asteroids update once per Amiga draw; their cross-port
-native-step equivalence remains unproved. These are separate motion targets for
-the user's decision, not a silently installed universal rate. Keep music and
-text deadlines unchanged. See the phase 5 findings in `internals.md`.
+**Intro decision: 10 native world updates per second**, matching flight, with
+bounded renderer-only extrapolation between updates. The user selected this
+working target; it is not independent proof of the historical intro rate.
+Do not scale native displacement toward the earlier PC-derived 15/s estimate.
+The PC recording is a secondary visual reference. Preserve native music and
+credit-text deadlines. Implementation and validation are now in progress.
 
 Rate choices use the following evidence before implementation:
 
@@ -654,7 +652,7 @@ executable, display, c2p (none expected) and timing. Reuse designs, not assumpti
 
 ## Decisions pending
 
-- Final intro motion-rate choice remains separate from the implemented 10 Hz flight clock.
+- Intro implementation must validate 10 Hz updates, between-update motion and unchanged music/credit deadlines.
 - Release play-testing must judge visible hard-turn corrections and all model/camera paths;
   the implemented presentation policy predicts to display time with authoritative
   snaps and a bound of one tick plus two queued display fields.

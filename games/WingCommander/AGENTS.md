@@ -1,7 +1,10 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 11b CD32 frame-rate recovery (work items A1–E2 in
+Current scope: apply the in-game 10 Hz clock and extrapolated presentation to
+the English ship/title and asteroid intro, preserving music and credit deadlines.
+The PC video is a secondary visual reference, not a timing authority.
+Phase 11b CD32 frame-rate recovery (work items A1–E2 in
 `docs/open-work.md`). B2 and the scoped cached-040 row-corruption fix are complete.
 C1–C3 and the C4 steady-flight display-cadence gate are complete.
 D1 model profiling, D2 prediction overhead and D3 view-region rendering are complete.
