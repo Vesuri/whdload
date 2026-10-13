@@ -24,9 +24,9 @@ windows, representative costs/source changes, state cadence and render coupling
 are documented. The native flight-unit anchor is 10 updates/s. Phase 7b is complete:
 the world-update dispatch inventory, FR-01–FR-23 and B/C/D audit costs are recorded
 in [the framerate audit](framerate-audit.md). Native 68000/68040 reproductions pass
-with steady/changing rates and explicit runtime/instrument gaps. Phase 8 pricing
-is ready in [the design comparison](timing-design.md); D is recommended with
-explicit gaps. The user decision is pending; phase 9 has not begun.
+with steady/changing rates and explicit runtime/instrument gaps. Phase 8 is
+complete: the user selected D on 2026-10-13, with the explicit pricing gaps in
+[the design comparison](timing-design.md). Stopped before phase 9.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -61,10 +61,12 @@ A definitive CD32 edition, OCS afterwards and separately:
 - **Caches (future slave policy).** Leave cache state to WHDLoad and its user
   options. The original slave explicitly calls SetCPU (phase 1 finding). Every
   measurement records the hardware cache state (`CACR`) it ran under.
-- **Design.** A fixed tick with only presentation interpolation is rejected. The
-  choice between designs B, C and D remains the user's phase-8 decision. The flight
-  time model, framerate audit and eleven-cell combat pricing are available in
-  [the design comparison](timing-design.md); D is recommended, decision pending.
+- **Design.** The user selected D on 2026-10-13: a 10 Hz world, responsive
+  per-render player orientation/camera and bounded world-object extrapolation
+  as the initial presentation approach to validate. A fixed tick with only
+  presentation smoothing remains rejected. The flight time model, framerate
+  audit, eleven-cell pricing and ownership contract are in
+  [the design comparison](timing-design.md).
 - **PC reference.** Use the supplied 86Box/eXoDOS recording as a practical external
   pace reference alongside the Amiga time sources and music. It represents the
   recorded experience, not proof of an original design rate or identical port code.
@@ -317,7 +319,10 @@ eleven-cell busy-combat root costs, B/C20/C25/C50/D10 budgets, FR item counts an
 the proposed D ownership contract. Full exclusive IRQ subtraction and new-code
 overhead remain explicit gaps; elapsed world reservations are not exclusive CPU
 utilisation or measured shipping frame rates. A fresh 020 repeat is identical.
-**D is recommended; user decision pending. Stop before phase 9.**
+**Gate complete: the user selected D on 2026-10-13. Stop before phase 9.**
+The world rate is the inferred 10 updates/s pace, not an existing native timer.
+Try bounded extrapolation for world-object presentation; validate prediction
+errors without changing authoritative collision, damage or lifecycle state.
 
 ### Phase 9 — Decoupled simulation (chosen design)
 
@@ -377,4 +382,5 @@ executable, display, c2p (none expected) and timing. Reuse designs, not assumpti
 ## Decisions pending
 
 - Intended intro/flight rates, deferred to the in-game timing investigation.
-- Decoupling design B, C or D, after phase 8's pricing.
+- D presentation prediction limits and correction policy, to validate during
+  implementation; the decoupling design itself is selected.

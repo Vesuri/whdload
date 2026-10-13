@@ -1,10 +1,11 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 8 CD32 design pricing is ready; user decision pending.
-The eleven-cell combat comparison recommends D with explicit instrument gaps.
-The phase 8 gate reserves the design choice to the user. Stop before phase 9,
-release or OCS work.
+Current scope: phase 8 CD32 design selection is complete; the user chose D.
+Use a 10 Hz world with responsive per-render player orientation/camera; bounded
+world-object extrapolation is the initial presentation approach to validate.
+The eleven-cell pricing and instrument gaps are recorded. Stop before phase 9,
+release or OCS work until requested.
 Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 

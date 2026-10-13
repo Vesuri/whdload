@@ -2454,9 +2454,11 @@ cached 020, 20.78 / 23.75 ms uncached; the accelerated emulator cells range from
 15.8–20.8%; at 25 Hz it is 39.6–51.9%. These are elapsed reservations including
 preemption, not exclusive CPU utilisation or physical-hardware measurements.
 
-D is recommended because it retains most native world clocks while making the
+The user selected D on 2026-10-13 because it retains most native world clocks while making the
 player control/camera path responsive. Costs of its new per-render path and of
 B/C conversion are not measured yet. Full IRQ subtraction, worst-case combat,
 phase-6 renderer budgets and previously documented live gameplay paths remain
-explicit gaps. The user decision belongs to the phase-8 gate; no timing fix is
-installed by these measurements.
+explicit gaps. The 10 Hz rate is inferred from native speed/displacement units;
+the original world is frame-coupled. Bounded extrapolation is the initial
+world-object presentation approach to validate, separate from authoritative
+collision and lifecycle state. Phase 8 is complete; no timing fix is installed.

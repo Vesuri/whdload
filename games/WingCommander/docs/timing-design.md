@@ -1,9 +1,23 @@
 # CD32 timing design: phase 8 decision
 
-**Recommendation: D, the hybrid. User decision pending.** Retain the native world
-at 10 updates/s, advance player orientation and camera from elapsed render time,
-and interpolate other objects for display. This preserves most existing gameplay
-clock policies while addressing control response. Phase 9 has not begun.
+**Selected: D, the hybrid. The user chose D on 2026-10-13.** Schedule the world
+at 10 updates/s and advance player orientation/camera from elapsed render time.
+Try bounded extrapolation for other objects between world ticks. This preserves
+most existing gameplay clock policies while addressing control response. Phase 8
+is complete; phase 9 has not begun.
+
+The original world advances once per rendered frame; 10 Hz is an inferred intended
+pace, not an existing fixed timer. At a displayed 200 kps, native displacement is
+20 km per update, making ten updates/s consistent with those units. The user
+accepted this reasoning; later gameplay validation still applies.
+
+The initial presentation approach discussed with the user predicts ships,
+asteroids and projectiles from their latest authoritative motion, bounded to at
+most one world tick ahead. Validate correction smoothing on the next update; snap
+at discontinuities such as impacts or teleports. Do not predict collision, damage,
+creation or destruction events or write predicted poses back into world state.
+Prediction limits, correction details and suitability per object type remain
+implementation tests, not proven behaviour.
 
 ## Measured basis
 
@@ -92,7 +106,7 @@ Proposed ownership contract for the later implementation:
 
 - Sample held controls each rendered frame and integrate player orientation with
   elapsed time, bounded steps and carried fractions. Keep a separate authoritative
-  world snapshot; never write interpolated other-object positions into simulation.
+  world snapshot; never write predicted or interpolated object poses into simulation.
 - Consume accumulated player orientation/control input once at the world boundary;
   avoid applying native player steering a second time. Define thrust/afterburner
   duty over that interval so fuel and acceleration remain consistent.
@@ -107,7 +121,7 @@ Proposed ownership contract for the later implementation:
 - Separate draw-bound emissions (FR-15) and HUD/gameplay RNG (FR-16). Rebase both
   clocks at pause and modal transitions; loading creates no catch-up debt.
 
-The exact input history, pose transfer and interpolation storage are phase-9/10
+The exact input history, pose transfer and presentation storage are phase-9/10
 implementation choices to validate against this contract. Do not claim they are
 already implemented or that the measured old-world costs prove their overhead.
 
@@ -122,7 +136,8 @@ A second fresh 020 boot reproduces the selected state and every reported cost
 exactly (`tmp/phase8-combat-repeat/020-default/`).
 Commands are in [development](development.md#phase-8-design-pricing).
 
-Recommendation is ready for the user to choose B, C (with a tick rate), or D.
-The gate in [open work](open-work.md#phase-8--choose-the-decoupling-design-user-decision)
-explicitly reserves that choice to the user. No timing patch, phase 9 work or
-release work is authorised by this recommendation alone.
+The user selected D after discussing interpolation, extrapolation and the 10 Hz
+unit evidence. This completes the decision gate in
+[open work](open-work.md#phase-8--choose-the-decoupling-design-user-decision).
+Pricing gaps remain documented above. No timing patch is installed; stop before
+phase 9 and release work.

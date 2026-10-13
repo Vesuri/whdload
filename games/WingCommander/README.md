@@ -3,10 +3,11 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 8 design pricing is ready; the user decision is pending.**
-The [comparison](docs/timing-design.md) recommends D: retain the 10 Hz world and
-add responsive player controls/camera. Eleven combat configurations are priced
-with explicit overhead and instrument gaps. Timing implementation has not begun.
+**Phase 8 is complete: the user selected D, the hybrid.**
+The [design](docs/timing-design.md) uses a 10 Hz world with responsive per-render
+player orientation/camera and bounded world-object extrapolation to validate.
+Eleven combat configurations are priced with explicit overhead and instrument
+gaps. Stopped at the phase 8 gate; timing implementation has not begun.
 
 **Phase 7b framerate-dependency audit is complete.**
 The [audit](docs/framerate-audit.md) records 23 stable findings, the complete
