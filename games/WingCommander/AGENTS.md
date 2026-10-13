@@ -1,11 +1,11 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 8 CD32 design selection is complete; the user chose D.
-Use a 10 Hz world with responsive per-render player orientation/camera; bounded
-world-object extrapolation is the initial presentation approach to validate.
-The eleven-cell pricing and instrument gaps are recorded. Stop before phase 9,
-release or OCS work until requested.
+Current scope: phase 9 CD32 decoupled simulation for selected design D.
+Implement a gated 10 Hz world and elapsed-time per-render player orientation/camera.
+Validate clock/input/modal boundaries and required FR items; preserve original
+option-off behaviour. Stop at the phase 9 gate before phase 10 presentation,
+release or OCS work. Derived world-object extrapolation remains phase 10.
 Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 

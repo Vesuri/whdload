@@ -26,7 +26,8 @@ the world-update dispatch inventory, FR-01–FR-23 and B/C/D audit costs are rec
 in [the framerate audit](framerate-audit.md). Native 68000/68040 reproductions pass
 with steady/changing rates and explicit runtime/instrument gaps. Phase 8 is
 complete: the user selected D on 2026-10-13, with the explicit pricing gaps in
-[the design comparison](timing-design.md). Stopped before phase 9.
+[the design comparison](timing-design.md). Phase 9 implementation is in progress;
+stop before phase 10.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -324,7 +325,7 @@ The world rate is the inferred 10 updates/s pace, not an existing native timer.
 Try bounded extrapolation for world-object presentation; validate prediction
 errors without changing authoritative collision, damage or lifecycle state.
 
-### Phase 9 — Decoupled simulation (chosen design)
+### Phase 9 — Decoupled simulation (D; in progress)
 
 Common to every design:
 
