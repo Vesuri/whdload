@@ -10,9 +10,15 @@
 
 FF1SimulationTail:
  movem.l d0-d7/a0-a6,-(sp)
+ IFD FF1_RENDER_POSES
+ bsr.l B8ViewTick
+ ENDC
  ; Animation rates have native 100 ms units, like recovery and filtered boost.
  tst.w events_pulse(pc)
  beq.b .recovery
+ IFD FF1_RENDER_POSES
+ bsr.l B8NativePresentationTick
+ ENDC
  bsr.w FF1InstrumentTick
 .recovery:
  bsr.w recovery_tick
