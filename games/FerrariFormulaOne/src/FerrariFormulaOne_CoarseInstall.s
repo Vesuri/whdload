@@ -272,7 +272,7 @@ C1InstallUnload:
 C1UnloadInstalled: dc.l 0
 C1Ledger: ds.b 24
  IFD FF1_COARSE_NATIVE_000
-C3Enabled: dc.w 1
+C3Enabled: dc.w FF1_NATIVE_000_STAGE
  include "FerrariFormulaOne_Native000.s"
  ENDC
  IFD FF1_COARSE_NATIVE_EXACT
