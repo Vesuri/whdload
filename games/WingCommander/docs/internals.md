@@ -3754,7 +3754,7 @@ Evidence: `tmp/d2-final-030`, `tmp/d2-final-040-steady`,
 `tmp/d2-final-fps.json`. Commands are in development.md. No fresh corrected-MMU
 pixel capture, long campaign, forced-stall cadence or physical-hardware acceptance
 is claimed. The calibrated 040 gate remains blocked on A2. The phase-12 stash
-is untouched; D3 and D4 follow below; D5–E2 remain open.
+is untouched; D3–D5 model results follow below; calibrated acceptance remains open.
 
 ## Phase 11b view regions: D3 complete
 
@@ -3896,7 +3896,7 @@ blocked, phase 12 stays paused, and the phase-12 stash is untouched.
 
 The D4 comparison-cost gate is complete on the required current models. The
 retained change is a compact full-image comparison, **not drawing-based dirty
-rectangles**. Stop before D5; calibrated 040 timing remains blocked on A2.
+rectangles**. D5 model evaluation follows below; calibrated 040 timing remains blocked on A2.
 
 ### Scope decision and implementation
 
@@ -4009,3 +4009,118 @@ its D3 control is
 `df0c38d40fe196f25d72034d0e33be3f7f65c3f9c1bbffde1b52d84f3d0a9036`.
 Version remains **2.0b (13.06.2026)**. Phase 12 and its saved stash remain untouched;
 OCS work is not started.
+
+## Phase 11b Kalms families: D5 model evaluation complete
+
+The practical evaluation is complete. **Retain the current converter selection.**
+The original D5 calibrated-040 gate is still open under A2; these results do not
+establish the best routine on physical 040/060 hardware. E1/E2 and phase 12 remain
+open. No production assembly or cache policy changes in D5.
+
+### Candidates and semantics
+
+Kalms does provide CPU-specific routines: the pinned
+`c2p1x1_8_c5_030` and `c2p1x1_8_c5_040` sources in
+`manifest/kalms-c2p.tsv` are the applicable 1:1, eight-plane, contiguous-plane
+families. The latter explicitly targets 040/060. The upstream
+[collection](https://github.com/Kalmalyzer/kalms-c2p) also contains other pixel
+formats and layouts, which are not interchangeable with this surface.
+Both families were already embedded for full surfaces; cached 020/030 nonflight
+rendering already selects the 030 family. Flight used the 030 family for every
+changed 32-pixel block, regardless of CPU, and the original converter for a new
+buffer's full conversion. D5 specifically re-evaluates those flight choices.
+
+Both candidates use immutable generated constants (320×200, 8000-byte plane
+stride), not Kalms' mutable initialisation or SMC. The 040 single-block candidate
+retains that stride with a 32-pixel input extent. Its full-stream scheduling and
+prefetching cannot be assumed useful for isolated blocks; timing decides.
+
+`--c2p-experiment` generates five diagnostic arms from the D4 release path:
+030 changed blocks (`control`), 040 changed blocks (`block040`), and forced full
+conversion with original/030/040 routines. The latter three keep the same history
+copy, preserving two-buffer state. They measure sustained full conversion, not
+just the two cold destination fills or nonflight intro conversion.
+Every diagnostic arm is 42356 bytes with identical shared symbol locations;
+96 padding bytes relative to the normal recorder remove size/alignment as an
+inter-arm variable. Diagnostics never alter the normal release.
+
+In these recorder builds, the block slot is `S:9186–9455` (file `91a6–9475`),
+full-conversion call `S:9080` (file `90a0`), and forced-full switch `S:9048`
+(file `9068`). Full Kalms entries are `S:9a70` / file `9a90` (030) and
+`S:a280` / file `a2a0` (040). The block candidate changes only its reserved slot;
+full candidates change the two-byte NOP to `moveq #0,d7` and, where applicable,
+the full-call displacement. Original code, frame scheduling, allocation and
+buffer ownership remain unchanged.
+
+All five arms pass **360 native whole-output comparisons** on 020/040 ISA models:
+alternating and replaced buffers, small/sparse/dense changes, 128/166/200 heights,
+inactive flight and allocation failure. Register preservation, source integrity
+and store bounds pass. The separate D5 checker verifies exact shared layout,
+allowed changes and full-call targets; replacing the block converter with RTS
+is rejected on both ISA models. **All 20 live planar buffers (1,280,000 bytes)**
+match independent packing of their own histories. Buffer ownership checks pass
+for the 040 block candidate on both models. These are memory/pixel checks, not a
+new subjective display-glitch or campaign acceptance pass.
+
+### Measurements and disposition
+
+Same-session deterministic Nav-1 held-turn captures, `CUSTOM5=0`, frame recorder
+and read-only cost observer. The 030 uses the existing MMU/cache baseline and
+`CACHE DCACHE`; the cycle-exact 040 uses the existing `NoMMU` model. Both retain
+the diagnostic baseline's `cpu_data_cache=false`; the 040 core is not a calibrated
+040/25 or the corrected MMU frontend used for the user's visual acceptance.
+Observer binary SHA-256:
+`08360549c392f07b1fb3393bf1e071cd0bd5ffcb4048f229d528a1ce628c1313`.
+The first 20 draw records are warm-up. Windows end at recorder capacity, so
+full-conversion arms cover longer simulated time and different trajectories;
+these are workload results, not identical-source leaf benchmarks.
+
+| Model / converter | End-to-end frames/s | Fields per picture (count × fields) | Delta service mean / p95 ms |
+|---|---:|---|---:|
+| 030 / current 030 blocks | 47.533 | 605×1, 32×2 | 3.288 / 7.406 |
+| 030 / 040 blocks | 47.604 | 606×1, 31×2 | 3.244 / 7.224 |
+| 030 / full original | 30.630 | 234×1, 387×2, 3×3 | 17.363 / 18.203 |
+| 030 / full Kalms 030 | 35.496 | 374×1, 256×2 | 13.044 / 13.874 |
+| 030 / full Kalms 040 | 24.839 | 611×2, 6×3 | 20.802 / 21.233 |
+| 040 core / current 030 blocks | 43.424 | 543×1, 89×2, 3×3 | 4.665 / 8.512 |
+| 040 core / 040 blocks | 43.255 | 542×1, 90×2, 4×3 | 4.703 / 8.969 |
+| 040 core / full original | 17.814 | 162×2, 397×3, 43×4 | 33.634 / 34.394 |
+| 040 core / full Kalms 030 | 16.179 | 82×2, 382×3, 133×4 | 38.565 / 39.258 |
+| 040 core / full Kalms 040 | 16.475 | 101×2, 379×3, 119×4 | 37.575 / 38.469 |
+
+Delta service includes comparison, conversion and history for block arms;
+full arms include conversion plus their identical full history copy. All costs
+include interrupt/bus elapsed time. The changed-block call totals alone are
+1.162 / 4.913 ms mean/p95 for 030-on-030 versus 1.098 / 4.604 for 040-on-030;
+on the 040 model they are 1.362 / 5.031 versus 1.387 / 5.307. Changed workload
+counts and trajectories prevent treating these totals as per-block speed ratios.
+
+- **Changed blocks:** retain 030 on both models. FPS differences (+0.15% on 030,
+  −0.39% on the 040 core) are below the 3% meaningful-change threshold. There is
+  no measured reason to introduce CPU dispatch into the flight path.
+- **Full conversion on 030:** the 030 family beats the original in this workload,
+  consistent with the existing nonflight selection. Even this best full arm
+  remains substantially below changed-block throughput. No new full-flight mode
+  or cold-fill-only optimisation is justified by these sustained-window results.
+- **Full conversion on the current 040 core:** neither Kalms family wins against
+  the original. Keep the original fallback; do not retry this same model matrix
+  without a changed premise. A calibrated cache/memory reference is such a change.
+
+All ten independent frame/observer reconciliations pass (640–660 pictures on 030,
+620–658 on 040; maximum elapsed disagreement below 0.002 ms). World rate remains
+9.929–9.986 Hz on 030 and 9.965–9.994 Hz on the 040 model, within the
+existing ±1% gate. No recorder overflow is accepted.
+The padded 040 control's frame and display ledgers are byte-identical to the
+retained D4 held-turn control without cost scopes. This is cross-session/layout
+repeatability evidence, not a newly measured same-session observer on/off pair;
+all cost reports explicitly label separate neutrality as unchecked. No claim of
+a small speedup, global prediction-deadline pass, NTSC gate, 060 timing or physical
+hardware result follows from this experiment.
+
+Normal release SHA-256 remains
+`585ae02c164df96573173b936b84841b942a8cc030d7ef6c18e1ca3a87bc8c6a`,
+byte-identical to D4 and to the current preinstalled archive's slave. Diagnostic
+fixture hashes and changed ranges are in `tmp/d5-pixels.json`; raw captures and
+cost/frame reports are under `tmp/d5-{030,040}-{control,block040,full-original,full030,full040}`.
+`tmp/d5-fps.json` consolidates cadence; `tmp/d5-*-native.json` records the native
+comparisons. Reproduction commands are in development's D5 section.

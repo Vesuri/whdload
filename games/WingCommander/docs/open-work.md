@@ -62,7 +62,8 @@ D3 is complete: native view-region clear/composition keeps exact pixels and
 D4’s practical comparison-cost gate is complete: compact full-image comparisons
 reduce the 040 model’s residual cost by 0.84 ms per picture, with 43.424 frames/s
 in its held-turn window. Drawing-based dirty rectangles remain deferred.
-D5 is in progress on the available models. Held-turn frame-budget misses remain; campaign and hardware
+D5 model evaluation is complete with unchanged converter selection; its
+calibrated-040 gate remains open under A2. Stop before E1. Held-turn frame-budget misses remain; campaign and hardware
 visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
@@ -597,9 +598,16 @@ display wait (6–7 ms of idle per frame).
   two-buffer invalidation needs a separate correctness contract. See
   [D4 evidence and limits](internals.md#phase-11b-comparison-cost-d4-practical-gate-complete).
   D5 follows below.
-- **D5 — in progress.** Compare pinned Kalms 030 and 040 families for full and
-  changed-block conversion on the current models. The calibrated 040 gate
-  remains dependent on A2.
+- **D5 — model evaluation complete; calibrated-040 gate open under A2.**
+  Five equal-layout arms compare current/040 changed blocks and original/030/040
+  full conversion. Both families pass native and live pixel checks. Changed-block
+  FPS is 47.533 versus 47.604 on 030, 43.424 versus 43.255 on the 040 core: no
+  meaningful gain from the 040 family. Kalms 030 improves sustained full conversion
+  on 030, but every full arm trails changed blocks; neither full Kalms family beats
+  the original on the 040 model. Retain release bytes and selection unchanged.
+  See [D5 results and limits](internals.md#phase-11b-kalms-families-d5-model-evaluation-complete).
+  Physical 040 choice still requires A2; do not mistake this model evaluation for
+  that gate. Stop before E1.
 
 **E. Acceptance**
 

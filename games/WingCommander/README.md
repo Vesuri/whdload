@@ -46,8 +46,11 @@ the 040 model’s comparison/loop/history cost by 0.84 ms per picture. Drawing-b
 dirty rectangles remain deferred. Steady flight stays at 49.92 frames/s; the
 040 held-turn window reports 43.42 versus 42.49 for its unchanged D3 control.
 See the [D4 scope and evidence](docs/internals.md#phase-11b-comparison-cost-d4-practical-gate-complete).
-D5 is in progress: compare Kalms 030/040 full and changed-block conversion.
-Calibrated 040 profiling remains blocked on A2; phase 12 stays paused.
+D5 model evaluation is complete: Kalms 040 changed blocks give no meaningful
+gain on either model, and full conversion remains slower than changed blocks.
+The release converter selection is unchanged. See the
+[D5 comparison](docs/internals.md#phase-11b-kalms-families-d5-model-evaluation-complete).
+D5’s calibrated-040 gate remains open under A2. Stop before E1; phase 12 stays paused.
 
 **Phase 11 is complete: changed-block flight conversion.**
 The timing build converts only changed view/cockpit/HUD blocks, with separate

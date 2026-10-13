@@ -33,6 +33,12 @@ def main():
     sy=symbols(builds['control']); base=(builds['control']/'payload.bin').read_bytes()
     # Local labels differ by algorithm. All shared global entry/data symbols stay put.
     shared={k:v for k,v in sy.items() if '.' not in k and k!='FLIGHT_CONTROL'}
+    forced=(builds['full-original']/'payload.bin').read_bytes()
+    switch=[i for i,(x,y) in enumerate(zip(base,forced)) if x!=y]
+    assert len(switch)==2 and switch[1]==switch[0]+1
+    switch=switch[0]
+    assert base[switch:switch+2]==bytes.fromhex('4e71')
+    assert forced[switch:switch+2]==bytes.fromhex('7e00')
     changes={}; hashes={}
     for arm,build in builds.items():
         meta=json.loads((build/'build.json').read_text())
@@ -48,7 +54,7 @@ def main():
         assert all(any(lo<=i<hi for lo,hi in allowed) for i in delta)
         if arm=='block040':assert delta and all(allowed[1][0]<=i<allowed[1][1] for i in delta)
         if arm.startswith('full'):
-            assert bytes.fromhex('7e00') in payload[sy['flight_render_work']:sy['flight_render_work_done']]
+            assert payload[switch:switch+2]==bytes.fromhex('7e00')
             target={'full-original':0x1ac6,'full030':sy['kalms_030_200'],'full040':sy['kalms_040_200']}[arm]
             calls=[i for i in range(sy['flight_delta'],sy['flight_history'],2)
                    if payload[i:i+2]==bytes.fromhex('6100') and

@@ -2796,14 +2796,17 @@ for cpu in 030 040; do
 done
 python3 tools/c2p_experiment_check.py --prefix tmp/d5 \
   --layout tmp/d5-layout/layout.json "${runs[@]}" --output tmp/d5-pixels.json
-python3 tools/frame_report.py tmp/d5-0*/ --output tmp/d5-fps.json
+python3 tools/frame_report.py tmp/d5-030-*/ tmp/d5-040-*/ --output tmp/d5-fps.json
 python3 tools/reconstruct.py --release --output tmp/d5-release-check
 cmp tmp/d5-release-check/WingCommanderCD32.Slave tmp/d4-final/WingCommanderCD32.Slave
 ```
 
 The integrity checker rejects missing converters, enforces identical shared
 symbols and allowed binary changes, and compares both live planar buffers with
-independent packing of their own histories. Native checks cover alternation,
+independent packing of their own histories. Retained buffer ownership reports
+were also generated with `buffer_report.py` for `tmp/d5-030-block040` and
+`tmp/d5-040-block040`, using `--build tmp/d5-block040` and the D5 layout.
+Native checks cover alternation,
 replacement, inactive flight, smaller geometries and allocation failure. Costs
 are inclusive model elapsed time; full-arm `delta_total` includes the common
 history copy, while changed-block cost excludes comparison/history. Never compare

@@ -7,8 +7,9 @@ C1–C3 and the C4 steady-flight display-cadence gate are complete.
 D1 model profiling, D2 prediction overhead and D3 view-region rendering are complete.
 Exact native pixel coverage and the required current-model gates pass.
 D4 comparison-cost gate is complete with a compact full-image comparison;
-drawing-based dirty rectangles remain deferred. D5 is in progress: evaluate the
-pinned Kalms 030/040 families for full and changed-block conversion. Stop before E1.
+drawing-based dirty rectangles remain deferred. D5 model evaluation is complete:
+retain the current converter selection. Its calibrated-040 gate remains open
+under A2. Stop before E1.
 Calibrated 040 profiling remains blocked on A2.
 Every gate reports end-to-end frames/s from the
 `--frame-stats` recorder on the 030 model and the cycle-exact 040 core, and on a
