@@ -67,6 +67,10 @@ FF1VelocityApply200:
 FF1VelocityRotate000:
  movem.l d0/d2-d7,-(sp)
  suba.w #4,sp
+ IFD FF1_C4_MUL_INLINE
+ move.w FF1MulInlineControl(pc),d6
+ beq.w .p2_rotate
+ ENDC
  move.w d0,d2
  ext.l d2
  move.w d1,d3
@@ -104,6 +108,10 @@ FF1VelocityRotate000:
  addq.l #4,sp
  movem.l (sp)+,d0/d2-d7
  rts
+
+ IFD FF1_C4_MUL_INLINE
+ include "FerrariFormulaOne_Coarse200MulInline.s"
+ ENDC
 
 ; Internal signed D5:D4 >>15 to D4. D1 status, D5/D6 scratch.
 ; After doubling, the upper long must fit a signed word. The low word of
