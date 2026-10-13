@@ -64,7 +64,11 @@ C1End:
  bne.b .control
  lea C1Context(pc),a0
  bsr.w FF1TimeConsume
+ IFD FF1_COARSE_200_COMPLETE
+ cmpi.l #2,d0
+ ELSE
  cmpi.l #1,d0
+ ENDC
  bne.w C1Fault
 .control:
  lea C1Completed(pc),a0
@@ -111,9 +115,13 @@ C1NativeCheckpoint:
  jsr $2a130
  jmp $65f34
 
-; Recovery and boost execute native 100 ms arithmetic exactly once per step.
+; Recovery and boost retain native-tenth pulses: one at 100 ms, two at 200 ms.
 ; The instrument/status renderer is patched to omit only these state writes.
 recovery_tick:
+ IFD FF1_COARSE_200_COMPLETE
+ bsr.w C4RecoveryOnce
+C4RecoveryOnce:
+ ENDC
  lea $2268e,a0
  moveq #1,d0
  bsr.w FF1AdvanceRecovery
@@ -265,7 +273,11 @@ C1Completed: dc.l 0
 C1Skipped: dc.l 0
 error: dc.l 0
 recovery_simulation: dc.w 0
+ IFD FF1_COARSE_200_COMPLETE
+events_pulse: dc.w 2
+ ELSE
 events_pulse: dc.w 1
+ ENDC
  include "FerrariFormulaOne_Time.s"
 C1Context: ds.b FF1T_SIZE
  include "FerrariFormulaOne_Logic.s"

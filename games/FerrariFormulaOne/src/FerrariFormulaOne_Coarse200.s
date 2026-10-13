@@ -7,7 +7,11 @@
  IFD FF1_COARSE_020
  fail "FF1_COARSE_200 requires the 68000 host"
  ENDC
+ IFD FF1_COARSE_200_COMPLETE
+ include "FerrariFormulaOne_Coarse200Complete.s"
+ ELSE
 FF1InstallCoarse200:
  include "FerrariFormulaOne_Coarse200Heading.s"
 C4Enabled: dc.w 1
+ ENDC
  ENDC

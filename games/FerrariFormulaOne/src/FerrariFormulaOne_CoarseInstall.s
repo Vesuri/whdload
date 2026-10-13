@@ -1,3 +1,11 @@
+ IFD FF1_COARSE_200_COMPLETE
+ IFND FF1_COARSE_200
+ fail "Complete C4 requires FF1_COARSE_200"
+ ENDC
+ IFD FF1_COARSE_020
+ fail "Complete C4 requires the 68000 host"
+ ENDC
+ ENDC
 ; SPS 0481 coarse candidate installation, called after the public loader's
 ; official repairs. The host supplies selection/profile data, hunk bindings,
 ; FF1_HOST_CODE_SIZE, public_table/bound, and the step-1 RNG diagnostic entry.
@@ -233,7 +241,11 @@ C1Activate:
  move.l a0,$654ba
  move.w #$4eb9,$654b8
  lea C1Context(pc),a0
+ IFD FF1_COARSE_200_COMPLETE
+ move.w #200,d0
+ ELSE
  moveq #100,d0
+ ENDC
  bsr.w FF1TimeInit
  lea C1Active(pc),a0
  move.w #1,(a0)

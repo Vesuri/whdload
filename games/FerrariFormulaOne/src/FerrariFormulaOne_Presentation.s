@@ -49,6 +49,12 @@ FF1SimulationTail:
  ENDC
  ENDC
  bsr.w FF1InstrumentTick
+ IFD FF1_COARSE_200_COMPLETE
+ IFD FF1_RENDER_POSES
+ bsr.w B8NativePresentationTick
+ ENDC
+ bsr.w FF1InstrumentTick
+ ENDC
 .recovery:
  bsr.w recovery_tick
  bsr.w boost_before
@@ -60,6 +66,9 @@ FF1SimulationTail:
  ext.l d0
  move.l d0,-(sp)
  jsr $6bbfc
+ IFD FF1_COARSE_200_COMPLETE
+ jsr $6bbfc
+ ENDC
  addq.l #4,sp
  lea FF1BoostSimulation(pc),a0
  clr.w (a0)
@@ -163,7 +172,28 @@ FF1ClockTick:
  move.l 4(sp),-(sp)
  lea FF1ClockSimulation(pc),a0
  move.w #1,(a0)
+ IFD FF1_COARSE_200_COMPLETE
  jsr $22c3a
+ ; Re-evaluate the native capped session clock before its second tenth.
+ move.l #$226c0,d0
+ cmp.l (sp),d0
+ bne.b .second
+ cmpi.w #12,$1ed2c
+ bne.b .second
+ tst.w $1c222
+ bne.b .second
+ cmpi.b #4,$226c4
+ bne.b .second
+ cmpi.b #5,$226c5
+ bne.b .second
+ cmpi.b #9,$226c6
+ beq.b .done
+.second:
+ ENDC
+ jsr $22c3a
+ IFD FF1_COARSE_200_COMPLETE
+.done:
+ ENDC
  move.l a0,-(sp)
  lea FF1ClockSimulation(pc),a0
  clr.w (a0)
