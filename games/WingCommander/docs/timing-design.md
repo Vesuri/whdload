@@ -2,9 +2,9 @@
 
 **Selected: D, the hybrid. The user chose D on 2026-10-13.** Schedule the world
 at 10 updates/s and advance player orientation/camera from elapsed render time.
-Try bounded extrapolation for other objects between world ticks. This preserves
+Use bounded extrapolation for other objects between world ticks. This preserves
 most existing gameplay clock policies while addressing control response. Phase 8
-is complete; phase 9 now implements the selected clock/ownership policy.
+is complete; phases 9–10 implement the selected clock/ownership and presentation policies.
 
 The original world advances once per rendered frame; 10 Hz is an inferred intended
 pace, not an existing fixed timer. At a displayed 200 kps, native displacement is
@@ -123,7 +123,7 @@ Selected ownership contract, implemented with field-stamped input in phase 9:
 
 Phase 9 implements input history and the player/world hand-off; its gate is in
 [internals](internals.md#phase-9-decoupled-simulation-gate). World-object prediction
-and presentation storage remain phase 10. These original-world prices do not
+and presentation storage are implemented in the [phase-10 gate](internals.md#phase-10-renderer-only-prediction-gate). These original-world prices do not
 measure the new implementation overhead.
 
 ## Evidence and gate
@@ -140,5 +140,5 @@ Commands are in [development](development.md#phase-8-design-pricing).
 The user selected D after discussing interpolation, extrapolation and the 10 Hz
 unit evidence. This completes the decision gate in
 [open work](open-work.md#phase-8--choose-the-decoupling-design-user-decision).
-Pricing gaps remain documented above. Phase 9 is complete in the separate
-experimental timing build; stop before phase 10 and release work.
+Pricing gaps remain documented above. Phases 9–10 are complete in the separate
+experimental timing build; stop before phase 11 and release work.

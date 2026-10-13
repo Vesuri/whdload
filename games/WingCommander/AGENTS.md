@@ -1,10 +1,10 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 10 CD32 presentation between design D's 10 Hz world updates.
-Implement bounded renderer-only prediction, reset at discontinuities, and validate
-real-flight movement and next-update error without changing authoritative state.
-Stop at the phase 10 gate; do not start phase 11, release or OCS work.
+Current scope: phase 10 CD32 renderer-only presentation for design D is complete.
+Bounded position/orientation prediction and restored authoritative state pass the
+scoped native and real-flight gates. Correction and play-test gaps are documented.
+Stop at phase 10; do not start phase 11, release or OCS work until requested.
 Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 

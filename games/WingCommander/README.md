@@ -3,8 +3,11 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 10 is in progress: presentation between world updates.**
-Bounded prediction will smooth world objects while preserving authoritative gameplay.
+**Phase 10 is complete: presentation between world updates.**
+The experimental timing build predicts object positions and orientations for drawing,
+then restores authoritative state. PAL/NTSC flight checks pass; corrections snap at
+world boundaries, with hard-turn limits documented in the [gate evidence](docs/internals.md#phase-10-renderer-only-prediction-gate).
+Stopped before phase 11.
 
 **Phase 9 is complete: D's decoupled simulation and responsive controls.**
 The separate experimental timing build uses `CUSTOM1=3`. World timing stays within
@@ -12,14 +15,13 @@ The separate experimental timing build uses `CUSTOM1=3`. World timing stays with
 PAL/NTSC, input history, pause, targeting and draw/RNG separation are checked.
 The accelerated run shows player/camera motion between world ticks. Option-off
 game code remains unchanged. See the [gate evidence](docs/internals.md#phase-9-decoupled-simulation-gate).
-Phase 10 now adds world-object presentation; phase 11 remains out of scope.
+Phase 10 adds world-object presentation; phase 11 remains out of scope.
 
 **Phase 8 is complete: the user selected D, the hybrid.**
 The [design](docs/timing-design.md) uses a 10 Hz world with responsive per-render
 player orientation/camera and bounded world-object extrapolation to validate.
 Eleven combat configurations are priced with explicit overhead and instrument
-gaps. Phase 9 implements the simulation/player path; world-object presentation remains
-phase 10.
+gaps. Phases 9–10 implement the simulation, player and world-object presentation paths.
 
 **Phase 7b framerate-dependency audit is complete.**
 The [audit](docs/framerate-audit.md) records 23 stable findings, the complete

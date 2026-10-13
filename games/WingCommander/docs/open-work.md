@@ -28,8 +28,9 @@ with steady/changing rates and explicit runtime/instrument gaps. Phase 8 is
 complete: the user selected D on 2026-10-13, with the explicit pricing gaps in
 [the design comparison](timing-design.md). Phase 9 is complete: the gated 10 Hz
 world, responsive player/camera path and required clock owners pass the scoped
-[native/live gate](internals.md#phase-9-decoupled-simulation-gate). Phase 10 is now
-in progress: bounded renderer-only prediction and real-flight validation.
+[native/live gate](internals.md#phase-9-decoupled-simulation-gate). Phase 10 is complete: bounded renderer-only prediction, transient allocation
+isolation and real-flight validation pass the [presentation gate](internals.md#phase-10-renderer-only-prediction-gate).
+Stop before phase 11.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -41,8 +42,8 @@ The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.
 Its normal c2p limiter waits two CIA-A TOD increments; that is not an intended-rate
 measurement. `Custom5=4` selects the original blitter c2p path, not Akiko. These
-findings refine the implementation assumptions below; the intended-rate and design
-decisions still wait for the later gates. The OCS version remains unanalysed.
+findings refine the implementation assumptions below; flight now uses the selected
+10 Hz design, while the final intro motion-rate choice remains separate. The OCS version remains unanalysed.
 
 ## Goal
 
@@ -359,9 +360,9 @@ are recorded residuals. PAL and NTSC pause tests rebase without catch-up. The
 [FR closure](framerate-audit.md#phase-9-d-closure) records each item's policy and
 limits. Full modal/campaign and physical-device play-throughs, the original
 point-sampled collision limitation, and combined-renderer release validation remain
-explicit gaps. Do not start phase 10 until requested.
+explicit gaps. Phase 10 closes the presentation boundary below.
 
-### Phase 10 — Presentation between updates (C and D)
+### Phase 10 — Presentation between updates (D; complete)
 
 Needed where frames are shorter than a simulation update: world objects under D,
 everything under C below the display rate. Not needed under B.
@@ -373,6 +374,15 @@ everything under C below the display rate. Not needed under B.
    apart from the authoritative state.
 3. Validate on real flight, not only on the intro: frames within one update must move,
    and predictions are checked against the next update.
+
+**Gate complete.** The experimental timing build predicts for at most one world
+interval, uses native basis reconstruction, snaps at discontinuities and restores
+all staged poses/allocation fields before gameplay. Two real-flight gates include
+240 pictures, 916 between-tick projected moves, exact post-draw restoration,
+next-update error measurements and PAL pause. Hard turning reached an 8.982 km
+full-tick positional forecast error; corrections snap rather than feed back into
+simulation. Discrete effect/indicator frames remain world-clocked. Full model,
+scripted-camera and hardware play-tests remain release coverage. Stop before phase 11.
 
 ### Phase 11 — Rendering, second pass (flight scope)
 
@@ -395,6 +405,6 @@ executable, display, c2p (none expected) and timing. Reuse designs, not assumpti
 
 ## Decisions pending
 
-- Intended intro/flight rates, deferred to the in-game timing investigation.
-- D presentation prediction limits and correction policy, to validate during
-  implementation; the decoupling design itself is selected.
+- Final intro motion-rate choice remains separate from the implemented 10 Hz flight clock.
+- Release play-testing must judge visible hard-turn corrections and all model/camera paths;
+  the implemented presentation policy is one-tick prediction with authoritative snaps.

@@ -415,7 +415,7 @@ instructions and controlled state; the live gate uses measured emulated time.
 | FR-02 | Field-stamped steering preview, signed fractional angle carry, original axis order, one world ramp commit, no duplicate player rotation. 664 native mask/ramp/rate cases and live between-tick turning. AI damping remains world-owned. |
 | FR-03 | Native world fuel charge retained; afterburn commands commit on tick boundaries. Held-fire schedule captures match fuel; event-time quantisation is deliberately up to one tick. |
 | FR-04 | Native afterburn duration and expiry retained without widening counters. Native audit boundary checks remain applicable; no per-render fuel/action write is introduced. |
-| FR-05 | Native lifecycle/death/shrink calls stay in the fixed world root. Equal-tick object types/actions match; visual smoothing is phase 10. |
+| FR-05 | Native lifecycle/death/shrink calls stay in the fixed world root. Equal-tick object types/actions match; pose prediction is implemented in phase 10; discrete lifecycle transitions remain world-owned. |
 | FR-06 | Native signed missile-delay byte unchanged. Commands are delivered once; delay is never multiplied by a new rate. Signed/sentinel audit tests remain applicable. |
 | FR-07 | Recovery and held fire run once per world tick. Matched combat schedules retain energy, shields and weapon/entity state. Preview suppresses all fire side effects. |
 | FR-08 | Damage response and death bytes remain native world work. Matched combat state includes armour and actions; full ordinary-damage play-testing remains a release gap. |
@@ -424,7 +424,7 @@ instructions and controlled state; the live gate uses measured emulated time.
 | FR-11 | Native view geometry and target selection commit once at a world boundary; selection's modulo-eight gate uses the world counter. Extra draws cannot commit locks. Native ownership checks and equal-tick target comparisons pass; full missile-lock scenarios remain play-test coverage. |
 | FR-12 | Collision uses authoritative native positions at a fixed native step. No predicted position enters overlap/damage. Collision's original point-sampling limitation remains; D does not enlarge the displacement step. |
 | FR-13 | Range/angle predicates retain native fixed sampling. Targeting geometry is refreshed at the world hand-off, not inherited from arbitrary render cadence. Original narrow-region sampling limitations remain. |
-| FR-14 | Effects' opcode/countdown/size work remains on native world ticks. Debris pictures/regeneration can differ with rendering; this is explicitly separated from ships/weapons and deferred presentation work. |
+| FR-14 | Effects' opcode/countdown/size work remains on native world ticks. Debris pictures/regeneration can differ with rendering; this is explicitly separated from ships/weapons and covered by the phase-10 pose/attachment boundary. |
 | FR-15 | Damaged-ship emission uses world modulo four, with authoritative view geometry refreshed before the world. Native mask checks and matching gameplay RNG/object state validate the separation. |
 | FR-16 | Messages, simulator score/exit timers and subsystem fault/repair polling run on the world clock. Cockpit visual expiry consumes elapsed ticks; missed pictures coalesce. Portrait and renderer randomness are private. Native schedule tests and the live comparison cover these owners. |
 | FR-17 | Mission/encounter modulo-32/16 polls remain native world work. No extra render invokes the world root. Full mission/landing progression remains a release play-test gap. |
@@ -437,3 +437,9 @@ instructions and controlled state; the live gate uses measured emulated time.
 
 Commands and retained gate evidence are in [development](development.md) and
 [internals](internals.md#phase-9-decoupled-simulation-gate).
+
+Phase 10's [presentation gate](internals.md#phase-10-renderer-only-prediction-gate)
+adds renderer-only pose prediction. It also isolates class-7 flame allocations
+from `E:2914c` (file `29178`), discovered by same-tick state checks, and moves
+cosmetic regeneration `E:28c86` (file `28cb2`) to world boundaries. Native allocation
+fields are restored after drawing; extra pictures cannot change world membership.

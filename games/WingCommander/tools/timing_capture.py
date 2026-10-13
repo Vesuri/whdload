@@ -23,18 +23,20 @@ def main():
     p.add_argument('--off',action='store_true')
     p.add_argument('--held-key',default='40',help='raw key held during flight; hexadecimal')
     p.add_argument('--presentation-states',action='store_true',help='snapshot on publication instead of world return')
+    p.add_argument('--scene-samples',type=int,default=0,help='bounded post-window renderer/authority snapshots for phase 10')
     p.add_argument('--trace',action='store_true',help='retain full instruction profiles as well as observer events')
     p.add_argument('--schedule',choices=('normal','slow','one-field'),default='normal')
     p.add_argument('--pause',action='store_true',help='include a real native pause and resume')
     a=p.parse_args()
     if not 0<=int(a.held_key,16)<128:p.error('invalid raw key')
     out=(ROOT/a.output).resolve();slave=(ROOT/a.fixture).resolve()
-    if (ROOT/'tmp').resolve() not in out.parents or out.exists() or not 1<=a.windows<=30:
+    if (ROOT/'tmp').resolve() not in out.parents or out.exists() or not 1<=a.windows<=30 or not 0<=a.scene_samples<=160:
         raise ValueError('new bounded output in tmp required')
     fixture=json.loads((slave.parent/'build.json').read_text())
     if not fixture.get('timing') or fixture['sha256']!=hashlib.sha256(slave.read_bytes()).hexdigest():
         raise ValueError('verified timing fixture required')
     if fixture.get('schedule','normal')!=a.schedule:raise ValueError('schedule must match the pinned fixture')
+    if a.scene_samples and a.schedule=='one-field':raise ValueError('scene snapshots require actual drawing')
     if a.schedule!='normal' and not fixture.get('timing_verify'):raise ValueError('diagnostic schedule requires a VERIFY build')
     layout=json.loads((ROOT/a.layout).read_text());h=layout['hunks'];s=layout['slave']
     symbols={name:int(off,16) for off,name in re.findall(r'^([0-9A-F]{8}) (\S+)$',(slave.parent/'slave.lst').read_text(),re.M)}
@@ -86,6 +88,21 @@ def main():
         if 'cpu_data_cache=false' not in config_text:raise ValueError('emulated data cache differs from established baseline')
         cmd(f'monitor key {a.held_key} 1')
         for i in range(a.windows):window(f'window-{i}')
+        scene_samples=[]
+        if a.scene_samples:
+            # These breakpoint-separated pictures are correctness evidence,
+            # outside the uninterrupted timing windows above.
+            for i in range(a.scene_samples):
+                cmd(f"break *{s+symbols['timing_scene_end']:#x}\ncontinue\ndelete")
+                stem=f'scene-{i:03d}'
+                for suffix,begin,size in (
+                    ('data',h[1],0xfda0),
+                    ('slave',s,fixture['bytes']-36)):
+                    cmd(f'dump binary memory {out.relative_to(ROOT)}/{stem}-{suffix}.bin {begin:#x} {begin+size:#x}')
+                cmd(f"break *{s+symbols['timing_scene_restored']:#x}\ncontinue\ndelete")
+                cmd(f'dump binary memory {out.relative_to(ROOT)}/{stem}-restored.bin {h[1]:#x} {h[1]+0xfda0:#x}')
+                scene_samples.append(stem)
+            print(f'{out.name}: {len(scene_samples)} scene snapshots',flush=True)
         if a.pause:
             cmd(f'monitor key {a.held_key} 0')
             cmd('monitor key 19 1')
@@ -100,7 +117,7 @@ def main():
             cmd('monitor key 40 0')
             window('resume',100)
         dump('end-fast')
-        result=dict(layout,fixture=fixture,symbols=symbols,windows=windows,live_cpu=live,ntsc=a.ntsc,off=a.off,held_key=a.held_key,pause=a.pause,presentation_states=a.presentation_states,schedule=a.schedule,trace=a.trace,emulator_data_cache=False,fsuae_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest(),complete=True)
+        result=dict(layout,fixture=fixture,symbols=symbols,windows=windows,scene_samples=scene_samples,live_cpu=live,ntsc=a.ntsc,off=a.off,held_key=a.held_key,pause=a.pause,presentation_states=a.presentation_states,schedule=a.schedule,trace=a.trace,emulator_data_cache=False,fsuae_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest(),complete=True)
         (out/'result.json').write_text(json.dumps(result,indent=2)+'\n')
     finally:
         if g:g.p.kill()

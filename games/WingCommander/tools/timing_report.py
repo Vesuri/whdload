@@ -52,8 +52,9 @@ def read(run):
             if state[0xa148:0xa154]!=last[1][0xa148:0xa154]:
                 responsive+=1
                 if struct.unpack_from('>H',state,0x3896)[0]==0 and state[0xa424:0xa430]!=state[0xa148:0xa154]:raise ValueError('forward camera did not follow responsive player basis')
-            # Responsive orientation may change; world positions may not.
-            for slot in range(61):
+            # Phase 9 publishes authoritative positions; phase 10 publishes
+            # predictions, whose saved/restored state has a separate scene gate.
+            for slot in range(0 if 'timing_scene_begin' in sy else 61):
                 kind=struct.unpack_from('>h',state,0x96fe+2*slot)[0]
                 if kind>=8 and state[0x919a+12*slot:0x91a6+12*slot]!=last[1][0x919a+12*slot:0x91a6+12*slot]:raise ValueError('collidable positions changed between updates')
         states[tick]=state;last=(tick,state)

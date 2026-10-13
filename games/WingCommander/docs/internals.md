@@ -2679,7 +2679,7 @@ Two native drawing side effects require explicit ownership:
 
 ### Gate evidence and limits
 
-`tmp/phase10-gate-scenes.json` checks 120 consecutive renderer snapshots and
+`tmp/phase10-complete-scenes.json` checks 120 consecutive renderer snapshots and
 post-draw restorations from each of two real-flight captures. Every predicted
 position matches independent signed arithmetic; every saved range is restored
 exactly. Within unchanged world ticks, authoritative positions, velocities,
@@ -2697,7 +2697,7 @@ Next-tick comparisons use uninterrupted object identities and exclude detected
 cuts. Full-one-tick ship-position forecast error is PAL median 0, p95 1.987 km,
 maximum 2.491 km (208 comparisons); NTSC hard-turn median 2.834 km, p95 4.357 km,
 maximum 8.982 km (189). Constant-velocity classes 3/4/5/8 have zero observed error.
-The 813 PAL and 245 NTSC comparable non-player forward-vector forecasts match
+The 813 PAL and 245 NTSC comparable non-player basis forecasts match
 the next native orientation (zero measured angular error). This is scoped
 trajectory evidence, not a guarantee against future AI/controller changes.
 Hard-turn positional correction can remain visible; prediction is bounded to

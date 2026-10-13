@@ -1790,4 +1790,77 @@ Final evidence is retained in `tmp/phase9-final-normal/`,
 `tmp/phase9-final-ntsc-020-turn/` and `tmp/phase9-final-pal-030-baseline/`.
 The consolidated report is `tmp/phase9-complete-verified-report.json`.
 Native checks and the non-VERIFY candidate are recorded in the internals gate.
-Stop here; world-object extrapolation belongs to phase 10.
+The current timing build also includes phase 10; use its gate below for predicted poses.
+
+## Phase 10 renderer-only prediction
+
+The normal `--timing` candidate includes bounded prediction under `CUSTOM1=3`.
+The original reconstruction and options 0/1/2 remain unchanged. Rebuild and retain
+fresh output directories; all derived material stays in `tmp/`:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --timing --output tmp/scene-candidate
+python3 tools/flight_fixture.py --timing --timing-verify --nav 1 --output tmp/scene-flight
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+SLAVE="$PWD/tmp/scene-flight/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=3 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/scene-layout
+python3 tools/timing_capture.py \
+  --fixture tmp/scene-flight/WingCommanderCD32.Slave \
+  --layout tmp/scene-layout/layout.json --windows 20 --machine a1200-030 \
+  --held-key 40 --scene-samples 120 --pause --output tmp/scene-fire-pal
+python3 tools/timing_capture.py \
+  --fixture tmp/scene-flight/WingCommanderCD32.Slave \
+  --layout tmp/scene-layout/layout.json --windows 20 --machine a1200-030 \
+  --held-key 4e --ntsc --scene-samples 120 --output tmp/scene-turn-ntsc
+python3 tools/timing_scene_report.py tmp/scene-fire-pal tmp/scene-turn-ntsc \
+  --negative-controls --output tmp/scene-report.json
+python3 tools/timing_report.py tmp/scene-fire-pal tmp/scene-turn-ntsc \
+  --output tmp/scene-clock-report.json
+python3 tools/timing_scene_check.py tmp/scene-candidate \
+  --flame-run tmp/scene-turn-ntsc --output tmp/scene-native-check
+python3 tools/timing_adapter_check.py tmp/scene-candidate --output tmp/scene-install-check
+python3 tools/timing_presentation_check.py tmp/scene-candidate --output tmp/scene-ownership-check
+python3 tools/timing_player_check.py tmp/scene-candidate --output tmp/scene-player-check
+python3 tools/timing_input_check.py tmp/scene-candidate --output tmp/scene-input-check
+python3 tools/timing_modal_check.py tmp/scene-candidate --output tmp/scene-modal-check
+```
+
+Use the pinned retained observer hash and the established 030 compatibility setting
+from phase 9. No new instrument or CPU matrix is required. Native checks also use
+the retained `tmp/phase7-combat-controls/start-fast.bin` fixture. The flame check
+selects a real class-7 frame from the supplied flight and executes its native
+allocator on both CPU models; absence of an exercised frame fails the check.
+
+`--scene-samples` collects at most 160 pictures after the uninterrupted timing
+windows. At the post-render boundary it retains the data hunk and slave snapshot,
+then the data hunk again after restoration. The scene report validates independent
+position arithmetic, every saved range, unchanged gameplay fields within a tick,
+projected movement, and one-tick forecast error against the next authoritative
+update. Native axis routines independently supply the next-orientation oracle.
+These breakpoint-separated snapshots must not be used to report FPS.
+`--negative-controls` retains corrupted copies under the report's `tmp/` directory
+and requires rejection of both a wrong predicted position and a failed restoration.
+
+Final retained outputs are `tmp/phase10-isolated-fire-pal/` and
+`tmp/phase10-isolated-turn-ntsc/`, with `tmp/phase10-complete-scenes.json` and
+`tmp/phase10-gate-clock.json`. The non-VERIFY build is
+`tmp/phase10-isolated-candidate/`; native evidence and exact hashes are listed in
+[internals](internals.md#phase-10-renderer-only-prediction-gate). The first turning
+fixture exposed native flame allocations surviving extra pictures; only the
+isolated final fixtures pass the complete state-restoration gate.
+
+For static inspection, the new guarded game seam is `E:28c86` (file `28cb2`),
+while `E:2914c` (file `29178`) supplies native temporary flame construction:
+
+```sh
+python3 -m amigaxdev.disasm dis --cpu 68020 \
+  tmp/cd32-static/wing.english.h0.bin 0 0x28c86 0x28f96
+python3 -m amigaxdev.disasm dis --cpu 68020 \
+  tmp/cd32-static/wing.english.h0.bin 0 0x2914c 0x294fa
+```
+
+Stop at the phase-10 gate. Rendering optimisation is phase 11; full visual,
+campaign, device and hardware play-throughs remain later coverage.
