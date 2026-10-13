@@ -29,7 +29,11 @@ C4 confirms one displayed picture per field in steady PAL flight on both models:
 median and p95 intervals are both 20.032 ms. The existing queue absorbs world-tick
 work spikes; no further scheduler change was needed. Heavy-turn overruns remain
 for rendering-cost work. See the [C4 measurements](docs/internals.md#phase-11b-frame-time-spikes-c4-steady-flight-gate-complete).
-Phase 12 stays paused; D1 onward and broader visual acceptance remain open.
+D1’s model profile identifies repeated geometry, cockpit composition and block
+comparison as useful optimisation targets. Observer controls preserve the
+recorded run exactly; no optimisation was applied. See the
+[D1 costs and limits](docs/internals.md#phase-11b-rendering-costs-d1-model-profile-complete).
+Stop before D2. Calibrated 040 profiling remains blocked on A2; phase 12 stays paused.
 
 **Phase 11 is complete: changed-block flight conversion.**
 The timing build converts only changed view/cockpit/HUD blocks, with separate

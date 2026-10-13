@@ -52,8 +52,11 @@ world-tick position corrections in the steady and turning gates. C3 is complete:
 heading-aware ship forecasts retain native inertia, with p95 0.255 km and maximum
 6.348 km error on the retained hard-turn world-ship sample. Constant-velocity
 classes stay exact. C4 confirms one displayed picture per field in steady flight
-on both required models, with no scheduler change needed. Stop before D1.
-Held-turn frame-budget misses remain for D1 onward; campaign and hardware
+on both required models, with no scheduler change needed. D1’s practical model
+profile is complete: geometry, cockpit composition and comparison overhead
+justify the planned D2–D4 investigations. Calibrated 040 profiling remains blocked
+on A2. Stop before D2.
+Held-turn frame-budget misses remain for D2 onward; campaign and hardware
 visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
@@ -549,14 +552,21 @@ display wait (6–7 ms of idle per frame).
   prediction targets. This is not a global smoothness or C1 deadline pass;
   the remaining heavy-scene overruns carry into D1–D5 and E1. See the
   [C4 evidence](internals.md#phase-11b-frame-time-spikes-c4-steady-flight-gate-complete).
-  Stop before D1.
+  D1 records the remaining rendering costs below.
 
 **D. Rendering cost (driven by A3/D1)**
 
-- **D1.** Profile the release build on calibrated 040: clears, stars, polygons,
-  cockpit, HUD, text, block comparison, prediction save/restore and geometry rebuild.
-  Include the retained heavy-turn spikes/deadline misses from C4; steady-flight
-  acceptance does not close these. A2 still blocks calibrated hardware claims.
+- **D1 — model profile complete; calibrated follow-up blocked on A2.** The unchanged
+  release candidate is profiled on the current 030/040 models: clear, stars,
+  native object bitmap/scaling/rotation paths, cockpit composition, HUD, glyphs,
+  comparison/loop/history, prediction/backup/restore and geometry. Read-only
+  observer controls preserve both ledgers byte for byte. Geometry, cockpit
+  composition and comparison overhead justify D2–D4; no optimisation is applied.
+  Steady flight remains 49.920 pictures/s on both models; the 040 held turn stays
+  41.535 with 119/656 prediction misses. Hardware timing, exclusive attribution
+  and wider workload coverage remain explicit gaps. See the
+  [D1 profile](internals.md#phase-11b-rendering-costs-d1-model-profile-complete).
+  Stop before D2.
 - **D2.** Prediction overhead: save/restore only active slots; skip geometry
   rebuilds that cannot change.
 - **D3.** Region-specific clear/redraw of the view when the cockpit is unchanged,

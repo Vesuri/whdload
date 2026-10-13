@@ -2446,3 +2446,56 @@ zero, not evidence for smoothness after an artificial long stall. Both PAL stead
 cells pass at one displayed picture per field; no scheduler change was needed.
 Stop before D1. Heavy-scene overruns remain for rendering-cost work and acceptance;
 release and the phase-12 stash remain paused.
+
+## D1: read-only rendering-cost profile
+
+Use the unchanged C3 release frame fixture and its calibrated **address layout**
+above. Address calibration does not calibrate CPU performance. Generate fresh
+scope/output files below `tmp/`; no guest code or emulator rebuild is needed.
+
+```sh
+. amiga/env.sh
+python3 tools/render_cost.py --build tmp/c3-frames \
+  --layout tmp/c3-layout/layout.json --output tmp/d1-scopes-new.json
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/c3-frames/WingCommanderCD32.Slave --machine a1200-040 \
+  --baseline-cache-model --options NoMMU --timing-core --custom5 0 \
+  --debugger --observer --layout tmp/c3-layout/layout.json --held-key 4e \
+  --cost-scopes tmp/d1-scopes-new.json --output tmp/d1-turn-new --timeout 180
+python3 tools/render_cost.py --run tmp/d1-turn-new --control tmp/c3-040-gate \
+  --output tmp/d1-turn-new/costs.json
+python3 tools/frame_check.py tmp/d1-turn-new --output tmp/d1-turn-new/check.json
+```
+
+For the matching 040 steady run, omit `--held-key 4e` and compare against
+`tmp/c4-040-steady`. For the 030 steady gate, use `--machine a1200-030
+--options 'CACHE DCACHE'`, omit `--timing-core` and the held key, and compare
+against `tmp/c3-030-gate`. Keep the other flags, fixture and layout unchanged.
+Use fresh output names each time. If the fixture/settings change, capture a
+matching ordinary `--observer` control first instead of reusing these controls.
+The reporter requires identical fixture/settings/emulator, frame records and
+completed-display ledgers; it fails on differences, not just an FPS change.
+
+Final retained reports: `tmp/d1-030-steady/costs.json`,
+`tmp/d1-040-steady/final-costs.json`, and
+`tmp/d1-040-turn-final/final-costs.json`. Recompute the frame-rate summary with:
+
+```sh
+python3 tools/frame_report.py tmp/d1-030-steady tmp/d1-040-steady \
+  tmp/d1-040-turn-final --output tmp/d1-fps-new.json
+python3 tools/display_time_check.py tmp/d1-040-turn-final \
+  --output tmp/d1-040-turn-final/prediction-new.json
+```
+
+The final command **must still fail**; the ledger has 119/656 missed targets. D1 measures
+those overruns and does not fix them. Report visible FPS separately from internal
+work intervals. The cost report includes inclusive per-frame/per-call distributions,
+call counts, and the group of internal intervals longer than one field. Nested
+rows overlap; do not sum them. Comparison/loop/history is a residual after
+subtracting changed-block calls, not pure comparison time. Four call-pairing
+negative controls run whenever the tool is invoked. Generated scopes contain
+live addresses and stay in `tmp/`; documentation uses hunk/file offsets.
+
+Stop before D2. The calibrated-040 follow-up remains blocked by A2; these are
+model baselines. No release or phase-12 stash work is included.

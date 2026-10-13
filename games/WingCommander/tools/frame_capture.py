@@ -41,6 +41,7 @@ def main():
     p.add_argument('--debugger', action='store_true', help='boot through the gdb stub (FSUAE must be a debugger build)')
     p.add_argument('--held-key', help='raw key held through the window; requires --debugger')
     p.add_argument('--observer', action='store_true', help='log publication/VBL PCs; requires an observer build and --debugger')
+    p.add_argument('--cost-scopes', type=Path, help='D1 read-only observer scope configuration')
     p.add_argument('--layout', help='boot_gate layout of this fixture; required with --debugger')
     p.add_argument('--ntsc', action='store_true')
     p.add_argument('--display-sample',action='store_true',help='save chip/fast memory and three display fields after the window; requires debugger')
@@ -49,6 +50,8 @@ def main():
     a = p.parse_args()
     if (a.held_key or a.observer or a.display_sample) and not a.debugger:
         p.error('--held-key/--observer require --debugger')
+    if a.cost_scopes and not a.observer:
+        p.error('--cost-scopes requires --observer')
     if a.debugger and not a.layout:
         p.error('--debugger requires --layout')
     out = (ROOT/a.output).resolve()
@@ -90,6 +93,12 @@ def main():
         h, s = layout['hunks'], layout['slave']
         pcs = [s+symbols['release_presented'] if fixture.get('buffered') else h[0]+0x3378e, h[0]+0x34162] + [s+save_call]
         if fixture.get('buffered'):pcs += [s+symbols['release_convert_ready']]
+        if a.cost_scopes:
+            costs=json.loads(a.cost_scopes.read_text())
+            if costs['fixture_sha256']!=fixture['sha256'] or costs['layout']!=layout:
+                raise ValueError('cost scope fixture/layout mismatch')
+            pcs += [costs['draw']] + [r[k] for r in costs['scopes'] for k in ('start','end')]
+            shutil.copyfile(a.cost_scopes,out/'cost-scopes.json')
         cfg = out/'observer.cfg'
         cfg.write_text(' '.join(f'{v:x}' for v in [h[0], h[1], h[3]]+pcs)+'\n')
         env.update(WC_OBSERVER_CONFIG=str(cfg), WC_OBSERVER_OUTPUT=str(out/'events.txt'))

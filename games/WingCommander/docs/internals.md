@@ -3509,3 +3509,138 @@ The observer retains the established cache-model settings; cycle-exact 040 numbe
 are not physical-machine calibration. Heavy-scene stalls, extended deadline misses,
 forced-stall cadence and real-hardware acceptance remain explicit gaps for D/E.
 The phase-12 stash remains untouched.
+
+## Phase 11b rendering costs: D1 model profile complete
+
+D1's practical model profile is complete; **the calibrated-040 portion remains
+blocked on A2's missing hardware reference**. No game/slave or emulator code was
+changed. Stop before D2. These measurements select the next experiments; they
+neither fix the held-turn overruns nor close release acceptance.
+
+### Instrument and scope
+
+`render_cost.py` adds selected PCs to the existing read-only host observer through
+`frame_capture.py --cost-scopes`. A call-site timestamp is paired with the next
+instruction at the **same stack pointer**. The class-2 star branch is similarly
+paired with its dispatch-loop return. Timestamps use the emulator's cycle clock,
+converted by its recorded base clock × 64, not host time or CPU frequency labels.
+The window matches the recorder's complete draw-to-draw intervals after 20 warm-up
+pictures: 639 in each steady run, 635 in the turn. Costs include interrupts, bus
+stalls, callees and call/return overhead. They are **inclusive elapsed time**, not
+exclusive CPU utilisation. Nested rows must not be added.
+
+The unchanged C3 diagnostic release fixture has SHA-256
+`bd10fe37b73b0b42d127e683cf8aca52b394c5f2b5f099ad317aad37452ede94`.
+The existing observer emulator has SHA-256
+`08360549c392f07b1fb3393bf1e071cd0bd5ffcb4048f229d528a1ce628c1313`.
+The three final captures are `tmp/d1-030-steady`, `tmp/d1-040-steady` and
+`tmp/d1-040-turn-final`; each retains scope configuration, raw events, CPU/cache
+settings, ledger hashes and a cost report. The 030 uses the established MMU model
+with `CACHE DCACHE`; the 040 uses the established cycle-exact core with `NoMMU`.
+Both retain the diagnostic emulator's baseline cache model, including
+`cpu_data_cache=false`. Neither is a physical 040/25 measurement or a retest of
+the corrected cached-MMU emulator's pixels.
+
+Relevant native code-hunk offsets (English file offsets in parentheses):
+
+| Scope | Entry or call-site boundary |
+|---|---|
+| View clear | Call `E:0306–030c` (`0332–0338`) to `E:31cd6` (`31d02`) |
+| Enclosing scene | Call `E:0320–0326` (`034c–0352`) to `E:294d4` (`29500`) |
+| Geometry | All absolute calls and authored slave calls to `E:2a086` (`2a0b2`) |
+| Object dispatch | Call `E:294f0–294f6` (`2951c–29522`) to `E:2ca3e` (`2ca6a`) |
+| Stars | Class-2 branch `E:2caa6` (`2cad2`) until loop head `E:2ca5a` (`2ca86`) |
+| Object bitmap / scaled / rotated drawing | Calls `E:2cac4`, `2cb04`, `2cb48` (`2caf0`, `2cb30`, `2cb74`), each ending six bytes later |
+| Cockpit/view composition | Call `E:0c4c–0c52` (`0c78–0c7e`) to `E:2cf0a` (`2cf36`), copying the split view rows back into the composed image |
+| Post-publication cockpit/HUD work | Authored call to `E:46e6` (`4712`), including targeting/bookkeeping, not drawing alone |
+| Text glyphs | Absolute calls to `E:2fd6a` (`2fd96`); formatting/layout stays in its enclosing scope |
+
+The requested polygon bucket resolves here to the native object bitmap paths:
+`E:2efe8`, `2ec98`, `2d746` (file `2f014`, `2ecc4`, `2d772`), including
+TM6 image selection, scaling and rotation. There is no separately measured
+3D-polygon bucket; do not describe this profile as a polygon-rasteriser census.
+The star row overlaps the bitmap row. Geometry overlaps the scene/world scopes.
+Slave listing anchors bracket `timing_scene_begin`, its bulk pose backup,
+`timing_scene_end`, `timing_scene_snapshot`, `flight_delta` and each
+`flight_kalms_block` call. The conversion residual is delta-total minus changed
+block calls: **comparison, loop overhead and changed-history copies together**,
+not pure comparison instruction time.
+
+### Measured costs and next-step decisions
+
+Mean / p95 **milliseconds per draw-to-draw interval**, including zero for a scope
+not called in that interval. Per-call distributions and counts are in the reports.
+Zero scaled/rotated or glyph work in steady flight means those paths were not
+exercised in that window, not that they are free.
+
+| Scope | 030 steady | 040 model steady | 040 model held turn |
+|---|---:|---:|---:|
+| Clear | 0.514 / 0.514 | 0.744 / 0.712 | 0.755 / 1.366 |
+| Stars | 0.146 / 0.167 | 0.171 / 0.206 | 0.086 / 0.131 |
+| Object dispatch, inclusive | 0.167 / 0.190 | 0.190 / 0.224 | 1.894 / 8.682 |
+| Object bitmap | 0.144 / 0.165 | 0.168 / 0.202 | 0.787 / 3.861 |
+| Object scaled | 0 / 0 | 0 / 0 | 0.187 / 0.950 |
+| Object rotated | 0 / 0 | 0 / 0 | 0.901 / 7.330 |
+| Cockpit/view composition | 3.800 / 3.854 | 2.908 / 3.104 | 2.931 / 3.373 |
+| Post-publication cockpit/HUD | 2.786 / 2.865 | 3.709 / 3.737 | 3.848 / 4.098 |
+| Glyph drawing | 0 / 0 | 0 / 0 | 0.083 / 0.141 |
+| All geometry calls | 1.895 / 4.836 | 4.076 / 10.031 | 4.500 / 14.656 |
+| Prediction including backup | 0.649 / 0.868 | 0.986 / 1.740 | 1.229 / 1.996 |
+| Bulk pose backup alone | 0.262 / 0.262 | 0.313 / 0.278 | 0.289 / 0.278 |
+| Restore | 0.265 / 0.265 | 0.279 / 0.279 | 0.282 / 0.279 |
+| World-boundary snapshot | 0.049 / 0.244 | 0.129 / 0.518 | 0.146 / 0.518 |
+| Comparison/loop/history residual | 2.048 / 2.100 | 4.097 / 4.110 | 4.139 / 4.486 |
+| Changed-block converter calls | 0.193 / 0.323 | 0.303 / 0.490 | 1.363 / 4.879 |
+| Delta conversion total | 2.242 / 2.407 | 4.400 / 4.592 | 5.501 / 9.381 |
+
+**D2:** repeated geometry is the larger opportunity than copying poses alone.
+There are 1,020 geometry calls over 639 steady frames and 1,094 over 635 turn
+frames. The turn's mean call costs 2.612 ms; total geometry p95 is 14.656 ms per
+frame. Bulk backup plus restore averages only 0.571 ms on that model. Skipping
+rebuilds still needs a correctness contract for targeting, input and world work;
+these inclusive costs are not promised savings.
+
+**D3:** cockpit/view composition is a stable 2.9–3.8 ms per picture; clear is
+another 0.5–0.8 ms. This supports investigating region-specific composition and
+clear/redraw. It does not justify reviving the unsafe blanket-clear bypass.
+Post-publication HUD also costs 2.8–3.8 ms and includes gameplay-sensitive work.
+
+**D4:** comparison/loop/history overhead matters: about 2.05 ms on 030 and
+4.10–4.14 ms on the 040 model. Only 10,493 blocks are converted over 639 steady
+040 pictures (16.4 of 2,000 blocks per picture); the turn converts 45,676 over
+635 (71.9 per picture). This is against each destination's history, not the
+immediately preceding image. Dirty-region tracking is worth a correctness-priced
+experiment, not an established saving. **D5** remains dependent on A2 for any
+hardware converter selection. Stars and glyphs do not justify separate rewrites.
+
+### Heavy-turn limits and checks
+
+The held turn still displays **41.535 pictures/s**, with 524 one-field,
+92 two-field and 18 three-field intervals in the frame report's crop. The
+C4 display-ledger crop includes one extra one-field interval. Both steady runs
+remain **49.920 pictures/s**, 638 one-field intervals in the frame report.
+World rates are 9.925/s (030 steady), 9.929/s (040 steady) and 10.008/s
+turning, within 1% of 10 Hz.
+All 119/656 held-turn prediction misses remain unchanged.
+
+In the turn, 317/635 internal draw-to-draw intervals exceed one field. Within
+that group, object dispatch averages 3.589 ms (p95 10.038), geometry 6.737 ms
+(p95 15.843), and delta conversion 6.502 ms (p95 12.269). These overlapping
+measurements identify work associated with the long frames; they do not assign
+each missed publication to one cause. An internal long interval is not itself a
+missed display: steady runs can wait for ownership yet display every field.
+The C4 tick/no-tick display correlation therefore remains relevant.
+
+Extra-observer on/off controls are **byte-identical in both frame and display
+ledgers** against the retained C3/C4 runs on all three configurations. The
+independent A1 observer check matches all 661 / 661 / 656 displayed pictures and
+elapsed time (largest difference below 0.001 ms). Paired calls reject missing
+returns, wrong stack pointers, repeated entries and backwards clocks; per-picture
+scope counts are checked. A changed display ledger is a rejecting control.
+
+Coverage limits: this is one steady Nav-1 window on each model and one held-turn
+040 window, not the entire combat/afterburner/campaign matrix. Text formatting,
+individual HUD widgets, exclusive IRQ costs and detailed bitmap scanline costs
+are not separately attributed. The ordinary candidate remains byte-identical to
+C3, and the phase-12 stash is untouched. Calibrated 040 measurements remain an
+explicit follow-up under A2 before hardware or E1 acceptance claims.
