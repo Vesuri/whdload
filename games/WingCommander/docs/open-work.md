@@ -22,7 +22,7 @@ The user deferred further timing investigation to gameplay; exact scene-duration
 neutrality remains an explicit gap. Phase 7 gameplay timing and state investigation is complete: reproducible flight
 windows, representative costs/source changes, state cadence and render coupling
 are documented. The native flight-unit anchor is 10 updates/s. Stop at its gate;
-phase 7b and later work remain deferred.
+Phase 7b is now authorised and in progress; phase 8 and later work remain deferred.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -248,7 +248,7 @@ Comms, missile locking, ordinary damage, autopilot, landing and full mission
 progression retain explicit runtime gaps; their map is static classification.
 This is not the exhaustive phase-7b writer audit. Stop here.
 
-### Phase 7b — Framerate dependency audit (Their Finest Hour method)
+### Phase 7b — Framerate dependency audit (in progress)
 
 Their Finest Hour's `docs/framerate-audit.md` and FR-01..FR-27 are the template; its
 gameplay is expected to be more complex than Wing Commander's, but the kinds of

@@ -3,10 +3,13 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
+**Phase 7b framerate-dependency audit is in progress.** No timing fixes or design
+choice are included; this work stops at the audit gate.
+
 **Phase 7 gameplay timing investigation is complete.** Flight motion is coupled
 to rendering; the native speed/range units imply 10 world updates/s. Reproducible
 coast, combat-input and pause windows, a state/cadence map and CPU/drawing coupling
-measurements are recorded. Timing fixes and phase 7b remain deferred.
+measurements are recorded. Timing fixes remain deferred.
 
 **Phase 6 rendering work is complete.**
 `CUSTOM1=2` enables the experimental English renderer. Measured selection uses

@@ -1,9 +1,10 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 7 CD32 gameplay timing and state investigation is complete.
-The flight-unit anchor is 10 world updates/s; runtime gaps are documented.
-Stopped at the phase 7 gate; do not start phase 7b, release or OCS work until requested.
+Current scope: phase 7b CD32 framerate-dependency audit is in progress.
+Audit world-update calls and dispatch, reproduce native timing dependencies, and
+record the implications for designs B/C/D. The flight-unit anchor is 10 updates/s.
+Stop at the phase 7b gate; do not start phase 8, fixes, release or OCS work.
 Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 
