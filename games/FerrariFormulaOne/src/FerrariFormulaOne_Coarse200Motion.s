@@ -462,6 +462,14 @@ install_velocity:
  rts
 velocity_671e6:
  dc.w $33d0,$0003,$2f96
+ IFD FF1_C4_HOOK_P5
+C4P5Gate_velocity_671e6 equ *
+ bra.w .p5_original
+ ; The displaced native instruction still runs at its original point.
+ ; Defer only the shadow callback to the last adjacent load/store hook.
+ jmp $671ec
+.p5_original:
+ ENDC
 C4SaveMask000 equ *
  movem.l a0/a1/d0/d1/d2/d4/d7,-(sp)
  move.w sr,-(sp)
@@ -473,6 +481,24 @@ C4SaveMask001 equ *
  jmp $671ec
 velocity_685a6:
  dc.w $30b9,$0003,$2f96
+ IFD FF1_C4_HOOK_P5
+C4P5Gate_velocity_685a6 equ *
+ bra.w .p5_original
+ ; Native loads/stores between the combined callbacks neither call out nor
+ ; consume these shadow values. Keep their instructions and CCR intact.
+ movem.l d0/a0-a1,-(sp)
+ move.w sr,-(sp)
+ bsr.w bridge_context
+ tst.l d0
+ bmi.w fine_fault
+ bsr.w bridge_store
+ bsr.w velocity_speed_store
+ bsr.w velocity_store
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0/a0-a1
+ jmp $685ac
+.p5_original:
+ ENDC
 C4SaveMask002 equ *
  movem.l a0/d0/d4/d7,-(sp)
  move.w sr,-(sp)
@@ -701,6 +727,14 @@ velocity_69a5e:
  jmp $69a64
 velocity_68576:
  dc.w $30b9,$0003,$2fbe
+ IFD FF1_C4_HOOK_P5
+C4P5Gate_velocity_68576 equ *
+ bra.w .p5_original
+ ; The displaced native instruction still runs at its original point.
+ ; Defer only the shadow callback to the last adjacent load/store hook.
+ jmp $6857c
+.p5_original:
+ ENDC
 C4SaveMask014 equ *
  movem.l a0/a1/d0/d4/d7,-(sp)
  move.w sr,-(sp)
@@ -838,6 +872,24 @@ velocity_69a42:
  jmp $69a48
 velocity_6721c:
  dc.w $33d0,$0003,$2fc0
+ IFD FF1_C4_HOOK_P5
+C4P5Gate_velocity_6721c equ *
+ bra.w .p5_original
+ ; Native loads/stores between the combined callbacks neither call out nor
+ ; consume these shadow values. Keep their instructions and CCR intact.
+ movem.l d0-d2/a0-a1,-(sp)
+ move.w sr,-(sp)
+ bsr.w velocity_load
+ bsr.w bridge_context
+ tst.l d0
+ bmi.w fine_fault
+ bsr.w bridge_load
+ bsr.w velocity_speed_load
+ move.w (sp)+,ccr
+ movem.l (sp)+,d0-d2/a0-a1
+ jmp $67222
+.p5_original:
+ ENDC
 C4SaveMask016 equ *
  movem.l a0/a1/d0/d4/d7,-(sp)
  move.w sr,-(sp)
@@ -1722,6 +1774,14 @@ bridge_install_done:
  rts
 bridge_6720e:
  dc.w $33d0,$0003,$2fc4
+ IFD FF1_C4_HOOK_P5
+C4P5Gate_bridge_6720e equ *
+ bra.w .p5_original
+ ; The displaced native instruction still runs at its original point.
+ ; Defer only the shadow callback to the last adjacent load/store hook.
+ jmp $67214
+.p5_original:
+ ENDC
 C4SaveMask018 equ *
  movem.l a0/a1/d0/d4/d7,-(sp)
  move.w sr,-(sp)
@@ -1736,6 +1796,14 @@ C4SaveMask019 equ *
  jmp $67214
 bridge_68546:
  dc.w $30b9,$0003,$2fc4
+ IFD FF1_C4_HOOK_P5
+C4P5Gate_bridge_68546 equ *
+ bra.w .p5_original
+ ; The displaced native instruction still runs at its original point.
+ ; Defer only the shadow callback to the last adjacent load/store hook.
+ jmp $6854c
+.p5_original:
+ ENDC
 C4SaveMask020 equ *
  movem.l a0/d0/d4/d7,-(sp)
  move.w sr,-(sp)
@@ -1750,6 +1818,12 @@ C4SaveMask021 equ *
  jmp $6854c
 bridge_67b52:
  dc.w $33c1,$0003,$2fc4
+ ; P5 diagnostic may narrow the paired masks to D0-D4/A0-A1.
+ ; bridge_context/bridge_rotate clobber only those registers; both position
+ ; rotation adapters preserve the remaining caller state, including A0.
+ IFD FF1_C4_HOOK_P5
+C4P5RotateSave equ *
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  move.w sr,-(sp)
  FF1PlayerContext position_shadow,bridge_context
@@ -1758,6 +1832,9 @@ bridge_67b52:
  bsr.w bridge_rotate
 .done:
  move.w (sp)+,ccr
+ IFD FF1_C4_HOOK_P5
+C4P5RotateRestore equ *
+ ENDC
  movem.l (sp)+,d0-d7/a0-a6
  jmp $67b58
 bridge_67a12:
