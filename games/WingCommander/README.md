@@ -3,14 +3,19 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 11 is in progress: measured flight rendering optimisation.**
-The first candidate is changed-block conversion, based on the flight profile.
+**Phase 11 is complete: changed-block flight conversion.**
+The timing build converts only changed view/cockpit/HUD blocks, with separate
+history for each display buffer. Native/live output matches the original; measured
+mean conversion time falls 80% on the 030 firing sample and 67% on the 020 turning
+sample. PAL/NTSC world timing remains near 10 Hz. See the
+[gate and coverage limits](docs/internals.md#phase-11-flight-rendering-gate).
+Stopped before phase 12 release work.
 
 **Phase 10 is complete: presentation between world updates.**
 The experimental timing build predicts object positions and orientations for drawing,
 then restores authoritative state. PAL/NTSC flight checks pass; corrections snap at
 world boundaries, with hard-turn limits documented in the [gate evidence](docs/internals.md#phase-10-renderer-only-prediction-gate).
-Phase 11 is now authorised; release work remains deferred.
+Phase 11 integrates flight conversion; release work remains deferred.
 
 **Phase 9 is complete: D's decoupled simulation and responsive controls.**
 The separate experimental timing build uses `CUSTOM1=3`. World timing stays within

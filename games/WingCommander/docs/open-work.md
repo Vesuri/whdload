@@ -30,7 +30,8 @@ complete: the user selected D on 2026-10-13, with the explicit pricing gaps in
 world, responsive player/camera path and required clock owners pass the scoped
 [native/live gate](internals.md#phase-9-decoupled-simulation-gate). Phase 10 is complete: bounded renderer-only prediction, transient allocation
 isolation and real-flight validation pass the [presentation gate](internals.md#phase-10-renderer-only-prediction-gate).
-Phase 11 is in progress; stop before phase 12.
+Phase 11 is complete: changed-block flight conversion passes native/live output,
+measured conversion-time and PAL/NTSC timing gates. Stop before phase 12.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -382,14 +383,32 @@ all staged poses/allocation fields before gameplay. Two real-flight gates includ
 next-update error measurements and PAL pause. Hard turning reached an 8.982 km
 full-tick positional forecast error; corrections snap rather than feed back into
 simulation. Discrete effect/indicator frames remain world-clocked. Full model,
-scripted-camera and hardware play-tests remain release coverage. Stop before phase 11.
+scripted-camera and hardware play-tests remain release coverage. The phase-11
+flight conversion gate is recorded below.
 
 ### Phase 11 — Rendering, second pass (flight scope)
 
-Profile-driven: the hot routines found in phase 7 (ship bitmap scaling, polygon or span
-drawing, starfield, cockpit and HUD redraw, text). Cockpit-aware c2p (convert only the
-view area and changed HUD regions), drawing directly into fast RAM, removal of
-redundant clears. Each change measured and validated like phase 6.
+**Complete.** The phase-7 profile selected c2p (64–66% of representative 020 cost)
+as the useful target. The timing build now compares 32-pixel source blocks against
+separate histories for each planar buffer, converting changed view/cockpit/HUD
+blocks. First use, changed buffers and nonflight/geometry transitions are handled
+conservatively; history needs 128000 bytes of FAST RAM with original-converter
+fallback if allocation fails. The original limiter remains.
+
+Native complete-output and live original/candidate twin gates pass. Same-picture
+CHIP-to-CHIP destination comparisons measure 80.0% less mean conversion time on
+030 firing and 66.5% on 020 turning. Normal 030 PAL/NTSC flights retain the 10 Hz
+world, pause and presentation restoration, with roughly 25/30 publications/s.
+These are scoped emulator conversion savings, not an FPS or hardware claim.
+See [the phase-11 gate](internals.md#phase-11-flight-rendering-gate) and
+[reproducible commands](development.md#phase-11-flight-conversion).
+
+Flight chunky drawing already targets FAST RAM. Smaller drawing/math buckets do
+not justify speculative ship, polygon/span, starfield, HUD or text rewrites, and
+the earlier blanket-clear bypass was unsafe. Those native routines and clears are
+retained. Dense screen changes may reduce or reverse the conversion saving;
+all-scene/cache/hardware performance, every model/camera/transition and small-memory
+coverage remain explicit release gaps. Stop before phase 12.
 
 ### Phase 12 — Definitive-edition polish and release
 
