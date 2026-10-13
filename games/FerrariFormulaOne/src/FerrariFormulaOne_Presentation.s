@@ -1,5 +1,6 @@
 ; SPS 0481 candidate simulation/presentation split; not installed by the release.
-; 68020 candidate; requires FerrariFormulaOne_UpdateHooks.s and its native sites.
+; Fine host uses UpdateHooks; coarse host supplies native recovery/boost entries.
+; FF1_COARSE_STEP selects 68000-safe calls; FF1_COARSE_020 selects CCR saves.
 ; FF1InstallPresentation validates every new entry before patching. The host
 ; flushes the instruction cache after all installers, before resuming the game.
 ; FF1SimulationTail replaces the drawing-omission tail; clocks still execute at
@@ -8,16 +9,44 @@
 ; Native bitplanes, blitter waits and rendering scratch remain presentation-owned.
 ; This is the component split, not the full road renderer or final scheduler.
 
+FF1PresentationSaveFlags macro
+ IFD FF1_COARSE_STEP
+ IFND FF1_COARSE_020
+ move.w sr,-(sp)
+ ELSE
+ move.w ccr,-(sp)
+ ENDC
+ ELSE
+ move.w ccr,-(sp)
+ ENDC
+ endm
+
 FF1SimulationTail:
+ IFD FF1_COARSE_STEP
+ move.w #1,$1c1b4
+ ENDC
  movem.l d0-d7/a0-a6,-(sp)
  IFD FF1_RENDER_POSES
+ IFD FF1_COARSE_STEP
+ bsr.w B8ViewTick
+ ELSE
  bsr.l B8ViewTick
  ENDC
+ ENDC
  ; Animation rates have native 100 ms units, like recovery and filtered boost.
+ IFD FF1_COARSE_STEP
+ move.w events_pulse(pc),-(sp)
+ tst.w (sp)+
+ ELSE
  tst.w events_pulse(pc)
+ ENDC
  beq.b .recovery
  IFD FF1_RENDER_POSES
+ IFD FF1_COARSE_STEP
+ bsr.w B8NativePresentationTick
+ ELSE
  bsr.l B8NativePresentationTick
+ ENDC
  ENDC
  bsr.w FF1InstrumentTick
 .recovery:
@@ -67,7 +96,12 @@ FF1InstrumentTick:
 FF1BoostEntry:
  link a6,#-16
  movem.l d2-d3,-(sp)
+ IFD FF1_COARSE_STEP
+ move.w FF1BoostSimulation(pc),-(sp)
+ tst.w (sp)+
+ ELSE
  tst.w FF1BoostSimulation(pc)
+ ENDC
  bne.b .simulation
  ; The gauge uses the unfiltered RPM-derived height. Recompute this local
  ; drawing input without advancing boost, audio pitch/delta or gear position.
@@ -84,7 +118,12 @@ FF1BoostEntry:
  jmp $6bc04
 
 FF1BoostGauges:
+ IFD FF1_COARSE_STEP
+ move.w FF1BoostSimulation(pc),-(sp)
+ tst.w (sp)+
+ ELSE
  tst.w FF1BoostSimulation(pc)
+ ENDC
  bne.b .simulation
  tst.w $32b76
  jmp $6bcce
@@ -92,7 +131,12 @@ FF1BoostGauges:
  jmp $6be6a
 
 FF1BoostGear:
+ IFD FF1_COARSE_STEP
+ move.w FF1BoostSimulation(pc),-(sp)
+ tst.w (sp)+
+ ELSE
  tst.w FF1BoostSimulation(pc)
+ ENDC
  beq.b .presentation
  move.w $6f272,d0
  jmp $6be70
@@ -100,7 +144,12 @@ FF1BoostGear:
  jmp $6bf26
 
 FF1BoostGearDraw:
+ IFD FF1_COARSE_STEP
+ move.w FF1BoostSimulation(pc),-(sp)
+ tst.w (sp)+
+ ELSE
  tst.w FF1BoostSimulation(pc)
+ ENDC
  bne.b .simulation
  move.w 10(a6),d0
  ext.l d0
@@ -123,8 +172,13 @@ FF1ClockTick:
  rts
 
 FF1ClockDigit:
- move.w ccr,-(sp)
+ FF1PresentationSaveFlags
+ IFD FF1_COARSE_STEP
+ move.w FF1ClockSimulation(pc),-(sp)
+ tst.w (sp)+
+ ELSE
  tst.w FF1ClockSimulation(pc)
+ ENDC
  bne.b .simulation
  move.w (sp)+,ccr
  link a6,#0
@@ -136,7 +190,7 @@ FF1ClockDigit:
 
 FF1PresentComponents:
  movem.l d0-d7/a0-a6,-(sp)
- move.w ccr,-(sp)
+ FF1PresentationSaveFlags
  bsr.w FF1PresentFlag
  ; Retain the native instrument/opponent renderer, including all DMA waits.
  move.w $6a66a,d0
@@ -159,7 +213,12 @@ FF1PresentComponents:
 
 FF1FlagEntry:
  link a6,#0
+ IFD FF1_COARSE_STEP
+ move.w FF1FlagPresentation(pc),-(sp)
+ tst.w (sp)+
+ ELSE
  tst.w FF1FlagPresentation(pc)
+ ENDC
  bne.b .present
  move.w $1c1e0,d0
  jmp $6680c
@@ -168,7 +227,12 @@ FF1FlagEntry:
  jmp $66840
 
 FF1FlagBody:
+ IFD FF1_COARSE_STEP
+ move.w FF1FlagPresentation(pc),-(sp)
+ tst.w (sp)+
+ ELSE
  tst.w FF1FlagPresentation(pc)
+ ENDC
  bne.b .present
  ; Keep the native flag selection and its session counter on the update.
  ; Only latch the resulting graphic; the two plane blits belong to drawing.

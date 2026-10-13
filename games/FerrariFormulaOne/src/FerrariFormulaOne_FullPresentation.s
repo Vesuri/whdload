@@ -1079,7 +1079,11 @@ B8_65c8e:
 B8_65c94:
  lea $34(a7),a7
 B8_65c98:
+ IFD FF1_COARSE_STEP
+ bsr.w B8PresentPit
+ ELSE
  bsr.l B8PresentPit
+ ENDC
 B8_65c9e:
  move.w $6a66a.l,d0
 B8_65ca4:
@@ -1189,14 +1193,26 @@ B8_65d60:
 B8_65d68:
  clr.w $23bb2.l
 B8_65d6e:
+ IFD FF1_COARSE_STEP
+ bsr.w FF1PresentFlag
+ ELSE
  bsr.l FF1PresentFlag
+ ENDC
+ IFD FF1_COARSE_STEP
+ bsr.w FF1PresentClock
+ ELSE
  bsr.l FF1PresentClock
+ ENDC
  jsr $2a130
  jsr $2a270
  clr.w $1c1b4
  jsr $6694e
  jsr $2a130
+ IFD FF1_COARSE_STEP
+ lea B8Frames(pc),a0
+ ELSE
  lea (B8Frames.l,pc),a0
+ ENDC
  addq.l #1,(a0)
  move.l -60(a6),$226ae
  move.l -56(a6),$226b2

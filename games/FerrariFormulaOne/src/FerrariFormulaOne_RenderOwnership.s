@@ -59,7 +59,11 @@ B8NativePresentationTick:
 .message:
  tst.w $1c1c2
  beq.b .next
+ IFD FF1_COARSE_STEP
+ lea B8PitMessage(pc),a2
+ ELSE
  lea (B8PitMessage.l,pc),a2
+ ENDC
  move.w d2,(a2)
 .next:
  addq.l #1,a1
@@ -70,14 +74,24 @@ B8NativePresentationTick:
 
 B8PresentPit:
  movem.l d0-d7/a0-a6,-(sp)
+ IFD FF1_COARSE_STEP
+ move.w B8PitMessage(pc),-(sp)
+ tst.w (sp)+
+ ELSE
  tst.w B8PitMessage(pc)
+ ENDC
  beq.b .done
  moveq #1,d0
  move.l d0,-(sp)
  clr.l -(sp)
  jsr $670d0
  addq.l #8,sp
+ IFD FF1_COARSE_STEP
+ move.w B8PitMessage(pc),-(sp)
+ cmpi.w #1,(sp)+
+ ELSE
  cmpi.w #1,B8PitMessage(pc)
+ ENDC
  bne.b .outside
  pea 44.w
  pea 288.w
