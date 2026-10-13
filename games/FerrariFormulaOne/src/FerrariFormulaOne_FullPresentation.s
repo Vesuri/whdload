@@ -210,7 +210,18 @@ B8_6571a:
  move.w #$1,$1c1b4.l
 B8_65722:
  jsr $2a260.l
+ IFD FF1_C4_ROAD_PREFETCH
+ bsr.w FF1C4PrepareRoad
+ ENDC
 B8_65728:
+ IFD FF1_C4_ROAD_PREFETCH
+ move.w C4RoadPrefetchEnabled(pc),d0
+ beq.b .native_wait
+ move.l C1Context(pc),d0
+ cmp.l C4RoadField(pc),d0
+ bne.w B8_65734
+.native_wait:
+ ENDC
  move.w $dff004.l,d0
 B8_6572e:
  btst #$0,d0
@@ -261,7 +272,11 @@ B8_65786:
 B8_65788:
  move.l d0,-(a7)
 B8_6578a:
+ IFD FF1_C4_ROAD_PREFETCH
+ bsr.w FF1C4DrawPreparedRoad
+ ELSE
  jsr $6b368.l
+ ENDC
 B8_65790:
  addq.l #$4,a7
 B8_65792:
@@ -1219,4 +1234,10 @@ B8_65d6e:
  unlk a6
  rts
 B8Frames: dc.l 0
+ IFD FF1_C4_ROAD_PREFETCH
+ IFND FF1_COARSE_200_COMPLETE
+ fail "Road prefetch requires complete C4"
+ ENDC
+ include "FerrariFormulaOne_Coarse200Road.s"
+ ENDC
  ENDC
