@@ -950,10 +950,22 @@ velocity_context:
  cmpi.w #7,d0
  bhi.w velocity_fault
 
+ IFD FF1_C4_CONTEXT_P5
+C4P5VelocityGate equ *
+ ; Exact eight-car offsets, without a runtime dispatch cost. A0 is scratch.
+ ; MOVEA/ADDA preserve X; the word lookup matches MULU's N/Z/V/C.
+ move.l d0,a0
+ adda.w d0,a0
+ move.w .p5_offsets(pc,a0.w),d0
+ ELSE
  mulu.w #12,d0
+ ENDC
  lea velocity_shadow(pc),a0
  adda.l d0,a0
  rts
+ IFD FF1_C4_CONTEXT_P5
+.p5_offsets: dc.w 0,12,24,36,48,60,72,84
+ ENDC
 velocity_sync:
  FF1PlayerContext velocity_shadow,velocity_context
  move.w $32f94,d0
@@ -2050,7 +2062,16 @@ bridge_context:
  cmpi.l #7,d0
  bhi.b .bad
 
+ IFD FF1_C4_CONTEXT_P5
+C4P5PositionGate equ *
+ ; Exact eight-car offsets, without a runtime dispatch cost. A0 is scratch.
+ ; MOVEA/ADDA preserve X; the word lookup matches MULU's N/Z/V/C.
+ move.l d0,a0
+ adda.w d0,a0
+ move.w .p5_offsets(pc,a0.w),d0
+ ELSE
  mulu.w #12,d0
+ ENDC
  lea position_shadow(pc),a0
  adda.l d0,a0
  moveq #0,d0
@@ -2060,6 +2081,9 @@ bridge_context:
  move.l #7,(a0)
  moveq #-1,d0
  rts
+ IFD FF1_C4_CONTEXT_P5
+.p5_offsets: dc.w 0,12,24,36,48,60,72,84
+ ENDC
 bridge_load:
  lea fine_cross_pending(pc),a1
  clr.w (a1)
