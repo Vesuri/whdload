@@ -10,7 +10,7 @@ import argparse
 import json
 from collections import Counter
 from pathlib import Path
-from frame_report import records
+from frame_report import records, display_records
 
 
 def main():
@@ -33,17 +33,22 @@ def main():
     shown = [(f, t) for _, f, t in pairs]
     # Publication between the two samples straddling a field edge is ambiguous.
     ambiguous = {f for f0, f, _ in pairs if f0+1 != f}
+    buffered=meta['fixture'].get('buffered',False)
+    if buffered:
+        shown=[(f,f*lines+v) for f,v,index,plane,copper in display_records(a.run/'displaystats.bin')]
+        ambiguous=set()
     if len(shown) < 100 or len(pubs) < 100:
         raise ValueError('too few pictures')
     # Recorder fields are relative to an unrecorded start. One-field pictures
     # make nearby offsets alike; score each over the whole sequence.
-    observed = Counter(q['clock']+1 for q in pubs)
+    bias=0 if buffered else 1
+    observed = Counter(q['clock']+bias for q in pubs)
     recorded = Counter(f for f, _ in shown)
-    candidates = {c-f for f in list(recorded)[:50] for c in observed}
+    candidates = {meta['frame_epoch']} if buffered else {c-f for f in list(recorded)[:50] for c in observed}
     votes, offset = max((sum(min(n, observed[f+offset]) for f, n in recorded.items()), offset) for offset in candidates)
     mismatched = sorted(f for f, n in recorded.items() if observed[f+offset] != n)
     first, last = shown[0], shown[-1]
-    cyc = {q['clock']+1: q for q in pubs}
+    cyc = {q['clock']+bias: q for q in pubs}
     unit = pubs[0]['baseclock']*64
     observer_s = (cyc[last[0]+offset]['cycles']-cyc[first[0]+offset]['cycles'])/unit
     recorder_s = (last[1]-first[1])*records.line_ms/1000
@@ -54,6 +59,7 @@ def main():
                   passed=all(any(abs(m-f) <= 1 for f in ambiguous) for m in mismatched) and abs(recorder_s-observer_s)*1000 <= 1000/hz)
     a.output.write_text(json.dumps(result, indent=2)+'\n')
     print(json.dumps(result, indent=2))
+    if not result['passed']:raise ValueError('publication observer gate failed')
 
 
 if __name__ == '__main__':

@@ -29,8 +29,8 @@ def main():
             changed[sy['release_limit']:sy['release_limit']+2]=bytes.fromhex('4e75')
         else:
             at=sy['release_limit']+4
-            assert blob[at]==0x66
-            changed[at:at+2]=bytes.fromhex('4e71')
+            assert blob[at]==0x67
+            changed[at]=0x60  # force nonflight limiter even during flight
         blob=bytes(changed)
     options=[]
     for model,flags in ((2,2),(4,8)):

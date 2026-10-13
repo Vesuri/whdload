@@ -43,10 +43,11 @@ def main():
     p.add_argument('--observer', action='store_true', help='log publication/VBL PCs; requires an observer build and --debugger')
     p.add_argument('--layout', help='boot_gate layout of this fixture; required with --debugger')
     p.add_argument('--ntsc', action='store_true')
+    p.add_argument('--display-sample',action='store_true',help='save chip/fast memory and three display fields after the window; requires debugger')
     p.add_argument('--cpu-speed', choices=('real', 'max'), help='non-cycle-exact CPU speed bracket')
     p.add_argument('--timeout', type=int, default=3600)
     a = p.parse_args()
-    if (a.held_key or a.observer) and not a.debugger:
+    if (a.held_key or a.observer or a.display_sample) and not a.debugger:
         p.error('--held-key/--observer require --debugger')
     if a.debugger and not a.layout:
         p.error('--debugger requires --layout')
@@ -66,6 +67,7 @@ def main():
     if not fixture.get('release') and a.custom5==4:
         p.error('experimental timing build does not support CUSTOM5=4')
     language=0 if fixture.get('release') else 3
+    record_bytes=16+4*fixture.get('frame_records',16384)
     out.mkdir(parents=True)
     os.chdir(ROOT)
     lst = (slave.parent/'slave.lst').read_text().splitlines()
@@ -86,11 +88,13 @@ def main():
     if a.observer:
         layout = json.loads((ROOT/a.layout).read_text())
         h, s = layout['hunks'], layout['slave']
-        pcs = [h[0]+0x3378e, h[0]+0x34162] + [s+save_call]
+        pcs = [s+symbols['release_presented'] if fixture.get('buffered') else h[0]+0x3378e, h[0]+0x34162] + [s+save_call]
+        if fixture.get('buffered'):pcs += [s+symbols['release_convert_ready']]
         cfg = out/'observer.cfg'
         cfg.write_text(' '.join(f'{v:x}' for v in [h[0], h[1], h[3]]+pcs)+'\n')
         env.update(WC_OBSERVER_CONFIG=str(cfg), WC_OBSERVER_OUTPUT=str(out/'events.txt'))
     live = None
+    frame_epoch = None
     started = time.time()
     g = None
     try:
@@ -114,23 +118,36 @@ def main():
             # The flush runs only from the loop, so the next visit to the
             # following instruction is the return from resload_SaveFile.
             cmd(f'break *{s0+save_call+4:#x}\ncontinue\ndelete', 600)
+            if fixture.get('buffered'):
+                epoch_address=s0+symbols['frame_stats_first']
+                cmd(f'dump binary memory {out.relative_to(ROOT)}/frame-epoch.bin {epoch_address:#x} {epoch_address+4:#x}')
+                frame_epoch=int.from_bytes((out/'frame-epoch.bin').read_bytes(),'big')
+            if a.display_sample:
+                cmd(f'dump binary memory {out.relative_to(ROOT)}/chip.bin 0 0x200000')
+                cmd(f'dump binary memory {out.relative_to(ROOT)}/fast.bin 0x200000 0xa00000')
+                cmd(f'monitor profile 3 \"\" \"{out}/display.bin\"',600)
+                if not (out/'display.bin').exists():raise ValueError('missing display trace')
         else:
             subprocess.run(['/bin/bash', 'amiga/run.sh'], env=env, check=True, capture_output=True, text=True)
             deadline = started+a.timeout
             while time.time() < deadline:
                 files = glob.glob(str(out/'run/boot.*/dh1/WingCommanderCD32/**/framestats.bin'), recursive=True)
-                if files and os.path.getsize(files[0]) == 16+4*16384:
+                if files and os.path.getsize(files[0]) == record_bytes:
                     break
                 time.sleep(5)
         files = glob.glob(str(out/'run/boot.*/dh1/WingCommanderCD32/**/framestats.bin'), recursive=True)
-        if not files or os.path.getsize(files[0]) != 16+4*16384:
+        if not files or os.path.getsize(files[0]) != record_bytes:
             raise TimeoutError('frame statistics were not saved')
         time.sleep(2)
         shutil.copyfile(files[0], out/'framestats.bin')
+        if fixture.get('buffered'):
+            display=Path(files[0]).with_name('displaystats.bin')
+            if not display.exists():raise ValueError('missing completed-display ledger')
+            shutil.copyfile(display,out/'displaystats.bin')
         config = glob.glob(str(out/'run/fsuae/Cache/Logs/debug.uae')) or glob.glob(str(out/'run/**/debug.uae'), recursive=True)
         result = dict(fixture=fixture, machine=a.machine, timing_core=a.timing_core,
             baseline_cache_model=a.baseline_cache_model, custom5=a.custom5, options=a.options, cpu_speed=a.cpu_speed,
-            ntsc=a.ntsc, held_key=a.held_key, debugger=a.debugger, observer=a.observer, live_cpu=live,
+            ntsc=a.ntsc, held_key=a.held_key, debugger=a.debugger, observer=a.observer, live_cpu=live, frame_epoch=frame_epoch,
             emulator=os.path.basename(env.get('FSUAE', '')),
             emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest() if env.get('FSUAE') else None,
             emulator_config=config[0] if config else None, host_seconds=time.time()-started,

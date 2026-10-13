@@ -3,12 +3,15 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 11b is in progress; B1 is complete.**
+**Phase 11b is in progress; B2 is complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for
 enhanced English flight without Psygore's frame cap. Values 1–4 retain Psygore's
 normal/unlimited/relaxed/slow modes. German default and enhanced nonflight scenes
 retain normal pacing. See the [candidate ReadMe](release/ReadMe).
-Phase 12 release work remains paused; buffering and smoothness work remain open.
+Enhanced flight queues completed pictures for early vertical blank and waits
+only before reusing a pending display buffer. The scoped PAL gates reach 49.92
+pictures/s on both tested models; the 040 core remains uncalibrated against hardware.
+Phase 12 stays paused; C1 and the remaining smoothness/visual work remain open.
 
 **Phase 11 is complete: changed-block flight conversion.**
 The timing build converts only changed view/cockpit/HUD blocks, with separate

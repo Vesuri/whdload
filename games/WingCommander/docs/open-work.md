@@ -38,7 +38,10 @@ Psygore's default limiter caps flight at 25 FPS, the emulated machines reach
 release polish is paused behind it; OCS remains out of scope. B1 is complete:
 public CUSTOM5=0 enables uncapped English flight, 1–4 retain Psygore's modes,
 and CUSTOM1 selects language only. The cached 030 model reaches 49.920 pictures/s;
-the uncalibrated cycle-exact 040 core reaches 39.953. B2 is next, not started.
+the uncalibrated cycle-exact 040 core reaches 39.953 at the B1 gate.
+B2 is complete: queued early-VBL swaps and pre-conversion ownership waits retain
+two buffers. Both PAL model gates now report 49.920 displayed pictures/s; the
+030 NTSC gate reports 59.826. C1 is next, not started.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -485,10 +488,14 @@ display wait (6–7 ms of idle per frame).
   changed numbering. Psygore's modes stay for now.
   Native option/pacing/output gates and the required frame-rate reports pass;
   see [B1 evidence](internals.md#phase-11b-public-modes-and-uncapped-flight-b1-gate-complete).
-  WaitBOVP and the row-glitch investigation remain open. Stop at B1.
-- **B2.** Vsync without idle: publish immediately after conversion, swaps take
+  B2 replaces the flight display-end wait below; the row-glitch investigation remains open.
+- **B2 — complete.** Vsync without idle: publish immediately after conversion, swaps take
   effect at vertical blank, and wait only before converting into a buffer whose
   swap-away has not yet been displayed. Drawing into the FAST chunky buffer overlaps.
+  Native queue/retirement and original-path tests, complete converter output,
+  independent displayed-frame counts, ownership and PAL/NTSC copper audits pass.
+  See [B2 evidence](internals.md#phase-11b-deferred-buffer-reuse-b2-gate-complete).
+  Stop before C1; display-time prediction and subjective visual acceptance remain open.
 - **B3.** No triple buffering (user, 2026-10-13): keep two buffers; B2 removes
   the idle wait instead.
 

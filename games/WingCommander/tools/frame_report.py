@@ -19,7 +19,7 @@ from pathlib import Path
 
 NAMES = {1: 'loop', 2: 'world_begin', 3: 'world_end', 4: 'draw', 5: 'predicted', 6: 'scene_drawn',
          7: 'hud_done', 8: 'restored', 9: 'convert_entry', 10: 'limit_begin', 11: 'limit_end',
-         12: 'convert_begin', 13: 'convert_end', 14: 'wait_begin', 15: 'wait_end'}
+         12: 'convert_begin', 13: 'convert_end', 14: 'wait_begin', 15: 'wait_end', 16: 'queued'}
 # Interval name: (start event, end event)
 # Observed order inside $510: native drawing, then the converter call (limiter,
 # conversion, display wait) and publication; $46e6 runs after publication.
@@ -77,18 +77,34 @@ def settings(run):
     return found
 
 
+def display_records(path):
+    raw=path.read_bytes()
+    magic,hz,count,size=struct.unpack_from('>4sIII',raw)
+    if magic!=b'WCDS' or hz not in (50,60) or size!=16 or len(raw)!=16+16*count:
+        raise ValueError('invalid display ledger')
+    rows=list(struct.iter_unpack('>IHHII',raw[16:]))
+    if count<100 or any(not 4<=v<=16 or index>1 or not plane or not copper for f,v,index,plane,copper in rows):
+        raise ValueError('invalid/late copper handoff')
+    if any(b[0]<=a[0] or b[2]==a[2] or b[3]==a[3] for a,b in zip(rows,rows[1:])):
+        raise ValueError('display ownership/order violated')
+    return rows
+
+
 def summarise(run):
     meta = json.loads((run/'result.json').read_text())
     hz, lines, ev = records(run/'framestats.bin')
     ms = records.line_ms
     draws = [i for i, e in enumerate(ev) if e[0] == 4]
+    buffered=meta['fixture'].get('buffered',False)
+    spans=dict(SPANS)
+    if buffered:spans['publish']=(16,6)
     frames = []
     for a, b in zip(draws, draws[1:]):
         seg = ev[a:b+1]
         part = Counter()
         opened = {}
         for e, f, t in seg[:-1]:
-            for name, (s0, s1) in SPANS.items():
+            for name, (s0, s1) in spans.items():
                 if e == s0:
                     opened[name] = t
                 elif e == s1 and name in opened:
@@ -101,6 +117,11 @@ def summarise(run):
     if len(frames) < 100:
         raise ValueError(f'{run}: fewer than 100 measured frames')
     published = [f['shown'] for f in frames if f['shown'] is not None]
+    if buffered:
+        ledger=display_records(run/'displaystats.bin')
+        first_time=ev[draws[WARMUP_FRAMES]][2]
+        last_time=ev[draws[-1]][2]
+        published=[f for f,v,index,plane,copper in ledger if first_time<=f*lines+v<last_time]
     shown = sorted(set(published))
     overwritten = len(published)-len(shown)
     intervals = [b-a for a, b in zip(shown, shown[1:])]
@@ -108,10 +129,10 @@ def summarise(run):
     get = lambda f, k: f['parts'].get(k, 0.0)
     rows = {k: dist([get(f, k) for f in frames]) for k in SPANS}
     # converter_setup spans the limiter; report setup without it.
-    rows['converter_setup'] = dist([get(f, 'converter_setup')-get(f, 'limiter_wait') for f in frames])
+    rows['converter_setup'] = dist([get(f, 'converter_setup')-get(f, 'limiter_wait')-(get(f,'display_wait') if buffered else 0) for f in frames])
     accounted = ('prediction_save', 'native_draw', 'converter_setup', 'conversion', 'display_wait',
                  'publish', 'after_publish_46e6', 'restore', 'world_ticks')
-    rows['input_player_other'] = dist([f['ms']-sum(get(f, k) for k in accounted) for f in frames])
+    rows['input_player_other'] = dist([f['ms']-sum(get(f, k) for k in accounted)+(get(f,'display_wait') if buffered else 0) for f in frames])
     busy = [f['ms']-get(f, 'limiter_wait')-get(f, 'display_wait') for f in frames]
     return dict(run=run.name, machine=meta['machine'], timing_core=meta['timing_core'], custom5=meta['custom5'],
         options=meta['options'], held_key=meta['held_key'], cpu_speed=meta.get('cpu_speed'),

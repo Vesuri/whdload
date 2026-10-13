@@ -2931,9 +2931,9 @@ and its new public options. Version remains **2.0b (13.06.2026)**.
 At conversion entry `S:178a` (file `$17aa`), enhanced active flight bypasses
 Psygore's TOD limiter `S:17b8` (file `$17d8`). This applies both to changed-block
 conversion and full-conversion fallback when history allocation is unavailable.
-Inactive/nonflight enhanced conversion still calls the normal limiter. WaitBOVP
-and the existing single publication/two-buffer policy remain unchanged: B2 is
-not implemented. This is not a fix for the reported horizontal-row glitches.
+Inactive/nonflight enhanced conversion still calls the normal limiter. B2 below
+now replaces the flight WaitBOVP with queued early-blank presentation and a
+pre-conversion ownership wait. The reported horizontal-row glitches remain open.
 
 In the normal B1 artifact, authored entries are `release_setcpu` at `S:1e0c`
 (file `$1e2c`), `release_limit` at `S:1e4e` (file `$1e6e`), flight entry at
@@ -2996,4 +2996,113 @@ Evidence: `tmp/b1-final-native.json`, `tmp/b1-flight-native.json`,
 Commands are in development's B1 section; the public numbering/fallbacks are in
 `release/ReadMe`. Save-file work remains outside this gate. German live campaign,
 full control/visual acceptance, calibrated 040 performance and release packaging
-remain open. Stop at B1; B2 and later work are not started.
+remain open. The subsequent B2 gate is below; C1 and later work remain open.
+
+## Phase 11b: deferred buffer reuse (B2 gate complete)
+
+The public enhanced-English build retains two CHIP buffers. It finishes a
+conversion, queues its completed index, and continues the next world/player and
+FAST chunky drawing work immediately. Before either full or changed-block
+conversion, it waits only if the previous swap is still pending. The post-conversion
+flight WaitBOVP is removed. Nonflight retains normal pacing/WaitBOVP, and Psygore
+modes retain their native publication and converter paths. No third buffer or
+additional normal-build allocation is introduced.
+
+The request/acknowledgment path follows the buffer-ownership approach in Their
+Finest Hour, adapted to this game's OS-generated COP2 lists. Main writes the
+index, saved game A4 and planar pointer before publishing a word-sized pending
+flag. The VBL callback performs native View/BitMap/COP2LC bookkeeping, restarts
+COP2 in early blank, records the new front, then clears the flag. A request remains
+pending if the native publication lock is busy or the interrupt arrives late.
+Native teardown drains pending work before freeing the View/lists. Pending work
+is serviced even if flight has become inactive, preventing a pause/modal drain
+from deadlocking. Native main/IRQ register contracts are checked separately.
+
+Game seams (code hunk / executable file):
+
+| Seam | Purpose |
+|---|---|
+| `E:3378e` / `$337ba` | Queue active-flight publication; inactive calls displaced native publication |
+| `E:337ea` / `$33816` | Drain before native viewport teardown |
+| `E:34188` / `$341b4` | Service presentation before the existing input-history callback |
+| `E:33a12` / `$33a3e` | Unchanged native index/View/BitMap publication called by the IRQ |
+| `E:33ce2` / `$33d0e` | Unchanged COP2LC store inside that native helper |
+
+All new game seams have pinned original-byte guards and install only for enhanced
+English. Native trampolines resume at `E:33796` / file `$337c2` and `E:337f0` /
+file `$3381c`. In the normal B2 artifact, authored entries are queue `S:81a4`
+(file `$81c4`), conversion wait `S:8202` (file `$8222`), teardown `S:8210`
+(file `$8230`), VBL service `S:822a` (file `$824a`), and post-COPJMP2 marker
+`S:8274` (file `$8294`). These appended offsets are build-specific.
+
+The copper deadline is checked against actual lists. The pinned KickEmu 3.1
+copinit has 38 initial register/sprite MOVEs, then waits at line 12 and jumps to
+COP2. The IRQ lets that initialization finish by waiting until line 4; it begins
+native publication no later than line 12 and strobes COPJMP2 only by line 16.
+A late completion keeps the buffer unavailable until another VBL. The captured
+559-instruction game lists finish setup before display starts at PAL line 72 or
+NTSC line 44, even charging four colour clocks per instruction. Both lists use
+FMODE 3 and eight correctly spaced planes. This gate covers these pinned
+KickEmu lists, not arbitrary replacement display systems.
+
+### B2 correctness and instrumentation
+
+Native checks on 020/040 cover early/torn/late beam reads, late completion after
+bookkeeping, lock contention, one acknowledgment per request, blocking reuse,
+inactive service, teardown drainage, and native publication/teardown live-out.
+Deliberately permitting early reuse or removing COPJMP2 fails. The 196 option/cache
+cases, 180 pacing/output cases, 54 full-converter outputs, 72 changing-buffer
+outputs and whole-game-hunk installation checks pass. Original reconstruction
+and the standalone experimental timing build remain byte-identical to their
+previous references.
+
+Displayed frames are measured with a separate IRQ-owned ledger, not inferred
+from main-loop publication requests. It records actual field/line, index, planar
+pointer and copper pointer. Main-frame records and the display ledger share the
+original **65552-byte diagnostic FAST allocation** (8192 main records and up to
+2047 display records); normal builds include neither. This budget is native-tested.
+An initial larger diagnostic allocation pushed the chunky source into CHIP and
+produced a false rendering regression; those captures are rejected. The live gate
+now requires a FAST source and two aligned CHIP destinations.
+
+The observer comparison uses the recorder's exact epoch, read from its saved
+state, rather than choosing an offset from a repeating one-frame-per-field pattern.
+For each accepted run, all displayed frames match the independent post-COPJMP2
+observer; elapsed time differs by less than 0.002 ms. All 1987 observed converter
+entries target the buffer other than the current front. Every observed handoff
+is at line 4; late deferrals and input-history overflows are zero. The diagnostic
+also aborts if a converter is about to touch the front buffer. The NTSC three-field
+screen sample was inspected; this is not full visual acceptance or closure of the
+user's horizontal-row report.
+
+### B2 frame gate
+
+Nav-1 combat without held input, 8 MiB FAST, retained observer with the established
+cache-model compatibility settings. The 030 uses CACHE DCACHE (CACR `00002111`);
+the cycle-exact 040 core uses NoMMU (CACR `00000000`) and remains **uncalibrated
+against real 040 hardware**. Figures describe these diagnostic emulator windows.
+
+| Model / video | Displayed pictures/s | Fields/picture histogram | World updates/s | Mean pre-conversion ownership wait |
+|---|---:|---|---:|---:|
+| 030/50 PAL | 49.920 | 638 × 1 | 9.925 | 7.6 ms |
+| 040/25 core PAL | 49.920 | 638 × 1 | 9.929 | 2.2 ms |
+| 030/50 NTSC | 59.826 | 642 × 1 | 9.955 | 4.3 ms |
+
+These ~11–13 s windows meet the scoped display-rate gate and 10 Hz ±1% world gate.
+Waits occur before planar writes after the next chunky picture has been drawn;
+there is no flight post-conversion wait. Main-loop work intervals still vary
+(world-tick frames remain heavier), so C4 is not closed by the regular displayed
+cadence. C1 display-time prediction, C2 player translation, C3 heading-aware
+prediction, long missions, physical hardware and user visual acceptance remain
+open. No claim that all movement now feels like the display rate is made.
+
+Normal slave: 38916 bytes, SHA-256
+`65de422bd4f161b97e3ae208dd4249b81fe2bb551a08a7de1e0574bc743c2830`.
+Diagnostic direct-flight slave SHA-256:
+`2163e8f139acce712e58fffbba08f32b4dc731334719595f2448056b7d661b8e`.
+Evidence: `tmp/b2-buffer-final.json`, `tmp/b2-options-final.json`,
+`tmp/b2-pixels-final.json`, `tmp/b2-install-final/`,
+`tmp/b2-recorder-budget.json`, `tmp/b2-final-gate.json`, and
+`tmp/b2-{030,040,ntsc}-gate/{check,buffer-check}.json` with the raw ledgers,
+observer events and memory samples. Commands are in development's B2 section.
+Stop at B2; B3's no-third-buffer constraint is retained, and C1 is not started.

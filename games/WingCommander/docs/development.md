@@ -2052,8 +2052,8 @@ Use fresh output names on reruns. The 040 core requires the same
 emulated data cache off); it is still not a calibrated hardware model. WHDLoad's
 cache policy and emulated hardware-cache modeling are distinct. Each capture
 records actual CACR. No key is held in these bounded Nav-1 windows.
-B1 retains WaitBOVP, two buffers and the existing prediction policy. B2 and the
-smoothness items are separate work; the reported horizontal-row glitches remain
+The B1 evidence predates B2 below. The current public candidate defers buffer
+reuse, retains two buffers and keeps the existing prediction policy; the reported horizontal-row glitches remain
 unresolved. No archive is built by these commands.
 
 The recorder now requires two agreeing beam-line reads. VPOSR/VHPOSR longword
@@ -2063,3 +2063,83 @@ rejected it. `frame_stats_check.py` injects torn forward/backward boundary reads
 checks register/CCR preservation, and rejects a sabotaged single-read recorder.
 The corrected live recorder is cross-checked against the independent publication
 observer on 030. This diagnostic-only fix does not change the normal slave.
+
+## Phase 11b deferred buffer reuse (B2)
+
+`--release` enables the B2 queue/early-VBL handoff in enhanced English flight.
+It preserves B1's public options; the separate experimental `--timing` binary
+still retains the earlier display wait. Normal builds allocate no new display
+buffers or recorder memory. Use a fresh output directory for each build/run.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/b2-final
+python3 tools/buffer_check.py tmp/b2-final --output tmp/b2-buffer-final.json
+python3 tools/release_check.py tmp/b2-final --negative-controls --output tmp/b2-options-final.json
+python3 tools/flight_render_check.py tmp/b2-final --output tmp/b2-pixels-final.json
+python3 tools/timing_adapter_check.py tmp/b2-final --output tmp/b2-install-final
+python3 tools/reconstruct.py --timing --output tmp/b2-legacy
+python3 tools/reconstruct.py --output tmp/b2-original
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/b2-frames-compact
+python3 tools/frame_stats_check.py tmp/b2-frames-compact --output tmp/b2-recorder-budget.json
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/b2-frames-compact/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/b2-layout-compact
+
+for cell in 030 040 ntsc; do
+  case "$cell" in
+    030)  machine=a1200-030; options='CACHE DCACHE'; extra=() ;;
+    040)  machine=a1200-040; options=NoMMU; extra=(--timing-core) ;;
+    ntsc) machine=a1200-030; options='CACHE DCACHE'; extra=(--ntsc) ;;
+  esac
+  DEBUG_PORT=2499 python3 tools/frame_capture.py \
+    --fixture tmp/b2-frames-compact/WingCommanderCD32.Slave \
+    --machine "$machine" --baseline-cache-model --options "$options" \
+    --custom5 0 --debugger --observer --display-sample "${extra[@]}" \
+    --layout tmp/b2-layout-compact/layout.json --output "tmp/b2-$cell-gate"
+  python3 tools/frame_check.py "tmp/b2-$cell-gate" \
+    --output "tmp/b2-$cell-gate/check.json"
+  python3 tools/buffer_report.py "tmp/b2-$cell-gate" \
+    --layout tmp/b2-layout-compact/layout.json --build tmp/b2-frames-compact \
+    --output "tmp/b2-$cell-gate/buffer-check.json"
+done
+python3 tools/frame_report.py tmp/b2-030-gate tmp/b2-040-gate tmp/b2-ntsc-gate \
+  --output tmp/b2-final-gate.json
+```
+
+Run the loop with `/bin/bash` (including macOS 3.2). Captures stop only their owned
+emulator through the shared helper. The accepted 030/040 PAL snapshots were taken
+before the display-trace pathname fix; their frame/ownership/copper checks use
+complete memory snapshots and ledgers, not screenshots. The NTSC sample includes
+three actual display fields in `display.bin`. Current `--display-sample` saves
+both RAM regions and the trace, and rejects a missing trace.
+
+`buffer_check.py` executes the original publisher/teardown and authored request
+path on native 020/040 models. It proves pending buffers block reuse, blank-window
+and lock failures defer, IRQ registers/CCR survive, inactive publication is
+unchanged, and teardown drains before release. It rejects removed ownership waits
+and a removed COPJMP2 strobe. Converter checks independently cover every output
+pixel, including allocation fallback and nonflight.
+
+The public diagnostic records **8192 main events** to `framestats.bin` and a
+separate IRQ-only `displaystats.bin` ledger. Both fit the original 65552-byte
+FAST allocation; allocating another large FAST block changes game memory
+placement and is not an acceptable timing fixture. Native budget checks and the
+live FAST-source assertion guard against this. The old experimental timing
+recorder remains 16384 events. Frame reports derive displayed FPS/histograms from
+the new ledger, and call the pre-conversion ownership span `display_wait`.
+
+`frame_check.py` anchors the comparison to `frame_epoch`, read from the actual
+recorder state, and fails on mismatches. A search for a best offset is ambiguous
+when every field contains one picture, so it is not used for B2. The first accepted
+030 record's epoch was recovered from its complete FAST snapshot; the capture tool
+now saves it directly for every buffered debugger run.
+
+`buffer_report.py` checks converter targets against actual displayed planes,
+requires FAST chunky/CHIP planar placement, checks both lists' eight planes/FMODE,
+confirms the copinit setup and blank deadline, and reports late deferrals/input
+overflows. Its scope is continuous Nav-1 flight on the pinned KickEmu display
+path. Full modal/mission and visual acceptance remain open. The normal B2 artifact
+has no recorder, ownership diagnostic abort or extra allocation. Stop before C1.

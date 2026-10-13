@@ -19,8 +19,10 @@ CUSTOM1 is language only; the experimental CUSTOM1=2/3 switches do not
 apply to this candidate. Separate experimental builds retain their old options.
 
 Enhanced English flight runs its world at 10 updates/s and renders without
-Psygore's frame cap. The display-end wait remains for now; the actual frame
-rate depends on the machine and scene. Enhanced nonflight scenes, including
+Psygore's frame cap. Completed pictures are queued for early vertical blank;
+FAST-RAM drawing overlaps the pending swap. With two display buffers, conversion
+waits only until its target is no longer the front buffer. Actual frame rate
+depends on the machine and scene. Enhanced nonflight scenes, including
 the intro, keep Psygore's normal limiter until their movement is decoupled.
 German with CUSTOM5=0 falls back to Psygore normal until it is ported.
 CUSTOM5=1..4 retain Psygore's original simulation and rendering in both languages.

@@ -54,6 +54,16 @@ def main():
         raise ValueError('new tmp output required')
     blob = (a.build/'payload.bin').read_bytes()
     symbols = {n: int(o, 16) for o, n in re.findall(r'^([0-9A-F]{8}) (\S+)$', (a.build/'slave.lst').read_text(), re.M)}
+    # Diagnostic accounting must not alter the game allocator's RAM budget.
+    for model in (2,4):
+        c=CPU(blob,model)
+        c.write(4,struct.pack('>I',0x2000))
+        c.write(0x2000-198,bytes.fromhex('23c00003000023c100030004203c000a00004e75'))
+        c.write(STACK,struct.pack('>I',STOP));c.reg(8,STACK)
+        ck(u.uc_emu_start(c.h,BASE+symbols['frame_stats_init'],STOP,1000000,1000))
+        assert c.reg(18)==STOP
+        assert c.read(0x30000,8)==struct.pack('>II',65552,0x10005)
+        c.close()
     cases = []
     for model in (2, 4):
         for samples, expected in (([120, 120], 120), ([0, 256, 256, 256], 256), ([511, 255, 255, 255], 255)):

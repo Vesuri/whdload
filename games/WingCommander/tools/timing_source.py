@@ -3,7 +3,7 @@ import hashlib
 import struct
 
 
-def source(root):
+def source(root, buffered=False):
     game=(root/'tmp/originals/cd32/WingCommanderCD32/data/wing.english').read_bytes()
     if hashlib.sha256(game).hexdigest()!='093505483aed4c9dbd1b97484c3336e92fdb156be9c15a67ed0199bd4dade657':
         raise ValueError('changed English executable')
@@ -16,6 +16,9 @@ def source(root):
              (0x65f4,'timing_emission_clock',0x4eb9),(0x51a,'timing_message_draw',0x4eb9),(0x46ea,'timing_systems_draw',0x4eb9),
              (0x530,'timing_sim_draw',0x4ef9),(0x438,'timing_sim_score_draw',0x4eb9),(0x3b8e,'timing_target_draw',0x4ef9),(0x4b16,'timing_selection',0x4ef9),
              (0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]
+    if buffered:
+        patches=[(off,'release_input_vblank' if off==0x34188 else label,op) for off,label,op in patches]
+        patches += [(0x3378e,'release_publish',0x4ef9),(0x337ea,'release_teardown',0x4ef9)]
     lines=[(root/'whdload/timing.s').read_text(),(root/'whdload/timing_clock.s').read_text(),(root/'whdload/timing_player.s').read_text(),(root/'whdload/timing_input.s').read_text(),(root/'whdload/timing_presentation.s').read_text(),(root/'whdload/timing_scene.s').read_text(),'timing_install:']
     for offset,_,_ in patches:
         word=struct.unpack_from('>H',code,offset)[0]
@@ -25,7 +28,7 @@ def source(root):
             lines += ['\tmove.l a0,d0',f'\taddi.l #${target:x},d0',
                       f'\tcmp.l ${offset+2:x}(a0),d0','\tbne.w timing_bad']
         else:
-            width=8 if offset in (0x28c86,0x7bc2,0x878,0x65f4,0x4b16,0x101c,0x438,0x3b8e) else 6
+            width=8 if offset in (0x28c86,0x7bc2,0x878,0x65f4,0x4b16,0x101c,0x438,0x3b8e,0x3378e) else 6
             for at in range(offset+2,offset+width,2):
                 value=struct.unpack_from('>H',code,at)[0]
                 lines += [f'\tcmpi.w #${value:04x},${at:x}(a0)','\tbne.w timing_bad']
@@ -43,4 +46,13 @@ def source(root):
     lines += ['timing_autopilot_original:','\tdc.b '+','.join(f'${x:02x}' for x in code[0x101c:0x1024]),'\tmove.l timing_autopilot_resume(pc),-(sp)','\trts','\tcnop 0,4','timing_autopilot_resume: dc.l 0']
     lines += ['timing_target_original:','\tdc.b '+','.join(f'${x:02x}' for x in code[0x3b8e:0x3b96]),'\tmove.l timing_target_resume(pc),-(sp)','\trts','\tcnop 0,4','timing_target_resume: dc.l 0']
     lines += ['timing_debris_original:','\tdc.b '+','.join(f'${x:02x}' for x in code[0x28c86:0x28c8e]),'\tmove.l timing_debris_resume(pc),-(sp)','\trts','\tcnop 0,4','timing_debris_resume: dc.l 0']
+    if buffered:
+        lines += ['release_publish_native:', '\tmove.l timing_game(pc),a0', '\tlea $331f4(a0),a0',
+                  '\tmove.w $1c(a0),-(sp)', '\tmove.l release_publish_resume(pc),-(sp)', '\trts',
+                  'release_teardown_native:', '\tmove.l a2,-(sp)', '\tmove.l timing_game(pc),a2',
+                  '\tlea $331f4(a2),a2', '\tmove.l release_teardown_resume(pc),-(sp)', '\trts',
+                  '\tcnop 0,4', 'release_publish_resume: dc.l 0', 'release_teardown_resume: dc.l 0']
+        at=lines.index('timing_install:')+1
+        lines[at:at]=['\tlea $33796(a0),a1','\tlea release_publish_resume(pc),a3','\tmove.l a1,(a3)',
+                     '\tlea $337f0(a0),a1','\tlea release_teardown_resume(pc),a3','\tmove.l a1,(a3)']
     return '\n'.join(lines)

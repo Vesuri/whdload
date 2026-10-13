@@ -29,9 +29,10 @@ release_setcpu:
 ; Active flight has no limiter. Nonflight retains Psygore normal pacing.
 release_limit:
         tst.w   timing_active(pc)
-        bne.s   .done
+        beq.s   .nonflight
+        bra.w   release_convert_wait
+.nonflight:
         bsr.w   slave+$17b8
-.done:
         rts
 
 release_name:

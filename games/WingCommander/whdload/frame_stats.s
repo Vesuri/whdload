@@ -4,12 +4,19 @@
 ; Recording starts FS_SKIP active fields after the first active event, fills
 ; the buffer once, and the next loop entry saves it with resload_SaveFile.
 ; Header: 'WCFS', field Hz, record count, skipped fields.
+        ifne BUFFERED
+FS_RECORDS = 8192
+        else
 FS_RECORDS = 16384
+        endif
 FS_SKIP = 150
 
 frame_stats_init:
         movem.l d0-d1/a0-a1/a6,-(sp)
         move.l  #16+FS_RECORDS*4,d0
+        ifne BUFFERED
+        addi.l  #16+2047*16,d0
+        endif
         move.l  #$10005,d1       ; MEMF_CLEAR | MEMF_FAST | MEMF_PUBLIC
         move.l  $4.w,a6
         jsr     -198(a6)
@@ -86,6 +93,10 @@ frame_stats_flush:
         lea     frame_stats_saved(pc),a0
         move.w  #1,(a0)
         move.l  frame_stats_buffer(pc),a1
+        ifne BUFFERED
+        bsr.w   frame_stats_save_display
+        move.l  frame_stats_buffer(pc),a1
+        endif
         move.l  #'WCFS',(a1)
         move.l  timing_hz(pc),4(a1)
         move.l  #FS_RECORDS,8(a1)
@@ -107,3 +118,53 @@ frame_stats_started: dc.w 0
 frame_stats_saved:   dc.w 0
 frame_stats_name:    dc.b 'framestats.bin',0
         cnop    0,4
+
+        ifne BUFFERED
+; A separate IRQ-owned ledger avoids making the main-thread recorder reentrant.
+; Header: WCDS, Hz, count, entry size. Entry: field.l, line.w, index.w,
+; planar.l, copper.l. Main thread saves only the completed prefix.
+frame_stats_display:
+        tst.w   frame_stats_started(pc)
+        beq.w   .done
+        cmpi.l  #FS_RECORDS,frame_stats_count(pc)
+        bhs.w   .done
+        move.l  timing_data(pc),a0
+        move.l  $7f02(a0),d2
+        sub.l   frame_stats_first(pc),d2
+        bmi.s   .done
+        move.l  frame_stats_display_count(pc),d1
+        cmpi.l  #2047,d1
+        bhs.s   .done
+        move.l  frame_stats_buffer(pc),a0
+        adda.l  #16+FS_RECORDS*4+16,a0
+        lsl.l   #4,d1
+        adda.l  d1,a0
+        move.l  d2,(a0)+
+        move.w  d0,(a0)+
+        move.w  release_pending_index(pc),(a0)+
+        move.l  release_pending_plane(pc),(a0)+
+        move.l  -778(a4),a1
+        move.l  50(a1),(a0)+
+        lea     frame_stats_display_count(pc),a0
+        addq.l  #1,(a0)
+.done:
+        rts
+frame_stats_save_display:
+        move.l  frame_stats_buffer(pc),a1
+        adda.l  #16+FS_RECORDS*4,a1
+        move.l  #'WCDS',(a1)
+        move.l  timing_hz(pc),4(a1)
+        move.l  frame_stats_display_count(pc),d0
+        move.l  d0,8(a1)
+        move.l  #16,12(a1)
+        lsl.l   #4,d0
+        addi.l  #16,d0
+        lea     frame_stats_display_name(pc),a0
+        move.l  slave+$121e(pc),a2
+        jsr     12(a2)           ; separate completed display ledger
+        rts
+        cnop 0,4
+frame_stats_display_count: dc.l 0
+frame_stats_display_name: dc.b 'displaystats.bin',0
+        cnop 0,4
+        endif
