@@ -3754,11 +3754,11 @@ Evidence: `tmp/d2-final-030`, `tmp/d2-final-040-steady`,
 `tmp/d2-final-fps.json`. Commands are in development.md. No fresh corrected-MMU
 pixel capture, long campaign, forced-stall cadence or physical-hardware acceptance
 is claimed. The calibrated 040 gate remains blocked on A2. The phase-12 stash
-is untouched; D3 follows below and D4–E2 remain open.
+is untouched; D3 and D4 follow below; D5–E2 remain open.
 
 ## Phase 11b view regions: D3 complete
 
-D3 is complete on the required current models. Stop before D4.
+D3 is complete on the required current models. D4 follows below.
 
 The native renderer already preserves the cockpit with a region map; D3 does
 not need another cockpit cache or a blanket clear bypass. The new
@@ -3891,3 +3891,121 @@ No new campaign, forced-stall, corrected-MMU frontend pixel or physical-hardware
 play-test is claimed. Native pixel equivalence includes both retained and fresh
 flight memory; it is not a replacement for E2's visual acceptance. A2 remains
 blocked, phase 12 stays paused, and the phase-12 stash is untouched.
+
+## Phase 11b comparison cost: D4 practical gate complete
+
+The D4 comparison-cost gate is complete on the required current models. The
+retained change is a compact full-image comparison, **not drawing-based dirty
+rectangles**. Stop before D5; calibrated 040 timing remains blocked on A2.
+
+### Scope decision and implementation
+
+D1 measured a material comparison/loop/history cost, but drawing dirtiness is
+not final pixel change. The native view clear at `E:31cd6` (English file `31d02`),
+called at `E:0306` (file `0332`), rewrites all selected rows. The retained Nav-1
+view covers 320 × 105 bytes through its split row table. Composition at `E:2cf0a`
+(file `2cf36`), called at `E:0c4c` (file `0c78`), then copies aperture spans.
+Marking these writes dirty cannot by itself distinguish the small number of
+changed pixels from pixels cleared and redrawn identically. HUD/text and other
+writers, previous-object erasure and each planar buffer's separate age also
+need coverage before any region can safely be excluded from comparison.
+
+Drawing-based tracking is therefore **deferred, not implemented or measured as
+unprofitable**. The practical D4 change takes a smaller, independently testable
+saving without inventing a dirty-region completeness contract. A future region
+experiment must price marking and invalidation as well as skipped comparisons,
+and retain complete-output verification and conservative unknown-writer fallbacks.
+
+`render_source.py` emits eight advancing `CMPM.L` comparisons per 32-pixel block,
+using scratch A0/A1. A3/A5 retain the original block starts, so every unequal
+longword reaches the unchanged 32-byte history copy and Kalms block converter.
+Equal blocks make no planar stores. The two 64000-byte histories, first-use full
+conversion, destination replacement, geometry/nonflight invalidation, allocation
+fallback, public options and pacing are unchanged. Every source byte remains
+covered; there is no new game-hunk patch, allocation or persistent dirty state.
+
+In the ordinary release the changed region is `S:8d3c–8d8d` (slave file
+`8d5c–8dad`); in the recorder fixture it is `S:909a–90eb` (file `90ba–910b`).
+The region is still 82 bytes: the candidate's branch skips 44 bytes of zero
+padding. This keeps all subsequent symbols, data placement and file sizes
+identical to D3. `--comparison-control` emits the original instructions and is
+diagnostic-only, with `verify_only=true` in its build metadata. The control
+slaves are byte-identical to the D3 parent, not just equal-sized alternatives.
+
+### Correctness and focused measurements
+
+- `flight_render_check.py`: 72 whole-output native 020/040 cases against the
+  original converter and independent bit packing, including alternating/replaced
+  buffers, sparse/dense/no changes, inactive/geometry/option transitions, register
+  preservation and allocation failure. The shared experimental `--timing
+  --flight-verify` build also passes 72 output cases and both corrupt-output
+  abort controls (`tmp/d4-timing-twin-check.json`).
+- `comparison_check.py`: 128 single-byte cases spanning every byte in the first
+  and last blocks, complete planar/history/source checks, saved registers and
+  write bounds. Omitting the final comparison is rejected on both CPU models.
+  Candidate/control differences are confined to the declared region, and every
+  symbol retains its address.
+- Live captures: both planar buffers match independent packing of their own
+  retained histories on 030 steady, 040 steady and 040 held turn: six complete
+  buffers / 384000 bytes. A changed output byte is rejected. These are end-window
+  snapshots, not an every-frame live twin or a subjective visual play-test.
+- Existing release gates: 196 option/cache cases, 54 complete nonflight converter
+  outputs, 180 pacing/output cases and eight installer cases pass; the installer
+  checks the full code hunk and registers/CCR, including rejecting corrupt operands.
+
+Mean / p95 milliseconds per draw-to-draw interval, after the established warm-up:
+
+| Scope | Unchanged D3 control | D4 |
+|---|---:|---:|
+| 030 steady comparison/loop/history | 2.048 / 2.100 | 2.031 / 2.075 |
+| 030 steady total delta conversion | 2.242 / 2.406 | 2.224 / 2.383 |
+| 040 held-turn comparison/loop/history | 4.143 / 4.488 | 3.304 / 3.457 |
+| 040 held-turn total delta conversion | 5.622 / 9.860 | 4.665 / 8.512 |
+
+The 040 comparison residual is 0.839 ms / 20.3% lower in this window. The 030
+change is small and is not a material throughput claim. Residuals include loop
+and history-copy overhead, interrupts and bus stalls; they are not exclusive
+comparison instruction costs. Turn trajectories differ when rendering time
+changes: the changed-block call means are 1.479 versus 1.362 ms. Do not attribute
+that difference to the unchanged Kalms converter or add nested rows.
+
+| Recorder window | Pictures/s | Fields per picture | World updates/s |
+|---|---:|---|---:|
+| D4 030 steady | 49.920 | 638 × 1 | 9.925 |
+| D3 control 030 steady | 49.920 | 638 × 1 | 9.925 |
+| D4 cycle-exact 040 steady | 49.920 | 638 × 1 | 9.927 |
+| D4 cycle-exact 040 held turn | 43.424 | 543 × 1, 89 × 2, 3 × 3 | 9.965 |
+| D3 control cycle-exact 040 held turn | 42.493 | 532 × 1, 95 × 2, 8 × 3 | 10.006 |
+
+The turn FPS difference is 2.2%, below the shared 3% general throughput-claim
+threshold; report the window result, not a general speedup. The directly measured
+comparison residual supports keeping the change. Both in-session controls repeat
+D3's frame and display ledgers byte for byte. Candidate cost-observer on/off
+ledgers also match byte for byte on the turn. Other cost reports explicitly do
+not claim a separate observer-neutrality pair for their captures.
+
+The independent observer agrees with all 661 / 661 / 658 candidate pictures;
+maximum elapsed-time disagreement is below 0.002 ms. Steady prediction targets
+all match. The held turn still misses **100/658** targets (control: 112/657), so
+its strict display-time check remains a failure. Buffer checks retain one FAST
+source, two CHIP targets, swaps at line 4, eight planes and FMODE 3, with no late
+deferrals or input overflows. Player/camera checks show zero corrections over
+161 / 161 / 181 world ticks. This is not a global C1 deadline or E1 acceptance pass.
+
+Same observer SHA-256 and baseline cache models as D1–D3: cached 030 MMU with
+`CACHE DCACHE`, and cycle-exact 040 with `NoMMU`; diagnostic `cpu_data_cache=false`
+on both. No calibrated 040, corrected-MMU frontend visual retest, NTSC retest,
+forced stall, campaign or physical-hardware acceptance is added here.
+
+Evidence: `tmp/d4-final`, `tmp/d4-final-control`, `tmp/d4-frames`,
+`tmp/d4-frames-control`; `tmp/d4-final-native.json`, `tmp/d4-final-boundaries.json`,
+`tmp/d4-live-pixels.json`, `tmp/d4-options.json`, `tmp/d4-install/report.json`,
+`tmp/d4-fps.json`, `tmp/d4-misses.json` and each `tmp/d4-*` capture's reports.
+The normal slave remains 41392 bytes, SHA-256
+`585ae02c164df96573173b936b84841b942a8cc030d7ef6c18e1ca3a87bc8c6a`.
+The 42260-byte Nav-1 recorder fixture has SHA-256
+`75582cc7c4564329ad7d0455ceda4d5e440e75099a2effb1a2275e2abc393da4`;
+its D3 control is
+`df0c38d40fe196f25d72034d0e33be3f7f65c3f9c1bbffde1b52d84f3d0a9036`.
+Version remains **2.0b (13.06.2026)**. Phase 12 and its saved stash remain untouched;
+OCS work is not started.

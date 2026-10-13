@@ -95,6 +95,9 @@ flight_render_original:
         bra.w   slave+$178e
 
 ; a0 source, a1 planar, a2 history, d7 valid. Checked against native full output.
+; D4 still checks every block: drawing dirtiness is not final pixel change.
+; The generated comparison advances scratch a0/a1; a3/a5 retain the block
+; starts for the unchanged history copy and converter on any unequal longword.
 flight_delta:
         movem.l d2-a6,-(sp)
         move.l  a0,a3

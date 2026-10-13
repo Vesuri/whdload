@@ -59,7 +59,10 @@ unchanged-input geometry retain 49.920 frames/s in both steady gates and improve
 the 040 held turn to 42.087. Calibrated 040 profiling remains blocked on A2.
 D3 is complete: native view-region clear/composition keeps exact pixels and
 49.920 frames/s in both steady gates; the 040 held turn reaches 42.493.
-Stop before D4. Held-turn frame-budget misses remain; campaign and hardware
+D4’s practical comparison-cost gate is complete: compact full-image comparisons
+reduce the 040 model’s residual cost by 0.84 ms per picture, with 43.424 frames/s
+in its held-turn window. Drawing-based dirty rectangles remain deferred.
+Stop before D5. Held-turn frame-budget misses remain; campaign and hardware
 visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
@@ -582,9 +585,18 @@ display wait (6–7 ms of idle per frame).
   native fallbacks. Pixel/installer/buffer gates pass. Steady flight stays at
   49.920 frames/s on both models; the 040 held turn reaches 42.493 versus 42.087
   for its same-size native-path control, with 112/657 prediction misses remaining.
-  See [D3 evidence](internals.md#phase-11b-view-regions-d3-complete). Stop before D4.
-- **D4.** Replace the full 64 KB source comparison with dirty rectangles from the
-  drawing routines if D1 shows it matters.
+  See [D3 evidence](internals.md#phase-11b-view-regions-d3-complete).
+- **D4 — practical comparison-cost gate complete; dirty rectangles deferred.**
+  D1 confirms the overhead matters. A compact `CMPM` loop retains complete source
+  coverage and both buffer histories, reducing 040 held-turn comparison/loop/history
+  mean cost from 4.143 to 3.304 ms. Native and live pixels match; both steady
+  models retain 49.920 frames/s, and the held-turn window reports 43.424 versus
+  42.493 for the unchanged D3 control. This implements a smaller optimization
+  than the proposed drawing-based dirty rectangles, which are not implemented or
+  claimed disproved: native clears rewrite the view, and tracking all writers plus
+  two-buffer invalidation needs a separate correctness contract. See
+  [D4 evidence and limits](internals.md#phase-11b-comparison-cost-d4-practical-gate-complete).
+  Stop before D5.
 - **D5.** Re-evaluate Kalms 040 for full and changed-block conversion on calibrated 040.
 
 **E. Acceptance**

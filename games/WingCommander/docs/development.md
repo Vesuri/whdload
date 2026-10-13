@@ -2654,4 +2654,92 @@ waive fixture/hash, call-pairing, timestamp or per-frame coverage checks.
 The held-turn `display_time_check.py` still rejects missed targets and must not
 be reported as a C1 pass. The ordinary frame recorder and independent display
 observer remain the FPS instruments. Do not add nested costs or treat these model timings as hardware
-calibration. Stop before D4; phase 12 remains paused.
+calibration. D4 follows below; phase 12 remains paused.
+
+### D4: compact complete-source comparison
+
+The practical D4 gate retains full source coverage and independent histories for
+both planar buffers. Drawing-based dirty rectangles are deferred; see the scope
+and writer/invalidation requirements in `internals.md`. `--comparison-control`
+is a diagnostic build of the old loop with identical size and symbol placement;
+it is byte-identical to D3. Its metadata prevents treating it as a normal release.
+Use fresh output names below `tmp/`.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/d4-final
+python3 tools/reconstruct.py --release --comparison-control --output tmp/d4-final-control
+python3 tools/flight_render_check.py tmp/d4-final --output tmp/d4-final-native.json
+python3 tools/comparison_check.py tmp/d4-final --control tmp/d4-final-control --output tmp/d4-final-boundaries.json
+python3 tools/reconstruct.py --timing --flight-verify --output tmp/d4-timing-twin
+python3 tools/flight_render_check.py tmp/d4-timing-twin --output tmp/d4-timing-twin-check.json
+python3 tools/release_check.py tmp/d4-final --negative-controls --output tmp/d4-options.json
+python3 tools/timing_adapter_check.py tmp/d4-final --output tmp/d4-install
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/d4-frames
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --comparison-control --output tmp/d4-frames-control
+
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+# D4 preserves the D3 layout exactly. Reuse its calibration for retained builds;
+# for a fresh setup obtain the layout with this normal pre-window calibration.
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/d4-frames/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/d4-layout
+for arm in frames frames-control; do
+  python3 tools/render_cost.py --build "tmp/d4-$arm" \
+    --layout tmp/d4-layout/layout.json --output "tmp/d4-$arm-scopes.json"
+done
+
+d4_capture() {
+  d4_name="$1"; d4_arm="$2"; d4_machine="$3"; d4_options="$4"
+  shift 4
+  DEBUG_PORT=2499 python3 tools/frame_capture.py \
+    --fixture "tmp/d4-$d4_arm/WingCommanderCD32.Slave" \
+    --machine "$d4_machine" --options "$d4_options" --baseline-cache-model \
+    --custom5 0 --debugger --observer --display-sample \
+    --layout tmp/d4-layout/layout.json --output "tmp/$d4_name" --timeout 180 "$@"
+}
+# Sequential matched workloads; one explicit cost-observer neutrality pair.
+d4_capture d4-040-turn-cost frames a1200-040 NoMMU --timing-core --held-key 4e --cost-scopes tmp/d4-frames-scopes.json
+d4_capture d4-control-040-turn frames-control a1200-040 NoMMU --timing-core --held-key 4e --cost-scopes tmp/d4-frames-control-scopes.json
+d4_capture d4-030 frames a1200-030 'CACHE DCACHE' --cost-scopes tmp/d4-frames-scopes.json
+d4_capture d4-control-030 frames-control a1200-030 'CACHE DCACHE' --cost-scopes tmp/d4-frames-control-scopes.json
+d4_capture d4-040-steady frames a1200-040 NoMMU --timing-core
+d4_capture d4-040-turn frames a1200-040 NoMMU --timing-core --held-key 4e
+
+python3 tools/render_cost.py --run tmp/d4-040-turn-cost \
+  --control tmp/d4-040-turn --output tmp/d4-040-turn-cost/costs.json
+for cell in 030 control-030 control-040-turn; do
+  python3 tools/render_cost.py --run "tmp/d4-$cell" \
+    --without-neutrality-control --output "tmp/d4-$cell/costs.json"
+done
+for cell in 030 control-030 040-steady 040-turn 040-turn-cost control-040-turn; do
+  python3 tools/frame_check.py "tmp/d4-$cell" --output "tmp/d4-$cell/check.json"
+done
+for cell in 030 040-steady 040-turn; do
+  python3 tools/buffer_report.py "tmp/d4-$cell" --build tmp/d4-frames \
+    --layout tmp/d4-layout/layout.json --output "tmp/d4-$cell/buffers.json"
+  python3 tools/translation_report.py "tmp/d4-$cell" --build tmp/d4-frames \
+    --layout tmp/d4-layout/layout.json --output "tmp/d4-$cell/translation.json"
+done
+for cell in 030 040-steady; do
+  python3 tools/display_time_check.py "tmp/d4-$cell" --output "tmp/d4-$cell/prediction.json"
+done
+python3 tools/frame_report.py tmp/d4-030 tmp/d4-control-030 tmp/d4-040-steady \
+  tmp/d4-040-turn tmp/d4-control-040-turn --output tmp/d4-fps.json
+python3 tools/comparison_check.py tmp/d4-frames --control tmp/d4-frames-control \
+  --run tmp/d4-030 --run tmp/d4-040-steady --run tmp/d4-040-turn-cost \
+  --layout tmp/d4-layout/layout.json --output tmp/d4-live-pixels.json
+# Expected to reject the still-missed held-turn prediction deadlines:
+python3 tools/display_time_check.py tmp/d4-040-turn --output tmp/d4-040-turn/prediction.json
+```
+
+Retained captures used `tmp/d3-gate-layout/layout.json`, `tmp/d4-scopes.json` and
+`tmp/d4-control-scopes.json`; only names differ from the fresh recipe above.
+The strict held-turn prediction check must still fail; do not relax it into a
+D4 or global C1 success. Live pixel snapshots prove both destinations match their
+own histories, not every intermediate frame or subjective visual acceptance.
+The native checker deliberately omits the final longword comparison and requires
+rejection; it also checks every byte of the first/last blocks and the entire
+candidate/control binary layout. Do not treat Unicorn execution as timing.
+Stop before D5; calibrated 040 measurements and phase 12 remain blocked/paused.

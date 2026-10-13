@@ -38,6 +38,7 @@ def main():
     modes.add_argument('--ceiling',choices=['control','c2p','drawing-control','drawing','drawing-bitmap','drawing-clear'],help='VERIFY-only equal-size rendering ceiling fixture; never a release build')
     modes.add_argument('--cache-audit', action='store_true', help='VERIFY-only terminating hardware CACR audit')
     p.add_argument('--flight-verify',action='store_true',help='compare flight delta c2p against original on every picture')
+    p.add_argument('--comparison-control',action='store_true',help='D4 diagnostic old comparison loop, same size')
     p.add_argument('--flight-control',action='store_true',help='same-size flight full-conversion control')
     p.add_argument('--timing-verify',action='store_true',help='include diagnostic render schedules; requires --timing')
     p.add_argument('--render-family', choices=('auto','030','040'), default='auto', help='diagnostic converter-family override')
@@ -46,8 +47,9 @@ def main():
     a = p.parse_args()
     if a.release:
         if a.timing_verify or a.flight_verify or a.flight_control or a.render_verify or a.render_family!='auto':
-            p.error('public-option build supports only --frame-stats diagnostics')
+            p.error('public-option build supports only frame-stats and comparison-control diagnostics')
         a.timing=True
+    if a.comparison_control and not a.timing:p.error('comparison control requires --timing or --release')
     if (a.flight_verify or a.flight_control) and not a.timing:p.error('flight diagnostics require --timing')
     if a.frame_stats and not a.timing:p.error('--frame-stats requires --timing')
     if a.timing_verify and not a.timing: p.error('--timing-verify requires --timing')
@@ -140,7 +142,7 @@ def main():
         lines.append(timing_source(ROOT, buffered=a.release))
         if a.release:lines.append((ROOT/'whdload/release_buffer.s').read_text())
         if a.frame_stats:lines.append((ROOT/'whdload/frame_stats.s').read_text())
-        flight=flight_source(ROOT,a.flight_verify,a.flight_control)
+        flight=flight_source(ROOT,a.flight_verify,a.flight_control,a.comparison_control)
         if a.release:
             begin=flight.index('        move.l  slave+$1e04(pc),d7')
             end=flight.index('.work:',begin)
@@ -215,7 +217,7 @@ def main():
     (out/'WingCommanderCD32.Slave').write_bytes(result)
     report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
-              'code_ranges':CODE, 'byte_identical':result == original, 'release':a.release, 'buffered':a.release, 'frame_records':8192 if a.release and a.frame_stats else 16384 if a.frame_stats else 0, 'version':'2.0b' if a.release else None, 'flight_verify':a.flight_verify, 'flight_control':a.flight_control, 'timing':a.timing, 'timing_verify':a.timing_verify, 'frame_stats':a.frame_stats, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling or a.timing_verify or a.frame_stats or a.flight_verify or a.flight_control), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
+              'code_ranges':CODE, 'byte_identical':result == original, 'release':a.release, 'buffered':a.release, 'frame_records':8192 if a.release and a.frame_stats else 16384 if a.frame_stats else 0, 'version':'2.0b' if a.release else None, 'comparison_control':a.comparison_control, 'flight_verify':a.flight_verify, 'flight_control':a.flight_control, 'timing':a.timing, 'timing_verify':a.timing_verify, 'frame_stats':a.frame_stats, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling or a.timing_verify or a.frame_stats or a.flight_verify or a.flight_control or a.comparison_control), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
     if a.ceiling and a.ceiling.startswith('drawing'):
         report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')

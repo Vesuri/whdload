@@ -41,7 +41,12 @@ D3 is complete: faster view-region clears and cached-030 composition preserve
 native pixels. Steady flight stays at 49.92 frames/s; the 040 model held turn
 reaches 42.49, with 112/657 prediction deadlines still missed. See the
 [D3 evidence](docs/internals.md#phase-11b-view-regions-d3-complete).
-Stop before D4. Calibrated 040 profiling remains blocked on A2; phase 12 stays paused.
+D4’s comparison-cost gate is complete: a compact full-image comparison reduces
+the 040 model’s comparison/loop/history cost by 0.84 ms per picture. Drawing-based
+dirty rectangles remain deferred. Steady flight stays at 49.92 frames/s; the
+040 held-turn window reports 43.42 versus 42.49 for its unchanged D3 control.
+See the [D4 scope and evidence](docs/internals.md#phase-11b-comparison-cost-d4-practical-gate-complete).
+Stop before D5. Calibrated 040 profiling remains blocked on A2; phase 12 stays paused.
 
 **Phase 11 is complete: changed-block flight conversion.**
 The timing build converts only changed view/cockpit/HUD blocks, with separate

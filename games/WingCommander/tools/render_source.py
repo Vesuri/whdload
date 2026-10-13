@@ -36,10 +36,17 @@ def source(root):
     return '\n'.join(parts)
 
 
-def flight_source(root, verify=False, control=False):
+def flight_source(root, verify=False, control=False, comparison_control=False):
     wrapper=(root/'whdload/flight_render.s').read_text()
-    wrapper=wrapper.replace('FLIGHT_COMPARE_BLOCK', '\n'.join(
-        f'\tmove.l {i}(a3),d0\n\tcmp.l {i}(a5),d0\n\tbne.s .changed' for i in range(0,32,4)))
+    # Keep the comparison region exactly 82 bytes, including the no-change
+    # branch. The control reproduces the old instruction stream; the candidate
+    # uses advancing scratch pointers and never executes the padding.
+    old = '\n'.join(f'\tmove.l {i}(a3),d0\n\tcmp.l {i}(a5),d0\n\tbne.s .changed' for i in range(0,32,4))
+    new = '\tmove.l a3,a0\n\tmove.l a5,a1\n' + '\n'.join(
+        '\tcmpm.l (a0)+,(a1)+\n\tbne.s .changed' for _ in range(8))
+    wrapper=wrapper.replace('FLIGHT_COMPARE_BLOCK\n        bra.s   .next',
+        '.compare_start:\n'+(old if comparison_control else new)+
+        '\n\tbra.s .next\n\tdcb.b 82-(*-.compare_start),0')
     wrapper=wrapper.replace('FLIGHT_COPY_BLOCK', '\n'.join(
         f'\tmove.l {i}(a3),d0\n\tmove.l d0,{i}(a5)' for i in range(0,32,4)))
     # Reuse the pinned immutable Kalms transform with one 32-pixel block,

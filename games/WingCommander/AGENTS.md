@@ -6,7 +6,9 @@ Current scope: phase 11b CD32 frame-rate recovery (work items A1–E2 in
 C1–C3 and the C4 steady-flight display-cadence gate are complete.
 D1 model profiling, D2 prediction overhead and D3 view-region rendering are complete.
 Exact native pixel coverage and the required current-model gates pass.
-Stop before D4. Calibrated 040 profiling remains blocked on A2.
+D4 comparison-cost gate is complete with a compact full-image comparison;
+drawing-based dirty rectangles remain deferred. Stop before D5.
+Calibrated 040 profiling remains blocked on A2.
 Every gate reports end-to-end frames/s from the
 `--frame-stats` recorder on the 030 model and the cycle-exact 040 core, and on a
 calibrated 040 once A2 provides one. Phase 12 release work is paused until 11b passes; do not start
