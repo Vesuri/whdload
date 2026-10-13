@@ -24,8 +24,8 @@ windows, representative costs/source changes, state cadence and render coupling
 are documented. The native flight-unit anchor is 10 updates/s. Phase 7b is complete:
 the world-update dispatch inventory, FR-01–FR-23 and B/C/D audit costs are recorded
 in [the framerate audit](framerate-audit.md). Native 68000/68040 reproductions pass
-with steady/changing rates and explicit runtime/instrument gaps. Stop at phase 7b;
-phase 8 and later work remain deferred.
+with steady/changing rates and explicit runtime/instrument gaps. Phase 8 pricing
+is in progress; the user chooses the design before phase 9.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
