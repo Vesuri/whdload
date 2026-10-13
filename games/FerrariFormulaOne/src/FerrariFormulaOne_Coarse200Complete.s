@@ -1,6 +1,7 @@
 ; Experimental complete C4 integration: compile-time opt-in, CUSTOM2 gated.
 ; Capacity is not accepted. The ordinary slave does not include this module.
 FF1InstallCoarse200:
+ bsr.w FF1InstallMultiplyNative200
  bsr.w FF1Coarse200ReturnSkip
  moveq #8,d0
  bsr.w install_velocity
@@ -26,6 +27,7 @@ C4NativeHeading: dc.w 0
 C4Enabled: dc.w 1
 modeval: dc.w 8
 ticks equ C1Heads
+ include "FerrariFormulaOne_NativeMultiply200.s"
  include "FerrariFormulaOne_Coarse200Response.s"
  include "FerrariFormulaOne_Coarse200Return.s"
  include "FerrariFormulaOne_Coarse200Heading.s"
