@@ -45,7 +45,9 @@ def read(run):
             between+=1
             if state[0xa148:0xa154]!=last[1][0xa148:0xa154]:responsive+=1
             # Responsive orientation may change; world positions may not.
-            if state[0x919a:0x919a+61*12]!=last[1][0x919a:0x919a+61*12]:raise ValueError('positions changed between updates')
+            for slot in range(61):
+                kind=struct.unpack_from('>h',state,0x96fe+2*slot)[0]
+                if kind>=8 and state[0x919a+12*slot:0x91a6+12*slot]!=last[1][0x919a+12*slot:0x91a6+12*slot]:raise ValueError('collidable positions changed between updates')
         states[tick]=state;last=(tick,state)
     pauses=[]
     for w in m['windows']:
@@ -75,8 +77,9 @@ def main():
                 name,prior,pm=reference
                 common=sorted(set(prior)&set(states))
                 ranges={k:sum(states[t][o:o+n]!=prior[t][o:o+n] for t in common) for k,(o,n) in STATE_RANGES.items()}
+                changed_slots={str(slot):sum(states[t][0x919a+12*slot:0x91a6+12*slot]!=prior[t][0x919a+12*slot:0x91a6+12*slot] for t in common) for slot in range(61)}
                 displacement=max((max(abs(x-y) for x,y in zip(struct.unpack_from('>3i',states[t],0x919a),struct.unpack_from('>3i',prior[t],0x919a))) for t in common),default=0)
-                comparisons.append(dict(reference=name,run=run.name,matched_ticks=len(common),same_held_key=meta['held_key']==pm['held_key'],different_ticks_per_range=ranges,max_player_position_difference_fixed8=displacement))
+                comparisons.append(dict(reference=name,run=run.name,matched_ticks=len(common),same_held_key=meta['held_key']==pm['held_key'],different_ticks_per_range=ranges,position_difference_ticks_per_slot={k:v for k,v in changed_slots.items() if v},max_player_position_difference_fixed8=displacement))
         print(f"{run.name}: {result['world_hz']:.5f} updates/s ({result['error_percent']:+.3f}%), fields {result['field_hz']:.5f} Hz")
     out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(dict(runs=rows,comparisons=comparisons,scope='emulated elapsed clock; no exclusive CPU/DMA or physical hardware claims'),indent=2)+'\n')
 if __name__=='__main__':main()

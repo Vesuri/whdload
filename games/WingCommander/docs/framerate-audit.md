@@ -200,6 +200,9 @@ The contact hold at `D:c2dc` is loaded with three by `10a20` and consumed by
 `169e`. Native countdown slices reproduce frequency dependence. The positive and
 negative/sentinel meanings must remain distinct. The end-to-end player missile
 lock and encounter interaction are static findings with the phase-7 live gap intact.
+D additionally moves draw-called target selection `E:3b8e` to each world boundary,
+refreshes native geometry `2a086` there, and uses world modulo eight for its lock
+failure trial at `3bca`. Extra rendered frames cannot commit targeting changes.
 
 ### FR-12 — Sampled collision and tunnelling: reproduced
 
@@ -262,7 +265,10 @@ not purely visual noise. D moves the whole polling call to the world tick and
 suppresses its draw call. Native whole-routine checks and live equal-tick state
 comparisons cover this additional FR-16 dependency. Simulator draw tail
 `E:0530–057e` likewise contains a countdown and exit/position event and is moved
-to the world tick. Neither was safe to leave on a faster renderer.
+to the world tick, together with score/time bookkeeping at `E:0438`.
+The complete ordinary render call has a private random stream; star/debris
+regeneration must not leak extra draws into the gameplay seed. These paths were
+not safe to leave coupled to a faster renderer.
 
 ### FR-17 — Mission and encounter polling: reproduced
 

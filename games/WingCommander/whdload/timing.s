@@ -121,6 +121,7 @@ timing_loop:
         bne.w   timing_leave
         tst.w   timing_abort(pc)
         bne.s   .cancel
+        bsr.w   timing_target_tick
         bsr.w   timing_native_input
         tst.w   -32628(a4)
         bne.w   timing_leave
@@ -167,10 +168,15 @@ timing_render:
         cmpi.w  #1,timing_verify_schedule(pc)
         beq.s   .wait
         endc
+        move.l  -4326(a4),-(sp)
+        move.l  timing_render_seed(pc),-4326(a4)
         move.l  timing_game(pc),a6
         jsr     $510(a6)
         move.l  timing_game(pc),a6
         jsr     $46e6(a6)
+        lea     timing_render_seed(pc),a0
+        move.l  -4326(a4),(a0)
+        move.l  (sp)+,-4326(a4)
         ifne TIMING_VERIFY
 .wait:
         moveq   #0,d0

@@ -65,6 +65,27 @@ def main():
             else:assert state==reference
             assert state[0]!=struct.pack('>I',0x12345678)
             c.close()
+    for model in (2,4):
+        c=CPU(memory,layout,model);c.write(S,blob)
+        c.write(S+sym['timing_game'],struct.pack('>I',c.code))
+        c.write(S+sym['timing_active'],struct.pack('>H',1))
+        c.write(S+sym['timing_target_original'],bytes.fromhex('4ef9')+struct.pack('>I',c.code+0x3b8e))
+        c.data_value(0x9150,'H',123);c.data_value(0x914c,'H',8)
+        c.run(S+sym['timing_target_tick']-c.code)
+        assert c.data_value(0x9150,'H')==123
+        before=c.read(c.data,0xfda0)
+        for _ in range(5):c.run(S+sym['timing_target_draw']-c.code)
+        assert c.read(c.data,0xfda0)==before
+        # Exercise the complete render wrapper with both drawing callees
+        # replaced by native RNG calls. This proves arbitrary visual consumers
+        # cannot advance the gameplay seed; no rendering-cost claim is made.
+        sink=bytes.fromhex('4eb9')+struct.pack('>I',c.code+0x2cb56)+bytes.fromhex('4e75')
+        c.write(c.code+0x510,sink);c.write(c.code+0x46e6,sink)
+        seed=c.read(c.data+0x6f18,4);visual=c.read(S+sym['timing_render_seed'],4)
+        c.run(S+sym['timing_render']-c.code)
+        assert c.read(c.data+0x6f18,4)==seed
+        assert c.read(S+sym['timing_render_seed'],4)!=visual
+        c.close()
     assert len({r['visual_seed'] for r in rows})==1
     out.mkdir(parents=True);(out/'report.json').write_text(json.dumps(dict(cases=rows,game_rng_preserved=True,native_modal_paths=True),indent=2)+'\n')
     print('PASS: native timers, emission, visual RNG and original modal paths across four draw schedules')

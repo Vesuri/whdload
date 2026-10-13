@@ -1,3 +1,34 @@
+; Commit targeting from the authoritative player/camera and object positions
+; once at a world boundary. Renderer projections cannot select a future target.
+timing_target_tick:
+        movem.l d0-d7/a0-a6,-(sp)
+        bsr.w   timing_player_camera
+        move.l  timing_game(pc),a6
+        jsr     $2a086(a6)
+        move.w  4434(a4),-(sp)
+        move.w  4430(a4),4434(a4)
+        bsr.w   timing_target_original
+        move.w  (sp)+,4434(a4)
+        movem.l (sp)+,d0-d7/a0-a6
+        rts
+
+timing_target_draw:
+        tst.w   timing_active(pc)
+        bne.s   .done
+        bra.w   timing_target_original
+.done:
+        rts
+
+; Simulator score countdown is world-owned; the native draw branch skips its
+; exit transition when enabled. Native/modal flags are the original countdown.
+timing_sim_score_draw:
+        tst.w   timing_active(pc)
+        bne.s   .done
+        addq.l  #1,4480(a4)
+        subq.w  #1,4474(a4)
+.done:
+        rts
+
 ; Clock ownership at the ordinary flight boundary. Native/modal paths retain
 ; their original counters. These adapters do not predict any world objects.
 timing_emission_clock:
@@ -107,6 +138,15 @@ timing_presentation_tick:
         move.l  (sp)+,-4326(a4)
         move.l  timing_game(pc),a6
         jsr     $22a0(a6)
+        tst.w   -29986(a4)
+        beq.s   .no_score
+        tst.w   -32626(a4)
+        bgt.s   .no_score
+        addq.l  #1,4480(a4)
+        subq.w  #1,4474(a4)
+        bgt.s   .no_score
+        move.w  #4,-32628(a4)
+.no_score:
         bsr.w   timing_sim_update
         move.l  timing_game(pc),a6
         jsr     $af84(a6)
@@ -118,3 +158,6 @@ timing_visual_seed: dc.l $12345678
 timing_visual_random: dc.w 0
 timing_selection_last: dc.w 0
 timing_selection_delta: dc.w 0
+
+        cnop 0,4
+timing_render_seed: dc.l $6d2b79f5

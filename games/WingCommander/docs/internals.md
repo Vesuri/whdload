@@ -2514,7 +2514,12 @@ throttle, firing and other commands. The world rotation hook at `E:7bc2` (file
 player actions, death and external camera mode 8 retain native world ownership.
 Ordinary forward/side/rear camera modes 0–3 refresh from the player basis via
 `E:680e` (file `683a`); the script runner is excluded from these extra refreshes.
-No object position, collision, target lock, damage or lifecycle is extrapolated.
+No collision, target lock, damage or lifecycle is extrapolated. At each world
+boundary `E:2a086` (file `2a0b2`) refreshes native object/view geometry before
+`E:3b8e` (file `3bba`) commits target selection. The latter's modulo-eight gate
+uses the world counter; its draw invocation is suppressed. Input edges use the
+last committed target, then automatic selection and held actions run at the new
+boundary. Render-time aiming geometry cannot commit an extra lock or launch.
 
 Pause uses the common entry `E:0878` (file `08a4`), covering relative as well as
 absolute callers. Autopilot uses `E:101c` (file `1048`). Both disable sampling and
@@ -2532,7 +2537,8 @@ Draw dependencies now have explicit owners:
   inside the scheduled world; native/modal callers retain the draw counter.
 - The draw call at `E:051a` (file `0546`) defers message duration to each world
   tick. The simulator transition tail at `E:0530/0536` (files `055c/0562`) likewise
-  advances once per world tick, including its exit/position event.
+  advances once per world tick, including its exit/position event. Score/time
+  bookkeeping at `E:0438` (file `0464`) is also world-owned.
 - `E:4b16` (file `4b42`) consumes elapsed world ticks for the cockpit indicator.
   Missed pictures are coalesced at the next draw; an expired visual selection
   transitions once and reloads natively, rather than replaying old pictures.
@@ -2542,7 +2548,11 @@ Draw dependencies now have explicit owners:
 - `E:435c/43ee` (files `4388/441a`) use world parity and a private visual random
   value advanced on each tick. The original range routine advances a private seed
   and restores the gameplay seed. Repeated or skipped portraits cannot change AI
-  randomness. Outside the ordinary loop both calls retain native behaviour.
+  randomness. The entire ordinary scene/HUD call additionally saves the gameplay
+  seed, uses a separate rendering seed and restores gameplay state on return.
+  This covers cosmetic star/debris regeneration as well as portrait draws;
+  their pictures can differ across render schedules. Outside the ordinary loop
+  original random consumers and targeting retain native behaviour.
 
 Native component checks cover FIFO wrap, overflow, inactive producer, register/CCR
 preservation, captured command boundaries, two pad edges between world ticks,
