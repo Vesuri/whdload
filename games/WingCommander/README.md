@@ -3,6 +3,11 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
+**Phase 13: OCS investigation in progress.** The deliverable is an ordered,
+concrete implementation plan, including an Amiga 500/Fast RAM baseline,
+68000-safe conversion and CPU-selected 68020+ paths. No OCS runtime changes
+are being implemented. CD32 release work remains paused.
+
 **Phase 11b is in progress; C1–C3 and the C4 steady-flight gate are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for
 enhanced English flight without Psygore's frame cap. Values 1–4 retain Psygore's

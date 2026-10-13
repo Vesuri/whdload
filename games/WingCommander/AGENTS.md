@@ -1,26 +1,15 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-The English ship/title and asteroid intro now uses the in-game 10 Hz clock and
-extrapolated presentation. Native/live gates pass; music and credit deadlines
-are preserved. This scoped intro timing goal is complete; stop before E1.
-The PC video is a secondary visual reference, not a timing authority.
-Phase 11b CD32 frame-rate recovery (work items A1–E2 in
-`docs/open-work.md`). B2 and the scoped cached-040 row-corruption fix are complete.
-C1–C3 and the C4 steady-flight display-cadence gate are complete.
-D1 model profiling, D2 prediction overhead and D3 view-region rendering are complete.
-Exact native pixel coverage and the required current-model gates pass.
-D4 comparison-cost gate is complete with a compact full-image comparison;
-drawing-based dirty rectangles remain deferred. D5 is complete on the current
-models: retain the current converter selection. The user excludes real-hardware
-validation from D5; A2 remains separate follow-up work. Stop before E1.
-Newly spawned projectile prediction is fixed, including native AI shot paths
-and gun-cooldown discontinuity handling; native and scoped live gates pass.
-Calibrated 040 profiling remains blocked on A2.
-Every gate reports end-to-end frames/s from the
-`--frame-stats` recorder on the 030 model and the cycle-exact 040 core, and on a
-calibrated 040 once A2 provides one. Phase 12 release work is paused until 11b passes; do not start
-OCS work until requested.
+Current scope: phase 13 OCS investigation only. Produce an ordered plan with
+alphanumerical work-item identifiers for an Amiga 500 with Fast RAM and
+accelerated systems, sharing verified CD32 mechanisms wherever possible.
+Investigate 68000 and CPU-selected 68020+ C2P paths. Do not implement OCS
+runtime changes or resume CD32 E1/phase 12 release work in this scope.
+The CD32 intro 10 Hz timing and first-interval projectile fixes are complete;
+phase 11b D1–D5 are complete on current models. A2 calibration remains separate.
+Derived evidence is static unless explicitly labelled otherwise; no OCS
+performance or compatibility claim follows from this investigation.
 Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 
