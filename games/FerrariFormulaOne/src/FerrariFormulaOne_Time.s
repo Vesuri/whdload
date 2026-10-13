@@ -34,15 +34,24 @@ FF1T_SIZE       equ 56
 FF1T_FIELD_UNITS equ 710510
 FF1T_20MS_UNITS equ 709379
 
-; D0.w interval in milliseconds: 20 or provisional 200.
+; D0.w interval: 20, 100 with FF1_COARSE_STEP, or provisional 200.
 ; D0.l returns 1 for success, 0 for unsupported interval (context unchanged).
 FF1TimeInit:
         cmpi.w  #20,d0
         beq.b   .fine
+ IFD FF1_COARSE_STEP
+        cmpi.w  #100,d0
+        beq.b   .coarse
+ ENDC
         cmpi.w  #200,d0
         bne.b   .unsupported
         move.l  #FF1T_20MS_UNITS*10,d2
         bra.b   .clear
+ IFD FF1_COARSE_STEP
+.coarse:
+        move.l  #FF1T_20MS_UNITS*5,d2
+        bra.b   .clear
+ ENDC
 .fine:  move.l  #FF1T_20MS_UNITS,d2
 .clear: move.w  d0,d3
         move.l  a0,a1
