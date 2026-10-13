@@ -1,3 +1,11 @@
+ IFD FF1_C4_BLIT_A0
+ IFND FF1_COARSE_200_COMPLETE
+ fail "A0 blitter diagnostic requires complete 200 ms build"
+ ENDC
+ IFD FF1_C4_BLIT_GUARD
+ fail "A0 diagnostic and D1 ownership are mutually exclusive"
+ ENDC
+ ENDC
  IFD FF1_COARSE_200_COMPLETE
  IFND FF1_COARSE_200
  fail "Complete C4 requires FF1_COARSE_200"
@@ -262,6 +270,9 @@ C1Activate:
  tst.l d0
  bne.w C1Fault
  bsr.w C1Flush
+ IFD FF1_C4_BLIT_GUARD
+ bsr.w FF1C4BlitAcquire
+ ENDC
  move.l $4.w,a6
  jsr -126(a6)
  movem.l (sp)+,d0-d7/a0-a6
@@ -300,6 +311,12 @@ C4BlitA0Enabled: dc.w 0
  ENDC
 C1UnloadInstalled: dc.l 0
 C1Ledger: ds.b 24
+ IFD FF1_C4_BLIT_GUARD
+ IFND FF1_COARSE_200_COMPLETE
+ fail "C4 blitter guard requires complete 200 ms build"
+ ENDC
+ include "FerrariFormulaOne_Coarse200Blit.s"
+ ENDC
  IFD FF1_COARSE_200
  include "FerrariFormulaOne_Coarse200.s"
  ENDC

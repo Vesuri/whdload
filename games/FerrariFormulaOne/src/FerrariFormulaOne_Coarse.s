@@ -195,6 +195,9 @@ C1Pause:
  C1SaveFlags
  lea C1Context(pc),a0
  bsr.w FF1TimePause
+ IFD FF1_C4_BLIT_GUARD
+ bsr.w FF1C4BlitRestore
+ ENDC
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d3/a0-a1
  jsr $2546a
@@ -204,6 +207,9 @@ C1Resume:
  C1SaveFlags
  lea C1Context(pc),a0
  bsr.w FF1TimeResume
+ IFD FF1_C4_BLIT_GUARD
+ bsr.w FF1C4BlitAcquire
+ ENDC
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d3/a0-a1
  move.w $1c8b0,d0
@@ -232,6 +238,9 @@ C1UnloadJump:
  jmp $0.l
 
 C1Restore:
+ IFD FF1_C4_BLIT_GUARD
+ bsr.w FF1C4BlitRestore
+ ENDC
  move.l $4.w,a6
  jsr -120(a6)
  lea C1Ledger(pc),a0
@@ -260,6 +269,9 @@ C1Restore:
  rts
 
 C1Fault:
+ IFD FF1_C4_BLIT_GUARD
+ bsr.w FF1C4BlitRestore
+ ENDC
  lea error(pc),a0
  move.l #100,(a0)
 .stop: bra.b .stop
