@@ -7,7 +7,8 @@
 ; INT_MIN/-1 wrap and condition-code behavior, including its sign-restoration
 ; flags (which are not simply flags for the returned quotient).
 ;
-; Assemble with 68020 support; FF1Divide000 itself uses only 68000 instructions.
+; Default includes both CPU entries. Define FF1_MATH_000_ONLY for a pure
+; 68000 build; FF1Divide000 and its shared suffix use only 68000 instructions.
 FF1Divide000:
         movem.l d2-d5,-(sp)
         move.l  d1,d5
@@ -59,6 +60,7 @@ FF1Divide000:
 .next:  dbra    d3,.bit
         bra.b   FF1DivRestore
 
+        ifnd FF1_MATH_000_ONLY
 FF1Divide020:
         movem.l d2-d5,-(sp)
         move.l  d1,d5
@@ -72,6 +74,7 @@ FF1Divide020:
         neg.l   d0
 .positive_numerator:
         divul.l d1,d2:d0
+        endc
 FF1DivRestore:
         ; The native normalized 32-pass loop leaves X clear. DIVU does not
         ; define it, so restore it explicitly before the native sign suffix.

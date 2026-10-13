@@ -176,6 +176,14 @@ C1Activate:
  bne.w C1Fault
 .native_exact_done:
  ENDC
+ IFD FF1_COARSE_NATIVE_000
+ move.w C3Enabled(pc),d0
+ beq.b .native_000_done
+ bsr.w FF1InstallNative000
+ move.l error(pc),d0
+ bne.w C1Fault
+.native_000_done:
+ ENDC
  bsr.w FF1InstallPresentation
  move.l error(pc),d0
  bne.w C1Fault
@@ -263,6 +271,10 @@ C1InstallUnload:
  rts
 C1UnloadInstalled: dc.l 0
 C1Ledger: ds.b 24
+ IFD FF1_COARSE_NATIVE_000
+C3Enabled: dc.w 1
+ include "FerrariFormulaOne_Native000.s"
+ ENDC
  IFD FF1_COARSE_NATIVE_EXACT
 C2Enabled: dc.w 1
  include "FerrariFormulaOne_NativeExact.s"
