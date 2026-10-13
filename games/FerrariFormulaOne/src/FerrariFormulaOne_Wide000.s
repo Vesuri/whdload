@@ -69,6 +69,26 @@ FF1SquareRootU64_000:
  ; Before subtraction its largest value fits 32 bits for these rounds;
  ; trial 4*previous_root+1 also fits. Keep full width for rounds 31/32.
  moveq #29,d7
+ IFD FF1_ROOTLEAD_AB
+ move.w FF1RootLeadControl(pc),-(sp)
+ tst.w (sp)+
+ bne.b .narrow
+ ENDC
+ ; Empty leading base-four digits leave root/remainder zero. If the top
+ ; twelve bits are clear, shift them out and omit exactly six narrow rounds.
+ move.l d1,d5
+ andi.l #$fff00000,d5
+ bne.b .narrow
+ move.l d0,d5
+ swap d5
+ andi.l #$ffff,d5
+ lsr.l #4,d5
+ lsl.l #8,d0
+ lsl.l #4,d0
+ lsl.l #8,d1
+ lsl.l #4,d1
+ or.l d5,d1
+ moveq #23,d7
 .narrow:
  add.l d0,d0
  addx.l d1,d1
@@ -197,4 +217,8 @@ FF1RootControl: dc.w 0
 
  IFD FF1_PRODUCT_AB
 FF1ProductControl: dc.w 0
+ ENDC
+
+ IFD FF1_ROOTLEAD_AB
+FF1RootLeadControl: dc.w 0
  ENDC
