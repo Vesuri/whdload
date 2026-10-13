@@ -69,7 +69,16 @@ FF1VelocityRotate000:
  suba.w #4,sp
  IFD FF1_C4_MUL_INLINE
  move.w FF1MulInlineControl(pc),d6
+ IFD FF1_C4_ROTATE_FAST
+C4RotateDispatch equ *
+ IFD FF1_C4_ROTATE_FAST_TEST
+ beq.w .r3_rotate
+ ELSE
  beq.w .p2_rotate
+ ENDC
+ ELSE
+ beq.w .p2_rotate
+ ENDC
  ENDC
  move.w d0,d2
  ext.l d2
