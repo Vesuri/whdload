@@ -554,6 +554,17 @@ behaviour, save/load and nonvolatile storage, options in the slave, the ReadMe, 
 release archive per AmigaXDev's playbook. Final play-test by the user on real hardware
 if available.
 
+Deferred local work: the pre-existing save/load length guard and native checks
+are preserved in stash `5237ca28782a8e1fd1f615c91232c80b2fd93391`
+(`Phase 12: deferred save-load length guard and native checks`). It contains only
+`whdload/release.s`, `tools/reconstruct.py` and `tools/release_check.py`: reject
+missing or wrong-sized save files before loading, install the load detour, and
+test valid/invalid lengths. This work is not part of the accepted C1 build and
+still needs phase-12 review and validation. Restore when phase 12 resumes with
+`git stash apply 5237ca28782a8e1fd1f615c91232c80b2fd93391`, then review the diff;
+keep the stash until the work is safely committed. This stash is local to this
+checkout and is not transferred by pushing the documentation commit.
+
 ### Phase 13 — OCS version
 
 Repeat from phase 1 for the OCS disk version as a separate variant: different
