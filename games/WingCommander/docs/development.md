@@ -2497,5 +2497,80 @@ subtracting changed-block calls, not pure comparison time. Four call-pairing
 negative controls run whenever the tool is invoked. Generated scopes contain
 live addresses and stay in `tmp/`; documentation uses hunk/file offsets.
 
-Stop before D2. The calibrated-040 follow-up remains blocked by A2; these are
-model baselines. No release or phase-12 stash work is included.
+D1 is the baseline for D2 below. The calibrated-040 follow-up remains blocked
+by A2; these are model baselines. No release or phase-12 stash work is included.
+
+### D2: selective prediction backups and unchanged-input geometry
+
+Use fresh output directories under `tmp/`. The tests compare whole native data
+hunks and allocator registers, including empty/reused slots, render-only flames,
+range history, unchanged pad queues and every byte of a queued transition.
+Unicorn proves correctness, not performance. `timing_scene_report.py` understands
+both backup layouts; the C3 heading checker remains the forecast oracle for the
+current release's heading-aware, extended prediction interval.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/d2-final
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/d2-final-frames
+python3 tools/prediction_cost_check.py tmp/d2-final --output tmp/d2-final-equivalence.json
+python3 tools/timing_scene_check.py tmp/d2-final --output tmp/d2-final-scenes
+python3 tools/heading_check.py tmp/d2-final --output tmp/d2-final-heading.json
+python3 tools/translation_contract_check.py tmp/d2-final-frames --output tmp/d2-final-contracts.json
+python3 tools/timing_adapter_check.py tmp/d2-final --output tmp/d2-final-install
+python3 tools/release_check.py tmp/d2-final --negative-controls --output tmp/d2-final-options.json
+
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/d2-final-frames/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/d2-final-layout
+python3 tools/render_cost.py --build tmp/d2-final-frames \
+  --layout tmp/d2-final-layout/layout.json --output tmp/d2-final-scopes.json
+
+# One held-turn pair: inclusive costs and the matching observer control.
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/d2-final-frames/WingCommanderCD32.Slave --machine a1200-040 \
+  --baseline-cache-model --options NoMMU --timing-core --held-key 4e --custom5 0 \
+  --debugger --observer --display-sample --layout tmp/d2-final-layout/layout.json \
+  --cost-scopes tmp/d2-final-scopes.json --output tmp/d2-final-040-turn-cost --timeout 180
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/d2-final-frames/WingCommanderCD32.Slave --machine a1200-040 \
+  --baseline-cache-model --options NoMMU --timing-core --held-key 4e --custom5 0 \
+  --debugger --observer --display-sample --layout tmp/d2-final-layout/layout.json \
+  --output tmp/d2-final-040-turn --timeout 180
+python3 tools/render_cost.py --run tmp/d2-final-040-turn-cost \
+  --control tmp/d2-final-040-turn --output tmp/d2-final-040-turn-cost/costs.json
+
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/d2-final-frames/WingCommanderCD32.Slave --machine a1200-030 \
+  --baseline-cache-model --options 'CACHE DCACHE' --custom5 0 \
+  --debugger --observer --display-sample --layout tmp/d2-final-layout/layout.json \
+  --output tmp/d2-final-030 --timeout 180
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/d2-final-frames/WingCommanderCD32.Slave --machine a1200-040 \
+  --baseline-cache-model --options NoMMU --timing-core --custom5 0 \
+  --debugger --observer --display-sample --layout tmp/d2-final-layout/layout.json \
+  --output tmp/d2-final-040-steady --timeout 180
+for cell in 030 040-steady 040-turn 040-turn-cost; do
+  python3 tools/frame_check.py "tmp/d2-final-$cell" --output "tmp/d2-final-$cell/check.json"
+  python3 tools/buffer_report.py "tmp/d2-final-$cell" --build tmp/d2-final-frames \
+    --layout tmp/d2-final-layout/layout.json --output "tmp/d2-final-$cell/buffers.json"
+  python3 tools/translation_report.py "tmp/d2-final-$cell" --build tmp/d2-final-frames \
+    --layout tmp/d2-final-layout/layout.json --output "tmp/d2-final-$cell/translation.json"
+done
+for cell in 030 040-steady; do
+  python3 tools/display_time_check.py "tmp/d2-final-$cell" --output "tmp/d2-final-$cell/prediction.json"
+done
+python3 tools/frame_report.py tmp/d2-final-030 tmp/d2-final-040-steady \
+  tmp/d2-final-040-turn --output tmp/d2-final-fps.json
+```
+
+`buffer_report.py` resolves the conversion event by symbol, so extra cost scopes
+cannot be mistaken for a conversion. The cost pair must retain byte-identical
+frame and display ledgers. Initial active-slot backup excludes lazy attachment
+backup inside native drawing; restore includes every saved slot. Do not sum
+nested costs or equate their reduction with an identical frame-rate gain.
+The held-turn display-time check still fails and must not be labelled a C1 pass.
+The observer uses the established baseline cache models; hardware calibration
+remains blocked on A2. Stop before D3 and keep phase 12 paused.

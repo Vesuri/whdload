@@ -22,11 +22,29 @@ def report(run):
         if not 0<=fraction<=hz or hz not in (50,60):raise ValueError('unbounded prediction')
         base=sy['timing_scene_saved']
         restored=(run/(name+'-restored.bin')).read_bytes()
-        cursor=base;table=sy['timing_scene_pose_ranges'];end=sy['timing_scene_snapshot_ranges']
-        for at in range(table,end,4):
-            relative,longs=unpack(s,at,'hH');length=(longs+1)*4;offset=relative+0x7ffe
-            if restored[offset:offset+length]!=s[cursor:cursor+length]:raise ValueError(f'{name}: saved state not restored at D:{offset:x}')
-            cursor+=length
+        table=sy['timing_scene_pose_ranges'];end=sy['timing_scene_snapshot_ranges']
+        canonical=bytearray(restored)
+        if 'timing_scene_saved_mask' in sy:
+            saved_mask=s[sy['timing_scene_saved_mask']:sy['timing_scene_saved_mask']+64]
+            for slot in range(64):
+                if not saved_mask[slot]:continue
+                cursor=base+120*slot
+                for at in range(table,end,4):
+                    relative,longs=unpack(s,at,'hH');length=(longs+1)*4;offset=relative+0x7ffe
+                    # Angles, effect indices and projection words are separate
+                    # parallel arrays, not interleaved components per object.
+                    parts=3 if relative in (0x157a,0x245e) else 2 if relative==0x4078 else 1
+                    width=length//(64*parts)
+                    for part in range(parts):
+                        dst=offset+part*64*width+slot*width
+                        canonical[dst:dst+width]=s[cursor:cursor+width];cursor+=width
+                if cursor!=base+120*(slot+1):raise ValueError('bad packed pose size')
+        else:
+            cursor=base
+            for at in range(table,end,4):
+                relative,longs=unpack(s,at,'hH');length=(longs+1)*4;offset=relative+0x7ffe
+                canonical[offset:offset+length]=s[cursor:cursor+length];cursor+=length
+        if canonical!=restored:raise ValueError(f'{name}: saved state not restored')
         mask=s[sy['timing_scene_predictable']:sy['timing_scene_predictable']+64]
         valid=unpack(s,sy['timing_scene_valid'],'H')[0]
         if unpack(s,sy['timing_scene_staged'],'H')[0]!=1:raise ValueError('not a staged render')
@@ -34,7 +52,7 @@ def report(run):
         rr=dict(tick=tick,data=d,restored=restored,slave=s,base=base,mask=mask,positions=[],predicted=[],types=[])
         for slot in range(61):
             kind=unpack(d,0x96fe+2*slot,'h')[0];rr['types'].append(kind)
-            pos=unpack(s,base+12*slot,'3i');shown=unpack(d,0x919a+12*slot,'3i')
+            pos=unpack(restored,0x919a+12*slot,'3i');shown=unpack(d,0x919a+12*slot,'3i')
             vel=unpack(s,sy['timing_scene_velocities']+12*slot,'3i')
             original=unpack(s,sy['timing_scene_positions']+12*slot,'3i')
             enabled=bool(valid and mask[0] and mask[slot] and kind>=3 and kind!=7 and original==pos and 0<=view<=3)
@@ -56,13 +74,13 @@ def report(run):
                 if key in ('positions','forward_vectors','draw_counter'):continue
                 if restored[offset:offset+length]!=rows[-1]['restored'][offset:offset+length]:
                     raise ValueError(f'{name}: gameplay field {key} changed between updates')
-            if s[base:base+61*12]!=rows[-1]['slave'][base:base+61*12]:
+            if restored[0x919a:0x919a+61*12]!=rows[-1]['restored'][0x919a:0x919a+61*12]:
                 raise ValueError(f'{name}: authoritative positions changed between updates')
         if rows and (tick-rows[-1]['tick'])&0xffff==1:
             prior=rows[-1]
             native.write(native.data,prior['data'])
             for n,offset in enumerate((0x919a,0xa148,0xb450,0xb750,0x9d6c)):
-                native.write(native.data+offset,prior['slave'][prior['base']+n*768:prior['base']+(n+1)*768])
+                native.write(native.data+offset,prior['restored'][offset:offset+768])
             for slot in range(61):
                 kind=rr['types'][slot]
                 if kind>=3 and kind!=7 and kind==prior['types'][slot] and mask[slot] and prior['mask'][slot]:
@@ -75,7 +93,7 @@ def report(run):
                         basis_errors=[]
                         for index,offset in enumerate((0xa148,0xb450,0xb750),1):
                             forecast=unpack(native.read(native.data+offset+12*slot,12),0,'3i')
-                            actual=unpack(s,base+768*index+12*slot,'3i')
+                            actual=unpack(restored,offset+12*slot,'3i')
                             norm=math.sqrt(sum(v*v for v in forecast)*sum(v*v for v in actual))
                             if norm:basis_errors.append(math.degrees(math.acos(max(-1,min(1,sum(a*b for a,b in zip(forecast,actual))/norm)))))
                         if basis_errors:angles.append(max(basis_errors))

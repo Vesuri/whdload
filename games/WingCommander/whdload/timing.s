@@ -130,7 +130,7 @@ timing_loop:
         move.l  d0,d6
         tst.l   d6
         beq.s   .next_field
-        bsr.w   timing_scene_geometry
+        bsr.w   timing_edge_geometry
         bsr.w   timing_pad_edges
         tst.w   -32628(a4)
         bne.w   timing_leave

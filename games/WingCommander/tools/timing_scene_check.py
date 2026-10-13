@@ -20,6 +20,7 @@ def main():
         def run(n,regs=None):c.run(S+sy[n]-c.code,registers=regs)
         put('timing_game','I',c.code)
         if 'timing_scene_velocity' in sy:c.write(c.code+0x807a,struct.pack('>HI',0x4ef9,S+sy['translation_velocity']))
+        if 'timing_scene_allocate' in sy:c.write(c.code+0x2b648,struct.pack('>HI',0x4ef9,S+sy['timing_scene_allocate']))
         rng=random.Random(10)
         for hz in (50,60):
             for f in (0,1,hz//2,hz-1,hz,hz+10,hz+20):
@@ -112,6 +113,7 @@ def main():
     for model in (2,4):
         c=CPU((flight/'end-fast.bin').read_bytes(),live,model);c.write(S,blob)
         c.write(S+sy['timing_game'],struct.pack('>I',c.code));c.write(S+sy['timing_active'],b'\0\1')
+        if 'timing_scene_allocate' in sy:c.write(c.code+0x2b648,struct.pack('>HI',0x4ef9,S+sy['timing_scene_allocate']))
         c.write(c.data,flame_state)
         c.write(c.data+0x96fe+20,bytes(102))
         c.run(S+sy['timing_player_camera']-c.code)

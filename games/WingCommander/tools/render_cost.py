@@ -57,12 +57,19 @@ def scopes(build, layout):
             at=int(m[1],16);add(wanted[m[3]],s,at,at+len(m[2])//2)
     if not all(any(r['name']==v for r in rows) for v in wanted.values()):
         raise ValueError('missing listing anchors')
-    # Measure the bulk backup independently of arithmetic prediction.
-    begin=re.findall(r'^00:([0-9A-F]{8}) [0-9A-F]+.*lea\s+timing_scene_saved\(pc\),a1',listing,re.M)
-    staged=[int(x,16) for x in re.findall(r'^00:([0-9A-F]{8}) [0-9A-F]+.*lea\s+timing_scene_staged\(pc\),a0',listing,re.M)]
-    if len(begin)!=1:raise ValueError('ambiguous backup anchor')
-    at=int(begin[0],16)
-    add('pose_backup',s,at,min(x for x in staged if x>at))
+    # Measure the initial pose backup independently of arithmetic prediction.
+    # Lazy attachment backups remain inside native scene cost, not this row.
+    if 'timing_scene_save_active' in sy:
+        matches=re.findall(r'^00:([0-9A-F]{8}) ([0-9A-F]+).*bsr\.w\s+timing_scene_save_active$',listing,re.M)
+        if len(matches)!=1:raise ValueError('ambiguous selective backup anchor')
+        start,encoded=matches[0];at=int(start,16)
+        add('pose_backup',s,at,at+len(encoded)//2)
+    else:
+        begin=re.findall(r'^00:([0-9A-F]{8}) [0-9A-F]+.*lea\s+timing_scene_saved\(pc\),a1',listing,re.M)
+        staged=[int(x,16) for x in re.findall(r'^00:([0-9A-F]{8}) [0-9A-F]+.*lea\s+timing_scene_staged\(pc\),a0',listing,re.M)]
+        if len(begin)!=1:raise ValueError('ambiguous backup anchor')
+        at=int(begin[0],16)
+        add('pose_backup',s,at,min(x for x in staged if x>at))
     # Draw-entry FSTAT 4 is the frame boundary (pre-camera, pre-prediction).
     # FSTAT expansion is the unique move.w #4 immediately before frame_stat.
     candidates=[]

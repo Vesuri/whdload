@@ -27,6 +27,10 @@ def main():
     rows=[l.split() for l in (a.run/'events.txt').read_text().splitlines() if l and not l.startswith('#')]
     ledger=display_records(a.run/'displaystats.bin')
     front_by_clock={f+checked['offset']:plane for f,v,index,plane,copper in ledger}
+    layout=json.loads(a.layout.read_text())
+    sy={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(a.build/'slave.lst').read_text(),re.M)}
+    convert=layout['slave']+sy['release_convert_ready']
+    assert convert in cfg[3:], 'conversion entry missing from observer'
     front=None;seen=0;source=set();dest=set();lines=[]
     for row in rows:
         pc=int(row[0],16)
@@ -35,16 +39,15 @@ def main():
             front=front_by_clock.get(clock)
             if front is not None:
                 line=int(row[4]);assert 4<=line<=16;lines.append(line)
-        elif pc==cfg[-1] and front is not None:
+        elif pc==convert and front is not None:
             src,dst=int(row[16],16),int(row[17],16)
             check_owner(src,dst,front)
             source.add(src);dest.add(dst);seen+=1
     assert seen>100 and len(dest)==2 and len(source)==1
-    layout=json.loads(a.layout.read_text());fast=(a.run/'fast.bin').read_bytes();chip=(a.run/'chip.bin').read_bytes()
+    fast=(a.run/'fast.bin').read_bytes();chip=(a.run/'chip.bin').read_bytes()
     def read(at,n):return fast[at-0x200000:at-0x200000+n] if at>=0x200000 else chip[at:at+n]
     def long(at):return struct.unpack('>I',read(at,4))[0]
     def word(at):return struct.unpack('>H',read(at,2))[0]
-    sy={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(a.build/'slave.lst').read_text(),re.M)}
     assert json.loads((a.build/'build.json').read_text())['sha256']==json.loads((a.run/'result.json').read_text())['fixture']['sha256']
     late=long(layout['slave']+sy['release_late'])
     lost=long(layout['slave']+sy['timing_input_overflows'])

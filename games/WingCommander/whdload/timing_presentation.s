@@ -5,6 +5,7 @@ timing_target_tick:
         bsr.w   timing_player_camera
         move.l  timing_game(pc),a6
         jsr     $2a086(a6)
+        bsr.w   timing_geometry_history
         move.w  4434(a4),-(sp)
         move.w  4430(a4),4434(a4)
         bsr.w   timing_target_original

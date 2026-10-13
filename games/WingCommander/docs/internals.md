@@ -3514,8 +3514,9 @@ The phase-12 stash remains untouched.
 
 D1's practical model profile is complete; **the calibrated-040 portion remains
 blocked on A2's missing hardware reference**. No game/slave or emulator code was
-changed. Stop before D2. These measurements select the next experiments; they
-neither fix the held-turn overruns nor close release acceptance.
+changed for D1. D2 below implements the prediction changes selected by this
+profile. The D1 measurements neither fix the held-turn overruns nor close
+release acceptance.
 
 ### Instrument and scope
 
@@ -3644,3 +3645,113 @@ individual HUD widgets, exclusive IRQ costs and detailed bitmap scanline costs
 are not separately attributed. The ordinary candidate remains byte-identical to
 C3, and the phase-12 stash is untouched. Calibrated 040 measurements remain an
 explicit follow-up under A2 before hardware or E1 acceptance claims.
+
+
+## Phase 11b prediction overhead: D2 complete
+
+The buffered English release now backs up occupied slots and skips a redundant
+geometry rebuild when queued pad input cannot dispatch an edge. D2 is complete
+on the required current models. Stop before D3; calibrated 040 timing remains
+blocked on A2, and phase 12 stays paused.
+
+### State and geometry contracts
+
+`timing_scene_slots.s` replaces the 7,680-byte bulk copy with 120-byte records
+for nonzero object types plus camera/scratch slots 61–63. Type zero is the only
+empty value: stars, hidden classes and existing class-7 attachments remain saved.
+The field set is unchanged. Angles, effect words and projection words remain
+separate parallel arrays, correctly gathered into each record. Empty slots are
+left untouched until native rendering allocates one. A saved mask and slot list
+preserve the first backup across reuse and restore precisely those slots.
+
+The native allocator `E:2b632` (English file `2b65e`) selects a free slot from
+10–60. The guarded six-byte detour at `E:2b648` (file `2b674`) backs up selected
+slot D2 **before** the first write at `E:2b652` (file `2b67e`), then replays the
+displaced operations and resumes at `E:2b64e` (file `2b67a`). This covers
+render-only engine flames created by `E:2914c` (file `29178`), including stale
+bytes in previously empty slots. Exhausted allocation never reaches the detour;
+unstaged/native execution passes through with native register/CCR results.
+All six displaced bytes are checked before installation. Nonbuffered builds
+retain the original bulk-copy path.
+
+`timing_edge_geometry` compares **every queued 16-byte pad sample** with native
+current pad data `D:c6c8`. The queue normally contains samples even when nothing
+changes. Only an entirely unchanged queue (or an empty queue) permits deferring
+the first rebuild to targeting. Any transition, in any sample, retains both
+calls. The real edge dispatcher and pulse merging still run. Native
+`E:19278` / `E:19128` (file `192a4` / `19154`) dispatch release/rising edges;
+identical current/previous pad bytes cannot invoke a command. Keyboard dispatch
+remains after the targeting rebuild.
+
+There is one essential side effect to retain: `E:2a0c6–2a0d4` (file
+`2a0f2–2a100`) copies current range `D:a4dc` to previous range `D:a55c` before
+`E:2a086` rebuilds it. After the single rebuild, the authored history pass copies
+the new current range to previous range for slots 0–60, excluding classes 0/7
+exactly as native. Class 1 and negative classes are not excluded. Whole-data
+comparisons prove the same result as two native rebuilds on the scoped cases.
+The post-world/cosmetic rebuild, draw-time geometry and ordinary-loop exit
+rebuild remain in place. No prediction math, world rate, clear/redraw policy or
+conversion algorithm changes.
+
+### Correctness evidence
+
+`tmp/d2-final-equivalence.json` records both 68020 and 68040 Unicorn checks:
+240 retained whole-data geometry pairs, 240 transition-guard cases, eight
+class/view boundaries, 16 unchanged native pad-queue cases, 1,280 guarded byte
+transitions, eight occupancy/restore cases and 12 allocator/register comparisons.
+Reused-slot checks retain the first backup. Removing range-history replay or
+bypassing the lazy allocation backup is rejected by the same whole-data oracle.
+Existing checks retain 96 pose/isolation cases, 420 signed-scaling cases, two
+real native flame-allocation cases, the C3 forecast/error bounds, C2 arithmetic
+and fallback contracts, installer option/register/CCR checks and release
+option/cache/converter checks. The unchanged experimental bulk-copy path also
+passes its pose/flame checks. These are correctness checks, not speed estimates.
+
+The final normal release is 40,928 bytes, SHA-256
+`c7fe5c1ea7acb9363a3042330be07a9f7d3c8de36306f895f7240bc845b46fe5`.
+The final Nav-1 frame fixture is 41,796 bytes, SHA-256
+`17bbb088e900e279b175b188e96f497cdc1d9cb58241d09d4ca8d2cffba700e3`.
+Version remains **2.0b (13.06.2026)**. Derived builds and evidence stay in `tmp/`.
+
+### Model costs, displayed rates and remaining gaps
+
+Same instruments and cache-model limitations as D1. The final held-turn cost
+capture and its control have byte-identical frame/display ledgers. The buffer
+checker now resolves its conversion event by symbol; appended cost events no
+longer make it inspect the wrong registers. The observer is unchanged.
+
+| 040 held-turn scope | D1 mean / p95 ms | D2 mean / p95 ms |
+|---|---:|---:|
+| Geometry, all calls | 4.500 / 14.656 | 3.864 / 11.286 |
+| Initial pose backup | 0.289 / 0.278 | 0.185 / 0.204 |
+| Prediction including initial backup | 1.229 / 1.996 | 1.097 / 1.604 |
+| Restore | 0.282 / 0.279 | 0.155 / 0.184 |
+
+Geometry calls fall from 1,094 to 937 over 635 measured picture intervals:
+unchanged-input world boundaries now do two rebuilds instead of three, including
+the retained post-world rebuild. Initial backup excludes lazy attachment backups
+inside native scene drawing; restore includes every saved slot. Costs remain
+inclusive of interrupts/stalls and nested work. The fixed-input D1/D2 windows
+cover slightly different elapsed simulation time as frame rates change, so these
+are workload measurements, not instruction-isolated savings.
+
+| PAL model gate | Displayed frames/s | World updates/s | Fields per displayed interval |
+|---|---:|---:|---|
+| 030 steady | 49.920 | 9.925 | 638 × 1 |
+| Cycle-exact 040 steady | 49.920 | 9.927 | 638 × 1 |
+| Cycle-exact 040 held turn | 42.087 | 10.007 | 525 × 1, 100 × 2, 9 × 3 |
+
+The 040 held turn improves modestly from D1's 41.535 frames/s. It still misses
+118/656 prediction targets (D1: 119/656); this is **not** a global C1 deadline or
+E1 performance pass. Both steady gates retain zero prediction mismatches and
+one displayed picture per field. Recorder/observer counts match for all
+661/661/656 pictures, with at most 0.001 ms clock difference. Buffer ownership,
+CHIP/FAST placement and copper setup pass, with no input overflow or late swap
+deferral. C2 reports zero position/camera corrections over 161/161/186 ticks.
+
+Evidence: `tmp/d2-final-030`, `tmp/d2-final-040-steady`,
+`tmp/d2-final-040-turn`, `tmp/d2-final-040-turn-cost/costs.json` and
+`tmp/d2-final-fps.json`. Commands are in development.md. No fresh corrected-MMU
+pixel capture, long campaign, forced-stall cadence or physical-hardware acceptance
+is claimed. The calibrated 040 gate remains blocked on A2. The phase-12 stash
+is untouched; D3–E2 remain open.

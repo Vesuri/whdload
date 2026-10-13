@@ -33,7 +33,11 @@ D1’s model profile identifies repeated geometry, cockpit composition and block
 comparison as useful optimisation targets. Observer controls preserve the
 recorded run exactly; no optimisation was applied. See the
 [D1 costs and limits](docs/internals.md#phase-11b-rendering-costs-d1-model-profile-complete).
-Stop before D2. Calibrated 040 profiling remains blocked on A2; phase 12 stays paused.
+D2 is complete: selective pose backups and unchanged-input geometry reduce
+prediction overhead. Steady flight remains 49.92 frames/s on both models; the
+040 held turn improves from 41.53 to 42.09, with deadline misses still present.
+See the [D2 checks and limits](docs/internals.md#phase-11b-prediction-overhead-d2-complete).
+Stop before D3. Calibrated 040 profiling remains blocked on A2; phase 12 stays paused.
 
 **Phase 11 is complete: changed-block flight conversion.**
 The timing build converts only changed view/cockpit/HUD blocks, with separate

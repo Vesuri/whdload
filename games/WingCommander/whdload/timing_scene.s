@@ -1,3 +1,53 @@
+; Equal queued pad samples cannot dispatch an edge at E:19278/19128.
+; Defer the first rebuild only if every 16-byte sample matches native current
+; pad state. Any transition retains both calls; the queue is still consumed.
+timing_edge_geometry:
+        ifne BUFFERED
+        movem.l d0-d1/a0-a2,-(sp)
+        lea     timing_geometry_repeat(pc),a0
+        clr.w   (a0)
+        move.w  timing_pad_count(pc),d0
+        beq.s   .unchanged
+        subq.w  #1,d0
+        lea     timing_pad_pending(pc),a2
+.sample:
+        lea     $46ca(a4),a1
+        moveq   #3,d1
+.compare:
+        cmpm.l  (a1)+,(a2)+
+        bne.s   .edges
+        dbra    d1,.compare
+        dbra    d0,.sample
+.unchanged:
+        move.w  #1,(a0)
+        movem.l (sp)+,d0-d1/a0-a2
+        rts
+.edges:
+        movem.l (sp)+,d0-d1/a0-a2
+        endif
+        bra.w   timing_scene_geometry
+
+; Native E:2a086 copies current range to previous range before rebuilding it.
+; Preserve the second call's history effect after a single rebuild. Class 0/7
+; are skipped exactly as native; negative classes still participate.
+timing_geometry_history:
+        ifne BUFFERED
+        tst.w   timing_geometry_repeat(pc)
+        beq.s   .done
+        moveq   #60,d0
+.slot:
+        move.w  $1700(a4,d0.w*2),d1
+        beq.s   .next
+        cmpi.w  #7,d1
+        beq.s   .next
+        move.w  $24de(a4,d0.w*2),$255e(a4,d0.w*2)
+.next:
+        dbra    d0,.slot
+.done:
+        endif
+        rts
+timing_geometry_repeat: dc.w 0
+
 ; Refresh geometry before edge commands can use ranges or aiming predicates.
 ; Rendering may leave screen-space scratch, but gameplay always sees geometry
 ; rebuilt from restored authoritative poses, including on an ordinary-loop exit.
@@ -156,6 +206,9 @@ timing_scene_begin:
         clr.l   (a0)
         tst.w   timing_active(pc)
         beq.w   .done
+        ifne BUFFERED
+        bsr.w   timing_scene_save_active
+        else
         ; Back up all 64 poses, including camera/scratch slots 61..63, plus
         ; native allocation and projection fields used by render attachments.
         lea     timing_scene_saved(pc),a1
@@ -169,6 +222,7 @@ timing_scene_begin:
         move.l  (a0)+,(a1)+
         dbra    d1,.save
         dbra    d2,.save_range
+        endif
         lea     timing_scene_staged(pc),a0
         move.w  #1,(a0)
         ifne BUFFERED
@@ -337,6 +391,9 @@ timing_scene_end:
         movem.l d0-d2/a0-a2,-(sp)
         tst.w   timing_scene_staged(pc)
         beq.w   timing_scene_restored
+        ifne BUFFERED
+        bsr.w   timing_scene_restore_active
+        else
         lea     timing_scene_saved(pc),a0
         lea     timing_scene_pose_ranges(pc),a2
         moveq   #24,d2
@@ -348,6 +405,7 @@ timing_scene_end:
         move.l  (a0)+,(a1)+
         dbra    d1,.copy
         dbra    d2,.range
+        endif
         lea     timing_scene_staged(pc),a0
         clr.w   (a0)
 timing_scene_restored:

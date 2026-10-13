@@ -48,7 +48,7 @@ def main():
                 for off,label,op in [(0x28c86,'timing_debris_draw',0x4ef9),(0x698,'timing_loop',0x4ef9),(0x878,'timing_pause',0x4ef9),(0x101c,'timing_autopilot',0x4ef9),(0x18eee,'timing_throttle_gate',0x4eb9),(0x18f00,'timing_throttle_gate',0x4eb9),(0x18f3a,'timing_fire_gate',0x4eb9),(0x7bc2,'timing_world_rotation',0x4eb9),(0x34188,'timing_record_input',0x4eb9),(0x1934c,'timing_pad_read',0x4eb9),(0x18c6a,'timing_keys_read',0x4eb9),(0x19380,'timing_key_command',0x4eb9),(0x65f4,'timing_emission_clock',0x4eb9),(0x51a,'timing_message_draw',0x4eb9),(0x46ea,'timing_systems_draw',0x4eb9),(0x530,'timing_sim_draw',0x4ef9),(0x438,'timing_sim_score_draw',0x4eb9),(0x3b8e,'timing_target_draw',0x4ef9),(0x4b16,'timing_selection',0x4ef9),(0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]:
                     want[off:off+6]=struct.pack('>HI',op,s+sym['release_input_vblank' if buffered and off==0x34188 else label])
                 if buffered:
-                    for off,label in ((0x3378e,'release_publish'),(0x337ea,'release_teardown'),(0x807a,'translation_velocity'),(0x80b6,'translation_position')):
+                    for off,label in ((0x2b648,'timing_scene_allocate'),(0x3378e,'release_publish'),(0x337ea,'release_teardown'),(0x807a,'translation_velocity'),(0x80b6,'translation_position')):
                         want[off:off+6]=struct.pack('>HI',0x4ef9,s+sym[label])
                 want[0x28c8c:0x28c8e]=bytes.fromhex('4e71')
                 want[0x43e:0x440]=bytes.fromhex('4e71')
@@ -63,20 +63,21 @@ def main():
             assert c.read(c.code,0x35ea4)==want
             cases.append(dict(model=model,custom=custom,exact=True));c.close()
         # A changed instruction operand must be rejected before any patch write.
-        c=CPU(memory,layout,model);s=0x180000;resload=0x190000
-        c.write(s,blob);c.write(s+0x1de4,struct.pack('>I',3))
-        c.write(s+0x121e,struct.pack('>I',resload))
-        c.write(resload+116,bytes.fromhex('4e75'))
-        c.write(resload+4,bytes.fromhex('70094ef900001000'))
-        c.write(c.code+0x69a,bytes.fromhex('0000'))
-        before=c.read(c.code,0x35ea4)
-        c.reg(17,0x2700);c.reg(8,0x1f0000)
-        c.write(0x1f0000,struct.pack('>I',0x1000))
-        c.reg(3,resload);c.reg(16,(c.code-4)//4)
-        ck(u.uc_emu_start(c.h,s+sym['timing_patchseg'],0x1000,1000000,10000))
-        assert c.reg(18)==0x1000 and c.reg(9)==9
-        assert c.read(c.code,0x35ea4)==before
-        c.close()
+        for operand in ((0x69a,0x2b64a,0x2b64c) if buffered else (0x69a,)):
+            c=CPU(memory,layout,model);s=0x180000;resload=0x190000
+            c.write(s,blob);c.write(s+0x1de4,struct.pack('>I',3))
+            c.write(s+0x121e,struct.pack('>I',resload))
+            c.write(resload+116,bytes.fromhex('4e75'))
+            c.write(resload+4,bytes.fromhex('70094ef900001000'))
+            c.write(c.code+operand,bytes.fromhex('0000'))
+            before=c.read(c.code,0x35ea4)
+            c.reg(17,0x2700);c.reg(8,0x1f0000)
+            c.write(0x1f0000,struct.pack('>I',0x1000))
+            c.reg(3,resload);c.reg(16,(c.code-4)//4)
+            ck(u.uc_emu_start(c.h,s+sym['timing_patchseg'],0x1000,1000000,10000))
+            assert c.reg(18)==0x1000 and c.reg(9)==9
+            assert c.read(c.code,0x35ea4)==before
+            c.close()
     out.mkdir(parents=True);(out/'report.json').write_text(json.dumps(dict(cases=cases,changed_operand_rejected=True,scope='installer and option-off semantics; beam timing tested live'),indent=2)+'\n')
     print('PASS: eight native installer/option cases, whole code-hunk and register/CCR checks')
 

@@ -54,9 +54,10 @@ heading-aware ship forecasts retain native inertia, with p95 0.255 km and maximu
 classes stay exact. C4 confirms one displayed picture per field in steady flight
 on both required models, with no scheduler change needed. D1’s practical model
 profile is complete: geometry, cockpit composition and comparison overhead
-justify the planned D2–D4 investigations. Calibrated 040 profiling remains blocked
-on A2. Stop before D2.
-Held-turn frame-budget misses remain for D2 onward; campaign and hardware
+justify the D2–D4 investigations. D2 is complete: selective pose backups and
+unchanged-input geometry retain 49.920 frames/s in both steady gates and improve
+the 040 held turn to 42.087. Calibrated 040 profiling remains blocked on A2.
+Stop before D3. Held-turn frame-budget misses remain; campaign and hardware
 visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
@@ -566,9 +567,13 @@ display wait (6–7 ms of idle per frame).
   41.535 with 119/656 prediction misses. Hardware timing, exclusive attribution
   and wider workload coverage remain explicit gaps. See the
   [D1 profile](internals.md#phase-11b-rendering-costs-d1-model-profile-complete).
-  Stop before D2.
-- **D2.** Prediction overhead: save/restore only active slots; skip geometry
-  rebuilds that cannot change.
+- **D2 — complete on current models.** Save/restore occupied slots and camera
+  scratch, with lazy backup of native render allocations. Unchanged pad queues
+  skip one geometry rebuild while preserving native range history. Whole-data
+  and input-transition checks pass. Steady PAL flight retains 49.920 frames/s
+  on 030 and cycle-exact 040; the 040 held turn improves from 41.535 to 42.087,
+  with 118/656 prediction misses still open. Calibrated 040 remains blocked on A2.
+  See [D2 evidence](internals.md#phase-11b-prediction-overhead-d2-complete). Stop before D3.
 - **D3.** Region-specific clear/redraw of the view when the cockpit is unchanged,
   verified against the earlier finding that a blanket clear bypass breaks later reads.
 - **D4.** Replace the full 64 KB source comparison with dirty rectangles from the

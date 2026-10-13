@@ -4,8 +4,9 @@ Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
 Current scope: phase 11b CD32 frame-rate recovery (work items A1–E2 in
 `docs/open-work.md`). B2 and the scoped cached-040 row-corruption fix are complete.
 C1–C3 and the C4 steady-flight display-cadence gate are complete.
-D1 model profiling is complete; geometry, composition and comparison costs are
-recorded. Stop before D2. Calibrated 040 profiling remains blocked on A2.
+D1 model profiling and D2 prediction-overhead optimisation are complete.
+Selective pose backups and unchanged-input geometry pass the current model gates.
+Stop before D3. Calibrated 040 profiling remains blocked on A2.
 Every gate reports end-to-end frames/s from the
 `--frame-stats` recorder on the 030 model and the cycle-exact 040 core, and on a
 calibrated 040 once A2 provides one. Phase 12 release work is paused until 11b passes; do not start
