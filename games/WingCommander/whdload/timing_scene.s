@@ -226,6 +226,13 @@ timing_scene_begin:
         adda.w  d5,a2
         lea     timing_scene_positions(pc),a3
         adda.w  d5,a3
+        ifne BUFFERED
+        tst.w   d4
+        bne.s   .world_pose
+        tst.w   translation_active(pc)
+        bne.w   .player_pose
+.world_pose:
+        endif
         ; A pose changed outside the update snapshot is a cut, not a velocity.
         move.l  (a2),d0
         cmp.l   (a3),d0
@@ -245,7 +252,7 @@ timing_scene_begin:
         add.l   d0,(a2)+
         dbra    d3,.xyz
         tst.w   d4
-        beq.s   .next             ; player orientation already elapsed-field
+        beq.w   .next             ; player orientation already elapsed-field
         ; Native axis rotations rebuild an orthogonal fixed-point basis.
         ; Angular steps are snapshots, not a second AI/controller invocation.
         moveq   #0,d3
@@ -279,6 +286,28 @@ timing_scene_begin:
         addq.w  #1,d3
         cmpi.w  #3,d3
         bne.s   .axis
+        ifne BUFFERED
+        bra.s   .next
+.player_pose:
+        ; Player state already includes every consumed field. Only forecast
+        ; the remaining display lead, using current rather than tick velocity.
+        move.l  d6,-(sp)
+        move.l  release_render_time(pc),d6
+        sub.l   timing_clock(pc),d6
+        mulu.l  #10,d6
+        cmpi.l  #20,d6
+        bls.s   .player_bounded
+        moveq   #20,d6
+.player_bounded:
+        lea     7534(a4),a3
+        moveq   #2,d3
+.player_axis:
+        move.l  (a3)+,d0
+        bsr.w   timing_scene_scale
+        add.l   d0,(a2)+
+        dbra    d3,.player_axis
+        move.l  (sp)+,d6
+        endif
 .next:
         addq.w  #1,d4
         addi.w  #12,d5

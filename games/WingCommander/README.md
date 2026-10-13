@@ -3,7 +3,7 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 11b is in progress; C1 is complete.**
+**Phase 11b is in progress; C1 and C2 are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for
 enhanced English flight without Psygore's frame cap. Values 1–4 retain Psygore's
 normal/unlimited/relaxed/slow modes. German default and enhanced nonflight scenes
@@ -16,7 +16,12 @@ attributes in FS-UAE. The launcher now builds a corrected local emulator; caches
 remain enabled. See the [pixel checks and limits](docs/internals.md#cached-040-display-corruption-emulator-mmu-write-attributes).
 Flight prediction now targets the queued picture’s display field; the scoped
 PAL/NTSC gates retain 49.92/59.83 pictures/s with matching prediction times.
-Phase 12 stays paused; C2 and broader visual acceptance remain open.
+Player velocity and position now advance per elapsed field, without a second
+position step at world ticks. C2 steady flight retains 49.92 pictures/s; held turns
+measure 41.75 on the cycle-exact 040 and 54.23 on the NTSC 030. Rendering overruns
+still miss prediction targets, also observed in the previous C1 build. See the
+[C2 gate and limits](docs/internals.md#phase-11b-player-translation-c2-gate-complete).
+Phase 12 stays paused; C3 onward and broader visual acceptance remain open.
 
 **Phase 11 is complete: changed-block flight conversion.**
 The timing build converts only changed view/cockpit/HUD blocks, with separate

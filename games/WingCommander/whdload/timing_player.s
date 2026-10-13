@@ -128,6 +128,9 @@ timing_player_field:
         addq.w  #1,d4
         cmpi.w  #3,d4
         bne.s   .axis
+        ifne BUFFERED
+        bsr.w   translation_field
+        endif
         lea     timing_player_fields(pc),a0
         addq.l  #1,(a0)
         movem.l (sp)+,d0-d7/a0-a6

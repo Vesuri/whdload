@@ -224,9 +224,19 @@ timing_native_input:
         rts
 
 timing_world:
+        ifne BUFFERED
+        ifne FRAME_STATS
+        bsr.w   translation_tick_begin
+        endif
+        endif
         FSTAT   2
         move.l  timing_game(pc),a6
         jsr     $2a8(a6)
+        ifne BUFFERED
+        ifne FRAME_STATS
+        bsr.w   translation_tick_end
+        endif
+        endif
         tst.w   timing_active(pc)
         beq.s   timing_world_done
         bsr.w   timing_presentation_tick
@@ -256,6 +266,9 @@ timing_rebase:
         lea     timing_clock+16(pc),a0
         add.l   d0,(a0)
 .discarded:
+        ifne BUFFERED
+        bsr.w   translation_reset
+        endif
         lea     timing_scene_valid(pc),a0
         clr.w   (a0)
         lea     timing_input_tail(pc),a0

@@ -2259,3 +2259,81 @@ python3 tools/frame_report.py tmp/c1-final-030 tmp/c1-final-040 tmp/c1-final-nts
 `frame_capture.py` defaults remain warped/deterministic for the established
 instrumented model gates; explicit `WARP=0 DETERMINISTIC=0` selects the normal
 cached-MMU boot. No C2 player-translation change or release packaging is included.
+
+## C2: per-field player translation
+
+Use fresh `tmp/` destinations. The native motion oracle needs the pinned English
+snapshot `tmp/phase7-combat-controls/start-fast.bin` from the phase-7 capture
+instructions; `locate()` verifies its game identity. No snapshot is committed.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/c2-candidate
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/c2-frames
+python3 tools/translation_check.py tmp/c2-candidate --output tmp/c2-native-complete.json
+python3 tools/translation_contract_check.py tmp/c2-frames --output tmp/c2-contracts-complete.json
+python3 tools/timing_adapter_check.py tmp/c2-candidate --output tmp/c2-install
+python3 tools/timing_scene_check.py tmp/c2-candidate --output tmp/c2-scenes.json
+python3 tools/release_check.py tmp/c2-candidate --negative-controls --output tmp/c2-options.json
+python3 tools/buffer_check.py tmp/c2-candidate --output tmp/c2-buffer-native.json
+python3 tools/frame_stats_check.py tmp/c2-frames --output tmp/c2-recorder.json
+python3 tools/display_predict_check.py tmp/c2-candidate --output tmp/c2-display-native.json
+
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/c2-frames/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/c2-layout
+```
+
+The following loop runs under `/bin/bash` 3.2. It records steady PAL on both
+required models, a held-right 040 turn and a held-right NTSC 030 turn. The 040
+core remains uncalibrated; the observer uses the established cache-model settings.
+
+```bash
+for cell in 030-gate 040-steady 040-gate ntsc-gate; do
+    machine=a1200-030
+    options='CACHE DCACHE'
+    extra=()
+    case "$cell" in
+        040-*) machine=a1200-040; options=NoMMU; extra+=(--timing-core) ;;
+    esac
+    case "$cell" in
+        040-gate) extra+=(--held-key 4e) ;;
+        ntsc-gate) extra+=(--held-key 4e --ntsc) ;;
+    esac
+    DEBUG_PORT=2499 python3 tools/frame_capture.py \
+        --fixture tmp/c2-frames/WingCommanderCD32.Slave \
+        --machine "$machine" --baseline-cache-model --options "$options" \
+        "${extra[@]}" --custom5 0 --debugger --observer --display-sample \
+        --layout tmp/c2-layout/layout.json --output "tmp/c2-$cell" --timeout 180
+    python3 tools/translation_report.py "tmp/c2-$cell" --build tmp/c2-frames \
+        --layout tmp/c2-layout/layout.json --output "tmp/c2-$cell/translation.json"
+    python3 tools/frame_check.py "tmp/c2-$cell" --output "tmp/c2-$cell/check.json"
+    python3 tools/buffer_report.py "tmp/c2-$cell" --build tmp/c2-frames \
+        --layout tmp/c2-layout/layout.json --output "tmp/c2-$cell/buffers.json"
+done
+python3 tools/frame_report.py tmp/c2-030-gate tmp/c2-040-steady \
+    tmp/c2-040-gate tmp/c2-ntsc-gate --output tmp/c2-fps.json
+for cell in 030-gate 040-steady; do
+    python3 tools/display_time_check.py "tmp/c2-$cell" \
+        --output "tmp/c2-$cell/prediction.json"
+done
+```
+
+`translation_report.py` verifies fixture identity and requires at least 500 player
+fields, 100 actual native world boundaries and zero player/camera-position
+corrections. Native negative controls deliberately bypass the scaler and inject
+position corrections. The native trajectory comparison documents its speed and
+travel tolerances, including the separate action-3 expiry allowance; fuel and
+bookkeeping must match exactly.
+
+Run `display_time_check.py` on the held-turn windows to reproduce the known C1
+failure: 122/657 target misses on 040 and 72/663 on NTSC in this run. It exits with
+an assertion and does not write a passing report. For the prior-build control,
+repeat the 040 held-turn capture with `tmp/c1-final-frames` and `tmp/c1-layout`,
+writing `tmp/c2-control-c1-turn040`. That C1 fixture must come from commit
+`b16f1a2`, not a rebuild with the current C2 sources. It also misses 112/657 targets.
+This is recorded C4 work; ownership correctness does not waive display-time
+accuracy. The phase-12 save/load stash stays separate and must not be applied as
+part of these checks. Stop before C3.

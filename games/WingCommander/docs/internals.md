@@ -2998,7 +2998,7 @@ Evidence: `tmp/b1-final-native.json`, `tmp/b1-flight-native.json`,
 Commands are in development's B1 section; the public numbering/fallbacks are in
 `release/ReadMe`. Save-file work remains outside this gate. German live campaign,
 full control/visual acceptance, calibrated 040 performance and release packaging
-remain open. The subsequent B2 and C1 gates are below; C2 and later work remain open.
+remain open. The subsequent B2 and C1 gates are below; C2 is complete below; C3 and later work remain open.
 
 ## Phase 11b: deferred buffer reuse (B2 gate complete)
 
@@ -3094,8 +3094,8 @@ These ~11–13 s windows meet the scoped display-rate gate and 10 Hz ±1% world 
 Waits occur before planar writes after the next chunky picture has been drawn;
 there is no flight post-conversion wait. Main-loop work intervals still vary
 (world-tick frames remain heavier), so C4 is not closed by the regular displayed
-cadence. C1 display-time prediction is complete below. C2 player translation, C3 heading-aware
-prediction, long missions, physical hardware and user visual acceptance remain
+cadence. C1 display-time prediction and C2 player translation are complete below.
+C3 heading-aware prediction, long missions, physical hardware and user visual acceptance remain
 open. No claim that all movement now feels like the display rate is made.
 
 Normal slave: 38916 bytes, SHA-256
@@ -3213,7 +3213,135 @@ The direct-flight recorder is `tmp/c1-final-frames`; its build manifest pins the
 fixture after startup-argument adaptation. The diagnostic ledger allocation is
 now 98304 bytes and remains outside the game's declared memory budget.
 
-Stop before C2. Player translation, angular/velocity forecasting quality, visible
-hard-turn corrections, long missions and hardware calibration remain open. The
+C2 player translation is complete below. Angular/velocity forecasting quality,
+visible hard-turn corrections, long missions and hardware calibration remain open. The
 old phase-10 one-tick forecast-error measurements do not establish error bounds
 for the newly extended horizon. Release work remains paused.
+
+
+## Phase 11b player translation: C2 gate complete
+
+Controlled English flight now commits player velocity and position once per
+elapsed field, after that field's rotation. World ticks retain fuel, action timers,
+throttle commands, collisions and other objects; they do not move the player a
+second time. C3 heading-aware forecasting is not included. Phase 12 stays paused.
+
+### Native model and patch seams
+
+English code-hunk 0 file offsets are `E + $2c`. Data offsets below are relative
+to the data hunk, not loaded addresses. Player position is `D:919a`, velocity
+`D:9d6c` (fixed8 displacement per world tick), forward basis `D:a148`, set speed
+`D:99be`, and the camera position is slot 61 at `D:9476`.
+
+Native `E:7d1a` (file `$7d46`) mixes motion with gameplay effects. Ordinary desired
+velocity is forward × set speed / 256 through `E:2b7f0`. Afterburn action 1 uses
+`(2 × model.word(+22) + 40) << 8`; braking action 3 requests zero. The model index
+is `D:97f6`, with 104-byte records at `D:53a4`. Action expiry at `E:7e10` consumes
+`D:bb14` and returns to ordinary thrust. Active burn/braking fuel charges are
+200/140 through `E:15900`; ordinary fuel remains at `E:cb78`.
+
+The field wrapper reuses the original acceleration solver `E:7f78–8078`
+(file `$7fa4–80a4`) with its native local-frame ABI. It retains the engine capability
+from `E:15848`, engine condition, flag query at `E:29f94`, alignment calculations,
+and doubled action-1/3 acceleration. It restores the cosmetic effect byte at
+`D:bae8`; no fuel, timer, RNG or other game-data changes escape the field wrapper.
+Two guarded six-byte jump seams replace the velocity add entry `E:807a`
+(file `$80a6`) and position add entry `E:80b6` (file `$80e2`). The actual vector adds
+are at `E:809a` and `E:80e0`; the original epilogue is `E:80ea`.
+
+Each axis carries signed remainders for both acceleration and displacement:
+`step = trunc((native increment × 10 + carry) / field Hz)`. Six independent
+remainders survive render-frame grouping and reset on timing rebase or loss of
+controlled flight. The implementation splits quotient and remainder before
+multiplication to avoid 32-bit overflow. Eligible states are player type 12,
+ordinary camera, no script, and actions −1/1/3. Other objects, external camera,
+scripted states, unsupported actions and non-world native calls retain native
+motion. The scheduled world still records its acceleration scratch at `D:bb2c`.
+
+`E:2a8` dispatches collision/gameplay `E:76e4` before object motion `E:7b4e` and
+camera rebuild `E:680e`. These routines therefore see the already committed
+field pose. Render-only player translation forecasts from that pose using current
+velocity and only the remaining one/two-field display lead; it does not add the
+world residual debt twice. Full scene restoration prevents that future pose from
+reaching collision or gameplay code. Collision cadence remains 10 Hz; high-speed
+swept collision and whole-campaign equivalence are not claimed.
+
+### Native correctness and tolerances
+
+`translation_check.py` executes the original native solver as the per-field
+oracle on identical state. Across 020/040 and PAL/NTSC, 28 two-second trajectories
+cover steady flight, acceleration ramp, ordinary braking, action-3 braking,
+turning, afterburn and afterburn turns (3080 fields, 560 ticks). Fractional velocity,
+position and carry match exactly. Field writes are confined to player position
+and velocity; world bookkeeping matches the native routine byte-for-byte after
+excluding those intentionally retimed vectors. Fuel, action and timer differences
+are zero. Native camera rebuilds introduce no tick correction.
+
+A separate original 10 Hz trajectory quantifies the change from finer integration:
+
+| Trajectory | Maximum speed difference (km/s) | Maximum position difference (km) |
+|---|---:|---:|
+| Steady | 0 | 0 |
+| Ramp | 7.461 | 13.555 |
+| Ordinary braking | 3.867 | 9.078 |
+| Turn | 0.789 | 31.109 |
+| Afterburn | 31.016 | 44.336 |
+| Afterburn turn | 30.449 | 52.697 |
+| Action-3 braking/expiry | 48.008 | 20.442 |
+
+The regression allowances are 5% of the initial/set/burn speed envelope and 10%
+of two seconds' travel at that envelope, with exact fuel equality. Action-3 expiry
+has a separate speed allowance: one native acceleration step plus at most one
+fixed8 velocity LSB per sampled field. At expiry the native routine resumes thrust
+at the world boundary, whereas the field integrator has already consumed that
+interval under braking. This is a documented transition difference, not evidence
+of universally equivalent trajectories. Subsequent AI/collisions can differ with
+the changed trajectory; fuel exhaustion and long campaign transitions remain
+unverified.
+
+`translation_contract_check.py` passes 1284 signed arithmetic cases including
+32-bit extrema, 12 whole-data native fallbacks, four render/restore cases and two
+carry resets. Disabled-scaler and injected player/camera-position changes are
+rejected by the corresponding oracles. Installer guards, 96 scene/isolation and
+420 scale cases, 664 angular checks, 196 option/cache cases, 180 pacing cases,
+54 complete converter outputs, 72 pixel cases, recorder/publication checks and
+176 C1 target cases plus IRQ race controls also pass.
+Evidence: `tmp/c2-native-complete.json`, `tmp/c2-contracts-complete.json`,
+`tmp/c2-scenes.json`, `tmp/c2-angles`, `tmp/c2-options.json`, `tmp/c2-pixels.json`,
+`tmp/c2-buffer-native.json`, `tmp/c2-recorder.json`, `tmp/c2-display-native.json`.
+
+### Live gate and remaining frame-budget gap
+
+Diagnostic-only counters surround the actual native world call and compare both
+player and camera positions. They perform no gameplay writes. All four windows
+pass with zero corrections:
+
+| Model / input | Fields advanced | World ticks checked | Pictures/s |
+|---|---:|---:|---:|
+| PAL 030, steady | 809 | 161 | 49.920 |
+| PAL cycle-exact 040, steady | 809 | 161 | 49.920 |
+| PAL cycle-exact 040, held right | 938 | 187 | 41.754 |
+| NTSC 030, held right | 884 | 147 | 54.233 |
+
+All independent A1 publication counts and B2 ownership/copper checks pass:
+661/661/657/663 pictures respectively, one FAST source, two CHIP buffers,
+publication at line 4, no input overflow or late-blank deferral. The steady PAL
+runs also pass C1 with zero missed prediction targets. Held turns fail C1's
+strict display-time check: 122/657 targets on 040 and 72/663 on NTSC are missed
+because pictures finish too late for their forecast field. Safe buffer ownership
+does not make these predictions timely. The prior C1 build in the same 040 turn
+setup measures 42.722 pictures/s and 112/657 misses. C2 measures 41.754 in that
+window; changed trajectories also change rendering workload, so this comparison
+is not an isolated cost attribution. This remains C4 work, not a waived C1 pass.
+
+Evidence: `tmp/c2-{030-gate,040-steady,040-gate,ntsc-gate}`,
+`tmp/c2-control-c1-turn040`, `tmp/c2-fps.json`, `tmp/c2-turn-comparison.json`.
+The established observer uses its baseline cache model; the 040 core is not
+hardware-calibrated. These are measured emulator windows, not a 50/60 FPS promise
+for all scenes or physical hardware. Cached-MMU pixel acceptance remains the
+previous scoped check; C2 does not change conversion, buffers or cache policy.
+
+Normal candidate: 39820 bytes, SHA-256
+`c45d7bd9b88b923319fca4ff2cdb0dcf902646d6702b245db6034be3b59de385`.
+The recorder fixture is `tmp/c2-frames`, pinned by its post-adaptation build
+manifest. Version remains 2.0b (13.06.2026). Stop before C3.

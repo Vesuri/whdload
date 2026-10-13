@@ -47,7 +47,10 @@ correction preserves both caches and the B2 slave. See the
 [CPU/DMA pixel evidence](internals.md#cached-040-display-corruption-emulator-mmu-write-attributes).
 C1 is complete: render prediction includes both the upcoming publication and
 pending swap. PAL/NTSC display ledgers match every forecast to its actual field.
-C2 is next, not started. Broader campaign and hardware visual acceptance remain open.
+C2 is complete: controlled player velocity/position advance per field, with zero
+world-tick position corrections in the steady and turning gates. Stop before C3.
+Held-turn frame-budget misses are documented under C4; campaign and hardware
+visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -513,20 +516,26 @@ display wait (6–7 ms of idle per frame).
   independent A1 and buffer-ownership checks pass. The bounded renderer horizon
   includes up to two queued fields beyond one tick. See
   [C1 evidence](internals.md#phase-11b-display-time-prediction-c1-gate-complete).
-  Stop before C2.
-- **C2.** Player translation per field: identify the native player velocity model
+- **C2 — complete.** Player translation per field: identify the native player velocity model
   (thrust, afterburner, speed ramps), advance velocity and position every field with
   carried fractions, exclude the player from the world position step `E:80b6`, and
   commit at the tick as rotation already does. Gate: zero camera-position correction
   at ticks in steady flight and turns; fuel, speed and world state match within
-  documented tolerance; collisions use the committed authoritative pose.
+  documented tolerance; collisions use the committed authoritative pose. All four
+  live windows pass, with 656 checked ticks and zero player/camera corrections.
+  Native field arithmetic, world bookkeeping, fallbacks and render restoration
+  pass. See [C2 evidence and tolerances](internals.md#phase-11b-player-translation-c2-gate-complete).
+  Stop before C3.
 - **C3.** Heading-aware extrapolation: direct each object's predicted velocity
   along its predicted orientation, using the existing angular-step prediction.
   Gate: hard-turn full-tick forecast error well below the phase-10 p95 4.357 km /
   max 8.982 km; constant-velocity classes stay exact.
 - **C4.** Frame-time spikes: measure frame intervals around world ticks and
   catch-up batches; resolve with tick placement or cheaper ticks until
-  frame-interval p95 equals the median in steady flight.
+  frame-interval p95 equals the median in steady flight. C2 held-turn windows
+  expose 122/657 missed prediction targets on the cycle-exact 040 and 72/663 on
+  NTSC 030. The previous C1 build also misses 112/657 in the matched 040 turn
+  control. These fail the C1 display-time checker; steady gates still pass.
 
 **D. Rendering cost (driven by A3/D1)**
 
