@@ -75,6 +75,30 @@ timing_scene_snapshot:
         move.w  -18280(a4),d0
         cmp.w   timing_scene_view(pc),d0
         bne.w   .check_next
+        ifne BUFFERED
+        ; Only an actual completed constructor may bypass old-slot continuity.
+        lea     projectile_types(pc),a0
+        move.w  (a0,d4.w*2),d0
+        beq.s   .old_slot
+        lea     5888(a4),a0
+        cmp.w   (a0,d4.w*2),d0
+        bne.w   .check_next
+        lea     projectile_models(pc),a0
+        move.w  (a0,d4.w*2),d0
+        lea     6136(a4),a0
+        cmp.w   (a0,d4.w*2),d0
+        bne.w   .check_next
+        lea     5888(a4),a0
+        cmpi.w  #5,(a0,d4.w*2)     ; effect-script shot has no word lifetime
+        beq.w   .accept
+        lea     5320(a4),a0
+        move.w  (a0,d4.w*2),d0
+        bgt.w   .accept
+        cmpi.w  #-1,d0
+        beq.w   .accept
+        bra.w   .check_next
+.old_slot:
+        endif
         lea     5888(a4),a0
         lea     timing_scene_types(pc),a1
         move.w  (a0,d4.w*2),d0
@@ -89,7 +113,21 @@ timing_scene_snapshot:
         lea     timing_scene_life(pc),a1
         move.w  (a0,d4.w*2),d0
         cmp.w   (a1,d4.w*2),d0
+        ifne BUFFERED
+        ble.s   .life_ok
+        ; A constructor-certified ship cooldown is not a birth or teleport.
+        lea     projectile_cooldown_valid(pc),a0
+        tst.b   (a0,d4.w)
+        beq.w   .check_next
+        lea     projectile_cooldown(pc),a0
+        sub.w   (a0,d4.w*2),d0
+        beq.s   .life_ok
+        cmpi.w  #-1,d0            ; player input precedes native countdown
+        bne.w   .check_next
+.life_ok:
+        else
         bgt.w   .check_next       ; lifetime reload/new object
+        endif
         cmpi.w  #10,d4
         bhs.s   .position
         lea     5478(a4),a0
@@ -128,12 +166,16 @@ timing_scene_snapshot:
         cmp.l   d1,d0
         bhi.s   .check_next
         dbra    d3,.check_axis
+.accept:
         move.b  #1,(a5,d4.w)
 .check_next:
         addq.w  #1,d4
         addi.w  #12,d5
         cmpi.w  #61,d4
         blo.w   .check
+        ifne BUFFERED
+        bsr.w   projectile_reset
+        endif
         lea     timing_scene_snapshot_data(pc),a1
         lea     timing_scene_snapshot_ranges(pc),a2
         moveq   #8,d2

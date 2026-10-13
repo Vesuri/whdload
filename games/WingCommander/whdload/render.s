@@ -1,11 +1,12 @@
 ; Experimental English-only renderer: CUSTOM1=2. CUSTOM1=0/1 keeps original.
 ; Each generated converter has immutable geometry: no SMC or private workspace.
 ; Entry replaces only S:178a's MOVEM; all other original offsets stay fixed.
+; Long PC-relative transfers keep diagnostic builds within branch reach.
 render_entry:
         movem.l d0-a6,-(sp)
         move.l  slave+$1de4(pc),d7
         cmpi.l  #2,d7
-        bne.w   slave+$178e
+        bne.l   slave+$178e
         move.l  slave+$1e04(pc),d7
         subq.l  #1,d7
         beq.s   .convert
@@ -27,7 +28,7 @@ render_entry:
         bsr.w   slave+$1ac6
         bra.w   render_converted
 .original128:
-        bsr.w   slave+$17f6
+        bsr.l   slave+$17f6
         bra.w   render_converted
 .original166:
         bsr.w   slave+$195e
@@ -74,7 +75,7 @@ render_converted:
         bsr.w   slave+$1ac6
         bra.s   .compare
 .ref128:
-        bsr.w   slave+$17f6
+        bsr.l   slave+$17f6
         bra.s   .compare
 .ref166:
         bsr.w   slave+$195e

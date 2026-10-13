@@ -611,13 +611,16 @@ display wait (6–7 ms of idle per frame).
   close D5. A2 remains separate follow-up; no physical 040 performance claim
   follows from these model results. Stop before E1.
 
-**Known presentation defect — cannon spawn hold (analyzed, not fixed).**
-New class-8 bolts are excluded from prediction for their first world interval.
-Player firing also reloads the shared lifetime/cooldown field, falsely triggering
-whole-view discontinuity protection. Native reproduction isolates both guards;
-velocity is already available at spawn. See
-[spawn analysis](internals.md#cannon-spawn-first-interval-prediction-hold).
-A fix must address both guards without changing simulation or firing cadence.
+**Spawn prediction fix — complete.** Completed native player/AI weapon
+constructors certify new projectile identities for their first presentation
+interval. Constructor-recorded shooter cooldowns no longer trigger false view
+cuts. Slot reuse, death, view cuts and modal rebasing retain protection; native
+simulation and firing cadence remain unchanged. Native checks cover 44
+constructors, 220 render samples, simultaneous mounts and 56 rejecting controls.
+Short held-fire gates measure 49.92 frames/s on 030 and 48.03 on the cycle-exact
+040 model, with recorder/observer agreement and correct buffer ownership. See
+[spawn fix and limits](internals.md#cannon-spawn-first-interval-prediction-hold).
+Hardware acceptance is still separate; stop before E1 and keep phase 12 paused.
 
 **E. Acceptance**
 

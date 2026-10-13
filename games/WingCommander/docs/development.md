@@ -2812,23 +2812,63 @@ are inclusive model elapsed time; full-arm `delta_total` includes the common
 history copy, while changed-block cost excludes comparison/history. Never compare
 these as identical leaf operations or treat these 040 timings as hardware proof.
 
-### Cannon spawn and initial prediction hold
+### Newly spawned projectile prediction
 
-Reproduce the isolated native constructor/snapshot analysis against a fresh normal
-release build. Requires the retained combat memory fixture already used by
-`timing_scene_check.py`; all derived output remains under `tmp/`.
+Build a fresh normal release and execute the native constructor/snapshot checks.
+The retained combat fixture is the same one used by `timing_scene_check.py`.
+All derived output stays under `tmp/`; choose fresh names when rerunning.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/projectile-spawn-build
-python3 tools/projectile_spawn_check.py tmp/projectile-spawn-build \
-  --output tmp/projectile-spawn-report.json
+python3 tools/reconstruct.py --release --output tmp/projectile-fix-final
+python3 tools/projectile_spawn_check.py tmp/projectile-fix-final \
+  --output tmp/projectile-fix-final-spawn.json
+python3 tools/timing_adapter_check.py tmp/projectile-fix-final \
+  --output tmp/projectile-fix-final-install
+python3 tools/timing_scene_check.py tmp/projectile-fix-final \
+  --output tmp/projectile-fix-final-scene
+python3 tools/release_check.py tmp/projectile-fix-final --negative-controls \
+  --output tmp/projectile-fix-final-options.json
+python3 tools/flight_render_check.py tmp/projectile-fix-final \
+  --output tmp/projectile-fix-final-pixels.json
 ```
 
-The retained analysis used `tmp/preinstalled-d5/build` and wrote
-`tmp/projectile-spawn-analysis/final.json`. The tool checks 020/040 ISA semantics,
-not performance: one native gun construction, native countdown/integration,
-first/second snapshot prediction, five render fractions each, authoritative
-position restoration, and independent overrides of both blocking guards. It
-stops before sound and does not run a complete collision/AI world update. See
-internals' cannon-spawn analysis for offsets and the precise coverage limits.
+The spawn check covers player/enemy constructors, bolts, guided launches,
+class-10 missiles/effects, alternate AI shots, simultaneous mounts and rejection
+boundaries. It compares complete native constructor data/registers/CCR and
+restoration after each render. Sound is stubbed; collisions and the full AI world
+loop are outside this isolated check. Unicorn supplies semantics, not timing.
+
+The short held-fire model gate uses the normal diagnostic recorder:
+
+```sh
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 \
+  --output tmp/projectile-fix-frames2
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/projectile-fix-frames2/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/projectile-fix-layout
+for cpu in 030 040; do
+  options='CACHE DCACHE'; extra=()
+  if [ "$cpu" = 040 ]; then options=NoMMU; extra=(--timing-core); fi
+  DEBUG_PORT=2499 python3 tools/frame_capture.py \
+    --fixture tmp/projectile-fix-frames2/WingCommanderCD32.Slave \
+    --machine "a1200-$cpu" --options "$options" --baseline-cache-model \
+    --custom5 0 --debugger --observer --display-sample --held-key 40 \
+    --layout tmp/projectile-fix-layout/layout.json \
+    --output "tmp/projectile-fix-$cpu-fire" --timeout 180 "${extra[@]}"
+  python3 tools/frame_check.py "tmp/projectile-fix-$cpu-fire" \
+    --output "tmp/projectile-fix-$cpu-fire/check.json"
+  python3 tools/buffer_report.py "tmp/projectile-fix-$cpu-fire" \
+    --layout tmp/projectile-fix-layout/layout.json --build tmp/projectile-fix-frames2 \
+    --output "tmp/projectile-fix-$cpu-fire/buffers.json"
+done
+python3 tools/frame_report.py tmp/projectile-fix-030-fire tmp/projectile-fix-040-fire \
+  --output tmp/projectile-fix-fps.json
+```
+
+These are 030 baseline and cycle-exact 040 model measurements; the latter remains
+uncalibrated against hardware. Native prediction assertions establish the fix;
+FPS and buffer ownership checks establish the scoped live gate, not subjective
+hardware acceptance or every intermediate pixel.

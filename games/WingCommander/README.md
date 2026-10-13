@@ -51,6 +51,11 @@ gain on either model, and full conversion remains slower than changed blocks.
 The release converter selection is unchanged. See the
 [D5 comparison](docs/internals.md#phase-11b-kalms-families-d5-model-evaluation-complete).
 Hardware calibration is separate follow-up under A2, not a D5 completion gate.
+New projectiles now extrapolate from their first presentation interval, covering
+player and AI weapon constructors. Firing cooldowns no longer cause false view
+cuts. Native state-restoration checks and short held-fire model gates pass
+(030: 49.92 frames/s; cycle-exact 040: 48.03). See the
+[spawn fix and limits](docs/internals.md#cannon-spawn-first-interval-prediction-hold).
 Stop before E1; phase 12 stays paused.
 
 **Phase 11 is complete: changed-block flight conversion.**

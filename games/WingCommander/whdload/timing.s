@@ -268,6 +268,7 @@ timing_rebase:
 .discarded:
         ifne BUFFERED
         bsr.w   translation_reset
+        bsr.w   projectile_reset
         endif
         lea     timing_scene_valid(pc),a0
         clr.w   (a0)

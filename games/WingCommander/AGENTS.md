@@ -10,6 +10,8 @@ D4 comparison-cost gate is complete with a compact full-image comparison;
 drawing-based dirty rectangles remain deferred. D5 is complete on the current
 models: retain the current converter selection. The user excludes real-hardware
 validation from D5; A2 remains separate follow-up work. Stop before E1.
+Newly spawned projectile prediction is fixed, including native AI shot paths
+and gun-cooldown discontinuity handling; native and scoped live gates pass.
 Calibrated 040 profiling remains blocked on A2.
 Every gate reports end-to-end frames/s from the
 `--frame-stats` recorder on the 030 model and the cycle-exact 040 core, and on a

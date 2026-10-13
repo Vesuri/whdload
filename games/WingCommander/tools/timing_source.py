@@ -18,10 +18,11 @@ def source(root, buffered=False):
              (0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]
     if buffered:
         patches=[(off,'release_input_vblank' if off==0x34188 else label,op) for off,label,op in patches]
-        patches += [(0x306,'view_clear',0x4eb9),(0xc4c,'view_compose',0x4eb9),(0x2b648,'timing_scene_allocate',0x4ef9),(0x807a,'translation_velocity',0x4ef9),(0x80b6,'translation_position',0x4ef9),(0x3378e,'release_publish',0x4ef9),(0x337ea,'release_teardown',0x4ef9)]
+        patches += [(0xc912,'projectile_gun_return',0x4ef9),(0xca5e,'projectile_missile_return',0x4ef9),(0xc316,'projectile_effect_return',0x4ef9),(0x9a52,'projectile_init_return',0x4ef9),(0x306,'view_clear',0x4eb9),(0xc4c,'view_compose',0x4eb9),(0x2b648,'timing_scene_allocate',0x4ef9),(0x807a,'translation_velocity',0x4ef9),(0x80b6,'translation_position',0x4ef9),(0x3378e,'release_publish',0x4ef9),(0x337ea,'release_teardown',0x4ef9)]
     lines=[(root/'whdload/timing.s').read_text(),(root/'whdload/timing_clock.s').read_text(),(root/'whdload/timing_player.s').read_text(),(root/'whdload/timing_input.s').read_text(),(root/'whdload/timing_presentation.s').read_text(),(root/'whdload/timing_scene.s').read_text(),'timing_install:']
     if buffered:
         lines.insert(-1,(root/'whdload/timing_translation.s').read_text())
+        lines.insert(-1,(root/'whdload/timing_projectiles.s').read_text())
         lines.insert(-1,(root/'whdload/timing_scene_slots.s').read_text())
         lines.insert(-1,(root/'whdload/view_regions.s').read_text())
     for offset,_,_ in patches:

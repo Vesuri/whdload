@@ -4128,9 +4128,10 @@ comparisons. Reproduction commands are in development's D5 section.
 
 ## Cannon spawn: first-interval prediction hold
 
-Analysis of the current D5 release confirms two independent prediction guards
-that explain a new cannon bolt holding its initial displayed position. This is
-not missing velocity data. No production code is changed by this analysis.
+The enhanced English release now predicts newly constructed projectiles in their
+first world interval. Native velocity was already available; two independent
+continuity guards caused the reported hold. Construction and simulation remain
+native; the fix records presentation metadata only.
 
 ### Native sequence
 
@@ -4155,9 +4156,9 @@ The held point is its first post-update position, not necessarily its muzzle
 spawn coordinate. Collision/destruction can remove a bolt before it reaches
 this presentation path; the reproduction isolates the surviving-shot case.
 
-### Why it holds
+### Cause in the previous build
 
-`timing_scene_snapshot` first clears each prediction bit, then requires unchanged
+The previous `timing_scene_snapshot` first clears each prediction bit, then requires unchanged
 class/model and a non-increasing `D:94c6 + 2*slot` before accepting continuity.
 An empty-to-class-8 slot fails the identity check. A recycled matching slot can
 also fail the lifetime-reload test. Copying the new position and velocity into
@@ -4180,29 +4181,73 @@ The hold covers one 10 Hz simulation interval, nominally 100 ms. The exact
 visible duration depends on render/display timing and is not measured on hardware
 by this native check. Input waiting for its next world tick is a separate latency.
 
-### Native reproduction and fix boundary
+### Constructor-certified first-interval prediction
 
-`tools/projectile_spawn_check.py` executes the native constructor for player mount
-0 using retained combat state, stopping at `E:c8ae` / file `c8da` before sound
-selection. It runs the native countdown and class-8 integration routines, followed
-by the current release's actual snapshot/begin/end prediction routines. This is
-an isolated semantics reproduction, not a full world/collision/AI or live timing
-capture. The player is explicitly initialized to the gun-ready `-1` sentinel.
+`whdload/timing_projectiles.s` records the completed native slot's class/model and
+its shooter's observed cooldown. The guarded English hook sites are:
 
-On both 020 and 040 ISA models, the captured mount allocates slot 12, changes
-class 0 to 8, supplies a nonzero velocity immediately, sets bolt life to 30 and
-reloads player cooldown to 6 (5 at the first snapshot). The first snapshot has
-both prediction bits clear. Five PAL render-fraction samples hold exactly the
-same bolt position; the next snapshot enables five smoothly advancing samples.
-Every render restores the authoritative position. Artificially enabling only
-one guard still holds the bolt; enabling both permits movement. These controls
-localize both blockers without modifying the release. Detailed coordinates,
-hashes and control results remain in `tmp/projectile-spawn-analysis/final.json`.
+| Hook | Code / file offset | Coverage |
+|---|---|---|
+| Gun return | `c912` / `c93e` | Shared player/AI `c458` construction, including class 8 bolts and class 11 guided launches. |
+| Alternate AI shot return | `c316` / `c342` | `c1e4` model-48 class-5 approximate shot effect. |
+| Missile/effect return | `ca5e` / `ca8a` | `ca38` class-10 path, including delegation from `c458`; no shooter cooldown reload here. |
+| Common initializer return | `9a52` / `9a7e` | Revokes pending birth/cooldown when any slot is reinitialized, even to the same class/model. |
 
-A future fix should distinguish ship weapon cooldown from object birth/death,
-and grant prediction to a positively identified, fully initialized bolt at its
-post-world snapshot. It must preserve real player-cut, slot-reuse, expiry,
-collision and modal guards, and leave firing cadence, energy and authoritative
-motion unchanged. Multiple mounts, rapid recycling and non-player/missile spawn
-paths need separate coverage before generalizing the exception. No such fix is
-implemented or accepted by this analysis.
+Each hook preserves the original epilogue, registers and condition codes. No
+allocation, velocity, lifetime, energy, collision or firing rule changes. Failed
+slots and render-staged constructors cannot certify a birth. Only completed
+weapon constructors may certify classes 5, 8, 10 or 11; arbitrary effects and
+ordinary identity changes do not gain the exception.
+
+The post-world snapshot accepts a pending birth only while its class/model still
+match and its lifetime remains live (class 5 uses its native effect script, not
+the word lifetime). It still requires a valid previous snapshot and unchanged
+view. Ordinary slots retain continuity checks. A constructor-certified shooter
+cooldown may equal the recorded value or one less, accounting for the native
+countdown between player input and snapshot; identity, action and position-cut
+checks still apply. Actual player cuts still suppress whole-world prediction.
+Birth and cooldown masks are consumed after every snapshot and cleared on clock
+rebase, so records cannot bridge modal transitions. Multiple mounts retain
+separate slot identities. The renderer uses the existing velocity/heading-aware
+forecast and restores the authoritative data before gameplay resumes.
+
+`tools/projectile_spawn_check.py` executes complete native constructors against
+an unmodified-code reference on 020/040 ISA models, for shooters 0 and 1 and
+weapon models 24–33 plus the alternate model-48 path. All 44 constructors preserve
+the entire data hunk, returned registers and materialized CCR. Sound enqueue is
+stubbed equally in both arms. The checker includes native countdown/integration
+for classes 5/8/10 and the native class-11 launch transition, then tests five PAL
+render fractions: 220 samples restore the entire authoritative data hunk. The
+constant-velocity classes match exact signed displacement; class-11 samples use
+the existing guided forecast rather than asserting a constant-velocity oracle.
+Class 10's native constructor can provide zero velocity; this fix does not invent
+motion absent from the simulation.
+
+Four two-mount cases retain both births. Fifty-six rejecting controls cover each
+original guard independently, death, model replacement, expiry, view/first-snapshot
+cuts, mismatched cooldown, player jumps, same-model reinitialization, inactive or
+staged construction, invalid slots and modal rebasing. These are isolated semantic
+checks, not complete collision/AI world replay or hardware timing measurements.
+Retained evidence is under `tmp/projectile-fix-final-*`. Installer, option-off,
+scene-restoration and whole-output converter regression checks also pass.
+
+The short Nav-1 held-fire recorder gate uses `tmp/projectile-fix-frames2` with
+`CUSTOM5=0`. These are end-to-end displayed-picture rates, not native execution
+throughput:
+
+| Model | Displayed frames/s | World updates/s | Display intervals (fields) |
+|---|---:|---:|---|
+| PAL 030 baseline, CACHE/DCACHE | 49.92 | 9.93 | 638 × 1 |
+| PAL cycle-exact 040, NoMMU | 48.03 | 9.94 | 612 × 1, 25 × 2 |
+
+The independent observer agrees with all 661/660 recorded publications; the
+trimmed analysis window supplies the intervals above. Both runs pass FAST/CHIP
+placement, two-buffer ownership, line-4 publication and zero input-overflow
+checks. The 040 remains an uncalibrated model; occasional two-field pictures are
+still present. This is not a hardware smoothness acceptance or E1 completion.
+Reports: `tmp/projectile-fix-fps.json` and each `tmp/projectile-fix-0?0-fire/`
+`check.json`/`buffers.json`. Normal release SHA-256:
+`f2bcdd984e2d2ec67b24054ef0d2888d449740d7fe79b76e94b35d963b00a647`.
+The enlarged diagnostic build required long PC-relative transfers for the
+renderer fallback and original 128-line converter; regression checks cover their
+unchanged output. No converter algorithm or cache policy changed.
