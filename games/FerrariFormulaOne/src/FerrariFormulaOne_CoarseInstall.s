@@ -4,6 +4,11 @@
 ; Selection 0 and fine selection 2 return without installing any coarse hooks.
 ; CPU-only code, ledger and snapshots use the existing public-memory owners.
  IFD FF1_COARSE_STEP
+ IFD FF1_COARSE_NATIVE_EXACT
+ IFND FF1_COARSE_020
+ fail "FF1_COARSE_NATIVE_EXACT requires the 68020 coarse build"
+ ENDC
+ ENDC
 start:
  movem.l d0-d7/a0-a6,-(sp)
  cmpi.l #$22f30,(a3)
@@ -161,6 +166,16 @@ C1Activate:
  bne.w C1Fault
  cmpi.w #$c8b0,$654bc
  bne.w C1Fault
+ IFD FF1_COARSE_NATIVE_EXACT
+ ; Reuse audited native arithmetic only on the opt-in 68020 coarse path.
+ ; The same race ledger owns and restores every changed instruction.
+ move.w C2Enabled(pc),d0
+ beq.b .native_exact_done
+ bsr.w FF1InstallNativeExact
+ move.l error(pc),d0
+ bne.w C1Fault
+.native_exact_done:
+ ENDC
  bsr.w FF1InstallPresentation
  move.l error(pc),d0
  bne.w C1Fault
@@ -248,4 +263,8 @@ C1InstallUnload:
  rts
 C1UnloadInstalled: dc.l 0
 C1Ledger: ds.b 24
+ IFD FF1_COARSE_NATIVE_EXACT
+C2Enabled: dc.w 1
+ include "FerrariFormulaOne_NativeExact.s"
+ ENDC
  ENDC
