@@ -1903,8 +1903,9 @@ in particular, 060 NoCache still fails bare/IRQ exact recorder neutrality.
 
 ## Phase 5: intro motion model and PC reference
 
-Phase 5 analysis is complete; **the rate decision remains with the user**.
-No phase 6 renderer or release timing change has been made. The user's clarified
+Phase 5 analysis is complete. **The user selected 10 native updates/s for the
+intro, matching flight**, superseding the PC-derived candidate below. The video
+is a secondary visual reference, not an intended-rate authority. The user's clarified
 reference is the movement of ships, explosions and asteroids: visible advances
 per second **and distance/size change**, not total intro length or credit duration.
 Keep the existing music and text deadlines. Their cadence is not a motion-rate
@@ -2045,28 +2046,19 @@ Runtime confirmations, limited to this English PAL software-c2p intro:
 - No inference about flight's mission clock, unvisited modal paths, NTSC, German
   or OCS follows from these observations.
 
-### Rate-decision gate
+### Rate decision
 
-**Recommended practical ship-motion candidate: about 15 native updates/s**, with
-an approximate **15–17/s** range supported by the short displacement comparison.
-The measured 020 ship portion executes about 16.4 updates/s while producing about
-8.2 pictures/s and a similar projected travel speed to the PC sample. In the
-unmodified two-update-per-draw loop, 15 updates/s means about **7.5 drawn frames/s**,
-not a 15 FPS cap. Better rendering must eventually show intermediate motion
-without doubling the distance travelled per second.
+The selected intro target is **10 native world updates/s**, matching the measured
+flight-unit anchor. This is a practical design decision, not independent proof
+of the original intro's historical intended rate. Native displacement is not
+scaled toward the earlier 15–17/s PC-derived candidate. The recorded PC ship,
+explosion and asteroid advances remain reference observations only.
 
-For asteroids the PC reference is faster, approximately **20–25 visible advances/s**.
-Treat this as a separate visual target. A one-to-one PC/Amiga native-step mapping
-has **not** been established for the differently populated asteroid trajectories;
-calling 22 native updates/s a proved intended rate would overstate the evidence.
-The video also does not establish a universal historical design rate.
-
-The decision is therefore concrete: retain a common approximately 15-update/s
-working target, or use separate motion targets with the PC displacement/cadence
-examples above. **Prefer matching motion per subject over a blanket publication
-cap**, and preserve the native music/text deadlines in either case. The user
-chooses at this gate; no rate is installed by phase 5. Flight calibration remains
-phase 7. These limitations do not reopen the phase 4 profiling matrix.
+The enhanced ship/title and asteroid-credit loops now separate updates from
+rendering. Ships, asteroids and the scripted camera use bounded display-time
+extrapolation. Discrete explosion images remain tick-owned; no intermediate
+artwork is fabricated. Music playback and native credit deadlines are retained.
+See the intro-clock implementation gate below for exact scope and validation.
 
 ## Phase 6 rendering implementation
 
@@ -4251,3 +4243,77 @@ Reports: `tmp/projectile-fix-fps.json` and each `tmp/projectile-fix-0?0-fire/`
 The enlarged diagnostic build required long PC-relative transfers for the
 renderer fallback and original 128-line converter; regression checks cover their
 unchanged output. No converter algorithm or cache policy changed.
+
+
+### Intro 10 Hz world and extrapolated presentation
+
+The enhanced English ship/title and asteroid-credit world now uses the same
+10 Hz scheduler and bounded display-time extrapolation as flight. This is the
+selected working rate, not a historical-rate proof from the PC recording.
+Other languages/options and the separate music-cued Origin logo remain native.
+Flight controls are not enabled in the intro: a separate activation flag shares
+only the world clock, scene prediction and display queue.
+
+Offsets below are English executable code-hunk offsets (`E`); file offsets are
+`E + 0x2c`. Data offsets (`D`) are relative to hunk 1 (stored file base `0x3a048`).
+
+- `E:1fd00..1fd8e` (file `1fd2c..1fdba`) is replaced by a script loop that
+  advances its native index/title geometry only on world updates: 296 native
+  calls to `E:02a8`, over 1480 PAL fields in the isolated scheduler check.
+- Credits detour update/draw/finish at `E:1fdda`, `1fde0`, `1fe14` (file
+  `1fe06`, `1fe0c`, `1fe40`). Native text/page tests at `E:1fdec` and `1fe30`
+  retain their 220/320-field deadlines. Music interrupt code is unchanged.
+  The eight-byte exit span at `E:1fe44` includes the old backward branch;
+  explicit destinations are `E:1fc8e` (repeat) and `E:1fe4c` (skip).
+- Scripted view 15 uses camera slot 61. Native `E:7056` advances its position
+  and basis during updates; rendering predicts and restores it alongside the
+  objects. Calling the native camera update again per picture would double-step
+  the camera. Intro prediction also allows object slot 0 to rotate.
+- Asteroid generation/cleanup `E:98a2`, formerly called by drawing at `E:032e`
+  (file `035a`), now runs once per intro tick after native visibility rebuild
+  `E:2a086`. `E:9836` supplies the spawning proxy, `E:969a` allocates class 4,
+  and `D:5212` holds the slot list. Cleanup `E:97b2` temporarily uses the world
+  counter `D:914c` instead of draw counter `D:9150` for its modulo-20 selection.
+  Leaving generation in drawing caused snapshot restoration to discard new
+  asteroids: this explains the missing field behind the credits and is fixed.
+- Background flash `E:15fb4`, called at `E:02f8` (file `0324`), and the
+  `E:65f4` emission predicate are tick-owned in the intro. Render randomness
+  uses a private seed; authoritative gameplay RNG `D:6f18` is restored.
+
+Validation uses normal release `tmp/intro-clock-release-r2` (SHA-256
+`fdd92fbbda8689e3ec3ab2353d5baa866859469a684026841fd71527e0a6de8d`) and
+recorder build `tmp/intro-clock-stats-r2` (SHA-256
+`2ea7d7301a6756ca9bdb9d90d31924f3fb7dfdc3978e16a3234f19e7907a8166`).
+Native 020/040 checks pass 12 PAL/NTSC clock schedules, 96 camera/object
+prediction/restoration cases, title completion, flash/emission ownership and
+both credit exit destinations. Sixty actual native draws from live title/credit
+states show between-tick projected movement, including 81 changed asteroid
+projection samples per ISA model, while restoring authoritative poses, object
+identities/lifetimes and gameplay RNG. That check excludes composition/C2P and
+interrupt execution; live publication checks cover the display path separately.
+Installer guards, option-off/converter checks (196 options, 54 outputs, 270
+pacing cases), 44 native projectile constructors, 220 spawn renders and the
+96-case flight scene regression also pass.
+
+| PAL model / section | Displayed frames/s | World updates/s | Recorded pictures |
+|---|---:|---:|---:|
+| Cached 030, title | 48.98 | 9.985 | 786 |
+| Cached 030, asteroid credits | 49.92 | 9.978 | 319 |
+| Cycle-exact 040, title | 25.30 | 9.980 | 751 |
+| Cycle-exact 040, asteroid credits | 29.13 | 9.950 | 186 |
+
+These are end-to-end recorder measurements, not a matched optimization benchmark
+or hardware guarantee. The 8192-record cap truncates the 030 title measurement to
+16.03 seconds; the 040 title covers 29.65 seconds. Independent observers agree
+with every recorded publication (786/319 on 030, 751/186 on 040). Both models
+complete exactly 296 title updates and the first credit page in 320 fields.
+The 030 full-cycle run completes all 18 credit pages and repeats; both runs
+then reach the menu with intro/flight/staged/pending flags clear. Audio timing
+code and credit deadlines are preserved, but this does not assert a pixel- or
+music-cue-identical title sequence after selecting a new world rate.
+
+Reports are `tmp/intro-clock-report-r2.json`,
+`tmp/intro-clock-live-poses-r2.json`, `tmp/intro-clock-native-r2.json` and the
+section `check.json` files under `tmp/intro-clock-0?0-r2/`. The 040 core remains
+uncalibrated against hardware. E1, full campaign acceptance, separate Origin-logo
+motion work and phase 12 release work are not completed by this gate.

@@ -25,12 +25,36 @@ frame_stats_init:
         movem.l (sp)+,d0-d1/a0-a1/a6
         rts
 
+        ifne BUFFERED
+; A fresh diagnostic window at each intro section, without debugger writes.
+; The host can read a completed prefix before the next section begins.
+frame_stats_intro_begin:
+        movem.l d0/a0,-(sp)
+        lea     frame_stats_count(pc),a0
+        clr.l   (a0)
+        lea     frame_stats_display_count(pc),a0
+        clr.l   (a0)
+        lea     frame_stats_saved(pc),a0
+        clr.w   (a0)
+        lea     frame_stats_first(pc),a0
+        move.l  -252(a4),(a0)
+        lea     frame_stats_started(pc),a0
+        move.w  #1,(a0)
+        movem.l (sp)+,d0/a0
+        rts
+        endif
+
 ; Stack: return address, then the event id word pushed by FSTAT.
 ; Preserves every register and the condition codes.
 frame_stat:
         movem.l d0-d3/a0,-(sp)
         move.w  ccr,-(sp)
         tst.w   timing_active(pc)
+        ifne BUFFERED
+        bne.s   .active
+        tst.w   intro_active(pc)
+.active:
+        endif
         beq.w   .done
         move.l  frame_stats_buffer(pc),d0
         beq.w   .done

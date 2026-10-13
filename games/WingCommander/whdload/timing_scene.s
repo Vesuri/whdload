@@ -174,6 +174,13 @@ timing_scene_snapshot:
         cmpi.w  #61,d4
         blo.w   .check
         ifne BUFFERED
+        tst.w   intro_active(pc)
+        beq.s   .checked
+        cmpi.w  #62,d4
+        blo.w   .check
+.checked:
+        endif
+        ifne BUFFERED
         bsr.w   projectile_reset
         endif
         lea     timing_scene_snapshot_data(pc),a1
@@ -219,6 +226,10 @@ timing_scene_tick:
         rts
 
 timing_debris_draw:
+        ifne BUFFERED
+        tst.w   intro_active(pc)
+        bne.s   .done
+        endif
         tst.w   timing_active(pc)
         bne.s   .done
         bra.w   timing_debris_original
@@ -247,6 +258,11 @@ timing_scene_begin:
         lea     timing_scene_fraction(pc),a0
         clr.l   (a0)
         tst.w   timing_active(pc)
+        ifne BUFFERED
+        bne.s   .enabled
+        tst.w   intro_active(pc)
+.enabled:
+        endif
         beq.w   .done
         ifne BUFFERED
         bsr.w   timing_scene_save_active
@@ -282,6 +298,10 @@ timing_scene_begin:
         move.w  -18280(a4),d0
         cmp.w   timing_scene_view(pc),d0
         bne.w   .cut
+        ifne BUFFERED
+        tst.w   intro_active(pc)
+        bne.s   .intro_view
+        endif
         cmpi.w  #3,d0
         bhi.w   .cut
         tst.w   -29978(a4)
@@ -290,12 +310,22 @@ timing_scene_begin:
         bne.w   .cut
         cmpi.w  #-1,5478(a4)
         bne.w   .cut
+        ifne BUFFERED
+.intro_view:
+        endif
         lea     timing_scene_fraction(pc),a0
         move.l  d6,(a0)
         tst.l   d6
         beq.w   .camera
+        ifne BUFFERED
+        tst.w   intro_active(pc)
+        bne.s   .objects
+        endif
         tst.b   timing_scene_predictable(pc)
         beq.w   .camera           ; player jump cuts the entire camera interval
+        ifne BUFFERED
+.objects:
+        endif
         moveq   #0,d4
         moveq   #0,d5
 .object:
@@ -306,10 +336,17 @@ timing_scene_begin:
         beq.w   .next
         lea     5888(a4),a0
         move.w  (a0,d4.w*2),d0
+        ifne BUFFERED
+        cmpi.w  #61,d4
+        beq.s   .camera_slot
+        endif
         cmpi.w  #3,d0
         blo.w   .next
         cmpi.w  #7,d0
         beq.w   .next
+        ifne BUFFERED
+.camera_slot:
+        endif
         lea     timing_scene_types(pc),a1
         cmp.w   (a1,d4.w*2),d0
         bne.w   .next
@@ -339,10 +376,17 @@ timing_scene_begin:
         move.l  8(a2),d0
         cmp.l   8(a3),d0
         bne.w   .next
+        ifne BUFFERED
+        tst.w   intro_active(pc)
+        bne.s   .rotate
+        endif
         tst.w   d4
         beq.w   .translate       ; player orientation already elapsed-field
         ; Native axis rotations rebuild an orthogonal fixed-point basis.
         ; Angular steps are snapshots, not a second AI/controller invocation.
+        ifne BUFFERED
+.rotate:
+        endif
         moveq   #0,d3
 .axis:
         lea     timing_scene_angles(pc),a2
@@ -375,6 +419,8 @@ timing_scene_begin:
         cmpi.w  #3,d3
         bne.s   .axis
         ifne BUFFERED
+        cmpi.w  #61,d4
+        beq.s   .translate
         bsr.w   timing_scene_velocity
         endif
 .translate:
@@ -419,6 +465,13 @@ timing_scene_begin:
         addi.w  #12,d5
         cmpi.w  #61,d4
         blo.w   .object
+        ifne BUFFERED
+        tst.w   intro_active(pc)
+        beq.s   .objects_done
+        cmpi.w  #62,d4
+        blo.w   .object
+.objects_done:
+        endif
         bra.s   .camera
 .cut:
         lea     timing_scene_valid(pc),a0

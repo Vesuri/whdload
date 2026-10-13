@@ -2872,3 +2872,50 @@ These are 030 baseline and cycle-exact 040 model measurements; the latter remain
 uncalibrated against hardware. Native prediction assertions establish the fix;
 FPS and buffer ownership checks establish the scoped live gate, not subjective
 hardware acceptance or every intermediate pixel.
+
+
+### Intro world timing
+
+Use fresh output names; the capture/report tools reject existing output paths.
+The normal build checks native semantics. The diagnostic build supplies measured
+end-to-end display cadence; do not time Unicorn instruction execution.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/intro-clock-release-r2
+python3 tools/reconstruct.py --release --frame-stats --output tmp/intro-clock-stats-r2
+python3 tools/intro_clock_check.py tmp/intro-clock-release-r2 --output tmp/intro-clock-native-r2.json
+python3 tools/timing_adapter_check.py tmp/intro-clock-release-r2 --output tmp/intro-clock-install-r2
+python3 tools/release_check.py tmp/intro-clock-release-r2 --negative-controls --output tmp/intro-clock-options-r2.json
+python3 tools/projectile_spawn_check.py tmp/intro-clock-release-r2 --output tmp/intro-clock-projectiles-r2.json
+python3 tools/timing_scene_check.py tmp/intro-clock-release-r2 --output tmp/intro-clock-flight-r2
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/intro-clock-stats-r2/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM5=0' WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/intro-clock-layout-r2
+DEBUG_PORT=2499 python3 tools/intro_clock_capture.py --build tmp/intro-clock-stats-r2 \
+  --layout tmp/intro-clock-layout-r2/layout.json --machine a1200-030 \
+  --full-cycle --output tmp/intro-clock-030-r2
+DEBUG_PORT=2499 python3 tools/intro_clock_capture.py --build tmp/intro-clock-stats-r2 \
+  --layout tmp/intro-clock-layout-r2/layout.json --machine a1200-040 \
+  --output tmp/intro-clock-040-r2
+python3 tools/intro_clock_report.py tmp/intro-clock-030-r2 tmp/intro-clock-040-r2 \
+  --output tmp/intro-clock-report-r2.json
+for cpu in 030 040; do
+  for section in title credits; do
+    python3 tools/frame_check.py "tmp/intro-clock-$cpu-r2/$section" \
+      --output "tmp/intro-clock-$cpu-r2/$section/check.json"
+  done
+done
+python3 tools/intro_pose_check.py --build tmp/intro-clock-stats-r2 \
+  --capture tmp/intro-clock-040-r2 --output tmp/intro-clock-live-poses-r2.json
+```
+
+The harness owns its emulator/debugger processes and stops only that run. It
+records the unskipped title and first credit page; `--full-cycle` also waits for
+all 18 pages and native repetition before skipping to the menu. It uses cached
+030 and cycle-exact 040/NoMMU model settings. Raw memory, state streams, observer
+ledgers and all build products remain in `tmp/`. The native pose check executes
+real drawing at five render fractions on both ISA models, asserting projected
+motion and restoration; it excludes C2P/publication. The full-cycle observer's
+page-end entries and terminal dumps permit separate exit-state inspection.

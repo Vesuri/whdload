@@ -139,6 +139,10 @@ timing_player_field:
 ; Rebuild ordinary forward/side/rear camera poses from the new player basis.
 ; Script and external-camera state machines must not advance on extra renders.
 timing_player_camera:
+        ifne BUFFERED
+        tst.w   intro_active(pc)
+        bne.s   .done
+        endif
         cmpi.w  #3,-18280(a4)
         bhi.s   .done
         tst.w   -29978(a4)

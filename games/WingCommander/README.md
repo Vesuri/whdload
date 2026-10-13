@@ -6,8 +6,8 @@ WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 **Phase 11b is in progress; C1–C3 and the C4 steady-flight gate are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for
 enhanced English flight without Psygore's frame cap. Values 1–4 retain Psygore's
-normal/unlimited/relaxed/slow modes. German default and enhanced nonflight scenes
-retain normal pacing. See the [candidate ReadMe](release/ReadMe).
+normal/unlimited/relaxed/slow modes. German default and other nonflight scenes retain normal pacing. The enhanced
+English ship/title and asteroid intro uses the flight 10 Hz clock and extrapolation. See the [candidate ReadMe](release/ReadMe).
 Enhanced flight queues completed pictures for early vertical blank and waits
 only before reusing a pending display buffer. The scoped PAL gates reach 49.92
 pictures/s on both tested models; the 040 core remains uncalibrated against hardware.
@@ -108,7 +108,7 @@ paths. Native and live twin checks verify identical converter output.
 FAST chunky storage and FMODE 3 were already present in the observed setup.
 Exact intro duration neutrality is not claimed: the final 020 intro is about
 0.63 seconds longer with the display-end wait. Music/text deadlines stay unchanged;
-intro rate selection remains deferred. Flight runtime gaps include comms, missile
+the ship/title and asteroid intro now uses the selected 10 Hz rate. Flight runtime gaps include comms, missile
 locking, normal damage, autopilot and landing; these paths have static cadence
 classifications, not full live validation. See [internals](docs/internals.md).
 
@@ -145,6 +145,8 @@ The installer and both full installs are pinned in `manifest/inputs.tsv`.
 Archives and separate extracted originals live under ignored `tmp/`.
 The shared development tools come from AmigaXDev's installed environment.
 
-Intro timing work is in progress: the enhanced English intro will use the same
-10 Hz world clock and extrapolated motion as flight, preserving music and credit
-deadlines. The PC recording is a secondary visual reference.
+Intro timing is complete: the enhanced English ship/title and asteroid intro uses
+the same 10 Hz world clock and extrapolated motion as flight. Asteroid generation
+runs during world updates so drawing cannot discard newly created asteroids.
+Music and credit deadlines remain native; the separate Origin logo remains native.
+See the [intro gate](docs/internals.md#intro-10-hz-world-and-extrapolated-presentation).

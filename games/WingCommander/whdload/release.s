@@ -26,11 +26,12 @@ release_setcpu:
         bra.w   timing_bad
 
 ; Full enhanced converter gate, including flight allocation fallback.
-; Active flight has no limiter. Nonflight retains Psygore normal pacing.
+; Flight and the clocked world intro have no limiter; other scenes keep normal.
 release_limit:
         tst.w   timing_active(pc)
-        beq.s   .nonflight
-        bra.w   release_convert_wait
+        bne.w   release_convert_wait
+        tst.w   intro_active(pc)
+        bne.w   release_convert_wait
 .nonflight:
         bsr.w   slave+$17b8
         rts

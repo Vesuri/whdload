@@ -33,8 +33,15 @@ timing_sim_score_draw:
 ; Clock ownership at the ordinary flight boundary. Native/modal paths retain
 ; their original counters. These adapters do not predict any world objects.
 timing_emission_clock:
+        ifne BUFFERED
+        tst.w   intro_active(pc)
+        bne.s   .world
+        endif
         tst.w   timing_in_world(pc)
         beq.s   .native
+        ifne BUFFERED
+.world:
+        endif
         move.w  4430(a4),d0
         bra.s   .mask
 .native:

@@ -79,7 +79,10 @@ Its normal c2p limiter waits two CIA-A TOD increments; that is not an intended-r
 measurement. In the original slave, `Custom5=4` selects the blitter c2p path, not Akiko.
 The public-option candidate removes it and uses 4 for Psygore slow. These
 findings refine the implementation assumptions below; flight now uses the selected
-10 Hz design, and the intro is being adapted to the same 10 Hz behavior. The OCS version remains unanalysed.
+10 Hz design, including the English ship/title and asteroid intro. Native and
+model gates pass; music and credit deadlines remain native. See the
+[intro gate](internals.md#intro-10-hz-world-and-extrapolated-presentation).
+The separate Origin logo remains native. The OCS version remains unanalysed.
 
 ## Goal
 
@@ -226,7 +229,7 @@ failures and broader drawing bounds remain explicit gaps, not gate blockers
 under this approved scope. Accelerated figures describe the emulator model.
 Phase 5 analysis is complete; phase 6 is now authorised.
 
-### Phase 5 — Game-time model for the intro (analysis complete; rate choice pending)
+### Phase 5 — Game-time model for the intro (analysis complete; 10 Hz selected)
 
 1. Confirm the time sources from phase 1 with traces.
 2. Coupling test: the same window on several CPUs and with VERIFY-only slowed drawing.
@@ -240,9 +243,9 @@ Phase 5 analysis is complete; phase 6 is now authorised.
 
 Gate reached: the mixed time model, measured motion references and a ship-update
 rate candidate are documented. A uniform rate is not established by the video;
-the asteroid native-step mapping is an explicit limit. The user subsequently authorised phase 6 and deferred further timing
-investigation to gameplay. Preserve the existing limiter and record remaining
-frame coupling; do not install the candidate rates as established facts.
+the asteroid native-step mapping is an explicit limit. The user subsequently
+selected the flight-derived 10 Hz working target for the intro. The PC-derived
+candidates are not installed as established facts.
 
 ### Phase 6 — Rendering, first pass (rendering complete; timing gap documented)
 
@@ -505,8 +508,8 @@ display wait (6–7 ms of idle per frame).
   `Custom5` choice (user, 2026-10-13): 0 enhanced (default; WHDLoad's unset value),
   1–4 Psygore normal/unlimited/relaxed/slow (his 0–3, shifted; his blitter option is
   dropped). `Custom1` selects only the language. German with 0 falls back to Psygore
-  normal until the German port exists; outside flight, 0 keeps Psygore's normal
-  limiter until those scenes have fixed rates. The ReadMe states both and the
+  normal until the German port exists. The clocked ship/title and asteroid intro
+  now also bypasses the limiter; remaining scenes keep normal pacing. The ReadMe states both and the
   changed numbering. Psygore's modes stay for now.
   Native option/pacing/output gates and the required frame-rate reports pass;
   see [B1 evidence](internals.md#phase-11b-public-modes-and-uncapped-flight-b1-gate-complete).
@@ -652,7 +655,6 @@ executable, display, c2p (none expected) and timing. Reuse designs, not assumpti
 
 ## Decisions pending
 
-- Intro implementation must validate 10 Hz updates, between-update motion and unchanged music/credit deadlines.
 - Release play-testing must judge visible hard-turn corrections and all model/camera paths;
   the implemented presentation policy predicts to display time with authoritative
   snaps and a bound of one tick plus two queued display fields.

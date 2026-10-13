@@ -25,13 +25,13 @@ render_entry:
         beq.s   .original166
         cmpi.w  #200,d3
         bne.w   render_bad
-        bsr.w   slave+$1ac6
+        bsr.l   slave+$1ac6
         bra.w   render_converted
 .original128:
         bsr.l   slave+$17f6
         bra.w   render_converted
 .original166:
-        bsr.w   slave+$195e
+        bsr.l   slave+$195e
         bra.w   render_converted
 .early:
         cmpi.w  #128,d3
@@ -72,13 +72,13 @@ render_converted:
         beq.s   .ref128
         cmpi.w  #166,d3
         beq.s   .ref166
-        bsr.w   slave+$1ac6
+        bsr.l   slave+$1ac6
         bra.s   .compare
 .ref128:
         bsr.l   slave+$17f6
         bra.s   .compare
 .ref166:
-        bsr.w   slave+$195e
+        bsr.l   slave+$195e
 .compare:
         move.l  36(sp),a0
         move.l  render_scratch(pc),a1

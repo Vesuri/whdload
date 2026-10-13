@@ -10,6 +10,9 @@ FSTAT   macro
         addq.l  #2,sp
         endif
         endm
+timing_converter_entry:
+        bra.l   flight_render_entry
+
 timing_patchseg:
         jsr     116(a2)
         movem.l d0-d7/a0-a6,-(sp)

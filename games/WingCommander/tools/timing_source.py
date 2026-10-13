@@ -18,9 +18,10 @@ def source(root, buffered=False):
              (0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]
     if buffered:
         patches=[(off,'release_input_vblank' if off==0x34188 else label,op) for off,label,op in patches]
-        patches += [(0xc912,'projectile_gun_return',0x4ef9),(0xca5e,'projectile_missile_return',0x4ef9),(0xc316,'projectile_effect_return',0x4ef9),(0x9a52,'projectile_init_return',0x4ef9),(0x306,'view_clear',0x4eb9),(0xc4c,'view_compose',0x4eb9),(0x2b648,'timing_scene_allocate',0x4ef9),(0x807a,'translation_velocity',0x4ef9),(0x80b6,'translation_position',0x4ef9),(0x3378e,'release_publish',0x4ef9),(0x337ea,'release_teardown',0x4ef9)]
+        patches += [(0x32e,'intro_asteroids_draw',0x4eb9),(0x2f8,'intro_flash_draw',0x4eb9),(0x1fd00,'intro_title',0x4ef9),(0x1fdda,'intro_credits_update',0x4eb9),(0x1fde0,'intro_draw',0x4eb9),(0x1fe14,'intro_finish',0x4eb9),(0x1fe44,'intro_credits_end',0x4ef9),(0xc912,'projectile_gun_return',0x4ef9),(0xca5e,'projectile_missile_return',0x4ef9),(0xc316,'projectile_effect_return',0x4ef9),(0x9a52,'projectile_init_return',0x4ef9),(0x306,'view_clear',0x4eb9),(0xc4c,'view_compose',0x4eb9),(0x2b648,'timing_scene_allocate',0x4ef9),(0x807a,'translation_velocity',0x4ef9),(0x80b6,'translation_position',0x4ef9),(0x3378e,'release_publish',0x4ef9),(0x337ea,'release_teardown',0x4ef9)]
     lines=[(root/'whdload/timing.s').read_text(),(root/'whdload/timing_clock.s').read_text(),(root/'whdload/timing_player.s').read_text(),(root/'whdload/timing_input.s').read_text(),(root/'whdload/timing_presentation.s').read_text(),(root/'whdload/timing_scene.s').read_text(),'timing_install:']
     if buffered:
+        lines.insert(-1,(root/'whdload/timing_intro.s').read_text())
         lines.insert(-1,(root/'whdload/timing_translation.s').read_text())
         lines.insert(-1,(root/'whdload/timing_projectiles.s').read_text())
         lines.insert(-1,(root/'whdload/timing_scene_slots.s').read_text())
@@ -33,7 +34,7 @@ def source(root, buffered=False):
             lines += ['\tmove.l a0,d0',f'\taddi.l #${target:x},d0',
                       f'\tcmp.l ${offset+2:x}(a0),d0','\tbne.w timing_bad']
         else:
-            width=8 if offset in (0x28c86,0x7bc2,0x878,0x65f4,0x4b16,0x101c,0x438,0x3b8e,0x3378e) else 6
+            width=8 if offset in (0x28c86,0x7bc2,0x878,0x65f4,0x4b16,0x101c,0x438,0x3b8e,0x3378e,0x1fe44) else 6
             for at in range(offset+2,offset+width,2):
                 value=struct.unpack_from('>H',code,at)[0]
                 lines += [f'\tcmpi.w #${value:04x},${at:x}(a0)','\tbne.w timing_bad']
@@ -45,6 +46,7 @@ def source(root, buffered=False):
     lines += ['\tlea $6c8(a0),a1','\tlea timing_exit(pc),a3','\tmove.l a1,(a3)']
     for offset,label,opcode in patches:
         lines += [f'\tmove.w #${opcode:04x},${offset:x}(a0)',f'\tlea {label}(pc),a1',f'\tmove.l a1,${offset+2:x}(a0)']
+    if buffered: lines += ['\tmove.w #$4e71,$1fe4a(a0)']
     lines += ['\tmove.w #$4e71,$28c8c(a0)','\tmove.w #$4e71,$43e(a0)','\tmove.w #$4e71,$3b94(a0)','\tmove.w #$4e71,$1022(a0)','\tmove.w #$4e71,$65fa(a0)','\tmove.w #$4e71,$4b1c(a0)','\tmove.w #$4e71,$7bc8(a0)','\tmove.w #$4e71,$87e(a0)','\trts',
               'timing_pause_original:','\tdc.b '+','.join(f'${x:02x}' for x in code[0x878:0x880]),
               '\tmove.l timing_pause_resume(pc),-(sp)','\trts','\tcnop 0,4','timing_pause_resume: dc.l 0']

@@ -1,8 +1,9 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: apply the in-game 10 Hz clock and extrapolated presentation to
-the English ship/title and asteroid intro, preserving music and credit deadlines.
+The English ship/title and asteroid intro now uses the in-game 10 Hz clock and
+extrapolated presentation. Native/live gates pass; music and credit deadlines
+are preserved. This scoped intro timing goal is complete; stop before E1.
 The PC video is a secondary visual reference, not a timing authority.
 Phase 11b CD32 frame-rate recovery (work items A1–E2 in
 `docs/open-work.md`). B2 and the scoped cached-040 row-corruption fix are complete.

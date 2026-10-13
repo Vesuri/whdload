@@ -28,12 +28,15 @@ release_predict:
         move.l  d6,(a0)
         rts
 
-; Enhanced flight: queue after conversion, retire the old front only in VBL.
+; Enhanced flight/world intro: queue after conversion; retire the front in VBL.
 ; Main thread owns request data until pending=1; IRQ owns it until pending=0.
-; No allocation, OS calls, or third buffer. Nonflight retains native publication.
+; No allocation, OS calls, or third buffer. Other scenes retain native publication.
 release_publish:
         tst.w   timing_active(pc)
+        bne.s   .enhanced
+        tst.w   intro_active(pc)
         beq.w   .native
+.enhanced:
         bsr.w   release_buffer_wait
         movem.l d0/a0-a1,-(sp)
         move.l  timing_game(pc),a0

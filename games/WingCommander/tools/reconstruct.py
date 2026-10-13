@@ -106,7 +106,7 @@ def main():
             if a.release and pos==0x1422:
                 lines.append('\tbsr.w release_setcpu')
             elif a.timing and pos==0x178a:
-                lines.append('\tbra.w flight_render_entry')
+                lines.append('\tbra.w timing_converter_entry')
             elif (a.render and pos==0x178a) or ((a.render or a.render_control) and pos==0x1422):
                 lines.append('\t'+('bra.w render_entry' if pos==0x178a else 'bsr.w render_setcpu'))
             elif pos == 0x1422 and a.cache_audit:
@@ -160,7 +160,7 @@ def main():
         begin=renderer.index('        move.l  slave+$1e04(pc),d7')
         end=renderer.index('.convert:',begin)
         renderer=renderer[:begin]+'        bsr.w   release_limit\n'+renderer[end:]
-        renderer=renderer.replace('render_wait:\n','render_wait:\n        tst.w timing_active(pc)\n        bne.w render_wait_done\n')
+        renderer=renderer.replace('render_wait:\n','render_wait:\n        tst.w timing_active(pc)\n        bne.w render_wait_done\n        tst.w intro_active(pc)\n        bne.w render_wait_done\n')
         lines += ['RENDER_VERIFY equ 0','RENDER_FAMILY equ 0',renderer]
     if a.verify or a.verify_control:
         lines.append((ROOT/'whdload/verify.s').read_text())

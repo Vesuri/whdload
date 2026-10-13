@@ -29,8 +29,8 @@ def main():
             changed[sy['release_limit']:sy['release_limit']+2]=bytes.fromhex('4e75')
         else:
             at=sy['release_limit']+4
-            assert blob[at]==0x67
-            changed[at]=0x60  # force nonflight limiter even during flight
+            assert blob[at]==0x66
+            changed[at:at+4]=bytes.fromhex('4e714e71')  # remove the flight bypass
         blob=bytes(changed)
     options=[]
     for model,flags in ((2,2),(4,8)):
@@ -68,11 +68,12 @@ def main():
         # Exercise actual converter dispatch with a counted TOD wait stub.
         # New histories force full output, then flight_render_check covers reuse.
         for internal,pace in ((3,0),(0,0),(0,1),(0,2),(0,3),(1,0),(1,1),(1,2),(1,3)):
-            for active in (0,1):
+            for active,intro in ((0,0),(1,0),(0,1)):
                 for height,history in ((128,0),(166,0),(200,0),(200,0xffffffff),(200,0xa0000)):
                     c=CPU(blob,model);c.selected=sy['render_selected']
                     c.write(BASE+0x17b8,bytes.fromhex('52b9000320004e75'))
                     c.write(BASE+sy['timing_active'],struct.pack('>H',active))
+                    c.write(BASE+sy['intro_active'],struct.pack('>H',intro))
                     c.write(BASE+sy['flight_history'],struct.pack('>I',history))
                     c.allowed_stores=[(0x32000,0x32004),(0xa0000,0xa0000+128000)]
                     c.allowed_stores += [(BASE+sy[n],BASE+sy[n]+size) for n,size in (('flight_destinations',8),('flight_history_order',2))]
@@ -80,9 +81,9 @@ def main():
                     got,_=c.run(0x178a,src,height,internal,model,custom5=pace)
                     assert got==reference(src)
                     waits=int.from_bytes(c.read(0x32000,4),'big')
-                    expected=int(not active) if internal==3 else int(pace!=1)
+                    expected=int(not (active or intro)) if internal==3 else int(pace!=1)
                     assert waits==expected,(internal,pace,active,height,history,waits)
-                    pacing.append(dict(model=model,internal=internal,pace=pace,active=active,height=height,history=history,waits=waits))
+                    pacing.append(dict(model=model,internal=internal,pace=pace,active=active,intro=intro,height=height,history=history,waits=waits))
                     c.close()
     negatives=[]
     if a.negative_controls:
