@@ -12,6 +12,7 @@ import struct
 import subprocess
 import capstone
 from render_source import source as render_source
+from timing_source import source as timing_source
 
 ROOT = Path(__file__).resolve().parents[1]
 SLAVE_SHA = '5fbbb774bba3c794a776acc25f33c3f47c579449e1ba1a21c31418716aa74986'
@@ -27,6 +28,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
     modes = p.add_mutually_exclusive_group()
+    modes.add_argument('--timing', action='store_true', help='experimental CUSTOM1=3 English hybrid timing adapter')
     modes.add_argument('--render', action='store_true', help='experimental CUSTOM1=2 English rendering adapter')
     modes.add_argument('--render-control', action='store_true', help='same-size original converter with the same gated WHDLoad cache policy')
     modes.add_argument('--verify', action='store_true', help='build the CUSTOM1=2 diagnostic seam')
@@ -97,6 +99,8 @@ def main():
                     lines.append('\tdc.b '+','.join(f'${b:02x}' for b in code[pos+2:pos+size]))
             elif pos == 0x14da and a.ceiling and a.ceiling.startswith('drawing'):
                 lines.append('\tbsr.w drawing_patchseg')
+            elif pos == 0x14da and a.timing:
+                lines.append('\tbsr.w timing_patchseg')
             elif pos == 0x14da and a.verify:
                 lines.append('\tbsr.w verify_patchseg')
             else:
@@ -111,6 +115,8 @@ def main():
         lines.append('RENDER_VERIFY equ '+str(int(a.render_verify)))
         lines.append('RENDER_FAMILY equ '+str({'auto':0,'030':30,'040':40}[a.render_family]))
         lines.append(render_source(ROOT))
+    if a.timing:
+        lines.append(timing_source(ROOT))
     if a.verify or a.verify_control:
         lines.append((ROOT/'whdload/verify.s').read_text())
     if a.ceiling and a.ceiling.startswith('drawing'):
@@ -142,10 +148,10 @@ def main():
             if len(built)<=len(code) or len(built)%4 or built[:len(code)]!=expected:
                 raise ValueError('drawing fixture changed original code outside the PatchSeg detour')
         elif built!=expected:raise ValueError('ceiling fixture differs outside declared converter entry words')
-    if not (a.render or a.render_control or a.verify or a.cache_audit or a.ceiling) and built[:len(code)] != code:
+    if not (a.timing or a.render or a.render_control or a.verify or a.cache_audit or a.ceiling) and built[:len(code)] != code:
         differences = [hex(i) for i,(x,y) in enumerate(zip(built,code)) if x != y]
         raise ValueError(f'reassembly differs: size {len(built)}; first offsets {differences[:20]}')
-    if a.verify:
+    if a.verify or a.timing:
         # The only original instruction replaced is S:14da..14dd. Everything
         # before/after it through the original end must still match exactly.
         if built[:0x14da] != code[:0x14da] or built[0x14de:len(code)] != code[0x14de:]:
@@ -153,12 +159,12 @@ def main():
     # Standard one-code-hunk container; no original byte blob is embedded.
     header = struct.pack('>8I',0x3f3,0,1,0,0,len(built)//4,0x3e9,len(built)//4)
     result = header+built+struct.pack('>I',0x3f2)
-    if not (a.render or a.render_control or a.verify or a.verify_control or a.cache_audit or a.ceiling):
+    if not (a.timing or a.render or a.render_control or a.verify or a.verify_control or a.cache_audit or a.ceiling):
         assert result == original
     (out/'WingCommanderCD32.Slave').write_bytes(result)
     report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
-              'code_ranges':CODE, 'byte_identical':result == original, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
+              'code_ranges':CODE, 'byte_identical':result == original, 'timing':a.timing, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
     if a.ceiling and a.ceiling.startswith('drawing'):
         report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')

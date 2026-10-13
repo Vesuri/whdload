@@ -8,11 +8,16 @@ from cd32_runtime import ROOT
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
+    p.add_argument('--timing',action='store_true',help='experimental timing build instead of a delay fixture')
     p.add_argument('--nav',type=int,choices=(0,1),default=0)
     p.add_argument('--iterations', type=int, choices=(0,100000), default=0)
     a=p.parse_args()
-    subprocess.run([sys.executable,str(ROOT/'tools/intro_timing_fixture.py'),
-                    '--output',a.output,'--iterations',str(a.iterations)],check=True)
+    if a.timing:
+        if a.iterations: p.error('timing fixture cannot also use the old delay tail')
+        subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--timing','--output',a.output],check=True)
+    else:
+        subprocess.run([sys.executable,str(ROOT/'tools/intro_timing_fixture.py'),
+                        '--output',a.output,'--iterations',str(a.iterations)],check=True)
     out=ROOT/a.output; slave=out/'WingCommanderCD32.Slave'
     data=bytearray(slave.read_bytes())
     # Custom3 emits "- sN". Replace the redundant standalone "-" with the

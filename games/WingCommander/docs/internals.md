@@ -2462,3 +2462,44 @@ explicit gaps. The 10 Hz rate is inferred from native speed/displacement units;
 the original world is frame-coupled. Bounded extrapolation is the initial
 world-object presentation approach to validate, separate from authoritative
 collision and lifecycle state. Phase 8 is complete; no timing fix is installed.
+
+## Phase 9: implementation evidence so far (gate incomplete)
+
+The experimental `CUSTOM1=3` adapter replaces the ordinary loop entry `E:0698`
+(file `06c4`) and returns to its original exit at `E:06c8` (file `06f4`).
+It installs through `S:14da` (slave file `14fa`); option values 0/1/2 install no
+new game patches. Pinned-input guards include relocated call targets and every
+other displaced instruction operand before the first code write. Native installer
+checks preserve the whole code hunk and registers/CCR with the option off and
+reject a deliberately changed operand with no partial installation.
+
+The first live scheduler prototype reached Nav-1 held-fire combat. Its measured
+field rate was 49.9204 Hz and its beam classification selected 50 Hz. The retained
+window after warm-up contained 61 completed world calls and 303 observed VBLs;
+the complete-call interval rate was 10.0423 updates/s, with no dropped scheduler
+time at the end dump. This short prototype is **not** the phase-9 acceptance gate:
+normal/slow/one-field comparisons, NTSC, modal transitions and input equivalence
+remain to run on the completed implementation. Observer rows after the final
+window are excluded: detaching GDB may resume the guest before the owned process
+is stopped. Trace-window field counts are not interchangeable with observer VBL
+counts around debugger boundaries.
+
+Input is not a pure device poll. `E:19330` copies input latches, polls devices,
+runs `18daa` (steering ramps, throttle and held fire), maps rates at `0742`, and
+processes pad/keyboard commands. The isolated player helper previews `18daa/0742`
+with throttle calls at `18eee/18f00` and fire at `18f3a` suppressed, then restores
+all changed native ramp/rate state. Tests cover all 64 combined-input masks at
+five initial ramp values on both CPU models. The world data allocation is
+unchanged by preview. The helper retains signed sub-angle remainders and applies
+native pitch/yaw/roll routines `2acb2/2acf2/2ad32` in their original order; each
+rebuilds the basis through `2bb30`. Signed unit-rate results at 50/60 Hz match ten
+native rotations over a second. These are local native correctness checks only.
+
+The helpers are **not yet connected to the live elapsed-time loop**. The current
+prototype still polls native input once per world tick. It does not yet satisfy D's
+responsive controls or input-history contract. Remaining work includes ordered
+input sampling across catch-up; committing player orientation at world boundaries
+without duplicate native rotation (`E:7bc2`); responsive camera refresh without
+advancing scripts; FR-15 emission and FR-16 presentation/RNG separation; full
+pause/modal validation; and the required equal-elapsed-time acceptance runs.
+World-object extrapolation remains phase 10.

@@ -1716,3 +1716,42 @@ steps on Unicorn 68020/68040 at 50/60 Hz, varying render schedules, clock wrap,
 modal resume and overload. A wrong-rate mutation is rejected by the independent
 elapsed-time ledger. This is arithmetic correctness evidence, not game-speed or
 performance acceptance. All generated binaries/reports stay in `tmp/`.
+
+The experimental adapter and isolated player helpers can be rebuilt and checked:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --timing --output tmp/timing-foundation
+python3 tools/timing_adapter_check.py tmp/timing-foundation \
+  --output tmp/timing-install-check
+python3 tools/timing_player_check.py tmp/timing-foundation \
+  --output tmp/timing-player-check
+```
+
+Retained final component checks are in `tmp/phase9-foundation-guarded-install/`
+and `tmp/phase9-foundation-guarded-player/`: eight installer option/model cases
+plus changed-operand rejection, and 664 preview/isolation/signed-rate cases.
+The installer fixture stubs the already-applied original PatchSeg, cache flush
+and beam-rate result; live beam behaviour is separate evidence. Player checks
+execute original control/rotation code from the retained phase-7 memory dump.
+They do not prove the still-unconnected live input/player pipeline.
+
+For a bounded diagnostic flight (not the phase-9 acceptance gate), use a fresh
+fixture/layout and the retained phase-7 read-only observer build:
+
+```sh
+python3 tools/flight_fixture.py --timing --nav 1 --output tmp/timing-flight
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+SLAVE="$PWD/tmp/timing-flight/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=3 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=0 INTRO_STOCK_CLOCK=1 \
+python3 tools/boot_gate.py --calibrate --output tmp/timing-layout
+python3 tools/timing_capture.py \
+  --fixture tmp/timing-flight/WingCommanderCD32.Slave \
+  --layout tmp/timing-layout/layout.json --output tmp/timing-flight-window
+```
+
+The initial live evidence is `tmp/phase9-live-prototype/` with its own fixture
+hash, layout and window bounds. Later component changes require fresh calibration
+and captures; do not reuse that layout blindly. `--timing` is a separate experimental
+build mode, not a release default or the phase-6 combined renderer build.
