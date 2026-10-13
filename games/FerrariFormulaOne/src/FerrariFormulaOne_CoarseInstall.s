@@ -50,7 +50,14 @@ start:
  ELSE
  lea public_bindings(pc),a1
  ENDC
+ IFD FF1_C4_DIV_FAST
+ ; Larger diagnostic hosts need an anchored call beyond the 32 KiB span.
+ lea public_table(pc),a5
+ adda.w #(FF1ApplyBindings-public_table),a5
+ jsr (a5)
+ ELSE
  bsr.w FF1ApplyBindings
+ ENDC
  tst.l d0
  bne.w C1Fault
  lea public_bound(pc),a0

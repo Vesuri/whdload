@@ -10,6 +10,15 @@
 ; Default includes both CPU entries. Define FF1_MATH_000_ONLY for a pure
 ; 68000 build; FF1Divide000 and its shared suffix use only 68000 instructions.
 FF1Divide000:
+        ifd FF1_C4_DIV_FAST
+FF1DivFastGate:
+        ifd FF1_C4_DIV_FAST_TEST
+        bra.w FF1C4DividePositive
+        else
+        bra.w FF1Div000General
+        endc
+        endc
+FF1Div000General:
         movem.l d2-d5,-(sp)
         move.l  d1,d5
         beq.w   FF1DivZeroDivisor
@@ -133,4 +142,8 @@ FF1DivDone:
 
         ifd FF1_DIV200_AB
 FF1Div200Control: dc.w 0
+        endc
+
+        ifd FF1_C4_DIV_FAST
+        include "FerrariFormulaOne_Coarse200Divide.s"
         endc
