@@ -20,7 +20,9 @@ def main():
     p.add_argument('--schedule',choices=('normal','slow','one-field'),default='normal',help='VERIFY-only render schedule')
     p.add_argument('--nav',type=int,choices=(0,1),default=0)
     p.add_argument('--iterations', type=int, choices=(0,100000), default=0)
+    p.add_argument('--c2p-experiment',choices=('control','block040','full-original','full030','full040'))
     a=p.parse_args()
+    if a.c2p_experiment and not a.release:p.error('--c2p-experiment requires --release')
     if (a.flight_verify or a.flight_control) and not a.timing:p.error('flight diagnostics require --timing')
     if a.schedule!='normal' and not a.timing_verify:p.error('diagnostic schedule requires --timing-verify')
     if a.timing_verify and not a.timing:p.error('--timing-verify requires --timing')
@@ -29,7 +31,7 @@ def main():
     if a.view_control and not a.release:p.error('--view-control requires --release')
     if a.timing or a.release:
         if a.iterations: p.error('timing fixture cannot also use the old delay tail')
-        subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--release' if a.release else '--timing','--output',a.output]+(['--timing-verify'] if a.timing_verify else [])+(['--flight-verify'] if a.flight_verify else [])+(['--flight-control'] if a.flight_control else [])+(['--frame-stats'] if a.frame_stats else [])+(['--comparison-control'] if a.comparison_control else []),check=True)
+        subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--release' if a.release else '--timing','--output',a.output]+(['--timing-verify'] if a.timing_verify else [])+(['--flight-verify'] if a.flight_verify else [])+(['--flight-control'] if a.flight_control else [])+(['--frame-stats'] if a.frame_stats else [])+(['--comparison-control'] if a.comparison_control else [])+(['--c2p-experiment',a.c2p_experiment] if a.c2p_experiment else []),check=True)
     else:
         subprocess.run([sys.executable,str(ROOT/'tools/intro_timing_fixture.py'),
                         '--output',a.output,'--iterations',str(a.iterations)],check=True)

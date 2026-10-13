@@ -2743,3 +2743,68 @@ The native checker deliberately omits the final longword comparison and requires
 rejection; it also checks every byte of the first/last blocks and the entire
 candidate/control binary layout. Do not treat Unicorn execution as timing.
 Stop before D5; calibrated 040 measurements and phase 12 remain blocked/paused.
+
+### D5: Kalms CPU-family comparison
+
+`--c2p-experiment` is diagnostic only and never changes a normal release build.
+The five equal-layout arms reserve the same 720-byte block-converter slot:
+`control` uses the existing 030 block path, `block040` substitutes the 040 family;
+`full-original`, `full030` and `full040` force full conversion on every flight
+picture, with the same history copy. Both full families are already embedded.
+This tests 320×200 flight, not a new intro speed or cache-policy choice.
+
+From the project root in `/bin/bash`, with new output names if rerunning:
+
+```sh
+. amiga/env.sh
+for arm in control block040 full-original full030 full040; do
+  python3 tools/flight_fixture.py --release --frame-stats --nav 1 \
+    --c2p-experiment "$arm" --output "tmp/d5-$arm"
+  python3 tools/flight_render_check.py "tmp/d5-$arm" \
+    --output "tmp/d5-$arm-native.json"
+done
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/d5-control/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/d5-layout
+for arm in control block040 full-original full030 full040; do
+  python3 tools/render_cost.py --build "tmp/d5-$arm" \
+    --layout tmp/d5-layout/layout.json --output "tmp/d5-$arm-scopes.json"
+done
+for cpu in 030 040; do
+  options='CACHE DCACHE'; extra=()
+  if [ "$cpu" = 040 ]; then options=NoMMU; extra=(--timing-core); fi
+  for arm in control block040 full-original full030 full040; do
+    DEBUG_PORT=2499 python3 tools/frame_capture.py \
+      --fixture "tmp/d5-$arm/WingCommanderCD32.Slave" --machine "a1200-$cpu" \
+      --options "$options" --baseline-cache-model --custom5 0 --debugger \
+      --observer --display-sample --held-key 4e --layout tmp/d5-layout/layout.json \
+      --cost-scopes "tmp/d5-$arm-scopes.json" --output "tmp/d5-$cpu-$arm" \
+      --timeout 180 "${extra[@]}"
+    python3 tools/render_cost.py --run "tmp/d5-$cpu-$arm" \
+      --without-neutrality-control --output "tmp/d5-$cpu-$arm/costs.json"
+    python3 tools/frame_check.py "tmp/d5-$cpu-$arm" \
+      --output "tmp/d5-$cpu-$arm/check.json"
+  done
+done
+runs=()
+for cpu in 030 040; do
+  for arm in control block040 full-original full030 full040; do
+    runs+=(--run "tmp/d5-$cpu-$arm")
+  done
+done
+python3 tools/c2p_experiment_check.py --prefix tmp/d5 \
+  --layout tmp/d5-layout/layout.json "${runs[@]}" --output tmp/d5-pixels.json
+python3 tools/frame_report.py tmp/d5-0*/ --output tmp/d5-fps.json
+python3 tools/reconstruct.py --release --output tmp/d5-release-check
+cmp tmp/d5-release-check/WingCommanderCD32.Slave tmp/d4-final/WingCommanderCD32.Slave
+```
+
+The integrity checker rejects missing converters, enforces identical shared
+symbols and allowed binary changes, and compares both live planar buffers with
+independent packing of their own histories. Native checks cover alternation,
+replacement, inactive flight, smaller geometries and allocation failure. Costs
+are inclusive model elapsed time; full-arm `delta_total` includes the common
+history copy, while changed-block cost excludes comparison/history. Never compare
+these as identical leaf operations or treat these 040 timings as hardware proof.

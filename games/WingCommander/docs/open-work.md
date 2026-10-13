@@ -62,7 +62,7 @@ D3 is complete: native view-region clear/composition keeps exact pixels and
 D4’s practical comparison-cost gate is complete: compact full-image comparisons
 reduce the 040 model’s residual cost by 0.84 ms per picture, with 43.424 frames/s
 in its held-turn window. Drawing-based dirty rectangles remain deferred.
-Stop before D5. Held-turn frame-budget misses remain; campaign and hardware
+D5 is in progress on the available models. Held-turn frame-budget misses remain; campaign and hardware
 visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
@@ -596,8 +596,10 @@ display wait (6–7 ms of idle per frame).
   claimed disproved: native clears rewrite the view, and tracking all writers plus
   two-buffer invalidation needs a separate correctness contract. See
   [D4 evidence and limits](internals.md#phase-11b-comparison-cost-d4-practical-gate-complete).
-  Stop before D5.
-- **D5.** Re-evaluate Kalms 040 for full and changed-block conversion on calibrated 040.
+  D5 follows below.
+- **D5 — in progress.** Compare pinned Kalms 030 and 040 families for full and
+  changed-block conversion on the current models. The calibrated 040 gate
+  remains dependent on A2.
 
 **E. Acceptance**
 

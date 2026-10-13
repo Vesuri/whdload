@@ -36,7 +36,7 @@ def source(root):
     return '\n'.join(parts)
 
 
-def flight_source(root, verify=False, control=False, comparison_control=False):
+def flight_source(root, verify=False, control=False, comparison_control=False, experiment=None):
     wrapper=(root/'whdload/flight_render.s').read_text()
     # Keep the comparison region exactly 82 bytes, including the no-change
     # branch. The control reproduces the old instruction stream; the candidate
@@ -53,5 +53,16 @@ def flight_source(root, verify=False, control=False, comparison_control=False):
     # retaining the full 320x200 plane stride. No derived game bytes here.
     full=source(root)
     block=full.split('kalms_030_200:',1)[1].split('kalms_040_128:',1)[0]
+    if experiment:
+        # Equal 720-byte slots keep every diagnostic arm's layout identical.
+        # Default/release bytes remain untouched. 040 is also valid on 020 ISA.
+        if experiment == 'block040':
+            block=full.split('kalms_040_200:',1)[1].rsplit('\tcnop 0,4',1)[0]
+        if experiment.startswith('full'):
+            control=True
+            if experiment != 'full-original':
+                wrapper=wrapper.replace('movem.l a3/a5,-(sp)\n        bsr.w   slave+$1ac6',
+                    'movem.l a3/a5,-(sp)\n        bsr.w   kalms_'+experiment[-3:]+'_200')
+        block += '\n\tdcb.b 720-(*-flight_kalms_block),0\n'
     block=block.replace('#64000', '#32')
     return f'FLIGHT_VERIFY equ {int(verify)}\nFLIGHT_CONTROL equ {int(control)}\n'+wrapper+'\nflight_kalms_block:'+block+'\n\tcnop 0,4\n'
