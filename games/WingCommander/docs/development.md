@@ -2143,3 +2143,59 @@ confirms the copinit setup and blank deadline, and reports late deferrals/input
 overflows. Its scope is continuous Nav-1 flight on the pinned KickEmu display
 path. Full modal/mission and visual acceptance remain open. The normal B2 artifact
 has no recorder, ownership diagnostic abort or extra allocation. Stop before C1.
+
+
+## Cached 040 visual regression and local emulator correction
+
+The normal launcher builds/reuses `tmp/fsuae-mmu-fixed/fs-uae` for a1200-040 and
+a1200-060 when `FSUAE` is unset. It fixes six MMU write-attribute lookups in the
+pinned core. `FSUAE_SOURCE` can select the configured source tree; by default it
+comes from `$AMIGA_SHARE/fs-uae-aprof-build/fs-uae`. Revision and source hashes are
+checked against `manifest/mmu-fix.tsv` before copying. Existing outputs and the
+shared source remain untouched. `--ensure` accepts only the recorded intact normal
+binary. Stop commands never build anything.
+
+```sh
+. amiga/env.sh
+python3 tools/build_mmu_fix.py --ensure
+python3 tools/build_mmu_fix.py --audit --output tmp/mmu-fixed-audit-final
+python3 tools/build_mmu_fix.py --audit --unfixed-control --output tmp/mmu-control-audit
+
+# Calibrate each slave with the same setup used by the pixel observer.
+FSUAE="$PWD/tmp/fsuae-mmu-fixed/fs-uae" DEBUG_PORT=2499 \
+SLAVE="$PWD/tmp/b2-final/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM5=0 CACHE DCACHE' \
+AMIGA_SETUP=a1200-040 WARP=0 DETERMINISTIC=0 \
+python3 tools/boot_gate.py --calibrate --output tmp/mmu-intro-layout
+
+python3 tools/visual_capture.py --emulator tmp/mmu-fixed-audit-final \
+  --slave tmp/b2-final/WingCommanderCD32.Slave \
+  --layout tmp/mmu-intro-layout/layout.json --output tmp/mmu-intro-check
+python3 tools/visual_capture.py --emulator tmp/mmu-control-audit \
+  --slave tmp/b2-final/WingCommanderCD32.Slave \
+  --layout tmp/mmu-intro-layout/layout.json --frames 20 \
+  --expect-corruption --output tmp/mmu-control-check
+```
+
+For the short in-game check, calibrate the existing B2 direct Nav-1 fixture
+`tmp/b2-frames-compact/WingCommanderCD32.Slave` the same way, adding
+`CUSTOM2=2 CUSTOM3=1 CUSTOM4=0` to the calibration options to select direct flight.
+Then pass that slave
+and its layout to `visual_capture.py --frames 120`. The observer runner selects
+those startup options automatically for a manifest marked `direct_flight`. The fixture generation is in
+the B2 instructions above. Choose fresh output directories on repeats. The observer
+validates the slave's build hash and the emulator's recorded hash, requires both
+caches enabled, checks CPU and DMA pixels, and saves a normal frontend screenshot.
+It uses the current cached MMU/indirect-board configuration with `DETERMINISTIC=0`;
+the older deterministic boot setup stalled in this configuration. Layout calibration
+may use that override; the original phase-2 acceptance gate still forces its fixed
+configuration. The observer is a correctness tool and supplies no frame-rate claim.
+
+Launch the corrected normal build for play-testing:
+
+```sh
+unset FSUAE
+SLAVE="$PWD/tmp/b2-final/WingCommanderCD32.Slave" \
+AMIGA_SETUP=a1200-040 WHD_ARGS='CUSTOM1=0 CUSTOM5=0 CACHE DCACHE' \
+/bin/bash amiga/run.sh
+```

@@ -41,7 +41,11 @@ and CUSTOM1 selects language only. The cached 030 model reaches 49.920 pictures/
 the uncalibrated cycle-exact 040 core reaches 39.953 at the B1 gate.
 B2 is complete: queued early-VBL swaps and pre-conversion ownership waits retain
 two buffers. Both PAL model gates now report 49.920 displayed pictures/s; the
-030 NTSC gate reports 59.826. C1 is next, not started.
+030 NTSC gate reports 59.826. The cached-040 horizontal-row corruption is traced
+to FS-UAE using read-ATC cache attributes for write-ATC hits; the local emulator
+correction preserves both caches and the B2 slave. See the
+[CPU/DMA pixel evidence](internals.md#cached-040-display-corruption-emulator-mmu-write-attributes).
+C1 is next, not started. Broader campaign and hardware visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -488,7 +492,7 @@ display wait (6–7 ms of idle per frame).
   changed numbering. Psygore's modes stay for now.
   Native option/pacing/output gates and the required frame-rate reports pass;
   see [B1 evidence](internals.md#phase-11b-public-modes-and-uncapped-flight-b1-gate-complete).
-  B2 replaces the flight display-end wait below; the row-glitch investigation remains open.
+  B2 replaces the flight display-end wait below; the cached-040 row glitch is fixed in the local emulator (evidence above).
 - **B2 — complete.** Vsync without idle: publish immediately after conversion, swaps take
   effect at vertical blank, and wait only before converting into a buffer whose
   swap-away has not yet been displayed. Drawing into the FAST chunky buffer overlaps.

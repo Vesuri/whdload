@@ -11,7 +11,10 @@ retain normal pacing. See the [candidate ReadMe](release/ReadMe).
 Enhanced flight queues completed pictures for early vertical blank and waits
 only before reusing a pending display buffer. The scoped PAL gates reach 49.92
 pictures/s on both tested models; the 040 core remains uncalibrated against hardware.
-Phase 12 stays paused; C1 and the remaining smoothness/visual work remain open.
+The reported cached-040 row corruption was traced to incorrect MMU write cache
+attributes in FS-UAE. The launcher now builds a corrected local emulator; caches
+remain enabled. See the [pixel checks and limits](docs/internals.md#cached-040-display-corruption-emulator-mmu-write-attributes).
+Phase 12 stays paused; C1 and broader visual acceptance remain open.
 
 **Phase 11 is complete: changed-block flight conversion.**
 The timing build converts only changed view/cockpit/HUD blocks, with separate

@@ -3106,3 +3106,49 @@ Evidence: `tmp/b2-buffer-final.json`, `tmp/b2-options-final.json`,
 `tmp/b2-{030,040,ntsc}-gate/{check,buffer-check}.json` with the raw ledgers,
 observer events and memory samples. Commands are in development's B2 section.
 Stop at B2; B3's no-third-buffer constraint is retained, and C1 is not started.
+
+
+## Cached 040 display corruption: emulator MMU write attributes
+
+The horizontal-row corruption reported with B2 is reproduced with the unchanged
+release slave (`65de422bd4f161b97e3ae208dd4249b81fe2bb551a08a7de1e0574bc743c2830`).
+The pinned FS-UAE core has six incorrect MMU ATC hit paths in
+`src/include/cpummu.h`: ordinary and locked byte/word/long stores translate using
+`atc_data_cache_write`, then take cache attributes from `atc_data_cache_read`.
+Independent read-entry replacement can therefore apply copy-back attributes to a
+CHIP store whose actual MMU descriptor is write-through. The CPU sees correct
+planar pixels while display DMA reads stale physical CHIP bytes. `ChipNoCache`
+alone does not resolve this emulator defect.
+
+A local emulator correction takes both address and attributes from the write
+entry. No slave change, per-frame flush or disabled cache is required. The
+project launcher selects this correction for its default 040/060 emulator; an
+explicit `FSUAE` override remains available. The shared installation is untouched.
+
+The read-only instruction-loop observer samples after conversion at code-hunk 0
+`$31ff2` (English file `$3201e`), decoding all eight planes independently against
+the chunky source, through both CPU-cache and physical-DMA views. It stops the
+intro at hunk 3 `$de0`, the Origin FX fade entry, and requests a normal frontend
+screenshot. No GDB stops, profiler, guest writes or cache flushes intervene.
+Python independently decodes the saved snapshots. Earlier debugger/profiler
+captures did not expose this cache failure; they are insufficient acceptance
+instruments for it.
+
+The unfixed full-intro control had 259 bad DMA conversions out of 306, with zero
+CPU pixel mismatches; a ChipNoCache control still had 257. The corrected emulator
+passes all 306 conversions with zero CPU or DMA pixel mismatches. CACR remains
+`$80008000` (both caches enabled). Evidence lives in
+`tmp/glitch-audit-cached-v2`, `tmp/glitch-audit-chipnc`, and
+`tmp/mmu-intro-verified`. The corrected frontend Origin FX capture has no visible
+row corruption. The direct Nav-1 flight fixture also passes 120 full-height
+(320×200) conversions with zero CPU/DMA differences and both caches enabled;
+its frontend cockpit capture is clean (`tmp/mmu-nav1-check`). The fixture hash is
+`2163e8f139acce712e58fffbba08f32b4dc731334719595f2448056b7d661b8e`.
+The reproducible matched-source negative control, built with only the six-line
+correction omitted, fails 19 of its first 20 intro conversions
+(`tmp/mmu-control-check`); its CPU pixels still match.
+These are correctness observations, not performance measurements.
+
+The correction covers all six affected write paths, but live acceptance here is
+040-specific. Broader campaign/modal coverage, 060 validation and real-hardware
+acceptance remain open. C1 and phase 12 remain deferred.

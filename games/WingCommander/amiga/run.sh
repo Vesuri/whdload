@@ -5,6 +5,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -n "${SLAVE:-}" ]; then SLAVE="$(cd "$(dirname "$SLAVE")" && pwd)/$(basename "$SLAVE")"; export SLAVE; fi
 cd "$ROOT/amiga"
 . ./env.sh
+export AMIGA_SETUP="${AMIGA_SETUP:-a1200-fast}"
+# The pinned core takes CHIP write attributes from the wrong MMU cache entry.
+# Build locally; never modify the shared emulator or override an explicit choice.
+if [ -z "${FSUAE:-}" ] && [ "${1:-}" != stop ]; then
+  case "$AMIGA_SETUP" in
+    a1200-040|a1200-060)
+      python3 "$ROOT/tools/build_mmu_fix.py" --ensure
+      FSUAE="$ROOT/tmp/fsuae-mmu-fixed/fs-uae"
+      ;;
+  esac
+fi
 export FSUAE="${FSUAE:-$FSUAE_ARM}"
 FSUAE_RUN="${FSUAE_RUN:-../tmp/run}"
 # The shared launcher expects a path relative to amiga/. Canonicalise overrides
@@ -19,7 +30,6 @@ print(os.path.relpath(run, Path.cwd()))
 PYRUN
 )"
 export FSUAE_RUN
-export AMIGA_SETUP="${AMIGA_SETUP:-a1200-fast}"
 . "$FSUAE_COMMON"
 # A pidfile alone is insufficient if a PID was reused by another project's UAE.
 if [ -f "$FSUAE_PIDFILE" ]; then
