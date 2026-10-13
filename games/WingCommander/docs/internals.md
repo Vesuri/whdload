@@ -2212,3 +2212,156 @@ Phase 6 stops here with measured converter selection, bit-exact output evidence,
 cache-preserving gating and safe publication. The original gate's exact-duration
 requirement remains deferred with the user's timing investigation. No universal
 motion rate, phase-7 gameplay analysis, release archive or OCS work is included.
+
+## Phase 7: flight time model and reproducible gameplay windows
+
+The English CD32 flight gate is complete. Normal flight advances the world once
+per rendered picture in the captured default configuration. The native speed and
+range units imply **10 world updates/s**, replacing the unmeasured 15/s flight
+prior. This is a flight-unit calibration, not an intro rate or an implemented
+limiter. The timing fix and exhaustive framerate audit remain later work.
+
+### Route, counters and evidence
+
+`Custom3=1 Custom4=0` selects Enyo, mission 0; those options alone do not bypass
+the front end. The existing argument parser accepts bare `l` for direct flight
+(`H3:056a`, file `43356`, sets `D:004e`), and `as1` for starting navpoint 1
+(`H3:0594–05b0`). The diagnostic fixture replaces the redundant standalone `-`
+emitted before `s1` with `l` at `S:156d` (slave file `158d`). Optional `as1` is
+placed in the unused argument buffer tail. It uses the original game's parser;
+no game instructions or release defaults change. `Custom2=2` supplies invulnerability.
+The no-input departure window is reproducible; Nav 1 supplies nearby combat.
+
+Offsets below use `E` = English hunk 0, `D` = hunk 1, `H3` = hunk 3, and `S` =
+slave code hunk. Code file offsets are `E+002c`, `H3+042dec`, `S+0020`.
+Most flight state is in hunk 1's zero-filled allocation beyond stored offset
+`8464`, so those `D` offsets have no corresponding stored file bytes.
+
+The normal loop at `E:0698–06c6` polls input, calls world update `E:02a8`, then
+`E:0510` and the cockpit path. `D:914c.w` increments at `E:02d6` (file `0302`);
+the observer samples its completed value at the next `E:0698`. The draw gate
+`E:02e4` uses `D:008e/0090.w`; `D:9150.w` increments at `E:02f4` (file `0320`).
+The observed divisor is one. Publication remains `E:3378e` (file `337ba`).
+Do not equate these counters in a modal loop or after changing the draw divisor.
+
+Each coast capture has three uninterrupted 100-field windows, with debugger
+stops only between windows. Window 0 includes asset setup and acceleration and
+is excluded from settled figures. The corrected combat tape then holds Space
+(fire), Right (turn) and Tab (afterburner) for 100 fields each, enters pause via
+P, samples ten fields, resumes with Space and samples twenty fields. Inputs use
+the native shared debugger key route; recordings, traces and screenshots stay
+in `tmp/`. This is a short invulnerable flight, not a campaign-completion test.
+
+The phase-7 observer snapshots the allocated hunk 1 at `E:0698` without stopping
+or modifying the guest. A no-snapshot control, also including the census flush
+fix, has identical events, emulated cycle timestamps and screenshot pixels in
+all three coast windows. Short single-scene captures required explicit census
+flushes: the older delayed capture has no usable source census, not zero change.
+Frame-counter checks compare successive state counters, publication counts and
+an independent full instruction trace; see the retained validation report: 100 complete fields contain 20 flight entries,
+20 completed updates, 20 publications and 100 VBLs, with matching registers and
+field placement in the independent trace.
+
+### Native speed/range anchor and coupling test
+
+Positions (`D:919a+12*i`) and velocities (`D:9d6c+12*i`) are three signed longs
+with eight fractional bits. `E:80b6–80e0` adds velocity to position once per
+world update, without an elapsed-time factor. The set-speed HUD path multiplies
+its native value by ten (`E:22c2–22ca`); actual speed takes the velocity magnitude
+and applies the same scale (`E:22ee–230a`). Nav range is the length of the
+navpoint/player difference, shifted right eight (`E:3066–30d0`, `D:ab80.l`);
+`E:2848–2896` formats it with the ` km` suffix at `E:28aa`.
+
+At settled displayed speed 200 kps, velocity magnitude is 5120 fixed-point
+units: **20 km per update**. Therefore **200 / 20 = 10 updates/s** is the rate
+at which the game's own units agree. The nav HUD caches a value one update
+behind the entry snapshot; compare equivalent update stages. The departure course is not directly toward the navpoint: its cached range
+rises 34719→34893 km across the first settled 19 intervals. The anchor uses full
+3D displacement and the verified range-unit conversion, not radial range loss. This does not establish an intended cadence for every animation or AI
+subsystem.
+
+| Configuration, settled coast windows 1 / 2 | Updates and pictures/s | Travel km/s at displayed 200 kps | Mean update ms |
+|---|---:|---:|---:|
+| 020, original converter and normal limiter | 10.230 / 10.104 | 204.60 / 202.07 | 97.75 / 98.97 |
+| Same 020, matched 100,000-iteration c2p delay | 7.735 / 7.685 | 154.69 / 153.70 | 129.29 / 130.12 |
+| Calibrated 030 NoMMU interpreter | 24.956 / 24.966 | 499.12 / 499.33 | 40.07 / 40.05 |
+
+These are short-window emulator measurements, not real accelerator benchmarks.
+The stock 020 uses exact unit 128; 030 uses the previously calibrated NoMMU
+interpreter, unit 36. Seconds use emulated cycles / `(512 * 3546895)`.
+Both use the original software converter, `Custom5=0`, and equal-sized diagnostic
+slaves. No phase-6 renderer or new gameplay timing patch is enabled.
+The 020 windows contain 19 / 20 complete intervals; their p95 is
+100.31 / 100.38 ms and maxima 100.31 / 100.49 ms.
+
+The repeated boot matches 65 consecutive entry states. The delay matches 49,
+and the 030 matches the first 65, by update index: all 61 position, velocity,
+forward-vector and object-type slots; ten ship action, set-speed, fuel, energy,
+shield, armour and target slots; RNG and update/draw counters. Identical native
+steps take different wall-clock times. This directly demonstrates render-coupled
+flight motion; the existing limiter does not maintain the native 10 Hz model.
+
+### Representative flight costs and source changes
+
+In the 020 no-input windows 1 / 2, changed source bytes are only
+**0.03059% / 0.04156%** of the complete 320×200 source compared with its previous
+conversion. This includes the whole cockpit image, not an isolated cockpit crop.
+The Nav-1 fire / turn / afterburner windows change **1.000% / 1.382% / 0.711%**.
+These observations motivate later work; they do not prove that skipping writes
+or conversions would preserve animation.
+
+Native profiler PC buckets attribute **65.90% / 64.09%** to existing slave
+converter addresses `S:17f6–1e04`, **12.15% / 13.38%** to math
+`E:2a9d4–2cbd8`, **7.93% / 8.27%** to drawing `E:2d000–31fc2`, and
+**2.35% / 2.51%** to world dispatch/motion `E:65b4–10c7a`.
+These are address-range costs, not full self/inclusive call-tree attribution.
+The profiler residual is zero and its recorded gap about 0.9% in these windows.
+The approved phase-4 interrupt/DMA/attribution gaps remain; no new matrix is
+needed to establish the flight coupling result.
+
+### State map and cadence
+
+`i=0` is the player. World arrays serve up to 61 entity slots; several detailed
+ship arrays serve ten ships. Bounds differ: do not extend a ten-ship structure
+to all projectile/effect slots. **Update** below means a call to the world
+update, **draw** means a permitted presentation pass, **clocked** means VBL-based,
+and **modal** means a separate control flow. Static writers classify paths not
+exercised by the tape; that is not a claim of runtime coverage for every branch.
+
+| State (hunk-1 offset) | Writer / consumer evidence (hunk-0 offsets) | Cadence and coverage |
+|---|---|---|
+| Position `919a+12*i`, velocity `9d6c+12*i` | Acceleration `7f78–80b4`, integration `80b6–80e0` | Update; straight trajectories and changed-rate coupling measured |
+| Forward `a148+12*i`; other orientation bases `b450`, `b750`; angular steps `9578/95f8/9678+2*i` | Input `18daa–19070`, scale `0742–07ce`, rotations `7c86–7d18` | Update; Right-key turn exercised; orientation is fixed-point vectors, not a single heading |
+| Set speed `99be+4*i`; actual speed derived from velocity | Acceleration `7f78–80b4`; HUD `22c2–230a` | Update; 200-kps straight-flight anchor measured |
+| Ship action `9564+2*i`, afterburner timer `bb14+2*i`; fuel `a7cc+4*i` | Action setter `11688`, activation `cad8/cb42`, countdown/drain `7e10–7ed4`, fuel subtract `1591a`; normal drain `cb78` | Update; Tab exercised. Timer is a step count, not seconds. Fuel falls 199540→196055 in the retained afterburner window while actual HUD speed rises about 200→1237 kps |
+| Gun energy `9546+2*i` | Fire spend `c52e` and subsequent store; recharge `cc36–ccd2` | Update/action; Space firing gives energy 88–100, then recovers. Recharge depends on shields/system damage; fuel is separate |
+| Shields `a7f4+4*i` (two words), maxima `c03a+4*i`; armour `9876+8*i` (four words) | Shield regeneration `cba4–cc34`, eligible by update modulus; damage path `a49c–a598` selects and subtracts armour; HUD `1f86` | Update/event, not elapsed seconds. Static classification; invulnerability means this tape does not validate ordinary player damage balance |
+| Ship hull/system damage `98c6+2*i`, `9946+i` | Damage writers `abf8`, `aa1c` | Hit-event changes within update; static, not a separate damage clock |
+| Entity type `96fe+2*i`, model `97f6+2*i`, AI action `9564+2*i` | Dispatch `76e4`, `7b4e`; AI `8940–8ac4`, eligibility `89c6–89e4` | Movement each update; ordinary combat decision eligibility every fourth update, with exceptions for selected missiles and mode. Other-ship trajectories compared; not every AI branch exercised |
+| Projectile/missile position and velocity in entity arrays; lifetime `baa8+i`, guidance stage `ba52+2*i` | Spawn `c458`, `ca38–cad6`; lifetime seed `ca9e`, decrement `77ea/7820` | Update/event; gun firing exercised. Missile lifetime/guidance classification is static; no claim of a live missile-lock test |
+| Target `955a+i`, lock flag `38b0.w`, selection globals including `3898.w` | Target invalidation `3bba`, lock/selection `3bc4–3d1a`, selected missile `19832` | Input/event plus draw-based targeting checks (including draw-counter modulo eight); not an independent real-time lock clock. Static branch coverage |
+| Message countdown `a956.w`, text pointer `00f2.l` | Set `2298/39c4`, decrement `22a6`, clear `5a86`, called after draw gate at `051a` | Draw-count duration; comms/menu actions replace or clear messages |
+| Comms mode `0232.w`, speaker `027e.w`, portrait selection `0282.w`; portrait table `b270` | Mode setter `53be`, selection flow `545e–584e`, portrait drawing `4338–4460`, reset `5a20` | Modal selection plus draw-coupled portrait animation: `435c` tests odd draw count, `43ee` chooses a random frame. This is not a free-running video clock; static, conversation not entered by tape |
+| Cockpit cached animation `a7bc/a7c4/a7c8`; hand state `af9e`; blink phase from `7f02` | `1de4` uses draw-counter modulo four; hands `3d66`; blink `1a78` divides clock by 40 | Mixed draw/input/clocked presentation. Do not scale the entire cockpit with world motion |
+| Explosion/effect countdown `c076+2*i`, script index `c0f6+2*i` | `28fd0` decrement, `28fea` reload, `2901e` advance; object dispatch `65b4` | Update-count animation with asset-dependent periods; static classification, no calibrated explosion lifetime or asteroid rate from this flight tape |
+| RNG `6f18.l`, saved seed `6f1c.l` | Generator `2cb56–2cb6e`, write `2cb66` | Call-driven; frame/action and modal consumers. Coast seeds match by update, not by elapsed time |
+| VBL clock `7f02.l`; calendar origin `cfce.l` | Interrupt `34166`, origin `254ac`, display arithmetic `22c32` | Clocked. Calendar code divides elapsed ticks by 3300; this is not a simulation delta. No independent universal mission-seconds accumulator is established |
+| Mission/nav progress including `949a`, system/mission `910e/910f` | `0260` checks every 32 updates, calls `061c→2124c` | Update/event-driven mission logic; full mission completion not exercised |
+| Pause / active mode `0088.w` | Pause entry `0a76`, wait `0878` | Modal; measured: update/draw counters stay 110, all mapped world ranges and RNG freeze, no publication, VBL clock 744→754 |
+| Autopilot mode `0088.w`, destinations/ship motion arrays | `101c–1472` sets mode 4; `1396→0e64` has a VBL deadline; `13e0` directly advances position | Mixed modal deadline and per-pass motion, not ordinary flight ticks. Static classification; actual fast-travel sequence needs a later live check |
+| Return/landing animation, shared update/draw counters and cinematic motion | Return branch `1549c→1b8a8`; `1b948→1b2e6`; `1b394` increments draw on odd passes, `1b498` increments update each pass | Modal, per-pass animation; up to 100 iterations, skippable. Separate from normal integration. Static return/landing-path identification; not a measured landing duration |
+| Menus and briefing | Front-end dispatcher `15348`, separate scripted sequence paths around `1c952` | Modal; no assumption that normal flight cadence applies; outside the flight tape |
+
+The map identifies representative writers and cadence for each requested state
+family. It is not the phase-7b exhaustive writer/caller inventory. Runtime gaps
+are live comms, missile locking, normal damage, autopilot, landing and full mission
+progression; their classifications above are static evidence/hypotheses to check
+when those paths are changed. Pausing demonstrably separates the interrupt clock
+from the world counters, so replacing every counter with VBL time would be wrong.
+
+Evidence: `tmp/phase7-coast-{020,repeat,delay,030}/`,
+`tmp/phase7-observer-control/`, `tmp/phase7-combat-controls/`, their
+`flight-report.json` files and `tmp/phase7-validation.json`. The corrected combat
+capture supersedes exploratory control-key attempts. Derived binaries, complete
+traces, snapshots and pictures remain ignored. Phase 7 stops at this documented
+time-model/coupling gate; phase 7b, timing design, release and OCS work have not begun.

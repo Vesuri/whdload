@@ -3,7 +3,12 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 6 rendering work is complete; timing calibration remains deferred.**
+**Phase 7 gameplay timing investigation is complete.** Flight motion is coupled
+to rendering; the native speed/range units imply 10 world updates/s. Reproducible
+coast, combat-input and pause windows, a state/cadence map and CPU/drawing coupling
+measurements are recorded. Timing fixes and phase 7b remain deferred.
+
+**Phase 6 rendering work is complete.**
 `CUSTOM1=2` enables the experimental English renderer. Measured selection uses
 Kalms c2p on cached 020/030 (about 7% / 30–32% less conversion time in the emulator)
 and retains the existing converter elsewhere. It preserves WHDLoad cache choices
@@ -13,8 +18,9 @@ paths. Native and live twin checks verify identical converter output.
 FAST chunky storage and FMODE 3 were already present in the observed setup.
 Exact intro duration neutrality is not claimed: the final 020 intro is about
 0.63 seconds longer with the display-end wait. Music/text deadlines stay unchanged;
-intended movement rates and further timing investigation remain deferred.
-**Phase 7 gameplay timing and state investigation is in progress.** See the evidence and limits in [internals](docs/internals.md).
+intro rate selection remains deferred. Flight runtime gaps include comms, missile
+locking, normal damage, autopilot and landing; these paths have static cadence
+classifications, not full live validation. See [internals](docs/internals.md).
 
 **Phase 4 is complete under the approved practical-baseline scope.**
 The eleven-configuration CPU/cache baseline, source-change census, DMA/STOP idle

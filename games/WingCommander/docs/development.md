@@ -1467,3 +1467,123 @@ The final cached 020 pair uses `tmp/phase6-final-probe/result.json` and lives in
 `tmp/phase6-final-{control,render}-020/`. Final 060 NoCache twin calibration and
 capture are `tmp/phase6-final-twin-probe/` and `tmp/phase6-final-twin-060/`.
 These fixtures and every derived capture remain ignored.
+
+## Phase 7 flight windows and time model
+
+The flight tools use diagnostic slaves under `tmp/`; they do not enable the
+phase-6 renderer or change release defaults. Use fresh output names on reruns.
+The fixture builder verifies the original input through the existing reconstruction
+and timing-fixture path. `--iterations 0` and `100000` have equal allocation sizes;
+only the latter delays the existing c2p. The extra argument uses the game's
+native direct-flight parser. `--nav 1` starts at the first combat navpoint.
+
+```sh
+. amiga/env.sh
+python3 tools/flight_fixture.py --output tmp/flight-control --iterations 0
+python3 tools/flight_fixture.py --output tmp/flight-delay --iterations 100000
+python3 tools/flight_fixture.py --output tmp/flight-combat --nav 1
+python3 tools/build_debugger.py --output tmp/flight-debugger \
+  --intro-observer --matrix-observer --aprof-stable-pc \
+  --matrix-nommu-counters --frequency-clock --matrix-mmu030-counters --matrix-irq
+export FSUAE="$PWD/tmp/flight-debugger/fs-uae"
+SLAVE="$PWD/tmp/flight-control/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=0 INTRO_STOCK_CLOCK=1 \
+python3 tools/boot_gate.py --calibrate --output tmp/flight-layout
+```
+
+The retained Nav-1 fixture also rebuilds byte-identically in
+`tmp/phase7-fixture-repro-verified/`. Source `amiga/env.sh` first: the assembler
+path is supplied through `VASM`.
+
+Calibration only locates the loaded hunks/slave; it does not run the phase-2
+menu/name gate. The verified phase-7 command reproduced the retained layout in
+`tmp/phase7-layout-verified/layout.json`. The same allocation layout works for
+these matched fixtures on the selected 020 and 030 NoMMU configurations; each
+capture checks it again from live memory and fails on a mismatch.
+
+```sh
+python3 tools/flight_capture.py --output tmp/flight-020 \
+  --layout tmp/flight-layout/layout.json \
+  --fixture tmp/flight-control/WingCommanderCD32.Slave
+python3 tools/flight_capture.py --output tmp/flight-repeat \
+  --layout tmp/flight-layout/layout.json \
+  --fixture tmp/flight-control/WingCommanderCD32.Slave
+python3 tools/flight_capture.py --output tmp/flight-slow \
+  --layout tmp/flight-layout/layout.json \
+  --fixture tmp/flight-delay/WingCommanderCD32.Slave
+python3 tools/flight_capture.py --output tmp/flight-030 --machine a1200-030 \
+  --layout tmp/flight-layout/layout.json \
+  --fixture tmp/flight-control/WingCommanderCD32.Slave
+python3 tools/flight_capture.py --output tmp/flight-input --controls \
+  --layout tmp/flight-layout/layout.json \
+  --fixture tmp/flight-combat/WingCommanderCD32.Slave
+```
+
+Each run waits for the first normal flight-loop entry `E:0698`, then captures
+three 100-field no-input windows. `--controls` adds 100 fields each of Space,
+Right and Tab, followed by a state-gated pause, ten paused fields and twenty
+resumed fields. Raw key codes are hexadecimal `40`, `4e`, `42`, `19`; Space resumes
+pause. This is the shared `monitor key` route, not host keyboard automation.
+The script records key edges and window boundaries in `actions.json` and
+`result.json`. Stops occur between windows, never inside the measured interval.
+The script always requests stopping only its own project run in cleanup.
+
+Configuration is fixed: deterministic PAL, 8 MiB FAST, `Custom2=2`, system 1,
+mission 0, `Custom5=0`, software c2p, no instant blitter, no extra arguments.
+The 020 uses stock exact unit 128; 030 uses calibrated NoMMU unit 36.
+Boot/live CPU audits, fixture hashes and emulator SHA-256 are in each result.
+Warp affects host execution speed; reported seconds come from the emulated
+clock, not host time. Full traces are large (roughly 1 GB per 100-field window).
+Use the retained runs for additional analysis instead of collecting another matrix.
+
+```sh
+python3 tools/flight_report.py tmp/flight-repeat --compare tmp/flight-020 \
+  --validate-trace coast-1
+python3 tools/flight_report.py tmp/flight-slow --compare tmp/flight-020
+python3 tools/flight_report.py tmp/flight-030 --compare tmp/flight-020
+python3 tools/flight_report.py tmp/flight-input
+```
+
+Reports are saved as `flight-report.json` in the run. Comparisons require matching
+world trajectories by update index (including all world positions/velocities and
+ten-ship state ranges), not by field or elapsed time. Use settled `coast-1/2`;
+`coast-0` includes loading/acceleration. `--validate-trace` independently matches
+PC/register/field records for flight entry, completed update, publication and
+VBL. Only complete trace fields are compared; report intervals exclude partial
+updates at window edges. The retained trace has 20 updates/publications and 100
+VBLs, while its cadence estimate uses 19 complete entry-to-entry intervals.
+
+The report checks adjacent update counters and one publication per interval.
+Pause checks require unchanged mapped world state and a ten-tick VBL advance.
+Source-change percentages compare complete 320×200 sources; a missing census
+is null, never zero. `census_samples` shows coverage. PC buckets are scoped
+address ranges, not general self/inclusive routine accounting.
+
+The optional observer-neutrality check disables only hunk-1 snapshots:
+
+```sh
+python3 tools/flight_capture.py --output tmp/flight-observer-control --no-states \
+  --layout tmp/flight-layout/layout.json \
+  --fixture tmp/flight-control/WingCommanderCD32.Slave
+python3 tools/flight_report.py tmp/flight-repeat --compare tmp/flight-020 \
+  --observer-control tmp/flight-observer-control --validate-trace coast-1
+```
+
+`states.bin` consists of guest-order hunk-1 blocks of `0xfda0` bytes; block N
+matches event N at `E:0698` in `events.txt`. The reader enforces this alignment.
+The observer never writes guest memory. Explicit flushes preserve short-window
+census records when the owned emulator is stopped. The retained no-snapshot
+control also checks this flush change: all three window event streams and
+screenshot pixels match the earlier observer exactly. Startup/shutdown events
+outside the windows are excluded.
+
+Retained measurements are `tmp/phase7-coast-{020,repeat,delay,030}/`,
+`tmp/phase7-observer-control/` and `tmp/phase7-combat-controls/`.
+`tmp/phase7-validation.json` contains repeat, observer and full-trace checks.
+The older delayed run predates the census flush fix and has no source census;
+its timing/state evidence is intact. The corrected combat capture uses the key
+codes above and supersedes exploratory control attempts. All derived material
+stays in `tmp/`. This gate does not require full campaign, landing or conversation
+runs; their static cadence classifications and live-coverage gaps are recorded
+in `internals.md`. Do not begin phase 7b automatically.

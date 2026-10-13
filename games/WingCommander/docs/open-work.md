@@ -19,7 +19,9 @@ complete, using the supplied PC video for visible motion cadence and displacemen
 Phase 6 rendering work is complete: measured converter selection, native/live
 output checks, cache-preserving gating and display-end publication are recorded.
 The user deferred further timing investigation to gameplay; exact scene-duration
-neutrality remains an explicit gap. Phase 7 gameplay timing and state investigation is in progress. Stop at its gate;
+neutrality remains an explicit gap. Phase 7 gameplay timing and state investigation is complete: reproducible flight
+windows, representative costs/source changes, state cadence and render coupling
+are documented. The native flight-unit anchor is 10 updates/s. Stop at its gate;
 phase 7b and later work remain deferred.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
@@ -64,8 +66,10 @@ A definitive CD32 edition, OCS afterwards and separately:
 
 ## Intended speed: working estimate
 
-**Flight working estimate: 15 game ticks per second**, still an unmeasured prior
-until phase 7. Do not transfer intro evidence to flight.
+**Flight-unit anchor: 10 world updates per second.** Phase 7 verifies that a
+displayed 200 kps corresponds to 20 km per update. This supersedes the unmeasured
+15/s prior. No timing fix is installed, and this rate does not establish every
+animation/AI cadence. Do not transfer intro evidence to flight.
 
 **Intro phase 5 candidate: approximately 15 native ship updates/s** (roughly
 15–17/s from the short projected-motion comparison). The unmodified ship loop
@@ -222,7 +226,7 @@ thresholds are retained, but CPU-bound scene durations can change. The final
 020 reset-to-menu window is 0.631 s longer; no universal intended rate or exact
 duration neutrality is claimed. Stop here; do not start phase 7 automatically.
 
-### Phase 7 — Gameplay windows
+### Phase 7 — Gameplay windows (gate complete)
 
 1. Use the slave's cheat options (`Custom2`, `Custom3` system, `Custom4` mission) to
    enter a chosen mission directly; build a reproducible flight window with an input
@@ -237,7 +241,12 @@ duration neutrality is claimed. Stop here; do not start phase 7 automatically.
    modal (menus, comms, pause, briefing, landing).
 5. Calibrate the flight anchor (kps against range).
 
-Gate: the flight time model with a per-variable classification, and the coupling test.
+Gate passed: the flight time model, state-family writer/cadence map and matched
+CPU/drawing coupling test are recorded. The repeated coast, independent full-trace
+counter, observer control, firing/turning/afterburner and pause checks pass.
+Comms, missile locking, ordinary damage, autopilot, landing and full mission
+progression retain explicit runtime gaps; their map is static classification.
+This is not the exhaustive phase-7b writer audit. Stop here.
 
 ### Phase 7b — Framerate dependency audit (Their Finest Hour method)
 
