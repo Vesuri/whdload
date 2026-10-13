@@ -3611,8 +3611,8 @@ Post-publication HUD also costs 2.8–3.8 ms and includes gameplay-sensitive wor
 040 pictures (16.4 of 2,000 blocks per picture); the turn converts 45,676 over
 635 (71.9 per picture). This is against each destination's history, not the
 immediately preceding image. Dirty-region tracking is worth a correctness-priced
-experiment, not an established saving. **D5** remains dependent on A2 for any
-hardware converter selection. Stars and glyphs do not justify separate rewrites.
+experiment, not an established saving. D5’s model evaluation is complete below;
+any future hardware converter selection still depends on A2. Stars and glyphs do not justify separate rewrites.
 
 ### Heavy-turn limits and checks
 
@@ -4012,8 +4012,9 @@ OCS work is not started.
 
 ## Phase 11b Kalms families: D5 model evaluation complete
 
-The practical evaluation is complete. **Retain the current converter selection.**
-The original D5 calibrated-040 gate is still open under A2; these results do not
+D5 is complete on the current models. **Retain the current converter selection.**
+The user excludes real-hardware validation at this stage, so hardware calibration
+is separate follow-up under A2, not a D5 completion gate. These results do not
 establish the best routine on physical 040/060 hardware. E1/E2 and phase 12 remain
 open. No production assembly or cache policy changes in D5.
 
