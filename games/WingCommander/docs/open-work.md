@@ -611,6 +611,14 @@ display wait (6–7 ms of idle per frame).
   close D5. A2 remains separate follow-up; no physical 040 performance claim
   follows from these model results. Stop before E1.
 
+**Known presentation defect — cannon spawn hold (analyzed, not fixed).**
+New class-8 bolts are excluded from prediction for their first world interval.
+Player firing also reloads the shared lifetime/cooldown field, falsely triggering
+whole-view discontinuity protection. Native reproduction isolates both guards;
+velocity is already available at spawn. See
+[spawn analysis](internals.md#cannon-spawn-first-interval-prediction-hold).
+A fix must address both guards without changing simulation or firing cadence.
+
 **E. Acceptance**
 
 - **E1.** Calibrated 040/25 with fast RAM, Nav-1 combat: at least 25 frames/s at

@@ -4125,3 +4125,84 @@ fixture hashes and changed ranges are in `tmp/d5-pixels.json`; raw captures and
 cost/frame reports are under `tmp/d5-{030,040}-{control,block040,full-original,full030,full040}`.
 `tmp/d5-fps.json` consolidates cadence; `tmp/d5-*-native.json` records the native
 comparisons. Reproduction commands are in development's D5 section.
+
+## Cannon spawn: first-interval prediction hold
+
+Analysis of the current D5 release confirms two independent prediction guards
+that explain a new cannon bolt holding its initial displayed position. This is
+not missing velocity data. No production code is changed by this analysis.
+
+### Native sequence
+
+All `E` addresses below are English code-hunk offsets; file offsets add `2c`.
+
+| Step | Code / file offset | Verified behavior |
+|---|---|---|
+| Held-fire input | `18f3a` / `18f66` | Calls `06fe`; preview's `timing_fire_gate` suppresses this call, so only committed world-tick input fires. |
+| Player fire eligibility | `06fe` / `072a` | Requires player `D:94c6 == -1` and positive gun energy, then calls `c9d2` / `c9fe`. |
+| Gun enumeration | `c9d2` / `c9fe` | Iterates the player's weapon mounts; enabled class-8 entries call `c458` / `c484`. |
+| Slot construction | `c4cc` / `c4f8` | Calls `9a86` / `9ab2`; allocator `2b632` / `2b65e` searches empty slots 10–60. The player path has a fallback at `9a5a` / `9a86` if allocation fails; that fallback is not exercised by the reproduction. |
+| Identity and pose | `9a0a` / `9a36`, `c4ee` / `c51a`, `c53a` / `c566` | Initializes model/class and clears position/velocity, copies the shooter's basis, then sets mount-relative position through `2b5cc` / `2b5f8`. |
+| Lifetime and velocity | `c55e–c662` / `c58a–c68e` | Loads projectile life from the weapon descriptor; projects shooter velocity onto the bolt's forward direction through `2ac88` / `2acb4`, then adds the weapon's forward speed. Class 8 also computes its aim point. Velocity is ready before return. |
+| Player cooldown | `c87a–c898` / `c8a6–c8c4` | For the player's class-8 shot, reloads the player's own `D:94c6` from the weapon cooldown table. This field is not exclusively object lifetime. |
+| Scheduled world | `02a8` / `02d4` | Lifecycle at `76e4` / `7710` precedes processing/integration at `7b4e` / `7b7a`. `76a8` / `76d4` decrements non-sentinel countdowns. |
+| First motion | `7d1a` / `7d46`, `80b6–80e0` / `80e2–810c` | Class 8 takes the ordinary position-plus-velocity path in the second processing pass, before the post-world prediction snapshot. |
+
+The enhanced scheduler commits native input **before** this world update, then
+calls `timing_scene_tick` and `timing_scene_snapshot`. A surviving player bolt
+therefore already has velocity and one native position step when first drawn.
+The held point is its first post-update position, not necessarily its muzzle
+spawn coordinate. Collision/destruction can remove a bolt before it reaches
+this presentation path; the reproduction isolates the surviving-shot case.
+
+### Why it holds
+
+`timing_scene_snapshot` first clears each prediction bit, then requires unchanged
+class/model and a non-increasing `D:94c6 + 2*slot` before accepting continuity.
+An empty-to-class-8 slot fails the identity check. A recycled matching slot can
+also fail the lifetime-reload test. Copying the new position and velocity into
+the snapshot does not set its prediction bit until the next accepted snapshot.
+
+Separately, the player's gun-ready sentinel is `-1`. Reloading that same timer
+for a shot makes it increase, even after the native countdown step. The generic
+lifetime test therefore clears the **player's** prediction bit. At the start of
+`timing_scene_begin`, a false player bit skips the whole world-object prediction
+loop as though the player had teleported. The camera still follows its existing
+path; this is a suppression of world-object extrapolation, not proof that the
+entire screen or player control freezes.
+
+Both guards must be addressed. Merely permitting a new projectile through the
+slot guard still leaves the whole-view guard active on its firing tick. Merely
+ignoring player cooldown reloads still leaves the new projectile unpredicted.
+After the next ordinary update, unchanged identities and decreasing timers pass;
+position prediction then uses the already-existing native velocity smoothly.
+The hold covers one 10 Hz simulation interval, nominally 100 ms. The exact
+visible duration depends on render/display timing and is not measured on hardware
+by this native check. Input waiting for its next world tick is a separate latency.
+
+### Native reproduction and fix boundary
+
+`tools/projectile_spawn_check.py` executes the native constructor for player mount
+0 using retained combat state, stopping at `E:c8ae` / file `c8da` before sound
+selection. It runs the native countdown and class-8 integration routines, followed
+by the current release's actual snapshot/begin/end prediction routines. This is
+an isolated semantics reproduction, not a full world/collision/AI or live timing
+capture. The player is explicitly initialized to the gun-ready `-1` sentinel.
+
+On both 020 and 040 ISA models, the captured mount allocates slot 12, changes
+class 0 to 8, supplies a nonzero velocity immediately, sets bolt life to 30 and
+reloads player cooldown to 6 (5 at the first snapshot). The first snapshot has
+both prediction bits clear. Five PAL render-fraction samples hold exactly the
+same bolt position; the next snapshot enables five smoothly advancing samples.
+Every render restores the authoritative position. Artificially enabling only
+one guard still holds the bolt; enabling both permits movement. These controls
+localize both blockers without modifying the release. Detailed coordinates,
+hashes and control results remain in `tmp/projectile-spawn-analysis/final.json`.
+
+A future fix should distinguish ship weapon cooldown from object birth/death,
+and grant prediction to a positively identified, fully initialized bolt at its
+post-world snapshot. It must preserve real player-cut, slot-reuse, expiry,
+collision and modal guards, and leave firing cadence, energy and authoritative
+motion unchanged. Multiple mounts, rapid recycling and non-player/missile spawn
+paths need separate coverage before generalizing the exception. No such fix is
+implemented or accepted by this analysis.

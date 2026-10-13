@@ -2811,3 +2811,24 @@ replacement, inactive flight, smaller geometries and allocation failure. Costs
 are inclusive model elapsed time; full-arm `delta_total` includes the common
 history copy, while changed-block cost excludes comparison/history. Never compare
 these as identical leaf operations or treat these 040 timings as hardware proof.
+
+### Cannon spawn and initial prediction hold
+
+Reproduce the isolated native constructor/snapshot analysis against a fresh normal
+release build. Requires the retained combat memory fixture already used by
+`timing_scene_check.py`; all derived output remains under `tmp/`.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/projectile-spawn-build
+python3 tools/projectile_spawn_check.py tmp/projectile-spawn-build \
+  --output tmp/projectile-spawn-report.json
+```
+
+The retained analysis used `tmp/preinstalled-d5/build` and wrote
+`tmp/projectile-spawn-analysis/final.json`. The tool checks 020/040 ISA semantics,
+not performance: one native gun construction, native countdown/integration,
+first/second snapshot prediction, five render fractions each, authoritative
+position restoration, and independent overrides of both blocking guards. It
+stops before sound and does not run a complete collision/AI world update. See
+internals' cannon-spawn analysis for offsets and the precise coverage limits.
