@@ -56,6 +56,17 @@ FF1MultiplyS64_000:
 ; All other registers preserved; CCR scratch. Restoring base-four algorithm:
 ; remainder and trial retain their high words, including near 2^64-1.
 FF1SquareRootU64_000:
+ IFD FF1_C4_ROOT_SEED
+ move.w C4RootSeedControl(pc),-(sp)
+ tst.w (sp)+
+ bne.b .restoring
+ cmpi.l #$10000,d1
+ blo.b .restoring
+ cmpi.l #$40000,d1
+ bhs.b .restoring
+ bra.w FF1C4SeededRoot
+.restoring:
+ ENDC
  movem.l d1-d7,-(sp)
  moveq #0,d2
  moveq #0,d3
@@ -221,4 +232,8 @@ FF1ProductControl: dc.w 0
 
  IFD FF1_ROOTLEAD_AB
 FF1RootLeadControl: dc.w 0
+ ENDC
+
+ IFD FF1_C4_ROOT_SEED
+ include "FerrariFormulaOne_Coarse200Root.s"
  ENDC
