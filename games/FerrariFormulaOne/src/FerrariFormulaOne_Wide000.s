@@ -60,7 +60,39 @@ FF1SquareRootU64_000:
  moveq #0,d2
  moveq #0,d3
  moveq #0,d4
+ IFD FF1_ROOT_AB
+ move.w FF1RootControl(pc),-(sp)
+ tst.w (sp)+
+ bne.b .wide_start
+ ENDC
+ ; After k<=30 rounds, remainder <2*root+1 <=2^(k+1)-1.
+ ; Before subtraction its largest value fits 32 bits for these rounds;
+ ; trial 4*previous_root+1 also fits. Keep full width for rounds 31/32.
+ moveq #29,d7
+.narrow:
+ add.l d0,d0
+ addx.l d1,d1
+ addx.l d2,d2
+ add.l d0,d0
+ addx.l d1,d1
+ addx.l d2,d2
+ move.l d4,d5
+ add.l d5,d5
+ add.l d5,d5
+ addq.l #1,d5
+ add.l d4,d4
+ cmp.l d5,d2
+ blo.b .narrow_next
+ sub.l d5,d2
+ addq.l #1,d4
+.narrow_next:
+ dbra d7,.narrow
+ moveq #1,d7
+ bra.b .loop
+ IFD FF1_ROOT_AB
+.wide_start:
  moveq #31,d7
+ ENDC
 .loop:
  ; Shift the next two input bits into the 64-bit remainder D3:D2.
  add.l d0,d0
@@ -133,4 +165,8 @@ FF1MultiplyS32x16_000:
 
  IFD FF1_WIDE_AB
 FF1WideControl: dc.w 0
+ ENDC
+
+ IFD FF1_ROOT_AB
+FF1RootControl: dc.w 0
  ENDC
