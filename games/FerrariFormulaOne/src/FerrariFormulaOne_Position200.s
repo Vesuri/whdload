@@ -47,6 +47,24 @@ FF1PositionRotate200:
 ; Full signed Q16 coordinates and signed-word coefficients. Compare in signed
 ; 64 bits and reverse inequality for C<0, without rounded intermediate division.
 FF1PositionCrossed000:
+ IFD FF1_CROSS200_AB
+ move.w FF1Cross200Control(pc),-(sp)
+ tst.w (sp)+
+ bne.b .general
+ ENDC
+ ; For S=0 and C!=0, X*S/C+Z>=512 is exactly Z>=512, even
+ ; when C is negative. Compare signed Q16 directly without any products.
+ tst.w d1
+ beq.b .general
+ tst.w d0
+ bne.b .general
+ moveq #0,d0
+ cmpi.l #512*65536,4(a0)
+ sge d0
+ andi.w #1,d0
+ moveq #0,d1
+ rts
+.general:
  movem.l d2-d7,-(sp)
  move.w d1,d2
  ext.l d2
@@ -99,3 +117,7 @@ FF1Heading200:
  add.l d0,(a0)
  add.l d0,(a0)
  rts
+
+ IFD FF1_CROSS200_AB
+FF1Cross200Control: dc.w 0
+ ENDC
