@@ -48,7 +48,10 @@ correction preserves both caches and the B2 slave. See the
 C1 is complete: render prediction includes both the upcoming publication and
 pending swap. PAL/NTSC display ledgers match every forecast to its actual field.
 C2 is complete: controlled player velocity/position advance per field, with zero
-world-tick position corrections in the steady and turning gates. Stop before C3.
+world-tick position corrections in the steady and turning gates. C3 is complete:
+heading-aware ship forecasts retain native inertia, with p95 0.255 km and maximum
+6.348 km error on the retained hard-turn world-ship sample. Constant-velocity
+classes stay exact. Stop before C4.
 Held-turn frame-budget misses are documented under C4; campaign and hardware
 visual acceptance remain open.
 
@@ -525,17 +528,23 @@ display wait (6–7 ms of idle per frame).
   live windows pass, with 656 checked ticks and zero player/camera corrections.
   Native field arithmetic, world bookkeeping, fallbacks and render restoration
   pass. See [C2 evidence and tolerances](internals.md#phase-11b-player-translation-c2-gate-complete).
-  Stop before C3.
-- **C3.** Heading-aware extrapolation: direct each object's predicted velocity
+- **C3 — complete.** Heading-aware extrapolation: direct each object's predicted velocity
   along its predicted orientation, using the existing angular-step prediction.
   Gate: hard-turn full-tick forecast error well below the phase-10 p95 4.357 km /
-  max 8.982 km; constant-velocity classes stay exact.
+  max 8.982 km; constant-velocity classes stay exact. The 149 world-ship
+  comparisons now give p95 0.255 km / max 6.348 km (94% / 29% lower); all 441
+  constant-velocity comparisons are exact. Native thrust toward predicted heading
+  preserves inertia. AI speed changes remain unpredictable; this is a scoped
+  one-tick gate, not a universal correction bound. Native isolation and two live
+  frame-rate gates pass; see [C3 evidence](internals.md#phase-11b-heading-aware-extrapolation-c3-gate-complete).
+  Stop before C4.
 - **C4.** Frame-time spikes: measure frame intervals around world ticks and
   catch-up batches; resolve with tick placement or cheaper ticks until
   frame-interval p95 equals the median in steady flight. C2 held-turn windows
   expose 122/657 missed prediction targets on the cycle-exact 040 and 72/663 on
   NTSC 030. The previous C1 build also misses 112/657 in the matched 040 turn
-  control. These fail the C1 display-time checker; steady gates still pass.
+  control. C3 records 119/656 misses in its 040 held turn. These fail the C1
+  display-time checker; steady gates still pass.
 
 **D. Rendering cost (driven by A3/D1)**
 

@@ -37,6 +37,8 @@ The reported cached-040 horizontal-row glitches were fixed in the shared
 FS-UAE emulator; use a build with the MMU write-cache correction.
 Known gaps:
 Controlled player velocity and position now advance every elapsed field.
-Hard-turn forecasting and rendering overruns still need further work.
+Ship forecasts now follow predicted headings through the native thrust/inertia
+model. Unexpected AI speed changes can still cause position corrections.
+Rendering overruns still need further work.
 Real 040 performance is uncalibrated. Controls, campaign/save coverage and
 final release play-testing remain open. No release archive is approved yet.

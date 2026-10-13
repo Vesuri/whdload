@@ -147,6 +147,8 @@ translation_world_owned:
 ; Replaces E:807a's MOVE/MULS. Preview applies a fractional native delta;
 ; the scheduled world keeps native bookkeeping but cannot apply it a second time.
 translation_velocity:
+        tst.w   timing_scene_velocity_preview(pc)
+        bne.w   timing_scene_velocity_result
         tst.w   translation_preview(pc)
         bne.s   .fraction
         movem.l d0-d1,-(sp)
@@ -271,3 +273,100 @@ translation_ticks_checked: dc.l 0
 translation_position_corrections: dc.l 0
 translation_camera_corrections: dc.l 0
         endif
+
+; C3: predict thrust toward the already-predicted heading. The original solver
+; retains inertia/engine capability. No AI, RNG, fuel or timer routine is run.
+; Normal, afterburn and braking thrust are forecast while their action is stable.
+; Action expiry and scripted motion retain current velocity until the world tick.
+timing_scene_velocity:
+        tst.w   d4
+        beq.s   .done
+        cmpi.w  #10,d4
+        bhs.s   .done
+        lea     5888(a4),a0
+        cmpi.w  #11,(a0,d4.w*2)
+        blo.s   .done
+        lea     5478(a4),a0
+        move.w  (a0,d4.w*2),d0
+        cmpi.w  #-1,d0
+        beq.s   .stage
+        cmpi.w  #1,d0
+        beq.s   .timer
+        cmpi.w  #3,d0
+        bne.s   .done
+.timer:
+        lea     15126(a4),a0
+        cmpi.w  #1,(a0,d4.w*2)
+        ble.s   .done
+.stage:
+        lea     14932(a4),a0
+        cmpi.w  #1,(a0,d4.w*2)
+        beq.s   .done
+        movem.l d0-d7/a0-a6,-(sp)
+        bsr.s   timing_scene_velocity_solve
+        movem.l (sp)+,d0-d7/a0-a6
+.done:
+        rts
+
+timing_scene_velocity_solve:
+        link    a5,#-24
+        movem.l d2-d5,-(sp)
+        move.w  d4,d2
+        lea     timing_scene_velocity_preview(pc),a0
+        move.w  #1,(a0)
+        lea     15082(a4),a1
+        move.b  (a1,d2.w),2(a0)
+        clr.l   -24(a5)
+        clr.l   -20(a5)
+        clr.l   -16(a5)
+        lea     6592(a4),a0
+        move.l  (a0,d2.w*4),d0
+        lea     5478(a4),a0
+        cmpi.w  #3,(a0,d2.w*2)
+        beq.s   .brake
+        cmpi.w  #1,(a0,d2.w*2)
+        bne.s   .target
+        lea     6136(a4),a0
+        move.w  (a0,d2.w*2),d0
+        muls.w  #104,d0
+        lea     -11354(a4),a0
+        move.w  22(a0,d0.l),d0
+        add.w   d0,d0
+        addi.w  #40,d0
+        ext.l   d0
+        lsl.l   #8,d0
+        bra.s   .target
+.brake:
+        moveq   #0,d0
+.target:
+        pea     -12(a5)
+        move.l  d0,-(sp)
+        lea     8522(a4),a0
+        adda.w  d5,a0
+        move.l  a0,-(sp)
+        move.l  timing_game(pc),a6
+        jsr     $2b7f0(a6)
+        lea     12(sp),sp
+        move.l  timing_game(pc),-(sp)
+        addi.l  #$7f78,(sp)
+        rts
+
+timing_scene_velocity_result:
+        lea     timing_scene_velocity_preview(pc),a0
+        clr.w   (a0)
+        lea     15082(a4),a1
+        move.b  2(a0),(a1,d2.w)
+        move.w  d2,d0
+        mulu.w  #12,d0
+        lea     7534(a4),a2
+        adda.w  d0,a2
+        lea     -24(a5),a3
+        moveq   #2,d3
+.axis:
+        move.l  (a3)+,d0
+        bsr.w   timing_scene_scale
+        add.l   d0,(a2)+
+        dbra    d3,.axis
+        bra.w   translation_epilogue
+        cnop 0,4
+timing_scene_velocity_preview: dc.w 0,0

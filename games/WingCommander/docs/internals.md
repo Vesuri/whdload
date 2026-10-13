@@ -3224,7 +3224,7 @@ for the newly extended horizon. Release work remains paused.
 Controlled English flight now commits player velocity and position once per
 elapsed field, after that field's rotation. World ticks retain fuel, action timers,
 throttle commands, collisions and other objects; they do not move the player a
-second time. C3 heading-aware forecasting is not included. Phase 12 stays paused.
+second time. C3 heading-aware forecasting is recorded below. Phase 12 stays paused.
 
 ### Native model and patch seams
 
@@ -3345,3 +3345,89 @@ Normal candidate: 39820 bytes, SHA-256
 `c45d7bd9b88b923319fca4ff2cdb0dcf902646d6702b245db6034be3b59de385`.
 The recorder fixture is `tmp/c2-frames`, pinned by its post-adaptation build
 manifest. Version remains 2.0b (13.06.2026). Stop before C3.
+
+
+## Phase 11b heading-aware extrapolation: C3 gate complete
+
+Buffered enhanced English flight now predicts ship velocity after predicting its
+pitch/yaw/roll. It uses the native thrust solver toward that future heading,
+retaining inertia and engine capability. Simply aligning velocity to the heading
+is incorrect: it erases drift. The controlled player remains C2-owned; projectile,
+effect and debris classes keep constant-velocity prediction. No world rules change.
+
+For horizon `f/hz`, rotate the basis with the existing scaled angular steps,
+compute native full-step acceleration `a` against that basis, stage
+`v' = v + trunc(a*f/hz)`, then `p' = p + trunc(v'*f/hz)`. This deliberately matches
+the original endpoint integration at one tick; it is not continuous-physics
+half-acceleration integration. The renderer restores velocity, position and basis
+before gameplay. No persistent prediction accumulation or extra AI invocation occurs.
+
+The new wrapper reuses `E:7f78–8078` (file `7fa4–80a4`) and the existing guarded
+`E:807a` seam (file `80a6`), returning through `E:80ea` (file `8116`). Desired
+velocity uses `E:2b7f0` (file `2b81c`), as native `E:7f3e–7f64` does. Normal
+thrust uses `D:99be+4*i`; afterburn uses model word +22 from `D:53a4`, with
+`(2*value+40)<<8`; braking targets zero. `D:a148+12*i` supplies the already
+predicted forward vector. The solver's cosmetic byte `D:bae8+i` is restored
+immediately. Fuel, action/timer updates, RNG and AI are never invoked by this wrapper.
+
+Eligibility is ship slots 1–9, class >=11, action -1 or stable action 1/3 with
+`D:bb14+2*i > 1`, and native motion-stage `D:ba52+2*i != 1`. Action expiry,
+scripted/special motion and the existing cut guards retain current velocity.
+The normal experimental `--timing` build retains its previous velocity policy;
+Psygore modes and German are unchanged. C1 horizon bounds remain in force.
+
+### Forecast and isolation evidence
+
+`tmp/c3-heading-final.json` replays all 120 retained
+`phase10-isolated-turn-ntsc` renderer inputs through the actual candidate on native
+68020 and 68040 models. Each model checks 1,877 predictions against the original
+motion routine, with 424 changed forecasts, and exact whole-data restoration.
+The separate 140 fractional/action cases cover PAL/NTSC, zero/partial/full/extended
+horizons, afterburn, braking, action expiry and native fallback. A deliberately
+disabled solver fails the forecast oracle. Existing corrupted-restoration controls
+also remain effective.
+
+| One-tick trajectory comparison | Count | Old p95 / max km | C3 p95 / max km |
+|---|---:|---:|---:|
+| Non-player ships, same recorded inputs | 149 | 4.374 / 8.982 | 0.255 / 6.348 |
+| Constant-velocity classes 3/4/5/8 | 441 | 0 / 0 | 0 / 0 |
+
+The phase-10 headline p95 4.357 km included the player (189 comparisons); C3 uses
+149 world-ship comparisons because C2 now advances the player separately.
+The regression gate requires p95 below half that headline and maximum below
+three quarters, without excluding unexpected speed changes. Observed reductions
+are 94% and 29%. The largest residual coincides with a new AI set-speed command
+(from fixed8 7476 to 9114). C3 cannot predict future control decisions; there is
+still an occasional visible correction. These measurements bound this retained
+one-tick trajectory only, not arbitrary AI changes or the extended C1 horizon.
+
+Other passing checks: 96 scene/isolation cases and 420 signed-scale cases in both
+release and experimental builds; C2's 1,284 carry cases, 12 native fallbacks and
+four render-isolation cases; eight installer/option cases with whole-hunk and
+register/CCR checks; 196 release option/cache cases, 54 complete converter outputs
+and 180 pacing/output cases.
+
+### Required live frame-rate gates
+
+The frame-stats recorder and independent publication observer agree on all 661
+030 and 656 cycle-exact 040 pictures. Both runs retain one FAST source, two CHIP
+buffers, line-4 publication, zero late-blank deferrals and zero input overflow.
+C2 records zero player/camera position corrections across 349 actual world ticks.
+
+| Window | Pictures/s | World updates/s | Player fields / checked ticks |
+|---|---:|---:|---:|
+| PAL 030 steady | 49.920 | 9.925 | 809 / 161 |
+| PAL cycle-exact 040 held right | 41.535 | 10.008 | 941 / 188 |
+
+See `tmp/c3-fps.json` and per-run `check.json`, `buffers.json`, `translation.json`.
+The 030 display-time gate passes all targets. The 040 held-turn display-time gate
+still fails on 119/656 targets/fractions due to rendering overruns; this remains
+C4 work, not waived by C3.
+The previous C2 held-turn result was 41.754 pictures/s. These windows do not
+establish an isolated performance improvement or regression. The 040 remains
+uncalibrated against hardware; no new CPU matrix or release work was undertaken.
+
+Normal candidate `tmp/c3-final/WingCommanderCD32.Slave`: 40,124 bytes, SHA-256
+`ba4c088be9f634efaaee8a1889a2e19fa0380a0a788c0e49b32d5024f2483a6e`.
+A fresh source rebuild reproduces these bytes exactly. The phase-12 save/load
+stash remains untouched. Stop before C4.

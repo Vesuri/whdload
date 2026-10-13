@@ -19,6 +19,7 @@ def main():
         def put(n,f,v):c.write(S+sy[n],struct.pack('>'+f,v))
         def run(n,regs=None):c.run(S+sy[n]-c.code,registers=regs)
         put('timing_game','I',c.code)
+        if 'timing_scene_velocity' in sy:c.write(c.code+0x807a,struct.pack('>HI',0x4ef9,S+sy['translation_velocity']))
         rng=random.Random(10)
         for hz in (50,60):
             for f in (0,1,hz//2,hz-1,hz,hz+10,hz+20):
@@ -31,6 +32,7 @@ def main():
         for hz in (50,60):
             for view in range(4):
                 c.reset();put('timing_active','H',1);put('timing_hz','I',hz);put('timing_scene_valid','H',0)
+                c.data_value(0x9566,'h',-1);c.data_value(0xba54,'h',0)
                 c.data_value(0x3896,'h',view);c.data_value(0xae4,'h',0);c.data_value(0x9564,'h',-1)
                 c.write(c.data+0x96fe,bytes(128))
                 for slot,kind in ((0,12),(1,12),(2,4),(3,2),(60,8)):
@@ -51,17 +53,25 @@ def main():
                     for slot in (0,1,2,60):
                         got=struct.unpack('>3i',c.read(c.data+0x919a+12*slot,12))
                         want=tuple(p+trunc(v*effective,hz) for p,v in zip((1000,2000,3000),(5121,-513,-1)))
-                        assert got==want,(model,hz,view,fraction,slot,got,want)
+                        if slot!=1 or 'timing_scene_velocity' not in sy:
+                            assert got==want,(model,hz,view,fraction,slot,got,want)
                     assert c.read(c.data+0x919a+36,12)==before[0x919a+36:0x919a+48] # star direction
                     if fraction>=hz//2:
                         assert c.read(c.data+0xa148+12,12)!=before[0xa148+12:0xa148+24]
-                    if fraction and view==0:
+                    if 'timing_scene_velocity' in sy or (fraction and view==0):
                         ref=CPU(memory,layout,model);ref.write(ref.data,before)
                         for slot in (1,2,60):
                             for entry in (0x2acb2,0x2acf2,0x2ad32):
                                 angle=trunc(8*effective,hz)
                                 if angle:ref.run(entry,struct.pack('>hh',angle,slot))
                             for off in POSES[1:4]:assert c.read(c.data+off+12*slot,12)==ref.read(ref.data+off+12*slot,12)
+                            if slot==1 and 'timing_scene_velocity' in sy:
+                                ref.run(0x7d1a,struct.pack('>h',slot))
+                                future=struct.unpack('>3i',ref.read(ref.data+0x9d6c+12*slot,12))
+                                velocity=tuple(v+trunc((n-v)*effective,hz) for v,n in zip((5121,-513,-1),future))
+                                want=tuple(p+trunc(v*effective,hz) for p,v in zip((1000,2000,3000),velocity))
+                                got=struct.unpack('>3i',c.read(c.data+0x919a+12*slot,12))
+                                assert got==want,('native heading forecast',model,hz,effective,got,want)
                         ref.close()
                     run('timing_scene_end')
                     assert c.read(c.data,0xfda0)==before,('authoritative leak',model,hz,view,[hex(i) for i,(x,y) in enumerate(zip(before,c.read(c.data,0xfda0))) if x!=y][:20])

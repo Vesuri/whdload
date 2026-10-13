@@ -2336,4 +2336,69 @@ writing `tmp/c2-control-c1-turn040`. That C1 fixture must come from commit
 `b16f1a2`, not a rebuild with the current C2 sources. It also misses 112/657 targets.
 This is recorded C4 work; ownership correctness does not waive display-time
 accuracy. The phase-12 save/load stash stays separate and must not be applied as
-part of these checks. Stop before C3.
+part of these checks. C3 follows below.
+
+
+## C3: heading-aware ship forecasts
+
+Use fresh output destinations below `tmp/`. `heading_check.py` needs the retained
+phase-10 hard-turn snapshots produced by the Phase 10 commands above. It runs the
+candidate against all 120 recorded inputs on native 68020/68040 models, compares
+with the original motion routine, then measures one-tick error against the recorded
+next states. It also checks fractional normal/afterburn/braking motion, fallback
+boundaries, whole-data isolation and a disabled-solver negative control. It does
+not measure performance. No extra long gameplay capture is needed for this gate.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/c3-final
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/c3-frames
+python3 tools/heading_check.py tmp/c3-final --output tmp/c3-heading-final.json
+python3 tools/timing_scene_check.py tmp/c3-final --output tmp/c3-scenes-final
+python3 tools/translation_contract_check.py tmp/c3-frames --output tmp/c3-contracts.json
+python3 tools/timing_adapter_check.py tmp/c3-final --output tmp/c3-install
+python3 tools/release_check.py tmp/c3-final --negative-controls --output tmp/c3-options.json
+python3 tools/reconstruct.py --timing --output tmp/c3-experimental
+python3 tools/timing_scene_check.py tmp/c3-experimental --output tmp/c3-experimental-scenes
+
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/c3-frames/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/c3-layout
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/c3-frames/WingCommanderCD32.Slave --machine a1200-030 \
+  --baseline-cache-model --options 'CACHE DCACHE' --custom5 0 \
+  --debugger --observer --display-sample --layout tmp/c3-layout/layout.json \
+  --output tmp/c3-030-gate --timeout 180
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/c3-frames/WingCommanderCD32.Slave --machine a1200-040 \
+  --baseline-cache-model --options NoMMU --timing-core --held-key 4e --custom5 0 \
+  --debugger --observer --display-sample --layout tmp/c3-layout/layout.json \
+  --output tmp/c3-040-gate --timeout 180
+for cell in 030-gate 040-gate; do
+  python3 tools/frame_check.py "tmp/c3-$cell" --output "tmp/c3-$cell/check.json"
+  python3 tools/buffer_report.py "tmp/c3-$cell" --build tmp/c3-frames \
+    --layout tmp/c3-layout/layout.json --output "tmp/c3-$cell/buffers.json"
+  python3 tools/translation_report.py "tmp/c3-$cell" --build tmp/c3-frames \
+    --layout tmp/c3-layout/layout.json --output "tmp/c3-$cell/translation.json"
+done
+python3 tools/frame_report.py tmp/c3-030-gate tmp/c3-040-gate --output tmp/c3-fps.json
+python3 tools/display_time_check.py tmp/c3-030-gate --output tmp/c3-030-gate/prediction.json
+```
+
+The same display-time check on `tmp/c3-040-gate` intentionally fails: 119/656
+held-turn pictures miss their target field/fraction. It must not be reported as
+a passing C1 result; C4 retains this work. Both frame-rate counts and buffer
+ownership checks pass. The observer uses the established cache-model settings;
+this is not a calibrated physical 040 measurement.
+
+Static reproduction of the native solver uses the pinned English hunk:
+
+```sh
+python3 -m amigaxdev.disasm dis --cpu 68020 \
+  tmp/cd32-static/wing.english.h0.bin 0 0x7d1a 0x80f0
+```
+
+The C3 change is drawing-only and does not apply the deferred phase-12 save/load
+stash. Stop before C4; release remains paused.

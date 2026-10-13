@@ -243,16 +243,8 @@ timing_scene_begin:
         move.l  8(a2),d0
         cmp.l   8(a3),d0
         bne.w   .next
-        lea     timing_scene_velocities(pc),a3
-        adda.w  d5,a3
-        moveq   #2,d3
-.xyz:
-        move.l  (a3)+,d0
-        bsr.w   timing_scene_scale
-        add.l   d0,(a2)+
-        dbra    d3,.xyz
         tst.w   d4
-        beq.w   .next             ; player orientation already elapsed-field
+        beq.w   .translate       ; player orientation already elapsed-field
         ; Native axis rotations rebuild an orthogonal fixed-point basis.
         ; Angular steps are snapshots, not a second AI/controller invocation.
         moveq   #0,d3
@@ -286,6 +278,24 @@ timing_scene_begin:
         addq.w  #1,d3
         cmpi.w  #3,d3
         bne.s   .axis
+        ifne BUFFERED
+        bsr.w   timing_scene_velocity
+        endif
+.translate:
+        lea     4508(a4),a2
+        adda.w  d5,a2
+        ifne BUFFERED
+        lea     7534(a4),a3
+        else
+        lea     timing_scene_velocities(pc),a3
+        endif
+        adda.w  d5,a3
+        moveq   #2,d3
+.xyz:
+        move.l  (a3)+,d0
+        bsr.w   timing_scene_scale
+        add.l   d0,(a2)+
+        dbra    d3,.xyz
         ifne BUFFERED
         bra.s   .next
 .player_pose:
