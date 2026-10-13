@@ -2353,7 +2353,7 @@ exercised by the tape; that is not a claim of runtime coverage for every branch.
 | Menus and briefing | Front-end dispatcher `15348`, separate scripted sequence paths around `1c952` | Modal; no assumption that normal flight cadence applies; outside the flight tape |
 
 The map identifies representative writers and cadence for each requested state
-family. It is not the phase-7b exhaustive writer/caller inventory. Runtime gaps
+family. The phase-7b inventory and native reproductions below extend it. Runtime gaps
 are live comms, missile locking, normal damage, autopilot, landing and full mission
 progression; their classifications above are static evidence/hypotheses to check
 when those paths are changed. Pausing demonstrably separates the interrupt clock
@@ -2364,4 +2364,72 @@ Evidence: `tmp/phase7-coast-{020,repeat,delay,030}/`,
 `flight-report.json` files and `tmp/phase7-validation.json`. The corrected combat
 capture supersedes exploratory control-key attempts. Derived binaries, complete
 traces, snapshots and pictures remain ignored. Phase 7 stops at this documented
-time-model/coupling gate; phase 7b, timing design, release and OCS work have not begun.
+time-model/coupling gate. The phase-7b audit below is complete; timing design,
+release and OCS work have not begun.
+
+
+## Phase 7b: world-update dependency audit
+
+The complete findings are [FR-01–FR-23](framerate-audit.md), with hunk/file-offset
+notation, native fixture scope, clock-policy alternatives and implementation costs
+under B/C/D. The gate covers the English CD32 world root `E:02a8`, its direct
+calls and every dispatch entry, up to explicitly classified platform/resource
+boundaries. It is not a claim of full live mission coverage.
+
+The static closure has 30,384 instructions, 6,118 direct/selected-helper edges,
+54 tables and 625 entries. Native 68000 and 68040 checks reach all 625 targets and
+reject 104 out-of-bounds switch indices. The 47-entry ship-action table is
+`D:0372` (executable file offset `3a3ba`), selected at `E:13d60`; its shared
+elapsed/countdown word and phase byte are `D:c272/c288`, reset at `E:11620`.
+There are no unidentified simulation callbacks. Copy/fill, formatting, runtime and
+OS leaves are listed individually in the generated inventory; the external direct
+edges are slave adapters `S:16fc/176a`.
+
+Key refinements to the phase-7 map:
+
+- Motion includes acceleration and angular feedback, not only final position.
+  `E:807a–80e0` and complete angular update `7c86` reproduce call-count dependence.
+  Existing position/velocity arithmetic retains eight fractional bits.
+- Missile launch/guidance delay `D:baa8` is a signed byte (`E:77da/7808`), default
+  20 at `ca9c`. Values 128–255 do not decrement through the positive-only gate.
+  The native default expires at 0.8 seconds for a half-second 10→50 calls/s change,
+  versus 0.4 seconds for 50→10. This is a timer fixture, not live missile duration.
+- The original point-overlap routine `E:1597e` detects a controlled midpoint hit
+  while missing both endpoints of a crossing step. The complete range/angle
+  predicate `1187c` likewise admits or misses an equal-time approach according to
+  sampling cadence. Both are synthetic native reproductions, not observed live
+  collision or landing failures.
+- Effect scripts `E:28f96` have their own update-count period, jump/removal opcodes
+  and integer size growth. Damaged-ship emission at `65f4` instead reads the draw
+  counter `D:9150`; keeping the world at 10 Hz alone does not remove that coupling.
+- Communications animation `E:43e8` consumes the shared gameplay RNG `D:6f18`.
+  Extra rendered portrait frames can therefore alter subsequent gameplay random
+  values. Messages use draw counts; the six directional hit-indicator bytes
+  `D:c4f4–c4f9`, set to four at `15ffc–1607a`, use world counts.
+- The hardpoint byte at `E:ca12` is selected/disabled weapon state, with setters
+  `1a5a2/1a5aa`; it is not a newly discovered gun reload timer. Gun energy recovery,
+  firing opportunities and per-shot cost must be treated separately.
+- The current/previous input latch `E:19334` is an explicit world/render hand-off.
+  Reusing the native edge predicate's unchanged inputs produces five deliveries
+  across five ticks; advancing the latch produces one. The camera command runner
+  `18910` has a frame-count wait, but no general gameplay replay contract is proven.
+- Landing writes the world counter directly at `E:1b498`, outside the ordinary
+  root. Autopilot also has a VBL-deadline loop `0e64`; pause and modal transitions
+  need explicit scheduling rather than accumulated catch-up work.
+
+Steady 10/20/50/60 calls/s and both mid-run rate changes pass the current-defect
+oracles on both models. Reset, byte/word bounds, lifetime sentinel, all effect
+opcode families and rejecting mutation controls are included. VBL production and
+per-event amounts are unaffected only in the scoped controls; they are not to be
+wholesale rescaled. The installed Unicorn library mishandles an exploratory
+high-bit memory logical-shift fixture at `E:790e`; the report records observed
+`ffe0` versus expected `0020` after ten shifts. Positive-size timing results are
+separate. No physical-CPU or performance claim follows from native execution.
+
+Evidence: `tmp/phase7b-inventory-gate/` and `tmp/phase7b-native-verified/`, using the
+retained `tmp/phase7-combat-controls/start-fast.bin`. Reproducible commands and
+input/instrument fingerprints are documented in `development.md`. All derived
+material remains ignored. Comms, player missile locking, ordinary damage,
+autopilot, landing, full mission progression and gameplay-replay compatibility
+retain explicit live/contract gaps. Phase 7b is complete at this audit gate;
+phase 8, fixes, release and OCS work remain deferred.

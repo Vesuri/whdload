@@ -1,10 +1,11 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 7b CD32 framerate-dependency audit is in progress.
-Audit world-update calls and dispatch, reproduce native timing dependencies, and
-record the implications for designs B/C/D. The flight-unit anchor is 10 updates/s.
-Stop at the phase 7b gate; do not start phase 8, fixes, release or OCS work.
+Current scope: phase 7b CD32 framerate-dependency audit is complete.
+World-update dispatch, FR-01–FR-23, native checks and B/C/D audit costs are recorded.
+The flight-unit anchor is 10 updates/s; native and live coverage limits are explicit.
+Stopped at the phase 7b gate; do not start phase 8, fixes, release or OCS work
+until requested.
 Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 

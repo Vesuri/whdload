@@ -21,8 +21,11 @@ output checks, cache-preserving gating and display-end publication are recorded.
 The user deferred further timing investigation to gameplay; exact scene-duration
 neutrality remains an explicit gap. Phase 7 gameplay timing and state investigation is complete: reproducible flight
 windows, representative costs/source changes, state cadence and render coupling
-are documented. The native flight-unit anchor is 10 updates/s. Stop at its gate;
-Phase 7b is now authorised and in progress; phase 8 and later work remain deferred.
+are documented. The native flight-unit anchor is 10 updates/s. Phase 7b is complete:
+the world-update dispatch inventory, FR-01–FR-23 and B/C/D audit costs are recorded
+in [the framerate audit](framerate-audit.md). Native 68000/68040 reproductions pass
+with steady/changing rates and explicit runtime/instrument gaps. Stop at phase 7b;
+phase 8 and later work remain deferred.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -58,8 +61,8 @@ A definitive CD32 edition, OCS afterwards and separately:
   options. The original slave explicitly calls SetCPU (phase 1 finding). Every
   measurement records the hardware cache state (`CACR`) it ran under.
 - **Design.** A fixed tick with only presentation interpolation is rejected. The
-  choice between designs B, C and D (phase 8) waits for the flight time model and the
-  framerate audit.
+  choice between designs B, C and D remains the user's phase-8 decision. The flight
+  time model and framerate audit are available; performance pricing remains deferred.
 - **PC reference.** Use the supplied 86Box/eXoDOS recording as a practical external
   pace reference alongside the Amiga time sources and music. It represents the
   recorded experience, not proof of an original design rate or identical port code.
@@ -246,9 +249,10 @@ CPU/drawing coupling test are recorded. The repeated coast, independent full-tra
 counter, observer control, firing/turning/afterburner and pause checks pass.
 Comms, missile locking, ordinary damage, autopilot, landing and full mission
 progression retain explicit runtime gaps; their map is static classification.
-This is not the exhaustive phase-7b writer audit. Stop here.
+The phase-7b audit below adds the complete world/dispatch inventory and native
+reproductions; it does not close these live-coverage gaps.
 
-### Phase 7b — Framerate dependency audit (in progress)
+### Phase 7b — Framerate dependency audit (gate complete)
 
 Their Finest Hour's `docs/framerate-audit.md` and FR-01..FR-27 are the template; its
 gameplay is expected to be more complex than Wing Commander's, but the kinds of
@@ -274,8 +278,14 @@ defect will recur.
    carried remainder, step-scaled increment with carried fraction, or render-rate
    presentation only.
 
-Gate: an inventory complete for the world update and its dispatch tables, with each
-item's cost under designs B, C and D.
+Gate complete: [FR-01–FR-23](framerate-audit.md) record the world-root closure,
+54 dispatch tables / 625 entries, every classified subsystem boundary, clock
+initialisers/consumers and each item's B/C/D implementation cost. Original-code
+checks pass on Unicorn 68000/68040 at four steady rates and both directions of a
+mid-run rate change. All entries, 104 bounds checks and rejecting negative controls
+pass. Native slices, complete routines and static/live gaps are distinguished.
+No new emulator run, timing fix or phase-8 performance pricing was performed.
+Stop at phase 7b.
 
 ### Phase 8 — Choose the decoupling design (user decision)
 
