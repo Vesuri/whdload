@@ -43,10 +43,15 @@ def main():
             assert after[7]==before[7]+4
             want=bytearray(game_before)
             if custom==3:
-                for off,label,op in [(0x698,'timing_loop',0x4ef9),(0x176,'timing_pause',0x4eb9),(0x24c,'timing_pause',0x4eb9),(0x2571c,'timing_pause',0x4eb9),(0x18eee,'timing_throttle_gate',0x4eb9),(0x18f00,'timing_throttle_gate',0x4eb9),(0x18f3a,'timing_fire_gate',0x4eb9),(0x7bc2,'timing_world_rotation',0x4eb9)]:
+                for off,label,op in [(0x698,'timing_loop',0x4ef9),(0x878,'timing_pause',0x4ef9),(0x101c,'timing_autopilot',0x4ef9),(0x18eee,'timing_throttle_gate',0x4eb9),(0x18f00,'timing_throttle_gate',0x4eb9),(0x18f3a,'timing_fire_gate',0x4eb9),(0x7bc2,'timing_world_rotation',0x4eb9),(0x34188,'timing_record_input',0x4eb9),(0x1934c,'timing_pad_read',0x4eb9),(0x18c6a,'timing_keys_read',0x4eb9),(0x19380,'timing_key_command',0x4eb9),(0x65f4,'timing_emission_clock',0x4eb9),(0x51a,'timing_message_draw',0x4eb9),(0x46ea,'timing_systems_draw',0x4eb9),(0x530,'timing_sim_draw',0x4ef9),(0x4b16,'timing_selection',0x4ef9),(0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]:
                     want[off:off+6]=struct.pack('>HI',op,s+sym[label])
+                want[0x1022:0x1024]=bytes.fromhex('4e71')
+                want[0x65fa:0x65fc]=bytes.fromhex('4e71')
+                want[0x4b1c:0x4b1e]=bytes.fromhex('4e71')
                 want[0x7bc8:0x7bca]=bytes.fromhex('4e71')
+                want[0x87e:0x880]=bytes.fromhex('4e71')
                 assert c.read(s+sym['timing_hz'],4)==struct.pack('>I',50)
+                assert c.read(s+sym['timing_data'],4)==struct.pack('>I',c.data)
             assert c.read(c.code,0x35ea4)==want
             cases.append(dict(model=model,custom=custom,exact=True));c.close()
         # A changed instruction operand must be rejected before any patch write.

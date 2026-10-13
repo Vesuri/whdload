@@ -1703,8 +1703,8 @@ limits; full interrupt subtraction and real-hardware timing remain gaps.
 The standalone clock kernel is not a completed D implementation. It schedules
 10 world updates/s from a wrapping field count and a caller-supplied observed
 50/60 Hz field rate. A batch issues at most four ticks, explicitly accounts for
-dropped debt, and excludes modal time after a rebase. The live adapter, responsive
-player path, input history and draw-dependent clocks still need their full gates.
+dropped debt, and excludes modal time after a rebase. The connected adapter, player path and input history have native component checks;
+the final live gate also checks draw schedules and modal boundaries.
 
 ```sh
 . amiga/env.sh
@@ -1734,7 +1734,7 @@ plus changed-operand rejection, and 664 preview/isolation/signed-rate cases.
 The installer fixture stubs the already-applied original PatchSeg, cache flush
 and beam-rate result; live beam behaviour is separate evidence. Player checks
 execute original control/rotation code from the retained phase-7 memory dump.
-They do not prove the still-unconnected live input/player pipeline.
+They isolate controller arithmetic; the live captures verify the connected pipeline.
 
 For a bounded diagnostic flight (not the phase-9 acceptance gate), use a fresh
 fixture/layout and the retained phase-7 read-only observer build:
@@ -1755,3 +1755,25 @@ The initial live evidence is `tmp/phase9-live-prototype/` with its own fixture
 hash, layout and window bounds. Later component changes require fresh calibration
 and captures; do not reuse that layout blindly. `--timing` is a separate experimental
 build mode, not a release default or the phase-6 combined renderer build.
+
+Additional native checks for the connected implementation:
+
+```sh
+python3 tools/timing_input_check.py tmp/timing-foundation --output tmp/timing-input-check
+python3 tools/timing_presentation_check.py tmp/timing-foundation --output tmp/timing-presentation-check
+python3 tools/timing_modal_check.py tmp/timing-foundation --output tmp/timing-modal-check
+```
+
+For scheduling acceptance, build with `--timing --timing-verify` and use
+`flight_fixture.py --schedule normal`, `--schedule slow` or `--schedule one-field`.
+The schedule is pinned in the fixture bytes and metadata, not written by GDB.
+Normal draws both native scene and HUD. Slow imposes a ten-field minimum per draw.
+One-field replaces drawing with a one-field wait **only in VERIFY**; it is a
+scheduler stress test, not a claim that the original renderer achieves 50/60 FPS.
+Equal-size schedules share a calibrated layout, which every capture verifies.
+`timing_capture.py --schedule <same-name> --windows 20` collects compact read-only
+observer events and state snapshots. Add `--trace` only when full instruction
+profiles are needed. `timing_report.py <run> ... --output tmp/timing-report.json`
+excludes the first two windows, measures completed world time against observed
+emulated time, rejects schedule mismatch/overflow or >1% error, and reports
+per-range state residuals at matching world ticks. All derived output stays in `tmp/`.

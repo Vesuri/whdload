@@ -21,13 +21,21 @@ def main():
     p.add_argument('--machine',choices=('a1200-fast','a1200-030'),default='a1200-fast')
     p.add_argument('--ntsc',action='store_true')
     p.add_argument('--off',action='store_true')
+    p.add_argument('--held-key',default='40',help='raw key held during flight; hexadecimal')
+    p.add_argument('--presentation-states',action='store_true',help='snapshot on publication instead of world return')
+    p.add_argument('--trace',action='store_true',help='retain full instruction profiles as well as observer events')
+    p.add_argument('--schedule',choices=('normal','slow','one-field'),default='normal')
+    p.add_argument('--pause',action='store_true',help='include a real native pause and resume')
     a=p.parse_args()
+    if not 0<=int(a.held_key,16)<128:p.error('invalid raw key')
     out=(ROOT/a.output).resolve();slave=(ROOT/a.fixture).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists() or not 1<=a.windows<=30:
         raise ValueError('new bounded output in tmp required')
     fixture=json.loads((slave.parent/'build.json').read_text())
     if not fixture.get('timing') or fixture['sha256']!=hashlib.sha256(slave.read_bytes()).hexdigest():
         raise ValueError('verified timing fixture required')
+    if fixture.get('schedule','normal')!=a.schedule:raise ValueError('schedule must match the pinned fixture')
+    if a.schedule!='normal' and not fixture.get('timing_verify'):raise ValueError('diagnostic schedule requires a VERIFY build')
     layout=json.loads((ROOT/a.layout).read_text());h=layout['hunks'];s=layout['slave']
     symbols={name:int(off,16) for off,name in re.findall(r'^([0-9A-F]{8}) (\S+)$',(slave.parent/'slave.lst').read_text(),re.M)}
     out.mkdir(parents=True);os.chdir(ROOT)
@@ -39,7 +47,7 @@ def main():
     env.update(FSUAE_RUN=run,SLAVE=str(slave),AMIGA_SETUP=a.machine,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',
         WC_NOMMU_CORE='0' if a.machine=='a1200-fast' else '1',WHD_ARGS=f'CUSTOM1={0 if a.off else 3} CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0',
         WARP='1',NTSC='1' if a.ntsc else '0',WINDOW='front',JOY0='none',JOY1='none',DETERMINISTIC='1',WC_INSTANT_BLITTER='0',
-        WC_OBSERVER_CONFIG=str(config),WC_OBSERVER_OUTPUT=str(out/'events.txt'),WC_STATE_OUTPUT=str(out/'states.bin'),WC_STATE_PC=f'{h[0]+0x2da:x}')
+        WC_OBSERVER_CONFIG=str(config),WC_OBSERVER_OUTPUT=str(out/'events.txt'),WC_STATE_OUTPUT=str(out/'states.bin'),WC_STATE_PC=f'{h[0]+(0x3378e if a.presentation_states else 0x2da):x}')
     g=None;windows=[]
     def cmd(text,timeout=180):
         r=g.cmd(text,timeout=timeout)
@@ -48,6 +56,16 @@ def main():
     def dump(name):
         cmd(f'dump binary memory {out.relative_to(ROOT)}/{name}.bin {BASE:#x} {BASE+0x800000:#x}')
         if locate((out/(name+'.bin')).read_bytes())!=layout:raise ValueError('live layout mismatch')
+    def window(name,fields=100):
+        first=len((out/'events.txt').read_text().splitlines())-1
+        if a.trace:cmd(f'monitor profile {fields} "" "{out}/{name}.bin"')
+        else:
+            cmd(f'break *{h[0]+0x34162:#x}')
+            number=re.search(r'(\d+)\s+breakpoint',cmd('info breakpoints')).group(1)
+            cmd(f'ignore {number} {fields-1}\ncontinue\ndelete')
+        end=len((out/'events.txt').read_text().splitlines())-1
+        windows.append(dict(name=name,first_event=first,end_event=end,fields=fields))
+        print(f'{out.name}: {name}',flush=True)
     try:
         g=Server('wc-timing',root=str(ROOT),run_dir='amiga/'+run,profile_window=False).boot(env)
         pc=h[0]+0x698
@@ -55,15 +73,23 @@ def main():
         if f'0x{pc:x}' not in cmd('info registers pc'):raise ValueError('flight not reached')
         dump('start-fast')
         live=cmd('monitor wc-audit')
-        cmd('monitor key 40 1')
-        for i in range(a.windows):
-            first=len((out/'events.txt').read_text().splitlines())-1
-            cmd(f'monitor profile 100 "" "{out}/window-{i}.bin"')
-            end=len((out/'events.txt').read_text().splitlines())-1
-            windows.append(dict(first_event=first,end_event=end,fields=100))
-            print(f'{out.name}: {i+1}/{a.windows}',flush=True)
+        cmd(f'monitor key {a.held_key} 1')
+        for i in range(a.windows):window(f'window-{i}')
+        if a.pause:
+            cmd(f'monitor key {a.held_key} 0')
+            cmd('monitor key 19 1')
+            cmd(f'break *{h[0]+0x878:#x}\ncontinue\ndelete')
+            cmd('monitor key 19 0')
+            dump('pause-start')
+            window('pause',20)
+            dump('pause-end')
+            cmd('monitor key 40 1')
+            endpoint=h[0]+0x2da if a.off else s+symbols['timing_world_done']
+            cmd(f'break *{endpoint:#x}\ncontinue\ndelete')
+            cmd('monitor key 40 0')
+            window('resume',100)
         dump('end-fast')
-        result=dict(layout,fixture=fixture,symbols=symbols,windows=windows,live_cpu=live,ntsc=a.ntsc,off=a.off,complete=True)
+        result=dict(layout,fixture=fixture,symbols=symbols,windows=windows,live_cpu=live,ntsc=a.ntsc,off=a.off,held_key=a.held_key,pause=a.pause,presentation_states=a.presentation_states,schedule=a.schedule,trace=a.trace,complete=True)
         (out/'result.json').write_text(json.dumps(result,indent=2)+'\n')
     finally:
         if g:g.p.kill()

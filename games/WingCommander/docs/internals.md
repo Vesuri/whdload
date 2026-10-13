@@ -2495,11 +2495,57 @@ native pitch/yaw/roll routines `2acb2/2acf2/2ad32` in their original order; each
 rebuilds the basis through `2bb30`. Signed unit-rate results at 50/60 Hz match ten
 native rotations over a second. These are local native correctness checks only.
 
-The helpers are **not yet connected to the live elapsed-time loop**. The current
-prototype still polls native input once per world tick. It does not yet satisfy D's
-responsive controls or input-history contract. Remaining work includes ordered
-input sampling across catch-up; committing player orientation at world boundaries
-without duplicate native rotation (`E:7bc2`); responsive camera refresh without
-advancing scripts; FR-15 emission and FR-16 presentation/RNG separation; full
-pause/modal validation; and the required equal-elapsed-time acceptance runs.
+The helpers are connected through a VBL input history. `E:34188` (file `341b4`)
+records native RAM after the existing clock/music callback, preserving its register
+and CCR contract and replaying the displaced custom-register base load. The
+producer uses the saved data-hunk pointer, not interrupted A4. A 64-record ring
+publishes complete field-stamped pad/key samples; a full ring preserves unread
+records, counts loss and forces a rebase. Native pad event latches transfer into
+history. The consumer preserves pad transitions until a world tick and ORs event
+pulses; native edge dispatch runs for each transition, then held controls/actions
+run once. `E:1934c/18c6a/19380` (files `19378/18c96/193ac`) supply frozen pad/keys
+and clip the native command FIFO at the captured producer cursor. Command bytes
+remain in the native FIFO, including its original translation and 64-byte limit.
+
+Each elapsed field previews the native steering controller and advances player
+rotation with signed carried fractions. Only the world tick commits ramps,
+throttle, firing and other commands. The world rotation hook at `E:7bc2` (file
+`7bee`) excludes the already-integrated ordinary player. Other objects, scripted
+player actions, death and external camera mode 8 retain native world ownership.
+Ordinary forward/side/rear camera modes 0–3 refresh from the player basis via
+`E:680e` (file `683a`); the script runner is excluded from these extra refreshes.
+No object position, collision, target lock, damage or lifecycle is extrapolated.
+
+Pause uses the common entry `E:0878` (file `08a4`), covering relative as well as
+absolute callers. Autopilot uses `E:101c` (file `1048`). Both disable sampling and
+replay, discard/count unread active time, preserve native modal execution, and
+rebase on return. The loop exit `E:06c8` precedes outer menu/landing transitions.
+The retained pause run `tmp/phase9-history-pause-fixed-live-v2/` freezes all mapped
+world state for 20 fields and resumes with 20 completions in the next 100-field
+window, without the prior catch-up burst. CPU-only modal checks separately prove
+ownership, elapsed-time exclusion and D0/CCR/stack preservation for both wrappers;
+they do not claim a complete live autopilot or landing sequence.
+
+Draw dependencies now have explicit owners:
+
+- `E:65f4` (file `6620`) uses world-counter modulo four for damaged-ship emission
+  inside the scheduled world; native/modal callers retain the draw counter.
+- The draw call at `E:051a` (file `0546`) defers message duration to each world
+  tick. The simulator transition tail at `E:0530/0536` (files `055c/0562`) likewise
+  advances once per world tick, including its exit/position event.
+- `E:4b16` (file `4b42`) consumes elapsed world ticks for the cockpit indicator.
+  Missed pictures are coalesced at the next draw; an expired visual selection
+  transitions once and reloads natively, rather than replaying old pictures.
+- `E:46ea` (file `4716`) defers subsystem fault/repair polling `af84` (file
+  `afb0`) to the world tick. Its random trials and damaged-system writes are
+  gameplay work even though the original caller is HUD drawing.
+- `E:435c/43ee` (files `4388/441a`) use world parity and a private visual random
+  value advanced on each tick. The original range routine advances a private seed
+  and restores the gameplay seed. Repeated or skipped portraits cannot change AI
+  randomness. Outside the ordinary loop both calls retain native behaviour.
+
+Native component checks cover FIFO wrap, overflow, inactive producer, register/CCR
+preservation, captured command boundaries, two pad edges between world ticks,
+negative copy controls, and timer/RNG invariance across four draw schedules.
+Elapsed-time acceptance is still being collected; phase 9 is not yet at its gate.
 World-object extrapolation remains phase 10.

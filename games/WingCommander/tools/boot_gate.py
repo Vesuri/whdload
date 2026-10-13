@@ -25,7 +25,7 @@ def main():
     out = (ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():
         raise ValueError('choose a new output below tmp/')
-    if os.environ.get('WARP','0') != '0' or os.environ.get('AMIGA_SETUP','a1200-fast') != 'a1200-fast':
+    if not a.calibrate and (os.environ.get('WARP','0') != '0' or os.environ.get('AMIGA_SETUP','a1200-fast') != 'a1200-fast'):
         raise ValueError('phase 2 gate requires real-speed A1200-fast')
     if any(c.isspace() for c in str(out.relative_to(ROOT))):
         raise ValueError('GDB requires a scratch directory name without whitespace')
@@ -34,8 +34,8 @@ def main():
     out.mkdir(parents=True)
     os.chdir(ROOT)
     run = '../'+str(out.relative_to(ROOT))+'/run'
-    env = dict(os.environ, FSUAE_RUN=run, WARP='0', WINDOW='front',
-               JOY0='none', JOY1='none', DETERMINISTIC='1', AMIGA_SETUP='a1200-fast')
+    env = dict(os.environ, FSUAE_RUN=run, WARP=os.environ.get('WARP','0') if a.calibrate else '0', WINDOW='front',
+               JOY0='none', JOY1='none', DETERMINISTIC='1', AMIGA_SETUP=os.environ.get('AMIGA_SETUP','a1200-fast') if a.calibrate else 'a1200-fast')
     server = Server('wc-gate',root=str(ROOT),run_dir='amiga/'+run,profile_window=False)
     g = None
     actions = []

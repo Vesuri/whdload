@@ -1,8 +1,7 @@
 # CD32 framerate-dependency audit
 
 Phase 7b is complete for the pinned English CD32 executable. This is an inventory
-and native reproduction gate, not an implementation of timing changes. Phase 8,
-its performance pricing and the user's choice of design remain deferred. The
+and native reproduction gate, not an implementation of timing changes. Phase 8 selected D; the phase-9 implementation closes its clock ownership below. The
 phase-7 flight-unit anchor is **10 world updates/s**. No new emulator matrix or
 live run was required for this audit.
 
@@ -255,6 +254,15 @@ countdown. Communications animation gates on odd draw counts at `435c`, then
 seed differently for ten/fifty draw schedules. Separate presentation time without
 letting extra portrait frames consume gameplay randomness. VBL-based blink at
 `1a78` is separately unaffected by update count (FR-21).
+
+Phase-9 schedule comparisons also exposed the HUD call `E:46ea → af84`
+(files `4716 → afb0`). It makes per-call random trials at `af9c/afae` and can
+change cockpit subsystem damage via `af14`. This is gameplay fault/repair polling,
+not purely visual noise. D moves the whole polling call to the world tick and
+suppresses its draw call. Native whole-routine checks and live equal-tick state
+comparisons cover this additional FR-16 dependency. Simulator draw tail
+`E:0530–057e` likewise contains a countdown and exit/position event and is moved
+to the world tick. Neither was safe to leave on a faster renderer.
 
 ### FR-17 — Mission and encounter polling: reproduced
 

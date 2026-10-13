@@ -68,54 +68,123 @@ timing_rate:
         bne.s   .line
         rts
 
-; This initial integration keeps native input on each world update. The
-; responsive player path is added separately before the phase-9 gate.
+; Ordinary loop consumes timestamped native input in chronological field order.
+; It services at most four ticks per batch and skips drawing while catching up.
 timing_loop:
         movem.l d0-d7/a0-a6,-(sp)
-        lea     timing_active(pc),a0
-        move.w  #1,(a0)
-        ; First native update loads flight assets; it establishes the epoch.
+        ; Load initial flight assets on the original input/world path, before
+        ; enabling the producer. This initial update establishes the epoch.
         bsr.w   timing_native_input
         tst.w   -32628(a4)
         bne.w   timing_leave
         bsr.w   timing_world
-        lea     timing_abort(pc),a0
-        clr.w   (a0)
         bsr.w   timing_rebase
+        lea     timing_active(pc),a0
+        move.w  #1,(a0)
 .loop:
         tst.w   -32628(a4)
         bne.w   timing_leave
-        move.l  -252(a4),d0           ; D:7f02 native VBL counter
+        tst.w   timing_input_lost(pc)
+        beq.s   .budget
+        lea     timing_input_recoveries(pc),a0
+        addq.l  #1,(a0)
+        bsr.w   timing_rebase
+.budget:
+        move.l  timing_hz(pc),d7
+        divu.w  #10,d7
+        andi.l  #$ffff,d7
+        lsl.w   #2,d7
+.fields:
+        bsr.w   timing_take_sample
+        tst.w   d0
+        beq.w   .draw
+        lea     timing_replay(pc),a0
+        move.w  #1,(a0)
+        ; Merge the frozen keyboard and pad sample through the native decoder.
+        pea     timing_sample_pad(pc)
+        move.l  timing_game(pc),a6
+        jsr     $18c5e(a6)
+        addq.l  #4,sp
+        bsr.w   timing_preview_controls
+        bsr.w   timing_player_field
+        bsr.w   timing_queue_pad
+        move.l  timing_sample_clock(pc),d0
         move.l  timing_hz(pc),d1
         moveq   #1,d2
         lea     timing_clock(pc),a0
         bsr.w   timing_advance
         move.l  d0,d6
-.ticks:
         tst.l   d6
-        beq.s   .draw
+        beq.s   .next_field
+        bsr.w   timing_pad_edges
+        tst.w   -32628(a4)
+        bne.w   timing_leave
+        tst.w   timing_abort(pc)
+        bne.s   .cancel
         bsr.w   timing_native_input
         tst.w   -32628(a4)
         bne.w   timing_leave
         tst.w   timing_abort(pc)
         bne.s   .cancel
+        lea     timing_in_world(pc),a0
+        move.w  #1,(a0)
         bsr.w   timing_world
-        subq.l  #1,d6
-        bra.s   .ticks
-.cancel:
-        lea     timing_abort(pc),a0
+        lea     timing_in_world(pc),a0
         clr.w   (a0)
+.next_field:
+        tst.w   -32628(a4)
+        bne.w   timing_leave
+        subq.w  #1,d7
+        bne.w   .fields
+        ; More captured fields mean debt, so run another bounded batch first.
+        move.w  timing_input_tail(pc),d0
+        cmp.w   timing_input_head(pc),d0
+        bne.w   .loop
+        bra.s   .draw
+.cancel:
         lea     timing_clock(pc),a0
         sub.l   d6,12(a0)
         move.l  d6,d0
         mulu.w  timing_hz+2(pc),d0
         add.l   d0,16(a0)
+        lea     timing_abort(pc),a0
+        clr.w   (a0)
 .draw:
+        lea     timing_selection_last(pc),a0
+        move.w  4430(a4),d0
+        move.w  d0,d1
+        sub.w   (a0),d0
+        move.w  d1,(a0)
+        lea     timing_selection_delta(pc),a0
+        move.w  d0,(a0)
+        bsr.w   timing_player_camera
+        bsr.w   timing_render
+        bra.w   .loop
+
+timing_render:
+        ifne TIMING_VERIFY
+        move.l  -252(a4),-(sp)
+        cmpi.w  #1,timing_verify_schedule(pc)
+        beq.s   .wait
+        endc
         move.l  timing_game(pc),a6
         jsr     $510(a6)
         move.l  timing_game(pc),a6
         jsr     $46e6(a6)
-        bra.s   .loop
+        ifne TIMING_VERIFY
+.wait:
+        moveq   #0,d0
+        move.w  timing_verify_schedule(pc),d0
+        beq.s   .finish
+.again:
+        move.l  -252(a4),d1
+        sub.l   (sp),d1
+        cmp.l   d0,d1
+        blo.s   .again
+.finish:
+        addq.l  #4,sp
+        endc
+        rts
 
 timing_native_input:
         move.l  timing_game(pc),a6
@@ -129,13 +198,48 @@ timing_native_input:
 timing_world:
         move.l  timing_game(pc),a6
         jsr     $2a8(a6)
+        tst.w   timing_active(pc)
+        beq.s   timing_world_done
+        bsr.w   timing_presentation_tick
 timing_world_done:
         lea     timing_completed(pc),a0
         addq.l  #1,(a0)
+        lea     timing_abort(pc),a0
+        clr.w   (a0)
         rts
 
 timing_rebase:
         movem.l d0-d3/a0,-(sp)
+        ; Producer sees inactive before unread history is discarded. Single
+        ; word stores publish ownership; no interrupt masking or device writes.
+        lea     timing_active(pc),a0
+        move.w  (a0),-(sp)
+        clr.w   (a0)
+        tst.w   (sp)
+        beq.s   .discarded
+        move.l  -252(a4),d0
+        sub.l   timing_clock(pc),d0
+        lea     timing_input_dropped_fields(pc),a0
+        add.l   d0,(a0)
+        mulu.l  #10,d0
+        lea     timing_clock+16(pc),a0
+        add.l   d0,(a0)
+.discarded:
+        lea     timing_input_tail(pc),a0
+        move.w  timing_input_head(pc),(a0)
+        lea     timing_input_lost(pc),a0
+        clr.w   (a0)
+        lea     timing_replay(pc),a0
+        clr.w   (a0)
+        lea     timing_pad_count(pc),a0
+        clr.l   (a0)
+        lea     timing_selection_last(pc),a0
+        move.w  4430(a4),(a0)
+        clr.w   2(a0)
+        lea     timing_angle_remainder(pc),a0
+        clr.l   (a0)+
+        clr.l   (a0)+
+        clr.l   (a0)
         move.l  -252(a4),d0
         move.l  timing_hz(pc),d1
         moveq   #0,d2
@@ -145,28 +249,60 @@ timing_rebase:
         move.l  timing_hz(pc),d1
         moveq   #1,d2
         bsr.w   timing_advance
+        lea     timing_active(pc),a0
+        move.w  (sp)+,(a0)
         movem.l (sp)+,d0-d3/a0
         rts
 
 timing_leave:
+        bsr.w   timing_rebase
         lea     timing_active(pc),a0
         clr.w   (a0)
-        bsr.s   timing_rebase
         movem.l (sp)+,d0-d7/a0-a6
         move.l  timing_exit(pc),-(sp)
         rts
 
 timing_pause:
         move.l  a6,-(sp)
-        move.l  timing_game(pc),a6
-        jsr     $878(a6)
+        move.l  a0,-(sp)
+        lea     timing_active(pc),a0
+        move.w  (a0),-(sp)
+        bsr.w   timing_rebase
+        clr.w   (a0)
+        lea     timing_replay(pc),a0
+        clr.w   (a0)
+        bsr.w   timing_pause_original
         move.w  ccr,-(sp)
         bsr.w   timing_rebase
-        move.l  a0,-(sp)
         lea     timing_abort(pc),a0
         move.w  #1,(a0)
-        move.l  (sp)+,a0
+        lea     timing_active(pc),a0
+        move.w  2(sp),(a0)
         move.w  (sp)+,ccr
+        lea     2(sp),sp
+        move.l  (sp)+,a0
+        move.l  (sp)+,a6
+        rts
+
+timing_autopilot:
+        move.l  a6,-(sp)
+        move.l  a0,-(sp)
+        lea     timing_active(pc),a0
+        move.w  (a0),-(sp)
+        bsr.w   timing_rebase
+        clr.w   (a0)
+        lea     timing_replay(pc),a0
+        clr.w   (a0)
+        bsr.w   timing_autopilot_original
+        move.w  ccr,-(sp)
+        bsr.w   timing_rebase
+        lea     timing_abort(pc),a0
+        move.w  #1,(a0)
+        lea     timing_active(pc),a0
+        move.w  2(sp),(a0)
+        move.w  (sp)+,ccr
+        lea     2(sp),sp
+        move.l  (sp)+,a0
         move.l  (sp)+,a6
         rts
 
@@ -178,3 +314,7 @@ timing_active:    dc.w 0
 timing_abort:     dc.w 0
 timing_clock:    dcb.b 28,0
 timing_completed: dc.l 0
+
+        ifne TIMING_VERIFY
+timing_verify_schedule: dc.w 0
+        endc

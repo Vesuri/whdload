@@ -8,11 +8,11 @@ timing_preview_controls:
         clr.l   (a0)
         clr.w   4(a0)
         cmpi.w  #12,5888(a4)
-        bne.w   .done
+        bne.w   .inactive
         cmpi.w  #-1,5478(a4)
-        bne.w   .done
+        bne.w   .inactive
         cmpi.w  #8,-18280(a4)
-        beq.w   .done
+        beq.w   .inactive
         move.l  5882(a4),-(sp)
         move.w  5886(a4),-(sp)
         move.w  5498(a4),-(sp)
@@ -35,6 +35,12 @@ timing_preview_controls:
         move.w  (sp)+,5498(a4)
         move.w  (sp)+,5886(a4)
         move.l  (sp)+,5882(a4)
+        bra.s   .done
+.inactive:
+        lea     timing_angle_remainder(pc),a0
+        clr.l   (a0)+
+        clr.l   (a0)+
+        clr.l   (a0)
 .done:
         movem.l (sp)+,d0-d7/a0-a6
         rts
