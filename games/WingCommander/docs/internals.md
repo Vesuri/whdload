@@ -2433,3 +2433,30 @@ material remains ignored. Comms, player missile locking, ordinary damage,
 autopilot, landing, full mission progression and gameplay-replay compatibility
 retain explicit live/contract gaps. Phase 7b is complete at this audit gate;
 phase 8, fixes, release and OCS work remain deferred.
+
+## Phase 8: native-world price for the design decision
+
+The [design comparison](timing-design.md) prices all eleven established cells in
+Nav-1 held-fire combat. The root is `E:02a8` (file `02d4`), returning from the
+call at `E:06b8` (file `06e4`) to `E:06bc` (file `06e8`). Draw returns at
+`E:06c0` (file `06ec`); loop entry is `E:0698` (file `06c4`). Observer stack
+checks verify the exact root return; cost includes every callee and any interrupt
+preemption. Residual loop time includes input, HUD, drawing and waits, not drawing
+alone. This closes the missing inclusive-world bracket without claiming complete
+exclusive CPU/IRQ attribution.
+
+Updates 10–39 exclude initial loading; frames crossing field-window stops are
+excluded. All cells retain five ships and 17–23 active objects. Fourteen mapped
+state ranges match by update number across the matrix; a fresh 020 repeat gives
+identical selected state and costs. Root cost is 15.82 ms mean / 18.29 ms p95 on
+cached 020, 20.78 / 23.75 ms uncached; the accelerated emulator cells range from
+2.23 to 4.11 ms mean. At the native 10 Hz world rate the 020 reservation is
+15.8–20.8%; at 25 Hz it is 39.6–51.9%. These are elapsed reservations including
+preemption, not exclusive CPU utilisation or physical-hardware measurements.
+
+D is recommended because it retains most native world clocks while making the
+player control/camera path responsive. Costs of its new per-render path and of
+B/C conversion are not measured yet. Full IRQ subtraction, worst-case combat,
+phase-6 renderer budgets and previously documented live gameplay paths remain
+explicit gaps. The user decision belongs to the phase-8 gate; no timing fix is
+installed by these measurements.

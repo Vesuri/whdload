@@ -1645,3 +1645,55 @@ The final gate evidence is in `tmp/phase7b-inventory-gate/` and
 DMA or wall-clock performance instrument. The high-bit memory-shift probe records
 an instrument discrepancy separately; it is not asserted to be game behaviour.
 See [the audit](framerate-audit.md) for each fixture's scope and the live gaps.
+
+## Phase 8 design pricing
+
+`simulation_capture.py` reuses the phase-7 Nav-1 fixture and read-only observer.
+It holds fire for three 100-field windows and records exact world entry/return,
+draw return, publication and loop entry. The report selects updates 10–39 and
+rejects any frame crossing a debugger stop. Each retained phase-4 cell supplies
+its machine, MMU backend and WHDLoad options; the live audit must match every
+field, including CACR and TC. The flight fixture changes the slave allocation,
+so loaded game hunks are checked independently of the slave address.
+
+Reproduce with fresh output directories (the retained run used
+`tmp/phase7-debugger-v2/fs-uae` and `tmp/phase7-fixture-repro-verified/`):
+
+```sh
+. amiga/env.sh
+python3 tools/flight_fixture.py --output tmp/design-flight --nav 1
+python3 tools/build_debugger.py --output tmp/design-debugger \
+  --intro-observer --matrix-observer --aprof-stable-pc \
+  --matrix-nommu-counters --frequency-clock --matrix-mmu030-counters --matrix-irq
+export FSUAE="$PWD/tmp/design-debugger/fs-uae"
+for ref in tmp/phase4-dma-cia-matrix/020-*/bare/result.json \
+           tmp/phase4-dma-cia-accelerated/*/bare/result.json; do
+  cell=$(basename "$(dirname "$(dirname "$ref")")")
+  python3 tools/simulation_capture.py --reference "$ref" \
+    --fixture tmp/design-flight/WingCommanderCD32.Slave \
+    --output "tmp/design-combat/$cell" || break
+done
+python3 tools/simulation_report.py tmp/design-combat/*/ \
+  --output tmp/design-combat/report.json
+python3 tools/simulation_capture.py \
+  --reference tmp/phase4-dma-cia-matrix/020-default/bare/result.json \
+  --fixture tmp/design-flight/WingCommanderCD32.Slave \
+  --output tmp/design-repeat/020-default
+python3 tools/simulation_report.py tmp/design-repeat/020-default \
+  --output tmp/design-repeat/report.json
+```
+
+Matrix inputs come from the phase-4 procedure above; do not silently substitute
+030 NoMMU interpreter results for the 030 MMU-backend/NoMMU-option cell. The retained
+fixture SHA-256 is `cc4e6a177a567aaa4059206988fba2512d021995add3d7fded5c38d767ad6eb9`;
+the retained debugger SHA-256 is
+`08360549c392f07b1fb3393bf1e071cd0bd5ffcb4048f229d528a1ce628c1313`.
+Both are recorded in each capture. No additional downloads or instrument builds
+were needed for the retained pricing run. All captures, snapshots and reports
+remain in `tmp/`. The machine-readable report includes input hashes and per-range
+state comparisons with 020; use directory globs ending in `/` to exclude reports.
+
+These are inclusive elapsed world reservations and arithmetic render budgets.
+Do not label them exclusive CPU utilisation or measured B/C/D frame rates.
+The [design comparison](timing-design.md) defines formulas, assumed overhead and
+limits; full interrupt subtraction and real-hardware timing remain gaps.

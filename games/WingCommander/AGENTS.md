@@ -1,8 +1,8 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 8 CD32 decoupling-design pricing and recommendation.
-Phase 7b is complete; price B/C/D against the 10 world updates/s flight anchor.
+Current scope: phase 8 CD32 design pricing is ready; user decision pending.
+The eleven-cell combat comparison recommends D with explicit instrument gaps.
 The phase 8 gate reserves the design choice to the user. Stop before phase 9,
 release or OCS work.
 Derived material stays in `tmp/`.

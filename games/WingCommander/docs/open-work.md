@@ -25,7 +25,8 @@ are documented. The native flight-unit anchor is 10 updates/s. Phase 7b is compl
 the world-update dispatch inventory, FR-01–FR-23 and B/C/D audit costs are recorded
 in [the framerate audit](framerate-audit.md). Native 68000/68040 reproductions pass
 with steady/changing rates and explicit runtime/instrument gaps. Phase 8 pricing
-is in progress; the user chooses the design before phase 9.
+is ready in [the design comparison](timing-design.md); D is recommended with
+explicit gaps. The user decision is pending; phase 9 has not begun.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -62,7 +63,8 @@ A definitive CD32 edition, OCS afterwards and separately:
   measurement records the hardware cache state (`CACR`) it ran under.
 - **Design.** A fixed tick with only presentation interpolation is rejected. The
   choice between designs B, C and D remains the user's phase-8 decision. The flight
-  time model and framerate audit are available; performance pricing remains deferred.
+  time model, framerate audit and eleven-cell combat pricing are available in
+  [the design comparison](timing-design.md); D is recommended, decision pending.
 - **PC reference.** Use the supplied 86Box/eXoDOS recording as a practical external
   pace reference alongside the Amiga time sources and music. It represents the
   recorded experience, not proof of an original design rate or identical port code.
@@ -309,6 +311,13 @@ render rate left, and the number and kind of FR items it must close.
   and missile launch, collisions, targeting).
 
 Gate: a priced recommendation with the evidence; **the user chooses**.
+
+Pricing is ready in [the design comparison](timing-design.md). It records the
+eleven-cell busy-combat root costs, B/C20/C25/C50/D10 budgets, FR item counts and
+the proposed D ownership contract. Full exclusive IRQ subtraction and new-code
+overhead remain explicit gaps; elapsed world reservations are not exclusive CPU
+utilisation or measured shipping frame rates. A fresh 020 repeat is identical.
+**D is recommended; user decision pending. Stop before phase 9.**
 
 ### Phase 9 — Decoupled simulation (chosen design)
 
