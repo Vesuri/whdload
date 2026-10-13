@@ -194,7 +194,13 @@ FF1SpeedFromVelocity000:
 ; calculation first, retaining the old fractional word until a bound is hit.
 ; D1=0/-1, D0 scratch, other registers preserved. Error leaves state unchanged.
 FF1SpeedRate200:
+ moveq #2,d1
+; Same operation with D1.w eligible native pulses (0..2). Used only for rates
+; suppressed by the native modulo-four engine phase. Other rates use two.
+FF1SpeedRatePulses200:
  movem.l d2-d3,-(sp)
+ cmpi.w #2,d1
+ bhi.b .bad
  cmpi.l #500*65536,(a0)
  bhi.b .bad
  cmpi.l #-32768,d0
@@ -203,8 +209,14 @@ FF1SpeedRate200:
  bgt.b .bad
  moveq #0,d2
  move.w (a0),d2
- add.l d0,d0
  sub.l d2,d0
+ tst.w d1
+ beq.b .keep
+ subq.w #1,d1
+ beq.b .once
+ add.l d0,d0
+.once:
+ add.l d2,d0
  bmi.b .zero
  cmpi.l #500,d0
  bge.b .cap
@@ -216,6 +228,9 @@ FF1SpeedRate200:
  bra.b .store
 .zero:
  moveq #0,d0
+ bra.b .store
+.keep:
+ move.l (a0),d0
 .store:
  move.l d0,(a0)
  moveq #0,d1
@@ -224,6 +239,45 @@ FF1SpeedRate200:
  moveq #-1,d1
 .done:
  movem.l (sp)+,d2-d3
+ rts
+
+; D0.w last phase of this 200 ms window (0..3), D1.w native engine setting.
+; Return D0.l number of eligible phases among (last-1 mod4,last), or -1 for
+; invalid phase. Setting 4 suppresses phase 0, setting 5 suppresses 0 and 1.
+; Other settings allow both. D1-D7/A0-A6 preserved, CCR scratch. This avoids
+; duty-cycle aliasing when the outer modulo-four phase advances by two.
+FF1PhasePulses200:
+ movem.l d2-d4,-(sp)
+ cmpi.w #3,d0
+ bhi.b .bad
+ moveq #15,d2
+ cmpi.w #4,d1
+ bne.b .five
+ moveq #14,d2
+ bra.b .count
+.five:
+ cmpi.w #5,d1
+ bne.b .count
+ moveq #12,d2
+.count:
+ moveq #0,d3
+ btst d0,d2
+ beq.b .previous
+ addq.l #1,d3
+.previous:
+ move.w d0,d4
+ subq.w #1,d4
+ andi.w #3,d4
+ btst d4,d2
+ beq.b .answer
+ addq.l #1,d3
+.answer:
+ move.l d3,d0
+ bra.b .done
+.bad:
+ moveq #-1,d0
+.done:
+ movem.l (sp)+,d2-d4
  rts
 
 ; D0.l nonnegative native continuous loss, A0 -> nonnegative condition.l.
