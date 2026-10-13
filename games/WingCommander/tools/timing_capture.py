@@ -43,6 +43,7 @@ def main():
     out.mkdir(parents=True);os.chdir(ROOT)
     pcs=[h[0]+i for i in (0x698,0x2a8,0x2da,0x3378e,0x34162,0x878)]
     pcs += [s+symbols[k] for k in ('timing_loop','timing_world_done','timing_leave','timing_rebase')]
+    pcs += [s+symbols[k] for k in ('flight_render_work','flight_render_work_done','flight_reference_work','flight_reference_done') if k in symbols]
     config=out/'observer.cfg';config.write_text(' '.join(f'{v:x}' for v in [h[0],h[1],h[3]]+pcs)+'\n')
     env={k:v for k,v in os.environ.items() if not k.startswith(('WC_OBSERVER_','WC_MATRIX_','WC_STATE_'))}
     run='../'+str(out.relative_to(ROOT))+'/run'

@@ -2618,7 +2618,7 @@ The non-VERIFY candidate in `tmp/phase10-isolated-candidate/` is 32,472 bytes,
 SHA-256 `9f750132625a9a4d17622b80a8c89c6fcdfa23c3827fbebb0177242b7222c0eb`.
 Original reconstruction remains byte-identical, and option values 0/1/2 install
 none of the timing/presentation patches. This is not the combined phase-6 renderer
-or a release package. Stop before phase 11.
+or a release package. Phase 11 flight conversion is recorded below.
 
 ### Ownership and correction policy
 
@@ -2724,6 +2724,105 @@ Evidence is in `tmp/phase10-final-{native-check,ownership,modal,player,input}/`,
 The two flights exercise classes 3/4/5/8/12, temporary class-7 flames and ordinary
 forward-camera movement. Every asteroid/model, effect script, scripted camera,
 mission transition and physical-device combination has not been played through.
-No visual-quality claim comes from a debugger-greyed display. Combined renderer,
+No visual-quality claim comes from a debugger-greyed display. Flight conversion is integrated in phase 11. Unified intro/flight options,
 full campaign and hardware play-testing remain release coverage; they are not a
 reason to expand this phase into a new performance matrix.
+
+
+## Phase 11: flight rendering gate
+
+The measured phase-7 profile selects conversion as the useful second rendering
+pass: 64–66% of representative 020 instruction cost is in the existing converter,
+versus about 8% in drawing; observed chunky changes are only 0.03–1.4% per picture.
+The implemented change scans the complete source but converts only changed
+32-pixel blocks. It covers the view, cockpit, text and HUD without assuming a
+fixed cockpit rectangle or suppressing their native drawing.
+
+### Implementation and boundaries
+
+The normal `--timing` build adds a four-byte detour at `S:178a` (slave file `17aa`)
+to `S:7eb8` (file `7ed8`). This replaces the original register save, which the
+wrapper performs itself. The existing phase-9 PatchSeg detour at `S:14da` (file
+`14fa`) remains. Reconstruction verifies every other original slave byte. No new
+game-hunk patch is added in phase 11. English `CUSTOM1=3`, active flight, width
+320 and height 200 are all required; inactive flight and other geometries invalidate
+both destination records before the original path. Options 0/1/2 keep the original
+converter. The original cache request and `Custom5=0–3` limiter stay in place;
+this does not yet merge the phase-6 intro cache/converter policy into release options.
+`Custom5=4` bypasses the software-converter seam and is outside this gate.
+
+The history pointer is `S:8048` (file `8068`); destination records and their order
+are `S:804c/8054` (files `806c/8074`). Startup `S:8056` (file `8076`) allocates
+128000 bytes with `MEMF_FAST|MEMF_PUBLIC|MEMF_CLEAR`, before the game claims its heap.
+Failure selects the original path. Each of the two planar destinations has its
+own 64000-byte last-source image. A first or replaced destination always receives
+a full original conversion and source copy. This avoids comparing a back buffer
+against the previous picture rendered into the other buffer.
+
+`S:7f6c` (file `7f8c`) compares eight longwords per block. Changed blocks copy
+those 32 bytes into history and use an immutable 32-pixel specialization of the
+pinned Kalms 030 transform at `S:8082` (file `80a2`), with the actual 8000-byte
+plane stride. No code is copied or self-modified. Unchanged blocks issue no planar
+stores. After conversion, WaitBOVP protects reuse at the existing single swap and
+publication path. There is no new CHIP allocation in the normal build.
+
+The sampled flight source is already FAST, as are the game hunks; the destinations
+are CHIP. There is no evidence justifying a blanket drawing-memory patch or
+rewrites of the smaller drawing/math buckets here. Native clears remain necessary:
+the earlier blanket-clear experiment failed because later work reads their pixels.
+Ship scaling, polygon/span, starfield, HUD and text algorithms therefore remain
+native. No independent savings in those routines or DMA slots are claimed.
+
+### Output and timing evidence
+
+Native 020/040 checks pass **72 complete output comparisons per build**, for both
+normal and twin builds, against the existing converter plus independent pixel
+packing. Alternating/replaced buffers, no-change frames, sparse/dense changes,
+geometry and active-state transitions, option-off, allocation failure, source
+integrity, write bounds and preserved registers are covered. A corrupted planar
+byte in an otherwise unchanged block triggers the live twin's abort on both
+CPU models. Installer guards/option-off checks and phase-10 native prediction,
+whole-data restoration and real flame-allocation cases also pass.
+
+The live twin converts the same source with the original routine into a separate
+64000-byte CHIP reference and compares every output longword. Both sides thus
+write the same memory class. The accepted runs verify **130 firing pictures on
+030 and 40 turning pictures on 020**, with zero output differences. First-use
+full conversions and any unfinished final comparison are excluded from pricing.
+
+| Emulator workload | Measured pairs | Original mean / p95 ms | Delta mean / p95 ms | Mean time reduction |
+|---|---:|---:|---:|---:|
+| 030 established MMU/cache model, held fire | 128 | 15.511 / 16.304 | 3.098 / 4.464 | 80.0% |
+| 020 stock multiplier/cache model, held right | 38 | 67.336 / 68.661 | 22.552 / 35.045 | 66.5% |
+
+Candidate maxima are 5.940 / 35.607 ms; original maxima 16.536 / 68.968 ms.
+These are read-only observer elapsed-cycle brackets on the retained phase-7
+emulator, including interrupts within each interval and excluding limiter,
+comparison and display wait. The candidate includes history lookup/comparison;
+the original bracket contains the native converter alone. They establish a scoped
+conversion saving, not exclusive CPU cost or physical-accelerator performance.
+`tmp/phase11-conversion-final.json` records distributions, memory-class checks,
+fixture/emulator hashes and capture hashes. A preliminary FAST-reference timing
+is not used for the accepted equal-memory comparison.
+
+The **normal**, non-twin 030 flights retain 9.96188 world updates/s in PAL
+(−0.381%) and 9.97656 in NTSC (−0.234%), with zero input overflow. Publication
+rates are 24.97408 / 29.89642 per second under the retained limiter. Thus no FPS
+increase is claimed. The PAL 20-field pause freezes mapped state and resumes.
+Forty post-window turning pictures check 628 predictions, 116 between-tick
+projected moves, native orientation forecasts and exact restoration of every saved
+range; corrupted prediction/restoration controls are rejected. This confirms that
+conversion integrates with the phase-10 presentation boundary.
+
+Normal candidate: **33560 bytes**, SHA-256
+`80a94f84f0a7d357cbb7bd0bbcf526856105cc2d006603276a1896a15d520266`.
+A fresh source build reproduces it exactly; default reconstruction remains identical
+to the pinned original. Evidence and commands are in
+[development](development.md#phase-11-flight-conversion).
+
+Phase 11 is complete within this measured flight scope. Dense whole-screen changes
+can make the per-block approach slower; no universal all-scene/NoCache/040/060
+speedup is promised. Full campaign, every ship/asteroid/camera/effect, transitions,
+small-memory configurations and physical-hardware visual checks remain phase-12
+coverage. The earlier hard-turn prediction correction and unified intro/flight
+options remain documented release work. No release or OCS work starts here.

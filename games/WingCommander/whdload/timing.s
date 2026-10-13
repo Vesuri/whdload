@@ -1,5 +1,5 @@
 ; Experimental English CUSTOM1=3 simulation and renderer-prediction adapter.
-; Combined-renderer release work remains separate.
+; Flight delta conversion is separate from the intro renderer/release options.
 ; Original language choices CUSTOM1=0/1 install no new game patches.
 timing_patchseg:
         jsr     116(a2)
@@ -19,6 +19,7 @@ timing_patchseg:
         bsr.w   timing_rate
         lea     timing_hz(pc),a0
         move.l  d0,(a0)
+        bsr.w   flight_render_init
         jsr     32(a2)
 .done:
         move.w  (sp)+,ccr

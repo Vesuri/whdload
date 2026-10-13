@@ -34,3 +34,17 @@ def source(root):
             parts.append('\n'.join(lines))
     parts.append('\tcnop 0,4')
     return '\n'.join(parts)
+
+
+def flight_source(root, verify=False, control=False):
+    wrapper=(root/'whdload/flight_render.s').read_text()
+    wrapper=wrapper.replace('FLIGHT_COMPARE_BLOCK', '\n'.join(
+        f'\tmove.l {i}(a3),d0\n\tcmp.l {i}(a5),d0\n\tbne.s .changed' for i in range(0,32,4)))
+    wrapper=wrapper.replace('FLIGHT_COPY_BLOCK', '\n'.join(
+        f'\tmove.l {i}(a3),d0\n\tmove.l d0,{i}(a5)' for i in range(0,32,4)))
+    # Reuse the pinned immutable Kalms transform with one 32-pixel block,
+    # retaining the full 320x200 plane stride. No derived game bytes here.
+    full=source(root)
+    block=full.split('kalms_030_200:',1)[1].split('kalms_040_128:',1)[0]
+    block=block.replace('#64000', '#32')
+    return f'FLIGHT_VERIFY equ {int(verify)}\nFLIGHT_CONTROL equ {int(control)}\n'+wrapper+'\nflight_kalms_block:'+block+'\n\tcnop 0,4\n'

@@ -30,6 +30,7 @@ def main():
             # Beam reads are separately exercised by the live capture. Isolate
             # installer semantics with a 50 Hz result, not a fake timing claim.
             c.write(s+sym['timing_rate'],bytes.fromhex('70324e75'))
+            if 'flight_render_init' in sym:c.write(s+sym['flight_render_init'],bytes.fromhex('4e75'))
             c.write(0x1f0000,struct.pack('>I',0x1000))
             c.reg(17,0x2715)
             for r in range(1,17):c.reg(r,0x12340000+r)

@@ -1862,5 +1862,91 @@ python3 -m amigaxdev.disasm dis --cpu 68020 \
   tmp/cd32-static/wing.english.h0.bin 0 0x2914c 0x294fa
 ```
 
-Stop at the phase-10 gate. Rendering optimisation is phase 11; full visual,
+Phase 10 passes its gate. Flight conversion is integrated in phase 11 below; full visual,
 campaign, device and hardware play-throughs remain later coverage.
+
+
+## Phase 11 flight conversion
+
+`--timing`, `CUSTOM1=3` includes changed-block conversion during active 320×200
+flight. It reserves 128000 bytes of FAST history before game startup. Other
+geometries, inactive flight and failed allocation use the original converter.
+Original reconstruction and the separate `--render` intro experiment remain
+available. No cache request, gameplay instruction or motion rate is changed by
+this rendering pass. The original limiter is retained.
+
+Build and native checks (fresh output directories are required):
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --timing --output tmp/flight-render-candidate
+python3 tools/flight_render_check.py tmp/flight-render-candidate \
+  --output tmp/flight-render-native.json
+python3 tools/timing_adapter_check.py tmp/flight-render-candidate \
+  --output tmp/flight-render-install
+python3 tools/timing_scene_check.py tmp/flight-render-candidate \
+  --output tmp/flight-render-scene-native
+python3 tools/reconstruct.py --output tmp/flight-render-original
+```
+
+The native converter check executes the original binary and the candidate on
+020/040 models and independently checks pixel-to-plane packing. It covers
+alternating/replaced destinations, unchanged and sparse/dense source changes,
+128/166-row fallback, inactive/disabled flight, allocation-failure fallback,
+source/register preservation and write bounds. It checks complete outputs, not
+just dirty blocks. Native execution is correctness evidence, never a timer.
+
+For the live same-picture gate, `--flight-verify` allocates an additional 64000-byte
+**CHIP** reference, runs the original converter on exactly the same source, and
+compares every planar longword. A mismatch aborts. The read-only retained observer
+brackets candidate and original conversion separately, excluding the limiter,
+comparison and WaitBOVP. Both destinations must be CHIP and the source FAST.
+The report discards first-use full conversions and a final comparison still in
+progress. Native sabotage of an unchanged planar byte must trigger the twin abort.
+
+```sh
+python3 tools/flight_fixture.py --timing --flight-verify --nav 1 \
+  --output tmp/flight-render-twin
+python3 tools/flight_render_check.py tmp/flight-render-twin \
+  --output tmp/flight-render-twin-native.json
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+SLAVE="$PWD/tmp/flight-render-twin/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=3 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/flight-render-twin-layout
+python3 tools/timing_capture.py \
+  --fixture tmp/flight-render-twin/WingCommanderCD32.Slave \
+  --layout tmp/flight-render-twin-layout/layout.json --windows 4 \
+  --machine a1200-030 --held-key 40 --output tmp/flight-render-twin-030
+python3 tools/timing_capture.py \
+  --fixture tmp/flight-render-twin/WingCommanderCD32.Slave \
+  --layout tmp/flight-render-twin-layout/layout.json --windows 6 \
+  --machine a1200-fast --held-key 4e --output tmp/flight-render-twin-020
+python3 tools/flight_render_report.py \
+  tmp/flight-render-twin-030 tmp/flight-render-twin-020 \
+  --output tmp/flight-render-conversion.json
+```
+
+Use the pinned phase-7 observer and the established 030 cache-model compatibility
+setting, applied by the capture tool. The twin is diagnostic and cannot establish
+normal-build FPS. `--flight-control` is a same-size diagnostic that forces full
+conversion plus history refresh; its extra copy must not be counted as the original
+converter's cost. Neither diagnostic belongs in a release.
+
+For normal-build timing, build a fresh `flight_fixture.py --timing --nav 1` fixture,
+calibrate that fixture separately, and capture 20 windows on 030: held right (`4e`)
+in PAL with `--scene-samples 40 --pause`, then held fire (`40`) with `--ntsc`.
+Run `timing_report.py` on both and `timing_scene_report.py --negative-controls` on
+the PAL capture. These are the phase-10 commands above with the new fixture; no
+new emulator or full CPU matrix is necessary.
+
+Accepted artifacts: `tmp/phase11-candidate/`, `tmp/phase11-native-bounds.json`,
+`tmp/phase11-twin-native-bounds.json`, `tmp/phase11-conversion-final.json`,
+`tmp/phase11-clock-gate.json`, `tmp/phase11-scene-gate.json`,
+`tmp/phase11-scene-native/` and `tmp/phase11-install/`. Live inputs are
+`tmp/phase11-twin-final-{fire,turn-020}/`, `tmp/phase11-turn-pal/` and
+`tmp/phase11-fire-ntsc/`. The normal source rebuild is byte-identical to the tested
+candidate. All captured/derived material stays in `tmp/`.
+
+Stop at the phase-11 gate. Full campaign, visual/hardware acceptance, unified
+options and release packaging are phase 12.

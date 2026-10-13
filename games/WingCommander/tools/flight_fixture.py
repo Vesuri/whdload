@@ -9,16 +9,19 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
     p.add_argument('--timing',action='store_true',help='experimental timing build instead of a delay fixture')
+    p.add_argument('--flight-verify',action='store_true')
+    p.add_argument('--flight-control',action='store_true')
     p.add_argument('--timing-verify',action='store_true')
     p.add_argument('--schedule',choices=('normal','slow','one-field'),default='normal',help='VERIFY-only render schedule')
     p.add_argument('--nav',type=int,choices=(0,1),default=0)
     p.add_argument('--iterations', type=int, choices=(0,100000), default=0)
     a=p.parse_args()
+    if (a.flight_verify or a.flight_control) and not a.timing:p.error('flight diagnostics require --timing')
     if a.schedule!='normal' and not a.timing_verify:p.error('diagnostic schedule requires --timing-verify')
     if a.timing_verify and not a.timing:p.error('--timing-verify requires --timing')
     if a.timing:
         if a.iterations: p.error('timing fixture cannot also use the old delay tail')
-        subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--timing','--output',a.output]+(['--timing-verify'] if a.timing_verify else []),check=True)
+        subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--timing','--output',a.output]+(['--timing-verify'] if a.timing_verify else [])+(['--flight-verify'] if a.flight_verify else [])+(['--flight-control'] if a.flight_control else []),check=True)
     else:
         subprocess.run([sys.executable,str(ROOT/'tools/intro_timing_fixture.py'),
                         '--output',a.output,'--iterations',str(a.iterations)],check=True)

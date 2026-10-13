@@ -11,7 +11,7 @@ import re
 import struct
 import subprocess
 import capstone
-from render_source import source as render_source
+from render_source import source as render_source, flight_source
 from timing_source import source as timing_source
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,11 +35,14 @@ def main():
     modes.add_argument('--verify-control', action='store_true', help='original code with the same unused diagnostic tail/size')
     modes.add_argument('--ceiling',choices=['control','c2p','drawing-control','drawing','drawing-bitmap','drawing-clear'],help='VERIFY-only equal-size rendering ceiling fixture; never a release build')
     modes.add_argument('--cache-audit', action='store_true', help='VERIFY-only terminating hardware CACR audit')
+    p.add_argument('--flight-verify',action='store_true',help='compare flight delta c2p against original on every picture')
+    p.add_argument('--flight-control',action='store_true',help='same-size flight full-conversion control')
     p.add_argument('--timing-verify',action='store_true',help='include diagnostic render schedules; requires --timing')
     p.add_argument('--render-family', choices=('auto','030','040'), default='auto', help='diagnostic converter-family override')
     p.add_argument('--render-verify', action='store_true', help='native original/replacement twin on every conversion; requires --render')
     p.add_argument('--input', default='tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')
     a = p.parse_args()
+    if (a.flight_verify or a.flight_control) and not a.timing:p.error('flight diagnostics require --timing')
     if a.timing_verify and not a.timing: p.error('--timing-verify requires --timing')
     if a.render_family!='auto' and not a.render: p.error('--render-family requires --render')
     if a.render_verify and not a.render: p.error('--render-verify requires --render')
@@ -89,7 +92,9 @@ def main():
         lines += [f'\tifne *-slave-${pos:x}', '\tfail "offset drift"', '\tendif', f'S_{pos:04x}:']
         if pos in decoded:
             size, source = decoded[pos]
-            if (a.render and pos==0x178a) or ((a.render or a.render_control) and pos==0x1422):
+            if a.timing and pos==0x178a:
+                lines.append('\tbra.w flight_render_entry')
+            elif (a.render and pos==0x178a) or ((a.render or a.render_control) and pos==0x1422):
                 lines.append('\t'+('bra.w render_entry' if pos==0x178a else 'bsr.w render_setcpu'))
             elif pos == 0x1422 and a.cache_audit:
                 lines.append('\tbsr.w cache_audit')
@@ -120,6 +125,7 @@ def main():
     if a.timing:
         lines.append('TIMING_VERIFY equ '+str(int(a.timing_verify)))
         lines.append(timing_source(ROOT))
+        lines.append(flight_source(ROOT,a.flight_verify,a.flight_control))
     if a.verify or a.verify_control:
         lines.append((ROOT/'whdload/verify.s').read_text())
     if a.ceiling and a.ceiling.startswith('drawing'):
@@ -155,9 +161,11 @@ def main():
         differences = [hex(i) for i,(x,y) in enumerate(zip(built,code)) if x != y]
         raise ValueError(f'reassembly differs: size {len(built)}; first offsets {differences[:20]}')
     if a.verify or a.timing:
-        # The only original instruction replaced is S:14da..14dd. Everything
-        # before/after it through the original end must still match exactly.
-        if built[:0x14da] != code[:0x14da] or built[0x14de:len(code)] != code[0x14de:]:
+        # Only declared PatchSeg and (timing mode) c2p entry seams may change.
+        expected=bytearray(code)
+        for off in ((0x14da,0x178a) if a.timing else (0x14da,)):
+            expected[off:off+4]=built[off:off+4]
+        if built[:len(code)] != expected:
             raise ValueError('VERIFY changed bytes outside its declared detour')
     # Standard one-code-hunk container; no original byte blob is embedded.
     header = struct.pack('>8I',0x3f3,0,1,0,0,len(built)//4,0x3e9,len(built)//4)
@@ -167,7 +175,7 @@ def main():
     (out/'WingCommanderCD32.Slave').write_bytes(result)
     report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
-              'code_ranges':CODE, 'byte_identical':result == original, 'timing':a.timing, 'timing_verify':a.timing_verify, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling or a.timing_verify), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
+              'code_ranges':CODE, 'byte_identical':result == original, 'flight_verify':a.flight_verify, 'flight_control':a.flight_control, 'timing':a.timing, 'timing_verify':a.timing_verify, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling or a.timing_verify or a.flight_verify or a.flight_control), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
     if a.ceiling and a.ceiling.startswith('drawing'):
         report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
