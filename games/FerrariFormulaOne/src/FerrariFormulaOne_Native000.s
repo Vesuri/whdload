@@ -1,6 +1,8 @@
 ; SPS 0481 opt-in native 68000 arithmetic. The coarse host owns binding,
 ; interrupt exclusion, patch rollback and cache flush. Physics remains 100 ms.
-; Validate the complete original helper before replacing its entry point.
+; Stages: 1 exact division, 2 normal-mode lookahead, 3 full-CCR sin/cos.
+; C3Enabled selects a stage for matched-layout diagnostics; zero is inactive.
+; Validate complete native signatures before changing any entry point.
  IFD FF1_COARSE_020
  fail "FF1_COARSE_NATIVE_000 requires the 68000 coarse build"
  ENDC
@@ -38,6 +40,20 @@ FF1InstallNative000:
  dbra d1,.caller_check
 .track_checked:
  ENDC
+ IFGT FF1_NATIVE_000_STAGE-2
+ move.w C3Enabled(pc),d0
+ cmpi.w #3,d0
+ blo.b .trig_checked
+ lea FF1Trig000Signature(pc),a0
+ lea $24fe0,a1
+ moveq #31,d1
+.trig_check:
+ move.w (a0)+,d2
+ cmp.w (a1)+,d2
+ bne.w .bad
+ dbra d1,.trig_check
+.trig_checked:
+ ENDC
  lea FF1Divide000(pc),a0
  move.w #$4ef9,$293d0
  move.l a0,$293d2
@@ -49,6 +65,17 @@ FF1InstallNative000:
  move.w #$4ef9,$6977a
  move.l a0,$6977c
  move.w #$4e71,$69780
+ ENDC
+ IFGT FF1_NATIVE_000_STAGE-2
+ move.w C3Enabled(pc),d0
+ cmpi.w #3,d0
+ blo.b .done
+ lea FF1Sine000(pc),a0
+ lea $24fe0,a1
+ moveq #15,d1
+.trig_copy:
+ move.l (a0)+,(a1)+
+ dbra d1,.trig_copy
  ENDC
  bra.b .done
 .bad:
@@ -92,4 +119,35 @@ FF1Track000Signature:
  dc.w $4e56,$fff8,$42ae,$fffa,$4a79,$0001,$ed8a,$665c,$3d7c,$000a,$fffe,$546e,$000a,$302e,$fffe,$536e,$fffe,$4a40,$6730,$3039,$0002,$268c,$322e,$000a,$b240,$6d04,$916e,$000a,$302e,$000a,$526e,$000a,$48c0,$e380,$2040,$d1fc,$0001,$dc24,$3010,$48c0,$d1ae,$fffa,$60c4,$4aae,$fffa,$6a08,$202e,$fffa,$4480,$6004,$202e,$fffa,$4e5e,$4e75,$3d7c,$0008,$fffe,$3039,$0003,$2fbc,$48c0,$e380,$2040,$d1fc,$0002,$275a,$3010,$0c40,$015e,$6f04,$586e,$000a,$302e,$fffe,$536e,$fffe,$4a40,$676c,$3039,$0002,$268c,$322e,$000a,$b240,$6d04,$916e,$000a,$302e,$000a,$3f40,$0000,$5240,$322f,$0000,$48c1,$e381,$2041,$d1fc,$0001,$dc24,$3210,$3d40,$000a,$4a41,$6a18,$526e,$000a,$48c0,$e380,$2040,$d1fc,$0001,$dc24,$3010,$48c0,$4480,$6018,$302e,$000a,$526e,$000a,$48c0,$e380,$2040,$d1fc,$0001,$dc24,$3010,$48c0,$d1ae,$fffa,$6088,$202e,$fffa,$e380,$4e5e,$4e75
  dc.w $6100,$2264,$588f,$23c0,$0003,$2f8a,$3039,$0003,$2fbc,$48c0,$e380
 
+ ENDC
+
+ IFGT FF1_NATIVE_000_STAGE-2
+; D0, A0 and all CCR bits equal native. Keep both final logical shifts.
+FF1Sine000:
+ move.w 6(sp),d0
+ andi.w #1023,d0
+ add.w d0,d0
+ lea $2180c,a0
+ adda.w d0,a0
+ move.w 10(sp),d0
+ muls.w (a0),d0
+ lsr.l #8,d0
+ lsr.l #7,d0
+ rts
+ dcb.b 32-(*-FF1Sine000),0
+FF1Cosine000:
+ move.w 6(sp),d0
+ andi.w #1023,d0
+ add.w d0,d0
+ lea $21a0c,a0
+ adda.w d0,a0
+ move.w 10(sp),d0
+ muls.w (a0),d0
+ lsr.l #8,d0
+ lsr.l #7,d0
+ rts
+ dcb.b 32-(*-FF1Cosine000),0
+
+FF1Trig000Signature:
+ dc.b $30,$2f,$00,$06,$02,$80,$00,$00,$03,$ff,$e3,$80,$06,$80,$00,$02,$18,$0c,$20,$40,$30,$2f,$00,$0a,$c1,$d0,$e0,$88,$ee,$88,$4e,$75,$30,$2f,$00,$06,$02,$80,$00,$00,$03,$ff,$e3,$80,$06,$80,$00,$02,$1a,$0c,$20,$40,$30,$2f,$00,$0a,$c1,$d0,$e0,$88,$ee,$88,$4e,$75
  ENDC
