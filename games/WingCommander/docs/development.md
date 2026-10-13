@@ -2402,3 +2402,47 @@ python3 -m amigaxdev.disasm dis --cpu 68020 \
 
 The C3 change is drawing-only and does not apply the deferred phase-12 save/load
 stash. Stop before C4; release remains paused.
+
+## C4: displayed cadence around world ticks
+
+Use the C3 fixture and layout above. Its production code is unchanged: C4 checks
+whether the existing queue absorbs world-tick work spikes before considering any
+scheduler changes. Reuse the retained current-build 030 steady and 040 turn windows;
+only the current-build 040 steady window needs a new capture. Fresh output paths
+are required; the same fixture hash is enforced across all three windows.
+
+```sh
+. amiga/env.sh
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/c3-frames/WingCommanderCD32.Slave --machine a1200-040 \
+  --baseline-cache-model --options NoMMU --timing-core --custom5 0 \
+  --debugger --observer --display-sample --layout tmp/c3-layout/layout.json \
+  --output tmp/c4-040-steady --timeout 180
+python3 tools/frame_spike_report.py \
+  --steady tmp/c3-030-gate tmp/c4-040-steady --turn tmp/c3-040-gate \
+  --output tmp/c4-spikes.json
+python3 tools/frame_check.py tmp/c4-040-steady --output tmp/c4-040-steady/check.json
+python3 tools/buffer_report.py tmp/c4-040-steady --build tmp/c3-frames \
+  --layout tmp/c3-layout/layout.json --output tmp/c4-040-steady/buffers.json
+python3 tools/translation_report.py tmp/c4-040-steady --build tmp/c3-frames \
+  --layout tmp/c3-layout/layout.json --output tmp/c4-040-steady/translation.json
+python3 tools/display_time_check.py tmp/c4-040-steady \
+  --output tmp/c4-040-steady/prediction.json
+python3 tools/frame_report.py tmp/c3-030-gate tmp/c4-040-steady tmp/c3-040-gate \
+  --output tmp/c4-fps.json
+```
+
+`frame_spike_report.py` gates actual display-to-display intervals from the IRQ
+ledger. It also reports queue-to-queue intervals and world work, grouped by ticks
+between queue submissions. It must not substitute the older report's draw-to-draw
+`frame_ms` for visible cadence. Negative controls reject deliberate missed fields,
+a uniform half-rate cadence and absent world coverage. Putting the held-turn
+capture under `--steady` correctly fails the gate; `--turn` reports it without
+claiming it passes. The held-turn C1 display-time failure remains unchanged.
+
+No multi-tick interval occurred in these captures: the reported catch-up count is
+zero, not evidence for smoothness after an artificial long stall. Both PAL steady
+cells pass at one displayed picture per field; no scheduler change was needed.
+Stop before D1. Heavy-scene overruns remain for rendering-cost work and acceptance;
+release and the phase-12 stash remain paused.

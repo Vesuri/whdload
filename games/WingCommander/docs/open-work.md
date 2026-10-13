@@ -51,8 +51,9 @@ C2 is complete: controlled player velocity/position advance per field, with zero
 world-tick position corrections in the steady and turning gates. C3 is complete:
 heading-aware ship forecasts retain native inertia, with p95 0.255 km and maximum
 6.348 km error on the retained hard-turn world-ship sample. Constant-velocity
-classes stay exact. Stop before C4.
-Held-turn frame-budget misses are documented under C4; campaign and hardware
+classes stay exact. C4 confirms one displayed picture per field in steady flight
+on both required models, with no scheduler change needed. Stop before D1.
+Held-turn frame-budget misses remain for D1 onward; campaign and hardware
 visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
@@ -537,19 +538,25 @@ display wait (6–7 ms of idle per frame).
   preserves inertia. AI speed changes remain unpredictable; this is a scoped
   one-tick gate, not a universal correction bound. Native isolation and two live
   frame-rate gates pass; see [C3 evidence](internals.md#phase-11b-heading-aware-extrapolation-c3-gate-complete).
-  Stop before C4.
-- **C4.** Frame-time spikes: measure frame intervals around world ticks and
-  catch-up batches; resolve with tick placement or cheaper ticks until
-  frame-interval p95 equals the median in steady flight. C2 held-turn windows
-  expose 122/657 missed prediction targets on the cycle-exact 040 and 72/663 on
-  NTSC 030. The previous C1 build also misses 112/657 in the matched 040 turn
-  control. C3 records 119/656 misses in its 040 held turn. These fail the C1
-  display-time checker; steady gates still pass.
+- **C4 — steady-flight gate complete.** Measure displayed intervals separately
+  from internal work intervals around world ticks and catch-up batches. Both
+  current PAL models show 639/639 measured intervals of one field: median and
+  p95 both 20.032 ms, including 128 intervals containing a world tick. B2's
+  queue already absorbs the work spikes; no additional tick-placement or
+  simulation change is needed for this gate. No multi-tick catch-up interval
+  occurred in these windows; forced-stall cadence remains unmeasured.
+  The held-turn control still has two/three-field intervals and 119/656 missed
+  prediction targets. This is not a global smoothness or C1 deadline pass;
+  the remaining heavy-scene overruns carry into D1–D5 and E1. See the
+  [C4 evidence](internals.md#phase-11b-frame-time-spikes-c4-steady-flight-gate-complete).
+  Stop before D1.
 
 **D. Rendering cost (driven by A3/D1)**
 
 - **D1.** Profile the release build on calibrated 040: clears, stars, polygons,
   cockpit, HUD, text, block comparison, prediction save/restore and geometry rebuild.
+  Include the retained heavy-turn spikes/deadline misses from C4; steady-flight
+  acceptance does not close these. A2 still blocks calibrated hardware claims.
 - **D2.** Prediction overhead: save/restore only active slots; skip geometry
   rebuilds that cannot change.
 - **D3.** Region-specific clear/redraw of the view when the cockpit is unchanged,

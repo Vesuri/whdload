@@ -3431,3 +3431,81 @@ Normal candidate `tmp/c3-final/WingCommanderCD32.Slave`: 40,124 bytes, SHA-256
 `ba4c088be9f634efaaee8a1889a2e19fa0380a0a788c0e49b32d5024f2483a6e`.
 A fresh source rebuild reproduces these bytes exactly. The phase-12 save/load
 stash remains untouched. Stop before C4.
+
+
+## Phase 11b frame-time spikes: C4 steady-flight gate complete
+
+C4's steady-flight **displayed-interval** gate passes on the current C3 build.
+No scheduler or game-code change was necessary: B2's deferred two-buffer reuse
+already absorbs the measured world-tick work spikes in these windows. This is a
+verification result, not a new speed improvement or a claim that turning stalls
+are fixed. Phase 12 remains paused; stop before D1.
+
+### Measurement and attribution
+
+`frame_report.py`'s existing `frame_ms` means draw-entry to next draw-entry; it is
+an internal work interval. It can vary even when every displayed picture arrives
+on the next VBL. `frame_spike_report.py` instead joins FSTAT 16 queue submissions
+to the IRQ's actual displayed-picture ledger and measures display-to-display
+intervals. It requires one recorded queue request per displayed picture, drops
+20 warm-up pictures, and classifies each interval by completed world ticks between
+its two queue submissions. The world begin/end pairs must be complete.
+This is correlation across an overlapped pipeline, not isolated cost attribution.
+
+Relevant existing code-hunk offsets: native world `E:2a8–2da` (file `2d4–306`),
+converter/buffer index work around `E:33772` (file `3379e`), native publication
+`E:33a12` (file `33a3e`), and VBL instrumentation `E:34162` (file `3418e`).
+Slave labels `timing_world`, `release_publish`, `release_presented` and
+`frame_stats_display` supply the diagnostic boundaries; no new game seam is added.
+
+`tmp/c4-spikes.json` uses the same immutable C3 diagnostic fixture in all cells:
+SHA-256 `bd10fe37b73b0b42d127e683cf8aca52b394c5f2b5f099ad317aad37452ede94`.
+It reuses the retained C3 030 steady and 040 turn captures, plus one new
+`tmp/c4-040-steady` capture of the missing current-build steady 040 case.
+No additional CPU matrix was run.
+
+| PAL window | Display intervals in fields | Display median / p95 / max ms | Pictures/s |
+|---|---|---|---:|
+| 030 steady | 639 × 1 | 20.032 / 20.032 / 20.032 | 49.920 |
+| Cycle-exact 040 steady | 639 × 1 | 20.032 / 20.032 / 20.032 | 49.920 |
+| Cycle-exact 040 held turn | 525 × 1, 92 × 2, 18 × 3 | 20.032 / 40.064 / 60.096 | 41.535 |
+
+Both steady windows contain 511 measured intervals without a world tick and 128
+with one; every interval in both groups is exactly one field. In the 040 window,
+queue-to-queue p95 is 20.224 ms without a tick and 29.312 ms with one; the latter's
+world work has p95 6.976 ms. These internal spikes do not become visible gaps.
+The 030 queue-to-queue p95 is 20.608 ms in both groups. No interval contains more
+than one world tick, so there is **no measured forced-stall/catch-up cadence claim**.
+The existing bounded chronological catch-up scheduler remains unchanged.
+
+The held-turn control is deliberately not labelled passing: display p95 is two
+fields without an intervening world tick and three with one. Tick-associated
+queue intervals have p95 51.520 ms, including world-work p95 8.896 ms; intervals
+without a tick still have queue p95 30.912 ms. Both scene work and world work
+remain relevant to the later cost investigation. It still misses 119/656 target
+fields and fractions, and still fails `display_time_check.py`. C1 accuracy in
+heavy scenes is not waived or fixed by C4's steady-flight result.
+
+### Checks and boundaries
+
+The cadence gate requires at least 500 intervals and 100 tick-bearing intervals,
+and median = p95 = **one field**. Requiring one field prevents a uniformly slower
+25-FPS run from passing just because its percentiles match. Deliberate missed-field,
+half-rate and no-world-coverage controls all fail. Input/output hashes and fixture
+identity are retained in the report. The companion `frame_report.py` uses a slightly
+different draw-boundary crop (638 steady intervals); its display rate agrees.
+
+The new 040 capture passes independent observer/recorder agreement for 661
+pictures, all 661 display targets/fractions, and converter/copper ownership:
+one FAST source, two CHIP buffers, line-4 publication, zero late deferrals and
+zero input overflows. C2 also checks 809 fields and 161 actual world ticks with
+zero player/camera position corrections. `tmp/c4-fps.json` reports world rate
+within 1% of 10 Hz on both steady cells and the turn control. Previous C3 native
+checks remain applicable because the production source and built slave are unchanged.
+
+The normal candidate is still the C3 40,124-byte slave, SHA-256
+`ba4c088be9f634efaaee8a1889a2e19fa0380a0a788c0e49b32d5024f2483a6e`.
+The observer retains the established cache-model settings; cycle-exact 040 numbers
+are not physical-machine calibration. Heavy-scene stalls, extended deadline misses,
+forced-stall cadence and real-hardware acceptance remain explicit gaps for D/E.
+The phase-12 stash remains untouched.

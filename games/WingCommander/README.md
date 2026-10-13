@@ -3,7 +3,7 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**Phase 11b is in progress; C1, C2 and C3 are complete.**
+**Phase 11b is in progress; C1–C3 and the C4 steady-flight gate are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for
 enhanced English flight without Psygore's frame cap. Values 1–4 retain Psygore's
 normal/unlimited/relaxed/slow modes. German default and enhanced nonflight scenes
@@ -25,7 +25,11 @@ Heading-aware ship forecasting preserves native inertia: the retained hard-turn
 world-ship error falls to 0.26 km at p95 and 6.35 km maximum; constant-velocity
 classes stay exact. C3 measures 49.92 pictures/s in steady 030 flight and 41.53
 in the cycle-exact 040 held turn. See the [C3 gate and residuals](docs/internals.md#phase-11b-heading-aware-extrapolation-c3-gate-complete).
-Phase 12 stays paused; C4 onward and broader visual acceptance remain open.
+C4 confirms one displayed picture per field in steady PAL flight on both models:
+median and p95 intervals are both 20.032 ms. The existing queue absorbs world-tick
+work spikes; no further scheduler change was needed. Heavy-turn overruns remain
+for rendering-cost work. See the [C4 measurements](docs/internals.md#phase-11b-frame-time-spikes-c4-steady-flight-gate-complete).
+Phase 12 stays paused; D1 onward and broader visual acceptance remain open.
 
 **Phase 11 is complete: changed-block flight conversion.**
 The timing build converts only changed view/cockpit/HUD blocks, with separate
