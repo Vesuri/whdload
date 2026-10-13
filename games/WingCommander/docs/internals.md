@@ -2625,7 +2625,8 @@ or a release package. Phase 11 flight conversion is recorded below.
 The common world exit snapshots all 64 native position/velocity slots, types,
 models, lifetimes, angular steps and the ten ship actions. Rendering uses
 `position + trunc(velocity * fraction / field_rate)`, with fraction taken from
-the scheduler's residual debt and clamped to one world interval. Signed quotient
+the scheduler's residual debt and clamped to one world interval in the experimental
+timing build. The buffered release uses the C1 display-time horizon below. Signed quotient
 and remainder splitting avoids intermediate overflow and 64-bit division on 040.
 A new picture starts from the authoritative pose, never from a previous prediction.
 At a world boundary the latest authoritative state replaces the prediction;
@@ -2700,8 +2701,9 @@ maximum 8.982 km (189). Constant-velocity classes 3/4/5/8 have zero observed err
 The 813 PAL and 245 NTSC comparable non-player basis forecasts match
 the next native orientation (zero measured angular error). This is scoped
 trajectory evidence, not a guarantee against future AI/controller changes.
-Hard-turn positional correction can remain visible; prediction is bounded to
-one tick and never alters collision or other authoritative results.
+Hard-turn positional correction can remain visible. These forecast-error numbers
+cover one tick; they do not measure the extended C1 display-time horizon. Prediction
+never alters collision or other authoritative results.
 
 `tmp/phase10-gate-clock.json` covers the preceding uninterrupted 20×100-field
 windows, excluding two warm-up windows. PAL measures 9.96188 world updates/s
@@ -2996,7 +2998,7 @@ Evidence: `tmp/b1-final-native.json`, `tmp/b1-flight-native.json`,
 Commands are in development's B1 section; the public numbering/fallbacks are in
 `release/ReadMe`. Save-file work remains outside this gate. German live campaign,
 full control/visual acceptance, calibrated 040 performance and release packaging
-remain open. The subsequent B2 gate is below; C1 and later work remain open.
+remain open. The subsequent B2 and C1 gates are below; C2 and later work remain open.
 
 ## Phase 11b: deferred buffer reuse (B2 gate complete)
 
@@ -3092,7 +3094,7 @@ These ~11–13 s windows meet the scoped display-rate gate and 10 Hz ±1% world 
 Waits occur before planar writes after the next chunky picture has been drawn;
 there is no flight post-conversion wait. Main-loop work intervals still vary
 (world-tick frames remain heavier), so C4 is not closed by the regular displayed
-cadence. C1 display-time prediction, C2 player translation, C3 heading-aware
+cadence. C1 display-time prediction is complete below. C2 player translation, C3 heading-aware
 prediction, long missions, physical hardware and user visual acceptance remain
 open. No claim that all movement now feels like the display rate is made.
 
@@ -3105,7 +3107,7 @@ Evidence: `tmp/b2-buffer-final.json`, `tmp/b2-options-final.json`,
 `tmp/b2-recorder-budget.json`, `tmp/b2-final-gate.json`, and
 `tmp/b2-{030,040,ntsc}-gate/{check,buffer-check}.json` with the raw ledgers,
 observer events and memory samples. Commands are in development's B2 section.
-Stop at B2; B3's no-third-buffer constraint is retained, and C1 is not started.
+B3's no-third-buffer constraint is retained; the C1 gate follows below.
 
 
 ## Cached 040 display corruption: emulator MMU write attributes
@@ -3151,4 +3153,67 @@ These are correctness observations, not performance measurements.
 
 The correction covers all six affected write paths, but live acceptance here is
 040-specific. Broader campaign/modal coverage, 060 validation and real-hardware
-acceptance remain open. C1 and phase 12 remain deferred.
+acceptance remain open. C1 is complete below; phase 12 remains deferred.
+
+
+## Phase 11b display-time prediction: C1 gate complete
+
+The buffered release's scene entry now predicts from the last consumed field to
+`current field + 1 + pending swap`. It retries a clock read if an IRQ changes the
+field mid-snapshot. The numerator is `residual debt + 10 × (target − consumed)`;
+the denominator remains PAL 50 / NTSC 60. The release publisher at `E:3378e`
+(file `$337ba`) copies target, source clock, debt and selected numerator into
+IRQ-owned request metadata before publishing the pending flag. A later render
+cannot overwrite those values. The IRQ never displays a future target early.
+
+The existing pose snapshot/restore and cut rules are unchanged; prediction still
+cannot affect simulation, targeting, collision or gameplay RNG. The queued delay
+requires prediction beyond the next world boundary: its bounded maximum is now
+one tick plus two fields (140 ms PAL / 133.3 ms NTSC). The tested steady pipeline
+uses two-field lookahead, reaching 120 ms PAL / 116.7 ms NTSC. Clipping to the old
+one-tick limit would repeat the final phase; C1's gate requires the full actual
+display-time fraction instead. Longer overruns retain the cap, and late blank
+publication still defers safely; such misses fail the C1 checker rather than being
+silently counted as correctly timed pictures. Arbitrarily slow frames and locked
+modal transitions are not claimed to meet this scoped flight gate.
+
+The `--frame-stats` display ledger has 32-byte entries: the original field, line,
+index, planar and copper fields plus target field, consumed field, residual debt
+and prediction numerator. Both clock fields are relative to the recorder epoch,
+with wrapping subtraction. `display_time_check.py` independently computes the
+expected numerator from the actual displayed field, requires all steady phases,
+and rejects wrong-fraction and wrong-target negative controls. The independent
+A1 publication observer and B2 ownership/copper checks remain separate gates.
+
+| Model / window | Displayed pictures checked | Prediction errors / missed targets | Pictures/s | World updates/s |
+|---|---:|---:|---:|---:|
+| 030/50 PAL, established cache model | 661 | 0 / 0 | 49.920 | 9.926 |
+| Cycle-exact 040 core PAL, NoMMU | 661 | 0 / 0 | 49.920 | 9.929 |
+| 030/50 NTSC, established cache model | 665 | 0 / 0 | 59.826 | 9.956 |
+
+All three windows have one displayed picture per field, publish at line 4, retain
+two CHIP buffers and one FAST source, and have zero input overflows or late
+blank deferrals. The 040 core remains uncalibrated against physical hardware.
+Evidence: `tmp/c1-final-{030,040,ntsc}` and `tmp/c1-final-fps.json`.
+A fourth, uninterrupted cached-040 run uses the corrected shared `FSUAE_MMU`
+with `CACHE DCACHE`, the indirect UAE board and data-cache emulation enabled.
+All 661 predictions match, with zero missed targets; its recorder measures
+49.920 pictures/s and 9.928 world updates/s. It uses no debugger or
+read-only publication observer, so its independent-observer coverage comes from
+the three model gates above. Evidence: `tmp/c1-final-cached040`.
+Native checks cover 176 target/queue/wrap cases and two forced IRQ races on
+020/040, 96 scene/restore cases, 420 signed arithmetic cases through the extended
+horizon, recorder torn-read controls, publication locks/late IRQs, 196 option/cache
+cases, 180 pacing cases and 54 complete converter outputs. Earlier C1 native
+converter and installer checks also pass; they exercise unchanged routines.
+
+Normal slave: 39044 bytes, SHA-256
+`6c4efafbf982288a63df5abb1d36a9ebdf4287249bdfd7953edf7ca799ed070b`.
+The direct-flight recorder is `tmp/c1-final-frames`; its build manifest pins the
+fixture after startup-argument adaptation. The diagnostic ledger allocation is
+now 98304 bytes and remains outside the game's declared memory budget.
+
+Stop before C2. Player translation, angular/velocity forecasting quality, visible
+hard-turn corrections, long missions and hardware calibration remain open. The
+old phase-10 one-tick forecast-error measurements do not establish error bounds
+for the newly extended horizon. Release work remains paused.

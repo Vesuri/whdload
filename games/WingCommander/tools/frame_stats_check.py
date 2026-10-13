@@ -62,7 +62,7 @@ def main():
         c.write(STACK,struct.pack('>I',STOP));c.reg(8,STACK)
         ck(u.uc_emu_start(c.h,BASE+symbols['frame_stats_init'],STOP,1000000,1000))
         assert c.reg(18)==STOP
-        assert c.read(0x30000,8)==struct.pack('>II',65552,0x10005)
+        assert c.read(0x30000,8)==struct.pack('>II',16+symbols['FS_RECORDS']*4+(16+2047*(32 if 'release_predict' in symbols else 16) if 'release_pending' in symbols else 0),0x10005)
         c.close()
     cases = []
     for model in (2, 4):

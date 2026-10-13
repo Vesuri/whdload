@@ -45,7 +45,9 @@ two buffers. Both PAL model gates now report 49.920 displayed pictures/s; the
 to FS-UAE using read-ATC cache attributes for write-ATC hits; the local emulator
 correction preserves both caches and the B2 slave. See the
 [CPU/DMA pixel evidence](internals.md#cached-040-display-corruption-emulator-mmu-write-attributes).
-C1 is next, not started. Broader campaign and hardware visual acceptance remain open.
+C1 is complete: render prediction includes both the upcoming publication and
+pending swap. PAL/NTSC display ledgers match every forecast to its actual field.
+C2 is next, not started. Broader campaign and hardware visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -499,15 +501,19 @@ display wait (6–7 ms of idle per frame).
   Native queue/retirement and original-path tests, complete converter output,
   independent displayed-frame counts, ownership and PAL/NTSC copper audits pass.
   See [B2 evidence](internals.md#phase-11b-deferred-buffer-reuse-b2-gate-complete).
-  Stop before C1; display-time prediction and subjective visual acceptance remain open.
+  C1 display-time prediction is complete below; subjective visual acceptance remains open.
 - **B3.** No triple buffering (user, 2026-10-13): keep two buffers; B2 removes
   the idle wait instead.
 
 **C. Smoothness**
 
-- **C1.** Predict to the field the picture is displayed in (publication field
-  plus the pending swap), not render start. Gate: predicted fraction equals the
-  displayed field's world-time fraction in A1 records.
+- **C1 — complete.** Predict to the queued picture's display field, including the
+  pending swap. Gate: all 661 PAL pictures on each required model and 665 NTSC
+  pictures have exactly matching display-time fractions and no missed targets;
+  independent A1 and buffer-ownership checks pass. The bounded renderer horizon
+  includes up to two queued fields beyond one tick. See
+  [C1 evidence](internals.md#phase-11b-display-time-prediction-c1-gate-complete).
+  Stop before C2.
 - **C2.** Player translation per field: identify the native player velocity model
   (thrust, afterburner, speed ramps), advance velocity and position every field with
   carried fractions, exclude the player from the world position step `E:80b6`, and
@@ -557,4 +563,5 @@ executable, display, c2p (none expected) and timing. Reuse designs, not assumpti
 
 - Final intro motion-rate choice remains separate from the implemented 10 Hz flight clock.
 - Release play-testing must judge visible hard-turn corrections and all model/camera paths;
-  the implemented presentation policy is one-tick prediction with authoritative snaps.
+  the implemented presentation policy predicts to display time with authoritative
+  snaps and a bound of one tick plus two queued display fields.

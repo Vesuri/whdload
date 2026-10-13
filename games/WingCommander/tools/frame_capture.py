@@ -79,8 +79,8 @@ def main():
         INTRO_STOCK_CLOCK='1' if a.timing_core and a.machine == 'a1200-fast' else '0',
         WC_NOMMU_CORE='1' if a.timing_core and a.machine != 'a1200-fast' else '0',
         WHD_ARGS=f'CUSTOM1={language} CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5={a.custom5} NOWRITECACHE {a.options}'.strip(),
-        WARP='1', NTSC='1' if a.ntsc else '0', WINDOW='front', JOY0='none', JOY1='none',
-        DETERMINISTIC='1', WC_INSTANT_BLITTER='0')
+        WARP=os.environ.get('WARP','1'), NTSC='1' if a.ntsc else '0', WINDOW='front', JOY0='none', JOY1='none',
+        DETERMINISTIC=os.environ.get('DETERMINISTIC','1'), WC_INSTANT_BLITTER='0')
     if a.baseline_cache_model:
         env['WC_BASELINE_CACHE_MODEL'] = '1'
     if a.cpu_speed:

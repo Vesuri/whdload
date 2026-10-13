@@ -80,9 +80,9 @@ def settings(run):
 def display_records(path):
     raw=path.read_bytes()
     magic,hz,count,size=struct.unpack_from('>4sIII',raw)
-    if magic!=b'WCDS' or hz not in (50,60) or size!=16 or len(raw)!=16+16*count:
+    if magic!=b'WCDS' or hz not in (50,60) or size not in (16,32) or len(raw)!=16+size*count:
         raise ValueError('invalid display ledger')
-    rows=list(struct.iter_unpack('>IHHII',raw[16:]))
+    rows=[struct.unpack_from('>IHHII',raw,16+i*size) for i in range(count)]
     if count<100 or any(not 4<=v<=16 or index>1 or not plane or not copper for f,v,index,plane,copper in rows):
         raise ValueError('invalid/late copper handoff')
     if any(b[0]<=a[0] or b[2]==a[2] or b[3]==a[3] for a,b in zip(rows,rows[1:])):

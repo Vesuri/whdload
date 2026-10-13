@@ -22,7 +22,8 @@ Enhanced English flight runs its world at 10 updates/s and renders without
 Psygore's frame cap. Completed pictures are queued for early vertical blank;
 FAST-RAM drawing overlaps the pending swap. With two display buffers, conversion
 waits only until its target is no longer the front buffer. Actual frame rate
-depends on the machine and scene. Enhanced nonflight scenes, including
+depends on the machine and scene. Object prediction targets the field in which
+the queued picture is displayed. Enhanced nonflight scenes, including
 the intro, keep Psygore's normal limiter until their movement is decoupled.
 German with CUSTOM5=0 falls back to Psygore normal until it is ported.
 CUSTOM5=1..4 retain Psygore's original simulation and rendering in both languages.
@@ -32,7 +33,9 @@ options to enable caches as appropriate; the enhanced mode does not enable
 them itself. Psygore modes retain his original cache request.
 CUSTOM2 (cheats), CUSTOM3 (system), CUSTOM4 (mission) are unchanged.
 
-Known gaps: horizontal-row glitches reported by the user are unresolved.
+The reported cached-040 horizontal-row glitches were fixed in the shared
+FS-UAE emulator; use a build with the MMU write-cache correction.
+Known gaps:
 Smoothness, player translation and hard-turn corrections need further work.
 Real 040 performance is uncalibrated. Controls, campaign/save coverage and
 final release play-testing remain open. No release archive is approved yet.

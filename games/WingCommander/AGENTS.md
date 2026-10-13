@@ -3,7 +3,7 @@
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
 Current scope: phase 11b CD32 frame-rate recovery (work items A1–E2 in
 `docs/open-work.md`). B2 and the scoped cached-040 row-corruption fix are complete.
-Stop before C1 until requested. Every gate reports end-to-end frames/s from the
+C1 display-time prediction is complete; stop before C2 until requested. Every gate reports end-to-end frames/s from the
 `--frame-stats` recorder on the 030 model and the cycle-exact 040 core, and on a
 calibrated 040 once A2 provides one. Phase 12 release work is paused until 11b passes; do not start
 OCS work until requested.

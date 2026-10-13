@@ -2199,3 +2199,63 @@ SLAVE="$PWD/tmp/b2-final/WingCommanderCD32.Slave" \
 AMIGA_SETUP=a1200-040 WHD_ARGS='CUSTOM1=0 CUSTOM5=0 CACHE DCACHE' \
 /bin/bash amiga/run.sh
 ```
+
+
+## C1: prediction at the displayed field
+
+Build from the C1 commit, preserving unrelated work separately. The normal
+candidate stays 2.0b (13.06.2026). All outputs and recordings remain below `tmp/`.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/c1-final
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/c1-final-frames
+python3 tools/display_predict_check.py tmp/c1-final --output tmp/c1-final-native.json
+python3 tools/timing_scene_check.py tmp/c1-final --output tmp/c1-final-scene-full.json
+python3 tools/frame_stats_check.py tmp/c1-final-frames --output tmp/c1-final-recorder.json
+python3 tools/buffer_check.py tmp/c1-final --output tmp/c1-final-buffer.json
+python3 tools/release_check.py tmp/c1-final --negative-controls --output tmp/c1-final-options.json
+
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/c1-final-frames/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/c1-layout
+```
+
+Run the B2 three-cell loop with `tmp/c1-final-frames`, `tmp/c1-layout` and
+`tmp/c1-final-$cell` in place of its B2 paths. Retain `--debugger --observer
+--display-sample`; these are the independent A1 and ownership/copper checks.
+For each completed run, also execute:
+
+```sh
+python3 tools/display_time_check.py "tmp/c1-final-$cell" \
+  --output "tmp/c1-final-$cell/prediction.json"
+```
+
+The 32-byte display ledger records immutable prediction metadata at the actual
+VBL handoff. The checker requires exact un-clipped display-time fractions, zero
+missed deadlines and every steady phase, including the phase beyond one world
+tick. Wrong target/fraction negative controls must fail. Its coverage is the
+recorded flight window; a late or stalled path is not waived by this gate.
+`frame_report.py` continues to read both older 16-byte and C1 32-byte ledgers.
+
+The corrected emulator is now shared through AmigaXDev as `FSUAE_MMU`; its native
+build recipe includes the MMU write-cache fix. Verify the normal cached 040 setup
+without a debugger (or use the local corrected binary if that shared installation
+is unavailable):
+
+```sh
+FSUAE="$FSUAE_MMU" DEBUG_PORT=2501 WARP=0 DETERMINISTIC=0 \
+python3 tools/frame_capture.py --fixture tmp/c1-final-frames/WingCommanderCD32.Slave \
+  --machine a1200-040 --options 'CACHE DCACHE' --custom5 0 \
+  --output tmp/c1-final-cached040 --timeout 180
+python3 tools/display_time_check.py tmp/c1-final-cached040 \
+  --output tmp/c1-final-cached040/prediction.json
+python3 tools/frame_report.py tmp/c1-final-030 tmp/c1-final-040 tmp/c1-final-ntsc \
+  tmp/c1-final-cached040 --output tmp/c1-fps.json
+```
+
+`frame_capture.py` defaults remain warped/deterministic for the established
+instrumented model gates; explicit `WARP=0 DETERMINISTIC=0` selects the normal
+cached-MMU boot. No C2 player-translation change or release packaging is included.

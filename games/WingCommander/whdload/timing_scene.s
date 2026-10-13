@@ -134,7 +134,8 @@ timing_debris_draw:
         rts
 
 ; D0 * fraction / rate, truncating toward zero. Split quotient/remainder
-; avoids a 64-bit division (not native on 040); fraction is at most the rate.
+; avoids a 64-bit division (not native on 040). Buffered release prediction
+; permits one tick plus two display fields; signed results wrap as native longs.
 timing_scene_scale:
         move.l  d0,d2
         divs.l  d7,d0
@@ -170,12 +171,16 @@ timing_scene_begin:
         dbra    d2,.save_range
         lea     timing_scene_staged(pc),a0
         move.w  #1,(a0)
+        ifne BUFFERED
+        bsr.w   release_predict
+        else
         move.l  timing_clock+4(pc),d6
         move.l  timing_hz(pc),d7
         cmp.l   d7,d6
         bls.s   .bounded
         move.l  d7,d6
 .bounded:
+        endif
         tst.w   timing_scene_valid(pc)
         beq.w   .camera
         move.w  -18280(a4),d0

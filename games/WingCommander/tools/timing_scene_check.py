@@ -21,11 +21,12 @@ def main():
         put('timing_game','I',c.code)
         rng=random.Random(10)
         for hz in (50,60):
-            for f in (0,1,hz//2,hz-1,hz):
+            for f in (0,1,hz//2,hz-1,hz,hz+10,hz+20):
                 for value in (-2147483648,-5121,-1,0,1,5121,2147483647)+tuple(rng.randint(-2**31,2**31-1) for _ in range(8)):
                     run('timing_scene_scale',{9:value&0xffffffff,15:f,16:hz})
                     got=struct.unpack('>i',struct.pack('>I',c.reg(9)))[0]
-                    assert got==trunc(value*f,hz),(model,hz,f,value,got)
+                    expected=(trunc(value*f,hz)+2**31)%2**32-2**31
+                    assert got==expected,(model,hz,f,value,got)
                     scale_count+=1
         for hz in (50,60):
             for view in range(4):
@@ -40,14 +41,16 @@ def main():
                     for off in (0x9578,0x95f8,0x9678):c.data_value(off+2*slot,'h',8)
                 run('timing_scene_snapshot');run('timing_scene_snapshot')
                 run('timing_player_camera')
+                c.data_value(0x7f02,'I',100)
                 before=c.read(c.data,0xfda0)
                 for fraction in (0,1,hz//2,hz-1,hz,hz+20):
                     put('timing_clock' ,'I',100)
                     c.write(S+sy['timing_clock']+4,struct.pack('>I',fraction))
                     run('timing_scene_begin')
+                    effective=min(fraction+10,hz+20) if 'release_predict' in sy else min(fraction,hz)
                     for slot in (0,1,2,60):
                         got=struct.unpack('>3i',c.read(c.data+0x919a+12*slot,12))
-                        want=tuple(p+trunc(v*min(fraction,hz),hz) for p,v in zip((1000,2000,3000),(5121,-513,-1)))
+                        want=tuple(p+trunc(v*effective,hz) for p,v in zip((1000,2000,3000),(5121,-513,-1)))
                         assert got==want,(model,hz,view,fraction,slot,got,want)
                     assert c.read(c.data+0x919a+36,12)==before[0x919a+36:0x919a+48] # star direction
                     if fraction>=hz//2:
@@ -56,7 +59,7 @@ def main():
                         ref=CPU(memory,layout,model);ref.write(ref.data,before)
                         for slot in (1,2,60):
                             for entry in (0x2acb2,0x2acf2,0x2ad32):
-                                angle=trunc(8*min(fraction,hz),hz)
+                                angle=trunc(8*effective,hz)
                                 if angle:ref.run(entry,struct.pack('>hh',angle,slot))
                             for off in POSES[1:4]:assert c.read(c.data+off+12*slot,12)==ref.read(ref.data+off+12*slot,12)
                         ref.close()

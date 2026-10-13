@@ -15,7 +15,7 @@ frame_stats_init:
         movem.l d0-d1/a0-a1/a6,-(sp)
         move.l  #16+FS_RECORDS*4,d0
         ifne BUFFERED
-        addi.l  #16+2047*16,d0
+        addi.l  #16+2047*32,d0
         endif
         move.l  #$10005,d1       ; MEMF_CLEAR | MEMF_FAST | MEMF_PUBLIC
         move.l  $4.w,a6
@@ -121,8 +121,9 @@ frame_stats_name:    dc.b 'framestats.bin',0
 
         ifne BUFFERED
 ; A separate IRQ-owned ledger avoids making the main-thread recorder reentrant.
-; Header: WCDS, Hz, count, entry size. Entry: field.l, line.w, index.w,
-; planar.l, copper.l. Main thread saves only the completed prefix.
+; Header: WCDS, Hz, count, entry size (32). Entry: field.l, line.w, index.w,
+; planar.l, copper.l, target.l, clock.l, debt.l, fraction.l.
+; Main thread saves only the completed prefix.
 frame_stats_display:
         tst.w   frame_stats_started(pc)
         beq.w   .done
@@ -137,7 +138,7 @@ frame_stats_display:
         bhs.s   .done
         move.l  frame_stats_buffer(pc),a0
         adda.l  #16+FS_RECORDS*4+16,a0
-        lsl.l   #4,d1
+        lsl.l   #5,d1
         adda.l  d1,a0
         move.l  d2,(a0)+
         move.w  d0,(a0)+
@@ -145,6 +146,15 @@ frame_stats_display:
         move.l  release_pending_plane(pc),(a0)+
         move.l  -778(a4),a1
         move.l  50(a1),(a0)+
+        lea     release_pending_time(pc),a1
+        move.l  (a1)+,d2
+        sub.l   frame_stats_first(pc),d2
+        move.l  d2,(a0)+
+        move.l  (a1)+,d2
+        sub.l   frame_stats_first(pc),d2
+        move.l  d2,(a0)+
+        move.l  (a1)+,(a0)+
+        move.l  (a1)+,(a0)+
         lea     frame_stats_display_count(pc),a0
         addq.l  #1,(a0)
 .done:
@@ -156,8 +166,8 @@ frame_stats_save_display:
         move.l  timing_hz(pc),4(a1)
         move.l  frame_stats_display_count(pc),d0
         move.l  d0,8(a1)
-        move.l  #16,12(a1)
-        lsl.l   #4,d0
+        move.l  #32,12(a1)
+        lsl.l   #5,d0
         addi.l  #16,d0
         lea     frame_stats_display_name(pc),a0
         move.l  slave+$121e(pc),a2

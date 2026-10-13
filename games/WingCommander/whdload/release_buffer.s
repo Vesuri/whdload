@@ -1,3 +1,33 @@
+; Predict from the last consumed world-clock sample to the earliest display
+; field: one blank after this picture is queued, plus an outstanding swap.
+; The IRQ may retire the pending picture while this snapshot is taken.
+release_predict:
+.sample:
+        move.l  -252(a4),d0
+        moveq   #0,d1
+        move.w  release_pending(pc),d1
+        cmp.l   -252(a4),d0
+        bne.s   .sample
+        addq.l  #1,d0
+        add.l   d1,d0
+        lea     release_render_time(pc),a0
+        move.l  d0,(a0)+         ; target display field
+        move.l  timing_clock(pc),(a0)+
+        move.l  timing_clock+4(pc),(a0)+
+        sub.l   timing_clock(pc),d0
+        mulu.l  #10,d0
+        add.l   timing_clock+4(pc),d0
+        move.l  d0,d6
+        move.l  timing_hz(pc),d7
+        move.l  d7,d0
+        addi.l  #20,d0           ; one tick plus at most two queued fields
+        cmp.l   d0,d6
+        bls.s   .bounded
+        move.l  d0,d6            ; a longer stall is not unbounded extrapolation
+.bounded:
+        move.l  d6,(a0)
+        rts
+
 ; Enhanced flight: queue after conversion, retire the old front only in VBL.
 ; Main thread owns request data until pending=1; IRQ owns it until pending=0.
 ; No allocation, OS calls, or third buffer. Nonflight retains native publication.
@@ -18,6 +48,12 @@ release_publish:
         move.l  (a0,d0.w),d0
         lea     release_pending_plane(pc),a1
         move.l  d0,(a1)
+        lea     release_render_time(pc),a0
+        lea     release_pending_time(pc),a1
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
         FSTAT   16
         lea     release_pending(pc),a0
         move.w  #1,(a0)          ; publish request last
@@ -64,6 +100,10 @@ release_vblank:
         move.w  ccr,-(sp)
         tst.w   release_pending(pc)
         beq.w   release_vblank_done
+        move.l  timing_data(pc),a0
+        move.l  $7f02(a0),d0
+        sub.l   release_pending_time(pc),d0
+        bmi.w   release_vblank_done ; never show a future prediction early
 release_vblank_early:
         bsr.w   release_beam
         cmpi.w  #4,d0            ; allow copinit's initial register/sprite setup
@@ -115,3 +155,5 @@ release_pending_a4:    dc.l 0
 release_pending_plane: dc.l 0
 release_front:         dc.l 0
 release_late:          dc.l 0
+release_render_time:  dcb.l 4,0 ; target, clock sample, debt, selected fraction
+release_pending_time: dcb.l 4,0 ; immutable until IRQ retires this picture
