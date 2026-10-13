@@ -2506,7 +2506,7 @@ position/velocity residuals are limited to cosmetic debris slots 34–41; draw
 counts differ as intended. Native regeneration `E:28c86–28f94` (file
 `28cb2–28fc0`) scans slots 34–48 and creates replacement debris when presented.
 Its private visual RNG and regeneration pictures remain render-dependent;
-phase 10 must account for this presentation residual. No blanket state identity
+The phase-10 ownership policy below accounts for this presentation residual. No blanket state identity
 is claimed.
 
 The 030 publication snapshots contain **540 pairs within an unchanged world
@@ -2603,9 +2603,127 @@ The final native checks are retained under `tmp/phase9-final-*check/`,
 The unmodified reconstruction still matches the original slave SHA-256 exactly.
 
 Remaining limits: native free/external camera mode 8 and scripted/death cameras
-retain their original world cadence; no world-object extrapolation is present.
+retain their original world cadence. World-object presentation is covered by the
+phase-10 gate below.
 Complete comms, missile-lock, ordinary-damage, autopilot/landing/campaign and
 physical mouse/pad play-throughs remain release coverage. Native modal wrappers
 prove the clock boundary, not every mission outcome. Original point-sampled
 collision and integer world-effect quantisation remain unchanged. These are
-explicit limits, not claims of completed release validation. Stop at phase 9.
+explicit limits, not claims of completed release validation.
+
+## Phase 10: renderer-only prediction gate
+
+Phase 10 is complete in the separate English `--timing`, `CUSTOM1=3` build.
+The non-VERIFY candidate in `tmp/phase10-isolated-candidate/` is 32,472 bytes,
+SHA-256 `9f750132625a9a4d17622b80a8c89c6fcdfa23c3827fbebb0177242b7222c0eb`.
+Original reconstruction remains byte-identical, and option values 0/1/2 install
+none of the timing/presentation patches. This is not the combined phase-6 renderer
+or a release package. Stop before phase 11.
+
+### Ownership and correction policy
+
+The common world exit snapshots all 64 native position/velocity slots, types,
+models, lifetimes, angular steps and the ten ship actions. Rendering uses
+`position + trunc(velocity * fraction / field_rate)`, with fraction taken from
+the scheduler's residual debt and clamped to one world interval. Signed quotient
+and remainder splitting avoids intermediate overflow and 64-bit division on 040.
+A new picture starts from the authoritative pose, never from a previous prediction.
+At a world boundary the latest authoritative state replaces the prediction;
+there is no correction blend or persistent forecast debt.
+
+Other objects' pitch/yaw/roll use the scaled native angular steps, in their native
+order, through `E:2acb2/2acf2/2ad32` (files `2acde/2ad1e/2ad5e`). Their basis
+rebuild `E:2bb30` (file `2bb5c`) retains native fixed-point orthogonality rather
+than linearly blending matrix components. Player orientation remains phase 9's
+elapsed-field result. Ordinary camera modes 0–3 are rebuilt from the staged
+player pose; script/death/external-camera paths are not extrapolated.
+
+First snapshots, modal rebases, view changes, changed class/model/action and
+lifetime reloads snap. A per-axis change differing from the prior velocity by
+more than four prior displacements plus 100 km is treated as a jump; arithmetic
+overflow also snaps. A player jump suppresses prediction for the whole view.
+The first interval after a cut is held until continuity is established again.
+These are conservative presentation thresholds, not collision tolerances.
+
+The original renderer consumes arrays in place. A 7,680-byte private save area
+holds poses, velocities, allocation metadata and projection fields while the
+native arrays temporarily contain renderer copies. All saved fields are restored
+before input/world execution. The common-exit snapshot and per-slot validity mask
+use another 2,388 bytes; these are slave storage, with no new Chip allocation.
+Geometry is rebuilt from restored poses before edge commands and loop exit,
+using `E:2a086` (file `2a0b2`), so predicted ranges cannot enter gameplay decisions.
+Input interrupts only retain native input RAM; they do not run simulation against
+staged poses. The complete save-range table is authored in `timing_scene.s`.
+
+Native positions are `D:919a`, velocities `D:9d6c`, and basis arrays
+`D:a148/b450/b750`, each with 12-byte entries. Slots 61–63 are camera/scratch
+slots and are saved too. Class 2 stars are direction vectors and receive the
+responsive camera rotation, not fictitious world translation. Other active
+position-bearing classes are predicted; class 7 attachments use their parent's
+projected pose. Explosion images, effect-script sizes/lifetimes and discrete
+cockpit indicators retain their world-clock transitions. Their poses can move
+between ticks without guessing new animation frames or lifecycle events.
+
+Two native drawing side effects require explicit ownership:
+
+- `E:28c86–28f94` (files `28cb2–28fc0`) regenerates cosmetic debris. A guarded
+  eight-byte entry detour runs it once per world boundary with authoritative
+  geometry and private visual RNG; the draw call is suppressed. Native modal
+  callers retain the original body. Cosmetic random choices still share the
+  private renderer stream, so cross-schedule cosmetic identity is not promised.
+- `E:2914c–29304` (files `29178–29330`) creates class-7 engine flames in free
+  slots through `E:29206 → 9af2` (files `29232 → 9b1e`). These are renderer-only
+  attachments. Their native allocation, basis, model, lifetime/script and
+  projection fields are part of the save/restore boundary. Additional pictures
+  cannot retain a flame allocation into the world or consume free gameplay slots.
+
+### Gate evidence and limits
+
+`tmp/phase10-gate-scenes.json` checks 120 consecutive renderer snapshots and
+post-draw restorations from each of two real-flight captures. Every predicted
+position matches independent signed arithmetic; every saved range is restored
+exactly. Within unchanged world ticks, authoritative positions, velocities,
+classes, actions, fuel, energy, shields, armour, targets and gameplay RNG remain
+unchanged. These breakpoint-separated pictures are correctness evidence, not a
+frame-rate measurement. Published projection coordinates demonstrate movement
+in the actual native drawing path, not just a standalone arithmetic test.
+
+| Capture | Checked object predictions | Between-tick position / projected moves | Between-tick orientation changes |
+|---|---:|---:|---:|
+| `phase10-isolated-fire-pal`, 030, held fire | 2,920 | 1,624 / 476 | 28 |
+| `phase10-isolated-turn-ntsc`, 030, held right | 1,997 | 1,124 / 440 | 185 |
+
+Next-tick comparisons use uninterrupted object identities and exclude detected
+cuts. Full-one-tick ship-position forecast error is PAL median 0, p95 1.987 km,
+maximum 2.491 km (208 comparisons); NTSC hard-turn median 2.834 km, p95 4.357 km,
+maximum 8.982 km (189). Constant-velocity classes 3/4/5/8 have zero observed error.
+The 813 PAL and 245 NTSC comparable non-player forward-vector forecasts match
+the next native orientation (zero measured angular error). This is scoped
+trajectory evidence, not a guarantee against future AI/controller changes.
+Hard-turn positional correction can remain visible; prediction is bounded to
+one tick and never alters collision or other authoritative results.
+
+`tmp/phase10-gate-clock.json` covers the preceding uninterrupted 20×100-field
+windows, excluding two warm-up windows. PAL measures 9.96188 world updates/s
+(−0.381%) and 24.97408 publications/s; NTSC measures 9.97656 (−0.234%) and 29.92968.
+Both have zero input-history overflow. The PAL native pause freezes mapped world
+state for 20 fields and resumes with a rebase. These are standing measurements
+of these workloads using the established 030 observer configuration, not exclusive
+CPU/DMA, speedup or physical-hardware claims.
+
+Native 020/040 checks cover 96 pose/isolation cases, 300 signed scaling cases
+including longword extremes, four ordinary camera views, native axis equivalence,
+script/death/external/disabled cuts, jump/reuse detection and whole-data restoration.
+Two additional cases execute the real flame allocator and restore the entire data
+hunk exactly. A corrupted saved position is rejected. Separate corrupted prediction
+and restoration captures fail the live report. Installer guards, 664 player cases,
+126 input records/edge controls, eight modal cases and timer/RNG ownership pass.
+Evidence is in `tmp/phase10-final-{native-check,ownership,modal,player,input}/`,
+`tmp/phase10-isolated-install/` and `tmp/phase10-report-negatives.json`.
+
+The two flights exercise classes 3/4/5/8/12, temporary class-7 flames and ordinary
+forward-camera movement. Every asteroid/model, effect script, scripted camera,
+mission transition and physical-device combination has not been played through.
+No visual-quality claim comes from a debugger-greyed display. Combined renderer,
+full campaign and hardware play-testing remain release coverage; they are not a
+reason to expand this phase into a new performance matrix.

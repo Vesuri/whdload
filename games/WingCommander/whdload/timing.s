@@ -1,5 +1,5 @@
-; Experimental English CUSTOM1=3 simulation adapter; phase-9 gate complete.
-; World-object extrapolation and combined-renderer release work remain separate.
+; Experimental English CUSTOM1=3 simulation and renderer-prediction adapter.
+; Combined-renderer release work remains separate.
 ; Original language choices CUSTOM1=0/1 install no new game patches.
 timing_patchseg:
         jsr     116(a2)
@@ -116,6 +116,7 @@ timing_loop:
         move.l  d0,d6
         tst.l   d6
         beq.s   .next_field
+        bsr.w   timing_scene_geometry
         bsr.w   timing_pad_edges
         tst.w   -32628(a4)
         bne.w   timing_leave
@@ -168,6 +169,7 @@ timing_render:
         cmpi.w  #1,timing_verify_schedule(pc)
         beq.s   .wait
         endc
+        bsr.w   timing_scene_begin
         move.l  -4326(a4),-(sp)
         move.l  timing_render_seed(pc),-4326(a4)
         move.l  timing_game(pc),a6
@@ -177,6 +179,7 @@ timing_render:
         lea     timing_render_seed(pc),a0
         move.l  -4326(a4),(a0)
         move.l  (sp)+,-4326(a4)
+        bsr.w   timing_scene_end
         ifne TIMING_VERIFY
 .wait:
         moveq   #0,d0
@@ -207,6 +210,7 @@ timing_world:
         tst.w   timing_active(pc)
         beq.s   timing_world_done
         bsr.w   timing_presentation_tick
+        bsr.w   timing_scene_tick
 timing_world_done:
         lea     timing_completed(pc),a0
         addq.l  #1,(a0)
@@ -231,6 +235,8 @@ timing_rebase:
         lea     timing_clock+16(pc),a0
         add.l   d0,(a0)
 .discarded:
+        lea     timing_scene_valid(pc),a0
+        clr.w   (a0)
         lea     timing_input_tail(pc),a0
         move.w  timing_input_head(pc),(a0)
         lea     timing_input_lost(pc),a0
@@ -261,6 +267,10 @@ timing_rebase:
         rts
 
 timing_leave:
+        tst.w   timing_active(pc)
+        beq.s   .rebasing
+        bsr.w   timing_scene_geometry
+.rebasing:
         bsr.w   timing_rebase
         lea     timing_active(pc),a0
         clr.w   (a0)

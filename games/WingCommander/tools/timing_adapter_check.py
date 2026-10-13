@@ -43,8 +43,9 @@ def main():
             assert after[7]==before[7]+4
             want=bytearray(game_before)
             if custom==3:
-                for off,label,op in [(0x698,'timing_loop',0x4ef9),(0x878,'timing_pause',0x4ef9),(0x101c,'timing_autopilot',0x4ef9),(0x18eee,'timing_throttle_gate',0x4eb9),(0x18f00,'timing_throttle_gate',0x4eb9),(0x18f3a,'timing_fire_gate',0x4eb9),(0x7bc2,'timing_world_rotation',0x4eb9),(0x34188,'timing_record_input',0x4eb9),(0x1934c,'timing_pad_read',0x4eb9),(0x18c6a,'timing_keys_read',0x4eb9),(0x19380,'timing_key_command',0x4eb9),(0x65f4,'timing_emission_clock',0x4eb9),(0x51a,'timing_message_draw',0x4eb9),(0x46ea,'timing_systems_draw',0x4eb9),(0x530,'timing_sim_draw',0x4ef9),(0x438,'timing_sim_score_draw',0x4eb9),(0x3b8e,'timing_target_draw',0x4ef9),(0x4b16,'timing_selection',0x4ef9),(0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]:
+                for off,label,op in [(0x28c86,'timing_debris_draw',0x4ef9),(0x698,'timing_loop',0x4ef9),(0x878,'timing_pause',0x4ef9),(0x101c,'timing_autopilot',0x4ef9),(0x18eee,'timing_throttle_gate',0x4eb9),(0x18f00,'timing_throttle_gate',0x4eb9),(0x18f3a,'timing_fire_gate',0x4eb9),(0x7bc2,'timing_world_rotation',0x4eb9),(0x34188,'timing_record_input',0x4eb9),(0x1934c,'timing_pad_read',0x4eb9),(0x18c6a,'timing_keys_read',0x4eb9),(0x19380,'timing_key_command',0x4eb9),(0x65f4,'timing_emission_clock',0x4eb9),(0x51a,'timing_message_draw',0x4eb9),(0x46ea,'timing_systems_draw',0x4eb9),(0x530,'timing_sim_draw',0x4ef9),(0x438,'timing_sim_score_draw',0x4eb9),(0x3b8e,'timing_target_draw',0x4ef9),(0x4b16,'timing_selection',0x4ef9),(0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]:
                     want[off:off+6]=struct.pack('>HI',op,s+sym[label])
+                want[0x28c8c:0x28c8e]=bytes.fromhex('4e71')
                 want[0x43e:0x440]=bytes.fromhex('4e71')
                 want[0x3b94:0x3b96]=bytes.fromhex('4e71')
                 want[0x1022:0x1024]=bytes.fromhex('4e71')
