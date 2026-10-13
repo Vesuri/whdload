@@ -3,6 +3,7 @@
 FF1InstallCoarse200:
  bsr.w FF1Coarse200Reset
  bsr.w FF1InstallMultiplyNative200
+ bsr.w FF1Coarse200ProjectionSkip
  bsr.w FF1Coarse200ReturnSkip
  moveq #8,d0
  bsr.w install_velocity
@@ -53,6 +54,7 @@ C4Enabled: dc.w 1
 modeval: dc.w 8
 ticks equ C1Heads
  include "FerrariFormulaOne_NativeMultiply200.s"
+ include "FerrariFormulaOne_Coarse200Projection.s"
  include "FerrariFormulaOne_Coarse200Response.s"
  include "FerrariFormulaOne_Coarse200Return.s"
  include "FerrariFormulaOne_Coarse200Heading.s"
