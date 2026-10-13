@@ -30,7 +30,7 @@ complete: the user selected D on 2026-10-13, with the explicit pricing gaps in
 world, responsive player/camera path and required clock owners pass the scoped
 [native/live gate](internals.md#phase-9-decoupled-simulation-gate). Phase 10 is complete: bounded renderer-only prediction, transient allocation
 isolation and real-flight validation pass the [presentation gate](internals.md#phase-10-renderer-only-prediction-gate).
-Stop before phase 11.
+Phase 11 is in progress; stop before phase 12.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
