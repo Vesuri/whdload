@@ -2350,6 +2350,21 @@ C4SaveMask042 equ *
  move.w d4,-16(a6)
  andi.l #1023,d4
  add.l d4,d4
+ IFD FF1_C4_BOUNDARY_P5
+ move.w C4BoundaryControl(pc),-(sp)
+ tst.w (sp)+
+ bne.b .p5_native_coefficients
+ lea C4BoundaryControl(pc),a1
+ dc.w $d3fc
+ dc.l C4BoundaryCoefficients-C4BoundaryControl
+ move.w (a1,d4.l),d0
+ ext.l d0
+ adda.w #512,a1
+ move.w (a1,d4.l),d1
+ ext.l d1
+ bra.b .p5_coefficients_done
+.p5_native_coefficients:
+ ENDC
  lea $2180c,a1
  move.w (a1,d4.l),d0
  muls.w #1000,d0
@@ -2360,6 +2375,9 @@ C4SaveMask042 equ *
  muls.w #1000,d1
  asr.l #8,d1
  asr.l #7,d1
+ IFD FF1_C4_BOUNDARY_P5
+.p5_coefficients_done:
+ ENDC
  bsr.w FF1PositionCrossed25
  tst.l d1
  bne.w fine_fault
@@ -2437,6 +2455,9 @@ fine_steps: dc.l 0
 fine_cross_pending: dc.w 0
 fine_car_crosses: dc.w 0
 fine_trial: ds.b 12
+ IFD FF1_C4_BOUNDARY_P5
+ include "FerrariFormulaOne_Coarse200Boundary.s"
+ ENDC
 
 install_heading:
  movem.l d0-d7/a0-a6,-(sp)

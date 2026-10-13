@@ -2,6 +2,9 @@
 ; Capacity is not accepted. The ordinary slave does not include this module.
 FF1InstallCoarse200:
  bsr.w FF1Coarse200Reset
+ IFD FF1_C4_BOUNDARY_P5
+ bsr.w FF1C4BoundaryInit
+ ENDC
  bsr.w FF1InstallMultiplyNative200
  bsr.w FF1Coarse200ProjectionSkip
  bsr.w FF1Coarse200ReturnSkip
