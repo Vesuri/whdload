@@ -1697,3 +1697,22 @@ These are inclusive elapsed world reservations and arithmetic render budgets.
 Do not label them exclusive CPU utilisation or measured B/C/D frame rates.
 The [design comparison](timing-design.md) defines formulas, assumed overhead and
 limits; full interrupt subtraction and real-hardware timing remain gaps.
+
+## Phase 9 scheduler arithmetic (implementation in progress)
+
+The standalone clock kernel is not a completed D implementation. It schedules
+10 world updates/s from a wrapping field count and a caller-supplied observed
+50/60 Hz field rate. A batch issues at most four ticks, explicitly accounts for
+dropped debt, and excludes modal time after a rebase. The live adapter, responsive
+player path, input history and draw-dependent clocks still need their full gates.
+
+```sh
+. amiga/env.sh
+python3 tools/timing_clock_check.py --output tmp/timing-clock-check
+```
+
+The retained `tmp/phase9-clock-verified/report.json` covers 4,400 native assembly
+steps on Unicorn 68020/68040 at 50/60 Hz, varying render schedules, clock wrap,
+modal resume and overload. A wrong-rate mutation is rejected by the independent
+elapsed-time ledger. This is arithmetic correctness evidence, not game-speed or
+performance acceptance. All generated binaries/reports stay in `tmp/`.
