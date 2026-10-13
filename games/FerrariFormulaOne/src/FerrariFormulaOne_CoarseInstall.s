@@ -247,6 +247,14 @@ C1Activate:
  moveq #100,d0
  ENDC
  bsr.w FF1TimeInit
+ IFD FF1_C4_BLIT_A0
+ ; Diagnostic feasibility gate only; never enabled by ordinary builds.
+ ; Both arms execute this selector at the same layout and race checkpoint.
+ move.w C4BlitA0Enabled(pc),d0
+ beq.b .blit_a0_done
+ move.w #$0040,$dff09a
+.blit_a0_done:
+ ENDC
  lea C1Active(pc),a0
  move.w #1,(a0)
  lea C1Ledger(pc),a0
@@ -287,6 +295,9 @@ C1InstallUnload:
  move.l #1,(a0)
 .done:
  rts
+ IFD FF1_C4_BLIT_A0
+C4BlitA0Enabled: dc.w 0
+ ENDC
 C1UnloadInstalled: dc.l 0
 C1Ledger: ds.b 24
  IFD FF1_COARSE_200
