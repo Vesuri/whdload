@@ -1,6 +1,9 @@
 ; Experimental complete C4 integration: compile-time opt-in, CUSTOM2 gated.
 ; Capacity is not accepted. The ordinary slave does not include this module.
 FF1InstallCoarse200:
+ IFD FF1_C4_WAIT_IDLE
+ bsr.w FF1C4InstallWaitIdle
+ ENDC
  bsr.w FF1Coarse200Reset
  IFD FF1_C4_BOUNDARY_P5
  bsr.w FF1C4BoundaryInit
@@ -66,3 +69,7 @@ ticks equ C1Heads
  include "FerrariFormulaOne_Coarse200Adapters.s"
 velocity_records:
 velocity_scratch: ds.b 80
+
+ IFD FF1_C4_WAIT_IDLE
+ include "FerrariFormulaOne_Coarse200Wait.s"
+ ENDC
