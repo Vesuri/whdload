@@ -48,6 +48,41 @@ FF1Divide000:
         andi.l  #$ffff,d2
         bra.b   FF1DivRestore
 .long_divisor:
+        ifd FF1_COARSE_200_COMPLETE
+        ifd FF1_DIV200_AB
+        move.w  FF1Div200Control(pc),-(sp)
+        tst.w   (sp)+
+        bne.b   .long_legacy
+        endc
+        ; Signed magnitudes are at most $80000000. Align the large divisor
+        ; with the numerator, then emit only the possible quotient bits.
+        ; D2 retains the remainder; the shared suffix restores native XNZVC.
+        move.l  d0,d2
+        moveq   #0,d0
+        moveq   #0,d3
+        cmp.l   d1,d2
+        blo.w   FF1DivRestore
+.align:
+        tst.l   d1
+        bmi.b   .quotient_bits
+        add.l   d1,d1
+        addq.w  #1,d3
+        cmp.l   d2,d1
+        bls.b   .align
+        lsr.l   #1,d1
+        subq.w  #1,d3
+.quotient_bits:
+        add.l   d0,d0
+        cmp.l   d1,d2
+        blo.b   .quotient_next
+        sub.l   d1,d2
+        addq.l  #1,d0
+.quotient_next:
+        lsr.l   #1,d1
+        dbra    d3,.quotient_bits
+        bra.w   FF1DivRestore
+        endc
+.long_legacy:
         ; General unsigned restoring division, retaining the native result.
         clr.l   d2
         moveq   #31,d3
@@ -95,3 +130,7 @@ FF1DivZeroDivisor:
 FF1DivDone:
         movem.l (sp)+,d2-d5
         rts
+
+        ifd FF1_DIV200_AB
+FF1Div200Control: dc.w 0
+        endc
