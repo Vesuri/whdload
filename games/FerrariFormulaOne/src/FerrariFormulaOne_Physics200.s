@@ -73,12 +73,12 @@ FF1VelocityRotate000:
  ext.l d3
  move.l (a0),d0
  move.l d2,d1
- bsr.w FF1MultiplyS64_000
+ bsr.w FF1MultiplyS32x16_000
  move.l d0,d4
  move.l d1,d5
  move.l 4(a0),d0
  move.l d3,d1
- bsr.w FF1MultiplyS64_000
+ bsr.w FF1MultiplyS32x16_000
  sub.l d0,d4
  subx.l d1,d5
  bsr.w FF1Q15Product000
@@ -87,12 +87,12 @@ FF1VelocityRotate000:
  move.l d4,(sp)
  move.l (a0),d0
  move.l d3,d1
- bsr.w FF1MultiplyS64_000
+ bsr.w FF1MultiplyS32x16_000
  move.l d0,d4
  move.l d1,d5
  move.l 4(a0),d0
  move.l d2,d1
- bsr.w FF1MultiplyS64_000
+ bsr.w FF1MultiplyS32x16_000
  add.l d0,d4
  addx.l d1,d5
  bsr.w FF1Q15Product000
@@ -136,7 +136,7 @@ FF1VelocityProject000:
  ext.l d1
  move.w d2,d3
  ext.l d3
- bsr.w FF1MultiplyS64_000
+ bsr.w FF1MultiplyS32x16_000
  move.l d0,d4
  move.l d1,d5
  bsr.b FF1Q15Product000
@@ -145,7 +145,7 @@ FF1VelocityProject000:
  move.l d4,(sp)
  move.l d7,d0
  move.l d3,d1
- bsr.w FF1MultiplyS64_000
+ bsr.w FF1MultiplyS32x16_000
  move.l d0,d4
  move.l d1,d5
  bsr.w FF1Q15Product000

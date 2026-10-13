@@ -54,17 +54,17 @@ FF1PositionCrossed000:
  move.w d0,d1
  ext.l d1
  move.l (a0),d0
- bsr.w FF1MultiplyS64_000
+ bsr.w FF1MultiplyS32x16_000
  move.l d0,d3
  move.l d1,d4
  move.l 4(a0),d0
  move.l d2,d1
- bsr.w FF1MultiplyS64_000
+ bsr.w FF1MultiplyS32x16_000
  add.l d0,d3
  addx.l d1,d4
  move.l #512*65536,d0
  move.l d2,d1
- bsr.w FF1MultiplyS64_000
+ bsr.w FF1MultiplyS32x16_000
  sub.l d0,d3
  subx.l d1,d4
  moveq #0,d0
