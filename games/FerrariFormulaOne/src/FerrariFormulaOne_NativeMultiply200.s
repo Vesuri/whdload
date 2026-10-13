@@ -22,6 +22,45 @@ FF1InstallMultiplyNative200:
  rts
 
 FF1MultiplyNative200:
+ IFD FF1_C4_MUL_WORD
+FF1NativeMulP4Gate:
+ IFD FF1_C4_MUL_WORD_TEST
+ nop
+ nop
+ ELSE
+ bra.w .p4_original
+ ENDC
+ ; Positive word operands need one product and only D1/D4 scratch.
+ ; Range checks preserve X, including on the full-domain fallback.
+ movem.l d1/d4,-(sp)
+ move.l d0,d4
+ or.l d1,d4
+ swap d4
+ tst.w d4
+ bne.b .p4_fallback
+ tst.l d0
+ beq.b .p4_return
+ tst.l d1
+ beq.b .p4_zero
+ move.l d0,d4
+ eor.l d1,d4
+ mulu.w d1,d0
+ ; Native's final zero cross-product ADD clears X. Its sign TST reports
+ ; the input XOR, not the product (notably when equal operands square).
+ moveq #0,d1
+ add.l d1,d0
+ tst.l d4
+.p4_return:
+ movem.l (sp)+,d1/d4
+ rts
+.p4_zero:
+ clr.l d0
+ bra.b .p4_return
+.p4_fallback:
+ movem.l (sp)+,d1/d4
+ bra.b .p4_original
+.p4_original:
+ ENDC
  movem.l d1-d4,-(sp)
  move.l d0,d4
  eor.l d1,d4
