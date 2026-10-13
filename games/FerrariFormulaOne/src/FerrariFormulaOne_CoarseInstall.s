@@ -42,7 +42,14 @@ start:
  cmp.l public_bound(pc),d0
  beq.w done
  lea start(pc),a0
+ IFD FF1_C4_COLOUR_ELIDE
+ ; Larger C4 diagnostic hosts can put the binding table past PC-relative
+ ; reach. Its nearby fixed state anchor remains in range on the 68000.
+ lea public_table(pc),a1
+ adda.w #(public_bindings-public_table),a1
+ ELSE
  lea public_bindings(pc),a1
+ ENDC
  bsr.w FF1ApplyBindings
  tst.l d0
  bne.w C1Fault
