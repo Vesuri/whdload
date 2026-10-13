@@ -31,8 +31,10 @@ world, responsive player/camera path and required clock owners pass the scoped
 [native/live gate](internals.md#phase-9-decoupled-simulation-gate). Phase 10 is complete: bounded renderer-only prediction, transient allocation
 isolation and real-flight validation pass the [presentation gate](internals.md#phase-10-renderer-only-prediction-gate).
 Phase 11 is complete: changed-block flight conversion passes native/live output,
-measured conversion-time and PAL/NTSC timing gates. Phase 12 release polish is
-in progress; OCS remains out of scope.
+measured conversion-time and PAL/NTSC timing gates. Phase 11b frame-rate
+recovery is required before release: the default pacing still caps flight at
+25 FPS and no gate measured end-to-end frame rate on a credible 040. Phase 12
+release polish is paused behind it; OCS remains out of scope.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -76,6 +78,11 @@ A definitive CD32 edition, OCS afterwards and separately:
 - **PC reference.** Use the supplied 86Box/eXoDOS recording as a practical external
   pace reference alongside the Amiga time sources and music. It represents the
   recorded experience, not proof of an original design rate or identical port code.
+- **Frame-rate recovery (user, 2026-10-13).** Under D the enhanced modes render as
+  fast as they can with vsync on and no frame cap; game logic stays at its own rate.
+  Psygore's `Custom5` limiter is retained only in the original modes. The player's
+  translation, not only orientation, advances every field. Other objects are
+  extrapolated (not interpolated), along their predicted heading. See phase 11b.
 
 ## Intended speed: working estimate
 
@@ -410,6 +417,96 @@ the earlier blanket-clear bypass was unsafe. Those native routines and clears ar
 retained. Dense screen changes may reduce or reverse the conversion saving;
 all-scene/cache/hardware performance, every model/camera/transition and small-memory
 coverage remain explicit release gaps. Stop before phase 12.
+
+### Phase 11b — Frame-rate recovery (required before release)
+
+The user's emulated 040 with the release build's default pacing showed under 25 FPS.
+Diagnosis (2026-10-13):
+
+- `Custom5` is Psygore's original option: 0 waits for two CIA-A TOD ticks (fields)
+  per conversion, 1 never waits, 2 waits three, 3 waits five, 4 the blitter path.
+  The labels "Standard/Unlimited/Relaxed/Slow" were added by the release work. The
+  flight converter still calls the wait `S:17b8`, so the default caps at 25 FPS PAL.
+  Phase 9–11 gates measured 24.97 publications/s, exactly this cap.
+- Phase 8's render remainder `R` on fast CPUs is mostly limiter wait: 030
+  `S+R` = 40.07 ms, two PAL fields. True render cost on fast CPUs is unmeasured.
+- The emulated 040/060 cells do not represent those CPUs: the 040 world update is
+  slower than the 030 (4.11 vs 2.23 ms) and 060 results ignore cache state. Phase 6
+  rejected Kalms 040 on that model. Phases 9–11 never ran the timing build on a 040.
+- Both renderers call WaitBOVP after every conversion, before publication, idling
+  the CPU every frame.
+- Phase 9 advanced only player orientation per field. Player position is
+  extrapolated from the last tick's velocity, other objects in a straight line
+  (hard-turn error up to 9 km, snapping at 10 Hz), and the prediction targets
+  render start rather than the displayed field.
+- World ticks and catch-up land whole in single frames; drawing, clears, cockpit,
+  HUD and prediction save/restore were never profiled on a fast CPU.
+- No gate required an end-to-end frame rate.
+
+Work items, in order. Every item's gate reports end-to-end frames/s and the
+fields-per-frame histogram on the 030 model and the calibrated 040 (A2).
+
+**A. Measurement**
+
+- **A1.** Frame instrument in a diagnostic build: per published frame its display
+  field and the time in input/player, world, prediction save/restore, drawing,
+  conversion and waits. Output frames/s, a fields-per-frame histogram and the
+  per-part times. Gate: agrees with the existing observer within one field on 030.
+- **A2.** Credible 040 reference: calibrate an emulator 040/25 configuration
+  (CPU model, cache emulation, speed) against published 040/25 figures or the
+  user's hardware, within 10% on the same window. No 040/060 claims before this.
+- **A3.** Baseline the release build with `Custom5=1` (limiter off) on 030 and
+  calibrated 040: Nav-1 held fire, hard turn, afterburner. This is the real budget.
+
+**B. Pacing and buffering**
+
+- **B1.** Remove the limiter call from both enhanced renderers. `Custom5` keeps
+  Psygore's meaning only in the original modes; the enhanced modes ignore it and
+  the option label says so.
+- **B2.** Vsync without idle: publish immediately after conversion, swaps take
+  effect at vertical blank, and wait only before converting into a buffer whose
+  swap-away has not yet been displayed. Drawing into the FAST chunky buffer overlaps.
+- **B3.** Triple buffering (one more 64000-byte aligned CHIP buffer) so the CPU
+  renders ahead instead of waiting for vsync. Adopt it if A3/B2 measurements show
+  vsync waits; keep double buffering as the low-memory fallback.
+
+**C. Smoothness**
+
+- **C1.** Predict to the field the picture is displayed in (publication field
+  plus the pending swap), not render start. Gate: predicted fraction equals the
+  displayed field's world-time fraction in A1 records.
+- **C2.** Player translation per field: identify the native player velocity model
+  (thrust, afterburner, speed ramps), advance velocity and position every field with
+  carried fractions, exclude the player from the world position step `E:80b6`, and
+  commit at the tick as rotation already does. Gate: zero camera-position correction
+  at ticks in steady flight and turns; fuel, speed and world state match within
+  documented tolerance; collisions use the committed authoritative pose.
+- **C3.** Heading-aware extrapolation: direct each object's predicted velocity
+  along its predicted orientation, using the existing angular-step prediction.
+  Gate: hard-turn full-tick forecast error well below the phase-10 p95 4.357 km /
+  max 8.982 km; constant-velocity classes stay exact.
+- **C4.** Frame-time spikes: measure frame intervals around world ticks and
+  catch-up batches; resolve with B3 or tick placement until frame-interval p95
+  equals the median in steady flight.
+
+**D. Rendering cost (driven by A3/D1)**
+
+- **D1.** Profile the release build on calibrated 040: clears, stars, polygons,
+  cockpit, HUD, text, block comparison, prediction save/restore and geometry rebuild.
+- **D2.** Prediction overhead: save/restore only active slots; skip geometry
+  rebuilds that cannot change.
+- **D3.** Region-specific clear/redraw of the view when the cockpit is unchanged,
+  verified against the earlier finding that a blanket clear bypass breaks later reads.
+- **D4.** Replace the full 64 KB source comparison with dirty rectangles from the
+  drawing routines if D1 shows it matters.
+- **D5.** Re-evaluate Kalms 040 for full and changed-block conversion on calibrated 040.
+
+**E. Acceptance**
+
+- **E1.** Calibrated 040/25 with fast RAM, Nav-1 combat: at least 25 frames/s at
+  p95, 50 in light scenes; 030/50 at least 25. World 10 Hz ±1%; the view advances
+  every published frame. Numbers to be confirmed with the user after A3.
+- **E2.** User play-test with the A1 counter, emulator and real hardware if available.
 
 ### Phase 12 — Definitive-edition polish and release
 
