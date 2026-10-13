@@ -112,6 +112,9 @@ C4Phase:
  addq.b #2,d0
  andi.b #3,d0
  movem.l d0-d1/a0,-(sp)
+; Native MOVE.B leaves the upper D0 bits live; the helper takes a word.
+C4PhaseNormalize equ *
+ andi.l #3,d0
  move.w $6f272,d1
  bsr.w FF1PhasePulses200
  lea C4PhaseWeight(pc),a0
