@@ -57,7 +57,9 @@ profile is complete: geometry, cockpit composition and comparison overhead
 justify the D2–D4 investigations. D2 is complete: selective pose backups and
 unchanged-input geometry retain 49.920 frames/s in both steady gates and improve
 the 040 held turn to 42.087. Calibrated 040 profiling remains blocked on A2.
-Stop before D3. Held-turn frame-budget misses remain; campaign and hardware
+D3 is complete: native view-region clear/composition keeps exact pixels and
+49.920 frames/s in both steady gates; the 040 held turn reaches 42.493.
+Stop before D4. Held-turn frame-budget misses remain; campaign and hardware
 visual acceptance remain open.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
@@ -573,9 +575,14 @@ display wait (6–7 ms of idle per frame).
   and input-transition checks pass. Steady PAL flight retains 49.920 frames/s
   on 030 and cycle-exact 040; the 040 held turn improves from 41.535 to 42.087,
   with 118/656 prediction misses still open. Calibrated 040 remains blocked on A2.
-  See [D2 evidence](internals.md#phase-11b-prediction-overhead-d2-complete). Stop before D3.
-- **D3.** Region-specific clear/redraw of the view when the cockpit is unchanged,
-  verified against the earlier finding that a blanket clear bypass breaks later reads.
+  See [D2 evidence](internals.md#phase-11b-prediction-overhead-d2-complete).
+- **D3 — complete on current models.** The native split-row/aperture map already
+  preserves the cockpit. Faster exact-region clears and cached-030 span copies
+  retain all pixels needed by later reads; other shapes and 040 composition use
+  native fallbacks. Pixel/installer/buffer gates pass. Steady flight stays at
+  49.920 frames/s on both models; the 040 held turn reaches 42.493 versus 42.087
+  for its same-size native-path control, with 112/657 prediction misses remaining.
+  See [D3 evidence](internals.md#phase-11b-view-regions-d3-complete). Stop before D4.
 - **D4.** Replace the full 64 KB source comparison with dirty rectangles from the
   drawing routines if D1 shows it matters.
 - **D5.** Re-evaluate Kalms 040 for full and changed-block conversion on calibrated 040.

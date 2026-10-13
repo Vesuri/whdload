@@ -3651,7 +3651,7 @@ explicit follow-up under A2 before hardware or E1 acceptance claims.
 
 The buffered English release now backs up occupied slots and skips a redundant
 geometry rebuild when queued pad input cannot dispatch an edge. D2 is complete
-on the required current models. Stop before D3; calibrated 040 timing remains
+on the required current models. D3 follows below; calibrated 040 timing remains
 blocked on A2, and phase 12 stays paused.
 
 ### State and geometry contracts
@@ -3754,4 +3754,140 @@ Evidence: `tmp/d2-final-030`, `tmp/d2-final-040-steady`,
 `tmp/d2-final-fps.json`. Commands are in development.md. No fresh corrected-MMU
 pixel capture, long campaign, forced-stall cadence or physical-hardware acceptance
 is claimed. The calibrated 040 gate remains blocked on A2. The phase-12 stash
-is untouched; D3–E2 remain open.
+is untouched; D3 follows below and D4–E2 remain open.
+
+## Phase 11b view regions: D3 complete
+
+D3 is complete on the required current models. Stop before D4.
+
+The native renderer already preserves the cockpit with a region map; D3 does
+not need another cockpit cache or a blanket clear bypass. The new
+`view_regions.s` accelerates those existing regions without changing which
+pixels are cleared, copied or left alone. It adds no allocations, cached image,
+dirty flags or self-modifying drawing code. World scheduling, prediction, HUD
+work, drawing order and conversion remain unchanged.
+
+### Region contract and offsets
+
+The guarded call sites are `E:0306` (English file `0332`) for view clear and
+`E:0c4c` (file `0c78`) for composition. Only the buffered enhanced English
+installer redirects them. Their six original call bytes, including relocated
+targets, are checked before any patch write. Inactive flight tail-calls native;
+Psygore modes and German do not install the hooks.
+
+The surface at `D:9154` describes the view, sharing the split row table with the
+composed surface at `D:912c`. The Nav-1 view bounds are `(0,10)–(319,114)`.
+Native `E:2cc36` (file `2cc62`) scans the cockpit aperture and builds a row/span
+map. `D:6f2c` holds the split scratch allocation and `D:6f3c` the span table.
+Each 14-byte span has three instruction-displacement words and source/destination
+pointers; `E:2ceae–2cebc` (file `2ceda–2cee8`) encodes them. The native copier
+at `E:2cf0a` (file `2cf36`) reads that map at every composition. A retained
+Nav-1 map contains 134 spans. Cockpit gaps are never copied over.
+
+The new clear accepts only zero-colour, 320-wide row-table surfaces with
+`x=0..319`, ordered `y=0..199` bounds and zero bulk-size field. It clears every
+byte of each selected row using 32-byte stores. Other colours, clipped widths,
+bulk surfaces and inactive flight use `E:31cd6` (file `31d02`) unchanged.
+In particular, it does not restrict clears to the visible aperture or leave
+stale scratch pixels. The original shared clear and the setup scan at `E:2cd00`
+(file `2cd2c`) remain intact, preserving the dependency that rejected the
+phase-4 blanket-clear bypass.
+
+Composition decodes the current native map, keeps exact byte heads/tails and
+short spans, and batches longword copies. Forward overlap retains native
+longword order. Rebuilt maps take effect immediately; there is no invalidation
+state. Batching uses the existing `render_selected=30` cached 020/030 selection.
+The current 040 model measured native composition faster, so 040/060 and the
+uncached selection retain the native copier. That is a model-based conservative
+choice, not calibrated hardware evidence. The faster row clear is retained on
+both required models.
+
+The call sites use these as void routines: scratch registers and flags are
+redefined before use (`E:3766` / `E:31fc6`, files `3792` / `31ff2`). Native
+callee-saved registers are preserved. No shared drawing routine is globally
+replaced.
+
+### Correctness evidence
+
+`view_regions_check.py` executes both native and replacement routines on 68020
+and 68040 Unicorn cores. Each run covers 16 retained-memory comparisons,
+96 clear/fallback shapes, 2,560 span cases, 80 overlap cases and four no-map
+fallbacks. Widths 1–320,
+all source alignments, destination alignment changes, byte tails, short records,
+permuted rows, cropped rectangles, colours, bulk clear and inactive/CPU-selection
+fallbacks are included. Whole buffers, sentinels and nonzero callee-saved
+registers are compared. Deliberately missing clears and truncated spans are
+rejected. These are correctness checks, not performance estimates.
+
+The tests also pass on fresh flight memory, loading both FAST and CHIP: the
+split scratch/map can reside in CHIP even though the final chunky image is in
+FAST. A FAST-only replay is insufficient for those captures. Evidence is
+`tmp/d3-gate-native.json` and `tmp/d3-gate-current-pixels.json`. Installer checks
+reject changed operands at both new call sites and preserve the complete
+option-off game hunk/register state. Existing release checks retain 196
+option/cache cases, 54 complete converter outputs and 180 pacing/output cases.
+
+### Build and measurement scope
+
+Normal release: 41,392 bytes, SHA-256
+`26030484bcd275dd5b5989b2f4712c20363a0c8c72598cc6475bb5ff71c715f6`.
+Nav-1 recorder fixture: 42,260 bytes, SHA-256
+`df0c38d40fe196f25d72034d0e33be3f7f65c3f9c1bbffde1b52d84f3d0a9036`.
+The equal-size native-path control has SHA-256
+`d035c57fca33d87a7e9d83b017efad8cdc1ddd9cde20019f596dc5fc700c7812`;
+only its two fallback branch bytes differ. Version remains **2.0b (13.06.2026)**.
+
+The observer binary and machine/cache models are unchanged from D1/D2. The
+030 uses the baseline MMU model with `CACHE DCACHE`; the cycle-exact 040 uses
+`NoMMU`. Both retain the diagnostic baseline cache model, including
+`cpu_data_cache=false`. A2's calibrated-040 gate remains blocked. These are
+model measurements, not physical 030/50 or 040/25 performance claims.
+Costs use the same read-only call-site brackets and emulated cycle clock, with
+20 warm-up pictures omitted. They include interrupts and bus stalls. The
+held-turn arms cover slightly different simulation time as rendering changes;
+per-frame scope differences are workload results, not an isolated CPU benchmark.
+
+### Measured costs and displayed cadence
+
+The final held-turn cost capture and ordinary-observer control have byte-identical
+frame and display ledgers. Other cost reports explicitly record that observer
+neutrality was not separately repeated for that capture. The instruments and
+call-site probes are unchanged from D1/D2.
+
+Mean / p95 **milliseconds per draw-to-draw interval**:
+
+| Scope and workload | Native-path control | D3 |
+|---|---:|---:|
+| 030 steady clear | 0.514 / 0.514 | 0.510 / 0.510 |
+| 030 steady composition | 3.843 / 3.855 | 3.425 / 3.438 |
+| 040 held-turn clear | 0.734 / 0.713 | 0.172 / 0.165 |
+| 040 held-turn composition, retained native | 2.906 / 3.260 | 2.937 / 3.259 |
+
+The useful measured savings are 0.418 ms per picture in 030 composition and
+0.562 ms in 040 clearing. The steady 030 already fills every field, so its
+saving becomes available time rather than additional displayed pictures. The
+retained native 040 composition has no claimed speed-up. Do not add these
+savings across machines or to inclusive parent scopes.
+
+| PAL model gate | Displayed frames/s | World updates/s | Fields per displayed interval |
+|---|---:|---:|---|
+| 030 steady | 49.920 | 9.925 | 638 × 1 |
+| Cycle-exact 040 steady | 49.920 | 9.927 | 638 × 1 |
+| Cycle-exact 040 held turn | 42.493 | 10.006 | 532 × 1, 95 × 2, 8 × 3 |
+| Same-size 040 held-turn native control | 42.087 | 10.007 | 525 × 1, 100 × 2, 9 × 3 |
+
+The held turn still has **112/657 missed prediction targets**, compared with
+118/656 in its native-path control. This is a modest rendering-cost improvement,
+not a global C1 deadline or E1 acceptance pass. The two steady gates retain zero
+prediction mismatches. All required candidate gates pass buffer ownership,
+FAST final-chunky / CHIP planar placement, copper setup and independent frame
+count checks, with zero late swap deferrals or input overflows. Player/camera
+corrections remain zero across 161/161/185 checked ticks. Recorder/observer
+counts match all 661/661/657 pictures, within 0.001 ms elapsed clock difference.
+
+Evidence stays under `tmp/d3-gate-*`; `tmp/d3-gate-fps.json` records final frame
+rates and the cost captures retain their raw events and scope configurations.
+No new campaign, forced-stall, corrected-MMU frontend pixel or physical-hardware
+play-test is claimed. Native pixel equivalence includes both retained and fresh
+flight memory; it is not a replacement for E2's visual acceptance. A2 remains
+blocked, phase 12 stays paused, and the phase-12 stash is untouched.

@@ -2573,4 +2573,85 @@ backup inside native drawing; restore includes every saved slot. Do not sum
 nested costs or equate their reduction with an identical frame-rate gain.
 The held-turn display-time check still fails and must not be labelled a C1 pass.
 The observer uses the established baseline cache models; hardware calibration
-remains blocked on A2. Stop before D3 and keep phase 12 paused.
+remains blocked on A2. D3 follows below; keep phase 12 paused.
+
+### D3: native view-region clear and composition
+
+D3 preserves the native row/span map and exact pixel coverage. The copy selection
+uses the existing cached 020/030 renderer selection; other selections retain
+native composition. Use fresh output names under `tmp/`. Native twins include
+byte tails, overlap, crop/colour/bulk fallbacks and rejecting clear/span controls.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/d3-gate
+python3 tools/view_regions_check.py tmp/d3-gate --output tmp/d3-gate-native.json
+python3 tools/timing_adapter_check.py tmp/d3-gate --output tmp/d3-gate-install
+python3 tools/release_check.py tmp/d3-gate --negative-controls --output tmp/d3-gate-options.json
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/d3-gate-frames
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --view-control --output tmp/d3-gate-control
+
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/d3-gate-frames/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/d3-gate-layout
+for arm in frames control; do
+  python3 tools/render_cost.py --build "tmp/d3-gate-$arm" \
+    --layout tmp/d3-gate-layout/layout.json --output "tmp/d3-gate-$arm-scopes.json"
+done
+
+# Sequential runs: one same-size A/B pair per affected model/workload.
+d3_capture() {
+  d3_name="$1"; d3_arm="$2"; d3_machine="$3"; d3_options="$4"
+  shift 4
+  DEBUG_PORT=2499 python3 tools/frame_capture.py \
+    --fixture "tmp/d3-gate-$d3_arm/WingCommanderCD32.Slave" \
+    --machine "$d3_machine" --options "$d3_options" --baseline-cache-model \
+    --custom5 0 --debugger --observer --display-sample \
+    --layout tmp/d3-gate-layout/layout.json --output "tmp/$d3_name" --timeout 180 "$@"
+}
+d3_capture d3-gate-030 frames a1200-030 'CACHE DCACHE' --cost-scopes tmp/d3-gate-frames-scopes.json
+d3_capture d3-gate-control-030 control a1200-030 'CACHE DCACHE' --cost-scopes tmp/d3-gate-control-scopes.json
+d3_capture d3-gate-040-turn-cost frames a1200-040 NoMMU --timing-core --held-key 4e --cost-scopes tmp/d3-gate-frames-scopes.json
+d3_capture d3-gate-control-040-turn control a1200-040 NoMMU --timing-core --held-key 4e --cost-scopes tmp/d3-gate-control-scopes.json
+# Required steady 040 gate and one explicit observer-neutrality control.
+d3_capture d3-gate-040-steady frames a1200-040 NoMMU --timing-core
+d3_capture d3-gate-040-turn frames a1200-040 NoMMU --timing-core --held-key 4e
+
+python3 tools/render_cost.py --run tmp/d3-gate-040-turn-cost \
+  --control tmp/d3-gate-040-turn --output tmp/d3-gate-040-turn-cost/costs.json
+for cell in 030 control-030 control-040-turn; do
+  python3 tools/render_cost.py --run "tmp/d3-gate-$cell" \
+    --without-neutrality-control --output "tmp/d3-gate-$cell/costs.json"
+done
+for cell in 030 040-steady 040-turn 040-turn-cost control-030 control-040-turn; do
+  python3 tools/frame_check.py "tmp/d3-gate-$cell" --output "tmp/d3-gate-$cell/check.json"
+done
+for cell in 030 040-steady 040-turn; do
+  python3 tools/buffer_report.py "tmp/d3-gate-$cell" --build tmp/d3-gate-frames \
+    --layout tmp/d3-gate-layout/layout.json --output "tmp/d3-gate-$cell/buffers.json"
+  python3 tools/translation_report.py "tmp/d3-gate-$cell" --build tmp/d3-gate-frames \
+    --layout tmp/d3-gate-layout/layout.json --output "tmp/d3-gate-$cell/translation.json"
+done
+for cell in 030 040-steady; do
+  python3 tools/display_time_check.py "tmp/d3-gate-$cell" --output "tmp/d3-gate-$cell/prediction.json"
+done
+python3 tools/frame_report.py tmp/d3-gate-030 tmp/d3-gate-control-030 \
+  tmp/d3-gate-040-steady tmp/d3-gate-040-turn tmp/d3-gate-control-040-turn \
+  --output tmp/d3-gate-fps.json
+python3 tools/view_regions_check.py tmp/d3-gate --run tmp/d3-gate-030 \
+  --layout tmp/d3-gate-layout/layout.json --output tmp/d3-gate-current-pixels.json
+```
+
+`--view-control` changes only the two conditional native-fallback branches to
+unconditional branches in the diagnostic slave. It preserves file size and
+layout and is not a public option. Verify the pair differs only at those two
+bytes before comparing. The final 040 turn has an explicit read-only observer
+on/off check; other scoped reports deliberately say observer neutrality was not
+separately checked for that capture. `--without-neutrality-control` does not
+waive fixture/hash, call-pairing, timestamp or per-frame coverage checks.
+The held-turn `display_time_check.py` still rejects missed targets and must not
+be reported as a C1 pass. The ordinary frame recorder and independent display
+observer remain the FPS instruments. Do not add nested costs or treat these model timings as hardware
+calibration. Stop before D4; phase 12 remains paused.

@@ -14,6 +14,7 @@ def main():
     p.add_argument('--flight-verify',action='store_true')
     p.add_argument('--flight-control',action='store_true')
     p.add_argument('--timing-verify',action='store_true')
+    p.add_argument('--view-control',action='store_true',help='D3 diagnostic native clear/composition control; release only')
     p.add_argument('--frame-stats',action='store_true',help='diagnostic frame-part recorder')
     p.add_argument('--schedule',choices=('normal','slow','one-field'),default='normal',help='VERIFY-only render schedule')
     p.add_argument('--nav',type=int,choices=(0,1),default=0)
@@ -23,6 +24,7 @@ def main():
     if a.schedule!='normal' and not a.timing_verify:p.error('diagnostic schedule requires --timing-verify')
     if a.timing_verify and not a.timing:p.error('--timing-verify requires --timing')
     if a.frame_stats and not (a.timing or a.release):p.error('--frame-stats requires --timing or --release')
+    if a.view_control and not a.release:p.error('--view-control requires --release')
     if a.timing or a.release:
         if a.iterations: p.error('timing fixture cannot also use the old delay tail')
         subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--release' if a.release else '--timing','--output',a.output]+(['--timing-verify'] if a.timing_verify else [])+(['--flight-verify'] if a.flight_verify else [])+(['--flight-control'] if a.flight_control else [])+(['--frame-stats'] if a.frame_stats else []),check=True)
@@ -43,9 +45,15 @@ def main():
         symbols={name:int(off,16) for off,name in re.findall(r'^([0-9A-F]{8}) (\S+)$',(out/'slave.lst').read_text(),re.M)}
         at=32+symbols['timing_verify_schedule']
         data[at:at+2]=struct.pack('>H',{'normal':0,'slow':10,'one-field':1}[a.schedule])
+    if a.view_control:
+        symbols={name:int(off,16) for off,name in re.findall(r'^([0-9A-F]{8}) (\S+)$',(out/'slave.lst').read_text(),re.M)}
+        for name in ('view_clear','view_compose'):
+            at=32+symbols[name]+4
+            assert data[at:at+2]==bytes.fromhex('6700')
+            data[at:at+2]=bytes.fromhex('6000') # same-size unconditional native fallback
     slave.write_bytes(data)
     meta=json.loads((out/'build.json').read_text())
-    meta.update(direct_flight=True,nav=a.nav,schedule=a.schedule,argument_immediate=0x156d,
+    meta.update(view_control=a.view_control,direct_flight=True,nav=a.nav,schedule=a.schedule,argument_immediate=0x156d,
                 sha256=hashlib.sha256(data).hexdigest())
     (out/'build.json').write_text(json.dumps(meta,indent=2)+'\n')
 

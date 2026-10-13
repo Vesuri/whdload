@@ -37,7 +37,11 @@ D2 is complete: selective pose backups and unchanged-input geometry reduce
 prediction overhead. Steady flight remains 49.92 frames/s on both models; the
 040 held turn improves from 41.53 to 42.09, with deadline misses still present.
 See the [D2 checks and limits](docs/internals.md#phase-11b-prediction-overhead-d2-complete).
-Stop before D3. Calibrated 040 profiling remains blocked on A2; phase 12 stays paused.
+D3 is complete: faster view-region clears and cached-030 composition preserve
+native pixels. Steady flight stays at 49.92 frames/s; the 040 model held turn
+reaches 42.49, with 112/657 prediction deadlines still missed. See the
+[D3 evidence](docs/internals.md#phase-11b-view-regions-d3-complete).
+Stop before D4. Calibrated 040 profiling remains blocked on A2; phase 12 stays paused.
 
 **Phase 11 is complete: changed-block flight conversion.**
 The timing build converts only changed view/cockpit/HUD blocks, with separate

@@ -103,19 +103,20 @@ def pair(events, definitions):
     return calls
 
 
-def report(run, control):
+def report(run, control=None):
     cfg=json.loads((run/'cost-scopes.json').read_text())
     meta=json.loads((run/'result.json').read_text())
     if digest(run/'framestats.bin')!=meta['framestats_sha256']:
         raise ValueError('frame record hash mismatch')
     if not meta['complete'] or meta['fixture']['sha256']!=cfg['fixture_sha256']:
         raise ValueError('incomplete or different fixture')
-    for name in ('framestats.bin','displaystats.bin'):
-        if (run/name).read_bytes()!=(control/name).read_bytes():
-            raise ValueError('observer changes recorded execution: '+name)
-    ref=json.loads((control/'result.json').read_text())
-    for name in ('fixture','machine','timing_core','baseline_cache_model','custom5','options','held_key','emulator_sha256','live_cpu'):
-        if meta[name]!=ref[name]:raise ValueError('unmatched control: '+name)
+    if control is not None:
+        for name in ('framestats.bin','displaystats.bin'):
+            if (run/name).read_bytes()!=(control/name).read_bytes():
+                raise ValueError('observer changes recorded execution: '+name)
+        ref=json.loads((control/'result.json').read_text())
+        for name in ('fixture','machine','timing_core','baseline_cache_model','custom5','options','held_key','emulator_sha256','live_cpu'):
+            if meta[name]!=ref[name]:raise ValueError('unmatched control: '+name)
     frames=[];events=[];clocks=set()
     with (run/'events.txt').open() as f:
         for line in f:
@@ -153,7 +154,8 @@ def report(run, control):
     # Predict/save is an enclosing scope; all rows are inclusive, never a pie chart.
     names=sorted({r['name'] for r in cfg['scopes']}|{'comparison_loop_history'})
     slow=[i for i,(a,b) in enumerate(zip(bounds,bounds[1:])) if (b-a)/units>field_ms]
-    result=dict(run=run.name,control=control.name,neutrality='byte-identical frame and display ledgers',
+    result=dict(run=run.name,control=control.name if control else None,
+                neutrality='byte-identical frame and display ledgers' if control else 'not separately checked for this capture',
                 frames=len(per),field_ms=field_ms,calls={name:counts[name] for name in names if name!='comparison_loop_history'}, scope='inclusive emulated elapsed ms, not hardware or exclusive CPU costs',
                 per_call_ms={name:dist([(hi-lo)/units for lo,hi,k in calls if k==name]) for name in counts},
                 per_frame_ms={name:dist([r[name] for r in per]) for name in names},
@@ -177,13 +179,14 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--build',type=Path);p.add_argument('--layout',type=Path)
     p.add_argument('--run',type=Path);p.add_argument('--control',type=Path)
+    p.add_argument('--without-neutrality-control',action='store_true',help='report scopes without claiming observer neutrality for this capture')
     p.add_argument('--output',type=Path,required=True)
     a=p.parse_args()
     if (ROOT/'tmp').resolve() not in a.output.resolve().parents or a.output.exists():
         p.error('fresh output in tmp/ required')
-    if a.run and (not a.control or a.build or a.layout):
-        p.error('--run requires --control, without --build/--layout')
-    if not a.run and (not a.build or not a.layout or a.control):
+    if a.run and (bool(a.control)==a.without_neutrality_control or a.build or a.layout):
+        p.error('--run requires --control or --without-neutrality-control, without --build/--layout')
+    if not a.run and (not a.build or not a.layout or a.control or a.without_neutrality_control):
         p.error('scope generation requires --build and --layout')
     check_pairs()
     if a.run:
