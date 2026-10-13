@@ -31,7 +31,8 @@ world, responsive player/camera path and required clock owners pass the scoped
 [native/live gate](internals.md#phase-9-decoupled-simulation-gate). Phase 10 is complete: bounded renderer-only prediction, transient allocation
 isolation and real-flight validation pass the [presentation gate](internals.md#phase-10-renderer-only-prediction-gate).
 Phase 11 is complete: changed-block flight conversion passes native/live output,
-measured conversion-time and PAL/NTSC timing gates. Stop before phase 12.
+measured conversion-time and PAL/NTSC timing gates. Phase 12 release polish is
+in progress; OCS remains out of scope.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait

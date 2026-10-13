@@ -1,10 +1,10 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 11 CD32 flight rendering optimisation is complete.
-Changed-block conversion passes native/live output and measured service-time gates.
-PAL/NTSC timing and presentation remain validated; coverage gaps are documented.
-Stop at phase 11; do not start phase 12 release or OCS work until requested.
+Current scope: phase 12 CD32 release polish and packaging is in progress.
+Finish supported options, controls/save/NTSC checks, release documentation and a
+reproducible beta archive; keep untested hardware/visual coverage explicit.
+Stop at phase 12; do not start OCS work until requested.
 Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 

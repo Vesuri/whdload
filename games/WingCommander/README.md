@@ -9,7 +9,7 @@ history for each display buffer. Native/live output matches the original; measur
 mean conversion time falls 80% on the 030 firing sample and 67% on the 020 turning
 sample. PAL/NTSC world timing remains near 10 Hz. See the
 [gate and coverage limits](docs/internals.md#phase-11-flight-rendering-gate).
-Stopped before phase 12 release work.
+Phase 12 release polish and packaging is in progress.
 
 **Phase 10 is complete: presentation between world updates.**
 The experimental timing build predicts object positions and orientations for drawing,
