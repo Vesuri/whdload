@@ -1586,4 +1586,62 @@ its timing/state evidence is intact. The corrected combat capture uses the key
 codes above and supersedes exploratory control attempts. All derived material
 stays in `tmp/`. This gate does not require full campaign, landing or conversation
 runs; their static cadence classifications and live-coverage gaps are recorded
-in `internals.md`. Do not begin phase 7b automatically.
+in `internals.md`. The phase-7b native audit below complements those live checks.
+
+## Phase 7b: native framerate-dependency audit
+
+Use the retained phase-7 combat dump; no new emulator run is needed. These tools
+execute or decode the English CD32 executable only. Load the shared environment
+for Capstone and the installed Unicorn library, as for the existing native c2p
+checks. Run Python without `-O`: assertions are the native test oracle.
+
+```sh
+. amiga/env.sh
+python3 tools/timing_inventory.py tmp/phase7-combat-controls \
+  --output tmp/timing-inventory
+python3 tools/timing_audit_check.py tmp/phase7-combat-controls \
+  --output tmp/timing-audit
+```
+
+Both output directories must be fresh and inside `tmp/`; differing results are
+never overwritten. The input is `start-fast.bin` from the named run. The reader
+verifies the original English executable SHA-256 and identifies its live patched
+hunk chain, rather than a PRELOAD copy. Both reports record the dump SHA-256. The inventory records the Capstone version;
+the native report records the shared Unicorn library SHA-256.
+The retained input used for the gate is
+`9ba523f262405ce1ff743e65fa897a341c48a7b4b0c2a2d9ec36894f97880902`.
+Other captures may locate successfully but are not substitutes for that evidence
+without rerunning the checks and reviewing changed fixtures.
+
+The inventory produces `inventory.json` and `reachable.dis`. It follows direct
+calls and branches, all bounded switches, the 47-entry ship-action callback table,
+the image decoder's 128-entry table, and the selected resource helpers. Classified
+copy/format/OS boundaries are explicit leaves; a new unclassified indirect transfer
+fails the command. The two slave leaves are named by slave-hunk offset. The complete
+derived call graph and decoded entry lists stay under `tmp/`.
+
+The native checker maps the retained image into separate Unicorn 68000 and 68040
+instances. Full routines and explicitly bounded original-code slices use controlled
+data, with fresh hunk-1 state for each fixture. Code is unchanged in the positive
+checks. Every call has instruction/time limits and must reach its specified return
+or slice end. Translation caches are flushed between calls so a previous slice's
+stop address cannot contaminate the next one.
+
+Schedules cover one second at 10, 20, 50 and 60 calls/s, plus half a second at each
+of 10→50 and 50→10. Native routines have no elapsed-time argument: changing the
+number and timing of calls is the experiment, not a timing fix. Tests assert the
+current dependencies. When a fix is introduced, change that item's oracle to equal
+elapsed-time outcomes while retaining the old-defect negative control. Per-event
+and clock-source controls have different oracles, described in the audit.
+
+`report.json` contains both CPU-model results, all 625 dispatch entry checks,
+104 unsigned bounds rejections, and negative controls. The controls corrupt a
+switch signature in a private memory copy and reverse a lifetime decrement in the
+private Unicorn image; neither changes the retained dump or game tree. They must
+reject the corresponding good-code expectations. No game-derived output is tracked.
+
+The final gate evidence is in `tmp/phase7b-inventory-gate/` and
+`tmp/phase7b-native-verified/`. Native execution is correctness evidence, not a cycle,
+DMA or wall-clock performance instrument. The high-bit memory-shift probe records
+an instrument discrepancy separately; it is not asserted to be game behaviour.
+See [the audit](framerate-audit.md) for each fixture's scope and the live gaps.
