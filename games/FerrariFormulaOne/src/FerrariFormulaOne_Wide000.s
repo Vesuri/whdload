@@ -132,6 +132,30 @@ FF1SquareRootU64_000:
 ; unsigned low(A)*unsigned(B), plus signed high(A)*signed(B) shifted by 16.
 ; For B<0, subtract low(A) from the high partial product before composing.
 FF1MultiplyS32x16_000:
+ IFD FF1_PRODUCT_AB
+ move.w FF1ProductControl(pc),-(sp)
+ tst.w (sp)+
+ bne.b .general
+ ENDC
+ ; A zero coefficient and an integer Q16 operand need no partial products.
+ ; For low(A)=0, signed high(A)*signed(B), shifted by 16, is the full result.
+ tst.w d1
+ beq.b .zero
+ tst.w d0
+ bne.b .general
+ swap d0
+ muls.w d1,d0
+ move.l d0,d1
+ swap d1
+ ext.l d1
+ swap d0
+ clr.w d0
+ rts
+.zero:
+ moveq #0,d0
+ moveq #0,d1
+ rts
+.general:
  IFD FF1_WIDE_AB
  ; Equal-layout diagnostic control; absent from the ordinary helper build.
  move.w FF1WideControl(pc),-(sp)
@@ -169,4 +193,8 @@ FF1WideControl: dc.w 0
 
  IFD FF1_ROOT_AB
 FF1RootControl: dc.w 0
+ ENDC
+
+ IFD FF1_PRODUCT_AB
+FF1ProductControl: dc.w 0
  ENDC
