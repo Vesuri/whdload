@@ -95,7 +95,33 @@ FF1VelocityLimit020:
  bhi.b .bad
  muls.w d1,d0
  move.l d2,d1
+ IFD FF1_C4_DIV_LIMIT
+ ; The existing frame owns D2/D3; D1 is status, so remainder/CCR are dead.
+ move.w FF1DivLimitControl(pc),d2
+ beq.b .inline_divide
+ ENDC
  bsr.w FF1Divide000
+ IFD FF1_C4_DIV_LIMIT
+ bra.b .range
+.inline_divide:
+ ; MULS uses signed words; the validated coefficient is non-negative.
+ ; Its magnitude is below 2^30. Divisor is already known to be 1..65535.
+ tst.l d0
+ bpl.b .magnitude
+ neg.l d0
+.magnitude:
+ move.l d0,d2
+ swap d2
+ cmp.w d1,d2
+ ; An unsigned quotient >=65536 cannot pass either signed-word bound.
+ bcc.b .bad
+ divu.w d1,d0
+ andi.l #$ffff,d0
+ tst.w d3
+ bpl.b .range
+ neg.l d0
+.range:
+ ENDC
  cmpi.l #-32768,d0
  blt.b .bad
  cmpi.l #32767,d0
@@ -108,6 +134,9 @@ FF1VelocityLimit020:
 .done:
  movem.l (sp)+,d2-d3
  rts
+ IFD FF1_C4_DIV_LIMIT
+FF1DivLimitControl: dc.w 1
+ ENDC
 FF1SquareRootU32:
  IFD FF1_SMALLROOT_AB
  move.w FF1SmallRootControl(pc),-(sp)
