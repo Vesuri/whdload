@@ -184,6 +184,12 @@ C1Activate:
  bne.w C1Fault
 .native_000_done:
  ENDC
+ IFD FF1_COARSE_200
+ move.w C4Enabled(pc),d0
+ beq.b .coarse_200_done
+ bsr.w FF1InstallCoarse200
+.coarse_200_done:
+ ENDC
  bsr.w FF1InstallPresentation
  move.l error(pc),d0
  bne.w C1Fault
@@ -271,6 +277,9 @@ C1InstallUnload:
  rts
 C1UnloadInstalled: dc.l 0
 C1Ledger: ds.b 24
+ IFD FF1_COARSE_200
+ include "FerrariFormulaOne_Coarse200.s"
+ ENDC
  IFD FF1_COARSE_NATIVE_000
 C3Enabled: dc.w FF1_NATIVE_000_STAGE
  include "FerrariFormulaOne_Native000.s"
