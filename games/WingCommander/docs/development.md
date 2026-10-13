@@ -1994,3 +1994,72 @@ publications (`E:3378e`). The only exceptions allowed are pictures published
 exactly on a field edge, which the recorder flags as ambiguous. Elapsed time
 must agree within one field. `WC_CPU_SPEED=max` (`--cpu-speed max`) is available
 but is not an upper bound: in these runs it was slower than `real`.
+
+## Phase 11b public options and uncapped flight (B1)
+
+The `--release` builder now means the public-option **candidate**, not an approved
+release. `CUSTOM1=0/1` selects English/German; `CUSTOM5=0` selects enhanced English
+(or normal German), and 1–4 select Psygore's former 0–3. The experimental
+`--timing` and `--render` builders keep their earlier options and binary behavior.
+The authored `release/ReadMe` documents the changed numbering and fallbacks.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --release --output tmp/b1-release
+python3 tools/release_check.py tmp/b1-release --negative-controls --output tmp/b1-native-gate.json
+python3 tools/flight_render_check.py tmp/b1-release --output tmp/b1-flight-native.json
+python3 tools/timing_adapter_check.py tmp/b1-release --output tmp/b1-install
+python3 tools/reconstruct.py --timing --output tmp/b1-legacy-timing
+python3 tools/reconstruct.py --output tmp/b1-original
+```
+
+The native gate covers language/mode boundaries, WHDLoad cache requests, full
+converter pixels and counted limiter calls. TOD waits are stubbed only in the
+CPU oracle: both active-flight paths (changed blocks and full-conversion fallback)
+must bypass the wait, while nonflight and Psygore modes must dispatch it as
+specified. Wrong mode mapping, uncapped nonflight and capped flight fallbacks
+are deliberate negative controls and must fail. These checks do not measure time.
+The installation gate compares the whole code hunk and registers/CCR with the
+existing patch contract, including unchanged option-off code.
+
+Build a separate diagnostic Nav-1 fixture for frame measurements. Its recorder
+is absent from the normal candidate. The public-option recorder supports only
+`CUSTOM5=0`; Psygore modes do not install the timing hooks that drive it.
+
+```sh
+python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/b1-frames-v2
+export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
+DEBUG_PORT=2499 SLAVE="$PWD/tmp/b1-frames-v2/WingCommanderCD32.Slave" \
+WHD_ARGS='CUSTOM1=0 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0' \
+WARP=1 INTRO_STOCK_CLOCK=1 AMIGA_SETUP=a1200-fast \
+python3 tools/boot_gate.py --calibrate --output tmp/b1-layout-v2
+python3 tools/frame_stats_check.py tmp/b1-frames-v2 --output tmp/b1-recorder-native.json
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/b1-frames-v2/WingCommanderCD32.Slave --machine a1200-030 \
+  --baseline-cache-model --options 'CACHE DCACHE' --custom5 0 --debugger --observer \
+  --layout tmp/b1-layout-v2/layout.json --output tmp/b1-030-gate
+python3 tools/frame_check.py tmp/b1-030-gate --output tmp/b1-030-gate/check.json
+DEBUG_PORT=2499 python3 tools/frame_capture.py \
+  --fixture tmp/b1-frames-v2/WingCommanderCD32.Slave --machine a1200-040 \
+  --timing-core --baseline-cache-model --options NoMMU --custom5 0 --debugger \
+  --layout tmp/b1-layout-v2/layout.json --output tmp/b1-040core-gate
+python3 tools/frame_report.py tmp/b1-030-gate tmp/b1-040core-gate \
+  --output tmp/b1-frame-gate.json
+```
+
+Use fresh output names on reruns. The 040 core requires the same
+`--baseline-cache-model` compatibility setting used in A3 (indirect board and
+emulated data cache off); it is still not a calibrated hardware model. WHDLoad's
+cache policy and emulated hardware-cache modeling are distinct. Each capture
+records actual CACR. No key is held in these bounded Nav-1 windows.
+B1 retains WaitBOVP, two buffers and the existing prediction policy. B2 and the
+smoothness items are separate work; the reported horizontal-row glitches remain
+unresolved. No archive is built by these commands.
+
+The recorder now requires two agreeing beam-line reads. VPOSR/VHPOSR longword
+reads are not atomic on the chipset bus: an initial 040 capture contained line
+255, torn line 0, then line 260 in the same VBL interval. The unchanged report
+rejected it. `frame_stats_check.py` injects torn forward/backward boundary reads,
+checks register/CCR preservation, and rejects a sabotaged single-read recorder.
+The corrected live recorder is cross-checked against the independent publication
+observer on 030. This diagnostic-only fix does not change the normal slave.

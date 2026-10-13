@@ -28,8 +28,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
     modes = p.add_mutually_exclusive_group()
+    modes.add_argument('--release',action='store_true',help='public options: language and enhanced/Psygore modes')
     modes.add_argument('--timing', action='store_true', help='experimental CUSTOM1=3 English hybrid timing adapter')
-    p.add_argument('--frame-stats', action='store_true', help='diagnostic frame-part recorder saved as framestats.bin; requires --timing')
+    p.add_argument('--frame-stats', action='store_true', help='diagnostic frame-part recorder saved as framestats.bin; requires --timing or --release')
     modes.add_argument('--render', action='store_true', help='experimental CUSTOM1=2 English rendering adapter')
     modes.add_argument('--render-control', action='store_true', help='same-size original converter with the same gated WHDLoad cache policy')
     modes.add_argument('--verify', action='store_true', help='build the CUSTOM1=2 diagnostic seam')
@@ -43,6 +44,10 @@ def main():
     p.add_argument('--render-verify', action='store_true', help='native original/replacement twin on every conversion; requires --render')
     p.add_argument('--input', default='tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')
     a = p.parse_args()
+    if a.release:
+        if a.timing_verify or a.flight_verify or a.flight_control or a.render_verify or a.render_family!='auto':
+            p.error('public-option build supports only --frame-stats diagnostics')
+        a.timing=True
     if (a.flight_verify or a.flight_control) and not a.timing:p.error('flight diagnostics require --timing')
     if a.frame_stats and not a.timing:p.error('--frame-stats requires --timing')
     if a.timing_verify and not a.timing: p.error('--timing-verify requires --timing')
@@ -94,7 +99,9 @@ def main():
         lines += [f'\tifne *-slave-${pos:x}', '\tfail "offset drift"', '\tendif', f'S_{pos:04x}:']
         if pos in decoded:
             size, source = decoded[pos]
-            if a.timing and pos==0x178a:
+            if a.release and pos==0x1422:
+                lines.append('\tbsr.w release_setcpu')
+            elif a.timing and pos==0x178a:
                 lines.append('\tbra.w flight_render_entry')
             elif (a.render and pos==0x178a) or ((a.render or a.render_control) and pos==0x1422):
                 lines.append('\t'+('bra.w render_entry' if pos==0x178a else 'bsr.w render_setcpu'))
@@ -124,12 +131,27 @@ def main():
         lines.append('RENDER_VERIFY equ '+str(int(a.render_verify)))
         lines.append('RENDER_FAMILY equ '+str({'auto':0,'030':30,'040':40}[a.render_family]))
         lines.append(render_source(ROOT))
+    if a.release:
+        lines.append((ROOT/'whdload/release.s').read_text())
     if a.timing:
         lines.append('TIMING_VERIFY equ '+str(int(a.timing_verify)))
         lines.append('FRAME_STATS equ '+str(int(a.frame_stats)))
         lines.append(timing_source(ROOT))
         if a.frame_stats:lines.append((ROOT/'whdload/frame_stats.s').read_text())
-        lines.append(flight_source(ROOT,a.flight_verify,a.flight_control))
+        flight=flight_source(ROOT,a.flight_verify,a.flight_control)
+        if a.release:
+            begin=flight.index('        move.l  slave+$1e04(pc),d7')
+            end=flight.index('.work:',begin)
+            flight=flight[:begin]+flight[end:]
+            flight=flight.replace('flight_render_original:\n        bra.w   slave+$178e',
+                'flight_render_original:\n        movem.l (sp)+,d0-a6\n        bra.w render_entry')
+        lines.append(flight)
+    if a.release:
+        renderer=render_source(ROOT).replace('cmpi.l  #2,d7','cmpi.l  #3,d7').replace('cmpi.l  #2,d2','cmpi.l  #3,d2')
+        begin=renderer.index('        move.l  slave+$1e04(pc),d7')
+        end=renderer.index('.convert:',begin)
+        renderer=renderer[:begin]+'        bsr.w   release_limit\n'+renderer[end:]
+        lines += ['RENDER_VERIFY equ 0','RENDER_FAMILY equ 0',renderer]
     if a.verify or a.verify_control:
         lines.append((ROOT/'whdload/verify.s').read_text())
     if a.ceiling and a.ceiling.startswith('drawing'):
@@ -167,10 +189,18 @@ def main():
     if a.verify or a.timing:
         # Only declared PatchSeg and (timing mode) c2p entry seams may change.
         expected=bytearray(code)
-        for off in ((0x14da,0x178a) if a.timing else (0x14da,)):
+        for off in ((0x1422,0x14da,0x178a) if a.release else (0x14da,0x178a) if a.timing else (0x14da,)):
             expected[off:off+4]=built[off:off+4]
         if built[:len(code)] != expected:
             raise ValueError('VERIFY changed bytes outside its declared detour')
+    if a.release:
+        symbols={name:int(off,16) for off,name in re.findall(r'^([0-9A-F]{8}) (\S+)$',(out/'slave.lst').read_text(),re.M)}
+        updated=bytearray(built)
+        for offset,label in ((0x24,'release_name'),(0x28,'release_info'),(0x32,'release_config')):
+            if symbols[label]>=0x8000:raise ValueError('header string outside signed offset range')
+            struct.pack_into('>H',updated,offset,symbols[label])
+        built=bytes(updated)
+        binary.write_bytes(built)
     # Standard one-code-hunk container; no original byte blob is embedded.
     header = struct.pack('>8I',0x3f3,0,1,0,0,len(built)//4,0x3e9,len(built)//4)
     result = header+built+struct.pack('>I',0x3f2)
@@ -179,7 +209,7 @@ def main():
     (out/'WingCommanderCD32.Slave').write_bytes(result)
     report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
-              'code_ranges':CODE, 'byte_identical':result == original, 'flight_verify':a.flight_verify, 'flight_control':a.flight_control, 'timing':a.timing, 'timing_verify':a.timing_verify, 'frame_stats':a.frame_stats, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling or a.timing_verify or a.frame_stats or a.flight_verify or a.flight_control), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
+              'code_ranges':CODE, 'byte_identical':result == original, 'release':a.release, 'version':'2.0b' if a.release else None, 'flight_verify':a.flight_verify, 'flight_control':a.flight_control, 'timing':a.timing, 'timing_verify':a.timing_verify, 'frame_stats':a.frame_stats, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.ceiling or a.timing_verify or a.frame_stats or a.flight_verify or a.flight_control), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
     if a.ceiling and a.ceiling.startswith('drawing'):
         report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')

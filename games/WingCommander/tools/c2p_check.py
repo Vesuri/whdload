@@ -35,7 +35,7 @@ class CPU:
         b=C.create_string_buffer(n); ck(u.uc_mem_read(self.h,a,b,n)); return b.raw
     def reg(self,r,v=None):
         x=C.c_uint32(v or 0); ck(u.uc_reg_read(self.h,r,C.byref(x)) if v is None else u.uc_reg_write(self.h,r,C.byref(x))); return x.value
-    def run(self,entry,src,height,custom=None,cpu=2):
+    def run(self,entry,src,height,custom=None,cpu=2,custom5=1):
         size=len(src); self.write(SRC,src+b'\x5a'*64)
         self.write(DST-64,b'\xa5'*(size+128)); self.write(STACK,struct.pack('>I',STOP))
         for r in range(1,17): self.reg(r,0x12340000+r)
@@ -47,7 +47,7 @@ class CPU:
         if custom is not None:
             self.write(BASE+0x1de4,struct.pack('>I',custom))
             if self.selected is not None: self.write(BASE+self.selected,struct.pack('>H',self.forced or (30 if cpu<4 else 0)))
-            self.write(BASE+0x1e04,struct.pack('>I',1)) # limiter bypass in CPU-only test
+            self.write(BASE+0x1e04,struct.pack('>I',custom5)) # limiter bypass by default in CPU-only tests
             self.write(4,struct.pack('>I',0x2000))
             self.write(0x2000+296,struct.pack('>H',0x80 if cpu==5 else 8 if cpu==4 else 2))
         before=[self.reg(r) for r in range(1,17)]
@@ -60,6 +60,7 @@ class CPU:
         coverage=np.zeros(size,dtype=np.uint16)
         for address,n in self.writes:
             if STACK-512<=address<STACK: continue
+            if any(lo<=address and address+n<=hi for lo,hi in getattr(self,"allowed_stores",())):continue
             assert DST<=address and address+n<=DST+size, ('unexpected store',hex(address),n)
             coverage[address-DST:address-DST+n]+=1
         assert np.all(coverage==1), 'output not written exactly once'

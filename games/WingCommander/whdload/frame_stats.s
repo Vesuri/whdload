@@ -21,12 +21,12 @@ frame_stats_init:
 ; Stack: return address, then the event id word pushed by FSTAT.
 ; Preserves every register and the condition codes.
 frame_stat:
-        movem.l d0-d2/a0,-(sp)
+        movem.l d0-d3/a0,-(sp)
         move.w  ccr,-(sp)
         tst.w   timing_active(pc)
-        beq.s   .done
+        beq.w   .done
         move.l  frame_stats_buffer(pc),d0
-        beq.s   .done
+        beq.w   .done
         move.l  frame_stats_count(pc),d1
         cmpi.l  #FS_RECORDS,d1
         bhs.s   .done
@@ -35,10 +35,17 @@ frame_stat:
         ; A field change between the two counter reads retries the sample.
         move.l  $7f02(a0),d2
         move.l  $dff004,d0
+        move.l  $dff004,d3
         cmp.l   $7f02(a0),d2
         bne.s   .sample
         lsr.l   #8,d0
         andi.l  #$1ff,d0
+        lsr.l   #8,d3
+        andi.l  #$1ff,d3
+        ; VPOSR/VHPOSR are two bus reads, not one atomic longword.
+        ; Require agreeing beam lines to reject a torn 255/256 transition.
+        cmp.l   d3,d0
+        bne.s   .sample
         tst.w   frame_stats_started(pc)
         bne.s   .started
         lea     frame_stats_started(pc),a0
@@ -55,7 +62,7 @@ frame_stat:
         add.l   d2,d2
         or.l    d2,d0
         moveq   #0,d2
-        move.w  22(sp),d2
+        move.w  26(sp),d2
         ror.l   #5,d2
         or.l    d2,d0
         move.l  frame_stats_buffer(pc),a0
@@ -65,7 +72,7 @@ frame_stat:
         move.l  d1,(a0)
 .done:
         move.w  (sp)+,ccr
-        movem.l (sp)+,d0-d2/a0
+        movem.l (sp)+,d0-d3/a0
         rts
 
 frame_stats_flush:

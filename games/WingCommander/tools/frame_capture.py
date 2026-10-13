@@ -36,7 +36,7 @@ def main():
     p.add_argument('--machine', choices=('a1200-fast', 'a1200-030', 'a1200-040', 'a1200-060'), required=True)
     p.add_argument('--timing-core', action='store_true', help='project cycle-exact timing core (WC_NOMMU_CORE / stock 020 clock)')
     p.add_argument('--baseline-cache-model', action='store_true', help='030 phase-8 emulated cache model')
-    p.add_argument('--custom5', type=int, choices=(0, 1, 2, 3), default=1)
+    p.add_argument('--custom5', type=int, choices=(0, 1, 2, 3, 4), default=None)
     p.add_argument('--options', default='', help='extra WHDLoad options, e.g. NoMMU or DCache')
     p.add_argument('--debugger', action='store_true', help='boot through the gdb stub (FSUAE must be a debugger build)')
     p.add_argument('--held-key', help='raw key held through the window; requires --debugger')
@@ -59,6 +59,13 @@ def main():
         raise ValueError('verified --frame-stats fixture required')
     if not re.fullmatch(r'[A-Za-z ]*', a.options):
         raise ValueError('unexpected WHDLoad options')
+    if a.custom5 is None:
+        a.custom5=0 if fixture.get('release') else 1
+    if fixture.get('release') and a.custom5!=0:
+        p.error('public-option frame recorder requires enhanced CUSTOM5=0')
+    if not fixture.get('release') and a.custom5==4:
+        p.error('experimental timing build does not support CUSTOM5=4')
+    language=0 if fixture.get('release') else 3
     out.mkdir(parents=True)
     os.chdir(ROOT)
     lst = (slave.parent/'slave.lst').read_text().splitlines()
@@ -69,7 +76,7 @@ def main():
     env.update(FSUAE_RUN=run, SLAVE=str(slave), AMIGA_SETUP=a.machine,
         INTRO_STOCK_CLOCK='1' if a.timing_core and a.machine == 'a1200-fast' else '0',
         WC_NOMMU_CORE='1' if a.timing_core and a.machine != 'a1200-fast' else '0',
-        WHD_ARGS=f'CUSTOM1=3 CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5={a.custom5} NOWRITECACHE {a.options}'.strip(),
+        WHD_ARGS=f'CUSTOM1={language} CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5={a.custom5} NOWRITECACHE {a.options}'.strip(),
         WARP='1', NTSC='1' if a.ntsc else '0', WINDOW='front', JOY0='none', JOY1='none',
         DETERMINISTIC='1', WC_INSTANT_BLITTER='0')
     if a.baseline_cache_model:

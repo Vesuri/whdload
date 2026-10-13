@@ -35,7 +35,10 @@ measured conversion-time and PAL/NTSC timing gates. Phase 11b frame-rate
 recovery is required before release. A1/A3 measured the frame budget:
 Psygore's default limiter caps flight at 25 FPS, the emulated machines reach
 40–50 with it off, and no credible 040 model exists yet (A2). Phase 12
-release polish is paused behind it; OCS remains out of scope.
+release polish is paused behind it; OCS remains out of scope. B1 is complete:
+public CUSTOM5=0 enables uncapped English flight, 1–4 retain Psygore's modes,
+and CUSTOM1 selects language only. The cached 030 model reaches 49.920 pictures/s;
+the uncalibrated cycle-exact 040 core reaches 39.953. B2 is next, not started.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -46,7 +49,8 @@ change requires that evidence; do not expand the matrix merely to fill it.
 The executable uses the Manx/Aztec C runtime and a View/copper display path with
 two eight-plane buffers. The original slave explicitly requests cache settings.
 Its normal c2p limiter waits two CIA-A TOD increments; that is not an intended-rate
-measurement. `Custom5=4` selects the original blitter c2p path, not Akiko. These
+measurement. In the original slave, `Custom5=4` selects the blitter c2p path, not Akiko.
+The public-option candidate removes it and uses 4 for Psygore slow. These
 findings refine the implementation assumptions below; flight now uses the selected
 10 Hz design, while the final intro motion-rate choice remains separate. The OCS version remains unanalysed.
 
@@ -472,13 +476,16 @@ display wait (6–7 ms of idle per frame).
 
 **B. Pacing and buffering**
 
-- **B1.** Remove the limiter call from both enhanced renderers and make the mode a
+- **B1 — complete.** Remove the limiter call from both enhanced renderers and make the mode a
   `Custom5` choice (user, 2026-10-13): 0 enhanced (default; WHDLoad's unset value),
   1–4 Psygore normal/unlimited/relaxed/slow (his 0–3, shifted; his blitter option is
   dropped). `Custom1` selects only the language. German with 0 falls back to Psygore
   normal until the German port exists; outside flight, 0 keeps Psygore's normal
   limiter until those scenes have fixed rates. The ReadMe states both and the
   changed numbering. Psygore's modes stay for now.
+  Native option/pacing/output gates and the required frame-rate reports pass;
+  see [B1 evidence](internals.md#phase-11b-public-modes-and-uncapped-flight-b1-gate-complete).
+  WaitBOVP and the row-glitch investigation remain open. Stop at B1.
 - **B2.** Vsync without idle: publish immediately after conversion, swaps take
   effect at vertical blank, and wait only before converting into a buffer whose
   swap-away has not yet been displayed. Drawing into the FAST chunky buffer overlaps.

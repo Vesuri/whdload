@@ -1,0 +1,36 @@
+Wing Commander CD32 2.0b (13.06.2026)
+Original slave: Psygore. CD32 improvements: Vesa Halttunen.
+
+Development candidate; release and visual acceptance remain open.
+Fast RAM is required. OCS is a separate, unchanged project target.
+
+CUSTOM1 selects language: 0 English (default), 1 German.
+CUSTOM5 selects the mode:
+  0 Enhanced (default, also used when the option is unset)
+  1 Psygore normal
+  2 Psygore unlimited
+  3 Psygore relaxed
+  4 Psygore slow
+
+The numbering has changed: Psygore's old CUSTOM5 values 0..3 are now 1..4.
+His old value 4 (blitter conversion) is removed. Update existing tooltypes;
+an old CUSTOM5=1 now means Psygore normal, not unlimited.
+CUSTOM1 is language only; the experimental CUSTOM1=2/3 switches do not
+apply to this candidate. Separate experimental builds retain their old options.
+
+Enhanced English flight runs its world at 10 updates/s and renders without
+Psygore's frame cap. The display-end wait remains for now; the actual frame
+rate depends on the machine and scene. Enhanced nonflight scenes, including
+the intro, keep Psygore's normal limiter until their movement is decoupled.
+German with CUSTOM5=0 falls back to Psygore normal until it is ported.
+CUSTOM5=1..4 retain Psygore's original simulation and rendering in both languages.
+
+Enhanced English preserves WHDLoad's cache choices. Use WHDLoad CACHE/DCACHE
+options to enable caches as appropriate; the enhanced mode does not enable
+them itself. Psygore modes retain his original cache request.
+CUSTOM2 (cheats), CUSTOM3 (system), CUSTOM4 (mission) are unchanged.
+
+Known gaps: horizontal-row glitches reported by the user are unresolved.
+Smoothness, player translation and hard-turn corrections need further work.
+Real 040 performance is uncalibrated. Controls, campaign/save coverage and
+final release play-testing remain open. No release archive is approved yet.

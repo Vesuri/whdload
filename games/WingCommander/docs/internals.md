@@ -2908,3 +2908,92 @@ Findings:
 - None of these configurations reproduces the user's below-25 report with
   standard pacing; all hold exactly 25. A slower emulated CPU or modelled
   cache-off cost would produce it.
+
+## Phase 11b: public modes and uncapped flight (B1 gate complete)
+
+The public-option candidate (`reconstruct.py --release`) uses language-only
+CUSTOM1 (0 English, 1 German). CUSTOM5 defaults to 0: enhanced English, or
+Psygore normal for German until that port exists. Values 1–4 translate to
+Psygore's original 0–3 (normal, unlimited, relaxed, slow), retaining his simulation,
+converter and cache request. The blitter option is removed. Values outside the
+public ranges abort before language loading. The separate experimental builds
+retain their original options; normal `--timing` is still byte-identical to the
+phase-11 candidate.
+
+Public-option translation enters at `S:1422` (file `$1442`) before language
+selection at `S:142a` (file `$144a`). English+enhanced maps internally to mode 3;
+all other choices keep language 0/1 and cannot install the English timing patches
+at `S:14da` (file `$14fa`). Enhanced mode uses the existing zero-mask SetCPU query,
+preserving WHDLoad policy; it does not enable caches. The header's name, info and
+configuration pointers at `S:24/28/32` (file `$44/48/52`) identify the candidate
+and its new public options. Version remains **2.0b (13.06.2026)**.
+
+At conversion entry `S:178a` (file `$17aa`), enhanced active flight bypasses
+Psygore's TOD limiter `S:17b8` (file `$17d8`). This applies both to changed-block
+conversion and full-conversion fallback when history allocation is unavailable.
+Inactive/nonflight enhanced conversion still calls the normal limiter. WaitBOVP
+and the existing single publication/two-buffer policy remain unchanged: B2 is
+not implemented. This is not a fix for the reported horizontal-row glitches.
+
+In the normal B1 artifact, authored entries are `release_setcpu` at `S:1e0c`
+(file `$1e2c`), `release_limit` at `S:1e4e` (file `$1e6e`), flight entry at
+`S:80c0` (file `$80e0`) and full-renderer entry at `S:84f4` (file `$8514`).
+These appended offsets belong to the exact build below, not diagnostic builds.
+
+Native evidence:
+
+- 196 language/mode/cache cases cover accepted and rejected values on 020/040
+  models. Enhanced queries preserve policy; Psygore choices retain the original
+  request. All four shifted pacing values and the German default are covered.
+- 180 pacing/output cases execute both converter paths, three heights, active
+  and inactive flight, missing/failed/allocated histories, and both languages'
+  original modes. Limiter calls are counted with a TOD stub; complete pixels,
+  source/register preservation and write bounds are checked.
+- 54 additional full-converter outputs and 72 changing/reused/replaced-buffer
+  outputs match the independent planar oracle (the latter also execute the
+  original converter). Eight installation cases preserve the complete code hunk
+  and registers/CCR according to the existing option-off/install contract.
+- Wrong mode translation, uncapped nonflight and capped flight fallback each
+  fail the new gate. The normal candidate contains no recorder or VERIFY symbols.
+  Fresh original reconstruction is byte-identical to the pinned original.
+
+The diagnostic recorder needed a correctness fix: a 040 capture showed beam
+lines 255, 0, 260 within one VBL interval, consistent with a torn VPOSR/VHPOSR
+longword read at the 255/256 boundary. The existing monotonicity check rejected
+that capture. Two agreeing beam-line reads now guard the sample; six native
+race/register/CCR cases and a deliberately broken single-read control pass.
+No normal-build instructions changed for this fix. The corrected 030 recorder
+matches the independent observer on all 1437 pictures/fields, with zero elapsed
+time difference and no ambiguous pictures.
+
+Final frame gate: PAL, Nav-1 combat without held input, 8 MiB FAST, diagnostic
+recorder, retained observer SHA-256
+`08360549c392f07b1fb3393bf1e071cd0bd5ffcb4048f229d528a1ce628c1313`.
+The established compatibility setting disables the emulator's indirect board and
+emulated data cache; WHDLoad's cache choices and live CACR are recorded separately.
+
+| Emulator model | WHDLoad options / CACR | Pictures/s | Fields/picture histogram | World updates/s |
+|---|---|---:|---|---:|
+| 030/50 cycle-exact | CACHE DCACHE / `00002111` | 49.920 | 1415 × 1 | 9.979 |
+| 040/25 cycle-exact core | NoMMU / `00000000` | 39.953 | 1053 × 1, 350 × 2 | 9.983 |
+
+Both have zero limiter wait. The remaining mean display wait is 7.1/6.3 ms,
+respectively. These are scoped emulator end-to-end measurements, not calibrated
+040 hardware results or a universal 50 FPS guarantee. A preliminary 030 capture
+without cache options (CACR `00002000`) reached 39.908 pictures/s, histogram
+1051 × 1 / 352 × 2, world 9.975/s; its valid original-recorder data is retained
+separately and is not a matched performance comparison with the final fixture.
+The first 040 boot without the established compatibility setting did not reach
+flight and was stopped; neither it nor the rejected timestamp capture is a pass.
+
+Normal slave: 38404 bytes, SHA-256
+`dc8e64ffdc39bb624909c47bbbeff8af2fc488dfbb745a6bcfe2e040441986cb`.
+Final direct-flight diagnostic SHA-256:
+`0bc7e1bfb6490c4fced387a867b1f897607c2e8b02898ac2cf340a3c043726cc`.
+Evidence: `tmp/b1-final-native.json`, `tmp/b1-flight-native.json`,
+`tmp/b1-install/`, `tmp/b1-recorder-native.json`, `tmp/b1-030-gate/check.json`,
+`tmp/b1-frame-gate.json`, and the two `tmp/b1-{030,040core}-gate/` captures.
+Commands are in development's B1 section; the public numbering/fallbacks are in
+`release/ReadMe`. Save-file work remains outside this gate. German live campaign,
+full control/visual acceptance, calibrated 040 performance and release packaging
+remain open. Stop at B1; B2 and later work are not started.

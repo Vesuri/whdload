@@ -10,11 +10,14 @@ def main():
     a.output=a.output.resolve()
     if a.output.exists() or (ROOT/'tmp').resolve() not in a.output.parents:raise ValueError('new tmp output required')
     blob=(a.build/'payload.bin').read_bytes()
-    control=json.loads((a.build/'build.json').read_text()).get('flight_control',False)
+    meta=json.loads((a.build/'build.json').read_text())
+    control=meta.get('flight_control',False)
     sym={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(a.build/'slave.lst').read_text(),re.M)}
     rng=random.Random(11);results=[]
     for model in (2,4):
-        c=CPU(blob,model);c.write(BASE+0x1de4,struct.pack('>I',3));c.write(BASE+0x1e04,struct.pack('>I',1))
+        c=CPU(blob,model)
+        if meta.get('release'):c.write(BASE+0x17b8,bytes.fromhex('4e75')) # pacing tested separately
+        c.write(BASE+0x1de4,struct.pack('>I',3));c.write(BASE+0x1e04,struct.pack('>I',1))
         c.write(BASE+sym['flight_history'],struct.pack('>I',0xa0000))
         if 'flight_reference' in sym:c.write(BASE+sym['flight_reference'],struct.pack('>I',0xc0000))
         c.write(0x30000-778,struct.pack('>I',0x3000));c.write(0x3000-402,bytes.fromhex('4e75'))
