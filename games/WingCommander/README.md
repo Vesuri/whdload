@@ -3,13 +3,16 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
+**Phase 10 is in progress: presentation between world updates.**
+Bounded prediction will smooth world objects while preserving authoritative gameplay.
+
 **Phase 9 is complete: D's decoupled simulation and responsive controls.**
 The separate experimental timing build uses `CUSTOM1=3`. World timing stays within
 0.4% of 10 updates/s across normal, delayed and diagnostic one-field schedules;
 PAL/NTSC, input history, pause, targeting and draw/RNG separation are checked.
 The accelerated run shows player/camera motion between world ticks. Option-off
 game code remains unchanged. See the [gate evidence](docs/internals.md#phase-9-decoupled-simulation-gate).
-Stopped before phase 10; world-object extrapolation is not implemented.
+Phase 10 now adds world-object presentation; phase 11 remains out of scope.
 
 **Phase 8 is complete: the user selected D, the hybrid.**
 The [design](docs/timing-design.md) uses a 10 Hz world with responsive per-render

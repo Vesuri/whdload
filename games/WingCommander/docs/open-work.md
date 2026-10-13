@@ -28,7 +28,8 @@ with steady/changing rates and explicit runtime/instrument gaps. Phase 8 is
 complete: the user selected D on 2026-10-13, with the explicit pricing gaps in
 [the design comparison](timing-design.md). Phase 9 is complete: the gated 10 Hz
 world, responsive player/camera path and required clock owners pass the scoped
-[native/live gate](internals.md#phase-9-decoupled-simulation-gate). Stop before phase 10.
+[native/live gate](internals.md#phase-9-decoupled-simulation-gate). Phase 10 is now
+in progress: bounded renderer-only prediction and real-flight validation.
 
 The user accepted the practical baseline with documented gaps on 2026-10-12.
 General routine self/inclusive attribution, complete interrupt and blitter-wait
@@ -77,7 +78,7 @@ A definitive CD32 edition, OCS afterwards and separately:
 
 **Flight-unit anchor: 10 world updates per second.** Phase 7 verifies that a
 displayed 200 kps corresponds to 20 km per update. This supersedes the unmeasured
-15/s prior. No timing fix is installed, and this rate does not establish every
+15/s prior. The experimental timing build uses this rate; it does not establish every
 animation/AI cadence. Do not transfer intro evidence to flight.
 
 **Intro phase 5 candidate: approximately 15 native ship updates/s** (roughly
