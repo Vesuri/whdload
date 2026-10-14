@@ -4437,7 +4437,7 @@ screen or game-state equality across machines with different rendering speeds.
 
 `amiga/run-ocs.sh` is the OCS entry point. It builds the current public candidate
 into a fresh `tmp/ocs-launch.*/build/`, then uses the shared launcher with the
-A3000 preset and `CUSTOM5=1`. Its process/log directory is `tmp/run-ocs`, separate
+A3000 preset and `CUSTOM5=1 DCACHE` (instruction and data caches). Its process/log directory is `tmp/run-ocs`, separate
 from the default CD32 run. Each boot still uses a fresh game tree.
 
 ```sh
@@ -4452,3 +4452,10 @@ A500 automatically retains original behaviour despite the requested toggle.
 and the shared sound/window settings remain overridable. An explicitly empty
 `WHD_ARGS` also selects original behaviour. `stop` does not build a slave.
 The existing `amiga/run.sh` keeps its CD32 default and explicit variant support.
+
+The OCS generated launch icon also adds `DCACHE` unless an explicit CACHE,
+DCACHE or NOCACHE choice already exists. The launcher default can be replaced
+with `WHD_ARGS='CUSTOM5=1 NOCACHE'`. These defaults do not change slave bytes or
+restart an already-running game. The slave retains its existing SetCPU policy;
+WHDLoad applies the user cache override. `CACHE` alone is not the equivalent:
+it requests instruction caching while disabling data caching.

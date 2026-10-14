@@ -7,7 +7,7 @@ published release. CD32 E1/phase 12 and their save/load stash remain separate.
 ## Current public-option candidate
 
 Build with `--public` to generate `WingCommander.Slave`, `WingCommander.info`
-and the OCS `ReadMe`. The icon contains `CUSTOM5=1`; command-line launches must
+and the OCS `ReadMe`. The icon contains `CUSTOM5=1` and `DCACHE` (instruction/data caches); command-line launches must
 supply it explicitly. Clear the checkbox, use `CUSTOM5=0`, or omit the option
 for original per-frame simulation, rendering, waits and cache behaviour in the
 same slave. Only the value 1 requests enhancements; other values stay original.

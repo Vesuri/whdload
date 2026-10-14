@@ -747,6 +747,14 @@ CD32 E1 and phase 12 remain paused.
 
 ## Decisions pending
 
+- The user reports accelerated orchestra/planet/Origin FX/fireworks motion on
+  OCS/A3000. This separate opening remains native and frame-driven in both
+  variants; it is outside the completed title/asteroid 10 Hz work. Existing CD32
+  fast-model Origin animation/particle measurements approach its normal 25 Hz
+  limiter. Investigate a shared elapsed-time motion policy with variant-specific
+  hooks; retain music cues and original-mode behaviour. No opening-speed fix is
+  claimed yet.
+
 - Release play-testing must judge visible hard-turn corrections and all model/camera paths;
   the implemented presentation policy predicts to display time with authoritative
   snaps and a bound of one tick plus two queued display fields.

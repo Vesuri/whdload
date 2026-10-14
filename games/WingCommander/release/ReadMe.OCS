@@ -3,7 +3,8 @@ Original slave: Psygore. Improvements: Vesa Halttunen.
 
 Enhanced framerate (68020+Fast RAM)
 
-The launch icon enables CUSTOM5=1 by default. Clear this checkbox in WHDLoad,
+The launch icon enables CUSTOM5=1 and DCACHE by default. DCACHE requests both
+instruction and data caches; use NOCACHE to override caching explicitly. Clear this checkbox in WHDLoad,
 set CUSTOM5=0, or remove the tooltype to use the original game behaviour:
 per-frame simulation, original rendering, frame waits and cache request.
 

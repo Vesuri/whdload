@@ -32,11 +32,13 @@ def enhanced_icon(original):
         raise ValueError('icon does not select OCS slave')
     if any(x.upper().lstrip(b'(').startswith(b'CUSTOM5=') for x in entries):
         raise ValueError('refusing to replace existing CUSTOM5 choice')
-    entry = b'CUSTOM5=1\0'
-    addition = struct.pack('>I', len(entry)) + entry
+    added = [b'CUSTOM5=1\0']
+    if not any(x.rstrip(b'\0').upper() in (b'CACHE', b'DCACHE', b'NOCACHE') for x in entries):
+        added.append(b'DCACHE\0')
+    addition = b''.join(struct.pack('>I', len(entry)) + entry for entry in added)
     size = struct.unpack_from('>I', original, start)[0]
-    updated = original[:start] + struct.pack('>I', size+4) + addition + original[start+4:]
-    if tooltypes(updated)[2] != [entry] + entries:
+    updated = original[:start] + struct.pack('>I', size+4*len(added)) + addition + original[start+4:]
+    if tooltypes(updated)[2] != added + entries:
         raise ValueError('tooltype insertion failed')
     if updated[:start]+struct.pack('>I',size)+updated[start+4+len(addition):] != original:
         raise ValueError('icon artwork changed')

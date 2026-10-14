@@ -6814,3 +6814,34 @@ preserving artwork and existing options. Reference icons/game trees are not
 modified. The new OCS ReadMe and [support document](ocs-release.md) distinguish
 original-mode selection from per-source conversion fallback and retain E2's
 campaign, hardware/cache, controller and cold-boot save/load limitations.
+
+
+### Opening animation speed and default caches
+
+The OCS/A3000 report concerns the separate orchestra/planet/Origin FX/fireworks
+opening, not the title ships and asteroid credits already on the 10 Hz clock.
+The opening remains native in both variants. In CD32 code hunk 3, `$ee0` (file
+`$43ccc`) enters the animation; `$ef2` (file `$43cde`) decrements its countdown
+per loop, `$f0e` (file `$43cfa`) draws the selected animation image and `$f40`
+(file `$43d2c`) increments the frame index. Music-cue exit tests coexist with
+these frame-driven steps; a timed scene boundary does not fix the speed of its
+motion. The OCS counterpart is O3:`$e26` (file `$42c72`), with a per-loop
+countdown at `$e38` (file `$42c84`) and frame-index increment at `$e86`
+(file `$42cd2`); it likewise has separate music-cue exit checks. `release_limit` retains the normal limiter outside enhanced world
+intro/flight, rather than applying the 10 Hz scheduler to this sequence.
+
+The retained corrected-clock CD32 scene table above measures approximately
+25.0–25.2 publications/s in Origin animation and particles across the tested
+030/040/060 models. The earlier stock-model animation sample has 30 publications
+over 2.672 seconds. These establish machine-dependent frame throughput, with
+fast CD32 capped by its normal limiter; they are not an intended-rate estimate
+for every opening subscene. OCS's newly reported visible speed remains a timing
+issue to investigate; no opening animation fix or new live measurement is claimed.
+
+OCS launcher and generated-icon defaults now request WHDLoad `DCACHE`, which
+requests both instruction and data caches. Installed WHDLoad option documentation
+specifies that `CACHE` instead disables data caching and that `NOCACHE` overrides
+both. Original OCS SetCPU already requests IC/DC (`$032a`, or `$3b3d` on 040);
+the new default makes the user's request explicit without modifying slave code.
+Existing generated icons/running games are not edited in place. No new hardware
+or data-cache compatibility claim follows from changing launch defaults.

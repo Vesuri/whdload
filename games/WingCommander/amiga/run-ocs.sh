@@ -6,7 +6,7 @@ export WC_VARIANT=ocs
 export AMIGA_SETUP="${AMIGA_SETUP:-a3000}"
 export FSUAE_RUN="${FSUAE_RUN:-../tmp/run-ocs}"
 # An explicitly empty WHD_ARGS selects original behaviour.
-export WHD_ARGS="${WHD_ARGS-CUSTOM5=1}"
+export WHD_ARGS="${WHD_ARGS-CUSTOM5=1 DCACHE}"
 
 if [ "${1:-}" != stop ] && [ -z "${SLAVE:-}" ]; then
   . "$ROOT/amiga/env.sh"

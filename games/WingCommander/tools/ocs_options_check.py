@@ -94,7 +94,7 @@ def check(build, mutation=None):
     original=(ROOT/'tmp/originals/ocs/WingCommander/WingCommander.info').read_bytes()
     icon=(build/'WingCommander.info').read_bytes()
     require(icon==enhanced_icon(original),'generated icon mismatch')
-    require(tooltypes(icon)[2][0]==b'CUSTOM5=1\0','icon default disabled')
+    require(tooltypes(icon)[2][:2]==[b'CUSTOM5=1\0',b'DCACHE\0'],'icon defaults disabled')
     rejected=0
     for bad in (icon,b'bad icon',original[:80]):
         try:enhanced_icon(bad)
