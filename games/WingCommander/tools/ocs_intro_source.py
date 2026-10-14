@@ -9,11 +9,14 @@ HOOKS=((0x1ef24,'intro_title',0x4ef9),(0x1effc,'intro_credits_update',0x4eb9),
 def source(root):
     shared=(root/'whdload/timing_intro.s').read_text()
     title=shared[shared.index('intro_title:'):shared.index('; Native credit loop')]
-    replacements={'timing_game':'game_base','WC_SCENE_APPROACH':'135',
+    replacements={'timing_game':'game_base','timing_clock':'ocs_clock_state',
+     'timing_hz':'ocs_clock_hz','WC_A4_FIELD_CLOCK':'-2048','WC_SCENE_APPROACH':'135',
      'WC_SCENE_DEPARTURE':'235','WC_SCENE_TITLE_UPDATES':'296',
      '-22652(a4)':'-22676(a4)','4438(a4)':'2276(a4)',
-     '$13f50(a6)':'$13cc6(a6)','$1fb40(a6)':'$1ed64(a6)',
-     '$1fb7a(a6)':'$1ed9e(a6)','$1898a(a6)':'$180c4(a6)',
+     '$13f50(a6)':'$13cc6(a6)',
+     '-22256(a4)':'-22292(a4)','-4314(a4)':'-4184(a4)',
+     '$2ec98(a6)':'$2f3a0(a6)','$2d746(a6)':'$2d0de(a6)',
+     '$1898a(a6)':'$180c4(a6)',
      '#$1fd90':'#$1efb4'}
     for old,new in replacements.items():title=title.replace(old,new)
     return select((root/'whdload/ocs_intro.s').read_text()+'\n'+title,'68000')

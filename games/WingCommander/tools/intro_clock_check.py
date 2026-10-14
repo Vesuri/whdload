@@ -72,13 +72,14 @@ def main():
         c.write(s+sy['intro_world'],bytes.fromhex('52b9000011004e75'))
         c.write(s+sy['intro_draw'],bytes.fromhex('52acff044e75'))
         c.write(s+sy['intro_finish'],bytes.fromhex('4e75'))
-        for off in (0x13f50,0x1fb40,0x1fb7a):c.write(c.code+off,bytes.fromhex('4e75'))
+        for off in (0x13f50,0x2ec98,0x2d746):c.write(c.code+off,bytes.fromhex('4e75'))
         c.write(c.code+0x1898a,bytes.fromhex('70004e75'))
         c.write(0x1100,bytes(4));c.data_value(0x7f02,'I',0)
         c.run(s+sy['intro_title']-c.code,end=0x1fd90,registers={6:0x1e0000,4:90,15:200})
         assert int.from_bytes(c.read(0x1100,4),'big')==296
         assert c.data_value(0x7f02,'I')==1480
         assert c.reg(11)==296 and c.reg(15)==138
+        assert int.from_bytes(c.read(0x1dfffe,2),'big')==366
         assert c.read(s+sy['intro_active'],2)==bytes(2)
         # Both the repeated cycle and skip exits must land on intact native
         # instructions, restore prediction state, and retain the skip flag.

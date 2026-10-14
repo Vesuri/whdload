@@ -74,10 +74,11 @@ def check(build,model):
   def draw():c.write(DATA+0x77fe,long(c.get(DATA+0x77fe,4)+1));c.return_call()
   c.intercept(SLAVE+sy['intro_draw'],draw)
   c.intercept(SLAVE+sy['intro_finish'],lambda:c.return_call())
-  for off in (0x13cc6,0x1ed64,0x1ed9e,0x1efb4,0x180c4):c.intercept(CODE+off,lambda:c.return_call(0))
+  for off in (0x13cc6,0x2f3a0,0x2d0de,0x1efb4,0x180c4):c.intercept(CODE+off,lambda:c.return_call(0))
   c.run(SLAVE-CODE+sy['intro_title'],registers={6:0x1e0000,4:90,15:200,11:0,12:0})
   require(count[0]==296 and c.reg(11)==296 and c.reg(15)==138,('title script',count,c.reg(11),c.reg(15)))
   require(c.get(DATA+0x77fe,4)==1480,'title time')
+  require(c.get(0x1dfffe)==366,'authoritative title rotation')
   require(c.get(SLAVE+sy['intro_active'])==0,'title exit active')
   exits=[]
   for off in (0x1eeb2,0x1f06e):

@@ -4495,3 +4495,35 @@ reports are `tmp/opening-{ocs,cd32}-final-clock` and
 `tmp/opening-{ocs,cd32}-final-options`; full opening reports/screenshots are
 `tmp/opening-{ocs,cd32}-live`. Launch the current OCS code through
 `./amiga/run-ocs.sh`, which builds a fresh public candidate by default.
+
+### Wing Commander title zoom and rotation
+
+The shared title loop now samples its own sprite scale and rotation between world
+ticks. Build and test both variants with fresh output directories:
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/title-ocs-new
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/title-cd32-new
+python3 tools/title_motion_check.py ocs tmp/title-ocs-new --output tmp/title-ocs-native-new
+python3 tools/title_motion_check.py cd32 tmp/title-cd32-new --output tmp/title-cd32-native-new
+python3 tools/ocs_intro_check.py tmp/title-ocs-new --output tmp/title-ocs-intro-new
+python3 tools/intro_clock_check.py tmp/title-cd32-new --output tmp/title-cd32-intro-new.json
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/opening_live_check.py ocs tmp/title-ocs-new --title-only --output tmp/title-ocs-live-new
+python3 tools/opening_live_check.py cd32 tmp/title-cd32-new --title-only --output tmp/title-cd32-live-new
+```
+
+`--title-only` skips the opening through native Escape handling, releases the key
+at the world-intro entry, then records 20 calls to each native title bitmap
+renderer. It requires differing render parameters within one unchanged script
+tick, captures approach/rotation images, and reaches the native title-loop exit.
+It retains the bounded PAL/DCACHE setups and field-based observations of the
+opening gate. Native tests additionally cover NTSC and fractional projection at
+phase boundaries without modifying authoritative geometry.
+
+Accepted builds are `tmp/title-ocs-v2` and `tmp/title-cd32-v2`; their native
+sampler reports are `tmp/title-{ocs,cd32}-native/report.json`. Full-loop checks
+are `tmp/title-ocs-intro-final/report.json` and `tmp/title-cd32-intro-final.json`.
+Both live runs pass in `tmp/title-{ocs,cd32}-live/report.json`, with two PNG
+captures each. The existing OCS launcher builds these changes automatically.

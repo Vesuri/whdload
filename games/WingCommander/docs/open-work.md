@@ -12,6 +12,8 @@ Enhanced OCS and CD32 openings now run orchestra/fireworks steps at 10 Hz and
 sample the planet/Origin FX zooms between ticks. Music cues and original modes
 remain native. Both unskipped opening gates pass through to the world intro; see
 [opening timing](internals.md#opening-animation-speed-and-default-caches).
+The separate Wing Commander title logo also samples fractional zoom and rotation
+between ticks; its authoritative script duration and geometry remain unchanged.
 
 **Phase 13 investigation, P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E3 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in

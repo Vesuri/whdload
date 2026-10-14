@@ -6896,3 +6896,44 @@ both. Original OCS SetCPU already requests IC/DC (`$032a`, or `$3b3d` on 040);
 the new default makes the user's request explicit without modifying slave code.
 Existing generated icons/running games are not edited in place. No new hardware
 or data-cache compatibility claim follows from changing launch defaults.
+
+### Wing Commander title logo: fractional zoom and rotation
+
+The Wing Commander title logo is separate from the orchestra/planet/Origin FX
+opening. Its shared `intro_title` loop already ran the script at 10 Hz, but sent
+unchanged integer depth D6 and local rotation angle `-2(a5)` to every draw between
+ticks. World-object prediction did not affect these sprite parameters.
+
+The script still performs 296 updates, approaching at index 135 and departing at
+235. Authoritative approach depth decreases by four per tick to 16; departure
+adds two to depth and six to rotation per tick. A render-only sampler now combines
+the clock remainder with fields elapsed during drawing, capped at one tick.
+It projects **fractional depth** directly as `floor(4096 * Hz / depth_numerator)`;
+rounding depth to an integer before projection would introduce additional zoom
+steps near the camera. Rotation adds the fractional part of the next six-unit
+step. Neither sample is stored back into D6, the angle local, or world state.
+Integer sprite scale/angle resolution and machine rendering capacity still apply.
+
+The same native bitmap renderers receive the resulting parameters. Their original
+title wrappers are CD32 hunk 0 `$1fb40`/`$1fb7a` (file `$1fb6c`/`$1fba6`) and OCS
+`$1ed64`/`$1ed9e` (file `$1ed90`/`$1edca`). Enhanced title drawing passes scale
+directly to CD32 `$2ec98`/`$2d746` (file `$2ecc4`/`$2d772`) or independently mapped
+OCS `$2f3a0`/`$2d0de` (file `$2f3cc`/`$2d10a`), retaining the native destination,
+image, centre, frame and flags. No additional game hook or original-mode change
+is needed. The shared title-loop hook remains CD32 `$1fd00` / OCS `$1ef24`.
+
+Native PAL/NTSC tests cover approach, settled logo, departure, phase boundaries,
+clock wrap and state preservation on 68000/020 OCS and 020/040 CD32 models.
+For the final approach from depth 20 to 16, PAL render scale samples are
+204, 213, 222, 232, 243, 256; departure angle samples are 0, 1, 2, 3, 4, 6.
+Both full native title-loop gates retain 296 ticks and 1480 PAL fields, with
+unchanged final geometry and exit behavior. See [reproduction commands](development.md#wing-commander-title-zoom-and-rotation)
+for the focused checks; these are functional tests, not performance measurements.
+
+The bounded live gate checks actual native bitmap-call arguments, including
+multiple scales/angles with the same script index, depth and authoritative angle.
+OCS samples at index 165 keep depth 80 while scale changes 51 to 53; at index
+256, depth 58 and angle 126 remain fixed while displayed angle changes 127 to
+132. These show that both changes reach the renderer, rather than existing only
+in scheduler arithmetic. Captures retain the logo's normal composition and the
+rotated departure. Rendering can still take more than one field on these setups.

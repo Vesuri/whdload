@@ -111,7 +111,8 @@ intro_finish:
         rts
 
 ; Replaces E:1fd00..1fd8e's frame-coupled loop. Native script index D2 and
-; title geometry advance once per world tick, never once per drawn picture.
+; title geometry advance once per world tick. Render arguments are sampled
+; between ticks without modifying D6 or the native local rotation angle.
 ; A5/D3/D7 and the surrounding native function's stack remain its own.
 intro_title:
         bsr.w   intro_start
@@ -150,21 +151,31 @@ intro_title:
         jsr     $13f50(a6)
         lea     10(sp),sp
 .title:
+        bsr.w   intro_title_sample
         cmpi.w  #WC_SCENE_APPROACH,d2
         blt.s   .finish
         cmpi.w  #WC_SCENE_DEPARTURE,d2
         bge.s   .depart_draw
+        move.w  d0,-(sp)        ; projected scale, with fractional depth retained
+        clr.w   -(sp)
+        move.l  -22256(a4),-(sp)
         move.w  a3,-(sp)
-        move.w  d6,-(sp)
-        jsr     $1fb40(a6)
-        addq.l  #4,sp
+        move.w  -4314(a4),-(sp)
+        pea     4438(a4)
+        jsr     $2ec98(a6)
+        lea     16(sp),sp
         bra.s   .finish
 .depart_draw:
-        move.w  -2(a5),-(sp)
+        clr.w   -(sp)
+        move.w  d0,-(sp)
+        move.w  d1,-(sp)
+        clr.w   -(sp)
+        move.l  -22256(a4),-(sp)
         move.w  a3,-(sp)
-        move.w  d6,-(sp)
-        jsr     $1fb7a(a6)
-        addq.l  #6,sp
+        move.w  -4314(a4),-(sp)
+        pea     4438(a4)
+        jsr     $2d746(a6)
+        lea     20(sp),sp
 .finish:
         bsr.w   intro_finish
         move.l  timing_game(pc),a6
@@ -177,6 +188,54 @@ intro_title:
         bsr.w   intro_stop
         move.l  timing_game(pc),-(sp)
         addi.l  #$1fd90,(sp)
+        rts
+
+; D0/D1 = render-only projected scale/rotation angle. D2 is the next script tick.
+; Include fields spent drawing, but cap preview at one tick: a slow render must
+; not advance through unexecuted script phases. Never feed samples back to D6.
+intro_title_sample:
+        movem.l d3-d5,-(sp)
+        moveq   #0,d0
+        move.w  d6,d0
+        move.w  -2(a5),d1
+        move.l  WC_A4_FIELD_CLOCK(a4),d3
+        sub.l   timing_clock(pc),d3
+        cmpi.l  #6,d3
+        bls.s   .elapsed
+        moveq   #6,d3
+.elapsed:
+        mulu.w  #10,d3
+        add.l   timing_clock+4(pc),d3
+        move.l  timing_hz(pc),d4
+        cmp.l   d4,d3
+        bls.s   .bounded
+        move.l  d4,d3
+.bounded:
+        mulu.w  d4,d0          ; retain fractional depth through projection
+        cmpi.w  #WC_SCENE_APPROACH,d2
+        blt.s   .project
+        cmpi.w  #WC_SCENE_DEPARTURE,d2
+        bge.s   .depart
+        cmpi.w  #16,d6
+        ble.s   .project
+        mulu.w  #4,d3
+        sub.l   d3,d0
+        bra.s   .project
+.depart:
+        move.l  d3,d5
+        mulu.w  #2,d3
+        add.l   d3,d0
+        mulu.w  #6,d5
+        divu.w  d4,d5
+        add.w   d5,d1
+.project:
+        move.l  d0,d3
+        move.l  #4096,d0
+        mulu.w  d4,d0
+        divu.w  d3,d0
+        andi.l  #$ffff,d0
+.done:
+        movem.l (sp)+,d3-d5
         rts
 
 ; Native credit loop keeps both the 220-field text and 320-field page tests.
