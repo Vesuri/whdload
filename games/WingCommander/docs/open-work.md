@@ -2,7 +2,7 @@
 
 ## Current state
 
-**Phase 13 investigation, P13A1–P13A4 and P13B1–P13B2 are complete.** The OCS loader, four-plane blitter
+**Phase 13 investigation, P13A1–P13A4 and P13B1–P13B3 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The
 [ordered OCS work items P13A1–P13E3](ocs-plan.md) cover shared CD32 mechanisms,
@@ -18,9 +18,13 @@ No OCS runtime change or backend selection is included. Compile-time variant map
 and explicit build/analysis selection now preserve all checked CD32 binaries and
 original OCS bytes. The shared 68000 ISA alternatives pass arithmetic, flags and
 wrapper checks; full OCS linking and native ABI integration remain later gates.
-P13B3 is next only on request; CD32 E1 and phase 12 remain
+Shared instrumentation now distinguishes world ticks, rendered sources and actual
+OCS display changes, with strict state/pixel/allocation/ownership checks. The
+callable OCS recorder passes CPU/replay checks; live guest hooks and their overhead
+remain later integration. The retained native observer-off control remains exact.
+P13C1 is next only on request; CD32 E1 and phase 12 remain
 paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
-[P13B2 scope and checks](internals.md#p13b2-shared-68000-execution-safety).
+[P13B3 scope and checks](internals.md#p13b3-shared-instrumentation-and-validation-interfaces).
 
 The following completed implementation results concern **CD32**:
 
@@ -683,7 +687,7 @@ The investigation deliverable is the [ordered OCS plan](ocs-plan.md):
   projectile prediction and the 15-page intro.
 - **P13E1–P13E3:** focused A500 performance work, compatibility and later release hand-off.
 
-P13A1–P13A4 and P13B1–P13B2 are complete; P13B3–P13E3 remain pending. The native converter **uses the blitter**;
+P13A1–P13A4 and P13B1–P13B3 are complete; P13C1–P13E3 remain pending. The native converter **uses the blitter**;
 keep it where measured end-to-end performance wins, including potentially 68000
 and no-Fast 68020 systems. A 68000 CPU converter and the proposed 68020+ longword
 path are alternatives to compare, not a reason to remove the blitter. CPU type

@@ -1,11 +1,13 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: P13A1–P13A4 and P13B1–P13B2 are complete. Shared mechanisms
-have base-ISA alternatives with executed arithmetic/flag gates; CD32 outputs and
-original OCS reconstruction remain byte-identical. Stop at P13B2; start P13B3
-only when requested. No OCS enhancement hooks or backend selection yet. See
-`docs/ocs-plan.md`. Per-unit ISA fixtures do not certify an OCS linked runtime.
+Current scope: P13A1–P13A4 and P13B1–P13B3 are complete. Shared base-ISA
+mechanisms and instrumentation interfaces pass their documented gates. CD32
+release and original OCS reconstruction remain byte-identical. Stop at P13B3;
+start P13C1 only when requested. No OCS enhancement hooks or backend selection
+are installed. The OCS guest recorder is CPU-tested, not live-hooked; its later
+integration must measure guest overhead and validate allocation/IRQ ownership.
+See `docs/ocs-plan.md`. CPU fixtures do not certify an OCS enhanced runtime.
 Required baseline for later work: Amiga 500 with Fast RAM. Share verified CD32
 mechanisms with 68000-safe paths. Retain native blitter C2P wherever matched
 CPU/memory measurements favour it; CPU type alone is not a crossover measurement.

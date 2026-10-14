@@ -5103,3 +5103,114 @@ The existing variant rejection/locator, eight installer/option, 12 intro-clock
 schedule and 96 intro pose/camera/restoration checks also pass. No FS-UAE/game
 run was required. These are functional CPU-model results, not cycle benchmarks
 or real-hardware acceptance. Stop at B2; B3 starts only on request.
+
+### P13B3: shared instrumentation and validation interfaces
+
+**P13B3 is complete as an instrumentation-interface gate.** `frame_schema.py`
+now owns the WCFS/WCDS binary formats, while the explicit-variant
+`instrumentation_check.py` selects the existing CD32 recorder/observer gate or
+the OCS native observer adapter. The OCS guest recorder is assembled and executed
+in CPU tests, including native-data/event replay; it is **not installed into the
+OCS slave**. Native OCS hooks, IRQ integration, allocation and measured guest
+recorder cost remain responsibilities of the later components that install them.
+There is no new converter, timing policy, release or emulator run in this step.
+
+#### Shared format and OCS event ownership
+
+Existing CD32 event IDs 1–16 and WCFS/WCDS layouts are unchanged. WCFS adds
+17 (`render_complete`) and 18 (`native_publication`). OCS exports use the
+independent field edges and colour-clock samples from the retained A4 observer;
+the report explicitly labels them **host observations, not guest WCFS captures**.
+WCDS contains actual first DMA of a newly displayed OCS buffer, with its matching
+Copper publication. The CD32 adapter retains its existing publication-time ledger
+and early-VBL checks. A shared wire format does not make those two timestamp
+sources identical; do not feed the OCS export to the CD32 cost summariser.
+
+| OCS event | Code-hunk offset | File offset | Check |
+|---|---:|---:|---|
+| World entry / completed update | `02be` / `02dc` | `02ea` / `0308` | Completed event agrees with `OD:88da` counter delta |
+| Drawing entry | `02e6` | `0312` | Agrees with `OD:88de` counter delta in the native default windows |
+| Rendered source ready, before conversion | `3260a` | `32636` | Entry/completion ordering, including window-edge work |
+| Conversion entry / first blitter stage | `32626` / `329e4` | `32652` / `32a10` | Native three-stage queue checks retained |
+| Final blitter completion | `32e02` | `32e2e` | Publication must use the same completed buffer index |
+| Copper publication | `33aa8` | `33ad4` | Aligned Chip pointer, reconciled with independent plane-0 DMA |
+
+The field clock is `OD:77fe` (file `41146`, A4−`800`), not CD32's `D:7f02`
+(file `41f4a`, A4−`fc`). Plane-0 allocations and plane extent come from
+`O:331c0`/`331c4`/`331d2` (files `331ec`/`331f0`/`331fe`). Every observed fetch
+must fall within the named buffer's plane-0 range. No CD32 line-4–16 deadline or
+AGA fetch assumption is transferred to OCS.
+
+`native_validation.py` shares strict hunk comparisons, actual MEMF_CHIP extent
+and non-overlap checks, and variant-selected pixel decoding. OCS retains four
+planes, checkerboard nibbles, two leading rows and the four independently verified
+black edge pixels. CD32 retains eight planes and byte colours. Its pixel fixture
+also agrees with the existing independent NumPy packing oracle. Native revision
+locators and OS memory-header traversal remain in their existing variant adapters.
+
+#### Callable recorder contract
+
+`recorder_source.source(variant, capacity)` reuses the existing owned
+`frame_stat` body, selecting the variant field operand and B2's 68000 lowering.
+`recorder_window.s` adds begin/freeze entry points without borrowing a CD32
+resload pointer, allocator or publication hook. Default capacity is 2,048 events:
+8,208 bytes of caller-owned Fast storage; the OCS callable code/state is 688 bytes.
+These are component sizes, not a measured installed-game memory requirement.
+
+Begin receives the buffer, variant data hunk and nominal 50/60 Hz. The caller
+must validate aligned, disjoint Fast storage and its lifetime, and serialise all
+calls on one task. Null pointers or invalid Hz disable recording. The first active
+sample establishes the epoch without emitting an event. Subsequent calls preserve
+all registers and CCR, including X, in user and supervisor modes. Freeze disables
+recording before writing a header for the completed prefix; no disk I/O occurs.
+The buffer fills once. Consumers must reject a saturated window or nonzero
+`frame_stats_dropped` instead of silently accepting incomplete evidence.
+
+A timestamp gets at most four attempts to reconcile the field counter and two
+beam reads; exhausting these increments the dropped-sample counter and returns.
+This bounds the diagnostic loop. CPU execution checks observe at most 118
+instructions on the tested OCS paths, including fourth-attempt success; stable
+replayed events use 79. These are **instruction counts, not cycle costs or A500
+performance measurements**. IRQ callers must not share this main-task recorder;
+OCS IRQ publication remains a separate host observation until its later integration.
+
+#### Accepted evidence and limits
+
+The retained A4 on/off captures are revalidated with the new interfaces. Across
+eight checkpoints, all native hunks, Chip bytes and full RGB pictures remain
+exact; the 63,680-pixel name-screen oracle and its edge/nibble controls pass.
+Matched field edges and counters have zero emulated-cycle difference. This bounds
+the **read-only host observer's emulated effect**; it measures neither host wall
+cost nor the future guest recorder's runtime overhead.
+
+| 250-field window | World ticks | Draw entries | Rendered pictures | Publications | Actually displayed |
+|---|---:|---:|---:|---:|---:|
+| Asteroid credits | 28 | 28 | 29 | 29 | 29 |
+| Simulator/fire | 27 | 27 | 27 | 27 | 27 |
+
+Both windows begin with drawing already underway; asteroid drawing finishes before
+the end, while flight drawing is pending at both edges. These boundaries explain
+the distinct counts; a submission is never counted as actual display. All 500
+observed fields contain one display allocation, and the 56 new-buffer changes
+match completed-image publications. The original A4 11 rejecting controls remain;
+five additional controls reject bad DMA addresses, Fast Copper pointers, wrong draw
+counts, missing render completion and publication of the wrong completed buffer.
+
+The OCS recorder passes all 32 CCR values in both privilege modes on 68000/020/040;
+the shared accelerated version passes on 020/040 (320 flag/lifecycle cases total).
+Capacity, freeze, null setup, PAL/NTSC, field wrap, each retry-success position and
+repeated torn/advancing-clock failure pass. Replaying 230 asteroid and 216 flight
+records with captured OCS data produces byte-identical WCFS on all three models
+(1,338 emitted records). Deliberately poisoning the CD32 field location does not
+affect OCS. Wrong-clock and missing-second-beam-read recorder mutations are
+rejected, as are 16 shared schema/state/pixel/allocation controls.
+
+Retained CD32 PAL buffered/unbuffered and NTSC reports are identical before/after
+the parser extraction. The independent CD32 gate still matches all 657 publications
+in its held-turn capture (0.00113 ms elapsed-time difference). Fresh CD32 release
+and original OCS builds remain byte-identical to B2. Evidence is in
+`tmp/p13b3-gate/`, `tmp/p13b3-ocs-gate/`, `tmp/p13b3-cd32/` and
+`tmp/p13b3-cd32-parser.json`; derived exports, assembled components and binaries
+remain in `tmp/`. Later live guest integration still needs its own overhead,
+allocation/failure, native ABI and IRQ checks; these CPU replays do not close them.
+Stop here; P13C1 is the next ordered item, only on request.

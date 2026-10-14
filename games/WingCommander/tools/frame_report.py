@@ -13,13 +13,11 @@ same field replaces it before display ("overwritten").
 import argparse
 import json
 import statistics
-import struct
 from collections import Counter
 from pathlib import Path
 
-NAMES = {1: 'loop', 2: 'world_begin', 3: 'world_end', 4: 'draw', 5: 'predicted', 6: 'scene_drawn',
-         7: 'hud_done', 8: 'restored', 9: 'convert_entry', 10: 'limit_begin', 11: 'limit_end',
-         12: 'convert_begin', 13: 'convert_end', 14: 'wait_begin', 15: 'wait_end', 16: 'queued'}
+from frame_schema import NAMES, decode_frames, decode_display, display_order
+
 # Interval name: (start event, end event)
 # Observed order inside $510: native drawing, then the converter call (limiter,
 # conversion, display wait) and publication; $46e6 runs after publication.
@@ -30,15 +28,9 @@ WARMUP_FRAMES = 20
 
 
 def records(path):
-    raw = path.read_bytes()
-    magic, hz, count, skip = struct.unpack_from('>4sIII', raw)
-    if magic != b'WCFS' or hz not in (50, 60) or len(raw) != 16+4*count:
-        raise ValueError(f'{path}: not a frame statistics file')
+    hz, skip, rows = decode_frames(path.read_bytes())
     lines = 313 if hz == 50 else 263
     records.line_ms = 1000*(227/3546895 if hz == 50 else 227.5/3579545)
-    rows = [(w >> 27, (w >> 9) & 0x3ffff, w & 0x1ff) for (w,) in struct.iter_unpack('>I', raw[16:])]
-    if any(r[0] not in NAMES for r in rows):
-        raise ValueError(f'{path}: unknown event id')
     ev, corrected = [], 0
     for e, f, v in rows:
         # Early in a field the beam can wrap before the game's VBL handler
@@ -78,15 +70,11 @@ def settings(run):
 
 
 def display_records(path):
-    raw=path.read_bytes()
-    magic,hz,count,size=struct.unpack_from('>4sIII',raw)
-    if magic!=b'WCDS' or hz not in (50,60) or size not in (16,32) or len(raw)!=16+size*count:
-        raise ValueError('invalid display ledger')
-    rows=[struct.unpack_from('>IHHII',raw,16+i*size) for i in range(count)]
+    hz, size, rows = decode_display(path.read_bytes())
+    count = len(rows)
     if count<100 or any(not 4<=v<=16 or index>1 or not plane or not copper for f,v,index,plane,copper in rows):
         raise ValueError('invalid/late copper handoff')
-    if any(b[0]<=a[0] or b[2]==a[2] or b[3]==a[3] for a,b in zip(rows,rows[1:])):
-        raise ValueError('display ownership/order violated')
+    display_order(rows)
     return rows
 
 

@@ -6,14 +6,7 @@ import struct
 from pathlib import Path
 from PIL import Image
 from ocs_runtime import SIZES, locate
-
-
-def equal_bytes(a, b, size, label):
-    if len(a) != size or len(b) != size:
-        raise ValueError('truncated '+label)
-    if a != b:
-        first = next(i for i, (x, y) in enumerate(zip(a, b)) if x != y)
-        raise ValueError(f'{label} differs at offset {first:#x}')
+from native_validation import equal_bytes, dma_regions, chunky_pixels, planar_pixels
 
 
 def memory_contract(root, label):
@@ -64,11 +57,7 @@ def memory_contract(root, label):
         raise ValueError('native plane geometry differs')
     regions = [(p, p+size) for p in (workspace, display0, display1)]
     regions.append((source, source+width*height))
-    if any(start & 1 or not 0 < start < end <= 0x80000 for start, end in regions):
-        raise ValueError('DMA storage is not aligned Chip RAM')
-    for i, (a, b) in enumerate(regions):
-        if any(max(a, c) < min(b, d) for c, d in regions[i+1:]):
-            raise ValueError('overlapping native DMA allocations')
+    dma_regions(regions, headers)
     return dict(width=width, height=height, memory_attributes=[h[0] for h in headers],
                 chip_dma_regions=len(regions), planes=4)
 
@@ -89,15 +78,16 @@ def pixels(root):
     source = int.from_bytes(code[0x324b0:0x324b4], 'big')
     expected, actual, plain, low = (bytearray() for _ in range(4))
     edge = {(1, 1), (3, 1), (9, 1), (11, 1)}
+    source_pixels = chunky_pixels('ocs', chip[source:source+width*height], width, height)
+    plane_pixels = planar_pixels('ocs', chip[base:base+4*plane], width, height-1, row, plane)
     for y in range(height-1):
         for x in range(width):
             packed = chip[source+y*width+x]
-            colour = (packed >> (4 if (x+y)%2 == 0 else 0)) & 15
+            colour = source_pixels[y*width+x]
             plain.append(colour)
             low.append(0 if (x, y) in edge else packed & 15)
             expected.append(0 if (x, y) in edge else colour)
-            actual.append(sum(((chip[base+n*plane+(y+2)*row+x//8] >> (7-x%8)) & 1) << n
-                              for n in range(4)))
+            actual.append(plane_pixels[y*width+x])
     equal_bytes(actual, expected, width*(height-1), 'published name pixels')
     differences = [(i % width, i // width) for i, (a, b) in enumerate(zip(actual, plain)) if a != b]
     if set(differences) != edge:

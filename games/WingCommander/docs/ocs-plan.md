@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1–P13A4 and P13B1–P13B2 are complete**;
+It does not implement or validate an improved OCS slave. **P13A1–P13A4 and P13B1–P13B3 are complete**;
 the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -119,11 +119,18 @@ CD32 release/timing/render/native and original OCS outputs remain identical.
 This is an ISA gate, not a linked OCS enhancement or a speed result. See
 [contracts and audit limits](internals.md#p13b2-shared-68000-execution-safety).
 
-**P13B3 — Share instrumentation and validation interfaces.** Depends on B2, A4.
+**P13B3 — Share instrumentation and validation interfaces (complete).** Depends on B2, A4.
 Port the frame-statistics schema with a 68000-safe recorder and OCS publication
 observer. Add variant-aware native state/pixel, allocation and ownership checks.
 Gate: separate counts for world ticks, rendered pictures and actually displayed
 pictures; bounded observer overhead and a working uninstrumented control.
+Gate passed: shared WCFS/WCDS reader/writer, OCS field-clock recorder assembled and
+executed on 68000/020/040, native-data/event replay, distinct world/render/display
+counts and exact retained observer-off state/pixels. Host observer has zero matched
+emulated-cycle effect; the guest retry loop is bounded. The callable recorder is
+not yet hooked into the OCS game: later users must measure its installed overhead
+and validate allocation/IRQ integration. No backend or timing hooks are added.
+See [evidence and boundaries](internals.md#p13b3-shared-instrumentation-and-validation-interfaces).
 
 ## C — Choose conversion from measured CPU and memory behaviour
 
@@ -276,7 +283,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4 and P13B1–P13B2 are complete. Start **P13B3** only when requested. The first backend decision
+P13A1–P13A4 and P13B1–P13B3 are complete. Start **P13C1** only when requested. The first backend decision
 is **P13C2**, not the current investigation. In particular, neither “68000 must use
 CPU C2P” nor “68020 must abandon the blitter” has been established. Keep the
 blitter implementation available through the comparison and acceptance gates.

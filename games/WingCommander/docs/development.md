@@ -3370,3 +3370,61 @@ Accepted evidence: `tmp/p13b2-accepted/report.json`,
 `tmp/p13b2-variants/report.json`, `tmp/p13b2-install/report.json` and
 `tmp/p13b2-intro.json`; matching binaries are in `tmp/p13b2-final-*`.
 See [contracts and limits](internals.md#p13b2-shared-68000-execution-safety).
+
+## P13B3: shared instrumentation and validation gate
+
+Use an explicit variant. The OCS path reuses the calibrated P13A4 observer and
+matched on/off controls, not CD32's IRQ deadline or display assumptions. If the
+retained inputs are absent, recreate them with the P13A4 commands above. No new
+live capture is required when the observer, game and retained inputs are unchanged.
+Every output directory must be new and below `tmp/`.
+
+```sh
+. amiga/env.sh
+python3 tools/instrumentation_check.py --variant ocs \
+  --run tmp/p13a4-stock-on --control tmp/p13a4-stock-off \
+  --output tmp/b3-ocs
+python3 tools/instrumentation_unit_check.py --output tmp/b3-cpu \
+  --replay tmp/b3-ocs --capture tmp/p13a4-stock-on
+python3 tools/instrumentation_check.py --variant cd32 \
+  --run tmp/d3-final-040-turn-cost --output tmp/b3-cd32
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/b3-release
+python3 tools/reconstruct.py --variant ocs --output tmp/b3-native
+cmp tmp/b3-release/WingCommanderCD32.Slave tmp/p13b2-final-release/WingCommanderCD32.Slave
+cmp tmp/b3-native/WingCommander.Slave tmp/p13b2-final-ocs/WingCommander.Slave
+```
+
+The named CD32 input is the retained D3 held-turn capture; another accepted
+`--frame-stats`/observer pair can be supplied instead. Its original capture
+procedure is documented under D3. B2 build reproduction is above if comparison
+binaries are absent. Do not substitute a different capture for the OCS control:
+machine, slave, emulator, actions, clocks and every checkpoint must match.
+
+The OCS report separates completed world ticks, draw entries, rendered sources,
+Copper publications and actually displayed buffer changes. Exports
+`asteroids-framestats.bin`, `fire-framestats.bin` and their `*-displaystats.bin`
+companions share WCFS/WCDS with CD32, but their report records **host-observer**
+provenance and independent field-edge timestamps. They are not game-generated
+recorder output. `frame_schema.py` reads either format; `frame_report.py` remains
+the CD32 policy/cost summariser. The common wire reader imposes no CD32 beam deadline.
+
+`recorder_source.source('ocs', capacity=2048)` generates the callable owned
+recorder and state. The CPU gate writes the source, base-ISA binary and symbols
+under its output; `ocs-replay.*` uses the default capacity. The small lifecycle
+fixtures use capacity eight to exercise saturation. Assembly uses `-m68000
+-spaces -no-opt -Fbin`; the generated source includes B2's flag/addressing macros.
+Begin ABI: A0 = validated Fast buffer of `16+4*capacity` bytes, A1 = OCS data hunk,
+D0 = nominal 50/60 Hz. `frame_stat` takes event.w after the return address, as in
+the shared FSTAT call convention. `recorder_end` freezes and writes the completed
+header; export exactly `16+4*frame_stats_count` bytes. Check
+`frame_stats_dropped == 0` and `frame_stats_count < capacity` before accepting a
+window. `frame_stats_first` retains the native field epoch. The first sample only
+arms the epoch. All calls preserve registers and CCR; valid setup/lifetime and
+main-task serialisation remain the caller's responsibility.
+
+This component does not allocate memory, install hooks, save files, or support
+reentrant IRQ callers. Use a separate publication observer/ledger. The test's
+native-data replay supplies field/beam samples synthetically and labels the result
+as CPU semantics, not live guest instrumentation or elapsed-time performance.
+The four-attempt limit and executed instruction counts bound the recorder loop;
+measure guest overhead when later OCS components actually install it.
