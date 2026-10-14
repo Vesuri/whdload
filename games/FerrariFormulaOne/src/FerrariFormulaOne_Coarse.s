@@ -17,10 +17,16 @@ C1SaveFlags macro
 C1Head:
  movem.l d0-d7/a0-a6,-(sp)
  C1SaveFlags
+ IFD FF1_PRODUCTION
+ move.w C1Active(pc),d0
+ tst.w d0
+ bne.b .existing
+ ELSE
  lea C1Heads(pc),a0
  addq.l #1,(a0)
  cmpi.l #126,(a0)
  bne.b .existing
+ ENDC
  bsr.w C1Activate
 .existing:
  move.w C1Active(pc),-(sp)
@@ -71,8 +77,10 @@ C1End:
  ENDC
  bne.w C1Fault
 .control:
+ IFND FF1_PRODUCTION
  lea C1Completed(pc),a0
  addq.l #1,(a0)
+ ENDC
  IFD FF1_COARSE_VERIFY
  bsr.w C1Record
  ENDC
@@ -93,8 +101,10 @@ C1Checkpoint:
  bsr.w B8Draw
  bra.b .done
 .behind:
+ IFND FF1_PRODUCTION
  lea C1Skipped(pc),a0
  addq.l #1,(a0)
+ ENDC
 .done:
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d7/a0-a6
@@ -103,8 +113,10 @@ C1Checkpoint:
 C1NativeEnd:
  movem.l d0-d7/a0-a6,-(sp)
  C1SaveFlags
+ IFND FF1_PRODUCTION
  lea C1Completed(pc),a0
  addq.l #1,(a0)
+ ENDC
  IFD FF1_COARSE_VERIFY
  bsr.w C1Record
  ENDC
@@ -261,8 +273,10 @@ C1Restore:
  clr.l (a0)
  lea public_bound(pc),a0
  clr.l (a0)
+ IFND FF1_PRODUCTION
  lea s2_rng_done(pc),a0
  clr.w (a0)
+ ENDC
  lea FF1PresentationInstalled(pc),a0
  clr.l (a0)
  lea FF1FlagGraphic(pc),a0

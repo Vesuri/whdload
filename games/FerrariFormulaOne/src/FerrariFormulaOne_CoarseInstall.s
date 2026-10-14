@@ -108,9 +108,11 @@ start:
  move.w #$4ef9,$65174
  lea C1Head(pc),a0
  move.l a0,$65176
+ IFND FF1_PRODUCTION
  move.w #$4eb9,$6a304
  lea s2_rng_control(pc),a0
  move.l a0,$6a306
+ ENDC
  ; All race exits funnel through the original cleanup call at $65f48.
  lea C1Exit(pc),a0
  move.w #$4ef9,$65f48
@@ -131,6 +133,7 @@ start:
 done:
  movem.l (sp)+,d0-d7/a0-a6
  rts
+ IFND FF1_PRODUCTION
  IFD FF1_C4_NATIVE_FRAMES
 ; WHDLoad's entry offset is a signed word. Keep the header entry near the
 ; host even when the diagnostic selection wrapper grows past that range.
@@ -139,11 +142,16 @@ FF1C4EarlyBoot:
  lea selection_boot(pc),a1
  jmp (a1)
  ENDC
+ ENDC
 C1Flush:
  movem.l d0-d7/a0-a6,-(sp)
  lea start(pc),a2
  suba.l #FF1_HOST_CODE_SIZE,a2
+ IFD FF1_PRODUCTION
+ move.l FF1_HOST_RESLOAD(a2),a2
+ ELSE
  move.l $1180(a2),a2
+ ENDC
  jsr $20(a2)
  movem.l (sp)+,d0-d7/a0-a6
  rts

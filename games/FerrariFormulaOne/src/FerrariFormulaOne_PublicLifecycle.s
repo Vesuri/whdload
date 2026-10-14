@@ -98,7 +98,11 @@ public_seal:
 public_flush:
  lea start(pc),a2
  suba.l #FF1_HOST_CODE_SIZE,a2
+ IFD FF1_PRODUCTION
+ move.l FF1_HOST_RESLOAD(a2),a2
+ ELSE
  move.l $1180(a2),a2
+ ENDC
  jsr $20(a2)
  rts
 public_rollback:

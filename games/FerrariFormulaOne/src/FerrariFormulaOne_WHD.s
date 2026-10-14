@@ -69,7 +69,7 @@ BOOTDOS
 ;CBDOSLOADSEG
 ;CBDOSREAD
 ;CACHE
-DEBUG
+;DEBUG ; enable only for a local diagnostic build
 ;DISKSONBOOT
 DOSASSIGN
 FONTHEIGHT	= 8
@@ -115,16 +115,18 @@ slv_info	dc.b	"installed by StingRay/[S]carab^Scoopex",10
 		IFD	DEBUG
 		dc.b	"DEBUG!!! "
 		ENDC
-		dc.b	"Version 1.01 (07.08.2016)",0
+		dc.b	"Version 1.02 (performance mode opt-in)",0
 		CNOP	0,4
 
-slv_config	dc.b	"C1:B:Disable Timing Fix"
+slv_config	dc.b	"C1:B:Disable Timing Fix;C2:B:Elapsed-time performance mode (SPS 0481)"
 		dc.b	0
 		CNOP	0,4
 
 TAGLIST		dc.l	WHDLTAG_CUSTOM1_GET
 NOTIMINGFIX	dc.l	0
-		dc.l	TAG_DONE
+		dc.l	WHDLTAG_CUSTOM2_GET
+FF1PublicEnabled	dc.l 0
+	dc.l	TAG_DONE
 DOSbase	dc.l	0
 
 	IFD BOOTDOS
@@ -156,6 +158,8 @@ _bootdos
 	lea	PLGAME(pc),a5
 	cmp.l	#199368,d0			; SPS 481
 	beq.b	.ok
+	lea FF1PublicEnabled(pc),a0
+	clr.l (a0)
 	lea	PLGAME_IREK(pc),a5		; version sent by Irek
 	cmp.l	#199500,d0			; (later version with
 	beq.b	.ok				; bugs fixed)
@@ -167,12 +171,16 @@ _bootdos
 ; load game and patch game
 .ok	lea	.game(pc),a0
 	move.l	a0,d1
+	bsr.w FF1PublicBoot
 	jsr	_LVOLoadSeg(a6)
+	lea FF1PublicRoot(pc),a0
+	move.l d0,(a0)
 	move.l	d0,d7
 	
 	move.l	a5,a0
 	move.l	d7,a1
 	jsr	resload_PatchSeg(a2)
+	bsr.w FF1PublicResident
 
 	move.l	d7,d1
 	moveq	#.arglen,d0
@@ -212,6 +220,7 @@ _bootdos
 
 	movem.l	.saveregs(pc),d1-d3/d5-d7/a1-a2/a4-a6
 
+FF1PublicCallSite equ *
 	jsr	4(a3)
 
 
@@ -317,6 +326,31 @@ PLGAME	PL_START
 	add.l	$1c(a3),d0
 	move.l	d0,a1
 
+ move.l d1,-(sp)
+ move.l FF1PublicEnabled(pc),d1
+ movem.l (sp)+,d1
+ beq.w .legacy_layout
+ cmpi.l #$22f30,(a3)
+ bne.w .no
+ movem.l d0-d7/a0-a6,-(sp)
+ move.l a4,a0
+ move.l $18(a3),d0
+ lsl.l #2,d0
+ suba.l d0,a0
+ lea .patch(pc),a1
+ lea fixtiming(pc),a2
+ moveq #1,d0 ; elapsed mode replaces the native timing callback
+ bsr.w FF1PatchPublicRace
+ lea FF1PublicPatchError(pc),a0
+ move.l d0,(a0)
+ tst.l d0
+ bne.w FF1WrongVersion
+ move.l _resload(pc),a2
+ jsr resload_FlushCache(a2)
+ movem.l (sp)+,d0-d7/a0-a6
+ bsr.w FF1Dispatch
+ bra.w .no
+.legacy_layout:
 ; check if it is the "Race" hunk
 ; hunk starts at $64a68
 	cmp.w	#$2250,$6662(a1)	; $6b0ca
@@ -377,3 +411,69 @@ fixtiming
 	jsr	-270(a6)
 	movem.l	(a7)+,d0-a6
 	rts
+
+	ENDC ; close published BOOTDOS conditional for vasm
+
+FF1PublicResident:
+ movem.l d0-d7/a0-a6,-(sp)
+ move.l FF1PublicEnabled(pc),d0
+ beq.b .done
+ move.l d7,d0
+ lsl.l #2,d0
+ move.l d0,a0
+ move.l 4+16(a0),d0
+ lsl.l #2,d0
+ move.l d0,a0
+ bsr.w FF1PreparePublicResident
+ tst.l d0
+ beq.b .flush
+ pea (TDREASON_WRONGVER).w
+ bra.w EXIT
+.flush:
+ move.l _resload(pc),a2
+ jsr resload_FlushCache(a2)
+.done:
+ movem.l (sp)+,d0-d7/a0-a6
+ rts
+FF1PublicPatchError: dc.l 0
+FF1PublicBoot:
+ movem.l d0-d7/a0-a6,-(sp)
+ move.l FF1PublicEnabled(pc),d0
+ beq.b .done
+ lea FF1PublicPool(pc),a0
+ move.l _expmem(pc),a1
+ adda.l #$40000,a1
+ move.l #$80000,d0
+ move.l a0,-(sp)
+ move.l a1,d2
+ move.l #$80000,d3
+ moveq #1,d0
+ moveq #2,d1
+ bsr.w FF1SelectProfile
+ moveq #1,d1
+ cmpi.l #2,d0
+ bne.b .attrs
+ moveq #5,d1
+.attrs:
+ move.l (sp)+,a0
+ move.l #$80000,d0
+ bsr.w FF1PublicPoolOpen
+ tst.l d0
+ bne.w FF1WrongVersion
+ lea FF1PublicCallSite(pc),a0
+ move.w #$6100,(a0)
+ move.w #FF1PublicCall-FF1PublicCallSite-2,2(a0)
+ move.l _resload(pc),a2
+ jsr resload_FlushCache(a2)
+.done:
+ movem.l (sp)+,d0-d7/a0-a6
+ rts
+FF1PublicPool: ds.l 2
+FF1PublicRoot: dc.l 0
+FF1PublicMarker: dc.b 'FF1B7PUBLICROOT',0,0
+ even
+ include "FerrariFormulaOne_PublicMemory.s"
+ include "FerrariFormulaOne_PublicLoader.s"
+ include "FerrariFormulaOne_PublicStack.s"
+
+ include "ProductionHost.s"

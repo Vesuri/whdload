@@ -5044,8 +5044,10 @@ install_events:
  movem.l (sp)+,d0-d7/a0-a6
  rts
 events_quantum:
+ IFND FF1_PRODUCTION
  cmpi.l #126,ticks(pc)
  blo.b .done
+ ENDC
  cmpi.w #8,modeval(pc)
  bne.b .done
  lea events_phase(pc),a0
@@ -6241,7 +6243,11 @@ schedule_install:
  move.l a0,$24948
  lea (start.l,pc),a2
  suba.l #FF1_HOST_CODE_SIZE,a2
+ IFD FF1_PRODUCTION
+ move.l FF1_HOST_RESLOAD(a2),a2
+ ELSE
  move.l $1180(a2),a2
+ ENDC
  jsr $20(a2)
  move.l $4.w,a6
  jsr -126(a6)
@@ -6269,8 +6275,10 @@ schedule_record:
  adda.l d0,a4
  rts
 schedule_begin:
+ IFND FF1_PRODUCTION
  cmpi.l #126,ticks(pc)
  blo.w .done
+ ENDC
  lea (schedule_context.l,pc),a0
 .wait:
  bsr.w FF1TimeDue

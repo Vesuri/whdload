@@ -1223,12 +1223,14 @@ B8_65d6e:
  clr.w $1c1b4
  jsr $6694e
  jsr $2a130
+ IFND FF1_PRODUCTION
  IFD FF1_COARSE_STEP
  lea B8Frames(pc),a0
  ELSE
  lea (B8Frames.l,pc),a0
  ENDC
  addq.l #1,(a0)
+ ENDC
  move.l -60(a6),$226ae
  move.l -56(a6),$226b2
  unlk a6
