@@ -5588,4 +5588,133 @@ All project emulator sessions completed and used scoped cleanup.
 Fresh builds `tmp/p13c3-native` and `tmp/p13c3-release` retain SHA-256
 `eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913`
 and `fdd92fbbda8689e3ec3ab2353d5baa866859469a684026841fd71527e0a6de8d`.
-Stop before C4. [Commands](development.md#p13c3-selection-and-fallback).
+[Commands](development.md#p13c3-selection-and-fallback).
+
+### P13C4: backend-specific memory ownership
+
+`tools/ocs_memory_build.py` builds an OCS integration candidate from the pinned
+original slave and English executable. This is a separate candidate command;
+normal OCS reconstruction and the CD32 release build remain unchanged. Backend
+choice is a build option (`auto`, `native`, `cpu`), not a new CUSTOM tooltype.
+Automatic selection remains native because the shipped loader has no trustworthy
+clock/profile certificate. Explicit CPU uses the shared word/longword selector;
+unknown memory banks retain native conversion. C2's measured diagnostic speedup
+is not a performance claim for this allocation-integrated candidate.
+
+The original runtime CRC/revision choice remains intact. At `OS:11c6` (slave
+file `11e6`), a wrapper performs the original PatchSeg operation, then installs
+only the verified English hooks. It validates every displaced six-byte window,
+including relocated call operands, before installing any enhancement hook.
+Native entry operands in the appended code are relocated against the actual
+loaded code hunk. The original FlushCache trampoline runs after installation;
+no SetCPU/CACR policy is changed. Other revisions keep the original patch list.
+
+| Hook, code-hunk / file offset | Ownership change |
+|---|---|
+| `O:31e1e` / `31e4a` | Choose the allocator only for the main surface at A4+`10e2`, when its native allocator requests Chip and its extent is the verified 320×200. Request CLEAR\|FAST\|PUBLIC; accept only the audited Zorro-II Fast bank. Reject and free slow/unknown-bank results, or fall back to the original Chip allocator on failure. |
+| `O:00c94` / `00cc0` | Wrap source creation before the first view/compositor aliases exist. A row-table failure rolls back the source and row owners; failure exits with a specific WHDLoad allocation message instead of binding an incomplete surface. |
+| `O:32476` / `324a2` | Retire native QBlit before freeing the main source; clear selected-backend and converter-source references, then resume the original registry/free routine at `3247c` / `324a8`. Other offscreen surfaces retain native semantics. |
+| `O:324c0` / `324ec` | Check the combined Chip allocation before allocating either conversion descriptor. Failure of any of the three allocations unwinds through native display teardown. |
+| `O:3291e` / `3294a` | Native sources retain the original asynchronous QBlit route. CPU sources use the selected synchronous converter, native field pacing and completion/publication. A Fast source never falls through to a blitter consumer. |
+
+Allocation happens before `O:32554` builds conversion descriptors and before the
+compositor constructs its shadow rows and copy commands. Those native producers
+therefore derive their pointers from the correct owner; no pointer scan or
+mid-scene rebasing is used. The source remains owned across the 128-row intro
+and 200-row flight/name views. Public row tables and conversion descriptors stay
+under the native allocation registry. Native surface cleanup and the overall
+registry can consequently reclaim Fast sources without a second allocator or
+untracked reservation.
+
+**The combined Chip allocation is deliberately retained.** Native display 0,
+shared blitter workspace and display 1 occupy one registered allocation. It is
+created before source allocation can certify a CPU backend, so it also supplies
+the real low-memory fallback. Its middle region is not individually freeable.
+No obsolete QBlit consumer runs on CPU submissions, but C4 does not reclaim that
+middle region or alias it with a live display. Planes, Copper lists, hidden
+screen, sprites and audio keep native Chip ownership. No staging backend is added.
+
+#### Memory budget and supported test configuration
+
+The tested minimum for this candidate and the supplied PRELOAD launcher is
+**512 KiB Chip plus 4 MiB true Fast RAM**. This is a model/launcher support floor,
+not a universal physical-memory minimum for every installation. The 1 MiB Fast
+run fails before loading the game with “Can't allocate ExpMem.” The 2 MiB run
+reaches the menu but stalls before simulator play. The untouched original also
+stalls with 2 MiB, earlier in its intro: both stop at `O:3415e` (file `3418a`),
+waiting on final QBlit flag `O:3291c` (file `32948`). This does not establish the
+cause of the native low-memory stall. Its compatibility investigation remains
+separate from claiming a smaller supported memory configuration.
+
+| Item | Bytes / placement |
+|---|---|
+| Required Chip reservation | 524,288; native usable pool 523,232 |
+| Original expansion request | 983,040, unchanged; includes 262,144 ROM bytes |
+| Expansion after ROM reservation | 720,896; native usable Fast pool 713,496 |
+| Four game hunks | 289,816 before loader bookkeeping; already within the native pool |
+| Main source | 64,000 Chip on native/fallback; 64,000 true Fast on CPU |
+| Main row table and two conversion descriptors | 800 + 1,336 public bytes, native registry owned |
+| Two displays plus retained workspace | 96,960 Chip bytes at the full 320×200 capacity |
+| Candidate slave | 8,136 file bytes, 2,812 more than the original; outside the native game pool |
+| New histories / prediction snapshots | 0 / 0; timing/prediction is not linked by C4 |
+| CPU conversion scratch | Existing 512-byte converter stack allowance, plus wrapper/native-call and interrupt headroom; no persistent scratch allocation |
+| Supplied game data files | 2,517,101 bytes of input payload; preload storage is outside the native game pool |
+
+ROM is included in the 960 KiB expansion request, and game hunks/source/rows are
+included in its remaining native pool: do not add these rows as independent
+physical reservations. The remainder of configured Fast RAM supports the host
+OS, WHDLoad, slave and preload; input-file size is not an exact measurement of
+resident preload bookkeeping. Live reports enumerate actual native registry
+allocations and Exec MemHeaders at each checkpoint. They distinguish sampled
+pool usage from total physical RAM unavailable to that allocator, which also
+includes reservations outside the pool. They are not boot-wide allocation peaks.
+The native Fast pool becomes nearly full in flight on both paths; moving the
+source can displace other public allocations into Chip. No additional memory or
+performance saving is inferred from the 64,000-byte source move alone.
+
+The native region-size field changes to the active view height while allocation
+capacity stays at 200 rows. Ownership checks therefore derive capacity from the
+registered allocation, rather than incorrectly treating the intro's shorter
+active extent as a new, smaller allocation.
+
+#### Accepted checks and limits
+
+P13C4 is complete for this allocation/conversion candidate. The CPU-executed
+ownership gate passes **45 source-allocation cases and 12 display-allocation
+cases**, including real native registry instructions, failure at each setup
+allocation, repeated setup/cleanup, rejected slow memory, unverified geometry,
+registry exhaustion and queue retirement before source free. Exec allocation and
+OS display services are stubbed in that gate; five deliberate code defects fail.
+The runtime installer passes **96 normal and 108 diagnostic startup cases**,
+including changed displaced sites, unsupported revisions and slow-memory code.
+
+The normal 8,136-byte candidate passes **196 independent live pixel checks**:
+56 on automatic A500/native, 120 on forced 020/Fast longword, and 20 on forced
+68000/Fast word conversion. All traverse Origin, title, credits, campaign menu,
+simulator flight/fire and pilot-name entry. These are correctness trajectories,
+not matched timing comparisons. The two 250-field windows on each path also
+check actual display DMA, source placement and absence of native QBlit consumers
+on CPU submissions. Native retains all QBlit stages.
+
+The separate 8,208-byte exit-probe candidates pass another **176 pixel checks**
+and execute native `O:00cac` / file `00cd8` and `O:32526` / file `32552` teardown
+at the quiescent name-input boundary. The source/row/descriptor/display owners
+are released, and complete subsequent fields have no stale reads. The native
+path's former Chip source is reused by graphics.library for the restored OS
+View's LOF Copper list. The checker verifies the live library, View/CprList,
+list extent/terminator and non-free allocation before accepting those reads;
+it does not whitelist the old source range. Six corrupted-evidence controls,
+including a stale bitplane fetch and an invalid restored Copper owner, fail.
+The probe uses a data trigger installed and flushed with the slave; it adds no
+per-frame work in the measured scenes. Controlled subsystem exit is not evidence
+for every interactive quit/save/modal path; those remain E2 compatibility work.
+
+Accepted evidence is in `tmp/p13c4-memory-7`, `p13c4-install-6`,
+`p13c4-exitinstall-final`, `p13c4-live000-6`, `p13c4-live020-6`,
+`p13c4-forced000-6`, `p13c4-exit000-9`, `p13c4-exit020-9` and their reports.
+The native candidate SHA-256 is `98691452148b56dfed358207e23ff52a4d532e6dd1be440b26881f5964402c4c`;
+the CPU candidate is `cff1d61d76135d155c103eac3a6497cc791e00541abd1a568b81fe19d7350394`.
+A fresh CPU rebuild is byte-identical. Normal OCS remains 5,324 bytes
+(`eec155c9…`) and CD32 remains 43,544 bytes (`fdd92fbb…`). No release archive is
+changed. General OCS publication deadlines, all-view compatibility and later
+prediction/history memory remain their respective C5/D/E work items.

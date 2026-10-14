@@ -7,6 +7,8 @@ import hashlib
 import json
 import os
 import re
+import signal
+import struct
 from pathlib import Path
 import subprocess
 import time
@@ -17,17 +19,26 @@ from ocs_runtime import BASE, LENGTH, SIZES, ROOT, locate
 
 
 def main():
+    global LENGTH
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
     p.add_argument('--layout', help='calibrated layout.json from the same slave build')
     p.add_argument('--calibrate', action='store_true')
     p.add_argument('--simulator', action='store_true', help='continue from the menu to the first name prompt')
     p.add_argument('--baseline', choices=('on', 'off'), help='P13A4 two short field-bounded native windows')
+    p.add_argument('--teardown-build', help='build.json directory of a diagnostic --exit-probe candidate')
+    p.add_argument('--ownership', action='store_true', help='C4 candidate transition gate')
+    p.add_argument('--cpu', choices=('68000','68020'), default='68000')
+    p.add_argument('--fast-kib', type=int, choices=(1024,2048,4096), default=4096)
     a = p.parse_args()
+    if not a.ownership and (a.cpu != '68000' or a.fast_kib != 4096):
+        p.error('machine overrides require --ownership')
+    if a.teardown_build and not a.ownership:p.error('teardown requires --ownership')
+    LENGTH = a.fast_kib*1024
     out = (ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():
         raise ValueError('choose a new output below tmp/')
-    if not a.calibrate and (os.environ.get('WARP','0') != '0' or os.environ.get('AMIGA_SETUP','a500') != 'a500'):
+    if not a.calibrate and not a.ownership and (os.environ.get('WARP','0') != '0' or os.environ.get('AMIGA_SETUP','a500') != 'a500'):
         raise ValueError('P13A3 gate requires real-speed A500/Fast')
     if any(c.isspace() for c in str(out.relative_to(ROOT))):
         raise ValueError('GDB requires a scratch directory name without whitespace')
@@ -44,10 +55,12 @@ def main():
     out.mkdir(parents=True)
     os.chdir(ROOT)
     run = '../'+str(out.relative_to(ROOT))+'/run'
-    env = dict(os.environ, FSUAE_RUN=run, WARP=os.environ.get('WARP','0') if a.calibrate else '0', WINDOW='front',
+    env = dict(os.environ, FSUAE_RUN=run, WARP=os.environ.get('WARP','0') if a.calibrate or a.ownership else '0', WINDOW='front',
                JOY0='none', JOY1='none',
                DETERMINISTIC=os.environ.get('DETERMINISTIC', '1') if a.calibrate else '1',
-               AMIGA_SETUP='a500', WC_VARIANT='ocs', WHD_ARGS='', OCS_STOCK_CLOCK='1' if a.baseline else '0')
+               AMIGA_SETUP='a500', WC_VARIANT='ocs', WHD_ARGS='', OCS_STOCK_CLOCK='1' if a.baseline or a.ownership else '0')
+    if a.ownership:
+        env['EXTRA_ARGS']=f'--uae_cpu_model={a.cpu} --fast_memory={a.fast_kib}'
     server = Server('wc-gate',root=str(ROOT),run_dir='amiga/'+run,profile_window=False)
     g = None
     actions = []
@@ -67,7 +80,14 @@ def main():
         if condition:
             command('condition $bpnum '+condition)
         print('waiting for '+label,flush=True)
-        answer = command('continue',timeout=600)
+        try:
+            answer = command('continue',timeout=120 if a.ownership else 600)
+        except TimeoutError:
+            # Synchronous continue does not set Gdb.running. Interrupt this
+            # owned debugger and consume its pending reply before diagnostics.
+            g.p.send_signal(signal.SIGINT)
+            g.read_until(g.sent,30)
+            raise
         g.running = False
         command('delete')
         pc = command('info registers pc')
@@ -109,7 +129,7 @@ def main():
             dump(label+'-chip.bin', 0, 0x80000)
             (out/(label+'-registers.txt')).write_text(command('info registers'))
             trace = out/(label+'-screen.bin')
-            command(f'monitor profile {2 if label == "name" else 1} "" "{trace}"', timeout=120)
+            command(f'monitor profile {3 if label == "teardown" else 2 if label == "name" else 1} "" "{trace}"', timeout=120)
             shot = barto.load(str(trace)).fields[-1].shot
             if not shot or not shot.startswith(b'\x89PNG\r\n\x1a\n'):
                 raise ValueError('lossless screenshot required; use build_debugger.py --ocs-pixels')
@@ -165,10 +185,25 @@ def main():
                 until(h0+0x32e2c, 'name conversion published O:32e2c')
                 until(h0+0x16992, 'name input after publication O:16992')
             capture('name')
+            if a.teardown_build:
+                build=json.loads((ROOT/a.teardown_build/'build.json').read_text())
+                if not build.get('exit_probe'):raise ValueError('no diagnostic teardown trigger')
+                if hashlib.sha256(Path(env['SLAVE']).read_bytes()).hexdigest()!=build['sha256']:
+                    raise ValueError('teardown build differs from booted slave')
+                # Installed before first execution; toggling data avoids stale
+                # instruction-cache lines and unsupported GDB register writes.
+                address=layout['slave']+build['symbols']['exit_probe_trigger']
+                path=out/'teardown-trigger.bin';path.write_bytes(struct.pack('>I',1))
+                command(f'monitor ocs-load {address:x} "{path}"')
+                if dump('teardown-trigger-readback.bin',address,address+4)!=path.read_bytes():
+                    raise ValueError('teardown trigger not stored')
+                until(layout['slave']+build['symbols']['exit_probe_done'],
+                      'native source/display teardown completed')
+                capture('teardown')
         logfile = out/'run/fsuae/Cache/Logs/fs-uae.log.txt'
         options = dict(re.findall(r'Set option (\w+) = "([^"]*)"', logfile.read_text(errors='replace')))
-        expected = dict(cpu_model='68000', chipset='ocs', chipmem_size='1', fastmem_size='4',
-                        bogomem_size='0', cpu_speed='real', cpu_frequency='0' if a.baseline else '7093790',
+        expected = dict(cpu_model=a.cpu, chipset='ocs', chipmem_size='1', fastmem_size=str(a.fast_kib//1024),
+                        bogomem_size='0', cpu_speed='real', cpu_frequency='0' if a.baseline or a.ownership else '7093790',
                         cpu_cycle_exact='true', cpu_memory_cycle_exact='true', blitter_cycle_exact='true')
         for name, value in expected.items():
             if options.get(name) != value:
@@ -177,9 +212,11 @@ def main():
         slave = (boot/'dh1/WingCommander/WingCommander.Slave').read_bytes()
         metadata = dict(layout, actions=actions, slave_sha256=hashlib.sha256(slave).hexdigest(),
                         whd_args=env['WHD_ARGS'], fsuae_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest(),
-                        machine='a500-ocs-512k-chip-4m-fast', warp=False, variant='ocs', effective=expected,
+                        machine=f'{a.cpu}-ocs-512k-chip-{a.fast_kib}k-fast', warp=env['WARP']=='1', variant='ocs', effective=expected,
                         checkpoints=['origin', 'title', 'credits', 'menu'] +
                         (['simulator', 'name'] if a.simulator or a.baseline else []))
+        if a.teardown_build and (a.simulator or a.baseline):
+            metadata['checkpoints'].append('teardown')
         if a.baseline:
             metadata.update(baseline=a.baseline, fields_per_window=250)
             metadata['checkpoints'] += ['asteroids', 'fire']

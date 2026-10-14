@@ -1,8 +1,8 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C3 are complete**;
-the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
+The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C4 are complete**;
+the remaining work items below are pending, in dependency order.
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
 
@@ -206,7 +206,7 @@ calls the original FlushCache trampoline without changing cache policy.
 Normal builds remain native; C4 owns production allocations and transitions.
 See [selection contract and limits](internals.md#p13c3-conservative-backend-selection).
 
-**P13C4 — Apply backend-specific memory ownership.** Depends on C3.
+**P13C4 — Apply backend-specific memory ownership (complete).** Depends on C3.
 For blitter conversion retain its Chip source and shared workspace, with waits
 before reuse. For CPU conversion move only proven CPU-only source/work buffers
 to Fast RAM and bypass all obsolete QBlit consumers before reclaiming workspace.
@@ -215,6 +215,15 @@ for histories, prediction snapshots, code, ROM and preload in the memory budget.
 Gate: allocation failure/partial setup/exit work on both backends, no stale DMA
 reads, and the documented A500 minimum follows measurements. A staging backend,
 if selected, retains both source lifetimes through the final asynchronous read.
+Gate passed in the allocation-integrated OCS candidate: main-source ownership is
+chosen before aliases are built, failed setup rolls back, and native queue
+retirement precedes source release. Both backends pass controlled native teardown
+and complete-field DMA checks; the restored OS Copper list is separately owned.
+The combined Chip workspace is retained for native fallback, not reclaimed as
+an independent block. The documented tested launcher floor is 512 KiB Chip plus
+4 MiB Fast; 1 MiB fails the expansion reservation and 2 MiB stalls in a native
+wait that also fails in the original slave. Normal reconstruction remains the
+control. See [ownership, budget and limits](internals.md#p13c4-backend-specific-memory-ownership).
 
 **P13C5 — Publish completed images safely on both backends.** Depends on C4.
 Share the pending/drawing/displayed ownership model with CD32 while retaining
@@ -299,14 +308,12 @@ when available and is labelled separately from model evidence.
 Record supported revisions, CPU/memory/backend selection, minimum RAM, options,
 reproducible checks and remaining gaps. Keep OCS and CD32 installers distinct;
 share packaging machinery, never game assets. Propose the preinstalled archive
-and release checklist for a subsequent authorised release step. Do not implicitly
-resume the paused CD32 phase 12 work or restore its save/load stash.
+and release checklist. The CD32 phase 12 save/load stash remains separate.
 Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3 and P13C1–P13C3 are complete. **P13C4** is next, only on request.
+P13A1–P13A4, P13B1–P13B3 and P13C1–P13C4 are complete. **P13C5** is next.
 Use the scoped measured profiles and retain native fallback/override
-for unknown accelerators. CPU/Fast requires the audited compositor aliases;
-production memory ownership and transition handling remain C4. Do not resume
-CD32 E1/phase 12.
+for unknown accelerators. C4 now creates source ownership before the native compositor aliases. General
+publication/deadline acceptance remains C5.

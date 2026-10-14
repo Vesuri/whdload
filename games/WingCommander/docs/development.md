@@ -3662,3 +3662,93 @@ C2 pixel/display report, and rejects a copied uninitialized-selector result.
 The unit gate checks register/stack preservation, exact decision boundaries,
 once-only flush/commit and deliberate implementation mutations. These tests do
 not establish performance on unknown accelerators or compatibility across scenes.
+
+## P13C4: allocation-integrated OCS candidate
+
+The original reconstruction remains the native control. Build the separate C4
+candidate and validate its owned allocation code as follows; use new output
+names on repeats. No game or slave output belongs outside ignored `tmp/`.
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --backend auto --output tmp/c4-auto
+python3 tools/ocs_memory_build.py --backend cpu --output tmp/c4-cpu
+python3 tools/ocs_memory_check.py --output tmp/c4-memory-check
+python3 tools/ocs_memory_install_check.py tmp/c4-cpu --output tmp/c4-install-check
+
+export FSUAE="$PWD/tmp/p13c2-debugger-measured/fs-uae" WARP=1
+export SLAVE="$PWD/tmp/c4-cpu/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --calibrate --output tmp/c4-layout
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --baseline on --simulator \
+  --layout tmp/c4-layout/layout.json --output tmp/c4-live020
+python3 tools/ocs_boot_gate.py --ownership --baseline on --simulator \
+  --layout tmp/c4-layout/layout.json --output tmp/c4-forced000
+export SLAVE="$PWD/tmp/c4-auto/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --baseline on --simulator \
+  --layout tmp/c4-layout/layout.json --output tmp/c4-live000
+python3 tools/ocs_memory_report.py tmp/c4-live020 --build tmp/c4-cpu \
+  --output tmp/c4-report020
+python3 tools/ocs_memory_report.py tmp/c4-forced000 --build tmp/c4-cpu \
+  --output tmp/c4-reportword
+python3 tools/ocs_memory_report.py tmp/c4-live000 --build tmp/c4-auto \
+  --output tmp/c4-report000
+```
+
+`auto` and `native` retain native conversion without a measured runtime profile
+certificate. `cpu` is the explicit override, selecting word writes on 000/010
+and longword writes on 020+. A missing Fast allocation, an unaudited bank or an
+unverified main-source geometry retains the original Chip/native path. A failed
+mandatory source/row/display allocation unwinds and exits with a clear message.
+The original language/cheat/system/mission options and cache policy are unchanged.
+The 68000 CPU override is a correctness test, not a speed recommendation.
+
+For a controlled display-subsystem exit, build a diagnostic candidate with an
+additional name-input wrapper. It calls the original input routine until the
+host sets its owned trigger. It then executes the native source/view/display
+teardown and stops. This is not an interactive whole-game quit test.
+
+```sh
+python3 tools/ocs_memory_build.py --backend cpu --exit-probe --output tmp/c4-exitcpu
+python3 tools/ocs_memory_build.py --backend auto --exit-probe --output tmp/c4-exitauto
+python3 tools/ocs_memory_install_check.py tmp/c4-exitcpu --output tmp/c4-exit-install
+export SLAVE="$PWD/tmp/c4-exitcpu/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --calibrate --output tmp/c4-exit-layout
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --baseline on --simulator \
+  --teardown-build tmp/c4-exitcpu --layout tmp/c4-exit-layout/layout.json \
+  --output tmp/c4-exit020
+export SLAVE="$PWD/tmp/c4-exitauto/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --baseline on --simulator \
+  --teardown-build tmp/c4-exitauto --layout tmp/c4-exit-layout/layout.json \
+  --output tmp/c4-exit000
+python3 tools/ocs_memory_report.py tmp/c4-exit020 --build tmp/c4-exitcpu \
+  --output tmp/c4-exit-report020
+python3 tools/ocs_memory_report.py tmp/c4-exit000 --build tmp/c4-exitauto \
+  --output tmp/c4-exit-report000
+python3 tools/ocs_memory_report_check.py tmp/c4-exit020 --build tmp/c4-exitcpu \
+  --output tmp/c4-reject-report
+```
+
+The pinned debugger does not support register writes. The gate uses its bounded
+RAM loader to set a data trigger, with readback, rather than trying to call guest
+functions through register changes or replacing cached instructions. All probe
+code is installed and flushed at startup. The native input path is preserved
+until the trigger. The DMA check excludes the profiler's initial partial field,
+requires a positive old-buffer read control before teardown, then checks complete
+fields after teardown for stale reads. The native path can reuse its former
+source for the restored OS Copper list: the checker verifies that new View,
+Copper-list and allocation ownership before accepting those Copper reads.
+
+For the memory boundary, repeat calibration and the native-backend simulator run
+with `--ownership --fast-kib 2048`, then `1024`, using separate layouts for each.
+The smaller configurations do not pass the current gate: 1 MiB fails the WHDLoad
+expansion reservation, while 2 MiB stalls in a native QBlit wait. Reproduce the
+2 MiB control using `SLAVE="$PWD/tmp/originals/ocs/WingCommander/WingCommander.Slave"`
+and a fresh calibration. The original stalls too. These failures do not prove
+an absolute hardware minimum; 512 KiB Chip plus 4 MiB Fast is the smallest tested
+passing configuration with this launcher. Ownership waits have a bounded timeout,
+which interrupts only their own debugger to preserve failure diagnostics.
+
+The reports show sampled pool/registry memory, not boot-wide peaks. No new FPS
+claim follows from the ownership runs. Use normal reconstruction commands for
+unchanged OCS and CD32 controls; C5's general publication/transition acceptance
+and later compatibility work remain separate.

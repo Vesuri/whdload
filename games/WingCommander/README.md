@@ -3,7 +3,7 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A4, P13B1–P13B3 and P13C1–P13C3 complete: conservative OCS converter selection.** The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4, P13B1–P13B3 and P13C1–P13C4 complete: OCS converter selection and memory ownership.** The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting
@@ -19,7 +19,8 @@ displayed pictures/s in asteroid credits and 5.39 during simulator flight/fire;
 observer-off state/pixel controls pass. These are short emulator baselines.
 The shared build and analysis tools require an explicit variant; checked CD32
 binaries and original OCS reconstruction remain byte-identical. Base-ISA assembly,
-arithmetic, flag and wrapper checks pass on CPU models; production OCS hooks remain pending.
+arithmetic, flag and wrapper checks pass on CPU models; C4 now links allocation
+and conversion hooks in a separate OCS candidate. Timing hooks remain pending.
 Shared WCFS/WCDS interfaces now separate world, render and actual display counts;
 the OCS recorder passes CPU/replay checks and native observer-off controls remain
 exact. Guest hooks and their measured runtime overhead remain later integration.
@@ -29,12 +30,16 @@ Bounds, alternating destinations and native fallback checks pass. Diagnostic-onl
 C2 hooks now measure complete adapters and matched live images; native QBlit remains
 the normal default. The bounded C3 seam now selects once, preserves cache policy,
 and supports explicit native/CPU choices with safe pre-move memory fallback.
-Production allocation and transitions are P13C4, next only on request. See the
+C4 allocates the CPU source in Fast RAM before view aliases are built, unwinds
+failed setup and retires native readers before freeing it. Both backends pass
+controlled display teardown with DMA ownership checks. The tested launcher floor
+is 512 KiB Chip plus 4 MiB Fast. See the
+[C4 ownership gate](docs/internals.md#p13c4-backend-specific-memory-ownership), the
 [C3 gate](docs/internals.md#p13c3-conservative-backend-selection),
 [C2 gate](docs/internals.md#p13c2-measured-ocs-converter-crossover),
 [B3 gate](docs/internals.md#p13b3-shared-instrumentation-and-validation-interfaces),
 [baseline and limits](docs/internals.md#p13a4-short-native-ocs-baseline), and
-[reproduction commands](docs/development.md#p13c3-selection-and-fallback).
+[reproduction commands](docs/development.md#p13c4-allocation-integrated-ocs-candidate).
 
 **Phase 11b is in progress; C1–C3 and the C4 steady-flight gate are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for
