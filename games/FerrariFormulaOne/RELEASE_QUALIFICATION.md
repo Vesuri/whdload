@@ -191,31 +191,41 @@ or timing measurement. Native tow returns to the pit.
 
 Actual F10 reaches the WHDLoad abort entry with TDREASON_OK and returns to the
 AmigaDOS prompt, confirmed by a screenshot. A 4,190-byte season file was written
-through the native requester and retained for a fresh-session load check;
-restoration is not yet accepted. Evidence: `tmp/dev/manifest/release-native-ui.json`.
+through the native requester; its qualified cross-session restoration is below. Evidence: `tmp/dev/manifest/release-native-ui.json`.
 
-## Open accelerated save/exit case
+## Season persistence and write-cache requirement
 
-A fresh 020+Fast session loads the A500 season file and restores F3, but the
-subsequent save under a new filename is not persisted. F10 reaches resloadAbort
-with TDREASON_OK, then the display remains black. After 10 and 25 host seconds,
-the CPU is still in the same system-return loop (observed PCs `$228dee` and
-`$228df8`, unchanged A1 `$243478`). The new file is absent from the host drawer.
-The emulator was kept alive for the second observation; the failure cannot be
-accepted as a completed exit or save round trip. Full memory and register
-captures are retained in
-`tmp/dev/tmp/step5/c4-q03-release-live-a1200-fast-season-flush/`.
+Season save/load passes with `NoWriteCache` on the tested 020+Fast emulator.
+The A500's 4,190-byte native save is loaded in fresh enabled and legacy sessions,
+then saved under a new filename. Both resulting host files are byte-identical,
+without exclusions, SHA256
+`00afdad9ced97a64879dffa116194bd5480e4c8b6d5a31d68dfb5ca211b5953f`. Actual F10 returns both sessions to the visible
+AmigaDOS prompt. Loading restores the saved F3 selection. The native round trip
+changes the serialized `curtime` field from 08:02 to 08:04 in both arms; every
+other input byte is retained. The acceptance comparison covers both complete
+resulting files, including that timestamp.
 
-The A500 system return passes. A matching CUSTOM2=0 control is being run to
-isolate the accelerated failure before assigning it to the new engine, runtime,
-or emulator. Release qualification remains open.
+Without `NoWriteCache`, both enabled and CUSTOM2=0 runs stall in WHDLoad's
+file-cache cleanup after the save. The same failure occurs on 20.0 and 20.1.
+The saved-file cache entry remains pending and the new host file is absent;
+waiting 25 host seconds does not complete the return. Captured instructions
+match WHDLoad's own cache-cleanup routine. This is not isolated to the new physics
+mode, and no real-hardware or general runtime defect is claimed.
+
+Use `NoWriteCache` for qualified save/load runs on this emulator configuration.
+It affects disk buffering, not CPU caches or simulation intervals. Keep this
+requirement in candidate launch instructions. The production slave is unchanged.
+Evidence: `tmp/dev/manifest/release-season-roundtrip.json`; failing controls and
+full memory captures remain available. Reusable guidance is committed to
+AmigaXDev `docs/reference/headless-fsuae.md`.
 
 ## Remaining acceptance work
 
 - Minimum-memory and minimum/development WHDLoad runtime qualification.
 - Both disabled CUSTOM1 variants, including repeated overlay loads.
 - F3/F1 controls, Fiorano/Rio/contrasting track, starts/laps, fuel/wear,
-  pits, session/results, season save/load, travel/repair clocks; F10 exit passes on A500.
+  pits, session/results and travel/repair clocks; season persistence and F10 pass
+  in the documented scopes below.
 - Final reproducibility and release-candidate documentation.
 
 The Irek executable is unavailable locally; retain its original route and keep
