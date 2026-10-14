@@ -7,6 +7,9 @@ The Monaco speed check also incorrectly read two adjacent 16-bit car speeds as
 one 32-bit value; it observed an opponent, not player acceleration. Historical
 results below remain evidence only for their stated scopes and binary hash.
 See [CONTROLS_REGRESSION.md](CONTROLS_REGRESSION.md) for the fix and new checks.
+RC2 corrects the launch cutoff and passes native throttle/clutch, coast, braking,
+restart, steering and manual gear checks, including the reported 040/MMU/32 MiB
+configuration. Its exact binary and test scopes are in that report.
 Human full-race playtesting and real Amiga hardware testing remain deferred.
 
 ## Accelerated clock calibration

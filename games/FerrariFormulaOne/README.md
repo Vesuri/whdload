@@ -1,5 +1,10 @@
 # Ferrari Formula One performance build
 
+RC1 has a confirmed 20 ms player launch bug. The source now fixes it; see
+[driving-control regression](CONTROLS_REGRESSION.md) for the corrected build
+and native-input acceptance. Historical qualification figures below identify
+their original binary; they are not new measurements of the correction.
+
 Build the single slave from `Games/FerrariFormulaOne_WHD.s` with:
 
 ```
@@ -58,9 +63,9 @@ Integration acceptance passed on 2026-10-14 for SPS 0481 PAL on the four documen
 profiles. Controlled exact-state comparisons, 30 exact frames per engine,
 CUSTOM2=0 legacy comparisons, 60-second clocks, enabled CUSTOM1 options,
 pause/menu/re-entry, failure routes and reproducible builds pass. Fine-path
-cycle/debt and DMA audits pass. The current untraced 300-presentation figures
+cycle/debt and DMA audits pass. The RC1 untraced 300-presentation figures
 are 4.56 / 4.75 / 6.65 / 13.30 FPS for A500 / A500+Fast / chip-only 020 / 020+Fast;
-all 60-second clock errors are below 0.23%. These are current demo measurements,
+all 60-second clock errors are below 0.23%. These are historical RC1 demo measurements,
 not matched speedup claims against the original release.
 
 Fine simulation averages 53,747.8 cycles/update; worst rolling five is 58,122.2,
@@ -70,12 +75,15 @@ Actual tow restores all 503 coarse / 902 fine patch words before native cleanup;
 menu/session time do not enter driving debt. Full local evidence is indexed by
 `tmp/dev/manifest/production-integration.json` and `tmp/dev/docs/STEP5_CAPACITY.md`.
 
-The accepted 260,292-byte build has SHA256
+The historical RC1 260,292-byte build has SHA256
 `60123fd26a8c188925c2213118f417e233ad0f883224372e87feeda477e2a836`.
-An independent build from the committed sources reproduces it exactly.
+It was reproduced from its original committed sources. The corrected RC2 build
+is 260,276 bytes, SHA256
+`e57c42ec5160f1771146045f81a31c59ff7942f30678e801fb5c00178dd2910d`;
+an independent rebuild of the corrected source reproduces it exactly.
 
 This is an unreleased, opt-in emulator-qualified candidate. The 030/040/060,
-cache/MMU, original-option/reload, broader native control/track, save/load and
+cache/MMU, original-option/reload, track, save/load and
 clock checks are complete in [RELEASE_QUALIFICATION.md](RELEASE_QUALIFICATION.md).
 Accelerated profiles present about 16.64 FPS with less than 0.041% clock error in
 the measured automatic demo. Those are emulator observations, not physical CPU
