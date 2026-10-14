@@ -4489,10 +4489,11 @@ an explicit change.
 
 ### Sharing and base-CPU constraints
 
-Current `tools/reconstruct.py`, `timing_source.py`, `cd32_runtime.py`,
-`runtime_inputs.py` and `amiga/run.sh` assume CD32 hashes, names, hunk sizes,
-patches or Kickstart inputs. In particular, CD32 live-layout discovery uses the
-patched CD32 converter to find its chain. None is an OCS launcher/locator yet.
+`tools/reconstruct.py`, `timing_source.py` and `cd32_runtime.py` remain CD32-specific.
+The runtime inputs and launcher previously assumed CD32 hashes, names, hunk sizes, patches or Kickstart inputs.
+P13A3 adds explicit OCS selection to `runtime_inputs.py` and `amiga/run.sh`, plus
+a separate `ocs_runtime.py` locator. CD32 discovery still uses its own patched
+converter; OCS uses its native startup relocations and original slave helpers.
 Extract variant maps and shared mechanics rather than duplicating whole tools.
 
 The common design is reusable, but the current assembly is not all 68000-safe:
@@ -4580,10 +4581,9 @@ Existing outputs, paths outside `tmp/` and symlink escapes are rejected. The
 original OCS file set and hashes remain unchanged. Synthetic CRC fixtures do not
 stand in for testing unavailable game revisions.
 
-No emulator, Kickstart or game code was executed. Byte identity is the P13A1
-preservation proof, not a new boot or hardware compatibility result. The P13A2
-functional display contract follows below; P13A3 original/reconstructed boots
-remain pending. CD32 reconstruction, launcher and runtime assembly are unchanged.
+P13A1 executed no emulator, Kickstart or game code. Byte identity is its
+preservation proof. The P13A2 functional display contract and P13A3 matched live
+boots follow below. CD32 reconstruction and runtime assembly remain unchanged.
 
 ### P13A2: native display and allocation contract
 
@@ -4616,12 +4616,12 @@ width alone does not make arbitrary dimensions safe for this converter.
 
 The model reproduces four black pixels at visible `(x,y)=(1,1),(3,1),(9,1),(11,1)`.
 The oracle records this exception explicitly; a control without it differs.
-**This is a functional-model edge quirk requiring live confirmation in P13A3**,
-not a hardware-glitch finding or permission to patch it. All other visible pixels
+**P13A3 confirms this edge quirk in the live FS-UAE blitter result below**;
+it is not a real-hardware finding or permission to patch it. All other visible pixels
 match the independent nibble selection/packing formula. An odd-height 32×17
 control writes beyond the native planar allocation; it is a rejecting control,
-not a supported view. P13A3 must check native view geometry and edges before C1
-chooses whether to preserve or deliberately correct these behaviours.
+not a supported view. P13A3 checks the live 320×128 and 320×200 geometry. C1
+must cover other required sizes before preserving or deliberately correcting them.
 
 The 15 fixtures cover 320×200, ×166, ×128, ×16 and 32×16, each with all 256
 colour pairs, independent random nibbles and solid white. Each runs against both
@@ -4705,7 +4705,7 @@ FreeMem at `33c80`/`33c88`. `33c6a` drains the registry during overall cleanup.
 | Two BitMaps / native inline storage | At `335b4`, `335dc`; four plane pointers each, stride 40 bytes | `33aea` rebuilds; storage stays in code allocation. DMA reads the pointed-to Chip planes, not these CPU-only structs. |
 | Two generated Copper lists / graphics.library | OS-sized Chip lists, references at `3360c`/`33610`; Copper reads instruction data | `339c0`/`33a26` use MakeVPort/MrgCop; rebuild waits two fields (`339fc`, `33a00`) before FreeCprList at `33a12`. View teardown `33872` detaches/reloads view, waits two fields (`33898`, `3389c`), frees viewport/list storage (`338a8`, `338c0`). |
 | Hidden Intuition screen bitmap / display setup | 615 Chip bytes; native screen/display setup | `336fc`–`3370c` allocate, `3372e` opens screen, `33774` closes, `33780` frees. Keep backing memory until CloseScreen has detached its consumer. |
-| Sprite data / native sprite slot | 4×(spriteHeight+1)+8 Chip bytes, control/data/terminators; sprite DMA | `31ca6` allocates, `31cca`–`31ce2` fills, `31cea`–`31d20` binds via ChangeSprite. CPU table owns allocation. `31bf2` frees blocks; `31b7c` calls FreeSprite. Detach old binding and retire DMA before freeing; full exit-order/field confirmation remains P13A3. |
+| Sprite data / native sprite slot | 4×(spriteHeight+1)+8 Chip bytes, control/data/terminators; sprite DMA | `31ca6` allocates, `31cca`–`31ce2` fills, `31cea`–`31d20` binds via ChangeSprite. CPU table owns allocation. `31bf2` frees blocks; `31b7c` calls FreeSprite. Detach old binding and retire DMA before freeing; full exit-order/field confirmation remains C4–C5/E2. |
 
 The inventory is for the display/conversion subsystem; it is not a whole-game
 DMA audit. Audio remains a separate native subsystem and its allocations must
@@ -4733,6 +4733,91 @@ view rebuilds and palette changes, not just chunky source equality.
 
 The check also builds both BitMaps and exercises the actual final publication
 path against synthetic graphics/Copper metadata. Functional gates pass; actual
-beam ownership, OS queues, display edges, sprite detach ordering, view changes
-and original/reconstructed boot agreement remain **P13A3**, followed by measured
-baseline **P13A4**. No backend is selected and no game/slave runtime bytes change.
+beam deadlines and full sprite detach/exit ordering are not established by that
+isolated gate. P13A3 below confirms the live pixel edge, allocation placement,
+name-frame completion/publication and original/reconstructed boot agreement.
+Measured baseline follows in **P13A4**; full transition/teardown ownership remains
+part of C4–C5/E2. No backend is selected and no game/slave runtime bytes change.
+
+
+### P13A3: OCS launcher and matched live baseline
+
+**P13A3 is complete.** The launcher selects OCS and CD32 explicitly, with separate pinned runtime
+archives, drawers, slaves and KickEmu ROM inputs. The nominated OCS machine is
+PAL 68000/OCS, 512 KiB Chip and 4 MiB true Fast RAM, no trapdoor slow RAM. It uses
+the shared directory-drive host boot and the unchanged slave's Kickstart 1.3.
+No OCS runtime patch, backend selection or performance measurement is included.
+
+**Live layout.** `ocs_runtime.py` finds the native countdown signature at
+`O:34082–340b0`, verifies all four DOS segment allocations/links, and checks the
+entry relocation `O:0002` → `O3:1476` and A4 setup `O3:14d0` → `OD:7ffe`.
+The patched helpers `O:272b2` → `OS:138e` and `O:26a3c` → `OS:13a0` identify the
+slave independently; its header must match. A preload copy fails these checks.
+All six snapshots verify the discovered layout and the live A4 register.
+Eight negative cases reject bad sizes, links, entry/A4 relocations, either slave
+helper, the slave header, and a preload-only snapshot.
+
+**Native input and checkpoints.** The route changes no guest instruction or data;
+only debugger-native keyboard events enter the normal input queue. All addresses
+below are code-hunk offsets (`O` file offsets add `2c`).
+
+| Checkpoint | Native site and route |
+|---|---|
+| Origin | Input poll `180c8`; capture, then Escape |
+| Title motion | Intro entry `1edde`, release Escape; capture `1efb0` with D2 = 100 |
+| First credits | `1f03c`, after its first picture submission; then Escape |
+| Campaign menu | Enter `1f396`, release Escape, capture ready poll `1f43c` |
+| Simulator | Select Vega, reach flight loop `0694`, capture completed iteration `06c2` |
+| Name prompt | `16c1a` → input poll `16992`; retire pending final conversion at `32e2c`, return to `16992`, capture two fields |
+
+The menu's initial pointer is (159,99), over the absent Secret Missions option.
+Native Up (`4c`) moves it into Vega's rectangle (45,51)–(279,89); the harness waits
+for y ≤ 80, releases Up and presses Return (`44`). At `1f44e`, selected index D2
+must be zero. This is why reusing the CD32 Return-only tape failed. The simulator
+then proceeds without further input through death to the name question. No name
+is entered. Ordinary flight and the separate cinematic `1f760` route are distinct.
+
+**Memory and pixels.** Native Exec MemHeaders report attributes `0005`
+(PUBLIC|FAST) and `0003` (PUBLIC|CHIP), with the Chip upper bound at 512 KiB.
+The four game hunks and A4 are in the true Fast allocation. At each checkpoint,
+the chunky source, both display regions and the distinct shared workspace are
+aligned, non-overlapping and entirely in Chip RAM. Four planes retain the A2
+row/padding geometry. This is a successful nominated configuration, not a minimum
+memory measurement or support claim for other CPU/memory setups.
+
+The completed name frame independently matches all **63,680 visible pixels**
+(320 × 199), covering 14 colour indices. The source uses both nibbles in the A2
+checkerboard order; low-nibble-only packing fails. The four model edge pixels
+(1,1), (3,1), (9,1), (11,1) are also black in the live blitter result although the
+source predicts colour 6 there. Thus this scoped A2 quirk is now **confirmed in
+FS-UAE**, without cropping or silently correcting it. The three completion flags
+are clear before the name snapshot; reaching `32e2c` proves the native final
+completion/publication route ran. Two captured fields then show the text prompt.
+This does not establish a universal beam deadline or sprite teardown ordering.
+
+**Capture instrument.** The previous debugger used uninitialized host framebuffer
+storage (`src/od-fs/fsvideo.cpp`), exposing heap bytes at screenshot column 752.
+Paired runs had identical game/Chip state but differed in that exported border.
+The local `--ocs-pixels` build initializes host display storage and uses PNG for
+multi-field captures, avoiding the old lossy JPEG path. Shared files and guest
+execution are unchanged. The gate compares the entire 754 × 576 RGB screenshot;
+no border exclusion, ignored state bytes or pixel tolerance is used.
+
+The six paired checkpoints pass with **zero differing state bytes or pixels**:
+289,816 game-hunk bytes, 524,288 Chip bytes and 434,304 RGB pixels per checkpoint.
+The old/new screenshot-instrument controls also preserve all six game/Chip
+snapshots exactly. The final report is `tmp/p13a3-compare.json`. Additional negative fixtures
+reject pending conversion, a changed **published** pixel, a Fast DMA source,
+overlapping allocations and a wrong row stride (`p13a3-negative-checks-2`).
+
+Evidence remains under `tmp/`: final original/reconstructed captures are
+`p13a3-original-pixels` and `p13a3-rebuilt-pixels`; the rebuilt slave is
+`p13a3-reconstructed`. Automatic discovery is `p13a3-layout-final`; input isolation
+and overwrite refusal are `p13a3-input-check-2`. Reproduction is in
+[development](development.md#p13a3-ocs-launcher-and-live-layout-gate).
+
+Limits: these are emulator state/pixel checks with debugger pauses, not a speed
+benchmark or real-hardware visual acceptance. Full intro repetition, every view,
+sprite detach/release, exceptional exits and minimum RAM are not certified here;
+their existing C4–C5/D4/E2 gates remain. P13A4 is the next separate goal. CD32
+E1/phase 12 remain paused.

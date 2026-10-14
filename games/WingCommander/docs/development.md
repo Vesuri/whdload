@@ -22,7 +22,8 @@ working copies under `tmp/game/`. Never commit archives or extracted contents.
 
 Source `amiga/env.sh`, which sources `${AMIGA_ENV}` or the conventional
 `~/.local/share/amiga/env.sh`. The shared environment supplies toolchain, WHDLoad,
-ROM and launcher variables. The launcher selects the shared A1200-fast preset unless overridden.
+ROM and launcher variables. CD32 defaults to the shared A1200-fast preset;
+explicit OCS selection defaults to the A500/Fast baseline described below.
 Install shared prerequisites through AmigaXDev; ROM/OS sources are user supplied.
 
 ## Current commands
@@ -3072,3 +3073,111 @@ Four native-model edge pixels and an unsafe odd-height control are reported
 explicitly in the [contract](internals.md#p13a2-native-display-and-allocation-contract).
 Their real display behaviour needs P13A3 confirmation. Stop at this gate; no
 launcher, timing patch, CPU converter or backend selection is part of P13A2.
+
+
+## P13A3: OCS launcher and live-layout gate
+
+Select the install independently of the machine: `WC_VARIANT=ocs` selects the
+OCS archive, drawer and slave; omission retains `cd32`. `WC_VARIANT=ocs make
+prepare` verifies/extracts only the installer and OCS inputs. Original trees and
+runtime drives remain separate. The launcher creates fresh drives every time;
+an existing drive is never replaced. A selected `SLAVE` replaces only the slave
+in that new runtime copy, with the archive's original retained alongside it.
+
+```sh
+. amiga/env.sh
+WC_VARIANT=ocs make prepare
+make reconstruct-ocs OUT=tmp/ocs-reconstructed
+WC_VARIANT=ocs WINDOW=front /bin/bash amiga/run.sh
+/bin/bash amiga/run.sh stop
+```
+
+OCS defaults to the shared A500 preset with the project baseline override:
+68000, OCS, PAL, 512 KiB Chip, 4 MiB Zorro-II Fast, no slow/trapdoor RAM, real
+CPU speed and cycle-exact CPU/memory/blitter. Other machine selections remain
+explicit experiments. The host boots directory drives with the shared 3.1 ROM;
+the unchanged slave uses the user-supplied `KICKSTART13` and `RTB` as
+`devs/Kickstarts/kick34005.A500` and `.RTB`. Workbench and WHDLoad use the existing
+`WORKBENCH_ADF` and `WHDLOAD_BINARY` variables. No ROM/OS downloads are added.
+
+The gate needs the existing project debugger's native `key-raw-v1` capability,
+not merely the shared preset. Rebuild that debugger with the existing pinned
+`tools/build_debugger.py --ocs-pixels --output tmp/ocs-debugger` recipe if needed. Set `FSUAE`
+to that build, or a compatible existing project build. It fails before emulated
+boot progress when the native key route is absent.
+
+```sh
+export FSUAE="$PWD/tmp/p13a3-debugger/fs-uae"
+python3 tools/ocs_boot_gate.py --calibrate --output tmp/ocs-layout
+python3 tools/ocs_boot_gate.py --layout tmp/ocs-layout/layout.json \
+  --simulator --output tmp/ocs-original
+SLAVE="$PWD/tmp/ocs-reconstructed/WingCommander.Slave" \
+  python3 tools/ocs_boot_gate.py --layout tmp/ocs-layout/layout.json \
+  --simulator --output tmp/ocs-rebuilt
+python3 tools/ocs_boot_compare.py tmp/ocs-original tmp/ocs-rebuilt
+python3 tools/ocs_runtime_check.py tmp/ocs-original/menu-fast.bin
+```
+
+Use fresh output names below `tmp/`. The layout is validated again at every
+capture, including A4 against its OCS startup relocation. The locator rejects
+preload copies using DOS segment sizes/links, two startup relocations, two
+independent slave helper targets and the slave header. The negative check
+corrupts each relationship and removes the live code while retaining preload.
+
+The native input route uses Escape to leave Origin and, after the title and
+first credits picture, to reach the menu. OCS initializes its pointer over the
+unavailable Secret Missions option; native Up moves it into Vega's rectangle
+before Return. The selected menu index is asserted. The simulator runs to the
+name-input loop without entering a name. No game state or instructions are
+written by the route. Each capture saves all four game hunks, Chip/Fast RAM,
+registers and a lossless trace screenshot. At name entry it waits for the final
+blitter completion/publication, returns to the input poll, then captures two
+fields so the displayed prompt is complete. The comparison allows no byte or
+pixel differences. These debugger captures prove scoped state/pixel agreement,
+not performance or uninterrupted visual acceptance.
+
+Cleanup kills the owned GDB child and calls the shared launcher stop route for
+that run directory. Failed runs retain their diagnostic files; no failure is
+converted into a successful endpoint. P13A4 measurements are separate.
+
+
+`--ocs-pixels` initializes the **host** chipset image buffer with `calloc`
+instead of `malloc` and exports PNG for multi-field captures as well. It changes
+neither guest RAM nor CPU/blitter execution. The old exporter exposed untouched
+right-border host bytes and used lossy JPEG for two or more fields. The gate
+rejects a non-PNG screenshot; it never crops or masks mismatches.
+
+The shared configured source has since changed its CPU implementation. The
+existing manifest correctly rejects it. For this gate, a fresh staging copy uses
+the preserved CPU source with the exact existing manifest hash; other pinned
+files already match. To reproduce that preparation without overwriting shared
+inputs (requires the retained configured build and frozen CPU source):
+
+```sh
+. amiga/env.sh
+export OCS_SHARED_BUILD="${FSUAE_SOURCE:-$AMIGA_SHARE/fs-uae-aprof-build/fs-uae}"
+export OCS_FROZEN_CPU="${OCS_FROZEN_CPU:-$PWD/tmp/debugger/src/newcpu.cpp}"
+python3 - <<'PYOCS'
+import hashlib, os, shutil
+from pathlib import Path
+source = Path(os.environ['OCS_SHARED_BUILD'])
+frozen = Path(os.environ['OCS_FROZEN_CPU'])
+expected = dict(line.split('\t') for line in
+    Path('manifest/debugger.tsv').read_text().splitlines()
+    if line and not line.startswith('#'))['src/newcpu.cpp']
+assert hashlib.sha256(frozen.read_bytes()).hexdigest() == expected
+out = Path('tmp/ocs-debugger-source')
+shutil.copytree(source, out)  # fails if destination exists
+(out/'.replaced').mkdir(exist_ok=True)
+(out/'src/newcpu.cpp').rename(out/'.replaced/newcpu.cpp')
+shutil.copyfile(frozen, out/'src/newcpu.cpp')
+PYOCS
+FSUAE_SOURCE="$PWD/tmp/ocs-debugger-source" \
+  python3 tools/build_debugger.py --ocs-pixels --output tmp/ocs-debugger
+export FSUAE="$PWD/tmp/ocs-debugger/fs-uae"
+```
+
+The builder then verifies every manifest entry and the source commit before
+copying or compiling. This reuses configured host dependencies/objects, as the
+existing debugger recipe does; it is not a self-contained toolchain release.
+The tested retained build is `tmp/p13a3-debugger/fs-uae`.

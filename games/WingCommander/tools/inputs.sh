@@ -3,9 +3,12 @@ set -eu
 cd "$(dirname "$0")/.."
 action=${1:-verify}
 case "$action" in fetch|verify|prepare) ;; *) echo "Usage: $0 fetch|verify|prepare" >&2; exit 2 ;; esac
+selection=${WC_VARIANT:-all}
+case "$selection" in all|ocs|cd32) ;; *) echo "WC_VARIANT must be all, ocs or cd32" >&2; exit 2 ;; esac
 mkdir -p tmp/downloads
 while IFS="$(printf '\t')" read -r variant filename expected url; do
     case "$variant" in ''|\#*) continue ;; esac
+    if [ "$selection" != all ] && [ "$variant" != installer ] && [ "$variant" != "$selection" ]; then continue; fi
     archive="tmp/downloads/$filename"
     if [ ! -f "$archive" ] && [ "$action" = fetch ]; then
         # Keep interrupted downloads separate; never overwrite an existing input.

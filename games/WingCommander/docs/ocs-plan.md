@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1–P13A2 are complete**;
+It does not implement or validate an improved OCS slave. **P13A1–P13A3 are complete**;
 the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -58,17 +58,21 @@ DMA-read source in the display/conversion subsystem has a named owner and safe
 release point. The isolated functional gate passes 45 conversions plus
 allocation, direct-writer, publication and queue checks. See the
 [contract and explicit live gaps](internals.md#p13a2-native-display-and-allocation-contract).
-Checkerboard nibble selection is required; four model edge pixels, sprite detach
-ordering and actual beam deadlines need P13A3 confirmation.
+Checkerboard nibble selection is required. P13A3 confirms the four edge pixels
+and scoped native publication live; general beam deadlines and sprite teardown
+remain part of C4–C5/E2 acceptance.
 
-**P13A3 — Add the OCS launcher and live-layout discovery.** Depends on A1.
+**P13A3 — Add the OCS launcher and live-layout discovery (complete).** Depends on A1.
 Make install selection explicit in setup, runtime inputs and launcher; keep OCS
 and CD32 files separate. Supply the A500 Kickstart/RTB through existing user-input
 conventions. Discover OCS hunks and A4 from their own signatures/relocations.
 Boot original and reconstructed slaves on a 68000/OCS machine with 512 KiB Chip
 and true Fast RAM; compare intro, menu and simulator/name-prompt endpoints.
 Gate: matching native state/pixels, working controls and project-owned cleanup.
-Do not treat selecting an A500 preset in the current CD32 launcher as OCS support.
+Gate passed: six matching state/pixel checkpoints on 68000/OCS with 512 KiB
+Chip and 4 MiB true Fast RAM, native keyboard controls, independent published
+pixel checks and project-owned cleanup. See [live evidence and limits](internals.md#p13a3-ocs-launcher-and-matched-live-baseline).
+Explicit OCS install selection is required; an A500 preset alone does not select it.
 
 **P13A4 — Measure the short native baseline.** Depends on A2–A3.
 Use one repeatable intro/asteroid window and one flight/fire window, with a turn
@@ -114,7 +118,8 @@ order and destination padding. Cover every native view size with enclosing-windo
 or native fallbacks where necessary. Do not copy Legends of Valour's high-nibble
 or 192-byte-stride modifications into Wing Commander. Preserve the OCS
 checkerboard high/low-nibble selection established by A2; neither nibble is unused.
-Confirm the model edge quirks live before choosing deliberate corrections.
+The four edge pixels are confirmed live by A3; preserve them unless a deliberate
+correction is chosen. Odd-height support still requires its own bounds checks.
 Gate: native-versus-independent-oracle-versus-CPU pixels match with all 16 colours,
 independent high/low nibbles, edge widths, row canaries and alternating destinations.
 Experimental CPU conversion does not become the default yet.
@@ -255,7 +260,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A2 are complete. Start **P13A3** only when requested. The first backend decision
+P13A1–P13A3 are complete. Start **P13A4** only when requested. The first backend decision
 is **P13C2**, not the current investigation. In particular, neither “68000 must use
 CPU C2P” nor “68020 must abandon the blitter” has been established. Keep the
 blitter implementation available through the comparison and acceptance gates.

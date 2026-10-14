@@ -1,9 +1,9 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: P13A1 reconstruction and P13A2 native display contract are complete.
-The isolated native-instruction/pixel gate passes; beam timing, edge quirks and
-full original/reconstructed boots remain P13A3, to start only when requested.
+Current scope: P13A1–P13A3 are complete. OCS reconstruction, native display
+contract, launcher, live-layout discovery and matched A500 boots pass.
+Stop at the P13A3 gate; start P13A4 baseline measurement only when requested.
 No OCS runtime patches or backend selection yet. See `docs/ocs-plan.md`.
 Required baseline for later work: Amiga 500 with Fast RAM. Share verified CD32
 mechanisms with 68000-safe paths. Retain native blitter C2P wherever matched
@@ -11,8 +11,8 @@ CPU/memory measurements favour it; CPU type alone is not a crossover measurement
 CD32 E1/phase 12 remain paused. See `docs/ocs-plan.md` for the ordered work.
 The CD32 intro 10 Hz timing and first-interval projectile fixes are complete;
 phase 11b D1–D5 are complete on current models. A2 calibration remains separate.
-Derived evidence is static unless explicitly labelled otherwise; no OCS
-performance or compatibility claim follows from this investigation.
+OCS live evidence is limited to the documented emulator gate; no OCS hardware
+performance or broader compatibility claim follows from it.
 Derived material stays in `tmp/`.
 Psygore authored the original v1.0 slaves; source code is unavailable.
 

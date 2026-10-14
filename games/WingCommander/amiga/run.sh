@@ -5,7 +5,13 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -n "${SLAVE:-}" ]; then SLAVE="$(cd "$(dirname "$SLAVE")" && pwd)/$(basename "$SLAVE")"; export SLAVE; fi
 cd "$ROOT/amiga"
 . ./env.sh
-export AMIGA_SETUP="${AMIGA_SETUP:-a1200-fast}"
+export WC_VARIANT="${WC_VARIANT:-cd32}"
+case "$WC_VARIANT" in
+  cd32) GAME_DIR=WingCommanderCD32; default_setup=a1200-fast ;;
+  ocs) GAME_DIR=WingCommander; default_setup=a500 ;;
+  *) echo "WC_VARIANT must be cd32 or ocs" >&2; exit 1 ;;
+esac
+export AMIGA_SETUP="${AMIGA_SETUP:-$default_setup}"
 # The pinned core takes CHIP write attributes from the wrong MMU cache entry.
 # Build locally; never modify the shared emulator or override an explicit choice.
 if [ -z "${FSUAE:-}" ] && [ "${1:-}" != stop ]; then
@@ -45,12 +51,12 @@ fsuae_prepare
 mkdir -p "$FSUAE_RUN"
 BOOT=$(mktemp -d "$FSUAE_RUN/boot.XXXXXX")
 python3 "$ROOT/tools/runtime_inputs.py" "$BOOT"
-DH0="$BOOT/dh0"; DH1="$BOOT/dh1/WingCommanderCD32"
+DH0="$BOOT/dh0"; DH1="$BOOT/dh1/$GAME_DIR"
 chmod -R u+w "$DH0" "$DH1"
 printf 'Expert\nReadDelay=0\n' > "$DH0/s/WHDLoad.prefs"
 printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assign DEVS: DH0:devs' \
   'Stack 16384' 'FailAt 999' 'CD DH1:' \
-  "WHDLoad WingCommanderCD32.Slave PRELOAD SPLASHDELAY=0 NOREQ ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
+  "WHDLoad $GAME_DIR.Slave PRELOAD SPLASHDELAY=0 NOREQ ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
 mkdir -p "$BOOT/state" "$BOOT/shots"
 export FSEMU_SCREENSHOTS_DIR="$PWD/$BOOT/shots"
 JOY0="${JOY0:-mouse}" JOY1="${JOY1:-keyboard}"
@@ -151,6 +157,22 @@ fsuae_setup() {
   done
   if [ "$found" = 0 ]; then FSUAE_SETUP_ARGS+=(--uae_immediate_blits="$immediate"); fi
 }
+# Native OCS baseline uses true Zorro-II Fast RAM, without trapdoor slow RAM.
+if [ "$WC_VARIANT" = ocs ] && [ "$AMIGA_SETUP" = a500 ]; then
+  setup_function=$(declare -f fsuae_setup)
+  eval "${setup_function/fsuae_setup/wc_ocs_base_setup}"
+  fsuae_setup() {
+    wc_ocs_base_setup || return 1
+    local i
+    FAST_KB=4096 SLOW_KB=0
+    for i in "${!FSUAE_SETUP_ARGS[@]}"; do
+      case "${FSUAE_SETUP_ARGS[$i]}" in
+        --fast_memory=*) FSUAE_SETUP_ARGS[$i]=--fast_memory=4096 ;;
+        --slow_memory=*) FSUAE_SETUP_ARGS[$i]=--slow_memory=0 ;;
+      esac
+    done
+  }
+fi
 fsuae_options
 fsuae_launch --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
   --floppy_drive_0="$WORKBENCH_ADF" --state_dir="$BOOT/state"
