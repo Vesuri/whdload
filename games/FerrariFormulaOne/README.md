@@ -75,6 +75,7 @@ An independent build from the committed sources reproduces it exactly.
 This is an unreleased, opt-in production integration. Minimum-memory/runtime
 qualification, the full disabled-option/reload matrix, broader tracks/controls/
 season save-load, Irek, cache variants, real hardware and human handling remain
-release work. Enabled NTSC is rejected. 030/040/060 analysis is deferred.
+release work. Enabled NTSC is rejected. 030/040/060 qualification is in progress; calibrated enabled-demo results and
+remaining acceptance work are in [RELEASE_QUALIFICATION.md](RELEASE_QUALIFICATION.md).
 C4-T01 micro targets remain documented shortfalls; the user-selected C4 matched-
 workload no-regression gate has passed. There is no A500 performance fallback.

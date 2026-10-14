@@ -32,8 +32,39 @@ slave SHA256 remains
 `60123fd26a8c188925c2213118f417e233ad0f883224372e87feeda477e2a836`.
 The corrected observer SHA256 is
 `e411569ca9e0c30b0cb62b831c88a6dcab4f415517cfcf43fb290d1d5d57171c`.
-Corrected accelerated repeats and timing checks are underway. CPU-instruction
+Corrected accelerated repeats and timing checks pass in the scope below. CPU-instruction
 costs unavailable from a core must remain unavailable, never zero-cost claims.
+
+## Accelerated enabled-demo acceptance
+
+The unmodified production build passes on all four accelerated profiles with
+2 MiB Chip and 8 MiB Fast, WHDLoad 20.1. Two independent boots per profile have
+identical complete 1,000-field DMA observations. All select the 20 ms player /
+100 ms opponents path, preserve elapsed-time speed, and report no errors.
+
+| Requested CPU profile | Quantized cycle scale (MHz) | 300-presentation FPS | Elapsed for 60 simulated seconds |
+| --- | ---: | ---: | ---: |
+| 030-50 | 50.444729 | 16.640136 | 59.975470 s |
+| 040-25 | 25.222364 | 16.640136 | 59.975470 s |
+| 040-40 | 40.355783 | 16.640136 | 59.975470 s |
+| 060-50 | 50.444729 | 16.640136 | 59.975470 s |
+
+Every complete presentation interval is three PAL fields in the measured
+windows. The 1,000-field count is 333 changes (16.623497 FPS including window
+endpoints); the complete-interval rate is 16.640136 FPS. Clock error is 0.04090%
+in each 60-second test. Warp is disabled during measurements.
+
+These are emulator results, not real-hardware measurements or matched speedup
+claims against the original release. The 040/060 performance profiles disable
+the MMU; functional MMU qualification is separate. Live instruction-cache
+readbacks are 0x2011 on 030 and 0x8000 on 040/060. The DMA-only captures provide
+no instruction-cost attribution. A render-stage observation is being used to
+explain the shared ceiling.
+
+An independent rebuild using the current shared WHDLoad installation reproduces
+the accepted 260,292-byte slave and its SHA256 exactly. Evidence is indexed in
+`tmp/dev/manifest/release-accelerated-enabled.json`; clock validation is in
+`tmp/dev/manifest/release-clock-calibration.json`.
 
 ## Remaining acceptance work
 
