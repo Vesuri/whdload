@@ -6526,3 +6526,125 @@ Final native and CPU candidates are each **39,784 bytes**, SHA-256 respectively
 D3-only, default candidate, original OCS and CD32 release controls retain hashes
 `0aafdacc…`, `172d3297…`, `eec155c9…` and `fdd92fbb…`. Generated material stays
 under `tmp/`; no release archive or shared-emulator update is part of D4.
+
+### P13E1: focused OCS performance gate
+
+P13E1's focused optimisation/measurement gate is complete, with **heavy-scene
+limits retained**. The opt-in `--math-fast` candidate implies D4 `--intro` and
+adds exact 68000-safe arithmetic and collision shortcuts. It does not establish
+sustained 10 Hz in A500 asteroid credits or sustained fire. The required A500/Fast
+coasting gate passes; the representative 14 MHz 020/Fast gate passes. E2 is next.
+Normal OCS, D4-only and CD32 release binaries remain unchanged.
+
+**Measured cause and changes.** The stock A500 instruction trace accounts for
+142,102 CPU clocks per recorded 313-line PAL field. Complete entry/RTS scopes
+match stack pointers, include native callees/interrupts, exclude boundary calls,
+and are not added to their children. A 20-field settled asteroid trace exposes
+823 native radius predicates averaging 0.223 ms, including two approximate
+hypotenuse calculations even for obviously separated objects. The reference
+trace has only one complete world/preparation call, 189.679 ms; the candidate
+has three, 96.808 ms median / 104.061 ms maximum. This identifies the bottleneck;
+these differently progressed scenes are not an identical-input microbenchmark.
+
+| OCS code-hunk / file offset | Replacement and preserved behaviour |
+|---|---|
+| `2adb6 / 2ade2` | Exact signed 24.8 multiply: zero/unit shortcuts and two partial products when one magnitude fits 16 bits; native fallback otherwise |
+| `2b6d4 / 2b700` | Unroll exactly eight unsigned ratio bits; retain native lookup, correction and rounding at `2b6f4` |
+| `2b950 / 2b97c` | Reject radius predicates when an absolute axis already reaches the strict radius; ambiguous/wide cases execute native code |
+| `1574e / 1577a` | Fuse collision-pair subtraction/radius setup; preserve all three scratch coordinates and return to native first-hit handling at `1578e` |
+
+The radius shortcut requires **all three magnitudes below `2^30`**. The pinned
+native correction table is nonnegative and bounded by 27,146/65,536; within
+this domain the two corrections cannot wrap unsigned 32 bits or reduce the
+largest component. Radius scaling retains the native 32-bit shift/wrap. Large
+coordinates, including `INT_MIN`, use the original predicate. No Euclidean
+replacement, changed collision tolerance, reordered scan or cached world result
+is introduced. Native class permissions, self exclusion, ship/ship half-radius,
+first-hit return and scratch data remain intact. Multiply preserves even native
+scratch-register outputs; caller-visible register checks are not relaxed.
+Generated displaced bytes and all derived inputs remain in `tmp/`.
+
+The final native checks (`tmp/p13e1-native-final3/report.json`) compare 2,169
+multiply and 2,169 hypotenuse cases, 2,495 radius cases and 100 complete collision
+scans **per CPU model**, on M68000 and M68020. Inputs include signed limits,
+short/wide magnitudes, radius boundaries and nearby/separated populations.
+Complete scan data and all general registers match native execution. The D3
+pose/player/projectile/input suite passes unchanged in
+`tmp/p13e1-prediction-final2/`; D4 title/credit/restore checks pass in
+`tmp/p13e1-intro-native-final2/`. All 720 guarded startup cases pass in
+`tmp/p13e1-install-final2/`. Functional CPU tests are not timing instruments.
+
+**Throughput.** Live runs use the unchanged D3 observer/debugger
+`de7ed020a0af09491b21fe17ff79d93a6056fb9c02b63fb47039d2ea1cdfa5bf`, PAL OCS,
+512 KiB Chip plus 4 MiB physically verified Fast. A500 uses the stock 68000 and
+native blitter; 020 uses the measured 14 MHz model and CPU/Fast longword converter.
+All runs reach simulator and visible name entry. Field windows have no debugger
+stops. Time comes from the calibrated emulated clock, never host WARP duration.
+
+| Profile / workload | World updates/s | Displayed pictures/s | Display intervals p50 / p95 / p99 / max, ms (interior count) |
+|---|---:|---:|---|
+| A500 D4 reference, credits | 7.39 | 3.59 | 180 / 709 / 799 / 821 (17) |
+| A500 E1, credits | 8.59 | 4.19 | 180 / 522 / 537 / 541 (20) |
+| A500 D4 reference, held fire | 7.99 | 0 | no interior interval |
+| A500 E1, held fire | 8.99 | 0.25 | one picture in the window; no interior interval |
+| A500 E1, coasting | 9.98 | 2.75 | 381 / 412 / 419 / 421 (10) |
+| 020 D4 reference, credits | 9.98 | 13.78 | 70 / 100 / 100 / 100 (68) |
+| 020 E1, credits | 9.98 | 14.58 | 60 / 80 / 100 / 100 (72) |
+| 020 D4 reference, held fire | 9.65 | 9.32 | 100 / 120 / 135 / 140 (27) |
+| 020 E1, held fire | 9.65 | 9.65 | 100 / 120 / 120 / 120 (28) |
+
+Credits cover 250 fields / 5.007972 seconds; A500 flight covers 200 fields /
+4.006377 seconds and 020 flight 150 fields / 3.004783 seconds. The 020 flight
+count is 29 updates, within one tick of the target's boundary tolerance. The A500
+coasting count is 40; heavy fire is 36 and credits 43 instead of 50. Retained
+flight backlog peaks at 28 fields during held fire (reference 45), nine while
+coasting and five on 020. No input sample is missing or overflows in these runs.
+The repeated A500 reference credit result is exact, as is the candidate credit
+result between profiled/fire and coasting runs. Native arithmetic equivalence
+establishes identical-input correctness; real-time trajectories after rendering
+and intro skips differ, so the small 020 changes are not a universal speed-up.
+Short-window percentiles retain their sample counts and are not long-run tails.
+
+The final A500 coasting trace measures one complete draw at 93.975 ms, including
+36.562 ms in conversion submission/wait. The compositor command call is only
+0.528 ms. Its complete world/preparation call is 42.479 ms and input dispatch
+15.874 ms; field player work averages 1.602 ms (five samples). In the held-fire
+trace, world/preparation averages 49.080 ms (two) and input dispatch 21.200 ms
+(two), before later workload growth. The settled asteroid trace still measures
+world/preparation around 99.200 ms, plus draw/finish work. These are remaining
+budget constraints, not evidence that C2P alone causes the overload. C2/C6's
+measured converter choice remains: native blitter on A500, CPU/Fast on 020. No
+030-specific copy or full-image comparison path is imposed on 68000.
+
+**Memory and correctness.** Both final candidates are **40,352 bytes**, only
+568 bytes above D4. There is no new allocation/history/cache. The chunky source
+remains 64,000 bytes; combined Chip planes/workspace 96,960, row table 800 and
+descriptors 1,336. Sampled native registry maxima are 360,442 Chip / 375,185 Fast
+bytes on A500 coasting, and 357,075 / 375,474 on 020. These exclude other owners;
+OS pool snapshots (which include WHDLoad reservations) peak at 407,584 / 4,193,256
+and 404,240 / 4,193,496 bytes respectively. Neither is a boot-wide high-water mark
+or a new lower-RAM compatibility claim. The tested floor remains 512 KiB + 4 MiB.
+
+`tmp/p13e1-observer-final/` passes 21 credit and 11 coasting completed-image
+checks, actual-DMA pixels, publication ownership, all four negative controls and
+exact observer-off game/Chip/owned-state equality at eight checkpoints.
+`tmp/p13e1-cpu-pixels/` passes 73 credit and 28 flight images, 73/29 forecast
+matches and the same negative controls. Unknown DMA words remain explicitly
+unverified. The A500 held-fire window has only one completed image, so it **does
+not pass the unchanged three-image publication gate**; no mismatching pixels were
+observed there. Coasting supplies the full A500 correctness gate. It is not
+substituted for heavy-fire performance acceptance.
+
+Reports: `tmp/p13e1-accept-reference/`, `tmp/p13e1-accept-a500/`,
+`tmp/p13e1-accept-coast/`, `tmp/p13e1-accept-cpu-reference/` and
+`tmp/p13e1-accept-cpu/`. Final native/CPU SHA-256 values are respectively
+`7485ed46341185afaceb87c430b129a529538cdc03dc25199a6c96729d49f424` and
+`ad33a2a1452e22b6a98df5701cdfff3092cdf28a468cbd3e747f7681d3dee247`.
+
+**Remaining limits.** A500 asteroid and sustained-fire scenes still miss 10 Hz;
+catch-up prioritisation can starve drawing under sustained fire. The clock does
+not discard ticks or scale velocities to hide this. This focused gate closes
+with those documented heavy-scene limits, not a claim of smooth or universally
+fixed A500 play. Full campaign, views, live NTSC, save/load, accelerated cache
+regression and broader compatibility remain E2. No release archive or shared
+emulator change is included; CD32 phase 12 remains paused.

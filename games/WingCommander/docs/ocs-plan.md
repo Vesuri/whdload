@@ -322,7 +322,7 @@ overload. See the [D4 evidence](internals.md#p13d4-ocs-title-and-asteroid-credit
 
 ## E — Focused acceptance and hand-off
 
-**P13E1 — Close measured A500 bottlenecks.** Depends on C6, D4.
+**P13E1 — Close measured A500 bottlenecks — focused gate complete, heavy-scene limits retained.** Depends on C6, D4.
 Close the measured D4 asteroid-world overload (7.39 updates/s on A500) and
 D3 sustained-fire/display gaps. Profile the remaining world/drawing/composition/conversion cost and optimise only
 what prevents the accepted A500 timing or selected backend from working. Retain
@@ -331,6 +331,16 @@ copying or full-image comparison on a 68000 without evidence.
 Gate: report displayed frames/s, interval tails, world cadence and memory on the
 required A500/Fast target and representative 020/Fast configuration. Document
 heavy-scene gaps instead of promising CD32 smoothness on a 7 MHz CPU.
+
+The opt-in `--math-fast` candidate retains exact native arithmetic/collision
+results, native blitter on A500 and CPU/Fast conversion on the measured 020.
+A500 coasting holds 9.98 updates/s and 2.75 pictures/s. Credits improve from
+7.39/3.59 to 8.59/4.19; sustained fire remains 8.99 updates/s with only one new
+picture in four seconds. **These heavy workloads are not fixed to 10 Hz.**
+E1's reported cadence, tails, memory and correctness gate is complete; the
+remaining overload/display starvation is an explicit limitation for E2/E3, not
+a reason to drop world ticks or relax the pixel gate. See
+[E1 evidence](internals.md#p13e1-focused-ocs-performance-gate).
 
 **P13E2 — Complete compatibility and functional checks.** Depends on E1.
 Exercise native-blitter and CPU backends on 68000/OCS and 68020/OCS, then a short
@@ -352,7 +362,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D4 are complete. **P13E1** is next.
+P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1 are complete. **P13E2** is next.
 Use the scoped measured profiles and retain native fallback/override
 for unknown accelerators. C4 creates source ownership before native compositor aliases; C5 now protects
 pending/displayed ownership through publication and transitions. Broader

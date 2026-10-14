@@ -33,11 +33,15 @@ def main():
     p.add_argument('--ownership', action='store_true', help='C4 candidate transition gate')
     p.add_argument('--clock-build',help='D2 candidate build directory')
     p.add_argument('--intro-cycle',action='store_true',help='D4 full 15-page cycle and repeat before simulator')
+    p.add_argument('--cost-profile',action='store_true',help='E1 trace 20 settled asteroid fields after the cadence window')
+    p.add_argument('--held-fire',action='store_true',help='E1 hold native fire in the A500 flight window too')
     p.add_argument('--prediction-mode',choices=('auto','off','on'),default='auto')
     p.add_argument('--draw-every',type=int,choices=(1,2,5),default=1)
     p.add_argument('--cpu', choices=('68000','68020'), default='68000')
     p.add_argument('--fast-kib', type=int, choices=(1024,2048,4096), default=4096)
     a = p.parse_args()
+    if (a.cost_profile or a.held_fire) and not (a.clock_build and a.baseline and a.simulator):
+        p.error('E1 workload options require clock build, baseline and simulator')
     if not a.ownership and (a.cpu != '68000' or a.fast_kib != 4096):
         p.error('machine overrides require --ownership')
     if a.intro_cycle and not (a.clock_build and a.baseline and a.simulator):p.error('intro cycle requires clock build, baseline and simulator')
@@ -183,6 +187,9 @@ def main():
         until(h0+0x1f03c, 'credit picture submitted O:1f03c')
         capture('credits')
         if a.baseline: baseline('asteroids')
+        if a.cost_profile:
+            command('monitor trace-window-all')
+            command(f'monitor profile 20 "" "{out}/intro-cost.bin"',timeout=120)
         if a.intro_cycle:
             pages=[]
             for page in range(15):
@@ -239,9 +246,12 @@ def main():
                         command('monitor trace-window-all')
                         command(f'monitor profile 10 "" "{out}/prediction-cost.bin"',timeout=120)
                     if tick==2 and build.get('prediction') and a.baseline:
-                        if a.cpu!='68000':key(1,'40')
+                        if a.cpu!='68000' or a.held_fire:key(1,'40')
+                        if a.cost_profile:
+                            command('monitor trace-window-all')
+                            command(f'monitor profile 10 "" "{out}/fire-cost.bin"',timeout=120)
                         baseline('fire',200 if a.cpu=='68000' else 150)
-                        if a.cpu!='68000':key(0,'40')
+                        if a.cpu!='68000' or a.held_fire:key(0,'40')
                 (out/'clock-samples.json').write_text(json.dumps(dict(samples=clock_samples,draw_every=a.draw_every,prediction_mode=a.prediction_mode,build_sha256=build['sha256']),indent=2)+'\n')
                 if not (build.get('prediction') and a.cpu=='68000'):
                     until(sb+sy['ocs_clock_iteration'],'clock picture completed')
@@ -310,7 +320,7 @@ def main():
             metadata['checkpoints'] += ['view2','view1','view3','view0']
             metadata['view_fields']=a.view_fields
         if a.baseline:
-            metadata.update(baseline=a.baseline, fields_per_window=250, fire_fields=(200 if a.cpu=='68000' else 150) if a.clock_build and build.get('prediction') else 100 if a.clock_build else 250, flight_input='coast' if a.clock_build and build.get('prediction') and a.cpu=='68000' else 'held fire')
+            metadata.update(baseline=a.baseline, fields_per_window=250, fire_fields=(200 if a.cpu=='68000' else 150) if a.clock_build and build.get('prediction') else 100 if a.clock_build else 250, flight_input='coast' if a.clock_build and build.get('prediction') and a.cpu=='68000' and not a.held_fire else 'held fire', cost_profile=a.cost_profile)
             metadata['checkpoints'] += ['asteroids', 'fire']
         (out/'result.json').write_text(json.dumps(metadata, indent=2)+'\n')
     except Exception:

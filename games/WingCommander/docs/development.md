@@ -4157,3 +4157,98 @@ python3 tools/ocs_memory_build.py --output tmp/p13d4-default-control
 python3 tools/reconstruct.py --variant ocs --output tmp/p13d4-original-control
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/p13d4-cd32-control
 ```
+
+## P13E1: focused arithmetic and collision optimisation
+
+`--math-fast` implies `--intro --prediction --clock`. It is an opt-in OCS
+candidate, not a release. It adds no data history/allocation and retains the
+measured native-blitter A500 and CPU/Fast 020 choices. Heavy A500 scenes remain
+below the 10 Hz target; see [results and limits](internals.md#p13e1-focused-ocs-performance-gate).
+Use fresh output names. D3's pinned debugger and simulator fixture remain the
+prerequisites described above.
+
+```sh
+. amiga/env.sh
+/bin/bash tools/inputs.sh verify
+python3 tools/ocs_memory_build.py --math-fast --output tmp/p13e1-final2
+python3 tools/ocs_memory_build.py --math-fast --backend cpu --output tmp/p13e1-cpu-final2
+python3 tools/ocs_math_check.py tmp/p13e1-final2 --output tmp/p13e1-native-final3
+python3 tools/ocs_memory_install_check.py tmp/p13e1-final2 --output tmp/p13e1-install-final2
+python3 tools/ocs_prediction_check.py tmp/p13e1-final2 --output tmp/p13e1-prediction-final2
+python3 tools/ocs_intro_check.py tmp/p13e1-final2 --output tmp/p13e1-intro-native-final2
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae" WARP=1
+export SLAVE="$PWD/tmp/p13e1-final2/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --calibrate --output tmp/p13e1-layout-final2
+python3 tools/ocs_boot_gate.py --ownership --clock-build tmp/p13e1-final2 \
+  --simulator --baseline on --held-fire --cost-profile \
+  --layout tmp/p13e1-layout-final2/layout.json --output tmp/p13e1-final-live
+python3 tools/ocs_boot_gate.py --ownership --clock-build tmp/p13e1-final2 \
+  --simulator --baseline on --layout tmp/p13e1-layout-final2/layout.json \
+  --output tmp/p13e1-coast
+python3 tools/ocs_boot_gate.py --ownership --clock-build tmp/p13e1-final2 \
+  --simulator --baseline off --layout tmp/p13e1-layout-final2/layout.json \
+  --output tmp/p13e1-coast-off
+python3 tools/ocs_publication_report.py tmp/p13e1-coast --build tmp/p13e1-final2 \
+  --observer-off tmp/p13e1-coast-off --output tmp/p13e1-observer-final
+python3 tools/ocs_prediction_report.py tmp/p13e1-coast --build tmp/p13e1-final2 \
+  --output tmp/p13e1-coast-flight
+python3 tools/ocs_intro_report.py tmp/p13e1-final-live --build tmp/p13e1-final2 \
+  --output tmp/p13e1-final-intro
+python3 tools/ocs_performance_report.py tmp/p13e1-final-live --build tmp/p13e1-final2 \
+  --output tmp/p13e1-accept-a500
+python3 tools/ocs_performance_report.py tmp/p13e1-coast --build tmp/p13e1-final2 \
+  --output tmp/p13e1-accept-coast
+export SLAVE="$PWD/tmp/p13e1-cpu-final2/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --calibrate \
+  --output tmp/p13e1-layout-cpu-final2
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 \
+  --clock-build tmp/p13e1-cpu-final2 --simulator --baseline on --held-fire --cost-profile \
+  --layout tmp/p13e1-layout-cpu-final2/layout.json --output tmp/p13e1-cpu-live
+python3 tools/ocs_publication_report.py tmp/p13e1-cpu-live --build tmp/p13e1-cpu-final2 \
+  --output tmp/p13e1-cpu-pixels
+python3 tools/ocs_performance_report.py tmp/p13e1-cpu-live --build tmp/p13e1-cpu-final2 \
+  --output tmp/p13e1-accept-cpu
+```
+
+`--held-fire` selects native Space during the A500 measurement too. Without it,
+A500 remains the existing coasting correctness window. `--cost-profile` adds a
+20-field instruction trace after the asteroid window and a ten-field trace after
+pressing fire, before the flight window. Neither trace has debugger stops inside
+it; the existing pre-fire/coasting trace is retained separately. Profiling changes
+where subsequent flight input falls, so controls use the same flags. The normal
+A500 workload is 200 fields; 020 fire remains 150. Do not merge their denominators
+or claim that the coasting pixel gate accepts the overloaded held-fire workload.
+
+The performance report records overload rather than relaxing the separate D3
+cadence or C5 pixel gate. A500 held fire has only one completed image and cannot
+satisfy the existing three-image publication gate; coasting and 020 do satisfy it.
+It reports null interval distributions when fewer than two pictures appear,
+checks actual field/counter accounting, and labels OS memory as sampled pools.
+Instruction costs are only interpreted on the calibrated 68000, with complete
+entry/RTS scopes, stack matching and boundary exclusions. Nested costs must not
+be summed. The extra 020 traces are only part of the matched driving protocol.
+
+Fresh unchanged controls use the same bounded heavy-workload flags:
+
+```sh
+export SLAVE="$PWD/tmp/p13d4-candidate5/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --clock-build tmp/p13d4-candidate5 \
+  --simulator --baseline on --held-fire --cost-profile \
+  --layout tmp/p13d4-layout-a5005/layout.json --output tmp/p13e1-reference
+python3 tools/ocs_performance_report.py tmp/p13e1-reference --build tmp/p13d4-candidate5 \
+  --output tmp/p13e1-accept-reference
+export SLAVE="$PWD/tmp/p13d4-cpu5/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --clock-build tmp/p13d4-cpu5 \
+  --simulator --baseline on --held-fire --cost-profile \
+  --layout tmp/p13d4-layout-cpu5/layout.json --output tmp/p13e1-cpu-reference
+python3 tools/ocs_performance_report.py tmp/p13e1-cpu-reference --build tmp/p13d4-cpu5 \
+  --output tmp/p13e1-accept-cpu-reference
+python3 tools/ocs_memory_build.py --intro --output tmp/p13e1-d4-control
+python3 tools/ocs_memory_build.py --output tmp/p13e1-default-control
+python3 tools/reconstruct.py --variant ocs --output tmp/p13e1-original-control
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/p13e1-cd32-control
+```
+
+The D4/default/original OCS/CD32 controls retain `e32ece47…`, `172d3297…`,
+`eec155c9…` and `fdd92fbb…`. The native/CPU E1 candidates are 40,352 bytes, hashes
+`7485ed46…` and `ad33a2a1…`. All generated bytes, traces and captures stay in `tmp/`.
