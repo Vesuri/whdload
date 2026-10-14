@@ -92,3 +92,15 @@ Human playtesting and real Amiga hardware testing are deferred. Irek is
 unavailable and retains its original route. Enabled NTSC is rejected. C4-T01
 micro targets remain documented shortfalls; the user-selected C4 matched-
 workload no-regression gate has passed. There is no A500 performance fallback.
+
+A local Retroplay-based preinstalled candidate is also available at
+`tmp/dev/dist/FerrariFormulaOne_v1.02-rc1_0481_Performance.lha`.
+All 40 original game-data files, the manual and icon artwork are preserved.
+The normal FerrariFormulaOne icon keeps CUSTOM2=0; the added Performance icon
+selects CUSTOM2=1. Both carry NoWriteCache and disabled splash delays. The
+updated ReadMe includes the original text as historical documentation, with
+current memory requirements and qualification limits above it. New icons use
+automatic placement. The 53-member level-1 LH5 archive passes CRC testing and
+complete extraction/content comparison; its inventory and hashes are recorded
+in `tmp/dev/manifest/preinstalled-rc1.json`. Game data and packaging tools remain
+ignored and local; this archive is not published.
