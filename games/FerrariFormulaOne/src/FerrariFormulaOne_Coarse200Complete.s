@@ -7,6 +7,9 @@ FF1InstallCoarse200:
  IFD FF1_C4_COLOUR_ELIDE
  bsr.w FF1C4InstallColourElide
  ENDC
+ IFD FF1_C4_WAIT_DIRECT
+ bsr.w FF1C4InstallWaitDirect
+ ENDC
  bsr.w FF1Coarse200Reset
  IFD FF1_C4_BOUNDARY_P5
  bsr.w FF1C4BoundaryInit
@@ -86,4 +89,8 @@ velocity_scratch: ds.b 80
 
  IFD FF1_C4_MUL_SITES
  include "FerrariFormulaOne_Coarse200MulSites.s"
+ ENDC
+
+ IFD FF1_C4_WAIT_DIRECT
+ include "FerrariFormulaOne_Coarse200WaitDirect.s"
  ENDC
