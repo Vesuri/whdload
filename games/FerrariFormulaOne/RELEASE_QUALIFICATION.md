@@ -194,6 +194,22 @@ AmigaDOS prompt, confirmed by a screenshot. A 4,190-byte season file was written
 through the native requester and retained for a fresh-session load check;
 restoration is not yet accepted. Evidence: `tmp/dev/manifest/release-native-ui.json`.
 
+## Open accelerated save/exit case
+
+A fresh 020+Fast session loads the A500 season file and restores F3, but the
+subsequent save under a new filename is not persisted. F10 reaches resloadAbort
+with TDREASON_OK, then the display remains black. After 10 and 25 host seconds,
+the CPU is still in the same system-return loop (observed PCs `$228dee` and
+`$228df8`, unchanged A1 `$243478`). The new file is absent from the host drawer.
+The emulator was kept alive for the second observation; the failure cannot be
+accepted as a completed exit or save round trip. Full memory and register
+captures are retained in
+`tmp/dev/tmp/step5/c4-q03-release-live-a1200-fast-season-flush/`.
+
+The A500 system return passes. A matching CUSTOM2=0 control is being run to
+isolate the accelerated failure before assigning it to the new engine, runtime,
+or emulator. Release qualification remains open.
+
 ## Remaining acceptance work
 
 - Minimum-memory and minimum/development WHDLoad runtime qualification.
