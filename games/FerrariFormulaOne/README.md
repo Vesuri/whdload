@@ -52,8 +52,29 @@ selects the accepted R3g arithmetic branches explicitly and verifies all binding
 operands after its final assembly pass. Original diagnostic builders remain in
 the ignored local development harness.
 
-Integration acceptance is in progress. Initial demo activation has been checked
-on the four supported emulator profiles; matched-state, disabled-path, elapsed
-and lifecycle acceptance must be completed before integration is marked passed.
-Broader tracks/gameplay, Irek performance mode, NTSC, real hardware and human
-play-testing are separate release qualification. 030/040/060 analysis is deferred.
+Integration acceptance passed on 2026-10-14 for SPS 0481 PAL on the four documented emulator
+profiles. Controlled exact-state comparisons, 30 exact frames per engine,
+CUSTOM2=0 legacy comparisons, 60-second clocks, enabled CUSTOM1 options,
+pause/menu/re-entry, failure routes and reproducible builds pass. Fine-path
+cycle/debt and DMA audits pass. The current untraced 300-presentation figures
+are 4.56 / 4.75 / 6.65 / 13.30 FPS for A500 / A500+Fast / chip-only 020 / 020+Fast;
+all 60-second clock errors are below 0.23%. These are current demo measurements,
+not matched speedup claims against the original release.
+
+Fine simulation averages 53,747.8 cycles/update; worst rolling five is 58,122.2,
+against the 145,600 gate. Peak is 141,613 against 283,750. The matched reference
+averages 51,744.7: integration costs about 3.9%, with substantial capacity margin.
+Actual tow restores all 503 coarse / 902 fine patch words before native cleanup; pause and
+menu/session time do not enter driving debt. Full local evidence is indexed by
+`tmp/dev/manifest/production-integration.json` and `tmp/dev/docs/STEP5_CAPACITY.md`.
+
+The accepted 260,292-byte build has SHA256
+`60123fd26a8c188925c2213118f417e233ad0f883224372e87feeda477e2a836`.
+An independent build from the committed sources reproduces it exactly.
+
+This is an unreleased, opt-in production integration. Minimum-memory/runtime
+qualification, the full disabled-option/reload matrix, broader tracks/controls/
+season save-load, Irek, cache variants, real hardware and human handling remain
+release work. Enabled NTSC is rejected. 030/040/060 analysis is deferred.
+C4-T01 micro targets remain documented shortfalls; the user-selected C4 matched-
+workload no-regression gate has passed. There is no A500 performance fallback.
