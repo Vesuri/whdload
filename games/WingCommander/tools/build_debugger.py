@@ -26,6 +26,7 @@ def main():
     p.add_argument('--matrix-mmu030-counters',action='store_true',help='read-only scene counters on the cycle-exact 030 MMU interpreter')
     p.add_argument('--dma-cia-unsplit', action='store_true', help='diagnostic: preserve unrecorded CIA wait stepping; omit CIA wait-phase annotations')
     p.add_argument('--matrix-irq', action='store_true', help='diagnostic complete-call intervals for game VBL callbacks')
+    p.add_argument('--ocs-pixels', action='store_true', help='initialized host framebuffer and lossless multi-field screenshots')
     a = p.parse_args()
     if a.matrix_irq and not a.matrix_observer:
         raise ValueError('--matrix-irq requires --matrix-observer')
@@ -83,6 +84,17 @@ int record_key_debug(int kc) {
             response += record_key_debug(((raw << 1) | (raw >> 7)) & 0xff) ? "OK" : "E02";
         } else response += "E01";
     '''+anchor)
+    if a.ocs_pixels:
+        # The 754-wide export includes a right border the native drawer may
+        # leave untouched. malloc leaks host heap bytes there across boots.
+        # This initializes host display storage only, never emulated RAM.
+        target = out/'src/od-fs/fsvideo.cpp'
+        framebuffer = target.read_text()
+        old = 'uae_fsvideo.chipset_framebuffer =  (uae_u8 *) malloc('
+        assert framebuffer.count(old) == 1
+        target.write_text(framebuffer.replace(old, 'uae_fsvideo.chipset_framebuffer =  (uae_u8 *) calloc(1, '))
+        assert s.count('if(profile_num_frames > 1) {') == 1
+        s = s.replace('if(profile_num_frames > 1) {', 'if(false) { // Lossless diagnostic screenshots on every field')
     p.write_text(s)
     if a.intro_observer or a.matrix_observer:
         target = out/'src/newcpu.cpp'
