@@ -38,11 +38,19 @@ def main():
     p.add_argument('--prediction-mode',choices=('auto','off','on'),default='auto')
     p.add_argument('--draw-every',type=int,choices=(1,2,5),default=1)
     p.add_argument('--cpu', choices=('68000','68020'), default='68000')
+    p.add_argument('--ntsc', action='store_true', help='E2 NTSC field compatibility')
+    p.add_argument('--functional', action='store_true', help='E2 native campaign UI checks after name entry')
+    p.add_argument('--flight-fields', type=int, choices=(200,400), help='E2 longer slow-backend pixel window')
+    p.add_argument('--compat', action='store_true', help='E2 correctness run: omit instruction-cost capture')
+    p.add_argument('--aga', action='store_true', help='E2 accelerated 020/AGA instruction-cache regression')
     p.add_argument('--fast-kib', type=int, choices=(1024,2048,4096), default=4096)
     a = p.parse_args()
     if (a.cost_profile or a.held_fire) and not (a.clock_build and a.baseline and a.simulator):
         p.error('E1 workload options require clock build, baseline and simulator')
-    if not a.ownership and (a.cpu != '68000' or a.fast_kib != 4096):
+    if a.functional and not (a.compat and a.clock_build and a.simulator):p.error('functional checks require compat, clock build and simulator')
+    if a.flight_fields and not (a.compat and a.cpu=='68000'):p.error('long window requires 68000 compat')
+    if a.aga and a.cpu != '68020':p.error('AGA regression requires 68020')
+    if not a.ownership and (a.cpu != '68000' or a.fast_kib != 4096 or a.ntsc or a.aga):
         p.error('machine overrides require --ownership')
     if a.intro_cycle and not (a.clock_build and a.baseline and a.simulator):p.error('intro cycle requires clock build, baseline and simulator')
     if a.clock_build and not a.ownership:p.error('clock gate requires ownership')
@@ -72,11 +80,12 @@ def main():
     os.chdir(ROOT)
     run = '../'+str(out.relative_to(ROOT))+'/run'
     env = dict(os.environ, FSUAE_RUN=run, WARP=os.environ.get('WARP','0') if a.calibrate or a.ownership else '0', WINDOW='front',
-               JOY0='none', JOY1='none',
+               JOY0='none', JOY1='none', NTSC='1' if a.ntsc else '0',
                DETERMINISTIC=os.environ.get('DETERMINISTIC', '1') if a.calibrate else '1',
-               AMIGA_SETUP='a500', WC_VARIANT='ocs', WHD_ARGS='', OCS_STOCK_CLOCK='1' if a.baseline or a.ownership else '0')
+               AMIGA_SETUP='a1200-fast' if a.aga else 'a500', OCS_COMPAT_AGA='1' if a.aga else '0', WC_VARIANT='ocs', WHD_ARGS='', OCS_STOCK_CLOCK='1' if a.baseline or a.ownership else '0')
     if a.ownership:
         env['EXTRA_ARGS']=f'--uae_cpu_model={a.cpu} --fast_memory={a.fast_kib}'
+        if a.aga:env['EXTRA_ARGS']+=' --chip_memory=2048'
     if a.clock_build and a.layout:
         candidate=json.loads((ROOT/a.clock_build/'build.json').read_text())
         if candidate.get('prediction'):
@@ -147,8 +156,9 @@ def main():
                 raise ValueError('live A4 differs from startup relocation')
             for n, (base, size) in enumerate(zip(layout['hunks'], SIZES)):
                 (out/f'{label}-h{n}.bin').write_bytes(memory[base-BASE:base-BASE+size])
-            dump(label+'-chip.bin', 0, 0x80000)
+            dump(label+'-chip.bin', 0, 0x200000 if a.aga else 0x80000)
             (out/(label+'-registers.txt')).write_text(command('info registers'))
+            if a.compat:(out/(label+'-cpu.txt')).write_text(command('monitor wc-audit'))
             trace = out/(label+'-screen.bin')
             command(f'monitor profile {3 if label == "teardown" else 2 if label == "name" else 1} "" "{trace}"', timeout=120)
             shot = barto.load(str(trace)).fields[-1].shot
@@ -235,14 +245,14 @@ def main():
                     path=out/'prediction-mode.bin';path.write_bytes(struct.pack('>H',1 if a.prediction_mode=='off' else 2))
                     command(f'monitor ocs-load {sb+sy["ocs_prediction_mode"]:x} "{path}"')
                 clock_samples=[]
-                for tick in ((2,51) if build.get('prediction') and a.cpu=='68000' else (2,41,51) if build.get('prediction') else (2,11,21,31)):
+                for tick in ((2,) if a.flight_fields else (2,51) if build.get('prediction') and a.cpu=='68000' else (2,41,51) if build.get('prediction') else (2,11,21,31)):
                     until(sb+sy['ocs_clock_tick_done'],f'completed clock tick {tick}',
                           f'*(unsigned int*){sb+sy["ocs_clock_completed"]:#x} == {tick}')
                     dump(f'tick{tick}-data.bin',layout['hunks'][1],layout['hunks'][1]+SIZES[1])
                     dump(f'tick{tick}-clock.bin',sb+sy['ocs_clock_state'],sb+sy['ocs_clock_cancel']+2)
                     field=int.from_bytes(dump(f'tick{tick}-field.bin',layout['hunks'][1]+0x77fe,layout['hunks'][1]+0x7802),'big')
                     clock_samples.append(dict(tick=tick,field=field))
-                    if build.get('prediction') and ((tick==2 and a.cpu=='68000') or (tick==41 and a.cpu!='68000')):
+                    if not a.compat and build.get('prediction') and ((tick==2 and a.cpu=='68000') or (tick==41 and a.cpu!='68000')):
                         command('monitor trace-window-all')
                         command(f'monitor profile 10 "" "{out}/prediction-cost.bin"',timeout=120)
                     if tick==2 and build.get('prediction') and a.baseline:
@@ -250,7 +260,7 @@ def main():
                         if a.cost_profile:
                             command('monitor trace-window-all')
                             command(f'monitor profile 10 "" "{out}/fire-cost.bin"',timeout=120)
-                        baseline('fire',200 if a.cpu=='68000' else 150)
+                        baseline('fire',a.flight_fields or (200 if a.cpu=='68000' else 150))
                         if a.cpu!='68000' or a.held_fire:key(0,'40')
                 (out/'clock-samples.json').write_text(json.dumps(dict(samples=clock_samples,draw_every=a.draw_every,prediction_mode=a.prediction_mode,build_sha256=build['sha256']),indent=2)+'\n')
                 if not (build.get('prediction') and a.cpu=='68000'):
@@ -282,6 +292,10 @@ def main():
                 until(h0+0x32e2c, 'name conversion published O:32e2c')
                 until(h0+0x16992, 'name input after publication O:16992')
             capture('name')
+            functional={}
+            if a.functional:
+                from ocs_functional_run import run as functional_run
+                functional=functional_run(out,layout,command,until,key,dump,capture,build)
             if a.teardown_build:
                 build=json.loads((ROOT/a.teardown_build/'build.json').read_text())
                 if not build.get('exit_probe'):raise ValueError('no diagnostic teardown trigger')
@@ -299,9 +313,11 @@ def main():
                 capture('teardown')
         logfile = out/'run/fsuae/Cache/Logs/fs-uae.log.txt'
         options = dict(re.findall(r'Set option (\w+) = "([^"]*)"', logfile.read_text(errors='replace')))
-        expected = dict(cpu_model=a.cpu, chipset='ocs', chipmem_size='1', fastmem_size=str(a.fast_kib//1024),
+        expected = dict(cpu_model=a.cpu, chipset='aga' if a.aga else 'ocs', chipmem_size='4' if a.aga else '1', fastmem_size=str(a.fast_kib//1024),
                         bogomem_size='0', cpu_speed='real', cpu_frequency='0' if a.baseline or a.ownership else '7093790',
                         cpu_cycle_exact='true', cpu_memory_cycle_exact='true', blitter_cycle_exact='true')
+        if a.ntsc:expected['ntsc']='true'
+        if a.aga:expected['cpu_multiplier']='8'
         for name, value in expected.items():
             if options.get(name) != value:
                 raise ValueError('effective machine differs: '+name)
@@ -309,9 +325,12 @@ def main():
         slave = (boot/'dh1/WingCommander/WingCommander.Slave').read_bytes()
         metadata = dict(layout, actions=actions, slave_sha256=hashlib.sha256(slave).hexdigest(),
                         whd_args=env['WHD_ARGS'], fsuae_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest(),
-                        machine=f'{a.cpu}-ocs-512k-chip-{a.fast_kib}k-fast', warp=env['WARP']=='1', variant='ocs', effective=expected,
+                        machine=f'{a.cpu}-'+('aga' if a.aga else 'ocs')+f'-{2048 if a.aga else 512}k-chip-{a.fast_kib}k-fast', video_standard='NTSC' if a.ntsc else 'PAL', warp=env['WARP']=='1', variant='ocs', effective=expected,
                         checkpoints=['origin', 'title', 'credits', 'menu'] +
                         (['simulator', 'name'] if a.simulator or a.baseline else []))
+        if a.functional:
+            metadata['functional']=functional
+            metadata['checkpoints']+=functional['checkpoints']
         if a.intro_cycle:
             metadata['checkpoints'] += [f'page{i}' for i in range(15)]+['repeat','repeat-title','repeat-credits']
         if a.teardown_build and (a.simulator or a.baseline):
@@ -320,7 +339,7 @@ def main():
             metadata['checkpoints'] += ['view2','view1','view3','view0']
             metadata['view_fields']=a.view_fields
         if a.baseline:
-            metadata.update(baseline=a.baseline, fields_per_window=250, fire_fields=(200 if a.cpu=='68000' else 150) if a.clock_build and build.get('prediction') else 100 if a.clock_build else 250, flight_input='coast' if a.clock_build and build.get('prediction') and a.cpu=='68000' and not a.held_fire else 'held fire', cost_profile=a.cost_profile)
+            metadata.update(baseline=a.baseline, fields_per_window=250, fire_fields=(a.flight_fields or (200 if a.cpu=='68000' else 150)) if a.clock_build and build.get('prediction') else 100 if a.clock_build else 250, flight_input='coast' if a.clock_build and build.get('prediction') and a.cpu=='68000' and not a.held_fire else 'held fire', cost_profile=a.cost_profile)
             metadata['checkpoints'] += ['asteroids', 'fire']
         (out/'result.json').write_text(json.dumps(metadata, indent=2)+'\n')
     except Exception:

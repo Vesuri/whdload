@@ -106,7 +106,10 @@ def owners(build,model,corrupt=False):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('build',type=Path);p.add_argument('--output',required=True)
-    a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
+    a=p.parse_args()
+    require(not json.loads((a.build/'build.json').read_text()).get('prediction'),
+            'D2-only world fixture; use ocs_prediction_check.py for input-aware D3/E1 builds')
+    out=new_output(a.output);out.mkdir(parents=True)
     results={str(m):check(a.build,out,m) for m in (1,2)}
     owner_checks={str(m):owners(a.build,m) for m in (1,2)}
     require(results['1']==results['2'],'CPU disagreement')

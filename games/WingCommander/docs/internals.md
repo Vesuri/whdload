@@ -6648,3 +6648,49 @@ with those documented heavy-scene limits, not a claim of smooth or universally
 fixed A500 play. Full campaign, views, live NTSC, save/load, accelerated cache
 regression and broader compatibility remain E2. No release archive or shared
 emulator change is included; CD32 phase 12 remains paused.
+
+### P13E2 compatibility evidence (functional gate in progress)
+
+The unchanged E1 candidates pass the bounded 020/native-blitter, forced
+68000/CPU, NTSC 020/CPU and accelerated AGA 020/CPU pixel/ownership checks.
+Reports are `tmp/p13e2-020native-compat/`,
+`tmp/p13e2-000cpu-long-compat/`, `tmp/p13e2-ntsc-compat2/` and
+`tmp/p13e2-aga3-compat/`. The slow 68000 CPU override needs a 400-field flight
+window to supply seven completed images; the initial 200-field window had only
+two and did not pass the three-image gate. This does not change the A500 native
+blitter recommendation. E1's unchanged A500 native coasting gate remains the
+native-backend evidence.
+
+NTSC detects 60 fields/second for the world clock. Its observed non-interlaced
+field periods are 59,832/59,833 colour clocks: 263 lines alternating 227/228
+clocks, rather than PAL's fixed 227-clock line. The host emulator's `custom.cpp`
+NTSC geometry and horizontal `lol` alternation independently explain this
+period. The OS/game Copper enables display at lines 44/80 instead of PAL 72/108;
+publication restarts remain at line 16, within the unchanged line-41 limit.
+The NTSC window supplies 58 asteroid and 24 flight completed-image checks.
+
+The AGA check uses the A1200 preset with 2 MiB Chip, 4 MiB Fast and accelerated
+68020 scheduling. The CPU audit records `unit=64`, `multiplier=2048`, and
+`cacr=00000001`: instruction cache enabled, with no 68020 data cache. Its 119
+asteroid and 50 flight completed-image checks pass. This is a scoped emulator
+regression, not a 68030/68040 data-cache or real-hardware claim. Preliminary
+name/bar/barracks captures in this run are explicitly not full functional
+acceptance.
+
+Native target selection at O:$37c6 (file $37f2) filters ship slots 1–9 and
+excludes contacts at range >=12,000 at O:$3820 (file $384c). The first attempted
+campaign target-view check reached enemies at ranges 13,348–14,737, so it could
+not select a contact. The functional driver must wait for native eligibility;
+it must not force a target or change game data to enter the camera.
+
+`tmp/p13e2-functional5-compat/report.json` passes a complete native-keyboard
+route through simulator/name editing, bar/barracks, save/load, briefing,
+autopilot, combat and camera modes 0/1/2/3/4/7/14. Thirteen bounded flight windows
+supply 12–23 completed-image checks each with no pixel/ownership mismatch.
+Save/load compares the complete 342-byte campaign, 70-byte player and 480-byte
+state records against the 894-byte native slot. Quitting flushes the matching
+slot into the 7,152-byte save file; `quit.png` shows the AmigaDOS prompt.
+This proves same-session save/load and persistence, not a fresh-boot reload.
+A 20-field pause preserves world positions/velocities/types and the tick count;
+resume returns to normal flight. Remaining camera/control coverage is audited
+separately before closing E2; this is not a full-campaign completion claim.

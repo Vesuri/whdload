@@ -79,7 +79,7 @@ def report(root, build):
         free_fast=sum(x['free'] for x in headers if x['attributes']&4)
         samples.append(dict(label=label,source=source,source_bytes=size,planes_and_workspace=allocation,
                             row_bytes=800,descriptor_bytes=1336,registry_allocations=count,
-                            registry_chip_bytes=sum(n for p,n in registry.items() if p<0x80000),
+                            registry_chip_bytes=sum(n for p,n in registry.items() if p<len(chip)),
                             registry_fast_bytes=sum(n for p,n in registry.items() if p>=0x200000),
                             chip_used=len(chip)-free_chip,fast_used=len(fast)-free_fast,
                             headers=headers))
@@ -156,7 +156,7 @@ def report(root, build):
         require(all(d[3] in (0,1) and buffers[d[3]]<=d[4]<buffers[d[3]]+plane
                     for d in groups['D']),'display DMA outside owned plane')
         publications=[r for r in groups['P'] if r[2]==0x33aa8]
-        require(publications and all(0<r[3]<0x80000 and r[3]%2==0 for r in publications),
+        require(publications and all(0<r[3]<len(chip) and r[3]%2==0 for r in publications),
                 'published Copper list outside Chip RAM')
         native=[r for r in groups['P'] if r[2]==0x329de]
         require(bool(native)==(expected_backend==0),'obsolete QBlit consumer executed')

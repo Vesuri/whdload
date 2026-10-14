@@ -84,11 +84,14 @@ if [ "${OCS_STOCK_CLOCK:-0}" = 1 ]; then
   eval "${setup_function/fsuae_setup/wc_ocs_clock_base_setup}"
   fsuae_setup() {
     wc_ocs_clock_base_setup || return 1
-    [ "$AMIGA_SETUP" = a500 ] && [ "$WC_VARIANT" = ocs ] || return 1
+    [ "$WC_VARIANT" = ocs ] || return 1
+    case "$AMIGA_SETUP:${OCS_COMPAT_AGA:-0}" in a500:0|a1200-fast:1) ;; *) return 1 ;; esac
     local i
     for i in "${!FSUAE_SETUP_ARGS[@]}"; do
       case "${FSUAE_SETUP_ARGS[$i]}" in
-        --uae_cpu_multiplier=*) FSUAE_SETUP_ARGS[$i]=--uae_cpu_multiplier=0 ;;
+        --uae_cpu_multiplier=*) FSUAE_SETUP_ARGS[$i]=--uae_cpu_multiplier=0
+          [ "${OCS_COMPAT_AGA:-0}" = 1 ] && FSUAE_SETUP_ARGS[$i]=--uae_cpu_multiplier=8
+          ;;
         --uae_cpu_frequency=*) FSUAE_SETUP_ARGS[$i]=--uae_cpu_frequency=0 ;;
       esac
     done
