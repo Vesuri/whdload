@@ -1,6 +1,11 @@
 ; 68000 200 ms ownership callbacks, ported from UpdateHooks all-car branch.
 ; Only included by the experimental complete C4 integration.
 ; Preserve Q16 state and all reset/contact/save writers; no rational /5 carry.
+; Q02 native ownership checks: 56 position snapshot/reset/restore cases,
+; 40 cold velocity writes, and all 28 car pairs in both contact directions.
+; Contact exchanges longitudinal tails; native sideways impulses replace only
+; the integer word. Position assignment takes the source tail with the new
+; native integer. These checks do not replace wall/multi-segment/modal tests.
 FF1PlayerContext macro
  bsr.w \2
  endm
