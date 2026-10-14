@@ -5869,8 +5869,8 @@ Pure palette changes do not alter planar colour indices, so they do **not** need
 a source-history invalidation. Native palette/Copper updates and every completion
 remain active; no palette update or publication is skipped on source equality.
 Modal paths that clear, write, borrow or rebuild the display invalidate through
-these owners. Unvisited campaign/modal compatibility remains E2, rather than an
-assumption that arbitrary external planar writes are safe.
+these owners. The bounded E2 campaign/modal evidence appears below; it does not
+assume that arbitrary external planar writes are safe.
 
 #### Matched end-to-end measurements
 
@@ -6533,7 +6533,8 @@ P13E1's focused optimisation/measurement gate is complete, with **heavy-scene
 limits retained**. The opt-in `--math-fast` candidate implies D4 `--intro` and
 adds exact 68000-safe arithmetic and collision shortcuts. It does not establish
 sustained 10 Hz in A500 asteroid credits or sustained fire. The required A500/Fast
-coasting gate passes; the representative 14 MHz 020/Fast gate passes. E2 is next.
+coasting gate passes; the representative 14 MHz 020/Fast gate passes. The E2
+compatibility evidence follows below.
 Normal OCS, D4-only and CD32 release binaries remain unchanged.
 
 **Measured cause and changes.** The stock A500 instruction trace accounts for
@@ -6645,17 +6646,18 @@ Reports: `tmp/p13e1-accept-reference/`, `tmp/p13e1-accept-a500/`,
 catch-up prioritisation can starve drawing under sustained fire. The clock does
 not discard ticks or scale velocities to hide this. This focused gate closes
 with those documented heavy-scene limits, not a claim of smooth or universally
-fixed A500 play. Full campaign, views, live NTSC, save/load, accelerated cache
-regression and broader compatibility remain E2. No release archive or shared
+fixed A500 play. The bounded E2 compatibility and functional gate is recorded below; full-campaign
+and hardware acceptance remain outside these model checks. No release archive or shared
 emulator change is included; CD32 phase 12 remains paused.
 
-### P13E2 compatibility evidence (functional gate in progress)
+### P13E2 compatibility and functional gate
 
 The unchanged E1 candidates pass the bounded 020/native-blitter, forced
 68000/CPU, NTSC 020/CPU and accelerated AGA 020/CPU pixel/ownership checks.
-Reports are `tmp/p13e2-020native-compat/`,
-`tmp/p13e2-000cpu-long-compat/`, `tmp/p13e2-ntsc-compat2/` and
-`tmp/p13e2-aga3-compat/`. The slow 68000 CPU override needs a 400-field flight
+Reports are `tmp/p13e2-020native-compat-final/`,
+`tmp/p13e2-000cpu-long-compat-final/`, `tmp/p13e2-ntsc-compat-final/` and
+`tmp/p13e2-aga3-compat-final/`. The reused A500 native capture also passes
+`tmp/p13e2-000native-compat-final/` against the exact unchanged E1 binary. The slow 68000 CPU override needs a 400-field flight
 window to supply seven completed images; the initial 200-field window had only
 two and did not pass the three-image gate. This does not change the A500 native
 blitter recommendation. E1's unchanged A500 native coasting gate remains the
@@ -6678,19 +6680,53 @@ name/bar/barracks captures in this run are explicitly not full functional
 acceptance.
 
 Native target selection at O:$37c6 (file $37f2) filters ship slots 1–9 and
-excludes contacts at range >=12,000 at O:$3820 (file $384c). The first attempted
-campaign target-view check reached enemies at ranges 13,348–14,737, so it could
-not select a contact. The functional driver must wait for native eligibility;
-it must not force a target or change game data to enter the camera.
+excludes contacts at range >=12,000 at O:$3820 (file $384c). The functional driver waits for native eligibility before selecting F7; it does
+not force a target or change game data to enter the camera.
 
-`tmp/p13e2-functional5-compat/report.json` passes a complete native-keyboard
+`tmp/p13e2-functional6-compat/report.json` passes a complete native-keyboard
 route through simulator/name editing, bar/barracks, save/load, briefing,
-autopilot, combat and camera modes 0/1/2/3/4/7/14. Thirteen bounded flight windows
-supply 12–23 completed-image checks each with no pixel/ownership mismatch.
+autopilot, combat and all nine player-accessible camera modes 0/1/2/3/4/6/7/8/14. Sixteen bounded flight windows
+supply 6–23 completed-image checks each with no pixel/ownership mismatch.
 Save/load compares the complete 342-byte campaign, 70-byte player and 480-byte
 state records against the 894-byte native slot. Quitting flushes the matching
 slot into the 7,152-byte save file; `quit.png` shows the AmigaDOS prompt.
 This proves same-session save/load and persistence, not a fresh-boot reload.
 A 20-field pause preserves world positions/velocities/types and the tick count;
-resume returns to normal flight. Remaining camera/control coverage is audited
-separately before closing E2; this is not a full-campaign completion claim.
+resume returns to normal flight. F9 cycles the external subject at O:$189c6 (file $189f2); a capital ship
+selects mode 8 at O:$6e76 (file $6ea2). F8 toggles missile-follow at O:$18984
+(file $189b0); native missile launch enters mode 6 at O:$18dee (file $18e1a).
+The 40-field missile window has six completed images; no scene state is injected.
+Scripted cinematic variants are not additional player camera keys or a claim of
+playing every campaign branch. Four corrupted-evidence controls reject the wrong
+field standard, loaded record, target camera and moving paused world.
+
+
+**Completion audit.** P13E2 is complete for the bounded model gate specified in
+`ocs-plan.md`. The retained evidence maps to its requirements as follows:
+
+| Requirement | Accepted evidence and limits |
+|---|---|
+| 68000/OCS native and CPU | `p13e2-000native-compat-final` and `p13e2-000cpu-long-compat-final`; unchanged E1 binaries, 512 KiB Chip/4 MiB Fast. The forced CPU path is a correctness override, not the A500 recommendation. |
+| 68020/OCS native and CPU | `p13e2-020native-compat-final` and `p13e2-functional6-compat`; same 512 KiB/4 MiB model. |
+| PAL/NTSC and accelerated AGA/cache | The PAL functional route, `p13e2-ntsc-compat-final`, and `p13e2-aga3-compat-final`; AGA is an instruction-cache-enabled 020 model only. |
+| Intro, simulator/name, repeated scenes | All base runs traverse Origin, title, asteroid credits, menu, simulator and name entry. The functional route adds bar, barracks, briefing and combat; unchanged D4's full credit-cycle/repeat evidence remains applicable. |
+| Views and controls | Native F1–F9 routes, external fighter/carrier subjects and missile camera, autopilot, target selection, cannon, missile, steering, afterburner, native pause/resume. Keyboard-generated input; no physical joystick/mouse claim. |
+| Save/load and quit | All three native records equal the saved slot; final host save contains that slot, and the original WHDLoad quit key returns to the visually checked AmigaDOS prompt. No cold-reboot load claim. |
+| Low-memory fallback | `tmp/p13e2-memory/report.json`: 45 native source-allocation and 12 display-allocation cases, repeated failures/retries, five rejecting code mutations. Exec is stubbed; this does not lower C4's live launcher floor or resolve its original-game 2 MiB stall. |
+| Revision and option semantics | `tmp/p13e2-install/report.json`: 720 startup/guard cases for 000/010/020/030/040/060 flags and Fast/slow code banks. Changed English sites abort before partial installation; other language patch lists receive no enhancement hooks. Their gameplay remains untested/unsupported by enhancements. |
+| Shared CD32 regression | `tmp/p13e2-cd32-spawn.json`: 44 constructors/220 first-interval renders/56 rejecting controls; `p13e2-cd32-scene/`: 96 pose/isolation and 420 scaling cases; `p13e2-cd32-options.json`: 196 option/cache, 54 converter and 270 pacing/output cases; `p13e2-cd32-pixels.json`: 72 complete native outputs on 020/040. |
+
+The input-aware OCS native check `tmp/p13e2-prediction/report.json` passes on the
+E1 CPU candidate, including 50/60 Hz and projectile state restoration. The older
+D2-only clock fixture now fails fast on prediction-enabled builds instead of
+entering a loop without the required input history.
+
+Normal OCS and CD32 release bytes are unchanged. E1 candidates remain opt-in:
+auto/native conversion retains the blitter; explicit CPU selects the 68000/010
+word or 020+ longword converter only for verified Fast storage, otherwise native
+fallback. Clock/prediction/arithmetic are build options, not new public CUSTOM
+semantics. E2 changes the test launcher, reports and documentation only. It does
+not establish hardware performance, complete campaign play, lower RAM support,
+or 030/040 data-cache compatibility for OCS. The E1 A500 heavy-scene overload and
+unverified DMA words remain explicit limitations. P13E3/release work is separate;
+CD32 phase 12 remains paused.

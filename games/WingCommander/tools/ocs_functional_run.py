@@ -1,5 +1,4 @@
 """E2 native-keyboard campaign checkpoints; no guest code or state injection."""
-import json
 
 def run(out, layout, command, until, key, dump, capture, build):
     h=layout['hunks'][0]
@@ -74,6 +73,12 @@ def run(out, layout, command, until, key, dump, capture, build):
         capture(label);windows.append(dict(label=label,fields=fields));labels.append(label)
     until(iteration,'campaign clock active')
     window('campaign-coast')
+    # F9 cycles the external-camera subject; the carrier selects mode 8.
+    for slot,view in ((1,4),(2,8)):
+        key(1,'58')
+        until(h+0x73f8,f'external subject {slot}',f'*(short*)($a4-0x479e) == {slot} && *(short*)($a4-18318) == {view}')
+        key(0,'58');window(f'campaign-subject{slot}')
+    key(1,'50');until(h+0x73f8,'front view restored','*(short*)($a4-18318) == 0');key(0,'50')
     key(1,'20');until(sb+sy['ocs_clock_original_autopilot'],'native autopilot entered');key(0,'20')
     until(iteration,'autopilot returned to flight')
     # Native target builder O:37c6 excludes contacts at range >=12000.
@@ -89,6 +94,11 @@ def run(out, layout, command, until, key, dump, capture, build):
         key(1,raw)
         until(h+0x73f8,f'campaign view {view} selected',f'*(short*)($a4-18318) == {view}')
         key(0,raw);window(f'campaign-view{view}')
+    key(1,'57');until(h+0x1898a,'missile camera enabled');key(0,'57')
+    if number('*(unsigned short*)($a4-0x4772)')!=1:raise ValueError('missile follow not enabled')
+    key(1,'44');until(h+0x73f8,'missile camera entered','*(short*)($a4-18318) == 6');key(0,'44')
+    window('campaign-view6',40)
+    key(1,'50');until(h+0x73f8,'front view after missile','*(short*)($a4-18318) == 0');key(0,'50')
     for raw,label in (('40','campaign-fire'),('4e','campaign-turn'),('42','campaign-afterburner')):
         key(1,raw);window(label);key(0,raw)
     key(1,'19');until(h+0x87c,'native pause active');key(0,'19')

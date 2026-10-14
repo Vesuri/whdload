@@ -56,7 +56,8 @@ def report(root, build):
     if m.get('functional',{}).get('windows'):
         f=m['functional'];checks={}
         expected_labels={'campaign-coast','campaign-combat','campaign-view7',
-                         'campaign-fire','campaign-turn','campaign-afterburner','campaign-resumed'}
+                         'campaign-fire','campaign-turn','campaign-afterburner','campaign-resumed',
+                         'campaign-subject1','campaign-subject2','campaign-view6'}
         expected_labels|={f'campaign-view{i}' for i in (0,1,2,3,4,14)}
         require({w['label'] for w in f['windows']}==expected_labels,'functional window coverage incomplete')
         for w in f['windows']:
@@ -65,6 +66,10 @@ def report(root, build):
             if '-view' in label:
                 data=(root/f'{label}-h1.bin').read_bytes()
                 require(int.from_bytes(data[0x3870:0x3872],'big')==int(label.split('view')[1]),'wrong camera')
+        for slot,view in ((1,4),(2,8)):
+            data=(root/f'campaign-subject{slot}-h1.bin').read_bytes()
+            require(int.from_bytes(data[0x3860:0x3862],'big')==slot and
+                    int.from_bytes(data[0x3870:0x3872],'big')==view,'external camera subject mismatch')
         for label in ('surname','callsign'):
             require((root/f'{label}-text.bin').read_bytes().lower()==b'test','name edit/submission missing')
         for label in ('bar','barracks','saved','loaded'):
@@ -99,11 +104,38 @@ def report(root, build):
     return result
 
 
+def negative_controls(root, build, out):
+    """Reject corrupted records independently of native execution success."""
+    cases=[('wrong-field-standard','result.json',None)]
+    metadata=json.loads((root/'result.json').read_text())
+    if metadata.get('functional',{}).get('windows'):
+        cases += [('wrong-loaded-record','loaded-state.bin',0),
+                  ('wrong-target-view','campaign-view7-h1.bin',0x3871),
+                  ('world-moved-during-pause','pause-after.bin',0x892b)]
+    rejected=[]
+    for name,filename,offset in cases:
+        scratch=out/name;scratch.mkdir()
+        for path in root.iterdir():
+            (scratch/path.name).symlink_to(path.resolve(),target_is_directory=path.is_dir())
+        target=scratch/filename;data=target.read_bytes();target.unlink()
+        if offset is None:
+            value=json.loads(data);value['video_standard']='PAL' if value.get('video_standard')=='NTSC' else 'NTSC'
+            data=json.dumps(value).encode()
+        else:
+            value=bytearray(data);value[offset]^=1;data=bytes(value)
+        target.write_bytes(data)
+        try:report(scratch,build)
+        except ValueError:rejected.append(name)
+        else:raise ValueError('corrupt compatibility evidence accepted: '+name)
+    return rejected
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('run',type=Path);p.add_argument('--build',required=True,type=Path);p.add_argument('--output',required=True)
     a=p.parse_args();result=report(a.run,a.build)
     out=new_output(a.output);out.mkdir(parents=True)
+    result['rejected_controls']=negative_controls(a.run,a.build,out)
     (out/'report.json').write_text(json.dumps(result,indent=2)+'\n')
     print('Compatibility/state checks passed; functional route:',bool(result.get('functional')))
 

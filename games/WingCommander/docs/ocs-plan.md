@@ -342,7 +342,7 @@ remaining overload/display starvation is an explicit limitation for E2/E3, not
 a reason to drop world ticks or relax the pixel gate. See
 [E1 evidence](internals.md#p13e1-focused-ocs-performance-gate).
 
-**P13E2 — Complete compatibility and functional checks.** Depends on E1.
+**P13E2 — Complete compatibility and functional checks (complete).** Depends on E1.
 Exercise native-blitter and CPU backends on 68000/OCS and 68020/OCS, then a short
 accelerated AGA/cache-enabled regression and PAL/NTSC checks. Cover intro, combat,
 all views, controls, save/load, pause/resume, simulator/name prompt, repeated scene
@@ -353,6 +353,14 @@ Gate: pixels/ownership/state pass, options have defined semantics, no expanded
 hardware matrix without a failure that needs it. Real hardware feedback is useful
 when available and is labelled separately from model evidence.
 
+Gate passed: unchanged E1 native/CPU candidates cover 68000/OCS and 68020/OCS,
+PAL/NTSC, and accelerated 020/AGA with instruction cache. The native campaign
+route covers all nine player-accessible camera modes, missile/cannon controls,
+record-exact save/load and flushed saves, pause/resume and DOS quit. Allocation
+failure/revision rejection and focused CD32 regressions pass. Coverage and limits:
+[E2 evidence](internals.md#p13e2-compatibility-and-functional-gate). No full-campaign,
+hardware, smaller-memory or OCS 030/040 data-cache claim is made.
+
 **P13E3 — Document support and prepare the later release hand-off.** Depends on E2.
 Record supported revisions, CPU/memory/backend selection, minimum RAM, options,
 reproducible checks and remaining gaps. Keep OCS and CD32 installers distinct;
@@ -362,8 +370,8 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1 are complete. **P13E2** is next.
+P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E2 are complete. **P13E3** is next.
 Use the scoped measured profiles and retain native fallback/override
 for unknown accelerators. C4 creates source ownership before native compositor aliases; C5 now protects
-pending/displayed ownership through publication and transitions. Broader
-compatibility remains E2.
+pending/displayed ownership through publication and transitions. E2 closes the
+bounded compatibility gate with its documented model and coverage limits.

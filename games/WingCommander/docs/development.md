@@ -4269,7 +4269,7 @@ WARP=1 python3 tools/ocs_boot_gate.py --ownership --cpu 68020 \
   --compat --ntsc --layout tmp/p13e2-layout-ntsc/layout.json \
   --output tmp/p13e2-ntsc
 python3 tools/ocs_compatibility_report.py tmp/p13e2-ntsc \
-  --build tmp/p13e1-cpu-final2 --output tmp/p13e2-ntsc-compat2
+  --build tmp/p13e1-cpu-final2 --output tmp/p13e2-ntsc-compat-final
 ```
 
 Replace `--ntsc` with `--aga` for the accelerated A1200/020 instruction-cache
@@ -4277,8 +4277,9 @@ check, using its own calibrated layout. The AGA preset explicitly uses 2 MiB
 Chip and 4 MiB Fast; a CPU multiplier is not a hardware MHz measurement.
 The 68000 CPU override uses `--cpu 68000 --flight-fields 400` and its own layout.
 Use `--functional` for native name editing, campaign save/load and flight
-controls; the full functional acceptance remains in progress. Do not treat
-partial UI checkpoints as a completed route.
+controls. The final functional route additionally exercises missile-follow and
+external fighter/carrier subject cycling; partial UI checkpoints alone do not
+constitute this acceptance.
 
 The accepted first-mission functional route uses:
 
@@ -4286,12 +4287,42 @@ The accepted first-mission functional route uses:
 WARP=1 python3 tools/ocs_boot_gate.py --ownership --cpu 68020 \
   --clock-build tmp/p13e1-cpu-final2 --simulator --baseline on --held-fire \
   --compat --functional --layout tmp/p13e1-layout-cpu-final2/layout.json \
-  --output tmp/p13e2-functional5
-python3 tools/ocs_compatibility_report.py tmp/p13e2-functional5 \
-  --build tmp/p13e1-cpu-final2 --output tmp/p13e2-functional5-compat
+  --output tmp/p13e2-functional6
+python3 tools/ocs_compatibility_report.py tmp/p13e2-functional6 \
+  --build tmp/p13e1-cpu-final2 --output tmp/p13e2-functional6-compat
 ```
 
 The driver waits for a native target within range before F7. All control inputs
 use the native keyboard route; there are no injected mission/target/save records.
 Save files remain in the run's disposable game tree. Inspect `quit.png` for the
 DOS return in addition to the automated record and flush checks.
+
+
+The report checks all native save blocks, paused world state, actual selected
+cameras, input overflow counters and detected field frequency. It records unknown
+DMA words without counting them as verified pixels. Corrupted-evidence controls
+must fail; their scratch trees link to unchanged accepted captures to avoid
+copying large traces. Keep those captures while the reports are needed.
+
+Focused fallback/startup and shared-code checks (use new output paths on repeat):
+
+```sh
+python3 tools/ocs_memory_check.py --output tmp/p13e2-memory
+python3 tools/ocs_memory_install_check.py tmp/p13e1-cpu-final2 --output tmp/p13e2-install
+python3 tools/ocs_prediction_check.py tmp/p13e1-cpu-final2 --output tmp/p13e2-prediction
+```
+
+These native checks need the shared CPU-test runtime. The allocation suite stubs
+Exec and tests failure/rollback with the native registry; it is not a live
+low-RAM machine run. The D2-only `ocs_clock_check.py` rejects D3/E1 prediction
+builds; use the input-aware check above. Retain the original shared CD32 focused
+commands and fixtures documented in their sections, especially
+`tmp/phase7-combat-controls/start-fast.bin`.
+
+
+```sh
+python3 tools/projectile_spawn_check.py tmp/p13e1-cd32-control --output tmp/p13e2-cd32-spawn.json
+python3 tools/timing_scene_check.py tmp/p13e1-cd32-control --output tmp/p13e2-cd32-scene
+python3 tools/release_check.py tmp/p13e1-cd32-control --negative-controls --output tmp/p13e2-cd32-options.json
+python3 tools/flight_render_check.py tmp/p13e1-cd32-control --output tmp/p13e2-cd32-pixels.json
+```

@@ -3,7 +3,7 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1 complete: OCS conversion/display work, opt-in 10 Hz clocks and measured arithmetic/collision optimisations.** A500 heavy-scene overload remains documented; this is not a smoothness or release claim. The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E2 complete: OCS conversion/display work, opt-in 10 Hz clocks, measured arithmetic/collision optimisations and bounded compatibility/functional checks.** A500 heavy-scene overload remains documented; this is not a smoothness or release claim. The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
 The opt-in D3 candidate adds field input, bounded renderer prediction and first-interval
 player/AI projectile motion. Native CPU, state restoration and live pixel checks
