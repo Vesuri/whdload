@@ -3,23 +3,16 @@ import hashlib
 import struct
 
 
-def source(root, buffered=False):
-    game=(root/'tmp/originals/cd32/WingCommanderCD32/data/wing.english').read_bytes()
-    if hashlib.sha256(game).hexdigest()!='093505483aed4c9dbd1b97484c3336e92fdb156be9c15a67ed0199bd4dade657':
+def source(root, buffered=False, *, variant):
+    from variants import get, timing_hooks, assembly_definitions
+    v = get(variant)
+    patches = timing_hooks(v, buffered)
+    game = (root / v.GAME).read_bytes()
+    if hashlib.sha256(game).hexdigest() != v.GAME_SHA:
         raise ValueError('changed English executable')
-    code=game[0x2c:0x2c+0x35ea4]
-    patches=[(0x28c86,'timing_debris_draw',0x4ef9),(0x698,'timing_loop',0x4ef9),(0x878,'timing_pause',0x4ef9),(0x101c,'timing_autopilot',0x4ef9),
-             (0x18eee,'timing_throttle_gate',0x4eb9),(0x18f00,'timing_throttle_gate',0x4eb9),
-             (0x18f3a,'timing_fire_gate',0x4eb9),(0x7bc2,'timing_world_rotation',0x4eb9),
-             (0x34188,'timing_record_input',0x4eb9),(0x1934c,'timing_pad_read',0x4eb9),
-             (0x18c6a,'timing_keys_read',0x4eb9),(0x19380,'timing_key_command',0x4eb9),
-             (0x65f4,'timing_emission_clock',0x4eb9),(0x51a,'timing_message_draw',0x4eb9),(0x46ea,'timing_systems_draw',0x4eb9),
-             (0x530,'timing_sim_draw',0x4ef9),(0x438,'timing_sim_score_draw',0x4eb9),(0x3b8e,'timing_target_draw',0x4ef9),(0x4b16,'timing_selection',0x4ef9),
-             (0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]
-    if buffered:
-        patches=[(off,'release_input_vblank' if off==0x34188 else label,op) for off,label,op in patches]
-        patches += [(0x32e,'intro_asteroids_draw',0x4eb9),(0x2f8,'intro_flash_draw',0x4eb9),(0x1fd00,'intro_title',0x4ef9),(0x1fdda,'intro_credits_update',0x4eb9),(0x1fde0,'intro_draw',0x4eb9),(0x1fe14,'intro_finish',0x4eb9),(0x1fe44,'intro_credits_end',0x4ef9),(0xc912,'projectile_gun_return',0x4ef9),(0xca5e,'projectile_missile_return',0x4ef9),(0xc316,'projectile_effect_return',0x4ef9),(0x9a52,'projectile_init_return',0x4ef9),(0x306,'view_clear',0x4eb9),(0xc4c,'view_compose',0x4eb9),(0x2b648,'timing_scene_allocate',0x4ef9),(0x807a,'translation_velocity',0x4ef9),(0x80b6,'translation_position',0x4ef9),(0x3378e,'release_publish',0x4ef9),(0x337ea,'release_teardown',0x4ef9)]
-    lines=[(root/'whdload/timing.s').read_text(),(root/'whdload/timing_clock.s').read_text(),(root/'whdload/timing_player.s').read_text(),(root/'whdload/timing_input.s').read_text(),(root/'whdload/timing_presentation.s').read_text(),(root/'whdload/timing_scene.s').read_text(),'timing_install:']
+    offset, size, _ = v.HUNKS[0]
+    code = game[offset:offset+size]
+    lines=[assembly_definitions(v),(root/'whdload/timing.s').read_text(),(root/'whdload/timing_clock.s').read_text(),(root/'whdload/timing_player.s').read_text(),(root/'whdload/timing_input.s').read_text(),(root/'whdload/timing_presentation.s').read_text(),(root/'whdload/timing_scene.s').read_text(),'timing_install:']
     if buffered:
         lines.insert(-1,(root/'whdload/timing_intro.s').read_text())
         lines.insert(-1,(root/'whdload/timing_translation.s').read_text())
@@ -34,7 +27,7 @@ def source(root, buffered=False):
             lines += ['\tmove.l a0,d0',f'\taddi.l #${target:x},d0',
                       f'\tcmp.l ${offset+2:x}(a0),d0','\tbne.w timing_bad']
         else:
-            width=8 if offset in (0x28c86,0x7bc2,0x878,0x65f4,0x4b16,0x101c,0x438,0x3b8e,0x3378e,0x1fe44) else 6
+            width=8 if offset in v.WIDE_GUARDS else 6
             for at in range(offset+2,offset+width,2):
                 value=struct.unpack_from('>H',code,at)[0]
                 lines += [f'\tcmpi.w #${value:04x},${at:x}(a0)','\tbne.w timing_bad']

@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1–P13A4 are complete**;
+It does not implement or validate an improved OCS slave. **P13A1–P13A4 and P13B1 are complete**;
 the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -90,7 +90,7 @@ at eight checkpoints, and rejecting instrument controls. See the
 
 ## B — Share mechanisms without imposing a newer CPU
 
-**P13B1 — Extract compile-time variant definitions.** Depends on A1–A2.
+**P13B1 — Extract compile-time variant definitions (complete).** Depends on A1–A2.
 Introduce separate OCS/CD32 maps for hooks, relocated hunks, native entry points,
 A4 fields, object limits, bitmap layout and scene rules. Extract shared algorithms
 incrementally; avoid runtime variant branches in hot loops. Extend build and
@@ -98,6 +98,10 @@ analysis tools to accept an explicit variant instead of silently using CD32.
 Gate: unchanged CD32 output where possible; otherwise equal-size native controls
 and the existing focused timing/pixel checks. Original OCS reconstruction remains
 identical. Do not fold this refactor into an unreviewable OCS patch dump.
+Gate passed: separate verified maps and explicit build/analysis selection, zero-byte
+compile-time equates, byte-identical CD32 release/timing/render/native outputs and
+original OCS reconstruction. Existing focused timing/pixel and rejecting controls
+pass. See [scope and evidence](internals.md#p13b1-compile-time-variant-definitions).
 
 **P13B2 — Make shared execution paths 68000-safe.** Depends on B1.
 Replace or select alternatives for long multiply/divide, scaled indexing, long
@@ -265,7 +269,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4 are complete. Start **P13B1** only when requested. The first backend decision
+P13A1–P13A4 and P13B1 are complete. Start **P13B2** only when requested. The first backend decision
 is **P13C2**, not the current investigation. In particular, neither “68000 must use
 CPU C2P” nor “68020 must abandon the blitter” has been established. Keep the
 blitter implementation available through the comparison and acceptance gates.

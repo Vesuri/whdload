@@ -1,10 +1,10 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: P13A1–P13A4 are complete. OCS reconstruction, native display
-contract, launcher, matched A500 boots and the short native baseline pass.
-Stop at the P13A4 gate; start P13B1 only when requested. No OCS runtime patches
-or backend selection yet. See `docs/ocs-plan.md`.
+Current scope: P13A1–P13A4 and P13B1 are complete. Native OCS baseline and
+compile-time variant definitions pass; CD32 outputs and OCS reconstruction remain
+byte-identical. Stop at the P13B1 gate; start P13B2 only when requested. No OCS
+runtime patches or backend selection yet. See `docs/ocs-plan.md`.
 Required baseline for later work: Amiga 500 with Fast RAM. Share verified CD32
 mechanisms with 68000-safe paths. Retain native blitter C2P wherever matched
 CPU/memory measurements favour it; CPU type alone is not a crossover measurement.

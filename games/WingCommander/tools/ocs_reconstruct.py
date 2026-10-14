@@ -9,12 +9,13 @@ import struct
 import subprocess
 import sys
 
+from variants import ocs as VARIANT
 import capstone
 from cd32_static import ROOT, crc16, require, sha
 from amigaxdev.patchlist import decode
 
-SLAVE_SHA = 'eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913'
-GAME_SHA = 'eff90d6cfbc80b008e5e508ff6488f221b6e7243958aaff6fdfd0b06e6724a30'
+SLAVE_SHA = VARIANT.SLAVE_SHA
+GAME_SHA = VARIANT.GAME_SHA
 # Half-open slave hunk offsets: entry, KickEmu ROM helpers and DOS dispatch,
 # generated boot stub, cache flush trampoline, game loader/options and helpers.
 # Tables, strings, header and initial state are emitted as data, never decoded.
@@ -23,8 +24,7 @@ CODE = [(0, 4), (0x34, 0x62), (0x1d4, 0x43e), (0x44c, 0x4e4),
         (0x7b2, 0xe5c), (0xeb8, 0xebe), (0xee8, 0xef4),
         (0x10de, 0x11e4), (0x1210, 0x129a), (0x138e, 0x142e),
         (0x145a, 0x147c)]
-SELECTORS = ((0x115c, 0x116d, 0x12bc), (0x1166, 0x00e8, 0x1302),
-             (0x1170, 0x262d, 0x1348))
+SELECTORS = VARIANT.SELECTORS
 
 
 def new_output(path):
@@ -161,7 +161,7 @@ def build(out, original, game):
                          0x3e9, len(payload)//4) + payload + struct.pack('>I', 0x3f2)
     require(result == original, 'reconstructed HUNK differs from original')
     (out / 'WingCommander.Slave').write_bytes(result)
-    report = {'bytes': len(result), 'sha256': sha(result), 'byte_identical': True,
+    report = {'variant': 'ocs', 'bytes': len(result), 'sha256': sha(result), 'byte_identical': True,
               'assembled_instructions': count, 'game_sha256': sha(game),
               'revisions': revisions, 'displaced_sites': sites,
               'runtime_hooks_added': False, 'boot_validated': False}
@@ -169,12 +169,12 @@ def build(out, original, game):
     return report
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--input', default='tmp/originals/ocs/WingCommander/WingCommander.Slave')
-    parser.add_argument('--game', default='tmp/originals/ocs/WingCommander/data/Wing.english')
-    args = parser.parse_args()
+    parser.add_argument('--input', default=VARIANT.SLAVE)
+    parser.add_argument('--game', default=VARIANT.GAME)
+    args = parser.parse_args(argv)
     out = new_output(args.output)
     report = build(out, (ROOT / args.input).read_bytes(), (ROOT / args.game).read_bytes())
     print(json.dumps({k: report[k] for k in ('bytes', 'sha256', 'byte_identical', 'assembled_instructions')}))

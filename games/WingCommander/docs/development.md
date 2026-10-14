@@ -146,7 +146,7 @@ including the original KickEmu tables. No replacement KickEmu version is used.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --output tmp/reconstructed
+python3 tools/reconstruct.py --variant cd32 --output tmp/reconstructed
 SLAVE="$PWD/tmp/reconstructed/WingCommanderCD32.Slave" /bin/bash amiga/run.sh
 /bin/bash amiga/run.sh stop
 WHD_ARGS=CUSTOM5=0 WINDOW=front python3 tools/wc.py serve
@@ -195,9 +195,9 @@ the actual emulator and slave SHA-256.
 . amiga/env.sh
 python3 tools/build_debugger.py --output tmp/debugger
 export FSUAE="$PWD/tmp/debugger/fs-uae"
-python3 tools/reconstruct.py --output tmp/control
-python3 tools/reconstruct.py --verify --output tmp/verify
-python3 tools/reconstruct.py --verify-control --output tmp/verify-control
+python3 tools/reconstruct.py --variant cd32 --output tmp/control
+python3 tools/reconstruct.py --variant cd32 --verify --output tmp/verify
+python3 tools/reconstruct.py --variant cd32 --verify-control --output tmp/verify-control
 
 # Locate the live patched LoadSeg chain; reject file/PRELOAD copies.
 python3 tools/boot_gate.py --calibrate --output tmp/calibration
@@ -372,8 +372,8 @@ unchanged; all generated files stay below `tmp/`.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --cache-audit --output tmp/cache-audit-slave
-python3 tools/reconstruct.py --output tmp/stock-recheck
+python3 tools/reconstruct.py --variant cd32 --cache-audit --output tmp/cache-audit-slave
+python3 tools/reconstruct.py --variant cd32 --output tmp/stock-recheck
 python3 tools/build_debugger.py --matrix-observer --output tmp/matrix-debugger
 export FSUAE="$PWD/tmp/matrix-debugger/fs-uae"
 ```
@@ -738,8 +738,8 @@ never be substituted for a completed control.
 ### Prepare the VERIFY c2p ceiling fixture
 
 ```sh
-python3 tools/reconstruct.py --ceiling control --output tmp/ceiling-control-slave
-python3 tools/reconstruct.py --ceiling c2p --output tmp/ceiling-c2p-slave
+python3 tools/reconstruct.py --variant cd32 --ceiling control --output tmp/ceiling-control-slave
+python3 tools/reconstruct.py --variant cd32 --ceiling c2p --output tmp/ceiling-c2p-slave
 ```
 
 Both builds have identical size/alignment; the control is the original bytes.
@@ -859,8 +859,8 @@ cmp tmp/phase4-ceiling-control-030-mmu/matrix-events.txt \
 Build the matched drawing fixtures and calibrate their layout separately:
 
 ```sh
-python3 tools/reconstruct.py --ceiling drawing-control --output tmp/drawing-control-slave
-python3 tools/reconstruct.py --ceiling drawing-bitmap --output tmp/drawing-bitmap-slave
+python3 tools/reconstruct.py --variant cd32 --ceiling drawing-control --output tmp/drawing-control-slave
+python3 tools/reconstruct.py --variant cd32 --ceiling drawing-bitmap --output tmp/drawing-bitmap-slave
 python3 tools/matrix_probe.py --machine a1200-030 --options MMU --warp \
   --ceiling-slave tmp/drawing-control-slave/WingCommanderCD32.Slave \
   --output tmp/drawing-layout
@@ -1382,9 +1382,9 @@ limiter choices. Enabled rendering rejects `CUSTOM5=4` (old blitter converter).
 
 ```sh
 . amiga/env.sh
-make render-slave OUT=tmp/render
-make render-control OUT=tmp/render-control
-make render-verify OUT=tmp/render-twin
+make render-slave VARIANT=cd32 OUT=tmp/render
+make render-control VARIANT=cd32 OUT=tmp/render-control
+make render-verify VARIANT=cd32 OUT=tmp/render-twin
 python3 tools/c2p_check.py tmp/render \
   --capture tmp/phase4-dma-cia-matrix/020-default/bare \
   --output tmp/render-native.json
@@ -1711,7 +1711,7 @@ Build the candidate and run native component checks:
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --timing --output tmp/timing-candidate
+python3 tools/reconstruct.py --variant cd32 --timing --output tmp/timing-candidate
 python3 tools/timing_clock_check.py --output tmp/timing-clock-check
 python3 tools/timing_adapter_check.py tmp/timing-candidate --output tmp/timing-install-check
 python3 tools/timing_player_check.py tmp/timing-candidate --output tmp/timing-player-check
@@ -1801,7 +1801,7 @@ fresh output directories; all derived material stays in `tmp/`:
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --timing --output tmp/scene-candidate
+python3 tools/reconstruct.py --variant cd32 --timing --output tmp/scene-candidate
 python3 tools/flight_fixture.py --timing --timing-verify --nav 1 --output tmp/scene-flight
 export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
 SLAVE="$PWD/tmp/scene-flight/WingCommanderCD32.Slave" \
@@ -1880,14 +1880,14 @@ Build and native checks (fresh output directories are required):
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --timing --output tmp/flight-render-candidate
+python3 tools/reconstruct.py --variant cd32 --timing --output tmp/flight-render-candidate
 python3 tools/flight_render_check.py tmp/flight-render-candidate \
   --output tmp/flight-render-native.json
 python3 tools/timing_adapter_check.py tmp/flight-render-candidate \
   --output tmp/flight-render-install
 python3 tools/timing_scene_check.py tmp/flight-render-candidate \
   --output tmp/flight-render-scene-native
-python3 tools/reconstruct.py --output tmp/flight-render-original
+python3 tools/reconstruct.py --variant cd32 --output tmp/flight-render-original
 ```
 
 The native converter check executes the original binary and the candidate on
@@ -2006,12 +2006,12 @@ The authored `release/ReadMe` documents the changed numbering and fallbacks.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/b1-release
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/b1-release
 python3 tools/release_check.py tmp/b1-release --negative-controls --output tmp/b1-native-gate.json
 python3 tools/flight_render_check.py tmp/b1-release --output tmp/b1-flight-native.json
 python3 tools/timing_adapter_check.py tmp/b1-release --output tmp/b1-install
-python3 tools/reconstruct.py --timing --output tmp/b1-legacy-timing
-python3 tools/reconstruct.py --output tmp/b1-original
+python3 tools/reconstruct.py --variant cd32 --timing --output tmp/b1-legacy-timing
+python3 tools/reconstruct.py --variant cd32 --output tmp/b1-original
 ```
 
 The native gate covers language/mode boundaries, WHDLoad cache requests, full
@@ -2074,13 +2074,13 @@ buffers or recorder memory. Use a fresh output directory for each build/run.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/b2-final
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/b2-final
 python3 tools/buffer_check.py tmp/b2-final --output tmp/b2-buffer-final.json
 python3 tools/release_check.py tmp/b2-final --negative-controls --output tmp/b2-options-final.json
 python3 tools/flight_render_check.py tmp/b2-final --output tmp/b2-pixels-final.json
 python3 tools/timing_adapter_check.py tmp/b2-final --output tmp/b2-install-final
-python3 tools/reconstruct.py --timing --output tmp/b2-legacy
-python3 tools/reconstruct.py --output tmp/b2-original
+python3 tools/reconstruct.py --variant cd32 --timing --output tmp/b2-legacy
+python3 tools/reconstruct.py --variant cd32 --output tmp/b2-original
 python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/b2-frames-compact
 python3 tools/frame_stats_check.py tmp/b2-frames-compact --output tmp/b2-recorder-budget.json
 export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
@@ -2209,7 +2209,7 @@ candidate stays 2.0b (13.06.2026). All outputs and recordings remain below `tmp/
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/c1-final
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/c1-final
 python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/c1-final-frames
 python3 tools/display_predict_check.py tmp/c1-final --output tmp/c1-final-native.json
 python3 tools/timing_scene_check.py tmp/c1-final --output tmp/c1-final-scene-full.json
@@ -2269,7 +2269,7 @@ instructions; `locate()` verifies its game identity. No snapshot is committed.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/c2-candidate
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/c2-candidate
 python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/c2-frames
 python3 tools/translation_check.py tmp/c2-candidate --output tmp/c2-native-complete.json
 python3 tools/translation_contract_check.py tmp/c2-frames --output tmp/c2-contracts-complete.json
@@ -2352,14 +2352,14 @@ not measure performance. No extra long gameplay capture is needed for this gate.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/c3-final
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/c3-final
 python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/c3-frames
 python3 tools/heading_check.py tmp/c3-final --output tmp/c3-heading-final.json
 python3 tools/timing_scene_check.py tmp/c3-final --output tmp/c3-scenes-final
 python3 tools/translation_contract_check.py tmp/c3-frames --output tmp/c3-contracts.json
 python3 tools/timing_adapter_check.py tmp/c3-final --output tmp/c3-install
 python3 tools/release_check.py tmp/c3-final --negative-controls --output tmp/c3-options.json
-python3 tools/reconstruct.py --timing --output tmp/c3-experimental
+python3 tools/reconstruct.py --variant cd32 --timing --output tmp/c3-experimental
 python3 tools/timing_scene_check.py tmp/c3-experimental --output tmp/c3-experimental-scenes
 
 export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
@@ -2512,7 +2512,7 @@ current release's heading-aware, extended prediction interval.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/d2-final
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/d2-final
 python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/d2-final-frames
 python3 tools/prediction_cost_check.py tmp/d2-final --output tmp/d2-final-equivalence.json
 python3 tools/timing_scene_check.py tmp/d2-final --output tmp/d2-final-scenes
@@ -2585,7 +2585,7 @@ byte tails, overlap, crop/colour/bulk fallbacks and rejecting clear/span control
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/d3-gate
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/d3-gate
 python3 tools/view_regions_check.py tmp/d3-gate --output tmp/d3-gate-native.json
 python3 tools/timing_adapter_check.py tmp/d3-gate --output tmp/d3-gate-install
 python3 tools/release_check.py tmp/d3-gate --negative-controls --output tmp/d3-gate-options.json
@@ -2668,11 +2668,11 @@ Use fresh output names below `tmp/`.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/d4-final
-python3 tools/reconstruct.py --release --comparison-control --output tmp/d4-final-control
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/d4-final
+python3 tools/reconstruct.py --variant cd32 --release --comparison-control --output tmp/d4-final-control
 python3 tools/flight_render_check.py tmp/d4-final --output tmp/d4-final-native.json
 python3 tools/comparison_check.py tmp/d4-final --control tmp/d4-final-control --output tmp/d4-final-boundaries.json
-python3 tools/reconstruct.py --timing --flight-verify --output tmp/d4-timing-twin
+python3 tools/reconstruct.py --variant cd32 --timing --flight-verify --output tmp/d4-timing-twin
 python3 tools/flight_render_check.py tmp/d4-timing-twin --output tmp/d4-timing-twin-check.json
 python3 tools/release_check.py tmp/d4-final --negative-controls --output tmp/d4-options.json
 python3 tools/timing_adapter_check.py tmp/d4-final --output tmp/d4-install
@@ -2798,7 +2798,7 @@ done
 python3 tools/c2p_experiment_check.py --prefix tmp/d5 \
   --layout tmp/d5-layout/layout.json "${runs[@]}" --output tmp/d5-pixels.json
 python3 tools/frame_report.py tmp/d5-030-*/ tmp/d5-040-*/ --output tmp/d5-fps.json
-python3 tools/reconstruct.py --release --output tmp/d5-release-check
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/d5-release-check
 cmp tmp/d5-release-check/WingCommanderCD32.Slave tmp/d4-final/WingCommanderCD32.Slave
 ```
 
@@ -2821,7 +2821,7 @@ All derived output stays under `tmp/`; choose fresh names when rerunning.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/projectile-fix-final
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/projectile-fix-final
 python3 tools/projectile_spawn_check.py tmp/projectile-fix-final \
   --output tmp/projectile-fix-final-spawn.json
 python3 tools/timing_adapter_check.py tmp/projectile-fix-final \
@@ -2883,8 +2883,8 @@ end-to-end display cadence; do not time Unicorn instruction execution.
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --release --output tmp/intro-clock-release-r2
-python3 tools/reconstruct.py --release --frame-stats --output tmp/intro-clock-stats-r2
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/intro-clock-release-r2
+python3 tools/reconstruct.py --variant cd32 --release --frame-stats --output tmp/intro-clock-stats-r2
 python3 tools/intro_clock_check.py tmp/intro-clock-release-r2 --output tmp/intro-clock-native-r2.json
 python3 tools/timing_adapter_check.py tmp/intro-clock-release-r2 --output tmp/intro-clock-install-r2
 python3 tools/release_check.py tmp/intro-clock-release-r2 --negative-controls --output tmp/intro-clock-options-r2.json
@@ -3247,3 +3247,72 @@ landmarks. The report separates the KickEmu memory-pool capacity/usage from memo
 outside those pools. Physical capacity minus native free bytes includes reservations
 and preload; it is not all game allocations, a complete boot allocation census, or
 proof of minimum RAM. Those later acceptance gates remain separate.
+
+## P13B1: compile-time variants and byte-preserving sharing
+
+The generic builder now requires `--variant cd32|ocs`; the generic Make targets
+require `VARIANT=cd32|ocs`. OCS currently supports only native reconstruction:
+`--release`, `--timing` and renderer options reject before creating output.
+Explicitly named OCS tools remain available. Existing CD32 capture/check tools
+remain CD32-specific; selecting a map does not port their observers or native ABI.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/b1-release
+make reconstruct VARIANT=ocs OUT=tmp/b1-ocs
+python3 tools/analyze.py --variant cd32 definitions
+python3 tools/analyze.py --variant ocs definitions
+python3 tools/analyze.py --variant cd32 static --output tmp/b1-cd32-static
+python3 tools/analyze.py --variant ocs static --output tmp/b1-ocs-static
+python3 tools/analyze.py --variant ocs layout tmp/p13a4-stock-on/credits-fast.bin
+```
+
+For the before/after gate, preserve artifacts from the parent revision before
+editing generators. To recreate that independent reference later, stage the
+tracked parent tree below `tmp/`, link the already verified original inputs, and
+build there. This does not change the working checkout or install trees. Run in
+Bash with fresh directory names (the initial `mkdir` must fail if reused):
+
+```sh
+set -e
+. amiga/env.sh
+mkdir tmp/b1-parent
+git archive 495542d | tar -x -C tmp/b1-parent
+mkdir tmp/b1-parent/tmp
+ln -s ../../originals tmp/b1-parent/tmp/originals
+(
+  cd tmp/b1-parent
+  for mode in release timing render native; do
+    args=()
+    if [ "$mode" != native ]; then args=("--$mode"); fi
+    python3 tools/reconstruct.py "${args[@]}" --output "tmp/before-$mode"
+  done
+)
+for mode in release timing render native; do
+  args=()
+  if [ "$mode" != native ]; then args=("--$mode"); fi
+  python3 tools/reconstruct.py --variant cd32 "${args[@]}" --output "tmp/b1-after-$mode"
+done
+python3 tools/reconstruct.py --variant ocs --output tmp/b1-after-ocs
+python3 tools/variant_check.py --before-prefix tmp/b1-parent/tmp/before \
+  --after-prefix tmp/b1-after \
+  --cd32-memory tmp/phase7-combat-controls/start-fast.bin \
+  --ocs-memory tmp/p13a4-stock-on/credits-fast.bin --output tmp/b1-variants
+python3 tools/ocs_reconstruct_check.py --output tmp/b1-ocs-reconstruction
+python3 tools/timing_adapter_check.py tmp/b1-after-release --output tmp/b1-install
+python3 tools/intro_clock_check.py tmp/b1-after-release --output tmp/b1-intro.json
+python3 tools/flight_render_check.py tmp/b1-after-release --output tmp/b1-pixels.json
+```
+
+The layout checks use retained native memory captures from the phase-7 controls
+and P13A4, with each locator's own identity and relocation checks. Recreate those
+captures using their documented gates if absent; no new emulator run is needed
+when retained captures exist. `variant_check.py` also assembles each map's equates
+on its declared ISA, checks hunk metadata against the native files, rejects
+malformed and cross-variant segment chains, and rebuilds with a deliberately
+wrong clock-field definition to prove that the byte-identity gate detects it.
+The accepted results are in `tmp/p13b1-accepted-variants/report.json`,
+`tmp/p13b1-ocs-reconstruction/checks.json`, `tmp/p13b1-timing-install/report.json`,
+`tmp/p13b1-intro.json` and `tmp/p13b1-pixels.json`. Static front-door outputs are
+`tmp/p13b1-ocs-static` and `tmp/p13b1-cd32-static-final`. No timing/backend selection
+or performance measurement is part of this refactor.

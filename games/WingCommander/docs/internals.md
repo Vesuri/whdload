@@ -1270,7 +1270,7 @@ gate. Detailed evidence and failure reports remain available below.
 
 ### Prepared c2p ceiling fixtures
 
-The VERIFY-only equal-size `reconstruct.py --ceiling` fixtures are built and
+The VERIFY-only equal-size `reconstruct.py --variant cd32 --ceiling` fixtures are built and
 byte-checked; the matched c2p runtime result is recorded below. The control is
 byte-identical to the original 7,728-byte slave. The c2p arm changes only the first
 word of the three leaf converter entries to `RTS`: `S:17f6/195e/1ac6` (file
@@ -2905,7 +2905,7 @@ Findings:
 
 ## Phase 11b: public modes and uncapped flight (B1 gate complete)
 
-The public-option candidate (`reconstruct.py --release`) uses language-only
+The public-option candidate (`reconstruct.py --variant cd32 --release`) uses language-only
 CUSTOM1 (0 English, 1 German). CUSTOM5 defaults to 0: enhanced English, or
 Psygore normal for German until that port exists. Values 1–4 translate to
 Psygore's original 0–3 (normal, unlimited, relaxed, slow), retaining his simulation,
@@ -4489,7 +4489,9 @@ an explicit change.
 
 ### Sharing and base-CPU constraints
 
-`tools/reconstruct.py`, `timing_source.py` and `cd32_runtime.py` remain CD32-specific.
+`tools/reconstruct.py` now requires explicit variant selection (P13B1 below).
+Enhanced timing generation remains CD32-only until the OCS ABI and ISA gates pass;
+`cd32_runtime.py` retains CD32-specific discovery guards.
 The runtime inputs and launcher previously assumed CD32 hashes, names, hunk sizes, patches or Kickstart inputs.
 P13A3 adds explicit OCS selection to `runtime_inputs.py` and `amiga/run.sh`, plus
 a separate `ocs_runtime.py` locator. CD32 discovery still uses its own patched
@@ -4954,3 +4956,65 @@ Accepted evidence: `tmp/p13a4-stock-on`, `tmp/p13a4-stock-off` and
 `tmp/p13a4-report.json`; instrument `tmp/p13a4-debugger-final/fs-uae`, SHA-256
 `c634549a6f443dfbe1287f597e88cd447559e01de94ae9d652b3b572fd445c2d`.
 [Reproduction commands](development.md#p13a4-short-native-ocs-baseline).
+
+
+### P13B1: compile-time variant definitions
+
+P13B1 is complete. `tools/variants/cd32.py` and `ocs.py` separate verified English
+input identities, stored/allocated hunk layouts, locator signatures, native
+entry points, A4 fields, object bounds, bitmap layout, scene constants and hooks.
+All addresses in these maps are hunk offsets (or explicitly named file payload
+bases); A4 fields are signed displacements from data hunk +`7ffe`.
+
+| Definition | CD32 | OCS |
+|---|---|---|
+| World / draw / finish entry | `E:02a8 / 02e4 / 0c40` | `O:02be / 02e6 / 0b80` |
+| Asteroid entry | `E:98a2` | `O:9618` |
+| Field clock | `D:7f02`, A4 −252 | `OD:77fe`, A4 −`0800` |
+| World / draw counters | `D:914c / 9150` | `OD:88da / 88de` |
+| Position / velocity / class | `D:919a / 9d6c / 96fe` | `OD:8928 / 94fa / 8e8c` |
+| Native dispatch slots | 0–60 | 0–60 |
+| Planes / leading rows | 8 / 0 | 4 / 2 |
+| Chunky colour | byte | high/low nibble by checkerboard parity |
+| Title updates / credit pages | 296 / 18 | 296 / 15 |
+
+Names denote roles, **not identical calling conventions**. OCS dispatch bounds
+are not proof of CD32's 64-slot prediction storage layout. That size is deliberately
+absent from the OCS map. OCS enhanced timing hooks are also absent and requesting
+them rejects explicitly. Its verified original audio/clear hooks and three
+revision selectors remain separate from CD32's timing/presentation hook lists;
+A1's displaced-site manifest still guards all eight original English patches.
+German and unavailable OCS revisions gain no enhancement support.
+
+The first shared pieces are DOS segment-chain traversal, explicit-CPU static
+inventory, definition-to-assembler equates, and the existing guarded patch
+emitter driven by the CD32 hook map. Intro world/draw/finish/asteroid calls,
+clock/counter accesses, title thresholds and the geometry-history slot bound
+consume compile-time symbols. Kalms specialization consumes the CD32 bitmap
+width and supported heights. Equates add no bytes or runtime variant branches.
+The locators keep their different native signature/relocation/helper checks.
+
+This is incremental extraction: remaining CD32-only native call ABIs, prediction
+fields, patch-resume/displaced-instruction recipes and device publication stay
+in their existing adapters until their OCS counterparts are verified. P13B2 owns
+68000 execution safety; D1 owns the full OCS timing/side-effect map. Merely
+assembling OCS equates does not certify the shared runtime algorithms for 68000.
+
+The four CD32 outputs compare byte for byte against builds made from `495542d`
+before this refactor: release **43,544 bytes**, timing **33,584**, renderer
+**12,076**, original **7,728**. Release SHA-256 remains
+`fdd92fbbda8689e3ec3ab2353d5baa866859469a684026841fd71527e0a6de8d`.
+Original OCS remains **5,324 bytes**, SHA-256
+`eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913`.
+The A1 repeat/identity/revision/site/ISA/output-preservation checks pass.
+Both explicit static-analysis routes pass; retained live snapshots still locate
+correctly. Wrong allocation sizes, unterminated chains, opposite-variant dumps,
+missing/invalid variant selection, a CD32 build given the OCS slave and an OCS
+release request all reject. Changing the consumed field-clock map and rebuilding
+also fails the byte-identity gate; changed/truncated binary controls reject.
+
+Existing focused CD32 gates pass: eight installer/option cases with full code and
+register/CCR checks, 12 intro clock schedules, 96 pose/camera/restoration cases,
+and 72 whole-output native converter comparisons on 020/040. No emulator was
+run and no performance result is inferred. Stop before P13B2. See the
+[reproduction commands](development.md#p13b1-compile-time-variants-and-byte-preserving-sharing).

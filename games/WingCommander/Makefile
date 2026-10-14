@@ -1,7 +1,7 @@
 .PHONY: help fetch verify prepare
 help:
 	@echo "fetch: download missing pinned inputs; verify: check archives; prepare: extract separate originals"
-	@echo "reconstruct / verify-slave / render-slave / render-control / render-verify: new OUT below tmp; run / stop: project emulator"
+	@echo "reconstruct / verify-slave / render-slave / render-control / render-verify: VARIANT=cd32|ocs, new OUT below tmp; run / stop: project emulator"
 fetch:
 	@/bin/bash tools/inputs.sh fetch
 verify:
@@ -11,16 +11,17 @@ prepare:
 
 .PHONY: reconstruct verify-slave render-slave render-control render-verify run stop
 OUT ?= tmp/reconstructed
+VARIANT ?=
 reconstruct:
-	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --output "$(OUT)"'
+	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --variant "$(VARIANT)" --output "$(OUT)"'
 verify-slave:
-	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --verify --output "$(OUT)"'
+	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --variant "$(VARIANT)" --verify --output "$(OUT)"'
 render-slave:
-	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --render --output "$(OUT)"'
+	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --variant "$(VARIANT)" --render --output "$(OUT)"'
 render-control:
-	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --render-control --output "$(OUT)"'
+	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --variant "$(VARIANT)" --render-control --output "$(OUT)"'
 render-verify:
-	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --render --render-verify --output "$(OUT)"'
+	@/bin/bash -c '. amiga/env.sh; python3 tools/reconstruct.py --variant "$(VARIANT)" --render --render-verify --output "$(OUT)"'
 run:
 	@/bin/bash amiga/run.sh
 stop:

@@ -3,7 +3,11 @@ import hashlib
 from pathlib import Path
 
 
-def source(root):
+def source(root, *, variant):
+    from variants import get
+    v = get(variant)
+    if v.NAME != "cd32":
+        raise ValueError("eight-plane renderer requires cd32")
     parts = [(root/'whdload/render.s').read_text()]
     for row in (root/'manifest/kalms-c2p.tsv').read_text().splitlines():
         if not row or row.startswith('#'): continue
@@ -16,10 +20,10 @@ def source(root):
             raise ValueError('vendored Kalms source changed')
         body = raw.decode().split('\n'+name+'\n',1)[1]
         body = body.split('\n\tsection\tbss',1)[0] if cpu=='030' else body.split('\n'+name+'_data',1)[0]
-        for height in (128,166,200):
-            plane=40*height
+        for height in v.BITMAP["converter_heights"]:
+            plane=(v.BITMAP["width"]//8)*height
             label=f'kalms_{cpu}_{height}'
-            constants={'scroffs':0,'pixels':320*height, 'delta0':7*plane,
+            constants={'scroffs':0,'pixels':v.BITMAP['width']*height, 'delta0':7*plane,
                        'delta4':7*plane+4, **{f'delta{i}':4*plane for i in (1,3,5,7)},
                        **{f'delta{i}':3*plane for i in (2,6,8)}}
             lines=[label+':']
@@ -36,7 +40,7 @@ def source(root):
     return '\n'.join(parts)
 
 
-def flight_source(root, verify=False, control=False, comparison_control=False, experiment=None):
+def flight_source(root, verify=False, control=False, comparison_control=False, experiment=None, *, variant):
     wrapper=(root/'whdload/flight_render.s').read_text()
     # Keep the comparison region exactly 82 bytes, including the no-change
     # branch. The control reproduces the old instruction stream; the candidate
@@ -51,7 +55,7 @@ def flight_source(root, verify=False, control=False, comparison_control=False, e
         f'\tmove.l {i}(a3),d0\n\tmove.l d0,{i}(a5)' for i in range(0,32,4)))
     # Reuse the pinned immutable Kalms transform with one 32-pixel block,
     # retaining the full 320x200 plane stride. No derived game bytes here.
-    full=source(root)
+    full=source(root, variant=variant)
     block=full.split('kalms_030_200:',1)[1].split('kalms_040_128:',1)[0]
     if experiment:
         # Equal 720-byte slots keep every diagnostic arm's layout identical.

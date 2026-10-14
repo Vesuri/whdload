@@ -3,19 +3,22 @@
 import hashlib
 from pathlib import Path
 import struct
+from variants import ocs as VARIANT
+from variant_runtime import segment_chain
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE, LENGTH = 0x200000, 0x400000
-SIZES = (0x358c8, 0xf5b8, 4, 0x1d94)
-GAME_SHA = 'eff90d6cfbc80b008e5e508ff6488f221b6e7243958aaff6fdfd0b06e6724a30'
+SIZES = tuple(h[2] for h in VARIANT.HUNKS)
+GAME_SHA = VARIANT.GAME_SHA
 
 
 def locate(memory):
-    original = (ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english').read_bytes()
+    original = (ROOT / VARIANT.GAME).read_bytes()
     if hashlib.sha256(original).hexdigest() != GAME_SHA:
         raise ValueError('unsupported OCS English executable')
-    code = original[0x2c:0x2c+SIZES[0]]
-    signature = code[0x34082:0x340b0]
+    start, stored, _ = VARIANT.HUNKS[0]
+    code = original[start:start+stored]
+    signature = code[slice(*VARIANT.SIGNATURE)]
     def read(address, count):
         offset = address - BASE
         if not 0 <= offset <= len(memory)-count:
@@ -30,18 +33,9 @@ def locate(memory):
         if at < 0:
             break
         pos = at+1
-        h0 = BASE+at-0x34082
+        h0 = BASE+at-VARIANT.SIGNATURE[0]
         try:
-            hunks, address = [], h0
-            for size in SIZES:
-                if long(address-8) != size+8:
-                    raise ValueError('not a DOS segment allocation')
-                read(address, size)
-                hunks.append(address)
-                following = long(address-4)
-                address = following*4+4
-            if following != 0:
-                raise ValueError('unterminated segment chain')
+            hunks = segment_chain(memory, BASE, h0, SIZES)
             # Independent relocations: entry goes to startup, whose A4 LEA
             # points into the DATA allocation, not the stored-file payload.
             if read(h0, 2) != b'\x4e\xf9' or long(h0+2) != hunks[3]+int.from_bytes(code[2:6], "big"):
@@ -49,12 +43,12 @@ def locate(memory):
             if read(hunks[3]+0x14d0, 2) != b'\x49\xf9':
                 raise ValueError('missing native A4 setup')
             a4 = long(hunks[3]+0x14d2)
-            if a4 != hunks[1]+0x7ffe:
+            if a4 != hunks[1]+VARIANT.A4_BASE:
                 raise ValueError('A4 relocation mismatch')
-            if read(h0+0x272b2, 2) != b'\x4e\xf9':
+            if read(h0+VARIANT.ORIGINAL_HOOKS["clear"][1], 2) != b'\x4e\xf9':
                 raise ValueError('not patched by the OCS slave')
-            slave = long(h0+0x272b4)-0x138e
-            if read(h0+0x26a3c, 2) != b'\x4e\xb9' or long(h0+0x26a3e) != slave+0x13a0:
+            slave = long(h0+VARIANT.ORIGINAL_HOOKS["clear"][1]+2)-VARIANT.ORIGINAL_HOOKS["clear"][2]
+            if read(h0+VARIANT.ORIGINAL_HOOKS["audio"][1], 2) != b'\x4e\xb9' or long(h0+VARIANT.ORIGINAL_HOOKS["audio"][1]+2) != slave+VARIANT.ORIGINAL_HOOKS["audio"][2]:
                 raise ValueError('independent slave helper mismatch')
             if read(slave+4, 8) != b'WHDLOADS':
                 raise ValueError('missing slave header')

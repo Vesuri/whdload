@@ -46,14 +46,7 @@ def main():
     reports = []
     relocations = {}
     for path in [slave] + sorted((game / 'data').glob('Wing.*')):
-        report, _ = inventory(path, out)
-        # OCS inspection uses the base ISA. A linear sweep includes data;
-        # callers must inspect known entry points before inferring CPU legality.
-        for hunk in report['hunks']:
-            if hunk['file_offset'] is not None:
-                stem = out / f'{path.name}.h{hunk["index"]}'
-                stem.with_suffix(stem.suffix + '.dis').write_text(
-                    dis(str(stem.with_suffix(stem.suffix + '.bin')), 0, 0, hunk['size'], cpu='68000'))
+        report, _ = inventory(path, out, variant="ocs")
         reports.append(report)
         reader = HunkReader()
         require(reader.read_file(str(path)) == 0, reader.error_string)

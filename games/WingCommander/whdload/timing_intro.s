@@ -30,7 +30,7 @@ intro_due:
         ifne FRAME_STATS
         bsr.w   frame_stats_flush
         endif
-        move.l  -252(a4),d0
+        move.l  WC_A4_FIELD_CLOCK(a4),d0
         move.l  timing_hz(pc),d1
         moveq   #1,d2
         lea     timing_clock(pc),a0
@@ -42,7 +42,7 @@ intro_world:
         movem.l d0-d7/a0-a6,-(sp)
         FSTAT   2
         move.l  timing_game(pc),a6
-        jsr     $2a8(a6)
+        jsr     WC_NATIVE_WORLD(a6)
         move.l  timing_game(pc),a6
         jsr     $15fb4(a6)       ; background flash countdown is tick-owned
         ; Asteroid generation/cleanup also lived inside E:02e4 drawing.
@@ -52,11 +52,11 @@ intro_world:
         beq.s   .no_asteroids
         move.l  timing_game(pc),a6
         jsr     $2a086(a6)
-        move.w  4434(a4),-(sp)
-        move.w  4430(a4),4434(a4)
+        move.w  WC_A4_DRAW_COUNT(a4),-(sp)
+        move.w  WC_A4_WORLD_COUNT(a4),WC_A4_DRAW_COUNT(a4)
         move.l  timing_game(pc),a6
-        jsr     $98a2(a6)
-        move.w  (sp)+,4434(a4)
+        jsr     WC_NATIVE_ASTEROIDS(a6)
+        move.w  (sp)+,WC_A4_DRAW_COUNT(a4)
 .no_asteroids:
         bsr.w   timing_scene_tick
         lea     timing_completed(pc),a0
@@ -69,7 +69,7 @@ intro_asteroids_draw:
         tst.w   intro_active(pc)
         bne.s   .done
         move.l  timing_game(pc),-(sp)
-        addi.l  #$98a2,(sp)
+        addi.l  #WC_NATIVE_ASTEROIDS,(sp)
 .done:
         rts
 
@@ -92,7 +92,7 @@ intro_draw:
         move.l  timing_render_seed(pc),-4326(a4)
         move.l  timing_game(pc),a6
         move.w  #1,-32624(a4)
-        jsr     $2e4(a6)
+        jsr     WC_NATIVE_DRAW(a6)
         FSTAT   6
         movem.l (sp)+,d0-d7/a0-a6
         rts
@@ -101,7 +101,7 @@ intro_finish:
         movem.l d0-d7/a0-a6,-(sp)
         FSTAT   7
         move.l  timing_game(pc),a6
-        jsr     $c40(a6)
+        jsr     WC_NATIVE_FINISH(a6)
         lea     timing_render_seed(pc),a0
         move.l  -4326(a4),(a0)
         move.l  intro_game_seed(pc),-4326(a4)
@@ -122,9 +122,9 @@ intro_title:
         tst.w   d4
         beq.s   .draw
         bsr.w   intro_world
-        cmpi.w  #135,d2
+        cmpi.w  #WC_SCENE_APPROACH,d2
         blt.s   .next
-        cmpi.w  #235,d2
+        cmpi.w  #WC_SCENE_DEPARTURE,d2
         bge.s   .departure
         cmpi.w  #16,d6
         ble.s   .next
@@ -135,7 +135,7 @@ intro_title:
         addq.w  #6,-2(a5)
 .next:
         addq.w  #1,d2
-        cmpi.w  #296,d2
+        cmpi.w  #WC_SCENE_TITLE_UPDATES,d2
         bge.w   .exit
         subq.w  #1,d4
         bra.s   .ticks
@@ -150,9 +150,9 @@ intro_title:
         jsr     $13f50(a6)
         lea     10(sp),sp
 .title:
-        cmpi.w  #135,d2
+        cmpi.w  #WC_SCENE_APPROACH,d2
         blt.s   .finish
-        cmpi.w  #235,d2
+        cmpi.w  #WC_SCENE_DEPARTURE,d2
         bge.s   .depart_draw
         move.w  a3,-(sp)
         move.w  d6,-(sp)

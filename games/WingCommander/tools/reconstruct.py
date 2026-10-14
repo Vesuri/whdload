@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reconstruct the pinned slave as vasm source in tmp/, then prove byte identity.
+"""Build an explicitly selected variant in tmp/; native reconstructions prove identity.
 The repository contains offsets and conversion rules, never the derived assembly.
 """
 import argparse
@@ -10,12 +10,13 @@ from pathlib import Path
 import re
 import struct
 import subprocess
+from variants import cd32 as VARIANT
 import capstone
 from render_source import source as render_source, flight_source
 from timing_source import source as timing_source
 
 ROOT = Path(__file__).resolve().parents[1]
-SLAVE_SHA = '5fbbb774bba3c794a776acc25f33c3f47c579449e1ba1a21c31418716aa74986'
+SLAVE_SHA = VARIANT.SLAVE_SHA
 # Code islands established from entry, ROM/game patch destinations, filesystem
 # dispatch table, callback pointers and branches. Everything else is data.
 CODE = [(0,4), (0x34,0x7a), (0x4fa,0x4fe), (0x500,0x75a),
@@ -24,7 +25,7 @@ CODE = [(0,4), (0x34,0x7a), (0x4fa,0x4fe), (0x500,0x75a),
         (0x17f6,0x1cde), (0x1da4,0x1dc6)]
 
 
-def main():
+def cd32_main(argv):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
     modes = p.add_mutually_exclusive_group()
@@ -43,9 +44,9 @@ def main():
     p.add_argument('--timing-verify',action='store_true',help='include diagnostic render schedules; requires --timing')
     p.add_argument('--render-family', choices=('auto','030','040'), default='auto', help='diagnostic converter-family override')
     p.add_argument('--render-verify', action='store_true', help='native original/replacement twin on every conversion; requires --render')
-    p.add_argument('--input', default='tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')
+    p.add_argument('--input', default=VARIANT.SLAVE)
     p.add_argument('--c2p-experiment',choices=('control','block040','full-original','full030','full040'),help='D5 diagnostic equal-layout converter comparison; release only')
-    a = p.parse_args()
+    a = p.parse_args(argv)
     if a.c2p_experiment and not a.release:p.error('--c2p-experiment requires --release')
     if a.release:
         if a.timing_verify or a.flight_verify or a.flight_control or a.render_verify or a.render_family!='auto':
@@ -134,17 +135,17 @@ def main():
     if a.render or a.render_control:
         lines.append('RENDER_VERIFY equ '+str(int(a.render_verify)))
         lines.append('RENDER_FAMILY equ '+str({'auto':0,'030':30,'040':40}[a.render_family]))
-        lines.append(render_source(ROOT))
+        lines.append(render_source(ROOT, variant="cd32"))
     if a.release:
         lines.append((ROOT/'whdload/release.s').read_text())
     if a.timing:
         lines.append('TIMING_VERIFY equ '+str(int(a.timing_verify)))
         lines.append('FRAME_STATS equ '+str(int(a.frame_stats)))
         lines.append('BUFFERED equ '+str(int(a.release)))
-        lines.append(timing_source(ROOT, buffered=a.release))
+        lines.append(timing_source(ROOT, buffered=a.release, variant="cd32"))
         if a.release:lines.append((ROOT/'whdload/release_buffer.s').read_text())
         if a.frame_stats:lines.append((ROOT/'whdload/frame_stats.s').read_text())
-        flight=flight_source(ROOT,a.flight_verify,a.flight_control,a.comparison_control,a.c2p_experiment)
+        flight=flight_source(ROOT,a.flight_verify,a.flight_control,a.comparison_control,a.c2p_experiment, variant="cd32")
         if a.release:
             begin=flight.index('        move.l  slave+$1e04(pc),d7')
             end=flight.index('.work:',begin)
@@ -156,7 +157,7 @@ def main():
                 'flight_render_original:\n        movem.l (sp)+,d0-a6\n        bra.w render_entry')
         lines.append(flight)
     if a.release:
-        renderer=render_source(ROOT).replace('cmpi.l  #2,d7','cmpi.l  #3,d7').replace('cmpi.l  #2,d2','cmpi.l  #3,d2')
+        renderer=render_source(ROOT, variant="cd32").replace('cmpi.l  #2,d7','cmpi.l  #3,d7').replace('cmpi.l  #2,d2','cmpi.l  #3,d2')
         begin=renderer.index('        move.l  slave+$1e04(pc),d7')
         end=renderer.index('.convert:',begin)
         renderer=renderer[:begin]+'        bsr.w   release_limit\n'+renderer[end:]
@@ -217,13 +218,24 @@ def main():
     if not (a.timing or a.render or a.render_control or a.verify or a.verify_control or a.cache_audit or a.ceiling):
         assert result == original
     (out/'WingCommanderCD32.Slave').write_bytes(result)
-    report = {'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
+    report = {'variant': 'cd32', 'sha256': hashlib.sha256(result).hexdigest(), 'bytes':len(result),
               'instructions':len(decoded), 'instruction_bytes':sum(v[0] for v in decoded.values()),
               'code_ranges':CODE, 'byte_identical':result == original, 'release':a.release, 'buffered':a.release, 'frame_records':8192 if a.release and a.frame_stats else 16384 if a.frame_stats else 0, 'version':'2.0b' if a.release else None, 'comparison_control':a.comparison_control, 'flight_verify':a.flight_verify, 'c2p_experiment':a.c2p_experiment, 'flight_control':a.flight_control or bool(a.c2p_experiment and a.c2p_experiment.startswith('full')), 'timing':a.timing, 'timing_verify':a.timing_verify, 'frame_stats':a.frame_stats, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.c2p_experiment or a.ceiling or a.timing_verify or a.frame_stats or a.flight_verify or a.flight_control or a.comparison_control), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
     if a.ceiling and a.ceiling.startswith('drawing'):
         report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
+
+def main():
+    select = argparse.ArgumentParser(description='Build a selected variant; outputs stay in tmp/.', add_help=False)
+    select.add_argument('--variant', choices=('cd32', 'ocs'), required=True)
+    args, remaining = select.parse_known_args()
+    if args.variant == 'ocs':
+        from ocs_reconstruct import main as ocs_main
+        ocs_main(remaining)
+    else:
+        cd32_main(remaining)
+
 
 if __name__ == '__main__':
     main()

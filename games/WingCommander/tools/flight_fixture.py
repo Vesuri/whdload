@@ -31,7 +31,7 @@ def main():
     if a.view_control and not a.release:p.error('--view-control requires --release')
     if a.timing or a.release:
         if a.iterations: p.error('timing fixture cannot also use the old delay tail')
-        subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--release' if a.release else '--timing','--output',a.output]+(['--timing-verify'] if a.timing_verify else [])+(['--flight-verify'] if a.flight_verify else [])+(['--flight-control'] if a.flight_control else [])+(['--frame-stats'] if a.frame_stats else [])+(['--comparison-control'] if a.comparison_control else [])+(['--c2p-experiment',a.c2p_experiment] if a.c2p_experiment else []),check=True)
+        subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--variant','cd32','--release' if a.release else '--timing','--output',a.output]+(['--timing-verify'] if a.timing_verify else [])+(['--flight-verify'] if a.flight_verify else [])+(['--flight-control'] if a.flight_control else [])+(['--frame-stats'] if a.frame_stats else [])+(['--comparison-control'] if a.comparison_control else [])+(['--c2p-experiment',a.c2p_experiment] if a.c2p_experiment else []),check=True)
     else:
         subprocess.run([sys.executable,str(ROOT/'tools/intro_timing_fixture.py'),
                         '--output',a.output,'--iterations',str(a.iterations)],check=True)

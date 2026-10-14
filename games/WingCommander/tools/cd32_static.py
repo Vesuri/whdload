@@ -38,7 +38,9 @@ def crc16(data):
     return crc
 
 
-def inventory(path, out):
+def inventory(path, out, *, variant):
+    from variants import get
+    cpu = get(variant).CPU
     data = path.read_bytes()
     reader = HunkReader()
     require(reader.read_file(str(path)) == 0, reader.error_string)
@@ -66,7 +68,7 @@ def inventory(path, out):
         binary = stem.with_suffix(stem.suffix + '.bin')
         binary.write_bytes(raw)
         binaries.append(raw)
-        text = dis(str(binary), 0, 0, len(raw), cpu='68020')
+        text = dis(str(binary), 0, 0, len(raw), cpu=cpu)
         stem.with_suffix(stem.suffix + '.dis').write_text(text)
         strings = [f'{m.start():06x} {m[0].decode("ascii")}'
                    for m in re.finditer(rb'[\x20-\x7e]{5,}', raw)]
@@ -89,6 +91,8 @@ def inventory(path, out):
 
 
 def main():
+    from variants import cd32
+    cpu = cd32.CPU
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True, help='new directory below tmp/')
     args = parser.parse_args()
@@ -130,9 +134,9 @@ def main():
     for name, expected_crc in [('wing.english', 0x88e7), ('wing.german', 0xced7)]:
         path = fresh / 'data' / name
         require(crc16(path.read_bytes()) == expected_crc, f'unsupported executable: {name}')
-        report, _ = inventory(path, out)
+        report, _ = inventory(path, out, variant="cd32")
         reports.append(report)
-    report, binaries = inventory(slave, out)
+    report, binaries = inventory(slave, out, variant="cd32")
     reports.append(report)
     code = binaries[0]
     patches = {}
@@ -170,7 +174,7 @@ def main():
                        (0x13f0, 0x14f8), (0x1524, 0x15ae),
                        (0x1696, 0x17ee), (0x17f6, 0x1cde), (0x1da4, 0x1dc6)):
         (out / f'slave-{start:04x}-{end:04x}.dis').write_text(
-            dis(str(out / 'WingCommanderCD32.Slave.h0.bin'), 0, start, end, cpu='68020'))
+            dis(str(out / 'WingCommanderCD32.Slave.h0.bin'), 0, start, end, cpu=cpu))
     print(f'PASS: verified archives, reference tree, identical installer slave, CRCs and hunks; {out.relative_to(ROOT)}')
 
 

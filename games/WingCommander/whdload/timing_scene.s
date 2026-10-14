@@ -34,7 +34,7 @@ timing_geometry_history:
         ifne BUFFERED
         tst.w   timing_geometry_repeat(pc)
         beq.s   .done
-        moveq   #60,d0
+        moveq   #WC_OBJECTS_WORLD_SLOTS-1,d0
 .slot:
         move.w  $1700(a4,d0.w*2),d1
         beq.s   .next
