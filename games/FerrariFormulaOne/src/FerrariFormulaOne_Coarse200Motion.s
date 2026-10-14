@@ -5,7 +5,12 @@
 ; 40 cold velocity writes, and all 28 car pairs in both contact directions.
 ; Contact exchanges longitudinal tails; native sideways impulses replace only
 ; the integer word. Position assignment takes the source tail with the new
-; native integer. These checks do not replace wall/multi-segment/modal tests.
+; native integer. Final Q02 checks also cover scalar-speed resets/exchange,
+; 432 work/wall/recovery writers, 96 off-road writes and 72 full multi-segment
+; paths on A500 and A500+Fast: 768 cases per profile, each suite restored before
+; 20 ordinary updates. Bounded forced-wall debt is accounted without deletion.
+; Evidence: tmp/dev/manifest/step5-c4-q02-validation.json. Real modal Q03 remains
+; separate; these ownership checks do not establish keyboard or menu behavior.
 FF1PlayerContext macro
  bsr.w \2
  endm
