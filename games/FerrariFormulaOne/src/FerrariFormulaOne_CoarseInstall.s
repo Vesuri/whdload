@@ -131,6 +131,14 @@ start:
 done:
  movem.l (sp)+,d0-d7/a0-a6
  rts
+ IFD FF1_C4_NATIVE_FRAMES
+; WHDLoad's entry offset is a signed word. Keep the header entry near the
+; host even when the diagnostic selection wrapper grows past that range.
+; Original boot code immediately overwrites A1; A0/resload stays untouched.
+FF1C4EarlyBoot:
+ lea selection_boot(pc),a1
+ jmp (a1)
+ ENDC
 C1Flush:
  movem.l d0-d7/a0-a6,-(sp)
  lea start(pc),a2
@@ -155,8 +163,17 @@ C1Activate:
  move.l $4.w,a6
  jsr -120(a6)
  lea C1Ledger(pc),a0
+ IFD FF1_C4_NATIVE_FRAMES
+ lea FF1VelocityRotate000(pc),a1
+ adda.w #(public_table-FF1VelocityRotate000),a1
+ move.l (a1),a1
+ lea FF1VelocityRotate000(pc),a5
+ adda.w #(FF1PatchBegin-FF1VelocityRotate000),a5
+ jsr (a5)
+ ELSE
  move.l public_table(pc),a1
  bsr.w FF1PatchBegin
+ ENDC
  tst.l d0
  bne.w C1Fault
  cmpi.w #$3039,$654ec

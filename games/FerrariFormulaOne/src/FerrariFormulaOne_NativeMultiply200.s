@@ -22,6 +22,15 @@ FF1InstallMultiplyNative200:
  rts
 
 FF1MultiplyNative200:
+ IFD FF1_C4_NATIVE_FRAMES
+FF1NativeFrameGate:
+ IFD FF1_C4_NATIVE_FRAMES_TEST
+ bra.w FF1NativeFrameFast
+ ELSE
+ bra.w FF1NativeFrameControl
+ ENDC
+FF1NativeFrameControl:
+ ENDC
  IFD FF1_C4_MUL_WORD
 FF1NativeMulP4Gate:
  IFD FF1_C4_MUL_WORD_TEST
@@ -109,6 +118,9 @@ FF1NativeMulP4Gate:
 .done:
  movem.l (sp)+,d1-d4
  rts
+ IFD FF1_C4_NATIVE_FRAMES
+ include "FerrariFormulaOne_Coarse200NativeFrames.s"
+ ENDC
  IFD FF1_NATIVEMUL200_AB
 FF1NativeMul200Control: dc.w 0
  ENDC
