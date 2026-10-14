@@ -155,6 +155,18 @@ required by this qualification task. Evidence:
 `tmp/dev/manifest/release-original-observations.json` and
 `tmp/dev/manifest/release-accelerated-enabled.json`.
 
+## Native lap completion
+
+All three production paths (A500, chip-only 020 and 020+Fast) complete an actual
+player lap crossing in the automatic demo. The completed lap time is copied
+exactly to the native last-lap slot; the current lap clock resets to one tenth,
+and engine errors remain zero. No guest memory or registers are written by the
+debugger. The initial harness incorrectly required an unconditional lap-count
+increment: native `$67d5e` tests `$1ed2c` and skips that increment when nonzero.
+The demo uses value 12. The corrected test observes this branch condition before
+the crossing and verifies its exact counter outcome, rather than suppressing
+the check. Evidence: `tmp/dev/manifest/release-laps.json`.
+
 ## Remaining acceptance work
 
 - Minimum-memory and minimum/development WHDLoad runtime qualification.
