@@ -3,14 +3,16 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1 complete: byte-identical OCS slave reconstruction and revision guards.** The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A2 complete: OCS reconstruction and native display contract.** The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting
 by CPU and memory configuration. The crossover remains unmeasured. No OCS runtime
 changes are implemented; CD32 release work remains paused. The 5,324-byte slave
 rebuilds exactly with the 68000 assembler; input and displaced-byte rejection
-checks pass. P13A2 is next. See [reproduction commands](docs/development.md#p13a1-ocs-slave-reconstruction).
+checks pass. The functional display gate passes 45 conversions and ownership checks;
+native checkerboard colour selection and model edge quirks are documented.
+P13A3 live validation is next. See [reproduction commands](docs/development.md#p13a2-native-display-contract-check).
 
 **Phase 11b is in progress; C1–C3 and the C4 steady-flight gate are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for

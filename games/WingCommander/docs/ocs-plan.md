@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1 is complete**;
+It does not implement or validate an improved OCS slave. **P13A1–P13A2 are complete**;
 the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -46,7 +46,7 @@ Gate passed: identical original bytes; unexpected input rejected without modifyi
 See [results and limits](internals.md#p13a1-byte-identical-ocs-reconstruction) and
 [commands](development.md#p13a1-ocs-slave-reconstruction).
 
-**P13A2 — Finish the native display and allocation contract.** Depends on A1.
+**P13A2 — Finish the native display and allocation contract (complete).** Depends on A1.
 Trace each QBlit phase, completion flag, source lifetime, plane pointer, row
 padding, buffer transition and direct planar writer from the offsets in the
 internals notes. Establish pixel nibble/bit order from distinct-colour fixtures
@@ -54,7 +54,12 @@ and the native converter; do not infer it from an almost-black intro frame.
 Inventory allocation sizes, memory flags, consumers and free paths. Distinguish
 the two display buffers from the third, shared conversion workspace.
 Gate: native output is reproduced by an independent pixel oracle, and every
-DMA-read source has a named owner and safe release point.
+DMA-read source in the display/conversion subsystem has a named owner and safe
+release point. The isolated functional gate passes 45 conversions plus
+allocation, direct-writer, publication and queue checks. See the
+[contract and explicit live gaps](internals.md#p13a2-native-display-and-allocation-contract).
+Checkerboard nibble selection is required; four model edge pixels, sprite detach
+ordering and actual beam deadlines need P13A3 confirmation.
 
 **P13A3 — Add the OCS launcher and live-layout discovery.** Depends on A1.
 Make install selection explicit in setup, runtime inputs and launcher; keep OCS
@@ -107,9 +112,11 @@ Keep native QBlit conversion. Pin and adapt the two Kalms four-plane candidates
 listed in `manifest/ocs-c2p-candidates.tsv`; honour width/alignment/stride, plane
 order and destination padding. Cover every native view size with enclosing-window
 or native fallbacks where necessary. Do not copy Legends of Valour's high-nibble
-or 192-byte-stride modifications into Wing Commander.
+or 192-byte-stride modifications into Wing Commander. Preserve the OCS
+checkerboard high/low-nibble selection established by A2; neither nibble is unused.
+Confirm the model edge quirks live before choosing deliberate corrections.
 Gate: native-versus-independent-oracle-versus-CPU pixels match with all 16 colours,
-nonzero unused nibbles, edge widths, row canaries and alternating destinations.
+independent high/low nibbles, edge widths, row canaries and alternating destinations.
 Experimental CPU conversion does not become the default yet.
 
 **P13C2 — Establish the blitter/CPU/memory crossover.** Depends on C1.
@@ -248,7 +255,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1 is complete. Start **P13A2** only when requested. The first backend decision
+P13A1–P13A2 are complete. Start **P13A3** only when requested. The first backend decision
 is **P13C2**, not the current investigation. In particular, neither “68000 must use
 CPU C2P” nor “68020 must abandon the blitter” has been established. Keep the
 blitter implementation available through the comparison and acceptance gates.

@@ -3038,4 +3038,37 @@ python3 tools/ocs_reconstruct.py --output tmp/p13a1-explicit \
 
 These guards operate at build time. The byte-identical slave retains its original
 runtime CRC handling; new hooks and runtime guards belong to later implementation.
-Boot equivalence is P13A3, not part of this static gate. Stop after P13A1.
+Boot equivalence is P13A3, not part of this reconstruction gate.
+
+## P13A2: native display contract check
+
+Use the shared Python dependencies and `AMIGA_UNICORN` from `amiga/env.sh`, with
+the pinned English OCS input prepared as above. No Kickstart, OS boot or FS-UAE
+run is needed. Use a fresh output directory:
+
+```sh
+make check-ocs-display OUT=tmp/p13a2-check
+```
+
+The target verifies the executable SHA before loading/relocating its four hunks
+into an isolated M68000 instruction engine. Original descriptor, callback,
+allocator, direct-writer and publication instructions execute against a functional
+blitter and explicit OS service stubs. The independent pixel oracle uses scalar
+checkerboard high/low-nibble selection and bit packing. This is functional
+execution evidence, **not static-only evidence**, a full emulator boot or timing.
+
+`pixels.json` records 15 fixtures / 45 positive conversions and rejecting controls;
+`blits.json` retains one 320×200 command ledger and source-relative read extents.
+`allocation.json`, `publication.json` and `queue.json` record native ownership
+checks and the stubbed services; `report.json` records input identity and limits.
+All output stays below `tmp/`. Existing output paths and symlink escapes are
+rejected by the same output guard used in P13A1. Original inputs are read only.
+
+A host that restricts native JIT execution must permit Unicorn for this command;
+otherwise a host instruction fault is not an OCS game failure. The model accepts
+only the ascending area operations used here, completes blits synchronously,
+and does not simulate bus contention, beam timing, cache or OS queue scheduling.
+Four native-model edge pixels and an unsafe odd-height control are reported
+explicitly in the [contract](internals.md#p13a2-native-display-and-allocation-contract).
+Their real display behaviour needs P13A3 confirmation. Stop at this gate; no
+launcher, timing patch, CPU converter or backend selection is part of P13A2.

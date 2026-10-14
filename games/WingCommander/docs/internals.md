@@ -4400,8 +4400,9 @@ verified revision/language maps or enhancement offsets to them.
 The original expectation that OCS would have no C2P was wrong. The native path
 converts a byte-addressed chunky surface to four planar bitplanes through queued,
 multistage blits. This is a separate implementation from the CD32 eight-plane
-path. Static evidence establishes the mechanism, but exact pixel ordering,
-publication timing and usable overlap remain runtime/native-oracle work.
+path. Static evidence establishes the mechanism; the P13A2 functional gate below
+establishes pixel selection and queue ownership. Actual beam publication and
+usable overlap under contention remain live work.
 
 | OCS hunk offsets | Static finding |
 |---|---|
@@ -4580,6 +4581,158 @@ original OCS file set and hashes remain unchanged. Synthetic CRC fixtures do not
 stand in for testing unavailable game revisions.
 
 No emulator, Kickstart or game code was executed. Byte identity is the P13A1
-preservation proof, not a new boot or hardware compatibility result. P13A2's
-display contract and P13A3's original/reconstructed boots remain pending; CD32
-reconstruction, launcher and runtime assembly are unchanged.
+preservation proof, not a new boot or hardware compatibility result. The P13A2
+functional display contract follows below; P13A3 original/reconstructed boots
+remain pending. CD32 reconstruction, launcher and runtime assembly are unchanged.
+
+### P13A2: native display and allocation contract
+
+P13A2 is complete for the pinned English OCS executable. Evidence combines static
+tracing with **isolated execution of original 68000 instructions in Unicorn and
+an independently written functional ascending-area blitter model**. It is not a
+full game boot, OS scheduling simulation, beam-timing test or performance result.
+`tools/ocs_display_check.py` compares native conversion against a scalar pixel
+oracle, exercises allocation/free and direct writers, and checks queue ownership.
+See [commands and limits](development.md#p13a2-native-display-contract-check).
+Offsets use the `O:`, `OD:` and file-base notation above.
+
+#### Pixel layout and bounded native quirks
+
+For source byte `s[y*W+x]`, the displayed four-bit colour is the **high nibble
+when `(x+y)` is even, low nibble when odd**. These are two independently meaningful
+colours for checkerboard dithering. A solid colour `c` uses byte `c*17`; neither
+nibble is generally unused. Plane 0 holds colour bit 0; the left pixel occupies
+the most significant bit of its byte. A future Kalms adapter must preserve this
+selection rather than feed the original bytes into a low-nibble-only routine.
+
+`O:334e4` computes row bytes `R=ceil(W/16)*2`, per-plane bytes `P=R*(H+2)` and
+four-plane region size `4P`. Bitmap pointers at `O:33aea` skip two leading rows;
+bitmap Rows remains H. ViewPort height is **H−1** (`O:33970`–`33976`), so the last
+allocated logical row is outside the visible comparison. Its native conversion
+is incomplete; do not extend display height merely because the allocation fits.
+Native descriptors use W/8 and W/16; the checked conversion contract requires
+16-pixel-aligned widths and even heights. Surface allocation rounding to even
+width alone does not make arbitrary dimensions safe for this converter.
+
+The model reproduces four black pixels at visible `(x,y)=(1,1),(3,1),(9,1),(11,1)`.
+The oracle records this exception explicitly; a control without it differs.
+**This is a functional-model edge quirk requiring live confirmation in P13A3**,
+not a hardware-glitch finding or permission to patch it. All other visible pixels
+match the independent nibble selection/packing formula. An odd-height 32×17
+control writes beyond the native planar allocation; it is a rejecting control,
+not a supported view. P13A3 must check native view geometry and edges before C1
+chooses whether to preserve or deliberately correct these behaviours.
+
+The 15 fixtures cover 320×200, ×166, ×128, ×16 and 32×16, each with all 256
+colour pairs, independent random nibbles and solid white. Each runs against both
+destinations, then repeats with changed out-of-image source padding: **45 positive
+conversions**. Checks include opposite-buffer preservation, source immutability,
+planar allocation guards and no final-stage chunky reads. A mutation of the
+native first callback's C mask at `O:32cba` must break the pixel comparison.
+The gate also rejects low-nibble-only packing and records the odd-height failure.
+
+At 320×200 the first phase reads source-relative bytes `[-312,64632)`, the second
+`[-628,64316)` although the allocated source is only `[0,64000)`. Adjacent Chip
+memory is read by the native pipeline, including before the source. Changing
+those outside bytes does not change visible output in the checked fixtures.
+This is **not** permission to put unmapped or non-Chip memory next to a source:
+retain Chip-accessible margins or remove the overreads in a replacement backend.
+The harness supplies two rows on both sides and checks all DMA accesses against
+its Chip-memory model. These ranges describe reads, not extra native allocation.
+
+#### Descriptors, queue and ownership
+
+Display state at `O:331b8` has region bytes at +0, workspace at +4, display bases
+at +8/+c, original dimensions +10/+12, rounded dimensions +14/+16, row bytes +18,
+plane bytes +1a, depth +1c, next-draw index +1e, submitted index +20, active flag
++22 and 16 RGB4 entries +24. The allocation order is display 0, workspace,
+display 1. At 320×200: R=40, P=8080, region=32320, combined=96960 bytes.
+
+Conversion state `O:324a8` contains surface +0, W/H +4/+6, source +8 and two
+668-byte public descriptors +10/+14. Native `O:3257c` populates each descriptor:
+W/H +0/+2, W/8 +4, W/16 +8, chunky +c, destination planes **3,2,1,0** +10..+1c,
+workspace planes 3,2,1,0 +20..+2c, strip-count-minus-one +30, and an 18-command
+stream at +32. Commands are 28 bytes, followed by a zero word; construction is
+`O:32646`–`328c6`. Both descriptors share the source and workspace.
+
+| Queue node / callback / flag (O:) | Work and readers | Release condition |
+|---|---|---|
+| `328c8` / `329e4` → `32c90` / `3291a` | 4 blits per 16-pixel strip; chunky to workspace | First flag cleared after its last blit |
+| `328e2` / `32a26` → `32a66` / `3291b` | 8 blits per strip; chunky to selected destination | Second flag cleared after its last blit |
+| `328fc` / `32dba` → `32dca` / `3291c` | 18 commands in groups 4+6+4+4; destination/workspace ping-pong, no chunky reads | Third flag cleared in final continuation |
+
+`O:3299c`–`329de` initializes nodes and calls QBlit (graphics vector −276).
+Callbacks return −1 for another continuation and 0 when finished. The functional
+model completes each blit before invoking its next continuation; this tests the
+native instruction/control sequence, not actual interrupt scheduling.
+
+Submission `O:3291e` waits only for the first two flags (`32976`–`32984`) before
+returning: **the chunky source can be drawn again while the final phase runs**.
+Destination, workspace, final command stream and queue nodes remain owned until
+`O:32990` retires the third phase. Entry `O:3260a` waits there before `O:33426`
+rotates indices and resubmits. The ownership test leaves stage three busy and
+rejects a new-frame attempt before rotation; releasing it permits the wait.
+The two source-reading phases must both finish before changing/freeing source.
+Descriptors and node metadata are CPU-read, so public memory is sufficient;
+source, workspace and destination are DMA-read and must be Chip-accessible.
+
+`O:3293a`–`32942` also waits for field counter `OD:77fe` to differ from saved
+`O:32916`. This is scheduling delay, separate from conversion service time.
+Do not charge it to blitter throughput or remove it in a matched native baseline.
+
+Final completion `O:32dfe`–`32e2e` clears the third flag at `32e02`, uses the
+publication nesting guard `OD:77ae`, and calls `33442` → `3385a` → `33a6e` →
+`33aa8` (COP2LC), then saves the field counter. `33426` sets the submitted index
+from next-draw and advances next-draw modulo two. The functional check verifies
+that publication selects the submitted buffer, after all 18 final blits, and
+that the flag clear precedes COP2LC within the same callback. Flag completion
+alone does **not** mean the beam has displayed the new picture. Actual Copper
+latch deadline, nesting/deferred cases and tearing remain live gates.
+
+#### Display allocation and safe release inventory
+
+`O:33b60` requests flags `10003` (CLEAR|CHIP|PUBLIC); `33b76` requests `10001`
+(CLEAR|PUBLIC). Public is not a guarantee of Fast RAM. `33b94` reaches AllocMem;
+`33c8e` records up to 120 pointer/size pairs, and `33c48`/`33cbc` untrack before
+FreeMem at `33c80`/`33c88`. `33c6a` drains the registry during overall cleanup.
+
+| Allocation / owner | Size and consumers | Native path and safe-release requirement |
+|---|---|---|
+| Chunky surface / surface descriptor | even-rounded W × H, Chip for conversion; CPU drawers plus first two QBlit phases | `31dc4` selects Chip, `31da8` public, `31de2` allocates; `32476` frees source and row table, clears pointers. Caller must retire both readers before free/reallocation. |
+| Row table / surface | 4H public bytes; CPU-only biased row pointers | `31e10`–`31e22`, released with source at `32476`; no remaining CPU drawer may reference it. |
+| Two conversion descriptors / conversion state | 2×668 public bytes; callback/CPU command readers | `324c0`/`324e0`; `32526` calls `32638` to wait final conversion and close view before freeing both. |
+| Two displays plus workspace / display state | 3×4R(H+2) Chip bytes; blitter reads all, display DMA reads published planes | `3323e`–`33268`; `3327c` closes/restores graphics via `334b6`/`33674` before releasing the allocation. Retire conversion and detach display before reuse/free. |
+| Two BitMaps / native inline storage | At `335b4`, `335dc`; four plane pointers each, stride 40 bytes | `33aea` rebuilds; storage stays in code allocation. DMA reads the pointed-to Chip planes, not these CPU-only structs. |
+| Two generated Copper lists / graphics.library | OS-sized Chip lists, references at `3360c`/`33610`; Copper reads instruction data | `339c0`/`33a26` use MakeVPort/MrgCop; rebuild waits two fields (`339fc`, `33a00`) before FreeCprList at `33a12`. View teardown `33872` detaches/reloads view, waits two fields (`33898`, `3389c`), frees viewport/list storage (`338a8`, `338c0`). |
+| Hidden Intuition screen bitmap / display setup | 615 Chip bytes; native screen/display setup | `336fc`–`3370c` allocate, `3372e` opens screen, `33774` closes, `33780` frees. Keep backing memory until CloseScreen has detached its consumer. |
+| Sprite data / native sprite slot | 4×(spriteHeight+1)+8 Chip bytes, control/data/terminators; sprite DMA | `31ca6` allocates, `31cca`–`31ce2` fills, `31cea`–`31d20` binds via ChangeSprite. CPU table owns allocation. `31bf2` frees blocks; `31b7c` calls FreeSprite. Detach old binding and retire DMA before freeing; full exit-order/field confirmation remains P13A3. |
+
+The inventory is for the display/conversion subsystem; it is not a whole-game
+DMA audit. Audio remains a separate native subsystem and its allocations must
+remain untouched by the later display-memory move. OS-generated Copper/screen
+allocation sizes and simultaneous Chip high-water usage require live discovery.
+Sprite free code has no explicit WaitTOF at the block-free site; do not mistake
+this static free-path identification for proof of safe live exit ordering.
+
+The allocation check executes native allocation/registry/free instructions with
+host AllocMem/FreeMem stubs, exercising 96960 Chip bytes, two 668-byte descriptors,
+64000+800-byte surface/table, public surface allocation, even-width rounding,
+biased row pointers and full cleanup. A forced row-table allocation failure
+returns zero but leaves the previously allocated source owned by the surface;
+explicit `32476` cleanup reclaims it. Native partial setup is not transactional.
+OS initialization/teardown and field services are stubbed and reported as such.
+
+#### Direct planar writers and remaining live checks
+
+`O:33348` clears all four planes, including pad rows, in the next-draw buffer
+when active. `333b4` clips unsigned x/y, adds two row strides and writes bits
+0–3 with MSB-first masks. Native execution checks all 16 colours, three rejected
+coordinates and a full-region colour clear. Known clear callers include `O:bba`
+and `3039c`/`303b4`; future changed-block history must account for these writes,
+view rebuilds and palette changes, not just chunky source equality.
+
+The check also builds both BitMaps and exercises the actual final publication
+path against synthetic graphics/Copper metadata. Functional gates pass; actual
+beam ownership, OS queues, display edges, sprite detach ordering, view changes
+and original/reconstructed boot agreement remain **P13A3**, followed by measured
+baseline **P13A4**. No backend is selected and no game/slave runtime bytes change.

@@ -31,3 +31,7 @@ reconstruct-ocs:
 	@/bin/bash -c '. amiga/env.sh; python3 tools/ocs_reconstruct.py --output "$(OUT)"'
 check-ocs-reconstruction:
 	@/bin/bash -c '. amiga/env.sh; python3 tools/ocs_reconstruct_check.py --output "$(OUT)"'
+
+.PHONY: check-ocs-display
+check-ocs-display:
+	@/bin/bash -c '. amiga/env.sh; python3 tools/ocs_display_check.py --output "$(OUT)"'
