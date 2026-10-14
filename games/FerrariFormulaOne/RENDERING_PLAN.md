@@ -96,17 +96,11 @@ Keep CUSTOM2=0 legacy-exact, the 20 ms player/100 ms opponents design, public
 CPU allocations and Chip DMA ownership. Do not change the delivered RC2 until
 its successor passes the final gates.
 
-1. **Fast-memory WaitBlit dispatch and idle path.** Generalize the audited C4
-   `$2a130` shortcut/direct-call machinery for the fine path. Validate native
-   signatures and install through its relocation-aware patch ledger. Keep the
-   old-Agnus settling reads and final CCR behavior. First retain the existing
-   busy helper and CIA pacing; avoid the Chip library vector on the qualified
-   path. Audit callers that bypass `$2a130`. Measure wrapper/helper cycles,
-   idle/busy counts, actual BLTSIZE ordering and presentation cadence. This is
-   first because the measured wrapper/helper pair dominates drawing. Do not
-   remove busy waits or claim the dispatch stall disappears rather than moves.
+1. **H1 — Fast-memory WaitBlit dispatch: discarded (user decision).** The
+   direct-call candidate was measured, then completely removed. No experimental
+   implementation or build switch remains. See the findings below. Proceed to H2.
 
-2. **Remove exact zero/Q colour intermediates.** Adapt
+2. **H2 — Remove exact zero/Q colour intermediates.** Adapt
    `FerrariFormulaOne_Coarse200Colour.s` to fine-path bindings, without importing
    coarse timing assumptions. Reconfirm `$1c1b8` consumers for this executable;
    preserve clipping, masks, shifts, final cookie-cut, mixed minterms and DMA
@@ -114,7 +108,7 @@ its successor passes the final gates.
    edges and overlapping cars. Require fewer colour BLTSIZE operations and
    identical pixels; measure the actual saving at `$32e6c`, not 56% of draw time.
 
-3. **Overlap road preparation with safe buffer handover.** Adapt D2's CPU-only
+3. **H3 — Overlap road preparation with safe buffer handover.** Adapt D2's CPU-only
    `$6a2d0`/`$6b168` preparation before the beam wait, keeping native clear/sky
    order and exact projection results. Use `move.w ccr` on 020+, never the C4
    `move.w sr` save that traps through WHDLoad. Use the fine scheduler's VBL
@@ -123,7 +117,7 @@ its successor passes the final gates.
    is the observed overlap budget, not guaranteed savings. Verify both buffer
    alternations and intermediate display fields, not just final screenshots.
 
-4. **Reduce repeated text/instrument bitmap work.** Re-profile steps 1–3 first.
+4. **H4 — Reduce repeated text/instrument bitmap work.** Re-profile after H2–H3 first.
    If text remains substantial, investigate `$239a0` and `$24ae0` call chains,
    including the 7.024 ms demo label and clock/flag calls. Cache reusable glyph
    preparation in public memory; retain Chip storage for anything read by DMA.
@@ -132,7 +126,7 @@ its successor passes the final gates.
    value check. Track dirtiness per destination, invalidate on clear/view/menu/
    reload, and test value transitions, both buffers and demo/player modes.
 
-5. **Choose CPU or blitter per measured primitive; then reassess IRQs.** If
+5. **H5 — Choose CPU or blitter per measured primitive; then reassess IRQs.** If
    small bitmap operations still dominate, histogram native `$24ae0`, `$32d54`
    and road `$6acxx/$6adxx` operations by size, minterm, shift, clipping and
    overlap. Build exact CPU implementations only for profitable, bounded cases;
@@ -187,3 +181,38 @@ rules. The tracked report preserves the measured results and implementation gate
 The 308 MB raw instruction trace is retained as verified 18.2 MB `detail.bin.gz`;
 decompress it to `detail.bin` before rerunning the analysers. Its raw and
 compressed SHA256 hashes are in the manifest. No long-running trace is retained.
+
+## H1 findings and withdrawal (2026-10-15)
+
+The user rejected H1 after measurement: reaching the blitter wait earlier mainly
+moves waiting from the Chip library dispatch into the busy helper. All H1 source,
+build integration and local experimental builds were removed. The shipped RC2
+archive is unchanged; the ordinary source remains the RC2 implementation.
+
+Equal-layout, RNG-controlled, every-update endpoint rendering gives 14 complete
+matched draws per arm. Both execute exactly 6,712 WaitBlit calls. Mean total draw
+time is **60.102745 -> 60.111022 ms**, effectively unchanged. The wrapper/helper
+pair falls from 29.775656 to 29.115451 ms, but busy calls increase from 2,849 to
+3,371. CIA reads increase from 86,644 to 91,628. Work outside beam synchronization
+falls about 0.876 ms, while the beam wait rises about 0.885 ms. This is not a
+material reduction in total draw time.
+
+The completed untraced 020+Fast normal-demo 300-presentation comparison is
+13.229790 -> 13.288485 FPS (about 0.44%), mean interval 75.586987 -> 75.253122 ms;
+p95 remains 80.127548 ms. Both 60-second elapsed checks take 60.055597 emulated
+seconds, with 0.092576% error. These small cadence differences do not establish a
+useful high-end improvement. The 040 comparison was stopped at the user's
+request; no accelerated result is claimed.
+
+The 100-update oracle passes all 27 state blocks and private physics fractions
+exactly. The candidate's independent short trace/census has identical scheduler
+contexts, field cycles, DMA counts and displayed bitplane addresses. Complete
+RAM snapshots differ at two bytes ($5fa140 and $5fa146) in both endpoints;
+therefore full-RAM identity is not claimed. Canonical semantic blocks match.
+The remaining frame, grid/dense, controls and lifecycle qualification was not
+completed: this is a rejected experiment, not an accepted optimization.
+
+Local results and verified compressed traces remain as evidence under
+`tmp/dev/tmp/step5/c4-q03-*-h1-*` and are indexed by
+`tmp/dev/manifest/render-h1-withdrawal.json`. Experimental code and slaves are
+not retained. **H2 is the next implementation step.**
