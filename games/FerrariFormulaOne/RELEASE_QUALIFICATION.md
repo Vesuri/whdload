@@ -120,40 +120,24 @@ passes. The production reservation is 768 KiB expansion memory in addition to
 512 KiB Chip, the 260,292-byte slave, and runtime/OS overhead; it is not a claim
 that 1.25 MiB total machine memory is sufficient.
 
-Both CUSTOM1 values pass three matched legacy-loop state comparisons on A500
-and A500 + Fast. The 1,005-word union of the three engines' native patch ledgers
-also matches, allowing only the existing timing JSR's relocated host operand.
-The original timing callback is an expected legacy patch. Chip-only and Fast
-020 comparisons and repeated overlay loads remain outstanding.
+Both CUSTOM1 values pass three matched legacy-loop state comparisons on all four
+original profiles: A500, A500+Fast, chip-only 020 and 020+Fast. All 26 state
+blocks are exact at loops 125/150/175. The 1,005-word union of the three engines'
+native patch ledgers also matches in all 24 comparisons, allowing only the
+existing timing JSR's relocated host operand. This is the original legacy patch,
+not a new performance hook. Equal allocation layout and the established RNG
+fixture are applied to both arms. The 020 checks use ConfigDelay=0 with 20.1.
+Repeated overlay-load checks remain separate. Evidence:
+`tmp/dev/manifest/release-default-c0-validation.json`,
+`tmp/dev/manifest/release-default-c1-validation.json` and
+`tmp/dev/manifest/release-disabled-ranges.json`.
 
-## Original release observations on accelerated profiles
-
-The original v1.01 demo was measured separately, with the corrected observer,
-warp disabled for each 1,000-field window (20.031887 seconds), after 125 native
-updates. These observations are not matched-state speedup comparisons: the
-original and converted loops advance different amounts of simulation during the
-measurement, and startup RNG is uncontrolled.
-
-| Emulator profile | Original CUSTOM1=0 FPS | Original CUSTOM1=1 FPS | Enabled production FPS |
-| --- | ---: | ---: | ---: |
-| 030 50 MHz | 5.691 | 7.139 | 16.623 |
-| 040 25 MHz | 5.491 | 6.540 | 16.623 |
-| 040 40 MHz | 5.491 | 6.540 | 16.623 |
-| 060 50 MHz | 5.541 | 6.639 | 16.623 |
-
-The original calendar and session clocks advance only 11.0–11.5 seconds with
-CUSTOM1=0, or 13.1–14.3 seconds with CUSTOM1=1, during those 20.032-second
-windows. Enabled production independently passes the 60-second elapsed gate
-with 0.0409% error. Faster presentation alone therefore understates the behavioral
-change: the new mode also keeps simulation time aligned with elapsed time.
-
-The enabled 300-presentation measurement is 16.640 FPS; the table uses its
-1,000-field window count for the same observation length as the original.
-Quantized emulator clock scales and coarse 040/060 cache charging prevent
-hardware speed or CPU-ranking claims. No further accelerated optimization is
-required by this qualification task. Evidence:
-`tmp/dev/manifest/release-original-observations.json` and
-`tmp/dev/manifest/release-accelerated-enabled.json`.
+The normal production build defines FF1_PRODUCTION and excludes VERIFY. No
+VERIFY tape or warmup symbols are emitted. Retained diagnostic routine labels
+are immediate RTS instructions, and their inactive counter storage stays zero
+through the full lap on all three engines. Functional scheduler/installation
+state remains necessary. The independent rebuild is still byte-identical.
+Evidence: `tmp/dev/manifest/release-production-audit.json`.
 
 ## Native lap completion
 
