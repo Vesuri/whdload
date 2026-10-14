@@ -10,6 +10,10 @@ static uae_u64 ocs_begin_cycles, ocs_cpu[4], ocs_dma_wait[2];
 void wc_ocs_dma_wait(bool bitplane) { if(ocs_active) ++ocs_dma_wait[bitplane?1:0]; }
 static std::vector<unsigned char> ocs_previous, ocs_expected;
 static unsigned ocs_target, ocs_width, ocs_height;
+// C5: independent completed-image bytes checked at actual bitplane DMA reads.
+static std::vector<unsigned char> ocs_reference[2], ocs_valid[2];
+static unsigned ocs_fetch_good, ocs_fetch_bad, ocs_fetch_unknown;
+
 struct ocs_scope { unsigned off, sp, ret; uae_u64 start; };
 static std::vector<ocs_scope> ocs_scopes;
 
@@ -33,6 +37,8 @@ void wc_ocs_begin(unsigned h0,unsigned h1,unsigned mode,const char* path) {
     ocs_h0=h0; ocs_h1=h1; ocs_mode=mode; ocs_field=0;
     ocs_begin_cycles=get_cycles(); ocs_active=mode!=0;
     ocs_previous.clear(); ocs_expected.clear(); ocs_scopes.clear(); ocs_seen=-1;
+    for(unsigned n=0;n<2;++n) { ocs_reference[n].clear(); ocs_valid[n].clear(); }
+    ocs_fetch_good=ocs_fetch_bad=ocs_fetch_unknown=0;
     for (auto& c:ocs_cpu) c=0;
     for (auto& c:ocs_dma_wait) c=0;
     ocs_buffers[0]=get_long_debug(h0+0x331c0);
@@ -48,6 +54,8 @@ void wc_ocs_field(bool end) {
     ++ocs_field;
     fprintf(ocs_log,"F %llu %u %u %u %u\n",(unsigned long long)get_cycles(),ocs_field,
         get_word_debug(ocs_h1+0x88da),get_word_debug(ocs_h1+0x88de),get_long_debug(ocs_h1+0x77fe));
+    fprintf(ocs_log,"Y %u %u %u %u\n",ocs_field,ocs_fetch_good,ocs_fetch_bad,ocs_fetch_unknown);
+    ocs_fetch_good=ocs_fetch_bad=ocs_fetch_unknown=0;
     ocs_memory(); ocs_seen=-1;
     if (end) {
         ocs_active=false;
@@ -61,7 +69,17 @@ void wc_ocs_field(bool end) {
 }
 // Called at actual bitplane fetches, independently of game PCs/publication state.
 void wc_ocs_fetch(unsigned p,unsigned nr) {
-    if (!ocs_active || nr) return;
+    if (!ocs_active) return;
+    bool checked=false;
+    for(unsigned n=0;n<2;++n) if(p>=ocs_buffers[n] && p+1<ocs_buffers[n]+ocs_reference[n].size()) {
+        unsigned at=p-ocs_buffers[n];
+        if(ocs_valid[n][at] && ocs_valid[n][at+1]) {
+            unsigned expected=(ocs_reference[n][at]<<8)|ocs_reference[n][at+1];
+            ++ocs_fetch_good; ocs_fetch_bad+=get_word_debug(p)!=expected; checked=true;
+        }
+    }
+    if(!checked) ++ocs_fetch_unknown;
+    if(nr) return;
     int index=-1;
     for (int n=0;n<2;++n) if (p>=ocs_buffers[n] && p<ocs_buffers[n]+ocs_plane) index=n;
     if (index<0) return;
@@ -81,6 +99,8 @@ static void wc_ocs_pc(unsigned pc) {
             (unsigned long long)s.start,regs.regs[0]);
         ocs_scopes.erase(ocs_scopes.begin()+n); break;
     }
+    if(off==0x33442) fprintf(ocs_log,"Q %llu %u %u\n",(unsigned long long)get_cycles(),
+        get_word_debug(ocs_h0+0x331d8),get_long_debug(ocs_h1+0x77fe)+1);
     const unsigned scopes[]={0x2be,0x2e6,0xb80,0x32990,0x3407e,0x340ba,0x6fa,0xc748};
     for (unsigned entry:scopes) if (off==entry) {
         if (sp<0x100 || sp>0xdc0000-4 || ocs_scopes.size()>32) abort();
@@ -89,14 +109,23 @@ static void wc_ocs_pc(unsigned pc) {
     }
     const unsigned events[]={0x2dc,0x3260a,0x32626,0x3262a,0x3293a,0x32944,
         0x329de,0x329e4,0x32a0a,0x32a26,0x32a4a,0x32dba,0x32e02,0x33aa8,
-        0x9618,0x33b98,0x33c88,0x32e06};
+        0x9618,0x33b98,0x33c88,0x32e06,0x3342e,0x33350,0x333ba,0x334bc,0x342c8};
     for (unsigned entry:events) if (off==entry) {
         fprintf(ocs_log,"P %llu %x %x %x %u\n",(unsigned long long)get_cycles(),off,
             regs.regs[0],regs.regs[9],get_word_debug(ocs_h0+0x331d8));
+        if (off==0x33aa8) fprintf(ocs_log,"V %llu %u %u %u\n",(unsigned long long)get_cycles(),
+            ocs_field,get_long_debug(ocs_h1+0x77fe),vpos);
         if (off==0x33b98 || off==0x33c88) ocs_memory();
+    }
+    if(off==0x33350 || off==0x333ba) {
+        unsigned n=get_word_debug(ocs_h0+0x331d6);
+        if(n<2) std::fill(ocs_valid[n].begin(),ocs_valid[n].end(),0);
     }
     if(off==0x32e06 && !ocs_expected.empty()) {
         unsigned bad=0,row=ocs_width/8,plane=row*(ocs_height+2);
+        int target=-1; for(int n=0;n<2;++n) if(ocs_target==ocs_buffers[n]) target=n;
+        if(target<0) abort();
+        ocs_reference[target].assign(4*plane,0);ocs_valid[target].assign(4*plane,0);
         for(unsigned bit=0;bit<4;++bit) for(unsigned y=0;y<ocs_height-1;++y)
             for(unsigned x=0;x<row;++x) {
                 unsigned char expected=0;
@@ -106,7 +135,9 @@ static void wc_ocs_pc(unsigned pc) {
                     if(y==1 && (px==1 || px==3 || px==9 || px==11)) v=0;
                     expected|=((v>>bit)&1)<<(7-k);
                 }
-                bad+=get_byte_debug(ocs_target+bit*plane+(y+2)*row+x)!=expected;
+                unsigned at=bit*plane+(y+2)*row+x;
+                ocs_reference[target][at]=expected;ocs_valid[target][at]=1;
+                bad+=get_byte_debug(ocs_target+at)!=expected;
             }
         fprintf(ocs_log,"X %llu %u %u\n",(unsigned long long)get_cycles(),bad,4*row*(ocs_height-1));
         ocs_expected.clear();
@@ -135,10 +166,12 @@ static void wc_ocs_pc(unsigned pc) {
 }
 // Scope duration is inclusive; these instruction charges isolate actual CPU polls.
 struct ocs_instruction {
-    uae_u64 start=0; unsigned kind=0;
+    uae_u64 start=0; unsigned kind=0; bool jump=false; unsigned jump_line=0;
     explicit ocs_instruction(unsigned pc) {
         if (!ocs_active) return;
         start=get_cycles();
+        jump=get_word_debug(pc)==0x33c0 && get_long_debug(pc+2)==0xdff08a;
+        jump_line=vpos;
         unsigned off=pc-ocs_h0;
         if (off==0x3293e || off==0x32942) kind=1;
         else if (off>=0x32a66 && off<0x32dba) {
@@ -147,6 +180,10 @@ struct ocs_instruction {
         }
     }
     ~ocs_instruction() {
-        if (start && ocs_active) ocs_cpu[kind]+=get_cycles()-start;
+        if (start && ocs_active) {
+            ocs_cpu[kind]+=get_cycles()-start;
+            if(jump) fprintf(ocs_log,"J %llu %u %u %u\n",(unsigned long long)get_cycles(),
+                jump_line,vpos,get_long_debug(ocs_h1+0x77fe));
+        }
     }
 };

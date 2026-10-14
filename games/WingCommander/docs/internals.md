@@ -5718,3 +5718,113 @@ A fresh CPU rebuild is byte-identical. Normal OCS remains 5,324 bytes
 (`eec155c9…`) and CD32 remains 43,544 bytes (`fdd92fbb…`). No release archive is
 changed. General OCS publication deadlines, all-view compatibility and later
 prediction/history memory remain their respective C5/D/E work items.
+
+### P13C5: completed-image publication and display ownership
+
+P13C5 is complete for the English OCS allocation-integrated candidate. The builder
+now links `whdload/ocs_publication.s` as well as C4 allocation/conversion hooks.
+It shares CD32's pending/drawing/displayed protocol: the producer commits immutable
+request data last; the display interrupt releases the old front only after
+publication; task-side conversion and teardown drain pending ownership. The OCS
+adapter retains its native completion, View/BitMap, four-plane and Copper ABIs.
+No CD32 FMODE writes, timing hooks or prediction code are introduced.
+
+Native QBlit completion at `O:32e06` (file `32e32`) and synchronous CPU completion
+both reach the same queue. Blitter submission still waits for both source readers;
+its final phase must retire before a subsequent conversion or direct planar write.
+A completed picture is not treated as displayed merely because its final blit
+flag cleared. The queue freezes its index, plane, relocated game A4 and earliest
+field (`OD:77fe + 1`). The initializer derives A4 from the native relocated clock
+operand; an interrupted task's A4 is not assumed to be the game's A4.
+
+| Hook, code-hunk / file offset | Contract |
+|---|---|
+| `O:33442` / `3346e` | Queue the completed index and plane; publish the pending word last. No allocation, wait or graphics call in the QBlit completion callback. |
+| `O:342c0` / `342ec` | After the native field/countdown updates, service the pending request, then preserve the original callback, register restoration and return ABI. |
+| `O:33426` / `33452` | Wait for pending publication before rotating the next conversion destination. Native final-blit retirement remains ahead of this call. |
+| `O:33348` / `33374`, `333b4` / `333e0` | Native direct-plane clear and pixel writers drain final conversion and pending publication before touching their destination. |
+| `O:334b6` / `334e2` | Drain before destroying the View/Copper lists; clear the tracked front and resume native teardown. |
+
+The deadline comes from OCS evidence. The captured graphics.library copinit waits
+at line 12 before COPJMP2; both generated game lists initially disable bitplanes,
+then enable four planes at line 72 (200-row views) or 108 (128-row intro). The
+report verifies those list instructions in every accepted checkpoint. The VBL
+adapter waits until line 16, accepts native pointer bookkeeping through line 32,
+and restarts the new list only if its second stable beam sample is at most 40.
+Future-field requests and either occupied native publication lock defer. A late
+attempt retains ownership and retries; there is no late visible-window restart.
+If pointer bookkeeping has already occurred, retaining ownership is still safe:
+the following field may naturally latch that list, but no producer can reuse the
+old front until the pending request is retired. PAL tests observed actual restart
+completion at line 18 on 68000 and line 16 on 68020, with zero late counts.
+These are OCS values, not the CD32 line-4–16 policy.
+
+The normal candidate is 8,748 bytes, 612 more than C4's gate artifact. Its owned
+publication state is 32 bytes within the appended slave; no third image, history,
+heap allocation or additional game-pool reservation is added. The C4 native
+workspace/fallback and 512 KiB Chip plus 4 MiB Fast test configuration remain.
+Backend defaults and cache policy are unchanged.
+
+#### Validation
+
+The base-68000 test executes the real native completion and VBL entry/return,
+including its original saved registers and stack, with an explicit beam stub.
+**52 cases** cover idle/future/locked/early/late/overrun publication, both indices,
+field wrap, unrelated interrupted A4, and task-side rotation/direct writers/close.
+Six implementation mutations fail, including bypassed pending and blitter waits.
+Startup tests pass **168 normal and 192 diagnostic cases**, including rejection
+before partial installation and unsupported revisions remaining unenhanced.
+
+| Accepted PAL model | Window fields | Completed-image checks | Checked display-DMA words | Forecast/display matches |
+|---|---:|---:|---:|---:|
+| A500, 68000, native blitter | 900 | 92 | 10,083,140 | 97 |
+| OCS, 14 MHz 68020, CPU/Fast longword | 660 | 152 | 7,384,048 | 152 |
+
+Both traverse Origin, title/credits, menu, simulator, view modes 2/1/3/0, name
+entry and controlled native display teardown. Each window has one actual buffer
+per field, zero converted-image or DMA-word mismatches, and exact agreement
+between request forecasts, native pointer publication, Copper restart and actual
+display-buffer changes. Completion at a window boundary can precede its source
+capture, explaining the native check/count difference. Final teardown clears
+pending/front and retains C4's no-stale-DMA/verified-restored-OS-owner checks.
+
+The simulator intentionally ignores normal view keys (`O:188f0` / file `1891c`).
+The diagnostic build therefore accepts an owned data request at the native input
+boundary `O:18d14` (file `18d40`) and calls the original view routine `O:6e38`
+(file `6e64`) in task context. Normal builds have no such hook. The driver waits
+for the requested native mode before each window. Native windows are 100 fields;
+CPU windows are 40 so all requests precede scripted death. The native final
+front-view window also includes its transition to death-camera mode 4. These
+checks prove rendering/publication transitions, not interactive campaign controls.
+The name endpoint uses recurring input `O:16992`, since fast runs can pass its
+one-time entry during the preceding capture.
+
+The observer is read-only and checks actual DMA fetches, including every word in
+the emulator's optimized fetch spans. Its expected image comes from the submitted
+chunky source and independent checkerboard pixel oracle. Unverified words are
+counted, not accepted as pixel matches: initial fields before an observed complete
+image, padding/unconverted final row, and buffers invalidated by native direct
+writers. These total 789,560 native and 295,188 CPU words. Direct-writer semantics
+retain A2's native pixel oracle; C5 adds their ownership-wait tests. Mixed-buffer
+fields and wrong publication ordering are rejected independently of pixel coverage.
+Four corrupt evidence controls reject bad DMA pixels, a late restart, a wrong
+forecast and a wrong published buffer. An observer-off native control is exact at
+all **13 checkpoints** for four game hunks, all Chip RAM, owned slave state and
+field clocks across all six windows.
+
+Accepted evidence: `tmp/p13c5-unit-native-irq`, `p13c5-normal-install`,
+`p13c5-install-final`, `p13c5-native-final`, `p13c5-observer-off`,
+`p13c5-cpu-accepted`, and the `p13c5-native-complete-report` /
+`p13c5-cpu-complete-report` reports. The diagnostic native/CPU slaves are 8,896
+bytes; normal automatic candidate SHA-256 is
+`172d32973a77a4ecdbed84515b8e1454fae54bf7b9bbc4f47256fcd7c9771cf5`.
+The pinned local C5 observer SHA-256 is
+`b9ab0c446ac54b65207d6c1d58ea4df84753282ee247a5777ffb1fb0a66e0ed4`.
+Fresh original OCS and CD32 release reconstructions retain `eec155c9…` and
+`fdd92fbb…` respectively. No release archive or shared emulator is changed.
+
+This is scoped emulator correctness evidence, not a new performance or hardware
+claim. NTSC, other accelerators/revisions, campaign input/save/modal/whole-game
+quit and every cinematic route remain E2 compatibility work. The tested forecasts
+are completion-to-publication fields; renderer extrapolation/history arrives in
+D3. C6 changed-block evaluation is the next implementation item.

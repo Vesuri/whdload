@@ -2,7 +2,7 @@
 
 ## Current state
 
-**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3 and P13C1–P13C4 are complete.** The OCS loader, four-plane blitter
+**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3 and P13C1–P13C5 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The
 [ordered OCS work items P13A1–P13E3](ocs-plan.md) cover shared CD32 mechanisms,
@@ -38,7 +38,10 @@ DMA reads after release. The combined Chip workspace remains available for
 fallback. The tested launcher floor is 512 KiB Chip plus 4 MiB Fast.
 See the [C4 ownership gate](internals.md#p13c4-backend-specific-memory-ownership).
 See the [C3 gate](internals.md#p13c3-conservative-backend-selection).
-P13C5 publication acceptance is next; CD32 E1 and phase 12 remain
+C5 publication now passes native/CPU view transitions, independent display-DMA
+pixels and request/actual-field agreement, with exact observer-off controls.
+See the [C5 gate](internals.md#p13c5-completed-image-publication-and-display-ownership).
+P13C6 changed-block evaluation is next; CD32 E1 and phase 12 remain
 paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
 [P13B3 scope and checks](internals.md#p13b3-shared-instrumentation-and-validation-interfaces).
 

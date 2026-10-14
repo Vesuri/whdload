@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C4 are complete**;
+The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C5 are complete**;
 the remaining work items below are pending, in dependency order.
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -225,7 +225,7 @@ an independent block. The documented tested launcher floor is 512 KiB Chip plus
 wait that also fails in the original slave. Normal reconstruction remains the
 control. See [ownership, budget and limits](internals.md#p13c4-backend-specific-memory-ownership).
 
-**P13C5 — Publish completed images safely on both backends.** Depends on C4.
+**P13C5 — Publish completed images safely on both backends (complete).** Depends on C4.
 Share the pending/drawing/displayed ownership model with CD32 while retaining
 OCS-specific completion events, Copper setup and publication deadline. Verify
 blitter completion before publishing or reusing its source; CPU completion alone
@@ -233,6 +233,13 @@ does not certify a blitter frame. Preserve native direct-plane updates and view
 transitions. Do not copy CD32 FMODE or its scanline deadline.
 Gate: no tearing, old rows or mixed frames across intro, view changes and flight;
 actual display fields agree with ownership and forecast records.
+Gate passed: native and CPU candidates queue completion for the OCS VBL, drain
+before reuse/direct writes/teardown, and retain native Copper/BitMap handling.
+The 900-field native and 660-field CPU view/flight/intro windows have no mixed
+buffers or checked DMA pixel mismatches; 249 forecasts match actual publications.
+Native observer-off state/pixels match at 13 checkpoints. Diagnostic view changes
+use the native routine because the simulator suppresses view keys. See
+[evidence and limits](internals.md#p13c5-completed-image-publication-and-display-ownership).
 
 **P13C6 — Evaluate changed-block conversion only where it helps.** Depends on C5.
 Measure comparison/history cost against full CPU conversion and retained blitter
@@ -313,7 +320,8 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3 and P13C1–P13C4 are complete. **P13C5** is next.
+P13A1–P13A4, P13B1–P13B3 and P13C1–P13C5 are complete. **P13C6** is next.
 Use the scoped measured profiles and retain native fallback/override
-for unknown accelerators. C4 now creates source ownership before the native compositor aliases. General
-publication/deadline acceptance remains C5.
+for unknown accelerators. C4 creates source ownership before native compositor aliases; C5 now protects
+pending/displayed ownership through publication and transitions. Broader
+compatibility remains E2.

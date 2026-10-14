@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the C4 OCS allocation integration candidate; generated slave in tmp/."""
+"""Build the C4/C5 OCS allocation/publication candidate; generated slave in tmp/."""
 import argparse
 import hashlib
 import json
@@ -17,16 +17,28 @@ NATIVE={'OCS_CHIP_ALLOC':0x33b60,'OCS_REGISTER':0x33c8e,
         'OCS_STAMP':0x32916,'OCS_DISPLAY_CREATE':0x33200,
         'OCS_PUBLIC_ALLOC':0x33b76,'OCS_DISPLAY_FREE':0x32526,
         'OCS_SURFACE_FREE_BODY':0x3247c,'OCS_INPUT':0x345a8,
-        'OCS_PRIMARY_CLOSE':0xcac}
+        'OCS_PRIMARY_CLOSE':0xcac,
+        'OCS_DISPLAY_STATE':0x331b8,'OCS_COPPER_LOCK':0x33a6c,
+        'OCS_PUBLISH_INDEX':0x3385a,'OCS_ROTATE_BODY':0x3342e,
+        'OCS_CLEAR_BODY':0x33350,'OCS_PIXEL_BODY':0x333ba,
+        'OCS_CLOSE_BODY':0x334bc,'OCS_VBL_CALLBACK':0x340b4,
+        'OCS_VBL_RETURN':0x342c8,'OCS_VIEW_CHANGE':0x6e38,
+        'OCS_INPUT_PREPARE':0x182ce,'OCS_INPUT_BODY':0x18d1c}
 HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x324c0,'display_create_checked',0x4ef9),
        (0x31e1e,'ocs_source_allocate',0x4eb9),
        (0xc94,'source_create_checked',0x4eb9),
-       (0x3291e,'submit',0x4ef9))
+       (0x3291e,'submit',0x4ef9),
+       (0x33442,'ocs_publish_queue',0x4ef9),
+       (0x342c0,'ocs_publish_irq',0x4ef9),
+       (0x33426,'ocs_publish_rotate',0x4ef9),
+       (0x33348,'ocs_publish_clear',0x4ef9),
+       (0x333b4,'ocs_publish_pixel',0x4ef9),
+       (0x334b6,'ocs_publish_close',0x4ef9))
 
 
 def build(out,option,exit_probe=False):
-    hooks=HOOKS+(((0x16992,'exit_probe_entry',0x4eb9),) if exit_probe else ())
+    hooks=HOOKS+(((0x16992,'exit_probe_entry',0x4eb9),(0x18d14,'view_probe_entry',0x4ef9)) if exit_probe else ())
     original=(ROOT/ocs.SLAVE).read_bytes()
     require(hashlib.sha256(original).hexdigest()==SLAVE_SHA,'changed original slave')
     game=(ROOT/ocs.GAME).read_bytes();guard_game(game)
@@ -79,6 +91,12 @@ fixup:
  move.l d1,(a5)
  bra.s fixup
 fixup_done:
+ movea.l d6,a0
+ adda.l #$342a8,a0
+ move.l (a0),d0
+ addi.l #$800,d0
+ lea ocs_game_a4(pc),a0
+ move.l d0,(a0)
  ; Unknown clocks remain native automatically. Explicit CPU is a build option.
  moveq #{OPTIONS[option]},d0
  movea.l 4.w,a0
@@ -204,7 +222,7 @@ memory_message: dc.b "OCS display allocation failed",0
 contract_message: dc.b "OCS CPU conversion contract failed",0
  even
 game_base: dc.l 0
-'''+(ROOT/'whdload/ocs_memory.s').read_text()+'\n'+backend_source()+'\n'+converter_source(candidates())
+'''+(ROOT/'whdload/ocs_memory.s').read_text()+'\n'+(ROOT/'whdload/ocs_publication.s').read_text()+'\n'+backend_source()+'\n'+converter_source(candidates())
     if exit_probe:
         text+='''
 exit_probe_entry:
@@ -220,6 +238,22 @@ exit_probe_entry:
 exit_probe_done:
  bra.s exit_probe_done
 exit_probe_trigger: dc.l 0
+; Diagnostic task-context view request; simulator key dispatch disables F1-F4.
+view_probe_entry:
+ movem.l d2-d4,-(sp)
+ move.l view_probe_request(pc),d0
+ beq.s .native
+ subq.w #1,d0
+ clr.w -(sp)
+ move.w d0,-(sp)
+ jsr OCS_VIEW_CHANGE
+ addq.l #4,sp
+ lea view_probe_request(pc),a0
+ clr.l (a0)
+.native:
+ jsr OCS_INPUT_PREPARE
+ jmp OCS_INPUT_BODY
+view_probe_request: dc.l 0
 '''
     # Resolve native operands at startup. Fixups are constructed from unique
     # sentinel values, then checked as operands in the generated build listing.
@@ -235,7 +269,7 @@ exit_probe_trigger: dc.l 0
     for pos in range(TAIL,len(probe)-3,2):
         value=int.from_bytes(probe[pos:pos+4],'big')
         if 0xf0000000<=value<0xf0040000:fixes.append(pos)
-    require(len(fixes)>=len(NATIVE)-2,'missing native fixups')
+    require(len(fixes)>=len(NATIVE)-5,'missing native fixups')
     payload,sy=assemble(out,'candidate',text+tables+''.join(f' dc.l ${x:x}\n' for x in fixes)+' dc.l -1\npayload_end:\n')
     payload=bytearray(payload)
     require(payload[:TAIL]==original[32:-4],'original payload changed before patch')
@@ -255,7 +289,7 @@ exit_probe_trigger: dc.l 0
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',required=True)
     p.add_argument('--backend',choices=tuple(OPTIONS),default='auto')
-    p.add_argument('--exit-probe',action='store_true',help='diagnostic-only native teardown trigger')
+    p.add_argument('--exit-probe',action='store_true',help='diagnostic-only native teardown and view-change triggers')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     r=build(out,a.backend,a.exit_probe);print(r['bytes'],r['sha256'])
 

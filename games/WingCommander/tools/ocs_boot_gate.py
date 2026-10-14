@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """P13A3 OCS original/reconstructed boots, with native input and state waits.
-No game patches or CD32 layout assumptions. Optional P13A4 host observations.
+No host game-code patches or CD32 layout assumptions. Optional host observations
+and data-triggered diagnostics in explicitly selected candidate builds.
 """
 import argparse
 import hashlib
@@ -27,12 +28,15 @@ def main():
     p.add_argument('--simulator', action='store_true', help='continue from the menu to the first name prompt')
     p.add_argument('--baseline', choices=('on', 'off'), help='P13A4 two short field-bounded native windows')
     p.add_argument('--teardown-build', help='build.json directory of a diagnostic --exit-probe candidate')
+    p.add_argument('--view-fields', type=int, choices=(40,100), default=40)
+    p.add_argument('--views', action='store_true', help='C5 diagnostic native view transitions (simulator disables view keys)')
     p.add_argument('--ownership', action='store_true', help='C4 candidate transition gate')
     p.add_argument('--cpu', choices=('68000','68020'), default='68000')
     p.add_argument('--fast-kib', type=int, choices=(1024,2048,4096), default=4096)
     a = p.parse_args()
     if not a.ownership and (a.cpu != '68000' or a.fast_kib != 4096):
         p.error('machine overrides require --ownership')
+    if a.views and not (a.ownership and a.baseline and a.teardown_build):p.error('view gate requires ownership, baseline and diagnostic build')
     if a.teardown_build and not a.ownership:p.error('teardown requires --ownership')
     LENGTH = a.fast_kib*1024
     out = (ROOT/a.output).resolve()
@@ -136,10 +140,10 @@ def main():
             (out/(label+'.png')).write_bytes(shot)
             print('captured '+label, flush=True)
 
-        def baseline(label):
+        def baseline(label, fields=250):
             path = out/(label+'-events.txt')
-            print('measuring '+label+' (250 fields)', flush=True)
-            command(f'monitor ocs-window 250 {int(a.baseline == "on")} {h0:x} {layout["hunks"][1]:x} "{path}"', timeout=180)
+            print(f'measuring {label} ({fields} fields)', flush=True)
+            command(f'monitor ocs-window {fields} {int(a.baseline == "on")} {h0:x} {layout["hunks"][1]:x} "{path}"', timeout=180)
             capture(label)
 
         # Leave the Origin animation running to its input poll, then use its
@@ -174,11 +178,24 @@ def main():
             until(h0+0x0694, 'simulator flight loop O:0694')
             until(h0+0x06c2, 'simulator first iteration O:06c2')
             capture('simulator')
+            if a.views:
+                build=json.loads((ROOT/a.teardown_build/'build.json').read_text())
+                if hashlib.sha256(Path(env['SLAVE']).read_bytes()).hexdigest()!=build['sha256']:
+                    raise ValueError('view probe build differs from booted slave')
+                for view in (2,1,3,0):
+                    address=layout['slave']+build['symbols']['view_probe_request']
+                    path=out/f'view{view}-trigger.bin';path.write_bytes(struct.pack('>I',view+1))
+                    command(f'monitor ocs-load {address:x} "{path}"')
+                    if dump(f'view{view}-trigger-readback.bin',address,address+4)!=path.read_bytes():
+                        raise ValueError('view request not stored')
+                    until(h0+0x06c2, f'diagnostic native view {view} active', f'*(short*)($a4-18318) == {view}')
+                    baseline(f'view{view}',a.view_fields)
             if a.baseline:
                 key(1, '40')  # Native Space: fire, no artificial game writes.
                 baseline('fire')
                 key(0, '40')
-            until(h0+0x16c1a, 'pilot name prompt O:16c1a')
+            # A fast run can enter the prompt during the final capture. Its
+            # recurring input loop is a reliable endpoint even then.
             until(h0+0x16992, 'name input loop O:16992')
             flag = command(f'x/bx {h0+0x3291c:#x}')
             if int(flag.rsplit(':', 1)[1].strip(), 16):
@@ -217,6 +234,9 @@ def main():
                         (['simulator', 'name'] if a.simulator or a.baseline else []))
         if a.teardown_build and (a.simulator or a.baseline):
             metadata['checkpoints'].append('teardown')
+        if a.views:
+            metadata['checkpoints'] += ['view2','view1','view3','view0']
+            metadata['view_fields']=a.view_fields
         if a.baseline:
             metadata.update(baseline=a.baseline, fields_per_window=250)
             metadata['checkpoints'] += ['asteroids', 'fire']

@@ -3,7 +3,7 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A4, P13B1–P13B3 and P13C1–P13C4 complete: OCS converter selection and memory ownership.** The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4, P13B1–P13B3 and P13C1–P13C5 complete: OCS converter selection, memory and publication ownership.** The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting
@@ -33,7 +33,9 @@ and supports explicit native/CPU choices with safe pre-move memory fallback.
 C4 allocates the CPU source in Fast RAM before view aliases are built, unwinds
 failed setup and retires native readers before freeing it. Both backends pass
 controlled display teardown with DMA ownership checks. The tested launcher floor
-is 512 KiB Chip plus 4 MiB Fast. See the
+is 512 KiB Chip plus 4 MiB Fast. C5 now queues completed pictures for safe OCS
+blanking-time publication; both backends pass view transitions and display-DMA
+pixel checks. See the [C5 gate](docs/internals.md#p13c5-completed-image-publication-and-display-ownership), the
 [C4 ownership gate](docs/internals.md#p13c4-backend-specific-memory-ownership), the
 [C3 gate](docs/internals.md#p13c3-conservative-backend-selection),
 [C2 gate](docs/internals.md#p13c2-measured-ocs-converter-crossover),

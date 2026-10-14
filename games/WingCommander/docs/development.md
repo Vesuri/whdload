@@ -3752,3 +3752,66 @@ The reports show sampled pool/registry memory, not boot-wide peaks. No new FPS
 claim follows from the ownership runs. Use normal reconstruction commands for
 unchanged OCS and CD32 controls; C5's general publication/transition acceptance
 and later compatibility work remain separate.
+
+## P13C5: OCS publication ownership
+
+The allocation candidate builder now includes C5 publication by default. Original
+OCS reconstruction and the CD32 release remain separate controls. Use fresh output
+names; all derived artifacts stay under `tmp/`.
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --backend auto --output tmp/c5-normal
+python3 tools/ocs_publication_check.py --output tmp/c5-unit
+python3 tools/ocs_memory_install_check.py tmp/c5-normal --output tmp/c5-install
+python3 tools/ocs_memory_build.py --backend auto --exit-probe --output tmp/c5-native
+python3 tools/ocs_memory_build.py --backend cpu --exit-probe --output tmp/c5-cpu
+python3 tools/ocs_memory_install_check.py tmp/c5-cpu --output tmp/c5-probe-install
+python3 tools/ocs_publication_debugger.py --output tmp/c5-debugger
+```
+
+The debugger extension uses the retained C2 local build tree by default (override
+with `--source`). It verifies `manifest/ocs-publication-debugger.tsv`, copies the
+tree and replaces only the read-only observer plus its optimized DMA span hook.
+It never edits the shared emulator. Reconstructing the C2 input uses the earlier
+[C2 instrument workflow](#p13c2-measured-converter-comparison); its pinned local tree is
+required because the shared build may have changed since that measurement.
+
+```sh
+export FSUAE="$PWD/tmp/c5-debugger/fs-uae" WARP=1
+export SLAVE="$PWD/tmp/c5-native/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --calibrate --output tmp/c5-layout
+python3 tools/ocs_boot_gate.py --ownership --views --view-fields 100 \
+  --baseline on --simulator --teardown-build tmp/c5-native \
+  --layout tmp/c5-layout/layout.json --output tmp/c5-native-live
+python3 tools/ocs_boot_gate.py --ownership --views --view-fields 100 \
+  --baseline off --simulator --teardown-build tmp/c5-native \
+  --layout tmp/c5-layout/layout.json --output tmp/c5-native-off
+export SLAVE="$PWD/tmp/c5-cpu/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --views --view-fields 40 \
+  --baseline on --simulator --teardown-build tmp/c5-cpu \
+  --layout tmp/c5-layout/layout.json --output tmp/c5-cpu-live
+python3 tools/ocs_publication_report.py tmp/c5-native-live --build tmp/c5-native \
+  --observer-off tmp/c5-native-off --output tmp/c5-native-report
+python3 tools/ocs_publication_report.py tmp/c5-cpu-live --build tmp/c5-cpu \
+  --output tmp/c5-cpu-report
+python3 tools/reconstruct.py --variant ocs --output tmp/c5-original-control
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/c5-cd32-control
+```
+
+`--exit-probe` now also provides the diagnostic view-request entry used by
+`--views`. The simulator suppresses the normal view keys; the probe invokes the
+native view change from its normal task/input boundary, then resumes untouched
+input handling. The driver verifies the resulting mode before observing it.
+This is not interactive campaign-control acceptance. Shorter CPU windows keep
+all four requests ahead of scripted death; the native final window can include
+its death-camera transition. Name entry waits on the recurring input loop.
+
+The report combines C4 memory/teardown checks with queued/forecast/display
+reconciliation, actual Copper-restart bounds, captured copinit/game-list shape
+and independent source-to-DMA pixel checks. It explicitly counts unverified
+padding/final-row/initial/direct-writer words and rejects corrupted evidence.
+The CPU unit gate substitutes beam reads and graphics metadata, while executing
+the native VBL and completion instructions; live gates supply actual beam/DMA
+evidence. Neither warp/debugger timing nor these correctness windows is an FPS
+performance comparison. See the [accepted scope](internals.md#p13c5-completed-image-publication-and-display-ownership).
