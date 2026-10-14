@@ -3316,3 +3316,57 @@ The accepted results are in `tmp/p13b1-accepted-variants/report.json`,
 `tmp/p13b1-intro.json` and `tmp/p13b1-pixels.json`. Static front-door outputs are
 `tmp/p13b1-ocs-static` and `tmp/p13b1-cd32-static-final`. No timing/backend selection
 or performance measurement is part of this refactor.
+
+
+## P13B2: shared base-ISA and execution gate
+
+This gate uses the existing shared vasm and Unicorn tools; it does not boot a game.
+All generated assembly, listings, fixtures and reports stay in a fresh `tmp/`
+directory. The 68000 selector is an ISA layer; requesting an enhanced OCS slave
+still rejects until its native hooks/ABIs are implemented in later work.
+
+```sh
+. amiga/env.sh
+python3 tools/shared_cpu_check.py --output tmp/b2-cpu
+for mode in release timing render native; do
+  args=()
+  if [ "$mode" != native ]; then args=("--$mode"); fi
+  python3 tools/reconstruct.py --variant cd32 "${args[@]}" --output "tmp/b2-after-$mode"
+done
+python3 tools/reconstruct.py --variant ocs --output tmp/b2-after-ocs
+python3 tools/variant_check.py --before-prefix tmp/p13b1-final \
+  --after-prefix tmp/b2-after \
+  --cd32-memory tmp/phase7-combat-controls/start-fast.bin \
+  --ocs-memory tmp/p13a4-stock-on/credits-fast.bin --output tmp/b2-variants
+python3 tools/timing_adapter_check.py tmp/b2-after-release --output tmp/b2-install
+python3 tools/intro_clock_check.py tmp/b2-after-release --output tmp/b2-intro.json
+```
+
+If the retained P13B1 reference is absent, build the four modes from `0710118`
+using the isolated `git archive` recipe in the B1 section (with that commit and
+fresh directory names), and pass that reference prefix to `variant_check.py`.
+The locator inputs can likewise be regenerated using their original documented
+routes. Never substitute a mutated/game-derived fixture into a source directory.
+
+`shared_cpu_check.py` assembles all 13 audited units under four conditional
+profiles with explicit fixture-only external placeholders. It then executes
+actual scheduler/scaling/translation routines, flag/address/call contracts and
+publication/recorder wrappers on CPU models. The report lists the placeholder
+boundaries; they are not an OCS linker implementation. The 68000 flag routine is
+also tested in user mode on later CPUs. Original accelerated instructions supply
+an independent operand/flag differential, while Python integer and elapsed-time
+ledgers supply the arithmetic/clock oracle. Deliberate ISA, flag and arithmetic
+failures prove those checks reject. No guest time or performance is measured.
+
+For later OCS integration, `shared_cpu.unit(root, name, '68000')` emits an audited
+unit and `shared_cpu.preamble(root, '68000')` supplies its macros once per image.
+Use the variant's own verified definitions and actual callbacks, then assemble
+the **entire linked image** with `-m68000 -no-opt`; per-unit fixtures do not prove
+final branch reach or the native ABI. The 020+ selector preserves source verbatim.
+Arithmetic helpers have bounded positive-factor/rate contracts and scratch CCR;
+do not use this selector as a general game-code translator.
+
+Accepted evidence: `tmp/p13b2-accepted/report.json`,
+`tmp/p13b2-variants/report.json`, `tmp/p13b2-install/report.json` and
+`tmp/p13b2-intro.json`; matching binaries are in `tmp/p13b2-final-*`.
+See [contracts and limits](internals.md#p13b2-shared-68000-execution-safety).

@@ -11,6 +11,7 @@ import re
 import struct
 import subprocess
 from variants import cd32 as VARIANT
+from shared_cpu import unit
 import capstone
 from render_source import source as render_source, flight_source
 from timing_source import source as timing_source
@@ -143,8 +144,8 @@ def cd32_main(argv):
         lines.append('FRAME_STATS equ '+str(int(a.frame_stats)))
         lines.append('BUFFERED equ '+str(int(a.release)))
         lines.append(timing_source(ROOT, buffered=a.release, variant="cd32"))
-        if a.release:lines.append((ROOT/'whdload/release_buffer.s').read_text())
-        if a.frame_stats:lines.append((ROOT/'whdload/frame_stats.s').read_text())
+        if a.release:lines.append(unit(ROOT, 'release_buffer', VARIANT.CPU))
+        if a.frame_stats:lines.append(unit(ROOT, 'frame_stats', VARIANT.CPU))
         flight=flight_source(ROOT,a.flight_verify,a.flight_control,a.comparison_control,a.c2p_experiment, variant="cd32")
         if a.release:
             begin=flight.index('        move.l  slave+$1e04(pc),d7')

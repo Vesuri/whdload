@@ -1,6 +1,7 @@
 """Generate pinned-input guards for the English timing adapter in ignored builds."""
 import hashlib
 import struct
+from shared_cpu import unit, preamble
 
 
 def source(root, buffered=False, *, variant):
@@ -12,13 +13,13 @@ def source(root, buffered=False, *, variant):
         raise ValueError('changed English executable')
     offset, size, _ = v.HUNKS[0]
     code = game[offset:offset+size]
-    lines=[assembly_definitions(v),(root/'whdload/timing.s').read_text(),(root/'whdload/timing_clock.s').read_text(),(root/'whdload/timing_player.s').read_text(),(root/'whdload/timing_input.s').read_text(),(root/'whdload/timing_presentation.s').read_text(),(root/'whdload/timing_scene.s').read_text(),'timing_install:']
+    lines=[preamble(root,v.CPU),assembly_definitions(v),unit(root, 'timing', v.CPU),unit(root, 'timing_clock', v.CPU),unit(root, 'timing_player', v.CPU),unit(root, 'timing_input', v.CPU),unit(root, 'timing_presentation', v.CPU),unit(root, 'timing_scene', v.CPU),'timing_install:']
     if buffered:
-        lines.insert(-1,(root/'whdload/timing_intro.s').read_text())
-        lines.insert(-1,(root/'whdload/timing_translation.s').read_text())
-        lines.insert(-1,(root/'whdload/timing_projectiles.s').read_text())
-        lines.insert(-1,(root/'whdload/timing_scene_slots.s').read_text())
-        lines.insert(-1,(root/'whdload/view_regions.s').read_text())
+        lines.insert(-1,unit(root, 'timing_intro', v.CPU))
+        lines.insert(-1,unit(root, 'timing_translation', v.CPU))
+        lines.insert(-1,unit(root, 'timing_projectiles', v.CPU))
+        lines.insert(-1,unit(root, 'timing_scene_slots', v.CPU))
+        lines.insert(-1,unit(root, 'view_regions', v.CPU))
     for offset,_,_ in patches:
         word=struct.unpack_from('>H',code,offset)[0]
         lines += [f'\tcmpi.w #${word:04x},${offset:x}(a0)','\tbne.w timing_bad']

@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1–P13A4 and P13B1 are complete**;
+It does not implement or validate an improved OCS slave. **P13A1–P13A4 and P13B1–P13B2 are complete**;
 the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -103,7 +103,7 @@ compile-time equates, byte-identical CD32 release/timing/render/native outputs a
 original OCS reconstruction. Existing focused timing/pixel and rejecting controls
 pass. See [scope and evidence](internals.md#p13b1-compile-time-variant-definitions).
 
-**P13B2 — Make shared execution paths 68000-safe.** Depends on B1.
+**P13B2 — Make shared execution paths 68000-safe (complete).** Depends on B1.
 Replace or select alternatives for long multiply/divide, scaled indexing, long
 branches and flag preservation. `MOVE CCR` is unavailable on 68000; indiscriminate
 `MOVE SR` is not a safe replacement on later CPUs in user mode. Audit startup,
@@ -111,6 +111,13 @@ interrupts, exceptional exits and diagnostics as well as hot code. Reuse native
 math only after signedness, overflow, rounding and register contracts are tested.
 Gate: base-ISA assembly plus executed arithmetic/flag boundary tests on 68000,
 and unchanged results on 68020+. Keep accelerated implementations where useful.
+Gate passed: all 13 owned timing/prediction/publication/recorder units assemble
+for 68000 under four conditional profiles. Signed math, clock boundaries, all
+32 condition-code combinations, indexed addressing and call stacks pass on CPU
+models; actual interrupt/recorder wrappers pass with explicit native/OS boundaries.
+CD32 release/timing/render/native and original OCS outputs remain identical.
+This is an ISA gate, not a linked OCS enhancement or a speed result. See
+[contracts and audit limits](internals.md#p13b2-shared-68000-execution-safety).
 
 **P13B3 — Share instrumentation and validation interfaces.** Depends on B2, A4.
 Port the frame-statistics schema with a 68000-safe recorder and OCS publication
@@ -269,7 +276,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4 and P13B1 are complete. Start **P13B2** only when requested. The first backend decision
+P13A1–P13A4 and P13B1–P13B2 are complete. Start **P13B3** only when requested. The first backend decision
 is **P13C2**, not the current investigation. In particular, neither “68000 must use
 CPU C2P” nor “68020 must abandon the blitter” has been established. Keep the
 blitter implementation available through the comparison and acceptance gates.

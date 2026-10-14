@@ -2,7 +2,7 @@
 
 ## Current state
 
-**Phase 13 investigation, P13A1–P13A4 and P13B1 are complete.** The OCS loader, four-plane blitter
+**Phase 13 investigation, P13A1–P13A4 and P13B1–P13B2 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The
 [ordered OCS work items P13A1–P13E3](ocs-plan.md) cover shared CD32 mechanisms,
@@ -16,9 +16,11 @@ in asteroid credits and 5.39 during simulator flight/fire. Native publication an
 actual display counters agree; observer-off state/pixels match at eight checkpoints.
 No OCS runtime change or backend selection is included. Compile-time variant maps
 and explicit build/analysis selection now preserve all checked CD32 binaries and
-original OCS bytes. P13B2 is next only on request; CD32 E1 and phase 12 remain
+original OCS bytes. The shared 68000 ISA alternatives pass arithmetic, flags and
+wrapper checks; full OCS linking and native ABI integration remain later gates.
+P13B3 is next only on request; CD32 E1 and phase 12 remain
 paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
-[P13B1 scope and checks](internals.md#p13b1-compile-time-variant-definitions).
+[P13B2 scope and checks](internals.md#p13b2-shared-68000-execution-safety).
 
 The following completed implementation results concern **CD32**:
 
@@ -681,13 +683,13 @@ The investigation deliverable is the [ordered OCS plan](ocs-plan.md):
   projectile prediction and the 15-page intro.
 - **P13E1–P13E3:** focused A500 performance work, compatibility and later release hand-off.
 
-P13A1–P13A4 and P13B1 are complete; P13B2–P13E3 remain pending. The native converter **uses the blitter**;
+P13A1–P13A4 and P13B1–P13B2 are complete; P13B3–P13E3 remain pending. The native converter **uses the blitter**;
 keep it where measured end-to-end performance wins, including potentially 68000
 and no-Fast 68020 systems. A 68000 CPU converter and the proposed 68020+ longword
 path are alternatives to compare, not a reason to remove the blitter. CPU type
 alone does not establish the crossover. See the [static evidence and limits](internals.md#phase-13-ocs-static-investigation)
 and [reproducible commands](development.md#phase-13-ocs-static-investigation).
-Stop at the P13B1 gate; no OCS runtime changes or resumption of CD32 release work.
+Stop at the P13B2 gate; no OCS runtime changes or resumption of CD32 release work.
 
 ## Decisions pending
 

@@ -4950,7 +4950,7 @@ The current native code couples much world progress to drawn pictures. These
 windows measure that baseline; they do not prove the later 10 Hz scheduler can or
 cannot sustain its budget. They cover one first-credit asteroid sample and early
 simulator flight/fire, not every combat load, view, turn, intro repeat or hardware
-configuration. P13B1 is next only on request; CD32 E1/phase 12 remain paused.
+configuration. P13B3 is next only on request; CD32 E1/phase 12 remain paused.
 
 Accepted evidence: `tmp/p13a4-stock-on`, `tmp/p13a4-stock-off` and
 `tmp/p13a4-report.json`; instrument `tmp/p13a4-debugger-final/fs-uae`, SHA-256
@@ -4996,8 +4996,8 @@ The locators keep their different native signature/relocation/helper checks.
 
 This is incremental extraction: remaining CD32-only native call ABIs, prediction
 fields, patch-resume/displaced-instruction recipes and device publication stay
-in their existing adapters until their OCS counterparts are verified. P13B2 owns
-68000 execution safety; D1 owns the full OCS timing/side-effect map. Merely
+in their existing adapters until their OCS counterparts are verified. P13B2 below establishes
+68000 execution safety for the shared units; D1 owns the full OCS timing/side-effect map. Merely
 assembling OCS equates does not certify the shared runtime algorithms for 68000.
 
 The four CD32 outputs compare byte for byte against builds made from `495542d`
@@ -5015,6 +5015,91 @@ also fails the byte-identity gate; changed/truncated binary controls reject.
 
 Existing focused CD32 gates pass: eight installer/option cases with full code and
 register/CCR checks, 12 intro clock schedules, 96 pose/camera/restoration cases,
-and 72 whole-output native converter comparisons on 020/040. No emulator was
-run and no performance result is inferred. Stop before P13B2. See the
+and 72 whole-output native converter comparisons on 020/040. No game boot was
+run and no performance result is inferred. The subsequent B2 ISA gate is below. See the
 [reproduction commands](development.md#p13b1-compile-time-variants-and-byte-preserving-sharing).
+
+
+### P13B2: shared 68000 execution safety
+
+**P13B2 is complete.** `shared_cpu.py` selects instruction sequences at build time
+for the owned assembly units. CD32's accelerated source is returned verbatim;
+there is no runtime variant test in a hot loop. The 68000 alternative uses
+`shared_math.s` and is also executable in user mode on the tested 020/040 models.
+The builder consumes the selector for timing, publication and diagnostics.
+The OCS enhancement build still rejects: this work supplies reusable mechanisms,
+not unverified OCS native offsets or hooks.
+
+#### Arithmetic, addressing and flags
+
+| Mechanism | Base-ISA contract |
+|---|---|
+| Long multiply | Two word products give the low 32 bits of a signed/unsigned long times the bounded positive word factor (10, rate 50/60, or prediction fraction through 80). Wrap is intentional. |
+| Signed division | Divide the unsigned magnitude in two word stages, then restore the sign. Positive rate is 50/60; `INT_MIN` is supported; truncate toward zero. Division by zero or a negative rate is outside this contract. |
+| Prediction/translation | Execute the existing quotient/remainder algorithms, including sign normalization of carried remainders. No native math routine or unverified OCS math ABI is reused. |
+| Indexed operands | Preserve scratch address registers with MOVEM; ADDAs sign-extend word indices before repeated addition. Both operands of memory-to-memory moves are handled. Address computation leaves all flags unchanged. |
+| PC-relative tests | LEA plus indirect TST/CMPI avoids the newer-CPU PC-relative forms; preserve the scratch address register and the test's resulting flags. |
+| Far native calls/jumps | Construct a tail-dispatch frame with the original registers, flags and callee argument-stack layout. The native entry/ABI still belongs to its variant adapter. |
+| Branches | Use word branches after expansion. Vasm must reject out-of-range branches/PC references; the eventual linked OCS image must pass that check too. |
+| Condition-code saves | Capture C/V/Z/N with Scc and X with ROXL, build a word and restore the incoming CCR before returning. No SR read/write and no supervisor-mode assumption; all registers are preserved. |
+
+Multiply/divide helpers preserve D4/D5 and every other non-destination register;
+their CCR is scratch. Audited callers consume the result, then ADD/CMP or another
+flag-setting instruction before a conditional decision. They do not depend on
+long-MUL/DIV overflow flags. These are bounded timing/prediction helpers, not a
+general 68020 instruction emulator. Unreviewed arithmetic operands, unsupported
+expanded operations and stack-relative expanded operands reject. New source
+forms still require an ISA audit and executed contract checks.
+
+#### Execution-path audit
+
+The 13 audited units are `timing`, `timing_clock`, `timing_player`, `timing_input`,
+`timing_presentation`, `timing_scene`, `timing_intro`, `timing_translation`,
+`timing_projectiles`, `timing_scene_slots`, `view_regions`, `release_buffer` and
+`frame_stats` (all under `whdload/`). This includes the `timing_patchseg` startup
+wrapper, pause/autopilot rebasing and exceptional `timing_bad` exit path, input
+interrupt and projectile-return flag saves, publication interrupt early/future/
+late/locked/success paths, recorder disabled/full paths, allocation and flush.
+All conditional arms assemble; execution is scoped below, not claimed for every
+adapter/native callback. CD32 release-option/header code, eight-plane converters,
+cache policy and original slave code remain variant-specific. The OCS original
+startup/interrupt/exit paths retain the identical A1 reconstruction.
+
+Per-unit assembly fixtures use explicitly reported external placeholders and
+CD32 field definitions to cover the existing source, **not** invented OCS hook
+maps. The native publication boundary in the executed IRQ fixture is an RTS mock
+for CD32 `E:33a12` (file `33a3e`); it checks the shared wrapper, not OCS Copper or
+blitter completion. The recorder fixture keeps CD32's `D:7f02` field counter and
+synthetic beam reads. P13B3 still owns the OCS recorder/observer interface; C5 owns
+OCS publication, and D1–D4 own native timing/input/prediction integration. Full
+OCS linking must resolve real callbacks and check final branch reach, stack and
+memory budgets. No enhanced OCS boot, C2P choice or performance claim follows.
+
+#### Gate results
+
+`tmp/p13b2-accepted/report.json` records:
+
+- **52 base-ISA assemblies:** 13 complete units under four buffered/diagnostic/
+  verification profiles, using the actual FSTAT macro.
+- **10,400 arithmetic/scheduler samples**, plus modal/stall edge checks: full
+  signed-long boundaries, deterministic random values, PAL/NTSC rates, fractions
+  through one tick plus two fields, signed carried remainders, field wrap and
+  large-stall modulo accounting. Independent integer arithmetic/elapsed-time
+  ledgers check the 68000 implementation on 000/020/040 and the original on 020/040.
+- **7,680 operand/flag cases:** all 32 XNZVC combinations, user/supervisor modes,
+  positive/negative word indices, long indices, two memory operands, PC-relative
+  tests, long branch alternatives and far call/tail-call stack contracts. Compare
+  registers, observable memory and flags against the accelerated instructions.
+- **810 wrapper cases:** recorder stable/torn beam reads and actual publication
+  wrapper idle/future/late/locked/success exits. Native publication is mocked;
+  register/CCR and stack preservation are checked on the three models.
+- **Seven rejecting controls:** native long multiply, scaled indexing and CCR
+  reads fail the base assembler; unknown division/stack forms reject; deliberately
+  lost X and a wrong arithmetic factor fail their independent expected results.
+
+Four CD32 binaries are byte-identical to P13B1: release 43,544 bytes, timing
+33,584, renderer 12,076, original 7,728. Original OCS remains 5,324 identical bytes.
+The existing variant rejection/locator, eight installer/option, 12 intro-clock
+schedule and 96 intro pose/camera/restoration checks also pass. No FS-UAE/game
+run was required. These are functional CPU-model results, not cycle benchmarks
+or real-hardware acceptance. Stop at B2; B3 starts only on request.
