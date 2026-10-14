@@ -5827,4 +5827,127 @@ This is scoped emulator correctness evidence, not a new performance or hardware
 claim. NTSC, other accelerators/revisions, campaign input/save/modal/whole-game
 quit and every cinematic route remain E2 compatibility work. The tested forecasts
 are completion-to-publication fields; renderer extrapolation/history arrives in
-D3. C6 changed-block evaluation is the next implementation item.
+D3. C6 below adds opt-in changed-block conversion and the additional scratch-loan invalidation.
+
+### P13C6: measured changed-block conversion
+
+P13C6 is complete. Retain native blitter conversion on the measured A500/Fast
+profile. An explicit `--backend cpu --changed blocks` allocation candidate is
+available for the measured 14 MHz 68020/Fast profile. It uses the C1 Kalms leaves,
+OCS checkerboard/edge semantics and C5 ownership/publication protocol. Automatic
+backend selection and the ordinary candidate remain unchanged; unknown clocks
+still have no automatic CPU certificate. This is a scoped emulator result, not
+an accelerator-wide threshold or a hardware FPS promise.
+
+The adapter compares each 32-byte source block with the history belonging to its
+actual destination. Equal blocks issue no planar writes. Changed blocks refresh
+that history, select the checkerboard nibbles and call the existing four-plane
+word/longword leaf for 32 pixels at the original row/column. Two independent
+64,000-byte raw histories avoid treating the previously displayed image as the
+next destination's contents. Destination, source identity and height must match;
+an invalid history converts the entire visible image. Metadata commits after
+conversion. C5 completion/publication still runs even when every block is equal.
+This shares CD32's destination-history and publication semantics, without copying
+its eight-plane converter or cached-030 assumptions.
+
+#### Scratch loans are also display writers
+
+A live oracle rejected the first candidate despite passing isolated converter
+checks. The missing owner was the native scratch-loan API, which can overwrite
+an inactive display between conversions. Full conversion had hidden this use.
+
+| Code-hunk / file offset | Verified contract |
+|---|---|
+| `O:32504` / `32530` | Wait for conversion/field retirement, then return a scratch base and extent. Starting from display 0, add one region when submitted index is zero; expose two region lengths. This lends workspace plus the inactive display, not free memory. |
+| `O:3250c` / `32538` | New guarded six-byte hook, before the base/extent calculation. Drain C5 pending ownership and invalidate both histories; reproduce the two displaced moves, resume at `32512` / `3253e`. |
+| `O:1add0` / `1adfc`, `31300` / `3132c` | Native callers obtain the scratch pointer for synchronous asset processing/loading. These explain the stale display contents at credits and simulator entry. |
+| `O:33348` / `33374`, `333b4` / `333e0` | Existing C5 clear/pixel drains now invalidate both histories in the opt-in candidate before native writes. |
+| `O:334b6` / `334e2` | View close drains and invalidates, including same-address/same-size reuse and subsequent modal/view rebuilds. Geometry and source keys provide additional rejection. |
+
+Pure palette changes do not alter planar colour indices, so they do **not** need
+a source-history invalidation. Native palette/Copper updates and every completion
+remain active; no palette update or publication is skipped on source equality.
+Modal paths that clear, write, borrow or rebuild the display invalidate through
+these owners. Unvisited campaign/modal compatibility remains E2, rather than an
+assumption that arbitrary external planar writes are safe.
+
+#### Matched end-to-end measurements
+
+PAL, OCS, 512 KiB Chip plus 4 MiB Zorro-II Fast, cycle-exact stock CPU units
+256/128, native audio, unchanged cache policy and C5 publication. Each observation
+window is 250 fields (5.007972 emulated seconds); warp shortens host duration only.
+All compared artifacts reserve the same 128,000 history bytes, including the
+full/native controls. A whole-image full converter remains the baseline.
+
+The table uses a contiguous byte-identical source prefix, completed and actually
+displayed on every arm. The 020 native window discards exactly one initial
+submission to align the one-field capture boundary; the other trims are zero.
+The report permits at most that one boundary image, never searches for convenient
+interior samples. Starting milestone and palette agree; entire game memory is
+not claimed identical across different pre-window converter speeds.
+
+| CPU / backend | Matching pictures | Display pictures/s | Interval p95 ms | Conversion mean ms |
+|---|---:|---:|---:|---:|
+| 68020 / native blitter | 54 | 12.720 | 80.13 | 54.89 |
+| 68020 / full CPU/Fast | 54 | 13.638 | 88.14 | 36.98 |
+| 68020 / changed CPU/Fast | 54 | **18.764** | 80.13 | **16.98** |
+| 68000 / native blitter | 15 | **6.989** | 167.27 | **57.36** |
+| 68000 / changed CPU/Fast | 15 | 4.691 | 267.43 | 135.47 |
+
+Changed blocks improve this 020 workload by 37.6% against full CPU conversion
+and 47.5% against the blitter. On 68000 they lose 32.9% in displayed throughput,
+so the extra history allocation and comparison are not justified for the required
+A500 path. C2's full CPU/Fast word converter was already slower than the blitter;
+C6 does not repeat that rejected whole-image arm on 68000.
+
+The read-only instruction instrument separately charges owned adapters and Kalms
+leaves. On the 020 matched images, the full adapter/staging costs 15.01 ms and its
+leaf costs 20.86 ms per image. The changed adapter costs **13.30 ms**, including
+comparison, changed-history writes, staging, loop control and call overhead; its
+leaves cost 3.09 ms. On 68000 the changed adapter alone costs **89.67 ms**, plus
+34.65 ms in the leaves. These are exclusive instruction charges; IRQ/native wait
+and other time remain in the inclusive conversion column. They are not labelled
+as pure comparison time or inferred from Unicorn instruction counts.
+
+Flight/fire pixels and ownership pass on every arm. Its preceding timed intro
+advances different world histories, so the report deliberately makes **no matched
+flight speed claim**. Per-run conversion means are 65.42 ms full CPU and 30.14 ms
+changed CPU on 020, and 217.99 ms changed CPU on 68000; these describe different
+submitted workloads and cannot establish a speedup. Later E1 work can measure a
+matched combat workload if it is needed for a broader recommendation.
+
+#### Memory and validation
+
+Histories live in the owned slave hunk, not Chip RAM or an unregistered native
+allocation. The complete code-plus-history extent must be in the audited Fast
+bank before CPU selection succeeds. WHDLoad owns its lifetime and load failure;
+there is no partially allocated history to unwind. The diagnostic controls are
+137,448 bytes each: 128,000 bytes of history plus 552 bytes more code/state than
+the C5 diagnostic candidate. Full/native comparison controls retain the same
+reservation; normal `--changed off` builds pay neither cost. The existing combined
+Chip workspace remains intact. All accepted runs boot and tear down with the
+required 512 KiB Chip plus 4 MiB Fast; this does not establish a smaller minimum.
+
+The component gate executes **180 cases** on 68000/020, covering both destination
+histories, independent nibble changes, edge pixels, height changes, direct-writer
+invalidation and guarded planar extents. Three implementation mutations fail.
+Two additional cases execute the actual native scratch-loan API with the generated
+wrapper and an explicit publication-drain stub. **204 startup cases** check guards,
+revision selection, relocation and cache flushing; the non-diagnostic opt-in build
+passes another 180 startup cases. The live independent source
+oracle and display-DMA checks reject the uncorrected scratch-loan candidate and
+pass the corrected one. Four 20-field native view windows also pass, with five completed image checks
+each and the requested view retained at every endpoint. Their short duration
+avoids the simulator death transition. The new cost reader rejects missing/inflated charges and
+corrupted source hashes. Observer-off control is exact at nine checkpoints for
+all game hunks, Chip RAM, owned code/history/state and both field windows.
+
+Accepted evidence is retained in `tmp/p13c6-020-accepted.json`,
+`tmp/p13c6-000-accepted.json`, `tmp/p13c6-neutrality-final`, `tmp/p13c6-unit-final` and
+`tmp/p13c6-install-v3`, with view evidence in `tmp/p13c6-views-final`. The local read-only cost observer SHA-256 is
+`4f9360db439c971d888b43a21f6aaa34e191eebcff1dde88fb6afbd9aa9b1f31`.
+The opt-in diagnostic slave SHA-256 is
+`37f8ed6eca1d952f6c1c0d10f310ae32e6b3508f7683329c1ce240aa1d146435`.
+The default C5 candidate remains byte-identical (`172d3297…`); original OCS and
+CD32 controls remain separate. No release archive or shared emulator is changed.
+P13D1 is the next implementation item.

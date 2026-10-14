@@ -22,6 +22,11 @@ def report(root, build):
     require(hashlib.sha256((build/'WingCommander.Slave').read_bytes()).hexdigest()==b['sha256'],'changed candidate artifact')
     require(m['slave_sha256']==b['sha256'],'wrong candidate run')
     require(set(('origin','title','credits','menu','simulator','name'))<=set(m['checkpoints']),'missing transition')
+    history=b.get('history_bytes',0)
+    if history:
+        require(history==128000,'unknown history extent')
+        first=m['slave']+sy['ocs_changed_history']
+        require(0x200000<=first and first+history<=m['slave']+b['bytes']-36<=0xa00000,'history outside owned Fast hunk')
     samples=[];teardown=None;expected_backend=0 if b['backend']!='cpu' else 1 if m['effective']['cpu_model']=='68000' else 2
     for label in m['checkpoints']:
         chip=(root/(label+'-chip.bin')).read_bytes();fast=(root/(label+'-fast.bin')).read_bytes()
@@ -158,7 +163,7 @@ def report(root, build):
         pixels+=len(groups['X'])
     return dict(passed=True,backend=expected_backend,pixel_checks=pixels,samples=samples,teardown=teardown,
                 slave_bytes=b['bytes'],added_slave_bytes=b['bytes']-5324,
-                new_history_bytes=0,new_prediction_bytes=0,
+                new_history_bytes=history,new_prediction_bytes=0,
                 memory_scope='sampled native registry and total OS pools; not boot-wide peaks')
 
 

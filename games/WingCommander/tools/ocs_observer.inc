@@ -2,6 +2,11 @@
 // No guest writes, custom register reads, cycle charges or interior debugger stops.
 static FILE* ocs_log = nullptr;
 static FILE* ocs_sources = nullptr;
+// Optional C6 disjoint owned-code ranges: full adapter, changed adapter, leaves.
+// Parsed once; host-only instruction charges, with no guest instrumentation.
+static unsigned ocs_cost_ranges[6];
+static uae_u64 ocs_cost[3];
+static bool ocs_cost_started=false;
 static unsigned ocs_h0, ocs_h1, ocs_mode, ocs_field;
 static bool ocs_active = false;
 static unsigned ocs_buffers[2], ocs_plane;
@@ -36,6 +41,18 @@ void wc_ocs_begin(unsigned h0,unsigned h1,unsigned mode,const char* path) {
         ocs_sources=fopen(sources.c_str(),"wx"); if(!ocs_sources) abort(); }
     ocs_h0=h0; ocs_h1=h1; ocs_mode=mode; ocs_field=0;
     ocs_begin_cycles=get_cycles(); ocs_active=mode!=0;
+    for(auto& v:ocs_cost_ranges) v=0;
+    const char* ranges=getenv("WC_OCS_COST_RANGES");
+    if(ranges && sscanf(ranges,"%x,%x,%x,%x,%x,%x",&ocs_cost_ranges[0],&ocs_cost_ranges[1],
+        &ocs_cost_ranges[2],&ocs_cost_ranges[3],&ocs_cost_ranges[4],&ocs_cost_ranges[5])!=6) abort();
+    if(ranges) for(unsigned n=0;n<3;++n) {
+        if(ocs_cost_ranges[2*n]<0x200000 || ocs_cost_ranges[2*n]>=ocs_cost_ranges[2*n+1] ||
+           ocs_cost_ranges[2*n+1]>0xa00000) abort();
+        for(unsigned j=0;j<n;++j) if(ocs_cost_ranges[2*n]<ocs_cost_ranges[2*j+1] &&
+            ocs_cost_ranges[2*j]<ocs_cost_ranges[2*n+1]) abort();
+    }
+    for(auto& v:ocs_cost) v=0;
+    ocs_cost_started=false;
     ocs_previous.clear(); ocs_expected.clear(); ocs_scopes.clear(); ocs_seen=-1;
     for(unsigned n=0;n<2;++n) { ocs_reference[n].clear(); ocs_valid[n].clear(); }
     ocs_fetch_good=ocs_fetch_bad=ocs_fetch_unknown=0;
@@ -142,7 +159,14 @@ static void wc_ocs_pc(unsigned pc) {
         fprintf(ocs_log,"X %llu %u %u\n",(unsigned long long)get_cycles(),bad,4*row*(ocs_height-1));
         ocs_expected.clear();
     }
+    if(off==0x32e06 && ocs_cost_started) {
+        fprintf(ocs_log,"K %llu %llu %llu %llu\n",(unsigned long long)get_cycles(),
+            (unsigned long long)ocs_cost[0],(unsigned long long)ocs_cost[1],(unsigned long long)ocs_cost[2]);
+        ocs_cost_started=false;
+    }
     if (off==0x32626) {
+        for(auto& v:ocs_cost) v=0;
+        ocs_cost_started=true;
         unsigned w=get_word_debug(ocs_h0+0x324ac),h=get_word_debug(ocs_h0+0x324ae);
         unsigned source=get_long_debug(ocs_h0+0x324b0),size=w*h,changed=0,blocks=0;
         if (w!=320 || (h!=128 && h!=200) || !((source+size<=0x80000) || (source>=0x200000 && source+size<=0x600000))) abort();
@@ -166,10 +190,11 @@ static void wc_ocs_pc(unsigned pc) {
 }
 // Scope duration is inclusive; these instruction charges isolate actual CPU polls.
 struct ocs_instruction {
-    uae_u64 start=0; unsigned kind=0; bool jump=false; unsigned jump_line=0;
+    uae_u64 start=0; unsigned kind=0; int cost_kind=-1; bool jump=false; unsigned jump_line=0;
     explicit ocs_instruction(unsigned pc) {
         if (!ocs_active) return;
         start=get_cycles();
+        for(unsigned n=0;n<3;++n) if(pc>=ocs_cost_ranges[2*n] && pc<ocs_cost_ranges[2*n+1]) cost_kind=n;
         jump=get_word_debug(pc)==0x33c0 && get_long_debug(pc+2)==0xdff08a;
         jump_line=vpos;
         unsigned off=pc-ocs_h0;
@@ -182,6 +207,7 @@ struct ocs_instruction {
     ~ocs_instruction() {
         if (start && ocs_active) {
             ocs_cpu[kind]+=get_cycles()-start;
+            if(cost_kind>=0) ocs_cost[cost_kind]+=get_cycles()-start;
             if(jump) fprintf(ocs_log,"J %llu %u %u %u\n",(unsigned long long)get_cycles(),
                 jump_line,vpos,get_long_debug(ocs_h1+0x77fe));
         }

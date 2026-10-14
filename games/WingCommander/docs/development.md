@@ -3815,3 +3815,80 @@ The CPU unit gate substitutes beam reads and graphics metadata, while executing
 the native VBL and completion instructions; live gates supply actual beam/DMA
 evidence. Neither warp/debugger timing nor these correctness windows is an FPS
 performance comparison. See the [accepted scope](internals.md#p13c5-completed-image-publication-and-display-ownership).
+
+## P13C6: changed-block evaluation
+
+The ordinary allocation candidate remains byte-identical to C5. Select
+`--backend cpu --changed blocks` explicitly for the measured 020/Fast candidate;
+`--changed full` creates an equal-size history-reservation control that still
+converts every pixel. The A500 recommendation remains native, without histories.
+This is not a WHDLoad tooltype or a release-package change.
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --backend cpu --changed blocks --exit-probe --output tmp/c6-blocks
+python3 tools/ocs_memory_build.py --backend cpu --changed full --exit-probe --output tmp/c6-full
+python3 tools/ocs_memory_build.py --backend native --changed full --exit-probe --output tmp/c6-native
+python3 tools/ocs_changed_check.py --build tmp/c6-blocks --output tmp/c6-unit
+python3 tools/ocs_memory_install_check.py tmp/c6-blocks --output tmp/c6-install
+python3 tools/ocs_publication_debugger.py --output tmp/c6-debugger
+export FSUAE="$PWD/tmp/c6-debugger/fs-uae" WARP=1
+SLAVE="$PWD/tmp/c6-blocks/WingCommander.Slave" \
+  python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --calibrate --output tmp/c6-layout
+```
+
+The C5 pinned local debugger input is reused; the builder adds the C6 host-only
+instruction counters. `ocs_changed_run.py` supplies three disjoint owned-code
+ranges from the build symbols and discovered slave base through
+`WC_OCS_COST_RANGES`. `K` events at conversion completion report exclusive cycles
+in the full adapter, changed adapter and Kalms leaves. No guest timer, code patch,
+interior breakpoint or custom-register read is introduced by this instrument.
+The changed-adapter charge includes comparison/history **and** staging/control;
+it is not a pure comparison measurement. All output stays in a fresh `tmp/` tree.
+
+Run controls sequentially; each traverses the same native milestones and records
+one 250-field asteroid window plus one 250-field flight/fire window:
+
+```bash
+for arm in native full blocks; do
+    python3 tools/ocs_changed_run.py --cpu 68020 --build "tmp/c6-$arm" \
+        --layout tmp/c6-layout/layout.json --output "tmp/c6-020-$arm"
+done
+for arm in native blocks; do
+    python3 tools/ocs_changed_run.py --cpu 68000 --build "tmp/c6-$arm" \
+        --layout tmp/c6-layout/layout.json --output "tmp/c6-000-$arm"
+done
+python3 tools/ocs_changed_run.py --off --build tmp/c6-blocks \
+    --layout tmp/c6-layout/layout.json --output tmp/c6-off
+python3 tools/ocs_changed_run.py --views --build tmp/c6-blocks \
+    --layout tmp/c6-layout/layout.json --output tmp/c6-views
+```
+
+The last run uses four 20-field diagnostic native-view requests. Ten fields do
+not reliably capture a complete refreshed image; 40 can pass simulator death
+before the final request on this faster path. These are renderer/view checks,
+not interactive campaign-control acceptance.
+
+```sh
+python3 tools/ocs_changed_report.py \
+    --run tmp/c6-020-native tmp/c6-native --run tmp/c6-020-full tmp/c6-full \
+    --run tmp/c6-020-blocks tmp/c6-blocks --output tmp/c6-020.json
+python3 tools/ocs_changed_report.py \
+    --run tmp/c6-000-native tmp/c6-native --run tmp/c6-000-blocks tmp/c6-blocks \
+    --output tmp/c6-000.json
+python3 tools/ocs_publication_report.py tmp/c6-020-blocks --build tmp/c6-blocks \
+    --observer-off tmp/c6-off --output tmp/c6-neutrality
+python3 tools/ocs_publication_report.py tmp/c6-views --build tmp/c6-blocks \
+    --output tmp/c6-view-report
+python3 tools/ocs_memory_build.py --backend auto --output tmp/c6-default-control
+python3 tools/reconstruct.py --variant ocs --output tmp/c6-original-control
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/c6-cd32-control
+```
+
+The C6 report checks source-stream hashes, clock calibration, actual publication,
+independent DMA pixels, history allocation and exact instruction ranges. It allows
+at most one initial image of capture-boundary alignment, then measures the entire
+common contiguous asteroid prefix. It does not select convenient interior frames.
+Flight costs are explicitly descriptive: different intro-window progression
+prevents a matched flight-speed claim. Missing/inflated cost records and changed
+source hashes must fail. See [results and limits](internals.md#p13c6-measured-changed-block-conversion).

@@ -28,7 +28,7 @@ def main():
     p.add_argument('--simulator', action='store_true', help='continue from the menu to the first name prompt')
     p.add_argument('--baseline', choices=('on', 'off'), help='P13A4 two short field-bounded native windows')
     p.add_argument('--teardown-build', help='build.json directory of a diagnostic --exit-probe candidate')
-    p.add_argument('--view-fields', type=int, choices=(40,100), default=40)
+    p.add_argument('--view-fields', type=int, choices=(20,40,100), default=40)
     p.add_argument('--views', action='store_true', help='C5 diagnostic native view transitions (simulator disables view keys)')
     p.add_argument('--ownership', action='store_true', help='C4 candidate transition gate')
     p.add_argument('--cpu', choices=('68000','68020'), default='68000')

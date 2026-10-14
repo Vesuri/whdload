@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the C4/C5 OCS allocation/publication candidate; generated slave in tmp/."""
+"""Build the C4–C6 OCS allocation/publication candidate; generated slave in tmp/."""
 import argparse
 import hashlib
 import json
@@ -23,7 +23,7 @@ NATIVE={'OCS_CHIP_ALLOC':0x33b60,'OCS_REGISTER':0x33c8e,
         'OCS_CLEAR_BODY':0x33350,'OCS_PIXEL_BODY':0x333ba,
         'OCS_CLOSE_BODY':0x334bc,'OCS_VBL_CALLBACK':0x340b4,
         'OCS_VBL_RETURN':0x342c8,'OCS_VIEW_CHANGE':0x6e38,
-        'OCS_INPUT_PREPARE':0x182ce,'OCS_INPUT_BODY':0x18d1c}
+        'OCS_SCRATCH_BODY':0x32512,'OCS_INPUT_PREPARE':0x182ce,'OCS_INPUT_BODY':0x18d1c}
 HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x324c0,'display_create_checked',0x4ef9),
        (0x31e1e,'ocs_source_allocate',0x4eb9),
@@ -37,8 +37,9 @@ HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x334b6,'ocs_publish_close',0x4ef9))
 
 
-def build(out,option,exit_probe=False):
+def build(out,option,exit_probe=False,changed="off"):
     hooks=HOOKS+(((0x16992,'exit_probe_entry',0x4eb9),(0x18d14,'view_probe_entry',0x4ef9)) if exit_probe else ())
+    if changed != 'off': hooks+=((0x3250c,'ocs_changed_borrow',0x4ef9),)
     original=(ROOT/ocs.SLAVE).read_bytes()
     require(hashlib.sha256(original).hexdigest()==SLAVE_SHA,'changed original slave')
     game=(ROOT/ocs.GAME).read_bytes();guard_game(game)
@@ -223,6 +224,27 @@ contract_message: dc.b "OCS CPU conversion contract failed",0
  even
 game_base: dc.l 0
 '''+(ROOT/'whdload/ocs_memory.s').read_text()+'\n'+(ROOT/'whdload/ocs_publication.s').read_text()+'\n'+backend_source()+'\n'+converter_source(candidates())
+    if changed != 'off':
+        text=text.replace(' lea payload_end(pc),a0',
+                          ' lea payload_end(pc),a0\n adda.l #128000,a0')
+        # Equal-sized full/blocks controls include identical history reservation.
+        # Invalidation is task-side, after the C5 drain, before native writers.
+        text=text.replace('        bsr.w   ocs_publish_drain\n',
+                          '        bsr.w   ocs_publish_drain\n        bsr.w ocs_changed_invalidate\n')
+        if changed == 'blocks':
+            text=text.replace(' bsr.w ocs_c2p_word', ' bsr.w ocs_changed_word')
+            text=text.replace(' bsr.w ocs_c2p_long', ' bsr.w ocs_changed_long')
+        text+='\n'+(ROOT/'whdload/ocs_changed.s').read_text()+'''
+; Native O:32504 lends inactive display storage to general scratch consumers.
+; Its six displaced bytes follow the original final-conversion/field wait.
+ocs_changed_borrow:
+ bsr.w ocs_publish_drain
+ bsr.w ocs_changed_invalidate
+ move.l 8(a0),d0
+ move.l (a0),d1
+ jmp OCS_SCRATCH_BODY
+'''
+
     if exit_probe:
         text+='''
 exit_probe_entry:
@@ -264,13 +286,14 @@ view_probe_request: dc.l 0
     guards+=' dc.l -1\n'
     tables=guards+'\nhooks:\n'+''.join(f' dc.l ${off:x}\n dc.w ${op:x}\n dc.l {label}-slave\n' for off,label,op in hooks)+' dc.l -1\nnative_fixups:\n'
     # First pass obtains positions; later tables cannot shift preceding code.
-    probe,sy=assemble(out,'probe',text+tables+' dc.l -1\npayload_end:\n')
+    history='ocs_changed_history: ds.b 128000\n' if changed != 'off' else ''
+    probe,sy=assemble(out,'probe',text+tables+' dc.l -1\npayload_end:\n'+history)
     fixes=[]
     for pos in range(TAIL,len(probe)-3,2):
         value=int.from_bytes(probe[pos:pos+4],'big')
         if 0xf0000000<=value<0xf0040000:fixes.append(pos)
     require(len(fixes)>=len(NATIVE)-5,'missing native fixups')
-    payload,sy=assemble(out,'candidate',text+tables+''.join(f' dc.l ${x:x}\n' for x in fixes)+' dc.l -1\npayload_end:\n')
+    payload,sy=assemble(out,'candidate',text+tables+''.join(f' dc.l ${x:x}\n' for x in fixes)+' dc.l -1\npayload_end:\n'+history)
     payload=bytearray(payload)
     require(payload[:TAIL]==original[32:-4],'original payload changed before patch')
     require(sy['install']-0x11c8<32768,'install trampoline out of range')
@@ -279,7 +302,7 @@ view_probe_request: dc.l 0
     blob=struct.pack('>8I',0x3f3,0,1,0,0,len(payload)//4,0x3e9,len(payload)//4)+payload+struct.pack('>I',0x3f2)
     (out/'WingCommander.Slave').write_bytes(blob)
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
-                sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,
+                sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
                 workspace='native combined Chip allocation retained for fallback',
                 live_validated=False)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
@@ -290,7 +313,8 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',required=True)
     p.add_argument('--backend',choices=tuple(OPTIONS),default='auto')
     p.add_argument('--exit-probe',action='store_true',help='diagnostic-only native teardown and view-change triggers')
+    p.add_argument('--changed',choices=('off','full','blocks'),default='off',help='C6 opt-in history candidate or equal-reservation full control')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
-    r=build(out,a.backend,a.exit_probe);print(r['bytes'],r['sha256'])
+    r=build(out,a.backend,a.exit_probe,a.changed);print(r['bytes'],r['sha256'])
 
 if __name__=='__main__':main()

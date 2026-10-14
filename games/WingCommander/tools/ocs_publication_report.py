@@ -115,7 +115,7 @@ def neutrality(on,off,build):
         offset=a['slave']-0x200000
         require(snapshots[0][offset:offset+size]==snapshots[1][offset:offset+size],
                 'observer changed owned publication state: '+label)
-    for scene in ('asteroids','fire','view2','view1','view3','view0'):
+    for scene in ('asteroids','fire')+tuple(f'view{x}' for x in (2,1,3,0) if f'view{x}' in a['checkpoints']):
         edges=[[r for r in parse(p/f'{scene}-events.txt') if r[0] in ('B','F')] for p in (on,off)]
         require(edges[0]==edges[1],'observer changed emulated field timing')
     return dict(passed=True,checkpoints=len(a['checkpoints']),exact_game_chip_and_owned_state=True)

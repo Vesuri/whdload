@@ -1,7 +1,7 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current status: P13A1–P13A4, P13B1–P13B3 and P13C1–P13C5 are complete.
+Current status: P13A1–P13A4, P13B1–P13B3 and P13C1–P13C6 are complete.
 Normal OCS and CD32 slaves remain byte-identical. C2 recommends
 native blitter on the measured 68000 and no-Fast 68020 profiles; CPU/Fast longword
 conversion wins the measured 14 MHz 68020/Fast profile. These are scoped emulator
@@ -9,7 +9,9 @@ results, not a universal threshold.
 C4 provides a separate OCS candidate with creation-time source allocation,
 native registry cleanup, safe fallback and checked display teardown. C5 queues
 completed images for OCS blanking-time publication and drains ownership before
-conversion, direct planar writes and View teardown. The shared
+conversion, direct planar writes and View teardown. C6 adds opt-in changed-block
+CPU conversion with separate destination histories and scratch-loan invalidation; it wins the measured 020/Fast intro but loses to
+the A500 blitter. The default candidate remains unchanged. The shared
 Chip workspace stays in its combined allocation to support native fallback.
 Exec MEMF_FAST also labels slow expansion RAM; identify the physical bank.
 The OCS guest recorder remains CPU-tested, not live-hooked; correctness runs use

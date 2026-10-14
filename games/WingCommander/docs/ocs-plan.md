@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C5 are complete**;
+The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C6 are complete**;
 the remaining work items below are pending, in dependency order.
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -241,13 +241,20 @@ Native observer-off state/pixels match at 13 checkpoints. Diagnostic view change
 use the native routine because the simulator suppresses view keys. See
 [evidence and limits](internals.md#p13c5-completed-image-publication-and-display-ownership).
 
-**P13C6 — Evaluate changed-block conversion only where it helps.** Depends on C5.
+**P13C6 — Evaluate changed-block conversion only where it helps (complete).** Depends on C5.
 Measure comparison/history cost against full CPU conversion and retained blitter
 conversion. Include both destination histories and invalidations for direct
 planar writes, palettes, clears, resizing and modal transitions. Keep a full or
 native path when comparison is slower or costs too much memory on 68000.
 Gate: identical pixels and an end-to-end improvement on the selected profile.
 Otherwise close this item with the simpler backend and documented measurements.
+Gate passed on the scoped 020/Fast intro: 54 matching images rise from 13.64
+to 18.76 displayed pictures/s versus full CPU conversion. Native blitter remains
+faster on A500; no history cost is added to its default path. The opt-in candidate
+uses two 64,000-byte Fast histories and invalidates native scratch loans, direct
+writers and View teardown. Pixels, all four diagnostic views and observer-off
+state pass. Flight correctness passes, but unequal pre-window world progression
+precludes a matched flight-speed claim. See [measurements and limits](internals.md#p13c6-measured-changed-block-conversion).
 
 ## D — Share the gameplay and intro timing model
 
@@ -320,7 +327,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3 and P13C1–P13C5 are complete. **P13C6** is next.
+P13A1–P13A4, P13B1–P13B3 and P13C1–P13C6 are complete. **P13D1** is next.
 Use the scoped measured profiles and retain native fallback/override
 for unknown accelerators. C4 creates source ownership before native compositor aliases; C5 now protects
 pending/displayed ownership through publication and transitions. Broader
