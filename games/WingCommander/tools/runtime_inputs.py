@@ -39,6 +39,10 @@ def prepare(out, variant="cd32"):
         target = game/(game.name+'.Slave')
         target.rename(game/(game.name+'.original'))
         shutil.copyfile(os.environ['SLAVE'], target)
+        if variant == 'ocs' and b'C5:B:Enhanced framerate (68020+Fast RAM);' in target.read_bytes():
+            from ocs_icon import enhanced_icon
+            icon = game/'WingCommander.info'
+            icon.write_bytes(enhanced_icon(icon.read_bytes()))
     print('fresh boot drives:', out.relative_to(ROOT))
 
 if __name__ == '__main__':

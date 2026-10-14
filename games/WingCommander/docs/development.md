@@ -4364,3 +4364,71 @@ appropriate measured setup explicitly rather than assuming CPU type proves the
 crossover. The launcher creates a disposable runtime copy; it does not package
 or replace the reference installation. Preserve the accepted E1/E2 captures
 referenced by reports while they remain the evidence for this hand-off.
+
+### OCS public Enhanced framerate toggle
+
+The user-facing build is now distinct from the preserved ungated diagnostic
+builds used by P13C–E. `--public` implies all E1 enhancements, defaults to the CPU
+backend, leaves changed-block histories off, and emits an OCS launch icon with
+`CUSTOM5=1` plus an OCS ReadMe. An absent or zero option means original behaviour;
+the icon, not an implicit slave default, requests enhancements. CPU and true-Fast
+checks always apply. Existing original/CD32 input trees are not modified.
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/ocs-public-final2
+python3 tools/ocs_options_check.py tmp/ocs-public-final2 --output tmp/ocs-public-options-accepted
+python3 tools/ocs_prediction_check.py tmp/ocs-public-final2 --output tmp/ocs-public-prediction-final2
+```
+
+Use new output names on repeats. The public slave is 40,808 bytes, SHA-256
+`4e7149536d54b55b692b6a659b967f20680615cc2e3e20d7daf419595288b6f4`.
+The startup checker executes option values 0/1/2/-1, CPU flags through 060,
+English/other patch lists, valid/corrupt hooks, Zorro II/high Fast, Chip, slow,
+empty and invalid memory lists. It checks skipped relocation/hook/flush work,
+register preservation, original slave bytes and icon artwork/tooltypes. Mutating
+the option, CPU mask or slow-memory exclusion must fail. Exec list fixtures and
+WHDLoad calls are bounded native tests, not a hardware or speed measurement.
+
+A short eligible-machine live gate uses the existing local debugger:
+
+```sh
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+export SLAVE="$PWD/tmp/ocs-public-final2/WingCommander.Slave"
+WARP=1 python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --enhanced 1 \
+  --calibrate --output tmp/ocs-public-layout2
+WARP=1 python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --enhanced 1 \
+  --clock-build tmp/ocs-public-final2 --baseline on --simulator --compat \
+  --layout tmp/ocs-public-layout2/layout.json --output tmp/ocs-public-live2
+python3 tools/ocs_compatibility_report.py tmp/ocs-public-live2 \
+  --build tmp/ocs-public-final2 --output tmp/ocs-public-compat2
+python3 tools/ocs_publication_report.py tmp/ocs-public-live2 \
+  --build tmp/ocs-public-final2 --output tmp/ocs-public-pixels2
+```
+
+For original-mode smoke checks, use `--enhanced 0` on 68020 or `--enhanced 1`
+on 68000. Calibrate each configuration independently, then boot with its layout
+and `--ownership --compat`, omitting `--clock-build --baseline --simulator`.
+A clock fixture requires installed enhancements and is deliberately rejected for
+a public build with an off option or 68000. These original-mode runs stop at the
+menu, sufficient to inspect unchanged hook sites and native intro rendering.
+
+Interactive launches use `WHD_ARGS='CUSTOM5=1'` explicitly with `WC_VARIANT=ocs`
+and the selected public `SLAVE`; clearing that argument selects original mode.
+The runtime preparer only enables the icon in a fresh OCS tree when a public
+slave is selected. CD32 and original OCS icon contents remain unchanged. Merely
+copying the slave over an old installation does not silently change its tooltypes.
+
+Check original-mode live evidence without new captures:
+
+```sh
+python3 tools/ocs_options_live_check.py tmp/ocs-public-final2 tmp/ocs-public-off-live \
+  --output tmp/ocs-public-off-check.json
+python3 tools/ocs_options_live_check.py tmp/ocs-public-final2 tmp/ocs-public-000-live \
+  --output tmp/ocs-public-000-check.json
+```
+
+The checker relocates the pinned original game to each capture's hunk bases,
+compares all enhancement hook/NOP/modal windows and requires inactive state.
+A changed-hook negative control must be rejected. It does not claim complete
+screen or game-state equality across machines with different rendering speeds.

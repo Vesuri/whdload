@@ -23,6 +23,7 @@ def main():
     global LENGTH
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
+    p.add_argument('--enhanced',type=int,choices=(0,1),help='public OCS CUSTOM5 request; omitted keeps original option defaults')
     p.add_argument('--layout', help='calibrated layout.json from the same slave build')
     p.add_argument('--calibrate', action='store_true')
     p.add_argument('--simulator', action='store_true', help='continue from the menu to the first name prompt')
@@ -82,10 +83,14 @@ def main():
     env = dict(os.environ, FSUAE_RUN=run, WARP=os.environ.get('WARP','0') if a.calibrate or a.ownership else '0', WINDOW='front',
                JOY0='none', JOY1='none', NTSC='1' if a.ntsc else '0',
                DETERMINISTIC=os.environ.get('DETERMINISTIC', '1') if a.calibrate else '1',
-               AMIGA_SETUP='a1200-fast' if a.aga else 'a500', OCS_COMPAT_AGA='1' if a.aga else '0', WC_VARIANT='ocs', WHD_ARGS='', OCS_STOCK_CLOCK='1' if a.baseline or a.ownership else '0')
+               AMIGA_SETUP='a1200-fast' if a.aga else 'a500', OCS_COMPAT_AGA='1' if a.aga else '0', WC_VARIANT='ocs', WHD_ARGS='' if a.enhanced is None else f'CUSTOM5={a.enhanced}', OCS_STOCK_CLOCK='1' if a.baseline or a.ownership else '0')
     if a.ownership:
         env['EXTRA_ARGS']=f'--uae_cpu_model={a.cpu} --fast_memory={a.fast_kib}'
         if a.aga:env['EXTRA_ARGS']+=' --chip_memory=2048'
+    if a.clock_build:
+        selected=json.loads((ROOT/a.clock_build/'build.json').read_text())
+        if selected.get('public_option') and (a.enhanced != 1 or a.cpu == '68000'):
+            raise ValueError('public clock gate requires --enhanced 1 and --cpu 68020')
     if a.clock_build and a.layout:
         candidate=json.loads((ROOT/a.clock_build/'build.json').read_text())
         if candidate.get('prediction'):

@@ -12,7 +12,10 @@ functional model gate. E3 records the candidate support and later release hand-o
 in docs/ocs-release.md. A500 coasting sustains
 10 Hz; asteroid credits and sustained fire remain overloaded, with low display
 throughput.
-Normal OCS and CD32 slaves remain byte-identical. C2 recommends
+The OCS public candidate now gates all enhancements with CUSTOM5=1 and verified
+68020+/true Fast memory; its generated icon enables the toggle. Off/ineligible
+keeps original behaviour. Legacy diagnostic candidates remain reproducible.
+Normal OCS reconstruction and CD32 slaves remain byte-identical. C2 recommends
 native blitter on the measured 68000 and no-Fast 68020 profiles; CPU/Fast longword
 conversion wins the measured 14 MHz 68020/Fast profile. These are scoped emulator
 results, not a universal threshold.

@@ -2,6 +2,12 @@
 
 ## Current state
 
+The OCS public-option candidate adds **Enhanced framerate (68020+Fast RAM)**,
+enabled by `CUSTOM5=1` in its generated icon. Unchecked/absent or ineligible
+hardware keeps original simulation/rendering/waits in the same slave. Earlier
+A500 enhancement results below describe diagnostic experiments, not the public
+mode policy. See [current candidate support](ocs-release.md).
+
 **Phase 13 investigation, P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E3 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The

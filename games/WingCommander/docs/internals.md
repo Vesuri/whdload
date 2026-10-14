@@ -6746,3 +6746,71 @@ is reused by exact identity; no new live runs or performance claims were needed.
 The proposed OCS archive and release checklist keep assets/installers separate
 from CD32 while permitting shared packaging machinery. P13E3 is complete;
 packaging/publication and the paused CD32 phase-12 stash remain separate work.
+
+### OCS public Enhanced framerate toggle
+
+The public build (`tools/ocs_memory_build.py --public`) adds the WHDLoad checkbox
+**Enhanced framerate (68020+Fast RAM)**. The generated icon sets `CUSTOM5=1`;
+absent/zero and other values keep original behaviour. The native installer first
+executes Psygore's PatchSeg, then admits enhancements only for English `00e8`,
+the enabled option, CPU flags identifying 68020+ and an Exec memory header with
+FAST set, CHIP clear and a nonempty physical Zorro II Fast or high-Fast bank.
+68000/68010, slow-only and unverified memory configurations never install the
+clock, prediction, input, converter, publication or arithmetic hooks.
+
+Public slave hunk offsets: the existing `OS:$11c6` detour (file `$11e6`) calls
+startup at `$14a8` (file `$14c8`); the new gate is `$16b0` (file `$16d0`).
+Header `OS:$32` (file `$52`) selects the extended config at `$1724` (file `$1744`).
+All other original slave bytes are unchanged, including its cache requests and
+native wait helpers. The off path returns after original PatchSeg, without
+enhancement guards, native-operand relocation, allocation changes or hook writes.
+Thus a changed enhancement-only source window does not make original mode abort.
+Original game revision/CRC handling is still Psygore's responsibility.
+
+Exec's memory headers, rather than `TypeOfMem(slave)`, are essential here:
+KickEmu deliberately excludes the slave reservation from its managed pool.
+The first bounded trial correctly stayed original because that address was not
+registered. The corrected gate walks `ExecBase.MemList`, rejects the sentinel,
+checks `mh_Attributes`, `mh_Lower` and `mh_Upper`, and excludes trapdoor slow RAM
+regardless of MEMF_FAST. Bank addresses are hardware ranges, not game offsets.
+This is presence/eligibility, not a clock measurement or a converter crossover
+certificate. Existing source-allocation bank checks remain stricter; unsupported
+CPU-source placement falls back to the native blitter while retaining the selected
+10 Hz mode. No new high-memory conversion performance claim is made.
+
+Final candidate `tmp/ocs-public-final2/` has a 40,808-byte slave with SHA-256
+`4e7149536d54b55b692b6a659b967f20680615cc2e3e20d7daf419595288b6f4`.
+It includes E1 timing/prediction/arithmetic, defaults to the CPU backend and
+leaves C6 histories off. Ungated diagnostic builds remain available for
+reproducing historical A500 experiments; the rebuilt E1 CPU control still has
+SHA-256 `ad33a2a1452e22b6a98df5701cdfff3092cdf28a468cbd3e747f7681d3dee247`.
+CD32 code and public options are unchanged.
+
+Validation:
+
+- `tmp/ocs-public-options-accepted/report.json`: 1,680 native startup cases for
+  option values, CPU flags, revision lists, corrupted hooks and valid/invalid,
+  empty, Chip, slow, Zorro II and high-Fast memory lists. Off paths retain the
+  original game bytes and unrelocated payload, and preserve the caller ABI.
+  Option, CPU-mask and slow-bank mutations are rejected. Original slave bytes
+  outside the two declared edits and generated icon artwork are checked.
+- `tmp/ocs-public-prediction-final2/report.json`: native pose, constructor,
+  field-input and authoritative restoration checks pass on the final payload.
+- `tmp/ocs-public-live2/`, `tmp/ocs-public-compat2/` and
+  `tmp/ocs-public-pixels2/`: actual 020/Fast CUSTOM5=1 boot through intro,
+  simulator and name entry. All 72 asteroid and 29 flight completed-image
+  checks pass, with matching forecasts and safe publication. Unknown DMA words
+  retain the existing scope exclusion; no full campaign replay is claimed.
+- `tmp/ocs-public-off-live/` and `tmp/ocs-public-off-check.json`: actual 020/Fast
+  CUSTOM5=0 boot through the menu; 224 relocated original hook/window comparisons
+  pass across Origin, title, credits and menu, with no enhancement state active.
+- `tmp/ocs-public-000-live/` and `tmp/ocs-public-000-check.json`: the same bounded
+  original-path checks on A500/68000 with CUSTOM5=1 requested. Both live original
+  reports reject a corrupted hook byte. Native tests supply the no-Fast cases;
+  this is not a new unsupported low-memory live boot claim.
+
+The generated icon and fresh runtime OCS copy contain the enabled tooltype while
+preserving artwork and existing options. Reference icons/game trees are not
+modified. The new OCS ReadMe and [support document](ocs-release.md) distinguish
+original-mode selection from per-source conversion fallback and retain E2's
+campaign, hardware/cache, controller and cold-boot save/load limitations.

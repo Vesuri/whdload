@@ -1,0 +1,36 @@
+Wing Commander OCS - enhanced-framerate candidate
+Original slave: Psygore. Improvements: Vesa Halttunen.
+
+Enhanced framerate (68020+Fast RAM)
+
+The launch icon enables CUSTOM5=1 by default. Clear this checkbox in WHDLoad,
+set CUSTOM5=0, or remove the tooltype to use the original game behaviour:
+per-frame simulation, original rendering, frame waits and cache request.
+
+Enhancements only activate on the verified English OCS SPS 1657 game, with a
+68020 or better and verified true Fast RAM. A 68000/68010, Chip/slow RAM only, or an unverified memory bank always uses original
+behaviour, even with CUSTOM5=1. Values other than 1 also use original behaviour.
+Slow expansion RAM does not qualify merely because Exec labels it MEMF_FAST.
+
+Enhanced mode uses a 10 Hz world for flight and the title/asteroid intro,
+responsive input and bounded extrapolation between updates. Music and credit
+text deadlines remain native. The CPU converter uses verified Fast source
+storage; when that allocation is unavailable, conversion safely retains the
+native blitter. That conversion fallback does not disable an already selected
+10 Hz mode. No 25/50 FPS guarantee follows from enabling the option.
+
+CUSTOM1 (language), CUSTOM2 (cheats), CUSTOM3 (system) and CUSTOM4 (mission)
+retain their original meanings. German and other revisions have no enhancement
+support. CD32 CUSTOM5 mode numbers do not apply to this OCS slave.
+Quit uses the original '*' / PrtSc key unless WHDLoad QUITKEY overrides it.
+
+Tested launcher floor: 512 KiB Chip + 4 MiB true Fast, including PRELOAD.
+The focused 68020/Fast model is the performance target. This is not a full
+campaign, arbitrary accelerator/cache or real-hardware compatibility claim.
+The measured A500 enhancement experiments were too slow in heavy scenes;
+the public candidate therefore always keeps original behaviour on that CPU.
+Cold-boot save reload and physical controller acceptance remain release checks.
+
+Original installer and icon credits remain applicable. CPU conversion uses
+Kalms' four-plane routines. This is an OCS candidate, separate from the CD32
+release and its options. Do not mix the two variants' game assets or slaves.

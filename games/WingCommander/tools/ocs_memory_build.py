@@ -37,7 +37,8 @@ HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x334b6,'ocs_publish_close',0x4ef9))
 
 
-def build(out,option,exit_probe=False,changed="off", clock=False, prediction=False, intro=False, math_fast=False):
+def build(out,option,exit_probe=False,changed="off", clock=False, prediction=False, intro=False, math_fast=False, public=False):
+    math_fast = math_fast or public
     hooks=HOOKS+(((0x16992,'exit_probe_entry',0x4eb9),(0x18d14,'view_probe_entry',0x4ef9)) if exit_probe else ())
     if changed != 'off': hooks+=((0x3250c,'ocs_changed_borrow',0x4ef9),)
     native=dict(NATIVE)
@@ -320,6 +321,15 @@ view_probe_entry:
  jmp OCS_INPUT_BODY
 view_probe_request: dc.l 0
 '''
+    if public:
+        text=text.replace(' move.l d7,d6\n',
+                          ' bsr.w ocs_option_gate\n tst.l d0\n beq.w install_done\n move.l d7,d6\n',1)
+        # Keep option code/data in PC-relative range of the startup seam.
+        config=original[32+0xf81:].split(b'\0',1)[0].rstrip(b';')
+        config+=b';C5:B:Enhanced framerate (68020+Fast RAM);\0'
+        options=(ROOT/'whdload/ocs_options.s').read_text()
+        options+='\nocs_public_config: dc.b '+','.join(str(x) for x in config)+'\n even\n'
+        text=text.replace('display_create_checked:',options+'\ndisplay_create_checked:',1)
     if intro:
         # The appended D4 payload puts startup tables beyond d16(PC).
         for label in ('guards','native_fixups','payload_end','hooks'):
@@ -347,13 +357,22 @@ view_probe_request: dc.l 0
     require(payload[:TAIL]==original[32:-4],'original payload changed before patch')
     require(sy['install']-0x11c8<32768,'install trampoline out of range')
     payload[0x11c6:0x11ce]=struct.pack('>HhHH',0x6100,sy['install']-0x11c8,0x4e71,0x4e71)
+    if public:
+        require(sy['ocs_public_config'] < 65536, 'public configuration offset overflow')
+        struct.pack_into('>H',payload,0x32,sy['ocs_public_config'])
     payload+=bytes((-len(payload))%4)
     blob=struct.pack('>8I',0x3f3,0,1,0,0,len(payload)//4,0x3e9,len(payload)//4)+payload+struct.pack('>I',0x3f2)
     (out/'WingCommander.Slave').write_bytes(blob)
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
+                public_option=public,
                 workspace='native combined Chip allocation retained for fallback',
                 live_validated=False,clock=clock,prediction=prediction,intro=intro,math_fast=math_fast)
+    if public:
+        from ocs_icon import enhanced_icon
+        icon=(ROOT/'tmp/originals/ocs/WingCommander/WingCommander.info').read_bytes()
+        (out/'WingCommander.info').write_bytes(enhanced_icon(icon))
+        (out/'ReadMe').write_bytes((ROOT/'release/ReadMe.OCS').read_bytes())
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 
@@ -387,7 +406,8 @@ def prediction_clock(text):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',required=True)
-    p.add_argument('--backend',choices=tuple(OPTIONS),default='auto')
+    p.add_argument('--backend',choices=tuple(OPTIONS),default=None)
+    p.add_argument('--public',action='store_true',help='guard all enhancements with CUSTOM5 and 68020/true Fast; emit enabled icon')
     p.add_argument('--exit-probe',action='store_true',help='diagnostic-only native teardown and view-change triggers')
     p.add_argument('--changed',choices=('off','full','blocks'),default='off',help='C6 opt-in history candidate or equal-reservation full control')
     p.add_argument('--clock',action='store_true',help='D2 opt-in 10 Hz flight clock')
@@ -395,6 +415,6 @@ def main():
     p.add_argument('--intro',action='store_true',help='D4 OCS title/credits clock and prediction (implies --prediction)')
     p.add_argument('--math-fast',action='store_true',help='E1 exact native arithmetic shortcuts (implies --intro)')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
-    r=build(out,a.backend,a.exit_probe,a.changed,a.clock,a.prediction,a.intro,a.math_fast);print(r['bytes'],r['sha256'])
+    r=build(out,a.backend or ('cpu' if a.public else 'auto'),a.exit_probe,a.changed,a.clock,a.prediction,a.intro,a.math_fast,a.public);print(r['bytes'],r['sha256'])
 
 if __name__=='__main__':main()

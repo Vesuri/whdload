@@ -7,6 +7,11 @@ A500 heavy-scene overload and bounded model coverage remain explicit limitations
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
 
+The subsequent public option now limits enhancements to an enabled checkbox and
+verified 68020+/true Fast hardware. 68000/68010 use original behaviour; the earlier
+A500 enhancement experiments remain evidence for that policy. See the
+[current candidate](ocs-release.md#current-public-option-candidate).
+
 ## Design decisions and unresolved choices
 
 - Retain native four-plane blitter C2P as a supported candidate. Its DMA source

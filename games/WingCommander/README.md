@@ -5,6 +5,12 @@ WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
 **P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E3 complete: OCS conversion/display work, opt-in 10 Hz clocks, measured arithmetic/collision optimisations and bounded compatibility/functional checks, with a documented release hand-off.** A500 heavy-scene overload remains documented; this is not a smoothness or release claim. The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
+The current OCS public candidate has an **Enhanced framerate (68020+Fast RAM)**
+checkbox (`CUSTOM5=1`, enabled in the generated icon). Unchecked/absent, or on
+68000/68010 or without verified true Fast RAM, it keeps original simulation,
+rendering and frame waits. Build with `tools/ocs_memory_build.py --public`;
+see the [OCS ReadMe](release/ReadMe.OCS) and [reproduction commands](docs/development.md#ocs-public-enhanced-framerate-toggle).
+
 The [OCS candidate hand-off](docs/ocs-release.md) records exact build hashes,
 supported revisions, backend selection, RAM requirements, options and the proposed
 archive/checklist. E1's A500 coasting window holds 9.98 world updates/s and 2.75
