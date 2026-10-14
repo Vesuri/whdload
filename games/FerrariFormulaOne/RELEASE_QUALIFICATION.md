@@ -105,10 +105,15 @@ Fast memory, 020 with Fast memory, and 060 with Fast memory. The current shared
 runtime is WHDLoad 20.1 build 7190. The slave's required API version remains 17.
 On A500 with 512 KiB Chip and 1.5 MiB Slow, 17.0 displays “Can't allocate ExpMem”
 before game startup; the same configuration passes with 20.1. Chip-only 020 with 2 MiB Chip passes with 20.0, both with and without ExpChip.
-With 20.1 it fails to allocate ExpMem, including with the older emulator observer;
-this isolates the startup failure from the observer clock correction. The
-configuration-splash interaction and smaller-memory cases remain under investigation. These
-failures do not yet establish a game-code compatibility defect.
+With 20.1 and its default configuration splash, it fails to allocate ExpMem,
+including with the older emulator observer. Adding `ConfigDelay=0` passes
+20 production updates on the same 2 MiB Chip configuration. The launcher already
+sets `SplashDelay=0`; both delays must be disabled for this tested configuration.
+This isolates the failure to startup memory pressure rather than game code or
+the observer correction. Disabling the configuration splash does not resolve
+the 17.0 allocation failure on A500 with 1.5 MiB Slow or chip-only 020.
+Use Fast memory for the qualified 17.0 configurations; API compatibility does
+not imply identical runtime memory requirements.
 
 With 20.1, A500 with 512 KiB Chip and 2 MiB Fast, without Slow memory, also
 passes. The production reservation is 768 KiB expansion memory in addition to
@@ -121,9 +126,37 @@ also matches, allowing only the existing timing JSR's relocated host operand.
 The original timing callback is an expected legacy patch. Chip-only and Fast
 020 comparisons and repeated overlay loads remain outstanding.
 
+## Original release observations on accelerated profiles
+
+The original v1.01 demo was measured separately, with the corrected observer,
+warp disabled for each 1,000-field window (20.031887 seconds), after 125 native
+updates. These observations are not matched-state speedup comparisons: the
+original and converted loops advance different amounts of simulation during the
+measurement, and startup RNG is uncontrolled.
+
+| Emulator profile | Original CUSTOM1=0 FPS | Original CUSTOM1=1 FPS | Enabled production FPS |
+| --- | ---: | ---: | ---: |
+| 030 50 MHz | 5.691 | 7.139 | 16.623 |
+| 040 25 MHz | 5.491 | 6.540 | 16.623 |
+| 040 40 MHz | 5.491 | 6.540 | 16.623 |
+| 060 50 MHz | 5.541 | 6.639 | 16.623 |
+
+The original calendar and session clocks advance only 11.0–11.5 seconds with
+CUSTOM1=0, or 13.1–14.3 seconds with CUSTOM1=1, during those 20.032-second
+windows. Enabled production independently passes the 60-second elapsed gate
+with 0.0409% error. Faster presentation alone therefore understates the behavioral
+change: the new mode also keeps simulation time aligned with elapsed time.
+
+The enabled 300-presentation measurement is 16.640 FPS; the table uses its
+1,000-field window count for the same observation length as the original.
+Quantized emulator clock scales and coarse 040/060 cache charging prevent
+hardware speed or CPU-ranking claims. No further accelerated optimization is
+required by this qualification task. Evidence:
+`tmp/dev/manifest/release-original-observations.json` and
+`tmp/dev/manifest/release-accelerated-enabled.json`.
+
 ## Remaining acceptance work
 
-- Original-release accelerated reference observations and final analysis summary.
 - Minimum-memory and minimum/development WHDLoad runtime qualification.
 - Both disabled CUSTOM1 variants, including repeated overlay loads.
 - F3/F1 controls, Fiorano/Rio/contrasting track, starts/laps, fuel/wear,
