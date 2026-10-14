@@ -236,6 +236,23 @@ harness assertion incorrectly required that callback for CUSTOM1=1; correcting
 it to the original option contract preserves the complete patch-word gate.
 Evidence: `tmp/dev/manifest/release-disabled-reloads.json` (eight passing cases).
 
+## Monaco standing start and tow
+
+On the production 020+Fast path, actual native controls select Monaco, F3 and
+Race, with the clock set to 12:55 before the 13:00 start. Entering the cockpit
+starts a fresh driving epoch. The native countdown falls from 40 to zero; the
+red light changes to green. Bounded throttle input increases the native speed
+value, and 501 update checkpoints complete with no engine errors. The session
+clock reaches 6.1 seconds after the countdown; the calendar reaches 13:00:06.3.
+These counts are simulation updates, not rendered frames.
+
+Actual tow exits driving and clears the scheduler context before returning to
+native results/pit/transport screens. An earlier 13:00 selection reached the
+cockpit too late and produced a native DNF; it is retained as a diagnostic and
+is not used as start acceptance. Human completion of a race remains deferred.
+Evidence: `tmp/dev/manifest/release-monaco.json`, with selection, red-grid and
+green-light screenshots and complete state captures.
+
 ## Remaining acceptance work
 
 - Minimum-memory and minimum/development WHDLoad runtime qualification.
