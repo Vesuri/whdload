@@ -180,12 +180,26 @@ The demo uses value 12. The corrected test observes this branch condition before
 the crossing and verifies its exact counter outcome, rather than suppressing
 the check. Evidence: `tmp/dev/manifest/release-laps.json`.
 
+## Additional native controls and system exit
+
+The production A500 build enters Fiorano after a normal track selection and
+season reset. Actual modifier-key input with the clutch changes the native gear
+state from neutral (1) to first (2), and back to neutral. F1 control and difficulty
+fields both read 1; engine errors remain zero. A throttle run consumes fuel,
+but its diagnostic checkpoint limit was absent, so it is not a bounded movement
+or timing measurement. Native tow returns to the pit.
+
+Actual F10 reaches the WHDLoad abort entry with TDREASON_OK and returns to the
+AmigaDOS prompt, confirmed by a screenshot. A 4,190-byte season file was written
+through the native requester and retained for a fresh-session load check;
+restoration is not yet accepted. Evidence: `tmp/dev/manifest/release-native-ui.json`.
+
 ## Remaining acceptance work
 
 - Minimum-memory and minimum/development WHDLoad runtime qualification.
 - Both disabled CUSTOM1 variants, including repeated overlay loads.
 - F3/F1 controls, Fiorano/Rio/contrasting track, starts/laps, fuel/wear,
-  pits, session/results, season save/load, travel/repair clocks and F10 exit.
+  pits, session/results, season save/load, travel/repair clocks; F10 exit passes on A500.
 - Final reproducibility and release-candidate documentation.
 
 The Irek executable is unavailable locally; retain its original route and keep
