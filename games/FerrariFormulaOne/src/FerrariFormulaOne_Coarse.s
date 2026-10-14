@@ -1,6 +1,6 @@
-; SPS 0481 native 100 ms candidate. Default-off: the host must select coarse,
-; bind game operands, validate/install patches, flush caches and own their lifetime.
-; No player/opponent rate conversion or fractional state is installed.
+; SPS 0481 coarse candidate: native 100 ms, or converted 200 ms with
+; FF1_COARSE_200_COMPLETE. Default-off: the host selects the profile, binds game
+; operands, validates/installs patches, flushes caches and owns their lifetime.
 ; The native head still samples input once per admitted update. A service pass
 ; admits at most two updates; a full pass returns through the native head before
 ; starting another pass. Debt is never dropped, including during overload.
@@ -190,6 +190,12 @@ C1RecoveryExit:
  rts
 
 ; Reversible native pause preserves active debt. Called at native pause edges.
+; Q03 actual device-input checks on A500/A500+Fast preserve the exact pending
+; units across native pause, restore BLIT ownership and all 504 patch words at
+; tow/exit, leave menu/session clock jumps outside this context, and start a
+; fresh epoch on driving re-entry. No native input or modal wait was stubbed.
+; Evidence: tmp/dev/manifest/step5-c4-q03-validation.json. Physical host input
+; and real-hardware play-testing remain separate release qualification.
 C1Pause:
  movem.l d0-d3/a0-a1,-(sp)
  C1SaveFlags
