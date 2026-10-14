@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1–P13A4 and P13B1–P13B3 are complete**;
+It does not implement or validate an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1 are complete**;
 the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -134,7 +134,7 @@ See [evidence and boundaries](internals.md#p13b3-shared-instrumentation-and-vali
 
 ## C — Choose conversion from measured CPU and memory behaviour
 
-**P13C1 — Build interchangeable experimental converters.** Depends on A2, B2–B3.
+**P13C1 — Build interchangeable experimental converters (complete).** Depends on A2, B2–B3.
 Keep native QBlit conversion. Pin and adapt the two Kalms four-plane candidates
 listed in `manifest/ocs-c2p-candidates.tsv`; honour width/alignment/stride, plane
 order and destination padding. Cover every native view size with enclosing-window
@@ -146,6 +146,13 @@ correction is chosen. Odd-height support still requires its own bounds checks.
 Gate: native-versus-independent-oracle-versus-CPU pixels match with all 16 colours,
 independent high/low nibbles, edge widths, row canaries and alternating destinations.
 Experimental CPU conversion does not become the default yet.
+Gate passed: pinned Kalms word/longword components with shared checkerboard-row
+adaptation, exact native/oracle visible pixels at all native view sizes, guarded
+padding/source/stack, alternating destinations, base-ISA execution, explicit
+native requests for 16-but-not-32-pixel widths and rejecting odd-height checks.
+No game hooks are installed. The C2 comparison must charge row staging and wrapper
+calls and preserve the native scheduling control. See
+[evidence and component ABI](internals.md#p13c1-experimental-four-plane-converters).
 
 **P13C2 — Establish the blitter/CPU/memory crossover.** Depends on C1.
 Run matched short windows with identical source content, world state, display DMA,
@@ -283,7 +290,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4 and P13B1–P13B3 are complete. Start **P13C1** only when requested. The first backend decision
+P13A1–P13A4, P13B1–P13B3 and P13C1 are complete. Start **P13C2** only when requested. The first backend decision
 is **P13C2**, not the current investigation. In particular, neither “68000 must use
 CPU C2P” nor “68020 must abandon the blitter” has been established. Keep the
 blitter implementation available through the comparison and acceptance gates.

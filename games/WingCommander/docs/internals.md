@@ -4476,7 +4476,9 @@ full side-effect mapping are still required. The table is a starting map, not
 an assertion that CD32 FR-01–FR-23 are already proven on OCS.
 
 The title's world loop is at `O:1ef24`–`1efb0`, with 296 updates, odd-update draws,
-thresholds 135/235 and geometry changing from 200 to 16. Credits capture the
+thresholds 135/235 and a title drawing parameter changing from 200 to 16.
+That parameter feeds the sprite-scaling routines at `O:1ed64`/`1ed9e`; it does
+not resize the conversion bitmap. Credits capture the
 field clock at `O:1eff8`, call world/draw at `1effc`/`1f002`, check the text deadline
 of 220 fields at `1f00e`, finish drawing at `1f036`, and check 320 fields at `1f052`.
 `O:1f060` compares against **15 pages**, then `1f06a` branches back to `1eeb2`.
@@ -5213,4 +5215,102 @@ and original OCS builds remain byte-identical to B2. Evidence is in
 `tmp/p13b3-cd32-parser.json`; derived exports, assembled components and binaries
 remain in `tmp/`. Later live guest integration still needs its own overhead,
 allocation/failure, native ABI and IRQ checks; these CPU replays do not close them.
-Stop here; P13C1 is the next ordered item, only on request.
+The following P13C1 gate adds experimental converter components without installing hooks.
+
+
+### P13C1: experimental four-plane converters
+
+**P13C1 is complete as a component correctness gate.** `tools/ocs_c2p.py`
+verifies both sources in `manifest/ocs-c2p-candidates.tsv` before assembling the
+owned `whdload/ocs_c2p.s` adapter with Kalms' unchanged word-write and longword-write
+routines. Generated source, binary, listing and reports stay in `tmp/`. Standard
+OCS/CD32 builds do not include these components; native QBlit remains unchanged.
+There is no automatic CPU/backend selection or new live emulator run in this gate.
+
+#### Conversion contract and native view coverage
+
+The adapter stages one row into 320 bytes of private stack storage, selecting the
+high nibble at even `(x+y)` and the low nibble at odd `(x+y)`. It supplies the
+resulting four-bit colours to either Kalms leaf with height one. This shares the
+format adapter without changing the upstream shuffle, needing a whole-frame
+copy, or importing another game's stride/nibble assumptions. Row one retains the
+four native black pixels at x=1,3,9,11. Both candidates incur the staging pass and
+per-row call overhead: **C2 must measure the complete adapter**, not just Kalms'
+leaf. No speed or CPU/memory crossover claim follows from instruction execution.
+
+| Verified source | File offset | Meaning for this component |
+|---|---|---|
+| `OD:00c4`, `00e4`, `00f4` | `039a0c`, `039a2c`, `039a3c` | View rectangles select 320×200, 320×166 and 320×128 |
+| `O:0c34`, `0c9e`, `32554` | `00c60`, `00cca`, `32580` | Bind the selected native surface and copy its width/height |
+| `O:334e4` | `33510` | Row R = ceil(W/16)×2, plane P = R×(H+2), depth four |
+| `O:33aea`, `33970` | `33b16`, `3399c` | Plane pointers skip two rows; displayed height is H−1 |
+
+The pinned executable and exact rectangle values are checked in the test.
+Native source rows are dense W bytes. The 320×16 fixture is a synthetic minimum
+height check, not evidence that the title resizes its bitmap; the earlier title
+parameter wording is corrected above. The CPU contract covers all even heights
+16–200 and all 32-pixel widths 32–320. Widths 16,48,…,304 return a native request
+before touching source or destination; they do not invoke an incompatible Kalms
+leaf. All ten fallback widths also pass the original blitter/pixel oracle at
+height 16. Odd heights are explicitly invalid, **not** sent to the known unsafe
+native odd-height path. Unsupported non-16-aligned widths, out-of-range sizes and
+null/odd pointers are rejected before pixel access.
+
+The callable seam takes A0=chunky source, A1=base of four contiguous destination
+planes, D0.L=W, D1.L=H. It returns D0=0 for completed CPU conversion, 1 for a
+request to use original QBlit, or 2 for invalid input. D1–D7/A0–A6 are preserved;
+CCR is explicitly clobbered. `ocs_c2p_word` and `ocs_c2p_long` share this ABI;
+`ocs_c2p_native` only returns the native request. **A native request is not a
+completion event.** Its caller must still execute the original submission,
+wait/completion and publication protocol. This interface does not replace that
+protocol or simulate it with a synchronous CPU return.
+
+Callers must supply valid, disjoint source/destination/stack/code extents, own a
+nondisplayed destination, and retire outstanding native QBlit work before CPU
+entry. Nonzero/even pointer checks cannot prove allocation ownership. Planes
+remain Chip-resident for display DMA; the CPU source can be Chip or Fast and the
+stack should be Fast. Actual allocation placement and failure handling belong to
+C2–C4 integration. There is no allocator, native patch, IRQ hook or publication
+in this component. Both paths assemble with `-m68000`; the proposed 68020+ use of
+longword writes is a candidate policy rather than an ISA requirement.
+
+Only the H−1 visible rows in each plane are written. The two leading rows and
+last allocated logical row remain unchanged; native scratch/invisible writes
+are not reproduced. Tests explicitly guard those rows. They do not extend the
+viewport or claim full allocation equality with native scratch. Plane order is
+colour bits 0,1,2,3 with MSB-first pixels. Both source and plane bases work at
+0 and 2 modulo 4, retaining the 68000 even-alignment requirement.
+
+#### Accepted checks and limits
+
+`tmp/p13c1-accepted/report.json` records isolated execution of original 68000 code
+with the A2 functional blitter, the independent scalar pixel oracle and both CPU
+candidates. This is functional-model evidence, not FS-UAE timing or real hardware.
+
+- 94 native conversions and 606 CPU conversions: all three native sizes, all ten
+  CPU widths at height 16, an 18-row boundary, independent random nibbles, all 256
+  nibble pairs and solid white. Native and CPU visible pixels agree with the oracle.
+  The CPU count includes all 93 admitted even heights on 68000 word/68020 long.
+- Word path executes on 68000/020/040 models; longword path on 020/040. Stores to
+  planes are checked to be exactly words or longwords respectively. Both paths
+  preserve the opposite destination across alternating calls, source bytes,
+  allocation guards, row padding and immutable code. Every CPU data read/write
+  is range-checked; no source overread or write outside visible rows is permitted.
+- 320 incoming-CCR/user/supervisor ABI cases, 50 explicit native fallback cases,
+  80 invalid geometry/pointer cases, and the native-request entry on each model.
+  Four generated-code mutations (low-nibble-only, wrong parity, missing edge,
+  wrong leading rows) fail. Independently changed copies of each pinned upstream
+  input are rejected and preserved.
+
+The combined component is 1,666 bytes, SHA-256
+`4161f8aaa3838623d07acf730558589eed1fb4833dfa726bb234e22cde2ce2ce`.
+Observed maximum stack use is 508 bytes below entry SP; reserve at least 512
+bytes **plus interrupt/headroom requirements of the eventual caller**. This is
+a component footprint, not a measured A500 minimum memory budget.
+Fresh standard builds in `tmp/p13c1-release` and `tmp/p13c1-native` match B3 byte
+for byte: CD32 43,544 bytes (`fdd92fbb…`), original OCS 5,324 (`eec155c9…`).
+
+Stop at C1. C2 must wire the experimental arms into matched native scheduling,
+validate the installed instrumentation, and measure staging, conversion, queue
+waits, overlap and actual displayed pictures. C3–C5 still own selection, memory
+and publication. No end-to-end enhancement, performance claim or release is made.

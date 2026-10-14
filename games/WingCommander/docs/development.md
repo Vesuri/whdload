@@ -3428,3 +3428,49 @@ native-data replay supplies field/beam samples synthetically and labels the resu
 as CPU semantics, not live guest instrumentation or elapsed-time performance.
 The four-attempt limit and executed instruction counts bound the recorder loop;
 measure guest overhead when later OCS components actually install it.
+
+
+## P13C1: experimental OCS converter gate
+
+Use the shared environment, the pinned Kalms checkout and the supplied English
+OCS executable prepared above. `OCS_KALMS_ROOT` overrides the default
+`$AMIGA_SHARE/kalms-c2p`. Both manifest hashes are verified before sources are used;
+changed inputs are preserved and rejected. No download or checkout reset occurs.
+Every output must be a fresh directory below `tmp/`.
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_c2p.py --output tmp/c1-components
+python3 tools/ocs_c2p_check.py --output tmp/c1-check
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/c1-release
+python3 tools/reconstruct.py --variant ocs --output tmp/c1-native
+cmp tmp/c1-release/WingCommanderCD32.Slave tmp/p13b3-release/WingCommanderCD32.Slave
+cmp tmp/c1-native/WingCommander.Slave tmp/p13b3-native/WingCommander.Slave
+```
+
+The checker also builds its own converters. `build.json` records source hashes,
+binary hash/size and entry offsets; `converters.bin`, `converters.s` and its listing
+are standalone component artifacts, **not WHDLoad slaves**. `report.json` records
+the native/oracle/CPU pixel, memory-access, ABI, fallback and rejection checks.
+Deliberate mutations are assembled only into that scratch directory. Missing B3
+comparison builds can be recreated with the commands in the previous section.
+The accepted run is `tmp/p13c1-accepted`, with unchanged standard builds under
+`tmp/p13c1-release` and `tmp/p13c1-native`.
+
+Both CPU entries take A0=source, A1=destination, D0.L=width and D1.L=height.
+Native layout is dense width-byte source rows, width/8 planar rows, four contiguous
+planes of `(height+2)*width/8` bytes. They write only visible rows after two leading
+rows. D0 returns 0=complete, 1=native request, 2=invalid; all other general registers
+are preserved, CCR is clobbered. The native-request entry returns 1 immediately.
+See [contract and ownership preconditions](internals.md#p13c1-experimental-four-plane-converters)
+before using these components. A return of 1 must dispatch the native queue and
+its completion protocol; a return of 2 must not publish an unconverted image or
+blindly invoke the unsafe native geometry.
+
+The wrapper includes shared checkerboard selection in a private 320-byte staging
+row and preserves the native four edge pixels. Include its full cost and 512-byte
+minimum stack reservation in later experiments, with additional interrupt stack
+headroom. No full-screen staging allocation is required. These checks execute
+functional CPU/blitter models and provide no bus-contention, queue-latency or
+performance measurement. Native slave defaults and the CD32 release are untouched.
+Stop before P13C2's matched crossover experiment.
