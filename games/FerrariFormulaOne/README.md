@@ -1,6 +1,6 @@
 # Ferrari Formula One performance build
 
-RC1 has a confirmed 20 ms player launch bug. The source now fixes it; see
+RC2 fixes the confirmed RC1 20 ms player launch bug; see
 [driving-control regression](CONTROLS_REGRESSION.md) for the corrected build
 and native-input acceptance. Historical qualification figures below identify
 their original binary; they are not new measurements of the correction.
@@ -102,7 +102,7 @@ micro targets remain documented shortfalls; the user-selected C4 matched-
 workload no-regression gate has passed. There is no A500 performance fallback.
 
 A local Retroplay-based preinstalled candidate is also available at
-`tmp/dev/dist/FerrariFormulaOne_v1.02-rc1_0481_Performance.lha`.
+`tmp/dev/dist/FerrariFormulaOne_v1.02-rc2_0481_Performance.lha`.
 All 40 original game-data files, the manual and icon artwork are preserved.
 The normal FerrariFormulaOne icon keeps CUSTOM2=0; the added Performance icon
 selects CUSTOM2=1. Both carry NoWriteCache and disabled splash delays. The
@@ -110,5 +110,10 @@ updated ReadMe includes the original text as historical documentation, with
 current memory requirements and qualification limits above it. New icons use
 automatic placement. The 53-member level-1 LH5 archive passes CRC testing and
 complete extraction/content comparison; its inventory and hashes are recorded
-in `tmp/dev/manifest/preinstalled-rc1.json`. Game data and packaging tools remain
+in `tmp/dev/manifest/preinstalled-rc2.json`. Game data and packaging tools remain
 ignored and local; this archive is not published.
+
+The RC2 preinstalled archive is 677,063 bytes, SHA256
+`cdd0357047f302f1faec3584eafba5af2bfa56720452ab1f7eb1ad806a87c68b`.
+Its corrected slave is the exact independently rebuilt and control-tested binary
+identified above. Replace the RC1 installation; saved game data can be retained.
