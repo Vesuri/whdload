@@ -89,8 +89,14 @@ without pixel masks or debugger memory writes. This validates drawing correctnes
 production FPS comes from the unmodified-build measurements above.
 
 Evidence: `tmp/dev/manifest/release-cache-mmu.json` and the frame section of
-`tmp/dev/manifest/release-exact.json`. Simulation-state acceptance against the
-matched reference layouts is still being completed separately.
+`tmp/dev/manifest/release-exact.json`. Simulation-state acceptance also passes: nine accelerated/cache cases each
+match all 27 recorded state blocks and the complete captured private fractions
+for 100 consecutive updates, with zero engine errors. The reference is the
+previously accepted algorithm at the same allocation layout: one 030 reference
+and one 040 reference; 040 at both speeds and 060 have identical recorded states.
+No extra pointer normalization or byte masks were introduced. An exploratory
+4 MiB-versus-8 MiB comparison is not an acceptance test because dynamic pointers
+and a DOS file handle relocate.
 
 ## Runtime and memory checks in progress
 
@@ -98,8 +104,10 @@ Official WHDLoad 17.0 build 5139 passes 20-update functional checks on A500 with
 Fast memory, 020 with Fast memory, and 060 with Fast memory. The current shared
 runtime is WHDLoad 20.1 build 7190. The slave's required API version remains 17.
 On A500 with 512 KiB Chip and 1.5 MiB Slow, 17.0 displays “Can't allocate ExpMem”
-before game startup; the same configuration passes with 20.1. Chip-only 020
-startup and smaller-memory configurations remain under investigation. These
+before game startup; the same configuration passes with 20.1. Chip-only 020 with 2 MiB Chip passes with 20.0, both with and without ExpChip.
+With 20.1 it fails to allocate ExpMem, including with the older emulator observer;
+this isolates the startup failure from the observer clock correction. The
+configuration-splash interaction and smaller-memory cases remain under investigation. These
 failures do not yet establish a game-code compatibility defect.
 
 With 20.1, A500 with 512 KiB Chip and 2 MiB Fast, without Slow memory, also
@@ -115,7 +123,7 @@ The original timing callback is an expected legacy patch. Chip-only and Fast
 
 ## Remaining acceptance work
 
-- Corrected 030/040/060 comparisons, cache variants and MMU functional checks.
+- Original-release accelerated reference observations and final analysis summary.
 - Minimum-memory and minimum/development WHDLoad runtime qualification.
 - Both disabled CUSTOM1 variants, including repeated overlay loads.
 - F3/F1 controls, Fiorano/Rio/contrasting track, starts/laps, fuel/wear,
