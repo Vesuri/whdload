@@ -58,13 +58,37 @@ These are emulator results, not real-hardware measurements or matched speedup
 claims against the original release. The 040/060 performance profiles disable
 the MMU; functional MMU qualification is separate. Live instruction-cache
 readbacks are 0x2011 on 030 and 0x8000 on 040/060. The DMA-only captures provide
-no instruction-cost attribution. A render-stage observation is being used to
-explain the shared ceiling.
+no instruction-cost attribution. A separate 20-draw probe on 060 places all
+three fields inside drawing, after the observed beam-wait return. There is no
+whole-field gap between one draw returning and the next draw starting. This
+localizes the ceiling; it does not assign exact CPU costs to individual drawing
+routines.
 
 An independent rebuild using the current shared WHDLoad installation reproduces
 the accepted 260,292-byte slave and its SHA256 exactly. Evidence is indexed in
 `tmp/dev/manifest/release-accelerated-enabled.json`; clock validation is in
 `tmp/dev/manifest/release-clock-calibration.json`.
+
+## Runtime and memory checks in progress
+
+Official WHDLoad 17.0 build 5139 passes 20-update functional checks on A500 with
+Fast memory, 020 with Fast memory, and 060 with Fast memory. The current shared
+runtime is WHDLoad 20.1 build 7190. The slave's required API version remains 17.
+On A500 with 512 KiB Chip and 1.5 MiB Slow, 17.0 displays “Can't allocate ExpMem”
+before game startup; the same configuration passes with 20.1. Chip-only 020
+startup and smaller-memory configurations remain under investigation. These
+failures do not yet establish a game-code compatibility defect.
+
+With 20.1, A500 with 512 KiB Chip and 2 MiB Fast, without Slow memory, also
+passes. The production reservation is 768 KiB expansion memory in addition to
+512 KiB Chip, the 260,292-byte slave, and runtime/OS overhead; it is not a claim
+that 1.25 MiB total machine memory is sufficient.
+
+Both CUSTOM1 values pass three matched legacy-loop state comparisons on A500
+and A500 + Fast. The 1,005-word union of the three engines' native patch ledgers
+also matches, allowing only the existing timing JSR's relocated host operand.
+The original timing callback is an expected legacy patch. Chip-only and Fast
+020 comparisons and repeated overlay loads remain outstanding.
 
 ## Remaining acceptance work
 
