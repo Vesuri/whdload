@@ -36,24 +36,45 @@ start:
  move.l $18(a3),d0
  lsl.l #2,d0
  suba.l d0,a2
+ IFD FF1_C4_MUL_SITES
+ ; The largest capture host exceeds the first PC-relative span. Anchor CPU
+ ; code/data references in the existing rotation helper; no absolute address.
+ lea FF1VelocityRotate000(pc),a0
+ adda.w #(public_table-FF1VelocityRotate000),a0
+ ELSE
  lea public_table(pc),a0
+ ENDC
  move.l a2,(a0)
  move.l 160*4(a2),d0
+ IFD FF1_C4_MUL_SITES
+ cmp.l (public_bound-public_table)(a0),d0
+ ELSE
  cmp.l public_bound(pc),d0
+ ENDC
  beq.w done
  lea start(pc),a0
  IFD FF1_C4_COLOUR_ELIDE
  ; Larger C4 diagnostic hosts can put the binding table past PC-relative
  ; reach. Its nearby fixed state anchor remains in range on the 68000.
+ IFD FF1_C4_MUL_SITES
+ lea FF1VelocityRotate000(pc),a1
+ adda.w #(public_bindings-FF1VelocityRotate000),a1
+ ELSE
  lea public_table(pc),a1
  adda.w #(public_bindings-public_table),a1
+ ENDC
  ELSE
  lea public_bindings(pc),a1
  ENDC
  IFD FF1_C4_DIV_FAST
  ; Larger diagnostic hosts need an anchored call beyond the 32 KiB span.
+ IFD FF1_C4_MUL_SITES
+ lea FF1VelocityRotate000(pc),a5
+ adda.w #(FF1ApplyBindings-FF1VelocityRotate000),a5
+ ELSE
  lea public_table(pc),a5
  adda.w #(FF1ApplyBindings-public_table),a5
+ ENDC
  jsr (a5)
  ELSE
  bsr.w FF1ApplyBindings
@@ -81,7 +102,13 @@ start:
  move.w #$4ef9,$65f48
  move.l a0,$65f4a
  lea C1Ledger(pc),a0
+ IFD FF1_C4_MUL_SITES
+ lea FF1VelocityRotate000(pc),a5
+ adda.w #(FF1PatchSeal-FF1VelocityRotate000),a5
+ jsr (a5)
+ ELSE
  bsr.w FF1PatchSeal
+ ENDC
  tst.l d0
  bne.w C1Fault
  bsr.w C1Flush

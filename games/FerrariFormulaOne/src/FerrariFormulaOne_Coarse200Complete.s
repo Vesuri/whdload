@@ -12,6 +12,9 @@ FF1InstallCoarse200:
  bsr.w FF1C4BoundaryInit
  ENDC
  bsr.w FF1InstallMultiplyNative200
+ IFD FF1_C4_MUL_SITES
+ bsr.w FF1C4InstallMulSites
+ ENDC
  bsr.w FF1Coarse200ProjectionSkip
  bsr.w FF1Coarse200ReturnSkip
  moveq #8,d0
@@ -79,4 +82,8 @@ velocity_scratch: ds.b 80
 
  IFD FF1_C4_COLOUR_ELIDE
  include "FerrariFormulaOne_Coarse200Colour.s"
+ ENDC
+
+ IFD FF1_C4_MUL_SITES
+ include "FerrariFormulaOne_Coarse200MulSites.s"
  ENDC
