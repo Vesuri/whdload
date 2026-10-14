@@ -16,7 +16,7 @@ addresses and must never receive native relocation bindings.
 
 `CUSTOM2=0` (the default) selects the original loop. `CUSTOM1` retains its
 original meaning there: disable the original slave's timing repair.
-`CUSTOM2=1` enables elapsed-time scheduling for SPS 0481; it supersedes that
+`CUSTOM2=1` enables elapsed-time scheduling for SPS 0481 in PAL mode; it supersedes that
 repair, so both CUSTOM1 settings select the same performance behavior:
 
 | Machine | Simulation interval |
@@ -38,6 +38,12 @@ requirements to the small v1.01 release are not claimed. The documented A500
 emulator configuration has 512 KiB Chip plus 1.5 MiB Slow memory; the Fast variant
 also has 2 MiB Fast. The 020 configurations have 2 MiB Chip, with/without 4 MiB Fast.
 Minimum-memory release qualification is separate.
+
+The elapsed clock is PAL-calibrated. Enabled SPS mode requires WHDLoad to report
+PAL; NTSC is rejected with the normal WHDLoad PAL requirement message. The
+disabled path and Irek's original path retain their existing video behavior.
+Allocation or invariant failures in enabled mode exit WHDLoad with an error;
+production never enters a diagnostic halt loop.
 
 Production starts on entry to driving and contains no pinned RNG seed, delayed
 demo activation, VERIFY tape or forced-workload fixture. Payloads are assembled

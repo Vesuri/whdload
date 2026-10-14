@@ -1211,11 +1211,15 @@ velocity_failcode:
  lea error(pc),a0
  move.l d0,(a0)
 velocity_stop:
+ IFD FF1_PRODUCTION
+ bra.w C1Fault
+ ELSE
  IFD FF1_C4_BLIT_GUARD
  bsr.w FF1C4BlitRestore
 .halt: bra.b .halt
  ELSE
  bra.b velocity_stop
+ ENDC
  ENDC
 velocity_initialized: dc.w 0
 velocity_installed: dc.l 0

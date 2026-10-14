@@ -1,5 +1,6 @@
 ; Production coarse entries: 68000 200 ms / chip-only 68020 100 ms.
  include "FerrariFormulaOne_CoarseInstall.s"
+ include "ProductionFault.s"
 selection_path: dc.l 1
 selection_interval: dc.l 100
  include "FerrariFormulaOne_Coarse.s"

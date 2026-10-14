@@ -2062,7 +2062,11 @@ velocity_failcode:
  lea (error.l,pc),a0
  move.l d0,(a0)
 velocity_stop:
+ IFD FF1_PRODUCTION
+ bra.w FF1ProductionFault
+ ELSE
  bra.b velocity_stop
+ ENDC
 velocity_initialized: dc.w 0
 velocity_installed: dc.l 0
 velocity_loads: dc.l 0

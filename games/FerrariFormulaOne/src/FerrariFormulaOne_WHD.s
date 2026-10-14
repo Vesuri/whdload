@@ -439,7 +439,10 @@ FF1PublicPatchError: dc.l 0
 FF1PublicBoot:
  movem.l d0-d7/a0-a6,-(sp)
  move.l FF1PublicEnabled(pc),d0
- beq.b .done
+ beq.w .done
+ move.l FF1ProfileMonitor(pc),d0
+ cmpi.l #$00021000,d0 ; PAL_MONITOR_ID (graphics/modeid.i)
+ bne.w FF1RequirePAL
  lea FF1PublicPool(pc),a0
  move.l _expmem(pc),a1
  adda.l #$40000,a1

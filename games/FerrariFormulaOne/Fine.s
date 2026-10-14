@@ -36,6 +36,7 @@ public_early_done:
 bad:
  lea (error.l,pc),a0
  move.l #1,(a0)
+ bra.w FF1ProductionFault
 done:
  bsr.l public_seal
  move.w (sp)+,ccr
@@ -87,7 +88,16 @@ keep_gauges:
  bsr.l FF1InstallNativeExact
  endc
  bsr.l FF1FinePauseInstall
+ tst.l error(pc)
+ bne.l FF1ProductionFault
  bsr.w schedule_install
+ ; Retain the accepted B8 CPU-cache policy. WHDLoad owns cache teardown.
+ lea start(pc),a2
+ suba.l #FF1_HOST_CODE_SIZE,a2
+ move.l FF1_HOST_RESLOAD(a2),a2
+ move.l #$13e,d0
+ move.l #$13f,d1
+ jsr $60(a2)
  bsr.l public_seal
 finish:
  bsr.w schedule_begin
@@ -96,6 +106,7 @@ finish:
  rts
 logic_tail:
  jmp FF1SimulationTail
+ include "ProductionFault.s"
  include "FerrariFormulaOne_Math.s"
 install_extras:
  cmpi.w #3,d0
@@ -327,7 +338,7 @@ extra_done:
 extra_bad:
  lea (error.l,pc),a1
  move.l #2,(a1)
- rts
+ bra.w FF1ProductionFault
  include "FerrariFormulaOne_Sqrt.s"
 modeval: dc.w 8
 installed: dc.l 0
@@ -438,7 +449,7 @@ public_bind:
 .bad:
  lea (public_binding_error.l,pc),a0
  move.l d0,(a0)
- bra.b .coarse
+ bra.l FF1ProductionFault
 .done:
  movem.l (sp)+,d0-d7/a0-a6
  rts

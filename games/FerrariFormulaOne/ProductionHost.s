@@ -21,6 +21,8 @@ FF1ProfileTags:
 FF1ProfileAttn: dc.l 0
  dc.l WHDLTAG_CUSTOM2_GET
 FF1ProfileCustom2: dc.l 0
+ dc.l WHDLTAG_MONITOR_GET
+FF1ProfileMonitor: dc.l 0
  dc.l TAG_DONE
 FF1ProfileMode: dc.l 0
  include "FerrariFormulaOne_Profile.s"
@@ -51,4 +53,16 @@ FF1Dispatch:
  rts
 FF1WrongVersion:
  pea (TDREASON_WRONGVER).w
+ bra.w EXIT
+
+FF1PerformanceAbort:
+ pea .message(pc)
+ pea (TDREASON_FAILMSG).w
+ bra.w EXIT
+.message:
+ dc.b "Performance mode could not safely initialise or continue.",0
+ even
+
+FF1RequirePAL:
+ pea (TDREASON_MUSTPAL).w
  bra.w EXIT

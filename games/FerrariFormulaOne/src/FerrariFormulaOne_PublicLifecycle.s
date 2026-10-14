@@ -43,8 +43,10 @@ public_loop_entry:
  bsr.l FF1PatchRestore
  bsr.w public_reset
  bsr.w public_flush
+ IFND FF1_PRODUCTION
  lea (public_race_returns.l,pc),a0
  addq.l #1,(a0)
+ ENDC
  move.l $4.w,a6
  jsr -126(a6)
  movem.l (sp)+,d0-d7/a0-a6
@@ -109,11 +111,16 @@ public_rollback:
  lea (public_patch_context.l,pc),a0
  bsr.l FF1PatchRestore
  bsr.w public_reset
+ IFD FF1_PRODUCTION
+ bra.l FF1ProductionFault
+ ENDC
  lea (selection_path.l,pc),a0
  move.l #1,(a0)
  move.l #100,4(a0)
+ IFND FF1_PRODUCTION
  lea (public_fallbacks.l,pc),a0
  addq.l #1,(a0)
+ ENDC
  bsr.w public_flush
  rts
 public_install_lifetime:
@@ -160,8 +167,10 @@ public_unload:
  bsr.l FF1PatchRestore
  bsr.w public_reset
  bsr.w public_flush
+ IFND FF1_PRODUCTION
  lea (public_unloads.l,pc),a0
  addq.l #1,(a0)
+ ENDC
  move.l $4.w,a6
  jsr -126(a6)
 .done:

@@ -294,7 +294,11 @@ C1Fault:
  ENDC
  lea error(pc),a0
  move.l #100,(a0)
+ IFD FF1_PRODUCTION
+ bra.w FF1ProductionFault
+ ELSE
 .stop: bra.b .stop
+ ENDC
 
 C1Active: dc.w 0
 C1Batch: dc.w 0

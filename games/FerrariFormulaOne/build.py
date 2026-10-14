@@ -9,7 +9,7 @@ import argparse,hashlib,json,os,re,struct,subprocess,sys
 P=Path(__file__).resolve().parent; G=P.parent
 ap=argparse.ArgumentParser();ap.add_argument('--game',type=Path,required=True);ap.add_argument('--out',type=Path,required=True)
 a=ap.parse_args();out=a.out.resolve();out.mkdir(parents=True,exist_ok=True);a.game=a.game.resolve()
-assert a.game.stat().st_size==199368,'SPS 0481 racemenu required'
+assert hashlib.sha256(a.game.read_bytes()).hexdigest()=='66ebd0939954329148e87c051fc041420d8f1ab4c2ad73ece7351b87ef9c889e','Verified SPS 0481 racemenu required'
 vasm=os.environ.get('VASM',str(Path.home()/'.local/vasmm68k_mot'));whd=Path(os.environ['WHDLOAD']);ndk=Path(os.environ['NDK'])
 def run(args,cwd):
  result=subprocess.run(args,cwd=cwd,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
@@ -35,7 +35,7 @@ def payload(kind,offset,hs):
  (d/'fine.s').write_text((P/('Fine.s' if kind=='fine' else 'Coarse.s')).read_text())
  for fn in ['bindings.bin','reset.bin']:(d/fn).write_bytes(bytes.fromhex('ffffffff'))
  flags=flags0+(flagsfine if kind=='fine' else ['FF1_COARSE_STEP=1']+(flags000 if kind=='000' else ['FF1_COARSE_020=1','FF1_COARSE_NATIVE_EXACT=1','FF1_NATIVE_EXACT=1']))
- flags += [f'FF1_HOST_CODE_SIZE={offset}',f'FF1_HOST_RESLOAD={hs["_resload"]}',f'FF1_HOST_STACK={hs["FF1PublicStackOwner"]}']
+ flags += [f'FF1_HOST_CODE_SIZE={offset}',f'FF1_HOST_RESLOAD={hs["_resload"]}',f'FF1_HOST_ABORT={hs["FF1PerformanceAbort"]}',f'FF1_HOST_STACK={hs["FF1PublicStackOwner"]}']
  args=[vasm,'-m68000' if kind=='000' else '-m68020','-Fbin','-quiet',f'-I{G}',f'-I{P}']+['-D'+f for f in flags]+['-L','fine.list','-o','fine.bin','fine.s']
  run(args,d)
  run([sys.executable,str(P/'bindings.py'),str(d),str(a.game),kind],d)
