@@ -15,6 +15,11 @@ static uae_u64 ocs_begin_cycles, ocs_cpu[4], ocs_dma_wait[2];
 void wc_ocs_dma_wait(bool bitplane) { if(ocs_active) ++ocs_dma_wait[bitplane?1:0]; }
 static std::vector<unsigned char> ocs_previous, ocs_expected;
 static unsigned ocs_target, ocs_width, ocs_height;
+// D3 optional addresses supplied from the pinned candidate symbol map. Record
+// the installed queue's actual target at return, not the C5 ready+1 assumption.
+static unsigned ocs_prediction_fields[3], ocs_queue_ret, ocs_queue_sp;
+static unsigned ocs_queue_index, ocs_queue_estimate, ocs_queue_ready, ocs_queue_predicted;
+static uae_u64 ocs_queue_cycles;
 // C5: independent completed-image bytes checked at actual bitplane DMA reads.
 static std::vector<unsigned char> ocs_reference[2], ocs_valid[2];
 static unsigned ocs_fetch_good, ocs_fetch_bad, ocs_fetch_unknown;
@@ -39,6 +44,14 @@ void wc_ocs_begin(unsigned h0,unsigned h1,unsigned mode,const char* path) {
     ocs_log=fopen(path,"wx"); if (!ocs_log) abort();
     if(mode) { std::string sources=std::string(path)+".sources";
         ocs_sources=fopen(sources.c_str(),"wx"); if(!ocs_sources) abort(); }
+    for(auto& v:ocs_prediction_fields) v=0;
+    ocs_queue_ret=0;
+    const char* prediction=getenv("WC_OCS_PREDICTION_FIELDS");
+    if(prediction) {
+        if(sscanf(prediction,"%x,%x,%x", &ocs_prediction_fields[0],
+            &ocs_prediction_fields[1],&ocs_prediction_fields[2])!=3) abort();
+        for(auto v:ocs_prediction_fields) if(v<0x200000 || v>0xa00000-4) abort();
+    }
     ocs_h0=h0; ocs_h1=h1; ocs_mode=mode; ocs_field=0;
     ocs_begin_cycles=get_cycles(); ocs_active=mode!=0;
     for(auto& v:ocs_cost_ranges) v=0;
@@ -108,6 +121,13 @@ void wc_ocs_fetch(unsigned p,unsigned nr) {
 static void wc_ocs_pc(unsigned pc) {
     if (!ocs_active) return;
     unsigned off=pc-ocs_h0, sp=m68k_areg(regs,7);
+    if(ocs_queue_ret && pc==ocs_queue_ret && sp==ocs_queue_sp+4) {
+        unsigned target=get_long_debug(ocs_prediction_fields[0]);
+        fprintf(ocs_log,"Q %llu %u %u\n",(unsigned long long)ocs_queue_cycles,ocs_queue_index,target);
+        fprintf(ocs_log,"G %llu %u %u %u %u\n",(unsigned long long)get_cycles(),
+            ocs_queue_estimate,target,ocs_queue_ready,ocs_queue_predicted);
+        ocs_queue_ret=0;
+    }
     // Saved return address + restored SP distinguishes nested and interrupt calls.
     for (size_t n=0;n<ocs_scopes.size();++n) {
         const auto s=ocs_scopes[n];
@@ -116,8 +136,17 @@ static void wc_ocs_pc(unsigned pc) {
             (unsigned long long)s.start,regs.regs[0]);
         ocs_scopes.erase(ocs_scopes.begin()+n); break;
     }
-    if(off==0x33442) fprintf(ocs_log,"Q %llu %u %u\n",(unsigned long long)get_cycles(),
-        get_word_debug(ocs_h0+0x331d8),get_long_debug(ocs_h1+0x77fe)+1);
+    if(off==0x33442) {
+        if(ocs_prediction_fields[0]) {
+            if(ocs_queue_ret) abort();
+            ocs_queue_ret=get_long_debug(sp); ocs_queue_sp=sp; ocs_queue_cycles=get_cycles();
+            ocs_queue_index=get_word_debug(ocs_h0+0x331d8);
+            ocs_queue_ready=get_long_debug(ocs_h1+0x77fe)+1;
+            ocs_queue_estimate=get_long_debug(ocs_prediction_fields[1]);
+            ocs_queue_predicted=get_word_debug(ocs_prediction_fields[2]);
+        } else fprintf(ocs_log,"Q %llu %u %u\n",(unsigned long long)get_cycles(),
+            get_word_debug(ocs_h0+0x331d8),get_long_debug(ocs_h1+0x77fe)+1);
+    }
     const unsigned scopes[]={0x2be,0x2e6,0xb80,0x32990,0x3407e,0x340ba,0x6fa,0xc748};
     for (unsigned entry:scopes) if (off==entry) {
         if (sp<0x100 || sp>0xdc0000-4 || ocs_scopes.size()>32) abort();

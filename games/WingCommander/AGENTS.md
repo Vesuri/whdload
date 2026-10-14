@@ -1,10 +1,12 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current status: P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D2 are complete.
+Current status: P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D3 are complete.
 D1 verifies OCS timing owners and 10 Hz units with native CPU checks; its input
 queue/edge ABI differs from CD32. D2 integrates the opt-in 10 Hz flight clock with retained catch-up debt and
-world-owned side effects. D3 input/prediction is next.
+world-owned side effects. D3 adds field input and bounded renderer prediction;
+D4 intro integration is next. A500 sustained-fire overload and low display
+throughput remain measured E1 gaps.
 Normal OCS and CD32 slaves remain byte-identical. C2 recommends
 native blitter on the measured 68000 and no-Fast 68020 profiles; CPU/Fast longword
 conversion wins the measured 14 MHz 68020/Fast profile. These are scoped emulator

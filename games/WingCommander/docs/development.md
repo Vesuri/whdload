@@ -4020,3 +4020,80 @@ python3 tools/reconstruct.py --variant cd32 --release --output tmp/p13d2-cd32-co
 The hashes remain `172d3297…`, `eec155c9…` and `fdd92fbb…` respectively. Live NTSC,
 full campaign/modal/UI compatibility and heavier scenes remain later acceptance;
 PAL/NTSC scheduler arithmetic and a native pause return are covered locally.
+
+## P13D3: OCS input and presentation candidate
+
+`--prediction` implies `--clock`. The default candidate, original OCS and CD32
+release remain the controls; this is not a release archive. The native checker
+uses the retained D2 simulator fixture (`tmp/p13d2-final-on`), which can be
+regenerated with the preceding D2 procedure. All generated material remains in
+`tmp/`. Use fresh output names for repeat runs.
+
+```sh
+. amiga/env.sh
+/bin/bash tools/inputs.sh verify
+python3 tools/ocs_memory_build.py --prediction --output tmp/p13d3-candidate
+python3 tools/ocs_prediction_check.py tmp/p13d3-candidate --output tmp/p13d3-native-final5
+python3 tools/ocs_memory_install_check.py tmp/p13d3-candidate --output tmp/p13d3-install-final
+python3 tools/ocs_memory_build.py --prediction --backend cpu --output tmp/p13d3-cpu-candidate
+python3 tools/ocs_publication_debugger.py --output tmp/p13d3-debugger
+```
+
+The last command reuses the pinned C2 source input and C5/C6 DMA correction,
+adding the D3 read-only queue-target observation. It does not edit the shared
+emulator. Native CPU tests require executable JIT memory; live checks require the
+project-owned local debugger connection.
+
+```sh
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae" WARP=1
+export SLAVE="$PWD/tmp/p13d3-candidate/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --calibrate --output tmp/p13d3-layout-final
+```
+
+The A500 driver traces ten fields after completed tick two, then observes a
+200-field **coasting** window. The legacy output name `fire` is retained, but
+`flight_input` records the actual input. The 68020 driver holds fire for 150 fields
+after tick two, compares completed ticks 41/51, and traces ten fields after tick
+41. Both reach name entry. These windows exclude native post-flight calls from
+scheduler cadence. The observer reads actual queue targets from the verified
+candidate symbol map. Default `--prediction-mode auto` uses measured service
+cost; `on` and `off` are diagnostic data controls with identical code/layout.
+
+```sh
+python3 tools/ocs_boot_gate.py --ownership --simulator \
+  --clock-build tmp/p13d3-candidate --baseline on \
+  --layout tmp/p13d3-layout-final/layout.json --output tmp/p13d3-final-a500
+python3 tools/ocs_boot_gate.py --ownership --simulator \
+  --clock-build tmp/p13d3-candidate --baseline off \
+  --layout tmp/p13d3-layout-final/layout.json --output tmp/p13d3-final-a500-off
+python3 tools/ocs_prediction_report.py tmp/p13d3-final-a500 \
+  --build tmp/p13d3-candidate --output tmp/p13d3-a500-final-report
+python3 tools/ocs_publication_report.py tmp/p13d3-final-a500 \
+  --build tmp/p13d3-candidate --observer-off tmp/p13d3-final-a500-off \
+  --output tmp/p13d3-a500-final-observer
+export SLAVE="$PWD/tmp/p13d3-cpu-candidate/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --calibrate \
+  --output tmp/p13d3-layout-cpu
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --simulator \
+  --clock-build tmp/p13d3-cpu-candidate --prediction-mode on --baseline on \
+  --layout tmp/p13d3-layout-cpu/layout.json --output tmp/p13d3-final-cpu-on
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --simulator \
+  --clock-build tmp/p13d3-cpu-candidate --prediction-mode off --baseline on \
+  --layout tmp/p13d3-layout-cpu/layout.json --output tmp/p13d3-final-cpu-off
+python3 tools/ocs_prediction_report.py tmp/p13d3-final-cpu-on \
+  --build tmp/p13d3-cpu-candidate --compare-off tmp/p13d3-final-cpu-off \
+  --output tmp/p13d3-cpu-comparison
+python3 tools/ocs_publication_report.py tmp/p13d3-final-cpu-on \
+  --build tmp/p13d3-cpu-candidate --output tmp/p13d3-cpu-pixels
+python3 tools/ocs_publication_report.py tmp/p13d3-final-cpu-off \
+  --build tmp/p13d3-cpu-candidate --output tmp/p13d3-cpu-off-pixels
+```
+
+The stock-clock checks and 512 KiB Chip/4 MiB Fast selection remain mandatory.
+The cost report measures complete owned calls in the ten-field Barto trace,
+including native callees/interrupts and excluding boundary calls; it does not
+misattribute tail-dispatched input as an owned RTS scope. Native tests separately
+cover PAL/NTSC arithmetic, keyboard FIFO wrap, field gaps/overflow, modal resets
+and view-cut invalidation. Live all-view/NTSC/campaign acceptance remains E2.
+Repeat the preceding normal-build regressions with fresh D3 output names: hashes
+remain `172d3297…`, `eec155c9…` and `fdd92fbb…`. D4 intro work is separate.

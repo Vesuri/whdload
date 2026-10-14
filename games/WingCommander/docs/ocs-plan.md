@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D2 are complete**;
+The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D3 are complete**;
 the remaining work items below are pending, in dependency order.
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -286,7 +286,7 @@ normal-load gate. Completed ticks are distinct from issued work; native
 post-flight calls are excluded from that cadence. See the
 [D2 evidence and limits](internals.md#p13d2-ocs-authoritative-flight-clock).
 
-**P13D3 — Port responsive input and renderer-only prediction.** Depends on D2, C5.
+**P13D3 — Port responsive input and renderer-only prediction (complete).** Depends on D2, C5.
 Reuse player/camera and world-pose algorithms, native inertia and selective
 backup/restore with OCS field definitions and 68000-safe arithmetic. Predict to
 the actual backend's publication time, including pending work. Carry over the
@@ -297,6 +297,13 @@ Gate: world state restores exactly, first-interval shots move, slot reuse and
 view cuts reject stale history, and prediction stays within the shared bound.
 Measure overhead on 68000; avoid useless extrapolation work when no intermediate
 picture can be displayed without changing authoritative simulation policy.
+The opt-in candidate passes native 68000/68020 input, restore, first-interval
+player/AI shot, stale-history and forecast-bound checks. CPU/Fast prediction on/off
+preserves authoritative state at matched ticks; both backends pass live pixel
+checks. The A500 coasting window holds 9.98 world updates/s but displays 0.75
+pictures/s, and early sustained fire overloads it. E1 owns these measured world,
+input-geometry and display bottlenecks; no smooth-A500 claim follows from D3.
+See the [D3 evidence and limits](internals.md#p13d3-ocs-field-input-and-bounded-presentation).
 
 **P13D4 — Apply the same model to the OCS world-based intro.** Depends on D3.
 Port the shared title/asteroid world clock and prediction with OCS script data:
@@ -338,7 +345,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D2 are complete. **P13D3** is next.
+P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D3 are complete. **P13D4** is next.
 Use the scoped measured profiles and retain native fallback/override
 for unknown accelerators. C4 creates source ownership before native compositor aliases; C5 now protects
 pending/displayed ownership through publication and transitions. Broader

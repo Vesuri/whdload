@@ -6255,5 +6255,158 @@ All eight observer-off checkpoints match game, Chip and owned state exactly.
 Deliberately corrupted pixels, publication timing/ownership and world position
 are rejected. Accepted reports are `tmp/p13d2-clock-final/`,
 `tmp/p13d2-install-final/`, `tmp/p13d2-timing-final/` and
-`tmp/p13d2-publication-final/`. Reports, snapshots and instructions remain in `tmp/`. D3 is next; world-based
+`tmp/p13d2-publication-final/`. Reports, snapshots and instructions remain in `tmp/`. D3 input/prediction is described below; world-based
 intro changes remain D4 and CD32 E1/phase 12 remain paused.
+
+### P13D3: OCS field input and bounded presentation
+
+The opt-in `--prediction` candidate extends `--clock`; normal OCS, the default
+allocation/publication candidate and CD32 release remain unchanged. The shared
+player, translation, scene, selective-save and projectile algorithms are linked
+through `ocs_prediction_source.py` with explicit OCS fields and native calls.
+They are assembled for 68000. OCS addresses below are code-hunk offsets (add
+`002c` for file offsets); `OD:` identifies data-hunk offsets.
+
+**Input and authoritative motion.** The existing VBL/publication wrapper records
+one immutable sample after its blanking-critical publication work. Each of 64
+144-byte records contains field time, the native nine-byte port-one record plus
+padding, the 128-byte held-key image, and the keyboard producer cursor. It calls
+native `O:33f24` and `34606`, preserving their ABI and the original IRQ work.
+Hooks at `182de/182e8/18d2e` replay joystick, held keys and commands respectively.
+Native keyboard events remain in their original FIFO and stop at the captured
+producer. Joystick fire/edge pulses accumulate until their tick, then consume
+once. A future sample cannot affect an earlier field. Ring overflow never
+replaces unread samples or discards clock debt: missing intervals explicitly use
+the last held state with pulses cleared and increment a missing-sample counter.
+This is degraded input evidence, not an invented reconstruction of lost events.
+Modal/flight rebasing flushes replay and identity/pose history.
+
+Player rotation and translation advance once per consumed field, including on
+A500 when renderer prediction is disabled. Native control ramps, throttle,
+firing, fuel, actions and collisions remain tick-owned. Native `O:183e4/073e`
+provide the control preview; `18574/18528/1853a` suppress its fire/throttle side
+effects. Rotation seam `7938` and acceleration/position seams `7df0/7e2c` avoid
+applying the controlled player's field motion again in the scheduled world.
+Other objects and native modal paths retain their original motion.
+The native inertia solver `7cee` and axis rotations `29d26/29d66/29da6` are reused.
+
+Two exact 68000 shortcuts avoid unnecessary cost. Small signed increments use
+native word division, with the shared long quotient/remainder algorithm retained
+outside the proven range. A zero acceleration result is reused only within a
+world interval, with unchanged velocity, forward basis, model, action and set
+speed. Every world/modal boundary invalidates it. Disabling this cache produces
+the same tested player trajectory. Before input, `O:29114` filters the geometry
+pass to classes above three; decorative sky directions are unnecessary for
+input predicates. Full world and rendering geometry still process every native
+class. Tests compare all gameplay-object projection records against the full
+native pass. This filter neither changes class storage nor skips world work.
+
+**Prediction and identity.** Authoritative snapshots retain native position,
+velocity, basis, angular steps, class, model, action and lifetime/cooldown. The
+renderer stages bounded poses, rebuilds geometry and restores occupied slots plus
+camera/scratch slots 61–63. OCS previous-range history is `OD:d50a`, separate from
+current range `a52c`; both are restored. The OCS projection selector `OD:5292`
+is backed up separately. No prediction call performs AI, random choice, spawning,
+collision, fuel consumption or discrete animation advancement. D2's allocation
+owners and private drawing RNG remain in force.
+
+Completed constructor exits `O:c688` (gun), `c08c` (approximate shot) and `c7d4`
+(missile) certify native player/AI identities. Initialization exit `97c8` revokes
+certificates even on same-class/model slot reuse. Certificates cannot bypass a
+view cut, missing initial snapshot, identity mismatch, death or jump. Shooter
+cooldown reloads are recorded separately and are not player resets. A projectile
+with zero native velocity is not given invented motion; movable shots can be
+predicted during their first completed-world interval.
+
+The forecast uses the selected backend's last complete drawing/conversion
+service time, the field cursor/fraction and pending-publication state. The bound
+remains one world tick plus two display fields. Before claiming a new staged
+picture, the existing conversion/publication ownership is drained. A latched
+forecast survives restoration while native blitter conversion is asynchronous;
+the queue chooses the later of actual readiness plus one field and the forecast.
+It cannot publish a forecast early. Service variation can still make a picture
+late; prediction is not extended beyond its shared bound to hide that miss.
+The read-only observer records the installed queue's target at its actual return,
+rather than assuming the old ready-plus-one rule.
+
+Renderer-only work is skipped when measured service leaves no room for an
+intermediate picture. This does not change input integration or authoritative
+tick policy. Diagnostic on/off modes exercise both paths using data options,
+not host instruction patches. These modes are validation controls, not a new
+public release-option contract. World-based intro timing remains P13D4.
+
+**D3 gate complete, with performance gaps.** The retained native and CPU-override
+candidates are each 38,364 bytes, SHA-256
+`0aafdaccd5894b55d0865d46b2a084ebcf45c5dfbc2645146d1390b9557fadd6`
+and `d5aa6bafdd4de0cead966bfcea11a2ff0bd2b0f4305f109266d1d73bc4fb0b89`.
+The project-local observer debugger is
+`de7ed020a0af09491b21fe17ff79d93a6056fb9c02b63fb47039d2ea1cdfa5bf`.
+Normal allocation/publication, original OCS and CD32 release control hashes remain
+`172d3297…`, `eec155c9…` and `fdd92fbb…` respectively.
+
+`tmp/p13d3-native-final5/report.json` passes both M68000 and M68020 functional
+models. It checks full native data restoration after staging/projection,
+including a deliberately nondefault projection selector; 66 actual native
+constructor cases cover shooters 0/1/9 and weapons 24–33/48, with five first-interval
+samples each. Constructor data/register results match unpatched native calls.
+Zero-velocity native outcomes remain stationary. Reuse, dead/missing/expired
+history, model/view/jump cuts, simultaneous mounts and cooldown distinctions are
+checked. Input tests cover immutable records, once-only consumption, future-field
+gaps, full rings, keyboard FIFO wrap/producer boundaries and modal rebasing.
+PAL/NTSC turning/release trajectories match with renderer prediction disabled or
+enabled and acceleration caching disabled; 108 short/long fraction boundary
+cases pass. These are functional CPU tests, not timing measurements.
+`tmp/p13d3-install-final/report.json` passes 600 guarded installation cases.
+
+The live windows use calibrated PAL models with 512 KiB Chip and 4 MiB actual Fast
+RAM. A500 uses native blitter; the 14 MHz 68020 uses forced CPU/Fast longword C2P.
+The different input windows below are **not** a cross-machine speed comparison.
+
+| Window | Elapsed seconds | Completed world ticks | Actual new pictures | Display rate |
+|---|---:|---:|---:|---:|
+| A500 automatic policy, coast | 4.0064 | 40 | 3 | 0.749/s |
+| 68020 forced prediction, held fire | 3.0048 | 29 | 23 | 7.654/s |
+| 68020 prediction off, held fire | 3.0048 | 29 | 28 | 9.318/s |
+
+The A500 window is 9.984 completed ticks/s. The 68020 windows are within one tick
+of their 30-tick window expectation; matched authoritative world/event state at
+completed ticks 41 and 51 is byte-identical on/off. A deliberately changed
+position is rejected. Both machines have zero missing/overflow input samples.
+Maximum retained backlog is 12 fields on A500 and six/five on 68020 on/off.
+Eighteen of 23 predicted CPU queues meet their forecast, five arrive one field
+late. A500 disables prediction after measuring six-field service; its one
+predicted queue is two fields late. No forecast is published early, and the shared
+extrapolation bound is not enlarged. Forced prediction is slower here; this is
+correctness evidence, not a claim of smoother or faster presentation.
+
+The A500 ten-field Barto trace measures ten input records at 0.306 ms each;
+eleven field-player calls average 1.459 ms (maximum 3.280 ms), and two complete
+world/preparation calls average 62.260 ms (maximum 62.445 ms). These inclusive
+scopes include native callees and interrupts, exclude calls crossing trace
+boundaries, and do not stand in for the separate input-geometry cost.
+Early sustained fire remains overloaded: the retained exploratory
+`tmp/p13d3-final-native` trace contains a 103.650 ms complete world/preparation
+call and input refresh/dispatch calls of 31.431/29.410 ms. Retained catch-up work
+prevents drawing in that 150-field firing window. That run did not finish the
+name-prompt harness and is **not** accepted as a complete live gate. E1 must
+address this measured world/input-geometry budget and low A500 display throughput;
+D3 does not silently drop authoritative ticks to recover display speed.
+
+The accepted A500 run reaches visible name entry and passes 31 completed-image
+checks across intro/coasting. Actual DMA checks cover 2,091,592 intro and 914,612
+flight words with zero mismatches; 60,204 and 1,776,836 words respectively lack a
+known reference and are reported as unverified, not counted as pixel proof.
+The 68020 on/off runs pass 89/94 completed-image checks including their unchanged
+intro. Pixel corruption, late restart, wrong forecast and wrong published owner
+negative controls are rejected. The exact A500 observer-off control matches all
+eight game/Chip/owned-state checkpoints. Accepted reports are:
+
+- `tmp/p13d3-a500-final-report/report.json` and
+  `tmp/p13d3-a500-final-observer/report.json`;
+- `tmp/p13d3-cpu-comparison/report.json`,
+  `tmp/p13d3-cpu-pixels/report.json` and
+  `tmp/p13d3-cpu-off-pixels/report.json`.
+
+All views, live NTSC, full campaign/save/load and hardware acceptance remain E2;
+OCS intro integration is D4. The complete native pose restore and matched
+prediction-on/off state checks satisfy D3 without implying those later gates.

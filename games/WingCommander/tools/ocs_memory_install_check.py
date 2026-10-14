@@ -16,6 +16,9 @@ def check(build):
     if b.get('clock'):
         from ocs_clock_source import NOPS, MODALS
         guard_offsets+=NOPS+tuple(at for off,width,_,_ in MODALS for at in range(off+6,off+width,2))
+    if b.get('prediction'):
+        from ocs_prediction_source import NOPS as prediction_nops
+        guard_offsets+=prediction_nops
     results=[]
     for slave in (0x500000,0xc00000):
         for flags,cpu in ((0,0),(1,10),(2,20),(4,30),(8,40),(128,60)):

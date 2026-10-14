@@ -32,6 +32,7 @@ def main():
     p.add_argument('--views', action='store_true', help='C5 diagnostic native view transitions (simulator disables view keys)')
     p.add_argument('--ownership', action='store_true', help='C4 candidate transition gate')
     p.add_argument('--clock-build',help='D2 candidate build directory')
+    p.add_argument('--prediction-mode',choices=('auto','off','on'),default='auto')
     p.add_argument('--draw-every',type=int,choices=(1,2,5),default=1)
     p.add_argument('--cpu', choices=('68000','68020'), default='68000')
     p.add_argument('--fast-kib', type=int, choices=(1024,2048,4096), default=4096)
@@ -70,6 +71,11 @@ def main():
                AMIGA_SETUP='a500', WC_VARIANT='ocs', WHD_ARGS='', OCS_STOCK_CLOCK='1' if a.baseline or a.ownership else '0')
     if a.ownership:
         env['EXTRA_ARGS']=f'--uae_cpu_model={a.cpu} --fast_memory={a.fast_kib}'
+    if a.clock_build and a.layout:
+        candidate=json.loads((ROOT/a.clock_build/'build.json').read_text())
+        if candidate.get('prediction'):
+            location=json.loads((ROOT/a.layout).read_text())['slave'];symbols=candidate['symbols']
+            env['WC_OCS_PREDICTION_FIELDS']=','.join(f'{location+symbols[n]:x}' for n in ('ocs_target_field','release_render_time','ocs_prediction_queued'))
     server = Server('wc-gate',root=str(ROOT),run_dir='amiga/'+run,profile_window=False)
     g = None
     actions = []
@@ -188,16 +194,28 @@ def main():
                 sy=build['symbols'];sb=layout['slave']
                 path=out/'clock-schedule.bin';path.write_bytes(struct.pack('>I',a.draw_every))
                 command(f'monitor ocs-load {sb+sy["ocs_clock_draw_every"]:x} "{path}"')
+                if a.prediction_mode!='auto':
+                    if not build.get('prediction'):raise ValueError('prediction mode requires D3 build')
+                    path=out/'prediction-mode.bin';path.write_bytes(struct.pack('>H',1 if a.prediction_mode=='off' else 2))
+                    command(f'monitor ocs-load {sb+sy["ocs_prediction_mode"]:x} "{path}"')
                 clock_samples=[]
-                for tick in (2,11,21,31):
+                for tick in ((2,51) if build.get('prediction') and a.cpu=='68000' else (2,41,51) if build.get('prediction') else (2,11,21,31)):
                     until(sb+sy['ocs_clock_tick_done'],f'completed clock tick {tick}',
                           f'*(unsigned int*){sb+sy["ocs_clock_completed"]:#x} == {tick}')
                     dump(f'tick{tick}-data.bin',layout['hunks'][1],layout['hunks'][1]+SIZES[1])
                     dump(f'tick{tick}-clock.bin',sb+sy['ocs_clock_state'],sb+sy['ocs_clock_cancel']+2)
                     field=int.from_bytes(dump(f'tick{tick}-field.bin',layout['hunks'][1]+0x77fe,layout['hunks'][1]+0x7802),'big')
                     clock_samples.append(dict(tick=tick,field=field))
-                (out/'clock-samples.json').write_text(json.dumps(dict(samples=clock_samples,draw_every=a.draw_every,build_sha256=build['sha256']),indent=2)+'\n')
-                until(sb+sy['ocs_clock_iteration'],'clock picture completed')
+                    if build.get('prediction') and ((tick==2 and a.cpu=='68000') or (tick==41 and a.cpu!='68000')):
+                        command('monitor trace-window-all')
+                        command(f'monitor profile 10 "" "{out}/prediction-cost.bin"',timeout=120)
+                    if tick==2 and build.get('prediction') and a.baseline:
+                        if a.cpu!='68000':key(1,'40')
+                        baseline('fire',200 if a.cpu=='68000' else 150)
+                        if a.cpu!='68000':key(0,'40')
+                (out/'clock-samples.json').write_text(json.dumps(dict(samples=clock_samples,draw_every=a.draw_every,prediction_mode=a.prediction_mode,build_sha256=build['sha256']),indent=2)+'\n')
+                if not (build.get('prediction') and a.cpu=='68000'):
+                    until(sb+sy['ocs_clock_iteration'],'clock picture completed')
             else:
                 until(h0+0x06c2, 'simulator first iteration O:06c2')
             capture('simulator')
@@ -213,9 +231,9 @@ def main():
                         raise ValueError('view request not stored')
                     until(h0+0x06c2, f'diagnostic native view {view} active', f'*(short*)($a4-18318) == {view}')
                     baseline(f'view{view}',a.view_fields)
-            if a.baseline:
+            if a.baseline and not (a.clock_build and build.get('prediction')):
                 key(1, '40')  # Native Space: fire, no artificial game writes.
-                baseline('fire',100 if a.clock_build else 250)
+                baseline('fire',150 if a.clock_build and build.get('prediction') else 100 if a.clock_build else 250)
                 key(0, '40')
             # A fast run can enter the prompt during the final capture. Its
             # recurring input loop is a reliable endpoint even then.
@@ -261,7 +279,7 @@ def main():
             metadata['checkpoints'] += ['view2','view1','view3','view0']
             metadata['view_fields']=a.view_fields
         if a.baseline:
-            metadata.update(baseline=a.baseline, fields_per_window=250, fire_fields=100 if a.clock_build else 250)
+            metadata.update(baseline=a.baseline, fields_per_window=250, fire_fields=(200 if a.cpu=='68000' else 150) if a.clock_build and build.get('prediction') else 100 if a.clock_build else 250, flight_input='coast' if a.clock_build and build.get('prediction') and a.cpu=='68000' else 'held fire')
             metadata['checkpoints'] += ['asteroids', 'fire']
         (out/'result.json').write_text(json.dumps(metadata, indent=2)+'\n')
     except Exception:

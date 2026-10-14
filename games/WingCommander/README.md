@@ -3,12 +3,13 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D2 complete: OCS conversion/display work and an opt-in 10 Hz flight clock.** The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D3 complete: OCS conversion/display work and an opt-in 10 Hz flight clock.** The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
-The D2 candidate preserves overdue ticks and moves draw-driven world effects to
-ticks. Native CPU and bounded A500 simulator checks pass; the measured firing
-window displays about 3.5 pictures/s. Responsive input/prediction is D3, and
-intro timing is D4. See the [D2 gate](docs/internals.md#p13d2-ocs-authoritative-flight-clock).
+The opt-in D3 candidate adds field input, bounded renderer prediction and first-interval
+player/AI projectile motion. Native CPU, state restoration and live pixel checks
+pass. The A500 coasting window holds 9.98 world updates/s but displays only 0.75
+pictures/s; sustained-fire overload remains an E1 performance gap. Intro timing
+is D4. See the [D3 evidence and limits](docs/internals.md#p13d3-ocs-field-input-and-bounded-presentation).
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting
 by CPU and memory configuration. Matched emulator windows favour native blitter on 68000 and no-Fast 68020,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the C4–D2 OCS allocation/publication/clock candidate; generated slave in tmp/."""
+"""Build the C4–D3 OCS allocation/publication/clock candidate; generated slave in tmp/."""
 import argparse
 import hashlib
 import json
@@ -37,14 +37,19 @@ HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x334b6,'ocs_publish_close',0x4ef9))
 
 
-def build(out,option,exit_probe=False,changed="off", clock=False):
+def build(out,option,exit_probe=False,changed="off", clock=False, prediction=False):
     hooks=HOOKS+(((0x16992,'exit_probe_entry',0x4eb9),(0x18d14,'view_probe_entry',0x4ef9)) if exit_probe else ())
     if changed != 'off': hooks+=((0x3250c,'ocs_changed_borrow',0x4ef9),)
     native=dict(NATIVE)
+    clock = clock or prediction
     if clock:
         from ocs_clock_source import NATIVE as clock_native, HOOKS as clock_hooks, MODALS, NOPS
         native.update(clock_native)
         hooks+=clock_hooks+tuple((off,'ocs_clock_modal_'+name,0x4ef9) for off,_,name,_ in MODALS)
+    if prediction:
+        from ocs_prediction_source import HOOKS as prediction_hooks, NOPS as prediction_nops
+        hooks+=prediction_hooks
+        native.update(OCS_PAD=0x33f24,OCS_KEYS=0x34606,OCS_GUN_RETURN=0xc226)
     original=(ROOT/ocs.SLAVE).read_bytes()
     require(hashlib.sha256(original).hexdigest()==SLAVE_SHA,'changed original slave')
     game=(ROOT/ocs.GAME).read_bytes();guard_game(game)
@@ -232,8 +237,13 @@ game_base: dc.l 0
     if clock:
         from ocs_clock_source import source as clock_source
         text+='\n'+clock_source(ROOT,game)
+        if prediction:
+            from ocs_prediction_source import source as prediction_source
+            from shared_cpu import select
+            text+='\n'+prediction_source(ROOT)+'\n'+select((ROOT/'whdload/ocs_prediction.s').read_text(),'68000')
+            text=prediction_clock(text)
         # Extra overwritten words are separately guarded before any mutation.
-        nops=NOPS+tuple(at for off,width,_,_ in MODALS for at in range(off+6,off+width,2))
+        nops=NOPS+(prediction_nops if prediction else ())+tuple(at for off,width,_,_ in MODALS for at in range(off+6,off+width,2))
         checks=''.join(f' movea.l d6,a5\n adda.l #${off:x},a5\n cmpi.w #${int.from_bytes(game[44+off:46+off],"big"):x},(a5)\n bne.w wrong_revision\n' for off in nops if off not in (0x878,0x87a,0x9c2,0x9c4))
         for off in (0x878,0x9c2):
             checks+=f' movea.l d6,a5\n adda.l #${off:x},a5\n move.l d6,d0\n addi.l #${int.from_bytes(game[44+off:48+off],"big"):x},d0\n cmp.l (a5),d0\n bne.w wrong_revision\n'
@@ -319,10 +329,37 @@ view_probe_request: dc.l 0
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
                 workspace='native combined Chip allocation retained for fallback',
-                live_validated=False,clock=clock)
+                live_validated=False,clock=clock,prediction=prediction)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 
+
+def prediction_clock(text):
+    # Keep the D2 control exactly reproducible; integrate D3 only when requested.
+    text=text.replace('        bsr.w   ocs_publish_vblank',
+                      '        bsr.w   ocs_publish_vblank\n        bsr.w ocs_input_record')
+    text=text.replace('ocs_clock_rebase:\n','ocs_clock_rebase:\n        bsr.w ocs_prediction_rebase\n')
+    text=text.replace('        bsr.w ocs_clock_tick\n        subq.w',
+        '        lea timing_in_world(pc),a0\n        move.w #1,(a0)\n        bsr.w ocs_clock_tick\n        lea timing_in_world(pc),a0\n        clr.w (a0)\n        subq.w')
+    text=text.replace('ocs_clock_tick_done:', '        bsr.w ocs_prediction_snapshot\nocs_clock_tick_done:')
+    text=text.replace('        jsr OCS_DRAW\n', '        bsr.w ocs_prediction_begin\n        jsr OCS_DRAW\n        bsr.w ocs_prediction_end\n')
+    text=text.replace('        move.l ocs_clock_dirty(pc),d0\n        cmp.l',
+        '        move.l a0,-(sp)\n        lea ocs_prediction_fast(pc),a0\n        tst.w (a0)\n        movea.l (sp)+,a0\n        bne.s ocs_prediction_draw_ready\n        move.l ocs_clock_dirty(pc),d0\n        cmp.l',1)
+    text=text.replace('        bsr.w ocs_clock_draw\n', 'ocs_prediction_draw_ready:\n        bsr.w ocs_clock_draw\n',1)
+    a=text.index('.bounded:\n',text.index('ocs_clock_batch:'));b=text.index('        tst.l d0\n',a)
+    text=text[:a]+'.bounded:\n        bsr.w ocs_input_take\n        tst.w d0\n        beq.w .done\n        bsr.w ocs_prediction_field\n        move.l ocs_input_sample(pc),d0\n        move.l ocs_clock_hz(pc),d1\n        moveq #1,d2\n        lea ocs_clock_state(pc),a0\n        bsr.w timing_advance\n'+text[b:]
+    a=text.index('ocs_clock_batch:');b=text.index('ocs_clock_rebase:',a)
+    text=text[:a]+text[a:b].replace('jsr OCS_FLIGHT_INPUT','bsr.w ocs_prediction_input')+text[b:]
+    # Never present a forecast before its named target. Late service remains
+    # measured lateness, not permission to extrapolate past the shared bound.
+    text=text.replace('ocs_publish_queue:\n', 'ocs_publish_queue:\n        bsr.w ocs_prediction_completed\n')
+    text=text.replace('        move.l  d0,(a1)\n        lea     ocs_pending(pc),a1',
+        '        move.l a0,-(sp)\n        lea ocs_prediction_queued(pc),a0\n        move.w (a0),-(sp)\n        clr.w (a0)\n        tst.w (sp)+\n        movea.l (sp)+,a0\n        beq.s .target_ready\n        cmp.l release_render_time(pc),d0\n        bpl.s .target_ready\n        move.l release_render_time(pc),d0\n.target_ready:\n        move.l d0,(a1)\n        lea     ocs_pending(pc),a1')
+    # Kalms components reopen the same section; keep a single origin so vasm
+    # does not treat earlier absolute symbols as literal PC displacements.
+    import re
+    text=re.sub(r'^\s*section\s+code,code\s*$', '', text, flags=re.M)
+    return ' section code,code\n'+text
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',required=True)
@@ -330,7 +367,8 @@ def main():
     p.add_argument('--exit-probe',action='store_true',help='diagnostic-only native teardown and view-change triggers')
     p.add_argument('--changed',choices=('off','full','blocks'),default='off',help='C6 opt-in history candidate or equal-reservation full control')
     p.add_argument('--clock',action='store_true',help='D2 opt-in 10 Hz flight clock')
+    p.add_argument('--prediction',action='store_true',help='D3 opt-in field input and bounded prediction')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
-    r=build(out,a.backend,a.exit_probe,a.changed,a.clock);print(r['bytes'],r['sha256'])
+    r=build(out,a.backend,a.exit_probe,a.changed,a.clock,a.prediction);print(r['bytes'],r['sha256'])
 
 if __name__=='__main__':main()
