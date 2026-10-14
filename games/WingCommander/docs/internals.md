@@ -6410,3 +6410,119 @@ eight game/Chip/owned-state checkpoints. Accepted reports are:
 All views, live NTSC, full campaign/save/load and hardware acceptance remain E2;
 OCS intro integration is D4. The complete native pose restore and matched
 prediction-on/off state checks satisfy D3 without implying those later gates.
+
+### P13D4: OCS title and asteroid-credit timing
+
+P13D4 is complete for the opt-in English OCS `--intro` candidate. It implies
+D3 prediction and D2 flight timing. The required A500/Fast path remains the native
+blitter; the measured 14 MHz 68020/Fast control uses CPU longword conversion.
+The 10 Hz clock is a target, not a claim that every A500 scene sustains it.
+
+**Implementation and boundaries.** `ocs_intro_source.py` adapts the owned CD32
+`timing_intro.s` title loop with explicit OCS operands, thresholds 135/235 and
+296 updates. `ocs_intro.s` supplies the OCS world owner and retained-debt clock.
+It reuses D2's PAL/NTSC scheduler arithmetic and D3's selective pose backup,
+slot-61 scripted camera prediction, service-time forecast, native/CPU publication
+queue and exact restoration. A separate `intro_active` flag leaves flight input,
+field-integrated player controls, simulator scoring and fault polling disabled.
+
+| OCS code-hunk / file offset | D4 responsibility |
+|---|---|
+| `1ef24 / 1ef50` | Replace frame-coupled title loop; return to `O:1efb4` after exactly 296 updates or native skip |
+| `1effc / 1f028` | Consume due credit-world updates; no change to native page index or deadline origin |
+| `1f002 / 1f02e` | Stage bounded predicted poses and render world image |
+| `1f036 / 1f062` | Finish native composition/conversion, restore authoritative poses and RNG |
+| `1f066 / 1f092` | Drain publication, clear intro ownership and rebase before repeat `O:1eeb2` or exit `1f06e` |
+| `02fa / 0326` | Suppress draw-owned flash countdown while intro is active; call `O:15d1c` once per world update |
+| `0322 / 034e`, `0330 / 035c` | Existing D2 wrappers now recognize intro ownership: draw only sorts/rasterizes; asteroid allocation occurs in world work |
+| `636a / 6396` | Existing emission wrapper uses world rather than draw counter during intro too |
+
+Native `O:28548` normally calls geometry `290fa`, debris `27cfa`, flames `281c0`,
+attachments `2837a`, sort `2ba2c` and raster `2bab4`. D4 runs the first four once
+per world update, followed by asteroid cleanup/spawn `9618` when `OD:8902.l`
+enables it. Asteroid cleanup `O:9528` tests draw-counter modulo 20; the adapter
+temporarily supplies world counter `OD:88da` and restores `88de`. Allocation
+`O:9682→9410→8ec2` and its RNG therefore persist into the next snapshot. The
+20-slot asteroid list is `OD:5294`; the live credit asteroids have class 9 at
+`OD:8e8c+2*i`. Rendering cannot allocate another population or advance the flash
+countdown. Render RNG is isolated from the authoritative seed `OD:6f9a`.
+
+At most four due updates are issued per intro UI iteration. The adapter feeds
+small field increments to the shared scheduler, retaining excess fields behind
+its cursor instead of invoking the shared discard policy. Credit rendering/input
+and native field deadlines remain serviced between batches. Overload can thus
+leave world debt at a scene boundary; a repeat/exit intentionally rebases it,
+just as other modal transitions do. E1 owns the measured A500 overload below.
+Prediction uses the same one-tick-plus-two-field bound and measured service gate
+as flight; slow rendering disables prediction without scaling native velocities.
+
+Native text/page comparisons remain at `O:1f008–1f014` (220 fields) and
+`1f04c–1f058` (320 fields). The 15-page table and `1f060` limit are untouched.
+Music setup/IRQ/CIAB ownership (`O:267d2`, `2688c`, `26ece/26ef8`) is unchanged.
+This preserves native music/credit pacing; independent audio-cue measurement and
+live NTSC playback remain E2. The CPU tests execute both native deadline edges.
+
+Other cinematics are separate: `O:1f760` loads scene 18 at `1f7ce`, installs its
+own script at `1f834`, and calls world/draw at `1f8d8/1f8de`; `O:1fc8c` loads scene
+19 at `1fcfe`, installs script `1fd4e`, and loops through `1fd6e/1fd74`. Neither
+enters the D4 title/credit hooks. The separate Origin animation is also unchanged;
+the live driver reaches its native input poll `O:180c8` before skipping it.
+Full ending/campaign cinematic coverage remains E2, not inferred from intro tests.
+
+Startup tables now exceed a signed PC-relative displacement: D4 obtains them
+from the nearby installer plus a long offset. Native operand fixups are limited
+to the payload before the tables. Otherwise the word pair spanning hook offset
+`O:1f002` and its JSR opcode resembles a relocation sentinel and corrupts the
+hook table. All 672 startup/revision/corrupted-site cases pass, including the
+actual installed destinations. Older build modes retain their exact bytes.
+
+**Acceptance.** Native M68000/M68020 checks in
+`tmp/p13d4-native-final2/report.json` cover PAL/NTSC, wrap, six schedules per CPU,
+long retained-debt gaps, 48 total pose/restoration cases, 296 title ticks in
+1,480 simulated PAL fields, both credit exits, world-only asteroid/flash owners,
+emission and the 219/220/319/320-field native deadline edges. The existing D3
+input, player/AI projectile and geometry-restoration suite also passes in
+`tmp/p13d4-d3-regression5/`; startup checks are in `tmp/p13d4-install5/`.
+These functional CPU fixtures are not performance instruments.
+
+The calibrated PAL live gates use the unchanged D3 debugger, SHA-256
+`de7ed020a0af09491b21fe17ff79d93a6056fb9c02b63fb47039d2ea1cdfa5bf`.
+Both machines have 512 KiB Chip and 4 MiB true Fast RAM. Each measured credit
+window is 250 fields / 5.007972 seconds, with actual DMA publication counting:
+
+| Candidate / run | World updates | Display changes | Predicted queues | Completed pixel checks |
+|---|---|---|---|---|
+| A500 native, `tmp/p13d4-live-a5005` | 37 / **7.39 Hz** | 18 / **3.59 Hz** | 0 | 18 |
+| 68020/Fast CPU, `tmp/p13d4-live-cpu5` | 50 / **9.98 Hz** | 69 / **13.78 Hz** | 34 | 68 |
+
+The A500 **does not sustain the target in this asteroid window**. It retains
+pending world work and skips useless prediction; world/preparation/render cost
+is an explicit E1 gap. This is not 25/50 FPS or hardware acceptance. The subsequent
+A500 coasting window reaches 9.98 world updates/s and 2.00 displayed pictures/s;
+its different intro history prevents treating that as an improvement over D3's
+older trajectory. The existing sustained-fire overload remains open.
+
+The 020 run captures all 15 pages, the repeat boundary, another 296-update title,
+repeated credits, menu, simulator and visible name entry. Fourteen page-start
+intervals are 320–323 fields; the last page to the captured repeat boundary is
+324 fields, including publication drain. Every page has live asteroid slots and
+visible grey asteroid shapes; the image check combines native class/list evidence
+with connected grey components, not a claim that screenshots alone identify
+objects. First credit submission can precede the first asteroid world update;
+visibility checks use the settled window/pages. Native text/music deadlines were
+not slowed to disguise world overload.
+
+`tmp/p13d4-cpu-intro-final/` and `tmp/p13d4-a500-intro5/` record the intro gate.
+`tmp/p13d4-cpu-pixel-report5/` and `tmp/p13d4-a500-observer5/` pass actual-DMA pixels,
+queue/deadline ownership and corruption rejection. Credit DMA coverage verifies
+2,124,456 words on 020 and 2,102,736 on A500; 34,544 / 51,588 words respectively
+remain unknown and are not counted as pixel proof. The A500 observer-off control
+matches all game hunks, Chip bytes and owned payload state at eight checkpoints.
+Both runs leave `intro_active` clear through menu, flight and name entry.
+
+Final native and CPU candidates are each **39,784 bytes**, SHA-256 respectively
+`e32ece478a3797b8ff763b9047de59c0f97bd8c0600f021712438f93723754e0` and
+`1af3f4b4a01b0924ea2d940198b03cf80ec6a4d98f45d4c9ed6f18b526a10ac1`.
+D3-only, default candidate, original OCS and CD32 release controls retain hashes
+`0aafdacc…`, `172d3297…`, `eec155c9…` and `fdd92fbb…`. Generated material stays
+under `tmp/`; no release archive or shared-emulator update is part of D4.

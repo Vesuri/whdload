@@ -47,7 +47,7 @@ def check(build):
                         else:
                             require(events==['patch','flush'],'installation flush order')
                             for off,label,opcode in hooks:
-                                require(c.get(CODE+off,2)==opcode and c.get(CODE+off+2,4)==slave+sy[label],'hook destination')
+                                require(c.get(CODE+off,2)==opcode and c.get(CODE+off+2,4)==slave+sy[label],f'hook destination O:{off:x}: {c.get(CODE+off,2):x}/{c.get(CODE+off+2,4):x}, expected {opcode:x}/{slave+sy[label]:x}')
                             for pos in b['fixups']:
                                 expected=CODE+(int.from_bytes(payload[pos:pos+4],'big')&0xfffffff)
                                 require(c.get(slave+pos,4)==expected,'wrong native operand relocation')

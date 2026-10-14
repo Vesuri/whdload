@@ -32,6 +32,7 @@ def main():
     p.add_argument('--views', action='store_true', help='C5 diagnostic native view transitions (simulator disables view keys)')
     p.add_argument('--ownership', action='store_true', help='C4 candidate transition gate')
     p.add_argument('--clock-build',help='D2 candidate build directory')
+    p.add_argument('--intro-cycle',action='store_true',help='D4 full 15-page cycle and repeat before simulator')
     p.add_argument('--prediction-mode',choices=('auto','off','on'),default='auto')
     p.add_argument('--draw-every',type=int,choices=(1,2,5),default=1)
     p.add_argument('--cpu', choices=('68000','68020'), default='68000')
@@ -39,6 +40,7 @@ def main():
     a = p.parse_args()
     if not a.ownership and (a.cpu != '68000' or a.fast_kib != 4096):
         p.error('machine overrides require --ownership')
+    if a.intro_cycle and not (a.clock_build and a.baseline and a.simulator):p.error('intro cycle requires clock build, baseline and simulator')
     if a.clock_build and not a.ownership:p.error('clock gate requires ownership')
     if a.clock_build and a.views:p.error('clock view probes belong to the D3 gate')
     if a.draw_every!=1 and not a.clock_build:p.error('draw schedule requires a clock build')
@@ -165,11 +167,38 @@ def main():
         key(1)
         until(h0+0x1edde, 'world intro entry O:1edde')
         key(0)
-        until(h0+0x1efb0, 'title update 100 O:1efb0', '$d2 == 100')
+        intro_build=json.loads((ROOT/a.clock_build/'build.json').read_text()) if a.clock_build else {}
+        if intro_build.get('intro'):
+            if hashlib.sha256(Path(env['SLAVE']).read_bytes()).hexdigest()!=intro_build['sha256']:
+                raise ValueError('intro build differs from booted slave')
+            ib=layout['slave'];isy=intro_build['symbols']
+            if a.prediction_mode!='auto':
+                path=out/'intro-prediction-mode.bin';path.write_bytes(struct.pack('>H',1 if a.prediction_mode=='off' else 2))
+                command(f'monitor ocs-load {ib+isy["ocs_prediction_mode"]:x} "{path}"')
+            until(ib+isy['intro_world_done'], 'title update 100', '$d2 == 99')
+        else:
+            if a.intro_cycle:raise ValueError('intro cycle requires D4 build')
+            until(h0+0x1efb0, 'title update 100 O:1efb0', '$d2 == 100')
         capture('title')
         until(h0+0x1f03c, 'credit picture submitted O:1f03c')
         capture('credits')
         if a.baseline: baseline('asteroids')
+        if a.intro_cycle:
+            pages=[]
+            for page in range(15):
+                if page:
+                    until(h0+0x1f03c,f'credit page {page}',f'$d5 == {page}')
+                capture(f'page{page}')
+                raw=(out/f'page{page}-h1.bin').read_bytes()
+                regs=command('info registers d4 d5')
+                pages.append(dict(page=page,field=int.from_bytes(raw[0x77fe:0x7802],'big'),registers=regs))
+            until(h0+0x1eeb2,'intro cycle repeat')
+            capture('repeat')
+            until(ib+isy['intro_world_done'],'repeated title update 100','$d2 == 99')
+            capture('repeat-title')
+            until(h0+0x1f03c,'repeated credits first picture')
+            capture('repeat-credits')
+            (out/'intro-pages.json').write_text(json.dumps(pages,indent=2)+'\n')
         key(1)
         until(h0+0x1f396, 'campaign menu entry O:1f396')
         key(0)
@@ -273,6 +302,8 @@ def main():
                         machine=f'{a.cpu}-ocs-512k-chip-{a.fast_kib}k-fast', warp=env['WARP']=='1', variant='ocs', effective=expected,
                         checkpoints=['origin', 'title', 'credits', 'menu'] +
                         (['simulator', 'name'] if a.simulator or a.baseline else []))
+        if a.intro_cycle:
+            metadata['checkpoints'] += [f'page{i}' for i in range(15)]+['repeat','repeat-title','repeat-credits']
         if a.teardown_build and (a.simulator or a.baseline):
             metadata['checkpoints'].append('teardown')
         if a.views:

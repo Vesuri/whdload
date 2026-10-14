@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the C4–D3 OCS allocation/publication/clock candidate; generated slave in tmp/."""
+"""Build the C4–D4 OCS allocation/publication/clock candidate; generated slave in tmp/."""
 import argparse
 import hashlib
 import json
@@ -37,10 +37,11 @@ HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x334b6,'ocs_publish_close',0x4ef9))
 
 
-def build(out,option,exit_probe=False,changed="off", clock=False, prediction=False):
+def build(out,option,exit_probe=False,changed="off", clock=False, prediction=False, intro=False):
     hooks=HOOKS+(((0x16992,'exit_probe_entry',0x4eb9),(0x18d14,'view_probe_entry',0x4ef9)) if exit_probe else ())
     if changed != 'off': hooks+=((0x3250c,'ocs_changed_borrow',0x4ef9),)
     native=dict(NATIVE)
+    prediction = prediction or intro
     clock = clock or prediction
     if clock:
         from ocs_clock_source import NATIVE as clock_native, HOOKS as clock_hooks, MODALS, NOPS
@@ -50,6 +51,9 @@ def build(out,option,exit_probe=False,changed="off", clock=False, prediction=Fal
         from ocs_prediction_source import HOOKS as prediction_hooks, NOPS as prediction_nops
         hooks+=prediction_hooks
         native.update(OCS_PAD=0x33f24,OCS_KEYS=0x34606,OCS_GUN_RETURN=0xc226)
+    if intro:
+        from ocs_intro_source import NATIVE as intro_native, HOOKS as intro_hooks
+        native.update(intro_native);hooks+=intro_hooks
     original=(ROOT/ocs.SLAVE).read_bytes()
     require(hashlib.sha256(original).hexdigest()==SLAVE_SHA,'changed original slave')
     game=(ROOT/ocs.GAME).read_bytes();guard_game(game)
@@ -242,6 +246,9 @@ game_base: dc.l 0
             from shared_cpu import select
             text+='\n'+prediction_source(ROOT)+'\n'+select((ROOT/'whdload/ocs_prediction.s').read_text(),'68000')
             text=prediction_clock(text)
+            if intro:
+                from ocs_intro_source import source as intro_source, integrate
+                text=integrate(text)+intro_source(ROOT)
         # Extra overwritten words are separately guarded before any mutation.
         nops=NOPS+(prediction_nops if prediction else ())+tuple(at for off,width,_,_ in MODALS for at in range(off+6,off+width,2))
         checks=''.join(f' movea.l d6,a5\n adda.l #${off:x},a5\n cmpi.w #${int.from_bytes(game[44+off:46+off],"big"):x},(a5)\n bne.w wrong_revision\n' for off in nops if off not in (0x878,0x87a,0x9c2,0x9c4))
@@ -302,6 +309,10 @@ view_probe_entry:
  jmp OCS_INPUT_BODY
 view_probe_request: dc.l 0
 '''
+    if intro:
+        # The appended D4 payload puts startup tables beyond d16(PC).
+        for label in ('guards','native_fixups','payload_end','hooks'):
+            text=text.replace(f' lea {label}(pc),a0', f' lea install(pc),a0\n adda.l #{label}-install,a0')
     # Resolve native operands at startup. Fixups are constructed from unique
     # sentinel values, then checked as operands in the generated build listing.
     guards='\nguards:\n'
@@ -314,7 +325,9 @@ view_probe_request: dc.l 0
     history='ocs_changed_history: ds.b 128000\n' if changed != 'off' else ''
     probe,sy=assemble(out,'probe',text+tables+' dc.l -1\npayload_end:\n'+history)
     fixes=[]
-    for pos in range(TAIL,len(probe)-3,2):
+    # D4 hook offsets can resemble sentinel operands across word boundaries;
+    # never relocate table data. Preserve older controls byte for byte.
+    for pos in range(TAIL,(sy["guards"] if intro else len(probe))-3,2):
         value=int.from_bytes(probe[pos:pos+4],'big')
         if 0xf0000000<=value<0xf0040000:fixes.append(pos)
     require(len(fixes)>=len(native)-5,'missing native fixups')
@@ -329,7 +342,7 @@ view_probe_request: dc.l 0
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
                 workspace='native combined Chip allocation retained for fallback',
-                live_validated=False,clock=clock,prediction=prediction)
+                live_validated=False,clock=clock,prediction=prediction,intro=intro)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 
@@ -368,7 +381,8 @@ def main():
     p.add_argument('--changed',choices=('off','full','blocks'),default='off',help='C6 opt-in history candidate or equal-reservation full control')
     p.add_argument('--clock',action='store_true',help='D2 opt-in 10 Hz flight clock')
     p.add_argument('--prediction',action='store_true',help='D3 opt-in field input and bounded prediction')
+    p.add_argument('--intro',action='store_true',help='D4 OCS title/credits clock and prediction (implies --prediction)')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
-    r=build(out,a.backend,a.exit_probe,a.changed,a.clock,a.prediction);print(r['bytes'],r['sha256'])
+    r=build(out,a.backend,a.exit_probe,a.changed,a.clock,a.prediction,a.intro);print(r['bytes'],r['sha256'])
 
 if __name__=='__main__':main()

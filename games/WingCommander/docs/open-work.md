@@ -2,7 +2,7 @@
 
 ## Current state
 
-**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D3 are complete.** The OCS loader, four-plane blitter
+**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D4 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The
 [ordered OCS work items P13A1–P13E3](ocs-plan.md) cover shared CD32 mechanisms,
@@ -56,7 +56,12 @@ P13D3 adds field input and bounded prediction with exact native state restoratio
 player/AI birth certificates and live pixel/ownership checks. The A500 coasting
 window holds 9.98 world updates/s but displays 0.75 pictures/s; sustained-fire
 overload remains an E1 gap. See the [D3 gate](internals.md#p13d3-ocs-field-input-and-bounded-presentation).
-P13D4 intro integration is next; CD32 E1 and phase 12 remain
+P13D4 shares the 10 Hz clock and bounded prediction with the title/asteroid
+intro, retains native 220/320-field credit deadlines, and passes the full 15-page
+cycle/repeat on 020/Fast. A500 asteroid cadence is 7.39 world updates/s and
+3.59 displayed pictures/s, a measured E1 overload. See the
+[D4 gate](internals.md#p13d4-ocs-title-and-asteroid-credit-timing).
+P13E1 is next; CD32 E1 and phase 12 remain
 paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
 [P13B3 scope and checks](internals.md#p13b3-shared-instrumentation-and-validation-interfaces).
 
@@ -721,7 +726,7 @@ The investigation deliverable is the [ordered OCS plan](ocs-plan.md):
   projectile prediction and the 15-page intro.
 - **P13E1–P13E3:** focused A500 performance work, compatibility and later release hand-off.
 
-P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D3 are complete; P13D4–P13E3 remain pending. The native converter **uses the blitter**;
+P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D4 are complete; P13E1–P13E3 remain pending. The native converter **uses the blitter**;
 keep it where measured end-to-end performance wins, including potentially 68000
 and no-Fast 68020 systems. A 68000 CPU converter and the proposed 68020+ longword
 path are alternatives to compare, not a reason to remove the blitter. CPU type

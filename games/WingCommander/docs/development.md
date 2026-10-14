@@ -4097,3 +4097,63 @@ cover PAL/NTSC arithmetic, keyboard FIFO wrap, field gaps/overflow, modal resets
 and view-cut invalidation. Live all-view/NTSC/campaign acceptance remains E2.
 Repeat the preceding normal-build regressions with fresh D3 output names: hashes
 remain `172d3297…`, `eec155c9…` and `fdd92fbb…`. D4 intro work is separate.
+
+## P13D4: OCS title and asteroid credits
+
+`--intro` implies `--prediction --clock`; it is an opt-in candidate, not a release
+build. It shares the title-loop and prediction algorithms with CD32 while using
+OCS script constants, field addresses and native calls. Use fresh output names.
+The existing D3 fixture and debugger prerequisites above still apply.
+
+```sh
+. amiga/env.sh
+/bin/bash tools/inputs.sh verify
+python3 tools/ocs_memory_build.py --intro --output tmp/p13d4-candidate5
+python3 tools/ocs_memory_build.py --intro --backend cpu --output tmp/p13d4-cpu5
+python3 tools/ocs_intro_check.py tmp/p13d4-candidate5 --output tmp/p13d4-native-final2
+python3 tools/ocs_memory_install_check.py tmp/p13d4-candidate5 --output tmp/p13d4-install5
+python3 tools/ocs_prediction_check.py tmp/p13d4-candidate5 --output tmp/p13d4-d3-regression5
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae" WARP=1
+export SLAVE="$PWD/tmp/p13d4-cpu5/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --calibrate \
+  --output tmp/p13d4-layout-cpu5
+python3 tools/ocs_boot_gate.py --ownership --cpu 68020 \
+  --clock-build tmp/p13d4-cpu5 --intro-cycle --simulator --baseline on \
+  --layout tmp/p13d4-layout-cpu5/layout.json --output tmp/p13d4-live-cpu5
+python3 tools/ocs_intro_report.py tmp/p13d4-live-cpu5 \
+  --build tmp/p13d4-cpu5 --output tmp/p13d4-cpu-intro-final
+python3 tools/ocs_publication_report.py tmp/p13d4-live-cpu5 \
+  --build tmp/p13d4-cpu5 --output tmp/p13d4-cpu-pixel-report5
+export SLAVE="$PWD/tmp/p13d4-candidate5/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --calibrate --output tmp/p13d4-layout-a5005
+python3 tools/ocs_boot_gate.py --ownership --clock-build tmp/p13d4-candidate5 \
+  --simulator --baseline on --layout tmp/p13d4-layout-a5005/layout.json \
+  --output tmp/p13d4-live-a5005
+python3 tools/ocs_boot_gate.py --ownership --clock-build tmp/p13d4-candidate5 \
+  --simulator --baseline off --layout tmp/p13d4-layout-a5005/layout.json \
+  --output tmp/p13d4-live-a5005-off
+python3 tools/ocs_intro_report.py tmp/p13d4-live-a5005 \
+  --build tmp/p13d4-candidate5 --output tmp/p13d4-a500-intro5
+python3 tools/ocs_publication_report.py tmp/p13d4-live-a5005 \
+  --build tmp/p13d4-candidate5 --observer-off tmp/p13d4-live-a5005-off \
+  --output tmp/p13d4-a500-observer5
+python3 tools/ocs_prediction_report.py tmp/p13d4-live-a5005 \
+  --build tmp/p13d4-candidate5 --output tmp/p13d4-a500-flight5
+```
+
+`--intro-cycle` requires the baseline and simulator options. It traverses every
+credit page without skipping, then repeats the title and reaches credits again
+before using native Escape/menu input to enter the simulator. The short A500
+control uses identical checkpoints with observation enabled/disabled. Reports
+pin effective machine settings and emulated-time denominators; WARP affects host
+waiting only. The full cycle is scoped to PAL 020/Fast, and the A500 intro remains
+a measured E1 overload. See [D4 results and limits](internals.md#p13d4-ocs-title-and-asteroid-credit-timing).
+
+Control builds (same hashes as before D4):
+
+```sh
+python3 tools/ocs_memory_build.py --prediction --output tmp/p13d4-d3-control
+python3 tools/ocs_memory_build.py --output tmp/p13d4-default-control
+python3 tools/reconstruct.py --variant ocs --output tmp/p13d4-original-control
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/p13d4-cd32-control
+```

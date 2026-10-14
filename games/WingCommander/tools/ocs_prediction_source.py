@@ -106,6 +106,6 @@ def source(root):
     text=text.replace('timing_scene_restore_active:\n', 'timing_scene_restore_active:\n        move.w ocs_projection_saved(pc),-11628(a4)\n')
     text+='\nocs_projection_saved: dc.w 0\n'
     text=text.replace('timing_active','ocs_clock_active').replace('timing_hz','ocs_clock_hz').replace('timing_clock','ocs_clock_state').replace('timing_game','game_base')
-    # Labels with disabled intro dependencies are zero-valued data, no intro hooks.
+    # D3 alone leaves this zero; the optional D4 adapter owns intro entry/exit.
     text+='\nintro_active: dc.w 0\n'
     return select('BUFFERED equ 1\nFRAME_STATS equ 0\n'+text,'68000')

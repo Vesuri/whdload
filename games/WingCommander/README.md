@@ -3,13 +3,15 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D3 complete: OCS conversion/display work and an opt-in 10 Hz flight clock.** The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D4 complete: OCS conversion/display work and opt-in 10 Hz flight and intro clocks.** The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
 The opt-in D3 candidate adds field input, bounded renderer prediction and first-interval
 player/AI projectile motion. Native CPU, state restoration and live pixel checks
 pass. The A500 coasting window holds 9.98 world updates/s but displays only 0.75
-pictures/s; sustained-fire overload remains an E1 performance gap. Intro timing
-is D4. See the [D3 evidence and limits](docs/internals.md#p13d3-ocs-field-input-and-bounded-presentation).
+pictures/s; sustained-fire overload remains an E1 performance gap. D4 now shares the clock/prediction with the OCS title and asteroid credits;
+the full 15-page cycle and repeat pass on 020/Fast. The A500 asteroid window
+reaches only 7.39 world updates/s, an E1 gap. See the
+[D4 evidence](docs/internals.md#p13d4-ocs-title-and-asteroid-credit-timing) and [D3 evidence and limits](docs/internals.md#p13d3-ocs-field-input-and-bounded-presentation).
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting
 by CPU and memory configuration. Matched emulator windows favour native blitter on 68000 and no-Fast 68020,
@@ -25,7 +27,7 @@ observer-off state/pixel controls pass. These are short emulator baselines.
 The shared build and analysis tools require an explicit variant; checked CD32
 binaries and original OCS reconstruction remain byte-identical. Base-ISA assembly,
 arithmetic, flag and wrapper checks pass on CPU models; C4 now links allocation
-and conversion hooks in a separate OCS candidate. Timing hooks remain pending.
+and conversion hooks in a separate OCS candidate. Timing hooks are opt-in through the D2–D4 candidate modes.
 Shared WCFS/WCDS interfaces now separate world, render and actual display counts;
 the OCS recorder passes CPU/replay checks and native observer-off controls remain
 exact. Guest hooks and their measured runtime overhead remain later integration.

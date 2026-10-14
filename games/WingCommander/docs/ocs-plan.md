@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D3 are complete**;
+The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D4 are complete**;
 the remaining work items below are pending, in dependency order.
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -305,7 +305,7 @@ pictures/s, and early sustained fire overloads it. E1 owns these measured world,
 input-geometry and display bottlenecks; no smooth-A500 claim follows from D3.
 See the [D3 evidence and limits](internals.md#p13d3-ocs-field-input-and-bounded-presentation).
 
-**P13D4 — Apply the same model to the OCS world-based intro.** Depends on D3.
+**P13D4 — Apply the same model to the OCS world-based intro (complete).** Depends on D3.
 Port the shared title/asteroid world clock and prediction with OCS script data:
 296 title updates, 15 credit pages, and native text/music deadlines. Move
 render-side asteroid creation to its authoritative owner so credits retain visible
@@ -313,11 +313,18 @@ asteroids even when world ticks suppress drawing. Map any other cinematic route
 separately; do not assume the Origin logo or ending uses this intro path.
 Gate: short motion/state checks plus one full 15-page cycle and repeat, correct
 asteroid visibility, native music/credit pacing, and clean transition to gameplay.
+The shared title/prediction adapter passes native 68000/020 checks and a full
+15-page cycle/repeat on 020/Fast, with native text/music deadlines retained.
+Both backends pass pixel checks and reach simulator/name entry. The A500 asteroid
+window manages 7.39 world updates/s and 3.59 displayed pictures/s; its retained
+debt and slow-render fallback do not establish sustained 10 Hz. This is an E1
+overload. See the [D4 evidence](internals.md#p13d4-ocs-title-and-asteroid-credit-timing).
 
 ## E — Focused acceptance and hand-off
 
 **P13E1 — Close measured A500 bottlenecks.** Depends on C6, D4.
-Profile the remaining world/drawing/composition/conversion cost and optimise only
+Close the measured D4 asteroid-world overload (7.39 updates/s on A500) and
+D3 sustained-fire/display gaps. Profile the remaining world/drawing/composition/conversion cost and optimise only
 what prevents the accepted A500 timing or selected backend from working. Retain
 shared optimisations where their cost pays off; do not impose cached-030 region
 copying or full-image comparison on a 68000 without evidence.
@@ -345,7 +352,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D3 are complete. **P13D4** is next.
+P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D4 are complete. **P13E1** is next.
 Use the scoped measured profiles and retain native fallback/override
 for unknown accelerators. C4 creates source ownership before native compositor aliases; C5 now protects
 pending/displayed ownership through publication and transitions. Broader
