@@ -6,7 +6,7 @@ The identification sections record static evidence from verified extraction,
 hunk/relocation parsing, slave patch lists and 68020 disassembly. Their time-source
 and display-path descriptions remain hypotheses except for the explicitly scoped
 runtime confirmations in the phase 2 and phase 3 sections below. The OCS executable
-has not been analysed.
+has a separate static investigation below; its runtime behaviour is not yet validated.
 
 Notation: `E:` and `G:` mean English and German **game code hunk 0 offsets**;
 `S:` means **slave code hunk 0 offset**; `D:` means **English data hunk 1 offset**.
@@ -4317,3 +4317,224 @@ Reports are `tmp/intro-clock-report-r2.json`,
 section `check.json` files under `tmp/intro-clock-0?0-r2/`. The 040 core remains
 uncalibrated against hardware. E1, full campaign acceptance, separate Origin-logo
 motion work and phase 12 release work are not completed by this gate.
+
+
+## Phase 13: OCS static investigation
+
+Phase 13 is complete as an investigation and implementation plan only. No OCS
+runtime patch, emulator benchmark or hardware compatibility result is claimed.
+The [ordered plan](ocs-plan.md) is authoritative for subsequent work. In
+particular, the blitter/CPU crossover remains a measurement question, not a CPU
+family assumption. Reproduction commands are in
+[development](development.md#phase-13-ocs-static-investigation).
+
+### Identity, notation and loader
+
+Here `O:` is English OCS code hunk 0, `OD:` is its data hunk 1, `O3:` is code
+hunk 3, and `OS:` is the original OCS slave code hunk 0. All addresses below are
+**hunk offsets**, except explicitly labelled file or PatchSeg offsets. To obtain
+a file offset add the payload base in this table; BSS/tail storage has no file
+bytes. Existing `E:`, `D:` and `S:` elsewhere in this document remain CD32-only.
+
+The supplied pinned OCS archive matches a fresh extraction file for file. Its
+`WingCommander.Slave` is byte-identical to the installer's
+`WingCommanderECS.slave`. Only `data/Wing.english` is supplied; no German executable
+was available to inspect. Both slave and game are ordinary HUNK files.
+
+| File | Bytes | SHA-256 | WHDLoad CRC16 |
+|---|---:|---|---|
+| `WingCommander.Slave` | 5324 | `eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913` | `b380` |
+| `data/Wing.english` | 278304 | `eff90d6cfbc80b008e5e508ff6488f221b6e7243958aaff6fdfd0b06e6724a30` | `00e8` |
+
+| Hunk | File payload base (hex) | Stored / allocated bytes (hex) |
+|---|---|---|
+| Slave 0 CODE | `0020` | `14a8 / 14a8` |
+| Game 0 CODE | `002c` | `358c8 / 358c8` |
+| Game 1 DATA | `39948` | `7bb8 / f5b8` |
+| Game 2 BSS | none | `0 / 4` |
+| Game 3 CODE | `41e4c` | `1d94 / 1d94` |
+
+Game hunks have no explicit Chip/Fast allocation flags. Allocated game hunks total
+289,816 bytes before loader bookkeeping. Relocations matter: the entry jump in
+hunk 0 targets hunk 3, not hunk 0. The Manx/Aztec-style startup establishes A4 at
+`OD:7ffe` (`O3:14d0`). The zero-filled data allocation extends beyond stored data.
+
+| Slave evidence | Meaning |
+|---|---|
+| `OS:000c`, `000e` | Header v17, flags `3402`; neither ReqAGA nor Req68020 |
+| `OS:0010`, `0020` | 512 KiB base/Chip requirement, 960 KiB expansion request |
+| `OS:002a`, `002c`, `0ef4` | `34005.a500`, 256 KiB Kickstart image |
+| `OS:01ee`, `01fc` | Reserve 256 KiB for ROM; remaining expansion pool `b0000` (704 KiB) |
+| `OS:0f81` | C1 German, C2 cheat, C3 system, C4 mission; no native C5 |
+| `OS:10e8`, `147c` | Control tags obtain CPU attention flags |
+| `OS:10f4`–`1110` | SetCPU value `032a`, or `3b3d` for 040, mask `7f3f` |
+| `OS:1120`, `1130` | English file probe with German fallback |
+| `OS:1158`–`117e` | CRC selectors `116d`, `00e8`, `262d` and three patch lists |
+| `OS:11b8`, `11ca`, `11e0` | LoadSeg, PatchSeg, then enter loaded code |
+
+These header requirements are not a measurement of total host/preload RAM. The
+original ReadMe's 512 KiB Chip plus 1 MiB other-memory requirement needs fresh
+verification with an enhanced slave. Do not call ordinary public allocation
+“Fast RAM”: native `AllocMem` can return another memory class.
+
+The supplied revision selects the list at `OS:1302`. Its eight entries are:
+
+| Original PatchSeg offset | Mapped hunk offset | Action |
+|---|---|---|
+| `026a3c` | `O:26a3c` | Subroutine patch to `OS:13a0` (audio/custom-register helper with beam waits) |
+| `027132` | `O:27132` | Longword replacement `0c400ed0` |
+| `027740` | `O:27740` | Longword replacement `00bfe001` |
+| `0272b2` | `O:272b2` | Jump to `OS:138e` (`clr.w 8(a5)` then return) |
+| `044eba` | `O3:0036` | Two-byte NOP |
+| `045526` | `O3:06a2` | Word `7001` |
+| `045528` | `O3:06a4` | Skip entry, argument 4 |
+| `0463a8` | `O3:1524` | Byte `60` |
+
+The hunk-3 PatchSeg base is `44e84`, the sum of prior **allocated** hunk sizes,
+not a file offset. The hunk-3 changes bypass native memory/startup checks. Other
+CRC lists start at `OS:12bc` and `1348`; absent executables prevent assigning
+verified revision/language maps or enhancement offsets to them.
+
+### Native chunky, blitter and display contract
+
+The original expectation that OCS would have no C2P was wrong. The native path
+converts a byte-addressed chunky surface to four planar bitplanes through queued,
+multistage blits. This is a separate implementation from the CD32 eight-plane
+path. Static evidence establishes the mechanism, but exact pixel ordering,
+publication timing and usable overlap remain runtime/native-oracle work.
+
+| OCS hunk offsets | Static finding |
+|---|---|
+| `O:31de2`–`31e0a` | Surface allocation: even-rounded width times height; one byte per pixel |
+| `O:31e10`–`31e22`, `33b60`, `33b76`, `33b94` | Flag selects Chip or public allocator; row table allocated separately |
+| `O:31e7c`, `322e0`, `31e98` | Width-based row stride, surface clear, composition/copy |
+| `O:32554`–`325c6` | Surface dimensions/source copied into conversion descriptors |
+| `O:324e0` | Two `29c`-byte conversion descriptors |
+| `O:334e4`–`3350a` | Planar width rounds to 16 pixels, row bytes = width/8, height has two extra rows, depth = 4 |
+| `O:3323e`–`33268` | Three planar-sized regions allocated in Chip RAM: two display buffers and shared conversion scratch |
+| `O:33aea`, `33af6` | Bitmap plane pointers skip two row strides; only four planes populated |
+| `O:33348`, `333b4` | Direct planar clear/pixel writes also exist |
+| `O:3260a`–`3262a` | Wait for previous conversion, rotate buffer, submit selected descriptor |
+| `O:32646`–`328c6` | Staged blitter controls/masks, including `ff00`, `f0f0`, `cccc`, `aaaa` |
+| `O:3291e`–`3298e` | Three submissions with field wait and partial completion waits |
+| `O:3299c`–`329de` | Queue-node setup and graphics.library QBlit (vector -276) |
+| `O:329e4`, `32a26`, `32dba` | Conversion callback chain entries |
+| `O:33426`, `33442`, `3385a`, `33a6e`, `33aa8` | Buffer indices and Copper publication route, ending at COP2LC write |
+| `O:3381a`, `3398e`, `339c0` | View, LoadRGB4/MakeVPort, MrgCop setup |
+| `O:33872`, `34076` | Teardown and field-wait path |
+
+At the initialized 320×200 geometry (`O3:004a`–`0052`), the planar formula gives
+32,320 bytes per region, 96,960 bytes for all three. This is **two display buffers
+plus workspace**, not triple buffering. A CPU backend might remove 32,320 bytes
+of workspace only after proving no remaining consumer uses it. It would still
+need its own code/history/state budget. Viewport height is separately adjusted
+at `O:33970`; preserve borders, row padding and plane offsets in the pixel oracle.
+
+The blitter can only consume Chip-accessible sources. The source pointer passes
+from the surface into descriptors at `O:32586` and `325c6`; moving that surface
+to Fast RAM while keeping the native queue is invalid. Conversely, some surfaces
+already select public allocation. A runtime allocation/consumer census must
+identify precisely which drawing work benefits from a move, rather than globally
+rewriting memory flags.
+
+`O:3293a`–`32942` waits for the field clock to change between queue submissions.
+`O:32976`–`32984` waits for the first two flags; `O:32990` waits for the third,
+including at the next frame's entry. Thus the existing path includes both pacing
+and asynchronous completion. Measuring just one callback, or comparing a paced
+blitter frame with an unpaced CPU frame, would conflate conversion throughput,
+overlap and scheduling. The crossover experiment must report all of them.
+Neither native blitter speed on 68000 nor CPU/Fast superiority on 020 is measured
+by this investigation. Preserve both candidates until P13C2 establishes a choice.
+
+Direct planar writes also mean that changed-block histories need more than a
+chunky-source comparison. Publication and source ownership must be correct for
+both backends before introducing incremental conversion. No AGA FMODE setting
+belongs in an OCS backend, even with a 68020 or faster CPU.
+
+### World, clock and intro anchors
+
+| OCS hunk offsets | Static role |
+|---|---|
+| `O:0694`–`06c2` | Flight loop: input `18d14`, world `02be`, decorated draw `0512`, systems `4460` |
+| `O:02be` | World dispatcher; includes `745a`, `78c4`, `6584`, `1445a` and update counter |
+| `O:02e6`–`0330` | Draw divisor, clear, world draw `28548`, conditional asteroid path `9618` |
+| `O:0512`, `0b80` | HUD/simulator/message composition and frame-finish route to `3260a` |
+| `O:78c4` | World object dispatch, slots 0 through 60 |
+| `O:79fc` | Angular update using the per-object angular arrays |
+| `O:7e2c`–`7e56` | XYZ position advances by XYZ velocity |
+| `OD:8928`, `94fa`, `8e8c` | Position, velocity and class arrays (A4 + `092a`, `14fc`, `0e8e`) |
+| `OD:88da`, `88de` | World-update and draw counters (A4 + `08dc`, `08e0`) |
+| `O:342a2`–`342b4` | VBL handler increments `OD:77fe`, decrements countdown at `OD:7802` |
+| `O:34082`, `34098`, `340ba`, `34122` | Countdown, wait and supervisor STOP/field-change paths |
+| `O:26ece`, `26ef8` | CIAB TOD references in the audio code |
+| `O:33f28`, `33f38`, `33f74`, `33f88` | Native joystick/CIA fire sampling |
+
+The field clock is A4 minus `0800`, not the CD32 offset. Ten world updates per
+second is the selected shared design target; native OCS speed/range-unit and
+full side-effect mapping are still required. The table is a starting map, not
+an assertion that CD32 FR-01–FR-23 are already proven on OCS.
+
+The title's world loop is at `O:1ef24`–`1efb0`, with 296 updates, odd-update draws,
+thresholds 135/235 and geometry changing from 200 to 16. Credits capture the
+field clock at `O:1eff8`, call world/draw at `1effc`/`1f002`, check the text deadline
+of 220 fields at `1f00e`, finish drawing at `1f036`, and check 320 fields at `1f052`.
+`O:1f060` compares against **15 pages**, then `1f06a` branches back to `1eeb2`.
+CD32 has 18 pages. Shared timing therefore needs variant-specific script constants.
+Render-side asteroid generation at `O:0330`/`9618` needs the same ownership
+investigation that prevented missing CD32 credit asteroids. Other scripted routes
+around `O:1f760` and `1fc8c` must be identified separately, not assumed to be this
+intro. Music and credit timing remain native unless independent evidence requires
+an explicit change.
+
+### Sharing and base-CPU constraints
+
+Current `tools/reconstruct.py`, `timing_source.py`, `cd32_runtime.py`,
+`runtime_inputs.py` and `amiga/run.sh` assume CD32 hashes, names, hunk sizes,
+patches or Kickstart inputs. In particular, CD32 live-layout discovery uses the
+patched CD32 converter to find its chain. None is an OCS launcher/locator yet.
+Extract variant maps and shared mechanics rather than duplicating whole tools.
+
+The common design is reusable, but the current assembly is not all 68000-safe:
+`timing_clock.s`, `timing.s` and `release_buffer.s` use long multiplication;
+scene/translation prediction uses long signed multiply/divide; slot helpers use
+scaled indexing; flag-saving hooks use `MOVE CCR`; render code has long branches
+and eight-plane assumptions. Instrumentation itself has newer-ISA dependencies.
+Native math entries `O:2c6c0` and `2c710` are possible base-CPU building blocks,
+subject to ABI/rounding tests. `MOVE SR` is legal on 68000 but privileged on later
+CPUs: do not substitute it unconditionally for a CCR read.
+
+Share compile-time algorithms for elapsed fields, input history, prediction,
+selective state restoration, projectile identities/cooldown handling and frame
+statistics. Keep native function/field maps, loaders, palettes, plane geometry,
+backend publication and scene scripts distinct. The shared algorithms need
+base-CPU versions even when the chosen A500 converter remains the blitter.
+
+### Kalms candidates and sibling evidence
+
+The local Kalms checkout is pinned to commit
+`d8ecf79a3325615305dd800ae7704b518e0d9dda`. The two examined four-plane bitmap
+routines and hashes are recorded in `manifest/ocs-c2p-candidates.tsv`. Both
+`c2p1x1_4_c5_bm_word.s` and `c2p1x1_4_c5_bm.s` assemble with `-m68000` (560 and
+744 code bytes respectively). Assembly success is not pixel, speed or integration
+validation. “68020 path” here means a proposed longword-write selection, not that
+the upstream longword routine inherently requires 68020 instructions.
+
+Their ABI takes width/height/x/y in D0–D3, chunky source in A0 and BitMap in A1.
+Width must be a multiple of 32, x byte-aligned, depth at least four and row storage
+large enough. The source masks low nibbles. Native OCS bit/nibble order still needs
+the independent oracle; duplicating high and low nibbles in fixtures would hide
+an incorrect adapter.
+
+Legends of Valour `whdload/c2p.s` selects the word routine on 68000/68010 and the
+longword routine through attention-flag bit 1 on 68020+. Its
+`docs/performance-patches.md` documents high-nibble/192-byte-stride adaptations,
+window alignment, independent pixel checks and CPU-only allocation ownership.
+Reuse the dispatch/testing pattern, not those game-specific format changes.
+
+Battlehawks 1942 `docs/c2p.md` records a native delta converter outperforming full
+conversion on its A500 workload and an initially wrong pixel oracle hidden by
+flat scenes. This supports measuring changed content and checking all colours;
+it does not predict Wing Commander's winner. Their Finest Hour supplies examples
+of selected 68000/020 math paths; Powerdrome documents Fast RAM/DMA ownership.
+Sibling numbers are not Wing Commander measurements. No new upstream download,
+vendored converter or runtime implementation is part of phase 13.

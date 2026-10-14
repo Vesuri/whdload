@@ -2,6 +2,16 @@
 
 ## Current state
 
+**Phase 13 investigation is complete.** The OCS loader, four-plane blitter
+conversion, memory ownership and timing anchors are mapped in
+[internals](internals.md#phase-13-ocs-static-investigation). The
+[ordered OCS work items P13A1–P13E3](ocs-plan.md) cover shared CD32 mechanisms,
+68000 safety, measured blitter/CPU selection and Amiga 500/Fast RAM acceptance.
+No OCS runtime implementation or performance claim is included. Start with
+P13A1 on the next implementation request; CD32 E1 and phase 12 remain paused.
+
+The following completed implementation results concern **CD32**:
+
 Phases 1–3 are complete. The reconstructed slave is byte-identical. Original
 and reconstructed English boots match all four live game hunks and every screenshot
 pixel at the menu and simulator/name prompt for Custom5=0–3. VERIFY off/on marker
@@ -35,7 +45,7 @@ measured conversion-time and PAL/NTSC timing gates. Phase 11b frame-rate
 recovery is required before release. A1/A3 measured the frame budget:
 Psygore's default limiter caps flight at 25 FPS, the emulated machines reach
 40–50 with it off, and no credible 040 model exists yet (A2). Phase 12
-release polish is paused behind it; OCS remains out of scope. B1 is complete:
+release polish is paused behind it; OCS implementation is planned separately. B1 is complete:
 public CUSTOM5=0 enables uncapped English flight, 1–4 retain Psygore's modes,
 and CUSTOM1 selects language only. The cached 030 model reaches 49.920 pictures/s;
 the uncalibrated cycle-exact 040 core reaches 39.953 at the B1 gate.
@@ -82,7 +92,8 @@ findings refine the implementation assumptions below; flight now uses the select
 10 Hz design, including the English ship/title and asteroid intro. Native and
 model gates pass; music and credit deadlines remain native. See the
 [intro gate](internals.md#intro-10-hz-world-and-extrapolated-presentation).
-The separate Origin logo remains native. The OCS version remains unanalysed.
+The separate Origin logo remains native. OCS static findings and pending
+implementation are recorded under phase 13.
 
 ## Goal
 
@@ -648,10 +659,25 @@ still needs phase-12 review and validation. Restore when phase 12 resumes with
 keep the stash until the work is safely committed. This stash is local to this
 checkout and is not transferred by pushing the documentation commit.
 
-### Phase 13 — OCS version
+### Phase 13 — OCS investigation and implementation plan (complete)
 
-Repeat from phase 1 for the OCS disk version as a separate variant: different
-executable, display, c2p (none expected) and timing. Reuse designs, not assumptions.
+The investigation deliverable is the [ordered OCS plan](ocs-plan.md):
+
+- **P13A1–P13A4:** reconstruction, native display/memory contract, launcher and baseline.
+- **P13B1–P13B3:** shared variant definitions, 68000-safe mechanisms and instrumentation.
+- **P13C1–P13C6:** four-plane candidates, measured blitter/CPU/memory crossover,
+  selection, memory ownership, publication and optional changed-block conversion.
+- **P13D1–P13D4:** OCS timing audit, 10 Hz world clock, responsive presentation,
+  projectile prediction and the 15-page intro.
+- **P13E1–P13E3:** focused A500 performance work, compatibility and later release hand-off.
+
+All implementation items remain pending. The native converter **uses the blitter**;
+keep it where measured end-to-end performance wins, including potentially 68000
+and no-Fast 68020 systems. A 68000 CPU converter and the proposed 68020+ longword
+path are alternatives to compare, not a reason to remove the blitter. CPU type
+alone does not establish the crossover. See the [static evidence and limits](internals.md#phase-13-ocs-static-investigation)
+and [reproducible commands](development.md#phase-13-ocs-static-investigation).
+Stop at this plan; no OCS runtime changes or resumption of CD32 release work.
 
 ## Decisions pending
 

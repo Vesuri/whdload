@@ -1,0 +1,3 @@
+# path relative to kalms-c2p checkout	sha256	upstream
+bitmap/c2p1x1_4_c5_bm_word.s	60b9fbcaf3e337772e825cb1c5d045c6967c2d5f5bd04d30dc6e0464ec9388c2	https://github.com/Kalmalyzer/kalms-c2p/blob/d8ecf79a3325615305dd800ae7704b518e0d9dda/bitmap/c2p1x1_4_c5_bm_word.s
+bitmap/c2p1x1_4_c5_bm.s	0f1d0d4717ffd3650ae83568fcec2064d50cfc5cdc2d675b419c5d1e51247805	https://github.com/Kalmalyzer/kalms-c2p/blob/d8ecf79a3325615305dd800ae7704b518e0d9dda/bitmap/c2p1x1_4_c5_bm.s

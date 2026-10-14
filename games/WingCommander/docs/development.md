@@ -2919,3 +2919,81 @@ ledgers and all build products remain in `tmp/`. The native pose check executes
 real drawing at five render fractions on both ISA models, asserting projected
 motion and restoration; it excludes C2P/publication. The full-cycle observer's
 page-end entries and terminal dumps permit separate exit-state inspection.
+
+
+## Phase 13: OCS static investigation
+
+This procedure boots no emulator and changes no game tree. Use the shared
+Python/tool environment described above. `make verify` must pass for the cached
+archives, and `make prepare` supplies reference extractions if absent. The OCS
+inspector independently checks the pinned archives, a fresh extraction against
+the entire reference tree, and the installer's `WingCommanderECS.slave` against
+the installed `WingCommander.Slave`. It refuses an existing output directory or
+one outside `tmp/`. Choose a fresh suffix for repeated runs.
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_static.py --output tmp/phase13-static-repro
+python3 -m amigaxdev.disasm dis --cpu 68000 \
+  tmp/phase13-static-repro/Wing.english.h0.bin 0 0x3291e 0x329e4
+python3 -m amigaxdev.disasm dis --cpu 68000 \
+  tmp/phase13-static-repro/Wing.english.h0.bin 0 0x31de2 0x31e3a
+python3 -m amigaxdev.disasm dis --cpu 68000 \
+  tmp/phase13-static-repro/WingCommander.Slave.h0.bin 0 0x10de 0x11e8
+```
+
+Outputs include file fingerprints, hunk allocation/file offsets, the three
+revision patch lists, relocation records, extracted hunk bytes and 68000 linear
+disassemblies. Follow relocation targets and known entry points: embedded data
+can misalign a linear sweep, and the game entry jump targets hunk 3. To inspect
+other evidence rows in the internals notes, substitute the corresponding hunk
+file and start/end **hunk offsets** into the same disassembler command.
+PatchSeg coordinates must be mapped using allocated hunk lengths, not file sizes.
+All generated material remains under `tmp/`.
+
+The conversion candidates were inspected from the shared Kalms checkout, not
+vendored into this project. Verify the complete candidate set against the
+manifest before assembling. `OCS_KALMS_ROOT` can override the shared location;
+this does not modify or reset that checkout. Both candidates should assemble
+under the base ISA, even though the longword-write version is a candidate for
+68020+ selection. This probe is not a correctness or performance benchmark.
+Run this block with `/bin/bash`:
+
+```sh
+set -e
+. amiga/env.sh
+export OCS_KALMS_ROOT="${OCS_KALMS_ROOT:-$AMIGA_SHARE/kalms-c2p}"
+python3 - <<'PYVERIFY'
+import hashlib
+import os
+from pathlib import Path
+root = Path(os.environ['OCS_KALMS_ROOT'])
+for line in Path('manifest/ocs-c2p-candidates.tsv').read_text().splitlines():
+    if not line or line.startswith('#'):
+        continue
+    name, expected, upstream = line.split('\t')
+    actual = hashlib.sha256((root / name).read_bytes()).hexdigest()
+    if actual != expected:
+        raise SystemExit('candidate differs; preserved unchanged: ' + name)
+    print('verified ' + name)
+PYVERIFY
+if test -e tmp/phase13-c2p-repro; then
+  echo 'Choose a fresh output directory; nothing overwritten' >&2
+  exit 1
+fi
+mkdir -p tmp/phase13-c2p-repro
+for routine in c2p1x1_4_c5_bm_word c2p1x1_4_c5_bm; do
+  "$VASM" -m68000 -Fhunk -I"$NDK" \
+    -o "tmp/phase13-c2p-repro/$routine.o" \
+    "$OCS_KALMS_ROOT/bitmap/$routine.s"
+done
+```
+
+The investigation passed verified extraction, the English `00e8` CRC and hunk
+inventory, installer identity, all three eight-entry revision patch lists, base
+ISA assembly of both pinned candidates, and rejection of output reuse/outside
+scratch. Repeated inventory/file/patch/relocation reports matched exactly.
+No OCS emulator run or backend crossover measurement is part of phase 13.
+[P13C2](ocs-plan.md#c--choose-conversion-from-measured-cpu-and-memory-behaviour)
+specifies the matched experiment required before choosing blitter versus CPU;
+retain the blitter until that gate establishes which configurations benefit.
