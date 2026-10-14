@@ -3,12 +3,13 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A4, P13B1–P13B3 and P13C1 complete: native OCS baseline, shared mechanisms and experimental converters.** The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 complete: measured OCS converter crossover.** The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting
-by CPU and memory configuration. The crossover remains unmeasured. No OCS runtime
-changes are implemented; CD32 release work remains paused. The 5,324-byte slave
+by CPU and memory configuration. Matched emulator windows favour native blitter on 68000 and no-Fast 68020,
+and CPU/Fast longword conversion on the measured 14 MHz 68020/Fast profile.
+The Fast move includes native compositor aliases. Normal OCS builds remain unchanged; CD32 release work remains paused. The 5,324-byte slave
 rebuilds exactly with the 68000 assembler; input and displaced-byte rejection
 checks pass. The functional display gate passes 45 conversions and ownership checks;
 native checkerboard colour selection and its four edge pixels are confirmed live.
@@ -18,18 +19,19 @@ displayed pictures/s in asteroid credits and 5.39 during simulator flight/fire;
 observer-off state/pixel controls pass. These are short emulator baselines.
 The shared build and analysis tools require an explicit variant; checked CD32
 binaries and original OCS reconstruction remain byte-identical. Base-ISA assembly,
-arithmetic, flag and wrapper checks pass on CPU models; OCS hooks remain pending.
+arithmetic, flag and wrapper checks pass on CPU models; production OCS hooks remain pending.
 Shared WCFS/WCDS interfaces now separate world, render and actual display counts;
 the OCS recorder passes CPU/replay checks and native observer-off controls remain
 exact. Guest hooks and their measured runtime overhead remain later integration.
 Experimental Kalms word/longword candidates now match native visible pixels and
 an independent oracle, including checkerboard colours and four black edge pixels.
-Bounds, alternating destinations and native fallback checks pass. They are separate
-components, not installed game hooks; native QBlit remains the default. P13C2's
-measured crossover is next only on request. See the
-[C1 gate](docs/internals.md#p13c1-experimental-four-plane-converters), [B3 gate](docs/internals.md#p13b3-shared-instrumentation-and-validation-interfaces),
+Bounds, alternating destinations and native fallback checks pass. Diagnostic-only
+C2 hooks now measure complete adapters and matched live images; native QBlit remains
+the normal default. P13C3 selection is next only on request. See the
+[C2 gate](docs/internals.md#p13c2-measured-ocs-converter-crossover),
+[B3 gate](docs/internals.md#p13b3-shared-instrumentation-and-validation-interfaces),
 [baseline and limits](docs/internals.md#p13a4-short-native-ocs-baseline), and
-[reproduction commands](docs/development.md#p13c1-experimental-ocs-converter-gate).
+[reproduction commands](docs/development.md#p13c2-measured-converter-comparison).
 
 **Phase 11b is in progress; C1–C3 and the C4 steady-flight gate are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for

@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1 are complete**;
+It does not implement or validate an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 are complete**;
 the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -15,7 +15,7 @@ supported target; unavailable revisions and German must not inherit its patches.
   on 68020+. This is a candidate policy, not a measured performance result.
 - Select **blitter versus CPU** using measured CPU/memory profiles, independently
   of the word/longword choice inside the CPU backend. A 68020 with no true Fast
-  RAM may still favour blitter conversion. The crossover is not established.
+  RAM may still favour blitter conversion. The scoped C2 crossover is recorded below; unknown profiles remain unresolved.
 - Retain Chip RAM chunky storage for the blitter path. Move only audited CPU-only
   surfaces to true Fast RAM for a CPU path. A Fast-to-Chip staging copy is a third
   candidate only if measurements justify it; account for the entire copy.
@@ -150,11 +150,11 @@ Gate passed: pinned Kalms word/longword components with shared checkerboard-row
 adaptation, exact native/oracle visible pixels at all native view sizes, guarded
 padding/source/stack, alternating destinations, base-ISA execution, explicit
 native requests for 16-but-not-32-pixel widths and rejecting odd-height checks.
-No game hooks are installed. The C2 comparison must charge row staging and wrapper
-calls and preserve the native scheduling control. See
+Normal builds keep native conversion. The C2 diagnostic comparison below charges
+row staging and wrapper calls and preserves the native scheduling control. See
 [evidence and component ABI](internals.md#p13c1-experimental-four-plane-converters).
 
-**P13C2 — Establish the blitter/CPU/memory crossover.** Depends on C1.
+**P13C2 — Establish the blitter/CPU/memory crossover (complete).** Depends on C1.
 Run matched short windows with identical source content, world state, display DMA,
 audio, buffer ownership and publication policy. Compare these arms:
 
@@ -181,6 +181,15 @@ Deliverable: a small CPU/clock/memory/backend table, reproducible runs, and an
 explicit crossover range or uncertainty. Gate: retain blitter wherever it wins;
 no claim of a universal CPU threshold from one emulator configuration. Do not
 require a broad calibrated-040 matrix to finish this decision.
+
+Gate passed: ten asteroid CPU/memory/backend cells and focused flight/fire checks,
+byte-exact matched inputs and starting state, actual DMA/publication agreement,
+live pixels, queue/overlap/Chip-contention measurements, and three exact observer-off
+controls. Native wins the measured 68000 and no-Fast 68020 cases; CPU/Fast longword
+wins the 14 MHz 68020/Fast case by about 6% on matched images in both scenes.
+The Fast move includes compositor shadow rows and both copy-command pointer columns.
+Normal slaves remain identical. No universal CPU threshold or hardware claim follows;
+C3 retains conservative fallback for unknown profiles. See [results and limits](internals.md#p13c2-measured-ocs-converter-crossover).
 
 **P13C3 — Install conservative backend selection and fallback.** Depends on C2.
 Select once from measured CPU/memory profiles, retain a user override for unknown
@@ -290,7 +299,8 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3 and P13C1 are complete. Start **P13C2** only when requested. The first backend decision
-is **P13C2**, not the current investigation. In particular, neither “68000 must use
-CPU C2P” nor “68020 must abandon the blitter” has been established. Keep the
-blitter implementation available through the comparison and acceptance gates.
+P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 are complete. Start **P13C3** only when
+requested. Use the scoped measured profiles and retain native fallback/override
+for unknown accelerators. CPU/Fast requires the audited compositor aliases;
+production memory ownership and transition handling remain C4. Do not resume
+CD32 E1/phase 12.

@@ -5314,3 +5314,175 @@ Stop at C1. C2 must wire the experimental arms into matched native scheduling,
 validate the installed instrumentation, and measure staging, conversion, queue
 waits, overlap and actual displayed pictures. C3–C5 still own selection, memory
 and publication. No end-to-end enhancement, performance claim or release is made.
+
+### P13C2: measured OCS converter crossover
+
+**P13C2 is complete on the scoped emulator models.** Retain the native blitter
+on the measured 7.09 MHz 68000, with either true Fast or slow expansion RAM, and
+on the measured 14.19 MHz 68020 without true Fast RAM. On the 68020 with true Fast
+RAM, the longword CPU converter **with a Fast chunky source** wins both checked
+scenes by about 6% over matching images. CPU/Chip does not win. This is a measured
+profile recommendation for C3, not an automatic policy already installed or a
+universal CPU threshold. Normal OCS and CD32 slaves remain byte-identical to C1.
+
+#### Controlled experiment and matching
+
+`ocs_crossover.py` makes an explicitly experimental copy of the pinned native
+slave with a 73,728-byte owned reservation: 8,192 bytes for converter/code space,
+64,000 bytes for a source and 1,536 trailing guard bytes. This diagnostic-only
+file-backed reservation is identical across arms; it is not the production memory
+allocator or minimum-RAM design. The original source, workspace and allocation
+registry remain allocated. No change reaches an installed game tree or release.
+
+The bounded installer stops after native final-reader retirement at `O:3260e`
+(file `3263a`), checks all three queue flags, input identity and displaced bytes,
+then changes `O:3291e` (file `3294a`) only for a CPU arm. It preserves native
+rotation, the field-counter wait, and the original completion/publication body
+at `O:32e06` (file `32e32`). CPU conversion is synchronous in the main task;
+native conversion retains its asynchronous third phase. Both publish through the
+native nesting guard and Copper path. No native pacing is removed. Full CPU
+cost includes checkerboard staging, all per-row calls and the adapter. Unsupported
+converter results trap in this diagnostic; C3 owns production fallback.
+
+Each run covers 250 uninterrupted PAL fields, **5.007972 emulated seconds**, with
+native audio and identical controls. Warp only shortens host waiting; field ticks
+remain 227×313×512. CPU cycle units are 256 on 68000 and 128 on 68020, corresponding
+to 7.09379 and 14.18758 MHz. Numeric frequency and multiplier remain zero, selecting
+the core's calibrated defaults. CPU/memory/blitter cycle-exact modes are on,
+MMU/JIT/immediate blits are off; observed CACR is 0/1 respectively. The 020
+instruction cache remains enabled. Loaded hook execution is proved by absence of
+QBlit submissions in CPU arms, retained hook bytes and completed native publication.
+A production cache-flush/install contract remains C3 work.
+
+Within each CPU/memory/scene group, **all four starting game hunks and all Chip
+RAM match exactly** before installation. The observer retains every submitted
+chunky source in a binary stream and checks every completed visible conversion
+against an independent pixel oracle, including checkerboard nibbles and four
+native black edge pixels. The decision table uses the common **byte-exact source
+prefix**, bounded further to completed and displayed images. It reports intervals
+between those matched pictures, not unlike amounts of simulation in five seconds.
+The native game still advances much world state once per picture; slower arms
+reach fewer updates. Credit-clock changes eventually end the matching intro
+prefix. Full 250-field rates are retained separately, never used as proof of
+identical end-state progression across backends.
+
+#### Matched results
+
+All configurations use 512 KiB Chip and OCS. F means 4 MiB true Zorro-II Fast RAM;
+S means **no true Fast RAM**, with 1.75 MiB slow expansion RAM. The slow case boots;
+it is not an unsupported-memory omission. CPU word conversion is used on 68000,
+longword conversion on 68020. Times are milliseconds. Short-window p95 values
+are sample descriptions, especially the six-interval A500 flight comparison.
+
+| CPU / RAM / scene | Backend/source | Matched pictures | Display FPS | Interval p95 | Full conversion mean |
+|---|---|---:|---:|---:|---:|
+| 68000 / F / asteroids | Native/Chip | 10 | **7.488** | 140.22 | 58.51 |
+| same | CPU/Chip | 10 | 2.455 | 420.67 | 307.70 |
+| same | CPU/Fast | 10 | 2.455 | 432.69 | 307.11 |
+| 68000 / S / asteroids | Native/Chip | 10 | **6.607** | 172.27 | 65.44 |
+| same | CPU/Chip | 10 | 2.442 | 432.69 | 309.25 |
+| 68020 / F / asteroids | Native/Chip | 51 | 13.000 | 80.13 | 55.31 |
+| same | CPU/Chip | 51 | 11.829 | 100.16 | 39.80 |
+| same | CPU/Fast | 51 | **13.867** | 80.13 | 37.05 |
+| 68020 / S / asteroids | Native/Chip | 25 | **7.488** | 160.26 | 65.07 |
+| same | CPU/Chip | 25 | 6.021 | 200.32 | 83.34 |
+| 68000 / F / flight/fire | Native/Chip | 7 | **5.990** | 180.29 | 92.56 |
+| same | CPU/Fast | 7 | 1.619 | 620.99 | 493.59 |
+| 68020 / F / flight/fire | Native/Chip | 47 | 9.941 | 120.19 | 100.09 |
+| same | CPU/Chip | 47 | 9.689 | 120.19 | 68.91 |
+| same | CPU/Fast | 47 | **10.582** | 100.16 | 65.16 |
+
+The independent 250-field rates (native / CPU-Chip / CPU-Fast) are
+5.791/2.396/2.396 for 68000/F asteroids, 5.391/2.396 for 68000/S,
+12.979/11.781/13.578 for 68020/F and 6.989/5.990 for 68020/S.
+Flight/fire gives 5.391/1.597 for 68000 native/CPU-Fast, and
+9.784/9.585/10.583 for the three 68020/F arms. These are *different progressed
+workloads*; the matched table is the backend decision evidence.
+
+Native conversion overlaps later CPU work. On matched 68020/F asteroid pictures,
+its conversion interval overlaps 15.43 ms of world work and 21.47 ms of drawing
+per picture; in flight these are 7.62/31.52 ms. CPU conversion has zero such
+main-task overlap. Thus a shorter CPU conversion alone does not prove higher FPS.
+Matched 020 flight world means are 7.49/7.44/7.48 ms for native/CPU-Chip/CPU-Fast;
+drawing means are 31.53/21.27/16.74 ms. These are inclusive elapsed scopes, including
+interrupts/contention; do not sum overlapping phases or call them exclusive CPU cost.
+
+The native queue/scheduling residual averages 2.31 ms in 000/F asteroids,
+0.83 ms in 020/F asteroids and 11.15 ms in 020/F flight. Its explicit field-wait
+component averages 0.006/0.119/10.489 ms respectively and can overlap blitter
+service; it is not added again. Detailed stage sums, flag-poll time, world/draw
+means and percentiles, publication delay and instruction accounting remain in
+the reports. CPU adapter time includes its retained field check.
+
+The observer counts actual occupied-bus waits in the emulator's `dma_cycle`,
+separating bitplane-occupied slots from other DMA slots. These are CPU arbitration
+stalls, not all Chip-access time or isolated blitter throughput. Across the whole
+020/F asteroid window, native incurs 1,487.80 ms other-DMA plus 281.66 ms bitplane
+waits; CPU-Chip incurs 14.14/48.68 ms and CPU-Fast 4.10/26.37 ms. Flight gives
+1,486.71/446.42, 12.70/13.74 and 5.65/9.67 ms. These window totals have different
+completed-picture counts, and must not be interpreted as per-picture savings.
+
+#### Fast-source ownership finding
+
+The flight compositor owns more aliases than the primary surface/row table.
+`O:2be60`–`2be7a` (file base +`2c`) copies rows to the shadow table referenced by
+`OD:6fb6` (file `408fe`), then replaces backed rows with pointers into its separate
+backup allocation. `O:2bf74` (file `2bfa0`) executes the 12-byte CPU-copy stream
+at `OD:6fba` (file `40902`); `O:2bf40` swaps its +4/+8 source/destination columns.
+The stream ends with operation `fffa`; the shadow table is stream base +`bb8`.
+
+The Fast arm must rebase the primary rows, shadow entries still referencing the
+active source, and **both** command-pointer columns that reference that source.
+Backup pointers, opcodes/counts and allocations stay intact. Merely changing the
+surface source and primary table loses compositor pixels; merely looking for a
+second identical table misses its backed rows. The retained faulty flight arms
+fail exact source matching, and one also exposes writes to the old Chip source.
+The corrected arms match flight inputs and leave the retired Chip source unchanged.
+This is concrete C4 work: construct/rebind these owners deliberately through
+view transitions; do not turn the diagnostic snapshot rebase into a production
+scan-and-replace allocator.
+
+Both native allocator pools advertise expansion memory as attributes `0005`
+(PUBLIC|FAST), including the slow-memory test. Physical mapping distinguishes the
+banks: true Fast lies in the configured `200000`–`600000` bank; slow expansion in
+`c00000`–`dc0000`. These are **hardware memory-map ranges**, not game offsets.
+The loader reservation and native expansion pool are verified inside the selected
+bank. Do not classify trapdoor slow memory as uncontended Fast merely from Exec's
+MEMF_FAST flag. The measured slow configurations are comparison cases, not a
+replacement for the A500/true-Fast project baseline.
+
+#### Gate and limits
+
+Actual plane-0 DMA identifies the displayed allocation independently of publication
+PCs. Each accepted field uses one display buffer. Interior publications match
+DMA transitions; at most one publication in the final field can remain pending
+past the cap. The 15 accepted windows pass 520 independent four-plane pixel checks;
+converter code and reservation guards remain intact. Native queue waits, field
+pacing and direct-plane/Copper paths remain present. The source move is restricted
+to the active bounded scene; allocation failure, transitions, cleanup and general
+publication deadlines remain C3–C5/E2.
+
+Three observer-off controls (000 native asteroids and both CPU/Fast flight arms)
+match game hunks, complete Chip RAM, Fast source bytes, field clocks and native
+world counters exactly: zero measured emulated-cycle effect. Eight deliberate
+report sabotages reject bad CPU clock, pixels, missing DMA/source coverage,
+wrong source bank, unfrozen endpoint, wrong world count and missing instruction accounting. The earlier incomplete
+Fast move is a separate rejecting ownership control. Neither observer instrumentation
+nor the stopped-guest loader runs in a normal slave; no guest recorder is installed.
+
+No staged Fast-to-Chip/blitter arm or pacing-removal arm is selected. The required
+comparisons already distinguish the measured profiles; a staged path would add
+copying and another lifetime contract without demonstrated benefit. That is an
+unmeasured alternative, not a claim it can never win. There is no calibrated
+intermediate CPU/clock boundary, 030/040 result, hardware speed claim or general
+accelerator policy. For unknown profiles C3 must retain native fallback/override.
+No broad matrix is needed to resolve the observed, consistent profile choices.
+
+Accepted evidence: `tmp/p13c2-final-*` for the ten asteroid cells,
+`tmp/p13c2-flight-68000-native`, `tmp/p13c2-flight-68020-native`,
+`tmp/p13c2-flight-68020-chip-long`, `tmp/p13c2-flight-owned-*` for flight,
+`tmp/p13c2-check-*-final.json`, and `tmp/p13c2-accepted-final.json`.
+Instrument SHA-256: `432c44f7a9b59dd0454727851faecd413a308f5e557da42af0772ade61e764d6`.
+Normal OCS SHA remains `eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913`;
+CD32 release remains `fdd92fbbda8689e3ec3ab2353d5baa866859469a684026841fd71527e0a6de8d`.
+Stop before P13C3. [Reproduction](development.md#p13c2-measured-converter-comparison).

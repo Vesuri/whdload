@@ -3474,3 +3474,138 @@ headroom. No full-screen staging allocation is required. These checks execute
 functional CPU/blitter models and provide no bus-contention, queue-latency or
 performance measurement. Native slave defaults and the CD32 release are untouched.
 Stop before P13C2's matched crossover experiment.
+
+## P13C2: measured converter comparison
+
+This builds a **diagnostic-only** slave reservation and installs experimental
+hooks into a stopped guest for one bounded window. It never changes normal builds
+or game trees. Keep every generated file below `tmp/`. Use the canonical shared
+`WHDLoad` directory through `amiga/env.sh`; there is no version-suffixed path.
+The C1 Kalms pins and A3 debugger-source pins remain required.
+
+```sh
+. amiga/env.sh
+FSUAE_SOURCE="$PWD/tmp/p13a3-source" \
+  python3 tools/build_debugger.py --ocs-pixels --ocs-observer \
+  --output tmp/c2-meter
+export FSUAE="$PWD/tmp/c2-meter/fs-uae" WARP=1
+python3 tools/ocs_crossover_run.py --calibrate --output tmp/c2-fast-layout
+python3 tools/ocs_crossover_run.py --calibrate --memory slow --output tmp/c2-slow-layout
+```
+
+`tmp/p13a3-source` is the pinned, configured source staging described under A3;
+reproduce it there if absent. The builder copies it locally. The observer covers
+the actual cycle-exact 68000/020 dispatch, native conversion/publication PCs,
+bitplane fetches and occupied-slot CPU waits in `dma_cycle`. Its optional
+`ocs-load` monitor command loads bounded files into RAM **only while stopped**;
+C2 uses it before measurement and verifies the installed path afterwards. Ordinary
+GDB memory writes are unsupported by this debugger and must not be used instead.
+
+Run the ten asteroid cells sequentially under Bash 3.2:
+
+```bash
+for cpu in 68000 68020; do
+    candidate=word
+    [ "$cpu" = 68000 ] || candidate=long
+    for memory in fast slow; do
+        layout=tmp/c2-fast-layout/layout.json
+        [ "$memory" = fast ] || layout=tmp/c2-slow-layout/layout.json
+        arms="native chip-$candidate"
+        [ "$memory" = slow ] || arms="$arms fast-$candidate"
+        for arm in $arms; do
+            python3 tools/ocs_crossover_run.py --cpu "$cpu" --memory "$memory" \
+                --layout "$layout" --arm "$arm" \
+                --output "tmp/c2-$cpu-$memory-$arm"
+        done
+    done
+done
+```
+
+Both CPU models used the same discovered layout within each memory configuration
+in the accepted runs; the runner verifies it against live hunks/A4. If a changed
+input changes layout, calibrate that configuration separately and use its file.
+`fast` configures 4 MiB Zorro-II Fast and no slow memory; `slow` configures 1.75 MiB
+slow expansion and zero true Fast. Both retain 512 KiB Chip/OCS. The audit must
+report CPU unit 256/128 and native PAL defaults, never an overflowing numeric
+frequency. Warp affects only host duration, not the emulated-time denominator.
+
+The focused flight/fire confirmation keeps native controls and compares the
+required baseline and accelerated Fast profile:
+
+```bash
+for cpu in 68000 68020; do
+    arms='native fast-word'
+    [ "$cpu" = 68000 ] || arms='native chip-long fast-long'
+    for arm in $arms; do
+        python3 tools/ocs_crossover_run.py --cpu "$cpu" \
+            --layout tmp/c2-fast-layout/layout.json --scene fire --arm "$arm" \
+            --output "tmp/c2-flight-$cpu-$arm"
+    done
+done
+```
+
+All writes finish before `ocs-window` aligns to a field edge. There are no interior
+breakpoints, input changes or profiles. The installer retires QBlit first, retains
+its allocations, validates the active source/view and rebases the flight
+compositor's shadow rows and copy-command pointers for Fast arms. The run stops
+at its 250-field cap and cleans up only its own emulator. This bounded rebase is
+not production allocation, view-transition or cleanup code.
+
+Analyze individual windows and matched groups separately. The first emits full
+field-window counters/costs; the second verifies equal initial hunks/Chip RAM and
+compares byte-exact source images, completed conversions and actual displayed
+pictures. Do not substitute different progressed workloads for matched pictures.
+For example:
+
+```sh
+python3 tools/ocs_crossover_report.py \
+  tmp/c2-68020-fast-native tmp/c2-68020-fast-chip-long tmp/c2-68020-fast-fast-long \
+  --output tmp/c2-020-windows.json
+python3 tools/ocs_crossover_report.py --matched \
+  tmp/c2-68020-fast-native tmp/c2-68020-fast-chip-long tmp/c2-68020-fast-fast-long \
+  --output tmp/c2-020-matched.json
+python3 tools/ocs_crossover_report.py --matched \
+  tmp/c2-flight-68020-native tmp/c2-flight-68020-chip-long tmp/c2-flight-68020-fast-long \
+  --output tmp/c2-020-flight-matched.json
+```
+
+Repeat these reports for the other groups, always putting native first. Source
+streams are `*-events.txt.sources`, packed as W×H bytes per `H` record; `X` records
+contain independent visible-pixel comparisons, `T` occupied-slot wait counts.
+A source mismatch ends the eligible prefix; fewer than four completed matching
+pictures fails. A pending publication is permitted only in the last field, when
+its next Copper latch can lie beyond the cap. Interior publication loss fails.
+The report checks actual selected backend, memory placement, clock, source coverage,
+code/source guards and absence of stale writes to the retired Chip source.
+
+Run observer-off controls with the same options, adding `--baseline off` and a new
+output directory. Accepted controls cover native 000 asteroids and CPU/Fast flight
+on both CPUs. For example:
+
+```sh
+python3 tools/ocs_crossover_run.py --cpu 68020 --layout tmp/c2-fast-layout/layout.json \
+  --scene fire --arm fast-long --baseline off --output tmp/c2-020-off
+python3 tools/ocs_crossover_check.py tmp/c2-flight-68020-fast-long tmp/c2-020-off \
+  --output tmp/c2-020-control.json
+```
+
+The checker compares native game hunks, complete Chip RAM, Fast source, field
+clocks/counters and machine/build fingerprints. It also deliberately corrupts
+eight report inputs and requires rejection. The retained incomplete source-move
+runs `tmp/p13c2-flight-68020-fast-long` and `tmp/p13c2-flight-fixed-68020-fast-long`
+are **not accepted measurements**: current reporting rejects their stale source
+writers, and source matching rejects their compositor mismatch. Accepted Fast
+flight runs are `tmp/p13c2-flight-owned-*`.
+
+Finally rebuild both normal slaves and compare with the C1 outputs:
+
+```sh
+python3 tools/reconstruct.py --variant ocs --output tmp/c2-native-control
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/c2-release-control
+cmp tmp/c2-native-control/WingCommander.Slave tmp/p13c1-native/WingCommander.Slave
+cmp tmp/c2-release-control/WingCommanderCD32.Slave tmp/p13c1-release/WingCommanderCD32.Slave
+```
+
+See [the decision, measurements and limits](internals.md#p13c2-measured-ocs-converter-crossover).
+Stop before C3 selection and C4 production memory ownership. Do not distribute
+the diagnostic reservation/slave or resume paused CD32 release work.

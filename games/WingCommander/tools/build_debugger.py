@@ -27,7 +27,7 @@ def main():
     p.add_argument('--dma-cia-unsplit', action='store_true', help='diagnostic: preserve unrecorded CIA wait stepping; omit CIA wait-phase annotations')
     p.add_argument('--matrix-irq', action='store_true', help='diagnostic complete-call intervals for game VBL callbacks')
     p.add_argument('--ocs-pixels', action='store_true', help='initialized host framebuffer and lossless multi-field screenshots')
-    p.add_argument('--ocs-observer', action='store_true', help='P13A4 read-only 68000 baseline observer and field-bounded windows')
+    p.add_argument('--ocs-observer', action='store_true', help='OCS 68000/020 read-only observer, field windows and stopped-guest diagnostic RAM loader')
     a = p.parse_args()
     if a.matrix_irq and not a.matrix_observer:
         raise ValueError('--matrix-irq requires --matrix-observer')
@@ -109,6 +109,12 @@ int record_key_debug(int kc) {
         hook = '{ cpu_profiler profiler(r->instruction_pc); // BARTO'
         assert body.count(hook) == 1
         body = body.replace(hook, 'wc_ocs_pc(r->instruction_pc);\n                { ocs_instruction ocs_cost(r->instruction_pc); cpu_profiler profiler(r->instruction_pc); // BARTO')
+        code = code[:start]+body+code[end:]
+        start = code.index('static void m68k_run_2ce (void)\n{')
+        end = code.index('static void m68k_run_2p (void)', start)
+        body = code[start:end]
+        assert body.count(hook) == 1
+        body = body.replace(hook, 'wc_ocs_pc(r->instruction_pc);\n                { ocs_instruction ocs_cost(r->instruction_pc); cpu_profiler profiler(r->instruction_pc); // BARTO')
         target.write_text(code[:start]+body+code[end:])
         shutil.copyfile(ROOT/'tools/ocs_observer.inc', out/'src/wc_ocs_observer.inc')
         target = out/'src/custom.cpp'
@@ -118,6 +124,11 @@ int record_key_debug(int kc) {
         at = code.index(hook)
         at = code.rfind('#ifdef DEBUGGER', 0, at)
         code = code[:at]+'wc_ocs_fetch(p,nr);\n'+code[at:]
+        code = code.replace('static int dma_cycle(int *mode, int *ipl)\n{',
+                            'extern void wc_ocs_dma_wait(bool);\nstatic int dma_cycle(int *mode, int *ipl)\n{')
+        hook = '\t\tdo_cycles(1 * CYCLE_UNIT);\n\t\t/* bus was allocated to dma channel, wait for next cycle.. */'
+        assert code.count(hook) == 1
+        code = code.replace(hook, '\t\twc_ocs_dma_wait(bpldma != 0);\n'+hook)
         # Non-cycle-exact long-fetch optimization must also retain the observer,
         # although the fixed A500 gate refuses that CPU mode.
         hook = 'uaecptr bpladdr = bplpt[plane];'
@@ -130,7 +141,30 @@ int record_key_debug(int kc) {
         code = code.replace('enum class state {', 'static unsigned ocs_remaining, ocs_h0_arg, ocs_h1_arg, ocs_mode_arg;\n    static std::string ocs_path;\n    enum class state {\n        ocs_start, ocs_run,')
         hook = '} else if(cmd == "aprof start") {'
         assert code.count(hook) == 1
-        code = code.replace(hook, r''' } else if(cmd.substr(0,11) == "ocs-window ") {
+        code = code.replace(hook, r''' } else if(cmd.substr(0,9) == "ocs-load ") {
+            unsigned address; char path[1024], extra;
+            if(sscanf(cmd.c_str(),"ocs-load %x \"%1023[^\"]\" %c",&address,path,&extra)!=2 ||
+               debugger_state!=state::debugging) response+="E01";
+            else {
+                FILE* f=fopen(path,"rb");
+                if(!f) response+="E02";
+                else {
+                    fseek(f,0,SEEK_END); long size=ftell(f); rewind(f);
+                    if(size<=0 || size>73728 || !((address>=0x100 && address<=0x80000-size) ||
+                       (address>=0x200000 && address<=0x600000-size) ||
+                       (address>=0xc00000 && address<=0xdc0000-size))) response+="E03";
+                    else {
+                        std::vector<unsigned char> bytes(size);
+                        if(fread(bytes.data(),1,size,f)!=(size_t)size) response+="E04";
+                        else {
+                            for(long i=0;i<size;++i) put_byte(address+i,bytes[i]);
+                            response+="OK";
+                        }
+                    }
+                    fclose(f);
+                }
+            }
+        } else if(cmd.substr(0,11) == "ocs-window ") {
             char path[1024], extra;
             if(sscanf(cmd.c_str(),"ocs-window %u %u %x %x \"%1023[^\"]\" %c", &ocs_remaining,
                 &ocs_mode_arg,&ocs_h0_arg,&ocs_h1_arg,path,&extra)!=5 ||

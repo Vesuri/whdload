@@ -2,7 +2,7 @@
 
 ## Current state
 
-**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3 and P13C1 are complete.** The OCS loader, four-plane blitter
+**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The
 [ordered OCS work items P13A1–P13E3](ocs-plan.md) cover shared CD32 mechanisms,
@@ -14,7 +14,7 @@ through intro, menu, simulator and visible name entry on the nominated A500.
 The short calibrated stock-clock A500 baseline measures 5.79 displayed pictures/s
 in asteroid credits and 5.39 during simulator flight/fire. Native publication and
 actual display counters agree; observer-off state/pixels match at eight checkpoints.
-No OCS runtime change or backend selection is included. Compile-time variant maps
+Normal OCS builds retain native conversion; C2 runtime arms remain diagnostic-only. Compile-time variant maps
 and explicit build/analysis selection now preserve all checked CD32 binaries and
 original OCS bytes. The shared 68000 ISA alternatives pass arithmetic, flags and
 wrapper checks; full OCS linking and native ABI integration remain later gates.
@@ -24,9 +24,12 @@ callable OCS recorder passes CPU/replay checks; live guest hooks and their overh
 remain later integration. The retained native observer-off control remains exact.
 Experimental Kalms word/longword converters now pass native/oracle pixel and
 bounds checks with shared checkerboard adaptation and explicit native fallback.
-They remain standalone components; their row staging cost belongs in C2 measurements.
-See the [C1 gate](internals.md#p13c1-experimental-four-plane-converters).
-P13C2 is next only on request; CD32 E1 and phase 12 remain
+C2 now measures the full adapters, matched source images and actual display changes.
+Native wins the measured 68000 and no-Fast 68020 profiles; CPU/Fast longword wins
+the measured 14 MHz 68020/Fast profile. Flight requires rebasing compositor shadow
+rows and copy-command pointers as well as the primary source. Normal builds are
+unchanged. See the [C2 gate](internals.md#p13c2-measured-ocs-converter-crossover).
+P13C3 is next only on request; CD32 E1 and phase 12 remain
 paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
 [P13B3 scope and checks](internals.md#p13b3-shared-instrumentation-and-validation-interfaces).
 
@@ -691,13 +694,13 @@ The investigation deliverable is the [ordered OCS plan](ocs-plan.md):
   projectile prediction and the 15-page intro.
 - **P13E1–P13E3:** focused A500 performance work, compatibility and later release hand-off.
 
-P13A1–P13A4, P13B1–P13B3 and P13C1 are complete; P13C2–P13E3 remain pending. The native converter **uses the blitter**;
+P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 are complete; P13C3–P13E3 remain pending. The native converter **uses the blitter**;
 keep it where measured end-to-end performance wins, including potentially 68000
 and no-Fast 68020 systems. A 68000 CPU converter and the proposed 68020+ longword
 path are alternatives to compare, not a reason to remove the blitter. CPU type
 alone does not establish the crossover. See the [static evidence and limits](internals.md#phase-13-ocs-static-investigation)
 and [reproducible commands](development.md#phase-13-ocs-static-investigation).
-Stop at the P13B2 gate; no OCS runtime changes or resumption of CD32 release work.
+Stop at P13C2; no backend selection or resumption of CD32 release work.
 
 ## Decisions pending
 
