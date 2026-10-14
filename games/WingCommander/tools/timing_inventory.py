@@ -6,17 +6,27 @@ from capstone import m68k as m
 from cd32_runtime import ROOT, BASE, SIZES, locate
 
 
-def inventory(memory, layout, roots):
+def inventory(memory, layout, roots, profile=None):
+    """Walk native control flow; variant-specific indirect ABIs are explicit."""
+    profile = profile or {}
+    base = profile.get("base", BASE)
+    sizes = profile.get("sizes", SIZES)
+    prefix = profile.get("prefix", "E")
+    action = profile.get("action", 0x13d60)
+    action_data = profile.get("action_data", 0x372)
+    byte_switch = profile.get("byte_switch", 0x2fdde)
+    helpers = profile.get("helpers", {0x277b4:(0x27856,0x278fc),
+        0x309a4:(0x34620,0x3460a),0x30b02:(0x34620,0x3460a)})
     decoder=cs.Cs(cs.CS_ARCH_M68K,cs.CS_MODE_BIG_ENDIAN|cs.CS_MODE_M68K_020)
     decoder.detail=True
     h=layout['hunks']
     def label(a):
         for n in (0,3):
-            if h[n]<=a<h[n]+SIZES[n]:return f'{"E" if n==0 else "H3"}:{a-h[n]:05x}'
+            if h[n]<=a<h[n]+sizes[n]:return f'{prefix if n==0 else "H3"}:{a-h[n]:05x}'
         if layout['slave']<=a<layout['slave']+0x1e0c:return f'S:{a-layout["slave"]:05x}'
         return f'external:{a:08x}'
-    def code(a):return any(h[n]<=a<h[n]+SIZES[n] for n in (0,3))
-    def ins(a):return next(decoder.disasm(memory[a-BASE:a-BASE+16],a,1),None)
+    def code(a):return any(h[n]<=a<h[n]+sizes[n] for n in (0,3))
+    def ins(a):return next(decoder.disasm(memory[a-base:a-base+16],a,1),None)
     def target(i):
         o=i.operands[-1]
         if o.type==m.M68K_OP_BR_DISP:return i.address+2+o.br_disp.disp
@@ -36,6 +46,7 @@ def inventory(memory, layout, roots):
         **dict.fromkeys((0x34f08,0x35c6c,0x35c82,0x35cd8),
                        'C runtime exit/stdio callback'),
     }
+    boundaries = profile.get("boundaries", boundaries)
     todo=[h[0]+x for x in roots];seen={};edges=[];unresolved=[];tables=[];external=[];leaves=[]
     while todo:
         a=todo.pop()
@@ -49,36 +60,43 @@ def inventory(memory, layout, roots):
             dest=target(i)
             if dest is not None:
                 edges.append(dict(at=label(a),kind=name,target=label(dest)));todo.append(dest)
-            elif a==h[0]+0x13d60:
-                table=h[1]+0x372
-                entries=list(struct.unpack_from('>47I',memory,table-BASE))
+            elif a==h[0]+action:
+                table=h[1]+action_data
+                entries=list(struct.unpack_from('>47I',memory,table-base))
                 if not all(code(x) for x in entries):raise ValueError('non-code ship-action dispatch')
-                tables.append(dict(at=label(a),table='D:00372',entries=[label(x) for x in entries]))
+                tables.append(dict(at=label(a),table=f'{profile.get("data_prefix","D")}:{action_data:05x}',entries=[label(x) for x in entries]))
                 todo.extend(entries)
-            elif a-h[0] in (0x277b4,0x309a4,0x30b02):
-                entries=[h[0]+x for x in ((0x27856,0x278fc) if a-h[0]==0x277b4 else (0x34620,0x3460a))]
+            elif a-h[0] in helpers:
+                entries=[h[0]+x for x in helpers[a-h[0]]]
                 edges.extend(dict(at=label(a),kind='selected-resource-helper',target=label(x)) for x in entries)
                 todo.extend(entries)
-            elif a==h[0]+0x2fdde:
-                table=h[0]+0x2fde2
+            elif a==h[0]+byte_switch:
+                table=h[0]+byte_switch+4
                 # Byte index doubled with ADD.B: 128 word entries, not 256.
-                entries=[table+struct.unpack_from('>h',memory,table-BASE+2*j)[0] for j in range(128)]
+                entries=[table+struct.unpack_from('>h',memory,table-base+2*j)[0] for j in range(128)]
+                tables.append(dict(at=label(a),table=label(table),entries=[label(x) for x in entries]))
+                todo.extend(entries)
+            elif a-h[0] in profile.get('extra_tables', {}):
+                table_offset, base_offset, count = profile['extra_tables'][a-h[0]]
+                table = h[0]+table_offset
+                entries = [h[0]+base_offset+struct.unpack_from('>h',memory,table-base+2*j)[0] for j in range(count)]
+                if not all(code(x) for x in entries):raise ValueError('non-code extra table destination')
                 tables.append(dict(at=label(a),table=label(table),entries=[label(x) for x in entries]))
                 todo.extend(entries)
             elif a-h[0] in boundaries:
                 leaves.append(dict(at=label(a),reason=boundaries[a-h[0]]))
             elif name=='jsr' and i.operands[0].address_mode==m.M68K_AM_REGI_ADDR_DISP and i.operands[0].mem.base_reg==m.M68K_REG_A6 and i.operands[0].mem.disp<0:
                 leaves.append(dict(at=label(a),reason='OS library negative vector'))
-            elif name=='jmp' and memory[a-BASE:a-BASE+2]==bytes.fromhex('4efb'):
+            elif name=='jmp' and memory[a-base:a-base+2]==bytes.fromhex('4efb'):
                 # Aztec C bounded word-offset switch: cmp count; bcc default;
                 # add.w d0,d0; move.w table(pc,d0.w),d0; jmp 0(pc,d0.w).
-                cmp_at=next((a-n for n in (12,14) if memory[a-BASE-n:a-BASE-n+2]==bytes.fromhex('0c40')),None)
-                raw=memory[a-BASE-6:a-BASE]
-                if cmp_at is not None and memory[cmp_at-BASE+4]==0x64 and raw[:4]==bytes.fromhex('d040303b'):
-                    count=struct.unpack_from('>H',memory,cmp_at-BASE+2)[0]
+                cmp_at=next((a-n for n in (12,14) if memory[a-base-n:a-base-n+2]==bytes.fromhex('0c40')),None)
+                raw=memory[a-base-6:a-base]
+                if cmp_at is not None and memory[cmp_at-base+4]==0x64 and raw[:4]==bytes.fromhex('d040303b'):
+                    count=struct.unpack_from('>H',memory,cmp_at-base+2)[0]
                     table=a-2+struct.unpack('b',raw[-1:])[0]
-                    base=a+2+struct.unpack('b',memory[a-BASE+3:a-BASE+4])[0]
-                    entries=[base+struct.unpack_from('>h',memory,table-BASE+2*j)[0] for j in range(count)]
+                    switch_base=a+2+struct.unpack('b',memory[a-base+3:a-base+4])[0]
+                    entries=[switch_base+struct.unpack_from('>h',memory,table-base+2*j)[0] for j in range(count)]
                     if not all(code(x) for x in entries):raise ValueError('non-code switch destination at '+label(a))
                     tables.append(dict(at=label(a),table=label(table),entries=[label(x) for x in entries]))
                     todo.extend(entries)

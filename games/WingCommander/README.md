@@ -3,7 +3,7 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A4, P13B1–P13B3 and P13C1–P13C6 complete: OCS converter selection, memory/publication ownership and changed-block evaluation.** The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1 complete: OCS conversion/display work and native timing ownership audit.** The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting

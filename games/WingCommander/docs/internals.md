@@ -4470,10 +4470,11 @@ belongs in an OCS backend, even with a 68020 or faster CPU.
 | `O:26ece`, `26ef8` | CIAB TOD references in the audio code |
 | `O:33f28`, `33f38`, `33f74`, `33f88` | Native joystick/CIA fire sampling |
 
-The field clock is A4 minus `0800`, not the CD32 offset. Ten world updates per
-second is the selected shared design target; native OCS speed/range-unit and
-full side-effect mapping are still required. The table is a starting map, not
-an assertion that CD32 FR-01–FR-23 are already proven on OCS.
+The field clock is A4 minus `0800`, not the CD32 offset. The completed
+[P13D1 audit](#p13d1-ocs-timing-and-side-effect-map) verifies the OCS speed/range
+units supporting ten world updates per second and maps FR-01–FR-23 with native
+checks and named exclusions. The table above is the original anchor set; the
+D1 map records the verified OCS input and side-effect differences.
 
 The title's world loop is at `O:1ef24`–`1efb0`, with 296 updates, odd-update draws,
 thresholds 135/235 and a title drawing parameter changing from 200 to 16.
@@ -5950,4 +5951,205 @@ The opt-in diagnostic slave SHA-256 is
 `37f8ed6eca1d952f6c1c0d10f310ae32e6b3508f7683329c1ce240aa1d146435`.
 The default C5 candidate remains byte-identical (`172d3297…`); original OCS and
 CD32 controls remain separate. No release archive or shared emulator is changed.
-P13D1 is the next implementation item.
+P13D1 timing ownership is recorded below.
+
+### P13D1: OCS timing and side-effect map
+
+P13D1 is complete for the pinned English OCS executable
+`eff90d6cfbc80b008e5e508ff6488f221b6e7243958aaff6fdfd0b06e6724a30`.
+This is a native-code ownership audit, **not a timing implementation**. Neither
+slave nor any game instruction is changed. D2 owns clock integration; D3 owns
+responsive controls/prediction; D4 owns the world-based intro. The local tests
+below and named scene exclusions define the evidence; this is not whole-campaign
+or hardware acceptance.
+
+Notation remains `O:` code hunk 0 and `OD:` data hunk 1. In the table, `O/file`
+means two hexadecimal offsets: code hunk / executable file. Other `O:` offsets
+convert to file offsets by adding `002c`. File-backed `OD:` offsets add `39948`;
+state at or beyond `OD:7bb8` has no stored file bytes. No address in this section
+is a relocated runtime address.
+
+**Control-flow coverage.** The shared `timing_inventory.py` walker now accepts
+an explicit OCS indirect-call profile. The roots are world `O:02be`, decorated
+draw `0512`, input `18d14`, flight entry `0640` and title/credit cycle `1eeb2`.
+Their closure has 40,964 instructions, 8,397 direct/selected-helper edges,
+72 dispatch tables and 791 entries. Native execution on both **M68000 and
+M68020** reaches every table destination; 140 out-of-range checks reject the
+first excessive and unsigned-negative indices of the bounded word switches.
+Two additional checks reject action IDs −1 and 47.
+The 47-action table is `OD:038c`, selected at `O:13ad6`; the byte image switch
+is `30664`. The OCS renderer also has a 14-entry D1-register switch at `2bae6`.
+These are inspected OCS operands and executed targets, not an offset delta
+assumed from CD32. The table tests stop on entry to each handler; they do not
+claim to exercise every handler's semantic branches.
+
+All 61 indirect leaf boundaries are classified in the generated inventory:
+OS library calls, resource/image copy/fill kernels, formatted output and C runtime
+callbacks. The OCS compositor command runner `O:2bf8e` consumes image-copy
+commands; it is not an omitted world-action dispatcher. Selected allocators,
+music decoders and pixel/line helpers have explicit destinations. There are no
+unclassified indirect transfers or external code edges in this closure. The
+IRQ-driven audio/input providers and OS implementations are separate boundaries,
+not hidden claims of whole-machine coverage. Corrupting the lifecycle switch's
+index-register signature causes rejection. The unchanged CD32 inventory still
+has 30,384 instructions, 6,118 edges, 54 tables and 625 entries.
+
+**Native order and units.** The flight loop calls input `O:18d14` at `069a`,
+world `02be` at `06b4`, decorated draw `0512` at `06b8`, then systems `4460`
+at `06bc`. World work orders housekeeping `0276`, lifecycle `745a`, two-pass
+object processing `78c4`, camera/control `6584`, audio/encounter selection
+`1445a`, then increments `OD:88da.w` at `02d8`. The draw gate at `02e6` consumes
+`OD:00ae.w`, reloads `00b0.w`, and increments `88de.w` at `02f6` only when drawing.
+These counters have separate ownership even before decoupling.
+
+Position `OD:8928+12*i` and velocity `94fa+12*i` are three signed longs with
+8 fractional bits. `O:7e2c–7e56` adds velocity once per world call. Set-speed
+`203a–2042` shifts by eight then multiplies by ten; actual-speed `2062–2082`
+calls native magnitude and fixed-point multiplication with `0a00`, then rounds
+and shifts. Range `2de0–2e4a` computes nav/player relative geometry and writes
+`OD:a08e.l` after shifting by eight. Executed OCS fixtures give **200 kps** for
+velocity 5120 and **20 km per update**, establishing **10 updates/s** from OCS's
+own units. This is the target rate, not a measurement that an A500 sustains it.
+Positive and negative one-unit fractions survive integration.
+
+**FR-01–FR-23 ownership.** “Calls” below means controlled native invocations over
+a nominal second, with schedules 10, 20, 50, 60, 10→50 and 50→10. It does not mean
+emulator FPS. Full routines are distinguished from bounded writer/predicate
+slices in `tools/ocs_timing_check.py`. `tools/ocs_timing_map.py` binds every ID to
+its OCS owners, actual report paths and the exclusions below; missing test results
+fail the coverage check.
+
+| ID / responsibility | Primary O/file | Native owner, test and policy |
+|---|---|---|
+| FR-01 — Translation/acceleration | `07e2c/07e58` | Position `8928`, velocity `94fa`; acceleration writeback `O:7df0` then integration. Native +5120 motion gives 51,200/256,000 at 10/50 calls; +256 acceleration gives 14,080/326,400. Retain world-step units. |
+| FR-02 — Rotation/steering | `079fc/07a28` | Angular steps `8d06/8d86/8e06`; damping `O:2a6e0`; AI controller `9c4a→9b3a`. Full angular update and damping vary with calls. Feedback manoeuvres remain X1. |
+| FR-03 — Fuel | `0c8ee/0c91a` | Fuel `9cda+4*i`, speed `914c+4*i`. Whole fuel routine subtracts 50/250 at 10/50 calls. Afterburn expenditure also occurs at `O:7c32`; it remains world-owned. |
+| FR-04 — Afterburn duration | `07b86/07bb2` | Countdown `b102+2*i`, decrements `O:7b92/7c56`, action-3 reload ten at `c8c2`. Writer test gives 90/50 from 100. Preserve the action transition once at the world boundary. |
+| FR-05 — Life/death/shrink | `0741e/0744a` | Life/reload `8c54+2*i`; permanent −1; size `a9b8`. Native life gives 90/50; `O:7684` halves positive size. Ship gun reload is not identity reset; see below. |
+| FR-06 — Missile delay | `07550/0757c` | Signed byte `b096+i`, constructors `O:c490/c814`, lifecycle `7550/757e`. Native 127 decrements; 128/255 do not. The 20-call duration expires at different times under varying rates; do not widen by scaling the byte. |
+| FR-07 — Shield/gun recovery | `0c91a/0c946` | World `88da`, model table `5426+104*m` period +12, shields `9d02`, maxima `b628`, gun energy `8cd4`. Whole routines yield shields 2/12 and energy 20/100 at 10/50 calls. Energy spend `O:c2ae` is per shot. |
+| FR-08 — Damage/death delays | `0a320/0a34c` | Death response `b65a` reloaded four at `O:9aa2`; collision response `b472` consumed at `e41a`. Signed-byte writer tests pass. Damage amounts remain per impact; complete damage outcomes are X1. |
+| FR-09 — AI/RNG | `0873c/08768` | Decision gate `O:873c` uses world modulo four. Stagger `b8b6`, reload `b8c0`, phase `b7de`; shared seed `6f9a` at `O:2bbcc`. Decision/stagger/RNG native tests prove call-count dependence. Preserve order, not scaled probability. |
+| FR-10 — Ship actions | `13ad6/13b02` | 47 callbacks at `038c`, action `b0e0`, elapsed `b860`, phase `b876`. All targets, 16 arithmetic writers and reset `O:11396` execute. Keep action phase IDs distinct from elapsed words. |
+| FR-11 — Target/contact | `0d1f0/0d21c` | Lock countdown `3890` at `O:d1e2/d1f0`; contact hold `b8ca` at `107d0`. Target selection `3908`, draw-modulo-eight trial `3944`, geometry `290fa` must have explicit tick ownership. CD32 encounter hold has no certified OCS counterpart (X6). |
+| FR-12 — Collision | `156e6/15712` | Overlap `O:156e6` via `7f0c`, class `8e8c`, radius `9288`, positions `8928`. Whole native overlap misses relative x=−20/+20 and hits x=0 for radius-five fixtures. Collision precedes second-pass integration; preserve that order. |
+| FR-13 — Range/angle thresholds | `115f2/1161e` | Cached range `b0fe` and angle `a1f6`. Full predicate misses the qualifying interval at 10 samples and sees it at 20/50/60. Landing `O:7868–7880` and action approaches retain sampled geometry, with full paths X1. |
+| FR-14 — Effect scripts/explosions | `2800a/28036` | Period `b664`, frame/index `b6e4`, model script +26 and period +36. Full script tests cover frame, jump, removal, grow/shrink and period-four stepping (2/12 advances). Size 63 does not grow by factor one; size 64 becomes 65. Removal is authoritative. |
+| FR-15 — Damaged-ship emission | `0636a/06396` | `O:6356` tests draw counter `88de & 3` at `636a` before allocation/RNG. Native mask gives 3/13 opportunities for 10/50 draw counts starting at zero. Move eligibility to a world sub-clock; this is not merely decorative drawing. |
+| FR-16 — HUD/comms/simulator | `02018/02044` | Message `9e64`, selection `a8b8`, six hit bytes `bbc2–bbc7`; all countdown tests pass. Portrait `O:40d6/4162` consumes shared RNG. Systems `4464→acfa` performs fault trials. Score/time `043a` and simulator tail `0532` are also draw-owned; see below. |
+| FR-17 — Mission/encounter polls | `00276/002a2` | Housekeeping masks world `88da` by 31/15 before `O:061e→20472` / `9718`. `88dc` counts encounter records, not elapsed time. Native mask tests pass; `1445a` has further world-modulo-16/music-status polling. Campaign event ordering remains X1. |
+| FR-18 — Camera/script/class 1 | `06584/065b0` | Camera wait `b03e` at `O:699e`; script wait `8cce` at `18052`; class-1 elapsed/countdown `b880` at `e830/13ee4`. All writer slices execute. Script pointers and phase IDs are events, not clocks. |
+| FR-19 — Input/events | `18d14/18d40` | OCS poll `O:182ce`, controls `183e4`, command loop `18d14`. Keyboard queue `7808/780a`; held/edge joystick records `77bc/77c8`. Queue wrap/one-time consumption, edge consumption, held-axis clamp and release tests pass. This ABI differs from CD32. |
+| FR-20 — Modal/pause/reset | `00d9e/00dca` | Deadline loop `O:0d9e`, pause `0872`, autopilot `0f56`, landing counter/size writer `1a750`, name loop `16992`. Deadline and landing-writer tests pass; no catch-up debt may cross mode boundaries. Full transitions X1/X2/X5. |
+| FR-21 — Field/audio/calendar | `342a2/342ce` | Field long `77fe`, countdown word `7802`; full native handler wraps and expires once. Calendar `O:21e60` divides field elapsed by 3300; blink `17f0` uses fields. Audio tempo `5228/522a` and CIAB waits remain native; hardware cadence is X3. |
+| FR-22 — Per-event quantities | `0b0fe/0b12a` | Statistics `88b4` at `O:b0fe`: five +1 events remain five under every schedule. Hull/damage `a0ae/a56e/a5b8/a670`, subsystem changes, ammo, energy spend and kill counts are event quantities, not elapsed timers. |
+| FR-23 — Widths/sentinels | `12466/12492` | `b860.w` wraps 32767→−32768; `8c54.w=−1` persists; signed missile byte and effect quantisation are tested. Preserve widths/sentinels; use wide new clock state. High-bit memory shift remains an instrument limitation (X7). |
+
+**Boundaries that D2/D3 must preserve.**
+
+- Ordinary world work has two passes in `O:78c4`: lifecycle/effects, collision
+  and steering precede position integration. Class 1 has a separate script/state
+  path; active classes above three enter ordinary work. Ship slots below ten,
+  classes at least 11, enter angular control; class 12 adds recovery and emission.
+  The action arithmetic writers are `O:d0f2`, `da24`, `dae6`, `12472`, `1257a`,
+  `125be`, `12678`, `12772`, `12870`, `128a8`, `12918`, `12a78`, `12b2e`,
+  `130b4`, `136da` and `1377c`. Each has a native increment/decrement test;
+  `O:11396` resets elapsed and phase when setting the action.
+- Weapon construction shares `O:c1ce` for player/AI launch paths, with allocation
+  at `97fc/982e` and the alternate constructor at `c7ae`. Constructors write
+  projectile lifetimes at `c2e8/c486/c4ba/c5c2/c82a` and shooter reload at
+  `c60e/c61e`. `OD:8c54+2*i` is therefore a lifetime **or** ship cooldown according
+  to the slot/class. Executing the literal-12 reload for slots 0, 1 and 9 changes
+  exactly that word, leaving all other data-hunk bytes intact; the native
+  lifecycle helper then makes it 11. A rising player timer is not a reset
+  certificate. Constructor identity/pose certification remains D3, including
+  all successful player/AI exits and slot reuse; this audit does not claim those
+  prediction hooks exist on OCS yet.
+- `O:0512` calls message `2018`, simulator composition `0404`, HUD `371e` and
+  finish `0b80`, then the simulator tail at `0532`. At `043a/043e`, draw calls
+  increase `OD:890c.l` and consume `8906.w`; `0444` can set exit `OD:00aa.w=4`.
+  Tail `053e` consumes `OD:00ac.w`. At zero it may reset an excessively distant
+  position (`0544–0562`), add bonus `8908.l` to score, then set exit one or advance
+  the wave. Tests show 10/50 score increments and remaining time 90/50, and one
+  bonus/exit event despite further calls. Move the mutations once to a world
+  boundary while allowing extra pictures of unchanged UI state.
+- `O:4460` includes target selection `3908` and fault/repair polling `acfa`.
+  The latter's `ad12/ad24` random draws can change cockpit systems; its native
+  healthy/eligible fixtures demonstrate RNG ownership. Do not run it again for
+  a purely predicted picture. Communications `O:40d6/4162`, damaged-ship emission
+  `636a`, star/debris generation and asteroid spawning must be reviewed with the
+  same rule. In particular `O:0330→9618` can allocate at `9682→9410`; it is
+  necessary world work currently reached from drawing. Suppressing it without
+  relocating it would remove the credit asteroids. Authoritative allocation and
+  random order belong to ticks; renderer-only randomness needs isolated state.
+- OCS device poll `O:182ce` reads joystick `33f24` and the keyboard-held map via
+  `34606` before applying axes at `183e4`. The held keyboard map lives in code
+  storage `O:343a2`; its copied input image begins at `OD:be52`. Joystick state
+  has held/fire and edge bytes; `33f42–33f54` copies nine bytes and clears the two
+  consumable edges. Commands pop a 64-byte queue at `345a8`, wrap the consumer
+  index `OD:7808.w`, and compare producer `780a.w`; optional translation uses
+  `7804.l`. Native tests consume two wrapped events once, then return −1; repeated
+  joystick reads preserve held state but not already consumed edges. The button
+  sampler is registered on VBL at `O:33ede–33eec`; `33fa4` owns a per-port
+  hold/click word at record +10, using `OD:77d4/77d6` thresholds. Native held,
+  short-release and five-field expiry tests keep those timers separate from world
+  calls. A held turn
+  ramps by one to ±9 per poll and damps by two on release. The new clock must
+  define one-time command/edge delivery and held controls separately. It must
+  not reuse CD32's previous-pad image offsets or poll devices once per catch-up
+  tick without an explicit event policy.
+- Pause `O:0872` flushes joystick state and drains keyboard events without calling
+  world; autopilot `0f56` owns its own loop and can call world at `148c` after
+  moving positions. VBL-deadline loop `0d9e` repeatedly calls world/draw until
+  native field time expires. Landing separately increments world and shrinks
+  its view at `1a750/1a754`; replacing only the flight loop misses it. Name input
+  `16986` flushes the keyboard and `16992` waits on its queue, not on world calls.
+  Flight entry `0648` resets the draw divisor; `068c` clears exit state;
+  `06ea` leaves the flight sound/selection state. D2 needs rebasing at these
+  entry/exit boundaries, including failed/aborted transitions; D3 needs pose,
+  input and identity-history invalidation there.
+- Intro setup `O:1ee50` selects mode two (`OD:00a8.w`). The cycle resets objects
+  via `1eed2→8ce6`, clears the asteroid-mode word at `1eeee`, loads scene 16 at
+  `1eef6→20472`, and resets script state at `1ef12→18096`. Title `1ef24–1efb0`
+  has 296 world calls, with odd-call draws and thresholds 135/235. Credits use
+  field elapsed at `1f008/1f04c`: text 220 fields, page 320 fields, 15 pages.
+  Return `1f084–1f090` clears intro mode/script flags. Keep page/music deadlines
+  in native field time while D4 changes world motion; there is no OCS 18-page
+  CD32 table. Origin animation and other cinematics are separate (X2).
+- `O:342a2` produces the long field clock and word countdown independently of
+  these loops. Tests cover `ffffffff→00000000` and countdown `2→1→0→0` through
+  the whole original handler, whose original callback slots are RTS. This proves
+  producer semantics, not delivery of real interrupts. Audio setup `267d2–26802`
+  selects tempo 125 or 104 using the graphics display flag and writes
+  `OD:5228/522a`. Its VBL server is registered at `O:26798–267a6`; the
+  pointer at `OD:4bf0` names `2688c`, which enters `26dcc`. Native accumulator
+  slices `26de0–26de8` and `26df4–26dfa` prove tempo subtraction and 125 reload
+  with preserved remainder for both tempo settings. Audio DMA setup `26a3c`, CIAB-TOD waits `26ece/26ef8`, music
+  status `OD:4c40`, calendar `21e60` and blink `17f0` retain their native owners.
+  The original slave's audio hook remains unchanged. A world-clock change must
+  not scale the music, hardware waits or credit deadlines. Actual PAL/NTSC audio
+  delivery and synchronization remain X3, not inferred from the functional CPU.
+
+**Named scene/instrument exclusions.** These delimit local proofs; they do not
+remove any later implementation obligation from the ordered plan.
+
+| ID | Excluded from this gate | Required follow-up |
+|---|---|---|
+| X1 | Full campaign combat/damage outcomes, AI feedback manoeuvres, missile lock/guidance in combat, encounter spawning, autopilot arrival and landing transitions | D2/D3 equal-time world/event tests and E2 play-through; retain native order and event amounts meanwhile. Local counters, predicates and dispatch destinations are tested here. |
+| X2 | Complete camera bytecode trajectories, Origin logo, other cinematics around `O:1f760/1fc8c`, and complete title/credit playback after a clock change | D4 identifies/runs the world-based intro; E2 covers other scene transitions. Existing A3/A4 native boot evidence does not prove future decoupled playback. |
+| X3 | Physical IRQ/input/audio delivery, PAL/NTSC music cues and accelerator timing | Preserve native providers. D2 live clock validation and E2 compatibility; the CPU oracle has no timing or device model. |
+| X4 | German/other revisions and a general gameplay replay format | No enhancement offsets or replay compatibility claim; only the pinned English OCS binary is certified. |
+| X5 | Full name editing/submission, save/load, and all menu selections or abort paths | Queue consumption and simulator exit are tested, and A3/C5 reach visible name entry. E2 covers the remaining UI paths; modal rebasing belongs to D2. |
+| X6 | CD32-specific `E:1568` / `D:00ec` encounter-hold behavior | OCS world instead calls `O:1445a`; no equivalent ten-count encounter field has been certified. Do not transplant the CD32 field or hook. OCS target/contact owners are the verified FR-11 entries above. |
+| X7 | High-bit memory `LSR.W` accuracy in the installed Unicorn | The native `O:7684` probe turns `8000` into `ffe0` after ten calls, versus logical `0020`. Positive-size tests are valid; do not infer a game bug or rely on high-bit results without another instrument. |
+
+**Evidence and outcome.** The final inventory and native report are
+`tmp/p13d1-inventory-final/` and `tmp/p13d1-native-final-v2/report.json`. Reports pin
+the input and decoder/CPU-library identities. Both CPU models agree across six
+call schedules, the 23 responsibility records, the OCS-specific units/input/
+simulator/reload checks and 791 dispatch targets. Broken-dispatch and reversed
+life-decrement controls are rejected. All extracted/relocated code and reports
+remain ignored scratch material. Reproduction is in
+[development](development.md#p13d1-ocs-timing-and-side-effect-audit).
+The next implementation item is P13D2; no clock, extrapolation or release change
+is included here.

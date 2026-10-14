@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C6 are complete**;
+The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1 are complete**;
 the remaining work items below are pending, in dependency order.
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -258,13 +258,19 @@ precludes a matched flight-speed claim. See [measurements and limits](internals.
 
 ## D — Share the gameplay and intro timing model
 
-**P13D1 — Complete the OCS timing/side-effect map.** Depends on A3–A4, B1.
+**P13D1 — Complete the OCS timing/side-effect map (complete).** Depends on A3–A4, B1.
 Map the CD32 FR-01–FR-23 responsibilities to actual OCS functions and state fields.
 Verify speed/range units, field clock, input ownership, audio and every world- or
 render-driven timer. Include damage, AI, weapons, explosions, random calls,
 simulator score/death/name entry, autopilot, menus and scene resets.
 Gate: every responsibility has an OCS owner and executable test or a named
 excluded scene; analogous code is not accepted as proof of an identical ABI.
+All 23 responsibilities have OCS owners and executed local tests, with named
+campaign/cinematic/device/UI exclusions. Native OCS units establish 10 Hz;
+72 tables/791 entries and input/score/clock/reload checks pass on 68000/68020.
+The OCS keyboard queue and joystick edge records require their own adapter;
+CD32 input offsets do not apply. No timing patch is included. See the
+[D1 map and limits](internals.md#p13d1-ocs-timing-and-side-effect-map).
 
 **P13D2 — Port the shared 10 Hz authoritative clock.** Depends on D1, B2–B3.
 Preserve native OCS units while separating world updates from presentation.
@@ -327,7 +333,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3 and P13C1–P13C6 are complete. **P13D1** is next.
+P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1 are complete. **P13D2** is next.
 Use the scoped measured profiles and retain native fallback/override
 for unknown accelerators. C4 creates source ownership before native compositor aliases; C5 now protects
 pending/displayed ownership through publication and transitions. Broader

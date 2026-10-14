@@ -3892,3 +3892,56 @@ common contiguous asteroid prefix. It does not select convenient interior frames
 Flight costs are explicitly descriptive: different intro-window progression
 prevents a matched flight-speed claim. Missing/inflated cost records and changed
 source hashes must fail. See [results and limits](internals.md#p13c6-measured-changed-block-conversion).
+
+## P13D1: OCS timing and side-effect audit
+
+This gate executes the pinned original OCS instructions in the functional CPU
+oracle. It does not boot an emulator or change a slave. No new performance
+matrix is needed. The OCS unit/input/state owners and named scene exclusions
+are in [internals](internals.md#p13d1-ocs-timing-and-side-effect-map).
+
+```sh
+. amiga/env.sh
+/bin/bash tools/inputs.sh verify
+python3 tools/ocs_timing_inventory.py --output tmp/p13d1-inventory-final
+python3 tools/ocs_timing_check.py --output tmp/p13d1-native-final-v2
+```
+
+Use new names for subsequent runs; outputs must be fresh directories below
+`tmp/`. Run without Python `-O` because assertions are the native oracle.
+The installed `AMIGA_UNICORN` library requires executable JIT memory. The tool
+records its SHA-256 and uses explicit M68000/M68020 models (enum values 1/2).
+Both tools hash-check `tmp/originals/ocs/WingCommander/data/Wing.english` before
+loading, relocate its original hunks into a private fixture, and never overwrite
+an input. Obtain missing inputs with the existing `make prepare` procedure.
+
+`inventory.json` records roots, direct edges, decoded tables and classified
+indirect boundaries; `reachable.dis` is derived scratch output. The common
+walker is shared with CD32, with OCS-specific callback tables, selected helpers
+and boundaries supplied explicitly. Native tests execute all 791 dispatch
+entries, 140 bounded word-switch rejections and two action-ID rejections. A
+broken switch signature must be rejected by the inventory.
+
+`report.json` records six call-count schedules, local world/render timer
+reproductions, unit conversions, keyboard queue wrap, joystick edge consumption,
+held-axis clamping/release, simulator score/time/exit, gun reload versus reset,
+field wrap/countdown, joystick hold/click field timers, audio tempo accumulation
+and fault-poll RNG behavior. Its 23 responsibility records
+link actual test paths to code-hunk/file and data-hunk offsets; a missing result
+fails coverage. Whole routines and bounded slices are identified in the checker.
+The reversed lifetime decrement is a rejecting control. The known high-bit
+memory-shift discrepancy is reported as an instrument limitation, not accepted
+as original hardware semantics. No report value is a CPU speed measurement.
+
+The shared walker regression uses the retained, pinned CD32 flight capture:
+
+```sh
+python3 tools/timing_inventory.py tmp/phase7-combat-controls \
+  --output tmp/p13d1-cd32-inventory-control
+```
+
+It retains 30,384 instructions, 6,118 edges, 54 tables and 625 entries. Its semantic
+inventory matches the retained phase-7b result; decoder-version metadata is
+recorded independently. This is a tooling regression, not renewed CD32 work.
+D2 still needs live clock integration and equal-time state/event tests; D1's
+functional checks do not establish complete campaign, device or UI behavior.
