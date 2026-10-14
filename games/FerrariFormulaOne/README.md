@@ -37,7 +37,9 @@ This reservation also applies with CUSTOM2 disabled: identical minimum memory
 requirements to the small v1.01 release are not claimed. The documented A500
 emulator configuration has 512 KiB Chip plus 1.5 MiB Slow memory; the Fast variant
 also has 2 MiB Fast. The 020 configurations have 2 MiB Chip, with/without 4 MiB Fast.
-Minimum-memory release qualification is separate.
+These configurations are qualified with WHDLoad 20.1; A500 with 512 KiB Chip
+and 2 MiB Fast also passes without Slow memory. Smaller configurations and
+WHDLoad 17.0 allocation limits are documented in RELEASE_QUALIFICATION.md.
 
 The elapsed clock is PAL-calibrated. Enabled SPS mode requires WHDLoad to report
 PAL; NTSC is rejected with the normal WHDLoad PAL requirement message. The
@@ -72,10 +74,21 @@ The accepted 260,292-byte build has SHA256
 `60123fd26a8c188925c2213118f417e233ad0f883224372e87feeda477e2a836`.
 An independent build from the committed sources reproduces it exactly.
 
-This is an unreleased, opt-in production integration. Minimum-memory/runtime
-qualification, the full disabled-option/reload matrix, broader tracks/controls/
-season save-load, Irek, cache variants, real hardware and human handling remain
-release work. Enabled NTSC is rejected. 030/040/060 qualification is in progress; calibrated enabled-demo results and
-remaining acceptance work are in [RELEASE_QUALIFICATION.md](RELEASE_QUALIFICATION.md).
-C4-T01 micro targets remain documented shortfalls; the user-selected C4 matched-
+This is an unreleased, opt-in emulator-qualified candidate. The 030/040/060,
+cache/MMU, original-option/reload, broader native control/track, save/load and
+clock checks are complete in [RELEASE_QUALIFICATION.md](RELEASE_QUALIFICATION.md).
+Accelerated profiles present about 16.64 FPS with less than 0.041% clock error in
+the measured automatic demo. Those are emulator observations, not physical CPU
+rankings. The original-loop observations are reported separately.
+
+For the qualified emulator save/load route, use `NoWriteCache`. Chip-only 020
+with WHDLoad 20.1 also needs `ConfigDelay=0` and `SplashDelay=0`. The slave keeps
+API 17; WHDLoad 17.0 is functionally qualified with Fast memory, not the tested
+Chip/Slow-only arrangements. Use the shared `~/.local/share/amiga/WHDLoad`
+installation for development. The local candidate package and hash manifest
+remain ignored under `tmp/dev/`; nothing is published.
+
+Human playtesting and real Amiga hardware testing are deferred. Irek is
+unavailable and retains its original route. Enabled NTSC is rejected. C4-T01
+micro targets remain documented shortfalls; the user-selected C4 matched-
 workload no-regression gate has passed. There is no A500 performance fallback.

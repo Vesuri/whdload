@@ -1,8 +1,9 @@
 # Release qualification
 
-Emulator qualification is in progress. Human playtesting and real Amiga hardware
-testing are deferred by the user. The production build remains unchanged and
-opt-in; this document does not declare it release-qualified.
+Emulator qualification and 030/040/060 analysis pass in the scopes below. Human
+playtesting and real Amiga hardware testing are deferred by the user. This is
+an unreleased, opt-in release candidate; no physical-hardware timing or complete
+human-driven race is claimed. The production binary remains unchanged.
 
 ## Accelerated clock calibration
 
@@ -98,7 +99,7 @@ No extra pointer normalization or byte masks were introduced. An exploratory
 4 MiB-versus-8 MiB comparison is not an acceptance test because dynamic pointers
 and a DOS file handle relocate.
 
-## Runtime and memory checks in progress
+## Qualified runtime and memory configurations
 
 Official WHDLoad 17.0 build 5139 passes 20-update functional checks on A500 with
 Fast memory, 020 with Fast memory, and 060 with Fast memory. The current shared
@@ -119,6 +120,12 @@ With 20.1, A500 with 512 KiB Chip and 2 MiB Fast, without Slow memory, also
 passes. The production reservation is 768 KiB expansion memory in addition to
 512 KiB Chip, the 260,292-byte slave, and runtime/OS overhead; it is not a claim
 that 1.25 MiB total machine memory is sufficient.
+
+The tested smaller A500 arrangements (512 KiB Chip plus 512 KiB or 1 MiB
+Slow) and the 1 MiB Chip-only 020 do not start successfully. They are excluded
+from the qualified configurations. These are bounded startup/functionality
+checks, not a universal minimum-memory guarantee or an exhaustive runtime/OS
+cross-product. Runtime 17.0 save/load is not claimed by the 20-update checks.
 
 Both CUSTOM1 values pass three matched legacy-loop state comparisons on all four
 original profiles: A500, A500+Fast, chip-only 020 and 020+Fast. All 26 state
@@ -272,17 +279,40 @@ is an operation-level clock comparison, not a whole-game matched-state replay.
 The existing exact-state gates remain unchanged. Evidence:
 `tmp/dev/manifest/release-modal-clocks.json`.
 
-## Remaining acceptance work
+## Completion and remaining scope
 
-- Minimum-memory and minimum/development WHDLoad runtime qualification.
-- F3/F1 controls, Fiorano/Rio/contrasting track, starts/laps, fuel/wear,
-  pits, session/results and travel/repair clocks; season persistence and F10 pass
-  in the documented scopes below.
-- Final reproducibility and release-candidate documentation.
+The emulator release matrix is complete: original-option first loads and native
+reloads; base and accelerated CPU paths; cache and functional MMU checks; exact
+state and complete frames; elapsed clocks; native laps, F1/F3 controls, Fiorano,
+Rio and Monaco routes; starting grid, bounded throttle, pits/tow, pause,
+session/results, save/load, repair/transport and F10. Earlier directed contact,
+recovery, fuel/wear and grid/dense gates remain attached to the accepted engine
+bytes; those are not claims of a complete human-driven race.
 
-The Irek executable is unavailable locally; retain its original route and keep
-new performance patches gated to SPS 0481, as the plan permits. Enabled NTSC
-remains explicitly unsupported. No package has been published.
+The final integrity audit recomputes all nine accelerated state comparisons and
+hashes the actual pixels of all 300 retained frame images. Both independent
+260,292-byte builds and each payload hash agree. Source and toolchain hashes are
+recorded in `tmp/dev/manifest/release-final-artifact-audit.json`.
 
-Local evidence and progress: `tmp/dev/manifest/release-qualification.json`,
-`tmp/dev/manifest/release-clock-calibration.json`.
+The local candidate is prepared under `tmp/dev/tmp/release/FerrariFormulaOne-1.02-rc1/`
+and its sibling ZIP. It contains the slave, launch scripts, build identity and
+these qualification notes; no game data, Kickstart, WHDLoad or test fixture is
+included. `manifest/release-candidate.json` records package membership and hashes.
+Nothing has been published or pushed.
+
+Deferred work is human playtesting, including complete races, and real Amiga
+hardware qualification. The unavailable Irek executable retains its original
+route and is not runtime-qualified. Enabled NTSC remains explicitly rejected.
+The original release's lower memory requirement is not preserved. The tested
+save/load configuration requires `NoWriteCache`; chip-only 020 with WHDLoad 20.1
+requires `ConfigDelay=0` and `SplashDelay=0`. WHDLoad 17.0 functional coverage is
+limited to the documented Fast-memory configurations. C4-T01 micro targets are
+optional future optimization; the user-selected matched-workload gate passed.
+
+Local evidence: `tmp/dev/manifest/release-qualification.json`. The existing
+exact-state, frame, elapsed and legacy gates have not been weakened.
+
+The final completion audit covers all seven Step-7 requirement groups against
+retained captures and package bytes, with no required emulator work remaining.
+Its index is `tmp/dev/manifest/release-completion-audit.json`. Human/hardware
+work and the permitted version/video limitations above remain explicit.
