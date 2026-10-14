@@ -77,6 +77,23 @@ if [ "${INTRO_STOCK_CLOCK:-0}" = 1 ]; then
     done
   }
 fi
+# P13A4 uses the core's native PAL 68000 clock. Numeric frequency overflows
+# in the pinned emulator; zero frequency/multiplier selects CYCLE_UNIT/2.
+if [ "${OCS_STOCK_CLOCK:-0}" = 1 ]; then
+  setup_function=$(declare -f fsuae_setup)
+  eval "${setup_function/fsuae_setup/wc_ocs_clock_base_setup}"
+  fsuae_setup() {
+    wc_ocs_clock_base_setup || return 1
+    [ "$AMIGA_SETUP" = a500 ] && [ "$WC_VARIANT" = ocs ] || return 1
+    local i
+    for i in "${!FSUAE_SETUP_ARGS[@]}"; do
+      case "${FSUAE_SETUP_ARGS[$i]}" in
+        --uae_cpu_multiplier=*) FSUAE_SETUP_ARGS[$i]=--uae_cpu_multiplier=0 ;;
+        --uae_cpu_frequency=*) FSUAE_SETUP_ARGS[$i]=--uae_cpu_frequency=0 ;;
+      esac
+    done
+  }
+fi
 # Timing-core selection is independent of WHDLoad's NoMMU tooltype.
 if [ "${WC_NOMMU_CORE:-0}" = 1 ]; then
   setup_function=$(declare -f fsuae_setup)

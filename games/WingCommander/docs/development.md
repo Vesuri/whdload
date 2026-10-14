@@ -3181,3 +3181,69 @@ The builder then verifies every manifest entry and the source commit before
 copying or compiling. This reuses configured host dependencies/objects, as the
 existing debugger recipe does; it is not a self-contained toolchain release.
 The tested retained build is `tmp/p13a3-debugger/fs-uae`.
+
+## P13A4: short native OCS baseline
+
+Use the P13A3 pinned source staging procedure above; retain its frozen input and
+choose new output directories. Build the read-only **68000** observer locally:
+
+```sh
+. amiga/env.sh
+FSUAE_SOURCE="$PWD/tmp/ocs-debugger-source" \
+  python3 tools/build_debugger.py --ocs-pixels --ocs-observer \
+  --output tmp/ocs-baseline-debugger
+export FSUAE="$PWD/tmp/ocs-baseline-debugger/fs-uae"
+python3 tools/ocs_boot_gate.py --calibrate --baseline on --output tmp/ocs-baseline-layout
+python3 tools/ocs_boot_gate.py --layout tmp/ocs-baseline-layout/layout.json \
+  --baseline on --output tmp/ocs-baseline-on
+python3 tools/ocs_boot_gate.py --layout tmp/ocs-baseline-layout/layout.json \
+  --baseline off --output tmp/ocs-baseline-off
+python3 tools/ocs_baseline_report.py tmp/ocs-baseline-on tmp/ocs-baseline-off \
+  > tmp/ocs-baseline-report.json
+```
+
+The baseline option adds two **250-field** windows to the A3 route: immediately
+after its first-credit capture, and immediately after its first simulator capture
+with native Space held. Space is released after the flight capture. The run then
+reaches the name prompt and cleans up its owned emulator. No guest data, RNG,
+instructions or timing logic are patched. No turn or machine matrix is included.
+
+`OCS_STOCK_CLOCK=1` is set by the baseline harness. It replaces the preset's numeric
+frequency/multiplier with zero, selecting the pinned core's native PAL 68000 clock.
+This is necessary: the old numeric-frequency expression overflows to a cycle unit
+of **231**; stock 68000 requires **256** internal units per CPU clock. Ordinary A3
+runs retain their existing configuration; their state/pixel evidence was not a
+performance measurement. A baseline report rejects the wrong unit. The field
+clock is independent: 512 units per colour clock, 227 × 313 colour clocks per
+observed field, 49.920409 Hz. Times use that clock, never host wall time.
+
+The debugger's `ocs-window` command aligns to the next field, runs uninterrupted
+for the requested count, freezes all records at the last field edge, then replies.
+There are **no breakpoints, profiles, screenshots or input changes inside either
+measurement window**. The surrounding A3 screenshots are outside the windows.
+Observer-off disables PC scopes, instruction charges, source comparisons and DMA
+observations; identical field-boundary bookkeeping/counter reads remain enabled.
+All eight checkpoint hunk/Chip snapshots and full PNG pixels must match exactly.
+
+Each window produces `*-events.txt` below its run output: B/F/E are clock edges,
+P native PC landmarks, S/R entry/stack-validated return scopes, D actual plane-0
+DMA buffer observations, C source byte/block comparisons, and M native free-memory
+samples. Raw game-derived captures stay in `tmp/`. The report rejects missing
+landmarks, incomplete fields, publication/display disagreement, malformed scopes,
+wrong clocks, missing instruction accounting and corrupt state/pixels. Its built-in
+negative controls deliberately break those checks. It also checks the pinned slave,
+effective machine, matching actions and run fingerprints.
+
+Only complete scope/conversion pairs contribute durations. DMA changes count new
+buffers; merely rewriting the same pointer is not another picture. Publication
+and display counts are reconciled with explicitly bounded pending edge work.
+Conversion stage spans include native callback/interrupt dispatch and contention;
+they are not isolated DMA-engine throughput. The inter-stage residual and explicit
+field wait are reported separately. Drawing, world and asynchronous conversion
+can overlap; do not add their inclusive durations.
+
+Memory high-water values are samples at every field plus native allocation-return/free-entry
+landmarks. The report separates the KickEmu memory-pool capacity/usage from memory
+outside those pools. Physical capacity minus native free bytes includes reservations
+and preload; it is not all game allocations, a complete boot allocation census, or
+proof of minimum RAM. Those later acceptance gates remain separate.

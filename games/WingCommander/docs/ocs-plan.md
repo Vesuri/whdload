@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1–P13A3 are complete**;
+It does not implement or validate an improved OCS slave. **P13A1–P13A4 are complete**;
 the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -74,7 +74,7 @@ Chip and 4 MiB true Fast RAM, native keyboard controls, independent published
 pixel checks and project-owned cleanup. See [live evidence and limits](internals.md#p13a3-ocs-launcher-and-matched-live-baseline).
 Explicit OCS install selection is required; an A500 preset alone does not select it.
 
-**P13A4 — Measure the short native baseline.** Depends on A2–A3.
+**P13A4 — Measure the short native baseline (complete).** Depends on A2–A3.
 Use one repeatable intro/asteroid window and one flight/fire window, with a turn
 only if it materially changes costs. Record displayed pictures/s and interval
 percentiles, completed world updates/s, drawing, conversion submission-to-completion,
@@ -82,6 +82,11 @@ CPU waiting, publication delay, source-change fraction and Chip/Fast high-water
 usage. Separate conversion service time from waits inserted by the native queue.
 Gate: recorder/independent display-counter agreement and observer-off state/pixel
 agreement. Label emulator results; do not borrow CD32 or sibling performance.
+Gate passed: two calibrated stock-clock A500 windows, 29/27 native publications
+matching actual display-buffer changes, exact observer-off state/pixel agreement
+at eight checkpoints, and rejecting instrument controls. See the
+[measurements and scoped limits](internals.md#p13a4-short-native-ocs-baseline).
+
 
 ## B — Share mechanisms without imposing a newer CPU
 
@@ -260,7 +265,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A3 are complete. Start **P13A4** only when requested. The first backend decision
+P13A1–P13A4 are complete. Start **P13B1** only when requested. The first backend decision
 is **P13C2**, not the current investigation. In particular, neither “68000 must use
 CPU C2P” nor “68020 must abandon the blitter” has been established. Keep the
 blitter implementation available through the comparison and acceptance gates.

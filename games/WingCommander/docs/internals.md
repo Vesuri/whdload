@@ -4819,5 +4819,138 @@ and overwrite refusal are `p13a3-input-check-2`. Reproduction is in
 Limits: these are emulator state/pixel checks with debugger pauses, not a speed
 benchmark or real-hardware visual acceptance. Full intro repetition, every view,
 sprite detach/release, exceptional exits and minimum RAM are not certified here;
-their existing C4–C5/D4/E2 gates remain. P13A4 is the next separate goal. CD32
-E1/phase 12 remain paused.
+their existing C4–C5/D4/E2 gates remain. The separate P13A4 baseline is recorded
+below. CD32 E1/phase 12 remain paused.
+
+### P13A4: short native OCS baseline
+
+**P13A4 is complete on the nominated emulator model.** The pinned original OCS
+slave runs unchanged on PAL 68000/OCS, 512 KiB Chip and 4 MiB true Fast RAM. Two
+250-field windows cover the first asteroid-credit page and simulator flight with
+Space held to fire. Each lasts **5.007972 emulated seconds**. These are baseline
+measurements, not improved OCS performance or real-hardware measurements. No turn,
+CPU matrix, CPU converter, pacing removal or backend selection was added.
+
+#### Clock and observer gate
+
+The preset's numeric `7093790` frequency reaches an overflowing integer expression
+in the pinned emulator, producing **231** internal units per CPU clock. The new
+measurement-only `OCS_STOCK_CLOCK=1` uses zero frequency/multiplier to select the
+core's native PAL 68000 unit, **256**. The reporter rejects the old unit; the
+initial `tmp/p13a4-on` capture is excluded. A3's earlier paired state/pixel gate
+remains valid for its matched configuration, but must not supply performance
+numbers for the corrected stock-clock baseline.
+
+The independent field clock is 28,375,160 / 8 colour clocks/s, with 512 internal
+units per colour clock. All 250 intervals in each window are exactly
+227 × 313 × 512 units: **49.920409 fields/s**, not an assumed exact 50 Hz. No host
+wall-clock time enters the results. Instruction charges account for 99.893% and
+99.891% of elapsed time; the remaining 5.36/5.44 ms per whole window is outside
+recorded instruction bodies, including dispatch and boundary fragments. It is not
+silently charged to drawing, DMA service or a guessed idle category.
+
+`ocs_observer.inc` observes the cycle-exact 68000 dispatch and actual plane-0 DMA
+fetches without guest writes or emulated cycle charges. `ocs-window` begins at the
+next field edge and freezes the entire window after 250 fields. There are no
+interior debugger stops, input changes or Barto profiles. Observer-off disables
+PC/scoped-cost/source/DMA observations while retaining identical field-window
+bookkeeping. Across both boots, **all eight checkpoints match every game-hunk byte,
+all 512 KiB Chip RAM and every full 754 × 576 RGB pixel**. Window clock edges and
+native counters also match exactly. No crops, masks or tolerances are used.
+
+The DMA observer records each field's actual display allocation independently of
+native publication PCs. Each window has 250 single-buffer fields, with no observed
+within-field buffer switch. Its 29/27 new-buffer transitions match the native
+publication sequence exactly, with no unmatched interior or pending final picture.
+This is a scoped counter agreement, not a universal no-tearing or beam-deadline
+claim. Eleven negative controls reject bad CPU clock units, missing world counts,
+DMA fields, publications or conversion stages, bad field durations, an unfrozen
+denominator, an invalid change census, missing instruction accounting, and changed
+or truncated state/pixel bytes.
+
+#### Measurements
+
+| Metric | Asteroid credits | Simulator flight/fire |
+|---|---:|---:|
+| Displayed new pictures / 250 fields | 29 | 27 |
+| Displayed pictures/s | **5.79** | **5.39** |
+| Completed world updates / updates per second | 28 / **5.59** | 27 / **5.39** |
+| Display interval mean / p50 (ms) | 171.70 / 180.29 | 185.68 / 180.29 |
+| Display interval p95 / p99 / maximum (ms) | 220.35 / 234.97 / 240.38 | 220.35 / 235.37 / 240.38 |
+| Complete display intervals | 28 | 26 |
+| World scope mean / p95 (ms) | 44.93 / 102.72 | 34.03 / 47.20 |
+| Drawing through pre-submission mean / p95 (ms) | 105.75 / 121.61 | 90.50 / 98.80 |
+| First QBlit submission to final completion mean / p95 (ms) | 55.99 / 60.28 | 92.80 / 95.32 |
+| Sum of three conversion stage spans mean (ms) | 53.79 | 88.73 |
+| Inter-stage queue/scheduling residual mean (ms) | 2.20 | 4.07 |
+| Explicit field-wait span mean (ms) | 0.00592 | 0.00592 |
+| Publication to first new-buffer DMA mean / p95 (ms) | 18.34 / 25.66 | 15.45 / 21.46 |
+| Source bytes changed, mean / maximum | 1.152% / 3.833% | 0.438% / 1.148% |
+| Changed 32-byte source blocks, mean / maximum | 5.248% / 11.094% | 2.133% / 4.550% |
+
+The world/drawing/submission counts need not match at field-bounded edges. Complete
+conversions number 29/27; comparable source pairs number 28/26. Drawing spans
+number 28/26. Full means, p50/p95/p99/maxima and sample counts are in
+`tmp/p13a4-report.json`. Short-window percentiles describe these samples only.
+
+The CPU's measured blitter-poll instructions consume **16.52/15.38 ms total** over
+the respective five-second windows; field-spin instructions consume 0.106/0.099 ms.
+The native completion-flag wait scopes average 0.0273/0.0180 ms over 116/108 calls;
+the maximum is 1.087/0.0180 ms. These include the wait wrapper and any preemption,
+not just idle CPU time. The explicit field-clock check does not meaningfully stall
+this workload. That observation does not authorize removing native synchronization.
+
+Drawing, world work and final asynchronous conversion **overlap**. Their inclusive
+scope times must not be summed as a frame budget. Stage service here means the
+elapsed native callback stage, including contention, blitter polling and internal
+continuation/interrupt dispatch. It is not isolated DMA throughput. The residual
+separates initial/between-stage scheduling from those stage spans; the explicit
+field wait can overlap service, so it is reported without adding it a second time.
+No converter or RAM-placement crossover follows from these figures.
+
+#### Probe ownership and offsets
+
+All game addresses below are OCS code-hunk offsets; file offsets add `2c`.
+
+| Observation | OCS site / meaning |
+|---|---|
+| World | `O:02be` entry with saved-return/SP matching; `02dc` after update-counter increment, reconciled against `OD:88da` |
+| Drawing/composition | `O:02e6` entry to `3260a` pre-conversion entry; includes clear, scene drawing, text/HUD/composition on the selected route |
+| Source change | `O:32626`, before submission; source/size from `O:324a8` state; compare every native source byte and each 32-byte block with the previous submitted source |
+| Queue submissions | `O:329de`, three native QBlit calls per complete conversion |
+| Service stages | `O:329e4`→`32a0a`, `32a26`→`32a4a`, `32dba`→`32e02` |
+| Explicit field wait | `O:3293a`→`32944`; CPU spin instructions `3293e`, `32942` |
+| CPU blitter polling | Native `BTST D0,(A3)` / backward-branch pairs within `O:32a66`–`32db8`; individual instruction charges, excluding surrounding setup |
+| Completion wait | `O:3407e` entry/return; `32990` final-reader retirement also recorded |
+| Publication | `O:33aa8` COP2LC write, followed independently by display DMA from one of the two regions in `O:331b8` |
+| Scene positives | Asteroid routine `O:9618` reached; flight input calls `O:06fa` 27 times and the gun routine `c748` four times during held fire |
+| Memory | Exec MemHeaders at field edges and native allocation-return/free-entry landmarks `O:33b98` / `33c88`; no such allocator landmark occurs inside these windows |
+
+#### Memory and limits
+
+The native KickEmu pools have 523,232 Chip bytes and 713,496 Fast bytes. All 251
+free-memory samples per window agree internally (no sampled fluctuation).
+
+| Window | Native Chip pool used / free | Native Fast pool used / free |
+|---|---:|---:|
+| Asteroid credits | 404,040 / 119,192 bytes | 711,832 / 1,664 bytes |
+| Simulator flight/fire | 381,704 / 141,528 bytes | 712,448 / 1,048 bytes |
+
+These used values are the **sampled window high-water** marks. Relative to physical
+configured RAM, 1,056 Chip bytes and 3,480,808 Fast bytes lie outside these native
+pools. Subtracting only native free bytes from physical capacity gives
+405,096/382,760 Chip and 4,192,640/4,193,256 Fast bytes unavailable to this allocator.
+That includes reservations and preload outside the native pool; it is not a claim
+that game allocations consume nearly 4 MiB or that 4 MiB is the minimum. Boot-wide
+allocation peaks, allocator-failure behaviour and minimum RAM remain C4/E2 work.
+
+The current native code couples much world progress to drawn pictures. These
+windows measure that baseline; they do not prove the later 10 Hz scheduler can or
+cannot sustain its budget. They cover one first-credit asteroid sample and early
+simulator flight/fire, not every combat load, view, turn, intro repeat or hardware
+configuration. P13B1 is next only on request; CD32 E1/phase 12 remain paused.
+
+Accepted evidence: `tmp/p13a4-stock-on`, `tmp/p13a4-stock-off` and
+`tmp/p13a4-report.json`; instrument `tmp/p13a4-debugger-final/fs-uae`, SHA-256
+`c634549a6f443dfbe1287f597e88cd447559e01de94ae9d652b3b572fd445c2d`.
+[Reproduction commands](development.md#p13a4-short-native-ocs-baseline).

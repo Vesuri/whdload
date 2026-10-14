@@ -27,6 +27,7 @@ def main():
     p.add_argument('--dma-cia-unsplit', action='store_true', help='diagnostic: preserve unrecorded CIA wait stepping; omit CIA wait-phase annotations')
     p.add_argument('--matrix-irq', action='store_true', help='diagnostic complete-call intervals for game VBL callbacks')
     p.add_argument('--ocs-pixels', action='store_true', help='initialized host framebuffer and lossless multi-field screenshots')
+    p.add_argument('--ocs-observer', action='store_true', help='P13A4 read-only 68000 baseline observer and field-bounded windows')
     a = p.parse_args()
     if a.matrix_irq and not a.matrix_observer:
         raise ValueError('--matrix-irq requires --matrix-observer')
@@ -96,6 +97,63 @@ int record_key_debug(int kc) {
         assert s.count('if(profile_num_frames > 1) {') == 1
         s = s.replace('if(profile_num_frames > 1) {', 'if(false) { // Lossless diagnostic screenshots on every field')
     p.write_text(s)
+    if a.ocs_observer:
+        target = out/'src/newcpu.cpp'
+        code = target.read_text()
+        assert code.count('struct cpu_profiler {') == 1
+        code = code.replace('struct cpu_profiler {', '#include "wc_ocs_observer.inc"\nstruct cpu_profiler {')
+        # Only the actual 68000 cycle-exact instruction dispatch.
+        start = code.index('static void m68k_run_1_ce (void)\n{')
+        end = code.index('static void m68k_run_2 (void)', start)
+        body = code[start:end]
+        hook = '{ cpu_profiler profiler(r->instruction_pc); // BARTO'
+        assert body.count(hook) == 1
+        body = body.replace(hook, 'wc_ocs_pc(r->instruction_pc);\n                { ocs_instruction ocs_cost(r->instruction_pc); cpu_profiler profiler(r->instruction_pc); // BARTO')
+        target.write_text(code[:start]+body+code[end:])
+        shutil.copyfile(ROOT/'tools/ocs_observer.inc', out/'src/wc_ocs_observer.inc')
+        target = out/'src/custom.cpp'
+        code = target.read_text()
+        code = code.replace('#include "sysconfig.h"', '#include "sysconfig.h"\nextern void wc_ocs_fetch(unsigned,unsigned);', 1)
+        hook = 'record_dma_read(0x110 + nr * 2, p, hpos, vpos, DMARECORD_BITPLANE, nr);'
+        at = code.index(hook)
+        at = code.rfind('#ifdef DEBUGGER', 0, at)
+        code = code[:at]+'wc_ocs_fetch(p,nr);\n'+code[at:]
+        # Non-cycle-exact long-fetch optimization must also retain the observer,
+        # although the fixed A500 gate refuses that CPU mode.
+        hook = 'uaecptr bpladdr = bplpt[plane];'
+        assert code.count(hook) == 1
+        code = code.replace(hook, hook+'\n    wc_ocs_fetch(bpladdr,plane);')
+        target.write_text(code)
+        target = out/'src/barto_gdbserver.cpp'
+        code = target.read_text()
+        code = code.replace('#include "sysconfig.h"', '#include "sysconfig.h"\nextern void wc_ocs_begin(unsigned,unsigned,unsigned,const char*);\nextern void wc_ocs_field(bool);', 1)
+        code = code.replace('enum class state {', 'static unsigned ocs_remaining, ocs_h0_arg, ocs_h1_arg, ocs_mode_arg;\n    static std::string ocs_path;\n    enum class state {\n        ocs_start, ocs_run,')
+        hook = '} else if(cmd == "aprof start") {'
+        assert code.count(hook) == 1
+        code = code.replace(hook, r''' } else if(cmd.substr(0,11) == "ocs-window ") {
+            char path[1024], extra;
+            if(sscanf(cmd.c_str(),"ocs-window %u %u %x %x \"%1023[^\"]\" %c", &ocs_remaining,
+                &ocs_mode_arg,&ocs_h0_arg,&ocs_h1_arg,path,&extra)!=5 ||
+                ocs_remaining<2 || ocs_remaining>1000 || ocs_mode_arg>1) response+="E01";
+            else {
+                ocs_path=path; send_ack(ack); debugger_state=state::ocs_start;
+                deactivate_debugger(); return;
+            }
+        '''+hook)
+        hook = 'static uae_u32 profile_start_cycles{};'
+        assert code.count(hook) == 1
+        code = code.replace(hook, r'''if(debugger_state==state::ocs_start) {
+            wc_ocs_begin(ocs_h0_arg,ocs_h1_arg,ocs_mode_arg,ocs_path.c_str());
+            debugger_state=state::ocs_run;
+        } else if(debugger_state==state::ocs_run) {
+            bool end=--ocs_remaining==0;
+            wc_ocs_field(end);
+            if(end) {
+                send_response("$OK"); debugger_state=state::debugging; activate_debugger();
+            }
+        }
+        '''+hook)
+        target.write_text(code)
     if a.intro_observer or a.matrix_observer:
         target = out/'src/newcpu.cpp'
         code = target.read_text()

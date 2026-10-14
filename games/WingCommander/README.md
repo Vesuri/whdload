@@ -3,7 +3,7 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A3 complete: OCS reconstruction, display contract and live A500 gate.** The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4 complete: OCS reconstruction, live A500 gate and native baseline.** The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting
@@ -13,8 +13,11 @@ rebuilds exactly with the 68000 assembler; input and displaced-byte rejection
 checks pass. The functional display gate passes 45 conversions and ownership checks;
 native checkerboard colour selection and its four edge pixels are confirmed live.
 Original/rebuilt A500 boots match state and pixels through intro, menu, simulator
-and the visible name prompt. P13A4 measurement is next, when requested. See
-[reproduction commands](docs/development.md#p13a3-ocs-launcher-and-live-layout-gate).
+and the visible name prompt. The corrected stock-clock A500 model measures 5.79
+displayed pictures/s in asteroid credits and 5.39 during simulator flight/fire;
+observer-off state/pixel controls pass. These are short emulator baselines.
+P13B1 is next only on request. See the [baseline and limits](docs/internals.md#p13a4-short-native-ocs-baseline) and
+[reproduction commands](docs/development.md#p13a4-short-native-ocs-baseline).
 
 **Phase 11b is in progress; C1–C3 and the C4 steady-flight gate are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for

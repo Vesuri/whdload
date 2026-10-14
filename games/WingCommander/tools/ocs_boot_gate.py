@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """P13A3 OCS original/reconstructed boots, with native input and state waits.
-No game patches, performance instrumentation or CD32 layout assumptions.
+No game patches or CD32 layout assumptions. Optional P13A4 host observations.
 """
 import argparse
 import hashlib
@@ -22,6 +22,7 @@ def main():
     p.add_argument('--layout', help='calibrated layout.json from the same slave build')
     p.add_argument('--calibrate', action='store_true')
     p.add_argument('--simulator', action='store_true', help='continue from the menu to the first name prompt')
+    p.add_argument('--baseline', choices=('on', 'off'), help='P13A4 two short field-bounded native windows')
     a = p.parse_args()
     out = (ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():
@@ -46,7 +47,7 @@ def main():
     env = dict(os.environ, FSUAE_RUN=run, WARP=os.environ.get('WARP','0') if a.calibrate else '0', WINDOW='front',
                JOY0='none', JOY1='none',
                DETERMINISTIC=os.environ.get('DETERMINISTIC', '1') if a.calibrate else '1',
-               AMIGA_SETUP='a500', WC_VARIANT='ocs', WHD_ARGS='')
+               AMIGA_SETUP='a500', WC_VARIANT='ocs', WHD_ARGS='', OCS_STOCK_CLOCK='1' if a.baseline else '0')
     server = Server('wc-gate',root=str(ROOT),run_dir='amiga/'+run,profile_window=False)
     g = None
     actions = []
@@ -115,6 +116,12 @@ def main():
             (out/(label+'.png')).write_bytes(shot)
             print('captured '+label, flush=True)
 
+        def baseline(label):
+            path = out/(label+'-events.txt')
+            print('measuring '+label+' (250 fields)', flush=True)
+            command(f'monitor ocs-window 250 {int(a.baseline == "on")} {h0:x} {layout["hunks"][1]:x} "{path}"', timeout=180)
+            capture(label)
+
         # Leave the Origin animation running to its input poll, then use its
         # native Escape handling. The world title/credits run is not skipped
         # until the first completed credit picture has been captured.
@@ -127,12 +134,13 @@ def main():
         capture('title')
         until(h0+0x1f03c, 'credit picture submitted O:1f03c')
         capture('credits')
+        if a.baseline: baseline('asteroids')
         key(1)
         until(h0+0x1f396, 'campaign menu entry O:1f396')
         key(0)
         until(h0+0x1f43c, 'menu ready O:1f43c')
         capture('menu')
-        if a.simulator:
+        if a.simulator or a.baseline:
             # OCS starts at (159,99), over the absent Secret Missions option.
             # Native Up moves the pointer into Vega's rectangle (45,51)-(279,89).
             key(1, '4c')
@@ -146,6 +154,10 @@ def main():
             until(h0+0x0694, 'simulator flight loop O:0694')
             until(h0+0x06c2, 'simulator first iteration O:06c2')
             capture('simulator')
+            if a.baseline:
+                key(1, '40')  # Native Space: fire, no artificial game writes.
+                baseline('fire')
+                key(0, '40')
             until(h0+0x16c1a, 'pilot name prompt O:16c1a')
             until(h0+0x16992, 'name input loop O:16992')
             flag = command(f'x/bx {h0+0x3291c:#x}')
@@ -156,7 +168,7 @@ def main():
         logfile = out/'run/fsuae/Cache/Logs/fs-uae.log.txt'
         options = dict(re.findall(r'Set option (\w+) = "([^"]*)"', logfile.read_text(errors='replace')))
         expected = dict(cpu_model='68000', chipset='ocs', chipmem_size='1', fastmem_size='4',
-                        bogomem_size='0', cpu_speed='real', cpu_frequency='7093790',
+                        bogomem_size='0', cpu_speed='real', cpu_frequency='0' if a.baseline else '7093790',
                         cpu_cycle_exact='true', cpu_memory_cycle_exact='true', blitter_cycle_exact='true')
         for name, value in expected.items():
             if options.get(name) != value:
@@ -167,7 +179,10 @@ def main():
                         whd_args=env['WHD_ARGS'], fsuae_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest(),
                         machine='a500-ocs-512k-chip-4m-fast', warp=False, variant='ocs', effective=expected,
                         checkpoints=['origin', 'title', 'credits', 'menu'] +
-                        (['simulator', 'name'] if a.simulator else []))
+                        (['simulator', 'name'] if a.simulator or a.baseline else []))
+        if a.baseline:
+            metadata.update(baseline=a.baseline, fields_per_window=250)
+            metadata['checkpoints'] += ['asteroids', 'fire']
         (out/'result.json').write_text(json.dumps(metadata, indent=2)+'\n')
     except Exception:
         if g:
