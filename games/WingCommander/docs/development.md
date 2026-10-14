@@ -4451,7 +4451,10 @@ A500 automatically retains original behaviour despite the requested toggle.
 `SLAVE` overrides the automatic build; `AMIGA_SETUP`, `WHD_ARGS`, `FSUAE_RUN`
 and the shared sound/window settings remain overridable. An explicitly empty
 `WHD_ARGS` also selects original behaviour. `stop` does not build a slave.
-The existing `amiga/run.sh` keeps its CD32 default and explicit variant support.
+`amiga/run.sh` builds and runs the latest enhanced CD32 slave by default in a
+fresh `tmp/cd32-launch.*/build` directory, with `CUSTOM5=0 DCACHE`. An explicit
+`SLAVE` bypasses this build for original or diagnostic runs; explicit `WHD_ARGS`
+overrides the defaults. `stop` never builds. Explicit variant support remains.
 
 The OCS generated launch icon also adds `DCACHE` unless an explicit CACHE,
 DCACHE or NOCACHE choice already exists. The launcher default can be replaced

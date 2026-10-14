@@ -11,6 +11,18 @@ case "$WC_VARIANT" in
   ocs) GAME_DIR=WingCommander; default_setup=a500 ;;
   *) echo "WC_VARIANT must be cd32 or ocs" >&2; exit 1 ;;
 esac
+# Interactive CD32 launches use a fresh enhanced build. Explicit SLAVE inputs
+# retain diagnostic/original selection, and stop never assembles anything.
+if [ "$WC_VARIANT" = cd32 ] && [ "${1:-}" != stop ] && [ -z "${SLAVE:-}" ]; then
+  mkdir -p "$ROOT/tmp"
+  build_root=$(mktemp -d "$ROOT/tmp/cd32-launch.XXXXXX")
+  (
+    cd "$ROOT"
+    python3 tools/reconstruct.py --variant cd32 --release --output "$build_root/build"
+  )
+  export SLAVE="$build_root/build/WingCommanderCD32.Slave"
+  export WHD_ARGS="${WHD_ARGS-CUSTOM5=0 DCACHE}"
+fi
 export AMIGA_SETUP="${AMIGA_SETUP:-$default_setup}"
 # The pinned core takes CHIP write attributes from the wrong MMU cache entry.
 # Build locally; never modify the shared emulator or override an explicit choice.
