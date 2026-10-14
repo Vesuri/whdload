@@ -6728,5 +6728,21 @@ fallback. Clock/prediction/arithmetic are build options, not new public CUSTOM
 semantics. E2 changes the test launcher, reports and documentation only. It does
 not establish hardware performance, complete campaign play, lower RAM support,
 or 030/040 data-cache compatibility for OCS. The E1 A500 heavy-scene overload and
-unverified DMA words remain explicit limitations. P13E3/release work is separate;
+unverified DMA words remain explicit limitations. P13E3 documents the hand-off;
+packaging/publication are separate;
 CD32 phase 12 remains paused.
+
+
+### P13E3 candidate hand-off
+
+The [OCS support and release hand-off](ocs-release.md) consolidates the verified
+revision, backend policy, memory floor, options, scoped compatibility evidence
+and remaining gaps. Fresh `tmp/p13e3-native/` and `tmp/p13e3-cpu/` builds match
+the E1/E2 candidates byte for byte: 40,352 bytes each, SHA-256 respectively
+`7485ed46341185afaceb87c430b129a529538cdc03dc25199a6c96729d49f424` and
+`ad33a2a1452e22b6a98df5701cdfff3092cdf28a468cbd3e747f7681d3dee247`.
+No hook, runtime behaviour, public option or binary metadata changed. E2 evidence
+is reused by exact identity; no new live runs or performance claims were needed.
+The proposed OCS archive and release checklist keep assets/installers separate
+from CD32 while permitting shared packaging machinery. P13E3 is complete;
+packaging/publication and the paused CD32 phase-12 stash remain separate work.

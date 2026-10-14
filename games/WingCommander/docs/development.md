@@ -4326,3 +4326,41 @@ python3 tools/timing_scene_check.py tmp/p13e1-cd32-control --output tmp/p13e2-cd
 python3 tools/release_check.py tmp/p13e1-cd32-control --negative-controls --output tmp/p13e2-cd32-options.json
 python3 tools/flight_render_check.py tmp/p13e1-cd32-control --output tmp/p13e2-cd32-pixels.json
 ```
+
+### P13E3 reproducible hand-off
+
+The [OCS hand-off](ocs-release.md) defines the exact candidate pair, support
+limits, options and proposed packaging. Rebuild without generating more live
+captures; E2 acceptance carries over only if both binaries remain identical.
+Use fresh output names on repeats. All generated material stays in `tmp/`.
+
+```sh
+. amiga/env.sh
+/bin/bash tools/inputs.sh verify
+python3 tools/ocs_memory_build.py --math-fast --output tmp/p13e3-native
+python3 tools/ocs_memory_build.py --math-fast --backend cpu --output tmp/p13e3-cpu
+shasum -a 256 tmp/p13e3-native/WingCommander.Slave tmp/p13e3-cpu/WingCommander.Slave
+cmp tmp/p13e3-native/WingCommander.Slave tmp/p13e1-final2/WingCommander.Slave
+cmp tmp/p13e3-cpu/WingCommander.Slave tmp/p13e1-cpu-final2/WingCommander.Slave
+```
+
+Both comparisons passed at the hand-off. SHA-256 values match the full values
+in the candidate table. `build.json` must show `changed=off`, `exit_probe=false`
+and clock/prediction/intro/math enabled. These are fresh builds of the accepted
+code, not new emulator measurements. If E1 scratch copies are unavailable,
+compare against the recorded hashes; the documented E2 reports retain their
+original evidence scope. Use the E2 commands above when code changes invalidate
+that evidence, rather than making fresh multi-gigabyte captures for a doc edit.
+
+To run a candidate interactively using the existing separate OCS launcher:
+
+```sh
+WC_VARIANT=ocs SLAVE="$PWD/tmp/p13e3-native/WingCommander.Slave" \
+  AMIGA_SETUP=a500 OCS_STOCK_CLOCK=1 WARP=0 /bin/bash amiga/run.sh
+```
+
+The explicit CPU candidate is at `tmp/p13e3-cpu/WingCommander.Slave`; select the
+appropriate measured setup explicitly rather than assuming CPU type proves the
+crossover. The launcher creates a disposable runtime copy; it does not package
+or replace the reference installation. Preserve the accepted E1/E2 captures
+referenced by reports while they remain the evidence for this hand-off.

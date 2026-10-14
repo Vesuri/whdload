@@ -2,7 +2,7 @@
 
 ## Current state
 
-**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E2 are complete.** The OCS loader, four-plane blitter
+**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E3 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The
 [ordered OCS work items P13A1–P13E3](ocs-plan.md) cover shared CD32 mechanisms,
@@ -65,8 +65,9 @@ P13E1 completes the focused performance gate with exact arithmetic/collision
 shortcuts. A500 coasting holds 9.98 world updates/s and 2.75 pictures/s; asteroid
 credits reach 8.59/4.19 and held fire 8.99/0.25. Heavy scenes still miss 10 Hz;
 catch-up can starve drawing. See the [E1 limits and evidence](internals.md#p13e1-focused-ocs-performance-gate).
-P13E2 passes the bounded compatibility/functional model gate; P13E3 is next; CD32 E1 and phase 12 remain
-paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
+P13E2 passes the bounded compatibility/functional model gate; P13E3 completes the
+[OCS candidate support and release hand-off](ocs-release.md). Packaging/publication
+remain later work; CD32 E1 and phase 12 remain paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
 [P13B3 scope and checks](internals.md#p13b3-shared-instrumentation-and-validation-interfaces).
 
 The following completed implementation results concern **CD32**:
@@ -730,7 +731,7 @@ The investigation deliverable is the [ordered OCS plan](ocs-plan.md):
   projectile prediction and the 15-page intro.
 - **P13E1–P13E3:** focused A500 performance work, compatibility and later release hand-off.
 
-P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D4 are complete; P13E1 is complete with documented heavy-scene gaps; P13E2 is complete for the bounded model gate; P13E3 remains pending. The native converter **uses the blitter**;
+P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D4 are complete; P13E1 is complete with documented heavy-scene gaps; P13E2 is complete for the bounded model gate; P13E3 completes the [candidate hand-off](ocs-release.md), with packaging and publication left as later work. The native converter **uses the blitter**;
 keep it where measured end-to-end performance wins, including potentially 68000
 and no-Fast 68020 systems. A 68000 CPU converter and the proposed 68020+ longword
 path are alternatives to compare, not a reason to remove the blitter. CPU type

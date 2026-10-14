@@ -3,15 +3,14 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E2 complete: OCS conversion/display work, opt-in 10 Hz clocks, measured arithmetic/collision optimisations and bounded compatibility/functional checks.** A500 heavy-scene overload remains documented; this is not a smoothness or release claim. The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E3 complete: OCS conversion/display work, opt-in 10 Hz clocks, measured arithmetic/collision optimisations and bounded compatibility/functional checks, with a documented release hand-off.** A500 heavy-scene overload remains documented; this is not a smoothness or release claim. The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
-The opt-in D3 candidate adds field input, bounded renderer prediction and first-interval
-player/AI projectile motion. Native CPU, state restoration and live pixel checks
-pass. The A500 coasting window holds 9.98 world updates/s but displays only 0.75
-pictures/s; sustained-fire overload remains an E1 performance gap. D4 now shares the clock/prediction with the OCS title and asteroid credits;
-the full 15-page cycle and repeat pass on 020/Fast. The A500 asteroid window
-reaches only 7.39 world updates/s, an E1 gap. See the
-[D4 evidence](docs/internals.md#p13d4-ocs-title-and-asteroid-credit-timing) and [D3 evidence and limits](docs/internals.md#p13d3-ocs-field-input-and-bounded-presentation).
+The [OCS candidate hand-off](docs/ocs-release.md) records exact build hashes,
+supported revisions, backend selection, RAM requirements, options and the proposed
+archive/checklist. E1's A500 coasting window holds 9.98 world updates/s and 2.75
+pictures/s; asteroid credits and sustained fire still overload it. Both fresh
+hand-off builds match the E2-tested candidates. Packaging and publication remain
+later work, separate from the paused CD32 release.
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting
 by CPU and memory configuration. Matched emulator windows favour native blitter on 68000 and no-Fast 68020,

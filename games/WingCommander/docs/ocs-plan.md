@@ -1,8 +1,9 @@
-# OCS implementation plan — phase 13 investigation complete
+# OCS implementation plan — P13A1–P13E3 complete
 
-Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D4 are complete**;
-the remaining work items below are pending, in dependency order.
+The investigation and all ordered implementation items P13A1–P13E3 are complete
+within their documented gates. The [OCS candidate hand-off](ocs-release.md)
+records support, options, exact candidate hashes and the later release checklist.
+A500 heavy-scene overload and bounded model coverage remain explicit limitations.
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
 
@@ -361,17 +362,22 @@ failure/revision rejection and focused CD32 regressions pass. Coverage and limit
 [E2 evidence](internals.md#p13e2-compatibility-and-functional-gate). No full-campaign,
 hardware, smaller-memory or OCS 030/040 data-cache claim is made.
 
-**P13E3 — Document support and prepare the later release hand-off.** Depends on E2.
+**P13E3 — Document support and prepare the later release hand-off (complete).** Depends on E2.
 Record supported revisions, CPU/memory/backend selection, minimum RAM, options,
 reproducible checks and remaining gaps. Keep OCS and CD32 installers distinct;
 share packaging machinery, never game assets. Propose the preinstalled archive
 and release checklist. The CD32 phase 12 save/load stash remains separate.
 Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
-## Next gate
+Gate passed: the [support/limitations table and archive proposal](ocs-release.md)
+identify the unchanged E2-tested native and CPU candidates. Fresh builds match
+both accepted hashes exactly. Build/runtime options, RAM floor, revision guards,
+reproduction commands and remaining release checks are documented. No archive
+was published and no CD32 release or save/load-stash work was resumed.
 
-P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E2 are complete. **P13E3** is next.
-Use the scoped measured profiles and retain native fallback/override
-for unknown accelerators. C4 creates source ownership before native compositor aliases; C5 now protects
-pending/displayed ownership through publication and transitions. E2 closes the
-bounded compatibility gate with its documented model and coverage limits.
+## Remaining release work
+
+P13A1–P13E3 are complete. The [later release checklist](ocs-release.md#later-release-checklist)
+covers packaging, extracted-archive smoke tests and publication separately.
+The scoped model evidence does not remove E1's heavy-scene performance limits or
+E2's campaign, hardware, cache and cold-boot save/load coverage limits.
