@@ -4432,3 +4432,23 @@ The checker relocates the pinned original game to each capture's hunk bases,
 compares all enhancement hook/NOP/modal windows and requires inactive state.
 A changed-hook negative control must be rejected. It does not claim complete
 screen or game-state equality across machines with different rendering speeds.
+
+### OCS interactive launcher
+
+`amiga/run-ocs.sh` is the OCS entry point. It builds the current public candidate
+into a fresh `tmp/ocs-launch.*/build/`, then uses the shared launcher with the
+A3000 preset and `CUSTOM5=1`. Its process/log directory is `tmp/run-ocs`, separate
+from the default CD32 run. Each boot still uses a fresh game tree.
+
+```sh
+./amiga/run-ocs.sh
+./amiga/run-ocs.sh stop
+AMIGA_SETUP=a500 ./amiga/run-ocs.sh
+WHD_ARGS='CUSTOM5=0' ./amiga/run-ocs.sh
+```
+
+A500 automatically retains original behaviour despite the requested toggle.
+`SLAVE` overrides the automatic build; `AMIGA_SETUP`, `WHD_ARGS`, `FSUAE_RUN`
+and the shared sound/window settings remain overridable. An explicitly empty
+`WHD_ARGS` also selects original behaviour. `stop` does not build a slave.
+The existing `amiga/run.sh` keeps its CD32 default and explicit variant support.
