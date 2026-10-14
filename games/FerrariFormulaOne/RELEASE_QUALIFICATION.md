@@ -1,9 +1,13 @@
 # Release qualification
 
-Emulator qualification and 030/040/060 analysis pass in the scopes below. Human
-playtesting and real Amiga hardware testing are deferred by the user. This is
-an unreleased, opt-in release candidate; no physical-hardware timing or complete
-human-driven race is claimed. The production binary remains unchanged.
+**RC1 driving acceptance is withdrawn (2026-10-14).** Human testing exposed a
+20 ms player launch regression: ordinary throttle from rest can remain at zero
+speed. The demo-based checks below did not establish playable human controls.
+The Monaco speed check also incorrectly read two adjacent 16-bit car speeds as
+one 32-bit value; it observed an opponent, not player acceleration. Historical
+results below remain evidence only for their stated scopes and binary hash.
+See [CONTROLS_REGRESSION.md](CONTROLS_REGRESSION.md) for the fix and new checks.
+Human full-race playtesting and real Amiga hardware testing remain deferred.
 
 ## Accelerated clock calibration
 
@@ -248,8 +252,9 @@ Evidence: `tmp/dev/manifest/release-disabled-reloads.json` (eight passing cases)
 On the production 020+Fast path, actual native controls select Monaco, F3 and
 Race, with the clock set to 12:55 before the 13:00 start. Entering the cockpit
 starts a fresh driving epoch. The native countdown falls from 40 to zero; the
-red light changes to green. Bounded throttle input increases the native speed
-value, and 501 update checkpoints complete with no engine errors. The session
+red light changes to green. The 501 update checkpoints complete with no engine errors. The original
+claim of player acceleration is withdrawn: the 32-bit speed read combined the
+stationary player with the moving opponent next to it. The session
 clock reaches 6.1 seconds after the countdown; the calendar reaches 13:00:06.3.
 These counts are simulation updates, not rendered frames.
 

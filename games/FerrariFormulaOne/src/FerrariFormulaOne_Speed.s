@@ -145,7 +145,9 @@ FF1SpeedRate20:
 ; A0 -> X Q16.l, Z Q16.l, signed X/Z remainder.w (fifths of Q16).
 ; A1 -> scalar Q16.l, remainder.w. Floor magnitude at one fifth of Q16.
 ; Each 5*component+remainder must fit signed 32 bits; reject otherwise.
-; Speed below 4 becomes zero (caller must stop the vector too), above 500
+; Preserve sub-4 speed: this is the integrated 20 ms velocity, not the native
+; 100 ms proposal to which the original stop threshold applies. The native
+; zero-speed path still resets the vector through velocity_6e2a4. Above 500
 ; is capped. Input untouched; output unchanged on error. D1 status 0/-1;
 ; D0/D2-D7/A0-A6 preserved, CCR scratch. Requires FF1SquareRootU64.
 FF1SpeedFromVelocity020:
@@ -183,18 +185,12 @@ FF1SpeedFromVelocity020:
         add.l   d3,d0
         addx.l  d4,d1
         bsr.w   FF1SquareRootU64
-        cmpi.l  #4*65536*5,d0
-        blo.b   .stop
         cmpi.l  #500*65536*5,d0
         bhs.b   .cap
         moveq   #0,d1
         divu.l  #5,d1:d0
         move.l  d0,(a1)
         move.w  d1,4(a1)
-        bra.b   .okay
-.stop:
-        clr.l   (a1)
-        clr.w   4(a1)
         bra.b   .okay
 .cap:
         move.l  #500*65536,(a1)
