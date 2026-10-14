@@ -163,10 +163,18 @@ FF1SquareRootU64_000:
 ; unsigned low(A)*unsigned(B), plus signed high(A)*signed(B) shifted by 16.
 ; For B<0, subtract low(A) from the high partial product before composing.
 FF1MultiplyS32x16_000:
+ IFD FF1_C4_SINE_INLINE
+C4ProductFrameGate equ *
+ bra.w C4ProductFrameControl
+C4ProductFrameControl equ *
+ ENDC
  IFD FF1_PRODUCT_AB
  move.w FF1ProductControl(pc),-(sp)
  tst.w (sp)+
  bne.b .general
+ ENDC
+ IFD FF1_C4_SINE_INLINE
+C4ProductFrameSelected equ *
  ENDC
  ; A zero coefficient and an integer Q16 operand need no partial products.
  ; For low(A)=0, signed high(A)*signed(B), shifted by 16, is the full result.

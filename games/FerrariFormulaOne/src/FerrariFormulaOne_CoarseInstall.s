@@ -81,14 +81,28 @@ start:
  ENDC
  tst.l d0
  bne.w C1Fault
+ IFD FF1_C4_SINE_INLINE
+ lea FF1VelocityRotate000(pc),a0
+ adda.w #(public_bound-FF1VelocityRotate000),a0
+ ELSE
  lea public_bound(pc),a0
+ ENDC
  move.l 160*4(a2),(a0)
  bsr.w C1InstallUnload
  move.l $4.w,a6
  jsr -120(a6)
  lea C1Ledger(pc),a0
+ IFD FF1_C4_SINE_INLINE
+ lea FF1VelocityRotate000(pc),a1
+ adda.w #(public_table-FF1VelocityRotate000),a1
+ move.l (a1),a1
+ lea FF1VelocityRotate000(pc),a5
+ adda.w #(FF1PatchBegin-FF1VelocityRotate000),a5
+ jsr (a5)
+ ELSE
  move.l public_table(pc),a1
  bsr.w FF1PatchBegin
+ ENDC
  tst.l d0
  bne.w C1Fault
  move.w #$4ef9,$65174

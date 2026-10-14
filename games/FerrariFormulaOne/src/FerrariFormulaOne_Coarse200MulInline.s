@@ -1,7 +1,8 @@
 ; Included within FF1VelocityRotate000's local-label scope after its native body.
 ; Both cosine products dominate the measured general-helper call cost. Inline
 ; those exact operations using the outer frame's already-saved D6/D7 scratch.
-; Sine products retain the shared helper and its existing zero shortcut.
+; Optional R3d sine inlining reuses the same outer scratch registers; the
+; control retains the shared helper. Both keep its exact zero/integer shortcuts.
  IFD FF1_C4_ROTATE_FAST
 C4RotateGeneral equ *
  ENDC
@@ -77,7 +78,58 @@ C4RotateWordXGeneral equ *
  move.l d1,d5
  move.l 4(a0),d0
  move.l d3,d1
+ IFD FF1_C4_SINE_INLINE
+C4Sine1Gate equ *
+ IFD FF1_C4_SINE_INLINE_TEST
+ bra.w C4Sine1Fast
+ ELSE
+ bra.w .r3d_sin1_slow
+ ENDC
+C4Sine1Fast equ *
+ ; The outer rotation already owns D6/D7; no nested register frame is needed.
+ tst.w d1
+ beq.b .r3d_sin1_zero
+ tst.w d0
+ bne.b .r3d_sin1_general
+ swap d0
+ muls.w d1,d0
+ move.l d0,d1
+ swap d1
+ ext.l d1
+ swap d0
+ clr.w d0
+ bra.b .r3d_sin1_done
+.r3d_sin1_zero:
+ moveq #0,d0
+ moveq #0,d1
+ bra.b .r3d_sin1_done
+.r3d_sin1_general:
+ move.l d0,d6
+ moveq #0,d7
+ move.w d0,d7
+ mulu.w d1,d0
+ swap d6
+ muls.w d1,d6
+ tst.w d1
+ bpl.b .r3d_sin1_compose
+ sub.l d7,d6
+.r3d_sin1_compose:
+ move.l d6,d1
+ swap d1
+ ext.l d1
+ swap d6
+ clr.w d6
+ moveq #0,d7
+ add.l d6,d0
+ addx.l d7,d1
+ bra.b .r3d_sin1_done
+C4Sine1Slow equ *
+.r3d_sin1_slow:
  bsr.w FF1MultiplyS32x16_000
+.r3d_sin1_done:
+ ELSE
+ bsr.w FF1MultiplyS32x16_000
+ ENDC
  sub.l d0,d4
  subx.l d1,d5
  bsr.w FF1Q15Product000
@@ -86,7 +138,58 @@ C4RotateWordXGeneral equ *
  move.l d4,(sp)
  move.l (a0),d0
  move.l d3,d1
+ IFD FF1_C4_SINE_INLINE
+C4Sine2Gate equ *
+ IFD FF1_C4_SINE_INLINE_TEST
+ bra.w C4Sine2Fast
+ ELSE
+ bra.w .r3d_sin2_slow
+ ENDC
+C4Sine2Fast equ *
+ ; The outer rotation already owns D6/D7; no nested register frame is needed.
+ tst.w d1
+ beq.b .r3d_sin2_zero
+ tst.w d0
+ bne.b .r3d_sin2_general
+ swap d0
+ muls.w d1,d0
+ move.l d0,d1
+ swap d1
+ ext.l d1
+ swap d0
+ clr.w d0
+ bra.b .r3d_sin2_done
+.r3d_sin2_zero:
+ moveq #0,d0
+ moveq #0,d1
+ bra.b .r3d_sin2_done
+.r3d_sin2_general:
+ move.l d0,d6
+ moveq #0,d7
+ move.w d0,d7
+ mulu.w d1,d0
+ swap d6
+ muls.w d1,d6
+ tst.w d1
+ bpl.b .r3d_sin2_compose
+ sub.l d7,d6
+.r3d_sin2_compose:
+ move.l d6,d1
+ swap d1
+ ext.l d1
+ swap d6
+ clr.w d6
+ moveq #0,d7
+ add.l d6,d0
+ addx.l d7,d1
+ bra.b .r3d_sin2_done
+C4Sine2Slow equ *
+.r3d_sin2_slow:
  bsr.w FF1MultiplyS32x16_000
+.r3d_sin2_done:
+ ELSE
+ bsr.w FF1MultiplyS32x16_000
+ ENDC
  move.l d0,d4
  move.l d1,d5
  move.l 4(a0),d0
