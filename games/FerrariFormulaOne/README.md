@@ -117,3 +117,7 @@ The RC2 preinstalled archive is 677,063 bytes, SHA256
 `cdd0357047f302f1faec3584eafba5af2bfa56720452ab1f7eb1ad806a87c68b`.
 Its corrected slave is the exact independently rebuilt and control-tested binary
 identified above. Replace the RC1 installation; saved game data can be retained.
+
+The short RC2 020+Fast rendering profile and prioritized high-end optimization
+work order are in [RENDERING_PLAN.md](RENDERING_PLAN.md). This is measured
+follow-up work; it does not change the RC2 game binary or archive.
