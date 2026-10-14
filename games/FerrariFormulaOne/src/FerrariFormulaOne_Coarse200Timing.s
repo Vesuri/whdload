@@ -121,6 +121,9 @@ C4PhaseNormalize equ *
  move.w d0,(a0)
  movem.l (sp)+,d0-d1/a0
  jmp $67134
+; Native callers own the zero-entry guards (contact also rejects negatives).
+; Keep the zero-transition stop here: decrementing twice unconditionally would
+; turn an expiring value of one into -1. Q01 checks 88 installed caller cases.
 C4Countdown:
  subq.w #1,d0
  beq.b .store
@@ -157,6 +160,10 @@ C4EventsStart:
  lea C4EventsLeft(pc),a0
  move.w #2,(a0)
  move.l (sp)+,a0
+; Re-enter native eligibility for each pulse: a first-pulse failure may make
+; the second pulse ineligible. Never hoist the status tests or combine RNG calls.
+; Q01: native two-call oracle covers all cars, component/tyre failures, signed
+; status guards and exact RNG state/count (420 cases on A500 and A500+Fast).
 C4EventsRun:
  tst.w $32fbc
  jmp $6d4fe
