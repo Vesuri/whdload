@@ -74,12 +74,21 @@ def report(root, rows=None):
     require(all(r[2]==source and r[3]==meta['installation']['width']*meta['installation']['height'] for r in groups['H']),'source storage changed')
     end_memory=(root/'end-fast.bin').read_bytes()
     h0=meta['hunks'][0]-meta.get('memory_base',0x200000)
-    if not native:
+    if not native or 'selection' in meta['installation']:
         import struct
         require(end_memory[h0+0x3291e:h0+0x32924]==struct.pack('>HI',0x4ef9,meta['installation']['code']),'CPU hook not retained')
     i=meta['installation'];base=meta.get('memory_base',0x200000)
     code=i['code']-base;source_offset=code+0x2000
-    adapter=(root/'adapter.bin').read_bytes()
+    adapter=bytearray((root/'adapter.bin').read_bytes())
+    if 'selection' in i:
+        import struct
+        require((root/'install-audit.txt').read_text()==(root/'audit.txt').read_text(),'cache/CPU policy changed during selection')
+        selection=i['selection']
+        from ocs_backend import choose, ARMS
+        selected=choose(*selection['inputs'])
+        require(selected==selection['selected'] and ARMS[selected]==meta['arm'],'selection contract')
+        state=i['symbols']['backend_state']
+        adapter[state:state+8]=struct.pack('>II',0x4f435333,selected)
     require(end_memory[code:code+len(adapter)]==adapter,'adapter code changed')
     require(end_memory[code+len(adapter):source_offset]==bytes(0x2000-len(adapter)),'code/source guard changed')
     require(end_memory[source_offset+64000:code+i['tail_bytes']]==bytes(i['tail_bytes']-0x2000-64000),'source trailing guard changed')

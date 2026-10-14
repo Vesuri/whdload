@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 are complete**;
+It does not implement or validate an improved OCS slave. **P13A1–P13A4, P13B1–P13B3 and P13C1–P13C3 are complete**;
 the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -191,14 +191,20 @@ The Fast move includes compositor shadow rows and both copy-command pointer colu
 Normal slaves remain identical. No universal CPU threshold or hardware claim follows;
 C3 retains conservative fallback for unknown profiles. See [results and limits](internals.md#p13c2-measured-ocs-converter-crossover).
 
-**P13C3 — Install conservative backend selection and fallback.** Depends on C2.
+**P13C3 — Install conservative backend selection and fallback (complete).** Depends on C2.
 Select once from measured CPU/memory profiles, retain a user override for unknown
 accelerators, and fall back safely when the required memory is unavailable.
 Within the CPU backend select the tested word-write 68000/68010 and longword-write
 68020+ paths, unless C2 establishes a better rule. CPU capability and chipset are
 independent: an accelerated OCS machine still needs four-plane OCS output.
-Gate: forced and automatic choices select the same tested path; unsupported
-profiles keep a safe native option. Preserve cache policy and flush patched code.
+Gate passed at the bounded conversion seam: automatic/forced longword runs
+match all submitted images and starting/ending game/Chip state. Seven short
+runtime windows pass 305 independent pixel checks, including forced 68000 word,
+A500 default native, unknown-profile native, missing-storage native and actual
+slow-memory native fallback. The 68000-safe initializer freezes its choice and
+calls the original FlushCache trampoline without changing cache policy.
+Normal builds remain native; C4 owns production allocations and transitions.
+See [selection contract and limits](internals.md#p13c3-conservative-backend-selection).
 
 **P13C4 — Apply backend-specific memory ownership.** Depends on C3.
 For blitter conversion retain its Chip source and shared workspace, with waits
@@ -299,8 +305,8 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 are complete. Start **P13C3** only when
-requested. Use the scoped measured profiles and retain native fallback/override
+P13A1–P13A4, P13B1–P13B3 and P13C1–P13C3 are complete. **P13C4** is next, only on request.
+Use the scoped measured profiles and retain native fallback/override
 for unknown accelerators. CPU/Fast requires the audited compositor aliases;
 production memory ownership and transition handling remain C4. Do not resume
 CD32 E1/phase 12.

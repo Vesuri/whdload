@@ -21,7 +21,7 @@ def fixture(out):
     return blob
 
 
-def install(out, layout, arm, command, dump, memory_base=0x200000, memory_length=0x400000):
+def install(out, layout, arm, command, dump, memory_base=0x200000, memory_length=0x400000, selection=None):
     """Stopped at pre-submission O:3260a; retire pending native work first."""
     h0,h1 = layout['hunks'][:2]
     base = layout['slave']+TAIL
@@ -44,6 +44,14 @@ def install(out, layout, arm, command, dump, memory_base=0x200000, memory_length
     original=(ROOT/ocs.GAME).read_bytes()
     require(hashlib.sha256(original).hexdigest()==ocs.GAME_SHA,'wrong game')
     require(memory[h0+0x3291e-memory_base:h0+0x32924-memory_base]==original[0x3294a:0x32950],'changed displaced submit')
+    if selection is not None:
+        from ocs_backend import diagnostic
+        flags=read(read(4)+296,2)
+        detected=next((cpu for mask,cpu in ((128,68060),(8,68040),(4,68030),(2,68020),(1,68010)) if flags&mask),68000)
+        require(detected==int(selection['cpu']),'live Exec CPU disagrees with selected profile')
+        selection = diagnostic(memory_base=memory_base, source=fast, size=w*h, **selection)
+        selection['attnflags']=flags
+        arm = selection['arm']
     # Exact native field wait and completion/publication routine are retained.
     # CPU completion runs in the main task; native publication nesting guard is used.
     text=f''' section code,code
@@ -69,13 +77,39 @@ completed:
  movem.l (sp)+,d0-d7/a0-a6
  rts
 '''+source(candidates())
+    if selection is not None:
+        from ocs_backend import source as backend_source
+        option,cpu,profile,ready = selection['inputs']
+        text = text.replace(' move.l $', f''' lea backend_state(pc),a0
+ lea ${layout['slave']+0xee8:x},a1
+ move.l #{option},d0
+ move.l #{cpu},d1
+ move.l #{profile},d2
+ move.l #{ready},d3
+ bsr.w ocs_backend_init
+ cmpi.l #{selection['selected']},d0
+ bne.w selection_error
+ tst.l d0
+ beq.w native_dispatch
+ move.l $''', 1)
+        # Restore the displaced entry and retire through the original protocol.
+        # A native request is never treated as synchronous completion.
+        text += f'''
+native_dispatch:
+ movem.l (sp)+,d0-d7/a0-a6
+ movem.l d2-d7/a2-a6,-(sp)
+ jsr ${h0+0x32990:x}
+ jmp ${h0+0x32924:x}
+selection_error:
+ illegal
+''' + backend_source() + '\nbackend_state: dc.l 0,0\n'
     blob,sy=assemble(out,'adapter',text)
     require(len(blob)<CODE_BYTES,'adapter exceeds reservation')
     def write(name,address,data):
         path=out/(name+'.bin');path.write_bytes(data)
         command(f'monitor ocs-load {address:x} "{path}"')
     write('loaded-adapter',base,blob)
-    if arm!='native':
+    if arm!='native' or selection is not None:
         write('submit-hook',h0+0x3291e,struct.pack('>HI',0x4ef9,base))
     if arm.startswith('fast'):
         # Keep old Chip allocation/registry intact. Only the active view's CPU
@@ -117,5 +151,7 @@ completed:
                 production=False,source_allocation_retained=True,
                 row_aliases=aliases if arm.startswith('fast') else [],
                 compositor_pointers=command_pointers if arm.startswith('fast') else 0)
+    if selection is not None:
+        result['selection']=selection
     (out/'installation.json').write_text(json.dumps(result,indent=2)+'\n')
     return result

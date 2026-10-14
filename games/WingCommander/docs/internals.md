@@ -5322,8 +5322,8 @@ on the measured 7.09 MHz 68000, with either true Fast or slow expansion RAM, and
 on the measured 14.19 MHz 68020 without true Fast RAM. On the 68020 with true Fast
 RAM, the longword CPU converter **with a Fast chunky source** wins both checked
 scenes by about 6% over matching images. CPU/Chip does not win. This is a measured
-profile recommendation for C3, not an automatic policy already installed or a
-universal CPU threshold. Normal OCS and CD32 slaves remain byte-identical to C1.
+profile recommendation for C3, not a universal CPU threshold. C3 below applies the recommendation at the
+bounded seam; normal builds await production memory ownership. Normal OCS and CD32 slaves remain byte-identical to C1.
 
 #### Controlled experiment and matching
 
@@ -5352,7 +5352,8 @@ the core's calibrated defaults. CPU/memory/blitter cycle-exact modes are on,
 MMU/JIT/immediate blits are off; observed CACR is 0/1 respectively. The 020
 instruction cache remains enabled. Loaded hook execution is proved by absence of
 QBlit submissions in CPU arms, retained hook bytes and completed native publication.
-A production cache-flush/install contract remains C3 work.
+C3 below installs a once-only FlushCache contract at the bounded seam;
+production allocation/transition integration remains C4.
 
 Within each CPU/memory/scene group, **all four starting game hunks and all Chip
 RAM match exactly** before installation. The observer retains every submitted
@@ -5485,4 +5486,106 @@ Accepted evidence: `tmp/p13c2-final-*` for the ten asteroid cells,
 Instrument SHA-256: `432c44f7a9b59dd0454727851faecd413a308f5e557da42af0772ade61e764d6`.
 Normal OCS SHA remains `eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913`;
 CD32 release remains `fdd92fbbda8689e3ec3ab2353d5baa866859469a684026841fd71527e0a6de8d`.
-Stop before P13C3. [Reproduction](development.md#p13c2-measured-converter-comparison).
+C3 selection is complete below. [Reproduction](development.md#p13c2-measured-converter-comparison).
+
+
+### P13C3: conservative backend selection
+
+**P13C3 is complete at the bounded conversion seam.** The owned 68000 assembly
+`whdload/ocs_backend.s` provides selection and once-only initialization. The C2
+installer consumes it; the selector runs in the guest before dispatch. Normal
+OCS and CD32 outputs remain unchanged. This is not a release or a claim that
+production source ownership, allocation rollback or view transitions are complete.
+Those remain C4, followed by general publication integration in C5.
+
+#### Selection and memory contract
+
+| Request / verified inputs | Selected backend |
+|---|---|
+| Auto, measured C2 PAL 14.19 MHz 68020 with true Fast storage | CPU longword |
+| Auto, 68000/68010 or any unknown CPU/clock/memory profile | Native blitter |
+| Explicit native | Native blitter |
+| Explicit CPU, 68000/68010, required Fast storage available | CPU word |
+| Explicit CPU, 68020/030/040/060, required Fast storage available | CPU longword |
+| Any request without the required owned Fast storage / readiness, invalid CPU or option | Native blitter |
+
+The forced CPU path is an override, not a performance recommendation: native won
+on the measured 68000. Both CPU entries still produce four OCS planes. CPU family
+never selects AGA output. Forced longword operation on other accelerators is a
+functional option, not a measured speed claim or broad live compatibility gate.
+
+`ocs_backend_choose` takes D0.L option (0 auto, 1 native, 2 CPU), D1.L CPU class
+(0/10/20/30/40/60), D2.L profile (1 for the measured C2 020/Fast profile, otherwise
+unknown), and D3.L readiness (exactly 7). Readiness certifies owned true-Fast
+source/code storage, retired native QBlit, and valid Chip destination with the
+native fallback still intact. It returns D0=0 native, 1 word or 2 longword;
+other registers are preserved, CCR clobbered. This certificate is a caller
+contract, not an allocator or a general-purpose pointer validator.
+
+The bounded harness identifies the profile from its fixed C2 machine contract:
+PAL OCS, 512 KiB Chip, 4 MiB Zorro-II Fast, calibrated native 14.18758 MHz 020
+clock, instruction cache on, exact CPU/memory/blitter, no MMU/JIT/immediate blits.
+It also checks live Exec AttnFlags and the reservation's physical bank before
+installation. **AttnFlags alone cannot identify the clock or memory performance.**
+An unknown real accelerator must supply profile 0 and defaults native until a
+measured classification exists; there is no invented general MHz detector.
+`--profile unknown` exercises that policy independently of the host CPU model.
+
+Physical true-Fast placement is required, not just MEMF_FAST. The actual slow
+expansion run still uses native even under an explicit CPU request. The existing
+slave-owned diagnostic reservation is verified before choosing: `--unavailable`
+models its required Fast part being unavailable and selects native before any
+source pointer is changed. No production AllocMem failure or free path is claimed;
+C4 must supply the ownership certificate and handle partial setup/rollback.
+
+#### Installation, cache and dispatch
+
+The entry remains `O:3291e` (file `3294a`). Native fallback restores the displaced
+MOVEM and call to retirement `O:32990`, then resumes `O:32924` (file `32950`);
+it does not call the CPU completion path or pretend a native request completed.
+CPU selection binds the tested word/longword entry and preserves the native
+field wait and completion body at `O:32e06` (file `32e32`). A mismatch between
+the guest choice and the installer's source arrangement traps in this diagnostic.
+The existing C1 invalid-geometry trap remains diagnostic: a future transition
+cannot silently feed a relocated Fast source to a native blitter fallback.
+
+`ocs_backend_init` takes A0 pointing to zeroed owned eight-byte state and A1 to
+a FlushCache callback. It selects, flushes, then commits the backend and `OCS3`
+magic. Repeated calls return the frozen selection without another flush or a
+backend change. The callback is the original slave trampoline at `S:0ee8`
+(file `0f08`), which tail-calls resload_FlushCache via `S:0f24` (file `0f44`).
+No SetCPU, CACR write or cache-policy override is added. Unit execution checks
+flush-before-commit ordering; every live gate has identical pre/post CPU/cache
+audits (CACR 0 on 000, 1 on 020). Later C4 installation must use this flush
+contract when integrating the production patches, before handing over execution.
+
+The CPU source move still includes primary rows, compositor shadow rows, and
+both copy-command pointer columns. Original Chip allocations and the allocation
+registry remain intact. This is deliberately the bounded C2 ownership seam, not
+an implementation of C4's lifecycle or minimum-RAM budget.
+
+#### Accepted evidence
+
+`tmp/p13c3-unit/report.json` records 3,240 executed selector cases and 36
+initialization/repeat checks on 68000/020/040 CPU models. The decision table
+covers invalid inputs, unknown profiles, readiness failure, 68010 word and
+68060 longword selection, while running only base-ISA instructions. The 68010
+and 68060 choices are ISA/component tests, not live machines. All non-result
+registers and stack boundaries pass; code remains immutable. Wrong longword
+selection, missing flush and unwanted reselection mutations all reject.
+
+`tmp/p13c3-live-gate/report.json` records seven 250-field windows and **305**
+independent completed-image pixel checks. Automatic and forced 020/Fast flight
+runs match all starting/ending game hunks, all Chip RAM, and every submitted
+chunky image exactly. Other windows cover default 000/native, forced 000/word,
+unknown 020/native, unavailable Fast storage/native, and actual slow expansion
+020/native. Native queue activity versus CPU completion, display DMA/publication,
+source placement, frozen selector state, code and allocation guards all pass.
+A copied result with uninitialized live selector state is rejected. The C2 host
+observer is unchanged; no new timing instrument or performance claim is introduced.
+All project emulator sessions completed and used scoped cleanup.
+
+Fresh builds `tmp/p13c3-native` and `tmp/p13c3-release` retain SHA-256
+`eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913`
+and `fdd92fbbda8689e3ec3ab2353d5baa866859469a684026841fd71527e0a6de8d`.
+Stop before C4. [Commands](development.md#p13c3-selection-and-fallback).

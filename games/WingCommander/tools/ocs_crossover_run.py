@@ -19,14 +19,19 @@ from ocs_runtime import SIZES, ROOT, locate
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
-    p.add_argument('--arm', choices=('native','chip-word','fast-word','chip-long','fast-long'), default='native')
+    modes = p.add_mutually_exclusive_group()
+    modes.add_argument('--arm', choices=('native','chip-word','fast-word','chip-long','fast-long'), default='native')
     p.add_argument('--scene', choices=('asteroids','fire'),default='asteroids')
     p.add_argument('--memory', choices=('fast','slow'),default='fast')
     p.add_argument('--cpu', choices=('68000','68020'),default='68000')
     p.add_argument('--layout', help='calibrated layout.json from the same slave build')
     p.add_argument('--calibrate', action='store_true')
     p.add_argument('--baseline', choices=('on', 'off'), default='on', help='read-only observer control')
+    modes.add_argument('--backend', choices=('auto','native','cpu'), help='C3 one-time selection; do not combine with --arm')
+    p.add_argument('--profile', choices=('measured','unknown'), default='measured')
+    p.add_argument('--unavailable', action='store_true', help='C3 required-Fast reservation failure injection')
     a = p.parse_args()
+    if not a.backend and (a.profile != 'measured' or a.unavailable): p.error('selection controls require --backend')
     BASE,LENGTH=(0x200000,0x400000) if a.memory=='fast' else (0xc00000,0x1c0000)
     ocs_runtime.BASE,ocs_runtime.LENGTH=BASE,LENGTH
     if a.memory=='slow' and a.arm.startswith('fast'): raise ValueError('no true Fast RAM')
@@ -128,7 +133,10 @@ def main():
             # At a new conversion entry the previous asynchronous conversion may
             # still own its destination. Stop only after its native retirement.
             until(h0+0x3260e, 'retired previous conversion')
-            installation=install(out,layout,a.arm,command,dump,BASE,LENGTH)
+            (out/'install-audit.txt').write_text(command('monitor wc-audit'))
+            selection = dict(option=a.backend,cpu=a.cpu,profile=a.profile,unavailable=a.unavailable) if a.backend else None
+            installation=install(out,layout,a.arm,command,dump,BASE,LENGTH,selection)
+            a.arm=installation['arm']
             path=out/(label+'-events.txt')
             print('measuring '+label+' (250 fields)',flush=True)
             command(f'monitor ocs-window 250 {int(a.baseline != "off")} {h0:x} {layout["hunks"][1]:x} "{path}"',timeout=180)

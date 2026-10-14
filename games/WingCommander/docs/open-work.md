@@ -2,7 +2,7 @@
 
 ## Current state
 
-**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 are complete.** The OCS loader, four-plane blitter
+**Phase 13 investigation, P13A1–P13A4, P13B1–P13B3 and P13C1–P13C3 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The
 [ordered OCS work items P13A1–P13E3](ocs-plan.md) cover shared CD32 mechanisms,
@@ -29,7 +29,11 @@ Native wins the measured 68000 and no-Fast 68020 profiles; CPU/Fast longword win
 the measured 14 MHz 68020/Fast profile. Flight requires rebasing compositor shadow
 rows and copy-command pointers as well as the primary source. Normal builds are
 unchanged. See the [C2 gate](internals.md#p13c2-measured-ocs-converter-crossover).
-P13C3 is next only on request; CD32 E1 and phase 12 remain
+C3 selection and explicit native/CPU override pass the bounded live gate, with
+pre-move memory fallback, once-only selection and unchanged cache policy.
+Normal builds remain native pending C4 production ownership/transition work.
+See the [C3 gate](internals.md#p13c3-conservative-backend-selection).
+P13C4 is next only on request; CD32 E1 and phase 12 remain
 paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
 [P13B3 scope and checks](internals.md#p13b3-shared-instrumentation-and-validation-interfaces).
 
@@ -694,7 +698,7 @@ The investigation deliverable is the [ordered OCS plan](ocs-plan.md):
   projectile prediction and the 15-page intro.
 - **P13E1–P13E3:** focused A500 performance work, compatibility and later release hand-off.
 
-P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 are complete; P13C3–P13E3 remain pending. The native converter **uses the blitter**;
+P13A1–P13A4, P13B1–P13B3 and P13C1–P13C3 are complete; P13C4–P13E3 remain pending. The native converter **uses the blitter**;
 keep it where measured end-to-end performance wins, including potentially 68000
 and no-Fast 68020 systems. A 68000 CPU converter and the proposed 68020+ longword
 path are alternatives to compare, not a reason to remove the blitter. CPU type

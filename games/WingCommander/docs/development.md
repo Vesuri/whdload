@@ -3609,3 +3609,56 @@ cmp tmp/c2-release-control/WingCommanderCD32.Slave tmp/p13c1-release/WingCommand
 See [the decision, measurements and limits](internals.md#p13c2-measured-ocs-converter-crossover).
 Stop before C3 selection and C4 production memory ownership. Do not distribute
 the diagnostic reservation/slave or resume paused CD32 release work.
+
+
+## P13C3: selection and fallback
+
+These commands exercise the selector in the bounded C2 fixture, not an installed
+release. Use a fresh output name on repeats. All generated code, game bytes,
+dumps and screenshots remain in `tmp/`. Shared WHDLoad comes from `$WHDLOAD`
+(the stable `~/.local/share/amiga/WHDLoad` directory).
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_backend_check.py --output tmp/c3-unit
+# Use the C2 instrument build procedure above if the instrument is absent.
+export FSUAE="$PWD/tmp/p13c2-debugger-measured/fs-uae" WARP=1
+python3 tools/ocs_crossover_run.py --calibrate --output tmp/c3-layout
+python3 tools/ocs_crossover_run.py --calibrate --memory slow --output tmp/c3-slow-layout
+python3 tools/ocs_crossover_run.py --backend auto --cpu 68020 --scene fire \
+  --layout tmp/c3-layout/layout.json --output tmp/c3-auto020
+python3 tools/ocs_crossover_run.py --backend cpu --cpu 68020 --scene fire \
+  --profile unknown --layout tmp/c3-layout/layout.json --output tmp/c3-forced020
+python3 tools/ocs_crossover_run.py --backend auto --cpu 68000 \
+  --layout tmp/c3-layout/layout.json --output tmp/c3-auto000
+python3 tools/ocs_crossover_run.py --backend cpu --cpu 68000 \
+  --layout tmp/c3-layout/layout.json --output tmp/c3-forced000
+python3 tools/ocs_crossover_run.py --backend cpu --cpu 68020 --unavailable \
+  --layout tmp/c3-layout/layout.json --output tmp/c3-unavailable020
+python3 tools/ocs_crossover_run.py --backend auto --cpu 68020 --profile unknown \
+  --layout tmp/c3-layout/layout.json --output tmp/c3-unknown020
+python3 tools/ocs_crossover_run.py --backend cpu --cpu 68020 --memory slow \
+  --layout tmp/c3-slow-layout/layout.json --output tmp/c3-slow020
+python3 tools/ocs_backend_gate.py --auto tmp/c3-auto020 --forced tmp/c3-forced020 \
+  --runs tmp/c3-auto000 tmp/c3-forced000 tmp/c3-unavailable020 \
+  tmp/c3-unknown020 tmp/c3-slow020 --output tmp/c3-live-gate
+python3 tools/reconstruct.py --variant ocs --output tmp/c3-native
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/c3-release
+```
+
+`--backend auto|native|cpu` selects once using the guest 68000-safe initializer.
+It is mutually exclusive with C2's direct `--arm` experiments. `--backend native`
+always retains the native queue; `cpu` uses word writes on 000/010 and longword
+writes on 020+ only if the required storage is ready. This is a harness override,
+not a new public WHDLoad CUSTOM option. Existing cheat/language/mission options
+are untouched. `--profile measured` is the fixed harness profile (default);
+`unknown` removes that certificate, so auto retains native. `--unavailable`
+models missing required storage before changing any source owner. Real allocator
+failure/rollback and transition handling remain C4.
+
+The acceptance tool requires the automatic/forced source streams and complete
+starting/ending game/Chip state to match, validates every run through the strict
+C2 pixel/display report, and rejects a copied uninitialized-selector result.
+The unit gate checks register/stack preservation, exact decision boundaries,
+once-only flush/commit and deliberate implementation mutations. These tests do
+not establish performance on unknown accelerators or compatibility across scenes.

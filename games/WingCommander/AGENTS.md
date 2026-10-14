@@ -1,16 +1,18 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 are complete.
-Stop before P13C3; selection requires a new request. Normal OCS and CD32 slaves
-remain byte-identical. C2 recommends native blitter on the measured 68000 and
-no-Fast 68020 profiles; CPU/Fast longword conversion wins the measured 14 MHz
-68020/Fast profile. These are scoped emulator results, not a universal threshold.
+Current scope: P13A1–P13A4, P13B1–P13B3 and P13C1–P13C3 are complete.
+Stop before P13C4. Normal OCS and CD32 slaves remain byte-identical. C2 recommends
+native blitter on the measured 68000 and no-Fast 68020 profiles; CPU/Fast longword
+conversion wins the measured 14 MHz 68020/Fast profile. These are scoped emulator
+results, not a universal threshold.
 The bounded diagnostic source move must include compositor shadow rows and both
 copy-command pointer columns. C4 owns production allocation and transitions.
 Exec MEMF_FAST also labels slow expansion RAM; identify the physical bank.
 The OCS guest recorder remains CPU-tested, not live-hooked. C2 uses a host observer
-with exact observer-off controls. No automatic backend selection is installed.
+with exact observer-off controls. The bounded C3 seam selects once, supports
+native/CPU overrides, and falls back to native before moving a source when Fast storage is unavailable. Production
+allocation and transition integration remain C4; normal builds remain native.
 Required baseline for later work: Amiga 500 with Fast RAM. Share verified CD32
 mechanisms with 68000-safe paths. Retain native blitter C2P wherever matched
 CPU/memory measurements favour it; CPU type alone is not a crossover measurement.

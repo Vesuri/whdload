@@ -3,7 +3,7 @@
 Project scaffold for fixing the Amiga OCS disk and CD32 versions through their
 WHDLoad installs. Original slaves: Psygore, version 1.0. Source is unavailable.
 
-**P13A1–P13A4, P13B1–P13B3 and P13C1–P13C2 complete: measured OCS converter crossover.** The [ordered implementation plan](docs/ocs-plan.md)
+**P13A1–P13A4, P13B1–P13B3 and P13C1–P13C3 complete: conservative OCS converter selection.** The [ordered implementation plan](docs/ocs-plan.md)
 covers an Amiga 500/Fast RAM baseline and shared CD32 timing/prediction mechanisms.
 OCS has native four-plane blitter conversion. Retain it where measurements favour
 it; compare 68000-safe CPU conversion and a 68020+ longword path before selecting
@@ -27,11 +27,14 @@ Experimental Kalms word/longword candidates now match native visible pixels and
 an independent oracle, including checkerboard colours and four black edge pixels.
 Bounds, alternating destinations and native fallback checks pass. Diagnostic-only
 C2 hooks now measure complete adapters and matched live images; native QBlit remains
-the normal default. P13C3 selection is next only on request. See the
+the normal default. The bounded C3 seam now selects once, preserves cache policy,
+and supports explicit native/CPU choices with safe pre-move memory fallback.
+Production allocation and transitions are P13C4, next only on request. See the
+[C3 gate](docs/internals.md#p13c3-conservative-backend-selection),
 [C2 gate](docs/internals.md#p13c2-measured-ocs-converter-crossover),
 [B3 gate](docs/internals.md#p13b3-shared-instrumentation-and-validation-interfaces),
 [baseline and limits](docs/internals.md#p13a4-short-native-ocs-baseline), and
-[reproduction commands](docs/development.md#p13c2-measured-converter-comparison).
+[reproduction commands](docs/development.md#p13c3-selection-and-fallback).
 
 **Phase 11b is in progress; C1–C3 and the C4 steady-flight gate are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for
