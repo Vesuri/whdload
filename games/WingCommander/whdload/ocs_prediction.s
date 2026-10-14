@@ -125,6 +125,8 @@ ocs_input_command:
 .native: jmp OCS_INPUT
 
 ocs_prediction_rebase:
+        lea ocs_exhaust_valid(pc),a0
+        clr.w (a0)
         lea ocs_acceleration_valid(pc),a0
         clr.w (a0)
         movem.l d0/a0,-(sp)
@@ -256,6 +258,7 @@ ocs_prediction_begin:
         move.w #1,(a0)
         ; Project the staged poses without spawning or random work.
         jsr OCS_GEOMETRY
+        bsr.w ocs_exhaust_draw
 .done:  rts
 ocs_prediction_end:
         bsr.w timing_scene_end

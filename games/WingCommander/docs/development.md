@@ -4530,3 +4530,32 @@ sampler reports are `tmp/title-{ocs,cd32}-native/report.json`. Full-loop checks
 are `tmp/title-ocs-intro-final/report.json` and `tmp/title-cd32-intro-final.json`.
 Both live runs pass in `tmp/title-{ocs,cd32}-live/report.json`, with two PNG
 captures each. The existing OCS launcher builds these changes automatically.
+
+
+### Exhaust attachment motion
+
+Build the public OCS candidate and check native placement/restoration:
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/exhaust-ocs-v2
+python3 tools/exhaust_check.py tmp/exhaust-ocs-v2 --output tmp/exhaust-native-final
+python3 tools/ocs_prediction_check.py tmp/exhaust-ocs-v2 --output tmp/exhaust-prediction
+python3 tools/ocs_intro_check.py tmp/exhaust-ocs-v2 --output tmp/exhaust-intro
+python3 tools/ocs_options_check.py tmp/exhaust-ocs-v2 --output tmp/exhaust-options
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/opening_live_check.py ocs tmp/exhaust-ocs-v2 \
+  --exhaust-only --output tmp/exhaust-ocs-fast-live2
+python3 tools/opening_live_check.py cd32 tmp/title-cd32-v2 \
+  --exhaust-only --output tmp/exhaust-cd32-live
+```
+
+Use fresh output names on repeat runs. The CD32 command uses the existing enhanced
+build; rebuild it with `tools/reconstruct.py --variant cd32 --release` when needed.
+`--exhaust-only` skips the opening with native keyboard input, then observes up to
+200 intro pictures until eight parent/exhaust movement pairs occur within unchanged
+world ticks. It uses the established `a1200-030` observer profile for both variants,
+with its explicit legacy cache-model compatibility setting, PAL and DCACHE. It
+changes no guest poses. Reports contain coordinates sampled at native sort entry;
+the one-field screenshot may lag this render sample. This is functional evidence,
+not a frame-rate measurement. All owned observer processes stop on exit.

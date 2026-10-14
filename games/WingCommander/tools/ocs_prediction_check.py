@@ -25,7 +25,7 @@ def load_scene(c,sy,build):
   for old,new,size in zip(meta['hunks'],(CODE,DATA,0x150000,0x160000),(0x358c8,0xf5b8,4,0x1d94)):
    if old<=val<old+size:raw[off:off+4]=long(new+val-old);break
  c.write(DATA,bytes(raw))
- payload=c.read(SLAVE,40000)
+ payload=c.read(SLAVE,len((build/'WingCommander.Slave').read_bytes())-36)
  c.write(0x200000,(ROOT/'tmp/p13d2-final-on/fire-fast.bin').read_bytes())
  c.write(SLAVE,payload)
 

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import struct
 import subprocess
 import time
 from pathlib import Path
@@ -20,6 +21,7 @@ def main():
     p.add_argument('variant',choices=('ocs','cd32'));p.add_argument('build',type=Path)
     p.add_argument('--output',required=True)
     p.add_argument('--title-only',action='store_true',help='skip opening and sample Wing Commander logo zoom/rotation')
+    p.add_argument('--exhaust-only',action='store_true',help='sample native exhaust placement between intro world ticks')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     v=get(a.variant)
     if a.variant=='ocs':
@@ -36,6 +38,10 @@ def main():
              WHD_ARGS='CUSTOM5=1 DCACHE' if a.variant=='ocs' else 'CUSTOM5=0 DCACHE',
              EXTRA_ARGS='--uae_cpu_model=68020 --fast_memory=4096' if a.variant=='ocs' else '',
              OCS_STOCK_CLOCK='1' if a.variant=='ocs' else '0',INTRO_STOCK_CLOCK='0')
+    if a.exhaust_only:
+        env.update(AMIGA_SETUP='a1200-030',OCS_STOCK_CLOCK='0',
+                   EXTRA_ARGS='',WC_BASELINE_CACHE_MODEL='1')
+        length=0x800000
     g=None
     def stop():
         nonlocal g
@@ -72,12 +78,45 @@ def main():
         (out/'layout.json').write_text(json.dumps(layout,indent=2)+'\n')
         g=boot();h0,h1,_,h3=layout['hunks'];base=layout['slave'];shift=0xba if a.variant=='ocs' else 0
         field=h1+v.A4_BASE+v.A4['field_clock']
-        if a.title_only:
+        if a.title_only or a.exhaust_only:
             until(h0+(0x180c4 if a.variant=='ocs' else 0x1898a))
             cmd('monitor key 45 1')
             until(h0+(0x1edde if a.variant=='ocs' else 0x1fbba))
             cmd('monitor key 45 0')
             until(base+sy['intro_title'])
+            if a.exhaust_only:
+                a4=h1+0x7ffe
+                tick=a4+(2268 if a.variant=='ocs' else 4430)
+                offsets=(0xe8e,0xf86,0x3058,0x20f8,0x2178,0x252e,0x22fc,0x227c) if a.variant=='ocs' else (0x1700,0x17f8,0x3a6a,0x245e,0x2bea,0x24de,0x2d6e,0x2cee)
+                rows=[];moving=[];previous={};dump=out/'mounts.bin'
+                for frame in range(200):
+                    until(h0+(0x2ba2c if a.variant=='ocs' else 0x2c9b6))
+                    cmd(f'dump binary memory {dump.relative_to(ROOT)} {a4:#x} {a4+0x4100:#x}')
+                    data=dump.read_bytes()
+                    def w(off):return struct.unpack_from('>h',data,off)[0]
+                    world=w(tick-a4)
+                    for slot in range(10,61):
+                        if w(offsets[0]+2*slot)!=7:continue
+                        parent=data[offsets[2]+slot]
+                        if parent>=10:continue
+                        child=[w(off+2*slot) for off in offsets[3:]]
+                        ship=[w(off+2*parent) for off in offsets[3:]]
+                        if ship[0]==-32767:continue
+                        row=dict(frame=frame,tick=world,slot=slot,parent=parent,child=child,ship=ship)
+                        key=(slot,parent);old=previous.get(key)
+                        if old and old['tick']==world and old['ship'][:2]!=ship[:2]:
+                            if old['child'][:2]==child[:2]:raise ValueError('exhaust held while parent moved: '+str((old,row)))
+                            moving.append([old,row])
+                        previous[key]=row;rows.append(row)
+                    if frame%100==99:print(f'exhaust scan: {frame+1} pictures, {len(rows)} mounts, {len(moving)} moving pairs',flush=True)
+                    if len(moving)>=8:break
+                (out/'samples.json').write_text(json.dumps(rows,indent=2)+'\n')
+                dump.unlink()
+                if len(moving)<8:raise ValueError('insufficient between-tick exhaust motion')
+                shot('exhaust')
+                (out/'report.json').write_text(json.dumps(dict(complete=True,variant=a.variant,samples=rows,moving_pairs=moving,slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest()),indent=2)+'\n')
+                print('PASS: exhaust follows parent between ticks',flush=True)
+                return
             samples={}
             for name,off,minimum in (('approach',0x2f3a0 if a.variant=='ocs' else 0x2ec98,165),('rotation',0x2d0de if a.variant=='ocs' else 0x2d746,236)):
                 rows=[]

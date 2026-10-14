@@ -6439,7 +6439,7 @@ field-integrated player controls, simulator scoring and fault polling disabled.
 
 Native `O:28548` normally calls geometry `290fa`, debris `27cfa`, flames `281c0`,
 attachments `2837a`, sort `2ba2c` and raster `2bab4`. D4 runs the first four once
-per world update, followed by asteroid cleanup/spawn `9618` when `OD:8902.l`
+per world update (render-time attachment refresh is described below), followed by asteroid cleanup/spawn `9618` when `OD:8902.l`
 enables it. Asteroid cleanup `O:9528` tests draw-counter modulo 20; the adapter
 temporarily supplies world counter `OD:88da` and restores `88de`. Allocation
 `O:9682→9410→8ec2` and its RNG therefore persist into the next snapshot. The
@@ -6937,3 +6937,51 @@ OCS samples at index 165 keep depth 80 while scale changes 51 to 53; at index
 132. These show that both changes reach the renderer, rather than existing only
 in scheduler arithmetic. Captures retain the logo's normal composition and the
 rotated departure. Rendering can still take more than one field on these setups.
+
+
+## Exhaust attachments at render cadence
+
+OCS prediction previously rebuilt ship geometry each picture but left class-7
+engine exhaust in the screen coordinates produced at the last 10 Hz world tick.
+CD32 already runs its native flame creation and attachment placement inside the
+staged render boundary (`H0:2914c/29306`, files `29178/29332`); its code is unchanged.
+
+OCS keeps flame creation `H0:281c0` (file `281ec`) at world cadence. Immediately
+before destructive attachment placement `H0:2837a` (file `283a6`),
+`ocs_exhaust_capture` saves model-55 exhaust and model-27 mount inputs for slots
+10–60: parent, model, local X/Y/depth and mount angle. These 612 bytes are private
+slave storage. The original placement still executes at the tick.
+
+Each predicted flight/intro picture rebuilds parent geometry through
+`H0:290fa` (file `29126`), restores those local mount inputs, and calls native
+placement again before sorting/rasterization. The native angle helper
+`H0:2816a` (file `28196`) reapplies the current parent's roll and mirror flags;
+scale uses that parent's current projection. The staging backup restores every
+modified attachment field after drawing. There are no additional allocations,
+RNG calls, image changes, lifetime steps or simulation updates. Clipped parents
+hide their staged exhaust; class/model/parent checks reject reused slots and
+rebasing invalidates the saved mounts. Prediction-disabled and original modes
+retain native tick placement.
+
+`tmp/exhaust-native-final/report.json` executes native placement on 68000/020/040:
+156 PAL/NTSC render samples cover two parents, both models, slot boundaries,
+translation, roll, scale and all mirror flags. Repeated draws are exact, and the
+whole data hunk (including RNG/lifecycle) restores byte for byte. Additional
+controls cover mirrored capture, rebase, empty/reused slots and clipping.
+`tmp/exhaust-prediction`, `tmp/exhaust-intro` and `tmp/exhaust-options` pass the
+existing prediction/constructor, intro/script and 1,680 public-option checks.
+The prediction fixture now preserves the actual payload length rather than an
+obsolete fixed 40,000-byte prefix when loading captured Fast memory.
+
+The short OCS intro observer in `tmp/exhaust-ocs-fast-live2/report.json` verifies
+eight pairs of changing parent/exhaust screen coordinates within unchanged world
+ticks on the established 030 observer configuration. For example, within tick 2,
+parent Y moves −89→−87 and exhaust Y −90→−88. The slower stock 020 observer
+selected the existing prediction-off fallback and supplied no between-tick motion;
+that is not a smoothness pass or a new performance threshold. These are functional
+render-path checks, not FPS measurements or hardware performance claims.
+
+The unchanged enhanced CD32 build passes the same eight-pair check in
+`tmp/exhaust-cd32-live/report.json`. No CD32 placement patch is necessary.
+The default CD32 launcher now builds that enhanced source instead of silently
+selecting the original slave; explicit slave overrides still select originals.

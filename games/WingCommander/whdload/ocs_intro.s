@@ -65,6 +65,7 @@ intro_world:
         jsr OCS_DEBRIS
         addq.l #2,sp
         jsr OCS_FLAMES
+        bsr.w ocs_exhaust_capture
         jsr OCS_ATTACHMENTS
         tst.l 2308(a4)
         beq.s .snapshot

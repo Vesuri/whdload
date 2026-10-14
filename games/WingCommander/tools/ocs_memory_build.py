@@ -257,6 +257,7 @@ game_base: dc.l 0
             if intro:
                 from ocs_intro_source import source as intro_source, integrate
                 text=integrate(text)+intro_source(ROOT)
+            text+=select((ROOT/'whdload/ocs_exhaust.s').read_text(),'68000')
         # Extra overwritten words are separately guarded before any mutation.
         nops=NOPS+(prediction_nops if prediction else ())+tuple(at for off,width,_,_ in MODALS for at in range(off+6,off+width,2))
         checks=''.join(f' movea.l d6,a5\n adda.l #${off:x},a5\n cmpi.w #${int.from_bytes(game[44+off:46+off],"big"):x},(a5)\n bne.w wrong_revision\n' for off in nops if off not in (0x878,0x87a,0x9c2,0x9c4))
@@ -389,6 +390,7 @@ def prediction_clock(text):
     text=text.replace('ocs_clock_rebase:\n','ocs_clock_rebase:\n        bsr.w ocs_prediction_rebase\n')
     text=text.replace('        bsr.w ocs_clock_tick\n        subq.w',
         '        lea timing_in_world(pc),a0\n        move.w #1,(a0)\n        bsr.w ocs_clock_tick\n        lea timing_in_world(pc),a0\n        clr.w (a0)\n        subq.w')
+    text=text.replace('        jsr OCS_ATTACHMENTS', '        bsr.w ocs_exhaust_capture\n        jsr OCS_ATTACHMENTS')
     text=text.replace('ocs_clock_tick_done:', '        bsr.w ocs_prediction_snapshot\nocs_clock_tick_done:')
     text=text.replace('        jsr OCS_DRAW\n', '        bsr.w ocs_prediction_begin\n        jsr OCS_DRAW\n        bsr.w ocs_prediction_end\n')
     text=text.replace('        move.l ocs_clock_dirty(pc),d0\n        cmp.l',
