@@ -139,6 +139,35 @@ through the full lap on all three engines. Functional scheduler/installation
 state remains necessary. The independent rebuild is still byte-identical.
 Evidence: `tmp/dev/manifest/release-production-audit.json`.
 
+## Original release observations on accelerated profiles
+
+The original v1.01 demo was measured separately, with the corrected observer,
+warp disabled for each 1,000-field window (20.031887 seconds), after 125 native
+updates. These observations are not matched-state speedup comparisons: the
+original and converted loops advance different amounts of simulation during the
+measurement, and startup RNG is uncontrolled.
+
+| Emulator profile | Original CUSTOM1=0 FPS | Original CUSTOM1=1 FPS | Enabled production FPS |
+| --- | ---: | ---: | ---: |
+| 030 50 MHz | 5.691 | 7.139 | 16.623 |
+| 040 25 MHz | 5.491 | 6.540 | 16.623 |
+| 040 40 MHz | 5.491 | 6.540 | 16.623 |
+| 060 50 MHz | 5.541 | 6.639 | 16.623 |
+
+The original calendar and session clocks advance only 11.0–11.5 seconds with
+CUSTOM1=0, or 13.1–14.3 seconds with CUSTOM1=1, during those 20.032-second
+windows. Enabled production independently passes the 60-second elapsed gate
+with 0.0409% error. Faster presentation alone therefore understates the behavioral
+change: the new mode also keeps simulation time aligned with elapsed time.
+
+The enabled 300-presentation measurement is 16.640 FPS; the table uses its
+1,000-field window count for the same observation length as the original.
+Quantized emulator clock scales and coarse 040/060 cache charging prevent
+hardware speed or CPU-ranking claims. No further accelerated optimization is
+required by this qualification task. Evidence:
+`tmp/dev/manifest/release-original-observations.json` and
+`tmp/dev/manifest/release-accelerated-enabled.json`.
+
 ## Native lap completion
 
 All three production paths (A500, chip-only 020 and 020+Fast) complete an actual
