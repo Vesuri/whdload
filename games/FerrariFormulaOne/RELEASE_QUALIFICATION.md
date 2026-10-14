@@ -253,6 +253,25 @@ is not used as start acceptance. Human completion of a race remains deferred.
 Evidence: `tmp/dev/manifest/release-monaco.json`, with selection, red-grid and
 green-light screenshots and complete state captures.
 
+## Native repair and transport clocks
+
+Production 020+Fast and CUSTOM2=0 pass matched native UI operations on the same
+machine/runtime configuration. Changing a tyre compound requests 70 tenths at
+menu h176+$eae; both arms advance the calendar by exactly 78 tenths, preserving
+the native 13-tenth batching. Monaco-to-Rio transport executes menu
+h167+$84..$aa and adds exactly four days in both arms. The game's actual
+four-day intercontinental rule is retained, despite the manual's three-day text.
+
+Each complete before/after calendar is checked against its native increment,
+including all date and time fields. The session clock and every other captured modal field are
+unchanged across each isolated operation. The enabled driving scheduler remains
+entirely zero, with no pending driving time or completed updates. These are
+native input and read-only breakpoint observations; no debugger state writes
+or clock masks are used. Initial calendar times differ between sessions, so this
+is an operation-level clock comparison, not a whole-game matched-state replay.
+The existing exact-state gates remain unchanged. Evidence:
+`tmp/dev/manifest/release-modal-clocks.json`.
+
 ## Remaining acceptance work
 
 - Minimum-memory and minimum/development WHDLoad runtime qualification.
