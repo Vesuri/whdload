@@ -31,11 +31,16 @@ def main():
     p.add_argument('--view-fields', type=int, choices=(20,40,100), default=40)
     p.add_argument('--views', action='store_true', help='C5 diagnostic native view transitions (simulator disables view keys)')
     p.add_argument('--ownership', action='store_true', help='C4 candidate transition gate')
+    p.add_argument('--clock-build',help='D2 candidate build directory')
+    p.add_argument('--draw-every',type=int,choices=(1,2,5),default=1)
     p.add_argument('--cpu', choices=('68000','68020'), default='68000')
     p.add_argument('--fast-kib', type=int, choices=(1024,2048,4096), default=4096)
     a = p.parse_args()
     if not a.ownership and (a.cpu != '68000' or a.fast_kib != 4096):
         p.error('machine overrides require --ownership')
+    if a.clock_build and not a.ownership:p.error('clock gate requires ownership')
+    if a.clock_build and a.views:p.error('clock view probes belong to the D3 gate')
+    if a.draw_every!=1 and not a.clock_build:p.error('draw schedule requires a clock build')
     if a.views and not (a.ownership and a.baseline and a.teardown_build):p.error('view gate requires ownership, baseline and diagnostic build')
     if a.teardown_build and not a.ownership:p.error('teardown requires --ownership')
     LENGTH = a.fast_kib*1024
@@ -176,7 +181,25 @@ def main():
             if int(command('info registers d2').split()[1], 16) != 0:
                 raise ValueError('Vega campaign was not selected')
             until(h0+0x0694, 'simulator flight loop O:0694')
-            until(h0+0x06c2, 'simulator first iteration O:06c2')
+            if a.clock_build:
+                build=json.loads((ROOT/a.clock_build/'build.json').read_text())
+                if not build.get('clock') or hashlib.sha256(Path(env['SLAVE']).read_bytes()).hexdigest()!=build['sha256']:
+                    raise ValueError('clock build differs from booted slave')
+                sy=build['symbols'];sb=layout['slave']
+                path=out/'clock-schedule.bin';path.write_bytes(struct.pack('>I',a.draw_every))
+                command(f'monitor ocs-load {sb+sy["ocs_clock_draw_every"]:x} "{path}"')
+                clock_samples=[]
+                for tick in (2,11,21,31):
+                    until(sb+sy['ocs_clock_tick_done'],f'completed clock tick {tick}',
+                          f'*(unsigned int*){sb+sy["ocs_clock_completed"]:#x} == {tick}')
+                    dump(f'tick{tick}-data.bin',layout['hunks'][1],layout['hunks'][1]+SIZES[1])
+                    dump(f'tick{tick}-clock.bin',sb+sy['ocs_clock_state'],sb+sy['ocs_clock_cancel']+2)
+                    field=int.from_bytes(dump(f'tick{tick}-field.bin',layout['hunks'][1]+0x77fe,layout['hunks'][1]+0x7802),'big')
+                    clock_samples.append(dict(tick=tick,field=field))
+                (out/'clock-samples.json').write_text(json.dumps(dict(samples=clock_samples,draw_every=a.draw_every,build_sha256=build['sha256']),indent=2)+'\n')
+                until(sb+sy['ocs_clock_iteration'],'clock picture completed')
+            else:
+                until(h0+0x06c2, 'simulator first iteration O:06c2')
             capture('simulator')
             if a.views:
                 build=json.loads((ROOT/a.teardown_build/'build.json').read_text())
@@ -192,7 +215,7 @@ def main():
                     baseline(f'view{view}',a.view_fields)
             if a.baseline:
                 key(1, '40')  # Native Space: fire, no artificial game writes.
-                baseline('fire')
+                baseline('fire',100 if a.clock_build else 250)
                 key(0, '40')
             # A fast run can enter the prompt during the final capture. Its
             # recurring input loop is a reliable endpoint even then.
@@ -238,7 +261,7 @@ def main():
             metadata['checkpoints'] += ['view2','view1','view3','view0']
             metadata['view_fields']=a.view_fields
         if a.baseline:
-            metadata.update(baseline=a.baseline, fields_per_window=250)
+            metadata.update(baseline=a.baseline, fields_per_window=250, fire_fields=100 if a.clock_build else 250)
             metadata['checkpoints'] += ['asteroids', 'fire']
         (out/'result.json').write_text(json.dumps(metadata, indent=2)+'\n')
     except Exception:

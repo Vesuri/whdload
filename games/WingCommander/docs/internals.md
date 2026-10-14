@@ -6151,5 +6151,109 @@ simulator/reload checks and 791 dispatch targets. Broken-dispatch and reversed
 life-decrement controls are rejected. All extracted/relocated code and reports
 remain ignored scratch material. Reproduction is in
 [development](development.md#p13d1-ocs-timing-and-side-effect-audit).
-The next implementation item is P13D2; no clock, extrapolation or release change
-is included here.
+This D1 audit itself changes no runtime code. The D2 implementation follows below.
+
+### P13D2: OCS authoritative flight clock
+
+P13D2 is complete for the opt-in English OCS candidate (`--clock`). The original
+OCS slave, normal C4–C6 candidate and CD32 release remain byte-identical. The
+candidate is 10,840 bytes, SHA-256
+`205bced44071d3e65a6a48fcede4aea120af6875cff13d4f481202b5de407a02`.
+No intro timing or renderer prediction is enabled by this item.
+
+**Clock and ownership.** `O:0694/file:06c0` enters the flight adapter, returning
+to native `O:06c4/file:06f0` on exit. One initial native input/world update loads
+assets before the timed epoch. Thereafter the shared `timing_advance` arithmetic
+receives at most five PAL or six NTSC fields per invocation. Its original
+four-tick/drop and long-stall branches are therefore unreachable in active OCS
+flight. The unconsumed field difference stays behind the cursor, including after
+slow frames; each batch completes at most four ticks. Drawing waits while whole
+ticks are overdue. Separate counters record issued and **completed** ticks, draws,
+maximum backlog and exhausted batches. A batch-limit hit is not proof of
+sustained overload. Modal rebasing deliberately excludes modal time and clears
+fractional debt. Unsigned field subtraction handles counter wrap.
+
+The field producer `O:342a2/file:342ce`, native audio, calendar and display
+interrupts are unchanged. The beam classifier and scheduler come from the shared
+CD32 implementation, through the previously checked 68000 ISA selection; none of
+the CD32 input or game-data offsets is reused. Native speed, lifetime, damage and
+per-event amounts remain unchanged.
+
+The authoritative tick calls native world `O:02be/file:02ea`, geometry `290fa`,
+debris `27cfa`, flame creation `281c0`, attachment placement `2837a`, conditional
+asteroid creation `9618`, message expiry `2018`, simulator score/tail, target
+selection `3908` and damage-system polling `acfa`. These allocation-bearing scene
+preparations now occur once per tick. The ordinary scene draw call at
+`O:0322/file:034e` instead consumes the prepared scene through native sorting
+`2ba2c` and raster dispatch `2bab4`. It does not repeat geometry history, spawning
+or random choices. Intro/modal paths continue through the original scene routine.
+
+Other guarded seams are `O/file:0330/035c` (asteroids), `051c/0548` (messages),
+`0532/055e` (simulator tail), `043a/0466` (score), `636a/6396` (emission clock),
+`4464/4490` (fault polling) and `4890/48bc` (HUD selection expiry). Targeting uses
+the world counter for its modulo-eight predicate; emission uses its world
+modulo-four clock. Simulator score/time and the one-time bonus/exit transition
+advance at ticks even when no picture is drawn. Cosmetic HUD RNG has a separate
+seed, restored before any authoritative call. HUD annunciator bytes
+`OD:9cca–9cd9` retain native visual history (`O:1aea/1b0e/1b5c`); they are excluded
+from authoritative-state equality, not silently treated as equal.
+
+**Input and modes.** D2 deliberately polls native held controls at tick cadence.
+Native keyboard queue and joystick edge consumption remain one-shot. Catch-up
+samples current held state; it does not invent historical field samples.
+Timestamped responsive input, pose prediction and projectile identity remain D3.
+Pause `O:0872/file:089e`, autopilot `0f56/0f82`, options `09bc/09e8` and the
+blocking key command `18c6e/18c9a` suspend the adapter, preserve native execution,
+then rebase on return, including aborts. Nested modal calls restore ownership only
+at the outer return. Flight exit rebases before the existing post-flight,
+landing/name-entry paths. Their own cinematic/modal world calls remain native;
+they are not counted as completed ordinary-flight ticks.
+
+**Functional gate.** Both M68000 and M68020 execute PAL/NTSC schedules of one,
+five, varying and 150-field gaps across counter wrap. Each nominal three-second
+case completes exactly 30 native arithmetic updates: position `[153600,-30,30]`,
+lifetime 970, score 30, simulator time 970, identical RNG. Active dropped-debt
+stays zero and no batch exceeds four ticks. The fixture executes original
+integration, lifetime and RNG instructions; asset/device calls are explicit
+stubs, so it is not a whole-game substitute. Separate native checks cover the
+bonus/exit once, suppressed draw-owned score/tail, world-owned emission and the
+complete pause return. A deliberately draw-driven emission clock is rejected.
+All 420 installation cases pass, including each displaced hook/extra-word guard,
+other revisions and native/Fast backend choices. No partial installation occurs
+on a bad guard. The default candidate and both normal slaves retain their hashes.
+
+**Live gate and limits.** The calibrated cycle-exact PAL A500, 512 KiB Chip plus
+4 MiB Fast target reaches Origin, title/credits, menu, simulator and name entry.
+Matched completed-tick comparisons at ticks 11, 21 and 31 cover the world
+arrays, RNG, simulator score, mission/target state and exit events. By tick 31,
+the ordinary arm has drawn 16 pictures and the five-tick draw control only six;
+the compared state is byte-identical. Comparisons start after both schedules have
+drawn their first HUD: tick two precedes the deliberately slower arm's first
+picture and still contains uninitialised HUD scratch. A corrupted position byte
+must fail the comparison. This is a deterministic simulator window, not a full
+campaign or arbitrary-input replay certificate.
+
+The default 100-field firing window completes 19 world updates in 2.00319 seconds
+(9.485/s, within one tick of 10 Hz at the boundaries), with seven display changes
+(3.494/s). Native world `O:02be` averages 27.28 ms, maximum 38.54 ms; this excludes
+input, scene preparation, rendering and conversion and is not the whole tick
+budget. Completed-world intervals have a 170.13 ms p95 and 192.30 ms maximum:
+rendering still causes batching, so this is not perfectly even 100 ms delivery.
+Maximum sampled backlog is nine fields, retained rather than discarded. The
+normal-load target is met to the one-tick boundary tolerance over the bounded window; no hardware, heavy-scene
+or whole-campaign speed guarantee follows. D3 will not create extra display
+capacity, and E1 remains responsible for measured remaining bottlenecks.
+
+Cadence acceptance requires the adapter still active at the endpoint: native
+post-flight world calls are not evidence of clock overload. The sparse arm's
+later firing window crosses that boundary and is explicitly excluded from speed
+acceptance; its earlier equal-tick state comparison remains valid.
+
+The publication regression checks 36 completed images and 3,295,460 actual DMA
+words with no pixel mismatches; unknown boundary words remain reported separately.
+All eight observer-off checkpoints match game, Chip and owned state exactly.
+Deliberately corrupted pixels, publication timing/ownership and world position
+are rejected. Accepted reports are `tmp/p13d2-clock-final/`,
+`tmp/p13d2-install-final/`, `tmp/p13d2-timing-final/` and
+`tmp/p13d2-publication-final/`. Reports, snapshots and instructions remain in `tmp/`. D3 is next; world-based
+intro changes remain D4 and CD32 E1/phase 12 remain paused.

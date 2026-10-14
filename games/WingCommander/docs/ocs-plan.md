@@ -1,7 +1,7 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1 are complete**;
+The investigation itself did not implement an improved OCS slave. **P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D2 are complete**;
 the remaining work items below are pending, in dependency order.
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
@@ -272,7 +272,7 @@ The OCS keyboard queue and joystick edge records require their own adapter;
 CD32 input offsets do not apply. No timing patch is included. See the
 [D1 map and limits](internals.md#p13d1-ocs-timing-and-side-effect-map).
 
-**P13D2 — Port the shared 10 Hz authoritative clock.** Depends on D1, B2–B3.
+**P13D2 — Port the shared 10 Hz authoritative clock (complete).** Depends on D1, B2–B3.
 Preserve native OCS units while separating world updates from presentation.
 Count completed ticks, handle PAL/NTSC fractions, bounded catch-up and modal
 rebasing. Test slow-frame and wraparound cases. If the A500 cannot sustain the
@@ -280,6 +280,11 @@ world budget, report the overload and optimise the measured cause; do not silent
 change game speed or describe skipped simulation as correct timing.
 Gate: equal elapsed-time world/event results at deliberately varied render rates,
 plus measured normal-load world cadence on the required A500 target.
+The opt-in candidate passes native 68000/68020 PAL/NTSC, wrap, retained-debt
+and modal tests, matched live tick-state checks, and the bounded A500/Fast
+normal-load gate. Completed ticks are distinct from issued work; native
+post-flight calls are excluded from that cadence. See the
+[D2 evidence and limits](internals.md#p13d2-ocs-authoritative-flight-clock).
 
 **P13D3 — Port responsive input and renderer-only prediction.** Depends on D2, C5.
 Reuse player/camera and world-pose algorithms, native inertia and selective
@@ -333,7 +338,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1 are complete. **P13D2** is next.
+P13A1–P13A4, P13B1–P13B3, P13C1–P13C6 and P13D1–P13D2 are complete. **P13D3** is next.
 Use the scoped measured profiles and retain native fallback/override
 for unknown accelerators. C4 creates source ownership before native compositor aliases; C5 now protects
 pending/displayed ownership through publication and transitions. Broader

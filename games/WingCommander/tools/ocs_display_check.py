@@ -30,11 +30,11 @@ def long(value):
 
 
 class Native:
-    def __init__(self, game):
+    def __init__(self, game, model=1):
         require(sha(game.read_bytes()) == GAME_SHA, 'unsupported OCS executable')
         self.h = P()
         ck(u.uc_open(7, 1 << 30, C.byref(self.h)))
-        ck(u.uc_ctl(self.h, 7 | (1 << 26) | (1 << 30), I(1)))  # M68000
+        ck(u.uc_ctl(self.h, 7 | (1 << 26) | (1 << 30), I(model)))  # M68000 by default
         ck(u.uc_mem_map(self.h, 0, 0x1000000, 7))
         reader = HunkReader()
         require(reader.read_file(str(game)) == 0, reader.error_string)

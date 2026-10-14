@@ -12,11 +12,15 @@ def check(build):
     b=json.loads((build/'build.json').read_text());sy=b['symbols']
     payload=(build/'WingCommander.Slave').read_bytes()[32:-4]
     hooks=b.get('hooks',HOOKS)
+    guard_offsets=tuple(off for off,_,_ in hooks)
+    if b.get('clock'):
+        from ocs_clock_source import NOPS, MODALS
+        guard_offsets+=NOPS+tuple(at for off,width,_,_ in MODALS for at in range(off+6,off+width,2))
     results=[]
     for slave in (0x500000,0xc00000):
         for flags,cpu in ((0,0),(1,10),(2,20),(4,30),(8,40),(128,60)):
             for revision in (0x1302,0x12bc,0x1348):
-                for bad in (None,)+tuple(off for off,_,_ in hooks) if revision==0x1302 else (None,):
+                for bad in (None,)+guard_offsets if revision==0x1302 else (None,):
                     c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english')
                     events=[]
                     try:

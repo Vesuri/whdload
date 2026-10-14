@@ -79,7 +79,7 @@ def report(root,build):
             require(data[202:208]==bytes.fromhex('fffe01004200'),'unverified display enable')
             start=int.from_bytes(data[200:202],'big')>>8
             require(start>=72,'display begins before audited deadline');starts.add(start)
-    for scene,fields in [('asteroids',250),('fire',250)]+[(f'view{x}',m.get('view_fields',100)) for x in (2,1,3,0) if f'view{x}' in m['checkpoints']]:
+    for scene,fields in [('asteroids',250),('fire',m.get('fire_fields',250))]+[(f'view{x}',m.get('view_fields',100)) for x in (2,1,3,0) if f'view{x}' in m['checkpoints']]:
         result[scene]=window(parse(root/(scene+'-events.txt')),fields)
         if scene.startswith('view'):
             f=(root/(scene+'-fast.bin')).read_bytes();off=m['a4']-18318-0x200000

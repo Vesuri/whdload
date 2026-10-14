@@ -146,9 +146,10 @@ def report(root, build):
     for scene in ('asteroids','fire'):
         groups=defaultdict(list)
         for r in parse(root/(scene+'-events.txt')):groups[r[0]].append(r)
-        require([r[2] for r in groups['F']]==list(range(1,251)),'missing window fields')
+        fields=m.get('fire_fields',250) if scene=='fire' else 250
+        require([r[2] for r in groups['F']]==list(range(1,fields+1)),'missing window fields')
         require(len(groups['X'])>=3 and all(r[2]==0 for r in groups['X']),'pixel mismatch')
-        require(len(groups['D'])==250,'missing display fields')
+        require(len(groups['D'])==fields,'missing display fields')
         scene_code=(root/(scene+'-h0.bin')).read_bytes()
         plane=int.from_bytes(scene_code[0x331d2:0x331d4],'big')
         buffers=struct.unpack_from('>II',scene_code,0x331c0)

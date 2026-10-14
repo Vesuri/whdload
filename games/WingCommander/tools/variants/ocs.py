@@ -25,4 +25,5 @@ SCENE = dict(title_updates=296, approach=135, departure=235,
 SELECTORS = ((0x115c,0x116d,0x12bc),(0x1166,0x00e8,0x1302),(0x1170,0x262d,0x1348))
 # Verified original English hook targets, not an enhanced timing patch list.
 ORIGINAL_HOOKS = dict(audio=(0,0x26a3c,0x13a0), clear=(0,0x272b2,0x138e))
-# No TIMING_HOOKS/BUFFERED_HOOKS: D1 audits native owners; D2 integrates the clock.
+# No CD32 TIMING_HOOKS/BUFFERED_HOOKS. The separate OCS candidate links
+# its D2 adapter through ocs_clock_source; responsive prediction remains D3.

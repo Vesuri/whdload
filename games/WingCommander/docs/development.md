@@ -3943,5 +3943,80 @@ python3 tools/timing_inventory.py tmp/phase7-combat-controls \
 It retains 30,384 instructions, 6,118 edges, 54 tables and 625 entries. Its semantic
 inventory matches the retained phase-7b result; decoder-version metadata is
 recorded independently. This is a tooling regression, not renewed CD32 work.
-D2 still needs live clock integration and equal-time state/event tests; D1's
-functional checks do not establish complete campaign, device or UI behavior.
+D1's functional checks do not establish complete campaign, device or UI behavior.
+The D2 integration and its separate live gate follow below.
+
+
+## P13D2: OCS flight clock candidate
+
+The opt-in English OCS candidate adds flight timing to the existing native
+blitter/publication path. Default builds and CD32 are unchanged. Input is
+currently polled at ticks; responsive input/prediction remains D3 and the intro
+remains native until D4. See [the clock contract and measured limits](internals.md#p13d2-ocs-authoritative-flight-clock).
+
+```sh
+. amiga/env.sh
+/bin/bash tools/inputs.sh verify
+python3 tools/ocs_memory_build.py --clock --output tmp/p13d2-candidate
+python3 tools/ocs_clock_check.py tmp/p13d2-candidate --output tmp/p13d2-clock-final
+python3 tools/ocs_memory_install_check.py tmp/p13d2-candidate --output tmp/p13d2-install-final
+```
+
+Use fresh output names on repeats. The functional CPU requires executable JIT
+memory. It tests M68000 and M68020 explicitly; these results are not timing
+measurements. The local world fixture executes native arithmetic but stubs assets
+and devices; the live comparisons below supply the separate simulator evidence.
+
+Use the current `--ocs-pixels --ocs-observer` debugger from the C6 procedure,
+which includes corrected actual DMA-pixel observation. For the retained build:
+
+```sh
+export FSUAE="$PWD/tmp/p13c6-debugger/fs-uae" WARP=1
+export SLAVE="$PWD/tmp/p13d2-candidate/WingCommander.Slave"
+python3 tools/ocs_boot_gate.py --ownership --calibrate --output tmp/p13d2-layout
+python3 tools/ocs_boot_gate.py --ownership --simulator \
+  --clock-build tmp/p13d2-candidate --baseline on \
+  --layout tmp/p13d2-layout/layout.json --output tmp/p13d2-final-on
+python3 tools/ocs_boot_gate.py --ownership --simulator \
+  --clock-build tmp/p13d2-candidate --draw-every 5 --baseline on \
+  --layout tmp/p13d2-layout/layout.json --output tmp/p13d2-final-sparse
+python3 tools/ocs_boot_gate.py --ownership --simulator \
+  --clock-build tmp/p13d2-candidate --baseline off \
+  --layout tmp/p13d2-layout/layout.json --output tmp/p13d2-final-off
+python3 tools/ocs_clock_report.py tmp/p13d2-final-on tmp/p13d2-final-sparse \
+  --build tmp/p13d2-candidate --output tmp/p13d2-timing-final
+python3 tools/ocs_publication_report.py tmp/p13d2-final-on \
+  --build tmp/p13d2-candidate --observer-off tmp/p13d2-final-off \
+  --output tmp/p13d2-publication-final
+```
+
+The driver selects the stock-clock A500 with 512 KiB Chip plus 4 MiB Fast,
+validates effective settings and pins the slave/emulator hashes. WARP changes
+host waiting, not the calibrated emulated-time denominator. It traverses the
+native intro/menu into simulator flight and ends at the name prompt. Clock builds
+use a 100-field firing window to avoid mixing active flight with native
+post-flight calls; the unchanged intro control remains 250 fields. Cadence reports
+reject a normal-arm endpoint outside the adapter. A sparse-arm window that has
+already left flight is explicitly excluded from speed acceptance, not used to
+infer overload. Tick comparisons precede that boundary.
+
+The diagnostic `--draw-every 5` changes only the candidate's draw-budget data
+before flight. It does not rewrite game code. Equality is checked at completed
+ticks 11, 21 and 31 after both arms have drawn a first HUD, with a negative position
+control and a required actual draw-count contrast. `ocs_clock_report.py` lists
+the compared OCS data ranges and the native visual-annunciator exclusion. It
+reports retained backlog, batch limits, complete native-world cost and actual
+display changes separately. `ocs_publication_report.py` keeps the existing pixel,
+blanking/ownership and observer-off controls; no display gate is waived for D2.
+
+Normal-build regressions:
+
+```sh
+python3 tools/ocs_memory_build.py --output tmp/p13d2-default-control
+python3 tools/reconstruct.py --variant ocs --output tmp/p13d2-original-control
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/p13d2-cd32-control
+```
+
+The hashes remain `172d3297…`, `eec155c9…` and `fdd92fbb…` respectively. Live NTSC,
+full campaign/modal/UI compatibility and heavier scenes remain later acceptance;
+PAL/NTSC scheduler arithmetic and a native pause return are covered locally.

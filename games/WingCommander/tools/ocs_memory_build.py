@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the C4–C6 OCS allocation/publication candidate; generated slave in tmp/."""
+"""Build the C4–D2 OCS allocation/publication/clock candidate; generated slave in tmp/."""
 import argparse
 import hashlib
 import json
@@ -37,15 +37,20 @@ HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x334b6,'ocs_publish_close',0x4ef9))
 
 
-def build(out,option,exit_probe=False,changed="off"):
+def build(out,option,exit_probe=False,changed="off", clock=False):
     hooks=HOOKS+(((0x16992,'exit_probe_entry',0x4eb9),(0x18d14,'view_probe_entry',0x4ef9)) if exit_probe else ())
     if changed != 'off': hooks+=((0x3250c,'ocs_changed_borrow',0x4ef9),)
+    native=dict(NATIVE)
+    if clock:
+        from ocs_clock_source import NATIVE as clock_native, HOOKS as clock_hooks, MODALS, NOPS
+        native.update(clock_native)
+        hooks+=clock_hooks+tuple((off,'ocs_clock_modal_'+name,0x4ef9) for off,_,name,_ in MODALS)
     original=(ROOT/ocs.SLAVE).read_bytes()
     require(hashlib.sha256(original).hexdigest()==SLAVE_SHA,'changed original slave')
     game=(ROOT/ocs.GAME).read_bytes();guard_game(game)
     (out/'original.bin').write_bytes(original[32:-4])
     prefix=f' section code,code\n org 0\nslave:\n incbin "{out}/original.bin"\n'
-    equates='\n'.join(f'{n} equ ${0xf0000000+x:x}' for n,x in NATIVE.items())
+    equates='\n'.join(f'{n} equ ${0xf0000000+x:x}' for n,x in native.items())
     text=prefix+equates+f'''
 install:
  movea.l a3,a0
@@ -224,6 +229,16 @@ contract_message: dc.b "OCS CPU conversion contract failed",0
  even
 game_base: dc.l 0
 '''+(ROOT/'whdload/ocs_memory.s').read_text()+'\n'+(ROOT/'whdload/ocs_publication.s').read_text()+'\n'+backend_source()+'\n'+converter_source(candidates())
+    if clock:
+        from ocs_clock_source import source as clock_source
+        text+='\n'+clock_source(ROOT,game)
+        # Extra overwritten words are separately guarded before any mutation.
+        nops=NOPS+tuple(at for off,width,_,_ in MODALS for at in range(off+6,off+width,2))
+        checks=''.join(f' movea.l d6,a5\n adda.l #${off:x},a5\n cmpi.w #${int.from_bytes(game[44+off:46+off],"big"):x},(a5)\n bne.w wrong_revision\n' for off in nops if off not in (0x878,0x87a,0x9c2,0x9c4))
+        for off in (0x878,0x9c2):
+            checks+=f' movea.l d6,a5\n adda.l #${off:x},a5\n move.l d6,d0\n addi.l #${int.from_bytes(game[44+off:48+off],"big"):x},d0\n cmp.l (a5),d0\n bne.w wrong_revision\n'
+        text=text.replace('guards_done:\n','guards_done:\n'+checks)
+        text=text.replace('hooks_done:\n','hooks_done:\n'+''.join(f' movea.l d6,a5\n adda.l #${off:x},a5\n move.w #$4e71,(a5)\n' for off in nops))
     if changed != 'off':
         text=text.replace(' lea payload_end(pc),a0',
                           ' lea payload_end(pc),a0\n adda.l #128000,a0')
@@ -282,7 +297,7 @@ view_probe_request: dc.l 0
     guards='\nguards:\n'
     for off,_,_ in hooks:
         raw=game[44+off:44+off+6]
-        guards+=f' dc.l ${off:x}\n dc.w ${int.from_bytes(raw[:2],"big"):x},{int(off in (0xc94,0x16992))}\n dc.l ${int.from_bytes(raw[2:],"big"):x}\n'
+        guards+=f' dc.l ${off:x}\n dc.w ${int.from_bytes(raw[:2],"big"):x},{int(int.from_bytes(raw[:2],"big") in (0x4eb9,0x4ef9))}\n dc.l ${int.from_bytes(raw[2:],"big"):x}\n'
     guards+=' dc.l -1\n'
     tables=guards+'\nhooks:\n'+''.join(f' dc.l ${off:x}\n dc.w ${op:x}\n dc.l {label}-slave\n' for off,label,op in hooks)+' dc.l -1\nnative_fixups:\n'
     # First pass obtains positions; later tables cannot shift preceding code.
@@ -292,7 +307,7 @@ view_probe_request: dc.l 0
     for pos in range(TAIL,len(probe)-3,2):
         value=int.from_bytes(probe[pos:pos+4],'big')
         if 0xf0000000<=value<0xf0040000:fixes.append(pos)
-    require(len(fixes)>=len(NATIVE)-5,'missing native fixups')
+    require(len(fixes)>=len(native)-5,'missing native fixups')
     payload,sy=assemble(out,'candidate',text+tables+''.join(f' dc.l ${x:x}\n' for x in fixes)+' dc.l -1\npayload_end:\n'+history)
     payload=bytearray(payload)
     require(payload[:TAIL]==original[32:-4],'original payload changed before patch')
@@ -304,7 +319,7 @@ view_probe_request: dc.l 0
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
                 workspace='native combined Chip allocation retained for fallback',
-                live_validated=False)
+                live_validated=False,clock=clock)
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 
@@ -314,7 +329,8 @@ def main():
     p.add_argument('--backend',choices=tuple(OPTIONS),default='auto')
     p.add_argument('--exit-probe',action='store_true',help='diagnostic-only native teardown and view-change triggers')
     p.add_argument('--changed',choices=('off','full','blocks'),default='off',help='C6 opt-in history candidate or equal-reservation full control')
+    p.add_argument('--clock',action='store_true',help='D2 opt-in 10 Hz flight clock')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
-    r=build(out,a.backend,a.exit_probe,a.changed);print(r['bytes'],r['sha256'])
+    r=build(out,a.backend,a.exit_probe,a.changed,a.clock);print(r['bytes'],r['sha256'])
 
 if __name__=='__main__':main()
