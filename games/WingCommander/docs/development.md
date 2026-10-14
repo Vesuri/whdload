@@ -2997,3 +2997,45 @@ No OCS emulator run or backend crossover measurement is part of phase 13.
 [P13C2](ocs-plan.md#c--choose-conversion-from-measured-cpu-and-memory-behaviour)
 specifies the matched experiment required before choosing blitter versus CPU;
 retain the blitter until that gate establishes which configurations benefit.
+
+## P13A1: OCS slave reconstruction
+
+Use the shared environment's Python (Capstone and amigaxdev), `VASM`, `WHDLOAD`
+headers and `NDK`. From the project root, with fresh output names:
+
+```sh
+/bin/bash tools/inputs.sh verify
+make reconstruct-ocs OUT=tmp/p13a1-reconstruct
+make check-ocs-reconstruction OUT=tmp/p13a1-check
+```
+
+The first target uses the pinned original OCS slave and English game from
+`tmp/originals/ocs/WingCommander`. It validates their SHA-256 identities, the
+English CRC, all three native selector/list structures, and the eight displaced
+source windows in `manifest/ocs-patch-sites.tsv` before creating build output.
+It emits `WingCommanderOCS.s`, `slave.lst`, `payload.bin`, `WingCommander.Slave`
+and `report.json` below the chosen `tmp/` directory. Vasm assembles with
+`-m68000 -spaces -no-opt -Fbin`; the complete HUNK file must equal the original.
+No generated source, patch list bytes or built slave belongs in git.
+
+The check target performs two fresh builds and compares their generated source,
+payload, slave and report. It exercises invalid inputs (including changed game
+bytes with the original CRC), each protected source window, selector corruption,
+an actual assembly sabotage and output-path rejection. `checks.json` records the
+result. Rejected fixtures and failed assembly evidence stay under its output;
+reference installs are checked for preservation. It also uses the supplied CD32
+English file as a wrong-variant negative input. No emulator is started.
+
+For explicit source selection, use the same Python entry point after sourcing
+the shared environment (the same strict identities still apply):
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_reconstruct.py --output tmp/p13a1-explicit \
+  --input tmp/originals/ocs/WingCommander/WingCommander.Slave \
+  --game tmp/originals/ocs/WingCommander/data/Wing.english
+```
+
+These guards operate at build time. The byte-identical slave retains its original
+runtime CRC handling; new hooks and runtime guards belong to later implementation.
+Boot equivalence is P13A3, not part of this static gate. Stop after P13A1.

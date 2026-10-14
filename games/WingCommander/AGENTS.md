@@ -1,13 +1,13 @@
 # Wing Commander
 
 Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current scope: phase 13 OCS investigation and ordered plan are complete.
-`docs/ocs-plan.md` defines pending P13A1–P13E3; start P13A1 only when OCS
-implementation is requested. Required baseline: Amiga 500 with Fast RAM.
-Share verified CD32 mechanisms with 68000-safe paths. Retain native blitter
-C2P wherever matched CPU/memory measurements favour it; compare CPU conversion
-before selecting a backend. CPU type alone is not a crossover measurement.
-Do not implement OCS runtime changes or resume CD32 E1/phase 12 in this scope.
+Current scope: P13A1 OCS slave reconstruction and revision guards are complete.
+The original slave rebuilds byte for byte; generated source and binaries stay
+in `tmp/`. P13A2 is next only when requested; do not start runtime changes.
+Required baseline for later work: Amiga 500 with Fast RAM. Share verified CD32
+mechanisms with 68000-safe paths. Retain native blitter C2P wherever matched
+CPU/memory measurements favour it; CPU type alone is not a crossover measurement.
+CD32 E1/phase 12 remain paused. See `docs/ocs-plan.md` for the ordered work.
 The CD32 intro 10 Hz timing and first-interval projectile fixes are complete;
 phase 11b D1–D5 are complete on current models. A2 calibration remains separate.
 Derived evidence is static unless explicitly labelled otherwise; no OCS

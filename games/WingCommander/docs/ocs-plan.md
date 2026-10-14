@@ -1,8 +1,8 @@
 # OCS implementation plan — phase 13 investigation complete
 
 Phase 13 delivers this plan and the [static evidence](internals.md#phase-13-ocs-static-investigation).
-It does not implement or validate an improved OCS slave. All work items below
-are **pending**, in dependency order. OCS implementation needs a subsequent goal;
+It does not implement or validate an improved OCS slave. **P13A1 is complete**;
+the remaining work items below are pending, in dependency order. Further work needs a subsequent goal;
 CD32 E1 and phase 12 remain paused. The supplied English executable is the first
 supported target; unavailable revisions and German must not inherit its patches.
 
@@ -35,14 +35,16 @@ supported target; unavailable revisions and German must not inherit its patches.
 
 ## A — Establish a trustworthy OCS baseline
 
-**P13A1 — Reconstruct the supplied OCS slave.**
+**P13A1 — Reconstruct the supplied OCS slave (complete).**
 Use the pinned install and installer, reconstruct into `tmp/`, and require
 byte-for-byte equality with the original 5,324-byte slave before adding hooks.
 Preserve its Kickstart 1.3, relocation, cache, language, cheat and start-mission
 behaviour. Decode all three revision selectors, but implement enhanced hooks only
 for the verified English CRC `00e8`, guarded by SHA and displaced bytes.
 Deliverable: reproducible OCS reconstruction and negative revision checks.
-Gate: identical original bytes; unexpected input rejected without modifying it.
+Gate passed: identical original bytes; unexpected input rejected without modifying it.
+See [results and limits](internals.md#p13a1-byte-identical-ocs-reconstruction) and
+[commands](development.md#p13a1-ocs-slave-reconstruction).
 
 **P13A2 — Finish the native display and allocation contract.** Depends on A1.
 Trace each QBlit phase, completion flag, source lifetime, plane pointer, row
@@ -246,7 +248,7 @@ Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
 ## Next gate
 
-Start with **P13A1** when implementation is requested. The first backend decision
+P13A1 is complete. Start **P13A2** only when requested. The first backend decision
 is **P13C2**, not the current investigation. In particular, neither “68000 must use
 CPU C2P” nor “68020 must abandon the blitter” has been established. Keep the
 blitter implementation available through the comparison and acceptance gates.

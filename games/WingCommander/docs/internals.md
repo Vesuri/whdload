@@ -4538,3 +4538,48 @@ it does not predict Wing Commander's winner. Their Finest Hour supplies examples
 of selected 68000/020 math paths; Powerdrome documents Fast RAM/DMA ownership.
 Sibling numbers are not Wing Commander measurements. No new upstream download,
 vendored converter or runtime implementation is part of phase 13.
+
+### P13A1: byte-identical OCS reconstruction
+
+P13A1 is complete. `tools/ocs_reconstruct.py` generates assembly only under
+`tmp/`, assembles 1,210 instructions with `-m68000 -no-opt`, and regenerates the
+one-code-hunk container. The resulting **5,324 bytes** match the original slave
+exactly (SHA-256 `eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913`).
+Known code islands are instructions; headers, ROM patch tables, strings and
+initial state remain generated data. All three game patch lists are regenerated
+with WHDLoad `PL_` macros. The original KickEmu code is retained, not rebased.
+Full-file equality preserves its ROM relocation, cache policy, language fallback,
+cheats, system/mission options and native unsupported-revision abort.
+
+The selector instructions begin at `OS:115c`, `1166`, `1170` (slave file offsets
+`117c`, `1186`, `1190`). Their CRC/list pairs are `116d → 12bc`, `00e8 → 1302`,
+`262d → 1348`. Each has eight patches and END. The first two equality branches
+converge at `OS:117c`; the final inequality branches to `OS:1470` (abort reason 9).
+Only the supplied English `00e8` executable has a verified whole-file SHA.
+The other selectors are preserved, but their absent executables have no approved
+enhancement map. No enhanced hooks or runtime SHA checks are added by P13A1:
+these are **build-time guards** for subsequent work, alongside the unchanged
+original runtime CRC selector.
+
+`manifest/ocs-patch-sites.tsv` pins eight original English source windows by
+hunk offset, file offset, length and SHA-256. Hunk-0 file coordinates add `002c`;
+hunk-3 coordinates add `041e4c`. The protected windows are `O:26a3c` (6 bytes),
+`27132` (4), `27740` (4), `272b2` (6), and `O3:0036` (2), `06a2` (2), `06a4`
+(4), `1524` (1). The skip-site window includes the skipped instruction; it does
+not assert that every protected byte is overwritten. Future added hook sites
+need their own guards. Fingerprints contain no executable bytes.
+
+The reproducible gate at `tmp/p13a1-check-final/checks.json` passes two fresh,
+identical source/payload/slave/report builds; altered and truncated slave/game
+rejections; CD32 input rejection; a real altered-game CRC collision retaining
+`00e8`; synthetic inputs with the two unverified CRCs; independent mutations of
+all eight protected windows; 12 selector instruction/CRC/target/branch mutations;
+and an assembled-instruction sabotage caught by the payload identity check.
+Existing outputs, paths outside `tmp/` and symlink escapes are rejected. The
+original OCS file set and hashes remain unchanged. Synthetic CRC fixtures do not
+stand in for testing unavailable game revisions.
+
+No emulator, Kickstart or game code was executed. Byte identity is the P13A1
+preservation proof, not a new boot or hardware compatibility result. P13A2's
+display contract and P13A3's original/reconstructed boots remain pending; CD32
+reconstruction, launcher and runtime assembly are unchanged.

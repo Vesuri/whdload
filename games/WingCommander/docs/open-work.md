@@ -2,13 +2,15 @@
 
 ## Current state
 
-**Phase 13 investigation is complete.** The OCS loader, four-plane blitter
+**Phase 13 investigation and P13A1 reconstruction are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The
 [ordered OCS work items P13A1–P13E3](ocs-plan.md) cover shared CD32 mechanisms,
 68000 safety, measured blitter/CPU selection and Amiga 500/Fast RAM acceptance.
-No OCS runtime implementation or performance claim is included. Start with
-P13A1 on the next implementation request; CD32 E1 and phase 12 remain paused.
+The OCS slave rebuilds byte for byte with input/revision and displaced-site
+guards. No OCS runtime change or performance claim is included. P13A2 is next
+when requested; CD32 E1 and phase 12 remain paused. See the
+[P13A1 gate](internals.md#p13a1-byte-identical-ocs-reconstruction).
 
 The following completed implementation results concern **CD32**:
 
@@ -671,13 +673,13 @@ The investigation deliverable is the [ordered OCS plan](ocs-plan.md):
   projectile prediction and the 15-page intro.
 - **P13E1–P13E3:** focused A500 performance work, compatibility and later release hand-off.
 
-All implementation items remain pending. The native converter **uses the blitter**;
+P13A1 is complete; P13A2–P13E3 remain pending. The native converter **uses the blitter**;
 keep it where measured end-to-end performance wins, including potentially 68000
 and no-Fast 68020 systems. A 68000 CPU converter and the proposed 68020+ longword
 path are alternatives to compare, not a reason to remove the blitter. CPU type
 alone does not establish the crossover. See the [static evidence and limits](internals.md#phase-13-ocs-static-investigation)
 and [reproducible commands](development.md#phase-13-ocs-static-investigation).
-Stop at this plan; no OCS runtime changes or resumption of CD32 release work.
+Stop at the P13A1 gate; no OCS runtime changes or resumption of CD32 release work.
 
 ## Decisions pending
 

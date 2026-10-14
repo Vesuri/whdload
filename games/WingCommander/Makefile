@@ -25,3 +25,9 @@ run:
 	@/bin/bash amiga/run.sh
 stop:
 	@/bin/bash amiga/run.sh stop
+
+.PHONY: reconstruct-ocs check-ocs-reconstruction
+reconstruct-ocs:
+	@/bin/bash -c '. amiga/env.sh; python3 tools/ocs_reconstruct.py --output "$(OUT)"'
+check-ocs-reconstruction:
+	@/bin/bash -c '. amiga/env.sh; python3 tools/ocs_reconstruct_check.py --output "$(OUT)"'
