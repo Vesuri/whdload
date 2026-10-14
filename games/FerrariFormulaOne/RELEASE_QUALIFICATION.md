@@ -69,6 +69,29 @@ the accepted 260,292-byte slave and its SHA256 exactly. Evidence is indexed in
 `tmp/dev/manifest/release-accelerated-enabled.json`; clock validation is in
 `tmp/dev/manifest/release-clock-calibration.json`.
 
+## Cache, MMU and rendered-frame checks
+
+Cache variants pass the 1,000-field enabled-demo test. The 030 with NoCache
+records 16.573576 FPS; its complete presentation intervals average 3.009064
+fields, with a maximum of four. DCache on 030/040/060 and BranchCache on 060
+record 16.623497 FPS in the observation window, with every complete interval
+three fields. Live CACR reads verify the requested cache modes.
+
+Separate 040 and 060 MMU-enabled builds each complete 20 production updates
+without engine errors. Emulator logs confirm translation enabled (TC=0x8000).
+These are functional checks, not MMU-performance measurements.
+
+All ten frame configurations pass: the 020 reference with 8 MiB Fast, the four
+accelerated normal profiles, and five cache variants. Each captures 30 complete
+RGB frames with the existing matched-state/every-update fixture; fine rendering
+uses the same endpoint pose in every arm. Every frame matches the 020 reference,
+without pixel masks or debugger memory writes. This validates drawing correctness;
+production FPS comes from the unmodified-build measurements above.
+
+Evidence: `tmp/dev/manifest/release-cache-mmu.json` and the frame section of
+`tmp/dev/manifest/release-exact.json`. Simulation-state acceptance against the
+matched reference layouts is still being completed separately.
+
 ## Runtime and memory checks in progress
 
 Official WHDLoad 17.0 build 5139 passes 20-update functional checks on A500 with
