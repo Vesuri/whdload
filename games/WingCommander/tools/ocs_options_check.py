@@ -8,7 +8,7 @@ import ctypes as C
 import hashlib
 import json
 from pathlib import Path
-from ocs_display_check import Native, CODE, STOP, ck, u, word, long
+from ocs_display_check import Native, CODE, STARTUP, STOP, ck, u, word, long
 from ocs_reconstruct import ROOT, new_output, require
 from ocs_icon import enhanced_icon, tooltypes
 
@@ -70,6 +70,7 @@ def check(build, mutation=None):
                             off=meta['hooks'][0][0]
                             if corrupt:c.write(CODE+off,bytes([c.get(CODE+off,1)^1]))
                             before=c.read(CODE,0x358c8)
+                            opening_before=c.read(STARTUP,0x1d94)
                             regs={r:0x12340000+r for r in list(range(1,8))+list(range(9,17))}
                             regs.update({3:0x190000,4:slave+revision,16:(CODE-4)//4})
                             c.run(slave-CODE+sy['install'],registers=regs)
@@ -82,7 +83,7 @@ def check(build, mutation=None):
                                 for at,label,opcode in meta['hooks']:
                                     require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
                             else:
-                                require(c.read(CODE,0x358c8)==before,'original mode modified game')
+                                require(c.read(CODE,0x358c8)==before and c.read(STARTUP,0x1d94)==opening_before,'original mode modified game')
                                 require('flush' not in events and 'abort' not in events,'original mode enhanced')
                                 for pos in meta['fixups']:
                                     require(c.read(slave+pos,4)==payload[pos:pos+4],'original mode relocated payload')

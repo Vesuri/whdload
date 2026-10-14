@@ -50,6 +50,9 @@ class Native:
                     for offset in offsets:
                         address = bases[index] + offset
                         self.write(address, long(self.get(address, 4) + bases[target]))
+        for current, following in zip(bases, bases[1:]):
+            self.write(current-4, long((following-4)//4))
+        self.write(bases[-1]-4, long(0))
         self.error = None
         self.registers = bytearray(0x200)
         self.blits = []

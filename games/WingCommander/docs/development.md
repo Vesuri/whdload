@@ -4459,3 +4459,39 @@ with `WHD_ARGS='CUSTOM5=1 NOCACHE'`. These defaults do not change slave bytes or
 restart an already-running game. The slave retains its existing SetCPU policy;
 WHDLoad applies the user cache override. `CACHE` alone is not the equivalent:
 it requests instruction caching while disabling data caching.
+
+### Shared opening clock and smooth zooms
+
+The OCS public build and CD32 release include the opening adapter. Diagnostic
+OCS candidates without `--public` and normal reconstructions remain unchanged.
+Use fresh output directories; all binaries, screenshots and reports stay in `tmp/`.
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/opening-ocs
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/opening-cd32
+python3 tools/opening_check.py ocs tmp/opening-ocs --output tmp/opening-ocs-clock-check
+python3 tools/opening_check.py cd32 tmp/opening-cd32 --output tmp/opening-cd32-clock-check
+python3 tools/ocs_options_check.py tmp/opening-ocs --output tmp/opening-ocs-option-check
+python3 tools/timing_adapter_check.py tmp/opening-cd32 --output tmp/opening-cd32-option-check
+python3 tools/release_check.py tmp/opening-cd32 --negative-controls --output tmp/opening-release-check-new
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/opening_live_check.py ocs tmp/opening-ocs --output tmp/opening-ocs-live-new
+python3 tools/opening_live_check.py cd32 tmp/opening-cd32 --output tmp/opening-cd32-live-new
+```
+
+The native checker executes PAL/NTSC clocks, wrap, input skip, retained overdue
+steps, both zoom trajectories and every guarded-word rejection. The option
+checkers also compare untouched startup-hunk bytes in original modes. The live
+gate calibrates its own segment chain, reboots deterministically, samples 20
+positions in each zoom, captures four images, and stops at the world intro.
+It does not skip the opening, alter guest state, or retain large profiling files.
+Its fixed PAL machines are OCS 020/4 MiB Fast and CD32 A1200/Fast, with DCACHE and
+host warp; it records emulated field counts, not host-time performance.
+
+Accepted artifacts are `tmp/opening-ocs-v3` and `tmp/opening-cd32-final`
+(the latter is byte-identical to the live-tested `tmp/opening-cd32-v4`). Native
+reports are `tmp/opening-{ocs,cd32}-final-clock` and
+`tmp/opening-{ocs,cd32}-final-options`; full opening reports/screenshots are
+`tmp/opening-{ocs,cd32}-live`. Launch the current OCS code through
+`./amiga/run-ocs.sh`, which builds a fresh public candidate by default.

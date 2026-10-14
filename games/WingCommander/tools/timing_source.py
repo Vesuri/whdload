@@ -15,11 +15,14 @@ def source(root, buffered=False, *, variant):
     code = game[offset:offset+size]
     lines=[preamble(root,v.CPU),assembly_definitions(v),unit(root, 'timing', v.CPU),unit(root, 'timing_clock', v.CPU),unit(root, 'timing_player', v.CPU),unit(root, 'timing_input', v.CPU),unit(root, 'timing_presentation', v.CPU),unit(root, 'timing_scene', v.CPU),'timing_install:']
     if buffered:
+        from opening_source import source as opening_source
+        lines.insert(-1,opening_source(root,variant))
         lines.insert(-1,unit(root, 'timing_intro', v.CPU))
         lines.insert(-1,unit(root, 'timing_translation', v.CPU))
         lines.insert(-1,unit(root, 'timing_projectiles', v.CPU))
         lines.insert(-1,unit(root, 'timing_scene_slots', v.CPU))
         lines.insert(-1,unit(root, 'view_regions', v.CPU))
+    if buffered:lines += [' bsr.w opening_guard']
     for offset,_,_ in patches:
         word=struct.unpack_from('>H',code,offset)[0]
         lines += [f'\tcmpi.w #${word:04x},${offset:x}(a0)','\tbne.w timing_bad']
@@ -32,6 +35,7 @@ def source(root, buffered=False, *, variant):
             for at in range(offset+2,offset+width,2):
                 value=struct.unpack_from('>H',code,at)[0]
                 lines += [f'\tcmpi.w #${value:04x},${at:x}(a0)','\tbne.w timing_bad']
+    if buffered:lines += [' bsr.w opening_install']
     lines += ['\tlea $28c8e(a0),a1','\tlea timing_debris_resume(pc),a3','\tmove.l a1,(a3)']
     lines += ['\tmove.l -4(a0),d0','\tlsl.l #2,d0','\taddq.l #4,d0','\tlea timing_data(pc),a1','\tmove.l d0,(a1)']
     lines += ['\tlea $3b96(a0),a1','\tlea timing_target_resume(pc),a3','\tmove.l a1,(a3)']

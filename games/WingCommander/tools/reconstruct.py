@@ -148,6 +148,8 @@ def cd32_main(argv):
         if a.frame_stats:lines.append(unit(ROOT, 'frame_stats', VARIANT.CPU))
         flight=flight_source(ROOT,a.flight_verify,a.flight_control,a.comparison_control,a.c2p_experiment, variant="cd32")
         if a.release:
+            # The opening adapter moves these release-only calls beyond d16.
+            flight=flight.replace('bsr.w   slave+$1ac6','bsr.l   slave+$1ac6')
             begin=flight.index('        move.l  slave+$1e04(pc),d7')
             end=flight.index('.work:',begin)
             flight=flight[:begin]+'        bsr.w release_convert_wait\n'+flight[end:]
@@ -161,7 +163,7 @@ def cd32_main(argv):
         renderer=render_source(ROOT, variant="cd32").replace('cmpi.l  #2,d7','cmpi.l  #3,d7').replace('cmpi.l  #2,d2','cmpi.l  #3,d2')
         begin=renderer.index('        move.l  slave+$1e04(pc),d7')
         end=renderer.index('.convert:',begin)
-        renderer=renderer[:begin]+'        bsr.w   release_limit\n'+renderer[end:]
+        renderer=renderer[:begin]+'        bsr.l   release_limit\n'+renderer[end:]
         renderer=renderer.replace('render_wait:\n','render_wait:\n        tst.w timing_active(pc)\n        bne.w render_wait_done\n        tst.w intro_active(pc)\n        bne.w render_wait_done\n')
         lines += ['RENDER_VERIFY equ 0','RENDER_FAMILY equ 0',renderer]
     if a.verify or a.verify_control:

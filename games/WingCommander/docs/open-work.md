@@ -8,6 +8,11 @@ hardware keeps original simulation/rendering/waits in the same slave. Earlier
 A500 enhancement results below describe diagnostic experiments, not the public
 mode policy. See [current candidate support](ocs-release.md).
 
+Enhanced OCS and CD32 openings now run orchestra/fireworks steps at 10 Hz and
+sample the planet/Origin FX zooms between ticks. Music cues and original modes
+remain native. Both unskipped opening gates pass through to the world intro; see
+[opening timing](internals.md#opening-animation-speed-and-default-caches).
+
 **Phase 13 investigation, P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E3 are complete.** The OCS loader, four-plane blitter
 conversion, memory ownership and timing anchors are mapped in
 [internals](internals.md#phase-13-ocs-static-investigation). The
@@ -746,14 +751,6 @@ and [reproducible commands](development.md#phase-13-ocs-static-investigation).
 CD32 E1 and phase 12 remain paused.
 
 ## Decisions pending
-
-- The user reports accelerated orchestra/planet/Origin FX/fireworks motion on
-  OCS/A3000. This separate opening remains native and frame-driven in both
-  variants; it is outside the completed title/asteroid 10 Hz work. Existing CD32
-  fast-model Origin animation/particle measurements approach its normal 25 Hz
-  limiter. Investigate a shared elapsed-time motion policy with variant-specific
-  hooks; retain music cues and original-mode behaviour. No opening-speed fix is
-  claimed yet.
 
 - Release play-testing must judge visible hard-turn corrections and all model/camera paths;
   the implemented presentation policy predicts to display time with authoritative

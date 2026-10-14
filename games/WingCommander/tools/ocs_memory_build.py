@@ -330,6 +330,11 @@ view_probe_request: dc.l 0
         options=(ROOT/'whdload/ocs_options.s').read_text()
         options+='\nocs_public_config: dc.b '+','.join(str(x) for x in config)+'\n even\n'
         text=text.replace('display_create_checked:',options+'\ndisplay_create_checked:',1)
+    if public:
+        from opening_source import source as opening_source
+        text=text.replace('display_create_checked:',opening_source(ROOT,'ocs')+'\ndisplay_create_checked:',1)
+        text=text.replace('guards_done:\n','guards_done:\n movea.l d6,a0\n bsr.w opening_guard\n',1)
+        text=text.replace('hooks_done:\n','hooks_done:\n movea.l d6,a0\n bsr.w opening_install\n',1)
     if intro:
         # The appended D4 payload puts startup tables beyond d16(PC).
         for label in ('guards','native_fixups','payload_end','hooks'):
@@ -365,7 +370,7 @@ view_probe_request: dc.l 0
     (out/'WingCommander.Slave').write_bytes(blob)
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
-                public_option=public,
+                public_option=public,opening=public,
                 workspace='native combined Chip allocation retained for fallback',
                 live_validated=False,clock=clock,prediction=prediction,intro=intro,math_fast=math_fast)
     if public:

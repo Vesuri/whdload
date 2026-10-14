@@ -20,7 +20,7 @@ release_setcpu:
         move.l  #3,(a0)
 .ready:
         movem.l (sp)+,d0-d2/a0-a1
-        bra.w   render_setcpu
+        bra.l   render_setcpu
 .bad:
         movem.l (sp)+,d0-d2/a0-a1
         bra.w   timing_bad

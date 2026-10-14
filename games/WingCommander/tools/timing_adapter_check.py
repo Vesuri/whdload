@@ -38,6 +38,7 @@ def main():
             c.reg(3,resload);c.reg(8,0x1f0000);c.reg(16,(layout['hunks'][0]-4)//4)
             before=[c.reg(r) for r in range(1,18)]
             game_before=c.read(c.code,0x35ea4)
+            opening_before=c.read(layout["hunks"][3],0x1590)
             ck(u.uc_emu_start(c.h,s+sym['timing_patchseg'],0x1000,1000000,10000))
             assert c.reg(18)==0x1000
             after=[c.reg(r) for r in range(1,18)]
@@ -64,6 +65,7 @@ def main():
                 assert c.read(s+sym['timing_hz'],4)==struct.pack('>I',50)
                 assert c.read(s+sym['timing_data'],4)==struct.pack('>I',c.data)
             assert c.read(c.code,0x35ea4)==want
+            if custom!=3:assert c.read(layout["hunks"][3],0x1590)==opening_before
             cases.append(dict(model=model,custom=custom,exact=True));c.close()
         # A changed instruction operand must be rejected before any patch write.
         for operand in ((0x69a,0x2b64a,0x2b64c,0x308,0xc4e,0xc914,0xca60,0xc318,0x9a54,0x330,0x2fa,0x1fd02,0x1fddc,0x1fde2,0x1fe16,0x1fe46,0x1fe4a) if buffered else (0x69a,)):

@@ -6818,25 +6818,76 @@ campaign, hardware/cache, controller and cold-boot save/load limitations.
 
 ### Opening animation speed and default caches
 
-The OCS/A3000 report concerns the separate orchestra/planet/Origin FX/fireworks
-opening, not the title ships and asteroid credits already on the 10 Hz clock.
-The opening remains native in both variants. In CD32 code hunk 3, `$ee0` (file
-`$43ccc`) enters the animation; `$ef2` (file `$43cde`) decrements its countdown
-per loop, `$f0e` (file `$43cfa`) draws the selected animation image and `$f40`
-(file `$43d2c`) increments the frame index. Music-cue exit tests coexist with
-these frame-driven steps; a timed scene boundary does not fix the speed of its
-motion. The OCS counterpart is O3:`$e26` (file `$42c72`), with a per-loop
-countdown at `$e38` (file `$42c84`) and frame-index increment at `$e86`
-(file `$42cd2`); it likewise has separate music-cue exit checks. `release_limit` retains the normal limiter outside enhanced world
-intro/flight, rather than applying the 10 Hz scheduler to this sequence.
+The enhanced OCS and CD32 builds now share `whdload/opening_clock.s` for the
+separate orchestra/planet/Origin FX/fireworks opening. `opening_source.py` derives
+variant-specific guards and displaced instructions from pinned inputs into
+`tmp/`. Original modes retain the native opening. This is separate from the
+world/title/asteroid scheduler; music-cue checks, audio and the native drawing
+routines remain in control of scene transitions.
 
-The retained corrected-clock CD32 scene table above measures approximately
-25.0–25.2 publications/s in Origin animation and particles across the tested
-030/040/060 models. The earlier stock-model animation sample has 30 publications
-over 2.672 seconds. These establish machine-dependent frame throughput, with
-fast CD32 capped by its normal limiter; they are not an intended-rate estimate
-for every opening subscene. OCS's newly reported visible speed remains a timing
-issue to investigate; no opening animation fix or new live measurement is claimed.
+Native animation indices, random choices and particle updates were advanced per
+loop. They now advance at 10 Hz, with input polled while waiting and overdue steps
+retained. The orchestra countdown is rearmed for each logical step. Fireworks
+retain the native combined update/draw routine at 10 Hz; this change does not add
+particle interpolation. The two zooms instead sample elapsed display fields:
+
+- Separation follows the native `s -> s + floor(s/4) + 1` trajectory at 10 Hz,
+  interpolating the current interval for rendering. Integer coordinates can still
+  repeat at the small beginning of the curve.
+- Planet/logo flight treats 100 native depth units as one 10 Hz step: depth
+  travels from 5000 to 1000 in four seconds. This is the requested motion policy,
+  not a newly established historical rate. Both projections are recalculated for
+  each rendered sample, replacing the old 100/200-unit projection caches. The
+  native vertical trajectory and the depth-3500 layering switch are retained.
+
+PAL/NTSC rates are detected from the beam as in the shared world clock. Zooms
+sample the field counter, so a fast CPU cannot accelerate their progression.
+Rendering throughput still depends on the machine; CD32 retains its existing
+normal nonflight limiter. The 10 Hz step is not a new 10 FPS cap on the zooms.
+No opening state is shared with authoritative world or projectile state.
+
+Key patched locations (code-hunk 3 offsets; corresponding file offsets):
+
+| Purpose | CD32 hunk / file | OCS hunk / file |
+|---|---|---|
+| Opening entry | `$d12` / `$43afe` | `$c58` / `$42aa4` |
+| Orchestra entry | `$ee0` / `$43ccc` | `$e26` / `$42c72` |
+| Expression entry | `$fb4` / `$43da0` | `$efa` / `$42d46` |
+| Separation entry | `$10cc` / `$43eb8` | `$1012` / `$42e5e` |
+| Separation advance | `$1194` / `$43f80` | `$10da` / `$42f26` |
+| Planet/logo entry | `$11a8` / `$43f94` | `$10ee` / `$42f3a` |
+| Projection preparation | `$11ca` / `$43fb6` | `$1110` / `$42f5c` |
+| Replace per-loop vertical advance | `$1200` / `$43fec` | `$1146` / `$42f92` |
+| Flight advance | `$129a` / `$44086` | `$11e0` / `$4302c` |
+| Fireworks entry | `$12c0` / `$440ac` | `$1206` / `$43052` |
+| Final burst setup rebase | `$145c` / `$44248` | `$13a2` / `$431ee` |
+| Fade/cleanup entry | `$de0` / `$43bcc` | `$d26` / `$42b72` |
+
+Input-step hooks are CD32 hunk 3 `$f1a`, `$f88`, `$1010`, `$13de`, `$14d8`
+and OCS `$e60`, `$ece`, `$f56`, `$1324`, `$141e`. These call the independently
+relocated native input entry (CD32 hunk 0 `$1898a`; OCS `$180c4`). All changed
+instruction spans, including relocated targets, are checked before any game hook
+is installed. Stage wrappers preserve original prologues and branch flags.
+The burst rebase sits in particle setup at `$145c`/O3:`$13a2`, outside the final
+burst loop: its backward branch to `$146c`/O3:`$13b2` remains intact.
+
+Native checks pass for both variants at 50/60 Hz, counter wrap, retained debt,
+immediate skip, exact zoom curves and exact hunk-3 patch coverage. Every one of
+64 guarded instruction words is independently corrupted and rejected. OCS's
+1,680 startup cases and CD32's eight installer cases also verify the untouched
+opening in original modes. Normal reconstructions remain byte-identical.
+The release option/cache/conversion regression is separate from these clock tests.
+
+Unskipped PAL emulator openings with DCACHE pass through orchestra, expression,
+separation, planet/logo, fireworks and fade into the native world intro:
+`tmp/opening-ocs-live/report.json` and `tmp/opening-cd32-live/report.json`.
+The OCS 020/Fast sample includes depths 5000, 4940, 4880, 4820; the CD32 sample
+includes 5000, 4920, 4840, 4760. These are intermediate render samples rather than
+100-unit jumps. The captured images show intact native planet/logo composition.
+Warp only shortens host waiting; field counters supply elapsed emulated time.
+These bounded runs establish opening integration, not a new hardware performance
+or full-game compatibility claim. NTSC is covered by native clock tests here,
+not a new live NTSC run.
 
 OCS launcher and generated-icon defaults now request WHDLoad `DCACHE`, which
 requests both instruction and data caches. Installed WHDLoad option documentation
