@@ -219,10 +219,26 @@ Evidence: `tmp/dev/manifest/release-season-roundtrip.json`; failing controls and
 full memory captures remain available. Reusable guidance is committed to
 AmigaXDev `docs/reference/headless-fsuae.md`.
 
+## Disabled native overlay reloads
+
+Both CUSTOM1 values pass on A500, A500+Fast, chip-only 020 and 020+Fast with
+CUSTOM2=0. Actual device input leaves driving, returns through the native pit
+and race-control screens, selects qualifying, and loads driving again. All
+1,005 words in the combined performance patch inventory exactly match the
+first load and the original native reference after reload.
+
+For CUSTOM1=0, the original timing callback remains installed; its host address
+is checked separately before normalizing that linkage operand. For CUSTOM1=1,
+the native six bytes at `$6a304` remain `e34048c02840`. This direct native-code
+check complements the earlier RNG-controlled state fixture, whose startup
+control deliberately installed a timing callback for both options. An initial
+harness assertion incorrectly required that callback for CUSTOM1=1; correcting
+it to the original option contract preserves the complete patch-word gate.
+Evidence: `tmp/dev/manifest/release-disabled-reloads.json` (eight passing cases).
+
 ## Remaining acceptance work
 
 - Minimum-memory and minimum/development WHDLoad runtime qualification.
-- Both disabled CUSTOM1 variants, including repeated overlay loads.
 - F3/F1 controls, Fiorano/Rio/contrasting track, starts/laps, fuel/wear,
   pits, session/results and travel/repair clocks; season persistence and F10 pass
   in the documented scopes below.
