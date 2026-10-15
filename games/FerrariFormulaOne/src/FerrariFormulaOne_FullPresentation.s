@@ -213,7 +213,18 @@ B8_65722:
  IFD FF1_C4_ROAD_PREFETCH
  bsr.w FF1C4PrepareRoad
  ENDC
+ IFD FF1_FINE_ROAD_PREFETCH
+ bsr.w FF1RenderPrepareRoad
+ ENDC
 B8_65728:
+ IFD FF1_FINE_ROAD_PREFETCH
+ move.w FF1RenderRoadControl(pc),d0
+ beq.b .fine_native_wait
+ move.l schedule_context+FF1T_FIELDS(pc),d0
+ cmp.l FF1RenderRoadField(pc),d0
+ bne.w B8_65734
+.fine_native_wait:
+ ENDC
  IFD FF1_C4_ROAD_PREFETCH
  move.w C4RoadPrefetchEnabled(pc),d0
  beq.b .native_wait
@@ -275,7 +286,11 @@ B8_6578a:
  IFD FF1_C4_ROAD_PREFETCH
  bsr.w FF1C4DrawPreparedRoad
  ELSE
+ IFD FF1_FINE_ROAD_PREFETCH
+ bsr.w FF1RenderDrawPreparedRoad
+ ELSE
  jsr $6b368.l
+ ENDC
  ENDC
 B8_65790:
  addq.l #$4,a7
@@ -1208,6 +1223,9 @@ B8_65d60:
 B8_65d68:
  clr.w $23bb2.l
 B8_65d6e:
+ IFD FF1_FINE_ROAD_PREFETCH
+ bsr.w FF1RenderPresentHUD
+ ELSE
  IFD FF1_COARSE_STEP
  bsr.w FF1PresentFlag
  ELSE
@@ -1217,6 +1235,7 @@ B8_65d6e:
  bsr.w FF1PresentClock
  ELSE
  bsr.l FF1PresentClock
+ ENDC
  ENDC
  jsr $2a130
  jsr $2a270

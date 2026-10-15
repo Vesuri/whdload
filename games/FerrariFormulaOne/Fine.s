@@ -375,7 +375,9 @@ B8DrawEnabled: dc.w 1
  include "FerrariFormulaOne_RenderPose.s"
  include "FerrariFormulaOne_RenderHistory.s"
  include "FerrariFormulaOne_RenderOwnership.s"
+FF1_FINE_ROAD_PREFETCH equ 1
  include "FerrariFormulaOne_FullPresentation.s"
+ include "RenderRoad.s"
 
  FF1UpdateWorkspace
 

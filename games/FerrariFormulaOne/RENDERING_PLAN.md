@@ -1,7 +1,8 @@
 # High-end rendering performance: profile and work order
 
-Measured 2026-10-15. This is a profiling result and implementation plan, not an
-optimization release. Game source and RC2 archive are unchanged.
+Initial profile measured 2026-10-15 against unchanged RC2. Subsequent H2/H3
+implementation findings are recorded below. The delivered RC2 archive remains
+unchanged; this work is not a new packaged release.
 
 ## Short capture and accuracy
 
@@ -108,7 +109,7 @@ its successor passes the final gates.
    edges and overlapping cars. Require fewer colour BLTSIZE operations and
    identical pixels; measure the actual saving at `$32e6c`, not 56% of draw time.
 
-3. **H3 — Overlap road preparation with safe buffer handover.** Adapt D2's CPU-only
+3. **H3 — Overlap road preparation with safe buffer handover: accepted.** Adapt D2's CPU-only
    `$6a2d0`/`$6b168` preparation before the beam wait, keeping native clear/sky
    order and exact projection results. Use `move.w ccr` on 020+, never the C4
    `move.w sr` save that traps through WHDLoad. Use the fine scheduler's VBL
@@ -289,10 +290,121 @@ The independently reproduced slave is 261,512 bytes, SHA256
 `0a26fe52fd0e27e476dacdc53401c30b923a5d7dd7099bb025d8a06ee1d798b2`.
 The equal-layout control differs only in the immutable H2 preset. The 68000 and
 chip-only 020 payloads are unchanged. CUSTOM2 remains default-off. The delivered
-RC2 LHA is unchanged. **H3 is next.**
+RC2 LHA is unchanged. H3 was next; its findings follow.
 
 Local evidence: `tmp/dev/manifest/render-h2-validation.json`,
 `render-h2-performance.json`, `render-h2-matched-profile.json`,
 `render-h2-scratch.json`, `render-h2-dma.json` and `render-h2-traces.json`.
 The four raw traces were compressed and their decompressed hashes verified;
 analysers require decompression. Harness scripts and diagnostic builds stay ignored.
+
+## H3 accepted: road preparation and safe handover (2026-10-15)
+
+`RenderRoad.s` moves the native CPU-only road transformation/clipping before
+beam synchronization on the 020+Fast path. It preserves the projection's
+D0-D7/A0-A6 and CCR result, restores it at the original road call boundary,
+and retains the native clear/sky ordering. The fine scheduler's field counter
+permits buffer reuse only after a field boundary; otherwise line-256 waiting
+remains. The public lifetime reset clears the workspace. CCR reads avoid the
+WHDLoad traps caused by SR reads. No native hook, allocation, or interrupt
+ownership change is introduced by H3; the coarse payloads remain byte-identical.
+
+The first candidate passed completed-frame checks but failed intermediate-field
+comparison: native flag drawing temporarily overwrote the clock on the displayed
+bitmap before clock drawing repaired it. Earlier completion exposed that state.
+The corrected candidate composes both native flag/clock passes on the back buffer
+by temporarily aliasing the second pointer view to the first, then restores it.
+All native drawing operations and the final blitter-completion wait remain.
+This correction is part of safe H3 handover, not a pixel-comparison exclusion.
+
+Fourteen matched endpoint draws fall from **60.110256 to 59.484553 ms**, a
+**0.625703 ms / 1.04%** saving. Mean draw-entry interval falls from 64.366560 to
+63.705035 ms in this every-update endpoint fixture; this is not ordinary-demo
+FPS. Beam waiting falls from 5.640759 to 1.807914 ms, but most of that is replaced
+by preparation or shifts in other waits. The net saving is the figure above.
+
+All observed projection data/address registers, plane/minterm sequences,
+clipping and clear destinations match. The trace's raw SR copy is not a CCR
+oracle: the observer copies lazy `regs.sr` without MakeSR, while the candidate's
+CCR save materializes the flags. The native resume instruction immediately
+replaces NZVC. No architectural-CCR equality claim is made from that raw field.
+
+All 15 preparation-to-clear transitions are safe: eight cross a hardware field;
+seven retain the line-256 wait. Both buffer alternations are covered. After
+collapsing repeated identical interior fields, all 15 distinct bitplane DMA data sequences
+match exactly between arms, with no pixels excluded. The rejected first version
+had 22 sequences, including transient flag/clock corruption. Finished-frame
+checks independently match 30 complete RGB images in each normal/grid/dense
+scene (90 comparisons; all 180 retained images rehashed).
+
+Intermediate JPEGs are not all identical: the pre-existing B8 `COLOR00=1`
+diagnostic write (introduced in 38b2c61, absent from the original game) moves
+with draw timing. All 15 stable decoded RGB images match; 14 transition images
+per arm have different palette-pulse boundaries. The CPU colour-write values
+and all copper palette writes, including beam slots, are unchanged. This is
+documented separately from the corrected flag/clock corruption; no image mask
+is used. Removing the inherited palette pulse remains separate cleanup work.
+
+The 100-update state/private-fraction gate is exact. The 60-second clock test
+takes 59.975470 seconds in the control and 60.015534 in H3, absolute errors
+0.040900% and 0.025883%, both below 0.25%.
+
+| Emulator / scene | FPS control → H3 | Mean ms control → H3 | p95 ms control → H3 |
+|---|---:|---:|---:|
+| a1200-fast / normal | 13.312 → 13.312 | 75.120 → 75.120 | 80.128 → 80.128 |
+| a1200-fast / grid | 12.480 → 12.844 | 80.128 → 77.857 | 80.128 → 80.128 |
+| a1200-fast / dense | 6.240 → 6.316 | 160.255 → 158.319 | 160.255 → 160.255 |
+| 030-50 / normal | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 030-50 / grid | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 030-50 / dense | 9.984 → 9.984 | 100.159 → 100.159 | 100.159 → 100.159 |
+| 040-40 / normal | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 040-40 / grid | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 040-40 / dense | 9.984 → 10.004 | 100.159 → 99.959 | 100.159 → 100.159 |
+| 060-50 / normal | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 060-50 / grid | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 060-50 / dense | 9.984 → 10.004 | 100.159 → 99.959 | 100.159 → 100.159 |
+
+These are 300 complete warp-off presentation intervals with the calibrated
+emulator used for H2, not physical CPU rankings. Accelerated timing profiles
+use 8 MiB Fast and explicit real-frequency cycle settings; 040/060 timing runs
+have the MMU off. The functional 040/MMU/32 MiB control check is separate.
+Normal high-end presentation remains at three PAL fields; the two-field/~25 FPS
+target is still open.
+
+Native throttle/clutch, coast, braking, restart and steering pass on 020+Fast
+and 040/MMU/32 MiB. F1 manual up/down shifts, launch, braking to zero and restart
+pass. Native pause preserves exact pending time; tow restores all 905 owned
+patch words. INTENA is unchanged throughout the observed lifecycle. Pit/menu/
+session changes and re-entry start a fresh epoch with a zeroed H3 workspace;
+21 subsequent updates and fresh colour-hook bindings pass. The first manual
+replay omitted track entry and failed before testing controls; restoring the
+recorded native entry sequence fixed the harness without changing game code.
+
+The independent ordinary trace/census boots have identical complete start/end
+Chip/Fast snapshots, scheduler contexts, DMA counts and displayed bitplane
+addresses. All DMA remains Chip. Recorded cycle coverage is 99.999993%, with
+one boundary cycle unrecorded. Both CUSTOM1 settings pass the unchanged
+controlled CUSTOM2=0 exact-state gate on A500, A500+Fast, chip-only 020 and
+020+Fast. Deliberate colour-signature corruption reaches the WHDLoad error
+route before installing that hook.
+
+The ordinary post-H3 trace has 11 complete draws averaging 62.873917 ms in its
+own scene: the remaining scene/HUD stage costs 22.118482 ms, including the
+7.215498 ms demo-label call. This is fresh H4 input, not an A/B speedup claim.
+
+Local evidence: `tmp/dev/manifest/render-h3-validation.json`,
+`render-h3-performance.json`, `render-h3-matched-profile.json`,
+`render-h3-palette.json`, `render-h3-palette-dma.json`,
+`render-h3-field-rgb.json`, `render-h3-build-audit.json`,
+`render-h3-dma.json` and `render-h3-traces.json`. Raw traces were compressed
+and decompressed hashes verified. The rejected first candidate is indexed by
+`render-h3-v1-rejection.json`; harnesses, fixtures and game data remain ignored.
+
+The independently reproduced 262,056-byte slave has SHA256
+`ac034f9786055bcb04c45383740def6cf249bf0910260dbc322c98461f15a8c2`.
+CUSTOM2 remains default-off. The RC2 preinstalled archive is unchanged.
+Human full races and physical hardware remain deferred.
+
+**Next optimization: H4.** Separate pre-release cleanup **B8-PAL** is removal
+of the inherited unconditional diagnostic `COLOR00` pulse described above;
+H3 preserves its values and does not claim identical transition-field JPEGs.

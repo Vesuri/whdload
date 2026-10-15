@@ -131,6 +131,20 @@ lifecycle, legacy-option and 060 heavy-scene qualification were stopped at the
 user's request. This is accepted development work, not a newly qualified release.
 See RENDERING_PLAN.md for the complete table, scope and deferred checks.
 
-Current H2 source builds to 261,512 bytes, SHA256
+The accepted H2 revision built to 261,512 bytes, SHA256
 `0a26fe52fd0e27e476dacdc53401c30b923a5d7dd7099bb025d8a06ee1d798b2`.
-The packaged RC2 slave above is unchanged. H1 remains removed; H3 is next.
+The packaged RC2 slave above is unchanged. H1 remains removed.
+
+H3 overlaps road preparation with safe display handover and composes the final
+flag/clock on the back buffer. Matched draw cost falls 1.04% (0.626 ms); 020+Fast
+grid improves 12.48 -> 12.84 FPS and dense 6.24 -> 6.32. Normal accelerated
+presentation remains 16.64 FPS. All twelve performance pairs have no mean/p95
+regression. State/private fractions, 90 full RGB comparisons, native controls
+(including 040/MMU/32 MiB), lifecycle, both legacy options and failure checks pass.
+See RENDERING_PLAN.md for scope and the separately documented inherited B8-PAL
+palette pulse; intermediate transition JPEGs are not claimed identical.
+
+The current H3 source independently builds to 262,056 bytes, SHA256
+`ac034f9786055bcb04c45383740def6cf249bf0910260dbc322c98461f15a8c2`.
+CUSTOM2 remains default-off, and the packaged RC2 above is unchanged. H4 is the
+next optimization; human full races and real-hardware testing remain deferred.
