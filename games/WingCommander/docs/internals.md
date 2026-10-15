@@ -7171,3 +7171,61 @@ background cases per CPU model, including alternating tiles and negative control
 
 CD32 release packaging explicitly aligns its payload to whole hunk longwords;
 the builder rejects an unaligned payload instead of silently truncating its size.
+
+## Mission launch timing
+
+The enhanced mission-start path now paces the exterior hangar animation and the
+cockpit tunnel independently of rendering speed in both variants. The separate
+ejection routine is unchanged. The mission dispatcher identifies these launch
+calls explicitly; resemblance to other cockpit animations is not an address map.
+
+| Operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Exterior launch entry | `1d8b6 / 1d8e2` | `1e5ec / 1e618` |
+| Exterior stage input/wait hooks | `1d9e4 / 1da10`, `1da38 / 1da64`, `1dada / 1db06` | `1e71c / 1e748`, `1e770 / 1e79c`, `1e812 / 1e83e` |
+| Exterior pose calculation | `1d5a8 / 1d5d4` | `1e2d8 / 1e304` |
+| Exterior compositor | `1d680 / 1d6ac` | `1e3b2 / 1e3de` |
+| Cockpit tunnel entry | `1a454 / 1a480` | `1b19c / 1b1c8` |
+| Tunnel loop replacement | `1a4e2 / 1a50e` | `1b22a / 1b256` |
+| Tunnel native continuation | `1a544 / 1a570` | `1b28c / 1b2b8` |
+| Native layer projection/draw | `1a416 / 1a442` | `1b15e / 1b18a` |
+
+The exterior script has 10, 27 and 23 iterations. Each stage rebases after its
+setup, then schedules iterations at 10 Hz. Intermediate native compositor calls
+sample ship position, projected departure pose and scroll without committing
+those samples to script state. Bitmap animation indices retain their native
+script progression. Loading time does not become animation debt. Input/abort,
+asset ownership, sounds and scene cleanup remain native.
+
+The cockpit tunnel's four layers start at depths 50, 40, 30 and 20. Native code
+subtracts a speed starting at one on every pass, then increases that speed at
+script indices 0, 5, 10, 15 and 20. Its 25 passes now mean 25 world updates, or
+2.5 seconds at the selected 10 Hz policy. The shared intro owner provides world
+updates, render-only world extrapolation and restoration without enabling flight
+input/scoring. Tunnel scale is sampled as `6656*Hz/(depth*Hz-speed*debt)`, where
+clock debt is already in tenths of a field. Keeping the fractional denominator
+avoids rounding depth back to 10 Hz steps. The native near cutoff of depth 10
+remains. Native HUD, bitmap projection, setup and teardown are retained.
+
+The shared modal abort operand was also corrected to the flag actually read by
+these native routines: OCS A4−`707c`, CD32 A4−`7094`. The old adapter operands were
+eight bytes earlier. Public eligibility and original/off modes are unchanged.
+
+Accepted evidence: `tmp/launch-{ocs,cd32}-native-v6/report.json` covers two CPU
+models per variant, PAL/NTSC, render gaps of 1/3/9 fields, exactly 25 world ticks,
+native depth/acceleration endpoints, 77 fractional projection samples per model,
+all three exterior-stage durations and pose restoration, abort, and four rejected
+hook mutations. `tmp/launch-modal-{ocs,cd32}-abort` adds the real abort-flag
+regression to the existing simulator/room tests. Public options pass all 1,680 OCS
+hardware/option cases and eight CD32 whole-code installer/option cases in
+`tmp/launch-options-{ocs,cd32}`.
+
+The cached 030 PAL fixture reports are `tmp/launch-ocs-live-v6/report.json` and
+`tmp/launch-cd32-live-v6c/report.json`. All exterior stages complete, then native
+mission initialization and tunnel cleanup return successfully. Tunnel duration
+is 129 OCS fields and 126 CD32 fields including entry/calibration/render overhead.
+The same layer changes scale within a fixed script tick: OCS tick 3 shows
+147/150/153; CD32 tick 3 shows 147/150/151. The retained images show the hangar,
+ship and cockpit/tunnel layers intact. These are bounded functional emulator
+checks, not hardware performance or full campaign acceptance; live NTSC remains
+outside this gate.

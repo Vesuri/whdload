@@ -81,7 +81,9 @@ def check(build,variant,model):
    c.write(s+sy[clock],long(100)+bytes(20)+word(1)+word(0))
    c.write(s+sy['intro_active'],word(1));c.return_call()
   def tick():state['ticks']+=1;c.return_call()
+  abort=data+0x7ffe+(-0x707c if variant=='ocs' else -0x7094)
   def finish():
+   if state.get('native_abort'):c.write(abort,word(1))
    state['pictures']+=1;c.write(field,long(c.get(field,4)+state['gap']));c.return_call()
   def stop():c.write(s+sy['intro_active'],word(0));c.return_call()
   scales=[]
@@ -103,6 +105,11 @@ def check(build,variant,model):
      if delay==0 and gap==1:require(len(set(scales))>14,'zoom still steps at 10 Hz')
      require(c.get(s+sy['intro_active'])==0,'modal owner leaked')
      sims.append(dict(hz=rate,gap=gap,delay=delay,ticks=state['ticks'],pictures=state['pictures']))
+  state.update(ticks=0,pictures=0,rate=50,gap=1,skip=False,native_abort=True)
+  c.write(field,long(100));c.write(abort-8,word(0x1234))
+  call('modal_dispatch',struct.pack('>Ihhhh',0x180000,0,240,0,0))
+  require(state['pictures']==1 and state['ticks']==0,'native abort not observed')
+  require(c.get(abort-8)==0x1234 and c.get(abort)==0,'abort damaged adjacent state')
   return dict(model=model,running_samples=samples,installer=True,rejected_sites=len(rejected),bar_samples=bars,simulator=sims)
  finally:c.close()
 

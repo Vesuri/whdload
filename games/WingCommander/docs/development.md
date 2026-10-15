@@ -4638,3 +4638,28 @@ normal 8 MiB CD32 profile. The running fixture redirects the initialized menu
 call as described above; `--timing` samples by elapsed fields instead of expecting
 the old per-render displacement. These are bounded functional timing checks,
 not hardware throughput or whole-campaign acceptance.
+
+### Mission launch clocks
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/launch-ocs
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/launch-cd32
+python3 tools/launch_clock_check.py ocs tmp/launch-ocs --output tmp/launch-ocs-native
+python3 tools/launch_clock_check.py cd32 tmp/launch-cd32 --output tmp/launch-cd32-native
+python3 tools/ocs_options_check.py tmp/launch-ocs --output tmp/launch-ocs-options
+python3 tools/timing_adapter_check.py tmp/launch-cd32 --output tmp/launch-cd32-options
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/launch_live_check.py ocs tmp/launch-ocs --output tmp/launch-ocs-live
+python3 tools/launch_live_check.py cd32 tmp/launch-cd32 --output tmp/launch-cd32-live
+```
+
+Use fresh output directories. The bounded live fixture invokes native ship/pack
+loading, exterior launch, first-mission initialization and cockpit tunnel from
+the initialized menu. It temporarily uses the unused ejection entry for its
+fixture and restores both that span and the menu call afterwards. This checks
+scene integration, not a complete briefing/campaign traversal. It retains four
+images and field/script/scale samples, stops only its owned emulator, and uses
+the established cached 030 PAL observer profile. Native tests also exercise NTSC,
+slow rendering, script trajectories, fractional scales, abort and exact
+restoration of the exterior pose state.

@@ -22,7 +22,7 @@ def source(root, variant):
     upper,feet,sim,begin,wait,patches=specification(variant)
     fields=dict(MODAL_FIELD=v.A4['field_clock'],MODAL_COUNTDOWN=-32592 if ocs else -32624,
                 MODAL_CENTRE_X=-4184 if ocs else -4314,MODAL_CENTRE_Y=-4182 if ocs else -4312,
-                MODAL_ABORT=-28804 if ocs else -28828,MODAL_CONTEXT=-31670 if ocs else -31696,
+                MODAL_ABORT=-0x707c if ocs else -0x7094,MODAL_CONTEXT=-31670 if ocs else -31696,
                 BAR_POINTERS=0x84 if ocs else 0x970,BAR_RNG=-4196 if ocs else -4326,
                 BAR_DRAW_COUNT=2272 if ocs else 4434)
     fields.update(dict(zip(('BAR_SURFACE','BAR_COLOUR','BAR_STATIC','BAR_STATIC_COUNT','BAR_MOVING','BAR_MOVING_COUNT','BAR_IMAGE'),
@@ -62,7 +62,7 @@ def source(root, variant):
                           ' lea modal_bar_count(pc),a0',' move.w #-1,(a0)',' movem.l (sp)+,a0']
             if kind=='wait' and i==0:lines += [' bsr.w modal_bar_capture']
             native(f'modal_room_{kind}{i}_native' ,int.from_bytes(code[off+2:off+6],'big'))
-    lines+=['modal_guard:',' movem.l d0-d7/a0-a6,-(sp)']
+    lines+=['modal_guard:',' bsr.w launch_guard',' movem.l d0-d7/a0-a6,-(sp)']
     for off,width,_ in patches:
         if code[off:off+2]==bytes.fromhex('4eb9'):
             target=int.from_bytes(code[off+2:off+6],'big')
@@ -70,7 +70,7 @@ def source(root, variant):
                       ' move.l a0,d0',f' addi.l #${target:x},d0',f' cmp.l ${off+2:x}(a0),d0',' bne.w modal_bad']
         else:
             for n in range(0,width,2):lines += [f' cmpi.w #${int.from_bytes(code[off+n:off+n+2],"big"):x},${off+n:x}(a0)',' bne.w modal_bad']
-    lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_install:',' movem.l d0-d7/a0-a6,-(sp)']
+    lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_install:',' bsr.w launch_install',' movem.l d0-d7/a0-a6,-(sp)']
     for label,target in fix:
         lines += [' move.l a0,d0',f' addi.l #${target:x},d0',f' lea {label}+2(pc),a1',' move.l d0,(a1)']
     for off,width,label in patches:
@@ -78,7 +78,9 @@ def source(root, variant):
         lines += [f' move.w #${op:x},${off:x}(a0)',f' lea {label}(pc),a1',f' move.l a1,${off+2:x}(a0)']
         for n in range(6,width,2):lines += [f' move.w #$4e71,${off+n:x}(a0)']
     lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_bad:',
-            ' movem.l (sp)+,d0-d7/a0-a6',' bra.w '+('wrong_revision' if ocs else 'timing_bad')]
+            ' movem.l (sp)+,d0-d7/a0-a6','modal_bad_target:',' bra.w '+('wrong_revision' if ocs else 'timing_bad')]
+    from launch_source import source as launch_source
+    lines.append(launch_source(root,variant))
     text='\n'.join(lines)+'\n'
     if ocs:
         from shared_cpu import select
