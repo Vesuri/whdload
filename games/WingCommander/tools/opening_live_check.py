@@ -22,6 +22,7 @@ def main():
     p.add_argument('--output',required=True)
     p.add_argument('--title-only',action='store_true',help='skip opening and sample Wing Commander logo zoom/rotation')
     p.add_argument('--exhaust-only',action='store_true',help='sample native exhaust placement between intro world ticks')
+    p.add_argument('--camera-only',action='store_true',help='sample scripted camera basis between intro world ticks')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     v=get(a.variant)
     if a.variant=='ocs':
@@ -38,7 +39,7 @@ def main():
              WHD_ARGS='CUSTOM5=1 DCACHE' if a.variant=='ocs' else 'CUSTOM5=0 DCACHE',
              EXTRA_ARGS='--uae_cpu_model=68020 --fast_memory=4096' if a.variant=='ocs' else '',
              OCS_STOCK_CLOCK='1' if a.variant=='ocs' else '0',INTRO_STOCK_CLOCK='0')
-    if a.exhaust_only:
+    if a.exhaust_only or a.camera_only:
         env.update(AMIGA_SETUP='a1200-030',OCS_STOCK_CLOCK='0',
                    EXTRA_ARGS='',WC_BASELINE_CACHE_MODEL='1')
         length=0x800000
@@ -78,12 +79,39 @@ def main():
         (out/'layout.json').write_text(json.dumps(layout,indent=2)+'\n')
         g=boot();h0,h1,_,h3=layout['hunks'];base=layout['slave'];shift=0xba if a.variant=='ocs' else 0
         field=h1+v.A4_BASE+v.A4['field_clock']
-        if a.title_only or a.exhaust_only:
+        if a.title_only or a.exhaust_only or a.camera_only:
             until(h0+(0x180c4 if a.variant=='ocs' else 0x1898a))
             cmd('monitor key 45 1')
             until(h0+(0x1edde if a.variant=='ocs' else 0x1fbba))
             cmd('monitor key 45 0')
             until(base+sy['intro_title'])
+            if a.camera_only:
+                a4=h1+0x7ffe
+                basis=(0x18d8,0x2a40,0x2d40) if a.variant=='ocs' else (0x214a,0x3452,0x3752)
+                rate=(0xd88,0xd08,0xe08) if a.variant=='ocs' else (0x15fa,0x157a,0x167a)
+                tick=a4+(2268 if a.variant=='ocs' else 4430)
+                def camera():
+                    expressions=[f'*(int*){a4+off+732+j:#x}' for off in basis for j in (0,4,8)]
+                    r=cmd('printf "CAM'+(' %d'*9)+'\\n", '+', '.join(expressions))
+                    return [int(x) for x in re.search(r'CAM((?: -?\d+){9})',r).group(1).split()]
+                rows=[];groups={}
+                for frame in range(40):
+                    until(base+sy['timing_scene_begin'])
+                    original=camera()
+                    until(h0+(0x290fa if a.variant=='ocs' else 0x2a086))
+                    shown=camera()
+                    r=cmd(f'printf "STEP %u %u %u %d %d %d\\n", *(unsigned int*){field:#x}, *(unsigned short*){tick:#x}, *(unsigned int*){base+sy["timing_scene_fraction"]:#x}, '+', '.join(f'*(short*){a4+off+122:#x}' for off in rate))
+                    values_=[int(x) for x in re.search(r'STEP((?: -?\d+){6})',r).group(1).split()]
+                    until(base+sy['timing_scene_restored'])
+                    if camera()!=original:raise ValueError('authoritative camera did not restore')
+                    row=dict(frame=frame,field=values_[0],tick=values_[1],fraction=values_[2],rates=values_[3:],original=original,shown=shown)
+                    rows.append(row)
+                    if any(row['rates']):groups.setdefault(row['tick'],set()).add(tuple(shown))
+                if not any(len(v)>=3 for v in groups.values()):raise ValueError('camera basis still steps at world cadence')
+                shot('camera')
+                (out/'report.json').write_text(json.dumps(dict(complete=True,variant=a.variant,camera_samples=rows,distinct_bases_per_tick={k:len(v) for k,v in groups.items()},slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest()),indent=2)+'\n')
+                print('PASS: camera changes between ticks and restores after each picture',flush=True)
+                return
             if a.exhaust_only:
                 a4=h1+0x7ffe
                 tick=a4+(2268 if a.variant=='ocs' else 4430)

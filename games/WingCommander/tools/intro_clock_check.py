@@ -50,8 +50,14 @@ def main():
                             got=struct.unpack('>3i',c.read(c.data+0x919a+12*slot,12));want=tuple(p+trunc(v*f,hz) for p,v in zip((1000,2000,3000),(5121,-513,-1)))
                             assert got==want,(model,hz,view,slot,got,want)
                             ref=CPU(memory,layout,model);ref.write(ref.data,before)
-                            for entry in (0x2acb2,0x2acf2,0x2ad32):ref.run(entry,struct.pack('>hh',trunc(8*f,hz),slot))
-                            for off in (0xa148,0xb450,0xb750):assert c.read(c.data+off+12*slot,12)==ref.read(ref.data+off+12*slot,12)
+                            for entry in (0x2acb2,0x2acf2,0x2ad32):ref.run(entry,struct.pack('>hh',8 if slot==61 else trunc(8*f,hz),slot))
+                            for off in (0xa148,0xb450,0xb750):
+                                expected=ref.read(ref.data+off+12*slot,12)
+                                if slot==61:
+                                    old=struct.unpack_from('>3i',before,off+12*slot)
+                                    end=struct.unpack('>3i',expected)
+                                    expected=struct.pack('>3i',*(a+trunc((b-a)*f,hz) for a,b in zip(old,end)))
+                                assert c.read(c.data+off+12*slot,12)==expected
                             ref.close()
                         run('timing_scene_end');assert c.read(c.data,0xfda0)==before
                         cases.append(dict(model=model,hz=hz,view=view,pending=pending,fraction=frac))

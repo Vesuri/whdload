@@ -7041,3 +7041,56 @@ The public OCS option/hardware suite passes all 1,680 cases, including exact
 original-mode code preservation and enabled hook targets. CD32 passes 196
 option/cache cases, 54 converter outputs, 270 pacing cases and eight installer
 cases; altered operands at each new background hook are rejected before patching.
+
+### Intro camera: fractional orientation
+
+The intro camera position was already extrapolated, but its subtle rotation still
+stepped. Both variants script a one-unit pitch change per world tick near the
+start of the ship/title sequence. Scaling the integer angle before calling the
+native rotation routine rounded every sub-tick angle to zero. Earlier synthetic
+checks used eight-unit rotations and did not detect this visible quantization.
+
+The shared renderer now computes the camera's next native orientation using the
+snapshot pitch/yaw/roll, then samples each of its nine basis components as
+`current + trunc((next - current) * fraction / Hz)`. Only intro camera slot 61
+uses this path; object and flight prediction retain their existing algorithms.
+The existing forecast bound (one tick plus two display fields), position
+prediction, view-cut guards and authoritative 10 Hz script remain unchanged.
+At a full tick the sample is exactly the native endpoint. Intermediate bases are
+linear samples, not a second simulation update or a new trigonometric routine;
+native integer basis and screen-pixel precision still limit visible motion.
+The selective pose backup restores all components after drawing.
+
+Verified code-hunk 0 / file offsets:
+
+| Operation | CD32 | OCS |
+|---|---|---|
+| Scripted camera translation and rotation dispatch | `7056` / `7082` | `6dcc` / `6df8` |
+| Native angular-step dispatcher | `7c86` / `7cb2` | `79fc` / `7a28` |
+| Pitch basis rotation | `2acb2` / `2acde` | `29d26` / `29d52` |
+| Yaw basis rotation | `2acf2` / `2ad1e` | `29d66` / `29d92` |
+| Roll basis rotation | `2ad32` / `2ad5e` | `29da6` / `29dd2` |
+
+No additional native patch is needed: the shared presentation seam already owns
+this camera. The enlarged OCS payload also requires the title wrapper to address
+its game pointer through a nearby anchor rather than an out-of-range PC-relative
+word displacement.
+
+Accepted builds are `tmp/camera-ocs-v2` (SHA-256
+`9601f41e9394957cb78ca717de5042f958b92f9c8d8ce6b8806ad0546cfde017`)
+and `tmp/camera-cd32` (SHA-256
+`836c72448a9b69c53149eebe5f4a04b89c817c9ee4b7493fdcc6138d936881cb`).
+Native checks cover 272 samples per model (OCS 68000/020, CD32 020/040), PAL/NTSC,
+positive/negative single-axis and combined rotations, stationary cameras,
+view cuts, disabled intro and exact whole-data restoration. Twelve one-unit
+controls per model reject whole-angle rounding; both preceding release builds
+also fail the new basis oracle. The existing intro clock/title/owner suites,
+OCS 1680 option/hardware cases, CD32 installer guards and release option/cache/
+converter/pacing checks pass.
+
+Short PAL/DCACHE live captures (`tmp/camera-ocs-live2`,
+`tmp/camera-cd32-live`) each sample 40 real intro pictures. Both show at least
+three distinct camera bases within an unchanged world tick and exact restoration
+after each picture. These are functional emulator checks, not new FPS or hardware
+claims. The first interval after a view cut still respects the existing
+continuity guard. Native tests cover NTSC; no new live NTSC run is claimed.

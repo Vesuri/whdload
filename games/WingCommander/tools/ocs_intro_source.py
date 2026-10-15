@@ -19,6 +19,14 @@ def source(root):
      '$1898a(a6)':'$180c4(a6)',
      '#$1fd90':'#$1efb4'}
     for old,new in replacements.items():title=title.replace(old,new)
+    # The shared prediction payload can place the title past d16(PC) reach
+    # of the startup game pointer. Form its address from the nearby title.
+    load_base = ('        lea intro_title(pc),a6\n'
+                 '        adda.l #game_base-intro_title,a6\n'
+                 '        move.l (a6),a6')
+    title = title.replace('        move.l  game_base(pc),a6', load_base)
+    title = title.replace('        move.l  game_base(pc),-(sp)',
+                          load_base+'\n        move.l a6,-(sp)')
     return select((root/'whdload/ocs_intro.s').read_text()+'\n'+title,'68000')
 
 def integrate(text):

@@ -14,6 +14,9 @@ remain native. Both unskipped opening gates pass through to the world intro; see
 [opening timing](internals.md#opening-animation-speed-and-default-caches).
 The separate Wing Commander title logo also samples fractional zoom and rotation
 between ticks; its authoritative script duration and geometry remain unchanged.
+The intro camera also samples fractional orientation, fixing the one-unit turns
+that previously rounded to 10 Hz steps in both variants. See
+[camera sampling](internals.md#intro-camera-fractional-orientation).
 Both enhanced versions now wrap the post-briefing running-pilot backgrounds,
 preventing trails in the upper-body and feet shots. See the
 [cinematic fix](internals.md#running-pilot-cinematic-backgrounds).

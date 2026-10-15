@@ -4586,3 +4586,30 @@ It keeps eight PNGs and a 6 MiB native replay snapshot per variant, deleting
 transient instruction captures. The native checker verifies complete 320×128
 background pixels, alternating tile identity, register/stack contracts and
 missing-wrap rejection. It makes no performance claim.
+
+### Intro camera orientation
+
+The focused native test checks small pitch/yaw/roll motion against samples of
+native whole-tick basis endpoints, plus restoration and view-cut/disabled guards.
+Use fresh output directories:
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/camera-ocs-new
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/camera-cd32-new
+python3 tools/intro_camera_check.py ocs tmp/camera-ocs-new --output tmp/camera-ocs-native-new
+python3 tools/intro_camera_check.py cd32 tmp/camera-cd32-new --output tmp/camera-cd32-native-new
+python3 tools/ocs_intro_check.py tmp/camera-ocs-new --output tmp/camera-ocs-clock-new
+python3 tools/intro_clock_check.py tmp/camera-cd32-new --output tmp/camera-cd32-clock-new.json
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/opening_live_check.py ocs tmp/camera-ocs-new --camera-only --output tmp/camera-ocs-live-new
+python3 tools/opening_live_check.py cd32 tmp/camera-cd32-new --camera-only --output tmp/camera-cd32-live-new
+```
+
+`--camera-only` skips the music opening through native Escape handling, then
+samples 40 pictures in the actual ship/title intro on the cached 030 model. It
+requires at least three camera orientations within a single moving world tick,
+checks restoration after every draw, records the exact slave hash, and stops its
+owned emulator. It retains one screenshot, not an instruction trace. Accepted
+native reports are `tmp/camera-{ocs,cd32}-native-final/report.json`; live reports
+are `tmp/camera-ocs-live2/report.json` and `tmp/camera-cd32-live/report.json`.

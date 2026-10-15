@@ -386,6 +386,11 @@ timing_scene_begin:
         ; Angular steps are snapshots, not a second AI/controller invocation.
         ifne BUFFERED
 .rotate:
+        cmpi.w  #61,d4
+        bne.s   .object_rotation
+        bsr.w   timing_intro_camera_rotate
+        bra.w   .translate
+.object_rotation:
         endif
         moveq   #0,d3
 .axis:
@@ -480,6 +485,73 @@ timing_scene_begin:
         bsr.w   timing_player_camera
 .done:
         movem.l (sp)+,d0-d7/a0-a6
+        rts
+
+; The scripted intro camera can turn by just one native angular unit per tick.
+; Scaling that integer angle rounds every intermediate sample to zero. Compute
+; its native next basis, then sample the basis delta at the display fraction.
+; This is renderer-only, rebuilt from authoritative state each picture; the
+; existing pose backup restores all nine components before any world work.
+; Only slot 61 reaches this helper. D6/D7 retain the bounded display fraction.
+timing_intro_camera_rotate:
+        movem.l d0-d3/a0-a3/a5-a6,-(sp)
+        lea     -36(sp),sp
+        movea.l sp,a5
+        lea     9254(a4),a0
+        move.l  (a0)+,0(a5)
+        move.l  (a0)+,4(a5)
+        move.l  (a0)+,8(a5)
+        lea     14126(a4),a0
+        move.l  (a0)+,12(a5)
+        move.l  (a0)+,16(a5)
+        move.l  (a0)+,20(a5)
+        lea     14894(a4),a0
+        move.l  (a0)+,24(a5)
+        move.l  (a0)+,28(a5)
+        move.l  (a0)+,32(a5)
+        move.w  timing_scene_angles+122(pc),d0
+        beq.s   .axis_122
+        move.w  #61,-(sp)
+        move.w  d0,-(sp)
+        move.l  timing_game(pc),a6
+        jsr     $2acb2(a6)
+        addq.l  #4,sp
+.axis_122:
+        move.w  timing_scene_angles+250(pc),d0
+        beq.s   .axis_250
+        move.w  #61,-(sp)
+        move.w  d0,-(sp)
+        move.l  timing_game(pc),a6
+        jsr     $2acf2(a6)
+        addq.l  #4,sp
+.axis_250:
+        move.w  timing_scene_angles+378(pc),d0
+        beq.s   .axis_378
+        move.w  #61,-(sp)
+        move.w  d0,-(sp)
+        move.l  timing_game(pc),a6
+        jsr     $2ad32(a6)
+        addq.l  #4,sp
+.axis_378:
+        movea.l a5,a3
+        lea     9254(a4),a2
+        bsr.s   .vector
+        lea     14126(a4),a2
+        bsr.s   .vector
+        lea     14894(a4),a2
+        bsr.s   .vector
+        lea     36(sp),sp
+        movem.l (sp)+,d0-d3/a0-a3/a5-a6
+        rts
+.vector:
+        moveq   #2,d3
+.component:
+        move.l  (a2),d0
+        sub.l   (a3),d0
+        bsr.w   timing_scene_scale
+        add.l   (a3)+,d0
+        move.l  d0,(a2)+
+        dbra    d3,.component
         rts
 
 timing_scene_end:
