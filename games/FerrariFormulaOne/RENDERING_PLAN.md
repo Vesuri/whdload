@@ -1015,3 +1015,116 @@ index is `manifest/render-h7-reduced.json` under the harness. Additional
 indices are `render-h7-build-audit.json`, `render-h7-enabler.json` and
 `render-h7-traces.json`. Raw traces were gzip-compressed, decompressed hashes
 verified, then removed. Archives, fixtures, builds and harness remain ignored.
+
+## H8 — Post-H7 profiling and priority order (2026-10-15)
+
+**Complete; analysis only.** Reanalysed the three accepted H7 30-field,
+cycle-exact-blitter grid traces against source `975dace`. Each contains eleven
+complete draws. These are the final ownership implementation, not the earlier
+IRQ-disable diagnostic. Decompressed trace SHA256 and fixture slave SHA256
+match their recorded values on all three profiles. No emulator matrix was
+repeated: game code, production binary and RC2 are unchanged.
+
+### Corrected attribution
+
+The old call analyser divided by twelve draw entries, including an unfinished
+last draw. H8 accumulates each draw separately and commits its counters only
+at the matching B8Draw return; all three complete-draw counts agree with the
+stage analyser. It also separates the inline beam wait from the preceding
+`FF1RenderPrepareRoad` call. Without that split the 040 report attributed
+7.283 ms to preparation, most of it waiting. Preparation actually occupies
+about 1.31 ms, outside the post-wait draw budget.
+
+Complete-call totals reconcile with the independent complete-stage totals to
+within 0.02 ms (printed values round to 0.001 ms). Calls are inclusive through
+the next top-level call, not exclusive instruction timings. A wait charged to
+a call may finish a blit started by its predecessor. Do not interpret every
+call's wait time as work that deleting that call would save.
+
+| Grid measurement, ms per complete draw | EC030/50 BCE | 040/40 BCE | 060/50 BCE |
+|---|---:|---:|---:|
+| Post-wait draw | 41.397 | 40.255 | 40.446 |
+| Road drawing | 11.323 | 11.131 | 11.258 |
+| Background clear `$6b050` | 5.336 | 5.055 | 4.999 |
+| `$6b950` | 3.646 | 3.645 | 3.633 |
+| Opponent scene `$69bb8` | 5.481 | 5.182 | 5.249 |
+| Cockpit/gauges/mirrors: six H13 calls | 11.722 | 11.668 | 11.667 |
+| Demo text + final HUD calls | 2.805 | 2.526 | 2.564 |
+| Whole-draw WaitBlit spin, including pre-wait work | 32.759 | 31.908 | 32.366 |
+| Whole-draw interrupt service | 0.976 | 0.715 | 0.732 |
+
+The call rows and whole-draw categories are overlapping views, not additive
+costs. Faster CPU execution alone does not resolve this workload: the 060
+post-wait draw is slightly longer than the 040. The H7 safety audit retains
+empty graphics queues, no enabled BLIT observations and DMA entirely in Chip.
+
+The DMA census measures about 14.02 ms of blitter activity per 20.03 ms field
+on 040/060, with about 30% of slots free. Blitter sequencing and its channel
+cycle pattern, rather than a fully saturated bus, remain the main limit.
+On 040, the full-window census has 0.8 CD exclusive fills per field, consuming
+2.039 ms/field; the largest are 24 words by 103–106 rows and reach 2.96 ms.
+These are whole-window observations, not a conversion using eleven complete
+draws as the denominator. H9 must identify the road/mirror destinations before
+assuming that every fill belongs to its patch scope.
+
+### Ranked next work
+
+1. **H9 — Narrow road-fill spans.** First: the road stage costs 11.1–11.3 ms,
+   and the two large full-width fills offer a localized way to reduce actual
+   blitter work. Retain the provisional 1.5–3 ms saving estimate, not a measured
+   gain. Capture each pre-fill plane, map edge extents and mirror callers,
+   then model descending exclusive-fill carry and band boundaries exactly.
+   Proceed only when the narrowed result is byte-identical, including edge
+   words and pixels outside the proposed span. Keep the coarse payloads
+   unchanged in this fine-path series; any all-CPU port is separate scope.
+2. **H10 — Background clear.** Second: `$6b050` costs approximately 5 ms/draw.
+   Benchmark CPU Chip stores versus the existing blits at the same beam phase
+   before choosing CPU-only or concurrent CPU/blitter work. The previous
+   2–3 ms saving remains a hypothesis, dependent on memory contention and CPU
+   profile. Do not replace the clear merely because cached instructions look
+   cheap in the emulator. H9+H10's estimated 3.5–6 ms could meet the two-field
+   budget, but does not guarantee it or the 33 ms margin target.
+3. **H13 — Cockpit/gauges/mirrors.** Move ahead of H11 if H9+H10 leave the target
+   unmet. This group costs 11.67 ms on both 040 and 060. On 040 the individual
+   calls are `$6ba18` 2.909, `$6c0d0` 2.166, `$6bbfc` 2.030, `$6adf8` 1.843,
+   `$6ae70` 1.523 and `$6af7e` 1.197 ms. Start with the largest proven opaque
+   copy opportunity; evaluate small CPU gauge segments separately. Confirm
+   source masks and destination dependencies before choosing an implementation.
+   The earlier 2–4 ms saving estimate remains unvalidated.
+4. **H11 — Overlap text/HUD.** Lower priority than originally proposed. The
+   040 text/HUD total of 2.526 ms includes 1.455 ms of waiting; only about
+   1.071 ms is CPU work (060: 1.072 ms). Moving the call does not automatically
+   remove the earlier blit's completion cost. Treat roughly 1.1 ms as the
+   observed CPU work potentially hideable in this grid fixture, before bus
+   contention, rather than promising the earlier 1.5–2.3 ms saving. Prove the
+   top-region write ordering and measure any additional removed waits.
+5. **H12 — Inter-blit latency: approval-gated, not scheduled.** Short-gap
+   estimates are 1.91/1.89 ms per field on 040/060 (2.25 on EC030). They use
+   a DMA-run heuristic and include real setup and bus delays; they are not
+   directly recoverable WaitBlit overhead. No H1-style shortcut or priority
+   change was added. Explicit user approval is still required.
+
+### Stop rule and scope
+
+The estimated post-wait budget remains about 37 ms: 040/060 need roughly
+3.25/3.45 ms less work, or 7.25/7.45 ms to reach the 33 ms margin target.
+The decisive gate is still **300 complete intervals all two PAL fields**
+(mean = p95 = 40.06377 ms), not a short-trace average below 37 ms.
+The retained H7 grid FPS is 19.96816 on all three accelerated BCE profiles,
+with 150 two-field and 150 three-field intervals. Therefore H6c's common-scene
+25 FPS target is not yet met, and the next implementation is H9.
+
+After each accepted optimization, check that candidate's affected workload and
+stop adding optimizations once the H6c targets pass. Preserve the user's reduced,
+representative validation scope; do not restore the previous Cartesian test
+matrix. Final common-scene success still needs direct normal/solo/grid evidence
+on 040/060 BCE, with 030 a should-target and dense/020 no-regression checks.
+This H8 analysis makes no new normal, solo or dense performance claim and no
+real-hardware claim. It changes no control, lifecycle or simulation behavior,
+so repeating their unchanged H7 correctness tests was unnecessary.
+
+Local reproducibility: `tmp/dev/tools/run_h8_analysis.py` verifies and expands
+one retained trace at a time, invokes `analyze_h8_calls.py`, checks reconciliation
+and removes the temporary raw trace. Results and source hashes are in
+`tmp/dev/manifest/render-h8-analysis.json`; per-trace `h8-calls.json` records the
+corrected calls. The H7 trace index and original analyses remain intact.
