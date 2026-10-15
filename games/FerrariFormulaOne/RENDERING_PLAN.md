@@ -663,3 +663,129 @@ races and real hardware remain deferred. H1–H5's implementation work is closed
 Local evidence: `tmp/dev/manifest/render-h5-validation.json`, `render-h5-histogram.json`,
 `render-h5-oracles.json`, `render-h5-matched-profile.json`,
 `render-h5-performance.json`, source/build/model/DMA audits and compressed traces.
+
+## High-end 25 FPS profile and plan H6–H16 (2026-10-15)
+
+Short diagnostic profile of HEAD `25ca4b9` (264,520-byte slave). Only test
+fixtures were built; game code is unchanged. Full analysis:
+`tmp/dev/docs/HI25_PLAN.md`; evidence index: `tmp/dev/manifest/hi25-profile.json`.
+
+### Frame budget
+
+`B8Draw` publishes the previous frame, prepares the road, waits for line 256
+(or a passed field), then clears and draws. A frame is shown every two fields
+(40.06 ms, 24.96 FPS) only if post-wait drawing + ticks (~1.6–1.8 ms on 040)
++ publish/road preparation (1.3 ms) fit in 40.06 ms. Post-wait drawing must
+therefore stay below about 37 ms; target 33 ms for margin.
+
+### Profile: 040/40, 30 traced fields after 100 warm-up draws
+
+`solo` is the dense-pack pose with all seven opponent draw calls counted and
+returned before any sprite work. `default` is the accelerated profile used for
+H2–H5; `cycle-exact` adds `--uae_blitter_cycle_exact=true`. Values are ms per
+drawn frame; FPS values are 300 complete presentations.
+
+| Scene | Blitter | Post-wait draw | WaitBlit spin | BLIT IRQ | CPU | FPS |
+|---|---|---:|---:|---:|---:|---:|
+| solo | default | 37.6 | 24.0 | 9.8 | 5.1 | 23.11 |
+| normal | default | 41.2 | 26.0 | 11.1 | 5.5 | 18.26 (H5) |
+| grid | default | 44.3 | 28.4 | 11.6 | 5.7 | 16.64 |
+| dense | default | 71.7 | 55.5 | 11.8 | 5.8 | 12.48 (H5) |
+| solo | cycle-exact | 42.8 | 26.4 | 9.9 | 7.8 | 16.64 |
+| grid | cycle-exact | 50.0 | 31.0 | 11.6 | 8.7 | 16.64 |
+| dense | cycle-exact | 85.2 | 60.2 | 12.2 | 14.1 | ~10 (trace) |
+
+The 040 CPU is not the limit: drawing is mostly the CPU waiting for the blitter,
+and simulation ticks cost about 0.8 ms each.
+
+**Correction to the H5 IRQ audit.** BLIT was disabled (INTENA `$67AC`) only in
+that 020+Fast trace. On 040, INTENA is `$67EC`. The level-3 handler runs about
+100–120 times per field, 99% of them for BLIT, about 37 µs each including
+WHDLoad's VBR glue, with the blitter idle. No `$8040` write occurs inside the
+windows, so the bit is set earlier. A diagnostic fixture that writes INTENA
+`$0040` before each draw (no ownership or restore handling) measures:
+
+| CPU | Scene | Blitter | Current FPS | BLIT IRQ off |
+|---|---|---|---:|---:|
+| 040/40 | solo | default | 23.11 | 24.96 (all 2 fields) |
+| 040/40 | grid | default | 16.64 | 24.96 (all 2 fields) |
+| 030/50 | grid | default | 16.64 | 24.96 (all 2 fields) |
+| 060/50 | grid | default | 16.64 | 24.96 (all 2 fields) |
+| 040/40 | solo | cycle-exact | 16.64 | 24.96 (all 2 fields) |
+| 040/40 | grid | cycle-exact | 16.64 | 19.97 (150 × 2, 150 × 3) |
+
+**Blitter model.** `uae_cpu_cycle_exact=true` does not enable
+`blitter_cycle_exact`, so H2–H5 accelerated FPS used an approximate blitter.
+Cycle-exact blitting adds 5–6 ms per frame. Real hardware is expected to be
+closer to the cycle-exact model; physical testing remains deferred.
+
+**Blit census** (grid, cycle-exact, BLIT IRQ off). The blitter is busy 14.0 of
+20.0 ms per field and 31% of slots stay free. Per field:
+
+| Blit type | Count | ms | Use |
+|---|---:|---:|---|
+| ABCD cookie-cut | 13.3 | 3.78 | cars, cockpit |
+| D-only fill | 3.6 | 2.73 | `$6b050` background, `$6b950` |
+| BCD | 36.9 | 2.63 | mostly 1-row road spans |
+| CD exclusive fill | 0.8 | 2.04 | full-width 24 × ~103 road fills, 2.5–2.9 ms each |
+| line | 49.2 | 1.43 | road edges |
+| ABD | 9.9 | 1.38 | masks |
+
+Gaps between consecutive blits are 9–22 µs and total 1.9 ms per field.
+
+### Work order
+
+One switchable equal-layout change per commit, re-profiled after each
+acceptance. Keep the H-series rules and gates: CUSTOM2=0 legacy-exact, the
+68000/chip-only payloads byte-identical, Chip DMA ownership and the 20 ms
+player / 100 ms opponent design. Add solo frames and cycle-exact profiles to
+the gates.
+
+1. **H6 — Measurement baseline.** Add `030-50-bce`, `040-40-bce` and
+   `060-50-bce` profiles and a 68EC030 trace profile (the full-MMU 68030 loop
+   is not instrumented). Adopt the solo fixture, the 040/060 measurement
+   emulator and the `analyze_hi25_*` tools. Record 300-presentation baselines.
+   "25 FPS" means all 300 complete intervals are two fields.
+2. **H7 — Fine-path BLIT interrupt ownership.** Port C4
+   `FF1C4BlitAcquire/Restore`. First identify the enabler and prove the gfx
+   blit queues stay empty while racing. Acquire at epoch start, on resume and
+   at each `B8Draw`; restore on pause/tow/pit/menu/exit/fault/unload.
+3. **H8 — Re-profile** on cycle-exact profiles and rank H9–H13 by the residual.
+4. **H9 — Exact road-fill narrowing** to the edge-word span of each band
+   (fill carry resets per row; the planes are zero outside the edges).
+   Expected −1.5 to −3 ms.
+5. **H10 — CPU background fills on 030+** for `$6b050`'s D-only fills, gated
+   by per-CPU micro-benchmarks. Expected −2 to −3 ms.
+6. **H11 — Overlap the top-region flag/clock/demo text with long blits,**
+   after proving those rows have no later writer. Expected −1.5 to −2.3 ms.
+7. **H12 — Inter-blit latency.** A 030+ WaitBlit without the CIA-delay loop.
+   Needs explicit user approval because H1 was discarded. Expected −1 to
+   −2.5 ms.
+8. **H13 — Cockpit, gauges and mirrors** (`$6ba18`, `$6c0d0`, `$6adf8`,
+   `$6bbfc`, `$6ae70`, `$6af7e`; ~10 ms per frame): opaque runs as A→D copies,
+   bounded CPU gauge segments. Expected −2 to −4 ms.
+9. **H14 — Optional:** bit-exact CPU road rasteriser on 040/060.
+10. **H15 — Stretch:** dense car path (cars 33–41 ms per frame), targeting
+    16.6 FPS. 25 FPS in the dense pack is not promised.
+11. **H16 — Optional:** triple buffering to remove line-256 quantisation.
+
+Expected path under cycle-exact 040, where only the H7 row is measured:
+
+- **After H7:** solo 24.96 FPS (~2.5 ms slack); grid 19.97 FPS.
+- **After H9–H11:** solo, normal and grid at 25 FPS (estimated).
+- **H12/H13:** margin for the 030.
+- **Dense:** needs H15.
+
+In the default profiles, H7 alone gives 24.96 FPS for solo and grid on
+030/040/060. B8-PAL cleanup remains separate.
+
+### Evidence and reproduction
+
+- Traces: `tmp/dev/tmp/step5/hi25-profile-040-40-*`
+  (gzip-verified `detail.bin.gz`, `hi25-analysis.json`).
+- FPS results: `tmp/dev/tmp/step5/c4-q03-h5-fps-*-hi25-*`.
+- Tools: `tmp/dev/tools/build_hi25_fixtures.py`, `capture_hi25_profile.py`,
+  `analyze_hi25_{profile,calls,irq,blits,blitgaps}.py`,
+  `manifest_hi25_profile.py`.
+- Emulators: the 040/060 trace hook is in a separate measurement emulator,
+  SHA256 `d1c6e976…`. The accepted observer `e411569c…` is unchanged.
