@@ -168,7 +168,7 @@ no-regression, with exact state, frames, pixels/CCR primitive oracles, elapsed,
 controls, lifecycle, legacy and signature-failure checks. See RENDERING_PLAN.md
 for the measured results and scope. IRQ ownership is unchanged.
 
-The current source independently builds to 264,520 bytes, SHA256
+The H5 source independently builds to 264,520 bytes, SHA256
 `57900954b6eb18f1691f3ff8f9b51bcb4beb8a6c3456b6d33f1268cc810c9316`.
 CUSTOM2 remains default-off and RC2 is unchanged.
 B8-PAL cleanup and successor packaging are separate work; human full races and
@@ -180,4 +180,9 @@ user-reduced emulator checks documented in [RENDERING_PLAN.md](RENDERING_PLAN.md
 Grid reaches 24.96 FPS on 030/040/060 with the default blitter model and
 19.97 FPS with cycle-exact blitting. 020 normal/dense show no regression.
 The coarse payloads and RC2 archive are unchanged; CUSTOM2 remains default-off.
-H8 is next; H12 still needs explicit approval.
+H8 ranked the remaining costs. H9 now narrows the road fills exactly and passes
+the reduced state/image/elapsed/lifecycle gates. On cycle-exact 040, dense improves
+12.04 → 12.47 FPS; grid remains 19.97 FPS with a 0.34 ms draw-time saving.
+H10 is next; H12 still needs explicit approval. The H9 source reproducibly builds
+to 265,512 bytes, SHA256
+`b313710c295498f9a798728850c4b215d4eb0c412c2dd3cd9e0586baaceb3c5e`.

@@ -91,6 +91,7 @@ keep_gauges:
  endc
  bsr.l FF1RenderInstallColourElide
  bsr.l FF1RenderInstallBitmap
+ bsr.l FF1RenderInstallFill
  bsr.l FF1FinePauseInstall
  tst.l error(pc)
  bne.l FF1ProductionFault
@@ -382,6 +383,7 @@ B8DrawEnabled: dc.w 1
 FF1_FINE_ROAD_PREFETCH equ 1
  include "FerrariFormulaOne_FullPresentation.s"
  include "RenderRoad.s"
+ include "RenderFill.s"
  include "RenderText.s"
  include "RenderBitmap.s"
 
