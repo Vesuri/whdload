@@ -26,6 +26,7 @@ FF1FinePause:
  movem.l d0-d3/a0-a1,-(sp)
  move.w ccr,-(sp)
  lea (schedule_context.l,pc),a0
+ bsr.l FF1FineBlitRestore
  bsr.l FF1TimePause
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d3/a0-a1
@@ -35,6 +36,7 @@ FF1FineResume:
  move.w ccr,-(sp)
  lea (schedule_context.l,pc),a0
  bsr.l FF1TimeResume
+ bsr.l FF1FineBlitAcquire
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d3/a0-a1
  move.w $1c8b0,d0

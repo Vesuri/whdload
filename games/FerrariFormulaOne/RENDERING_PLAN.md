@@ -640,11 +640,12 @@ See `tmp/dev/manifest/render-h5-historical-baseline.json`.
 The fresh ordinary trace has 288.58 WaitBlit calls/draw,
 24.301731 ms/draw inclusive waits, and
 1.530963 ms/draw of interrupt-level instructions.
-The remaining IRQ budget is not empty-queue BLIT service: INTENA bit $40 is
+In this 020+Fast trace, the remaining IRQ budget is not empty-queue BLIT service: INTENA bit $40 is
 already clear at every captured field start and throughout all recorded CPU/
-copper INTENA writes, including conflict records. The fine path therefore
-already satisfies C4's interrupt-disable condition; no ownership port is needed.
-IRQ ownership remains unchanged. The histogram leaves larger bitmap, road and
+copper INTENA writes, including conflict records. This observation does not
+extend to 030/040/060: their startup graphics timer enables BLIT, as established
+by the H6/H7 investigation below. H5 left IRQ ownership unchanged.
+The histogram leaves larger bitmap, road and
 sprite work native; further optimization needs a new measured case rather than broader
 unvalidated CPU thresholds. H1's discarded dispatch-only experiment stays absent.
 
@@ -741,12 +742,12 @@ acceptance. Keep the H-series rules and gates: CUSTOM2=0 legacy-exact, the
 player / 100 ms opponent design. Add solo frames and cycle-exact profiles to
 the gates.
 
-1. **H6 — Measurement baseline.** Add `030-50-bce`, `040-40-bce` and
+1. **H6 — Measurement baseline: complete.** Add `030-50-bce`, `040-40-bce` and
    `060-50-bce` profiles and a 68EC030 trace profile (the full-MMU 68030 loop
    is not instrumented). Adopt the solo fixture, the 040/060 measurement
    emulator and the `analyze_hi25_*` tools. Record 300-presentation baselines.
    "25 FPS" means all 300 complete intervals are two fields.
-2. **H7 — Fine-path BLIT interrupt ownership.** Port C4
+2. **H7 — Fine-path BLIT interrupt ownership: accepted in the reduced scope below.** Port C4
    `FF1C4BlitAcquire/Restore`. First identify the enabler and prove the gfx
    blit queues stay empty while racing. Acquire at epoch start, on resume and
    at each `B8Draw`; restore on pause/tow/pit/menu/exit/fault/unload.
@@ -789,3 +790,228 @@ In the default profiles, H7 alone gives 24.96 FPS for solo and grid on
   `manifest_hi25_profile.py`.
 - Emulators: the 040/060 trace hook is in a separate measurement emulator,
   SHA256 `d1c6e976…`. The accepted observer `e411569c…` is unchanged.
+
+
+## H6 measurement baseline (2026-10-15)
+
+Source HEAD `914e24b` has H5 game code (`25ca4b9`). The unchanged baseline
+slave is 264,520 bytes, SHA256
+`57900954b6eb18f1691f3ff8f9b51bcb4beb8a6c3456b6d33f1268cc810c9316`.
+The local profiles add `030-50-bce`, `040-40-bce` and `060-50-bce` with
+the existing CPU options plus `--uae_blitter_cycle_exact=true`.
+`030-50-trace` and its BCE variant use 68EC030 because the full-MMU 68030
+dispatch loop has no instruction trace. The accepted observer remains
+unchanged (`e411569c…`); the existing 040/060 trace observer is `d1c6e976…`.
+
+Each row is 300 complete displayed-buffer intervals after 100 warm-up
+presentations, warp off, zero engine errors and no incomplete fixture draws.
+Launch: `CUSTOM1=0 CUSTOM2=1 ConfigDelay=0 NoWriteCache`. Normal is the live
+demo; solo/grid/dense use the existing Hi25 fixtures. An initial CUSTOM1=1
+normal 020 run ended its demo before 300 intervals and was rejected; the
+accepted matrix uses the established CUSTOM1=0 scope throughout. Actual
+blitter DMA slots were checked to distinguish the two models.
+
+25 FPS means **all 300 intervals are two PAL fields**: mean and p95
+40.063774 ms, or 24.960205 FPS. Histogram notation is `fields:count`.
+
+| Profile | Scene | FPS | Mean ms | p95 ms | Interval histogram |
+|---|---|---:|---:|---:|---|
+| a1200-fast | normal | 15.28176 | 65.43750 | 80.12755 | 3:220, 4:80 |
+| a1200-fast | solo | 12.17571 | 82.13074 | 100.15944 | 4:270, 5:30 |
+| a1200-fast | grid | 14.59661 | 68.50905 | 80.12755 | 3:178, 4:118, 5:4 |
+| a1200-fast | dense | 7.14510 | 139.95612 | 140.22321 | 6:11, 7:282, 8:7 |
+| 030-50 | normal | 17.35356 | 57.62506 | 60.09566 | 2:37, 3:263 |
+| 030-50 | solo | 21.24273 | 47.07493 | 60.09566 | 2:195, 3:105 |
+| 030-50 | grid | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 030-50 | dense | 12.48010 | 80.12755 | 80.12755 | 4:300 |
+| 040-40 | normal | 18.26356 | 54.75382 | 60.09566 | 2:80, 3:220 |
+| 040-40 | solo | 23.11130 | 43.26888 | 60.09566 | 2:252, 3:48 |
+| 040-40 | grid | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 040-40 | dense | 12.48010 | 80.12755 | 80.12755 | 4:300 |
+| 060-50 | normal | 18.02181 | 55.48833 | 60.09566 | 2:70, 3:229, 4:1 |
+| 060-50 | solo | 23.32729 | 42.86824 | 60.09566 | 2:258, 3:42 |
+| 060-50 | grid | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 060-50 | dense | 12.48010 | 80.12755 | 80.12755 | 4:300 |
+| 030-50-bce | normal | 17.03768 | 58.69343 | 60.09566 | 2:21, 3:279 |
+| 030-50-bce | solo | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 030-50-bce | grid | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 030-50-bce | dense | 9.98408 | 100.15944 | 100.15944 | 5:300 |
+| 040-40-bce | normal | 16.65865 | 60.02889 | 60.09566 | 2:2, 3:297, 4:1 |
+| 040-40-bce | solo | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 040-40-bce | grid | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 040-40-bce | dense | 9.98408 | 100.15944 | 100.15944 | 5:300 |
+| 060-50-bce | normal | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 060-50-bce | solo | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 060-50-bce | grid | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 060-50-bce | dense | 9.98408 | 100.15944 | 100.15944 | 5:300 |
+
+Evidence: `tmp/dev/manifest/render-h6-baseline.json`; `tools/audit_h6.py` verifies all 28 runs.
+
+
+## H7 accepted: fine-path BLIT ownership (2026-10-15)
+
+H6 is complete and H7 passes the user-reduced emulator acceptance scope.
+The final production slave is 264,700 bytes, SHA256
+`b6efb0e69f53a7b6e47e1e612c409252a94a8f45514fe9b65c6fa8ea851ed454`. An independent build is byte-identical.
+The equal-layout control differs only at file byte 178737 (the immutable
+preset); the 68000 and chip-only 020 payloads are byte-identical to H6.
+CUSTOM2 remains default-off. The RC2 archive is unchanged; no packaging or
+push is included.
+
+### Implementation
+
+`RenderBlit.s` owns only INTENA.BLIT in the fine (020+Fast) payload. It
+acquires at epoch start, after resume, and at every `B8Draw` entry. First
+acquisition saves the entry bit, including an initially clear bit. Subsequent
+draws read INTENAR once and clear any re-enable without replacing that saved
+state. The already-owned path uses a byte read of INTENAR's low byte and
+borrows no data/address registers; first acquisition saves d0/a0. CCR is
+preserved with `move.w ccr`, never privileged `move.w sr`.
+
+Restore writes the saved entry state and clears ownership before the public
+reset table clears transient data. Pause, native exit/tow/modal teardown,
+overlay unload and production faults use the existing lifecycle hooks and
+patch ledger. No new native patch site, DMA allocation or INTREQ write is
+introduced. The immutable `FF1FineBlitControl` preset selects equal-layout
+acceptance arms; the release-facing CUSTOM2 option remains default-off.
+
+The first candidate failed the strict 020 dense mean gate by one PAL field
+over 300 intervals (8.866858 → 8.861611 FPS, unchanged p95), reproduced on
+a second pair. Its evidence is retained in `tmp/dev/tmp/h7-v1`. Reducing
+only H7's register-save overhead gave a fresh probe of 8.866858 → 8.872111
+FPS with unchanged p95. All code-dependent acceptance checks were restarted
+for that refined implementation; the first candidate was not accepted.
+
+### BLIT enabler and ownership evidence
+
+The enabler is KickEmu 1.3 graphics.library's `gb_timsrv` CIA-B alarm
+callback. It calls `ciab.resource/AbleICR` with mask 4 to disable ALRM,
+tests `gb_blthd` at graphics base +$3a, then writes `$8040` to INTENA
+and INTREQ when that queue is empty. Its code was verified in live memory.
+Logging every INTENA write involving bit 6 from boot through the native
+pause/tow/pit/menu/unload/re-entry sequence found one such callback after
+the guest Kick reset on each 030/040/060 boot and none on the 020 boot.
+Thus the observed `$67EC` versus `$67AC` is a startup alarm-delivery
+difference, not a fine-path CPU-selection policy. No later native bit-6
+write occurred in those baseline lifecycle runs. This identifies the
+observed cause without claiming why every possible boot delivers the alarm.
+
+The native BLIT handler acknowledges the request and returns with BLIT
+still enabled when both graphics queues are empty. Racing snapshots show
+`gb_blthd` and `gb_bsblthd` (base +$3a/+$42) both zero. Exec interrupt vector
+6 consistently identifies the single graphics `gb_bltsrv` node (base +118),
+with unchanged code/data through the lifecycle. The static native audit of
+118 CODE hunks finds no graphics QBlit/QBSBlit calls; its two apparent
+negative-vector matches resolve to Exec FindTask. Dynamic trace checks
+complement this bounded evidence; it is not a claim about untested future
+workloads.
+
+The separate diagnostic logger (`42c8deb0…`) is used only for boot/lifecycle
+INTENA provenance, never for FPS acceptance. The accepted observer is
+unmodified. Full evidence is in `tmp/dev/manifest/render-h7-enabler.json`
+and `manifest/step5-c4-blit-d1-queue-audit.json` under the local harness.
+
+### Correctness and reduced acceptance scope
+
+At the user's request, the oversized CPU × scene validation matrix was
+replaced with representative checks. The final binary passes 100 exact
+game-state updates and all recorded private fractions on 020+Fast, plus
+30 complete RGB comparisons for each normal/solo/grid/dense scene, with
+no masks, crops or pixel tolerance. Its 60-second elapsed error is
+0.092576%, below the 0.25% limit. No duplicate final 040 correctness suite
+is claimed. The unchanged coarse payloads are verified byte-for-byte.
+
+The first implementation's initial 040-bce normal image capture failed
+equality: the existing two-field observer window included B8-PAL's
+timing-dependent blue COLOR00 pulse boundary. These rejected captures
+are retained. A test-only hold after draw completion lets three PAL wraps
+pass with no further CPU draw or palette writes, so the two-field observer
+records a stable complete scanout. That method passed all four scene
+comparisons on the first implementation and is used for all final 020
+complete-frame comparisons. Both arms have the same hold and differ only
+at the immutable H7 preset byte. No production palette write was removed
+or changed; the hold is absent from state, elapsed, FPS and trace
+measurements. Identical transitional RGB fields are not claimed. B8-PAL
+remains separate work.
+
+All 20 directed ownership/fault cases pass on 020/030/040/060: both entry
+bit states, repeated acquire/restore, re-enable while owned, pending BLIT
+completion, CCR preservation, and direct/scheduler/velocity fault exits.
+The final 040 native input/lifecycle run passes pause/resume, tow, pit, menu,
+overlay reload and race re-entry. INTENA is `$67AC` while owned, returns to
+its entry `$67EC` on pause/exit, and is acquired again on resume/re-entry.
+All 906 installed patch words are restored. A directed owned native unload
+restores the ledger and interrupt state before freeing the overlay, then
+returns through the native unloader. CUSTOM2=0 is legacy-exact on the
+representative 020+Fast profile with both CUSTOM1 settings; other disabled
+profiles were not rerun after the user reduced the matrix.
+
+The rejected first candidate's evidence is retained, as is one 060 test
+startup timeout before race entry. Its retry passed. Neither is substituted
+for final-binary acceptance. Completed final-binary results are reused only
+with matching binary hashes. Human full races and real hardware remain deferred.
+
+### Fresh FPS results
+
+Each result is 300 complete displayed-buffer intervals after 100 warm-up
+presentations, warp off, zero engine errors. `control` is the H7 equal-layout
+preset control. No control is implied for the candidate-only 030/060 grid
+rows; their H6 historical baselines are listed separately above. In
+particular, layout/startup differences make the old 020 solo/dense H6
+measurements unsuitable as paired H7 controls. The reduced final matrix
+does not claim fresh solo/normal/dense measurements on every high-end CPU.
+
+| Profile | Scene | Arm | FPS | Mean ms | p95 ms | Fields:count |
+|---|---|---|---:|---:|---:|---|
+| a1200-fast | normal | control | 15.23512 | 65.63782 | 80.12755 | 3:217, 4:83 |
+| a1200-fast | normal | candidate | 15.26618 | 65.50427 | 80.12755 | 3:219, 4:81 |
+| a1200-fast | dense | control | 8.86686 | 112.77952 | 120.19132 | 5:116, 6:179, 7:5 |
+| a1200-fast | dense | candidate | 8.87211 | 112.71275 | 120.19132 | 5:120, 6:172, 7:8 |
+| 040-40 | solo | control | 23.18285 | 43.13533 | 60.09566 | 2:254, 3:46 |
+| 040-40 | solo | candidate | 24.96020 | 40.06377 | 40.06377 | 2:300 |
+| 040-40 | grid | control | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 040-40 | grid | candidate | 24.96020 | 40.06377 | 40.06377 | 2:300 |
+| 040-40-bce | solo | control | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 040-40-bce | solo | candidate | 24.96020 | 40.06377 | 40.06377 | 2:300 |
+| 040-40-bce | grid | control | 16.64014 | 60.09566 | 60.09566 | 3:300 |
+| 040-40-bce | grid | candidate | 19.96816 | 50.07972 | 60.09566 | 2:150, 3:150 |
+| 030-50 | grid | candidate | 24.96020 | 40.06377 | 40.06377 | 2:300 |
+| 060-50 | grid | candidate | 24.96020 | 40.06377 | 40.06377 | 2:300 |
+| 030-50-bce | grid | candidate | 19.96816 | 50.07972 | 60.09566 | 2:150, 3:150 |
+| 060-50-bce | grid | candidate | 19.96816 | 50.07972 | 60.09566 | 2:150, 3:150 |
+
+020 normal and dense both pass mean/p95 no-regression. Default-model grid
+reaches 24.960205 FPS on all three high-end CPUs, with every interval two
+fields. Under cycle-exact blitting, grid is 19.968164 FPS on all three:
+150 two-field and 150 three-field intervals, mean 50.079718 ms, p95
+60.095661 ms. The paired 040 solo result is 24.960205 FPS under both models.
+
+### Residual for H8
+
+Three fresh 30-field candidate traces retain empty QBlit/QBSBlit queues, the
+same single graphics BLIT server, no queued-blit calls and no enabled BLIT
+observations. All recorded DMA addresses remain in Chip (maximum `$59FB0`).
+The EC030 trace contains 1,268,169 instructions, validating that profile.
+The accepted observer and separate 040/060 trace observer remain unchanged.
+
+| Cycle-exact profile | Post-wait grid draw, ms | Above estimated 37 ms budget | Above 33 ms margin target |
+|---|---:|---:|---:|
+| 030-50-trace-bce | 41.39726 | 4.39726 | 8.39726 |
+| 040-40-bce | 40.25469 | 3.25469 | 7.25469 |
+| 060-50-bce | 40.44585 | 3.44585 | 7.44585 |
+
+Thus H8 starts with **40.25 ms on 040-bce and 40.45 ms on 060-bce**. It
+should rank the remaining work needed to remove about 3.3–3.5 ms for the
+estimated two-field budget, or 7.3–7.5 ms for margin. H8–H16 are not
+implemented here. H12 still requires explicit user approval.
+
+### Acceptance evidence
+
+The local audit `tmp/dev/tools/audit_h7_final.py` verifies the final binary
+hashes, all retained RGB pixel hashes and state records, FPS/no-regression
+results, ownership/fault cases, lifecycle/unload, disabled options and traces.
+Its result is `tmp/dev/manifest/render-h7-validation.json`; the reduced run
+index is `manifest/render-h7-reduced.json` under the harness. Additional
+indices are `render-h7-build-audit.json`, `render-h7-enabler.json` and
+`render-h7-traces.json`. Raw traces were gzip-compressed, decompressed hashes
+verified, then removed. Archives, fixtures, builds and harness remain ignored.

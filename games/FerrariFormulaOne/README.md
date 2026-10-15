@@ -173,3 +173,11 @@ The current source independently builds to 264,520 bytes, SHA256
 CUSTOM2 remains default-off and RC2 is unchanged.
 B8-PAL cleanup and successor packaging are separate work; human full races and
 real hardware remain deferred.
+
+H6 establishes the cycle-exact-blitter baseline. H7 adds fine-path BLIT
+interrupt ownership with exact lifecycle restoration; it passes the
+user-reduced emulator checks documented in [RENDERING_PLAN.md](RENDERING_PLAN.md).
+Grid reaches 24.96 FPS on 030/040/060 with the default blitter model and
+19.97 FPS with cycle-exact blitting. 020 normal/dense show no regression.
+The coarse payloads and RC2 archive are unchanged; CUSTOM2 remains default-off.
+H8 is next; H12 still needs explicit approval.

@@ -1,5 +1,6 @@
 ; Production 68020+Fast entry; SPS 0481 bindings are generated at build time.
 FF1_FINE_TEXT equ 1
+FF1_FINE_BLIT_OWNER equ 1
 start:
  move.l d0,-(sp)
  move.l selection_path(pc),d0
@@ -94,6 +95,7 @@ keep_gauges:
  tst.l error(pc)
  bne.l FF1ProductionFault
  bsr.w schedule_install
+ bsr.l FF1FineBlitAcquire
  ; Retain the accepted B8 CPU-cache policy. WHDLoad owns cache teardown.
  lea start(pc),a2
  suba.l #FF1_HOST_CODE_SIZE,a2
@@ -389,6 +391,7 @@ FF1_FINE_ROAD_PREFETCH equ 1
 
  include "RenderColour.s"
  include "FinePause.s"
+ include "RenderBlit.s"
  include "FerrariFormulaOne_PublicLifecycle.s"
 public_reset_ranges:
  incbin "reset.bin"

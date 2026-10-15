@@ -9,6 +9,9 @@
 ; No hook is installed by including this module.
  IFD FF1_RENDER_POSES
 B8Draw:
+ IFD FF1_FINE_BLIT_OWNER
+ bsr.l FF1FineBlitAcquire
+ ENDC
  link a6,#-64
  move.l $226ae,-60(a6)
  move.l $226b2,-56(a6)

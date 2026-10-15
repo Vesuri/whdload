@@ -181,6 +181,9 @@ public_unload:
 public_unload_jump:
  jmp $0.l
 public_reset:
+ IFD FF1_FINE_BLIT_OWNER
+ bsr.l FF1FineBlitRestore
+ ENDC
  lea (public_reset_ranges.l,pc),a0
  lea start(pc),a2
 .range:
