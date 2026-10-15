@@ -183,6 +183,16 @@ The coarse payloads and RC2 archive are unchanged; CUSTOM2 remains default-off.
 H8 ranked the remaining costs. H9 now narrows the road fills exactly and passes
 the reduced state/image/elapsed/lifecycle gates. On cycle-exact 040, dense improves
 12.04 → 12.47 FPS; grid remains 19.97 FPS with a 0.34 ms draw-time saving.
-H10 is next; H12 still needs explicit approval. The H9 source reproducibly builds
+H10 was next at that checkpoint; H12 needs explicit approval. The H9 source reproducibly builds
 to 265,512 bytes, SHA256
 `b313710c295498f9a798728850c4b215d4eb0c412c2dd3cd9e0586baaceb3c5e`.
+
+H10 now uses CPU background stores on 030/040/060 + Fast after per-CPU
+cycle-exact benchmarks. Reduced correctness, lifecycle, elapsed and no-regression
+checks pass. Cycle-exact grid reaches 24.96 FPS on 030, 24.71 on 040 and 24.88
+on 060; only 030 has all 300 intervals at two fields. The fresh 040 pair improves
+19.97 -> 24.71 FPS; dense remains 12.48, and 020 is unchanged. H13 is next.
+The 266,080-byte source build is independently reproducible, SHA256
+`b4cbad2eb95c8e679a43c0cc6c8ad08065bbf11a0515301aa1ad68baacb23d50`.
+See [RENDERING_PLAN.md](RENDERING_PLAN.md) for exact scopes and histograms.
+CUSTOM2 stays default-off and RC2 is unchanged.
