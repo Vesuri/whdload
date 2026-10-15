@@ -203,3 +203,20 @@ RGB, native primitive, elapsed, lifecycle, legacy and performance gates pass.
 040BCE grid improves 24.67236 → 24.75392 FPS.
 See the H13 closure in [RENDERING_PLAN.md](RENDERING_PLAN.md) for scope and
 remaining H6c work. H12 is dropped; RC2 packaging remains unchanged.
+
+### H13 local preinstalled snapshot
+
+On request, the Retroplay-based development snapshot is available locally at
+`tmp/dev/dist/FerrariFormulaOne_v1.02-h13_0481_Performance.lha` (686,119 bytes).
+It contains source commit `7017177da0c9370756cf0cc5c9a363aedb4e9ab2` and the
+267,064-byte H13 production slave. SHA256 of the archive:
+`9a09fbb8715fe5fe382de07c328cfaf284e5c4e996677c1a3edbcdcf98ad8780`.
+
+All 40 game files remain exact to Retroplay. Both launch icons are retained:
+Performance enables CUSTOM2=1; FerrariFormulaOne selects CUSTOM2=0. CRC testing
+and complete re-extraction pass for all 53 members. BuildInfo.json records the
+source identity; Qualification.txt distinguishes reduced H-series acceptance
+from historical release qualification. This is a development snapshot, not a
+new release-qualified RC. B8-PAL cleanup, full human races and hardware testing
+remain separate. The older RC2 archive is unchanged. Local packaging evidence:
+`tmp/dev/manifest/preinstalled-h13.json`.
