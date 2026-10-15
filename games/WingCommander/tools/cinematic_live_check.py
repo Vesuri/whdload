@@ -20,6 +20,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('variant',choices=('ocs','cd32'));p.add_argument('build',type=Path)
     p.add_argument('--output',required=True)
+    p.add_argument('--timing',action='store_true',help='sample field-paced running motion')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     v=get(a.variant)
     if a.variant=='ocs':
@@ -98,10 +99,16 @@ def main():
         (out/'registers.txt').write_text(cmd('info registers'))
         rows=[]
         for name,point,reg in (('upper',0x1dec2,'d7'),('feet',0x1dfa4,'d2')):
-            for n in (0,15,30,45):
-                until(h0+point-shift, f'(short)${reg} <= {-12*n}')
+            epoch=None
+            for n in ((0,25,50,75) if a.timing else (0,15,30,45)):
+                condition=(None if epoch is None else f'*(unsigned int*){field:#x} >= {epoch+n}') if a.timing else f'(short)${reg} <= {-12*n}'
+                until(h0+point-shift, condition)
                 r=cmd(f'printf "SCENE %u %d\\n", *(unsigned int*){field:#x}, (short)${reg}')
                 field_value,x=map(int,re.search(r'SCENE (\d+) (-?\d+)',r).groups())
+                if epoch is None:epoch=field_value;epoch_x=x
+                if a.timing and n:
+                    elapsed=field_value-epoch
+                    assert abs(x-epoch_x+elapsed*120//50)<6, (name,n,elapsed,x)
                 rows.append(dict(scene=name,frame=n,field=field_value,x=x))
                 shot(name+'-'+str(n))
                 print(name,n,r,flush=True)

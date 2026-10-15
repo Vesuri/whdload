@@ -49,6 +49,11 @@ def main():
                 for off,label,op in [(0x28c86,'timing_debris_draw',0x4ef9),(0x698,'timing_loop',0x4ef9),(0x878,'timing_pause',0x4ef9),(0x101c,'timing_autopilot',0x4ef9),(0x18eee,'timing_throttle_gate',0x4eb9),(0x18f00,'timing_throttle_gate',0x4eb9),(0x18f3a,'timing_fire_gate',0x4eb9),(0x7bc2,'timing_world_rotation',0x4eb9),(0x34188,'timing_record_input',0x4eb9),(0x1934c,'timing_pad_read',0x4eb9),(0x18c6a,'timing_keys_read',0x4eb9),(0x19380,'timing_key_command',0x4eb9),(0x65f4,'timing_emission_clock',0x4eb9),(0x51a,'timing_message_draw',0x4eb9),(0x46ea,'timing_systems_draw',0x4eb9),(0x530,'timing_sim_draw',0x4ef9),(0x438,'timing_sim_score_draw',0x4eb9),(0x3b8e,'timing_target_draw',0x4ef9),(0x4b16,'timing_selection',0x4ef9),(0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]:
                     want[off:off+6]=struct.pack('>HI',op,s+sym['release_input_vblank' if buffered and off==0x34188 else label])
                 if buffered:
+                    from modal_source import specification
+                    _,_,_,begins,waits,modal=specification('cd32')
+                    for off,width,label in modal:
+                        op=0x4eb9 if off in begins+waits else 0x4ef9
+                        want[off:off+width]=struct.pack('>HI',op,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
                     for off in (0x1de20,0x1de3c,0x1df50,0x1df6c):
                         want[off:off+6]=struct.pack('>HI',0x4eb9,s+sym['cinematic_background'])
                     for off,label in ((0x32e,'intro_asteroids_draw'),(0x2f8,'intro_flash_draw'),(0x306,'view_clear'),(0xc4c,'view_compose'),(0x1fdda,'intro_credits_update'),(0x1fde0,'intro_draw'),(0x1fe14,'intro_finish')):

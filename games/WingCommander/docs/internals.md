@@ -6991,8 +6991,8 @@ selecting the original slave; explicit slave overrides still select originals.
 
 The enhanced OCS and CD32 builds wrap the two background tiles in both
 post-briefing running shots. This is a drawing-coordinate fix, not a C2P or
-cache change. Scene duration, pilot displacement/animation, input and audio
-remain native. Original/off modes remain unchanged.
+cache change. The wrap is independent of the subsequent [modal timing correction](#simulator-and-room-animation-clocks).
+Original/off modes remain unchanged.
 
 | Native operation | CD32 H0 / file | OCS H0 / file |
 |---|---|---|
@@ -7094,3 +7094,80 @@ three distinct camera bases within an unchanged world tick and exact restoration
 after each picture. These are functional emulator checks, not new FPS or hardware
 claims. The first interval after a view cut still respects the existing
 continuity guard. Native tests cover NTSC; no new live NTSC run is claimed.
+
+## Simulator and room animation clocks
+
+Enhanced builds now give the simulator's **Get Ready / Game Over** world the
+same 10 Hz updates and bounded render prediction as the intro. Their shared
+40-iteration text fly-in becomes 40 world ticks (four seconds), with fractional
+text depth sampled between ticks. Flight input/scoring is not enabled by this
+modal owner. Native text, projection, context setup/cleanup and abort handling
+remain in use. The particle-enabled alternative of the shared native routine
+retains its original path; the Ready/Game Over callers both request zero particles.
+
+The bar and barracks animation passes now run at 10 Hz independently of CPU
+speed. Their native animation/RNG and field-based subanimations remain together
+in each pass. Room setup/re-entry rebases the clock; ordinary render debt is
+retained. The bar additionally presents the window between passes: a snapshot
+of the positions actually drawn by the native pass is sampled using fractional
+velocity. These extra draws do not run respawn, random-number generation or frame
+advancement. The snapshot handles up to 64 moving records, failing back to native
+10 Hz presentation if an unexpected count exceeds the storage bound. Room pointer
+polling remains at the native animation-pass cadence. Intermediate window draws
+replay the last foreground poses so the window cannot erase the bartender. The
+portrait script pointers, random seed and draw counter are restored afterwards;
+these presentation draws do not advance the actors.
+
+The running-pilot shots retain their native 95-field deadlines. The background
+scroll now covers 120 pixels/second, pilot horizontal speeds are 20 and 30
+pixels/second, and bitmap frame sequences step at 10 Hz. Positions are sampled
+per rendered field; OCS background X retains its even-pixel checkerboard phase.
+The previously fixed 640-pixel background wrap remains in use.
+
+| Operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Shared simulator text/world entry | `19bda / 19c06` | `1a8b2 / 1a8de` |
+| Ready caller | `19d6e / 19d9a` | `1aa46 / 1aa72` |
+| Game Over caller | `19e82 / 19eae` | `1ab5a / 1ab86` |
+| Running upper deadline/sample | `1d0c6 / 1d0f2` | `1ddf4 / 1de20` |
+| Running feet deadline/sample | `1d1f6 / 1d222` | `1df24 / 1df50` |
+| Bar setup / animation call | `24eea / 24f16`, `24f16 / 24f42` | `25d18 / 25d44`, `25d44 / 25d70` |
+| Barracks setup / animation wait | `260f2 / 2611e`, `2611e / 2614a` | `26fe8 / 27014`, `27014 / 27040` |
+| Native window renderer | `1e8ae / 1e8da` | `1f5e8 / 1f614` |
+| Bar foreground entry | `24ae0 / 24b0c` | `25922 / 2594e` |
+
+`modal_clock.s` shares the policy; `modal_source.py` generates separately verified
+variant operands, displaced instructions and guards from pinned inputs. Every
+new hook is checked before installation. OCS uses the 68000-safe adapter generator;
+public hardware/option eligibility remains unchanged. Original/off modes do not
+install these patches.
+
+The 10 Hz modal rate extends the project's selected world-rate policy; it is not
+an independent historical PC-speed measurement. Native CPU checks cover PAL/NTSC,
+render gaps of 1/3/9 fields, 40 world updates, smooth text depth, fractional debris
+coordinates with exact game-data preservation, running trajectories and rejection
+of mutations at all eight hooks. The native drawing/audio/device routines shared
+with the reference are outside that arithmetic oracle; bounded live scene runs
+provide the separate integration evidence. Physical hardware and live NTSC visual
+acceptance remain separate.
+
+Accepted native reports are `tmp/modal-ocs-native-v8b/report.json` and
+`tmp/modal-cd32-native-v8b/report.json`: two CPU models per variant, 190 PAL/NTSC
+running-position samples, nine intermediate bar samples with unchanged game data,
+and twelve simulator schedules per model. `tmp/modal-ocs-options-v8` passes all
+1,680 public hardware/option cases; `tmp/modal-cd32-install-v8` passes eight
+whole-code installer/option cases. Original reconstruction remains byte-identical.
+
+The cached 030 PAL live gates in `tmp/modal-{ocs,cd32}-final-live` traverse the
+native simulator/name-entry/room path. CD32 Ready and Game Over each take 200
+fields; OCS takes 202 including rate calibration. Bar/barracks animation averages
+one pass per five fields. The bar screenshots retain the overlapping foreground.
+Running fixtures in `tmp/modal-ocs-running-live` and `tmp/modal-cd32-running-live`
+complete all three native shots: sampled background displacement is approximately
+60 pixels per 25 fields, with unchanged shot deadlines. These running captures
+precede the final bar foreground addition; the running implementation is unchanged.
+Their native pixel replays (`tmp/modal-{ocs,cd32}-running-pixels`) pass 238
+background cases per CPU model, including alternating tiles and negative controls.
+
+CD32 release packaging explicitly aligns its payload to whole hunk longwords;
+the builder rejects an unaligned payload instead of silently truncating its size.

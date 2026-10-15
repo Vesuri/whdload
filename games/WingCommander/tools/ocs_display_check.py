@@ -30,8 +30,9 @@ def long(value):
 
 
 class Native:
-    def __init__(self, game, model=1):
-        require(sha(game.read_bytes()) == GAME_SHA, 'unsupported OCS executable')
+    def __init__(self, game, model=1, variant="ocs"):
+        from variants import get
+        require(sha(game.read_bytes()) == get(variant).GAME_SHA, "unsupported executable")
         self.h = P()
         ck(u.uc_open(7, 1 << 30, C.byref(self.h)))
         ck(u.uc_ctl(self.h, 7 | (1 << 26) | (1 << 30), I(model)))  # M68000 by default

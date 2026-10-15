@@ -17,6 +17,10 @@ between ticks; its authoritative script duration and geometry remain unchanged.
 The intro camera also samples fractional orientation, fixing the one-unit turns
 that previously rounded to 10 Hz steps in both variants. See
 [camera sampling](internals.md#intro-camera-fractional-orientation).
+Simulator Ready/Game Over, bar/barracks and running-pilot motion now use
+CPU-independent timing in both enhanced versions; simulator world prediction,
+text zoom, running positions and bar-window motion receive intermediate samples.
+See [modal clocks](internals.md#simulator-and-room-animation-clocks).
 Both enhanced versions now wrap the post-briefing running-pilot backgrounds,
 preventing trails in the upper-body and feet shots. See the
 [cinematic fix](internals.md#running-pilot-cinematic-backgrounds).

@@ -174,12 +174,17 @@ def cd32_main(argv):
         lines.append((ROOT/'whdload/drawing_ceiling.s').read_text().replace('BITMAP_OPCODE',bitmap).replace('CLEAR_OPCODE',clear))
     if a.cache_audit:
         lines.append((ROOT/'whdload/cache_audit.s').read_text())
+    if a.release:
+        from modal_source import source as modal_source
+        lines.append(modal_source(ROOT,"cd32"))
+        lines.append(" cnop 0,4")
     out.mkdir(parents=True)
     source = out/'WingCommanderCD32.s'
     source.write_text('\n'.join(lines)+'\n')
     binary = out/'payload.bin'
     subprocess.run([os.environ['VASM'], '-m68020','-spaces','-no-opt','-Fbin','-L',str(out/'slave.lst'),'-o',str(binary),str(source)],check=True)
     built = binary.read_bytes()
+    if len(built)%4:raise ValueError("slave payload must occupy complete hunk longwords")
     if a.render or a.render_control:
         expected=bytearray(code)
         for offset in ((0x1422,0x178a) if a.render else (0x1422,)): expected[offset:offset+4]=built[offset:offset+4]

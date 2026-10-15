@@ -335,13 +335,16 @@ view_probe_request: dc.l 0
         options+='\nocs_public_config: dc.b '+','.join(str(x) for x in config)+'\n even\n'
         text=text.replace('display_create_checked:',options+'\ndisplay_create_checked:',1)
     if public:
+        from modal_source import source as modal_source
         from opening_source import source as opening_source
         text=text.replace('display_create_checked:',opening_source(ROOT,'ocs')+'\ndisplay_create_checked:',1)
-        text=text.replace('guards_done:\n','guards_done:\n movea.l d6,a0\n bsr.w opening_guard\n',1)
-        text=text.replace('hooks_done:\n','hooks_done:\n movea.l d6,a0\n bsr.w opening_install\n',1)
+        text=text.replace('guards_done:\n','guards_done:\n movea.l d6,a0\n bsr.w opening_guard\n lea install(pc),a1\n adda.l #modal_guard-install,a1\n jsr (a1)\n',1)
+        text=text.replace('hooks_done:\n','hooks_done:\n movea.l d6,a0\n bsr.w opening_install\n lea install(pc),a1\n adda.l #modal_install-install,a1\n jsr (a1)\n',1)
     if public:
         text+=(ROOT/'whdload/cinematic_background.s').read_text().replace(
             '        CINEMATIC_DRAW','        jmp OCS_CINEMATIC_DRAW')
+    if public:
+        text+=modal_source(ROOT,'ocs')
     if intro:
         # The appended D4 payload puts startup tables beyond d16(PC).
         for label in ('guards','native_fixups','payload_end','hooks'):

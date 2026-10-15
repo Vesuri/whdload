@@ -4570,8 +4570,8 @@ Build fresh enhanced candidates and run the bounded cinematic fixture:
 python3 tools/ocs_memory_build.py --public --output tmp/running-ocs
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/running-cd32
 export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
-python3 tools/cinematic_live_check.py ocs tmp/running-ocs --output tmp/running-ocs-live
-python3 tools/cinematic_live_check.py cd32 tmp/running-cd32 --output tmp/running-cd32-live
+python3 tools/cinematic_live_check.py ocs tmp/running-ocs --timing --output tmp/running-ocs-live
+python3 tools/cinematic_live_check.py cd32 tmp/running-cd32 --timing --output tmp/running-cd32-live
 python3 tools/cinematic_background_check.py ocs tmp/running-ocs tmp/running-ocs-live --output tmp/running-ocs-native
 python3 tools/cinematic_background_check.py cd32 tmp/running-cd32 tmp/running-cd32-live --output tmp/running-cd32-native
 ```
@@ -4613,3 +4613,28 @@ checks restoration after every draw, records the exact slave hash, and stops its
 owned emulator. It retains one screenshot, not an instruction trace. Accepted
 native reports are `tmp/camera-{ocs,cd32}-native-final/report.json`; live reports
 are `tmp/camera-ocs-live2/report.json` and `tmp/camera-cd32-live/report.json`.
+
+### Simulator, room and running-pilot timing
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/modal-ocs
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/modal-cd32
+python3 tools/modal_clock_check.py ocs tmp/modal-ocs --output tmp/modal-ocs-native
+python3 tools/modal_clock_check.py cd32 tmp/modal-cd32 --output tmp/modal-cd32-native
+python3 tools/ocs_options_check.py tmp/modal-ocs --output tmp/modal-ocs-options
+python3 tools/timing_adapter_check.py tmp/modal-cd32 --output tmp/modal-cd32-install
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/modal_live_check.py ocs tmp/modal-ocs --output tmp/modal-ocs-live
+python3 tools/modal_live_check.py cd32 tmp/modal-cd32 --output tmp/modal-cd32-live
+python3 tools/cinematic_live_check.py ocs tmp/modal-ocs --timing --output tmp/modal-ocs-running
+python3 tools/cinematic_live_check.py cd32 tmp/modal-cd32 --timing --output tmp/modal-cd32-running
+```
+
+Use fresh output directories. The modal live gate takes native menu/input paths
+through simulator, name entry, bar and barracks, retaining a handful of images
+and field-clock samples. It uses the cached 030 model, 4 MiB Fast for OCS and the
+normal 8 MiB CD32 profile. The running fixture redirects the initialized menu
+call as described above; `--timing` samples by elapsed fields instead of expecting
+the old per-render displacement. These are bounded functional timing checks,
+not hardware throughput or whole-campaign acceptance.

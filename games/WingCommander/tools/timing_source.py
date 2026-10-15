@@ -24,7 +24,7 @@ def source(root, buffered=False, *, variant):
         lines.insert(-1,unit(root, 'view_regions', v.CPU))
         lines.insert(-1,(root/'whdload/cinematic_background.s').read_text().replace(
             '        CINEMATIC_DRAW','        movea.l timing_game(pc),a0\n        jmp $2efe8(a0)'))
-    if buffered:lines += [' bsr.w opening_guard']
+    if buffered:lines += [' bsr.w opening_guard',' bsr.w modal_guard']
     for offset,_,_ in patches:
         word=struct.unpack_from('>H',code,offset)[0]
         lines += [f'\tcmpi.w #${word:04x},${offset:x}(a0)','\tbne.w timing_bad']
@@ -37,7 +37,7 @@ def source(root, buffered=False, *, variant):
             for at in range(offset+2,offset+width,2):
                 value=struct.unpack_from('>H',code,at)[0]
                 lines += [f'\tcmpi.w #${value:04x},${at:x}(a0)','\tbne.w timing_bad']
-    if buffered:lines += [' bsr.w opening_install']
+    if buffered:lines += [' bsr.w opening_install',' bsr.w modal_install']
     lines += ['\tlea $28c8e(a0),a1','\tlea timing_debris_resume(pc),a3','\tmove.l a1,(a3)']
     lines += ['\tmove.l -4(a0),d0','\tlsl.l #2,d0','\taddq.l #4,d0','\tlea timing_data(pc),a1','\tmove.l d0,(a1)']
     lines += ['\tlea $3b96(a0),a1','\tlea timing_target_resume(pc),a3','\tmove.l a1,(a3)']
