@@ -196,3 +196,10 @@ The 266,080-byte source build is independently reproducible, SHA256
 `b4cbad2eb95c8e679a43c0cc6c8ad08065bbf11a0515301aa1ad68baacb23d50`.
 See [RENDERING_PLAN.md](RENDERING_PLAN.md) for exact scopes and histograms.
 CUSTOM2 stays default-off and RC2 is unchanged.
+
+H13 adds bounded CPU gauge background strips on 030/040/060+Fast; native gauge
+calculations and foreground drawing remain unchanged. Reduced exact-state,
+RGB, native primitive, elapsed, lifecycle, legacy and performance gates pass.
+040BCE grid improves 24.67236 → 24.75392 FPS.
+See the H13 closure in [RENDERING_PLAN.md](RENDERING_PLAN.md) for scope and
+remaining H6c work. H12 is dropped; RC2 packaging remains unchanged.

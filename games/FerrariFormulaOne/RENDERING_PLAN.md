@@ -1348,3 +1348,92 @@ inter-blit dispatch or polling delays on fast processors. No H12 code was
 implemented. H12 is removed from the remaining work; the old saving estimate
 is not a measured result or an acceptance target. H13 continues, followed by
 H11 only if the common-scene target remains unmet.
+
+
+## H13 — Bounded CPU gauge strips (accepted, 2026-10-15)
+
+The accepted H13 change replaces six one-row gauge background operations per
+rendered frame on WHDLoad-selected 030/040/060 + Fast. `RenderGauges.s` redirects
+the calls at `$6bd66` and `$6bdb6`, each executed for three adjacent rows, to a
+bounded CPU bitmap operation. These draw the live 68-pixel and 40-pixel source
+patterns into the cockpit bitmap. Gauge calculations, foreground bars, cockpit
+cookie-cuts and mirrors retain their native code.
+
+Both call signatures are validated before either operand changes. The original
+patch ledger owns the four replacement words and restores them on driving exit;
+re-entry binds the new live hunk addresses. The CPU path requires one row, three
+planes, a 12-word destination stride, foreground 6/background 0, zero source
+coordinates, the two native source patterns, and the cockpit plane table.
+Unsigned destination and source-width bounds retain the native operation for
+other cases. Source data is read live, including first/last-word masks and all
+16 destination shifts. There is no cached image or persistent workspace.
+
+The native OwnBlitter/WaitBlit boundary precedes CPU writes, and the native
+conditional DisownBlitter epilogue completes the call. The private primitive
+oracle compares complete destination planes and native A6/SP/CCR, and checks
+that the CPU path preserves its other input registers. Native scratch-register
+outputs are unused at these two call sites. Actual Chip bus writes remain within the cockpit
+source planes, with no overlapping display bitplane fetch. DMA stays in Chip;
+CPU code remains in public Fast memory. No wait shortcut, priority change or
+H12 implementation is included. H12 was dropped separately by user decision.
+
+### Rejected larger cockpit option
+
+The captured cockpit mask has 446 fully opaque, 89 transparent and 149 partial
+words in its 12 × 57 source rectangle; its openings and edges prevent treating
+the whole image as opaque. A live-mask CPU cookie-cut was tested first, copying
+opaque words and blending partial words. It passed 68 native pixel comparisons
+across shifts and clipping, but the matched 040BCE short trace regressed from
+36.97148 to 40.66361 ms post-wait. It is rejected and absent from production.
+The bounded gauge diagnostic subsequently passed 108 native comparisons and
+saved 0.68650 ms (37.47383 → 36.78733 ms) in a verified-hook 12-field pair.
+Those diagnostics are separate from the final production figures below.
+
+### Final production evidence
+
+- 100 exact game-state updates and private fractions; live new hooks checked.
+- 30 complete RGB frames each for normal, solo, grid and dense: all exact.
+  The existing test-only scanout hold is retained; no pixels or tolerances change.
+- 108 native primitive cases, including every pixel shift,
+  exact surrounding pixels, CPU register preservation and native A6/SP/CCR;
+  CPU execution confirmed.
+- 60 simulated seconds: 0.02588261% elapsed error (gate ≤0.25%).
+- Native 040 pause, tow, pit/menu and fresh session; all
+  920 ledger words restored, new hooks present
+  again after re-entry. Corrupting the second signature leaves both calls native
+  and reaches the normal WHDLoad failure route.
+- Controlled 020+Fast CUSTOM2=0 exact with both CUSTOM1 settings. The 68000 and
+  chip-only 020 payloads remain byte-identical to H10; CUSTOM2 remains default-off.
+- Independent production rebuild byte-identical: 267064 bytes,
+  SHA256 `8b45d6a893ea3b29f3543e66147c3fcb419883c67cbdbfb15d981fe25078f1fd`. The equal-layout control differs only in
+  immutable `FF1RenderGaugeControl`; no allocation or reset-state addition.
+- Matched 30-field 040BCE grid traces: post-wait draw cost
+  **37.327016 → 37.141537 ms**, saving **0.185479 ms**. All trace costs retained.
+
+Warp is disabled for every 300-complete-interval measurement. These are emulator
+results, not hardware measurements. As in H10's reduced scope, 030/060 grid
+runs are candidate confirmations; fresh matched pairs cover 040 grid/dense and
+020 normal. No new default-blitter matrix or release archive is claimed.
+
+| Profile / scene / arm | FPS | Mean ms | p95 ms | Interval histogram (fields) |
+| --- | ---: | ---: | ---: | --- |
+| a1200-fast / normal / control | 15.37590 | 65.03686 | 80.12755 | 226 × 3, 74 × 4 |
+| a1200-fast / normal / candidate | 15.37590 | 65.03686 | 80.12755 | 226 × 3, 74 × 4 |
+| 040-40-bce / grid / control | 24.67236 | 40.53118 | 40.06377 | 293 × 2, 7 × 3 |
+| 040-40-bce / grid / candidate | 24.75392 | 40.39764 | 40.06377 | 295 × 2, 5 × 3 |
+| 040-40-bce / dense / control | 12.48010 | 80.12755 | 80.12755 | 300 × 4 |
+| 040-40-bce / dense / candidate | 12.48010 | 80.12755 | 80.12755 | 300 × 4 |
+| 060-50-bce / grid / candidate | 24.91867 | 40.13055 | 40.06377 | 299 × 2, 1 × 3 |
+| 030-50-bce / grid / candidate | 24.96020 | 40.06377 | 40.06377 | 300 × 2 |
+
+H13's earlier 2–4 ms estimate was not achieved. The small accepted operation
+saves measured work, but does not establish the all-300-two-field H6c target
+for every common scene. H11 remains the next planned option if that target is
+pursued; H12 is dropped. Human full-race playtesting and real hardware remain
+deferred. B8-PAL cleanup, packaging and the RC2 archive are unchanged.
+
+Local evidence: `tmp/dev/manifest/render-h13-validation.json`,
+`render-h13-microbench.json`, `render-h13-build-audit.json`,
+`render-h13-diagnostics.json` and `render-h13-capture-archive.json`.
+Completed large captures are hash-verified and compressed; no rejected cockpit
+kernel or test counter is part of the production source.

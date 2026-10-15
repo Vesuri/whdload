@@ -93,6 +93,7 @@ keep_gauges:
  bsr.l FF1RenderInstallBitmap
  bsr.l FF1RenderInstallFill
  bsr.l FF1RenderInstallClear
+ bsr.l FF1RenderInstallGauges
  bsr.l FF1FinePauseInstall
  tst.l error(pc)
  bne.l FF1ProductionFault
@@ -386,6 +387,7 @@ FF1_FINE_ROAD_PREFETCH equ 1
  include "RenderRoad.s"
  include "RenderFill.s"
  include "RenderClear.s"
+ include "RenderGauges.s"
  include "RenderText.s"
  include "RenderBitmap.s"
 
