@@ -105,6 +105,8 @@ if kind in ('fine','000'):
  fragment(symbols['FF1Track'+prefix+'Signature'],0x6977a,0x112,'lookahead signature')
  fragment(symbols['FF1Track'+prefix+'Signature']+0x112,0x67514,0x16,'lookahead caller')
  fragment(symbols['FF1Trig'+prefix+'Signature'],0x24fe0,64,'trig signature')
+if kind=='fine':
+ fragment(symbols['FF1RenderColourSignature'],0x32d48,0x1c8,'fine colour signature')
 if kind=='000':
  fragment(symbols['FF1C4ColourSignature'],0x32d48,0x1c8,'colour signature')
  for label,address,length in [('1',0x6759a,22),('2',0x6ea2c,12),('3',0x6cd54,16)]:

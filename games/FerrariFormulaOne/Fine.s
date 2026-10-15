@@ -87,6 +87,7 @@ keep_gauges:
  ifgt FF1_NATIVE_EXACT
  bsr.l FF1InstallNativeExact
  endc
+ bsr.l FF1RenderInstallColourElide
  bsr.l FF1FinePauseInstall
  tst.l error(pc)
  bne.l FF1ProductionFault
@@ -380,6 +381,7 @@ B8DrawEnabled: dc.w 1
 
  include "FerrariFormulaOne_NativeExact.s"
 
+ include "RenderColour.s"
  include "FinePause.s"
  include "FerrariFormulaOne_PublicLifecycle.s"
 public_reset_ranges:

@@ -100,7 +100,7 @@ its successor passes the final gates.
    direct-call candidate was measured, then completely removed. No experimental
    implementation or build switch remains. See the findings below. Proceed to H2.
 
-2. **H2 — Remove exact zero/Q colour intermediates.** Adapt
+2. **H2 — Remove exact zero/Q colour intermediates: accepted.** Adapt
    `FerrariFormulaOne_Coarse200Colour.s` to fine-path bindings, without importing
    coarse timing assumptions. Reconfirm `$1c1b8` consumers for this executable;
    preserve clipping, masks, shifts, final cookie-cut, mixed minterms and DMA
@@ -187,7 +187,7 @@ compressed SHA256 hashes are in the manifest. No long-running trace is retained.
 The user rejected H1 after measurement: reaching the blitter wait earlier mainly
 moves waiting from the Chip library dispatch into the busy helper. All H1 source,
 build integration and local experimental builds were removed. The shipped RC2
-archive is unchanged; the ordinary source remains the RC2 implementation.
+archive was unchanged and the ordinary source was restored to RC2.
 
 Equal-layout, RNG-controlled, every-update endpoint rendering gives 14 complete
 matched draws per arm. Both execute exactly 6,712 WaitBlit calls. Mean total draw
@@ -215,4 +215,84 @@ completed: this is a rejected experiment, not an accepted optimization.
 Local results and verified compressed traces remain as evidence under
 `tmp/dev/tmp/step5/c4-q03-*-h1-*` and are indexed by
 `tmp/dev/manifest/render-h1-withdrawal.json`. Experimental code and slaves are
-not retained. **H2 is the next implementation step.**
+not retained. H2 was the next implementation step.
+
+## H2 zero/Q colour intermediates (2026-10-15)
+
+`RenderColour.s` ports the accepted C4 colour operation to the fine path. The
+entire native table/routine is signature checked before the existing patch
+ledger installs the hook. Zero disables B DMA; Q uses the original Q source
+instead of first copying it to scratch. Mixed minterms, clipping, shifts, masks,
+final cookie-cut BLTSIZE and the wait before each plane remain native. There is
+no H1 dispatch change, new DMA allocation or interrupt ownership change.
+
+The fresh SPS 0481 relocation/alias audit confirms five references to `$1c1b8`:
+allocation guard, assignment, free argument, colour destination and cookie-cut
+source. Only the cookie-cut consumes scratch contents. The independent model
+passes all 32 Boolean and 5,760 shifted/clipped/row cases.
+
+Fourteen exact endpoint draws have identical plane/minterm and clipping/shift
+sequences. Intermediate colour blits fall **420 -> 182** (56.67%); all **420**
+final cookie-cut blits remain. Inclusive WaitBlit time at `$32e6c` falls
+**1.171216 -> 0.428373 ms/draw**, with calls **420 -> 182** and busy calls
+**19 -> 2**. Total matched draw time is **60.114767 -> 60.111228 ms**; work
+outside beam synchronization falls **56.082881 -> 54.847298 ms** (1.236 ms,
+2.20%). The beam wait absorbs that margin in this endpoint fixture, so this is
+not a matched-draw FPS gain. Ordinary and dense workloads are measured separately.
+
+The normal 020+Fast 60-second run takes **60.055597 seconds** in both arms,
+**0.092576%** error. The 100-update comparison matches all 27 semantic blocks
+and private physics fractions exactly. Normal, grid and dense fixtures each
+match 30 complete 754 x 576 RGB frames: 90 exact comparisons, with no crop or
+pixel tolerance. The frame observer initializes exporter padding, as established
+for C4; performance measurements use the timing observer.
+
+All four short traces keep blitter/bitplane DMA in Chip memory. Candidate trace
+and independent census match scheduler contexts, field cycles, DMA counts and
+first displayed bitplane addresses. Coverage is 99.999795% (28 boundary cycles).
+Whole RAM snapshots differ at two bytes, `$5fa140` and `$5fa146`, at both ends;
+full-RAM identity is not claimed. The separate semantic/private-state gate is exact.
+
+The user accepted H2 on these completed results and stopped the remaining
+qualification on 2026-10-15. The following are equal-layout, warp-off comparisons
+of 300 complete presentation intervals. Census-window boundaries are excluded;
+the 020 dense run required two windows. Fixed grid/dense fixtures retain all
+seven opponents. No completed comparison regresses in mean or p95.
+
+| Emulator / scene | FPS control → H2 | Mean ms control → H2 | p95 ms control → H2 |
+|---|---:|---:|---:|
+| a1200-fast / normal | 13.230 → 13.300 | 75.587 → 75.186 | 80.128 → 80.128 |
+| a1200-fast / grid | 12.480 → 12.480 | 80.128 → 80.128 | 80.128 → 80.128 |
+| a1200-fast / dense | 5.703 → 6.240 | 175.346 → 160.255 | 180.287 → 160.255 |
+| 030-50 / normal | 16.243 → 16.640 | 61.565 → 60.096 | 80.128 → 60.096 |
+| 030-50 / grid | 14.386 → 16.640 | 69.511 → 60.096 | 80.128 → 60.096 |
+| 030-50 / dense | 9.984 → 9.984 | 100.159 → 100.159 | 100.159 → 100.159 |
+| 040-40 / normal | 16.622 → 16.640 | 60.162 → 60.096 | 60.096 → 60.096 |
+| 040-40 / grid | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 040-40 / dense | 9.984 → 9.984 | 100.159 → 100.159 | 100.159 → 100.159 |
+| 060-50 / normal | 16.603 → 16.640 | 60.229 → 60.096 | 60.096 → 60.096 |
+
+These are emulator observations with the calibrated timing observer, not physical
+CPU rankings. Accelerated tests use explicit real-frequency, cycle-exact settings
+(030/50, 040/40 and 060/50; 8 MiB Fast). 040/060 timing profiles have MMU off;
+no new 040/MMU/32 MiB control result is claimed. The normal high-end workload
+still takes three PAL fields; H2 does not meet the 25 FPS target.
+
+Remaining H2 checks were deliberately stopped: 060 grid candidate/dense,
+native input/manual gears, 040/MMU/32 MiB driving, pause/tow/pit/menu/re-entry,
+patch/INTENA restoration, signature-failure injection and fresh CUSTOM2=0 /
+CUSTOM1 comparisons. Prior RC2 qualification is historical evidence, not a
+substitute for those H2 reruns. H2 is accepted for continued development, not
+fully release-qualified. Human full races and physical hardware remain deferred.
+
+The independently reproduced slave is 261,512 bytes, SHA256
+`0a26fe52fd0e27e476dacdc53401c30b923a5d7dd7099bb025d8a06ee1d798b2`.
+The equal-layout control differs only in the immutable H2 preset. The 68000 and
+chip-only 020 payloads are unchanged. CUSTOM2 remains default-off. The delivered
+RC2 LHA is unchanged. **H3 is next.**
+
+Local evidence: `tmp/dev/manifest/render-h2-validation.json`,
+`render-h2-performance.json`, `render-h2-matched-profile.json`,
+`render-h2-scratch.json`, `render-h2-dma.json` and `render-h2-traces.json`.
+The four raw traces were compressed and their decompressed hashes verified;
+analysers require decompression. Harness scripts and diagnostic builds stay ignored.

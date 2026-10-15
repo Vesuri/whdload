@@ -120,4 +120,17 @@ identified above. Replace the RC1 installation; saved game data can be retained.
 
 The short RC2 020+Fast rendering profile and prioritized high-end optimization
 work order are in [RENDERING_PLAN.md](RENDERING_PLAN.md). This is measured
-follow-up work; it does not change the RC2 game binary or archive.
+follow-up work; the delivered RC2 archive remains unchanged.
+
+H2 now removes exact zero/Q colour intermediates on the 020+Fast fine path.
+The user accepted the completed measurements: 020 dense 5.70 -> 6.24 FPS,
+030 grid 14.39 -> 16.64 FPS, with no regression in the completed comparisons.
+100 state updates/private fractions and 90 full RGB frame comparisons are exact;
+the 60-second clock gate and independent rebuild pass. Remaining H2 controls,
+lifecycle, legacy-option and 060 heavy-scene qualification were stopped at the
+user's request. This is accepted development work, not a newly qualified release.
+See RENDERING_PLAN.md for the complete table, scope and deferred checks.
+
+Current H2 source builds to 261,512 bytes, SHA256
+`0a26fe52fd0e27e476dacdc53401c30b923a5d7dd7099bb025d8a06ee1d798b2`.
+The packaged RC2 slave above is unchanged. H1 remains removed; H3 is next.
