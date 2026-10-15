@@ -1,4 +1,5 @@
 ; Production 68020+Fast entry; SPS 0481 bindings are generated at build time.
+FF1_FINE_TEXT equ 1
 start:
  move.l d0,-(sp)
  move.l selection_path(pc),d0
@@ -378,6 +379,7 @@ B8DrawEnabled: dc.w 1
 FF1_FINE_ROAD_PREFETCH equ 1
  include "FerrariFormulaOne_FullPresentation.s"
  include "RenderRoad.s"
+ include "RenderText.s"
 
  FF1UpdateWorkspace
 

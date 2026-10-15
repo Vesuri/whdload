@@ -340,7 +340,11 @@ FF1PresentClock:
  move.l d2,-(sp)
  move.l d1,-(sp)
  move.l d0,-(sp)
+ IFD FF1_FINE_TEXT
+ bsr.l FF1RenderClockDigit
+ ELSE
  jsr $23288
+ ENDC
  lea 12(sp),sp
  movem.l (sp)+,d7/a2-a3
  dbra d7,.next

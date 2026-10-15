@@ -144,7 +144,19 @@ regression. State/private fractions, 90 full RGB comparisons, native controls
 See RENDERING_PLAN.md for scope and the separately documented inherited B8-PAL
 palette pulse; intermediate transition JPEGs are not claimed identical.
 
-The current H3 source independently builds to 262,056 bytes, SHA256
+The accepted H3 source independently builds to 262,056 bytes, SHA256
 `ac034f9786055bcb04c45383740def6cf249bf0910260dbc322c98461f15a8c2`.
 CUSTOM2 remains default-off, and the packaged RC2 above is unchanged. H4 is the
-next optimization; human full races and real-hardware testing remain deferred.
+next optimization at that checkpoint; human full races and real-hardware testing remain deferred.
+
+H4 batches the demo label (126 → 6 blits) and removes the clock's immediate
+duplicate back-buffer overwrite (42 → 21 blits, including player driving).
+Matched draw cost falls 7.27% (4.371 ms). All twelve 300-presentation performance
+pairs pass no-regression, with exact state/private fractions, 90 complete RGB
+comparisons, elapsed, native controls, lifecycle, legacy and failure checks.
+See RENDERING_PLAN.md for the FPS table and the inherited B8-PAL limitation.
+
+The current H4 source independently builds to 263,532 bytes, SHA256
+`f4f09229e73699fe278df126cc9d3ab614df449b2a4d2e26384d16ca1911fa0f`.
+CUSTOM2 remains default-off and RC2 remains unchanged. H5 is next; human races
+and physical hardware testing remain deferred.

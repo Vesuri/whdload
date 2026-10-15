@@ -1215,7 +1215,11 @@ B8_65d4e:
 B8_65d50:
  pea.l $32cd3.l
 B8_65d56:
+ IFD FF1_FINE_TEXT
+ bsr.l FF1RenderDemoText
+ ELSE
  jsr $239a0.l
+ ENDC
 B8_65d5c:
  lea $c(a7),a7
 B8_65d60:
