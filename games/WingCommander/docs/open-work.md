@@ -14,6 +14,9 @@ remain native. Both unskipped opening gates pass through to the world intro; see
 [opening timing](internals.md#opening-animation-speed-and-default-caches).
 The separate Wing Commander title logo also samples fractional zoom and rotation
 between ticks; its authoritative script duration and geometry remain unchanged.
+Both enhanced versions now wrap the post-briefing running-pilot backgrounds,
+preventing trails in the upper-body and feet shots. See the
+[cinematic fix](internals.md#running-pilot-cinematic-backgrounds).
 OCS exhaust attachments now follow the predicted parent position, scale and roll
 on every enhanced picture; creation and animation remain world-owned. See
 [attachment motion](internals.md#exhaust-attachments-at-render-cadence).

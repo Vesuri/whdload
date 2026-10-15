@@ -6985,3 +6985,59 @@ The unchanged enhanced CD32 build passes the same eight-pair check in
 `tmp/exhaust-cd32-live/report.json`. No CD32 placement patch is necessary.
 The default CD32 launcher now builds that enhanced source instead of silently
 selecting the original slave; explicit slave overrides still select originals.
+
+
+## Running-pilot cinematic backgrounds
+
+The enhanced OCS and CD32 builds wrap the two background tiles in both
+post-briefing running shots. This is a drawing-coordinate fix, not a C2P or
+cache change. Scene duration, pilot displacement/animation, input and audio
+remain native. Original/off modes remain unchanged.
+
+| Native operation | CD32 H0 / file | OCS H0 / file |
+|---|---|---|
+| Running cinematic entry | `1dfde / 1e00a` | `1d2b0 / 1d2dc` |
+| Upper-body shot | `1ddd2 / 1ddfe` | `1d0a4 / 1d0d0` |
+| Feet shot | `1df00 / 1df2c` | `1d1d2 / 1d1fe` |
+| Upper background draw calls | `1de20 / 1de4c`, `1de3c / 1de68` | `1d0f2 / 1d11e`, `1d10e / 1d13a` |
+| Feet background draw calls | `1df50 / 1df7c`, `1df6c / 1df98` | `1d222 / 1d24e`, `1d23e / 1d26a` |
+| Native bitmap renderer | `2efe8 / 2f014` | `2f9a6 / 2f9d2` |
+
+Each shot lasts 95 native field-clock counts. Its background offset decreases
+by 12 each loop, but its two 320-pixel tiles were never recycled. After 27
+iterations, the right edge is no longer repainted; after 54, both tiles are
+entirely offscreen. The existing framebuffer then retains older pilot poses.
+The bounded CD32 control reaches offset -360 at picture 30 and reproduces the
+missing background. OCS reaches the same offset faster in the tested model.
+These are scene-coordinate observations, not hardware performance estimates.
+
+Shared `cinematic_background.s` changes only the disposable X argument at the
+four guarded bitmap call sites. It wraps into `[-319,320]` modulo **640**,
+preserving the alternating upper-background frames 0/1; the feet use frame 2
+for both tiles. Wrapping the pair at 320 would repeat the wrong upper tile.
+Native clipping handles the seam and all foreground calls remain untouched.
+The implementation uses base 68000 instructions and no allocation or persistent
+state. Each variant retains its own verified call sites and bitmap entry.
+
+Evidence: `tmp/running-cd32-before3` is the uncorrected CD32 control;
+`tmp/running-cd32-replay` and `tmp/running-ocs-after` capture the corrected native
+scenes at pictures 0/15/30/45 in each shot and complete the cinematic. The
+bounded fixture redirects one menu call into the real cinematic entry after
+frontend initialization; it does not claim an uninterrupted campaign traversal.
+It retains real asset loading, scene instructions, rendering and publication.
+
+`cinematic_background_check.py` replays those captured assets through each
+variant's actual native bitmap renderer. It first decodes the three opaque
+320×128 background tiles independently at X=0, then compares the patched pair
+against host-side tiling for 238 shot/offset cases per CPU model, beyond two
+complete tile periods. The tested coordinates are even, matching the native
+zero-start/12-pixel step; arbitrary odd-coordinate OCS checkerboard phase is
+outside this test. OCS passes on 68000/020/040 and CD32 on 020/040. Both missing-
+wrap controls fail per model. Native callee-saved registers, stack balance and
+all four installed call targets are checked. Reports are in
+`tmp/running-ocs-pixels2` and `tmp/running-cd32-pixels`.
+
+The public OCS option/hardware suite passes all 1,680 cases, including exact
+original-mode code preservation and enabled hook targets. CD32 passes 196
+option/cache cases, 54 converter outputs, 270 pacing cases and eight installer
+cases; altered operands at each new background hook are rejected before patching.

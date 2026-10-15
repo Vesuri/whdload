@@ -4559,3 +4559,30 @@ with its explicit legacy cache-model compatibility setting, PAL and DCACHE. It
 changes no guest poses. Reports contain coordinates sampled at native sort entry;
 the one-field screenshot may lag this render sample. This is functional evidence,
 not a frame-rate measurement. All owned observer processes stop on exit.
+
+
+### Running-pilot background regression
+
+Build fresh enhanced candidates and run the bounded cinematic fixture:
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/running-ocs
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/running-cd32
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/cinematic_live_check.py ocs tmp/running-ocs --output tmp/running-ocs-live
+python3 tools/cinematic_live_check.py cd32 tmp/running-cd32 --output tmp/running-cd32-live
+python3 tools/cinematic_background_check.py ocs tmp/running-ocs tmp/running-ocs-live --output tmp/running-ocs-native
+python3 tools/cinematic_background_check.py cd32 tmp/running-cd32 tmp/running-cd32-live --output tmp/running-cd32-native
+```
+
+Use new output directories. The live fixture needs the project's existing
+`key`, `ocs-load` and lossless profile-image observer commands. It uses the
+known 030/cache observer profile with 4 MiB Fast RAM, keeping the menu-call
+fixture inside the observer's supported address range. It invokes the native
+running cinematic from the initialized menu, restores that call on completion,
+and stops only its own emulator. This is a scene fixture, not a campaign replay.
+It keeps eight PNGs and a 6 MiB native replay snapshot per variant, deleting
+transient instruction captures. The native checker verifies complete 320×128
+background pixels, alternating tile identity, register/stack contracts and
+missing-wrap rejection. It makes no performance claim.

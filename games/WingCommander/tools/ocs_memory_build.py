@@ -56,6 +56,9 @@ def build(out,option,exit_probe=False,changed="off", clock=False, prediction=Fal
     if intro:
         from ocs_intro_source import NATIVE as intro_native, HOOKS as intro_hooks
         native.update(intro_native);hooks+=intro_hooks
+    if public:
+        hooks+=tuple((off,'cinematic_background',0x4eb9) for off in (0x1d0f2,0x1d10e,0x1d222,0x1d23e))
+        native['OCS_CINEMATIC_DRAW']=0x2f9a6
     if math_fast:
         hooks+=((0x2adb6,'ocs_multiply',0x4ef9),
                 (0x2b6d4,'ocs_distance_ratio',0x4ef9),
@@ -336,6 +339,9 @@ view_probe_request: dc.l 0
         text=text.replace('display_create_checked:',opening_source(ROOT,'ocs')+'\ndisplay_create_checked:',1)
         text=text.replace('guards_done:\n','guards_done:\n movea.l d6,a0\n bsr.w opening_guard\n',1)
         text=text.replace('hooks_done:\n','hooks_done:\n movea.l d6,a0\n bsr.w opening_install\n',1)
+    if public:
+        text+=(ROOT/'whdload/cinematic_background.s').read_text().replace(
+            '        CINEMATIC_DRAW','        jmp OCS_CINEMATIC_DRAW')
     if intro:
         # The appended D4 payload puts startup tables beyond d16(PC).
         for label in ('guards','native_fixups','payload_end','hooks'):

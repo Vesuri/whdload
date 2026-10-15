@@ -47,6 +47,10 @@ TIMING_HOOKS = (
     (0x43ee, 'timing_portrait_random', 0x4eb9),
 )
 BUFFERED_HOOKS = (
+    (0x1de20, 'cinematic_background', 0x4eb9),
+    (0x1de3c, 'cinematic_background', 0x4eb9),
+    (0x1df50, 'cinematic_background', 0x4eb9),
+    (0x1df6c, 'cinematic_background', 0x4eb9),
     (0x32e, 'intro_asteroids_draw', 0x4eb9),
     (0x2f8, 'intro_flash_draw', 0x4eb9),
     (0x1fd00, 'intro_title', 0x4ef9),
