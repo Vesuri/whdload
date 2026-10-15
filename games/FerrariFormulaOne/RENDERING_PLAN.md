@@ -759,9 +759,8 @@ the gates.
    by per-CPU micro-benchmarks. Expected −2 to −3 ms.
 6. **H11 — Overlap the top-region flag/clock/demo text with long blits,**
    after proving those rows have no later writer. Expected −1.5 to −2.3 ms.
-7. **H12 — Inter-blit latency.** A 030+ WaitBlit without the CIA-delay loop.
-   Needs explicit user approval because H1 was discarded. Expected −1 to
-   −2.5 ms.
+7. **H12 — Inter-blit latency: dropped by user decision (2026-10-15).**
+   No implementation remains or is planned.
 8. **H13 — Cockpit, gauges and mirrors** (`$6ba18`, `$6c0d0`, `$6adf8`,
    `$6bbfc`, `$6ae70`, `$6af7e`; ~10 ms per frame): opaque runs as A→D copies,
    bounded CPU gauge segments. Expected −2 to −4 ms.
@@ -774,7 +773,7 @@ Expected path under cycle-exact 040, where only the H7 row is measured:
 
 - **After H7:** solo 24.96 FPS (~2.5 ms slack); grid 19.97 FPS.
 - **After H9–H11:** solo, normal and grid at 25 FPS (estimated).
-- **H12/H13:** margin for the 030.
+- **H13:** margin for the 030.
 - **Dense:** needs H15.
 
 In the default profiles, H7 alone gives 24.96 FPS for solo and grid on
@@ -1003,7 +1002,7 @@ The accepted observer and separate 040/060 trace observer remain unchanged.
 Thus H8 starts with **40.25 ms on 040-bce and 40.45 ms on 060-bce**. It
 should rank the remaining work needed to remove about 3.3–3.5 ms for the
 estimated two-field budget, or 7.3–7.5 ms for margin. H8–H16 are not
-implemented here. H12 still requires explicit user approval.
+implemented here. H12 was subsequently dropped by the user.
 
 ### Acceptance evidence
 
@@ -1098,11 +1097,8 @@ assuming that every fill belongs to its patch scope.
    observed CPU work potentially hideable in this grid fixture, before bus
    contention, rather than promising the earlier 1.5–2.3 ms saving. Prove the
    top-region write ordering and measure any additional removed waits.
-5. **H12 — Inter-blit latency: approval-gated, not scheduled.** Short-gap
-   estimates are 1.91/1.89 ms per field on 040/060 (2.25 on EC030). They use
-   a DMA-run heuristic and include real setup and bus delays; they are not
-   directly recoverable WaitBlit overhead. No H1-style shortcut or priority
-   change was added. Explicit user approval is still required.
+5. **H12 — Inter-blit latency: dropped by user decision (2026-10-15).**
+   No WaitBlit polling shortcut or blitter-priority change is planned.
 
 ### Stop rule and scope
 
@@ -1217,7 +1213,7 @@ The original 1.5–3 ms whole-frame saving estimate was not achieved.
 
 H6c's 25 FPS target remains unmet: grid still has 150 two-field and 150
 three-field intervals. H10 is next, followed by H13/H11 only if needed;
-H12 still requires explicit approval. Stop further optimizations once the
+H12 is dropped. Stop further optimizations once the
 common-scene two-field gate passes. B8-PAL cleanup, successor packaging, human
 full races and real hardware remain separate/deferred work.
 
@@ -1331,8 +1327,7 @@ clears finish before returning. The whole post-wait draw measurement includes
 that boundary; individual call totals must not double-count its saving.
 The decisive all-300-two-field target is met by this 030 grid run, but 040 and
 060 still have occasional three-field intervals. Normal/solo/grid on 040/060
-have not all met H6c. Next is H13, then H11 only if needed; H12 still requires
-explicit approval. Do not add further optimizations once H6c is proven.
+have not all met H6c. Next is H13, then H11 only if needed; H12 is dropped. Do not add further optimizations once H6c is proven.
 
 The independent rebuild is byte-identical: 266,080 bytes, SHA256
 `b4cbad2eb95c8e679a43c0cc6c8ad08065bbf11a0515301aa1ad68baacb23d50`. RC2 SHA256 is unchanged:
@@ -1345,3 +1340,11 @@ Local evidence: `tmp/dev/manifest/render-h10-validation.json`,
 `render-h10-build-audit.json`, default-off manifests, native primitive/lifecycle/
 fault captures and hash-verified compressed traces. The validation index also
 records exact source/tool and result hashes.
+
+## H12 withdrawn (2026-10-15)
+
+The user dropped H12: focus on reducing the blits themselves, rather than
+inter-blit dispatch or polling delays on fast processors. No H12 code was
+implemented. H12 is removed from the remaining work; the old saving estimate
+is not a measured result or an acceptance target. H13 continues, followed by
+H11 only if the common-scene target remains unmet.
