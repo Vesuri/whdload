@@ -89,6 +89,7 @@ keep_gauges:
  bsr.l FF1InstallNativeExact
  endc
  bsr.l FF1RenderInstallColourElide
+ bsr.l FF1RenderInstallBitmap
  bsr.l FF1FinePauseInstall
  tst.l error(pc)
  bne.l FF1ProductionFault
@@ -380,6 +381,7 @@ FF1_FINE_ROAD_PREFETCH equ 1
  include "FerrariFormulaOne_FullPresentation.s"
  include "RenderRoad.s"
  include "RenderText.s"
+ include "RenderBitmap.s"
 
  FF1UpdateWorkspace
 

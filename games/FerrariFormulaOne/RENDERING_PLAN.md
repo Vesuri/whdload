@@ -127,7 +127,7 @@ its successor passes the final gates.
    value check. Track dirtiness per destination, invalidate on clear/view/menu/
    reload, and test value transitions, both buffers and demo/player modes.
 
-5. **H5 — Choose CPU or blitter per measured primitive; then reassess IRQs.** If
+5. **H5 — Choose CPU or blitter per measured primitive; then reassess IRQs: accepted.** If
    small bitmap operations still dominate, histogram native `$24ae0`, `$32d54`
    and road `$6acxx/$6adxx` operations by size, minterm, shift, clipping and
    overlap. Build exact CPU implementations only for profitable, bounded cases;
@@ -533,3 +533,133 @@ Local evidence: `tmp/dev/manifest/render-h4-validation.json`,
 Raw traces are compressed with verified decompressed hashes; harnesses and
 fixture builds remain ignored. The earlier demo-only iteration and observer
 sampling diagnostic remain separately labelled, not reused as final acceptance.
+
+## H5 accepted: bounded CPU font glyphs (2026-10-15)
+
+`RenderBitmap.s` replaces the native bitmap operation only for byte-aligned
+8 x 8 glyphs from either live native font, with three destination planes and
+48-byte destination rows in the driving pointer views. It reads each font row
+once, then writes eight bytes per plane with the exact foreground/background
+operation. Each selected glyph replaces three blits with 24 CPU byte writes.
+Other sizes, shifts, source types, multi-plane sources and unsupported coordinates
+retain the native routine. Road lines/fills and sprite colour operations remain
+on the blitter. The post-H4 histogram, not processor speed alone, selected this
+small class; it does not establish a general CPU/blitter crossover curve.
+
+The already-owned driving path is separately covered by 268 full-plane/CCR
+comparisons on 020, plus the actual rendering profiles.
+
+The previous DMA is completed by native WaitBlit before reading the font or
+writing destination pixels. Conditional native OwnBlitter/DisownBlitter remains.
+The same KickEmu ownership implementation explicitly preserves its scratch
+registers. No font/destination cache or new DMA allocation is introduced; the
+CPU code is in the existing public/Fast payload. The existing hunk ledger owns
+the six-byte entry patch and restores it on release. Both A500 and chip-only 020
+payloads remain byte-identical to H4. The final path also clears X before the
+native exit, matching the original final-plane subtraction; it never reads SR.
+
+The equal-layout control validates the same entry signature but leaves that
+entry untouched. All new hook/selection overhead is charged to the candidate.
+The preset is the sole differing binary byte. An earlier dispatch-bearing
+control was retained as a diagnostic, not reused as final acceptance.
+
+Each CPU profile passes 268 directed native-versus-CPU comparisons of all 30,960
+destination bytes and the complete CCR: all 64 foreground/background pairs,
+both fonts and byte positions, screen edges, and 12 shifted/size fallback cases.
+The independent bit-level model passes 3,072 whole-row cases. The benchmark
+executes 20,000 glyph calls per arm, acquiring/releasing native ownership per
+call, after two settled VBLs with warp off;
+readback verifies the control's original entry and the candidate's hook.
+VBL endpoint resolution is approximately 1.002 μs/glyph. These are calibrated
+emulator results, not physical CPU rankings or predictions for larger bitmaps.
+The actual matched driving trace selects seven clock glyphs per draw; their
+CPU function mean is approximately 82 μs with ownership already held.
+
+| Emulator | Native μs/glyph | CPU μs/glyph | Reduction |
+|---|---:|---:|---:|
+| a1200-fast | 159.254 | 121.193 | 23.9% |
+| 030-50 | 200.319 | 47.075 | 76.5% |
+| 040-40 | 173.276 | 39.062 | 77.5% |
+| 060-50 | 173.276 | 39.062 | 77.5% |
+
+The 15 complete matched draws average **55.884396 → 55.790830 ms**, a
+**0.093565 ms / 0.17%** reduction. Whole-loop matched entry intervals are
+**60.081409 → 60.081141 ms**.
+The 16 shared interior bitplane-DMA sequences match from the first sequence
+after collapsing repeated identical fields. Native projection registers, clipping,
+colour planes, clear destinations and safe buffer handovers remain exact.
+Beam waiting absorbs some primitive savings; the draw result is not an assumed
+whole-frame speedup.
+
+All 100 simulation updates and private fractions match exactly. Normal, grid and
+dense each pass 30 complete RGB images without pixel masks or tolerance. Both
+60-second elapsed tests pass the 0.25% gate. All twelve 300-interval performance
+pairs below pass mean and p95 no-regression; retain their fresh equal-layout
+baselines rather than summing speedups across older binary layouts. Accelerated
+profiles use the calibrated real-frequency emulator settings; the functional
+040/MMU/32 MiB check is separate from MMU-off timing.
+
+| Emulator / scene | FPS control → H5 | Mean ms control → H5 | p95 ms control → H5 |
+|---|---:|---:|---:|
+| a1200-fast / normal | 15.297 → 15.392 | 65.371 → 64.970 | 80.128 → 80.128 |
+| a1200-fast / grid | 14.304 → 14.597 | 69.911 → 68.509 | 80.128 → 80.128 |
+| a1200-fast / dense | 7.131 → 7.145 | 140.223 → 139.956 | 140.223 → 140.223 |
+| 030-50 / normal | 17.077 → 17.354 | 58.560 → 57.625 | 60.096 → 60.096 |
+| 030-50 / grid | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 030-50 / dense | 12.480 → 12.480 | 80.128 → 80.128 | 80.128 → 80.128 |
+| 040-40 / normal | 18.000 → 18.264 | 55.555 → 54.754 | 60.096 → 60.096 |
+| 040-40 / grid | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 040-40 / dense | 12.480 → 12.480 | 80.128 → 80.128 | 80.128 → 80.128 |
+| 060-50 / normal | 17.619 → 18.022 | 56.757 → 55.488 | 60.096 → 60.096 |
+| 060-50 / grid | 16.640 → 16.640 | 60.096 → 60.096 | 60.096 → 60.096 |
+| 060-50 / dense | 12.480 → 12.480 | 80.128 → 80.128 | 80.128 → 80.128 |
+
+Native F3 throttle/clutch/coast/braking/restart/steering, F1 manual gears,
+040/MMU/32 MiB controls, pause/tow/pit/menu/re-entry and patch restoration pass.
+The new entry is verified after reload. The CPU-write audit matches every
+selected write to an actual byte bus write.
+Matched-scene destinations are not fetched in the same field. Three ordinary
+trace fields also update a visible HUD glyph, but all affected rows and planes
+have already been fetched before any update (minimum margin 21,709 Chip slots).
+No selected write overlaps the affected display fetch interval. Both CUSTOM1
+settings retain the controlled four-profile CUSTOM2=0 exact-state gate. A deliberately damaged
+bitmap signature exits before installing its hook. The independent ordinary
+trace/census audit retains exact full snapshots, contexts and DMA; all DMA
+addresses stay in Chip memory.
+
+The historical H4 dense run recorded 8.883 FPS; the fresh H5 control already
+records 7.131 FPS before the H5 hook is installed. Their performance windows
+start after 557 versus 695 simulation updates even though both warm up 100 draws.
+All 30 shared normal/dense completed images and seven shared grid images match
+at fixed updates across H4-candidate/H5-control. The live-physics performance
+fixtures and binary layouts are not identical historical timing experiments;
+the cause of that absolute-rate shift remains unassigned. Acceptance uses the
+fresh native-entry control pair; historical raw FPS values are reported separately.
+See `tmp/dev/manifest/render-h5-historical-baseline.json`.
+
+The fresh ordinary trace has 288.58 WaitBlit calls/draw,
+24.301731 ms/draw inclusive waits, and
+1.530963 ms/draw of interrupt-level instructions.
+The remaining IRQ budget is not empty-queue BLIT service: INTENA bit $40 is
+already clear at every captured field start and throughout all recorded CPU/
+copper INTENA writes, including conflict records. The fine path therefore
+already satisfies C4's interrupt-disable condition; no ownership port is needed.
+IRQ ownership remains unchanged. The histogram leaves larger bitmap, road and
+sprite work native; further optimization needs a new measured case rather than broader
+unvalidated CPU thresholds. H1's discarded dispatch-only experiment stays absent.
+
+The existing **B8-PAL** diagnostic COLOR00 pulse remains separate cleanup.
+Exact bitplane sequences and completed RGB images do not claim identical full
+transitional RGB fields while that timing-dependent pulse exists. No palette
+masks or edits were used. The normal ~25 FPS target is not reached.
+
+The independently reproduced slave is 264,520 bytes, SHA256
+`57900954b6eb18f1691f3ff8f9b51bcb4beb8a6c3456b6d33f1268cc810c9316`.
+CUSTOM2 stays default-off. RC2 LHA is unchanged;
+no successor packaging or broad release qualification is claimed. Human full
+races and real hardware remain deferred. H1–H5's implementation work is closed
+(H1 discarded); B8-PAL cleanup and successor packaging remain separate work.
+
+Local evidence: `tmp/dev/manifest/render-h5-validation.json`, `render-h5-histogram.json`,
+`render-h5-oracles.json`, `render-h5-matched-profile.json`,
+`render-h5-performance.json`, source/build/model/DMA audits and compressed traces.

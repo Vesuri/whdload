@@ -156,7 +156,20 @@ pairs pass no-regression, with exact state/private fractions, 90 complete RGB
 comparisons, elapsed, native controls, lifecycle, legacy and failure checks.
 See RENDERING_PLAN.md for the FPS table and the inherited B8-PAL limitation.
 
-The current H4 source independently builds to 263,532 bytes, SHA256
+The accepted H4 source independently builds to 263,532 bytes, SHA256
 `f4f09229e73699fe278df126cc9d3ab614df449b2a4d2e26384d16ca1911fa0f`.
-CUSTOM2 remains default-off and RC2 remains unchanged. H5 is next; human races
-and physical hardware testing remain deferred.
+CUSTOM2 remains default-off and RC2 remains unchanged. H5 was next
+at that checkpoint; human races and physical hardware testing remain deferred.
+
+H5 draws bounded aligned 8x8 font glyphs with the CPU after native DMA
+synchronization, retaining the general blitter fallback. Matched draw cost falls
+0.17% (0.094 ms). All twelve performance pairs pass mean/p95
+no-regression, with exact state, frames, pixels/CCR primitive oracles, elapsed,
+controls, lifecycle, legacy and signature-failure checks. See RENDERING_PLAN.md
+for the measured results and scope. IRQ ownership is unchanged.
+
+The current source independently builds to 264,520 bytes, SHA256
+`57900954b6eb18f1691f3ff8f9b51bcb4beb8a6c3456b6d33f1268cc810c9316`.
+CUSTOM2 remains default-off and RC2 is unchanged.
+B8-PAL cleanup and successor packaging are separate work; human full races and
+real hardware remain deferred.
