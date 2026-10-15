@@ -37,13 +37,13 @@ remains byte-identical.
 
 ## Scratch retention
 
-Raw instruction traces from superseded profiling/rendering experiments are
-pruned, along with disposable failed-run and negative-control memory copies.
+Raw traces, memory dumps and screenshots from superseded experiments are
+pruned, including pre-fix captures and disposable negative-control copies.
 Their reports, scripts, listings and measurement summaries remain available;
 re-running a checker that needs a pruned trace requires a fresh capture.
-Current `tmp/fast60` evidence and successful `tmp/release60` captures are retained,
-as are installed game files and build references. The local deletion inventory
-is `tmp/cleanup-manifest.json`.
+Current `tmp/fast60/corrected` evidence and successful `tmp/release60` captures are retained,
+as are installed game files and build references. Local deletion inventories
+are `tmp/cleanup-manifest.json` and `tmp/cleanup-obsolete-dumps.json`.
 
 Retain raw traces only for unresolved findings or current release evidence.
 After a candidate is superseded, keep its measured report and reproduction
