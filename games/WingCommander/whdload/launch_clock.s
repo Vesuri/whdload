@@ -130,9 +130,15 @@ launch_exterior_wait:
         rts
 
 ; D5 elapsed fields, D6 fields/tick. Save the five pose words, scroll and
-; native draw countdown; repeated compositor calls only publish new pictures.
+; native draw countdown and bitmap actors; repeated compositor calls must not
+; commit the native actor routine's position/script advances.
 launch_exterior_draw:
         movem.l d0-d7/a0-a6,-(sp)
+        lea EXT_ACTORS(a4),a0
+        moveq #29,d0
+.save_actors:
+        move.l (a0)+,-(sp)
+        dbra d0,.save_actors
         move.l EXT_POSITION(a4),-(sp)
         move.l EXT_POSITION+4(a4),-(sp)
         move.w EXT_POSITION+8(a4),-(sp)
@@ -147,6 +153,9 @@ launch_exterior_draw:
         add.w d0,EXT_POSITION(a4)
         tst.w launch_exterior_stage(pc)
         bne.s .scroll
+        ; DIVU leaves its remainder in the upper word. The independent Y
+        ; division must not inherit the X division's remainder as dividend.
+        moveq #0,d0
         move.w d5,d0
         add.w d0,d0
         divu.w d6,d0
@@ -181,6 +190,11 @@ launch_exterior_draw:
         move.w (sp)+,EXT_POSITION+8(a4)
         move.l (sp)+,EXT_POSITION+4(a4)
         move.l (sp)+,EXT_POSITION(a4)
+        lea EXT_ACTORS+120(a4),a0
+        moveq #29,d0
+.restore_actors:
+        move.l (sp)+,-(a0)
+        dbra d0,.restore_actors
         movem.l (sp)+,d0-d7/a0-a6
         rts
 launch_exterior_stage: dc.w 0

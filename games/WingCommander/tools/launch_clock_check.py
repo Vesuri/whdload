@@ -77,9 +77,13 @@ def check(build,variant,model):
   pos=data+v.A4_BASE+(0x407e if variant=='ocs' else 0x488e)
   scroll=data+v.A4_BASE+(0x3f5a if variant=='ocs' else 0x476a)
   countdown=data+v.A4_BASE+(-32592 if variant=='ocs' else -32624)
+  actors=data+v.A4_BASE+(-0x5a44 if variant=='ocs' else -0x5a2c)
   shown=[]
   def present():
    shown.append(struct.unpack('>5h',c.read(pos,10)))
+   # Native exterior composition advances these actor records. Intermediate
+   # pictures must restore them, as well as the five ship-pose words.
+   c.write(actors,bytes((x+1)&255 for x in c.read(actors,120)))
    c.write(field,long(c.get(field,4)+1));c.return_call()
   c.intercept(s+sy['launch_exterior_native'],present)
   c.intercept(s+sy['launch_exterior_pose'],lambda:c.return_call())
@@ -93,6 +97,12 @@ def check(build,variant,model):
      c.write(pos,struct.pack('>5h',100,50,10,20,256));c.write(scroll,word(40));c.write(countdown,word(2))
      before=c.read(data,v.HUNKS[1][2])
      call('launch_exterior_wait',{9:stage,11:tick})
+     samples=shown[-(rate//10):]
+     for elapsed,sample in enumerate(samples):
+      if stage<2:
+       assert sample[0]==96+4*elapsed//(rate//10),('ship X',stage,elapsed,sample)
+       expected_y=52-2*elapsed//(rate//10) if stage==0 else 50
+       assert sample[1]==expected_y,('ship Y',stage,elapsed,sample,expected_y)
      # Only the isolated field clock can differ; presentation poses restore.
      after=bytearray(c.read(data,len(before)));f=field-data;after[f:f+4]=before[f:f+4]
      assert after==before,'exterior state leaked'

@@ -7221,6 +7221,7 @@ calls explicitly; resemblance to other cockpit animations is not an address map.
 | Exterior stage input/wait hooks | `1d9e4 / 1da10`, `1da38 / 1da64`, `1dada / 1db06` | `1e71c / 1e748`, `1e770 / 1e79c`, `1e812 / 1e83e` |
 | Exterior pose calculation | `1d5a8 / 1d5d4` | `1e2d8 / 1e304` |
 | Exterior compositor | `1d680 / 1d6ac` | `1e3b2 / 1e3de` |
+| Exterior bitmap actor advance/draw | `1d3a0 / 1d3cc` | `1e0ce / 1e0fa` |
 | Cockpit tunnel entry | `1a454 / 1a480` | `1b19c / 1b1c8` |
 | Tunnel loop replacement | `1a4e2 / 1a50e` | `1b22a / 1b256` |
 | Tunnel native continuation | `1a544 / 1a570` | `1b28c / 1b2b8` |
@@ -7232,6 +7233,20 @@ sample ship position, projected departure pose and scroll without committing
 those samples to script state. Bitmap animation indices retain their native
 script progression. Loading time does not become animation debt. Input/abort,
 asset ownership, sounds and scene cleanup remain native.
+
+The incoming-ship sampler clears the full dividend before calculating the
+independent vertical fraction. A 68000-family `DIVU` leaves its remainder in the
+upper word; replacing only the low word with elapsed fields incorrectly fed the
+horizontal remainder into the vertical division. This could put the ship far
+offscreen for intermediate pictures (the regression fixture produced Y=13159
+instead of 52 at PAL subfield 1), then bring it back at a later sample. The
+correction retains smooth X/Y sampling and the 10 Hz script clock.
+
+The compositor also advances four bitmap actors, not just the ship pose. Each
+render-only call now saves/restores the five-slot, 120-byte actor table at OCS
+A4−`5a44` / CD32 A4−`5a2c`; the unused slot is preserved too. Native script calls
+remain responsible for committing these actors' positions and animation cursors.
+Repeated intermediate pictures therefore cannot accelerate the background actors.
 
 The cockpit tunnel's four layers start at depths 50, 40, 30 and 20. Native code
 subtracts a speed starting at one on every pass, then increases that speed at
@@ -7255,6 +7270,18 @@ hook mutations. `tmp/launch-modal-{ocs,cd32}-abort` adds the real abort-flag
 regression to the existing simulator/room tests. Public options pass all 1,680 OCS
 hardware/option cases and eight CD32 whole-code installer/option cases in
 `tmp/launch-options-{ocs,cd32}`.
+
+The incoming-ship regression is covered by
+`tmp/launch-flicker-{ocs,cd32}-native/report.json`: every PAL/NTSC incoming
+subfield has the expected X and Y, and mutated actor tables restore exactly.
+The previous CD32 build fails the Y assertion at the second PAL sample.
+The corresponding `tmp/launch-flicker-{ocs,cd32}-options/report.json` checks
+pass the public option/installer gates with this correction.
+The corrected cached-030 PAL launch fixtures pass through all three exterior
+stages and the cockpit tunnel in `tmp/launch-flicker-ocs-live/report.json` and
+`tmp/launch-flicker-cd32-live-final/report.json`. Their incoming-ship samples
+remain onscreen with bounded forward/upward motion; retained screenshots show
+the ship intact. These remain bounded emulator checks, not hardware acceptance.
 
 The cached 030 PAL fixture reports are `tmp/launch-ocs-live-v6/report.json` and
 `tmp/launch-cd32-live-v6c/report.json`. All exterior stages complete, then native

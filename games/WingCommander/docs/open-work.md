@@ -25,6 +25,8 @@ polling runs per observed field, preserving clicks for the native room loop.
 See [modal clocks](internals.md#simulator-and-room-animation-clocks).
 The remaining exterior launch and cockpit-tunnel scripts now use 10 Hz timing
 with intermediate rendering; the tunnel shares world extrapolation with the intro.
+The incoming-ship sampler clears the vertical dividend independently of X,
+preventing offscreen flicker, and intermediate redraws preserve bitmap actor state.
 See [mission launch timing](internals.md#mission-launch-timing).
 Both enhanced versions now wrap the post-briefing running-pilot backgrounds,
 preventing trails in the upper-body and feet shots. See the

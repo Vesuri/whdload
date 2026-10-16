@@ -15,7 +15,7 @@ def source(root, variant):
     if hashlib.sha256(raw).hexdigest()!=v.GAME_SHA:raise ValueError('changed launch input')
     code=raw[v.HUNKS[0][0]:v.HUNKS[0][0]+v.HUNKS[0][1]]
     ocs=variant=='ocs'
-    lines=[f'EXT_POSITION equ {0x407e if ocs else 0x488e}',f'EXT_SCROLL equ {0x3f5a if ocs else 0x476a}',f'LAUNCH_COLOUR equ {0x8e2 if ocs else 0x1154}',
+    lines=[f'EXT_ACTORS equ {-0x5a44 if ocs else -0x5a2c}',f'EXT_POSITION equ {0x407e if ocs else 0x488e}',f'EXT_SCROLL equ {0x3f5a if ocs else 0x476a}',f'LAUNCH_COLOUR equ {0x8e2 if ocs else 0x1154}',
            f'LAUNCH_SURFACE equ {0x8e4 if ocs else 0x1156}',
            f'LAUNCH_IMAGE equ {-0x5d26 if ocs else -0x5d10}',
            (root/'whdload/launch_clock.s').read_text()]

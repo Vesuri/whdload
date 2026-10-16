@@ -20,6 +20,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('variant',choices=('ocs','cd32'));p.add_argument('build',type=Path)
     p.add_argument('--output',required=True)
+    p.add_argument('--exterior-samples',action='store_true',help='check and capture five incoming-ship pictures')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     v=get(a.variant)
     if a.variant=='ocs':
@@ -107,6 +108,24 @@ def main():
         for stage,steps in enumerate((10,27,23)):
             until(sb+sy['launch_exterior_wait'],'$d2 == 0')
             first=number(f'*(unsigned int*){field:#x}')
+            if a.exterior_samples and stage == 0:
+                until(sb+sy['launch_exterior_wait'],'$d2 == 4')
+                incoming=[]
+                for i in range(5):
+                    until(sb+sy['launch_exterior_native'])
+                    pose=h1+v.A4_BASE+(0x407e if ocs else 0x488e)
+                    x=number(f'*(unsigned short*){pose:#x}')
+                    y=number(f'*(unsigned short*){pose+2:#x}')
+                    incoming.append([x if x<32768 else x-65536,
+                                     y if y<32768 else y-65536,
+                                     number(f'*(unsigned int*){field:#x}')])
+                    shot('incoming-'+str(i))
+                # Profiling/debugger round trips can skip rendered fields. Bound
+                # motion by elapsed game fields, not by screenshot count.
+                assert all(0<=q[0]-p[0]<=4*((q[2]-p[2]+4)//5)
+                           and -2*((q[2]-p[2]+4)//5)<=q[1]-p[1]<=0
+                           for p,q in zip(incoming,incoming[1:])),incoming
+                (out/'incoming.json').write_text(json.dumps(incoming)+'\n')
             until(sb+sy['launch_exterior_wait'],f'$d2 == {steps-1}')
             last=number(f'*(unsigned int*){field:#x}')
             assert (steps-1)*5<=last-first<=(steps-1)*5+10,(stage,first,last)

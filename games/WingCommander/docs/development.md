@@ -4673,3 +4673,11 @@ images and field/script/scale samples, stops only its owned emulator, and uses
 the established cached 030 PAL observer profile. Native tests also exercise NTSC,
 slow rendering, script trajectories, fractional scales, abort and exact
 restoration of the exterior pose state.
+
+For the incoming-ship flicker regression, add `--exterior-samples` to each
+`launch_live_check.py` invocation. It retains five short incoming-ship screenshots
+and `incoming.json`, checks monotonic bounded X/Y movement, then completes the
+existing exterior/tunnel fixture. No instruction trace is retained. The native
+clock check asserts both coordinates at every PAL/NTSC subfield and verifies
+that compositor actor-table mutations do not escape render-only calls. This
+rejects the old partial-word dividend that sent the ship offscreen between ticks.
