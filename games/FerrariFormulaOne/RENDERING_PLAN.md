@@ -1437,3 +1437,87 @@ Local evidence: `tmp/dev/manifest/render-h13-validation.json`,
 `render-h13-diagnostics.json` and `render-h13-capture-archive.json`.
 Completed large captures are hash-verified and compressed; no rejected cockpit
 kernel or test counter is part of the production source.
+
+## H11 — Prepare clock glyphs during drawing (accepted, 2026-10-16)
+
+H11 prepares the seven session-clock glyphs after the sky blit has been started,
+using 56 bytes of public Fast workspace. At the original final HUD point, it
+draws the native flag, waits for completion and copies the prepared live-font
+bytes into the existing three Chip screen planes. All screen writers retain
+their original order, including the flag that overlaps the first clock glyph.
+Clock state is updated outside the synchronous draw; font and clock setup do
+not change between preparation and publication. Both pointer views retain H3's
+back-buffer aliasing. No DMA accesses the new workspace.
+
+The path is limited to WHDLoad-selected 030/040/060 + Fast, with the existing
+fine HUD enabled, native clock position (32,3), foreground 7/background 0,
+a valid font pointer and bounded font indices/row width. Other layouts and
+colours use the existing renderer. The workspace is rebuilt each draw and
+belongs to the existing lifecycle reset ranges; its immutable A/B control is
+excluded from reset. There are no new native patches, wait shortcuts,
+interrupt/priority changes or early screen writes. H12 remains dropped.
+
+### Choice and measured saving
+
+The proposed early screen writes were evaluated first. A last-wheel placement
+saved only 0.098 ms diagnostically and its guarded version regressed by 0.027 ms;
+it is absent from production. Moving clock writes next to the sky saved
+0.651 ms in a diagnostic, but would require preserving dependencies against
+all subsequent screen writers. The accepted Fast preparation keeps those
+writers in native order. Diagnostic figures are not production gains.
+
+The final matched 30-field 040BCE grid traces measure post-wait draw cost
+**37.131791 → 36.814138 ms**, saving **0.317653 ms (0.86%)**. All recorded
+trace costs are retained. This is below the original H11 estimate; it does not
+establish the common-scene all-two-field H6c target.
+
+### Acceptance evidence
+
+- 100 exact game-state updates and private fractions.
+- 30 complete RGB frames each for normal, solo, grid and dense: all exact.
+- 47 native clock bitmap comparisons, including all 28 font columns,
+  foreground/background alternatives and position fallbacks. Each compares
+  all three complete 9,600-byte planes, including surrounding pixels.
+- Trace audit: 840 prepared live-font bytes and 2,520 exact screen-byte stores;
+  all preparation reads overlap an active blit. Workspace is Fast; screen writes are bounded to the seven native clock columns
+  in rows 24–31, and DMA stays in Chip.
+- 60 simulated seconds: 0.02588261% elapsed error (gate ≤0.25%).
+- Native 040 pause, tow, pit/menu and fresh session pass; all
+  920 patch-ledger words restored. Clock-ready state is clear at lifecycle boundaries.
+- Faults injected after preparation restore both possible entry BLIT-enable
+  states. No DMA can reference the prepared private bytes.
+- Controlled 020+Fast CUSTOM2=0 is exact with both CUSTOM1 settings. The
+  68000 and chip-only 020 payloads remain byte-identical to H13; CUSTOM2 stays default-off.
+- Independent production rebuild byte-identical: 267,960 bytes,
+  SHA256 `84783350ad9b1b5a23d3ac28862e53fbb0fb9cc6fdf553edb6289afcbe8bcb26`. Equal-layout control differs at only
+  the immutable `FF1RenderOverlapControl` preset byte.
+
+| Profile / scene / arm | FPS | Mean ms | p95 ms | Interval histogram (fields) |
+| --- | ---: | ---: | ---: | --- |
+| a1200-fast / normal / control | 15.39170 | 64.97009 | 80.12755 | 227 × 3, 73 × 4 |
+| a1200-fast / normal / candidate | 15.39170 | 64.97009 | 80.12755 | 227 × 3, 73 × 4 |
+| 040-40-bce / grid / control | 24.71307 | 40.46441 | 40.06377 | 294 × 2, 6 × 3 |
+| 040-40-bce / grid / candidate | 24.91867 | 40.13055 | 40.06377 | 299 × 2, 1 × 3 |
+| 040-40-bce / dense / control | 12.48010 | 80.12755 | 80.12755 | 300 × 4 |
+| 040-40-bce / dense / candidate | 12.48010 | 80.12755 | 80.12755 | 300 × 4 |
+| 060-50-bce / grid / candidate | 24.96020 | 40.06377 | 40.06377 | 300 × 2 |
+| 030-50-bce / grid / candidate | 24.96020 | 40.06377 | 40.06377 | 300 × 2 |
+
+The reduced representative scope follows H13: matched 040 grid/dense and 020
+normal, plus candidate-only 030/060 grid confirmations, all with 300 complete
+presentation intervals and warp disabled. BCE denotes cycle-exact blitting.
+These are emulator measurements, not hardware results. No expanded Cartesian
+matrix or new release qualification is claimed.
+
+H6c common-scene confirmation remains separate, before deciding whether any
+optional H14–H16 work is justified. Stop adding optimizations if its targets
+pass. B8-PAL cleanup and successor packaging remain separate; the RC2 and H13
+preinstalled archives are unchanged. Human full races and real hardware testing
+remain deferred.
+
+Local evidence: `tmp/dev/manifest/render-h11-validation.json`,
+`render-h11-v2-checks.json`, `render-h11-build-audit.json`,
+`render-h11-source-audit.json`, `render-h11-diagnostics.json` and
+`render-h11-capture-archive.json`. Completed large captures are hash-verified
+and compressed. Rejected screen-reordering variants and test-only fixtures are
+absent from production.

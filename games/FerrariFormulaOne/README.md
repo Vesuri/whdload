@@ -183,7 +183,7 @@ The coarse payloads and RC2 archive are unchanged; CUSTOM2 remains default-off.
 H8 ranked the remaining costs. H9 now narrows the road fills exactly and passes
 the reduced state/image/elapsed/lifecycle gates. On cycle-exact 040, dense improves
 12.04 → 12.47 FPS; grid remains 19.97 FPS with a 0.34 ms draw-time saving.
-H10 was next at that checkpoint; H12 needs explicit approval. The H9 source reproducibly builds
+H10 was next at that checkpoint; H12 was subsequently dropped. The H9 source reproducibly builds
 to 265,512 bytes, SHA256
 `b313710c295498f9a798728850c4b215d4eb0c412c2dd3cd9e0586baaceb3c5e`.
 
@@ -203,6 +203,18 @@ RGB, native primitive, elapsed, lifecycle, legacy and performance gates pass.
 040BCE grid improves 24.67236 → 24.75392 FPS.
 See the H13 closure in [RENDERING_PLAN.md](RENDERING_PLAN.md) for scope and
 remaining H6c work. H12 is dropped; RC2 packaging remains unchanged.
+
+H11 prepares the live session-clock glyphs in 56 bytes of public Fast memory
+on 030/040/060, then copies them to Chip at the original HUD point. Reduced
+exact-state, native bitmap, RGB, elapsed, lifecycle, fault, legacy and performance
+checks pass. Matched 040BCE post-wait draw time improves 37.13179 → 36.81414 ms;
+grid improves 24.71307 → 24.91867 FPS. The 030/060 grid confirmations reach
+24.96020 FPS with all 300 intervals at two fields. Dense remains 12.48010 FPS.
+The reproducible 267,960-byte build has SHA256
+`84783350ad9b1b5a23d3ac28862e53fbb0fb9cc6fdf553edb6289afcbe8bcb26`.
+See the H11 closure in [RENDERING_PLAN.md](RENDERING_PLAN.md) for scope and
+histograms. H6c common-scene confirmation remains open; H12 is dropped.
+The H13 preinstalled snapshot and RC2 archive are unchanged.
 
 ### H13 local preinstalled snapshot
 

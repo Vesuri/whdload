@@ -384,6 +384,7 @@ B8DrawEnabled: dc.w 1
  include "FerrariFormulaOne_RenderOwnership.s"
 FF1_FINE_ROAD_PREFETCH equ 1
  include "FerrariFormulaOne_FullPresentation.s"
+ include "RenderOverlap.s"
  include "RenderRoad.s"
  include "RenderFill.s"
  include "RenderClear.s"

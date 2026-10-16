@@ -254,6 +254,9 @@ B8_65742:
 B8_65748:
  addq.l #$4,a7
 B8_6574a:
+ IFD FF1_FINE_TEXT
+ bsr.l FF1RenderPrepareClock
+ ENDC
  move.w $6a67a.l,d0
 B8_65750:
  move.w $66f96.l,d1
@@ -1231,7 +1234,7 @@ B8_65d68:
  clr.w $23bb2.l
 B8_65d6e:
  IFD FF1_FINE_ROAD_PREFETCH
- bsr.w FF1RenderPresentHUD
+ bsr.w FF1RenderOverlapHUD
  ELSE
  IFD FF1_COARSE_STEP
  bsr.w FF1PresentFlag
