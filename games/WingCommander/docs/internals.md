@@ -7410,3 +7410,65 @@ Validated binaries: OCS **50,332 bytes**, SHA-256
 `c29e15eceecafc6adb852f24fc40e0b7bf03cf1b8986e7e25969d64e43e6b886`;
 CD32 **50,868 bytes**, SHA-256
 `b34c56a9f7d80c7150ccf11256f1f782eeafd92a3d166e93b864342e21650b9e`.
+
+## Carrier return and hangar landing clocks
+
+The carrier-return dispatcher calls two bitmap-script loops. Neither runs the
+ordinary world-update root, so replaying that root between their pictures would
+add unrelated simulation. Both enhanced variants instead pace the native script
+passes at 10 Hz and sample the known before/after positions and perspective depth.
+The first loop retains 100 steps, the second 85 (10 and 8.5 seconds of script time).
+An overloaded renderer can take longer; steps and sound events are not dropped.
+Original/off/ineligible modes retain native timing.
+
+| Operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Return wrapper | `1ab60 / 1ab8c` | `1b8a8 / 1b8d4` |
+| Carrier approach entry | `1a59e / 1a5ca` | `1b2e6 / 1b312` |
+| Approach capture / paced input | `1a632 / 1a65e`, `1a774 / 1a7a0` | `1b37a / 1b3a6`, `1b4bc / 1b4e8` |
+| Native approach draw bypasses | `1a64c / 1a678`, `1a6a6 / 1a6d2` | `1b394 / 1b3c0`, `1b3ee / 1b41a` |
+| Hangar entry | `1a7bc / 1a7e8` | `1b504 / 1b530` |
+| Hangar capture / paced input | `1a962 / 1a98e`, `1ab36 / 1ab62` | `1b6aa / 1b6d6`, `1b87e / 1b8aa` |
+| Native cleanup continuations | `1a792 / 1a7be`, `1ab50 / 1ab7c` | `1b4da / 1b506`, `1b898 / 1b8c4` |
+
+`landing_clock.s` uses the detected PAL/NTSC field rate and an absolute stage
+epoch. Native counters, camera-position adds, sound calls and actor scripts remain
+in their original pass order. Input is polled during the wait, preserving early
+skip and abort. The approach's odd-pass vertical/frame script still runs natively;
+its old draw block is bypassed so it cannot publish an advanced Y position before
+the fractional picture. Native bitmap frames stay discrete.
+
+Redraw fragments are relocated from the pinned, separately mapped executable at
+build time; no native bytes are tracked. Coordinates and local scroll words are
+restored after rendering. Perspective uses a fractional depth denominator instead
+of rounding depth to an integer before division. The hangar keeps its final zoom
+at the native step-34 boundary. All five 24-byte bitmap actors are restored after
+extra draws; their script advancement is suppressed and their positions sampled
+using native velocities, compensating for the compositor's own position add.
+The native bitmap/publication and ownership hooks remain responsible for display.
+
+Validation: native differential checks pass on OCS 68000/020 and CD32 020/040.
+Each model covers eight PAL/NTSC schedules, nine-field stalls and field-clock
+wrap, both skip stages, fractional depth division and 50 mutated hook bytes.
+Script registers, scroll, actor records, local motion and sound counts match the
+original loops. Eight CD32 installer/register/CCR cases and 1,680 OCS option/
+hardware cases also pass. Reports are in `tmp/landing-ocs-native`,
+`tmp/landing-cd32-native2` and `tmp/landing-{ocs,cd32}-options`.
+
+Validated binaries: OCS **52,628 bytes**, SHA-256
+`22f0f8533915fb9bac00b4c49a9571516417b54499e6e938cc37d5d279377015`;
+CD32 **52,692 bytes**, SHA-256
+`62ee85de3c5a66617f660c8843f2033361e14a41003adea44419670e30ec0dec`.
+
+Cached 030 PAL live fixtures complete both stages and native cleanup/return in
+`tmp/landing-ocs-live-final` and `tmp/landing-cd32-live-checked`. The OCS spans
+from stage entry to the last pass's input hook are **497/424 fields**; CD32 spans
+are **498/424 fields**. Approach and hangar screenshots were inspected.
+OCS samples show changing positions within a script tick. CD32 approach does too,
+but its sampled hangar redraws are five fields apart: fractional poses are used,
+without evidence of multiple extra pictures per tick on that profile. This is a
+remaining render-throughput limitation, not a 25/50 FPS claim. These debugger
+fixtures verify timing and state; they are not hardware performance measurements.
+The fixture creates the missing carrier through native allocation/initialization;
+it does not test actual flight docking, mission completion or debriefing.
+Live NTSC and real hardware remain untested.

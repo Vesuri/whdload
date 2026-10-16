@@ -23,6 +23,7 @@ def main():
     p.add_argument('--exterior-samples',action='store_true',help='check and capture five incoming-ship pictures')
     p.add_argument('--autopilot',action='store_true',help='continue through the native waypoint fly-by after launch')
     p.add_argument('--ejection',action='store_true',help='continue through all three native ejection stages')
+    p.add_argument('--landing',action='store_true',help='continue through native carrier return and hangar arrival')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     v=get(a.variant)
     if a.variant=='ocs':
@@ -98,7 +99,7 @@ def main():
             ' addq.l #4,sp',f' jsr ${h0+exterior:x}',
             ' move.w #1,-(sp)',' move.w #1,-(sp)',f' jsr ${h0+mission:x}',' addq.l #4,sp',
             f' jsr ${h0+tunnel:x}',
-            *([f' jsr ${h0+(0xf56 if ocs else 0x101c):x}'] if a.autopilot else []), *([f' jsr ${h0+(0x19e9e if ocs else 0x1ab76):x}'] if a.ejection else []), ' movem.l (sp)+,d0-d7/a0-a6',' rts'])+'\n')
+            *([f' jsr ${h0+(0xf56 if ocs else 0x101c):x}'] if a.autopilot else []), *([f' jsr ${h0+(0x19e9e if ocs else 0x1ab76):x}'] if a.ejection else []), *([f' jsr ${h0+(0x2a6a6 if ocs else 0x2b632):x}',' move.w d0,d2',' move.w #-1,-(sp)',' move.w #8,-(sp)',' move.w d2,-(sp)',f' jsr ${h0+(0x9868 if ocs else 0x9af2):x}',' addq.l #6,sp',' move.w d2,-(sp)',f' jsr ${h0+(0x1ab60 if ocs else 0x1b8a8):x}',' addq.l #2,sp'] if a.landing else []), ' movem.l (sp)+,d0-d7/a0-a6',' rts'])+'\n')
         subprocess.run([os.environ['VASM'],'-m68020','-Fbin','-o',str(binary),str(src)],check=True)
         old=out/'original-stub.bin';cmd(f'dump binary memory {old.relative_to(ROOT)} {stub:#x} {stub+binary.stat().st_size:#x}')
         original=out/'original-call.bin';cmd(f'dump binary memory {original.relative_to(ROOT)} {callsite:#x} {callsite+6:#x}')
@@ -191,11 +192,35 @@ def main():
                 else:
                     assert any(x[1]==y[1] and x[2:]!=y[2:] for x,y in zip(samples,samples[1:])),samples
                 ejection.append(dict(stage=stage,first=first,last=last,samples=samples,camera=camera_samples))
+        landing=[]
+        if a.landing:
+            for stage,steps in enumerate((100,85)):
+                until(sb+sy[f'landing_entry{stage}'],'$d2 == 0',timeout=180)
+                first=number(f'*(unsigned int*){field:#x}')
+                slot=number('(unsigned short)$d3' if stage==0 else '(unsigned short)$d7')
+                assert slot<61,('carrier slot',stage,slot)
+                if stage==0:
+                    assert number(f'*(unsigned short*){h1+v.A4_BASE+(0xf86 if ocs else 0x17f8)+slot*2:#x}')==8
+                    carrier_slot=slot
+                else:assert slot==carrier_slot,('carrier argument',slot,carrier_slot)
+                samples=[];fractions=[]
+                for i in range(8):
+                    until(sb+sy[f'landing_draw{stage}'],'$d2 >= 10',timeout=180)
+                    sample=cmd(f'printf "LAND %u %u %d %d\\n", *(unsigned int*){field:#x}, (unsigned short)$d2, (short)$d4, (short)$d5')
+                    samples.append(list(map(int,re.search(r'LAND (\d+) (\d+) (-?\d+) (-?\d+)',sample).groups())))
+                    fractions.append(number(f'*(unsigned short*){sb+sy["landing_elapsed"]:#x}'))
+                    if i==3:shot('landing-'+str(stage))
+                until(sb+sy['landing_wait'],f'$d2 == {steps-1}',timeout=180)
+                last=number(f'*(unsigned int*){field:#x}')
+                assert (steps-1)*5<=last-first<=(steps-1)*5+15,(stage,first,last)
+                assert all(0<=f<5 for f in fractions) and any(f>0 for f in fractions),fractions
+                landing.append(dict(stage=stage,first=first,last=last,samples=samples,fractions=fractions,
+                    multiple_pictures_per_tick=any(x[1]==y[1] and x[2:]!=y[2:] for x,y in zip(samples,samples[1:]))))
         until(ret)
         cmd(f'monitor ocs-load {callsite:x} "{original}"');cmd(f'monitor ocs-load {stub:x} "{old}"')
         (out/'report.json').write_text(json.dumps(dict(complete=True,variant=a.variant,
             slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(),exterior=rows,
-            tunnel=dict(start=start,end=end,fields=end-start,samples=tunnel_samples),autopilot=autopilot,ejection=ejection,
+            tunnel=dict(start=start,end=end,fields=end-start,samples=tunnel_samples),autopilot=autopilot,ejection=ejection,landing=landing,
             scope='native first-mission setup/launch fixture; not a briefing or campaign traversal'),indent=2)+'\n')
     finally:stop()
 

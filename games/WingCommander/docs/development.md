@@ -4737,3 +4737,34 @@ instead of the ejection entry for its fixture, restoring both code spans on retu
 Only screenshots and compact samples are retained; instruction captures are
 removed after extracting the screenshot. The checks use the cached 030 PAL
 profile, not a full mission/death trigger or hardware performance test.
+
+### Carrier return and hangar landing
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/landing-ocs-build
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/landing-cd32-build
+python3 tools/landing_clock_check.py ocs tmp/landing-ocs-build --output tmp/landing-ocs-check
+python3 tools/landing_clock_check.py cd32 tmp/landing-cd32-build --output tmp/landing-cd32-check
+python3 tools/ocs_options_check.py tmp/landing-ocs-build --output tmp/landing-ocs-options-check
+python3 tools/timing_adapter_check.py tmp/landing-cd32-build --output tmp/landing-cd32-options-check
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/launch_live_check.py ocs tmp/landing-ocs-build --landing --output tmp/landing-ocs-run
+python3 tools/launch_live_check.py cd32 tmp/landing-cd32-build --landing --output tmp/landing-cd32-run
+```
+
+Use fresh output directories and run the live checks sequentially. Native tests
+compare final script registers, scroll, local motion, actor records and sound
+counts with the original loop instructions. They also check PAL/NTSC cadence,
+clock wrap, slow-render cases, early skip, fractional depth and mutated hooks.
+Graphics/OS services are stubbed; this is a functional CPU check, not hardware
+performance evidence.
+
+`--landing` extends the existing launch fixture with native slot allocation and
+carrier-model initialization, followed by the native return wrapper. The short
+launch fixture does not otherwise contain a carrier. It checks both stages'
+field/script progression, fractional sampling and successful cleanup/return,
+recording whether the renderer produces multiple pictures within a tick.
+It retains only compact reports and two additional screenshots. This exercises
+the cinematic with native assets, not docking permission, collision detection,
+mission completion or the subsequent debriefing.

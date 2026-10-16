@@ -36,6 +36,9 @@ Ejection now shares the 10 Hz cinematic clock in both enhanced variants, with
 fractional seat/separation motion and pilot/helmet-camera tumble. Camera scripts
 and the explosion stay tick-owned; native cleanup is retained. See
 [ejection timing](internals.md#ejection-cinematic-clock-and-helmet-view).
+Carrier return and hangar landing now pace their native bitmap scripts at 10 Hz
+with fractional position and zoom rendering in both enhanced variants. See
+[landing clocks](internals.md#carrier-return-and-hangar-landing-clocks).
 Both enhanced versions now wrap the post-briefing running-pilot backgrounds,
 preventing trails in the upper-body and feet shots. See the
 [cinematic fix](internals.md#running-pilot-cinematic-backgrounds).
