@@ -25,7 +25,7 @@ def check(build,variant,model):
   for off,width,_ in specification(variant)[-1]:
    old=c.read(code+off,width);c.write(code+off+width-1,bytes([old[-1]^1]))
    call('modal_guard',regs={1:code});c.write(code+off,old)
-  require(len(rejected)==8,'modal guard missed a changed site')
+  require(len(rejected)==len(specification(variant)[-1]),'modal guard missed a changed site')
   call('modal_guard',regs={1:code});call('modal_install',regs={1:code})
   samples=0
   for rate in (50,60):
@@ -48,9 +48,26 @@ def check(build,variant,model):
   draws=[];publications=[]
   def bitmap():
    draws.append(struct.unpack('>IhhIH',c.read(c.reg(8)+4,14)));c.return_call()
-  c.intercept(s+sy['modal_bar_clear'],lambda:c.return_call())
+  # Execute the actual native four-rectangle restore, with independent pixels.
+  # Clearing stands in for debris overwriting each protected foreground area.
+  rects=[]
+  for i in range(4):
+   base=data+0x7ffe+(0x84c if variant=='cd32' else -0xa0)+i*32
+   srcrows=0x190000+i*0x100;dstrows=srcrows+0x20
+   src=0x191000+i*0x100;dst=src+0x20
+   c.write(base,long(srcrows)+bytes(20)+struct.pack('>hhhh',0,0,3,1))
+   c.write(base+128,long(dstrows)+bytes(20)+struct.pack('>hhhh',0,0,3,1))
+   c.write(srcrows,long(src)+long(src+4));c.write(dstrows,long(dst)+long(dst+4))
+   pixels=bytes(range(8*i+1,8*i+9));c.write(src,pixels);rects.append((dst,pixels))
+  def clear():
+   for dst,pixels in rects:c.write(dst,bytes(len(pixels)))
+   c.return_call()
+  def publish():
+   for dst,pixels in rects:require(c.read(dst,len(pixels))==pixels,'foreground rectangle overwritten by window')
+   publications.append(1);c.return_call()
+  c.intercept(s+sy['modal_bar_clear'],clear)
   c.intercept(s+sy['modal_bar_bitmap'],bitmap)
-  c.intercept(s+sy['modal_bar_publish'],lambda:(publications.append(1),c.return_call()))
+  c.intercept(s+sy['modal_bar_publish'],publish)
   c.intercept(code+(0x2f9a6 if variant=='ocs' else 0x2efe8),bitmap)
   pointers=data+0x7ffe+(0x84 if variant=='ocs' else 0x970)
   assets=data+0x7ffe+(0x47fc if variant=='ocs' else 0x500c)
@@ -73,6 +90,25 @@ def check(build,variant,model):
     require([r[4] for r in draws]==[4,8,16,5,0,6,0,7],'window frame changed')
     bars+=1
    c.write(moving,struct.pack('>hhhhhhhh',100,30,7,8,200,40,-11,16))
+  # Input is sampled once per field; selection zero is valid, and a brief
+  # click is delivered once even if released before the 10 Hz owner resumes.
+  polls=[];response={'value':-1}
+  def input_poll():
+   require(c.get(c.reg(8)+4,4)==0x182000,'room input table ABI')
+   polls.append(c.get(field,4));c.return_call(response['value'])
+  c.intercept(s+sy['modal_room_native_input'],input_poll)
+  c.write(s+sy['modal_room_table'],long(0x182000))
+  c.write(s+sy['modal_room_result'],word(-1))
+  c.write(s+sy['modal_room_input_field'],long(0))
+  for f in range(200,210):
+   c.write(field,long(f));call('modal_room_poll');call('modal_room_poll')
+   call('modal_room_input');require(c.reg(9)&65535==65535,'unexpected room action')
+  require(polls==list(range(200,210)),'cursor not sampled once per field')
+  response['value']=0;c.write(field,long(210));call('modal_room_poll')
+  response['value']=-1;c.write(field,long(214));call('modal_room_poll')
+  require(polls[-1]==210,'pending click overwritten')
+  call('modal_room_input');require(c.reg(9)&65535==0,'short click lost')
+  call('modal_room_input');require(c.reg(9)&65535==65535,'click delivered twice')
   sims=[]
   clock='ocs_clock_state' if variant=='ocs' else 'timing_clock'
   state={'ticks':0,'pictures':0,'rate':50,'gap':1,'skip':False}
@@ -110,7 +146,7 @@ def check(build,variant,model):
   call('modal_dispatch',struct.pack('>Ihhhh',0x180000,0,240,0,0))
   require(state['pictures']==1 and state['ticks']==0,'native abort not observed')
   require(c.get(abort-8)==0x1234 and c.get(abort)==0,'abort damaged adjacent state')
-  return dict(model=model,running_samples=samples,installer=True,rejected_sites=len(rejected),bar_samples=bars,simulator=sims)
+  return dict(model=model,running_samples=samples,installer=True,rejected_sites=len(rejected),bar_samples=bars,foreground_rectangles=4,input_fields=10,short_click_exactly_once=True,simulator=sims)
  finally:c.close()
 
 def main():

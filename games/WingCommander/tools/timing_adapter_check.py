@@ -55,7 +55,7 @@ def main():
                     from modal_source import specification
                     _,_,_,begins,waits,modal=specification('cd32')
                     for off,width,label in modal:
-                        op=0x4eb9 if off in begins+waits else 0x4ef9
+                        op=0x4eb9 if off in begins+waits or label=='modal_room_input' else 0x4ef9
                         want[off:off+width]=struct.pack('>HI',op,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
                     for off in (0x1de20,0x1de3c,0x1df50,0x1df6c):
                         want[off:off+6]=struct.pack('>HI',0x4eb9,s+sym['cinematic_background'])

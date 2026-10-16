@@ -20,6 +20,8 @@ that previously rounded to 10 Hz steps in both variants. See
 Simulator Ready/Game Over, bar/barracks and running-pilot motion now use
 CPU-independent timing in both enhanced versions; simulator world prediction,
 text zoom, running positions and bar-window motion receive intermediate samples.
+The bar redraw restores the TV/foreground between ticks; bar and barracks cursor
+polling runs per observed field, preserving clicks for the native room loop.
 See [modal clocks](internals.md#simulator-and-room-animation-clocks).
 The remaining exterior launch and cockpit-tunnel scripts now use 10 Hz timing
 with intermediate rendering; the tunnel shares world extrapolation with the intro.

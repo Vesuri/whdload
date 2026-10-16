@@ -130,8 +130,25 @@ def main():
             for _ in range(12):
                 until(h0+point);fields.append(number(f'*(unsigned int*){field:#x}'))
             assert all(4<=b-a<=7 for a,b in zip(fields,fields[1:])),fields
+            # Check actual cursor sampling between animation ticks, not just
+            # calls to the arithmetic helper. Holding a direction produces distinct
+            # native pointer positions at consecutive field polls.
+            cursor=[]
+            direction='4e' if index==0 else '4f'
+            cmd('monitor key '+direction+' 1')
+            for _ in range(8):
+                until(sb+sy['modal_room_native_input'])
+                cursor.append(dict(field=number(f'*(unsigned int*){field:#x}'),
+                                   x=number(f'*(unsigned short*)($a4+{0x19c if a.variant=="ocs" else 0xa88})')))
+            cmd('monitor key '+direction+' 0')
+            assert len({r['x'] for r in cursor})>=4,cursor
+            assert any(0<b['field']-a['field']<5 and b['x']!=a['x'] for a,b in zip(cursor,cursor[1:])),cursor
+            if index==0:
+                # An intermediate publication exercises the restored foreground,
+                # unlike a screenshot taken only on the native 10 Hz pass.
+                until(sb+sy['modal_bar_publish'])
             shot('bar' if index==0 else 'barracks')
-            rows.append(dict(scene='bar' if index==0 else 'barracks',fields=fields))
+            rows.append(dict(scene='bar' if index==0 else 'barracks',fields=fields,cursor=cursor))
             if index==0:
                 cmd('monitor key 4e 1');until(h0+point,f'*(short*)($a4+{0x19c if a.variant=="ocs" else 0xa88}) >= 300');cmd('monitor key 4e 0')
                 cmd('monitor key 44 1');until(h0+(0x24ffe if a.variant=='ocs' else 0x25e2c));cmd('monitor key 44 0')

@@ -1,6 +1,7 @@
 ; Enhanced modal scenes: one animation step per tenth of a second.
-; Room loops retain their native composition/input order. Each room rebases
-; after setup and returns from dialogs; load time is never animation debt.
+; Native room loops consume actions; cursor polling also runs between ticks.
+; Each room rebases after setup and returns from dialogs; load time is never
+; animation debt.
 modal_room_begin:
         movem.l d0-d1/a0,-(sp)
         bsr.w timing_rate
@@ -11,6 +12,10 @@ modal_room_begin:
         sub.l d0,d1
         lea modal_room_cursor(pc),a0
         move.l d1,(a0)
+        lea modal_room_input_field(pc),a0
+        move.l #-1,(a0)
+        lea modal_room_result(pc),a0
+        move.w #-1,(a0)
         movem.l (sp)+,d0-d1/a0
         rts
 modal_room_wait:
@@ -23,6 +28,7 @@ modal_room_wait:
         sub.l modal_room_cursor(pc),d0
         cmp.l d2,d0
         bcc.s .due
+        bsr.w modal_room_poll
         bsr.w modal_bar_between
         bra.s .wait
 .due:
@@ -32,6 +38,39 @@ modal_room_wait:
         add.l d2,(a0)
         movem.l (sp)+,d0-d2/a0
         rts
+
+; Poll the native cursor/hotspot routine once per field while animations wait.
+; Keep the first selected action until the owning room loop consumes it. Further
+; polling must not replace a short click or enter a dialog from this wait stack.
+modal_room_poll:
+        movem.l d0-d7/a0-a6,-(sp)
+        tst.w modal_room_result(pc)
+        bpl.s .done
+        move.l MODAL_FIELD(a4),d0
+        cmp.l modal_room_input_field(pc),d0
+        beq.s .done
+        lea modal_room_input_field(pc),a0
+        move.l d0,(a0)
+        move.l modal_room_table(pc),-(sp)
+        bsr.w modal_room_native_input
+        addq.l #4,sp
+        lea modal_room_result(pc),a0
+        move.w d0,(a0)
+.done:
+        movem.l (sp)+,d0-d7/a0-a6
+        rts
+modal_room_input:
+        bsr.w modal_room_poll
+        move.w modal_room_result(pc),d0
+        move.l a0,-(sp)
+        lea modal_room_result(pc),a0
+        move.w #-1,(a0)
+        move.l (sp)+,a0
+        rts
+modal_room_table: dc.l 0
+modal_room_input_field: dc.l -1
+modal_room_result: dc.w -1
+        even
 
 ; D0=shot duration, A3=native end field. Sample positions continuously,
 ; frames discretely at 10 Hz. The original shot's field deadline is retained.
@@ -283,6 +322,7 @@ modal_bar_between:
         addq.l #8,a2
 .moving_test:
         dbra d2,.moving_body
+        bsr.w modal_bar_restore
         bsr.w modal_portrait_replay
         bsr.w modal_bar_publish
         bra.s .done

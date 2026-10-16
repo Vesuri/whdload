@@ -7136,6 +7136,42 @@ The previously fixed 640-pixel background wrap remains in use.
 | Native window renderer | `1e8ae / 1e8da` | `1f5e8 / 1f614` |
 | Bar foreground entry | `24ae0 / 24b0c` | `25922 / 2594e` |
 
+### Bar foreground restoration and room cursor cadence
+
+Intermediate bar-window pictures now repeat the native four-rectangle foreground
+restore before replaying the last portrait pose and publishing. The earlier
+intermediate pass omitted this restore, allowing window pixels to overwrite the
+bottom-right corner of the upper-left TV until the next authoritative picture.
+The native pass already restores these regions in this order.
+
+| Operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Four foreground rectangles | `24d04 / 24d30` | `25b46 / 25b72` |
+| Rectangle copy | `31edc / 31f08` | `318d2 / 318fe` |
+| Native cursor/hotspot routine | `26490 / 264bc` | `27372 / 2739e` |
+| Bar input call | `24f2c / 24f58` | `25d5a / 25d86` |
+| Barracks input call | `26138 / 26164` | `2702e / 2705a` |
+
+The room wait previously delayed input along with animation until the next 10 Hz
+step. It now polls the native cursor/hotspot routine once per observed field,
+including intermediate waits. The first nonnegative selection is latched until
+the native room loop consumes it; polling pauses while that action is pending.
+Thus a short click is not overwritten, and dialogs still enter from the normal
+room stack. Setup/dialog return resets the field stamp and pending selection.
+The bar and barracks animation clocks remain 10 Hz. Original/off modes install
+neither new input call hook.
+
+Native regressions execute the real four-rectangle copier with independent
+foreground bytes after simulated window overwrites; all four regions must match
+at publication. They also check per-field input polling, duplicate-field rejection,
+selection zero, and exactly-once delivery after a short click. Reports are in
+`tmp/bar-fix/{ocs,cd32}-native/report.json`. These are correctness checks, not
+hardware frame-rate measurements. The bounded cached-030 PAL runs in
+`tmp/bar-fix/ocs-live` and `tmp/bar-fix/cd32-cursor-live` also pass native room
+navigation and observe changing cursor positions at one- or two-field intervals
+while room animation remains on its 10 Hz cadence. Intermediate bar screenshots show
+the protected TV foreground intact. No new hardware throughput claim follows.
+
 `modal_clock.s` shares the policy; `modal_source.py` generates separately verified
 variant operands, displaced instructions and guards from pinned inputs. Every
 new hook is checked before installation. OCS uses the 68000-safe adapter generator;
@@ -7146,16 +7182,16 @@ The 10 Hz modal rate extends the project's selected world-rate policy; it is not
 an independent historical PC-speed measurement. Native CPU checks cover PAL/NTSC,
 render gaps of 1/3/9 fields, 40 world updates, smooth text depth, fractional debris
 coordinates with exact game-data preservation, running trajectories and rejection
-of mutations at all eight hooks. The native drawing/audio/device routines shared
+of mutations at all ten hooks. The native drawing/audio/device routines shared
 with the reference are outside that arithmetic oracle; bounded live scene runs
 provide the separate integration evidence. Physical hardware and live NTSC visual
 acceptance remain separate.
 
-Accepted native reports are `tmp/modal-ocs-native-v8b/report.json` and
-`tmp/modal-cd32-native-v8b/report.json`: two CPU models per variant, 190 PAL/NTSC
+Accepted native reports are `tmp/bar-fix/ocs-native/report.json` and
+`tmp/bar-fix/cd32-native/report.json`: two CPU models per variant, 190 PAL/NTSC
 running-position samples, nine intermediate bar samples with unchanged game data,
-and twelve simulator schedules per model. `tmp/modal-ocs-options-v8` passes all
-1,680 public hardware/option cases; `tmp/modal-cd32-install-v8` passes eight
+and twelve simulator schedules per model. `tmp/bar-fix/ocs-options` passes all
+1,680 public hardware/option cases; `tmp/bar-fix/cd32-options` passes eight
 whole-code installer/option cases. Original reconstruction remains byte-identical.
 
 The cached 030 PAL live gates in `tmp/modal-{ocs,cd32}-final-live` traverse the
