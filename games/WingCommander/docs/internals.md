@@ -7443,27 +7443,43 @@ build time; no native bytes are tracked. Coordinates and local scroll words are
 restored after rendering. Perspective uses a fractional depth denominator instead
 of rounding depth to an integer before division. The hangar keeps its final zoom
 at the native step-34 boundary. All five 24-byte bitmap actors are restored after
-extra draws; their script advancement is suppressed and their positions sampled
-using native velocities, compensating for the compositor's own position add.
+extra draws. Each extra draw replays the actor's script from its pre-tick state,
+so it selects the same image as the authoritative draw, including script loops
+and stop commands. Positions are sampled using native velocities, compensating
+for the compositor's own position add.
+
+The native actor interpreter is OCS H0 `1d3a0` (file `1d3cc`), CD32 H0 `1e0ce`
+(file `1e0fa`). Actor byte 9 is an active script cursor; byte 10 enables script
+advancement and the pointer at +12 selects the script. Clearing byte 10 makes the
+routine interpret byte 9 directly as an image index. Freezing that flag alone
+therefore alternates wrong images with the scripted images, causing foreground
+crew flicker and apparent accelerated animation. The redraw now snapshots the
+pre-tick records and restores script fields +8 through +23 before replaying the
+native draw; it restores the complete post-tick records afterwards.
 The native bitmap/publication and ownership hooks remain responsible for display.
 
 Validation: native differential checks pass on OCS 68000/020 and CD32 020/040.
 Each model covers eight PAL/NTSC schedules, nine-field stalls and field-clock
-wrap, both skip stages, fractional depth division and 50 mutated hook bytes.
+wrap, both skip stages, fractional depth division and 50 mutated hook bytes. Each
+model also executes the actual actor interpreter for 40 redraws, verifying equal
+image selection and restored actor records for repeated, looping, stopped and
+static animations.
 Script registers, scroll, actor records, local motion and sound counts match the
 original loops. Eight CD32 installer/register/CCR cases and 1,680 OCS option/
-hardware cases also pass. Reports are in `tmp/landing-ocs-native`,
-`tmp/landing-cd32-native2` and `tmp/landing-{ocs,cd32}-options`.
+hardware cases also pass. Reports are in `tmp/landing-actors-{ocs,cd32}-check` and
+`tmp/landing-actors-{ocs,cd32}-options`.
 
-Validated binaries: OCS **52,628 bytes**, SHA-256
-`22f0f8533915fb9bac00b4c49a9571516417b54499e6e938cc37d5d279377015`;
-CD32 **52,692 bytes**, SHA-256
-`62ee85de3c5a66617f660c8843f2033361e14a41003adea44419670e30ec0dec`.
+Validated binaries: OCS **52,808 bytes**, SHA-256
+`770cc791c2593491ba165d3abd13ed2d1c1ad33793263a7fc2267d4107935d70`;
+CD32 **52,864 bytes**, SHA-256
+`4ee6836d9cf81b9b9cc70f00d7f3cd00040e94e4247a05ad34f726b69aa19869`.
 
 Cached 030 PAL live fixtures complete both stages and native cleanup/return in
-`tmp/landing-ocs-live-final` and `tmp/landing-cd32-live-checked`. The OCS spans
-from stage entry to the last pass's input hook are **497/424 fields**; CD32 spans
-are **498/424 fields**. Approach and hangar screenshots were inspected.
+`tmp/landing-crew-{ocs,cd32}-live`. The OCS spans
+from stage entry to the last pass's input hook are **497/423 fields**; CD32 spans
+are **498/424 fields**. Approach and hangar screenshots were inspected. Twenty consecutive foreground
+crew draws per variant preserve the native frame on every extra redraw, including
+held frames; the animation advances only with the native script.
 OCS samples show changing positions within a script tick. CD32 approach does too,
 but its sampled hangar redraws are five fields apart: fractional poses are used,
 without evidence of multiple extra pictures per tick on that profile. This is a

@@ -203,6 +203,22 @@ def main():
                     assert number(f'*(unsigned short*){h1+v.A4_BASE+(0xf86 if ocs else 0x17f8)+slot*2:#x}')==8
                     carrier_slot=slot
                 else:assert slot==carrier_slot,('carrier argument',slot,carrier_slot)
+                actor_frames=[]
+                if stage==1:
+                    # Slot 1 is the scripted foreground crew member. Check the
+                    # native committed image against its extra redraws directly.
+                    actor=h1+v.A4_BASE+(-0x5a44 if ocs else -0x5a2c)+24
+                    expected=None
+                    for _ in range(20):
+                        until(h0+(0x1d422 if ocs else 0x1e150),f'$a2 == {actor}',timeout=180)
+                        frame=number('(unsigned short)$d2')
+                        caller=number('*(unsigned int*)($a5+4)')
+                        native=h0<=caller<h0+v.HUNKS[0][1]
+                        if native:expected=frame
+                        else:assert expected is not None and frame==expected,('foreground frame',frame,expected)
+                        actor_frames.append(dict(native=native,frame=frame))
+                    assert any(not x['native'] for x in actor_frames),actor_frames
+                    assert len({x['frame'] for x in actor_frames})>1,actor_frames
                 samples=[];fractions=[]
                 for i in range(8):
                     until(sb+sy[f'landing_draw{stage}'],'$d2 >= 10',timeout=180)
@@ -214,7 +230,7 @@ def main():
                 last=number(f'*(unsigned int*){field:#x}')
                 assert (steps-1)*5<=last-first<=(steps-1)*5+15,(stage,first,last)
                 assert all(0<=f<5 for f in fractions) and any(f>0 for f in fractions),fractions
-                landing.append(dict(stage=stage,first=first,last=last,samples=samples,fractions=fractions,
+                landing.append(dict(stage=stage,first=first,last=last,samples=samples,fractions=fractions,actor_frames=actor_frames,
                     multiple_pictures_per_tick=any(x[1]==y[1] and x[2:]!=y[2:] for x,y in zip(samples,samples[1:]))))
         until(ret)
         cmd(f'monitor ocs-load {callsite:x} "{original}"');cmd(f'monitor ocs-load {stub:x} "{old}"')

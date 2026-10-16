@@ -25,6 +25,7 @@ def check(build,variant,model):
   c.write(field,long(c.get(field,4)+state['gap']))
   c.return_call(1 if state.get('abort_at') and c.reg(11)>=state['abort_at'] else 0)
  def actor():
+  if state.get('native_actor'):return
   slot=c.get(c.reg(8)+4);p=actors+slot*24
   c.write(p,word(c.get(p)+c.get(p+4)));c.write(p+2,word(c.get(p+2)+c.get(p+6)))
   if c.get(p+10,1):c.write(p+9,bytes([(c.get(p+9,1)+1)&255]))
@@ -87,7 +88,27 @@ def check(build,variant,model):
      assert c.reg(9)==base_scale*fields//(old*fields+(new-old)*f)
      samples.append(c.reg(9))
     assert len(set(samples))>1
-  return dict(model=model,native=native,schedules=rows,guards=50,abort_stages=2)
+  # Execute the actual actor script interpreter: a cursor is not an image ID.
+  regs=reset(1);regs[11]=1;state['native_actor']=True
+  script=0x190000
+  c.write(script,bytes([7,3,3,12,0x81,4,9,0x40]))
+  for slot,cursor,active,ptr in ((0,0,1,script),(3,0,1,script+5),(4,5,0,0),(1,255,1,0)):
+   p=actors+slot*24;c.write(p+9,bytes([cursor,active]));c.write(p+12,long(ptr))
+  frames=[]
+  c.intercept(CODE+(0x1d422 if ocs else 0x1e150),lambda:frames.append(c.reg(11)&65535))
+  actor_entry=0x1d3a0 if ocs else 0x1e0ce
+  for tick in range(8):
+   call('landing_capture',{**regs,9:1})
+   frames.clear()
+   for slot in (0,3,4,1):c.run(actor_entry,args=word(slot))
+   expected=frames[:];committed=c.read(actors,120)
+   c.write(s+sy['landing_next'],c.read(s+sy['landing_previous'],16))
+   c.write(s+sy['landing_fields'],word(5))
+   for fraction in range(5):
+    frames.clear();c.write(s+sy['landing_elapsed'],word(fraction));call('landing_draw',regs)
+    assert frames==expected,('actor images',tick,fraction,frames,expected)
+    assert c.read(actors,120)==committed,('actor state',tick,fraction)
+  return dict(model=model,native=native,schedules=rows,guards=50,abort_stages=2,actor_redraws=40)
  finally:c.close()
 
 

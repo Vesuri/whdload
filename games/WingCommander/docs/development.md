@@ -4757,6 +4757,8 @@ Use fresh output directories and run the live checks sequentially. Native tests
 compare final script registers, scroll, local motion, actor records and sound
 counts with the original loop instructions. They also check PAL/NTSC cadence,
 clock wrap, slow-render cases, early skip, fractional depth and mutated hooks.
+The actual native actor interpreter checks image selection across extra redraws,
+including repeated images, script loops, stop commands and static actors.
 Graphics/OS services are stubbed; this is a functional CPU check, not hardware
 performance evidence.
 
@@ -4764,7 +4766,8 @@ performance evidence.
 carrier-model initialization, followed by the native return wrapper. The short
 launch fixture does not otherwise contain a carrier. It checks both stages'
 field/script progression, fractional sampling and successful cleanup/return,
-recording whether the renderer produces multiple pictures within a tick.
+recording whether the renderer produces multiple pictures within a tick. The
+foreground crew member's native image selection must match its extra redraws.
 It retains only compact reports and two additional screenshots. This exercises
 the cinematic with native assets, not docking permission, collision detection,
 mission completion or the subsequent debriefing.

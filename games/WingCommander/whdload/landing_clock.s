@@ -1,7 +1,7 @@
 ; Native landing loops keep their script, effects and cleanup. Each pass owns
 ; one tenth-second; extra pictures interpolate that pass without committing it.
 landing_capture:
-        movem.l d0-d1/a0,-(sp)
+        movem.l d0-d1/a0-a1,-(sp)
         lea landing_stage(pc),a0
         move.w d0,(a0)
         tst.w d2
@@ -15,7 +15,16 @@ landing_capture:
 .save:
         lea landing_previous(pc),a0
         bsr.w landing_store
-        movem.l (sp)+,d0-d1/a0
+        tst.w landing_stage(pc)
+        beq.s .done
+        lea EXT_ACTORS(a4),a0
+        lea landing_actor_previous(pc),a1
+        moveq #29,d0
+.actors:
+        move.l (a0)+,(a1)+
+        dbra d0,.actors
+.done:
+        movem.l (sp)+,d0-d1/a0-a1
         rts
 
 landing_store:
@@ -103,6 +112,7 @@ landing_draw:
         move.l (a0)+,-(sp)
         dbra d0,.actors
         lea EXT_ACTORS(a4),a2
+        lea landing_actor_previous(pc),a1
         moveq #4,d7
 .actor_pose:
         move.w 4(a2),d0
@@ -115,7 +125,14 @@ landing_draw:
         divs.w landing_fields(pc),d0
         sub.w 6(a2),d0
         add.w d0,2(a2)
-        clr.b 10(a2)
+        ; Replay the same script step from its pre-tick state. Byte 9 is a
+        ; script cursor while active, not the image number used when inactive.
+        ; The complete post-tick records are restored after this redraw.
+        move.l 8(a1),8(a2)
+        move.l 12(a1),12(a2)
+        move.l 16(a1),16(a2)
+        move.l 20(a1),20(a2)
+        lea 24(a1),a1
         lea 24(a2),a2
         dbra d7,.actor_pose
         bsr.w landing_draw1
@@ -159,3 +176,4 @@ landing_epoch: dc.l 0
 landing_previous: dcb.w 8,0
 landing_next: dcb.w 8,0
 landing_sample: dcb.w 8,0
+landing_actor_previous: dcb.b 120,0
