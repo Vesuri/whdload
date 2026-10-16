@@ -1,4 +1,6 @@
-# Ferrari Formula One performance build
+# Ferrari Formula One 2.0b (16.10.2026)
+
+Player-facing changes and activation: [ReadMe](ReadMe).
 
 RC2 fixes the confirmed RC1 20 ms player launch bug; see
 [driving-control regression](CONTROLS_REGRESSION.md) for the corrected build
