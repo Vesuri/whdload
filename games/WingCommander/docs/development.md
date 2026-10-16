@@ -4705,3 +4705,35 @@ positions, movement between world ticks and successful native arrival return.
 It retains one extra screenshot and JSON samples, deleting the single-field
 instruction capture immediately. The fixture restores its temporary menu/stub
 patches and stops only its owned emulator. This is not a full campaign replay.
+
+### Ejection and helmet camera
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/ejection-ocs-build
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/ejection-cd32-build
+python3 tools/ejection_clock_check.py ocs tmp/ejection-ocs-build --output tmp/ejection-ocs-check
+python3 tools/ejection_clock_check.py cd32 tmp/ejection-cd32-build --output tmp/ejection-cd32-check
+python3 tools/ocs_options_check.py tmp/ejection-ocs-build --output tmp/ejection-ocs-options-check
+python3 tools/timing_adapter_check.py tmp/ejection-cd32-build --output tmp/ejection-cd32-options-check
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/launch_live_check.py ocs tmp/ejection-ocs-build --ejection --output tmp/ejection-ocs-run
+python3 tools/launch_live_check.py cd32 tmp/ejection-cd32-build --ejection --output tmp/ejection-cd32-run
+```
+
+Use fresh output directories and sequential live runs. The native check compares
+script registers and effect counts against the original loop instructions,
+checks PAL/NTSC cadence with skipped renders and field-counter wrap, intermediate
+bitmap positions, aborts, stack/register preservation and mutated hook rejection.
+OS/world/render callees are stubbed in this functional test; it is not a timing
+or whole-game emulator. The tumble sampler is checked independently for stage,
+slot and camera selection.
+
+`--ejection` extends the bounded launch fixture through all three ejection stages,
+including the helmet camera after tick 75. It checks field deadlines, intermediate
+pilot positions and changing camera basis within a single world tick, then waits
+for cleanup and return. It temporarily uses the unused ending-cinematic entry
+instead of the ejection entry for its fixture, restoring both code spans on return.
+Only screenshots and compact samples are retained; instruction captures are
+removed after extracting the screenshot. The checks use the cached 030 PAL
+profile, not a full mission/death trigger or hardware performance test.

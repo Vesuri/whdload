@@ -7212,8 +7212,9 @@ the builder rejects an unaligned payload instead of silently truncating its size
 ## Mission launch timing
 
 The enhanced mission-start path now paces the exterior hangar animation and the
-cockpit tunnel independently of rendering speed in both variants. The separate
-ejection routine is unchanged. The mission dispatcher identifies these launch
+cockpit tunnel independently of rendering speed in both variants. Ejection has
+its own [clock and helmet-view adapter](#ejection-cinematic-clock-and-helmet-view).
+The mission dispatcher identifies these launch
 calls explicitly; resemblance to other cockpit animations is not an address map.
 
 | Operation | OCS H0 / file | CD32 H0 / file |
@@ -7348,3 +7349,64 @@ fixed. The corresponding Y/Z coordinates also advance smoothly. These are
 staged render poses, not extra authoritative movement. Each run retains one
 fly-by screenshot and completes the existing exterior/tunnel checks. Live NTSC
 and full campaign traversal remain outside this bounded gate.
+
+## Ejection cinematic clock and helmet view
+
+The ejection routine has three independent per-picture loops, not the simulator
+Game Over loop. Both enhanced variants now use the shared cinematic 10 Hz clock
+and bounded world prediction. The original 10/10/200 script steps become
+1/1/20 seconds of simulation; loading, fades and publication can add elapsed
+fields. Each camera/resource boundary stops and rebases prediction. Original
+OCS mode and legacy CD32 mode retain their native loops.
+
+| Operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Ejection entry | `19e9e / 19eca` | `1ab76 / 1aba2` |
+| Seat loop hook / native continuation | `19f6c / 19f98`, `1a040 / 1a06c` | `1ac30 / 1ac5c`, `1ad0a / 1ad36` |
+| Separation loop hook / continuation | `1a12a / 1a156`, `1a17a / 1a1a6` | `1ae32 / 1ae5e`, `1ae9c / 1aec8` |
+| Tumble loop hook / continuation | `1a21c / 1a248`, `1a280 / 1a2ac` | `1af44 / 1af70`, `1afc8 / 1aff4` |
+| Explicit pilot rotation | `1a224 / 1a250` → `29d26 / 29d52` | `1af4c / 1af78` → `2acb2 / 2acde` |
+| Ship destruction at script index 10 | `1a248 / 1a274` | `1af8e / 1afba` |
+| Helmet camera (view 10), copy subject pose | `06cc4 / 06cf0` | `06f4e / 06f7a` |
+
+`ejection_source.py` verifies each pinned game, guards all three hook spans, and
+relocates bounded native bitmap/step/effect fragments into the generated payload.
+No native fragment bytes are tracked. The seat trajectory and separation scroll
+sample the fractional clock debt, then restore their authoritative registers.
+Bitmap frame selection remains discrete. World motion, camera script commands,
+the pilot tumble and the one-time ship explosion execute only on world ticks.
+Input remains responsive between ticks; aborts stop prediction before native
+cleanup. Native world rendering and publication share the existing save/restore
+and buffer ownership paths.
+
+The tumble is a four-unit explicit rotation before each world update, outside
+the ordinary angular-rate arrays. Its rate is added only to the fresh renderer
+snapshot. The camera script uses view 11 for 70 ticks, view 10 for 80 ticks, then
+view 4. View 10 copies the pilot basis, but leaves camera angular rates zero.
+While that view follows the ejected pilot, camera slot 61 receives the same
+render-only tumble rate. The existing fractional camera-basis sampler therefore
+smooths the helmet view without advancing the camera script or altering native
+orientation. Other camera modes and subjects receive no extra rotation.
+
+Validation: `ejection_clock_check.py` passes on 68000/020 for OCS and 020/040
+for CD32. Each model compares original versus enhanced script results, checks
+12 PAL/NTSC schedules (including nine-field render gaps and clock wrap), three
+abort stages, 18 hook corruptions, and 60 tumble stage/slot/view/subject cases.
+Eight CD32 whole-code installer/register/CCR cases and 1,680 OCS public-option
+hardware cases pass. Reports are in `tmp/ejection-helmet-{ocs,cd32}-native-final`
+and `tmp/ejection-helmet-{ocs,cd32}-options`.
+
+The bounded cached 030 PAL live fixtures pass all stages and native cleanup/
+return in `tmp/ejection-helmet-{ocs,cd32}-live`. Entry-to-continuation field spans
+are OCS **53/53/1003**, CD32 **55/51/1001** for the three stages. These debugger
+checks establish deadlines and intermediate poses, not performance. In both
+helmet views, tick 75 spans four sampled consecutive fields: the pilot moves
+on each picture and camera basis components progress from `(0,-254,-33)` to
+`(0,-252,-42)` while the script index remains 75. The visible helmet images were
+inspected. Native camera state is restored before the next world update.
+Full mission-trigger traversal, live NTSC and real hardware remain untested.
+
+Validated binaries: OCS **50,332 bytes**, SHA-256
+`c29e15eceecafc6adb852f24fc40e0b7bf03cf1b8986e7e25969d64e43e6b886`;
+CD32 **50,868 bytes**, SHA-256
+`b34c56a9f7d80c7150ccf11256f1f782eeafd92a3d166e93b864342e21650b9e`.

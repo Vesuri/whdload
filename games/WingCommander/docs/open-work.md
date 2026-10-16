@@ -32,6 +32,10 @@ The waypoint autopilot fly-by now shares 10 Hz world updates and bounded
 render-only extrapolation in both enhanced variants. Native arrival logic and
 the 240-field cinematic deadline remain unchanged; see
 [autopilot timing](internals.md#waypoint-autopilot-fly-by).
+Ejection now shares the 10 Hz cinematic clock in both enhanced variants, with
+fractional seat/separation motion and pilot/helmet-camera tumble. Camera scripts
+and the explosion stay tick-owned; native cleanup is retained. See
+[ejection timing](internals.md#ejection-cinematic-clock-and-helmet-view).
 Both enhanced versions now wrap the post-briefing running-pilot backgrounds,
 preventing trails in the upper-body and feet shots. See the
 [cinematic fix](internals.md#running-pilot-cinematic-backgrounds).

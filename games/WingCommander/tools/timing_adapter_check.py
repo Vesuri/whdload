@@ -50,6 +50,9 @@ def main():
                     want[off:off+6]=struct.pack('>HI',op,s+sym['release_input_vblank' if buffered and off==0x34188 else label])
                 if buffered:
                     want[0x1396:0x139c]=struct.pack('>HI',0x4ef9,s+sym['autopilot_entry'])
+                    from ejection_source import specification as ejection_specification
+                    for i,(off,_) in enumerate(ejection_specification('cd32')):
+                        want[off:off+6]=struct.pack('>HI',0x4ef9,s+sym[f'ejection_entry{i}'])
                     from launch_source import specification as launch_specification
                     for i,(off,width,_) in enumerate(launch_specification('cd32')):
                         want[off:off+width]=struct.pack('>HI',0x4ef9 if i==0 else 0x4eb9,s+sym[f'launch_entry{i}'])+bytes.fromhex('4e71')*((width-6)//2)
