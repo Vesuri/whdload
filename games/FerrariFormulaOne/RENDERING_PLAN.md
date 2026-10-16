@@ -1572,3 +1572,48 @@ remain separate. Neither preinstalled archive is rebuilt here.
 Local evidence: `tmp/dev/manifest/render-h6c-validation.json`; six fresh captures
 under `tmp/dev/tmp/step5/*-h6c-*`, plus the linked H11 results. Large memory
 captures are compressed with byte-hash verification; compact timing records remain.
+
+## B8-PAL — Remove the diagnostic palette pulse (2026-10-16)
+
+B8-PAL is complete. The shared performance drawing adapter no longer writes
+`D1.w` to `COLOR00` after repairing the screen pointers. This inherited diagnostic
+write could turn colour zero blue between the CPU write and the next copper
+palette load; its timing-dependent boundary explained earlier transitional RGB
+differences. The cleanup removes the write rather than masking pixels or
+changing the real palette. It applies to 68000, chip-only 020 and Fast-memory
+performance paths. The preceding `EXT.L D1` already supplies identical CCR
+flags for every 16-bit input; no replacement instruction or test switch remains.
+
+The historical host `.patch` write is deliberately retained for CUSTOM2=0
+legacy-exact behavior. That source is unchanged. The shared adapter is used
+only by the opt-in performance paths; CUSTOM2 remains default-off.
+
+Focused checks passed:
+
+- All three compiled payloads remove exactly the six-byte write at the audited
+  screen-pointer repair site. Exhaustive 65,536-word flag equivalence passes.
+- 040BCE: 100 game-state updates and private fractions match H11 exactly.
+- 30 complete RGB frames each for normal and grid match H11 exactly, with no
+  pixel masks or palette edits. These stable scanouts are separate from the
+  transitional-field diagnostic identified in H3.
+- Six traced 040BCE grid fields show the draw site executing with no CPU
+  palette bus writes versus three in the retained H11 trace. All 54 copper
+  palette events match exactly, including field slots. Queue/interrupt and
+  Chip-DMA checks pass.
+- 60 simulated seconds: elapsed error **0.02588261%**, below 0.25%.
+- 300 040BCE grid intervals: **24.96020 FPS**, mean **40.06377 ms**,
+  p95 **40.06377 ms**; histogram **{2: 300}**
+  in PAL fields. The revised H6c 95%/three-field maximum gate passes.
+- Independent build is byte-identical: **267,940 bytes**, SHA256
+  `5db5a4c4fb42360578a38aa61c5cdcb3c7524fb4c5bed948f51d305050e1663e`.
+
+This is a palette cleanup, not a claimed speed optimization. No native patch,
+simulation, lifecycle, DMA resource, real palette or buffer ownership logic was
+changed. The reduced scope does not claim a fresh coarse-path, lifecycle or
+CUSTOM2=0 runtime matrix; host source identity and the compiled-site audit
+cover the unchanged code contracts. Successor packaging/qualification remains
+separate. RC2 and H13 archives are unchanged; human full races and real hardware
+testing remain deferred. Earlier B8-PAL limitations describe historical builds.
+
+Local evidence: `tmp/dev/manifest/b8-pal-validation.json`,
+`b8-pal-source-audit.json`, `b8-pal-trace-audit.json` and their linked captures.

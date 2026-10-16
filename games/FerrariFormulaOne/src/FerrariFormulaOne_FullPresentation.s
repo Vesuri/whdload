@@ -42,7 +42,7 @@ B8_65518:
  lsl.l #4,d0
  move.l d0,a0
  ext.l d1
- move.w d1,$dff180
+; No inherited diagnostic COLOR00 pulse; ext.l already supplies the flags.
 B8_6551e:
  adda.l #$66c92,a0
 B8_65524:

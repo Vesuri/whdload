@@ -237,3 +237,14 @@ from historical release qualification. This is a development snapshot, not a
 new release-qualified RC. B8-PAL cleanup, full human races and hardware testing
 remain separate. The older RC2 archive is unchanged. Local packaging evidence:
 `tmp/dev/manifest/preinstalled-h13.json`.
+
+### B8-PAL cleanup
+
+The inherited diagnostic COLOR00 write is removed from all performance paths.
+Real palette setup and the frozen CUSTOM2=0 host patch remain unchanged.
+Focused exact-state/RGB, elapsed, palette trace, DMA and 040BCE grid timing checks
+pass; see the B8-PAL closure in [RENDERING_PLAN.md](RENDERING_PLAN.md).
+The reproducible production build is 267,940 bytes, SHA256
+`5db5a4c4fb42360578a38aa61c5cdcb3c7524fb4c5bed948f51d305050e1663e`.
+This supersedes earlier B8-PAL cleanup notes for current source. The existing
+preinstalled archives still contain their documented older builds.
