@@ -28,6 +28,10 @@ with intermediate rendering; the tunnel shares world extrapolation with the intr
 The incoming-ship sampler clears the vertical dividend independently of X,
 preventing offscreen flicker, and intermediate redraws preserve bitmap actor state.
 See [mission launch timing](internals.md#mission-launch-timing).
+The waypoint autopilot fly-by now shares 10 Hz world updates and bounded
+render-only extrapolation in both enhanced variants. Native arrival logic and
+the 240-field cinematic deadline remain unchanged; see
+[autopilot timing](internals.md#waypoint-autopilot-fly-by).
 Both enhanced versions now wrap the post-briefing running-pilot backgrounds,
 preventing trails in the upper-body and feet shots. See the
 [cinematic fix](internals.md#running-pilot-cinematic-backgrounds).

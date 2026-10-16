@@ -4681,3 +4681,27 @@ existing exterior/tunnel fixture. No instruction trace is retained. The native
 clock check asserts both coordinates at every PAL/NTSC subfield and verifies
 that compositor actor-table mutations do not escape render-only calls. This
 rejects the old partial-word dividend that sent the ship offscreen between ticks.
+
+
+### Waypoint autopilot clock
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/autopilot-ocs
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/autopilot-cd32
+python3 tools/autopilot_clock_check.py ocs tmp/autopilot-ocs --output tmp/autopilot-ocs-native
+python3 tools/autopilot_clock_check.py cd32 tmp/autopilot-cd32 --output tmp/autopilot-cd32-native
+python3 tools/ocs_options_check.py tmp/autopilot-ocs --output tmp/autopilot-ocs-options
+python3 tools/timing_adapter_check.py tmp/autopilot-cd32 --output tmp/autopilot-cd32-options
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/launch_live_check.py ocs tmp/autopilot-ocs --autopilot --output tmp/autopilot-ocs-live
+python3 tools/launch_live_check.py cd32 tmp/autopilot-cd32 --autopilot --output tmp/autopilot-cd32-live
+```
+
+Use fresh output directories and run the emulator checks sequentially. The
+`--autopilot` option extends the existing bounded launch fixture with a native
+waypoint-autopilot call. It checks the 240-field deadline, eight staged player
+positions, movement between world ticks and successful native arrival return.
+It retains one extra screenshot and JSON samples, deleting the single-field
+instruction capture immediately. The fixture restores its temporary menu/stub
+patches and stops only its owned emulator. This is not a full campaign replay.

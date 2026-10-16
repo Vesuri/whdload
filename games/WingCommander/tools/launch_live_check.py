@@ -21,6 +21,7 @@ def main():
     p.add_argument('variant',choices=('ocs','cd32'));p.add_argument('build',type=Path)
     p.add_argument('--output',required=True)
     p.add_argument('--exterior-samples',action='store_true',help='check and capture five incoming-ship pictures')
+    p.add_argument('--autopilot',action='store_true',help='continue through the native waypoint fly-by after launch')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     v=get(a.variant)
     if a.variant=='ocs':
@@ -95,7 +96,8 @@ def main():
             ' clr.w -(sp)',f' jsr ${h0+load:x}',' move.w #1,-(sp)',f' jsr ${h0+pack:x}',
             ' addq.l #4,sp',f' jsr ${h0+exterior:x}',
             ' move.w #1,-(sp)',' move.w #1,-(sp)',f' jsr ${h0+mission:x}',' addq.l #4,sp',
-            f' jsr ${h0+tunnel:x}',' movem.l (sp)+,d0-d7/a0-a6',' rts'])+'\n')
+            f' jsr ${h0+tunnel:x}',
+            *([f' jsr ${h0+(0xf56 if ocs else 0x101c):x}'] if a.autopilot else []), ' movem.l (sp)+,d0-d7/a0-a6',' rts'])+'\n')
         subprocess.run([os.environ['VASM'],'-m68020','-Fbin','-o',str(binary),str(src)],check=True)
         old=out/'original-stub.bin';cmd(f'dump binary memory {old.relative_to(ROOT)} {stub:#x} {stub+binary.stat().st_size:#x}')
         original=out/'original-call.bin';cmd(f'dump binary memory {original.relative_to(ROOT)} {callsite:#x} {callsite+6:#x}')
@@ -143,11 +145,30 @@ def main():
         end=number(f'*(unsigned int*){field:#x}')
         assert 125<=end-start<=135,(start,end)
         assert any(len({scale for _,t,scale in samples if t==tick})>1 for tick in {r[1] for r in samples}),samples
+        tunnel_samples=samples
+        autopilot=None
+        if a.autopilot:
+            until(sb+sy['autopilot_scene'])
+            first=number(f'*(unsigned int*){field:#x}')
+            until(sb+sy['intro_world'])
+            samples=[]
+            counter='ocs_intro_completed' if ocs else 'timing_completed'
+            for i in range(8):
+                until(sb+sy['intro_finish'])
+                position=h1+v.A4_BASE+(0x92a if ocs else 0x119c)
+                sample=cmd(f'printf "AUTO %u %u %d %d %d\\n", *(unsigned int*){field:#x}, *(unsigned int*){sb+sy[counter]:#x}, *(int*){position:#x}, *(int*){position+4:#x}, *(int*){position+8:#x}')
+                samples.append(list(map(int,re.search(r'AUTO (\d+) (\d+) (-?\d+) (-?\d+) (-?\d+)',sample).groups())))
+                if i==3:shot('autopilot')
+            until(sb+sy['autopilot_resume'])
+            last=number(f'*(unsigned int*){field:#x}')
+            assert 240<=last-first<=250,(first,last)
+            assert any(x[1]==y[1] and x[2:]!=y[2:] for x,y in zip(samples,samples[1:])),samples
+            autopilot=dict(first=first,last=last,samples=samples)
         until(ret)
         cmd(f'monitor ocs-load {callsite:x} "{original}"');cmd(f'monitor ocs-load {stub:x} "{old}"')
         (out/'report.json').write_text(json.dumps(dict(complete=True,variant=a.variant,
             slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(),exterior=rows,
-            tunnel=dict(start=start,end=end,fields=end-start,samples=samples),
+            tunnel=dict(start=start,end=end,fields=end-start,samples=tunnel_samples),autopilot=autopilot,
             scope='native first-mission setup/launch fixture; not a briefing or campaign traversal'),indent=2)+'\n')
     finally:stop()
 

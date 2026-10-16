@@ -68,7 +68,7 @@ def source(root, variant):
                           ' move.l a1,-(sp)', ' lea modal_room_table(pc),a1', ' move.l a0,(a1)', ' move.l (sp)+,a1', ' movem.l (sp)+,a0']
             if kind=='wait' and i==0:lines += [' bsr.w modal_bar_capture']
             native(f'modal_room_{kind}{i}_native' ,int.from_bytes(code[off+2:off+6],'big'))
-    lines+=['modal_guard:',' bsr.w launch_guard',' movem.l d0-d7/a0-a6,-(sp)']
+    lines+=['modal_guard:',' bsr.w autopilot_guard',' bsr.w launch_guard',' movem.l d0-d7/a0-a6,-(sp)']
     for off,width,_ in patches:
         if code[off:off+2]==bytes.fromhex('4eb9'):
             target=int.from_bytes(code[off+2:off+6],'big')
@@ -76,7 +76,7 @@ def source(root, variant):
                       ' move.l a0,d0',f' addi.l #${target:x},d0',f' cmp.l ${off+2:x}(a0),d0',' bne.w modal_bad']
         else:
             for n in range(0,width,2):lines += [f' cmpi.w #${int.from_bytes(code[off+n:off+n+2],"big"):x},${off+n:x}(a0)',' bne.w modal_bad']
-    lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_install:',' bsr.w launch_install',' movem.l d0-d7/a0-a6,-(sp)']
+    lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_install:',' bsr.w autopilot_install',' bsr.w launch_install',' movem.l d0-d7/a0-a6,-(sp)']
     for label,target in fix:
         lines += [' move.l a0,d0',f' addi.l #${target:x},d0',f' lea {label}+2(pc),a1',' move.l d0,(a1)']
     for off,width,label in patches:
@@ -87,6 +87,8 @@ def source(root, variant):
             ' movem.l (sp)+,d0-d7/a0-a6','modal_bad_target:',' bra.w '+('wrong_revision' if ocs else 'timing_bad')]
     from launch_source import source as launch_source
     lines.append(launch_source(root,variant))
+    from autopilot_source import source as autopilot_source
+    lines.append(autopilot_source(root,variant))
     text='\n'.join(lines)+'\n'
     if ocs:
         from shared_cpu import select

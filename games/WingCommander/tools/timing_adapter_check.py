@@ -49,6 +49,7 @@ def main():
                 for off,label,op in [(0x28c86,'timing_debris_draw',0x4ef9),(0x698,'timing_loop',0x4ef9),(0x878,'timing_pause',0x4ef9),(0x101c,'timing_autopilot',0x4ef9),(0x18eee,'timing_throttle_gate',0x4eb9),(0x18f00,'timing_throttle_gate',0x4eb9),(0x18f3a,'timing_fire_gate',0x4eb9),(0x7bc2,'timing_world_rotation',0x4eb9),(0x34188,'timing_record_input',0x4eb9),(0x1934c,'timing_pad_read',0x4eb9),(0x18c6a,'timing_keys_read',0x4eb9),(0x19380,'timing_key_command',0x4eb9),(0x65f4,'timing_emission_clock',0x4eb9),(0x51a,'timing_message_draw',0x4eb9),(0x46ea,'timing_systems_draw',0x4eb9),(0x530,'timing_sim_draw',0x4ef9),(0x438,'timing_sim_score_draw',0x4eb9),(0x3b8e,'timing_target_draw',0x4ef9),(0x4b16,'timing_selection',0x4ef9),(0x435c,'timing_portrait_clock',0x4eb9),(0x43ee,'timing_portrait_random',0x4eb9)]:
                     want[off:off+6]=struct.pack('>HI',op,s+sym['release_input_vblank' if buffered and off==0x34188 else label])
                 if buffered:
+                    want[0x1396:0x139c]=struct.pack('>HI',0x4ef9,s+sym['autopilot_entry'])
                     from launch_source import specification as launch_specification
                     for i,(off,width,_) in enumerate(launch_specification('cd32')):
                         want[off:off+width]=struct.pack('>HI',0x4ef9 if i==0 else 0x4eb9,s+sym[f'launch_entry{i}'])+bytes.fromhex('4e71')*((width-6)//2)
@@ -78,7 +79,7 @@ def main():
             if custom!=3:assert c.read(layout["hunks"][3],0x1590)==opening_before
             cases.append(dict(model=model,custom=custom,exact=True));c.close()
         # A changed instruction operand must be rejected before any patch write.
-        for operand in ((0x1de22,0x1de3e,0x1df52,0x1df6e,0x69a,0x2b64a,0x2b64c,0x308,0xc4e,0xc914,0xca60,0xc318,0x9a54,0x330,0x2fa,0x1fd02,0x1fddc,0x1fde2,0x1fe16,0x1fe46,0x1fe4a) if buffered else (0x69a,)):
+        for operand in ((0x1398,0x139a,0x1de22,0x1de3e,0x1df52,0x1df6e,0x69a,0x2b64a,0x2b64c,0x308,0xc4e,0xc914,0xca60,0xc318,0x9a54,0x330,0x2fa,0x1fd02,0x1fddc,0x1fde2,0x1fe16,0x1fe46,0x1fe4a) if buffered else (0x69a,)):
             c=CPU(memory,layout,model);s=0x180000;resload=0x190000
             c.write(s,blob);c.write(s+0x1de4,struct.pack('>I',3))
             c.write(s+0x121e,struct.pack('>I',resload))

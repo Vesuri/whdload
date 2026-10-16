@@ -2556,8 +2556,9 @@ boundary. Render-time aiming geometry cannot commit an extra lock or launch.
 
 Pause uses the common entry `E:0878` (file `08a4`), covering relative as well as
 absolute callers. Autopilot uses `E:101c` (file `1048`). Both disable sampling and
-replay, discard/count unread active time, preserve native modal execution, and
-rebase on return. The loop exit `E:06c8` precedes outer menu/landing transitions.
+replay, discard/count unread active time, retain native modal ownership, and
+rebase on return. The waypoint fly-by now uses the separately gated shared
+10 Hz cinematic adapter described [below](#waypoint-autopilot-fly-by). The loop exit `E:06c8` precedes outer menu/landing transitions.
 The retained pause run `tmp/phase9-history-pause-fixed-live-v2/` freezes all mapped
 world state for 20 fields and resumes with 20 completions in the next 100-field
 window, without the prior catch-up burst. CPU-only modal checks separately prove
@@ -7292,3 +7293,58 @@ The same layer changes scale within a fixed script tick: OCS tick 3 shows
 ship and cockpit/tunnel layers intact. These are bounded functional emulator
 checks, not hardware performance or full campaign acceptance; live NTSC remains
 outside this gate.
+
+
+## Waypoint autopilot fly-by
+
+The visible autopilot sequence previously bypassed the flight scheduler. Its
+native deadline helper calls the world once per drawn picture until 240 fields
+have elapsed. The following fast-travel loop updates position and tests arrival
+without drawing; it is a separate transaction, not the fly-by animation.
+
+| Site | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Autopilot entry / existing modal wrapper | `0f56` / `0f82` | `101c` / `1048` |
+| Fly-by deadline helper | `0d9e` / `0dca` | `0e64` / `0e90` |
+| World call inside original helper | `0dc4` / `0df0` | `0e8a` / `0eb6` |
+| Fly-by call and argument cleanup, new six-byte hook | `12d0` / `12fc` | `1396` / `13c2` |
+| Native camera selection | `6e24` / `6e50` | `70ae` / `70da` |
+| Fast-travel position addition, retained | `131a` / `1346` | `13e0` / `140c` |
+| Arrival's final native world call, retained | `148c` / `14b8` | `1552` / `157e` |
+
+`autopilot_clock.s` replaces only that call site, not every user of the native
+deadline helper. It selects native camera 12 / subject 0, starts the existing
+cinematic owner (`intro_start`), issues due `intro_world` ticks and brackets each
+picture with `intro_draw` / `intro_finish`. This shares flight's bounded prediction,
+world-owned attachments, render-state restoration and publication path without
+enabling flight input inside the modal. Native message/HUD/radar overlay calls
+remain in order before publication. `intro_stop` restores prediction ownership
+and drains publication before native fast travel and arrival. The surrounding
+modal wrapper still rebases flight on return, preventing cinematic time from
+becoming catch-up debt.
+
+The deadline remains 240 native fields: 4.8 seconds PAL, 4 seconds NTSC, plus
+bounded rendering/entry overhead. World motion runs at 10 Hz in either mode.
+There is no claim of a new intended cinematic duration or hardware frame rate.
+Original/off and OCS ineligible-machine behavior are unchanged.
+
+Native reports `tmp/autopilot-{ocs,cd32}-native-final/report.json` cover two CPU
+models per variant, PAL/NTSC, 1/3/9-field rendering gaps, clock wrap, camera
+arguments, stack/callee-saved registers, intermediate clock fractions, exit
+ownership and six rejected hook-byte mutations per model. OCS public options
+pass 1,680 cases in `tmp/autopilot-ocs-options`; CD32 whole-code installer,
+register/CCR and rejection checks pass in `tmp/autopilot-cd32-options-final`.
+The bounded live fixture invokes the native autopilot after first-mission setup
+and launch, then requires return through arrival. It samples player positions
+while prediction is staged and checks changing positions within the same world
+tick. This is a native cinematic/arrival fixture, not a full campaign replay.
+
+Cached-030 PAL live checks pass in `tmp/autopilot-cd32-live/report.json` and
+`tmp/autopilot-ocs-live-final/report.json`. Both reach native arrival return;
+the measured fly-by entry-to-resume interval is 241 fields including overhead.
+At completed world tick 26, four consecutive pictures have player X coordinates
+−26180, −29920, −33660 and −37400 in both variants, while the world counter stays
+fixed. The corresponding Y/Z coordinates also advance smoothly. These are
+staged render poses, not extra authoritative movement. Each run retains one
+fly-by screenshot and completes the existing exterior/tunnel checks. Live NTSC
+and full campaign traversal remain outside this bounded gate.
