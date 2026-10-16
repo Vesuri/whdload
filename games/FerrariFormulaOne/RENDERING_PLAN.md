@@ -1521,3 +1521,54 @@ Local evidence: `tmp/dev/manifest/render-h11-validation.json`,
 `render-h11-capture-archive.json`. Completed large captures are hash-verified
 and compressed. Rejected screen-reordering variants and test-only fixtures are
 absent from production.
+
+## H6c — Common-scene confirmation (2026-10-16)
+
+During this measurement the user requested a realistic goal of 95% of frames
+holding 25 FPS. The revised gate is **at least 285 of 300 complete presentation
+intervals at two PAL fields**, with the remaining intervals no longer than
+three fields. This means p95 = 40.06377 ms and maximum ≤60.09566 ms; it does
+not mean a 25 FPS average. Required scenes are normal, solo and grid on
+040/060 with cycle-exact blitting; 030 remains a secondary target. Dense retains
+its same-workload no-regression gate. The original all-300-two-field result is
+preserved in the evidence rather than relabelled as passed.
+
+Measured source: H11 commit `95ba29d3bed5ba48e742e9b663cbcc5794439d1a`.
+No game code or build layout changed. Production SHA256:
+`84783350ad9b1b5a23d3ac28862e53fbb0fb9cc6fdf553edb6289afcbe8bcb26`.
+Six fresh normal/solo measurements complete the missing evidence; the three
+same-source H11 grid measurements are retained. Each run uses 300 complete
+intervals after 100 warm-up presentations, with warp disabled. Normal is the
+production demo; solo/grid are the established deterministic rendering fixtures.
+Profiles use 2 MiB Chip and 8 MiB Fast, calibrated CPU timing and cycle-exact
+blitting. These are emulator observations, not hardware guarantees or statistical
+claims about every track and every possible gameplay scene.
+
+| Profile / scene | FPS | Mean ms | p95 ms | Two-field share | Histogram (fields) |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 040-40-bce / normal | 24.51084 | 40.79828 | 40.06377 | 96.33% | 289 × 2, 11 × 3 |
+| 040-40-bce / solo | 24.96020 | 40.06377 | 40.06377 | 100.00% | 300 × 2 |
+| 040-40-bce / grid | 24.91867 | 40.13055 | 40.06377 | 99.67% | 299 × 2, 1 × 3 |
+| 060-50-bce / normal | 24.55102 | 40.73150 | 40.06377 | 96.67% | 290 × 2, 10 × 3 |
+| 060-50-bce / solo | 24.96020 | 40.06377 | 40.06377 | 100.00% | 300 × 2 |
+| 060-50-bce / grid | 24.96020 | 40.06377 | 40.06377 | 100.00% | 300 × 2 |
+| 030-50-bce / normal | 24.55102 | 40.73150 | 40.06377 | 96.67% | 290 × 2, 10 × 3 |
+| 030-50-bce / solo | 24.96020 | 40.06377 | 40.06377 | 100.00% | 300 × 2 |
+| 030-50-bce / grid | 24.96020 | 40.06377 | 40.06377 | 100.00% | 300 × 2 |
+
+**H6c passes the revised gate on all nine common-scene measurements.**
+The strict original gate remains unmet. The representative H11 dense pair is
+unchanged at 12.48010 FPS (300 four-field intervals), and the 020+Fast normal
+pair is unchanged at 15.39170 FPS. Those matched checks are retained without
+expanding the test matrix. Existing H11 correctness and lifecycle acceptance
+continues to apply because this step changes no game code.
+
+The common-scene stopping rule is satisfied: do not add H14 or H16 to reach
+this target. H15 remains a separate optional dense-scene stretch goal, not a
+condition of H6c completion. H12 stays dropped. B8-PAL cleanup, successor
+packaging/qualification, deferred human full races and real hardware testing
+remain separate. Neither preinstalled archive is rebuilt here.
+
+Local evidence: `tmp/dev/manifest/render-h6c-validation.json`; six fresh captures
+under `tmp/dev/tmp/step5/*-h6c-*`, plus the linked H11 results. Large memory
+captures are compressed with byte-hash verification; compact timing records remain.

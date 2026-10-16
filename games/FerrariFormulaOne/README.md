@@ -213,7 +213,12 @@ grid improves 24.71307 → 24.91867 FPS. The 030/060 grid confirmations reach
 The reproducible 267,960-byte build has SHA256
 `84783350ad9b1b5a23d3ac28862e53fbb0fb9cc6fdf553edb6289afcbe8bcb26`.
 See the H11 closure in [RENDERING_PLAN.md](RENDERING_PLAN.md) for scope and
-histograms. H6c common-scene confirmation remains open; H12 is dropped.
+histograms. H6c now passes the revised common-scene gate: at least 95% of
+300 intervals at two PAL fields, with none longer than three fields. Normal
+030/040/060 BCE scenes achieve 96.3–96.7%; solo/grid achieve 99.7–100%.
+The original all-300 target remains unmet. No further common-scene optimization
+is needed for the revised goal; dense retains its no-regression result.
+H12 is dropped.
 The H13 preinstalled snapshot and RC2 archive are unchanged.
 
 ### H13 local preinstalled snapshot
