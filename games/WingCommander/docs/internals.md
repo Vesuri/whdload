@@ -2654,8 +2654,9 @@ Native positions are `D:919a`, velocities `D:9d6c`, and basis arrays
 slots and are saved too. Class 2 stars are direction vectors and receive the
 responsive camera rotation, not fictitious world translation. Other active
 position-bearing classes are predicted; class 7 attachments use their parent's
-projected pose. Explosion images, effect-script sizes/lifetimes and discrete
-cockpit indicators retain their world-clock transitions. Their poses can move
+projected pose. Explosion images, effect-script lifetimes and discrete cockpit indicators retain
+their world-clock transitions. Effect sizes sample the known next script values
+between ticks; see [effect size sampling](#explosion-size-sampling). Their poses can move
 between ticks without guessing new animation frames or lifecycle events.
 
 Two native drawing side effects require explicit ownership:
@@ -7136,6 +7137,46 @@ The previously fixed 640-pixel background wrap remains in use.
 | Barracks setup / animation wait | `260f2 / 2611e`, `2611e / 2614a` | `26fe8 / 27014`, `27014 / 27040` |
 | Native window renderer | `1e8ae / 1e8da` | `1f5e8 / 1f614` |
 | Bar foreground entry | `24ae0 / 24b0c` | `25922 / 2594e` |
+
+### Explosion size sampling
+
+The simulator Game Over explosion (class 5, model 49) exposed a mismatch:
+positions/camera distance were predicted per picture, while script growth stayed
+at 10 Hz. In the CD32 capture, projected scale fell `307,301,296,291,286`, then
+jumped to `308` when native size changed from 1120 to 1222. This was a real
+size discontinuity, not extra effect-image or RNG advancement.
+
+Both enhanced variants now share `timing_scene_effect_size`. It reads the native
+period, cursor and script without executing side effects, and samples between
+successive native size endpoints. A display lead crossing a tick boundary reads
+at most two local script steps, including growth/dwell transitions. Only classes
+5/6/9/10 participate; class-7 attachments retain their own renderer. First-interval
+size sampling does not require old-slot pose continuity. The existing staged-slot
+backup restores size before any world work. Native image selection, flip flags,
+cursor, period, removal and allocation stay authoritative at 10 Hz. This smooths
+scaling, not the discrete source images themselves. Disabled enhancements retain
+the original code path.
+
+| Native operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Effect interpreter | `2800a / 28036` | `28f96 / 28fc2` |
+| Period decrement | `28044 / 28070` | `28fd0 / 28ffc` |
+| Growth write | `280f8 / 28124` | `29084 / 290b0` |
+| Shrink write | `2811e / 2814a` | `290aa / 290d6` |
+| Frame write | `2812c / 28158` | `290b8 / 290e4` |
+
+`tools/effect_size_check.py` compares the preview with one or two executions of
+these original interpreters on 68000/020 (OCS) and 020/040 (CD32), including
+period waits, jump/removal, quantisation and word wrap. It also checks first
+interval staging, full data-hunk restoration, excluded classes and null scripts.
+Each model passes 7,200 native endpoint comparisons, plus exclusions and exact
+restoration. The modal-clock and public-option checks also pass on these builds.
+The CD32 cached-030 PAL simulator capture replaces the old scale jump `270→292`
+with `301→303` at the corresponding script boundary. Both OCS and CD32 live
+runs record intermediate size changes, retain the Ready/Game Over deadlines
+and reach native name entry. This is a bounded
+functional check; source-image changes remain discrete. Reproducible commands
+and live scope are in [development](development.md#explosion-size-sampling).
 
 ### Bar foreground restoration and room cursor cadence
 

@@ -329,8 +329,11 @@ timing_scene_begin:
         moveq   #0,d4
         moveq   #0,d5
 .object:
+        ifne BUFFERED
+        bsr.w   timing_scene_effect_size
+        endif
         ; Stars are directions, not world positions. Empty/hidden slots stay
-        ; native. Discrete effect images, sizes and lifetime are never guessed.
+        ; native. Effect images and lifetime retain their native tick transitions.
         lea     timing_scene_predictable(pc),a0
         tst.b   (a0,d4.w)
         beq.w   .next
@@ -552,6 +555,109 @@ timing_intro_camera_rotate:
         add.l   (a3)+,d0
         move.l  d0,(a2)+
         dbra    d3,.component
+        rts
+
+; Preview only the next native effect-script size operation. Image selection,
+; script cursor/period, allocation and removal remain owned by world ticks.
+; D4=slot, D6/D7=display fraction/rate. The existing slot backup owns size.
+timing_scene_effect_size:
+        movem.l d0-d3/d5-d6/a0-a2,-(sp)
+        lea     5888(a4),a0
+        move.w  (a0,d4.w*2),d0
+        cmpi.w  #5,d0
+        beq.s   .effect
+        cmpi.w  #6,d0
+        beq.s   .effect
+        cmpi.w  #9,d0
+        beq.s   .effect
+        cmpi.w  #10,d0
+        bne.w   .done
+.effect:
+        lea     6136(a4),a0
+        move.w  (a0,d4.w*2),d0
+        muls.w  #104,d0
+        lea     -11354(a4),a0
+        adda.l  d0,a0
+        move.w  36(a0),d5
+        movea.l 26(a0),a1
+        move.l  a1,d0
+        beq.w   .done
+        lea     16504(a4),a0
+        move.w  (a0,d4.w*2),d3
+        lea     16632(a4),a0
+        move.w  (a0,d4.w*2),d2
+        lea     13260(a4),a2
+        adda.w  d4,a2
+        adda.w  d4,a2
+        ; The display predictor can lead by one tick plus two fields. Walk
+        ; that first tick locally before sampling the following command;
+        ; clamping here would introduce a new kink at growth/dwell boundaries.
+        cmp.l   d7,d6
+        bls.s   .fraction
+        bsr.s   .step
+        move.w  d0,(a2)
+        sub.l   d7,d6
+.fraction:
+        bsr.s   .step
+        moveq   #0,d1
+        move.w  (a2),d1
+        sub.l   d1,d0
+        bsr.w   timing_scene_scale
+        add.w   d0,(a2)
+.done:
+        movem.l (sp)+,d0-d3/d5-d6/a0-a2
+        rts
+
+; A read-only native script step: local cursor D2 and period D3, reset D5.
+; Return the unsigned endpoint size in D0. Never select an image or remove.
+.step:
+        subq.w  #1,d3
+        bgt.s   .held
+        move.w  d5,d3
+        move.w  d2,d0
+        ext.l   d0
+        add.l   d0,d0
+        move.w  (a1,d0.l),d1
+        move.w  d1,d0
+        lsr.w   #8,d0
+        lsr.w   #4,d0
+        cmpi.w  #10,d0
+        beq.s   .removed
+        cmpi.w  #9,d0
+        bne.s   .command
+        andi.w  #$fff,d1
+        move.w  d1,d2
+        add.w   d1,d1
+        move.w  (a1,d1.w),d1
+.command:
+        addq.w  #1,d2
+        move.w  d1,d0
+        andi.w  #$c00,d0
+        cmpi.w  #$400,d0
+        beq.s   .grow
+        cmpi.w  #$800,d0
+        bne.s   .held
+        bsr.s   .amount
+        neg.w   d0
+        bra.s   .add
+.grow:
+        bsr.s   .amount
+.add:
+        add.w   (a2),d0
+        andi.l  #$ffff,d0
+        rts
+.removed:
+        move.w  #32767,d3
+.held:
+        moveq   #0,d0
+        move.w  (a2),d0
+        rts
+.amount:
+        moveq   #0,d0
+        move.w  (a2),d0
+        lsr.w   #6,d0
+        andi.w  #$3f,d1
+        mulu.w  d1,d0
         rts
 
 timing_scene_end:

@@ -20,6 +20,8 @@ that previously rounded to 10 Hz steps in both variants. See
 Simulator Ready/Game Over, bar/barracks and running-pilot motion now use
 CPU-independent timing in both enhanced versions; simulator world prediction,
 text zoom, running positions and bar-window motion receive intermediate samples.
+Explosion script sizes also receive intermediate samples, removing growth jumps
+against smooth camera motion; image frames and lifetime stay tick-owned.
 The bar redraw restores the TV/foreground between ticks; bar and barracks cursor
 polling runs per observed field, preserving clicks for the native room loop.
 See [modal clocks](internals.md#simulator-and-room-animation-clocks).

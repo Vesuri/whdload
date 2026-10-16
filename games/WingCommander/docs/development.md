@@ -4771,3 +4771,38 @@ foreground crew member's native image selection must match its extra redraws.
 It retains only compact reports and two additional screenshots. This exercises
 the cinematic with native assets, not docking permission, collision detection,
 mission completion or the subsequent debriefing.
+
+## Explosion size sampling
+
+Build separate enhanced candidates and compare their render-only size sampler
+against the original effect interpreters. Use fresh output names on repeats.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/effect-cd32-build
+python3 tools/ocs_memory_build.py --public --output tmp/effect-ocs-build
+python3 tools/effect_size_check.py cd32 tmp/effect-cd32-build --output tmp/effect-cd32-check
+python3 tools/effect_size_check.py ocs tmp/effect-ocs-build --output tmp/effect-ocs-check
+python3 tools/modal_clock_check.py cd32 tmp/effect-cd32-build --output tmp/effect-cd32-modal
+python3 tools/modal_clock_check.py ocs tmp/effect-ocs-build --output tmp/effect-ocs-modal
+python3 tools/timing_adapter_check.py tmp/effect-cd32-build --output tmp/effect-cd32-options
+python3 tools/ocs_options_check.py tmp/effect-ocs-build --output tmp/effect-ocs-options
+```
+
+For the bounded live check, select the corrected debugger emulator described
+above through `FSUAE`, then run these sequentially:
+
+```sh
+python3 tools/modal_live_check.py cd32 tmp/effect-cd32-build --simulator-only --output tmp/effect-cd32-live
+python3 tools/modal_live_check.py ocs tmp/effect-ocs-build --simulator-only --output tmp/effect-ocs-live
+```
+
+The short mode follows the actual simulator route, records 55 native/rendered
+explosion-size pairs, checks intermediate growth, verifies Ready/Game Over
+clock durations and reaches the name prompt. It stops its own emulator. Reports
+and three screenshots stay in `tmp/`; it does not record a large instruction trace.
+This is a cached 030 PAL functional check, not a throughput or hardware claim.
+
+Accepted evidence: `tmp/explosion-{ocs,cd32}-v4` builds,
+`tmp/explosion-{ocs,cd32}-final-check`, `-final-modal`, `-final-options`,
+and `tmp/explosion-{ocs,cd32}-live-v4/report.json`. Both live runs pass.

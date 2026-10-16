@@ -20,6 +20,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('variant',choices=('ocs','cd32'));p.add_argument('build',type=Path)
     p.add_argument('--output',required=True)
+    p.add_argument('--simulator-only',action='store_true',help='check explosion sampling and stop at name entry')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     v=get(a.variant)
     if a.variant=='ocs':
@@ -98,14 +99,40 @@ def main():
         for label in ('ready','game-over'):
             until(sb+sy['intro_start'])
             start=number(f'*(unsigned int*){field:#x}')
+            effects=[]
+            if a.simulator_only and label=='game-over':
+                # Capture native size before staging, then the size actually
+                # projected. No game-state injection or large trace files.
+                kind,model,size,scale,tick=((0xe8e,0xf86,0x29ba,0x227c,0x8dc) if a.variant=='ocs' else
+                                          (0x1700,0x17f8,0x33cc,0x2cee,0x114e))
+                until(sb+sy['intro_draw'])
+                slots=[i for i in range(61) if number(f'*(unsigned short*)($a4+{kind+2*i})')==5
+                       and number(f'*(unsigned short*)($a4+{model+2*i})')==49]
+                assert len(slots)==1,slots
+                slot=slots[0]
+                for i in range(55):
+                    if i:until(sb+sy['intro_draw'])
+                    row=dict(tick=number(f'*(unsigned short*)($a4+{tick})'),
+                             native_size=number(f'*(unsigned short*)($a4+{size+2*slot})'))
+                    until(sb+sy['intro_finish'])
+                    row.update(shown_size=number(f'*(unsigned short*)($a4+{size+2*slot})'),
+                               projected_scale=number(f'*(unsigned short*)($a4+{scale+2*slot})'))
+                    effects.append(row)
+                assert any(r['native_size']!=r['shown_size'] for r in effects),'no fractional size'
+                assert any(len({r['shown_size'] for r in effects if r['tick']==t})>=3
+                           for t in {r['tick'] for r in effects}),'size still held between ticks'
             until(sb+sy['intro_draw'],f'*(unsigned int*){field:#x} >= {start+(150 if label=='game-over' else 100)}')
             shot(label)
             until(sb+sy['intro_stop'])
             end=number(f'*(unsigned int*){field:#x}')
             assert 200<=end-start<=210,(label,start,end)
-            rows.append(dict(scene=label,start=start,end=end,fields=end-start))
+            rows.append(dict(scene=label,start=start,end=end,fields=end-start,effects=effects))
         until(h0+(0x16992 if a.variant=='ocs' else 0x16fc6))
         shot('name')
+        if a.simulator_only:
+            (out/'report.json').write_text(json.dumps(dict(complete=True,variant=a.variant,
+                slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(),samples=rows),indent=2)+'\n')
+            return
         # Native name entry and room navigation; no save/load or campaign run.
         char_done=0x16a86 if a.variant=='ocs' else 0x17172
         input_loop=0x16992 if a.variant=='ocs' else 0x16fc6
