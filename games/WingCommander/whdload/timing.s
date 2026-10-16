@@ -31,7 +31,7 @@ timing_patchseg:
         bsr.w   timing_rate
         lea     timing_hz(pc),a0
         move.l  d0,(a0)
-        bsr.w   flight_render_init
+        bsr.l   flight_render_init
         jsr     32(a2)
 .done:
         move.w  (sp)+,ccr

@@ -31,7 +31,8 @@ The incoming-ship sampler clears the vertical dividend independently of X,
 preventing offscreen flicker, and intermediate redraws preserve bitmap actor state.
 See [mission launch timing](internals.md#mission-launch-timing).
 The waypoint autopilot fly-by now shares 10 Hz world updates and bounded
-render-only extrapolation in both enhanced variants. Native arrival logic and
+render-only extrapolation in both enhanced variants. Its sideways camera motion
+and aim also follow the staged ship positions, preventing tick-boundary snaps. Native arrival logic and
 the 240-field cinematic deadline remain unchanged; see
 [autopilot timing](internals.md#waypoint-autopilot-fly-by).
 Ejection now shares the 10 Hz cinematic clock in both enhanced variants, with

@@ -7365,6 +7365,33 @@ and drains publication before native fast travel and arrival. The surrounding
 modal wrapper still rebases flight on return, preventing cinematic time from
 becoming catch-up debt.
 
+The render predictor also implements camera 12's complete geometry: the native
+sideways step is `right * -2560 / 256`, in addition to the camera velocity, and
+its basis aims at player slot 0. Predicting velocity alone while holding this
+basis made the moving ships drift across the view and snap back at each world
+tick. `timing_autopilot_camera` adds the fractional sideways displacement and
+calls only the native aim helper on the staged player/camera pair. It skips the
+unrelated angular-rate prediction for this camera. All camera positions/bases
+are restored by the existing scene backup before the next world update; the
+whole camera dispatcher is not called during rendering.
+
+| Camera geometry | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Camera-12 sideways/velocity/aim case | `6946 / 6972` | `6bd0 / 6bfc` |
+| Aim camera at subject | `29894 / 298c0` | `2a820 / 2a84c` |
+
+`tools/autopilot_camera_check.py` compares the native camera step and native aim
+from matching initial bases, samples PAL/NTSC fractions on two CPU models per
+variant, and checks exact data-hunk restoration. The preceding CD32 build fails
+its missing-drift assertion. The existing intro-camera and autopilot clock tests
+also pass. The live harness now checks 20 player projections across tick
+boundaries, rather than checking only that world positions move between ticks. Final
+cached-030 PAL runs in `tmp/autopilot-camera-{ocs,cd32}-live/report.json` pass:
+both keep projected player X/Y within one pixel of centre across the sampled
+tick boundaries, preserve the 241-field entry-to-resume interval and return
+through native arrival. Native reports use the corresponding `-final-check`,
+`-intro`, `-clock` and `-options` directories.
+
 The deadline remains 240 native fields: 4.8 seconds PAL, 4 seconds NTSC, plus
 bounded rendering/entry overhead. World motion runs at 10 Hz in either mode.
 There is no claim of a new intended cinematic duration or hardware frame rate.

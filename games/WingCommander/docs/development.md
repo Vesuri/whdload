@@ -4806,3 +4806,35 @@ This is a cached 030 PAL functional check, not a throughput or hardware claim.
 Accepted evidence: `tmp/explosion-{ocs,cd32}-v4` builds,
 `tmp/explosion-{ocs,cd32}-final-check`, `-final-modal`, `-final-options`,
 and `tmp/explosion-{ocs,cd32}-live-v4/report.json`. Both live runs pass.
+
+## Autopilot camera sampling
+
+Camera 12 has both sideways drift and subject tracking. The focused native test
+compares against these original routines and checks full restoration. Use fresh
+output directories on repeats.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/flyby-cd32-build
+python3 tools/ocs_memory_build.py --public --output tmp/flyby-ocs-build
+python3 tools/autopilot_camera_check.py cd32 tmp/flyby-cd32-build --output tmp/flyby-cd32-camera
+python3 tools/autopilot_camera_check.py ocs tmp/flyby-ocs-build --output tmp/flyby-ocs-camera
+python3 tools/intro_camera_check.py cd32 tmp/flyby-cd32-build --output tmp/flyby-cd32-intro
+python3 tools/intro_camera_check.py ocs tmp/flyby-ocs-build --output tmp/flyby-ocs-intro
+python3 tools/autopilot_clock_check.py cd32 tmp/flyby-cd32-build --output tmp/flyby-cd32-clock
+python3 tools/autopilot_clock_check.py ocs tmp/flyby-ocs-build --output tmp/flyby-ocs-clock
+python3 tools/timing_adapter_check.py tmp/flyby-cd32-build --output tmp/flyby-cd32-options
+python3 tools/ocs_options_check.py tmp/flyby-ocs-build --output tmp/flyby-ocs-options
+```
+
+With the corrected debugger emulator selected through `FSUAE`, run sequentially:
+
+```sh
+python3 tools/launch_live_check.py cd32 tmp/flyby-cd32-build --autopilot --output tmp/flyby-cd32-live
+python3 tools/launch_live_check.py ocs tmp/flyby-ocs-build --autopilot --output tmp/flyby-ocs-live
+```
+
+This retains the existing first-mission launch/arrival fixture, adding 20
+projected player coordinates across fly-by ticks. It requires the tracked ship
+to stay within three pixels of the view centre. This is a bounded cached-030 PAL
+functional test, not a campaign replay or performance claim.

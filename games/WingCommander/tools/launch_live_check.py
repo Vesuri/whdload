@@ -155,17 +155,23 @@ def main():
             until(sb+sy['intro_world'])
             samples=[]
             counter='ocs_intro_completed' if ocs else 'timing_completed'
-            for i in range(8):
+            projected=[]
+            for i in range(20):
                 until(sb+sy['intro_finish'])
                 position=h1+v.A4_BASE+(0x92a if ocs else 0x119c)
                 sample=cmd(f'printf "AUTO %u %u %d %d %d\\n", *(unsigned int*){field:#x}, *(unsigned int*){sb+sy[counter]:#x}, *(int*){position:#x}, *(int*){position+4:#x}, *(int*){position+8:#x}')
                 samples.append(list(map(int,re.search(r'AUTO (\d+) (\d+) (-?\d+) (-?\d+) (-?\d+)',sample).groups())))
+                sx=h1+v.A4_BASE+(0x20f8 if ocs else 0x245e)
+                sypos=h1+v.A4_BASE+(0x2178 if ocs else 0x2bea)
+                screen=cmd(f'printf "AIM %d %d\\n", *(short*){sx:#x}, *(short*){sypos:#x}')
+                projected.append(list(map(int,re.search(r'AIM (-?\d+) (-?\d+)',screen).groups())))
                 if i==3:shot('autopilot')
             until(sb+sy['autopilot_resume'])
             last=number(f'*(unsigned int*){field:#x}')
             assert 240<=last-first<=250,(first,last)
             assert any(x[1]==y[1] and x[2:]!=y[2:] for x,y in zip(samples,samples[1:])),samples
-            autopilot=dict(first=first,last=last,samples=samples)
+            assert all(abs(x)<=3 and abs(y)<=3 for x,y in projected),('fly-by aim jumps',projected)
+            autopilot=dict(first=first,last=last,samples=samples,projected=projected)
         ejection=[]
         if a.ejection:
             for stage, ticks in enumerate((10,10,200)):

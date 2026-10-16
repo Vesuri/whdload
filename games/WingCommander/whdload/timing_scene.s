@@ -391,6 +391,8 @@ timing_scene_begin:
 .rotate:
         cmpi.w  #61,d4
         bne.s   .object_rotation
+        cmpi.w  #12,-18280(a4)
+        beq.w   .translate       ; fly-by aim is rebuilt after all poses
         bsr.w   timing_intro_camera_rotate
         bra.w   .translate
 .object_rotation:
@@ -485,9 +487,41 @@ timing_scene_begin:
         lea     timing_scene_valid(pc),a0
         clr.w   (a0)              ; remain snapped until a new world snapshot
 .camera:
+        ifne BUFFERED
+        bsr.w   timing_autopilot_camera
+        endif
         bsr.w   timing_player_camera
 .done:
         movem.l (sp)+,d0-d7/a0-a6
+        rts
+
+; Camera 12 adds a sideways step to its velocity and then aims at slot 0.
+; Native camera work runs only on ticks; replay its geometry on staged poses.
+; Never call the entire camera dispatcher here: other views have side effects.
+timing_autopilot_camera:
+        tst.w   intro_active(pc)
+        beq.s   .done
+        cmpi.w  #12,-18280(a4)
+        bne.s   .done
+        tst.b   timing_scene_predictable+61(pc)
+        beq.s   .done
+        tst.l   timing_scene_fraction(pc)
+        beq.s   .done
+        lea     14894(a4),a3     ; camera right vector (slot 61)
+        lea     5240(a4),a2      ; camera position, velocity already sampled
+        moveq   #2,d3
+.axis:
+        move.l  (a3)+,d0
+        muls.l  #10,d0
+        neg.l   d0              ; native right * -2560 / 256
+        bsr.w   timing_scene_scale
+        add.l   d0,(a2)+
+        dbra    d3,.axis
+        clr.w   -(sp)           ; native aim at player slot 0
+        move.l  timing_game(pc),a6
+        jsr     $2a820(a6)
+        addq.l  #2,sp
+.done:
         rts
 
 ; The scripted intro camera can turn by just one native angular unit per tick.
