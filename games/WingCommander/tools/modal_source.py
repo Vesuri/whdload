@@ -10,6 +10,7 @@ def specification(variant):
     begin=(0x24eea,0x260f2) if ocs else (0x25d18,0x26fe8)
     wait=(0x24f16,0x2611e) if ocs else (0x25d44,0x27014)
     patches=[(upper,6,'modal_run_upper'),(feet,6,'modal_run_feet'),(sim,8,'modal_dispatch'),(0x24ae0 if ocs else 0x25922,8,'modal_portraits')]
+    patches += list(zip((0x26566,0x2664a,0x26670) if ocs else (0x27448,0x2752c,0x27552), (6,6,6), ('modal_label_begin','modal_label_print','modal_label_end')))
     patches += [(off,6,'modal_room_input') for off in ((0x24f2c,0x26138) if ocs else (0x25d5a,0x2702e))]
     patches += [(off,6,'modal_room_'+kind+str(i)) for kind,sites in [('begin',begin),('wait',wait)] for i,off in enumerate(sites)]
     return upper,feet,sim,begin,wait,patches
@@ -21,7 +22,7 @@ def source(root, variant):
     code=raw[44:44+v.HUNKS[0][1]]
     ocs=variant=='ocs'
     upper,feet,sim,begin,wait,patches=specification(variant)
-    fields=dict(MODAL_FIELD=v.A4['field_clock'],MODAL_COUNTDOWN=-32592 if ocs else -32624,
+    fields=dict(MODAL_LABEL_SURFACE=0x1b8 if ocs else 0xaa4,MODAL_LABEL_COLOUR=0x1b7 if ocs else 0xaa3,MODAL_FIELD=v.A4['field_clock'],MODAL_COUNTDOWN=-32592 if ocs else -32624,
                 MODAL_CENTRE_X=-4184 if ocs else -4314,MODAL_CENTRE_Y=-4182 if ocs else -4312,
                 MODAL_ABORT=-0x707c if ocs else -0x7094,MODAL_CONTEXT=-31670 if ocs else -31696,
                 BAR_POINTERS=0x84 if ocs else 0x970,BAR_RNG=-4196 if ocs else -4326,
@@ -37,7 +38,10 @@ def source(root, variant):
     fix=[]
     def native(label, target):
         lines.append(label+': jmp $0');fix.append((label,target))
-    for label,target in [('modal_bar_clear',0x322e0 if ocs else 0x31cd6),
+    for label,target in [('modal_label_native_clear',0x322e0 if ocs else 0x31cd6),
+                          ('modal_label_native_print',0x2cc80 if ocs else 0x2f76a),
+                          ('modal_label_native_cursor',0x31cea if ocs else 0x316e6),
+                          ('modal_bar_clear',0x322e0 if ocs else 0x31cd6),
                           ('modal_bar_restore',0x24d04 if ocs else 0x25b46),
                           ('modal_room_native_input',0x26490 if ocs else 0x27372),
                           ('modal_bar_bitmap',0x2f9a6 if ocs else 0x2efe8),
@@ -80,7 +84,7 @@ def source(root, variant):
     for label,target in fix:
         lines += [' move.l a0,d0',f' addi.l #${target:x},d0',f' lea {label}+2(pc),a1',' move.l d0,(a1)']
     for off,width,label in patches:
-        op=0x4eb9 if off in begin+wait or label=='modal_room_input' else 0x4ef9
+        op=0x4eb9 if off in begin+wait or label=='modal_room_input' or label.startswith('modal_label_') else 0x4ef9
         lines += [f' move.w #${op:x},${off:x}(a0)',f' lea {label}(pc),a1',f' move.l a1,${off+2:x}(a0)']
         for n in range(6,width,2):lines += [f' move.w #$4e71,${off+n:x}(a0)']
     lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_bad:',

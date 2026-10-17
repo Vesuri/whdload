@@ -159,7 +159,7 @@ def main():
             assert all(4<=b-a<=7 for a,b in zip(fields,fields[1:])),fields
             # Check actual cursor sampling between animation ticks, not just
             # calls to the arithmetic helper. Holding a direction produces distinct
-            # native pointer positions at consecutive field polls.
+            # native pointer positions at the capped cursor polls.
             cursor=[]
             direction='4e' if index==0 else '4f'
             cmd('monitor key '+direction+' 1')
@@ -169,7 +169,8 @@ def main():
                                    x=number(f'*(unsigned short*)($a4+{0x19c if a.variant=="ocs" else 0xa88})')))
             cmd('monitor key '+direction+' 0')
             assert len({r['x'] for r in cursor})>=4,cursor
-            assert any(0<b['field']-a['field']<5 and b['x']!=a['x'] for a,b in zip(cursor,cursor[1:])),cursor
+            assert all(b['field']-a['field']>=2 for a,b in zip(cursor,cursor[1:])),cursor
+            assert any(2<=b['field']-a['field']<5 and b['x']!=a['x'] for a,b in zip(cursor,cursor[1:])),cursor
             if index==0:
                 # An intermediate publication exercises the restored foreground,
                 # unlike a screenshot taken only on the native 10 Hz pass.

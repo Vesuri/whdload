@@ -4639,15 +4639,27 @@ call as described above; `--timing` samples by elapsed fields instead of expecti
 the old per-render displacement. These are bounded functional timing checks,
 not hardware throughput or whole-campaign acceptance.
 
-The room regression also checks four native foreground rectangle copies before
-intermediate publication, per-field cursor polling, and exactly-once short-click
-handling. The live check samples held-direction cursor positions between 10 Hz
-room ticks and captures the bar at an intermediate publication. For the bar fix,
-use the same commands above with builds `tmp/bar-fix/ocs` and
-`tmp/bar-fix/cd32`, native reports `tmp/bar-fix/{ocs,cd32}-native`, and live outputs
-`tmp/bar-fix/ocs-live` and `tmp/bar-fix/cd32-cursor-live`. Each output must be fresh.
-Only small screenshots/reports are retained; single-field capture files are
-removed immediately after extracting their screenshot.
+The room regression checks four native foreground rectangle copies before
+intermediate publication, 25 Hz PAL/NTSC cursor polling, exactly-once sampled
+click handling, and repainting hover titles only when they change. The live check
+samples held-direction cursor positions between 10 Hz room ticks and captures
+the bar at an intermediate publication.
+
+```sh
+. amiga/env.sh
+python3 tools/ocs_memory_build.py --public --output tmp/room-hover-ocs-v2
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/room-hover-cd32-v2
+python3 tools/modal_clock_check.py ocs tmp/room-hover-ocs-v2 --output tmp/room-hover-ocs-check
+python3 tools/modal_clock_check.py cd32 tmp/room-hover-cd32-v2 --output tmp/room-hover-cd32-check
+python3 tools/ocs_options_check.py tmp/room-hover-ocs-v2 --output tmp/room-hover-ocs-options
+python3 tools/timing_adapter_check.py tmp/room-hover-cd32-v2 --output tmp/room-hover-cd32-options-v2
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/modal_live_check.py ocs tmp/room-hover-ocs-v2 --output tmp/room-hover-ocs-live
+python3 tools/modal_live_check.py cd32 tmp/room-hover-cd32-v2 --output tmp/room-hover-cd32-live
+```
+
+Each output must be fresh. Only small screenshots/reports are retained;
+single-field capture files are removed immediately after extracting their image.
 
 ### Mission launch clocks
 

@@ -7194,25 +7194,36 @@ The native pass already restores these regions in this order.
 | Bar input call | `24f2c / 24f58` | `25d5a / 25d86` |
 | Barracks input call | `26138 / 26164` | `2702e / 2705a` |
 
-The room wait previously delayed input along with animation until the next 10 Hz
-step. It now polls the native cursor/hotspot routine once per observed field,
-including intermediate waits. The first nonnegative selection is latched until
-the native room loop consumes it; polling pauses while that action is pending.
-Thus a short click is not overwritten, and dialogs still enter from the normal
-room stack. Setup/dialog return resets the field stamp and pending selection.
-The bar and barracks animation clocks remain 10 Hz. Original/off modes install
-neither new input call hook.
+Room input runs at 25 Hz independently of the 10 Hz room animation clock. A
+field-clock phase accumulator gives two-field PAL intervals and two/three-field
+NTSC intervals. A stall produces one input sample rather than a burst of cursor
+steps. The first nonnegative selection is latched until the native room loop
+consumes it; polling pauses while that action is pending. Setup/dialog return
+resets the input phase, pending selection and title history.
 
-Native regressions execute the real four-rectangle copier with independent
-foreground bytes after simulated window overwrites; all four regions must match
-at publication. They also check per-field input polling, duplicate-field rejection,
-selection zero, and exactly-once delivery after a short click. Reports are in
-`tmp/bar-fix/{ocs,cd32}-native/report.json`. These are correctness checks, not
-hardware frame-rate measurements. The bounded cached-030 PAL runs in
-`tmp/bar-fix/ocs-live` and `tmp/bar-fix/cd32-cursor-live` also pass native room
-navigation and observe changing cursor positions at one- or two-field intervals
-while room animation remains on its 10 Hz cadence. Intermediate bar screenshots show
-the protected TV foreground intact. No new hardware throughput claim follows.
+Native hotspot polling otherwise clears and redraws its directly displayed action
+title on every call. Enhanced room polling defers the clear until the selected
+static title, destination surface or clear colour changes. Leaving a hotspot
+clears the old title once. Calls outside enhanced room polling retain the native
+behaviour. The hooks preserve the native stack arguments and cursor-image call.
+
+| Label operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Deferred clear call | `26566 / 26592` | `27448 / 27474` |
+| Conditional title print | `2664a / 26676` | `2752c / 27558` |
+| End of hotspot scan / cursor image | `26670 / 2669c` | `27552 / 2757e` |
+
+Native regressions execute the four-rectangle copier with independent foreground
+bytes after simulated window overwrites. They also verify 25 polls per second on
+PAL/NTSC including field-counter wrap, duplicate-field rejection, selection zero,
+exactly-once delivery, unchanged-title suppression, title transitions, leaving a
+hotspot, changed surfaces and inactive native calls. Reports are in
+`tmp/room-hover-{ocs,cd32}-check/report.json`. The bounded cached-030 PAL runs in
+`tmp/room-hover-{ocs,cd32}-live` pass room navigation and observe cursor movement
+every two fields in both rooms, with room animation retaining its 10 Hz cadence.
+These are functional emulator checks, not hardware throughput measurements or
+live NTSC visual acceptance. The earlier `tmp/bar-fix` screenshots separately
+verify the protected TV foreground.
 
 `modal_clock.s` shares the policy; `modal_source.py` generates separately verified
 variant operands, displaced instructions and guards from pinned inputs. Every

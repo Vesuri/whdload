@@ -90,25 +90,56 @@ def check(build,variant,model):
     require([r[4] for r in draws]==[4,8,16,5,0,6,0,7],'window frame changed')
     bars+=1
    c.write(moving,struct.pack('>hhhhhhhh',100,30,7,8,200,40,-11,16))
-  # Input is sampled once per field; selection zero is valid, and a brief
-  # click is delivered once even if released before the 10 Hz owner resumes.
+  # PAL and NTSC both give 25 cursor updates/second, never a same-field
+  # repeat or catch-up burst. Preserve a sampled click until its room owns it.
   polls=[];response={'value':-1}
   def input_poll():
    require(c.get(c.reg(8)+4,4)==0x182000,'room input table ABI')
    polls.append(c.get(field,4));c.return_call(response['value'])
   c.intercept(s+sy['modal_room_native_input'],input_poll)
   c.write(s+sy['modal_room_table'],long(0x182000))
-  c.write(s+sy['modal_room_result'],word(-1))
-  c.write(s+sy['modal_room_input_field'],long(0))
-  for f in range(200,210):
-   c.write(field,long(f));call('modal_room_poll');call('modal_room_poll')
-   call('modal_room_input');require(c.reg(9)&65535==65535,'unexpected room action')
-  require(polls==list(range(200,210)),'cursor not sampled once per field')
-  response['value']=0;c.write(field,long(210));call('modal_room_poll')
-  response['value']=-1;c.write(field,long(214));call('modal_room_poll')
-  require(polls[-1]==210,'pending click overwritten')
+  for rate in (50,60):
+   for startfield in (200,0xfffffff0):
+    polls.clear();c.write(s+sy['modal_hz'],word(rate))
+    c.write(s+sy['modal_room_result'],word(-1))
+    c.write(s+sy['modal_room_input_field'],long(startfield))
+    c.write(s+sy['modal_room_input_phase'],word(rate))
+    for elapsed in range(rate):
+     c.write(field,long(startfield+elapsed));call('modal_room_poll');call('modal_room_poll')
+     call('modal_room_input');require(c.reg(9)&65535==65535,'unexpected room action')
+    require(len(polls)==25,('cursor rate',rate,polls))
+    require(all(2<=(b-a)&0xffffffff<=3 for a,b in zip(polls,polls[1:])),'cursor interval')
+  response['value']=0;c.write(field,long(500));call('modal_room_poll')
+  response['value']=-1;c.write(field,long(514));call('modal_room_poll')
+  require(polls[-1]==500,'pending click overwritten')
   call('modal_room_input');require(c.reg(9)&65535==0,'short click lost')
   call('modal_room_input');require(c.reg(9)&65535==65535,'click delivered twice')
+  # Exercise actual label wrappers with the native C ABI, including room
+  # re-entry, leaving hotspots, changed surfaces and unenhanced callers.
+  labels=[]
+  def label_clear():
+   labels.append(('clear',c.get(c.reg(8)+4,4)));c.return_call()
+  def label_print():
+   labels.append(('print',c.get(c.reg(8)+8,4)));c.return_call()
+  c.intercept(s+sy['modal_label_native_clear'],label_clear)
+  c.intercept(s+sy['modal_label_native_print'],label_print)
+  c.intercept(s+sy['modal_label_native_cursor'],lambda:c.return_call())
+  c.write(s+sy['modal_room_polling'],word(1))
+  c.write(s+sy['modal_label_previous'],long(-1))
+  def hover(title,surface=0x183000):
+   call('modal_label_begin',long(surface)+bytes([3,0]))
+   if title:call('modal_label_print',long(0x184000)+long(title))
+   call('modal_label_end',word(1))
+  hover(0x185000)
+  require(labels==[('clear',0x183000),('print',0x185000)],('initial title',labels))
+  for _ in range(8):hover(0x185000)
+  require(len(labels)==2,'unchanged hover still clears/repaints')
+  hover(0x186000);require(labels[-2:]==[('clear',0x183000),('print',0x186000)],'changed title')
+  hover(0);require(labels[-1]==('clear',0x183000),'old title retained')
+  count=len(labels);hover(0);require(len(labels)==count,'empty hover still clears')
+  hover(0x186000,0x187000);require(labels[-2:]==[('clear',0x187000),('print',0x186000)],'new surface')
+  c.write(s+sy['modal_room_polling'],word(0));count=len(labels)
+  hover(0x186000);hover(0x186000);require(len(labels)==count+4,'original caller changed')
   sims=[]
   clock='ocs_clock_state' if variant=='ocs' else 'timing_clock'
   state={'ticks':0,'pictures':0,'rate':50,'gap':1,'skip':False}
@@ -146,7 +177,7 @@ def check(build,variant,model):
   call('modal_dispatch',struct.pack('>Ihhhh',0x180000,0,240,0,0))
   require(state['pictures']==1 and state['ticks']==0,'native abort not observed')
   require(c.get(abort-8)==0x1234 and c.get(abort)==0,'abort damaged adjacent state')
-  return dict(model=model,running_samples=samples,installer=True,rejected_sites=len(rejected),bar_samples=bars,foreground_rectangles=4,input_fields=10,short_click_exactly_once=True,simulator=sims)
+  return dict(model=model,running_samples=samples,installer=True,rejected_sites=len(rejected),bar_samples=bars,foreground_rectangles=4,input_hz=25,hover_label_changes_only=True,short_click_exactly_once=True,simulator=sims)
  finally:c.close()
 
 def main():

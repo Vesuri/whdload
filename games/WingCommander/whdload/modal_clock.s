@@ -13,7 +13,13 @@ modal_room_begin:
         lea modal_room_cursor(pc),a0
         move.l d1,(a0)
         lea modal_room_input_field(pc),a0
+        move.l MODAL_FIELD(a4),(a0)
+        lea modal_room_input_phase(pc),a0
+        move.w modal_hz(pc),(a0)
+        lea modal_label_previous(pc),a0
         move.l #-1,(a0)
+        lea modal_label_surface(pc),a0
+        clr.l (a0)
         lea modal_room_result(pc),a0
         move.w #-1,(a0)
         movem.l (sp)+,d0-d1/a0
@@ -39,7 +45,7 @@ modal_room_wait:
         movem.l (sp)+,d0-d2/a0
         rts
 
-; Poll the native cursor/hotspot routine once per field while animations wait.
+; Poll cursor/hotspots at 25 Hz (two PAL fields, alternating NTSC intervals).
 ; Keep the first selected action until the owning room loop consumes it. Further
 ; polling must not replace a short click or enter a dialog from this wait stack.
 modal_room_poll:
@@ -47,13 +53,41 @@ modal_room_poll:
         tst.w modal_room_result(pc)
         bpl.s .done
         move.l MODAL_FIELD(a4),d0
-        cmp.l modal_room_input_field(pc),d0
-        beq.s .done
         lea modal_room_input_field(pc),a0
-        move.l d0,(a0)
+        move.l d0,d1
+        sub.l (a0),d0
+        move.l d1,(a0)
+        lea modal_room_input_phase(pc),a0
+        cmpi.l #3,d0
+        bhi.s .late
+        mulu.w #25,d0
+        moveq #0,d1
+        move.w (a0),d1
+        add.l d1,d0
+        cmp.w modal_hz(pc),d0
+        blo.s .not_due
+        divu.w modal_hz(pc),d0
+        swap d0
+        move.w d0,(a0)
+        bra.s .poll
+.not_due:
+        move.w d0,(a0)
+        bra.s .done
+.late:
+        clr.w (a0)             ; one sample after a stall, no cursor catch-up
+.poll:
+        lea modal_label_seen(pc),a0
+        clr.w (a0)
+        lea modal_label_pending(pc),a0
+        move.l MODAL_LABEL_SURFACE(a4),(a0)+
+        move.b MODAL_LABEL_COLOUR(a4),(a0)
+        lea modal_room_polling(pc),a0
+        move.w #1,(a0)
         move.l modal_room_table(pc),-(sp)
         bsr.w modal_room_native_input
         addq.l #4,sp
+        lea modal_room_polling(pc),a0
+        clr.w (a0)
         lea modal_room_result(pc),a0
         move.w d0,(a0)
 .done:
@@ -70,6 +104,8 @@ modal_room_input:
 modal_room_table: dc.l 0
 modal_room_input_field: dc.l -1
 modal_room_result: dc.w -1
+modal_room_input_phase: dc.w 0
+modal_room_polling: dc.w 0
         even
 
 ; D0=shot duration, A3=native end field. Sample positions continuously,
@@ -377,3 +413,80 @@ modal_portrait_replay:
         movem.l (sp)+,d0-d7/a0-a6
         rts
 modal_portrait_state: ds.b 22
+
+; Native hotspot polling clears its directly drawn label before scanning. Defer
+; that clear until the selected static title changes; identical hover samples
+; leave the visible pixels intact. Other native callers retain their own path.
+modal_label_begin:
+        tst.w modal_room_polling(pc)
+        beq.w modal_label_native_clear
+        movem.l d0/a0,-(sp)
+        lea modal_label_pending(pc),a0
+        move.l 12(sp),(a0)+
+        move.b 16(sp),(a0)
+        lea modal_label_seen(pc),a0
+        clr.w (a0)
+        movem.l (sp)+,d0/a0
+        rts
+modal_label_print:
+        tst.w modal_room_polling(pc)
+        beq.w modal_label_native_print
+        movem.l d0/a0,-(sp)
+        lea modal_label_seen(pc),a0
+        move.w #1,(a0)
+        move.l 16(sp),d0
+        cmp.l modal_label_previous(pc),d0
+        bne.s .changed
+        move.l modal_label_pending(pc),d0
+        cmp.l modal_label_surface(pc),d0
+        bne.s .changed
+        move.b modal_label_pending+4(pc),d0
+        cmp.b modal_label_colour(pc),d0
+        bne.s .changed
+        movem.l (sp)+,d0/a0
+        rts
+.changed:
+        bsr.w modal_label_clear
+        lea modal_label_previous(pc),a0
+        move.l 16(sp),(a0)
+        movem.l (sp)+,d0/a0
+        bra.w modal_label_native_print
+modal_label_end:
+        tst.w modal_room_polling(pc)
+        beq.w modal_label_native_cursor
+        tst.w modal_label_seen(pc)
+        bne.w modal_label_native_cursor
+        movem.l d0/a0,-(sp)
+        tst.l modal_label_previous(pc)
+        bne.s .clear
+        move.l modal_label_pending(pc),d0
+        cmp.l modal_label_surface(pc),d0
+        beq.s .done
+.clear:
+        bsr.w modal_label_clear
+        lea modal_label_previous(pc),a0
+        clr.l (a0)
+.done:
+        movem.l (sp)+,d0/a0
+        bra.w modal_label_native_cursor
+modal_label_clear:
+        movem.l d0-d7/a0-a6,-(sp)
+        tst.l modal_label_pending(pc)
+        beq.s .done
+        lea modal_label_surface(pc),a0
+        move.l modal_label_pending(pc),(a0)
+        lea modal_label_colour(pc),a0
+        move.b modal_label_pending+4(pc),(a0)
+        move.b modal_label_pending+4(pc),-(sp)
+        move.l modal_label_pending(pc),-(sp)
+        bsr.w modal_label_native_clear
+        addq.l #6,sp
+.done:
+        movem.l (sp)+,d0-d7/a0-a6
+        rts
+modal_label_previous: dc.l -1
+modal_label_surface: dc.l 0
+modal_label_pending: dc.l 0
+        dc.w 0
+modal_label_colour: dc.w 0
+modal_label_seen: dc.w 0
