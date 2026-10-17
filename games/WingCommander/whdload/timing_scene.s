@@ -221,6 +221,14 @@ timing_scene_tick:
         lea     timing_render_seed(pc),a0
         move.l  -4326(a4),(a0)
         move.l  (sp)+,-4326(a4)
+        ifne BUFFERED
+        ; Flight field objects must survive render snapshot restoration, just
+        ; like intro asteroids. Intro already dispatches this before this call.
+        tst.w   timing_active(pc)
+        beq.s   .snapshot
+        bsr.w   intro_field_world
+.snapshot:
+        endif
         bsr.w   timing_scene_snapshot
         movem.l (sp)+,d0-d7/a0-a6
         rts

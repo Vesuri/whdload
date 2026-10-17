@@ -129,7 +129,12 @@ ocs_clock_tick:
         jsr OCS_ATTACHMENTS
         tst.l 2308(a4)
         beq.s .messages
+        ; Cleanup rotates through twenty slots by world time, not the number
+        ; of intermediate pictures (which can alias the modulo-20 selection).
+        move.w 2272(a4),-(sp)
+        move.w 2268(a4),2272(a4)
         jsr OCS_ASTEROIDS
+        move.w (sp)+,2272(a4)
 .messages:
         jsr OCS_MESSAGE
         bsr.w ocs_clock_score

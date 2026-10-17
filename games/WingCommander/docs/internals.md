@@ -4247,6 +4247,70 @@ renderer fallback and original 128-line converter; regression checks cover their
 unchanged output. No converter algorithm or cache policy changed.
 
 
+### Mission asteroid and mine field ownership
+
+Enhanced CD32 flight now maintains hazard fields once per 10 Hz world update,
+after authoritative geometry and before the presentation snapshot. Previously
+only the intro moved this work out of drawing. Flight still called the native
+field maintainer inside a staged render: lazy slot backup restored a newly
+allocated object's empty class at render end, while its entry in the separate
+20-slot field list survived. This prevented normal replenishment. It was an
+allocation/cleanup ownership error, not a missing velocity extrapolator.
+
+Both asteroid fields (native type 22) and mine fields (type 23) use this path.
+The constructor chooses asteroid models 34–38 (class 9) or mine model 33
+(class 10). Native field entry, spawn probability, movement, proximity tests
+and collision behaviour are
+retained. A new object waits for the normal continuity snapshot before prediction;
+subsequent pictures sample its native velocity and restore the authoritative pose.
+Dust/debris already has a world-owned regeneration path, and weapon/effect
+constructors retain their separate birth handling.
+
+| Operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Native field detection/exit | `9718 / 9744` | `99a2 / 99ce` |
+| Field entry and initial three spawn attempts | `9694 / 96c0` | `991e / 994a` |
+| Field constructor | `8ec2 / 8eee` | `914c / 9178` |
+| Spawn candidate/allocator | `9410 / 943c` | `969a / 96c6` |
+| Replenishment and cleanup | `9618 / 9644` | `98a2 / 98ce` |
+| Cleanup modulo-20 slot selection | `9528 / 9554` | `97b2 / 97de` |
+| Former draw call, suppressed while enhanced flight/intro owns it | `0330 / 035c` | `032e / 035a` |
+
+OCS already assigned allocation to its flight tick. Its cleanup now temporarily
+substitutes the world counter for the render counter, matching intro and CD32.
+This prevents intermediate drawing cadence from aliasing which of the twenty
+entries receives cleanup. The native draw counter is restored immediately.
+Original/off modes retain the original call and counters.
+
+`tools/field_objects_check.py` checks world-before-snapshot ordering, draw
+suppression, original fallback, the cleanup counter, and 90 PAL/NTSC field-model
+pose/restoration samples per CPU model. Both variants pass on their two native
+CPU models. The previous CD32 build fails the missing-world-maintenance check;
+the previous OCS build fails the cleanup-counter check. These are correctness
+checks, not performance measurements. Reports are
+`tmp/field-objects-{cd32,ocs}-classes/report.json`; intro and original-option
+regressions also pass.
+
+The cached-030 PAL encounter fixture uses native Enyo system 1 / mission 0,
+Nav 2. Both versions load the same type-22 field record with radius 10,500 native
+range units. The fixture places the player at that field's centre, then lets
+native detection and maintenance run for 35 ticks. Both corrected variants
+replenish beyond the three entry attempts (four live asteroids in these windows),
+and the captured cockpit views show the asteroids. The OCS eight-picture sample
+also shows distinct asteroid positions within a single world tick. Reports:
+`tmp/field-objects-cd32-live` and `tmp/field-objects-ocs-live`.
+The old CD32 control retains only its three initial objects after the same
+35 ticks; its field list contains repeated references to an empty slot. The
+control is `tmp/field-objects-cd32-control-final`, whose replenishment assertion
+rejects the old build.
+
+The CD32 mine fixture changes only that record's field type to 23; it is not an
+Enyo mission-content claim. It creates nine live class-10/model-33 mines and
+shows their distinct between-tick positions in eight staged pictures, with mines
+visible in the cockpit capture (`tmp/field-mines-cd32-live`). OCS mine poses and
+ownership are covered by native checks; a live OCS minefield/campaign replay and
+hardware acceptance remain outside this bounded regression.
+
 ### Intro 10 Hz world and extrapolated presentation
 
 The enhanced English ship/title and asteroid-credit world now uses the same
@@ -4273,7 +4337,7 @@ Offsets below are English executable code-hunk offsets (`E`); file offsets are
   the camera. Intro prediction also allows object slot 0 to rotate.
 - Asteroid generation/cleanup `E:98a2`, formerly called by drawing at `E:032e`
   (file `035a`), now runs once per intro tick after native visibility rebuild
-  `E:2a086`. `E:9836` supplies the spawning proxy, `E:969a` allocates class 4,
+  `E:2a086`. `E:9836` supplies the spawning proxy, `E:969a` allocates field objects,
   and `D:5212` holds the slot list. Cleanup `E:97b2` temporarily uses the world
   counter `D:914c` instead of draw counter `D:9150` for its modulo-20 selection.
   Leaving generation in drawing caused snapshot restoration to discard new

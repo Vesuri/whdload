@@ -31,6 +31,10 @@ with intermediate rendering; the tunnel shares world extrapolation with the intr
 The incoming-ship sampler clears the vertical dividend independently of X,
 preventing offscreen flicker, and intermediate redraws preserve bitmap actor state.
 See [mission launch timing](internals.md#mission-launch-timing).
+CD32 mission asteroid/mine replenishment now belongs to world updates, preventing
+render snapshot restoration from discarding new field objects. Both variants use
+the world counter for field cleanup; see
+[field ownership](internals.md#mission-asteroid-and-mine-field-ownership).
 The waypoint autopilot fly-by now shares 10 Hz world updates and bounded
 render-only extrapolation in both enhanced variants. Its sideways camera motion
 and aim also follow the staged ship positions, preventing tick-boundary snaps. Native arrival logic and

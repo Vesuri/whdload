@@ -52,11 +52,7 @@ intro_world:
         beq.s   .no_asteroids
         move.l  timing_game(pc),a6
         jsr     $2a086(a6)
-        move.w  WC_A4_DRAW_COUNT(a4),-(sp)
-        move.w  WC_A4_WORLD_COUNT(a4),WC_A4_DRAW_COUNT(a4)
-        move.l  timing_game(pc),a6
-        jsr     WC_NATIVE_ASTEROIDS(a6)
-        move.w  (sp)+,WC_A4_DRAW_COUNT(a4)
+        bsr.w   intro_field_world
 .no_asteroids:
         bsr.w   timing_scene_tick
         lea     timing_completed(pc),a0
@@ -65,7 +61,21 @@ intro_world:
         movem.l (sp)+,d0-d7/a0-a6
         rts
 
+; Shared flight/intro field maintenance, after authoritative geometry.
+intro_field_world:
+        tst.l   4470(a4)
+        beq.s   .done
+        move.w  WC_A4_DRAW_COUNT(a4),-(sp)
+        move.w  WC_A4_WORLD_COUNT(a4),WC_A4_DRAW_COUNT(a4)
+        move.l  timing_game(pc),a6
+        jsr     WC_NATIVE_ASTEROIDS(a6)
+        move.w  (sp)+,WC_A4_DRAW_COUNT(a4)
+.done:
+        rts
+
 intro_asteroids_draw:
+        tst.w   timing_active(pc)
+        bne.s   .done
         tst.w   intro_active(pc)
         bne.s   .done
         move.l  timing_game(pc),-(sp)

@@ -4695,6 +4695,35 @@ that compositor actor-table mutations do not escape render-only calls. This
 rejects the old partial-word dividend that sent the ship offscreen between ticks.
 
 
+### Mission asteroid and mine fields
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/field-objects-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/field-objects-ocs
+python3 tools/field_objects_check.py cd32 tmp/field-objects-cd32 --output tmp/field-objects-cd32-classes
+python3 tools/field_objects_check.py ocs tmp/field-objects-ocs --output tmp/field-objects-ocs-classes
+python3 tools/timing_adapter_check.py tmp/field-objects-cd32 --output tmp/field-objects-cd32-options
+python3 tools/ocs_options_check.py tmp/field-objects-ocs --output tmp/field-objects-ocs-options
+python3 tools/intro_clock_check.py tmp/field-objects-cd32 --output tmp/field-objects-cd32-intro.json
+python3 tools/ocs_intro_check.py tmp/field-objects-ocs --output tmp/field-objects-ocs-intro
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/field_objects_live_check.py cd32 tmp/field-objects-cd32 --output tmp/field-objects-cd32-live
+python3 tools/field_objects_live_check.py ocs tmp/field-objects-ocs --output tmp/field-objects-ocs-live
+python3 tools/field_objects_live_check.py cd32 tmp/field-objects-cd32 --mine --output tmp/field-mines-cd32-live
+```
+
+Use fresh output directories. The live fixture invokes native mission setup for
+system 1 / mission 0 (Enyo 1), then native Nav 2 loading. It records the actual
+hazard field and places the player at its centre, leaving detection, allocation,
+cleanup and rendering native. This is a bounded encounter fixture, not a full
+mission replay. `--mine` changes only the field type to native type 23 to exercise
+the shared mine constructor; it does not claim Enyo 1 contains mines. The check
+requires replenishment beyond the three entry attempts and between-tick rendered
+motion, retaining compact reports, data snapshots and one image. No long traces
+are retained. Running the ownership check against the previous builds rejects
+CD32's missing world dispatch and OCS's render-counter cleanup dependency.
+
 ### Waypoint autopilot clock
 
 ```sh
