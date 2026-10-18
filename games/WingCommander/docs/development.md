@@ -2813,6 +2813,39 @@ are inclusive model elapsed time; full-arm `delta_total` includes the common
 history copy, while changed-block cost excludes comparison/history. Never compare
 these as identical leaf operations or treat these 040 timings as hardware proof.
 
+### Intro cannon contact prediction
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/intro-shot-cd32-final
+python3 tools/ocs_memory_build.py --public --output tmp/intro-shot-ocs-v2
+python3 tools/intro_shot_check.py cd32 tmp/intro-shot-cd32-final \
+  --native-intro-capture tmp/intro-pal-a/title-animation-fast.bin \
+  --output tmp/intro-shot-cd32-impact-verified
+python3 tools/intro_shot_check.py ocs tmp/intro-shot-ocs-v2 --output tmp/intro-shot-ocs-verified
+python3 tools/intro_clock_check.py tmp/intro-shot-cd32-final --output tmp/intro-shot-cd32-clock.json
+python3 tools/ocs_intro_check.py tmp/intro-shot-ocs-v2 --output tmp/intro-shot-ocs-clock
+python3 tools/timing_adapter_check.py tmp/intro-shot-cd32-final --output tmp/intro-shot-cd32-install
+python3 tools/ocs_options_check.py tmp/intro-shot-ocs-v2 --output tmp/intro-shot-ocs-options
+python3 tools/modal_clock_check.py cd32 tmp/intro-shot-cd32-final --output tmp/intro-shot-cd32-modal
+python3 tools/modal_clock_check.py ocs tmp/intro-shot-ocs-v2 --output tmp/intro-shot-ocs-modal
+python3 tools/projectile_spawn_check.py tmp/intro-shot-cd32-final --output tmp/intro-shot-cd32-spawn.json
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/intro_shot_live_check.py cd32 tmp/intro-shot-cd32-final \
+  --port 2495 --output tmp/intro-shot-cd32-live-final
+python3 tools/intro_shot_live_check.py ocs tmp/intro-shot-ocs-v2 \
+  --port 2496 --output tmp/intro-shot-ocs-live-final
+```
+
+Use fresh output names on repeats. The optional native-intro input is the original
+CD32 title-animation checkpoint from the existing intro capture workflow. Omit
+that argument to run the standalone native contact/staging checks without the
+retained live capture. The replay retains native world updates; its render
+checks inspect poses and state restoration, not DMA pixels or frame rate.
+The live checker needs the project diagnostic emulator selected above. It samples
+three moving-contact pictures and saves one screenshot per variant; it leaves
+the separate interactive run untouched.
+
 ### Newly spawned projectile prediction
 
 Build a fresh normal release and execute the native constructor/snapshot checks.

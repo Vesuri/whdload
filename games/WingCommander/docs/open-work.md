@@ -17,6 +17,10 @@ between ticks; its authoritative script duration and geometry remain unchanged.
 The intro camera also samples fractional orientation, fixing the one-unit turns
 that previously rounded to 10 Hz steps in both variants. See
 [camera sampling](internals.md#intro-camera-fractional-orientation).
+Intro cannon prediction now stops at native ship-contact endpoints and follows
+the staged target until the native impact update, preventing shots from passing
+through it. Player-shot muzzle presentation remains separate follow-up work.
+See [intro cannon contacts](internals.md#intro-cannon-contact-presentation).
 Simulator Ready/Game Over, bar/barracks and running-pilot motion now use
 CPU-independent timing in both enhanced versions; simulator world prediction,
 text zoom, running positions and bar-window motion receive intermediate samples.

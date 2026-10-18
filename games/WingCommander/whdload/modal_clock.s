@@ -121,7 +121,10 @@ modal_run_sample:
         move.l #600,d0
 .bounded:
         move.l d0,d2
-        move.l MODAL_HZ(pc),d0
+        ; The shared prediction payload can put the clock beyond d16(PC).
+        lea modal_run_sample(pc),a0
+        adda.l #MODAL_HZ-modal_run_sample,a0
+        move.l (a0),d0
         lea modal_hz(pc),a0
         move.w d0,(a0)
         move.l d2,d0
@@ -229,9 +232,14 @@ modal_simulator:
         move.w -2(a5),d0
         mulu.w #10,d0
         move.l d0,d3
-        move.l MODAL_CLOCK+4(pc),d0
+        move.l a0,-(sp)
+        lea modal_run_sample(pc),a0
+        adda.l #MODAL_CLOCK+4-modal_run_sample,a0
+        move.l (a0),d0
         mulu.w #10,d0
-        divu.w MODAL_HZ+2(pc),d0
+        adda.l #MODAL_HZ+2-(MODAL_CLOCK+4),a0
+        divu.w (a0),d0
+        move.l (sp)+,a0
         andi.l #$ffff,d0
         add.l d0,d3
         moveq #0,d1

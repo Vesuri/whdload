@@ -4120,6 +4120,58 @@ cost/frame reports are under `tmp/d5-{030,040}-{control,block040,full-original,f
 `tmp/d5-fps.json` consolidates cadence; `tmp/d5-*-native.json` records the native
 comparisons. Reproduction commands are in development's D5 section.
 
+## Intro cannon contact presentation
+
+Enhanced CD32 and OCS intro rendering now limits cannon prediction at native
+ship-contact endpoints. The native update tests collisions **before** integrating
+positions: a surviving class-8 bolt can already be at its last contact position
+in the post-world snapshot. Unbounded presentation of its velocity then carried
+it through the ship before the next update converted it to an impact effect.
+This is separate from the player's first-visible muzzle position.
+
+| Native operation | CD32 H0 / file | OCS H0 / file |
+|---|---|---|
+| Ordered collision query | `1597e / 159aa` | `156e6 / 15712` |
+| Collision response entry | `8196 / 81c2` | `7f0c / 7f38` |
+| Ordinary position integration | `80b6 / 80e2` | `7e2c / 7e58` |
+
+At each intro snapshot, `timing_intro_shot_contacts` queries current positions
+and a one-tick constant-velocity preview. It records only class-8 contacts with
+ship slots 0–9 (class 12 or higher), excludes the shooter exactly as native
+response does, and restores all positions and the query's scratch vector. It
+never dispatches collision response, damage, effects, allocation or randomness.
+The next-position preview also bounds the queued display lead beyond one tick.
+After ordinary render staging, `timing_intro_shot_limit` holds the contact offset
+relative to the **staged target**, so the shot follows the moving ship instead
+of freezing in space or passing through it. Native impacts and explosions still
+occur on their original world update. Unrelated shots retain normal prediction;
+flight does not enable this policy. This is a bounded presentation forecast,
+not swept gameplay collision detection or a new collision radius.
+
+`tools/intro_shot_check.py` executes both native collision queries and the actual
+assembly staging/restoration. Each of CD32 020/040 and OCS 000/020 passes 45
+PAL/NTSC samples, including current contact, next contact, ordinary travel,
+shooter exclusion and disabled-intro controls. Whole native data remains exact
+after each contact query and restored render. A replay from the retained original
+CD32 title capture runs 100 native updates and 400 render samples; all four
+hitting volleys retain their native contact offsets, and all eight limited bolts
+become native model-51 impact effects on the following update. Evidence:
+`tmp/intro-shot-cd32-impact-verified/`, `tmp/intro-shot-ocs-verified/`. Removing only
+the limiter reproduces a through-target pose on all four tested CPU paths. Intro scheduler,
+installer/options, modal clocks and the CD32 44-constructor/220-render projectile
+regression also pass. These are correctness checks, not performance measurements.
+
+The bounded live cached-030 checks also pass in both variants
+(`tmp/intro-shot-cd32-live-final/` and `tmp/intro-shot-ocs-live-final/`). Three
+successive rendered pictures keep the first bolt's contact offset at
+`(-2924, 2560, 28556)` native fixed-point units while the ship and bolt both
+move between pictures. One displayed screenshot per variant is retained and
+inspected. These runs use the project diagnostic emulator and stop their own
+processes; they do not replace the user's interactive session.
+
+The extra shared code requires longer CD32 converter-gate branches and
+68000-safe distant modal clock references; their existing native tests pass.
+
 ## Cannon spawn: first-interval prediction hold
 
 The enhanced English release now predicts newly constructed projectiles in their

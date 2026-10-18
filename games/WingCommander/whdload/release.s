@@ -29,9 +29,9 @@ release_setcpu:
 ; Flight and the clocked world intro have no limiter; other scenes keep normal.
 release_limit:
         tst.w   timing_active(pc)
-        bne.w   release_convert_wait
+        bne.l   release_convert_wait
         tst.w   intro_active(pc)
-        bne.w   release_convert_wait
+        bne.l   release_convert_wait
 .nonflight:
         bsr.w   slave+$17b8
         rts

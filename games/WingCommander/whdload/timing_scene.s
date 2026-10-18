@@ -197,6 +197,9 @@ timing_scene_snapshot:
         lea     timing_scene_valid(pc),a0
         move.w  #1,(a0)
         move.w  -18280(a4),2(a0)
+        ifne BUFFERED
+        bsr.w   timing_intro_shot_contacts
+        endif
         movem.l (sp)+,d0-d7/a0-a6
         rts
 
@@ -489,6 +492,7 @@ timing_scene_begin:
         cmpi.w  #62,d4
         blo.w   .object
 .objects_done:
+        bsr.w   timing_intro_shot_limit
         endif
         bra.s   .camera
 .cut:
@@ -502,6 +506,157 @@ timing_scene_begin:
 .done:
         movem.l (sp)+,d0-d7/a0-a6
         rts
+
+; Native cannon impact is tested before position integration. A surviving
+; bolt can already occupy its final contact pose at the post-world snapshot.
+; Cache current/next linear contact endpoints once per intro tick, using the
+; native ordered collision query only (no damage, allocation or RNG). Preserve
+; every position and the query's scratch vector. Flight retains its own policy.
+timing_intro_shot_contacts:
+        lea     timing_intro_shot_targets(pc),a0
+        moveq   #63,d0
+.clear:
+        move.b  #-1,(a0)+
+        dbra    d0,.clear
+        tst.w   intro_active(pc)
+        beq.w   .done
+        moveq   #10,d4
+.find:
+        lea     5888(a4),a0
+        cmpi.w  #8,(a0,d4.w*2)
+        beq.s   .prepare
+        addq.w  #1,d4
+        cmpi.w  #61,d4
+        blo.s   .find
+        bra.w   .done
+.prepare:
+        lea     -780(sp),sp
+        movea.l sp,a5
+        lea     4508(a4),a0
+        movea.l a5,a1
+        move.w  #191,d0
+.save:
+        move.l  (a0)+,(a1)+
+        dbra    d0,.save
+        lea     15162(a4),a0
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
+        moveq   #0,d5
+.pass:
+        moveq   #10,d4
+.slot:
+        lea     timing_intro_shot_targets(pc),a0
+        tst.b   (a0,d4.w)
+        bpl.s   .next
+        lea     5888(a4),a0
+        cmpi.w  #8,(a0,d4.w*2)
+        bne.s   .next
+        move.w  d4,-(sp)
+        move.l  timing_game(pc),a6
+        jsr     $1597e(a6)
+        addq.l  #2,sp
+        cmpi.w  #9,d0
+        bhi.s   .next
+        lea     5888(a4),a0
+        cmpi.w  #12,(a0,d0.w*2)
+        blo.s   .next
+        lea     14954(a4),a0
+        cmp.b   (a0,d4.w),d0      ; native response ignores the shooter
+        beq.s   .next
+        lea     timing_intro_shot_targets(pc),a0
+        move.b  d0,(a0,d4.w)
+        lea     timing_intro_shot_steps(pc),a0
+        move.b  d5,(a0,d4.w)
+.next:
+        addq.w  #1,d4
+        cmpi.w  #61,d4
+        blo.s   .slot
+        tst.w   d5
+        bne.s   .restore
+        lea     4508(a4),a0
+        lea     7534(a4),a1
+        move.w  #182,d0          ; native world slots 0..60, three longs
+.advance:
+        move.l  (a1)+,d1
+        add.l   d1,(a0)+
+        dbra    d0,.advance
+        moveq   #1,d5
+        bra.s   .pass
+.restore:
+        movea.l a5,a0
+        lea     4508(a4),a1
+        move.w  #191,d0
+.copy:
+        move.l  (a0)+,(a1)+
+        dbra    d0,.copy
+        lea     15162(a4),a1
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
+        move.l  (a0)+,(a1)+
+        lea     780(sp),sp
+.done:
+        rts
+
+; All ships have already been staged. Beyond a native contact endpoint, keep
+; the bolt at that endpoint relative to its moving target until the world owns
+; the impact. This also bounds the extra queued-field lead beyond one tick.
+timing_intro_shot_limit:
+        tst.w   intro_active(pc)
+        beq.w   .done
+        moveq   #10,d4
+.slot:
+        lea     timing_intro_shot_targets(pc),a0
+        moveq   #0,d2
+        move.b  (a0,d4.w),d2
+        bmi.w   .next
+        lea     timing_scene_predictable(pc),a0
+        tst.b   (a0,d4.w)
+        beq.w   .next
+        tst.b   (a0,d2.w)
+        beq.w   .next
+        lea     timing_intro_shot_steps(pc),a0
+        moveq   #0,d3
+        move.b  (a0,d4.w),d3
+        beq.s   .limit
+        cmp.l   d7,d6
+        bls.w   .next
+.limit:
+        move.w  d4,d0
+        mulu.w  #12,d0
+        mulu.w  #12,d2
+        lea     4508(a4),a0
+        lea     (a0,d0.w),a1     ; rendered bolt
+        adda.w  d2,a0            ; rendered target
+        lea     timing_scene_positions(pc),a2
+        lea     (a2,d0.w),a3
+        adda.w  d2,a2
+        lea     timing_scene_velocities(pc),a5
+        lea     (a5,d0.w),a6
+        adda.w  d2,a5
+        moveq   #2,d1
+.axis:
+        move.l  (a3)+,d0
+        sub.l   (a2)+,d0
+        tst.w   d3
+        beq.s   .position
+        add.l   (a6),d0
+        sub.l   (a5),d0
+.position:
+        add.l   (a0)+,d0
+        move.l  d0,(a1)+
+        addq.l  #4,a6
+        addq.l  #4,a5
+        dbra    d1,.axis
+.next:
+        addq.w  #1,d4
+        cmpi.w  #61,d4
+        blo.w   .slot
+.done:
+        rts
+
+timing_intro_shot_targets: dcb.b 64,-1
+timing_intro_shot_steps: dcb.b 64,0
 
 ; Camera 12 adds a sideways step to its velocity and then aims at slot 0.
 ; Native camera work runs only on ticks; replay its geometry on staged poses.
