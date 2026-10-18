@@ -100,6 +100,7 @@ def projectiles(build,model):
      call('timing_scene_snapshot')
      require(c.get(SLAVE+sy['timing_scene_predictable']+second,1)==1,'second mount prediction')
      c.write(SLAVE,saved);c.write(DATA,data)
+    muzzle=struct.unpack('>3i',c.read(DATA+0x8928+12*slot,12))
     c.run(0x7a90,struct.pack('>h',slot))
     call('timing_scene_snapshot')
     require(c.get(SLAVE+sy['timing_scene_predictable']+slot,1)==1,('birth prediction',weapon,slot,kind))
@@ -111,7 +112,18 @@ def projectiles(build,model):
      call('timing_scene_begin');samples.append(c.read(DATA+0x8928+12*slot,12).hex())
      call('timing_scene_end');require(c.read(DATA,0xf5b8)==before,'spawn restoration')
     require(len(set(samples))>1 or c.read(DATA+0x94fa+12*slot,12)==bytes(12),('stationary projectile',weapon))
-    results.append(dict(shooter=shooter,weapon=weapon,slot=slot,kind=kind,samples=samples))
+    path=0
+    if shooter==0 and kind==8:
+     from projectile_path_check import check_path
+     velocity=struct.unpack('>3i',c.read(DATA+0x94fa+12*slot,12))
+     require(struct.unpack('>3i',c.read(DATA+0x8928+12*slot,12))==tuple(p+v for p,v in zip(muzzle,velocity)), 'native birth step')
+     path=check_path(muzzle,velocity,
+       lambda:c.run(0x7a90,word(slot)),lambda:call('timing_scene_snapshot'),
+       lambda hz:put('ocs_clock_hz',hz,4),
+       lambda debt:c.write(SLAVE+sy['ocs_clock_state']+4,long(debt)),
+       lambda:(call('timing_scene_begin'),struct.unpack('>3i',c.read(DATA+0x8928+12*slot,12)))[1],
+       lambda:call('timing_scene_end'),lambda:c.read(DATA,0xf5b8))
+    results.append(dict(shooter=shooter,weapon=weapon,slot=slot,kind=kind,samples=samples,muzzle_path_samples=path))
    finally:c.close()
  return results
 

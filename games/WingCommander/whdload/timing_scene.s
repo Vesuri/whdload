@@ -445,6 +445,35 @@ timing_scene_begin:
         bsr.w   timing_scene_velocity
         endif
 .translate:
+        ifne BUFFERED
+        move.l  d6,-(sp)
+        ; Player cannon construction precedes this tick's integration. Show
+        ; its completed movement interval, including the muzzle end, rather
+        ; than skipping it and forecasting another step. Class 8 is linear;
+        ; retain this phase for its whole life to avoid a second-tick jump.
+        tst.w   intro_active(pc)
+        bne.s   .shot_phase_done
+        lea     5888(a4),a0
+        cmpi.w  #8,(a0,d4.w*2)
+        bne.s   .shot_phase_done
+        lea     14954(a4),a0
+        tst.b   (a0,d4.w)         ; native shooter byte: player is slot zero
+        bne.s   .shot_phase_done
+        cmp.l   d7,d6
+        bls.s   .shot_phase_bounded
+        move.l  d7,d6             ; never forecast beyond the completed step
+.shot_phase_bounded:
+        lea     4508(a4),a0
+        adda.w  d5,a0
+        lea     7534(a4),a1
+        adda.w  d5,a1
+        moveq   #2,d0
+.shot_previous:
+        move.l  (a1)+,d1
+        sub.l   d1,(a0)+
+        dbra    d0,.shot_previous
+.shot_phase_done:
+        endif
         lea     4508(a4),a2
         adda.w  d5,a2
         ifne BUFFERED
@@ -460,6 +489,7 @@ timing_scene_begin:
         add.l   d0,(a2)+
         dbra    d3,.xyz
         ifne BUFFERED
+        move.l  (sp)+,d6
         bra.s   .next
 .player_pose:
         ; Player state already includes every consumed field. Only forecast

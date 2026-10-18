@@ -14,7 +14,9 @@ intro_start:
 intro_stop:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w timing_scene_end
-        bsr.w ocs_publish_drain
+        lea intro_stop(pc),a0
+        adda.l #ocs_publish_drain-intro_stop,a0
+        jsr (a0)
         lea intro_active(pc),a0
         clr.w (a0)
         bsr.w ocs_clock_rebase

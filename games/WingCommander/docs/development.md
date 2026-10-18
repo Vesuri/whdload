@@ -2813,6 +2813,28 @@ are inclusive model elapsed time; full-arm `delta_total` includes the common
 history copy, while changed-block cost excludes comparison/history. Never compare
 these as identical leaf operations or treat these 040 timings as hardware proof.
 
+### Player cannon muzzle presentation
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/muzzle-cd32-v2
+python3 tools/ocs_memory_build.py --public --output tmp/muzzle-ocs-v3
+python3 tools/projectile_spawn_check.py tmp/muzzle-cd32-v2 --output tmp/muzzle-cd32-path-final.json
+python3 tools/ocs_prediction_check.py tmp/muzzle-ocs-v3 --output tmp/muzzle-ocs-check-final
+python3 tools/intro_shot_check.py cd32 tmp/muzzle-cd32-v2 \
+  --native-intro-capture tmp/intro-pal-a/title-animation-fast.bin --output tmp/muzzle-cd32-intro
+python3 tools/intro_shot_check.py ocs tmp/muzzle-ocs-v3 --output tmp/muzzle-ocs-intro
+python3 tools/ocs_intro_check.py tmp/muzzle-ocs-v3 --output tmp/muzzle-ocs-clock
+python3 tools/timing_adapter_check.py tmp/muzzle-cd32-v2 --output tmp/muzzle-cd32-install
+```
+
+Use fresh output names when rerunning. The constructor checks share
+`projectile_path_check.py`: actual native birth and movement are the reference,
+with six intervals across PAL/NTSC, regular-speed movement, endpoint bounds and
+whole-data restoration. Each variant adds 360 path samples. Running the updated
+CD32 check against the preceding intro-contact build rejects its first player
+shot position. No large recordings or live emulator run are required for this gate.
+
 ### Intro cannon contact prediction
 
 ```sh

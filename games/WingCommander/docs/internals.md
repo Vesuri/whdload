@@ -4172,6 +4172,43 @@ processes; they do not replace the user's interactive session.
 The extra shared code requires longer CD32 converter-gate branches and
 68000-safe distant modal clock references; their existing native tests pass.
 
+## Player cannon muzzle presentation
+
+Enhanced CD32 and OCS now draw player-owned class-8 cannon bolts over the
+**completed** native movement step. The constructor starts at the gun mount,
+but input precedes integration (CD32 code `7d1a`, ordinary addition `80b6–80e0`;
+OCS `7a90`, addition `7e2c–7e56`). Consequently the first snapshot is already one
+velocity step beyond the muzzle. Forecasting from there omitted the entire near
+segment. The native owner byte is A4+`3a6a` on CD32, A4+`3058` on OCS; zero denotes
+the player. These are hunk-relative native operands, not runtime addresses.
+
+For these linear bolts only, staging uses `P - V + V * min(f, 1)`, where `P` is
+the post-world position, `V` the native per-tick displacement and `f` the existing
+fraction including publication lead. The phase remains the same throughout the
+bolt's life: there is no first-tick hold, acceleration to catch up, or switch back
+to forward prediction on the second tick. At the normal first PAL sample (`f=0.2`)
+this displays 0.2 steps from the muzzle instead of 1.2. A delayed renderer cannot
+recover already-missed pictures; the bound holds at the completed endpoint.
+
+This is intentionally one tick behind the former bolt presentation. Ships retain
+forward prediction. Allocation, native positions, lifetime, collision, damage,
+cooldown and input are unchanged; staging is restored before simulation. AI shots,
+guided missiles and approximate effects retain their existing presentation. Intro
+shots keep the separate native-contact policy. Original/disabled modes remain
+native. No game data or additional persistent per-projectile history is needed.
+
+Both native constructor suites verify the actual muzzle-to-first-update movement,
+then six consecutive intervals at 50/60 Hz for weapon models 24–27. CD32 checks
+020/040 execution; OCS checks the shared 68000-safe implementation on 68000/020.
+Each arm checks 360 additional trajectory samples and complete data-hunk
+restoration. The previous build fails the first muzzle-position assertion. Existing
+constructor, slot-reuse/cut, cooldown and intro-impact checks also pass, including
+the original CD32 intro replay's eight impacts. This is native CPU evidence;
+no new live flight capture or exact PC-screen pixel equivalence is claimed.
+
+The small code increase moves the OCS intro-stop drain beyond a short branch's
+range; that call now uses a 68000-safe local anchor plus long offset.
+
 ## Cannon spawn: first-interval prediction hold
 
 The enhanced English release now predicts newly constructed projectiles in their

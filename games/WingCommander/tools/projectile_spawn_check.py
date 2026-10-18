@@ -126,6 +126,7 @@ def main():
                         assert c.read(S+sy['projectile_cooldown_valid'],64)==bytes(64),cut
                         guards.append(dict(model=model,shooter=shooter,cut=cut,rejected=True))
                     c.write(S,saved);c.write(c.data,data)
+                muzzle=vec(0x919a,slot)
                 # Native countdown and movement subset; excludes collisions/AI.
                 c.run(0x76a8,struct.pack('>h',shooter))
                 if kind==11:c.run(0x7808,end=0x78d8,registers={11:slot})
@@ -144,15 +145,29 @@ def main():
                     c.write(S+sy['timing_clock']+4,struct.pack('>I',debt))
                     run('timing_scene_begin');got=vec(0x919a,slot)
                     if kind in (5,8,10):
-                        want=tuple(x+(abs(v)*(debt+10)//50)*(-1 if v<0 else 1) for x,v in zip(pos,vel))
+                        own=shooter==0 and kind==8
+                        phase=min(debt+10,50) if own else debt+10
+                        want=tuple(x-(v if own else 0)+(abs(v*phase)//50)*(-1 if v*phase<0 else 1) for x,v in zip(pos,vel))
                         assert got==want,(weapon,debt,got,want)
                     samples.append(got)
                     run('timing_scene_end')
                     assert c.read(c.data,0xfda0)==authoritative,('render state leak',weapon,[(hex(i),x,y) for i,(x,y) in enumerate(zip(authoritative,c.read(c.data,0xfda0))) if x!=y][:25])
+                path=0
+                if shooter==0 and kind==8:
+                    assert pos==tuple(p+v for p,v in zip(muzzle,vel)), ('native birth step',weapon)
+                    from projectile_path_check import check_path
+                    path=check_path(muzzle,vel,
+                        lambda: c.run(0x7d1a,struct.pack('>h',slot)),
+                        lambda: run('timing_scene_snapshot'),
+                        lambda hz: put('timing_hz','I',hz),
+                        lambda debt: c.write(S+sy['timing_clock']+4,struct.pack('>I',debt)),
+                        lambda: (run('timing_scene_begin'),vec(0x919a,slot))[1],
+                        lambda: run('timing_scene_end'),
+                        lambda: c.read(c.data,0xfda0))
                 if kind==11:
                     assert len(set(samples))==5,(weapon,"guided launch still holds")
                 results.append(dict(model=model,shooter=shooter,weapon=weapon,slot=slot,kind=kind,
-                                    velocity=vel,first_interval_positions=samples,constructor_identical=True))
+                                    velocity=vel,first_interval_positions=samples,muzzle_path_samples=path,constructor_identical=True))
                 c.close();ref.close()
     a.output.write_text(json.dumps(dict(payload_sha256=hashlib.sha256(blob).hexdigest(),
         memory_sha256=hashlib.sha256(memory).hexdigest(),cases=results,negative_controls=guards,simultaneous_mounts=mounts),indent=2)+'\n')
