@@ -4951,3 +4951,24 @@ python3 tools/modal_clock_check.py ocs tmp/room-compose-ocs --output tmp/room-co
 The checks require repainting on repeated compositions while preserving the
 transparent-background sentinel, text context, cursor rate and pending clicks.
 Use `modal_live_check.py` with either build for the bounded room navigation gate.
+
+## Waypoint marker layering
+
+Build both enhanced candidates and run the native ordering/visibility checks:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/waypoint-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/waypoint-ocs
+python3 tools/waypoint_check.py cd32 tmp/waypoint-cd32 --output tmp/waypoint-cd32-check
+python3 tools/waypoint_check.py ocs tmp/waypoint-ocs --output tmp/waypoint-ocs-check
+python3 tools/timing_adapter_check.py tmp/waypoint-cd32 --output tmp/waypoint-cd32-install
+python3 tools/ocs_options_check.py tmp/waypoint-ocs --output tmp/waypoint-ocs-options
+```
+
+Use fresh output names on repeat runs. `waypoint_check.py` executes native flight
+and marker instructions with explicit camera/drawing boundary stubs. It checks
+original versus enhanced order, marker eligibility, projection arguments,
+scene argument forwarding, stack balance and data isolation. It does not claim
+pixel or live-video validation; the retained user screenshots are the reported
+visual defect, and a subsequent play-test should confirm the corrected overlap.

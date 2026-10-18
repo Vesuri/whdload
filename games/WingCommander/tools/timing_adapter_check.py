@@ -66,7 +66,7 @@ def main():
                         want[off:off+width]=struct.pack('>HI',op,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
                     for off in (0x1de20,0x1de3c,0x1df50,0x1df6c):
                         want[off:off+6]=struct.pack('>HI',0x4eb9,s+sym['cinematic_background'])
-                    for off,label in ((0x32e,'intro_asteroids_draw'),(0x2f8,'intro_flash_draw'),(0x306,'view_clear'),(0xc4c,'view_compose'),(0x1fdda,'intro_credits_update'),(0x1fde0,'intro_draw'),(0x1fe14,'intro_finish')):
+                    for off,label in ((0x30c,'waypoint_early'),(0x320,'waypoint_scene'),(0x32e,'intro_asteroids_draw'),(0x2f8,'intro_flash_draw'),(0x306,'view_clear'),(0xc4c,'view_compose'),(0x1fdda,'intro_credits_update'),(0x1fde0,'intro_draw'),(0x1fe14,'intro_finish')):
                         want[off:off+6]=struct.pack('>HI',0x4eb9,s+sym[label])
                     for off,label in ((0x1fd00,'intro_title'),(0x1fe44,'intro_credits_end'),(0xc912,'projectile_gun_return'),(0xca5e,'projectile_missile_return'),(0xc316,'projectile_effect_return'),(0x9a52,'projectile_init_return'),(0x2b648,'timing_scene_allocate'),(0x3378e,'release_publish'),(0x337ea,'release_teardown'),(0x807a,'translation_velocity'),(0x80b6,'translation_position')):
                         want[off:off+6]=struct.pack('>HI',0x4ef9,s+sym[label])
@@ -85,7 +85,7 @@ def main():
             if custom!=3:assert c.read(layout["hunks"][3],0x1590)==opening_before
             cases.append(dict(model=model,custom=custom,exact=True));c.close()
         # A changed instruction operand must be rejected before any patch write.
-        for operand in ((0x1398,0x139a,0x1de22,0x1de3e,0x1df52,0x1df6e,0x69a,0x2b64a,0x2b64c,0x308,0xc4e,0xc914,0xca60,0xc318,0x9a54,0x330,0x2fa,0x1fd02,0x1fddc,0x1fde2,0x1fe16,0x1fe46,0x1fe4a) if buffered else (0x69a,)):
+        for operand in ((0x30e,0x310,0x322,0x324,0x1398,0x139a,0x1de22,0x1de3e,0x1df52,0x1df6e,0x69a,0x2b64a,0x2b64c,0x308,0xc4e,0xc914,0xca60,0xc318,0x9a54,0x330,0x2fa,0x1fd02,0x1fddc,0x1fde2,0x1fe16,0x1fe46,0x1fe4a) if buffered else (0x69a,)):
             c=CPU(memory,layout,model);s=0x180000;resload=0x190000
             c.write(s,blob);c.write(s+0x1de4,struct.pack('>I',3))
             c.write(s+0x121e,struct.pack('>I',resload))

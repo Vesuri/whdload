@@ -7729,3 +7729,36 @@ fixtures verify timing and state; they are not hardware performance measurements
 The fixture creates the missing carrier through native allocation/initialization;
 it does not test actual flight docking, mission completion or debriefing.
 Live NTSC and real hardware remain untested.
+
+## Waypoint marker layering
+
+Both original English renderers draw the navigation symbol **before** world
+bitmaps. This ordering predates the enhanced renderer: CD32 calls the marker at
+H0 `030c` (file `0338`) → `3766` (file `3792`), then the scene at `0320`
+(file `034c`) → `294d4` (file `29500`). OCS independently has the same order:
+H0 `030e` (file `033a`) → `34e0` (file `350c`), then `0322` (file `034e`)
+→ `28548` (file `28574`). The native marker submits frame 3 to the bitmap
+renderer at CD32 H0 `38b2` (file `38de`), OCS H0 `362c` (file `3658`).
+The user's CD32 screenshots show the nebula obscuring this white symbol.
+
+`waypoint_overlay.s` defers the early marker call only while the enhanced flight
+clock is active. The scene wrapper forwards the native word argument, completes
+world drawing, then calls the unchanged marker routine while preserving the
+scene's register results. OCS retains its existing scene preparation versus
+sort/raster selection. Marker eligibility, camera projection, image frame,
+clipping and cockpit/HUD composition remain native. Original mode retains its
+original ordering; this is a presentation fix under the enhancements toggle.
+
+The native CPU regression executes each original flight dispatcher and marker
+routine, including projection arithmetic. Explicit boundary stubs supply camera
+orientation and record drawing calls; graphics are not pixel-emulated here.
+Original and inactive controls draw marker→world; enhanced flight draws
+world→marker. Front/rear, other views, disabled sensor and behind-camera cases
+retain native eligibility, both scene-argument values survive, and game data is
+unchanged apart from the native draw counter. The 432 cases pass on CD32
+020/040 and OCS 68000/020 models. CD32's eight installer/option cases, changed
+hook-operand rejection and OCS's 1680 option/hardware cases also pass. Reports
+are in `tmp/waypoint-cd32-check2`, `tmp/waypoint-ocs-check3`,
+`tmp/waypoint-cd32-install` and `tmp/waypoint-ocs-options`.
+This verifies native ordering and integration, not a fresh live visual overlap
+capture or hardware performance. No new live overlap capture was made.

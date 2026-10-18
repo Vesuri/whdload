@@ -2,6 +2,7 @@
 from shared_cpu import preamble, select, unit
 
 NATIVE = dict(OCS_WORLD=0x2be, OCS_FLIGHT_INPUT=0x18d14,
+ OCS_WAYPOINT=0x34e0,
  OCS_FLIGHT_EXIT=0x6c4, OCS_GEOMETRY=0x290fa, OCS_DEBRIS=0x27cfa,
  OCS_MOUNT_ANGLE=0x2816a, OCS_FLAMES=0x281c0, OCS_ATTACHMENTS=0x2837a, OCS_ASTEROIDS=0x9618,
  OCS_MESSAGE=0x2018, OCS_TARGET=0x3908, OCS_FAULTS=0xacfa,
@@ -9,7 +10,8 @@ NATIVE = dict(OCS_WORLD=0x2be, OCS_FLIGHT_INPUT=0x18d14,
  OCS_SORT=0x2ba2c, OCS_RASTER=0x2bab4, OCS_SCENE=0x28548,
  OCS_SIM_BODY=0x538, OCS_SELECTION_READY=0x4898, OCS_SELECTION_WAIT=0x49d0)
 HOOKS = ((0x694,'ocs_clock_loop',0x4ef9),
- (0x322,'ocs_clock_scene_draw',0x4eb9),
+ (0x30e,'waypoint_early',0x4eb9),
+ (0x322,'waypoint_scene',0x4eb9),
  (0x330,'ocs_clock_asteroids_draw',0x4eb9),
  (0x51c,'ocs_clock_message_draw',0x4eb9),
  (0x532,'ocs_clock_sim_draw',0x4ef9),
@@ -25,6 +27,10 @@ MODALS = ((0x872,10,'pause',0),(0xf56,8,'autopilot',0),
 
 def source(root, game):
     text=(root/'whdload/ocs_clock.s').read_text()
+    text+='\nWAYPOINT_ACTIVE equ ocs_clock_active\n'+(root/'whdload/waypoint_overlay.s').read_text()+'''
+waypoint_native_marker: jmp OCS_WAYPOINT
+waypoint_native_scene: bra.w ocs_clock_scene_draw
+'''
     # Reuse the established beam classification and scheduler, selecting the
     # previously checked 68000 arithmetic expansions. No CD32 game ABI enters.
     shared=(root/'whdload/timing.s').read_text()

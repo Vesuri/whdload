@@ -15,6 +15,16 @@ def source(root, buffered=False, *, variant):
     code = game[offset:offset+size]
     lines=[preamble(root,v.CPU),assembly_definitions(v),unit(root, 'timing', v.CPU),unit(root, 'timing_clock', v.CPU),unit(root, 'timing_player', v.CPU),unit(root, 'timing_input', v.CPU),unit(root, 'timing_presentation', v.CPU),unit(root, 'timing_scene', v.CPU),'timing_install:']
     if buffered:
+        lines.insert(-1, 'WAYPOINT_ACTIVE equ timing_active\n'+(root/'whdload/waypoint_overlay.s').read_text()+'''
+waypoint_native_marker:
+ move.l timing_game(pc),-(sp)
+ addi.l #$3766,(sp)
+ rts
+waypoint_native_scene:
+ move.l timing_game(pc),-(sp)
+ addi.l #$294d4,(sp)
+ rts
+''')
         from opening_source import source as opening_source
         lines.insert(-1,opening_source(root,variant))
         lines.insert(-1,unit(root, 'timing_intro', v.CPU))

@@ -33,6 +33,10 @@ polling is capped at 25 Hz, preserving clicks for the native room loop. Hover
 titles are cached during input and repainted after every room composition,
 honouring the native transparent background instead of filling the strip black.
 See [modal clocks](internals.md#simulator-and-room-animation-clocks).
+Enhanced flight now draws the waypoint marker after the world scene in both
+variants, preventing nebulae and other world bitmaps from covering it. Native
+visibility/projection rules and original-mode ordering remain unchanged. See
+[waypoint layering](internals.md#waypoint-marker-layering).
 The remaining exterior launch and cockpit-tunnel scripts now use 10 Hz timing
 with intermediate rendering; the tunnel shares world extrapolation with the intro.
 The incoming-ship sampler clears the vertical dividend independently of X,

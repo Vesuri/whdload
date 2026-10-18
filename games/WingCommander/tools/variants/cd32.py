@@ -47,6 +47,8 @@ TIMING_HOOKS = (
     (0x43ee, 'timing_portrait_random', 0x4eb9),
 )
 BUFFERED_HOOKS = (
+    (0x30c, 'waypoint_early', 0x4eb9),
+    (0x320, 'waypoint_scene', 0x4eb9),
     (0x1de20, 'cinematic_background', 0x4eb9),
     (0x1de3c, 'cinematic_background', 0x4eb9),
     (0x1df50, 'cinematic_background', 0x4eb9),
