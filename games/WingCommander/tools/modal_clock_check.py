@@ -114,32 +114,47 @@ def check(build,variant,model):
   require(polls[-1]==500,'pending click overwritten')
   call('modal_room_input');require(c.reg(9)&65535==0,'short click lost')
   call('modal_room_input');require(c.reg(9)&65535==65535,'click delivered twice')
-  # Exercise actual label wrappers with the native C ABI, including room
-  # re-entry, leaving hotspots, changed surfaces and unenhanced callers.
+  # Input caches text without touching pixels. Every composed image replays
+  # it, including unchanged hovers; transparent backgrounds must never fill.
   labels=[]
+  context=data+0x7ffe+(-0xc74 if variant=='ocs' else -0x8de)
+  labelcontext=data+0x7ffe+(0x1a0 if variant=='ocs' else 0xa8c)
+  labelsurface=data+0x7ffe+(0x1b8 if variant=='ocs' else 0xaa4)
+  labelcolour=labelsurface-1
+  transparent=data+0x7ffe+(0x21fa if variant=='ocs' else 0x2c6c)
+  c.write(context,long(0x188000));c.write(labelsurface,long(0x183000))
+  c.write(labelcolour,b'\x03');c.write(transparent,b'\x03')
   def label_clear():
    labels.append(('clear',c.get(c.reg(8)+4,4)));c.return_call()
   def label_print():
    labels.append(('print',c.get(c.reg(8)+8,4)));c.return_call()
+  def label_reset():
+   require(c.get(context,4)==labelcontext,'label context');c.return_call()
   c.intercept(s+sy['modal_label_native_clear'],label_clear)
   c.intercept(s+sy['modal_label_native_print'],label_print)
+  c.intercept(s+sy['modal_label_native_reset'],label_reset)
   c.intercept(s+sy['modal_label_native_cursor'],lambda:c.return_call())
   c.write(s+sy['modal_room_polling'],word(1))
-  c.write(s+sy['modal_label_previous'],long(-1))
-  def hover(title,surface=0x183000):
-   call('modal_label_begin',long(surface)+bytes([3,0]))
-   if title:call('modal_label_print',long(0x184000)+long(title))
-   call('modal_label_end',word(1))
-  hover(0x185000)
-  require(labels==[('clear',0x183000),('print',0x185000)],('initial title',labels))
-  for _ in range(8):hover(0x185000)
-  require(len(labels)==2,'unchanged hover still clears/repaints')
-  hover(0x186000);require(labels[-2:]==[('clear',0x183000),('print',0x186000)],'changed title')
-  hover(0);require(labels[-1]==('clear',0x183000),'old title retained')
-  count=len(labels);hover(0);require(len(labels)==count,'empty hover still clears')
-  hover(0x186000,0x187000);require(labels[-2:]==[('clear',0x187000),('print',0x186000)],'new surface')
-  c.write(s+sy['modal_room_polling'],word(0));count=len(labels)
-  hover(0x186000);hover(0x186000);require(len(labels)==count+4,'original caller changed')
+  call('modal_label_begin',long(0x183000)+bytes([3,0]))
+  call('modal_label_print',long(0x184000)+long(0x185000))
+  call('modal_label_end',word(1))
+  require(labels==[],'polling modified title pixels')
+  for _ in range(8):call('modal_label_replay')
+  require(labels==[('print',0x185000)]*8,'transparent persistent title')
+  require(c.get(context,4)==0x188000,'text context leaked')
+  # Composition, not a new input sample, must restore a lost title.
+  labels.clear();call('modal_room_input')
+  require(labels==[('print',0x185000)],'room composition missed cached title')
+  call('modal_label_print',long(0x184000)+long(0x186000))
+  call('modal_label_replay');require(labels[-1]==('print',0x186000),'changed title')
+  c.write(s+sy['modal_label_previous'],long(0));labels.clear()
+  call('modal_label_replay');require(labels==[],'empty transparent title filled background')
+  c.write(labelcolour,b'\x04');call('modal_label_replay')
+  require(labels==[('clear',0x183000)],'opaque native clear lost')
+  c.write(s+sy['modal_room_polling'],word(0));labels.clear()
+  call('modal_label_begin',long(0x183000)+bytes([3,0]))
+  call('modal_label_print',long(0x184000)+long(0x186000))
+  require(labels==[('clear',0x183000),('print',0x186000)],'original caller changed')
   sims=[]
   clock='ocs_clock_state' if variant=='ocs' else 'timing_clock'
   state={'ticks':0,'pictures':0,'rate':50,'gap':1,'skip':False}
@@ -177,7 +192,7 @@ def check(build,variant,model):
   call('modal_dispatch',struct.pack('>Ihhhh',0x180000,0,240,0,0))
   require(state['pictures']==1 and state['ticks']==0,'native abort not observed')
   require(c.get(abort-8)==0x1234 and c.get(abort)==0,'abort damaged adjacent state')
-  return dict(model=model,running_samples=samples,installer=True,rejected_sites=len(rejected),bar_samples=bars,foreground_rectangles=4,input_hz=25,hover_label_changes_only=True,short_click_exactly_once=True,simulator=sims)
+  return dict(model=model,running_samples=samples,installer=True,rejected_sites=len(rejected),bar_samples=bars,foreground_rectangles=4,input_hz=25,hover_label_composition_replay=True,short_click_exactly_once=True,simulator=sims)
  finally:c.close()
 
 def main():

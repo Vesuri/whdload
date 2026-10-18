@@ -4696,7 +4696,8 @@ not hardware throughput or whole-campaign acceptance.
 
 The room regression checks four native foreground rectangle copies before
 intermediate publication, 25 Hz PAL/NTSC cursor polling, exactly-once sampled
-click handling, and repainting hover titles only when they change. The live check
+click handling, and repainting cached hover titles after each composition while
+preserving transparent backgrounds. The live check
 samples held-direction cursor positions between 10 Hz room ticks and captures
 the bar at an intermediate publication.
 
@@ -4934,3 +4935,19 @@ This retains the existing first-mission launch/arrival fixture, adding 20
 projected player coordinates across fly-by ticks. It requires the tracked ship
 to stay within three pixels of the view centre. This is a bounded cached-030 PAL
 functional test, not a campaign replay or performance claim.
+
+### Room title composition regression
+
+Build and check the title replay independently of the 25 Hz input sampler:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/room-compose-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/room-compose-ocs
+python3 tools/modal_clock_check.py cd32 tmp/room-compose-cd32 --output tmp/room-compose-cd32-check
+python3 tools/modal_clock_check.py ocs tmp/room-compose-ocs --output tmp/room-compose-ocs-check
+```
+
+The checks require repainting on repeated compositions while preserving the
+transparent-background sentinel, text context, cursor rate and pending clicks.
+Use `modal_live_check.py` with either build for the bounded room navigation gate.

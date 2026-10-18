@@ -30,7 +30,8 @@ Explosion script sizes also receive intermediate samples, removing growth jumps
 against smooth camera motion; image frames and lifetime stay tick-owned.
 The bar redraw restores the TV/foreground between ticks; bar and barracks cursor
 polling is capped at 25 Hz, preserving clicks for the native room loop. Hover
-titles are redrawn only when they change, avoiding repeated clear/repaint flicker.
+titles are cached during input and repainted after every room composition,
+honouring the native transparent background instead of filling the strip black.
 See [modal clocks](internals.md#simulator-and-room-animation-clocks).
 The remaining exterior launch and cockpit-tunnel scripts now use 10 Hz timing
 with intermediate rendering; the tunnel shares world extrapolation with the intro.

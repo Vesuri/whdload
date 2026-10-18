@@ -17,8 +17,6 @@ modal_room_begin:
         lea modal_room_input_phase(pc),a0
         move.w modal_hz(pc),(a0)
         lea modal_label_previous(pc),a0
-        move.l #-1,(a0)
-        lea modal_label_surface(pc),a0
         clr.l (a0)
         lea modal_room_result(pc),a0
         move.w #-1,(a0)
@@ -76,11 +74,8 @@ modal_room_poll:
 .late:
         clr.w (a0)             ; one sample after a stall, no cursor catch-up
 .poll:
-        lea modal_label_seen(pc),a0
-        clr.w (a0)
-        lea modal_label_pending(pc),a0
-        move.l MODAL_LABEL_SURFACE(a4),(a0)+
-        move.b MODAL_LABEL_COLOUR(a4),(a0)
+        lea modal_label_previous(pc),a0
+        clr.l (a0)
         lea modal_room_polling(pc),a0
         move.w #1,(a0)
         move.l modal_room_table(pc),-(sp)
@@ -95,6 +90,7 @@ modal_room_poll:
         rts
 modal_room_input:
         bsr.w modal_room_poll
+        bsr.w modal_label_replay
         move.w modal_room_result(pc),d0
         move.l a0,-(sp)
         lea modal_room_result(pc),a0
@@ -368,6 +364,7 @@ modal_bar_between:
         dbra d2,.moving_body
         bsr.w modal_bar_restore
         bsr.w modal_portrait_replay
+        bsr.w modal_label_replay
         bsr.w modal_bar_publish
         bra.s .done
 .moving_body:
@@ -422,79 +419,52 @@ modal_portrait_replay:
         rts
 modal_portrait_state: ds.b 22
 
-; Native hotspot polling clears its directly drawn label before scanning. Defer
-; that clear until the selected static title changes; identical hover samples
-; leave the visible pixels intact. Other native callers retain their own path.
+; Input selects a title; composition owns its pixels. Room redraws overwrite
+; the strip even when the pointer has not moved. Never manufacture a clear:
+; native transparent labels deliberately skip the colour-fill call.
 modal_label_begin:
         tst.w modal_room_polling(pc)
         beq.w modal_label_native_clear
-        movem.l d0/a0,-(sp)
-        lea modal_label_pending(pc),a0
-        move.l 12(sp),(a0)+
-        move.b 16(sp),(a0)
-        lea modal_label_seen(pc),a0
-        clr.w (a0)
-        movem.l (sp)+,d0/a0
         rts
 modal_label_print:
         tst.w modal_room_polling(pc)
         beq.w modal_label_native_print
-        movem.l d0/a0,-(sp)
-        lea modal_label_seen(pc),a0
-        move.w #1,(a0)
-        move.l 16(sp),d0
-        cmp.l modal_label_previous(pc),d0
-        bne.s .changed
-        move.l modal_label_pending(pc),d0
-        cmp.l modal_label_surface(pc),d0
-        bne.s .changed
-        move.b modal_label_pending+4(pc),d0
-        cmp.b modal_label_colour(pc),d0
-        bne.s .changed
-        movem.l (sp)+,d0/a0
+        move.l a0,-(sp)
+        lea modal_label_format(pc),a0
+        move.l 8(sp),(a0)+
+        move.l 12(sp),(a0)
+        move.l (sp)+,a0
         rts
-.changed:
-        bsr.w modal_label_clear
-        lea modal_label_previous(pc),a0
-        move.l 16(sp),(a0)
-        movem.l (sp)+,d0/a0
-        bra.w modal_label_native_print
 modal_label_end:
-        tst.w modal_room_polling(pc)
-        beq.w modal_label_native_cursor
-        tst.w modal_label_seen(pc)
-        bne.w modal_label_native_cursor
-        movem.l d0/a0,-(sp)
-        tst.l modal_label_previous(pc)
-        bne.s .clear
-        move.l modal_label_pending(pc),d0
-        cmp.l modal_label_surface(pc),d0
-        beq.s .done
-.clear:
-        bsr.w modal_label_clear
-        lea modal_label_previous(pc),a0
-        clr.l (a0)
-.done:
-        movem.l (sp)+,d0/a0
         bra.w modal_label_native_cursor
-modal_label_clear:
+
+; Called after native room composition and after intermediate bar restoration.
+; Recreate the native text context/reset and honour its transparent sentinel.
+modal_label_replay:
         movem.l d0-d7/a0-a6,-(sp)
-        tst.l modal_label_pending(pc)
+        move.l MODAL_LABEL_SURFACE(a4),d0
         beq.s .done
-        lea modal_label_surface(pc),a0
-        move.l modal_label_pending(pc),(a0)
-        lea modal_label_colour(pc),a0
-        move.b modal_label_pending+4(pc),(a0)
-        move.b modal_label_pending+4(pc),-(sp)
-        move.l modal_label_pending(pc),-(sp)
+        move.b MODAL_LABEL_COLOUR(a4),d0
+        cmp.b MODAL_TRANSPARENT(a4),d0
+        beq.s .text
+        move.b d0,-(sp)
+        move.l MODAL_LABEL_SURFACE(a4),-(sp)
         bsr.w modal_label_native_clear
         addq.l #6,sp
+.text:
+        tst.l modal_label_previous(pc)
+        beq.s .done
+        move.l MODAL_TEXT_CONTEXT(a4),-(sp)
+        lea MODAL_LABEL_CONTEXT(a4),a0
+        move.l a0,MODAL_TEXT_CONTEXT(a4)
+        bsr.w modal_label_native_reset
+        move.l modal_label_previous(pc),-(sp)
+        move.l modal_label_format(pc),-(sp)
+        bsr.w modal_label_native_print
+        addq.l #8,sp
+        move.l (sp)+,MODAL_TEXT_CONTEXT(a4)
 .done:
         movem.l (sp)+,d0-d7/a0-a6
         rts
-modal_label_previous: dc.l -1
-modal_label_surface: dc.l 0
-modal_label_pending: dc.l 0
-        dc.w 0
-modal_label_colour: dc.w 0
-modal_label_seen: dc.w 0
+modal_label_format: dc.l 0
+modal_label_previous: dc.l 0

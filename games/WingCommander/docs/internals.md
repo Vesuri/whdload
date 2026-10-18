@@ -7354,29 +7354,38 @@ steps. The first nonnegative selection is latched until the native room loop
 consumes it; polling pauses while that action is pending. Setup/dialog return
 resets the input phase, pending selection and title history.
 
-Native hotspot polling otherwise clears and redraws its directly displayed action
-title on every call. Enhanced room polling defers the clear until the selected
-static title, destination surface or clear colour changes. Leaving a hotspot
-clears the old title once. Calls outside enhanced room polling retain the native
-behaviour. The hooks preserve the native stack arguments and cursor-image call.
+Enhanced polling caches the selected title without drawing or clearing it. Each
+native room composition replays the cached title after restoring the background;
+intermediate bar pictures do so after the four-rectangle and portrait restores.
+This also paints unchanged titles when no new 25 Hz input sample is due. Leaving
+a hotspot clears the cached pointer; the next room composition supplies the
+background. Input selection and click delivery remain independent of painting.
+
+The native clear is conditional: CD32 H0 `27436–2743e` (file `27462–2746a`)
+and OCS `26554–2655c` (file `26580–26588`) skip filling when the label colour
+matches the transparent sentinel. The previous change-only implementation
+manufactured a fill even on that skipped path, and suppressed repaint after
+scene composition erased the text. The replacement retains the sentinel test.
+It temporarily selects the native label text context, resets the text position,
+prints, and restores the caller's context on every composed image.
 
 | Label operation | OCS H0 / file | CD32 H0 / file |
 |---|---|---|
-| Deferred clear call | `26566 / 26592` | `27448 / 27474` |
-| Conditional title print | `2664a / 26676` | `2752c / 27558` |
+| Suppressed input-time clear | `26566 / 26592` | `27448 / 27474` |
+| Cached title print | `2664a / 26676` | `2752c / 27558` |
+| Native text-position reset | `30556 / 30582` | `2fcd0 / 2fcfc` |
 | End of hotspot scan / cursor image | `26670 / 2669c` | `27552 / 2757e` |
 
-Native regressions execute the four-rectangle copier with independent foreground
-bytes after simulated window overwrites. They also verify 25 polls per second on
-PAL/NTSC including field-counter wrap, duplicate-field rejection, selection zero,
-exactly-once delivery, unchanged-title suppression, title transitions, leaving a
-hotspot, changed surfaces and inactive native calls. Reports are in
-`tmp/room-hover-{ocs,cd32}-check/report.json`. The bounded cached-030 PAL runs in
-`tmp/room-hover-{ocs,cd32}-live` pass room navigation and observe cursor movement
-every two fields in both rooms, with room animation retaining its 10 Hz cadence.
-These are functional emulator checks, not hardware throughput measurements or
-live NTSC visual acceptance. The earlier `tmp/bar-fix` screenshots separately
-verify the protected TV foreground.
+Native CPU regressions verify transparent replay on eight consecutive images,
+repainting without an input sample, changed/empty titles, opaque clear behaviour,
+text-context restoration and unchanged non-room calls. They also retain the
+four-rectangle background copier checks, 25 Hz PAL/NTSC cursor sampling including
+counter wrap, click latching, modal clocks and installer guards on both variants.
+Reports: `tmp/room-compose-{cd32,ocs}-check/report.json`. These checks do not by
+themselves establish live pixel correctness or hardware performance. Bounded
+cached-030 PAL emulator runs in `tmp/room-compose-{cd32,ocs}-live` pass room
+navigation and cursor cadence. Their bar intermediate-publication and barracks
+captures show the action text over intact room artwork in both variants.
 
 `modal_clock.s` shares the policy; `modal_source.py` generates separately verified
 variant operands, displaced instructions and guards from pinned inputs. Every

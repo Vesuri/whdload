@@ -22,7 +22,7 @@ def source(root, variant):
     code=raw[44:44+v.HUNKS[0][1]]
     ocs=variant=='ocs'
     upper,feet,sim,begin,wait,patches=specification(variant)
-    fields=dict(MODAL_LABEL_SURFACE=0x1b8 if ocs else 0xaa4,MODAL_LABEL_COLOUR=0x1b7 if ocs else 0xaa3,MODAL_FIELD=v.A4['field_clock'],MODAL_COUNTDOWN=-32592 if ocs else -32624,
+    fields=dict(MODAL_TEXT_CONTEXT=-0xc74 if ocs else -0x8de,MODAL_LABEL_CONTEXT=0x1a0 if ocs else 0xa8c,MODAL_TRANSPARENT=0x21fa if ocs else 0x2c6c,MODAL_LABEL_SURFACE=0x1b8 if ocs else 0xaa4,MODAL_LABEL_COLOUR=0x1b7 if ocs else 0xaa3,MODAL_FIELD=v.A4['field_clock'],MODAL_COUNTDOWN=-32592 if ocs else -32624,
                 MODAL_CENTRE_X=-4184 if ocs else -4314,MODAL_CENTRE_Y=-4182 if ocs else -4312,
                 MODAL_ABORT=-0x707c if ocs else -0x7094,MODAL_CONTEXT=-31670 if ocs else -31696,
                 BAR_POINTERS=0x84 if ocs else 0x970,BAR_RNG=-4196 if ocs else -4326,
@@ -38,7 +38,8 @@ def source(root, variant):
     fix=[]
     def native(label, target):
         lines.append(label+': jmp $0');fix.append((label,target))
-    for label,target in [('modal_label_native_clear',0x322e0 if ocs else 0x31cd6),
+    for label,target in [('modal_label_native_reset',0x30556 if ocs else 0x2fcd0),
+                          ('modal_label_native_clear',0x322e0 if ocs else 0x31cd6),
                           ('modal_label_native_print',0x2cc80 if ocs else 0x2f76a),
                           ('modal_label_native_cursor',0x31cea if ocs else 0x316e6),
                           ('modal_bar_clear',0x322e0 if ocs else 0x31cd6),
