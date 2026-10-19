@@ -86,3 +86,26 @@ SplashDelay argument prevented WHDLoad startup; the first Z3 dump used the wrong
 bank address; another emulator lacked native-input monitor support. The passing
 run uses one splash option, maps Z3 at $40000000 and delivers actual native input.
 No game-state writes force throttle, gear, speed, or demo takeover.
+
+## Shared input harness
+
+The local `tmp/dev/tools/test_drive_controls.py` uses AmigaXDev's `FSUAE_ARM` and
+`amigaxdev.input.Input` by default. `RELEASE_FSUAE` remains an explicit emulator
+override. It checks capabilities, disconnects host input with `JOY0=none`, records
+`actions.json`, and releases held input on cleanup. Launch-time `WARP=1` replaces
+the private warp command; this control check does not require the private IRQ
+observer or survey profiler. The loader gate accepts an already-loaded race.
+
+Source `tmp/dev/amiga/env.sh`, select the exact slave with `DRIVE_SLAVE`, and run
+`python3 tmp/dev/tools/test_drive_controls.py a1200-fast` from the repository root.
+The paired build metadata must be beside the slave. Use `DRIVE_CLUTCH=1` for both
+buttons held during the countdown, followed by left release while right remains
+held, then right release and the ordinary brake/restart sequence. Use distinct
+`C1_VARIANT` values to retain each run's output.
+
+The shared-emulator regression uses the pinned RC2 slave above and
+`RELEASE_WHD_ARGS='CUSTOM1=1 CUSTOM2=1 ConfigDelay=0 NoWriteCache'`. It checks native
+throttle-from-rest, coast, braking to zero, idle, restart, and both steering directions.
+RC1 is the negative control: input reaches the player, but acceleration remains zero
+and the test fails. These are gameplay checks, not performance comparisons. Keep
+addresses, state thresholds and game evidence in this project's harness.
