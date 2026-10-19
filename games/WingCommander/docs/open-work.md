@@ -59,6 +59,10 @@ Ejection now shares the 10 Hz cinematic clock in both enhanced variants, with
 fractional seat/separation motion and pilot/helmet-camera tumble. Camera scripts
 and the explosion stay tick-owned; native cleanup is retained. See
 [ejection timing](internals.md#ejection-cinematic-clock-and-helmet-view).
+The funeral ceremony now redraws its moving starfield between 10 Hz steps in
+both enhanced versions, with native foreground composition and single-step
+respawn/salute state. Native CPU checks pass; live visual confirmation remains
+outstanding. See [funeral background motion](internals.md#funeral-background-motion).
 Carrier return and hangar landing now pace their native bitmap scripts at 10 Hz
 with fractional position and zoom rendering in both enhanced variants. See
 [landing clocks](internals.md#carrier-return-and-hangar-landing-clocks).

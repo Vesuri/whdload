@@ -7821,3 +7821,37 @@ muzzle trajectory and intro-contact regressions pass. Bounded live Enyo 1
 field smoke checks in both variants validate installed field spawning and intermediate rendering;
 these are not uninterrupted campaign or interactive firing play-tests. No new
 performance claim follows from these checks.
+
+## Funeral background motion
+
+The hangar ceremony is a separate bitmap scene from the ejection world. Its
+renderer is CD32 H0 `1ec4c` (file `1ec78`), OCS H0 `1df12` (file `1df3e`).
+It calls the moving-star renderer at CD32 `1f5e8` (file `1f614`), OCS `1e8ae`
+(file `1e8da`). This is the same star-record format used by the bar, but the
+bar's intermediate redraw adapter did not cover the funeral. Consequently the
+stars still moved in whole native steps.
+
+The enhanced funeral adapter runs one committed native pass per tenth of a
+second and redraws between passes. It samples each moving star's X coordinate
+from its pre-step position and signed velocity. Each intermediate pass redraws
+the complete native ceremony over the starfield, preserving foreground and
+subtitle layering. Image animation remains discrete. The coffin/ceremony script
+is not treated as a flight world and receives no speculative world updates.
+
+The bounded replay saves 628 bytes starting at A4+`48ba` (CD32) or A4+`40aa`
+(OCS): funeral geometry, salute records, static stars and up to 64 moving
+records. It restores the committed records, random seed and drawing countdown
+on return. Thus native star replacement and salute movement happen once even
+though their drawing routines are replayed. Original-mode installation remains
+unchanged. Both entry prefixes are checked before patching.
+
+`tools/funeral_check.py` executes the actual native funeral and star routines
+with graphics backend calls intercepted. Across CD32 CPU models 2/4 and OCS
+models 1/2, PAL/NTSC, ordinary/respawning stars and one-/three-field display
+spacing, all 32 cases preserve the complete data hunk (apart from elapsed field
+time) against one native pass. A PAL star moving ten pixels per tick renders
+at X=100,98,96,94,92 before the next native X=90. Active salute records and
+respawn RNG state also match. Installer checks pass eight CD32 cases and the
+OCS public hardware/option matrix. These are functional CPU checks, not a live
+frame-rate or pixel-capture claim; visual confirmation of the updated funeral
+scene remains outstanding.

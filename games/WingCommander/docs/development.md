@@ -4999,3 +4999,18 @@ throughput claim. `field_objects_live_check.py` with either build provides the
 bounded native Enyo 1 setup/field smoke check; `--mine` selects its mine fixture.
 Use the shared debugger-capable emulator through `FSUAE`. That smoke check covers
 field spawning and sampling, not shot impacts or uninterrupted campaign play.
+
+## Funeral background redraw checks
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/funeral-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/funeral-ocs
+python3 tools/funeral_check.py cd32 tmp/funeral-cd32 --output tmp/funeral-check-cd32
+python3 tools/funeral_check.py ocs tmp/funeral-ocs --output tmp/funeral-check-ocs
+```
+
+Use fresh output directories. The checks execute native ceremony/star routines,
+compare whole data-hunk state with one native pass, and check intermediate star
+positions including boundary respawn, PAL/NTSC and field-counter wrap. Graphics
+backends are intercepted; this does not replace a visual funeral-scene check.

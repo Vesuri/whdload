@@ -50,6 +50,7 @@ def main():
                     want[off:off+6]=struct.pack('>HI',op,s+sym['release_input_vblank' if buffered and off==0x34188 else label])
                 if buffered:
                     want[0x1396:0x139c]=struct.pack('>HI',0x4ef9,s+sym['autopilot_entry'])
+                    want[0x1ec4c:0x1ec54]=struct.pack('>HI',0x4ef9,s+sym['funeral_draw'])+bytes.fromhex('4e71')
                     from landing_source import specification as landing_specification
                     for off,width,label in landing_specification('cd32'):
                         want[off:off+width]=struct.pack('>HI',0x4eb9 if label=='landing_wait' else 0x4ef9,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
