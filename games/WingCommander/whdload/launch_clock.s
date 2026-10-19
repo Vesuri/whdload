@@ -93,7 +93,7 @@ launch_scale:
         rts
 
 ; Exterior launch is a bitmap script before mission world setup. Its native
-; state advances once per tenth-second; intermediate pictures temporarily
+; state advances at 50/3 updates per second; intermediate pictures temporarily
 ; sample positions/viewport and restore them before the next native iteration.
 launch_exterior_wait:
         movem.l d0-d7/a0-a6,-(sp)
@@ -109,14 +109,15 @@ launch_exterior_wait:
 .ready:
         moveq #0,d6
         move.w launch_exterior_hz(pc),d6
-        divu.w #10,d6
+        mulu.w #3,d6
         moveq #0,d7
         move.w d2,d7
         mulu.w d6,d7
-        add.l launch_exterior_epoch(pc),d7
         moveq #-1,d5
 .wait:
         move.l MODAL_FIELD(a4),d0
+        sub.l launch_exterior_epoch(pc),d0
+        mulu.w #50,d0
         sub.l d7,d0
         cmp.l d6,d0
         bcc.s .done
@@ -129,7 +130,7 @@ launch_exterior_wait:
         movem.l (sp)+,d0-d7/a0-a6
         rts
 
-; D5 elapsed fields, D6 fields/tick. Save the five pose words, scroll and
+; D5 elapsed field units (x50), D6 units/tick (Hz x3). Save the five pose words, scroll and
 ; native draw countdown and bitmap actors; repeated compositor calls must not
 ; commit the native actor routine's position/script advances.
 launch_exterior_draw:

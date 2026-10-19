@@ -7282,8 +7282,8 @@ portrait script pointers, random seed and draw counter are restored afterwards;
 these presentation draws do not advance the actors.
 
 The running-pilot shots retain their native 95-field deadlines. The background
-scroll now covers 120 pixels/second, pilot horizontal speeds are 20 and 30
-pixels/second, and bitmap frame sequences step at 10 Hz. Positions are sampled
+scroll now covers 200 pixels/second, pilot horizontal speeds are 100/3 and 50
+pixels/second, and bitmap frame sequences step at 50/3 Hz. Positions are sampled
 per rendered field; OCS background X retains its even-pixel checkerboard phase.
 The previously fixed 640-pixel background wrap remains in use.
 
@@ -7492,7 +7492,7 @@ calls explicitly; resemblance to other cockpit animations is not an address map.
 | Native layer projection/draw | `1a416 / 1a442` | `1b15e / 1b18a` |
 
 The exterior script has 10, 27 and 23 iterations. Each stage rebases after its
-setup, then schedules iterations at 10 Hz. Intermediate native compositor calls
+setup, then schedules iterations at 50/3 Hz. Intermediate native compositor calls
 sample ship position, projected departure pose and scroll without committing
 those samples to script state. Bitmap animation indices retain their native
 script progression. Loading time does not become animation debt. Input/abort,
@@ -7504,7 +7504,7 @@ upper word; replacing only the low word with elapsed fields incorrectly fed the
 horizontal remainder into the vertical division. This could put the ship far
 offscreen for intermediate pictures (the regression fixture produced Y=13159
 instead of 52 at PAL subfield 1), then bring it back at a later sample. The
-correction retains smooth X/Y sampling and the 10 Hz script clock.
+correction retains smooth X/Y sampling and the 50/3 Hz script clock.
 
 The compositor also advances four bitmap actors, not just the ship pose. Each
 render-only call now saves/restores the five-slot, 120-byte actor table at OCS
@@ -7645,7 +7645,7 @@ The pilot covering his eyes uses a separate eight-frame bitmap loop before the
 external ship explosion, not the three-stage ejection routine. It previously
 incremented D2 after each publication, so accelerated rendering shortened it.
 Enhanced CD32 and OCS now publish each original frame once and hold the script
-to 12.5 Hz deadlines (32 PAL or 38 NTSC fields for all eight frames, excluding
+to 50/3 Hz deadlines (24 PAL or 28 NTSC fields for all eight frames, excluding
 setup and any rendering overrun). No new bitmap frames are invented.
 
 | Operation | OCS H0 / file | CD32 H0 / file |
@@ -7738,8 +7738,8 @@ CD32 **50,868 bytes**, SHA-256
 The carrier-return dispatcher calls two bitmap-script loops. Neither runs the
 ordinary world-update root, so replaying that root between their pictures would
 add unrelated simulation. Both enhanced variants instead pace the native script
-passes at 10 Hz and sample the known before/after positions and perspective depth.
-The first loop retains 100 steps, the second 85 (10 and 8.5 seconds of script time).
+passes at 50/3 Hz and sample the known before/after positions and perspective depth.
+The first loop retains 100 steps, the second 85 (6 and 5.1 seconds of script time).
 An overloaded renderer can take longer; steps and sound events are not dropped.
 Original/off/ineligible modes retain native timing.
 
@@ -7910,17 +7910,17 @@ It calls the moving-star renderer at CD32 `1f5e8` (file `1f614`), OCS `1e8ae`
 bar's intermediate redraw adapter did not cover the funeral. Consequently the
 stars still moved in whole native steps.
 
-The enhanced funeral adapter runs one committed native pass per 80 ms and redraws between passes. It samples each moving star's X coordinate
+The enhanced funeral adapter runs one committed native pass per 60 ms and redraws between passes. It samples each moving star's X coordinate
 from its pre-step position and signed velocity. Each intermediate pass redraws
 the complete native ceremony over the starfield, preserving foreground and
 subtitle layering. The seven active salute elements also receive fractional
 (-6,-6) movement between updates. Image selection remains discrete. The coffin/ceremony script
 is not treated as a flight world and receives no speculative world updates.
 
-This 12.5 Hz cadence is a tuning choice, not an established original target.
+This 50/3 Hz cadence is a tuning choice, not an established original target.
 The native script advances per call; the drawing routine uses the native
-countdown gate at CD32 H0 `1ec60` (file `1ec8c`). PAL uses four fields; NTSC
-retains fractional field debt for a four/five-field cadence. Funeral residual
+countdown gate at CD32 H0 `1ec60` (file `1ec8c`). PAL uses three fields; NTSC
+retains fractional field debt for a three/four-field cadence. Funeral residual
 phase is bounded below one field and cannot borrow motion across scenes.
 
 The bounded replay saves 628 bytes starting at A4+`48ba` (CD32) or A4+`40aa`
@@ -7935,7 +7935,7 @@ with graphics backend calls intercepted. Across CD32 CPU models 2/4 and OCS
 models 1/2, PAL/NTSC, ordinary/respawning stars and one-/three-field display
 spacing, all 32 cases preserve the complete data hunk (apart from elapsed field
 time) against one native pass. A PAL star moving ten pixels per tick renders
-at X=100,98,95,93 before the next native X=90. Active salute records and
+at X=100,97,94 before the next native X=90. Active salute records and
 respawn RNG state also match. Installer checks pass eight CD32 cases and the
 OCS public hardware/option matrix. These are functional CPU checks, not a live
 frame-rate or pixel-capture claim; visual confirmation of the updated funeral

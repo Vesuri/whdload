@@ -105,7 +105,7 @@ modal_room_polling: dc.w 0
         even
 
 ; D0=shot duration, A3=native end field. Sample positions continuously,
-; frames discretely at 10 Hz. The original shot's field deadline is retained.
+; frames discretely at 50/3 Hz. The original shot's field deadline is retained.
 modal_run_sample:
         movem.l d0-d2/a0,-(sp)
         move.l a3,d1
@@ -122,9 +122,10 @@ modal_run_sample:
         adda.l #MODAL_HZ-modal_run_sample,a0
         move.l (a0),d0
         lea modal_hz(pc),a0
+        mulu.w #3,d0
         move.w d0,(a0)
         move.l d2,d0
-        mulu.w #10,d0
+        mulu.w #50,d0
         move.l d0,d1
         divu.w modal_hz(pc),d0
         andi.l #$ffff,d0
@@ -471,11 +472,11 @@ modal_label_previous: dc.l 0
 
 ; The cockpit death reaction has eight bitmap cels, separate from ejection.
 ; Rebase after resource loading. Publish every native cel once, then hold it
-; to its 12.5 Hz deadline; keep abort input responsive without replaying draws.
+; to its 50/3 Hz deadline; keep abort input responsive without replaying draws.
 modal_death_rebase:
         movem.l d0/a0,-(sp)
         bsr.w timing_rate
-        lsl.w #2,d0
+        mulu.w #3,d0
         lea modal_death_period(pc),a0
         move.w d0,(a0)
         lea modal_death_fraction(pc),a0
@@ -520,6 +521,6 @@ modal_death_publish:
 .done:
         movem.l (sp)+,d0-d7/a0-a6
         rts
-modal_death_period: dc.w 200
+modal_death_period: dc.w 150
 modal_death_fraction: dc.w 0
 modal_death_cursor: dc.l 0

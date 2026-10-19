@@ -33,9 +33,9 @@ def check(build,variant,model):
    for elapsed in range(95):
     c.write(field,long(100+elapsed))
     call('modal_run_sample',regs={9:95,4:195})
-    want=(elapsed*100//rate,elapsed*20//rate,elapsed*30//rate)
-    require(c.get(s+sy['modal_run_tick'])==elapsed*10//rate,'running frames')
-    require(c.get(s+sy['modal_run_x'])==(-(elapsed*120//rate) & 0xfffe),'running scroll')
+    want=(elapsed*500//(rate*3),elapsed*100//(rate*3),elapsed*150//(rate*3))
+    require(c.get(s+sy['modal_run_tick'])==elapsed*50//(rate*3),'running frames')
+    require(c.get(s+sy['modal_run_x'])==(-(elapsed*600//(rate*3)) & 0xfffe),'running scroll')
     require(c.reg(14)==want[1] and c.reg(15)==want[2],'running positions')
     samples+=1
   # Window presentation uses the previous native draw records, not mutable

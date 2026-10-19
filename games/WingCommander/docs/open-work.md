@@ -3,7 +3,7 @@
 ## Current state
 
 The pilot covering his eyes before the ship explosion now plays its eight native
-frames at 12.5 Hz in both enhanced variants. CPU timing, abort and re-entry checks
+frames at 50/3 Hz in both enhanced variants. CPU timing, abort and re-entry checks
 pass; live visual confirmation remains. See
 [death reaction](internals.md#cockpit-death-reaction-timing).
 
@@ -70,7 +70,7 @@ Enhanced flight now draws the waypoint marker after the world scene in both
 variants, preventing nebulae and other world bitmaps from covering it. Native
 visibility/projection rules and original-mode ordering remain unchanged. See
 [waypoint layering](internals.md#waypoint-marker-layering).
-The remaining exterior launch and cockpit-tunnel scripts now use 10 Hz timing
+The exterior launch uses 50/3 Hz and the cockpit tunnel retains 10 Hz timing
 with intermediate rendering; the tunnel shares world extrapolation with the intro.
 The incoming-ship sampler clears the vertical dividend independently of X,
 preventing offscreen flicker, and intermediate redraws preserve bitmap actor state.
@@ -92,11 +92,11 @@ Ejection now shares the 10 Hz cinematic clock in both enhanced variants, with
 fractional seat/separation motion and pilot/helmet-camera tumble. Camera scripts
 and the explosion stay tick-owned; native cleanup is retained. See
 [ejection timing](internals.md#ejection-cinematic-clock-and-helmet-view).
-The funeral ceremony now redraws its moving starfield between 12.5 Hz steps in
+The funeral ceremony now redraws its moving starfield between 50/3 Hz steps in
 both enhanced versions, with native foreground composition and single-step
 respawn/salute state. Native CPU checks pass; live visual confirmation remains
 outstanding. See [funeral background motion](internals.md#funeral-background-motion).
-Carrier return and hangar landing now pace their native bitmap scripts at 10 Hz
+Carrier return and hangar landing now pace their native bitmap scripts at 50/3 Hz
 with fractional position and zoom rendering in both enhanced variants. See
 [landing clocks](internals.md#carrier-return-and-hangar-landing-clocks).
 Both enhanced versions now wrap the post-briefing running-pilot backgrounds,

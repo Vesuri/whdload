@@ -126,13 +126,13 @@ def main():
                     shot('incoming-'+str(i))
                 # Profiling/debugger round trips can skip rendered fields. Bound
                 # motion by elapsed game fields, not by screenshot count.
-                assert all(0<=q[0]-p[0]<=4*((q[2]-p[2]+4)//5)
-                           and -2*((q[2]-p[2]+4)//5)<=q[1]-p[1]<=0
+                assert all(0<=q[0]-p[0]<=4*((q[2]-p[2]+2)//3)
+                           and -2*((q[2]-p[2]+2)//3)<=q[1]-p[1]<=0
                            for p,q in zip(incoming,incoming[1:])),incoming
                 (out/'incoming.json').write_text(json.dumps(incoming)+'\n')
             until(sb+sy['launch_exterior_wait'],f'$d2 == {steps-1}')
             last=number(f'*(unsigned int*){field:#x}')
-            assert (steps-1)*5<=last-first<=(steps-1)*5+10,(stage,first,last)
+            assert (steps-1)*3<=last-first<=(steps-1)*3+10,(stage,first,last)
             shot('exterior-'+str(stage));rows.append(dict(stage=stage,first=first,last=last,steps=steps))
         until(sb+sy['launch_loop'])
         start=number(f'*(unsigned int*){field:#x}')

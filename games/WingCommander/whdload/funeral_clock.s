@@ -1,10 +1,10 @@
-; Funeral draw-and-step calls retain one authoritative pass per 80 ms.
+; Funeral draw-and-step calls retain one authoritative pass per 60 ms.
 ; Extra pictures replay the pre-step records with fractional horizontal motion.
 ; Native respawns, random state and salute animation advance only once.
 funeral_draw:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w funeral_rate
-        lsl.w #2,d0
+        mulu.w #3,d0
         add.w funeral_fraction(pc),d0
         divu.w #50,d0
         swap d0

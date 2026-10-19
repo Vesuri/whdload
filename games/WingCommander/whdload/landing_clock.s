@@ -1,5 +1,5 @@
 ; Native landing loops keep their script, effects and cleanup. Each pass owns
-; one tenth-second; extra pictures interpolate that pass without committing it.
+; one 3/50-second interval; extra pictures interpolate that pass without committing it.
 landing_capture:
         movem.l d0-d1/a0-a1,-(sp)
         lea landing_stage(pc),a0
@@ -8,7 +8,7 @@ landing_capture:
         bne.s .save
         bsr.w landing_rate
         lea landing_fields(pc),a0
-        divu.w #10,d0
+        mulu.w #3,d0
         move.w d0,(a0)
         lea landing_epoch(pc),a0
         move.l MODAL_FIELD(a4),(a0)
@@ -43,13 +43,16 @@ landing_wait:
         moveq #0,d7
         move.w d2,d7
         mulu.w landing_fields(pc),d7
-        add.l landing_epoch(pc),d7
         lea landing_next(pc),a0
         bsr.w landing_store
         moveq #-1,d6
 .loop:
         move.l MODAL_FIELD(a4),d0
+        sub.l landing_epoch(pc),d0
+        mulu.w #50,d0
         sub.l d7,d0
+        cmp.l #65535,d0
+        bhi.s .done
         cmp.w landing_fields(pc),d0
         bcc.s .done
         cmp.w d6,d0

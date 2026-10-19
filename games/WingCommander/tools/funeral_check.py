@@ -59,9 +59,9 @@ def check(build,variant,model,respawn=False):
     at=field-DATA;final[at:at+4]=reference[at:at+4]
     assert final==reference,('state leak',[(hex(i),a,b) for i,(a,b) in enumerate(zip(final,reference)) if a!=b][:20])
     x=-1 if respawn else 100
-    want=[x&65535]+[(x-int(10*f/((hz*4//50))))&65535 for f in range(gap,(hz*4//50),gap)]
+    want=[x&65535]+[(x-int(10*f/((hz*3//50))))&65535 for f in range(gap,(hz*3//50),gap)]
     assert calls==want,(hz,gap,calls,want)
-    want_salutes=[(100,80)]+[(100-int(6*f/(hz*4//50)),80-int(6*f/(hz*4//50))) for f in range(gap,hz*4//50,gap)]
+    want_salutes=[(100,80)]+[(100-int(6*f/(hz*3//50)),80-int(6*f/(hz*3//50))) for f in range(gap,hz*3//50,gap)]
     assert salutes==want_salutes,(salutes,want_salutes)
     rows.append(dict(hz=hz,gap=gap,positions=calls[:],state_restored=True))
   return dict(model=model,respawn=respawn,rows=rows)
