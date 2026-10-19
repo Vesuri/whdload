@@ -2,6 +2,11 @@
 
 ## Current state
 
+The pilot covering his eyes before the ship explosion now plays its eight native
+frames at 10 Hz in both enhanced variants. CPU timing, abort and re-entry checks
+pass; live visual confirmation remains. See
+[death reaction](internals.md#cockpit-death-reaction-timing).
+
 Shared scene-boundary prediction reset now restores staged poses before clearing
 camera, object and projectile-contact eligibility in both variants. The scene
 owner audit and focused CPU checks are recorded under

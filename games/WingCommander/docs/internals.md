@@ -7639,6 +7639,39 @@ staged render poses, not extra authoritative movement. Each run retains one
 fly-by screenshot and completes the existing exterior/tunnel checks. Live NTSC
 and full campaign traversal remain outside this bounded gate.
 
+## Cockpit death reaction timing
+
+The pilot covering his eyes uses a separate eight-frame bitmap loop before the
+external ship explosion, not the three-stage ejection routine. It previously
+incremented D2 after each publication, so accelerated rendering shortened it.
+Enhanced CD32 and OCS now publish each original frame once and hold the script
+to 10 Hz deadlines (40 PAL or 48 NTSC fields for all eight frames, excluding
+setup and any rendering overrun). No new bitmap frames are invented.
+
+| Operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Clock rebase after loading, displaced countdown/index setup | `19a94 / 19ac0` | `1a7a8 / 1a7d4` |
+| Native loop | `19a9c / 19ac8` | `1a7b0 / 1a7dc` |
+| Publication hook | `19b02 / 19b2e` | `1a7fe / 1a82a` |
+| Native cleanup continuation | `19b1a / 19b46` | `1a816 / 1a842` |
+
+The shared adapter in `modal_clock.s` polls abort input between fields, retains
+ordinary deadline debt, and rebases after loading on every entry. Native drawing,
+last-frame flash, resource disposal and the following explosion loop remain
+unchanged. The OCS saved-background and fallback-bitmap branches remain native.
+Original-mode installation is untouched. Both hook spans have revision guards.
+
+`death_clock_check.py` executes the native loop with drawing/publication and
+field interrupts modelled. Both variants pass on two CPU models: eight ordered
+frames with identical bitmap arguments, PAL/NTSC deadlines, counter wrap,
+nine-field rendering overruns, abort and re-entry. Its original-loop control
+finishes in eight fields and fails the enhanced deadline. The OCS bitmap fallback
+is exercised; the saved-background branch is retained but not exercised here.
+Modal guard/regression checks and full option-install checks also pass.
+Reports: `tmp/death-cels-check-{cd32,ocs}`, `tmp/death-cels-modal-{cd32,ocs}`,
+`tmp/death-cels-install` and `tmp/death-cels-options`. Live visual confirmation
+of this animation remains pending; these checks make no performance claim.
+
 ## Ejection cinematic clock and helmet view
 
 The ejection routine has three independent per-picture loops, not the simulator

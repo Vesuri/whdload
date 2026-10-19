@@ -13,6 +13,8 @@ def specification(variant):
     patches += list(zip((0x26566,0x2664a,0x26670) if ocs else (0x27448,0x2752c,0x27552), (6,6,6), ('modal_label_begin','modal_label_print','modal_label_end')))
     patches += [(off,6,'modal_room_input') for off in ((0x24f2c,0x26138) if ocs else (0x25d5a,0x2702e))]
     patches += [(off,6,'modal_room_'+kind+str(i)) for kind,sites in [('begin',begin),('wait',wait)] for i,off in enumerate(sites)]
+    patches += [(0x19a94 if ocs else 0x1a7a8,8,'modal_death_begin'),
+                (0x19b02 if ocs else 0x1a7fe,6,'modal_death_publish')]
     return upper,feet,sim,begin,wait,patches
 
 
@@ -55,6 +57,11 @@ def source(root, variant):
     for name,off in [('upper',upper),('feet',feet)]:
         lines+=['modal_'+name+'_resume:',' dc.b '+','.join(str(x) for x in code[off:off+6])]
         native('modal_'+name+'_tail',off+6)
+    death=0x19a94 if ocs else 0x1a7a8
+    lines += ['modal_death_begin:', ' bsr.w modal_death_rebase',
+              ' dc.b '+','.join(str(x) for x in code[death:death+8])]
+    native('modal_death_resume',death+8)
+    native('modal_death_native_publish',0xb80 if ocs else 0xc40)
     portrait=0x24ae0 if ocs else 0x25922
     lines+=['modal_portrait_native:',' dc.b '+','.join(str(x) for x in code[portrait:portrait+8])]
     native('modal_portrait_resume',portrait+8)
@@ -85,7 +92,7 @@ def source(root, variant):
     for label,target in fix:
         lines += [' move.l a0,d0',f' addi.l #${target:x},d0',f' lea {label}+2(pc),a1',' move.l d0,(a1)']
     for off,width,label in patches:
-        op=0x4eb9 if off in begin+wait or label=='modal_room_input' or label.startswith('modal_label_') else 0x4ef9
+        op=0x4eb9 if off in begin+wait or label in ('modal_room_input','modal_death_publish') or label.startswith('modal_label_') else 0x4ef9
         lines += [f' move.w #${op:x},${off:x}(a0)',f' lea {label}(pc),a1',f' move.l a1,${off+2:x}(a0)']
         for n in range(6,width,2):lines += [f' move.w #$4e71,${off+n:x}(a0)']
     lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_bad:',

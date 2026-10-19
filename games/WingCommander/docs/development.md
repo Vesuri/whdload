@@ -5160,3 +5160,24 @@ The camera regression includes a transition with staged poses and poisoned
 contact certificates, exact native-data restoration, a cold first snapshot,
 and resumed camera history on the second snapshot. See
 [prediction state ownership](internals.md#prediction-state-at-scene-boundaries).
+
+## Cockpit death reaction timing
+
+Build both enhanced candidates and run the native eight-frame loop checks:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/death-cels-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/death-cels-ocs
+python3 tools/death_clock_check.py cd32 tmp/death-cels-cd32 --output tmp/death-cels-check-cd32
+python3 tools/death_clock_check.py ocs tmp/death-cels-ocs --output tmp/death-cels-check-ocs
+python3 tools/modal_clock_check.py cd32 tmp/death-cels-cd32 --output tmp/death-cels-modal-cd32
+python3 tools/modal_clock_check.py ocs tmp/death-cels-ocs --output tmp/death-cels-modal-ocs
+python3 tools/timing_adapter_check.py tmp/death-cels-cd32 --output tmp/death-cels-install
+python3 tools/ocs_options_check.py tmp/death-cels-ocs --output tmp/death-cels-options
+```
+
+Use fresh output directories for subsequent runs. The focused check compares the
+native bitmap arguments and frame order, checks 50/60 Hz deadlines, clock wrap,
+render overruns, abort and fresh entry. It models drawing and interrupts; it does
+not replace visual checking of a campaign death on an emulator or real hardware.
