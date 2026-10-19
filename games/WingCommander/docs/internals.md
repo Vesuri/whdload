@@ -7645,7 +7645,7 @@ The pilot covering his eyes uses a separate eight-frame bitmap loop before the
 external ship explosion, not the three-stage ejection routine. It previously
 incremented D2 after each publication, so accelerated rendering shortened it.
 Enhanced CD32 and OCS now publish each original frame once and hold the script
-to 10 Hz deadlines (40 PAL or 48 NTSC fields for all eight frames, excluding
+to 12.5 Hz deadlines (32 PAL or 38 NTSC fields for all eight frames, excluding
 setup and any rendering overrun). No new bitmap frames are invented.
 
 | Operation | OCS H0 / file | CD32 H0 / file |
@@ -7910,12 +7910,18 @@ It calls the moving-star renderer at CD32 `1f5e8` (file `1f614`), OCS `1e8ae`
 bar's intermediate redraw adapter did not cover the funeral. Consequently the
 stars still moved in whole native steps.
 
-The enhanced funeral adapter runs one committed native pass per tenth of a
-second and redraws between passes. It samples each moving star's X coordinate
+The enhanced funeral adapter runs one committed native pass per 80 ms and redraws between passes. It samples each moving star's X coordinate
 from its pre-step position and signed velocity. Each intermediate pass redraws
 the complete native ceremony over the starfield, preserving foreground and
-subtitle layering. Image animation remains discrete. The coffin/ceremony script
+subtitle layering. The seven active salute elements also receive fractional
+(-6,-6) movement between updates. Image selection remains discrete. The coffin/ceremony script
 is not treated as a flight world and receives no speculative world updates.
+
+This 12.5 Hz cadence is a tuning choice, not an established original target.
+The native script advances per call; the drawing routine uses the native
+countdown gate at CD32 H0 `1ec60` (file `1ec8c`). PAL uses four fields; NTSC
+retains fractional field debt for a four/five-field cadence. Funeral residual
+phase is bounded below one field and cannot borrow motion across scenes.
 
 The bounded replay saves 628 bytes starting at A4+`48ba` (CD32) or A4+`40aa`
 (OCS): funeral geometry, salute records, static stars and up to 64 moving
@@ -7929,7 +7935,7 @@ with graphics backend calls intercepted. Across CD32 CPU models 2/4 and OCS
 models 1/2, PAL/NTSC, ordinary/respawning stars and one-/three-field display
 spacing, all 32 cases preserve the complete data hunk (apart from elapsed field
 time) against one native pass. A PAL star moving ten pixels per tick renders
-at X=100,98,96,94,92 before the next native X=90. Active salute records and
+at X=100,98,95,93 before the next native X=90. Active salute records and
 respawn RNG state also match. Installer checks pass eight CD32 cases and the
 OCS public hardware/option matrix. These are functional CPU checks, not a live
 frame-rate or pixel-capture claim; visual confirmation of the updated funeral

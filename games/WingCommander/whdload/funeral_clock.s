@@ -1,10 +1,16 @@
-; Funeral draw-and-step calls retain one authoritative pass per 100 ms.
+; Funeral draw-and-step calls retain one authoritative pass per 80 ms.
 ; Extra pictures replay the pre-step records with fractional horizontal motion.
 ; Native respawns, random state and salute animation advance only once.
 funeral_draw:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w funeral_rate
-        divu.w #10,d0
+        lsl.w #2,d0
+        add.w funeral_fraction(pc),d0
+        divu.w #50,d0
+        swap d0
+        lea funeral_fraction(pc),a0
+        move.w d0,(a0)
+        swap d0
         move.w d0,d6
         move.l MODAL_FIELD(a4),d7
         lea FUNERAL_STATE(a4),a0
@@ -30,6 +36,21 @@ funeral_wait:
         lea funeral_before(pc),a0
         lea FUNERAL_STATE(a4),a1
         bsr.w funeral_copy
+        ; Seven live salute elements move (-6,-6) per native pass.
+        ; Borrow only their displayed positions; restore native state below.
+        lea FUNERAL_STATE+20(a4),a2
+        moveq #6,d3
+        moveq #-6,d0
+        muls.w d4,d0
+        divs.w d6,d0
+.salute:
+        tst.w (a2)
+        beq.s .next_salute
+        add.w d0,(a2)
+        add.w d0,2(a2)
+.next_salute:
+        addq.l #4,a2
+        dbra d3,.salute
         move.w BAR_MOVING_COUNT(a4),d3
         cmpi.w #64,d3
         bhi.s .done
@@ -59,5 +80,6 @@ funeral_copy:
 .loop:  move.l (a0)+,(a1)+
         dbra d0,.loop
         rts
+funeral_fraction: dc.w 0
 funeral_before: ds.b FUNERAL_BYTES
 funeral_after: ds.b FUNERAL_BYTES

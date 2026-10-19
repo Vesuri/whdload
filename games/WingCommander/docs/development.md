@@ -5181,3 +5181,8 @@ Use fresh output directories for subsequent runs. The focused check compares the
 native bitmap arguments and frame order, checks 50/60 Hz deadlines, clock wrap,
 render overruns, abort and fresh entry. It models drawing and interrupts; it does
 not replace visual checking of a campaign death on an emulator or real hardware.
+
+The death reaction now targets 12.5 FPS (32 PAL fields for eight frames).
+The funeral also targets 12.5 updates/s with fractional salute motion; run
+`tools/funeral_check.py` for each variant against the same fresh builds.
+These cadence choices still require visual acceptance.

@@ -471,13 +471,15 @@ modal_label_previous: dc.l 0
 
 ; The cockpit death reaction has eight bitmap cels, separate from ejection.
 ; Rebase after resource loading. Publish every native cel once, then hold it
-; to its 10 Hz deadline; keep abort input responsive without replaying draws.
+; to its 12.5 Hz deadline; keep abort input responsive without replaying draws.
 modal_death_rebase:
         movem.l d0/a0,-(sp)
         bsr.w timing_rate
-        divu.w #10,d0
+        lsl.w #2,d0
         lea modal_death_period(pc),a0
         move.w d0,(a0)
+        lea modal_death_fraction(pc),a0
+        clr.w (a0)
         lea modal_death_cursor(pc),a0
         move.l MODAL_FIELD(a4),(a0)
         movem.l (sp)+,d0/a0
@@ -487,7 +489,15 @@ modal_death_publish:
         movem.l d0-d7/a0-a6,-(sp)
         moveq #0,d2
         move.w modal_death_period(pc),d2
-        moveq #-1,d3
+        add.w modal_death_fraction(pc),d2
+        divu.w #50,d2
+        swap d2
+        lea modal_death_fraction(pc),a0
+        move.w d2,(a0)
+        swap d2
+        andi.l #$ffff,d2
+        move.l MODAL_FIELD(a4),d3
+        subq.l #1,d3
 .wait:
         tst.w MODAL_ABORT(a4)
         bne.s .done
@@ -510,5 +520,6 @@ modal_death_publish:
 .done:
         movem.l (sp)+,d0-d7/a0-a6
         rts
-modal_death_period: dc.w 5
+modal_death_period: dc.w 200
+modal_death_fraction: dc.w 0
 modal_death_cursor: dc.l 0
