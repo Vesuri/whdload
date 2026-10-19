@@ -1,6 +1,7 @@
 ; F5/F6/F7/F8/F9 select native modes 4/14/7/6/4 (8 for capitals).
 ; The dispatcher also advances chase controllers, missile expiry and view
 ; changes. Sample completed camera poses instead of executing it at draw rate.
+; The simulator Game Over modal clock uses the same native mode-4 owner.
 timing_external_allowed:
         move.w  -18280(a4),d0
         cmpi.w  #4,d0
@@ -36,8 +37,6 @@ timing_external_snapshot:
         bsr.s   timing_external_allowed
         tst.w   d0
         beq.w   .reset
-        tst.w   intro_active(pc)
-        bne.w   .reset
         tst.w   -29978(a4)
         bne.w   .reset
         move.l  external_identity(pc),d4
@@ -101,8 +100,6 @@ timing_external_snapshot:
 ; Called only inside the saved render pose, after all world objects are staged.
 ; Rebuild from the snapshot each time. The ordinary slot-61 backup restores it.
 timing_external_camera:
-        tst.w   intro_active(pc)
-        bne.w   .done
         tst.w   external_valid(pc)
         beq.w   .done
         tst.w   timing_scene_valid(pc)

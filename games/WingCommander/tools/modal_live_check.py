@@ -21,6 +21,7 @@ def main():
     p.add_argument('variant',choices=('ocs','cd32'));p.add_argument('build',type=Path)
     p.add_argument('--output',required=True)
     p.add_argument('--simulator-only',action='store_true',help='check explosion sampling and stop at name entry')
+    p.add_argument('--skip-turn',action='store_true',help='Return during intro pitch; check simulator star stability')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     v=get(a.variant)
     if a.variant=='ocs':
@@ -72,14 +73,23 @@ def main():
         (out/'layout.json').write_text(json.dumps(layout,indent=2)+'\n')
         g=boot();h0,h1,_,_=layout['hunks']
         field=h1+v.A4_BASE+v.A4['field_clock']
-        until(h0+(0x180c4 if a.variant=='ocs' else 0x1898a))
-        cmd('monitor key 45 1')
-        until(h0+(0x1edde if a.variant=='ocs' else 0x1fbba))
-        cmd('monitor key 45 0')
-        until(h0+(0x180c4 if a.variant=='ocs' else 0x1898a))
-        cmd('monitor key 45 1')
-        until(h0+(0x1f396 if a.variant=='ocs' else 0x20164))
-        cmd('monitor key 45 0')
+        if a.skip_turn:
+            # The opening's input polling is much more frequent than world
+            # updates. Stop at the actual scripted camera tick, then use Return.
+            until(h0+(0x6dcc if a.variant=='ocs' else 0x7056),
+                  '*(short*)($a4+'+('0xd88' if a.variant=='ocs' else '0x15fa')+'+122) != 0')
+            cmd('monitor key 44 1')
+            until(h0+(0x1f396 if a.variant=='ocs' else 0x20164))
+            cmd('monitor key 44 0')
+        else:
+            until(h0+(0x180c4 if a.variant=='ocs' else 0x1898a))
+            cmd('monitor key 45 1')
+            until(h0+(0x1edde if a.variant=='ocs' else 0x1fbba))
+            cmd('monitor key 45 0')
+            until(h0+(0x180c4 if a.variant=='ocs' else 0x1898a))
+            cmd('monitor key 45 1')
+            until(h0+(0x1f396 if a.variant=='ocs' else 0x20164))
+            cmd('monitor key 45 0')
         until(h0+(0x1f43c if a.variant=='ocs' else 0x20214))
         if a.variant=='ocs':
             sy=json.loads((a.build/'build.json').read_text())['symbols']
@@ -100,6 +110,25 @@ def main():
             until(sb+sy['intro_start'])
             start=number(f'*(unsigned int*){field:#x}')
             effects=[]
+            cameras=[]
+            if a.skip_turn:
+                offsets=(0x18d8,0x2a40,0x2d40) if a.variant=='ocs' else (0x214a,0x3452,0x3752)
+                pitch=0xd88 if a.variant=='ocs' else 0x15fa
+                x,y=(0x20f8,0x2178) if a.variant=='ocs' else (0x245e,0x2bea)
+                def basis():
+                    return [number(f'*(unsigned int*)($a4+{off+732+axis*4})')
+                            for off in offsets for axis in range(3)]
+                for i in range(24):
+                    until(sb+sy['intro_draw'])
+                    native=basis()
+                    rate=number(f'*(unsigned short*)($a4+{pitch+122})')
+                    until(sb+sy['intro_finish'])
+                    shown=basis()
+                    star=[number(f'*(unsigned short*)($a4+{off+84})') for off in (x,y)]
+                    cameras.append(dict(native=native,shown=shown,stale_pitch=rate,star=star))
+                assert all(r['stale_pitch']!=0 for r in cameras),'skip did not retain the triggering rate'
+                assert all(r['shown']==r['native'] for r in cameras),'stale intro pitch reached simulator camera'
+                assert len({tuple(r['star']) for r in cameras})==1,'fixed star oscillates'
             if a.simulator_only and label=='game-over':
                 # Capture native size before staging, then the size actually
                 # projected. No game-state injection or large trace files.
@@ -126,7 +155,7 @@ def main():
             until(sb+sy['intro_stop'])
             end=number(f'*(unsigned int*){field:#x}')
             assert 200<=end-start<=210,(label,start,end)
-            rows.append(dict(scene=label,start=start,end=end,fields=end-start,effects=effects))
+            rows.append(dict(scene=label,start=start,end=end,fields=end-start,effects=effects,cameras=cameras))
         until(h0+(0x16992 if a.variant=='ocs' else 0x16fc6))
         shot('name')
         if a.simulator_only:

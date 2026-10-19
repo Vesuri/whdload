@@ -7299,6 +7299,46 @@ The previously fixed 640-pixel background wrap remains in use.
 | Native window renderer | `1e8ae / 1e8da` | `1f5e8 / 1f614` |
 | Bar foreground entry | `24ae0 / 24b0c` | `25922 / 2594e` |
 
+### Simulator stars after skipping a camera turn
+
+Return during the title camera pitch leaves slot 61's angular controls intact.
+The original simulator cameras do not consume those controls: Ready selects
+mode 0 (copies player orientation), Game Over selects mode 4 (native chase
+controller). The shared enhanced intro predictor incorrectly applied the leftover
+pitch between their world ticks. This is an enhancement bug, not an original
+starfield or emulator fault.
+
+A normal CD32 Return-during-pitch run retained pitch −1. With native forward
+basis `(0,0,256)`, successive rendered bases became `(0,-1,256)`, `(0,-2,256)`,
+`(0,-3,256)`, `(0,-4,256)`, then reset to `(0,-1,256)` on the next tick.
+Star slot 42's projected Y went `46,46,47,47,47,46` in Ready and
+`-86,-86,-85,-84,-84,-86` in Game Over. Skipping before the camera turn did
+not trigger it. Evidence: `tmp/sim-stars-skip3/`; derived snapshots stay ignored.
+
+Both variants now choose presentation by native camera ownership. Modes 0–3
+rebuild from the staged player even under the modal clock and do not apply
+slot-61 script rotation. External modes skip generic slot-61 prediction and use
+the existing completed-pose sampler, now also admitted under the modal clock.
+This preserves smooth chase translation/orientation without executing chase
+controllers per picture. Mode 15's intro turns, mode 12's fly-by aim and the
+explicit ejection/helmet tumble remain on their existing paths. No stale-rate
+clearing, native simulation changes or star-position hacks are needed; original
+option behavior is unchanged.
+
+| Camera operation | CD32 H0 / file | OCS H0 / file |
+|---|---|---|
+| Native dispatcher | `680e / 683a` | `6584 / 65b0` |
+| Forward pose copy | `6dec / 6e18` | `6b62 / 6b8e` |
+| Chase controller | `6826 / 6852` | `659c / 65c8` |
+| Free-script camera tick (skip anchor) | `7056 / 7082` | `6dcc / 6df8` |
+
+The CPU camera regression now includes modal modes 0/4 with nonzero leftover
+controls on all three axes, alongside the five external flight modes: 392
+PAL/NTSC samples across CD32 020/040 and OCS 000/020, with exact game-data
+restoration. The scripted intro camera, modal timing, ejection and public-option
+checks also pass. Reproduction commands and bounded live evidence are in
+[development](development.md#simulator-star-stability-after-intro-skip).
+
 ### Explosion size sampling
 
 The simulator Game Over explosion (class 5, model 49) exposed a mismatch:
@@ -7978,7 +8018,8 @@ The existing slot-61 render backup restores every camera component before
 input, geometry or simulation. Ships use the ordinary bounded world predictor;
 mode 8 also predicts the player rotation that remains native-tick-owned in that
 view. Ordinary cockpit cameras still rebuild directly from the field-updated
-player basis. Intro and cinematic camera paths remain separate.
+player basis, including the simulator Ready screen. Game Over uses the same
+external-camera sampler; scripted cinematic modes retain their own adapters.
 
 Camera history cuts on first observation, invalid world history, view/subject
 changes, script ownership or a camera pose modified outside its snapshot.

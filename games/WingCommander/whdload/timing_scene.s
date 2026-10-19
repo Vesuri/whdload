@@ -406,6 +406,16 @@ timing_scene_begin:
         beq.w   .next
         ifne BUFFERED
 .camera_slot:
+        ; Native external controllers own the complete camera pose. Their
+        ; endpoint sampler below also handles the simulator Game Over view.
+        cmpi.w  #61,d4
+        bne.s   .camera_owner_done
+        bsr.w   timing_external_allowed
+        tst.w   d0
+        bne.w   .next
+        lea     5888(a4),a0
+        move.w  (a0,d4.w*2),d0
+.camera_owner_done:
         endif
         lea     timing_scene_types(pc),a1
         cmp.w   (a1,d4.w*2),d0
@@ -451,6 +461,8 @@ timing_scene_begin:
 .rotate:
         cmpi.w  #61,d4
         bne.s   .object_rotation
+        cmpi.w  #3,-18280(a4)
+        bls.w   .translate       ; ordinary views copy the staged player basis
         cmpi.w  #12,-18280(a4)
         beq.w   .translate       ; fly-by aim is rebuilt after all poses
         bsr.w   timing_intro_camera_rotate

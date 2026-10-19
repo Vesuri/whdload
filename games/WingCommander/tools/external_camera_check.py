@@ -45,7 +45,11 @@ def check(build, variant, model):
    c.write(off,struct.pack('>3i',*vec))
   put('ocs_clock_active' if ocs else 'timing_active',1);put('intro_active',0)
   if ocs:put('ocs_prediction_cost',0,4)
-  for mode in (4,6,7,8,14):
+  for modal,mode in ((0,4),(0,6),(0,7),(0,8),(0,14),(1,4),(1,0)):
+   put('intro_active',modal)
+   # Return during the moving intro leaves camera angular controls behind.
+   for off in ((0xd08,0xd88,0xe08) if ocs else (0x157a,0x15fa,0x167a)):
+    field(off+122,1 if modal else 0)
    field(view,mode);put('timing_scene_valid',0);put('external_seen',0)
    for hz in (50,60):
     put('ocs_clock_hz' if ocs else 'timing_hz',hz,4)
@@ -57,7 +61,7 @@ def check(build, variant, model):
      xyz=struct.unpack('>3i',c.read(pos+12*slot,12))
      c.write(pos+12*slot,struct.pack('>3i',*(x+y for x,y in zip(xyz,(300,400,2000)))))
     c.run(0x6584 if ocs else 0x680e);call('timing_scene_snapshot');current=pose()
-    require(c.get(SLAVE+sy['external_valid'])==1,('history rejected',mode,hz))
+    require(c.get(SLAVE+sy['external_valid'])==(mode!=0),('history rejected',mode,hz))
     require(old!=current,('native camera did not move',mode,hz))
     frames=[]
     for fraction in (10,20,30,40,hz,hz+10,hz+20):
@@ -72,9 +76,10 @@ def check(build, variant, model):
     # Prove this oracle rejects a camera sampler that does nothing.
     entry=SLAVE+sy['timing_external_camera'];saved=c.read(entry,2)
     c.write(entry,word(0x4e75));call('timing_scene_begin')
-    require(pose()==current and pose()!=expected,('disabled sampler undetected',mode,hz))
+    if mode!=0:require(pose()==current and pose()!=expected,('disabled sampler undetected',mode,hz))
     call('timing_scene_end');c.write(entry,saved)
-    results.append(dict(mode=mode,hz=hz,distinct_samples=7,restored=True,disabled_sampler_rejected=True))
+    results.append(dict(modal=modal,mode=mode,hz=hz,distinct_samples=7,restored=True,disabled_sampler_rejected=(mode!=0)))
+  put('intro_active',0)
   # Changing subject within the SAME view cuts history, including when the
   # renderer sees the switch before the next world snapshot.
   field(view,4);call('timing_scene_snapshot');call('timing_scene_snapshot')

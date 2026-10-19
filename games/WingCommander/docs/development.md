@@ -5106,3 +5106,32 @@ successive pictures with the same world counter and valid camera history.
 Use native keyboard input to reach views; do not inject mission or target state.
 Retain the small samples/screenshots and stop only the isolated test process;
 remove its disposable boot tree after shutdown.
+
+## Simulator star stability after intro skip
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/sim-stars2-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/sim-stars2-ocs
+python3 tools/external_camera_check.py cd32 tmp/sim-stars2-cd32 --output tmp/sim-stars2-cd32-check
+python3 tools/external_camera_check.py ocs tmp/sim-stars2-ocs --output tmp/sim-stars2-ocs-check
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/modal_live_check.py cd32 tmp/sim-stars2-cd32 --simulator-only --skip-turn --output tmp/sim-stars-fixed-cd32
+python3 tools/modal_live_check.py ocs tmp/sim-stars2-ocs --simulator-only --skip-turn --output tmp/sim-stars-fixed-ocs
+```
+
+Use fresh output names; live runs are sequential. `--skip-turn` waits for the
+native opening camera pitch, presses Return, and follows the normal menu into
+the simulator. It injects no camera/world state. Twenty-four render samples in
+each screen must retain the nonzero stale pitch while keeping the stationary
+camera orientation and star-42 projection fixed. The existing explosion-size
+sampling, four-second deadlines and native name-entry endpoint are also checked.
+The run uses cached A1200-030 PAL (OCS 4 MiB Fast) and stops only its own emulator.
+Reports and three screenshots are small; no full instruction traces are retained.
+CPU tests cover PAL/NTSC arithmetic; this is functional evidence, not an FPS claim.
+
+Accepted live reports: `tmp/sim-stars-fixed-{cd32,ocs}/report.json`. Both pass
+48 camera samples, 55 explosion samples, and name entry. Each screen lasts
+200 fields on CD32 and 202 on OCS, within the bounded four-second deadline gate. The old CD32 candidate reproduces the oscillation after the same
+Return skip (`tmp/sim-stars-skip3/`); an early skip did not. Native checks are in
+`tmp/sim-stars2-{cd32,ocs}-{check,intro,modal,ejection,options}/`.

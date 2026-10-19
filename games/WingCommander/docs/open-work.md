@@ -2,6 +2,11 @@
 
 ## Current state
 
+Simulator Ready/Game Over camera presentation now ignores leftover intro angular
+controls after Return during a camera turn. Both enhanced variants retain smooth
+motion through their actual camera owners. See
+[simulator star stability](internals.md#simulator-stars-after-skipping-a-camera-turn).
+
 Enhanced F5–F9 flight views now predict world objects and sample native camera
 motion between 10 Hz ticks in both variants. Chase controllers, target selection
 and missile lifetimes remain tick-owned. See
