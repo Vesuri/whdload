@@ -2,6 +2,11 @@
 
 ## Current state
 
+Enhanced flight keeps motion prediction active during afterburner and braking,
+including transitions back to normal thrust, in both variants. Native CPU
+regressions pass; interactive confirmation remains. See
+[afterburner continuity](internals.md#afterburner-prediction-continuity).
+
 The OCS public-option candidate adds **Enhanced framerate (68020+Fast RAM)**,
 enabled by `CUSTOM5=1` in its generated icon. Unchecked/absent or ineligible
 hardware keeps original simulation/rendering/waits in the same slave. Earlier

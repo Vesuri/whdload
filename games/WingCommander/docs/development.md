@@ -5014,3 +5014,24 @@ Use fresh output directories. The checks execute native ceremony/star routines,
 compare whole data-hunk state with one native pass, and check intermediate star
 positions including boundary respawn, PAL/NTSC and field-counter wrap. Graphics
 backends are intercepted; this does not replace a visual funeral-scene check.
+
+## Afterburner prediction continuity
+
+Build and check both enhanced variants in fresh scratch directories:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/afterburn-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/afterburn-ocs
+python3 tools/afterburn_prediction_check.py cd32 tmp/afterburn-cd32 --output tmp/afterburn-check-cd32
+python3 tools/afterburn_prediction_check.py ocs tmp/afterburn-ocs --output tmp/afterburn-check-ocs
+python3 tools/translation_check.py tmp/afterburn-cd32 --output tmp/afterburn-translation.json
+python3 tools/translation_contract_check.py tmp/afterburn-cd32 --output tmp/afterburn-contract.json
+python3 tools/timing_adapter_check.py tmp/afterburn-cd32 --output tmp/afterburn-install.json
+python3 tools/ocs_options_check.py tmp/afterburn-ocs --output tmp/afterburn-options
+```
+
+The focused regression must fail against the preceding build when changing
+ordinary thrust to afterburner. For visual acceptance, engage/release Tab in
+flight with other objects visible; verify that they and the camera retain
+intermediate motion. Functional reports do not establish display throughput.

@@ -149,7 +149,19 @@ timing_scene_snapshot:
         lea     timing_scene_actions(pc),a1
         move.w  (a0,d4.w*2),d0
         cmp.w   (a1,d4.w*2),d0
-        bne.w   .check_next
+        beq.s   .position
+        ifne BUFFERED
+        ; Thrust changes are continuous motion, not a new object or a cut.
+        bsr.w   timing_scene_thrust_action
+        tst.w   d0
+        beq.w   .check_next
+        move.w  (a1,d4.w*2),d0
+        bsr.w   timing_scene_thrust_action
+        tst.w   d0
+        beq.w   .check_next
+        else
+        bra.w   .check_next
+        endif
 .position:
         lea     4508(a4),a0
         adda.w  d5,a0
@@ -335,8 +347,15 @@ timing_scene_begin:
         bne.w   .cut
         cmpi.w  #12,5888(a4)
         bne.w   .cut
+        ifne BUFFERED
+        move.w  5478(a4),d0
+        bsr.w   timing_scene_thrust_action
+        tst.w   d0
+        beq.w   .cut
+        else
         cmpi.w  #-1,5478(a4)
         bne.w   .cut
+        endif
         ifne BUFFERED
 .intro_view:
         endif
@@ -999,3 +1018,17 @@ timing_scene_actions: dcb.b 20,0
 timing_scene_predictable: dcb.b 64,0
 timing_scene_saved: dcb.b 7680,0
 timing_scene_saved_end:
+
+; D0 action -> boolean; preserve slot pointers and prediction fraction.
+timing_scene_thrust_action:
+        cmpi.w  #-1,d0
+        beq.s   .yes
+        cmpi.w  #1,d0
+        beq.s   .yes
+        cmpi.w  #3,d0
+        beq.s   .yes
+        moveq   #0,d0
+        rts
+.yes:
+        moveq   #1,d0
+        rts

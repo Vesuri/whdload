@@ -7855,3 +7855,31 @@ respawn RNG state also match. Installer checks pass eight CD32 cases and the
 OCS public hardware/option matrix. These are functional CPU checks, not a live
 frame-rate or pixel-capture claim; visual confirmation of the updated funeral
 scene remains outstanding.
+
+## Afterburner prediction continuity
+
+The renderer's flight guard previously accepted only ordinary action `-1`.
+Afterburner action `1` (Tab) and braking action `3` therefore invalidated the
+whole scene snapshot on every picture, although field-rate player translation
+already supported both. A second guard rejected every ship action transition,
+producing another snapped interval when thrust mode changed.
+
+Enhanced OCS and CD32 now admit the same three thrust actions for flight
+presentation and preserve snapshot continuity between them. Scripted actions,
+view changes, class/model changes, lifecycle checks and large position jumps
+retain their existing rejection paths. This changes presentation eligibility;
+it does not change native acceleration, fuel, timers, collisions or angular
+control. The shared code uses the verified OCS operand mapping. Native motion
+entries remain CD32 H0 `7d1a` (file `7d46`) and OCS H0 `7a90` (file `7abc`);
+the velocity seams remain `807a`/`7df0` respectively.
+
+`afterburn_prediction_check.py` passes 288 intermediate presentation samples
+across PAL/NTSC and both variants, with 56 rejecting script/view controls.
+It checks ship-class transition eligibility, intermediate constant-velocity
+world poses, player/camera display lead and exact restoration of the whole
+data hunk. The preceding CD32 build fails on the `-1` to `1` transition.
+Existing native CD32 translation tests pass all 28 trajectories (including
+burn, burn-turn and braking), with their existing documented numerical budgets;
+render isolation, arithmetic and fallback checks also pass. Installer/option
+checks pass for both variants. These are native CPU functional checks, not a
+new live visual or performance measurement. Interactive confirmation remains.
