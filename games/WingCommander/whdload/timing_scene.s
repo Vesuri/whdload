@@ -76,6 +76,21 @@ timing_scene_snapshot:
         cmp.w   timing_scene_view(pc),d0
         bne.w   .check_next
         ifne BUFFERED
+        ; A swept field impact changes this bolt to native effect model 51
+        ; before integration. Its first picture needs the same interval phase.
+        lea     field_shot_effects(pc),a0
+        tst.b   (a0,d4.w)
+        beq.s   .ordinary_birth
+        lea     5888(a4),a0
+        cmpi.w  #5,(a0,d4.w*2)
+        bne.s   .clear_field_effect
+        lea     6136(a4),a0
+        cmpi.w  #51,(a0,d4.w*2)
+        beq.w   .accept
+.clear_field_effect:
+        lea     field_shot_effects(pc),a0
+        clr.b   (a0,d4.w)
+.ordinary_birth:
         ; Only an actual completed constructor may bypass old-slot continuity.
         lea     projectile_types(pc),a0
         move.w  (a0,d4.w*2),d0
@@ -199,6 +214,7 @@ timing_scene_snapshot:
         move.w  -18280(a4),2(a0)
         ifne BUFFERED
         bsr.w   timing_intro_shot_contacts
+        bsr.w   field_shot_snapshot
         endif
         movem.l (sp)+,d0-d7/a0-a6
         rts
@@ -451,14 +467,36 @@ timing_scene_begin:
         ; its completed movement interval, including the muzzle end, rather
         ; than skipping it and forecasting another step. Class 8 is linear;
         ; retain this phase for its whole life to avoid a second-tick jump.
+        ; Field hazards and their cannon impact effects share this interval.
         tst.w   intro_active(pc)
-        bne.s   .shot_phase_done
+        bne.w   .shot_phase_done
         lea     5888(a4),a0
-        cmpi.w  #8,(a0,d4.w*2)
-        bne.s   .shot_phase_done
+        move.w  (a0,d4.w*2),d0
+        cmpi.w  #9,d0
+        beq.s   .shot_phase_bounded_check
+        cmpi.w  #10,d0
+        bne.s   .field_effect
+        lea     6136(a4),a0
+        cmpi.w  #33,(a0,d4.w*2)
+        beq.s   .shot_phase_bounded_check
+        bra.s   .shot_phase_done
+.field_effect:
+        cmpi.w  #5,d0
+        bne.s   .player_bolt
+        lea     field_shot_effects(pc),a0
+        tst.b   (a0,d4.w)
+        beq.s   .shot_phase_done
+        lea     6136(a4),a0
+        cmpi.w  #51,(a0,d4.w*2)
+        beq.s   .shot_phase_bounded_check
+        bra.s   .shot_phase_done
+.player_bolt:
+        cmpi.w  #8,d0
+        bne.w   .shot_phase_done
         lea     14954(a4),a0
         tst.b   (a0,d4.w)         ; native shooter byte: player is slot zero
-        bne.s   .shot_phase_done
+        bne.w   .shot_phase_done
+.shot_phase_bounded_check:
         cmp.l   d7,d6
         bls.s   .shot_phase_bounded
         move.l  d7,d6             ; never forecast beyond the completed step
@@ -523,6 +561,7 @@ timing_scene_begin:
         blo.w   .object
 .objects_done:
         bsr.w   timing_intro_shot_limit
+        bsr.w   field_shot_limit
         endif
         bra.s   .camera
 .cut:

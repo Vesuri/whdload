@@ -96,7 +96,7 @@ release_teardown:
 
 release_input_vblank:
         bsr.w   release_vblank
-        bra.w   timing_record_input
+        bra.l   timing_record_input
 
 release_vblank:
         movem.l d0-d7/a0-a6,-(sp)

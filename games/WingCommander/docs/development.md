@@ -4972,3 +4972,30 @@ original versus enhanced order, marker eligibility, projection arguments,
 scene argument forwarding, stack balance and data isolation. It does not claim
 pixel or live-video validation; the retained user screenshots are the reported
 visual defect, and a subsequent play-test should confirm the corrected overlap.
+
+## Swept player cannon contacts with fields
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/field-shot-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/field-shot-ocs
+python3 tools/field_shots_check.py cd32 tmp/field-shot-cd32 --output tmp/field-shot-cd32-check
+python3 tools/field_shots_check.py ocs tmp/field-shot-ocs --output tmp/field-shot-ocs-check
+python3 tools/field_objects_check.py cd32 tmp/field-shot-cd32 --output tmp/field-shot-cd32-objects
+python3 tools/field_objects_check.py ocs tmp/field-shot-ocs --output tmp/field-shot-ocs-objects
+python3 tools/timing_adapter_check.py tmp/field-shot-cd32 --output tmp/field-shot-cd32-install
+python3 tools/ocs_options_check.py tmp/field-shot-ocs --output tmp/field-shot-ocs-options
+python3 tools/projectile_spawn_check.py tmp/field-shot-cd32 --output tmp/field-shot-cd32-spawn
+python3 tools/ocs_prediction_check.py tmp/field-shot-ocs --output tmp/field-shot-ocs-prediction
+python3 tools/intro_shot_check.py cd32 tmp/field-shot-cd32 --output tmp/field-shot-cd32-intro
+python3 tools/intro_shot_check.py ocs tmp/field-shot-ocs --output tmp/field-shot-ocs-intro
+```
+
+Choose fresh output directories on repeat runs. The new check uses native game
+instructions with synthetic bounded geometry and pins RNG only to cover each
+asteroid response branch. It checks swept detection, contact sampling, native
+impact conversion and complete restoration after rendering. It makes no emulator
+throughput claim. `field_objects_live_check.py` with either build provides the
+bounded native Enyo 1 setup/field smoke check; `--mine` selects its mine fixture.
+Use the shared debugger-capable emulator through `FSUAE`. That smoke check covers
+field spawning and sampling, not shot impacts or uninterrupted campaign play.

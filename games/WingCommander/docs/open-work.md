@@ -46,6 +46,10 @@ CD32 mission asteroid/mine replenishment now belongs to world updates, preventin
 render snapshot restoration from discarding new field objects. Both variants use
 the world counter for field cleanup; see
 [field ownership](internals.md#mission-asteroid-and-mine-field-ownership).
+Player cannon now uses swept asteroid/mine contacts in enhanced flight, with
+hazards and bolts sharing the completed movement interval. Bolts stop at the
+contact until the native response creates the impact; asteroid breakup and mine
+rules remain native. See [field shot contacts](internals.md#player-cannon-contacts-with-asteroid-and-mine-fields).
 The waypoint autopilot fly-by now shares 10 Hz world updates and bounded
 render-only extrapolation in both enhanced variants. Its sideways camera motion
 and aim also follow the staged ship positions, preventing tick-boundary snaps. Native arrival logic and

@@ -34,6 +34,10 @@ projectile_init_return:             ; E:9a52: any slot reinitialization revokes 
         bne.s   .done
         cmpi.w  #60,d2
         bhi.s   .done               ; includes -1 allocation failure
+        lea     field_shot_targets(pc),a0
+        move.b  #-1,(a0,d2.w)
+        lea     field_shot_effects(pc),a0
+        clr.b   (a0,d2.w)
         lea     projectile_types(pc),a0
         clr.w   (a0,d2.w*2)
         lea     projectile_cooldown_valid(pc),a0

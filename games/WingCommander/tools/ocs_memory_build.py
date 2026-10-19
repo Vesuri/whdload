@@ -251,7 +251,15 @@ game_base: dc.l 0
 '''+(ROOT/'whdload/ocs_memory.s').read_text()+'\n'+(ROOT/'whdload/ocs_publication.s').read_text()+'\n'+backend_source()+'\n'+converter_source(candidates())
     if clock:
         from ocs_clock_source import source as clock_source
-        text+='\n'+clock_source(ROOT,game)
+        if prediction:
+            # Place the shared contact unit before the clock so the existing
+            # clock/intro/exhaust calls retain their 68000 PC-relative reach.
+            from ocs_prediction_source import field_source
+            from shared_cpu import preamble
+            text+='\n'+preamble(ROOT,'68000')+field_source(ROOT)
+            text+='\n'+clock_source(ROOT,game).replace(preamble(ROOT,'68000'),'')
+        else:
+            text+='\n'+clock_source(ROOT,game)
         if prediction:
             from ocs_prediction_source import source as prediction_source
             from shared_cpu import select
@@ -344,7 +352,8 @@ view_probe_request: dc.l 0
         text+=(ROOT/'whdload/cinematic_background.s').read_text().replace(
             '        CINEMATIC_DRAW','        jmp OCS_CINEMATIC_DRAW')
     if public:
-        text+=modal_source(ROOT,'ocs')
+        # The enlarged payload needs a long address calculation for this call.
+        text+=modal_source(ROOT,'ocs').replace('        bsr.w timing_rate', '        lea modal_room_begin(pc),a0\n        adda.l #timing_rate-modal_room_begin,a0\n        jsr (a0)')
     if intro:
         # The appended D4 payload puts startup tables beyond d16(PC).
         for label in ('guards','native_fixups','payload_end','hooks'):

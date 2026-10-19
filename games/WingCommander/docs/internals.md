@@ -4182,7 +4182,7 @@ velocity step beyond the muzzle. Forecasting from there omitted the entire near
 segment. The native owner byte is A4+`3a6a` on CD32, A4+`3058` on OCS; zero denotes
 the player. These are hunk-relative native operands, not runtime addresses.
 
-For these linear bolts only, staging uses `P - V + V * min(f, 1)`, where `P` is
+For these linear bolts, staging uses `P - V + V * min(f, 1)`, where `P` is
 the post-world position, `V` the native per-tick displacement and `f` the existing
 fraction including publication lead. The phase remains the same throughout the
 bolt's life: there is no first-tick hold, acceleration to catch up, or switch back
@@ -4191,11 +4191,13 @@ this displays 0.2 steps from the muzzle instead of 1.2. A delayed renderer canno
 recover already-missed pictures; the bound holds at the completed endpoint.
 
 This is intentionally one tick behind the former bolt presentation. Ships retain
-forward prediction. Allocation, native positions, lifetime, collision, damage,
-cooldown and input are unchanged; staging is restored before simulation. AI shots,
+forward prediction. The field-contact fix below also puts asteroids, mines and
+their cannon impact effects on this completed interval and adds swept field
+contacts. Allocation, lifetime, cooldown and input remain native; staging is
+restored before simulation. AI shots,
 guided missiles and approximate effects retain their existing presentation. Intro
 shots keep the separate native-contact policy. Original/disabled modes remain
-native. No game data or additional persistent per-projectile history is needed.
+native. Field-contact caches are described below.
 
 Both native constructor suites verify the actual muzzle-to-first-update movement,
 then six consecutive intervals at 50/60 Hz for weapon models 24–27. CD32 checks
@@ -4349,8 +4351,8 @@ allocation/cleanup ownership error, not a missing velocity extrapolator.
 Both asteroid fields (native type 22) and mine fields (type 23) use this path.
 The constructor chooses asteroid models 34–38 (class 9) or mine model 33
 (class 10). Native field entry, spawn probability, movement, proximity tests
-and collision behaviour are
-retained. A new object waits for the normal continuity snapshot before prediction;
+are retained. Enhanced player-cannon field contacts now use the swept query
+described below. A new object waits for the normal continuity snapshot before prediction;
 subsequent pictures sample its native velocity and restore the authoritative pose.
 Dust/debris already has a world-owned regeneration path, and weapon/effect
 constructors retain their separate birth handling.
@@ -7762,3 +7764,60 @@ are in `tmp/waypoint-cd32-check2`, `tmp/waypoint-ocs-check3`,
 `tmp/waypoint-cd32-install` and `tmp/waypoint-ocs-options`.
 This verifies native ordering and integration, not a fresh live visual overlap
 capture or hardware performance. No new live overlap capture was made.
+
+## Player cannon contacts with asteroid and mine fields
+
+Enhanced CD32 and OCS flight now sweep each player-owned class-8 cannon bolt
+against class-9 asteroids and model-33/class-10 mines over the completed movement
+interval. The native endpoint-only query could miss an object entirely between
+updates. Separately, drawing the bolt's previous interval against a hazard's
+predicted future interval displaced visible contacts. Hazards now use the same
+`P - V + V * min(f, 1)` position sampling as player cannon bolts. Their orientation
+and all other object policies retain their existing rules. Intro is excluded.
+
+| Native operation | CD32 H0 / file | OCS H0 / file |
+|---|---|---|
+| Response's query call (enhanced hook) | `81a4 / 81d0` | `7f1a / 7f46` |
+| Original ordered overlap query | `1597e / 159aa` | `156e6 / 15712` |
+| Native radius predicate | `2c8dc / 2c908` | `2b950 / 2b97c` |
+| Collision response entry | `8196 / 81c2` | `7f0c / 7f38` |
+| Asteroid breakup decision | `80f2 / 811e` | `7e68 / 7e94` |
+
+After the world snapshot, the shared helper forms the relative segment
+`(Pshot - Ptarget) - (Vshot - Vtarget)` through `Pshot - Ptarget`. Axis bounds reject
+distant pairs. A normalized integer closest-point calculation and the original
+radius predicate identify a contact; binary search locates its entry at Q16
+fractional resolution. Earliest entry wins, with native slot order breaking ties.
+The original query's non-field endpoint contacts retain priority. Its scratch
+vector is restored after the snapshot-only query. Overflowing/unqualified pairs
+retain the original endpoint fallback. This is a finite-precision swept test,
+not an exact real-number intersection or an all-object collision replacement.
+
+A cached contact clamps the visible bolt relative to the displayed hazard after
+that fraction. At the next native collision response, matching class, model and
+position are required for both slots. Allocation invalidates cached contacts.
+The accepted bolt is placed at the contact relative to the target's current pose,
+and the native collision-vector scratch is supplied consistently. The existing
+response owns impact model 51, damage, randomness, breakup and mine behaviour.
+In particular, this does not make every asteroid hit destroy the asteroid or
+change the native mine destruction rules. Impact effects share the completed
+interval from their first picture, avoiding a new one-tick position jump.
+Original/off/ineligible modes, AI cannon, missiles and intro contacts keep their
+native or previously established policies.
+
+`field_shots_check.py` passes on CD32 020/040 and OCS 68000/020: 720 randomized
+geometric cases, 24 stationary/moving asteroid/mine contact cases and 360 PAL/NTSC
+contact pictures. The independent geometric oracle excludes the narrow boundary
+where native approximate distance and integer normalization differ. Tests also
+exercise near misses, earliest target selection, native ship-contact priority,
+invalidated targets, original/intro/AI exclusions, native impact initialization,
+first-effect sampling and both asteroid breakup/non-breakup branches. Only the
+RNG result is pinned for those two response branches. Removing the cache restores
+tunnelling; removing the display limiter restores through-target rendering.
+Presentation checks require full data-hunk restoration.
+
+Installer guards, OCS option/hardware gates, field ownership, projectile birth,
+muzzle trajectory and intro-contact regressions pass. Bounded live Enyo 1
+field smoke checks in both variants validate installed field spawning and intermediate rendering;
+these are not uninterrupted campaign or interactive firing play-tests. No new
+performance claim follows from these checks.

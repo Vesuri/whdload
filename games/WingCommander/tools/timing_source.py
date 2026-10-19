@@ -72,4 +72,5 @@ waypoint_native_scene:
         at=lines.index('timing_install:')+1
         lines[at:at]=['\tlea $33796(a0),a1','\tlea release_publish_resume(pc),a3','\tmove.l a1,(a3)',
                      '\tlea $337f0(a0),a1','\tlea release_teardown_resume(pc),a3','\tmove.l a1,(a3)']
+    if buffered: lines.append((root/'whdload/timing_field_shots.s').read_text())
     return '\n'.join(lines)
