@@ -5182,26 +5182,27 @@ native bitmap arguments and frame order, checks 50/60 Hz deadlines, clock wrap,
 render overruns, abort and fresh entry. It models drawing and interrupts; it does
 not replace visual checking of a campaign death on an emulator or real hardware.
 
-The death reaction now targets 50/3 FPS (24 PAL fields for eight frames).
-The funeral also targets 50/3 updates/s with fractional salute motion; run
+The death reaction uses three fields per frame (24 fields for eight frames).
+The funeral also updates every three fields with fractional salute motion; run
 `tools/funeral_check.py` for each variant against the same fresh builds.
 These cadence choices still require visual acceptance.
 
 The running-pilot, exterior cockpit-entry and carrier-return bitmap scripts also
-use 50/3 updates/s, retaining fractional movement. The cockpit tunnel remains
+update every three fields, retaining fractional movement. The cockpit tunnel remains
 10 Hz. Reproduce the focused native checks with fresh output directories:
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --variant cd32 --release --output tmp/cels503-cd32
-python3 tools/ocs_memory_build.py --public --output tmp/cels503-ocs
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/cels3b-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/cels3b-ocs
 for variant in cd32 ocs; do
-  for check in death_clock funeral modal_clock launch_clock landing_clock; do
-    python3 "tools/${check}_check.py" "$variant" "tmp/cels503-$variant" --output "tmp/cels503-$check-$variant"
+  for check in death_clock funeral modal_clock launch_clock landing_clock opening; do
+    python3 "tools/${check}_check.py" "$variant" "tmp/cels3b-$variant" --output "tmp/cels3b-$check-$variant"
   done
 done
 ```
 
-PAL uses three fields per update. NTSC retains fractional timing rather than
-rounding every interval to three or four fields. These checks cover native state
+PAL and NTSC both use three fields per update (50/3 and 20 updates/s).
+Fireworks and bar/barracks use the same cadence; orchestra and opening zooms
+retain their prior 10 Hz clock, and room cursor input remains 25 Hz. These checks cover native state
 restoration and intermediate movement; live visual acceptance remains pending.

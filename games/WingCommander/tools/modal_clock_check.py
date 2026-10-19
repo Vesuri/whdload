@@ -33,9 +33,9 @@ def check(build,variant,model):
    for elapsed in range(95):
     c.write(field,long(100+elapsed))
     call('modal_run_sample',regs={9:95,4:195})
-    want=(elapsed*500//(rate*3),elapsed*100//(rate*3),elapsed*150//(rate*3))
-    require(c.get(s+sy['modal_run_tick'])==elapsed*50//(rate*3),'running frames')
-    require(c.get(s+sy['modal_run_x'])==(-(elapsed*600//(rate*3)) & 0xfffe),'running scroll')
+    want=(elapsed*500//150,elapsed*100//150,elapsed*150//150)
+    require(c.get(s+sy['modal_run_tick'])==elapsed*50//150,'running frames')
+    require(c.get(s+sy['modal_run_x'])==(-(elapsed*600//150) & 0xfffe),'running scroll')
     require(c.reg(14)==want[1] and c.reg(15)==want[2],'running positions')
     samples+=1
   # Window presentation uses the previous native draw records, not mutable
@@ -82,11 +82,11 @@ def check(build,variant,model):
    c.write(s+sy['modal_hz'],word(rate));c.write(s+sy['modal_bar_enabled'],word(1))
    c.write(field,long(100));call('modal_bar_capture')
    c.write(moving,bytes(16)) # Deliberate later respawn must not alter this interval.
-   for f in range(1,rate//10):
+   for f in range(1,3):
     draws.clear();c.write(field,long(100+f));before=c.read(data,0xf5b8 if variant=='ocs' else 0xfda0)
     call('modal_bar_between')
     require(c.read(data,len(before))==before,'window presentation mutated game data')
-    require([r[1] for r in draws[:3]]==[12,100+int(7*f*10/rate),200+int(-11*f*10/rate)],('window sample',draws))
+    require([r[1] for r in draws[:3]]==[12,100+int(7*f/3),200+int(-11*f/3)],('window sample',draws))
     require([r[4] for r in draws]==[4,8,16,5,0,6,0,7],'window frame changed')
     bars+=1
    c.write(moving,struct.pack('>hhhhhhhh',100,30,7,8,200,40,-11,16))
@@ -99,6 +99,12 @@ def check(build,variant,model):
   c.intercept(s+sy['modal_room_native_input'],input_poll)
   c.write(s+sy['modal_room_table'],long(0x182000))
   for rate in (50,60):
+   c.write(s+sy['modal_hz'],word(rate))
+   c.write(s+sy['modal_room_cursor'],long(0xfffffff0))
+   for tick in range(1,21):
+    deadline=(0xfffffff0+tick*3)&0xffffffff
+    c.write(field,long(deadline));call('modal_room_wait')
+    require(c.get(s+sy['modal_room_cursor'],4)==deadline,'room three-field cadence')
    for startfield in (200,0xfffffff0):
     polls.clear();c.write(s+sy['modal_hz'],word(rate))
     c.write(s+sy['modal_room_result'],word(-1))

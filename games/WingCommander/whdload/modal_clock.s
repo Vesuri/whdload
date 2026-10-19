@@ -1,4 +1,4 @@
-; Enhanced modal scenes: one animation step per tenth of a second.
+; Enhanced rooms: one animation step per three display fields.
 ; Native room loops consume actions; cursor polling also runs between ticks.
 ; Each room rebases after setup and returns from dialogs; load time is never
 ; animation debt.
@@ -7,7 +7,7 @@ modal_room_begin:
         bsr.w timing_rate
         lea modal_hz(pc),a0
         move.w d0,(a0)
-        divu.w #10,d0
+        moveq #3,d0
         move.l MODAL_FIELD(a4),d1
         sub.l d0,d1
         lea modal_room_cursor(pc),a0
@@ -24,9 +24,7 @@ modal_room_begin:
         rts
 modal_room_wait:
         movem.l d0-d2/a0,-(sp)
-        moveq #0,d2
-        move.w modal_hz(pc),d2
-        divu.w #10,d2
+        moveq #3,d2
 .wait:
         move.l MODAL_FIELD(a4),d0
         sub.l modal_room_cursor(pc),d0
@@ -122,7 +120,7 @@ modal_run_sample:
         adda.l #MODAL_HZ-modal_run_sample,a0
         move.l (a0),d0
         lea modal_hz(pc),a0
-        mulu.w #3,d0
+        move.w #150,d0
         move.w d0,(a0)
         move.l d2,d0
         mulu.w #50,d0
@@ -319,8 +317,7 @@ modal_bar_between:
         lea modal_bar_last(pc),a0
         move.l d7,(a0)
         sub.l modal_bar_epoch(pc),d7
-        mulu.w #10,d7
-        cmp.w modal_hz(pc),d7
+        cmpi.w #3,d7
         bhs.w .done
         movea.l BAR_SURFACE(a4),a3
         move.b BAR_COLOUR(a4),-(sp)
@@ -351,7 +348,7 @@ modal_bar_between:
 .moving:
         move.w 4(a2),d0
         muls.w d7,d0
-        divs.w modal_hz(pc),d0
+        divs.w #3,d0
         add.w (a2),d0
         move.w 6(a2),-(sp)
         move.l BAR_IMAGE(a4),-(sp)
@@ -472,31 +469,17 @@ modal_label_previous: dc.l 0
 
 ; The cockpit death reaction has eight bitmap cels, separate from ejection.
 ; Rebase after resource loading. Publish every native cel once, then hold it
-; to its 50/3 Hz deadline; keep abort input responsive without replaying draws.
+; to its three-field deadline; keep abort input responsive without replaying draws.
 modal_death_rebase:
-        movem.l d0/a0,-(sp)
-        bsr.w timing_rate
-        mulu.w #3,d0
-        lea modal_death_period(pc),a0
-        move.w d0,(a0)
-        lea modal_death_fraction(pc),a0
-        clr.w (a0)
+        movem.l a0,-(sp)
         lea modal_death_cursor(pc),a0
         move.l MODAL_FIELD(a4),(a0)
-        movem.l (sp)+,d0/a0
+        movem.l (sp)+,a0
         rts
 modal_death_publish:
         bsr.w modal_death_native_publish
         movem.l d0-d7/a0-a6,-(sp)
-        moveq #0,d2
-        move.w modal_death_period(pc),d2
-        add.w modal_death_fraction(pc),d2
-        divu.w #50,d2
-        swap d2
-        lea modal_death_fraction(pc),a0
-        move.w d2,(a0)
-        swap d2
-        andi.l #$ffff,d2
+        moveq #3,d2
         move.l MODAL_FIELD(a4),d3
         subq.l #1,d3
 .wait:
@@ -521,6 +504,4 @@ modal_death_publish:
 .done:
         movem.l (sp)+,d0-d7/a0-a6
         rts
-modal_death_period: dc.w 150
-modal_death_fraction: dc.w 0
 modal_death_cursor: dc.l 0

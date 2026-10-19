@@ -72,7 +72,7 @@ def check(build,variant,model):
      assert c.reg(8)==STACK+4
      elapsed=(c.get(field,4)-0xfffffff0)&0xffffffff
      ticks=100 if stage==0 else 85
-     assert (ticks*rate*3+49)//50<=elapsed<=max((ticks*rate*3+49)//50,ticks*gap)+2*gap,(stage,rate,gap,elapsed)
+     assert ticks*3<=elapsed<=max(ticks*3,ticks*gap)+2*gap,(stage,rate,gap,elapsed)
      if gap==1:assert any(x[0]==y[0] and x[1:]!=y[1:] for x,y in zip(state['samples'],state['samples'][1:])),state['samples'][:30]
      rows.append(dict(stage=stage,rate=rate,gap=gap,fields=elapsed,pictures=len(state['samples'])))
   for stage in range(2):

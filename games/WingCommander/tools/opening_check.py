@@ -91,6 +91,13 @@ def check(build, variant):
                 skip[0]=True;polls[0]=0;run('opening_tick_input');skip[0]=False
                 require(c.reg(9)==1 and polls[0]==1,'skip delayed')
                 c.write(field,long(epoch));run('opening_rebase')
+                for step in range(1,21):
+                    run('opening_fireworks_input')
+                    require(c.get(field,4)==(epoch+step*3)&0xffffffff,'fireworks cadence')
+                    require(c.get(count)==1,'fireworks countdown')
+                skip[0]=True;polls[0]=0;run('opening_fireworks_input');skip[0]=False
+                require(c.reg(9)==1 and polls[0]==1,'fireworks skip delayed')
+                c.write(field,long(epoch));run('opening_rebase')
                 samples=[]
                 for elapsed in range(1,hz*2+1):
                     c.write(field,long(epoch+elapsed));run('opening_separation_sample')

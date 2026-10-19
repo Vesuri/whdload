@@ -47,12 +47,12 @@ def check(build,variant,model):
      got=run(rate,gap,start)
      assert got['frames']==native['frames'] and got['draws']==native['draws'],got
      assert got['stack']==STACK+4
-     assert got['fields']==max(8*rate*3//50,8*gap),got
+     assert got['fields']==max(24,8*gap),got
      rows.append(dict(rate=rate,gap=gap,start=start,fields=got['fields']))
    got=run(rate,1,123,3)
    assert got['frames']==[0,1,2] and got['aborted']==1,got
    # Re-entry after a skip must discard the old deadline.
-   assert run(rate,1,10000)['fields']==8*rate*3//50
+   assert run(rate,1,10000)['fields']==24
   return dict(model=model,native_fast_control_fields=native['fields'],schedules=rows,abort_and_reentry=True)
  finally:c.close()
 

@@ -52,16 +52,15 @@ def check(build,variant,model,respawn=False):
   for hz in (50,60):
    for gap in (1,3):
     state.update(hz=hz,gap=gap);c.write(DATA,initial);calls.clear();salutes.clear()
-    c.write(SLAVE+sy['funeral_fraction'],word(0))
     c.write(field,long(0xfffffffc))
     c.run(start)
     final=bytearray(c.read(DATA,v.HUNKS[1][2]));reference=bytearray(expected)
     at=field-DATA;final[at:at+4]=reference[at:at+4]
     assert final==reference,('state leak',[(hex(i),a,b) for i,(a,b) in enumerate(zip(final,reference)) if a!=b][:20])
     x=-1 if respawn else 100
-    want=[x&65535]+[(x-int(10*f/((hz*3//50))))&65535 for f in range(gap,(hz*3//50),gap)]
+    want=[x&65535]+[(x-int(10*f/((3))))&65535 for f in range(gap,(3),gap)]
     assert calls==want,(hz,gap,calls,want)
-    want_salutes=[(100,80)]+[(100-int(6*f/(hz*3//50)),80-int(6*f/(hz*3//50))) for f in range(gap,hz*3//50,gap)]
+    want_salutes=[(100,80)]+[(100-int(6*f/(3)),80-int(6*f/(3))) for f in range(gap,3,gap)]
     assert salutes==want_salutes,(salutes,want_salutes)
     rows.append(dict(hz=hz,gap=gap,positions=calls[:],state_restored=True))
   return dict(model=model,respawn=respawn,rows=rows)

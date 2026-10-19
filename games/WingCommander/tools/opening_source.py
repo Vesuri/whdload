@@ -17,7 +17,7 @@ def specification(variant):
     shift=0xba if variant=='ocs' else 0
     stages=[(o-shift,w,n) for o,w,n in STAGES]
     patches=[(o,w,'opening_stage_'+n,0x4ef9) for o,w,n in stages]
-    patches += [(o-shift,6,'opening_tick_input',0x4eb9) for o in TICKS]
+    patches += [(o-shift,6,'opening_fireworks_input' if o in (0x13de,0x14d8) else 'opening_tick_input',0x4eb9) for o in TICKS]
     patches += [(0x1194-shift,10,'opening_separation_sample',0x4eb9),
                 (0x11ca-shift,6,'opening_flight_prepare',0x4eb9),
                 (0x129a-shift,6,'opening_flight_sample',0x4eb9)]

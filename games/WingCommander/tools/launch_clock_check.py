@@ -101,17 +101,17 @@ def check(build,variant,model):
      call('launch_exterior_wait',{9:stage,11:tick})
      samples=shown[first:]
      for index,sample in enumerate(samples):
-      elapsed=(start+index)*50-tick*rate*3
+      elapsed=(start+index)*50-tick*150
       if stage<2:
-       assert sample[0]==96+4*elapsed//(rate*3),('ship X',stage,elapsed,sample)
-       expected_y=52-2*elapsed//(rate*3) if stage==0 else 50
+       assert sample[0]==96+4*elapsed//150,('ship X',stage,elapsed,sample)
+       expected_y=52-2*elapsed//150 if stage==0 else 50
        assert sample[1]==expected_y,('ship Y',stage,elapsed,sample,expected_y)
      # Only the isolated field clock can differ; presentation poses restore.
      after=bytearray(c.read(data,len(before)));f=field-data;after[f:f+4]=before[f:f+4]
      assert after==before,'exterior state leaked'
-    assert c.get(field,4)-100==(steps*rate*3+49)//50
+    assert c.get(field,4)-100==steps*3
     if stage<2:assert len({r[0] for r in shown})>=3
-    rooms.append(dict(hz=rate,stage=stage,fields=(steps*rate*3+49)//50,pictures=len(shown)))
+    rooms.append(dict(hz=rate,stage=stage,fields=steps*3,pictures=len(shown)))
   return dict(model=model,rejected_hooks=4,schedules=schedules,projections=projections,exterior=rooms,abort=True)
  finally:c.close()
 

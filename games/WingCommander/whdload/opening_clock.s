@@ -1,6 +1,6 @@
 ; Shared opening motion policy. Variant offsets and displaced instructions are
 ; generated from pinned inputs into tmp/, never copied into this source.
-; Animation/script steps are 10 Hz. Pure zoom parameters are sampled per field.
+; Orchestra steps are 10 Hz, fireworks every three fields. Zooms sample per field.
 opening_begin:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w timing_rate
@@ -28,17 +28,22 @@ opening_rebase:
 
 ; Keep input polling responsive while waiting; do not advance a native script
 ; index, consume RNG or allocate a particle on a presentation-only field.
+opening_fireworks_input:
+        movem.l d1-d7/a0-a6,-(sp)
+        moveq #3,d2
+        bra.s opening_tick_wait
 opening_tick_input:
         movem.l d1-d7/a0-a6,-(sp)
+        moveq #0,d2
+        move.w opening_hz(pc),d2
+        divu.w #10,d2
+opening_tick_wait:
 .wait:
         bsr.w opening_input_native
         tst.w d0
         bne.s .done
         move.l OPEN_FIELD(a4),d1
         sub.l opening_cursor(pc),d1
-        moveq #0,d2
-        move.w opening_hz(pc),d2
-        divu.w #10,d2
         cmp.l d2,d1
         bcs.s .wait
         lea opening_cursor(pc),a0
