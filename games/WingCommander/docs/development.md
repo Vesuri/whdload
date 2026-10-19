@@ -5206,3 +5206,21 @@ PAL and NTSC both use three fields per update (50/3 and 20 updates/s).
 Fireworks and bar/barracks use the same cadence; orchestra and opening zooms
 retain their prior 10 Hz clock, and room cursor input remains 25 Hz. These checks cover native state
 restoration and intermediate movement; live visual acceptance remains pending.
+
+### Briefing crowd timing
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/crowd3b-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/crowd3b-ocs
+for variant in cd32 ocs; do
+  python3 tools/briefing_clock_check.py "$variant" "tmp/crowd3b-$variant" --output "tmp/crowd3b-check-$variant"
+  python3 tools/modal_clock_check.py "$variant" "tmp/crowd3b-$variant" --output "tmp/crowd3b-modal-$variant"
+done
+python3 tools/timing_adapter_check.py tmp/crowd3b-cd32 --output tmp/crowd3b-install
+python3 tools/ocs_options_check.py tmp/crowd3b-ocs --output tmp/crowd3b-options
+```
+
+Use fresh output directories on reruns. The crowd fixture compares native frame
+and actor calls against paced calls; it does not replace watching both briefing
+transitions through normal campaign flow.

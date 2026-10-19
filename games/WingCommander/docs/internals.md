@@ -8159,3 +8159,28 @@ with the same view, and accept fresh endpoints on the following tick.
 CD32 68020/68040 and OCS 68000/68020 functional models pass, alongside existing
 camera and asteroid/mine-shot checks. This is functional CPU coverage, not a
 new interactive sweep of every scene or a performance measurement.
+
+## Briefing crowd animation cadence
+
+The enhanced briefing crowd sequences publish one picture every three display
+fields (50/3 updates/s PAL, 20 NTSC). Native frame order, actor scripts, RNG,
+input polling and cleanup remain in place. Only the three publication calls are
+wrapped; the first iteration rebases the deadline before native publication,
+excluding loading and initial drawing time. Subsequent overruns retain debt.
+Original/off/ineligible installation is unchanged.
+
+| Crowd loop | OCS publication H0 / file | CD32 publication H0 / file |
+|---|---|---|
+| Eight actors, 22 frames | `230da / 23106` | `23f3c / 23f68` |
+| Eight actors, 40 passes with individual activation | `23340 / 2336c` | `241a2 / 241ce` |
+| Alternate fourteen actors, 22 frames | `1c474 / 1c4a0` | `1d19e / 1d1ca` |
+
+`briefing_clock_check.py` executes all three native loops, intercepting graphics,
+actor drawing, random choices and input/field delivery. Enhanced and original
+bitmap arguments, actor arguments and stack results match on CD32 CPU models 2/4
+and OCS 1/2. The paced loops take 66, 120 and 66 fields without rendering overruns.
+Wrap, nine-field rendering stalls, native skip behavior and fresh entry pass.
+The alternate fourteen-actor loop retains its original end-of-loop input polling;
+no new per-frame skip semantics are introduced. Modal revision guards, whole-hunk
+CD32 installation and OCS option/hardware checks pass. These are functional CPU
+checks; live visual acceptance remains pending.

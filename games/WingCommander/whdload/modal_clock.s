@@ -505,3 +505,24 @@ modal_death_publish:
         movem.l (sp)+,d0-d7/a0-a6
         rts
 modal_death_cursor: dc.l 0
+
+; Briefing crowd scripts: retain native frames and input/cleanup ordering.
+; Rebase at the first publication, excluding setup and its initial drawing cost.
+modal_crowd_rebase:
+        move.l a0,-(sp)
+        lea modal_crowd_cursor(pc),a0
+        move.l MODAL_FIELD(a4),(a0)
+        movea.l (sp)+,a0
+        rts
+modal_crowd_wait:
+        movem.l d0/a0,-(sp)
+.loop:
+        move.l MODAL_FIELD(a4),d0
+        sub.l modal_crowd_cursor(pc),d0
+        cmpi.l #3,d0
+        bcs.s .loop
+        lea modal_crowd_cursor(pc),a0
+        addq.l #3,(a0)
+        movem.l (sp)+,d0/a0
+        rts
+modal_crowd_cursor: dc.l 0

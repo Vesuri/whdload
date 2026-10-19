@@ -4,7 +4,8 @@
 
 Selected bitmap scripts use three display fields per update (50/3 Hz PAL,
 20 Hz NTSC): fireworks, bar/barracks, running pilots, exterior cockpit entry,
-carrier return/hangar, cockpit death reaction and funeral. Existing motion
+carrier return/hangar, cockpit death reaction, funeral and briefing crowd
+sit/stand sequences. Existing motion
 smoothing is retained; cursor input remains 25 Hz.
 
 The pilot covering his eyes before the ship explosion now plays its eight native
