@@ -2595,9 +2595,10 @@ The final native checks are retained under `tmp/phase9-final-*check/`,
 `tmp/phase9-flight-final-{install,input,modal}/` and the candidate check directories.
 The unmodified reconstruction still matches the original slave SHA-256 exactly.
 
-Remaining limits: native free/external camera mode 8 and scripted/death cameras
-retain their original world cadence. World-object presentation is covered by the
-phase-10 gate below.
+External-camera controllers retain native world cadence; their presentation now
+uses [external camera sampling](#external-flight-camera-presentation). Scripted
+camera presentation is covered by the individual cinematic sections.
+World-object presentation is covered by the phase-10 gate below.
 Complete comms, missile-lock, ordinary-damage, autopilot/landing/campaign and
 physical mouse/pad play-throughs remain release coverage. Native modal wrappers
 prove the clock boundary, not every mission outcome. Original point-sampled
@@ -2630,7 +2631,9 @@ order, through `E:2acb2/2acf2/2ad32` (files `2acde/2ad1e/2ad5e`). Their basis
 rebuild `E:2bb30` (file `2bb5c`) retains native fixed-point orthogonality rather
 than linearly blending matrix components. Player orientation remains phase 9's
 elapsed-field result. Ordinary camera modes 0–3 are rebuilt from the staged
-player pose; script/death/external-camera paths are not extrapolated.
+player pose. External views use the separate
+[render sampler](#external-flight-camera-presentation); scripted/death cameras
+use their individual cinematic adapters.
 
 First snapshots, modal rebases, view changes, changed class/model/action and
 lifetime reloads snap. A per-axis change differing from the prior velocity by
@@ -7955,3 +7958,69 @@ Validated slave SHA-256 values:
 
 - CD32: `346ba15df4eccd8a8d5afddf66c6d4ff42826f478ecc3e1533a162645cd439d5`.
 - OCS: `6d151abd88ab075d989e94027374321662af541676111297d54874ff55f27392`.
+
+## External flight camera presentation
+
+Enhanced flight now admits the player-accessible external modes 4, 6, 7, 8 and
+14 to world-object prediction. F5 selects chase mode 4; F6 selects mode 14;
+F7 uses target mode 7; F8 enables missile-follow mode 6 when a missile launches;
+F9 cycles subjects, with capitals selecting mode 8. The native camera dispatcher
+is `E:680e` / `O:6584` (files `683a` / `65b0`), with mode tables at
+`E:707a` / `O:6df0` (files `70a6` / `6e1c`). These routines are not safe to
+repeat per picture: chase integration, missile expiry and camera selection have
+world-owned side effects.
+
+`timing_external.s` samples each completed native camera position and its three
+basis vectors. Intermediate pictures extrapolate the difference between the
+last two endpoints, using the same bounded world/render horizon (one tick plus
+at most two display fields), without calling the dispatcher.
+The existing slot-61 render backup restores every camera component before
+input, geometry or simulation. Ships use the ordinary bounded world predictor;
+mode 8 also predicts the player rotation that remains native-tick-owned in that
+view. Ordinary cockpit cameras still rebuild directly from the field-updated
+player basis. Intro and cinematic camera paths remain separate.
+
+Camera history cuts on first observation, invalid world history, view/subject
+changes, script ownership or a camera pose modified outside its snapshot.
+Selectors are A4-relative: view `-18280/-18318`, subject `-18296/-18334`, missile
+`-18278/-18316`, player target byte `5468/3306` and chase toggle byte
+`-32109/-32085` (CD32/OCS respectively). Position, forward/up/right vectors use
+slot 61 in the verified variant arrays. Overflow, a position jump exceeding
+`$100000` fixed-point units on an axis or a basis-component change exceeding
+256 rejects the interval. These are presentation cuts, not collision rules.
+The basis forecast is a short linear component extrapolation; abrupt tracking
+changes can still correct at the next native tick. No AI, missile timer, camera
+controller or target-selection operation advances with display throughput.
+
+`external_camera_check.py` executes the original dispatcher to generate moving
+endpoints for every admitted mode, then checks seven distinct intermediate
+camera poses per interval at PAL and NTSC rates. CD32 020/040 and OCS 000/020
+CPU models pass 280 samples in total, with whole-game-data restoration,
+subject/teleport/unsupported-mode cuts and a disabled-sampler negative control. OCS 000 is an ISA check; public 000
+systems still select original behavior. Existing afterburner/cockpit checks
+pass 288 samples; release checks pass 196 CD32 option/cache cases, 54 converter
+outputs, 270 pacing/output cases and 1,680 OCS option/hardware cases. Original
+reconstructions remain byte-identical. Evidence is under
+`tmp/external5-{cd32-final-check,ocs-final-check,options}` and
+`tmp/external5-release.json`; cockpit/afterburner regressions are in
+`tmp/external4-{afterburn-cd32,afterburn-ocs}`.
+
+Final live evidence: `tmp/external5-live-cd32/` and
+`tmp/external5-live-ocs/`, A1200-030 with Cache (OCS 4 MiB Fast). Both runs use
+normal keyboard entry through simulator/name, rooms, briefing and launch; no
+mission or target state is injected. Sixteen successive rendered poses per view
+show camera movement within unchanged world ticks in modes 4, 14 and 6, including
+F9's moving fighter. The mode-8 carrier and camera are stationary in this window;
+its moving-pose sampling is CPU-tested. F7 remained mode 0 because no eligible
+target was selected in these short runs, so mode 7 has CPU coverage only.
+`external-samples.json` and `target-samples.json` retain this distinction.
+Returning to F2/F3 preserves the cockpit. This is a functional motion check,
+not a frame-rate or hardware-performance claim.
+
+Final slaves: CD32 187,320 bytes, SHA-256
+`1523d61480569b99a2545419e868a2bd157bf8829def9ea2be4fcbada7a3f35d`;
+OCS 61,108 bytes, SHA-256
+`d6ae0cafc8980df417a3602760840287472469de9b6cac61298353419479c2ae`.
+The initial live candidate exposed a one-picture hold from a camera-only
+one-tick clamp; the final common horizon removes it. Final samples explicitly
+include motion from fraction 50 to 60 with the same world counter.

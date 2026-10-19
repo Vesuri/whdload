@@ -8,7 +8,7 @@ import re
 
 UNITS = ('timing', 'timing_clock', 'timing_player', 'timing_input',
          'timing_presentation', 'timing_scene', 'timing_intro',
-         'timing_translation', 'timing_projectiles', 'timing_scene_slots',
+         'timing_external', 'timing_translation', 'timing_projectiles', 'timing_scene_slots',
          'view_regions', 'release_buffer', 'frame_stats')
 INDEX = re.compile(r'(?P<disp>\$[0-9a-f]+|-?\d+)?\((?P<base>a[0-6]),(?P<index>d[0-7])\.(?P<size>[wl])(?:\*(?P<scale>[1248]))?\)', re.I)
 FAR = re.compile(r'(?P<disp>WC_NATIVE_[A-Z_]+|\$[0-9a-f]+|\d+)\((?P<base>a[0-6])\)', re.I)

@@ -210,6 +210,9 @@ timing_scene_snapshot:
         ifne BUFFERED
         bsr.w   projectile_reset
         endif
+        ifne BUFFERED
+        bsr.w   timing_external_snapshot
+        endif
         lea     timing_scene_snapshot_data(pc),a1
         lea     timing_scene_snapshot_ranges(pc),a2
         moveq   #8,d2
@@ -342,7 +345,15 @@ timing_scene_begin:
         bne.s   .intro_view
         endif
         cmpi.w  #3,d0
-        bhi.w   .cut
+        bls.s   .flight_view
+        ifne BUFFERED
+        bsr.w   timing_external_allowed
+        tst.w   d0
+        beq.w   .cut
+        else
+        bra.w   .cut
+        endif
+.flight_view:
         tst.w   -29978(a4)
         bne.w   .cut
         cmpi.w  #12,5888(a4)
@@ -430,7 +441,10 @@ timing_scene_begin:
         bne.s   .rotate
         endif
         tst.w   d4
-        beq.w   .translate       ; player orientation already elapsed-field
+        bne.s   .rotate_player_done
+        cmpi.w  #8,-18280(a4)
+        bne.w   .translate       ; other player views already elapsed-field
+.rotate_player_done:
         ; Native axis rotations rebuild an orthogonal fixed-point basis.
         ; Angular steps are snapshots, not a second AI/controller invocation.
         ifne BUFFERED
@@ -588,6 +602,7 @@ timing_scene_begin:
         clr.w   (a0)              ; remain snapped until a new world snapshot
 .camera:
         ifne BUFFERED
+        bsr.w   timing_external_camera
         bsr.w   timing_autopilot_camera
         endif
         bsr.w   timing_player_camera

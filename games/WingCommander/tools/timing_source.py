@@ -31,6 +31,7 @@ waypoint_native_scene:
         lines.insert(-1,unit(root, 'timing_translation', v.CPU))
         lines.insert(-1,unit(root, 'timing_projectiles', v.CPU))
         lines.insert(-1,unit(root, 'timing_scene_slots', v.CPU))
+        lines.insert(-1,unit(root, 'timing_external', v.CPU))
         lines.insert(-1,unit(root, 'view_regions', v.CPU))
         lines.insert(-1,(root/'whdload/cinematic_background.s').read_text().replace(
             '        CINEMATIC_DRAW','        movea.l timing_game(pc),a0\n        jmp $2efe8(a0)'))

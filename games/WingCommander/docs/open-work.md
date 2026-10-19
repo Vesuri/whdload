@@ -2,6 +2,11 @@
 
 ## Current state
 
+Enhanced F5–F9 flight views now predict world objects and sample native camera
+motion between 10 Hz ticks in both variants. Chase controllers, target selection
+and missile lifetimes remain tick-owned. See
+[external camera presentation](internals.md#external-flight-camera-presentation).
+
 F2/F3 cockpit restoration now survives normal campaign entry and F1–F9 view
 switching in both variants. CD32 conversion histories no longer consume the
 native game pool; the public OCS pool gains 64 KiB of allocation headroom.

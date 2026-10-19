@@ -68,7 +68,7 @@ def check(build, variant, model):
     field(action+2,new);call('timing_scene_snapshot')
     require(c.get(SLAVE+sy['timing_scene_predictable']+1,1)==0,'script transition accepted')
     controls+=1
-   for off,value in ((action,4),(-18318 if ocs else -18280,8),(-29954 if ocs else -29978,1)):
+   for off,value in ((action,4),(-18318 if ocs else -18280,9),(-29954 if ocs else -29978,1)):
     field(action,-1);field(-18318 if ocs else -18280,0);field(-29954 if ocs else -29978,0)
     call('timing_scene_snapshot');call('timing_scene_snapshot')
     field(off,value);before=c.read(DATA,v.HUNKS[1][2]);call('timing_scene_begin');call('timing_scene_end')

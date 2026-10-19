@@ -33,8 +33,8 @@ side-cockpit images after normal campaign entry. The reservation applies in
 all option modes; the off path still uses original simulation and rendering.
 Legacy diagnostic builds and original reconstruction retain their old budgets.
 
-Current build: `tmp/sideview-pool-ocs/`, 60,444-byte slave, SHA-256
-`6d151abd88ab075d989e94027374321662af541676111297d54874ff55f27392`.
+Current build: `tmp/external5-ocs/`, 61,108-byte slave, SHA-256
+`d6ae0cafc8980df417a3602760840287472469de9b6cac61298353419479c2ae`.
 See [public-option validation](internals.md#ocs-public-enhanced-framerate-toggle)
 and [commands](development.md#ocs-public-enhanced-framerate-toggle).
 The user-facing [OCS ReadMe](../release/ReadMe.OCS) describes the option.

@@ -269,6 +269,8 @@ game_base: dc.l 0
                 from ocs_intro_source import source as intro_source, integrate
                 text=integrate(text)+intro_source(ROOT)
             text+=select((ROOT/'whdload/ocs_exhaust.s').read_text(),'68000')
+            from ocs_prediction_source import external_source
+            text+=external_source(ROOT)
         # Extra overwritten words are separately guarded before any mutation.
         nops=NOPS+(prediction_nops if prediction else ())+tuple(at for off,width,_,_ in MODALS for at in range(off+6,off+width,2))
         checks=''.join(f' movea.l d6,a5\n adda.l #${off:x},a5\n cmpi.w #${int.from_bytes(game[44+off:46+off],"big"):x},(a5)\n bne.w wrong_revision\n' for off in nops if off not in (0x878,0x87a,0x9c2,0x9c4))

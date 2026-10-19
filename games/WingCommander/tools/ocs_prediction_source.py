@@ -17,7 +17,8 @@ FIELDS={0x119c:0x92a,0x1d6e:0x14fc,0x1700:0xe8e,0x17f8:0xf86,
  0x245e:0x20f8,0x24de:0x252e,0x255e:0x550c,0x2bea:0x2178,
  0x2cee:0x227c,0x3b86:0x3174,0x19c0:0x114e,0x3aea:0x30d8,
  0x3b2e:0x311c,0x3b16:0x3104,0x3a54:0x3042,
- 0x3b3a:0x3128,-18280:-18318,-29978:-29954,-11354:-11224}
+ 0x3b3a:0x3128,0x155c:0xcea,-18296:-18334,-18278:-18316,
+ -32109:-32085,-18280:-18318,-29978:-29954,-11354:-11224}
 CALLS={0x2c8dc:0x2b950,0x1597e:0x156e6,0x18daa:0x183e4,0x742:0x73e,0x6fe:0x6fa,0xccda:0xca50,
  0x7c86:0x79fc,0x2acb2:0x29d26,0x2acf2:0x29d66,0x2ad32:0x29da6,
  0x2a820:0x29894,0x680e:0x6584,0x2a086:0x290fa,0x2b7f0:0x2a864,
@@ -114,4 +115,14 @@ def source(root):
 def field_source(root):
     text=adapt((root/'whdload/timing_field_shots.s').read_text())
     text=text.replace('timing_active','ocs_clock_active').replace('timing_game','game_base')
+    return select(text,'68000')
+
+
+def external_source(root):
+    text=(root/'whdload/timing_external.s').read_text()
+    text=re.sub(r'(dc.w[^\n]+)',lambda m:re.sub(r'\$[0-9a-f]+',lambda x:field(x[0]),m[0]),text)
+    text=adapt(text).replace('timing_hz','ocs_clock_hz')
+    # Placed after exhaust to retain the existing early clock-call reach.
+    # The Hz constant is beyond signed-word PC reach in the public payload.
+    text=text.replace('move.l  ocs_clock_hz(pc),d7', 'lea timing_external_camera(pc),a0\n        adda.l #ocs_clock_hz-timing_external_camera,a0\n        move.l (a0),d7')
     return select(text,'68000')

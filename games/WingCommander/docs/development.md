@@ -5078,3 +5078,31 @@ A memory-assisted check must verify that the saved cockpit allocation is
 nonzero and that CD32's `flight_history` points into the slave's
 `flight_history_storage`, rather than accepting a clean fallback-only picture.
 The history initializer must not allocate from the fixed native game pools.
+
+### External flight camera regression
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/external-candidate
+python3 tools/ocs_memory_build.py --public --output tmp/external-ocs-candidate
+python3 tools/external_camera_check.py cd32 tmp/external-candidate \
+  --output tmp/external-check
+python3 tools/external_camera_check.py ocs tmp/external-ocs-candidate \
+  --output tmp/external-ocs-check
+python3 tools/afterburn_prediction_check.py cd32 tmp/external-candidate \
+  --output tmp/external-cockpit-check
+python3 tools/afterburn_prediction_check.py ocs tmp/external-ocs-candidate \
+  --output tmp/external-ocs-cockpit-check
+```
+
+Use the normal campaign-entry procedure above with A1200-030 and Cache enabled.
+Exercise F5 chase, F6, repeated F9 subject cycling, F7 after selecting a contact
+with T, and F8 followed by Enter to launch a missile. Confirm camera and ships
+move between world ticks, then return to F1/F2/F3. A screenshot alone cannot
+prove smooth motion: a debugger observer can sample `timing_scene_end` before
+restoration, recording the native world counter, `timing_scene_fraction`,
+`external_valid` and slot-61 camera position. Require distinct positions on
+successive pictures with the same world counter and valid camera history.
+Use native keyboard input to reach views; do not inject mission or target state.
+Retain the small samples/screenshots and stop only the isolated test process;
+remove its disposable boot tree after shutdown.
