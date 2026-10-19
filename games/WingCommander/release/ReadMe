@@ -1,46 +1,122 @@
-Wing Commander CD32 2.0b (13.06.2026)
-Original slave: Psygore. CD32 improvements: Vesa Halttunen.
 
-Development candidate; release and visual acceptance remain open.
-Fast RAM is required. OCS is a separate, unchanged project target.
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
-CUSTOM1 selects language: 0 English (default), 1 German.
-CUSTOM5 selects the mode:
-  0 Enhanced (default, also used when the option is unset)
-  1 Psygore normal
-  2 Psygore unlimited
-  3 Psygore relaxed
-  4 Psygore slow
+ This install applies to "Wing Commander" (c) 1994 Origin.
+ Disk versions (SPS #824 and #1657) and the CD32 Dangerous Streets /
+ Wing Commander compilation are supported in English and German.
+ Original install: Psygore. Version 2.0b improvements: Vesa Halttunen.
 
-The numbering has changed: Psygore's old CUSTOM5 values 0..3 are now 1..4.
-His old value 4 (blitter conversion) is removed. Update existing tooltypes;
-an old CUSTOM5=1 now means Psygore normal, not unlimited.
-CUSTOM1 is language only; the experimental CUSTOM1=2/3 switches do not
-apply to this candidate. Separate experimental builds retain their old options.
+ Requirements:
+ -------------
+ WHDLoad 17 or newer and xfddecrunch must be available in the command path.
+ xfddecrunch is supplied by the XFD package (aminet:util/pack/xfdmaster.lha).
+ Use Expert installation mode to select a floppy drive other than DF0:.
 
-Enhanced English flight runs its world at 10 updates/s and renders without
-Psygore's frame cap. Completed pictures are queued for early vertical blank;
-FAST-RAM drawing overlaps the pending swap. With two display buffers, conversion
-waits only until its target is no longer the front buffer. Actual frame rate
-depends on the machine and scene. Object prediction targets the field in which
-the queued picture is displayed. The English ship/title and asteroid intro also uses a 10 Hz world clock,
-with ships, asteroids and its scripted camera predicted between updates. Music
-and credit-text deadlines are unchanged. The separate Origin logo animation
-and other nonflight scenes retain their native timing and normal limiter.
-German with CUSTOM5=0 falls back to Psygore normal until it is ported.
-CUSTOM5=1..4 retain Psygore's original simulation and rendering in both languages.
+ Disk/OCS: 512 KB Chip RAM and 1 MB other RAM, plus about 2.5 MB for PRELOAD.
+ CD32/AGA: 640 KB Chip RAM and 1.4 MB other RAM, plus about 4.1 MB for PRELOAD.
+ Additional free memory is needed for WHDLoad and the enhanced renderer.
+ For enhanced play, use a 68020 or better with Fast RAM. The tested OCS
+ configuration starts at 512 KB Chip RAM and 4 MB Fast RAM including PRELOAD.
+ Rendering speed depends on the processor and scene; 50 FPS is not guaranteed.
 
-Enhanced English preserves WHDLoad's cache choices. Use WHDLoad CACHE/DCACHE
-options to enable caches as appropriate; the enhanced mode does not enable
-them itself. Psygore modes retain his original cache request.
-CUSTOM2 (cheats), CUSTOM3 (system), CUSTOM4 (mission) are unchanged.
+ The OCS slave requires an A500 Kickstart 1.3 image:
+   Devs:Kickstarts/kick34005.A500
+   Devs:Kickstarts/kick34005.A500.RTB
+ The CD32 slave requires an A1200 or A4000 Kickstart 3.1 image:
+   Devs:Kickstarts/kick40068.A1200 and kick40068.A1200.RTB, or
+   Devs:Kickstarts/kick40068.A4000 and kick40068.A4000.RTB
+ Supply your own ROM image, extracted using GrabKick or a similar tool.
+ The matching RTB files are available in aminet:util/boot/skick346.lha.
+ WHDLoad rejects an incorrect or altered ROM image.
 
-The reported cached-040 horizontal-row glitches were fixed in the shared
-FS-UAE emulator; use a build with the MMU write-cache correction.
-Known gaps:
-Controlled player velocity and position now advance every elapsed field.
-Ship forecasts now follow predicted headings through the native thrust/inertia
-model. Unexpected AI speed changes can still cause position corrections.
-Rendering overruns still need further work.
-Real 040 performance is uncalibrated. Controls, campaign/save coverage and
-final release play-testing remain open. No release archive is approved yet.
+ Installation:
+ -------------
+ Run Install and select the disk or CD32 edition. The disk installer requests
+ WingDisk1, WingDisk2 and WingDisk3, identifies English/German, and unpacks the
+ executable. The CD32 installer copies Wingco from the disc named Bundle: and
+ unpacks both language executables. Keep the two editions in separate drawers.
+ Existing destination drawers are preserved; choose a new destination instead.
+ Manual and QuickDocEN/DE/FR/IT are included, together with the original icons.
+
+ Features and options:
+ ---------------------
+ Quit with '*' (PrtSc), or select another key using WHDLoad's QUITKEY tooltype.
+ The installed icon enables enhanced mode and DCACHE by default. NOCACHE can
+ be used to disable caching. Enhancements currently support English only;
+ German uses original behaviour. Enhanced OCS supports SPS #1657 only.
+
+ CUSTOM1: 0 = English, 1 = German.
+ CUSTOM2: 0 = cheats off, 1 = cheat mode, 2 = invincible cheat mode.
+ In cheat mode hold SHIFT and press:
+   F1  music on/off                 F6  self-destruct
+   F2  sound effects on/off         F7  cockpit damage graphics
+   F3  video images on/off          F8  game information
+   F4  message speed                F9  pause for screenshots
+   F5  destroy locked target        F10 eject
+ CUSTOM3 selects a system (cheat mode required):
+   0 Default       1 Enyo          2 McAuliffe       3 Gateway
+   4 Gimle         5 Brimstone     6 Chengdu         7 Dakota
+   8 Port Hedland  9 Kurasawa     10 Rostov         11 Hubble's Star
+  12 Venice       13 Hell's Kitchen
+ CUSTOM4: 0 = mission 1, 1 = mission 2, 2 = mission 3 (cheat mode required).
+
+ OCS CUSTOM5:
+   1 = Enhanced framerate (68020+Fast RAM), enabled in the installed icon.
+   0 or unset = original timing and rendering.
+ A 68000/68010 or a machine without suitable Fast RAM always uses original
+ behaviour, regardless of this option. Slow expansion RAM does not qualify.
+
+ CD32 CUSTOM5:
+   0 or unset = Enhanced (English); German uses Psygore normal.
+   1 = Psygore normal        2 = Psygore unlimited
+   3 = Psygore relaxed       4 = Psygore slow
+ Original simulation and rendering remain available with modes 1-4.
+ When updating an old icon, note that the 1.0 modes 0-3 are now numbered 1-4.
+ The old CUSTOM5=4 original-conversion option has been removed.
+
+ History:
+ --------
+ Version 2.0b (19.10.2026) by Vesa Halttunen:
+ - Optional enhanced framerate with smoother flight, cameras and ship effects.
+ - Consistent game speed on faster processors and smoother cinematic movement.
+ - Retimed intro, room, briefing, launch, landing, death and funeral animations.
+ - Improved projectile appearance and asteroid/mine hit detection.
+ - Waypoint markers remain visible in front of nebulae.
+ - More responsive room controls with limited cursor speed.
+ - Enhanced mode and caches enabled in newly installed icons; original modes
+   remain available.
+
+Version 1.0 (11.01.2014) by Psygore:
+ - Nice color/newicon (created by Frank/Dr.Zarkov) and BoxIcon included
+ - Some accesses fault patched
+ - CD32 hardware chunky to planar (AKIKO chipset) replaced by software
+ - Bugs in music replay routine fixed (thanks to Don Adan for the info)
+ - Lowlevel and nonvolatile libraries functions patched
+ - Manual and quick doc included
+ - Quit with '*' (PrtSc)
+
+ Credits:
+ --------
+ Psygore: original 1.0 slaves and installer.
+ Vesa Halttunen: 2.0b improvements.
+ Frank and Dr.Zarkov: original colour/NewIcons; original BoxIcon included.
+ Tony Aksnes: original disks and CD32 version.
+ Don Adan: information used for the original music replay fixes.
+ Kalms: chunky-to-planar conversion routines used by the enhanced renderer.
+
+ Contact:
+ --------
+ This is a beta; final campaign and hardware compatibility testing is ongoing.
+ For install updates and the bug-report form, visit https://www.whdload.de/.
+ Report 2.0b issues to Vesa Halttunen <vesuri@jormas.com>; include the game
+ edition/language, CPU, memory, WHDLoad version and tooltypes.
+ Psygore's original contact: psygore@whdload.de.
+ The full WHDLoad package and other installs are also available on Aminet:
+   dev/misc/whdload#? and game/patch/.

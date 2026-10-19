@@ -23,9 +23,12 @@ def check(build, mutation=None):
             'expansion reservation/pool mismatch')
     for i,(old,new) in enumerate(zip(original,payload)):
         require(old==new or 0x20<=i<0x24 or 0x1fe<=i<0x202 or
-                0x32<=i<0x34 or 0x11c6<=i<0x11ce,
+                0x28<=i<0x2a or 0x32<=i<0x34 or 0x11c6<=i<0x11ce,
                 'unexpected change to original slave, including cache/wait paths')
     require(hashlib.sha256(blob).hexdigest()==meta['sha256'],'stale build metadata')
+    info=int.from_bytes(payload[0x28:0x2a],'big')
+    require(payload[info:].startswith(b'2.0b (19.10.2026)\n'), 'public release information missing')
+    require(b'$VER: WingCommander 2.0b (19.10.2026)\0' in payload, 'public version missing')
     config=int.from_bytes(payload[0x32:0x34],'big')
     require(payload[config:].split(b'\0',1)[0].endswith(b'C5:B:Enhanced framerate (68020+Fast RAM);'),'public config missing')
     if mutation:

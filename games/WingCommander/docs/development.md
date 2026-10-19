@@ -2207,7 +2207,7 @@ AMIGA_SETUP=a1200-040 WHD_ARGS='CUSTOM1=0 CUSTOM5=0 CACHE DCACHE' \
 ## C1: prediction at the displayed field
 
 Build from the C1 commit, preserving unrelated work separately. The normal
-candidate stays 2.0b (13.06.2026). All outputs and recordings remain below `tmp/`.
+candidate stays 2.0b (19.10.2026). All outputs and recordings remain below `tmp/`.
 
 ```sh
 . amiga/env.sh
@@ -5224,3 +5224,31 @@ python3 tools/ocs_options_check.py tmp/crowd3b-ocs --output tmp/crowd3b-options
 Use fresh output directories on reruns. The crowd fixture compares native frame
 and actor calls against paced calls; it does not replace watching both briefing
 transitions through normal campaign flow.
+
+## Template-based release installer
+
+`release/ReadMe` and `release/Install` adapt the shared WHDLoad Install Template.
+The input fingerprints are in `manifest/install-template.tsv`; template paths
+are relative to `WHDLOAD`. Psygore's pinned installer supplies the WingDisk1-3
+copy filters, German executable detection, Bundle:Wingco CD32 files, unpacking,
+original icons, Manual and QuickDocEN/DE/FR/IT. The old QuickDocED/QuickDocIt
+spelling is corrected. The combined ReadMe also supplies the OCS build's ReadMe.
+Both enhanced slaves report 2.0b (19.10.2026); original reconstruction is untouched.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/release-docs2-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/release-docs2-ocs
+python3 tools/release_install.py --cd32 tmp/release-docs2-cd32 --ocs tmp/release-docs2-ocs --output tmp/release-docs-package
+python3 tools/release_check.py tmp/release-docs2-cd32 --output tmp/release-docs-cd32-check
+python3 tools/ocs_options_check.py tmp/release-docs2-ocs --output tmp/release-docs-ocs-check
+```
+
+The staging tool checks pinned input archives, script parentheses/procedures,
+ReadMe/slave version agreement and build hashes. It copies only installer assets,
+documentation and the two slaves to a fresh directory, with a file-hash report;
+no game data or ROM is included. The installer enables DCACHE and the appropriate
+variant's enhancement tooltype, and refuses an existing destination to preserve
+saves. The template's media/drive handling and icon selection remain available.
+Amiga Installer execution from floppy/CD media remains an interactive release
+check; structural/package checks are not evidence of that execution.

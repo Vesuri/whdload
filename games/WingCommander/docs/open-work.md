@@ -2,6 +2,12 @@
 
 ## Current state
 
+Release ReadMe/Install now follow the WHDLoad templates, retaining Psygore's
+original media handling, documentation, options and credits. Both enhanced
+slaves identify as 2.0b (19.10.2026). Installer structure/package and release
+option checks pass; interactive media installation and release acceptance
+remain open.
+
 Selected bitmap scripts use three display fields per update (50/3 Hz PAL,
 20 Hz NTSC): fireworks, bar/barracks, running pilots, exterior cockpit entry,
 carrier return/hangar, cockpit death reaction, funeral and briefing crowd

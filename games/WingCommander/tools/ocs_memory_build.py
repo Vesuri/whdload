@@ -342,6 +342,7 @@ view_probe_request: dc.l 0
         config=original[32+0xf81:].split(b'\0',1)[0].rstrip(b';')
         config+=b';C5:B:Enhanced framerate (68020+Fast RAM);\0'
         options=(ROOT/'whdload/ocs_options.s').read_text()
+        options+='\nocs_public_info: dc.b "2.0b (19.10.2026)",10,"Original slave: Psygore",10,"Improvements: Vesa Halttunen",0\nocs_public_version: dc.b "$VER: WingCommander 2.0b (19.10.2026)",0\n even\n'
         options+='\nocs_public_config: dc.b '+','.join(str(x) for x in config)+'\n even\n'
         text=text.replace('display_create_checked:',options+'\ndisplay_create_checked:',1)
     if public:
@@ -386,6 +387,8 @@ view_probe_request: dc.l 0
     if public:
         require(sy['ocs_public_config'] < 65536, 'public configuration offset overflow')
         struct.pack_into('>H',payload,0x32,sy['ocs_public_config'])
+        require(sy['ocs_public_info'] < 65536, 'public info offset overflow')
+        struct.pack_into('>H',payload,0x28,sy['ocs_public_info'])
         # Normal campaign entry can fragment both native pools enough to
         # reject the 42511-byte side-cockpit image. Keep its native ownership
         # and cleanup, supplying one extra 64 KiB of game-pool headroom.
@@ -401,6 +404,7 @@ view_probe_request: dc.l 0
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
                 public_option=public,opening=public,
+                version='2.0b' if public else None, release_date='19.10.2026' if public else None,
                 expansion_bytes=0x100000 if public else 0xf0000,
                 game_pool_bytes=0xc0000 if public else 0xb0000,
                 workspace='native combined Chip allocation retained for fallback',

@@ -2928,7 +2928,7 @@ all other choices keep language 0/1 and cannot install the English timing patche
 at `S:14da` (file `$14fa`). Enhanced mode uses the existing zero-mask SetCPU query,
 preserving WHDLoad policy; it does not enable caches. The header's name, info and
 configuration pointers at `S:24/28/32` (file `$44/48/52`) identify the candidate
-and its new public options. Version remains **2.0b (13.06.2026)**.
+and its new public options. Version remains **2.0b (19.10.2026)**.
 
 At conversion entry `S:178a` (file `$17aa`), enhanced active flight bypasses
 Psygore's TOD limiter `S:17b8` (file `$17d8`). This applies both to changed-block
@@ -3344,7 +3344,7 @@ previous scoped check; C2 does not change conversion, buffers or cache policy.
 Normal candidate: 39820 bytes, SHA-256
 `c45d7bd9b88b923319fca4ff2cdb0dcf902646d6702b245db6034be3b59de385`.
 The recorder fixture is `tmp/c2-frames`, pinned by its post-adaptation build
-manifest. Version remains 2.0b (13.06.2026). Stop before C3.
+manifest. Version remains 2.0b (19.10.2026). Stop before C3.
 
 
 ## Phase 11b heading-aware extrapolation: C3 gate complete
@@ -3711,7 +3711,7 @@ The final normal release is 40,928 bytes, SHA-256
 `c7fe5c1ea7acb9363a3042330be07a9f7d3c8de36306f895f7240bc845b46fe5`.
 The final Nav-1 frame fixture is 41,796 bytes, SHA-256
 `17bbb088e900e279b175b188e96f497cdc1d9cb58241d09d4ca8d2cffba700e3`.
-Version remains **2.0b (13.06.2026)**. Derived builds and evidence stay in `tmp/`.
+Version remains **2.0b (19.10.2026)**. Derived builds and evidence stay in `tmp/`.
 
 ### Model costs, displayed rates and remaining gaps
 
@@ -3835,7 +3835,7 @@ Nav-1 recorder fixture: 42,260 bytes, SHA-256
 `df0c38d40fe196f25d72034d0e33be3f7f65c3f9c1bbffde1b52d84f3d0a9036`.
 The equal-size native-path control has SHA-256
 `d035c57fca33d87a7e9d83b017efad8cdc1ddd9cde20019f596dc5fc700c7812`;
-only its two fallback branch bytes differ. Version remains **2.0b (13.06.2026)**.
+only its two fallback branch bytes differ. Version remains **2.0b (19.10.2026)**.
 
 The observer binary and machine/cache models are unchanged from D1/D2. The
 030 uses the baseline MMU model with `CACHE DCACHE`; the cycle-exact 040 uses
@@ -4007,7 +4007,7 @@ The 42260-byte Nav-1 recorder fixture has SHA-256
 `75582cc7c4564329ad7d0455ceda4d5e440e75099a2effb1a2275e2abc393da4`;
 its D3 control is
 `df0c38d40fe196f25d72034d0e33be3f7f65c3f9c1bbffde1b52d84f3d0a9036`.
-Version remains **2.0b (13.06.2026)**. Phase 12 and its saved stash remain untouched;
+Version remains **2.0b (19.10.2026)**. Phase 12 and its saved stash remain untouched;
 OCS work is not started.
 
 ## Phase 11b Kalms families: D5 model evaluation complete

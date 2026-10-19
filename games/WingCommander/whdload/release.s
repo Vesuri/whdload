@@ -39,11 +39,11 @@ release_limit:
 release_name:
         dc.b 'Wing Commander CD32',0
 release_info:
-        dc.b '2.0b (13.06.2026)',10
+        dc.b '2.0b (19.10.2026)',10
         dc.b 'Original slave: Psygore',10
         dc.b 'CD32 improvements: Vesa Halttunen',0
 release_version:
-        dc.b '$VER: WingCommanderCD32 2.0b (13.06.2026)',0
+        dc.b '$VER: WingCommanderCD32 2.0b (19.10.2026)',0
 release_config:
         dc.b 'C1:L:Language:English,German;'
         dc.b 'C2:L:Cheats:Off,Enabled,Invincible;'

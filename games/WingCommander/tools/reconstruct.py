@@ -235,6 +235,9 @@ def cd32_main(argv):
               'code_ranges':CODE, 'byte_identical':result == original, 'release':a.release, 'buffered':a.release, 'frame_records':8192 if a.release and a.frame_stats else 16384 if a.frame_stats else 0, 'version':'2.0b' if a.release else None, 'comparison_control':a.comparison_control, 'flight_verify':a.flight_verify, 'c2p_experiment':a.c2p_experiment, 'flight_control':a.flight_control or bool(a.c2p_experiment and a.c2p_experiment.startswith('full')), 'timing':a.timing, 'timing_verify':a.timing_verify, 'frame_stats':a.frame_stats, 'render':a.render, 'render_control':a.render_control, 'render_verify':a.render_verify, 'render_family':a.render_family, 'ceiling':a.ceiling, 'verify_only':bool(a.c2p_experiment or a.ceiling or a.timing_verify or a.frame_stats or a.flight_verify or a.flight_control or a.comparison_control), 'cache_audit':a.cache_audit, 'verify':a.verify, 'verify_control':a.verify_control}
     if a.ceiling and a.ceiling.startswith('drawing'):
         report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
+    if a.release:
+        (out/'ReadMe').write_bytes((ROOT/'release/ReadMe').read_bytes())
+        report['release_date']='19.10.2026'
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
 
