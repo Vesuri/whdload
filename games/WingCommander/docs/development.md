@@ -5033,10 +5033,15 @@ python3 tools/timing_adapter_check.py tmp/afterburn-cd32 --output tmp/afterburn-
 python3 tools/ocs_options_check.py tmp/afterburn-ocs --output tmp/afterburn-options
 ```
 
-The focused regression must fail against the preceding build when changing
-ordinary thrust to afterburner. For visual acceptance, engage/release Tab in
-flight with other objects visible; verify that they and the camera retain
-intermediate motion. Functional reports do not establish display throughput.
+The focused regression includes native control-preview isolation, intermediate
+camera rotation and suppression of duplicate world rotation during normal thrust,
+afterburner and braking, with script-action rejection. It must fail against the
+preceding scene-reset build on afterburner steering, even though that build passes
+the positional checks. Retained passing reports are
+`tmp/burn-turn-final-{cd32,ocs}/report.json`.
+For visual acceptance, hold Tab while turning in flight with other objects
+visible, then release Tab and continue turning; verify that they and the camera
+retain intermediate motion. Functional reports do not establish display throughput.
 
 ### Side-view cockpit regression
 

@@ -33,8 +33,8 @@ side-cockpit images after normal campaign entry. The reservation applies in
 all option modes; the off path still uses original simulation and rendering.
 Legacy diagnostic builds and original reconstruction retain their old budgets.
 
-Current build: `tmp/scene-reset-ocs/`, 61,192-byte slave, SHA-256
-`e494a775e004c8e289cebffe921a96a85c3ea6a3b0b0f5742f2c5094ed440294`.
+Current build: `tmp/burn-turn-ocs/`, 61,232-byte slave, SHA-256
+`4080e669d0c66d6eb7901780b8a90769cf63f52f4298b9737ff50612f4241429`.
 See [public-option validation](internals.md#ocs-public-enhanced-framerate-toggle)
 and [commands](development.md#ocs-public-enhanced-framerate-toggle).
 The user-facing [OCS ReadMe](../release/ReadMe.OCS) describes the option.

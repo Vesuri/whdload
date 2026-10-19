@@ -80,9 +80,72 @@ def check(build, variant, model):
  finally: c.close()
 
 
+def steering(build, variant, model):
+ c,sy=machine(build,variant,model);v=get(variant);ocs=variant=='ocs';a4=DATA+v.A4_BASE
+ def put(n,x,size=2):c.write(SLAVE+sy[n],word(x) if size==2 else long(x))
+ def call(n,args=b'',registers=None):c.run(SLAVE-CODE+sy[n],args,registers)
+ def field(off,x):c.write(a4+off,word(x))
+ action=0xcf4 if ocs else 0x1566
+ ramp=0xe88 if ocs else 0x16fa
+ angles=(0xd88,0xd08,0xe08) if ocs else (0x15fa,0x157a,0x167a)
+ bases=(0x18d8,0x2a40,0x2d40) if ocs else (0x214a,0x3452,0x3752)
+ controller,mapper,rotation=(0x183e4,0x73e,0x79fc) if ocs else (0x18daa,0x742,0x7c86)
+ hooks=(0x18528,0x1853a,0x18574) if ocs else (0x18eee,0x18f00,0x18f3a)
+ for off,label in zip(hooks,('timing_throttle_gate','timing_throttle_gate','timing_fire_gate')):
+  c.write(CODE+off,word(0x4eb9)+long(SLAVE+sy[label]))
+ native=[]
+ c.intercept(CODE+rotation,lambda:native.append(1))
+ cases=0
+ try:
+  field(v.A4['object_class'],12)
+  field(-18318 if ocs else -18280,0);field(-29954 if ocs else -29978,0)
+  # Native held-axis input images differ between the two executables.
+  c.write(DATA+(0xbe52 if ocs else 0xc642),bytes(128))
+  pad=a4+0x3ed4 if ocs else DATA+0xc6c2
+  for hz in (50,60):
+   put('ocs_clock_hz' if ocs else 'timing_hz',hz,4)
+   for axis in range(4):
+    c.write(pad,bytes(int(i==axis) for i in range(6)))
+    for thrust in (-1,1,3,-1):
+     field(action,thrust)
+     for off in (ramp,ramp+2,ramp+4):field(off,7)
+     before=c.read(DATA,v.HUNKS[1][2])
+     call('timing_preview_controls')
+     require(c.read(DATA,v.HUNKS[1][2])==before,'steering preview leaked native state')
+     got=c.read(SLAVE+sy['timing_angles'],6)
+     put('timing_preview',1);c.run(controller);c.run(mapper);put('timing_preview',0)
+     want=b''.join(c.read(a4+off,2) for off in angles)
+     require(got==want and got!=bytes(6),('afterburn steering disabled',thrust,axis,hz,got.hex(),want.hex()))
+     c.write(DATA,before)
+     for off,vec in zip(bases,((0,0,256),(0,256,0),(256,0,0))):
+      c.write(a4+off,struct.pack('>3i',*vec))
+     c.write(SLAVE+sy['timing_angle_remainder'],bytes(12))
+     # Camera changes within the interval; small integer angles may need
+     # more than one field to accumulate a whole native angular unit.
+     call('timing_player_camera')
+     changes=0
+     for _ in range(hz//10):
+      previous=b''.join(c.read(a4+off+61*12,12) for off in bases)
+      call('timing_player_field');call('timing_player_camera')
+      changes+=previous!=b''.join(c.read(a4+off+61*12,12) for off in bases)
+     require(changes>=2,('camera held until world tick',thrust,axis,hz,changes))
+     put('timing_in_world',1);native.clear()
+     basis=b''.join(c.read(a4+off,12) for off in bases)
+     call('timing_world_rotation',word(0),{11:0})
+     require(not native,'world duplicated field rotation')
+     require(basis==b''.join(c.read(a4+off,12) for off in bases),'world changed field-owned basis')
+     cases+=1
+  # Scripted thrust retains native rotation; never broaden ownership to it.
+  field(action,4);native.clear();call('timing_world_rotation',word(0),{11:0})
+  require(len(native)==1,'script rotation lost native owner')
+  call('timing_preview_controls');require(c.read(SLAVE+sy['timing_angles'],6)==bytes(6),'script preview accepted')
+  return dict(model=model,steering_cases=cases,preview_isolated=True,field_camera=True,no_double_rotation=True)
+ finally:c.close()
+
+
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('variant',choices=('cd32','ocs'));p.add_argument('build',type=Path);p.add_argument('--output',required=True)
  a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
- rows=[check(a.build,a.variant,m) for m in ((1,2) if a.variant=='ocs' else (2,4))]
+ rows=[dict(presentation=check(a.build,a.variant,m),steering=steering(a.build,a.variant,m)) for m in ((1,2) if a.variant=='ocs' else (2,4))]
  (out/'report.json').write_text(json.dumps(rows,indent=2)+'\n');print(rows)
 if __name__=='__main__': main()

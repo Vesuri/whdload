@@ -7904,31 +7904,42 @@ scene remains outstanding.
 
 ## Afterburner prediction continuity
 
-The renderer's flight guard previously accepted only ordinary action `-1`.
-Afterburner action `1` (Tab) and braking action `3` therefore invalidated the
-whole scene snapshot on every picture, although field-rate player translation
-already supported both. A second guard rejected every ship action transition,
-producing another snapped interval when thrust mode changed.
+Enhanced OCS and CD32 accept ordinary action `-1`, afterburner `1` (Tab)
+and braking `3` for both motion prediction and field-rate steering. Previously,
+renderer eligibility was corrected but two independent steering guards still
+accepted only `-1`: control preview cleared the angular rates during afterburner,
+and the scheduled world retained rotation ownership. Turning therefore moved the
+camera only at 10 Hz even though objects still received intermediate positions.
 
-Enhanced OCS and CD32 now admit the same three thrust actions for flight
-presentation and preserve snapshot continuity between them. Scripted actions,
-view changes, class/model changes, lifecycle checks and large position jumps
-retain their existing rejection paths. This changes presentation eligibility;
-it does not change native acceleration, fuel, timers, collisions or angular
-control. The shared code uses the verified OCS operand mapping. Native motion
-entries remain CD32 H0 `7d1a` (file `7d46`) and OCS H0 `7a90` (file `7abc`);
-the velocity seams remain `807a`/`7df0` respectively.
+The buffered path now previews native controls for all three thrust actions and
+suppresses the matching world rotation. This preserves one angular owner, signed
+field remainders and normal steering on release. Scripted actions and view 8 keep
+native ownership. The unbuffered experimental path retains its existing policy;
+off/ineligible public options still use the original game. Native controller/rate
+mapping entries are CD32 H0 `18daa` / `0742` (file `18dd6` / `076e`) and
+OCS H0 `183e4` / `073e` (file `18410` / `076a`). Rotation routines are CD32
+H0 `7c86` (file `7cb2`) and OCS H0 `79fc` (file `7a28`). The shared source uses
+the verified OCS operand mapping. Native motion entries remain CD32 H0 `7d1a`
+(file `7d46`) and OCS H0 `7a90` (file `7abc`). The CD32 pause call uses a long
+relative branch because the added steering guards exceed its old word reach.
 
-`afterburn_prediction_check.py` passes 288 intermediate presentation samples
-across PAL/NTSC and both variants, with 56 rejecting script/view controls.
-It checks ship-class transition eligibility, intermediate constant-velocity
-world poses, player/camera display lead and exact restoration of the whole
-data hunk. The preceding CD32 build fails on the `-1` to `1` transition.
-Existing native CD32 translation tests pass all 28 trajectories (including
-burn, burn-turn and braking), with their existing documented numerical budgets;
-render isolation, arithmetic and fallback checks also pass. Installer/option
-checks pass for both variants. These are native CPU functional checks, not a
-new live visual or performance measurement. Interactive confirmation remains.
+`afterburn_prediction_check.py` checks 288 intermediate presentation samples,
+56 rejecting script/view controls and 128 steering cases across PAL/NTSC,
+CD32 68020/68040 and OCS 68000/68020 functional models. Steering uses each
+variant's real control/rate routines as the oracle, verifies preview leaves the
+whole data hunk unchanged, and checks camera changes inside a world interval
+and no duplicate rotation at its boundary. Small native integer angular rates
+can require multiple fields to accumulate a unit; this is not a 10 Hz hold.
+Scripted action 4 retains native rotation and rejects preview. The previous
+scene-reset CD32 build fails this test on action 1 with zero preview rates,
+against nonzero native rates. Reports are in `tmp/burn-turn-final-{cd32,ocs}`;
+current builds are `tmp/burn-turn2-cd32` and `tmp/burn-turn-ocs`.
+Existing translation trajectories and arithmetic/restoration checks, both
+variants' external/modal camera and scene-reset checks, and installation/option
+checks also pass against these builds.
+
+These are native CPU functional checks, not a new live visual or performance
+measurement. Interactive confirmation of Tab plus turning remains.
 
 
 ### Side-view cockpit memory investigation

@@ -320,7 +320,7 @@ timing_pause:
         clr.w   (a0)
         lea     timing_replay(pc),a0
         clr.w   (a0)
-        bsr.w   timing_pause_original
+        bsr.l   timing_pause_original
         move.w  ccr,-(sp)
         bsr.w   timing_rebase
         lea     timing_abort(pc),a0

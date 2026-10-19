@@ -23,9 +23,11 @@ native game pool; the public OCS pool gains 64 KiB of allocation headroom.
 A1200-030 normal-flow checks pass with enhancements active, including OCS at
 4 MiB Fast RAM. See [cockpit memory](internals.md#side-view-cockpit-memory-investigation).
 
-Enhanced flight keeps motion prediction active during afterburner and braking,
-including transitions back to normal thrust, in both variants. Native CPU
-regressions pass; interactive confirmation remains. See
+Enhanced flight keeps motion prediction and field-rate steering active during
+afterburner and braking, including transitions back to normal thrust, in both
+variants. The steering guards now agree on field ownership so turning no longer
+falls back to world-tick rotation. Native CPU regressions pass; interactive
+confirmation remains. See
 [afterburner continuity](internals.md#afterburner-prediction-continuity).
 
 The OCS public-option candidate adds **Enhanced framerate (68020+Fast RAM)**,

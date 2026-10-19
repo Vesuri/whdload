@@ -1,6 +1,7 @@
 ; Preview the next native control step without committing throttle/fire or
 ; advancing the native ramp. This supplies a responsive angular rate between
 ; world ticks; only the real tick commits the original input/action routine.
+; Enhanced normal/afterburn/braking steering has the same field owner.
 ; Free-camera/script/death modes retain their native world path for now.
 timing_preview_controls:
         movem.l d0-d7/a0-a6,-(sp)
@@ -10,7 +11,14 @@ timing_preview_controls:
         cmpi.w  #12,5888(a4)
         bne.w   .inactive
         cmpi.w  #-1,5478(a4)
+        ifne BUFFERED
+        beq.s   .thrust
+        cmpi.w  #1,5478(a4)
+        beq.s   .thrust
+        cmpi.w  #3,5478(a4)
+        endif
         bne.w   .inactive
+.thrust:
         cmpi.w  #8,-18280(a4)
         beq.w   .inactive
         move.l  5882(a4),-(sp)
@@ -74,7 +82,14 @@ timing_world_rotation:
         cmpi.w  #12,5888(a4)
         bne.s   .native
         cmpi.w  #-1,5478(a4)
+        ifne BUFFERED
+        beq.s   .thrust
+        cmpi.w  #1,5478(a4)
+        beq.s   .thrust
+        cmpi.w  #3,5478(a4)
+        endif
         bne.s   .native
+.thrust:
         cmpi.w  #8,-18280(a4)
         beq.s   .native
         bra.s   .compare
