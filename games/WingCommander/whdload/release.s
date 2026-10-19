@@ -41,7 +41,7 @@ release_name:
 release_info:
         dc.b '2.0b (19.10.2026)',10
         dc.b 'Original slave: Psygore',10
-        dc.b 'CD32 improvements: Vesa Halttunen',0
+        dc.b 'CD32 improvements: Vesuri',0
 release_version:
         dc.b '$VER: WingCommanderCD32 2.0b (19.10.2026)',0
 release_config:
