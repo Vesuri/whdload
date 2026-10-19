@@ -140,18 +140,31 @@ flight_verified: dc.l 0
 flight_reference: dc.l 0
         endif
 
-; Allocate before the game takes its FAST heap, not at first flight conversion.
+; Histories belong to the slave, outside KickEmu's fixed game-memory pool.
+; Taking 128000 bytes from that pool can leave too little contiguous space
+; for the native saved cockpit image after the normal briefing/launch flow.
 flight_render_init:
         movem.l d0-d1/a0-a1/a6,-(sp)
-        move.l  #128000,d0
-        move.l  #$10005,d1       ; MEMF_CLEAR | MEMF_FAST | MEMF_PUBLIC
-        move.l  $4.w,a6
-        jsr     -198(a6)
+        lea     slave(pc),a1
+        adda.l  #flight_history_storage-slave,a1
+        ; KickEmu excludes slave storage from its Exec memory headers.
+        ; TypeOfMem therefore cannot classify it. WHDLoad owns this valid
+        ; allocation: accept Zorro II or high Fast, excluding Chip/slow RAM.
+        move.l  a1,d0
+        cmpi.l  #$200000,d0
+        bcs.s   .unavailable
+        cmpi.l  #$1000000,d0
+        bcc.s   .store
+        addi.l  #128000,d0
+        cmpi.l  #$a00000,d0
+        bhi.s   .unavailable
+        move.l  a1,d0
+        bra.s   .store
+.unavailable:
+        moveq   #-1,d0
+.store:
         lea     flight_history(pc),a0
         move.l  d0,(a0)
-        bne.s   .allocated
-        move.l  #-1,(a0)        ; no memory: retain original converter
-.allocated:
         ifne FRAME_STATS
         bsr.w   frame_stats_init
         endif

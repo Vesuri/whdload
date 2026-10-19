@@ -1870,8 +1870,9 @@ campaign, device and hardware play-throughs remain later coverage.
 ## Phase 11 flight conversion
 
 `--timing`, `CUSTOM1=3` includes changed-block conversion during active 320×200
-flight. It reserves 128000 bytes of FAST history before game startup. Other
-geometries, inactive flight and failed allocation use the original converter.
+flight. It reserves 128000 history bytes in the slave, outside the fixed native
+game-memory pool. Other geometries, inactive flight and non-Fast history storage
+use the original converter.
 Original reconstruction and the separate `--render` intro experiment remain
 available. No cache request, gameplay instruction or motion rate is changed by
 this rendering pass. The original limiter is retained.
@@ -1881,6 +1882,7 @@ Build and native checks (fresh output directories are required):
 ```sh
 . amiga/env.sh
 python3 tools/reconstruct.py --variant cd32 --timing --output tmp/flight-render-candidate
+python3 tools/history_storage_check.py tmp/flight-render-candidate
 python3 tools/flight_render_check.py tmp/flight-render-candidate \
   --output tmp/flight-render-native.json
 python3 tools/timing_adapter_check.py tmp/flight-render-candidate \
@@ -5035,3 +5037,44 @@ The focused regression must fail against the preceding build when changing
 ordinary thrust to afterburner. For visual acceptance, engage/release Tab in
 flight with other objects visible; verify that they and the camera retain
 intermediate motion. Functional reports do not establish display throughput.
+
+### Side-view cockpit regression
+
+Use normal campaign entry for this check. Direct mission-call fixtures bypass
+allocation lifetimes from the simulator, rooms, briefing and launch and did not
+reproduce the missing cockpit.
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/sideview-candidate
+python3 tools/history_storage_check.py tmp/sideview-candidate
+python3 tools/flight_render_check.py tmp/sideview-candidate \
+  --output tmp/sideview-conversion.json
+python3 tools/release_check.py tmp/sideview-candidate \
+  --output tmp/sideview-release.json
+SLAVE="$PWD/tmp/sideview-candidate/WingCommanderCD32.Slave" \
+  AMIGA_SETUP=a1200-030 WHD_ARGS='CUSTOM5=0 CUSTOM3=1 CUSTOM4=0 CACHE' \
+  /bin/bash amiga/run.sh
+```
+
+Advance opening scenes with Enter, start the Vega campaign, complete the
+simulator/name entry, go from the bar to the barracks and then the briefing room.
+Advance briefing/launch scenes with Enter. In first-mission flight, switch
+F1 → F2 → F3 → F2 and inspect the cockpit while stars/debris move. Exercise
+F1–F9 as well. Repeat normal entry with `AMIGA_SETUP=a1200-030` and
+`WHD_ARGS='CUSTOM5=1 DCACHE'` using `amiga/run-ocs.sh` for OCS. The checked OCS
+run uses 4 MiB Fast RAM. Its public build and startup check are reproducible with:
+
+```sh
+python3 tools/ocs_memory_build.py --public --output tmp/sideview-ocs-candidate
+python3 tools/ocs_options_check.py tmp/sideview-ocs-candidate \
+  --output tmp/sideview-ocs-options
+SLAVE="$PWD/tmp/sideview-ocs-candidate/WingCommander.Slave" \
+  AMIGA_SETUP=a1200-030 WHD_ARGS='CUSTOM5=1 DCACHE' \
+  EXTRA_ARGS='--fast_memory=4096' /bin/bash amiga/run-ocs.sh
+```
+
+A memory-assisted check must verify that the saved cockpit allocation is
+nonzero and that CD32's `flight_history` points into the slave's
+`flight_history_storage`, rather than accepting a clean fallback-only picture.
+The history initializer must not allocate from the fixed native game pools.

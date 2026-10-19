@@ -25,6 +25,9 @@ retain their original meanings. German and other revisions have no enhancement
 support. CD32 CUSTOM5 mode numbers do not apply to this OCS slave.
 Quit uses the original '*' / PrtSc key unless WHDLoad QUITKEY overrides it.
 
+The public slave adds 64 KiB of native game-pool headroom for cockpit images.
+This startup memory reservation applies with the enhancement toggle off too.
+
 Tested launcher floor: 512 KiB Chip + 4 MiB true Fast, including PRELOAD.
 The focused 68020/Fast model is the performance target. This is not a full
 campaign, arbitrary accelerator/cache or real-hardware compatibility claim.

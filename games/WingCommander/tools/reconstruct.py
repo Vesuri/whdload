@@ -178,6 +178,10 @@ def cd32_main(argv):
         from modal_source import source as modal_source
         lines.append(modal_source(ROOT,"cd32"))
         lines.append(" cnop 0,4")
+    if a.timing:
+        # Keep conversion histories out of KickEmu's fixed native heap. They
+        # need no initial contents: each destination starts with a full copy.
+        lines.append("flight_history_storage: ds.b 128000\n")
     out.mkdir(parents=True)
     source = out/'WingCommanderCD32.s'
     source.write_text('\n'.join(lines)+'\n')

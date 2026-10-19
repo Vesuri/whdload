@@ -17,7 +17,7 @@ RAM retain original behaviour. The gate checks Exec CPU flags and memory headers
 requiring a nonempty FAST/non-CHIP bank in Zorro II Fast space or above 16 MiB.
 It rejects trapdoor slow memory even when marked MEMF_FAST. KickEmu excludes the
 slave reservation from its managed memory, so `TypeOfMem(slave)` is not a valid
-presence test. No allocation or enhancement hook occurs on the off path.
+presence test. No enhancement hook occurs on the off path.
 Other revisions/languages continue through Psygore's original patch lists.
 
 The public build includes the E1 enhancements and defaults to explicit CPU
@@ -27,8 +27,14 @@ is distinct from selecting original behaviour at startup. Unknown high-memory
 converter placements retain native conversion; high Fast admission to timing
 is not a new performance claim. Optional C6 changed-block histories stay off.
 
-Current build: `tmp/ocs-public-final2/`, 40,808-byte slave, SHA-256
-`4e7149536d54b55b692b6a659b967f20680615cc2e3e20d7daf419595288b6f4`.
+The public slave reserves 1 MiB of expansion memory: 256 KiB for Kickstart and
+768 KiB for the native game pool. This adds 64 KiB of pool headroom for saved
+side-cockpit images after normal campaign entry. The reservation applies in
+all option modes; the off path still uses original simulation and rendering.
+Legacy diagnostic builds and original reconstruction retain their old budgets.
+
+Current build: `tmp/sideview-pool-ocs/`, 60,444-byte slave, SHA-256
+`6d151abd88ab075d989e94027374321662af541676111297d54874ff55f27392`.
 See [public-option validation](internals.md#ocs-public-enhanced-framerate-toggle)
 and [commands](development.md#ocs-public-enhanced-framerate-toggle).
 The user-facing [OCS ReadMe](../release/ReadMe.OCS) describes the option.

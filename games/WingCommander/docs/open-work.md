@@ -2,6 +2,12 @@
 
 ## Current state
 
+F2/F3 cockpit restoration now survives normal campaign entry and F1–F9 view
+switching in both variants. CD32 conversion histories no longer consume the
+native game pool; the public OCS pool gains 64 KiB of allocation headroom.
+A1200-030 normal-flow checks pass with enhancements active, including OCS at
+4 MiB Fast RAM. See [cockpit memory](internals.md#side-view-cockpit-memory-investigation).
+
 Enhanced flight keeps motion prediction active during afterburner and braking,
 including transitions back to normal thrust, in both variants. Native CPU
 regressions pass; interactive confirmation remains. See
@@ -580,8 +586,8 @@ flight conversion gate is recorded below.
 as the useful target. The timing build now compares 32-pixel source blocks against
 separate histories for each planar buffer, converting changed view/cockpit/HUD
 blocks. First use, changed buffers and nonflight/geometry transitions are handled
-conservatively; history needs 128000 bytes of FAST RAM with original-converter
-fallback if allocation fails. The original limiter remains.
+conservatively; history reserves 128000 bytes in the slave, outside the native
+game-memory pool, with original-converter fallback for non-Fast storage. The original limiter remains.
 
 Native complete-output and live original/candidate twin gates pass. Same-picture
 CHIP-to-CHIP destination comparisons measure 80.0% less mean conversion time on

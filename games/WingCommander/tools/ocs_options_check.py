@@ -18,8 +18,12 @@ def check(build, mutation=None):
     blob=(build/'WingCommander.Slave').read_bytes();payload=blob[32:-4]
     require(meta.get('public_option'), 'public build required')
     original=(ROOT/'tmp/originals/ocs/WingCommander/WingCommander.Slave').read_bytes()[32:-4]
+    require(payload[0x20:0x24] == long(0x100000), 'missing expansion headroom')
+    require(payload[0x1fc:0x202] == bytes.fromhex('d9fc000c0000'),
+            'expansion reservation/pool mismatch')
     for i,(old,new) in enumerate(zip(original,payload)):
-        require(old==new or 0x32<=i<0x34 or 0x11c6<=i<0x11ce,
+        require(old==new or 0x20<=i<0x24 or 0x1fe<=i<0x202 or
+                0x32<=i<0x34 or 0x11c6<=i<0x11ce,
                 'unexpected change to original slave, including cache/wait paths')
     require(hashlib.sha256(blob).hexdigest()==meta['sha256'],'stale build metadata')
     config=int.from_bytes(payload[0x32:0x34],'big')

@@ -2747,11 +2747,14 @@ converter. The original cache request and `Custom5=0–3` limiter stay in place;
 this does not yet merge the phase-6 intro cache/converter policy into release options.
 `Custom5=4` bypasses the software-converter seam and is outside this gate.
 
-The history pointer is `S:8048` (file `8068`); destination records and their order
-are `S:804c/8054` (files `806c/8074`). Startup `S:8056` (file `8076`) allocates
-128000 bytes with `MEMF_FAST|MEMF_PUBLIC|MEMF_CLEAR`, before the game claims its heap.
-Failure selects the original path. Each of the two planar destinations has its
-own 64000-byte last-source image. A first or replaced destination always receives
+The phase-11 measurements used the history pointer at `S:8048` (file `8068`)
+and destination records/order at `S:804c/8054` (files `806c/8074`). Current
+startup uses 128000 bytes reserved in the slave rather than allocating from
+KickEmu's fixed game pool; see the side-view memory investigation below.
+The reservation must lie in Zorro II or high Fast address space, otherwise
+conversion takes the original path. KickEmu excludes the slave from its Exec
+memory headers, so `TypeOfMem` cannot classify this storage.
+Each of the two planar destinations has its own 64000-byte last-source image. A first or replaced destination always receives
 a full original conversion and source copy. This avoids comparing a back buffer
 against the previous picture rendered into the other buffer.
 
@@ -7883,3 +7886,72 @@ burn, burn-turn and braking), with their existing documented numerical budgets;
 render isolation, arithmetic and fallback checks also pass. Installer/option
 checks pass for both variants. These are native CPU functional checks, not a
 new live visual or performance measurement. Interactive confirmation remains.
+
+
+### Side-view cockpit memory investigation
+
+A normal CD32 A1200-030 campaign entry (simulator, pilot name, bar, barracks,
+briefing and launch, with Enter advancing scenes) reproduces the missing F2/F3
+cockpit. Injecting mission setup directly does not reproduce that allocation
+history and is not an acceptance test for this defect.
+
+At `E:2cdf2` (file `2ce1e`), the native mask builder requests 48,622 bytes:
+322 bytes times 151 rows. It stores the result at `E:2cdfa` (file `2ce26`)
+in `D:6f2c` and exits on failure at `E:2cdfe` (file `2ce2a`). In the failed
+F2 capture this pointer is zero. Its 254 span records remain in the raw scan
+format, because allocation failure bypasses their conversion to copy spans.
+The native compositor `E:2cf0a` (file `2cf36`) and enhanced compositor both
+correctly skip a missing saved image. Moving stars consequently remain visible
+where cockpit pixels should have been restored, before C2P runs.
+
+The failed snapshot has 14,216 free Fast bytes (largest block 13,848) and
+65,600 free Chip bytes (largest block 35,608). Neither pool can satisfy the
+48,622-byte contiguous request. The native allocation registry contains 70
+entries, below its 120-entry limit at `E:34738` (file `34764`). Physical Fast
+RAM configured in the emulator does not enlarge these fixed KickEmu pools.
+The enhanced converter had consumed 128,000 native Fast-pool bytes for histories.
+
+The CD32 fix moves those histories into a trailing slave-owned reservation,
+with no native allocator call. First use still performs a full conversion/copy;
+there is no dependency on initial history contents. Normal campaign entry now
+retains the cockpit in F2/F3, including after cycling F1–F9. Memory confirms a
+nonzero saved cockpit, 254 prepared spans, and both display histories pointing
+into the slave reservation: enhanced conversion remains active. Native checks
+cover ten initializer placements, 72 full-output conversion cases, and the
+existing release-option/converter/pacing suite. Original CD32 reconstruction
+remains byte-identical. No emulator drawing workaround is part of the fix.
+
+OCS independently reproduces the same failure after normal campaign entry.
+Its `O:2be50` (file `2be7c`) requests 42,511 bytes; `O:2be58` (file `2be84`)
+stores the result at `OD:6fae`. The native compositor `O:2bf74` (file `2bfa0`)
+skips when that pointer is zero. The failing snapshot has 11,696 free Fast bytes
+(largest block 10,696) and 41,056 free Chip bytes (largest block 21,832).
+OCS changed-block histories already use separate slave storage, and the public
+candidate has them disabled: this is independent native-pool fragmentation.
+
+The public OCS candidate adds 64 KiB of pool headroom, retaining native image
+allocation, registration and cleanup. `OS:0020` (slave file `0040`) changes the
+expansion request from `f0000` to `100000`; the immediate at `OS:01fe` (file
+`021e`) changes the post-ROM pool bound from `b0000` to `c0000`. Both original
+values are guarded. This reservation applies to all option modes because
+KickEmu establishes the pool before the enhancement gate. Original timing,
+rendering and waits remain gated as before. Legacy diagnostic builds and
+original reconstruction retain their old memory budgets. The A1200-030 OCS
+normal campaign route passes with 4 MiB Fast RAM: both side cockpits remain
+intact after F1–F9, the saved-image pointer is nonzero, and enhancements/CPU
+conversion remain active. The public option/hardware/native-preservation suite
+passes; original OCS reconstruction remains byte-identical.
+
+Evidence: `tmp/sideview-normal/` (failed normal route, memory snapshots and
+allocation-entry registers), `tmp/sideview-owned2-cd32/` (CD32 fix and native checks),
+`tmp/sideview-owned2-live/` (CD32 normal-route validation),
+`tmp/sideview-ocs-normal/` (OCS failure), `tmp/sideview-pool-ocs/` (OCS fix),
+`tmp/sideview-pool-ocs-options/` (startup gate), and
+`tmp/sideview-pool-ocs-live2/` (OCS normal-route validation).
+The first `sideview-owned` diagnostic restored the image using fallback C2P;
+only the `owned2` result certifies enhanced conversion.
+
+Validated slave SHA-256 values:
+
+- CD32: `346ba15df4eccd8a8d5afddf66c6d4ff42826f478ecc3e1533a162645cd439d5`.
+- OCS: `6d151abd88ab075d989e94027374321662af541676111297d54874ff55f27392`.

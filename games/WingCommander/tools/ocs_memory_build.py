@@ -384,12 +384,23 @@ view_probe_request: dc.l 0
     if public:
         require(sy['ocs_public_config'] < 65536, 'public configuration offset overflow')
         struct.pack_into('>H',payload,0x32,sy['ocs_public_config'])
+        # Normal campaign entry can fragment both native pools enough to
+        # reject the 42511-byte side-cockpit image. Keep its native ownership
+        # and cleanup, supplying one extra 64 KiB of game-pool headroom.
+        require(payload[0x20:0x24] == struct.pack('>I',0xf0000),
+                'unexpected original expansion request')
+        require(payload[0x1fc:0x202] == bytes.fromhex('d9fc000b0000'),
+                'unexpected original expansion-pool bound')
+        struct.pack_into('>I',payload,0x20,0x100000)
+        struct.pack_into('>I',payload,0x1fe,0xc0000)
     payload+=bytes((-len(payload))%4)
     blob=struct.pack('>8I',0x3f3,0,1,0,0,len(payload)//4,0x3e9,len(payload)//4)+payload+struct.pack('>I',0x3f2)
     (out/'WingCommander.Slave').write_bytes(blob)
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
                 public_option=public,opening=public,
+                expansion_bytes=0x100000 if public else 0xf0000,
+                game_pool_bytes=0xc0000 if public else 0xb0000,
                 workspace='native combined Chip allocation retained for fallback',
                 live_validated=False,clock=clock,prediction=prediction,intro=intro,math_fast=math_fast)
     if public:
