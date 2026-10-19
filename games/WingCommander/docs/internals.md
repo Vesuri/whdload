@@ -8065,3 +8065,47 @@ OCS 61,108 bytes, SHA-256
 The initial live candidate exposed a one-picture hold from a camera-only
 one-tick clamp; the final common horizon removes it. Final samples explicitly
 include motion from fraction 50 to 60 with the same world counter.
+
+
+## Prediction state at scene boundaries
+
+Both variants now route clock rebases through `timing_prediction_reset`.
+It first restores any staged native poses, then invalidates the scene snapshot,
+per-slot predictability, fractional sample, external camera endpoints, projectile
+constructor/cooldown certificates, field-contact targets and effect certificates,
+and intro-contact targets. Translation activity and its carried fractions are
+reset too. The variant rebase retains input-queue and angular-remainder resets;
+OCS additionally invalidates exhaust and acceleration caches.
+
+The missing reset was the field-shot effect certificate: a reused slot containing
+class 5/model 51 could otherwise inherit an earlier scene's contact eligibility.
+The first cold snapshot skipped continuity checks without clearing that flag.
+Invalidating this certificate at the boundary preserves its intended lifetime
+during consecutive ticks within one scene.
+
+Large pose, velocity, angle and contact payload arrays remain allocated but cannot
+be consumed until their validity gates are rebuilt from the new scene. Native
+camera controls are not erased: scripted ejection rotation still owns its rates.
+Preview flags are synchronous, balanced call-local state; player preview angles
+are regenerated before each field update.
+
+| Scene family | Boundary/history ownership |
+|---|---|
+| Flight, world intro, simulator, launch and ejection | Flight/intro clock rebases invalidate shared prediction state; intro stop restores poses and drains publication. |
+| External views | Scene reset discards endpoints; view/subject changes and teleports additionally cut history within a scene. |
+| Orchestra, planet, Origin FX and fireworks | Opening begin rebases its field epoch and cursor. |
+| Bar and barracks | Room begin resets phase/input/label state; generated entry resets debris count, and capture replaces its records and epoch. |
+| Landing | Entry capture rebases stage-zero timing; each stage captures its native pose before sampling. |
+| Funeral | Each draw captures fresh native endpoints and restores temporary samples before returning. |
+
+Publication queues retain their separate drain/ownership protocol; resetting
+prediction must not discard a pending displayed image. No game data is zeroed
+as a substitute for these ownership rules.
+
+Native CPU regression coverage deliberately leaves poses staged and poisons
+slot/contact history, then calls the actual variant clock rebase. Both variants
+restore the complete native data hunk, reject inherited camera endpoints even
+with the same view, and accept fresh endpoints on the following tick.
+CD32 68020/68040 and OCS 68000/68020 functional models pass, alongside existing
+camera and asteroid/mine-shot checks. This is functional CPU coverage, not a
+new interactive sweep of every scene or a performance measurement.

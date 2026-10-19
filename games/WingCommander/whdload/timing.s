@@ -269,12 +269,7 @@ timing_rebase:
         lea     timing_clock+16(pc),a0
         add.l   d0,(a0)
 .discarded:
-        ifne BUFFERED
-        bsr.w   translation_reset
-        bsr.w   projectile_reset
-        endif
-        lea     timing_scene_valid(pc),a0
-        clr.w   (a0)
+        bsr.w   timing_prediction_reset
         lea     timing_input_tail(pc),a0
         move.w  timing_input_head(pc),(a0)
         lea     timing_input_lost(pc),a0

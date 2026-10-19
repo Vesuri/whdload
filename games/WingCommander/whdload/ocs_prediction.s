@@ -125,25 +125,22 @@ ocs_input_command:
 .native: jmp OCS_INPUT
 
 ocs_prediction_rebase:
+        movem.l d0/a0,-(sp)
         lea ocs_exhaust_valid(pc),a0
         clr.w (a0)
         lea ocs_acceleration_valid(pc),a0
         clr.w (a0)
-        movem.l d0/a0,-(sp)
         lea ocs_input_tail(pc),a0
         move.w ocs_input_head(pc),(a0)
         lea ocs_input_replay(pc),a0
         clr.w (a0)
         lea ocs_input_pulses(pc),a0
         clr.w (a0)
-        lea timing_scene_valid(pc),a0
-        clr.w (a0)
+        bsr.w timing_prediction_reset
         lea timing_angle_remainder(pc),a0
         clr.l (a0)+
         clr.l (a0)+
         clr.l (a0)
-        bsr.w translation_reset
-        bsr.w projectile_reset
         movem.l (sp)+,d0/a0
         rts
 

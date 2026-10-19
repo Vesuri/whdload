@@ -93,7 +93,28 @@ def check(build, variant, model):
   for mode in (0,3,5,9,10,11,12,13,15,-1):
    field(view,mode);call('timing_scene_snapshot')
    require(c.get(SLAVE+sy['external_valid'])==0,('nonexternal accepted',mode))
-  return dict(model=model,views=results,cuts=True)
+  # A scene cut may arrive with temporary poses still staged. Rebase must
+  # restore them before discarding history, even for an identical next view.
+  field(view,4);call('timing_scene_snapshot');call('timing_scene_snapshot')
+  before=c.read(DATA,v.HUNKS[1][2]);call('timing_scene_begin')
+  require(c.get(SLAVE+sy['timing_scene_staged'])==1,'reset fixture not staged')
+  for name in ('field_shot_effects','timing_scene_predictable'):
+   c.write(SLAVE+sy[name],bytes([1])*64)
+  for name in ('field_shot_targets','timing_intro_shot_targets'):
+   c.write(SLAVE+sy[name],bytes(64))
+  call('ocs_clock_rebase' if ocs else 'timing_rebase')
+  require(c.read(DATA,v.HUNKS[1][2])==before,'scene reset lost native poses')
+  for name in ('timing_scene_valid','timing_scene_staged','external_seen','external_valid'):
+   require(c.get(SLAVE+sy[name])==0,('stale scene gate',name))
+  for name in ('field_shot_effects','timing_scene_predictable'):
+   require(c.read(SLAVE+sy[name],64)==bytes(64),('stale slot certificate',name))
+  for name in ('field_shot_targets','timing_intro_shot_targets'):
+   require(c.read(SLAVE+sy[name],64)==bytes([255])*64,('stale contact',name))
+  call('timing_scene_snapshot')
+  require(c.get(SLAVE+sy['external_valid'])==0,'scene inherited camera endpoint')
+  call('timing_scene_snapshot')
+  require(c.get(SLAVE+sy['external_valid'])==1,'fresh camera endpoints rejected')
+  return dict(model=model,views=results,cuts=True,scene_reset=True)
  finally:c.close()
 
 

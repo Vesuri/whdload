@@ -2,6 +2,11 @@
 
 ## Current state
 
+Shared scene-boundary prediction reset now restores staged poses before clearing
+camera, object and projectile-contact eligibility in both variants. The scene
+owner audit and focused CPU checks are recorded under
+[prediction reset](internals.md#prediction-state-at-scene-boundaries).
+
 Simulator Ready/Game Over camera presentation now ignores leftover intro angular
 controls after Return during a camera turn. Both enhanced variants retain smooth
 motion through their actual camera owners. See

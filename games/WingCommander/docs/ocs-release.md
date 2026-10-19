@@ -33,8 +33,8 @@ side-cockpit images after normal campaign entry. The reservation applies in
 all option modes; the off path still uses original simulation and rendering.
 Legacy diagnostic builds and original reconstruction retain their old budgets.
 
-Current build: `tmp/sim-stars2-ocs/`, 61,100-byte slave, SHA-256
-`ddcba396274032ec924a0da2d5b08061a7769a4dc82330627eb3817a6d818539`.
+Current build: `tmp/scene-reset-ocs/`, 61,192-byte slave, SHA-256
+`e494a775e004c8e289cebffe921a96a85c3ea6a3b0b0f5742f2c5094ed440294`.
 See [public-option validation](internals.md#ocs-public-enhanced-framerate-toggle)
 and [commands](development.md#ocs-public-enhanced-framerate-toggle).
 The user-facing [OCS ReadMe](../release/ReadMe.OCS) describes the option.

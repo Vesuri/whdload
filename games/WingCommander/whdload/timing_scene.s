@@ -234,6 +234,46 @@ timing_scene_snapshot:
         movem.l (sp)+,d0-d7/a0-a6
         rts
 
+; Scene boundary: restore borrowed native poses before invalidating history.
+; Payload arrays need not be erased: their validity gates are cleared here.
+timing_prediction_reset:
+        movem.l d0/a0,-(sp)
+        bsr.w   timing_scene_end
+        lea     timing_scene_valid(pc),a0
+        clr.w   (a0)
+        lea     timing_scene_fraction(pc),a0
+        clr.l   (a0)
+        lea     timing_scene_predictable(pc),a0
+        moveq   #15,d0
+.clear:
+        clr.l   (a0)+
+        dbra    d0,.clear
+        ifne BUFFERED
+        bsr.w   translation_reset
+        bsr.w   projectile_reset
+        lea     external_seen(pc),a0
+        clr.w   (a0)
+        lea     external_valid(pc),a0
+        clr.w   (a0)
+        lea     field_shot_effects(pc),a0
+        moveq   #15,d0
+.effects:
+        clr.l   (a0)+
+        dbra    d0,.effects
+        lea     field_shot_targets(pc),a0
+        moveq   #63,d0
+.targets:
+        move.b  #-1,(a0)+
+        dbra    d0,.targets
+        lea     timing_intro_shot_targets(pc),a0
+        moveq   #63,d0
+.intro:
+        move.b  #-1,(a0)+
+        dbra    d0,.intro
+        endif
+        movem.l (sp)+,d0/a0
+        rts
+
 ; Cosmetic regeneration used to mutate objects from the draw path. Once per
 ; world boundary, project authoritative geometry then run its native routine
 ; with the private rendering RNG. Drawing only consumes the resulting objects.

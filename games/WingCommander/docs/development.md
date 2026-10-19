@@ -5135,3 +5135,23 @@ Accepted live reports: `tmp/sim-stars-fixed-{cd32,ocs}/report.json`. Both pass
 200 fields on CD32 and 202 on OCS, within the bounded four-second deadline gate. The old CD32 candidate reproduces the oscillation after the same
 Return skip (`tmp/sim-stars-skip3/`); an early skip did not. Native checks are in
 `tmp/sim-stars2-{cd32,ocs}-{check,intro,modal,ejection,options}/`.
+
+
+## Scene-boundary prediction reset
+
+Rebuild and run the bounded CPU regressions (outputs must be fresh directories):
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/scene-reset-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/scene-reset-ocs
+python3 tools/external_camera_check.py cd32 tmp/scene-reset-cd32 --output tmp/scene-reset-cd32-check2
+python3 tools/external_camera_check.py ocs tmp/scene-reset-ocs --output tmp/scene-reset-ocs-check2
+python3 tools/field_shots_check.py cd32 tmp/scene-reset-cd32 --output tmp/scene-reset-cd32-shots
+python3 tools/field_shots_check.py ocs tmp/scene-reset-ocs --output tmp/scene-reset-ocs-shots
+```
+
+The camera regression includes a transition with staged poses and poisoned
+contact certificates, exact native-data restoration, a cold first snapshot,
+and resumed camera history on the second snapshot. See
+[prediction state ownership](internals.md#prediction-state-at-scene-boundaries).
