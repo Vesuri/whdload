@@ -5252,3 +5252,17 @@ variant's enhancement tooltype, and refuses an existing destination to preserve
 saves. The template's media/drive handling and icon selection remain available.
 Amiga Installer execution from floppy/CD media remains an interactive release
 check; structural/package checks are not evidence of that execution.
+
+The release archive retains the pinned `WingCommander.lha` member list exactly,
+including `WingCommanderHD.info` and the original installer/slave filenames.
+Only `Install-WingCommander`, `ReadMe`, `WingCommanderCD32.slave` and
+`WingCommanderECS.slave` are replaced. The staging report is a sibling JSON file,
+not an archive member. From a fresh staged output directory, package with:
+
+```sh
+"$LHA" a1o5q2 ../WingCommander-2.0b.lha WingCommanderHD.info WingCommanderHD
+"$LHA" t ../WingCommander-2.0b.lha
+```
+
+Extract the archive into a separate fresh directory and compare every file hash
+and relative filename with the staging report before handing it off.

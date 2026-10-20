@@ -44,19 +44,29 @@ def main():
         assert hashlib.sha256(slave).hexdigest()==meta['sha256']
         assert ('$VER: '+name+' 2.0b (19.10.2026)\0').encode() in slave
     out.mkdir(parents=True)
-    original=ROOT/'tmp/originals/installer/WingCommanderHD'
-    # Original installer assets are preserved byte-for-byte, staged only in tmp/.
-    names=['ReadMe.info','Manual','Manual.info']
-    names += [n+suffix for n in ('QuickDocEN','QuickDocDE','QuickDocFR','QuickDocIT') for suffix in ('','.info')]
-    names += ['WingCommander.'+suffix for suffix in ('inf','newfrank','colfrank','colzarkov','colbox')]
-    for name in names:shutil.copyfile(original/name,out/name)
-    shutil.copyfile(original/'Install-WingCommander.info',out/'Install.info')
-    for name in ('Install','ReadMe'):shutil.copyfile(ROOT/'release'/name,out/name)
-    for build,name in ((a.cd32,'WingCommanderCD32.Slave'),(a.ocs,'WingCommander.Slave')):
-        shutil.copyfile(build/name,out/name)
-    report={f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in sorted(out.iterdir())}
-    (out/'package-check.json').write_text(json.dumps(dict(version='2.0b',date='19.10.2026',files=report,
-        validation='static script structure and package/version checks; Amiga Installer not executed'),indent=2)+'\n')
+    # Extract the verified original afresh, retaining its exact member names.
+    subprocess.run(['lha','xq',str(ROOT/'tmp/downloads/WingCommander.lha')],cwd=out,check=True)
+    def hashes():
+        return {str(f.relative_to(out)):hashlib.sha256(f.read_bytes()).hexdigest()
+                for f in sorted(out.rglob('*')) if f.is_file()}
+    original=hashes()
+    replacements={
+        'WingCommanderHD/Install-WingCommander':ROOT/'release/Install',
+        'WingCommanderHD/ReadMe':ROOT/'release/ReadMe',
+        'WingCommanderHD/WingCommanderCD32.slave':a.cd32/'WingCommanderCD32.Slave',
+        'WingCommanderHD/WingCommanderECS.slave':a.ocs/'WingCommander.Slave',
+    }
+    assert set(replacements)<=set(original)
+    for name,source in replacements.items():shutil.copyfile(source,out/name)
+    report=hashes()
+    assert report.keys()==original.keys()
+    assert {n for n in report if report[n]!=original[n]}==set(replacements)
+    assert '(set #prefix-slave "WingCommanderECS")' in script
+    assert '(source ("%s.slave" #icon_slave))' in script
+    # Keep validation metadata outside the installer's original member list.
+    out.with_name(out.name+'-package-check.json').write_text(json.dumps(dict(
+        version='2.0b',date='19.10.2026',files=report,replacements=sorted(replacements),
+        validation='exact original member list; four replacements; Amiga Installer not executed'),indent=2)+'\n')
     print('PASS: installer structure, version metadata, original assets and game-free staging')
 
 if __name__=='__main__':main()

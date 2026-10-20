@@ -109,7 +109,7 @@
     (help @askchoice-help)
   )))
   (if (= #version 3)
-    ((set #prefix "WingCommander") (set #prefix-slave "WingCommander") (set #enhanced "1"))
+    ((set #prefix "WingCommander") (set #prefix-slave "WingCommanderECS") (set #enhanced "1"))
     ((set #prefix "WingCommanderCD32") (set #prefix-slave "WingCommanderCD32") (set #enhanced "0"))
   )
 )
@@ -838,7 +838,7 @@
 (procedure P_CopySlave
   (copyfiles
     (help @copyfiles-help)
-    (source ("%s.Slave" #icon_slave))
+    (source ("%s.slave" #icon_slave))
     (dest #dest)
   )
 )
@@ -1028,7 +1028,7 @@
   (tooltype
     (dest (tackon #dest #icon_newname))
     (settooltype "PreLoad" "")
-    (settooltype "Slave" ("%s.Slave" #icon_slave))
+    (settooltype "Slave" ("%s.slave" #icon_slave))
   )
   (tooltype
     (dest (tackon #dest #icon_newname))
