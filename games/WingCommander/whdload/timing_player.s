@@ -1,3 +1,24 @@
+; Flight ownership boundary, not a pause, view change or clock recovery.
+; Discard old control inertia while retaining the new scene's authored pose,
+; velocity and throttle. Fresh held input is sampled normally after entry.
+timing_player_reset:
+        movem.l d0-d7/a0-a6,-(sp)
+        bsr.w   timing_prediction_reset
+        clr.l   5882(a4)
+        clr.w   5886(a4)
+        clr.w   5498(a4)
+        clr.w   5626(a4)
+        clr.w   5754(a4)
+        lea     timing_angles(pc),a0
+        clr.l   (a0)
+        clr.w   4(a0)
+        lea     timing_angle_remainder(pc),a0
+        clr.l   (a0)+
+        clr.l   (a0)+
+        clr.l   (a0)
+        movem.l (sp)+,d0-d7/a0-a6
+        rts
+
 ; Preview the next native control step without committing throttle/fire or
 ; advancing the native ramp. This supplies a responsive angular rate between
 ; world ticks; only the real tick commits the original input/action routine.

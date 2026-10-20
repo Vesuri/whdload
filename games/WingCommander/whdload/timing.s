@@ -85,6 +85,7 @@ timing_rate:
 ; It services at most four ticks per batch and skips drawing while catching up.
 timing_loop:
         movem.l d0-d7/a0-a6,-(sp)
+        bsr.w   timing_player_reset
         ; Load initial flight assets on the original input/world path, before
         ; enabling the producer. This initial update establishes the epoch.
         bsr.w   timing_native_input
@@ -305,6 +306,7 @@ timing_leave:
         bsr.w   timing_scene_geometry
 .rebasing:
         bsr.w   timing_rebase
+        bsr.w   timing_player_reset
         lea     timing_active(pc),a0
         clr.w   (a0)
         movem.l (sp)+,d0-d7/a0-a6

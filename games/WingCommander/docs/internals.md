@@ -8309,3 +8309,26 @@ control and checks native-pose replacement, scene/inactive invalidation and
 register preservation. Player preview/fraction and afterburner ownership checks
 pass. This is functional CPU evidence; interactive confirmation of the reported
 video sequence and performance measurements are not claimed.
+
+## Player control state across flights
+
+The native controllers at CD32 H0 `$18daa` and OCS H0 `$183e4` retain
+three signed steering ramps between calls. Releasing a direction decays these
+ramps instead of clearing them immediately. The existing prediction reset only
+invalidated private state; a neutral first mission could therefore inherit a
+simulator turn. Native CPU tests reproduce nonzero preview angles with released
+input even after the former prediction-only reset.
+
+`timing_player_reset` clears those three ramps and slot-zero angular rates,
+preview rates, angular fractions, translation fractions and prediction history.
+It runs at enhanced flight entry before the initial native input/world update,
+and at flight exit. It is deliberately separate from clock rebasing used for
+pause, autopilot and backlog recovery. New mission position, basis, velocity and
+throttle remain authored by native setup; current held controls are polled anew.
+OCS uses its verified operand mapping and the shared 68000-safe helper. Original
+or disabled flight paths are unchanged.
+
+`player_reset_check.py` covers released-input residual steering, the old reset
+as a negative control, neutral entry, fresh right input, retained mission
+velocity and the assembled entry/exit calls on CD32 020/040 and OCS 000/020.
+Interactive simulator-to-mission validation remains outstanding.

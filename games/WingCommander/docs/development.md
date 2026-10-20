@@ -5366,3 +5366,21 @@ Interactive acceptance: pitch down, release and coast for a second, then alterna
 Left/Right around a star near the reticle. The star should not steadily climb as
 horizontal steering continues. Repeat after scene transitions and with afterburner.
 This interactive confirmation remains separate from the passing native CPU checks.
+
+### Flight-boundary steering reset regression
+
+From the project root, build fresh candidates and run the focused CPU checks:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/flight-reset-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/flight-reset-ocs
+python3 tools/player_reset_check.py tmp/flight-reset-cd32 --variant cd32 --output tmp/flight-reset-check-cd32
+python3 tools/player_reset_check.py tmp/flight-reset-ocs --variant ocs --output tmp/flight-reset-check-ocs
+python3 tools/timing_player_check.py tmp/flight-reset-cd32 --output tmp/flight-reset-preview-check
+```
+
+Use new output names for repeated runs. Interactive acceptance: hold Right until
+simulator game over, release it, then follow the normal bar/briefing path into
+the first mission. With no steering input the ship must not initially turn.
+A direction held in the new flight must still respond normally.

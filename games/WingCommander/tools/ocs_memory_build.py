@@ -429,6 +429,8 @@ def prediction_clock(text):
     # Keep the D2 control exactly reproducible; integrate D3 only when requested.
     text=text.replace('        bsr.w   ocs_publish_vblank',
                       '        bsr.w   ocs_publish_vblank\n        bsr.w ocs_input_record')
+    text=text.replace('ocs_clock_loop:\n', 'ocs_clock_loop:\n        bsr.w timing_player_reset\n')
+    text=text.replace('ocs_clock_leave_label:\n', 'ocs_clock_leave_label:\n        bsr.w timing_player_reset\n')
     text=text.replace('ocs_clock_rebase:\n','ocs_clock_rebase:\n        bsr.w ocs_prediction_rebase\n')
     text=text.replace('        bsr.w ocs_clock_tick\n        subq.w',
         '        lea timing_in_world(pc),a0\n        move.w #1,(a0)\n        bsr.w ocs_clock_tick\n        lea timing_in_world(pc),a0\n        clr.w (a0)\n        subq.w')

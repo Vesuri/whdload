@@ -2,10 +2,15 @@
 
 ## Current state
 
+Enhanced flight entry and exit now discard native player steering ramps, angular
+rates and private motion prediction state in both variants. This prevents held
+simulator steering from leaking into the first mission. Native CPU regressions
+pass; interactive simulator-to-mission confirmation remains.
+
 Smooth player steering now retains a Q14 orientation in both enhanced variants,
 preventing repeated horizontal turns from rounding away the previous pitch.
-Native CPU precision, reset and steering ownership regressions pass; interactive
-confirmation remains. See [steering precision](internals.md#smooth-player-steering-precision).
+Native CPU precision, reset and steering ownership regressions pass; the user
+confirmed the vertical-drift fix on A1200-040. See [steering precision](internals.md#smooth-player-steering-precision).
 
 The opening death explosion now wins equal-depth draw-order ties with its own
 ship in both enhanced variants. The correction preserves simulation and effect
