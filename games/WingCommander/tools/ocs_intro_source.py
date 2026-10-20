@@ -27,7 +27,13 @@ def source(root):
     title = title.replace('        move.l  game_base(pc),a6', load_base)
     title = title.replace('        move.l  game_base(pc),-(sp)',
                           load_base+'\n        move.l a6,-(sp)')
-    return select((root/'whdload/ocs_intro.s').read_text()+'\n'+title,'68000')
+    order='''EFFECT_LIST equ -4326
+EFFECT_CLASS equ $e8e
+EFFECT_MODEL equ $f86
+EFFECT_OWNER equ $3058
+EFFECT_DEPTH equ $252e
+'''+(root/'whdload/effect_order.s').read_text()
+    return select((root/'whdload/ocs_intro.s').read_text()+'\n'+title+'\n'+order,'68000')
 
 def integrate(text):
     # These three wrappers are shared with flight, but intro never enables its
@@ -36,7 +42,7 @@ def integrate(text):
         at=text.index(label+':');end=text.index('\nocs_',at+1)
         piece=text[at:end].replace(label+':',label+':\n'+select('        tst.w intro_active(pc)\n        bne.w .intro\n','68000'),1)
         if label.endswith('scene_draw'):
-            piece=piece.replace('        jsr OCS_SORT','.intro:\n        jsr OCS_SORT',1)
+            piece=piece.replace('        jsr OCS_SORT','.intro:\n        jsr OCS_SORT\n        bsr.w effect_order',1)
         elif label.endswith('emission'):
             piece=piece.replace('        move.w 2268(a4),d0','.intro:\n        move.w 2268(a4),d0',1)
         else:piece=piece.replace('.done: rts','.intro:\n.done: rts')

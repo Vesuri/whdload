@@ -8203,8 +8203,8 @@ in either current public slave. This reduces file size, not required runtime RAM
 
 | Public build | File bytes | Initialized hunk bytes | Runtime workspace bytes | Allocated hunk bytes |
 |---|---:|---:|---:|---:|
-| CD32 | 37,376 | 37,340 | 151,036 | 188,376 |
-| OCS | 39,492 | 39,456 | 23,136 | 62,592 |
+| CD32 | 37,576 | 37,540 | 151,036 | 188,576 |
+| OCS | 39,712 | 39,676 | 23,136 | 62,812 |
 
 `ws_GameLoader` at slave hunk offset `18` (file `38`) selects the 68000-safe
 clear-and-tail-call wrapper. In these builds its hunk/file offsets are CD32
@@ -8216,7 +8216,7 @@ failure stays a loader failure, before game entry; it is not an unchecked pointe
 or a loan from KickEmu's fixed game pools. Existing conversion/Fast-memory gates
 remain, and OCS's allocation-range check now includes the tail.
 
-Workspace hunk ranges are CD32 `91dc..2dfd8`, OCS `9a20..f480` (end exclusive).
+Workspace hunk ranges are CD32 `92a4..2e0a0`, OCS `9afc..f55c` (end exclusive).
 They have no stored file offsets. Generated listings and build metadata distinguish
 initialized size from allocation size. The native fixtures reconstruct the full
 allocation when loading a slave; snapshots must include that full size rather
@@ -8232,3 +8232,38 @@ WHDLoad on A1200-030 for each variant. This is allocation/startup evidence, not 
 new full-campaign or hardware-performance claim. An earlier general opening check
 reached separation but timed out at a later scene checkpoint; it is not counted
 as full-opening acceptance.
+
+### Intro death-explosion draw order
+
+The opening ship's death effect is class 5/model 49, with its parent slot in
+CD32 A4+`3a6a` / OCS A4+`3058`. Creation copies the parent's position and velocity
+(CD32 H0 `b4d8..b54a`, OCS H0 `b24e..b2c0`). The native sorter rounds distance
+to a word and does not preserve ordering for ties. In the captured CD32 opening,
+ship 1 and explosion 17 alternated between equal depth and a one-unit difference.
+At equal depth the ship sometimes followed its explosion in the draw list,
+painting ship pixels over it. This is a depth-order defect, not an extra
+simulation update or effect-frame advance.
+
+The shared `effect_order` pass resolves only that tie: a visible class-12 parent
+in slots 0–9 is moved immediately before its model-49 death explosion when both
+have equal projected depth. Other objects keep their relative order; unequal
+depths, absent parents, other effects and non-intro rendering retain the native
+order. The pass changes only the completed draw list, with no position, scale,
+script, RNG or lifetime changes. `intro_active` also covers the existing modal
+3D scene owner. The enhancement-off paths remain native.
+
+| Operation/data | CD32 H0 or A4 offset | OCS H0 or A4 offset |
+|---|---|---|
+| Native list construction/sort | H0 `2c9b6..2ca36` | H0 `2ba2c..2baac` |
+| Raster routine | H0 `2ca3e` | H0 `2bab4` |
+| Draw list (doubled slot indices, -1 terminator) | A4−`1168` | A4−`10e6` |
+| Projected integer distance | A4+`24de` | A4+`252e` |
+| Enhanced integration | H0 `294f0` call wrapper | owned scene wrapper, after native sort |
+
+Native checks execute each variant's original sorter on 020/040 (CD32) and
+000/020 (OCS), including both tie orders, intervening objects, unequal depths,
+invalid/missing parents and inactive ownership. Replaying 40 captured CD32
+pictures reproduces 11 reversed ties; the correction resolves all 11 and
+preserves all game-data bytes outside the draw list. This is a correctness
+check, not a performance measurement. Reproduction is in
+[development](development.md#intro-death-explosion-order).

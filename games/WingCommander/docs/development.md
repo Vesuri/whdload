@@ -5296,3 +5296,43 @@ WHDLoad allocation and startup, not full gameplay. `runtime_buffers.load` expand
 the hunk allocation for native test fixtures; reading only file bytes omits the
 workspace. The final `.Slave` files contain no workspace bytes, while the ignored
 flat assembler outputs retain the complete memory image for analysis.
+
+## Intro death-explosion order
+
+Build both public variants and run the native sort/tie regression:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/intro-order-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/intro-order-ocs
+for variant in cd32 ocs; do
+  python3 tools/effect_order_check.py "$variant" "tmp/intro-order-$variant" --output "tmp/intro-order-check-$variant"
+  python3 tools/intro_shot_check.py "$variant" "tmp/intro-order-$variant" --output "tmp/intro-order-shots-$variant"
+done
+python3 tools/release_check.py tmp/intro-order-cd32 --output tmp/intro-order-options-cd32
+python3 tools/ocs_options_check.py tmp/intro-order-ocs --output tmp/intro-order-options-ocs
+```
+
+The bounded live check boots an isolated cached A1200-030, lets the opening play
+naturally and samples 40 pictures around the first death explosion. It checks
+that every visible equal-depth ship/death-effect pair draws in the right order,
+saves small H1 snapshots/screenshots and deletes each single-field trace after
+extracting its picture. It stops only its own emulator. Run variants serially:
+
+```sh
+python3 tools/effect_order_live_check.py cd32 tmp/intro-order-cd32 --output tmp/intro-order-live-cd32
+python3 tools/effect_order_live_check.py ocs tmp/intro-order-ocs --output tmp/intro-order-live-ocs
+```
+
+For retained pre-fix evidence, add `--capture tmp/intro-blink-explosion` to the
+CD32 native regression with a fresh output directory. That capture reproduced
+11 reversed ties across 40 pictures; the model checks do not require it.
+The older `ocs_intro_check.py` currently has a stale slot-61 motion expectation
+for native camera modes 0/8; it fails identically on the pre-fix runtime-buffer
+build and this candidate. It is not counted as a passing gate for this fix.
+
+Cached A1200-030 live captures passed in both variants: 11 CD32 and 20 OCS
+visible depth ties, with screenshots confirming the explosion overlays the ship.
+Final OCS packaging keeps the pass in the intro-enabled build only; its build
+and checks use the `tmp/intro-order-final-*` prefix. Historical `--clock` builds
+still build without intro symbols.

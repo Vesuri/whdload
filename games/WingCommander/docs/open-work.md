@@ -2,9 +2,13 @@
 
 ## Current state
 
+The opening death explosion now wins equal-depth draw-order ties with its own
+ship in both enhanced variants. The correction preserves simulation and effect
+animation state; see [draw order](internals.md#intro-death-explosion-draw-order).
+
 Both public slaves now allocate their large workspaces at load time using the
 single hunk's unstored tail, explicitly cleared before the original loader.
-CD32 is 37,376 bytes and OCS 39,492 bytes; input/prediction, cinematic and
+Large workspaces are absent from both slave files; input/prediction, cinematic and
 conversion buffers no longer occupy zero-filled file blocks. Runtime memory
 requirements remain; no game-heap allocation is added. See
 [runtime workspaces](internals.md#loader-allocated-runtime-workspaces).

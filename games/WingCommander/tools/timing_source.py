@@ -15,6 +15,18 @@ def source(root, buffered=False, *, variant):
     code = game[offset:offset+size]
     lines=[preamble(root,v.CPU),assembly_definitions(v),unit(root, 'timing', v.CPU),unit(root, 'timing_clock', v.CPU),unit(root, 'timing_player', v.CPU),unit(root, 'timing_input', v.CPU),unit(root, 'timing_presentation', v.CPU),unit(root, 'timing_scene', v.CPU),'timing_install:']
     if buffered:
+        lines.insert(-1, '''EFFECT_LIST equ -4456
+EFFECT_CLASS equ $1700
+EFFECT_MODEL equ $17f8
+EFFECT_OWNER equ $3a6a
+EFFECT_DEPTH equ $24de
+'''+(root/'whdload/effect_order.s').read_text()+'''
+effect_raster:
+ bsr.w effect_order
+ move.l timing_game(pc),-(sp)
+ addi.l #$2ca3e,(sp)
+ rts
+''')
         lines.insert(-1, 'WAYPOINT_ACTIVE equ timing_active\n'+(root/'whdload/waypoint_overlay.s').read_text()+'''
 waypoint_native_marker:
  move.l timing_game(pc),-(sp)
