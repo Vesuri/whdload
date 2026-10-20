@@ -2,6 +2,7 @@
 """Execute C6 dual histories and invalidation against independent OCS pixels.
 Unicorn is a functional instrument, never a performance measurement.
 """
+from runtime_buffers import load as load_slave
 import argparse
 import hashlib
 import json
@@ -71,7 +72,7 @@ def borrow(build):
     from pathlib import Path
     from ocs_display_check import Native, CODE, long, word
     b=json.loads((Path(build)/'build.json').read_text());sy=b['symbols']
-    payload=bytearray((Path(build)/'WingCommander.Slave').read_bytes()[32:-4]);base=0x500000
+    payload=bytearray(load_slave((Path(build)/'WingCommander.Slave').read_bytes()));base=0x500000
     for pos in b['fixups']:
         value=int.from_bytes(payload[pos:pos+4],'big')
         payload[pos:pos+4]=long(CODE+(value&0xfffffff))

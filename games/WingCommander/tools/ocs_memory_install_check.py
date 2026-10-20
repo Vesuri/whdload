@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Execute candidate startup guards, relocation, backend choice and cache flush."""
+from runtime_buffers import load as load_slave
 import argparse
 import json
 from pathlib import Path
@@ -10,7 +11,7 @@ from ocs_reconstruct import ROOT, new_output, require
 
 def check(build):
     b=json.loads((build/'build.json').read_text());sy=b['symbols']
-    payload=(build/'WingCommander.Slave').read_bytes()[32:-4]
+    payload=load_slave((build/'WingCommander.Slave').read_bytes())
     hooks=b.get('hooks',HOOKS)
     guard_offsets=tuple(off for off,_,_ in hooks)
     if b.get('clock'):

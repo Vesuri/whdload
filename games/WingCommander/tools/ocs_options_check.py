@@ -3,6 +3,7 @@
 Exec memory headers are fixtures; WHDLoad Control/PatchSeg/FlushCache are stubs.
 This proves startup selection, not hardware speed or full gameplay.
 """
+from runtime_buffers import load as load_slave
 import argparse
 import ctypes as C
 import hashlib
@@ -15,7 +16,7 @@ from ocs_icon import enhanced_icon, tooltypes
 
 def check(build, mutation=None):
     meta=json.loads((build/'build.json').read_text());sy=meta['symbols']
-    blob=(build/'WingCommander.Slave').read_bytes();payload=blob[32:-4]
+    blob=(build/'WingCommander.Slave').read_bytes();payload=load_slave(blob)
     require(meta.get('public_option'), 'public build required')
     original=(ROOT/'tmp/originals/ocs/WingCommander/WingCommander.Slave').read_bytes()[32:-4]
     require(payload[0x20:0x24] == long(0x100000), 'missing expansion headroom')
@@ -23,7 +24,7 @@ def check(build, mutation=None):
             'expansion reservation/pool mismatch')
     for i,(old,new) in enumerate(zip(original,payload)):
         require(old==new or 0x20<=i<0x24 or 0x1fe<=i<0x202 or
-                0x28<=i<0x2a or 0x32<=i<0x34 or 0x11c6<=i<0x11ce,
+                0x18<=i<0x1a or 0x28<=i<0x2a or 0x32<=i<0x34 or 0x11c6<=i<0x11ce,
                 'unexpected change to original slave, including cache/wait paths')
     require(hashlib.sha256(blob).hexdigest()==meta['sha256'],'stale build metadata')
     info=int.from_bytes(payload[0x28:0x2a],'big')

@@ -2,6 +2,13 @@
 
 ## Current state
 
+Both public slaves now allocate their large workspaces at load time using the
+single hunk's unstored tail, explicitly cleared before the original loader.
+CD32 is 37,376 bytes and OCS 39,492 bytes; input/prediction, cinematic and
+conversion buffers no longer occupy zero-filled file blocks. Runtime memory
+requirements remain; no game-heap allocation is added. See
+[runtime workspaces](internals.md#loader-allocated-runtime-workspaces).
+
 Release ReadMe/Install now follow the WHDLoad templates, retaining Psygore's
 original media handling, documentation, options and credits. Both enhanced
 slaves identify as 2.0b (19.10.2026). Installer structure/package and release

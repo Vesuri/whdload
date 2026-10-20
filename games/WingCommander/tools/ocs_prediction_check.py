@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Native OCS D3 construction, selective restoration and input contracts."""
+from runtime_buffers import load as load_slave
 import argparse,json,struct
 from pathlib import Path
 from ocs_clock_check import machine,SLAVE
@@ -78,7 +79,7 @@ def projectiles(build,model):
     require(slot<=60,('allocation',shooter,weapon,slot))
     kind=c.get(DATA+0x8e8c+2*slot)
     require(c.get(SLAVE+sy['projectile_types']+slot*2)==kind,('certificate',weapon,slot,kind))
-    saved=c.read(SLAVE,40000);data=c.read(DATA,0xf5b8)
+    saved=c.read(SLAVE,len(load_slave((build/"WingCommander.Slave").read_bytes())));data=c.read(DATA,0xf5b8)
     if weapon==24:
      for cut in ('birth','cooldown','reuse','dead','expired','model','view','jump'):
       c.write(SLAVE,saved);c.write(DATA,data);target=slot

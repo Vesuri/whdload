@@ -4,6 +4,7 @@
 Synthetic field/input sources exercise PAL/NTSC, delayed fields, wrap and skip.
 These are functional checks, not emulator or hardware performance measurements.
 """
+from runtime_buffers import load as load_slave
 import argparse
 import json
 import re
@@ -19,7 +20,7 @@ def check(build, variant):
     v=get(variant)
     if variant=='ocs':
         sy=json.loads((build/'build.json').read_text())['symbols']
-        payload=(build/'WingCommander.Slave').read_bytes()[32:-4]
+        payload=load_slave((build/'WingCommander.Slave').read_bytes())
     else:
         sy={name:int(off,16) for off,name in re.findall(r'^([0-9A-F]{8}) (\S+)$',(build/'slave.lst').read_text(),re.M)}
         payload=(build/'payload.bin').read_bytes()

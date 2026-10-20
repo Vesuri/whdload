@@ -2752,7 +2752,7 @@ this does not yet merge the phase-6 intro cache/converter policy into release op
 
 The phase-11 measurements used the history pointer at `S:8048` (file `8068`)
 and destination records/order at `S:804c/8054` (files `806c/8074`). Current
-startup uses 128000 bytes reserved in the slave rather than allocating from
+startup uses 128000 bytes in the loader-allocated, unstored slave tail rather than allocating from
 KickEmu's fixed game pool; see the side-view memory investigation below.
 The reservation must lie in Zorro II or high Fast address space, otherwise
 conversion takes the original path. KickEmu excludes the slave from its Exec
@@ -8184,3 +8184,51 @@ The alternate fourteen-actor loop retains its original end-of-loop input polling
 no new per-frame skip semantics are introduced. Modal revision guards, whole-hunk
 CD32 installation and OCS option/hardware checks pass. These are functional CPU
 checks; live visual acceptance remains pending.
+
+## Loader-allocated runtime workspaces
+
+The public CD32 and OCS builds retain WHDLoad's required single, relocation-free
+hunk. Its HUNK_HEADER allocation length includes the workspace, while HUNK_CODE
+contains only initialized code/data. `tools/runtime_buffers.py` moves explicit
+buffer declarations to that tail, retaining internal record layouts and aliases.
+It emits PC-relative address formation without a signed-word distance assumption;
+non-LEA accesses preserve the scratch address register and the instruction's CCR.
+Original reconstruction and separate historical diagnostic builds are unchanged.
+
+The moved storage includes conversion histories, input rings, scene pose/snapshot
+records, projectile certificates/contact arrays, bar replay records, funeral
+snapshots and OCS exhaust mounts. Small control words, nonzero initializers and
+immutable tables remain in the file. There are no zero runs of 256 bytes or more
+in either current public slave. This reduces file size, not required runtime RAM.
+
+| Public build | File bytes | Initialized hunk bytes | Runtime workspace bytes | Allocated hunk bytes |
+|---|---:|---:|---:|---:|
+| CD32 | 37,376 | 37,340 | 151,036 | 188,376 |
+| OCS | 39,492 | 39,456 | 23,136 | 62,592 |
+
+`ws_GameLoader` at slave hunk offset `18` (file `38`) selects the 68000-safe
+clear-and-tail-call wrapper. In these builds its hunk/file offsets are CD32
+`1e0c/1e2c`, OCS `14a8/14c8`. It preserves incoming data/address registers and
+stack, explicitly clears the entire workspace, then branches to the original
+loader. Re-entry clears it again; it does not depend on previously zero memory.
+The reservation is owned and freed with the slave by the host loader. Allocation
+failure stays a loader failure, before game entry; it is not an unchecked pointer
+or a loan from KickEmu's fixed game pools. Existing conversion/Fast-memory gates
+remain, and OCS's allocation-range check now includes the tail.
+
+Workspace hunk ranges are CD32 `91dc..2dfd8`, OCS `9a20..f480` (end exclusive).
+They have no stored file offsets. Generated listings and build metadata distinguish
+initialized size from allocation size. The native fixtures reconstruct the full
+allocation when loading a slave; snapshots must include that full size rather
+than an old fixed 40,000-byte prefix.
+
+Validation uses poisoned allocations, guards, two entry passes, preserved ABI
+and a bypass negative control on native 68000/020/040 models as applicable.
+Existing input, prediction/constructor, field-object, bar/funeral, release-option
+and complete converter-output checks exercise the relocated storage. Both original
+reconstructions remain byte-identical. The focused live check observes the zeroed
+tail immediately before the original loader, then reaches native game entry under
+WHDLoad on A1200-030 for each variant. This is allocation/startup evidence, not a
+new full-campaign or hardware-performance claim. An earlier general opening check
+reached separation but timed out at a later scene checkpoint; it is not counted
+as full-opening acceptance.

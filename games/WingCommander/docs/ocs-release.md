@@ -33,8 +33,8 @@ side-cockpit images after normal campaign entry. The reservation applies in
 all option modes; the off path still uses original simulation and rendering.
 Legacy diagnostic builds and original reconstruction retain their old budgets.
 
-Current build: `tmp/death-cels-ocs/`, 62,228-byte slave, SHA-256
-`3f27f07bf4968dc7045818fdde758daa4cb95ff074457e24f63e42b699998416`.
+Current build: `tmp/runtime-buffers3-ocs/`, 39,492-byte slave, SHA-256
+`4c7cbee15f2625ca65563f3b9a56feb9a45227ee6ae67e026054f0401623507d`.
 See [public-option validation](internals.md#ocs-public-enhanced-framerate-toggle)
 and [commands](development.md#ocs-public-enhanced-framerate-toggle).
 The user-facing [OCS ReadMe](../release/ReadMe.OCS) describes the option.

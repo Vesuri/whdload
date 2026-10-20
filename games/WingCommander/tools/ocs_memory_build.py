@@ -283,8 +283,9 @@ game_base: dc.l 0
         text+='\nocs_multiply_native:\n dc.b '+','.join(f'${v:02x}' for v in game[44+0x2adb6:44+0x2adbc])+'\n jmp $f002adbc\n'
         text+='\nocs_radius_native:\n dc.b '+','.join(f'${v:02x}' for v in game[44+0x2b950:44+0x2b956])+'\n jmp $f002b956\n'
     if changed != 'off':
-        text=text.replace(' lea payload_end(pc),a0',
-                          ' lea payload_end(pc),a0\n adda.l #128000,a0')
+        if not public:  # Public range check already includes its whole workspace.
+            text=text.replace(' lea payload_end(pc),a0',
+                              ' lea payload_end(pc),a0\n adda.l #128000,a0')
         # Equal-sized full/blocks controls include identical history reservation.
         # Invalidation is task-side, after the C5 drain, before native writers.
         text=text.replace('        bsr.w   ocs_publish_drain\n',
@@ -371,7 +372,9 @@ view_probe_request: dc.l 0
     tables=guards+'\nhooks:\n'+''.join(f' dc.l ${off:x}\n dc.w ${op:x}\n dc.l {label}-slave\n' for off,label,op in hooks)+' dc.l -1\nnative_fixups:\n'
     # First pass obtains positions; later tables cannot shift preceding code.
     history='ocs_changed_history: ds.b 128000\n' if changed != 'off' else ''
-    probe,sy=assemble(out,'probe',text+tables+' dc.l -1\npayload_end:\n'+history)
+    from runtime_buffers import source as workspace_source, container as workspace_container
+    def workspace(text):return workspace_source(text,int.from_bytes(original[32+0x18:32+0x1a],"big")) if public else text
+    probe,sy=assemble(out,'probe',workspace(text+tables+' dc.l -1\npayload_end:\n'+history))
     fixes=[]
     # D4 hook offsets can resemble sentinel operands across word boundaries;
     # never relocate table data. Preserve older controls byte for byte.
@@ -379,12 +382,14 @@ view_probe_request: dc.l 0
         value=int.from_bytes(probe[pos:pos+4],'big')
         if 0xf0000000<=value<0xf0040000:fixes.append(pos)
     require(len(fixes)>=len(native)-5,'missing native fixups')
-    payload,sy=assemble(out,'candidate',text+tables+''.join(f' dc.l ${x:x}\n' for x in fixes)+' dc.l -1\npayload_end:\n'+history)
+    payload,sy=assemble(out,'candidate',workspace(text+tables+''.join(f' dc.l ${x:x}\n' for x in fixes)+' dc.l -1\npayload_end:\n'+history))
     payload=bytearray(payload)
     require(payload[:TAIL]==original[32:-4],'original payload changed before patch')
     require(sy['install']-0x11c8<32768,'install trampoline out of range')
     payload[0x11c6:0x11ce]=struct.pack('>HhHH',0x6100,sy['install']-0x11c8,0x4e71,0x4e71)
     if public:
+        require(sy['runtime_workspace_init'] < 32768, 'workspace startup out of range')
+        struct.pack_into('>H',payload,0x18,sy['runtime_workspace_init'])
         require(sy['ocs_public_config'] < 65536, 'public configuration offset overflow')
         struct.pack_into('>H',payload,0x32,sy['ocs_public_config'])
         require(sy['ocs_public_info'] < 65536, 'public info offset overflow')
@@ -399,7 +404,8 @@ view_probe_request: dc.l 0
         struct.pack_into('>I',payload,0x20,0x100000)
         struct.pack_into('>I',payload,0x1fe,0xc0000)
     payload+=bytes((-len(payload))%4)
-    blob=struct.pack('>8I',0x3f3,0,1,0,0,len(payload)//4,0x3e9,len(payload)//4)+payload+struct.pack('>I',0x3f2)
+    blob=(workspace_container(payload,sy['runtime_workspace']) if public else
+          struct.pack('>8I',0x3f3,0,1,0,0,len(payload)//4,0x3e9,len(payload)//4)+payload+struct.pack('>I',0x3f2))
     (out/'WingCommander.Slave').write_bytes(blob)
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
@@ -410,6 +416,7 @@ view_probe_request: dc.l 0
                 workspace='native combined Chip allocation retained for fallback',
                 live_validated=False,clock=clock,prediction=prediction,intro=intro,math_fast=math_fast)
     if public:
+        report.update(runtime_workspace_bytes=len(payload)-sy['runtime_workspace'],initialized_bytes=sy['runtime_workspace'])
         from ocs_icon import enhanced_icon
         icon=(ROOT/'tmp/originals/ocs/WingCommander/WingCommander.info').read_bytes()
         (out/'WingCommander.info').write_bytes(enhanced_icon(icon))

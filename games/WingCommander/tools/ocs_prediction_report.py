@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """D3 native-model cost, authoritative equality and publication-lead evidence."""
+from runtime_buffers import load as load_slave
 import argparse,json
 from pathlib import Path
 import _amigaxdev
@@ -15,7 +16,7 @@ def costs(root,build):
  b=json.loads((build/'build.json').read_text());sy=b['symbols'];m=json.loads((root/'result.json').read_text())
  require(m['slave_sha256']==b['sha256'],'wrong cost build')
  require(m['effective']['cpu_model']=='68000','cost denominator is stock A500 only')
- base=m['slave'];payload=(build/'WingCommander.Slave').read_bytes()[32:-4]
+ base=m['slave'];payload=load_slave((build/'WingCommander.Slave').read_bytes())
  trace=barto.load(str(root/'prediction-cost.bin'))
  require(len(trace.fields)==10,'bounded ten-field trace required')
  records=[r for f in trace.fields for r in trace.instructions(f)]

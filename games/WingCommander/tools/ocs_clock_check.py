@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """D2 scheduler/owner contracts on native M68000 and M68020; no cost claims."""
+from runtime_buffers import load as load_slave
 import argparse, json, struct
 from pathlib import Path
 from ocs_display_check import Native, CODE, DATA, word, long
@@ -11,7 +12,7 @@ SLAVE=0x500000
 def machine(build, model):
     b=json.loads((build/'build.json').read_text());sy=b['symbols']
     c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english',model=model)
-    c.write(SLAVE,(build/'WingCommander.Slave').read_bytes()[32:-4])
+    c.write(SLAVE,load_slave((build/'WingCommander.Slave').read_bytes()))
     for pos in b['fixups']:c.write(SLAVE+pos,long(CODE+(c.get(SLAVE+pos,4)&0xfffffff)))
     for off,label,op in b['hooks']:c.write(CODE+off,word(op)+long(SLAVE+sy[label]))
     for off in (0x440,0x6370,0x4896):c.write(CODE+off,word(0x4e71))

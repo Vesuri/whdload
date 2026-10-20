@@ -2,6 +2,7 @@
 """E1 field-bounded throughput, complete-call cost and memory evidence.
 Overloads remain measurements; this report never relaxes the D3 cadence gate.
 """
+from runtime_buffers import load as load_slave
 import argparse,json,hashlib
 from pathlib import Path
 import _amigaxdev
@@ -20,7 +21,7 @@ def profile(root,build,name):
  m=json.loads((root/'result.json').read_text());b=json.loads((build/'build.json').read_text())
  require(m['effective']['cpu_model']=='68000','instruction cycle denominator only validated for stock 68000')
  h=m['hunks'][0];base=m['slave'];sy=b['symbols']
- game=(root/'simulator-h0.bin').read_bytes();payload=(build/'WingCommander.Slave').read_bytes()[32:-4]
+ game=(root/'simulator-h0.bin').read_bytes();payload=load_slave((build/'WingCommander.Slave').read_bytes())
  scopes={h+o:n for o,n in NATIVE.items() if n!='collision_scan_body'}
  scopes.update({base+sy[n]:n for n in OWNED})
  t=barto.load(str(root/name));active={};values={n:[] for n in scopes.values()};total=0;pc_cost={}

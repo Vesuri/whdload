@@ -5266,3 +5266,33 @@ not an archive member. From a fresh staged output directory, package with:
 
 Extract the archive into a separate fresh directory and compare every file hash
 and relative filename with the staging report before handing it off.
+
+## Runtime workspaces in public slaves
+
+Build fresh public candidates and check their unstored allocation tails:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/runtime-buffers3-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/runtime-buffers3-ocs
+for variant in cd32 ocs; do
+  python3 tools/runtime_buffers_check.py "$variant" "tmp/runtime-buffers3-$variant" --output "tmp/runtime-buffers3-startup-$variant"
+  python3 tools/field_objects_check.py "$variant" "tmp/runtime-buffers3-$variant" --output "tmp/runtime-buffers3-fields-$variant"
+  python3 tools/opening_check.py "$variant" "tmp/runtime-buffers3-$variant" --output "tmp/runtime-buffers3-opening-$variant"
+  python3 tools/modal_clock_check.py "$variant" "tmp/runtime-buffers3-$variant" --output "tmp/runtime-buffers3-modal-$variant"
+  python3 tools/funeral_check.py "$variant" "tmp/runtime-buffers3-$variant" --output "tmp/runtime-buffers3-funeral-$variant"
+  python3 tools/runtime_buffers_live_check.py "$variant" "tmp/runtime-buffers3-$variant" --output "tmp/runtime-buffers3-live-$variant"
+done
+python3 tools/ocs_prediction_check.py tmp/runtime-buffers3-ocs --output tmp/runtime-buffers3-prediction
+python3 tools/timing_input_check.py tmp/runtime-buffers3-cd32 --output tmp/runtime-buffers3-input
+python3 tools/flight_render_check.py tmp/runtime-buffers3-cd32 --output tmp/runtime-buffers3-conversion
+python3 tools/release_check.py tmp/runtime-buffers3-cd32 --output tmp/runtime-buffers3-release
+python3 tools/ocs_options_check.py tmp/runtime-buffers3-ocs --output tmp/runtime-buffers3-options
+```
+
+Outputs must be fresh; change the suffix when repeating. Live checks use isolated
+project-owned runs and delete their temporary memory dumps. They validate actual
+WHDLoad allocation and startup, not full gameplay. `runtime_buffers.load` expands
+the hunk allocation for native test fixtures; reading only file bytes omits the
+workspace. The final `.Slave` files contain no workspace bytes, while the ignored
+flat assembler outputs retain the complete memory image for analysis.

@@ -184,7 +184,10 @@ def cd32_main(argv):
         lines.append("flight_history_storage: ds.b 128000\n")
     out.mkdir(parents=True)
     source = out/'WingCommanderCD32.s'
-    source.write_text('\n'.join(lines)+'\n')
+    from runtime_buffers import source as workspace_source, container as workspace_container
+    assembled='\n'.join(lines)+'\n'
+    if a.release:assembled=workspace_source(assembled,int.from_bytes(code[0x18:0x1a],"big"))
+    source.write_text(assembled)
     binary = out/'payload.bin'
     subprocess.run([os.environ['VASM'], '-m68020','-spaces','-no-opt','-Fbin','-L',str(out/'slave.lst'),'-o',str(binary),str(source)],check=True)
     built = binary.read_bytes()
@@ -219,14 +222,15 @@ def cd32_main(argv):
     if a.release:
         symbols={name:int(off,16) for off,name in re.findall(r'^([0-9A-F]{8}) (\S+)$',(out/'slave.lst').read_text(),re.M)}
         updated=bytearray(built)
-        for offset,label in ((0x24,'release_name'),(0x28,'release_info'),(0x32,'release_config')):
+        for offset,label in ((0x18,'runtime_workspace_init'),(0x24,'release_name'),(0x28,'release_info'),(0x32,'release_config')):
             if symbols[label]>=0x8000:raise ValueError('header string outside signed offset range')
             struct.pack_into('>H',updated,offset,symbols[label])
         built=bytes(updated)
         binary.write_bytes(built)
     # Standard one-code-hunk container; no original byte blob is embedded.
     header = struct.pack('>8I',0x3f3,0,1,0,0,len(built)//4,0x3e9,len(built)//4)
-    result = header+built+struct.pack('>I',0x3f2)
+    result = (workspace_container(built,symbols['runtime_workspace']) if a.release
+              else header+built+struct.pack('>I',0x3f2))
     if not (a.timing or a.render or a.render_control or a.verify or a.verify_control or a.cache_audit or a.ceiling):
         assert result == original
     (out/'WingCommanderCD32.Slave').write_bytes(result)
@@ -238,6 +242,8 @@ def cd32_main(argv):
     if a.release:
         (out/'ReadMe').write_bytes((ROOT/'release/ReadMe').read_bytes())
         report['release_date']='19.10.2026'
+        report['runtime_workspace_bytes']=len(built)-symbols['runtime_workspace']
+        report['initialized_bytes']=symbols['runtime_workspace']
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
 

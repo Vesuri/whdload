@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Native release options/cache contract and integrated nonflight conversion."""
+from runtime_buffers import load as load_slave
 import argparse,hashlib,json,random,re,struct,subprocess,sys
 from pathlib import Path
 from cd32_runtime import ROOT
@@ -14,7 +15,7 @@ def main():
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():raise ValueError('new tmp report required')
     meta=json.loads((a.build/'build.json').read_text());blob=(a.build/'payload.bin').read_bytes()
     slave=(a.build/'WingCommanderCD32.Slave').read_bytes()
-    assert slave[32:-4]==blob and hashlib.sha256(slave).hexdigest()==meta['sha256']
+    assert load_slave(slave)==blob and hashlib.sha256(slave).hexdigest()==meta['sha256']
     assert meta['release'] and meta['version']=='2.0b' and not meta['verify_only']
     sy={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(a.build/'slave.lst').read_text(),re.M)}
     assert not any(n in sy for n in ('flight_verified','render_verified','timing_verify_schedule','frame_stat'))

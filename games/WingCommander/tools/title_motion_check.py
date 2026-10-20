@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Native render-only title scale/rotation sampling, including fractional depth."""
+from runtime_buffers import load as load_slave
 import argparse,json,re
 from pathlib import Path
 from ocs_display_check import Native,CODE,DATA,word,long
@@ -10,7 +11,7 @@ from variants import get
 def check(build,variant,model):
  v=get(variant);slave=0x500000
  if variant=='ocs':
-  sy=json.loads((build/'build.json').read_text())['symbols'];blob=(build/'WingCommander.Slave').read_bytes()[32:-4]
+  sy=json.loads((build/'build.json').read_text())['symbols'];blob=load_slave((build/'WingCommander.Slave').read_bytes())
   clock,rate='ocs_clock_state','ocs_clock_hz'
  else:
   sy={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(build/'slave.lst').read_text(),re.M)}
