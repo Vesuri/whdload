@@ -239,6 +239,7 @@ timing_scene_snapshot:
 timing_prediction_reset:
         movem.l d0/a0,-(sp)
         bsr.w   timing_scene_end
+        bsr.w   player_basis_reset
         lea     timing_scene_valid(pc),a0
         clr.w   (a0)
         lea     timing_scene_fraction(pc),a0

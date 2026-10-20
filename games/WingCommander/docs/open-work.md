@@ -2,6 +2,11 @@
 
 ## Current state
 
+Smooth player steering now retains a Q14 orientation in both enhanced variants,
+preventing repeated horizontal turns from rounding away the previous pitch.
+Native CPU precision, reset and steering ownership regressions pass; interactive
+confirmation remains. See [steering precision](internals.md#smooth-player-steering-precision).
+
 The opening death explosion now wins equal-depth draw-order ties with its own
 ship in both enhanced variants. The correction preserves simulation and effect
 animation state; see [draw order](internals.md#intro-death-explosion-draw-order).

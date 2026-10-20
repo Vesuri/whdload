@@ -45,6 +45,7 @@ timing_preview_controls:
         move.l  (sp)+,5882(a4)
         bra.s   .done
 .inactive:
+        bsr.w   player_basis_reset
         lea     timing_angle_remainder(pc),a0
         clr.l   (a0)+
         clr.l   (a0)+
@@ -104,11 +105,13 @@ timing_world_rotation:
         cmpi.w  #10,d2
         rts
 
-; Advance one elapsed field, carrying signed sub-angle remainders. All native
-; rotations run in original axis order and rebuild the orthogonal basis.
+; Advance one elapsed field, carrying signed sub-angle remainders. Q14
+; rotations retain native axis order without repeated Q8 rounding drift.
 ; Repeating one-field substeps makes grouping by render frame irrelevant.
 timing_player_field:
         movem.l d0-d7/a0-a6,-(sp)
+        bsr.w   player_basis_sync
+        moveq   #0,d5
         lea     timing_angles(pc),a2
         lea     timing_angle_remainder(pc),a3
         moveq   #0,d4
@@ -123,26 +126,16 @@ timing_player_field:
         move.l  d1,(a3)+
         tst.w   d0
         beq.s   .next
-        clr.w   -(sp)                ; player object zero
-        move.w  d0,-(sp)
-        move.l  timing_game(pc),a6
-        tst.w   d4
-        bne.s   .yaw
-        jsr     $2acb2(a6)
-        bra.s   .pop
-.yaw:
-        cmpi.w  #1,d4
-        bne.s   .roll
-        jsr     $2acf2(a6)
-        bra.s   .pop
-.roll:
-        jsr     $2ad32(a6)
-.pop:
-        addq.l  #4,sp
+        bsr.w   player_basis_rotate
+        moveq   #1,d5
 .next:
         addq.w  #1,d4
         cmpi.w  #3,d4
         bne.s   .axis
+        tst.w   d5
+        beq.s   .no_rotation
+        bsr.w   player_basis_publish
+.no_rotation:
         ifne BUFFERED
         bsr.w   translation_field
         endif

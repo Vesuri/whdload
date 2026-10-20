@@ -5336,3 +5336,33 @@ visible depth ties, with screenshots confirming the explosion overlays the ship.
 Final OCS packaging keeps the pass in the intro-enabled build only; its build
 and checks use the `tmp/intro-order-final-*` prefix. Historical `--clock` builds
 still build without intro symbols.
+
+## Smooth player steering precision
+
+Build both public candidates and run the bounded functional regressions:
+
+```sh
+. amiga/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/steering-fix-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/steering-fix-ocs
+for variant in cd32 ocs; do
+  python3 tools/player_basis_check.py "$variant" "tmp/steering-fix-$variant" --output "tmp/steering-check-$variant"
+  python3 tools/afterburn_prediction_check.py "$variant" "tmp/steering-fix-$variant" --output "tmp/steering-afterburn-$variant"
+done
+python3 tools/timing_player_check.py tmp/steering-fix-cd32 --output tmp/steering-player-cd32
+python3 tools/release_check.py tmp/steering-fix-cd32 --output tmp/steering-release-cd32
+python3 tools/ocs_options_check.py tmp/steering-fix-ocs --output tmp/steering-options-ocs
+```
+
+Use fresh output directories on repeats. The precision check uses actual assembled
+helpers and native routines, with an independent floating-point mixed-axis oracle
+and an original small-rotation negative control. It checks zero vertical-axis drift
+during yaw, pose replacement, scene/inactive reset and register preservation.
+The older player fraction check now compares against real-number rotations;
+bit equality with the native low-precision result would preserve the bug.
+No long emulator trace or new capture is required for these checks.
+
+Interactive acceptance: pitch down, release and coast for a second, then alternate
+Left/Right around a star near the reticle. The star should not steadily climb as
+horizontal steering continues. Repeat after scene transitions and with afterburner.
+This interactive confirmation remains separate from the passing native CPU checks.

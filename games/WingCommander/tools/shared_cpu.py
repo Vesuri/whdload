@@ -6,7 +6,7 @@ No native ABI, field offset, device or converter selection is implied.
 """
 import re
 
-UNITS = ('timing', 'timing_clock', 'timing_player', 'timing_input',
+UNITS = ('timing', 'timing_clock', 'timing_player', 'player_basis', 'timing_input',
          'timing_presentation', 'timing_scene', 'timing_intro',
          'timing_external', 'timing_translation', 'timing_projectiles', 'timing_scene_slots',
          'view_regions', 'release_buffer', 'frame_stats')

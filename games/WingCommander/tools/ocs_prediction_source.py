@@ -57,8 +57,10 @@ def adapt(text):
 
 def source(root):
     pieces=[]
-    for name in ('timing_player','timing_translation','timing_scene','timing_scene_slots','timing_projectiles'):
+    for name in ('timing_player','player_basis','timing_translation','timing_scene','timing_scene_slots','timing_projectiles'):
         s=(root/'whdload'/f'{name}.s').read_text()
+        if name=='player_basis':
+            s=re.sub(r'(player_basis_offsets: dc.w[^\n]+)',lambda m:re.sub(r'\$[0-9a-f]+',lambda x:field(x[0]),m[0]),s)
         if name=='timing_scene':
             # D2 owns all allocating preparation. Only snapshot/staging remains.
             a=s.index('timing_scene_snapshot:');b=s.index('; Cosmetic regeneration')

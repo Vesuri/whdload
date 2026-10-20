@@ -2523,10 +2523,12 @@ processes pad/keyboard commands. The isolated player helper previews `18daa/0742
 with throttle calls at `18eee/18f00` and fire at `18f3a` suppressed, then restores
 all changed native ramp/rate state. Tests cover all 64 combined-input masks at
 five initial ramp values on both CPU models. The world data allocation is
-unchanged by preview. The helper retains signed sub-angle remainders and applies
-native pitch/yaw/roll routines `2acb2/2acf2/2ad32` in their original order; each
-rebuilds the basis through `2bb30`. Signed unit-rate results at 50/60 Hz match ten
-native rotations over a second. These are local native correctness checks only.
+unchanged by preview. The helper retains signed sub-angle remainders and the original pitch/yaw/roll
+order. Field rotation now uses the Q14 orientation described under
+[smooth steering precision](#smooth-player-steering-precision), replacing repeated
+calls to native `2acb2/2acf2/2ad32` and their Q8 rebuild `2bb30`. Signed unit-rate
+results at 50/60 Hz agree with a ten-degree real-number rotation over a second.
+These are local native CPU correctness checks only.
 
 The helpers are connected through a VBL input history. `E:34188` (file `341b4`)
 records native RAM after the existing clock/music callback, preserving its register
@@ -8203,8 +8205,8 @@ in either current public slave. This reduces file size, not required runtime RAM
 
 | Public build | File bytes | Initialized hunk bytes | Runtime workspace bytes | Allocated hunk bytes |
 |---|---:|---:|---:|---:|
-| CD32 | 37,576 | 37,540 | 151,036 | 188,576 |
-| OCS | 39,712 | 39,676 | 23,136 | 62,812 |
+| CD32 | 38,312 | 38,276 | 151,036 | 189,312 |
+| OCS | 40,100 | 40,064 | 23,136 | 63,200 |
 
 `ws_GameLoader` at slave hunk offset `18` (file `38`) selects the 68000-safe
 clear-and-tail-call wrapper. In these builds its hunk/file offsets are CD32
@@ -8216,7 +8218,7 @@ failure stays a loader failure, before game entry; it is not an unchecked pointe
 or a loan from KickEmu's fixed game pools. Existing conversion/Fast-memory gates
 remain, and OCS's allocation-range check now includes the tail.
 
-Workspace hunk ranges are CD32 `92a4..2e0a0`, OCS `9afc..f55c` (end exclusive).
+Workspace hunk ranges are CD32 `9584..2e380`, OCS `9c80..f6e0` (end exclusive).
 They have no stored file offsets. Generated listings and build metadata distinguish
 initialized size from allocation size. The native fixtures reconstruct the full
 allocation when loading a slave; snapshots must include that full size rather
@@ -8267,3 +8269,43 @@ pictures reproduces 11 reversed ties; the correction resolves all 11 and
 preserves all game-data bytes outside the draw list. This is a correctness
 check, not a performance measurement. Reproduction is in
 [development](development.md#intro-death-explosion-order).
+
+## Smooth player steering precision
+
+Alternating horizontal turns after pitching reproduced a vertical orientation
+change with zero pitch input. Native CD32 H0 `2acf2` (file `2ad1e`) and OCS H0
+`29d66` (file `29d92`) rotate the right/forward pair, then rebuild and normalize
+the Q8 basis. CD32 H0 `2bb30` (file `2bb5c`) is that basis rebuild. Repeated small
+field-rate rotations amplify rounding in these native routines: the controlled
+150-turn negative case changes an up-vector component by 128 Q8 units. This is
+orientation drift, not a stale steering ramp or a fractional pitch accumulator.
+The original larger-step path also rounds; the enhancement made the effect much
+more pronounced by repeatedly committing small Q8 rotations.
+
+`whdload/player_basis.s` now retains the player's three basis vectors in Q14 and
+uses a mathematically generated Q14 sine table. Pitch/yaw/roll retain their native
+axis order, signs, degree units and field-rate angle fractions. Symmetric rounding,
+Q14 cross products and near-unit normalization keep precision between fields.
+Only the rounded Q8 basis is published to the native game, once per rotating
+field, before controlled translation. World collision/targeting and the camera
+therefore consume the same authoritative orientation; no cosmetic-only heading
+or extra world update is introduced. Other objects and native/off-mode rotation
+paths are unchanged. CD32 uses A4 offsets `214a/3452/3752`; OCS explicitly maps
+these to `18d8/2a40/2d40`.
+
+The helper compares the native pose with its last publication before each field.
+A native/script change reseeds from that pose. Shared scene reset and inactive
+steering invalidate the private basis; idle fields do not rewrite native pose.
+The small private state is 56 bytes (nine words, nine longs, validity word), not a
+large workspace. All helper arithmetic and addressing are 68000-compatible;
+public enhancement eligibility remains 68020 plus true Fast memory.
+
+Native CPU checks cover CD32 020/040 and OCS 000/020: each executes 4,400 alternating
+yaw fields across PAL/NTSC and four tilted orientations, with zero change in the
+published up-vector components. Another 1,200 mixed-axis fields agree with an
+independent real-number rotation reference within 1.102 Q8 component units.
+The same test reproduces the old drift using native rotation as a negative
+control and checks native-pose replacement, scene/inactive invalidation and
+register preservation. Player preview/fraction and afterburner ownership checks
+pass. This is functional CPU evidence; interactive confirmation of the reported
+video sequence and performance measurements are not claimed.

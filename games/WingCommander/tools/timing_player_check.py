@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native player-preview isolation and signed angular-fraction checks."""
+"""Native player-preview isolation and signed angular-fraction checks against real-number rotation."""
 import argparse
 import json
 import re
@@ -7,6 +7,7 @@ import struct
 from pathlib import Path
 from timing_audit_check import CPU
 from cd32_runtime import ROOT, locate
+from player_basis_check import IDENTITY, turn
 
 S=0x180000
 
@@ -51,17 +52,20 @@ def main():
         for hz in (50,60):
             for axis in range(3):
                 for sign in (-1,1):
-                    c=setup();ref=setup()
+                    c=setup()
+                    for off,vec in zip((0xa148,0xb450,0xb750),IDENTITY):
+                        c.write(c.data+off,struct.pack('>3i',*vec))
                     c.write(S+sym['timing_hz'],struct.pack('>I',hz))
                     rates=[0,0,0];rates[axis]=sign
                     c.write(S+sym['timing_angles'],struct.pack('>3h',*rates))
                     for _ in range(hz):own(c,'timing_player_field')
-                    for _ in range(10):ref.run((0x2acb2,0x2acf2,0x2ad32)[axis],struct.pack('>hh',sign,0))
-                    for off in (0xa148,0xb450,0xb750):
-                        assert c.read(c.data+off,12)==ref.read(ref.data+off,12)
+                    expected=turn(IDENTITY,axis,sign*10)
+                    for off,vec in zip((0xa148,0xb450,0xb750),expected):
+                        got=struct.unpack('>3i',c.read(c.data+off,12))
+                        assert max(abs(x-y) for x,y in zip(got,vec))<2,(axis,sign,got,vec)
                     assert c.read(S+sym['timing_angle_remainder'],12)==bytes(12)
-                    c.close();ref.close();checks+=1
-    out.mkdir(parents=True);(out/'report.json').write_text(json.dumps(dict(checks=checks,models=[68020,68040],preview_state_unchanged=True,signed_fraction_native_rotation=True),indent=2)+'\n')
+                    c.close();checks+=1
+    out.mkdir(parents=True);(out/'report.json').write_text(json.dumps(dict(checks=checks,models=[68020,68040],preview_state_unchanged=True,signed_fraction_rotation=True),indent=2)+'\n')
     print(f'PASS: {checks} native preview/isolation and signed-rate cases')
 
 

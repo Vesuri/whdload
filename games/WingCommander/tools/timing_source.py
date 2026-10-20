@@ -13,7 +13,7 @@ def source(root, buffered=False, *, variant):
         raise ValueError('changed English executable')
     offset, size, _ = v.HUNKS[0]
     code = game[offset:offset+size]
-    lines=[preamble(root,v.CPU),assembly_definitions(v),unit(root, 'timing', v.CPU),unit(root, 'timing_clock', v.CPU),unit(root, 'timing_player', v.CPU),unit(root, 'timing_input', v.CPU),unit(root, 'timing_presentation', v.CPU),unit(root, 'timing_scene', v.CPU),'timing_install:']
+    lines=[preamble(root,v.CPU),assembly_definitions(v),unit(root, 'timing', v.CPU),unit(root, 'timing_clock', v.CPU),unit(root, 'timing_player', v.CPU),unit(root, 'player_basis', v.CPU),unit(root, 'timing_input', v.CPU),unit(root, 'timing_presentation', v.CPU),unit(root, 'timing_scene', v.CPU),'timing_install:']
     if buffered:
         lines.insert(-1, '''EFFECT_LIST equ -4456
 EFFECT_CLASS equ $1700
