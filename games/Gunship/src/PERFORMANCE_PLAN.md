@@ -473,7 +473,7 @@ Current ownership, source map, evidence and demo checks: [TIMING_DESIGN.md](TIMI
 | ID | Remaining work | Completion evidence |
 |---|---|---|
 | C-R1 | Complete: unattended demo playback and any-key exit. | PAL/NTSC normal-startup runs with CUSTOM1 off/on fly the recorded demo; Space returns to vehicle identification. Demo retains native timing. |
-| C-R2 | Complete: ordinary-play world rate on 68020/68060, PAL/NTSC. | F release-slave 500-field windows each measured 3.00 Hz (criterion 1). |
+| C-R2 | Complete (also C9b): ordinary-play world rate on 68020/68060, PAL/NTSC. | F release-slave samples rechecked: 30 ticks / 500 PAL fields and 25 ticks / 500 NTSC fields on each CPU, all 3.00 Hz (criterion 1). |
 | C-R3 | Confirm visible response to new input. | The response appears on the next completed frame (criterion 3). |
 | C-R4 | Full-mission user acceptance on a1200 with current fixes. | No visible problems, including missile destruction and damaged-tail-rotor motion (criterion 5). |
 | C-R5 | Full-mission user acceptance on 68060 with current fixes. | No visible problems (criterion 5). |
@@ -532,7 +532,7 @@ is a later verification note. No further 68000 timing or exact-forecast work.
   - C8c. Invalidate player/prediction history on lifecycle transitions and flight retirement.
 - **C9. Validation reference; only the five refocus criteria are release gates.**
   - C9a. Existing cross-CPU and drawing-independent state comparisons remain regression checks.
-  - C9b. Ordinary-play world-rate acceptance is C-R2.
+  - C9b. Complete: ordinary-play world-rate acceptance is C-R2. All four required CPU/video combinations meet 3.00 Hz ±1%; see the world-rate acceptance evidence in TIMING_DESIGN.md.
   - C9c. Visible next-frame input response is C-R3; full-mission play is C-R4/C-R5.
   - C9d. Retain native held-input player endpoint checks (criterion 2 already shown).
   - C9e. Retain clock, reserves, reload, effect and lifecycle duration checks.

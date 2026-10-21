@@ -393,6 +393,28 @@ Evidence: ignored `tmp/dev/tmp/e23-pixels-final2/`, `e-040-cache/`,
 `test_cpu_render_install.py`.
 
 
+## World-rate acceptance (C-R2, C9b)
+
+Both items are complete against refocus criterion 1. The saved F release-slave
+samples were rechecked directly against their result summaries: elapsed display
+fields and the native world-tick counter give the following rates.
+
+| Release | CPU | Fields | World ticks | World Hz |
+|---|---|---:|---:|---:|
+| 0658 / PAL | 68020 | 500 | 30 | 3.00 |
+| 0658 / PAL | 68060 | 500 | 30 | 3.00 |
+| 1489 / NTSC | 68020 | 500 | 25 | 3.00 |
+| 1489 / NTSC | 68060 | 500 | 25 | 3.00 |
+
+Rate is ticks × video field rate / elapsed fields (50 PAL, 60 NTSC); all
+four meet 3.00 Hz ±1%. These are ordinary startup/takeoff windows with CUSTOM1=1,
+using `play_port_f.py` and the existing flight route, not unattended demos.
+Evidence: ignored `tmp/dev/tmp/f-{pal,ntsc}-{020,060}/samples.json` and
+`result.json`. This is an audit of the existing F measurements, not a fresh
+emulator run. Subsequent bank-rounding, damage-colour, damage-camera and demo
+fixes have not changed the ordinary-play world scheduler. Visible input response
+and full-mission acceptance remain separately open as C-R3–C-R5.
+
 ## Remaining blitter work and measured outcome (E4/E5)
 
 E4 is closed by the user's measurement-based decision: do not introduce an
