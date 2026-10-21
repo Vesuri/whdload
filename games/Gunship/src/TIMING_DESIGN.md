@@ -175,7 +175,7 @@ plane pointers. The game's VBL server exchanges those words and acknowledges
 completion before the task may reuse the old front buffer. Submission returns
 immediately; bitmap binding waits only if an exchange is still pending. Native
 swaps and DisownBlitter drain pending work before handing back ownership. VERIFY
-logs VBL exchanges rather than task submissions. D4 remains separate. FrontScreen waiting
+logs VBL exchanges rather than task submissions. D4 is closed by user decision: retain double buffering. FrontScreen waiting
 yields through WaitTOF. Native/modal paths still rebuild their screen normally.
 Palette moves and the flash-effect pointers found by +00AB8 stay intact;
 there is no unchanged per-frame palette copy or MakeScreen/RethinkDisplay.

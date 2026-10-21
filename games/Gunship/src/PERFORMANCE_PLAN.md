@@ -568,11 +568,11 @@ is a later verification note. No further 68000 timing or exact-forecast work.
   Evidence: ignored `tmp/dev/tmp/d3-{fps020,fps060,pause-exit}/`.
   - D3a. With D2, the task requests the swap and continues.
   - D3b. Before drawing into a buffer it waits only until that buffer is no longer displayed.
-- **D4. Triple buffering.**
-  - D4a. Add a third 40 KB chip bitmap where chip RAM allows: always on 2 MB chip machines, and
-    optional on 512 KB.
-  - D4b. The CPU and blitter then never wait for the display, and frame times stop rounding up
-    to whole fields.
+- **D4. Triple buffering — closed, declined by the user (2026-10-21).**
+  Keep D3's asynchronous double buffering. The uncommitted triple-buffer
+  implementation was removed; no third bitmap or triple-buffer option ships.
+  - D4a. Third chip bitmap: cancelled.
+  - D4b. Drawing/display overlap through a third buffer: cancelled.
 - **D5. Small fixes.**
   - D5a. Remove the redundant final wait at `+08D7A`.
   - D5b. Clear only the span-table rows of the previous polygon box in `+08818`, instead of all
@@ -625,18 +625,17 @@ is a later verification note. No further 68000 timing or exact-forecast work.
 - **E5. Expected outcome.**
   - E5a. With D and E, the work left on a 68030 or faster is mostly geometry: 1.5 % of today's
     frame on the 68060, plus the copy.
-  - E5b. That should reach the 25 fps (2-field) level and, with triple buffering, beyond.
+  - E5b. Assess the 25 fps (2-field) level with double buffering; D4 is closed.
   - E5c. Measure it with A3/A5 rather than assuming it.
 
 ### F. Release
 
 - **F1. Options.** Use CUSTOM options for:
   - the master boolean **Enhanced framerate**, CUSTOM1 (C10),
-  - the renderer choice (E1c),
-  - triple buffering (D4).
+  - the renderer choice (E1c).
   
-  Default: enhancements off. Renderer and buffering choices only apply when
-  Enhanced framerate is enabled.
+  Default: enhancements off. Renderer choices only apply when Enhanced framerate
+  is enabled. Triple buffering (D4) was declined; retain double buffering.
 - **F2. All versions.** Apply each patch to every supported `gamemule`/`titlmule`/`scrnmule`
   version at its own offsets. Where a version cannot be tested, say so in the ReadMe.
 - **F3. ReadMe and slave version.** Bump the version, add a history entry, and document the
