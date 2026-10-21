@@ -321,3 +321,25 @@ with D1 interrupt restoration passed. The ordinary slave is byte-identical.
 Evidence: ignored `tmp/dev/tmp/e23-pixels-final2/`, `e-040-cache/`,
 `e-pause-exit/`; harness checks `test_cockpit_e.py` and
 `test_cpu_render_install.py`.
+
+
+## Remaining blitter work and measured outcome (E4/E5)
+
+E4 is closed by the user's measurement-based decision: do not introduce an
+interrupt-driven queue when the 060 meets 25 fps. D1 and double buffering stay
+in place. The E2/E3 060 cycle profile measured 25 fps, 39.8% STOP idle, and
+33.2% chip-bus share. Inclusive remaining costs included map copy 7.3%, scope
+2.7%, tapes 2.5%, and the retained overlay path 3.4%; these overlap and must
+not be added. This profile predates the final panel-invalidation correction.
+
+Final 500-field PAL completed-swap runs after that correction measured:
+020 125 frames / 12.5 fps, 030 at 50 MHz 250 / 25 fps, and 060 at 50 MHz
+250 / 25 fps. Every run completed 30 world ticks / 3.00 Hz. The eight injected
+stick events reached the next completed frame in 40–80 ms, 20 ms and 40 ms
+respectively. These field-phase samples are not evidence of visible input
+response or scanout latency. The old prediction that only geometry would
+remain is not confirmed: copies, native blits and display pacing still matter.
+No 68000 work was done. No full-mission or PAL/NTSC acceptance is implied;
+C-R1–C-R5 remain open and other executable versions remain F2.
+Evidence: ignored `tmp/dev/tmp/e-final-fps{020,030,060}/`,
+`e-aprof-baseline060-current/` and `e-aprof-final060/`.

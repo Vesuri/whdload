@@ -597,6 +597,9 @@ versions remain F2. This does not close C's five release blockers.
 
 ### E. Cut blitter work (the ceiling from the 68020 on)
 
+**Complete for enhanced 0658 (2026-10-21).** E4 is closed by the user-approved
+measurement decision. Other executable versions remain F2; C-R1–C-R5 remain open.
+
 - **E1. CPU renderer for the 3D view — complete for the enhanced 0658 runtime.**
   `timing-cpu-render.i` retains native geometry/clipping and draws the view into
   an 18,000-byte MEMF_FAST buffer: pen-selected multi-plane Bresenham lines,
@@ -646,16 +649,35 @@ versions remain F2. This does not close C's five release blockers.
   pause/exit and blitter-interrupt restoration passed. Ordinary slave is
   byte-identical. Evidence under ignored `tmp/dev/tmp/`:
   `e23-pixels-final2/`, `e-040-cache/`, `e-pause-exit/`.
-- **E4. Overlap what stays on the blitter.**
-  - E4a. For blits that remain (map, cockpit art, the 68000 path), queue them and start the next
-    one from a game-owned BLIT interrupt, instead of spinning.
-  - E4b. Measure first: on the 68000 the CPU work is about as long as the blitter work, so overlap
-    could hide most of the 21 % spin.
-- **E5. Expected outcome.**
-  - E5a. With D and E, the work left on a 68030 or faster is mostly geometry: 1.5 % of today's
-    frame on the 68060, plus the copy.
-  - E5b. Assess the 25 fps (2-field) level with double buffering; D4 is closed.
-  - E5c. Measure it with A3/A5 rather than assuming it.
+- **E4. Overlap what stays on the blitter — closed after measurement.**
+  - E4a. No interrupt-driven queue. The user approved closure if measurement
+    supported keeping it out: final 060 reaches 25 fps with double buffering.
+    Keep D1's disabled flight BLIT interrupts and native ordered blits.
+  - E4b. The E2/E3 060 cycle profile measured 25 fps and 39.8% STOP idle;
+    remaining map copy was 7.3%, scope 2.7%, tapes 2.5%, and the retained
+    cockpit restore path 3.4%. These inclusive shares overlap and are not
+    additive. Profile precedes the final panel-invalidation correction;
+    final completed-swap measurements below confirm the target still holds.
+    No 68000 rate or overlap work, per the C refocus.
+- **E5. Expected outcome — measured and complete.**
+  - E5a. The old mostly-geometry estimate is not established: chip copy,
+    remaining blits and VBL pacing still matter. No claim of a universal
+    mission-wide frame rate or a 1.5% geometry budget.
+  - E5b. The two-field / 25 fps level is reached on the tested 50 MHz 030
+    and 060 setups with double buffering. D4 stays closed.
+  - E5c. Existing A3/A5 tools, normal startup and 500 PAL fields per final run:
+
+    | Setup | Completed frames | FPS | World Hz | Input → next completed frame |
+    |---|---:|---:|---:|---:|
+    | a1200-fast (020) | 125 | 12.5 | 3.00 | 40–80 ms |
+    | a1200-030 (50 MHz) | 250 | 25.0 | 3.00 | 20 ms |
+    | a1200-060 (50 MHz) | 250 | 25.0 | 3.00 | 40 ms |
+
+    These are short play windows. Delay samples depend on field phase and do
+    not establish visible input response or scanout latency. Full-MMU 040
+    CACHE smoke is correctness evidence, not a frame-rate measurement.
+    Evidence: ignored `tmp/dev/tmp/e-final-fps{020,030,060}/`,
+    `e-aprof-baseline060-current/`, `e-aprof-final060/`.
 
 ### F. Release
 
