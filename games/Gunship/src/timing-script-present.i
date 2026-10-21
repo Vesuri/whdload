@@ -1,4 +1,4 @@
-; Serialized world snapshot for renderer-only index-5 pose.
+; Renderer-only index-5 extrapolation from consecutive committed poses.
 ; Lifecycle owners invalidate SPC_VALID when resetting generation counters.
 SPC_PLAYER equ 0
 SPC_GENERATION equ 4
@@ -10,14 +10,34 @@ SPC_CURRENT equ 18 ; split XYZ, heading and both metadata bytes (9 bytes)
 SPC_NEXT equ 28 ; packed XYZ words and heading byte
 SPC_SIZE equ 36
 
-; a0=SH,a1=prepared SP,a2=generation record,a3=P,a4=stable bitmap,
-; a5=two palette bytes,d0=tick,d1=world phase0..2. Return 1/0, -3 bad phase.
+; a0=SH,a2=generation record,a3=P,d0=tick,d1=world phase0..2.
+; a1/a4/a5 retained for ABI compatibility, unused. Return 1/-3 bad phase.
 script_present_capture:
  movem.l d1-d7/a0-a6,-(sp)
  cmpi.l #2,d1
  bhi .bad
  movea.l a0,a6
- clr.w SPC_VALID(a6)
+ moveq #0,d7
+ cmpi.w #1,SPC_VALID(a6)
+ bne .snapshot
+ move.l SPC_TICK(a6),d2
+ addq.l #1,d2
+ cmp.l d2,d0
+ bne .snapshot
+ ; Native store stamps ordinary movement too: exactly one store, unchanged
+ ; mode/type, is a continuous interval. Multiple stores snap conservatively.
+ move.l SPC_GENERATION(a6),d2
+ addq.l #1,d2
+ cmp.l (a2),d2
+ bne .snapshot
+ move.b $1db(a3),d2
+ cmp.b SPC_CURRENT+7(a6),d2
+ bne .snapshot
+ move.b $25b(a3),d2
+ cmp.b SPC_CURRENT+8(a6),d2
+ bne .snapshot
+ moveq #1,d7
+.snapshot:
  move.l a3,SPC_PLAYER(a6)
  move.l (a2),SPC_GENERATION(a6)
  move.w AG_EXHAUSTED(a2),SPC_EXHAUSTED(a6)
@@ -25,32 +45,36 @@ script_present_capture:
  move.w d1,SPC_PHASE(a6)
  lea script_present_offsets(pc),a0
  lea SPC_CURRENT(a6),a2
- moveq #8,d2
-.copy:
+ lea SPC_NEXT(a6),a1
+ moveq #2,d4
+.axis:
  move.w (a0)+,d3
- move.b 0(a3,d3.w),(a2)+
- dbf d2,.copy
- btst #0,SPC_EXHAUSTED+1(a6)
- bne .unknown
- movea.l a1,a0
- movea.l a3,a1
- movea.l a4,a2
- movea.l a5,a3
- bsr script_preview_forecast
- tst.l d0
- beq .done
- lea SP_PLAYER(a0),a1
- lea script_present_offsets(pc),a0
- lea SPC_NEXT(a6),a2
- moveq #6,d2
-.next:
+ move.b 0(a3,d3.w),d2
+ lsl.w #8,d2
  move.w (a0)+,d3
- move.b 0(a1,d3.w),(a2)+
- dbf d2,.next
+ move.b 0(a3,d3.w),d2
+ move.w d2,d5
+ tst.w d7
+ beq .axis_store
+ sub.w (a2),d5
+ add.w d2,d5
+.axis_store:
+ move.w d2,(a2)+
+ move.w d5,(a1)+
+ dbf d4,.axis
+ move.b $15b(a3),d2
+ move.b d2,d5
+ tst.w d7
+ beq .heading_store
+ sub.b (a2),d5
+ add.b d2,d5
+.heading_store:
+ move.b d2,(a2)+
+ move.b d5,(a1)
+ move.b $1db(a3),(a2)+
+ move.b $25b(a3),(a2)
  move.w #1,SPC_VALID(a6)
- bra .done
-.unknown:
- moveq #0,d0
+ moveq #1,d0
  bra .done
 .bad:
  moveq #-3,d0

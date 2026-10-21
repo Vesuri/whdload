@@ -67,11 +67,8 @@
  include "timing-endpoint-fraction.i"
  include "timing-endpoint-motion.i"
  include "timing-endpoint-player.i"
-	include "timing-forecast-checkpoint.i"
-	include "timing-forecast-tape.i"
  include "timing-scheduled-endpoint.i"
  include "timing-endpoint-ground.i"
- include "timing-forecast-build.i"
  include "timing-endpoint-camera.i"
  include "timing-endpoint-impulse.i"
  include "timing-scheduled-impulses.i"
@@ -92,7 +89,4 @@
 
  include "timing-runtime-loop.i"
 
-; Construction-only helpers follow runtime entry points to preserve 68000
-; PC-relative loader call reach. They are not on the installed frame path.
- include "timing-forecast-sine.i"
- include "timing-runtime-forecast.i"
+; Exact guided forecast/tape helpers are no longer part of the runtime.

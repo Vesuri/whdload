@@ -65,6 +65,35 @@ timing_runtime_target:
  lea $3b88(a0),a0
  lea RT_CAMERA(a6),a2
  bsr native_camera_build
+ ; Project the committed candidates without drawing first. An empty list
+ ; needs no visibility pixels: the native selector produces no lock. This
+ ; avoids a whole extra raster frame at every empty-view world deadline.
+ lea RT_SCENE(a6),a0
+ lea RT_CAMERA(a6),a1
+ movea.l RT_HUNKS(a6),a2
+ adda.l #$c6a0,a2
+ bsr scene_target_step
+ tst.l d0
+ bmi .failed
+ move.w d0,RT_GEOMETRY+SGE_RESULT(a6)
+ move.w #1,RT_GEOMETRY+SGE_PRECHECK(a6)
+ tst.w RT_TARGET+WT_STATE+2(a6)
+ bne .raster
+ ; Native projectiles and the scripted helicopter still sample terrain
+ ; pixels during the world tick. Keep their committed raster dependency,
+ ; including a player launch on this deadline.
+ tst.w RT_FIRE(a6)
+ bne .raster
+ movea.l RT_HUNKS(a6),a0
+ adda.l #$ba08,a0
+ tst.w (a0)
+ bne .raster
+ movea.l RT_HUNKS+24(a6),a0
+ tst.b $3be3(a0) ; split scripted X high byte
+ bne .raster
+ tst.b $3c5d(a0) ; split scripted X low byte
+ beq .select
+.raster:
  lea RT_VISIBILITY(a6),a0
  lea RT_TARGET(a6),a1
  lea RT_CAMERA(a6),a2
@@ -73,6 +102,7 @@ timing_runtime_target:
  bsr visibility_raster_step
  tst.l d0
  bne .failed
+.select:
  lea RT_TARGET(a6),a0
  lea WT_PIXELS(a0),a1
  lea WT_PALETTE+24(a0),a2

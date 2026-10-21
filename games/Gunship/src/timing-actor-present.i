@@ -1,5 +1,5 @@
-; Renderer-only six-slot forward prediction. Capture only after a serialized
-; completed world step, lifecycle seed, or certified guided release.
+; Renderer-only six-slot extrapolation from consecutive committed positions.
+; Capture after a completed world step or lifecycle seed; first captures snap.
 ; Lifecycle owners clear AC_VALID before reusing generation zero.
 AC_PREVIEW equ 0
 AC_TICK equ 4
@@ -11,50 +11,99 @@ AC_CURRENT equ AC_MASKS+4 ; four six-word coordinate/vertical arrays
 AC_BYTES equ AC_CURRENT+48 ; fifteen six-byte actor arrays
 AC_NEXT equ AC_BYTES+90 ; three six-word predicted coordinate arrays
 AC_SAFE equ AC_NEXT+36
-AC_SELECTED equ AC_SAFE+2 ; selector dependency for native bit-7 homing actors
+AC_SELECTED equ AC_SAFE+2 ; retained historical layout; not a prediction dependency
 AC_SIZE equ AC_SELECTED+12
 
 ; a0=AC,a1=prepared AP,a2=AG,a3=committed P,d0=tick,d1=phase0..59 (caller requires phase < field rate).
-; Return 0/-3, preserve others. Invalid phase writes nothing. Caller flushes
-; AP code after preparation and excludes all actor/identity writers.
+; Return 0/-3, preserve others. Invalid phase writes nothing. Caller owns
+; a stable AP_H0 binding and excludes all actor/identity writers.
 actor_present_capture:
  movem.l d1-d7/a0-a6,-(sp)
  cmpi.l #59,d1
  bhi .bad
  movea.l a0,a6
  move.l a1,AC_PREVIEW(a6)
+ move.l AC_TICK(a6),d2
+ addq.l #1,d2
+ cmp.l d2,d0
+ beq .consecutive
+ clr.w AC_VALID(a6)
+.consecutive:
  move.l d0,AC_TICK(a6)
  move.w d1,AC_PHASE(a6)
- clr.w AC_VALID(a6)
+ ; Extrapolate the last committed displacement only. New/reused/morphed
+ ; slots snap for their first interval; no speculative native step is run.
+ movea.l AP_H0(a1),a4
+ adda.l #$c6a0,a4
+ movea.l AP_H0(a1),a5
+ adda.l #$ba08,a5
+ moveq #0,d7
+ cmpi.w #1,AC_VALID(a6)
+ bne .snap_all
+ move.w (a5),d7
+ and.w 4(a5),d7
+ and.w AC_MASKS(a6),d7
+ and.w AC_MASKS+2(a6),d7
+ move.w AG_EXHAUSTED(a2),d2
+ or.w AC_GENERATIONS+AG_EXHAUSTED(a6),d2
+ not.w d2
+ and.w d2,d7
+.snap_all:
+ moveq #5,d6
+.predict_slot:
+ move.w d6,d5
+ lsl.w #2,d5
+ move.l 0(a2,d5.w),d2
+ cmp.l AC_GENERATIONS(a6,d5.w),d2
+ bne .snap_slot
+ ; Type/impact flags and the ordinary lifetime decrement identify motion.
+ move.b 54(a4,d6.w),d2
+ cmp.b AC_BYTES+6(a6,d6.w),d2
+ bne .snap_slot
+ btst #0,d2
+ bne .snap_slot
+ move.b AC_BYTES(a6,d6.w),d2
+ subq.b #1,d2
+ cmp.b 48(a4,d6.w),d2
+ bne .snap_slot
+ cmpi.b #1,d2
+ bhi .predict_axes
+.snap_slot:
+ bclr d6,d7
+.predict_axes:
+ move.w d6,d5
+ add.w d5,d5
+ lea 0(a4,d5.w),a0
+ lea AC_CURRENT(a6,d5.w),a3
+ lea AC_NEXT(a6),a1
+ adda.w d5,a1
+ moveq #2,d4
+.axis:
+ move.w (a0),d2
+ btst d6,d7
+ beq .store_axis
+ sub.w (a3),d2
+ add.w (a0),d2
+.store_axis:
+ move.w d2,(a1)
+ adda.w #12,a0
+ adda.w #12,a3
+ adda.w #12,a1
+ dbf d4,.axis
+ dbf d6,.predict_slot
+ move.w d7,AC_SAFE(a6)
  lea AC_GENERATIONS(a6),a0
  moveq #AG_SIZE/2-1,d2
 .generations:
  move.w (a2)+,(a0)+
  dbf d2,.generations
- movea.l AP_H0(a1),a2
- adda.l #$ba08,a2
- move.w (a2),AC_MASKS(a6)
- move.w 4(a2),AC_MASKS+2(a6)
- adda.w #$c6a0-$ba08,a2
+ move.w (a5),AC_MASKS(a6)
+ move.w 4(a5),AC_MASKS+2(a6)
  lea AC_CURRENT(a6),a0
  moveq #(48+90)/2-1,d2
 .current:
- move.w (a2)+,(a0)+
+ move.w (a4)+,(a0)+
  dbf d2,.current
- movea.l a1,a0
- movea.l a3,a1
- bsr actor_preview_step
- move.w d0,AC_SAFE(a6)
- movea.l AC_PREVIEW(a6),a0
- move.l AP_SELECTED(a0),AC_SELECTED(a6)
- move.l AP_SELECTED+4(a0),AC_SELECTED+4(a6)
- move.l AP_SELECTED+8(a0),AC_SELECTED+8(a6)
- lea AP_ACTORS(a0),a0
- lea AC_NEXT(a6),a1
- moveq #17,d2
-.next:
- move.w (a0)+,(a1)+
- dbf d2,.next
  move.w #1,AC_VALID(a6)
  moveq #0,d0
  bra .done
@@ -160,23 +209,6 @@ actor_present_build_common:
  move.l 0(a5,d5.w),d0
  cmp.l AC_GENERATIONS(a6,d5.w),d0
  bne .reject
- tst.l (sp)
- bne .selector_ready
- ; Native bit-7 steering reads AA0A..AA15 unless bit-3/4 modes win first.
- ; A different selector invalidates only dependent homing slots. Capture
- ; it in AC, not the shared AP workspace reused by guided-release previews.
- move.b 54(a3,d6.w),d0
- andi.b #$98,d0
- cmpi.b #$80,d0
- bne .selector_ready
- movea.l AC_PREVIEW(a6),a0
- movea.l AP_H0(a0),a0
- adda.l #$aa0a,a0
- lea AC_SELECTED(a6),a1
- REPT 3
- cmpm.l (a0)+,(a1)+
- bne .reject
- ENDR
 .selector_ready:
  ; Certify current coordinates and vertical state against the captured pose.
  move.w d6,d5

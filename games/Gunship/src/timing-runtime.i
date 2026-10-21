@@ -46,7 +46,8 @@ RT_OPENING equ RT_CLEANUP+WT_CLEANUP_SIZE
 RT_GUIDANCE equ RT_OPENING+WS_CODE_SIZE
 RT_GROUND equ RT_GUIDANCE+FG_SIZE
 RT_SCENE equ RT_GROUND+GR_CODE_SIZE
-RT_GUIDANCE_PRESENT equ RT_SCENE+SCENE_SIZE
+RT_TARGET_COLLECTOR equ RT_SCENE+SCT_SIZE
+RT_GUIDANCE_PRESENT equ RT_TARGET_COLLECTOR+WTC_CODE_SIZE
 RT_BATCH equ RT_GUIDANCE_PRESENT+GP_SIZE ; 0 idle, 1 running, 2 command,
                                         ; 3 modal, 4 end, 5 fault, 6 excess
 RT_BOUNDARY equ RT_BATCH+2
@@ -71,7 +72,7 @@ RT_VIEW_SAVED equ RT_VIEW+TPV_SIZE
 RT_VIEW_PHASE equ RT_VIEW_SAVED+WT_STATE_SIZE ; 0 closed, 1 collecting, 2 drawing
 RT_ACTOR_GENERATIONS equ RT_VIEW_PHASE+2
 RT_ACTOR_PREVIEW equ RT_ACTOR_GENERATIONS+AG_SIZE
-RT_ACTOR_PRESENT equ RT_ACTOR_PREVIEW+AP_SIZE
+RT_ACTOR_PRESENT equ RT_ACTOR_PREVIEW+8 ; only immutable native hunk bindings
 RT_ACTOR_COORDS equ RT_ACTOR_PRESENT+AC_SIZE
 RT_RELEASE_PRESENT equ RT_ACTOR_COORDS+36
 RT_RELEASE_COORDS equ RT_RELEASE_PRESENT+AC_SIZE
@@ -82,34 +83,8 @@ RT_SCRIPT_BITMAP equ RT_SCRIPT_POSE+8
 RT_DRAW_ENTRY equ RT_SCRIPT_BITMAP+4
 RT_DRAW_READY equ RT_DRAW_ENTRY+4
 RT_SCRIPT_PREVIEW equ RT_DRAW_READY+2
-RT_PLAYER_CACHE equ RT_SCRIPT_PREVIEW+SP_SIZE
-RT_FORECAST equ RT_PLAYER_CACHE+PC_SIZE
-; Dedicated forecast storage; use a long base adjustment beyond signed words.
-RF_CONTEXT equ 0
-RF_EVENT equ RF_CONTEXT+FCT_CONTEXT_SIZE
-RF_SINE equ RF_EVENT+GD_SIZE
-RF_STAGES equ RF_SINE+536
-RF_GROUND equ RF_STAGES+MS_CODE_SIZE
-RF_TAPE equ RF_GROUND+GR_CODE_SIZE
-RF_WORK equ RF_TAPE+FCT_SIZE
-RF_OWNER equ RF_WORK+FB_SIZE
-RF_PLAYER equ RF_OWNER+EP_SIZE
-RF_CAMERA equ RF_PLAYER+MP_RECORD_SIZE
-RF_TARGET equ RF_CAMERA+12
-RF_COLLECTOR equ RF_TARGET+WT_SIZE
-RF_SCENE equ RF_COLLECTOR+WTC_CODE_SIZE
-RF_SELECTED equ RF_SCENE+SCT_SIZE
-RF_CERTIFIED equ RF_SELECTED+12
-RF_ACTOR_NEXT equ RF_CERTIFIED+12
-RF_ACTOR_SAFE equ RF_ACTOR_NEXT+36
-RF_PRESENT_COORDS equ RF_ACTOR_SAFE+2
-RF_PRESENT_SAFE equ RF_PRESENT_COORDS+36
-RF_ATTEMPTS equ RF_PRESENT_SAFE+2
-RF_ACCEPTED equ RF_ATTEMPTS+4
-RF_REJECTED equ RF_ACCEPTED+4
-RF_CAMERA_VIEW equ RF_REJECTED+4
-RF_SIZE equ RF_CAMERA_VIEW+2
-RT_ARENA_SIZE equ RT_FORECAST+RF_SIZE
+RT_PLAYER_CACHE equ RT_SCRIPT_PREVIEW ; no scripted native-motion preview
+RT_ARENA_SIZE equ RT_PLAYER_CACHE+PC_SIZE
 
 ; a0=first code address from a valid DOS LoadSeg chain, a1=36-byte output.
 ; Require the nine-hunk 0658 layout. Return 0/-1, preserve other registers.
@@ -288,9 +263,12 @@ timing_runtime_prepare:
  tst.l d0
  bne .bad
  movea.l RT_HUNKS+0(a6),a0
- movea.l RT_HUNKS+24(a6),a1
- lea RT_SCENE(a6),a2
- bsr scene_private_prepare
+ movea.l RT_HUNKS+16(a6),a1
+ movea.l RT_HUNKS+24(a6),a2
+ lea RT_SCENE(a6),a3
+ lea RT_TARGET(a6),a4
+ lea RT_TARGET_COLLECTOR(a6),a5
+ bsr scene_target_prepare
  tst.l d0
  bne .bad
  movea.l RT_HUNKS(a6),a0
@@ -312,21 +290,11 @@ timing_runtime_prepare:
  bsr target_view_prepare
  tst.l d0
  bne .bad
- movea.l RT_HUNKS(a6),a0
- movea.l RT_HUNKS+24(a6),a1
- lea RT_ACTOR_PREVIEW(a6),a2
- bsr actor_preview_prepare
- tst.l d0
- bne .bad
+ move.l RT_HUNKS(a6),RT_ACTOR_PREVIEW+AP_H0(a6)
+ move.l RT_HUNKS+24(a6),RT_ACTOR_PREVIEW+AP_H6(a6)
  lea RT_ACTOR_PREVIEW(a6),a0
  move.l a0,RT_ACTOR_PRESENT+AC_PREVIEW(a6)
  move.l a0,RT_RELEASE_PRESENT+AC_PREVIEW(a6)
- movea.l RT_HUNKS(a6),a0
- movea.l RT_HUNKS+24(a6),a1
- lea RT_SCRIPT_PREVIEW(a6),a2
- bsr script_preview_prepare
- tst.l d0
- bne .bad
  movea.l RT_HUNKS(a6),a0
  adda.w #$5c04,a0
  move.l a0,RT_DRAW_ENTRY(a6)
@@ -365,10 +333,6 @@ timing_runtime_prepare:
  movea.l a6,a0
  adda.l #RT_PLAYER_CACHE,a0
  move.l a0,RT_PLAYER+SE_CACHE(a6)
- movea.l a6,a0
- bsr timing_runtime_forecast_prepare
- tst.l d0
- bne .bad
  ; Wire arena-relative pointers from immutable offset pairs.
  lea .bindings(pc),a0
  move.w #(.bindings_end-.bindings)/4-1,d0

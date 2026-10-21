@@ -8,7 +8,8 @@ SGE_FIELD equ 16
 SGE_VALID equ 20
 SGE_COMMITTED equ 22
 SGE_RESULT equ 24
-SGE_SIZE equ 26
+SGE_PRECHECK equ 26 ; one-shot geometry result from this deadline target pass
+SGE_SIZE equ 28
 
 ; a0=context; metadata initialized to zero at lifecycle epoch start.
 ; Return 0 clear, 1 flight end, -1 failure, -3 wrong/duplicate phase.
@@ -34,12 +35,23 @@ scheduled_world_scene:
  cmp.l SGE_FIELD(a3),d2
  beq .phase
 .apply:
+ tst.w SGE_PRECHECK(a3)
+ beq .calculate
+ clr.w SGE_PRECHECK(a3)
+ moveq #0,d0
+ move.w SGE_RESULT(a3),d0
+ beq .checked
+ movea.l SGE_PLAYER(a3),a0
+ move.b #1,$18(a0)
+ bra .checked
+.calculate:
  movea.l SGE_PLAYER(a3),a0
  movea.l SGE_SCENE(a3),a1
  movea.l SGE_OBJECTS(a3),a2
  bsr world_scene_check
  tst.l d0
  bmi .done
+.checked:
  move.w d0,SGE_RESULT(a3)
  move.l d2,SGE_FIELD(a3)
  move.w #1,SGE_VALID(a3)
