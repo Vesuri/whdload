@@ -442,46 +442,50 @@ acceptance text in the status notes and items below where they conflict.
 5. List at most ten release blockers; everything else is a later note.
 6. Trim this section's status notes to about 20 lines and make
    `TIMING_DESIGN.md` describe the current design; history is in git.
-7. Then D1/D2, then E1: C fixes speed and response, but the blitter caps
+7. Then D2 (D1 brought forward into step 3 by user approval), then E1: C fixes speed and response, but the blitter caps
    drawing at about 15 fps until D and E.
 
-**Current status (2026-10-21): step 3 simplified; 68020 fps criterion still open.**
+**Current status (2026-10-21): refocus step 3 complete; stopped for report.**
 
-CUSTOM1 is now cleared at startup below the 68020, before any enhancement
-patch is installed; ReadMe documents this. No further 68000 runs were made.
-The exact guided-forecast path, tapes and certification are removed from the
-runtime build and allocation. Object presentation uses consecutive committed
-motion, bounded to one interval; first captures and identity/type/lifecycle
-changes snap. Runtime storage fell from 57,620 to 30,420 bytes.
+The user authorized bringing D1 forward. CUSTOM1 now requires a 68020+;
+ReadMe documents native timing below that. Exact guided forecasting, tapes
+and certification are removed from the runtime build/allocation. Object
+presentation extrapolates consecutive committed motion for at most one tick,
+with first-capture, identity/type and lifecycle snapping. Runtime storage
+fell from 57,620 to 30,420 bytes. No new 68000 runs were made.
 
-Target acquisition projects candidates with the existing private native
-geometry pass. It skips rasterization only with no candidates, no active
-projectiles/scripted helicopter and no pending player fire; those consumers
-retain their committed terrain pixels. The same geometry result serves the
-immediately following world collision check, avoiding duplicate traversal.
+Target acquisition and collision share native private geometry. Empty views
+skip the extra visibility raster only without projectile/scripted-helicopter
+or pending-fire terrain-pixel consumers. D1 masks BLIT after OwnBlitter and
+WaitBlit, restoring its incoming enable before DisownBlitter. Other interrupt
+sources are untouched. The native game call audit found no QBlit/QBSBlit calls.
 
-Same normal-startup 500-field PAL window as step 2, final simplified build:
+Final comparison: same binary, normal startup, same 500-field PAL control
+window, one run per CPU/toggle. Native values match the step 2 baseline.
 
-| Machine | Native baseline fps | Previous enhanced fps | Simplified enhanced fps | World Hz | Input to next completed frame, median (range) |
+| Machine | Native fps | Enhanced fps | Gain | Native/enhanced ticks in 10 s | Enhanced input→next completed frame, median (range) |
 |---|---:|---:|---:|---:|---:|
-| a1200-fast (68020) | 10.4 | 8.0 | 9.6 | 3.00 | 60 ms (20–100) |
-| a1200-060 | 16.3 | 14.6 | 16.6 | 3.00 | 40 ms (20–60) |
+| a1200-fast (68020) | 10.4 | 11.5 | 10.6% | 52 / 30 | 60 ms (20–80) |
+| a1200-060 | 16.3 | 16.7 | 2.5% | 82 / 31 | 40 ms (20–60) |
 
-Criterion 4 is **not met on 68020**: 7.7% below native despite a 20% gain
-from step 2. The 060 is 1.8% above its baseline. These remain short PAL
-measurements; input-to-completion does not prove visible input response,
-and the native/enhanced control route reaches different world states.
-The 020 profile identified the redundant raster pass; after removing it,
-blitter waits still account for about 32% of elapsed time. Blitter fixes
-alone measured 10.3 fps, so they do not explain the remaining timing cost.
-Existing actor/script presentation and private/native candidate comparisons
-pass after adapting their expectations to committed-motion extrapolation.
+The 060 window includes 31 observed tick edges; first-to-last spacing gives
+30 intervals in 498 fields (3.012 Hz). The corresponding 020 estimate is
+3.008 Hz. Short-window edge counts are not a full PAL/NTSC rate acceptance
+check. Input→completion does not prove visible response, and native/enhanced
+control routes reach different world states. FPS parity is met in this window;
+full-mission play and C's other exit criteria remain open.
 
-Evidence: `tmp/dev/tmp/c/refocus-step3-simplified-final-{a1200-fast,a1200-060}/`;
-slave SHA-256 `2b2d2b3551e0897fcb3f8e2940d11f6bd7d834dbde0e6830029a7f1ef33e89fd`.
-Code commits: `849083a7` (CPU gate), `1aa150f7` (simplification).
-**Pending user decision:** bring D1 forward to close the 020 fps gap, or
-retain the plan order and leave step 3 incomplete. No D work has started.
+Existing actor/script prediction and native/private candidate checks pass.
+The live 020 pause/exit route freezes all player bytes, returns to native
+cleanup, and verifies BLIT masked during flight and restored on release
+(INTENA 0x602c → 0x606c; saved BLIT=0x40). Normal and VERIFY runtime builds pass.
+
+Evidence: `tmp/dev/tmp/c/refocus-step3-d1-{a1200-fast,a1200-060}/`, matching
+`refocus-step3-d1-off-*`, and `refocus-step3-d1-pause-exit/`.
+Slave SHA-256: `319d3b3e00ef48028ef7ac99be2fab2575ae562d4c4a7442891823a6b6e4ab77`.
+Code commits: `849083a7` (CPU gate), `1aa150f7` (simplification),
+`268af168` (D1). **Next: step 4**, windowed a1200 user play; do not start it
+until the step 3 report has been delivered. D2 and E1 retain their later order.
 
 **Step 2 measurement record (2026-10-21).**
 
@@ -1367,7 +1371,9 @@ the field-rate player step and snapshots add work, priced in C4f. The ignored ha
 
 ### D. Remove fixed overheads
 
-- **D1. Blitter interrupt off during flight.**
+- **D1. Blitter interrupt off during flight — complete for the experimental 0658 runtime.**
+  Brought forward into refocus step 3 with user approval; results and ownership
+  restoration check are recorded above. Other executable versions remain F2.
   - D1a. After OwnBlitter (`+0867C`), save INTENA and clear BLIT. Restore it before DisownBlitter
     (`+0868C`).
   - D1b. Check that nothing queues QBlit work during flight.

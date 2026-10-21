@@ -12,7 +12,10 @@ Committed target projection and collision share one geometry pass. An empty
 candidate list avoids the visibility raster only when there are no projectile,
 scripted-helicopter or pending-fire terrain-pixel consumers. Otherwise the native
 committed raster remains. Player motion and the 3 Hz world arithmetic are unchanged.
-See PERFORMANCE_PLAN.md for the current measurements and remaining 020 fps gap.
+D1 masks the blitter interrupt only while the game owns the blitter, restoring
+its previous enable before release, including modal and exit handoffs. The
+final PAL comparison reaches 11.5/16.7 fps on 020/060 versus native 10.4/16.3.
+See PERFORMANCE_PLAN.md for measurement scope and the remaining C exit criteria.
 The full document cleanup remains refocus step 6.
 
 The governing design is PERFORMANCE_PLAN.md section C, as revised in
