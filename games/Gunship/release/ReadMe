@@ -77,7 +77,7 @@
  - optional smoother framerate and responsive controls on 68020 and later
  - selectable faster CPU renderer
  - fixes for enhanced-mode ground climb indication, missile kills and
-   damaged-tail-rotor turning; 68040 graphics corruption fixed
+   small-bank left drift; 68040 graphics corruption fixed
  - updated installer with PAL/NTSC selection
 
  version 1.2 (15.02.2020) done by JOTD:

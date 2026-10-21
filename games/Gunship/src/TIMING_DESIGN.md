@@ -23,7 +23,7 @@ blitter (1) rendering, subordinate to CUSTOM1 and the 68020 CPU gate.
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
 The arena is 30,436 bytes for 0658 and 30,428 for 1489; each release slave
-has 49,666 bytes of text (49,704-byte hunk executable).
+has 49,674 bytes of text (49,712-byte hunk executable).
 The CPU renderer separately allocates 36,010 bytes of fast RAM: 18,000 for
 the view and 18,010 for cached cockpit artwork and its mask.
 `timing-core.i` defines the included implementation. Exact guided forecast,
@@ -93,7 +93,8 @@ Each field previews a native motion contribution using that anchor and fresh
 controls/current non-motion inputs, then distributes the contribution across
 the actual 16/17/20-field interval. Fractional shadow values preserve native
 rounding, saturation and wrap. A complete held-input interval reproduces the
-native endpoint, including displacement. A press/release within the interval
+native endpoint, including displacement, except for the intentional enhanced-mode
+bank-rounding correction below. A press/release within the interval
 contributes immediately; its result need not equal a native tick which never
 sampled that input. This is not delayed interpolation between world poses.
 
@@ -151,8 +152,15 @@ Damage-induced yaw is the one deliberate camera easing: only the retained
 random tail-rotor heading impulse is eased over 8 PAL fields (160 ms) or
 10 NTSC fields (167 ms). Normal steering uses the latest field pose without
 that delay. Gameplay heading, targeting, collision and RNG are unchanged.
-Small-bank asymmetry remains native: +0943A's signed byte shift maps +1..+3
-to zero and -1..-3 to -1.
+Enhanced heading now divides signed bank by four towards zero. Native
++0943A floors negative banks: +1..+3 produce zero turn but -1..-3 produce -1.
+`heading_step` removes that left bias in its replacement heading/track
+calculation; positive banks and exact multiples of four are unchanged. This
+is an intentional handling correction authorized after beta play-testing,
+not a camera adjustment. CUSTOM1=0 retains native handling. Both release
+binaries pass 1,536 assembled heading cases each, plus 651 PAL and 780 NTSC
+field updates through small-bank reversals without heading/track drift.
+Evidence: ignored `tmp/dev/tools/test_left_drift.py`.
 
 Effect construction belongs to world deadlines; countdown/animation and slot
 release progression belong to consumed fields. Native speed-toggle command

@@ -448,14 +448,19 @@ acceptance text in the status notes and items below where they conflict.
 **Current status (2026-10-21): refocus step 7 complete: D2 and E1 are implemented.**
 Enhanced mode ships in the 2.0b slaves for 0658 and 1489, gated by
 CUSTOM1 on 68020+; C remains open against the five exit criteria above.
-Held-input native endpoint equivalence (criterion 2) is shown.
+Held-input native endpoint equivalence (criterion 2) is shown, except for the
+subsequently authorized enhanced-mode bank-rounding correction.
 Step 3 met fps parity (criterion 4): 020 10.4 → 11.5; 060 16.3 → 16.7 fps.
 Step 7 PAL 500-field window: enhanced 020 11.7 fps, 060 25.0 fps; both 3.00 Hz.
 Next-completion delays: 020 median 60 ms (20–80), 060 20 ms in all eight samples.
 F normal-startup windows meet 3.00 Hz on 020/060 in PAL and NTSC (C-R2 complete).
 Input-to-completion medians were 60/40 ms; visible response still needs confirmation.
 Reported ground-gauge, 68040 BltClear, damage-yaw and deferred missile-kill fixes are in.
-Small-bank left/right asymmetry is native handling and is retained.
+Post-beta play-test correction: enhanced bank-to-turn division now truncates
+towards zero, removing the native small-bank left bias. Native mode is unchanged.
+Both release builds pass heading and field-rate small-bank reversal checks;
+see TIMING_DESIGN.md. Damage flash restoration and visibly choppy damaged-tail
+rotation remain reported issues requiring follow-up.
 Full-mission user acceptance remains open; targeted checks do not replace it.
 Unattended demo playback and any-key exit are confirmed enhanced-mode regressions.
 Current ownership, source map, evidence and demo diagnosis: [TIMING_DESIGN.md](TIMING_DESIGN.md).

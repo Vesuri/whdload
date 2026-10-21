@@ -125,6 +125,13 @@ heading_step:
 	bra .impulse
 .bank:
 	move.b $37(a5),d5
+	; Enhanced handling: divide bank by four towards zero. Native ASR
+	; floors negative banks, turning -1..-3 left while +1..+3 stay level.
+	; Bias only negative operands; exact multiples and right turns stay put.
+	tst.b d5
+	bpl .bank_divide
+	addq.b #3,d5
+.bank_divide:
 	asr.b #2,d5
 	ext.w d5
 	ext.l d5
