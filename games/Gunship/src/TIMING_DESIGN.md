@@ -23,7 +23,7 @@ blitter (1) rendering, subordinate to CUSTOM1 and the 68020 CPU gate.
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
 The arena is 30,436 bytes for 0658 and 30,428 for 1489; each release slave
-has 49,762 bytes of text (49,800-byte hunk executable).
+has 49,798 bytes of text (49,836-byte hunk executable).
 The CPU renderer separately allocates 36,010 bytes of fast RAM: 18,000 for
 the view and 18,010 for cached cockpit artwork and its mask.
 `timing-core.i` defines the included implementation. Exact guided forecast,
@@ -149,9 +149,20 @@ prevent the grounded needle jitter; positive lift and airborne readings keep
 native conversion, and physics is unchanged.
 
 Damage-induced yaw is the one deliberate camera easing: only the retained
-random tail-rotor heading impulse is eased over 8 PAL fields (160 ms) or
-10 NTSC fields (167 ms). Normal steering uses the latest field pose without
-that delay. Gameplay heading, targeting, collision and RNG are unchanged.
+random tail-rotor heading impulse is spread over the full following world
+interval: 16/17 PAL fields or 20 NTSC fields. The previous half-tick easing
+caused a repeated turn/pause; recovering the phase at the impulse stamp makes
+the new ramp meet the next deadline without an extra boundary jump. Only
+the damage contribution is spread: normal steering uses the latest field
+pose immediately. Gameplay heading, targeting, collision and RNG are unchanged.
+Assembled PAL/NTSC checks cover 350 field cases and 350 same-field steering
+responses, plus 17 consecutive intervals per release with reversals and zero
+impulses. For maximum damage impulses, observed per-field camera increments
+are at most 32/26 angle units (about 0.176/0.143 degrees); no half-tick stops
+remain. Grounded/repaired/invalid/stale samples leave the camera alone.
+Evidence: `tmp/dev/tools/test_damage_rotation.py` (ignored harness). Visual
+confirmation in damaged-tail play remains part of C-R4/C-R5; fewer completed
+frames under host CPU starvation still reduce the visible sampling rate.
 Enhanced heading now divides signed bank by four towards zero. Native
 +0943A floors negative banks: +1..+3 produce zero turn but -1..-3 produce -1.
 `heading_step` removes that left bias in its replacement heading/track

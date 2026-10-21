@@ -167,8 +167,9 @@ timing_runtime_present_state:
  movem.l (sp)+,d1-d7/a0-a6
  rts
 
-; Ease only the latest world-owned damage yaw over half a tick (160 ms PAL,
-; 167 ms NTSC). Ordinary steering remains the current field pose: do not
+; Spread only the latest world-owned damage yaw across the next world interval
+; (PAL 16/17 fields, NTSC 20). Half-tick easing caused a turn/pause at 3 Hz.
+; Ordinary steering remains the current field pose: do not
 ; interpolate the whole camera or postpone input. Physics, RNG, targeting
 ; and hit tests retain the native committed heading. No persistent smoothing
 ; state: the retained impulse stamp is cleared by the existing lifecycle.
@@ -185,13 +186,26 @@ timing_runtime_damage_yaw:
  beq .done
  move.w RT_IMPULSES+SI_CACHE+4(a0),d0
  beq .done
- moveq #0,d2
- move.w RT_CLOCK+TC_RATE(a0),d2
- divu.w #6,d2
- andi.l #$ffff,d2
- beq .done
  move.l RT_RECORD+TR_FIELD(a0),d3
  sub.l RT_IMPULSES+SI_FIELD(a0),d3
+ cmpi.l #20,d3
+ bhs .done
+ ; Recover clock phase at the impulse's deadline. It is 0..2, including
+ ; PAL's alternating intervals. A stale stamp must not prolong the effect.
+ move.w d3,d1
+ mulu.w #3,d1
+ moveq #0,d2
+ move.w RT_CLOCK+TC_PHASE(a0),d2
+ sub.w d1,d2
+ cmpi.w #2,d2
+ bhi .done
+ move.w d2,d1
+ move.w RT_CLOCK+TC_RATE(a0),d2
+ sub.w d1,d2
+ addq.w #2,d2
+ divu.w #3,d2
+ andi.l #$ffff,d2
+ beq .done
  cmp.l d2,d3
  bhs .done
  move.w d2,d1

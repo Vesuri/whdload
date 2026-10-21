@@ -460,8 +460,10 @@ Post-beta play-test correction: enhanced bank-to-turn division now truncates
 towards zero, removing the native small-bank left bias. Native mode is unchanged.
 Both release builds pass heading and field-rate small-bank reversal checks;
 see TIMING_DESIGN.md. Damage-flash expiry now restores the saved background
-colour in the enhanced display path. Visibly choppy damaged-tail rotation
-remains a reported issue requiring follow-up.
+colour in the enhanced display path. Damaged-tail camera rotation now spreads
+each random turn over the full next world interval, replacing half-tick
+turn/pause easing. PAL/NTSC continuity and immediate-steering checks pass;
+visual damaged-tail acceptance remains in the user mission checks.
 Full-mission user acceptance remains open; targeted checks do not replace it.
 Unattended demo playback and any-key exit are confirmed enhanced-mode regressions.
 Current ownership, source map, evidence and demo diagnosis: [TIMING_DESIGN.md](TIMING_DESIGN.md).
