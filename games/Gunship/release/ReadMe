@@ -1,0 +1,9 @@
+Gunship development build
+
+Enhanced framerate (CUSTOM1) is off by default and requires a 68020 or
+later. On a 68000 the option is ignored and native timing is retained.
+All framerate enhancements use this master option.
+
+The experimental TIMING_RUNTIME build adds a 3 Hz world clock, responsive
+player motion and renderer-only object prediction. It remains in development;
+ordinary builds retain native timing.

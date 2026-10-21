@@ -227,6 +227,13 @@ _bootdos
 		lea	(_tag,pc),a0
 		jsr	(resload_Control,a2)
 	
+	; Enhancements require a 68020 or later, including the blitter patches.
+		move.l	_cpu_flags(pc),d0
+		btst	#1,d0	; AFF_68020
+		bne.b	.enhanced_cpu
+		lea	_custom1(pc),a0
+		clr.l	(a0)
+.enhanced_cpu:
 	;open doslib
 		lea	(_dosname,pc),a1
 		move.l	(4),a6
@@ -461,7 +468,9 @@ _load_exe:
 	add.l	#resload_Abort,(a7)
 	rts
 
-_tag		dc.l	WHDLTAG_CUSTOM1_GET
+_tag		dc.l	WHDLTAG_ATTNFLAGS_GET
+_cpu_flags	dc.l	0
+		dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0	; master Enhanced framerate toggle; off by default
 	IFD VERIFY
 		dc.l	WHDLTAG_CUSTOM2_GET
