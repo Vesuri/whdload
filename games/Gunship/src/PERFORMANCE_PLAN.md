@@ -446,13 +446,13 @@ acceptance text in the status notes and items below where they conflict.
    drawing at about 15 fps until D and E.
 
 **Current status (2026-10-21): refocus step 7 complete: D2 and E1 are implemented.**
-Enhanced mode is implemented in the TIMING_RUNTIME build for 0658, gated by
+Enhanced mode ships in the 2.0b slaves for 0658 and 1489, gated by
 CUSTOM1 on 68020+; C remains open against the five exit criteria above.
 Held-input native endpoint equivalence (criterion 2) is shown.
 Step 3 met fps parity (criterion 4): 020 10.4 → 11.5; 060 16.3 → 16.7 fps.
 Step 7 PAL 500-field window: enhanced 020 11.7 fps, 060 25.0 fps; both 3.00 Hz.
 Next-completion delays: 020 median 60 ms (20–80), 060 20 ms in all eight samples.
-Short PAL world-rate estimates were 3.008/3.012 Hz; PAL/NTSC acceptance remains open.
+F normal-startup windows meet 3.00 Hz on 020/060 in PAL and NTSC (C-R2 complete).
 Input-to-completion medians were 60/40 ms; visible response still needs confirmation.
 Reported ground-gauge, 68040 BltClear, damage-yaw and deferred missile-kill fixes are in.
 Small-bank left/right asymmetry is native handling and is retained.
@@ -460,12 +460,12 @@ Full-mission user acceptance remains open; targeted checks do not replace it.
 Unattended demo playback and any-key exit are confirmed enhanced-mode regressions.
 Current ownership, source map, evidence and demo diagnosis: [TIMING_DESIGN.md](TIMING_DESIGN.md).
 
-**Release blockers (five; authoritative list from step 5).**
+**Release acceptance items (four open; authoritative list from step 5).**
 
 | ID | Remaining work | Completion evidence |
 |---|---|---|
 | C-R1 | Restore unattended demo playback and any-key exit. | Normal startup without input flies the recorded demo; a key exits as with CUSTOM1=0. |
-| C-R2 | Ordinary-play world rate on 68020/68060, PAL/NTSC. | 3.00 Hz ±1% in each case (criterion 1). |
+| C-R2 | Complete: ordinary-play world rate on 68020/68060, PAL/NTSC. | F release-slave 500-field windows each measured 3.00 Hz (criterion 1). |
 | C-R3 | Confirm visible response to new input. | The response appears on the next completed frame (criterion 3). |
 | C-R4 | Full-mission user acceptance on a1200 with current fixes. | No visible problems, including missile destruction and damaged-tail-rotor motion (criterion 5). |
 | C-R5 | Full-mission user acceptance on 68060 with current fixes. | No visible problems (criterion 5). |
@@ -681,9 +681,10 @@ measurement decision. Other executable versions remain F2; C-R1–C-R5 remain op
 
 ### F. Release
 
-**2.0b beta preparation (21.10.2026).** F1–F3 are implemented. F4's
-full-release sign-off remains distinct from the beta regression checks below;
-C's remaining acceptance items and the deferred T-74 report are not closed.
+**Complete for 2.0b beta (21.10.2026).** F is closed for this beta on the
+checks below. The full A3 matrix is not a beta gate. C's remaining acceptance
+items (C-R1, C-R3–C-R5) and the deferred T-74 report stay open; this is not
+full-release or full-mission sign-off.
 
 - **F1. Options — complete.** CUSTOM1 is the default-off **Enhanced framerate**
   master, ignored below 68020. CUSTOM4 selects CPU (0, default) or native
@@ -704,13 +705,15 @@ C's remaining acceptance items and the deferred T-74 report are not closed.
   selection, support for the launcher in C:, and icon selection. The history
   entry lists user-visible changes since 1.2. `source/build.sh` builds both
   production slaves with the shared toolchain; diagnostic builds are not shipped.
-- **F4. Final check — beta checks implemented; full acceptance pending.**
+- **F4. Final check — complete for the beta.**
   Existing blitter checks pass for PAL/NTSC title, menu and flight, including
   disabled-option behavior, delayed busy reads and register/flag preservation.
   Both release CPU gates ignore CUSTOM1 on 68000/010; no new 68000 rate or
   overload work was performed, per the refocus. The NTSC runtime's preparation
   and every live-hook signature pass. Both releases pass pause/exit, frozen
   paused state, no extra ticks after exit, and BLIT interrupt restoration.
+  NTSC with CUSTOM1=0 also passes normal startup/takeoff without a timing
+  arena: 15.12 fps and native 7.56 world Hz over 500 fields on 68060.
   Full-MMU 68040 CACHE startup/flight passed in FS-UAE. In that profile the CPU
   renderer is slower (6.12 fps) than the blitter (23.64); ReadMe recommends
   CUSTOM4=1 there. This is not a real-hardware performance result.
@@ -723,6 +726,7 @@ missions; these are not matched-state speedup comparisons or a full A3 matrix.
 |---|---|---:|---:|
 | 0658 / PAL | a1200-fast (020) | 13.9 | 3.00 |
 | 0658 / PAL | 030, 50 MHz | 23.5 | 3.00 |
+| 0658 / PAL | 060, 50 MHz | 22.0 | 3.00 |
 | 1489 / NTSC | a1200-fast (020) | 10.44 | 3.00 |
 | 1489 / NTSC | 060, 50 MHz | 30.0 | 3.00 |
 | 1489 / NTSC, blitter | 060, 50 MHz | 18.24 | 3.00 |

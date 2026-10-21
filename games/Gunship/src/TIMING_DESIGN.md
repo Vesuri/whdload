@@ -2,7 +2,7 @@
 
 This describes the 2.0b (21.10.2026) hybrid timing implementation.
 [PERFORMANCE_PLAN.md](PERFORMANCE_PLAN.md), section C's refocus, defines release
-acceptance and the five remaining blockers C-R1–C-R5. C is not complete.
+acceptance. C-R2 is measured; C-R1 and C-R3–C-R5 remain open. C is not complete.
 Implementation history and superseded experiments are in git.
 
 ## Activation and scope
@@ -239,7 +239,8 @@ binary and 500-field PAL control window. Native/enhanced fps were 10.4/11.5
 on a1200-fast and 16.3/16.7 on a1200-060. Enhanced world spacing estimated
 3.008/3.012 Hz. Input-to-next-completion medians were 60/40 ms (ranges 20–80 /
 20–60 ms). Those timestamps do not prove visible response, and the short PAL
-windows do not complete ordinary-play PAL/NTSC world-rate acceptance.
+windows alone did not establish PAL/NTSC world-rate acceptance. The F release
+checks now measure 3.00 Hz on 020/060 with both PAL and NTSC executables.
 Native and enhanced control routes also reach different world states because
 native simulation runs faster. Full-mission acceptance remains a user check.
 
