@@ -123,3 +123,47 @@ blitter_pixel:
 
 blitter_pixel_target: dc.l 0
 blitter_sites: ds.l 14
+
+; Every module's C wrapper starts an asynchronous BltClear and returns to
+; callers which immediately reuse its destination (including the decompressor
+; dictionary). Set WAIT while retaining the caller's row/fill flags. Locate
+; the identical wrapper in each supported release, before LoadSeg cache flush.
+blitter_clear_dispatch:
+	movem.l d0-d2/a0-a3,-(sp)
+	move.l _custom1(pc),d0
+	beq .done
+	move.l -8(a1),d2
+	subi.l #22,d2 ; allocation header plus complete 14-byte signature
+	bmi wrong_version
+	movea.l a1,a3
+	suba.l a0,a0
+.scan:
+	cmpi.l #$4cef0003,(a3)
+	bne .next
+	cmpi.l #$000c4eae,4(a3)
+	bne .next
+	cmpi.l #$fed42c5f,8(a3)
+	bne .next
+	cmpi.w #$4e75,12(a3)
+	bne .next
+	move.l a0,d0
+	bne wrong_version
+	lea 6(a3),a0
+.next:
+	addq.l #2,a3
+	subq.l #2,d2
+	bpl .scan
+	move.l a0,d0
+	beq wrong_version
+	move.w #$4ef9,(a0)+ ; JMP keeps the wrapper's saved a6 on the stack
+	lea blitter_clear_wait(pc),a3
+	move.l a3,(a0)
+.done:
+	movem.l (sp)+,d0-d2/a0-a3
+	rts
+
+blitter_clear_wait:
+	bset #0,d1
+	jsr -300(a6)
+	movea.l (sp)+,a6
+	rts

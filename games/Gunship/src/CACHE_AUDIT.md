@@ -156,3 +156,20 @@ Evidence: `040-intro-nommu-nonce`, `040-intro-cecpu-fastblit`,
 `040-intro-clear-owner` (write/start/stack trace and memory dump), and
 `040-intro-guest-waitclear`, all under `tmp/dev/tmp/c/`. The private emulator
 and modified original files are ignored diagnostic artifacts only.
+
+### Production correction (refocus step 4)
+
+`blitter_clear_dispatch` now locates the unique BltClear wrapper in each
+loaded title, menu and game module. Under CUSTOM1 it replaces the call/restore
+pair with a helper that sets WAIT (bit 0), calls BltClear and restores a6.
+All other flags and the original argument-loading ABI are preserved. The
+loader's existing cache flush covers the patch. CUSTOM1 off remains native.
+
+The existing assembled blitter checks pass (182 previous cases plus all six
+PAL/NTSC module wrappers, toggle off/on and flags 0/1/2/4/6/$12340006).
+The production slave with untouched game files completes normal startup and
+the engine/collective flight window on the full-MMU 68040 preset, CACHE on,
+asynchronous blits. Cockpit and flight artwork are intact; evidence is
+`tmp/dev/tmp/c/040-production-waitclear/`. The cycle-exact NOMMU workaround
+is no longer required for this corruption. This is emulator validation;
+real 68040 hardware has not been tested.

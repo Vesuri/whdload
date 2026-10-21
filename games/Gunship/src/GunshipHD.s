@@ -127,6 +127,7 @@ PATCH_EXE:MACRO
 	bsr timing_runtime_dispatch
 	ENDC
 	bsr	blitter_dispatch
+	bsr	blitter_clear_dispatch
 	IFD VERIFY
 	bsr	verify_dispatch_near
 	ENDC
