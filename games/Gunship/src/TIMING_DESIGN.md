@@ -393,6 +393,33 @@ Evidence: ignored `tmp/dev/tmp/e23-pixels-final2/`, `e-040-cache/`,
 `test_cpu_render_install.py`.
 
 
+## Visible input response (C-R3, C9c)
+
+The literal next-completed-frame criterion is not yet met. Production-slave
+paired runs on PAL 68020 and 68060 injected a held right-stick input at native
+draw entry, after that frame's camera was published. A no-input control used
+the same startup/takeoff route and identical pre-injection state. The frame
+already being drawn was byte-identical in all 40,000 bitplane bytes in both
+pairs. The first subsequent draw used the input: camera bank changed from zero
+to $ff00 on 020 and $ff88 on 060, and its rendered image differed in 380 and
+382 bytes respectively. The 020 image comparison visibly shows the banked
+horizon; the 060 comparison has the same zero-bank control and changed camera.
+
+This follows the current loop: consume field history, publish the camera,
+then draw. Input arriving during drawing is retained for the next iteration;
+the in-progress frame is not rebuilt. These observations establish response
+in the next newly drawn frame for these cases, not the next completion for
+arbitrarily timed input. Changing the acceptance wording requires the user's
+decision; C-R3 remains open. C9c also references full-mission acceptance, which
+remains separately under C-R4/C-R5.
+
+Evidence: ignored `tmp/dev/tools/check_visible_input.py` and
+`tmp/dev/tmp/visible-input-pal{020,060}-{control,right}/`. The check uses
+unmodified production slaves, debugger reads/breakpoints and real monitor
+input. Each frame capture is taken at the next draw preparation, after rendering
+and submission; some VBL swaps are still pending. These are framebuffer/camera
+observations, not exact display or scanout latency measurements.
+
 ## World-rate acceptance (C-R2, C9b)
 
 Both items are complete against refocus criterion 1. The saved F release-slave

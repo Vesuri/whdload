@@ -474,7 +474,7 @@ Current ownership, source map, evidence and demo checks: [TIMING_DESIGN.md](TIMI
 |---|---|---|
 | C-R1 | Complete: unattended demo playback and any-key exit. | PAL/NTSC normal-startup runs with CUSTOM1 off/on fly the recorded demo; Space returns to vehicle identification. Demo retains native timing. |
 | C-R2 | Complete (also C9b): ordinary-play world rate on 68020/68060, PAL/NTSC. | F release-slave samples rechecked: 30 ticks / 500 PAL fields and 25 ticks / 500 NTSC fields on each CPU, all 3.00 Hz (criterion 1). |
-| C-R3 | Confirm visible response to new input. | The response appears on the next completed frame (criterion 3). |
+| C-R3 | Open: resolve the next-completed-frame requirement. | PAL 020/060 paired production runs show input in the next newly drawn frame; the in-progress frame is unchanged. See TIMING_DESIGN.md; acceptance wording awaits the user's decision. |
 | C-R4 | Full-mission user acceptance on a1200 with current fixes. | No visible problems, including missile destruction and damaged-tail-rotor motion (criterion 5). |
 | C-R5 | Full-mission user acceptance on 68060 with current fixes. | No visible problems (criterion 5). |
 
