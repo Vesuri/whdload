@@ -7,3 +7,18 @@ All framerate enhancements use this master option.
 The experimental TIMING_RUNTIME build adds a 3 Hz world clock, responsive
 player motion and renderer-only object prediction. It remains in development;
 ordinary builds retain native timing.
+
+FS-UAE 68040 play setup
+
+Use the cycle-exact 68040 core without MMU emulation for this development
+build. The shared full-MMU a1200-040 preset corrupts the intro, menus and
+cockpit with either CACHE or NOCACHE. The working configuration retains
+asynchronous blits and enables the CPU data cache; immediate blits are not
+required. This is an emulator configuration workaround, not a hardware fix.
+With the shared a1200-040 preset (25 MHz, 2 MB chip, 8 MB fast), override:
+
+  --cpu=68040-NOMMU --uae_cpu_cycle_exact=true
+  --uae_cpu_memory_cycle_exact=true --uae_blitter_cycle_exact=true
+  --uae_uaeboard=full
+
+Use CUSTOM1=1 for Enhanced framerate. CACHE may remain enabled.

@@ -87,3 +87,26 @@ immediate blits to isolate cache behaviour from an asynchronous-blitter emulator
 path that corrupts cockpit artwork even with the pre-B slave and NOCACHE.
 Separate cycle-exact runs and assembled delayed-BBUSY cases cover wait timing.
 This is emulator evidence, not real-hardware certification.
+
+## 68040 interactive play follow-up (2026-10-21)
+
+User screenshots reproduced severe intro, arming-screen and cockpit damage
+with the shared full-MMU `a1200-040` preset. Separate normal-startup captures
+reproduce the intro damage with both `CACHE` and `NOCACHE`. Immediate blits
+clear the intro and cockpit; forcing blitter cycle accuracy alone or
+`waiting_blits=always` does not clear the intro. The WHDLoad SnoopOCS check
+stops earlier on a KickEmu copper-list check, so it does not establish whether
+the affected path has a missing wait.
+
+The working play configuration uses `68040-NOMMU` at 25 MHz with CPU, memory
+and blitter cycle accuracy enabled, `uaeboard=full`, and data cache enabled.
+Effective configuration confirms `immediate_blits=false`. Normal startup,
+cockpit and engine/collective input run without the observed artwork damage
+with `CUSTOM1=1 CACHE`. The local play launcher now selects this configuration;
+the ReadMe records its options. No guest wait/cache patches were changed.
+
+This isolates a usable emulator configuration, not the precise defect in the
+full-MMU asynchronous path. Full-MMU support remains unresolved; these runs
+do not certify real 68040 hardware or a complete mission. Local evidence is
+under `tmp/dev/tmp/c/cache-intro-*`, `cache-cockpit-immediate`,
+`040-intro-{cycle-exact,wait-always,nommu}`, and `040-play-cycle-exact`.
