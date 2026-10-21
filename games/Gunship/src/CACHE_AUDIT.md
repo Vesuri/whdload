@@ -105,8 +105,54 @@ cockpit and engine/collective input run without the observed artwork damage
 with `CUSTOM1=1 CACHE`. The local play launcher now selects this configuration;
 the ReadMe records its options. No guest wait/cache patches were changed.
 
-This isolates a usable emulator configuration, not the precise defect in the
-full-MMU asynchronous path. Full-MMU support remains unresolved; these runs
+This initially isolated a usable emulator configuration, not the precise defect.
+The investigation below supersedes the full-MMU attribution. These runs
 do not certify real 68040 hardware or a complete mission. Local evidence is
 under `tmp/dev/tmp/c/cache-intro-*`, `cache-cockpit-immediate`,
 `040-intro-{cycle-exact,wait-always,nommu}`, and `040-play-cycle-exact`.
+
+## Root cause: asynchronous BltClear in the original game (2026-10-21)
+
+The intro also corrupts with MMU emulation and caches disabled when CPU cycle
+accuracy is disabled. Conversely, cycle-exact CPU/memory timing with the bulk
+(non-cycle-exact) blitter produces a clean intro. The MMU is not required for
+the failure; neither configuration comparison alone diagnoses a guest bug.
+
+A private emulator build enabled the existing missing-register-wait log, then
+observed CPU writes into pending blitter destinations. No register-overwrite
+warning appeared, but the original title executable writes its LZW dictionary
+while a clear of the same allocation is outstanding:
+
+- PAL 0658 `titlmule` hunk 0 base was `$9797a0`.
+- Caller `+$33a0` pushes flags=0, length=$1770 (6000 bytes), and the workspace
+  pointer, then calls the BltClear wrapper at `+$6190`.
+- Wrapper calls graphics.library `-$12c` (BltClear) at `+$61a2`.
+- The remaining clear targets `$47b60`, 64 words by 46 rows, ascending,
+  minterm zero (`BLTCON0=$0100`, `BLTCON1=0`).
+- CPU instruction `+$13ce` (`move.b d0,(a4)+`, observed next PC `$97ab70`)
+  initializes dictionary bytes starting at `$48af0` inside that pending clear.
+
+BltClear explicitly requires flags bit 0 to wait for completion. The original
+caller does not set it or wait before using this memory. A faster CPU can reach
+the dictionary initialization before the asynchronous clear finishes; the clear
+then erases those writes. This is a guest synchronization bug, not evidence of
+an MMU cache-attribute defect. The timing conditions on real hardware remain
+untested, but the same missing synchronization is invalid there too.
+
+Causal check: in a disposable copy of `titlmule`, change only its wrapper's
+argument load to pass flags=1. The previously failing full-MMU, NOCACHE,
+asynchronous-blitter setup then renders the intro cleanly. No emulator timing
+or cache policy change is involved. The same wrapper pattern exists at
+`+$cfe8` in `scrnmule` and `+$ef68` in `gamemule` (offsets of the MOVEM argument
+load, not the wrapper entry). A production correction must preserve all other
+flag bits while setting bit 0; the disposable flags=1 experiment is not a
+release patch. The installed slave and the user's running session are unchanged.
+Applying the diagnostic change to all three modules also completes the normal
+startup route and engine/collective window with intact cockpit artwork under
+the original full-MMU preset, `CACHE`, and asynchronous blits. Evidence:
+`tmp/dev/tmp/c/040-play-guest-waitclear/{cockpit,flight}.png`.
+
+Evidence: `040-intro-nommu-nonce`, `040-intro-cecpu-fastblit`,
+`040-intro-clear-owner` (write/start/stack trace and memory dump), and
+`040-intro-guest-waitclear`, all under `tmp/dev/tmp/c/`. The private emulator
+and modified original files are ignored diagnostic artifacts only.
