@@ -53,6 +53,8 @@ timing_runtime_present_state:
  bsr endpoint_camera_angles
  tst.l d0
  bne .done
+ movea.l a6,a0
+ bsr timing_runtime_damage_yaw
  lea RT_ACTOR_PRESENT(a6),a0
  lea RT_ACTOR_GENERATIONS(a6),a1
  lea RT_ACTOR_COORDS(a6),a2
@@ -162,6 +164,44 @@ timing_runtime_present_state:
  moveq #-3,d0
 .done:
  movem.l (sp)+,d1-d7/a0-a6
+ rts
+
+; Ease only the latest world-owned damage yaw over half a tick (160 ms PAL,
+; 167 ms NTSC). Ordinary steering remains the current field pose: do not
+; interpolate the whole camera or postpone input. Physics, RNG, targeting
+; and hit tests retain the native committed heading. No persistent smoothing
+; state: the retained impulse stamp is cleared by the existing lifecycle.
+; a0=arena; preserve all registers. Call after endpoint_camera_angles only.
+timing_runtime_damage_yaw:
+ movem.l d0-d3/a1,-(sp)
+ tst.w RT_IMPULSES+SI_VALID(a0)
+ beq .done
+ movea.l RT_HUNKS+24(a0),a1
+ tst.w $3ba4(a1) ; player height
+ beq .done
+ move.w $3b96(a1),d0 ; damage flags
+ andi.w #3,d0
+ beq .done
+ move.w RT_IMPULSES+SI_CACHE+4(a0),d0
+ beq .done
+ moveq #0,d2
+ move.w RT_CLOCK+TC_RATE(a0),d2
+ divu.w #6,d2
+ andi.l #$ffff,d2
+ beq .done
+ move.l RT_RECORD+TR_FIELD(a0),d3
+ sub.l RT_IMPULSES+SI_FIELD(a0),d3
+ cmp.l d2,d3
+ bhs .done
+ move.w d2,d1
+ sub.w d3,d1
+ lsl.w #8,d0
+ muls.w d1,d0
+ divs.w d2,d0
+ ; Camera heading is negated; adding the unshown impulse removes it.
+ add.w d0,RT_CAMERA+6(a0)
+.done:
+ movem.l (sp)+,d0-d3/a1
  rts
 
 

@@ -8410,3 +8410,28 @@ The committed builder optimization, equality results and NTSC 000 overload
 remain as documented above. The T-74/68060 copy-protection graphics issue
 remains deferred. Commit each coherent change; use the same CUSTOM1 master
 gate for every future enhancement.
+
+### Refocus step 4: damaged-rotor yaw presentation
+
+The user reported uncontrolled rotation arriving in 3 Hz jumps after tail-rotor
+damage. Native +09474..+09492 adds a random -2..+2 heading-byte impulse once
+per world tick; the endpoint owner correctly retained that whole impulse.
+`timing_runtime_damage_yaw` now eases only this committed damage contribution
+in the renderer over 8 PAL fields (160 ms) or 10 NTSC fields (167 ms). Steering
+and all other camera motion use the latest field pose without interpolation
+or input delay. Targeting, collision, RNG and native world endpoints are
+unchanged. The retained impulse timestamp supplies the age; existing lifecycle
+reset clears it. There is no new persistent state or forecast.
+
+The camera checks pass 220 damage/rate/age/wrap cases plus the existing 1,792
+angle cases. A normal-startup A1200 run with a guest flight-entry damage probe
+records 40 completed draw inputs: a 512-unit heading jump becomes successive
+256-unit camera changes, or 192/256/64 depending on field alignment. Evidence:
+`tmp/dev/tmp/c/step4-damage-yaw-live/damage-yaw.json`. The probe sets damage;
+it is not part of the play build. User judgement of the feel remains valuable.
+
+The reported small-bank asymmetry is also present in the original instructions
+at +0943A: signed ASR.B #2 maps roll +1..+3 to zero and -1..-3 to -1. Executing
+that native branch with equal heading/track confirms heading/track deltas
+0/0 for the positive values and -1/-1 for the negative values. Keep this native
+handling rather than silently changing the flight model.
