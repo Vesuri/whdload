@@ -509,6 +509,7 @@ verify_dispatch_near:
 	include "timing-live-loop.i"
 	include "timing-display.i"
 	include "timing-cpu-render.i"
+	include "timing-draw-overhead.i"
 	; Keep loader/live hooks close to their shared configuration and pointer.
 	include "timing-core.i"
 	ENDC

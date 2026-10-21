@@ -7,7 +7,9 @@ All framerate enhancements use this master option.
 The experimental TIMING_RUNTIME build adds a 3 Hz world clock, responsive
 player motion and renderer-only object prediction. It remains in development;
 ordinary builds retain native timing. On the supported 0658 version the
-runtime build also uses a cheaper buffer swap and a CPU-drawn 3D view.
+runtime build also uses an asynchronous double-buffer swap and a CPU-drawn
+3D view. Triple buffering is not used. Polygon drawing clears only used span
+rows and avoids a redundant trailing wait; required blitter waits remain.
 The CPU view needs 18,000 bytes of free fast RAM; if unavailable it keeps
 the native blitter renderer. These changes share the CUSTOM1 master option.
 

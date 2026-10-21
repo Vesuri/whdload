@@ -405,14 +405,9 @@ cpu_render_begin:
 .cpu:
  movea.l (sp)+,a0
  movem.l d0-d2/a0-a1,-(sp)
+ bsr draw_overhead_clear_spans
  movea.l cpu_render_h0(pc),a1
  adda.l #$8d88,a1
- movea.l a1,a0
- move.l #$ffff0000,d0
- move.w #199,d1
-.clear:
- move.l d0,(a0)+
- dbf d1,.clear
  ; Native bbox reset; prior mask is already clean and CPU spans do not use it.
  move.w #-1,$90ac-$8d88(a1)
  move.w #-1,$90ae-$8d88(a1)

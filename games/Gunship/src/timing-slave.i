@@ -98,6 +98,10 @@ timing_runtime_dispatch:
  tst.l d0
  bne .status
  movea.l timing_runtime_arena(pc),a0
+ bsr draw_overhead_install
+ tst.l d0
+ bne .status
+ movea.l timing_runtime_arena(pc),a0
  bsr timing_loop_install
 .status:
  lea timing_runtime_status(pc),a0

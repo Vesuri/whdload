@@ -17,7 +17,7 @@ version. The ordinary build and CUSTOM1=0 retain native timing.
 `timing-slave.i` resolves loaded hunks, reads the display's 50/60 Hz frequency,
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
-The current arena is 30,436 bytes and production runtime text is 48,386 bytes.
+The current arena is 30,436 bytes and production runtime text is 48,766 bytes.
 The CPU renderer separately allocates 18,000 bytes of fast RAM.
 `timing-core.i` defines the included implementation. Exact guided forecast,
 selector certification and forecast tapes are absent from runtime inclusion
@@ -166,7 +166,7 @@ reused. The former asynchronous clear raced LZW dictionary use and caused
 is not necessary to disable MMU or CACHE for that issue. See
 [CACHE_AUDIT.md](CACHE_AUDIT.md) for cache details.
 
-## View drawing and display exchange (D2–D3, E1)
+## View drawing and display exchange (D2–D5, E1)
 
 `timing-display.i` replaces only the enhanced flight swap at +044B4.
 The task waits for the last blit, finds the current copper list's ten BPLxPT
@@ -175,8 +175,9 @@ plane pointers. The game's VBL server exchanges those words and acknowledges
 completion before the task may reuse the old front buffer. Submission returns
 immediately; bitmap binding waits only if an exchange is still pending. Native
 swaps and DisownBlitter drain pending work before handing back ownership. VERIFY
-logs VBL exchanges rather than task submissions. D4 is closed by user decision: retain double buffering. FrontScreen waiting
-yields through WaitTOF. Native/modal paths still rebuild their screen normally.
+logs VBL exchanges rather than task submissions. D4 is closed by user decision:
+retain double buffering. FrontScreen waiting yields through WaitTOF.
+Native/modal paths still rebuild their screen normally.
 Palette moves and the flash-effect pointers found by +00AB8 stay intact;
 there is no unchanged per-frame palette copy or MakeScreen/RethinkDisplay.
 
@@ -264,3 +265,23 @@ Use separate run directories and exclude host input. Debugger guest-memory
 writes are unsupported by the shared harness; previous guest probes were
 compiled diagnostics, not play-build behavior. No new proof fixtures or gates
 are required by this document. Current release work is exactly C-R1–C-R5.
+
+## Completed D5 drawing overhead work
+
+`timing-draw-overhead.i` removes the trailing polygon wait at +08D7A while
+preserving its completed-wait flags. The waits protecting blitter registers,
+CPU mask/pixel access and display publication remain. It initializes the span
+table once, then clears only the previous polygon's clipped Y range. Both the
+CPU path and native +08818 use this helper. Native text enters at +08842 and
+resets the shared bounding box, so that entry clears pending span rows too.
+
+The CPU/native view comparison matched all 18,000 bytes in each of 173
+normal-startup/takeoff/banking frames. The final existing 500-field PAL window
+measured 12.5 fps on 020 and 25.0 fps on 060, both at 3.00 world ticks/s.
+A BLTPRI diagnostic measured 12.7 / 25.0 fps; its small 020-only gain does not
+justify a bus-priority change, so production preserves the incoming setting.
+These are short emulator windows, not full-mission or real-hardware acceptance.
+Full-MMU 68040 CACHE startup/takeoff and native pause/exit with blitter-interrupt
+restoration also passed. D5 evidence is under ignored
+`tmp/dev/tmp/d5-initialized-pixels/`, `d5-final-{fps020,fps060,priority020,priority060}/`,
+`d5-040-cache/` and `d5-pause-exit/`. The ordinary slave remains byte-identical.

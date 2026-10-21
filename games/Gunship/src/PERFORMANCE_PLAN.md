@@ -535,6 +535,10 @@ is a later verification note. No further 68000 timing or exact-forecast work.
 
 ### D. Remove fixed overheads
 
+**Status: complete for the enhanced 0658 runtime (2026-10-21).**
+D1–D3 and D5 are complete; D4 is closed by user decision. Other executable
+versions remain F2. This does not close C's five release blockers.
+
 - **D1. Blitter interrupt off during flight — complete for the experimental 0658 runtime.**
   Brought forward into refocus step 3 with user approval; results and ownership
   restoration check are recorded above. Other executable versions remain F2.
@@ -573,12 +577,23 @@ is a later verification note. No further 68000 timing or exact-forecast work.
   implementation was removed; no third bitmap or triple-buffer option ships.
   - D4a. Third chip bitmap: cancelled.
   - D4b. Drawing/display overlap through a third buffer: cancelled.
-- **D5. Small fixes.**
-  - D5a. Remove the redundant final wait at `+08D7A`.
-  - D5b. Clear only the span-table rows of the previous polygon box in `+08818`, instead of all
-    200.
-  - D5c. Measure BLTPRI (blitter priority) during flight. The CPU rarely needs the chip bus when
-    code and data are in fast RAM.
+- **D5. Small fixes — complete for enhanced 0658.**
+  - D5a. Removed the final wait at `+08D7A`, preserving its return flags.
+    Consumer waits before mask/pixel access, blitter setup and display publication remain.
+  - D5b. Clear only the previous polygon's inclusive, clipped span rows, in both
+    CPU and native paths. Initialize all 200 rows once; clear pending rows before
+    the native text path resets the shared bounds. CPU/native view comparison:
+    173 takeoff/banking frames, zero differing words across 18,000 bytes/frame.
+  - D5c. Measured BLTPRI with the existing 500-field PAL flight window. Normal /
+    priority: 020 **12.5 / 12.7 fps**, 060 **25.0 / 25.0 fps**; all **3.00 Hz**.
+    Retain the incoming priority: the small 020-only gain in this short window
+    does not justify changing bus arbitration. Priority remains a diagnostic experiment.
+  First-use initialization, clipped/empty span ranges, guards/registers and all
+  32 return-flag combinations passed. Full-MMU 040 CACHE startup/takeoff and
+  native pause/exit with blitter-interrupt restoration passed. The ordinary slave
+  remains byte-identical. Evidence: ignored `tmp/dev/tmp/`
+  `d5-initialized-pixels/`, `d5-final-{fps020,fps060,priority020,priority060}/`,
+  `d5-040-cache/` and `d5-pause-exit/`.
 
 ### E. Cut blitter work (the ceiling from the 68020 on)
 
