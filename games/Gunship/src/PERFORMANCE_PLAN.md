@@ -542,7 +542,15 @@ is a later verification note. No further 68000 timing or exact-forecast work.
   - D1c. Expected gain: most of the level-3 time, which is 5 % (68040/060) to 17 % (68020) of all
     time and includes the one VERTB per field. On top of that it removes about 520 cycles of
     blitter idle between consecutive blits.
-- **D2. Cheap buffer swap.**
+- **D2. Cheap buffer swap — complete for the enhanced 0658 runtime.**
+  `timing-display.i` patches the flight swap only; modal/native calls still rebuild.
+  The VBL exchanges ten bitplane-pointer words and acknowledges before buffer reuse.
+  Palette moves remain in place; FrontScreen waiting yields through WaitTOF.
+  A1200 normal-startup/takeoff smoke passed with no input loss or scheduler fault.
+  A 100-field moving-flight profile completed 25 swaps (12.5 fps), with zero
+  calls to +00B7C/MakeScreen/RethinkDisplay and 0.38% task-side swap self time.
+  This short window is not a matched-scene overall speed comparison. Evidence:
+  ignored `tmp/dev/tmp/step7-d2-smoke/` and `step7-d2-profile/`.
   - D2a. Replace MakeScreen + RethinkDisplay in `+00B7C`. Build the screen's copper list once,
     then exchange the bitplane pointers for the two buffers, by patching the BPLxPT moves or by
     using two prebuilt copper lists.

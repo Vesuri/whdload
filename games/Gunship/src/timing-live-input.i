@@ -56,6 +56,7 @@ timing_live_field:
 	bsr timing_live_original
 	move.w sr,-(sp)
 	movem.l d0-d2/a0-a2,-(sp)
+	bsr timing_display_vbl
 	movea.l timing_runtime_arena(pc),a2
 	lea RT_CAPTURE(a2),a2
 	tst.w RT_BOUNDARY_PHASE-RT_CAPTURE(a2)
