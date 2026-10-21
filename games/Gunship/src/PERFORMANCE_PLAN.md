@@ -445,7 +445,45 @@ acceptance text in the status notes and items below where they conflict.
 7. Then D1/D2, then E1: C fixes speed and response, but the blitter caps
    drawing at about 15 fps until D and E.
 
-**Current status (2026-10-21): refocus step 2 measured; stopped for report.**
+**Current status (2026-10-21): step 3 simplified; 68020 fps criterion still open.**
+
+CUSTOM1 is now cleared at startup below the 68020, before any enhancement
+patch is installed; ReadMe documents this. No further 68000 runs were made.
+The exact guided-forecast path, tapes and certification are removed from the
+runtime build and allocation. Object presentation uses consecutive committed
+motion, bounded to one interval; first captures and identity/type/lifecycle
+changes snap. Runtime storage fell from 57,620 to 30,420 bytes.
+
+Target acquisition projects candidates with the existing private native
+geometry pass. It skips rasterization only with no candidates, no active
+projectiles/scripted helicopter and no pending player fire; those consumers
+retain their committed terrain pixels. The same geometry result serves the
+immediately following world collision check, avoiding duplicate traversal.
+
+Same normal-startup 500-field PAL window as step 2, final simplified build:
+
+| Machine | Native baseline fps | Previous enhanced fps | Simplified enhanced fps | World Hz | Input to next completed frame, median (range) |
+|---|---:|---:|---:|---:|---:|
+| a1200-fast (68020) | 10.4 | 8.0 | 9.6 | 3.00 | 60 ms (20–100) |
+| a1200-060 | 16.3 | 14.6 | 16.6 | 3.00 | 40 ms (20–60) |
+
+Criterion 4 is **not met on 68020**: 7.7% below native despite a 20% gain
+from step 2. The 060 is 1.8% above its baseline. These remain short PAL
+measurements; input-to-completion does not prove visible input response,
+and the native/enhanced control route reaches different world states.
+The 020 profile identified the redundant raster pass; after removing it,
+blitter waits still account for about 32% of elapsed time. Blitter fixes
+alone measured 10.3 fps, so they do not explain the remaining timing cost.
+Existing actor/script presentation and private/native candidate comparisons
+pass after adapting their expectations to committed-motion extrapolation.
+
+Evidence: `tmp/dev/tmp/c/refocus-step3-simplified-final-{a1200-fast,a1200-060}/`;
+slave SHA-256 `2b2d2b3551e0897fcb3f8e2940d11f6bd7d834dbde0e6830029a7f1ef33e89fd`.
+Code commits: `849083a7` (CPU gate), `1aa150f7` (simplification).
+**Pending user decision:** bring D1 forward to close the 020 fps gap, or
+retain the plan order and leave step 3 incomplete. No D work has started.
+
+**Step 2 measurement record (2026-10-21).**
 
 One completed PAL run per CPU/toggle, from normal startup with seed 12345,
 using the same 500-field (10-second) cockpit control window: ten F1 taps,
@@ -481,9 +519,8 @@ four completed runs: one caught double field advancement, the other rejected
 zero-field stepping. The completed runs use supported two-field steps and
 assert exactly 500 actual game fields; aborted attempts supply no results.
 
-**Next: step 3**, disable exact guided forecasting, restrict enhanced mode to
-68020+, and profile/reduce added 020 cost until fps is at least native. No new
-acceptance gates or fixtures were added. Stop here before implementation.
+Step 2 identified simplification and the 020 overhead as the next work; see
+the current step 3 status above. No additional acceptance gates were added.
 
 **Older status notes (superseded by the refocus and current report above).**
 

@@ -1,5 +1,20 @@
 # Hybrid timing implementation notes
 
+## Refocus implementation update (2026-10-21)
+
+The current runtime uses committed-motion extrapolation for world objects,
+limited to one tick, with spawn/identity/type/lifecycle snapping. Exact guided
+forecasting, selector certification and tapes are no longer included or allocated
+by the runtime; the older sections below describe historical implementations.
+The arena is 30,420 bytes. CUSTOM1 is ignored below the 68020.
+
+Committed target projection and collision share one geometry pass. An empty
+candidate list avoids the visibility raster only when there are no projectile,
+scripted-helicopter or pending-fire terrain-pixel consumers. Otherwise the native
+committed raster remains. Player motion and the 3 Hz world arithmetic are unchanged.
+See PERFORMANCE_PLAN.md for the current measurements and remaining 020 fps gap.
+The full document cleanup remains refocus step 6.
+
 The governing design is PERFORMANCE_PLAN.md section C, as revised in
 f56356a and 522ad23. The world runs at three native ticks per second; the
 player must respond and move at field rate. Weapons launch at a world tick.
