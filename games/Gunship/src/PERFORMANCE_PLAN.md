@@ -407,6 +407,44 @@ This follows AmigaXDev `docs/playbooks/fixed-time-simulation.md` and
 the world kept its intended 10 Hz and the player's own motion became responsive (that
 project's `docs/timing-design.md`, design D, and its phase-9 gate in `docs/internals.md`).
 
+**Refocus (2026-10-21, user decisions).** These override the open-ended
+acceptance text in the status notes and items below where they conflict.
+
+- **68020 and up only.** On a 68000, Enhanced framerate is ignored and the game
+  keeps native timing; the ReadMe says so. The 68000 renders about 1 fps, so a
+  3 Hz world cannot make it smooth. 68000 rate, overload and responsiveness work
+  stops. Keep the existing cross-CPU state comparisons as regression checks.
+- **Simple object prediction (C6).** Every world object is drawn with bounded
+  forward extrapolation from its last committed motion, at most one tick
+  ahead, snapping at spawn, impact, slot reuse and lifecycle changes. The exact
+  guided-forecast path (private scene collection, selector certification,
+  forecast tapes) goes behind a disabled assembly flag or is removed. G stays
+  the fallback if play shows visible errors.
+- **Exit criteria for C**, replacing the full C9 matrix as the release gate:
+  1. World rate 3.00 Hz ±1 % on 68020 and 68060, PAL and NTSC, in ordinary play.
+  2. Held-input player state at world ticks equals native (already shown).
+  3. Input shows on the next completed frame.
+  4. Enhanced fps is no lower than native fps in the same scene.
+  5. The user plays a full mission on the a1200 and the 68060 with no visible
+     problems.
+
+  Remaining C9 items become regression checks or later notes, not blockers.
+
+**Steps, in order; stop and report after each.**
+
+1. Freeze: no new forecast, certification or 68000 work.
+2. Measure ordinary play from normal startup on a1200-fast and 68060, CUSTOM1
+   off and on, same window: fps, world Hz, input-to-frame delay.
+3. Simplify per the decisions above. Profile what CUSTOM1 adds on the 68020
+   and cut it until criterion 4 holds.
+4. Provide a windowed a1200 configuration with CUSTOM1=1 for the user to play;
+   fix only what the user reports.
+5. List at most ten release blockers; everything else is a later note.
+6. Trim this section's status notes to about 20 lines and make
+   `TIMING_DESIGN.md` describe the current design; history is in git.
+7. Then D1/D2, then E1: C fixes speed and response, but the blitter caps
+   drawing at about 15 fps until D and E.
+
 **Status (2026-10-21): paused at user request; C remains incomplete.**
 
 The experimental runtime implements a 3 Hz world, field-rate input/player
@@ -1239,7 +1277,8 @@ the field-rate player step and snapshots add work, priced in C4f. The ignored ha
     world labels across a phase reset are not assumed. Pixels, other effects
     and the broader lifecycle matrix remain open.
 - **C10. Option.** `CUSTOM1=1`, exposed as the boolean **Enhanced framerate**,
-  is the master opt-in for all framerate enhancements. Omitted/zero retains
+  is the master opt-in for all framerate enhancements, on the 68020 and up only;
+  a 68000 keeps native timing whatever CUSTOM1 says. Omitted/zero retains
   original timing and rendering paths. All future C/D/E optimizations must
   use this same gate. The new blitter patches and diagnostic native input
   producer are gated already; the original slave's cache policy and existing
@@ -1331,7 +1370,7 @@ the field-rate player step and snapshots add work, priced in C4f. The ignored ha
   options.
 - **F4. Final check.** Run the full matrix (68000, 68020, 68030, 68040, 68060) on all windows of
   A3: fps, pacing jitter, ticks per second and state equality. Also play through a full mission
-  on the 68000 and the 68060. Resolve or independently validate the full-MMU
+  on the 68000 (native timing), the a1200 and the 68060. Resolve or independently validate the full-MMU
   asynchronous-blitter emulator limitation documented under B4. The reported
   68060 T-74 copy-protection graphics issue remains deferred at the user’s request.
 
