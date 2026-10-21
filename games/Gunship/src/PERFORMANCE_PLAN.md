@@ -445,11 +445,13 @@ acceptance text in the status notes and items below where they conflict.
 7. Then D2 (D1 brought forward into step 3 by user approval), then E1: C fixes speed and response, but the blitter caps
    drawing at about 15 fps until D and E.
 
-**Current status (2026-10-21): refocus step 6 complete; next is step 7: D2, then E1.**
+**Current status (2026-10-21): refocus step 7 complete: D2 and E1 are implemented.**
 Enhanced mode is implemented in the TIMING_RUNTIME build for 0658, gated by
 CUSTOM1 on 68020+; C remains open against the five exit criteria above.
 Held-input native endpoint equivalence (criterion 2) is shown.
 Step 3 met fps parity (criterion 4): 020 10.4 → 11.5; 060 16.3 → 16.7 fps.
+Step 7 PAL 500-field window: enhanced 020 11.7 fps, 060 25.0 fps; both 3.00 Hz.
+Next-completion delays: 020 median 60 ms (20–80), 060 20 ms in all eight samples.
 Short PAL world-rate estimates were 3.008/3.012 Hz; PAL/NTSC acceptance remains open.
 Input-to-completion medians were 60/40 ms; visible response still needs confirmation.
 Reported ground-gauge, 68040 BltClear, damage-yaw and deferred missile-kill fixes are in.
@@ -575,7 +577,20 @@ is a later verification note. No further 68000 timing or exact-forecast work.
 
 ### E. Cut blitter work (the ceiling from the 68020 on)
 
-- **E1. CPU renderer for the 3D view.** This is the main lever for fps on fast CPUs.
+- **E1. CPU renderer for the 3D view — complete for the enhanced 0658 runtime.**
+  `timing-cpu-render.i` retains native geometry/clipping and draws the view into
+  an 18,000-byte MEMF_FAST buffer: pen-selected multi-plane Bresenham lines,
+  direct word spans, and MOVEM sky/ground fills. Five planes are copied once
+  before the native cockpit overlay. Allocation failure keeps native drawing.
+  Same-state CPU/blitter comparison passed across 163 takeoff/banking frames
+  (all 18,000 bytes/frame); the native polygon right-edge word-boundary quirk
+  is preserved. Normal full-MMU 68040 CACHE startup/takeoff also passed.
+  Existing 500-field PAL measurement: 020 117 frames (11.7 fps), 060 250 (25 fps),
+  both 30 world ticks (3.00 Hz). These are short play windows, not full missions
+  or the outstanding PAL/NTSC acceptance. E1 adds no release gates.
+  Evidence under ignored `tmp/dev/tmp/`: `step7-e1-pixels3/`,
+  `step7-e1-fps020/`, `step7-e1-fps060/`, `step7-e1-040-cache/`.
+  Focused allocation/fallback checks passed; ordinary slave is byte-identical.
   - E1a. Draw the 320×90 view, 4 planes plus plane 4 where needed, into a fast-RAM planar buffer
     with the CPU:
     - Bresenham lines that set all colour bits in one pass, instead of one blit per plane,

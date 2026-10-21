@@ -123,10 +123,10 @@ _args_end
 PATCH_EXE:MACRO
 .\1
 	lea	pl_\1(pc),a0
+	bsr	blitter_dispatch
 	IFD TIMING_RUNTIME
 	bsr timing_runtime_dispatch
 	ENDC
-	bsr	blitter_dispatch
 	bsr	blitter_clear_dispatch
 	IFD VERIFY
 	bsr	verify_dispatch_near
@@ -508,6 +508,7 @@ verify_dispatch_near:
 	include "timing-live-script-heading.i"
 	include "timing-live-loop.i"
 	include "timing-display.i"
+	include "timing-cpu-render.i"
 	; Keep loader/live hooks close to their shared configuration and pointer.
 	include "timing-core.i"
 	ENDC

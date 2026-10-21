@@ -94,6 +94,10 @@ timing_runtime_dispatch:
  tst.l d0
  bne .status
  movea.l timing_runtime_arena(pc),a0
+ bsr cpu_render_install
+ tst.l d0
+ bne .status
+ movea.l timing_runtime_arena(pc),a0
  bsr timing_loop_install
 .status:
  lea timing_runtime_status(pc),a0
@@ -114,6 +118,7 @@ timing_runtime_dispatch:
 ; Called after the main program returns. Native input callbacks must have
 ; stopped before their shared arena can be released.
 timing_runtime_release:
+ bsr cpu_render_release
  movem.l d0-d1/a0-a1/a6,-(sp)
  lea timing_runtime_arena(pc),a0
  move.l (a0),d0

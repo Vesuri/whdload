@@ -17,7 +17,8 @@ version. The ordinary build and CUSTOM1=0 retain native timing.
 `timing-slave.i` resolves loaded hunks, reads the display's 50/60 Hz frequency,
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
-The current arena is 30,436 bytes and production runtime text is 44,840 bytes.
+The current arena is 30,436 bytes and production runtime text is 48,190 bytes.
+The CPU renderer separately allocates 18,000 bytes of fast RAM.
 `timing-core.i` defines the included implementation. Exact guided forecast,
 selector certification and forecast tapes are absent from runtime inclusion
 and allocation; historical helper files still present are not active paths.
@@ -163,7 +164,48 @@ interrupt sources are untouched. Native calls contain no QBlit/QBSBlit use.
 reused. The former asynchronous clear raced LZW dictionary use and caused
 68040 corruption; full-MMU/CACHE startup and flight pass with the fix. It
 is not necessary to disable MMU or CACHE for that issue. See
-[CACHE_AUDIT.md](CACHE_AUDIT.md) for cache details. D2 and E1 are still next.
+[CACHE_AUDIT.md](CACHE_AUDIT.md) for cache details.
+
+## View drawing and display exchange (D2, E1)
+
+`timing-display.i` replaces only the enhanced flight swap at +044B4.
+The task waits for the last blit, finds the current copper list's ten BPLxPT
+moves, copies the selected bitmap into Screen.BitMap, and publishes the new
+plane pointers. The game's VBL server exchanges those words and acknowledges
+completion before the task may reuse the old front buffer. This retains
+synchronous double buffering; D3/D4 remain separate work. FrontScreen waiting
+yields through WaitTOF. Native/modal paths still rebuild their screen normally.
+Palette moves and the flash-effect pointers found by +00AB8 stay intact;
+there is no unchanged per-frame palette copy or MakeScreen/RethinkDisplay.
+
+`timing-cpu-render.i` is installed only for enhanced 0658 flight when an
+18,000-byte MEMF_FAST allocation succeeds; failure retains the blitter path.
+Native geometry, clipping and edge-to-span tables are reused. The CPU draws
+320×90 pixels into five contiguous fast-RAM planes: lines select an unrolled
+four/five-plane pen routine once, polygons fill spans directly without a mask,
+and sky/ground bands use MOVEM. Native polygon right-edge word rounding is
+retained for pixel equality, including its word-aligned endpoint quirk.
+
+The horizon routine also draws the attitude instrument below the view. Those
+primitives keep their native chip/blitter path; the mask is cleared after a
+native polygon, not for every CPU polygon. The five completed view planes
+(18,000 bytes) are copied once to the chip back buffer before native cockpit
+overlays. Subsequent native effects and cockpit work retain their ordering.
+The fast buffer is freed with the timing runtime. Compatibility blitter hooks
+are installed first so native trampolines retain their corrected pixel waits;
+the existing LoadSeg cache flush covers the prepared hooks and trampolines.
+
+A same-state diagnostic rerender compared all five CPU planes with the real
+blitter on 163 takeoff/banking frames: zero differing words. Allocation and
+no-fast-memory fallback checks passed. Full-MMU 68040 with CACHE passed normal
+startup and takeoff. The ordinary slave remains byte-identical.
+
+The existing 500-field PAL window reports 11.7 fps on a1200-fast and 25.0 fps
+on a1200-060, each with 30 world ticks (3.00 Hz). Input-to-next-completed-frame
+samples are 20–80 ms (median 60) and 20 ms respectively; these timestamps do
+not prove visible response or scanout latency. Evidence is under ignored
+`tmp/dev/tmp/step7-e1-{pixels3,fps020,fps060,040-cache}/`; D2's short profile is
+in `step7-d2-profile/`. This completes refocus step 7, not C-R1–C-R5.
 
 ## Known demo regression (C-R1)
 
