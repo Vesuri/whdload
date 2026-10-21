@@ -1,7 +1,8 @@
 ; E1: CPU planar view, enabled only with the enhanced 0658 runtime and
-; an 18000-byte MEMF_FAST allocation. Native clipping/edge-to-span geometry
+; a 36010-byte MEMF_FAST allocation (view plus cached cockpit art).
+; Native clipping/edge-to-span geometry
 ; is retained. Cockpit and modal rendering remain native chip/blitter work.
-CPU_VIEW_BYTES EQU 18000
+CPU_VIEW_BYTES EQU 36010 ; 18000 view + five cached 3602-byte art strips
 cpu_render_install:
  movem.l d1-d7/a0-a6,-(sp)
  movea.l RT_HUNKS(a0),a3
@@ -24,6 +25,8 @@ cpu_render_install:
  lea cpu_render_buffer(pc),a1
  move.l d0,(a1)
 .allocated:
+ lea cpu_render_art_ready(pc),a1
+ clr.w (a1)
  movea.l a3,a1
  adda.l #$8548,a1
  cmpi.l #$48e701f6,(a1)
@@ -56,6 +59,28 @@ cpu_render_install:
  addi.l #$aa4c,d0
  cmp.l $5c86(a3),d0
  bne .bad
+ movea.l a3,a0
+ adda.l #$aa80,a0
+ cmpi.w #$45f9,(a0)
+ bne .bad
+ cmpi.l #$6100009c,6(a0)
+ bne .bad
+ cmpi.l #$6100008a,24(a0)
+ bne .bad
+ lea cpu_render_art(pc),a1
+ move.l 2(a0),4(a1) ; native overlay descriptors
+ move.l a0,-(sp)
+ movea.l a3,a0
+ adda.l #$927a,a0
+ move.l (a0),(a1) ; native bitmap table
+ movea.l (sp)+,a0
+ lea cpu_render_overlay_native(pc),a1
+ move.l (a0),(a1)+
+ move.w 4(a0),(a1)+
+ move.w #$4ef9,(a1)+
+ move.l a3,d0
+ addi.l #$aa86,d0
+ move.l d0,(a1)
  lea cpu_render_native_line(pc),a1
  movea.l a3,a0
  adda.l #$8548,a0
@@ -112,6 +137,7 @@ cpu_render_install:
  PL_P $8818,cpu_render_begin
  PL_P $8b6c,cpu_render_poly
  PL_P $921c,cpu_render_band
+ PL_P $aa80,cpu_render_overlay
  PL_END
 
 cpu_render_release:
@@ -140,6 +166,7 @@ cpu_render_start:
 .state:
  lea cpu_render_active(pc),a0
  move.w d0,(a0)
+ clr.w cpu_render_overlay_ready-cpu_render_active(a0)
  move.w #1,2(a0) ; previous native mask may be dirty
  movem.l (sp)+,d0/a0
  move.l a0,-(sp)
@@ -160,17 +187,73 @@ cpu_render_finish:
  movea.l cpu_render_h6(pc),a0
  movea.l $47c4(a0),a2
  lea 8(a2),a2
+ ; Finish any preceding native blit before touching its chip destination.
+ movea.l cpu_render_h0(pc),a0
+ adda.l #$867e,a0
+ movea.l (a0),a6
+ movea.l (a6),a6
+ jsr -228(a6)
+ lea cpu_render_art_ready(pc),a0
+ tst.w (a0)
+ bne .art_ready
+ move.w #1,(a0)
+ movea.l cpu_render_art(pc),a3
+ lea 128(a3),a3
+ movea.l cpu_render_buffer(pc),a5
+ adda.l #18000,a5
+ moveq #4,d7
+.cache_plane:
+ movea.l (a3)+,a0
+ move.w #1800,d6
+.cache_word:
+ move.w (a0)+,(a5)+
+ dbf d6,.cache_word
+ dbf d7,.cache_plane
+.art_ready:
+ movea.l cpu_render_buffer(pc),a5
+ adda.l #18000,a5
+ movea.l a5,a4
+ adda.l #14408,a4 ; plane 4 is the cockpit's opaque mask
  movea.l cpu_render_buffer(pc),a0
  moveq #4,d7
 .plane:
  movea.l (a2)+,a1
- move.w #224,d6 ; 3600 bytes/plane, 16 bytes/iteration
-.copy:
- movem.l (a0)+,d0-d3
- movem.l d0-d3,(a1)
- adda.w #16,a1
- dbf d6,.copy
+ movea.l a4,a6
+ ; Top five rows are wholly opaque cockpit art: leave them in place.
+ adda.w #200,a0
+ adda.w #200,a1
+ adda.w #200,a5
+ adda.w #200,a6
+ moveq #84,d6 ; remaining 85 view rows
+.row:
+ ; Native right strip wraps one word into the next row. Compose both
+ ; edges; row 90 and the wholly opaque top strip are never overwritten.
+ move.w (a6)+,d1
+ move.w (a5)+,d0
+ and.w d1,d0
+ not.w d1
+ and.w (a0)+,d1
+ or.w d1,d0
+ move.w d0,(a1)+
+ movem.l (a0)+,d0-d5
+ movem.l d0-d5,(a1)
+ movem.l (a0)+,d0-d2
+ movem.l d0-d2,24(a1)
+ adda.w #36,a1
+ adda.w #36,a5
+ adda.w #36,a6
+ move.w (a6)+,d1
+ move.w (a5)+,d0
+ and.w d1,d0
+ not.w d1
+ and.w (a0)+,d1
+ or.w d1,d0
+ move.w d0,(a1)+
+ dbf d6,.row
+ addq.l #2,a5 ; row 90 is outside the view and remains untouched
  dbf d7,.plane
+ lea cpu_render_overlay_ready(pc),a0
+ move.w #1,(a0)
 .done:
  movem.l (sp)+,d0-d7/a0-a6
  move.l a0,-(sp)
@@ -181,6 +264,32 @@ cpu_render_finish:
  move.l (sp),4(sp)
  addq.l #4,sp
  rts
+
+cpu_render_overlay:
+ bsr cockpit_check_restores
+ move.l a0,-(sp)
+ movea.l timing_runtime_arena(pc),a0
+ cmpi.w #1,RT_CAPTURE_OWNER(a0)
+ bne .native
+ tst.w RT_BOUNDARY_PHASE(a0)
+ bne .native
+ lea cpu_render_overlay_ready(pc),a0
+ tst.w (a0)
+ beq .native
+ movem.l (sp)+,a0
+ move.l a0,-(sp)
+ movea.l cpu_render_h0(pc),a0
+ movea.l cpu_render_rects(pc),a2
+ adda.w #24,a2 ; retain the third (attitude instrument) restore
+ adda.l #$aa98,a0
+ move.l a0,-(sp)
+ movea.l 4(sp),a0
+ move.l (sp),4(sp)
+ addq.l #4,sp
+ rts
+.native:
+ movea.l (sp)+,a0
+ bra cpu_render_overlay_native
 
 ; Plot one pixel into all requested planes. d0=x,d1=y,d6=last plane,
 ; d7=pen. Preserve coordinates and line/span state.
@@ -574,6 +683,11 @@ cpu_render_h0: dc.l 0
 cpu_render_h6: dc.l 0
 cpu_render_pen: dc.l 0
 cpu_render_buffer: dc.l 0
+cpu_render_art: dc.l 0
+cpu_render_rects: dc.l 0
+cpu_render_overlay_ready: dc.w 0
+cpu_render_art_ready: dc.w 0
+cpu_render_overlay_native: ds.b 12
 cpu_render_active: dc.w 0
 cpu_render_mask_dirty: dc.w 1
 cpu_render_native_line: ds.b 16

@@ -17,8 +17,9 @@ version. The ordinary build and CUSTOM1=0 retain native timing.
 `timing-slave.i` resolves loaded hunks, reads the display's 50/60 Hz frequency,
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
-The current arena is 30,436 bytes and production runtime text is 48,766 bytes.
-The CPU renderer separately allocates 18,000 bytes of fast RAM.
+The current arena is 30,436 bytes and production runtime text is 49,568 bytes.
+The CPU renderer separately allocates 36,010 bytes of fast RAM: 18,000 for
+the view and 18,010 for cached cockpit artwork and its mask.
 `timing-core.i` defines the included implementation. Exact guided forecast,
 selector certification and forecast tapes are absent from runtime inclusion
 and allocation; historical helper files still present are not active paths.
@@ -166,7 +167,7 @@ reused. The former asynchronous clear raced LZW dictionary use and caused
 is not necessary to disable MMU or CACHE for that issue. See
 [CACHE_AUDIT.md](CACHE_AUDIT.md) for cache details.
 
-## View drawing and display exchange (D2–D5, E1)
+## View drawing and display exchange (D2–D5, E1–E3)
 
 `timing-display.i` replaces only the enhanced flight swap at +044B4.
 The task waits for the last blit, finds the current copper list's ten BPLxPT
@@ -182,7 +183,7 @@ Palette moves and the flash-effect pointers found by +00AB8 stay intact;
 there is no unchanged per-frame palette copy or MakeScreen/RethinkDisplay.
 
 `timing-cpu-render.i` is installed only for enhanced 0658 flight when an
-18,000-byte MEMF_FAST allocation succeeds; failure retains the blitter path.
+36,010-byte MEMF_FAST allocation succeeds; failure retains the blitter path.
 Native geometry, clipping and edge-to-span tables are reused. The CPU draws
 320×90 pixels into five contiguous fast-RAM planes: lines select an unrolled
 four/five-plane pen routine once, polygons fill spans directly without a mask,
@@ -191,9 +192,9 @@ retained for pixel equality, including its word-aligned endpoint quirk.
 
 The horizon routine also draws the attitude instrument below the view. Those
 primitives keep their native chip/blitter path; the mask is cleared after a
-native polygon, not for every CPU polygon. The five completed view planes
-(18,000 bytes) are copied once to the chip back buffer before native cockpit
-overlays. Subsequent native effects and cockpit work retain their ordering.
+native polygon, not for every CPU polygon. The five completed view planes are copied once to the chip back buffer,
+clipped/composed at the cockpit edges as described below. Subsequent native
+effects and cockpit work retain their ordering.
 The fast buffer is freed with the timing runtime. Compatibility blitter hooks
 are installed first so native trampolines retain their corrected pixel waits;
 the existing LoadSeg cache flush covers the prepared hooks and trampolines.
@@ -285,3 +286,38 @@ Full-MMU 68040 CACHE startup/takeoff and native pause/exit with blitter-interrup
 restoration also passed. D5 evidence is under ignored
 `tmp/dev/tmp/d5-initialized-pixels/`, `d5-final-{fps020,fps060,priority020,priority060}/`,
 `d5-040-cache/` and `d5-pause-exit/`. The ordinary slave remains byte-identical.
+
+
+## Cockpit work (E2/E3)
+
+The top five view rows are wholly opaque cockpit art and are left untouched.
+Rows 5–89 copy their middle 288 pixels with MOVEM and compose their edge words
+using bitmap 3's plane-4 mask and cached artwork. The native right strip wraps
+one word into the next row; both edges preserve that footprint. Row 90 is
+outside the CPU view and stays untouched. This removes the first two restores
+at +0AA80. The third restore, the attitude-instrument bezel below the view,
+remains native. Art is cached in fast RAM and invalidated by native screen
+swaps and module installation. Modal rendering retains the original overlay.
+The CPU still fills the rectangular fast-RAM view; clipping its final copy
+avoids chip traffic without complicating native geometry.
+
+`timing-cockpit.i` caches the three native needle inputs independently for the
+two back-buffer indices. Unchanged values skip both the erase at +0AC14 and
+draw at +0ACF0. Native screen swaps invalidate both entries. Before +0AA80
+consumes its eight panel-restore counters, any pending restore invalidates
+the needle entries: rotor-warning artwork overlaps a needle even when its
+angle is unchanged. Modal/native ownership always uses the original routines.
+This optimization requires the CPU renderer's allocation and overlay hook;
+allocation failure retains all native cockpit work. Text, scope and tapes
+remain native, including their existing conditional updates.
+
+Validation: a same-state native redraw diagnostic found zero differing words
+across 423 cockpit-edge frames (18,010 bytes each) and 95 skipped-needle frames
+(all 40,000 screen bytes each), including takeoff, banking and panel refreshes.
+Focused assembled-code checks covered both back buffers, changed inputs,
+panel restoration, native-swap invalidation and modal fallback. Allocation
+failure checks passed. Full-MMU 040 CACHE startup/takeoff and native pause/exit
+with D1 interrupt restoration passed. The ordinary slave is byte-identical.
+Evidence: ignored `tmp/dev/tmp/e23-pixels-final2/`, `e-040-cache/`,
+`e-pause-exit/`; harness checks `test_cockpit_e.py` and
+`test_cpu_render_install.py`.

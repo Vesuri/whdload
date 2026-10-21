@@ -10,8 +10,11 @@ ordinary builds retain native timing. On the supported 0658 version the
 runtime build also uses an asynchronous double-buffer swap and a CPU-drawn
 3D view. Triple buffering is not used. Polygon drawing clears only used span
 rows and avoids a redundant trailing wait; required blitter waits remain.
-The CPU view needs 18,000 bytes of free fast RAM; if unavailable it keeps
-the native blitter renderer. These changes share the CUSTOM1 master option.
+The CPU view clips/composes its cockpit edges to remove two restore blits,
+and unchanged instrument needles are retained separately in each buffer.
+Panel changes still repaint overlapping needles. The CPU view and cached art
+need 36,010 bytes of free fast RAM; if unavailable they keep native drawing.
+These changes share the CUSTOM1 master option.
 
 FS-UAE 68040 play setup
 

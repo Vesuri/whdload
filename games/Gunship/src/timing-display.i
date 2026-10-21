@@ -148,6 +148,11 @@ timing_display_swap:
  move.l timing_display_native(pc),-(sp)
  rts
 timing_display_native_swap:
+ bsr cockpit_invalidate
+ move.l a0,-(sp)
+ lea cpu_render_art_ready(pc),a0
+ clr.w (a0) ; modal/native screen rebuild may replace cockpit artwork
+ movea.l (sp)+,a0
  bsr timing_display_drain
  move.l a0,-(sp)
  lea timing_display_async(pc),a0

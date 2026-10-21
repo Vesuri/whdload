@@ -621,17 +621,31 @@ versions remain F2. This does not close C's five release blockers.
   - E1c. Select it when the CPU is a 68020 or better and fast RAM exists, and keep the blitter
     path for the 68000.
   - E1d. The result must be pixel-identical to the blitter path at matched ticks (A4/B4).
-- **E2. Cockpit overlay.**
-  - E2a. `+0AA80` re-blits three cockpit-frame pieces over the view every frame, because the view
-    is drawn underneath them: the top strip, the right strip and the attitude-ball bezel.
-  - E2b. With E1, clip the view's copy and fill to the visible window shape (a mask from bitmap 3,
-    plane 4) and drop those restore blits. Without E1, clip the band fills to the window
-    rectangle.
-- **E3. Remaining cockpit blits.**
-  - E3a. Text (`+02F44`), needles (`+0AD30`), scope (`+0B740`) and tapes (`+0AB3C`) are about 7 %
-    on the 68060.
-  - E3b. Draw them with the CPU into the same fast-RAM staging, or skip them when their value has
-    not changed.
+- **E2. Cockpit overlay — complete for enhanced 0658.**
+  - E2a. Audited the three restores: top view strip, right view strip (which
+    wraps one word into the following row), and attitude-instrument bezel.
+  - E2b. The CPU copy leaves the opaque top five rows untouched and composes
+    the two edge words of each remaining view row using bitmap 3's plane-4
+    mask and cached artwork. The middle uses MOVEM. The first two restores
+    are skipped; the bezel below the view remains native. Keep rectangular
+    fills in fast RAM and the native fallback without an allocation; no new
+    68000 path work. View plus art cache uses 36,010 fast bytes. Native screen
+    swaps and module installation invalidate the art cache.
+- **E3. Remaining cockpit blits — complete with targeted update suppression.**
+  - E3a. Current 060 profiling measured needle erase/draw at about 2.9%, scope
+    at 2.3%, and tapes at 1.7% before this work. Text, scope and tapes retain
+    native drawing and their existing conditional updates.
+  - E3b. `timing-cockpit.i` retains unchanged needles independently in each
+    back buffer, skipping both erase and redraw. Native screen swaps and
+    pending panel restores invalidate the cache: the rotor-warning panel
+    overlaps a needle. Modal/native ownership and allocation failure retain
+    native behavior. No full cockpit CPU renderer is introduced.
+  Same-state native redraw comparisons passed: **423 edge frames, 95 skipped
+  needle frames, zero differing words**. Two-buffer/change/panel/modal cache
+  checks and allocation fallback passed. Full-MMU 040 CACHE startup/takeoff,
+  pause/exit and blitter-interrupt restoration passed. Ordinary slave is
+  byte-identical. Evidence under ignored `tmp/dev/tmp/`:
+  `e23-pixels-final2/`, `e-040-cache/`, `e-pause-exit/`.
 - **E4. Overlap what stays on the blitter.**
   - E4a. For blits that remain (map, cockpit art, the 68000 path), queue them and start the next
     one from a game-owned BLIT interrupt, instead of spinning.
