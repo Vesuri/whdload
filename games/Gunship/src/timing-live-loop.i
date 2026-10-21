@@ -119,6 +119,7 @@ timing_blitter_owned:
 ; Restore the incoming BLIT enable before graphics.library releases ownership
 ; or services any queue. Leave a pending completion request for its handler.
 timing_blitter_release:
+ bsr timing_display_drain
  move.l d0,-(sp)
  move.w timing_blitter_intena(pc),d0
  beq .disabled

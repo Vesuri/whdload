@@ -17,7 +17,7 @@ version. The ordinary build and CUSTOM1=0 retain native timing.
 `timing-slave.i` resolves loaded hunks, reads the display's 50/60 Hz frequency,
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
-The current arena is 30,436 bytes and production runtime text is 48,190 bytes.
+The current arena is 30,436 bytes and production runtime text is 48,386 bytes.
 The CPU renderer separately allocates 18,000 bytes of fast RAM.
 `timing-core.i` defines the included implementation. Exact guided forecast,
 selector certification and forecast tapes are absent from runtime inclusion
@@ -166,14 +166,16 @@ reused. The former asynchronous clear raced LZW dictionary use and caused
 is not necessary to disable MMU or CACHE for that issue. See
 [CACHE_AUDIT.md](CACHE_AUDIT.md) for cache details.
 
-## View drawing and display exchange (D2, E1)
+## View drawing and display exchange (D2–D3, E1)
 
 `timing-display.i` replaces only the enhanced flight swap at +044B4.
 The task waits for the last blit, finds the current copper list's ten BPLxPT
 moves, copies the selected bitmap into Screen.BitMap, and publishes the new
 plane pointers. The game's VBL server exchanges those words and acknowledges
-completion before the task may reuse the old front buffer. This retains
-synchronous double buffering; D3/D4 remain separate work. FrontScreen waiting
+completion before the task may reuse the old front buffer. Submission returns
+immediately; bitmap binding waits only if an exchange is still pending. Native
+swaps and DisownBlitter drain pending work before handing back ownership. VERIFY
+logs VBL exchanges rather than task submissions. D4 remains separate. FrontScreen waiting
 yields through WaitTOF. Native/modal paths still rebuild their screen normally.
 Palette moves and the flash-effect pointers found by +00AB8 stay intact;
 there is no unchanged per-frame palette copy or MakeScreen/RethinkDisplay.

@@ -560,7 +560,12 @@ is a later verification note. No further 68000 timing or exact-forecast work.
   - D2c. Keep the palette pokes that `+00AB8` locates (flash effects).
   - D2d. Drop the palette copy that changes nothing.
   - D2e. Keep the front-screen check, but stop spinning on it.
-- **D3. Don't wait for the vertical blank.**
+- **D3. Don't wait for the vertical blank — complete for enhanced 0658.**
+  Swaps publish and return; bitmap binding waits for VBL acknowledgement before
+  reusing a displayed buffer. Native swaps and DisownBlitter drain pending work.
+  VERIFY timestamps the actual VBL exchange. Existing 500-field PAL windows:
+  020 12.4 fps, 060 25.0 fps, both 3.00 Hz; pause/exit cleanup passed.
+  Evidence: ignored `tmp/dev/tmp/d3-{fps020,fps060,pause-exit}/`.
   - D3a. With D2, the task requests the swap and continues.
   - D3b. Before drawing into a buffer it waits only until that buffer is no longer displayed.
 - **D4. Triple buffering.**

@@ -179,6 +179,25 @@ verify_tick_ready:
 ; Fixed-size log: stop writing at capacity and count overflow, never overwrite memory.
 verify_frame:
 	movem.l d0/a0-a1,-(sp)
+ IFD TIMING_RUNTIME
+	lea verify_frame(pc),a0
+	adda.l #timing_display_async-verify_frame,a0
+	tst.w (a0)
+	bne verify_frame_restore
+ ENDC
+	bsr verify_frame_record
+	bra verify_frame_restore
+
+ IFD TIMING_RUNTIME
+; Called only by the VBL acknowledgement, with a published payload.
+verify_display_frame:
+	movem.l d0/a0-a1,-(sp)
+	bsr verify_frame_record
+	movem.l (sp)+,d0/a0-a1
+	rts
+ ENDC
+
+verify_frame_record:
 	lea verify_marker(pc),a0
 	move.l 44(a0),d0
 	cmpi.l #VERIFY_FRAMES,d0
@@ -194,6 +213,15 @@ verify_frame:
 	move.w $3b94(a0),d0
 	move.w d0,(a1)+
 	move.w $4bb0(a0),(a1)
+ IFD TIMING_RUNTIME
+	lea verify_frame(pc),a0
+	adda.l #timing_display_async-verify_frame,a0
+	tst.w (a0)
+	beq .native_index
+	move.w 2(a0),(a1) ; submitted index, independent of task's toggle
+	eori.w #1,(a1)
+.native_index:
+ ENDC
 	swap d0
 	move.w (a1),d0
 	swap d0
@@ -205,11 +233,12 @@ verify_frame_tick:
 	movea.l 44(a0),a1
 	addq.l #1,a1
 	move.l a1,44(a0)
-	bra verify_frame_restore
+	rts
 verify_frame_overflow:
 	movea.l 52(a0),a1
 	addq.l #1,a1
 	move.l a1,52(a0)
+	rts
 verify_frame_restore:
 	movea.l verify_marker+8(pc),a0
 	adda.l #$c757,a0
