@@ -35,6 +35,32 @@ optimization evidence is under `tmp/render60`; buffer-reuse correction and
 current validation evidence are under `tmp/fast60/corrected`. The normal loader
 remains byte-identical.
 
+## Installer archive
+
+Run `make dist` from the repository root. It sources the shared environment,
+forces fresh non-VERIFY builds, then creates
+`tmp/dist/Stellar7_<commit>_experimental_install.lha` with an adjacent SHA-256
+file and content-validation report. A dirty checkout is labelled in the name.
+This is a commit-labelled experimental snapshot, not a new stable release
+version or completion of step 6.
+
+Packaging starts with a fresh extraction of `tmp/Stellar7.lha`. It replaces the
+normal slave, ReadMe and Install-Stellar7 script, adds the two CPU-specific
+simulation slaves, and preserves all eleven other original members exactly.
+The installer targets English NTSC disks and offers 15 Hz for 68000/68010,
+60 Hz for 68020+, or original timing through the reconstructed development
+loader. Fixed-rate installation sets the selected slave and CUSTOM1=1 in the
+installed game icon. Original destination handling and icon choices remain.
+Game data, Kickstarts and WHDLoad itself are not bundled.
+
+The packager uses LHa level-1 headers, tests archive integrity, extracts it again
+and compares every member byte-for-byte with staging. It rejects VERIFY menu
+options, checks both simulation labels and statically validates Installer
+expression balance and procedure references. The changed Installer choice UI
+has not been exercised under Amiga Installer; these checks establish package
+contents, not end-to-end installation. Temporary extraction drawers are removed
+automatically. The final archive, checksum, report and small build log remain.
+
 ## Scratch retention
 
 Raw traces, memory dumps and screenshots from superseded experiments are

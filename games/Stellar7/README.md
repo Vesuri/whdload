@@ -36,6 +36,10 @@ rates at runtime. Scripted tests use the existing VERIFY fixtures.
 To try 20 Hz on the 68000, use `SIM68000_SUBSTEPS=4 amiga/play60.sh`.
 Without that override the next launch rebuilds the selected 15 Hz default.
 
+Build the current experimental installer archive with `make dist`. The `.lha`,
+checksum and verification report are written to `tmp/dist/`. It includes both
+CPU builds and an installer choice; original English NTSC disks are required.
+
 Read [current status and remaining work](docs/open-work.md),
 [build and validation instructions](docs/development.md), and
 [internals and measurements](docs/internals.md).
