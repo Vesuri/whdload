@@ -8435,3 +8435,27 @@ at +0943A: signed ASR.B #2 maps roll +1..+3 to zero and -1..-3 to -1. Executing
 that native branch with equal heading/track confirms heading/track deltas
 0/0 for the positive values and -1/-1 for the negative values. Keep this native
 handling rather than silently changing the flight model.
+
+### Refocus step 4: missile hits must remove their targets
+
+The native projectile update publishes a deferred destroyed-target index at
+hunk 0+$C756. Native +05874..+05884 consumes it with +07CB2 after drawing and
+before the next weapon update. The enhanced loop had omitted that bridge:
++0BED4 cleared the index on the next world tick without removing the target.
+This accounts for explosions without destruction; changing missile strength
+would not fix it.
+
+`world_start_prepare` now validates and appends that original 16-byte block
+to the world opening. It runs once per deadline under the existing scheduler,
+before weapons can clear the result. Native target removal, mission bookkeeping
+and notifications remain native. Nothing is applied per rendered frame.
+Runtime storage increases by 16 bytes to 30,436; production text is 44,840 bytes.
+
+The 560 existing opening comparisons pass. For all 90 live target entries in
+the captured mission, pending-kill execution produces the same alive bitmap
+and player/object state as the original bridge. A normal-startup A1200 guest
+probe publishes target 6 at tick 32: its actual alive byte changes $F5->$F4
+(bit 0 cleared), with the scheduler continuing normally. Evidence:
+`tmp/dev/tmp/c/step4-pending-kill-live/kill.json`. This isolates the reported
+missing consequence; it is not a replay of the user's exact Bradley/BMP-1
+shots or a claim that every visible missile contact qualifies as a native hit.

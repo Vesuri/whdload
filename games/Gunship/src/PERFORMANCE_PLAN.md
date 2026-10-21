@@ -445,7 +445,30 @@ acceptance text in the status notes and items below where they conflict.
 7. Then D2 (D1 brought forward into step 3 by user approval), then E1: C fixes speed and response, but the blitter caps
    drawing at about 15 fps until D and E.
 
-**Current status (2026-10-21): refocus step 3 complete; step 4 user play underway.**
+**Current status (2026-10-21): refocus step 4 complete for the reported issues.**
+
+Windowed a1200-fast and a1200-040 launchers use the latest CUSTOM1=1 build.
+The reported issues have been addressed:
+
+- Grounded vertical-speed needle: zero for descent at zero height (444e0727).
+- 68040 graphics corruption: wait for the original asynchronous BltClear in
+  each module; full-MMU/CACHE startup and flight pass (b24a7821).
+- Small-bank left/right asymmetry: reproduced in original +0943A arithmetic;
+  +1..+3 rounds to zero, -1..-3 to -1. Native handling retained.
+- Tail-rotor yaw jumps: ease only damage yaw over 160 ms PAL / 167 ms NTSC;
+  ordinary steering remains immediate (08618766). 220 focused camera cases
+  pass, with 40 live A1200 draw samples showing intermediate angles.
+- Missiles explode without destroying targets: restore the omitted native
+  deferred-kill bridge before the next weapon update clears its result.
+  560 opening checks and 90 native target-removal comparisons pass; the live
+  A1200 pending-hit probe clears the actual target's alive bit.
+
+No new release gates were added. Full-mission user acceptance on a1200 and
+68060 remains C criterion 5; the fixes above do not substitute for that play.
+Stop here as requested by the refocus sequence. **Next: step 5**, at most ten
+release blockers. The exact Bradley/BMP-1 shots have not been replayed;
+verification isolates the missing native destruction path.
+
 
 The windowed a1200-fast CUSTOM1=1 build is available for user play. The first
 reported issue was the vertical-speed needle oscillating with engines off on
@@ -497,8 +520,8 @@ Evidence: `tmp/dev/tmp/c/refocus-step3-d1-{a1200-fast,a1200-060}/`, matching
 `refocus-step3-d1-off-*`, and `refocus-step3-d1-pause-exit/`.
 Slave SHA-256: `319d3b3e00ef48028ef7ac99be2fab2575ae562d4c4a7442891823a6b6e4ab77`.
 Code commits: `849083a7` (CPU gate), `1aa150f7` (simplification),
-`268af168` (D1). **Current: step 4**, windowed a1200 user play and reported
-fixes. D2 and E1 retain their later order.
+`268af168` (D1). **Current: step 4 reported fixes complete**; next is step 5.
+D2 and E1 retain their later order.
 
 **Step 2 measurement record (2026-10-21).**
 

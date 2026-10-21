@@ -1,7 +1,8 @@
 ; Native 0658 world-tick opening, before HUD/camera/render work.
 ; Standalone. Once-only scheduling and command ordering belong to the caller.
 WS_NATIVE_SIZE equ $98       ; +05640..+056d8
-WS_CODE_SIZE equ WS_NATIVE_SIZE+2
+WS_KILL_SIZE equ $10         ; +05874..+05884, deferred missile destruction
+WS_CODE_SIZE equ WS_NATIVE_SIZE+WS_KILL_SIZE+2
 
 ; a0=validated hunk 0, a1=even clone, a2=validated hunk 6,
 ; a3=authoritative player to bind. Buffers must not overlap; flush caches.
@@ -39,11 +40,31 @@ world_start_prepare:
 	bne .bad
 	cmpa.l $94(a4),a5
 	bne .bad
+	; The old render/tick bridge consumed the previous projectile result.
+	; Without this block +0bed4 clears it before the target can be removed.
+	cmpi.w #$1639,$5874(a0)
+	bne .bad
+	movea.l a0,a5
+	adda.l #$c756,a5
+	cmpa.l $5876(a0),a5
+	bne .bad
+	cmpi.l #$67000008,$587a(a0)
+	bne .bad
+	cmpi.w #$4eb9,$587e(a0)
+	bne .bad
+	lea $7cb2(a0),a5
+	cmpa.l $5880(a0),a5
+	bne .bad
 	movea.l a1,a5
 	moveq #WS_NATIVE_SIZE/2-1,d1
 .copy:
 	move.w (a4)+,(a5)+
 	dbf d1,.copy
+	lea $5874(a0),a4
+	moveq #WS_KILL_SIZE/2-1,d1
+.kill_copy:
+	move.w (a4)+,(a5)+
+	dbf d1,.kill_copy
 	move.w #$4e75,(a5)
 	move.l a3,$76(a1)
 	move.l a3,$94(a1)
@@ -56,7 +77,8 @@ world_start_prepare:
 	rts
 
 ; a0=bound authoritative player, a1=prepared clone. Return 0/-1.
-; Advances tick, cooldowns and engine state; native indicator writes/calls real.
+; Advances tick, cooldowns and engine state; consumes last tick's deferred
+; missile kill before this tick's actor update clears it. Native side effects.
 ; Never call from presentation or speculative motion. No rollback after entry.
 world_start_step:
 	movem.l d1-d7/a0-a6,-(sp)
