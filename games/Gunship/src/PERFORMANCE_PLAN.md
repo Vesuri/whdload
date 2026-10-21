@@ -423,7 +423,9 @@ acceptance text in the status notes and items below where they conflict.
 - **Exit criteria for C**, replacing the full C9 matrix as the release gate:
   1. World rate 3.00 Hz ±1 % on 68020 and 68060, PAL and NTSC, in ordinary play.
   2. Held-input player state at world ticks equals native (already shown).
-  3. Input shows on the next completed frame.
+  3. Input affects the next frame whose drawing starts after that input is
+     sampled (user-approved clarification). A frame already in progress keeps
+     its original camera.
   4. Enhanced fps is no lower than native fps in the same scene.
   5. The user plays a full mission on the a1200 and the 68060 with no visible
      problems.
@@ -454,7 +456,8 @@ Step 3 met fps parity (criterion 4): 020 10.4 → 11.5; 060 16.3 → 16.7 fps.
 Step 7 PAL 500-field window: enhanced 020 11.7 fps, 060 25.0 fps; both 3.00 Hz.
 Next-completion delays: 020 median 60 ms (20–80), 060 20 ms in all eight samples.
 F normal-startup windows meet 3.00 Hz on 020/060 in PAL and NTSC (C-R2 complete).
-Input-to-completion medians were 60/40 ms; visible response still needs confirmation.
+Input-to-completion medians were 60/40 ms; paired PAL 020/060 frames now
+confirm visible response in the next newly drawn frame (C-R3 complete).
 Reported ground-gauge, 68040 BltClear, damage-yaw and deferred missile-kill fixes are in.
 Post-beta play-test correction: enhanced bank-to-turn division now truncates
 towards zero, removing the native small-bank left bias. Native mode is unchanged.
@@ -468,13 +471,13 @@ Full-mission user acceptance remains open; targeted checks do not replace it.
 Unattended demo playback and any-key exit are restored through native demo ownership.
 Current ownership, source map, evidence and demo checks: [TIMING_DESIGN.md](TIMING_DESIGN.md).
 
-**Release acceptance items (three open; authoritative list from step 5).**
+**Release acceptance items (two open; authoritative list from step 5).**
 
 | ID | Remaining work | Completion evidence |
 |---|---|---|
 | C-R1 | Complete: unattended demo playback and any-key exit. | PAL/NTSC normal-startup runs with CUSTOM1 off/on fly the recorded demo; Space returns to vehicle identification. Demo retains native timing. |
 | C-R2 | Complete (also C9b): ordinary-play world rate on 68020/68060, PAL/NTSC. | F release-slave samples rechecked: 30 ticks / 500 PAL fields and 25 ticks / 500 NTSC fields on each CPU, all 3.00 Hz (criterion 1). |
-| C-R3 | Open: resolve the next-completed-frame requirement. | PAL 020/060 paired production runs show input in the next newly drawn frame; the in-progress frame is unchanged. See TIMING_DESIGN.md; acceptance wording awaits the user's decision. |
+| C-R3 | Complete: visible response in the next newly drawn frame. | User-approved criterion 3; paired PAL 020/060 production runs show changed camera bank and rendered pixels in the first subsequent draw. See TIMING_DESIGN.md. |
 | C-R4 | Full-mission user acceptance on a1200 with current fixes. | No visible problems, including missile destruction and damaged-tail-rotor motion (criterion 5). |
 | C-R5 | Full-mission user acceptance on 68060 with current fixes. | No visible problems (criterion 5). |
 
@@ -533,7 +536,7 @@ is a later verification note. No further 68000 timing or exact-forecast work.
 - **C9. Validation reference; only the five refocus criteria are release gates.**
   - C9a. Existing cross-CPU and drawing-independent state comparisons remain regression checks.
   - C9b. Complete: ordinary-play world-rate acceptance is C-R2. All four required CPU/video combinations meet 3.00 Hz ±1%; see the world-rate acceptance evidence in TIMING_DESIGN.md.
-  - C9c. Visible next-frame input response is C-R3; full-mission play is C-R4/C-R5.
+  - C9c. Input-response check complete under the user-approved C-R3 criterion: next newly drawn frame. Full-mission play remains separately open as C-R4/C-R5.
   - C9d. Retain native held-input player endpoint checks (criterion 2 already shown).
   - C9e. Retain clock, reserves, reload, effect and lifecycle duration checks.
   - C9f. Retain bounded-prediction/identity checks; do not restore exact-forecast gates.
@@ -606,7 +609,7 @@ versions remain F2. C's remaining acceptance is listed above.
 ### E. Cut blitter work (the ceiling from the 68020 on)
 
 **Complete for enhanced 0658 (2026-10-21).** E4 is closed by the user-approved
-measurement decision. Other executable versions remain F2; C-R3–C-R5 remain open.
+measurement decision. Other executable versions remain F2; C-R4/C-R5 remain open.
 
 - **E1. CPU renderer for the 3D view — complete for the enhanced 0658 runtime.**
   `timing-cpu-render.i` retains native geometry/clipping and draws the view into
@@ -691,7 +694,7 @@ measurement decision. Other executable versions remain F2; C-R3–C-R5 remain op
 
 **Complete for 2.0b beta (21.10.2026).** F is closed for this beta on the
 checks below. The full A3 matrix is not a beta gate. C's remaining acceptance
-items (C-R3–C-R5) and the deferred T-74 report stay open; this is not
+items (C-R4/C-R5) and the deferred T-74 report stay open; this is not
 full-release or full-mission sign-off.
 
 - **F1. Options — complete.** CUSTOM1 is the default-off **Enhanced framerate**

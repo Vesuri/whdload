@@ -2,7 +2,7 @@
 
 This describes the 2.0b (21.10.2026) hybrid timing implementation.
 [PERFORMANCE_PLAN.md](PERFORMANCE_PLAN.md), section C's refocus, defines release
-acceptance. C-R1 and C-R2 are complete; C-R3–C-R5 remain open. C is not complete.
+acceptance. C-R1–C-R3 are complete; C-R4/C-R5 remain open. C is not complete.
 Implementation history and superseded experiments are in git.
 
 ## Activation and scope
@@ -335,7 +335,7 @@ selects the existing `tools/fps.py <out>` comparison under its environment.
 Use separate run directories and exclude host input. Debugger guest-memory
 writes are unsupported by the shared harness; previous guest probes were
 compiled diagnostics, not play-build behavior. No new proof fixtures or gates
-are required by this document. Remaining release work is C-R3–C-R5.
+are required by this document. Remaining release work is C-R4/C-R5.
 
 ## Completed D5 drawing overhead work
 
@@ -395,7 +395,9 @@ Evidence: ignored `tmp/dev/tmp/e23-pixels-final2/`, `e-040-cache/`,
 
 ## Visible input response (C-R3, C9c)
 
-The literal next-completed-frame criterion is not yet met. Production-slave
+C-R3 and C9c's input-response check are complete under the user-approved
+criterion: input affects the next frame whose drawing starts after it is sampled.
+A frame already being drawn retains its original camera. Production-slave
 paired runs on PAL 68020 and 68060 injected a held right-stick input at native
 draw entry, after that frame's camera was published. A no-input control used
 the same startup/takeoff route and identical pre-injection state. The frame
@@ -409,9 +411,9 @@ This follows the current loop: consume field history, publish the camera,
 then draw. Input arriving during drawing is retained for the next iteration;
 the in-progress frame is not rebuilt. These observations establish response
 in the next newly drawn frame for these cases, not the next completion for
-arbitrarily timed input. Changing the acceptance wording requires the user's
-decision; C-R3 remains open. C9c also references full-mission acceptance, which
-remains separately under C-R4/C-R5.
+arbitrarily timed input. The user accepted this distinction; no rendering change
+was needed. C9c also references full-mission acceptance, which remains
+separately open under C-R4/C-R5.
 
 Evidence: ignored `tmp/dev/tools/check_visible_input.py` and
 `tmp/dev/tmp/visible-input-pal{020,060}-{control,right}/`. The check uses
@@ -440,7 +442,7 @@ Evidence: ignored `tmp/dev/tmp/f-{pal,ntsc}-{020,060}/samples.json` and
 `result.json`. This is an audit of the existing F measurements, not a fresh
 emulator run. Subsequent bank-rounding, damage-colour, damage-camera and demo
 fixes have not changed the ordinary-play world scheduler. Visible input response
-and full-mission acceptance remain separately open as C-R3–C-R5.
+is complete as C-R3; full-mission acceptance remains open as C-R4/C-R5.
 
 ## Remaining blitter work and measured outcome (E4/E5)
 
