@@ -445,7 +445,45 @@ acceptance text in the status notes and items below where they conflict.
 7. Then D2 (D1 brought forward into step 3 by user approval), then E1: C fixes speed and response, but the blitter caps
    drawing at about 15 fps until D and E.
 
-**Current status (2026-10-21): refocus step 4 complete for the reported issues.**
+**Current status (2026-10-21): refocus step 5 complete; next is step 6.**
+
+**Release blockers (five; authoritative list after refocus step 5).**
+
+| ID | Remaining work | Completion evidence |
+|---|---|---|
+| C-R1 | Restore unattended demo playback and its any-key exit in enhanced mode. | Normal startup without input plays the recorded flight and a key exits, as with CUSTOM1=0. Confirmed regression; diagnosis below. |
+| C-R2 | Finish ordinary-play world-rate acceptance on 68020 and 68060, PAL and NTSC. | 3.00 Hz ±1% in each case (criterion 1). The short PAL windows below are encouraging, not the full acceptance check. |
+| C-R3 | Confirm that new input is visible on the next completed frame. | Observe the response in that frame (criterion 3); input-to-completion timestamps alone do not establish this. |
+| C-R4 | Full-mission user acceptance on a1200 with the current fixes. | A complete mission with no visible problems (criterion 5), including whether the reported missile and damaged-tail-rotor problems are resolved in play. |
+| C-R5 | Full-mission user acceptance on 68060 with the current fixes. | A complete mission with no visible problems (criterion 5). |
+
+Held-input equivalence (criterion 2) is already shown. FPS parity (criterion 4)
+is met by step 3's comparison: 10.4 → 11.5 fps on 68020 and 16.3 → 16.7 fps
+on 68060. The older exhaustive C9 matrix remains regression material or later
+notes, not additional release gates. No more 68000 timing work, exact forecast
+work or certification machinery is planned. The previously reported T-74
+graphics issue remains a later verification note, not a newly added gate.
+
+**C-R1 diagnosis.** The user's `FS-UAE_Full_261021-1356_00.png` was found in
+`tmp/dev/tmp/play-a1200-040/.run/shots/`. A normal-startup, unattended PAL
+a1200-fast run per toggle reproduces it. Over the same approximately 20-second
+observation window, native demo playback advances 85 world ticks, moves from
+(29871, 21920) to (31025, 18752), and advances its tape pointer by 96 bytes.
+Enhanced advances 61 world ticks but remains at (28416, 28672), with zero
+height, RPM and attitude; its tape pointer stays at the first record (base+4).
+Space exits native demo to the T-74 identification screen; enhanced remains
+in the demo cockpit. This is not an intentional stationary demonstration.
+
+The native PAL input decoder at +04E3C calls the recorded-input reader at
++053F2 and maps any key to exit when hunk 6 +45CC indicates demo playback.
+The enhanced loop instead consumes live field input, bypassing both demo
+behaviors. No fix was made in step 5. Local evidence:
+`tmp/dev/tmp/c/step5-demo-{native,enhanced}/` (`demo.json`, start/end/exit
+screenshots); the JSON's `demo` field reads an unrelated offset and is not
+used as evidence. Tape progress, player state and screenshots establish the
+comparison. Next: step 6 documentation cleanup; stop here before proceeding.
+
+**Step 4 reported fixes.**
 
 Windowed a1200-fast and a1200-040 launchers use the latest CUSTOM1=1 build.
 The reported issues have been addressed:
@@ -465,8 +503,7 @@ The reported issues have been addressed:
 
 No new release gates were added. Full-mission user acceptance on a1200 and
 68060 remains C criterion 5; the fixes above do not substitute for that play.
-Stop here as requested by the refocus sequence. **Next: step 5**, at most ten
-release blockers. The exact Bradley/BMP-1 shots have not been replayed;
+The exact Bradley/BMP-1 shots have not been replayed;
 verification isolates the missing native destruction path.
 
 
@@ -520,7 +557,7 @@ Evidence: `tmp/dev/tmp/c/refocus-step3-d1-{a1200-fast,a1200-060}/`, matching
 `refocus-step3-d1-off-*`, and `refocus-step3-d1-pause-exit/`.
 Slave SHA-256: `319d3b3e00ef48028ef7ac99be2fab2575ae562d4c4a7442891823a6b6e4ab77`.
 Code commits: `849083a7` (CPU gate), `1aa150f7` (simplification),
-`268af168` (D1). **Current: step 4 reported fixes complete**; next is step 5.
+`268af168` (D1). Step 4 reported fixes and step 5 blocker inventory are complete.
 D2 and E1 retain their later order.
 
 **Step 2 measurement record (2026-10-21).**
