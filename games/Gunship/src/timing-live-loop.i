@@ -21,6 +21,25 @@ timing_loop_install:
  adda.l #$868c,a3
  cmpa.l $5624(a1),a3
  bne .bad
+ ; Blitter ownership wrappers are shared by flight and its modal handoffs.
+ ; Preserve the native OwnBlitter/WaitBlit/DisownBlitter ordering.
+ cmpi.w #$2c79,-16(a3)
+ bne .bad
+ cmpi.l #$4eaefe38,-10(a3)
+ bne .bad
+ cmpi.l #$4eaeff1c,-6(a3)
+ bne .bad
+ cmpi.w #$4e75,-2(a3)
+ bne .bad
+ cmpi.w #$2c79,0(a3)
+ bne .bad
+ move.l -14(a3),d0
+ cmp.l 2(a3),d0
+ bne .bad
+ cmpi.l #$4eaefe32,6(a3)
+ bne .bad
+ cmpi.w #$4e75,10(a3)
+ bne .bad
  lea .patches(pc),a0
  jsr resload_Patch(a2)
 .disabled:
@@ -34,6 +53,8 @@ timing_loop_install:
 .patches:
  PL_START
  PL_PS $561c,timing_flight_entry
+ PL_P $8686,timing_blitter_owned
+ PL_P $8692,timing_blitter_release
  PL_END
 
 ; The initialized native flight owns its usual return to +05622. A failed
@@ -80,3 +101,31 @@ timing_flight_include:
  rts
  even
 timing_flight_status: dc.l 0
+
+; A6 is graphics.library, already loaded by the native wrapper. OwnBlitter
+; has completed; wait for its last DMA before masking only BLIT. Other
+; interrupt sources retain their state. No queued blits are used by Gunship.
+timing_blitter_owned:
+ jsr -228(a6) ; WaitBlit
+ movem.l d0/a0,-(sp)
+ move.w $dff01c,d0 ; INTENAR
+ andi.w #$0040,d0
+ lea timing_blitter_intena(pc),a0
+ move.w d0,(a0)
+ move.w #$0040,$dff09a ; clear BLIT only
+ movem.l (sp)+,d0/a0
+ rts
+
+; Restore the incoming BLIT enable before graphics.library releases ownership
+; or services any queue. Leave a pending completion request for its handler.
+timing_blitter_release:
+ move.l d0,-(sp)
+ move.w timing_blitter_intena(pc),d0
+ beq .disabled
+ ori.w #$8000,d0
+ move.w d0,$dff09a
+.disabled:
+ move.l (sp)+,d0
+ jmp -462(a6) ; DisownBlitter returns directly to the native caller
+ even
+timing_blitter_intena: dc.w 0
