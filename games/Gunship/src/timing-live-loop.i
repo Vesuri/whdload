@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; CUSTOM1-only replacement for the initialized flight call, +0561C.
 ; Install last: no enhanced flight may start with incomplete isolation hooks.
 ; a0=arena,a2=resload. Return 0/-1, preserve non-result registers.
@@ -10,16 +11,16 @@ timing_loop_install:
  cmpi.w #1,RT_DRAW_READY(a0)
  bne .bad
  movea.l RT_HUNKS(a0),a1
- cmpi.w #$4eb9,$561c(a1)
+ cmpi.w #$4eb9,GS0_561c(a1)
  bne .bad
- lea $563a(a1),a3
- cmpa.l $561e(a1),a3
+ lea GS0_563a(a1),a3
+ cmpa.l GS0_561e(a1),a3
  bne .bad
- cmpi.w #$4eb9,$5622(a1)
+ cmpi.w #$4eb9,GS0_5622(a1)
  bne .bad
  movea.l a1,a3
- adda.l #$868c,a3
- cmpa.l $5624(a1),a3
+ adda.l #GS0_868c,a3
+ cmpa.l GS0_5624(a1),a3
  bne .bad
  ; Blitter ownership wrappers are shared by flight and its modal handoffs.
  ; Preserve the native OwnBlitter/WaitBlit/DisownBlitter ordering.
@@ -52,9 +53,9 @@ timing_loop_install:
  rts
 .patches:
  PL_START
- PL_PS $561c,timing_flight_entry
- PL_P $8686,timing_blitter_owned
- PL_P $8692,timing_blitter_release
+ PL_PS GS0_561c,timing_flight_entry
+ PL_P GS0_8686,timing_blitter_owned
+ PL_P GS0_8692,timing_blitter_release
  PL_END
 
 ; The initialized native flight owns its usual return to +05622. A failed

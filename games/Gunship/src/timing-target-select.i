@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Private native target selection, with explicit committed-view pixel samples.
 ; This does not acquire visibility, collect candidates or publish a lock.
 WT_CODE_SIZE equ $158 ; native +a58c..+a6e4
@@ -32,7 +33,7 @@ target_select_prepare:
 .h0:
  adda.l d3,a0
  movea.l a4,a1
- adda.l #$a58c,a1
+ adda.l #GS0_a58c,a1
  cmpa.l 0(a1,d1.w),a0
  bne .bad
  dbf d4,.check
@@ -60,7 +61,7 @@ target_select_prepare:
  move.l a0,0(a6,d1.w)
  dbf d4,.patch
  lea target_select_pixel(pc),a0
- move.l a0,$a6b0-$a58c(a6)
+ move.l a0,GS0_a6b0-GS0_a58c(a6)
  moveq #0,d0
  bra .done
 .bad:
@@ -155,33 +156,33 @@ target_select_pixel:
 ; Verified HUNK relocations: clone offset, source hunk, source offset,
 ; private destination offset. Pixel-call entry is patched separately.
 target_select_relocs:
- dc.w $0002,0,$a9a0,WT_STATE+$0002
- dc.w $000c,0,$a99e,WT_STATE+$0000
- dc.w $0018,0,$aa0a,WT_STATE+$006c
- dc.w $0024,0,$a9a0,WT_STATE+$0002
- dc.w $0030,0,$a9a2,WT_STATE+$0004
- dc.w $0042,0,$a9a4,WT_STATE+$0006
- dc.w $004a,0,$a6a2,$0116
- dc.w $0054,0,$a99e,WT_STATE+$0000
- dc.w $0062,0,$a9a0,WT_STATE+$0002
- dc.w $006c,0,$a68e,$0102
- dc.w $0076,0,$aa0a,WT_STATE+$006c
- dc.w $007e,0,$a68e,$0102
- dc.w $008a,0,$aa0a,WT_STATE+$006c
- dc.w $0090,0,$a9a2,WT_STATE+$0004
- dc.w $009a,0,$a9a4,WT_STATE+$0006
- dc.w $00a0,0,$aa14,WT_STATE+$0076
- dc.w $00a8,0,$aa1e,WT_STATE+$0080
- dc.w $00b0,0,$aa28,WT_STATE+$008a
- dc.w $00bc,0,$aa32,WT_STATE+$0094
- dc.w $00c2,0,$a9a6,WT_STATE+$0008
- dc.w $00cc,0,$a9b0,WT_STATE+$0012
- dc.w $00e0,0,$a9a0,WT_STATE+$0002
- dc.w $00e8,0,$a99e,WT_STATE+$0000
- dc.w $00f0,0,$a99e,WT_STATE+$0000
- dc.w $00f6,0,$a9a0,WT_STATE+$0002
- dc.w $00fc,0,$a9a4,WT_STATE+$0006
- dc.w $010e,0,$a9a0,WT_STATE+$0002
- dc.w $0124,0,$825e,0
+ dc.w $0002,0,GS0_a9a0,WT_STATE+$0002
+ dc.w $000c,0,GS0_a99e,WT_STATE+$0000
+ dc.w $0018,0,GS0_aa0a,WT_STATE+$006c
+ dc.w $0024,0,GS0_a9a0,WT_STATE+$0002
+ dc.w $0030,0,GS0_a9a2,WT_STATE+$0004
+ dc.w $0042,0,GS0_a9a4,WT_STATE+$0006
+ dc.w $004a,0,GS0_a6a2,$0116
+ dc.w $0054,0,GS0_a99e,WT_STATE+$0000
+ dc.w $0062,0,GS0_a9a0,WT_STATE+$0002
+ dc.w $006c,0,GS0_a68e,$0102
+ dc.w $0076,0,GS0_aa0a,WT_STATE+$006c
+ dc.w $007e,0,GS0_a68e,$0102
+ dc.w $008a,0,GS0_aa0a,WT_STATE+$006c
+ dc.w $0090,0,GS0_a9a2,WT_STATE+$0004
+ dc.w $009a,0,GS0_a9a4,WT_STATE+$0006
+ dc.w $00a0,0,GS0_aa14,WT_STATE+$0076
+ dc.w $00a8,0,GS0_aa1e,WT_STATE+$0080
+ dc.w $00b0,0,GS0_aa28,WT_STATE+$008a
+ dc.w $00bc,0,GS0_aa32,WT_STATE+$0094
+ dc.w $00c2,0,GS0_a9a6,WT_STATE+$0008
+ dc.w $00cc,0,GS0_a9b0,WT_STATE+$0012
+ dc.w $00e0,0,GS0_a9a0,WT_STATE+$0002
+ dc.w $00e8,0,GS0_a99e,WT_STATE+$0000
+ dc.w $00f0,0,GS0_a99e,WT_STATE+$0000
+ dc.w $00f6,0,GS0_a9a0,WT_STATE+$0002
+ dc.w $00fc,0,GS0_a9a4,WT_STATE+$0006
+ dc.w $010e,0,GS0_a9a0,WT_STATE+$0002
+ dc.w $0124,0,GS0_825e,0
  dc.w $012c,6,$16dc,WT_PALETTE
  dc.w $0132,6,$3b9e,WT_MODE

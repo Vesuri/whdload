@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Deadline-owned target visibility/selection. The field consumer calls this
 ; after committed player motion and before geometry/weapons, never per draw.
 ; a0=arena. Return 0/-3 admission/-1 failure; preserve non-result registers.
@@ -44,7 +45,7 @@ timing_runtime_target:
  bne .failed
  ; Validate native descriptor offsets before any publication/phase change.
  movea.l RT_HUNKS(a6),a0
- adda.l #$a99e,a0
+ adda.l #GS0_a99e,a0
  lea 8(a0),a1
  moveq #4,d2
 .validate:
@@ -71,7 +72,7 @@ timing_runtime_target:
  lea RT_SCENE(a6),a0
  lea RT_CAMERA(a6),a1
  movea.l RT_HUNKS(a6),a2
- adda.l #$c6a0,a2
+ adda.l #GS0_c6a0,a2
  bsr scene_target_step
  tst.l d0
  bmi .failed
@@ -85,7 +86,7 @@ timing_runtime_target:
  tst.w RT_FIRE(a6)
  bne .raster
  movea.l RT_HUNKS(a6),a0
- adda.l #$ba08,a0
+ adda.l #GS0_ba08,a0
  tst.w (a0)
  bne .raster
  movea.l RT_HUNKS+24(a6),a0
@@ -98,7 +99,7 @@ timing_runtime_target:
  lea RT_TARGET(a6),a1
  lea RT_CAMERA(a6),a2
  movea.l RT_HUNKS(a6),a3
- adda.l #$c6a0,a3
+ adda.l #GS0_c6a0,a3
  bsr visibility_raster_step
  tst.l d0
  bne .failed
@@ -111,7 +112,7 @@ timing_runtime_target:
  bne .failed
  lea RT_TARGET+WT_STATE(a6),a0
  movea.l RT_HUNKS(a6),a1
- adda.l #$a99e,a1
+ adda.l #GS0_a99e,a1
  moveq #WT_STATE_SIZE/2-1,d2
 .publish:
  move.w (a0)+,(a1)+
@@ -125,7 +126,7 @@ timing_runtime_target:
  tst.b $1c5(a0)
  bne .selected
  movea.l RT_HUNKS(a6),a0
- adda.w #$46de,a0
+ adda.w #GS0_46de,a0
  move.l a6,-(sp)
  jsr (a0)
  movea.l (sp)+,a6

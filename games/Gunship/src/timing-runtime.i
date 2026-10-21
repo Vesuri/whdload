@@ -1,4 +1,5 @@
-; One caller-allocated, even runtime arena for the validated 0658 executable.
+ include "timing-offsets.i"
+; One caller-allocated, even runtime arena for the selected executable.
 ; Requires timing-core.i. Not installed. Native hunks and arena must not overlap.
 ; Preparation does not patch or execute game code. Flush instruction caches
 ; after success and before any copied native entry executes.
@@ -87,7 +88,7 @@ RT_PLAYER_CACHE equ RT_SCRIPT_PREVIEW ; no scripted native-motion preview
 RT_ARENA_SIZE equ RT_PLAYER_CACHE+PC_SIZE
 
 ; a0=first code address from a valid DOS LoadSeg chain, a1=36-byte output.
-; Require the nine-hunk 0658 layout. Return 0/-1, preserve other registers.
+; Require the nine-hunk game layout. Return 0/-1, preserve other registers.
 ; Validate chain length/alignment before publishing any pointer. This does
 ; not probe arbitrary addresses: the loader owns the valid segment memory.
 timing_runtime_hunks:
@@ -163,7 +164,7 @@ timing_runtime_prepare:
  tst.l d0
  bne .bad
  movea.l RT_HUNKS(a6),a0
- adda.l #$7a5c,a0
+ adda.l #GS0_7a5c,a0
  lea RT_RNG(a6),a1
  lea RT_RECORD(a6),a2
  movea.l RT_HUNKS+8(a6),a3
@@ -296,7 +297,7 @@ timing_runtime_prepare:
  move.l a0,RT_ACTOR_PRESENT+AC_PREVIEW(a6)
  move.l a0,RT_RELEASE_PRESENT+AC_PREVIEW(a6)
  movea.l RT_HUNKS(a6),a0
- adda.w #$5c04,a0
+ adda.w #GS0_5c04,a0
  move.l a0,RT_DRAW_ENTRY(a6)
  lea timing_runtime_actors(pc),a0
  move.l a0,RT_CONSUMER+TF_ACTOR_ENTRY(a6)
@@ -313,18 +314,18 @@ timing_runtime_prepare:
  movea.l RT_HUNKS(a6),a0
  movea.l RT_HUNKS+24(a6),a1
  lea $3b88(a1),a1
- cmpi.w #$3039,$475a(a0)
+ cmpi.w #$3039,GS0_475a(a0)
  bne .bad
- cmpa.l $475c(a0),a1
+ cmpa.l GS0_475c(a0),a1
  bne .bad
  addq.l #2,a1
- cmpi.w #$3239,$4760(a0)
+ cmpi.w #$3239,GS0_4760(a0)
  bne .bad
- cmpa.l $4762(a0),a1
+ cmpa.l GS0_4762(a0),a1
  bne .bad
- cmpi.w #$4e75,$487a(a0)
+ cmpi.w #$4e75,GS0_487a(a0)
  bne .bad
- lea $475a(a0),a0
+ lea GS0_475a(a0),a0
  move.l a0,RT_CONSUMER+TF_MAP_ENTRY(a6)
  movea.l RT_HUNKS+16(a6),a0
  lea $1c5(a0),a0
@@ -344,7 +345,7 @@ timing_runtime_prepare:
  dbf d0,.bind
  movea.l RT_HUNKS(a6),a0
  move.l a0,RT_CAPTURE+8(a6)
- lea $1068(a0),a1
+ lea GS0_1068(a0),a1
  move.l a1,RT_CAPTURE+40(a6)
  move.l RT_HUNKS+8(a6),RT_CAPTURE+12(a6)
  ; Native bindings are stable addresses in the loaded hunks.
@@ -367,15 +368,15 @@ timing_runtime_prepare:
  move.l a0,RT_FIELD+SF_HUNK4(a6)
  movea.l RT_HUNKS(a6),a0
  movea.l a0,a1
- adda.l #$af36,a1
+ adda.l #GS0_af36,a1
  move.l a1,RT_WORLD_READER+CW_INDICATOR(a6)
- lea $7a44(a0),a1
+ lea GS0_7a44(a0),a1
  move.l a1,RT_PLAYER+SE_SINE(a6)
  movea.l a0,a1
- adda.l #$c6a0,a1
+ adda.l #GS0_c6a0,a1
  move.l a1,RT_GEOMETRY+SGE_OBJECTS(a6)
  movea.l a0,a1
- adda.l #$a150,a1
+ adda.l #GS0_a150,a1
  move.l a1,RT_CONSUMER+TF_NOTIFY(a6)
  movea.l RT_HUNKS+24(a6),a0
  lea $42f6(a0),a1

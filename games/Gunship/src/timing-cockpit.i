@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; E3: retain unchanged needles independently in the two chip bitmaps.
 ; Native screen swaps invalidate both entries; modal/native rendering always
 ; executes the original erase and draw. No simulation state is cached.
@@ -7,7 +8,7 @@ cockpit_install:
  beq .done
  movea.l RT_HUNKS(a0),a3
  movea.l a3,a0
- adda.l #$ac14,a0
+ adda.l #GS0_ac14,a0
  cmpi.w #$45f9,(a0)
  bne .bad
  lea cockpit_native_erase(pc),a1
@@ -16,7 +17,7 @@ cockpit_install:
  move.w #$4ef9,(a1)+
  move.l a0,(a1)
  movea.l a3,a0
- adda.l #$acf0,a0
+ adda.l #GS0_acf0,a0
  cmpi.w #$1039,(a0)
  bne .bad
  cmpi.w #$3039,$1c(a0)
@@ -25,7 +26,7 @@ cockpit_install:
  bne .bad
  move.l a0,-(sp)
  movea.l a3,a0
- adda.l #$aaa4,a0
+ adda.l #GS0_aaa4,a0
  lea cockpit_restore_counters(pc),a1
  move.l (a0),(a1)
  movea.l (sp)+,a0
@@ -51,8 +52,8 @@ cockpit_install:
  rts
 .patches:
  PL_START
- PL_P $ac14,cockpit_erase
- PL_P $acf0,cockpit_draw
+ PL_P GS0_ac14,cockpit_erase
+ PL_P GS0_acf0,cockpit_draw
  PL_END
 
 cockpit_invalidate:

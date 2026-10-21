@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Experimental committed-view visibility acquisition, called by the world
 ; target owner. Native flight-loop activation remains separate.
 ; Uses the native back buffer, raster scratch and blitter. Foreground only:
@@ -19,12 +20,12 @@ visibility_raster_prepare:
  movea.l a0,a4
  movea.l a1,a5
  movea.l a2,a6
- lea $5c04(a4),a2
+ lea GS0_5c04(a4),a2
  cmpi.l #$48e71f1e,(a2)
  bne .bad
- cmpi.l #$4cdf78f8,$5cb8(a4)
+ cmpi.l #$4cdf78f8,GS0_5cb8(a4)
  bne .bad
- cmpi.w #$4e75,$5cbc(a4)
+ cmpi.w #$4e75,GS0_5cbc(a4)
  bne .bad
  lea visibility_raster_relocs(pc),a3
  moveq #13,d4
@@ -84,7 +85,7 @@ visibility_raster_step:
  dbf d1,.validate
  ; Preserve the native target block while collecting this committed view.
  movea.l VR_H0(a6),a0
- adda.l #$a99e,a0
+ adda.l #GS0_a99e,a0
  lea VR_SAVED_TARGET(a6),a1
  lea WT_STATE(a4),a5
  moveq #WT_STATE_SIZE/2-1,d1
@@ -93,7 +94,7 @@ visibility_raster_step:
  move.w (a5)+,(a0)+
  dbf d1,.borrow
  movea.l VR_H0(a6),a0
- adda.l #$a9a0,a0
+ adda.l #GS0_a9a0,a0
  clr.w (a0)
  ; The native prefix binds the back buffer and builds cell/transform scratch.
  movea.l a2,a0
@@ -108,7 +109,7 @@ visibility_raster_step:
  btst #6,$dff002
  bne .wait
  movea.l VR_H0(a6),a0
- adda.l #$a99e,a0
+ adda.l #GS0_a99e,a0
  lea VR_SAVED_TARGET(a6),a1
  lea WT_STATE(a4),a2
  moveq #WT_STATE_SIZE/2-1,d1
@@ -134,7 +135,7 @@ visibility_raster_step:
  subq.w #1,d7
  bmi .ok
  movea.l VR_H0(a6),a5
- adda.l #$825e,a5
+ adda.l #GS0_825e,a5
  lea WT_STATE+$80(a4),a3
  lea WT_PIXELS(a4),a2
  moveq #0,d6
@@ -161,7 +162,7 @@ visibility_raster_step:
 
 ; Prefix offset, source hunk, source offset. No PC-relative branches in prefix.
 visibility_raster_relocs:
- dc.w $06,6,$38f6,$0c,6,$15dc,$16,0,$84e2,$1c,0,$6980
- dc.w $26,6,$3958,$30,0,$7a1c,$3e,0,$7a1c,$48,0,$5f8e
- dc.w $4e,0,$5cbe,$54,0,$5ea4,$5a,0,$77b8,$62,0,$8524
- dc.w $68,0,$60a8,$70,0,$8524
+ dc.w $06,6,$38f6,$0c,6,$15dc,$16,0,GS0_84e2,$1c,0,GS0_6980
+ dc.w $26,6,$3958,$30,0,GS0_7a1c,$3e,0,GS0_7a1c,$48,0,GS0_5f8e
+ dc.w $4e,0,GS0_5cbe,$54,0,GS0_5ea4,$5a,0,GS0_77b8,$62,0,GS0_8524
+ dc.w $68,0,GS0_60a8,$70,0,GS0_8524

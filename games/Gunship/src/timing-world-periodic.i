@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Remaining native periodic housekeeping after reserve depletion. Not installed.
 ; Requires timing-world-rng.i. Keep native RNG order and object-table accesses.
 WP_NATIVE_SIZE equ $82        ; +0598a..+05a0c (excludes loop back branch)
@@ -10,7 +11,7 @@ WP_SIZE equ WP_CODE_SIZE+4    ; bound native player pointer after code
 world_periodic_prepare:
 	movem.l d1-d2/a0-a6,-(sp)
 	movea.l a3,a6
-	lea $598a(a0),a4
+	lea GS0_598a(a0),a4
 	cmpi.l #$323c0080,(a4)
 	bne .bad
 	cmpi.l #$6200006e,$12(a4)
@@ -56,8 +57,8 @@ world_periodic_prepare:
 	movem.l (sp)+,d1-d2/a0-a6
 	rts
 .calls:
-	dc.w $04,$7a6a,$18,$7b7e,$30,$7b7e,$40,$7bd0
-	dc.w $48,$7fbe,$64,$8036,$6c,$7fbe,$7c,$46de
+	dc.w $04,GS0_7a6a,$18,GS0_7b7e,$30,GS0_7b7e,$40,GS0_7bd0
+	dc.w $48,GS0_7fbe,$64,GS0_8036,$6c,GS0_7fbe,$7c,GS0_46de
 
 ; a0=authoritative player INCLUDING native trailing object tables, a1=clone.
 ; Call only after world_reserves_step returned 1, once per periodic tick.

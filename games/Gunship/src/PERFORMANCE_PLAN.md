@@ -681,21 +681,58 @@ measurement decision. Other executable versions remain F2; C-R1–C-R5 remain op
 
 ### F. Release
 
-- **F1. Options.** Use CUSTOM options for:
-  - the master boolean **Enhanced framerate**, CUSTOM1 (C10),
-  - the renderer choice (E1c).
-  
-  Default: enhancements off. Renderer choices only apply when Enhanced framerate
-  is enabled. Triple buffering (D4) was declined; retain double buffering.
-- **F2. All versions.** Apply each patch to every supported `gamemule`/`titlmule`/`scrnmule`
-  version at its own offsets. Where a version cannot be tested, say so in the ReadMe.
-- **F3. ReadMe and slave version.** Bump the version, add a history entry, and document the
-  options.
-- **F4. Final check.** Run the full matrix (68000, 68020, 68030, 68040, 68060) on all windows of
-  A3: fps, pacing jitter, ticks per second and state equality. Also play through a full mission
-  on the 68000 (native timing), the a1200 and the 68060. Resolve or independently validate the full-MMU
-  asynchronous-blitter emulator limitation documented under B4. The reported
-  68060 T-74 copy-protection graphics issue remains deferred at the user’s request.
+**2.0b beta preparation (21.10.2026).** F1–F3 are implemented. F4's
+full-release sign-off remains distinct from the beta regression checks below;
+C's remaining acceptance items and the deferred T-74 report are not closed.
+
+- **F1. Options — complete.** CUSTOM1 is the default-off **Enhanced framerate**
+  master, ignored below 68020. CUSTOM4 selects CPU (0, default) or native
+  blitter (1) rendering, only within enhanced mode. CPU allocation failure
+  retains the blitter. Double buffering remains; D4 stays cancelled.
+- **F2. Versions — complete for the available releases.** `Gunship.slave`
+  supports enhanced 0658; `GunshipNTSC.slave` supports enhanced 1489. The
+  installer chooses by executable release, not video frequency. Both compile
+  the same timing/rendering code with independently mapped code-hunk offsets.
+  NTSC's shorter command decoder and longer weapons block retain their native
+  layouts. Preparation validates native signatures and relocated operands.
+  The 0658 address-map refactor was byte-identical before release metadata and
+  the renderer option were added. Other recognized releases keep native timing;
+  the unavailable German/alternate releases are explicitly untested in ReadMe.
+- **F3. Version, ReadMe and installer — complete.** Version/date is
+  **2.0b (21.10.2026)**. ReadMe and Install use the WHDLoad Install Template,
+  retaining the original requirements, history, manual/icon credits, disk-file
+  selection, support for the launcher in C:, and icon selection. The history
+  entry lists user-visible changes since 1.2. `source/build.sh` builds both
+  production slaves with the shared toolchain; diagnostic builds are not shipped.
+- **F4. Final check — beta checks implemented; full acceptance pending.**
+  Existing blitter checks pass for PAL/NTSC title, menu and flight, including
+  disabled-option behavior, delayed busy reads and register/flag preservation.
+  Both release CPU gates ignore CUSTOM1 on 68000/010; no new 68000 rate or
+  overload work was performed, per the refocus. The NTSC runtime's preparation
+  and every live-hook signature pass. Both releases pass pause/exit, frozen
+  paused state, no extra ticks after exit, and BLIT interrupt restoration.
+  Full-MMU 68040 CACHE startup/flight passed in FS-UAE. In that profile the CPU
+  renderer is slower (6.12 fps) than the blitter (23.64); ReadMe recommends
+  CUSTOM4=1 there. This is not a real-hardware performance result.
+
+Current production-slave normal-startup measurements, one 500-field takeoff
+window each, CPU renderer unless specified. Unseeded runs can select different
+missions; these are not matched-state speedup comparisons or a full A3 matrix.
+
+| Executable / video | CPU profile | fps | World Hz |
+|---|---|---:|---:|
+| 0658 / PAL | a1200-fast (020) | 13.9 | 3.00 |
+| 0658 / PAL | 030, 50 MHz | 23.5 | 3.00 |
+| 1489 / NTSC | a1200-fast (020) | 10.44 | 3.00 |
+| 1489 / NTSC | 060, 50 MHz | 30.0 | 3.00 |
+| 1489 / NTSC, blitter | 060, 50 MHz | 18.24 | 3.00 |
+
+Evidence is under ignored `tmp/dev/tmp/f-*`: normal-startup samples/results,
+040 CACHE screenshots, the renderer comparison, and PAL/NTSC pause/exit results.
+The completed E measurements remain applicable to the shared 0658 renderer.
+Full A3-window/state-equality and full-mission acceptance are not claimed by
+these short checks. The refocus's user mission checks remain C-R4/C-R5; native
+68000 rate/full-mission expansion is excluded by the user's refocus decision.
 
 ### G. Optional: more of the world at field rate
 

@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native damage scan and nested hit routine with deadline-owned RNG/effects.
 ; Standalone; requires world-rng and a prepared world-effect constructor.
 WH_ENTRY equ 8               ; keep preceding PC-relative lookup table
@@ -10,7 +11,7 @@ WD_SIZE equ WD_CODE_SIZE+4
 ; Return 0/-1, preserve others. Caller owns buffers and instruction-cache flush.
 world_hit_prepare:
 	movem.l d1/a0/a3-a4,-(sp)
-	lea $7d8a(a0),a3
+	lea GS0_7d8a(a0),a3
 	cmpi.l #$0408ff08,(a3)
 	bne .bad
 	cmpi.l #$ffffffff,4(a3)
@@ -20,10 +21,10 @@ world_hit_prepare:
 	cmpi.w #$4eb9,8(a3)
 	bne .bad
 	movea.l a0,a4
-	adda.l #$a150,a4
+	adda.l #GS0_a150,a4
 	cmpa.l $a(a3),a4
 	bne .bad
-	lea $7a5c(a0),a4
+	lea GS0_7a5c(a0),a4
 	cmpi.w #$4eb9,$e(a3)
 	bne .bad
 	cmpa.l $10(a3),a4
@@ -56,7 +57,7 @@ world_hit_prepare:
 world_damage_prepare:
 	movem.l d1-d2/a0-a6,-(sp)
 	movea.l a0,a6
-	adda.l #$9c5c,a6
+	adda.l #GS0_9c5c,a6
 	cmpi.l #$102d0017,(a6)
 	bne .bad
 	cmpi.w #$4e75,WD_CODE_SIZE-2(a6)
@@ -98,7 +99,7 @@ world_damage_prepare:
 	movem.l (sp)+,d1-d2/a0-a6
 	rts
 .calls:
-	dc.w $1ce,$9b9a,$1d4,$7a5c,$1e6,$7d92,$1fa,$9b9a
+	dc.w $1ce,GS0_9b9a,$1d4,GS0_7a5c,$1e6,GS0_7d92,$1fa,GS0_9b9a
 
 ; a0=bound native player with tables, a1=damage clone. Return 0/-1.
 ; Run once after native world weapons/actors, before scripts/periodic tail.

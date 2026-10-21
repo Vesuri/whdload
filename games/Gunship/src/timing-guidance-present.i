@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Retain the latest native request for each guidance hardware sprite.
 ; Foreground field owner captures; render owner presents, serialized by caller.
 ; No gameplay state writes or graphics calls while capturing.
@@ -18,10 +19,10 @@ guidance_present_init:
  move.l a1,GP_H0(a0)
  move.l a2,GP_H6(a0)
  movea.l a1,a3
- adda.l #$f048,a3
+ adda.l #GS0_f048,a3
  move.l a3,GP_MOVE(a0)
  movea.l a1,a3
- adda.l #$f02c,a3
+ adda.l #GS0_f02c,a3
  move.l a3,GP_CHANGE(a0)
  movem.l (sp)+,a1/a3
  bra guidance_present_reset
@@ -90,7 +91,7 @@ guidance_capture_sprite:
  movem.l d0-d5/a0-a2/a6,-(sp)
  movea.l FG_PRESENT(a0),a0
  movea.l GP_H0(a0),a1
- adda.l #$a44d,a1
+ adda.l #GS0_a44d,a1
  moveq #0,d2
  move.b (a1),d2
  add.w d2,d2

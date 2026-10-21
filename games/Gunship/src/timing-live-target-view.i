@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Install only with CUSTOM1 and prepared runtime. Preserve native call targets
 ; for ordinary ownership; copied panel code is unnecessary.
 ; a0=arena,a2=resload; return 0/-1, preserve others.
@@ -8,20 +9,20 @@ timing_target_view_install:
  cmpi.l #1,RT_READY(a0)
  bne .bad
  movea.l RT_HUNKS(a0),a1
- cmpi.w #$4eb9,$5c78(a1)
+ cmpi.w #$4eb9,GS0_5c78(a1)
  bne .bad
- lea $468c(a1),a3
- cmpa.l $5c7a(a1),a3
+ lea GS0_468c(a1),a3
+ cmpa.l GS0_5c7a(a1),a3
  bne .bad
- cmpi.w #$4eb9,$46a4(a1)
+ cmpi.w #$4eb9,GS0_46a4(a1)
  bne .bad
  movea.l a1,a0
- adda.l #$a6e4,a0
- cmpa.l $46a6(a1),a0
+ adda.l #GS0_a6e4,a0
+ cmpa.l GS0_46a6(a1),a0
  bne .bad
  lea timing_view_native_draw(pc),a3
  move.l a0,(a3)
- lea $468c(a1),a0
+ lea GS0_468c(a1),a0
  lea timing_view_native_panel(pc),a3
  move.l a0,(a3)
  lea .patches(pc),a0
@@ -36,8 +37,8 @@ timing_target_view_install:
  rts
 .patches:
  PL_START
- PL_PS $5c78,timing_view_panel
- PL_PS $46a4,timing_view_draw
+ PL_PS GS0_5c78,timing_view_panel
+ PL_PS GS0_46a4,timing_view_draw
  PL_END
 
 timing_view_panel:

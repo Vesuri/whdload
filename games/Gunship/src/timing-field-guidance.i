@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native guided-weapon field state; optional retained sprite request binding.
 ; Replay in delivered-field order; do not also run the native VBL state owner.
 FG_CODE_SIZE equ $128        ; +0a1c8..+0a2f0, includes native RTS exits
@@ -16,11 +17,11 @@ field_guidance_prepare:
 	movem.l d1-d2/a0-a6,-(sp)
 	movea.l a3,a6
 	movea.l a0,a3
-	adda.l #$a1c8,a3
+	adda.l #GS0_a1c8,a3
 	cmpi.l #$42421439,(a3)
 	bne .bad
 	movea.l a0,a5
-	adda.l #$a44d,a5
+	adda.l #GS0_a44d,a5
 	cmpa.l 4(a3),a5
 	bne .bad
 	cmpi.w #$4e75,FG_CODE_SIZE-2(a3)
@@ -33,7 +34,7 @@ field_guidance_prepare:
 	cmp.w -2(a3,d1.w),d0
 	bne .bad
 	movea.l a0,a5
-	adda.l #$c757,a5
+	adda.l #GS0_c757,a5
 	cmpa.l 0(a3,d1.w),a5
 	bne .bad
 	dbf d2,.pending_check
@@ -59,12 +60,12 @@ field_guidance_prepare:
 	lea $1c6(a2),a5
 	move.l a5,FG_QUIT(a1)
 	movea.l a0,a5
-	adda.l #$a44e,a5
+	adda.l #GS0_a44e,a5
 	move.l a5,FG_ENABLED(a1)
 	move.l a6,FG_PENDING(a1)
 	clr.l FG_PRESENT(a1)
 	movea.l a0,a5
-	adda.l #$c6d0,a5
+	adda.l #GS0_c6d0,a5
 	move.l a5,FG_EFFECTS(a1)
 	lea .pending(pc),a4
 	moveq #3,d2
@@ -89,7 +90,7 @@ field_guidance_prepare:
 	movem.l (sp)+,d1-d2/a0-a6
 	rts
 .calls:
-	dc.w $44,$a35a,$c2,$a2f0,$f6,$a2f0,$114,$a2f0
+	dc.w $44,GS0_a35a,$c2,GS0_a2f0,$f6,GS0_a2f0,$114,GS0_a2f0
 .pending:
 	dc.w $24,$50f9,$2a,$4a39,$4e,$50f9,$5c,$4a39
 

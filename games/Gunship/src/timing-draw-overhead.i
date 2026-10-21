@@ -1,15 +1,16 @@
-; D5a/b, enhanced 0658 only. Retain waits before blitter register changes,
+ include "timing-offsets.i"
+; D5a/b, enhanced flight only. Retain waits before blitter register changes,
 ; CPU mask writes, pixel reads/writes and display publication. The final
 ; polygon wait adds no protection beyond those consumers' own waits.
 draw_overhead_install:
  movem.l d1/a0-a3,-(sp)
  movea.l RT_HUNKS(a0),a1
  movea.l a1,a3
- adda.l #$8820,a3
+ adda.l #GS0_8820,a3
  cmpi.w #$41f9,(a3)
  bne .bad
  move.l a1,d0
- addi.l #$8d88,d0
+ addi.l #GS0_8d88,d0
  cmp.l 2(a3),d0
  bne .bad
  cmpi.l #$203cffff,6(a3)
@@ -19,7 +20,7 @@ draw_overhead_install:
  cmpi.w #$6004,32(a3)
  bne .bad
  movea.l a1,a3
- adda.l #$8d7a,a3
+ adda.l #GS0_8d7a,a3
  cmpi.w #$4eb9,(a3)
  bne .bad
  lea blitter_wait(pc),a0
@@ -30,7 +31,7 @@ draw_overhead_install:
  cmpi.l #$4cdf6f00,8(a3)
  bne .bad
  movea.l a1,a3
- adda.l #$8842,a3
+ adda.l #GS0_8842,a3
  cmpi.l #$48e701e2,(a3)
  bne .bad
  cmpi.w #$3a39,4(a3)
@@ -55,11 +56,11 @@ draw_overhead_install:
  rts
 .patches:
  PL_START
- PL_P $8820,draw_overhead_native_begin
- PL_P $8842,draw_overhead_text_begin
+ PL_P GS0_8820,draw_overhead_native_begin
+ PL_P GS0_8842,draw_overhead_text_begin
  ; A completed BTST wait sets only Z. Preserve that return-flag contract.
- PL_L $8d7a,$003c0004 ; ORI #4,CCR
- PL_NOP $8d7e,4
+ PL_L GS0_8d7a,$003c0004 ; ORI #4,CCR
+ PL_NOP GS0_8d7e,4
  PL_END
 
 ; Native +8818 already saved d7/a0-a2/a6 and loaded d2. Continue at
@@ -92,7 +93,7 @@ draw_overhead_clear_spans:
  bra .range
 .bounded:
  movea.l draw_overhead_h0(pc),a1
- adda.l #$90aa,a1
+ adda.l #GS0_90aa,a1
  move.w (a1),d1
  move.w 4(a1),d2
  tst.w d1
@@ -107,7 +108,7 @@ draw_overhead_clear_spans:
  bmi .done
 .range:
  movea.l draw_overhead_h0(pc),a0
- adda.l #$8d88,a0
+ adda.l #GS0_8d88,a0
  lsl.w #2,d1
  adda.w d1,a0
  move.l #$ffff0000,d0

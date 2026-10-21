@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native lifecycle/display command adapter. Caller suspends sampling before
 ; blocking UI and owns command acknowledgement and post-command rebase.
 ; Do not invoke twice for one retained command. No queue cursors changed here.
@@ -8,14 +9,14 @@ BC_SIZE equ 4 ; native +04ed4 decoder entry
 ; Return 0/-1, preserving others. No native writes or cache flush required.
 boundary_commands_prepare:
  move.l a0,-(sp)
- lea $4ed4(a0),a0
+ lea GS0_4ed4(a0),a0
  cmpi.l #$0c470045,(a0)
  bne .bad
  cmpi.l #$584f70ff,$18(a0) ; +04eec drops inner return, then MOVEQ -1
  bne .bad
  cmpi.w #$4e75,$1c(a0)
  bne .bad
- cmpi.w #$4e75,$460(a0)
+ cmpi.w #$4e75,GS0_5334-GS0_4ed4(a0)
  bne .bad
  move.l a0,(a1)
  moveq #0,d0

@@ -1,26 +1,111 @@
-Gunship development build
 
-Enhanced framerate (CUSTOM1) is off by default and requires a 68020 or
-later. On a 68000 the option is ignored and native timing is retained.
-All framerate enhancements use this master option.
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
-The experimental TIMING_RUNTIME build adds a 3 Hz world clock, responsive
-player motion and renderer-only object prediction. It remains in development;
-ordinary builds retain native timing. On the supported 0658 version the
-runtime build also uses an asynchronous double-buffer swap and a CPU-drawn
-3D view. Triple buffering is not used. Polygon drawing clears only used span
-rows and avoids a redundant trailing wait; required blitter waits remain.
-The CPU view clips/composes its cockpit edges to remove two restore blits,
-and unchanged instrument needles are retained separately in each buffer.
-Panel changes still repaint overlapping needles. The CPU view and cached art
-need 36,010 bytes of free fast RAM; if unavailable they keep native drawing.
-These changes share the CUSTOM1 master option.
+ This install applies to "Gunship" (c) 1987-1989 Microprose, 1 disk.
 
-FS-UAE 68040 play setup
+ Requirements:
+ -------------
+ This install requires WHDLoad version 18.0 to be in the path.
+ It can be found in the WHDLoad package. Installation copies files from the
+ original Gunship disk. Select the disk's release in the installer: PAL
+ (SPS 0658), NTSC (SPS 1489), or another supported release.
 
-The shared full-MMU a1200-040 preset (25 MHz, 2 MB chip, 8 MB fast) now
-works with CUSTOM1=1 and CACHE, retaining asynchronous blits. The original
-game reused memory before BltClear finished; Enhanced framerate now waits
-for completion in the title, menu and game modules. The previous cycle-exact
-NOMMU workaround is no longer needed for that corruption. Validation so far
-is in FS-UAE, not on real 68040 hardware.
+ The installed program requires 0.5 MB ChipMem and 1.0 MB OtherMem.
+ For Enhanced framerate, use a 68020 or later and at least 2 MB OtherMem.
+ It can be quit by pressing num '*' (key can be changed with Tooltype
+ "QuitKey=").
+
+ The game requires an installed A500 Kickstart 1.3 image.
+ The kickstart image must be located in the directory "Devs:Kickstarts" and
+ must be named "kick34005.A500". The image can be extracted from a A500 with
+ tools like 'GrabKick' or similar which can be found on aminet.
+ If the image is of wrong version or altered in any way WHDLoad will quit with
+ an appropriate message.
+ Additionally the file "kick34005.A500.RTB" must be installed in the same
+ directory as the kickstart image. It can be found in the archive
+ "util/boot/skick346.lha" on aminet.
+
+ Features:
+ ---------
+ - Disk and password protections removed on the supported original versions.
+ - Access fault fixed; fast memory and caches supported.
+ - Quick manual, source code and icons by Exoticons and Chris Vella included.
+ - Optional Enhanced framerate for the PAL 0658 and NTSC 1489 releases.
+
+ Options:
+ --------
+ CUSTOM1=1: Enhanced framerate (default: off).
+ Runs the world at its intended pace while updating controls and helicopter
+ motion more frequently. Other moving objects are drawn smoothly between
+ world updates. Weapons launch on the next world update. On a 68000 this
+ option is ignored and native timing is retained.
+
+ CUSTOM4=0: CPU renderer (default when Enhanced framerate is enabled).
+ CUSTOM4=1: Original blitter renderer.
+ The renderer choice only applies with CUSTOM1=1. The CPU renderer needs
+ about 36 KB of additional free fast memory; if unavailable, drawing falls
+ back to the blitter. All framerate enhancements share the CUSTOM1 switch.
+
+ The installer uses Gunship.slave for PAL 0658 and GunshipNTSC.slave for
+ NTSC 1489. Choose by the game release, not by your Amiga's video mode.
+ Other previously supported releases retain native timing. Their enhanced
+ timing has not been ported or tested; the German and alternate title
+ releases were not available for this beta's tests.
+
+ Beta notes:
+ -----------
+ Enhanced mode is still awaiting full-mission play-testing on the A1200 and
+ 68060. The unattended demo does not play or exit correctly in enhanced
+ mode; leave Enhanced framerate off to use the demo.
+ The reported 68060 T-74 identification-screen graphics issue remains open.
+ The 68040 graphics corruption caused by unfinished blitter clears has been
+ fixed in enhanced mode. CACHE works in the tested full-MMU FS-UAE setup;
+ a cycle-exact NOMMU workaround is no longer required. In that emulator
+ profile, select CUSTOM4=1 for better speed. Real 68040 hardware has not
+ been tested.
+
+ History:
+ --------
+ version 2.0b (21.10.2026) done by Vesa Halttunen:
+ - optional smoother framerate and responsive controls on 68020 and later
+ - selectable faster CPU renderer
+ - fixes for enhanced-mode ground climb indication, missile kills and
+   damaged-tail-rotor turning; 68040 graphics corruption fixed
+ - updated installer with PAL/NTSC selection
+
+ version 1.2 (15.02.2020) done by JOTD:
+ - another original version supported (from which the supported crack was issued)
+
+ version 1.1 (12.09.05) done by JOTD:
+ - another version (without MPS logo) supported & fixed (needs re-installing)
+
+ version 1.0 (10.01.05) done by JOTD:
+ - initial release
+ - 3 versions supported, 2 originals & 1 crack
+ - disk & password protections removed on original versions
+ - access fault fixed
+ - use of fastmem & caches for awesome speed
+ - nice icons by Exoticons & Chris Vella
+ - quick manual included
+ - source code included
+
+
+ Contact:
+ --------
+ If you have problems with this installation please try and get a newer
+ version of this package from the WHDLoad WWW-Page. If that doesn't help try
+ some Tooltypes like NOCACHE, NOAUTOVEC, EXPCHIP, NOMMU, PAL or NTSC. If
+ that also fails, please inform the author via the Bug-Report-Form which
+ can be accessed on the WHDLoad WWW-Page.
+
+ For the full WHDLoad package, other installs and updates refer to:
+	http://www.whdload.de/
+ or	aminet:dev/misc/whdload#?
+ and	aminet:game/patch/

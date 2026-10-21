@@ -1,23 +1,24 @@
+ include "timing-offsets.i"
 ; D2/D3: publish flight bitplanes asynchronously at VBL. Wait only before
 ; binding a drawing buffer or handing ownership back to native/modal code.
 timing_display_install:
  movem.l a0-a3,-(sp)
  movea.l RT_HUNKS(a0),a1
- cmpi.w #$4eb9,$44b4(a1)
+ cmpi.w #$4eb9,GS0_44b4(a1)
  bne .bad
- lea $b7c(a1),a3
- cmpa.l $44b6(a1),a3
+ lea GS0_0b7c(a1),a3
+ cmpa.l GS0_44b6(a1),a3
  bne .bad
  movea.l a1,a0
- adda.l #$8516,a0
+ adda.l #GS0_8516,a0
  cmpi.l #$c2fc0028,(a0)
  bne .bad
  cmpi.w #$43f9,4(a0)
  bne .bad
  lea timing_display_bitmap_array(pc),a0
- move.l $ba2(a1),(a0)
+ move.l GS0_0ba2(a1),(a0)
  movea.l a1,a0
- adda.l #$851c,a0
+ adda.l #GS0_851c,a0
  move.l (a0),d0
  cmp.l timing_display_bitmap_array(pc),d0
  bne .bad
@@ -44,9 +45,9 @@ timing_display_install:
  rts
 .patches:
  PL_START
- PL_PS $44b4,timing_display_swap
- PL_P $8516,timing_display_bind
- PL_P $b7c,timing_display_native_swap
+ PL_PS GS0_44b4,timing_display_swap
+ PL_P GS0_8516,timing_display_bind
+ PL_P GS0_0b7c,timing_display_native_swap
  PL_END
 
 timing_display_swap:
@@ -74,7 +75,7 @@ timing_display_swap:
  ; Native graphics.library base is the operand of the OwnBlitter wrapper.
  movea.l timing_runtime_arena(pc),a0
  movea.l RT_HUNKS(a0),a0
- adda.l #$867e,a0
+ adda.l #GS0_867e,a0
  movea.l (a0),a0
  movea.l (a0),a6
  jsr -228(a6) ; WaitBlit
@@ -85,7 +86,7 @@ timing_display_swap:
  mulu #40,d7
  movea.l timing_runtime_arena(pc),a0
  movea.l RT_HUNKS(a0),a0
- movea.l $ba2(a0),a3 ; native bitmap-array relocation
+ movea.l GS0_0ba2(a0),a3 ; native bitmap-array relocation
  adda.l d7,a3
  ; Locate exactly one high/low move for each of the five display planes.
  ; No persistent addresses survive a native screen rebuild.
@@ -164,7 +165,7 @@ timing_display_wait:
  movem.l d0-d1/a0-a1/a6,-(sp)
  movea.l timing_runtime_arena(pc),a0
  movea.l RT_HUNKS(a0),a0
- adda.l #$867e,a0
+ adda.l #GS0_867e,a0
  movea.l (a0),a0
  movea.l (a0),a6
  jsr -270(a6) ; WaitTOF

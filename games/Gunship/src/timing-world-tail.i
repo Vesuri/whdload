@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native periodic completion and flight-end cleanup. Not installed.
 ; Requires world-reserves and world-periodic. Caller invokes once per world tick.
 WT_CLEANUP_SIZE equ $46       ; +058c6..+0590c, includes RTS
@@ -7,7 +8,7 @@ WT_CLEANUP_SIZE equ $46       ; +058c6..+0590c, includes RTS
 ; Nonoverlapping buffers and instruction-cache flush required.
 world_cleanup_prepare:
 	movem.l d1-d2/a0-a5,-(sp)
-	lea $58c6(a0),a4
+	lea GS0_58c6(a0),a4
 	cmpi.w #$7005,(a4)
 	bne .bad
 	cmpi.l #$727941ed,$14(a4)
@@ -17,7 +18,7 @@ world_cleanup_prepare:
 	cmpi.w #$4279,$38(a4)
 	bne .bad
 	movea.l a0,a5
-	adda.l #$ba08,a5
+	adda.l #GS0_ba08,a5
 	cmpa.l $3a(a4),a5
 	bne .bad
 	cmpi.w #$50f9,$3e(a4)
@@ -53,7 +54,7 @@ world_cleanup_prepare:
 	movem.l (sp)+,d1-d2/a0-a5
 	rts
 .calls:
-	dc.w $02,$7b7e,$0e,$7bd0,$28,$b726
+	dc.w $02,GS0_7b7e,$0e,GS0_7bd0,$28,GS0_b726
 
 ; a0=native authoritative player, a1=reserves clone, a2=periodic clone,
 ; a3=cleanup clone. Return 0 nonperiodic, 1 periodic completed, 2 flight ended,

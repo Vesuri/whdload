@@ -12,6 +12,14 @@
 ;  :To Do.
 ;---------------------------------------------------------------------------*
 
+; The beta ships the enhanced runtime; CUSTOM1 remains off by default.
+; GUNSHIP_NATIVE keeps a small native-only build for regression comparisons.
+	IFND GUNSHIP_NATIVE
+	IFND TIMING_RUNTIME
+TIMING_RUNTIME equ 1
+	ENDC
+	ENDC
+
 	INCDIR	Include:
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
@@ -78,15 +86,7 @@ slv_keyexit	= $5D	; num '*'
 
 
 DECL_VERSION:MACRO
-	dc.b	"1.2"
-	IFD BARFLY
-		dc.b	" "
-		INCBIN	"T:date"
-	ENDC
-	IFD	DATETIME
-		dc.b	" "
-		incbin	datetime
-	ENDC
+	dc.b "2.0b (21.10.2026)"
 	ENDM
 	dc.b	"$","VER: slave "
 	DECL_VERSION
@@ -104,7 +104,8 @@ slv_info		dc.b	"adapted & fixed by JOTD",10
 slv_CurrentDir:
 	dc.b	"data",0
 slv_config:
-	dc.b	"C1:B:Enhanced framerate;",0
+	dc.b	"C1:B:Enhanced framerate;"
+		dc.b	"C4:L:Enhanced renderer:CPU,Blitter;",0
 
 _program:
 	dc.b	"Gunship",0
@@ -473,6 +474,8 @@ _tag		dc.l	WHDLTAG_ATTNFLAGS_GET
 _cpu_flags	dc.l	0
 		dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0	; master Enhanced framerate toggle; off by default
+		dc.l	WHDLTAG_CUSTOM4_GET
+_renderer	dc.l	0	; 0 CPU (automatic allocation fallback), 1 blitter
 	IFD VERIFY
 		dc.l	WHDLTAG_CUSTOM2_GET
 _verify_seed	dc.l	0

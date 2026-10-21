@@ -1,6 +1,7 @@
+ include "timing-offsets.i"
 ; Native 0658 weapons/actors with private deadline fire flags and RNG.
 ; Standalone. Requires timing-world-rng.i; native callbacks remain authoritative.
-WW_CODE_SIZE equ $3fe          ; +0979c..+09b9a, includes RTS
+WW_CODE_SIZE equ GS0_9b9a-GS0_979c          ; +0979c..+09b9a, includes RTS
 WW_SIZE equ WW_CODE_SIZE+4     ; native player binding after code
 
 ; a0=hunk 0, a1=even clone, a2=deadline RNG, a3=private two-byte fire packet,
@@ -9,23 +10,23 @@ WW_SIZE equ WW_CODE_SIZE+4     ; native player binding after code
 world_weapons_prepare:
 	movem.l d1-d3/a0-a6,-(sp)
 	movea.l a0,a6
-	adda.l #$979c,a0
+	adda.l #GS0_979c,a0
 	cmpi.w #$4239,(a0)
 	bne .bad
 	movea.l a6,a5
-	adda.l #$b92c,a5
+	adda.l #GS0_b92c,a5
 	cmpa.l 2(a0),a5
 	bne .bad
 	cmpi.w #$4eb9,$1a(a0)
 	bne .bad
 	movea.l a6,a5
-	adda.l #$bed4,a5
+	adda.l #GS0_bed4,a5
 	cmpa.l $1c(a0),a5
 	bne .bad
-	cmpi.w #$4eb9,$25e(a0)
+	cmpi.w #$4eb9,(GS0_99fa-GS0_979c)(a0)
 	bne .bad
-	lea $7a5c(a6),a5
-	cmpa.l $260(a0),a5
+	lea GS0_7a5c(a6),a5
+	cmpa.l (GS0_99fc-GS0_979c)(a0),a5
 	bne .bad
 	cmpi.w #$4e75,WW_CODE_SIZE-2(a0)
 	bne .bad
@@ -50,7 +51,7 @@ world_weapons_prepare:
 	dbf d3,.copy
 	lea $3b88(a4),a5
 	move.l a5,WW_CODE_SIZE(a1)
-	move.l a2,$260(a1)          ; native default bound 256 entry
+	move.l a2,(GS0_99fc-GS0_979c)(a1)          ; native default bound 256 entry
 	lea .fire(pc),a6
 	moveq #7,d3
 .patch:
@@ -71,8 +72,8 @@ world_weapons_prepare:
 	rts
 .fire:
 	; operand offset, native opcode, byte offset within the two-byte packet
-	dc.w $016,$4239,0,$05e,$4a79,0,$096,$4279,0,$1be,$4a39,0
-	dc.w $2f6,$4239,0,$3de,$4239,0,$0a0,$4a39,1,$0b8,$4239,1
+	dc.w $016,$4239,0,$05e,$4a79,0,(GS0_9832-GS0_979c),$4279,0,(GS0_995a-GS0_979c),$4a39,0
+	dc.w (GS0_9a92-GS0_979c),$4239,0,(GS0_9b7a-GS0_979c),$4239,0,(GS0_983c-GS0_979c),$4a39,1,(GS0_9854-GS0_979c),$4239,1
 
 ; a0=native authoritative player with trailing object tables, a1=prepared clone.
 ; Return 0/-1, preserve others. Authoritative effects are real, not a preview.

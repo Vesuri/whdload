@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native periodic flight-end check and reserve depletion. Not installed.
 ; All copied branches stay within their blocks; neither block has relocations.
 RS_GUARD_SIZE equ $24         ; +07f80..+07fa4, includes RTS
@@ -9,14 +10,14 @@ RS_CODE_SIZE equ RS_GUARD_SIZE+RS_RESERVE_SIZE+2
 ; flush instruction caches before using the clone.
 world_reserves_prepare:
 	movem.l d1/a0/a2-a4,-(sp)
-	lea $7f80(a0),a2
+	lea GS0_7f80(a0),a2
 	lea .guard(pc),a3
 	moveq #RS_GUARD_SIZE/2-1,d1
 .guard_check:
 	cmpm.w (a2)+,(a3)+
 	bne .bad
 	dbf d1,.guard_check
-	lea $590c(a0),a2
+	lea GS0_590c(a0),a2
 	lea .reserves(pc),a3
 	moveq #RS_RESERVE_SIZE/2-1,d1
 .reserve_check:
@@ -24,12 +25,12 @@ world_reserves_prepare:
 	bne .bad
 	dbf d1,.reserve_check
 	movea.l a1,a4
-	lea $7f80(a0),a2
+	lea GS0_7f80(a0),a2
 	moveq #RS_GUARD_SIZE/2-1,d1
 .guard_copy:
 	move.w (a2)+,(a4)+
 	dbf d1,.guard_copy
-	lea $590c(a0),a2
+	lea GS0_590c(a0),a2
 	moveq #RS_RESERVE_SIZE/2-1,d1
 .reserve_copy:
 	move.w (a2)+,(a4)+

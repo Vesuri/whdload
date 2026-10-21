@@ -1,11 +1,15 @@
-; Experimental TIMING_RUNTIME setup and flight ownership.
+; Enhanced timing runtime setup and flight ownership.
 ; CUSTOM1 gates allocation/preparation and every installed timing hook.
 ; LoadSeg's existing post-callback cache flush covers the prepared copies.
 timing_runtime_dispatch:
  movem.l d0-d7/a0-a6,-(sp)
  move.l _custom1(pc),d0
  beq .done
+ IFD GUNSHIP_NTSC
+ lea pl_gamemule_1489(pc),a3
+ ELSE
  lea pl_gamemule_658(pc),a3
+ ENDC
  cmpa.l a3,a0
  bne .done
  movea.l a1,a0

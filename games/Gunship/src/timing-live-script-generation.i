@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; CUSTOM1-only identity/discontinuity stamp for native split-object slot 5.
 ; All stores through 7BD0 are stamped, including ordinary world motion. The
 ; cache captures after the entire world step, so it observes the final stamp.
@@ -11,7 +12,7 @@ timing_script_generation_install:
  cmpi.l #1,RT_READY(a0)
  bne .bad
  movea.l RT_HUNKS(a0),a1
- lea $7bd0(a1),a3
+ lea GS0_7bd0(a1),a3
  lea timing_script_native_store(pc),a4
  moveq #(timing_script_native_store_end-timing_script_native_store)/2-1,d2
 .check:
@@ -31,7 +32,7 @@ timing_script_generation_install:
  rts
 .patches:
  PL_START
- PL_P $7bd0,timing_script_store
+ PL_P GS0_7bd0,timing_script_store
  PL_END
 
 timing_script_store:

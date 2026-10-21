@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Presentation-only capture of the world-selected object from native projection.
 ; Uses the original collector filters, but never selects or samples pixels.
 ; The caller resets before a frame and invokes capture at native collector sites.
@@ -27,7 +28,7 @@ target_view_prepare:
  movea.l 0(sp,d2.w),a0
  adda.l d3,a0
  movea.l (sp),a1
- adda.l #$a450,a1
+ adda.l #GS0_a450,a1
  cmpa.l 0(a1,d1.w),a0
  bne .bad
  dbf d7,.check
@@ -108,12 +109,12 @@ target_view_capture:
  cmpi.b #2,TPV_STATE(a6)
  bne .ignored
  movea.l TPV_H0(a6),a0
- move.w $6ac6(a0),d0
+ move.w GS0_6ac6(a0),d0
  cmp.w TPV_STATE+4(a6),d0
  bne .ignored
  tst.w d0
  bmi .matched
- move.w $5b00(a0),d0
+ move.w GS0_5b00(a0),d0
  cmp.w TPV_STATE+6(a6),d0
  bne .ignored
 .matched:

@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Separate map coordinate refresh from per-buffer drawing. CUSTOM1/runtime only.
 ; a0=arena, a2=resload, return 0/-1 and preserve other registers.
 timing_map_install:
@@ -11,31 +12,31 @@ timing_map_install:
  movea.l RT_HUNKS(a0),a1
  movea.l RT_HUNKS+20(a0),a3
  lea $48(a3),a3
- cmpi.w #$5279,$489a(a1)
+ cmpi.w #$5279,GS0_489a(a1)
  bne .bad
- cmpa.l $489c(a1),a3
+ cmpa.l GS0_489c(a1),a3
  bne .bad
- cmpi.w #$3039,$48a0(a1)
+ cmpi.w #$3039,GS0_48a0(a1)
  bne .bad
- cmpa.l $48a2(a1),a3
+ cmpa.l GS0_48a2(a1),a3
  bne .bad
- cmpi.l #$0c400008,$48a6(a1)
+ cmpi.l #$0c400008,GS0_48a6(a1)
  bne .bad
- cmpi.l #$64046100,$48aa(a1)
+ cmpi.l #$64046100,GS0_48aa(a1)
  bne .bad
- cmpi.w #$feac,$48ae(a1)
+ cmpi.w #$feac,GS0_48ae(a1)
  bne .bad
- cmpi.w #$4eb9,$48b0(a1)
+ cmpi.w #$4eb9,GS0_48b0(a1)
  bne .bad
- lea $44dc(a1),a3
- cmpa.l $48b2(a1),a3
+ lea GS0_44dc(a1),a3
+ cmpa.l GS0_48b2(a1),a3
  bne .bad
  lea timing_map_native_sprite(pc),a4
  move.l a3,(a4)
- lea $475a(a1),a3
+ lea GS0_475a(a1),a3
  lea timing_map_native_coordinates(pc),a4
  move.l a3,(a4)
- lea $489a(a1),a3
+ lea GS0_489a(a1),a3
  lea timing_map_native_prefix(pc),a4
  moveq #13,d1
 .copy:
@@ -60,7 +61,7 @@ timing_map_install:
  rts
 .patches:
  PL_START
- PL_PSS $489a,timing_map_frame,22
+ PL_PSS GS0_489a,timing_map_frame,22
  PL_END
 
 timing_map_frame:

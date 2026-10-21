@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native 0658 motion preview support, standalone and not installed.
 ; Clone +0937c..+0979a with world RNG and contact actions bypassed.
 ; Native branches and the embedded RPM table retain their relative positions.
@@ -13,7 +14,7 @@ MP_RECORD_SIZE equ 86
 motion_preview_prepare:
 	movem.l d1-d2/a2-a4,-(sp)
 	movea.l a0,a2
-	adda.l #$937c,a2
+	adda.l #GS0_937c,a2
 	cmpi.l #$122d001b,(a2)
 	bne .bad
 	cmpi.l #$302d000e,$f8(a2)
@@ -25,7 +26,7 @@ motion_preview_prepare:
 	cmpi.w #$4e75,$41c(a2)
 	bne .bad
 	lea .sine_calls(pc),a3
-	lea $7a44(a0),a4
+	lea GS0_7a44(a0),a4
 	moveq #5,d2
 .validate:
 	move.w (a3)+,d1
@@ -36,13 +37,13 @@ motion_preview_prepare:
 	dbf d2,.validate
 	cmpi.w #$4eb9,$104(a2)
 	bne .bad
-	lea $7a5c(a0),a4
+	lea GS0_7a5c(a0),a4
 	cmpa.l $106(a2),a4
 	bne .bad
 	cmpi.w #$4eb9,$26c(a2)
 	bne .bad
 	movea.l a0,a4
-	adda.l #$a150,a4
+	adda.l #GS0_a150,a4
 	cmpa.l $26e(a2),a4
 	bne .bad
 	movea.l a1,a3

@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; CUSTOM1-only allocation identity tracking. All three native constructor
 ; callers use this allocator, including calls retained by runtime clones.
 ; a0=arena,a2=resload; return 0/-1, preserve other registers.
@@ -11,8 +12,8 @@ timing_actor_generation_install:
  bne .bad
  movea.l RT_HUNKS(a0),a1
  movea.l a1,a3
- adda.l #$ba08,a3
- adda.l #$bea8,a1
+ adda.l #GS0_ba08,a3
+ adda.l #GS0_bea8,a1
  cmpa.l 4(a1),a3
  bne .bad
  cmpa.l 16(a1),a3
@@ -36,7 +37,7 @@ timing_actor_generation_install:
 .copy:
  move.w (a3)+,(a0)+
  dbf d1,.copy
- suba.l #$bea8,a1
+ suba.l #GS0_bea8,a1
  lea .patches(pc),a0
  jsr resload_Patch(a2)
 .disabled:
@@ -53,7 +54,7 @@ timing_actor_generation_install:
  dc.w 40,$5240,42,$4e75
 .patches:
  PL_START
- PL_P $bea8,timing_actor_allocate
+ PL_P GS0_bea8,timing_actor_allocate
  PL_END
 
 timing_actor_allocate:

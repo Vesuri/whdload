@@ -1,16 +1,20 @@
-; E1: CPU planar view, enabled only with the enhanced 0658 runtime and
+ include "timing-offsets.i"
+; E1: CPU planar view, enabled only with enhanced flight and
 ; a 36010-byte MEMF_FAST allocation (view plus cached cockpit art).
 ; Native clipping/edge-to-span geometry
 ; is retained. Cockpit and modal rendering remain native chip/blitter work.
 CPU_VIEW_BYTES EQU 36010 ; 18000 view + five cached 3602-byte art strips
 cpu_render_install:
  movem.l d1-d7/a0-a6,-(sp)
+ move.l _renderer(pc),d0
+ cmpi.l #1,d0
+ beq .disabled
  movea.l RT_HUNKS(a0),a3
  lea cpu_render_h0(pc),a1
  move.l a3,(a1)
  move.l RT_HUNKS+24(a0),4(a1)
  movea.l a3,a1
- adda.l #$85fc,a1
+ adda.l #GS0_85fc,a1
  move.l (a1),d1
  lea cpu_render_pen(pc),a1
  move.l d1,(a1)
@@ -28,39 +32,39 @@ cpu_render_install:
  lea cpu_render_art_ready(pc),a1
  clr.w (a1)
  movea.l a3,a1
- adda.l #$8548,a1
+ adda.l #GS0_8548,a1
  cmpi.l #$48e701f6,(a1)
  bne .bad
  movea.l a3,a1
- adda.l #$828a,a1
+ adda.l #GS0_828a,a1
  cmpi.l #$48e73ec0,(a1)
  bne .bad
  movea.l a3,a1
- adda.l #$8818,a1
+ adda.l #GS0_8818,a1
  cmpi.l #$48e701e2,(a1)
  bne .bad
  movea.l a3,a1
- adda.l #$8b6c,a1
+ adda.l #GS0_8b6c,a1
  cmpi.w #$3e39,(a1)
  bne .bad
  movea.l a3,a1
- adda.l #$921c,a1
+ adda.l #GS0_921c,a1
  cmpi.l #$38026f52,(a1)
  bne .bad
- cmpi.w #$4eb9,$5c5c(a3)
+ cmpi.w #$4eb9,GS0_5c5c(a3)
  bne .bad
  move.l a3,d0
- addi.l #$77b8,d0
- cmp.l $5c5e(a3),d0
+ addi.l #GS0_77b8,d0
+ cmp.l GS0_5c5e(a3),d0
  bne .bad
- cmpi.w #$4eb9,$5c84(a3)
+ cmpi.w #$4eb9,GS0_5c84(a3)
  bne .bad
  move.l a3,d0
- addi.l #$aa4c,d0
- cmp.l $5c86(a3),d0
+ addi.l #GS0_aa4c,d0
+ cmp.l GS0_5c86(a3),d0
  bne .bad
  movea.l a3,a0
- adda.l #$aa80,a0
+ adda.l #GS0_aa80,a0
  cmpi.w #$45f9,(a0)
  bne .bad
  cmpi.l #$6100009c,6(a0)
@@ -71,7 +75,7 @@ cpu_render_install:
  move.l 2(a0),4(a1) ; native overlay descriptors
  move.l a0,-(sp)
  movea.l a3,a0
- adda.l #$927a,a0
+ adda.l #GS0_927a,a0
  move.l (a0),(a1) ; native bitmap table
  movea.l (sp)+,a0
  lea cpu_render_overlay_native(pc),a1
@@ -79,11 +83,11 @@ cpu_render_install:
  move.w 4(a0),(a1)+
  move.w #$4ef9,(a1)+
  move.l a3,d0
- addi.l #$aa86,d0
+ addi.l #GS0_aa86,d0
  move.l d0,(a1)
  lea cpu_render_native_line(pc),a1
  movea.l a3,a0
- adda.l #$8548,a0
+ adda.l #GS0_8548,a0
  moveq #4,d0
 .copy_line:
  move.w (a0)+,(a1)+
@@ -92,7 +96,7 @@ cpu_render_install:
  move.l a0,(a1)
  lea cpu_render_native_pixel(pc),a1
  movea.l a3,a0
- adda.l #$828a,a0
+ adda.l #GS0_828a,a0
  moveq #4,d0
 .copy_pixel:
  move.w (a0)+,(a1)+
@@ -101,7 +105,7 @@ cpu_render_install:
  move.l a0,(a1)
  lea cpu_render_native_begin(pc),a1
  movea.l a3,a0
- adda.l #$8818,a0
+ adda.l #GS0_8818,a0
  moveq #3,d0
 .copy_begin:
  move.w (a0)+,(a1)+
@@ -110,7 +114,7 @@ cpu_render_install:
  move.l a0,(a1)
  lea cpu_render_native_poly(pc),a1
  movea.l a3,a0
- adda.l #$8b6c,a0
+ adda.l #GS0_8b6c,a0
  moveq #2,d0
 .copy_poly:
  move.w (a0)+,(a1)+
@@ -130,14 +134,14 @@ cpu_render_install:
  rts
 .patches:
  PL_START
- PL_PS $5c5c,cpu_render_start
- PL_PS $5c84,cpu_render_finish
- PL_P $8548,cpu_render_line
- PL_P $828a,cpu_render_pixel
- PL_P $8818,cpu_render_begin
- PL_P $8b6c,cpu_render_poly
- PL_P $921c,cpu_render_band
- PL_P $aa80,cpu_render_overlay
+ PL_PS GS0_5c5c,cpu_render_start
+ PL_PS GS0_5c84,cpu_render_finish
+ PL_P GS0_8548,cpu_render_line
+ PL_P GS0_828a,cpu_render_pixel
+ PL_P GS0_8818,cpu_render_begin
+ PL_P GS0_8b6c,cpu_render_poly
+ PL_P GS0_921c,cpu_render_band
+ PL_P GS0_aa80,cpu_render_overlay
  PL_END
 
 cpu_render_release:
@@ -171,7 +175,7 @@ cpu_render_start:
  movem.l (sp)+,d0/a0
  move.l a0,-(sp)
  movea.l cpu_render_h0(pc),a0
- adda.l #$77b8,a0
+ adda.l #GS0_77b8,a0
  move.l a0,-(sp)
  movea.l 4(sp),a0
  move.l (sp),4(sp)
@@ -189,7 +193,7 @@ cpu_render_finish:
  lea 8(a2),a2
  ; Finish any preceding native blit before touching its chip destination.
  movea.l cpu_render_h0(pc),a0
- adda.l #$867e,a0
+ adda.l #GS0_867e,a0
  movea.l (a0),a6
  movea.l (a6),a6
  jsr -228(a6)
@@ -258,7 +262,7 @@ cpu_render_finish:
  movem.l (sp)+,d0-d7/a0-a6
  move.l a0,-(sp)
  movea.l cpu_render_h0(pc),a0
- adda.l #$aa4c,a0
+ adda.l #GS0_aa4c,a0
  move.l a0,-(sp)
  movea.l 4(sp),a0
  move.l (sp),4(sp)
@@ -281,7 +285,7 @@ cpu_render_overlay:
  movea.l cpu_render_h0(pc),a0
  movea.l cpu_render_rects(pc),a2
  adda.w #24,a2 ; retain the third (attitude instrument) restore
- adda.l #$aa98,a0
+ adda.l #GS0_aa98,a0
  move.l a0,-(sp)
  movea.l 4(sp),a0
  move.l (sp),4(sp)
@@ -363,7 +367,7 @@ cpu_render_line:
  movea.w d4,a3 ; sx
  movea.w d5,a4 ; sy
  movea.l cpu_render_h0(pc),a0
- adda.l #$8524,a0
+ adda.l #GS0_8524,a0
  move.w (a0),d6
  move.w d2,d0
  or.w d3,d0
@@ -492,7 +496,7 @@ cpu_render_band:
  move.l a0,-(sp)
  movea.l cpu_render_h0(pc),a0
  asl.w #6,d4
- adda.l #$9222,a0
+ adda.l #GS0_9222,a0
  move.l a0,-(sp)
  movea.l 4(sp),a0
  move.l (sp),4(sp)
@@ -516,12 +520,12 @@ cpu_render_begin:
  movem.l d0-d2/a0-a1,-(sp)
  bsr draw_overhead_clear_spans
  movea.l cpu_render_h0(pc),a1
- adda.l #$8d88,a1
+ adda.l #GS0_8d88,a1
  ; Native bbox reset; prior mask is already clean and CPU spans do not use it.
- move.w #-1,$90ac-$8d88(a1)
- move.w #-1,$90ae-$8d88(a1)
- move.w #320,$90a8-$8d88(a1)
- move.w #200,$90aa-$8d88(a1)
+ move.w #-1,GS0_90ac-GS0_8d88(a1)
+ move.w #-1,GS0_90ae-GS0_8d88(a1)
+ move.w #320,GS0_90a8-GS0_8d88(a1)
+ move.w #200,GS0_90aa-GS0_8d88(a1)
  movem.l (sp)+,d0-d2/a0-a1
  rts
 
@@ -531,13 +535,13 @@ cpu_render_poly:
  tst.w (a0)
  beq .native
  movea.l cpu_render_h0(pc),a0
- adda.l #$90a8,a0
+ adda.l #GS0_90a8,a0
  cmpi.w #90,6(a0)
  bhs .dirty
  movem.l (sp)+,a0
  movem.l d0-d7/a0-a6,-(sp)
  movea.l cpu_render_h0(pc),a2
- adda.l #$90a8,a2
+ adda.l #GS0_90a8,a2
  move.w 4(a2),d0
  cmp.w (a2),d0
  blt .done
@@ -547,7 +551,7 @@ cpu_render_poly:
  blt .done
  beq .line
  movea.l cpu_render_h0(pc),a3
- adda.l #$8d88,a3
+ adda.l #GS0_8d88,a3
  move.w 2(a2),d1
  move.w d1,d0
  lsl.w #2,d0
@@ -567,7 +571,7 @@ cpu_render_poly:
 .right_bound:
  subq.w #1,d4
  movea.l cpu_render_h0(pc),a0
- adda.l #$8524,a0
+ adda.l #GS0_8524,a0
  move.w (a0),d6
  movea.l cpu_render_pen(pc),a0
  moveq #0,d7

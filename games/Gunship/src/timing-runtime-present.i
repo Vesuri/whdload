@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Publish latest player/certified forward-actor inputs for one native +05c04 frame.
 ; No old +04288 interpolation loop, gameplay writes, RNG or graphics calls.
 ; a0=arena. Caller serializes foreground state and presentation readers during
@@ -117,7 +118,7 @@ timing_runtime_present_state:
  ; this committed identity, while projected coordinates come from rendering.
  lea RT_VIEW(a6),a0
  movea.l RT_HUNKS(a6),a1
- adda.l #$a99e,a1
+ adda.l #GS0_a99e,a1
  bsr target_view_reset
  tst.l d0
  bne .done
@@ -218,7 +219,7 @@ timing_runtime_draw:
  cmpi.w #1,RT_DRAW_READY(a0)
  bne .bad
  movea.l RT_HUNKS(a0),a1
- adda.w #$5c04,a1
+ adda.w #GS0_5c04,a1
  cmpa.l RT_DRAW_ENTRY(a0),a1
  bne .bad
  bsr timing_runtime_present_state

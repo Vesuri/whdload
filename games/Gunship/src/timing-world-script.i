@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native scripted-object world work, split before its blocking modal interpreter.
 ; Standalone; requires world-rng and world-damage (WH_ENTRY).
 SC_PREFIX_SIZE equ $36       ; +09f74..+09faa
@@ -12,7 +13,7 @@ SC_SIZE equ SC_PLAYER+4
 world_script_prepare:
 	movem.l d1/a0/a5-a6,-(sp)
 	movea.l a0,a6
-	adda.l #$9f74,a0
+	adda.l #GS0_9f74,a0
 	cmpi.l #$302d0000,(a0)
 	bne .bad
 	cmpi.l #$1b42002c,$32(a0)
@@ -20,7 +21,7 @@ world_script_prepare:
 	cmpi.w #$4eb9,$36(a0)
 	bne .bad
 	movea.l a6,a5
-	adda.l #$8050,a5
+	adda.l #GS0_8050,a5
 	cmpa.l $38(a0),a5
 	bne .bad
 	cmpi.l #$4a2d0053,(a5)
@@ -35,12 +36,12 @@ world_script_prepare:
 	bne .bad
 	cmpi.w #$4eb9,$176(a0)
 	bne .bad
-	lea $7a5c(a6),a5
+	lea GS0_7a5c(a6),a5
 	cmpa.l $178(a0),a5
 	bne .bad
 	cmpi.w #$4eb9,$18a(a0)
 	bne .bad
-	lea $7d92(a6),a5
+	lea GS0_7d92(a6),a5
 	cmpa.l $18c(a0),a5
 	bne .bad
 	cmpi.w #$4e75,$1d6(a0)

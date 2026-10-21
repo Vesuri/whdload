@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native candidate collector bound to private projected scene and target state.
 ; Shared world model data, viewport bounds and targeting limits must be stable.
 WTC_CODE_SIZE equ $13c ; +a450..+a58c
@@ -19,7 +20,7 @@ target_collect_prepare:
  movea.l 0(sp,d2.w),a0
  adda.l d3,a0
  movea.l (sp),a1
- adda.l #$a450,a1
+ adda.l #GS0_a450,a1
  cmpa.l 0(a1,d1.w),a0
  bne .bad
  dbf d7,.check
@@ -64,35 +65,35 @@ target_collect_prepare:
 ; Relocations: clone offset, argument stack offset (h0/h4/h6), native offset,
 ; destination: scene offset, $8000+WT offset, or $ffff for stable shared read.
 target_collect_relocs:
- dc.w $0002,0,$6ac8,$10a4
+ dc.w $0002,0,GS0_6ac8,$10a4
  dc.w $0008,8,$1d72,$ffff
- dc.w $0014,0,$a9a0,$8000+WT_STATE+$0002
- dc.w $001e,0,$76e2,$1cbe
+ dc.w $0014,0,GS0_a9a0,$8000+WT_STATE+$0002
+ dc.w $001e,0,GS0_76e2,$1cbe
  dc.w $0028,4,$0430,$ffff
- dc.w $0032,0,$770c,$1ce8
+ dc.w $0032,0,GS0_770c,$1ce8
  dc.w $003c,4,$0432,$ffff
- dc.w $0046,0,$6ac6,$10a2
- dc.w $0050,0,$768e,$1c6a
- dc.w $005c,0,$a99c,$ffff
- dc.w $0066,0,$6ac6,$10a2
- dc.w $006c,0,$a9a2,$8000+WT_STATE+$0004
- dc.w $007e,0,$5b00,$00dc
- dc.w $0084,0,$a9a4,$8000+WT_STATE+$0006
- dc.w $008e,0,$76e2,$1cbe
- dc.w $0094,0,$a998,$ffff
- dc.w $009e,0,$a99a,$ffff
+ dc.w $0046,0,GS0_6ac6,$10a2
+ dc.w $0050,0,GS0_768e,$1c6a
+ dc.w $005c,0,GS0_a99c,$ffff
+ dc.w $0066,0,GS0_6ac6,$10a2
+ dc.w $006c,0,GS0_a9a2,$8000+WT_STATE+$0004
+ dc.w $007e,0,GS0_5b00,$00dc
+ dc.w $0084,0,GS0_a9a4,$8000+WT_STATE+$0006
+ dc.w $008e,0,GS0_76e2,$1cbe
+ dc.w $0094,0,GS0_a998,$ffff
+ dc.w $009e,0,GS0_a99a,$ffff
  dc.w $00a8,8,$3ba2,$ffff
- dc.w $00b2,0,$a9a0,$8000+WT_STATE+$0002
- dc.w $00b8,0,$a9a0,$8000+WT_STATE+$0002
- dc.w $00be,0,$aa0a,$8000+WT_STATE+$006c
- dc.w $00c6,0,$6ac6,$10a2
- dc.w $00ce,0,$5b00,$00dc
- dc.w $00d6,0,$a9a6,$8000+WT_STATE+$0008
- dc.w $00e0,0,$a9b0,$8000+WT_STATE+$0012
- dc.w $00f8,0,$aa1e,$8000+WT_STATE+$0080
- dc.w $00fe,0,$76e2,$1cbe
- dc.w $0106,0,$770c,$1ce8
- dc.w $010e,0,$6ac6,$10a2
- dc.w $0118,0,$5a24,$ffff
- dc.w $0130,0,$aa32,$8000+WT_STATE+$0094
+ dc.w $00b2,0,GS0_a9a0,$8000+WT_STATE+$0002
+ dc.w $00b8,0,GS0_a9a0,$8000+WT_STATE+$0002
+ dc.w $00be,0,GS0_aa0a,$8000+WT_STATE+$006c
+ dc.w $00c6,0,GS0_6ac6,$10a2
+ dc.w $00ce,0,GS0_5b00,$00dc
+ dc.w $00d6,0,GS0_a9a6,$8000+WT_STATE+$0008
+ dc.w $00e0,0,GS0_a9b0,$8000+WT_STATE+$0012
+ dc.w $00f8,0,GS0_aa1e,$8000+WT_STATE+$0080
+ dc.w $00fe,0,GS0_76e2,$1cbe
+ dc.w $0106,0,GS0_770c,$1ce8
+ dc.w $010e,0,GS0_6ac6,$10a2
+ dc.w $0118,0,GS0_5a24,$ffff
+ dc.w $0130,0,GS0_aa32,$8000+WT_STATE+$0094
 target_collect_relocs_end:

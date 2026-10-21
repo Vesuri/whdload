@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Experimental native-render gameplay isolation, behind CUSTOM1.
 ; World effect construction already runs through the deadline-owned path.
 ; Field replay owns effect countdowns/animation during enhanced ownership.
@@ -10,49 +11,49 @@ timing_render_install:
  cmpi.l #1,RT_READY(a0)
  bne .bad
  movea.l RT_HUNKS(a0),a1
- cmpi.w #$4eb9,$6356(a1)
+ cmpi.w #$4eb9,GS0_6356(a1)
  bne .bad
- cmpi.w #$4eb9,$63d4(a1)
- bne .bad
- movea.l a1,a3
- adda.l #$a450,a3
- cmpa.l $6358(a1),a3
- bne .bad
- cmpa.l $63d6(a1),a3
- bne .bad
- cmpi.w #$4eb9,$468c(a1)
+ cmpi.w #$4eb9,GS0_63d4(a1)
  bne .bad
  movea.l a1,a3
- adda.l #$a58c,a3
- cmpa.l $468e(a1),a3
+ adda.l #GS0_a450,a3
+ cmpa.l GS0_6358(a1),a3
  bne .bad
- cmpi.w #$4eb9,$5c92(a1)
+ cmpa.l GS0_63d6(a1),a3
+ bne .bad
+ cmpi.w #$4eb9,GS0_468c(a1)
  bne .bad
  movea.l a1,a3
- adda.l #$9b9a,a3
- cmpa.l $5c94(a1),a3
+ adda.l #GS0_a58c,a3
+ cmpa.l GS0_468e(a1),a3
  bne .bad
- cmpi.w #$4eb9,$5c98(a1)
+ cmpi.w #$4eb9,GS0_5c92(a1)
+ bne .bad
+ movea.l a1,a3
+ adda.l #GS0_9b9a,a3
+ cmpa.l GS0_5c94(a1),a3
+ bne .bad
+ cmpi.w #$4eb9,GS0_5c98(a1)
  bne .bad
  movea.l a1,a0
- adda.l #$be5a,a0
- cmpa.l $5c9a(a1),a0
+ adda.l #GS0_be5a,a0
+ cmpa.l GS0_5c9a(a1),a0
  bne .bad
  cmpi.w #$7405,(a0) ; following animation overwrites NZVC before use
  bne .bad
  lea timing_render_native_animation(pc),a0
  move.l a1,d1
- addi.l #$be5a,d1
+ addi.l #GS0_be5a,d1
  move.l d1,(a0)
  lea timing_render_native_effect(pc),a0
  move.l a3,(a0)
  lea timing_render_native_collect(pc),a0
  move.l a1,d1
- addi.l #$a450,d1
+ addi.l #GS0_a450,d1
  move.l d1,(a0)
  lea timing_render_native_select(pc),a0
  move.l a1,d1
- addi.l #$a58c,d1
+ addi.l #GS0_a58c,d1
  move.l d1,(a0)
  lea .patches(pc),a0
  jsr resload_Patch(a2)
@@ -66,11 +67,11 @@ timing_render_install:
  rts
 .patches:
  PL_START
- PL_PS $5c92,timing_render_effect
- PL_PS $5c98,timing_render_animation
- PL_PS $6356,timing_render_collect
- PL_PS $63d4,timing_render_collect
- PL_PS $468c,timing_render_select
+ PL_PS GS0_5c92,timing_render_effect
+ PL_PS GS0_5c98,timing_render_animation
+ PL_PS GS0_6356,timing_render_collect
+ PL_PS GS0_63d4,timing_render_collect
+ PL_PS GS0_468c,timing_render_select
  PL_END
 
 ; Foreground/user-mode compatible on 68000: no privileged SR reads.

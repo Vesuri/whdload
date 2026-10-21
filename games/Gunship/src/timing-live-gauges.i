@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; CUSTOM1-only gauge painter ownership. Native behavior until activation.
 ; a0=arena, a2=resload; return 0/-1, preserve other registers.
 timing_gauges_install:
@@ -7,7 +8,7 @@ timing_gauges_install:
  cmpi.l #1,RT_READY(a0)
  bne .bad
  movea.l RT_HUNKS(a0),a1
- adda.l #$adb6,a1
+ adda.l #GS0_adb6,a1
  cmpi.l #$7e064244,0(a1)
  bne .bad
  cmpi.w #$45f9,4(a1)
@@ -31,7 +32,7 @@ timing_gauges_install:
  dbf d1,.copy
  move.w #$4ef9,(a0)+
  move.l a3,(a0)
- suba.l #$adb6,a1
+ suba.l #GS0_adb6,a1
  lea .patches(pc),a0
  jsr resload_Patch(a2)
 .disabled:
@@ -44,7 +45,7 @@ timing_gauges_install:
  rts
 .patches:
  PL_START
- PL_P $adb6,timing_render_gauges
+ PL_P GS0_adb6,timing_render_gauges
  PL_END
 
 timing_render_gauges:

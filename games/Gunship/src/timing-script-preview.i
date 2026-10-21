@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Private index-5 scripted-object next pose. Native steering and word/byte
 ; arithmetic, with explicit stable committed terrain pixels and no RNG/damage.
 ; The body entry accepts supplied P+2C. Forecast entry privately executes
@@ -15,7 +16,7 @@ SP_UNKNOWN equ 18
 SP_PLAYER equ 20
 SP_PLAYER_SIZE equ $2d6
 SP_CODE equ SP_PLAYER+SP_PLAYER_SIZE
-SP_CODE_SIZE equ $a14c-$9fb0
+SP_CODE_SIZE equ GS0_a14c-GS0_9fb0
 SP_PREFIX equ SP_CODE+SP_CODE_SIZE
 SP_PREFIX_SIZE equ $36
 SP_SIZE equ SP_PREFIX+SP_PREFIX_SIZE+2
@@ -28,7 +29,7 @@ script_preview_prepare:
  movem.l a0-a2,(sp)
  ; Validate every prefix word, including both relocated absolute operands.
  movea.l a0,a1
- adda.l #$9f74,a1
+ adda.l #GS0_9f74,a1
  lea script_preview_prefix_signature(pc),a6
  moveq #0,d1
 .prefix_check:
@@ -43,7 +44,7 @@ script_preview_prepare:
  bra .prefix_next
 .query_operand:
  movea.l (sp),a0
- adda.l #$b422,a0
+ adda.l #GS0_b422,a0
  bra .prefix_operand
 .flags_operand:
  movea.l 4(sp),a0
@@ -56,7 +57,7 @@ script_preview_prepare:
  cmpi.w #SP_PREFIX_SIZE,d1
  blo .prefix_check
  movea.l (sp),a0
- adda.l #$8050,a0
+ adda.l #GS0_8050,a0
  cmpi.l #$4a2d0053,(a0)
  bne .bad
  cmpi.l #$6f00014e,4(a0)
@@ -76,13 +77,13 @@ script_preview_prepare:
  movea.l 0(sp,d2.w),a0
  adda.l d3,a0
  movea.l (sp),a1
- adda.l #$9fb0,a1
+ adda.l #GS0_9fb0,a1
  cmpa.l 0(a1,d1.w),a0
  bne .bad
  dbf d7,.check
  cmpi.w #$7005,(a1)
  bne .bad
- cmpi.l #$302d000c,$a0ca-$9fb0(a1)
+ cmpi.l #$302d000c,GS0_a0ca-GS0_9fb0(a1)
  bne .bad
  cmpi.w #$4e75,SP_CODE_SIZE-2(a1)
  bne .bad
@@ -118,9 +119,9 @@ script_preview_prepare:
  ; Heading has already been adjusted. Skip the RNG/damage decision and hit
  ; callback entirely. Neither owns this object's movement inputs; the native
  ; movement suffix reloads its inputs from player/object state.
- move.l #$60000038,SP_CODE+$a0ca-$9fb0(a2)
+ move.l #$60000038,SP_CODE+GS0_a0ca-GS0_9fb0(a2)
  movea.l (sp),a1
- adda.l #$9f74,a1
+ adda.l #GS0_9f74,a1
  lea SP_PREFIX(a2),a0
  moveq #SP_PREFIX_SIZE/2-1,d1
 .prefix_copy:
@@ -165,7 +166,7 @@ script_preview_common:
  move.w (a1)+,(a0)+
  dbf d1,.copy
  movea.l SP_H0(a6),a0
- adda.l #$b92c,a0
+ adda.l #GS0_b92c,a0
  move.b (a0),SP_CLOSE(a6)
  movea.l SP_H6(a6),a0
  move.b $157b(a0),SP_TARGET(a6)
@@ -227,22 +228,22 @@ script_preview_terrain:
 
 ; Operand offset, original base (0=h0,4=h6), target, private offset/sentinel.
 script_preview_relocs:
- dc.w $004,0,$7b7e,$ffff
- dc.w $01a,0,$7fa4,$fffe
+ dc.w $004,0,GS0_7b7e,$ffff
+ dc.w $01a,0,GS0_7fa4,$fffe
  dc.w $038,4,$157b,SP_TARGET
- dc.w $03e,0,$7b7e,$ffff
- dc.w $052,0,$7b7e,$ffff
- dc.w $088,0,$7ac8,$ffff
- dc.w $0c8,0,$b92c,SP_CLOSE
- dc.w $0d4,0,$a14c,SP_TERRAIN_OR
- dc.w $0e6,0,$7fa4,$fffe
- dc.w $0ec,0,$a14c,SP_TERRAIN_OR
- dc.w $0f6,0,$a14c,SP_TERRAIN_OR
- dc.w $13c,0,$7a5c,$ffff
- dc.w $150,0,$7d92,$ffff
- dc.w $15c,0,$7a44,$ffff
- dc.w $170,0,$7a44,$ffff
- dc.w $196,0,$7bd0,$ffff
+ dc.w $03e,0,GS0_7b7e,$ffff
+ dc.w $052,0,GS0_7b7e,$ffff
+ dc.w $088,0,GS0_7ac8,$ffff
+ dc.w $0c8,0,GS0_b92c,SP_CLOSE
+ dc.w $0d4,0,GS0_a14c,SP_TERRAIN_OR
+ dc.w $0e6,0,GS0_7fa4,$fffe
+ dc.w $0ec,0,GS0_a14c,SP_TERRAIN_OR
+ dc.w $0f6,0,GS0_a14c,SP_TERRAIN_OR
+ dc.w $13c,0,GS0_7a5c,$ffff
+ dc.w $150,0,GS0_7d92,$ffff
+ dc.w $15c,0,GS0_7a44,$ffff
+ dc.w $170,0,GS0_7a44,$ffff
+ dc.w $196,0,GS0_7bd0,$ffff
 script_preview_relocs_end:
 
 script_preview_prefix_signature:

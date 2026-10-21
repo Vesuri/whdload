@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native 0658 effect constructor with explicit deadline inputs.
 ; Used by native damage and the foreground recurring hit-effect deadline path.
 WE_CODE_SIZE equ $a4
@@ -11,11 +12,11 @@ WE_CODE_SIZE equ $a4
 world_effect_prepare:
 	movem.l d1-d2/a0-a5,-(sp)
 	movea.l a0,a4
-	adda.l #$9b9a,a4
+	adda.l #GS0_9b9a,a4
 	cmpi.w #$4eb9,(a4)
 	bne .bad
 	movea.l a0,a5
-	adda.l #$bea8,a5
+	adda.l #GS0_bea8,a5
 	cmpa.l 2(a4),a5
 	bne .bad
 	cmpi.l #$6700009a,6(a4)
@@ -24,7 +25,7 @@ world_effect_prepare:
 	bne .bad
 	cmpi.w #$4e75,$a2(a4)
 	bne .bad
-	lea $7a6a(a0),a5
+	lea GS0_7a6a(a0),a5
 	lea .rng_sites(pc),a0
 	moveq #2,d2
 .validate:

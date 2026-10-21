@@ -99,58 +99,15 @@
 ; to be changed UNLESS there are multiple versions.
 
 (procedure P_SelectVersion
-  (if (= #multiple-versions "")
-    ("")
-    (
-      (set #version
-        (askchoice
-          (prompt ("Which version of %s would you like to install?" @app-name))
-          (default 0)
-	  ;
-	  ; it is recommend to simply set choices which are not required to an
-	  ; empty string ala "", because then other procedures must bot changed
-	  ; because the number of the #version remains unchanged
-	  ;
-	  (choices
-		"Original release (RawDIC)"
-		"Alternate version (Patcher)"
-		"Budget re-release (DIC)"
-		"Hit-Squad version (Files)"
-		"CD/CDTV/CD³² version (Files)"
-		"Defjam compact (Single File)"
-	  )
-          (help @askchoice-help)
-        )
-      )
-      ;
-      ; Certain versions may use different slaves, islaves, imager and icons.
-      ;	This can be set up here if required.
-      ; If you set #prefix it will change: install directory, islave, imager
-      ; and icon. If you set #prefix-slave it only changes the slave name.
-      ; You may also set the #sub-dir here if this is not required with all
-      ; versions
-      ;                                                                         §
-      (select #version
-	; 0 = RawDIC
-        ("")
-	; 1 = Patcher
-        ("")
-	; 2 = DIC
-        ("")
-	; 3 = Files
-        ("")
-	;(set #prefix ("%s%s" #prefix "AGA"))
-	; 4 = CD Files
-        ("")
-	;(
-	;  (set #prefix-slave (cat #prefix "CDTV"))
-	;  (set #sub-dir "data")
-	;)
-	; 5 = Single File
-	("")
-      )
+  (set #edition
+    (askchoice
+      (prompt "Which Gunship release are you installing?")
+      (choices "PAL (SPS 0658)" "NTSC (SPS 1489)" "Other supported release (native timing)")
+      (default 0)
+      (help "Select the release on your disk, not your Amiga's video mode. Enhanced framerate is available for 0658 and 1489. Other supported releases retain native timing.")
     )
   )
+  (if (= #edition 1) (set #prefix-slave "GunshipNTSC"))
 )
 
 ;---------------------------------------------------------------------

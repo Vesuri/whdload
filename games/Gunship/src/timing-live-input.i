@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Runtime-backed native capture for experimental TIMING_RUNTIME builds.
 ; Same displaced ABI as diagnostic input, without its $7f rearm behavior.
 ; Marker layout in RT_CAPTURE matches h0/h2/history/sample at +8..20,
@@ -13,24 +14,24 @@ timing_live_install:
  cmpi.l #1,RT_READY(a0)
  bne .bad
  movea.l RT_HUNKS(a0),a1
- cmpi.w #$4eb9,$fa0(a1)
+ cmpi.w #$4eb9,GS0_0fa0(a1)
  bne .bad
- lea $1068(a1),a3
- cmpa.l $fa2(a1),a3
+ lea GS0_1068(a1),a3
+ cmpa.l GS0_0fa2(a1),a3
  bne .bad
- cmpi.l #$3228000a,$fc6(a1)
+ cmpi.l #$3228000a,GS0_0fc6(a1)
  bne .bad
- cmpi.w #$4841,$fca(a1)
+ cmpi.w #$4841,GS0_0fca(a1)
  bne .bad
- cmpi.l #$31860800,$34c8(a1)
+ cmpi.l #$31860800,GS0_34c8(a1)
  bne .bad
- cmpi.w #$7056,$34cc(a1)
+ cmpi.w #$7056,GS0_34cc(a1)
  bne .bad
- cmpi.w #$2a39,$4dc6(a1)
+ cmpi.w #$2a39,GS0_4dc6(a1)
  bne .bad
  movea.l RT_HUNKS+8(a0),a4
  adda.w #$10,a4
- cmpa.l $4dc8(a1),a4
+ cmpa.l GS0_4dc8(a1),a4
  bne .bad
  lea timing_runtime_sampler(pc),a4
  move.l a3,(a4)
@@ -46,10 +47,10 @@ timing_live_install:
  rts
 .patches:
  PL_START
- PL_PS $fa0,timing_live_field
- PL_PS $fc6,timing_live_mouse
- PL_PS $34c8,timing_live_command
- PL_PS $4dc6,timing_live_fire
+ PL_PS GS0_0fa0,timing_live_field
+ PL_PS GS0_0fc6,timing_live_mouse
+ PL_PS GS0_34c8,timing_live_command
+ PL_PS GS0_4dc6,timing_live_fire
  PL_END
 
 timing_live_field:
@@ -74,7 +75,7 @@ timing_live_field:
 	move.l 24(a2),TR_COMMAND(a1)
 	movea.l 8(a2),a0
 	moveq #0,d0
-	move.b $c8c(a0),d0
+	move.b GS0_0c8c(a0),d0
 	move.w d0,TR_MODE(a1)
 	move.l 28(a2),d0
 	move.w d0,TR_DX(a1)
@@ -222,7 +223,7 @@ timing_live_fire:
 	movea.l 12(a1),a0
 	move.l $10(a0),d0
 	movea.l 8(a1),a0
-	move.w $4e2a(a0),d1
+	move.w GS0_4e2a(a0),d1
 	eor.w d1,d0
 	movea.l 12(a1),a0
 	and.w $12(a0),d0

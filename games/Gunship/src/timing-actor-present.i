@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Renderer-only six-slot extrapolation from consecutive committed positions.
 ; Capture after a completed world step or lifecycle seed; first captures snap.
 ; Lifecycle owners clear AC_VALID before reusing generation zero.
@@ -34,9 +35,9 @@ actor_present_capture:
  ; Extrapolate the last committed displacement only. New/reused/morphed
  ; slots snap for their first interval; no speculative native step is run.
  movea.l AP_H0(a1),a4
- adda.l #$c6a0,a4
+ adda.l #GS0_c6a0,a4
  movea.l AP_H0(a1),a5
- adda.l #$ba08,a5
+ adda.l #GS0_ba08,a5
  moveq #0,d7
  cmpi.w #1,AC_VALID(a6)
  bne .snap_all
@@ -158,7 +159,7 @@ actor_present_build_common:
  movea.l a2,a4
  movea.l AC_PREVIEW(a6),a0
  movea.l AP_H0(a0),a3
- adda.l #$c6a0,a3
+ adda.l #GS0_c6a0,a3
  movea.l a3,a0
  moveq #17,d3
 .seed:
@@ -191,7 +192,7 @@ actor_present_build_common:
 .mask_ready:
  movea.l AC_PREVIEW(a6),a0
  movea.l AP_H0(a0),a0
- adda.l #$ba08,a0
+ adda.l #GS0_ba08,a0
  and.w (a0),d7
  and.w 4(a0),d7
  and.w AC_MASKS(a6),d7

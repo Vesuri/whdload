@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Runtime ownership of native gameplay VBL state, experimental builds only.
 ; Cosmetic RNG/audio/counters/drawing outside these sites stay native.
 ; Guidance display reconstruction is separate from its extracted state update.
@@ -12,31 +13,31 @@ timing_vbl_install:
  bne .bad
  movea.l RT_HUNKS(a0),a1
  movea.l RT_HUNKS+24(a0),a3
- cmpi.w #$5339,$4ba8(a1)
+ cmpi.w #$5339,GS0_4ba8(a1)
  bne .bad
  lea $4296(a3),a4
- cmpa.l $4baa(a1),a4
+ cmpa.l GS0_4baa(a1),a4
  bne .bad
- cmpi.w #$5339,$4bba(a1)
+ cmpi.w #$5339,GS0_4bba(a1)
  bne .bad
  lea $42f6(a3),a4
- cmpa.l $4bbc(a1),a4
+ cmpa.l GS0_4bbc(a1),a4
  bne .bad
- cmpi.w #$5339,$4c32(a1)
+ cmpi.w #$5339,GS0_4c32(a1)
  bne .bad
  lea $42f7(a3),a4
- cmpa.l $4c34(a1),a4
+ cmpa.l GS0_4c34(a1),a4
  bne .bad
- cmpi.w #$4eb9,$4c12(a1)
+ cmpi.w #$4eb9,GS0_4c12(a1)
  bne .bad
  movea.l a1,a4
- adda.l #$a1c8,a4
- cmpa.l $4c14(a1),a4
+ adda.l #GS0_a1c8,a4
+ cmpa.l GS0_4c14(a1),a4
  bne .bad
  ; All six effect countdown stores form one indivisible hook span.
- lea $4c40(a1),a5
+ lea GS0_4c40(a1),a5
  movea.l a1,a6
- adda.l #$c724,a6
+ adda.l #GS0_c724,a6
  moveq #5,d1
 .effect_check:
  cmpi.w #$9139,(a5)+
@@ -59,11 +60,11 @@ timing_vbl_install:
  rts
 .patches:
  PL_START
- PL_PS $4ba8,timing_vbl_timer_weapon
- PL_PS $4bba,timing_vbl_timer_ground
- PL_PS $4c32,timing_vbl_timer_hit
- PL_PS $4c12,timing_vbl_guidance
- PL_PSS $4c40,timing_vbl_effect_timers,30
+ PL_PS GS0_4ba8,timing_vbl_timer_weapon
+ PL_PS GS0_4bba,timing_vbl_timer_ground
+ PL_PS GS0_4c32,timing_vbl_timer_hit
+ PL_PS GS0_4c12,timing_vbl_guidance
+ PL_PSS GS0_4c40,timing_vbl_effect_timers,30
  PL_END
 
 ; Interrupt-only entries: MOVE SR is legal in the native VBL server.
@@ -134,7 +135,7 @@ timing_vbl_effect_timers:
  movem.l d1-d2/a0-a1,-(sp)
  movea.l timing_runtime_arena(pc),a0
  movea.l RT_HUNKS(a0),a1
- adda.l #$c724,a1
+ adda.l #GS0_c724,a1
  tst.w RT_BOUNDARY_PHASE(a0)
  bne .suppressed
  cmpi.w #1,RT_CAPTURE_OWNER(a0)

@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Project native candidates privately, without rasterization or pixel sampling.
 ; Requires scene-private, target-select, target-collect. Do NOT use this as a
 ; visibility oracle: selection still needs pixels from the same committed view.
@@ -25,11 +26,11 @@ scene_target_prepare:
  cmpa.l 2(a0,d1.w),a1
  bne .bad
  dbf d7,.check
- cmpi.w #$4eb9,$63d4(a0)
+ cmpi.w #$4eb9,GS0_63d4(a0)
  bne .bad
  movea.l a0,a1
- adda.l #$a450,a1
- cmpa.l $63d6(a0),a1
+ adda.l #GS0_a450,a1
+ cmpa.l GS0_63d6(a0),a1
  bne .bad
  movea.l 8(sp),a1
  movea.l 12(sp),a2
@@ -44,20 +45,20 @@ scene_target_prepare:
  movea.l 12(sp),a1
  ; Restore the full native vertex transform/projector prologue, replacing
  ; traversal-only optimization. Its two pointers belong to private scratch.
- lea $6642(a0),a2
- lea $6642-SCENE_START(a1),a3
+ lea GS0_6642(a0),a2
+ lea GS0_6642-SCENE_START(a1),a3
  moveq #6,d1
 .restore:
  move.w (a2)+,(a3)+
  dbf d1,.restore
- lea $6aca-SCENE_START(a1),a2
- move.l a2,$6644-SCENE_START(a1)
- lea $75e6-SCENE_START(a1),a2
- move.l a2,$664a-SCENE_START(a1)
- move.l $6372(a0),$6372-SCENE_START(a1)
- move.w #$4eb9,$6356-SCENE_START(a1)
- move.l 20(sp),$6358-SCENE_START(a1)
- move.l 20(sp),$63d6-SCENE_START(a1)
+ lea GS0_6aca-SCENE_START(a1),a2
+ move.l a2,GS0_6644-SCENE_START(a1)
+ lea GS0_75e6-SCENE_START(a1),a2
+ move.l a2,GS0_664a-SCENE_START(a1)
+ move.l GS0_6372(a0),GS0_6372-SCENE_START(a1)
+ move.w #$4eb9,GS0_6356-SCENE_START(a1)
+ move.l 20(sp),GS0_6358-SCENE_START(a1)
+ move.l 20(sp),GS0_63d6-SCENE_START(a1)
  lea scene_target_draw_sites(pc),a6
  moveq #2,d7
 .remove:
@@ -86,17 +87,17 @@ scene_target_prepare:
 ; Flush cloned code after preparation, as for scene_target_prepare.
 scene_target_player_prepare:
  movem.l d1/a0-a2,-(sp)
- cmpi.w #$1439,$61c0(a0)
+ cmpi.w #$1439,GS0_61c0(a0)
  bne .bad
  lea $3b88(a2),a1
- cmpa.l $61c2(a0),a1
+ cmpa.l GS0_61c2(a0),a1
  bne .bad
- cmpi.w #$1439,$61d2(a0)
+ cmpi.w #$1439,GS0_61d2(a0)
  bne .bad
  addq.l #2,a1
- cmpa.l $61d4(a0),a1
+ cmpa.l GS0_61d4(a0),a1
  bne .bad
- adda.l #$a4f6,a0
+ adda.l #GS0_a4f6,a0
  cmpi.w #$4a39,(a0)
  bne .bad
  lea $3ba2(a2),a1
@@ -106,11 +107,11 @@ scene_target_player_prepare:
  bsr scene_target_prepare
  tst.l d0
  bne .done
- move.l a6,$61c2-SCENE_START(a3)
+ move.l a6,GS0_61c2-SCENE_START(a3)
  lea 2(a6),a0
- move.l a0,$61d4-SCENE_START(a3)
+ move.l a0,GS0_61d4-SCENE_START(a3)
  lea $1a(a6),a0
- move.l a0,$a4f8-$a450(a5)
+ move.l a0,GS0_a4f8-GS0_a450(a5)
  moveq #0,d0
  bra .done
 .bad:
@@ -119,7 +120,7 @@ scene_target_player_prepare:
  movem.l (sp)+,d1/a0-a2
  rts
 scene_target_draw_sites:
- dc.w $63b0,$bc32,$63c4,$8208,$63ce,$8228
+ dc.w GS0_63b0,GS0_bc32,GS0_63c4,GS0_8208,GS0_63ce,GS0_8228
 
 
 ; a0=prepared SCT, a1=committed camera, a2=committed object coordinates.
@@ -183,9 +184,9 @@ scene_target_common:
  lea $15dc(a2),a0
  move.l a0,$5e(a5)
  clr.b $62(a5)
- lea $5c2e-SCENE_START(a6),a0
+ lea GS0_5c2e-SCENE_START(a6),a0
  jsr (a0)
- lea $60a8-SCENE_START(a6),a0
+ lea GS0_60a8-SCENE_START(a6),a0
  jsr (a0)
  tst.l (sp)
  bne .candidates_done
@@ -197,7 +198,7 @@ scene_target_common:
 .capture:
  move.w (a0)+,(a1)+
  dbf d1,.capture
- lea $6224-SCENE_START(a6),a0
+ lea GS0_6224-SCENE_START(a6),a0
  jsr (a0)
  movea.l SCT_TARGET(a6),a0
  lea WT_STATE(a0),a0

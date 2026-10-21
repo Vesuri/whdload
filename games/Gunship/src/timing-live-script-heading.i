@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Presentation-only heading reads. Never borrow the authoritative player byte.
 ; a0=arena,a2=resload. Validate all three original loads before patching.
 timing_script_heading_install:
@@ -9,17 +10,17 @@ timing_script_heading_install:
  movea.l RT_HUNKS(a0),a1
  movea.l RT_HUNKS+24(a0),a3
  adda.w #$3ce3,a3
- cmpi.w #$1239,$5d20(a1)
+ cmpi.w #$1239,GS0_5d20(a1)
  bne .bad
- cmpa.l $5d22(a1),a3
+ cmpa.l GS0_5d22(a1),a3
  bne .bad
- cmpi.w #$1439,$68a2(a1)
+ cmpi.w #$1439,GS0_68a2(a1)
  bne .bad
- cmpa.l $68a4(a1),a3
+ cmpa.l GS0_68a4(a1),a3
  bne .bad
- cmpi.w #$1439,$68d2(a1)
+ cmpi.w #$1439,GS0_68d2(a1)
  bne .bad
- cmpa.l $68d4(a1),a3
+ cmpa.l GS0_68d4(a1),a3
  bne .bad
  lea timing_script_heading_native(pc),a4
  move.l a3,(a4)
@@ -35,9 +36,9 @@ timing_script_heading_install:
  rts
 .patches:
  PL_START
- PL_PS $5d20,timing_script_heading_d1
- PL_PS $68a2,timing_script_heading_d2
- PL_PS $68d2,timing_script_heading_d2
+ PL_PS GS0_5d20,timing_script_heading_d1
+ PL_PS GS0_68a2,timing_script_heading_d2
+ PL_PS GS0_68d2,timing_script_heading_d2
  PL_END
 
 ; Exactly the native byte-load ABI: preserve upper destination bits, other

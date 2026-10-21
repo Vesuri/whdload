@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native 0658 world-tick opening, before HUD/camera/render work.
 ; Standalone. Once-only scheduling and command ordering belong to the caller.
 WS_NATIVE_SIZE equ $98       ; +05640..+056d8
@@ -9,7 +10,7 @@ WS_CODE_SIZE equ WS_NATIVE_SIZE+WS_KILL_SIZE+2
 ; Validate relocated side effects before writing. Return 0/-1, preserve others.
 world_start_prepare:
 	movem.l d1/a0/a2-a5,-(sp)
-	lea $5640(a0),a4
+	lea GS0_5640(a0),a4
 	cmpi.l #$526d000c,(a4)
 	bne .bad
 	cmpi.w #$4239,$36(a4)
@@ -22,7 +23,7 @@ world_start_prepare:
 	lea $1583(a2),a5
 	cmpa.l $3e(a4),a5
 	bne .bad
-	lea $7eee(a0),a5
+	lea GS0_7eee(a0),a5
 	cmpi.w #$4eb9,$6e(a4)
 	bne .bad
 	cmpa.l $70(a4),a5
@@ -42,25 +43,25 @@ world_start_prepare:
 	bne .bad
 	; The old render/tick bridge consumed the previous projectile result.
 	; Without this block +0bed4 clears it before the target can be removed.
-	cmpi.w #$1639,$5874(a0)
+	cmpi.w #$1639,GS0_5874(a0)
 	bne .bad
 	movea.l a0,a5
-	adda.l #$c756,a5
-	cmpa.l $5876(a0),a5
+	adda.l #GS0_c756,a5
+	cmpa.l GS0_5876(a0),a5
 	bne .bad
-	cmpi.l #$67000008,$587a(a0)
+	cmpi.l #$67000008,GS0_587a(a0)
 	bne .bad
-	cmpi.w #$4eb9,$587e(a0)
+	cmpi.w #$4eb9,GS0_587e(a0)
 	bne .bad
-	lea $7cb2(a0),a5
-	cmpa.l $5880(a0),a5
+	lea GS0_7cb2(a0),a5
+	cmpa.l GS0_5880(a0),a5
 	bne .bad
 	movea.l a1,a5
 	moveq #WS_NATIVE_SIZE/2-1,d1
 .copy:
 	move.w (a4)+,(a5)+
 	dbf d1,.copy
-	lea $5874(a0),a4
+	lea GS0_5874(a0),a4
 	moveq #WS_KILL_SIZE/2-1,d1
 .kill_copy:
 	move.w (a4)+,(a5)+

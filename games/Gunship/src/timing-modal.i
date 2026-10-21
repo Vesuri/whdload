@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Native script-modal continuation. Requires lifecycle and world-body.
 ; Prepared stable bindings; not installed in production.
 TM_SCHEDULER equ 0
@@ -10,7 +11,7 @@ TM_SIZE equ 14
 ; Initialize only at a new lifecycle admission, never to retry partial work.
 timing_modal_prepare:
 	movem.l a3,-(sp)
-	adda.l #$8050,a3
+	adda.l #GS0_8050,a3
 	cmpi.l #$4a2d0053,(a3)
 	bne .bad
 	cmpi.l #$6f00014e,4(a3)

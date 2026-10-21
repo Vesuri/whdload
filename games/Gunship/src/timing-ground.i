@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; World-owned native ground consequences, extracted without rewriting policy.
 ; Standalone; not installed. The caller schedules this once per world tick
 ; after height and before forward speed, displacement and RPM (native order).
@@ -10,7 +11,7 @@ GR_CODE_SIZE equ GR_NATIVE_SIZE+2
 ground_prepare:
 	movem.l d1/a0/a2-a4,-(sp)
 	movea.l a0,a3
-	adda.l #$95a0,a3
+	adda.l #GS0_95a0,a3
 	cmpi.l #$4a026700,(a3)
 	bne .bad
 	cmpi.w #$0082,4(a3)
@@ -18,7 +19,7 @@ ground_prepare:
 	cmpi.w #$4eb9,$48(a3)
 	bne .bad
 	movea.l a0,a4
-	adda.l #$a150,a4
+	adda.l #GS0_a150,a4
 	cmpa.l $4a(a3),a4
 	bne .bad
 	cmpi.l #$13fc00b4,$54(a3)

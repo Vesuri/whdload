@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Private bar heights follow consumed fields, never render count.
 ; a0=arena, stable native bindings. Seed at preparation and normal activation.
 ; Lifecycle caller excludes producers/consumers. Preserve all registers.
@@ -102,7 +103,7 @@ timing_runtime_gauge_draw:
  move.b (a2)+,(a3)+
  dbf d1,.save
  movea.l RT_HUNKS(a0),a4
- adda.l #$adc0,a4
+ adda.l #GS0_adc0,a4
  adda.w #$09bc,a1
  lea RT_GAUGES(a0),a0
  movea.l (sp),a2

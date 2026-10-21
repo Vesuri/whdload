@@ -1,3 +1,4 @@
+ include "timing-offsets.i"
 ; Capture after normal world effects; non-deadline fields check guided release.
 ; Retained command completion uses the same callback. Script-modal completion
 ; stays suspended; normal activation seeds a fresh lifecycle prediction.
@@ -94,7 +95,7 @@ timing_runtime_actor_release:
  cmp.w RT_CLOCK+TC_RATE(a6),d1
  bhs .bad
  movea.l RT_HUNKS(a6),a0
- adda.l #$ba08,a0
+ adda.l #GS0_ba08,a0
  move.w 6(a0),d7 ; native guided slot, -1 means absent
  cmpi.w #5,d7
  bhi .done

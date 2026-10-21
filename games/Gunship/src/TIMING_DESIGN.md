@@ -1,6 +1,6 @@
 # Gunship hybrid timing design
 
-This describes the current TIMING_RUNTIME implementation as of 2026-10-21.
+This describes the 2.0b (21.10.2026) hybrid timing implementation.
 [PERFORMANCE_PLAN.md](PERFORMANCE_PLAN.md), section C's refocus, defines release
 acceptance and the five remaining blockers C-R1–C-R5. C is not complete.
 Implementation history and superseded experiments are in git.
@@ -10,14 +10,20 @@ Implementation history and superseded experiments are in git.
 **Enhanced framerate** is the default-off CUSTOM1 boolean. The slave ignores
 it below 68020. Every framerate patch, including blitter changes, shares that
 gate; existing baseline compatibility and protection fixes remain baseline.
-The hybrid flight loop is currently installed for the 0658 executable in
-TIMING_RUNTIME builds. This is not a claim of timing support for every game
-version. The ordinary build and CUSTOM1=0 retain native timing.
+The release build includes the hybrid flight loop. `Gunship.slave` selects
+0658 offsets; `GunshipNTSC.slave` selects 1489 offsets (`GUNSHIP_NTSC`). Both
+compile the same implementation with `timing-offsets.i`; the installer selects
+the slave by executable release, independently of display frequency.
+CUSTOM1=0 retains native timing. Other recognized executables retain native
+timing and are explicitly untested for this beta. `GUNSHIP_NATIVE` permits a
+small native-only regression build. CUSTOM4 chooses CPU (0, default) or native
+blitter (1) rendering, subordinate to CUSTOM1 and the 68020 CPU gate.
 
 `timing-slave.i` resolves loaded hunks, reads the display's 50/60 Hz frequency,
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
-The current arena is 30,436 bytes and production runtime text is 49,568 bytes.
+The arena is 30,436 bytes for 0658 and 30,428 for 1489; each release slave
+has 49,666 bytes of text (49,704-byte hunk executable).
 The CPU renderer separately allocates 36,010 bytes of fast RAM: 18,000 for
 the view and 18,010 for cached cockpit artwork and its mask.
 `timing-core.i` defines the included implementation. Exact guided forecast,
@@ -182,7 +188,7 @@ Native/modal paths still rebuild their screen normally.
 Palette moves and the flash-effect pointers found by +00AB8 stay intact;
 there is no unchanged per-frame palette copy or MakeScreen/RethinkDisplay.
 
-`timing-cpu-render.i` is installed only for enhanced 0658 flight when an
+`timing-cpu-render.i` is installed only for enhanced 0658/1489 flight when an
 36,010-byte MEMF_FAST allocation succeeds; failure retains the blitter path.
 Native geometry, clipping and edge-to-span tables are reused. The CPU draws
 320×90 pixels into five contiguous fast-RAM planes: lines select an unrolled
@@ -202,7 +208,7 @@ the existing LoadSeg cache flush covers the prepared hooks and trampolines.
 A same-state diagnostic rerender compared all five CPU planes with the real
 blitter on 163 takeoff/banking frames: zero differing words. Allocation and
 no-fast-memory fallback checks passed. Full-MMU 68040 with CACHE passed normal
-startup and takeoff. The ordinary slave remains byte-identical.
+startup and takeoff. The native-only build was unchanged by that renderer change.
 
 The existing 500-field PAL window reports 11.7 fps on a1200-fast and 25.0 fps
 on a1200-060, each with 30 world ticks (3.00 Hz). Input-to-next-completed-frame
@@ -259,6 +265,13 @@ The demo JSON's `demo` field reads an unrelated offset and is not evidence;
 use tape progress, player state and screenshots. The user's matching screenshot
 is `tmp/dev/tmp/play-a1200-040/.run/shots/FS-UAE_Full_261021-1356_00.png`.
 
+For release builds, run `source/build.sh` with the shared AmigaXDev toolchain.
+It writes `Gunship.slave` and `GunshipNTSC.slave` under the ignored
+`tmp/dev/tmp/build/release/`; `BUILD_DIR` overrides that destination. Ship both
+slaves with the updated Install/ReadMe and the original package's manual and
+icons. No game files, ROMs or generated binaries belong in git. VERIFY builds
+are diagnostics, not distribution files; the older verifier targets 0658.
+
 For an existing measurement rerun, the harness builds with VERIFY=1 and
 TIMING_RUNTIME=1; `REFOCUS=1 MACHINE=<machine> CUSTOM1=<0|1> SLAVE=<built-slave>`
 selects the existing `tools/fps.py <out>` comparison under its environment.
@@ -285,7 +298,7 @@ These are short emulator windows, not full-mission or real-hardware acceptance.
 Full-MMU 68040 CACHE startup/takeoff and native pause/exit with blitter-interrupt
 restoration also passed. D5 evidence is under ignored
 `tmp/dev/tmp/d5-initialized-pixels/`, `d5-final-{fps020,fps060,priority020,priority060}/`,
-`d5-040-cache/` and `d5-pause-exit/`. The ordinary slave remains byte-identical.
+`d5-040-cache/` and `d5-pause-exit/`. The native-only build was unchanged by that renderer change.
 
 
 ## Cockpit work (E2/E3)
@@ -317,7 +330,7 @@ across 423 cockpit-edge frames (18,010 bytes each) and 95 skipped-needle frames
 Focused assembled-code checks covered both back buffers, changed inputs,
 panel restoration, native-swap invalidation and modal fallback. Allocation
 failure checks passed. Full-MMU 040 CACHE startup/takeoff and native pause/exit
-with D1 interrupt restoration passed. The ordinary slave is byte-identical.
+with D1 interrupt restoration passed. The native-only build was unchanged by that renderer change.
 Evidence: ignored `tmp/dev/tmp/e23-pixels-final2/`, `e-040-cache/`,
 `e-pause-exit/`; harness checks `test_cockpit_e.py` and
 `test_cpu_render_install.py`.
@@ -340,6 +353,7 @@ respectively. These field-phase samples are not evidence of visible input
 response or scanout latency. The old prediction that only geometry would
 remain is not confirmed: copies, native blits and display pacing still matter.
 No 68000 work was done. No full-mission or PAL/NTSC acceptance is implied;
-C-R1–C-R5 remain open and other executable versions remain F2.
+Release support and current regression results are recorded under F in
+PERFORMANCE_PLAN.md. Full-mission acceptance and known beta issues remain in C.
 Evidence: ignored `tmp/dev/tmp/e-final-fps{020,030,060}/`,
 `e-aprof-baseline060-current/` and `e-aprof-final060/`.

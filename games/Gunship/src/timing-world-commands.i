@@ -1,15 +1,16 @@
+ include "timing-offsets.i"
 ; Native world-primary command decoder, excluding the field-owned yaw tail.
 ; Requires command-dispatch/control-mode definitions. Standalone, not installed.
-WC_CODE_SIZE equ $462      ; +04ed4..+05334 inclusive
-WC_TAIL equ $3f8           ; native +052cc
-WC_POST_TAIL equ $426      ; native +052fa
+WC_CODE_SIZE equ GS0_5336-GS0_4ed4      ; +04ed4..+05334 inclusive
+WC_TAIL equ GS0_52cc-GS0_4ed4           ; native +052cc
+WC_POST_TAIL equ GS0_52fa-GS0_4ed4      ; native +052fa
 
 ; a0=validated 0658 code hunk, a1=even WC_CODE_SIZE-byte destination.
 ; Validate patch boundaries before writes; caller owns version/non-overlap
 ; checks and instruction-cache flush. Return 0/-1, preserve others.
 world_commands_prepare:
 	movem.l d1/a0/a2,-(sp)
-	lea $4ed4(a0),a0
+	lea GS0_4ed4(a0),a0
 	cmpi.l #$0c470045,(a0)
 	bne .bad
 	cmpi.l #$102d003f,WC_TAIL(a0)
