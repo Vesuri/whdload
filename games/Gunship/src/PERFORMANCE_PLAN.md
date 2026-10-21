@@ -445,7 +445,47 @@ acceptance text in the status notes and items below where they conflict.
 7. Then D1/D2, then E1: C fixes speed and response, but the blitter caps
    drawing at about 15 fps until D and E.
 
-**Status (2026-10-21): paused at user request; C remains incomplete.**
+**Current status (2026-10-21): refocus step 2 measured; stopped for report.**
+
+One completed PAL run per CPU/toggle, from normal startup with seed 12345,
+using the same 500-field (10-second) cockpit control window: ten F1 taps,
+then eight alternating left/right stick pulses. No combat fixture or game-code
+change. The existing `fps.py` harness now supports this comparison using the
+existing VERIFY completed-swap log and native world counter. Host input is
+excluded and runs are headless. The same `VERIFY=1 TIMING_RUNTIME=1` build is
+used for all four runs; CUSTOM1 selects native or current experimental timing.
+
+| Machine | CUSTOM1 | Completed frames / fps | World ticks / Hz | Input to next completed frame, median (range) |
+|---|---:|---:|---:|---:|
+| a1200-fast (68020) | 0 | 104 / 10.4 | 52 / 5.20 | 50 ms (20–100) |
+| a1200-fast (68020) | 1 | 80 / 8.0 | 30 / 3.00 | 70 ms (20–180) |
+| a1200-060 | 0 | 163 / 16.3 | 82 / 8.20 | 50 ms (20–80) |
+| a1200-060 | 1 | 146 / 14.6 | 30 / 3.00 | 20 ms (20–60) |
+
+Enhanced fps is 23.1% lower on 020 and 10.4% lower on 060 in this window.
+The delay uses eight injected stick presses and 20 ms field timestamps; it
+measures the next completed frame, **not whether that frame contains the new
+input**, and does not measure display scanout. These short PAL samples do not
+establish the full PAL/NTSC rate criterion or full-mission playability. The
+startup control route also does not keep the two modes at identical world
+states: native simulation runs faster. End screenshots remain in the cockpit.
+
+Evidence: `tmp/dev/tmp/c/refocus-step2-{a1200-fast,a1200-060}-{0,1}-final/`
+contains `comparison.json`, `samples.json`, `frame-log.json`, the measurement
+script/listing and end screenshot. The slave SHA-256 is
+`7d57fd948331bac23029d4d981b130ba358fdfb11f050fef94690aab230b4857`.
+Reproduce with `VERIFY=1 TIMING_RUNTIME=1 tools/build.sh`, then
+`REFOCUS=1 MACHINE=<machine> CUSTOM1=<0|1> SLAVE=<built-slave> tools/fps.py <out>`
+under the harness environment. Two aborted measurement attempts preceded the
+four completed runs: one caught double field advancement, the other rejected
+zero-field stepping. The completed runs use supported two-field steps and
+assert exactly 500 actual game fields; aborted attempts supply no results.
+
+**Next: step 3**, disable exact guided forecasting, restrict enhanced mode to
+68020+, and profile/reduce added 020 cost until fps is at least native. No new
+acceptance gates or fixtures were added. Stop here before implementation.
+
+**Older status notes (superseded by the refocus and current report above).**
 
 The experimental runtime implements a 3 Hz world, field-rate input/player
 motion and forward presentation. The ordinary build still retains native
