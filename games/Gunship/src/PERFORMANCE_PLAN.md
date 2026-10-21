@@ -459,8 +459,9 @@ Reported ground-gauge, 68040 BltClear, damage-yaw and deferred missile-kill fixe
 Post-beta play-test correction: enhanced bank-to-turn division now truncates
 towards zero, removing the native small-bank left bias. Native mode is unchanged.
 Both release builds pass heading and field-rate small-bank reversal checks;
-see TIMING_DESIGN.md. Damage flash restoration and visibly choppy damaged-tail
-rotation remain reported issues requiring follow-up.
+see TIMING_DESIGN.md. Damage-flash expiry now restores the saved background
+colour in the enhanced display path. Visibly choppy damaged-tail rotation
+remains a reported issue requiring follow-up.
 Full-mission user acceptance remains open; targeted checks do not replace it.
 Unattended demo playback and any-key exit are confirmed enhanced-mode regressions.
 Current ownership, source map, evidence and demo diagnosis: [TIMING_DESIGN.md](TIMING_DESIGN.md).

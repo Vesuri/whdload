@@ -23,7 +23,7 @@ blitter (1) rendering, subordinate to CUSTOM1 and the 68020 CPU gate.
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
 The arena is 30,436 bytes for 0658 and 30,428 for 1489; each release slave
-has 49,674 bytes of text (49,712-byte hunk executable).
+has 49,762 bytes of text (49,800-byte hunk executable).
 The CPU renderer separately allocates 36,010 bytes of fast RAM: 18,000 for
 the view and 18,010 for cached cockpit artwork and its mask.
 `timing-core.i` defines the included implementation. Exact guided forecast,
@@ -195,6 +195,18 @@ retain double buffering. FrontScreen waiting yields through WaitTOF.
 Native/modal paths still rebuild their screen normally.
 Palette moves and the flash-effect pointers found by +00AB8 stay intact;
 there is no unchanged per-frame palette copy or MakeScreen/RethinkDisplay.
+The VBL restores COLOR00 from the selected bitmap's saved palette when the
+field-owned hit timer (+4296) is zero. This replaces the restoration formerly
+provided by native palette rebuilds, preventing the last red/orange damage
+flash from persisting. Active flashes, native/modal ownership and retained
+boundaries are untouched; both native copper colour orders are supported.
+Restoration also runs without a pending frame and writes only on a mismatch.
+The shared hook applies to both renderer choices. Assembled PAL/NTSC checks
+cover 384 combinations of ownership, timer, bitmap, colour and copper order
+(`tmp/dev/tools/test_damage_colour.py`, ignored harness). Full-MMU 040 CACHE
+startup succeeds. Debugger-triggered hit attempts did not produce a flash,
+so they do not establish live flash/expiry acceptance; that remains a
+play-test check.
 
 `timing-cpu-render.i` is installed only for enhanced 0658/1489 flight when an
 36,010-byte MEMF_FAST allocation succeeds; failure retains the blitter path.

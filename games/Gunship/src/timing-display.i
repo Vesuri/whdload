@@ -195,6 +195,7 @@ timing_display_drain:
 ; Called by the game's VBL server, already guarded by FrontScreen==ours.
 ; Palette moves and the pointers found by +00AB8 stay intact.
 timing_display_vbl:
+ bsr timing_display_restore_background
  move.w timing_display_pending(pc),d0
  beq .done
  lea timing_display_moves(pc),a0
@@ -222,6 +223,40 @@ timing_display_vbl:
  ENDC
  lea timing_display_pending(pc),a0
  clr.w (a0)
+.done:
+ rts
+
+; Native swaps rebuild the copper palette, undoing the transient hit colour.
+; Our bitplane-only swaps do not. Restore COLOR00 once the field-owned hit
+; timer expires, even if no new frame is pending. Keep active flashes and
+; native/modal ownership alone. Use the selected bitmap's saved palette,
+; not a hard-coded black: native copper colours may run forwards or backwards.
+; Called only inside VBL; d0/a0-a2 are already saved by timing_live_field.
+timing_display_restore_background:
+ move.w timing_display_async(pc),d0
+ beq .done
+ movea.l timing_runtime_arena(pc),a0
+ cmpi.w #1,RT_CAPTURE_OWNER(a0)
+ bne .done
+ tst.w RT_BOUNDARY_PHASE(a0)
+ bne .done
+ movea.l RT_HUNKS+24(a0),a1
+ tst.b $4296(a1)
+ bne .done
+ move.l $40(a1),d0
+ beq .done
+ movea.l d0,a2
+ move.l $44(a1),d0
+ lsl.l #2,d0
+ adda.l d0,a2 ; native COLOR00 address: base + (0 XOR order)*4
+ move.l $49ac(a1),d0
+ lsl.l #6,d0
+ lea $484c(a1),a0
+ adda.l d0,a0
+ move.w (a0),d0
+ cmp.w (a2),d0
+ beq .done
+ move.w d0,(a2)
 .done:
  rts
  even
