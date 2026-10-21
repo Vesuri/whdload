@@ -62,8 +62,8 @@
  Beta notes:
  -----------
  Enhanced mode is still awaiting full-mission play-testing on the A1200 and
- 68060. The unattended demo does not play or exit correctly in enhanced
- mode; leave Enhanced framerate off to use the demo.
+ 68060. The unattended demo uses original timing and controls even when
+ Enhanced framerate is enabled.
  The reported 68060 T-74 identification-screen graphics issue remains open.
  The 68040 graphics corruption caused by unfinished blitter clears has been
  fixed in enhanced mode. CACHE works in the tested full-MMU FS-UAE setup;

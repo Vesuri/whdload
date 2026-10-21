@@ -465,14 +465,14 @@ each random turn over the full next world interval, replacing half-tick
 turn/pause easing. PAL/NTSC continuity and immediate-steering checks pass;
 visual damaged-tail acceptance remains in the user mission checks.
 Full-mission user acceptance remains open; targeted checks do not replace it.
-Unattended demo playback and any-key exit are confirmed enhanced-mode regressions.
-Current ownership, source map, evidence and demo diagnosis: [TIMING_DESIGN.md](TIMING_DESIGN.md).
+Unattended demo playback and any-key exit are restored through native demo ownership.
+Current ownership, source map, evidence and demo checks: [TIMING_DESIGN.md](TIMING_DESIGN.md).
 
-**Release acceptance items (four open; authoritative list from step 5).**
+**Release acceptance items (three open; authoritative list from step 5).**
 
 | ID | Remaining work | Completion evidence |
 |---|---|---|
-| C-R1 | Restore unattended demo playback and any-key exit. | Normal startup without input flies the recorded demo; a key exits as with CUSTOM1=0. |
+| C-R1 | Complete: unattended demo playback and any-key exit. | PAL/NTSC normal-startup runs with CUSTOM1 off/on fly the recorded demo; Space returns to vehicle identification. Demo retains native timing. |
 | C-R2 | Complete: ordinary-play world rate on 68020/68060, PAL/NTSC. | F release-slave 500-field windows each measured 3.00 Hz (criterion 1). |
 | C-R3 | Confirm visible response to new input. | The response appears on the next completed frame (criterion 3). |
 | C-R4 | Full-mission user acceptance on a1200 with current fixes. | No visible problems, including missile destruction and damaged-tail-rotor motion (criterion 5). |
@@ -495,7 +495,7 @@ is a later verification note. No further 68000 timing or exact-forecast work.
   - C3a. Retain controls, buttons, edges and command positions in a bounded history.
   - C3b. Consume every retained player record once, in order.
   - C3c. Retain world input until its deadline without applying player motion twice.
-  - C3d. Preserve native input filtering and command semantics; demo exception is C-R1.
+  - C3d. Complete: native sampler/filtering, full command words and ordered player/world acknowledgements retained; current release regression checks pass. C-R1 restores native demo semantics. See TIMING_DESIGN.md for intentional enhanced-mode timing differences.
 - **C4. Player motion.**
   - C4a. Keep the field/writer inventory in [PLAYER_STATE_INVENTORY.md](PLAYER_STATE_INVENTORY.md).
   - C4b. Separate continuous motion from world-owned reserves, damage, weapons and contact.
@@ -545,7 +545,7 @@ is a later verification note. No further 68000 timing or exact-forecast work.
 
 **Status: complete for the enhanced 0658 runtime (2026-10-21).**
 D1–D3 and D5 are complete; D4 is closed by user decision. Other executable
-versions remain F2. This does not close C's five release blockers.
+versions remain F2. C's remaining acceptance is listed above.
 
 - **D1. Blitter interrupt off during flight — complete for the experimental 0658 runtime.**
   Brought forward into refocus step 3 with user approval; results and ownership
@@ -606,7 +606,7 @@ versions remain F2. This does not close C's five release blockers.
 ### E. Cut blitter work (the ceiling from the 68020 on)
 
 **Complete for enhanced 0658 (2026-10-21).** E4 is closed by the user-approved
-measurement decision. Other executable versions remain F2; C-R1–C-R5 remain open.
+measurement decision. Other executable versions remain F2; C-R3–C-R5 remain open.
 
 - **E1. CPU renderer for the 3D view — complete for the enhanced 0658 runtime.**
   `timing-cpu-render.i` retains native geometry/clipping and draws the view into
@@ -691,7 +691,7 @@ measurement decision. Other executable versions remain F2; C-R1–C-R5 remain op
 
 **Complete for 2.0b beta (21.10.2026).** F is closed for this beta on the
 checks below. The full A3 matrix is not a beta gate. C's remaining acceptance
-items (C-R1, C-R3–C-R5) and the deferred T-74 report stay open; this is not
+items (C-R3–C-R5) and the deferred T-74 report stay open; this is not
 full-release or full-mission sign-off.
 
 - **F1. Options — complete.** CUSTOM1 is the default-off **Enhanced framerate**

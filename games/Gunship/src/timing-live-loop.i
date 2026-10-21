@@ -63,6 +63,12 @@ timing_loop_install:
 timing_flight_entry:
  movem.l d0-d7/a0-a6,-(sp)
  movea.l timing_runtime_arena(pc),a0
+ ; Attract playback owns a native tick-indexed control tape and any-key
+ ; exit decoder. Keep that entire flight native; ordinary play still enters
+ ; the field-history owner below. Shared hooks already honor native ownership.
+ movea.l RT_HUNKS+24(a0),a1
+ cmpi.b #1,$45cc(a1)
+ beq .demo
  lea timing_flight_exclude(pc),a1
  lea timing_flight_include(pc),a2
 .call_base:
@@ -74,6 +80,14 @@ timing_flight_entry:
  cmpi.l #4,d0
  bne .failed
  movem.l (sp)+,d0-d7/a0-a6
+ rts
+.demo:
+ movea.l RT_HUNKS(a0),a0
+ lea GS0_563a(a0),a0
+ lea timing_flight_native(pc),a1
+ move.l a0,(a1)
+ movem.l (sp)+,d0-d7/a0-a6
+ move.l timing_flight_native(pc),-(sp)
  rts
 .failed:
  ; WHDLoad restores the host environment. Keep exact loop failure in the
@@ -102,6 +116,7 @@ timing_flight_include:
  rts
  even
 timing_flight_status: dc.l 0
+timing_flight_native: dc.l 0
 
 ; A6 is graphics.library, already loaded by the native wrapper. OwnBlitter
 ; has completed; wait for its last DMA before masking only BLIT. Other

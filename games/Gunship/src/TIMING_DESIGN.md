@@ -2,7 +2,7 @@
 
 This describes the 2.0b (21.10.2026) hybrid timing implementation.
 [PERFORMANCE_PLAN.md](PERFORMANCE_PLAN.md), section C's refocus, defines release
-acceptance. C-R2 is measured; C-R1 and C-R3–C-R5 remain open. C is not complete.
+acceptance. C-R1 and C-R2 are complete; C-R3–C-R5 remain open. C is not complete.
 Implementation history and superseded experiments are in git.
 
 ## Activation and scope
@@ -23,7 +23,7 @@ blitter (1) rendering, subordinate to CUSTOM1 and the 68020 CPU gate.
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
 The arena is 30,436 bytes for 0658 and 30,428 for 1489; each release slave
-has 49,798 bytes of text (49,836-byte hunk executable).
+has 49,840 bytes of text (49,876-byte hunk executable).
 The CPU renderer separately allocates 36,010 bytes of fast RAM: 18,000 for
 the view and 18,010 for cached cockpit artwork and its mask.
 `timing-core.i` defines the included implementation. Exact guided forecast,
@@ -246,22 +246,46 @@ on a1200-060, each with 30 world ticks (3.00 Hz). Input-to-next-completed-frame
 samples are 20–80 ms (median 60) and 20 ms respectively; these timestamps do
 not prove visible response or scanout latency. Evidence is under ignored
 `tmp/dev/tmp/step7-e1-{pixels3,fps020,fps060,040-cache}/`; D2's short profile is
-in `step7-d2-profile/`. This completes refocus step 7, not C-R1–C-R5.
+in `step7-d2-profile/`. This completed refocus step 7; later release-item status is in PERFORMANCE_PLAN.md.
 
-## Known demo regression (C-R1)
+## Demo playback and input semantics (C-R1, C3d)
 
-Unattended normal startup enters a recorded demo. Native input decoding at
-+04E3C calls the tape reader +053F2 and maps any key to exit when hunk 6 +45CC
-indicates playback. Enhanced flight instead consumes live field input and
-bypasses both behaviors. This is diagnosed, not fixed.
+The unattended demo uses a tick-indexed recorded input tape. At flight entry,
+`timing-live-loop.i` checks the native playback byte (hunk 6 +45CC == 1)
+and dispatches that flight to the original +0563A loop (mapped for NTSC).
+This preserves the tape reader, native control decoder and any-key exit.
+It deliberately keeps the demo's original frame-dependent timing. Ordinary
+play still enters the enhanced field-history loop and its 3 Hz world clock.
+No owner is activated for playback: the shared input, display, effect and
+renderer hooks retain their existing native paths. This is an entry-time
+choice, never recovery from a partly executed enhanced transaction.
 
-One normal-startup PAL a1200-fast run per toggle confirms the difference over
-an approximately 20-second observation window. Native advances 85 world ticks,
-moves from (29871,21920) to (31025,18752), and advances the tape by 96 bytes.
-Enhanced advances 61 ticks but remains at (28416,28672), with zero altitude,
-RPM and attitude, and its tape pointer stays at base+4. Space exits native to
-the T-74 screen but leaves enhanced in the demo cockpit. The world is running;
-recorded flight controls and the special exit behavior are missing.
+Normal-startup a1200-fast checks with current PAL and NTSC release slaves,
+CUSTOM1 off/on, observe 1,000 fields without input, then inject Space.
+Both enhanced demos fly, advance their tapes and return to the vehicle
+identification screen. The PAL enhanced window advances 104 ticks and 116
+tape bytes; native advances 84 ticks and 96 bytes. NTSC enhanced advances
+82 ticks and 92 bytes; native advances 77 ticks and 76 bytes. These are demo progression checks, not 3 Hz gameplay
+measurements. Evidence: `tmp/dev/tmp/demo-fix-{pal,ntsc}-{off,on}/`.
+The production-entry check also covers demo-to-ordinary-play selection and
+register/stack preservation in both releases.
+
+C3d retains the original sampler before publishing field history: native
+mouse filtering and input-mode selection are not reimplemented. The consumer
+uses the sampled low-byte directions, not accumulated raw mouse deltas.
+Accepted command words retain modifier bits and FIFO order, with separate
+player/world acknowledgements. Native pause/menu handlers keep ownership
+while enhanced sampling is suspended. Existing production-binary checks
+cover sampler ABI, direction decoding, command classification, target changes,
+engine-mode ordering, queue ownership and retained boundaries. The bounded
+checks use 222 native target comparisons, all 41 native command words, 48
+engine-mode tapes and 16 queue-dispatch tapes per release; the native sampler
+ABI check has 452 cases. Direction/command differential tests use the shared
+PAL decoder as reference; sampler installation checks use each release's own
+executable. They do not claim full-mission or visible-input acceptance.
+The intentional enhanced-mode exceptions remain: field-rate control response,
+weapons at the next world tick, and the obsolete speed-toggle key has no speed
+effect. Demo playback now uses the original filtering/command path in full.
 
 ## Evidence and remaining acceptance
 
@@ -291,9 +315,10 @@ Retained local evidence is ignored under `tmp/dev/`, not shipped in git:
 | Grounded needle | `ground-gauge-{before,after}/gauge.json` |
 | Damage yaw | `step4-damage-yaw-live/damage-yaw.json` |
 | Deferred target removal | `step4-pending-kill-live/kill.json` |
-| Demo comparison | `step5-demo-{native,enhanced}/`: `demo.json`, start/end/exit screenshots |
+| Original demo regression | `step5-demo-{native,enhanced}/`: `demo.json`, start/end/exit screenshots |
+| Demo fix and input regression | `demo-fix-{pal,ntsc}-{off,on}/`, `c3d-release-checks.log`; tools `check_demo_fix.py`, `test_demo_owner.py`, `check_c3d_release.py` |
 
-The demo JSON's `demo` field reads an unrelated offset and is not evidence;
+The original step-5 demo JSON's `demo` field reads an unrelated offset and is not evidence;
 use tape progress, player state and screenshots. The user's matching screenshot
 is `tmp/dev/tmp/play-a1200-040/.run/shots/FS-UAE_Full_261021-1356_00.png`.
 
@@ -310,7 +335,7 @@ selects the existing `tools/fps.py <out>` comparison under its environment.
 Use separate run directories and exclude host input. Debugger guest-memory
 writes are unsupported by the shared harness; previous guest probes were
 compiled diagnostics, not play-build behavior. No new proof fixtures or gates
-are required by this document. Current release work is exactly C-R1–C-R5.
+are required by this document. Remaining release work is C-R3–C-R5.
 
 ## Completed D5 drawing overhead work
 
