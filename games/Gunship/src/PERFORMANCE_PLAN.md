@@ -445,7 +445,20 @@ acceptance text in the status notes and items below where they conflict.
 7. Then D2 (D1 brought forward into step 3 by user approval), then E1: C fixes speed and response, but the blitter caps
    drawing at about 15 fps until D and E.
 
-**Current status (2026-10-21): refocus step 3 complete; stopped for report.**
+**Current status (2026-10-21): refocus step 3 complete; step 4 user play underway.**
+
+The windowed a1200-fast CUSTOM1=1 build is available for user play. The first
+reported issue was the vertical-speed needle oscillating with engines off on
+the ground. Field motion accumulates negative vertical speed before each
+world-tick ground reset, despite height remaining zero. Presentation now maps
+that grounded descent to zero without changing player physics; positive lift
+and airborne readings retain native conversion. The existing presentation
+check covers all vertical-speed byte values at zero and positive height, and
+a normal-startup emulator replay checks the reported engines-off state.
+All 768 instrument comparisons pass; all 100 live ground samples show a zero
+needle with identical sampled player motion before/after. Local evidence:
+`tmp/dev/tmp/c/ground-gauge-{before,after}/gauge.json` and
+`tmp/dev/tmp/c/presentation-tests.json`.
 
 The user authorized bringing D1 forward. CUSTOM1 now requires a 68020+;
 ReadMe documents native timing below that. Exact guided forecasting, tapes
@@ -484,8 +497,8 @@ Evidence: `tmp/dev/tmp/c/refocus-step3-d1-{a1200-fast,a1200-060}/`, matching
 `refocus-step3-d1-off-*`, and `refocus-step3-d1-pause-exit/`.
 Slave SHA-256: `319d3b3e00ef48028ef7ac99be2fab2575ae562d4c4a7442891823a6b6e4ab77`.
 Code commits: `849083a7` (CPU gate), `1aa150f7` (simplification),
-`268af168` (D1). **Next: step 4**, windowed a1200 user play; do not start it
-until the step 3 report has been delivered. D2 and E1 retain their later order.
+`268af168` (D1). **Current: step 4**, windowed a1200 user play and reported
+fixes. D2 and E1 retain their later order.
 
 **Step 2 measurement record (2026-10-21).**
 

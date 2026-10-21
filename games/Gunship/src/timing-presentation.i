@@ -60,6 +60,15 @@ presentation_build:
 	lsr.w #8,d0
 	move.b d0,7(a1)
 	move.b $3e(a0),d0
+	; Field motion may accumulate descent before the world-tick ground
+	; reset. At zero height that is no actual vertical movement. Suppress
+	; only its instrument reading; retain the native physics and positive
+	; lift indication when taking off.
+	bpl .vertical_ready
+	tst.w $1c(a0)
+	bne .vertical_ready
+	clr.b d0
+.vertical_ready:
 	lsl.w #8,d0
 	asr.w #1,d0
 	; Native +07a1c interpolation, including rounding from the shifted bit.

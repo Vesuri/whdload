@@ -18,6 +18,12 @@ final PAL comparison reaches 11.5/16.7 fps on 020/060 versus native 10.4/16.3.
 See PERFORMANCE_PLAN.md for measurement scope and the remaining C exit criteria.
 The full document cleanup remains refocus step 6.
 
+During step 4 user play, grounded vertical-speed needle jitter exposed the
+negative field-motion velocity before world-tick contact resets. The enhanced
+instrument builder displays zero for negative vertical speed at zero height.
+This is presentation-only: player state, contact timing, positive takeoff
+readings and airborne instrument conversion remain unchanged.
+
 The governing design is PERFORMANCE_PLAN.md section C, as revised in
 f56356a and 522ad23. The world runs at three native ticks per second; the
 player must respond and move at field rate. Weapons launch at a world tick.
