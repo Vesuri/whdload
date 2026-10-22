@@ -21,6 +21,7 @@ STACKSIZE	= $1000
 HOTSIZE		= $1000
 TABLESIZE	= $6104
 TABLEMEM	= $7000		;ws_ExpMem requires whole 4 KB pages
+RESTOREMEM	= $5000		;17,366 bytes, rounded to whole pages
 
 ;======================================================================
 
@@ -34,7 +35,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$41			;ws_keyexit = Backspace
-_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM) ;optional stack, code and tables
+_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM) ;optional workspace
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -188,6 +189,14 @@ lbC0002AA
 .nogate
 	btst	#4,(_custom1+3,pc)
 	beq.b	.nopresent
+; Without a restore buffer, retain native-rate logic but omit redraws.
+	lea	(_logicgate,pc),a0
+	move.l	a0,($5a2e4).l
+	move.l	(_expmem,pc),d0
+	beq.b	.nopresent
+	addi.l	#STACKSIZE+HOTSIZE+TABLEMEM,d0
+	lea	(_restore_buffer,pc),a0
+	move.l	d0,(a0)
 	lea	(_presentgate,pc),a0
 	move.l	a0,($5a2e4).l
 ; Disk.1 $5E4DE: count publications separately from logic passes. Replace
@@ -756,7 +765,7 @@ _present
 
 _savepresent
 	lea	(_restore_ranges,pc),a2
-	lea	(_restore_buffer,pc),a1
+	movea.l	(_restore_buffer,pc),a1
 .next	move.l	(a2)+,d0
 	beq.b	.done
 	movea.l	d0,a0
@@ -767,7 +776,7 @@ _savepresent
 .done	rts
 _restorepresent
 	lea	(_restore_ranges,pc),a2
-	lea	(_restore_buffer,pc),a0
+	movea.l	(_restore_buffer,pc),a0
 .next	move.l	(a2)+,d0
 	beq.b	.done
 	movea.l	d0,a1
@@ -1026,4 +1035,4 @@ _custom2	dc.l	0
 _resload	dc.l	0
 	CNOP	0,4
 
-_restore_buffer	ds.b	17366
+_restore_buffer	dc.l	0

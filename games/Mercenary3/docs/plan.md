@@ -217,11 +217,11 @@ moved and self-modifying code.
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
 - [x] M1 [x] M2
-- [x] S0 [ ] S1 [ ] S2 [ ] S3 [ ] S4 [ ] S5 [ ] S6
+- [x] S0 [x] S1 [ ] S2 [ ] S3 [ ] S4 [ ] S5 [ ] S6
 - [x] R1 [ ] R2 [ ] R3 [ ] R4
 - [ ] X1
 
-Next: S1, S2, then S3 and S4. P2 and P3 can run alongside S3/S4; they touch
+Next: S2, then S3 and S4. P2 and P3 can run alongside S3/S4; they touch
 the presentation path, so not alongside S2.
 
 ## In place

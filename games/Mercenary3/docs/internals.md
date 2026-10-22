@@ -72,9 +72,10 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
-the shipped patch list. It asks for an optional 36 KB of expansion memory (`ws_ExpMem`):
-4 KB for bit 2's stack, 4 KB for bit 5's hot code and 28 KB for bit 6's lookup tables.
-If allocation fails, all three retain their chip paths. With every option off it runs the shipped slave's code paths.
+the shipped patch list. It asks for an optional 56 KB of expansion memory (`ws_ExpMem`):
+4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
+20 KB for bit 4's presentation restore buffer. If allocation fails, the stack, code and
+tables retain their chip paths; presentation falls back to logic gating. With every option off it runs the shipped slave's code paths.
 
 | Option | Effect |
 | --- | --- |
@@ -155,7 +156,7 @@ With one field left, a redraw starts only if the last presentation fitted one fi
 Camera/view setup precedes publication; back-buffer setup and drawing follow it, in
 native order. Disk.1 `$5E0BA` is an inline block, not a callable routine. The redraw
 includes `$469C8` and `$5765E`, omitted from the initial plan sketch, and never calls
-collision or main-loop logic. A 17,366-byte slave buffer restores scratch, drawing
+collision or main-loop logic. A 17,366-byte expansion-memory buffer restores scratch, drawing
 variables, object-selection tables and self-modified words, including the 040 indirect
 vectors. Copper state and bitmap output remain live. Chip `$7180` counts logic passes;
 a separate displayed-frame counter exists only in VERIFY.
@@ -792,3 +793,15 @@ fetches per field from chip RAM; 95% come from 20 KB of code, led by Disk.1
 (25%, the span fills and the word at `$4966A`), `$5B8B0..$5C4B0` (12%) and `$575B0..$580B0`
 (11%). Display buffers take 4,500 CPU writes and 1,900 reads per field, much of it
 read-modify-write.
+
+### S1: presentation restore buffer in expansion memory
+
+The restore buffer occupies a 20 KB page-rounded slot in the optional expansion block;
+without it, bit 4 retains L1 gating and skips presentation frames. Release slave size is
+5,596 bytes (VERIFY 5,716, previously 23,052). The 040 route exercises 43 presentations;
+all restore hashes pass. Same-build `Custom1=239 → 255` gives 11.20 → 11.20 fps on
+`a1200-fast`, 4.10 → 4.10 on A500, 12.40 → 12.40 on 030/50 and 12.50 → 16.50 on
+040-25. This tests presentation off/on, not a speed gain from moving the buffer.
+Options-off and shipped both give 37 A500 frames. Walking remains 6 units/field and
+turning 2 heading units/field; route screenshots show no scene or panel faults.
+Evidence: `tmp/s1/`.

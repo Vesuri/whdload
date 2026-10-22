@@ -108,5 +108,5 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md): phase S (frames in one field) comes next, starting with S1. The [frame budget](internals.md#frame-budget-toward-50-fps) shows why: without
+Follow [plan.md](plan.md): phase S (frames in one field) comes next, starting with S2. The [frame budget](internals.md#frame-budget-toward-50-fps) shows why: without
 drawing, presentation frames still take two fields on `a1200-fast`.
