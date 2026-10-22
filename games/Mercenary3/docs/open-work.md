@@ -96,9 +96,18 @@ the user accepts this known emulator limitation. The diagnostic remains visible 
 advisory, so it does not prevent matrix acceptance or A5. See
 [measurements and timing limitation](internals.md#a3-machine-matrix).
 
+## A6 complete: committed-state recorder
+
+`tools/state_trace.py` records every main-loop head and compares traces at the first
+differing pass. Two shipped-slave boots on `a1200-fast` give 75 identical records,
+including every game-image hash, from field 11 through field 501. The plan's loop
+address was corrected from `Disk.1` `$5E992` (inside the clear routine) to `$5DF92`.
+Object windows remain provisional until D4; cross-speed equivalence belongs to A7.
+See [A6 evidence](internals.md#a6-committed-state-recorder).
+
 ## Next steps
 
-A6 is next on the recommended path, followed by A7. A5 needs A4's guest cache-state
+A7 is next on the recommended path. A5 needs A4's guest cache-state
 instrument first. The historical A500 reference drift and picture comparison must still
 be reconciled before declaring an optimization regression gate passed.
 

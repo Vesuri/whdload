@@ -22,7 +22,8 @@ rates. Any agent can pick up the first step whose dependencies are done. Backgro
   the same route and machine, with fps from frame counts (`route_profile.py`, or `fps.py`
   from A2). No performance claim without a measurement. A change under 2% on every CPU
   class is dropped unless it is free. Run the full machine matrix only at checkpoints (the
-  ✓ steps). Never rerun the emulator without a source change in between.
+  ✓ steps). Never rerun the emulator without a source change in between, except the identical-build
+  repeat boots explicitly required by A6 and A8.
 - **Regression gate**: with every option off, `a500-1.5m` must give the shipped slave's
   frame count on the route (38 frames, 3.82 fps today), and the picture must match.
 - **Decisions** marked **(U)** belong to the user. Ask, record the answer under
@@ -102,7 +103,7 @@ needs WHDLoad 18.
 Record the tables in `internals.md`.
 
 **A6. Committed-state recorder.** Add `tools/state_trace.py`, a breakpoint at the main
-loop head (`Disk.1` `$5E992`). On every pass it records:
+loop head (`Disk.1` `$5DF92`). On every pass it records:
 - the pose block, chip `$7142..$7161`;
 - the clock, chip `$57B0..$57B3`;
 - the frame counter `$7180` and the field stamps `$52952`/`$52954`;
@@ -112,6 +113,11 @@ loop head (`Disk.1` `$5E992`). On every pass it records:
 
 `--compare A B` reports the first differing pass and the differing fields.
 - **Done when** two boots of the same build give identical records.
+  **Done:** two shipped-slave boots on `a1200-fast` give 75 identical records,
+  including the full image hash, through field 501. The former `$5E992` address was
+  inside the clear routine; disassembly and the existing profiler identify the main
+  loop at `$5DF92`. Object windows are provisional pending D4. See
+  [A6 evidence](internals.md#a6-committed-state-recorder).
 
 **A7. Lockstep mode** (`VERIFY` only, `Custom2` bit 0). It makes each frame's world
 advance independent of the frame's duration:
@@ -247,7 +253,7 @@ The design and decisions are in [open work](open-work.md#design-native-logic-pas
 - presentation frames run in between;
 - the player's presented pose is extrapolated, other objects are interpolated.
 
-**D1. Logic gating** (new bit), at the main loop head (`Disk.1` `$5E992`, a 6-byte `jsr`).
+**D1. Logic gating** (new bit), at the main loop head (`Disk.1` `$5DF92`, a 6-byte `jsr`).
 It applies only when walking mode is active (chip `$7122` = 1). Fewer than 4 fields since
 the last logic pass: skip the pass (for D1 alone, wait for the next field). Otherwise:
 - run the native pass;
@@ -422,7 +428,7 @@ on its own), then C1–C5 and D2–D5 in parallel, then B, E and F.
 
 ## Status
 
-- [x] A1 [x] A2 [x] A3 [ ] A4 [ ] A5 [ ] A6 [ ] A7 [ ] A8
+- [x] A1 [x] A2 [x] A3 [ ] A4 [ ] A5 [x] A6 [ ] A7 [ ] A8
 - [ ] B1 [ ] B2 [ ] B3 [ ] B4 [ ] B5 [ ] B6
 - [ ] C1 [ ] C2 [ ] C3 [ ] C4 [ ] C5 [ ] C6 [ ] C7
 - [ ] D1 [ ] D2 [ ] D3 [ ] D4 [ ] D5 [ ] D6 [ ] D7 [ ] D8

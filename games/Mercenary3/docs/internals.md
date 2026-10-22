@@ -98,8 +98,8 @@ Offsets are `Disk.1` offsets; chip variables are BaseMem addresses, which do not
   for the VERTB counter at chip `$529F4` to change (`$5E4D6`), counts the frame in chip
   `$7180` (`$5E4DE`), and stores the fields since the previous frame in chip `$52954`
   (`$5E4F0`). Then the copy that the slave's `_dmaon` patch interrupts.
-- **Main loop** (head `$5E992`, one pass per frame):
-  1. per-frame calls `$5E992..$5EA04` (not yet classified; together about 7,000 cycles);
+- **Main loop** (head `$5DF92`, one pass per frame):
+  1. per-frame calls `$5DF92..$5E004` (not yet classified; together about 7,000 cycles);
   2. a snapshot of the player pose (chip `$7146..`, `$7038`, `$7040` to `$70D2..`);
   3. the world ticks below;
   4. per-frame calls after the ticks (`$5E084..`), the frame publication call (`$5E0E2`),
@@ -325,6 +325,58 @@ strict frequency sanity and failed-cell rendering. The report validator was corr
 for UAE's omitted zero MMU setting and its 256 KB slow-memory units, then the same
 captured results were revalidated without rerunning any cell. Ignored evidence is under
 `tmp/a3/shipped/`.
+
+## A6 committed-state recorder
+
+`tools/state_trace.py` stops at the main-loop head, `Disk.1` `$5DF92`, before its
+first `jsr`. The former `$5E992` in the plan was a transcription error: that offset
+is a `movem` inside the screen-clear routine. The existing profiler's loop marker
+and disassembly agree on `$5DF92`; the per-frame call range ends at `$5E004`.
+
+Each stop reads chip `$5350..$67FFF` once, then derives the pose bytes
+`$7142..$7161`, clock bytes `$57B0..$57B3`, words `$7180`, `$52952`, `$52954`,
+`$6F56`, and `$529F4`, and a SHA-256 of the entire read. Nothing is masked from
+that hash, including stack, display-control state and self-modified code; the bitmap
+buffers themselves lie outside it. Object data is recorded as raw bytes in two
+provisional 1,000-byte windows, `$AF36..$B31D` and `$B31E..$B705`. These cover the
+known table writes; their ends are capture boundaries, not established table extents.
+D4 must map and extend them. The full image hash also detects changes beyond them.
+The instrument is entirely host-side; no guest instrumentation or slave code changed.
+
+The entry anchor remains `Disk.1` `$4EDB0`. At each loop head the recorder captures
+state committed by the preceding pass, with a zero-based record index. Joystick
+changes occur **after** the capture at the first head reaching each cumulative route
+boundary (175, 360, 500 fields). `held` describes the input leading into the sample.
+The route therefore differs from the exact-field FPS route and must not be used as
+its performance baseline. A7 will add pass-number input for cross-speed lockstep.
+
+Two independent deterministic `a1200-fast` boots of the shipped slave, with no WHDLoad
+options, produced **75 identical records**, including all 75 full-image hashes:
+
+| Observation | Both boots |
+| --- | --- |
+| First head | record 0, field 11, frame counter 1 |
+| Walk starts after capture | record 23, field 179 |
+| Turn starts after capture | record 52, field 365 |
+| Last head | record 74, field 501, frame counter 75 |
+| Last publication stamp / elapsed word | 494 / 7 |
+| Final clock bytes | `bb18000a` |
+| Comparison | identical, exit status 0 |
+
+Evidence: `tmp/a6/boot-a.json` and `tmp/a6/boot-b.json`. The emulator, shipped slave,
+WHDLoad and shared-launcher hashes match the A3 identities above, and the effective
+configuration matches A3's `a1200-fast` cell (68020, 14,187,580 Hz, 2 MB chip, 8 MB fast,
+cycle-exact PAL, no JIT). The repeat boots are the explicit A6 exception to the
+plan's no-reruns rule. A sandboxed launch could not attach to the debugger; a first
+capture attempt exposed GDB's filename quoting limitation, fixed with a relative
+scratch filename before the successful pair. Neither failed attempt yielded a trace.
+
+`--compare` checks the trace definition and every record field, reports the first
+unequal pass and field names, and rejects unequal lengths or empty evidence. It compares
+records rather than machine/build metadata, allowing later option comparisons; callers
+must check those identities when claiming same-build repeatability. A6 establishes
+repeatability on this 020 setup only, not on threaded 030 boots, across CPU speeds or
+between different slave options. It makes no performance or A500 picture-parity claim.
 
 ## Renderer inputs and writes
 

@@ -172,3 +172,28 @@ runtime, a known emulator limitation accepted by the user. `matrix.json` records
 `sanity_passed=false` and `sanity_advisory=true` separately from overall `passed=true`.
 The 040/060 counts remain emulator measurements, not calibrated hardware-speed baselines.
 See [A3 evidence](internals.md#a3-machine-matrix). A3 is complete.
+
+## Committed-state traces
+
+```sh
+. amiga/env.sh
+python3 tools/state_trace.py tmp/state/boot-a.json
+python3 tools/state_trace.py tmp/state/boot-b.json
+python3 tools/state_trace.py --compare tmp/state/boot-a.json tmp/state/boot-b.json
+```
+
+The two unchanged boots are A6's required repeatability test. The recorder uses the
+shared checked entry, runtime hashes, PAL validation, deadlines and owned-process
+cleanup. `AMIGA_SETUP`, `SLAVE`, `WHD_ARGS` and `ROUTE` work as in the other route tools.
+Output must be new and under `tmp/`; scratch dumps are removed on success or failure.
+No guest memory is written and no instruction recording is required.
+
+Every main-loop-head stop produces one record, capturing the preceding pass's committed
+state. Route lengths remain fields, but inputs change after the first head reaching a
+cumulative boundary. The final capture can overshoot 500 fields. This is not the exact
+FPS route or A7's pass-driven lockstep. Ranges in JSON use exclusive ends. The two raw
+object windows are provisional until D4; the full game-image hash has no exclusions
+inside its range. Compare reports the first differing pass and field names (exit 1),
+or identical records (exit 0). Trace definitions must match; build/machine identities
+remain available in metadata and must be checked separately for repeatability claims.
+See [A6 evidence](internals.md#a6-committed-state-recorder).
