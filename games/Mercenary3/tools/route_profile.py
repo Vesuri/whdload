@@ -35,6 +35,18 @@ IMAGE, IMAGE_END, DISK_DELTA = 0x5350, 0x5350 + 0x6d7b0, 0x3cb0
 # The frame publication routine (Disk.1 $5E4B0..): it writes COP1LC, waits for the VERTB
 # counter at chip $529F4 to change (the loop at $5A826), then counts the frame at $5A82E.
 FRAME, FRAME_WAIT = 0x5a82e, (0x5a826, 0x5a82c)
+# Main loop points (Disk.1 $5E992.., docs/internals.md): the loop head, each world tick, the
+# first instruction after the tick loop, and the frame publication call.
+MARKS = {'frame': FRAME, 'loop': 0x5a2e2, 'tick': 0x5a3b0, 'ticks_done': 0x5a3d4}
+# Main loop call sites after the ticks (chip addresses of the call instructions) and their
+# callees; the report times each site to the next mark.
+CALLS = {0x5a3da: 0x5b678, 0x5a420: 0x59b94, 0x5a424: 0x59da0, 0x5a428: 0x56c6e,
+         0x5a42c: 0x5213e, 0x5a432: 0x5a7a8, 0x5a436: 0x5ab90, 0x5a43a: 0x50408,
+         0x5a46c: 0x42d14, 0x5a472: 0x42d18, 0x5a4a0: 0x5045e, 0x5a4cc: 0x5045e,
+         0x5a4d6: 0x56e00, 0x5a51a: None, 0x5a520: 0x557d0, 0x5a524: 0x50408,
+         0x5a52a: 0x556f6, 0x5a52e: 0x572fa, 0x5a532: 0x53b0e, 0x5a536: 0x509f2,
+         0x5a53c: 0x51d2a, 0x5a542: 0x51dfc, 0x5a548: None, 0x5a54c: 0x5b774}
+MARKS.update({f'site{a:05x}': a for a in CALLS})
 # Shipped slave code offsets (whdload/original/Mercenary3.slave.asm), named in the report.
 SLAVE_SYMBOLS = {0x27c: '_dmaon', 0x28e: '_diskload', 0x298: '_patch_vertb',
                  0x2aa: '_patch_aud1', 0x2bc: '_int68', 0x2ce: '_checkkeyboard',
@@ -93,6 +105,54 @@ def region(pc):
     return 'other'
 
 
+def loop_split(red):
+    """Cycles per main loop pass between its marks: before the ticks, the ticks, after them."""
+    ev = [(n, p) for n, p, _ in red.events if n != 'frame']
+    passes, cur = [], None
+    for name, pos in ev:
+        if name == 'loop':
+            if cur and {'tick', 'ticks_done'} <= set(cur):
+                passes.append(cur)
+            cur = {'loop': pos, 'ticks': 0}
+        elif cur is not None:
+            if name == 'tick':
+                cur['ticks'] += 1
+                cur.setdefault('tick', pos)
+            elif name not in cur:
+                cur[name] = pos
+    for a, b in zip(passes, passes[1:]):
+        a['end'] = b['loop']
+    passes = [p for p in passes if 'end' in p]
+    if not passes:
+        return []
+    n = len(passes)
+    pre = sum(p['tick'] - p['loop'] for p in passes) / n
+    ticks = sum(p['ticks_done'] - p['tick'] for p in passes) / n
+    post = sum(p['end'] - p['ticks_done'] for p in passes) / n
+    nt = sum(p['ticks'] for p in passes)
+    per_tick = sum(p['ticks_done'] - p['tick'] for p in passes) / max(nt, 1)
+    # Cycles from each marked call site to the next mark: the call and the glue after it.
+    seq = [(nm, p) for nm, p, _ in red.events if nm.startswith('site') or nm == 'loop']
+    cost, cnt = collections.Counter(), collections.Counter()
+    for (a, pa), (_, pb) in zip(seq, seq[1:]):
+        if a.startswith('site'):
+            cost[a] += pb - pa
+            cnt[a] += 1
+    sites = []
+    for name, c in cost.most_common(8):
+        site = int(name[4:], 16)
+        callee = CALLS[site]
+        sites.append(f'  {label(site):10} call {label(callee) if callee else "-":10} '
+                     f'{c / n:12,.0f} per pass  ({cnt[name]} times)')
+    return ['', f'Main loop passes {n} (complete, between loop-head marks), cycles per pass '
+            '(interrupts included):',
+            f'  before the ticks  {pre:12,.0f}',
+            f'  world ticks       {ticks:12,.0f}  ({nt / n:.2f} ticks per pass, '
+            f'{per_tick:,.0f} per tick)',
+            f'  after the ticks   {post:12,.0f}  (frame publication, drawing, panel)',
+            'Costliest call sites after the ticks (to the next marked site):'] + sites
+
+
 def report(red, meta):
     tot = red.total() or 1
     pct = lambda c: f'{c / tot * 100:6.2f}%'
@@ -115,6 +175,7 @@ def report(red, meta):
         lines += ['', f'frames counted at {label(FRAME)}: {len(frames)}; '
                   f'{span / (len(frames) - 1):.2f} fields per frame, '
                   f'{(len(frames) - 1) / span * 50:.2f} fps over the window']
+    lines += loop_split(red)
     waits = {'game: wait for the VERTB counter (' + label(FRAME_WAIT[0]) + ')':
              sum(red.self[pc] for pc in FRAME_WAIT)}
     if slave_base is not None:
@@ -195,7 +256,7 @@ def main():
         g.cmd(f'break *{ENTRY:#x}')
         print(g.cmd('continue', timeout=600), flush=True)
         g.cmd('delete')
-        red, shots, field = Reduction(marks={'frame': FRAME}), [], 0
+        red, shots, field = Reduction(marks=MARKS), [], 0
         with Input(g, log=log.append) as controls:
             for fields, held in ROUTE:
                 for name in held:

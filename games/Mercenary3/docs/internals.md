@@ -82,6 +82,14 @@ Offsets are `Disk.1` offsets; chip variables are BaseMem addresses, which do not
   for the VERTB counter at chip `$529F4` to change (`$5E4D6`), counts the frame in chip
   `$7180` (`$5E4DE`), and stores the fields since the previous frame in chip `$52954`
   (`$5E4F0`). Then the copy that the slave's `_dmaon` patch interrupts.
+- **Main loop** (head `$5E992`, one pass per frame):
+  1. per-frame calls `$5E992..$5EA04` (not yet classified; together about 7,000 cycles);
+  2. a snapshot of the player pose (chip `$7146..`, `$7038`, `$7040` to `$70D2..`);
+  3. the world ticks below;
+  4. per-frame calls after the ticks (`$5E084..`), the frame publication call (`$5E0E2`),
+     drawing and the instrument panel;
+  5. a collision test (`$5E18A..`): on a hit it restores the pre-tick snapshot, undoing
+     the pass's ticks of player movement, and draws again from `$5E0E6`.
 - **World ticks** (`$5E040`): the fields since the previous frame, clamped to 4..8, are
   stored in a word inside the code (`$5DF46`); the loop `$5E060..$5E082` runs that many
   ticks (`$5A644`, `$5C8F8`, `$5F724`, `$5F328`). One tick is one field of game time:
@@ -127,6 +135,21 @@ differed by 3 cycles in total.
 - The game and its data sit in the slave's 512 KB chip BaseMem, so on this machine every
   game instruction fetch and data access competes with display DMA; the fast RAM holds
   only WHDLoad and the slave.
+- Cycles per main loop pass (71 complete passes, interrupts included): before the ticks
+  7,100; the ticks 11,600 (6.6 per pass, 1,770 per tick); after them 1,893,500. The
+  costliest call sites after the ticks:
+
+  | Call site | Callee | Cycles per pass | Role |
+  | --- | --- | ---: | --- |
+  | `$5E1E2` | `$577BE` | 887,000 | main 3D drawing (by cost and call tree; not yet confirmed) |
+  | `$5E0E2` | `$5E458` | 421,000 | frame publication: its field wait and the slave's `_waitvb` |
+  | `$5E150` | `$5410E` | 245,000 | not yet classified |
+  | `$5E1DE` | `$5AFAA` | 228,000 | not yet classified |
+  | `$5E1DA` | `$593A6` | 101,000 | not yet classified |
+  | `$5E0E6` | `$5E840` | 57,000 | not yet classified |
+
+  World logic, ticks included, is therefore about 1% of a frame; drawing is about
+  1.4 million cycles (5 fields on this machine).
 - The game is assembly with one supervisor stack for its main loop and interrupts, so the
   reconstructed call tree roots everything under interrupt frames; use the self-cycle
   tables. Outside the waits no single routine exceeds 1.5%.
