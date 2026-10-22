@@ -9,6 +9,7 @@ and executable structure.
 
 - [Development setup](docs/development.md)
 - [Current scope and next work](docs/open-work.md)
+- [Plan: real-time speed, up to 50 fps, performance](docs/plan.md)
 - [Internals](docs/internals.md)
 - [Input provenance](manifest/inputs.json)
 

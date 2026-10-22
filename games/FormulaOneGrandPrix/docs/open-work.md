@@ -10,13 +10,8 @@ verified slave and executable structure. No slave reconstruction or patching has
 
 # Next
 
-1. Baselines exist for `a1200-fast` (`docs/internals.md`): the game is held to about
-   8 fps by its frame pacer. Next: the same windows on the A500-equivalent and the rest
-   of the playbook §8 machine matrix (the leads need recalibrating per machine), and a
-   game-state anchor in place of screen signatures.
-2. Game time is frame-locked at a nominal 1/8 s per frame (`docs/internals.md`). Next:
-   find the simulation step and the in-game race clock in the code, verify the step
-   size directly, and plan decoupling it from rendering (AmigaXDev
-   `docs/playbooks/fixed-time-simulation.md`); measure the 68030/040/060 presets.
-3. Entering Quick Race without the menus needs a patch to `f1gp` through a rebuilt
-   slave; no slave source is available. The scripted route makes it optional.
+The plan is [docs/plan.md](plan.md): real-time game speed on every machine, smooth
+pictures up to 50 fps on 68020+ by extrapolation, and the performance work, in steps
+`A1`–`G4`. Its first steps are `A1`–`A3`, `A5`, `A6` (time sources, the main loops,
+simulation versus presentation, publication, interrupts) and `B1`–`B4` (rebuilding the
+slave, which has no source). Take steps when the user asks.
