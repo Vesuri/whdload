@@ -88,6 +88,7 @@ Bit 4 adds walking presentation frames and includes that gate (P1 below).
 Bit 5 moves numeric helpers and projection code to fast RAM on 68020+ (M1 below).
 Bit 6 copies their read-only lookup tables to fast RAM (M2 below).
 Bit 7 accelerates horizontal span interiors on 68000 and fast-RAM 68020+ (R1 below).
+Bit 8 copies the full presentation restore set with bulk moves (S2 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -762,7 +763,7 @@ on the existing 040 cell, retaining the emulator timing caveat.
 The `VERIFY` build's `Custom2` bits make drawing routines return at once (bit 0 the 3D
 drawing `$577BE`, 1 the clear `$5E840`, 2 `$5410E`, 3 `$5AFAA`, 4 `$593A6`). The 030 and
 040 cores record no profile ("Protocol error" on `monitor profile`), so this elimination is
-the frame-cost instrument there. `fps.py`, 500-field route, `Custom1=255`, one session:
+the frame-cost instrument there. Before S2: `fps.py`, 500-field route, `Custom1=255`, one session:
 
 | `Custom2` (skipped) | a1200-fast | 030/50 | 040-25 cell |
 | --- | ---: | ---: | ---: |
@@ -774,8 +775,8 @@ the frame-cost instrument there. `fps.py`, 500-field route, `Custom1=255`, one s
 | 16 (`$593A6`) | 11.0 | 12.4 | 16.7 |
 | 31 (all five) | 25.4 | 37.0 | 49.6 |
 
-Frames land on whole fields, so single bypasses under a field change little. Without any
-drawing, frames still take two fields on `a1200-fast` and about 1.35 on the 030. The
+Frames land on whole fields, so single bypasses under a field change little. Before S2,
+without any drawing, frames took two fields on `a1200-fast` and about 1.35 on the 030. The
 profile of that case (`tmp/prof/nodraw/`) shows why:
 
 - The CPU waits 43% of the time in the publication's field wait: presentation work that
@@ -805,3 +806,36 @@ all restore hashes pass. Same-build `Custom1=239 → 255` gives 11.20 → 11.20 
 Options-off and shipped both give 37 A500 frames. Walking remains 6 units/field and
 turning 2 heading units/field; route screenshots show no scene or panel faults.
 Evidence: `tmp/s1/`.
+
+### S2: bulk presentation restore
+
+`Custom1` bit 8 copies the full 17,366-byte set in 32-byte `movem` groups, with longword
+and word tails. The 020 no-draw profile measures 185,845 → 114,790 copy cycles per
+presentation (0.65 → 0.40 field). Scene setup stays: `$5765E` projects objects relative
+to the staged camera, so its inputs change between presentations.
+
+Removing scratch was rejected. Matched-cost VERIFY poison on/off comparisons first
+differed at pass 75: chip `$0340..$2000` changed the recorded object window even at equal
+field counts; `$2000..$4000` also failed, with timing differences. No scratch range is
+omitted. The test uses `Custom2=64` (read/write unchanged) versus `96` (complement words),
+with `Custom3`/`Custom4` as optional start/end chip addresses; defaults are `$0340..$4000`.
+It runs only after presentations and exists only in VERIFY.
+
+Same-build/session `Custom1=255 → 511`, with `Custom2=31` (no drawing):
+
+| Cell | Off fps | On fps |
+| --- | ---: | ---: |
+| A500 | 12.30 | 16.20 |
+| 020 chip-only | 24.80 | 25.30 |
+| 020 fast | 25.40 | 35.90 |
+| 030/50 | 37.30 | 49.60 |
+| 030 MMU | 36.90 | 49.60 |
+| 040-25 | 49.60 | 49.60 |
+| 060-50 | 49.60 | 49.60 |
+
+Full drawing: A500 4.10 → 4.10, 020 fast 11.30 → 11.30, 030/50 12.40 → 12.40,
+040-25 16.50 → 16.80 fps. All 45 full-drawing 040 restore hashes pass. Options-off and
+shipped both give 37 A500 frames. World speed on 020 and 030 remains 6 walking units and
+2 heading units per field; route screenshots show no scene or panel faults.
+The 030 no-draw cadence has one two-field startup interval, then 495 one-field
+intervals (mean 1.002). Evidence: `tmp/s2/`.

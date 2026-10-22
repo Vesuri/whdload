@@ -63,6 +63,7 @@ _config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
 		dc.b	"C1:X:Hot code in fast RAM (68020+):5;"
 		dc.b	"C1:X:Read-only lookup tables in fast RAM (68020+):6;"
 		dc.b	"C1:X:Longword horizontal span fills:7;"
+		dc.b	"C1:X:Bulk presentation restore:8;"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -756,6 +757,9 @@ _present
 	jsr	($572fa).l		; Disk.1 $5AFAA
 	jsr	($53b0e).l		; Disk.1 $577BE
 	bsr.w	_restorepresent
+	IFD VERIFY
+	bsr.w	_poisonpresent
+	ENDC
 	lea	(_inpresent,pc),a0
 	clr.w	(a0)
 	IFD VERIFY
@@ -770,8 +774,12 @@ _savepresent
 	beq.b	.done
 	movea.l	d0,a0
 	move.w	(a2)+,d0
-.copy	move.w	(a0)+,(a1)+
-	dbra	d0,.copy
+	btst	#0,(_custom1+2,pc)
+	beq.b	.words
+	bsr.w	_copylongs
+	bra.b	.next
+.words	move.w	(a0)+,(a1)+
+	dbra	d0,.words
 	bra.b	.next
 .done	rts
 _restorepresent
@@ -781,10 +789,65 @@ _restorepresent
 	beq.b	.done
 	movea.l	d0,a1
 	move.w	(a2)+,d0
-.copy	move.w	(a0)+,(a1)+
-	dbra	d0,.copy
+	btst	#0,(_custom1+2,pc)
+	beq.b	.words
+	bsr.w	_copylongs
+	bra.b	.next
+.words	move.w	(a0)+,(a1)+
+	dbra	d0,.words
 	bra.b	.next
 .done	rts
+
+; Range lengths are words minus one. Move 32 bytes per loop, then pairs
+; and an odd final word. All registers used here are saved by the gate.
+_copylongs
+	addq.w	#1,d0
+	move.w	d0,d1
+	lsr.w	#4,d0
+	beq.b	.pairs
+	subq.w	#1,d0
+.bulk	movem.l	(a0)+,d2-d7/a3-a4
+	movem.l	d2-d7/a3-a4,(a1)
+	lea	(32,a1),a1
+	dbra	d0,.bulk
+.pairs	move.w	d1,d0
+	andi.w	#15,d0
+	lsr.w	#1,d0
+	beq.b	.tail
+	subq.w	#1,d0
+.loop	move.l	(a0)+,(a1)+
+	dbra	d0,.loop
+.tail	btst	#0,d1
+	beq.b	.done
+	move.w	(a0)+,(a1)+
+.done	rts
+
+	IFD VERIFY
+; Custom2 bit 6 enables a matched-cost scratch test; bit 5 complements every
+; scratch word. With bit 5 clear, read/write the same words at the same cost.
+_poisonpresent
+	btst	#6,(_custom2+3,pc)
+	beq.b	.done
+	btst	#5,(_custom2+3,pc)
+	sne	d1
+	ext.w	d1
+	move.l	(_poison_start,pc),d0
+	bne.b	.start
+	move.l	#$340,d0
+.start	movea.l	d0,a0
+	move.l	(_poison_end,pc),d0
+	bne.b	.end
+	move.l	#$4000,d0
+.end
+	sub.l	a0,d0
+	lsr.l	#1,d0
+	subq.w	#1,d0
+.loop	move.w	(a0),d2
+	eor.w	d1,d2
+	move.w	d2,(a0)+
+	dbra	d0,.loop
+.done	rts
+	ENDC
 
 	IFD VERIFY
 _verify_before
@@ -1029,6 +1092,10 @@ _custom1	dc.l	0
 	IFD VERIFY
 	dc.l	WHDLTAG_CUSTOM2_GET
 _custom2	dc.l	0
+	dc.l	WHDLTAG_CUSTOM3_GET
+_poison_start	dc.l	$340
+	dc.l	WHDLTAG_CUSTOM4_GET
+_poison_end	dc.l	$4000
 	ENDC
 	dc.l	0
 

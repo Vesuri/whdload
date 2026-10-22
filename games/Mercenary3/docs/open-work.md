@@ -108,5 +108,7 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md): phase S (frames in one field) comes next, starting with S2. The [frame budget](internals.md#frame-budget-toward-50-fps) shows why: without
-drawing, presentation frames still take two fields on `a1200-fast`.
+Follow [plan.md](plan.md): phase S (frames in one field) comes next, starting with S3. S2 reaches 49.6 fps without drawing on the 030/50, retaining the full
+restore set after failed poison comparisons. Full drawing still takes about four fields;
+the [frame budget](internals.md#frame-budget-toward-50-fps) identifies code fetches and
+bitmap traffic as the next costs.

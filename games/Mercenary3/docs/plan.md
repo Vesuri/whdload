@@ -147,11 +147,12 @@ presentation frames off when that memory is missing. Check: P1's hash check; sla
 
 **S2. Cheaper presentation frames.** About 0.7 field per presentation on `a1200-fast` goes
 to copying the restore set word by word, and 0.3 to scene setup (`$5765E`).
-- Restore only what something reads before rewriting it. Render scratch (chip
-  `$0340..$4000`, most of the set) that the drawing always writes before reading needs no
-  restore. Test each candidate range with a `VERIFY` poison fill after every presentation:
+- Restore only what something reads before rewriting it. Test render scratch (chip
+  `$0340..$4000`, most of the set) with a `VERIFY` poison fill after every presentation:
   the committed state (`state_trace.py --compare` against poison off) and the screenshots
-  must not change.
+  must not change before removing a range. The whole range and both halves failed that
+  comparison in S2, so retain them; the assumption that this scratch is all rewritten
+  before reading was wrong. Bulk copying the full set reaches the 030 no-draw target.
 - Copy what remains with long or `movem` moves, from and to fast RAM where possible.
 - Find whether scene setup can be skipped or shared when its inputs haven't changed since
   the last frame; keep it if not.
@@ -217,17 +218,17 @@ moved and self-modifying code.
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
 - [x] M1 [x] M2
-- [x] S0 [x] S1 [ ] S2 [ ] S3 [ ] S4 [ ] S5 [ ] S6
+- [x] S0 [x] S1 [x] S2 [ ] S3 [ ] S4 [ ] S5 [ ] S6
 - [x] R1 [ ] R2 [ ] R3 [ ] R4
 - [ ] X1
 
-Next: S2, then S3 and S4. P2 and P3 can run alongside S3/S4; they touch
+Next: S3, then S4. P2 and P3 can run alongside S3/S4; they touch
 the presentation path, so not alongside S2.
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–7.
+  with `Custom1` bits 0–8.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the
