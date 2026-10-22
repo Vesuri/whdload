@@ -1,12 +1,8 @@
-; F: CPU work reduction. Public entry runs after CUSTOM2/placement validation.
+; CPU work reduction, enabled after CUSTOM2 and Fast RAM selection.
 ; The caller flushes caches after all one-time patches; no per-frame code writes.
 f_cpu_init:
- IFD VERIFY_F_CONTROL
- bra.w .done
- ELSE
  nop
  nop
- ENDC
  bsr.w f_hud_init
  bsr.w f_saves_init
  bsr.w f_sort_init
@@ -15,7 +11,7 @@ f_cpu_init:
  bsr.w f_span_init
 .done:
  rts
-; F1c: paired plane fills; preserve clipping and rewrite relocated jump tables.
+; paired plane fills; preserve clipping and rewrite relocated jump tables.
 f_span_init:
  lea f_span_sites(pc),a2
  moveq #2,d7
@@ -64,8 +60,7 @@ f_span_sites:
  dc.l $3140a,$3145a,$31508
  dc.l $3157e,$315ce,$3167c
 
-
-; F1b: turn the eight binary palette flags into four stripe dispatch entries.
+; turn the eight binary palette flags into four stripe dispatch entries.
 ; Bit 7..4 selects outer masks in d0/d2/d4/d6; bit 3..0 selects inner masks.
 ; The static cases below contain only the required ORs and a shared return.
 f_edge_init:
@@ -1949,7 +1944,7 @@ f_edge_255:
  or.l d3,d6
  bra.w f_edge_return
 
-; F4: direct dispatch for the native nonnegative object-type namespace.
+; direct dispatch for the native nonnegative object-type namespace.
 ; Negative types retain their separate native overlay/split handling.
 f_dispatch_init:
  lea f_dispatch_base(pc),a0
@@ -2543,7 +2538,7 @@ f_dispatch_table:
  dc.w $0538 ; $232
  dc.w $0538 ; $233
 
-; F5a: leaf helpers only. Indirect collision callbacks keep their full saves.
+; leaf helpers only. Indirect collision callbacks keep their full saves.
 f_saves_init:
  move.l a5,a0
  adda.l #$a716,a0
@@ -2555,10 +2550,10 @@ f_saves_init:
  move.w #$1bf3,$6a(a0) ; restore at $8b3e6 + 2
  rts
 
-; F3: private per-buffer needle keys. Preparation invalidates both buffers.
+; private per-buffer needle keys. Preparation invalidates both buffers.
 ; Keep all native restore/draw work on a miss; never add a presentation wait.
 f_hud_init:
- move.l verify_c_selection+20(pc),d0
+ move.l enhanced_selected(pc),d0
  cmpi.l #3,d0
  bne .done
  bsr f_text_init
@@ -2779,7 +2774,7 @@ f_glyph:
 f_glyph_native:
  jmp $0
 
-; F5c: temporal permutation seed, stable ties retain incoming draw-list order.
+; temporal permutation seed, stable ties retain incoming draw-list order.
 ; Count changes reset to ordinal order; identities need not persist between lists.
 f_sort_init:
  move.l a5,a1

@@ -8,9 +8,6 @@
  IFNE STEP_FIELDS-1
  FAIL "Reference motion requires one-field simulation"
  ENDC
- IFND C_PHYSICS_FAST
- FAIL "Reference motion requires the physics copy"
- ENDC
 reference_motion_begin:
  move.w $12(a1),-(a7)
  move.w $14(a1),d1

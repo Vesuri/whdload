@@ -8,9 +8,6 @@ e_dirty_reset:
 
 e_dirty_prepare:
  movem.l d0-d7/a0-a6,-(a7)
- IFD VERIFY_E_DIRTY_CONTROL
- bra .done
- ENDC
  bsr e_dirty_slot
  bcs .done
  move.w (a0),d7

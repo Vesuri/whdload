@@ -1,6 +1,6 @@
 ; Audited raw-module operands. Offsets are relative to the loaded file.
 ; Sources: lomain.ami (base $400, $6fb0 bytes), TITLE.AMI (base $8000,
-; $fe86 bytes), INTRO.AMI (base $8000, $2008 bytes). See memory-performance.md.
+; $fe86 bytes), INTRO.AMI (base $8000, $2008 bytes).
 ; *_refs: typed absolute pointers; *_relative: external PC-relative stubs;
 ; *_check: expected native longwords at every modified operand/instruction.
 ; Kept after runtime code so WHDLoad signed-word patch targets stay in range.

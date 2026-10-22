@@ -2,14 +2,6 @@
 ; native routine. Called only after the master toggle/CPU/Fast selection.
 ; Keep centre, height and occlusion used by world-object collision projection;
 ; omit width and edge arrays rebuilt by native geometry before rendering.
-; Normal runtime selects this after full finish/arrest/wreck equivalence,
-; hardware, response and restart checks. Snapshot diagnostics opt in explicitly.
-	IFD VERIFY_C_ROAD_FAST
-	FAIL "Collision geometry reduction requires the native road entry"
-	ENDC
-	IFD VERIFY_C_GEOMETRY_LUT
-	FAIL "Collision geometry reduction excludes the width lookup experiment"
-	ENDC
 
 step_collision_geometry_init:
 	lea step_collision_geometry_code(pc),a0

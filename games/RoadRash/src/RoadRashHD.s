@@ -3,264 +3,6 @@
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 
-	IFD C_SIMULATION
-C_STEP_BUILD = 1
-C_RUNTIME_ONLY = 1
-STEP_NO_HASH = 1
-	ELSE
-	IFD VERIFY
-	IFD VERIFY_C_STEP
-C_STEP_BUILD = 1
-	ENDC
-	ELSE
-C_STEP_BUILD = 1
-C_RUNTIME_ONLY = 1
-STEP_NO_HASH = 1
-	ENDC
-	ENDC
-
- ; Main-image relocation has its own CUSTOM2/Fast gate, including native 68000.
- ; Snapshot diagnostics opt in, keeping older reference builds reproducible.
- IFD VERIFY_D_PUBLIC_MAIN
-C_PUBLIC_MAIN = 1
- ENDC
- IFD C_RUNTIME_ONLY
- IFND C_PUBLIC_MAIN
-C_PUBLIC_MAIN = 1
- ENDC
- ENDC
- IFD C_PUBLIC_MAIN
-C_CPU_BOBS = 1
- IFND C_STEP_BUILD
- FAIL "Public main image requires the shared runtime support"
- ENDC
- ; These older experiments introduce additional copies or absolute operands.
- ; Keep them on the native-image reference until their relocation is audited.
- IFD VERIFY_C_ROAD_FAST
- FAIL "Road-copy experiment is not audited with public main image"
- ENDC
- IFD VERIFY_C_GEOMETRY_LUT
- FAIL "Geometry LUT overlaps the public main allocation"
- ENDC
- IFD VERIFY_C_AUDIT
- FAIL "Legacy phase audit is not audited with public main image"
- ENDC
- IFD VERIFY_C_DECAY_TEST
- FAIL "VERIFY_C_DECAY_TEST needs public-main operand audit"
- ENDC
- IFD VERIFY_C_SEED_ATTACK
- FAIL "VERIFY_C_SEED_ATTACK needs public-main operand audit"
- ENDC
- IFD VERIFY_C_SEED_FINISH
- FAIL "VERIFY_C_SEED_FINISH needs public-main operand audit"
- ENDC
- IFD VERIFY_C_OBJECT_WIDTH
- FAIL "VERIFY_C_OBJECT_WIDTH needs public-main operand audit"
- ENDC
- IFD VERIFY_B
- FAIL "VERIFY_B needs public-main operand audit"
- ENDC
- IFD VERIFY_C_PHYSICS_AUX_CONTROL
- FAIL "VERIFY_C_PHYSICS_AUX_CONTROL needs public-main operand audit"
- ENDC
- IFD STEP_EXTRAPOLATE
- FAIL "Legacy pose extrapolation is not audited with public main image"
- ENDC
- ENDC
-
-; Derive lean in the simulation pose traversal, reusing its actor eligibility.
-	IFD VERIFY_C_FUSED_LEAN
-C_FUSED_LEAN = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_FUSED_LEAN
-C_FUSED_LEAN = 1
-	ENDC
-	ENDC
-
-; Keep AI dispatch and its hot acceleration helpers in Fast RAM together.
-	IFD VERIFY_C_PHYSICS_AUX
-C_PHYSICS_AUX = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_PHYSICS_AUX
-C_PHYSICS_AUX = 1
-	ENDC
-	ENDC
-
-; Uncached 68020 lane scans use Fast RAM after the same enhancement gate.
-; Full snapshot diagnostics retain explicit selection for reference builds.
-	IFD VERIFY_C_LANE_SCAN
-C_LANE_SCAN = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_LANE_SCAN
-C_LANE_SCAN = 1
-	ENDC
-	ENDC
-
-; Relocate movement/collision code only after the enhancement hardware gate.
-; Snapshot diagnostics opt in explicitly to preserve reference builds.
-	IFD VERIFY_C_PHYSICS_FAST
-C_PHYSICS_FAST = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_PHYSICS_FAST
-C_PHYSICS_FAST = 1
-	ENDC
-	ENDC
-
-; Match the reference four-field movement convention with one-field updates.
-; Diagnostics opt in explicitly; runtime selection uses the common C gate.
-	IFD VERIFY_C_REFERENCE_MOTION
-REFERENCE_MOTION = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND REFERENCE_MOTION
-REFERENCE_MOTION = 1
-	ENDC
-	ENDC
-
-; The enhanced runtime uses an optional WHDLoad-managed Fast RAM stack.
-; Keep the legacy diagnostic define as an explicit test-build opt-in.
-	IFD VERIFY_C_FAST_STACK
-C_FAST_STACK = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_FAST_STACK
-C_FAST_STACK = 1
-	ENDC
-	ENDC
-
-; Runtime projection executes from the already-verified Fast RAM slave hunk.
-; Full snapshot diagnostics opt in explicitly for reference comparisons.
-	IFD VERIFY_C_OBJECT_FAST
-C_OBJECT_FAST = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_OBJECT_FAST
-C_OBJECT_FAST = 1
-	ENDC
-	ENDC
-
-; Enable caches only after enhanced hardware selection. Preserve the explicit
-; diagnostic alias so older reference builds remain reproducible.
-	IFD VERIFY_C_CACHE
-C_CACHE = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_CACHE
-C_CACHE = 1
-	ENDC
-	ENDC
-
-; The complete priority matrix benefits 040/060 only. Diagnostics opt in.
-	IFD VERIFY_D_BUS_PRIORITY
-C_BUS_PRIORITY = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_BUS_PRIORITY
-C_BUS_PRIORITY = 1
-	ENDC
-	ENDC
-
-; Normalize steering for the one-field runtime. Snapshot diagnostics retain
-; explicit selection so older timing references can still be reproduced.
-	IFD VERIFY_C_STEERING
-C_STEERING = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_STEERING
-C_STEERING = 1
-	ENDC
-	ENDC
-
-	IFD VERIFY_C_ROAD_TIMING
-	IFND C_STEERING
-	FAIL "Road timing diagnostics require normalized steering"
-	ENDC
-C_ROAD_TIMING = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_ROAD_TIMING
-C_ROAD_TIMING = 1
-	ENDC
-	ENDC
-
-; Predict only the displayed rider heading through the measured render
-; interval. Explicit diagnostic selection retains fixed-horizon controls.
-	IFD VERIFY_C_POSE_PREDICT
-C_POSE_PREDICT = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_POSE_PREDICT
-C_POSE_PREDICT = 1
-	ENDC
-	IFND VERIFY_C_POSE_PREDICT
-	IFND POSE_PREDICT_MEASURED
-POSE_PREDICT_MEASURED = 1
-	ENDC
-	ENDC
-	ENDC
-
-; Simulation collision projection needs only centre, height and occlusion.
-; Keep the full native geometry path for rendering.
-	IFD VERIFY_C_COLLISION_GEOMETRY
-C_COLLISION_GEOMETRY = 1
-	ENDC
-	IFD C_RUNTIME_ONLY
-	IFND C_COLLISION_GEOMETRY
-C_COLLISION_GEOMETRY = 1
-	ENDC
-	ENDC
-	IFD C_COLLISION_GEOMETRY
-	IFND C_STEP_BUILD
-	FAIL "Collision geometry reduction requires the C simulation"
-	ENDC
-	ENDC
-
-; Reuse the last render's geometry on measured 040/060 runtime paths.
-; Diagnostics opt in explicitly, optionally forcing reuse on their test CPU.
- IFD VERIFY_C_GEOMETRY_REUSE
-C_GEOMETRY_REUSE = 1
- ENDC
- IFD VERIFY_C_GEOMETRY_REUSE_FORCE
- IFND VERIFY
- FAIL "Forced geometry reuse requires VERIFY"
- ENDC
- IFND C_GEOMETRY_REUSE
-C_GEOMETRY_REUSE = 1
- ENDC
- ENDC
- IFD C_RUNTIME_ONLY
- IFND C_GEOMETRY_REUSE
-C_GEOMETRY_REUSE = 1
- ENDC
- ENDC
- IFD C_GEOMETRY_REUSE
- IFND C_COLLISION_GEOMETRY
- FAIL "Geometry reuse requires simulation collision geometry"
- ENDC
- IFND C_POSE_PREDICT
- FAIL "Geometry reuse requires the pose render hook"
- ENDC
- IFND POSE_PREDICT_MEASURED
- FAIL "Geometry reuse requires the measured render hook"
- ENDC
- IFD STEP_EXTRAPOLATE
- FAIL "Geometry reuse excludes whole-view extrapolation"
- ENDC
- ENDC
-
-	IFD VERIFY_C_GEOMETRY_LUT
-	IFND C_STEP_BUILD
-	FAIL "Geometry lookup requires VERIFY and VERIFY_C_STEP"
-	ENDC
-	IFND C_FAST_STACK
-	FAIL "Geometry lookup requires the optional expansion allocation"
-	ENDC
-	ENDC
-
 	IFD BARFLY
 	OUTPUT	"RoadRash.Slave"
 	BOPT	O+				;enable optimizing
@@ -292,27 +34,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 _keydebug	dc.b	0			;ws_keydebug = F9
 _keyexit	dc.b	$5F;ws_keyexit = help
 _expmem
- IFD C_PUBLIC_MAIN
- IFD C_CPU_BOBS
  dc.l -$8d000
- ELSE
- dc.l -$6d000 ; optional runtime, image headers and CPU mask index
- ENDC
- ELSE
- IFD C_STEP_BUILD
- IFD C_FAST_STACK
- IFD VERIFY_C_GEOMETRY_LUT
- dc.l -$a000 ; stack plus exact road-width quotient table
- ELSE
- dc.l -$5000 ; optional WHDLoad-managed stack and guards
- ENDC
- ELSE
- dc.l 0
- ENDC
- ELSE
- dc.l 0
- ENDC
- ENDC ; ws_ExpMem
 
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
@@ -358,9 +80,6 @@ Start	;	A0 = resident loader
 		
 		lea	_tags(pc),a0
 		jsr	(resload_Control,a2)
-	IFD VERIFY
-		bsr	verify_start
-	ENDC
 		
 		;get password
 		lea	(_user_password,pc),a0
@@ -377,9 +96,7 @@ Start	;	A0 = resident loader
 		sub.l	a1,a1
 		jsr	(resload_Patch,a2)
 		
- IFD C_PUBLIC_MAIN
 		bsr public_loader_init
- ENDC
 		move.l	expansion_memory(pc),A0	; expansion start
 		move.l	A0,D0	; and size
 
@@ -412,9 +129,7 @@ PatchIntro1:
 	sub.l	a1,a1
 	move.l	_resload(pc),a2
 	jsr	(resload_Patch,a2)
- IFD C_PUBLIC_MAIN
 	bsr public_boot_title
- ENDC
 	movem.l	(a7)+,d0-d1/a1-a2
 
 	move.l	$4C98.W,A0
@@ -431,9 +146,7 @@ PatchIntro2:
 	sub.l	a1,a1
 	move.l	_resload(pc),a2
 	jsr	(resload_Patch,a2)
- IFD C_PUBLIC_MAIN
 	bsr public_boot_intro
- ENDC
 	movem.l	(a7)+,d0-d1/a1-a2
 	
 	move.l	$4C98.W,A0
@@ -444,7 +157,6 @@ pl_intro_2:
 	PL_P	$8E58,ReadSomeFile
 	PL_P	$8CDA,MoveD0_2
 	PL_END
-
 
 	
 ;MoveD0_1:
@@ -501,61 +213,40 @@ PatchLoader2:
 .nopad
 	move.l	_resload(pc),a2
 	jsr	(resload_Patch,a2)
-	IFD C_STEP_BUILD
 	bsr	step_select_path
 	tst.l	d0
 	beq.b	.no_c
-	IFD C_CACHE
 ; WHDLoad honors NoCache and flushes after SetCPU. BaseMem is write-through,
 ; never copyback; preserve the existing ExpMem and slave cacheability.
 	move.l #WCPUF_Base_WT|WCPUF_IC|WCPUF_DC,d0
 	move.l #WCPUF_Base|WCPUF_IC|WCPUF_DC,d1
 	move.l _resload(pc),a2
 	jsr (resload_SetCPU,a2)
-	IFD VERIFY
-	bsr verify_cpu_set
-	ENDC
-	ENDC
 	move.l	expansion_memory(pc),a1
 	lea	pl_c_simulation(pc),a0
 	move.l	_resload(pc),a2
 	jsr	(resload_Patch,a2)
-	IFD C_OBJECT_FAST
 	lea _base(pc),a0
 	adda.l #step_object_fast_init-_base,a0
 	jsr (a0)
-	ENDC
-	IFD VERIFY_C_ROAD_FAST
-	bsr step_road_fast_init
-	ENDC
-	IFD C_COLLISION_GEOMETRY
 	lea _base(pc),a0
 	adda.l #step_collision_geometry_init-_base,a0
 	jsr (a0)
-	ENDC
-	IFD C_PHYSICS_FAST
-; Copy after C patches so the relocated code includes the steering hooks.
-; Full snapshot diagnostics can place the helper beyond short branch reach.
+; Copy after simulation patches so the relocated code includes steering hooks.
 	lea _base(pc),a0
 	adda.l #step_physics_fast_init-_base,a0
 	jsr (a0)
-	ENDC
-	IFD C_PHYSICS_AUX
 	lea _base(pc),a0
 	adda.l #step_physics_aux_init-_base,a0
 	jsr (a0)
-	ENDC
 .no_c:
-	ENDC
 ; Install render correction after the native simulation geometry is copied.
 	move.l expansion_memory(pc),a1
 	lea pl_visual_height(pc),a0
 	move.l _resload(pc),a2
 	jsr (resload_Patch,a2)
-	IFD C_PUBLIC_MAIN
 ; The native 68000 path also benefits from public code and stack placement.
 	bsr public_main_init
-	ENDC
 	movem.l	(a7)+,d0-d1/a0-a2
 	jmp	(a1)
 	
@@ -599,38 +290,7 @@ pl_main
 	PL_P $9E2C,visual_actor_visibility
 	PL_PS $2874E,enable_border_blank
 	PL_IFC2
-	IFD VERIFY_C_SEED_RNG
-	PL_PS $657C,step_seed_rng
-	ENDC
-	IFND C_STEP_BUILD
-	PL_PS	$7736,safe_swap
-	PL_PS	$6FA0,bound_delta
-	PL_PS	$9D32,field_animation
-	ENDC
 	PL_ENDIF
-	IFD VERIFY
-	PL_PS	$6FE0,verify_field
-	PL_PS	$71DC,verify_frame
-	IFD VERIFY_B
-	PL_PS	$75BC,verify_b_gate
-	PL_PS	$AFF0,verify_b_drain
-	ENDC
-	IFND C_STEP_BUILD
-	PL_IFC2
-	IFD VERIFY_SKIP_RENDER
-	PL_NOP	$7730,6
-	ENDC
-	IFD VERIFY_FRAME_PERIOD
-	PL_PS	$7736,verify_pace
-	ENDC
-	PL_ENDIF
-	ENDC
-	IFD VERIFY_C_AUDIT
-	PL_PSS	$747E,verify_c_sim_begin,2
-	PL_PS	$75B6,verify_c_render_begin
-	PL_P	$7748,verify_c_render_end
-	ENDC
-	ENDC
 
 	
 	; *** pause
@@ -672,26 +332,6 @@ enable_border_blank:
 	move.l (a7)+,d0
 	rts
 
-
-
-	IFD VERIFY_C_SEED_RNG
-	IFND VERIFY
-	FAIL "Fixed RNG seed is diagnostic only"
-	ENDC
-; Shared by diagnostic B references and C. Seed before native actor creation,
-; so menu frame count cannot select different initial opponent randomness.
-step_seed_rng:
-	move.l d0,-(a7)
-	moveq #0,d0
-	jsr $90088
-public_ref_0 equ *-4
-	jsr $9011c
-public_ref_1 equ *-4
-	move.l (a7)+,d0
-	jmp $8685c
-public_ref_2 equ *-4
-	ENDC
-
 ; A one-field simulation has measurable integration/collision differences.
 ; Wait for one elapsed tick; the original swap waits for the following tick.
 safe_swap:
@@ -717,28 +357,13 @@ field_animation:
 	move.l	d0,-(a7)
 	move.l	$a5d4c,d0
 public_ref_6 equ *-4
-	IFD VERIFY
-	movem.l	a0,-(a7)
-	lea	verify_animation(pc),a0
-	move.l	d0,8(a0)
-	ENDC
 	lsr.l	#2,d0
 	move.b	d0,$a5990
 public_ref_7 equ *-4
-	IFD VERIFY
-	and.l	#7,d0
-	move.l	d0,12(a0)
-	movem.l	(a7)+,a0
-	ENDC
 	; Original ADDQ on a phase in 0..7 always clears X; ANDI preserves X.
 	andi	#$ef,ccr
 	move.l	(a7)+,d0
 	rts
-	IFD VERIFY
-verify_animation:
-	dc.b	'RRANIM01'
-	dc.l	0,0
-	ENDC
 
 FUNCTION_KEYPRESS:MACRO
 	btst	#JPB_BTN_\1,d0
@@ -907,14 +532,11 @@ password_data:
     dc.b	"00000  01S9010EGJ  576IK"   ;DIABLO 1000
 password_data_end
 
-
-
 ; < A0: filename
 ; < A1: destination address
 ; > D0: 0 (ok)
 ; > D1: filesize (not returning that leads to strange bugs...)
 
-	IFD C_CACHE
 ; Native Ice! depacker exit, including its non-packed-input path. Unlike
 ; resload_LoadFile[Decrunch] and resload_Patch, this game routine does not
 ; flush caches itself. Restore its saved registers before calling WHDLoad;
@@ -928,18 +550,14 @@ enhanced_decrunch_done:
 	move.l (a7)+,a2
 	move.w (a7)+,ccr
 	rts
-	ENDC
 
-	IFD C_PUBLIC_MAIN
 	include public_main.s
 	include cpu_work.s
 	include blitter_queue.s
 	include bob_masks.s
 	include dirty_sky.s
 	include cpu_bobs.s
-	ENDC
 
- IFD C_PUBLIC_MAIN
  include public_loader.s
  include public_boot.s
  include public_iff.s
@@ -947,12 +565,9 @@ enhanced_decrunch_done:
  include public_recolor.s
  include public_audio.s
  include public_assets.s
- ENDC
 
 ReadSomeFile:
- IFD C_PUBLIC_MAIN
  bsr public_asset_load_destination
- ENDC
 	; Preloaded files can arrive before the previous screen blit finishes.
 	; Finish DMA before overwriting its destination (notably DASH2.LBM).
 	tst.b	$dff002
@@ -1000,7 +615,6 @@ ReadSomeFile:
 	moveq	#0,D0		; no problemo
 	movem.l	(sp)+,a0-a2
 	rts
-
 
 ; < D0: numbers of vertical positions to wait
 beamdelay
@@ -1116,15 +730,8 @@ _password		dc.l	0
 _enhanced_framerate	dc.l	0
 	dc.l WHDLTAG_CHIPREVBITS_GET
 _chip_rev dc.l 0
-	IFD C_STEP_BUILD
 	dc.l WHDLTAG_ATTNFLAGS_GET
-verify_attn dc.l 0
-	ELSE
-	IFD VERIFY
-	dc.l WHDLTAG_ATTNFLAGS_GET
-verify_attn dc.l 0
-	ENDC
-	ENDC
+cpu_attention dc.l 0
 	dc.l	0
 	
 previous_button_state
@@ -1132,42 +739,22 @@ previous_button_state
 expansion_memory:
 	dc.l	$80000
 public_ref_8 equ *-4
-	IFD VERIFY
-	include	verify.s
-	IFD VERIFY_B
-	include	verify_b.s
-	ENDC
-	IFD VERIFY_C_AUDIT
-	include	verify_c_audit.s
-	ENDC
-	ENDC
 	
-	IFD C_STEP_BUILD
 pl_c_simulation
 	PL_START
 ; Applied only after step_select_path accepts CUSTOM2 and CPU/Fast placement.
 	PL_P $31994,raster_edge_fast
 
-	IFD C_FUSED_LEAN
 	PL_PSS $9DE8,step_fused_lean,4
-	ENDC
 	PL_IFC2
-	IFD C_CACHE
 	PL_P $3284E,enhanced_decrunch_done
-	ENDC
-	IFD C_BUS_PRIORITY
 	PL_PS $712A,step_priority_end
 	PL_PS $28D26,step_priority_end
 	PL_PS $28D30,step_priority_end
-	ENDC
 	PL_PSS $660E,step_prepare,2
 	PL_P	$747E,step_main
 	PL_P	$75B6,step_end
 	PL_P	$915A,step_camera_decay
-	IFD STEP_EXTRAPOLATE
-	PL_PS	$75C8,step_view_begin
-	PL_P	$7748,step_view_end
-	ENDC
 	PL_NOP	$76C6,6
 	PL_PSS	$A40E,step_start_sprite,2
 	PL_PS	$70DC,step_field_input
@@ -1183,87 +770,32 @@ pl_c_simulation
 	PL_P	$9E70,step_pose_lean
 	PL_P	$9EF0,step_lean_end
 	PL_P	$9F48,step_pose_project
-	IFD VERIFY_C_ROAD_FAST
-	PL_P $970E,step_road_fast_code
-	ENDC
-	IFD C_OBJECT_FAST
 	PL_P $B02E,step_object_fast_code
-	ENDC
-	IFD VERIFY_C_OBJECT_WIDTH
-; Width is not consumed by rejection tests. Defer the divide until the
-; object's depth/lateral checks have accepted it.
-	PL_NOP $B2E8,6
-	PL_PSS $B326,step_object_width,2
-	ENDC
-	IFD REFERENCE_MOTION
 	PL_P $B4A4,reference_motion_begin
 	PL_P $B4D2,reference_motion_displacement
-	ENDC
-	IFD C_STEERING
-	IFD C_ROAD_TIMING
 	PL_P $10C64,step_actor_road_reactivate
 	PL_P $BABE,step_road_reference
 	PL_PS $BCD0,step_actor_road
 	PL_PSS $BDF0,step_actor_road_copy,6
-	ENDC
 	PL_P	$B93A,step_steering_heading
 	PL_P	$B97A,step_steering_motion
 	PL_P	$B9A0,step_steering_store
-	ENDC
-	IFD C_POSE_PREDICT
 	PL_PSS $A8E2,step_predict_pose,4
-	IFD POSE_PREDICT_MEASURED
-	IFD STEP_EXTRAPOLATE
-	FAIL "Measured pose prediction conflicts with whole-view extrapolation"
-	ENDC
-	IFD VERIFY_C_LATENCY
-	FAIL "Measured pose prediction conflicts with the latency probe"
-	ENDC
 	PL_PS $75C8,step_predict_render_begin
 	PL_PS $773C,step_predict_render_end
-	ENDC
-	ENDC
 	PL_S	$AECC,$AEE2-$AECC
 	PL_NOP	$6FA0,6
 	PL_R	$6FE6
 	PL_NOP	$28C7C,$28C94-$28C7C
 	PL_NOP	$28C9A,$28CBC-$28C9A
 	PL_PSS	$28C4C,step_reset,4
-	IFD VERIFY_SKIP_RENDER
-	PL_NOP	$7730,6
-	ENDC
-	IFD VERIFY_FRAME_PERIOD
-	PL_PS	$7736,verify_pace
-	ENDC
-	IFD VERIFY_C_LATENCY
-	PL_PS	$75C8,step_latency_render
-	PL_PS	$7736,step_latency_swap
-	ENDC
-	IFD VERIFY_C_EVENTS
-	PL_PS $F06A,step_event_engine
-	PL_PS $F080,step_event_stop
-	PL_PS $F0BE,step_event_primary
-	PL_PS $F0DE,step_event_secondary
-	PL_PS $F120,step_event_siren
-	ENDC
-	IFD C_FAST_STACK
 	PL_P	$2876C,step_stack_start
-	ENDC
 	PL_ENDIF
 	PL_END
-	ENDC
 
-	IFD C_STEP_BUILD
-	IFND VERIFY
-verify_c_selection:
-	dc.b "RRCSEL01"
-	dc.l 0,0,0,0
-	ENDC
-	IFND C_RUNTIME_ONLY
-	include raster_edge.s
-	ENDC
+enhanced_selected:
+	dc.l 0
 	include simulation.s
-	ENDC
 	IFD DEBUG
 		dc.l	WHDLTAG_CUST_DISABLE,vposw
 		dc.l	WHDLTAG_CUST_DISABLE,vhposw
@@ -1272,18 +804,12 @@ verify_c_selection:
 	ENDC
 		dc.l	0
 
-	IFD C_RUNTIME_ONLY
 	include raster_edge.s
-	ENDC
 
-	IFD C_PUBLIC_MAIN
 	include public_refs.s
-	ENDC
 
- IFD C_PUBLIC_MAIN
  include public_boot_tables.s
  include public_intro_index.s
- ENDC
 
 ; Amiga Version and release tooling use the same fixed version/date as WHDLoad.
  dc.b "$VER: RoadRash "

@@ -1,11 +1,10 @@
 ; Move the complete patched rr.ice HUNK_CODE image into optional public RAM.
-; Called after any selected C copy initializers; independently gates CUSTOM2/Fast.
+; Called after the simulation copy initializers; independently gates CUSTOM2/Fast.
 ; Native 68000 keeps its original simulation and gains code/data/stack placement.
 ; Keep the original Chip heap endpoint and all external DMA buffers unchanged.
 ; Validate the surviving native HUNK_RELOC32 block before changing anything.
 ; Never guess pointers from arbitrary words: use native relocation offsets
-; and explicitly annotated slave operands. See memory-performance.md.
-; This handles the main image; the broader D3 module/data audit remains open.
+; and explicitly annotated slave operands.
 public_main_init:
  movem.l d0-d7/a0-a6,-(a7)
  move.l _enhanced_framerate(pc),d0
@@ -51,8 +50,8 @@ public_main_init:
  move.l #$3c3ec,d3
  move.l a5,a4
  bsr public_main_remap_span
- ; C-only copies were never initialized on the native CPU path.
- move.l verify_c_selection+20(pc),d0
+ ; Simulation copies were never initialized on the native CPU path.
+ move.l enhanced_selected(pc),d0
  cmpi.l #3,d0
  bne .helpers
  lea public_main_spans(pc),a6
@@ -128,7 +127,6 @@ public_main_init:
  lea public_asset_relocate(pc),a0
  move.w #$4ef9,(a1)
  move.l a0,2(a1)
- IFD C_FAST_STACK
  ; Also install the guarded stack for a relocated native main image.
  move.l a5,a1
  adda.l #$2876c,a1
@@ -136,7 +134,6 @@ public_main_init:
  adda.l #step_stack_start-_base,a0
  move.w #$4ef9,(a1)
  move.l a0,2(a1)
- ENDC
  move.l a5,a1
  adda.l #$d000,a1
  lea public_main_lane_lookup(pc),a0
@@ -185,33 +182,15 @@ public_main_adjust:
 .done:
  rts
 public_main_spans:
- IFD C_PHYSICS_FAST
  dc.l $b486,$1b80,step_physics_fast_code-_base
- ENDC
- IFD C_OBJECT_FAST
  dc.l $b02e,$350,step_object_fast_code-_base
- ENDC
- IFD C_COLLISION_GEOMETRY
  dc.l $970e,$140,step_collision_geometry_code-_base
- ENDC
- IFD C_COLLISION_GEOMETRY
  dc.l $989e,$44,step_collision_geometry_code+$140-_base
- ENDC
- IFD C_PHYSICS_AUX
  dc.l $d2c0,$610,aux_8d2c0-_base
- ENDC
- IFD C_PHYSICS_AUX
  dc.l $dd66,$106,aux_8dd66-_base
- ENDC
- IFD C_PHYSICS_AUX
  dc.l $e166,$170,aux_8e166-_base
- ENDC
- IFD C_PHYSICS_AUX
  dc.l $da5c,$ae,aux_8da5c-_base
- ENDC
- IFD C_LANE_SCAN
  dc.l $d970,$72,aux_lane_scan_body-_base
- ENDC
  dc.l -1
 
 ; Preserve the seventh lane coordinate: native reads the high word of the

@@ -1,38 +1,21 @@
-; Shared C simulation, selected by CUSTOM2 and the CPU/Fast RAM check below.
-; Normal builds use C_RUNTIME_ONLY: no snapshot storage or per-step hashes.
-; VERIFY + VERIFY_C_STEP retains the diagnostic capture/replay instrumentation.
-; STEP_FIELDS=1 (50 Hz PAL) is the runtime timestep. Larger quanta and whole-view
-; extrapolation remain diagnostic experiments, never user-selectable modes.
-; Runtime rider-heading prediction affects only presentation.
-; Input history exhaustion aborts explicitly. See simulation-timing.md for
-; validation results and remaining release checks. Game addresses are absolute.
-;
-; RRCSTEP1: cursor +8, count +12, captured field +16, quantum +20,
-; frozen $a5900..$a873f at +24. RRCHASH2 follows with a longword slot count and actor
-; hashes (slot zero unused). STEP_HASH_RING uses RRCHASH3 and publishes a
-; completed-step counter for loss-checked host collection across ring wrap.
-; Copies/hashes perturb timing: no FPS claims.
+; Fixed 20 ms PAL simulation steps, selected by CUSTOM2 and CPU/Fast RAM.
+; Rendering remains vsynced and runs as fast as possible. Rider-heading
+; prediction affects display only. Input history exhaustion aborts explicitly.
 
 ; Select only if enabled, CPU >= 020, and the allocated public slave hunk is
 ; in a conventional Fast RAM window. Do not mistake Chip or $c00000 slow RAM
 ; for Fast RAM. Reject the whole reserved upper-24-bit window conservatively.
 ; No probing of unallocated addresses or extra allocation is needed.
-; Reason: 0 disabled, 1 CPU, 2 memory placement, 3 selected. Return d0=0/1.
+; Save the selected path for relocation/HUD setup. Return d0=0/1.
 step_select_path:
-	lea verify_c_selection+8(pc),a0
-	move.l _enhanced_framerate(pc),d0
-	move.l d0,(a0)+
-	move.l verify_attn(pc),d1
-	move.l d1,(a0)+
-	lea _base(pc),a1
-	move.l a1,(a0)+
+	lea enhanced_selected(pc),a0
 	clr.l (a0)
-	tst.l d0
+	move.l _enhanced_framerate(pc),d0
 	beq .no
-	move.l #1,(a0)
+	move.l cpu_attention(pc),d1
 	btst #1,d1
 	beq .no
-	move.l #2,(a0)
+	lea _base(pc),a1
 	cmpa.l #$200000,a1
 	bcs .no
 	cmpa.l #$a00000,a1
@@ -47,31 +30,6 @@ step_select_path:
 	moveq #0,d0
 	rts
 
-	IFD VERIFY_C_SEED_ATTACK
-	IFND VERIFY_C_EVENTS
-	FAIL "Seeded attack requires the event audit"
-	ENDC
-	ENDC
-	IFND STEP_HASH_SLOTS
-STEP_HASH_SLOTS = 2048
-	ENDC
-	IFLT STEP_HASH_SLOTS-2
-	FAIL "STEP_HASH_SLOTS needs slot zero and at least one tick"
-	ENDC
-	IFGT STEP_HASH_SLOTS-8192
-	FAIL "STEP_HASH_SLOTS exceeds signed indexed addressing"
-	ENDC
-	IFD STEP_HASH_RING
-	IFD STEP_NO_HASH
-	FAIL "STEP_HASH_RING requires hashing"
-	ENDC
-	IFNE STEP_HASH_SLOTS&(STEP_HASH_SLOTS-1)
-	FAIL "STEP_HASH_RING requires a power-of-two capacity"
-	ENDC
-	ENDC
-	IFND STEP_CAPTURE
-STEP_CAPTURE = 601
-	ENDC
 	IFND STEP_FIELDS
 STEP_FIELDS = 1
 	ENDC
@@ -89,18 +47,10 @@ STEP_INPUT_SLOTS = 2048
 	ENDC
 step_reset:
 	movem.l d0-d7/a0-a6,-(a7)
-	IFD C_BUS_PRIORITY
 	bsr step_priority_begin
-	ENDC
 	move.l $a5d4c,d0
 public_ref_19 equ *-4
 	bsr step_reset_history
-	IFD VERIFY_C_DECAY_TEST
-	bsr step_decay_test
-	ENDC
-	IFD STEP_EXTRAPOLATE
-	bsr step_save_previous
-	ENDC
 	jsr $8f552
 public_ref_20 equ *-4
 	lea step_start_frame(pc),a0
@@ -116,14 +66,10 @@ public_ref_22 equ *-4
 ; Cursor field-1 reproduces the first boot's initial step at field 1.
 step_prepare:
 	movem.l d0-d7/a0-a6,-(a7)
-	IFD C_PUBLIC_MAIN
 	bsr e_masks_build
 	bsr e_dirty_reset
 	bsr f_hud_reset
-	ENDC
-	IFD C_BUS_PRIORITY
 	bsr step_priority_begin
-	ENDC
 	move.l $a5d4c,d0
 public_ref_23 equ *-4
 	subq.l #1,d0
@@ -140,34 +86,17 @@ public_ref_23 equ *-4
 public_ref_24 equ *-4
 	rts
 
-	IFD C_BUS_PRIORITY
-	IFD VERIFY
-	include bus_priority.s
-	ENDC
-	ENDC
-
 ; d0 is the initial simulation cursor; the queue follows the live field.
-	IFD C_GEOMETRY_REUSE
 ; Ready byte followed by hardware selection; cleared for every new race.
 step_geometry_reuse_flag: dc.w 0
-	ENDC
 step_reset_history:
-	IFD C_GEOMETRY_REUSE
 	lea step_geometry_reuse_flag(pc),a1
 	clr.w (a1)
-	move.l verify_attn(pc),d1
+	move.l cpu_attention(pc),d1
 	andi.w #$88,d1 ; AFF_68040 | AFF_68060; 020/030 rebuild normally
 	sne 1(a1)
-	IFD VERIFY_C_GEOMETRY_REUSE_FORCE
-	st 1(a1)
-	ENDC
-	ENDC
-	IFD C_POSE_PREDICT
 	IFNE STEP_FIELDS-1
 	FAIL "Presentation heading prediction requires one-field simulation"
-	ENDC
-	IFND POSE_PREDICT_FIELDS
-POSE_PREDICT_FIELDS = 3
 	ENDC
 	lea step_pose_headings(pc),a1
 	move.l d0,-(a7)
@@ -175,17 +104,12 @@ POSE_PREDICT_FIELDS = 3
 .poseclear:
 	clr.w (a1)+
 	dbf d0,.poseclear
-	IFD POSE_PREDICT_MEASURED
 	lea step_pose_render_start(pc),a1
 	clr.l (a1)+
 	clr.w (a1)
-	ENDC
 	move.l (a7)+,d0
-	ENDC
-	IFD C_STEERING
 	lea step_steering_fraction(pc),a1
 	clr.l (a1)
-	IFD C_ROAD_TIMING
 	lea step_actor_road_fraction(pc),a1
 	moveq #34,d1
 .actorroadclear:
@@ -195,27 +119,13 @@ POSE_PREDICT_FIELDS = 3
 	clr.l (a1)+
 	clr.l (a1)+
 	clr.l (a1)
-	ENDC
-	ENDC
-	lea step_stats(pc),a0
-	move.l d0,8(a0)
-	clr.l 12(a0)
-	clr.l 16(a0)
-	IFD STEP_HASH_RING
-	lea step_hashes(pc),a1
-	clr.l 12(a1)
-	ENDC
+	lea step_cursor(pc),a0
+	move.l d0,(a0)
 	lea step_queued_field(pc),a1
 	move.l $a5d4c,(a1)
 public_ref_26 equ *-4
 	clr.b step_replaying-step_queued_field(a1)
 	clr.b step_input_overflow-step_queued_field(a1)
-	IFD VERIFY_C_EVENTS
-	bsr step_events_reset
-	ENDC
-	IFD VERIFY_C_LATENCY
-	bsr step_latency_reset
-	ENDC
 	rts
 ; Consume every due step without discarding elapsed-time remainder.
 step_main:
@@ -226,20 +136,19 @@ step_main:
 	tst.w $a59d0
 public_ref_27 equ *-4
 	bne .render
-	lea step_stats(pc),a0
-	move.l 8(a0),d0
+	lea step_cursor(pc),a0
+	move.l (a0),d0
 	add.l #STEP_FIELDS,d0
 	cmp.l $a5d4c,d0
 public_ref_28 equ *-4
 	bhi .render
 	bsr step_replay_inputs
-	lea step_stats(pc),a0
-	move.l 8(a0),d0
+	lea step_cursor(pc),a0
+	move.l (a0),d0
 	add.l #STEP_FIELDS,d0
-	move.l d0,8(a0)
+	move.l d0,(a0)
 	move.l d0,$a5d50
 public_ref_29 equ *-4
-	addq.l #1,12(a0)
 	move.w #STEP_FIELDS,$a6f00
 public_ref_30 equ *-4
 	bsr step_clock
@@ -251,16 +160,7 @@ public_ref_32 equ *-4
 	move.w d0,$a5d38
 public_ref_33 equ *-4
 .highwater:
-	IFD STEP_EXTRAPOLATE
-	bsr step_save_previous
-	ENDC
 	bsr step_collision_objects
-	IFD VERIFY_C_SEED_ATTACK
-	bsr step_event_seed_attack
-	ENDC
-	IFD VERIFY_C_SEED_FINISH
-	bsr step_seed_finish
-	ENDC
 	bsr .run
 	bra step_main
 .run:
@@ -271,38 +171,16 @@ public_ref_35 equ *-4
 .render:
 	jmp $875bc
 public_ref_36 equ *-4
-	IFD VERIFY_C_SEED_FINISH
-; Synthetic finish-state boundary. Native action code owns the ensuing finish
-; countdown and exit request; no direct exit flag or shortened timer is seeded.
-step_seed_finish:
-	move.l step_stats+8(pc),d0
-	cmpi.l #501,d0
-	bne .done
-	bset #7,$a5dc8
-	move.l d0,$a5dc2
-	move.w #1,$a5980
-	clr.w $a5982
-	move.w #18,$a5984
-	clr.w $a5986
-.done:
-	rts
-	ENDC
 ; Run stateful presentation helpers exactly once per simulation step.
 step_end:
-	IFD C_POSE_PREDICT
 	bsr step_predict_history
-	ENDC
 	jsr $89138
 public_ref_37 equ *-4
 	bsr step_track_events
 	bsr step_actor_animations
 	bsr step_spark_events
-	IFD C_FUSED_LEAN
 	nop
 	nop
-	ELSE
-	bsr step_derive_lean
-	ENDC
 	bsr step_scenery_cursor
 	bsr step_pose_events
 	jsr $8f552
@@ -311,91 +189,15 @@ public_ref_38 equ *-4
 	move.w d0,(a0)
 	jsr $8eff8
 public_ref_39 equ *-4
-	IFD C_STEERING
 	bsr step_steering_finish
-	ENDC
-	IFND STEP_NO_HASH
-	moveq #0,d0
-	lea $a5d60,a0
-public_ref_40 equ *-4
-	move.w #$1180/4-1,d1
-.hash:
-	rol.l #5,d0
-	move.l (a0)+,d2
-	eor.l d2,d0
-	dbf d1,.hash
-	move.l step_stats+12(pc),d1
-	IFD STEP_HASH_RING
-	andi.w #STEP_HASH_SLOTS-1,d1
-	lsl.w #2,d1
-	lea step_hashes+16(pc),a0
-	move.l d0,(a0,d1.w)
-	move.l step_stats+12(pc),-4(a0) ; publish only after the hash is complete
-	ELSE
-	cmpi.l #STEP_HASH_SLOTS,d1
-	bcc .nohash
-	lsl.w #2,d1
-	lea step_hashes+12(pc),a0
-	move.l d0,(a0,d1.w)
-	ENDC
-.nohash:
-	ENDC
-	IFND C_RUNTIME_ONLY
-	lea step_stats(pc),a0
-	IFD STEP_CAPTURE_END
-	tst.w $a59d0
-public_ref_41 equ *-4
-	beq .done
-	ELSE
-	cmpi.l #STEP_CAPTURE,8(a0)
-	bne .done
-	ENDC
-	lea step_snapshot(pc),a1
-	lea $a5900,a0
-public_ref_42 equ *-4
-	move.w #($a8740-$a5900)/4-1,d0
-.copy:
-	move.l (a0)+,(a1)+
-	dbf d0,.copy
-	lea step_stats(pc),a0
-	IFD STEP_CAPTURE_END
-	move.l 8(a0),16(a0)
-	ELSE
-	move.l #STEP_CAPTURE,16(a0)
-	ENDC
-	ENDC
 .done:
-	IFD VERIFY_C_LATENCY
-	bsr step_latency_simulated
-	ENDC
 	rts
 	cnop 0,4
-step_stats:
-	dc.b 'RRCSTEP1'
-	dc.l 0,0,0,STEP_FIELDS
-	IFND C_RUNTIME_ONLY
-step_snapshot:
-	ds.b $a8740-$a5900
+step_cursor:
+	dc.l 0
 
-step_hashes:
-	IFD STEP_HASH_RING
-	dc.b "RRCHASH3"
-	dc.l STEP_HASH_SLOTS,0 ; capacity and last completely published step
-	ELSE
-	dc.b "RRCHASH2"
-	dc.l STEP_HASH_SLOTS
-	ENDC
-	ds.l STEP_HASH_SLOTS
-
-	ENDC
-
-; Keep diagnostic patch targets within the WHDLoad signed-word reach and
+; Keep patch targets within the WHDLoad signed-word reach and
 ; the helper returns within PC-relative reach of the Fast RAM physics copy.
-	IFD VERIFY
-	IFD REFERENCE_MOTION
-	include reference_motion.s
-	ENDC
-	ENDC
 step_start_sprite:
 	move.w step_start_frame(pc),d0
 	move.w d0,8(a0)
@@ -416,7 +218,7 @@ public_ref_45 equ *-4
 public_ref_46 equ *-4
 
 ; Signed 32-bit offset in/out d0. Split the product to avoid overflow and retain
-; 68000-compatible instructions. Repeat per field for larger diagnostic quanta.
+; 68000-compatible instructions.
 step_decay:
 	movem.l d1-d3,-(a7)
 	moveq #STEP_FIELDS-1,d3
@@ -434,24 +236,6 @@ step_decay:
 	dbf d3,.field
 	movem.l (a7)+,d1-d3
 	rts
-
-	IFD VERIFY_C_DECAY_TEST
-step_decay_test:
-	lea step_decay_cases(pc),a0
-	lea step_decay_results+8(pc),a1
-	moveq #10-1,d4
-.next:
-	move.l (a0)+,d0
-	bsr step_decay
-	move.l d0,(a1)+
-	dbf d4,.next
-	rts
-step_decay_cases:
-	dc.l $80000000,-65536,-32768,-28672,-1,0,1,32767,65536,$7fffffff
-step_decay_results:
-	dc.b "RRCDECAY"
-	ds.l 10
-	ENDC
 
 ; Field producer: use existing control/pause handling, but keep the physics
 ; steering and throttle state owned by the simulation consumer.
@@ -505,16 +289,13 @@ public_ref_60 equ *-4
 	cmp.l step_queued_field(pc),d3
 	beq .done
 	move.l d3,d4
-	sub.l step_stats+8(pc),d4
+	sub.l step_cursor(pc),d4
 	cmpi.l #STEP_INPUT_SLOTS,d4
 	bcc .overflow
 	andi.w #STEP_INPUT_SLOTS-1,d3
 	lea step_inputs(pc),a0
 	move.b $a598c,(a0,d3.w)
 public_ref_61 equ *-6
-	IFD VERIFY_C_LATENCY
-	bsr step_latency_input
-	ENDC
 	lea step_queued_field(pc),a0
 	move.l $a5d4c,(a0)
 public_ref_62 equ *-4
@@ -540,7 +321,7 @@ step_replay_inputs:
 	tst.w $a7204
 public_ref_65 equ *-4
 	bne .done
-	move.l step_stats+8(pc),d3
+	move.l step_cursor(pc),d3
 	moveq #STEP_FIELDS-1,d4
 	lea step_replaying(pc),a0
 	st.b (a0)
@@ -561,9 +342,6 @@ public_ref_67 equ *-4
 	jsr $8744c
 public_ref_68 equ *-4
 .applied:
-	IFD VERIFY_C_LATENCY
-	bsr step_latency_replayed
-	ENDC
 	dbf d4,.next
 	lea step_replaying(pc),a0
 	clr.b (a0)
@@ -734,12 +512,6 @@ public_ref_90 equ *-4
 ; The simulation owns actor +$34. Pose selection reads that stored lean, so
 ; neither the per-tick pose pass nor a render needs to derive it again.
 ; Enter past the presentation hook only for the authoritative lean pass.
-	IFD C_FUSED_LEAN
-	IFND C_RUNTIME_ONLY
-; Full snapshot diagnostics need the helper within signed patch reach.
-	include lean_pose.s
-	ENDC
-	ENDC
 step_compute_lean:
 	sub.l $a5d1e,d2
 public_ref_93 equ *-4
@@ -794,33 +566,7 @@ public_ref_101 equ *-4
 
 ; Rebuild the world-object collision inputs for every step. The original
 ; collision code reads these projection records, not just world positions.
-	IFD VERIFY_C_ROAD_FAST
-	IFND VERIFY
-	FAIL "Fast road projection experiment requires VERIFY"
-	ENDC
-	IFD VERIFY_C_GEOMETRY_LUT
-	FAIL "Road copy does not yet mirror the later-installed width LUT patch"
-	ENDC
-; $8970e..$898e1 is a self-contained routine with internal relative branches
-; and absolute data references. Keep the mutable word at $898e2 outside it.
-step_road_fast_init:
-	lea step_road_fast_code(pc),a0
-	move.l #$41f9000a,(a0)+
-	move.w #$6f3c,(a0)+
-	lea $89714,a1
-	move.w #($898e2-$89714)/2-1,d0
-.copy:
-	move.w (a1)+,(a0)+
-	dbf d0,.copy
-	move.l _resload(pc),a2
-	jsr (resload_FlushCache,a2)
-	rts
-	cnop 0,4
-step_road_fast_code:
-	ds.b $898e2-$8970e
-	ENDC
 
-	IFD C_OBJECT_FAST
 ; The selected C slave hunk is already verified to be in Fast RAM. All relative
 ; branches in $8b02e..$8b37d remain inside this block; data addresses are absolute.
 ; Copy after applying patches so optional width changes are preserved as well.
@@ -843,22 +589,11 @@ public_ref_103 equ *-4
 	cnop 0,4
 step_object_fast_code:
 	ds.b $8b37e-$8b02e
-	ENDC
 
-	IFD C_COLLISION_GEOMETRY
 	INCLUDE "collision_geometry.s"
-	ENDC
 
 step_collision_objects:
-	IFD C_COLLISION_GEOMETRY
-	IFD C_GEOMETRY_REUSE
 	bsr step_geometry_reuse
-	ELSE
-	bsr step_collision_geometry_code
-	ENDC
-	ELSE
-	jsr $8970e
-	ENDC
 	clr.w $a8734
 public_ref_106 equ *-4
 	clr.w $a59fc
@@ -871,21 +606,6 @@ public_ref_110 equ *-4
 	jsr $8a492
 public_ref_111 equ *-4
 	rts
-
-	IFD VERIFY_C_OBJECT_WIDTH
-	IFND VERIFY
-	FAIL "Object width experiment requires VERIFY"
-	ENDC
-; $8b2e8's numerator D3 and divisor D1 survive the native rejection tests.
-; Rejected records are not published; accepted records need their width before
-; D3 is reused for projected height at $8b332. Restore displaced instructions.
-step_object_width:
-	divu.w d1,d3
-	move.w d3,4(a0)
-	add.w d2,d2
-	lea $a7068,a2
-	rts
-	ENDC
 
 ; The live field clock schedules work; the race stopwatch belongs to simulation.
 ; Preserve the original game's 60-field BCD second, including its finish flag.
@@ -946,130 +666,6 @@ public_ref_124 equ *-4
 .done:
 	rts
 
-	IFD STEP_EXTRAPOLATE
-	IFNE STEP_FIELDS-2
-	IFNE STEP_FIELDS-4
-	FAIL "STEP_EXTRAPOLATE requires STEP_FIELDS=2 or 4"
-	ENDC
-	ENDC
-; Presentation experiment: predict forward from the latest simulation state.
-; There is no deliberate one-step presentation delay.
-; Authoritative actors and camera are restored before publishing completion.
-step_save_previous:
-	lea $a5d60,a0
-	lea step_previous(pc),a1
-	move.w #$1180/4-1,d0
-.copy:
-	move.l (a0)+,(a1)+
-	dbf d0,.copy
-	rts
-step_view_begin:
-	lea $a5d60,a0
-	lea step_authoritative(pc),a1
-	move.w #$1180/4-1,d0
-.save:
-	move.l (a0)+,(a1)+
-	dbf d0,.save
-	lea $a5d00,a0
-	lea step_camera(pc),a1
-	moveq #$4c/4-1,d0
-.camera:
-	move.l (a0)+,(a1)+
-	dbf d0,.camera
-	move.l $a5d4c,d7
-	sub.l step_stats+8(pc),d7
-	cmpi.l #STEP_FIELDS-1,d7
-	bls .phase
-	moveq #STEP_FIELDS-1,d7
-.phase:
-	lea step_view_stats(pc),a0
-	addq.l #1,8(a0)
-	move.l d7,12(a0)
-	move.w d7,d0
-	lsl.w #2,d0
-	addq.l #1,16(a0,d0.w)
-	lea step_previous(pc),a1
-	lea $a5d60,a2
-	moveq #35-1,d6
-.actor:
-	move.b $6e(a1),d0
-	cmp.b $6e(a2),d0
-	bne .nextactor
-	tst.w $12(a2)
-	beq .nextactor
-	move.l (a1),d0
-	move.l (a2),d1
-	bsr .long
-	move.l d0,(a2)
-	move.l 4(a1),d0
-	move.l 4(a2),d1
-	bsr .long
-	move.l d0,4(a2)
-	move.w $30(a1),d0
-	ext.l d0
-	move.w $30(a2),d1
-	ext.l d1
-	bsr .long
-	move.w d0,$30(a2)
-	move.w $32(a1),d0
-	ext.l d0
-	move.w $32(a2),d1
-	ext.l d1
-	bsr .long
-	move.w d0,$32(a2)
-.nextactor:
-	lea $80(a1),a1
-	lea $80(a2),a2
-	dbf d6,.actor
-	move.w d7,d0
-	mulu #12,d0
-	lea step_view_stats+32(pc),a0
-	adda.w d0,a0
-	move.l step_previous+4(pc),(a0)+
-	move.l step_authoritative+4(pc),(a0)+
-	move.l $a5d64,(a0)+
-	jsr $891ae
-	jmp $8970e
-.long:
-	sub.l d0,d1
-	add.l d1,d0
-	IFNE STEP_FIELDS-4
-	asr.l #1,d1
-	ELSE
-	asr.l #2,d1
-	ENDC
-	move.w d7,d2
-	beq .done
-	subq.w #1,d2
-.add:
-	add.l d1,d0
-	dbf d2,.add
-.done:
-	rts
-step_view_end:
-	movem.l d0-d7/a0-a6,-(a7)
-	lea step_authoritative(pc),a0
-	lea $a5d60,a1
-	move.w #$1180/4-1,d0
-.restore:
-	move.l (a0)+,(a1)+
-	dbf d0,.restore
-	lea step_camera(pc),a0
-	lea $a5d00,a1
-	moveq #$4c/4-1,d0
-.camera:
-	move.l (a0)+,(a1)+
-	dbf d0,.camera
-	movem.l (a7)+,d0-d7/a0-a6
-	jmp $871dc
-	cnop 0,4
-step_view_stats:
-	dc.b 'RRCVIEW1'
-	dc.l 0,0
-	ds.l 4
-	ds.l 12
-	ENDC
-
 ; Rider spark lifetime is simulation-owned; drawing consults a cached effect.
 step_spark_events:
 	lea $a5d60,a1
@@ -1108,7 +704,7 @@ step_sparks:
 ; Pose selection contains attack-state transitions and the sound-event gate at
 ; $a5991. Run it at the simulation boundary, including invisible catch-up steps.
 step_pose_events:
-	move.l step_stats+8(pc),d0
+	move.l step_cursor(pc),d0
 	lsr.l #2,d0
 	move.b d0,$a598d
 public_ref_127 equ *-4
@@ -1147,16 +743,15 @@ step_pose_busy:
 	dc.b 0
 	even
 
-	IFD C_POSE_PREDICT
 ; Estimate presentation heading from the latest authoritative increment.
 ; Integer heading can repeat during a continuing turn: on those ticks use
 ; the four-tick average. History stores four times the estimated rate so the
 ; prediction multiply below retains its existing quarter-unit scaling.
-; Runtime uses the measured render interval; diagnostics can fix the horizon.
+; Use the measured render interval for heading prediction.
 ; Never write prediction to an actor or use it in the simulation pose pass.
 step_predict_history:
 	movem.l d0-d2/a0,-(a7)
-	move.l step_stats+8(pc),d0
+	move.l step_cursor(pc),d0
 	andi.w #3,d0
 	add.w d0,d0
 	lea step_pose_headings(pc),a0
@@ -1208,11 +803,7 @@ public_ref_136 equ *-4
 	tst.w d1
 	bge .restore
 .predict:
-	IFD POSE_PREDICT_MEASURED
 	muls.w step_pose_render_fields(pc),d2
-	ELSE
-	muls.w #POSE_PREDICT_FIELDS,d2
-	ENDC
 	asr.l #2,d2
 	add.w d2,d1
 .restore:
@@ -1223,16 +814,13 @@ public_ref_137 equ *-4
 	rts
 step_pose_headings:
 	ds.w 5
-	IFD POSE_PREDICT_MEASURED
 ; Observe drawing plus the native vsync handoff. Start conservatively at zero
 ; after each reset and bound extrapolation to four fields even after a stall.
 ; These hooks neither delay presentation nor alter its original handshake.
 step_predict_render_begin:
 	move.l a0,-(a7)
-	IFD C_GEOMETRY_REUSE
 	lea step_geometry_reuse_flag(pc),a0
 	move.b 1(a0),(a0)
-	ENDC
 	lea step_pose_render_start(pc),a0
 	move.l $a5d4c,(a0)
 public_ref_138 equ *-4
@@ -1257,57 +845,18 @@ step_pose_render_start:
 	dc.l 0
 step_pose_render_fields:
 	dc.w 0
-	ENDC
-	ENDC
 
-	IFD C_STEERING
 	include steering.s
-	ENDC
 
-	IFD STEP_EXTRAPOLATE
-; Keep large presentation snapshots after code so short PC-relative calls fit.
-step_camera:
-	ds.b $4c
-step_previous:
-	ds.b $1180
-step_authoritative:
-	ds.b $1180
-	ENDC
-
-	IFD VERIFY_C_LATENCY
-	IFD STEP_EXTRAPOLATE
-	FAIL "Latency probe currently requires latest-state presentation"
-	ENDC
-	include verify_c_latency.s
-	ENDC
-
-	IFD C_FAST_STACK
 	include runtime_stack.s
-	ENDC
 
-	IFD VERIFY_C_EVENTS
-	IFD STEP_EXTRAPOLATE
-	FAIL "Event audit currently requires latest-state presentation"
-	ENDC
-	include verify_c_events.s
-	ENDC
-
-	IFD C_PHYSICS_FAST
 	include physics_fast.s
-	ENDC
 
-	IFD C_PHYSICS_AUX
 	include physics_aux.s
-	ENDC
 
-	IFD C_FUSED_LEAN
-	IFD C_RUNTIME_ONLY
-; Preserve the measured normal-runtime layout independently of diagnostics.
+; Keep these helpers within PC-relative reach of their callers.
 	include lean_pose.s
-	ENDC
-	ENDC
 
-	IFD C_GEOMETRY_REUSE
 ; Consume render geometry once, before the next movement update.
 ; Additional catch-up ticks rebuild it normally; no tick or input is skipped.
 step_geometry_reuse:
@@ -1319,13 +868,6 @@ step_geometry_reuse:
  rts
 .build:
  jmp step_collision_geometry_code(pc)
-	ENDC
 
-	IFND VERIFY
-	IFD C_BUS_PRIORITY
 	include bus_priority.s
-	ENDC
-	IFD REFERENCE_MOTION
 	include reference_motion.s
-	ENDC
-	ENDC

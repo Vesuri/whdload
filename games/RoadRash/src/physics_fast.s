@@ -1,15 +1,9 @@
 ; Movement/collision code copy for the selected enhanced Fast RAM path.
-; Initialize after the C patch list and before entering the loaded game.
+; Initialize after the simulation patch list and before entering the loaded game.
 ; Most absolute data references stay native; two shared scratch words move
 ; with all their native users before copying. External branches need stubs.
 ; Embedded tables retain their native aliases. Steering wrappers return
-; to their original code addresses. See simulation-timing.md for the copy audit.
-; The diagnostic control retains allocation/layout but skips entry redirects.
-	IFD VERIFY_C_PHYSICS_CONTROL
-	IFND VERIFY
-	FAIL "Physics copy control requires VERIFY"
-	ENDC
-	ENDC
+; to their original code addresses.
 step_physics_fast_init:
  bsr step_scratch_init
  lea $8b486,a0
@@ -29,12 +23,8 @@ public_ref_160 equ *-4
  bra .fix
 .patched:
  bsr step_pair_clear_init
- IFD VERIFY_C_PHYSICS_CONTROL
- bra.w .done
- ELSE
  nop
  nop
- ENDC
  lea step_physics_fast_code+$0(pc),a0
  move.w #$4ef9,$8b486
 public_ref_161 equ *-4
@@ -85,12 +75,6 @@ public_ref_176 equ *-4
 ; Patch all native absolute users, including the pose renderer; the copy then
 ; inherits those pointers. Each pair/pose traversal clears scratch before use.
 ; Data remains in the selected public Fast slave hunk; no DMA consumes it.
-; The diagnostic control changes only one flag byte, preserving code placement.
- IFD VERIFY_C_SCRATCH_CONTROL
- IFND VERIFY
- FAIL "Scratch relocation control requires VERIFY"
- ENDC
- ENDC
 step_scratch_init:
  move.w step_scratch_enabled(pc),d0
  beq .done
@@ -136,21 +120,12 @@ public_ref_191 equ *-12
 public_ref_192 equ *-8
 step_scratch_words: dc.w 0,0
 step_scratch_enabled:
- IFD VERIFY_C_SCRATCH_CONTROL
- dc.w 0
- ELSE
  dc.w 1
- ENDC
  cnop 0,4
 ; The copied pair tail originally performs three unconditional Chip writes.
 ; Test before clearing: BTST and BCLR both alter only Z, using the old bit.
 ; The final test/clear therefore preserves the native CCR result, even if
 ; A1 and A2 alias. No data/address registers are changed by the tail.
- IFD VERIFY_C_PAIR_CLEAR_CONTROL
- IFND VERIFY
- FAIL "Pair flag-clear control requires VERIFY"
- ENDC
- ENDC
 step_pair_clear_init:
  move.w step_pair_clear_enabled(pc),d0
  beq .done
@@ -175,11 +150,7 @@ step_pair_clear:
 .done:
  rts
 step_pair_clear_enabled:
- IFD VERIFY_C_PAIR_CLEAR_CONTROL
- dc.w 0
- ELSE
  dc.w 1
- ENDC
  cnop 0,4
 step_physics_fast_fixups:
  dc.w $88,step_physics_to_8e166-(step_physics_fast_code+$88)
@@ -204,16 +175,8 @@ step_physics_fast_fixups:
 step_physics_fast_code:
  ds.b 7040
 step_physics_to_8da5c:
- IFD C_PHYSICS_AUX
- IFND VERIFY_C_PHYSICS_AUX_CONTROL
  jmp aux_8da5c+$0(pc)
  nop
- ELSE
- jmp $8da5c
- ENDC
- ELSE
- jmp $8da5c
- ENDC
 step_physics_to_8dade:
  jmp $8dade
 public_ref_193 equ *-4
@@ -221,16 +184,8 @@ step_physics_to_8de84:
  jmp $8de84
 public_ref_194 equ *-4
 step_physics_to_8e166:
- IFD C_PHYSICS_AUX
- IFND VERIFY_C_PHYSICS_AUX_CONTROL
  jmp aux_8e166+$0(pc)
  nop
- ELSE
- jmp $8e166
- ENDC
- ELSE
- jmp $8e166
- ENDC
 step_physics_to_8e2d6:
  jmp $8e2d6
 public_ref_195 equ *-4

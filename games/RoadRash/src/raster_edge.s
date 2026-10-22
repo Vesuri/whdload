@@ -2,7 +2,7 @@
 ; The mutable edge table pointer remains at native $b1950.
 ; Omit redundant D0/D2 clears before full word/swap/word assignment, and
 ; ANDs into freshly zeroed D4/D6. Other arithmetic and branch tests are native.
-; Native-address labels retain correspondence with the differential audit.
+; Labels identify the corresponding native instructions.
 raster_edge_fast:
 edge_b1994:
  move.l a0,-(a7)

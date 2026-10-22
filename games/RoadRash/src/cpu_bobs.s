@@ -1,6 +1,5 @@
-; E5: reuse the native CPU cookie-cut dispatcher for images up to
+; reuse the native CPU cookie-cut dispatcher for images up to
 ; 80 pixels wide, with a bounded 128 KiB public pixel cache on 040/060.
- IFD C_CPU_BOBS
 e_cpu_reset:
  movem.l d0/a0,-(a7)
  move.l e_mask_table(pc),d0
@@ -21,7 +20,7 @@ e_cpu_init:
 
 e_cpu_cache:
  movem.l d0-d7/a0-a6,-(a7)
- btst #3,verify_attn+3(pc)
+ btst #3,cpu_attention+3(pc)
  beq .done
  cmpi.w #10,d2
  bhi .done
@@ -107,4 +106,3 @@ e_cpu_recolor:
 e_cpu_cursor: dc.l 0
 e_cpu_limit: dc.l 0
 e_cpu_jump: jmp $0.l
- ENDC

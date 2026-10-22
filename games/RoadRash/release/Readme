@@ -32,32 +32,11 @@
  CUSTOM2=1 enables "Enhanced framerate". It is off by default; omit CUSTOM2
  or use CUSTOM2=0 for original timing. Visual bug fixes apply in both modes.
 
- With Enhanced framerate, 68020+ machines with suitable Fast RAM render as
- fast as they can while retaining vsync. The simulation advances in fixed
- 20 ms PAL steps and catches up when rendering takes longer. There is no
- added frame limiter or delayed interpolation. Rider heading is predicted
- for display to reduce visible steering lag. Opponent paths and collision
- outcomes can differ because lane occupancy now uses actor widths.
-
- Caches are enabled automatically on the enhanced accelerated path unless
- NoCache is specified. A 68000 with suitable Fast RAM can benefit from faster
- rendering while retaining the original simulation. Chip-only machines and
- unavailable/unsuitable optional memory use the original path. Input,
- loading, distant/mirror bike visibility, hill projection and ECS/AGA border
- fixes also apply when CUSTOM2 is off.
-
- Performance (emulated PAL, first race, 500 fields of full throttle):
- -----------------------------------------------------------------
- MACHINE                                    ENHANCED 3.0b (fps)
- 68000, Chip/Slow RAM (original path)                      8.5
- 68000 with Fast RAM                                      9.4
- 68020, Chip RAM only (original path)                     12.5
- 68020 with Fast RAM                                     18.6
- 68030/50 with Fast RAM                                  39.4
- 68040/25 with Fast RAM                                  49.6
- 68060/50 with Fast RAM                                  49.6
- These are scene-specific emulator measurements, not minimum frame rates or
- real-hardware guarantees. Physical 68040/68060 cache testing remains pending.
+ Enhanced framerate uses Fast RAM for smoother, vsynced play while keeping
+ game logic at a consistent speed. It enables caches unless NoCache is set.
+ A 68000 with Fast RAM benefits from rendering improvements; Chip-only
+ machines and machines without suitable memory use the original path.
+ Opponent paths and collision outcomes may differ with the option enabled.
 
 CD32 controls - menu:
 

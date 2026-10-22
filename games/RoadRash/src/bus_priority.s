@@ -3,7 +3,7 @@
 ; Native startup's temporary copper list sets BLTPRI; save its value once
 ; across prepare/reset and restore it on each native race/demo hook removal.
 step_priority_begin:
-	btst #3,verify_attn+3(pc) ; AFF_68040 also applies to 060
+	btst #3,cpu_attention+3(pc) ; AFF_68040 also applies to 060
 	beq .done
 	lea step_priority_saved(pc),a0
 	tst.w (a0)

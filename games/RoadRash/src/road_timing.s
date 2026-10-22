@@ -1,5 +1,4 @@
 ; Selected by C_ROAD_TIMING after the Enhanced framerate/CPU/Fast gate.
-; Diagnostics retain explicit VERIFY_C_ROAD_TIMING selection.
 ; Road normalization: evaluate the four-field reference,
 ; retaining quarter-unit output while running the simulation every field.
 step_road_fraction: dc.l 0

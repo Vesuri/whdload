@@ -1,23 +1,8 @@
-	IFD C_LANE_SCAN
-	IFD VERIFY_C_PHYSICS_AUX_CONTROL
-	IFND VERIFY_C_LANE_SCAN_CONTROL
-VERIFY_C_LANE_SCAN_CONTROL = 1
-	ENDC
-	ENDC
-	IFND C_STEP_BUILD
-	FAIL "Lane scan relocation requires the gated C simulation"
-	ENDC
-	ENDC
 ; Copy AI dispatch and hot acceleration helpers after the movement/code copy.
 ; Called only after CUSTOM2 and CPU/Fast selection, before entering the game.
 ; Native data/table addresses stay unchanged. Cross-copy relative calls resolve
 ; directly; the remaining external calls use native JMP stubs. Each span keeps
-; an explicit native fallthrough target. See simulation-timing.md for the audit.
-	IFD VERIFY_C_PHYSICS_AUX_CONTROL
-	IFND VERIFY
-	FAIL "Auxiliary physics control requires VERIFY"
-	ENDC
-	ENDC
+; an explicit native fallthrough target.
 step_physics_aux_init:
  lea $8d2c0,a0
 public_ref_200 equ *-4
@@ -107,12 +92,8 @@ public_ref_203 equ *-4
  move.w #aux_to_8db0a-(aux_8da5c+$7a),$7a(a0)
  lea aux_8da5c(pc),a0
  move.w #aux_to_8db0a-(aux_8da5c+$9e),$9e(a0)
- IFD VERIFY_C_PHYSICS_AUX_CONTROL
- bra.w .done
- ELSE
  nop
  nop
- ENDC
  lea aux_8d2c0+$0(pc),a0
  move.w #$4ef9,$8d2c0
 public_ref_204 equ *-4
@@ -157,13 +138,8 @@ public_ref_219 equ *-4
  lea step_physics_aux_init(pc),a2
  suba.l #step_physics_aux_init-_resload,a2
  move.l (a2),a2
- IFD C_LANE_SCAN
  jmp aux_lane_width_init(pc)
  nop
- ELSE
- jsr (resload_FlushCache,a2)
- rts
- ENDC
  cnop 0,2
 aux_8d2c0:
  ds.b 1552
@@ -212,9 +188,7 @@ aux_to_90b8e:
  jmp $90b8e
 public_ref_232 equ *-4
 
- IFD C_LANE_SCAN
-; Preserve existing symbol offsets and add 256 bytes overall. Runtime placement
-; still depends on the loader; see measured alignment effects in the audit.
+; Padding keeps the hot copied routines aligned.
  ds.b 42
 aux_lane_width_init:
 ; Reuse reserved initialization space without moving any hot copied routines.
@@ -225,7 +199,7 @@ aux_lane_width_init:
 aux_lane_scan_init:
 ; Only the measured uncached 68020 benefits. The outer gate already excludes 000.
  lea step_physics_aux_init(pc),a0
- suba.l #step_physics_aux_init-verify_attn,a0
+ suba.l #step_physics_aux_init-cpu_attention,a0
  move.l (a0),d0
  andi.l #$8c,d0 ; AFF_68030 | AFF_68040 | AFF_68060
  bne.s .done
@@ -239,11 +213,7 @@ public_ref_233 equ *-4
 .copy:
  move.w (a0)+,(a1)+
  dbf d0,.copy
- IFD VERIFY_C_LANE_SCAN_CONTROL
- bra.s .done
- ELSE
  nop
- ENDC
  lea aux_lane_scan(pc),a0
  move.w #$4ef9,$8d966
 public_ref_234 equ *-4
@@ -259,4 +229,3 @@ aux_lane_scan:
 public_ref_236 equ *-4
 aux_lane_scan_body:
  ds.b $72
- ENDC

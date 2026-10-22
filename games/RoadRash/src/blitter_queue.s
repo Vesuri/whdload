@@ -1,4 +1,4 @@
-; E1/E2: bounded background descriptor ring, owned only while drawing the road.
+; bounded background descriptor ring, owned only while drawing the road.
 ; Installed in the relocated main image (CUSTOM2 + public allocation required).
 ; Native 68000 and callers with masked/owned BLIT interrupts stay synchronous.
 e_blitter_init:
@@ -8,13 +8,9 @@ e_blitter_init:
  lea e_hill_wait(pc),a0
  move.w #$4eb9,(a1)
  move.l a0,2(a1)
- IFD VERIFY_E_CONTROL
- bra.w .done
- ELSE
  nop
  nop
- ENDC
- btst #1,verify_attn+3(pc)
+ btst #1,cpu_attention+3(pc)
  beq .done
  lea e_main(pc),a0
  move.l a5,(a0)
@@ -61,7 +57,6 @@ e_background_road:
  move.w d3,(a1)+
  subi.l #$20d0,d2
  dbf d4,.sky
- IFND VERIFY_E_CLEAR_CONTROL
  ; Opaque scenery replaces [top,horizon-16) in its destination planes.
  ; Reproduce the native signed shifts, then clip to the current sky height.
  move.l e_main(pc),a2
@@ -87,7 +82,6 @@ e_background_road:
  bsr e_clear_height
  lea e_ring(pc),a2
  move.w d0,14(a2) ; plane 2
- ENDC
  move.l $408.w,d2
  addi.l #$41a0,d2
  moveq #42,d0
