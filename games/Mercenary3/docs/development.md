@@ -55,4 +55,35 @@ python3 tools/merc3.py quit
 (`-no-opt`, the shared `WHDLOAD` includes) into `tmp/build/` and requires it to equal
 the shipped slave byte for byte. `BUILD` overrides the output directory.
 
-No patched build, fixed-window or profiling targets exist yet.
+No patched build exists yet.
+
+## Profiling and game time
+
+Both tools boot the shipped slave with the native build (`FSUAE_ARM`), `WARP=1`,
+`DETERMINISTIC=1` and `JOY0=none`, stop at the game's entry and drive the same route
+with the port-1 joystick through `monitor input`: wait 175 fields for the cell door,
+walk 185 fields through it and outside, then turn right for 140 (500 fields, 10 s PAL).
+`ROUTE` overrides it (`ROUTE='175:,185:JOY2_UP,140:JOY2_RIGHT'`).
+
+```sh
+. amiga/env.sh
+python3 tools/route_profile.py                       # tmp/prof/a1200-fast-route/
+AMIGA_SETUP=a1200-fast python3 tools/sim_speed.py tmp/sim/a1200-fast.json
+AMIGA_SETUP=a500-1.5m python3 tools/sim_speed.py tmp/sim/a500-1.5m.json
+python3 tools/sim_speed.py --compare tmp/sim/a500-1.5m.json tmp/sim/a1200-fast.json
+PER_FRAME=1 AMIGA_SETUP=a500-1.5m python3 tools/sim_speed.py tmp/sim/frames.json
+python3 tools/sim_speed.py --frames tmp/sim/frames.json
+```
+
+`route_profile.py` (default `AMIGA_SETUP=a1200-fast`) traces the window in `CHUNK`-field
+captures (default 50), reduces each with `amigaxdev.callprofile` and deletes it
+(`KEEP_TRACE=1` keeps them). It locates the live slave in fast RAM to name its code, counts
+frames at the frame publication routine, and writes `report.txt`, `profile.pkl.gz`,
+`route.json`, a screenshot per chunk and `sheet.png`. A run takes under a minute.
+
+`sim_speed.py` runs the route untraced and samples position, heading, the in-game clock and
+the frame and VERTB counters every `STEP` fields (default 5), or at every frame with
+`PER_FRAME=1`. `--compare` tabulates machines side by side with per-segment rates.
+
+On `a1200-030` the game boots and plays, but the breakpoint at the game entry never fires,
+so neither tool runs there yet.
