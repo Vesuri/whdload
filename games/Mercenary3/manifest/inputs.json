@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Mercenary3.lha",
+    "url": "https://whdload.de/games/Mercenary3.lha",
+    "sha256": "a09f28d294fc33302145e9c1b62dbb301660049e624ec91a0a0a8e1d529994f9",
+    "extraction": "tmp/installer/Mercenary3",
+    "files_manifest": "manifest/Mercenary3.files.json"
+  },
+  {
+    "name": "Mercenary3_v1.2_0356.lha",
+    "url": "https://ftp2.grandis.nu/turran/FTP/Retroplay%20WHDLoad%20Packs/Commodore_Amiga_-_WHDLoad_-_Games/M/Mercenary3_v1.2_0356.lha",
+    "sha256": "763e6475daec69d302f744a9c06d2f7a05e08f182cb0ba16681c1ae5744648b8",
+    "extraction": "tmp/game/Mercenary3_v1.2_0356",
+    "files_manifest": "manifest/Mercenary3_v1.2_0356.files.json"
+  }
+]
