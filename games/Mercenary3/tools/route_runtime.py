@@ -38,7 +38,7 @@ def word(g, address):
 
 
 def snapshot(g):
-    return dict(frames=word(g, 0x7180), vertb=word(g, 0x529f4),
+    return dict(frames=word(g, getattr(g, 'publication_counter', 0x7180)), vertb=word(g, 0x529f4),
                 stamp=word(g, 0x52952), dt=word(g, 0x52954))
 
 
@@ -140,6 +140,18 @@ def session(boot_timeout):
             g.cmd(f'break *{ENTRY:#x}')
             at_breakpoint(g, ENTRY, boot_timeout)
             g.cmd('delete')
+            # P1 retains $7180 as logic passes. Its optional publication hook has
+            # a descriptor immediately before the counter; never guess from CPU type.
+            opcode = word(g, 0x5a82e)
+            if opcode == 0x4eb9:
+                target = (word(g, 0x5a830) << 16) | word(g, 0x5a832)
+                signature = b''.join(word(g, target - 12 + i).to_bytes(2, 'big')
+                                     for i in range(0, 8, 2))
+                if word(g, target) != 0x2f08 or word(g, target + 2) != 0x41fa:
+                    raise RuntimeError('unrecognized publication hook')
+                g.presentation_flag = target - 2
+                if signature == b'M3PUB001':
+                    g.publication_counter = target - 4
             anchor_state = snapshot(g)
             if anchor_state['frames'] != 0:
                 raise RuntimeError('entry anchor did not start a fresh game')
@@ -154,6 +166,9 @@ def session(boot_timeout):
                     launcher_sha256=hashlib.sha256(Path(os.environ['FSUAE_COMMON']).read_bytes()).hexdigest(),
                     machine=settings, anchor='entry', anchor_state=anchor_state,
                     entry_disk_offset='0x4edb0',
+                    frame_counter=('P1 publications' if hasattr(g, 'publication_counter')
+                                   else 'logic only (P1 release)' if hasattr(g, 'presentation_flag')
+                                   else 'game $7180'),
                     boot_timeout=boot_timeout)
         yield g, meta
     finally:

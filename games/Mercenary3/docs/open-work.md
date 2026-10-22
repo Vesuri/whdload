@@ -57,6 +57,11 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- Correct P1's restore check to allow normal interrupt-owned state to advance while
+  checking that presentation code restores its changes (user decision). A publication
+  probe advanced VERTB 178 → 179 and changed timers at chip `$7236` and `$727E`;
+  an unchanged hash excluding display state alone would incorrectly reject this.
+
 - Defer O1's map, vehicle and flight play checks until those modes are reached in
   later steps (user decision); no save or known short route is available. These
   screens, including any separate FMODE fetch-window setup, remain unverified.
@@ -82,6 +87,8 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md); P1 is next. L1's optional walking gate restores native
-world speed on the fastest emulator cell; the 020 and A500 route frame counts are
-unchanged. O1's map, vehicle and flight play coverage remains deferred as recorded above.
+Follow [plan.md](plan.md); P2 is next. P1 adds optional player presentation frames
+between native walking passes. The route gains displayed frames in the fast emulator
+cells and is unchanged on A500, 020 and 030; these are not hardware speed predictions.
+Restore hashes, native world speed, options-off and route play checks pass. O1's
+map, vehicle and flight coverage remains deferred as recorded above.

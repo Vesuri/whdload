@@ -55,6 +55,7 @@ _config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
 		dc.b	"C1:X:64-bit bitplane fetch on AGA (FMODE 3):1;"
 		dc.b	"C1:X:Supervisor stack in expansion memory:2;"
 		dc.b	"C1:X:Native walking logic rate:3;"
+		dc.b	"C1:X:Walking presentation frames (includes logic gate):4;"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -179,6 +180,17 @@ lbC0002AA
 	lea	(_logicgate,pc),a0
 	move.l	a0,($5a2e4).l
 .nogate
+	btst	#4,(_custom1+3,pc)
+	beq.b	.nopresent
+	lea	(_presentgate,pc),a0
+	move.l	a0,($5a2e4).l
+; Disk.1 $5E4DE: count publications separately from logic passes. Replace
+; addq.w #1,$7180.w and move.w $52952.l,d1 (ten bytes).
+	move.w	#$4eb9,($5a82e).l
+	lea	(_pubcount,pc),a0
+	move.l	a0,($5a830).l
+	move.l	#$4e714e71,($5a834).l
+.nopresent
 	moveq	#CACRF_EnableI,d0
 	move.l	d0,d1
 	movea.l	(_resload,pc),a0
@@ -258,6 +270,290 @@ _logicgate
 	jmp	($5a298).l		;original callee, Disk.1 $5DF48
 
 _logicstamp	dc.w	0,0			;last accepted VERTB, valid walking pass
+
+; P1 uses its own gate so disabled options retain L1's measured path.
+_presentgate
+	move.w	sr,-(sp)
+	movem.l	d0-d7/a0-a6,-(sp)
+	lea	(_pstate,pc),a5
+	cmpi.w	#1,($7122).w
+	bne.w	.other
+	cmpi.w	#1,($7142).w
+	bne.w	.other
+	tst.w	(2,a5)
+	beq.b	.first
+.check	move.w	($529f4).l,d0
+	sub.w	(a5),d0
+	cmpi.w	#4,d0
+	bhs.b	.ready
+; With one field left, only redraw if the last presentation fit in one field.
+; Two spare fields can amortise a redraw even when it finishes a field late.
+	cmpi.w	#3,d0
+	bne.b	.screen
+	cmpi.w	#1,(6,a5)
+	bhi.b	.waitfield
+.screen	tst.w	($71cc).w		; special screens keep their native path
+	bmi.b	.render
+.waitfield
+	move.w	($529f4).l,d0
+.wait	cmp.w	($529f4).l,d0
+	beq.b	.wait
+	bra.b	.check
+.render	move.w	($529f4).l,-(sp)
+	bsr.w	_present
+	lea	(_pstate,pc),a5
+	move.w	($529f4).l,d0
+	sub.w	(sp)+,d0
+	move.w	d0,(6,a5)
+	bra.b	.check
+.first	move.w	($52954).l,d0
+	bra.b	.accept
+.ready	move.w	d0,($52954).l
+.accept
+	move.w	($529f4).l,(a5)
+	move.w	#1,(2,a5)
+	cmpi.w	#4,d0
+	bge.b	.minok
+	moveq	#4,d0
+.minok	cmpi.w	#8,d0
+	ble.b	.maxok
+	moveq	#8,d0
+.maxok	move.w	d0,(4,a5)
+	lea	($7142).w,a0
+	lea	(_previous,pc),a1
+	movem.l	(a0),d0-d7
+	movem.l	d0-d7,(a1)
+	bra.b	.done
+.other	clr.w	(2,a5)
+.done	movem.l	(sp)+,d0-d7/a0-a6
+	move.w	(sp)+,ccr
+	jmp	($5a298).l
+
+; The game counter remains logic-only. Publication measurement is VERIFY-only.
+	IFD VERIFY
+	dc.b	'M3PUB001'
+_presentcount	dc.w	0
+	ENDC
+_inpresent	dc.w	0
+_pubcount
+	move.l	a0,-(sp)
+	lea	(_inpresent,pc),a0
+	IFD VERIFY
+	addq.w	#1,(-2,a0)
+	ENDC
+	tst.w	(a0)
+	bne.b	.presentation
+	addq.w	#1,($7180).w
+.presentation
+	move.l	(sp)+,a0
+	move.w	($52952).l,d1
+	rts
+
+_pstate	dc.w	0,0,4,2
+_previous	ds.b	32
+
+_present
+	move.w	d0,-(sp)
+	IFD VERIFY
+; Host-side SHA-256 and address differences, at these VERIFY-only markers.
+	bsr.w	_verify_before
+	ENDC
+	bsr.w	_savepresent
+	move.w	(sp)+,d6
+	lea	(_inpresent,pc),a0
+	move.w	#1,(a0)
+; No extrapolation on a collision rollback or a special screen.
+	tst.w	($70e2).w
+	bne.w	.draw
+	tst.w	($6f56).w
+	bmi.w	.draw
+	tst.w	($71cc).w
+	bpl.w	.draw
+	lea	(_previous,pc),a0
+	lea	($7142).w,a1
+	move.w	(_pstate+4,pc),d7
+; Reject discontinuities before staging any position. 28-bit X/Z wrap.
+	moveq	#2,d5
+	moveq	#4,d4
+.validate
+	move.l	(a1,d4.w),d0
+	sub.l	(a0,d4.w),d0
+	asl.l	#4,d0
+	asr.l	#4,d0
+	cmpi.l	#1024,d0
+	bgt.w	.draw
+	cmpi.l	#-1024,d0
+	blt.w	.draw
+	addq.w	#4,d4
+	dbra	d5,.validate
+	moveq	#2,d5
+	moveq	#4,d4
+.position
+	move.l	(a1,d4.w),d0
+	sub.l	(a0,d4.w),d0
+	muls.w	d6,d0
+	divs.w	d7,d0
+	ext.l	d0
+	add.l	d0,(a1,d4.w)
+	addq.w	#4,d4
+	dbra	d5,.position
+	moveq	#2,d5
+.angle	move.w	(a1,d4.w),d0
+	sub.w	(a0,d4.w),d0
+	addi.w	#$200,d0
+	andi.w	#$3ff,d0
+	subi.w	#$200,d0
+	muls.w	d6,d0
+	divs.w	d7,d0
+	add.w	d0,(a1,d4.w)
+	andi.w	#$3ff,(a1,d4.w)
+	addq.w	#2,d4
+	dbra	d5,.angle
+.draw
+	jsr	($59b94).l		; camera, Disk.1 $5D844
+; Disk.1 $5E0BA is inline, not a callable routine: derive sky heading.
+	move.w	($70b4).w,d0
+	movea.l	($713a).w,a1
+	add.w	($575a,a1),d0
+	andi.w	#$3ff,d0
+	move.w	d0,($42c6c).l
+	jsr	($59da0).l		; Disk.1 $5DA50
+	jsr	($56c6e).l		; Disk.1 $5A91E
+	jsr	($5a7a8).l		; publish, Disk.1 $5E458
+	jsr	($5ab90).l		; clear, Disk.1 $5E840
+	jsr	($42d14).l		; Disk.1 $469C4
+	jsr	($42d18).l		; Disk.1 $469C8
+; Palette setup from Disk.1 $5E132, using committed logic's colours.
+	movea.l	($72b4).w,a0
+	move.w	($7324).w,($10,a0)
+	move.w	($70b0).w,d0
+	tst.w	($6f56).w
+	beq.b	.palette
+	move.w	($7326).w,d0
+.palette
+	move.w	d0,($20,a0)
+	move.w	($7186).w,($1c,a0)
+	move.w	#$caa,($1e,a0)
+	move.w	#$88a,($1a,a0)
+	jsr	($5045e).l		; Disk.1 $5410E
+	jsr	($539ae).l		; Disk.1 $5765E, scene setup
+	jsr	($556f6).l		; Disk.1 $593A6
+	jsr	($572fa).l		; Disk.1 $5AFAA
+	jsr	($53b0e).l		; Disk.1 $577BE
+	bsr.w	_restorepresent
+	lea	(_inpresent,pc),a0
+	clr.w	(a0)
+	IFD VERIFY
+	bsr.w	_verify_after
+	ENDC
+	rts
+
+_savepresent
+	lea	(_restore_ranges,pc),a2
+	lea	(_restore_buffer,pc),a1
+.next	move.l	(a2)+,d0
+	beq.b	.done
+	movea.l	d0,a0
+	move.w	(a2)+,d0
+.copy	move.w	(a0)+,(a1)+
+	dbra	d0,.copy
+	bra.b	.next
+.done	rts
+_restorepresent
+	lea	(_restore_ranges,pc),a2
+	lea	(_restore_buffer,pc),a0
+.next	move.l	(a2)+,d0
+	beq.b	.done
+	movea.l	d0,a1
+	move.w	(a2)+,d0
+.copy	move.w	(a0)+,(a1)+
+	dbra	d0,.copy
+	bra.b	.next
+.done	rts
+
+	IFD VERIFY
+_verify_before
+	nop
+	rts
+	dc.b	'M3BEFORE'
+_verify_after
+	nop
+	rts
+	dc.b	'M3AFTER!'
+	ENDC
+
+; Chip data ranges from the existing write audit. No live interrupt state,
+; copper lists, display-buffer pointers or bitmaps are rolled back.
+_restore_ranges
+	dc.l	$c0
+	dc.w	$7
+	dc.l	$340
+	dc.w	$1e5f
+	dc.l	$4af0
+	dc.w	$21
+	dc.l	$5330
+	dc.w	$0
+	dc.l	$6f32
+	dc.w	$0
+	dc.l	$700e
+	dc.w	$5
+	dc.l	$704a
+	dc.w	$3
+	dc.l	$7084
+	dc.w	$3
+	dc.l	$70c2
+	dc.w	$7
+	dc.l	$7122
+	dc.w	$2f
+	dc.l	$719e
+	dc.w	$0
+	dc.l	$71ae
+	dc.w	$1d
+	dc.l	$7220
+	dc.w	$5
+	dc.l	$727c
+	dc.w	$0
+	dc.l	$aa6e
+	dc.w	$27b
+	dc.l	$b31e
+	dc.w	$0
+	dc.l	$b364
+	dc.w	$0
+	dc.l	$354e2
+	dc.w	$8
+	dc.l	$42c04
+	dc.w	$38
+	dc.l	$459ba
+	dc.w	$1
+	dc.l	$459c6
+	dc.w	$1
+	dc.l	$4f700
+	dc.w	$a
+	dc.l	$4f9bc
+	dc.w	$0
+	dc.l	$4f9c2
+	dc.w	$1
+	dc.l	$4fa0a
+	dc.w	$1
+	dc.l	$52952
+	dc.w	$1
+	dc.l	$53ad4
+	dc.w	$1
+	dc.l	$53d36
+	dc.w	$8
+	dc.l	$5447e
+	dc.w	0
+	dc.l	$5492c
+	dc.w	$4
+	dc.l	$54b9c
+	dc.w	$1
+	dc.l	$5c0ea
+	dc.w	$0
+	dc.l	$5c0f2
+	dc.w	$7
+	dc.l	$67ffe
+	dc.w	$0
+	dc.l	0
 
 ; Reached from the frame publication routine's 34-byte copy (Disk.1 $5E4F6), which
 ; continues past the patch to $5A862. The original body copies six bytes and returns,
@@ -419,3 +715,5 @@ _custom1	dc.l	0
 
 _resload	dc.l	0
 	CNOP	0,4
+
+_restore_buffer	ds.b	17366

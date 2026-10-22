@@ -47,6 +47,8 @@ def run(boot_timeout, run_timeout, per_frame):
         raise ValueError('route must have positive segments and total fewer than 60000 fields')
     samples, segments, inputs = [], [], []
     with session(boot_timeout) as (g, meta):
+        if meta['frame_counter'] == 'logic only (P1 release)':
+            raise RuntimeError('P1 frame measurements require the VERIFY build')
         start = snapshot(g)
         field = 0
         with deadline(run_timeout, 'route'):
@@ -84,7 +86,17 @@ def run(boot_timeout, run_timeout, per_frame):
         frames = delta(end['frames'], start['frames'])
         if frames == 0:
             raise RuntimeError('route published no frames')
-        cadence = publication_intervals(samples)
+        if meta['frame_counter'] == 'P1 publications':
+            # P1 restores the game's logic dt/stamp after presentation frames.
+            # Publication breakpoints still observe every displayed frame.
+            cadence = []
+            for previous, current in zip(samples, samples[1:]):
+                if delta(current['frames'], previous['frames']) != 1:
+                    raise RuntimeError('publication samples skipped or repeated a frame')
+                cadence.append(dict(frame=current['frames'],
+                                    fields=delta(current['vertb'], previous['vertb'])))
+        else:
+            cadence = publication_intervals(samples)
         return dict(meta, per_frame=per_frame, run_timeout=run_timeout,
                     route=ROUTE, requested_fields=sum(n for n, _ in ROUTE), fields=field,
                     frames=frames, fps=frames * 50 / field, start=start, end=end,

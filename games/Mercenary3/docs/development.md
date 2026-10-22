@@ -197,3 +197,18 @@ inside its range. Compare reports the first differing pass and field names (exit
 or identical records (exit 0). Trace definitions must match; build/machine identities
 remain available in metadata and must be checked separately for repeatability claims.
 See [A6 evidence](internals.md#a6-committed-state-recorder).
+
+## Presentation restore check
+
+P1 keeps the game's frame word counting logic passes. Its separate displayed-frame
+counter and restore markers exist only in `make verify`. Use that same VERIFY build
+with `CUSTOM1=15` and `CUSTOM1=31` for P1's `fps.py`/`matrix.sh` comparisons; the tools
+reject an enabled P1 release build instead of mistaking logic passes for displayed frames.
+`sim_speed.py PER_FRAME=1` skips staged presentation poses and samples logic publications.
+
+`tools/presentation_check.py tmp/p1/check.json`, with the VERIFY slave and bit 4 enabled,
+compares SHA-256 hashes and reports changed addresses around every presentation restore.
+The report lists the display and interrupt-owned exclusions. These allow live field,
+clock, panel and text updates; they are never restored to old values. At least one
+presentation frame must execute for a passing result. Use the fast cell when the 020
+has no spare interval. No instruction recording is needed.

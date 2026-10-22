@@ -83,7 +83,9 @@ the shipped slave's code paths.
 | `Custom1` bit 2 | The supervisor stack in a 4 KB expansion block (fast RAM when fitted) instead of the top of chip RAM: the three `lea $7fffa,a0` / `unlk a0` stack setups (Disk.1 `$5DE66`, `$5DE88`, `$5DEEA`) get its top. The game uses less than a page of stack |
 
 `Custom1` bit 3 gates walking logic to at most 12.5 passes/s (L1 below).
-The `VERIFY` build (`make verify`) adds instruments; it has none yet besides its name.
+Bit 4 adds walking presentation frames and includes that gate (P1 below).
+The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
+release builds keep only the game's logic-pass counter.
 
 ### O1: existing options
 
@@ -136,6 +138,54 @@ Options-off and shipped both give 37 A500 frames. The fastest-cell idle, walk, t
 stop screenshots show an intact scene and panel, and the view stays still after stopping.
 Builds and input checks pass. O1's deferred map/vehicle/flight coverage remains deferred.
 Evidence: `tmp/l1/`. No new instruments or emulator changes.
+
+### P1: player presentation frames
+
+`Custom1` bit 4 replaces spare walking waits with a saved-state redraw. It includes
+L1's gate. The staged pose is the committed pose plus the last pass's displacement
+scaled by elapsed fields / that pass's clamped tick count. Angles wrap at 1024;
+collision rollback, discontinuities and mode changes suppress extrapolation. A stopped
+pass gives zero displacement. Other modes and special screens retain their native path.
+With one field left, a redraw starts only if the last presentation fitted one field
+(initial estimate: two); this avoids a measured one-frame loss on the 030 MMU cell.
+
+Camera/view setup precedes publication; back-buffer setup and drawing follow it, in
+native order. Disk.1 `$5E0BA` is an inline block, not a callable routine. The redraw
+includes `$469C8` and `$5765E`, omitted from the initial plan sketch, and never calls
+collision or main-loop logic. A 17,366-byte slave buffer restores scratch, drawing
+variables, object-selection tables and self-modified words, including the 040 indirect
+vectors. Copper state and bitmap output remain live. Chip `$7180` counts logic passes;
+a separate displayed-frame counter exists only in VERIFY.
+
+Same VERIFY build/session, `fps.py` through `matrix.sh`, 500 fields, `Custom1=15 → 31`:
+
+| Machine | P1 off | P1 on |
+| --- | ---: | ---: |
+| a500-1.5m | 40 / 4.00 fps | 40 / 4.00 fps |
+| a1200 | 94 / 9.40 fps | 94 / 9.40 fps |
+| a1200-fast | 96 / 9.60 fps | 96 / 9.60 fps |
+| 030 default / MMU | 116 / 11.60 fps | 116 / 11.60 fps |
+| 040-25 emulator cell | 125 / 12.50 fps | 141 / 14.10 fps |
+| 060-50 emulator cell | 125 / 12.50 fps | 153 / 15.30 fps |
+| 040-8 advisory cell | 125 / 12.50 fps | 139 / 13.90 fps |
+
+The 040/060 increases are emulator frame counts, not hardware speed predictions.
+There is no measured gain on the lower cells; faster drawing remains necessary there.
+Both matrices complete. Release options-off and shipped both give 37 A500 frames.
+Release `sim_speed.py PER_FRAME=1` skips staged poses: held walking is `-6 × dt`,
+turning `2 × dt`, with dt 4–6 on both 020 and 060. The route's 32 VERIFY presentation
+restores have identical masked SHA-256 hashes. Exclusions are display state and the
+identified live interrupt updates, including startup panel bars and text scrolling;
+these updates are not rolled back. The check caught and corrected a missing renderer
+selection-table restore at chip `$AA6E..$AF65` and its selection word `$5447E`.
+
+Release idle, walking, 20 successive turning publications and stopping screenshots
+were inspected. Intermediate views appear between logic frames, without visible scene
+or panel faults. After stopping, position and heading modulo 1024 stay fixed across
+81 fields. This is route coverage, not the deferred map/vehicle/flight coverage.
+Inputs, three builds and 17 existing tool tests pass. Evidence: `tmp/p1/final-off/`,
+`final-on/`, `restore-route.json`, `world-020.json`, `world-060.json`, `play/`,
+`options-off.json` and `shipped.json`, all under `tmp/p1/`.
 
 ## Running
 

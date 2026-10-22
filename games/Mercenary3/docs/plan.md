@@ -61,13 +61,17 @@ wait for the next field; otherwise run the pass with the true elapsed count in c
 ### P. Smooth frames between logic passes
 
 **P1. Presentation frames with the player extrapolated** (needs L1). Where L1 would wait,
-draw a frame instead:
+draw a frame instead. With only one field left before logic is due, start a redraw
+only if the last presentation took at most one field; the initial allowance is two.
+This admission rule avoids spending a full redraw on a one-field gap on the 030.
 1. save the restore set;
 2. put the extrapolated player pose in chip `$7142..$7161`: committed pose + per-tick rate
    × fields since the last pass, with the rate taken from the last pass's pose change;
-3. run the camera derivation (`$5D844`) and view setup (`$5E0BA`, `$5DA50`, `$5A91E`,
-   `$469C4`);
-4. publish (`$5E458`), clear (`$5E840`), draw (`$5410E`, `$593A6`, `$5AFAA`, `$577BE`);
+3. run the camera derivation (`$5D844`) and view setup (the inline block at `$5E0BA`,
+   `$5DA50`, `$5A91E`);
+4. publish (`$5E458`), clear (`$5E840`), set up the new back buffer (`$469C4`, `$469C8`)
+   and draw (`$5410E`, `$5765E`, `$593A6`, `$5AFAA`, `$577BE`). This follows the native
+   order: buffer setup belongs after publication; `$5765E` supplies scene setup;
 5. restore.
 
 The restore set is what the write audit lists for those calls ([internals](internals.md#renderer-inputs-and-writes)):
@@ -79,9 +83,10 @@ and the self-modified code words. Leave the display state alone: copper list poi
 Never run the collision test in a presentation frame. Snap to the committed pose after a
 collision (`$6F56`), a mode change or a stop.
 
-- A `VERIFY` check hashes chip `$5350..$68000` before step 1 and after step 5, and reports
-  any changed address outside the display state. This is the one check that the game logic
-  is untouched.
+- A `VERIFY` check hashes chip `$5350..$68000` before step 1 and after step 5,
+  excluding display state and normal interrupt-owned updates. Report every other changed
+  address. Presentation code must restore its changes without rolling back live interrupts
+  (user-approved correction: publication necessarily advances non-display timers).
 - Check: the hash check holds over the route; world speed; play, and look for smooth turning
   in per-frame screenshots. Measure the frame rate on `a1200-fast` and with `matrix.sh`.
 
@@ -141,7 +146,7 @@ CPU class, and the options-off test.
 
 - [x] O1
 - [x] L1
-- [ ] P1 [ ] P2 [ ] P3
+- [x] P1 [ ] P2 [ ] P3
 - [ ] M1 [ ] M2
 - [ ] R1 [ ] R2 [ ] R3 [ ] R4
 - [ ] X1
@@ -151,8 +156,8 @@ P1 and M1 are independent; after L1 they can run side by side.
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–3.
+  with `Custom1` bits 0–4.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
-  `write_audit.py`, `bus_audit.py`.
+  `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes).
 - The game-time model and the renderer's inputs and writes ([internals](internals.md)).

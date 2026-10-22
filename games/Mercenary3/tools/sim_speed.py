@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _amigaxdev  # noqa: F401
 from amigaxdev.input import Input
 from route_profile import FRAME, ROUTE
-from route_runtime import (at_breakpoint, deadline, delta, output_path, session, timeouts)
+from route_runtime import (at_breakpoint, deadline, delta, output_path, session, timeouts, word)
 
 STEP = int(os.environ.get('STEP', '5'))
 PER_FRAME = os.environ.get('PER_FRAME') == '1'
@@ -62,6 +62,10 @@ def run(path):
                 g.cmd(f'break *{FRAME:#x}')
                 while True:
                     at_breakpoint(g, FRAME, run_timeout)
+                    # P1 stages an extrapolated pose only for drawing. Measure
+                    # committed motion at logic publications, not staged poses.
+                    if hasattr(g, 'presentation_flag') and word(g, g.presentation_flag):
+                        continue
                     s = read(g)
                     elapsed = (s['vertb'] - start) & 0xffff
                     samples.append(dict(field=field + elapsed, held=held,
