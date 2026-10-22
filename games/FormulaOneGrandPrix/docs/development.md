@@ -125,3 +125,19 @@ Field counts need the harness's `exact-fields` and `gapless-profile` (`quickrace
 `monitor harness`): after a `fields` or `profile` stop, `monitor fields N` runs exactly N
 fields and `monitor profile N` traces the next N with no gap. Older builds ran N + 1 and
 left one field untraced before each profile, so counts from them are not comparable.
+
+## Reconstructing the original slave (B1)
+
+After `make check`, the retained install archive was extracted into a separate scratch
+folder and its game and slave compared with `tmp/game`. Their verified standalone
+hashes are in `manifest/game-inputs.json`. Do not update those pins to accept changed data.
+
+```sh
+. amiga/env.sh
+python3 tools/slave_inputs.py
+"$VASM" -m68000 -no-opt -devpac -Fbin -o tmp/slave/reassembled.bin tmp/slave/original.s
+cmp tmp/slave/original.bin tmp/slave/reassembled.bin
+```
+
+The comparison covers the entire loaded slave, including the separated old KickEmu.
+Both generated assembly and binaries contain derived bytes and stay in ignored `tmp/`.

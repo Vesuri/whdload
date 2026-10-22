@@ -23,7 +23,52 @@ audio filter off, then
    at `$2A6`, `$2DC`, `$312`), `resload_PatchSeg`s it, patches the built-in driver names
    (`$3D6`), and runs it with an empty argument line; on return, quits.
 
-The patch lists are not decoded yet.
+### B1: reconstruction and patch lists
+
+`tools/slave_inputs.py` verifies `manifest/game-inputs.json`, generates symbolic assembly
+for the loader and helpers in `tmp/slave/original.s`, and extracts the compressed driver
+names into `tmp/slave/names.rnc`. The generated source reassembles byte-for-byte to the
+original 5428-byte code hunk (5464-byte HUNK executable including its wrapper). The
+previous `tmp/re/slave.bin` also included the final four-byte HUNK_END marker; it is not
+part of the loaded slave.
+
+Loader code is at slave `$170–2A5`, `$358–3A3`, `$3B6–423`; strings/header, patch lists
+and the names payload are data. The old KickEmu starts at `$6EC` and extends through
+the trailing workspace at `$1533`. Its entry receives resload in A0; the game-specific
+DOS entry is `$174`. The generated reconstruction keeps old KickEmu as literal local
+bytes, separate from the symbolic loader. B2 replaces that section with shared kick13
+source; this is a behavioural rebuild, not a byte-identical KickEmu rebuild.
+
+`PatchSeg` offsets below are cumulative **allocated hunk sizes**, including BSS, not
+file offsets. For the supplied 582992-byte game, hunk 2 begins at cumulative `$6F394`.
+Every list contains these six operations:
+
+| Operation | 582992 (`$2A6`) | 582988 (`$2DC`) | 582780 (`$312`) | Replacement / purpose |
+|---|---:|---:|---:|---|
+| long | `$982` | `$982` | `$978` | `$22116000`: load expected protection answer and branch unconditionally |
+| long | `$345C4` | `$345D8` | `$345CE` | two NOPs: remove the second protection failure branch |
+| subroutine | `$6F840` | `$6F856` | `$6F84A` | slave `$3B6`: decode keyboard byte and abort on F10 |
+| byte | `$A79CE` | `$A79C6` | `$A791E` | `$FF`: save-directory state flag |
+| long | `$A7A42` | `$A7A3A` | `$A7992` | first four characters of `saves` |
+| word | `$A7A46` | `$A7A3E` | `$A7996` | final character plus terminator |
+
+For the supplied version, the original ranges are h0+$982 (CMP.L (A1),D1 and
+BEQ opcode), h0+$345C4 (BNE.W), h2+$4AC (ROR.B then EORI.B keyboard decode),
+h2+$3863A (zero byte) and h2+$386AE (the six-byte `DF0:` buffer). The keyboard
+replacement replays both displaced instructions before comparing the decoded key with
+`ws_keyexit`; it preserves the decoder result on return. The other two game variants
+are accepted by the original loader but are not supplied here: their replacement lists
+are decoded; their original bytes and hunk-relative mappings remain unverified.
+
+The driver-names routine at slave `$3D6` obtains a relocated pointer from h0+$91A
+(or +$910 for 582780), adds `$900`, and checks for the eight-character prefix
+`Carlos S`. Only on that match it calls `resload_Decrunch` on the RNC1 payload at
+slave `$424–6EA`: 693 compressed bytes plus an 18-byte header, 1480 unpacked bytes.
+Otherwise names remain unchanged. The compressed bytes are extracted locally, never
+committed. The names restore is unconditional with respect to CUSTOM1; CUSTOM1 only
+skips `frontend`. The loader also tests both fire-button bits, tolerates a missing
+frontend, runs with an empty argument line, unloads each segment and quits on return.
+
 
 ## Executables
 
