@@ -63,7 +63,7 @@ profile and game-time tools take the same `SLAVE` and `WHD_ARGS` and record them
 ## Profiling and game time
 
 Both tools boot the shipped slave with the native build (`FSUAE_ARM`), `WARP=1`,
-`DETERMINISTIC=1` and `JOY0=none`, stop at the game's entry and drive the same route
+`DETERMINISTIC=1` on the 020 and `JOY0=none`, stop at the game's entry and drive the same route
 with the port-1 joystick through `monitor input`: wait 175 fields for the cell door,
 walk 185 fields through it and outside, then turn right for 140 (500 fields, 10 s PAL).
 `ROUTE` overrides it (`ROUTE='175:,185:JOY2_UP,140:JOY2_RIGHT'`).
@@ -99,8 +99,8 @@ python3 -m unittest discover -s tools -p test_fps.py
 
 `AMIGA_SETUP`, `SLAVE`, `WHD_ARGS` and `ROUTE` work as in the profiler. `BOOT_TIMEOUT=120`
 covers launch through the verified entry breakpoint; `RUN_TIMEOUT=180` covers the route
-(host seconds). Failure produces no result JSON and stops the owned processes. The only
-validated anchor is `ANCHOR=entry`; a counter anchor awaits A1. The default result uses
+(host seconds). Failure produces no result JSON and stops the owned processes. The validated
+anchor is `ANCHOR=entry`; the 030 now reaches it too, so no counter fallback is needed. The default result uses
 counter delta over the exact-field route. `PER_FRAME=1` samples publication field stamps
 where breakpoints work, shifts input boundaries to those stops, and reports the resulting
 overshoot; use it for cadence, not as an exact-field reference. See
@@ -122,7 +122,23 @@ outside the bitplane lines: `KEEP_TRACE=1 python3 tools/route_profile.py tmp/pro
 FS-UAE's screenshots can carry non-Amiga colours in the right border on the A500 setup;
 they are not game output (OCS colours are multiples of 17 per channel).
 
-Neither route tool is validated on `a1200-030`. A1's bounded probes have not confirmed
-arrival at gameplay; the MMU backend also lacks the instruction recording needed by
-`route_profile.py`. See the [A1 investigation](internals.md#a1-anchor-investigation) and
-its prerequisite in the plan before relying on a counter-based anchor.
+All three route tools share `route_runtime.py`: checked entry, PAL configuration,
+boot/route deadlines, runtime hashes and process cleanup. `a1200-030` defaults explicitly
+to `DETERMINISTIC=0`: deterministic directory I/O deadlocks with its indirect UAE board
+before the game entry. This keeps the 68030 MMU, 50 MHz and data-cache emulation settings.
+Other setups retain `DETERMINISTIC=1`; an explicit environment value is honored and
+recorded. Do not override it through `EXTRA_ARGS` or `RECORD`. Threaded boot I/O is not
+an assertion of deterministic boots or hardware timing; compare route evidence from the
+checked game entry. The 040/060 cells remain for A3 to validate.
+
+```sh
+AMIGA_SETUP=a1200-030 MODE=counter python3 tools/route_profile.py tmp/routes/030-count
+AMIGA_SETUP=a1200-030 python3 tools/sim_speed.py tmp/routes/030-state.json
+AMIGA_SETUP=a1200-030 PER_FRAME=1 python3 tools/fps.py tmp/routes/030-cadence.json
+python3 -m unittest discover -s tools -p 'test_*.py'
+```
+
+`MODE=counter` writes `route.json` and `report.txt` with frames/fps and explicitly no
+instruction costs. The normal `MODE=profile` refuses unsupported CPU backends rather than
+interpreting an empty instruction trace. Output directories/files must be new and inside
+`tmp/`. See [A1 validation](internals.md#a1-anchor-investigation).

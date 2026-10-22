@@ -4,24 +4,22 @@
   python3 tools/route_profile.py [OUT]       default OUT: tmp/prof/a1200-fast-route
 
 Boots the shipped game with the native FS-UAE (AMIGA_SETUP, default a1200-fast; WARP=1,
-DETERMINISTIC=1, JOY0=none), stops at the game's entry and traces the route below from there
+DETERMINISTIC=1 on the 020 / 0 on a1200-030, JOY0=none), stops at the game's entry and traces the route below from there
 in chunks of at most CHUNK fields, holding the port-1 joystick directions each segment lists.
+MODE=counter runs the same route through fps.py without instruction recording.
 Each chunk is reduced with amigaxdev.callprofile and deleted. OUT receives profile.pkl.gz
 (the reduction), report.txt, route.json (the route, input log and machine), a screenshot of
 each chunk's last field and sheet.png (all of them). Set KEEP_TRACE=1 to keep the chunks.
 """
 import bisect
 import collections
-import hashlib
 import json
 import os
-import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _amigaxdev  # noqa: F401
 from amigaxdev.callprofile import Reduction
-from amigaxdev.gdbserve import Server
 from amigaxdev.input import Input
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -270,63 +268,72 @@ def sheet(out, shots):
 def main():
     out = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else
                           os.path.join(ROOT, 'tmp/prof/a1200-fast-route'))
-    os.makedirs(out, exist_ok=True)
-    os.chdir(ROOT)  # gdb splits paths at spaces: give it repo-relative ones
-    env = dict(AMIGA_SETUP=os.environ.get('AMIGA_SETUP', 'a1200-fast'),
-               FSUAE=os.environ.get('FSUAE') or os.environ['FSUAE_ARM'],
-               WARP='1', DETERMINISTIC='1', JOY0='none')
-    os.environ.update(env)
-    server = Server('merc3', root=ROOT, profile_window=False)
-    g = server.boot()
+    from route_runtime import (deadline, output_path, require_instruction_backend,
+                               session, timeouts)
+    out = str(output_path(out))
+    os.makedirs(out)
+    if CHUNK <= 0 or any(n <= 0 for n, _ in ROUTE):
+        raise ValueError('CHUNK and route segment lengths must be positive')
+    mode = os.environ.get('MODE', 'profile')
+    if mode not in ('profile', 'counter'):
+        raise ValueError('MODE must be profile or counter')
+    boot_timeout, run_timeout = timeouts()
+    if mode == 'counter':
+        from fps import run
+        result = run(boot_timeout, run_timeout, os.environ.get('PER_FRAME') == '1')
+        result['mode'] = 'counter'
+        with open(os.path.join(out, 'route.json'), 'x') as f:
+            json.dump(result, f, indent=2)
+        text = (f'Untraced route: {result["setup"]}, {result["frames"]} frames / '
+                f'{result["fields"]} fields, {result["fps"]:.2f} fps (nominal PAL window).\n'
+                'Instruction costs unavailable in MODE=counter.\n')
+        with open(os.path.join(out, 'report.txt'), 'x') as f:
+            f.write(text)
+        print(text, end='')
+        return
     log = []
-    try:
-        g.cmd(f'break *{ENTRY:#x}')
-        print(g.cmd('continue', timeout=600), flush=True)
-        g.cmd('delete')
+    with session(boot_timeout) as (g, runtime), deadline(run_timeout, 'profile route'):
+        require_instruction_backend(runtime['machine'])
         red, shots, field = Reduction(marks=MARKS), [], 0
-        with Input(g, log=log.append) as controls:
-            for fields, held in ROUTE:
-                for name in held:
-                    controls.button(name, True)
-                left = fields
-                while left:
-                    n = min(CHUNK, left)
-                    path = os.path.join(out, f'chunk-{field:05d}.bin')
-                    reply = g.cmd(f'monitor profile {n} "" "{path}"', timeout=1800)
-                    if not os.path.exists(path):
-                        raise RuntimeError(f'no trace at field {field}: {reply}')
-                    t = red.feed(path)
-                    field += n
-                    left -= n
-                    png = os.path.join(out, f'field-{field:05d}.png')
-                    open(png, 'wb').write(t.fields[-1].shot)
-                    shots.append((field, png))
-                    if os.environ.get('KEEP_TRACE') != '1':
-                        os.unlink(path)
-                    print(f'field {field}: {sum(f["total"] for f in red.fields[-n:]) // n:,} '
-                          f'cycles/field', flush=True)
-                for name in held:
-                    controls.button(name, False)
+        controls = Input(g, log=log.append)
+        for fields, held in ROUTE:
+            for name in held:
+                controls.button(name, True)
+            left = fields
+            while left:
+                n = min(CHUNK, left)
+                path = os.path.join(out, f'chunk-{field:05d}.bin')
+                reply = g.cmd(f'monitor profile {n} "" "{path}"', timeout=1800)
+                if not os.path.exists(path):
+                    raise RuntimeError(f'no trace at field {field}: {reply}')
+                t = red.feed(path)
+                field += n
+                left -= n
+                png = os.path.join(out, f'field-{field:05d}.png')
+                open(png, 'wb').write(t.fields[-1].shot)
+                shots.append((field, png))
+                if os.environ.get('KEEP_TRACE') != '1':
+                    os.unlink(path)
+                print(f'field {field}: {sum(f["total"] for f in red.fields[-n:]) // n:,} '
+                      f'cycles/field', flush=True)
+            for name in held:
+                controls.button(name, False)
         counter_end = int(g.cmd("x/1xh 0x7180").split(":")[1].split()[0], 16)
         locate_slave(g, out)
         red.save(os.path.join(out, 'profile.pkl.gz'))
-        meta = dict(setup=env['AMIGA_SETUP'], fsuae=env['FSUAE'].replace(os.path.expanduser('~'), '~'),
+        meta = dict(runtime, mode='profile',
                     entry=f'{ENTRY:#x}', chunk=CHUNK,
                     counter_end=counter_end,
-                    emulator_sha256=hashlib.sha256(open(env["FSUAE"], "rb").read()).hexdigest(),
                     slave_base=None if slave_base is None else f'{slave_base:#x}', route=ROUTE, input=log,
-                    slave=os.path.relpath(SLAVE, ROOT), whd_args=os.environ.get('WHD_ARGS', ''),
-                    slave_sha256=hashlib.sha256(open(SLAVE, 'rb').read()).hexdigest())
+                    run_timeout=run_timeout)
         json.dump(meta, open(os.path.join(out, 'route.json'), 'w'), indent=1)
         open(os.path.join(out, 'report.txt'), 'w').write(report(red, meta))
         sheet(os.path.join(out, 'sheet.png'), shots)
         print('wrote', out)
-    finally:
-        g.p.kill()
-        g.p.wait()
-        subprocess.run(['/bin/bash', '-c', '. "$FSUAE_COMMON"; fsuae_stop_previous'],
-                       cwd=os.path.join(ROOT, 'amiga'), check=True)
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (TimeoutError, RuntimeError, ValueError) as error:
+        sys.exit(f'route_profile: measurement failed: {error}')

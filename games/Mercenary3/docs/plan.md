@@ -20,7 +20,7 @@ rates. Any agent can pick up the first step whose dependencies are done. Backgro
   slave` and `make verify`.
 - **Measurement**: compare a change only against the same build with the option off, on
   the same route and machine, with fps from frame counts (`route_profile.py`, or `fps.py`
-  from A3). No performance claim without a measurement. A change under 2% on every CPU
+  from A2). No performance claim without a measurement. A change under 2% on every CPU
   class is dropped unless it is free. Run the full machine matrix only at checkpoints (the
   ✓ steps). Never rerun the emulator without a source change in between.
 - **Regression gate**: with every option off, `a500-1.5m` must give the shipped slave's
@@ -44,33 +44,24 @@ rate. It also makes the extra frames smooth on machines that draw faster than 12
 
 ## Phase A: instruments and baselines
 
-**A1. Anchor the route without the entry breakpoint.** On `a1200-030` the gdb breakpoint at
-`Disk.1` `$4EDB0` never fires in the existing tool.
-
-**Blocked: the original done criterion assumes an unavailable instrument.** The shared
-FS-UAE guidance documents no instruction trace on the 68030 MMU backend; the inspected
-`m68k_run_mmu030` implementation has no Barto `cpu_profiler` hook. A counter anchor cannot
-make `route_profile.py` produce a valid instruction profile on that backend. Do not treat
-an empty trace as zero CPU cost, disable MMU silently, or mark A1 complete on that basis.
-The bounded boot probes also have not established arrival at gameplay, so a missed entry
-breakpoint alone does not yet identify a debugger or cache fault. See the A1 investigation
-in [internals](internals.md#a1-anchor-investigation).
-
-Before the actions below, establish a bounded boot-to-gameplay observation and resolve the
-instrument prerequisite: either validate instruction capture on the required 030 backend,
-or revise A1's acceptance to state/counter sampling and use A2 for its frame measurements.
-Keep the original done criterion below pending that resolution.
-- Find out why. Check whether any breakpoint fires on the 030 core, for example at the
-  frame publication's frame count (`Disk.1` `$5E4DE`), and whether the MMU or cache setup
-  hides it.
-- If the cause can't be fixed, change how `route_profile.py` and `sim_speed.py` find the
-  game's start, behind an `ANCHOR=` switch:
-  - advance in single fields (`monitor fields 1`);
-  - read the frame counter (chip `$7180`) after each field;
-  - treat the first field where it reads 1 as the start, and shift the route so it starts
-    the same number of fields after the game entry as now.
-- **Done when** both tools run on `a1200-030`. On `a1200-fast` the new anchor gives the
-  same frame count as the breakpoint anchor.
+**A1. Reliable route entry on the 68030, without changing its MMU backend.**
+- Diagnose the missed entry breakpoint and establish bounded boot-to-gameplay observation.
+- Share checked entry anchoring, deadlines and owned-process cleanup between route tools.
+  If the entry breakpoint cannot be recovered, validate a counter anchor and its route
+  alignment against the entry anchor on `a1200-fast` before using it.
+- Use `fps.py` and `sim_speed.py` for counter/state evidence on the 030. Give
+  `route_profile.py` an explicit untraced mode; instruction costs remain unavailable
+  on the MMU backend and must never be reported as zero.
+- **Done when** the full untraced route completes on `a1200-030` in both
+  `route_profile.py MODE=counter` and `sim_speed.py`, with matching frame counts, and
+  `a1200-fast` retains A2's 90-frame entry-anchored reference for `Custom1=1`.
+- The original requirement that the instruction profiler run on the 030 was invalid:
+  its MMU backend does not record instructions. The user requested completion without
+  changing that backend. Boot diagnosis recovered the original entry breakpoint by
+  disabling deterministic directory I/O; no counter fallback or route shift is needed.
+  **Done:** both 030 tools count 89 frames over 500 fields; the 020 counter and
+  instruction profiler retain 90. Publication breakpoints also work on the 030.
+  See [A1 validation](internals.md#a1-anchor-investigation) for evidence and limits.
 
 **A2. Frame counting without traces.** The 040/060 cores record no instruction trace.
 - Add `tools/fps.py`. It boots, anchors as in A1 and drives the route untraced, then
@@ -84,8 +75,8 @@ Keep the original done criterion below pending that resolution.
   for `Custom1=1` in 500 fields. The original 89-frame expectation is not reproduced
   by the current profiler either; [A2 validation](internals.md#a2-frame-counting-without-traces)
   records the evidence and runtime identity. This corrects the expected reference count,
-  not the counter output. A1's counter anchor remains pending; A2 uses the existing entry
-  breakpoint and fails within its deadline on unsupported boots.
+  not the counter output. A2 uses the existing entry breakpoint; A1 extends that validated boot path to the
+  030 without instruction recording.
 
 **A3. Machine matrix script.** Add `tools/matrix.sh SLAVE "WHD_ARGS..." OUTDIR`.
 - It runs `fps.py` once for each setup in the table above, one at a time.
@@ -427,7 +418,7 @@ on its own), then C1–C5 and D2–D5 in parallel, then B, E and F.
 
 ## Status
 
-- [ ] A1 [x] A2 [ ] A3 [ ] A4 [ ] A5 [ ] A6 [ ] A7 [ ] A8
+- [x] A1 [x] A2 [ ] A3 [ ] A4 [ ] A5 [ ] A6 [ ] A7 [ ] A8
 - [ ] B1 [ ] B2 [ ] B3 [ ] B4 [ ] B5 [ ] B6
 - [ ] C1 [ ] C2 [ ] C3 [ ] C4 [ ] C5 [ ] C6 [ ] C7
 - [ ] D1 [ ] D2 [ ] D3 [ ] D4 [ ] D5 [ ] D6 [ ] D7 [ ] D8

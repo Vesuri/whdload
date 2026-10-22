@@ -133,41 +133,71 @@ the code, not observed.
 
 ## A1 anchor investigation
 
-`make check` verifies both input archives and their extracted files; `make original`
-reproduces the shipped slave byte for byte. A1 has not met its done criterion.
+A1 is complete without changing the 68030 MMU backend. The original entry breakpoint
+(`Disk.1` `$4EDB0`) works on `a1200-030`; the previous failure occurred before gameplay.
+No counter fallback or route shift is necessary. The entry check requires a breakpoint
+stop at the expected PC and a zero initial frame counter.
 
-The selected native emulator identifies its base revision as
-`b70b1180b44ab25b97cd66466c70879897d8a362`, with the shared core, frequency, harness,
-register-observer and input-observer patches. Its effective `a1200-030` configuration
-selects 68030, 50 MHz, MMU 68030, data-cache emulation and cycle-exact CPU/memory timing.
-These are configuration facts, not validated hardware timing measurements.
+The failure is the combination of deterministic directory I/O and the preset's indirect
+UAE board. A bounded probe with `DETERMINISTIC=1` stalled at directory-drive startup.
+A host stack sample placed the emulator thread in
+`filesys_hsync → filesys_iteration → trap_get_bytes → call_hardware_trap_back`, waiting
+on a semaphore. The installed build's source runs deterministic filesystem work on the
+emulation thread; the indirect access waits for a guest callback that needs that thread
+to advance. With only `DETERMINISTIC=0` changed, the same binary and preset reached the
+entry and completed the route. This diagnoses a boot-I/O scheduling problem, not a
+missing game breakpoint or evidence of stale instruction-cache contents.
 
-AmigaXDev's standalone WHDLoad playbook, section 5, documents the missing 68030 instruction
-trace. In the inspected shared FS-UAE source, the MMU selection dispatches to
-`m68k_run_mmu030` before the non-MMU cycle-exact loop; that MMU loop has no Barto
-`cpu_profiler` scope. This explains why changing an anchor alone cannot satisfy the
-instruction-profiler part of A1. It does **not** establish why the entry breakpoint is
-missed: breakpoint processing is separate from instruction recording.
+`route_runtime.py` shares checked entry anchoring, PAL validation, bounded boot/route
+execution and owned-process cleanup across the three tools. For `a1200-030` it explicitly
+prints and records the default `DETERMINISTIC=0`; other setups retain 1, and explicit
+environment values are honored. The 030 still uses 50 MHz, MMU model 68030, CPU/data-cache
+emulation, cycle-exact CPU/memory/blitter settings and `uaeboard=full+indirect`.
+These are effective configuration facts, not a hardware-timing calibration or proof of
+WHDLoad translation-table state. No emulator, shared installation or slave code changed.
 
-Bounded probes with the shipped slave have not yet confirmed gameplay:
+Instruction recording is a separate limitation. The selected MMU loop has no Barto
+`cpu_profiler` scope. `route_profile.py MODE=counter` explicitly delegates to `fps.py`
+and writes counts/fps with no instruction costs. Normal profiling rejects unsupported
+CPU backends instead of reporting missing instruction records as zero cost. Per the
+user's request, A1 acceptance now requires untraced route/state completion on the 030
+and preservation of the 020 reference, rather than an impossible 030 instruction profile.
 
-- With entry (`Disk.1` `$4EDB0`) and publication (`$5E4DE`) breakpoints armed, a request
-  to advance 1,200 fields did not complete within 60 host seconds.
-- With no breakpoints, a request for 600 fields did not complete within 45 host seconds.
-- A control with `--uae_mmu_model=0` also failed to reach the entry breakpoint within
-  45 host seconds. Disabling MMU emulation alone did not resolve the bounded boot probe.
-- An asynchronous continue followed by interrupt did not yield a confirmed stopped
-  target; reads were rejected as target-running and are not counter observations.
+Validation, the same 175/185/140-field wait/walk/turn route:
 
-The logs end around directory-drive startup. This is a boot-observation failure, not
-proof that either game breakpoint cannot fire, that cache contents are stale, or that the
-game itself is hung. No route frame count, first-frame offset or performance result was
-obtained. Diagnostic source and logs remain under ignored `tmp/a1/`; emulator cleanup
-uses the shared process helper and the project's recorded PID.
+| Setup / build / options | Instrument | Frames | Fields | Full-window fps |
+| --- | --- | ---: | ---: | ---: |
+| `a1200-030`, shipped, no extra WHDLoad options | `MODE=counter` | 89 | 500 | 8.90 |
+| same, independent boot | `sim_speed.py`, every 5 fields | 89 | 500 | 8.90 |
+| same, publication-aligned input | `fps.py PER_FRAME=1` | 89 | 504 | 8.83 |
+| `a1200-fast`, performance, `Custom1=1` | `fps.py` | 90 | 500 | 9.00 |
+| same, independent boot | instruction markers and endpoint counter | 90 | 500 | 9.00 |
 
-Resolve the A1 prerequisite in the plan before implementing the proposed counter anchor.
-Its equivalence to the entry anchor on `a1200-fast` remains untested. A2's counter checks
-below do not resolve that anchor or establish screenshot equivalence.
+The 030 state samples show z changing by −1,116 units during the walk and heading by
++278 during the turn. Its entry counters are zero; after 500 harness fields the VERTB
+counter is 499 and frame count 89. The initial partial field and harness convention are
+unchanged from the entry-anchored route. Both independent 030 tools agree on endpoint
+frame/VERTB counts and their recorded build, route, options and machine settings.
+This does not establish that arbitrary threaded boots or all intermediate states are
+identical; A6 still owns repeated committed-state equivalence.
+
+The 030 publication breakpoint (`Disk.1` `$5E4DE`) also works: 88 complete stored
+intervals span 5..7 fields, mean 5.614. Publication-aligned inputs overshoot the requested
+route by 4 fields, so this is a cadence diagnostic, not an exact-field comparison.
+The 020 counter and instruction markers both preserve A2's 90-frame reference; the
+profiler's first-to-last-publication rate remains 9.06 fps. No performance gain is claimed.
+
+The native emulator and WHDLoad hashes are unchanged from A2. Additional SHA-256 identities:
+
+- Shipped slave: `e1d0dc878ff941a03d8a2685d0e2a2ed353381f065a5d8e013aece956dedf76d`.
+- Shared launcher: `4e05e36d4a121fde37f4f371effbb82c7a3d2bf450126964c84fb2dd39c26f83`.
+
+Inputs verify and the original build is byte-identical. Ten offline checks cover the
+counter/cadence boundaries, stop and deadline validation, boot-mode defaults/overrides
+and refusal of unsupported instruction profiles. The failing deterministic probe reached
+its 90-second deadline and cleaned up the owned emulator. Generated evidence is ignored
+under `tmp/a1-finish/`. The historical A500 38-frame/picture gate remains unresolved as
+recorded in A2; A1 changes no game behavior. The 040/060 route cells remain unvalidated.
 
 ## A2 frame counting without traces
 
@@ -226,8 +256,8 @@ byte-identical build also pass. Slave code is unchanged.
 Results and diagnostics are ignored under `tmp/a2/`. New reports retain slave, emulator
 and WHDLoad hashes, effective machine settings, input events and both counters. Existing
 output files are refused. The profiler now retains its endpoint counter and emulator
-hash too. Only the entry anchor is supported until A1 is resolved; 030/040/060 route
-completion is not established by this A2 validation.
+hash too. A1 subsequently validates the same entry anchor on the 030; 040/060 route
+completion is not established by these checks.
 
 ## Renderer inputs and writes
 

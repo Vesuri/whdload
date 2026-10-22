@@ -59,16 +59,20 @@ split and the measured game-time model ([internals](internals.md)).
 
 - The player's presented pose is extrapolated from the native per-tick rates; other
   objects are interpolated between the last two committed passes (the user's choice).
+- A1 must be completed without changing the 68030 MMU backend (user request). Its
+  acceptance uses untraced counter/state routes; instruction recording is not required.
 - On fast machines logic passes run at the minimum native pass length, 4 fields (12.5 Hz).
 
-## A1 blocker
+## A1 complete: route anchoring
 
-Input verification and the byte-identical original build pass. A1 remains unchecked:
-changing its route anchor cannot supply the missing 68030 MMU instruction trace required
-by `route_profile.py`. Bounded boot probes have not yet established gameplay or isolated
-the missed breakpoint to cache/MMU behaviour. The evidence and limits are in
-[internals](internals.md#a1-anchor-investigation); the prerequisite is recorded in the
-plan. No game behaviour or slave code changed, and no new performance figure is available.
+The 030 reaches the original game-entry breakpoint with `DETERMINISTIC=0`, retaining
+its MMU and cache settings. Deterministic directory I/O with the preset's indirect UAE
+board stalled before gameplay. The shared route runtime now validates the entry and
+bounds boot and route execution. Instruction profiling remains unavailable on this
+backend; `route_profile.py MODE=counter` explicitly uses A2's untraced measurement.
+The two independent 030 routes agree at 89 frames over 500 fields; the 020 counter and
+profiler retain 90. See [internals](internals.md#a1-anchor-investigation) for validation
+and remaining limits.
 
 ## A2 complete; reference counts need reconciliation
 
@@ -82,8 +86,8 @@ See [A2 validation](internals.md#a2-frame-counting-without-traces) for results a
 
 ## Next steps
 
-A3 is next on the requested instrument path. A1's boot/anchor issue still limits the
-machine matrix, and the historical reference drift must be reconciled before declaring
-an optimization regression gate passed.
+A3 is next on the requested instrument path. Its remaining machine cells need validation;
+the historical reference drift must also be reconciled before declaring an optimization
+regression gate passed.
 
 The ordered, step-by-step plan with step IDs is [plan.md](plan.md).

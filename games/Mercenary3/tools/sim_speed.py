@@ -6,7 +6,7 @@
   PER_FRAME=1 AMIGA_SETUP=a500-1.5m python3 tools/sim_speed.py OUT.json
   python3 tools/sim_speed.py --frames OUT.json
 
-Boots like route_profile.py (native FS-UAE, WARP=1, DETERMINISTIC=1, JOY0=none), stops at
+Boots like route_profile.py (native FS-UAE, WARP=1, DETERMINISTIC=1 on the 020 / 0 on a1200-030, JOY0=none), stops at
 the game's entry and runs its ROUTE with no tracing, reading every STEP fields (default 5):
 the player position (chip $7146, $714A, $714E: longwords the walk adds velocity x elapsed
 fields to), the angles at $7154/$7156, the in-game clock (bytes $57B0..$57B3; $57B3 holds the
@@ -17,15 +17,13 @@ publication instead, with the elapsed fields ($52954) that frame's world ticks w
 """
 import json
 import os
-import signal
-import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _amigaxdev  # noqa: F401
-from amigaxdev.gdbserve import Server
 from amigaxdev.input import Input
-from route_profile import ENTRY, FRAME, ROOT, ROUTE
+from route_profile import FRAME, ROUTE
+from route_runtime import (at_breakpoint, deadline, delta, output_path, session, timeouts)
 
 STEP = int(os.environ.get('STEP', '5'))
 PER_FRAME = os.environ.get('PER_FRAME') == '1'
@@ -46,57 +44,50 @@ def read(g):
 
 
 def run(path):
-    setup = os.environ.get('AMIGA_SETUP', 'a1200-fast')
-    os.environ.update(AMIGA_SETUP=setup, WARP='1', DETERMINISTIC='1', JOY0='none',
-                      FSUAE=os.environ.get('FSUAE') or os.environ['FSUAE_ARM'])
-    os.chdir(ROOT)
-    server = Server('merc3', root=ROOT, profile_window=False)
-    g = server.boot()
-    samples, field = [], 0
-    try:
-        g.cmd(f'break *{ENTRY:#x}')
-        g.cmd('continue', timeout=600)
-        g.cmd('delete')
+    path = output_path(path)
+    if STEP <= 0 or any(n <= 0 for n, _ in ROUTE):
+        raise ValueError('STEP and route segment lengths must be positive')
+    boot_timeout, run_timeout = timeouts()
+    samples, field, inputs = [], 0, []
+    with session(boot_timeout) as (g, meta), deadline(run_timeout, 'state route'):
         samples.append(dict(field=0, **read(g)))
-        with Input(g) as controls:
-            for fields, held in ROUTE:
-                for name in held:
-                    controls.button(name, True)
-                if PER_FRAME:
-                    # Stop at every frame until the segment's fields have run (the last frame
-                    # can overshoot the segment by less than one frame).
-                    start = read(g)['vertb']
-                    g.cmd(f'break *{FRAME:#x}')
-                    while True:
-                        g.cmd('continue', timeout=600)
-                        s = read(g)
-                        elapsed = (s['vertb'] - start) & 0xffff
-                        samples.append(dict(field=field + elapsed, held=held,
-                                            dt=int(g.cmd('x/1dh 0x52954').split(':')[1]), **s))
-                        if elapsed >= fields:
-                            break
-                    g.cmd('delete')
-                    field += elapsed
-                    for name in held:
-                        controls.button(name, False)
-                    continue
-                left = fields
-                while left:
-                    n = min(STEP, left)
-                    controls.fields(n)
-                    field += n
-                    left -= n
-                    samples.append(dict(field=field, **read(g)))
+        controls = Input(g, log=inputs.append)
+        for fields, held in ROUTE:
+            for name in held:
+                controls.button(name, True)
+            if PER_FRAME:
+                # Stop at every frame until the segment's fields have run (the last frame
+                # can overshoot the segment by less than one frame).
+                start = read(g)['vertb']
+                g.cmd(f'break *{FRAME:#x}')
+                while True:
+                    at_breakpoint(g, FRAME, run_timeout)
+                    s = read(g)
+                    elapsed = (s['vertb'] - start) & 0xffff
+                    samples.append(dict(field=field + elapsed, held=held,
+                                        dt=int(g.cmd('x/1dh 0x52954').split(':')[1]), **s))
+                    if elapsed >= fields:
+                        break
+                g.cmd('delete')
+                field += elapsed
                 for name in held:
                     controls.button(name, False)
-    finally:
-        g.p.kill()
-        pid = open(os.path.join(server.run_dir, 'fsuae.pid')).read().strip()
-        if 'fs-uae' in subprocess.run(['ps', '-o', 'comm=', '-p', pid], capture_output=True,
-                                      text=True).stdout:
-            os.kill(int(pid), signal.SIGKILL)
-    json.dump(dict(setup=setup, route=ROUTE, step=STEP, per_frame=PER_FRAME, samples=samples),
-              open(path, 'w'))
+                continue
+            left = fields
+            while left:
+                n = min(STEP, left, 6000)
+                controls.fields(n)
+                field += n
+                left -= n
+                samples.append(dict(field=field, **read(g)))
+            for name in held:
+                controls.button(name, False)
+        if delta(samples[-1]['frames'], samples[0]['frames']) == 0:
+            raise RuntimeError('state route published no frames')
+    with path.open('x') as f:
+        json.dump(dict(meta, route=ROUTE, step=STEP, per_frame=PER_FRAME,
+                       run_timeout=run_timeout, fields=field, input=inputs,
+                       samples=samples), f, indent=2)
     print('wrote', path)
 
 
@@ -148,6 +139,9 @@ if __name__ == '__main__':
     elif sys.argv[1:2] == ['--frames']:
         frames(sys.argv[2])
     elif len(sys.argv) == 2:
-        run(os.path.abspath(sys.argv[1]))
+        try:
+            run(os.path.abspath(sys.argv[1]))
+        except (TimeoutError, RuntimeError, ValueError) as error:
+            sys.exit(f'sim_speed: measurement failed: {error}')
     else:
         sys.exit(__doc__)
