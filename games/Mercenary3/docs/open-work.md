@@ -87,6 +87,13 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Measurement notes
 
+- The existing `040-25` cell measures 11.70 fps with all options off and 16.50 fps
+  with `Custom1=255` on the same build/route. Its remaining bottleneck has no
+  measured component breakdown. Chip-RAM drawing, CPU clearing, publication waits
+  and presentation overhead are candidates; measure their costs before ranking them.
+  The 020 cost percentages do not establish the 040 split. See
+  [040 results and interpretation](internals.md#routine-040-performance-check).
+
 - Frame counts drift between sessions (the A500 route gave 38 frames, now 37, with the same
   slave), so compare builds only within one session.
 - The 040/060 cells don't follow the configured frequency (118 frames at 8 and 25 MHz):

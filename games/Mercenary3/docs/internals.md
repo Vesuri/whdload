@@ -743,3 +743,15 @@ gives 117 frames / 11.70 fps; current options on (`Custom1=255`) gives 165 frame
 16.50 fps. Effective machine settings, route and runtime/build hashes match.
 Evidence: `tmp/040-check/off.json`, `on.json`. These remain emulator measurements
 with the accepted frequency-timing limitation, not predicted hardware frame rates.
+
+The 040 bottleneck is not yet measured by component. Likely remaining costs are
+renderer instruction fetches and bitplane writes in chip RAM, the CPU back-buffer
+clear, publication's next-field wait, and presentation save/restore work. M1 moves
+selected numeric routines, M2 moves lookup tables, and R1 changes horizontal span
+interiors; the rest of the drawing path remains largely native. These are candidates,
+not a measured ranking on the 040. The roughly 1% world-logic cost and 7–10%
+publication wait were measured on the 020 and must not be assigned to the 040.
+The 12.5 Hz logic gate is not a rendering cap: the measured 16.50 fps includes
+presentation frames. Before choosing further renderer work over R2's blitter clear,
+measure drawing, clearing, publication waits and presentation overhead separately
+on the existing 040 cell, retaining the emulator timing caveat.
