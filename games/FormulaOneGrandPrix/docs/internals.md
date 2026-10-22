@@ -85,6 +85,41 @@ language 807, protection 1184, startup 1413, track 1608, race 2115 fields. The e
 original route begins at language 838 and has identical subsequent intervals (all
 screens 31 fields later). This is boot validation only; B3 equivalence is still open.
 
+### B3: acceptance failure — decision required
+
+The current rebuild **does not pass B3**. `tools/slave_compare.py` captured the
+500-field green window on `a1200-fast` for the original, rebuilt and padded-original
+slaves, each from a fresh deterministic boot. Green was found by screen polling from
+race entry, with identical command sequences (`RACE_LEADS=0,0,400`; only the first
+value is used for green). The old calibrated 840-field lead had overshot on the rebuild;
+that rejected attempt is retained separately under `tmp/b3/rebuilt/green-lead-overshoot`.
+
+| Check | Original | Original padded to rebuilt size | Rebuilt |
+|---|---:|---:|---:|
+| Slave file bytes | 5464 | 5684 | 5684 |
+| Language field | 838 | 838 | 807 |
+| First race field | 2146 | 2146 | 2115 |
+| Green anchor, fields after race entry | 857 | 857 | 826 |
+| Hunk 0/1 placement relative to original | unchanged | unchanged | both `$2720` lower |
+| Hunk 2/3 placement relative to original | unchanged | unchanged | unchanged |
+| Green screenshot digests matching original | 500/500 | 500/500 | 0/500 |
+
+The first screenshot already differs in the car ahead. Padding changes only the HUNK
+allocation/code sizes and appends zeroes, preserving every original executable byte.
+The padded original reproduces the original route, actual hunk layout and every green
+screenshot. **It does not reproduce the rebuild's actual layout**, so this is not a
+layout-controlled comparison of rebuilt versus original. All four hunk bases, input
+slave hashes, routes, anchors and per-field screenshot digests are in each local
+`tmp/b3/CASE/green/meta.json`; `comparison.json` records the failing comparisons.
+
+The new shared KickEmu is a remaining compatibility variable, beyond file-size padding.
+A1 identifies a mechanism by which changed menu execution changes the race, but it has
+not isolated all rebuild differences. There is no claim of gameplay equivalence, no
+performance claim and no relaxation of the gate. Stop here for a decision: either
+continue exact-compatibility work (including actual allocation and timing control), or
+explicitly revise B3 for a newer-KickEmu behavioural comparison. Tow/follow captures,
+A2 mode routes, optional A3, and B4 are not completed; do not advance to B5/C.
+
 ## Executables
 
 `data/game` is the original hard-disk loader (assigns, `frontend`, then `f1gp`); the slave

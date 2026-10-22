@@ -159,3 +159,31 @@ repin a reviewed toolchain update, source `amiga/env.sh`, set/export `NDK_ASM`, 
 
 Run with `SLAVE=tmp/build/F1GP.Slave` in the server environment. Do not interpret a
 successful boot as B3 acceptance. All slave builds, listings and captures stay in `tmp/`.
+
+## Slave acceptance captures (B3)
+
+```sh
+. amiga/env.sh
+python3 tools/slave_compare.py capture original green
+python3 tools/slave_compare.py capture rebuilt green
+python3 tools/slave_compare.py capture padded green
+python3 tools/slave_compare.py compare
+```
+
+Each capture starts a fresh project server, waits for its new `serving on` message,
+runs the screen-anchored route/window and quits through that server. Stale project
+sockets are removed before launch. The normal project launcher owns process cleanup;
+no name-wide termination is used. The desktop sandbox may require permission for the
+emulator/debugger's local connection. The default window is 500 fields. Capture names
+are immutable: move a rejected local attempt aside explicitly before retrying.
+
+Use `tow` and `follow` in place of `green` only after the current failed gate is resolved.
+The comparator accepts either a complete original match or a complete padded-control
+match; the latter additionally requires all four actual hunk bases to agree. Missing
+windows, short windows, different routes/anchors or any different screenshot digest
+fail. It writes `tmp/b3/comparison.json` and exits nonzero. Equal slave file sizes are
+not evidence of equal hunk placement. The current result is FAIL/INCOMPLETE, not PASS.
+
+The capture driver uses `RACE_LEADS=0,0,400` for every case: green and tow are polled
+from their preceding anchors; follow retains the existing 400-field separation from
+the tow banner and still rejects an overshoot. Only green has been captured for B3.

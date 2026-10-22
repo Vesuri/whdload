@@ -1,21 +1,27 @@
 # Current scope
 
-Goals: improve the game's performance, especially on 68020-with-fast-RAM and faster
-Amigas, and make the simulation speed independent of the frame rate.
+Goals: keep world simulation at real-time speed, present smooth motion up to 50 fps,
+and improve performance, especially on 68020+ with fast RAM. The implementation plan
+is [plan.md](plan.md); verified findings are in [internals.md](internals.md).
 
-The launcher boots the installed game, `tools/f1gp.py quickrace` drives it from boot to
-the first field of a Quick Race at Silverstone, and `tools/race_profile.py` profiles
-three 10-second phases of that race. `docs/internals.md` records the
-verified slave and executable structure. B1 has a byte-identical local reconstruction of the original slave and decoded patch lists.
-No new slave has passed a gameplay gate yet.
+# Stop: B3 decision required
 
-# Next
+B1 and B2 are committed: original loader reconstruction reassembles exactly; the new
+version-17 slave builds from pinned shared kick13 inputs and boots Quick Race. A1
+identifies the menu RNG busy-wait feeding gameplay randomness. A5 maps copper
+publication and safe buffer retirement; A6 maps interrupts/input and sound cadence.
 
-The plan is [docs/plan.md](plan.md): real-time game speed on every machine, smooth
-pictures up to 50 fps on 68020+ by extrapolation, and the performance work, in steps
-`A1`–`G4`. Its first steps are `A1`–`A3`, `A5`, `A6` (time sources, the main loops,
-simulation versus presentation, publication, interrupts) and `B1`–`B4` (rebuilding the
-slave, which has no source). This session is authorised for B1–B4 and A1, A2, A5, A6 (A3 if time permits).
-B2 now builds and boots Quick Race with shared kick13.
-Next: B3, original/rebuilt/layout-control screenshot and route comparison. A1 names the menu RNG busy-wait as a timing input to gameplay. A5 documents the copper publication handshake and the safe reuse rule. A6 maps interrupt/input ownership and corrects the sound-update cadence. A2
-remains open; no B3 equivalence or B4 gating claim yet.
+**B3 does not pass.** In the 500-field green window, original and same-size padded
+original match all 500 screenshot digests, while the rebuild matches none. The rebuild
+reaches the language screen 31 fields earlier and places hunk 0/1 `$2720` lower;
+padding the original does not reproduce that layout. Full evidence and limitations:
+[internals: B3](internals.md#b3-acceptance-failure--decision-required).
+
+Next: the user decides whether to continue exact compatibility/allocation/timing work
+under the existing gate, or revise B3 explicitly for the newer KickEmu. Do not silently
+accept the mismatch. `tools/slave_compare.py compare` reports FAIL for green and
+INCOMPLETE for tow/follow. Existing captures stay in ignored `tmp/b3/`.
+
+A2 (mode routes and call counts), A3 (optional write audit), and B4 (gating, disabled-byte
+checks and developer/VERIFY targets) remain open. B5 and later steps are not authorised
+by this session. No simulation or performance patches have been installed.

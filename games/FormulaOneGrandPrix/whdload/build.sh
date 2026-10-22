@@ -6,6 +6,13 @@ export NDK_ASM="${NDK_ASM:-$AMIGA_SHARE/ndk/Include_I}"
 python3 tools/slave_toolchain.py
 python3 tools/slave_inputs.py
 OUT="${OUT:-tmp/build}"
+python3 - "$OUT" <<'PYOUT'
+from pathlib import Path
+import sys
+out = Path(sys.argv[1]).resolve()
+if not out.is_relative_to(Path('tmp').resolve()):
+    sys.exit('Slave outputs must stay under the project tmp/ directory')
+PYOUT
 mkdir -p "$OUT" tmp/slave/include/lvo
 for lib in dos exec graphics expansion; do
   printf '        INCLUDE "lvo/%s_lib.i"\n' "$lib" > "tmp/slave/include/lvo/$lib.i"
