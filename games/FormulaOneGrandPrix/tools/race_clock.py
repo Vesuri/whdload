@@ -11,8 +11,9 @@ the green light, which a step can miss).  DIR gets samples.json, the green and
 results screenshots and every STEP-th screenshot.  It then opens Race Finishing Times
 and saves it as times.png (the winner's time and the gaps, in game time).
 
-`monitor fields N` from a stop at a vertical sync runs N + 1 fields (AmigaXDev's harness
-counts the first vsync as ending a partial field); a one-field screenshot trace runs one.
+Field counts need the harness's exact-fields and gapless-profile (checked by quickrace):
+after a `fields` or `profile` stop, `monitor fields N` runs N fields and a one-field
+screenshot trace one.
 """
 import json, os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -80,7 +81,7 @@ def raceclock(server, g, rest):
     samples, field, frames, last, green = [], 0, 0, None, None
     while field < LIMIT:
         g.cmd(f'monitor fields {STEP}', timeout=1800)
-        field += STEP + 1
+        field += STEP
         minimum, work, counter, count = read_words(g, h0)
         if last is not None:
             frames += (count - last) & 0xffff

@@ -33,7 +33,7 @@ CHUNK = 50                 # fields per trace file (about 7.5 MB per field on a1
 # quickrace stop) -> green -> tow -> follow.  Calibrated on a1200-fast, each 50-100 fields
 # short; RACE_LEADS=0,0,0 polls throughout (other machines; the follow lead must still pass
 # the tow scene's own "Viewing" banner, so use RACE_LEADS=0,0,400 or so).
-LEADS = (800, 1950, 400)
+LEADS = (840, 2210, 400)
 POLL_LIMIT = 6000
 FAST = 0x200000            # Zorro II fast RAM base
 FAST_KB = {'a1200-fast': 8192, 'a1200-030': 8192, 'a1200-040': 8192, 'a1200-060': 8192,

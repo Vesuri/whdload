@@ -76,7 +76,7 @@ per-PC cycles, frame events and per-field screenshots. Different sequences diver
 over the same span (`monitor fields N` and `monitor profile N` do not leave identical
 states), so anchor field numbers are per-command counts for that sequence, and windows
 from different phases need not show one continuous race. Consecutive `monitor profile`
-chunks are contiguous.
+chunks are contiguous (the harness's gapless-profile).
 
 Each capture runs `quickrace` and then finds its anchor field exactly: `green` is the first
 field with green start lights, `tow` the first non-cockpit field after it (the retired car
@@ -114,6 +114,7 @@ Finishing Times and saves `times.png`; `samples.json` has the frame count per st
 RAM regions per `AMIGA_SETUP` are listed in the tool. The 68030 cycle-exact preset timed
 out in the route on a loaded host; it has no result yet.
 
-`monitor fields N` from a stop at a vertical sync runs N + 1 fields: AmigaXDev's harness
-counts the first vsync as ending a partial field even when there is none. The tools count
-it that way; a one-field screenshot trace runs one field.
+Field counts need the harness's `exact-fields` and `gapless-profile` (`quickrace` checks
+`monitor harness`): after a `fields` or `profile` stop, `monitor fields N` runs exactly N
+fields and `monitor profile N` traces the next N with no gap. Older builds ran N + 1 and
+left one field untraced before each profile, so counts from them are not comparable.

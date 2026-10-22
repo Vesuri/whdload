@@ -56,11 +56,12 @@ intervals are fixed per machine (fields after the language dialog, 25-field poll
 
 | Machine | protection | startup | track | race |
 |---|---:|---:|---:|---:|
-| A500-equivalent | 688 | 983 | 1246 | 2109 |
-| `a1200-fast` | 338 | 533 | 696 | 1134 |
+| A500-equivalent | 767 | 1100 | 1373 | 2348 |
+| `a1200` (no fast RAM) | 559 | 866 | 1139 | 1854 |
+| `a1200-fast` | 377 | 606 | 801 | 1308 |
 
 With the CPU held from reset (`BOOT_BREAK`), the whole route and the race repeat exactly
-from boot to boot; on `a1200-fast` the language dialog appears at field 930. Without it,
+from boot to boot; on `a1200-fast` the language dialog appears at field 838. Without it,
 host timing changed the start and the race itself: in some boots the player's car kept
 driving and was never retired.
 
@@ -95,25 +96,27 @@ The simulation advances a fixed step per frame; elapsed real time does not enter
   minimum ÷ elapsed fields, so the engine sound stays smooth when a frame overruns.
 - The whole Quick Race (first cockpit field to the results screen, `tools/race_clock.py`)
   takes about the same number of frames on every machine while its real duration changes
-  with the frame rate, and the in-game finishing times stay near 4:46–5:02:
+  with the frame rate, and the in-game finishing times stay near 4:51–4:54:
 
 | Machine | race fps | frames | fields to results | winner (game time) | game clock vs real |
 |---|---:|---:|---:|---|---:|
-| A500-equivalent | 5.49 | 2995 | 29088 (582 s) | Senna 4:46.260 | 0.70× |
-| `a1200` (no fast RAM) | 7.18 | 3208 | 23230 (465 s) | Patrese 4:49.592 | 0.92× |
-| `a1200-fast` | 8.04 | 3306 | 21210 (424 s) | Patrese 5:02.229 | 1.03× |
+| A500-equivalent | 5.49 | 3297 | 31557 (631 s) | Senna 4:53.111 | 0.70× |
+| `a1200` (no fast RAM) | 7.23 | 3194 | 22914 (458 s) | Patrese 4:50.744 | 0.93× |
+| `a1200-fast` | 8.00 | 3143 | 20301 (406 s) | Berger 4:54.233 | 1.02× |
 
-  "race fps" is measured over fields 2000–14000. On `a1200-fast`, green light to the
-  "Race won by" banner took 2340–2372 frames for the winner's 302.229 s: 127–129 ms of
+  "race fps" is measured over fields 2000–14000; the last column is race fps × 128 ms.
+  Game time per frame comes from an earlier `a1200-fast` race (Patrese 5:02.229), which
+  compares the game's own frame counter with its race clock: green light to the
+  "Race won by" banner took 2340–2372 frames for the winner's 302.229 s, 127–129 ms of
   game time per frame (200-field sampling at both ends; where the in-game clock starts
-  relative to the green light is not established), so close to the pacer's 1/8 s. The
-  last column is race fps × 128 ms.
-- So the in-game clocks show game time. On the A500-equivalent a race shown as 4:46
-  takes about 6:50 of real time; on `a1200-fast` the pacer holds the game at about real
-  time. On slower machines the pacer seldom waits (A500-equivalent: work 5–14 fields per
+  relative to the green light is not established), so close to the pacer's 1/8 s.
+- So the in-game clocks show game time. On the A500-equivalent a race shown as 4:53
+  takes about 7:00 of real time; on `a1200-fast` the pacer holds the game at about real
+  time. On slower machines the pacer seldom waits (A500-equivalent: work 7–13 fields per
   frame against a minimum of 6), so the game simply runs slower.
-- The races differ between machines (each machine repeats its own exactly): on the
-  A500-equivalent the player's car is never retired and Senna wins.
+- The races differ between machines (on one machine a run repeats exactly, checked on
+  `a1200-fast`), so the frame
+  counts are not directly comparable.
 
 Consequences for the goals: on `a1200-fast` and faster machines, faster code alone cannot
 raise the frame rate while the pacer holds 8 fps, and removing the pacer would speed up
@@ -130,16 +133,16 @@ deterministic Quick Race (`tools/race_profile.py`, development doc). Times are e
 
 | Window (anchor) | fps | frame ms mean / p95 / max | work ms mean / p95 / max | pacer wait |
 |---|---:|---|---|---:|
-| green light | 8.04 | 124.3 / 140 / 240 | 72.8 / 86.2 / 120.4 | 41.8% |
-| retirement and towing | 8.07 | 123.9 / 140 / 220 | 98.3 / 108.7 / 167.4 | 20.5% |
-| follow camera | 8.06 | 124.1 / 140 / 220 | 85.7 / 103.0 / 145.4 | 30.8% |
+| green light | 8.00 | 125.1 / 140 / 140 | 71.7 / 82.1 / 85.2 | 42.7% |
+| retirement and towing | 8.02 | 124.8 / 140 / 140 | 96.5 / 106.1 / 127.0 | 22.3% |
+| follow camera | 8.03 | 124.6 / 140 / 140 | 84.1 / 103.2 / 128.0 | 32.0% |
 
 - The frame rate is the pacer's cadence (6–7 fields per frame) in all three windows, not
   the machine's limit: no window's mean work fills its frame.
-- The per-frame work runs under `h2+280F6` (46–62% of all cycles inclusive), which lives in
-  hunk 2. That hunk is declared chip memory, so on this machine 27–36% of all cycles
+- The per-frame work runs under `h2+280F6` (46–63% of all cycles inclusive), which lives in
+  hunk 2. That hunk is declared chip memory, so on this machine 27–34% of all cycles
   execute from chip RAM.
-- DMA: about 56–62% of chip-bus slots are free; blitter 1.3–1.8%; bitplanes 22.5%.
+- DMA: about 57–62% of chip-bus slots are free; blitter 1.3–1.8%; bitplanes 22.5%.
   The CPU never stops (`STOP` 0%).
 - Function names are hunk offsets of the nearest preceding call target, a heuristic; a
   large entry needs checking against the disassembly before acting on it.

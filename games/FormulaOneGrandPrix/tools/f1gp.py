@@ -25,7 +25,7 @@ import io, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _amigaxdev  # noqa: F401
 from amigaxdev import barto
-from amigaxdev.gdbserve import Server
+from amigaxdev.gdbserve import Server, require_harness
 from amigaxdev.input import Input
 from PIL import Image
 
@@ -90,6 +90,9 @@ def quickrace(server, g, rest):
     """Boot to the first race field.  Fire is pressed while waiting for the language
     dialog, which skips the intro (or clicks its prompt) when CUSTOM1 is not set."""
     g.stop()
+    # Field counts here and in race_profile/race_clock assume exact fields and gapless
+    # profiles after a stop at a vsync.
+    require_harness(g, 'key', 'fields', 'mouse', 'input', 'exact-fields', 'gapless-profile')
     log = open(rest, 'w') if rest else None
     elapsed = {'fields': 0}
     trail = []
@@ -105,7 +108,8 @@ def quickrace(server, g, rest):
 
     def wait_for(name, idle):
         for _ in range(LIMIT // POLL):
-            image = screenshot(server, g)
+            image = screenshot(server, g)       # traces (runs) one field
+            elapsed['fields'] += 1
             if shots:
                 image.save(os.path.join(shots, f'{elapsed["fields"]:06d}-{name}.png'))
             if showing(image, name):
