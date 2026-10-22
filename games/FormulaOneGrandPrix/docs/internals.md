@@ -206,6 +206,63 @@ its frame rate to a fixed cadence instead of running as fast as the machine allo
 tables average 8 frames per second: 6.25 fields at 50 Hz, 7.5 at 60 Hz (the word compared
 with 60 is presumably the display rate).
 
+## Time sources (A1)
+
+The gameplay RNG is **not seeded solely by a beam register**. There is a concrete
+CPU-speed-dependent timing input before gameplay: the menu's busy-wait at h2+$31380
+calls h2+$3652C repeatedly until the VBL counter reaches the menu's minimum. Faster
+execution advances that RNG more times in the same field interval. A second wait at
+h2+$3742C does the same. The RNG writes five bytes at h2+$2A794–2A798, reached through
+the menu context's pointer to h2+$2A634. Its first longword is initially relocated
+against hunk 1, so allocation layout is another input before any RNG draws.
+
+At the protection prompt, h0+$8E4 reads h2+$2A797; h0+$8F0 advances the gameplay RNG
+that byte **plus one** times (`DBF`). Removing the protection comparison does not remove
+this RNG advance. Thus machine speed, CACHE and changed loader timing/layout can all
+change the later race without changing any physics code. Identical field-count input
+commands do not imply identical RNG state. Existing green captures have h2+$2A797
+values `$53` (A500-equivalent), `$E7` (A1200), `$D6` (a1200-fast) and `$6D` (CACHE);
+these are post-menu evidence, not the exact byte at the protection call.
+
+**A1 gate:** the timing input is named: the number of menu RNG advances before each
+VBL-paced wait ends, feeding the protection-time gameplay RNG advance. This explains
+why CPU/CACHE comparisons are not tick-equivalence controls. It does not identify the
+particular random decision that prevents the A500 player's retirement, nor prove there
+are no additional causes. A VERIFY experiment must freeze this input before attributing
+remaining differences to simulation changes; no pinning is installed in normal builds.
+
+### Reader inventory
+
+Offsets below were checked in the supplied 582992-byte executable, resolving relocation
+target hunks rather than interpreting an unrelocated absolute operand as a runtime address.
+The inventory distinguishes game readers from the KickEmu/OS implementation of clocks.
+
+| Source and readers | Class / use |
+|---|---|
+| h0+$125E: h0+$1272, +$127C; h2+$232, +$27E98 | Presentation/hardware: elapsed work, frame wait, keyboard handshake timeout, renderer work/wait decision. h0+$2CC3C increments once per VBL; h0+$128C and h2+$222 clear it. |
+| h0+$125C: h0+$12A4, +$36288 | Presentation cadence and sound smoothing; no direct physics integration. |
+| h0+$1260: h0+$1298 | Presentation: index modulo four into the PAL/NTSC cadence tables; increment at +$1292. It is a frame count, not a copy of elapsed fields. |
+| Menu context A6 = h2+$37B44, +$2A40: h2+$31384, +$36308, +$36420, +$37430 | Presentation waits; +$31380 and +$3742C advance the menu RNG during those waits, indirectly influencing simulation. |
+| Same context +$2A42: h2+$318A4 | Presentation/UI choice; free-running field count incremented at h2+$35FA4 / +$3601E (OS/direct interrupt paths). |
+| Same context +$2A5C: h2+$2CE72, +$34C10, +$35FB0, +$36026 | Hardware/UI: countdown after DOS operations, decremented per field, used during OS handoff. |
+| DOS DateStamp: h2+$2C88C, +$2D63C | Hardware/UI calendar state in context +$2A50, converted to date fields; separate from the race clock. |
+| `$6C`: h2+$118 and +$34C70 install level-3 paths; +$34CDE–34CEE restore saved vectors | Hardware interrupt ownership. Game code uses the low vector table; no game `MOVEC VBR` found. KickEmu mediates privileged/OS interrupt handling. |
+| CIAA SDR/ICR/CRA: h2+$488, +$4A8, +$4EE–512, +$5B4–5D0; menu +$36166–3627E | Hardware/input: keyboard serial data and acknowledgment. CIAB timer B is programmed at h2+$50C/+512; its interrupt releases the keyboard handshake. These are not physics clocks. |
+| `$DFF004/6`, CIA timer-value and TOD registers | No direct absolute game reader found in either code hunk. The inspected custom/CIA-base paths implement input, DMA, audio, keyboard acknowledgment and interrupt dispatch. OS clock internals remain in KickEmu/Kickstart; this negative static result is not an exhaustive proof over dynamically computed addresses. |
+
+### Random-number streams
+
+All four routines use the same five-byte shift/XOR recurrence (right shifts of the
+first and second words, XOR of their low bytes, shift the longword left by one byte,
+append the fifth byte, replace the fifth byte with the result).
+
+| Routine | State / seed | Classification |
+|---|---|---|
+| h0+$2572C | h0+$3A7B0–3A7B4, initial five bytes fixed in the executable | Simulation (cars, AI and race choices), also scene construction. Protection consumes a menu-dependent number of draws. h2+$1FE12/+1FE42/+2265E save the state, temporarily seed from h0+$12–16, then restore it at +$2027A/+22754. Those scoped draws must remain paired. |
+| h0+$2575E | h0+$2578C–25790, fixed initial state | Sound: interrupt callers h0+$2CD3E and +$2CD6A add engine pitch jitter; separate from the gameplay state. |
+| h0+$25792 | h0+$257C4–257C8, fixed initial state | Mixed simulation/presentation/sound callers: h0+$28BB8/+28C06, +$33BE6–33C68, +$3992E/+3A218; h2+$1D884–1D976 and +$2A144. Do not move these draws to an arbitrary presentation rate before A3 classifies their writes. |
+| h2+$3652C (veneer +$325C2) | h2+$2A794–2A798 through context +$7CC; address-dependent initial longword | UI/presentation, feeding simulation via the protection seed byte. Direct callers +$31380 and +$3742C are VBL-bounded busy loops, not once-per-field calls. |
+
 ## Game time
 
 The simulation advances a fixed step per frame; elapsed real time does not enter it.
