@@ -1470,3 +1470,20 @@ The 020 TFX.FPU regression also needed the harness's longer legacy enrolment
 waits: its first attempt remained on the blank form before any flight swap.
 The archived capture and successful same-option retry distinguish this from a
 slave regression; performance fixtures and measured windows are unchanged.
+
+## Integer projection default (2026-10-22)
+
+At the user's request, the shared optimized tfx.020 renderer now always selects
+project_int_040 instead of offering CUSTOM1. The unused FPU projection helper
+and CUSTOM1 option/tag are removed. Original rendering and CUSTOM5 retain their
+existing projection bypass; all other native FPU maths is unchanged. This is a
+separate reversible change: compare against its parent by reverting the commit,
+rather than changing a CUSTOM option. The previous measurements and CUSTOM1
+test records above describe the earlier switchable build; hardware calibration
+is still outstanding.
+
+Verification: the rebuilt integer routine is byte-identical (154 bytes) to the
+previous selectable implementation. Its retained 275 native cases pass the
+independent integer oracle and four negative controls. The slave builds with
+no hunk relocations or structural errors. No new emulator run was performed,
+so the user's running game remains untouched.
