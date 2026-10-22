@@ -72,9 +72,9 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
-the shipped patch list. It asks for an optional 8 KB of expansion memory (`ws_ExpMem`):
-4 KB for bit 2's stack and 4 KB for bit 5's hot code. If allocation fails, both retain
-their chip paths. With every option off it runs the shipped slave's code paths.
+the shipped patch list. It asks for an optional 36 KB of expansion memory (`ws_ExpMem`):
+4 KB for bit 2's stack, 4 KB for bit 5's hot code and 28 KB for bit 6's lookup tables.
+If allocation fails, all three retain their chip paths. With every option off it runs the shipped slave's code paths.
 
 | Option | Effect |
 | --- | --- |
@@ -85,6 +85,8 @@ their chip paths. With every option off it runs the shipped slave's code paths.
 `Custom1` bit 3 gates walking logic to at most 12.5 passes/s (L1 below).
 Bit 4 adds walking presentation frames and includes that gate (P1 below).
 Bit 5 moves numeric helpers and projection code to fast RAM on 68020+ (M1 below).
+Bit 6 copies their read-only lookup tables to fast RAM (M2 below).
+Bit 7 accelerates horizontal span interiors on 68000 and fast-RAM 68020+ (R1 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -193,8 +195,8 @@ Inputs, three builds and 17 existing tool tests pass. Evidence: `tmp/p1/final-of
 `Custom1` bit 5 copies 2,710 bytes at boot: the numeric helpers at Disk.1
 `$4EDE4..$4EF92` and projection kernels at `$5B030..$5B918` (exclusive ends).
 These cover the two leading instruction-fetch regions in the existing bus profile.
-The optional expansion allocation is now 8 KB: the first 4 KB remains the stack;
-the second holds the copies. Relocation requires 68020+ and an allocated block in
+The first 4 KB of the optional expansion allocation holds the stack;
+the second holds the code copies. Relocation requires 68020+ and an allocated block in
 Zorro-II fast RAM or the 32-bit expansion address range. Chip/slow RAM and allocation
 failure keep the original code.
 
@@ -230,6 +232,76 @@ per-logic-publication samples on A1200-fast and the 060 cell retain walking at
 Release route play with M1 off/on shows intact cell, exterior, turning view and panel,
 then a stable stopped pose (`tmp/m1/play-off/`, `play-on/`). O1's deferred map,
 vehicle and flight coverage remains open.
+
+### M2: read-only lookup tables in fast RAM
+
+The post-M1 `bus_audit.py` run reports 10,057 chip-data reads per gameplay field.
+The numeric/trigonometric region at chip `$60000..$66000` (exclusive end) accounts
+for 364,337 reads over 325 fields: 11.1% of data reads, with no writes to that region
+on the route (`tmp/m2/bus.txt`, `table-reads.txt`, `profile/`).
+
+`Custom1` bit 6 copies chip `$60000..$66104` at boot and redirects 77 explicit
+table-base loads
+for chip `$60000` and `$64000`. The original data remains available to other readers.
+The same CPU/fast-memory guard as M1 applies; this option also works without M1.
+The optional expansion allocation is now 36 KB, retaining the stack and code slots.
+The copy includes the angle lookup at chip `$66002..$66102`: the MMU check exposed
+its use by Disk.1 `$5231E` beyond the main 24 KB tables. The allocation is rounded
+to WHDLoad's required 4 KB pages.
+The existing post-patch cache flush covers the changed operands. No per-frame work
+or new guest instrumentation is added. The corrected post-M2 bus census gives
+8,501 chip-data reads per field (`tmp/m2/final-bus.txt`); the remaining drawing
+costs are examined together with R1.
+
+### R1: horizontal span interiors
+
+The sixteen colour variants share a word-at-a-time, four-bitplane fill loop.
+Before the rewrite, their full-word interiors account for 7.18% of the A500 profile
+(`tmp/m2/r1-000/`); colour 14 alone is 3.57%. The post-M1 A1200-fast profile spends
+4.96% there (`tmp/m2/profile/`). These loops do not use the moved lookup tables:
+they repeatedly fetch store instructions and write the chip bitplanes.
+
+`Custom1` bit 7 replaces their interiors at Disk.1 `$4978C + colour*$B6`.
+The original clipping and left/right masks stay in place. The 68000 variant writes
+pairs of words with long stores and handles an odd word separately. The 68020+
+variant requires fast RAM, first aligns the destination, then uses an 80-byte routine
+with a compact
+paired-store loop; an odd final word remains a word write. Both advance the same
+pointer by the same amount and preserve the native edge-mask inputs. The chip-only
+020 keeps the native loop: a measured 9.40 → 9.20 fps regression
+showed the call/alignment overhead was not worthwhile there. No blitter or
+change to buffer layout is involved. In the same VERIFY build, the A1200-fast
+route spends 5.14% of CPU time in the original interiors versus 4.32% in the patched
+calls and replacements (`tmp/m2/final-profile-020-off/`, `final-profile-020-on/`).
+The smaller FPS gain reflects the remaining drawing cost and field-boundary waits.
+
+M2 and R1 were completed together by user decision. Final same-build, same-session
+500-field measurements (`Custom1=63` versus `255`):
+
+| Cell | Both off fps | Both on fps |
+| --- | ---: | ---: |
+| a500-1.5m | 4.00 | 4.10 |
+| a1200, no fast RAM | 9.40 | 9.40 |
+| a1200-fast | 10.90 | 11.30 |
+| 030 default | 12.40 | 12.40 |
+| 030 MMU | 12.40 | 12.50 |
+| 040 25 MHz | 14.60 | 16.50 |
+| 060 50 MHz | 15.90 | 16.90 |
+| 040 8 MHz sanity | 14.10 | 16.50 |
+
+The same final build with only M2 added (`Custom1=127`) gives 11.20 fps on
+A1200-fast: M2 contributes 0.30 fps, R1 another 0.10 fps. The earlier corrected
+same-build pair repeated those counts, and R1 raised A500 from 4.00 to 4.10 fps.
+Evidence: `tmp/m2/accepted-off/`, `accepted-on/`, `accepted-020-data-only.json`,
+`020-v2-*.json`, `000-v2-*.json`. No measured matrix losses remain. The 040 frequency
+sanity remains advisory; 040/060 counts are not hardware-speed predictions.
+
+All options off and shipped both give 37 A500 frames. The release world-speed checks
+on A1200-fast and 060 retain 6 walking units and 2 heading units per field. Release
+route screenshots with the span option off/on show intact edges, scenery and panel;
+the stopped poses remain stable. A500 route screenshots also show intact drawing.
+Evidence: `tmp/m2/options-off.json`, `shipped.json`, `world-*.json`, `play-off/`,
+`play-on/`, `final-profile-000-on/`. Deferred map, vehicle and flight coverage remains.
 
 ## Running
 

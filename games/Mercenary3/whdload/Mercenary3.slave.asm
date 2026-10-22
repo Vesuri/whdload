@@ -19,6 +19,8 @@
 
 STACKSIZE	= $1000
 HOTSIZE		= $1000
+TABLESIZE	= $6104
+TABLEMEM	= $7000		;ws_ExpMem requires whole 4 KB pages
 
 ;======================================================================
 
@@ -32,7 +34,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$41			;ws_keyexit = Backspace
-_expmem		dc.l	-(STACKSIZE+HOTSIZE)	;optional stack and hot code
+_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM) ;optional stack, code and tables
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -58,6 +60,8 @@ _config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
 		dc.b	"C1:X:Native walking logic rate:3;"
 		dc.b	"C1:X:Walking presentation frames (includes logic gate):4;"
 		dc.b	"C1:X:Hot code in fast RAM (68020+):5;"
+		dc.b	"C1:X:Read-only lookup tables in fast RAM (68020+):6;"
+		dc.b	"C1:X:Longword horizontal span fills:7;"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -194,6 +198,8 @@ lbC0002AA
 	move.l	#$4e714e71,($5a834).l
 .nopresent
 	bsr.w	_hotcode
+	bsr.w	_hotdata
+	bsr.w	_patchspans
 	moveq	#CACRF_EnableI,d0
 	move.l	d0,d1
 	movea.l	(_resload,pc),a0
@@ -289,6 +295,219 @@ _hotentries
 	dc.l	$57914
 	dc.w	$4b2e2-$4b134+$57914-$57380
 	dc.l	0
+
+; M2: the read-only lookup region at chip $60000..$66103 supplies
+; the renderer's numeric and trigonometric tables. Keep the original copy
+; for unpatched users; redirect the explicit table-base loads only.
+_hotdata
+	btst	#6,(_custom1+3,pc)
+	beq.w	.done
+	move.w	(_attn,pc),d0
+	btst	#AFB_68020,d0
+	beq.w	.done
+	move.l	(_expmem,pc),d0
+	cmpi.l	#$200000,d0
+	blo.w	.done
+	cmpi.l	#$a00000,d0
+	blo.b	.fast
+	cmpi.l	#$1000000,d0
+	blo.w	.done
+.fast	addi.l	#STACKSIZE+HOTSIZE,d0
+	movea.l	d0,a1
+	move.l	d0,d1
+	lea	($60000).l,a0
+	move.w	#TABLESIZE/4-1,d0
+.copy	move.l	(a0)+,(a1)+
+	dbra	d0,.copy
+	lea	(_table60000,pc),a0
+	bsr.b	.patch
+	addi.l	#$4000,d1
+	lea	(_table64000,pc),a0
+.patch	move.l	(a0)+,d0
+	beq.b	.done
+	movea.l	d0,a1
+	move.l	d1,(a1)
+	bra.b	.patch
+.done	rts
+
+; Operands of table-base movea.l/lea instructions. To map an operand
+; to Disk.1, add $3CB0. None lies in M1's copied code blocks.
+_table60000
+	dc.l	$45194,$45608,$45814,$458ae,$4c200
+	dc.l	$4c6b2,$4c990,$4e4ca,$4e59e,$4f7c6
+	dc.l	$4fb7e,$4fbf0,$506ba,$50bd4,$51a5a
+	dc.l	$536f8,$539f8,$53ae0,$53b20,$54020
+	dc.l	$54096,$54358,$54716,$54b76,$55714
+	dc.l	$56654,$5668e,$56c76,$5709a,$57122
+	dc.l	$571b0,$5727a,$57318,$583ee,$58c50
+	dc.l	$5a8ec,$5b796,$5c140
+	dc.l	0
+_table64000
+	dc.l	$4518e,$4519a,$45602,$4580e,$458a8
+	dc.l	$4c1fa,$4c6ac,$4c6b8,$4c98a,$4e4c4
+	dc.l	$4e598,$4f7c0,$4fb78,$4fbea,$506b4
+	dc.l	$50bce,$51a54,$536f2,$539f2,$53ada
+	dc.l	$53b1a,$5401a,$54090,$54352,$54710
+	dc.l	$54b70,$5570e,$56688,$56c7c,$57094
+	dc.l	$5711c,$571aa,$57274,$57312,$583e8
+	dc.l	$58c4a,$5a8e6,$5b790,$5c13a
+	dc.l	0
+
+; R1: full-word interiors of the sixteen horizontal colour spans.
+; Disk.1 $4978C + colour*$B6: replace the count setup with a call,
+; then branch over the old word loop to its unchanged right-edge mask.
+_patchspans
+	btst	#7,(_custom1+3,pc)
+	beq.b	.done
+	lea	(_span000,pc),a0
+	move.w	(_attn,pc),d0
+	btst	#AFB_68020,d0
+	beq.b	.install
+; The 020 chip-only cell loses to call/alignment overhead: keep it native.
+	move.l	(_expmem,pc),d0
+	cmpi.l	#$200000,d0
+	blo.b	.done
+	cmpi.l	#$a00000,d0
+	blo.b	.fast
+	cmpi.l	#$1000000,d0
+	blo.b	.done
+.fast	lea	(_span020,pc),a0
+.install
+	lea	(_spans,pc),a2
+	lea	($45adc).l,a1
+	moveq	#15,d1
+.next	move.w	(a0)+,d0
+	ext.l	d0
+	add.l	a2,d0
+	move.w	#$4eb9,(a1)
+	move.l	d0,(2,a1)
+	move.w	#$6010,(6,a1)
+	adda.w	#$b6,a1
+	dbra	d1,.next
+.done	rts
+
+; d5=0, d6=-1 from native setup; d2 is the remaining pixel width.
+; Retain native masks at both ends and write exactly its complete words.
+; 000: pairs at either even alignment. 020+: align to a longword first;
+; the small paired loop fits the instruction cache without unrolling.
+_SPAN MACRO
+	move.w	d2,d7
+	lsr.w	#4,d7
+	beq.b	.done
+	IFNE \5
+	move.w	a0,d5
+	andi.w	#2,d5
+	beq.b	.aligned
+	moveq	#0,d5
+	move.w	\1,(a0)+
+	move.w	\2,(7998,a0)
+	move.w	\3,(15998,a0)
+	move.w	\4,(23998,a0)
+	subq.w	#1,d7
+.aligned
+	moveq	#0,d5
+	subq.w	#2,d7
+	bmi.b	.tail
+.loop	move.l	\1,(a0)+
+	move.l	\2,(7996,a0)
+	move.l	\3,(15996,a0)
+	move.l	\4,(23996,a0)
+	subq.w	#2,d7
+	bpl.b	.loop
+.tail	addq.w	#1,d7
+	bmi.b	.done
+	move.w	\1,(a0)+
+	move.w	\2,(7998,a0)
+	move.w	\3,(15998,a0)
+	move.w	\4,(23998,a0)
+	ELSE
+	lsr.w	#1,d7
+	bcc.b	.pairs
+	move.w	\1,(a0)+
+	move.w	\2,(7998,a0)
+	move.w	\3,(15998,a0)
+	move.w	\4,(23998,a0)
+.pairs	subq.w	#1,d7
+	bmi.b	.done
+.loop	move.l	\1,(a0)+
+	move.l	\2,(7996,a0)
+	move.l	\3,(15996,a0)
+	move.l	\4,(23996,a0)
+	dbra	d7,.loop
+	ENDC
+.done	move.w	#-1,d7
+	rts
+	ENDM
+
+_span000
+	dc.w	_span0_000-_spans,_span1_000-_spans,_span2_000-_spans,_span3_000-_spans,_span4_000-_spans,_span5_000-_spans,_span6_000-_spans,_span7_000-_spans,_span8_000-_spans,_span9_000-_spans,_span10_000-_spans,_span11_000-_spans,_span12_000-_spans,_span13_000-_spans,_span14_000-_spans,_span15_000-_spans
+_span020
+	dc.w	_span0_020-_spans,_span1_020-_spans,_span2_020-_spans,_span3_020-_spans,_span4_020-_spans,_span5_020-_spans,_span6_020-_spans,_span7_020-_spans,_span8_020-_spans,_span9_020-_spans,_span10_020-_spans,_span11_020-_spans,_span12_020-_spans,_span13_020-_spans,_span14_020-_spans,_span15_020-_spans
+_spans
+_span0_000
+	_SPAN	d5,d5,d5,d5,0
+_span1_000
+	_SPAN	d6,d5,d5,d5,0
+_span2_000
+	_SPAN	d5,d6,d5,d5,0
+_span3_000
+	_SPAN	d6,d6,d5,d5,0
+_span4_000
+	_SPAN	d5,d5,d6,d5,0
+_span5_000
+	_SPAN	d6,d5,d6,d5,0
+_span6_000
+	_SPAN	d5,d6,d6,d5,0
+_span7_000
+	_SPAN	d6,d6,d6,d5,0
+_span8_000
+	_SPAN	d5,d5,d5,d6,0
+_span9_000
+	_SPAN	d6,d5,d5,d6,0
+_span10_000
+	_SPAN	d5,d6,d5,d6,0
+_span11_000
+	_SPAN	d6,d6,d5,d6,0
+_span12_000
+	_SPAN	d5,d5,d6,d6,0
+_span13_000
+	_SPAN	d6,d5,d6,d6,0
+_span14_000
+	_SPAN	d5,d6,d6,d6,0
+_span15_000
+	_SPAN	d6,d6,d6,d6,0
+_span0_020
+	_SPAN	d5,d5,d5,d5,1
+_span1_020
+	_SPAN	d6,d5,d5,d5,1
+_span2_020
+	_SPAN	d5,d6,d5,d5,1
+_span3_020
+	_SPAN	d6,d6,d5,d5,1
+_span4_020
+	_SPAN	d5,d5,d6,d5,1
+_span5_020
+	_SPAN	d6,d5,d6,d5,1
+_span6_020
+	_SPAN	d5,d6,d6,d5,1
+_span7_020
+	_SPAN	d6,d6,d6,d5,1
+_span8_020
+	_SPAN	d5,d5,d5,d6,1
+_span9_020
+	_SPAN	d6,d5,d5,d6,1
+_span10_020
+	_SPAN	d5,d6,d5,d6,1
+_span11_020
+	_SPAN	d6,d6,d5,d6,1
+_span12_020
+	_SPAN	d5,d5,d6,d6,1
+_span13_020
+	_SPAN	d6,d5,d6,d6,1
+_span14_020
+	_SPAN	d5,d6,d6,d6,1
+_span15_020
+	_SPAN	d6,d6,d6,d6,1
 
 _pl	PL_START
 	PL_W	$716,DMAF_SETCLR|DMAF_MASTER	;game enables master DMA only

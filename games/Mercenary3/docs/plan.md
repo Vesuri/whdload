@@ -12,8 +12,9 @@ whose dependencies are met. Design and decisions: [open work](open-work.md). Rul
   the shipped code. Debug aids go in the `VERIFY` build.
 - **Build** with `make original slave verify` before each commit.
 - **Measure** with `tools/fps.py` on `a1200-fast` and `a500-1.5m`: the same build with the
-  option off and on, same session. Keep a change only if it gains 2% or more somewhere and
-  loses nowhere. L1 is a correctness prerequisite: accept native world speed and
+  option off and on, same session. Keep a change only if it gives a repeatable measured
+  gain somewhere and loses nowhere; there is no fixed percentage cutoff (user decision).
+  L1 is a correctness prerequisite: accept native world speed and
   the intentional 12.5 Hz logic cap rather than requiring an FPS gain. Run
   `tools/matrix.sh` only where a step says so. The 040/060 cells give
   emulator counts that don't follow the CPU frequency; use them only to check that the game
@@ -116,8 +117,9 @@ collision (`$6F56`), a mode change or a stop.
 - Only on a 68020 or later with real fast RAM; otherwise the original code.
 - Check: play; options-off test; measure on `a1200-fast`, then `matrix.sh`.
 
-**M2. Hot read-only data** used by the moved code, if `bus_audit.py` still shows chip reads
-worth 2% or more. Same checks.
+**M2. Hot read-only data** used by the moved code, if `bus_audit.py` still shows worthwhile chip reads
+and moving them gives a repeatable measured gain. Same checks. Implement and assess
+with R1 (user decision), retaining separate options and measurements for each change.
 
 ### R. Faster drawing
 
@@ -147,8 +149,8 @@ CPU class, and the options-off test.
 - [x] O1
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
-- [x] M1 [ ] M2
-- [ ] R1 [ ] R2 [ ] R3 [ ] R4
+- [x] M1 [x] M2
+- [x] R1 [ ] R2 [ ] R3 [ ] R4
 - [ ] X1
 
 P1 and M1 are independent; after L1 they can run side by side.
@@ -156,7 +158,7 @@ P1 and M1 are independent; after L1 they can run side by side.
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–5.
+  with `Custom1` bits 0–7.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes).

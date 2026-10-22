@@ -22,7 +22,7 @@ split and the measured game-time model ([internals](internals.md)).
 - The slave's `_dmaon` waits for a vertical blank on every frame (14.7% of the CPU time)
   and leaves 12 of the frame's 34 copied bytes uncopied. The performance slave's `Custom1`
   bit 0 fixes both: 7.40 to 8.98 fps on `a1200-fast`, same build.
-- All game code and data are in chip RAM, even with fast RAM fitted. On `a1200-fast`, 80%
+- In the shipped game, all code and data are in chip RAM, even with fast RAM fitted. On `a1200-fast`, 80%
   of the CPU's chip accesses are code fetches (50%), CPU-only data (21%) and the stack
   (7%); only the display buffers (20%) need chip RAM. The instruction cache hits about 43%
   of fetched longwords; 95% of the misses come from 18.5 KB of code.
@@ -57,6 +57,12 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- Combine M2 with R1 to investigate what limits the hot drawing loops (user decision).
+  Measure table relocation and loop rewrites separately, then commit the combined step.
+
+- Remove the fixed 2% gain cutoff (user decision: "2% is too high of a requirement").
+  Retain changes with a repeatable measured gain and no measured regressions.
+
 - Correct P1's restore check to allow normal interrupt-owned state to advance while
   checking that presentation code restores its changes (user decision). A publication
   probe advanced VERTB 178 → 179 and changed timers at chip `$7236` and `$727E`;
@@ -87,8 +93,9 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md); P2 is next. M1 is complete: optional hot code in fast RAM
-raises A1200-fast from 9.50 to 10.90 fps and leaves A500 at 4.00 fps in the same-build
-comparison. The machine matrix has no measured losses; options off matches shipped,
-world speed and route play pass. P1's walking presentation frames remain in place.
-O1's map, vehicle and flight coverage remains deferred as recorded above.
+Follow [plan.md](plan.md); P2 is next. M2 and R1 are complete together: optional
+read-only tables in fast RAM and paired longword horizontal span fills. On the same
+build, A1200-fast improves from 10.90 to 11.20 fps with M2, then 11.30 with R1;
+A500 improves from 4.00 to 4.10 fps. The chip-only 020 keeps its native span loop.
+The combined matrix has no measured losses; options off matches shipped, world
+speed and route play pass. O1's map, vehicle and flight coverage remains deferred.
