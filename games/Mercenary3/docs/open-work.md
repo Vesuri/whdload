@@ -104,9 +104,6 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md); P2 is next. M2 and R1 are complete together: optional
-read-only tables in fast RAM and paired longword horizontal span fills. On the same
-build, A1200-fast improves from 10.90 to 11.20 fps with M2, then 11.30 with R1;
-A500 improves from 4.00 to 4.10 fps. The chip-only 020 keeps its native span loop.
-The combined matrix has no measured losses; options off matches shipped, world
-speed and route play pass. O1's map, vehicle and flight coverage remains deferred.
+Follow [plan.md](plan.md): phase S (frames in one field) comes next, starting with the S0
+question. The [frame budget](internals.md#frame-budget-toward-50-fps) shows why: without
+drawing, presentation frames still take two fields on `a1200-fast`.

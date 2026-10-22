@@ -131,6 +131,10 @@ read, write) and region, counts misaligned longwords and compares slot use insid
 outside the bitplane lines: `KEEP_TRACE=1 python3 tools/route_profile.py tmp/prof/bus` then
 `python3 tools/bus_audit.py tmp/prof/bus 175` (about 3 GB of chunks; delete them afterwards).
 
+The `VERIFY` build's `Custom2` makes drawing routines return at once (see
+[the frame budget](internals.md#frame-budget-toward-50-fps)): compare `fps.py` runs with
+and without it to price drawing on the 030/040/060, whose cores record no profile.
+
 `route_profile.py` finds the live slave in fast RAM, or in slow RAM on the `a500` setups.
 FS-UAE's screenshots can carry non-Amiga colours in the right border on the A500 setup;
 they are not game output (OCS colours are multiples of 17 per channel).

@@ -755,3 +755,40 @@ The 12.5 Hz logic gate is not a rendering cap: the measured 16.50 fps includes
 presentation frames. Before choosing further renderer work over R2's blitter clear,
 measure drawing, clearing, publication waits and presentation overhead separately
 on the existing 040 cell, retaining the emulator timing caveat.
+
+### Frame budget toward 50 fps
+
+The `VERIFY` build's `Custom2` bits make drawing routines return at once (bit 0 the 3D
+drawing `$577BE`, 1 the clear `$5E840`, 2 `$5410E`, 3 `$5AFAA`, 4 `$593A6`). The 030 and
+040 cores record no profile ("Protocol error" on `monitor profile`), so this elimination is
+the frame-cost instrument there. `fps.py`, 500-field route, `Custom1=255`, one session:
+
+| `Custom2` (skipped) | a1200-fast | 030/50 | 040-25 cell |
+| --- | ---: | ---: | ---: |
+| 0 (none) | 11.3 | 12.5 | 16.5 |
+| 1 (3D drawing) | 17.4 | 24.8 | 24.9 |
+| 2 (clear) | 11.6 | 12.6 | 18.4 |
+| 4 (`$5410E`) | 11.3 | 12.5 | 16.5 |
+| 8 (`$5AFAA`) | 11.6 | 13.7 | 19.1 |
+| 16 (`$593A6`) | 11.0 | 12.4 | 16.7 |
+| 31 (all five) | 25.4 | 37.0 | 49.6 |
+
+Frames land on whole fields, so single bypasses under a field change little. Without any
+drawing, frames still take two fields on `a1200-fast` and about 1.35 on the 030. The
+profile of that case (`tmp/prof/nodraw/`) shows why:
+
+- The CPU waits 43% of the time in the publication's field wait: presentation work that
+  spills past the field boundary costs a whole second field.
+- P1's save and restore copy the 17,366-byte restore set word by word, both ways, on every
+  presentation: about 17% of all cycles, roughly 200,000 cycles (0.7 field) per presentation
+  frame on the 020. Most of the set is render scratch at chip `$0340..$4000`.
+- Scene setup (`$5765E`, not bypassed) is 15.5% inclusive, about 0.3 field per frame.
+
+With all options on (`tmp/prof/b255/`, a1200-fast), the 3D drawing is half of a logic pass
+(625,000 of 1,245,000 cycles), `$5410E` 15%, `$5AFAA` 13%, publication 11% (mostly its
+field wait), `$593A6` 7%, the clear 4%, logic 1.3%. The CPU still makes 10,400 instruction
+fetches per field from chip RAM; 95% come from 20 KB of code, led by Disk.1
+`$524B0..$53AB0` (33%, containing the self-modified words at `$533B0..`), `$48DB0..$4A5B0`
+(25%, the span fills and the word at `$4966A`), `$5B8B0..$5C4B0` (12%) and `$575B0..$580B0`
+(11%). Display buffers take 4,500 CPU writes and 1,900 reads per field, much of it
+read-modify-write.

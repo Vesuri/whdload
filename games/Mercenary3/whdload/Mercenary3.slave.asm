@@ -200,6 +200,9 @@ lbC0002AA
 	bsr.w	_hotcode
 	bsr.w	_hotdata
 	bsr.w	_patchspans
+	IFD VERIFY
+	bsr.w	_bypass
+	ENDC
 	moveq	#CACRF_EnableI,d0
 	move.l	d0,d1
 	movea.l	(_resload,pc),a0
@@ -385,6 +388,24 @@ _patchspans
 	adda.w	#$b6,a1
 	dbra	d1,.next
 .done	rts
+
+	IFD VERIFY
+; Custom2 (VERIFY only): skip drawing routines to find each one's share of the frame
+; time on CPUs without an instruction trace. Bits 0..4: the 3D drawing (Disk.1 $577BE),
+; the back-buffer clear ($5E840), $5410E, $5AFAA and $593A6 return at once.
+_bypass	lea	(_bypassed,pc),a0
+	moveq	#0,d1
+.next	move.l	(a0)+,d0
+	beq.b	.done
+	btst	d1,(_custom2+3,pc)
+	beq.b	.skip
+	movea.l	d0,a1
+	move.w	#$4e75,(a1)
+.skip	addq.w	#1,d1
+	bra.b	.next
+.done	rts
+_bypassed	dc.l	$53b0e,$5ab90,$5045e,$572fa,$556f6,0
+	ENDC
 
 ; d5=0, d6=-1 from native setup; d2 is the remaining pixel width.
 ; Retain native masks at both ends and write exactly its complete words.
@@ -996,6 +1017,10 @@ _tags	dc.l	WHDLTAG_ATTNFLAGS_GET
 _attn	dc.w	0
 	dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
+	IFD VERIFY
+	dc.l	WHDLTAG_CUSTOM2_GET
+_custom2	dc.l	0
+	ENDC
 	dc.l	0
 
 _resload	dc.l	0

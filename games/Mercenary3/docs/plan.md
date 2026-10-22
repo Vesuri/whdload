@@ -1,8 +1,8 @@
 # Plan
 
 Goal: faster on every supported machine, rendering up to 50 fps, world and game logic at
-their native speed. Steps are in order of value to the player; take the first one not done
-whose dependencies are met. Design and decisions: [open work](open-work.md). Rules:
+their native speed. 50 fps means a frame, logic or presentation, in one field (20 ms). Steps
+are in order of value; take the first one not done whose dependencies are met. Design and decisions: [open work](open-work.md). Rules:
 `AGENTS.md`.
 
 ## How to work
@@ -19,6 +19,11 @@ whose dependencies are met. Design and decisions: [open work](open-work.md). Rul
   `tools/matrix.sh` only where a step says so. The 040/060 cells give
   emulator counts that don't follow the CPU frequency. Include `040-25` in routine
   off/on comparisons (user decision), but do not treat its FPS as a hardware-speed prediction.
+- **Price frame time** on `a1200-fast` with `route_profile.py` (instruction profile) and on
+  the 030/040/060 with the `VERIFY` build's `Custom2` drawing bypass: `fps.py` with and
+  without it ([frame budget](internals.md#frame-budget-toward-50-fps)). Those cores record no
+  profile. The cycle-exact 030/50 is the trustworthy fast cell until **(U)** decides
+  otherwise (S0).
 - **Check the game still works** with three tests, not more:
   1. **Options off:** the performance slave gives the shipped slave's frame count in the
      same session on `a500-1.5m`.
@@ -102,6 +107,9 @@ collision (`$6F56`), a mode change or a stop.
 - The vehicle, flight and lift paths (`Disk.1` `$5E214`, `$5E3CA`) move a step per frame,
   so they run fast on fast machines today. Gating them restores native speed **(U)**.
 - For each agreed mode, apply L1 and P1. Leave the rest native.
+- These modes are also where O1's deferred map, vehicle and flight checks happen: check
+  each screen with options 0–2 on, including whether it sets its own fetch window under
+  FMODE 3.
 - Check: world speed in that mode; play.
 
 ### M. Code and data in fast RAM (68020+ with fast RAM)
@@ -121,6 +129,64 @@ collision (`$6F56`), a mode change or a stop.
 and moving them gives a repeatable measured gain. Same checks. Implement and assess
 with R1 (user decision), retaining separate options and measurements for each change.
 
+### S. Frames in one field (the 50 fps path)
+
+Measured with all options on: drawing nothing still takes 2 fields per frame on
+`a1200-fast` and 1.35 on the 030/50, because presentation frames carry fixed costs (save and
+restore, scene setup) that push their publication past the field boundary. With drawing,
+the 030/50 needs about 4 fields. S2 removes the fixed costs; S3 and S4 take drawing off the
+chip bus. Targets, per frame on the 030/50: S2 no-draw frames in one field; S4 full frames
+in two fields or fewer (25 fps); 50 fps on a real 68040/68060 is the expectation to check
+in S6, not a promise.
+
+**S0. Reference fast machine (U).** The 040/060 emulator cells don't follow the CPU clock,
+so they can't confirm 50 fps. Ask the user: the 030/50 as the reference, fixing the shared
+emulator's 040 timing, or real-hardware tests. Record the answer; it decides S6's targets.
+
+**S1. Restore buffer out of the slave file.** P1's 17,366-byte buffer is a `ds.b` in the
+slave (22.9 KB file instead of about 6 KB). Take it from the expansion memory instead, with
+presentation frames off when that memory is missing. Check: P1's hash check; slave size.
+
+**S2. Cheaper presentation frames.** About 0.7 field per presentation on `a1200-fast` goes
+to copying the restore set word by word, and 0.3 to scene setup (`$5765E`).
+- Restore only what something reads before rewriting it. Render scratch (chip
+  `$0340..$4000`, most of the set) that the drawing always writes before reading needs no
+  restore. Test each candidate range with a `VERIFY` poison fill after every presentation:
+  the committed state (`state_trace.py --compare` against poison off) and the screenshots
+  must not change.
+- Copy what remains with long or `movem` moves, from and to fast RAM where possible.
+- Find whether scene setup can be skipped or shared when its inputs haven't changed since
+  the last frame; keep it if not.
+- Check: P1's hash check, the poison test, world speed, play. Measure: `a1200-fast`
+  profile (cycles per presentation) and the `Custom2=31` frame rate on all cells: the 030
+  must reach about 50 fps without drawing.
+
+**S3. The rest of the hot renderer code in fast RAM** (extends M1). 20 KB covers 95% of the
+remaining fetches: Disk.1 `$524B0..$53AB0`, `$48DB0..$4A5B0`, `$5B8B0..$5C4B0`,
+`$575B0..$580B0`, then the smaller blocks in the frame budget. These contain the
+self-modifying sites (chip `$459BA`, `$4F700..`, `$4F9C2..`): point their writers at the
+copies, or use the slave's 68040 indirect-call variant, then flush. Same guard as M1.
+Check: play, options off, world speed. Measure on all cells.
+
+**S4. Draw into fast RAM, copy to chip once** (68020+ with real fast RAM, new bit).
+- Give the renderer a staging bitmap in fast RAM for the 3D view (point the back-buffer
+  base at chip `$42C00` used by the drawing there). The clear and the read-modify-write
+  drawing then happen in fast RAM.
+- After drawing, copy the view's rows into the chip back buffer with `movem` (about 22 KB),
+  then publish. Find first who else writes the back buffer (the panel and text below row
+  140): keep those writes in chip, or copy those rows too.
+- Expansion memory grows by the staging bitmap (about 32 KB including panel rows if
+  needed).
+- Check: screenshots off/on identical in a still scene, play, world speed. Measure on all
+  cells; keep it only where it gains (the playbook's Powerdrome case gained only with the
+  code in fast RAM too).
+
+**S5. Publication wait.** Re-measure the publication's field wait after S4. If it is still
+a large share on fast cells, decide R3 (triple buffering) with the numbers.
+
+**S6. ✓ Budget checkpoint.** `matrix.sh` with all options, the frame budget table
+again, and the S0 target check. Record what limits each cell next.
+
 ### R. Faster drawing
 
 **R1. Renderer inner loops.** Profile the drawing routines on `a1200-fast` and `a500-1.5m`.
@@ -129,10 +195,11 @@ stores; 68020+: cache-sized loops). Compare screenshots with the option off and 
 a pixel twin only if they differ. Keep each rewrite only where it gains.
 
 **R2. Blitter back-buffer clear** (new bit). Clear the 3D view with the blitter instead of
-the CPU (`$5E840`). Wait for the blitter before the first drawing. Measure per CPU class.
+the CPU (`$5E840`). Wait for the blitter before the first drawing. After S4 this matters
+only where S4 is off: the A500 and the chip-only A1200. Measure there.
 
-**R3. Triple buffering (U).** It removes the publication's wait for the next field (7–10%
-on `a1200-fast`). It needs 32 KB of chip RAM beyond the 512 KB BaseMem, which drops 512 KB
+**R3. Triple buffering (U).** Decide after S5. It removes the publication's wait for the
+next field (7–10% on `a1200-fast` with drawing). It needs 32 KB of chip RAM beyond the 512 KB BaseMem, which drops 512 KB
 chip machines.
 
 **R4. Data cache on 68030+ (U).** Measure the slave requesting the data cache as well, then
@@ -141,8 +208,10 @@ ask.
 ### X. Release
 
 **X1.** Propose one player-facing toggle and its default **(U)**. Update the ReadMe
-(requirements, options). Run `matrix.sh`, a play pass with the release options on each
-CPU class, and the options-off test.
+(requirements, expansion memory, options). Run `matrix.sh`, a play pass with the release
+options on each CPU class, and the options-off test. Ask whether a real-hardware test is
+possible **(U)**: no emulator cell confirms 040/060 speed or real cache behaviour with the
+moved and self-modifying code.
 
 ## Status
 
@@ -150,10 +219,12 @@ CPU class, and the options-off test.
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
 - [x] M1 [x] M2
+- [ ] S0 [ ] S1 [ ] S2 [ ] S3 [ ] S4 [ ] S5 [ ] S6
 - [x] R1 [ ] R2 [ ] R3 [ ] R4
 - [ ] X1
 
-P1 and M1 are independent; after L1 they can run side by side.
+Next: S0 (ask), S1, S2, then S3 and S4. P2 and P3 can run alongside S3/S4; they touch
+the presentation path, so not alongside S2.
 
 ## In place
 
@@ -161,5 +232,6 @@ P1 and M1 are independent; after L1 they can run side by side.
   with `Custom1` bits 0–7.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
-  `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes).
+  `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the
+  `VERIFY` build's `Custom2` drawing bypass.
 - The game-time model and the renderer's inputs and writes ([internals](internals.md)).
