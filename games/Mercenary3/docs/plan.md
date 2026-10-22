@@ -22,8 +22,7 @@ are in order of value; take the first one not done whose dependencies are met. D
 - **Price frame time** on `a1200-fast` with `route_profile.py` (instruction profile) and on
   the 030/040/060 with the `VERIFY` build's `Custom2` drawing bypass: `fps.py` with and
   without it ([frame budget](internals.md#frame-budget-toward-50-fps)). Those cores record no
-  profile. The cycle-exact 030/50 is the trustworthy fast cell until **(U)** decides
-  otherwise (S0).
+  profile. The cycle-exact 030/50 is the reference fast machine (S0, user decision).
 - **Check the game still works** with three tests, not more:
   1. **Options off:** the performance slave gives the shipped slave's frame count in the
      same session on `a500-1.5m`.
@@ -139,9 +138,8 @@ chip bus. Targets, per frame on the 030/50: S2 no-draw frames in one field; S4 f
 in two fields or fewer (25 fps); 50 fps on a real 68040/68060 is the expectation to check
 in S6, not a promise.
 
-**S0. Reference fast machine (U).** The 040/060 emulator cells don't follow the CPU clock,
-so they can't confirm 50 fps. Ask the user: the 030/50 as the reference, fixing the shared
-emulator's 040 timing, or real-hardware tests. Record the answer; it decides S6's targets.
+**S0. Reference fast machine.** Decided: the cycle-exact 030/50 (`030-default` matrix
+cell). S2, S4 and S6 targets are judged there; the 040/060 cells only confirm the game runs.
 
 **S1. Restore buffer out of the slave file.** P1's 17,366-byte buffer is a `ds.b` in the
 slave (22.9 KB file instead of about 6 KB). Take it from the expansion memory instead, with
@@ -219,11 +217,11 @@ moved and self-modifying code.
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
 - [x] M1 [x] M2
-- [ ] S0 [ ] S1 [ ] S2 [ ] S3 [ ] S4 [ ] S5 [ ] S6
+- [x] S0 [ ] S1 [ ] S2 [ ] S3 [ ] S4 [ ] S5 [ ] S6
 - [x] R1 [ ] R2 [ ] R3 [ ] R4
 - [ ] X1
 
-Next: S0 (ask), S1, S2, then S3 and S4. P2 and P3 can run alongside S3/S4; they touch
+Next: S1, S2, then S3 and S4. P2 and P3 can run alongside S3/S4; they touch
 the presentation path, so not alongside S2.
 
 ## In place

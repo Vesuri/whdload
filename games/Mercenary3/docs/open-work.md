@@ -57,6 +57,10 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- The reference fast machine for the 50 fps path is the cycle-exact 68030/50
+  (`030-default` cell) (user decision, S0). The 040/060 emulator cells only confirm the
+  game runs there.
+
 - Include the existing `040-25` matrix configuration in routine FPS comparisons,
   alongside `a1200-fast` and `a500-1.5m` (user decision). Keep that configuration;
   do not substitute the separate `a1200-040` preset.
@@ -104,6 +108,5 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md): phase S (frames in one field) comes next, starting with the S0
-question. The [frame budget](internals.md#frame-budget-toward-50-fps) shows why: without
+Follow [plan.md](plan.md): phase S (frames in one field) comes next, starting with S1. The [frame budget](internals.md#frame-budget-toward-50-fps) shows why: without
 drawing, presentation frames still take two fields on `a1200-fast`.
