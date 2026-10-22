@@ -14,6 +14,8 @@ and:
                      quickrace, then profile FIELDS (default 500) fields from the green
                      light, the retirement/towing scene or the follow camera
                      (PHASE green|tow|follow) into DIR; see tools/race_profile.py
+  raceclock DIR      quickrace, then run the race to the results screen, sampling the game's
+                     frame counter; see tools/race_clock.py
 Input goes through the native build's harness: gdb monitor key|mouse|input|fields.
 The CPU stays halted from reset until the first command (BOOT_BREAK, below); `cont` resumes.
 Uses the native arm64 FS-UAE ($FSUAE_ARM) unless FSUAE is set; it profiles the whole
@@ -44,9 +46,14 @@ SCREENS = {
                    (636, 146): 0x009900},
     'viewing':    {(206, 74): 0x009900, (247, 78): 0x009900,        # banner: green "Viewing"
                    (272, 81): 0x009900},
+    'results':    {(190, 252): 0xcc0000, (590, 252): 0xcc0000,      # Non Championship Results
+                   (190, 200): 0x667799, (590, 292): 0x667799},
+    'times':      {(120, 438): 0x667799, (650, 438): 0x667799,      # Race Finishing Times
+                   (200, 100): 0xffff44},
 }
 HOME = (74, 54)            # the pointer's top-left clamp
-OK = {'language': (395, 358), 'startup': (395, 313), 'track': (235, 391)}
+OK = {'language': (395, 358), 'startup': (395, 313), 'track': (235, 391),
+      'times': (390, 252)}   # results menu: Race Finishing Times
 KEY_A, KEY_RETURN = 0x20, 0x44
 POLL = 25                  # fields between screen checks
 LIMIT = 6000               # fields to wait for any one screen (two minutes of PAL)
@@ -61,6 +68,22 @@ def screenshot(server, g):
 def showing(image, name):
     return all(image.getpixel(p) == ((c >> 16) & 255, (c >> 8) & 255, c & 255)
                for p, c in SCREENS[name].items())
+
+
+def click(c, target):
+    """Home the pointer to its top-left clamp, move it to target (screenshot pixels) and
+    click the left mouse button; c is an amigaxdev.input.Input, the CPU stopped."""
+    for _ in range(8):
+        c.mouse(-64, -64)
+    dx, dy = target[0] - HOME[0], target[1] - HOME[1]
+    while dx or dy:
+        sx, sy = max(-64, min(64, dx)), max(-64, min(64, dy))
+        c.mouse(sx, sy)
+        dx, dy = dx - sx, dy - sy
+    c.fields(5)
+    c.button('JOY1_FIRE_BUTTON', True)
+    c.fields(5)
+    c.button('JOY1_FIRE_BUTTON', False)
 
 
 def quickrace(server, g, rest):
@@ -91,19 +114,6 @@ def quickrace(server, g, rest):
             idle()
         raise TimeoutError(f'no {name} screen after {LIMIT} fields; seen {trail}')
 
-    def click_at(c, target):
-        for _ in range(8):
-            c.mouse(-64, -64)
-        dx, dy = target[0] - HOME[0], target[1] - HOME[1]
-        while dx or dy:
-            sx, sy = max(-64, min(64, dx)), max(-64, min(64, dy))
-            c.mouse(sx, sy)
-            dx, dy = dx - sx, dy - sy
-        c.fields(5)
-        c.button('JOY1_FIRE_BUTTON', True)
-        c.fields(5)
-        c.button('JOY1_FIRE_BUTTON', False)
-
     def tap(c, key):
         c.key(key, True)
         c.fields(5)
@@ -118,14 +128,14 @@ def quickrace(server, g, rest):
                 c.button('JOY1_FIRE_BUTTON', False)
                 c.fields(5)
             wait_for('language', fire)
-            click_at(c, OK['language'])
+            click(c, OK['language'])
             wait_for('protection', lambda: c.fields(POLL))
             tap(c, KEY_A)
             tap(c, KEY_RETURN)
             wait_for('startup', lambda: c.fields(POLL))
-            click_at(c, OK['startup'])
+            click(c, OK['startup'])
             wait_for('track', lambda: c.fields(POLL))
-            click_at(c, OK['track'])
+            click(c, OK['track'])
             wait_for('race', lambda: c.fields(POLL))
     finally:
         if log:
@@ -138,13 +148,19 @@ def raceprofile(server, g, rest):
     return race_profile.raceprofile(server, g, rest)
 
 
+def raceclock(server, g, rest):
+    import race_clock
+    return race_clock.raceclock(server, g, rest)
+
+
 # Keep the CPU halted from reset until a command advances it (BOOT_BREAK is the shared
 # server's): otherwise host timing decides how many fields run before the first command,
 # and the race (its random elements included) differs from boot to boot.  $F800D6 is the
 # second instruction of the Kickstart 3.1 reset code in both host ROMs.
 os.environ.setdefault('BOOT_BREAK', '0xf800d6')
 server = Server('f1gp', root=ROOT, profile_window=False,
-                commands={'quickrace': quickrace, 'raceprofile': raceprofile})
+                commands={'quickrace': quickrace, 'raceprofile': raceprofile,
+                          'raceclock': raceclock})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])

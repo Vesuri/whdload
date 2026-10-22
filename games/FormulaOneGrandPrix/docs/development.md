@@ -98,3 +98,22 @@ charged to the nearest preceding call target), inclusive time per call target an
 call tree. Interrupts are charged to their own roots. Self time per "function" is only
 as good as that nearest-call-target heuristic: check a large entry with
 `python3 -m amigaxdev.disasm disd DIR/fast.bin 0x200000 <h0 base> START END`.
+
+## Race clock across machines
+
+```sh
+AMIGA_SETUP=a500-1.5m WARP=1 DETERMINISTIC=1 JOY0=none JOY1=none python3 tools/f1gp.py serve > amiga/.run/serve.log 2>&1 &
+python3 tools/f1gp.py raceclock tmp/clock/a500-1.5m
+python3 tools/f1gp.py quit
+```
+
+`raceclock` runs `quickrace` and then the race to the results screen in 200-field steps,
+reading the pacer's words in hunk 0 (located in RAM by its minimum-field tables and the
+relocated instruction after them) and saving a screenshot per step. It opens Race
+Finishing Times and saves `times.png`; `samples.json` has the frame count per step. Its
+RAM regions per `AMIGA_SETUP` are listed in the tool. The 68030 cycle-exact preset timed
+out in the route on a loaded host; it has no result yet.
+
+`monitor fields N` from a stop at a vertical sync runs N + 1 fields: AmigaXDev's harness
+counts the first vsync as ending a partial field even when there is none. The tools count
+it that way; a one-field screenshot trace runs one field.

@@ -82,8 +82,45 @@ the frame's work took. The code after the loop reloads the minimum from one of t
 word tables indexed by the frame count modulo 4: `h0+1262` (6, 6, 6, 7) or `h0+126A`
 (7, 8, 7, 8). Which table applies depends on a chip-hunk word compared with 60, and a frame
 whose work already took at least the table value keeps the old minimum. So the game holds
-its frame rate to a fixed cadence instead of running as fast as the machine allows; whether
-the simulation step is tied to it is not yet established.
+its frame rate to a fixed cadence instead of running as fast as the machine allows. Both
+tables average 8 frames per second: 6.25 fields at 50 Hz, 7.5 at 60 Hz (the word compared
+with 60 is presumably the display rate).
+
+## Game time
+
+The simulation advances a fixed step per frame; elapsed real time does not enter it.
+
+- Besides the pacer itself, the only reader of the frame's elapsed fields (`h0+125C`) is
+  `h0+36288`, which scales the per-field engine-sound pitch step by
+  minimum ÷ elapsed fields, so the engine sound stays smooth when a frame overruns.
+- The whole Quick Race (first cockpit field to the results screen, `tools/race_clock.py`)
+  takes about the same number of frames on every machine while its real duration changes
+  with the frame rate, and the in-game finishing times stay near 4:46–5:02:
+
+| Machine | race fps | frames | fields to results | winner (game time) | game clock vs real |
+|---|---:|---:|---:|---|---:|
+| A500-equivalent | 5.49 | 2995 | 29088 (582 s) | Senna 4:46.260 | 0.70× |
+| `a1200` (no fast RAM) | 7.18 | 3208 | 23230 (465 s) | Patrese 4:49.592 | 0.92× |
+| `a1200-fast` | 8.04 | 3306 | 21210 (424 s) | Patrese 5:02.229 | 1.03× |
+
+  "race fps" is measured over fields 2000–14000. On `a1200-fast`, green light to the
+  "Race won by" banner took 2340–2372 frames for the winner's 302.229 s: 127–129 ms of
+  game time per frame (200-field sampling at both ends; where the in-game clock starts
+  relative to the green light is not established), so close to the pacer's 1/8 s. The
+  last column is race fps × 128 ms.
+- So the in-game clocks show game time. On the A500-equivalent a race shown as 4:46
+  takes about 6:50 of real time; on `a1200-fast` the pacer holds the game at about real
+  time. On slower machines the pacer seldom waits (A500-equivalent: work 5–14 fields per
+  frame against a minimum of 6), so the game simply runs slower.
+- The races differ between machines (each machine repeats its own exactly): on the
+  A500-equivalent the player's car is never retired and Senna wins.
+
+Consequences for the goals: on `a1200-fast` and faster machines, faster code alone cannot
+raise the frame rate while the pacer holds 8 fps, and removing the pacer would speed up
+the simulation with it. Higher frame rates need the simulation step decoupled from the
+displayed frame (AmigaXDev `docs/playbooks/fixed-time-simulation.md`); slower machines
+need it to keep game time at real time.
+
 
 ## Current measurements
 
