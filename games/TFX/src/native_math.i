@@ -1,9 +1,8 @@
-; Native 040 arithmetic for observed transcendental instructions.
+; Native 040 arithmetic for transcendental instructions.
 ; Range reduction uses a split pi/2; atan uses two half-angle reductions.
 ; FPSP remains available for exceptional arguments / non-default FPCR.
 ; Trig fast range: |x| <= 2^20. Sine degree 17, cosine degree 18.
 ; Atan reduces to |x| <= tan(pi/16), then uses degree 31.
-; Validated error bound: 2e-15 absolute (|result|<=1), relative otherwise.
 ; Preserve FPCR, CCR, all GPRs and every non-destination FPU register.
         mc68040
 native_tan:

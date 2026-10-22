@@ -221,8 +221,7 @@ _bootdos
         move.l  executable(pc),d1
         bne   .noauto
     ;automatic mode
-        ; The 1997 FPU build wins both measured tapes on 020+6888x,
-        ; 030+68882 and 060 too. Keep plain TFX for CPUs without an FPU.
+        ; Use the 1997 build with an FPU, plain TFX without one.
         move.l  attnflags(pc),d0
         btst    #AFB_68040,d0
         beq   .test_fpu
@@ -717,8 +716,7 @@ split_new_chip_data:
         lea     delta_shadow(pc),a0
         move.l  d0,(a0)
 .no_shadow:
-        ; Rotation caching measured slower on 020/030/060. Only the full 040
-        ; render list calls the cached handler; do not allocate its table elsewhere.
+        ; Only the full 040 renderer uses the rotation cache.
         btst.b  #AFB_68040,attnflags+3(pc)
         beq.b   .no_rot_table
         btst.b  #AFB_68060,attnflags+3(pc)
@@ -2245,21 +2243,6 @@ copy_linebuf_part:
         move.l  a5,d0
         bra     c2p_32pixels_masked
 
-; gouraud_fill_new and gouraud_fill are no longer patched in: gouraud_runs and
-; gouraud_runs_c replace them on every CPU. They stay as the chunky fill and c2p
-; reference that the run fill's twin tests compare against.
-; tfx.020 passes the scan stream inline at SP+4 and y in A5.
-; Adapt to the existing C-argument fill without moving the caller's stream.
-gouraud_fill_new:
-        movem.l d0-d7/a0-a6,-(sp)
-        lea     64(sp),a0
-        move.l  a0,-(sp)
-        move.l  a5,-(sp)
-        bsr     gouraud_fill
-        addq.l  #8,sp
-        movem.l (sp)+,d0-d7/a0-a6
-        rts
-
 gouraud_fill:
         link    a6,#0
         movem.l d0-d7/a0-a6,-(sp)
@@ -3651,8 +3634,7 @@ GF_BODY macro
         endm
 
 ; Entries: gouraud_runs for tfx.020 (scan stream inline at SP+4, y in A5) and
-; gouraud_runs_c for TFX (C arguments: y at 4(SP), scan table at 8(SP)), as the
-; gouraud_fill_new/gouraud_fill pair they replace.
+; gouraud_runs_c for TFX (C arguments: y at 4(SP), scan table at 8(SP)).
 gouraud_runs:
         movem.l d0-d7/a0-a6,-(sp)
         lea     64(sp),a2               ; scan table, inline after the return
