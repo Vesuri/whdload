@@ -17,5 +17,5 @@ pictures up to 50 fps on 68020+ by extrapolation, and the performance work, in s
 simulation versus presentation, publication, interrupts) and `B1`–`B4` (rebuilding the
 slave, which has no source). This session is authorised for B1–B4 and A1, A2, A5, A6 (A3 if time permits).
 B2 now builds and boots Quick Race with shared kick13.
-Next: B3, original/rebuilt/layout-control screenshot and route comparison. A1 names the menu RNG busy-wait as a timing input to gameplay. A5 documents the copper publication handshake and the safe reuse rule. A2 and A6
-remain open; no B3 equivalence or B4 gating claim yet.
+Next: B3, original/rebuilt/layout-control screenshot and route comparison. A1 names the menu RNG busy-wait as a timing input to gameplay. A5 documents the copper publication handshake and the safe reuse rule. A6 maps interrupt/input ownership and corrects the sound-update cadence. A2
+remains open; no B3 equivalence or B4 gating claim yet.

@@ -241,6 +241,39 @@ copper ownership. This is a design rule; no 50-fps publisher has been installed 
 The separate menu publisher h2+$36318 writes COP1LC and has its own pending state
 (context +$2A3C); it must not be treated as the race's h2+$1DAB0 handshake.
 
+## Interrupts and input (A6)
+
+The game's race level-3 vector points to h2+$2E4, not directly to h0+$2CC38.
+The dispatcher tests copper, VBL and blitter interrupt bits. VBL calls h2+$5DC,
+which saves registers and calls h0+$2CC38; that callback increments h0+$125E at
++$2CC3C and returns with RTS. The outer dispatcher acknowledges VBL and returns
+with RTE. Copper publication and the blitter command queue are separate branches
+of the same level-3 dispatcher. The supplied slave's KickEmu/privileged-instruction
+handling remains part of the measured interrupt path (the previously measured roughly
+1.2% overhead); no interrupt-chain optimisation is installed.
+
+The sound description needs a cadence distinction. h0+$36288 is inside
+h0+$36246, called from the car-update path at h0+$2B952. Once per **frame**, it derives
+a pitch increment, scales it by minimum fields / max(minimum, measured work fields),
+and stores h0+$3A706. The VBL callback applies that increment to h0+$3A704 at
+h0+$2CD02–2CD38 and updates Paula's channel-0 period, with a separate sound RNG.
+The retained green/tow/follow 50-field profiles each count 50 calls to +$2CC38,
+but only eight to +$36246 and +$36288. The +$2CD02 branch runs 50/0/50 times:
+tow uses a different sound branch. C2 must retain both the per-tick increment calculation
+and the per-field application, including the field-duration denominator.
+
+| Input | Sampling / consumption |
+|---|---|
+| Keyboard in the race | Level-2 handler h2+$2D4 calls +$47E; +$488 reads CIAA ICR and +$4A8 reads SDR. The original slave's hook at +$4AC decodes the key and handles F10. The routine records pressed/released state in the key table h1+$52A. h0+$64 scans that table once per loop pass to form gameplay key masks. This is asynchronous acquisition with frame-rate consumption, not a once-per-VBL keyboard poll. |
+| Keyboard acknowledgment | h2+$4E0 sets CIAA's serial-output handshake and starts CIAB timer B; h2+$5AA clears it on the level-6 timer interrupt. h2+$212–23E can wait up to ten VBLs for completion, clearing the game's elapsed-field counter in the process. |
+| Joystick / digital mouse-counter input | h0+$34D24 is called from the race loop; the path at +$34E28 reads JOY1DAT and +$34E62 calls h2+$1D9F6. That helper reads JOY1DAT at +$1D9FC and the button at +$1DA38. Gameplay samples this path per frame/tick. |
+| Analog control | The VBL callback alternates POTGO start at h0+$2CDD6 with POT1DAT read at +$2CDE2, accumulating values at h0+$3A928/+3A92A. Frame input processing uses the calibration words in h2+$2A658–2A662. This acquisition must keep running while rendering is skipped. |
+| Menu input | Separate menu code uses OS events and a direct hardware path (h2+$2E4C0–2E548, +$324A6 and +$36166–3627E). The menu context and its field timers are separate from the race key masks and pacer. Preserve that ownership at mode transitions. |
+
+For catch-up ticks, key-state scans and control consumption stay in native tick order;
+edge-triggered view/pause handling still needs the A3 write audit. No input replay or
+one-shot suppression has been implemented or validated by this mapping.
+
 ## Time sources (A1)
 
 The gameplay RNG is **not seeded solely by a beam register**. There is a concrete
@@ -303,7 +336,7 @@ append the fifth byte, replace the fifth byte with the result).
 The simulation advances a fixed step per frame; elapsed real time does not enter it.
 
 - Besides the pacer itself, the only reader of the frame's elapsed fields (`h0+125C`) is
-  `h0+36288`, which scales the per-field engine-sound pitch step by
+  `h0+36288`, which calculates the per-field engine-sound pitch step once per frame, scaling it by
   minimum ÷ elapsed fields, so the engine sound stays smooth when a frame overruns.
 - The whole Quick Race (first cockpit field to the results screen, `tools/race_clock.py`)
   takes about the same number of frames on every machine while its real duration changes

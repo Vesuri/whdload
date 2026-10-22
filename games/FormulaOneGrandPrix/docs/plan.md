@@ -127,8 +127,8 @@ swap at a vertical blank, wait while a swap is pending; AmigaXDev
 
 **A6 Interrupts and input.** The level-3 handler at `h0+2CC38` (field counter increment
 at `h0+2CC3C`), the KickEmu interrupt chain (about 1.2% of cycles), where the keyboard,
-joystick and mouse are sampled (per field or per frame), and the per-field engine-sound
-update `h0+36288`, which scales by `h0+125C`. *Output:* internals.
+joystick and mouse are sampled (per field or per frame), and engine sound: the per-frame increment calculation at `h0+36288`, which scales
+by `h0+125C`, and its per-field application in the interrupt. *Output:* internals.
 
 **A7 Machine matrix.** Profile green, tow and follow (`RACE_LEADS=0,0,0` on machines
 without calibrated leads) on the A500-equivalent, `a1200`, `a1200-fast`, a cycle-exact
