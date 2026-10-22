@@ -36,6 +36,7 @@ CHUNK = 50                 # fields per trace file (about 7.5 MB per field on a1
 LEADS = (840, 2210, 400)
 POLL_LIMIT = 6000
 FAST = 0x200000            # Zorro II fast RAM base
+SLOW = 0xc00000            # trapdoor slow RAM base (in the trace; holds hunk 0 without fast RAM)
 FAST_KB = {'a1200-fast': 8192, 'a1200-030': 8192, 'a1200-040': 8192, 'a1200-060': 8192,
            'a3000': 8192}
 HUNKS = (0, 2)             # f1gp's code hunks
@@ -180,18 +181,22 @@ def raceprofile(server, g, rest):
         if start == 0:
             open(os.path.join(out, 'chip.bin'), 'wb').write(t.chip)
             open(os.path.join(out, 'first.png'), 'wb').write(t.fields[0].shot)
-            h0 = locate(t.chip.ljust(FAST, b'\0') + fast, game_hunks())[0][0]
+            if not fast and t.slow:
+                open(os.path.join(out, 'slow.bin'), 'wb').write(t.slow)
+            h0 = locate(image(t.chip, fast, t.slow), game_hunks())[0][0]
             red.marks = {'frame': h0 + FRAME_END}
             red.tally = {h0 + o for o in FRAME_WAIT}
         digests += [hashlib.sha1(f.shot).hexdigest()[:16] for f in t.fields]
         if start + n == fields:
             open(os.path.join(out, 'last.png'), 'wb').write(t.fields[-1].shot)
         # amigaxdev.callprofile finds JSR/BSR in t.chip for PCs below its length: make it a
-        # flat image of chip RAM followed by fast RAM, so code in fast RAM is followed too.
-        if fast:
-            t.chip = t.chip.ljust(FAST, b'\0') + fast
+        # flat image of chip RAM followed by fast (or slow) RAM, so code there is followed too.
+        t.chip = image(t.chip, fast, t.slow)
         red.feed(t)
-        os.unlink(chunk)
+        if os.environ.get('RACE_KEEP_TRACES'):     # raw chunks for DMA/address analysis
+            os.replace(chunk, os.path.join(out, f'trace-{start:04d}.bin'))
+        else:
+            os.unlink(chunk)
     red.save(os.path.join(out, 'profile.pkl.gz'))
     meta = dict(phase=phase, fields=fields, chunk=CHUNK, setup=setup, fast_kb=fast_kb,
                 leads=leads, anchors=anchors, route=route, shot_digests=digests,
@@ -230,6 +235,15 @@ def game_hunks(path=GAME):
         else:
             raise ValueError(f'hunk type {t:#x} at {p - 4:#x}')
     return hunks
+
+
+def image(chip, fast, slow):
+    """A flat image of chip RAM followed by fast RAM at FAST or, without it, slow RAM at SLOW."""
+    if fast:
+        return chip.ljust(FAST, b'\0') + fast
+    if slow:
+        return chip.ljust(SLOW, b'\0') + slow
+    return chip
 
 
 def locate(memory, hunks):
@@ -288,8 +302,9 @@ def report(directory):
     meta = json.load(open(os.path.join(directory, 'meta.json')))
     red = StackReduction.load(os.path.join(directory, 'profile.pkl.gz'))
     memory = open(os.path.join(directory, 'chip.bin'), 'rb').read()
-    if meta['fast_kb']:
-        memory = memory.ljust(FAST, b'\0') + open(os.path.join(directory, 'fast.bin'), 'rb').read()
+    extra = lambda name: (open(os.path.join(directory, name), 'rb').read()
+                          if os.path.exists(os.path.join(directory, name)) else b'')
+    memory = image(memory, extra('fast.bin') if meta['fast_kb'] else b'', extra('slow.bin'))
     bases = locate(memory, game_hunks())
     kick = locate_kick(memory)
     if kick:

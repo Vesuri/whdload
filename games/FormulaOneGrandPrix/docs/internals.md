@@ -65,6 +65,65 @@ from boot to boot; on `a1200-fast` the language dialog appears at field 838. Wit
 host timing changed the start and the race itself: in some boots the player's car kept
 driving and was never retired.
 
+## Race main loop
+
+During the race the game runs one loop pass per frame at hunk 0 `$3C8F6–$3CA56` (the
+only one of three similar loops that executed in the green, tow and follow windows; the
+others, at `$3C652` and `$3CC40–$3CD0C`, are not yet identified). One pass:
+
+1. `$3C8F6–$3C93C`: a timer check against a 2000 × factor deadline;
+2. short calls `h0+396AC`, `h0+64`, `h0+34D24`, `h0+3BBF6`, `h0+39654`, `h0+3B5DE`, then
+   (unless a mode bit is set) `h0+3B346`, **`h0+2AC14`**, `h0+3BF96`, optionally `h0+3C55C`
+   and `h0+34028`;
+3. **`h2+280F6`**, the drawing root;
+4. `h0+258A2`, `h0+39542`, `h0+2DD74`;
+5. the frame pacer, `h0+1272` (below).
+
+`h0+2AC14` walks the car records through an offset list (each record points at its
+track segment) and is the per-car update. Everything else in steps 1, 2 and 4 together
+takes at most about 3% of all cycles on `a1200-fast`. Which of those calls are simulation and which are
+presentation is not classified yet.
+
+Inclusive cost per frame (`tools/race_profile.py`, green window, 500 fields; work is a
+frame's cycles outside the pacer's wait):
+
+| Machine | fps | drawing `h2+280F6` | per-car update `h0+2AC14` |
+|---|---:|---:|---:|
+| A500-equivalent | 5.84 | 124.3 ms (72.6%) | 38.6 ms (22.6%) |
+| `a1200` (no fast RAM) | 7.67 | 97.4 ms (74.7%) | 25.9 ms (19.8%) |
+| `a1200-fast` | 8.00 | 58.0 ms (46.4%) | 10.4 ms (8.3%) |
+
+On `a1200-fast` the tow and follow windows spend 63.4% and 58.7% of all cycles in
+drawing and 9.8% and 4.9% in the per-car update.
+
+## Memory and the chip bus
+
+`f1gp`'s hunk 0 (code) and hunk 1 (BSS) are `MEMF_ANY` and load into fast RAM when there
+is any (slow RAM at `$C00000` on the A500-equivalent); hunk 2 (code and data, 269 KB) and hunk 3 (BSS, 86 KB) are `MEMF_CHIP`.
+`tools/dma_census.py` over 50 fields of each `a1200-fast` window (`RACE_KEEP_TRACES=1`):
+
+- The display is 4 lores bitplanes, 320 × 200 (`BPLCON0` `$4200`, `DDFSTRT`/`DDFSTOP`
+  `$38`/`$D0`, `DIWSTRT`/`DIWSTOP` `$3581`/`$FDC1`, modulos 0, `FMODE` 0): 16,000
+  bitplane slots per field, 22.5%. About 52–56% of slots are free.
+- The CPU takes 14,742 chip slots per field in the follow window (20.7%): 8,532
+  instruction fetches, all from hunk 2's code (hottest pages `h2+23000`, `h2+29000`,
+  `h2+28000`, `h2+26000`, `h2+24000`), 3,036 data reads and 3,174 data writes, most of them
+  to the two screen buffers.
+- The two screen buffers (four 8,000-byte planes each) and the blitter's source masks lie
+  in chip RAM just above hunk 2, consistent with hunk 3. Their plane pointers are 4 mod 8:
+  aligned for a 32-bit AGA fetch (`FMODE` 1 or 2), not for 64-bit (`FMODE` 3).
+- DMA reads only two parts of hunk 2 in these windows: the copper list at `h2+0000–0FFF`
+  and audio samples at `h2+18000–1DFFF`. The blitter (1.3–2.2% of slots) works on the
+  screen buffers and reads its sources above hunk 2.
+- Hunk 2 interleaves variables with its routines (for example `h2+23126–231EA`,
+  `h2+28168–281A0`, `h2+1E2DC–1E65A`, each right after an `RTS`). No write landed on an
+  executed instruction in the three windows.
+
+With WHDLoad's `CACHE` option the green window's work per frame fell from 71.7 to
+63.0 ms (−12%) and CPU chip slots from 11.9% to 10.0%, so the 68020's instruction cache
+is off under the supplied slave by default. (That run's race differed: green came 124
+fields earlier and hunk 2 loaded `$A8` lower.)
+
 ## Frame pacing
 
 The main loop ends each frame in a busy-wait at hunk 0 `$127C–$128B` (f1gp 582992 bytes):

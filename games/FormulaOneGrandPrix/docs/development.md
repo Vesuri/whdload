@@ -89,6 +89,13 @@ The window is the given number of fields after the anchor field, traced 50 field
 chip and fast RAM images, anchor, first and last screenshots and `meta.json`; nothing in it
 may be committed.
 
+`RACE_KEEP_TRACES=1` (server environment) keeps the raw chunks as `DIR/trace-NNNN.bin`
+(about 7.5 MB per field) for `tools/dma_census.py DIR`, which counts chip-bus slots per
+field: the CPU's instruction fetches, data reads and writes by region (hunk 2 by 4 KB
+page), every other DMA channel by region, and the display registers. Without fast RAM
+the capture also saves `slow.bin` (hunk 0 then lives in slow RAM at `$C00000`), and the
+report reads it.
+
 The reducer (`StackReduction`) follows one call stack per CPU stack, because the game's
 task and its interrupts run on different stacks, and follows JSR/BSR in fast RAM. The
 report locates hunks 0 and 2 and the Kickstart 1.3 image in the saved RAM and labels PCs
