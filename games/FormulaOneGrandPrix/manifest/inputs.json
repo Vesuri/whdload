@@ -1,0 +1,17 @@
+{
+  "install_page": "https://whdload.de/games/FormulaOneGrandPrix.html",
+  "inputs": [
+    {
+      "file": "tmp/archives/FormulaOneGrandPrix.lha",
+      "url": "https://whdload.de/games/FormulaOneGrandPrix.lha",
+      "sha256": "a532928794728adeead7fd2cdf471582f628684ce42e0c05891d3b31335e23ee",
+      "bytes": 97427
+    },
+    {
+      "file": "tmp/archives/FormulaOneGrandPrix_v1.0_4Disk_0325.lha",
+      "url": "https://ftp2.grandis.nu/turran/FTP/Retroplay%20WHDLoad%20Packs/Commodore_Amiga_-_WHDLoad_-_Games/F/FormulaOneGrandPrix_v1.0_4Disk_0325.lha",
+      "sha256": "a201df932dd23ea4a1402571395456dce60f703ab04188eea093324a67cf21a7",
+      "bytes": 1523524
+    }
+  ]
+}
