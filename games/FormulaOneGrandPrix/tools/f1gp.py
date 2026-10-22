@@ -5,20 +5,126 @@
   python3 tools/f1gp.py <command...>   send one command to the running server, print the reply
 
 Commands are the shared server's (AmigaXDev amigaxdev.gdbserve): stop, cont, gdb <text>,
-shot <png>, profile <fields> <bin> (PAL fields, Barto format), wait <s>, until <addr>, quit.
+shot <png>, profile <fields> <bin> (PAL fields, Barto format), wait <s>, until <addr>, quit,
+and:
+  quickrace [log]    from boot, drive the menus into a Quick Race at Silverstone and stop
+                     at the first race field; optional log file of every input sent.
+                     ROUTE_SHOTS=dir (server environment) saves every polled screenshot
 Input goes through the native build's harness: gdb monitor key|mouse|input|fields.
 Uses the native arm64 FS-UAE ($FSUAE_ARM) unless FSUAE is set; it profiles the whole
 24-bit space without a trigger, so no lldb profiler-window fix.
 """
-import os, sys
+import io, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _amigaxdev  # noqa: F401
+from amigaxdev import barto
 from amigaxdev.gdbserve import Server
+from amigaxdev.input import Input
+from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault('FSUAE', os.environ.get('FSUAE_ARM')
                       or os.path.expanduser('~/.local/share/amiga/fs-uae-arm/fs-uae'))
-server = Server('f1gp', root=ROOT, profile_window=False)
+
+# Screens, as pixels of a one-field trace screenshot (754x576; one mouse count moves the
+# pointer one pixel in both axes).  Each colour is a dialog element the pointer never covers.
+SCREENS = {
+    'language':   {(555, 258): 0xeecc00, (235, 240): 0xbb0000},     # German, UK flags
+    'protection': {(395, 200): 0xbb0000, (555, 258): 0x667799},     # UK flag, no German
+    'startup':    {(170, 275): 0xcc0000, (600, 275): 0x667799},     # Quick Race selected
+    'track':      {(195, 391): 0xbb0000, (400, 120): 0x0066cc},     # O.K. selected, map sky
+    'race':       {(100, 70): 0x5599ff, (84, 424): 0xffffff,        # sky, cockpit
+                   (236, 300): 0x555555, (92, 424): 0x555555},
+}
+HOME = (74, 54)            # the pointer's top-left clamp
+OK = {'language': (395, 358), 'startup': (395, 313), 'track': (235, 391)}
+KEY_A, KEY_RETURN = 0x20, 0x44
+POLL = 25                  # fields between screen checks
+LIMIT = 6000               # fields to wait for any one screen (two minutes of PAL)
+
+
+def screenshot(server, g):
+    target = os.path.join(server.run_dir, 'route.bin')
+    g.cmd(f'monitor profile 1 "" "{target}"', timeout=1800)
+    return Image.open(io.BytesIO(barto.load(target).fields[-1].shot)).convert('RGB')
+
+
+def showing(image, name):
+    return all(image.getpixel(p) == ((c >> 16) & 255, (c >> 8) & 255, c & 255)
+               for p, c in SCREENS[name].items())
+
+
+def quickrace(server, g, rest):
+    """Boot to the first race field.  Fire is pressed while waiting for the language
+    dialog, which skips the intro (or clicks its prompt) when CUSTOM1 is not set."""
+    g.stop()
+    log = open(rest, 'w') if rest else None
+    elapsed = {'fields': 0}
+    trail = []
+    shots = os.environ.get('ROUTE_SHOTS')   # save every polled screenshot here
+    if shots:
+        os.makedirs(shots, exist_ok=True)
+
+    def record(r):
+        if r['command'].startswith('fields '):
+            elapsed['fields'] += int(r['command'].split()[1])
+        if log:
+            log.write(json.dumps(r) + '\n')
+
+    def wait_for(name, idle):
+        for _ in range(LIMIT // POLL):
+            image = screenshot(server, g)
+            if shots:
+                image.save(os.path.join(shots, f'{elapsed["fields"]:06d}-{name}.png'))
+            if showing(image, name):
+                trail.append(f'{name}@{elapsed["fields"]}')
+                return
+            idle()
+        raise TimeoutError(f'no {name} screen after {LIMIT} fields; seen {trail}')
+
+    def click_at(c, target):
+        for _ in range(8):
+            c.mouse(-64, -64)
+        dx, dy = target[0] - HOME[0], target[1] - HOME[1]
+        while dx or dy:
+            sx, sy = max(-64, min(64, dx)), max(-64, min(64, dy))
+            c.mouse(sx, sy)
+            dx, dy = dx - sx, dy - sy
+        c.fields(5)
+        c.button('JOY1_FIRE_BUTTON', True)
+        c.fields(5)
+        c.button('JOY1_FIRE_BUTTON', False)
+
+    def tap(c, key):
+        c.key(key, True)
+        c.fields(5)
+        c.key(key, False)
+        c.fields(5)
+
+    try:
+        with Input(g, log=record) as c:
+            def fire():
+                c.button('JOY1_FIRE_BUTTON', True)
+                c.fields(POLL)
+                c.button('JOY1_FIRE_BUTTON', False)
+                c.fields(5)
+            wait_for('language', fire)
+            click_at(c, OK['language'])
+            wait_for('protection', lambda: c.fields(POLL))
+            tap(c, KEY_A)
+            tap(c, KEY_RETURN)
+            wait_for('startup', lambda: c.fields(POLL))
+            click_at(c, OK['startup'])
+            wait_for('track', lambda: c.fields(POLL))
+            click_at(c, OK['track'])
+            wait_for('race', lambda: c.fields(POLL))
+    finally:
+        if log:
+            log.close()
+    return ' '.join(trail) + ' (fields since the command; CPU stopped)'
+
+
+server = Server('f1gp', root=ROOT, profile_window=False, commands={'quickrace': quickrace})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])

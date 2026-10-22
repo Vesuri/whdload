@@ -49,3 +49,15 @@ Nigel Mansell", car 5, fourth on the grid) at the start lights; the player's car
 creeps (5–16 mph) and drops to 26th while the field drives away. A "Viewing" sequence and
 a follow-car camera follow until "Race won by …"; the game then returns to the
 Non Championship Results menu.
+
+`tools/f1gp.py quickrace` follows this route by recognising each screen from screenshot
+pixels and stops at the first polled cockpit field. Once the language dialog is up, the
+intervals are fixed per machine (fields after the language dialog, 25-field polling):
+
+| Machine | protection | startup | track | race |
+|---|---:|---:|---:|---:|
+| A500-equivalent | 688 | 983 | 1246 | 2109 |
+| `a1200-fast` | 338 | 533 | 696 | 1134 |
+
+Fields before the language dialog vary between boots: 780 to 1500 on the A500-equivalent
+with fire pressed during the intro.

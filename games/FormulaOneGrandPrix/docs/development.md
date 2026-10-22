@@ -38,3 +38,21 @@ unless `FSUAE` is set) and serves the shared `amigaxdev.gdbserve` commands
 `gdb monitor mouse DX DY`, `gdb monitor input JOY1_FIRE_BUTTON 1|0`,
 `gdb monitor key RAW 1|0` and `gdb monitor fields N` while stopped. One mouse count
 moves the game's pointer one screenshot pixel in both axes.
+
+To reach gameplay without manual input:
+
+```sh
+. amiga/env.sh
+WARP=1 DETERMINISTIC=1 JOY0=none JOY1=none python3 tools/f1gp.py serve > amiga/.run/serve.log 2>&1 &
+python3 tools/f1gp.py quickrace tmp/route.jsonl   # stops at the first race field
+python3 tools/f1gp.py shot "$PWD/tmp/race.png"
+python3 tools/f1gp.py quit
+```
+
+`quickrace` waits for each screen (language, protection, startup, track, race) by
+sampling fixed screenshot pixels every 25 fields, presses fire while waiting for the
+first one (skipping the intro), homes the pointer to its top-left clamp before each
+click, and fails after 6000 fields on any screen. The optional file logs every input
+command and reply. `ROUTE_SHOTS=DIR` in the server's environment saves each polled
+screenshot, which is how to re-derive a signature if a screen stops matching.
+It works with any `AMIGA_SETUP` and with or without `CUSTOM1=1`.
