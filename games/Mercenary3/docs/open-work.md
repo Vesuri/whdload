@@ -57,6 +57,8 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- Keep A3 blocked pending an external timing fix (user decision). Do not expand this
+  goal to changing shared-emulator 040 timing; the 68030 MMU backend remains unchanged.
 - The player's presented pose is extrapolated from the native per-tick rates; other
   objects are interpolated between the last two committed passes (the user's choice).
 - A1 must be completed without changing the 68030 MMU backend (user request). Its
