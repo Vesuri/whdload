@@ -54,6 +54,7 @@ _info		dc.b	"adapted by Harry/Graham/Wepl",10
 _config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
 		dc.b	"C1:X:64-bit bitplane fetch on AGA (FMODE 3):1;"
 		dc.b	"C1:X:Supervisor stack in expansion memory:2;"
+		dc.b	"C1:X:Native walking logic rate:3;"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -171,6 +172,13 @@ lbC0002AA
 	lea	$50000,a1
 	jsr	(resload_Patch,a2)
 
+; Replace the operand of the main-loop head's jsr (Disk.1 $5DF92) only
+; when enabled. SetCACR below makes the patched instruction visible.
+	btst	#3,(_custom1+3,pc)
+	beq.b	.nogate
+	lea	(_logicgate,pc),a0
+	move.l	a0,($5a2e4).l
+.nogate
 	moveq	#CACRF_EnableI,d0
 	move.l	d0,d1
 	movea.l	(_resload,pc),a0
@@ -217,6 +225,39 @@ _pl	PL_START
 	PL_P	$5f26,_savegame
 	PL_P	$a858,_dmaon		;enable copper and bitplanes
 	PL_END
+
+; Walking passes start at least four VERTBs apart. Publication owns its own
+; timestamp; do not use it as the pass timestamp or count the wait twice.
+; The first pass (also after another mode) keeps the native elapsed count.
+_logicgate
+	move.w	sr,-(sp)
+	movem.l	d0/a0,-(sp)
+	lea	(_logicstamp,pc),a0
+	cmpi.w	#1,($7122).w
+	bne.b	.othermode
+	tst.w	(2,a0)
+	beq.b	.first
+.check	move.w	($529f4).l,d0
+	sub.w	(a0),d0			;word subtraction handles VERTB wrap
+	cmpi.w	#4,d0
+	bhs.b	.ready
+	move.w	($529f4).l,d0
+.wait	cmp.w	($529f4).l,d0
+	beq.b	.wait
+	bra.b	.check
+.ready	move.w	d0,($52954).l		;original code still clamps to 4..8
+	add.w	d0,(a0)			;stamp of the accepted pass
+	bra.b	.done
+.first	move.w	($529f4).l,(a0)
+	move.w	#1,(2,a0)
+	bra.b	.done
+.othermode
+	clr.w	(2,a0)
+.done	movem.l	(sp)+,d0/a0
+	move.w	(sp)+,ccr
+	jmp	($5a298).l		;original callee, Disk.1 $5DF48
+
+_logicstamp	dc.w	0,0			;last accepted VERTB, valid walking pass
 
 ; Reached from the frame publication routine's 34-byte copy (Disk.1 $5E4F6), which
 ; continues past the patch to $5A862. The original body copies six bytes and returns,

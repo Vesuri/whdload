@@ -82,6 +82,7 @@ the shipped slave's code paths.
 | `Custom1` bit 1 | On AGA (Lisa's ID `$F8` in `LISAID`), 64-bit bitplane fetch: `FMODE` = 3 and `DDFSTOP` `$B8` in the two known in-game copper lists (Disk.1 `$56780`, `$567CC`). Buffers and planes are 8-byte aligned, rows 40 bytes, modulos 0; deferred screens remain unverified |
 | `Custom1` bit 2 | The supervisor stack in a 4 KB expansion block (fast RAM when fitted) instead of the top of chip RAM: the three `lea $7fffa,a0` / `unlk a0` stack setups (Disk.1 `$5DE66`, `$5DE88`, `$5DEEA`) get its top. The game uses less than a page of stack |
 
+`Custom1` bit 3 gates walking logic to at most 12.5 passes/s (L1 below).
 The `VERIFY` build (`make verify`) adds instruments; it has none yet besides its name.
 
 ### O1: existing options
@@ -105,6 +106,36 @@ screens were played and inspected with all three options on: loading restored th
 saved view, heading and clock; Quit Situation moved to Eris and walking continued.
 No display fault was seen. Map, vehicle and flight screens (and any separate fetch
 windows there) are deferred by user decision. Evidence: `tmp/o1/`.
+
+### L1: walking logic gate
+
+`Custom1` bit 3 redirects the six-byte `jsr` at Disk.1 `$5DF92`. In walking mode
+(chip `$7122 = 1`), it waits until four VERTBs have elapsed since the previous accepted
+pass, stores the true elapsed count in chip `$52954`, then runs the original callee
+(`$5DF48`). A separate word timestamp handles counter wrap without disturbing the
+publication stamp. The original 4..8 tick clamp remains. The first pass keeps native
+timing; another mode clears the timestamp's validity and otherwise runs unchanged.
+
+Same build/session, `fps.py`, 500 fields, `Custom1=7 → 15`:
+
+| Machine | Gate off | Gate on |
+| --- | ---: | ---: |
+| a1200-fast | 96 / 9.60 fps | 96 / 9.60 fps |
+| a500-1.5m | 41 / 4.10 fps | 41 / 4.10 fps |
+| 060-50 emulator cell | 198 / 19.80 fps | 125 / 12.50 fps |
+
+The fast-cell reduction is intentional: rendering still accompanies each logic pass
+until P1. Its counts are not hardware speed predictions. `sim_speed.py PER_FRAME=1`
+shows the 060 gate-off walk advancing 24 units and turn 8 heading units per 2–3 fields;
+gate-on gives exactly 24 and 8 every four fields. On the 020, gate-on motion is
+`6 × dt` and `2 × dt`, dt 4–6. The word now measures pass-start intervals, rather than
+the previous publication interval. No waits are needed when a pass already takes four
+or more fields; the slow-machine 8-tick cap remains.
+
+Options-off and shipped both give 37 A500 frames. The fastest-cell idle, walk, turn and
+stop screenshots show an intact scene and panel, and the view stays still after stopping.
+Builds and input checks pass. O1's deferred map/vehicle/flight coverage remains deferred.
+Evidence: `tmp/l1/`. No new instruments or emulator changes.
 
 ## Running
 

@@ -13,7 +13,9 @@ whose dependencies are met. Design and decisions: [open work](open-work.md). Rul
 - **Build** with `make original slave verify` before each commit.
 - **Measure** with `tools/fps.py` on `a1200-fast` and `a500-1.5m`: the same build with the
   option off and on, same session. Keep a change only if it gains 2% or more somewhere and
-  loses nowhere. Run `tools/matrix.sh` only where a step says so. The 040/060 cells give
+  loses nowhere. L1 is a correctness prerequisite: accept native world speed and
+  the intentional 12.5 Hz logic cap rather than requiring an FPS gain. Run
+  `tools/matrix.sh` only where a step says so. The 040/060 cells give
   emulator counts that don't follow the CPU frequency; use them only to check that the game
   runs there.
 - **Check the game still works** with three tests, not more:
@@ -138,7 +140,7 @@ CPU class, and the options-off test.
 ## Status
 
 - [x] O1
-- [ ] L1
+- [x] L1
 - [ ] P1 [ ] P2 [ ] P3
 - [ ] M1 [ ] M2
 - [ ] R1 [ ] R2 [ ] R3 [ ] R4
@@ -149,7 +151,7 @@ P1 and M1 are independent; after L1 they can run side by side.
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–2.
+  with `Custom1` bits 0–3.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`.

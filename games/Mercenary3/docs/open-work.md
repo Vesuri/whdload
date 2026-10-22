@@ -82,5 +82,6 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md); L1 is next. O1 is complete with map, vehicle and flight
-play coverage deferred as recorded above.
+Follow [plan.md](plan.md); P1 is next. L1's optional walking gate restores native
+world speed on the fastest emulator cell; the 020 and A500 route frame counts are
+unchanged. O1's map, vehicle and flight play coverage remains deferred as recorded above.
