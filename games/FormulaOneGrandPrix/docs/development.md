@@ -141,3 +141,21 @@ cmp tmp/slave/original.bin tmp/slave/reassembled.bin
 
 The comparison covers the entire loaded slave, including the separated old KickEmu.
 Both generated assembly and binaries contain derived bytes and stay in ignored `tmp/`.
+
+## Building the reconstructed loader (B2)
+
+`make slave` invokes `whdload/build.sh` under bash 3.2 and writes `tmp/build/F1GP.Slave`
+and its listing. `OUT="tmp/build spaced" make slave` is supported. The build verifies
+the assembler, NDK trees, WHDLoad headers and shared KickEmu against
+`manifest/slave-toolchain.json`, then verifies the original game and slave before
+extracting the names payload. Tree hashes cover sorted relative filenames, a NUL,
+and each file's raw SHA-256 digest; no machine paths are stored in the manifest.
+
+`NDK_ASM` defaults to `$AMIGA_SHARE/ndk/Include_I`; the installed assembly LVO headers
+use `_lib.i` names, so the build generates four include-name adapters under `tmp/slave`.
+The normal `NDK` and shared environment overrides remain supported. To deliberately
+repin a reviewed toolchain update, source `amiga/env.sh`, set/export `NDK_ASM`, and run
+`python3 tools/slave_toolchain.py --record`. A differing input is otherwise a build error.
+
+Run with `SLAVE=tmp/build/F1GP.Slave` in the server environment. Do not interpret a
+successful boot as B3 acceptance. All slave builds, listings and captures stay in `tmp/`.

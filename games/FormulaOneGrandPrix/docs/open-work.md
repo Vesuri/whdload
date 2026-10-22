@@ -16,4 +16,6 @@ pictures up to 50 fps on 68020+ by extrapolation, and the performance work, in s
 `A1`–`G4`. Its first steps are `A1`–`A3`, `A5`, `A6` (time sources, the main loops,
 simulation versus presentation, publication, interrupts) and `B1`–`B4` (rebuilding the
 slave, which has no source). This session is authorised for B1–B4 and A1, A2, A5, A6 (A3 if time permits).
-Next: B2, the new loader using shared kick13. The A audits remain open.
+B2 now builds and boots Quick Race with shared kick13.
+Next: B3, original/rebuilt/layout-control screenshot and route comparison. The A audits
+remain open; no B3 equivalence or B4 gating claim yet.

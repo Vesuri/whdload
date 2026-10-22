@@ -70,6 +70,21 @@ skips `frontend`. The loader also tests both fire-button bits, tolerates a missi
 frontend, runs with an empty argument line, unloads each segment and quits on return.
 
 
+### B2: shared-KickEmu loader
+
+`whdload/F1GP.s` builds with slave version 17 and the pinned shared kick13 source.
+It retains the original memory requirements, assigns, frontend/fire/CUSTOM1 decision,
+three size-selected patch lists, conditional names restore, empty argument line and
+F10 quit hook. No performance changes are installed. The old CPU mask is retained;
+B5 has not enabled caches. DOS BSTR assign names are explicitly longword-aligned.
+The shared kit is consumed in place, rather than copying WHDLoad source into this repo.
+
+B2 build checks: bash 3.2, ordinary and spaced output directories produce identical
+5684-byte executables. A deterministic `a1200-fast` Quick Race boots successfully:
+language 807, protection 1184, startup 1413, track 1608, race 2115 fields. The existing
+original route begins at language 838 and has identical subsequent intervals (all
+screens 31 fields later). This is boot validation only; B3 equivalence is still open.
+
 ## Executables
 
 `data/game` is the original hard-disk loader (assigns, `frontend`, then `f1gp`); the slave
