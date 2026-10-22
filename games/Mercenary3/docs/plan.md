@@ -147,7 +147,7 @@ CPU class, and the options-off test.
 - [x] O1
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
-- [ ] M1 [ ] M2
+- [x] M1 [ ] M2
 - [ ] R1 [ ] R2 [ ] R3 [ ] R4
 - [ ] X1
 
@@ -156,7 +156,7 @@ P1 and M1 are independent; after L1 they can run side by side.
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–4.
+  with `Custom1` bits 0–5.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes).

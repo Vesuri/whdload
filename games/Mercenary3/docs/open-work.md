@@ -87,8 +87,8 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md); P2 is next. P1 adds optional player presentation frames
-between native walking passes. The route gains displayed frames in the fast emulator
-cells and is unchanged on A500, 020 and 030; these are not hardware speed predictions.
-Restore hashes, native world speed, options-off and route play checks pass. O1's
-map, vehicle and flight coverage remains deferred as recorded above.
+Follow [plan.md](plan.md); P2 is next. M1 is complete: optional hot code in fast RAM
+raises A1200-fast from 9.50 to 10.90 fps and leaves A500 at 4.00 fps in the same-build
+comparison. The machine matrix has no measured losses; options off matches shipped,
+world speed and route play pass. P1's walking presentation frames remain in place.
+O1's map, vehicle and flight coverage remains deferred as recorded above.

@@ -18,6 +18,7 @@
 	INCLUDE	whdmacros.i
 
 STACKSIZE	= $1000
+HOTSIZE		= $1000
 
 ;======================================================================
 
@@ -31,7 +32,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$41			;ws_keyexit = Backspace
-_expmem		dc.l	-STACKSIZE		;optional ws_ExpMem (Custom1 bit 2's stack)
+_expmem		dc.l	-(STACKSIZE+HOTSIZE)	;optional stack and hot code
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -56,6 +57,7 @@ _config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
 		dc.b	"C1:X:Supervisor stack in expansion memory:2;"
 		dc.b	"C1:X:Native walking logic rate:3;"
 		dc.b	"C1:X:Walking presentation frames (includes logic gate):4;"
+		dc.b	"C1:X:Hot code in fast RAM (68020+):5;"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -191,6 +193,7 @@ lbC0002AA
 	move.l	a0,($5a830).l
 	move.l	#$4e714e71,($5a834).l
 .nopresent
+	bsr.w	_hotcode
 	moveq	#CACRF_EnableI,d0
 	move.l	d0,d1
 	movea.l	(_resload,pc),a0
@@ -223,6 +226,69 @@ lbC0002AA
 .nostack
 	move.w	#$2700,sr
 	jmp	($4B100).l
+
+; M1: copy the numeric helpers (Disk.1 $4EDE4..$4EF92) and the
+; projection kernels ($5B030..$5B918). All relative branches stay inside
+; their copied block; data references are absolute/register based. The
+; self-modifying drawing sites stay in chip RAM, under their existing patches.
+; Copy before installing entry jumps so internal branches retain original code.
+_hotcode
+	btst	#5,(_custom1+3,pc)
+	beq.w	.done
+	move.w	(_attn,pc),d0
+	btst	#AFB_68020,d0
+	beq.w	.done
+	move.l	(_expmem,pc),d0
+; ExpMem may be chip or slow RAM. Accept allocated Zorro-II fast RAM or
+; 32-bit expansion RAM; reject chip and the $C00000 slow-memory window.
+	cmpi.l	#$200000,d0
+	blo.w	.done
+	cmpi.l	#$a00000,d0
+	blo.b	.fast
+	cmpi.l	#$1000000,d0
+	blo.w	.done
+.fast	addi.l	#STACKSIZE,d0
+	movea.l	d0,a1
+	movea.l	d0,a3
+	lea	($4b134).l,a0
+	move.w	#($4b2e2-$4b134)/2-1,d0
+.copy1	move.w	(a0)+,(a1)+
+	dbra	d0,.copy1
+	lea	($57380).l,a0
+	move.w	#($57c68-$57380)/2-1,d0
+.copy2	move.w	(a0)+,(a1)+
+	dbra	d0,.copy2
+	lea	(_hotentries,pc),a0
+.next	move.l	(a0)+,d0
+	beq.b	.done
+	movea.l	d0,a1
+	moveq	#0,d0
+	move.w	(a0)+,d0
+	add.l	a3,d0
+	move.w	#$4ef9,(a1)+
+	move.l	d0,(a1)
+	bra.b	.next
+.done	rts
+
+; Disk.1 entries $4EDE4, $4EE76, $4EE88, $5B030, $5B038,
+; $5B050, $5B5C4. The long-input helper at $4EE84 keeps its first
+; two instructions in chip and falls through the $4EE88 entry jump.
+_hotentries
+	dc.l	$4b134
+	dc.w	0
+	dc.l	$4b1c6
+	dc.w	$4b1c6-$4b134
+	dc.l	$4b1d8
+	dc.w	$4b1d8-$4b134
+	dc.l	$57380
+	dc.w	$4b2e2-$4b134
+	dc.l	$57388
+	dc.w	$4b2e2-$4b134+$57388-$57380
+	dc.l	$573a0
+	dc.w	$4b2e2-$4b134+$573a0-$57380
+	dc.l	$57914
+	dc.w	$4b2e2-$4b134+$57914-$57380
+	dc.l	0
 
 _pl	PL_START
 	PL_W	$716,DMAF_SETCLR|DMAF_MASTER	;game enables master DMA only

@@ -72,9 +72,9 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
-the shipped patch list. It asks for an optional 4 KB of expansion memory (`ws_ExpMem`)
-for bit 2; if allocation fails, it keeps the chip stack. With every option off it runs
-the shipped slave's code paths.
+the shipped patch list. It asks for an optional 8 KB of expansion memory (`ws_ExpMem`):
+4 KB for bit 2's stack and 4 KB for bit 5's hot code. If allocation fails, both retain
+their chip paths. With every option off it runs the shipped slave's code paths.
 
 | Option | Effect |
 | --- | --- |
@@ -84,6 +84,7 @@ the shipped slave's code paths.
 
 `Custom1` bit 3 gates walking logic to at most 12.5 passes/s (L1 below).
 Bit 4 adds walking presentation frames and includes that gate (P1 below).
+Bit 5 moves numeric helpers and projection code to fast RAM on 68020+ (M1 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -186,6 +187,49 @@ or panel faults. After stopping, position and heading modulo 1024 stay fixed acr
 Inputs, three builds and 17 existing tool tests pass. Evidence: `tmp/p1/final-off/`,
 `final-on/`, `restore-route.json`, `world-020.json`, `world-060.json`, `play/`,
 `options-off.json` and `shipped.json`, all under `tmp/p1/`.
+
+### M1: hot code in fast RAM
+
+`Custom1` bit 5 copies 2,710 bytes at boot: the numeric helpers at Disk.1
+`$4EDE4..$4EF92` and projection kernels at `$5B030..$5B918` (exclusive ends).
+These cover the two leading instruction-fetch regions in the existing bus profile.
+The optional expansion allocation is now 8 KB: the first 4 KB remains the stack;
+the second holds the copies. Relocation requires 68020+ and an allocated block in
+Zorro-II fast RAM or the 32-bit expansion address range. Chip/slow RAM and allocation
+failure keep the original code.
+
+Copy both blocks before installing seven entry jumps. The long-input conversion
+entry at `$4EE84` retains its first two instructions, then falls through the relocated
+entry at `$4EE88`, avoiding overlapping patches. All relative branches stay within
+their copied block; data references remain absolute or register based. No external
+PC-relative fixups are needed for these blocks. The self-modifying drawing sites
+remain in chip RAM with their existing 040 patches. The subsequent `resload_SetCACR`
+flushes the caches before game entry. No runtime copying or new instrumentation.
+
+Same VERIFY build, `Custom1=31` versus `63`, the 500-field route in one session:
+
+| Cell | M1 off fps | M1 on fps |
+| --- | ---: | ---: |
+| a500-1.5m | 4.00 | 4.00 |
+| a1200 | 9.40 | 9.40 |
+| a1200-fast | 9.50 | 10.90 |
+| 030 default / MMU | 11.60 | 12.40 |
+| 040 25 MHz | 14.10 | 14.60 |
+| 060 50 MHz | 15.30 | 16.00 |
+| 040 8 MHz sanity | 13.90 | 14.30 |
+
+A1200-fast gains 14.7%, with no measured loss in the matrix. The 040/060 figures
+remain emulator counts, not hardware-speed predictions. Evidence:
+`tmp/m1/matrix-off/`, `tmp/m1/matrix-on/`; an initial A1200-fast pair also gave
+95 versus 109 frames.
+
+The release slave with all options off matches the shipped slave at 37 A500 frames
+in this session (`tmp/m1/options-off.json`, `shipped.json`). With bit 5 enabled,
+per-logic-publication samples on A1200-fast and the 060 cell retain walking at
+6 units and turning at 2 heading units per field (`world-020.json`, `world-060.json`).
+Release route play with M1 off/on shows intact cell, exterior, turning view and panel,
+then a stable stopped pose (`tmp/m1/play-off/`, `play-on/`). O1's deferred map,
+vehicle and flight coverage remains open.
 
 ## Running
 
