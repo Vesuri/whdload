@@ -88,6 +88,25 @@ frames at the frame publication routine, and writes `report.txt`, `profile.pkl.g
 the frame and VERTB counters every `STEP` fields (default 5), or at every frame with
 `PER_FRAME=1`. `--compare` tabulates machines side by side with per-segment rates.
 
+`tools/fps.py` measures the route without traces. Store results under `tmp/`; choose a
+new filename for each run (existing results are refused):
+
+```sh
+SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM1=1 python3 tools/fps.py tmp/fps/count.json
+SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM1=1 PER_FRAME=1 python3 tools/fps.py tmp/fps/cadence.json
+python3 -m unittest discover -s tools -p test_fps.py
+```
+
+`AMIGA_SETUP`, `SLAVE`, `WHD_ARGS` and `ROUTE` work as in the profiler. `BOOT_TIMEOUT=120`
+covers launch through the verified entry breakpoint; `RUN_TIMEOUT=180` covers the route
+(host seconds). Failure produces no result JSON and stops the owned processes. The only
+validated anchor is `ANCHOR=entry`; a counter anchor awaits A1. The default result uses
+counter delta over the exact-field route. `PER_FRAME=1` samples publication field stamps
+where breakpoints work, shifts input boundaries to those stops, and reports the resulting
+overshoot; use it for cadence, not as an exact-field reference. See
+[A2 validation](internals.md#a2-frame-counting-without-traces) for the current measurements
+and the unresolved difference from the old 89/38-frame references.
+
 `tools/write_audit.py` attributes every memory write in kept traces to the main-loop
 call site running at the time (interrupt code separately):
 `KEEP_TRACE=1 ROUTE='175:,135:JOY2_UP,40:JOY2_RIGHT' python3 tools/route_profile.py tmp/prof/audit`

@@ -70,6 +70,20 @@ the missed breakpoint to cache/MMU behaviour. The evidence and limits are in
 [internals](internals.md#a1-anchor-investigation); the prerequisite is recorded in the
 plan. No game behaviour or slave code changed, and no new performance figure is available.
 
+## A2 complete; reference counts need reconciliation
+
+The untraced frame counter and per-publication cadence sampler are implemented, bounded
+and validated on `a1200-fast`. The current counter and profiler both give 90 frames for
+`Custom1=1` over 500 fields. A500 shipped and option-off runs both give 37. These differ
+from the stored 89/38-frame references with the same slave builds; the runtime cause is
+unresolved. No slave code changed. A2's plan criterion now uses contemporaneous counter/
+profiler agreement; the historical A500 regression target remains unresolved.
+See [A2 validation](internals.md#a2-frame-counting-without-traces) for results and limits.
+
 ## Next steps
+
+A3 is next on the requested instrument path. A1's boot/anchor issue still limits the
+machine matrix, and the historical reference drift must be reconciled before declaring
+an optimization regression gate passed.
 
 The ordered, step-by-step plan with step IDs is [plan.md](plan.md).

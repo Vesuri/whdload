@@ -79,8 +79,13 @@ Keep the original done criterion below pending that resolution.
   - fields per frame from the field stamps at chip `$52954`, read at a breakpoint at
     `Disk.1` `$5E4DE`, or from `PER_FRAME` samples where breakpoints work.
 - Give each boot a deadline.
-- **Done when** on `a1200-fast` it agrees with `route_profile.py` (89 frames for
-  `Custom1=1`).
+- **Done when** on `a1200-fast` the counter delta agrees with a contemporaneous
+  `route_profile.py` run of the same build and options. **Done:** both count 90 frames
+  for `Custom1=1` in 500 fields. The original 89-frame expectation is not reproduced
+  by the current profiler either; [A2 validation](internals.md#a2-frame-counting-without-traces)
+  records the evidence and runtime identity. This corrects the expected reference count,
+  not the counter output. A1's counter anchor remains pending; A2 uses the existing entry
+  breakpoint and fails within its deadline on unsupported boots.
 
 **A3. Machine matrix script.** Add `tools/matrix.sh SLAVE "WHD_ARGS..." OUTDIR`.
 - It runs `fps.py` once for each setup in the table above, one at a time.
@@ -422,7 +427,7 @@ on its own), then C1–C5 and D2–D5 in parallel, then B, E and F.
 
 ## Status
 
-- [ ] A1 [ ] A2 [ ] A3 [ ] A4 [ ] A5 [ ] A6 [ ] A7 [ ] A8
+- [ ] A1 [x] A2 [ ] A3 [ ] A4 [ ] A5 [ ] A6 [ ] A7 [ ] A8
 - [ ] B1 [ ] B2 [ ] B3 [ ] B4 [ ] B5 [ ] B6
 - [ ] C1 [ ] C2 [ ] C3 [ ] C4 [ ] C5 [ ] C6 [ ] C7
 - [ ] D1 [ ] D2 [ ] D3 [ ] D4 [ ] D5 [ ] D6 [ ] D7 [ ] D8

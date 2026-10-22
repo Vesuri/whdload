@@ -166,8 +166,68 @@ obtained. Diagnostic source and logs remain under ignored `tmp/a1/`; emulator cl
 uses the shared process helper and the project's recorded PID.
 
 Resolve the A1 prerequisite in the plan before implementing the proposed counter anchor.
-Its equivalence to the entry anchor on `a1200-fast` remains untested, and the A500 38-frame
-regression gate has not been rerun because this investigation changes no slave code.
+Its equivalence to the entry anchor on `a1200-fast` remains untested. A2's counter checks
+below do not resolve that anchor or establish screenshot equivalence.
+
+## A2 frame counting without traces
+
+`tools/fps.py` counts chip `$7180` at the entry and at the end of the same route used
+by `route_profile.py`, with no instruction capture. Counter subtraction wraps at 16 bits.
+The default route advances exactly 500 whole harness fields after the entry's partial
+field, just as the profiler does. Full-window fps is frames × 50 / fields; it includes
+startup and the unfinished interval at the end. The profiler's existing fps instead uses
+the interval from the first to the last publication, so those fps values need not agree.
+
+`PER_FRAME=1` stops at publication (`Disk.1` `$5E4DE`) and records chip `$52952`, `$52954`,
+`$529F4` and `$7180`. At this instruction the current frame increment and elapsed-field
+store have **not** executed: sample i's elapsed count belongs to publication i−1. The
+report excludes the startup interval and the final unobserved store, and checks each
+remaining elapsed count against the difference between stored field stamps. This mode
+moves input boundaries to publications and reports segment overshoot explicitly; it is
+not the exact-field route used for the count comparison.
+
+Validation with the current shared runtime:
+
+| Setup / build / options | Method | Frames | Fields | Full-window fps |
+| --- | --- | ---: | ---: | ---: |
+| `a1200-fast`, performance, `Custom1=1` | untraced counter | 90 | 500 | 9.00 |
+| same | profiler markers and endpoint counter | 90 | 500 | 9.00 |
+| same, publication-aligned input | `PER_FRAME=1` counter | 91 | 507 | 8.97 |
+| `a500-1.5m`, performance, all options off | untraced counter | 37 | 500 | 3.70 |
+| `a500-1.5m`, shipped | untraced counter | 37 | 500 | 3.70 |
+
+The cadence run yielded 90 complete stored intervals, 4..8 fields each, mean 5.522 fields;
+its three segments overshot by 1, 1 and 5 fields. The exact-field profiler reported
+9.06 fps between its first and last publication. A second traced comparison with counter
+reads between chunks also counted 90; omitting those reads left the marker count and
+traced cycle total unchanged.
+
+The old 89-frame `Custom1=1` reference and 38-frame A500 reference are not reproduced.
+The current performance slave still has the same SHA-256 as those stored reference
+runs. The cause of the reference drift is unresolved; those old reports did not record
+an emulator or WHDLoad binary hash. No optimization or performance gain is claimed.
+The A500 counter matches the shipped slave on the current runtime, but the historical
+38-frame regression target and the picture comparison are **not** declared passed.
+Resolve that baseline discrepancy before using the optimization regression gate.
+
+Runtime identities for these checks (SHA-256):
+
+- Performance slave: `4a4492b58fdf01346680715311c9420bf949ef76db01b9423e79946e33669ca9`.
+- Native emulator: `5e18f89c3440bb12378b4df1a079efd72dc28d64b402a1859a904816d3e0f9f0`.
+- WHDLoad: `e904dbe9494f85475fedf926b53ee8597dcdf581209f00122d7baf7b7df4cd8e`.
+
+Boot/attachment/anchor have one wall-clock deadline (default 120 seconds), and the route
+has another (180 seconds). A real 3-second boot-deadline check on `a1200-030` exited with
+failure, stopped the recorded project emulator through the shared helper, and produced
+no success JSON. Six offline checks cover wraparound, rejected reads, wrong stops,
+previous-publication stamp alignment, PAL configuration and deadline handling. Inputs and the original
+byte-identical build also pass. Slave code is unchanged.
+
+Results and diagnostics are ignored under `tmp/a2/`. New reports retain slave, emulator
+and WHDLoad hashes, effective machine settings, input events and both counters. Existing
+output files are refused. The profiler now retains its endpoint counter and emulator
+hash too. Only the entry anchor is supported until A1 is resolved; 030/040/060 route
+completion is not established by this A2 validation.
 
 ## Renderer inputs and writes
 

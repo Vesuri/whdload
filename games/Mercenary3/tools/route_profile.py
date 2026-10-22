@@ -15,7 +15,6 @@ import collections
 import hashlib
 import json
 import os
-import signal
 import subprocess
 import sys
 
@@ -308,10 +307,13 @@ def main():
                           f'cycles/field', flush=True)
                 for name in held:
                     controls.button(name, False)
+        counter_end = int(g.cmd("x/1xh 0x7180").split(":")[1].split()[0], 16)
         locate_slave(g, out)
         red.save(os.path.join(out, 'profile.pkl.gz'))
         meta = dict(setup=env['AMIGA_SETUP'], fsuae=env['FSUAE'].replace(os.path.expanduser('~'), '~'),
                     entry=f'{ENTRY:#x}', chunk=CHUNK,
+                    counter_end=counter_end,
+                    emulator_sha256=hashlib.sha256(open(env["FSUAE"], "rb").read()).hexdigest(),
                     slave_base=None if slave_base is None else f'{slave_base:#x}', route=ROUTE, input=log,
                     slave=os.path.relpath(SLAVE, ROOT), whd_args=os.environ.get('WHD_ARGS', ''),
                     slave_sha256=hashlib.sha256(open(SLAVE, 'rb').read()).hexdigest())
@@ -321,12 +323,9 @@ def main():
         print('wrote', out)
     finally:
         g.p.kill()
-        # Kill only this run's emulator: the recorded pid, if it is still an fs-uae.
-        pid = open(os.path.join(server.run_dir, 'fsuae.pid')).read().strip()
-        comm = subprocess.run(['ps', '-o', 'comm=', '-p', pid], capture_output=True,
-                              text=True).stdout
-        if 'fs-uae' in comm:
-            os.kill(int(pid), signal.SIGKILL)
+        g.p.wait()
+        subprocess.run(['/bin/bash', '-c', '. "$FSUAE_COMMON"; fsuae_stop_previous'],
+                       cwd=os.path.join(ROOT, 'amiga'), check=True)
 
 
 if __name__ == '__main__':
