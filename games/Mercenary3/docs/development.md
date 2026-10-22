@@ -191,8 +191,8 @@ No guest memory is written and no instruction recording is required.
 Every main-loop-head stop produces one record, capturing the preceding pass's committed
 state. Route lengths remain fields, but inputs change after the first head reaching a
 cumulative boundary. The final capture can overshoot 500 fields. This is not the exact
-FPS route or A7's pass-driven lockstep. Ranges in JSON use exclusive ends. The two raw
-object windows are provisional until D4; the full game-image hash has no exclusions
+FPS route. Ranges in JSON use exclusive ends. The two raw
+object windows are provisional until P2 maps the objects; the full game-image hash has no exclusions
 inside its range. Compare reports the first differing pass and field names (exit 1),
 or identical records (exit 0). Trace definitions must match; build/machine identities
 remain available in metadata and must be checked separately for repeatability claims.

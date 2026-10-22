@@ -276,7 +276,7 @@ The 040/060 use the `a1200-030` preset with explicit `--cpu=68040-NOMMU` /
 `--cpu=68060-NOMMU` and frequency overrides. They retain CPU/memory/blitter cycle-exact
 flags, data-cache emulation and the indirect UAE board. All these 030-derived cells use
 `DETERMINISTIC=0` for boot I/O as in A1; the three lower-end presets use 1.
-Actual guest CACR logging remains A4, not a claim made from these configuration flags.
+These are configuration flags, not the guest's actual cache state.
 
 Shipped slave, no caller WHDLoad options, one boot per cell:
 
@@ -306,7 +306,7 @@ frequency. It does explain why the cycle-exact flags alone are insufficient evid
 of realistic 040/060 instruction timing. This route has not demonstrated the required
 frequency response. The 040/060 figures are diagnostic emulator counts, not validated
 hardware-speed baselines or evidence of optimization gains. The user accepts this known
-emulator limitation: A3 is complete and A5 is not gated on a timing fix. The report
+emulator limitation: A3 is complete without a timing fix. The report
 retains the failed sanity as an advisory; no alternate timing mode or emulator patch was used.
 
 Runtime SHA-256 identities:
@@ -340,7 +340,7 @@ that hash, including stack, display-control state and self-modified code; the bi
 buffers themselves lie outside it. Object data is recorded as raw bytes in two
 provisional 1,000-byte windows, `$AF36..$B31D` and `$B31E..$B705`. These cover the
 known table writes; their ends are capture boundaries, not established table extents.
-D4 must map and extend them. The full image hash also detects changes beyond them.
+P2 must map and extend them. The full image hash also detects changes beyond them.
 The instrument is entirely host-side; no guest instrumentation or slave code changed.
 
 The entry anchor remains `Disk.1` `$4EDB0`. At each loop head the recorder captures
@@ -348,7 +348,7 @@ state committed by the preceding pass, with a zero-based record index. Joystick
 changes occur **after** the capture at the first head reaching each cumulative route
 boundary (175, 360, 500 fields). `held` describes the input leading into the sample.
 The route therefore differs from the exact-field FPS route and must not be used as
-its performance baseline. A7 will add pass-number input for cross-speed lockstep.
+its performance baseline.
 
 Two independent deterministic `a1200-fast` boots of the shipped slave, with no WHDLoad
 options, produced **75 identical records**, including all 75 full-image hashes:

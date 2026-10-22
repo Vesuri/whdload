@@ -62,53 +62,21 @@ split and the measured game-time model ([internals](internals.md)).
   68030 MMU backend remains unchanged.
 - The player's presented pose is extrapolated from the native per-tick rates; other
   objects are interpolated between the last two committed passes (the user's choice).
-- A1 must be completed without changing the 68030 MMU backend (user request). Its
-  acceptance uses untraced counter/state routes; instruction recording is not required.
+- Keep the 68030 MMU backend unchanged; route tools run untraced there (user request).
+- The plan is practical, not formal: three checks (options off, world speed, play) plus
+  P1's restore hash; heavier verification only to chase a fault (user direction).
 - On fast machines logic passes run at the minimum native pass length, 4 fields (12.5 Hz).
 
-## A1 complete: route anchoring
+## Measurement notes
 
-The 030 reaches the original game-entry breakpoint with `DETERMINISTIC=0`, retaining
-its MMU and cache settings. Deterministic directory I/O with the preset's indirect UAE
-board stalled before gameplay. The shared route runtime now validates the entry and
-bounds boot and route execution. Instruction profiling remains unavailable on this
-backend; `route_profile.py MODE=counter` explicitly uses A2's untraced measurement.
-The two independent 030 routes agree at 89 frames over 500 fields; the 020 counter and
-profiler retain 90. See [internals](internals.md#a1-anchor-investigation) for validation
-and remaining limits.
+- Frame counts drift between sessions (the A500 route gave 38 frames, now 37, with the same
+  slave), so compare builds only within one session.
+- The 040/060 cells don't follow the configured frequency (118 frames at 8 and 25 MHz):
+  emulator counts, not hardware speed.
+- The 68030 runs with `DETERMINISTIC=0`; it has no instruction profile.
 
-## A2 complete; reference counts need reconciliation
-
-The untraced frame counter and per-publication cadence sampler are implemented, bounded
-and validated on `a1200-fast`. The current counter and profiler both give 90 frames for
-`Custom1=1` over 500 fields. A500 shipped and option-off runs both give 37. These differ
-from the stored 89/38-frame references with the same slave builds; the runtime cause is
-unresolved. No slave code changed. A2's plan criterion now uses contemporaneous counter/
-profiler agreement; the historical A500 regression target remains unresolved.
-See [A2 validation](internals.md#a2-frame-counting-without-traces) for results and limits.
-
-## A3 complete: machine matrix
-
-`tools/matrix.sh` runs all seven target cells and the additional 8 MHz 040 sanity cell
-sequentially, validates their effective settings, and writes a table plus runtime evidence.
-The shipped route completes in every cell. The 040 gives 118 frames at both 8 and 25 MHz;
-the user accepts this known emulator limitation. The diagnostic remains visible but is
-advisory, so it does not prevent matrix acceptance or A5. See
-[measurements and timing limitation](internals.md#a3-machine-matrix).
-
-## A6 complete: committed-state recorder
-
-`tools/state_trace.py` records every main-loop head and compares traces at the first
-differing pass. Two shipped-slave boots on `a1200-fast` give 75 identical records,
-including every game-image hash, from field 11 through field 501. The plan's loop
-address was corrected from `Disk.1` `$5E992` (inside the clear routine) to `$5DF92`.
-Object windows remain provisional until D4; cross-speed equivalence belongs to A7.
-See [A6 evidence](internals.md#a6-committed-state-recorder).
+Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-A7 is next on the recommended path. A5 needs A4's guest cache-state
-instrument first. The historical A500 reference drift and picture comparison must still
-be reconciled before declaring an optimization regression gate passed.
-
-The ordered, step-by-step plan with step IDs is [plan.md](plan.md).
+Follow [plan.md](plan.md); O1 is next.
