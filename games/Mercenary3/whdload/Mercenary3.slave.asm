@@ -31,7 +31,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$41			;ws_keyexit = Backspace
-_expmem		dc.l	STACKSIZE		;ws_ExpMem (Custom1 bit 2's stack)
+_expmem		dc.l	-STACKSIZE		;optional ws_ExpMem (Custom1 bit 2's stack)
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -177,8 +177,8 @@ lbC0002AA
 	jsr	(resload_SetCACR,a0)
 
 ; Custom1 bit 1: on AGA (Lisa's ID in LISAID), fetch the bitplanes 64 bits wide. The
-; game's two in-game copper lists (Disk.1 $56780, $567CC) are the only ones that set the
-; fetch window; their 320-pixel window ends at $b8 with 64-bit fetches. The buffers and
+; game's two known in-game copper lists (Disk.1 $56780, $567CC) set the fetch window;
+; their 320-pixel window ends at $b8 with 64-bit fetches. The buffers and
 ; planes are 8-byte aligned and the rows 40 bytes, without modulos.
 	btst	#1,(_custom1+3,pc)
 	beq.b	.nofmode
@@ -195,6 +195,7 @@ lbC0002AA
 	btst	#2,(_custom1+3,pc)
 	beq.b	.nostack
 	move.l	(_expmem,pc),d0
+	beq.b	.nostack			;no expansion block: keep the chip stack
 	add.l	#STACKSIZE-6,d0
 	move.l	d0,($5a1b8).l
 	move.l	d0,($5a1da).l

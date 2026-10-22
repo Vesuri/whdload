@@ -57,6 +57,9 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- Defer O1's map, vehicle and flight play checks until those modes are reached in
+  later steps (user decision); no save or known short route is available. These
+  screens, including any separate FMODE fetch-window setup, remain unverified.
 - Accept A3 despite the known 040 emulator frequency-timing limitation (user decision).
   Keep the frequency sanity advisory; no shared-emulator timing fix is required. The
   68030 MMU backend remains unchanged.
@@ -79,4 +82,5 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md); O1 is next.
+Follow [plan.md](plan.md); L1 is next. O1 is complete with map, vehicle and flight
+play coverage deferred as recorded above.

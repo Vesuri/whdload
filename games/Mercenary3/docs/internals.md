@@ -72,15 +72,39 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
-the shipped patch list. It asks for 4 KB of expansion memory (`ws_ExpMem`) for bit 2. With every option off it runs the shipped slave's code paths.
+the shipped patch list. It asks for an optional 4 KB of expansion memory (`ws_ExpMem`)
+for bit 2; if allocation fails, it keeps the chip stack. With every option off it runs
+the shipped slave's code paths.
 
 | Option | Effect |
 | --- | --- |
 | `Custom1` bit 0 | `_dmaon` enables copper and bitplane DMA on its first call only, after the vertical blank, and completes the frame's 34-byte copy (the three replaced moves, then the original code from `$A85E`) |
-| `Custom1` bit 1 | On AGA (Lisa's ID `$F8` in `LISAID`), 64-bit bitplane fetch: `FMODE` = 3 and `DDFSTOP` `$B8` in the two in-game copper lists (Disk.1 `$56780`, `$567CC`), the only ones that set the fetch window. Buffers and planes are 8-byte aligned, rows 40 bytes, modulos 0 |
+| `Custom1` bit 1 | On AGA (Lisa's ID `$F8` in `LISAID`), 64-bit bitplane fetch: `FMODE` = 3 and `DDFSTOP` `$B8` in the two known in-game copper lists (Disk.1 `$56780`, `$567CC`). Buffers and planes are 8-byte aligned, rows 40 bytes, modulos 0; deferred screens remain unverified |
 | `Custom1` bit 2 | The supervisor stack in a 4 KB expansion block (fast RAM when fitted) instead of the top of chip RAM: the three `lea $7fffa,a0` / `unlk a0` stack setups (Disk.1 `$5DE66`, `$5DE88`, `$5DEEA`) get its top. The game uses less than a page of stack |
 
 The `VERIFY` build (`make verify`) adds instruments; it has none yet besides its name.
+
+### O1: existing options
+
+Expansion memory is optional (`ws_ExpMem = -$1000`); a zero returned pointer leaves
+all three chip-stack setups untouched. Allocation failure was not forced in these runs.
+Same-build, same-session `fps.py` results over the 500-field route:
+
+| Custom1 | a1200-fast fps | a500-1.5m fps |
+| --- | --- | --- |
+| 0 | 7.50 | 3.70 |
+| 1 (DMA) | 9.00 | 4.10 |
+| 3 (DMA + FMODE) | 9.40 | 4.10 |
+| 5 (DMA + stack) | 9.40 | 4.10 |
+| 7 (all three) | 9.60 | 4.10 |
+
+Options off matches the shipped slave's 37 A500 frames. On `a1200-fast`,
+`sim_speed.py PER_FRAME=1 CUSTOM1=7` gives walking displacement `-6 × dt` and
+turning `2 × dt`, with dt 4–6 fields. Route, Help, save/load and Quit Situation
+screens were played and inspected with all three options on: loading restored the
+saved view, heading and clock; Quit Situation moved to Eris and walking continued.
+No display fault was seen. Map, vehicle and flight screens (and any separate fetch
+windows there) are deferred by user decision. Evidence: `tmp/o1/`.
 
 ## Running
 

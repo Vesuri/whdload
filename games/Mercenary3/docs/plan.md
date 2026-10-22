@@ -38,8 +38,11 @@ is `Disk.1` `A + $3CB0`).
 ### O. Settle the existing options
 
 **O1. Options 0–2** (one-time DMA enable; FMODE 3 on AGA; stack in expansion memory).
-- Play through the screens the route doesn't reach: the map, a vehicle, a flight, game over
-  and restart, save and load. Look for display faults.
+- Play through the screens the route doesn't reach: the map, a vehicle, a flight,
+  Quit Situation, save and load. Look for display faults. The supplied manual says the
+  player is never killed; a game-over/restart screen is not an applicable check.
+- Map, vehicle and flight checks are deferred by user decision until those modes
+  are reached in later steps; record this coverage gap rather than blocking O1.
 - For FMODE 3, if a screen shows its own copper list, check whether it sets the fetch
   window (`$0092`/`$0094`); patch it or turn FMODE off while it shows.
 - Make `ws_ExpMem` optional (a negative size) and fall back to the chip stack without it.
@@ -134,7 +137,7 @@ CPU class, and the options-off test.
 
 ## Status
 
-- [ ] O1
+- [x] O1
 - [ ] L1
 - [ ] P1 [ ] P2 [ ] P3
 - [ ] M1 [ ] M2
