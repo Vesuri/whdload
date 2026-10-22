@@ -10,7 +10,12 @@ and:
   quickrace [log]    from boot, drive the menus into a Quick Race at Silverstone and stop
                      at the first race field; optional log file of every input sent.
                      ROUTE_SHOTS=dir (server environment) saves every polled screenshot
+  raceprofile PHASE DIR [FIELDS]
+                     quickrace, then profile FIELDS (default 500) fields from the green
+                     light, the retirement/towing scene or the follow camera
+                     (PHASE green|tow|follow) into DIR; see tools/race_profile.py
 Input goes through the native build's harness: gdb monitor key|mouse|input|fields.
+The CPU stays halted from reset until the first command (BOOT_BREAK, below); `cont` resumes.
 Uses the native arm64 FS-UAE ($FSUAE_ARM) unless FSUAE is set; it profiles the whole
 24-bit space without a trigger, so no lldb profiler-window fix.
 """
@@ -35,6 +40,10 @@ SCREENS = {
     'track':      {(195, 391): 0xbb0000, (400, 120): 0x0066cc},     # O.K. selected, map sky
     'race':       {(100, 70): 0x5599ff, (84, 424): 0xffffff,        # sky, cockpit
                    (236, 300): 0x555555, (92, 424): 0x555555},
+    'green':      {(548, 135): 0x009900, (592, 144): 0x009900,      # start lights green
+                   (636, 146): 0x009900},
+    'viewing':    {(206, 74): 0x009900, (247, 78): 0x009900,        # banner: green "Viewing"
+                   (272, 81): 0x009900},
 }
 HOME = (74, 54)            # the pointer's top-left clamp
 OK = {'language': (395, 358), 'startup': (395, 313), 'track': (235, 391)}
@@ -124,7 +133,18 @@ def quickrace(server, g, rest):
     return ' '.join(trail) + ' (fields since the command; CPU stopped)'
 
 
-server = Server('f1gp', root=ROOT, profile_window=False, commands={'quickrace': quickrace})
+def raceprofile(server, g, rest):
+    import race_profile
+    return race_profile.raceprofile(server, g, rest)
+
+
+# Keep the CPU halted from reset until a command advances it (BOOT_BREAK is the shared
+# server's): otherwise host timing decides how many fields run before the first command,
+# and the race (its random elements included) differs from boot to boot.  $F800D6 is the
+# second instruction of the Kickstart 3.1 reset code in both host ROMs.
+os.environ.setdefault('BOOT_BREAK', '0xf800d6')
+server = Server('f1gp', root=ROOT, profile_window=False,
+                commands={'quickrace': quickrace, 'raceprofile': raceprofile})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])

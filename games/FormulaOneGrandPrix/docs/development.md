@@ -55,4 +55,46 @@ first one (skipping the intro), homes the pointer to its top-left clamp before e
 click, and fails after 6000 fields on any screen. The optional file logs every input
 command and reply. `ROUTE_SHOTS=DIR` in the server's environment saves each polled
 screenshot, which is how to re-derive a signature if a screen stops matching.
-It works with any `AMIGA_SETUP` and with or without `CUSTOM1=1`.
+It works with any `AMIGA_SETUP` and with or without `CUSTOM1=1`. `tools/f1gp.py` sets
+`BOOT_BREAK=0xf800d6` (the second instruction of the Kickstart 3.1 reset code), so the
+server holds the CPU from reset until a command advances it; `cont` resumes free running.
+
+## Profiling the race
+
+`tools/race_profile.py` captures cycle-exact Barto traces of one race phase and reduces
+them, through the same server (start it with `AMIGA_SETUP=a1200-fast` and the options
+above):
+
+```sh
+python3 tools/f1gp.py raceprofile green tmp/prof/a1200-green 500   # or tow, follow
+python3 tools/race_profile.py report tmp/prof/a1200-green          # also writes report.txt
+```
+
+The server holds the CPU from reset (`BOOT_BREAK`), and the route only advances it through
+gdb commands, so a given command sequence repeats exactly: two tow captures gave identical
+per-PC cycles, frame events and per-field screenshots. Different sequences diverge, even
+over the same span (`monitor fields N` and `monitor profile N` do not leave identical
+states), so anchor field numbers are per-command counts for that sequence, and windows
+from different phases need not show one continuous race. Consecutive `monitor profile`
+chunks are contiguous.
+
+Each capture runs `quickrace` and then finds its anchor field exactly: `green` is the first
+field with green start lights, `tow` the first non-cockpit field after it (the retired car
+being pushed away, "Viewing Nigel Mansell") and `follow` the first field with the green
+"Viewing" banner after that ("Viewing Riccardo Patrese"). It runs a lead
+without polling (`LEADS`, calibrated on `a1200-fast`; `RACE_LEADS=0,0,0` polls throughout on
+other machines), then checks a screenshot every field, and fails if the lead overshoots.
+The window is the given number of fields after the anchor field, traced 50 fields at a time
+(about 7.5 MB per field), reduced and deleted. The directory keeps `profile.pkl.gz`, the
+chip and fast RAM images, anchor, first and last screenshots and `meta.json`; nothing in it
+may be committed.
+
+The reducer (`StackReduction`) follows one call stack per CPU stack, because the game's
+task and its interrupts run on different stacks, and follows JSR/BSR in fast RAM. The
+report locates hunks 0 and 2 and the Kickstart 1.3 image in the saved RAM and labels PCs
+`h0+offset`, `h2+offset` or `kick+offset`. It gives cycle accounting, DMA slot shares,
+per-frame time and work from the frame pacer (below), self time per function (each PC
+charged to the nearest preceding call target), inclusive time per call target and the
+call tree. Interrupts are charged to their own roots. Self time per "function" is only
+as good as that nearest-call-target heuristic: check a large entry with
+`python3 -m amigaxdev.disasm disd DIR/fast.bin 0x200000 <h0 base> START END`.

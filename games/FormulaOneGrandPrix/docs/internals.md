@@ -59,5 +59,50 @@ intervals are fixed per machine (fields after the language dialog, 25-field poll
 | A500-equivalent | 688 | 983 | 1246 | 2109 |
 | `a1200-fast` | 338 | 533 | 696 | 1134 |
 
-Fields before the language dialog vary between boots: 780 to 1500 on the A500-equivalent
-with fire pressed during the intro.
+With the CPU held from reset (`BOOT_BREAK`), the whole route and the race repeat exactly
+from boot to boot; on `a1200-fast` the language dialog appears at field 930. Without it,
+host timing changed the start and the race itself: in some boots the player's car kept
+driving and was never retired.
+
+## Frame pacing
+
+The main loop ends each frame in a busy-wait at hunk 0 `$127C–$128B` (f1gp 582992 bytes):
+
+```
+0127c  move.w h0+125E,d0      ; fields since the last frame
+01282  cmp.w  h0+125A,d0      ; this frame's minimum fields
+01288  bcs.w  0127c
+0128c  clr.w  h0+125E
+01292  addq.w #1,h0+1260      ; frame count
+```
+
+The counter's only increment is at `h0+2CC3C`, in an interrupt routine at `h0+2CC38`
+that ran exactly once per field (100 times in 100 traced fields). Before waiting, `$1272` copies the field counter to `h0+125C`, so that word holds the fields
+the frame's work took. The code after the loop reloads the minimum from one of two 4-entry
+word tables indexed by the frame count modulo 4: `h0+1262` (6, 6, 6, 7) or `h0+126A`
+(7, 8, 7, 8). Which table applies depends on a chip-hunk word compared with 60, and a frame
+whose work already took at least the table value keeps the old minimum. So the game holds
+its frame rate to a fixed cadence instead of running as fast as the machine allows; whether
+the simulation step is tied to it is not yet established.
+
+## Current measurements
+
+`a1200-fast` (68020, 8 MB fast RAM, PAL), three 500-field windows (10 s each) from the
+deterministic Quick Race (`tools/race_profile.py`, development doc). Times are emulated;
+"work" is a frame's cycles outside the pacer's wait loop, interrupts included.
+
+| Window (anchor) | fps | frame ms mean / p95 / max | work ms mean / p95 / max | pacer wait |
+|---|---:|---|---|---:|
+| green light | 8.04 | 124.3 / 140 / 240 | 72.8 / 86.2 / 120.4 | 41.8% |
+| retirement and towing | 8.07 | 123.9 / 140 / 220 | 98.3 / 108.7 / 167.4 | 20.5% |
+| follow camera | 8.06 | 124.1 / 140 / 220 | 85.7 / 103.0 / 145.4 | 30.8% |
+
+- The frame rate is the pacer's cadence (6–7 fields per frame) in all three windows, not
+  the machine's limit: no window's mean work fills its frame.
+- The per-frame work runs under `h2+280F6` (46–62% of all cycles inclusive), which lives in
+  hunk 2. That hunk is declared chip memory, so on this machine 27–36% of all cycles
+  execute from chip RAM.
+- DMA: about 56–62% of chip-bus slots are free; blitter 1.3–1.8%; bitplanes 22.5%.
+  The CPU never stops (`STOP` 0%).
+- Function names are hunk offsets of the nearest preceding call target, a heuristic; a
+  large entry needs checking against the disassembly before acting on it.
