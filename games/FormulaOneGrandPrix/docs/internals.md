@@ -206,6 +206,41 @@ its frame rate to a fixed cadence instead of running as fast as the machine allo
 tables average 8 frames per second: 6.25 fields at 50 Hz, 7.5 at 60 Hz (the word compared
 with 60 is presumably the display rate).
 
+## Display publication (A5)
+
+The race has two software screen addresses based on h0+$124A, separated by
+h2+$231DA. The renderer reads its destination from h0+$1252; h0+$1256 remembers
+that choice, while h0+$124E is the next requested display address. The tail of the
+pacer, h0+$12F2–1332, chooses the complementary addresses and calls h2+$1DA62.
+That routine writes the requested address to h2+$1DAAC, then sets pending byte
+h2+$1DAB0. It **does not immediately change the displayed buffer**.
+
+Publication is handled by the **copper interrupt**, not by the main-loop store and
+not by h0+$2CC38's VBL handler. The level-3 dispatcher at h2+$2E4 tests COPER first
+and calls h2+$60E. When pending, it calls h2+$1DA76, which rewrites the four pairs
+of bitplane-pointer values in the copper list at h2+$0000 (plane stride 8000), then
+clears pending. The list's interrupt request follows its late-screen WAIT. The new
+pointer values are consumed when the copper next executes the list's opening moves.
+Do not equate the pending-byte clear with proof that DMA has retired the previous bitmap.
+
+The retained 50-field green, tow and follow profiles each contain 50 executions of
+h2+$60E and eight executions of +$1DA76, matching eight pacer calls. This agrees
+with one publication per native frame. The native 6–7-field cadence hides a hazard:
+there is no pending-swap wait in h2+$1DA62. Two submissions before the copper services
+them overwrite the single pending address; immediately recycling the other buffer
+can draw into a bitmap still being scanned.
+
+**50-fps publication rule for C2/D:** keep ownership of displayed, completed and pending
+buffers explicit. Finish all CPU and blitter writes before submitting. Submit only the
+completed off-screen bitmap; never overwrite a pending request. Before reusing the old
+displayed bitmap, wait for acknowledgment **and the subsequent VBL / opening-list fetch**,
+with at most one new submission per field. Use a monotonic field serial, not h0+$125E
+which the pacer and keyboard path clear. If no retired buffer is available, wait or
+skip the new picture. Modal/menu transitions must drain publication before changing
+copper ownership. This is a design rule; no 50-fps publisher has been installed or tested.
+The separate menu publisher h2+$36318 writes COP1LC and has its own pending state
+(context +$2A3C); it must not be treated as the race's h2+$1DAB0 handshake.
+
 ## Time sources (A1)
 
 The gameplay RNG is **not seeded solely by a beam register**. There is a concrete
