@@ -54,12 +54,23 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Next steps
 
-1. Classify the main loop's calls: drawing (`$577BE`, `$5410E`, `$5AFAA`, `$593A6`,
-   `$5E840` candidates) versus logic, and find every renderer input: player pose, camera
-   values derived per pass (such as chip `$42C6C`), object records, lifts and vehicles.
-2. Prototype presentation frames for the player only on `a1200-fast`, behind a VERIFY
-   check that committed world state at every logic pass equals the original game's at
-   12.5 fps.
-3. Make the entry breakpoint work on the 68030 (or anchor differently) and add
+1. **Logic gating** at the main loop head (`$5E992`, a 6-byte `jsr`): with the option on
+   and the walking mode active, run the native pass only once 4 fields have passed since
+   the previous one, giving it that elapsed count in `$52954` so its tick count and
+   velocity scaling are native; otherwise run a presentation frame. VERIFY control: the
+   same gating with no drawing in between must give identical committed state.
+2. **Presentation frame**: stage the extrapolated player pose in `$7142..$7161`, run the
+   camera derivation and view setup, publish, clear and draw, then restore every byte the
+   drawing chain writes outside the display (the audit's union: image variables, render
+   scratch below the image, self-modified code words), except the display state that must
+   follow the real screen: copper list pointers, buffer toggle, back buffer pointer and the
+   copper list contents. Keep `$7180` at the logic-pass count so blinking keeps its rate.
+3. **Player extrapolation** from the per-tick rates with the input held; snap to committed
+   state at collisions, mode changes and position jumps.
+4. Other objects: find their pose fields (object tables near `$AF36`, `$B31E`, the lists the
+   drawing walks) and interpolate them between the last two passes.
+5. Extend the audit to the other movement modes (vehicles, lifts) before enabling the
+   option there; until then they run natively.
+6. Make the entry breakpoint work on the 68030 (or anchor differently) and add
    `a1200-030` and `-NOMMU` 040/060 cells, where higher frame rates are reachable.
-4. Evaluate moving game code and CPU-only data out of chip RAM on fast-RAM machines.
+7. Evaluate moving game code and CPU-only data out of chip RAM on fast-RAM machines.

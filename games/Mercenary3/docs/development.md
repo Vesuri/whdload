@@ -88,5 +88,11 @@ frames at the frame publication routine, and writes `report.txt`, `profile.pkl.g
 the frame and VERTB counters every `STEP` fields (default 5), or at every frame with
 `PER_FRAME=1`. `--compare` tabulates machines side by side with per-segment rates.
 
+`tools/write_audit.py` attributes every memory write in kept traces to the main-loop
+call site running at the time (interrupt code separately):
+`KEEP_TRACE=1 ROUTE='175:,135:JOY2_UP,40:JOY2_RIGHT' python3 tools/route_profile.py tmp/prof/audit`
+then `python3 tools/write_audit.py tmp/prof/audit 175` (the kept chunks take about 2 GB;
+delete them afterwards).
+
 On `a1200-030` the game boots and plays, but the breakpoint at the game entry never fires,
 so neither tool runs there yet.

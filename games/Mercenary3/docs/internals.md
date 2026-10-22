@@ -129,6 +129,34 @@ A500-equivalent walked at 62% and turned at 71% of `a1200-fast`'s speed while th
 identically. No measured frame was shorter than 5 fields, so the lower clamp is read from
 the code, not observed.
 
+## Renderer inputs and writes
+
+From `tools/write_audit.py` over 175 fields of the route (walking and turning; executed
+paths only). Chip addresses are BaseMem addresses; code is named by `Disk.1` offset.
+
+- **Camera derivation** (`$5D844`, called before and after the ticks): copies the pose
+  block chip `$7142..$7161` (mode `$7142`, X `$7146`, Y `$714A`, Z `$714E`, angles
+  `$7152..$7156`) to the render copy `$7122..$7141`, wraps the position's high words to
+  12 bits, and writes the camera-relative position `$70C2..$70CD` (pose minus `$6F4A`/`$6F4E`),
+  the projection value `$704A..$7051` and the view angles `$7132..$7136`. Everything the
+  renderer knows about the player passes through it.
+- **View setup after the ticks**: `$5E0BA` (sky heading `$42C6C`), `$5DA50` (`$70CE`),
+  `$5A91E` (`$700E..`, `$7084..`, `$7162..$7179`, `$42C08..`), `$469C4`/`$469C8` (`$42C20..$42C67`
+  and palette source words near `$7CF2`).
+- **Frame publication** (`$5E458`): copper list pointers `$72B2`/`$72B6`, the buffer toggle
+  `$42C01`, `COP1LC`, the frame counter `$7180`, the field stamps `$52952`/`$52954`, and the
+  palette copy into the copper list. The renderer reads `$7180` for blinking (`$57A4E`).
+- **Drawing**: `$5E840` clears the back buffer; `$5410E` (palette allocation, with `$5765E`),
+  `$593A6`, `$5AFAA` and `$577BE` draw. Besides the display buffers they write render scratch
+  below the game image (`$0340..$4000`), variables such as `$719E`, `$71AE..$71E9`, `$7220..`,
+  `$727C`, object-table areas at `$AF36..` and `$B31E..`, and code words at `$459BA`,
+  `$4F700..` and `$4F9C2..` (self-modifying drawing code).
+- **Collision**: `$5AAB0..$5ADAA` (called at `$5E186` only when `$6F56` is set) sets
+  `$6F56`; on a hit the main loop restores the pre-tick snapshot and draws again.
+- **Other movement modes**: when the mode copy `$7122` is not 1 the loop takes `$5E214`
+  or `$5E3CA` instead of the tick loop. Those paths move one step per frame and publish
+  through their own calls, so their game speed follows the frame rate natively.
+
 ## Measurements
 
 Same route, `a1200-fast`, frames in the 500-field window:
