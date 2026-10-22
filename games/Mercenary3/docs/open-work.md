@@ -108,7 +108,7 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md): phase S (frames in one field) comes next, starting with S3. S2 reaches 49.6 fps without drawing on the 030/50, retaining the full
-restore set after failed poison comparisons. Full drawing still takes about four fields;
+Follow [plan.md](plan.md): phase S (frames in one field) comes next, starting with S4. S2 reaches 49.6 fps without drawing on the 030/50, retaining the full
+restore set after failed poison comparisons. S3 raises full drawing on the 030/50 from 12.4 to 20.3 fps;
 the [frame budget](internals.md#frame-budget-toward-50-fps) identifies code fetches and
 bitmap traffic as the next costs.

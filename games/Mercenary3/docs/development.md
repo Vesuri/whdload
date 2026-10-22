@@ -136,7 +136,9 @@ The `VERIFY` build's `Custom2` makes drawing routines return at once (see
 and without it to price drawing on the 030/040/060, whose cores record no profile.
 
 `route_profile.py` finds the live slave in fast RAM, or in slow RAM on the `a500` setups.
-FS-UAE's screenshots can carry non-Amiga colours in the right border on the A500 setup;
+For a one-off play screenshot after an untraced advance, record two fields and use the
+last screenshot: the first captured field can be incomplete. Longer route-profile chunks
+already provide complete fields. FS-UAE's screenshots can carry non-Amiga colours in the right border on the A500 setup;
 they are not game output (OCS colours are multiples of 17 per channel).
 
 All three route tools share `route_runtime.py`: checked entry, PAL configuration,

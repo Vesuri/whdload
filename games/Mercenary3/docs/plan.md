@@ -218,17 +218,17 @@ moved and self-modifying code.
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
 - [x] M1 [x] M2
-- [x] S0 [x] S1 [x] S2 [ ] S3 [ ] S4 [ ] S5 [ ] S6
+- [x] S0 [x] S1 [x] S2 [x] S3 [ ] S4 [ ] S5 [ ] S6
 - [x] R1 [ ] R2 [ ] R3 [ ] R4
 - [ ] X1
 
-Next: S3, then S4. P2 and P3 can run alongside S3/S4; they touch
+Next: S4, then S5 and S6. P2 and P3 can run alongside S3/S4; they touch
 the presentation path, so not alongside S2.
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–8.
+  with `Custom1` bits 0–9.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the

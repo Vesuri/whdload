@@ -21,6 +21,7 @@ STACKSIZE	= $1000
 HOTSIZE		= $1000
 TABLESIZE	= $6104
 TABLEMEM	= $7000		;ws_ExpMem requires whole 4 KB pages
+RENDERMEM	= $9000
 RESTOREMEM	= $5000		;17,366 bytes, rounded to whole pages
 
 ;======================================================================
@@ -35,7 +36,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$41			;ws_keyexit = Backspace
-_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM) ;optional workspace
+_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM) ;optional workspace
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -64,6 +65,7 @@ _config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
 		dc.b	"C1:X:Read-only lookup tables in fast RAM (68020+):6;"
 		dc.b	"C1:X:Longword horizontal span fills:7;"
 		dc.b	"C1:X:Bulk presentation restore:8;"
+		dc.b	"C1:X:Renderer code in fast RAM (68020+):9;"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -144,7 +146,20 @@ lbC00018C	clr.l	(a0)+
 
 	move.w	(_attn,pc),d0
 	btst	#AFB_68040,d0
-	beq.b	lbC0002AA
+	bne.b	.indirect
+; Copied renderer code uses the existing indirect-call variant on 020/030 too.
+	btst	#1,(_custom1+2,pc)
+	beq.w	lbC0002AA
+	btst	#AFB_68020,d0
+	beq.w	lbC0002AA
+	move.l	(_expmem,pc),d0
+	cmpi.l	#$200000,d0
+	blo.w	lbC0002AA
+	cmpi.l	#$a00000,d0
+	blo.b	.indirect
+	cmpi.l	#$1000000,d0
+	blo.w	lbC0002AA
+.indirect
 	lea	($C0).w,a0
 	move.l	a0,($458CC).l
 	addq.l	#4,a0
@@ -213,10 +228,16 @@ lbC0002AA
 	IFD VERIFY
 	bsr.w	_bypass
 	ENDC
+	bsr.w	_hotrenderer
 	moveq	#CACRF_EnableI,d0
 	move.l	d0,d1
 	movea.l	(_resload,pc),a0
 	jsr	(resload_SetCACR,a0)
+	move.l	(_render_base,pc),d0
+	beq.b	.norenderflush
+	movea.l	(_resload,pc),a0
+	jsr	(resload_FlushCache,a0)
+.norenderflush
 
 ; Custom1 bit 1: on AGA (Lisa's ID in LISAID), fetch the bitplanes 64 bits wide. The
 ; game's two known in-game copper lists (Disk.1 $56780, $567CC) set the fetch window;
@@ -365,6 +386,114 @@ _table64000
 	dc.l	$5711c,$571aa,$57274,$57312,$583e8
 	dc.l	$58c4a,$5a8e6,$5b790,$5c13a
 	dc.l	0
+
+; S3: four renderer blocks, including their PC-relative data. Absolute
+; references and external branch islands are described by Disk.1 offsets.
+; Copy after M2/R1 and VERIFY bypasses, before the final instruction-cache flush.
+_hotrenderer
+	btst	#1,(_custom1+2,pc)
+	beq.w	.done
+	move.w	(_attn,pc),d0
+	btst	#AFB_68020,d0
+	beq.w	.done
+	move.l	(_expmem,pc),d0
+	cmpi.l	#$200000,d0
+	blo.w	.done
+	cmpi.l	#$a00000,d0
+	blo.b	.fast
+	cmpi.l	#$1000000,d0
+	blo.w	.done
+.fast	addi.l	#STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM,d0
+	lea	(_render_base,pc),a0
+	move.l	d0,(a0)
+	move.l	d0,d6
+	lea	(_render_ranges,pc),a2
+.copyrange
+	move.l	(a2)+,d0
+	beq.b	.operands
+	movea.l	d0,a0
+	move.l	(a2)+,d1
+	sub.l	d0,d1
+	move.l	(a2)+,d0
+	add.l	d6,d0
+	movea.l	d0,a1
+	lsr.l	#1,d1
+	subq.w	#1,d1
+.copy	move.w	(a0)+,(a1)+
+	dbra	d1,.copy
+	bra.b	.copyrange
+.operands
+	lea	(_render_operands,pc),a0
+.nextop	move.l	(a0)+,d0
+	beq.b	.branches
+	movea.l	d0,a1
+	move.l	(a1),d0
+	bsr.w	_rendermap
+	move.l	d0,d3
+	move.l	a1,d0
+	bsr.w	_rendermap
+	movea.l	d0,a1
+	move.l	d3,(a1)
+	bra.b	.nextop
+.branches
+	lea	(_render_branches,pc),a0
+.nextbr	move.l	(a0)+,d0
+	beq.b	.entries
+	bsr.w	_rendermap
+	movea.l	d0,a1
+	move.l	(a0)+,d0
+	bsr.w	_rendermap
+	move.l	d0,d3
+	move.l	(a0)+,d0
+	add.l	d6,d0
+	movea.l	d0,a3
+	move.w	#$4ef9,(a3)+
+	move.l	d3,(a3)
+	sub.l	a1,d0
+	move.w	d0,(a1)
+	bra.b	.nextbr
+.entries
+	lea	(_render_entries,pc),a0
+.nextentry
+	move.l	(a0)+,d0
+	beq.b	.restore
+	movea.l	d0,a1
+	bsr.w	_rendermap
+	move.w	#$4ef9,(a1)+
+	move.l	d0,(a1)
+	bra.b	.nextentry
+.restore
+; P1 must restore the moved mutable words, not their unused chip copies.
+	lea	(_restore_ranges,pc),a0
+.nextrange
+	move.l	(a0),d0
+	beq.b	.done
+	bsr.w	_rendermap
+	move.l	d0,(a0)
+	addq.l	#6,a0
+	bra.b	.nextrange
+.done	rts
+
+; d0: original address -> copied address, unchanged outside the blocks.
+; Clobbers a2/d1/d2 only. d6 holds the renderer allocation base during boot.
+_rendermap
+	lea	(_render_ranges,pc),a2
+.next	move.l	(a2)+,d1
+	beq.b	.done
+	move.l	(a2)+,d2
+	cmp.l	d1,d0
+	blo.b	.skip
+	cmp.l	d2,d0
+	bhs.b	.skip
+	sub.l	d1,d0
+	add.l	(a2),d0
+	add.l	d6,d0
+	rts
+.skip	addq.l	#4,a2
+	bra.b	.next
+.done	rts
+_render_base	dc.l	0
+	INCLUDE	"whdload/renderer-relocs.i"
 
 ; R1: full-word interiors of the sixteen horizontal colour spans.
 ; Disk.1 $4978C + colour*$B6: replace the count setup with a call,

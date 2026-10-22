@@ -72,9 +72,10 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
-the shipped patch list. It asks for an optional 56 KB of expansion memory (`ws_ExpMem`):
+the shipped patch list. It asks for an optional 92 KB of expansion memory (`ws_ExpMem`):
 4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
-20 KB for bit 4's presentation restore buffer. If allocation fails, the stack, code and
+20 KB for bit 4's presentation restore buffer and 36 KB for bit 9's renderer copies.
+If allocation fails, the stack, code and
 tables retain their chip paths; presentation falls back to logic gating. With every option off it runs the shipped slave's code paths.
 
 | Option | Effect |
@@ -89,6 +90,7 @@ Bit 5 moves numeric helpers and projection code to fast RAM on 68020+ (M1 below)
 Bit 6 copies their read-only lookup tables to fast RAM (M2 below).
 Bit 7 accelerates horizontal span interiors on 68000 and fast-RAM 68020+ (R1 below).
 Bit 8 copies the full presentation restore set with bulk moves (S2 below).
+Bit 9 moves the remaining hot renderer blocks and their private mutable data to fast RAM (S3 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -839,3 +841,32 @@ shipped both give 37 A500 frames. World speed on 020 and 030 remains 6 walking u
 2 heading units per field; route screenshots show no scene or panel faults.
 The 030 no-draw cadence has one two-field startup interval, then 495 one-field
 intervals (mean 1.002). Evidence: `tmp/s2/`.
+
+
+### S3: renderer code in fast RAM
+
+`Custom1` bit 9 moves 23,762 bytes in four renderer blocks into a 36 KB fast-RAM
+area, on 68020+ with real fast RAM. Relocation includes absolute operands, external
+branches, colour-span tables and mutable drawing state. The indirect-call variant
+avoids the four cached call-operand writes; P1 restores the relocated state. Flush
+the instruction cache after installing the entry jumps.
+
+Same build/session, `Custom1=511 → 1023`, full drawing:
+
+| Cell | Off fps | On fps |
+| --- | ---: | ---: |
+| A500 | 4.10 | 4.10 |
+| 020 chip-only | 9.40 | 9.40 |
+| 020 fast | 11.20 | 12.40 |
+| 030/50 | 12.40 | 20.30 |
+| 030 MMU | 12.50 | 19.90 |
+| 040-25 | 16.80 | 19.10 |
+| 060-50 | 17.50 | 19.50 |
+
+World speed remains 6 walking units and 2 heading units per field on 020/030;
+options-off and shipped both give 37 A500 frames. Complete-field route screenshots
+show intact drawing and panel, including turning and stopping. A suspected missing
+wall in the first field captured after an untraced advance prompted checks: later
+fields draw correctly and all 74 presentation hashes of the relocated workspace
+pass on the 040. Use the last of two captured fields for still screenshots.
+Evidence: `tmp/s3/accepted/`, `tmp/s3/play-complete/`, `tmp/s3/fast-restore-040.json`.
