@@ -49,4 +49,10 @@ python3 tools/merc3.py shot tmp/shots/now.png
 python3 tools/merc3.py quit
 ```
 
-No build, fixed-window or profiling targets exist yet.
+## Building
+
+`make original` assembles `whdload/original/Mercenary3.slave.asm` with vasm
+(`-no-opt`, the shared `WHDLOAD` includes) into `tmp/build/` and requires it to equal
+the shipped slave byte for byte. `BUILD` overrides the output directory.
+
+No patched build, fixed-window or profiling targets exist yet.
