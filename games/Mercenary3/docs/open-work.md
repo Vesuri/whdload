@@ -61,6 +61,15 @@ split and the measured game-time model ([internals](internals.md)).
   objects are interpolated between the last two committed passes (the user's choice).
 - On fast machines logic passes run at the minimum native pass length, 4 fields (12.5 Hz).
 
+## A1 blocker
+
+Input verification and the byte-identical original build pass. A1 remains unchecked:
+changing its route anchor cannot supply the missing 68030 MMU instruction trace required
+by `route_profile.py`. Bounded boot probes have not yet established gameplay or isolated
+the missed breakpoint to cache/MMU behaviour. The evidence and limits are in
+[internals](internals.md#a1-anchor-investigation); the prerequisite is recorded in the
+plan. No game behaviour or slave code changed, and no new performance figure is available.
+
 ## Next steps
 
 The ordered, step-by-step plan with step IDs is [plan.md](plan.md).

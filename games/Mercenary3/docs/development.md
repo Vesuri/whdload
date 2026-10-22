@@ -103,5 +103,7 @@ outside the bitplane lines: `KEEP_TRACE=1 python3 tools/route_profile.py tmp/pro
 FS-UAE's screenshots can carry non-Amiga colours in the right border on the A500 setup;
 they are not game output (OCS colours are multiples of 17 per channel).
 
-On `a1200-030` the game boots and plays, but the breakpoint at the game entry never fires,
-so neither tool runs there yet.
+Neither route tool is validated on `a1200-030`. A1's bounded probes have not confirmed
+arrival at gameplay; the MMU backend also lacks the instruction recording needed by
+`route_profile.py`. See the [A1 investigation](internals.md#a1-anchor-investigation) and
+its prerequisite in the plan before relying on a counter-based anchor.

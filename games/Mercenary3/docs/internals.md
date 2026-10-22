@@ -131,6 +131,44 @@ A500-equivalent walked at 62% and turned at 71% of `a1200-fast`'s speed while th
 identically. No measured frame was shorter than 5 fields, so the lower clamp is read from
 the code, not observed.
 
+## A1 anchor investigation
+
+`make check` verifies both input archives and their extracted files; `make original`
+reproduces the shipped slave byte for byte. A1 has not met its done criterion.
+
+The selected native emulator identifies its base revision as
+`b70b1180b44ab25b97cd66466c70879897d8a362`, with the shared core, frequency, harness,
+register-observer and input-observer patches. Its effective `a1200-030` configuration
+selects 68030, 50 MHz, MMU 68030, data-cache emulation and cycle-exact CPU/memory timing.
+These are configuration facts, not validated hardware timing measurements.
+
+AmigaXDev's standalone WHDLoad playbook, section 5, documents the missing 68030 instruction
+trace. In the inspected shared FS-UAE source, the MMU selection dispatches to
+`m68k_run_mmu030` before the non-MMU cycle-exact loop; that MMU loop has no Barto
+`cpu_profiler` scope. This explains why changing an anchor alone cannot satisfy the
+instruction-profiler part of A1. It does **not** establish why the entry breakpoint is
+missed: breakpoint processing is separate from instruction recording.
+
+Bounded probes with the shipped slave have not yet confirmed gameplay:
+
+- With entry (`Disk.1` `$4EDB0`) and publication (`$5E4DE`) breakpoints armed, a request
+  to advance 1,200 fields did not complete within 60 host seconds.
+- With no breakpoints, a request for 600 fields did not complete within 45 host seconds.
+- A control with `--uae_mmu_model=0` also failed to reach the entry breakpoint within
+  45 host seconds. Disabling MMU emulation alone did not resolve the bounded boot probe.
+- An asynchronous continue followed by interrupt did not yield a confirmed stopped
+  target; reads were rejected as target-running and are not counter observations.
+
+The logs end around directory-drive startup. This is a boot-observation failure, not
+proof that either game breakpoint cannot fire, that cache contents are stale, or that the
+game itself is hung. No route frame count, first-frame offset or performance result was
+obtained. Diagnostic source and logs remain under ignored `tmp/a1/`; emulator cleanup
+uses the shared process helper and the project's recorded PID.
+
+Resolve the A1 prerequisite in the plan before implementing the proposed counter anchor.
+Its equivalence to the entry anchor on `a1200-fast` remains untested, and the A500 38-frame
+regression gate has not been rerun because this investigation changes no slave code.
+
 ## Renderer inputs and writes
 
 From `tools/write_audit.py` over 175 fields of the route (walking and turning; executed

@@ -45,7 +45,21 @@ rate. It also makes the extra frames smooth on machines that draw faster than 12
 ## Phase A: instruments and baselines
 
 **A1. Anchor the route without the entry breakpoint.** On `a1200-030` the gdb breakpoint at
-`Disk.1` `$4EDB0` (chip `$4B100`) never fires.
+`Disk.1` `$4EDB0` never fires in the existing tool.
+
+**Blocked: the original done criterion assumes an unavailable instrument.** The shared
+FS-UAE guidance documents no instruction trace on the 68030 MMU backend; the inspected
+`m68k_run_mmu030` implementation has no Barto `cpu_profiler` hook. A counter anchor cannot
+make `route_profile.py` produce a valid instruction profile on that backend. Do not treat
+an empty trace as zero CPU cost, disable MMU silently, or mark A1 complete on that basis.
+The bounded boot probes also have not established arrival at gameplay, so a missed entry
+breakpoint alone does not yet identify a debugger or cache fault. See the A1 investigation
+in [internals](internals.md#a1-anchor-investigation).
+
+Before the actions below, establish a bounded boot-to-gameplay observation and resolve the
+instrument prerequisite: either validate instruction capture on the required 030 backend,
+or revise A1's acceptance to state/counter sampling and use A2 for its frame measurements.
+Keep the original done criterion below pending that resolution.
 - Find out why. Check whether any breakpoint fires on the 030 core, for example at the
   frame publication's frame count (`Disk.1` `$5E4DE`), and whether the MMU or cache setup
   hides it.
