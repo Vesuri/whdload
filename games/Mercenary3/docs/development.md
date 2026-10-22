@@ -28,5 +28,25 @@ environment file, whose default is `~/.local/share/amiga/env.sh`. Missing shared
 environment files fail explicitly. Shared tool and ROM paths are inherited from it;
 no local copies or paths into other projects are used.
 
-No launcher, build, tracing or profiling targets exist yet: machine settings and
-slave requirements must be established during the later investigation.
+## Running
+
+`amiga/run.sh` boots Kickstart 3.1 from a generated `DH0` that runs
+`WHDLoad Mercenary3.Slave PRELOAD` on `DH1`, a disposable copy of the pristine drawer
+under ignored `amiga/.run/`. The default machine is the A500-equivalent (68000, 512 KB
+chip, 1.5 MB slow, no fast RAM); the slave needs 512 KB chip and WHDLoad needs other
+memory beside it. Variables: `SLAVE`, `WHD_SPLASH=1`, `WHD_ARGS`, and the shared
+launcher's (`AMIGA_SETUP`, `CPU`, `CHIP_KB`, `SLOW_KB`, `FAST_KB`, `DEBUG`, `WARP`,
+`DETERMINISTIC`, `JOY0`, `JOY1`, `SOUND`, `WINDOW`). Defaults: mouse in port 0,
+keyboard joystick in port 1.
+
+The debugger server uses the native build:
+
+```sh
+. amiga/env.sh
+FSUAE="$FSUAE_ARM" JOY0=none python3 tools/merc3.py serve > tmp/serve.log 2>&1 &
+python3 tools/merc3.py gdb 'monitor fields 400'
+python3 tools/merc3.py shot tmp/shots/now.png
+python3 tools/merc3.py quit
+```
+
+No build, fixed-window or profiling targets exist yet.

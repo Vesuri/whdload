@@ -1,9 +1,8 @@
 # Mercenary 3
 
 Investigation workspace for Mercenary III: The Dion Crisis (Novagen).
-Read `docs/open-work.md` first. Setup is complete; analysis has not been authorized.
-Do not inspect source or binaries, reconstruct the slave, boot, trace, profile or patch
-until the user asks to begin investigation.
+Read `docs/open-work.md` first. The investigation has started: the game boots under
+WHDLoad and the slave is documented. Patches come after the playbook's setup is done.
 
 ## Rules
 
@@ -31,6 +30,6 @@ until the user asks to begin investigation.
 
 - `docs/open-work.md`: current scope and deferred next steps.
 - `docs/development.md`: inputs, verification and shared environment.
-- `docs/internals.md`: investigation status; no findings yet.
+- `docs/internals.md`: the slave, the boot and the game's memory layout.
 - AmigaXDev `docs/index.md`: shared topic routing; its standalone WHDLoad
   playbook provides guidance when investigation is authorized.

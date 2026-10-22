@@ -1,19 +1,17 @@
 # Current work
 
-Repository and input preparation are complete. Analysis is deliberately deferred.
-Both supplied archives are retained, pinned and extracted. No source reading,
-disassembly, executable inspection, emulator boot, trace, profile or patch work
-has been performed.
+Inputs are pinned and extracted. The shipped slave's source has been read
+([internals](internals.md)), the original game boots under WHDLoad on the
+A500-equivalent machine, and the native debugger server takes screenshots and traces
+with PCs. No reproducible window, frame counter, baseline or patch exists yet.
 
-The initial assumption that slave source was unavailable is corrected by the
-installer archive listing: it contains both slave and imager assembly files.
-The official page credits Harry, Graham and Wepl, with version 1.2 by Wepl.
+## Next steps
 
-## When investigation is requested
-
-1. Inspect the supplied source and establish whether it rebuilds the shipped slave.
-2. Identify the slave requirements, game code and supported versions.
-3. Add a project-specific launcher using the shared environment and process helper.
-4. Establish a reproducible boot and gameplay route before measuring or changing code.
-
-Do not execute these steps under the setup-only request.
+1. Rebuild the shipped slave from `src/Mercenary3.slave.asm` and establish whether
+   the bytes match; otherwise confirm the rebuild by behaviour.
+2. Find the game's controls and a reproducible gameplay route from the prison cell
+   (`monitor key`/`input` with `WARP=1 DETERMINISTIC=1 JOY0=none`), and the game's
+   entropy sources.
+3. Find the frame-publication point and count frames per field (playbook §7).
+4. Baseline profile on the A500-equivalent and a 68020 (playbook §8), then the
+   game-time model (§9). Patches come after these.
