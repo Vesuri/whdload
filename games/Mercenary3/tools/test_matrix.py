@@ -1,4 +1,4 @@
-"""Matrix acceptance must reject mislabeled machines and a failed speed sanity."""
+"""Matrix acceptance must reject mislabeled machines while retaining the advisory speed sanity."""
 import unittest
 
 from matrix import cells, frequency_sanity, render, validate

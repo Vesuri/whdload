@@ -166,8 +166,9 @@ rejects conflicts. Caller `MMU`/`NoMMU` arguments are rejected because the 030 p
 its default mode and explicit `MMU`. The 040/060 use the 030 cycle-exact preset with
 explicit non-MMU CPU and frequency overrides; the stock 040/060 presets are not used.
 
-The command succeeds only when every effective configuration validates and the 8 MHz
-040 publishes fewer frames than the 25 MHz one. On the current emulator both give 118
-frames, so the complete shipped table deliberately returns failure. Do not treat those
-040/060 results as validated hardware-speed baselines. See
-[A3 evidence](internals.md#a3-machine-matrix); A3 remains incomplete pending that check.
+The command succeeds when every cell completes and its effective configuration validates.
+The 8 MHz / 25 MHz 040 frequency check is advisory: both give 118 frames on the measured
+runtime, a known emulator limitation accepted by the user. `matrix.json` records
+`sanity_passed=false` and `sanity_advisory=true` separately from overall `passed=true`.
+The 040/060 counts remain emulator measurements, not calibrated hardware-speed baselines.
+See [A3 evidence](internals.md#a3-machine-matrix). A3 is complete.

@@ -82,16 +82,12 @@ rate. It also makes the extra frames smooth on machines that draw faster than 12
 - It runs `fps.py` once for each setup in the table above, one at a time.
 - Use the cycle-exact 030 options with the frequency set for the 030/040/060 cells.
 - It writes a table: setup, options, frames, fps.
-- Sanity check: an 8 MHz 040 run must be slower than a 25 MHz one.
-- **Done when** the table renders for the shipped slave and the frequency sanity check
-  passes. A rendered table with a failed check is diagnostic evidence, not a baseline.
-- **Blocked on frequency sanity:** the script and shipped table exist, but the current
-  runtime gives 118 frames at both 8 and 25 MHz on the 040, including identical segment
-  counts. Both requested frequencies are present in the effective configuration. The
-  040/060 core uses approximate timing; changing the frequency alone has not provided
-  the required distinction on this route. Keep A3 unchecked; establish a valid timing
-  model before A5 or performance conclusions for those cells. No backend change or
-  replacement benchmark is hidden in the matrix. See [A3 evidence](internals.md#a3-machine-matrix).
+- Record the 8 MHz / 25 MHz 040 frequency sanity as an advisory diagnostic. The user
+  accepts the known emulator timing limitation; this check does not gate A3 or A5.
+- **Done when** the table renders for the shipped slave with all target cells validated.
+  **Done:** all seven target cells and the additional sanity cell complete. The 040
+  gives 118 frames at both frequencies; this remains visible in the report without
+  failing matrix acceptance. See [A3 evidence](internals.md#a3-machine-matrix).
 
 **A4. Cache state per cell.** Add a `VERIFY` instrument that logs `CACR` right after
 `resload_SetCACR` with `resload_Log`. Run it only on the 68020 and later; `resload_Log`
@@ -426,7 +422,7 @@ on its own), then C1–C5 and D2–D5 in parallel, then B, E and F.
 
 ## Status
 
-- [x] A1 [x] A2 [ ] A3 [ ] A4 [ ] A5 [ ] A6 [ ] A7 [ ] A8
+- [x] A1 [x] A2 [x] A3 [ ] A4 [ ] A5 [ ] A6 [ ] A7 [ ] A8
 - [ ] B1 [ ] B2 [ ] B3 [ ] B4 [ ] B5 [ ] B6
 - [ ] C1 [ ] C2 [ ] C3 [ ] C4 [ ] C5 [ ] C6 [ ] C7
 - [ ] D1 [ ] D2 [ ] D3 [ ] D4 [ ] D5 [ ] D6 [ ] D7 [ ] D8

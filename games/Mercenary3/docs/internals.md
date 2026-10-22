@@ -266,8 +266,7 @@ then an extra 8 MHz 040 sanity cell. All results use the same entry-anchored
 Each cell retains its log and JSON; `table.md` and `matrix.json` aggregate the results.
 Missing or invalid results are failures, never zero fps. The runner validates effective
 CPU/MMU, frequency, memory, cache-emulation and timing configuration, and rejects a
-changed slave or runtime between cells. It returns failure if any cell or the frequency
-sanity fails. `--report-only` revalidates the captured JSON without another emulator run.
+changed slave or runtime between cells. It returns failure if any cell fails. The frequency sanity is advisory by user decision. `--report-only` revalidates the captured JSON without another emulator run.
 
 The 030 cells both retain the full 68030 emulator backend. The default WHDLoad mode on
 030 disables its MMU use; the second cell adds `MMU` to enable it. This follows the
@@ -306,8 +305,9 @@ and some memory paths use it, so this is not a claim that every execution path i
 frequency. It does explain why the cycle-exact flags alone are insufficient evidence
 of realistic 040/060 instruction timing. This route has not demonstrated the required
 frequency response. The 040/060 figures are diagnostic emulator counts, not validated
-hardware-speed baselines or evidence of optimization gains. A3 stays unchecked and A5
-must wait for a valid timing model; no alternate timing mode or emulator patch was used.
+hardware-speed baselines or evidence of optimization gains. The user accepts this known
+emulator limitation: A3 is complete and A5 is not gated on a timing fix. The report
+retains the failed sanity as an advisory; no alternate timing mode or emulator patch was used.
 
 Runtime SHA-256 identities:
 

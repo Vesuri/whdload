@@ -57,8 +57,9 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
-- Keep A3 blocked pending an external timing fix (user decision). Do not expand this
-  goal to changing shared-emulator 040 timing; the 68030 MMU backend remains unchanged.
+- Accept A3 despite the known 040 emulator frequency-timing limitation (user decision).
+  Keep the frequency sanity advisory; no shared-emulator timing fix is required. The
+  68030 MMU backend remains unchanged.
 - The player's presented pose is extrapolated from the native per-tick rates; other
   objects are interpolated between the last two committed passes (the user's choice).
 - A1 must be completed without changing the 68030 MMU backend (user request). Its
@@ -86,20 +87,19 @@ unresolved. No slave code changed. A2's plan criterion now uses contemporaneous 
 profiler agreement; the historical A500 regression target remains unresolved.
 See [A2 validation](internals.md#a2-frame-counting-without-traces) for results and limits.
 
-## A3 implemented; frequency sanity prevents completion
+## A3 complete: machine matrix
 
 `tools/matrix.sh` runs all seven target cells and the additional 8 MHz 040 sanity cell
 sequentially, validates their effective settings, and writes a table plus runtime evidence.
-The shipped route completes in every cell. The 040 gives 118 frames at both 8 and 25 MHz,
-so the mandatory speed sanity fails and the command returns failure. A3 remains unchecked;
-see [measurements and timing limitation](internals.md#a3-machine-matrix).
+The shipped route completes in every cell. The 040 gives 118 frames at both 8 and 25 MHz;
+the user accepts this known emulator limitation. The diagnostic remains visible but is
+advisory, so it does not prevent matrix acceptance or A5. See
+[measurements and timing limitation](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Resolve the 040 frequency sanity before completing A3 and using A5's full baseline.
-The configured 040/060 cycle-exact flags do not establish calibrated CPU timing. No
-emulator or slave change was made. A6 is the next independent instrument on the
-recommended path. The historical A500 reference drift and picture comparison must also
+A6 is next on the recommended path, followed by A7. A5 needs A4's guest cache-state
+instrument first. The historical A500 reference drift and picture comparison must still
 be reconciled before declaring an optimization regression gate passed.
 
 The ordered, step-by-step plan with step IDs is [plan.md](plan.md).

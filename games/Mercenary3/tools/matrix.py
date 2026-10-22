@@ -82,7 +82,7 @@ def render(rows, sanity):
                   row['extra'] or '(preset)', str(r.get('frames', '—')),
                   f"{r['fps']:.2f}" if 'fps' in r else '—', row['status']]
         lines.append('| ' + ' | '.join(str(v).replace('|', '\\|').replace('\n', ' ') for v in values) + ' |')
-    return '\n'.join(lines) + '\n\n040 frequency sanity: ' + sanity + '\n'
+    return '\n'.join(lines) + '\n\n040 frequency sanity (advisory; known emulator limitation accepted): ' + sanity + '\n'
 
 
 def main():
@@ -145,9 +145,9 @@ def main():
         (out / 'table.md').write_text(render(rows, 'pending'))
     passed = all(row['status'] == 'ok' for row in rows)
     checked, sanity = frequency_sanity(rows)
-    passed = passed and checked
+    # User accepts the known 040 timing limitation; retain it as advisory evidence.
     (out / 'table.md').write_text(render(rows, sanity))
-    (out / 'matrix.json').write_text(json.dumps(dict(rows=rows, sanity=sanity, passed=passed), indent=2) + '\n')
+    (out / 'matrix.json').write_text(json.dumps(dict(rows=rows, sanity=sanity, sanity_passed=checked, sanity_advisory=True, passed=passed), indent=2) + '\n')
     print((out / 'table.md').read_text())
     return 0 if passed else 1
 
