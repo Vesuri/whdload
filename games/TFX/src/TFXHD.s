@@ -88,20 +88,8 @@ IGNORE_JOY_DIRECTIONS
 ;============================================================================
 
 
-	IFD BARFLY
-	DOSCMD	"WDate  >T:date"
-	ENDC
-
 DECL_VERSION:MACRO
-	dc.b	"2.2"
-	IFD BARFLY
-		dc.b	" "
-		INCBIN	"T:date"
-	ENDC
-	IFD	DATETIME
-		dc.b	" "
-		incbin	datetime
-	ENDC
+	dc.b	"2.2 (22.10.2026)"
 	ENDM
 	dc.b	"$","VER: slave "
 	DECL_VERSION
@@ -129,7 +117,7 @@ slv_name		dc.b	"TFX"
 	ENDC
 			dc.b	0
 slv_copy		dc.b	"1995-1997 Digital Image Design",0
-slv_info		dc.b	"adapted by JOTD & paraj",10,10
+slv_info		dc.b	"adapted by JOTD, paraj & Vesuri",10,10
 		dc.b	"Version "
 		DECL_VERSION
 		dc.b	0
