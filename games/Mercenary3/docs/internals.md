@@ -197,7 +197,7 @@ counter/cadence boundaries, stop and deadline validation, boot-mode defaults/ove
 and refusal of unsupported instruction profiles. The failing deterministic probe reached
 its 90-second deadline and cleaned up the owned emulator. Generated evidence is ignored
 under `tmp/a1-finish/`. The historical A500 38-frame/picture gate remains unresolved as
-recorded in A2; A1 changes no game behavior. The 040/060 route cells remain unvalidated.
+recorded in A2; A1 changes no game behavior. A3 below subsequently validates route completion, but its frequency sanity fails.
 
 ## A2 frame counting without traces
 
@@ -256,8 +256,75 @@ byte-identical build also pass. Slave code is unchanged.
 Results and diagnostics are ignored under `tmp/a2/`. New reports retain slave, emulator
 and WHDLoad hashes, effective machine settings, input events and both counters. Existing
 output files are refused. The profiler now retains its endpoint counter and emulator
-hash too. A1 subsequently validates the same entry anchor on the 030; 040/060 route
-completion is not established by these checks.
+hash too. A1 subsequently validates the same entry anchor on the 030; A3 below records 040/060 route completion and its failed frequency sanity.
+
+## A3 machine matrix
+
+`tools/matrix.sh SLAVE "WHD_ARGS..." OUTDIR` runs `fps.py` sequentially for each target,
+then an extra 8 MHz 040 sanity cell. All results use the same entry-anchored
+175/185/140-field route and counter delta over 500 fields (10 nominal PAL seconds).
+Each cell retains its log and JSON; `table.md` and `matrix.json` aggregate the results.
+Missing or invalid results are failures, never zero fps. The runner validates effective
+CPU/MMU, frequency, memory, cache-emulation and timing configuration, and rejects a
+changed slave or runtime between cells. It returns failure if any cell or the frequency
+sanity fails. `--report-only` revalidates the captured JSON without another emulator run.
+
+The 030 cells both retain the full 68030 emulator backend. The default WHDLoad mode on
+030 disables its MMU use; the second cell adds `MMU` to enable it. This follows the
+installed WHDLoad manual (`Docs/en/mmu.html`, User control); `NoMMU` is not substituted
+for the default. The runner rejects caller MMU/NoMMU overrides to preserve this pairing.
+The 040/060 use the `a1200-030` preset with explicit `--cpu=68040-NOMMU` /
+`--cpu=68060-NOMMU` and frequency overrides. They retain CPU/memory/blitter cycle-exact
+flags, data-cache emulation and the indirect UAE board. All these 030-derived cells use
+`DETERMINISTIC=0` for boot I/O as in A1; the three lower-end presets use 1.
+Actual guest CACR logging remains A4, not a claim made from these configuration flags.
+
+Shipped slave, no caller WHDLoad options, one boot per cell:
+
+| Cell | CPU / configured MHz | WHDLoad option | Frames | Full-window fps |
+| --- | --- | --- | ---: | ---: |
+| `a500-1.5m` | 68000 / 7.094 | none | 37 | 3.70 |
+| `a1200` | 68020 / 14.188, chip only | none | 75 | 7.50 |
+| `a1200-fast` | 68020 / 14.188, 8 MB fast | none | 75 | 7.50 |
+| `030-default` | 68030 / 50 | none | 89 | 8.90 |
+| `030-mmu` | 68030 / 50 | `MMU` | 89 | 8.90 |
+| `040-25` | 68040-NOMMU / 25 | none | 118 | 11.80 |
+| `060-50` | 68060-NOMMU / 50 | none | 127 | 12.70 |
+| `040-8-sanity` | 68040-NOMMU / 8 | none | 118 | 11.80 |
+
+**Frequency sanity failed.** The two 040 results have identical segment frame counts
+(35, 47, 36), ending frame count 118, VERTB 501, stamp 500 and elapsed count 4. Their
+recorded frequencies are 8,000,000 and 25,000,000 respectively; other recorded machine
+settings and runtime hashes match. The 500-field denominator is the harness route,
+not a claim that the game's VERTB counter is exactly 500 at the endpoint.
+
+Read-only inspection of the installed emulator's source finds the non-MMU cycle-exact
+040/060 selection uses `m68k_run_3ce` in `newcpu.cpp`. That loop executes instructions
+without a per-instruction clock charge; if no cycles advance, its fallback charges one
+fixed `CYCLE_UNIT` after four such instructions. Frequency sets `cpucycleunit` elsewhere,
+and some memory paths use it, so this is not a claim that every execution path ignores
+frequency. It does explain why the cycle-exact flags alone are insufficient evidence
+of realistic 040/060 instruction timing. This route has not demonstrated the required
+frequency response. The 040/060 figures are diagnostic emulator counts, not validated
+hardware-speed baselines or evidence of optimization gains. A3 stays unchecked and A5
+must wait for a valid timing model; no alternate timing mode or emulator patch was used.
+
+Runtime SHA-256 identities:
+
+- Emulator: `e4beb4588634ecc4b41b833a76f37ea859ced77c1128de43d4d302089d1df264`.
+- Shipped slave: `e1d0dc878ff941a03d8a2685d0e2a2ed353381f065a5d8e013aece956dedf76d`.
+- WHDLoad: `e904dbe9494f85475fedf926b53ee8597dcdf581209f00122d7baf7b7df4cd8e`.
+- Shared launcher: `4e05e36d4a121fde37f4f371effbb82c7a3d2bf450126964c84fb2dd39c26f83`.
+
+The installed emulator hash differs from A1/A2; this work did not rebuild or change it.
+All eight cells used the same current hash. The A500 remains at 37, so the historical
+38-frame/picture gate remains unresolved. No slave code or shared project was changed.
+Input verification and the byte-identical original build pass. Fifteen offline tests
+pass, including rejected machine/build/route mismatches, absent-MMU serialization,
+strict frequency sanity and failed-cell rendering. The report validator was corrected
+for UAE's omitted zero MMU setting and its 256 KB slow-memory units, then the same
+captured results were revalidated without rerunning any cell. Ignored evidence is under
+`tmp/a3/shipped/`.
 
 ## Renderer inputs and writes
 

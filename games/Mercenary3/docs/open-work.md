@@ -84,10 +84,20 @@ unresolved. No slave code changed. A2's plan criterion now uses contemporaneous 
 profiler agreement; the historical A500 regression target remains unresolved.
 See [A2 validation](internals.md#a2-frame-counting-without-traces) for results and limits.
 
+## A3 implemented; frequency sanity prevents completion
+
+`tools/matrix.sh` runs all seven target cells and the additional 8 MHz 040 sanity cell
+sequentially, validates their effective settings, and writes a table plus runtime evidence.
+The shipped route completes in every cell. The 040 gives 118 frames at both 8 and 25 MHz,
+so the mandatory speed sanity fails and the command returns failure. A3 remains unchecked;
+see [measurements and timing limitation](internals.md#a3-machine-matrix).
+
 ## Next steps
 
-A3 is next on the requested instrument path. Its remaining machine cells need validation;
-the historical reference drift must also be reconciled before declaring an optimization
-regression gate passed.
+Resolve the 040 frequency sanity before completing A3 and using A5's full baseline.
+The configured 040/060 cycle-exact flags do not establish calibrated CPU timing. No
+emulator or slave change was made. A6 is the next independent instrument on the
+recommended path. The historical A500 reference drift and picture comparison must also
+be reconciled before declaring an optimization regression gate passed.
 
 The ordered, step-by-step plan with step IDs is [plan.md](plan.md).

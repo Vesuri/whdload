@@ -83,7 +83,15 @@ rate. It also makes the extra frames smooth on machines that draw faster than 12
 - Use the cycle-exact 030 options with the frequency set for the 030/040/060 cells.
 - It writes a table: setup, options, frames, fps.
 - Sanity check: an 8 MHz 040 run must be slower than a 25 MHz one.
-- **Done when** the table renders for the shipped slave.
+- **Done when** the table renders for the shipped slave and the frequency sanity check
+  passes. A rendered table with a failed check is diagnostic evidence, not a baseline.
+- **Blocked on frequency sanity:** the script and shipped table exist, but the current
+  runtime gives 118 frames at both 8 and 25 MHz on the 040, including identical segment
+  counts. Both requested frequencies are present in the effective configuration. The
+  040/060 core uses approximate timing; changing the frequency alone has not provided
+  the required distinction on this route. Keep A3 unchecked; establish a valid timing
+  model before A5 or performance conclusions for those cells. No backend change or
+  replacement benchmark is hidden in the matrix. See [A3 evidence](internals.md#a3-machine-matrix).
 
 **A4. Cache state per cell.** Add a `VERIFY` instrument that logs `CACR` right after
 `resload_SetCACR` with `resload_Log`. Run it only on the 68020 and later; `resload_Log`

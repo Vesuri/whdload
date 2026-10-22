@@ -129,7 +129,7 @@ before the game entry. This keeps the 68030 MMU, 50 MHz and data-cache emulation
 Other setups retain `DETERMINISTIC=1`; an explicit environment value is honored and
 recorded. Do not override it through `EXTRA_ARGS` or `RECORD`. Threaded boot I/O is not
 an assertion of deterministic boots or hardware timing; compare route evidence from the
-checked game entry. The 040/060 cells remain for A3 to validate.
+checked game entry. A3 completes their routes but fails the frequency sanity check; see below.
 
 ```sh
 AMIGA_SETUP=a1200-030 MODE=counter python3 tools/route_profile.py tmp/routes/030-count
@@ -142,3 +142,32 @@ python3 -m unittest discover -s tools -p 'test_*.py'
 instruction costs. The normal `MODE=profile` refuses unsupported CPU backends rather than
 interpreting an empty instruction trace. Output directories/files must be new and inside
 `tmp/`. See [A1 validation](internals.md#a1-anchor-investigation).
+
+## Machine matrix
+
+```sh
+tools/matrix.sh tmp/game/Mercenary3_v1.2_0356/Mercenary3/Mercenary3.Slave '' tmp/matrix/shipped
+# Revalidate existing evidence and render its table without booting again:
+tools/matrix.sh --report-only tmp/game/Mercenary3_v1.2_0356/Mercenary3/Mercenary3.Slave '' tmp/matrix/shipped
+```
+
+The Bash 3.2 entry point sources the shared environment. Pass the slave, a single quoted
+WHDLoad argument string (empty for none), and a new directory under `tmp/`. The runner
+uses the fixed 500-field route and runs seven target cells plus an 8 MHz 040 frequency
+sanity cell, one at a time. It preserves logs and per-cell JSON and writes `table.md`
+and `matrix.json`, even when a cell fails. It never retries a cell automatically.
+`--report-only` replaces only the aggregate reports, preserving the captured cell files.
+`BOOT_TIMEOUT` and `RUN_TIMEOUT` retain the route tools' limits; `FSUAE` may explicitly
+select an emulator, whose hash must remain identical across cells.
+
+Unset machine/route overrides (`AMIGA_SETUP`, `CPU`, `EXTRA_ARGS`, memory variables,
+`DETERMINISTIC`, `PER_FRAME`, `ROUTE`, etc.) before running: the matrix owns them and
+rejects conflicts. Caller `MMU`/`NoMMU` arguments are rejected because the 030 pair tests
+its default mode and explicit `MMU`. The 040/060 use the 030 cycle-exact preset with
+explicit non-MMU CPU and frequency overrides; the stock 040/060 presets are not used.
+
+The command succeeds only when every effective configuration validates and the 8 MHz
+040 publishes fewer frames than the 25 MHz one. On the current emulator both give 118
+frames, so the complete shipped table deliberately returns failure. Do not treat those
+040/060 results as validated hardware-speed baselines. See
+[A3 evidence](internals.md#a3-machine-matrix); A3 remains incomplete pending that check.
