@@ -26,7 +26,21 @@ from amigaxdev.gdbserve import Server
 from amigaxdev.input import Input
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SLAVE = os.path.join(ROOT, 'tmp/game/Mercenary3_v1.2_0356/Mercenary3/Mercenary3.Slave')
+SHIPPED = os.path.join(ROOT, 'tmp/game/Mercenary3_v1.2_0356/Mercenary3/Mercenary3.Slave')
+# SLAVE= runs another build (amiga/run.sh copies it in); WHD_ARGS= passes WHDLoad options.
+SLAVE = os.path.abspath(os.environ.get('SLAVE') or SHIPPED)
+
+
+def slave_code(path):
+    """The code hunk of a single-hunk slave file."""
+    d = open(path, 'rb').read()
+    return d[0x20:0x20 + 4 * int.from_bytes(d[0x1c:0x20], 'big')]
+
+
+CODE = slave_code(SLAVE)
+IS_SHIPPED = CODE == slave_code(SHIPPED)
+# The slave's vertical blank wait (_waitvb): btst #0,$dff005 until set, then until clear.
+WAITVB = bytes.fromhex('0839000000dff00567f6' '0839000000dff00566f6' '4e75')
 
 # The game's entry: the slave jumps here once the game image is loaded and patched.
 ENTRY = 0x4b100
@@ -47,7 +61,8 @@ CALLS = {0x5a3da: 0x5b678, 0x5a420: 0x59b94, 0x5a424: 0x59da0, 0x5a428: 0x56c6e,
          0x5a52a: 0x556f6, 0x5a52e: 0x572fa, 0x5a532: 0x53b0e, 0x5a536: 0x509f2,
          0x5a53c: 0x51d2a, 0x5a542: 0x51dfc, 0x5a548: None, 0x5a54c: 0x5b774}
 MARKS.update({f'site{a:05x}': a for a in CALLS})
-# Shipped slave code offsets (whdload/original/Mercenary3.slave.asm), named in the report.
+# Shipped slave code offsets (whdload/original/Mercenary3.slave.asm), named in the report
+# when the shipped slave runs.
 SLAVE_SYMBOLS = {0x27c: '_dmaon', 0x28e: '_diskload', 0x298: '_patch_vertb',
                  0x2aa: '_patch_aud1', 0x2bc: '_int68', 0x2ce: '_checkkeyboard',
                  0x332: '_quit', 0x33e: '_loadgame', 0x390: '_savegame', 0x3ae: '_setsavename',
@@ -77,7 +92,7 @@ def label(pc):
         return f'D1:{pc + DISK_DELTA:05x}'
     if pc < 0x200000:
         return f'chip:{pc:06x}'
-    if slave_base is not None and slave_base <= pc < slave_base + 0x458:
+    if slave_base is not None and slave_base <= pc < slave_base + len(CODE):
         return f'slave:{pc - slave_base:04x}'
     if pc < 0xa00000:
         return f'fast:{pc:06x}'
@@ -87,6 +102,8 @@ def label(pc):
 
 
 def slave_name(off):
+    if not IS_SHIPPED:
+        return ''
     start = max((o for o in SLAVE_SYMBOLS if o <= off), default=None)
     return f'{SLAVE_SYMBOLS[start]}+{off - start:x}' if start is not None else ''
 
@@ -96,7 +113,7 @@ def region(pc):
         return 'game image (chip)'
     if pc < 0x200000:
         return 'other chip'
-    if slave_base is not None and slave_base <= pc < slave_base + 0x458:
+    if slave_base is not None and slave_base <= pc < slave_base + len(CODE):
         return 'slave (fast RAM)'
     if pc < 0xa00000:
         return 'other fast RAM (WHDLoad)'
@@ -159,6 +176,8 @@ def report(red, meta):
     nf = len(red.fields)
     lines = [f'Mercenary 3 route profile: {meta["setup"]}, {nf} fields '
              f'({nf / 50:.1f} s PAL) from the game entry',
+             f'slave {meta["slave"]} ({meta["slave_sha256"][:12]}), WHDLoad options '
+             f'"{meta["whd_args"]}"',
              f'traced cycles {tot:,} ({tot // max(nf, 1):,} per field)', '']
     nopc = sum(f['nopc'] for f in red.fields)
     gap = sum(f['gap'] for f in red.fields)
@@ -179,9 +198,12 @@ def report(red, meta):
     waits = {'game: wait for the VERTB counter (' + label(FRAME_WAIT[0]) + ')':
              sum(red.self[pc] for pc in FRAME_WAIT)}
     if slave_base is not None:
-        for name, lo, hi in (('slave: _waitvb (called by _dmaon)', 0x3e8, 0x3fe),
-                             ('slave: _subd0 raster delay', 0x3ca, 0x3e8),
-                             ('slave: _checkkeyboard handshake', 0x2ce, 0x332)):
+        wv = CODE.find(WAITVB)
+        spans = [('slave: _waitvb (called by _dmaon)', wv, wv + len(WAITVB))] if wv >= 0 else []
+        if IS_SHIPPED:
+            spans += [('slave: _subd0 raster delay', 0x3ca, 0x3e8),
+                      ('slave: _checkkeyboard handshake', 0x2ce, 0x332)]
+        for name, lo, hi in spans:
             waits[name] = sum(c for pc, c in red.self.items()
                               if slave_base + lo <= pc < slave_base + hi)
     lines += ['', 'Waits (self cycles):'] + [f'  {k:52} {pct(c)}' for k, c in waits.items()]
@@ -208,20 +230,21 @@ def report(red, meta):
 
 
 def locate_slave(g, out):
-    """Find the live slave in fast RAM: its code after the header, with _resload filled in."""
+    """Find the live slave in fast RAM. WHDLoad's file copy equals the file; the live copy
+    matches its loader code but differs elsewhere (WHDLoad fills in _resload)."""
     global slave_base
-    code = open(SLAVE, 'rb').read()[0x20:0x20 + 0x458]
     dump = os.path.relpath(os.path.join(out, 'fast.bin'), ROOT)
     g.cmd(f'dump binary memory {dump} {FAST[0]:#x} {FAST[1]:#x}', timeout=300)
     mem = open(dump, 'rb').read()
     os.unlink(dump)
-    hits = []
-    i = mem.find(code[0x9a:0x232])
+    loader = int.from_bytes(CODE[0x18:0x1a], 'big')
+    probe = CODE[loader:loader + 0x100]
+    hits, i = [], mem.find(probe)
     while i >= 0:
-        base = i - 0x9a
-        if mem[base + 0x452:base + 0x456] != b'\0' * 4:
+        base = i - loader
+        if base >= 0 and mem[base:base + len(CODE)] != CODE:
             hits.append(FAST[0] + base)
-        i = mem.find(code[0x9a:0x232], i + 1)
+        i = mem.find(probe, i + 1)
     if len(hits) != 1:
         raise RuntimeError(f'expected one live slave in fast RAM, found {[hex(h) for h in hits]}')
     slave_base = hits[0]
@@ -285,6 +308,7 @@ def main():
         meta = dict(setup=env['AMIGA_SETUP'], fsuae=env['FSUAE'].replace(os.path.expanduser('~'), '~'),
                     entry=f'{ENTRY:#x}', chunk=CHUNK,
                     slave_base=None if slave_base is None else f'{slave_base:#x}', route=ROUTE, input=log,
+                    slave=os.path.relpath(SLAVE, ROOT), whd_args=os.environ.get('WHD_ARGS', ''),
                     slave_sha256=hashlib.sha256(open(SLAVE, 'rb').read()).hexdigest())
         json.dump(meta, open(os.path.join(out, 'route.json'), 'w'), indent=1)
         open(os.path.join(out, 'report.txt'), 'w').write(report(red, meta))

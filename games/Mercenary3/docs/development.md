@@ -55,7 +55,10 @@ python3 tools/merc3.py quit
 (`-no-opt`, the shared `WHDLOAD` includes) into `tmp/build/` and requires it to equal
 the shipped slave byte for byte. `BUILD` overrides the output directory.
 
-No patched build exists yet.
+`make slave` builds the performance slave `whdload/Mercenary3.slave.asm` into
+`tmp/build/Mercenary3.Slave`, `make verify` its VERIFY build `Mercenary3.verify.Slave`.
+Run one with `SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM1=1 amiga/run.sh`; the
+profile and game-time tools take the same `SLAVE` and `WHD_ARGS` and record them.
 
 ## Profiling and game time
 

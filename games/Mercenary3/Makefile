@@ -3,7 +3,7 @@ BUILD ?= tmp/build
 SHIPPED ?= tmp/game/Mercenary3_v1.2_0356/Mercenary3/Mercenary3.Slave
 VASMFLAGS = -m68000 -x -devpac -Fhunkexe -nosym -no-opt
 
-.PHONY: check original
+.PHONY: check original slave verify
 check:
 	$(PYTHON) tools/check_inputs.py
 
@@ -14,3 +14,15 @@ original:
 	  -o "$(BUILD)/Mercenary3.original.Slave" whdload/original/Mercenary3.slave.asm
 	cmp "$(BUILD)/Mercenary3.original.Slave" "$(SHIPPED)"
 	@echo "original: identical to the shipped slave"
+
+# The performance slave (whdload/Mercenary3.slave.asm) and its VERIFY build, which adds
+# instruments. Both are always assembled so an option change never leaves a stale file.
+slave:
+	@mkdir -p "$(BUILD)"
+	. amiga/env.sh && "$$VASM" $(VASMFLAGS) -I"$$WHDLOAD/Include" -I"$$NDK" \
+	  -o "$(BUILD)/Mercenary3.Slave" whdload/Mercenary3.slave.asm
+
+verify:
+	@mkdir -p "$(BUILD)"
+	. amiga/env.sh && "$$VASM" $(VASMFLAGS) -DVERIFY=1 -I"$$WHDLOAD/Include" -I"$$NDK" \
+	  -o "$(BUILD)/Mercenary3.verify.Slave" whdload/Mercenary3.slave.asm

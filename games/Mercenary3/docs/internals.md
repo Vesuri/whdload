@@ -59,12 +59,26 @@ Patch list (offsets relative to `$50000`; add `$53CB0` for the `Disk.1` offset):
 from chip `$7CC0` to the pointer at `$72B4` with an unrolled `move.l (a1)+,(a0)+` run, and
 the patch replaces its fifth to seventh moves. `_dmaon` then copies six bytes and returns, so
 each frame copies 22 bytes instead of 34: the moves at `$A85E` and `$A860` never execute
-(0 of 75 frames in the profile window). What the last 12 bytes hold is not yet checked.
-`_dmaon` also rewrites DMACON and waits for a vertical blank on every frame, not once.
+(0 of 75 frames in the profile window). `_dmaon`'s body (`move.l`, `move.w`, `rts`) matches
+the copy's last six bytes at `$A85E`, so the patch looks placed for a layout 12 bytes
+different, probably the other supported version. `_dmaon` also rewrites DMACON and waits
+for a vertical blank on every frame, not once.
 
 The slave installs its own level-2 handler at `$68` for the keyboard. Its keyboard
 poll (`_checkkeyboard`) busy-waits three raster lines for the handshake and stores the
 key code at chip `$8`, with `$FF` at `$9`.
+
+## Performance slave
+
+`whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
+(for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
+the shipped patch list. With every option off it runs the shipped slave's code paths.
+
+| Option | Effect |
+| --- | --- |
+| `Custom1` bit 0 | `_dmaon` enables copper and bitplane DMA on its first call only, after the vertical blank, and completes the frame's 34-byte copy (the three replaced moves, then the original code from `$A85E`) |
+
+The `VERIFY` build (`make verify`) adds instruments; it has none yet besides its name.
 
 ## Running
 
@@ -116,6 +130,19 @@ identically. No measured frame was shorter than 5 fields, so the lower clamp is 
 the code, not observed.
 
 ## Measurements
+
+Same route, `a1200-fast`, frames in the 500-field window:
+
+| Slave | Options | Frames | fps | `_waitvb` share |
+| --- | --- | ---: | ---: | ---: |
+| shipped | | 75 | 7.51 | 14.7% |
+| performance | none | 74 | 7.40 | 14.5% |
+| performance | `Custom1=1` | 89 | 8.98 | 0.2% |
+
+Compare options only within one build: the performance slave without options differs from
+the shipped one by a frame (a different slave changes WHDLoad's layout and timing).
+
+The rest of this section is the shipped slave's profile.
 
 `a1200-fast` (68EC020 14 MHz, 2 MB chip, 8 MB fast, cycle-exact), the 500-field route of
 `tools/route_profile.py` from the game entry. Two boots gave identical call stacks,

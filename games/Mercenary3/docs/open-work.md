@@ -20,7 +20,8 @@ split and the measured game-time model ([internals](internals.md)).
   frame rates also need faster drawing (faster CPUs, code and CPU-only data out of chip RAM,
   renderer work).
 - The slave's `_dmaon` waits for a vertical blank on every frame (14.7% of the CPU time)
-  and leaves 12 of the frame's 34 copied bytes uncopied.
+  and leaves 12 of the frame's 34 copied bytes uncopied. The performance slave's `Custom1`
+  bit 0 fixes both: 7.40 to 8.98 fps on `a1200-fast`, same build.
 - All game code and data are in chip RAM, even with fast RAM fitted.
 
 ## Design: native logic passes, separate presentation frames
@@ -33,25 +34,23 @@ split and the measured game-time model ([internals](internals.md)).
 2. **Presentation frames in between.** When fewer than 4 fields have passed, draw and
    publish only: stage presented poses into the renderer's inputs, run the drawing calls,
    then restore the committed state. Nothing in a presentation frame writes world state.
-3. **Presented poses** for the player (position, heading, pitch) and every moving object,
-   with alpha = fields since the last pass / the pass length:
-   - interpolation between the last two committed passes: never shows an uncommitted or
-     colliding pose; adds one pass (80 ms at 12.5 Hz) of display delay;
-   - extrapolation from the native per-tick rates (walking 6 units, turning 2 heading units
-     per tick with the input held): no added delay; can overshoot when the player stops,
-     turns back or collides, and must snap back to committed state when it does.
+3. **Presented poses**, with alpha = fields since the last pass / the pass length:
+   - the player is extrapolated from the native per-tick rates (walking 6 units, turning
+     2 heading units per tick with the input held): no added delay; it can overshoot when
+     the player stops, turns back or collides, and snaps back to committed state then;
+   - other objects are interpolated between the last two committed passes: never an
+     uncommitted pose, one pass (80 ms) of display delay.
    Snap at teleports, transport changes, lifts and new objects.
 4. **Publication**: at most one frame per field, as now (the game waits for the VERTB
    counter after each `COP1LC` write, which caps it at 50 fps PAL). `_dmaon`'s per-frame
    wait goes, with the copy restored.
 5. Everything behind a `CUSTOMn` option; with it off, the original bytes.
 
-## Decisions for the user
+## Decisions
 
-- Interpolation (safe, +80 ms delay), extrapolation (no delay, can overshoot), or
-  extrapolation for the player and interpolation for other objects.
-- Whether the native logic rate on fast machines should be the minimum native pass
-  length (4 fields, 12.5 Hz), as proposed.
+- The player's presented pose is extrapolated from the native per-tick rates; other
+  objects are interpolated between the last two committed passes (the user's choice).
+- On fast machines logic passes run at the minimum native pass length, 4 fields (12.5 Hz).
 
 ## Next steps
 
@@ -61,7 +60,6 @@ split and the measured game-time model ([internals](internals.md)).
 2. Prototype presentation frames for the player only on `a1200-fast`, behind a VERIFY
    check that committed world state at every logic pass equals the original game's at
    12.5 fps.
-3. Remove `_dmaon`'s per-frame wait and restore the copy; measure.
-4. Make the entry breakpoint work on the 68030 (or anchor differently) and add
+3. Make the entry breakpoint work on the 68030 (or anchor differently) and add
    `a1200-030` and `-NOMMU` 040/060 cells, where higher frame rates are reachable.
-5. Evaluate moving game code and CPU-only data out of chip RAM on fast-RAM machines.
+4. Evaluate moving game code and CPU-only data out of chip RAM on fast-RAM machines.
