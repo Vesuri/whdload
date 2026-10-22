@@ -94,5 +94,14 @@ call site running at the time (interrupt code separately):
 then `python3 tools/write_audit.py tmp/prof/audit 175` (the kept chunks take about 2 GB;
 delete them afterwards).
 
+`tools/bus_audit.py` splits the CPU's chip-bus accesses by kind (instruction fetch, data
+read, write) and region, counts misaligned longwords and compares slot use inside and
+outside the bitplane lines: `KEEP_TRACE=1 python3 tools/route_profile.py tmp/prof/bus` then
+`python3 tools/bus_audit.py tmp/prof/bus 175` (about 3 GB of chunks; delete them afterwards).
+
+`route_profile.py` finds the live slave in fast RAM, or in slow RAM on the `a500` setups.
+FS-UAE's screenshots can carry non-Amiga colours in the right border on the A500 setup;
+they are not game output (OCS colours are multiples of 17 per channel).
+
 On `a1200-030` the game boots and plays, but the breakpoint at the game entry never fires,
 so neither tool runs there yet.

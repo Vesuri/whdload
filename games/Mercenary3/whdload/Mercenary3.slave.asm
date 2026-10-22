@@ -17,6 +17,8 @@
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 
+STACKSIZE	= $1000
+
 ;======================================================================
 
 _base		SLAVE_HEADER			;ws_Security + ws_ID
@@ -29,7 +31,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$41			;ws_keyexit = Backspace
-_expmem		dc.l	0			;ws_ExpMem
+_expmem		dc.l	STACKSIZE		;ws_ExpMem (Custom1 bit 2's stack)
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -50,6 +52,8 @@ _info		dc.b	"adapted by Harry/Graham/Wepl",10
 	ENDC
 		dc.b	0
 _config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
+		dc.b	"C1:X:64-bit bitplane fetch on AGA (FMODE 3):1;"
+		dc.b	"C1:X:Supervisor stack in expansion memory:2;"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -172,6 +176,30 @@ lbC0002AA
 	movea.l	(_resload,pc),a0
 	jsr	(resload_SetCACR,a0)
 
+; Custom1 bit 1: on AGA (Lisa's ID in LISAID), fetch the bitplanes 64 bits wide. The
+; game's two in-game copper lists (Disk.1 $56780, $567CC) are the only ones that set the
+; fetch window; their 320-pixel window ends at $b8 with 64-bit fetches. The buffers and
+; planes are 8-byte aligned and the rows 40 bytes, without modulos.
+	btst	#1,(_custom1+3,pc)
+	beq.b	.nofmode
+	move.w	(_custom+$7c).l,d0	;LISAID
+	cmp.b	#$f8,d0
+	bne.b	.nofmode
+	move.w	#$b8,($52aee).l		;DDFSTOP
+	move.w	#$b8,($52b32).l
+	move.w	#3,(_custom+$1fc).l	;FMODE
+.nofmode
+; Custom1 bit 2: the game sets its supervisor stack at the top of chip RAM with
+; lea $7fffa,a0 / unlk a0 in three places (Disk.1 $5DE66, $5DE88, $5DEEA) and uses less
+; than a page of it. Move it into the expansion memory, which is fast RAM when fitted.
+	btst	#2,(_custom1+3,pc)
+	beq.b	.nostack
+	move.l	(_expmem,pc),d0
+	add.l	#STACKSIZE-6,d0
+	move.l	d0,($5a1b8).l
+	move.l	d0,($5a1da).l
+	move.l	d0,($5a23c).l
+.nostack
 	move.w	#$2700,sr
 	jmp	($4B100).l
 

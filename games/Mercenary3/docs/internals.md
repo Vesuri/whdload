@@ -72,11 +72,13 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
-the shipped patch list. With every option off it runs the shipped slave's code paths.
+the shipped patch list. It asks for 4 KB of expansion memory (`ws_ExpMem`) for bit 2. With every option off it runs the shipped slave's code paths.
 
 | Option | Effect |
 | --- | --- |
 | `Custom1` bit 0 | `_dmaon` enables copper and bitplane DMA on its first call only, after the vertical blank, and completes the frame's 34-byte copy (the three replaced moves, then the original code from `$A85E`) |
+| `Custom1` bit 1 | On AGA (Lisa's ID `$F8` in `LISAID`), 64-bit bitplane fetch: `FMODE` = 3 and `DDFSTOP` `$B8` in the two in-game copper lists (Disk.1 `$56780`, `$567CC`), the only ones that set the fetch window. Buffers and planes are 8-byte aligned, rows 40 bytes, modulos 0 |
+| `Custom1` bit 2 | The supervisor stack in a 4 KB expansion block (fast RAM when fitted) instead of the top of chip RAM: the three `lea $7fffa,a0` / `unlk a0` stack setups (Disk.1 `$5DE66`, `$5DE88`, `$5DEEA`) get its top. The game uses less than a page of stack |
 
 The `VERIFY` build (`make verify`) adds instruments; it has none yet besides its name.
 
@@ -169,6 +171,60 @@ Same route, `a1200-fast`, frames in the 500-field window:
 
 Compare options only within one build: the performance slave without options differs from
 the shipped one by a frame (a different slave changes WHDLoad's layout and timing).
+
+The options against each other, one build (with bits 1 and 2), same route and machine:
+
+| `Custom1` | Frames | fps | Bitplane slots | CPU slots | Game's VERTB wait |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 89 | 8.93 | 22.3% | 39.2% | 7.3% |
+| 3 (+ FMODE 3) | 94 | 9.45 | 5.6% | 40.8% | 8.0% |
+| 5 (+ stack in fast RAM) | 94 | 9.49 | 22.3% | 37.5% | 7.2% |
+| 7 (all) | 96 | 9.62 | 5.6% | 39.3% | 9.6% |
+
+On `a500-1.5m` (500 fields): the shipped slave and the performance slave without options
+both draw 38 frames (3.82 fps); `Custom1` 1, 3, 5 and 7 all draw 42 (4.28 fps). Bit 1
+stays off without AGA, and bit 2's expansion memory is slow RAM there, on the chip bus.
+
+The gains don't add: frames are published on whole fields (the game waits for the VERTB
+counter after each `COP1LC` write), and the saved time partly moves into that wait. A
+frame is about 1% of the window. The pictures match; frame-timed animation (the panel logo)
+and the scene position differ with the frame rate.
+
+### Where the CPU's chip-bus time goes
+
+`tools/bus_audit.py` over the gameplay fields 175..500 of the `Custom1=1` route
+(325 fields): 27,800 CPU chip accesses per field, against 284,200 CPU cycles, and
+31,900 instructions per field (97 KB of instruction bytes, about 9 cycles each).
+
+| Kind | Region | Per field | Share |
+| --- | --- | ---: | ---: |
+| instruction fetch (32-bit) | game image | 13,830 | 49.7% |
+| data read | game image | 5,270 | 18.9% |
+| write | display buffers | 4,060 | 14.6% |
+| data read | display buffers | 1,500 | 5.4% |
+| write | stack (top of chip) | 1,010 | 3.6% |
+| data read | stack | 1,000 | 3.6% |
+| data read / write | below the image | 730 | 2.6% |
+| write | game image | 410 | 1.5% |
+| custom chip registers | | 26 | 0.1% |
+
+- Only the display accesses (20%) need chip RAM; the other 80% go to code and CPU-only
+  data that could sit in fast RAM.
+- The instruction cache is on (the slave's `resload_SetCACR` with `CACRF_EnableI`) but
+  hits only about 43% of the longwords: 97 KB of executed instructions need 13,800
+  fetches. The hot code is concentrated: 80% of the fetches come from 8.8 KB of code
+  (256-byte pages), 95% from 18.5 KB, 99% from 31.5 KB. The hottest pages are chip
+  `$4B100..$4B2FF` (15%) and `$57900..$57CFF` (24%).
+- 28% of the image's data reads are the publication's spin on the VERTB counter
+  (page `$52900`), which costs nothing that matters.
+- No longword access is misaligned (address 2 mod 4).
+- In the 200 bitplane lines the CPU gets 37.5% of the slots (bitplanes 35.2%, free
+  25.2%), outside them 42.1% (free 55.7%): display DMA slows the CPU's chip accesses but
+  never starves them.
+- The blitter is never used; all drawing is by the CPU. The panel below row 140 gets
+  almost no writes per frame: it is not redrawn.
+- The level 3 handler, once per field, costs 1.6% of the CPU's cycles; no other
+  interrupt ran on the route.
 
 The rest of this section is the shipped slave's profile.
 

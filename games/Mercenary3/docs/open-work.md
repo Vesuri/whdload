@@ -22,7 +22,16 @@ split and the measured game-time model ([internals](internals.md)).
 - The slave's `_dmaon` waits for a vertical blank on every frame (14.7% of the CPU time)
   and leaves 12 of the frame's 34 copied bytes uncopied. The performance slave's `Custom1`
   bit 0 fixes both: 7.40 to 8.98 fps on `a1200-fast`, same build.
-- All game code and data are in chip RAM, even with fast RAM fitted.
+- All game code and data are in chip RAM, even with fast RAM fitted. On `a1200-fast`, 80%
+  of the CPU's chip accesses are code fetches (50%), CPU-only data (21%) and the stack
+  (7%); only the display buffers (20%) need chip RAM. The instruction cache hits about 43%
+  of fetched longwords; 95% of the misses come from 18.5 KB of code.
+- Measured on `a1200-fast`, one build, `Custom1=1` as the reference (8.93 fps): 64-bit
+  bitplane fetch (bit 1) 9.45 fps, the stack in fast RAM (bit 2) 9.49, both 9.62. The A500
+  is unchanged by both (FMODE is AGA-only; its slow RAM is chip-bus memory).
+- The publication waits for the next field after each `COP1LC` write (7-10% of the CPU's
+  time on `a1200-fast`): double buffering quantises frames to whole fields.
+- No blitter, no misaligned longwords, the panel is not redrawn, interrupts cost 1.6%.
 
 ## Design: native logic passes, separate presentation frames
 
@@ -73,4 +82,13 @@ split and the measured game-time model ([internals](internals.md)).
    option there; until then they run natively.
 6. Make the entry breakpoint work on the 68030 (or anchor differently) and add
    `a1200-030` and `-NOMMU` 040/060 cells, where higher frame rates are reachable.
-7. Evaluate moving game code and CPU-only data out of chip RAM on fast-RAM machines.
+7. **Hot code into fast RAM** on a 68020+ with real fast RAM: the largest remaining chip
+   cost (half of the CPU's chip accesses). Copy the hot routines (18.5 KB covers 95% of
+   the fetches) and enter them through jumps; first redirect the renderer's writes to its
+   own code words (the write audit lists them) to the copies, and check every absolute
+   reference into the moved ranges. Then the CPU-only data the hot code reads.
+8. Smaller candidates: clear the back buffer with the blitter while the CPU works
+   (`$5E0E6` call, about 3.5% of a pass); triple buffering to drop the publication wait,
+   which needs 32 KB of chip RAM beyond the 512 KB BaseMem (a user decision: it would drop
+   512 KB chip machines); the data cache on 68030+ (the slave asks for the instruction
+   cache only), measurable once the 68030 entry breakpoint works.

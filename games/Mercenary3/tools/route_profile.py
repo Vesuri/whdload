@@ -67,7 +67,9 @@ SLAVE_SYMBOLS = {0x27c: '_dmaon', 0x28e: '_diskload', 0x298: '_patch_vertb',
                  0x2aa: '_patch_aud1', 0x2bc: '_int68', 0x2ce: '_checkkeyboard',
                  0x332: '_quit', 0x33e: '_loadgame', 0x390: '_savegame', 0x3ae: '_setsavename',
                  0x3ca: '_subd0', 0x3e8: '_waitvb'}
-FAST = (0x200000, 0xa00000)
+# Where WHDLoad keeps itself and the slave: fast RAM, or slow RAM on the A500 setups.
+FAST = (0xc00000, 0xd80000) if os.environ.get('AMIGA_SETUP', 'a1200-fast').startswith('a500') \
+    else (0x200000, 0xa00000)
 slave_base = None
 
 # (fields, joystick directions held), 500 fields (10 s PAL) from the game's entry. The door
@@ -114,9 +116,9 @@ def region(pc):
     if pc < 0x200000:
         return 'other chip'
     if slave_base is not None and slave_base <= pc < slave_base + len(CODE):
-        return 'slave (fast RAM)'
-    if pc < 0xa00000:
-        return 'other fast RAM (WHDLoad)'
+        return 'slave (fast RAM)' if FAST[0] < 0xa00000 else 'slave (slow RAM)'
+    if FAST[0] <= pc < FAST[1]:
+        return 'other fast RAM (WHDLoad)' if FAST[0] < 0xa00000 else 'other slow RAM (WHDLoad)'
     if pc >= 0xf80000:
         return 'Kickstart ROM'
     return 'other'
@@ -230,7 +232,7 @@ def report(red, meta):
 
 
 def locate_slave(g, out):
-    """Find the live slave in fast RAM. WHDLoad's file copy equals the file; the live copy
+    """Find the live slave in fast (or slow) RAM. WHDLoad's file copy equals the file; the live copy
     matches its loader code but differs elsewhere (WHDLoad fills in _resload)."""
     global slave_base
     dump = os.path.relpath(os.path.join(out, 'fast.bin'), ROOT)
@@ -245,9 +247,12 @@ def locate_slave(g, out):
         if base >= 0 and mem[base:base + len(CODE)] != CODE:
             hits.append(FAST[0] + base)
         i = mem.find(probe, i + 1)
-    if len(hits) != 1:
-        raise RuntimeError(f'expected one live slave in fast RAM, found {[hex(h) for h in hits]}')
-    slave_base = hits[0]
+    # A stale copy can remain in freed memory; the live one differs only in its filled-in data.
+    diffs = {h: sum(a != b for a, b in zip(mem[h - FAST[0]:h - FAST[0] + len(CODE)], CODE)) for h in hits}
+    print('slave candidates (differing bytes):', {hex(h): n for h, n in diffs.items()})
+    if not hits or sorted(diffs.values())[:2].count(min(diffs.values())) > 1:
+        raise RuntimeError(f'expected one live slave, found {diffs}')
+    slave_base = min(hits, key=diffs.get)
 
 
 def sheet(out, shots):
