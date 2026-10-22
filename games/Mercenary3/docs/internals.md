@@ -72,9 +72,10 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
-the shipped patch list. It asks for an optional 92 KB of expansion memory (`ws_ExpMem`):
+the shipped patch list. It asks for an optional 188 KB of expansion memory (`ws_ExpMem`):
 4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
-20 KB for bit 4's presentation restore buffer and 36 KB for bit 9's renderer copies.
+20 KB for bit 4's presentation restore buffer, 36 KB for bit 9's renderer copies and
+96 KB for bit 10's aligned staging bitmap.
 If allocation fails, the stack, code and
 tables retain their chip paths; presentation falls back to logic gating. With every option off it runs the shipped slave's code paths.
 
@@ -91,6 +92,7 @@ Bit 6 copies their read-only lookup tables to fast RAM (M2 below).
 Bit 7 accelerates horizontal span interiors on 68000 and fast-RAM 68020+ (R1 below).
 Bit 8 copies the full presentation restore set with bulk moves (S2 below).
 Bit 9 moves the remaining hot renderer blocks and their private mutable data to fast RAM (S3 below).
+Bit 10 stages the 3D bitmap in fast RAM and copies the view before publication (S4 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -870,3 +872,38 @@ wall in the first field captured after an untraced advance prompted checks: late
 fields draw correctly and all 74 presentation hashes of the relocated workspace
 pass on the 040. Use the last of two captured fields for still screenshots.
 Evidence: `tmp/s3/accepted/`, `tmp/s3/play-complete/`, `tmp/s3/fast-restore-040.json`.
+
+
+### S4: stage the view bitmap in fast RAM
+
+`Custom1` bit 10 redirects view writers and clearing to fast RAM on 68020+ with
+real fast RAM. Publication copies four 5,440-byte planes (136 rows, 21,760 bytes)
+with `movem`, then runs the native buffer flip. The panel, IRQ text and full-screen
+copies keep the native chip pointer. Special screens bypass staging. The drawing's
+low-word address arithmetic requires bitmap alignment at `$8000`; a 96 KB slot
+holds the 32 KB bitmap plus alignment slack, making optional workspace 188 KB.
+The original 140-row estimate copied four uninitialised rows over the separator;
+136-row copies give pixel-identical off/on still screenshots.
+
+Same-build/session `Custom1=1023 → 2047`, full drawing:
+
+| Cell | Off fps | On fps |
+| --- | ---: | ---: |
+| A500 | 4.10 | 4.10 |
+| 020 chip-only | 9.40 | 9.40 |
+| 020 fast | 12.40 | 12.50 |
+| 030/50 | 20.00 | 24.80 |
+| 030 MMU | 19.90 | 24.80 |
+| 040-25 | 19.10 | 24.90 |
+| 060-50 | 19.50 | 24.90 |
+
+Without S3, bit 10 also gains: 020 fast 11.30 → 11.60, 030/50 12.40 → 14.40 fps.
+It therefore remains independent. The 030 full-drawing cadence has one three-field
+startup interval, then 248 two-field intervals; no-draw has one two-field startup
+interval, then 495 one-field intervals (49.60 fps). The VERIFY clear bypass also
+omits staging/copying, so the no-draw budget excludes bitmap work.
+World speed remains 6 walking units and 2 heading units per field on 020/030.
+Options-off and shipped both give 37 A500 frames. Walking, turning and stopping
+screenshots retain the view and panel. Help, return to game and Quit Situation also
+show intact screens, with walking continuing on Eris. Evidence: `tmp/s4/accepted/`,
+`tmp/s4/still-fixed-{off,on}/`, `tmp/s4/play-final/`, `tmp/s4/cadence-030-*.json`.

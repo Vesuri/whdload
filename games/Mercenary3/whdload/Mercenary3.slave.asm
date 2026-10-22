@@ -22,6 +22,7 @@ HOTSIZE		= $1000
 TABLESIZE	= $6104
 TABLEMEM	= $7000		;ws_ExpMem requires whole 4 KB pages
 RENDERMEM	= $9000
+STAGEMEM	= $18000	;32 KB bitmap plus up to 64 KB alignment
 RESTOREMEM	= $5000		;17,366 bytes, rounded to whole pages
 
 ;======================================================================
@@ -36,7 +37,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$41			;ws_keyexit = Backspace
-_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM) ;optional workspace
+_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM) ;optional workspace
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -66,6 +67,7 @@ _config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
 		dc.b	"C1:X:Longword horizontal span fills:7;"
 		dc.b	"C1:X:Bulk presentation restore:8;"
 		dc.b	"C1:X:Renderer code in fast RAM (68020+):9;"
+		dc.b	"C1:X:View bitmap in fast RAM (68020+):10;"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -225,6 +227,7 @@ lbC0002AA
 	bsr.w	_hotcode
 	bsr.w	_hotdata
 	bsr.w	_patchspans
+	bsr.w	_stageinit
 	IFD VERIFY
 	bsr.w	_bypass
 	ENDC
@@ -390,6 +393,161 @@ _table64000
 ; S3: four renderer blocks, including their PC-relative data. Absolute
 ; references and external branch islands are described by Disk.1 offsets.
 ; Copy after M2/R1 and VERIFY bypasses, before the final instruction-cache flush.
+; S4: only view writers use _drawbase. The native chip-buffer pointer stays
+; live for the panel, IRQ text, full-screen copies and display hardware.
+_stageinit
+	btst	#2,(_custom1+2,pc)
+	beq.w	.done
+	move.w	(_attn,pc),d0
+	btst	#AFB_68020,d0
+	beq.w	.done
+	move.l	(_expmem,pc),d0
+	cmpi.l	#$200000,d0
+	blo.w	.done
+	cmpi.l	#$a00000,d0
+	blo.b	.fast
+	cmpi.l	#$1000000,d0
+	blo.w	.done
+.fast	addi.l	#STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+$7fff,d0
+	andi.l	#$ffff0000,d0
+	ori.l	#$8000,d0
+	lea	(_stagebase,pc),a0
+	move.l	d0,(a0)
+	lea	(_drawbase,pc),a0
+	move.l	($42c00).l,(a0)
+	move.l	a0,d0
+	lea	(_stageoperands,pc),a1
+.next	move.l	(a1)+,d1
+	beq.b	.hooks
+	movea.l	d1,a2
+	move.l	d0,(a2)
+	bra.b	.next
+.hooks
+; Disk.1 $5E840: first clear base load becomes a call setting the view target.
+	move.w	#$4eb9,($5ab90).l
+	lea	(_stageclear,pc),a0
+	move.l	a0,($5ab92).l
+; Disk.1 $5E458: copy before publication, then resume its original body.
+	move.w	#$4ef9,($5a7a8).l
+	lea	(_stagepublish,pc),a0
+	move.l	a0,($5a7aa).l
+	move.w	#$4e71,($5a7ae).l
+.done	rts
+
+_stageclear
+	move.w	sr,-(sp)
+	move.l	a0,-(sp)
+	lea	(_drawbase,pc),a0
+	move.l	($42c00).l,(a0)
+	tst.w	($71cc).w
+	bpl.b	.chip
+	move.l	(_stagebase,pc),(a0)
+	lea	(_stagepending,pc),a0
+	move.w	#1,(a0)
+.chip	movea.l	(_drawbase,pc),a6
+	movea.l	(sp)+,a0
+	move.w	(sp)+,ccr
+	rts
+
+_stagepublish
+	move.w	sr,-(sp)
+	movem.l	d0-d7/a0-a6,-(sp)
+	move.w	(_stagepending,pc),d0
+	beq.b	.native
+	tst.w	($71cc).w
+	bpl.b	.native
+	movea.l	(_stagebase,pc),a0
+	movea.l	($42c00).l,a1
+	moveq	#3,d0
+.plane	move.w	#169,d1
+.copy	movem.l	(a0)+,d2-d7/a2-a3
+	movem.l	d2-d7/a2-a3,(a1)
+	lea	32(a1),a1
+	dbra	d1,.copy
+	lea	2560(a0),a0
+	lea	2560(a1),a1
+	dbra	d0,.plane
+.native
+	movem.l	(sp)+,d0-d7/a0-a6
+	move.w	(sp)+,ccr
+	movea.l	($72b4).w,a0
+	tst.w	($6ee4).w
+	jsr	($5a7b0).l
+	move.w	sr,-(sp)
+	move.l	a0,-(sp)
+	lea	(_stagepending,pc),a0
+	clr.w	(a0)
+	lea	(_drawbase,pc),a0
+	move.l	($42c00).l,(a0)
+	movea.l	(sp)+,a0
+	move.w	(sp)+,ccr
+	rts
+_stagebase	dc.l	0
+_drawbase	dc.l	0
+_stagepending	dc.w	0
+; Absolute base-load operands, expressed as Disk.1 offsets. IRQ text and
+; full-screen/menu/blitter users deliberately retain the native chip pointer.
+_stageoperands
+	dc.l	$49524-$3cb0
+	dc.l	$4a2de-$3cb0
+	dc.l	$4a3b0-$3cb0
+	dc.l	$4a482-$3cb0
+	dc.l	$4a554-$3cb0
+	dc.l	$4a626-$3cb0
+	dc.l	$4a6f8-$3cb0
+	dc.l	$4a7ca-$3cb0
+	dc.l	$4a89c-$3cb0
+	dc.l	$4a96e-$3cb0
+	dc.l	$4aa40-$3cb0
+	dc.l	$4ab12-$3cb0
+	dc.l	$4abe4-$3cb0
+	dc.l	$4acb6-$3cb0
+	dc.l	$4ad88-$3cb0
+	dc.l	$4ae5a-$3cb0
+	dc.l	$4af2c-$3cb0
+	dc.l	$4b060-$3cb0
+	dc.l	$4b272-$3cb0
+	dc.l	$4b484-$3cb0
+	dc.l	$4b696-$3cb0
+	dc.l	$4b8a8-$3cb0
+	dc.l	$4baba-$3cb0
+	dc.l	$4bccc-$3cb0
+	dc.l	$4bede-$3cb0
+	dc.l	$4c0f0-$3cb0
+	dc.l	$4c302-$3cb0
+	dc.l	$4c514-$3cb0
+	dc.l	$4c726-$3cb0
+	dc.l	$4c938-$3cb0
+	dc.l	$4cb4a-$3cb0
+	dc.l	$4cd5c-$3cb0
+	dc.l	$4cf6e-$3cb0
+	dc.l	$53540-$3cb0
+	dc.l	$53b32-$3cb0
+	dc.l	$53b60-$3cb0
+	dc.l	$53b8e-$3cb0
+	dc.l	$53bbc-$3cb0
+	dc.l	$53bea-$3cb0
+	dc.l	$53c18-$3cb0
+	dc.l	$53c46-$3cb0
+	dc.l	$53c74-$3cb0
+	dc.l	$53ca2-$3cb0
+	dc.l	$53cd0-$3cb0
+	dc.l	$53cfe-$3cb0
+	dc.l	$53d2c-$3cb0
+	dc.l	$53d5a-$3cb0
+	dc.l	$53d88-$3cb0
+	dc.l	$53db6-$3cb0
+	dc.l	$53de4-$3cb0
+	dc.l	$55e00-$3cb0
+	dc.l	$5c84e-$3cb0
+	dc.l	$5c886-$3cb0
+	dc.l	$5c8cc-$3cb0
+	dc.l	$5e51a-$3cb0
+	dc.l	$5e84e-$3cb0
+	dc.l	$5e85c-$3cb0
+	dc.l	$5e86a-$3cb0
+	dc.l	0
+
 _hotrenderer
 	btst	#1,(_custom1+2,pc)
 	beq.w	.done

@@ -172,10 +172,10 @@ Check: play, options off, world speed. Measure on all cells.
   base at chip `$42C00` used by the drawing there). The clear and the read-modify-write
   drawing then happen in fast RAM.
 - After drawing, copy the view's rows into the chip back buffer with `movem` (about 22 KB),
-  then publish. Find first who else writes the back buffer (the panel and text below row
-  140): keep those writes in chip, or copy those rows too.
-- Expansion memory grows by the staging bitmap (about 32 KB including panel rows if
-  needed).
+  then publish. Find first who else writes the back buffer (the panel and text below the view): keep those writes in chip, or copy those rows too.
+- The native clear covers 136 rows (21,760 bytes over four planes), not the estimated
+  140; copy only those rows. Reserve 96 KB for the 32 KB bitmap and its required
+  low-word `$8000` alignment.
 - Check: screenshots off/on identical in a still scene, play, world speed. Measure on all
   cells; keep it only where it gains (the playbook's Powerdrome case gained only with the
   code in fast RAM too).
@@ -218,17 +218,17 @@ moved and self-modifying code.
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
 - [x] M1 [x] M2
-- [x] S0 [x] S1 [x] S2 [x] S3 [ ] S4 [ ] S5 [ ] S6
+- [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [ ] S5 [ ] S6
 - [x] R1 [ ] R2 [ ] R3 [ ] R4
 - [ ] X1
 
-Next: S4, then S5 and S6. P2 and P3 can run alongside S3/S4; they touch
+Next: S5, then S6. P2 and P3 can run alongside S3/S4; they touch
 the presentation path, so not alongside S2.
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–9.
+  with `Custom1` bits 0–10.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the
