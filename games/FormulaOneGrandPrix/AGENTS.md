@@ -2,10 +2,10 @@
 
 ## Scope
 
-Project scaffolding and original input preparation are complete. Analysis is not
-started. Do not boot, disassemble, reconstruct the slave, profile, or patch the
-game until the user asks to begin investigation. The supplied install uses
-Codetapper's v1.0 slave; no slave source is available.
+The launcher (`amiga/run.sh`, `tools/f1gp.py`) boots the game to gameplay, and the slave
+loader and executable layout are documented. Do not reconstruct or patch the slave,
+or profile, until the user asks. The supplied install uses Codetapper's v1.0 slave;
+no slave source is available.
 
 Read `docs/open-work.md` first. Shared guidance starts at AmigaXDev
 `docs/index.md`; the relevant workflow is `docs/playbooks/new-game-playbook.md`.
