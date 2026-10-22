@@ -156,11 +156,18 @@ kit, `slv_Version` 17, KickEmu kick13), reproducing the loader: assigns, `fronte
 unless `CUSTOM1` or fire, `LoadSeg` of `f1gp`, the patch list for each known size, driver
 names, quit. Pin the toolchain inputs in `manifest/`; built slaves stay in `tmp/`.
 
-**B3 Behave like the original.** The `quickrace` trail and the green, tow and follow
-windows' screenshot digests must match the original slave's. If the slave's size moves
-the load address and the race diverges, build a padded original as the control
-(Indianapolis 500) and compare against it. *Gate:* match, or a layout-controlled match
-with the difference explained.
+**B3 Establish the modern-KickEmu baseline.** Retain the shared KickEmu fixes rather
+than reproduce the 2002 implementation's allocation and startup timing. Verify the
+supplied game's loader patches and restored names in captured memory, navigate the
+Quick Race menus, and exercise F10 quit. Capture green, tow and follow for 500 fields
+each, twice from fresh deterministic boots with identical screen-anchored commands.
+Record slave and emulator hashes, game input pins and actual hunk bases. Keep the
+original-slave comparisons as reference evidence and explain observed differences;
+matching its timing-dependent random race is no longer the acceptance criterion.
+*Output:* internals baseline results and development commands. *Gate:* all three paired
+windows have identical routes, anchors, hunk layout and every screenshot digest;
+loader checks and clean quit pass. This establishes repeatability of the modern build,
+not equivalence to the original. Other game-file variants remain unverified until supplied.
 
 **B4 Gating and checks.** `CUSTOMn` bits in `slv_config`; a checker that, with every bit
 off, confirms the original bytes of every hooked range, reading the ranges from comments

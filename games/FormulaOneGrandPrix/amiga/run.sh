@@ -5,6 +5,7 @@
 #                           window behind the others (WINDOW=front|none, SOUND=1 to change)
 #   SLAVE=path amiga/run.sh run another slave build instead of the installed one
 #   WHD_ARGS='CUSTOM1=1'    extra WHDLoad options (CUSTOM1=1 skips the intro)
+#   VERIFY_EXIT=1          record WHDLoad's return status in .run/dh0/whdload-exit.txt
 #   AMIGA_SETUP=name        a named machine (AmigaXDev docs/reference/headless-fsuae.md)
 # Host: Kickstart 3.1 + Workbench 2.04 floppy boots DH0, which runs WHDLoad on DH1; the slave
 # runs Kickstart 1.3 (kick34005.A500 + .RTB) inside WHDLoad.  DH1 is a disposable copy of the
@@ -44,6 +45,10 @@ printf 'Expert\nReadDelay=0\n' > "$DH0/s/WHDLoad.prefs"
 printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assign DEVS: DH0:devs' \
   'Stack 16384' 'FailAt 999' 'CD DH1:' \
   "WHDLoad $SLAVE_NAME PRELOAD SPLASHDELAY=0 NOREQ ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
+if [ "${VERIFY_EXIT:-0}" = 1 ]; then
+  printf '%s\n' 'If WARN' 'Echo "FAIL" >DH0:whdload-exit.txt' 'Else' \
+    'Echo "OK" >DH0:whdload-exit.txt' 'EndIf' >> "$DH0/s/startup-sequence"
+fi
 rm -f "$RUN"/state/*.uss
 
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$PWD/../tmp/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"

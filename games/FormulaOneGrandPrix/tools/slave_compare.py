@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""B3 capture and strict comparison, with a locally padded original control.
+"""B3 modern-KickEmu repeatability and original-reference comparisons.
 
 Source amiga/env.sh. Usage:
-  python3 tools/slave_compare.py capture original|rebuilt|padded green|tow|follow [fields]
+  python3 tools/slave_compare.py capture original|rebuilt|padded|baseline|repeat green|tow|follow [fields]
   python3 tools/slave_compare.py compare
+  python3 tools/slave_compare.py compare-original
 All generated files stay in tmp/b3. A comparison requires every requested window;
 its nonzero exit is an acceptance failure, never an invitation to mask pixels.
 """
@@ -59,7 +60,7 @@ def capture(case, phase, fields):
     for key in ('SLAVE', 'WHD_ARGS', 'RACE_LEADS', 'ROUTE_SHOTS', 'RACE_KEEP_TRACES'):
         env.pop(key, None)
     env['RACE_LEADS'] = '0,0,400'
-    slave = ROOT/SLAVE if case == 'original' else BUILT if case == 'rebuilt' else padded()
+    slave = ROOT/SLAVE if case == 'original' else padded() if case == 'padded' else BUILT
     if case != 'original':
         env['SLAVE'] = str(slave)
     sock = ROOT/'amiga/.run/f1gp.sock'
@@ -67,7 +68,7 @@ def capture(case, phase, fields):
         # Quit through the project server; do not terminate unidentified processes.
         try:
             client('quit', quiet=True)
-        except (ConnectionError, subprocess.CalledProcessError):
+        except (ConnectionError, subprocess.CalledProcessError, RuntimeError):
             pass
         sock.unlink(missing_ok=True)
     log = dest/'serve.log'
@@ -93,6 +94,12 @@ def capture(case, phase, fields):
         meta['slave_sha256'] = hashlib.sha256(slave.read_bytes()).hexdigest()
         meta['slave_bytes'] = len(slave.read_bytes())
         meta['case'] = case
+        meta['capture_tools_sha256'] = {name: hashlib.sha256((ROOT/'tools'/name).read_bytes()).hexdigest()
+                                         for name in ('f1gp.py', 'race_profile.py', 'slave_compare.py')}
+        meta['game_inputs'] = json.loads((ROOT/'manifest/game-inputs.json').read_text())
+        meta['emulator_sha256'] = hashlib.sha256(Path(meta['fsuae']).read_bytes()).hexdigest()
+        if case in ('baseline', 'repeat'):
+            meta['loader_checks'] = loader_checks(mem, h0, h2, slave)
         (dest/'meta.json').write_text(json.dumps(meta,indent=2)+'\n')
     finally:
         if sock.exists():
@@ -100,7 +107,7 @@ def capture(case, phase, fields):
         server.wait(timeout=30)
 
 
-def compare():
+def compare_original():
     accepted = []
     report = []
     for control in ('original', 'padded'):
@@ -130,16 +137,77 @@ def compare():
             report.append(row)
         if passes:
             accepted.append(control)
-    (OUT/'comparison.json').write_text(json.dumps(dict(accepted=accepted, windows=report), indent=2)+'\n')
+    (OUT/'original-comparison.json').write_text(json.dumps(dict(accepted=accepted, windows=report), indent=2)+'\n')
     return 0 if accepted else 1
+
+
+def loader_checks(mem, h0, h2, slave):
+    """Check supplied-game patches against captured RAM, including the live keyboard target."""
+    checks = {}
+    for name, addr, expected in (
+        ('protection_answer', h0+0x982, bytes.fromhex('22116000')),
+        ('protection_branch', h0+0x345c4, bytes.fromhex('4e714e71')),
+        ('save_flag', h2+0x3863a, b'\xff'),
+        ('save_directory', h2+0x386ae, b'saves\0'),
+    ):
+        checks[name] = mem[addr:addr+len(expected)] == expected
+    hook = mem[h2+0x4ac:h2+0x4b2]
+    target = struct.unpack_from('>I', hook, 2)[0]
+    # ROR/EOR displaced instructions, CMP against keyexit, BEQ quit, RTS.
+    body = mem[target:target+16]
+    checks['keyboard_hook'] = hook[:2] == bytes.fromhex('4eb9') and body[:8] == bytes.fromhex('e2180a0000ffb03a')
+    if checks['keyboard_hook']:
+        key = target+8+struct.unpack_from('>h',body,8)[0]
+        checks['keyboard_exit_key'] = mem[key] == 0x59
+        checks['keyboard_built_code'] = body in slave.read_bytes()[32:-4]
+    # Original loader's captured names are an independent oracle for its RNC patch.
+    reference = OUT/'original/green'
+    oldmeta = json.loads((reference/'meta.json').read_text())
+    oldmem = image((reference/'chip.bin').read_bytes(), (reference/'fast.bin').read_bytes(), b'')
+    names = struct.unpack_from('>I', mem, h0+0x91a)[0]+0x900
+    oldnames = struct.unpack_from('>I', oldmem, oldmeta['hunk_bases'][0]+0x91a)[0]+0x900
+    checks['driver_names'] = mem[names:names+1480] == oldmem[oldnames:oldnames+1480]
+    return checks
+
+
+def compare():
+    report = []
+    for phase in ('green', 'tow', 'follow'):
+        paths = [OUT/case/phase/'meta.json' for case in ('baseline', 'repeat')]
+        if not all(p.exists() for p in paths):
+            row = dict(phase=phase, status='INCOMPLETE')
+        else:
+            a, b = [json.loads(p.read_text()) for p in paths]
+            keys = ('phase', 'fields', 'setup', 'fast_kb', 'leads', 'anchors', 'route',
+                    'hunk_bases', 'slave_sha256', 'slave_bytes', 'whd_args',
+                    'emulator_sha256', 'capture_tools_sha256', 'game_inputs')
+            different = [k for k in keys if k not in a or k not in b or a[k] != b[k]]
+            count_ok = a['fields'] == b['fields'] == len(a['shot_digests']) == len(b['shot_digests']) == 500
+            mismatches = sum(x != y for x,y in zip(a['shot_digests'],b['shot_digests']))
+            required = {'protection_answer','protection_branch','save_flag','save_directory',
+                        'keyboard_hook','keyboard_exit_key','keyboard_built_code','driver_names'}
+            patches_ok = all(set(m.get('loader_checks',{})) == required and
+                             all(m['loader_checks'].values()) for m in (a,b))
+            ok = not different and count_ok and not mismatches and patches_ok
+            row = dict(phase=phase, different_metadata=different, full_window=count_ok,
+                       digest_mismatches=mismatches, loader_checks=patches_ok,
+                       status='PASS' if ok else 'FAIL')
+        report.append(row)
+        print(json.dumps(row))
+    passed = all(row['status'] == 'PASS' for row in report)
+    (OUT/'comparison.json').write_text(json.dumps(dict(gate='modern-repeatability',
+        status='PASS' if passed else 'FAIL', windows=report),indent=2)+'\n')
+    return 0 if passed else 1
 
 
 if __name__ == '__main__':
     if sys.argv[1:2] == ['capture']:
         case,phase = sys.argv[2:4]
-        if case not in ('original','rebuilt','padded') or phase not in ('green','tow','follow'):
+        if case not in ('original','rebuilt','padded','baseline','repeat') or phase not in ('green','tow','follow'):
             sys.exit('invalid case or phase')
         capture(case,phase,int(sys.argv[4]) if len(sys.argv)>4 else 500)
+    elif sys.argv[1:] == ['compare-original']:
+        sys.exit(compare_original())
     elif sys.argv[1:] == ['compare']:
         sys.exit(compare())
     else:

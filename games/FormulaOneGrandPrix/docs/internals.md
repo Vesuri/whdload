@@ -80,45 +80,81 @@ B5 has not enabled caches. DOS BSTR assign names are explicitly longword-aligned
 The shared kit is consumed in place, rather than copying WHDLoad source into this repo.
 
 B2 build checks: bash 3.2, ordinary and spaced output directories produce identical
-5684-byte executables. A deterministic `a1200-fast` Quick Race boots successfully:
+6100-byte executables with `IOCACHE = 10000`. A deterministic `a1200-fast` Quick Race boots successfully:
 language 807, protection 1184, startup 1413, track 1608, race 2115 fields. The existing
 original route begins at language 838 and has identical subsequent intervals (all
-screens 31 fields later). This is boot validation only; B3 equivalence is still open.
+screens 31 fields later). B3 validates repeatability of this modern-KickEmu baseline below.
 
-### B3: acceptance failure — decision required
+### B3: modern-KickEmu baseline
 
-The current rebuild **does not pass B3**. `tools/slave_compare.py` captured the
-500-field green window on `a1200-fast` for the original, rebuilt and padded-original
-slaves, each from a fresh deterministic boot. Green was found by screen polling from
-race entry, with identical command sequences (`RACE_LEADS=0,0,400`; only the first
-value is used for green). The old calibrated 840-field lead had overshot on the rebuild;
-that rejected attempt is retained separately under `tmp/b3/rebuilt/green-lead-overshoot`.
+The user selected a new baseline with the shared modern KickEmu. Exact original-slave
+screenshot matching is no longer the gate: game randomness depends on menu execution
+and allocation, so those screenshots cannot independently distinguish loader bugs
+from legitimate KickEmu changes. B3 now requires paired deterministic captures of all
+three windows, captured-memory loader checks and clean F10 quit. This is a deliberate
+change to the plan, not a claim that the original comparison passed.
 
-| Check | Original | Original padded to rebuilt size | Rebuilt |
+The allocation investigation identified a missing configuration setting: the old
+slave's filesystem code uses a 10,000-byte I/O cache (read path at slave +$10C6,
+write path +$117C, free path +$13D4). Defining `IOCACHE = 10000` in the rebuild restores
+that setting. It is a filesystem cache, unrelated to the CPU caches deferred to B5.
+
+| Deterministic `a1200-fast` check | Original | Rebuild without I/O cache | Modern rebuild with I/O cache |
 |---|---:|---:|---:|
-| Slave file bytes | 5464 | 5684 | 5684 |
-| Language field | 838 | 838 | 807 |
-| First race field | 2146 | 2146 | 2115 |
-| Green anchor, fields after race entry | 857 | 857 | 826 |
-| Hunk 0/1 placement relative to original | unchanged | unchanged | both `$2720` lower |
+| Slave file bytes | 5464 | 5684 | 6100 |
+| Language field | 838 | 807 | 807 |
+| First race field | 2146 | 2115 | 2115 |
+| Green anchor, fields after race entry | 857 | 826 | 778 |
+| Hunk 0/1 placement relative to original | unchanged | `$2720` lower | `$28` higher |
 | Hunk 2/3 placement relative to original | unchanged | unchanged | unchanged |
-| Green screenshot digests matching original | 500/500 | 500/500 | 0/500 |
 
-The first screenshot already differs in the car ahead. Padding changes only the HUNK
-allocation/code sizes and appends zeroes, preserving every original executable byte.
-The padded original reproduces the original route, actual hunk layout and every green
-screenshot. **It does not reproduce the rebuild's actual layout**, so this is not a
-layout-controlled comparison of rebuilt versus original. All four hunk bases, input
-slave hashes, routes, anchors and per-field screenshot digests are in each local
-`tmp/b3/CASE/green/meta.json`; `comparison.json` records the failing comparisons.
+The same-size padded original reproduced all 500 original green screenshots and its
+actual layout; it never reproduced the rebuilt layout. Restoring the I/O cache moves
+both fast hunks by `$2748`. A diagnostic reducing the modern DOS environment table
+from 16 entries to the original 11 moved them back by `$18`, leaving `$10` difference.
+Also removing the device name caused a "Can't find disk" requester before the language
+screen. These local adaptations are rejected: the normal build uses unmodified shared
+KickEmu. The remaining allocation difference is not itself a defect.
 
-The new shared KickEmu is a remaining compatibility variable, beyond file-size padding.
-A1 identifies a mechanism by which changed menu execution changes the race, but it has
-not isolated all rebuild differences. There is no claim of gameplay equivalence, no
-performance claim and no relaxation of the gate. Stop here for a decision: either
-continue exact-compatibility work (including actual allocation and timing control), or
-explicitly revise B3 for a newer-KickEmu behavioural comparison. Tow/follow captures,
-A2 mode routes, optional A3, and B4 are not completed; do not advance to B5/C.
+The 31-field language difference is one polling interval, not a precise measurement
+of loading duration. All later route intervals agree. Restoring I/O caching does not
+change that route difference. The old slave explicitly invokes `resload_LoadKick`;
+the modern version-17 header lets WHDLoad load Kickstart before entering the slave.
+Modern KickEmu also changes early CPU setup and OS patches. Those are remaining boot
+path differences, not isolated causes of the measured route difference. No artificial
+startup delay or fixed RNG seed is installed to force the original race.
+
+Current paired captures and their acceptance report are in `tmp/b3/baseline`,
+`tmp/b3/repeat` and `tmp/b3/comparison.json`. The report checks 500 digests per window,
+route, anchors, hunk bases, slave/emulator hashes, input pins and capture-tool hashes.
+Captured memory is also checked for the two protection patches, save flag/directory,
+the live keyboard hook and F10 key, and 1480 restored driver-name bytes against the
+original capture. Other game-file variants have no supplied runtime fixtures.
+
+Paired captures pass on `a1200-fast` (supplied 582992-byte game, caches unchanged):
+
+| Window | Anchor after Quick Race | Matching screenshot digests | Loader checks |
+|---|---:|---:|---|
+| Green | 778 fields | 500/500 | pass in both runs |
+| Tow | 5692 fields | 500/500 | pass in both runs |
+| Follow | 6372 fields | 500/500 | pass in both runs |
+
+Every pair has the same route, actual hunk bases, executable/input/tool hashes and
+window length. The current slave SHA-256 is
+`c44d576c6e0bed066a91abe44d9e7b1925863e2c7f8cd7f5e430cf9e08607eed`.
+The green, retirement and follow-camera screenshots were visually inspected.
+The separate `CUSTOM1=1` quit probe follows the same menu route, confirms no return
+marker exists before F10, sends the real key, and observes WHDLoad return `OK`. Its
+screen shows the host AmigaDOS prompt without an error requester.
+
+**B3 passes the revised gate.** `tools/slave_accept.py` checks the paired windows,
+coherent capture identities, current build and clean quit. Adversarial local fixtures
+confirmed rejection of missing/short windows, a changed picture, wrong layout, a
+failed patch check, missing/failed/stale quit evidence and mixed slave builds. Build
+repetition including a spaced output path, input hashes, Python compilation, bash 3.2
+syntax and whitespace checks also pass. Captures, probe records and checker fixtures
+remain in ignored `tmp/b3/`; no game or built-slave bytes are tracked.
+
 
 ## Executables
 

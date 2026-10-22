@@ -162,12 +162,21 @@ successful boot as B3 acceptance. All slave builds, listings and captures stay i
 
 ## Slave acceptance captures (B3)
 
+B3 uses the modern shared KickEmu with `IOCACHE = 10000`. Build normally with
+`make slave`; local device-description adaptations are diagnostic rejects, not inputs
+to that build. Rejected captures must not be promoted into the baseline.
+
 ```sh
 . amiga/env.sh
-python3 tools/slave_compare.py capture original green
-python3 tools/slave_compare.py capture rebuilt green
-python3 tools/slave_compare.py capture padded green
-python3 tools/slave_compare.py compare
+make slave
+python3 tools/slave_compare.py capture baseline green
+python3 tools/slave_compare.py capture repeat green
+python3 tools/slave_compare.py capture baseline tow
+python3 tools/slave_compare.py capture repeat tow
+python3 tools/slave_compare.py capture baseline follow
+python3 tools/slave_compare.py capture repeat follow
+python3 tools/slave_quit.py
+python3 tools/slave_accept.py
 ```
 
 Each capture starts a fresh project server, waits for its new `serving on` message,
@@ -177,13 +186,30 @@ no name-wide termination is used. The desktop sandbox may require permission for
 emulator/debugger's local connection. The default window is 500 fields. Capture names
 are immutable: move a rejected local attempt aside explicitly before retrying.
 
-Use `tow` and `follow` in place of `green` only after the current failed gate is resolved.
-The comparator accepts either a complete original match or a complete padded-control
-match; the latter additionally requires all four actual hunk bases to agree. Missing
-windows, short windows, different routes/anchors or any different screenshot digest
-fail. It writes `tmp/b3/comparison.json` and exits nonzero. Equal slave file sizes are
-not evidence of equal hunk placement. The current result is FAIL/INCOMPLETE, not PASS.
+The comparison requires all three pairs to contain 500 identical screenshot digests,
+identical routes/anchors and actual hunk bases, matching slave/emulator/input/tool
+hashes, and passing captured-memory loader checks. Missing or short captures fail.
+`slave_compare.py compare` writes `tmp/b3/comparison.json` and returns nonzero until
+every window passes. `slave_accept.py` additionally requires one coherent capture set,
+the current built slave and a successful quit probe; its combined B3 report is
+`tmp/b3/acceptance.json`.
+The names check uses the verified original green capture as its independent oracle;
+retain `tmp/b3/original/green`, or recreate it with `capture original green`.
 
-The capture driver uses `RACE_LEADS=0,0,400` for every case: green and tow are polled
-from their preceding anchors; follow retains the existing 400-field separation from
-the tow banner and still rejects an overshoot. Only green has been captured for B3.
+The driver uses `RACE_LEADS=0,0,400` for every case: green and tow are polled from their
+preceding anchors; follow retains the 400-field separation from tow and rejects an
+overshoot. This comparison establishes repeatability of the new baseline. It does not
+prove original-slave equivalence, other CPU behavior or the two unavailable game variants.
+
+Original-reference diagnostics remain available as `capture original|rebuilt|padded`
+and `compare-original`; their report is `tmp/b3/original-comparison.json`. Equal slave
+file sizes never establish equal game allocations. The original comparison is not the
+modern-baseline acceptance command.
+
+`tools/slave_quit.py` performs the separate real-input quit check with `CUSTOM1=1`.
+For a manual check, set `VERIFY_EXIT=1` in the server environment,
+enter the race and send raw key `$59` (F10) through the native harness. The launcher
+records WHDLoad's return as `OK` or `FAIL` in `amiga/.run/dh0/whdload-exit.txt` after it
+returns. A missing marker is not a pass. Save that evidence in ignored `tmp/b3/` before
+another launch replaces the disposable hard drive. Check the returned screen as well,
+then quit the project server normally.
