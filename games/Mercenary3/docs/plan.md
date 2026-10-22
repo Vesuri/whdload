@@ -11,14 +11,14 @@ whose dependencies are met. Design and decisions: [open work](open-work.md). Rul
   `whdload/Mercenary3.slave.asm`, listed in `_config`. With every option off the slave runs
   the shipped code. Debug aids go in the `VERIFY` build.
 - **Build** with `make original slave verify` before each commit.
-- **Measure** with `tools/fps.py` on `a1200-fast` and `a500-1.5m`: the same build with the
+- **Measure** with `tools/fps.py` on `a1200-fast`, `a500-1.5m` and the existing `040-25` matrix configuration: the same build with the
   option off and on, same session. Keep a change only if it gives a repeatable measured
   gain somewhere and loses nowhere; there is no fixed percentage cutoff (user decision).
   L1 is a correctness prerequisite: accept native world speed and
   the intentional 12.5 Hz logic cap rather than requiring an FPS gain. Run
   `tools/matrix.sh` only where a step says so. The 040/060 cells give
-  emulator counts that don't follow the CPU frequency; use them only to check that the game
-  runs there.
+  emulator counts that don't follow the CPU frequency. Include `040-25` in routine
+  off/on comparisons (user decision), but do not treat its FPS as a hardware-speed prediction.
 - **Check the game still works** with three tests, not more:
   1. **Options off:** the performance slave gives the shipped slave's frame count in the
      same session on `a500-1.5m`.

@@ -97,6 +97,19 @@ SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM1=1 PER_FRAME=1 python3 tools/fp
 python3 -m unittest discover -s tools -p test_fps.py
 ```
 
+Routine comparisons include the existing `040-25` matrix configuration. Run it directly
+without running the full matrix, using the same VERIFY build and route for both options:
+
+```sh
+AMIGA_SETUP=a1200-030 DETERMINISTIC=0 \
+EXTRA_ARGS='--cpu=68040-NOMMU --uae_cpu_frequency=25000000' \
+SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS=CUSTOM1=255 \
+python3 tools/fps.py tmp/fps/040-on.json
+```
+
+Change `WHD_ARGS` and the output name for the matching off run. This is the existing
+cycle-exact matrix cell, not the separate `a1200-040` preset.
+
 `AMIGA_SETUP`, `SLAVE`, `WHD_ARGS` and `ROUTE` work as in the profiler. `BOOT_TIMEOUT=120`
 covers launch through the verified entry breakpoint; `RUN_TIMEOUT=180` covers the route
 (host seconds). Failure produces no result JSON and stops the owned processes. The validated

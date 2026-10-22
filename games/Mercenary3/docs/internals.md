@@ -732,3 +732,14 @@ differed by 3 cycles in total.
 - The game is assembly with one supervisor stack for its main loop and interrupts, so the
   reconstructed call tree roots everything under interrupt frames; use the self-cycle
   tables. Outside the waits no single routine exceeds 1.5%.
+
+### Routine 040 performance check
+
+The routine measurement set now includes the existing `040-25` matrix configuration:
+`a1200-030` with `68040-NOMMU`, 25 MHz and `DETERMINISTIC=0`. The separate
+`a1200-040` preset is not substituted (user decision).
+Same VERIFY build/session, standard 500-field route: all options off (`Custom1=0`)
+gives 117 frames / 11.70 fps; current options on (`Custom1=255`) gives 165 frames /
+16.50 fps. Effective machine settings, route and runtime/build hashes match.
+Evidence: `tmp/040-check/off.json`, `on.json`. These remain emulator measurements
+with the accepted frequency-timing limitation, not predicted hardware frame rates.

@@ -57,6 +57,10 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- Include the existing `040-25` matrix configuration in routine FPS comparisons,
+  alongside `a1200-fast` and `a500-1.5m` (user decision). Keep that configuration;
+  do not substitute the separate `a1200-040` preset.
+
 - Combine M2 with R1 to investigate what limits the hot drawing loops (user decision).
   Measure table relocation and loop rewrites separately, then commit the combined step.
 
