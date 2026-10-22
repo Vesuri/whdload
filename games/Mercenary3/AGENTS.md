@@ -1,7 +1,7 @@
 # Mercenary 3
 
 Investigation workspace for Mercenary III: The Dion Crisis (Novagen).
-Read `docs/open-work.md` first. The investigation has started: the game boots under
+Read `docs/open-work.md` and `docs/plan.md` first. The investigation has started: the game boots under
 WHDLoad and the slave is documented. Patches come after the playbook's setup is done.
 
 ## Rules
@@ -28,7 +28,8 @@ WHDLoad and the slave is documented. Patches come after the playbook's setup is 
 
 ## Guidance
 
-- `docs/open-work.md`: current scope and deferred next steps.
+- `docs/open-work.md`: current scope, findings and decisions.
+- `docs/plan.md`: the step-by-step plan (step IDs, dependencies, done criteria).
 - `docs/development.md`: inputs, verification and shared environment.
 - `docs/internals.md`: the slave, the boot and the game's memory layout.
 - AmigaXDev `docs/index.md`: shared topic routing; its standalone WHDLoad
