@@ -1695,7 +1695,11 @@ h2+$52A indexed by raw key. No pending-press record survives a completed release
 Consequently a press and release between native scans can be missed. Retaining native
 sampling and requiring lossless one-shot presses need an explicit policy: buffer the
 one-shot events for native consumption, or accept the original short-press limitation.
-C4 is not complete pending that decision; no input patch has been installed.
+C4 is blocked awaiting the user’s decision; no input patch has been installed.
+Buffering one-shot presses for the next native input check is recommended but has not
+been selected. Accepting the native limitation would require an explicit change to
+the no-loss acceptance requirement; it would not turn the current failed test into
+a pass.
 
 `tmp/c4/input-2/` captures the C3 VERIFY slave (`330662b72ba7c19d049a0eb68cb522cbe668e27470a9ccfd24df561465273b97`)
 on `a1200-fast`, PAL, `CUSTOM2=3`, `CUSTOM4=3`. It uses real harness key/joystick

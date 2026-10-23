@@ -755,5 +755,8 @@ It also checks controller press/release and a full press/release between scans.
 The reporter prints and saves that acceptance result without treating a reproduced game
 failure as a corrupt capture. Check the result, not merely its process exit status.
 
-Current evidence is a failed short-press gate; see internals. C4 has not yet changed
-input semantics or completed all input acceptance cases.
+Current evidence is a failed short-press gate; see internals. C4 is blocked awaiting
+the user’s input-policy decision and has not changed input semantics. After that
+decision, complete pause, all view keys, replay/input and rapid-repeat checks. If the
+slave changes, rebuild and collect fresh evidence, including the disabled-feature
+gate; retain the current captures as evidence of the original failure.
