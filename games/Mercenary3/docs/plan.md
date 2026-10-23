@@ -197,9 +197,8 @@ a pixel twin only if they differ. Keep each rewrite only where it gains.
 the CPU (`$5E840`). Wait for the blitter before the first drawing. After S4 this matters
 only where S4 is off: the A500 and the chip-only A1200. Measure there.
 
-**R3. Triple buffering (U).** Decide after S5. It removes the publication's wait for the
-next field (7–10% on `a1200-fast` with drawing). It needs 32 KB of chip RAM beyond the 512 KB BaseMem, which drops 512 KB
-chip machines.
+**R3. Triple buffering — closed, not implemented.** The user does not want triple
+buffering. Retain double buffering despite the S5 measured wait; no extra chip buffer.
 
 **R4. Data cache on 68030+ (U).** Measure the slave requesting the data cache as well, then
 ask.
@@ -218,12 +217,11 @@ moved and self-modifying code.
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
 - [x] M1 [x] M2
-- [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [ ] S5 [ ] S6
-- [x] R1 [ ] R2 [ ] R3 [ ] R4
+- [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [ ] S6
+- [x] R1 [ ] R2 [x] R3 (closed) [ ] R4
 - [ ] X1
 
-Next: S5, then S6. P2 and P3 can run alongside S3/S4; they touch
-the presentation path, so not alongside S2.
+Next: S6, then P2 and P3.
 
 ## In place
 

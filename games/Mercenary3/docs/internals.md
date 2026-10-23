@@ -907,3 +907,19 @@ Options-off and shipped both give 37 A500 frames. Walking, turning and stopping
 screenshots retain the view and panel. Help, return to game and Quit Situation also
 show intact screens, with walking continuing on Eris. Evidence: `tmp/s4/accepted/`,
 `tmp/s4/still-fixed-{off,on}/`, `tmp/s4/play-final/`, `tmp/s4/cadence-030-*.json`.
+
+
+### S5: publication wait after staging
+
+With `Custom1=2047`, the 020 instruction profile assigns 16.39% of route cycles to
+Disk.1 `$5E4D6`'s field wait. Beam-position samples at wait entry/exit measure 17.0%
+including interrupt time, averaging 0.675 field per publication. The same sampling
+on the 030/50 measures 36.4%, averaging 0.731 field per publication over 502 fields.
+This is a measured 030 wait cost, not an inference from the 020 profile. It is large
+enough to bring R3's triple-buffer decision to the user; the steady two-field target
+already holds without it. The user rejected triple buffering; R3 is closed without
+implementation and the native publication wait remains.
+
+The unchanged S4 build passes the three guards: options-off equals shipped (37 A500
+frames), native 6/2 world rates on 020/030, and intact route/menu screenshots.
+Evidence: `tmp/s4/profile-020/`, `tmp/s4/wait-a1200-{fast,030}.json`.

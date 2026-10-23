@@ -57,6 +57,9 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- Close R3 without implementing triple buffering: the user does not want it. Keep
+  double buffering and continue to S6 (user decision after S5 measurements).
+
 - The reference fast machine for the 50 fps path is the cycle-exact 68030/50
   (`030-default` cell) (user decision, S0). The 040/060 emulator cells only confirm the
   game runs there.
@@ -108,7 +111,9 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md): S5 publication wait, then S6 budget checkpoint. S2–S4
+Follow [plan.md](plan.md): S6 is the budget checkpoint. R3 is closed without
+implementation by user decision. Publication waits remain 16.4% of the 020 profile
+and about 36.4% of 030 route time. S2–S4
 reach steady one-field no-draw and two-field full frames on the 030/50; the first
 interval is one field longer. S4 measures 24.8 fps with full drawing and 49.6 without.
 The [frame budget](internals.md#frame-budget-toward-50-fps) records the remaining costs.
