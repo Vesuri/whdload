@@ -66,7 +66,8 @@ wait for the next field; otherwise run the pass with the true elapsed count in c
 
 ### P. Smooth frames between logic passes
 
-**P1. Presentation frames with the player extrapolated** (needs L1). Where L1 would wait,
+**P1. Presentation frames** (needs L1). The original prediction below is retained
+for comparisons; P4 supersedes it in Enhanced framerate. Where L1 would wait,
 draw a frame instead. With only one field left before logic is due, start a redraw
 only if the last presentation took at most one field; the initial allowance is two.
 This admission rule avoids spending a full redraw on a one-field gap on the 030.
@@ -116,6 +117,17 @@ collision (`$6F56`), a mode change or a stop.
 - These modes also cover O1's deferred vehicle, flight and A-to-Z navigation panel
   checks with options 0–2 on, including any separate fetch window under FMODE 3.
 - Check: world speed in that mode; play.
+
+**P4. Correct presentation transitions** (follow-up to the user's video).
+- Bit 14 replaces player extrapolation with previous/current interpolation on all
+  rendered frames. Freeze one alpha for camera and geometry after the publication wait;
+  keep committed poses for input, collision and subsequent game logic.
+- Render the collision routine's drawing tail in extra frames without running its
+  collision decisions. Preserve the complete polygon clipping workspace.
+- Check starts, stops, reversing, the mailbox approach and vehicle/flight/lift views;
+  P1 restore hashes, world speed and options off. Compare bit 14 off/on with `fps.py`
+  on the routine setups and reference 030. Accept this as a smoothness correction,
+  with one native pass of visual delay, rather than requiring an FPS increase.
 
 ### M. Code and data in fast RAM (68020+ with fast RAM)
 
@@ -227,17 +239,19 @@ without it. Real cache behaviour and 040/060 hardware performance remain unverif
 - [x] O1
 - [x] L1
 - [x] P1 [x] P2 [x] P3
+- [x] P4
 - [x] M1 [x] M2
 - [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [x] S6
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
 - [x] X1
 
-All planned steps are complete. Hardware validation remains unavailable, outside X1.
+P4 addresses the presentation defects reported after the original plan completed.
+Hardware validation remains unavailable, outside X1.
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–13.
+  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–14.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the

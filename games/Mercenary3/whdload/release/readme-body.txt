@@ -31,6 +31,8 @@
  Set it to Off for the original game behaviour. The equivalent tooltype
  is CUSTOM5=1 for On or CUSTOM5=0 for Off; omission also means Off.
  Old CUSTOM1 settings are ignored.
+ Smooth frames use completed movement, adding about 80 ms of visual delay
+ on fast machines instead of predicting past stops and collisions.
  Rendering can reach 50 fps PAL on suitable machines and scenes; this is
  not a guaranteed frame rate. The installer enables CACHE and PRELOAD.
  NOCACHE can be used for cache troubleshooting.

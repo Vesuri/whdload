@@ -10,6 +10,8 @@ frame rate depends on the machine and scene.
 The WHDLoad startup screen has one control: **Enhanced framerate** checkbox.
 Off restores shipped game behaviour. On selects the supported optimisations for the
 CPU, chipset and available memory, including smoother walking, vehicles and flight.
+Smooth frames interpolate completed movement, adding about 80 ms of visual delay
+on fast machines instead of predicting past stops and collisions.
 
 ## Requirements and installation
 

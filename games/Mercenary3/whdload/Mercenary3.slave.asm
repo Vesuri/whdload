@@ -82,7 +82,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$3fff,(a0)
+	move.l	#$7fff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -234,6 +234,7 @@ lbC0002AA
 	ENDC
 	bsr.w	_hotrenderer
 	bsr.w	_objectinit
+	bsr.w	_viewinit
 ; Let WHDLoad handle CPU/MMU differences and NOCACHE. Preserve the shipped
 ; instruction-only request with bit 13 off; SetCACR also flushes patched code.
 	moveq	#CACRF_EnableI,d0
@@ -981,8 +982,14 @@ _objectdraw
 .generation
 	lea	(_object_generation,pc),a0
 	move.w	d5,(a0)
-.time	move.w	($529f4).l,d6
+.time	btst	#6,(_custom1+2,pc)
+	beq.b	.livetime
+	move.w	(_viewalpha,pc),d6
+	bra.b	.timeok
+.livetime
+	move.w	($529f4).l,d6
 	sub.w	(_pstate,pc),d6
+.timeok
 	move.w	(_pstate+4,pc),d7
 	cmp.w	d7,d6
 	bls.b	.ratio
@@ -1189,10 +1196,389 @@ _modelnative
 _model_continue
 	jmp	($57c3c-$3cb0).l
 
+; Bit 14: a single delayed camera timeline for logic and extra frames.
+; Collision still sees committed coordinates; its drawing tail runs with the
+; presented camera. Hooks below name Disk.1 offsets.
+_viewinit
+	btst	#6,(_custom1+2,pc)
+	beq.w	.done
+	btst	#4,(_custom1+3,pc)
+	beq.w	.done
+	move.l	(_restore_buffer,pc),d0
+	beq.w	.done
+	moveq	#0,d7
+	btst	#4,(_custom1+2,pc)
+	beq.b	.walkhooks
+	moveq	#1,d7
+; Vehicle view setup is already done with the staged pose at publication.
+	move.l	#$4e714e71,($5e2d8-$3cb0).l
+.walkhooks
+	lea	(_viewhooks,pc),a1
+.next	move.l	(a1)+,d0
+	beq.b	.tableend
+	movea.l	d0,a0
+	move.w	#$4eb9,(a0)+
+	move.w	(a1)+,d0
+	lea	(_viewhooks,pc),a2
+	adda.w	d0,a2
+	move.l	a2,(a0)+
+	move.w	(a1)+,d0
+	beq.b	.next
+	move.w	d0,(a0)
+	bra.b	.next
+.tableend
+	tst.w	d7
+	beq.b	.geometry
+	moveq	#0,d7
+	lea	(_viewtransporthooks,pc),a1
+	bra.b	.next
+.geometry
+	lea	($577be-$3cb0).l,a0
+	lea	(_viewobjects_call+2,pc),a1
+	lea	(_viewobjects,pc),a2
+	lea	(_objectnative,pc),a3
+	bsr.w	_viewhook
+	lea	($5765e-$3cb0).l,a0
+	lea	(_viewscene_call+2,pc),a1
+	lea	(_viewscene,pc),a2
+	lea	(_viewscenechip,pc),a3
+	bsr.w	_viewhook
+.done	rts
+_viewhook
+	cmpi.w	#$4e75,(a0)
+	beq.b	.done
+	cmpi.w	#$4ef9,(a0)
+	bne.b	.chip
+	movea.l	(2,a0),a3
+.chip	move.l	a3,(a1)
+	move.w	#$4ef9,(a0)+
+	move.l	a2,(a0)
+.done	rts
+_viewscenechip
+	tst.w	($713e).w
+	beq.b	.zero
+	jmp	($57664-$3cb0).l
+.zero	jmp	($57674-$3cb0).l
+_viewhooks
+	dc.l	$5e0ba-$3cb0
+	dc.w	_nativewalk-_viewhooks,$6000+($5e0dc-($5e0ba+8))
+	dc.l	$5e186-$3cb0
+	dc.w	_nativecollision-_viewhooks,$4e71
+	dc.l	$5e1be-$3cb0
+	dc.w	_rollbackcamera-_viewhooks,$4e71
+	dc.l	$5e1e6-$3cb0
+	dc.w	_endwalk-_viewhooks,0
+	dc.l	$5aee0-$3cb0
+	dc.w	_collisiontail-_viewhooks,0
+	dc.l	0
+_viewtransporthooks
+	dc.l	$5e280-$3cb0
+	dc.w	_nativevehicle-_viewhooks,$6000+($5e2c0-($5e280+8))
+	dc.l	$5e3ce-$3cb0
+	dc.w	_nativespace-_viewhooks,$6000+($5e3dc-($5e3ce+8))
+	dc.l	$5e37a-$3cb0
+	dc.w	_nativecollision-_viewhooks,$4e71
+	dc.l	$5e39e-$3cb0
+	dc.w	_endvehicle-_viewhooks,0
+	dc.l	$5e43a-$3cb0
+	dc.w	_endvehicle-_viewhooks,0
+	dc.l	0
+
+_viewalpha	dc.w	0
+_viewready	dc.w	0
+_viewpose	ds.b	32
+_viewnav	ds.b	12
+_viewspaceactive dc.w 0
+_committednav	ds.b	12
+_collisiononly	dc.w	0
+_drawcollision	dc.w	0
+
+_viewtime
+	move.w	($529f4).l,d6
+	sub.w	(_pstate,pc),d6
+	move.w	(_pstate+4,pc),d7
+	cmp.w	d7,d6
+	bls.b	.clamped
+	move.w	d7,d6
+.clamped
+	lea	(_viewalpha,pc),a0
+	move.w	d6,(a0)
+	rts
+
+; Temporarily stage the player, derive all camera inputs, then restore the
+; committed pose before returning to native code. d6/d7 is the frozen alpha.
+_viewcamera
+	movem.l	($7142).w,d0-d7
+	movem.l	d0-d7,-(sp)
+	movem.l	($702a).w,d0-d2
+	movem.l	d0-d2,-(sp)
+	move.w	(_viewalpha,pc),d6
+	move.w	(_pstate+4,pc),d7
+	bsr.w	_interpolateplayer
+	bsr.w	_rememberview
+	bsr.w	_deriveview
+	movem.l	(sp)+,d0-d2
+	movem.l	d0-d2,($702a).w
+	movem.l	(sp)+,d0-d7
+	movem.l	d0-d7,($7142).w
+	rts
+_deriveview
+	cmpi.w	#2,($7142).w
+	beq.b	.space
+	tst.w	($7142).w
+	bne.b	.camera
+	move.w	($714e).w,d1
+	asr.w	#2,d1
+	addi.w	#256,d1
+	andi.w	#$3ff,d1
+	move.w	d1,($70b8).w
+	move.w	d1,($42c70).l
+	move.w	($7146).w,d0
+	asr.w	#2,d0
+	andi.w	#$3ff,d0
+	move.w	d0,($70b4).w
+.camera
+	jsr	($59b94).l
+	jsr	($59da0).l
+	jsr	($56c6e).l
+	move.w	($70b4).w,d0
+	movea.l	($713a).w,a1
+	add.w	($575a,a1),d0
+	andi.w	#$3ff,d0
+	move.w	d0,($42c6c).l
+	rts
+.space	jsr	($59ba0).l
+	jmp	($56c6e).l
+
+_nativewalk
+	lea	(_drawcollision,pc),a0
+	clr.w	(a0)
+	bra.b	_prepareview
+_nativevehicle
+	jsr	($59b94).l
+	jsr	($58e42).l
+	bra.b	_prepareview
+_nativespace
+	lea	(_drawcollision,pc),a0
+	clr.w	(a0)
+	bsr.b	_prepareview
+	jmp	($42d14).l
+_prepareview
+	lea	(_viewready,pc),a0
+	move.w	#1,(a0)
+	bra.w	_deriveview
+
+; Publication has completed its field wait. Sample once here, so crossing a
+; field during camera preparation cannot alternate the interpolation interval.
+_publishedview
+	move.w	sr,-(sp)
+	movem.l	d0-d7/a0-a6,-(sp)
+	btst	#6,(_custom1+2,pc)
+	beq.b	.done
+	move.w	(_viewready,pc),d0
+	beq.b	.done
+	bsr.w	_viewtime
+	move.w	(_inpresent,pc),d0
+	beq.b	.native
+	bsr.w	_interpolateplayer
+	bsr.w	_rememberview
+	bsr.w	_deriveview
+	bra.b	.done
+.native
+	cmpi.w	#2,($7142).w
+	beq.b	.space
+	bsr.w	_viewcamera
+	bra.b	.done
+.space
+	lea	(_committednav,pc),a0
+	movem.l	($702a).w,d0-d2
+	movem.l	d0-d2,(a0)
+	lea	(_viewspaceactive,pc),a0
+	move.w	#1,(a0)
+	bsr.w	_viewcamera
+	lea	(_viewnav,pc),a0
+	movem.l	(a0),d0-d2
+	movem.l	d0-d2,($702a).w
+.done
+	movem.l	(sp)+,d0-d7/a0-a6
+	move.w	(sp)+,ccr
+	rts
+_rollbackcamera
+	bra.w	_viewcamera
+_endwalk
+	lea	(_viewready,pc),a0
+	clr.w	(a0)
+	bsr.w	_deriveview
+	jmp	($509f2).l
+_endvehicle
+	lea	(_viewspaceactive,pc),a0
+	tst.w	(a0)
+	beq.b	.camera
+	clr.w	(a0)
+	lea	(_committednav,pc),a0
+	movem.l	(a0),d0-d2
+	movem.l	d0-d2,($702a).w
+.camera
+	lea	(_viewready,pc),a0
+	clr.w	(a0)
+	bsr.w	_deriveview
+	jmp	($50b62).l
+
+_nativecollision
+	lea	(_drawcollision,pc),a0
+	clr.w	(a0)
+	bsr.w	_deriveview
+	lea	(_collisiononly,pc),a0
+	move.w	#1,(a0)
+	jsr	($56e00).l
+	lea	(_collisiononly,pc),a0
+	clr.w	(a0)
+	bsr.w	_viewcamera
+	bsr.w	_drawbuildings
+	move.b	($6fda).w,d0
+	rts
+_collisiontail
+; Hook the comparison, leaving the loop's move.w entry intact. Its back edge
+; enters two bytes before this hook. Discard this JSR's return on either path.
+	addq.l	#4,sp
+	move.w	(_collisiononly,pc),d0
+	bne.b	.done
+	cmpi.w	#-32768,d3
+	beq.b	.return
+	jmp	($57236).l
+.done	lea	(_drawcollision,pc),a0
+	move.w	#1,(a0)
+.return	rts
+
+_drawbuildings
+	move.w	(_drawcollision,pc),d0
+	beq.b	.done
+	jmp	($5722a).l
+.done	rts
+
+; Some model and secondary-view code reads the live pose directly. Give it
+; the same pose as the camera, without exposing delayed coordinates to logic.
+_rememberview
+	lea	(_viewpose,pc),a0
+	movem.l	($7142).w,d0-d7
+	movem.l	d0-d7,(a0)
+	movem.l	($702a).w,d0-d2
+	movem.l	d0-d2,(32,a0)
+	lea	(_viewready,pc),a0
+	move.w	#1,(a0)
+	rts
+
+_VIEWDRAW MACRO
+	suba.w	#44,sp
+	move.w	sr,-(sp)
+	movem.l	d0-d7/a0-a1,-(sp)
+	lea	(42,sp),a1
+	movem.l	($7142).w,d0-d7
+	movem.l	d0-d7,(a1)
+	movem.l	($702a).w,d0-d2
+	movem.l	d0-d2,(32,a1)
+	move.w	(_viewready,pc),d0
+	beq.b	.native
+	lea	(_viewpose,pc),a0
+	movem.l	(a0),d0-d7
+	movem.l	d0-d7,($7142).w
+	movem.l	(32,a0),d0-d2
+	movem.l	d0-d2,($702a).w
+.native	movem.l	(sp)+,d0-d7/a0-a1
+	move.w	(sp)+,ccr
+\1
+	jsr	0.l
+	move.w	sr,-(sp)
+	movem.l	d0-d7/a0,-(sp)
+	lea	(38,sp),a0
+	movem.l	(a0),d0-d7
+	movem.l	d0-d7,($7142).w
+	movem.l	(32,a0),d0-d2
+	movem.l	d0-d2,($702a).w
+	movem.l	(sp)+,d0-d7/a0
+	move.w	(sp)+,ccr
+	adda.w	#44,sp
+	rts
+	ENDM
+_viewobjects
+	_VIEWDRAW _viewobjects_call
+_viewscene
+	_VIEWDRAW _viewscene_call
+
+
+_interpolateplayer
+	move.w	(_pstate+2,pc),d0
+	beq.w	.done
+	tst.w	($71cc).w
+	bpl.w	.done
+	lea	(_previous,pc),a0
+	lea	($7142).w,a1
+	move.l	(a1),d0
+	cmp.l	(a0),d0
+	bne.w	.done
+; Floor, scene and model changes snap instead of blending coordinate systems.
+	move.l	(22,a1),d0
+	cmp.l	(22,a0),d0
+	bne.w	.done
+	move.l	(24,a1),d0
+	cmp.l	(24,a0),d0
+	bne.w	.done
+	sub.w	d7,d6
+	move.l	#1024,d3
+	cmpi.w	#1,(a1)
+	beq.b	.limit
+	btst	#4,(_custom1+2,pc)
+	beq.w	.done
+	move.l	#32767,d3
+.limit	moveq	#2,d5
+	moveq	#4,d4
+.validate
+	move.l	(a1,d4.w),d0
+	sub.l	(a0,d4.w),d0
+	asl.l	#4,d0
+	asr.l	#4,d0
+	cmp.l	d3,d0
+	bgt.w	.done
+	neg.l	d0
+	cmp.l	d3,d0
+	bgt.w	.done
+	addq.w	#4,d4
+	dbra	d5,.validate
+	moveq	#2,d5
+	moveq	#4,d4
+.position
+	move.l	(a1,d4.w),d0
+	sub.l	(a0,d4.w),d0
+	muls.w	d6,d0
+	divs.w	d7,d0
+	ext.l	d0
+	add.l	d0,(a1,d4.w)
+	cmpi.w	#2,(a1)
+	bne.b	.next
+	lea	($7026).w,a2
+	add.l	d0,(a2,d4.w)
+.next	addq.w	#4,d4
+	dbra	d5,.position
+	moveq	#2,d5
+.angle	move.w	(a1,d4.w),d0
+	sub.w	(a0,d4.w),d0
+	addi.w	#$200,d0
+	andi.w	#$3ff,d0
+	subi.w	#$200,d0
+	muls.w	d6,d0
+	divs.w	d7,d0
+	add.w	d0,(a1,d4.w)
+	andi.w	#$3ff,(a1,d4.w)
+	addq.w	#2,d4
+	dbra	d5,.angle
+.done	rts
+
 ; P1 uses its own gate so disabled options retain L1's measured path.
 _presentgate
 	move.w	sr,-(sp)
 	movem.l	d0-d7/a0-a6,-(sp)
+	lea	(_viewready,pc),a0
+	clr.w	(a0)
 	lea	(_pstate,pc),a5
 	move.w	($7142).w,d0
 	cmp.w	($7122).w,d0
@@ -1273,6 +1659,7 @@ _pubcount
 	addq.w	#1,($7180).w
 .presentation
 	move.l	(sp)+,a0
+	bsr.w	_publishedview
 	move.w	($52952).l,d1
 	rts
 
@@ -1289,6 +1676,12 @@ _present
 	move.w	(sp)+,d6
 	lea	(_inpresent,pc),a0
 	move.w	#1,(a0)
+	btst	#6,(_custom1+2,pc)
+	beq.b	.predict
+	lea	(_viewready,pc),a0
+	move.w	#1,(a0)
+	bra.w	.draw
+.predict
 ; Never extrapolate a transport, floor, scene or coordinate-system change.
 	btst	#4,(_custom1+2,pc)
 	beq.b	.walkcollision
@@ -1399,6 +1792,10 @@ _present
 	move.w	#$88a,($1a,a0)
 	jsr	($5045e).l		; Disk.1 $5410E
 	jsr	($539ae).l		; Disk.1 $5765E, scene setup
+	btst	#6,(_custom1+2,pc)
+	beq.b	.nobuildings
+	bsr.w	_drawbuildings		; drawing tail only, Disk.1 $5AEDA
+.nobuildings
 	jsr	($556f6).l		; Disk.1 $593A6
 	jsr	($572fa).l		; Disk.1 $5AFAA
 	jsr	($53b0e).l		; Disk.1 $577BE
@@ -1406,6 +1803,8 @@ _present
 .transport
 	bsr.w	_presenttransport
 .restore
+	lea	(_viewready,pc),a0
+	clr.w	(a0)
 	bsr.w	_restorepresent
 	IFD VERIFY
 	bsr.w	_poisonpresent
@@ -1474,6 +1873,10 @@ _presenttransport
 	jsr	($539ae).l
 	jsr	($5a864).l
 .objects
+	btst	#6,(_custom1+2,pc)
+	beq.b	.nobuildings
+	bsr.w	_drawbuildings
+.nobuildings
 	jsr	($556f6).l
 	tst.w	($70c6).w
 	bne.b	.models
@@ -1603,6 +2006,8 @@ _restore_ranges
 	dc.w	$ff
 	dc.l	$5330
 	dc.w	$0
+	dc.l	$6f48
+	dc.w	0
 	dc.l	$6f32
 	dc.w	$0
 	dc.l	$6fae
@@ -1638,7 +2043,7 @@ _restore_ranges
 	dc.l	$72ae
 	dc.w	$0
 	dc.l	$aa6e
-	dc.w	$27b
+	dc.w	$457
 	dc.l	$b31e
 	dc.w	$0
 	dc.l	$b364

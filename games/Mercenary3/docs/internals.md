@@ -100,6 +100,8 @@ Bit 11 interpolates object geometry with bit 4 and real fast RAM on 68020+.
 Bit 12 extends logic gating and presentation to vehicle/surface flight and space flight
 (P3); requires bit 4 for presentation.
 Bit 13 requests the data cache through WHDLoad (R4 below).
+Bit 14 replaces prediction with consistent player/camera interpolation (P4 below);
+requires bit 4 and its restore buffer, plus bit 12 for transport modes.
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -202,6 +204,44 @@ or panel faults. After stopping, position and heading modulo 1024 stay fixed acr
 Inputs, three builds and 17 existing tool tests pass. Evidence: `tmp/p1/final-off/`,
 `final-on/`, `restore-route.json`, `world-020.json`, `world-060.json`, `play/`,
 `options-off.json` and `shipped.json`, all under `tmp/p1/`.
+
+### P4: presentation transitions
+
+Bit 14 replaces player prediction with previous/current interpolation on logic and
+extra frames. Camera and geometry use one alpha sampled **after** the publication
+wait; sampling before it could cross a field during camera preparation. The old
+2/6-heading-unit and 6/18-position-unit alternation becomes 4/12 per two fields.
+Starts, stops and reversals stay within committed movement, without overshoot.
+The visual delay is one native pass (80 ms at four fields); input and logic stay native.
+
+Renderer calls reading the player directly receive the same staged pose as the
+camera, then restore it. Space also stages navigation coordinates. Collision sees
+committed camera inputs; its drawing tail (Disk.1 `$5AEDA`) is drawn with the
+presented camera, including in extra frames. Hook `$5AEE0`, preserving the loop
+entry at `$5AEDE`. Mode, scene, floor and large coordinate changes snap.
+Preserve polygon clipping scratch through chip `$B31D` and drawing word `$6F48`,
+within the existing 20 KB restore allocation. Copper colours `$2EA50..$2EA57` are
+explicit display exclusions in the restore check.
+
+Same build/session, `fps.py`, 500 fields, `Custom1=16383 → 32767`, CACHE PRELOAD:
+
+| Setup | Bit 14 off | Bit 14 on |
+| --- | ---: | ---: |
+| a500-1.5m | 4.10 fps | 4.10 fps |
+| a1200-fast | 12.50 fps | 12.50 fps |
+| reference 030/50 | 24.80 fps | 24.80 fps |
+| 040-25 emulator check | 24.80 fps | 24.80 fps |
+
+The loaded flight route is 50.00 → 49.30 fps; retain this small presentation cost
+for correct transitions. Its 31 logic intervals remain four fields with XYZ deltas
+362/60/159, matching P3; space retains four-field logic within each mode.
+Options off and shipped both give 37 A500 frames. Walking/turning retain 6/2 units
+per field in all 79/80 checked 020/030 intervals. Restore hashes pass 124 walking,
+188 flight, 187 space and 300 lift presentations.
+The mailbox approach, turning, reversals, vehicle, flight, space and Help/return
+views were checked; the final 12 fields after stopping at the mailbox are identical.
+Evidence: `tmp/presentation-fix/final4/`; the original defect probe is
+`tmp/presentation-fix/before-probe.json`.
 
 ### P2: other-object interpolation
 
