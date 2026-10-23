@@ -85,16 +85,12 @@ game time). Times are emulated.
 ## Current validation scope
 
 Current status: B1–B4 and A1/A2/A3/A5/A6 are complete. B5 has not passed. A7 is
-incomplete. A8 has not started. The user lifted the 68030 deferral to investigate its
-cause. The 030/040 startup stalls are an emulator deadlock between deterministic mode
-and the indirect UAE board
-([evidence](internals.md#startup-failures-cause-found-68030-68040)). All 030/040/060
-setups start with caches on when deterministic mode is off.
+incomplete. A8 has not started. The 030/040 startup deadlock is fixed in the shared
+emulator ([evidence](internals.md#startup-failures-cause-and-fix-68030-68040)), and
+030/040/060 runs repeat exactly under deterministic mode.
 
 B5/A7/A8 acceptance covers 68000, 68020, 68030, 68040 and 68060, with 030/040/060 MMU
-functional tests. Until the shared emulator is fixed, 030+ runs can't use the
-exact-repeat method; how to validate them is the user's decision (see [open work](open-work.md)).
-No gate is relaxed by that limitation.
+functional tests, all using the exact-repeat method.
 
 ## A. Map the game (gdb, traces, static disassembly; no slave changes)
 

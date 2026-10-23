@@ -380,12 +380,11 @@ traces are explicitly separate from the breakpoint captures; retain their same-r
 
 ## Cache and machine-matrix pilot (B5/A7)
 
-B5 has not passed. See [current status](open-work.md). **030, 040 and 060 cells hang at
-boot under this runner:** it always sets `DETERMINISTIC=1`, and FS-UAE deadlocks when
-deterministic mode is combined with the indirect UAE board that every data-cache setup
-uses ([cause](internals.md#startup-failures-cause-found-68030-68040)). The bounded probe
-`tmp/b5-cause/probe.py` boots those setups with deterministic mode off, but such runs don't
-repeat exactly. The commands below are capture recipes, not evidence that the matrix has passed. The cache option is
+B5 has not passed. See [current status](open-work.md). The runner needs the pinned
+emulator with AmigaXDev's TOOL1 fix: older builds hang at boot on every 030/040/060 cell
+under `DETERMINISTIC=1` ([cause](internals.md#startup-failures-cause-and-fix-68030-68040)).
+The commands below are
+capture recipes, not evidence that the matrix has passed. The cache option is
 `CUSTOM2=1`. Build with the existing release/developer/VERIFY targets. VERIFY uses
 API 18 solely for `resload_Log`; enable `FileLog` (a switch in the pinned runtime).
 The cache register is logged after the policy request, before loading the intro/game.

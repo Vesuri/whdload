@@ -241,7 +241,7 @@ The installed runtime accepts **`FileLog`**, not `FileLog=1` despite the API aut
 numeric-option description. The rejected numeric-option probe never launched the game.
 
 Inputs are pinned in `manifest/runtime-inputs.json` as well as the game/toolchain manifests.
-Emulator SHA-256: `ef14ed962d646ca4f85a29c184d86963a9e2a6a2a4de0ed745e8b6e413f6ec3f`.
+Emulator SHA-256 for the pilot rows below: `ef14ed962d646ca4f85a29c184d86963a9e2a6a2a4de0ed745e8b6e413f6ec3f`.
 Release SHA-256: `93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`;
 VERIFY: `ceba5ad09b28dd8741df9e0725395655b0d4dffa484edeab9ac4f1d2acc327f8`.
 
@@ -290,48 +290,45 @@ after 21,105 fields, logs `CACR=$00000000`, and quits OK. It validates the revis
 and incremental clock collector, including the four-hunk metadata. It is not a matched
 per-scene gain measurement.
 
-**Gate: not passed.** The startup stalls on 030 and 040 come from deterministic mode
-combined with the indirect board (next section). Without deterministic mode, all six
-030/040/060 setups start with caches on. No whole race or matched gain has been measured
-on any of them, A7's paired matrix is incomplete, and A8 has not started. Disabling
-data-cache emulation is not an accepted substitute. No shared tooling or runtime has been
-modified. AmigaXDev backlog TOOL1 tracks the emulator fix; TOOL2
-(CPU spelling) and TOOL3 (stale captures) are separate.
+**Gate: not passed.** The 030/040 startup stalls were an emulator deadlock, now fixed
+(next section). All six 030/040/060 setups start with caches on and repeat exactly under
+deterministic mode. No whole race or matched gain has been measured on any of them, A7's
+paired matrix is incomplete, and A8 has not started. Disabling data-cache emulation is
+not an accepted substitute. AmigaXDev TOOL2 (CPU spelling) and TOOL3 (stale captures)
+remain open; F1GP's runner keeps its local mitigations for both.
 
-### Startup failures: cause found (68030, 68040)
+### Startup failures: cause and fix (68030, 68040)
 
-The 030 and 040 startup failures have **one cause, in the emulator, not in F1GP or the
-slave**: FS-UAE's deterministic mode deadlocks with the indirect UAE board, which every
-data-cache setup needs. It hangs when the boot drive starts, before WHDLoad runs. The
-analysis, a game-free reproduction and the fix plan are in AmigaXDev's open work, TOOL1.
+The 030 and 040 startup failures had **one cause, in the emulator, not in F1GP or the
+slave**. FS-UAE's deterministic mode deadlocked with the indirect UAE board, which every
+data-cache setup needs, when the boot drive started, before WHDLoad ran. The earlier
+"Remote connection closed" replies arrived only when the stuck emulator was killed. The
+debugger link wasn't the cause. AmigaXDev TOOL1 fixed it (AmigaXDev `bfb2fbc`: with that
+board, deterministic mode runs the filesystem and trap threads in lockstep). The installed
+emulator, SHA-256 `cece3e1a9c19a58e2b9cd395615be54c25df5be6cc436187636917ec815c643e`,
+is pinned in `manifest/runtime-inputs.json`.
 
-The earlier records fit this cause. `monitor fields 25` waits under gdb's 1800-second
-`remotetimeout`. Its reply, "Remote connection closed", arrived only when the agent
-killed the emulator; the later "monitor not supported" replies followed from that. The
-debugger link wasn't the cause.
+Verification with the installed build:
 
-Fresh bounded probes (`tmp/b5-cause/`, `probe.py`, VERIFY slave, `CUSTOM2=1`, warp,
-effective CPU/FPU/MMU checked from the emulator report):
+- AmigaXDev's `test_fsuae_repeat.py` passes on `a1200-030`, `a1200-040` and `a1200-060`:
+  a directory-drive boot, repeated, agrees at every stop.
+- F1GP probes (`tmp/b5-fixed/`, `tmp/b5-cause/probe.py`, VERIFY slave, `CUSTOM2=1`,
+  `WARP=1 DETERMINISTIC=1`) ran each setup twice from fresh boots. Both runs had identical
+  route fields and identical first-race-field screenshots. CACR was logged, the emulator
+  log never reported data-cache emulation turned off, and F10 returned OK.
 
-| Setup | Deterministic | Result |
+| Setup | Route (fields since the command) | CACR |
 | --- | --- | --- |
-| 030/50 non-MMU | on | No progress after 240 s, emulator at 0.9% CPU; emulation thread in `filesys_hsync` → `trap_get_bytes` → `call_hardware_trap_back` |
-| 040/25 non-MMU, cycle-exact | on | Same: 2.4% CPU, same stack on `m68k_run_3ce` |
-| 030/50 non-MMU | off | Quick Race reached twice, F10 returns OK, `CACR=$00002111` |
-| 040/25 non-MMU, cycle-exact | off | Reached twice, OK, `CACR=$80008000` |
-| 030 MMU, 040 MMU | off | Reached once each, OK; `$00002111`, `$80008000` |
-| 060/50 non-MMU, 060 MMU | off | Reached once each, OK, `CACR=$A0808000` |
+| 030/50 non-MMU | language 466, race 1358 | `$00002111` |
+| 040/25 non-MMU, cycle-exact | language 435, race 1275 | `$80008000` |
+| 060/50 non-MMU, cycle-exact | language 435, race 1249 | `$A0808000` |
+| 030 MMU | language 435, race 1275 | `$00002111` |
+| 040 MMU | language 435, race 1223 | `$80008000` |
+| 060 MMU | language 435, race 1223 | `$A0808000` |
 
-The earlier MMU-capable 030 sample (`tmp/b5/030-on-clock`) shows the same stack on
-`m68k_run_mmu030`. With caches requested, every 030, 040 and 060 setup loads the
-game, reaches the first race field and quits cleanly. This shows the caches don't break
-startup or the menus. It does not accept B5: no whole race or matched gain was measured.
-
-**Without deterministic mode, runs don't repeat exactly.** Two 030 runs differ by 31
-fields (one poll interval) at every route screen. The two 040 runs had identical route
-fields, but all four race screenshots differ between runs. The exact-repeat method used
-by B3, B4, A3 and the 020/A500 cells is not available on 030+ until the emulator is
-fixed (TOOL1).
+These checks cover start-up and menus with caches on, not whole races. Evidence from the
+hang itself (host samples, the non-deterministic controls) is in `tmp/b5-cause/`.
+B3/B4/A3 evidence was captured with earlier emulator builds and hasn't been re-run on this one.
 
 ## Executables
 

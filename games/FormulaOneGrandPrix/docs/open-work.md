@@ -4,15 +4,15 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with fast RAM. The implementation plan
 is [plan.md](plan.md); verified findings are in [internals.md](internals.md).
 
-# Current status: B5 startup cause found; decision on determinism
+# Current status: B5 unblocked; whole-race cache validation next
 
 | Work | Status |
 | --- | --- |
 | B1–B4; A1/A2/A3/A5/A6 | Complete, with gates recorded in internals. |
-| B5 | Cache pilot implemented; gate not passed. 030/040 startup stalls explained (emulator deadlock); all 030/040/060 setups start with caches on when deterministic mode is off. |
+| B5 | Cache pilot implemented; gate not passed. 030/040 startup deadlock fixed in the emulator (AmigaXDev TOOL1); all 030/040/060 setups start with caches on and repeat exactly. |
 | A7 | Matrix incomplete; paired measurements and a reliable zero-lead follow anchor remain open. |
 | A8 | Not started. Developer gates and ceiling measurements remain open. |
-| 68030 B5/A7/A8 cells | Deferral lifted for root-cause work; not passed. |
+| 68030 B5/A7/A8 cells | No longer deferred; open like the other CPUs. |
 | A4 | Open; required before D. |
 | C–G | Implementation and acceptance work remain open under the plan. |
 
@@ -44,24 +44,19 @@ The B5 cache policy is opt-in and disabled by default; its acceptance gate is st
 **B5, A7 and A8 are unfinished.** The gated cache policy and VERIFY CACR logging are in
 place. On the 68020, a whole Quick Race completed and quit cleanly with the instruction cache on.
 
-**The 030 and 040 startup stalls share one cause: an emulator deadlock**
-([details](internals.md#startup-failures-cause-found-68030-68040)) between FS-UAE's
-deterministic mode and the indirect UAE board that every data-cache setup needs.
-Neither F1GP, the slave nor the caches are involved. With deterministic mode off, the
-030, 040 and 060 setups, both MMU and non-MMU, all reach the first race field with caches
-on and quit with F10 OK. Those runs don't repeat exactly. Evidence is in `tmp/b5-cause/`.
-The emulator fix is tracked as AmigaXDev TOOL1.
-
-**Decision needed:** either fix the shared emulator so deterministic mode works with the
-indirect board (TOOL1), or validate 030+ without deterministic mode. The second option
-would mean accepting functional runs and treating timings as repeated measurements with
-spread, not exact repeats.
+**The 030/040 startup stalls are fixed.** They were an FS-UAE deadlock between
+deterministic mode and the indirect UAE board
+([details](internals.md#startup-failures-cause-and-fix-68030-68040)). AmigaXDev TOOL1
+fixed it, and F1GP now pins the installed emulator. With `DETERMINISTIC=1`, all six
+030/040/060 setups (MMU and non-MMU) reach the first race field with caches on, quit with
+F10 OK, and repeat exactly from fresh boots. `tools/machine_matrix.py` can now run every
+cell. TOOL2 and TOOL3 remain open in AmigaXDev; the runner keeps its local mitigations.
 
 Next steps, under the [current validation scope](plan.md#current-validation-scope):
 
-1. **B5:** after that decision, run whole races on 68020, 68030, 68040 and 68060 (MMU and
-   non-MMU) with caches on, and record matched cache gains. Caches stay opt-in until this
-   gate passes.
+1. **B5:** run whole Quick Races with caches on, using `machine_matrix.py ... on clock`,
+   on 68020, 68030, 68040 and 68060 (MMU and non-MMU). Run the matching cache-off cells
+   too, and record matched cache gains. Caches stay opt-in until this gate passes.
 2. **A7:** capture both cache states on A500-equivalent, A1200, 020+Fast, 030, 040 and
    060, with actual layouts, per-window timings/chip slots and full race-clock evidence.
    Repair the zero-lead follow anchor first: it can select the tow scene's own Viewing banner.
