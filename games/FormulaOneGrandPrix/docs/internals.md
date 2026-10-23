@@ -290,37 +290,48 @@ after 21,105 fields, logs `CACR=$00000000`, and quits OK. It validates the revis
 and incremental clock collector, including the four-hunk metadata. It is not a matched
 per-scene gain measurement.
 
-**Gate: not passed; 68030 deferred by the user.** All 030 cache/MMU validation and
-030 A7/A8 measurements remain open for a later session. AmigaXDev backlog TOOL1–TOOL3
-records the startup wait, CPU-spelling fallback and stale-capture issues; shared repairs
-are out of scope for this session. The required 040 non-MMU startup check below was
-also unsuccessful; work is stopped pending a decision on that additional blocker.
-040 MMU and both 060 variants remain untested, and matched gains remain unmeasured;
-A7's paired green/tow/follow matrix is incomplete and A8 has not started. The deferral is
-not a pass, and disabling data-cache emulation is not an accepted substitute. No shared
-tooling or runtime was modified.
+**Gate: not passed.** The startup stalls on 030 and 040 come from deterministic mode
+combined with the indirect board (next section). Without deterministic mode, all six
+030/040/060 setups start with caches on. No whole race or matched gain has been measured
+on any of them, A7's paired matrix is incomplete, and A8 has not started. Disabling
+data-cache emulation is not an accepted substitute. No shared tooling or runtime has been
+modified. AmigaXDev backlog TOOL1 tracks the emulator fix; TOOL2
+(CPU spelling) and TOOL3 (stale captures) are separate.
 
-### Non-deferred B5 check: 68040 startup also unsuccessful
+### Startup failures: cause found (68030, 68040)
 
-After the user deferred 68030 and shared tooling repairs, the next required cell was
-attempted with the unchanged pinned VERIFY slave and runtime: 68040/25, `NOMMU`,
-cycle-exact CPU/memory/blitter, data-cache emulation enabled and `full+indirect` drives.
-The effective emulator report confirms CPU=68040, FPU=68040, MMU=0, JIT=0.
+The 030 and 040 startup failures have **one cause, in the emulator, not in F1GP or the
+slave**: FS-UAE's deterministic mode deadlocks with the indirect UAE board, which every
+data-cache setup needs. It hangs when the boot drive starts, before WHDLoad runs. The
+analysis, a game-free reproduction and the fix plan are in AmigaXDev's open work, TOOL1.
 
-`tmp/b5/040-on-clock` retains the capture metadata, effective configuration, startup
-log and `intervention.json`. The initial one-field profile and fire input completed;
-the following `monitor fields 25` remained the last command without progress across
-liveness checks. At 2 minutes 23 seconds of process lifetime, the verified owned emulator
-was deliberately stopped. No language screen, game CACR log or race-clock samples were
-obtained. The subsequent disconnected-debugger error is a consequence of that stop,
-not the diagnosis of the original startup failure.
+The earlier records fit this cause. `monitor fields 25` waits under gdb's 1800-second
+`remotetimeout`. Its reply, "Remote connection closed", arrived only when the agent
+killed the emulator; the later "monitor not supported" replies followed from that. The
+debugger link wasn't the cause.
 
-This is an unsuccessful bounded startup check, not proof of a permanent deadlock or
-of the same root cause as the 030 wait. No shared-tool investigation or repair was
-performed. The required 040 non-MMU B5 gate remains unmet; **040 has not been deferred**.
-040 MMU and both 060 variants have not yet been tested. Continuing past this failed gate
-requires a decision on the additional startup blocker while shared repairs remain out
-of scope. The user-authorized 030 deferral does not waive any of these remaining gates.
+Fresh bounded probes (`tmp/b5-cause/`, `probe.py`, VERIFY slave, `CUSTOM2=1`, warp,
+effective CPU/FPU/MMU checked from the emulator report):
+
+| Setup | Deterministic | Result |
+| --- | --- | --- |
+| 030/50 non-MMU | on | No progress after 240 s, emulator at 0.9% CPU; emulation thread in `filesys_hsync` → `trap_get_bytes` → `call_hardware_trap_back` |
+| 040/25 non-MMU, cycle-exact | on | Same: 2.4% CPU, same stack on `m68k_run_3ce` |
+| 030/50 non-MMU | off | Quick Race reached twice, F10 returns OK, `CACR=$00002111` |
+| 040/25 non-MMU, cycle-exact | off | Reached twice, OK, `CACR=$80008000` |
+| 030 MMU, 040 MMU | off | Reached once each, OK; `$00002111`, `$80008000` |
+| 060/50 non-MMU, 060 MMU | off | Reached once each, OK, `CACR=$A0808000` |
+
+The earlier MMU-capable 030 sample (`tmp/b5/030-on-clock`) shows the same stack on
+`m68k_run_mmu030`. With caches requested, every 030, 040 and 060 setup loads the
+game, reaches the first race field and quits cleanly. This shows the caches don't break
+startup or the menus. It does not accept B5: no whole race or matched gain was measured.
+
+**Without deterministic mode, runs don't repeat exactly.** Two 030 runs differ by 31
+fields (one poll interval) at every route screen. The two 040 runs had identical route
+fields, but all four race screenshots differ between runs. The exact-repeat method used
+by B3, B4, A3 and the 020/A500 cells is not available on 030+ until the emulator is
+fixed (TOOL1).
 
 ## Executables
 

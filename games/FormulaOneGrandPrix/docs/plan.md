@@ -82,24 +82,19 @@ game time). Times are emulated.
   rebuilt slave (`B`), in a VERIFY or developer build. (Asking AmigaXDev for gdb memory
   writes would speed up `A3`/`A4`; it is optional.)
 
-## Current validation scope: 68030 deferred
+## Current validation scope
 
-Current status: B1–B4 and A1/A2/A3/A5/A6 are complete. B5 has not passed: the
-required 68040 non-MMU startup check was unsuccessful and work is stopped pending a
-decision. A7 is incomplete; A8 has not started. See [open work](open-work.md) for the
-next steps and [the startup evidence](internals.md#non-deferred-b5-check-68040-startup-also-unsuccessful)
-for the limits of that finding.
+Current status: B1–B4 and A1/A2/A3/A5/A6 are complete. B5 has not passed. A7 is
+incomplete. A8 has not started. The user lifted the 68030 deferral to investigate its
+cause. The 030/040 startup stalls are an emulator deadlock between deterministic mode
+and the indirect UAE board
+([evidence](internals.md#startup-failures-cause-found-68030-68040)). All 030/040/060
+setups start with caches on when deterministic mode is off.
 
-At the user's direction, defer every 68030 cell in **B5, A7 and A8**, including
-MMU and non-MMU configurations and both cache states. The shared startup wait and
-diagnostic-tool findings are backlogged in AmigaXDev as TOOL1–TOOL3; do not address
-those shared items in this session.
-
-For this iteration, B5/A7/A8 acceptance covers the non-deferred machines. The remaining
-scope includes 68000/68020 timing measurements and the required 68020/68040/68060 cache checks,
-including 040/060 MMU functional tests. Report 68030 cells as **deferred**, never
-measured or passed. Full 68030 qualification remains open for a later session;
-this exception does not relax any gate for the remaining machines.
+B5/A7/A8 acceptance covers 68000, 68020, 68030, 68040 and 68060, with 030/040/060 MMU
+functional tests. Until the shared emulator is fixed, 030+ runs can't use the
+exact-repeat method; how to validate them is the user's decision (see [open work](open-work.md)).
+No gate is relaxed by that limitation.
 
 ## A. Map the game (gdb, traces, static disassembly; no slave changes)
 

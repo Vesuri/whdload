@@ -4,15 +4,15 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with fast RAM. The implementation plan
 is [plan.md](plan.md); verified findings are in [internals.md](internals.md).
 
-# Current status: B5 blocked; 68030 deferred
+# Current status: B5 startup cause found; decision on determinism
 
 | Work | Status |
 | --- | --- |
 | B1–B4; A1/A2/A3/A5/A6 | Complete, with gates recorded in internals. |
-| B5 | Cache pilot implemented; gate not passed. Required 68040 non-MMU startup check unsuccessful. |
+| B5 | Cache pilot implemented; gate not passed. 030/040 startup stalls explained (emulator deadlock); all 030/040/060 setups start with caches on when deterministic mode is off. |
 | A7 | Matrix incomplete; paired measurements and a reliable zero-lead follow anchor remain open. |
 | A8 | Not started. Developer gates and ceiling measurements remain open. |
-| All 68030 B5/A7/A8 cells | Deferred by the user, not passed. |
+| 68030 B5/A7/A8 cells | Deferral lifted for root-cause work; not passed. |
 | A4 | Open; required before D. |
 | C–G | Implementation and acceptance work remain open under the plan. |
 
@@ -41,43 +41,32 @@ race equivalence is not claimed. B4's changed builds and A3's ownership captures
 separate evidence, not a relabelled B3 baseline. No simulation patches are enabled.
 The B5 cache policy is opt-in and disabled by default; its acceptance gate is still open.
 
-**B5, A7 and A8 are unfinished; 68030 validation is explicitly deferred.** A gated cache policy and VERIFY CACR
-logging have been added. The 68020 completed a whole Quick Race and quit cleanly with
-its instruction cache enabled; a fresh release-off capture passes the disabled-byte,
-loader and quit checks. These are pilots, not acceptance of the full matrix.
+**B5, A7 and A8 are unfinished.** The gated cache policy and VERIFY CACR logging are in
+place. On the 68020, a whole Quick Race completed and quit cleanly with the instruction cache on.
 
-The 68030 stalls before the language screen in the shared emulator's indirect
-directory-drive path, with both the MMU-capable core and a verified non-MMU 030 configuration. Additional probes accidentally selected a 68020 through an
-unsupported CPU spelling and are rejected as 030 evidence. The corrected runner checks
-the effective CPU/MMU report before collecting evidence. Details and evidence are in
-[internals](internals.md#b5-gated-cache-pilot--gate-not-passed); commands are in
-[development](development.md#cache-and-machine-matrix-pilot-b5a7).
+**The 030 and 040 startup stalls share one cause: an emulator deadlock**
+([details](internals.md#startup-failures-cause-found-68030-68040)) between FS-UAE's
+deterministic mode and the indirect UAE board that every data-cache setup needs.
+Neither F1GP, the slave nor the caches are involved. With deterministic mode off, the
+030, 040 and 060 setups, both MMU and non-MMU, all reach the first race field with caches
+on and quit with F10 OK. Those runs don't repeat exactly. Evidence is in `tmp/b5-cause/`.
+The emulator fix is tracked as AmigaXDev TOOL1.
 
-The user has deferred all 68030 cells for now. The shared findings are recorded in
-AmigaXDev's backlog as **TOOL1** (indirect-drive startup wait), **TOOL2** (unsupported
-CPU spelling/effective configuration), and **TOOL3** (stale capture reuse). Do not
-investigate or fix those shared items in this session. No shared tooling or installed
-runtime has changed. Deferred 68030 results are not passes.
+**Decision needed:** either fix the shared emulator so deterministic mode works with the
+indirect board (TOOL1), or validate 030+ without deterministic mode. The second option
+would mean accepting functional runs and treating timings as repeated measurements with
+spread, not exact repeats.
 
-**Current non-deferred blocker:** the verified 68040/25 non-MMU cache-on check also failed
-to advance past its first 25-field startup command. The live process was stopped after
-2 minutes 23 seconds without reaching the language screen; evidence is retained in
-`tmp/b5/040-on-clock`. See [the check and its limits](internals.md#non-deferred-b5-check-68040-startup-also-unsuccessful).
-No shared-tool investigation or fix was made. 040 is still required, not deferred;
-040 MMU and 060 cells remain untested. The next decision is how to handle this additional
-startup blocker under the instruction to leave shared repairs out of this session.
+Next steps, under the [current validation scope](plan.md#current-validation-scope):
 
-Next steps, under the [current validation scope](plan.md#current-validation-scope-68030-deferred):
-
-1. **B5:** first resolve the decision on the failed 68040 startup gate. Then validate
-   whole races/menus on 68020 and MMU/non-MMU 68040/68060 configurations; record matched
-   cache gains. Cache behavior stays opt-in until this gate passes.
-2. **A7:** capture both cache states on A500-equivalent, A1200, 020+Fast, 040 and 060, with actual layouts,
-   per-window timings/chip slots and full race-clock evidence. Repair the zero-lead
-   follow anchor before accepting uncalibrated follow captures.
+1. **B5:** after that decision, run whole races on 68020, 68030, 68040 and 68060 (MMU and
+   non-MMU) with caches on, and record matched cache gains. Caches stay opt-in until this
+   gate passes.
+2. **A7:** capture both cache states on A500-equivalent, A1200, 020+Fast, 030, 040 and
+   060, with actual layouts, per-window timings/chip slots and full race-clock evidence.
+   Repair the zero-lead follow anchor first: it can select the tow scene's own Viewing banner.
 3. **A8:** implement the developer-only no-wait/no-fill gates and matched instant-blitter
-   controls, extend the disabled-range checker, then measure the non-deferred CPUs' ceilings.
+   controls, extend the disabled-range checker, then measure each CPU's ceiling.
 4. **C1–C6:** implement real-time ticks using A3 ownership and A5 publication rules.
 
-**A4** remains required before D. Resume 68030 qualification in a later session after
-its tooling blocker is resolved; no B5/A7/A8 step is marked complete by this deferral.
+**A4** remains required before D.
