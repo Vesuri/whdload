@@ -1,8 +1,8 @@
-"""Where the performance slave copies game code in its expansion memory (M1, S3).
+"""Where the performance slave copies game code in its expansion memory (M1, S3, F2).
 
 Maps a copied instruction's address back to the original chip address, given the
-allocated ws_ExpMem base (route_profile.py records it in route.json). The S3 ranges come
-from whdload/renderer-relocs.i; the M1 blocks and the area offsets follow _hotcode and
+allocated ws_ExpMem base (route_profile.py records it in route.json). The S3/F2 ranges come
+from whdload/renderer-relocs.i and renderer-f2.i; the M1 blocks and area offsets follow _hotcode and
 _hotrenderer in whdload/Mercenary3.slave.asm. Copies keep the original instruction
 lengths, so opcodes and offsets within a block match the chip original.
 """
@@ -29,22 +29,32 @@ def blocks(expmem):
         out.append((hot, hot + hi - lo, lo))
         hot += hi - lo
     render = expmem + k['STACKSIZE'] + k['HOTSIZE'] + k['TABLEMEM'] + k['RESTOREMEM']
-    text = open(os.path.join(ROOT, 'whdload/renderer-relocs.i'), encoding='latin1').read()
-    text = text.split('_render_ranges', 1)[1].split('dc.l\t0', 1)[0]
-    for lo, hi, off in re.findall(r'dc\.l\s+\$(\w+)-\$3cb0,\$(\w+)-\$3cb0,\$(\w+)', text):
-        lo, hi = int(lo, 16) - DISK_DELTA, int(hi, 16) - DISK_DELTA
-        out.append((render + int(off, 16), render + int(off, 16) + hi - lo, lo))
+    seen = set()
+    for filename, label in (('renderer-relocs.i', '_render_ranges'),
+                            ('renderer-f2.i', '_f2_ranges')):
+        text = open(os.path.join(ROOT, 'whdload', filename), encoding='latin1').read()
+        text = text.split(label, 1)[1].split('dc.l\t0', 1)[0]
+        for lo, hi, off in re.findall(r'dc\.l\s+\$(\w+)-\$3cb0,\$(\w+)-\$3cb0,\$(\w+)', text):
+            lo, hi = int(lo, 16) - DISK_DELTA, int(hi, 16) - DISK_DELTA
+            entry = (render + int(off, 16), render + int(off, 16) + hi - lo, lo)
+            if entry not in seen:
+                out.append(entry)
+                seen.add(entry)
     return out
 
 
 def islands(expmem):
-    """{island address: chip target} for S3's JMP islands (external word branches)."""
+    """{island address: chip target} for the renderer's JMP islands (external word branches)."""
     k = _constants()
     render = expmem + k['STACKSIZE'] + k['HOTSIZE'] + k['TABLEMEM'] + k['RESTOREMEM']
-    text = open(os.path.join(ROOT, 'whdload/renderer-relocs.i'), encoding='latin1').read()
-    text = text.split('_render_branches', 1)[1].split('dc.l\t0', 1)[0]
-    return {render + int(off, 16): int(target, 16) - DISK_DELTA for target, off in
-            re.findall(r'dc\.l\s+\$\w+-\$3cb0,\$(\w+)-\$3cb0,\$(\w+)', text)}
+    out = {}
+    for filename, label in (('renderer-relocs.i', '_render_branches'),
+                            ('renderer-f2.i', '_f2_branches')):
+        text = open(os.path.join(ROOT, 'whdload', filename), encoding='latin1').read()
+        text = text.split(label, 1)[1].split('dc.l\t0', 1)[0]
+        for target, off in re.findall(r'dc\.l\s+\$\w+-\$3cb0,\$(\w+)-\$3cb0,\$(\w+)', text):
+            out[render + int(off, 16)] = int(target, 16) - DISK_DELTA
+    return out
 
 
 class Map:

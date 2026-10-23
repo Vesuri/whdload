@@ -21,7 +21,7 @@ STACKSIZE	= $1000
 HOTSIZE		= $1000
 TABLESIZE	= $6104
 TABLEMEM	= $7000		;ws_ExpMem requires whole 4 KB pages
-RENDERMEM	= $9000
+RENDERMEM	= $1a000
 STAGEMEM	= $18000	;32 KB bitmap plus up to 64 KB alignment
 OBJECTMEM	= $3000		;256 pose histories (40 bytes each), page rounded
 RESTOREMEM	= $5000		;17,912 bytes, rounded to whole pages
@@ -82,7 +82,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$1ffff,(a0)
+	move.l	#$3ffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -400,7 +400,7 @@ _table64000
 	dc.l	$58c4a,$5a8e6,$5b790,$5c13a
 	dc.l	0
 
-; S3: four renderer blocks, including their PC-relative data. Absolute
+; S3/F2: renderer blocks, including their PC-relative data. Absolute
 ; references and external branch islands are described by Disk.1 offsets.
 ; Copy after M2/R1 and VERIFY bypasses, before the final instruction-cache flush.
 ; S4: only view writers use _drawbase. The native chip-buffer pointer stays
@@ -571,11 +571,26 @@ _hotrenderer
 	blo.b	.fast
 	cmpi.l	#$1000000,d0
 	blo.w	.done
-.fast	addi.l	#STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM,d0
+.fast
+	lea	(_render_ranges,pc),a0
+	lea	(_render_operands,pc),a1
+	lea	(_render_branches,pc),a2
+	lea	(_render_entries,pc),a3
+; Custom1 bit 17 extends S3 and bypasses M1 chip entry jumps.
+	btst	#1,(_custom1+1,pc)
+	beq.b	.tables
+	lea	(_f2_ranges,pc),a0
+	lea	(_f2_operands,pc),a1
+	lea	(_f2_branches,pc),a2
+	lea	(_f2_entries,pc),a3
+.tables
+	lea	(_render_tables,pc),a4
+	movem.l	a0-a3,(a4)
+	addi.l	#STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM,d0
 	lea	(_render_base,pc),a0
 	move.l	d0,(a0)
 	move.l	d0,d6
-	lea	(_render_ranges,pc),a2
+	movea.l	(_render_tables,pc),a2
 .copyrange
 	move.l	(a2)+,d0
 	beq.b	.operands
@@ -591,7 +606,7 @@ _hotrenderer
 	dbra	d1,.copy
 	bra.b	.copyrange
 .operands
-	lea	(_render_operands,pc),a0
+	movea.l	(_render_tables+4,pc),a0
 .nextop	move.l	(a0)+,d0
 	beq.b	.branches
 	movea.l	d0,a1
@@ -604,7 +619,7 @@ _hotrenderer
 	move.l	d3,(a1)
 	bra.b	.nextop
 .branches
-	lea	(_render_branches,pc),a0
+	movea.l	(_render_tables+8,pc),a0
 .nextbr	move.l	(a0)+,d0
 	beq.b	.entries
 	bsr.w	_rendermap
@@ -621,7 +636,7 @@ _hotrenderer
 	move.w	d0,(a1)
 	bra.b	.nextbr
 .entries
-	lea	(_render_entries,pc),a0
+	movea.l	(_render_tables+12,pc),a0
 .nextentry
 	move.l	(a0)+,d0
 	beq.b	.restore
@@ -706,7 +721,37 @@ _cliplimit	dc.w	$9540
 ; d0: original address -> copied address, unchanged outside the blocks.
 ; Clobbers a2/d1/d2 only. d6 holds the renderer allocation base during boot.
 _rendermap
-	lea	(_render_ranges,pc),a2
+	btst	#1,(_custom1+1,pc)
+	beq.b	.ranges
+; Native drawing dispatch entries are four-byte branches; leave them intact
+; for register/computed users, but send copied direct callers to the callee.
+	lea	(_render_aliases,pc),a2
+.alias	move.l	(a2)+,d1
+	beq.b	.m1
+	move.l	(a2)+,d2
+	cmp.l	d1,d0
+	bne.b	.alias
+	move.l	d2,d0
+	bra.b	.ranges
+.m1	btst	#5,(_custom1+3,pc)
+	beq.b	.ranges
+	cmpi.l	#$4ede4-$3cb0,d0
+	blo.b	.ranges
+	cmpi.l	#$4ef92-$3cb0,d0
+	bhs.b	.projection
+	subi.l	#$4ede4-$3cb0,d0
+	bra.b	.hot
+.projection
+	cmpi.l	#$5b030-$3cb0,d0
+	blo.b	.ranges
+	cmpi.l	#$5b918-$3cb0,d0
+	bhs.b	.ranges
+	subi.l	#$5b030-$3cb0-($4ef92-$4ede4),d0
+.hot	add.l	(_expmem,pc),d0
+	addi.l	#STACKSIZE,d0
+	rts
+.ranges
+	movea.l	(_render_tables,pc),a2
 .next	move.l	(a2)+,d1
 	beq.b	.done
 	move.l	(a2)+,d2
@@ -721,8 +766,17 @@ _rendermap
 .skip	addq.l	#4,a2
 	bra.b	.next
 .done	rts
+_render_aliases
+	dc.l	$469b0-$3cb0,$494b6-$3cb0
+	dc.l	$469b4-$3cb0,$4a26c-$3cb0
+	dc.l	$469b8-$3cb0,$4afd4-$3cb0
+	dc.l	$469c4-$3cb0,$492b0-$3cb0
+	dc.l	$469c8-$3cb0,$48e3c-$3cb0
+	dc.l	0
 _render_base	dc.l	0
+_render_tables	dc.l	0,0,0,0
 	INCLUDE	"whdload/renderer-relocs.i"
+	INCLUDE	"whdload/renderer-f2.i"
 
 ; R1: full-word interiors of the sixteen horizontal colour spans.
 ; Disk.1 $4978C + colour*$B6: replace the count setup with a call,

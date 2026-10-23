@@ -227,7 +227,7 @@ about 21,000 accesses per frame, 6..12 ms. Steps are in order of measured value 
 For every step, on the reference 030/50: `beam_profile.py` on the routines the step changes,
 before and after, and the publication intervals (roots `5e460`, as in F0); `fps.py` and
 `PER_FRAME=1` cadence. On the 020: `bus_audit.py` where the step targets chip traffic. New
-behaviour takes the next free `Custom1` bit (17 up); add it to the release mask (`$1FFFF`)
+behaviour takes the next free `Custom1` bit (18 up); add it to the release mask (`$3FFFF`)
 once accepted.
 
 **F0. ✓ Budget.** `render_profile.py`, `beam_profile.py`, `bus_audit.py`'s place table,
@@ -243,7 +243,7 @@ incorrect. Beam timing regressed and FPS did not improve; retain the existing re
 path. Reconsider copy amortisation only if later work allows multiple presentations
 per pass. See [F1 results](internals.md#f1-deferred-restore-tested-not-retained).
 
-**F2. The remaining hot code in fast RAM** (extends S3). Chip code fetches are 1,943 per
+**F2. ✓ The remaining hot code in fast RAM** (extends S3). Chip code fetches are 1,943 per
 field on the 020; the room path, whose code is in chip, is 6.6% of main 3D on the 020 but
 42% on the 030.
 - Move the routines behind F0's fetch pages, largest first: Disk.1 page `$5F000` (room
@@ -256,7 +256,8 @@ field on the 020; the room path, whose code is in chip, is 6.6% of main 3D on th
   (`$5B030`, `$5B038`, `$5B050`) and the two instructions `$4EE84` keeps in chip.
 - Check: play, options off, world speed, P1 hash, still-scene screenshots off/on identical.
 - Measure: `bus_audit.py` fetches (aim: a few hundred per field), beam `577be 5f438 5e840`.
-- Expected: 2..5 ms per frame on the 030.
+- Result: mean 030 frame work 24.8 → 21.6 ms; chip-code fetches 1,963 → 430 per field.
+  Accepted as bit 17; see [F2 results](internals.md#f2-remaining-hot-code-in-fast-ram).
 
 **F3. Hot chip data reached through long operands.** Move data blocks whose every reference
 is an absolute long operand or a long immediate (patchable in chip code and copies alike):
@@ -335,16 +336,16 @@ without it. Real cache behaviour and 040/060 hardware performance remain unverif
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
 - [x] R5
 - [x] X1
-- [x] F0 [x] F1 (not retained) [ ] F2 [ ] F3 [ ] F4 [ ] F5 (U) [ ] F6
+- [x] F0 [x] F1 (not retained) [x] F2 [ ] F3 [ ] F4 [ ] F5 (U) [ ] F6
 
 P4 and P5 address the presentation defects reported after the original plan completed.
-Phase F continues toward one-field frames on the 030/50; next: F2.
+Phase F continues toward one-field frames on the 030/50; next: F3.
 Hardware validation remains unavailable, outside X1.
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–16.
+  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–17.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `render_profile.py`, `beam_profile.py`,

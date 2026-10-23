@@ -134,12 +134,16 @@ presentation copies cost 7.1 ms per presentation and the staging copy 3.3 ms. Th
 remaining chip-bus traffic, about 21,000 accesses per frame from chip-resident code,
 game variables, render scratch and renderer data, costs an estimated 6..12 ms.
 
-F1 tested deferred restoration but retained the existing path: there is only one
-presentation per pass on the route, and the restore stays before the same next
-publication, so no copies or frame time were saved. Next: F2 (remaining hot code
-in fast RAM). See [F1](internals.md#f1-deferred-restore-tested-not-retained),
-[F0](internals.md#f0-one-field-frame-budget-03050) and
-the [plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step).
+F2 is complete: another 25,954 bytes of hot code/private state run in fast RAM,
+with direct calls between copies. Same-build off/on FPS: A500 4.10 → 4.10,
+020-fast 12.40–12.50 → 13.30, reference 030/50 24.80 → 26.40,
+040 emulator 24.80 → 25.00. Mean 030 frame work falls from 24.8 to 21.6 ms
+(worst 27.3 → 24.6); chip-code fetches on the 020 fall from 1,963 to 430 per field.
+Native speed, restore hashes, play, pixel-identical still screenshots and options-off
+checks pass. Enhanced framerate includes bit 17; optional workspace is now 268 KB.
+Next: F3 (hot data reached through long operands). See
+[F2](internals.md#f2-remaining-hot-code-in-fast-ram) and the
+[plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step).
 
 The post-P5 68040 investigation measures 24.80 fps: steady frames spend about
 25.6 ms working, then wait for the next field, producing two-field delivery.

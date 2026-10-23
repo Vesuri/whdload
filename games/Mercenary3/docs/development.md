@@ -145,7 +145,7 @@ VERTB counter poll and display writes apart. A 275-field route
 `tools/render_profile.py PROFILE_DIR [ROOT ...]` turns a route profile into cycles per
 published frame for each drawing call and a callee tree (Disk.1 offsets; `SLAVE_LST=` names
 slave routines from a vasm listing, `-L FILE`). `route_profile.py` records the live
-`ws_ExpMem` in `route.json` and reads code the slave copied there (M1, S3; mapped by
+`ws_ExpMem` in `route.json` and reads code the slave copied there (M1, S3, F2; mapped by
 `tools/relocation.py`) as its chip original, so calls inside copies are recognised.
 
 `tools/beam_profile.py OUT.json ROOT ...` times routines on any CPU from beam positions at

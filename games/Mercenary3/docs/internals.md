@@ -75,9 +75,9 @@ key code at chip `$8`, with `$FF` at `$9`.
 the shipped patch list. The release exposes **Enhanced framerate**, default On
 (`Custom5=1`), which selects all feature bits below. Off (`Custom5=0`) clears them;
 release builds ignore `Custom1`. The VERIFY build accepts `Custom1` as the individual
-feature mask with `Custom5=0`. Historical measurements below name those feature bits. It asks for an optional 200 KB of expansion memory (`ws_ExpMem`):
+feature mask with `Custom5=0`. Historical measurements below name those feature bits. It asks for an optional 268 KB of expansion memory (`ws_ExpMem`):
 4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
-20 KB for bit 4's presentation restore buffer, 36 KB for bit 9's renderer copies and
+20 KB for bit 4's presentation restore buffer, 104 KB for bits 9/17's renderer copies and
 96 KB for bit 10's aligned staging bitmap and 12 KB for bit 11's object histories.
 If allocation fails, the stack, code and
 tables retain their chip paths; presentation falls back to logic gating. With every option off it runs the shipped slave's code paths.
@@ -104,6 +104,7 @@ Bit 14 replaces prediction with consistent player/camera interpolation (P4 below
 requires bit 4 and its restore buffer, plus bit 12 for transport modes.
 Bit 15 fixes the cached polygon clipping limit on 68040/060 (R5 below).
 Bit 16 includes room-local XYZ in P4 camera interpolation (P5 below).
+Bit 17 extends bit 9 to the remaining hot code and removes M1 entry hops (F2 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -1326,8 +1327,48 @@ path publishes before drawing. Moving a restore from the end of presentation to
 the gate before logic leaves it between the same two publications. At the current
 two-field cadence there is only one presentation per pass, so no copies disappear.
 Reject the candidate; reconsider amortisation only after more than one presentation
-fits per pass. F2 is next. Evidence: `tmp/f1-restore/final/` and the rejected candidate
+fits per pass. Evidence: `tmp/f1-restore/final/` and the rejected candidate
 in `tmp/f1-restore/rejected.slave.asm`.
+
+### F2: remaining hot code in fast RAM
+
+Custom1 bit 17 extends S3 on 68020+ with real fast RAM. It moves another
+25,954 bytes of code/private state: room and edge drawing, clearing, camera/view
+setup, colour lines and computed line plotters, movement/projection helpers,
+room lookup and scrolling text. Relocation preserves the main loop and presentation
+hook sites in chip, remaps mutable renderer words into P1's restore set, and directs
+copied calls to the M1 kernels and drawing callees without chip entry hops.
+The 128-entry line-plotter table stays in chip with relocated targets. Interrupt-owned
+text state remains live. Optional workspace grows from 200 to 268 KB.
+
+Same VERIFY build/session, Custom1 `131071 → 262143`, CACHE PRELOAD; two exact
+500-field FPS comparisons per setup:
+
+| Setup | F2 off fps | F2 on fps |
+| --- | ---: | ---: |
+| A500 1.5 MB slow | 4.10 | 4.10 |
+| 020 fast | 12.40–12.50 | 13.30 |
+| Reference 030/50 | 24.80 | 26.40 |
+| Existing 040-25 emulator cell | 24.80 | 25.00 |
+
+On the reference 030, beam timing over fields 175..500 gives mean frame work
+**24.8 → 21.6 ms**, worst **27.3 → 24.6 ms**. Main 3D is 9.54 → 7.27 ms/frame,
+rooms 4.02 → 3.08, clear 0.88 → 0.36. PER_FRAME cadence changes from 247 two-field
+intervals to 233 two-field and 31 one-field intervals; each run has one three-field
+startup interval. This improves delivery but does not reach steady 50 fps.
+
+The same-build 020 bus audit (fields 175..275) reduces chip-code fetches
+**1,963 → 430 per field**. Remaining traffic includes native main-loop/interrupt
+code and indirect entry paths. Still-scene screenshots are pixel-identical off/on;
+walking and turning retain 6 and 2 units per field on 020/030, apart from native
+collision stops. Restore hashes pass 146 walking presentations in both chip and
+copied renderer state, 188 surface-flight, 187 space-flight and 450 lift presentations.
+Walking/turning/room-return and transport screenshots show intact drawing.
+Options-off release and shipped each give 37 frames / 500 fields on A500;
+release play with Enhanced framerate on and the input/original/release/VERIFY builds
+pass. Bit 17 is included in the release mask (`$3FFFF`).
+Evidence: `tmp/f2/final-v6/`. The 040 figures remain emulator counts,
+not real-hardware speed predictions.
 
 ### WHDLoad launch configuration
 
@@ -1413,10 +1454,10 @@ Evidence: `tmp/r4/`.
 ### X1: release
 
 The single player control is the **Enhanced framerate** checkbox, enabled by
-CUSTOM5=1 in the installed icon. Omission or zero leaves it unchecked. `Custom5=1` selects feature bits 0–16; `Custom5=0` turns them all off. The release
+CUSTOM5=1 in the installed icon. Omission or zero leaves it unchecked. `Custom5=1` now selects feature bits 0–17 (F2); `Custom5=0` turns them all off. The release
 ignores legacy Custom1 settings. VERIFY retains individual bits with
 `Custom5=0 Custom1=<mask>`. CPU/chipset/memory guards are unchanged. The README covers
-installation, WHDLoad 17+, 512 KB chip RAM, the optional 200 KB workspace and CACHE/PRELOAD.
+installation, WHDLoad 17+, 512 KB chip RAM, the optional 268 KB workspace and CACHE/PRELOAD.
 
 Same-session, same VERIFY build, 500-field `fps.py` route, enhancement Off → On:
 
