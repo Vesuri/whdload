@@ -350,6 +350,21 @@ does not use it.
 the race and the results screens (all their strings are in it, for example "Quick Race" at
 hunk 2 `$3D8F0`). Menus and race therefore share one executable and need no handover.
 
+### Current runtime and whole-race validation
+
+The installed native emulator now hashes to
+`950f14c966ba852372d382dec8e40544f1c49184eb9f2c24e901f352ecd9b048`.
+Its source-revision record retains the TOOL1 determinism patch and adds AmigaXDev's
+window-title patch (`d5ce108`); both patch hashes match the shared sources. The launcher
+pin is unchanged. Earlier startup evidence above belongs to its recorded build.
+
+On this build, `tmp/b5-final/030-on-clock-b` completes the 030 non-MMU cache-on Quick
+Race, reaches finishing times and returns F10 `OK`, with `CACR=$00002111`.
+Results are detected at 19,296 fields after the cockpit stop (201-field sampling).
+This is a whole-race functional result, not yet a repeat pair or cache-gain measurement.
+The preceding `030-on-clock-a` failed before debugger connection because the host sandbox
+refused the connection; it is not evidence of a guest startup regression.
+
 ## Route to gameplay
 
 From boot (`WHD_ARGS=CUSTOM1=1` skips the intro; otherwise click at its prompt): Choose

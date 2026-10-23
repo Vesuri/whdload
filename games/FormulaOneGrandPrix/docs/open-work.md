@@ -41,7 +41,9 @@ race equivalence is not claimed. B4's changed builds and A3's ownership captures
 separate evidence, not a relabelled B3 baseline. No simulation patches are enabled.
 The B5 cache policy is opt-in and disabled by default; its acceptance gate is still open.
 
-**B5, A7 and A8 are unfinished.** The gated cache policy and VERIFY CACR logging are in
+**B5, A7 and A8 are unfinished.** The current window-title emulator build is pinned;
+a first 030 non-MMU cache-on whole race and clean quit pass (`tmp/b5-final/030-on-clock-b`).
+Its exact repeat and the remaining whole-race cells are next. The gated cache policy and VERIFY CACR logging are in
 place. On the 68020, a whole Quick Race completed and quit cleanly with the instruction cache on.
 
 **The 030/040 startup stalls are fixed.** They were an FS-UAE deadlock between
