@@ -293,6 +293,27 @@ are exposed. Otherwise the route's repeated fire presses can keep WHDLoad's conf
 window open. This is a launcher setting; the slave's ordinary interactive options remain
 available when launched elsewhere.
 
+## State-map evidence (A4)
+
+The native record/view map is in [internals](internals.md#state-map-a4). Reproduce its
+static-path and retained-snapshot checks with Capstone 5 available:
+
+```sh
+python3 tools/state_map.py tmp/a3 tmp/a4/state-map.json
+```
+
+This verifies `manifest/game-inputs.json`, reconstructs relocations directly from the
+original executable, decodes the selected pose/camera paths and checks all 50
+camera-return snapshots from each of A3's five captures. It checks hashes, sizes,
+source/target selection and camera publication relationships. Output starts INCOMPLETE
+and becomes PASS only when all checks succeed. Derived disassembly and snapshot details
+stay in `tmp/`; no emulator is launched and no current runtime pin is changed.
+
+The report retains each capture's original emulator/slave identities. Its dynamic
+coverage is cockpit and rear chase (including another selected car), plus cockpit replay;
+TV/front chase and track-relative pose conversion are static findings. Do not treat this
+as an all-view gameplay test or an extrapolation/restore check. Those belong to D/G.
+
 ## Call-boundary state and drawing ownership (A3)
 
 `state_diff.py` is exposed as the server command `statediff live|replay DIR [FRAMES]`.

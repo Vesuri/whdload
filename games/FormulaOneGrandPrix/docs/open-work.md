@@ -8,12 +8,12 @@ results and acceptance evidence are in [internals.md](internals.md).
 
 | Work | Status |
 |---|---|
-| B1–B4; A1/A2/A3/A5/A6 | Complete. Current A8 additions also pass the disabled-range gate. |
+| B1–B4; A1–A6 | Complete. Current A8 additions also pass the disabled-range gate. |
 | B5 | Menus and whole races pass on every required CPU, with exact repeats, cache audits and clean quit. Matched work gains on 040/060 remain unavailable; gate not passed. |
 | A7 | Complete under its “measured or failure explained” gate: 24 CPU-timing cells measured, 12 unavailable 040/060 cells explained. All 36 windows have repeated field/DMA captures; all whole-race pairs pass. |
 | A8 | A500/A1200/020/030 four-arm ceiling audits pass. A developer-only preference-notification control fixes the 030 allocation mismatch. Only 040/060 CPU timings remain unavailable. |
 | 68030 | B5/A7 measurements and A8 common-layout ceiling comparisons pass; no 030 item remains deferred. |
-| A4 | Open; required before D. |
+| A4 | Complete: car/track/camera/view map, static view paths and 250 checked A3 camera-return snapshots. |
 | C–G | Simulation, presentation, optimisation and release work remain open under the plan. |
 
 **Next required step: restore 040/060 CPU profiling when shared work is resumed.**
@@ -30,8 +30,9 @@ When shared profiling is repaired and explicitly resumed, pin the new runtime an
 recapture the affected B5/A7/A8 controls; do not relabel the current evidence. This
 session changed no AmigaXDev files.
 
+A4 is now complete; its state map is in [internals](internals.md#state-map-a4).
 After those acceptance gaps are resolved, proceed to **C1–C6** (real-time ticks), then
-**A4** and **D1–D10** (presentation), following the plan. Caches remain opt-in while B5
+**D1–D10** (presentation), following the plan. Caches remain opt-in while B5
 is open. No real-time simulation or extrapolation patches are enabled.
 
 Measurement controls now enforced:

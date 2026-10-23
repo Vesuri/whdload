@@ -663,7 +663,7 @@ live driving loop, also used by practice and qualifying). One pass:
 `h0+2AC14` walks the car records through an offset list (each record points at its
 track segment) and is the per-car update. Everything else in steps 1, 2 and 4 together
 takes at most about 3% of all cycles on `a1200-fast`. Which of those calls are simulation and which are
-presentation is not classified yet.
+presentation are classified in A3 below.
 
 Inclusive cost per frame (`tools/race_profile.py`, green window, 500 fields; work is a
 frame's cycles outside the pacer's wait):
@@ -867,6 +867,182 @@ A tow attempt stopped on a malformed debugger memory reply after 38 complete fra
 it is not accepted. The retry uses bounded retries of that halted read only, validates
 snapshot sizes/hashes and captures all 50 frames anew. Negative checks reject incomplete,
 odd, corrupt or missing-frame evidence and an injected unclassified renderer change.
+
+## State map (A4)
+
+A4 is complete for the supplied, SHA-256-pinned executable. This is the native input
+map for later snapshots, not an implemented presentation patch. Offsets below are hex;
+`R` is a car-record base in hunk 1 and `T` its track-record pointer. Quantities retain
+native integer units: no metres, degrees-per-second or physical timestep conversion is
+implied. Static evidence is the named writer/consumer paths; the final subsection
+separates that coverage from the retained live captures.
+
+### Car records and the two pose representations
+
+There are 26 `$C0`-byte car records at **h1+$5D6–1955**, so slot `i` starts at
+`h1+$5D6 + i*$C0`. They are not iterated in physical-slot order. The word-offset list at
+**h1+$520** selects records relative to `$5D6` (`h0+$2AC2E–2AC44`); view cycling also
+uses this list (`h0+$3C36E–3C3AA`). Record `+$66` is its byte index into that list.
+`h0+$29290` clears exactly `$C0` bytes; +$292B6 searches 26 slots at that stride.
+Do not use the list index as persistent identity: ranking can reorder it. Retain the
+record address/slot and driver identity (`+$AC & $3F`) with snapshot validity.
+
+| Field relative to R | First-slot h1 offset | Width / meaning | Writer and rendering consumer |
+|---|---:|---|---|
+| `+$00` | `$5D6` | word, motion direction; distinct from body heading | `h0+$25F68` derives it from velocity components. Camera copies it at +$33ECE; chase orientation uses +$3996C. |
+| `+$04` | `$5DA` | signed word, explicit-pose pitch | `h0+$2BAB4–2BADE` derives road slope projected onto body heading. `h0+$26218` returns it to camera/car drawing when explicit pose is selected. |
+| `+$08` | `$5DE` | signed word, explicit-pose height | `h0+$2BA96–2BAB0`; read at +$2621C. |
+| `+$0A` | `$5E0` | signed word, lateral offset in the segment's local frame | `h0+$2B95A–2B9C6` projects explicit world position back onto track axes. `h0+$26286` uses it in track-relative projection; +$33EDE publishes it for the road renderer. |
+| `+$0C` | `$5E2` | signed word, uncorrected longitudinal local coordinate | `h0+$2B9CA`; combined with curvature/lateral correction to obtain +$1C. It is not a second lateral offset. |
+| `+$10` | `$5E6` | word, speed magnitude | `h0+$25F4E–25F62` computes `sqrt(v0²+v1²)` from the high words of +$30/+34. Track-driven update also writes +$2B34A. Used by chase/camera selection at +$3995E/+39BFC; not an independent translation input to car drawing. |
+| `+$12` | `$5E8` | long, pointer T to a `$2E`-byte track segment | Loaded at +$2AC44 and by `h2+$29A38`; explicit-motion segment search +$263F6 writes it, track-driven traversal +$2B558 writes it. |
+| `+$16` | `$5EC` | word, curvature-adjusted segment length/denominator | +$2B9E8–2BA08 clamps it to at least `$10`; used when computing fraction. |
+| `+$1A` | `$5F0` | word, body heading/yaw | Player angular integration +$37586; track-driven path +$2B618. Camera +$33ED6; car renderer +$29A54. One turn is `$10000`, quarter turn `$4000`; use wrapped word deltas. |
+| `+$1C` | `$5F2` | signed word, corrected longitudinal segment coordinate | +$2B9CE–2B9E4 and +$2B55C; used with +$0A by +$26286. Segment traversal updates T and this coordinate together. |
+| `+$1E` | `$5F4` | word, segment fraction, Q14 (`$4000` = one interval) | +$2BA0C–2BA2A / +$2B560–2B57E computes `((longitudinal-$400)<<14)/denominator + $4000`, with native signed division and overflow handling. Height/slope interpolation and AI use it. |
+| `+$26` | `$5FC` | word, lap-relative segment index | +$2BAE4–2BB32 derives it from T's index, start-line origin and lap wrap; camera copies it at +$33EE6. |
+| `+$28`, `+$2C` | `$5FE`, `$602` | signed longs, explicit horizontal world coordinates | +$26074 converts track coordinates; physics advances them. +$26210/+26214 supplies them to camera and car drawing. Native coarse track coordinates are these values arithmetically shifted right by 11. |
+| `+$30`, `+$34` | `$606`, `$60A` | signed longs, horizontal velocity components with fractional low words | +$25F7C constructs them from direction/speed; +$25F4E reads their high words. Do not confuse these with the world positions at +$28/+2C. |
+| `+$38` | `$60E` | long, angular-motion state; high word advances body heading | +$37506–37586. It is simulation input, not another renderer angle. |
+| `+$48` | `$61E` | signed word, steering angle | Player path +$359BA and other control paths +$3681E/+3691C. `h2+$29A58` copies it to h2+$28168 for wheel-image selection. |
+| `+$4A` | `$620` | signed word, track/body correction relative to motion direction | +$2B61C–2B620. `h2+$29A46–29A54` adds a scaled correction to rendered body yaw: +$1A plus the high word of `(+$4A * h0+$3A964)<<3`. |
+| `+$72` | `$648` | signed word, speed change | +$2ADE4–2ADEA / +$2B34E; camera excitation at +$33EBA, not a pose angle. |
+| `+$7E` bit 0 | `$654` | byte flag selecting explicit world pose | +$25FD8 enters explicit mode, +$26050 clears it; +$26206/+26272 choose representation. Snapshot this discriminator; do not interpolate it. |
+| `+$80` | `$656` | word, packed lap position (segment index ×64 plus signed high byte of fraction) | +$2BB36–2BB3A; lower precision than the full segment pointer/fraction. Do not use it alone for smooth position. |
+| `+$8C` | `$662` | signed word, vertical displacement above interpolated track height | +$34C7E; added at +$2623E / +$2BAAC. |
+| `+$B6` | `$68C` | signed word, vertical-motion state used as cockpit pitch effect | +$34C7A, added only for cockpit at +$33F28–33F2C. This is not roll. |
+
+The common pose accessor **h0+$26206** is essential. With `R+$7E` bit 0 set it returns
+world X/Z from +$28/+2C, pitch from +$04 and height from +$08. Otherwise it reconstructs
+X/Z from T, lateral +$0A and longitudinal +$1C (`+$26286`), interpolates height using
++$1E and +$8C, and derives pitch from T's slope and the difference between T's heading
+and body heading +$1A. Copying only +$28/+2C will therefore miss track-driven cars.
+`h0+$26272` is the position-only variant used by external-camera construction.
+
+T points into hunk 1: the ordinary track starts at **h1+$53DE**, with alternate/pit
+segments below it (including **h1+$2BFA**). Segment +$00 is heading, +$02 slope, +$04/+08
+horizontal position, +$06 height, +$14 curvature and +$1A contains the segment index and
+camera flags. Neighbour samples are `$2E` bytes apart. Runtime end/length/alternate-range
+pointers are in h2+$1FAC2/+1FAC6/+1FAD6/+1FADE/+1FAE2. Follow native conversion/wrap
+helpers (+$26326, +$26406, +$26794/+267DA), especially through the pit lane; interpolating
+raw pointers across these boundaries is invalid.
+
+**Roll and wheel rotation:** the mapped car-model transform takes horizontal position,
+height, yaw and pitch; it has no independent roll argument. The road projection rotates
+the horizontal axes and shifts the horizon; it has no camera-roll rotation. Do not invent
+a roll word at the unused-looking record +$02 or +$06. Wheel steering consumes +$48 via
+h2+$28168: h2+$28C30–28D34 combines it with relative yaw/perspective and chooses graphics
+through h0+$147C. No independent per-wheel spin angle is consumed on that path. This
+identifies the inputs to preserve; it does not promise new roll or wheel-spin animation.
+
+### Camera records and selection
+
+| h1 location | Meaning and owner |
+|---|---|
+| `+$224` (long) | Renderer track anchor. +$26502 converts the source's segment as necessary and publishes it; road +$25C26/+24CD2, object visibility +$298A8 and secondary track pass +$2A50C read it. |
+| `+$234` (long) | Active pose source: selected car in cockpit, synthetic camera at h1+$256 in external views. Read by +$34036 and h2+$29E90; also determines self-car suppression at h2+$29F02. |
+| `+$238` (long) | Selected/viewed car, independent of controlled player. View cycling and automatic Viewing cuts write it. External camera follows this car; its model, pit status and HUD can still be consumed while +$234 points elsewhere. |
+| `+$23C` (byte) | View code: `$00` cockpit; `$80` TV before initialization, `$C0` initialized TV; `$A0` rear chase, `$B0` opposite/front chase. Bit 6 is the TV camera initialized/cut latch, not a separate car identity. |
+| `+$23E` (byte) | One-shot view requests: bits 7/6 previous/next car, 3 player car, 4 cockpit, 5 TV, 2 rear chase, 1 front chase. Native +$3C292 validates availability and consumes these. |
+| `+$240` (word) | Nonzero track-camera fallback/selection when no suitable target remains; low 15 bits select a track region. It is not a pointer or an angle. |
+| `+$256–315` | Synthetic camera, same `$C0`-byte record shape. Relevant absolute offsets: direction `$256`, pitch `$25A`, height `$25E`, lateral `$260`, segment pointer `$268`, body yaw `$270`, fraction `$274`, lap segment `$27C`, world coordinates `$27E/$282`, list index `$2BC`, representation flag `$2D4`, packed lap position `$2D6`. |
+
+The controlled player pointer is **h0+$3A720**, not h1+$238. Pending source/view/request
+changes live at h0+$3A6BC/+3A6C0/+3A6C2 and are applied by +$3BF96. Key-edge latches
+are at h0+$3A915. +$3C4E4 selects cockpit and sets +$234=+$238; +$3C516 selects the
+synthetic record and resets the TV initialization bit. A view change, driver change,
+TV cut, replay restore or transition into/out of a synthetic source invalidates pose
+history even when the new source occupies the same address.
+
+**TV:** +$397E4 dispatches to +$39A3C when bit 5 is clear and bit 6 is clear. It selects
+a flagged track-camera location, initializes the synthetic record (+$29290), and writes
+its explicit world coordinates/height (+$39BAC–39BB8). +$39BD0/+39CBE aims it at the
+selected car; increasing target distance past the threshold clears bit 6 at +$39C64,
+requesting a new location next tick. h0+$3A8F8/+3A8FA/+3A8FE/+3A900 hold selection
+parameters; +$3A906/+3A908 hold current/previous distance. A nonzero h1+$240 instead
+selects the track fallback (+$39C6E).
+
+**Chase:** bit 5 dispatches to +$398AA. +$3990C positions the synthetic camera at an
+offset from the selected car's world pose using h0+$3A90C and the evolving heading
+h0+$3A710; +$3A70E is its initialization flag. Bit 4 reverses the offset direction by
+`$8000` at +$399BC (front versus rear). Segment search and height derivation follow;
++$39CBE aims the camera at the target. This is a moving camera state, not just a fixed
+offset that can be reapplied independently of its native update.
+
+### Published camera and what the renderer reads
+
+Camera preparation **h0+$34028** reads the source selected by h1+$234. Its +$33EA6
+helper publishes the following hunk-0 values; they are not extra hunk-1 camera records:
+
+| h0 offset | Contents / consumer |
+|---|---|
+| `+$3A7F8` | Source motion direction (+$00). |
+| `+$3A7FA` | Pose pitch + h2+$231D8 view bias, plus source +$B6 only in cockpit. Used to calculate horizon h2+$231D4 at +$3404C. |
+| `+$3A7FC`, `+$3A800` | Coarse X/Z words (`world >> 11`); track transform h2+$2329C/+232A2 subtracts these. |
+| `+$3A7FE` | Pose height + view height bias h0+$3A904; h2+$232A8 subtracts it. |
+| `+$3A802`, `+$3A806` | Full X/Z longs returned by the pose accessor. |
+| `+$3A80A` | Source lateral offset; road clipping/detail selection h2+$24C46/+24C5C. |
+| `+$3A80C` | Source body yaw; used for camera trig coefficients and relative car/model yaw. |
+| `+$3A810`, `+$3A818` | X/Z longs reduced by 8 bits; car/model placement h2+$286F0/+286F6 subtracts them. |
+| `+$3A81C`, `+$3A81E` | Source lap segment and anchor track heading; keep consistent with source and h1+$224. |
+| `+$3A820`, `+$3A824` | Long spring displacement/velocity; high words consumed by +$3676A. Only cockpit adds displacement to the pitch used for horizon placement. A3 owns this evolution once per tick. |
+| `+$3A8C2`, `+$3A8C4` | Derived yaw trig coefficients (+$3409E); road and car transforms consume them. Recompute from a staged yaw, do not independently extrapolate coefficients. |
+
+The native views share this publication/geometry pipeline:
+
+| View | Native pose inputs and relevant reads |
+|---|---|
+| Player cockpit | +$234=+$238=player record. Pose-discriminator inputs above, body yaw, lateral offset and segment/lap position; +$72 excites the camera spring and +$B6 affects pitch. The selected car is normally suppressed by h2+$29F02–29F12. |
+| Onboard another car | Identical cockpit path, with +$238 selecting the other record. It does not switch physics/input ownership to that car. |
+| TV cameras | +$238 remains target car; +$234=h1+$256. Synthetic explicit X/Z/height/pitch/yaw supply the published camera, while target pose/speed/segment drives aim and camera cuts. No cockpit spring displacement is added. |
+| Rear/front chase | Same synthetic-source publication as TV, but +$398AA updates it from target position, speed/direction and chase history; bit 4 reverses placement. Rendered cars still come from the car offset list. |
+| Replay | +$3976A restores checkpoints into h1+$368–1955 and h0+$3A714–3A7BB; +$395F2 reads recorded controls from h1+$1B048–1BE57. Replay then runs +$2AC14, +$3BF96, +$34028 and h2+$280F6. It has the same per-view records, not a separate recorded-pose render array. |
+| Mirrors / secondary track passes | Preserve the same published camera and car poses. h2+$2A450 remaps track ranges from h1+$224 and temporarily changes projection/clipping workspace, restoring it before return. h2+$28774 onward uses relative car placement for cockpit side-image routing. No separately advancing mirror-car record was found. |
+
+For **every visible car**, h2+$29A20 resolves R through h1+$520, calls +$26206, reads
+body yaw +$1A, correction +$4A and steering +$48, then enters the shared model transform
++$28652. Model/visibility decisions additionally read +$19 (damage/debris bits), +$25
+(model/colour selection), +$96/+97 (status) and +$AC (driver identity). Association
+h2+$29E7C reads +$66, T and retirement flags and temporarily marks track records, as
+classified in A3. These discrete values belong with snapshot validity but must not be
+numerically extrapolated. The viewport is not determined by camera pose alone: keep
+h1+$224, h2+$231E0/+231E4, horizon +$231D4 and the scene/association lists consistent.
+
+For D1/D3, snapshot both representations and their discriminator, the selected target,
+the synthetic camera when active, and the native camera history needed by that view.
+Stage a consistent pose before projection/visibility work, then restore it before any
+simulation. Recompute derived geometry from that staged pose without running camera
+spring, TV-cut selection, replay advancement or A3 drawing side effects again. Hold
+pointers, identities, flags and steering-image selection predicates at tick cadence;
+segment crossing and lap wrap need native coordinate conversion, not pointer arithmetic.
+D6/D8 must decide prediction and animation policies; this map does not implement them.
+
+### A4 evidence and limits
+
+`tools/state_map.py` verifies original input pins, decodes 15 selected native paths from
+the relocated original (rejecting undecodable/incomplete ranges), then checks **250
+camera-return snapshots**, 50 each from the retained A3 green, tow, follow, qualifying
+and replay captures. It verifies each decompressed snapshot's hash and size, complete
+frame coverage, source selection, four direct camera-word copies, both explicit X/Z
+copies and their two precision reductions. Result: **PASS**,
+`tmp/a4/state-map.json`. Negative probes reject a missing frame, a corrupt snapshot
+and a changed camera heading even when its snapshot hash is updated. This reuses the
+captured A3 build identities; it is not a new
+runtime baseline or a timing measurement.
+
+| Capture | View code | Pose source | Selected car | Frames |
+|---|---|---|---|---:|
+| Green | `$00` | h1+$816 | h1+$816 | 50 |
+| Tow | `$A0` | h1+$256 | h1+$816 | 50 |
+| Follow | `$A0` | h1+$256 | h1+$696 | 50 |
+| Qualifying | `$00` | h1+$5D6 | h1+$5D6 | 50 |
+| Replay | `$00` | h1+$5D6 | h1+$5D6 | 50 |
+
+All five captured camera sources use explicit pose. Track-relative cars, TV cuts and
+front chase are mapped from their native branches, not claimed as newly exercised UI
+routes. A4 has an output requirement rather than a separate all-view play-test gate;
+D7/G2 still require those routes after implementation. No game/slave or shared-tool
+changes were needed for this map.
 
 ## Memory and the chip bus
 
