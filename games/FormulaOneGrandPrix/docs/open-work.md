@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with fast RAM. The implementation plan
 is [plan.md](plan.md); verified findings are in [internals.md](internals.md).
 
-# Current status: B5/A7/A8 validation in progress
+# Current status: B5/A7/A8: functional races pass; 040/060 timing blocked
 
 | Work | Status |
 | --- | --- |
@@ -56,6 +56,11 @@ F10 OK, and repeat exactly from fresh boots. `tools/machine_matrix.py` can now r
 cell. AmigaXDev TOOL2 and TOOL3 are also done: the launcher refuses unknown CPU names, and
 failed captures leave no image or trace. F1GP pins that launcher.
 
+**Timing blocker:** the selected 040/060 cores produce field/DMA data but zero CPU
+instruction records. Their exact repeats are functional evidence, not timing acceptance.
+B5 gains and A8 ceilings on these CPUs require a shared-profiler decision. The corrected
+020 ceiling comparison passes with a common intro-skipping route.
+
 **Control correction:** cache-off matrix arms now explicitly use `NoCache`; the original
 CPU policy can leave Fast RAM cacheable with an MMU. Old off runs lacking this override
 are not accepted as uncached controls. New MMU off pairs pass.
@@ -70,7 +75,8 @@ Next steps, under the [current validation scope](plan.md#current-validation-scop
    The corrected zero-lead follow anchor passes; combined three-window captures are being collected.
 3. **A8:** validate enabled no-wait/no-fill gates and matched instant-blitter controls, then
    measure each CPU's ceiling. All-off byte checks pass for all three build targets. The first 020 instant-blitter
-   comparison fails the common-layout audit; investigate its startup allocation difference.
+   comparison failed the common-layout audit; intro-skipping recaptures fix it on 020
+   and are being checked on 030.
 4. **C1–C6:** implement real-time ticks using A3 ownership and A5 publication rules.
 
 **A4** remains required before D.

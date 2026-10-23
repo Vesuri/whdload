@@ -54,7 +54,15 @@ def report(directory):
         whole, fraction = struct.unpack_from('>IH', memory, h0+offset)
         return whole + fraction/65536
     fps = 1000*len(spans)/sum(spans) if spans else None
-    return dict(phase=meta['phase'], setup=meta['setup'], hunk_bases=meta['hunk_bases'],
+    unavailable = []
+    if not red.counts:
+        unavailable.append('trace contains no CPU instruction records')
+    for name, values in (('frame', spans), ('drawing', calls['draw']), ('tick', calls['tick'])):
+        if not values:
+            unavailable.append(f'no complete {name} samples')
+    return dict(status='UNAVAILABLE' if unavailable else 'MEASURED', unavailable=unavailable,
+                instruction_records=sum(red.counts.values()),
+                phase=meta['phase'], setup=meta['setup'], hunk_bases=meta['hunk_bases'],
                 fields=fields, cycles_per_field=cycles/fields,
                 fps=fps, game_clock_step_ms=fixed_ms(0x3a7de),
                 native_step_ms=fixed_ms(0x3a7e4),

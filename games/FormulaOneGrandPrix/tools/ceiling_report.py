@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 from matrix_compare import compare
 from matrix_report import report
+from race_profile import image
 from check_disabled import relocated_original
 from slave_inputs import verify
 
@@ -35,8 +36,9 @@ def audit(root, machine):
             if config.get('immediate_blits') != ('true' if instant == '1' else 'false'):
                 errors.append(f'{p.name}: effective instant-blitter setting differs')
             h0 = meta['hunk_bases'][0]
-            memory = (p/'fast.bin').read_bytes() if h0 >= 0x200000 else (p/'chip.bin').read_bytes()
-            base = h0-0x200000 if h0 >= 0x200000 else h0
+            read = lambda name: (p/name).read_bytes() if (p/name).exists() else b''
+            memory = image(read('chip.bin'), read('fast.bin'), read('slow.bin'))
+            base = h0
             original = relocated_original(meta['hunk_bases'])[0]
             expected = ((0x1288, bytes.fromhex('4e714e71') if custom3 & 1 else original[0x1288:0x128c]),
                         (0x1f388, bytes.fromhex('4e75') if custom3 & 2 else original[0x1f388:0x1f38a]))
@@ -44,6 +46,8 @@ def audit(root, machine):
                 if memory[base+offset:base+offset+len(value)] != value:
                     errors.append(f'{p.name}: wrong hook at h0+{offset:x}')
         rows[variant] = report(pair[0])
+        if rows[variant]['fps'] is None:
+            errors.append(f'{variant}: no measured frame rate')
     return dict(status='FAIL' if errors else 'PASS', errors=errors, machine=machine, arms=rows)
 
 

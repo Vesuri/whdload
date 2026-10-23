@@ -336,6 +336,28 @@ match. The new `all` capture collects 100 fields at each of these three independ
 recognized anchors in one race and includes the timed fields in its anchor accounting.
 This is a new capture protocol, not a relabelled B3 baseline.
 
+### 040/060 CPU profile coverage failure
+
+Fresh non-MMU cycle-exact 040 and 060 green/tow/follow pairs repeat all ten PNGs,
+anchors and reductions exactly. However, their reductions contain **zero CPU instruction
+records and zero call/frame events**, despite 100 valid fields and nonzero CPU DMA
+activity in each window. Thus drawing/tick time, work and event-derived fps are
+unavailable. Repeating empty CPU data does not satisfy a timing gate. The 030 control
+contains instruction records and complete calls with the same collector.
+
+Evidence: `tmp/matrix-workers/{040-mmu,060-mmu}/tmp/a7-all/{040,060}-on-{a,b}`
+(the worker names describe isolation directories; these captures explicitly use
+non-MMU CPUs). Effective logs and configuration are retained. The installed runtime
+source-revision lists the normal tracing patches but not the separate optional `aprof`
+patch; that alternative has not been validated here. No shared tooling was modified.
+
+`matrix_report.py` now reports `UNAVAILABLE` and the missing samples explicitly;
+`ceiling_report.py` fails any arm without a measured frame rate, as well as a mismatched
+layout. Whole-race clock samples and DMA counts remain separate usable observations.
+This blocks B5's matched gain requirement on 040/060 and their A8 CPU-event ceilings.
+A7 permits an explained unavailable cell, but its remaining machine rows must still be
+collected. Repairing the shared profiler is a separate scope decision.
+
 ### A8 developer ceiling gates — measurements in progress
 
 Developer and VERIFY builds expose `CUSTOM3` bit 0 (replace the four-byte pacer branch
@@ -359,9 +381,15 @@ the no-fill arm. The breakpoint is removed before the 100-field timed window. Th
 the intended branches/RTS. Their common-layout rates are 7.98, 16.84 and 19.63 fps.
 The instant pair repeats but changes h2/h3 placement by 168 bytes and changes startup
 timing, so its 17.31 fps is **not accepted as a matched gain**. The four-arm audit
-correctly fails this layout comparison; allocation-controlled recapture is pending.
-Remaining CPUs are being collected. Instant-blitter comparisons must also verify the effective
-emulator configuration. No ceiling conclusion is accepted yet.
+correctly fails this layout comparison. A fresh four-arm 020 set with `CUSTOM1=1`
+(skipping the frontend in every arm) has identical four-hunk placement, exact repeats,
+correct hook bytes, effective instant-blitter configuration and clean quit. Its audit
+passes: control 7.98 fps, no-wait 17.15, no-fill 20.05, instant blitter 17.31. Evidence:
+`tmp/matrix-workers/a8-anchor/tmp/a8/020-{control,no-wait,no-fill,instant}-{a,b}`.
+The original-route 030 instant arm also shifts placement and is rejected as a matched
+comparison; its intro-skipping recapture and stock-machine measurements are pending. Instant-blitter comparisons must also verify the effective
+emulator configuration. These ceiling figures cover this native-coupled 100-field start window, not every scene.
+The 040/060 timing limitation below prevents a complete A8 result.
 
 ### Startup failures: cause and fix (68030, 68040)
 

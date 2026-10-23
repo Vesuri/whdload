@@ -49,8 +49,9 @@ def capture(machine, caches, command, destination, fields=100):
     extra = (extra + ' --joystick_port_0_autoswitch=0').strip()
     custom3 = int(os.environ.get('MATRIX_CUSTOM3', '0'), 0)
     instant = os.environ.get('MATRIX_INSTANT_BLITTER', '0')
+    skip_intro = os.environ.get('MATRIX_SKIP_INTRO', '0')
     anchor_method = os.environ.get('RACE_ANCHOR', 'screen')
-    if custom3 < 0 or custom3 & ~3 or instant not in ('0', '1'):
+    if custom3 < 0 or custom3 & ~3 or instant not in ('0', '1') or skip_intro not in ('0', '1'):
         raise ValueError('invalid developer ceiling options')
     if instant == '1':
         extra += ' --uae_immediate_blits=true --uae_waiting_blits=false'
@@ -79,7 +80,7 @@ def capture(machine, caches, command, destination, fields=100):
         finally:
             s.close()
     out.mkdir(parents=True, exist_ok=False)
-    args = f'CUSTOM1=0 CUSTOM2={int(caches == "on")} CUSTOM3={custom3} CUSTOM4=0 CUSTOM5=0 {mmu}'
+    args = f'CUSTOM1={skip_intro} CUSTOM2={int(caches == "on")} CUSTOM3={custom3} CUSTOM4=0 CUSTOM5=0 {mmu}'
     if caches == 'off':
         args += ' NoCache'
     if build['build'] == 'verify':
@@ -91,7 +92,7 @@ def capture(machine, caches, command, destination, fields=100):
         env.pop(key, None)
     meta = dict(status='INCOMPLETE', machine=machine, caches=caches, command=command,
                 setup=setup, extra_args=extra, whd_args=args, build=build, runtime=pins,
-                fields=fields, custom3=custom3, instant_blitter=instant, anchor_method=anchor_method, tools={p.name: sha(p) for p in (ROOT/'tools').glob('*.py')})
+                fields=fields, skip_intro=skip_intro, custom3=custom3, instant_blitter=instant, anchor_method=anchor_method, tools={p.name: sha(p) for p in (ROOT/'tools').glob('*.py')})
     (out/'capture.json').write_text(json.dumps(meta, indent=2)+'\n')
     shutil.copy(slave, out/'slave.bin')
     log = out/'serve.log'

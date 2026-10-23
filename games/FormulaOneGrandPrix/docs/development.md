@@ -478,3 +478,22 @@ byte checks and clean quit. `start-state` selects the native start transition, r
 the breakpoint, and advances to a complete field before profiling. It accepts only
 the green ceiling window. The instant arm requests `immediate_blits=true` and
 `waiting_blits=false`; inspect `debug.uae` rather than trusting the requested options.
+
+`matrix_report.py` distinguishes `MEASURED` from `UNAVAILABLE`: exact repeated empty
+CPU records are not timings. DMA counts can still be valid. The current selected
+040/060 timing cores expose this limitation; do not substitute zero for missing values.
+
+For a common-layout A8 comparison set `MATRIX_SKIP_INTRO=1` on **every** arm, including
+the control. This maps to the existing `CUSTOM1=1`; it avoids the frontend allocation
+difference observed when instant blits are enabled from boot. Keep the original-route
+menu/whole-race evidence separately. After collecting both repeats of all four arms:
+
+```sh
+python3 tools/ceiling_report.py tmp/a8 MACHINE
+```
+
+Directories must be named `MACHINE-{control,no-wait,no-fill,instant}-{a,b}`. The audit
+requires exact repeats, common binary/layout, enabled and disabled hook bytes compared
+with the pinned relocated original, effective instant-blitter settings, and a measured
+frame rate in every arm. Use `MATRIX_SKIP_INTRO=1` together with the A8 variables above;
+never mix old-route and intro-skipping arms in one result.
