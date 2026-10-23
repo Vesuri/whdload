@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Count route frames without instruction traces (PAL, 50 fields/s).
 
-  SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM1=1 python3 tools/fps.py OUT.json
+  SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS="CUSTOM5=1 CUSTOM1=1" python3 tools/fps.py OUT.json
   PER_FRAME=1 python3 tools/fps.py OUT.json
 
 AMIGA_SETUP defaults to a1200-fast. ROUTE is shared with route_profile.py.

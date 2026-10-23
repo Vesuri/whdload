@@ -59,8 +59,14 @@ the shipped slave byte for byte. `BUILD` overrides the output directory.
 
 `make slave` builds the performance slave `whdload/Mercenary3.slave.asm` into
 `tmp/build/Mercenary3.Slave`, `make verify` its VERIFY build `Mercenary3.verify.Slave`.
-Run one with `SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM1=1 amiga/run.sh`; the
+Run the instrumented build with `SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=1 CUSTOM1=1' amiga/run.sh`; the
 profile and game-time tools take the same `SLAVE` and `WHD_ARGS` and record them.
+
+The release shows only **Enhanced framerate**, default On (`CUSTOM5=0`). Off
+(`CUSTOM5=1`) clears every feature; release builds ignore `CUSTOM1`. For individual
+features in VERIFY, supply `CUSTOM5=1 CUSTOM1=<mask>`; with Custom5 omitted, VERIFY
+also enables every feature. Older investigation commands using only Custom1 need
+this additional Custom5 setting. Custom2–4 remain VERIFY-only instruments.
 
 ## Profiling and game time
 
@@ -94,8 +100,8 @@ the frame and VERTB counters every `STEP` fields (default 5), or at every frame 
 new filename for each run (existing results are refused):
 
 ```sh
-SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM1=1 python3 tools/fps.py tmp/fps/count.json
-SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM1=1 PER_FRAME=1 python3 tools/fps.py tmp/fps/cadence.json
+SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=1 CUSTOM1=1' python3 tools/fps.py tmp/fps/count.json
+SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=1 CUSTOM1=1' PER_FRAME=1 python3 tools/fps.py tmp/fps/cadence.json
 python3 -m unittest discover -s tools -p test_fps.py
 ```
 
@@ -105,7 +111,7 @@ without running the full matrix, using the same VERIFY build and route for both 
 ```sh
 AMIGA_SETUP=a1200-030 DETERMINISTIC=0 \
 EXTRA_ARGS='--cpu=68040-NOMMU --uae_cpu_frequency=25000000' \
-SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS=CUSTOM1=255 \
+SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=1 CUSTOM1=255' \
 python3 tools/fps.py tmp/fps/040-on.json
 ```
 
@@ -223,7 +229,7 @@ See [A6 evidence](internals.md#a6-committed-state-recorder).
 
 P1 keeps the game's frame word counting logic passes. Its separate displayed-frame
 counter and restore markers exist only in `make verify`. Use that same VERIFY build
-with `CUSTOM1=15` and `CUSTOM1=31` for P1's `fps.py`/`matrix.sh` comparisons; the tools
+with `CUSTOM5=1 CUSTOM1=15` and `CUSTOM5=1 CUSTOM1=31` for P1's `fps.py`/`matrix.sh` comparisons; the tools
 reject an enabled P1 release build instead of mistaking logic passes for displayed frames.
 `sim_speed.py PER_FRAME=1` skips staged presentation poses and samples logic publications.
 

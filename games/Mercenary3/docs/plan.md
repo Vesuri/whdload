@@ -7,9 +7,10 @@ are in order of value; take the first one not done whose dependencies are met. D
 
 ## How to work
 
-- **One option per feature.** Each behaviour change is a `Custom1` bit (then `Custom2`) in
-  `whdload/Mercenary3.slave.asm`, listed in `_config`. With every option off the slave runs
-  the shipped code. Debug aids go in the `VERIFY` build.
+- **One option per feature for development.** Each behaviour change has a `Custom1`
+  bit in `whdload/Mercenary3.slave.asm`. VERIFY accepts these with `Custom5=1`. The
+  release exposes one **Enhanced framerate** control, default On (`Custom5=0`); Off
+  (`Custom5=1`) runs the shipped code and ignores individual-feature settings. Debug aids go in the `VERIFY` build.
 - **Build** with `make original slave verify` before each commit.
 - **Measure** with `tools/fps.py` on `a1200-fast`, `a500-1.5m` and the existing `040-25` matrix configuration: the same build with the
   option off and on, same session. Keep a change only if it gives a repeatable measured
@@ -215,11 +216,11 @@ user decision. See [measurements](internals.md#r4-data-cache).
 
 ### X. Release
 
-**X1.** Propose one player-facing toggle and its default **(U)**. Update the ReadMe
-(requirements, expansion memory, options). Run `matrix.sh`, a play pass with the release
-options on each CPU class, and the options-off test. Ask whether a real-hardware test is
-possible **(U)**: no emulator cell confirms 040/060 speed or real cache behaviour with the
-moved and self-modifying code.
+**X1. Complete.** User approved **Enhanced framerate**, default On. README updated
+with requirements, expansion memory, installation and options. Matrix, release play
+on every CPU class, world speed and options-off checks passed; see
+[results](internals.md#x1-release). No hardware is available; the user approved finishing
+without it. Real cache behaviour and 040/060 hardware performance remain unverified.
 
 ## Status
 
@@ -229,14 +230,14 @@ moved and self-modifying code.
 - [x] M1 [x] M2
 - [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [x] S6
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
-- [ ] X1
+- [x] X1
 
-Next: X1 (release toggle/default and real-hardware decision, U).
+All planned steps are complete. Hardware validation remains unavailable, outside X1.
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–13.
+  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–13.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the

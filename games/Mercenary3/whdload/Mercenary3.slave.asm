@@ -53,26 +53,12 @@ _name		dc.b	"Mercenary 3 - The Dion Crisis",0
 _copy		dc.b	"1991 Novagen",0
 _info		dc.b	"adapted by Harry/Graham/Wepl",10
 		dc.b	"Version 1.2 (29.07.2004)",10
-		dc.b	"performance version in development"
+		dc.b	"enhanced framerate edition"
 	IFD VERIFY
 		dc.b	" (VERIFY)"
 	ENDC
 		dc.b	0
-_config		dc.b	"C1:X:Enable display DMA once and copy whole palette:0;"
-		dc.b	"C1:X:64-bit bitplane fetch on AGA (FMODE 3):1;"
-		dc.b	"C1:X:Supervisor stack in expansion memory:2;"
-		dc.b	"C1:X:Native walking logic rate:3;"
-		dc.b	"C1:X:Walking presentation frames (includes logic gate):4;"
-		dc.b	"C1:X:Hot code in fast RAM (68020+):5;"
-		dc.b	"C1:X:Read-only lookup tables in fast RAM (68020+):6;"
-		dc.b	"C1:X:Longword horizontal span fills:7;"
-		dc.b	"C1:X:Bulk presentation restore:8;"
-		dc.b	"C1:X:Renderer code in fast RAM (68020+):9;"
-		dc.b	"C1:X:View bitmap in fast RAM (68020+):10;"
-		dc.b	"C1:X:Interpolate other objects (requires presentation):11;"
-		dc.b	"C1:X:Vehicle and flight presentation (requires bit 4):12;"
-		dc.b	"C1:X:Request data cache (68030+):13"
-		dc.b	0
+_config		dc.b	"C5:L:Enhanced framerate:On,Off",0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
 
@@ -87,6 +73,17 @@ _boot		;	A0 = resident loader
 	movea.l	a0,a2
 	lea	(_tags,pc),a0
 	jsr	(resload_Control,a2)
+
+; Default-on player control. VERIFY retains Custom1 for individual feature
+; comparisons when Custom5=1; the release Off setting always clears all features.
+	lea	(_custom1,pc),a0
+	IFND VERIFY
+	clr.l	(a0)
+	ENDC
+	move.l	(_enhanced,pc),d0
+	bne.b	.featuresready
+	move.l	#$3fff,(a0)
+.featuresready
 
 	lea	($4000).w,a0
 	moveq	#0,d0
@@ -1838,6 +1835,8 @@ _clist	dc.l	$8E2C81
 _tags	dc.l	WHDLTAG_ATTNFLAGS_GET
 	dc.w	0
 _attn	dc.w	0
+	dc.l	WHDLTAG_CUSTOM5_GET
+_enhanced	dc.l	0
 	dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
 	IFD VERIFY

@@ -57,9 +57,13 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- X1: player-facing **Enhanced framerate**, default on (user approval). No real
+  hardware is available; finish X1 with emulator checks and record hardware cache
+  behaviour and 040/060 speed as unverified.
+
 - R4: support whatever caches can be supported (user decision before measurement).
   Retain the cache option for compatibility even if these emulator routes show no gain;
-  real-hardware cache performance remains a release check.
+  real-hardware cache performance remains unverified (X1 accepted without hardware).
 
 - P3: extend native-speed logic and smooth presentation frames to vehicles, flight
   and lifts (user approval). Check each mode and the deferred navigation/vehicle/flight screens.
@@ -117,15 +121,15 @@ split and the measured game-time model ([internals](internals.md)).
 
 Details: [internals](internals.md#a3-machine-matrix).
 
-## Next steps
+## Current status
 
-Phase S and P1–P3 are complete; R3 is closed without implementation by user decision.
-P3 extends native-rate logic and presentation to vehicles and flight, preserves lift
-arrival timing and closes the deferred vehicle/flight/navigation play coverage. The
-030 Eagle view retains 50 fps with 12.5 logic passes/s; the standard route remains
-24.80 fps. Options-off matches shipped. See [P3](internals.md#p3-vehicles-flight-and-lifts).
-R2's blitter clear was measured and rejected: A500 unchanged, chip-only A1200 slower,
-including a repeated blitter-priority trial. Keep the native CPU clear.
-R4 adds an optional WHDLoad data-cache request; route FPS is unchanged across all
-measured setups. Retained for cache support by user decision. See
-[R4](internals.md#r4-data-cache). Next is X1 (release decisions, U).
+All planned steps are complete, including X1. The release exposes **Enhanced framerate**,
+default On. Off restores shipped behaviour. README includes installation, requirements,
+memory fallback and options; the release was played on every supported CPU class.
+Same-session route FPS Off → On: A500 3.70 → 4.10, 020-fast 7.50 → 12.50,
+reference 030/50 8.90 → 24.80. The matrix, native world-speed and options-off checks
+passed. See [X1](internals.md#x1-release).
+
+No hardware is available. Real-hardware cache behaviour and 040/060 performance remain
+unverified; the user explicitly accepted completing X1 without those tests. R2's blitter
+clear remains rejected and R3's triple buffering remains closed without implementation.

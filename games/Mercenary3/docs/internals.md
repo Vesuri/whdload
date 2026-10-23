@@ -71,8 +71,11 @@ key code at chip `$8`, with `$FF` at `$9`.
 ## Performance slave
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
-(for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
-the shipped patch list. It asks for an optional 200 KB of expansion memory (`ws_ExpMem`):
+(for the startup control), reads options through `resload_Control` and keeps
+the shipped patch list. The release exposes **Enhanced framerate**, default On
+(`Custom5=0`), which selects all feature bits below. Off (`Custom5=1`) clears them;
+release builds ignore `Custom1`. The VERIFY build accepts `Custom1` as the individual
+feature mask with `Custom5=1`. Historical measurements below name those feature bits. It asks for an optional 200 KB of expansion memory (`ws_ExpMem`):
 4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
 20 KB for bit 4's presentation restore buffer, 36 KB for bit 9's renderer copies and
 96 KB for bit 10's aligned staging bitmap and 12 KB for bit 11's object histories.
@@ -96,6 +99,7 @@ Bit 10 stages the 3D bitmap in fast RAM and copies the view before publication (
 Bit 11 interpolates object geometry with bit 4 and real fast RAM on 68020+.
 Bit 12 extends logic gating and presentation to vehicle/surface flight and space flight
 (P3); requires bit 4 for presentation.
+Bit 13 requests the data cache through WHDLoad (R4 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -1140,7 +1144,8 @@ Same build/session, `fps.py`, 500-field route, `CACHE PRELOAD`,
 
 No measured route gain or regression. Retained by the user's cache-support decision,
 not as a demonstrated speedup. The 040/060 counts are emulator run checks, not
-hardware performance predictions. Real-hardware cache behaviour remains an X1 check.
+hardware performance predictions. Real-hardware cache behaviour remains unverified; X1 was accepted without hardware
+testing because no hardware was available.
 The existing WHDLoad `BRANCHCACHE` switch also completed the 060 route at
 24.90 fps with bit 13 enabled. It remains available through WHDLoad; R4 does not
 force 060-specific CPU settings.
@@ -1152,3 +1157,37 @@ walking, Help/return and Quit Situation on 030, plus loaded Eagle vehicle/flight
 views on 030/040/060. The cache option alone also passed the menu/walking play
 check on 030/040. Input verification and original/release/VERIFY builds passed.
 Evidence: `tmp/r4/`.
+
+### X1: release
+
+The single player control is **Enhanced framerate**, default On, as approved by the
+user. `Custom5=0` selects feature bits 0–13; `Custom5=1` turns them all off. The release
+ignores legacy Custom1 settings. VERIFY retains individual bits with
+`Custom5=1 Custom1=<mask>`. CPU/chipset/memory guards are unchanged. The README covers
+installation, WHDLoad 17+, 512 KB chip RAM, the optional 200 KB workspace and CACHE/PRELOAD.
+
+Same-session, same VERIFY build, 500-field `fps.py` route, enhancement Off → On:
+
+| Setup | Off → On, fps |
+| --- | ---: |
+| a500-1.5m | 3.70 → 4.10 |
+| a1200-fast | 7.50 → 12.50 |
+| reference 030/50 | 8.90 → 24.80 |
+| existing 040-25 | 11.70 → 24.80 |
+| 060-50 | 12.80 → 24.90 |
+
+The default-on matrix passed every cell, including explicit 030 MMU (24.80 fps)
+and chip-only A1200 (9.40 fps). The known 040 frequency advisory remains: both 8 and
+25 MHz give 248 frames. These 040/060 numbers do not predict hardware speed.
+
+Release Off and shipped A500 both give 37 frames. Release world-speed checks on
+020-fast and 030 give 6 walking units and 2 heading units per field. Release play
+checks on 68000/020/030/040/060 covered Help/return, Quit Situation and walking;
+030/040/060 also loaded the Eagle save, boarded, flew and returned from Help.
+Screenshots were inspected, including the startup control showing Enhanced framerate
+set to On. All 124 VERIFY presentation restores passed.
+Input verification and original/release/VERIFY builds passed. Evidence: `tmp/x1/`.
+
+No real hardware is available (user decision). X1 is complete without hardware tests;
+real-cache behaviour with relocated/self-modifying code and 040/060 speed remain
+unverified. No hardware-performance claim is made.
