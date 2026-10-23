@@ -33,7 +33,7 @@ def compare(first, second):
             errors.append(f'cache-register audit failed: {root.name}')
     for key in ('machine', 'caches', 'command', 'setup', 'extra_args', 'whd_args',
                 'build', 'runtime', 'fields', 'effective_cpu_report',
-                'custom3', 'instant_blitter', 'anchor_method', 'skip_intro'):
+                'custom3', 'custom4', 'instant_blitter', 'anchor_method', 'skip_intro'):
         if captures[0].get(key) != captures[1].get(key):
             errors.append(f'different {key}')
     clock = captures[0]['command'] == 'clock'

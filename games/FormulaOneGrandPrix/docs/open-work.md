@@ -11,17 +11,17 @@ results and acceptance evidence are in [internals.md](internals.md).
 | B1–B4; A1/A2/A3/A5/A6 | Complete. Current A8 additions also pass the disabled-range gate. |
 | B5 | Menus and whole races pass on every required CPU, with exact repeats, cache audits and clean quit. Matched work gains on 040/060 remain unavailable; gate not passed. |
 | A7 | Complete under its “measured or failure explained” gate: 24 CPU-timing cells measured, 12 unavailable 040/060 cells explained. All 36 windows have repeated field/DMA captures; all whole-race pairs pass. |
-| A8 | A500/A1200/020 four-arm ceiling audits pass. 030 control/no-wait/no-fill measurements pass, but its instant arm changes Fast-hunk placement by 24 bytes. 040/060 CPU timings are unavailable. Incomplete. |
-| 68030 | Active, not deferred. Cache and baseline measurements pass; the A8 instant-blitter allocation difference is open. |
+| A8 | A500/A1200/020/030 four-arm ceiling audits pass. A developer-only preference-notification control fixes the 030 allocation mismatch. Only 040/060 CPU timings remain unavailable. |
+| 68030 | B5/A7 measurements and A8 common-layout ceiling comparisons pass; no 030 item remains deferred. |
 | A4 | Open; required before D. |
 | C–G | Simulation, presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP work: A8's 030 instant-blitter control.** Find a common-layout comparison
-without accepting a different allocation or weakening the audit. Skipping the frontend
-fixed the 020 comparison, but not the 030's 24-byte Fast-hunk difference. New
-breakpoint captures show that the 24-byte Fast free-region difference already exists
-before `LoadSeg`; removing boot fire presses shifts both arms equally and does not fix
-it. Trace the startup allocation before game loading next.
+**Next required step: restore 040/060 CPU profiling when shared work is resumed.**
+All currently measurable F1GP B5/A7/A8 cells and the 030 allocation fix are complete.
+The 030 difference arose during the loader's notification-enabled `SetPrefs` call.
+Developer-only `CUSTOM4=1` suppresses notification in every ceiling arm, preserving
+common layout; gate-off retains the original argument and release bytes are unchanged.
+Fresh disabled-byte gates, exact 030 repeats and all three MMU functional pairs pass.
 
 **Shared tooling remains deferred by the user's decision.** The selected 040/060
 non-MMU cycle-exact cores yield field/DMA data but no CPU instruction records. Their

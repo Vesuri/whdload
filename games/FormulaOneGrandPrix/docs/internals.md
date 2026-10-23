@@ -473,87 +473,81 @@ No game or trace bytes are tracked. Reproduce with the development matrix recipe
 
 ### A8 developer ceiling gates — partial result
 
-Developer and VERIFY builds expose `CUSTOM3` bit 0 (replace the four-byte pacer branch
-at `h0+$1288` with NOPs) and bit 1 (RTS at polygon filler `h0+$1F388`). Release omits
-both options and patches; its binary SHA-256 remains
+Developer and VERIFY builds expose `CUSTOM3` bit 0 (four NOP bytes replacing the pacer
+branch at `h0+$1288`) and bit 1 (RTS at polygon filler `h0+$1F388`). `CUSTOM4` bit 0
+suppresses preference-change notifications during startup to keep the 030 comparison's
+allocation stable. These are developer measurement options; native simulation coupling
+is retained, so no-wait intentionally speeds up the game. Release omits all three
+options and retains its SHA-256:
 `93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`.
-The filler walks the edge lists, loads the back buffer through `h0+$1252`, and writes
-four bitplanes. Its scratch is classified as presentation by A3. These are measurement
-options with native frame/world coupling; no-wait intentionally speeds up the game.
 
-All-off captures `tmp/b4/a8-release-off`, `a8-developer-off` and `a8-verify-off` pass
-all eight loader/name checks, original optional-range bytes, and clean quit. The actual
-VERIFY relay-on control passes separately. The checker supports declared PL_PS, PL_NOP
-and PL_R hooks and its negative tests reject mutations of all 12 optional-hook bytes,
-wrong gates/layout/source and a falsely labelled enabled relay.
+The filler walks edge lists, loads the back buffer through `h0+$1252`, and writes four
+bitplanes. A3 classifies its scratch as presentation. All-off gates for the current
+release/developer/VERIFY builds and the actual enabled VERIFY relay pass in
+`tmp/b4/prefs-*`: all eight loader/name checks, original optional game-hook bytes and
+clean quit. Negative tests reject mutations of all 12 hook bytes, wrong gates/layout/
+source and a falsely labelled enabled relay. The aggregate is
+`tmp/b4/prefs-acceptance.json` (`slave_gate.py --check --prefix prefs-`).
 
-All ceiling arms use the same VERIFY binary (SHA-256
-`084d897ceb94d431646dad4ffa41e5fafabe49df6eb5c27a51600454b60c4bd8`) and the native
-start-state transition at `h0+$3B4FA`, followed by the next full field. This avoids
-relying on painted lights in the no-fill arm. The breakpoint is removed before the
-100-field timed window. The new binary is not the earlier B5/A7 VERIFY baseline.
+Within each machine's comparison, all four arms use one VERIFY binary, identical
+hunk placement, `CUSTOM1=1`, and the native start transition at `h0+$3B4FA`, followed
+by the next complete field. The breakpoint is removed before the 100-field timed
+window. Instant blits change only `immediate_blits`; the effective blitter-wait policy
+must agree across arms. Every accepted row passes exact fresh repeats, actual patch
+bytes, configuration checks and clean quit.
 
 | Machine | Normal pacer fps | No wait fps | No wait + no fill fps | No wait + instant blits fps | Four-arm audit |
 |---|---:|---:|---:|---:|---|
 | A500-equivalent | 5.81 | 5.81 | 6.82 | 5.93 | PASS |
 | A1200, Chip only | 7.98 | 11.52 | 13.60 | 11.56 | PASS |
 | 020 + Fast | 7.98 | 17.15 | 20.05 | 17.31 | PASS |
-| 030/50 + Fast | 8.01 | 25.30 | 28.05 | unavailable as matched comparison | FAIL: instant arm changes Fast placement |
+| 030/50 + Fast | 8.01 | 25.30 | 28.05 | 25.29 | PASS, CUSTOM4=1 throughout |
 | 040/25, 060/50 | unavailable | unavailable | unavailable | unavailable | CPU instruction records missing |
 
-Accepted audits are in `tmp/a8-single-setting/{020,a1200,a500}-audit.json`. Its
-control/no-wait/no-fill entries link to the unchanged retained captures in
-`tmp/a8/{a500,a1200}-{arm}-{a,b}` and `tmp/matrix-workers/a8-anchor/tmp/a8/020-{arm}-{a,b}`;
-its instant arms are fresh captures. The rejected four-arm 030 comparison remains in
-`tmp/matrix-workers/a8-anchor/tmp/a8/` with the same naming. Arms are `control`, `no-wait`, `no-fill`, `instant`. All use
-`CUSTOM1=1` to skip the frontend in every arm. Accepted rows pass exact repeated
-screenshots and reductions, common build/layout, actual enabled/disabled hook bytes,
-effective blitter settings and clean quit. The A500 has no CPU caches; the cache-on
-request logs zero as expected. These figures cover this start window with native
-simulation coupling, not every scene or a real-time presentation implementation.
+These are observed ceilings in this start window, not every scene or a real-time
+presentation implementation. The 030 instant arm shows no uplift in this window;
+that does not establish zero blitter cost throughout the game. The A500 has no CPU
+caches and its cache audit correctly logs zero.
 
-The original-route 020 instant pair changes h2/h3 placement by 168 bytes and startup
-timing: its 17.31 fps cannot be compared with the original-route no-wait 16.84 fps.
-Skipping the frontend produces the accepted 020 common-layout row above. On the 030,
-frontend skipping still leaves the instant arm's h0/h1 24 bytes higher, although the
-h2/h3 bases and menu route agree. Its measured 25.29 fps is retained as an unmatched
-observation, not evidence that the blitter has no cost. The common-layout 030
-control/no-wait/no-fill arms remain valid. Both failed layout audits are retained.
+A500/A1200/020 audits are `tmp/a8-single-setting/{020,a1200,a500}-audit.json`, using
+VERIFY SHA-256 `084d897ceb94d431646dad4ffa41e5fafabe49df6eb5c27a51600454b60c4bd8`.
+That directory links its unchanged control/no-wait/no-fill captures to the retained
+original directories and contains fresh single-setting instant arms. The 030 audit is
+`tmp/matrix-workers/prefs/tmp/a8-stable-prefs/030-audit.json`, with all eight captures
+named `030-{control,no-wait,no-fill,instant}-{a,b}`. Its VERIFY SHA-256 is
+`777ac5f59bd6cb640f77ce71fc61d4f247ba21bcd3c63519eaab62a08bd1b843`.
+Neither build is the earlier B5/A7 VERIFY baseline.
 
-The enabled combined no-wait/no-fill arm also passes fresh functional repeats on
-030-MMU, 040-MMU and 060-MMU: both hook byte sequences, cache audits, four PNGs,
-profile reductions and F10 quit agree. Evidence is
-`tmp/matrix-workers/a8-anchor/tmp/a8-mmu/{030,040,060}-mmu-{a,b}`. These are MMU
-functional checks, not timing results.
+**030 allocation cause and control.** In `tmp/alloc-stages/`, both arms have identical
+free memory on entry to `_bootdos` and before `fast_pointer`. The instant arm uses 24
+extra Fast bytes after that helper. `tmp/alloc-prefs/` narrows this to `SetPrefs`:
+free memory agrees immediately before the call and differs immediately afterward.
+The inherited loader passes a leftover nonzero D1 as the API's `Inform` argument.
+The NDK `SetPrefs` contract defines true as requesting preference-change messages.
+This startup effect precedes `LoadSeg`, not the renderer or the timed window.
 
-The instant arm now changes only `immediate_blits`; the runner no longer also disables
-`waiting_blits`. The audit requires the effective wait policy to agree with the control.
-The old instant arms fail that stronger configuration check. Fresh A500/A1200/020
-instant pairs with the same automatic wait policy pass all checks and give the same
-rates shown above. They replace the old instant arms for comparison acceptance.
+The new developer-only `CUSTOM4` bit reads its option before the helper while preserving
+the helper's original input registers. When enabled it passes `Inform=FALSE`; when off
+it preserves the original D1. Read-only debugger probes in `tmp/prefs-argument-gate/`
+confirm nonzero D1 with the gate off and zero with it on. The same rebuilt binary's
+`tmp/matrix-workers/prefs/tmp/gate-off-{normal,instant}` probes still differ by 24 Fast
+bytes, while all eight gate-on captures have identical four-hunk placement. Thus the
+control is effective without padding or a relaxed layout audit. This does not identify
+the individual OS allocation object or claim an OS defect.
 
-The 030 single-setting probe (`tmp/matrix-workers/a8-anchor/tmp/030-instant-wait-auto`)
-still has the 24-byte Fast-hunk shift. Suppressing boot fire presses while skipping
-the frontend (`030-passive-normal`, `030-passive-instant` in that worker's `tmp/`)
-moves both Fast layouts 32 bytes lower but leaves their 24-byte separation. Those
-unrepeated probes are diagnostic only; passive input was not adopted in the launcher.
+Earlier failed controls remain reference evidence: skipping the frontend removes the
+020's 168-byte Chip allocation difference but alone leaves the 030's 24-byte Fast
+difference; passive boot input shifts both 030 arms equally and leaves the gap. Old
+instant arms also changed the wait policy and fail the stronger configuration audit.
+They are not accepted substitutes for the current comparisons.
 
-Read-only breakpoint probes in `tmp/alloc-probe-v2/{normal,instant}` stop immediately
-before and after `LoadSeg` (current VERIFY slave code offsets `$13BA` and `$13C4`).
-Before the call, the instant arm's main Fast free region already starts 24 bytes higher
-and contains 24 fewer free bytes; Chip free regions agree. After the call the difference
-is unchanged. The preloaded game-file header occupies the same address in the retained
-normal/instant dumps. Thus the mismatch exists before game-hunk loading, rather than
-arising in the renderer or its timed window. The responsible startup allocation is
-still unidentified. Next: trace allocations before `load_game`, including pending OS
-work around the pointer-preference setup; do not compensate with an arbitrary pad or
-claim a matched instant-blitter gain.
+The current combined `CUSTOM3=3 CUSTOM4=1` arm also passes fresh functional repeats on
+030-MMU, 040-MMU and 060-MMU, including cache audits, screenshots/reductions and F10
+quit: `tmp/a8-mmu-prefs/{030,040,060}-mmu-{a,b}`. These are functional checks, not MMU
+timing measurements. Earlier C3-only MMU evidence remains tied to its original build.
 
-The off-state acceptance report is `tmp/b4/a8-acceptance.json`; regenerate it with
-`slave_gate.py --check --prefix a8-`. **A8 is incomplete:** the 030 instant-blitter
-allocation difference and 040/060 missing CPU traces prevent all-machine acceptance.
-The user has chosen to keep shared AmigaXDev fixes deferred. No fallback core or
-synthetic zero timing is accepted in place of these measurements.
+**A8 is incomplete only for the 040/060 CPU measurements.** The user has deferred
+shared AmigaXDev repairs. No substitute core or synthetic zero timing is accepted.
 
 ### Startup failures: cause and fix (68030, 68040)
 

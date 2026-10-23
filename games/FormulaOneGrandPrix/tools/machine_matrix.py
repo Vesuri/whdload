@@ -48,10 +48,11 @@ def capture(machine, caches, command, destination, fields=100):
     # Keep host mouse activity from auto-switching a disabled capture port.
     extra = (extra + ' --joystick_port_0_autoswitch=0').strip()
     custom3 = int(os.environ.get('MATRIX_CUSTOM3', '0'), 0)
+    custom4 = int(os.environ.get('MATRIX_CUSTOM4', '0'), 0)
     instant = os.environ.get('MATRIX_INSTANT_BLITTER', '0')
     skip_intro = os.environ.get('MATRIX_SKIP_INTRO', '0')
     anchor_method = os.environ.get('RACE_ANCHOR', 'screen')
-    if custom3 < 0 or custom3 & ~3 or instant not in ('0', '1') or skip_intro not in ('0', '1'):
+    if custom3 < 0 or custom3 & ~3 or custom4 not in (0, 1) or instant not in ('0', '1') or skip_intro not in ('0', '1'):
         raise ValueError('invalid developer ceiling options')
     if instant == '1':
         extra += ' --uae_immediate_blits=true'
@@ -64,7 +65,7 @@ def capture(machine, caches, command, destination, fields=100):
     build = json.loads((slave.parent/'build.json').read_text())
     if build['slave_sha256'] != sha(slave) or build['source_sha256'] != sha(ROOT/'whdload/F1GP.s'):
         raise ValueError('stale build')
-    if custom3 or instant == '1':
+    if custom3 or custom4 or instant == '1':
         if build['build'] not in ('developer', 'verify') or command != 'green' or anchor_method != 'start-state':
             raise ValueError('ceiling options require a developer/VERIFY green start-state capture')
     sock = ROOT/'amiga/.run/f1gp.sock'
@@ -80,7 +81,7 @@ def capture(machine, caches, command, destination, fields=100):
         finally:
             s.close()
     out.mkdir(parents=True, exist_ok=False)
-    args = f'CUSTOM1={skip_intro} CUSTOM2={int(caches == "on")} CUSTOM3={custom3} CUSTOM4=0 CUSTOM5=0 {mmu}'
+    args = f'CUSTOM1={skip_intro} CUSTOM2={int(caches == "on")} CUSTOM3={custom3} CUSTOM4={custom4} CUSTOM5=0 {mmu}'
     if caches == 'off':
         args += ' NoCache'
     if build['build'] == 'verify':
@@ -92,7 +93,7 @@ def capture(machine, caches, command, destination, fields=100):
         env.pop(key, None)
     meta = dict(status='INCOMPLETE', machine=machine, caches=caches, command=command,
                 setup=setup, extra_args=extra, whd_args=args, build=build, runtime=pins,
-                fields=fields, skip_intro=skip_intro, custom3=custom3, instant_blitter=instant, anchor_method=anchor_method, tools={p.name: sha(p) for p in (ROOT/'tools').glob('*.py')})
+                fields=fields, skip_intro=skip_intro, custom3=custom3, custom4=custom4, instant_blitter=instant, anchor_method=anchor_method, tools={p.name: sha(p) for p in (ROOT/'tools').glob('*.py')})
     (out/'capture.json').write_text(json.dumps(meta, indent=2)+'\n')
     shutil.copy(slave, out/'slave.bin')
     log = out/'serve.log'

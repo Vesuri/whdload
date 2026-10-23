@@ -463,15 +463,25 @@ an MMU. `matrix_compare.py` requires the override for off arms and audits CACR.
 Use `all` for green/tow/follow in one boot with zero leads; reduce each child window
 with `matrix_report.py`. Repeat comparisons include all child profiles and PNGs.
 
-For A8 use the same current VERIFY build for every arm:
+For A8 use one current VERIFY build for all four arms. For a new 030 set:
 
 ```sh
-RACE_ANCHOR=start-state python3 tools/machine_matrix.py 020 on green tmp/a8/control 100
-RACE_ANCHOR=start-state MATRIX_CUSTOM3=1 python3 tools/machine_matrix.py 020 on green tmp/a8/no-wait 100
-RACE_ANCHOR=start-state MATRIX_CUSTOM3=3 python3 tools/machine_matrix.py 020 on green tmp/a8/no-fill 100
-RACE_ANCHOR=start-state MATRIX_CUSTOM3=1 MATRIX_INSTANT_BLITTER=1 python3 tools/machine_matrix.py 020 on green tmp/a8/instant 100
-python3 tools/test_disabled.py tmp/b4/a8-verify-off tmp/b4/a8-verify-on
+export RACE_ANCHOR=start-state MATRIX_SKIP_INTRO=1 MATRIX_CUSTOM4=1
+for repeat in a b; do
+  MATRIX_CUSTOM3=0 MATRIX_INSTANT_BLITTER=0 python3 tools/machine_matrix.py 030 on green "tmp/a8-new/030-control-$repeat" 100
+  MATRIX_CUSTOM3=1 MATRIX_INSTANT_BLITTER=0 python3 tools/machine_matrix.py 030 on green "tmp/a8-new/030-no-wait-$repeat" 100
+  MATRIX_CUSTOM3=3 MATRIX_INSTANT_BLITTER=0 python3 tools/machine_matrix.py 030 on green "tmp/a8-new/030-no-fill-$repeat" 100
+  MATRIX_CUSTOM3=1 MATRIX_INSTANT_BLITTER=1 python3 tools/machine_matrix.py 030 on green "tmp/a8-new/030-instant-$repeat" 100
+done
+python3 tools/ceiling_report.py tmp/a8-new 030
+python3 tools/test_disabled.py tmp/b4/prefs-verify-off tmp/b4/prefs-verify-on
 ```
+
+`MATRIX_CUSTOM4=1` selects the developer-only startup control: `SetPrefs` gets a false
+notification argument. Use it for **every** arm of a 030 comparison, including the normal
+pacer control. The default zero preserves the original argument. Release contains no
+C4 option or conditional code. The runner rejects this option outside developer/VERIFY
+green start-state captures; it is not a player mode or simulation change.
 
 Each arm needs a fresh repeat, effective-config review, original-versus-enabled hook
 byte checks and clean quit. `start-state` selects the native start transition, removes
@@ -486,8 +496,8 @@ CPU records are not timings. DMA counts can still be valid. The current selected
 
 For a common-layout A8 comparison set `MATRIX_SKIP_INTRO=1` on **every** arm, including
 the control. This maps to the existing `CUSTOM1=1`; it removes the observed 020 frontend allocation
-difference. It does not guarantee equal allocation on other CPUs: the 030 instant arm
-still fails the Fast-hunk layout check. Keep the original-route
+difference. On 030 also use `MATRIX_CUSTOM4=1` to suppress the notification-related Fast allocation
+difference. Keep the original-route
 menu/whole-race evidence separately. After collecting both repeats of all four arms:
 
 ```sh
@@ -503,7 +513,7 @@ never mix old-route and intro-skipping arms in one result.
 To recheck the current all-off captures without replacing the older B4 evidence:
 
 ```sh
-python3 tools/slave_gate.py --check --prefix a8-
+python3 tools/slave_gate.py --check --prefix prefs-
 ```
 
 The prefix selects all four named cases and the corresponding negative-test fixtures;
@@ -524,5 +534,7 @@ deferred by the user; do not replace the cores or present missing records as zer
 The current accepted A500/A1200/020 audits use `tmp/a8-single-setting`: existing control,
 no-wait and no-fill captures are linked there, alongside fresh single-setting instant
 pairs. Old instant captures that also changed the wait policy are reference only, even
-where their measured fps happens to agree. The 030 allocation probes are diagnostic
-captures, not timing acceptance or new baseline evidence.
+where their measured fps happens to agree. The 030 allocation probes are diagnostic captures; its accepted four-arm timing set is
+`tmp/matrix-workers/prefs/tmp/a8-stable-prefs/`. The new build has its own hash,
+all-off acceptance in `tmp/b4/prefs-acceptance.json`, and C4-on MMU functional pairs in
+`tmp/a8-mmu-prefs/`. Do not relabel old A7 or B3 evidence as the new build.

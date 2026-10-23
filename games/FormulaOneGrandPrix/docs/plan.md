@@ -89,8 +89,8 @@ replace the original baseline or prove the projected implementation below.
 Current status: B1–B4 and A1/A2/A3/A5/A6 are complete. A7 meets its gate with 24
 CPU-timing cells measured and 12 unavailable 040/060 cells explained; all field/DMA
 and whole-race captures repeat exactly. B5's functional races pass, but its 040/060
-work gains remain unavailable. A8 has accepted A500/A1200/020 ceilings, an unmatched
-030 instant-blitter arm, and unavailable 040/060 CPU timings. Neither B5 nor A8 is
+work gains remain unavailable. A8 has accepted A500/A1200/020/030 ceilings; a developer-only startup notification
+control fixes the 030 layout mismatch. Its 040/060 CPU timings remain unavailable. Neither B5 nor A8 is
 complete. The user has deferred shared-profiler fixes. See [open work](open-work.md).
 The earlier startup deadlock is fixed; this is a distinct profiling limitation.
 

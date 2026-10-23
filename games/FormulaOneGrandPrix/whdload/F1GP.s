@@ -37,6 +37,7 @@ slv_config
         IFNE DEVELOPER
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
+        dc.b 'C4:X:Ceiling - no preference notifications:0;'
         ENDC
         IFNE VERIFY
         dc.b 'C5:X:Verify pacer relay:0;'
@@ -59,6 +60,10 @@ custom_tags dc.l WHDLTAG_CUSTOM1_GET
 skip_intro dc.l 0
         dc.l WHDLTAG_CUSTOM2_GET
 cache_options dc.l 0
+        IFNE DEVELOPER
+        dc.l WHDLTAG_CUSTOM4_GET
+preference_options dc.l 0
+        ENDC
         dc.l 0
 game_size dc.l 0
         IFNE VERIFY
@@ -102,6 +107,14 @@ _bootdos
         lea (assign4,pc),a0
         suba.l a1,a1
         bsr _dos_assign
+        IFNE DEVELOPER
+        ; Read the measurement gate before SetPrefs; retain its original inputs.
+        movem.l d0-d1/a0-a2,-(sp)
+        lea (custom_tags,pc),a0
+        move.l (_resload,pc),a2
+        jsr (resload_Control,a2)
+        movem.l (sp)+,d0-d1/a0-a2
+        ENDC
         bsr fast_pointer
         bset #1,$bfe001
         lea (custom_tags,pc),a0
@@ -201,7 +214,15 @@ fast_pointer
         move.w #1,(108,a0)   ; PointerTicks
         move.l sp,a0
         moveq #110,d0
-        jsr (-324,a6)        ; SetPrefs, same D1 as original
+        IFNE DEVELOPER
+        ; SetPrefs Inform=FALSE suppresses startup preference notifications.
+        ; With the gate off, preserve the original nonzero D1 and notification.
+        btst #0,(preference_options+3,pc)
+        beq.s .original_inform
+        moveq #0,d1
+.original_inform
+        ENDC
+        jsr (-324,a6)        ; SetPrefs
         lea (110,sp),sp
         movem.l (sp)+,d0-a6
         rts
