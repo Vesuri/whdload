@@ -407,9 +407,11 @@ logs, clean-quit status and failure text. `CAPTURED` means capture succeeded, **
 acceptance. The runner does not yet implement an A7/A8 acceptance report.
 
 The 030 non-MMU timing cell explicitly removes the emulator MMU model as well as passing
-WHDLoad `NOMMU`: `--uae_mmu_model=0 --cpu=68030`, in that order.
-`68030-NOMMU` is unsupported and silently selects a 68020; the runner rejects such
-effective-CPU mismatches before advancing the route. The 040/060 timing cells explicitly select the non-MMU, cycle-exact cores.
+WHDLoad `NOMMU`: `--cpu=68030 --uae_mmu_model=0` (either order; `68EC030` also works,
+without an FPU). The pinned shared launcher refuses unknown CPU names such as
+`68030-NOMMU` before starting the emulator (AmigaXDev TOOL2). `f1gp.py serve` then shows
+only a traceback; run `amiga/run.sh` with the same variables to see the message. The
+runner also rejects effective-CPU/MMU mismatches before advancing the route. The 040/060 timing cells explicitly select the non-MMU, cycle-exact cores.
 MMU cells are functional tests, not fixed-clock speed claims. Check effective emulator
 settings in the retained debug log before using measurements. No post-B5 timing claims
 have been established by this runner.
@@ -417,7 +419,8 @@ have been established by this runner.
 Local input field commands now allow 1800 seconds by default (`F1GP_FIELD_TIMEOUT`
 overrides it); this does not repair an emulator semaphore wait. Screenshot collection
 requires a new one-field trace and fails after a debugger disconnection instead of
-reusing a stale image. `raceclock` retains the route, actual four-hunk layout and partial
+reusing a stale image. The pinned shared `shot`/`profile` commands do the same
+(AmigaXDev TOOL3). `raceclock` retains the route, actual four-hunk layout and partial
 samples with `INCOMPLETE` status; only reaching results and the finishing-times screen
 sets `COMPLETE`. Read `capture.json` as well: a complete clock capture with failed quit
 is not an accepted run.

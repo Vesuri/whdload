@@ -50,7 +50,8 @@ deterministic mode and the indirect UAE board
 fixed it, and F1GP now pins the installed emulator. With `DETERMINISTIC=1`, all six
 030/040/060 setups (MMU and non-MMU) reach the first race field with caches on, quit with
 F10 OK, and repeat exactly from fresh boots. `tools/machine_matrix.py` can now run every
-cell. TOOL2 and TOOL3 remain open in AmigaXDev; the runner keeps its local mitigations.
+cell. AmigaXDev TOOL2 and TOOL3 are also done: the launcher refuses unknown CPU names, and
+failed captures leave no image or trace. F1GP pins that launcher.
 
 Next steps, under the [current validation scope](plan.md#current-validation-scope):
 

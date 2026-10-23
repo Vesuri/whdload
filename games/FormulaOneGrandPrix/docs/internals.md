@@ -267,8 +267,8 @@ Evidence is retained under `tmp/b5/`: `smoke020` (rejected option syntax), `smok
 `020-on-clock`, `030-on-clock`, `030-nommu-on-clock`, `direct030-diagnostic` and
 `normal-speed030-diagnostic` (the latter three use an invalid 030 spelling and are
 rejected as 030 evidence). The runner now checks the emulator's effective CPU/MMU report
-and retains `debug.uae`; the valid 030 non-MMU override is `--uae_mmu_model=0 --cpu=68030`
-in that order. `030-effective-on-clock` retains the corrected, still-failing non-MMU
+and retains `debug.uae`; the valid 030 non-MMU override is `--cpu=68030 --uae_mmu_model=0`
+(the order mattered with the launcher of the time; since TOOL2 it doesn't). `030-effective-on-clock` retains the corrected, still-failing non-MMU
 030 capture and its host sample. Failure messages following deliberate emulator termination
 include input-release errors; the old screenshot helper could also reuse a stale trace
 and report a misleading screen timeout after disconnection. It now deletes the previous
@@ -294,8 +294,9 @@ per-scene gain measurement.
 (next section). All six 030/040/060 setups start with caches on and repeat exactly under
 deterministic mode. No whole race or matched gain has been measured on any of them, A7's
 paired matrix is incomplete, and A8 has not started. Disabling data-cache emulation is
-not an accepted substitute. AmigaXDev TOOL2 (CPU spelling) and TOOL3 (stale captures)
-remain open; F1GP's runner keeps its local mitigations for both.
+not an accepted substitute. AmigaXDev TOOL2 (the launcher refuses unknown CPU names) and
+TOOL3 (failed captures leave no image or trace) are also fixed and installed. F1GP's
+runner keeps its own effective-CPU and fresh-trace checks as extra guards.
 
 ### Startup failures: cause and fix (68030, 68040)
 
@@ -325,6 +326,11 @@ Verification with the installed build:
 | 030 MMU | language 435, race 1275 | `$00002111` |
 | 040 MMU | language 435, race 1223 | `$80008000` |
 | 060 MMU | language 435, race 1223 | `$A0808000` |
+
+After the TOOL2/TOOL3 launcher was installed (`fsuae_common.sh` SHA-256
+`5a61a854defeaaaeb610d7514b83acc4bcc998bfc4378d1db2615ececcad194a`, now pinned), a third
+run each of the 030, 040 and 060 non-MMU setups gave the same screenshots as before
+(`tmp/b5-fixed/*-c`). The launcher refused `--cpu=68030-NOMMU` before starting the emulator.
 
 These checks cover start-up and menus with caches on, not whole races. Evidence from the
 hang itself (host samples, the non-deterministic controls) is in `tmp/b5-cause/`.
