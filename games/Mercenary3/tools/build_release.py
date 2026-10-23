@@ -60,7 +60,7 @@ def main():
     install = replace_once(install, '(set #icon_set_slave_preload "")',
                            '(set #icon_set_slave_preload "true")')
     install = replace_once(install, '(settooltype "PreLoad" "")',
-                           '(settooltype "PreLoad" "")\n    (settooltype "Cache" "")')
+                           '(settooltype "PreLoad" "")\n    (settooltype "Cache" "")\n    (settooltype "Custom5" "1")')
     install = '; Mercenary 3 install version 2.0 (23.10.2026)\n' + install
 
     # Keep the verified input drawer intact. No game image is included.

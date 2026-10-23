@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """P1 VERIFY restore hashes, excluding display and live interrupt-owned state.
 
-SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS="CUSTOM5=1 CUSTOM1=31" python3 tools/presentation_check.py tmp/p1/check.json
+SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS="CUSTOM5=0 CUSTOM1=31" python3 tools/presentation_check.py tmp/p1/check.json
 Uses VERIFY-only markers; no guest state is altered by this checker.
 """
 import hashlib

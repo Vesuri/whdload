@@ -58,7 +58,7 @@ _info		dc.b	"adapted by Harry/Graham/Wepl",10
 		dc.b	" (VERIFY)"
 	ENDC
 		dc.b	0
-_config		dc.b	"C5:L:Enhanced framerate:On,Off",0
+_config		dc.b	"C5:B:Enhanced framerate",0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
 
@@ -74,14 +74,14 @@ _boot		;	A0 = resident loader
 	lea	(_tags,pc),a0
 	jsr	(resload_Control,a2)
 
-; Default-on player control. VERIFY retains Custom1 for individual feature
-; comparisons when Custom5=1; the release Off setting always clears all features.
+; Boolean player control (enabled by the installed icon). VERIFY retains Custom1 for individual feature
+; comparisons when Custom5=0; the release Off setting always clears all features.
 	lea	(_custom1,pc),a0
 	IFND VERIFY
 	clr.l	(a0)
 	ENDC
 	move.l	(_enhanced,pc),d0
-	bne.b	.featuresready
+	beq.b	.featuresready
 	move.l	#$3fff,(a0)
 .featuresready
 

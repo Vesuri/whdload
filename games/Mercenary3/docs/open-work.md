@@ -57,6 +57,9 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- The Enhanced framerate control is a boolean checkbox (user correction). The
+  installer sets CUSTOM5=1 so it starts checked; CUSTOM5=0 or omission is unchecked.
+
 - X1: player-facing **Enhanced framerate**, default on (user approval). No real
   hardware is available; finish X1 with emulator checks and record hardware cache
   behaviour and 040/060 speed as unverified.

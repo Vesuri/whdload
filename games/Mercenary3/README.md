@@ -3,11 +3,11 @@
 Version **2.0 (23.10.2026)**.
 
 Performance WHDLoad slave for **Mercenary III: The Dion Crisis** (Novagen), based on
-install version 1.2. **Enhanced framerate** is on by default: rendering can run up to
+install version 1.2. **Enhanced framerate** is enabled by default in the installed icon: rendering can run up to
 50 fps PAL while world simulation and game logic keep their native rates. Actual
 frame rate depends on the machine and scene.
 
-The WHDLoad startup screen has one control: **Enhanced framerate — On / Off**.
+The WHDLoad startup screen has one control: **Enhanced framerate** checkbox.
 Off restores shipped game behaviour. On selects the supported optimisations for the
 CPU, chipset and available memory, including smoother walking, vehicles and flight.
 
@@ -43,10 +43,11 @@ slaves are distributed in this repository.
 Use `CACHE PRELOAD` in the game icon's tooltypes or launch from the Amiga Shell:
 
 ```text
-WHDLoad Mercenary3.Slave CACHE PRELOAD
+WHDLoad Mercenary3.Slave CACHE PRELOAD CUSTOM5=1
 ```
 
-`CUSTOM5=0` means On (the default); `CUSTOM5=1` means Off. The release ignores
+`CUSTOM5=1` checks the box (set by the installer); `CUSTOM5=0` or omission
+unchecks it. The release ignores
 `CUSTOM1`, including older individual-feature settings. `NOCACHE` remains available
 for cache troubleshooting; WHDLoad also supports `BRANCHCACHE` on 68060.
 Backspace quits WHDLoad. Keep a writable game drawer for saved situations.
@@ -54,10 +55,10 @@ Backspace quits WHDLoad. Keep a writable game drawer for saved situations.
 For this workspace's emulator launcher:
 
 ```sh
-SLAVE=tmp/build/Mercenary3.Slave WHD_SPLASH=1 amiga/run.sh
+SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM5=1 WHD_SPLASH=1 amiga/run.sh
 ```
 
-It supplies `CACHE PRELOAD`. Add `WHD_ARGS=CUSTOM5=1` to start with the enhancement off.
+It supplies `CACHE PRELOAD`. Use `WHD_ARGS=CUSTOM5=0` to start with the enhancement off.
 Without `SLAVE`, the launcher still runs the installed original. Its game drawer is a
 scratch copy, so saves made there are not copied back to the original installation.
 
@@ -71,7 +72,7 @@ No real hardware was available for this release check. Real-hardware cache behav
 with relocated/self-modifying code and 040/060 performance remain unverified.
 See [measured results](docs/internals.md#x1-release) and [current decisions](docs/open-work.md).
 
-Developers can use `make verify` with `CUSTOM5=1 CUSTOM1=<feature mask>` for individual
+Developers can use `make verify` with `CUSTOM5=0 CUSTOM1=<feature mask>` for individual
 feature comparisons. The VERIFY build also contains the measurement instruments;
 use the regular slave to play. [Development](docs/development.md) describes the tools.
 

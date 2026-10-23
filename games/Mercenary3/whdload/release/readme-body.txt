@@ -27,9 +27,10 @@
  - Fast RAM, AGA and cache support selected for the available hardware.
  - Return to the operating system with the quit key.
 
- "Enhanced framerate" is On by default in the WHDLoad startup window.
+ The installer enables the "Enhanced framerate" checkbox by default.
  Set it to Off for the original game behaviour. The equivalent tooltype
- is CUSTOM5=0 for On or CUSTOM5=1 for Off. Old CUSTOM1 settings are ignored.
+ is CUSTOM5=1 for On or CUSTOM5=0 for Off; omission also means Off.
+ Old CUSTOM1 settings are ignored.
  Rendering can reach 50 fps PAL on suitable machines and scenes; this is
  not a guaranteed frame rate. The installer enables CACHE and PRELOAD.
  NOCACHE can be used for cache troubleshooting.
