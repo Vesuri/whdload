@@ -374,22 +374,48 @@ VERIFY relay-on control passes separately. The checker supports declared PL_PS, 
 and PL_R hooks and its negative tests reject mutations of all 12 optional-hook bytes,
 wrong gates/layout/source and a falsely labelled enabled relay.
 
-All ceiling arms use the same VERIFY binary and the native start-state transition at
-`h0+$3B4FA`, followed by the next full field. This avoids relying on painted lights in
-the no-fill arm. The breakpoint is removed before the 100-field timed window. The
-020 control, no-wait and no-fill pairs repeat exactly and captured hook bytes match
-the intended branches/RTS. Their common-layout rates are 7.98, 16.84 and 19.63 fps.
-The instant pair repeats but changes h2/h3 placement by 168 bytes and changes startup
-timing, so its 17.31 fps is **not accepted as a matched gain**. The four-arm audit
-correctly fails this layout comparison. A fresh four-arm 020 set with `CUSTOM1=1`
-(skipping the frontend in every arm) has identical four-hunk placement, exact repeats,
-correct hook bytes, effective instant-blitter configuration and clean quit. Its audit
-passes: control 7.98 fps, no-wait 17.15, no-fill 20.05, instant blitter 17.31. Evidence:
-`tmp/matrix-workers/a8-anchor/tmp/a8/020-{control,no-wait,no-fill,instant}-{a,b}`.
-The original-route 030 instant arm also shifts placement and is rejected as a matched
-comparison; its intro-skipping recapture and stock-machine measurements are pending. Instant-blitter comparisons must also verify the effective
-emulator configuration. These ceiling figures cover this native-coupled 100-field start window, not every scene.
-The 040/060 timing limitation below prevents a complete A8 result.
+All ceiling arms use the same VERIFY binary (SHA-256
+`084d897ceb94d431646dad4ffa41e5fafabe49df6eb5c27a51600454b60c4bd8`) and the native
+start-state transition at `h0+$3B4FA`, followed by the next full field. This avoids
+relying on painted lights in the no-fill arm. The breakpoint is removed before the
+100-field timed window. The new binary is not the earlier B5/A7 VERIFY baseline.
+
+| Machine | Normal pacer fps | No wait fps | No wait + no fill fps | No wait + instant blits fps | Four-arm audit |
+|---|---:|---:|---:|---:|---|
+| A500-equivalent | 5.81 | 5.81 | 6.82 | 5.93 | PASS |
+| A1200, Chip only | 7.98 | 11.52 | 13.60 | 11.56 | PASS |
+| 020 + Fast | 7.98 | 17.15 | 20.05 | 17.31 | PASS |
+| 030/50 + Fast | 8.01 | 25.30 | 28.05 | unavailable as matched comparison | FAIL: instant arm changes Fast placement |
+| 040/25, 060/50 | unavailable | unavailable | unavailable | unavailable | CPU instruction records missing |
+
+The accepted A500/A1200 evidence is `tmp/a8/{a500,a1200}-{arm}-{a,b}`; 020 and the
+rejected four-arm 030 comparison are in `tmp/matrix-workers/a8-anchor/tmp/a8/` with
+the same naming. Arms are `control`, `no-wait`, `no-fill`, `instant`. All use
+`CUSTOM1=1` to skip the frontend in every arm. Accepted rows pass exact repeated
+screenshots and reductions, common build/layout, actual enabled/disabled hook bytes,
+effective blitter settings and clean quit. The A500 has no CPU caches; the cache-on
+request logs zero as expected. These figures cover this start window with native
+simulation coupling, not every scene or a real-time presentation implementation.
+
+The original-route 020 instant pair changes h2/h3 placement by 168 bytes and startup
+timing: its 17.31 fps cannot be compared with the original-route no-wait 16.84 fps.
+Skipping the frontend produces the accepted 020 common-layout row above. On the 030,
+frontend skipping still leaves the instant arm's h0/h1 24 bytes higher, although the
+h2/h3 bases and menu route agree. Its measured 25.29 fps is retained as an unmatched
+observation, not evidence that the blitter has no cost. The common-layout 030
+control/no-wait/no-fill arms remain valid. Both failed layout audits are retained.
+
+The enabled combined no-wait/no-fill arm also passes fresh functional repeats on
+030-MMU, 040-MMU and 060-MMU: both hook byte sequences, cache audits, four PNGs,
+profile reductions and F10 quit agree. Evidence is
+`tmp/matrix-workers/a8-anchor/tmp/a8-mmu/{030,040,060}-mmu-{a,b}`. These are MMU
+functional checks, not timing results.
+
+The off-state acceptance report is `tmp/b4/a8-acceptance.json`; regenerate it with
+`slave_gate.py --check --prefix a8-`. **A8 is incomplete:** the 030 instant-blitter
+allocation difference and 040/060 missing CPU traces prevent all-machine acceptance.
+The user has chosen to keep shared AmigaXDev fixes deferred. No fallback core or
+synthetic zero timing is accepted in place of these measurements.
 
 ### Startup failures: cause and fix (68030, 68040)
 

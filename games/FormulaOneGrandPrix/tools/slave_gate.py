@@ -110,14 +110,14 @@ CASES = (
 )
 
 
-def acceptance():
-    target = ROOT/'tmp/b4/acceptance.json'
+def acceptance(prefix=''):
+    target = ROOT/'tmp/b4'/f'{prefix}acceptance.json'
     target.write_text(json.dumps(dict(status='INCOMPLETE'))+'\n')
     results = {}
     required = {'protection_answer', 'protection_branch', 'save_flag', 'save_directory',
                 'keyboard_hook', 'keyboard_exit_key', 'keyboard_built_code', 'driver_names'}
     for name, build, custom in CASES:
-        out = ROOT/'tmp/b4'/name
+        out = ROOT/'tmp/b4'/(prefix+name)
         meta = json.loads((out/'meta.json').read_text())
         result = json.loads((out/'result.json').read_text())
         if meta['slave_sha256'] != hashlib.sha256((ROOT/build/'F1GP.Slave').read_bytes()).hexdigest():
@@ -134,20 +134,26 @@ def acceptance():
         if custom and not result.get('relay_installed'):
             raise ValueError('missing enabled relay evidence')
         results[name] = result
-    subprocess.check_call([sys.executable, 'tools/test_disabled.py'], cwd=ROOT)
+    subprocess.check_call([sys.executable, 'tools/test_disabled.py',
+                           str(ROOT/'tmp/b4'/(prefix+'verify-off')),
+                           str(ROOT/'tmp/b4'/(prefix+'verify-on'))], cwd=ROOT)
     target.write_text(json.dumps(dict(status='PASS', negative_checks=True, cases=results),indent=2)+'\n')
     print('B4 PASS')
 
 
 def main():
-    if sys.argv[1:] == ['--check']:
-        acceptance()
-        return
-    if sys.argv[1:]:
-        raise ValueError('usage: slave_gate.py [--check]')
-    for name,build,custom in CASES:
-        capture(name,build,custom)
-    acceptance()
+    import argparse
+    import re
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--check', action='store_true')
+    parser.add_argument('--prefix', default='', help='new evidence name prefix under tmp/b4')
+    args = parser.parse_args()
+    if not re.fullmatch(r'[A-Za-z0-9_-]*', args.prefix):
+        parser.error('prefix must contain only letters, digits, underscores and hyphens')
+    if not args.check:
+        for name,build,custom in CASES:
+            capture(args.prefix+name,build,custom)
+    acceptance(args.prefix)
 
 
 if __name__=='__main__':

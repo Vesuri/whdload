@@ -484,8 +484,9 @@ CPU records are not timings. DMA counts can still be valid. The current selected
 040/060 timing cores expose this limitation; do not substitute zero for missing values.
 
 For a common-layout A8 comparison set `MATRIX_SKIP_INTRO=1` on **every** arm, including
-the control. This maps to the existing `CUSTOM1=1`; it avoids the frontend allocation
-difference observed when instant blits are enabled from boot. Keep the original-route
+the control. This maps to the existing `CUSTOM1=1`; it removes the observed 020 frontend allocation
+difference. It does not guarantee equal allocation on other CPUs: the 030 instant arm
+still fails the Fast-hunk layout check. Keep the original-route
 menu/whole-race evidence separately. After collecting both repeats of all four arms:
 
 ```sh
@@ -497,3 +498,13 @@ requires exact repeats, common binary/layout, enabled and disabled hook bytes co
 with the pinned relocated original, effective instant-blitter settings, and a measured
 frame rate in every arm. Use `MATRIX_SKIP_INTRO=1` together with the A8 variables above;
 never mix old-route and intro-skipping arms in one result.
+
+To recheck the current all-off captures without replacing the older B4 evidence:
+
+```sh
+python3 tools/slave_gate.py --check --prefix a8-
+```
+
+The prefix selects all four named cases and the corresponding negative-test fixtures;
+without `--check` it creates fresh captures with that prefix. Existing directories remain
+protected from replacement.

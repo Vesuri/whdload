@@ -58,8 +58,8 @@ failed captures leave no image or trace. F1GP pins that launcher.
 
 **Timing blocker:** the selected 040/060 cores produce field/DMA data but zero CPU
 instruction records. Their exact repeats are functional evidence, not timing acceptance.
-B5 gains and A8 ceilings on these CPUs require a shared-profiler decision. The corrected
-020 ceiling comparison passes with a common intro-skipping route.
+B5 gains and A8 ceilings on these CPUs require a shared-profiler decision. A500, A1200 and 020 ceiling comparisons pass with a common intro-skipping route.
+The user has chosen to keep AmigaXDev fixes deferred.
 
 **Control correction:** cache-off matrix arms now explicitly use `NoCache`; the original
 CPU policy can leave Fast RAM cacheable with an MMU. Old off runs lacking this override
@@ -76,7 +76,7 @@ Next steps, under the [current validation scope](plan.md#current-validation-scop
 3. **A8:** validate enabled no-wait/no-fill gates and matched instant-blitter controls, then
    measure each CPU's ceiling. All-off byte checks pass for all three build targets. The first 020 instant-blitter
    comparison failed the common-layout audit; intro-skipping recaptures fix it on 020
-   and are being checked on 030.
+   but the 030 instant arm still moves Fast hunks by 24 bytes.
 4. **C1–C6:** implement real-time ticks using A3 ownership and A5 publication rules.
 
 **A4** remains required before D.

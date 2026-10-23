@@ -24,8 +24,9 @@ def audit(root, machine):
         for p in pair:
             capture = json.loads((p/'capture.json').read_text())
             meta = json.loads((p/'meta.json').read_text())
-            identity = {key: capture[key] for key in ('machine', 'caches', 'build', 'runtime', 'fields')}
+            identity = {key: capture[key] for key in ('machine', 'setup', 'caches', 'build', 'runtime', 'fields', 'effective_cpu_report')}
             identity['hunk_bases'] = meta['hunk_bases']
+            identity['whd_control_options'] = [v for v in capture['whd_args'].split() if not v.startswith('CUSTOM3=')]
             if controls is None:
                 controls = identity
             if identity != controls:
