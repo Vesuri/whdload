@@ -9,7 +9,11 @@ DEVELOPER = 0
         IFND VERIFY
 VERIFY = 0
         ENDC
+        IFNE VERIFY
+slv_Version = 18             ; resload_Log is VERIFY-only
+        ELSE
 slv_Version = 17
+        ENDC
 slv_Flags = WHDLF_NoError|WHDLF_EmulPriv|WHDLF_ClearMem|WHDLF_Examine
 slv_keyexit = $59
 CHIPMEMSIZE = $80000
@@ -29,6 +33,7 @@ slv_copy dc.b '1991 Microprose',0
 slv_info dc.b 'Reconstructed loader',10,'Original install by Codetapper/Action!',0
 slv_config
         dc.b 'C1:B:Skip intro;'
+        dc.b 'C2:X:Enable CPU caches:0;'
         IFNE VERIFY
         dc.b 'C5:X:Verify pacer relay:0;'
         ENDC
@@ -48,6 +53,8 @@ assign4 dc.b 12,'F1GP_Disk_#4',0
         EVEN
 custom_tags dc.l WHDLTAG_CUSTOM1_GET
 skip_intro dc.l 0
+        dc.l WHDLTAG_CUSTOM2_GET
+cache_options dc.l 0
         dc.l 0
 game_size dc.l 0
         IFNE VERIFY
@@ -95,6 +102,18 @@ _bootdos
         lea (custom_tags,pc),a0
         move.l (_resload,pc),a2
         jsr (resload_Control,a2)
+        btst #0,(cache_options+3,pc)
+        beq.s cache_ready
+        ; Chip/IO data caching is inhibited by Amiga hardware. WT avoids
+        ; copyback requests there; Fast/Slave RAM may use copyback with MMU.
+        ; Keep 030 write allocation enabled (the game runs in user mode).
+        move.l #WCPUF_Base_WT|WCPUF_Exp_CB|WCPUF_Slave_CB|WCPUF_IC|WCPUF_DC|WCPUF_BC|WCPUF_SS|WCPUF_SB,d0
+        move.l #WCPUF_All,d1
+        jsr (resload_SetCPU,a2)
+cache_ready
+        IFNE VERIFY
+        bsr verify_cache
+        ENDC
         move.l (skip_intro,pc),d0
         bne.s load_game
         move.b $bfe001,d0
@@ -214,6 +233,30 @@ names_done
         rts
 
         IFNE VERIFY
+verify_cache
+        movem.l d0-a6,-(sp)
+        moveq #0,d0
+        move.l (_attnflags,pc),d1
+        btst #1,d1            ; AFF_68020: never MOVEC on a 68000
+        beq.s verify_cache_log
+        lea (read_cacr,pc),a5
+        move.l 4.w,a6
+        jsr (_LVOSupervisor,a6)
+verify_cache_log
+        move.l d0,-(sp)
+        lea (cache_log,pc),a0
+        move.l (_resload,pc),a2
+        jsr (resload_Log,a2)
+        addq.l #4,sp
+        movem.l (sp)+,d0-a6
+        rts
+read_cacr
+        machine 68020
+        movec cacr,d0
+        rte
+        machine 68000
+cache_log dc.b 'F1GP VERIFY CACR=%08lx',10,0
+        EVEN
 verify_pacer
         ; Stack-only tail call: no game register or X change. The original
         ; pacer's first MOVE replaces NZVC before those flags are consumed.

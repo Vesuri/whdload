@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _amigaxdev  # noqa: F401
 from amigaxdev import barto
 from amigaxdev.gdbserve import Server, require_harness
-from amigaxdev.input import Input
+from amigaxdev.input import Input as SharedInput
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -69,10 +69,30 @@ POLL = 25                  # fields between screen checks
 LIMIT = 6000               # fields to wait for any one screen (two minutes of PAL)
 
 
+class Input(SharedInput):
+    """Allow slow cycle-exact machines longer field-command deadlines locally."""
+    def __init__(self, g, log=None):
+        class FieldDeadline:
+            def cmd(self, command, timeout=30):
+                if command.startswith('monitor fields '):
+                    timeout = max(timeout, int(os.environ.get('F1GP_FIELD_TIMEOUT', '1800')))
+                return g.cmd(command, timeout=timeout)
+        super().__init__(FieldDeadline(), log=log)
+
+
 def screenshot(server, g):
     target = os.path.join(server.run_dir, 'route.bin')
-    g.cmd(f'monitor profile 1 "" "{target}"', timeout=1800)
-    return Image.open(io.BytesIO(barto.load(target).fields[-1].shot)).convert('RGB')
+    # A disconnected debugger must never turn the previous picture into a new
+    # successful field. This matters when diagnosing a stalled emulator.
+    if os.path.exists(target):
+        os.unlink(target)
+    reply = g.cmd(f'monitor profile 1 "" "{target}"', timeout=1800)
+    if not os.path.isfile(target):
+        raise RuntimeError(f'screenshot profile produced no trace: {reply}')
+    trace = barto.load(target)
+    if len(trace.fields) != 1:
+        raise RuntimeError('screenshot profile did not contain exactly one field')
+    return Image.open(io.BytesIO(trace.fields[0].shot)).convert('RGB')
 
 
 def showing(image, name):
@@ -100,6 +120,7 @@ def quickrace(server, g, rest, destination="race"):
     """Boot to the first race field.  Fire is pressed while waiting for the language
     dialog, which skips the intro (or clicks its prompt) when CUSTOM1 is not set."""
     g.stop()
+    g.cmd(f'set remotetimeout {max(120, int(os.environ.get("F1GP_FIELD_TIMEOUT", "1800")))}')
     # Field counts here and in race_profile/race_clock assume exact fields and gapless
     # profiles after a stop at a vsync.
     require_harness(g, 'key', 'fields', 'mouse', 'input', 'exact-fields', 'gapless-profile')

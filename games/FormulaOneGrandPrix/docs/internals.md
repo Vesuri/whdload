@@ -223,6 +223,78 @@ that timer. The automated launcher now supplies `CONFIGDELAY=0` as well as
 build initially hit bash 3.2's empty-array/nounset behavior; explicitly defining both
 build symbols fixed it. Neither failed attempt is counted as acceptance evidence.
 
+### B5: gated cache pilot — gate not passed
+
+`CUSTOM2` bit 0 requests instruction/data caches through `resload_SetCPU`, with
+BaseMem write-through and ExpMem/Slave copyback. The 030 write-allocation disable bit
+is clear because the game runs in user mode. This follows WHDLoad's documented Amiga
+hardware inhibition of Chip/IO data caching; it is not permission to cache DMA buffers
+on arbitrary hardware. WHDLoad's `NoCache` override remains effective. All CUSTOM bits
+zero retain the old CPU request and original hooked game bytes. Caches remain opt-in
+until B5 passes; no simulation/presentation patch is enabled.
+
+VERIFY requires slave API 18 and logs `CACR` using `resload_Log` after the cache request.
+The read runs through Exec Supervisor, guarded by WHDLoad's 68020 attention bit; the
+68000 never executes `MOVEC`. Release/developer builds retain API 17 and omit the audit.
+The installed runtime accepts **`FileLog`**, not `FileLog=1` despite the API autodoc's
+numeric-option description. The rejected numeric-option probe never launched the game.
+
+Inputs are pinned in `manifest/runtime-inputs.json` as well as the game/toolchain manifests.
+Emulator SHA-256: `ef14ed962d646ca4f85a29c184d86963a9e2a6a2a4de0ed745e8b6e413f6ec3f`.
+Release SHA-256: `93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`;
+VERIFY: `ceba5ad09b28dd8741df9e0725395655b0d4dffa484edeab9ac4f1d2acc327f8`.
+
+| Probe | Observation | Scope |
+|---|---|---|
+| 68020 + 8 MB Fast, caches requested | `CACR=$00000001`; Quick Race through results and finishing times; F10 returns OK | One whole-race pilot, not the full B5 matrix |
+| Same release, all CUSTOM bits zero | 50-field capture: original hook bytes, all eight loader/name checks and F10 pass | `tmp/b4/b5-release-off`; actual four-hunk layout retained |
+| 68030/50, MMU-capable emulator core, WHDLoad `NOMMU` | Startup stalls in indirect directory-drive handling | No language screen, no game/cache audit reached |
+| Verified 68030/50, explicit MMU=0 | Same indirect-drive semaphore wait after 84 seconds of host time; no language screen | Effective CPU and MMU checked before capture |
+| Invalid `68030-NOMMU` spelling | Effective CPU silently falls back to 68020; indirect-drive probes stall, direct/data-cache-off probe boots | All three rejected as 030 evidence; no 030 normal-speed conclusion |
+
+The failed startup probes' host stack samples show `filesys_iteration` → `trap_get_bytes` →
+`call_hardware_trap_back` waiting on a semaphore inside the emulation thread. The first
+25-field startup command stops making progress. Valid 030 samples cover both
+`m68k_run_mmu030` and `m68k_run_2ce`. The direct-drive control selected the wrong CPU
+and changed two coupled settings, so it does not establish the cause of the 030 stall.
+The host samples localize the observed wait to shared
+emulator startup, not to a demonstrated F1GP cache-coherency failure. A longer deadline
+cannot itself fix the sampled wait; the stalled runs were stopped using verified
+project-owned PIDs rather than allowed to occupy the entire deadline.
+
+Evidence is retained under `tmp/b5/`: `smoke020` (rejected option syntax), `smoke020b`,
+`020-on-clock`, `030-on-clock`, `030-nommu-on-clock`, `direct030-diagnostic` and
+`normal-speed030-diagnostic` (the latter three use an invalid 030 spelling and are
+rejected as 030 evidence). The runner now checks the emulator's effective CPU/MMU report
+and retains `debug.uae`; the valid 030 non-MMU override is `--uae_mmu_model=0 --cpu=68030`
+in that order. `030-effective-on-clock` retains the corrected, still-failing non-MMU
+030 capture and its host sample. Failure messages following deliberate emulator termination
+include input-release errors; the old screenshot helper could also reuse a stale trace
+and report a misleading screen timeout after disconnection. It now deletes the previous
+trace and requires a newly produced one-field capture. These messages are not additional
+game failures. Any `rejected-stale-failure.png` is also excluded: the shared shot
+command could reuse its old trace after disconnection. The runner no longer requests
+failure screenshots from a disconnected target. Stack samples and debugger logs are
+the evidence for the startup wait.
+
+The 020 clock pilot reached results after 20,703 fields from the cockpit route. Between
+sample fields 2,010 and 13,869 it counted 8.002 frames/s; the existing 128-ms/frame proxy
+would give 1.024×. Its winner was Senna, 4:58.855. This is neither a cache-gain comparison
+nor a new precise clock calibration. The early collector saved only hunk 0's base, so
+this pilot is **not** a complete A7 cell; the updated collector records all four hunks
+and saves partial samples as it goes.
+
+A separate uncached 020 whole-race control in `tmp/b5/020-off-clock` reaches results
+after 21,105 fields, logs `CACR=$00000000`, and quits OK. It validates the revised route
+and incremental clock collector, including the four-hunk metadata. It is not a matched
+per-scene gain measurement.
+
+**Gate: not passed.** Full 030 cache validation, 030 MMU, both 040/060 MMU variants and
+matched gains remain unmeasured. A7's paired green/tow/follow matrix is incomplete;
+A8's ceiling experiments have not started. Before continuing, decide whether to expand
+work into repairing/validating shared AmigaXDev indirect-drive startup. Disabling data-cache
+emulation is not an acceptable way to mark B5 complete. No shared tooling was modified.
+
 ## Executables
 
 `data/game` is the original hard-disk loader (assigns, `frontend`, then `f1gp`); the slave

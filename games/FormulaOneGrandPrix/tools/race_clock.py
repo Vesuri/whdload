@@ -76,8 +76,16 @@ def raceclock(server, g, rest):
     import f1gp
     out = os.path.abspath(rest.strip() or 'tmp/clock')
     os.makedirs(out, exist_ok=True)
-    route = f1gp.quickrace(server, g, '')
+    route = f1gp.quickrace(server, g, os.path.join(out, 'route.jsonl'))
     h0 = find_hunk0(server, g)
+    bases = [h0]
+    for _ in range(3):
+        reply = g.cmd(f'x/wx {bases[-1]-4:#x}')
+        bases.append(int(reply.split(':', 1)[1].strip(), 16)*4+4)
+    meta = dict(setup=os.environ.get('AMIGA_SETUP', ''), h0=h0, hunk_bases=bases,
+                step=STEP, route=route, status='INCOMPLETE', samples=[])
+    meta_path = os.path.join(out, 'samples.json')
+    json.dump(meta, open(meta_path, 'w'), indent=1)
     samples, field, frames, last, green = [], 0, 0, None, None
     while field < LIMIT:
         g.cmd(f'monitor fields {STEP}', timeout=1800)
@@ -96,13 +104,14 @@ def raceclock(server, g, rest):
             image.save(os.path.join(out, 'green.png'))
         samples.append(dict(field=field, frames=frames, minimum=minimum, work=work,
                             counter=counter, state=state))
+        meta.update(samples=samples, green=green)
+        json.dump(meta, open(meta_path, 'w'), indent=1)
         if state == 'results':
             image.save(os.path.join(out, 'results.png'))
             break
     else:
         raise TimeoutError(f'no results screen within {LIMIT} fields')
-    from amigaxdev.input import Input
-    with Input(g) as c:
+    with f1gp.Input(g) as c:
         f1gp.click(c, f1gp.OK['times'])
         for _ in range(200):
             c.fields(25)
@@ -112,9 +121,8 @@ def raceclock(server, g, rest):
                 break
         else:
             raise TimeoutError('no finishing times screen')
-    meta = dict(setup=os.environ.get('AMIGA_SETUP', ''), h0=h0, step=STEP, route=route,
-                green=green, results=field, samples=samples)
-    json.dump(meta, open(os.path.join(out, 'samples.json'), 'w'), indent=1)
+    meta.update(green=green, results=field, samples=samples, status='COMPLETE')
+    json.dump(meta, open(meta_path, 'w'), indent=1)
     fps = (samples[-1]['frames'] - samples[0]['frames']) * 50 / (samples[-1]['field'] - samples[0]['field'])
     return (f'results@{field} (fields after the quickrace stop, to {STEP}-field steps; green '
             f'seen at {green}); {samples[-1]["frames"]} frames, {fps:.2f} frames/s; h0 {h0:#x}')

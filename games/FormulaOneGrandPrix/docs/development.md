@@ -377,3 +377,51 @@ trace inputs, requires every observed renderer store PC to appear in the static 
 runs the negative checks and writes `acceptance.json`. It starts as `INCOMPLETE`, never
 retaining an old PASS after a failed rerun. It does not start an emulator. The auxiliary
 traces are explicitly separate from the breakpoint captures; retain their same-run dumps.
+
+## Cache and machine-matrix pilot (B5/A7)
+
+B5 has not passed; see the startup blocker in internals. The cache option is
+`CUSTOM2=1`. Build with the existing release/developer/VERIFY targets. VERIFY uses
+API 18 solely for `resload_Log`; enable `FileLog` (a switch in the pinned runtime).
+The cache register is logged after the policy request, before loading the intro/game.
+It is a point observation, not proof of every later memory page's cacheability.
+
+```sh
+. amiga/env.sh
+make check slave slave-developer slave-verify
+python3 tools/machine_matrix.py 020 on clock tmp/b5/new-020-on-clock
+python3 tools/machine_matrix.py 030 on clock tmp/b5/new-030-on-clock
+# After the shared startup blocker has been resolved:
+python3 tools/machine_matrix.py 020 off green tmp/a7/020-off-green 100
+```
+
+The serial runner accepts machines `a500`, `a1200`, `020`, `030`, `030-mmu`, `040`,
+`040-mmu`, `060`, `060-mmu`; cache policy `on|off`; and `clock|green|tow|follow`.
+It defaults to the VERIFY slave; `MATRIX_SLAVE` selects another built variant.
+It checks the game, runtime and build hashes before boot, rejects active sockets and
+existing output directories, removes stale sockets, and waits for the new server's
+`serving on` message. Evidence includes runtime/build/tool hashes, options, screenshots,
+logs, clean-quit status and failure text. `CAPTURED` means capture succeeded, **not** gate
+acceptance. The runner does not yet implement an A7/A8 acceptance report.
+
+The 030 non-MMU timing cell explicitly removes the emulator MMU model as well as passing
+WHDLoad `NOMMU`: `--uae_mmu_model=0 --cpu=68030`, in that order.
+`68030-NOMMU` is unsupported and silently selects a 68020; the runner rejects such
+effective-CPU mismatches before advancing the route. The 040/060 timing cells explicitly select the non-MMU, cycle-exact cores.
+MMU cells are functional tests, not fixed-clock speed claims. Check effective emulator
+settings in the retained debug log before using measurements. No post-B5 timing claims
+have been established by this runner.
+
+Local input field commands now allow 1800 seconds by default (`F1GP_FIELD_TIMEOUT`
+overrides it); this does not repair an emulator semaphore wait. Screenshot collection
+requires a new one-field trace and fails after a debugger disconnection instead of
+reusing a stale image. `raceclock` retains the route, actual four-hunk layout and partial
+samples with `INCOMPLETE` status; only reaching results and the finishing-times screen
+sets `COMPLETE`. Read `capture.json` as well: a complete clock capture with failed quit
+is not an accepted run.
+
+All uncalibrated profiles request `RACE_LEADS=0,0,0`. **The existing follow-banner detector
+still needs review before those captures can be accepted:** with zero follow lead it can
+select the tow scene's own Viewing banner. Anchor the next camera transition by actual
+screen/game state; do not promote a mislabeled follow window. The existing B3/A3 calibrated
+follow evidence is separate. No uncalibrated A7 follow captures have been accepted.
