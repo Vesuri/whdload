@@ -10,6 +10,11 @@ and:
   quickrace [log]    from boot, drive the menus into a Quick Race at Silverstone and stop
                      at the first race field; optional log file of every input sent.
                      ROUTE_SHOTS=dir (server environment) saves every polled screenshot
+  startup [log]      boot to the startup menu, with the same screen checks
+  practice [log]     Main Menu -> Practise any Circuit -> Silverstone -> cockpit
+  qualifying [log]   Main Menu -> Non-Championship Race -> Silverstone -> Qualifying
+  menuclick X Y      click a screenshot coordinate using the homed pointer
+  tap RAW [FIELDS]   press a hexadecimal raw key for FIELDS (default 25), then release
   raceprofile PHASE DIR [FIELDS]
                      quickrace, then profile FIELDS (default 500) fields from the green
                      light, the retirement/towing scene or the follow camera
@@ -36,6 +41,9 @@ os.environ.setdefault('FSUAE', os.environ.get('FSUAE_ARM')
 # Screens, as pixels of a one-field trace screenshot (754x576; one mouse count moves the
 # pointer one pixel in both axes).  Each colour is a dialog element the pointer never covers.
 SCREENS = {
+    'main': {(320, 85): 0xffffff, (380, 85): 0xffffff, (340, 95): 0xffffff},
+    'circuit': {(260, 105): 0xffffff, (340, 105): 0xffffff, (460, 105): 0xffffff},
+    'weekend': {(260, 125): 0xffffff, (380, 125): 0xffffff, (300, 135): 0xffffff},
     'language':   {(555, 258): 0xeecc00, (235, 240): 0xbb0000},     # German, UK flags
     'protection': {(395, 200): 0xbb0000, (555, 258): 0x667799},     # UK flag, no German
     'startup':    {(170, 275): 0xcc0000, (600, 275): 0x667799},     # Quick Race selected
@@ -86,7 +94,7 @@ def click(c, target):
     c.button('JOY1_FIRE_BUTTON', False)
 
 
-def quickrace(server, g, rest):
+def quickrace(server, g, rest, destination="race"):
     """Boot to the first race field.  Fire is pressed while waiting for the language
     dialog, which skips the intro (or clicks its prompt) when CUSTOM1 is not set."""
     g.stop()
@@ -137,14 +145,51 @@ def quickrace(server, g, rest):
             tap(c, KEY_A)
             tap(c, KEY_RETURN)
             wait_for('startup', lambda: c.fields(POLL))
-            click(c, OK['startup'])
+            if destination == 'startup':
+                return ' '.join(trail) + ' (CPU stopped)'
+            if destination in ('practice', 'qualifying'):
+                click(c, (500, 275))
+                click(c, OK['startup'])
+                wait_for('main', lambda: c.fields(POLL))
+                click(c, (395, 252 if destination == 'practice' else 290))
+                wait_for('circuit', lambda: c.fields(POLL))
+                click(c, (530, 246))
+            else:
+                click(c, OK['startup'])
             wait_for('track', lambda: c.fields(POLL))
             click(c, OK['track'])
+            if destination == 'qualifying':
+                wait_for('weekend', lambda: c.fields(POLL))
+                click(c, (395, 252))
             wait_for('race', lambda: c.fields(POLL))
     finally:
         if log:
             log.close()
     return ' '.join(trail) + ' (fields since the command; CPU stopped)'
+
+
+def menuclick(server, g, rest):
+    x, y = map(int, rest.split())
+    if not (HOME[0] <= x < 714 and HOME[1] <= y < 454):
+        raise ValueError('target outside game screen')
+    g.stop()
+    with Input(g) as c:
+        click(c, (x, y))
+    return 'clicked; CPU stopped'
+
+
+def tap_key(server, g, rest):
+    args = rest.split()
+    raw = int(args[0], 16)
+    fields = int(args[1]) if len(args) == 2 else 25
+    if len(args) not in (1, 2):
+        raise ValueError('tap RAW [FIELDS]')
+    g.stop()
+    with Input(g) as c:
+        c.key(raw, True)
+        c.fields(fields)
+        c.key(raw, False)
+    return 'released; CPU stopped'
 
 
 def raceprofile(server, g, rest):
@@ -163,7 +208,11 @@ def raceclock(server, g, rest):
 # second instruction of the Kickstart 3.1 reset code in both host ROMs.
 os.environ.setdefault('BOOT_BREAK', '0xf800d6')
 server = Server('f1gp', root=ROOT, profile_window=False,
-                commands={'quickrace': quickrace, 'raceprofile': raceprofile,
+                commands={'quickrace': quickrace, 'menuclick': menuclick, 'tap': tap_key,
+                          'startup': lambda s, g, r: quickrace(s, g, r, 'startup'),
+                          'practice': lambda s, g, r: quickrace(s, g, r, 'practice'),
+                          'qualifying': lambda s, g, r: quickrace(s, g, r, 'qualifying'),
+                          'raceprofile': raceprofile,
                           'raceclock': raceclock})
 
 if __name__ == '__main__':

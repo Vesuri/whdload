@@ -213,3 +213,33 @@ records WHDLoad's return as `OK` or `FAIL` in `amiga/.run/dh0/whdload-exit.txt` 
 returns. A missing marker is not a pass. Save that evidence in ignored `tmp/b3/` before
 another launch replaces the disposable hard drive. Check the returned screen as well,
 then quit the project server normally.
+
+## Other live modes and call counts (A2)
+
+From a fresh deterministic server using the B3 slave, use `practice LOG` or
+`qualifying LOG` in place of `quickrace LOG`. Both recognize the main menu,
+circuit selector and track; qualifying also recognizes the Grand Prix menu.
+`startup LOG` stops before selecting either startup option. `menuclick X Y` and
+`tap RAW [FIELDS]` expose the same native input helpers for modal transitions.
+
+At a screen-anchored cockpit stop, dump fast RAM with the debugger, then capture:
+
+```sh
+python3 tools/f1gp.py gdb 'dump binary memory tmp/a2/fast.bin 0x200000 0xa00000'
+python3 tools/f1gp.py profile 50 "$PWD/tmp/a2/session.bin"
+python3 tools/loop_profile.py tmp/a2/session.bin tmp/a2/fast.bin
+```
+
+The raw trace, same-run RAM dump, JSON counts and endpoint screenshots stay in `tmp/`.
+The reducer locates actual code hunks; it does not borrow addresses from another build.
+It verifies game input pins and records capture hashes. Save the route log, setup and
+slave hash alongside each fresh-boot capture. The example RAM range is for the 8 MB
+fast-RAM preset; it is a debugger capture range, not a documented game-code address.
+
+Replay: in qualifying, press Space (`tap 40`), advance 10 fields to consume its release,
+then R (`tap 13`); confirm the red R before profiling. Return: leave replay, press Escape
+(`tap 45`), wait for **Qualifying Frozen**, then `menuclick 395 214` (Return to Cockpit).
+Start contiguous profiles immediately after that click; the redraw occurs during the
+transition, before the stable cockpit. Six 50-field chunks captured it exactly once.
+Do not start the trace at a breakpoint on the draw: the profiler begins at a field
+boundary and can omit the call at the breakpoint. Use screen-anchored transitions.

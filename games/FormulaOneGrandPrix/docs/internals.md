@@ -199,8 +199,7 @@ driving and was never retired.
 ## Race main loop
 
 During the race the game runs one loop pass per frame at hunk 0 `$3C8F6–$3CA56` (the
-only one of three similar loops that executed in the green, tow and follow windows; the
-others, at `$3C652` and `$3CC40–$3CD0C`, are not yet identified). One pass:
+live driving loop, also used by practice and qualifying). One pass:
 
 1. `$3C8F6–$3C93C`: a timer check against a 2000 × factor deadline;
 2. short calls `h0+396AC`, `h0+64`, `h0+34D24`, `h0+3BBF6`, `h0+39654`, `h0+3B5DE`, then
@@ -226,6 +225,55 @@ frame's cycles outside the pacer's wait):
 
 On `a1200-fast` the tow and follow windows spend 63.4% and 58.7% of all cycles in
 drawing and 9.8% and 4.9% in the per-car update.
+
+### A2: live sessions, replay and cockpit return
+
+The three draw/pacer pairs are **two loops and a one-time redraw**, not three
+independent session modes. Verified on the supplied 582992-byte game and the B3
+6100-byte modern slave, `a1200-fast`, deterministic reset, no joystick sources:
+
+| Path reached through native controls | h0 draw call | h0 pacer call | Behavior |
+|---|---|---|---|
+| Quick Race; Practise any Circuit; Non-Championship → Qualifying | `$3C9BA` | `$3C9D2` | Loop head `$3C8F6`, back edge `$3CA56`; per-car update at `$3C98E`. |
+| Space, then R while paused (red R appears) | `$3CCE8` | `$3CD06` | Replay head `$3CC40`, back edge `$3CD0C`; update at `$3CCC6`. |
+| Escape → Qualifying Frozen → Return to Cockpit | `$3C652` | `$3C65E` | Entry routine `$3C5C6`, called at `$3C8D2`, draws once and returns at `$3C66A`. No local back edge. |
+
+These are all callers of `h0+$1272` and `h2+$280F6` in the supplied executable:
+each target has exactly three relocated longword references in the two code hunks,
+all operands of these absolute JSRs. The disassembly has no additional direct BSR/JSR
+callers. No extra attract loop was found; this is not a full attract-mode play-test.
+
+The entry routine tests `h2+$2A72C` at `h0+$3C5F8`, clears it at +$3C602, and takes
+the one-time redraw path when resuming a session. A fresh session can bypass that path.
+Replay is entered from live code at `h0+$3C984` through +$3CBD6. Its exit at +$3CCB6
+returns to live +$3C962. Both live and replay call `h0+$2AC14`; replay must not be
+classified as pure presentation merely because it shows recorded action. Pausing with
+Space is consumed inside `h0+$3B5DE`, not a fourth draw/pacer pair. A3 must audit these
+paths and their state writes before retiming them.
+
+Call-site execution counts from raw profiles (`tools/loop_profile.py`):
+
+| Capture | Fields | Entry draw / pacer | Live update / draw / pacer | Replay update / draw / pacer |
+|---|---:|---:|---:|---:|
+| Fresh Quick Race cockpit | 50 | 0 / 0 | 8 / 8 / 8 | 0 / 0 / 0 |
+| Fresh practice garage | 50 | 0 / 0 | 8 / 8 / 8 | 0 / 0 / 0 |
+| Fresh qualifying garage | 50 | 0 / 0 | 8 / 8 / 7 | 0 / 0 / 0 |
+| Qualifying replay, red R visible | 50 | 0 / 0 | 0 / 0 / 0 | 8 / 8 / 8 |
+| Return to cockpit, six contiguous 50-field chunks | 300 | 1 / 1 | 9 / 9 / 9 | 0 / 0 / 0 |
+
+The qualifying window ends between a draw and its pacer; partial iterations at window
+edges explain unequal counts. These are call counts, not new performance measurements.
+The return's first four chunks contain neither pair, the fifth contains its sole entry
+pair, and the sixth runs the live loop. A rejected breakpoint-started capture missed
+the draw before the profiler's first field boundary; it is not used for that count.
+
+Evidence is in `tmp/a2/route-{quickrace,practice,qualifying}`, `tmp/a2/replay.bin`
+and `tmp/a2/resume-route`. Reports retain trace/dump hashes and actual hunk bases;
+route captures retain the command log and slave hash. Fresh menu-route field counts:
+practice reaches main/circuit/track/cockpit at 1622/1817/2016/2523;
+qualifying reaches the same first three, weekend at 2367 and cockpit at 2718.
+Quick Race remains 807/1184/1413/1608/2115. These counts describe these commands and
+build only; the route recognizes screens rather than waiting those numbers.
 
 ## Memory and the chip bus
 
