@@ -137,6 +137,25 @@ delete them afterwards).
 read, write) and region, counts misaligned longwords and compares slot use inside and
 outside the bitplane lines: `KEEP_TRACE=1 python3 tools/route_profile.py tmp/prof/bus` then
 `python3 tools/bus_audit.py tmp/prof/bus 175` (about 3 GB of chunks; delete them afterwards).
+Its last table names the remaining traffic by place: code fetches per Disk.1 4 KB page and
+data per named chip range (vectors, render scratch, game variables) or 4 KB page, with the
+VERTB counter poll and display writes apart. A 275-field route
+(`ROUTE='175:,60:JOY2_UP,40:JOY2_RIGHT'`) keeps about 1.4 GB.
+
+`tools/render_profile.py PROFILE_DIR [ROOT ...]` turns a route profile into cycles per
+published frame for each drawing call and a callee tree (Disk.1 offsets; `SLAVE_LST=` names
+slave routines from a vasm listing, `-L FILE`). `route_profile.py` records the live
+`ws_ExpMem` in `route.json` and reads code the slave copied there (M1, S3; mapped by
+`tools/relocation.py`) as its chip original, so calls inside copies are recognised.
+
+`tools/beam_profile.py OUT.json ROOT ...` times routines on any CPU from beam positions at
+entry and return: the instrument for the 030/040/060, which record no instruction profile.
+Roots are Disk.1 offsets or slave symbols (`SLAVE_LST=`); copies in expansion memory are
+caught too. Nested roots are not counted inside an outer root, so probe each level in its
+own run. `PROBE_FIELDS=175:500` limits probing to gameplay (not `WINDOW`, which `run.sh`
+uses). Example, reference 030/50:
+`AMIGA_SETUP=a1200-030 SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM1=131071' SLAVE_LST=tmp/f1/slave.lst PROBE_FIELDS=175:500 python3 tools/beam_profile.py tmp/f1/top.json 577be 5765e 5afaa 593a6 5e840 5e458 _savepresent _restorepresent`
+(about 20 s per run).
 
 The `VERIFY` build's `Custom2` makes drawing routines return at once (see
 [the frame budget](internals.md#frame-budget-toward-50-fps)): compare `fps.py` runs with

@@ -10,6 +10,8 @@ whether the access is an instruction fetch (extra 0) or data (extra 1). This spl
 chip accesses by kind and by memory region, counts misaligned longwords, and compares slot use
 inside the bitplane fetch window with the rest of the field. From FIRST_FIELD (default 175:
 gameplay). Instruction records give the CPU cycles per field for the cost estimate.
+Last, the remaining traffic by place: the VERTB counter poll and display-buffer writes apart,
+code fetches per Disk.1 4 KB page and data accesses per named range or 4 KB chip page.
 """
 import collections
 import os
@@ -30,6 +32,24 @@ SLOTS, LINES = 227, 313
 WINDOW = range(0x2c, 0xf4)
 
 
+# Named chip ranges for the per-place breakdown (docs/internals.md: P1 restore set, M2).
+PLACES = ((0, 0x340, 'vectors, $C0 calls'), (0x340, 0x4000, 'render scratch'),
+          (0x5350, 0x8000, 'game variables'))
+
+
+def place(kind, a):
+    if a in (0x529f4, 0x529f6):
+        return 'VERTB counter $529F4 (publication wait)'
+    if 0x68000 <= a < 0x80000:
+        return 'display buffers, stack'
+    if kind == 'fetch' and IMAGE <= a < IMAGE_END:
+        return f'code, Disk.1 page ${(a + 0x3cb0) & ~0xfff:05x}'
+    for lo, hi, name in PLACES:
+        if lo <= a < hi:
+            return f'{name} ${lo:05x}..${hi - 1:05x}'
+    return 'custom chips' if a >= 0xdff000 else f'chip page ${a & ~0xfff:05x}'
+
+
 def region(a):
     for lo, hi, name in REGIONS:
         if lo <= a < hi:
@@ -46,6 +66,7 @@ def main():
     sizes = collections.Counter()           # (kind, size) -> accesses
     misaligned = collections.Counter()      # kind -> long accesses at an address = 2 mod 4
     slots = {True: collections.Counter(), False: collections.Counter()}  # in window -> type
+    places = collections.Counter()          # (kind, place) -> accesses
     nfields = cycles = 0
     for name in chunks:
         t = barto.load(os.path.join(d, name))
@@ -66,6 +87,7 @@ def main():
                 assert not (kind == 'write' and not dma[i + 31]), (name, hex(reg))
                 width = 4 if reg & 4 else 2 if reg & 2 else 1
                 kinds[(kind, region(addr))] += 1
+                places[(kind, place(kind, addr))] += 1
                 sizes[(kind, width)] += 1
                 if width == 4 and addr & 2:
                     misaligned[kind] += 1
@@ -89,6 +111,10 @@ def main():
         n = sum(slots[inside].values())
         print(f'  {"inside " if inside else "outside"} '
               + '  '.join(f'{DMA_NAMES.get(k, k)} {100 * v / n:.1f}%' for k, v in sorted(slots[inside].items())))
+
+    print('By place (top 30):')
+    for (k, p), n in places.most_common(30):
+        print(f'  {k:10} {p:42} {n / nfields:9,.0f} per field')
 
 
 if __name__ == '__main__':

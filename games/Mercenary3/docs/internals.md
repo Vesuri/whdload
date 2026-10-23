@@ -1232,6 +1232,73 @@ was introduced in S5/S6. Fresh options-off and shipped runs both give 37 A500 fr
 The existing deferred map/vehicle/flight coverage gap remains. Evidence: `tmp/s6/`,
 S4's same-build cadence/world/play checks, and S5's 020 profile.
 
+### F0: one-field frame budget (030/50)
+
+Measured on the current build, VERIFY with all Enhanced framerate features (`Custom1=131071`),
+standard route. Per-frame costs come from two instruments: the 020 instruction profile
+(`route_profile.py`, read with `render_profile.py`; calls inside fast-RAM copies are now
+recognised) and beam-timed entry/return probes on the reference 030/50
+(`beam_profile.py`, fields 175..500, 163 frames, 25.1 fps). Evidence: `tmp/f1/`.
+
+**Work per frame on the 030/50.** Publication interval minus the native publication call:
+mean 24.9 ms, 21.5..27.4 ms per interval. One-field frames need every frame under 20 ms.
+A presentation frame does the same drawing as a logic frame plus the save and restore
+(7.1 ms), so presentation frames are about 28 ms and logic frames about 21.5 ms.
+
+| Work (Disk.1 / slave) | 030/50 ms per frame | 020 cycles per frame |
+| --- | ---: | ---: |
+| Main 3D `$577BE` | 9.6 | 423,859 |
+| - rooms `$5F438` | 4.0 | 28,156 |
+| - objects `$57BF4` (7 calls outside rooms) | 4.0 | 194,481 |
+| - interior detail `$5836A` | 1.1 | 31,092 |
+| - edges `$5FDCC` outside rooms (16 calls, chip-resident) | 2.1 | 87,914 |
+| Scene setup `$5765E` (`$536FE` 2.0 ms) | 2.4 | 115,365 |
+| `$5AFAA` (`$53440` 1.1 ms) | 2.3 | 101,974 |
+| `$593A6` | 1.4 | 53,133 |
+| Clear `$5E840` | 0.9 | 25,029 |
+| Staging copy (`_stagepublish` minus `$5E460`) | 3.3 | 61,510 |
+| Save + restore, per presentation | 3.7 + 3.4 | (no presentations on the 020) |
+| Native publication incl. field wait `$5E460` | 15.0 | 196,294 |
+
+The 020 runs at 12.5 fps (4 fields per frame); its L1 gate waits another 113,720 cycles
+per frame. Its profile covers fields 0..500, the probes 175..500. The room path's share
+differs most: 6.6% of main 3D on the 020, 42% on the 030. Its code (Disk.1 page `$5F000`,
+with `$5FDCC`) runs from chip RAM, the most-fetched chip page below, and a chip fetch costs
+the 50 MHz 030 many more cycles than the 14 MHz 020. Beam times include interrupts; per-call times under about 0.1 ms read high
+(`$5C096`, 37 calls per frame, sums above its caller), so treat them as upper bounds.
+The 020 profile has no single hot loop left: no 64-byte window above 2.6% outside the
+field wait. Shared kernels, summed over callers (020): log-domain multiply and projection
+`$5B038` 113k cycles per frame (10%), log conversion `$4EE84`/`$4EE88` 62k (5.5%; a
+compare-and-shift search for the leading bit), `$5C046` 38k, `$5C096` 36k.
+
+**Chip-bus traffic left.** `bus_audit.py` on the same build (020, fields 175..275): apart
+from the VERTB counter poll (8,429 reads per field, the waits) and the staging writes
+(1,363), the CPU still makes about 5,200 chip accesses per field, about 21,000 per frame:
+
+| Place | Accesses per field (020) |
+| --- | ---: |
+| Code fetches from chip-resident game code | 1,943 |
+| - Disk.1 pages `$5F000` 353, `$5E000` 232, `$4E000` 157, `$5A000` 157, `$5D000` 148, `$4B000` 144, `$5B000` 100, `$56000` 91, `$55000` 89, `$59000` 80, `$60000` 80, `$0C000..$0DFFF` 58 | |
+| Game variables, chip `$5350..$7FFF` (read / write) | 838 / 297 |
+| Render scratch, chip `$0340..$3FFF` (read / write) | 479 / 329 |
+| Renderer state and projection constants, chip `$42000` page (`$42C00..$42F3F`) | 513 |
+| Other game-image data pages (`$49000`, `$0A000` read and write, `$04000`, `$37000`, `$28000`, ...) | about 700 |
+| `$C0` indirect-call vectors | 136 |
+
+The `$5B000` and part of the `$4E000` fetches are chip entry jumps into M1 copies (and
+the two instructions `$4EE84` keeps in chip). The `$0C000..$0DFFF` code is the per-colour,
+per-octant line plotters, entered by computed jumps.
+
+Cost per chip access on the 030/50: the copy loops measure 0.61 µs per longword written
+(staging), 0.85 µs read (save) and 0.78 µs written (restore), with the bus saturated.
+Scattered accesses cost less: subtracting the measured copies and a compute estimate (the
+020's non-chip cycles at 50 MHz, about 12 ms) from the 24.9 ms leaves about 6 ms, about
+0.3 µs per access. Chip traffic is therefore an estimated **6..12 ms per frame** on the
+030/50, the largest reducible block after the presentation copies. It does not shrink with
+a faster CPU: on a real 68040/060 the same accesses cost about the same time while the
+computation shrinks, so the same reductions apply there. The 040/060 cells cannot confirm
+that (their timing does not follow the CPU frequency).
+
 ### WHDLoad launch configuration
 
 WHDLoad 20.1 rejected the comma in the first Custom1 checkbox label; labels cannot

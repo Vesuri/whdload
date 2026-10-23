@@ -19,8 +19,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _amigaxdev  # noqa: F401
+from amigaxdev import callprofile
 from amigaxdev.callprofile import Reduction
 from amigaxdev.input import Input
+from relocation import Map
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHIPPED = os.path.join(ROOT, 'tmp/game/Mercenary3_v1.2_0356/Mercenary3/Mercenary3.Slave')
@@ -68,6 +70,7 @@ SLAVE_SYMBOLS = {0x27c: '_dmaon', 0x28e: '_diskload', 0x298: '_patch_vertb',
 FAST = (0xc00000, 0xd80000) if os.environ.get('AMIGA_SETUP', 'a1200-fast').startswith('a500') \
     else (0x200000, 0xa00000)
 slave_base = None
+reloc = Map(None)
 
 # (fields, joystick directions held), 500 fields (10 s PAL) from the game's entry. The door
 # opens on the game clock; walking earlier reaches it while still closed ("LOCKED").
@@ -87,6 +90,7 @@ CHUNK = int(os.environ.get('CHUNK', '50'))
 def label(pc):
     if isinstance(pc, str):
         return pc
+    pc = reloc.to_chip(pc)
     if IMAGE <= pc < IMAGE_END:
         return f'D1:{pc + DISK_DELTA:05x}'
     if pc < 0x200000:
@@ -294,6 +298,18 @@ def main():
     log = []
     with session(boot_timeout) as (g, runtime), deadline(run_timeout, 'profile route'):
         require_instruction_backend(runtime['machine'])
+        locate_slave(g, out)
+        # WHDLoad writes the allocated expansion memory into the live header's ws_ExpMem
+        # (slave offset $20). Code the slave copied there is read for calls, and labelled,
+        # as its chip original: the reducer only reads chip, slow and ROM memory.
+        expmem = 0
+        if int.from_bytes(CODE[12:14], 'big') >= 8:      # ws_Version: header has ws_ExpMem
+            expmem = int(g.cmd(f'x/1xw {slave_base + 0x20:#x}').split(':')[1].split()[0], 16)
+        global reloc
+        reloc = Map(expmem)
+        native = callprofile._opkind
+        callprofile._opkind = lambda t, pc, cache: (
+            0 if reloc.island(pc) else native(t, reloc.to_chip(pc), cache))
         red, shots, field = Reduction(marks=MARKS), [], 0
         controls = Input(g, log=log.append)
         for fields, held in ROUTE:
@@ -319,11 +335,10 @@ def main():
             for name in held:
                 controls.button(name, False)
         counter_end = int(g.cmd("x/1xh 0x7180").split(":")[1].split()[0], 16)
-        locate_slave(g, out)
         red.save(os.path.join(out, 'profile.pkl.gz'))
         meta = dict(runtime, mode='profile',
                     entry=f'{ENTRY:#x}', chunk=CHUNK,
-                    counter_end=counter_end,
+                    counter_end=counter_end, expmem=f'{expmem:#x}',
                     slave_base=None if slave_base is None else f'{slave_base:#x}', route=ROUTE, input=log,
                     run_timeout=run_timeout)
         json.dump(meta, open(os.path.join(out, 'route.json'), 'w'), indent=1)

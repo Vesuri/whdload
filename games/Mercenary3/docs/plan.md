@@ -25,6 +25,8 @@ are in order of value; take the first one not done whose dependencies are met. D
   without it ([frame budget](internals.md#frame-budget-toward-50-fps)). Those cores record no
   instruction profile. Routine-entry/return video-beam timing also measures inclusive
   elapsed costs on the 040; see the [current breakdown](internals.md#68040-frame-budget-after-p5).
+  `beam_profile.py` does that for any routine on any CPU, and `render_profile.py` splits
+  the 020 profile per routine ([F0](internals.md#f0-one-field-frame-budget-03050)).
   The cycle-exact 030/50 remains the reference fast machine (S0, user decision).
 - **Check the game still works** with three tests, not more:
   1. **Options off:** the performance slave gives the shipped slave's frame count in the
@@ -212,6 +214,79 @@ a large share on fast cells, decide R3 (triple buffering) with the numbers.
 **S6. ✓ Budget checkpoint.** `matrix.sh` with all options, the frame budget table
 again, and the S0 target check. Record what limits each cell next.
 
+### F. One-field frames on the 030/50 (the 50 fps step)
+
+[F0](internals.md#f0-one-field-frame-budget-03050) measured the current build. On the
+030/50 a frame's work is 24.9 ms on average (21.5..27.4); presentation frames, which also
+save and restore, are about 28 ms. 50 fps needs every steady frame under 20 ms: about
+8 ms less on the worst frames. Measured candidates: the presentation copies (7.1 ms per
+presentation) and the staging copy (3.3 ms, kept); estimated: chip-bus traffic by the CPU,
+about 21,000 accesses per frame, 6..12 ms. Steps are in order of measured value and cost.
+"Expected" figures are estimates for the step to confirm or refute.
+
+For every step, on the reference 030/50: `beam_profile.py` on the routines the step changes,
+before and after, and the publication intervals (roots `5e460`, as in F0); `fps.py` and
+`PER_FRAME=1` cadence. On the 020: `bus_audit.py` where the step targets chip traffic. New
+behaviour takes the next free `Custom1` bit (17 up); add it to the release mask (`$1FFFF`)
+once accepted.
+
+**F0. ✓ Budget.** `render_profile.py`, `beam_profile.py`, `bus_audit.py`'s place table,
+relocation-aware `route_profile.py`; results in internals.
+
+**F1. Restore once per logic pass.** Each presentation now saves and restores the 17,366-byte
+set (3.7 + 3.4 ms). Save at the first presentation after a logic pass only; later
+presentations draw on the scratch the previous one left, as consecutive native frames do;
+restore once, just before the next logic pass runs, and at snaps and mode changes. Logic still
+sees exactly the state its own frame left.
+- Check: P1's hash at the restore point (state before the pass equals the saved state);
+  world speed; play: starts, stops, mailbox, lift, vehicle, flight.
+- Expected: worst frame −3.4 ms (presentations about 28 → 25 ms; logic frames take the
+  restore, about 21.5 → 25 ms).
+
+**F2. The remaining hot code in fast RAM** (extends S3). Chip code fetches are 1,943 per
+field on the 020; the room path, whose code is in chip, is 6.6% of main 3D on the 020 but
+42% on the 030.
+- Move the routines behind F0's fetch pages, largest first: Disk.1 page `$5F000` (room
+  path `$5F438`, edges `$5FDCC`), the clear (`$5E840..`), `$5D000` (camera and view setup),
+  `$5A000`, `$4B000`/`$4C000`, `$56000`, `$55000`, `$59000`, `$60000`, and the line plotters
+  `$0C000..$0DFFF` with their computed-jump table. Delimit routines with `render_profile.py`
+  and the disassembly; relocate with S3's tables (operands, islands, entries; moved mutable
+  words join P1's restore set). Keep the main loop and the patched call sites in chip.
+- Remove chip hops: point copied callers straight at copies, including M1's entry jumps
+  (`$5B030`, `$5B038`, `$5B050`) and the two instructions `$4EE84` keeps in chip.
+- Check: play, options off, world speed, P1 hash, still-scene screenshots off/on identical.
+- Measure: `bus_audit.py` fetches (aim: a few hundred per field), beam `577be 5f438 5e840`.
+- Expected: 2..5 ms per frame on the 030.
+
+**F3. Hot chip data reached through long operands.** Move data blocks whose every reference
+is an absolute long operand or a long immediate (patchable in chip code and copies alike):
+- Renderer state and projection constants at chip `$42C00..$42F3F` (513 reads per field),
+  for example `movea.l #$42C44,a4` at `$5B030`. Find the writers with `write_audit.py`. The
+  back-buffer pointer `$42C00` is also used by the panel, IRQ text and S4: keep it in chip
+  or patch every user.
+- Game-image data pages with heavy reads: `$49000` (`$498A0..$498FF`), `$0A000`
+  (`$0AF20..$0AF5F`, read and written), `$28000`, `$35000`, `$37000`; measure each.
+- `$C0` call vectors (136 reads per field): only if a same-length direct form exists in
+  the copies; otherwise leave them.
+- Check as F2. Expected: 1.5..3 ms per frame.
+
+**F4. Log conversion with `bfffo`** (68020+). `$4EE84`/`$4EE88` find the leading bit with a
+compare tree (5.5% of the 020's cycles). Use `bfffo` in the fast copy, giving the same shift
+and exponent. Check: the two routines agree for every 28-bit input (host harness), then
+play and screenshots. Expected: 0.5..1 ms on the 030.
+
+**F5. (U) Game variables and render scratch in fast RAM.** Their 1,943 accesses per field
+(variables 1,135, scratch 808) and F1's remaining copy (3.4..3.7 ms on one frame per pass)
+all use the chip bus. Their operands are absolute short words and 16-bit displacements: a
+copy cannot reach fast RAM at the same length, so this needs the renderer reassembled from
+source with symbolic data addresses. Ask the user with F1..F4's results. Expected: 2..5 ms,
+and the copy down to about 0.5 ms.
+
+**F6. Checkpoint.** F0's beam table again, `PER_FRAME=1` cadence on the 030/50 (target:
+steady one-field intervals), `matrix.sh` with all options, options off. Record what limits
+each cell next. A real 68040/060 is expected to gain at least as much (chip accesses cost
+the same time while its computation is faster); the emulator cells cannot show it.
+
 ### R. Faster drawing
 
 **R1. Renderer inner loops.** Profile the drawing routines on `a1200-fast` and `a500-1.5m`.
@@ -260,8 +335,10 @@ without it. Real cache behaviour and 040/060 hardware performance remain unverif
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
 - [x] R5
 - [x] X1
+- [x] F0 [ ] F1 [ ] F2 [ ] F3 [ ] F4 [ ] F5 (U) [ ] F6
 
 P4 and P5 address the presentation defects reported after the original plan completed.
+Phase F continues toward one-field frames on the 030/50; next: F1.
 Hardware validation remains unavailable, outside X1.
 
 ## In place
@@ -270,6 +347,7 @@ Hardware validation remains unavailable, outside X1.
   with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–16.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
-  `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the
+  `write_audit.py`, `bus_audit.py`, `render_profile.py`, `beam_profile.py`,
+  `presentation_check.py` (VERIFY restore hashes), the
   `VERIFY` build's `Custom2` drawing bypass.
 - The game-time model and the renderer's inputs and writes ([internals](internals.md)).

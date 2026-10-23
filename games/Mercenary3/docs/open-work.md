@@ -128,6 +128,14 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Current status
 
+Phase F works toward one-field frames on the reference 030/50. F0 measured the budget:
+frames take 24.9 ms of work on average (worst 27.4), against 20 ms per field. The
+presentation copies cost 7.1 ms per presentation and the staging copy 3.3 ms. The CPU's
+remaining chip-bus traffic, about 21,000 accesses per frame from chip-resident code,
+game variables, render scratch and renderer data, costs an estimated 6..12 ms. Next: F1
+(restore once per logic pass). See [F0](internals.md#f0-one-field-frame-budget-03050) and
+the [plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step).
+
 The post-P5 68040 investigation measures 24.80 fps: steady frames spend about
 25.6 ms working, then wait for the next field, producing two-field delivery.
 Main 3D drawing costs 10.9 ms; bitmap copying, scene setup and presentation
