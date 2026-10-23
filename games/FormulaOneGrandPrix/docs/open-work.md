@@ -43,7 +43,8 @@ The B5 cache policy is opt-in and disabled by default; its acceptance gate is st
 
 **B5, A7 and A8 are unfinished.** The current window-title emulator build is pinned;
 a first 030 non-MMU cache-on whole race and clean quit pass (`tmp/b5-final/030-on-clock-b`).
-Its exact repeat and the remaining whole-race cells are next. The gated cache policy and VERIFY CACR logging are in
+A fresh 030 non-MMU cache-on pair (`-d`/`-e`) passes exact comparison with mouse
+auto-switching disabled. The remaining whole-race cells and matched gains are next. The gated cache policy and VERIFY CACR logging are in
 place. On the 68020, a whole Quick Race completed and quit cleanly with the instruction cache on.
 
 **The 030/040 startup stalls are fixed.** They were an FS-UAE deadlock between

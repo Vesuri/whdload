@@ -430,3 +430,14 @@ still needs review before those captures can be accepted:** with zero follow lea
 select the tow scene's own Viewing banner. Anchor the next camera transition by actual
 screen/game state; do not promote a mislabeled follow window. The existing B3/A3 calibrated
 follow evidence is separate. No uncalibrated A7 follow captures have been accepted.
+
+Whole-race repeat comparison:
+
+```sh
+python3 tools/matrix_compare.py tmp/b5-final/030-on-clock-d tmp/b5-final/030-on-clock-e
+```
+
+The comparator requires completed captures, clean quit, matching configuration/build/runtime
+and capture-dependency hashes, all clock samples (or profile anchors/digests), actual hunk
+layout and every retained PNG. It does not mask pointer pixels. The matrix runner explicitly
+disables automatic mouse switching as well as setting both joystick sources to `none`.

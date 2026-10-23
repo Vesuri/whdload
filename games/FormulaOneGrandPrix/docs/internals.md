@@ -361,7 +361,12 @@ pin is unchanged. Earlier startup evidence above belongs to its recorded build.
 On this build, `tmp/b5-final/030-on-clock-b` completes the 030 non-MMU cache-on Quick
 Race, reaches finishing times and returns F10 `OK`, with `CACR=$00002111`.
 Results are detected at 19,296 fields after the cockpit stop (201-field sampling).
-This is a whole-race functional result, not yet a repeat pair or cache-gain measurement.
+The first repeat (`-c`) matched all counters and gameplay images but differed in the
+mouse pointer in three images at the results transition; that pair fails exact-image
+acceptance. With `--joystick_port_0_autoswitch=0`, fresh runs `-d` and `-e` match all
+99 PNGs, every clock sample, route and four-hunk layout; both quit `OK`. This establishes
+a passing whole-race repeat pair for 030 non-MMU cache-on. The control supports retaining
+the explicit input setting; it does not establish a cache gain or a shared-tool defect.
 The preceding `030-on-clock-a` failed before debugger connection because the host sandbox
 refused the connection; it is not evidence of a guest startup regression.
 

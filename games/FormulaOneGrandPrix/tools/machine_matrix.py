@@ -45,6 +45,8 @@ def capture(machine, caches, command, destination, fields=100):
     verify()
     pins = runtime()
     setup, extra, mmu = MACHINES[machine]
+    # Keep host mouse activity from auto-switching a disabled capture port.
+    extra = (extra + ' --joystick_port_0_autoswitch=0').strip()
     if caches not in ('on', 'off') or command not in ('clock', 'green', 'tow', 'follow'):
         raise ValueError('invalid cache/command selection')
     out = Path(destination).resolve()
