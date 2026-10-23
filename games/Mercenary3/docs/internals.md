@@ -947,23 +947,13 @@ differed by 3 cycles in total.
 The routine measurement set now includes the existing `040-25` matrix configuration:
 `a1200-030` with `68040-NOMMU`, 25 MHz and `DETERMINISTIC=0`. The separate
 `a1200-040` preset is not substituted (user decision).
-Same VERIFY build/session, standard 500-field route: all options off (`Custom1=0`)
-gives 117 frames / 11.70 fps; current options on (`Custom1=255`) gives 165 frames /
-16.50 fps. Effective machine settings, route and runtime/build hashes match.
-Evidence: `tmp/040-check/off.json`, `on.json`. These remain emulator measurements
-with the accepted frequency-timing limitation, not predicted hardware frame rates.
-
-The 040 bottleneck is not yet measured by component. Likely remaining costs are
-renderer instruction fetches and bitplane writes in chip RAM, the CPU back-buffer
-clear, publication's next-field wait, and presentation save/restore work. M1 moves
-selected numeric routines, M2 moves lookup tables, and R1 changes horizontal span
-interiors; the rest of the drawing path remains largely native. These are candidates,
-not a measured ranking on the 040. The roughly 1% world-logic cost and 7–10%
-publication wait were measured on the 020 and must not be assigned to the 040.
-The 12.5 Hz logic gate is not a rendering cap: the measured 16.50 fps includes
-presentation frames. Before choosing further renderer work over R2's blitter clear,
-measure drawing, clearing, publication waits and presentation overhead separately
-on the existing 040 cell, retaining the emulator timing caveat.
+With current Enhanced framerate, the standard 500-field route gives 248 frames /
+24.80 fps, repeated identically. The [post-P5 component measurements](#68040-frame-budget-after-p5)
+find 25.6 ms of work per frame on average, exceeding the one-field 20 ms budget.
+Main 3D drawing is the largest measured component at 10.9 ms; bypassing it reaches
+49.60 fps. Bitmap copying, scene setup and presentation save/restore also matter.
+The 12.5 Hz logic gate is not a rendering cap. Keep these emulator measurements
+separate from hardware-speed predictions and from older 020 instruction profiles.
 
 ### Frame budget toward 50 fps
 

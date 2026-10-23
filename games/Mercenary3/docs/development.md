@@ -140,7 +140,13 @@ outside the bitplane lines: `KEEP_TRACE=1 python3 tools/route_profile.py tmp/pro
 
 The `VERIFY` build's `Custom2` makes drawing routines return at once (see
 [the frame budget](internals.md#frame-budget-toward-50-fps)): compare `fps.py` runs with
-and without it to price drawing on the 030/040/060, whose cores record no profile.
+and without it to price drawing on the 030/040/060, whose cores record no instruction
+profile. Rebuild VERIFY before measuring: the main-3D bypass now survives the
+object-interpolation hook. `CUSTOM5=1 CUSTOM2=1` skips main 3D;
+`CUSTOM5=1 CUSTOM2=31` skips all five drawing calls. The clear bypass also disables
+fast bitmap staging, so it does not isolate clearing cost. For inclusive routine
+costs and publication wait/copy timing, see the
+[current 040 beam measurements](internals.md#68040-frame-budget-after-p5).
 
 `route_profile.py` finds the live slave in fast RAM, or in slow RAM on the `a500` setups.
 For a one-off play screenshot after an untraced advance, record two fields and use the

@@ -72,7 +72,9 @@ emulator timing is not a hardware-speed prediction.
 
 No real hardware was available for this release check. Real-hardware cache behaviour
 with relocated/self-modifying code and 040/060 performance remain unverified.
-See [measured results](docs/internals.md#x1-release) and [current decisions](docs/open-work.md).
+See [release validation](docs/internals.md#x1-release), the
+[current 68040 frame budget](docs/internals.md#68040-frame-budget-after-p5), and
+[current decisions](docs/open-work.md).
 
 Developers can use `make verify` with `CUSTOM5=0 CUSTOM1=<feature mask>` for individual
 feature comparisons. The VERIFY build also contains the measurement instruments;

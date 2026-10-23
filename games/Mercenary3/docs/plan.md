@@ -23,7 +23,9 @@ are in order of value; take the first one not done whose dependencies are met. D
 - **Price frame time** on `a1200-fast` with `route_profile.py` (instruction profile) and on
   the 030/040/060 with the `VERIFY` build's `Custom2` drawing bypass: `fps.py` with and
   without it ([frame budget](internals.md#frame-budget-toward-50-fps)). Those cores record no
-  profile. The cycle-exact 030/50 is the reference fast machine (S0, user decision).
+  instruction profile. Routine-entry/return video-beam timing also measures inclusive
+  elapsed costs on the 040; see the [current breakdown](internals.md#68040-frame-budget-after-p5).
+  The cycle-exact 030/50 remains the reference fast machine (S0, user decision).
 - **Check the game still works** with three tests, not more:
   1. **Options off:** the performance slave gives the shipped slave's frame count in the
      same session on `a500-1.5m`.
