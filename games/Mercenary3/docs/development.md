@@ -239,3 +239,25 @@ The report lists the display and interrupt-owned exclusions. These allow live fi
 clock, panel and text updates; they are never restored to old values. At least one
 presentation frame must execute for a passing result. Use the fast cell when the 020
 has no spare interval. No instruction recording is needed.
+
+## Release packaging
+
+`make release` builds version 2.0 (23.10.2026) and prepares a new
+`tmp/release-2.0/Mercenary3 Install/` drawer. Override `RELEASE` with another new
+path under `tmp/`; existing output is never overwritten. `BUILD` still selects
+the slave build directory.
+
+The builder verifies the original installer inputs and the WHDLoad Install Template's
+`Install` and `ReadMe` against `manifest/release-templates.json`, using `$WHDLOAD`.
+It adapts the template's RawDIC path to Mercenary3, retains the original manual,
+transport guide and complete solution tree, and sets CACHE/PRELOAD in the game icon.
+The ReadMe uses the template's layout, warranty and contact sections, the maintained
+text in `whdload/release/readme-body.txt`, and the original 1.2 history entry.
+
+Template-derived files, original icons/docs/imager and built slaves remain ignored
+under `tmp/`. The package contains no game disk image. Original extracted inputs
+are left unchanged. Use the plain release slave, never VERIFY, for packaging.
+
+Validation: the package rebuilt identically, input checks and all three slave builds
+passed, and Installer 43 accepted the generated script through its initial setup
+screen. Imaging from an original floppy has not been exercised.

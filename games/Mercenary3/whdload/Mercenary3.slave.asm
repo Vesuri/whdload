@@ -52,7 +52,7 @@ _expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM+OBJECTM
 _name		dc.b	"Mercenary 3 - The Dion Crisis",0
 _copy		dc.b	"1991 Novagen",0
 _info		dc.b	"adapted by Harry/Graham/Wepl",10
-		dc.b	"Version 1.2 (29.07.2004)",10
+		dc.b	"Version 2.0 (23.10.2026)",10
 		dc.b	"enhanced framerate edition"
 	IFD VERIFY
 		dc.b	" (VERIFY)"

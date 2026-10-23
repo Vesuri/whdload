@@ -26,3 +26,9 @@ verify:
 	@mkdir -p "$(BUILD)"
 	. amiga/env.sh && "$$VASM" $(VASMFLAGS) -DVERIFY=1 -I"$$WHDLOAD/Include" -I"$$NDK" \
 	  -o "$(BUILD)/Mercenary3.verify.Slave" whdload/Mercenary3.slave.asm
+
+# Keep template-derived installer files and built slaves in ignored tmp/.
+RELEASE ?= tmp/release-2.0
+.PHONY: release
+release: check original slave verify
+	. amiga/env.sh && $(PYTHON) tools/build_release.py --slave "$(BUILD)/Mercenary3.Slave" "$(RELEASE)"

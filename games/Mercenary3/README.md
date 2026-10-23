@@ -1,5 +1,7 @@
 # Mercenary 3 — Enhanced framerate
 
+Version **2.0 (23.10.2026)**.
+
 Performance WHDLoad slave for **Mercenary III: The Dion Crisis** (Novagen), based on
 install version 1.2. **Enhanced framerate** is on by default: rendering can run up to
 50 fps PAL while world simulation and game logic keep their native rates. Actual
@@ -26,7 +28,15 @@ Build with the shared Amiga environment described in [development](docs/developm
 make check original slave verify
 ```
 
-Back up the installed slave, then copy `tmp/build/Mercenary3.Slave` into a writable
+To build the complete template-based WHDLoad installer drawer, run `make release`.
+It writes `tmp/release-2.0/Mercenary3 Install/`, including the Amiga `ReadMe` and
+`Install` script, the release slave, imager, icons and original documentation.
+Open its Install icon on the Amiga to install from the original disk. The game icon
+gets `CACHE PRELOAD`; the installer retains source-drive and icon selection.
+Existing output is preserved; use `make release RELEASE=tmp/another-release` for a
+new build. See [release packaging](docs/development.md#release-packaging).
+
+To update an existing installation manually, back up the installed slave, then copy `tmp/build/Mercenary3.Slave` into a writable
 copy of the game drawer. Keep its `Disk.1` and other game files. No game data or built
 slaves are distributed in this repository.
 
@@ -64,3 +74,10 @@ See [measured results](docs/internals.md#x1-release) and [current decisions](doc
 Developers can use `make verify` with `CUSTOM5=1 CUSTOM1=<feature mask>` for individual
 feature comparisons. The VERIFY build also contains the measurement instruments;
 use the regular slave to play. [Development](docs/development.md) describes the tools.
+
+## Version 2.0 (23.10.2026)
+
+- Faster rendering and smoother walking, vehicles and flight without speeding up
+  the game world.
+- Default-on **Enhanced framerate** option; Off restores original behaviour.
+- Updated installer with CACHE and PRELOAD enabled in the game icon.
