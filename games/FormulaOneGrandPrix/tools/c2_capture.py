@@ -30,12 +30,12 @@ def capture(args):
     verify()
     pins = runtime()
     out = scratch(args.out)
-    slave = ROOT / 'tmp/c2/build-verify/F1GP.Slave'
+    slave = scratch(args.build) / 'F1GP.Slave'
     build = json.loads((slave.parent / 'build.json').read_text())
     if build['slave_sha256'] != sha(slave) or build['source_sha256'] != sha(SOURCE):
         raise ValueError('stale C2 build')
     symbols = {n: int(o, 16) for n, o in re.findall(
-        r'^(c2_\w+)\s+00:([0-9A-F]+)$',
+        r'^(c[23]_\w+)\s+00:([0-9A-F]+)$',
         (slave.parent / 'F1GP.lst').read_text(errors='replace'), re.M)}
     sock = ROOT / 'amiga/.run/f1gp.sock'
     if sock.exists():
@@ -107,6 +107,21 @@ def capture(args):
         expected_mode = 2 if args.replay else 1
         if struct.unpack_from('>H', memory, base+symbols['c2_mode'])[0] != expected_mode:
             raise ValueError('requested live/replay loop not reached')
+        if args.modal:
+            from c3_capture import exercise
+            meta.update(hunk_bases=bases, slave_base=base, symbols=symbols)
+            exercise(args, command, out, base, bases, symbols, meta)
+            command('gdb', 'delete breakpoints')
+            command('tap', '59')
+            command('gdb', 'monitor fields 1000')
+            command('shot', str(out/'quit.png'))
+            marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
+            meta['quit'] = marker.read_text().strip() if marker.exists() else 'MISSING'
+            if meta['quit'] != 'OK':
+                raise ValueError('F10 quit failed')
+            meta['status'] = 'CAPTURED'
+            print(json.dumps(meta['modal'], indent=2), flush=True)
+            return
         if args.view:
             raw = dict(rear='5f', tv='4f', front='46', cockpit='4e')[args.view]
             command('tap', raw)
@@ -224,6 +239,8 @@ def capture(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('out')
+    parser.add_argument('--build', default='tmp/c2/build-verify')
+    parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))
     parser.add_argument('--custom4', type=int, choices=(0,1,3,5,7), default=0)
     parser.add_argument('--ticks', type=int, default=100)
     parser.add_argument('--route', choices=('quickrace','qualifying','practice'), default='quickrace')

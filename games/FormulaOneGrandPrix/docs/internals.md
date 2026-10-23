@@ -1383,9 +1383,9 @@ run, live hook validation, speed measurement or NTSC gameplay acceptance is clai
 The current prototype is compiled only for DEVELOPER/VERIFY, behind `CUSTOM2`
 bit 1 and only in the supplied 582992-byte variant's patch list. Release bytes
 remain identical to the pre-C2 build. The CPU HUD/background split, bounded loop and
-sound-duration checks are complete. This closes C2 only: full modal handling, input
+sound-duration checks are complete. C3 adds the modal handoffs documented below; input
 acceptance, whole-machine real-time validation and matched slow-machine performance
-remain C3–C6 work. D's extrapolation is also separate.
+remain C4–C6 work. D's extrapolation is also separate.
 
 The hook at h0+$2CC3C advances the slave's aligned 32-bit serial and reproduces the
 native counter increment and flags. Live/replay heads at h0+$3C8F6/+$3CC40 reserve
@@ -1567,3 +1567,109 @@ deterministic Quick Race (`tools/race_profile.py`, development doc). Times are e
   The CPU never stops (`STOP` 0%).
 - Function names are hunk offsets of the nearest preceding call target, a heuristic; a
   large entry needs checking against the disassembly before acting on it.
+
+### C3 modal clock boundaries
+
+**C3 is complete.** It keeps native modal ownership while the developer clock is enabled. It uses the
+same `CUSTOM2` bit 1 and supplied executable gate as C2. There is no new timer,
+fractional update, release option or change to the eight-update schedule.
+
+| Boundary or sequence | Clock ownership and implementation |
+|---|---|
+| Start lights | Remain live ticks. h0+$3B346 calls the start-state machine +$3B3B0; +$3A750 selects its phase, +$3A764 its native game-time deadline and +$3A73A its tick countdown. No pause/rebase is introduced between red and green. |
+| Pit service, tyre UI and pit animation | Stay in native session/car/HUD/renderer tick order. C2 retains the A3 pit phases and dirty-state updates even when an intermediate tick is not painted. Being stationary in the pits is not a clock suspension. |
+| Native accelerated time inside the pits | h0+$3BA24 calls the unpaced native loop +$3CA5A. Suspend the outer reserved tick around this call; the native loop advances its own session/car state. On return, exclude its elapsed VBLs and continue that reserved tick once. Never add scheduler updates inside the accelerated loop. |
+| Retirement, tow and following another car | Continue the live tick stream. The native car/session/view state machines choose removal, marshal/tow animation and the following camera. These transitions do not start new clock epochs. |
+| Live pause | The actual wait entry h0+$3B6DE suspends the clock; the wrapper at +$3C962 resumes it after native +$3B5DE returns. Merely polling the pause key does not rebase. |
+| Replay pause | The wait entry +$3B8B4 suspends; the wrapper at +$3CCBA resumes after native +$3B80E returns. Calls from the unpaced reconstruction path retain native ownership. |
+| Replay entry | +$3CBD6 closes the live epoch before native replay restoration. +$3CC40 starts a fresh replay epoch, after detecting the actual display rate. |
+| Natural replay completion | Native +$3CCB6 branches into +$3C962, bypassing the live loop head. Its wrapper closes the replay epoch before native live pause handling; after resume it reserves a fresh live tick before any car update. The native pause remains visible until the user resumes. |
+| Escape, race end and results | +$3CA26 closes the epoch before native interrupt/audio handoff. Pending HUD work is flushed and publication retired. Native menus/results run with enhanced tick and raster gates inactive. |
+| Loading, menus and cockpit re-entry | No enhanced tick runs outside live/replay loops. +$3C8D2 closes any old epoch before native one-time cockpit preparation. Re-entry detects display rate and starts from zero credit; the +$3C962 bypass is covered too. |
+| Menu accelerated-time batches | The separate +$3CB6A / +$3CB82 path runs after live exit, with the clock inactive. Its native fifty-update batches are unchanged. |
+
+At an in-tick suspension, publish queued UI work, wait for the pending exchange and
+its following VBL, and drain the blitter. Observe active time up to this boundary,
+then move residual credit into `c3_rebased` and clear credit, phase and batch.
+Clear `c2_in_tick`, `c2_draw_mode` and scene-history validity so native modal code
+owns its painting. The already reserved tick is neither completed nor repeated.
+
+On resume, acquire an owned bitmap, move `WC_LAST` to the current serial and count
+the excluded interval in `c3_excluded`. Restore a normal painted tick, not an
+intermediate catch-up pass. Reset the sound interval origin and set h0+$125C to the
+reserved interval at +$125A; paused fields must not stretch the next engine-pitch
+ramp. Completion of the reserved native tick then uses the ordinary C2 pacer.
+The next reservation starts with the first whole PAL/NTSC interval, with no backlog.
+
+Accounting within a continuing epoch is now:
+`observed = consumed + credit + dropped + rebased` (unsigned 32-bit counters).
+Modal exclusion is separate from overload drops. Suspension and epoch close reuse
+the exact `WC_LAST` sample as their excluded-interval origin, so a VBL between
+accounting instructions cannot disappear between two samples. At epoch exit, `c3_closed_clock`
+retains the 28-byte clock plus rebased fields, the reserved-tick flag, old mode and
+reason: 1 restart, 2 replay entry, 3 replay completion, 4 race/menu exit. A reserved
+iteration abandoned by a native branch remains identifiable as reserved, not falsely
+counted as a completed tick. This is the last closed epoch, not a history ring.
+`c3_epochs`, `c3_exits`, `c3_pauses` and `c3_reconstructions` count transitions.
+
+The serial remains owned by the native race VBL callback. If a menu or loading path
+removes that callback, elapsed wall/display time there is not observable through this
+serial. It is still excluded by epoch entry; `c3_excluded` reports only observable
+callback intervals and must not be described as the duration of every menu visit.
+The new mode becomes visible only after rate detection and clock initialization.
+
+#### C3 evidence
+
+Current VERIFY build: SHA-256
+`330662b72ba7c19d049a0eb68cb522cbe668e27470a9ccfd24df561465273b97`,
+source SHA-256 `a5ef57b5535c11637629f0fe492e245c571788427ffbf1e1c0d69871993f8ddd`.
+All routes below use pinned deterministic boots, actual loaded hunk addresses and
+native input. Each completes with F10 `OK`. Evidence is under `tmp/c3/`.
+
+| Capture | Result |
+|---|---|
+| `v2-pause` | Two PAL pauses: car state and clock unchanged across each 250-field hold. Exact resume stops retain the pending tick, zero credit/phase/batch and reset the sound interval. 647 callback fields excluded in total; no debt drops. |
+| `v2-ntsc` | Same checks at detected 60 Hz; 646 callback fields excluded, no debt drops. |
+| `v2-delayed` | Same checks with the 20-field batch delay. 661 callback fields excluded and 76 residual-credit fields rebased. The run has 42 workload debt drops; the exact resume checks require no drop increase during suspension. |
+| `v2-a500` | Same checks on the 68000 `a500-1.5m` setup. 647 callback fields excluded, 62 credit fields rebased, no drops in this window. Not a C6 performance result. |
+| `v2-menu` | Qualifying Frozen holds cars and clock unchanged for 250 fields; re-entry starts epoch 2 with no debt drops. Only 35 callback fields are observable outside the old epoch; the race callback is inactive for much of the menu/loading interval. |
+| `v2-pause-menu` | Escape while paused, frozen-menu dwell, cockpit return still paused, then Space resume. A new live epoch starts without backlog; no free update is inserted on the bypass path. |
+| `v2-pit` | Native joystick acceleration enters and leaves +$3CA5A. Car state changes while enhanced clock accounting stays frozen. Return excludes 343 callback fields and rebases 46 credit fields. The existing 161 qualifying overload drops stay 161 through this transition. |
+| `v2-replay` | Live pause → replay → replay pause/resume → natural replay completion → live pause/resume. Three epochs, two explicit closes, no debt drops in the final live epoch. |
+| `v2-race` | Green lights at completed tick 135, retirement/tow Viewing at tick 817, results after 3071 completed ticks. One live epoch, one exit, zero dropped fields. A further 250-field results hold leaves the clock unchanged. |
+
+These results establish modal ownership and rebasing, not C4 input acceptance, C5's
+clock calibration/equivalence or full pit-stop acceptance, C6 performance, or G2's
+all-CPU/all-route regression matrix. The native accelerated-time route is not counted
+as an eight-Hz world interval. C5's native clock-rate discrepancy remains unresolved.
+
+Failed exploratory captures remain INCOMPLETE rather than being relabelled:
+`menu-1` sampled the Entering Cockpit transition too early; `menu-2` caught rate
+initialization before the mode-publication adjustment; `race-1` reached results but
+missed green with coarse sampling; `pit-1` used a keyboard accelerator while the game
+was configured for joystick; `pit-2` incorrectly required stable queue totals during
+an active flush. Corrected routes use state/screen anchors, native joystick input and
+quiescent accounting checks. Earlier `pause-1`/`replay-1` validate the earlier build
+only and are not substituted for the current-build results.
+
+The `v2-pause`/`v2-repeat` pair repeats exactly: pinned configuration/build,
+loaded layout, screen route, clock/car snapshots and every corresponding screenshot.
+`c3_report.py` verifies retained snapshot hashes and closed-epoch accounting, including
+the reserved iteration at replay completion and paused Escape. The native session
+snapshot (including game clock state) also stays unchanged during each held pause/menu.
+
+The fresh four-arm suite `tmp/b4/c3-v2-acceptance.json` passes: release, developer,
+VERIFY off and VERIFY relay-on, with clean quits, loader checks, and independent rejection
+of all 288 optional hook bytes plus the existing malformed/stale/option negative cases.
+The release SHA-256 remains
+`93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`.
+The C3 static audit checks seven call sites and 405 original instructions, including
+an interior-entry negative fixture; the 665-instruction HUD audit and five host clock
+tests also pass. Shared AmigaXDev files are unchanged.
+
+The final-build steady window `v2-steady` also passes the C2 regression reducers:
+50 VBL callbacks, 12 publications, 11 complete publication intervals, 185448 CPU
+bitmap writes and 82284 blitter writes with no writes to the scanned bitmap. All eight
+nonzero pitch updates pass the sound formula, including four overrun and four short
+intervals. These are window-scoped publication/sound checks, not C5/C6 acceptance.
+The combined current-build record is `tmp/c3/acceptance.json`.

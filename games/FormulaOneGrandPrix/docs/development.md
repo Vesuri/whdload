@@ -665,3 +665,68 @@ handoff and native pitch arithmetic, including per-field VBL cadence. It require
 nonzero pitch inputs and both short and overrun tick spacing; an idle-only window
 is INCOMPLETE. The checker verifies trace/build hashes and finds the timing store
 in that slave's verified bytes. This is not an audio-quality or whole-race claim.
+
+## C3 modal-boundary validation
+
+The C3 probes reuse the pinned fresh-boot collector and deterministic native inputs.
+They run with `CUSTOM2=3`, keeping caches and the developer clock enabled; `CUSTOM4=1`
+uses the common-layout preference control. Build products and evidence remain in `tmp/`.
+
+```sh
+. amiga/env.sh
+make slave-verify OUT=tmp/c3/build-verify
+python3 tools/check_modal_hooks.py
+python3 tools/check_hud_hooks.py
+python3 tools/c2_capture.py tmp/c3/pause --build tmp/c3/build-verify --modal pause --custom4 1
+python3 tools/c2_capture.py tmp/c3/ntsc --build tmp/c3/build-verify --modal pause --custom4 1 --ntsc
+python3 tools/c2_capture.py tmp/c3/menu --build tmp/c3/build-verify --modal menu --custom4 1 --route qualifying
+python3 tools/c2_capture.py tmp/c3/pit --build tmp/c3/build-verify --modal pit --custom4 1 --route qualifying
+python3 tools/c2_capture.py tmp/c3/replay --build tmp/c3/build-verify --modal replay --custom4 1
+python3 tools/c2_capture.py tmp/c3/race --build tmp/c3/build-verify --modal race --custom4 1
+```
+
+Use fresh output directories. `--build` selects an ignored build directory and rejects
+stale source/build hashes. `--modal` dispatches to `tools/c3_capture.py`; these probes
+capture transitions rather than using `--ticks`, `--publish` or `--profile`.
+Each saves native command logs, hashes, actual hunk layout, clock/car/session snapshots,
+screenshots, a modal report and F10 quit evidence. Failure keeps INCOMPLETE metadata.
+
+Pause tests hold the native wait for 250 fields, require unchanged car state and clock
+accounting, and stop at the resume epilogue before the reserved tick continues. They
+require zero credit/phase/batch, no extra completed tick or overload drop, and the
+rebased sound interval. Replay tests also wait for natural completion and resume live.
+The menu probe recognizes the frozen menu and waits for actual initialized clock entry,
+not a copied field number. The pit probe uses harness `JOY2_UP`, matching the supplied
+joystick control selection, to enter and leave native accelerated time. The race probe
+polls every 25 fields until green, then every 250 fields until results; scene anchors
+must actually be observed. These are modal checks, not C5 clock-ratio acceptance.
+
+Queue accounting is checked only at quiescent snapshots: during a flush the full
+pending count is retained while the painted counter increases. The static hook checker
+verifies all seven C3 calls and rejects interior branch-entry overlap. After assembly
+changes, rebuild all three variants and run `tools/slave_gate.py --prefix c3-` for the
+four-arm disabled-feature gate and its byte-by-byte negative checks.
+
+`--modal pause-menu --route qualifying` covers Escape from a paused race, including
+its paused cockpit return. `--modal pause --custom4 3` covers forced catch-up;
+`--modal pause --setup a500-1.5m --custom4 1` covers the 68000. Additional input-latency
+and one-shot acceptance remains C4.
+
+Validate saved snapshots and closed-epoch accounting with:
+
+```sh
+python3 tools/c3_report.py tmp/c3/race --out tmp/c3/race-report.json
+python3 tools/c3_report.py tmp/c3/pause --repeat tmp/c3/pause-repeat --out tmp/c3/pause-repeat-report.json
+```
+
+The repeat form requires matching pins, build, machine/options, actual layout, route,
+clock and car snapshot hashes, and every corresponding screenshot. Capture the repeat
+with the same command sequence into a fresh output directory first.
+
+A steady C2 regression on the same C3 build can be collected with:
+
+```sh
+python3 tools/c2_capture.py tmp/c3/steady --build tmp/c3/build-verify --custom4 1 --ticks 240 --profile 50 --profile-tick 200
+python3 tools/c2_publication.py tmp/c3/steady tmp/c3/publication.json
+python3 tools/c2_sound.py tmp/c3/steady tmp/c3/sound.json
+```

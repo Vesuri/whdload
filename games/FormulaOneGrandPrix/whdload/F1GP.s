@@ -406,12 +406,12 @@ c2_init
         move.l d2,(a0)
         move.l (c2_h0,pc),d0
         lea (c2_target_h0,pc),a0
-        moveq #2,d2
+        moveq #(c2_target_h2-c2_target_h0)/4-1,d2
 .target0
         add.l d0,(a0)+
         dbf d2,.target0
         move.l (c2_h2,pc),d0
-        moveq #8,d2
+        moveq #(c2_target_end-c2_target_h2)/4-1,d2
 .target2
         add.l d0,(a0)+
         dbf d2,.target2
@@ -420,6 +420,7 @@ c2_init
         rts
 
 c2_live_entry
+        bsr c3_leave_restart
         move.l a0,-(sp)
         lea (c2_mode,pc),a0
         clr.w (a0)
@@ -454,7 +455,6 @@ c2_head
         lea (c2_mode,pc),a1
         cmp.w (a1),d7
         beq.s .same_epoch
-        move.w d7,(a1)
         lea (c2_scene_ready,pc),a1
         clr.w (a1)
         move.l (c2_h2,pc),a2
@@ -463,7 +463,22 @@ c2_head
         move.w (a2),(a1)
         bsr c2_field_rate
         move.l (c2_serial,pc),d0
+        lea (c3_inactive,pc),a1
+        tst.w (a1)
+        beq.s .initial
+        clr.w (a1)
+        move.l d0,d2
+        sub.l (c3_idle_start,pc),d2
+        lea (c3_excluded,pc),a1
+        add.l d2,(a1)
+.initial
         bsr world_clock_rebase
+        lea (c2_mode,pc),a1
+        move.w d7,(a1)
+        lea (c3_rebased,pc),a1
+        clr.l (a1)
+        lea (c3_epochs,pc),a1
+        addq.l #1,(a1)
         lea (c2_sound_serial,pc),a1
         move.l d0,(a1)
 .same_epoch
@@ -523,6 +538,236 @@ c2_head
         tst.l (a0)            ; native header instruction, supplies branch flags
         movea.l (sp)+,a0
         rts
+
+; C3 modal handoffs. A suspended native tick remains reserved and completes
+; once after resume. Its accumulated credit is explicitly rebased, never dropped.
+; Outside a live/replay epoch the native pacer and modal painters retain ownership.
+c3_live_pause
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        move.w (c2_mode,pc),d0
+        cmpi.w #2,d0
+        bne.s .live
+        bsr c3_leave_replay_end  ; replay ends before returning to live pause
+.live
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        bsr .native
+        bsr c3_resume
+        ; Menu return and replay completion bypass the ordinary live header.
+        ; Reserve a tick here only if native control actually continues live.
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        move.w (c2_in_tick,pc),d0
+        bne.s .done
+        movea.l (c2_h2,pc),a0
+        adda.l #$2a75e,a0
+        btst #4,(a0)
+        bne.s .done
+        movea.l (c2_h0,pc),a0
+        adda.l #$3a70c,a0
+        tst.b (a0)
+        beq.s .schedule
+        tst.b ($c0,a0)
+        bpl.s .done
+.schedule
+        bsr c2_live_head
+.done
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        rts
+.native
+        move.l (c3_native_live_pause,pc),-(sp)
+        rts
+
+c3_replay_pause
+        bsr .native
+        bra c3_resume
+.native
+        move.l (c3_native_replay_pause,pc),-(sp)
+        rts
+
+; Both wait entries replace the native audio-off JSR. Queued UI is made visible
+; before native modal code may touch both bitmaps. No enhanced painting while idle.
+c3_pause_begin
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        move.w (c2_in_tick,pc),d0
+        beq.s .done
+        bsr c3_suspend
+        lea (c3_pauses,pc),a0
+        addq.l #1,(a0)
+.done
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        bra c3_audio_off
+
+c3_suspend
+        bsr c2_publish
+        bsr c3_retire
+        lea (c2_clock,pc),a0
+        move.l (c2_serial,pc),d0
+        bsr world_clock_observe
+        moveq #0,d0
+        move.w WC_CREDIT(a0),d0
+        lea (c3_rebased,pc),a1
+        add.l d0,(a1)
+        clr.w WC_CREDIT(a0)
+        clr.w WC_PHASE(a0)
+        clr.w WC_BATCH(a0)
+        lea (c3_suspended,pc),a1
+        move.w #1,(a1)
+        lea (c2_in_tick,pc),a1
+        clr.w (a1)
+        lea (c2_draw_mode,pc),a1
+        clr.w (a1)
+        lea (c2_scene_ready,pc),a1
+        clr.w (a1)
+        lea (c3_idle_start,pc),a1
+        move.l (c2_clock+WC_LAST,pc),(a1)
+        rts
+
+c3_resume
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        move.w (c3_suspended,pc),d0
+        beq.s .done
+        bsr c2_acquire
+        move.l (c2_serial,pc),d0
+        move.l d0,d1
+        sub.l (c3_idle_start,pc),d1
+        lea (c3_excluded,pc),a1
+        add.l d1,(a1)
+        lea (c2_clock,pc),a0
+        move.l d0,WC_LAST(a0)
+        lea (c2_sound_serial,pc),a1
+        move.l d0,(a1)
+        movea.l (c2_h0,pc),a1
+        move.w ($125a,a1),($125c,a1)
+        clr.w ($125e,a1)
+        lea (c2_in_tick,pc),a1
+        move.w #1,(a1)
+        lea (c2_draw_mode,pc),a1
+        move.w #1,(a1)          ; resumed tick must paint, even after catch-up
+        lea (c3_suspended,pc),a1
+        clr.w (a1)
+.done
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        rts
+
+; The native accelerated pit/session reconstruction is not a timed world loop.
+; Suspend the outer reserved tick, let its native loop run, and resume without debt.
+c3_reconstruct
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        move.w (c2_in_tick,pc),d0
+        beq.s .ready
+        bsr c3_suspend
+        lea (c3_reconstructions,pc),a0
+        addq.l #1,(a0)
+.ready
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        bsr .native
+        bra c3_resume
+.native
+        move.l (c3_native_reconstruct,pc),-(sp)
+        rts
+
+c3_replay_enter
+        bsr c3_leave_replay_start
+        move.l (c3_native_replay_enter,pc),-(sp)
+        rts
+c3_race_exit
+        bsr c3_leave_race
+        bra c3_audio_off
+c3_audio_off
+        move.l (c3_native_audio_off,pc),-(sp)
+        rts
+
+; Wait for the last published bitmap to be acknowledged before native ownership.
+c3_retire
+        movea.l (c2_h2,pc),a2
+        adda.l #$1dab0,a2
+.pending
+        tst.b (a2)
+        bne.s .pending
+        move.l (c2_serial,pc),d0
+.field
+        cmp.l (c2_serial,pc),d0
+        beq.s .field
+        bra c2_drain
+
+; Close an epoch before replay setup, menus/results/loading or a new live entry.
+; Retain its accounting and whether native control abandoned a reserved tick.
+c3_leave_restart
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        moveq #1,d7
+        bra c3_leave
+c3_leave_replay_start
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        moveq #2,d7
+        bra c3_leave
+c3_leave_replay_end
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        moveq #3,d7
+        bra c3_leave
+c3_leave_race
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        moveq #4,d7
+        bra c3_leave
+c3_leave
+        move.w (c2_mode,pc),d0
+        beq.s .done
+        bsr c2_hud_flush
+        bsr c3_retire
+        lea (c2_clock,pc),a0
+        move.l (c2_serial,pc),d0
+        bsr world_clock_observe
+        lea (c3_closed_clock,pc),a1
+        moveq #WC_SIZE/4-1,d0
+.copy
+        move.l (a0)+,(a1)+
+        dbf d0,.copy
+        move.l (c3_rebased,pc),(a1)+
+        move.w (c2_in_tick,pc),(a1)+
+        move.w (c2_mode,pc),(a1)+
+        move.w d7,(a1)
+        lea (c3_inactive,pc),a0
+        move.w #1,(a0)
+        lea (c3_idle_start,pc),a0
+        move.l (c3_closed_clock+WC_LAST,pc),(a0)
+        lea (c3_exits,pc),a0
+        addq.l #1,(a0)
+        lea (c2_mode,pc),a0
+        clr.w (a0)
+        lea (c2_in_tick,pc),a0
+        clr.w (a0)
+        lea (c2_draw_mode,pc),a0
+        clr.w (a0)
+        lea (c2_scene_ready,pc),a0
+        clr.w (a0)
+.done
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        rts
+
+        CNOP 0,4
+c3_epochs dc.l 0
+c3_exits dc.l 0
+c3_pauses dc.l 0
+c3_reconstructions dc.l 0
+c3_rebased dc.l 0
+c3_excluded dc.l 0
+c3_idle_start dc.l 0
+c3_closed_clock ds.b WC_SIZE+10
+c3_inactive dc.w 0
+c3_suspended dc.w 0
 
 ; Observe one complete beam sweep, after synchronising to its wrap. PAL has
 ; lines beyond 280; NTSC wraps near 262. Read VPOSR/VHPOSR together and discard
@@ -1243,6 +1488,10 @@ c2_target_h0
 c2_fill_rest dc.l $1f398
 c2_sprite_rest dc.l $1482
 c2_native_entry dc.l $3c5c6
+c3_native_live_pause dc.l $3b5de
+c3_native_replay_pause dc.l $3b80e
+c3_native_replay_enter dc.l $39fd2
+c3_native_reconstruct dc.l $3ca5a
 c2_target_h2
 c2_clear_rest dc.l $1e158
 c2_native_colour dc.l $1dc50
@@ -1253,6 +1502,7 @@ c2_hands_rest dc.l $1f856
 c2_queue_rest dc.l $1e6d4
 c2_native_scene dc.l $280f6
 c2_native_replay_paint dc.l $1dfb4
+c3_native_audio_off dc.l $8e2
 c2_target_end
 c2_dry_passes dc.l 0
 c2_dry_scene dc.w 0
@@ -1364,6 +1614,20 @@ patch_582992
         PL_IFC2X 1
         ; PERF_RANGE h0:3c8d2 6 custom=2 bit=1 variant=582992
         PL_PS $3c8d2,c2_live_entry
+        ; PERF_RANGE h0:3c962 6 custom=2 bit=1 variant=582992
+        PL_PS $3c962,c3_live_pause
+        ; PERF_RANGE h0:3ccba 6 custom=2 bit=1 variant=582992
+        PL_PS $3ccba,c3_replay_pause
+        ; PERF_RANGE h0:3b6de 6 custom=2 bit=1 variant=582992
+        PL_PS $3b6de,c3_pause_begin
+        ; PERF_RANGE h0:3b8b4 6 custom=2 bit=1 variant=582992
+        PL_PS $3b8b4,c3_pause_begin
+        ; PERF_RANGE h0:3ba24 6 custom=2 bit=1 variant=582992
+        PL_PS $3ba24,c3_reconstruct
+        ; PERF_RANGE h0:3cbd6 6 custom=2 bit=1 variant=582992
+        PL_PS $3cbd6,c3_replay_enter
+        ; PERF_RANGE h0:3ca26 6 custom=2 bit=1 variant=582992
+        PL_PS $3ca26,c3_race_exit
         ; PERF_RANGE h0:2cc3c 6 custom=2 bit=1 variant=582992
         PL_PS $2cc3c,c2_vbl
         ; PERF_RANGE h0:3c8f6 6 custom=2 bit=1 variant=582992
