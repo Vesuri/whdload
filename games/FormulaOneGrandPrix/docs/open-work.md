@@ -10,7 +10,7 @@ is [plan.md](plan.md); verified findings are in [internals.md](internals.md).
 | --- | --- |
 | B1–B4; A1/A2/A3/A5/A6 | Complete, with gates recorded in internals. |
 | B5 | Cache pilot implemented; gate not passed. 030/040 startup deadlock fixed in the emulator (AmigaXDev TOOL1); all 030/040/060 setups start with caches on and repeat exactly. |
-| A7 | Matrix incomplete; paired measurements and a reliable zero-lead follow anchor remain open. |
+| A7 | Matrix incomplete; paired measurements and fresh validation of the corrected zero-lead follow anchor remain open. |
 | A8 | Not started. Developer gates and ceiling measurements remain open. |
 | 68030 B5/A7/A8 cells | No longer deferred; open like the other CPUs. |
 | A4 | Open; required before D. |
@@ -63,7 +63,7 @@ Next steps, under the [current validation scope](plan.md#current-validation-scop
    too, and record matched cache gains. Caches stay opt-in until this gate passes.
 2. **A7:** capture both cache states on A500-equivalent, A1200, 020+Fast, 030, 040 and
    060, with actual layouts, per-window timings/chip slots and full race-clock evidence.
-   Repair the zero-lead follow anchor first: it can select the tow scene's own Viewing banner.
+   Validate the corrected zero-lead follow anchor first; it now requires a changed driver name.
 3. **A8:** implement the developer-only no-wait/no-fill gates and matched instant-blitter
    controls, extend the disabled-range checker, then measure each CPU's ceiling.
 4. **C1–C6:** implement real-time ticks using A3 ownership and A5 publication rules.

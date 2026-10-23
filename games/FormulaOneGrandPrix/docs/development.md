@@ -425,11 +425,27 @@ samples with `INCOMPLETE` status; only reaching results and the finishing-times 
 sets `COMPLETE`. Read `capture.json` as well: a complete clock capture with failed quit
 is not an accepted run.
 
-All uncalibrated profiles request `RACE_LEADS=0,0,0`. **The existing follow-banner detector
-still needs review before those captures can be accepted:** with zero follow lead it can
-select the tow scene's own Viewing banner. Anchor the next camera transition by actual
-screen/game state; do not promote a mislabeled follow window. The existing B3/A3 calibrated
-follow evidence is separate. No uncalibrated A7 follow captures have been accepted.
+All uncalibrated profiles request `RACE_LEADS=0,0,0`. The follow anchor now requires
+an actual change in the yellow driver name inside the Viewing banner. It records the tow
+name and rejects that same banner, scene motion below it, and incomplete banners. This
+predicate passes tests against three retained tow/follow capture sets; a fresh zero-lead
+repeat is still required before accepting new A7 follow cells. Existing B3/A3 calibrated
+evidence remains tied to its original capture tools.
+
+`race_profile.py` uses the shared checked profile writer, retains all four hunk bases and
+marks complete car-update and drawing calls as well as the pacer. Run:
+
+```sh
+python3 tools/test_profile_anchor.py tmp/raw/follow tmp/b3/baseline/follow tmp/prof/a1200-follow
+python3 tools/matrix_report.py tmp/a7/CAPTURE
+```
+
+The report saves `metrics.json`: complete-frame fps/work, complete-call drawing/tick ms
+(including interrupts within each call), and chip slots per field by DMA type. Partial
+calls at the window edges are excluded. The game-clock ratio uses the captured Q32.16
+increment at `h0+3A7DE`, rather than rounding it to 128 ms. The separate native increment
+at `h0+3A7E4` is also reported. These are emulator figures; 040/060 cycle-exact timing
+models instruction throughput plus chip accesses, not real accelerator clock rates.
 
 Whole-race repeat comparison:
 

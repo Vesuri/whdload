@@ -10,7 +10,7 @@ Each capture boots through `quickrace`, then finds its anchor field by field:
   green   first field with the start lights green
   tow     first field after green without the cockpit: the player's car has retired and the
           camera cuts to the marshals pushing it away ("Viewing Nigel Mansell")
-  follow  first field, a lead after tow, with the green "Viewing" banner: the camera cuts to
+  follow  first field with a different named driver in the "Viewing" banner: the camera cuts to
           the competitor it then follows ("Viewing Riccardo Patrese")
 The server holds the CPU from reset (tools/f1gp.py BOOT_BREAK), so every boot runs the same
 race.  Each anchor is found after running a calibrated lead without polling, then polling
@@ -25,14 +25,15 @@ import _amigaxdev  # noqa: F401
 from amigaxdev import barto
 from amigaxdev import callprofile
 from amigaxdev.callprofile import Reduction
+from amigaxdev.gdbserve import profile as capture_profile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GAME = os.path.join(ROOT, 'tmp/game/FormulaOneGrandPrix4Disk/data/f1gp')
 CHUNK = 50                 # fields per trace file (about 7.5 MB per field on a1200-fast)
 # Fields to run without polling before each anchor, after the previous one: race (the
 # quickrace stop) -> green -> tow -> follow.  Calibrated on a1200-fast, each 50-100 fields
-# short; RACE_LEADS=0,0,0 polls throughout (other machines; the follow lead must still pass
-# the tow scene's own "Viewing" banner, so use RACE_LEADS=0,0,400 or so).
+# short; RACE_LEADS=0,0,0 polls throughout. Follow requires a changed driver name,
+# so the tow scene's own Viewing banner cannot satisfy it.
 LEADS = (840, 2210, 400)
 POLL_LIMIT = 6000
 FAST = 0x200000            # Zorro II fast RAM base
@@ -126,6 +127,19 @@ def cockpit(f1gp, image):
                for p, c in f1gp.SCREENS['race'].items() if p != (100, 70))
 
 
+def viewing_driver(f1gp, picture):
+    """Yellow driver-name mask inside the fixed black Viewing banner, or None.
+
+    Ignore the green label and scene pixels. A repeated tow banner is not a
+    transition; require a different nonempty name before accepting follow.
+    """
+    if not f1gp.showing(picture, 'viewing'):
+        return None
+    pixels = picture.crop((300, 70, 640, 94)).convert('RGB').getdata()
+    mask = bytes(int(r > 180 and g > 180 and b < 100) for r, g, b in pixels)
+    return mask if any(mask) else None
+
+
 def raceprofile(server, g, rest):
     import f1gp
     args = rest.split()
@@ -153,14 +167,17 @@ def raceprofile(server, g, rest):
                     raise RuntimeError(f'{name}: lead {lead} overshot the anchor')
                 image.save(os.path.join(out, f'anchor-{name}.png'))
                 anchors[name] = elapsed
-                return
+                return image
         raise TimeoutError(f'no {name} within {POLL_LIMIT} polls')
 
     anchor('green', leads[0], lambda im: f1gp.showing(im, 'green'))
     if phase in ('tow', 'follow'):
-        anchor('tow', leads[1], lambda im: not cockpit(f1gp, im))
+        tow_image = anchor('tow', leads[1], lambda im: not cockpit(f1gp, im))
     if phase == 'follow':
-        anchor('follow', leads[2], lambda im: f1gp.showing(im, 'viewing'))
+        tow_driver = viewing_driver(f1gp, tow_image)
+        if tow_driver is None:
+            raise RuntimeError('tow anchor has no driver banner; cannot establish follow transition')
+        anchor('follow', leads[2], lambda im: viewing_driver(f1gp, im) not in (None, tow_driver))
 
     setup = os.environ.get('AMIGA_SETUP', '')
     fast_kb = FAST_KB.get(setup, int(os.environ.get('FAST_KB') or 0))
@@ -174,17 +191,20 @@ def raceprofile(server, g, rest):
     chunk = os.path.join(server.run_dir, 'chunk.bin')
     for start in range(0, fields, CHUNK):
         n = min(CHUNK, fields - start)
-        reply = g.cmd(f'monitor profile {n} "" "{chunk}"', timeout=3600)
-        t = barto.load(chunk)
-        if len(t.fields) != n:
-            raise RuntimeError(f'chunk at {start}: {len(t.fields)} fields, wanted {n}: {reply}')
+        _, t = capture_profile(g, n, chunk)
         if start == 0:
             open(os.path.join(out, 'chip.bin'), 'wb').write(t.chip)
             open(os.path.join(out, 'first.png'), 'wb').write(t.fields[0].shot)
             if not fast and t.slow:
                 open(os.path.join(out, 'slow.bin'), 'wb').write(t.slow)
-            h0 = locate(image(t.chip, fast, t.slow), game_hunks())[0][0]
-            red.marks = {'frame': h0 + FRAME_END}
+            memory = image(t.chip, fast, t.slow)
+            located = locate(memory, game_hunks())
+            h0, h2 = located[0][0], located[2][0]
+            next_hunk = lambda b: struct.unpack_from('>I', memory, b - 4)[0] * 4 + 4
+            hunk_bases = [h0, next_hunk(h0), h2, next_hunk(h2)]
+            red.marks = {'frame': h0 + FRAME_END, 'draw': h2 + 0x280f6,
+                         'draw_end': h0 + 0x3c9c0, 'tick': h0 + 0x2ac14,
+                         'tick_end': h0 + 0x3c994}
             red.tally = {h0 + o for o in FRAME_WAIT}
         digests += [hashlib.sha1(f.shot).hexdigest()[:16] for f in t.fields]
         if start + n == fields:
@@ -200,6 +220,7 @@ def raceprofile(server, g, rest):
     red.save(os.path.join(out, 'profile.pkl.gz'))
     meta = dict(phase=phase, fields=fields, chunk=CHUNK, setup=setup, fast_kb=fast_kb,
                 leads=leads, anchors=anchors, route=route, shot_digests=digests,
+                hunk_bases=hunk_bases,
                 fsuae=os.environ.get('FSUAE'), whd_args=os.environ.get('WHD_ARGS', ''))
     json.dump(meta, open(os.path.join(out, 'meta.json'), 'w'), indent=1)
     return f'{phase}: anchors {anchors} (fields after the quickrace stop); {fields} fields in {out}'
