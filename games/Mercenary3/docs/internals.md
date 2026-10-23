@@ -764,6 +764,10 @@ on the existing 040 cell, retaining the emulator timing caveat.
 
 ### Frame budget toward 50 fps
 
+Current checkpoint: [S6](#s6-budget-checkpoint). S1–S4 reach one-field no-draw and
+two-field full frames on the reference 030/50 after startup; R3 is closed by user
+decision, retaining double buffering.
+
 The `VERIFY` build's `Custom2` bits make drawing routines return at once (bit 0 the 3D
 drawing `$577BE`, 1 the clear `$5E840`, 2 `$5410E`, 3 `$5AFAA`, 4 `$593A6`). The 030 and
 040 cores record no profile ("Protocol error" on `monitor profile`), so this elimination is
@@ -923,3 +927,53 @@ implementation and the native publication wait remains.
 The unchanged S4 build passes the three guards: options-off equals shipped (37 A500
 frames), native 6/2 world rates on 020/030, and intact route/menu screenshots.
 Evidence: `tmp/s4/profile-020/`, `tmp/s4/wait-a1200-{fast,030}.json`.
+
+
+### S6: budget checkpoint
+
+`matrix.sh`, `Custom1=2047`, all eight cells pass (same VERIFY build as S4/S5).
+Full-drawing fps: A500 **4.10**, 020 chip-only **9.40**, 020 fast **12.50**,
+030/50 and 030 MMU **24.80**, 040-25 and 060-50 **24.90**. The 040 8 MHz sanity
+cell gives 24.80: its one-frame difference from 25 MHz does not establish reliable
+frequency scaling. The 040/060 results remain run checks, not hardware predictions.
+
+Same-build/session drawing-bypass budget, fps:
+
+| `Custom2` (skipped) | 020 fast | 030/50 | 040-25 |
+| --- | ---: | ---: | ---: |
+| 0 (none) | 12.50 | 24.80 | 24.90 |
+| 1 (3D drawing) | 24.80 | 49.60 | 49.60 |
+| 2 (clear / staging) | 12.50 | 24.00 | 22.70 |
+| 4 (`$5410E`) | 12.50 | 24.80 | 24.90 |
+| 8 (`$5AFAA`) | 13.80 | 25.60 | 27.00 |
+| 16 (`$593A6`) | 12.50 | 24.80 | 24.90 |
+| 31 (all five) | 49.50 | 49.60 | 49.60 |
+
+Bit 1's clear bypass also skips staging and its copy, leaving subsequent drawing in
+chip RAM. That row does not isolate clear cost. Whole-field publication and changed
+presentation admission also mean bypass gains are not additive cost percentages.
+
+Remaining limits:
+
+- A500 and chip-only 020: drawing still dominates; skipping all drawing gives 16.20
+  and 25.30 fps. Skipping only the clear gives 4.30 and 9.60, so R2 has modest measured
+  headroom on this route. The remaining no-draw work still exceeds one field.
+- Fast-RAM 020: main 3D drawing is the leading measured cost (433,063 cycles per logic
+  pass in the S5 profile); bypassing it doubles route fps. Fixed work now approaches
+  50 fps with all drawing bypassed. Publication waiting remains 16.39% of profile cycles.
+- 030/50, including MMU: full frames occupy two fields. Bypassing the main 3D drawing
+  reaches 49.60 fps, identifying it as the next reduction needed for one-field frames.
+  The measured 36.4% publication wait stays by the decision to close R3.
+- 040-25: the same 3D bypass reaches 49.60 fps in the emulator. 060-50 reaches 49.60
+  with all drawing bypassed; no component ranking is measured for that cell. Real
+  040/060 speed and cache behaviour remain unverified.
+
+S0 checkpoint: the unchanged build's 030 cadence has 495 consecutive one-field
+no-draw intervals and 248 consecutive two-field full-drawing intervals. In each
+run the preceding startup interval is one field longer; the steady-route targets
+hold, rather than a strict bound covering startup. World checks on 020/030 retain
+6 walking units and 2 heading units per field. Route, turning, stopping, Help and
+Quit Situation screenshots remain valid for the identical build; no new behaviour
+was introduced in S5/S6. Fresh options-off and shipped runs both give 37 A500 frames.
+The existing deferred map/vehicle/flight coverage gap remains. Evidence: `tmp/s6/`,
+S4's same-build cadence/world/play checks, and S5's 020 profile.

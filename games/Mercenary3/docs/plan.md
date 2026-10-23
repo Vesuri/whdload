@@ -130,10 +130,10 @@ with R1 (user decision), retaining separate options and measurements for each ch
 
 ### S. Frames in one field (the 50 fps path)
 
-Measured with all options on: drawing nothing still takes 2 fields per frame on
+Before phase S, with all then-existing options on, drawing nothing took 2 fields per frame on
 `a1200-fast` and 1.35 on the 030/50, because presentation frames carry fixed costs (save and
-restore, scene setup) that push their publication past the field boundary. With drawing,
-the 030/50 needs about 4 fields. S2 removes the fixed costs; S3 and S4 take drawing off the
+restore, scene setup) that pushed publication past the field boundary. With drawing,
+the 030/50 needed about 4 fields. S2 reduces the fixed costs; S3 and S4 take drawing off the
 chip bus. Targets, per frame on the 030/50: S2 no-draw frames in one field; S4 full frames
 in two fields or fewer (25 fps); 50 fps on a real 68040/68060 is the expectation to check
 in S6, not a promise.
@@ -217,11 +217,11 @@ moved and self-modifying code.
 - [x] L1
 - [x] P1 [ ] P2 [ ] P3
 - [x] M1 [x] M2
-- [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [ ] S6
+- [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [x] S6
 - [x] R1 [ ] R2 [x] R3 (closed) [ ] R4
 - [ ] X1
 
-Next: S6, then P2 and P3.
+Next: P2, then P3 (the latter includes a user decision on movement modes).
 
 ## In place
 

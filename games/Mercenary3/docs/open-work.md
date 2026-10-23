@@ -94,12 +94,10 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Measurement notes
 
-- The existing `040-25` cell measures 11.70 fps with all options off and 16.50 fps
-  with `Custom1=255` on the same build/route. Its remaining bottleneck has no
-  measured component breakdown. Chip-RAM drawing, CPU clearing, publication waits
-  and presentation overhead are candidates; measure their costs before ranking them.
-  The 020 cost percentages do not establish the 040 split. See
-  [040 results and interpretation](internals.md#routine-040-performance-check).
+- The S6 build (`Custom1=2047`) measures 24.80 fps on the reference 030/50 and
+  24.90 on the 040/060 cells. Main 3D bypass reaches 49.60 on 030/040; all-drawing
+  bypass reaches 49.60 on 060. Publication waits remain by the R3 closure decision.
+  These are emulator measurements; see [S6](internals.md#s6-budget-checkpoint).
 
 - Frame counts drift between sessions (the A500 route gave 38 frames, now 37, with the same
   slave), so compare builds only within one session.
@@ -111,9 +109,8 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Follow [plan.md](plan.md): S6 is the budget checkpoint. R3 is closed without
-implementation by user decision. Publication waits remain 16.4% of the 020 profile
-and about 36.4% of 030 route time. S2–S4
-reach steady one-field no-draw and two-field full frames on the 030/50; the first
-interval is one field longer. S4 measures 24.8 fps with full drawing and 49.6 without.
-The [frame budget](internals.md#frame-budget-toward-50-fps) records the remaining costs.
+Phase S is complete; R3 is closed without implementation by user decision. On the
+030/50, no-draw frames take one field and full frames two after startup; each run's
+first interval is one field longer. World speed remains native and options off
+matches shipped. Follow [plan.md](plan.md): P2, then P3. See the measured remaining
+costs and coverage limits in [S6](internals.md#s6-budget-checkpoint).
