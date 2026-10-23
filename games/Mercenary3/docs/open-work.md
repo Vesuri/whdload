@@ -134,15 +134,16 @@ presentation copies cost 7.1 ms per presentation and the staging copy 3.3 ms. Th
 remaining chip-bus traffic, about 21,000 accesses per frame from chip-resident code,
 game variables, render scratch and renderer data, costs an estimated 6..12 ms.
 
-F2 is complete: another 25,954 bytes of hot code/private state run in fast RAM,
-with direct calls between copies. Same-build off/on FPS: A500 4.10 → 4.10,
-020-fast 12.40–12.50 → 13.30, reference 030/50 24.80 → 26.40,
-040 emulator 24.80 → 25.00. Mean 030 frame work falls from 24.8 to 21.6 ms
-(worst 27.3 → 24.6); chip-code fetches on the 020 fall from 1,963 to 430 per field.
-Native speed, restore hashes, play, pixel-identical still screenshots and options-off
-checks pass. Enhanced framerate includes bit 17; optional workspace is now 268 KB.
-Next: F3 (hot data reached through long operands). See
-[F2](internals.md#f2-remaining-hot-code-in-fast-ram) and the
+F3 is complete: 1,078 bytes of projection state, line masks and row offsets move
+into spare fast workspace, with no allocation increase (268 KB). Same-build off/on
+FPS, repeated twice: A500 4.10 → 4.10, 020-fast 13.30 → 13.50, reference 030/50
+26.30 → 28.80, 040 emulator 25.00 → 26.50. Mean 030 frame work falls 21.61 →
+20.76 ms; worst remains about 24.65 ms, so steady 50 fps is still out of reach.
+The moved blocks lose about 400 chip reads and 16.5 writes per field on the 020.
+Native speed, restore hashes, play, identical still images and options-off checks
+pass. Enhanced framerate includes bit 18. Low-word-addressed/shared/model data
+need broader relocation in F5. Next: F4 (log conversion). See
+[F3](internals.md#f3-hot-renderer-data-in-fast-ram) and the
 [plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step).
 
 The post-P5 68040 investigation measures 24.80 fps: steady frames spend about

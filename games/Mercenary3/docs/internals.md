@@ -105,6 +105,7 @@ requires bit 4 and its restore buffer, plus bit 12 for transport modes.
 Bit 15 fixes the cached polygon clipping limit on 68040/060 (R5 below).
 Bit 16 includes room-local XYZ in P4 camera interpolation (P5 below).
 Bit 17 extends bit 9 to the remaining hot code and removes M1 entry hops (F2 below).
+Bit 18 moves projection state and drawing lookup tables to fast RAM (F3 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -1370,6 +1371,52 @@ pass. Bit 17 is included in the release mask (`$3FFFF`).
 Evidence: `tmp/f2/final-v6/`. The 040 figures remain emulator counts,
 not real-hardware speed predictions.
 
+### F3: hot renderer data in fast RAM
+
+Custom1 bit 18 moves 1,078 bytes on 68020+ with real fast RAM: projection state
+at chip `$42C04..$42C75`, line masks/offsets at `$49880..$49B33`, and row offsets
+at `$43080..$4318F`. It uses the unused tail of M2's page-rounded allocation;
+optional workspace remains 268 KB. Patch 193 native long operands before copying
+code, plus the slave's five sky writers. P1 restores the moved projection state.
+The display pointer `$42C00` stays in chip. The mask copy includes negative-index
+entries before its `$498B0` base; the row table's startup writer moves too.
+
+The low-word-addressed coordinate table, shared variable-length scratch and model
+data remain in chip; they need broader relocation (F5). Dynamic `$C0` calls retain
+the cache-safe indirect form. The [plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step)
+records why these candidates do not meet F3's long-operand criterion.
+
+Same VERIFY build/session, Custom1 `262143 → 524287`, CACHE PRELOAD, two exact
+500-field comparisons per setup:
+
+| Setup | F3 off fps | F3 on fps |
+| --- | ---: | ---: |
+| A500 1.5 MB slow | 4.10 | 4.10 |
+| 020 fast | 13.30 | 13.50 |
+| Reference 030/50 | 26.30 | 28.80 |
+| Existing 040-25 emulator cell | 25.00 | 26.50 |
+
+Reference 030 beam probes over fields 175..500: mean frame work **21.61 → 20.76 ms**,
+worst **24.64 → 24.65 ms**. Main 3D is 7.28 → 6.81 ms/frame, rooms 3.09 → 2.84;
+clear remains 0.36. Scene setup `$5765E` falls 2.30 → 1.95 ms, `$5AFAA`
+1.96 → 1.81, and `$593A6` 1.09 → 1.06. The saving is below the estimated 1.5..3 ms, and the worst frame
+still exceeds one field. PER_FRAME cadence changes from 29 one-field / 233 two-field
+intervals to 80 / 208; both have one three-field startup interval.
+
+The 020 bus trace (fields 175..275) removes all chip accesses to the moved blocks:
+399.61 reads and 16.50 writes per field → zero. Remaining coordinate-table/model/
+scratch traffic is unchanged. Total chip reads fall less because the faster drawing
+spends longer polling VERTB. Evidence: `tmp/f3/final/`; the 040 figures remain emulator
+counts, not hardware predictions.
+
+Native walking/turning rates remain 6/2 units per elapsed logic field on 020/030.
+Still images are pixel-identical off/on; walking, turning, room return, surface/space
+flight, lifts and release play pass. All 167 walking restore hashes pass in chip,
+copied code and new data; transport checks pass 188 surface-flight, 187 space-flight
+and 450 lift restores. Options-off release and shipped each give 37 A500 frames /
+500 fields. Input verification and original/release/VERIFY builds pass. Enhanced
+framerate includes bit 18 (`$7FFFF`); next is F4.
+
 ### WHDLoad launch configuration
 
 WHDLoad 20.1 rejected the comma in the first Custom1 checkbox label; labels cannot
@@ -1454,7 +1501,7 @@ Evidence: `tmp/r4/`.
 ### X1: release
 
 The single player control is the **Enhanced framerate** checkbox, enabled by
-CUSTOM5=1 in the installed icon. Omission or zero leaves it unchecked. `Custom5=1` now selects feature bits 0–17 (F2); `Custom5=0` turns them all off. The release
+CUSTOM5=1 in the installed icon. Omission or zero leaves it unchecked. `Custom5=1` now selects feature bits 0–18 (F3); `Custom5=0` turns them all off. The release
 ignores legacy Custom1 settings. VERIFY retains individual bits with
 `Custom5=0 Custom1=<mask>`. CPU/chipset/memory guards are unchanged. The README covers
 installation, WHDLoad 17+, 512 KB chip RAM, the optional 268 KB workspace and CACHE/PRELOAD.

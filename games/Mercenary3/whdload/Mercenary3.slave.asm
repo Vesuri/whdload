@@ -82,7 +82,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$3ffff,(a0)
+	move.l	#$7ffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -225,6 +225,7 @@ lbC0002AA
 	move.l	a0,($5a830).l
 	move.l	#$4e714e71,($5a834).l
 .nopresent
+	bsr.w	_f3data
 	bsr.w	_hotcode
 	bsr.w	_hotdata
 	bsr.w	_patchspans
@@ -342,6 +343,88 @@ _hotentries
 	dc.l	$57914
 	dc.w	$4b2e2-$4b134+$57914-$57380
 	dc.l	0
+
+; F3: CPU-only projection state, line masks and row offsets. Use the unused tail of
+; M2's page-rounded allocation; the native display pointer stays in chip.
+; Patch before M1/S3/F2 copy code, so all copies inherit the same operands.
+; Layout within the table slot: $6200 state, $62d0 mask/offset tables
+; (base $6300, negative indexes included), $6600 row offsets. End $6710.
+; The low-word-addressed $42e00 coordinate table remains in chip RAM.
+_f3data
+	btst	#2,(_custom1+1,pc)
+	beq.w	.done
+	move.w	(_attn,pc),d0
+	btst	#AFB_68020,d0
+	beq.w	.done
+	move.l	(_expmem,pc),d0
+	cmpi.l	#$200000,d0
+	blo.w	.done
+	cmpi.l	#$a00000,d0
+	blo.b	.fast
+	cmpi.l	#$1000000,d0
+	blo.w	.done
+.fast	addi.l	#STACKSIZE+HOTSIZE+$6200,d0
+	move.l	d0,d6
+	movea.l	d0,a1
+	lea	($42c04).l,a0
+	moveq	#($42c76-$42c04)/2-1,d0
+.state	move.w	(a0)+,(a1)+
+	dbra	d0,.state
+	movea.l	d6,a1
+	adda.w	#$d0,a1
+	lea	($49880).l,a0
+	move.w	#($49b34-$49880)/2-1,d0
+.masks	move.w	(a0)+,(a1)+
+	dbra	d0,.masks
+	movea.l	d6,a1
+	adda.w	#$400,a1
+	lea	($43080).l,a0
+	move.w	#($43190-$43080)/2-1,d0
+.lookup	move.w	(a0)+,(a1)+
+	dbra	d0,.lookup
+	lea	(_f3_operands,pc),a0
+.next	move.l	(a0)+,d0
+	beq.b	.slave
+	movea.l	d0,a1
+	bsr.b	.patch
+	bra.b	.next
+.slave	lea	(_f3_slave,pc),a0
+.nextslave
+	move.w	(a0)+,d0
+	beq.b	.restore
+	lea	(_base,pc),a1
+	adda.w	d0,a1
+	bsr.b	.patch
+	bra.b	.nextslave
+.restore
+	lea	(_restore_projection,pc),a0
+	move.l	d6,(a0)
+.done	rts
+.patch	move.l	(a1),d0
+	cmpi.l	#$498b0,d0
+	bne.b	.projection
+	move.l	d6,d0
+	addi.l	#$100,d0
+	bra.b	.store
+.projection
+	cmpi.l	#$43080,d0
+	blo.b	.stateptr
+	subi.l	#$43080-$400,d0
+	add.l	d6,d0
+	bra.b	.store
+.stateptr
+	subi.l	#$42c04,d0
+	add.l	d6,d0
+.store	move.l	d0,(a1)
+	rts
+_f3_slave
+	dc.w	_f3sky0+2-_base
+	dc.w	_f3sky1+2-_base
+	dc.w	_f3sky2+2-_base
+	dc.w	_f3sky3+2-_base
+	dc.w	_f3sky4+2-_base
+	dc.w	0
+	INCLUDE "whdload/data-f3.i"
 
 ; M2: the read-only lookup region at chip $60000..$66103 supplies
 ; the renderer's numeric and trigonometric tables. Keep the original copy
@@ -1454,6 +1537,7 @@ _deriveview
 	addi.w	#256,d1
 	andi.w	#$3ff,d1
 	move.w	d1,($70b8).w
+_f3sky0	equ	*
 	move.w	d1,($42c70).l
 	move.w	($7146).w,d0
 	asr.w	#2,d0
@@ -1467,6 +1551,7 @@ _deriveview
 	movea.l	($713a).w,a1
 	add.w	($575a,a1),d0
 	andi.w	#$3ff,d0
+_f3sky1	equ	*
 	move.w	d0,($42c6c).l
 	rts
 .space	jsr	($59ba0).l
@@ -1912,6 +1997,7 @@ _present
 	movea.l	($713a).w,a1
 	add.w	($575a,a1),d0
 	andi.w	#$3ff,d0
+_f3sky2	equ	*
 	move.w	d0,($42c6c).l
 	jsr	($59da0).l		; Disk.1 $5DA50
 	jsr	($56c6e).l		; Disk.1 $5A91E
@@ -1967,6 +2053,7 @@ _presenttransport
 	addi.w	#256,d1
 	andi.w	#$3ff,d1
 	move.w	d1,($70b8).w
+_f3sky3	equ	*
 	move.w	d1,($42c70).l
 	move.w	($7146).w,d0
 	asr.w	#2,d0
@@ -1975,6 +2062,7 @@ _presenttransport
 	movea.l	($713a).w,a1
 	add.w	($575a,a1),d0
 	andi.w	#$3ff,d0
+_f3sky4	equ	*
 	move.w	d0,($42c6c).l
 	jsr	($59b94).l
 	jsr	($59da0).l
@@ -2200,6 +2288,7 @@ _restore_ranges
 	dc.w	$1f
 	dc.l	$354e2
 	dc.w	$8
+_restore_projection
 	dc.l	$42c04
 	dc.w	$38
 	dc.l	$459ba

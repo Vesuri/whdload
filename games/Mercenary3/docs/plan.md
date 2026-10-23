@@ -227,7 +227,7 @@ about 21,000 accesses per frame, 6..12 ms. Steps are in order of measured value 
 For every step, on the reference 030/50: `beam_profile.py` on the routines the step changes,
 before and after, and the publication intervals (roots `5e460`, as in F0); `fps.py` and
 `PER_FRAME=1` cadence. On the 020: `bus_audit.py` where the step targets chip traffic. New
-behaviour takes the next free `Custom1` bit (18 up); add it to the release mask (`$3FFFF`)
+behaviour takes the next free `Custom1` bit (19 up); add it to the release mask (`$7FFFF`)
 once accepted.
 
 **F0. ✓ Budget.** `render_profile.py`, `beam_profile.py`, `bus_audit.py`'s place table,
@@ -259,7 +259,7 @@ field on the 020; the room path, whose code is in chip, is 6.6% of main 3D on th
 - Result: mean 030 frame work 24.8 → 21.6 ms; chip-code fetches 1,963 → 430 per field.
   Accepted as bit 17; see [F2 results](internals.md#f2-remaining-hot-code-in-fast-ram).
 
-**F3. Hot chip data reached through long operands.** Move data blocks whose every reference
+**F3. ✓ Hot chip data reached through long operands.** Move data blocks whose every reference
 is an absolute long operand or a long immediate (patchable in chip code and copies alike):
 - Renderer state and projection constants at chip `$42C00..$42F3F` (513 reads per field),
   for example `movea.l #$42C44,a4` at `$5B030`. Find the writers with `write_audit.py`. The
@@ -270,6 +270,15 @@ is an absolute long operand or a long immediate (patchable in chip code and copi
 - `$C0` call vectors (136 reads per field): only if a same-length direct form exists in
   the copies; otherwise leave them.
 - Check as F2. Expected: 1.5..3 ms per frame.
+- Resolved scope: projection state `$42C04..$42C75`, complete mask/offset tables
+  `$49880..$49B33`, and the row table `$43080..$4318F` are relocatable with long
+  operands. Keep the low-word-addressed `$42E00` table in chip. `$AF36` shares
+  variable-length workspaces with `$AA6E`/`$AE6E`; the model pages use relative
+  offsets and embedded pointers. Those are not independent long-addressed blocks.
+  Leave their broader relocation for F5. Keep dynamic `$C0` calls cache-safe.
+- Result: 030 FPS 26.30 → 28.80; mean frame work 21.61 → 20.76 ms,
+  below the estimated saving. Accepted as bit 18; see
+  [F3 results](internals.md#f3-hot-renderer-data-in-fast-ram).
 
 **F4. Log conversion with `bfffo`** (68020+). `$4EE84`/`$4EE88` find the leading bit with a
 compare tree (5.5% of the 020's cycles). Use `bfffo` in the fast copy, giving the same shift
@@ -281,7 +290,7 @@ play and screenshots. Expected: 0.5..1 ms on the 030.
 (3.4 + 3.7 ms per presentation) all use the chip bus. Their operands are absolute short words and 16-bit displacements: a
 copy cannot reach fast RAM at the same length, so this needs the renderer reassembled from
 source with symbolic data addresses. Ask the user with F1..F4's results. Expected: 2..5 ms,
-and the copy down to about 0.5 ms.
+and the copy down to about 0.5 ms. Also consider F3's shared workspaces and model data here.
 
 **F6. Checkpoint.** F0's beam table again, `PER_FRAME=1` cadence on the 030/50 (target:
 steady one-field intervals), `matrix.sh` with all options, options off. Record what limits
@@ -336,16 +345,16 @@ without it. Real cache behaviour and 040/060 hardware performance remain unverif
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
 - [x] R5
 - [x] X1
-- [x] F0 [x] F1 (not retained) [x] F2 [ ] F3 [ ] F4 [ ] F5 (U) [ ] F6
+- [x] F0 [x] F1 (not retained) [x] F2 [x] F3 [ ] F4 [ ] F5 (U) [ ] F6
 
 P4 and P5 address the presentation defects reported after the original plan completed.
-Phase F continues toward one-field frames on the 030/50; next: F3.
+Phase F continues toward one-field frames on the 030/50; next: F4.
 Hardware validation remains unavailable, outside X1.
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–17.
+  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–18.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `render_profile.py`, `beam_profile.py`,
