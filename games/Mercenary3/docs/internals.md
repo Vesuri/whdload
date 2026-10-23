@@ -969,7 +969,8 @@ on the existing 040 cell, retaining the emulator timing caveat.
 
 Current checkpoint: [S6](#s6-budget-checkpoint). S1–S4 reach one-field no-draw and
 two-field full frames on the reference 030/50 after startup; R3 is closed by user
-decision, retaining double buffering.
+decision, retaining double buffering. The current release's
+[68040 frame budget](#68040-frame-budget-after-p5) is measured below.
 
 The `VERIFY` build's `Custom2` bits make drawing routines return at once (bit 0 the 3D
 drawing `$577BE`, 1 the clear `$5E840`, 2 `$5410E`, 3 `$5AFAA`, 4 `$593A6`). The 030 and
@@ -1005,6 +1006,66 @@ fetches per field from chip RAM; 95% come from 20 KB of code, led by Disk.1
 (25%, the span fills and the word at `$4966A`), `$5B8B0..$5C4B0` (12%) and `$575B0..$580B0`
 (11%). Display buffers take 4,500 CPU writes and 1,900 reads per field, much of it
 read-modify-write.
+
+### 68040 frame budget after P5
+
+Current Enhanced framerate, existing `040-25` cell, CACHE PRELOAD: the standard
+500-field route gives **248 frames / 24.80 fps**, repeated identically. Publication
+sampling gives 248 two-field intervals and one three-field startup interval.
+This is actual scene publication cadence, not host window refresh.
+
+The 040 backend cannot record instruction profiles. Breakpoints at routine entry
+and return, with VERTB and video-beam samples, measure inclusive emulated elapsed
+time (including interrupts). Separate publication probes split the bitmap copy
+from the field wait. These probes move route boundaries to breakpoints; the FPS
+comparisons use the exact-field route. Times below are approximate PAL milliseconds,
+rounded to 0.1 ms, not calibrated 68040 hardware timings.
+
+| Work | Mean ms per rendered frame |
+| --- | ---: |
+| Main 3D renderer, Disk.1 `$577BE` | 10.9 |
+| Drawing at `$5AFAA` / `$593A6` | 2.3 / 1.5 |
+| Scene setup, `$5765E` | 2.7 |
+| Fast bitmap to chip copy, publication at `$5E458` | 3.3 |
+| Presentation save/restore, amortised over all frames | 3.3 |
+| Clear, `$5E840` | 0.1 |
+
+Saving and restoring cost **3.3 ms each**, about **6.7 ms per extra presentation**;
+roughly half the frames are extra presentations. Within the main 3D cost, separate
+inclusive probes measure the room path (`$5F438`) at **4.8 ms** and the interior
+detail path (`$5836A`) at **0.8 ms** per call; these are not additional costs.
+
+Between publication and the following wait, steady frames do **21.0–29.2 ms** of
+work, averaging **25.6 ms**; remaining time includes camera, logic and other glue.
+The field wait averages **14.3 ms**, giving approximately 40 ms between publications.
+The workload misses the 20 ms boundary, then double buffering rounds delivery up
+to two fields. Reaching one field needs about **5.6 ms less work on average**, and
+about **9.2 ms** on the slowest sampled steady frame. Removing the wait alone
+would not make the measured work fit in 20 ms. R3 stays closed.
+
+Same corrected VERIFY build/session, `Custom5=1`, `Custom2` bypass results:
+
+| Bypass | FPS |
+| --- | ---: |
+| None / repeated baseline | 24.80 / 24.80 |
+| Main 3D | 49.60 |
+| Clear / staging | 21.50 |
+| `$5410E` | 24.80 |
+| `$5AFAA` | 25.70 |
+| `$593A6` | 24.80 |
+| All five | 49.60 |
+
+The clear bypass also disables fast bitmap staging, so it is not a pure clear-cost
+test. Bypass gains are not additive. The main 3D renderer remains the largest
+measured target; presentation copying and scene setup also consume substantial
+budget. Optimisation must retain P5's room-camera consistency and native logic.
+
+The investigation corrected a VERIFY-only instrument fault: `_objectinit` checked
+Custom2 bit 4 instead of bit 0, replacing the main-3D bypass RTS with its hook.
+Before correction, bit 0 misleadingly gave 24.80 fps. Release bytes are unchanged
+from the P5 build, whose world-speed, play, restore and options-off checks still
+apply. No emulator changes or hardware-speed claims. Evidence and sampling scripts:
+`tmp/profile-040/`; final same-build comparisons in `tmp/profile-040/final/`.
 
 ### S1: presentation restore buffer in expansion memory
 

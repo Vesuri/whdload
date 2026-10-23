@@ -128,6 +128,13 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Current status
 
+The post-P5 68040 investigation measures 24.80 fps: steady frames spend about
+25.6 ms working, then wait for the next field, producing two-field delivery.
+Main 3D drawing costs 10.9 ms; bitmap copying, scene setup and presentation
+save/restore also matter. A VERIFY-only bypass hook error is corrected; skipping
+main 3D reaches 49.60 fps. Release behaviour is unchanged. See the
+[current 040 frame budget](internals.md#68040-frame-budget-after-p5).
+
 R5 fixes intermittent missing ground with caches enabled on 68040/060. The
 outside-prison reproduction also fails in the shipped slave; it was not introduced
 by P4. The mutable clipping instruction is replaced with a data comparison while

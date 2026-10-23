@@ -959,7 +959,8 @@ _logicstamp	dc.w	0,0			;last accepted VERTB, valid walking pass
 ; previous/current heading bytes, changed flag, padding (40 bytes per object).
 _objectinit
 	IFD VERIFY
-	btst	#4,(_custom2+3,pc)
+; Preserve the main-3D bypass; the object entry hook would replace its RTS.
+	btst	#0,(_custom2+3,pc)
 	bne.w	.done
 	ENDC
 	btst	#3,(_custom1+2,pc)
