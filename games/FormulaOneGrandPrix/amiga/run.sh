@@ -44,7 +44,7 @@ chmod -R u+w "$DH0" "$DH1"
 printf 'Expert\nReadDelay=0\n' > "$DH0/s/WHDLoad.prefs"
 printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assign DEVS: DH0:devs' \
   'Stack 16384' 'FailAt 999' 'CD DH1:' \
-  "WHDLoad $SLAVE_NAME PRELOAD SPLASHDELAY=0 NOREQ ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
+  "WHDLoad $SLAVE_NAME PRELOAD SPLASHDELAY=0 CONFIGDELAY=0 NOREQ ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
 if [ "${VERIFY_EXIT:-0}" = 1 ]; then
   printf '%s\n' 'If WARN' 'Echo "FAIL" >DH0:whdload-exit.txt' 'Else' \
     'Echo "OK" >DH0:whdload-exit.txt' 'EndIf' >> "$DH0/s/startup-sequence"

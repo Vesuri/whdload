@@ -79,7 +79,7 @@ F10 quit hook. No performance changes are installed. The old CPU mask is retaine
 B5 has not enabled caches. DOS BSTR assign names are explicitly longword-aligned.
 The shared kit is consumed in place, rather than copying WHDLoad source into this repo.
 
-B2 build checks: bash 3.2, ordinary and spaced output directories produce identical
+B2/B3 baseline build checks: bash 3.2, ordinary and spaced output directories produced identical
 6100-byte executables with `IOCACHE = 10000`. A deterministic `a1200-fast` Quick Race boots successfully:
 language 807, protection 1184, startup 1413, track 1608, race 2115 fields. The existing
 original route begins at language 838 and has identical subsequent intervals (all
@@ -140,7 +140,7 @@ Paired captures pass on `a1200-fast` (supplied 582992-byte game, caches unchange
 | Follow | 6372 fields | 500/500 | pass in both runs |
 
 Every pair has the same route, actual hunk bases, executable/input/tool hashes and
-window length. The current slave SHA-256 is
+window length. The B3 accepted slave SHA-256 is
 `c44d576c6e0bed066a91abe44d9e7b1925863e2c7f8cd7f5e430cf9e08607eed`.
 The green, retirement and follow-camera screenshots were visually inspected.
 The separate `CUSTOM1=1` quit probe follows the same menu route, confirms no return
@@ -155,6 +155,73 @@ repetition including a spaced output path, input hashes, Python compilation, bas
 syntax and whitespace checks also pass. Captures, probe records and checker fixtures
 remain in ignored `tmp/b3/`; no game or built-slave bytes are tracked.
 
+
+### B4: option gates and disabled-byte checks
+
+The build now exposes the existing `CUSTOM1` skip-intro option in `slv_config`.
+`CUSTOM2–4` remain unassigned: no unimplemented performance or simulation option is
+advertised. Release and developer targets currently assemble identical code; the
+`DEVELOPER` define is the entry point for future individual feature switches. VERIFY
+adds `CUSTOM5` bit 0, **Verify pacer relay**, solely to exercise an actual optional hook.
+It is not a faster-pacer or simulation patch.
+
+For the supplied game only, the VERIFY patch list uses `PL_IFC5X 0` around the six-byte
+JSR at `h0+$3C9D2`. The relay tail-calls the original `h0+$1272` through the stack,
+leaving registers and X intact; its MOVE changes NZVC, which the original pacer's first
+MOVE replaces before use. Off installs nothing. Release/developer contain neither the
+relay nor its option. The whole original JSR is replaced, with no return adjustment.
+Other game variants have no diagnostic hook and remain unverified.
+
+`tools/check_disabled.py` reads `PERF_RANGE` comments beside optional hooks. It checks
+annotation/patch address and length, the enclosing CUSTOM bit condition and matching
+`slv_config` declaration, rejecting missing, malformed, empty or unsupported inventories.
+It rebuilds original hunk relocations from the pinned executable using the capture's
+actual DOS segment chain. **All bytes, including relocated operands, are compared**;
+relocations are not masked out. All five CUSTOM values must be zero. Source, slave,
+input pins and actual layout must match capture metadata. Mandatory protection, save,
+keyboard and names patches retain the B3 baseline and are separately checked, rather
+than falsely required to equal the unpatched original.
+
+B4 runtime evidence (`tmp/b4`, `a1200-fast`, fresh deterministic boots):
+
+| Build / option | Optional range | 50-field live update / draw / pacer | Loader checks | Real F10 exit |
+|---|---|---:|---|---|
+| Release, all off | Original six bytes | 8 / 8 / 8 | All eight pass | OK |
+| Developer, all off | Original six bytes | 8 / 8 / 8 | All eight pass | OK |
+| VERIFY, all off | Original six bytes | 8 / 8 / 8 | All eight pass | OK |
+| VERIFY, CUSTOM5=1 | Relay installed; target resolves to original pacer | 8 / 8 / 8 | All eight pass | OK |
+
+All four quit screenshots show the AmigaDOS prompt without an error requester. The
+release/developer raw traces and RAM dumps match; VERIFY is a distinct build. These
+short checks establish B4 gating, not full-race regression or performance equivalence.
+All four routes reach language/protection/startup/track/race at
+1706/2083/2312/2507/3014 fields; the actual layouts agree between these four cases.
+Relative to B3, h0/h1 stay at the same bases and h2/h3 move by −$A8. This changed
+startup route is not treated as a performance result or proof of a specific cause.
+B3's 500-field paired baseline remains evidence for its recorded 6100-byte build;
+it is not relabelled as a capture of these changed binaries.
+
+Current build sizes/hashes:
+
+- Release/developer: 6116 bytes,
+  `e34ac9c3f726d7de2c566c2f73c29ac0a363c9d1165023674e77990542f9d568`.
+- VERIFY: 6180 bytes,
+  `69ef15a83eb41573d79269fd01dff6ddb284b1160e19ce1f60ab6d6e2e75a87d`.
+
+The checker rejects independent corruption of each of the six bytes, an actual enabled
+relay even when its copied metadata claims all-off, nonzero options, stale source and
+wrong layout. Nine malformed-source cases also fail, including an undeclared option,
+missing annotation, wrong address/length/bit, extra hook, orphan and empty inventory.
+`tools/slave_gate.py --check` rechecks the retained runtime set and negative tests before
+writing PASS. All three builds also reproduce byte-for-byte with relative and absolute
+output paths containing spaces; guarded cleanup succeeds on all six directories.
+
+The first runtime attempt failed at the WHDLoad configuration splash: adding
+`slv_config` activates `ConfigDelay`, and the route's repeated fire input kept restarting
+that timer. The automated launcher now supplies `CONFIGDELAY=0` as well as
+`SPLASHDELAY=0`. The failed capture stays in `tmp/b4/rejected-configdelay`. A release
+build initially hit bash 3.2's empty-array/nounset behavior; explicitly defining both
+build symbols fixed it. Neither failed attempt is counted as acceptance evidence.
 
 ## Executables
 

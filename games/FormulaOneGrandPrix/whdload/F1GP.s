@@ -3,6 +3,12 @@
         INCLUDE whdload.i
         INCLUDE whdmacros.i
 
+        IFND DEVELOPER
+DEVELOPER = 0
+        ENDC
+        IFND VERIFY
+VERIFY = 0
+        ENDC
 slv_Version = 17
 slv_Flags = WHDLF_NoError|WHDLF_EmulPriv|WHDLF_ClearMem|WHDLF_Examine
 slv_keyexit = $59
@@ -21,7 +27,12 @@ slv_CurrentDir dc.b 'data',0
 slv_name dc.b 'Formula One Grand Prix',0
 slv_copy dc.b '1991 Microprose',0
 slv_info dc.b 'Reconstructed loader',10,'Original install by Codetapper/Action!',0
-slv_config dc.b 0
+slv_config
+        dc.b 'C1:B:Skip intro;'
+        IFNE VERIFY
+        dc.b 'C5:X:Verify pacer relay:0;'
+        ENDC
+        dc.b 0
 intro_name dc.b 'frontend',0
 game_name dc.b 'f1gp',0
 empty_args dc.b 0
@@ -39,6 +50,9 @@ custom_tags dc.l WHDLTAG_CUSTOM1_GET
 skip_intro dc.l 0
         dc.l 0
 game_size dc.l 0
+        IFNE VERIFY
+verify_pacer_target dc.l 0
+        ENDC
 
 RUN_SEGMENT MACRO
         move.l d7,a1
@@ -121,6 +135,14 @@ patch_game
         move.l (_resload,pc),a2
         jsr (resload_PatchSeg,a2)
         bsr restore_names
+        IFNE VERIFY
+        ; This relay is only installed for the supplied, verified layout.
+        move.l d7,d0
+        lsl.l #2,d0
+        add.l #4+$1272,d0
+        lea (verify_pacer_target,pc),a0
+        move.l d0,(a0)
+        ENDC
         RUN_SEGMENT
 quit
         pea TDREASON_OK
@@ -191,6 +213,15 @@ names_done
         movem.l (sp)+,d0-a6
         rts
 
+        IFNE VERIFY
+verify_pacer
+        ; Stack-only tail call: no game register or X change. The original
+        ; pacer's first MOVE replaces NZVC before those flags are consumed.
+        move.l (verify_pacer_target,pc),-(sp)
+        rts
+        ENDC
+
+; BASELINE_PATCHES_BEGIN: mandatory B3 loader patches, never feature-gated.
 patch_582992
         PL_START
         PL_L $982,$22116000
@@ -199,7 +230,15 @@ patch_582992
         PL_B $a79ce,$ff
         PL_L $a7a42,'save'
         PL_W $a7a46,$7300
+        ; BASELINE_PATCHES_END
+        IFNE VERIFY
+        PL_IFC5X 0
+        ; PERF_RANGE h0:3c9d2 6 custom=5 bit=0 variant=582992
+        PL_PS $3c9d2,verify_pacer
+        PL_ENDIF
+        ENDC
         PL_END
+; BASELINE_PATCHES_BEGIN: mandatory B3 loader patches.
 patch_582988
         PL_START
         PL_L $982,$22116000
@@ -218,6 +257,7 @@ patch_582780
         PL_L $a7992,'save'
         PL_W $a7996,$7300
         PL_END
+; BASELINE_PATCHES_END
 names_rnc
         INCBIN tmp/slave/names.rnc
         EVEN

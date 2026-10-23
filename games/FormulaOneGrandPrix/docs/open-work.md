@@ -4,29 +4,30 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with fast RAM. The implementation plan
 is [plan.md](plan.md); verified findings are in [internals.md](internals.md).
 
-# Next: B4
+# A2 and B4 complete — stop point reached
 
-B1–B3 and A1/A2/A5/A6 are complete. The user selected a modern-KickEmu baseline instead
-of requiring the original slave's timing-dependent race. B3 explicitly checks
-repeatability and loader behavior; original-slave equivalence is not claimed.
+B1–B4 and A1/A2/A5/A6 are complete. A2 identifies the shared live loop for race,
+practice and qualifying, the replay loop, and the one-time cockpit-return redraw.
+All six drawing/pacer callers have native-route call-count evidence.
 
-The missing original 10,000-byte filesystem I/O cache is restored. The normal build
-uses unmodified shared KickEmu; local legacy-allocation experiments are rejected.
-On `a1200-fast`, paired green/tow/follow windows match all 1500 screenshot digests,
-routes, anchors and actual hunk bases. All captured loader checks pass. Real F10 input
-returns cleanly to AmigaDOS. `python3 tools/slave_accept.py` reports PASS for the
-current build. See [B3 evidence](internals.md#b3-modern-kickemu-baseline).
+B4 has release/developer/VERIFY targets, declared options and a source-driven,
+relocation-aware disabled-hook checker. Release, developer and VERIFY with all options
+off preserve every declared optional hook byte. A VERIFY-only relay proves the enabled
+path and the checker's rejection of changed bytes. All four fresh-boot cases pass loader
+checks and real F10 exit; adversarial checks pass. See [B4 evidence](internals.md#b4-option-gates-and-disabled-byte-checks).
 
-A2 identifies the shared live loop (race/practice/qualifying), the replay loop, and
-the one-time cockpit-return draw/pacer pair. All six caller sites are documented with
-native-route profile counts.
+B3's modern-KickEmu baseline remains accepted for its pinned build; original-slave
+race equivalence is not claimed. B4's changed builds have their own gating captures,
+not a relabelled B3 baseline. No simulation or CPU-performance patches are enabled.
+Builds, captures and rejected attempts remain in ignored `tmp/`.
 
-Next work:
+Next work, requiring a new scope:
 
-- **B4:** add feature gating, disabled-hook byte checks and developer/VERIFY targets.
-- **A3:** optional in the original session scope, required before C: audit call writes
-  and drawing side effects that simulation consumes.
+- **A3:** audit each live-loop call's writes and every renderer side effect consumed
+  by simulation; required before C.
+- **B5:** enable caches and validate menus/full races across the CPU matrix.
+- **A8:** use developer/VERIFY gates to measure renderer ceilings.
+- **A7:** complete the machine matrix; can proceed alongside the above.
 
-Stop after B4 passes under the original session scope. B5 and later implementation
-remain outside that scope. No simulation or CPU-performance patches are installed.
-All builds, captures and rejected experiments stay in ignored `tmp/`.
+The requested stop after B4 has been reached. C and later implementation remain outside
+this session's scope; A4 will be needed before D's presentation snapshots.

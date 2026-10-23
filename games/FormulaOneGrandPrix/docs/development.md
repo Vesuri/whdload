@@ -27,7 +27,7 @@ Do not merge into modified game data.
 
 `amiga/run.sh` copies `tmp/game/FormulaOneGrandPrix4Disk` to the disposable
 `amiga/.run/dh1`, boots Kickstart 3.1 with the Workbench 2.04 floppy and runs
-`WHDLoad FormulaOneGrandPrix4Disk.Slave PRELOAD SPLASHDELAY=0 NOREQ`. The default machine
+`WHDLoad FormulaOneGrandPrix4Disk.Slave PRELOAD SPLASHDELAY=0 CONFIGDELAY=0 NOREQ`. The default machine
 is the A500-equivalent: 68000, 512 KB chip, 1.5 MB slow, no fast RAM. `AMIGA_SETUP`,
 `CHIP_KB`/`SLOW_KB`/`FAST_KB`, `WHD_ARGS` (for example `CUSTOM1=1`), `SLAVE`, `DEBUG`,
 `WARP` and the other shared launcher variables apply.
@@ -162,6 +162,11 @@ successful boot as B3 acceptance. All slave builds, listings and captures stay i
 
 ## Slave acceptance captures (B3)
 
+The retained B3 set belongs to the 6100-byte baseline. B4 changes the build and launcher;
+`slave_accept.py` correctly rejects that old set against the current binary. The commands
+below are the recipe for a fresh full B3 set, not a request to overwrite accepted evidence.
+B4 has its own gate below; its shorter captures do not replace the B3 paired windows.
+
 B3 uses the modern shared KickEmu with `IOCACHE = 10000`. Build normally with
 `make slave`; local device-description adaptations are diagnostic rejects, not inputs
 to that build. Rejected captures must not be promoted into the baseline.
@@ -243,3 +248,47 @@ Start contiguous profiles immediately after that click; the redraw occurs during
 transition, before the stable cockpit. Six 50-field chunks captured it exactly once.
 Do not start the trace at a breakpoint on the draw: the profiler begins at a field
 boundary and can omit the call at the breakpoint. Use screen-anchored transitions.
+
+## Build variants and disabled-hook gate (B4)
+
+```sh
+make slave                 # release -> tmp/build
+make slave-developer       # DEVELOPER=1 -> tmp/build-developer
+make slave-verify          # DEVELOPER=1 VERIFY=1 -> tmp/build-verify
+make slave-verify OUT='tmp/verify with spaces'
+make slave-clean OUT='tmp/verify with spaces'
+. amiga/env.sh
+python3 tools/slave_gate.py
+python3 tools/slave_gate.py --check
+make check-disabled CAPTURE=tmp/b4/verify-off
+make test-disabled
+```
+
+Each build writes the slave, listing and `build.json` into its selected `tmp/` directory.
+`OUT` accepts relative or absolute paths, including spaces; paths outside `tmp/` fail.
+Cleanup removes only those three generated files. The normal target excludes VERIFY
+code, even if a VERIFY build previously occupied that output directory. Never release
+an artifact based only on its filename; inspect the build manifest and rebuild normally.
+
+`slave_gate.py` requires fresh capture directories under `tmp/b4`; it refuses to overwrite
+prior evidence. Move a rejected attempt aside explicitly before retrying. It starts and
+stops only project servers, verifies input/source/build hashes, reaches Quick Race and
+captures 50 fields for each of release-off, developer-off, VERIFY-off and VERIFY-on.
+Each case also checks the B3 loader patches/names and real F10 return. The enabled case
+uses only `CUSTOM5=1`, a VERIFY relay to the original pacer. `--check` audits retained
+captures against current binaries, runs adversarial checker tests and writes the combined
+`acceptance.json`; it does not launch an emulator. Missing or stale evidence is a failure.
+The original B3 names oracle in `tmp/b3/original/green` is still required.
+
+A new optional hook must carry a comment immediately before the patch, for example
+`PERF_RANGE h0:3c9d2 6 custom=5 bit=0 variant=582992`, inside the matching `PL_IFC5X 0`
+gate, with its bit declared in `slv_config`. Do not put new optional patches inside the
+mandatory baseline delimiters. The current checker deliberately supports only the one
+present form (six-byte hunk-0 `PL_PS`); extend its audit and negative tests together when
+adding another patch form, hunk or source file. Unsupported forms fail closed. Original
+bytes are read from the verified local game, never copied into tracked fixtures.
+
+`CONFIGDELAY=0` is needed alongside `SPLASHDELAY=0` for automated boots now that options
+are exposed. Otherwise the route's repeated fire presses can keep WHDLoad's configuration
+window open. This is a launcher setting; the slave's ordinary interactive options remain
+available when launched elsewhere.
