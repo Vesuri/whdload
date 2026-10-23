@@ -298,6 +298,28 @@ A7's paired green/tow/follow matrix is incomplete and A8 has not started. The de
 not a pass, and disabling data-cache emulation is not an accepted substitute. No shared
 tooling or runtime was modified.
 
+### Non-deferred B5 check: 68040 startup also unsuccessful
+
+After the user deferred 68030 and shared tooling repairs, the next required cell was
+attempted with the unchanged pinned VERIFY slave and runtime: 68040/25, `NOMMU`,
+cycle-exact CPU/memory/blitter, data-cache emulation enabled and `full+indirect` drives.
+The effective emulator report confirms CPU=68040, FPU=68040, MMU=0, JIT=0.
+
+`tmp/b5/040-on-clock` retains the capture metadata, effective configuration, startup
+log and `intervention.json`. The initial one-field profile and fire input completed;
+the following `monitor fields 25` remained the last command without progress across
+liveness checks. At 2 minutes 23 seconds of process lifetime, the verified owned emulator
+was deliberately stopped. No language screen, game CACR log or race-clock samples were
+obtained. The subsequent disconnected-debugger error is a consequence of that stop,
+not the diagnosis of the original startup failure.
+
+This is an unsuccessful bounded startup check, not proof of a permanent deadlock or
+of the same root cause as the 030 wait. No shared-tool investigation or repair was
+performed. The required 040 non-MMU B5 gate remains unmet; **040 has not been deferred**.
+040 MMU and both 060 variants have not yet been tested. Continuing past this failed gate
+requires a decision on the additional startup blocker while shared repairs remain out
+of scope. The user-authorized 030 deferral does not waive any of these remaining gates.
+
 ## Executables
 
 `data/game` is the original hard-disk loader (assigns, `frontend`, then `f1gp`); the slave

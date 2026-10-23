@@ -49,6 +49,14 @@ CPU spelling/effective configuration), and **TOOL3** (stale capture reuse). Do n
 investigate or fix those shared items in this session. No shared tooling or installed
 runtime has changed. Deferred 68030 results are not passes.
 
+**New non-deferred blocker:** the verified 68040/25 non-MMU cache-on check also failed
+to advance past its first 25-field startup command. The live process was stopped after
+2 minutes 23 seconds without reaching the language screen; evidence is retained in
+`tmp/b5/040-on-clock`. See [the check and its limits](internals.md#non-deferred-b5-check-68040-startup-also-unsuccessful).
+No shared-tool investigation or fix was made. 040 is still required, not deferred;
+040 MMU and 060 cells remain untested. The next decision is how to handle this additional
+startup blocker under the instruction to leave shared repairs out of this session.
+
 Next steps, under the [current validation scope](plan.md#current-validation-scope-68030-deferred):
 
 1. **B5:** validate whole races/menus on 68020 and both 68040/68060 MMU variants; record matched
