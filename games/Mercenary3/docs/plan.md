@@ -96,10 +96,13 @@ collision (`$6F56`), a mode change or a stop.
   in per-frame screenshots. Measure the frame rate on `a1200-fast` and with `matrix.sh`.
 
 **P2. Other objects interpolated** (needs P1).
-- Find where moving objects keep their position and orientation (start from the object
-  tables at chip `$AF36..`/`$B31E..` and what the drawing reads).
-- Keep the previous pass's poses. In a presentation frame, draw objects between the last two
-  passes, then restore. Snap new or vanished objects and jumps.
+- The named `$AF36..`/`$B31E..` areas are drawing scratch. Object XYZ arrays start at
+  chip `$581C`, `$5C1C`, `$601C`; vehicle headings are at `$6C1C + 4 × slot`.
+- Keep the previous pass's poses. Draw objects between the last two passes, then restore.
+  Apply the one-pass display delay to logic frames too: delaying only presentation frames
+  would rewind from the current pose shown by each logic frame. Stage only the object
+  renderer after collision; keep simulation, distance ordering and selection committed.
+  Snap new or vanished objects, scene/model changes and jumps.
 - Check: the P1 hash check; play near moving objects.
 
 **P3. Other movement modes** (needs P1).
@@ -215,18 +218,18 @@ moved and self-modifying code.
 
 - [x] O1
 - [x] L1
-- [x] P1 [ ] P2 [ ] P3
+- [x] P1 [x] P2 [ ] P3
 - [x] M1 [x] M2
 - [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [x] S6
 - [x] R1 [ ] R2 [x] R3 (closed) [ ] R4
 - [ ] X1
 
-Next: P2, then P3 (the latter includes a user decision on movement modes).
+Next: P3 (user decision on movement modes).
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–10.
+  with `Custom1` bits 0–11.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the

@@ -23,6 +23,7 @@ TABLESIZE	= $6104
 TABLEMEM	= $7000		;ws_ExpMem requires whole 4 KB pages
 RENDERMEM	= $9000
 STAGEMEM	= $18000	;32 KB bitmap plus up to 64 KB alignment
+OBJECTMEM	= $3000		;256 pose histories (40 bytes each), page rounded
 RESTOREMEM	= $5000		;17,366 bytes, rounded to whole pages
 
 ;======================================================================
@@ -37,7 +38,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$41			;ws_keyexit = Backspace
-_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM) ;optional workspace
+_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM+OBJECTMEM) ;optional workspace
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -67,7 +68,8 @@ _config		dc.b	"C1:X:Enable display DMA once and copy whole palette:0;"
 		dc.b	"C1:X:Longword horizontal span fills:7;"
 		dc.b	"C1:X:Bulk presentation restore:8;"
 		dc.b	"C1:X:Renderer code in fast RAM (68020+):9;"
-		dc.b	"C1:X:View bitmap in fast RAM (68020+):10"
+		dc.b	"C1:X:View bitmap in fast RAM (68020+):10;"
+		dc.b	"C1:X:Interpolate other objects (requires presentation):11"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -232,6 +234,7 @@ lbC0002AA
 	bsr.w	_bypass
 	ENDC
 	bsr.w	_hotrenderer
+	bsr.w	_objectinit
 	moveq	#CACRF_EnableI,d0
 	move.l	d0,d1
 	movea.l	(_resload,pc),a0
@@ -873,6 +876,299 @@ _logicgate
 	jmp	($5a298).l		;original callee, Disk.1 $5DF48
 
 _logicstamp	dc.w	0,0			;last accepted VERTB, valid walking pass
+
+; P2: snapshot in the object renderer (Disk.1 $577BE), after collision.
+; Logic frames use the previous pose too, so intermediate frames never rewind.
+; History: previous XYZ, current XYZ, location, model flags, generation,
+; previous/current heading bytes, changed flag, padding (40 bytes per object).
+_objectinit
+	IFD VERIFY
+	btst	#4,(_custom2+3,pc)
+	bne.w	.done
+	ENDC
+	btst	#3,(_custom1+2,pc)
+	beq.w	.done
+	move.l	(_restore_buffer,pc),d0
+	beq.w	.done
+	move.l	(_expmem,pc),d0
+	cmpi.l	#$200000,d0
+	blo.w	.done
+	move.w	(_attn,pc),d1
+	btst	#AFB_68020,d1
+	beq.w	.done
+	addi.l	#STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM,d0
+	lea	(_object_buffer,pc),a0
+	move.l	d0,(a0)
+	movea.l	d0,a0
+	move.w	#OBJECTMEM/4-1,d1
+.clear	clr.l	(a0)+
+	dbra	d1,.clear
+; Enter the unmodified continuation in chip or its S3 copy.
+	move.l	#$577c8-$3cb0,d0
+	move.l	(_render_base,pc),d6
+	beq.b	.chip
+	bsr.w	_rendermap
+.chip	lea	(_object_continue+2,pc),a0
+	move.l	d0,(a0)
+	move.w	#$4ef9,($577be-$3cb0).l
+	lea	(_objectdraw,pc),a0
+	move.l	a0,($577c0-$3cb0).l
+; Stage the model only after its committed distance/selection test.
+	move.l	#$57c36-$3cb0,d0
+	tst.l	d6
+	beq.b	.modelchip
+	bsr.w	_rendermap
+.modelchip
+	movea.l	d0,a1
+	move.w	#$4ef9,(a1)+
+	lea	(_objectmodel,pc),a0
+	move.l	a0,(a1)
+	addq.l	#6,d0
+	lea	(_model_continue+2,pc),a0
+	move.l	d0,(a0)
+.done	rts
+_object_buffer	dc.l	0
+_object_generation	dc.w	0
+_object_scene	dc.l	-1
+_object_active	dc.w	0
+_object_alpha	dc.w	0
+
+_objectdraw
+	move.w	sr,-(sp)
+	movem.l	d0-d7/a0-a6,-(sp)
+	lea	(_inpresent,pc),a6
+	lea	(_object_active,pc),a0
+	clr.w	(a0)
+	cmpi.w	#1,($7122).w
+	bne.w	.reset
+	cmpi.w	#1,($7142).w
+	bne.w	.reset
+	tst.w	($71cc).w
+	bpl.w	.reset
+	move.w	(_object_generation,pc),d5
+	tst.w	(a6)
+	bne.b	.time
+	addq.w	#1,d5
+	bne.b	.generation
+; Reset scene validity on wrap so every visible object snaps.
+	lea	(_object_scene,pc),a0
+	move.l	#-1,(a0)
+	movea.l	(_object_buffer,pc),a0
+	move.w	#255,d0
+.wrap	clr.w	(32,a0)
+	lea	(40,a0),a0
+	dbra	d0,.wrap
+	moveq	#1,d5
+.generation
+	lea	(_object_generation,pc),a0
+	move.w	d5,(a0)
+.time	move.w	($529f4).l,d6
+	sub.w	(_pstate,pc),d6
+	move.w	(_pstate+4,pc),d7
+	cmp.w	d7,d6
+	bls.b	.ratio
+	move.w	d7,d6
+.ratio	lea	(_object_alpha,pc),a0
+	move.w	d6,(a0)
+	lea	(_object_active,pc),a0
+	move.w	#1,(a0)
+	lea	($7423).w,a3
+	move.w	($71e6).w,d4
+	beq.w	.draw
+	subq.w	#1,d4
+.next	moveq	#0,d0
+	move.b	(a3)+,d0
+	beq.w	.skip		; player/world marker
+	cmpi.w	#10,d0		; player proxy follows P1, not object delay
+	beq.w	.skip
+	move.w	d0,d1
+	mulu.w	#40,d1
+	movea.l	(_object_buffer,pc),a1
+	adda.l	d1,a1
+	add.w	d0,d0
+	add.w	d0,d0
+	movea.w	d0,a0		; object index * 4
+	tst.w	(a6)
+	bne.w	.skip
+	move.l	(12,a1),(a1)
+	move.l	(16,a1),(4,a1)
+	move.l	(20,a1),(8,a1)
+	move.b	(35,a1),(34,a1)
+	move.l	($581c,a0),(12,a1)
+	move.l	($5c1c,a0),(16,a1)
+	move.l	($601c,a0),(20,a1)
+	moveq	#0,d1
+; The native heading byte is used by the vehicle slots 1..27.
+	cmpi.w	#28*4,d0
+	bhs.b	.heading
+	move.b	($6c1c,a0),d1
+.heading	move.b	d1,(35,a1)
+	move.l	($681c,a0),d1
+	clr.b	d1		; last byte is the changing spatial cell
+	cmp.l	(24,a1),d1
+	bne.b	.snap
+	move.l	($641c,a0),d2
+	cmp.l	(28,a1),d2
+	bne.b	.snap
+	move.w	d5,d2
+	subq.w	#1,d2
+	cmp.w	(32,a1),d2
+	bne.b	.snap
+	move.l	($7158).w,d2
+	cmp.l	(_object_scene,pc),d2
+	bne.b	.snap
+; Large discontinuities snap, including wrapped world coordinates.
+	moveq	#0,d2
+.validate
+	move.l	(12,a1,d2.w),d3
+	sub.l	(a1,d2.w),d3
+	cmpi.l	#32767,d3
+	bgt.b	.snap
+	cmpi.l	#-32767,d3
+	blt.b	.snap
+	addq.w	#4,d2
+	cmpi.w	#12,d2
+	bne.b	.validate
+	bra.b	.record
+.snap	movem.l	(12,a1),d1-d3
+	movem.l	d1-d3,(a1)
+	move.b	(35,a1),(34,a1)
+.record	move.l	($681c,a0),d1
+	clr.b	d1
+	move.l	d1,(24,a1)
+	move.l	($641c,a0),(28,a1)
+	move.w	d5,(32,a1)
+	clr.w	(36,a1)
+; Static objects need no staging.
+	move.l	(a1),d1
+	cmp.l	(12,a1),d1
+	bne.b	.changed
+	move.l	(4,a1),d1
+	cmp.l	(16,a1),d1
+	bne.b	.changed
+	move.l	(8,a1),d1
+	cmp.l	(20,a1),d1
+	bne.b	.changed
+	move.b	(34,a1),d1
+	cmp.b	(35,a1),d1
+	beq.b	.skip
+.changed	move.w	#1,(36,a1)
+.skip	dbra	d4,.next
+	tst.w	(a6)
+	bne.b	.draw
+	lea	(_object_scene,pc),a0
+	move.l	($7158).w,(a0)
+	bra.b	.draw
+.reset	lea	(_object_scene,pc),a0
+	move.l	#-1,(a0)
+.draw	movem.l	(sp)+,d0-d7/a0-a6
+	move.w	(sp)+,ccr
+	bsr.w	_objectnative
+	move.w	sr,-(sp)
+	move.l	a0,-(sp)
+	lea	(_object_active,pc),a0
+	clr.w	(a0)
+	movea.l	(sp)+,a0
+	move.w	(sp)+,ccr
+	rts
+_objectnative
+	clr.w	($6f32).w
+	move.w	#$7fff,($71da).w
+_object_continue
+	jmp	($577c8-$3cb0).l
+
+; Distance ordering and the nearest-object result remain committed. Only
+; geometry sees staged coordinates, restored before this model returns.
+_objectmodel
+; Most visible objects are static. Avoid the full staging frame for them.
+	movem.l	d0/a1,-(sp)
+	move.w	(_object_active,pc),d0
+	beq.b	.native
+	move.w	a0,d0
+	beq.b	.native
+	cmpi.w	#10*4,d0
+	beq.b	.native
+	cmpi.w	#255*4,d0
+	bhi.b	.native
+	mulu.w	#10,d0
+	movea.l	(_object_buffer,pc),a1
+	adda.l	d0,a1
+	move.w	(_object_generation,pc),d0
+	cmp.w	(32,a1),d0
+	bne.b	.native
+	tst.w	(36,a1)
+	beq.b	.native
+	movem.l	(sp)+,d0/a1
+	bra.b	.stage
+.native	movem.l	(sp)+,d0/a1
+	bra.w	_modelnative
+.stage	suba.w	#20,sp		; object pointer, XYZ, heading word, active word
+	move.w	sr,-(sp)
+	movem.l	d0-d7/a0-a6,-(sp)
+	lea	(62,sp),a5
+	clr.w	(18,a5)
+	move.w	a0,d0
+	mulu.w	#10,d0
+	movea.l	(_object_buffer,pc),a1
+	adda.l	d0,a1
+	move.w	(_object_alpha,pc),d6
+	move.w	(_pstate+4,pc),d7
+	cmp.w	d7,d6
+	bhs.w	.draw		; caught up: use the committed pose
+	move.l	a0,(a5)
+	move.l	($581c,a0),(4,a5)
+	move.l	($5c1c,a0),(8,a5)
+	move.l	($601c,a0),(12,a5)
+	move.w	#1,(18,a5)
+	moveq	#0,d2
+	lea	($581c,a0),a2
+.position
+	move.l	(12,a1,d2.w),d1
+	sub.l	(a1,d2.w),d1
+	muls.w	d6,d1
+	divs.w	d7,d1
+	ext.l	d1
+	add.l	(a1,d2.w),d1
+	move.l	d1,(a2)
+	lea	($400,a2),a2
+	addq.w	#4,d2
+	cmpi.w	#12,d2
+	bne.b	.position
+	cmpa.w	#28*4,a0
+	bhs.b	.draw
+	move.b	($6c1c,a0),(16,a5)
+	moveq	#0,d1
+	move.b	(35,a1),d1
+	sub.b	(34,a1),d1
+	ext.w	d1
+	muls.w	d6,d1
+	divs.w	d7,d1
+	add.b	(34,a1),d1
+	move.b	d1,($6c1c,a0)
+.draw	movem.l	(sp)+,d0-d7/a0-a6
+	move.w	(sp)+,ccr
+	bsr.w	_modelnative
+	move.w	sr,-(sp)
+	movem.l	d0/a0-a1,-(sp)
+	lea	(14,sp),a1
+	tst.w	(18,a1)
+	beq.b	.done
+	movea.l	(a1),a0
+	move.l	(4,a1),($581c,a0)
+	move.l	(8,a1),($5c1c,a0)
+	move.l	(12,a1),($601c,a0)
+	cmpa.w	#28*4,a0
+	bhs.b	.done
+	move.b	(16,a1),($6c1c,a0)
+.done	movem.l	(sp)+,d0/a0-a1
+	move.w	(sp)+,ccr
+	adda.w	#20,sp
+	rts
+_modelnative
+	move.w	(a4,d7.w),d7
+	adda.l	d7,a4
+_model_continue
+	jmp	($57c3c-$3cb0).l
 
 ; P1 uses its own gate so disabled options retain L1's measured path.
 _presentgate

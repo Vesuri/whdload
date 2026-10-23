@@ -57,6 +57,9 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- Use `CACHE PRELOAD` for normal and measured runs (user direction). PRELOAD was
+  already enabled; `NOCACHE` remains available for explicit cache-off comparisons.
+
 - Close R3 without implementing triple buffering: the user does not want it. Keep
   double buffering and continue to S6 (user decision after S5 measurements).
 
@@ -109,8 +112,9 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Phase S is complete; R3 is closed without implementation by user decision. On the
-030/50, no-draw frames take one field and full frames two after startup; each run's
-first interval is one field longer. World speed remains native and options off
-matches shipped. Follow [plan.md](plan.md): P2, then P3. See the measured remaining
-costs and coverage limits in [S6](internals.md#s6-budget-checkpoint).
+Phase S and P2 are complete; R3 is closed without implementation by user decision.
+P2 adds intermediate object poses while keeping the reference 030 at 24.80 fps and
+world speed native; options-off matches shipped. Its 040 run check costs one frame
+per 500 fields (24.90 → 24.80 fps), recorded in [P2](internals.md#p2-other-object-interpolation).
+Next is P3's user decision on vehicle, flight and lift gating, followed by its mode
+checks and O1's deferred map/vehicle/flight coverage. See [plan.md](plan.md).

@@ -72,10 +72,10 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the options in the splash window), reads `Custom1` through `resload_Control` and keeps
-the shipped patch list. It asks for an optional 188 KB of expansion memory (`ws_ExpMem`):
+the shipped patch list. It asks for an optional 200 KB of expansion memory (`ws_ExpMem`):
 4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
 20 KB for bit 4's presentation restore buffer, 36 KB for bit 9's renderer copies and
-96 KB for bit 10's aligned staging bitmap.
+96 KB for bit 10's aligned staging bitmap and 12 KB for bit 11's object histories.
 If allocation fails, the stack, code and
 tables retain their chip paths; presentation falls back to logic gating. With every option off it runs the shipped slave's code paths.
 
@@ -93,6 +93,7 @@ Bit 7 accelerates horizontal span interiors on 68000 and fast-RAM 68020+ (R1 bel
 Bit 8 copies the full presentation restore set with bulk moves (S2 below).
 Bit 9 moves the remaining hot renderer blocks and their private mutable data to fast RAM (S3 below).
 Bit 10 stages the 3D bitmap in fast RAM and copies the view before publication (S4 below).
+Bit 11 interpolates object geometry while walking, with bit 4 and real fast RAM on 68020+.
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -195,6 +196,47 @@ or panel faults. After stopping, position and heading modulo 1024 stay fixed acr
 Inputs, three builds and 17 existing tool tests pass. Evidence: `tmp/p1/final-off/`,
 `final-on/`, `restore-route.json`, `world-020.json`, `world-060.json`, `play/`,
 `options-off.json` and `shipped.json`, all under `tmp/p1/`.
+
+### P2: other-object interpolation
+
+`Custom1` bit 11 requires bit 4, a 68020+ and real fast RAM. It uses 12 KB of
+optional expansion memory for 256 pose histories. Object XYZ are the longword arrays
+at chip `$581C`, `$5C1C`, `$601C` (four-byte stride); vehicle slots 1–27 use byte
+headings at `$6C1C + 4 × slot`, wrapping at 256. `$AF36` and `$B31E` are drawing
+scratch, not world poses. The visible-object list is at `$7423`, count `$71E6`.
+
+Disk.1 `$577BE` captures native-pass poses. Both logic and presentation drawings use
+the previous/current pair and elapsed fields at drawing time; delaying only the extra
+frames would rewind objects. Geometry is staged at `$57C36`, after the native distance
+and nearest-object tests, and restored before each model returns. Collision, distance
+ordering, object selection and simulation keep committed poses. New/reappearing objects,
+scene/model changes and per-axis jumps over 32,767 units snap; stationary objects skip
+staging. The player proxy remains with P1. This works with the S3 copy or chip renderer.
+
+Near the Eris bus crossing (HELP, F10, 150 fields walking), 20 consecutive 030 draws
+advance the bus by 256 units every two fields; committed motion stays 512 per four-field
+logic pass. Inspected off/on screenshots show the intermediate positions rather than
+repeated frames. Same-build/session 500-field `Custom1=2047 → 4095` measurements:
+
+| Cell | P2 off | P2 on |
+| --- | ---: | ---: |
+| A500 | 4.10 fps | 4.10 fps |
+| 020-fast | 12.50 fps | 12.50 fps |
+| 030/50 reference | 24.80 fps | 24.80 fps |
+| 040-25 run check | 24.90 fps | 24.80 fps |
+
+The gain is smoother object motion, not more frames. The 040 cadence check shows two
+isolated one-field frames becoming two-field frames, not a startup difference; with P2,
+all intervals after the first are two fields. This emulator cell is a run check under
+S0, not a hardware-performance acceptance target. The reference 030 count is unchanged.
+
+World-speed checks pass all 79/80 walking and turning intervals on 020/030. Options-off
+and shipped each give 37 A500 frames. Restore hashes pass 124 route presentations,
+63 beside moving buses, and another 28 there with S3 off. The check's live-interrupt
+mask now covers all six cached clock digits at chip `$52BF0..$52BF5`: the field handler
+writes them at Disk.1 `$568E4..$5693C`; the old one-byte exclusion failed with P2 off too.
+Evidence: `tmp/p2/final/`. Vehicle/flight/map coverage remains for P3.
+
 
 ### M1: hot code in fast RAM
 
