@@ -27,13 +27,14 @@ def audit(root, machine):
             identity = {key: capture[key] for key in ('machine', 'setup', 'caches', 'build', 'runtime', 'fields', 'effective_cpu_report')}
             identity['hunk_bases'] = meta['hunk_bases']
             identity['whd_control_options'] = [v for v in capture['whd_args'].split() if not v.startswith('CUSTOM3=')]
+            config = dict(line.split('=', 1) for line in (p/'debug.uae').read_text().splitlines() if '=' in line)
+            identity['waiting_blits'] = config.get('waiting_blits')
             if controls is None:
                 controls = identity
             if identity != controls:
                 errors.append(f'{p.name}: unmatched control layout/build/configuration')
             if (capture.get('custom3'), capture.get('instant_blitter'), meta.get('anchor_method')) != (custom3, instant, 'start-state'):
                 errors.append(f'{p.name}: wrong options or anchor')
-            config = dict(line.split('=', 1) for line in (p/'debug.uae').read_text().splitlines() if '=' in line)
             if config.get('immediate_blits') != ('true' if instant == '1' else 'false'):
                 errors.append(f'{p.name}: effective instant-blitter setting differs')
             h0 = meta['hunk_bases'][0]

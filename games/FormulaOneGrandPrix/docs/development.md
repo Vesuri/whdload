@@ -476,8 +476,9 @@ python3 tools/test_disabled.py tmp/b4/a8-verify-off tmp/b4/a8-verify-on
 Each arm needs a fresh repeat, effective-config review, original-versus-enabled hook
 byte checks and clean quit. `start-state` selects the native start transition, removes
 the breakpoint, and advances to a complete field before profiling. It accepts only
-the green ceiling window. The instant arm requests `immediate_blits=true` and
-`waiting_blits=false`; inspect `debug.uae` rather than trusting the requested options.
+the green ceiling window. The instant arm requests only `immediate_blits=true`, retaining the control
+wait policy. Inspect `debug.uae` rather than trusting the requested options; the ceiling
+audit compares `waiting_blits` across all arms.
 
 `matrix_report.py` distinguishes `MEASURED` from `UNAVAILABLE`: exact repeated empty
 CPU records are not timings. DMA counts can still be valid. The current selected
@@ -519,3 +520,9 @@ capture's `machine`, WHDLoad arguments and retained effective configuration.
 A7's gate permits explained missing timings, so it is complete with 040/060 failures
 explicit. B5 and A8 require those measurements and remain open. Shared-profiler work is
 deferred by the user; do not replace the cores or present missing records as zero cost.
+
+The current accepted A500/A1200/020 audits use `tmp/a8-single-setting`: existing control,
+no-wait and no-fill captures are linked there, alongside fresh single-setting instant
+pairs. Old instant captures that also changed the wait policy are reference only, even
+where their measured fps happens to agree. The 030 allocation probes are diagnostic
+captures, not timing acceptance or new baseline evidence.

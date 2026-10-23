@@ -18,7 +18,10 @@ results and acceptance evidence are in [internals.md](internals.md).
 
 **Next F1GP work: A8's 030 instant-blitter control.** Find a common-layout comparison
 without accepting a different allocation or weakening the audit. Skipping the frontend
-fixed the 020 comparison, but not the 030's 24-byte Fast-hunk difference.
+fixed the 020 comparison, but not the 030's 24-byte Fast-hunk difference. New
+breakpoint captures show that the 24-byte Fast free-region difference already exists
+before `LoadSeg`; removing boot fire presses shifts both arms equally and does not fix
+it. Trace the startup allocation before game loading next.
 
 **Shared tooling remains deferred by the user's decision.** The selected 040/060
 non-MMU cycle-exact cores yield field/DMA data but no CPU instruction records. Their
@@ -38,7 +41,8 @@ Measurement controls now enforced:
 - Exact repeats include configuration/build/runtime, routes, anchors, actual layout,
   every screenshot, semantic reductions and clean quit. Mouse auto-switching is disabled.
 - Follow requires a different driver name, not another frame of the tow banner.
-- Ceiling audits check actual patch bytes, common layout and effective blitter settings.
+- Ceiling audits check actual patch bytes, common layout and effective blitter settings,
+  including an unchanged blitter-wait policy. Fresh instant arms change only instant blits.
   Missing CPU timings are unavailable, never zero. Both failed allocation comparisons
   remain recorded alongside accepted results.
 

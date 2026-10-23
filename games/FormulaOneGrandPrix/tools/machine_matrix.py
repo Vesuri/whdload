@@ -54,7 +54,7 @@ def capture(machine, caches, command, destination, fields=100):
     if custom3 < 0 or custom3 & ~3 or instant not in ('0', '1') or skip_intro not in ('0', '1'):
         raise ValueError('invalid developer ceiling options')
     if instant == '1':
-        extra += ' --uae_immediate_blits=true --uae_waiting_blits=false'
+        extra += ' --uae_immediate_blits=true'
     if caches not in ('on', 'off') or command not in ('clock', 'green', 'tow', 'follow', 'all'):
         raise ValueError('invalid cache/command selection')
     out = Path(destination).resolve()

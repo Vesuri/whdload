@@ -501,9 +501,11 @@ relying on painted lights in the no-fill arm. The breakpoint is removed before t
 | 030/50 + Fast | 8.01 | 25.30 | 28.05 | unavailable as matched comparison | FAIL: instant arm changes Fast placement |
 | 040/25, 060/50 | unavailable | unavailable | unavailable | unavailable | CPU instruction records missing |
 
-The accepted A500/A1200 evidence is `tmp/a8/{a500,a1200}-{arm}-{a,b}`; 020 and the
-rejected four-arm 030 comparison are in `tmp/matrix-workers/a8-anchor/tmp/a8/` with
-the same naming. Arms are `control`, `no-wait`, `no-fill`, `instant`. All use
+Accepted audits are in `tmp/a8-single-setting/{020,a1200,a500}-audit.json`. Its
+control/no-wait/no-fill entries link to the unchanged retained captures in
+`tmp/a8/{a500,a1200}-{arm}-{a,b}` and `tmp/matrix-workers/a8-anchor/tmp/a8/020-{arm}-{a,b}`;
+its instant arms are fresh captures. The rejected four-arm 030 comparison remains in
+`tmp/matrix-workers/a8-anchor/tmp/a8/` with the same naming. Arms are `control`, `no-wait`, `no-fill`, `instant`. All use
 `CUSTOM1=1` to skip the frontend in every arm. Accepted rows pass exact repeated
 screenshots and reductions, common build/layout, actual enabled/disabled hook bytes,
 effective blitter settings and clean quit. The A500 has no CPU caches; the cache-on
@@ -523,6 +525,29 @@ The enabled combined no-wait/no-fill arm also passes fresh functional repeats on
 profile reductions and F10 quit agree. Evidence is
 `tmp/matrix-workers/a8-anchor/tmp/a8-mmu/{030,040,060}-mmu-{a,b}`. These are MMU
 functional checks, not timing results.
+
+The instant arm now changes only `immediate_blits`; the runner no longer also disables
+`waiting_blits`. The audit requires the effective wait policy to agree with the control.
+The old instant arms fail that stronger configuration check. Fresh A500/A1200/020
+instant pairs with the same automatic wait policy pass all checks and give the same
+rates shown above. They replace the old instant arms for comparison acceptance.
+
+The 030 single-setting probe (`tmp/matrix-workers/a8-anchor/tmp/030-instant-wait-auto`)
+still has the 24-byte Fast-hunk shift. Suppressing boot fire presses while skipping
+the frontend (`030-passive-normal`, `030-passive-instant` in that worker's `tmp/`)
+moves both Fast layouts 32 bytes lower but leaves their 24-byte separation. Those
+unrepeated probes are diagnostic only; passive input was not adopted in the launcher.
+
+Read-only breakpoint probes in `tmp/alloc-probe-v2/{normal,instant}` stop immediately
+before and after `LoadSeg` (current VERIFY slave code offsets `$13BA` and `$13C4`).
+Before the call, the instant arm's main Fast free region already starts 24 bytes higher
+and contains 24 fewer free bytes; Chip free regions agree. After the call the difference
+is unchanged. The preloaded game-file header occupies the same address in the retained
+normal/instant dumps. Thus the mismatch exists before game-hunk loading, rather than
+arising in the renderer or its timed window. The responsible startup allocation is
+still unidentified. Next: trace allocations before `load_game`, including pending OS
+work around the pointer-preference setup; do not compensate with an arbitrary pad or
+claim a matched instant-blitter gain.
 
 The off-state acceptance report is `tmp/b4/a8-acceptance.json`; regenerate it with
 `slave_gate.py --check --prefix a8-`. **A8 is incomplete:** the 030 instant-blitter
