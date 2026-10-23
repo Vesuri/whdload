@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C2 implementation in progress; B5/A8 gates remain open
+# Current status: C2 complete; C3 next; B5/A8 gates remain open
 
 | Work | Status |
 |---|---|
@@ -15,32 +15,26 @@ results and acceptance evidence are in [internals.md](internals.md).
 | 68030 | B5/A7 measurements and A8 common-layout ceiling comparisons pass; no 030 item remains deferred. |
 | A4 | Complete: car/track/camera/view map, static view paths and 250 checked A3 camera-return snapshots. |
 | C1 | Complete: elapsed-VBL clock design, whole native updates, PAL/NTSC integer schedules and checked accounting model. The C2 prototype now installs runtime hooks behind a developer option. |
-| C2 | Developer implementation and probes in progress; not accepted. Beam-based PAL/NTSC detection replaces the insufficient native rate word with user approval. |
+| C2 | Complete as a developer-only loop implementation: bounded whole ticks, separated painting, safe publication and checked sound timing. PAL/NTSC beam detection is user-approved. |
 | C3–G | Modal/input acceptance, presentation, optimisation and release work remain open under the plan. |
 
-**Current F1GP step: finish C2, implementing the elapsed-VBL clock and loop separation.**
+**Next F1GP step: C3, audit and implement modal clock boundaries.**
 The user explicitly selected C2 while shared work remains deferred. The clock design
 is in [Game time](internals.md#elapsed-vbl-world-clock-c1); it adds no CIA timer and
 allows no fractional simulation updates. Its host accounting checks pass for PAL/NTSC.
 B5/A8 are still incomplete; this work does not waive their measurement gates.
 
-C2 remains open: finish conditional background-rebuild separation; validate
-full replay, view changes and A5 CPU/blitter buffer ownership; rerun current-build
-state comparisons after the remaining changes. The CPU HUD queue now preserves
-selected gameplay/HUD state and completed replay/qualifying pictures against native
-painting. Its bound was raised after a recorded overflow; developer storage is now
-192 KiB; the A500 probe completes and quits without overflow but drops 41 fields
-of debt. The fresh four-build disabled-feature suite passes, including all 234 hook-byte
-negative checks. The replay R now paints once per publication;
-a same-build replay tick-40 comparison passes selected authoritative state, and its
-50-field trace passes CPU/blitter ownership and cadence checks. The native-painting
-control correctly fails the R cadence check. Early PAL tick-160 probes matched all
-26 car records, clocks, camera and selected A3 side effects across normal and
-artificially delayed drawing. Those are selected-state checks, not C5 acceptance.
-The qualifying probe also completed and quit cleanly, but dropped substantial debt;
-that is overload, not evidence of real-time operation. Evidence is under `tmp/c2/`;
-each capture carries its own build identity. Do not mix earlier prototypes with
-current-build acceptance. Shared tooling remains untouched.
+C2 implementation now includes the elapsed-VBL scheduler, bounded catch-up,
+CPU HUD/background painting separation and external-view bitmap-base handling.
+Current-build PAL/NTSC sound and publication audits pass; normal and forced-catch-up
+rear-view pairs and replay match selected gameplay/HUD state and completed pictures.
+TV/front-chase and A500 probes complete and quit cleanly. The 192 KiB developer HUD
+queue does not overflow in these checks; the current A500 run drops 31 fields of
+debt and qualifying drops 1263. These are overload diagnostics, not C5/C6 acceptance.
+The current qualifying pair also matches. The fresh four-build disabled-feature
+suite passes, including independent rejection of all 246 optional hook bytes. Full modal/replay transitions belong to C3;
+C5 still requires the whole-machine real-time and equivalence gates. Evidence is under
+`tmp/c2/`, with per-capture build identities. Shared tooling remains untouched.
 
 **Shared dependency: restore 040/060 CPU profiling when shared work is resumed.**
 All currently measurable F1GP B5/A7/A8 cells and the 030 allocation fix are complete.
@@ -57,9 +51,9 @@ recapture the affected B5/A7/A8 controls; do not relabel the current evidence. T
 session changed no AmigaXDev files.
 
 A4 is now complete; its state map is in [internals](internals.md#state-map-a4).
-Continue with **C2–C6** (real-time ticks), then **D1–D10** (presentation), following
+Continue with **C3–C6** (modal/input acceptance and real-time validation), then **D1–D10** (presentation), following
 the plan and retaining the unresolved B5/A8 gates. Caches remain opt-in while B5
-is open. The C2 prototype is developer-only and opt-in (`CUSTOM2` bit 1); no extrapolation
+is open. The C2 implementation is developer-only and opt-in (`CUSTOM2` bit 1); no extrapolation
 patch or release clock option is enabled.
 
 Measurement controls now enforced:

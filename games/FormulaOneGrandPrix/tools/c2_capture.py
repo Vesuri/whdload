@@ -107,6 +107,27 @@ def capture(args):
         expected_mode = 2 if args.replay else 1
         if struct.unpack_from('>H', memory, base+symbols['c2_mode'])[0] != expected_mode:
             raise ValueError('requested live/replay loop not reached')
+        if args.view:
+            raw = dict(rear='5f', tv='4f', front='46', cockpit='4e')[args.view]
+            command('tap', raw)
+            command('shot', str(out/'view-entry.png'))
+        meta['view'] = args.view
+        meta['profile_tick'] = args.profile_tick
+        meta['profile_fields'] = args.profile
+        if args.profile_tick:
+            if not args.profile or not 1 < args.profile_tick < args.ticks:
+                raise ValueError('profile tick must precede capture and requires a profile')
+            command('gdb', f'break *{base+symbols["c2_hud_overflow"]:#x}')
+            command('gdb', f'break *{base+symbols["c2_pacer"]:#x}')
+            command('gdb', f'condition $bpnum *(unsigned int*){clock+24:#x} >= {args.profile_tick-1}')
+            command('gdb', 'continue')
+            pc = re.search(r'\$\d+\s*=\s*(0x[0-9a-fA-F]+)', command('gdb', 'p/x $pc'))
+            if not pc or int(pc[1], 16) != base+symbols['c2_pacer']:
+                raise ValueError('profile anchor stopped outside the pacer')
+            command('gdb', f'dump binary memory {out}/profile-tick.bin {clock+24:#x} {clock+28:#x}')
+            if struct.unpack('>I', (out/'profile-tick.bin').read_bytes())[0] != args.profile_tick-1:
+                raise ValueError('requested profile tick not reached')
+            command('gdb', 'delete breakpoints')
         if args.profile:
             command('profile', str(args.profile), str(out/'trace.bin'))
             meta['trace_sha256'] = sha(out/'trace.bin')
@@ -121,6 +142,9 @@ def capture(args):
         command('gdb', f'condition $bpnum *(unsigned int*){clock+24:#x} >= {completed}')
         command('gdb', f'break *{base+symbols["c2_hud_overflow"]:#x}')
         command('gdb', 'continue')
+        pc = re.search(r'\$\d+\s*=\s*(0x[0-9a-fA-F]+)', command('gdb', 'p/x $pc'))
+        if not pc or int(pc[1], 16) != base+stop:
+            raise ValueError('capture stopped outside the requested boundary')
         parts = []
         for h, (address, size) in enumerate(zip(bases, SIZES)):
             path = out/f'h{h}.bin'
@@ -129,7 +153,10 @@ def capture(args):
         snapshot = b''.join(parts)
         (out/'tick.bin.gz').write_bytes(gzip.compress(snapshot, mtime=0))
         if args.publish:
-            bitmap = struct.unpack_from('>I', parts[0], 0x1252)[0]
+            bitmap = struct.unpack_from('>I', parts[0], 0x1256)[0]
+            first = struct.unpack_from('>I', parts[0], 0x124a)[0]
+            if bitmap not in (first, first+32000):
+                raise ValueError('publication bitmap is not a canonical buffer')
             command('gdb', f'dump binary memory {out}/paint.bin {bitmap:#x} {bitmap+32000:#x}')
             meta['paint_sha256'] = sha(out/'paint.bin')
         command('gdb', f'dump binary memory {out}/clock.bin {base:#x} {base+len(slave.read_bytes()):#x}')
@@ -140,7 +167,8 @@ def capture(args):
         counters = {name: struct.unpack_from('>I', state, symbols[name])[0]
                     for name in ('c2_pictures','c2_dry_passes','c2_repeat_pictures',
                                  'c2_replay_pictures','c2_hud_queued','c2_hud_painted',
-                                 'c2_hud_overflows')}
+                                 'c2_hud_overflows','c2_background_clears',
+                                 'c2_background_copies')}
         meta['hud_queue'] = {name: struct.unpack_from('>H', state, symbols[name])[0]
                              for name in ('c2_hud_count','c2_hud_high')}
         if (counters['c2_hud_overflows'] or meta['hud_queue']['c2_hud_high'] > 2048
@@ -149,6 +177,10 @@ def capture(args):
         meta['rate_detection'] = {
             name: struct.unpack_from('>H', state, symbols[name])[0]
             for name in ('c2_native_rate', 'c2_beam_max')}
+        meta['view_code'] = parts[1][0x23c]
+        views = dict(rear=(0xa0,), tv=(0x80,0xc0), front=(0xb0,), cockpit=(0,))
+        if args.view and meta['view_code'] not in views[args.view]:
+            raise ValueError('requested view not active at capture')
         if (ticks != completed or observed != (consumed+credit+dropped)&0xffffffff
                 or not 1 <= batch <= 4 or not 0 <= credit <= rate
                 or rate != (60 if args.ntsc else 50)):
@@ -199,5 +231,7 @@ if __name__ == '__main__':
     parser.add_argument('--ntsc', action='store_true')
     parser.add_argument('--replay', action='store_true')
     parser.add_argument('--publish', action='store_true', help='stop after painting, immediately before submission')
-    parser.add_argument('--profile', type=int, choices=(0,50), default=0)
+    parser.add_argument('--view', choices=('rear','tv','front','cockpit'), help='request a native view after the route')
+    parser.add_argument('--profile', type=int, choices=(0,50,100), default=0)
+    parser.add_argument('--profile-tick', type=int, default=0, help='anchor the profile at this tick pacer instead of route completion')
     capture(parser.parse_args())

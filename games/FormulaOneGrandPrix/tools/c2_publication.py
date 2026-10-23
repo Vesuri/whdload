@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit C2's captured 50-field window, not an entire race or modal transition.
+"""Audit C2's captured field window, not an entire race or modal transition.
 
 Checks CPU/blitter bitmap writes against actual bitplane DMA, VBL/publication
 counts, and replay-R cadence between complete publication boundaries.
@@ -35,8 +35,10 @@ def audit(directory):
         raise ValueError('unrecognised bitmap layout')
     buffers = (first, first+stride)
     trace = barto.load(str(path/'trace.bin'))
-    if trace.pc_base or len(trace.fields) != 50:
-        raise ValueError('requires 50 fields with absolute instruction PCs')
+    expected_fields = meta.get('profile_fields', 50)
+    if (expected_fields not in (50,100) or trace.pc_base
+            or len(trace.fields) != expected_fields):
+        raise ValueError('requires the recorded field count and absolute instruction PCs')
     symbols = meta['symbols']
     vbl_pc = meta['slave_base']+symbols['c2_vbl']
     publish_pc = meta['slave_base']+symbols['c2_submit_call']
@@ -108,7 +110,7 @@ def audit(directory):
     return dict(status='FAIL' if failures else 'PASS', trace_sha256=meta['trace_sha256'],
                 slave_sha256=meta['build']['slave_sha256'], totals=dict(totals),
                 failures=failures, fields=fields,
-                scope='Only this 50-field window; excludes partial publication intervals at trace edges.')
+                scope=f'Only this {expected_fields}-field window; excludes partial publication intervals at trace edges.')
 
 
 if __name__ == '__main__':

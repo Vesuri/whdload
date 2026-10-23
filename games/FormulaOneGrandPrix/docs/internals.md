@@ -1378,12 +1378,14 @@ sound consumers; local disassembly is retained in `tmp/c1/clock-paths.txt`. No e
 run, live hook validation, speed measurement or NTSC gameplay acceptance is claimed.
 
 
-### C2 developer implementation — not accepted
+### C2 developer implementation — complete
 
 The current prototype is compiled only for DEVELOPER/VERIFY, behind `CUSTOM2`
 bit 1 and only in the supplied 582992-byte variant's patch list. Release bytes
-remain identical to the pre-C2 build. C2 remains open: the CPU HUD painting queue is implemented, but conditional
-background rebuilds, broad transition/publication and sound validation are unfinished. Do not describe this prototype as the completed C2 loop split.
+remain identical to the pre-C2 build. The CPU HUD/background split, bounded loop and
+sound-duration checks are complete. This closes C2 only: full modal handling, input
+acceptance, whole-machine real-time validation and matched slow-machine performance
+remain C3–C6 work. D's extrapolation is also separate.
 
 The hook at h0+$2CC3C advances the slave's aligned 32-bit serial and reproduces the
 native counter increment and flags. Live/replay heads at h0+$3C8F6/+$3CC40 reserve
@@ -1447,9 +1449,12 @@ is not used as equivalence evidence; startup timing must be controlled as in A1.
 
 #### CPU HUD painting queue
 
-Ten raster regions are intercepted after native preparation: icons, dirty boxes,
+Twelve raster regions are intercepted after native preparation: icons, dirty boxes,
 box reuse copies, top-strip clears, digits, masked instrument images, text glyphs,
-gear, packed RPM runs and assistance icons. The native text parser still handles
+gear, packed RPM runs, assistance icons and conditional background clear/copy.
+The background gates are at h2+$1DC84 and +$1DCBC; they retain prepared destinations
+and copy extent, and leave the surrounding view/refresh state changes on the tick.
+The native text parser still handles
 control characters and cursor advancement; dirty-mask and blink state still evolve
 once per tick. The RPM walker retains its address arithmetic and register outputs
 while its stores are deferred. Each queued command holds its prepared registers,
@@ -1464,7 +1469,7 @@ overflows. Overflow aborts with an explicit diagnostic rather than corrupting me
 or discarding painting. This storage and the CPU cost are not an optimisation claim;
 C6/E still need matched machine measurements. Release bytes are unchanged.
 
-`check_hud_hooks.py` traverses 636 native HUD instructions and rejects direct branch
+`check_hud_hooks.py` traverses 665 native HUD/background instructions and rejects direct branch
 or call targets inside a patch. Its negative fixture is the rejected glyph hook
 placement. Earlier queue builds failed because hooks overlapped inner loop entries;
 those captures remain failures. The initial 512-command queue also failed qualifying
@@ -1476,29 +1481,70 @@ quick races at tick 160 and replay at tick 40. The comparison now includes dirty
 requests/deadlines, blink state, refresh flags, instrument history, text colours and
 cursor/control state, and box reuse. The initial expanded comparison also included
 h0+$3A706, which differed; this is the per-field sound pitch increment documented in
-A6, not HUD state. It needs formula/cadence validation against elapsed fields, not
-raw equality across differing painting costs. The failed report is retained.
+A6, not HUD state. Formula/cadence checks against elapsed fields now pass below;
+raw equality across differing painting costs is not required. The failed report is retained.
 
-`hud-qualifying-large` and `hud-qualifying-large-control` are the current common-build
+`hud-qualifying-large` and `hud-qualifying-large-control` are the earlier HUD-build
 qualifying pair at tick 160. Selected gameplay/HUD state matches, and their completed
 32000-byte pictures are identical. The queued arm paints all 38,913 commands, peaks
 at 825 pending commands and quits OK without overflow. It drops 1263 fields of debt
 under overload, so this is not evidence of real-time operation. The earlier 512-slot
 replay pair (`hud-replay-publish` / `hud-replay-control`) also has identical completed
-pictures and selected state, but belongs to that smaller-buffer build. The current
+pictures and selected state, but belongs to that smaller-buffer build. That build's
 `hud-a500` probe reaches tick 160 and quits OK: 271 commands queued, 269 painted,
 two pending at the pre-publication pacer boundary, and no overflow. It drops 41
 fields of debt; this establishes functionality, not C6 performance. Wider
 view/transition acceptance remains open.
 
-The current HUD build's suite `tmp/b4/c2-hud-acceptance.json` passes for release,
-developer, VERIFY-off and VERIFY-relay builds. All four retain eight native
-updates/draws/pacers in their 50-field controls and quit OK. Negative checks reject
-all 234 optional hook bytes independently, malformed inventories, stale metadata and
-an enabled relay disguised as off. The current VERIFY SHA-256 is
-`16fd6d60247bb010def4e245b3e9787a0ca24999664e9119a715a1919b690916`;
-the unchanged release SHA-256 is
-`93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`.
+#### Background, viewport and sound checks
+
+Current-build regression captures all quit OK. `background-replay` and its control
+match selected state and all 32,000 picture bytes at replay tick 40. The
+`background-qualifying-current` pair does the same at tick 160, painting 38,915
+queued commands with a peak depth of 825 and no overflow. Qualifying drops 1263
+fields in the enhanced arm, so this is not real-time acceptance. TV and front-chase
+probes confirm native view codes `$C0` and `$B0`. The current `background-a500`
+probe reaches the tick-160 pacer with 273 queued commands, 271 painted and two
+pending; it quits OK with no overflow, but drops 31 fields. This establishes
+functionality only; C6 still needs matched machine measurements.
+
+The native external-view path h0+$3C286 adds 640 bytes to h0+$1252. C2 now
+resets that pointer from the owned base h0+$1256 at every tick, applies the offset
+once for a zero-tick repeated picture, and publishes the base rather than the
+viewport. Dual-bitmap HUD destinations also use the base. This prevents cumulative
+viewport offsets within catch-up batches and shifted copper submissions.
+
+Current VERIFY build:
+`607b892640250e433b6e3c4e47182d473d96bc9d08cae523d8d3a06f86066acf`.
+The same-build rear-view normal and delayed pairs (`background-rear*`) match all
+selected state ranges and all 32,000 completed picture bytes at tick 160. Both
+background-clear and background-copy counters are exercised. Delayed enhanced mode
+completes 120 dry scene passes and drops 211 fields; the control drops 368. These
+are diagnostic workload controls, not a matched performance claim.
+
+Publication audits require actual bitplane DMA ownership, CPU/blitter writes,
+one VBL callback per field, at most one submission per field and complete
+publication intervals. Current passing windows include PAL live `background-green`
+(13 submissions/50 fields), NTSC live `background-ntsc` (11/50), rear view
+`background-rear` (10/50), delayed rear view `background-rear-delayed-100` (3/100),
+and `background-replay` (13/50, with 13 replay R paints). None writes to the scanned
+bitmap. Two earlier delayed 50-field windows had only one publication and failed
+the coverage gate. They remain failed; the 100-field window supplies the missing
+complete intervals without relaxing the gate.
+
+`c2_sound.py` validates the actual serial-difference handoff to h0+$125C and the
+native minimum/max-duration pitch formula at h0+$36288–362AA. PAL live, NTSC live
+and delayed rear-view windows pass with nonzero pitch inputs, overrun and short
+spacing cases, and one VBL per field. The delayed 100-field window has 12 checked
+pitch calculations, three overrun and nine short-spacing cases. An idle-only window
+is INCOMPLETE, never accepted as nonzero-pitch coverage. These checks do not claim
+audio quality or all sound branches.
+
+The current disabled-feature suite `tmp/b4/c2-final-acceptance.json` passes release,
+developer, VERIFY-off and VERIFY-relay controls, each with eight native ticks/draws
+in 50 fields and clean quit. Negative checks independently reject all 246 optional
+hook bytes, stale metadata, malformed declarations and an enabled relay disguised
+as off. Release SHA-256 remains `93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`.
 
 ## Current measurements
 

@@ -576,9 +576,9 @@ the disabled-byte gate and verify live callback counts, completed ticks, field d
 sound and publication alongside C3/C4 transitions and input handling.
 
 
-## C2 developer probes (in progress)
+## C2 developer validation
 
-C2 is not accepted. Its current prototype is confined to developer/VERIFY builds
+C2 is implemented and its scoped checks pass. It is confined to developer/VERIFY builds
 and the supplied executable variant. `CUSTOM2` bit 1 enables the VBL clock; bit 0
 still controls caches. `CUSTOM4` bit 1 introduces a 20-field batch delay for tests;
 bit 2 retains native painting (catch-up raster work, CPU HUD operations and tick-time replay R) as a
@@ -608,8 +608,10 @@ and observed maximum line are recorded under `rate_detection`.
 The comparator checks selected authoritative A3/A4 ranges at common tick/layout
 and build/runtime. It is neither whole-program equivalence nor C5 acceptance.
 `--route qualifying` exercises pit animation; `--replay` is an experimental route.
-Optional profiles cover the 50 fields immediately after the route, not the final
-tick snapshot. Raw artifacts stay in ignored `tmp/`.
+Optional profiles cover 50 or 100 fields after the route, not the final tick
+snapshot. `--profile-tick N` instead anchors the window at tick N's pacer. Longer
+windows are useful when slow batches leave no complete publication interval in 50
+fields; retain the insufficient-coverage result as failed evidence. Raw artifacts stay in ignored `tmp/`.
 
 `--publish` stops immediately before submission with the requested number of ticks
 completed, after queued HUD operations have painted. It records and hashes the
@@ -619,14 +621,14 @@ If a batch crosses that tick, the collector stops at the next publication and
 rejects the mismatch instead of waiting forever. The ordinary pacer boundary
 remains useful for comparing tick state independently of batch size.
 
-The HUD queue retains prepared register inputs and text state for ten CPU raster
-regions. It drains before the final scene and publication; parser updates, dirty
+The HUD queue retains prepared register inputs and text state for twelve CPU raster
+regions, including conditional background clear/copy. It drains before the final scene and publication; parser updates, dirty
 flags and instrument state still run on every native tick. Its 2048 slots reserve
 192 KiB in developer builds. Capture metadata includes queued/painted counts,
 pending count, high-water mark and overflow count. Overflow stops the probe and
 fails acceptance; it must never be treated as a partial successful picture.
 The collector preserves diagnostics for failed captures and still stops only its
-own emulator. Conditional background clear/copy separation remains unfinished.
+own emulator. Background-clear/copy counters show whether each path was exercised.
 
 Run `python3 tools/check_hud_hooks.py` after changing these hooks. It traverses
 original HUD control flow and rejects patches that overwrite another branch's
@@ -651,3 +653,15 @@ edges and requires exercised CPU, blitter and publication paths. Running that
 cadence check on the native-painting replay control is expected to fail: the control
 paints R per tick, leaving some zero-tick publications without a repaint. This is an
 intentional negative control, not a successful enhanced-mode acceptance run.
+
+`--view rear|tv|front|cockpit` sends the corresponding native view key after the
+route, records the request and checks the resulting view code at capture. The
+comparator requires matching requests. This is a view-path probe, not C4 input
+acceptance. Published bitmap captures use the remembered base at h0+$1256, never
+h0+$1252's external-view viewport offset.
+
+`python3 tools/c2_sound.py CAPTURE REPORT` checks the recorded elapsed-field
+handoff and native pitch arithmetic, including per-field VBL cadence. It requires
+nonzero pitch inputs and both short and overrun tick spacing; an idle-only window
+is INCOMPLETE. The checker verifies trace/build hashes and finds the timing store
+in that slave's verified bytes. This is not an audio-quality or whole-race claim.

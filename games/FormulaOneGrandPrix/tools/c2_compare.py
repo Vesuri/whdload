@@ -41,6 +41,8 @@ def compare(left, right):
             raise ValueError(f'unmatched {key}')
     if metadata[0].get('boundary', 'pacer') != metadata[1].get('boundary', 'pacer'):
         raise ValueError('unmatched snapshot boundary')
+    if metadata[0].get('view') != metadata[1].get('view'):
+        raise ValueError('unmatched view request')
     snapshots = [gzip.decompress((p/'tick.bin.gz').read_bytes()) for p in paths]
     if any(len(s) != sum(SIZES) for s in snapshots):
         raise ValueError('incomplete tick snapshot')

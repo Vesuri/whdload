@@ -488,6 +488,9 @@ c2_head
         bra.s .observe
 .tick_due
         move.l (c2_h0,pc),a2
+        ; Native external-view selection adds 640 to the draw destination.
+        ; Restart from the owned bitmap on every tick, including catch-up.
+        move.l ($1256,a2),($1252,a2)
         adda.l #$125a,a2
         move.w d0,(a2)
         lea (c2_sound_serial,pc),a1
@@ -675,7 +678,7 @@ c2_publish
 .no_replay
         movea.l (c2_h0,pc),a2
         adda.l #$124e,a2
-        move.l 4(a2),(a2)
+        move.l 8(a2),(a2)      ; bitmap base, never the external-view viewport
         bsr c2_submit_call
         lea (c2_pictures,pc),a0
         addq.l #1,(a0)
@@ -706,7 +709,7 @@ c2_pair_a0_a2
         lea 2(sp),sp
         beq.s .native
         movea.l (c2_h0,pc),a0
-        movea.l ($1252,a0),a0
+        movea.l ($1256,a0),a0
         movea.l a0,a2
         addq.l #4,2(sp)
         bra.s .done
@@ -722,7 +725,7 @@ c2_pair_a5_a6
         lea 2(sp),sp
         beq.s .native
         movea.l (c2_h0,pc),a5
-        movea.l ($1252,a5),a5
+        movea.l ($1256,a5),a5
         movea.l a5,a6
         addq.l #4,2(sp)
         bra.s .done
@@ -738,7 +741,7 @@ c2_pair_a1_a2
         lea 2(sp),sp
         beq.s .native
         movea.l (c2_h0,pc),a1
-        movea.l ($1252,a1),a1
+        movea.l ($1256,a1),a1
         movea.l a1,a2
         addq.l #4,2(sp)
         bra.s .done
@@ -757,7 +760,7 @@ C2_HUD_CAPACITY = 2048
 c2_hud_init
         move.l (c2_h2,pc),d0
         lea (c2_hud_targets,pc),a0
-        moveq #9,d1
+        moveq #11,d1
 .loop
         add.l d0,(a0)+
         add.l d0,(a0)+
@@ -811,6 +814,16 @@ c2_hud_enqueue
         dbf d1,.text
         lea (c2_hud_queued,pc),a0
         addq.l #1,(a0)
+        cmpi.w #10,d0
+        bne.s .not_clear
+        lea (c2_background_clears,pc),a0
+        addq.l #1,(a0)
+.not_clear
+        cmpi.w #11,d0
+        bne.s .not_copy
+        lea (c2_background_copies,pc),a0
+        addq.l #1,(a0)
+.not_copy
         ; RPM still walks its packed run list to preserve its register outputs.
         ; Its pixel loop is separately suppressed while preparing the command.
         cmpi.w #8,d0
@@ -911,6 +924,19 @@ c2_hud_assist
         adda.w d3,a2
         asl.w #2,d3
         adda.w d3,a1
+        rts
+
+; Conditional view rebuilds prepare native destinations before these gates.
+; Keep the clear/copy in order with the HUD operations from the same tick.
+c2_hud_background_clear
+        C2_HUD_GATE 10
+        move.l a0,d1
+        addi.l #32000,d1
+        rts
+c2_hud_background_copy
+        C2_HUD_GATE 11
+        muls.w #160,d0
+        adda.l d0,a0
         rts
 
 ; The packed RPM walker has live register outputs. Skip its stores but retain
@@ -1077,12 +1103,18 @@ c2_hud_targets
         dc.w 4,0
         dc.l $1fa6e,$1fa74,$1faa4 ; assist
         dc.w 0,0
+        dc.l $1dc84,$1dc8c,$1dc98 ; full background clear
+        dc.w 12,0
+        dc.l $1dcbc,$1dcc2,$1dcda ; cockpit background copy
+        dc.w 16,0
 c2_hud_skip dc.l 0
 c2_hud_target dc.l 0
 c2_hud_read dc.l 0
 c2_hud_queued dc.l 0
 c2_hud_painted dc.l 0
 c2_hud_overflows dc.l 0
+c2_background_clears dc.l 0
+c2_background_copies dc.l 0
 c2_hud_count dc.w 0
 c2_hud_high dc.w 0
 c2_hud_remaining dc.w 0
@@ -1229,6 +1261,17 @@ c2_dry_scene dc.w 0
 ; effects are staged from that tick's entry and authoritative post-tick bytes
 ; restored afterwards. No camera evolution, input or HUD/blink call is repeated.
 c2_repeat_picture
+        movea.l (c2_h0,pc),a2
+        move.l ($1256,a2),d0
+        move.l -4(a2),d1      ; next segment BPTR -> hunk 1
+        lsl.l #2,d1
+        addq.l #4,d1
+        movea.l d1,a1
+        tst.b ($23c,a1)
+        bpl.s .viewport
+        addi.l #640,d0
+.viewport
+        move.l d0,($1252,a2)
         lea (c2_stage_saved,pc),a2
         bsr c2_save_stage
         lea (c2_stage_entry,pc),a2
@@ -1336,6 +1379,10 @@ patch_582992
         PL_PS $3cce8,c2_scene
         ; PERF_RANGE h2:1dd24 6 custom=2 bit=1 variant=582992
         PL_P $8d0b8,c2_hud_icon
+        ; PERF_RANGE h2:1dc84 6 custom=2 bit=1 variant=582992
+        PL_P $8d018,c2_hud_background_clear
+        ; PERF_RANGE h2:1dcbc 6 custom=2 bit=1 variant=582992
+        PL_P $8d050,c2_hud_background_copy
         ; PERF_RANGE h2:1de58 6 custom=2 bit=1 variant=582992
         PL_P $8d1ec,c2_hud_box
         ; PERF_RANGE h2:1df24 6 custom=2 bit=1 variant=582992

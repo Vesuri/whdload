@@ -93,8 +93,9 @@ and whole-race captures repeat exactly. B5's functional races pass, but its 040/
 work gains remain unavailable. A8 has accepted A500/A1200/020/030 ceilings; a developer-only startup notification
 control fixes the 030 layout mismatch. Its 040/060 CPU timings remain unavailable. Neither B5 nor A8 is
 complete. The user has deferred shared-profiler fixes. See [open work](open-work.md).
-C1 is complete as an elapsed-VBL, whole-update clock design; C2 implementation is in progress
-by the user's explicit scope, without closing B5/A8. The C1 design records the native
+C1 and the developer-only C2 loop implementation are complete, without closing B5/A8.
+C2's selected-state/picture, publication, sound and disabled-feature checks are in internals;
+C3 modal boundaries are next, followed by C4 input and C5/C6 acceptance. The C1 design records the native
 race-clock increment discrepancy that must be resolved before C5(a) acceptance.
 The earlier startup deadlock is fixed; this is a distinct profiling limitation.
 
