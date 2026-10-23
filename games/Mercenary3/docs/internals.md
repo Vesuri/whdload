@@ -102,6 +102,7 @@ Bit 12 extends logic gating and presentation to vehicle/surface flight and space
 Bit 13 requests the data cache through WHDLoad (R4 below).
 Bit 14 replaces prediction with consistent player/camera interpolation (P4 below);
 requires bit 4 and its restore buffer, plus bit 12 for transport modes.
+Bit 15 fixes the cached polygon clipping limit on 68040/060 (R5 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -242,6 +243,41 @@ The mailbox approach, turning, reversals, vehicle, flight, space and Help/return
 views were checked; the final 12 fields after stopping at the mailbox are identical.
 Evidence: `tmp/presentation-fix/final4/`; the original defect probe is
 `tmp/presentation-fix/before-probe.json`.
+
+### R5: cache-safe polygon clipping
+
+Outside the prison, turning then stopping exposed intermittent missing gray ground
+on the 040 with CACHE. The shipped slave and enhancement-off controls also flash;
+this predates P4. NOCACHE removes the fault in the control capture. No flashes were
+observed in the matching enhanced 030 capture.
+
+The polygon renderer changes the immediate operand at Disk.1 `$5366C` between
+`$8AA0` (68 rows) and `$9540` (136 rows). The shipped 040 indirect-call patches
+leave this self-modifying comparison intact. A cached half-height limit clips away
+the ground. Bit 15 keeps that limit in slave data, redirects its writers at
+`$5380A`/`$53822`, and replaces both readers with cache-safe comparisons. The
+secondary reader still takes its original early-exit branch. This applies only to
+68040/060 and supports both chip and relocated code. Presentation restores the
+new limit with its other drawing state. Enhanced framerate includes the fix;
+Off retains the shipped behaviour, including this cache defect.
+
+Same build/session, CACHE PRELOAD, 600 stationary fields after the outside-prison
+turn: bit 15 off has 10 fields with the gray ground absent; on has zero. The
+chip-renderer-only fix and enhanced 060 also have zero absent-ground fields in
+100-field captures. Vehicle, flight and Help/return views were inspected. All 124
+presentation restore hashes pass; 040 walking/turning remain 6/2 units per field.
+Options-off and shipped both give 37 frames on A500.
+
+Same-build 500-field `fps.py`, bit 15 off → on: A500 4.10 → 4.10 fps,
+020-fast 12.50 → 12.50, reference 030 24.80 → 24.80, 040-25 24.80 → 24.80.
+The 040 figure remains emulated-time throughput, not a measurement of distinct
+images delivered to the desktop. Evidence: `tmp/ground-flicker/final/`.
+
+The earlier interactive timing capture (`tmp/live-pacing/`) covers 37.8 seconds
+after boot: display submissions average 49.92 Hz, median gap 20.15 ms,
+99th percentile 25.8 ms, maximum 31.1 ms. This rules out sustained emulator
+slowdown in that capture, but does not count distinct game images or establish
+smooth monitor delivery. The user's frame-pacing report remains open.
 
 ### P2: other-object interpolation
 
@@ -1201,7 +1237,7 @@ Evidence: `tmp/r4/`.
 ### X1: release
 
 The single player control is the **Enhanced framerate** checkbox, enabled by
-CUSTOM5=1 in the installed icon. Omission or zero leaves it unchecked. `Custom5=1` selects feature bits 0–13; `Custom5=0` turns them all off. The release
+CUSTOM5=1 in the installed icon. Omission or zero leaves it unchecked. `Custom5=1` selects feature bits 0–15; `Custom5=0` turns them all off. The release
 ignores legacy Custom1 settings. VERIFY retains individual bits with
 `Custom5=0 Custom1=<mask>`. CPU/chipset/memory guards are unchanged. The README covers
 installation, WHDLoad 17+, 512 KB chip RAM, the optional 200 KB workspace and CACHE/PRELOAD.

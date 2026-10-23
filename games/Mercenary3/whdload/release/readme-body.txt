@@ -52,5 +52,6 @@
    speeding up the game world.
  - Added "Enhanced framerate", enabled by default; Off restores original
    behaviour.
+ - Fixed intermittent missing ground with caches enabled on 68040/68060.
  - Updated installer, with CACHE and PRELOAD enabled in the game icon.
 

@@ -128,6 +128,17 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Current status
 
+R5 fixes intermittent missing ground with caches enabled on 68040/060. The
+outside-prison reproduction also fails in the shipped slave; it was not introduced
+by P4. The mutable clipping instruction is replaced with a data comparison while
+keeping caches enabled. Same-build captures show 10 missing-ground fields → zero
+in 600 fields; routine FPS, native speed, restore and options-off checks pass.
+See [R5](internals.md#r5-cache-safe-polygon-clipping).
+
+Still open: the user's report that interactive 040 movement feels less smooth than
+25 fps. The live capture shows real-time emulation and about 50 display submissions
+per second, but does not measure distinct game images or monitor frame pacing.
+
 P4 corrects presentation transitions with a shared, delayed camera/geometry timeline;
 starts, stops, reversals and the mailbox approach have been checked. Frame rates are
 unchanged on the routine setups; native world speed and options-off checks pass.

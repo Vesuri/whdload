@@ -226,6 +226,12 @@ Custom1 bit 13 requests the data cache through WHDLoad alongside the instruction
 cache. Route FPS is unchanged on all measured setups; retained for cache support by
 user decision. See [measurements](internals.md#r4-data-cache).
 
+**R5. Cache-safe polygon clipping** (follow-up to the reported red ground).
+- Bit 15 replaces the mutable immediate clipping comparison with a data read on
+  68040/060, in both chip and relocated renderer paths. Keep CACHE enabled.
+- Check: the outside-prison turn/stop reproduction with the same build, bit off/on;
+  P1 restore hash, world speed, options off, and routine FPS comparisons.
+
 ### X. Release
 
 **X1. Complete.** User approved **Enhanced framerate**, default On. README updated
@@ -243,6 +249,7 @@ without it. Real cache behaviour and 040/060 hardware performance remain unverif
 - [x] M1 [x] M2
 - [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [x] S6
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
+- [x] R5
 - [x] X1
 
 P4 addresses the presentation defects reported after the original plan completed.
@@ -251,7 +258,7 @@ Hardware validation remains unavailable, outside X1.
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–14.
+  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–15.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the

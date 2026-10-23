@@ -82,7 +82,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$7fff,(a0)
+	move.l	#$ffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -235,6 +235,7 @@ lbC0002AA
 	bsr.w	_hotrenderer
 	bsr.w	_objectinit
 	bsr.w	_viewinit
+	bsr.w	_clipinit
 ; Let WHDLoad handle CPU/MMU differences and NOCACHE. Preserve the shipped
 ; instruction-only request with bit 13 off; SetCACR also flushes patched code.
 	moveq	#CACRF_EnableI,d0
@@ -640,6 +641,67 @@ _hotrenderer
 	addq.l	#6,a0
 	bra.b	.nextrange
 .done	rts
+
+; Bit 15: the ground renderer temporarily changes the lower clipping limit.
+; Its native immediate comparison (Disk.1 $5366A) can remain stale in the
+; instruction cache. Keep the limit as data, in chip or relocated rendering.
+_clipinit
+	lea	(_cliplimit,pc),a0
+	lea	(_restore_clip,pc),a1
+	move.l	a0,(a1)
+	btst	#7,(_custom1+2,pc)
+	beq.w	.done
+	move.w	(_attn,pc),d0
+	btst	#AFB_68040,d0
+	beq.w	.done
+	move.l	(_render_base,pc),d6
+	move.l	#$5366c-$3cb0,d0
+	bsr.w	_clipmap
+	movea.l	d0,a0
+	lea	(_cliplimit,pc),a1
+	move.w	(a0),(a1)
+	move.l	#$5380a-$3cb0,d0
+	bsr.w	_clipmap
+	movea.l	d0,a0
+	move.l	a1,(a0)
+	move.l	#$53822-$3cb0,d0
+	bsr.w	_clipmap
+	movea.l	d0,a0
+	move.l	a1,(a0)
+	move.l	#$53668-$3cb0,d0
+	bsr.w	_clipmap
+	movea.l	d0,a0
+	move.w	#$4eb9,(a0)+
+	lea	(_cliprow,pc),a1
+	move.l	a1,(a0)
+	move.l	#$5368e-$3cb0,d0
+	bsr.w	_clipmap
+	movea.l	d0,a0
+	move.w	#$4eb9,(a0)+
+	lea	(_cliplast,pc),a1
+	move.l	a1,(a0)
+	move.l	#$536be-$3cb0,d0
+	bsr.w	_clipmap
+	lea	(_clipend+2,pc),a0
+	move.l	d0,(a0)
+.done	rts
+_clipmap
+	tst.l	d6
+	beq.b	.done
+	bra.w	_rendermap
+.done	rts
+_cliprow
+	move.w	a3,d7
+	cmp.w	(_cliplimit,pc),d7
+	rts
+_cliplast
+	cmp.w	(_cliplimit,pc),d0
+	bcs.b	_clipreturn
+	lea	(4,sp),sp
+_clipend
+	jmp	0.l
+_clipreturn	rts
+_cliplimit	dc.w	$9540
 
 ; d0: original address -> copied address, unchanged outside the blocks.
 ; Clobbers a2/d1/d2 only. d6 holds the renderer allocation base during boot.
@@ -2084,6 +2146,8 @@ _restore_ranges
 	dc.w	$7
 	dc.l	$67ffe
 	dc.w	$0
+_restore_clip	dc.l	0
+	dc.w	0
 	dc.l	0
 
 ; Reached from the frame publication routine's 34-byte copy (Disk.1 $5E4F6), which
