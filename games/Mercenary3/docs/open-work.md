@@ -57,6 +57,9 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- P3: extend native-speed logic and smooth presentation frames to vehicles, flight
+  and lifts (user approval). Check each mode and the deferred navigation/vehicle/flight screens.
+
 - Use `CACHE PRELOAD` for normal and measured runs (user direction). PRELOAD was
   already enabled; `NOCACHE` remains available for explicit cache-off comparisons.
 
@@ -83,8 +86,8 @@ split and the measured game-time model ([internals](internals.md)).
   an unchanged hash excluding display state alone would incorrectly reject this.
 
 - Defer O1's map, vehicle and flight play checks until those modes are reached in
-  later steps (user decision); no save or known short route is available. These
-  screens, including any separate FMODE fetch-window setup, remain unverified.
+  later steps (user decision). P3 reached vehicles, flight, lifts and the A-to-Z
+  navigation panel; no separate full-screen map was identified.
 - Accept A3 despite the known 040 emulator frequency-timing limitation (user decision).
   Keep the frequency sanity advisory; no shared-emulator timing fix is required. The
   68030 MMU backend remains unchanged.
@@ -112,9 +115,9 @@ Details: [internals](internals.md#a3-machine-matrix).
 
 ## Next steps
 
-Phase S and P2 are complete; R3 is closed without implementation by user decision.
-P2 adds intermediate object poses while keeping the reference 030 at 24.80 fps and
-world speed native; options-off matches shipped. Its 040 run check costs one frame
-per 500 fields (24.90 → 24.80 fps), recorded in [P2](internals.md#p2-other-object-interpolation).
-Next is P3's user decision on vehicle, flight and lift gating, followed by its mode
-checks and O1's deferred map/vehicle/flight coverage. See [plan.md](plan.md).
+Phase S and P1–P3 are complete; R3 is closed without implementation by user decision.
+P3 extends native-rate logic and presentation to vehicles and flight, preserves lift
+arrival timing and closes the deferred vehicle/flight/navigation play coverage. The
+030 Eagle view retains 50 fps with 12.5 logic passes/s; the standard route remains
+24.80 fps. Options-off matches shipped. See [P3](internals.md#p3-vehicles-flight-and-lifts).
+Next is R2's blitter back-buffer clear. See [plan.md](plan.md).

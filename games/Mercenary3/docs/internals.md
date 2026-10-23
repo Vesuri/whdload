@@ -82,7 +82,7 @@ tables retain their chip paths; presentation falls back to logic gating. With ev
 | Option | Effect |
 | --- | --- |
 | `Custom1` bit 0 | `_dmaon` enables copper and bitplane DMA on its first call only, after the vertical blank, and completes the frame's 34-byte copy (the three replaced moves, then the original code from `$A85E`) |
-| `Custom1` bit 1 | On AGA (Lisa's ID `$F8` in `LISAID`), 64-bit bitplane fetch: `FMODE` = 3 and `DDFSTOP` `$B8` in the two known in-game copper lists (Disk.1 `$56780`, `$567CC`). Buffers and planes are 8-byte aligned, rows 40 bytes, modulos 0; deferred screens remain unverified |
+| `Custom1` bit 1 | On AGA (Lisa's ID `$F8` in `LISAID`), 64-bit bitplane fetch: `FMODE` = 3 and `DDFSTOP` `$B8` in the two known in-game copper lists (Disk.1 `$56780`, `$567CC`). Buffers and planes are 8-byte aligned, rows 40 bytes, modulos 0; vehicle, flight, lift and A-to-Z panel coverage is recorded under P3 |
 | `Custom1` bit 2 | The supervisor stack in a 4 KB expansion block (fast RAM when fitted) instead of the top of chip RAM: the three `lea $7fffa,a0` / `unlk a0` stack setups (Disk.1 `$5DE66`, `$5DE88`, `$5DEEA`) get its top. The game uses less than a page of stack |
 
 `Custom1` bit 3 gates walking logic to at most 12.5 passes/s (L1 below).
@@ -93,7 +93,9 @@ Bit 7 accelerates horizontal span interiors on 68000 and fast-RAM 68020+ (R1 bel
 Bit 8 copies the full presentation restore set with bulk moves (S2 below).
 Bit 9 moves the remaining hot renderer blocks and their private mutable data to fast RAM (S3 below).
 Bit 10 stages the 3D bitmap in fast RAM and copies the view before publication (S4 below).
-Bit 11 interpolates object geometry while walking, with bit 4 and real fast RAM on 68020+.
+Bit 11 interpolates object geometry with bit 4 and real fast RAM on 68020+.
+Bit 12 extends logic gating and presentation to vehicle/surface flight and space flight
+(P3); requires bit 4 for presentation.
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -236,6 +238,57 @@ and shipped each give 37 A500 frames. Restore hashes pass 124 route presentation
 mask now covers all six cached clock digits at chip `$52BF0..$52BF5`: the field handler
 writes them at Disk.1 `$568E4..$5693C`; the old one-byte exclusion failed with P2 off too.
 Evidence: `tmp/p2/final/`. Vehicle/flight/map coverage remains for P3.
+
+
+
+### P3: vehicles, flight and lifts
+
+`Custom1` bit 12 extends the four-field logic gate to matching committed/render modes
+0 (vehicle/surface flight) and 2 (space). Presentation follows their native drawing
+paths, Disk.1 `$5E280..$5E3BA` and `$5E3CE..$5E440`, without running movement,
+input or collision again. Space stages the navigation pose at chip `$702A..$7035`
+as well as the player pose. Bit 11 also interpolates objects in those modes.
+Boarding/leaving resets history; transport, scene, planet and floor changes snap.
+Transport displacements over 32,767 units per axis also snap to avoid signed-word
+arithmetic overflow. Enclosed rooms retain native drawing.
+
+Lifts already use walking mode and the tick timer at Disk.1 `$5A644`: the camera
+changes height at arrival, not continuously during travel. P3 preserves that behaviour
+and suppresses extrapolation across floor changes. The restore set grows from 17,366
+to 17,912 bytes within its existing 20 KB allocation, covering navigation scratch,
+star colours, sorting and the entry-delay timer mixed into planet drawing. The restore
+check exposed live sound-envelope updates; its interrupt exclusions now include the
+callback at chip `$4B390` and envelope state `$4B39A..$4B39F` (field-handler code at
+Disk.1 `$4F202..$4F22A`, `$4FC96..$4FCB8`, callback writer `$4FCCC`). These remain
+live rather than being restored.
+
+Play with options 0–12 enabled covered the Eagle key pickup, B to board, powered
+surface flight, stopping, landing, L to leave, escape to space, and planetary arrival.
+Dooberry's and ETA House lifts reached floor 9; the floor-9 transporter connected them.
+The A-to-Z computer was collected and activated at ETA House. It uses the normal
+navigation panel (Disk.1 `$511C4`), not a separate full-screen copper/fetch-window path;
+vehicle, flight, lift and navigation screenshots showed intact views and panels with
+FMODE 3. This closes O1's deferred coverage for the reached screens; the earlier
+assumption of a separate full-screen map was unsupported by the supplied manual.
+
+
+Same final VERIFY build/session, `fps.py`, 500-field standard route,
+`Custom1=4095 → 8191`: A500 **4.10 → 4.10 fps**, 020-fast **12.50 → 12.50**,
+030/50 **24.80 → 24.80**, existing 040-25 run check **24.80 → 24.80**.
+The loaded Eagle/open-flight route gives **50.00 → 50.00 fps** over 500 fields.
+With P3 on, all 31 sampled logic intervals are four fields, advancing XYZ by
+362/60/159 units per pass at fixed power/pitch. This preserves 50 fps presentation
+while reducing the previously frame-driven logic from 50 to 12.5 passes/s in that view;
+it is not a claim that every flight scene reaches 50 fps. All 650 lift samples match
+exactly off/on: the ground-floor arrival changes height at field 316. Space also
+keeps four-field logic spacing in all 28 sampled within-mode intervals; planetary
+entry resets the gate for its first surface pass, then resumes four-field spacing.
+
+Options-off and shipped each give **37 frames / 500 fields** on A500.
+Walking/turning retain 6/2 units per field in all 79/80 checked 020/030 intervals.
+Restore hashes pass 124 walking, 188 surface-flight, 187 space-flight and 392 lift
+presentations. Evidence: `tmp/p3/final2/`, `tmp/p3/restore-space-3.json`; play screenshots
+and the locally saved Eagle, lift and A-to-Z situations are under `tmp/p3/`.
 
 
 ### M1: hot code in fast RAM

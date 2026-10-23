@@ -45,11 +45,11 @@ is `Disk.1` `A + $3CB0`).
 ### O. Settle the existing options
 
 **O1. Options 0–2** (one-time DMA enable; FMODE 3 on AGA; stack in expansion memory).
-- Play through the screens the route doesn't reach: the map, a vehicle, a flight,
+- Play through the screens the route doesn't reach: navigation, a vehicle, a flight,
   Quit Situation, save and load. Look for display faults. The supplied manual says the
   player is never killed; a game-over/restart screen is not an applicable check.
-- Map, vehicle and flight checks are deferred by user decision until those modes
-  are reached in later steps; record this coverage gap rather than blocking O1.
+- Vehicle, flight and navigation checks were deferred by user decision and reached in
+  P3. Navigation is the A-to-Z panel; no separate full-screen map was identified.
 - For FMODE 3, if a screen shows its own copper list, check whether it sets the fetch
   window (`$0092`/`$0094`); patch it or turn FMODE off while it shows.
 - Make `ws_ExpMem` optional (a negative size) and fall back to the chip stack without it.
@@ -106,12 +106,14 @@ collision (`$6F56`), a mode change or a stop.
 - Check: the P1 hash check; play near moving objects.
 
 **P3. Other movement modes** (needs P1).
-- The vehicle, flight and lift paths (`Disk.1` `$5E214`, `$5E3CA`) move a step per frame,
-  so they run fast on fast machines today. Gating them restores native speed **(U)**.
-- For each agreed mode, apply L1 and P1. Leave the rest native.
-- These modes are also where O1's deferred map, vehicle and flight checks happen: check
-  each screen with options 0–2 on, including whether it sets its own fetch window under
-  FMODE 3.
+- Approved: extend native-speed logic and presentation to vehicles, flight and lifts.
+- Vehicle/surface flight and space flight (`Disk.1` `$5E214`, `$5E3CA`) move a step
+  per pass. Apply L1 and their respective presentation drawing paths.
+- Correction: lifts stay in walking mode. Their timer (`$5A644`) already runs in
+  L1's tick loop; they change height at arrival rather than moving the camera
+  continuously. Keep this native timing and snap presentation at floor changes.
+- These modes also cover O1's deferred vehicle, flight and A-to-Z navigation panel
+  checks with options 0–2 on, including any separate fetch window under FMODE 3.
 - Check: world speed in that mode; play.
 
 ### M. Code and data in fast RAM (68020+ with fast RAM)
@@ -218,18 +220,18 @@ moved and self-modifying code.
 
 - [x] O1
 - [x] L1
-- [x] P1 [x] P2 [ ] P3
+- [x] P1 [x] P2 [x] P3
 - [x] M1 [x] M2
 - [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [x] S6
 - [x] R1 [ ] R2 [x] R3 (closed) [ ] R4
 - [ ] X1
 
-Next: P3 (user decision on movement modes).
+Next: R2 (blitter back-buffer clear).
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–11.
+  with `Custom1` bits 0–12.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the

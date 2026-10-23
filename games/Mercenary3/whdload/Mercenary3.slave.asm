@@ -24,7 +24,7 @@ TABLEMEM	= $7000		;ws_ExpMem requires whole 4 KB pages
 RENDERMEM	= $9000
 STAGEMEM	= $18000	;32 KB bitmap plus up to 64 KB alignment
 OBJECTMEM	= $3000		;256 pose histories (40 bytes each), page rounded
-RESTOREMEM	= $5000		;17,366 bytes, rounded to whole pages
+RESTOREMEM	= $5000		;17,912 bytes, rounded to whole pages
 
 ;======================================================================
 
@@ -69,7 +69,8 @@ _config		dc.b	"C1:X:Enable display DMA once and copy whole palette:0;"
 		dc.b	"C1:X:Bulk presentation restore:8;"
 		dc.b	"C1:X:Renderer code in fast RAM (68020+):9;"
 		dc.b	"C1:X:View bitmap in fast RAM (68020+):10;"
-		dc.b	"C1:X:Interpolate other objects (requires presentation):11"
+		dc.b	"C1:X:Interpolate other objects (requires presentation):11;"
+		dc.b	"C1:X:Vehicle and flight presentation (requires bit 4):12"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -852,7 +853,15 @@ _logicgate
 	movem.l	d0/a0,-(sp)
 	lea	(_logicstamp,pc),a0
 	cmpi.w	#1,($7122).w
+	beq.b	.modeok
+	btst	#4,(_custom1+2,pc)
+	beq.b	.othermode
+	move.w	($7142).w,d0
+	cmp.w	($7122).w,d0
 	bne.b	.othermode
+	cmpi.w	#2,d0
+	bhi.b	.othermode
+.modeok
 	tst.w	(2,a0)
 	beq.b	.first
 .check	move.w	($529f4).l,d0
@@ -939,10 +948,16 @@ _objectdraw
 	lea	(_inpresent,pc),a6
 	lea	(_object_active,pc),a0
 	clr.w	(a0)
-	cmpi.w	#1,($7122).w
+	move.w	($7142).w,d0
+	cmp.w	($7122).w,d0
 	bne.w	.reset
-	cmpi.w	#1,($7142).w
-	bne.w	.reset
+	cmpi.w	#1,d0
+	beq.b	.modeok
+	btst	#4,(_custom1+2,pc)
+	beq.w	.reset
+	cmpi.w	#2,d0
+	bhi.w	.reset
+.modeok
 	tst.w	($71cc).w
 	bpl.w	.reset
 	move.w	(_object_generation,pc),d5
@@ -1175,10 +1190,19 @@ _presentgate
 	move.w	sr,-(sp)
 	movem.l	d0-d7/a0-a6,-(sp)
 	lea	(_pstate,pc),a5
-	cmpi.w	#1,($7122).w
+	move.w	($7142).w,d0
+	cmp.w	($7122).w,d0
 	bne.w	.other
-	cmpi.w	#1,($7142).w
-	bne.w	.other
+	cmpi.w	#1,d0
+	beq.b	.modeok
+	btst	#4,(_custom1+2,pc)
+	beq.w	.other
+	cmpi.w	#2,d0
+	bhi.w	.other
+.modeok
+; Reset velocity history on boarding, leaving, or changing coordinate systems.
+	cmp.w	(_previous,pc),d0
+	bne.b	.first
 	tst.w	(2,a5)
 	beq.b	.first
 .check	move.w	($529f4).l,d0
@@ -1191,7 +1215,7 @@ _presentgate
 	bne.b	.screen
 	cmpi.w	#1,(6,a5)
 	bhi.b	.waitfield
-.screen	tst.w	($71cc).w		; special screens keep their native path
+.screen	tst.w	($71cc).w		; enclosed rooms keep their native drawing path
 	bmi.b	.render
 .waitfield
 	move.w	($529f4).l,d0
@@ -1261,17 +1285,43 @@ _present
 	move.w	(sp)+,d6
 	lea	(_inpresent,pc),a0
 	move.w	#1,(a0)
-; No extrapolation on a collision rollback or a special screen.
+; Never extrapolate a transport, floor, scene or coordinate-system change.
+	btst	#4,(_custom1+2,pc)
+	beq.b	.walkcollision
+	lea	(_previous,pc),a0
+	move.l	($7142).w,d0
+	cmp.l	(a0),d0
+	bne.w	.draw
+	move.l	($7158).w,d0
+	cmp.l	(22,a0),d0
+	bne.w	.draw
+	move.l	($715a).w,d0
+	cmp.l	(24,a0),d0
+	bne.w	.draw
+	cmpi.w	#2,($7142).w
+	beq.b	.velocity
+	tst.w	($6f56).w
+	bmi.w	.draw
+	tst.w	($7142).w
+	beq.b	.velocity
+; Walking collision rollback suppresses extrapolation.
+.walkcollision
 	tst.w	($70e2).w
 	bne.w	.draw
 	tst.w	($6f56).w
 	bmi.w	.draw
 	tst.w	($71cc).w
 	bpl.w	.draw
+.velocity
 	lea	(_previous,pc),a0
 	lea	($7142).w,a1
 	move.w	(_pstate+4,pc),d7
 ; Reject discontinuities before staging any position. 28-bit X/Z wrap.
+	move.l	#1024,d3
+	cmpi.w	#1,($7142).w
+	beq.b	.limit
+	move.l	#32767,d3
+.limit
 	moveq	#2,d5
 	moveq	#4,d4
 .validate
@@ -1279,10 +1329,11 @@ _present
 	sub.l	(a0,d4.w),d0
 	asl.l	#4,d0
 	asr.l	#4,d0
-	cmpi.l	#1024,d0
+	cmp.l	d3,d0
 	bgt.w	.draw
-	cmpi.l	#-1024,d0
-	blt.w	.draw
+	neg.l	d0
+	cmp.l	d3,d0
+	bgt.w	.draw
 	addq.w	#4,d4
 	dbra	d5,.validate
 	moveq	#2,d5
@@ -1294,6 +1345,12 @@ _present
 	divs.w	d7,d0
 	ext.l	d0
 	add.l	d0,(a1,d4.w)
+	cmpi.w	#2,($7142).w
+	bne.b	.nextposition
+; Space bodies use the navigation pose, in the same coordinates as the player.
+	lea	($7026).w,a2
+	add.l	d0,(a2,d4.w)
+.nextposition
 	addq.w	#4,d4
 	dbra	d5,.position
 	moveq	#2,d5
@@ -1309,6 +1366,8 @@ _present
 	addq.w	#2,d4
 	dbra	d5,.angle
 .draw
+	cmpi.w	#1,($7142).w
+	bne.w	.transport
 	jsr	($59b94).l		; camera, Disk.1 $5D844
 ; Disk.1 $5E0BA is inline, not a callable routine: derive sky heading.
 	move.w	($70b4).w,d0
@@ -1339,6 +1398,10 @@ _present
 	jsr	($556f6).l		; Disk.1 $593A6
 	jsr	($572fa).l		; Disk.1 $5AFAA
 	jsr	($53b0e).l		; Disk.1 $577BE
+	bra.w	.restore
+.transport
+	bsr.w	_presenttransport
+.restore
 	bsr.w	_restorepresent
 	IFD VERIFY
 	bsr.w	_poisonpresent
@@ -1349,6 +1412,88 @@ _present
 	bsr.w	_verify_after
 	ENDC
 	rts
+
+; P3: redraw the native vehicle/flight view without its simulation or collision.
+; Disk.1 $5E280..$5E3BA (surface) and $5E3CE..$5E440 (space).
+_presenttransport
+	cmpi.w	#2,($7142).w
+	beq.w	.space
+	move.w	($714e).w,d1
+	asr.w	#2,d1
+	addi.w	#256,d1
+	andi.w	#$3ff,d1
+	move.w	d1,($70b8).w
+	move.w	d1,($42c70).l
+	move.w	($7146).w,d0
+	asr.w	#2,d0
+	andi.w	#$3ff,d0
+	move.w	d0,($70b4).w
+	movea.l	($713a).w,a1
+	add.w	($575a,a1),d0
+	andi.w	#$3ff,d0
+	move.w	d0,($42c6c).l
+	jsr	($59b94).l
+	jsr	($59da0).l
+	jsr	($5a7a8).l
+	jsr	($5ab90).l
+	jsr	($56c6e).l
+	jsr	($42d14).l
+	jsr	($42d18).l
+	lea	($2ea40).l,a0
+	move.w	#$556,($10,a0)
+	move.w	#$445,($12,a0)
+	move.w	#$334,($14,a0)
+	move.w	#$640,($16,a0)
+	movea.l	($72b4).w,a0
+	move.w	($7324).w,($10,a0)
+	move.w	($7186).w,($1c,a0)
+	move.w	#$88a,($1a,a0)
+	tst.w	($6f56).w
+	bne.b	.interior
+	tst.w	($713e).w
+	beq.b	.interior
+	move.w	($70b0).w,($20,a0)
+	move.w	#$caa,($1e,a0)
+	jsr	($5045e).l
+	jsr	($539ae).l
+	bra.b	.objects
+.interior
+	move.w	($70b0).w,d0
+	tst.w	($6f56).w
+	bne.b	.colour
+	tst.w	($70c6).w
+	beq.b	.setcolour
+.colour	move.w	($7326).w,d0
+.setcolour
+	move.w	d0,($1e,a0)
+	jsr	($502a2).l
+	jsr	($539ae).l
+	jsr	($5a864).l
+.objects
+	jsr	($556f6).l
+	tst.w	($70c6).w
+	bne.b	.models
+	jsr	($572fa).l
+.models	jmp	($53b0e).l
+.space
+	jsr	($59ba0).l
+	jsr	($56c6e).l
+	jsr	($42d14).l
+	jsr	($5a7a8).l
+	lea	($2ea40).l,a0
+	move.w	#$444,($10,a0)
+	move.w	#$333,($12,a0)
+	move.w	#$222,($14,a0)
+	move.w	#$740,($16,a0)
+	movea.l	($72b4).w,a0
+	move.w	#2,($10,a0)
+	move.w	#$eee,($1e,a0)
+	move.w	#$822,($1c,a0)
+	move.w	#$666,($1a,a0)
+	jsr	($5ab90).l
+	jsr	($50524).l
+	jsr	($536c4).l
+	jmp	($53b0e).l
 
 _savepresent
 	lea	(_restore_ranges,pc),a2
@@ -1451,22 +1596,34 @@ _restore_ranges
 	dc.l	$340
 	dc.w	$1e5f
 	dc.l	$4af0
-	dc.w	$21
+	dc.w	$ff
 	dc.l	$5330
 	dc.w	$0
 	dc.l	$6f32
 	dc.w	$0
+	dc.l	$6fae
+	dc.w	$5
 	dc.l	$700e
+	dc.w	$5
+	dc.l	$702a
 	dc.w	$5
 	dc.l	$704a
 	dc.w	$3
 	dc.l	$7084
 	dc.w	$3
+	dc.l	$70b4
+	dc.w	$2
+	dc.l	$70be
+	dc.w	$0
 	dc.l	$70c2
 	dc.w	$7
 	dc.l	$7122
 	dc.w	$2f
+	dc.l	$7182
+	dc.w	$0
 	dc.l	$719e
+	dc.w	$0
+	dc.l	$71a2
 	dc.w	$0
 	dc.l	$71ae
 	dc.w	$1d
@@ -1474,12 +1631,16 @@ _restore_ranges
 	dc.w	$5
 	dc.l	$727c
 	dc.w	$0
+	dc.l	$72ae
+	dc.w	$0
 	dc.l	$aa6e
 	dc.w	$27b
 	dc.l	$b31e
 	dc.w	$0
 	dc.l	$b364
 	dc.w	$0
+	dc.l	$505e2
+	dc.w	$1f
 	dc.l	$354e2
 	dc.w	$8
 	dc.l	$42c04
