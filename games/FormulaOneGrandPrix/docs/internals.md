@@ -75,8 +75,9 @@ frontend, runs with an empty argument line, unloads each segment and quits on re
 `whdload/F1GP.s` builds with slave version 17 and the pinned shared kick13 source.
 It retains the original memory requirements, assigns, frontend/fire/CUSTOM1 decision,
 three size-selected patch lists, conditional names restore, empty argument line and
-F10 quit hook. No performance changes are installed. The old CPU mask is retained;
-B5 has not enabled caches. DOS BSTR assign names are explicitly longword-aligned.
+F10 quit hook. The default path retains the old CPU mask and installs no performance
+changes; the later B5 pilot adds an opt-in cache policy. DOS BSTR assign names are
+explicitly longword-aligned.
 The shared kit is consumed in place, rather than copying WHDLoad source into this repo.
 
 B2/B3 baseline build checks: bash 3.2, ordinary and spaced output directories produced identical
@@ -292,8 +293,9 @@ per-scene gain measurement.
 **Gate: not passed; 68030 deferred by the user.** All 030 cache/MMU validation and
 030 A7/A8 measurements remain open for a later session. AmigaXDev backlog TOOL1–TOOL3
 records the startup wait, CPU-spelling fallback and stale-capture issues; shared repairs
-are out of scope for this session. Continue the remaining machines under the plan's
-current validation scope. Both 040/060 MMU variants and matched gains remain unmeasured;
+are out of scope for this session. The required 040 non-MMU startup check below was
+also unsuccessful; work is stopped pending a decision on that additional blocker.
+040 MMU and both 060 variants remain untested, and matched gains remain unmeasured;
 A7's paired green/tow/follow matrix is incomplete and A8 has not started. The deferral is
 not a pass, and disabling data-cache emulation is not an accepted substitute. No shared
 tooling or runtime was modified.

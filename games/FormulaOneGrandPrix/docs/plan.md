@@ -84,13 +84,19 @@ game time). Times are emulated.
 
 ## Current validation scope: 68030 deferred
 
+Current status: B1–B4 and A1/A2/A3/A5/A6 are complete. B5 has not passed: the
+required 68040 non-MMU startup check was unsuccessful and work is stopped pending a
+decision. A7 is incomplete; A8 has not started. See [open work](open-work.md) for the
+next steps and [the startup evidence](internals.md#non-deferred-b5-check-68040-startup-also-unsuccessful)
+for the limits of that finding.
+
 At the user's direction, defer every 68030 cell in **B5, A7 and A8**, including
 MMU and non-MMU configurations and both cache states. The shared startup wait and
 diagnostic-tool findings are backlogged in AmigaXDev as TOOL1–TOOL3; do not address
 those shared items in this session.
 
-For this iteration, B5/A7/A8 acceptance covers the non-deferred machines. Continue
-68000/68020 timing measurements and the required 68020/68040/68060 cache checks,
+For this iteration, B5/A7/A8 acceptance covers the non-deferred machines. The remaining
+scope includes 68000/68020 timing measurements and the required 68020/68040/68060 cache checks,
 including 040/060 MMU functional tests. Report 68030 cells as **deferred**, never
 measured or passed. Full 68030 qualification remains open for a later session;
 this exception does not relax any gate for the remaining machines.

@@ -380,8 +380,12 @@ traces are explicitly separate from the breakpoint captures; retain their same-r
 
 ## Cache and machine-matrix pilot (B5/A7)
 
-B5 has not passed. The user has deferred all 68030 cells; continue the other machines
-without addressing shared backlog TOOL1–TOOL3 this session. The cache option is
+B5 has not passed. All 68030 cells are deferred; the required 68040 non-MMU startup
+check was also unsuccessful. Work is stopped pending a decision on that additional
+blocker; 040 MMU and both 060 variants are untested. See [current status](open-work.md)
+and [the bounded startup check](internals.md#non-deferred-b5-check-68040-startup-also-unsuccessful).
+Shared backlog TOOL1–TOOL3 remains outside this session. The commands below are capture
+recipes, not evidence that the remaining matrix has passed. The cache option is
 `CUSTOM2=1`. Build with the existing release/developer/VERIFY targets. VERIFY uses
 API 18 solely for `resload_Log`; enable `FileLog` (a switch in the pinned runtime).
 The cache register is logged after the policy request, before loading the intro/game.
@@ -391,7 +395,7 @@ It is a point observation, not proof of every later memory page's cacheability.
 . amiga/env.sh
 make check slave slave-developer slave-verify
 python3 tools/machine_matrix.py 020 on clock tmp/b5/new-020-on-clock
-# 68030 commands are deferred; continue the non-deferred cells.
+# Example capture recipe; 68030 cells remain deferred.
 python3 tools/machine_matrix.py 020 off green tmp/a7/020-off-green 100
 ```
 

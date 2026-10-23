@@ -4,7 +4,17 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with fast RAM. The implementation plan
 is [plan.md](plan.md); verified findings are in [internals.md](internals.md).
 
-# B5/A7/A8: continue with 68030 deferred
+# Current status: B5 blocked; 68030 deferred
+
+| Work | Status |
+| --- | --- |
+| B1–B4; A1/A2/A3/A5/A6 | Complete, with gates recorded in internals. |
+| B5 | Cache pilot implemented; gate not passed. Required 68040 non-MMU startup check unsuccessful. |
+| A7 | Matrix incomplete; paired measurements and a reliable zero-lead follow anchor remain open. |
+| A8 | Not started. Developer gates and ceiling measurements remain open. |
+| All 68030 B5/A7/A8 cells | Deferred by the user, not passed. |
+| A4 | Open; required before D. |
+| C–G | Implementation and acceptance work remain open under the plan. |
 
 B1–B4 and A1/A2/A3/A5/A6 are complete. A3's call-by-call table and drawing-side-effect
 inventory are in [internals](internals.md#a3-simulation-versus-presentation); capture and
@@ -28,8 +38,8 @@ Important constraints for C:
 
 B3's modern-KickEmu baseline remains accepted for its pinned build; original-slave
 race equivalence is not claimed. B4's changed builds and A3's ownership captures have
-separate evidence, not a relabelled B3 baseline. No simulation or CPU-performance patches
-are enabled.
+separate evidence, not a relabelled B3 baseline. No simulation patches are enabled.
+The B5 cache policy is opt-in and disabled by default; its acceptance gate is still open.
 
 **B5, A7 and A8 are unfinished; 68030 validation is explicitly deferred.** A gated cache policy and VERIFY CACR
 logging have been added. The 68020 completed a whole Quick Race and quit cleanly with
@@ -49,7 +59,7 @@ CPU spelling/effective configuration), and **TOOL3** (stale capture reuse). Do n
 investigate or fix those shared items in this session. No shared tooling or installed
 runtime has changed. Deferred 68030 results are not passes.
 
-**New non-deferred blocker:** the verified 68040/25 non-MMU cache-on check also failed
+**Current non-deferred blocker:** the verified 68040/25 non-MMU cache-on check also failed
 to advance past its first 25-field startup command. The live process was stopped after
 2 minutes 23 seconds without reaching the language screen; evidence is retained in
 `tmp/b5/040-on-clock`. See [the check and its limits](internals.md#non-deferred-b5-check-68040-startup-also-unsuccessful).
@@ -59,7 +69,8 @@ startup blocker under the instruction to leave shared repairs out of this sessio
 
 Next steps, under the [current validation scope](plan.md#current-validation-scope-68030-deferred):
 
-1. **B5:** validate whole races/menus on 68020 and both 68040/68060 MMU variants; record matched
+1. **B5:** first resolve the decision on the failed 68040 startup gate. Then validate
+   whole races/menus on 68020 and MMU/non-MMU 68040/68060 configurations; record matched
    cache gains. Cache behavior stays opt-in until this gate passes.
 2. **A7:** capture both cache states on A500-equivalent, A1200, 020+Fast, 040 and 060, with actual layouts,
    per-window timings/chip slots and full race-clock evidence. Repair the zero-lead
