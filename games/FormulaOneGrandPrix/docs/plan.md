@@ -82,6 +82,19 @@ game time). Times are emulated.
   rebuilt slave (`B`), in a VERIFY or developer build. (Asking AmigaXDev for gdb memory
   writes would speed up `A3`/`A4`; it is optional.)
 
+## Current validation scope: 68030 deferred
+
+At the user's direction, defer every 68030 cell in **B5, A7 and A8**, including
+MMU and non-MMU configurations and both cache states. The shared startup wait and
+diagnostic-tool findings are backlogged in AmigaXDev as TOOL1–TOOL3; do not address
+those shared items in this session.
+
+For this iteration, B5/A7/A8 acceptance covers the non-deferred machines. Continue
+68000/68020 timing measurements and the required 68020/68040/68060 cache checks,
+including 040/060 MMU functional tests. Report 68030 cells as **deferred**, never
+measured or passed. Full 68030 qualification remains open for a later session;
+this exception does not relax any gate for the remaining machines.
+
 ## A. Map the game (gdb, traces, static disassembly; no slave changes)
 
 **A1 Time sources and race divergence.** Find every reader of time and randomness:

@@ -289,11 +289,14 @@ after 21,105 fields, logs `CACR=$00000000`, and quits OK. It validates the revis
 and incremental clock collector, including the four-hunk metadata. It is not a matched
 per-scene gain measurement.
 
-**Gate: not passed.** Full 030 cache validation, 030 MMU, both 040/060 MMU variants and
-matched gains remain unmeasured. A7's paired green/tow/follow matrix is incomplete;
-A8's ceiling experiments have not started. Before continuing, decide whether to expand
-work into repairing/validating shared AmigaXDev indirect-drive startup. Disabling data-cache
-emulation is not an acceptable way to mark B5 complete. No shared tooling was modified.
+**Gate: not passed; 68030 deferred by the user.** All 030 cache/MMU validation and
+030 A7/A8 measurements remain open for a later session. AmigaXDev backlog TOOL1–TOOL3
+records the startup wait, CPU-spelling fallback and stale-capture issues; shared repairs
+are out of scope for this session. Continue the remaining machines under the plan's
+current validation scope. Both 040/060 MMU variants and matched gains remain unmeasured;
+A7's paired green/tow/follow matrix is incomplete and A8 has not started. The deferral is
+not a pass, and disabling data-cache emulation is not an accepted substitute. No shared
+tooling or runtime was modified.
 
 ## Executables
 
