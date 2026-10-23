@@ -120,4 +120,6 @@ P3 extends native-rate logic and presentation to vehicles and flight, preserves 
 arrival timing and closes the deferred vehicle/flight/navigation play coverage. The
 030 Eagle view retains 50 fps with 12.5 logic passes/s; the standard route remains
 24.80 fps. Options-off matches shipped. See [P3](internals.md#p3-vehicles-flight-and-lifts).
-Next is R2's blitter back-buffer clear. See [plan.md](plan.md).
+R2's blitter clear was measured and rejected: A500 unchanged, chip-only A1200 slower,
+including a repeated blitter-priority trial. Keep the native CPU clear.
+Next is R4's data-cache decision (U). See [plan.md](plan.md).

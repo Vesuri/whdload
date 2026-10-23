@@ -1083,3 +1083,36 @@ results record the complete launch command. Fresh 500-field checks give 37 frame
 for both options-off and shipped on A500; `Custom1=2047` gives 12.50 fps on 020-fast,
 24.80 on 030/50 and 24.90 in the 040-25 emulator cell. These match the S6 counts;
 no speed gain is claimed. Evidence: `tmp/p2/launch-check/`, `tmp/p2/config-runs/`.
+
+### R2: blitter clear
+
+Tested and rejected. A temporary `Custom1` bit 13 replaced Disk.1 `$5E840` with
+four destination-only blits: 136 × 40 bytes per plane, 8,000-byte plane spacing,
+three zero planes and one all-ones plane. Each blit completed before the next;
+the last completed before returning to drawing. S4-active configurations kept
+the CPU clear. A second candidate gave the blitter priority while clearing and
+restored the previous priority afterward. Neither candidate is retained.
+
+Same-build/session `fps.py`, `Custom1=8191 → 16383`, 500-field standard route,
+`CACHE PRELOAD`:
+
+| Setup | CPU clear fps | Blitter clear fps |
+| --- | ---: | ---: |
+| A500 | 4.10 | 4.10 |
+| 020 chip-only | 9.40 | 9.20 |
+| 020 fast (S4 active) | 12.50 | 12.50 |
+| 030/50 (S4 active) | 24.80 | 24.80 |
+| 040-25 (S4 active) | 24.80 | 24.80 |
+
+The priority candidate repeated the A500 and chip-only 020 pairs twice with
+identical counts (41/41 and 94/92). These synchronous clears provide no measured
+gain and regress on chip-only 020; retain the native CPU clear. This does not
+measure a future design overlapping clearing with other work. The 040 result is
+an emulator run check, not a hardware speed prediction.
+
+Candidate checks: A500 and chip-only 020 still screenshots are byte-identical
+off/on; help, return, Quit Situation and subsequent walking show intact views and
+panels. World speed is 6 walking units and 2 heading units per field on 020 fast
+and 030/50. Options-off and shipped both give 37 A500 frames. Evidence and rejected
+candidate sources remain ignored under `tmp/r2/{first,priority,checks}/` and
+`tmp/r2/{shared-bus,priority}.asm`. No game code changes remain from R2.

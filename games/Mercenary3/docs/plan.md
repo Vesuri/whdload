@@ -198,9 +198,12 @@ Rewrite the loops worth 3% or more, one at a time, per CPU class (68000: long an
 stores; 68020+: cache-sized loops). Compare screenshots with the option off and on; build
 a pixel twin only if they differ. Keep each rewrite only where it gains.
 
-**R2. Blitter back-buffer clear** (new bit). Clear the 3D view with the blitter instead of
-the CPU (`$5E840`). Wait for the blitter before the first drawing. After S4 this matters
-only where S4 is off: the A500 and the chip-only A1200. Measure there.
+**R2. Blitter back-buffer clear — tested, not retained.** A temporary option replaced
+the CPU clear (`$5E840`) with four blits, waiting before drawing and preserving the
+three zero planes and one filled plane. With S4 active it kept the CPU clear.
+Neither shared-bus nor blitter-priority clearing gained on A500 (4.10 → 4.10 fps);
+both regressed on chip-only A1200 (9.40 → 9.20). The priority comparison repeated
+identically. Keep the native CPU clear; see [measurements](internals.md#r2-blitter-clear).
 
 **R3. Triple buffering — closed, not implemented.** The user does not want triple
 buffering. Retain double buffering despite the S5 measured wait; no extra chip buffer.
@@ -223,10 +226,10 @@ moved and self-modifying code.
 - [x] P1 [x] P2 [x] P3
 - [x] M1 [x] M2
 - [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [x] S6
-- [x] R1 [ ] R2 [x] R3 (closed) [ ] R4
+- [x] R1 [x] R2 (not retained) [x] R3 (closed) [ ] R4
 - [ ] X1
 
-Next: R2 (blitter back-buffer clear).
+Next: R4 (data-cache decision, U).
 
 ## In place
 
