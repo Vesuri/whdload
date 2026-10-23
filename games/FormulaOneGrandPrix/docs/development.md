@@ -292,3 +292,88 @@ bytes are read from the verified local game, never copied into tracked fixtures.
 are exposed. Otherwise the route's repeated fire presses can keep WHDLoad's configuration
 window open. This is a launcher setting; the slave's ordinary interactive options remain
 available when launched elsewhere.
+
+## Call-boundary state and drawing ownership (A3)
+
+`state_diff.py` is exposed as the server command `statediff live|replay DIR [FRAMES]`.
+It currently requires `a1200-fast` (8 MB fast RAM), an explicit `SLAVE`, and a stopped
+native-route game. Use the B4 release slave with all five CUSTOM values explicitly zero,
+`WARP=1 DETERMINISTIC=1 JOY0=none JOY1=none`. Wait for the **new** server's `serving on`
+message; reject an active socket rather than connecting to a different run. All capture
+names must be new directories under `tmp/`.
+
+From a fresh server, one race sample is:
+
+```sh
+# Set RACE_LEADS=0,0,400 in the server environment for the accepted A3 route.
+python3 tools/f1gp.py raceprofile green tmp/a3/green-anchor 1
+python3 tools/f1gp.py statediff live tmp/a3/green 50
+python3 tools/f1gp.py quit
+python3 tools/state_diff.py tmp/a3/green
+```
+
+Repeat from fresh boots with `tow` and `follow` replacing `green`. The one-field profile
+is for the screen anchor and layout, not the 50-frame write audit. For the garage and
+replay samples, from another fresh server:
+
+```sh
+python3 tools/f1gp.py qualifying tmp/a3/qualifying-route.jsonl
+python3 tools/f1gp.py statediff live tmp/a3/qualifying 50
+python3 tools/f1gp.py gdb 'monitor fields 2000'  # populate replay history in this session
+python3 tools/f1gp.py tap 40
+python3 tools/f1gp.py gdb 'monitor fields 10'
+python3 tools/f1gp.py tap 13
+python3 tools/f1gp.py shot "$PWD/tmp/a3/replay.png"  # confirm the red R
+python3 tools/f1gp.py statediff replay tmp/a3/replay 50
+python3 tools/f1gp.py quit
+```
+
+The collector discovers the four hunks through the loaded code and DOS segment chain,
+verifies bitmap bounds, stops at the selected loop head, and snapshots before each actual
+call and at its return. It uses **one breakpoint at a time**: this debugger rejects a
+large simultaneous breakpoint set. Non-call instructions between sites are single-stepped.
+It fails if a call does not return, the loop exits, or a frame does not complete. Pausing
+or exiting during capture is therefore not a valid steady-loop sample. Emulated time is
+halted during the reads; host capture duration is not a performance measurement.
+
+The four complete hunks are concatenated into each `.bin.gz`, with paired events and
+SHA-256 hashes in `events.jsonl`. Keeping all h0/h2 bytes captures interleaved data;
+keeping all h3 bytes permits auditing screen exclusions. `diff.json` reports every
+call, including zero-count conditional sites, changed intervals, screen counts and
+reviewed ownership classes from `state_classes.py`. It validates captured layout, screen
+exclusions, hashes, pairing, frame coverage and call targets. Failed/partial captures
+cannot pass. A malformed hexadecimal memory reply may retry the same halted read up to
+three times; continue, input and stepping commands are never retried implicitly.
+
+`state_audit.py` and `state_access.py` require the available Python **Capstone 5** package.
+The former walks the pinned executable and enumerates renderer stores, including reviewed
+indirect dispatches; the latter uses instruction/register traces to resolve memory reads
+and writes and identify potential cross-call consumers. It separates interrupt stacks,
+not merely the CCR (KickEmu virtualizes SR). An unresolved decoder/address or an unclassified
+store is a failure. Neither a byte intersection nor a missing net delta proves dependence
+or independence: use the writer/consumer discussion in internals.
+
+```sh
+python3 tools/state_audit.py tmp/a3/static-audit.json
+python3 tools/state_access.py tmp/raw/green/trace-0000.bin tmp/raw/green/fast.bin tmp/a3/green-access.json
+python3 tools/state_access.py tmp/raw/tow/trace-0000.bin tmp/raw/tow/fast.bin tmp/a3/tow-access.json
+python3 tools/state_access.py tmp/raw/follow/trace-0000.bin tmp/raw/follow/fast.bin tmp/a3/follow-access.json
+python3 tools/state_access.py tmp/a2/route-practice/trace.bin tmp/a2/route-practice/fast.bin tmp/a3/practice-access.json
+python3 tools/state_access.py tmp/a2/replay.bin tmp/a2/fast.bin tmp/a3/replay-access.json
+python3 tools/test_state_diff.py tmp/a3/probe3
+python3 tools/state_gate.py tmp/a3
+```
+
+The retained one-frame `probe3` is the successful collector smoke test; recreate it with
+`statediff live tmp/a3/probe3 1` in a separate native-route session. Negative tests copy
+its evidence into a temporary directory and leave originals unchanged. They reject failed,
+short, unpaired, corrupt, missing-frame and forged-screen evidence, plus an injected change
+outside the renderer's classified ranges.
+
+For the combined gate, `tmp/a3/access-sources.json` maps `green`, `tow`, `follow`,
+`practice`, `replay` to `[trace_path, fast_dump_path]` arrays (paths under project `tmp/`,
+as in the commands). The gate rechecks all five 50-frame captures, hashes the auxiliary
+trace inputs, requires every observed renderer store PC to appear in the static inventory,
+runs the negative checks and writes `acceptance.json`. It starts as `INCOMPLETE`, never
+retaining an old PASS after a failed rerun. It does not start an emulator. The auxiliary
+traces are explicitly separate from the breakpoint captures; retain their same-run dumps.

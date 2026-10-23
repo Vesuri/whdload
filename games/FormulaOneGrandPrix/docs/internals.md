@@ -342,6 +342,148 @@ qualifying reaches the same first three, weekend at 2367 and cockpit at 2718.
 Quick Race remains 807/1184/1413/1608/2115. These counts describe these commands and
 build only; the route recognizes screens rather than waiting those numbers.
 
+### A3: simulation versus presentation
+
+**Gate passed for the pinned 582992-byte game.** The call-boundary audit covers 50
+complete drawn iterations each of green, tow, follow, qualifying and replay (250 total),
+not 50 PAL fields. Each snapshot includes all four hunks: retaining code as well as data
+avoids missing variables between routines. The report excludes the two live-discovered
+32,000-byte bitmaps from its non-screen changes, but retains their bytes in compressed
+snapshots. Every observed non-screen drawing change is classified. A separate reachable
+instruction audit classifies **3,681 explicit memory-store instructions**, including
+same-value and write/restore stores that a snapshot difference cannot reveal.
+
+This is a write-ownership audit, not a new game-speed, performance or equivalence result.
+Unexecuted conditional branches below have static evidence; they are not labelled as
+play-tested. No game/slave instructions were changed for A3.
+
+#### Calls in native order
+
+`L` means h0's live loop; `R` its replay loop. All call-site offsets in this table are
+in h0. The report's full changed-byte intervals are in `tmp/a3/*/diff.json`; the table
+groups them by their owners and also includes conditional writes absent from a sample.
+A zero net delta does **not** mean that a call is read-only.
+
+| L site / R site | Target | Class and writes; required cadence |
+|---|---|---|
+| `$3C944` / — | h0+$396AC | Tick: replay checkpoints. Copies h1+$368–1955 car/session state and h0+$3A714–3A7BB into the h1 replay slots; updates h1+$1B03C slot pointers and h0+$3A7CA/+3A7CC/+3A7D2. Keep before the live tick. |
+| `$3C94A` / `$3CC8E` | h0+$64 | Tick input: builds active-low masks h0+$18–1D from the keyboard table **h2+$52A**. Same values in an idle-input sample are still stores. |
+| `$3C950` / — | h0+$34D24 | Tick input: controller masks/axes, player control fields (including record +$98–9B), calibration and input scratch. Hardware acquisition remains asynchronous as in A6. |
+| `$3C956` / `$3CC9A` | h0+$3BBF6 | Tick/modal: consumes control/assistance edges, updates h2+$2A73E option bits and h0+$3A7A8 edge latches; descendants also affect control state and UI. Do not repeat at picture rate. |
+| `$3C95C` / — | h0+$39654 | Tick: records control bytes in the h1+$1B048–1BE57 ring and advances h0+$3A728; includes player record +$7F and analog +$9A/+9B. |
+| — / `$3CC94` | h0+$395F2 | Tick: inverse replay-input operation; restores masks and player controls, advances the same ring cursor. Replay really re-simulates cars. |
+| `$3C962` / — | h0+$3B5DE | Tick/modal: pause/replay/view-key handling, edge latches and mode flags, with modal waits and UI updates. Preserve native entry/exit ownership. |
+| — / `$3CCBA` | h0+$3B80E | Tick/modal: pause/resume key latch h0+$3A918, h0+$2CC2C/+2CC2E/+2CC32 handshake/deadline state and UI refresh flags; can wait for a key. |
+| `$3C988` / `$3CCC0` | h0+$3B346 | Tick/session: start-light and race-state machines, h0+$3A73A–3A7A6 timers/flags, gameplay RNG h0+$3A7B0–3A7B4, car/ranking state and messages. Keep native order before car updates. |
+| `$3C98E` / `$3CCC6` | h0+$2AC14 | **Mixed**, predominantly tick: car records h1+$5D6 onward (stride $C0), track/control/AI and physics scratch, ranking tables h2+$2AE56 onward, h0 game/sound state. It also calls HUD text drawing on some branches; see the bitmap-read finding below. Skipping only h2+$280F6 does not make a tick completely free of display writes. |
+| `$3C994` / `$3CCCC` | h0+$3BF96 | Tick camera/view selection: h1+$234/+238/+23C/+23E source/view state, h0+$3A6BC–3A6C4 pending changes and +$3A915 edge latches, camera state through +$3C292. Includes automatic “Viewing” changes. |
+| `$3C9A4` / `$3CCDC` | h0+$3C55C | Conditional mixed rebuild: waits for pending publication, rebuilds cockpit/external background, clears h0+$3A6CE and shifts refresh byte +$3A712. Pixel rebuild and tick-owned request consumption must be separated; do not discard the latter. Not exercised in the steady 50-frame samples. |
+| `$3C9B4` / `$3CCE2` | h0+$34028 | **Mixed camera evolution/projection:** camera h0+$3A7F8–3A828, matrix inputs +$3A8C2/+3A8C4 and h2+$231D4/+231E0/+231E4. Its +$3676A call advances the damped camera state +$3A820/+3A824. Run that evolution once per tick; recompute pure projection inputs from staged presentation poses later. |
+| `$3C9BA` / `$3CCE8` | h2+$280F6 | **Mixed renderer.** Pixels, blitter work, geometry/cache scratch and the tick side effects listed below. Cannot be called freely or omitted wholesale. |
+| `$3C9C0` / `$3CCEE` | h0+$258A2 | Tick clocks: fixed increments to h0+$3A77C/+3A780 and +$3A782/+3A786, countdown/status +$3A7BA, deadline and dirty flags. Retain after the native drawing-side effects. |
+| `$3C9C6` / `$3CCF4` | h0+$39542 | Mixed cockpit/UI: instruments, text scratch h2+$1F312 onward, dirty/event flags and h0+$3A799. Its +$39504 path reads the pit-animation word +$3A74A and can trigger a UI update. |
+| — / `$3CCFA` | h2+$1DFB4 | Presentation: paints the red replay R into the remembered bitmap h0+$1256; reads/masks pixels, no world step. |
+| `$3C9CC` / `$3CD00` | h0+$2DD74 | Mixed HUD: temporarily selects the remembered bitmap, draws text/status, consumes dirty flags h0+$3A6DE/+3A6DF, advances blink phase +$3A6E0, updates text scratch and related HUD state, then restores h0+$1252. Preserve tick-rate blink/request handling when extracting painting. |
+| `$3C9D2` / `$3CD06` | h0+$1272 | Presentation/sound: fields-work/minimum/frame counters h0+$125A–1261, bitmap selection +$124E/+1252/+1256, publication address h2+$1DAAC and pending byte +$1DAB0. Replace by C's clock/publication contract, retaining A6's sound denominator meaning. |
+| `$3C9E6` / — | h2+$51C | Escape-key predicate: reads the key table, changes condition codes, no game-state store. |
+| `$3CA26` / — | h2+$8E2 | Exit-only hardware/modal handoff: interrupt/audio enable state; not an extra world tick. |
+| `$3CA36` / — | h0+$29C1C | Exit-only classification: car ranking fields and h2+$2AE56 standings / +$2AE8A results. |
+| `$3CA3C` / — | h0+$3B1E0 | Exit-only result status: writes h2+$2A736 from the selected car's retirement/finish flags. |
+
+Inline code is part of the tick too: the loop headers update h0+$2CC2C/+2CC2E/+2CC32
+against the game clock; the live exit sets h2+$2A75E and h0+$CC/+2CC06; the replay exit
+clears h0+$3A70A before returning to live pause handling. The undrawn replay reconstruction
+paths at h0+$3CA5A and +$3CB82 reuse control/session/car/clock calls; they are modal
+reconstruction, not additional picture loops. C must not add a second clock around them.
+
+A2's h0+$3C5C6 cockpit-return path is a **one-time transition**, not a third live loop.
+Its draw/camera/HUD/pacer calls have the same ownership as above; its other calls initialise
+object workspace (h2+$281AE), session/input state, restored replay state and scene data.
+The clears of h2+$2A72C/+2A75E and h0+$3A6B0/+3A6CE and the final sound handoff remain
+modal work. There is no proposal to execute this transition 50 times as a live loop.
+
+#### Drawing writes and consumers
+
+The static traversal starts at h2+$280F6, follows calls/branches, expands all sixteen
+colour-kernel entries (24-byte and 96-byte dispatch strides), and resolves the three
+`JSR (A5)` sites to the four selected transform routines h2+$23A98/+23D80/+24000/+24180.
+It reaches 14,077 instructions with no unresolved control-flow edge. These dispatch
+bounds belong to this pinned game's four-plane palette and are not a generic disassembler
+heuristic. Every renderer store PC seen in the retained green/tow/follow traces is included.
+
+| Write family | Ownership / consumer |
+|---|---|
+| Both bitmaps; fill/span work in h0+$1348–147B, +$1E802–222EB and h3+$112F8 onward | Presentation. h3's non-screen polygon buffer is also borrowed for race-order sorting, but h0+$2916E–291B8 rewrites all 26 entries before +$291CA onward reads them. The old polygons are not physics input. |
+| h0+$25644 trig result | Shared math scratch. Physics consumers +$260AE/+260CA/+349D4/+349F6/+36B50/+36B72 and camera consumers +$262BA/+262D6 first call +$25648, which overwrites it at +$25670. No dependency on a preceding picture's result. |
+| h1 palette/span tables +$0–21F; object list +$1AD6; projection/object work +$16294–16C49, +$1C3FC onward; h2+$23126–2327D, +$28168–281AB, +$29E16–29E2B | Presentation workspace: projected vertices, clipping/visibility results, object ordering, mirror staging and span preparation. No persistent physics result was found here. Raw changed intervals and writer PCs remain in the reports. |
+| Track-record bytes +$A, +$1E, +$25, +$26, +$2A, +$2B (46-byte records) | Presentation association/visibility flags and packed clipping caches. +$29FAE–29FCC marks visible car associations; +$29FEA clears them. Physics at h0+$26912/+2695C tests bits 0/1 of record +$26 and the camera at +$33FA6 tests bit 3; drawing changes its high bits. The +$25 clipping nibbles are written by h2+$234A2–234B0 and consumed by clipping. Byte overlap is not a dependency on the renderer's bits. Keep the mark/cleanup pair within each draw. |
+| h0 model decoration +$2E2EC, +$2E3EA/+2E4D6, +$31B96, +$32448/+32693/+327F0; h2+$2C3BF and object dimensions | Presentation: material/shape and projected-object selection from existing object/car/track state. Marshal/tow-object decoration copies the native phase/pose; these stores are not an independent world advance. Model updates and mirror staging must remain paired with their consumers. |
+| h2+$1E278–1E65B queue and descriptors, +$1E804/+1E80E, +$1F4E6–1F561; custom `INTREQ` | Presentation/hardware: blitter command production and drain. Its interrupt also writes h2+$28C–291 and queue read cursors; keep asynchronous completion alive while pictures are skipped. |
+| h0+$125E, sound RNG +$2578C–25790, pitch +$3A704, handshake +$2CC06; h2 copper pointers, +$93A, pending +$1DAB0 | **Asynchronous**, not renderer-owned, despite changes between draw entry and return. Call dumps include interrupt work. Trace attribution separates stacks; KickEmu's virtual SR means the recorded CCR alone cannot distinguish interrupts. |
+| h0+$3A746/+3A748/+3A74A/+3A74C, +$257C4–257C8, +$3A820, +$3A770 | Persistent tick side effects, detailed below. These are the exceptions to freely repeating presentation work. |
+| Stack pushes, saved registers and temporary pointers | Call-local storage. Explicit stores are counted; implicit call return-address pushes are classified as stack without treating them as game state. |
+
+**Drawing side effects that must run once per native tick, in native order and with the
+native view/car predicates:**
+
+1. **Pit-service phases:** h2+$2A0FA, +$2A19E, +$2A226 and +$2A3CE advance, saturate,
+   initialise or reset h0+$3A748, +$3A746, +$3A74A and +$3A74C. The normal-cockpit
+   path at h2+$28070–28080 resets the first three when the relevant car flag is absent.
+   Qualifying's 50-frame sample observes +$3A74A advancing. h0+$3950E reads it for a
+   UI trigger; +$3BA68 reads it before admitting a pit/control action and recording car
+   field +$92. These counters cannot become picture-rate animations. Keep the tick
+   update and allow drawing to consume its result without advancing it again.
+2. **Shared RNG and shake:** under the car-state-3/race predicate, h2+$2A144 calls
+   h0+$25792 (state +$257C4–257C8) and +$2A14C adds its result to camera word +$3A820.
+   That stream also has non-renderer simulation/sound consumers (A1). Preserve the draw
+   count and order once per tick; moving it to each picture changes later random choices.
+   The camera's +$3676A spring/damping update is also tick work, although its caller is
+   immediately before drawing rather than inside h2+$280F6.
+3. **Visible-car debris expiry:** h2+$29ACE–29AD8 changes zero h0+$3A770 to −1 when a
+   rendered car has record +$19 bit 4. Simulation h0+$33CA4–33CDA consumes that deadline
+   and can clear bit 4 from all cars. This is genuine visibility-to-simulation feedback.
+   Retain a tick-rate evaluation using the native visibility predicates even on an
+   undrawn tick; do not substitute “all cars” or the set visible in an extrapolated picture.
+
+Other camera selection, “Viewing” cuts, start lights, phase timers, HUD dirty flags,
+blink state and event/one-shot input consumption live in the surrounding calls above.
+They remain tick/modal work. In particular, neither +$34028 nor +$2DD74 is a pure painter.
+This audit identifies the split; implementing a tick-only visibility pass and extracting
+embedded HUD writes are C's work, not changes already made here.
+
+**Does physics read the painted screen?** The green/tow/follow and practice instruction
+samples show no bitmap reads under the car-update call. Replay does: 192 distinct bytes,
+at h2+$1F16E/+1F172/+1F1BE/+1F1C2/+1F216/+1F21A/+1F266/+1F26A. Following the path
+from h0+$3CCC6 through call sites +$2AD38, +$28E74, +$28B10, +$2D50E and h2+$1EFE0
+identifies glyph compositing (+$1F07A): it masks existing pixels and writes the composed
+glyph to the bitmap(s). Those pixel values do not feed grip, collision or car integration.
+Thus “the car-update call never reads the screen” would be false; the observed reads are
+embedded presentation. No Revs-style painted-screen physics dependency was found.
+
+#### Evidence and limits
+
+Local evidence is `tmp/a3/{green,tow,follow,qualifying,replay}`: initial RAM, actual four
+hunk bases, slave/emulator/input hashes, compressed before/after snapshots, paired event
+indices, debugger command logs and classified byte ranges. Screen-anchored route/profile
+records are in the `*-anchor` directories; qualifying/replay use native menu and key input,
+with the red R checked visually. All use the B4 release slave, all CUSTOM values zero.
+The accepted tow run has a different boot/anchor route from the other race samples;
+its own route is retained. No field number was borrowed and no cross-race state match
+is claimed. These samples do not replace the B3 repeatability baseline.
+
+The supporting effective-address inventories use the retained `tmp/raw` race traces
+and A2 practice/replay traces with their own RAM layouts. They are separate evidence,
+not traces of the new breakpoint runs. The static scan covers conditional renderer
+branches missing from those short traces. It is bounded by the pinned executable and
+reviewed dispatch tables, not a proof for unavailable game variants or modified code.
+
+Rejected probes remain local: the debugger rejected simultaneous breakpoint installation,
+so the collector now uses one return breakpoint at a time and steps only between calls.
+A tow attempt stopped on a malformed debugger memory reply after 38 complete frames;
+it is not accepted. The retry uses bounded retries of that halted read only, validates
+snapshot sizes/hashes and captures all 50 frames anew. Negative checks reject incomplete,
+odd, corrupt or missing-frame evidence and an injected unclassified renderer change.
+
 ## Memory and the chip bus
 
 `f1gp`'s hunk 0 (code) and hunk 1 (BSS) are `MEMF_ANY` and load into fast RAM when there
@@ -450,7 +592,7 @@ and the per-field application, including the field-duration denominator.
 
 | Input | Sampling / consumption |
 |---|---|
-| Keyboard in the race | Level-2 handler h2+$2D4 calls +$47E; +$488 reads CIAA ICR and +$4A8 reads SDR. The original slave's hook at +$4AC decodes the key and handles F10. The routine records pressed/released state in the key table h1+$52A. h0+$64 scans that table once per loop pass to form gameplay key masks. This is asynchronous acquisition with frame-rate consumption, not a once-per-VBL keyboard poll. |
+| Keyboard in the race | Level-2 handler h2+$2D4 calls +$47E; +$488 reads CIAA ICR and +$4A8 reads SDR. The original slave's hook at +$4AC decodes the key and handles F10. The routine records pressed/released state in the key table h2+$52A. h0+$64 scans that table once per loop pass to form gameplay key masks. This is asynchronous acquisition with frame-rate consumption, not a once-per-VBL keyboard poll. |
 | Keyboard acknowledgment | h2+$4E0 sets CIAA's serial-output handshake and starts CIAB timer B; h2+$5AA clears it on the level-6 timer interrupt. h2+$212–23E can wait up to ten VBLs for completion, clearing the game's elapsed-field counter in the process. |
 | Joystick / digital mouse-counter input | h0+$34D24 is called from the race loop; the path at +$34E28 reads JOY1DAT and +$34E62 calls h2+$1D9F6. That helper reads JOY1DAT at +$1D9FC and the button at +$1DA38. Gameplay samples this path per frame/tick. |
 | Analog control | The VBL callback alternates POTGO start at h0+$2CDD6 with POT1DAT read at +$2CDE2, accumulating values at h0+$3A928/+3A92A. Frame input processing uses the calibration words in h2+$2A658–2A662. This acquisition must keep running while rendering is skipped. |

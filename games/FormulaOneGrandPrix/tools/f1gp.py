@@ -15,6 +15,8 @@ and:
   qualifying [log]   Main Menu -> Non-Championship Race -> Silverstone -> Qualifying
   menuclick X Y      click a screenshot coordinate using the homed pointer
   tap RAW [FIELDS]   press a hexadecimal raw key for FIELDS (default 25), then release
+  statediff live|replay DIR [FRAMES]
+                     dump call-boundary state for complete drawn frames (default 50)
   raceprofile PHASE DIR [FIELDS]
                      quickrace, then profile FIELDS (default 500) fields from the green
                      light, the retirement/towing scene or the follow camera
@@ -197,6 +199,11 @@ def raceprofile(server, g, rest):
     return race_profile.raceprofile(server, g, rest)
 
 
+def statediff(server, g, rest):
+    import state_diff
+    return state_diff.capture(server, g, rest)
+
+
 def raceclock(server, g, rest):
     import race_clock
     return race_clock.raceclock(server, g, rest)
@@ -213,7 +220,7 @@ server = Server('f1gp', root=ROOT, profile_window=False,
                           'practice': lambda s, g, r: quickrace(s, g, r, 'practice'),
                           'qualifying': lambda s, g, r: quickrace(s, g, r, 'qualifying'),
                           'raceprofile': raceprofile,
-                          'raceclock': raceclock})
+                          'raceclock': raceclock, 'statediff': statediff})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])
