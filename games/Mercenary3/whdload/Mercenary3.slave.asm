@@ -57,7 +57,7 @@ _info		dc.b	"adapted by Harry/Graham/Wepl",10
 		dc.b	" (VERIFY)"
 	ENDC
 		dc.b	0
-_config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
+_config		dc.b	"C1:X:Enable display DMA once and copy whole palette:0;"
 		dc.b	"C1:X:64-bit bitplane fetch on AGA (FMODE 3):1;"
 		dc.b	"C1:X:Supervisor stack in expansion memory:2;"
 		dc.b	"C1:X:Native walking logic rate:3;"
@@ -67,7 +67,7 @@ _config		dc.b	"C1:X:Enable display DMA once, copy whole palette:0;"
 		dc.b	"C1:X:Longword horizontal span fills:7;"
 		dc.b	"C1:X:Bulk presentation restore:8;"
 		dc.b	"C1:X:Renderer code in fast RAM (68020+):9;"
-		dc.b	"C1:X:View bitmap in fast RAM (68020+):10;"
+		dc.b	"C1:X:View bitmap in fast RAM (68020+):10"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN

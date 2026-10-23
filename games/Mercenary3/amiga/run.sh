@@ -39,7 +39,7 @@ printf 'Expert\nReadDelay=0\n' > "$DH0/s/WHDLoad.prefs"
 WHD_UI='SPLASHDELAY=0 NOREQ'
 [ "${WHD_SPLASH:-0}" = 1 ] && WHD_UI='SPLASHDELAY=-1'
 printf '%s\n' 'Stack 16384' 'FailAt 999' 'CD DH1:' \
-  "WHDLoad Mercenary3.Slave PRELOAD $WHD_UI ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
+  "WHDLoad Mercenary3.Slave CACHE PRELOAD $WHD_UI ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
 rm -f "$RUN"/state/*.uss
 
 SHOTS="${FSEMU_SCREENSHOTS_DIR:-$(cd .. && pwd)/tmp/shots}"; mkdir -p "$SHOTS"; export FSEMU_SCREENSHOTS_DIR="$SHOTS"

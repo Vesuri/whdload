@@ -157,6 +157,7 @@ def session(boot_timeout):
                 raise RuntimeError('entry anchor did not start a fresh game')
         print('anchored at Disk.1 $4EDB0', flush=True)
         meta = dict(setup=os.environ['AMIGA_SETUP'], whd_args=os.environ.get('WHD_ARGS', ''),
+                    launch_command=(Path(ROOT) / 'amiga/.run/dh0/s/startup-sequence').read_text().splitlines()[-1],
                     extra_args=os.environ.get('EXTRA_ARGS', ''),
                     deterministic=os.environ['DETERMINISTIC'],
                     slave=os.path.relpath(SLAVE, ROOT),

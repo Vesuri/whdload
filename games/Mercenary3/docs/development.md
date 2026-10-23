@@ -31,13 +31,15 @@ no local copies or paths into other projects are used.
 ## Running
 
 `amiga/run.sh` boots Kickstart 3.1 from a generated `DH0` that runs
-`WHDLoad Mercenary3.Slave PRELOAD` on `DH1`, a disposable copy of the pristine drawer
+`WHDLoad Mercenary3.Slave CACHE PRELOAD` on `DH1`, a disposable copy of the pristine drawer
 under ignored `amiga/.run/`. The default machine is the A500-equivalent (68000, 512 KB
 chip, 1.5 MB slow, no fast RAM); the slave needs 512 KB chip and WHDLoad needs other
 memory beside it. Variables: `SLAVE`, `WHD_SPLASH=1`, `WHD_ARGS`, and the shared
 launcher's (`AMIGA_SETUP`, `CPU`, `CHIP_KB`, `SLOW_KB`, `FAST_KB`, `DEBUG`, `WARP`,
 `DETERMINISTIC`, `JOY0`, `JOY1`, `SOUND`, `WINDOW`). Defaults: mouse in port 0,
-keyboard joystick in port 1.
+keyboard joystick in port 1. `CACHE PRELOAD` are supplied for normal and measured runs;
+`WHD_ARGS=NOCACHE` overrides cache use for an explicit cache-off test. Route results
+record the complete launch command, including these defaults.
 
 The debugger server uses the native build:
 

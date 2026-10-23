@@ -977,3 +977,14 @@ Quit Situation screenshots remain valid for the identical build; no new behaviou
 was introduced in S5/S6. Fresh options-off and shipped runs both give 37 A500 frames.
 The existing deferred map/vehicle/flight coverage gap remains. Evidence: `tmp/s6/`,
 S4's same-build cadence/world/play checks, and S5's 020 profile.
+
+### WHDLoad launch configuration
+
+WHDLoad 20.1 rejected the comma in the first Custom1 checkbox label; labels cannot
+contain commas. The corrected label and config terminator boot without the warning
+(shell inspected after exit). Runs now explicitly pass `CACHE PRELOAD`; PRELOAD was
+already present. `NOCACHE` still overrides CACHE for cache-off comparisons, and route
+results record the complete launch command. Fresh 500-field checks give 37 frames
+for both options-off and shipped on A500; `Custom1=2047` gives 12.50 fps on 020-fast,
+24.80 on 030/50 and 24.90 in the 040-25 emulator cell. These match the S6 counts;
+no speed gain is claimed. Evidence: `tmp/p2/launch-check/`, `tmp/p2/config-runs/`.
