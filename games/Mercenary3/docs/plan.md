@@ -233,15 +233,15 @@ once accepted.
 **F0. ✓ Budget.** `render_profile.py`, `beam_profile.py`, `bus_audit.py`'s place table,
 relocation-aware `route_profile.py`; results in internals.
 
-**F1. Restore once per logic pass.** Each presentation now saves and restores the 17,366-byte
-set (3.7 + 3.4 ms). Save at the first presentation after a logic pass only; later
-presentations draw on the scratch the previous one left, as consecutive native frames do;
-restore once, just before the next logic pass runs, and at snaps and mode changes. Logic still
-sees exactly the state its own frame left.
-- Check: P1's hash at the restore point (state before the pass equals the saved state);
-  world speed; play: starts, stops, mailbox, lift, vehicle, flight.
-- Expected: worst frame −3.4 ms (presentations about 28 → 25 ms; logic frames take the
-  restore, about 21.5 → 25 ms).
+**F1. Restore once per logic pass — tested, not retained.** A temporary bit 17
+saved at the first presentation and restored before the next logic pass; the small
+player/navigation/room pose still restored after every redraw. This did not remove
+any copies on the measured route (one presentation per logic pass). Because publication
+precedes drawing, deferring the restore to the gate still puts it before the same next
+publication: the expected 3.4 ms reduction in the worst displayed-frame interval was
+incorrect. Beam timing regressed and FPS did not improve; retain the existing restore
+path. Reconsider copy amortisation only if later work allows multiple presentations
+per pass. See [F1 results](internals.md#f1-deferred-restore-tested-not-retained).
 
 **F2. The remaining hot code in fast RAM** (extends S3). Chip code fetches are 1,943 per
 field on the 020; the room path, whose code is in chip, is 6.6% of main 3D on the 020 but
@@ -276,8 +276,8 @@ and exponent. Check: the two routines agree for every 28-bit input (host harness
 play and screenshots. Expected: 0.5..1 ms on the 030.
 
 **F5. (U) Game variables and render scratch in fast RAM.** Their 1,943 accesses per field
-(variables 1,135, scratch 808) and F1's remaining copy (3.4..3.7 ms on one frame per pass)
-all use the chip bus. Their operands are absolute short words and 16-bit displacements: a
+(variables 1,135, scratch 808) and the retained presentation copies
+(3.4 + 3.7 ms per presentation) all use the chip bus. Their operands are absolute short words and 16-bit displacements: a
 copy cannot reach fast RAM at the same length, so this needs the renderer reassembled from
 source with symbolic data addresses. Ask the user with F1..F4's results. Expected: 2..5 ms,
 and the copy down to about 0.5 ms.
@@ -335,10 +335,10 @@ without it. Real cache behaviour and 040/060 hardware performance remain unverif
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
 - [x] R5
 - [x] X1
-- [x] F0 [ ] F1 [ ] F2 [ ] F3 [ ] F4 [ ] F5 (U) [ ] F6
+- [x] F0 [x] F1 (not retained) [ ] F2 [ ] F3 [ ] F4 [ ] F5 (U) [ ] F6
 
 P4 and P5 address the presentation defects reported after the original plan completed.
-Phase F continues toward one-field frames on the 030/50; next: F1.
+Phase F continues toward one-field frames on the 030/50; next: F2.
 Hardware validation remains unavailable, outside X1.
 
 ## In place

@@ -132,8 +132,13 @@ Phase F works toward one-field frames on the reference 030/50. F0 measured the b
 frames take 24.9 ms of work on average (worst 27.4), against 20 ms per field. The
 presentation copies cost 7.1 ms per presentation and the staging copy 3.3 ms. The CPU's
 remaining chip-bus traffic, about 21,000 accesses per frame from chip-resident code,
-game variables, render scratch and renderer data, costs an estimated 6..12 ms. Next: F1
-(restore once per logic pass). See [F0](internals.md#f0-one-field-frame-budget-03050) and
+game variables, render scratch and renderer data, costs an estimated 6..12 ms.
+
+F1 tested deferred restoration but retained the existing path: there is only one
+presentation per pass on the route, and the restore stays before the same next
+publication, so no copies or frame time were saved. Next: F2 (remaining hot code
+in fast RAM). See [F1](internals.md#f1-deferred-restore-tested-not-retained),
+[F0](internals.md#f0-one-field-frame-budget-03050) and
 the [plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step).
 
 The post-P5 68040 investigation measures 24.80 fps: steady frames spend about

@@ -1299,6 +1299,36 @@ a faster CPU: on a real 68040/060 the same accesses cost about the same time whi
 computation shrinks, so the same reductions apply there. The 040/060 cells cannot confirm
 that (their timing does not follow the CPU frequency).
 
+### F1: deferred restore tested, not retained
+
+A temporary Custom1 bit 17 saved the restore set at the first presentation and
+restored it immediately before accepting the next logic pass (including mode-change
+paths). A small 56-byte player/navigation/room pose backup still restored after each
+redraw, avoiding repeated interpolation of an already staged pose. The existing
+restore path and Enhanced framerate mask remain unchanged.
+
+Same candidate build, bit 17 off/on (`Custom1=131071 → 262143`), reference 030/50,
+beam probes over route fields 175..500: work between publications **24.9 → 26.2 ms
+mean**, **27.4 → 28.4 ms worst**. Save and restore calls both remained 81 over the
+163-frame window; restore cost moved from 3.4 ms during presentation to 3.3 ms at
+the gate. PER_FRAME cadence remained 247 two-field intervals and one three-field
+startup interval. Same-session exact 500-field FPS comparisons, repeated twice:
+A500 4.10 → 4.10, 020-fast 12.50 → 12.50, reference 030/50 24.80 → 24.80,
+040-25 24.80 → 24.80. All runs used CACHE PRELOAD. These are emulator
+measurements, not hardware results. The candidate was rejected on timing before
+completing world-speed and full movement-mode play acceptance; no game change is
+retained. Rebuilt release bytes match the accepted build. Input verification and
+original/release/VERIFY builds pass; options-off and shipped A500 runs both give
+37 frames over 500 fields.
+
+The proposed worst-frame saving was based on the wrong frame boundary: the native
+path publishes before drawing. Moving a restore from the end of presentation to
+the gate before logic leaves it between the same two publications. At the current
+two-field cadence there is only one presentation per pass, so no copies disappear.
+Reject the candidate; reconsider amortisation only after more than one presentation
+fits per pass. F2 is next. Evidence: `tmp/f1-restore/final/` and the rejected candidate
+in `tmp/f1-restore/rejected.slave.asm`.
+
 ### WHDLoad launch configuration
 
 WHDLoad 20.1 rejected the comma in the first Custom1 checkbox label; labels cannot
