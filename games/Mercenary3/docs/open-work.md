@@ -135,9 +135,12 @@ keeping caches enabled. Same-build captures show 10 missing-ground fields → ze
 in 600 fields; routine FPS, native speed, restore and options-off checks pass.
 See [R5](internals.md#r5-cache-safe-polygon-clipping).
 
-Still open: the user's report that interactive 040 movement feels less smooth than
-25 fps. The live capture shows real-time emulation and about 50 display submissions
-per second, but does not measure distinct game images or monitor frame pacing.
+Still open: P4 omits room-local camera interpolation. Prison walls use local X/Z
+while the spiderweb uses the interpolated world camera, producing native-rate wall
+motion despite 25 fps redraws. A scratch VERIFY off/on comparison reduces repeated
+wall-edge positions from 8/17 to 2/17 intervals; the release fix and its guards remain
+to do. This supersedes the frame-delivery hypothesis for this reproduction. See
+[prison wall motion](internals.md#prison-wall-motion-missing-local-camera-interpolation).
 
 P4 corrects presentation transitions with a shared, delayed camera/geometry timeline;
 starts, stops, reversals and the mailbox approach have been checked. Frame rates are

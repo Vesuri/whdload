@@ -244,6 +244,30 @@ views were checked; the final 12 fields after stopping at the mailbox are identi
 Evidence: `tmp/presentation-fix/final4/`; the original defect probe is
 `tmp/presentation-fix/before-probe.json`.
 
+### Prison wall motion: missing local camera interpolation
+
+The prison walls and spiderweb use different camera inputs. The room renderer
+(Disk.1 `$5F438`, local-coordinate reads at `$5F49A`/`$5F49E`) uses the separate
+room-local X/Z words at chip `$7038`/`$7040`. The interior detail path at `$5836A`
+uses the world camera, subtracting its X/Z at `$583A2`/`$583B4`. P4 stages the world
+pose but omits the room-local words. Thus a 25 fps redraw can show walls moving
+only at the native 12.5 Hz logic rate while the spiderweb moves between those steps.
+
+040 CACHE PRELOAD prison walk: room depth at fields 178/180/182/184/186/188 is
+92/92/68/68/44/44; the world camera advances 12 units every two fields. The filled
+room polygons repeat their projected vertices on the paired fields. This is an
+interpolation coverage defect, not evidence of slow desktop frame delivery.
+
+A scratch VERIFY build, Custom2 bit 5 off/on in the same session, temporarily
+stages room-local X/Z from the presented world pose relative to object 0, restoring
+them after object drawing. In 18 two-field samples, the wall's upper/lower edge
+at capture column 300 repeats on 8/17 intervals off versus 2/17 on. This confirms
+the missing local pose is causal; individual pixel edges can still repeat after
+rounding. No FPS gain is claimed. The release remains unchanged: a production fix
+still needs room transitions, turning, collision and restore checks. Evidence:
+`tmp/wall-web/local-camera.json`, `polygons-all.json`, `edge-comparison.json` and
+`unstaged-local/` / `staged-local/` under the same directory.
+
 ### R5: cache-safe polygon clipping
 
 Outside the prison, turning then stopping exposed intermittent missing gray ground
@@ -277,7 +301,8 @@ The earlier interactive timing capture (`tmp/live-pacing/`) covers 37.8 seconds
 after boot: display submissions average 49.92 Hz, median gap 20.15 ms,
 99th percentile 25.8 ms, maximum 31.1 ms. This rules out sustained emulator
 slowdown in that capture, but does not count distinct game images or establish
-smooth monitor delivery. The user's frame-pacing report remains open.
+smooth monitor delivery. The subsequent prison-wall investigation above identifies
+a scene-motion defect that this submission-rate measurement cannot detect.
 
 ### P2: other-object interpolation
 
