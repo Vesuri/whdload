@@ -293,8 +293,8 @@ per-scene gain measurement.
 **Gate: not passed.** The 030/040 startup stalls were an emulator deadlock, now fixed
 (next section). All six 030/040/060 setups start with caches on and repeat exactly under
 deterministic mode. Whole-race pairs now pass on all six 030/040/060 setups (see below).
-Matched gains and A7's full paired matrix remain incomplete; A8 gates are implemented
-and ceiling collection is in progress. Disabling data-cache emulation is
+A7's matrix is complete under its explained-failure gate. B5 still lacks matched
+040/060 work gains because their CPU traces are empty; A8 remains partial below. Disabling data-cache emulation is
 not an accepted substitute. AmigaXDev TOOL2 (the launcher refuses unknown CPU names) and
 TOOL3 (failed captures leave no image or trace) are also fixed and installed. F1GP's
 runner keeps its own effective-CPU and fresh-trace checks as extra guards.
@@ -307,10 +307,11 @@ It retains TOOL1 and adds the shared window-title change. Earlier evidence keeps
 original hashes. Mouse auto-switching is explicitly disabled for new captures.
 
 Cache-on whole-race pairs reach results, agree on every retained screenshot and clock
-sample, and quit with F10 OK on all six 030/040/060 setups. Evidence:
+sample, and quit with F10 OK on all seven required 020/030/040/060 setups. Evidence:
 
 | Machine | Pair under `tmp/` | Result field after cockpit route | PNGs per run |
 |---|---|---:|---:|
+| 020 + Fast | `matrix-workers/remaining/tmp/nocache-clocks/020-on-a`, `-b` | 20703 | 106 |
 | 030 non-MMU | `b5-final/030-on-clock-d`, `-e` | 19296 | 99 |
 | 040 non-MMU | `b5-final/040-on-clock-a`, `matrix-clocks/040-on-b` | 18693 | 97 |
 | 060 non-MMU | `matrix-clocks/060-on-a`, `-b` | 20502 | 105 |
@@ -355,10 +356,122 @@ patch; that alternative has not been validated here. No shared tooling was modif
 `ceiling_report.py` fails any arm without a measured frame rate, as well as a mismatched
 layout. Whole-race clock samples and DMA counts remain separate usable observations.
 This blocks B5's matched gain requirement on 040/060 and their A8 CPU-event ceilings.
-A7 permits an explained unavailable cell, but its remaining machine rows must still be
-collected. Repairing the shared profiler is a separate scope decision.
+A7 permits an explained unavailable cell and its full matrix is now recorded below.
+The user has chosen to keep shared-profiler repairs deferred.
 
-### A8 developer ceiling gates — measurements in progress
+### A7 machine matrix — gate passed with explained timing failures
+
+Every machine/cache/window cell has a fresh exact-repeat pair. There are 24 measured
+CPU-timing cells (A500, A1200, 020, 030) and 12 explicitly unavailable CPU-timing cells
+(040, 060), whose missing instruction records are explained above. Field and DMA data
+exist for all 36 cells. All 12 three-window pairs agree on routes, anchors, four-hunk
+layout, every PNG and semantic profile reductions, and quit cleanly. The gate permits
+an explained failure; this does **not** turn unavailable 040/060 timings into passes
+for B5 or A8. Shared profiler work remains deferred by the user.
+
+Each window is 100 PAL fields, with zero leads and distinct green/tow/follow anchors.
+FPS is from complete frame intervals; drawing/tick ms are complete-call means including
+interrupt time within the call. Partial calls are excluded. Ratios use the captured
+128.84521484375 ms game-clock increment times observed fps, not a rounded 128-ms proxy.
+The native step is separately 125 ms. Short windows include normal 6/7-field pacing
+variation, so slightly over 8 fps is not a new sustainable frame cap.
+
+CPU/blitter columns are chip-bus slots per field; free is the percentage of 71,051 PAL
+slots unused. These are emulator measurements, not real 040/060 accelerator timings.
+
+| Machine | Cache | Window | fps | Draw ms | Tick ms | CPU slots | Blit slots | Free % | Clock ratio |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| a500 | off | green | 5.79 | 135.11 | 33.37 | 27390 | 945 | 35.6 | 0.75 |
+| a500 | off | tow | 4.06 | 191.12 | 46.98 | 28025 | 463 | 35.5 | 0.52 |
+| a500 | off | follow | 3.86 | 227.66 | 23.39 | 27434 | 649 | 35.7 | 0.50 |
+| a500 | on | green | 5.79 | 135.11 | 33.37 | 27390 | 945 | 35.6 | 0.75 |
+| a500 | on | tow | 4.06 | 191.12 | 46.98 | 28025 | 463 | 35.5 | 0.52 |
+| a500 | on | follow | 3.86 | 227.66 | 23.39 | 27434 | 649 | 35.7 | 0.50 |
+| a1200 | off | green | 8.05 | 97.54 | 22.44 | 27885 | 1215 | 34.5 | 1.04 |
+| a1200 | off | tow | 5.76 | 134.14 | 34.02 | 28171 | 695 | 34.9 | 0.74 |
+| a1200 | off | follow | 7.58 | 111.75 | 15.11 | 27941 | 820 | 34.7 | 0.98 |
+| a1200 | on | green | 7.98 | 64.70 | 20.05 | 27290 | 1260 | 35.3 | 1.03 |
+| a1200 | on | tow | 8.13 | 82.49 | 21.56 | 28124 | 985 | 34.6 | 1.05 |
+| a1200 | on | follow | 8.14 | 72.18 | 13.27 | 27317 | 1652 | 34.5 | 1.05 |
+| 020 | off | green | 7.98 | 61.06 | 9.02 | 8785 | 1260 | 61.3 | 1.03 |
+| 020 | off | tow | 8.05 | 90.62 | 14.57 | 13916 | 842 | 54.8 | 1.04 |
+| 020 | off | follow | 8.14 | 68.18 | 6.10 | 11608 | 1297 | 57.1 | 1.05 |
+| 020 | on | green | 7.98 | 47.79 | 8.70 | 7071 | 1260 | 63.7 | 1.03 |
+| 020 | on | tow | 8.06 | 60.76 | 11.09 | 10483 | 927 | 59.5 | 1.04 |
+| 020 | on | follow | 7.98 | 58.15 | 6.68 | 9834 | 1046 | 59.9 | 1.03 |
+| 030 | off | green | 8.01 | 46.00 | 2.51 | 10540 | 1260 | 58.9 | 1.03 |
+| 030 | off | tow | 8.02 | 56.63 | 5.17 | 14270 | 1053 | 54.0 | 1.03 |
+| 030 | off | follow | 8.01 | 50.26 | 1.87 | 12542 | 1039 | 56.1 | 1.03 |
+| 030 | on | green | 8.09 | 39.65 | 2.61 | 9177 | 1260 | 60.8 | 1.04 |
+| 030 | on | tow | 8.02 | 53.85 | 3.38 | 13408 | 927 | 55.4 | 1.03 |
+| 030 | on | follow | 8.02 | 53.66 | 1.77 | 13135 | 1820 | 54.2 | 1.03 |
+| 040 | off | green | — | — | — | 11106 | 1260 | 58.1 | — |
+| 040 | off | tow | — | — | — | 15782 | 1053 | 51.9 | — |
+| 040 | off | follow | — | — | — | 13724 | 1039 | 54.5 | — |
+| 040 | on | green | — | — | — | 7200 | 1260 | 63.6 | — |
+| 040 | on | tow | — | — | — | 10828 | 927 | 59.0 | — |
+| 040 | on | follow | — | — | — | 9392 | 1015 | 60.6 | — |
+| 060 | off | green | — | — | — | 11204 | 1260 | 57.9 | — |
+| 060 | off | tow | — | — | — | 15597 | 985 | 52.2 | — |
+| 060 | off | follow | — | — | — | 13068 | 1061 | 55.4 | — |
+| 060 | on | green | — | — | — | 6842 | 1260 | 64.1 | — |
+| 060 | on | tow | — | — | — | 9887 | 927 | 60.3 | — |
+| 060 | on | follow | — | — | — | 8861 | 894 | 61.5 | — |
+
+The A500 has no caches: on/off request arms produce the same race and measurements.
+This modern baseline reaches tow and follow on the A500; the older original-slave
+observation that it did not retire must not be carried over to this build.
+
+Observed work-per-frame reductions with caches requested (positive means less work):
+
+| Machine | Green | Tow | Follow |
+|---|---:|---:|---:|
+| a500 | +0.0% | +0.0% | +0.0% |
+| a1200 | +29.3% | +38.4% | +32.6% |
+| 020 | +19.0% | +32.1% | +14.4% |
+| 030 | +12.7% | +9.1% | -3.2% |
+| 040 | unavailable | unavailable | unavailable |
+| 060 | unavailable | unavailable | unavailable |
+
+Each comparison uses the same binary, memory layout and anchor protocol. On/off races
+differ through A1 timing/RNG inputs, including the followed driver and visible geometry.
+These are observed workload changes in corresponding race phases, not isolated
+instruction-cache gains on identical pictures. The 030 follow regression is retained,
+not averaged away. No matched work gain is claimed for 040/060.
+
+Whole-race counter measurements, between sample fields 2,010 and 13,869 after each
+machine's own cockpit anchor (not used to anchor any scene):
+
+| Machine | Off fps | On fps | Off clock ratio | On clock ratio | Off / on results field |
+|---|---:|---:|---:|---:|---:|
+| a500 | 5.490 | 5.490 | 0.707 | 0.707 | 30552 / 30552 |
+| a1200 | 7.290 | 7.998 | 0.939 | 1.031 | 21105 / 19698 |
+| 020 | 7.998 | 8.002 | 1.031 | 1.031 | 21105 / 20703 |
+| 030 | 7.998 | 8.002 | 1.031 | 1.031 | 21507 / 19296 |
+| 040 | 8.002 | 8.002 | 1.031 | 1.031 | 21507 / 18693 |
+| 060 | 7.998 | 7.998 | 1.031 | 1.031 | 20502 / 20502 |
+
+The roughly 8-fps pacer hides work savings on Fast machines. MMU clock runs are
+functional evidence only; raw debugger RAM can lag copyback cache state and is not
+used for MMU timing conclusions.
+
+Evidence locations under `tmp/matrix-workers/`:
+
+- `profiles/tmp/a7-all/{020,030}-{off,on}-{a,b}`.
+- `040-mmu/tmp/a7-all/{040,a1200}-{off,on}-{a,b}`.
+- `060-mmu/tmp/a7-all/{060,a500}-{off,on}-{a,b}`.
+- `remaining/tmp/nocache-clocks/{a500,a1200,020}-{off,on}-{a,b}` and `030-off-{a,b}`.
+- `040-mmu/tmp/nocache-clocks/040-off-{a,b}` and the equivalent `060-mmu` paths.
+- Cache-on 030/040/060 and MMU whole-race pairs are listed in the B5 table above;
+  fresh MMU off pairs are in each corresponding worker's `tmp/nocache-clocks/`.
+
+The baseline VERIFY SHA-256 is
+`ceba5ad09b28dd8741df9e0725395655b0d4dffa484edeab9ac4f1d2acc327f8`;
+all runs use the currently pinned emulator and launcher. Each capture records actual
+four-hunk bases, full effective configuration, build/runtime/tool hashes and cache audit.
+No game or trace bytes are tracked. Reproduce with the development matrix recipes.
+
+### A8 developer ceiling gates — partial result
 
 Developer and VERIFY builds expose `CUSTOM3` bit 0 (replace the four-byte pacer branch
 at `h0+$1288` with NOPs) and bit 1 (RTS at polygon filler `h0+$1F388`). Release omits

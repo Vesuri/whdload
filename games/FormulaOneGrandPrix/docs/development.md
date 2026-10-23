@@ -508,3 +508,14 @@ python3 tools/slave_gate.py --check --prefix a8-
 The prefix selects all four named cases and the corresponding negative-test fixtures;
 without `--check` it creates fresh captures with that prefix. Existing directories remain
 protected from replacement.
+
+The completed A7 table is in internals. Reproduce baseline captures with the recorded
+B5 VERIFY binary/source identity; the larger current A8 developer build has a different
+layout and requires a new baseline if used for A7. Scratch worker directories isolated
+sockets, debugger ports, boot volumes and PIDs while using the same immutable game
+inputs. A worker name containing `mmu` is not an effective CPU selection: read each
+capture's `machine`, WHDLoad arguments and retained effective configuration.
+
+A7's gate permits explained missing timings, so it is complete with 040/060 failures
+explicit. B5 and A8 require those measurements and remain open. Shared-profiler work is
+deferred by the user; do not replace the cores or present missing records as zero cost.

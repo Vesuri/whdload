@@ -12,8 +12,10 @@ keep [open work](open-work.md) pointing at the next step.
 
 ## What the measurements say
 
-All from `docs/internals.md` (race main loop, memory and the chip bus, frame pacing,
-game time). Times are emulated.
+The following original-baseline findings are from `docs/internals.md` (race main loop,
+memory and the chip bus, frame pacing, game time). Times are emulated. The current
+cache matrix and ceiling results are recorded in its A7/A8 sections; those do not
+replace the original baseline or prove the projected implementation below.
 
 - **The game steps its world once per drawn frame,** about 1/8 s of game time per frame,
   and a frame pacer (hunk 0 `$127C`) busy-waits so that no frame is shorter than 6–7 PAL
@@ -41,7 +43,7 @@ game time). Times are emulated.
 | A500-equivalent | 5.8 fps at 0.70× | about 5.2–5.6 fps at 1.0× |
 | A1200, no fast RAM | 7.2–7.7 fps at 0.93× | about 8 fps at 1.0× |
 | `a1200-fast` | 8.0 fps at 1.02× | about 12–16 fps at 1.0× |
-| 68030/50, 68040, 68060 | not measured (`A7`) | not measured |
+| 68030/50, 68040, 68060 | see A7; 040/060 CPU profiles unavailable | not implemented |
 
 ## Design decisions
 
@@ -84,10 +86,13 @@ game time). Times are emulated.
 
 ## Current validation scope
 
-Current status: B1–B4 and A1/A2/A3/A5/A6 are complete. B5 has not passed. A7 is
-incomplete. A8 developer gates and all-off checks pass; ceiling collection is in progress. The 030/040 startup deadlock is fixed in the shared
-emulator ([evidence](internals.md#startup-failures-cause-and-fix-68030-68040)), and
-030/040/060 runs repeat exactly under deterministic mode.
+Current status: B1–B4 and A1/A2/A3/A5/A6 are complete. A7 meets its gate with 24
+CPU-timing cells measured and 12 unavailable 040/060 cells explained; all field/DMA
+and whole-race captures repeat exactly. B5's functional races pass, but its 040/060
+work gains remain unavailable. A8 has accepted A500/A1200/020 ceilings, an unmatched
+030 instant-blitter arm, and unavailable 040/060 CPU timings. Neither B5 nor A8 is
+complete. The user has deferred shared-profiler fixes. See [open work](open-work.md).
+The earlier startup deadlock is fixed; this is a distinct profiling limitation.
 
 B5/A7/A8 acceptance covers 68000, 68020, 68030, 68040 and 68060, with 030/040/060 MMU
 functional tests, all using the exact-repeat method.
