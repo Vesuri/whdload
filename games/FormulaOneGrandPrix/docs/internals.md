@@ -1382,9 +1382,8 @@ run, live hook validation, speed measurement or NTSC gameplay acceptance is clai
 
 The current prototype is compiled only for DEVELOPER/VERIFY, behind `CUSTOM2`
 bit 1 and only in the supplied 582992-byte variant's patch list. Release bytes
-remain identical to the pre-C2 build. C2 remains open: mixed HUD/glyph painting
-still runs during catch-up, and broad transition/publication and sound validation
-is unfinished. Do not describe this prototype as the completed C2 loop split.
+remain identical to the pre-C2 build. C2 remains open: the CPU HUD painting queue is implemented, but conditional
+background rebuilds, broad transition/publication and sound validation are unfinished. Do not describe this prototype as the completed C2 loop split.
 
 The hook at h0+$2CC3C advances the slave's aligned 32-bit serial and reproduces the
 native counter increment and flags. Live/replay heads at h0+$3C8F6/+$3CC40 reserve
@@ -1413,8 +1412,10 @@ Publication waits for the pending copper request to clear and then for a subsequ
 VBL before acquiring the complementary bitmap. It drains queued/active blits before
 copying persistent pixels from the front to the retired back buffer and before
 submission. Nine dual-bitmap HUD destination sites are redirected to the owned back
-buffer while a tick runs. This addresses buffer ownership, but does not finish the
-required extraction of HUD painting from tick work.
+buffer while a tick runs. The CPU HUD raster regions are now queued while native request consumption and
+text parsing remain tick work. The queue is drained before the final scene and
+before publication, retaining the ordering of clears, copies, instruments and
+glyph composition. Intermediate catch-up ticks do not paint these regions.
 
 Local evidence is under `tmp/c2/`; each capture has its own build/source/runtime
 identity. The older `normal`, `twin-dry-2` and `twin-raster` probes matched selected
@@ -1444,20 +1445,58 @@ window-scoped evidence, not proof of all views, modal transitions or a whole rep
 The earlier cross-build comparison did differ in car/view/gameplay-RNG state and
 is not used as equivalence evidence; startup timing must be controlled as in A1.
 
-The mixed HUD split is still required. In particular, h2+$1EFEC parses text control
-bytes and updates cursor state; h2+$1F07A prepares glyph coordinates and +$1F2AE
-advances the cursor after rasterisation. Skipping the whole text routine would lose
-these updates. Similarly h2+$1DDC0 consumes dirty-box state and +$1DEEC writes the
-UI reuse flag. Deferred painting must preserve the ordering of box clears/copies
-and glyph composition, including calls embedded in car updates. The replay-R fix
-does not complete those mixed paths.
+#### CPU HUD painting queue
 
-The current disabled-feature suite `tmp/b4/c2-overlay-acceptance.json` passes for
-release, developer, VERIFY-off and VERIFY-relay builds. All four retain eight native
+Ten raster regions are intercepted after native preparation: icons, dirty boxes,
+box reuse copies, top-strip clears, digits, masked instrument images, text glyphs,
+gear, packed RPM runs and assistance icons. The native text parser still handles
+control characters and cursor advancement; dirty-mask and blink state still evolve
+once per tick. The RPM walker retains its address arithmetic and register outputs
+while its stores are deferred. Each queued command holds its prepared registers,
+text colours/mode and a raster-region identifier. The painter re-enters the native
+region with a disposable stack frame, then restores authoritative text-parser state
+and the HUD reuse flag after draining the queue. Asset pointers refer to immutable
+native graphics; the front/back pair remains owned throughout a batch.
+
+The developer queue is bounded at 2048 commands of 96 bytes: **192 KiB** of additional
+slave storage. It records current depth, high-water mark, queued/painted counts and
+overflows. Overflow aborts with an explicit diagnostic rather than corrupting memory
+or discarding painting. This storage and the CPU cost are not an optimisation claim;
+C6/E still need matched machine measurements. Release bytes are unchanged.
+
+`check_hud_hooks.py` traverses 636 native HUD instructions and rejects direct branch
+or call targets inside a patch. Its negative fixture is the rejected glyph hook
+placement. Earlier queue builds failed because hooks overlapped inner loop entries;
+those captures remain failures. The initial 512-command queue also failed qualifying
+at tick 22: its guard aborted after 512 pending glyphs. Both findings were fixed,
+not relabelled as successful captures.
+
+Selected-state probes with the corrected hooks pass for normal and forced-catch-up
+quick races at tick 160 and replay at tick 40. The comparison now includes dirty
+requests/deadlines, blink state, refresh flags, instrument history, text colours and
+cursor/control state, and box reuse. The initial expanded comparison also included
+h0+$3A706, which differed; this is the per-field sound pitch increment documented in
+A6, not HUD state. It needs formula/cadence validation against elapsed fields, not
+raw equality across differing painting costs. The failed report is retained.
+
+`hud-qualifying-large` and `hud-qualifying-large-control` are the current common-build
+qualifying pair at tick 160. Selected gameplay/HUD state matches, and their completed
+32000-byte pictures are identical. The queued arm paints all 38,913 commands, peaks
+at 825 pending commands and quits OK without overflow. It drops 1263 fields of debt
+under overload, so this is not evidence of real-time operation. The earlier 512-slot
+replay pair (`hud-replay-publish` / `hud-replay-control`) also has identical completed
+pictures and selected state, but belongs to that smaller-buffer build. The current
+`hud-a500` probe reaches tick 160 and quits OK: 271 commands queued, 269 painted,
+two pending at the pre-publication pacer boundary, and no overflow. It drops 41
+fields of debt; this establishes functionality, not C6 performance. Wider
+view/transition acceptance remains open.
+
+The current HUD build's suite `tmp/b4/c2-hud-acceptance.json` passes for release,
+developer, VERIFY-off and VERIFY-relay builds. All four retain eight native
 updates/draws/pacers in their 50-field controls and quit OK. Negative checks reject
-all 162 optional hook bytes independently, malformed inventories, stale metadata and
+all 234 optional hook bytes independently, malformed inventories, stale metadata and
 an enabled relay disguised as off. The current VERIFY SHA-256 is
-`9958097355a0274176848a5707d6496d3ba1e951b5159088abe2b3a4f461df99`;
+`16fd6d60247bb010def4e245b3e9787a0ca24999664e9119a715a1919b690916`;
 the unchanged release SHA-256 is
 `93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`.
 

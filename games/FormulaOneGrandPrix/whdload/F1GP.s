@@ -415,6 +415,7 @@ c2_init
 .target2
         add.l d0,(a0)+
         dbf d2,.target2
+        bsr c2_hud_init
         movem.l (sp)+,d0-d2/a0-a2
         rts
 
@@ -657,6 +658,7 @@ c2_pacer
         move.l (c2_pacer_rest,pc),-(sp)
         rts
 c2_publish
+        bsr c2_hud_flush
         bsr c2_drain
         btst #2,(preference_options+3,pc)
         bne.s .no_replay
@@ -747,6 +749,349 @@ c2_pair_a1_a2
         move.w (sp)+,ccr
         rts
 
+; C2 CPU HUD display list. Tick code prepares operands and consumes requests;
+; only the raster regions are queued. Commands retain register inputs and text
+; colours/mode. The bitmap pair remains owned until this list has been painted.
+C2_HUD_STRIDE = 96
+C2_HUD_CAPACITY = 2048
+c2_hud_init
+        move.l (c2_h2,pc),d0
+        lea (c2_hud_targets,pc),a0
+        moveq #9,d1
+.loop
+        add.l d0,(a0)+
+        add.l d0,(a0)+
+        add.l d0,(a0)+
+        addq.l #4,a0
+        dbf d1,.loop
+        rts
+
+; D0 is the command index. The caller saved SR and D0-A6; its register
+; image starts four bytes above our return address. D0 returns 1 if deferred.
+c2_hud_enqueue
+        move.w (c2_in_tick,pc),d1
+        beq .native
+        move.w (c2_hud_replaying,pc),d1
+        bne .native
+        btst #2,(preference_options+3,pc)
+        bne .native
+        lea (c2_hud_count,pc),a0
+        moveq #0,d1
+        move.w (a0),d1
+        cmpi.w #C2_HUD_CAPACITY,d1
+        bcc c2_hud_overflow
+        addq.w #1,(a0)
+        lea (c2_hud_high,pc),a1
+        move.w (a0),d2
+        cmp.w (a1),d2
+        bls.s .high
+        move.w d2,(a1)
+.high
+        mulu.w #C2_HUD_STRIDE,d1
+        lea (c2_hud_buffer,pc),a1
+        adda.l d1,a1
+        move.w d0,(a1)+
+        move.w d0,d1
+        lsl.w #4,d1
+        lea (c2_hud_targets,pc),a2
+        adda.w d1,a2
+        move.w 12(a2),(a1)+
+        lea (c2_hud_skip,pc),a0
+        move.l 8(a2),(a0)
+        lea 4(sp),a0
+        moveq #14,d1
+.regs
+        move.l (a0)+,(a1)+
+        dbf d1,.regs
+        movea.l (c2_h2,pc),a0
+        adda.l #$1f302,a0
+        moveq #6,d1
+.text
+        move.l (a0)+,(a1)+
+        dbf d1,.text
+        lea (c2_hud_queued,pc),a0
+        addq.l #1,(a0)
+        ; RPM still walks its packed run list to preserve its register outputs.
+        ; Its pixel loop is separately suppressed while preparing the command.
+        cmpi.w #8,d0
+        beq.s .native
+        moveq #1,d0
+        rts
+.native
+        moveq #0,d0
+        rts
+c2_hud_overflow
+        lea (c2_hud_overflows,pc),a0
+        addq.l #1,(a0)
+        pea (c2_hud_overflow_message,pc)
+        pea TDREASON_FAILMSG
+        move.l (_resload,pc),a2
+        jmp (resload_Abort,a2)
+
+C2_HUD_GATE MACRO
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        moveq #\1,d0
+        bsr c2_hud_enqueue
+        tst.w d0
+        beq.s .native\@
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        IFEQ \1-7
+        move.w #-1,d0         ; final DBF value; A0-A2 restored by native epilogue
+        ENDC
+        IFEQ \1-9
+        adda.w d3,a2
+        asl.w #2,d3
+        adda.w d3,a1
+        adda.w #200,a0
+        adda.w #200,a2
+        adda.w #800,a1
+        move.w #-1,d1
+        ENDC
+        move.l (c2_hud_skip,pc),-(sp)
+        rts
+.native\@
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        move.l (c2_hud_targets+\1*16+4,pc),-(sp)
+        ENDM
+
+c2_hud_icon
+        C2_HUD_GATE 0
+        adda.l #7370,a0
+        rts
+c2_hud_box
+        C2_HUD_GATE 1
+        movea.l (c2_h0,pc),a4
+        adda.l #$3ff8a,a4
+        rts
+c2_hud_copy
+        C2_HUD_GATE 2
+        adda.w d0,a5
+        adda.w d0,a6
+        move.w #19,d1
+        rts
+c2_hud_top
+        C2_HUD_GATE 3
+        lea 24000(a0),a3
+        move.w #79,d0
+        rts
+c2_hud_digit
+        C2_HUD_GATE 4
+        movea.l (c2_h0,pc),a3
+        adda.l #$3cd32,a3
+        rts
+c2_hud_image
+        C2_HUD_GATE 5
+        movea.l (c2_h0,pc),a3
+        adda.l #$3cd32,a3
+        rts
+c2_hud_glyph
+        C2_HUD_GATE 6
+        asl.l #1,d3
+        adda.l d3,a1
+        adda.l d3,a2
+        rts
+c2_hud_gear
+        C2_HUD_GATE 7
+        adda.w #5832,a0
+        adda.w #5832,a2
+        rts
+c2_hud_rpm
+        C2_HUD_GATE 8
+        move.l a0,-(sp)
+        movea.l (c2_h2,pc),a0
+        adda.l #$1f31b,a0
+        tst.b (a0)
+        movea.l (sp)+,a0
+        rts
+c2_hud_assist
+        C2_HUD_GATE 9
+        adda.w d3,a2
+        asl.w #2,d3
+        adda.w d3,a1
+        rts
+
+; The packed RPM walker has live register outputs. Skip its stores but retain
+; the exact per-run pointer increments, DBF result and subsequent run traversal.
+c2_hud_rpm_pixels
+        move.w sr,-(sp)
+        move.l d0,-(sp)
+        move.w (c2_in_tick,pc),d0
+        beq.s .native
+        move.w (c2_hud_replaying,pc),d0
+        bne.s .native
+        btst #2,(preference_options+3,pc)
+        bne.s .native
+        moveq #0,d0
+        move.w d5,d0
+        addq.l #1,d0
+        lsl.l #3,d0
+        adda.l d0,a1
+        mulu.w #5,d0
+        suba.l d0,a0
+        suba.l d0,a2
+        move.w #-1,d5
+        move.l (sp)+,d0
+        move.w (sp)+,ccr
+        move.l (c2_hud_targets+8*16+8,pc),-(sp)
+        rts
+.native
+        move.l (sp)+,d0
+        move.w (sp)+,ccr
+        pea 0.w
+        move.l a3,-(sp)
+        movea.l (c2_h2,pc),a3
+        adda.l #$1f9c0,a3
+        move.l a3,4(sp)       ; reserve continuation below saved A3
+        movea.l (sp)+,a3
+        move.w (a1),(a0)+
+        move.w (a1)+,(a2)+
+        move.w (a1),7998(a0)
+        rts
+
+c2_hud_rpm_end
+        move.w (c2_hud_replaying,pc),-(sp)
+        lea 2(sp),sp
+        beq.s .walk
+        movea.l (sp)+,a2      ; fake native frame installed by the painter
+        rts
+.walk
+        move.w (a1)+,d5
+        beq.s .end
+        move.l (c2_hud_targets+8*16,pc),-(sp)
+        tst.w d5
+        rts
+.end
+        pea 0.w
+        move.l a0,-(sp)
+        movea.l (c2_h2,pc),a0
+        adda.l #$1f9e6,a0
+        move.l a0,4(sp)
+        movea.l (sp)+,a0
+        tst.w d5
+        rts
+
+; Drain at the final scene boundary and before publication. Queued regions
+; return through their native epilogues, using disposable saved-register frames.
+; Text parser state and UI reuse flags are restored to the authoritative tick.
+c2_hud_flush
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        lea (c2_hud_count,pc),a0
+        tst.w (a0)
+        beq .done
+        bsr c2_drain
+        lea (c2_hud_remaining,pc),a0
+        move.w (c2_hud_count,pc),(a0)
+        lea (c2_hud_read,pc),a0
+        lea (c2_hud_buffer,pc),a1
+        move.l a1,(a0)
+        lea (c2_hud_saved,pc),a1
+        movea.l (c2_h2,pc),a0
+        adda.l #$1f302,a0
+        moveq #6,d0
+.save
+        move.l (a0)+,(a1)+
+        dbf d0,.save
+        movea.l (c2_h2,pc),a0
+        adda.l #$231ea,a0
+        move.b (a0),(a1)+
+        lea (c2_hud_saved_tick,pc),a0
+        move.w (c2_in_tick,pc),(a0)
+        lea (c2_in_tick,pc),a0
+        move.w #1,(a0)
+        lea (c2_hud_replaying,pc),a0
+        move.w #1,(a0)
+.next
+        movea.l (c2_hud_read,pc),a1
+        moveq #0,d0
+        move.w (a1),d0
+        lsl.w #4,d0
+        lea (c2_hud_targets,pc),a0
+        adda.w d0,a0
+        lea (c2_hud_target,pc),a2
+        move.l (a0),(a2)
+        lea 64(a1),a2
+        movea.l (c2_h2,pc),a0
+        adda.l #$1f302,a0
+        moveq #6,d0
+.load
+        move.l (a2)+,(a0)+
+        dbf d0,.load
+        lea (.returned,pc),a0
+        move.l a0,-(sp)
+        suba.w 2(a1),sp
+        movem.l 4(a1),d0-a6
+        move.l (c2_hud_target,pc),-(sp)
+        rts
+.returned
+        lea (c2_hud_painted,pc),a0
+        addq.l #1,(a0)
+        lea (c2_hud_read,pc),a0
+        add.l #C2_HUD_STRIDE,(a0)
+        lea (c2_hud_remaining,pc),a0
+        subq.w #1,(a0)
+        bne .next
+        lea (c2_hud_saved,pc),a1
+        movea.l (c2_h2,pc),a0
+        adda.l #$1f302,a0
+        moveq #6,d0
+.restore
+        move.l (a1)+,(a0)+
+        dbf d0,.restore
+        movea.l (c2_h2,pc),a0
+        adda.l #$231ea,a0
+        move.b (a1)+,(a0)
+        lea (c2_in_tick,pc),a0
+        move.w (c2_hud_saved_tick,pc),(a0)
+        lea (c2_hud_replaying,pc),a0
+        clr.w (a0)
+        lea (c2_hud_count,pc),a0
+        clr.w (a0)
+.done
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        rts
+
+        CNOP 0,4
+c2_hud_targets
+        dc.l $1dd24,$1dd2a,$1ddba ; icon
+        dc.w 20,0
+        dc.l $1de58,$1de5e,$1dee8 ; box
+        dc.w 60,0
+        dc.l $1df24,$1df2c,$1df56 ; copy
+        dc.w 60,0
+        dc.l $1df92,$1df9a,$1dfae ; top
+        dc.w 20,0
+        dc.l $1ea40,$1ea46,$1ea8a ; digit
+        dc.w 60,0
+        dc.l $1eb9e,$1eba4,$1ec3a ; image
+        dc.w 60,0
+        dc.l $1f128,$1f12e,$1f2ae ; glyph
+        dc.w 0,0
+        dc.l $1f928,$1f930,$1f960 ; gear
+        dc.w 12,0
+        dc.l $1f974,$1f97a,$1f9e0 ; rpm
+        dc.w 4,0
+        dc.l $1fa6e,$1fa74,$1faa4 ; assist
+        dc.w 0,0
+c2_hud_skip dc.l 0
+c2_hud_target dc.l 0
+c2_hud_read dc.l 0
+c2_hud_queued dc.l 0
+c2_hud_painted dc.l 0
+c2_hud_overflows dc.l 0
+c2_hud_count dc.w 0
+c2_hud_high dc.w 0
+c2_hud_remaining dc.w 0
+c2_hud_replaying dc.w 0
+c2_hud_saved_tick dc.w 0
+c2_hud_saved ds.b 30
+c2_hud_overflow_message dc.b 'C2 HUD display list overflow',0
+        EVEN
+
 ; Geometry/association/mirror traversal still executes on an undrawn tick.
 ; Only raster leaves are suppressed, preserving the native visibility predicate
 ; before h2+$29AD8 and the pit/RNG paths at the end of the traversal.
@@ -762,6 +1107,15 @@ C2_RASTER_GATE MACRO
         ENDM
 
 c2_scene
+        move.w sr,-(sp)
+        move.l d0,-(sp)
+        move.w (c2_draw_mode,pc),d0
+        cmpi.w #2,d0
+        beq.s .keep_hud
+        bsr c2_hud_flush
+.keep_hud
+        move.l (sp)+,d0
+        move.w (sp)+,ccr
         movem.l d0-a6,-(sp)
         lea (c2_stage_entry,pc),a2
         bsr c2_save_stage
@@ -980,6 +1334,30 @@ patch_582992
         PL_PS $3c9ba,c2_scene
         ; PERF_RANGE h0:3cce8 6 custom=2 bit=1 variant=582992
         PL_PS $3cce8,c2_scene
+        ; PERF_RANGE h2:1dd24 6 custom=2 bit=1 variant=582992
+        PL_P $8d0b8,c2_hud_icon
+        ; PERF_RANGE h2:1de58 6 custom=2 bit=1 variant=582992
+        PL_P $8d1ec,c2_hud_box
+        ; PERF_RANGE h2:1df24 6 custom=2 bit=1 variant=582992
+        PL_P $8d2b8,c2_hud_copy
+        ; PERF_RANGE h2:1df92 6 custom=2 bit=1 variant=582992
+        PL_P $8d326,c2_hud_top
+        ; PERF_RANGE h2:1ea40 6 custom=2 bit=1 variant=582992
+        PL_P $8ddd4,c2_hud_digit
+        ; PERF_RANGE h2:1eb9e 6 custom=2 bit=1 variant=582992
+        PL_P $8df32,c2_hud_image
+        ; PERF_RANGE h2:1f128 6 custom=2 bit=1 variant=582992
+        PL_P $8e4bc,c2_hud_glyph
+        ; PERF_RANGE h2:1f928 6 custom=2 bit=1 variant=582992
+        PL_P $8ecbc,c2_hud_gear
+        ; PERF_RANGE h2:1f974 6 custom=2 bit=1 variant=582992
+        PL_P $8ed08,c2_hud_rpm
+        ; PERF_RANGE h2:1fa6e 6 custom=2 bit=1 variant=582992
+        PL_P $8ee02,c2_hud_assist
+        ; PERF_RANGE h2:1f9b8 6 custom=2 bit=1 variant=582992
+        PL_P $8ed4c,c2_hud_rpm_pixels
+        ; PERF_RANGE h2:1f9e0 6 custom=2 bit=1 variant=582992
+        PL_P $8ed74,c2_hud_rpm_end
         ; Replay R painting belongs to publication, not the world tick.
         ; PERF_RANGE h0:3ccfa 6 custom=2 bit=1 variant=582992
         PL_PS $3ccfa,c2_replay_tick_paint
@@ -1058,3 +1436,8 @@ patch_582780
 names_rnc
         INCBIN tmp/slave/names.rnc
         EVEN
+
+        IFNE DEVELOPER
+        CNOP 0,4
+c2_hud_buffer ds.b C2_HUD_STRIDE*C2_HUD_CAPACITY
+        ENDC

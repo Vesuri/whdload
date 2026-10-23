@@ -581,7 +581,7 @@ sound and publication alongside C3/C4 transitions and input handling.
 C2 is not accepted. Its current prototype is confined to developer/VERIFY builds
 and the supplied executable variant. `CUSTOM2` bit 1 enables the VBL clock; bit 0
 still controls caches. `CUSTOM4` bit 1 introduces a 20-field batch delay for tests;
-bit 2 retains native painting (catch-up raster work and tick-time replay R) as a
+bit 2 retains native painting (catch-up raster work, CPU HUD operations and tick-time replay R) as a
 comparison control. These
 bits do not enable a release feature or waive B5/A8/C5 gates.
 
@@ -610,6 +610,29 @@ and build/runtime. It is neither whole-program equivalence nor C5 acceptance.
 `--route qualifying` exercises pit animation; `--replay` is an experimental route.
 Optional profiles cover the 50 fields immediately after the route, not the final
 tick snapshot. Raw artifacts stay in ignored `tmp/`.
+
+`--publish` stops immediately before submission with the requested number of ticks
+completed, after queued HUD operations have painted. It records and hashes the
+32,000-byte bitmap in `paint.bin`; the comparator then requires pixel equality as
+well as the selected state ranges. Choose a tick that ends a batch in both arms.
+If a batch crosses that tick, the collector stops at the next publication and
+rejects the mismatch instead of waiting forever. The ordinary pacer boundary
+remains useful for comparing tick state independently of batch size.
+
+The HUD queue retains prepared register inputs and text state for ten CPU raster
+regions. It drains before the final scene and publication; parser updates, dirty
+flags and instrument state still run on every native tick. Its 2048 slots reserve
+192 KiB in developer builds. Capture metadata includes queued/painted counts,
+pending count, high-water mark and overflow count. Overflow stops the probe and
+fails acceptance; it must never be treated as a partial successful picture.
+The collector preserves diagnostics for failed captures and still stops only its
+own emulator. Conditional background clear/copy separation remains unfinished.
+
+Run `python3 tools/check_hud_hooks.py` after changing these hooks. It traverses
+original HUD control flow and rejects patches that overwrite another branch's
+entry, including a negative fixture reproducing the rejected glyph placement.
+Run the disabled-byte suite on fresh captures after rebuilding all three variants.
+These checks complement the runtime comparisons; they do not prove all UI paths.
 
 The replay-overlay comparison uses one common build and changes only painting policy:
 

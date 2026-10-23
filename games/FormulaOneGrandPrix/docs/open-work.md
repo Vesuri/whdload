@@ -24,10 +24,14 @@ is in [Game time](internals.md#elapsed-vbl-world-clock-c1); it adds no CIA timer
 allows no fractional simulation updates. Its host accounting checks pass for PAL/NTSC.
 B5/A8 are still incomplete; this work does not waive their measurement gates.
 
-C2 remains open: complete the mixed HUD/embedded glyph painting split; validate
+C2 remains open: finish conditional background-rebuild separation; validate
 full replay, view changes and A5 CPU/blitter buffer ownership; rerun current-build
-state comparisons after the remaining changes. Fresh prototype disabled-byte gates
-pass, including all 162 optional-byte mutation checks. The replay R now paints once per publication;
+state comparisons after the remaining changes. The CPU HUD queue now preserves
+selected gameplay/HUD state and completed replay/qualifying pictures against native
+painting. Its bound was raised after a recorded overflow; developer storage is now
+192 KiB; the A500 probe completes and quits without overflow but drops 41 fields
+of debt. The fresh four-build disabled-feature suite passes, including all 234 hook-byte
+negative checks. The replay R now paints once per publication;
 a same-build replay tick-40 comparison passes selected authoritative state, and its
 50-field trace passes CPU/blitter ownership and cadence checks. The native-painting
 control correctly fails the R cadence check. Early PAL tick-160 probes matched all

@@ -110,10 +110,16 @@ def capture(args):
         if args.profile:
             command('profile', str(args.profile), str(out/'trace.bin'))
             meta['trace_sha256'] = sha(out/'trace.bin')
-        if u32(clock+24) >= args.ticks-1:
+        completed = args.ticks if args.publish else args.ticks-1
+        boundary = 'publish' if args.publish else 'pacer'
+        if u32(clock+24) >= completed:
             raise ValueError('requested tick already passed')
-        command('gdb', f'break *{base+symbols["c2_pacer"]:#x}')
-        command('gdb', f'condition $bpnum *(unsigned int*){clock+24:#x} == {args.ticks-1}')
+        stop = symbols['c2_submit_call' if args.publish else 'c2_pacer']
+        command('gdb', f'break *{base+stop:#x}')
+        # A publication can skip the requested tick when a batch straddles it.
+        # Stop and reject that mismatch instead of waiting forever for equality.
+        command('gdb', f'condition $bpnum *(unsigned int*){clock+24:#x} >= {completed}')
+        command('gdb', f'break *{base+symbols["c2_hud_overflow"]:#x}')
         command('gdb', 'continue')
         parts = []
         for h, (address, size) in enumerate(zip(bases, SIZES)):
@@ -122,6 +128,10 @@ def capture(args):
             parts.append(path.read_bytes())
         snapshot = b''.join(parts)
         (out/'tick.bin.gz').write_bytes(gzip.compress(snapshot, mtime=0))
+        if args.publish:
+            bitmap = struct.unpack_from('>I', parts[0], 0x1252)[0]
+            command('gdb', f'dump binary memory {out}/paint.bin {bitmap:#x} {bitmap+32000:#x}')
+            meta['paint_sha256'] = sha(out/'paint.bin')
         command('gdb', f'dump binary memory {out}/clock.bin {base:#x} {base+len(slave.read_bytes()):#x}')
         state = (out/'clock.bin').read_bytes()
         values = struct.unpack_from('>I4H4I', state, symbols['c2_clock'])
@@ -129,20 +139,26 @@ def capture(args):
         serial = struct.unpack_from('>I', state, symbols['c2_serial'])[0]
         counters = {name: struct.unpack_from('>I', state, symbols[name])[0]
                     for name in ('c2_pictures','c2_dry_passes','c2_repeat_pictures',
-                                 'c2_replay_pictures')}
+                                 'c2_replay_pictures','c2_hud_queued','c2_hud_painted',
+                                 'c2_hud_overflows')}
+        meta['hud_queue'] = {name: struct.unpack_from('>H', state, symbols[name])[0]
+                             for name in ('c2_hud_count','c2_hud_high')}
+        if (counters['c2_hud_overflows'] or meta['hud_queue']['c2_hud_high'] > 2048
+                or counters['c2_hud_queued'] != counters['c2_hud_painted'] + meta['hud_queue']['c2_hud_count']):
+            raise ValueError('HUD queue overflow or accounting mismatch')
         meta['rate_detection'] = {
             name: struct.unpack_from('>H', state, symbols[name])[0]
             for name in ('c2_native_rate', 'c2_beam_max')}
-        if (ticks != args.ticks-1 or observed != (consumed+credit+dropped)&0xffffffff
+        if (ticks != completed or observed != (consumed+credit+dropped)&0xffffffff
                 or not 1 <= batch <= 4 or not 0 <= credit <= rate
                 or rate != (60 if args.ntsc else 50)):
             raise ValueError(f'clock accounting failed: {values}')
         if struct.unpack_from('>H', state, symbols['c2_mode'])[0] != expected_mode:
             raise ValueError('left requested live/replay loop before capture')
-        meta.update(replay=args.replay, hunk_bases=bases, slave_base=base, symbols=symbols,
+        meta.update(replay=args.replay, boundary=boundary, hunk_bases=bases, slave_base=base, symbols=symbols,
                     clock=dict(last=last, serial=serial, credit=credit, rate=rate, phase=phase,
                                batch=batch, observed=observed, consumed=consumed,
-                               dropped=dropped, completed=ticks, at_pacer_tick=args.ticks),
+                               dropped=dropped, completed=ticks, requested_tick=args.ticks),
                     counters=counters, tick_sha256=sha(out/'tick.bin.gz'))
         command('gdb', 'delete breakpoints')
         command('shot', str(out/'race.png'))
@@ -157,6 +173,14 @@ def capture(args):
         print(json.dumps(dict(clock=meta['clock'], counters=counters, quit=meta['quit'])), flush=True)
     except Exception as error:
         meta['error'] = str(error)
+        if ready:
+            try:
+                command('shot', str(out/'failure.png'))
+                command('gdb', f'dump binary memory {out}/failure-chip.bin 0 0x80000')
+                if args.setup == 'a1200-fast':
+                    command('gdb', f'dump binary memory {out}/failure-fast.bin 0x200000 0xa00000')
+            except Exception as diagnostic_error:
+                meta['diagnostic_error'] = str(diagnostic_error)
         raise
     finally:
         meta_path.write_text(json.dumps(meta, indent=2) + '\n')
@@ -174,5 +198,6 @@ if __name__ == '__main__':
     parser.add_argument('--setup', choices=('a1200-fast','a1200','a500-1.5m'), default='a1200-fast')
     parser.add_argument('--ntsc', action='store_true')
     parser.add_argument('--replay', action='store_true')
+    parser.add_argument('--publish', action='store_true', help='stop after painting, immediately before submission')
     parser.add_argument('--profile', type=int, choices=(0,50), default=0)
     capture(parser.parse_args())

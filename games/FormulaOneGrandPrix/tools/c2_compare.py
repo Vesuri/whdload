@@ -17,6 +17,13 @@ RANGES = {
     'debris expiry': (0, 0x3a770, 4),
     'game clocks': (0, 0x3a77c, 12),
     'camera pose and spring': (0, 0x3a7f8, 0x30),
+    'HUD requests, deadlines and blink state': (0, 0x3a6bc, 0x48),
+    # +3A706/+3A708 are sound interpolation values, dependent on elapsed fields.
+    'replay, view and HUD refresh flags': (0, 0x3a70a, 0x0a),
+    'HUD dirty-mask snapshot': (0, 0x2dce2, 2),
+    'instrument current and previous values': (0, 0x3a91c, 4),
+    'text colours, cursor and control state': (2, 0x1f302, 0x1c),
+    'HUD box reuse flag': (2, 0x231ea, 1),
 }
 
 
@@ -32,6 +39,8 @@ def compare(left, right):
                 'game_inputs', 'hunk_bases'):
         if metadata[0][key] != metadata[1][key]:
             raise ValueError(f'unmatched {key}')
+    if metadata[0].get('boundary', 'pacer') != metadata[1].get('boundary', 'pacer'):
+        raise ValueError('unmatched snapshot boundary')
     snapshots = [gzip.decompress((p/'tick.bin.gz').read_bytes()) for p in paths]
     if any(len(s) != sum(SIZES) for s in snapshots):
         raise ValueError('incomplete tick snapshot')
@@ -41,8 +50,20 @@ def compare(left, right):
         a, b = (s[start:start+size] for s in snapshots)
         differences = [f'h{h}+{offset+i:05x}' for i, (x,y) in enumerate(zip(a,b)) if x != y]
         result[name] = dict(equal=not differences, differences=differences)
-    return dict(status='PASS' if all(r['equal'] for r in result.values()) else 'FAIL',
-                tick=metadata[0]['ticks'], ranges=result,
+    picture = None
+    if metadata[0].get('boundary', 'pacer') == 'publish':
+        pictures = []
+        for p, m in zip(paths, metadata):
+            if m.get('paint_sha256') != sha(p/'paint.bin'):
+                raise ValueError('changed publication bitmap')
+            pictures.append((p/'paint.bin').read_bytes())
+        if any(len(p) != 32000 for p in pictures):
+            raise ValueError('incomplete publication bitmap')
+        differences = sum(a != b for a, b in zip(*pictures))
+        picture = dict(equal=not differences, differing_bytes=differences, size=32000)
+    passed = all(r['equal'] for r in result.values()) and (picture is None or picture['equal'])
+    return dict(status='PASS' if passed else 'FAIL',
+                tick=metadata[0]['ticks'], ranges=result, picture=picture,
                 note='Selected authoritative A3/A4 ranges, not a whole-program or performance gate.')
 
 
