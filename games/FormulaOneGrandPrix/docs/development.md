@@ -571,6 +571,41 @@ This host-only executable specification checks the integer elapsed-VBL schedule 
 accounting contract in [Game time](internals.md#elapsed-vbl-world-clock-c1). It uses no
 game assets, emulator, CIA timer or fractional simulation updates. Five tests pass
 for both PAL and NTSC, including counter wrap, debt cap and rebase. It does not install
-a clock hook or validate the future C2 assembly. C2 must add optional hook ranges to
+a clock hook or validate the C2 assembly. C2 adds optional hook ranges to
 the disabled-byte gate and verify live callback counts, completed ticks, field debt,
 sound and publication alongside C3/C4 transitions and input handling.
+
+
+## C2 developer probes (in progress)
+
+C2 is not accepted. Its current prototype is confined to developer/VERIFY builds
+and the supplied executable variant. `CUSTOM2` bit 1 enables the VBL clock; bit 0
+still controls caches. `CUSTOM4` bit 1 introduces a 20-field batch delay for tests;
+bit 2 retains native raster work during catch-up as a comparison control. These
+bits do not enable a release feature or waive B5/A8/C5 gates.
+
+```sh
+make slave-verify OUT=tmp/c2/build-verify
+. amiga/env.sh
+python3 tools/c2_capture.py tmp/c2/new-pal --custom4 1 --ticks 160 --profile 50
+python3 tools/c2_capture.py tmp/c2/new-ntsc --ntsc --custom4 1 --ticks 160
+python3 tools/c2_capture.py tmp/c2/new-delayed --custom4 3 --ticks 160
+python3 tools/c2_capture.py tmp/c2/new-raster --custom4 7 --ticks 160
+python3 tools/c2_compare.py tmp/c2/new-delayed tmp/c2/new-raster tmp/c2/comparison.json
+```
+
+Use fresh output names. The collector verifies pinned inputs and runtime, refuses
+stale builds, starts its own emulator, routes by screen signatures, and stops at
+the requested tick's pacer entry. At this point that tick's native calls have run,
+but the slave's completed-tick count is one lower. It records the actual layout,
+clock credit/accounting and picture counts, then requires F10's `OK` handback.
+Failures remain `INCOMPLETE`; never promote them based on a screenshot alone.
+`--ntsc` selects an NTSC emulator display and adjusts the screen-signature search
+origin; the slave detects the rate independently from the beam. The native word
+and observed maximum line are recorded under `rate_detection`.
+
+The comparator checks selected authoritative A3/A4 ranges at common tick/layout
+and build/runtime. It is neither whole-program equivalence nor C5 acceptance.
+`--route qualifying` exercises pit animation; `--replay` is an experimental route.
+Optional profiles cover the 50 fields immediately after the route, not the final
+tick snapshot. Raw artifacts stay in ignored `tmp/`.

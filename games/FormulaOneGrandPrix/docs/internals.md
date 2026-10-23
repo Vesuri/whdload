@@ -1281,11 +1281,19 @@ return convention. The serial is never cleared by the pacer, keyboard or world-c
 rebase. Both h0+$128C and h2+$222 clear h0+$125E, so that native word cannot supply
 lossless elapsed time; h0+$1260 counts frames, not fields.
 
-At each active-world epoch, read h2+$2A650 as the native pacer does at h0+$12AA:
-**60 selects NTSC (F = 60); otherwise select PAL (F = 50)**. Record the raw word in
-VERIFY. Do not infer the rate from CPU type, host time or measured rendering speed.
-A display-mode change requires a new epoch. This follows the game's nominal field
-rate, not a claim that physical PAL/NTSC fields are exactly 50/60 Hz.
+At each active-world epoch, detect the physical display family from one complete
+video-beam sweep, after synchronising to its wrap: a maximum line at or beyond 280
+selects PAL (F = 50); otherwise NTSC (F = 60). Read VPOSR/VHPOSR and recheck VP8
+before accepting the sample: the two bus accesses can straddle line 255/256.
+The startup observation precedes the epoch's initial serial sample and therefore
+creates no simulation debt. This uses neither host time nor a CIA timer.
+
+The user approved this correction during C2. The proposed h2+$2A650 source proved
+insufficient: it remained 50 under an actual NTSC display. The native pacer compares
+it with 60, but that comparison does not establish hardware detection. Keep its raw
+value and the observed beam maximum in C2 diagnostics; do not overwrite the native
+word. A display-mode change requires a new epoch. The schedules use nominal 50/60
+field rates, not a claim that physical fields are exactly 50/60 Hz.
 
 #### Whole-field schedule
 
@@ -1369,6 +1377,67 @@ of the pinned game confirms the field-rate read, native counter increment/reset 
 sound consumers; local disassembly is retained in `tmp/c1/clock-paths.txt`. No emulator
 run, live hook validation, speed measurement or NTSC gameplay acceptance is claimed.
 
+
+### C2 developer implementation — not accepted
+
+The current prototype is compiled only for DEVELOPER/VERIFY, behind `CUSTOM2`
+bit 1 and only in the supplied 582992-byte variant's patch list. Release bytes
+remain identical to the pre-C2 build. C2 remains open: mixed HUD/glyph painting
+still runs during catch-up, and broad transition/publication and sound validation
+is unfinished. Do not describe this prototype as the completed C2 loop split.
+
+The hook at h0+$2CC3C advances the slave's aligned 32-bit serial and reproduces the
+native counter increment and flags. Live/replay heads at h0+$3C8F6/+$3CC40 reserve
+whole ticks using the C1 integer schedule, one-second credit cap and four-tick batch
+limit. The pacer replacement at h0+$1272 counts completed ticks and publishes after
+the final tick in a batch. Other pacer callers retain native behaviour. Epoch entry
+samples the display beam before starting the clock; the native rate word is retained
+in diagnostics. `h0+$125A` receives the reserved interval and +$125C receives elapsed
+fields since the previous tick start, capped at 32767; it does not receive clock debt.
+The native sound path still applies its minimum/maximum denominator rule.
+
+Each catch-up tick retains native camera evolution, geometry, visibility and the
+A3 renderer side effects. Raster leaf gates suppress fills, sprites, clearing,
+sky, cockpit sides, lights, hands and queued blits in the intermediate scene calls.
+This preserves the native visibility predicate for debris and the order of pit/RNG
+updates. The final tick paints normally. Between ticks, the renderer can repaint
+using staged entry values for the shared RNG, pit phases, debris latch, shake and
+mirror request, restoring their authoritative post-tick values afterwards. No input,
+camera evolution or HUD blink routine is repeated at picture rate. D's extrapolation
+is not implemented.
+
+Publication waits for the pending copper request to clear and then for a subsequent
+VBL before acquiring the complementary bitmap. It drains queued/active blits before
+copying persistent pixels from the front to the retired back buffer and before
+submission. Nine dual-bitmap HUD destination sites are redirected to the owned back
+buffer while a tick runs. This addresses buffer ownership, but does not finish the
+required extraction of HUD painting from tick work.
+
+Local evidence is under `tmp/c2/`; each capture has its own build/source/runtime
+identity. The older `normal`, `twin-dry-2` and `twin-raster` probes matched selected
+A3/A4 authoritative ranges at tick 160, including all 26 car records and both RNGs.
+They predate beam detection and are not current-build acceptance. `qualifying`
+reached tick 160 and quit OK, but dropped 971 fields under overload; no real-time
+claim follows. `ntsc-2` failed because the native rate word was 50 while the display
+ran at about 60 Hz; this prompted the user-approved C1 detection correction.
+
+With consistent beam sampling, `ntsc-stable-beam` selected 60 with maximum line 262,
+reserved 160 ticks from 1200 consumed fields with zero dropped debt, and quit OK.
+`pal-stable-beam` selected 50 and reserved 160 ticks from 1000 consumed fields with
+zero dropped debt, then quit OK. `replay` reached its 40th replay tick, consumed 250
+fields with zero dropped debt, and quit OK. These are bounded probes, not whole
+replay or C5 acceptance. The pacer-entry snapshot has one fewer *completed* tick
+because completion is counted inside the replacement pacer.
+
+The fresh disabled-feature suite `tmp/b4/c2-beam-acceptance.json` passes for release,
+developer, VERIFY-off and VERIFY-relay builds. All four retain eight native loop
+updates/draws/pacers in their 50-field controls and quit OK. Negative tests reject
+all 156 optional hook bytes independently, malformed inventories, stale metadata
+and an enabled relay disguised as off. This proves the disabled-range gate for the
+prototype, not C2's enabled behaviour. The tested VERIFY SHA-256 is
+`780ebe87a3be645fe10b0c6703a6a7932b0038d9bb39d0d4f68a54eb255529a0`;
+the unchanged release SHA-256 is
+`93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`.
 
 ## Current measurements
 

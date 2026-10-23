@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """B4: compare all optional hook ranges with the relocated, pinned original.
 
-Ranges come from PERF_RANGE comments immediately before PL_PS, PL_NOP or PL_R hooks. Baseline loader
+Ranges come from PERF_RANGE comments immediately before PL_P, PL_PS, PL_NOP or PL_R hooks. Baseline loader
 patches are explicitly delimited separately. Unknown optional patch forms fail closed;
 extend the audit alongside any future patch type. No original bytes are stored here.
 """
@@ -51,15 +51,19 @@ def ranges(source):
         elif line.startswith('PL_') and not baseline:
             if line in ('PL_START','PL_END'):
                 continue
-            call = re.fullmatch(r'PL_PS \$([0-9a-fA-F]+),\w+', line)
+            call = re.fullmatch(r'PL_P(?:S)? \$([0-9a-fA-F]+),\w+', line)
             nop = re.fullmatch(r'PL_NOP \$([0-9a-fA-F]+),(\d+)', line)
             ret = re.fullmatch(r'PL_R \$([0-9a-fA-F]+)', line)
             match = call or nop or ret
             size = 6 if call else int(nop[2]) if nop else 2
-            # Supported hooks are in hunk 0: PatchSeg's flat offset is identical.
-            if (not pending or not match or pending['hunk'] != 0
+            # PatchSeg offsets include preceding CODE/DATA/BSS hunk sizes.
+            starts = (0, 0x44a54, 0x6f394, 0xb1004)
+            flat = (starts[pending['hunk']] + pending['offset']
+                    if pending and pending['variant'] == 582992
+                    and 0 <= pending['hunk'] < len(starts) else None)
+            if (not pending or not match or flat is None
                     or size < 2 or size % 2 or pending['size'] != size
-                    or int(match[1],16) != pending['offset']):
+                    or int(match[1],16) != flat):
                 raise ValueError(f'unannotated/unsupported hook at line {number}')
             result.append(pending)
             pending = None

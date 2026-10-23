@@ -96,7 +96,10 @@ def screenshot(server, g):
 
 
 def showing(image, name):
-    return all(image.getpixel(p) == ((c >> 16) & 255, (c >> 8) & 255, c & 255)
+    # The pinned NTSC output places this same viewport ten pixels lower.
+    # Mouse movement is relative to the home clamp, so click deltas stay unchanged.
+    dy = int(os.environ.get('F1GP_SCREEN_Y', '0'))
+    return all(0 <= p[1]+dy < image.height and image.getpixel((p[0], p[1]+dy)) == ((c >> 16) & 255, (c >> 8) & 255, c & 255)
                for p, c in SCREENS[name].items())
 
 

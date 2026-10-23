@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C1 design complete; C2 next; B5/A8 gates remain open
+# Current status: C2 implementation in progress; B5/A8 gates remain open
 
 | Work | Status |
 |---|---|
@@ -14,14 +14,26 @@ results and acceptance evidence are in [internals.md](internals.md).
 | A8 | A500/A1200/020/030 four-arm ceiling audits pass. A developer-only preference-notification control fixes the 030 allocation mismatch. Only 040/060 CPU timings remain unavailable. |
 | 68030 | B5/A7 measurements and A8 common-layout ceiling comparisons pass; no 030 item remains deferred. |
 | A4 | Complete: car/track/camera/view map, static view paths and 250 checked A3 camera-return snapshots. |
-| C1 | Complete: elapsed-VBL clock design, whole native updates, PAL/NTSC integer schedules and checked accounting model. No runtime hook installed. |
-| C2–G | Simulation implementation, presentation, optimisation and release work remain open under the plan. |
+| C1 | Complete: elapsed-VBL clock design, whole native updates, PAL/NTSC integer schedules and checked accounting model. The C2 prototype now installs runtime hooks behind a developer option. |
+| C2 | Developer implementation and probes in progress; not accepted. Beam-based PAL/NTSC detection replaces the insufficient native rate word with user approval. |
+| C3–G | Modal/input acceptance, presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: C2, implementing the C1 elapsed-VBL clock and loop separation.**
-The user explicitly selected C1 while shared work remains deferred. The clock design
+**Current F1GP step: finish C2, implementing the elapsed-VBL clock and loop separation.**
+The user explicitly selected C2 while shared work remains deferred. The clock design
 is in [Game time](internals.md#elapsed-vbl-world-clock-c1); it adds no CIA timer and
 allows no fractional simulation updates. Its host accounting checks pass for PAL/NTSC.
-B5/A8 are still incomplete; this design does not waive their measurement gates.
+B5/A8 are still incomplete; this work does not waive their measurement gates.
+
+C2 remains open: complete the mixed HUD/embedded glyph painting split; validate
+full replay, view changes and A5 CPU/blitter buffer ownership; rerun current-build
+state comparisons after the remaining changes. Fresh prototype disabled-byte gates
+pass, including all 156 optional-byte mutation checks. Early PAL tick-160 probes matched all
+26 car records, clocks, camera and selected A3 side effects across normal and
+artificially delayed drawing. Those are selected-state checks, not C5 acceptance.
+The qualifying probe also completed and quit cleanly, but dropped substantial debt;
+that is overload, not evidence of real-time operation. Evidence is under `tmp/c2/`;
+each capture carries its own build identity. Do not mix earlier prototypes with
+current-build acceptance. Shared tooling remains untouched.
 
 **Shared dependency: restore 040/060 CPU profiling when shared work is resumed.**
 All currently measurable F1GP B5/A7/A8 cells and the 030 allocation fix are complete.
@@ -40,7 +52,8 @@ session changed no AmigaXDev files.
 A4 is now complete; its state map is in [internals](internals.md#state-map-a4).
 Continue with **C2–C6** (real-time ticks), then **D1–D10** (presentation), following
 the plan and retaining the unresolved B5/A8 gates. Caches remain opt-in while B5
-is open. No real-time simulation or extrapolation patches are enabled.
+is open. The C2 prototype is developer-only and opt-in (`CUSTOM2` bit 1); no extrapolation
+patch or release clock option is enabled.
 
 Measurement controls now enforced:
 

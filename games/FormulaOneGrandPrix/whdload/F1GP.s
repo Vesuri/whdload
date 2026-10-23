@@ -35,9 +35,12 @@ slv_config
         dc.b 'C1:B:Skip intro;'
         dc.b 'C2:X:Enable CPU caches:0;'
         IFNE DEVELOPER
+        dc.b 'C2:X:Developer - VBL world clock:1;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
+        dc.b 'C4:X:C2 diagnostic - 20 field delay per batch:1;'
+        dc.b 'C4:X:C2 diagnostic - retain catch-up raster work:2;'
         ENDC
         IFNE VERIFY
         dc.b 'C5:X:Verify pacer relay:0;'
@@ -168,6 +171,9 @@ load_game
         cmp.l #582780,d0
         bne wrong_version
 patch_game
+        IFNE DEVELOPER
+        bsr c2_init
+        ENDC
         move.l d7,a1
         move.l (_resload,pc),a2
         jsr (resload_PatchSeg,a2)
@@ -290,6 +296,635 @@ verify_pacer
         rts
         ENDC
 
+        IFNE DEVELOPER
+; C1 integer VBL accounting. Caller supplies a stable serial in D0.
+; No hardware access, no partial ticks. A0 points to this clock's state.
+WC_LAST       = 0
+WC_CREDIT     = 4
+WC_RATE       = 6
+WC_PHASE      = 8
+WC_BATCH      = 10
+WC_OBSERVED   = 12
+WC_CONSUMED   = 16
+WC_DROPPED    = 20
+WC_TICKS      = 24
+WC_SIZE       = 28
+
+; D0=serial, D1=50/60. Start a new accounting epoch.
+world_clock_rebase
+        move.l d0,WC_LAST(a0)
+        clr.w WC_CREDIT(a0)
+        move.w d1,WC_RATE(a0)
+        clr.w WC_PHASE(a0)
+        clr.w WC_BATCH(a0)
+        clr.l WC_OBSERVED(a0)
+        clr.l WC_CONSUMED(a0)
+        clr.l WC_DROPPED(a0)
+        clr.l WC_TICKS(a0)
+        rts
+
+; D0=serial. Clobbers D0-D2. Saturate before addition, including partial credit.
+world_clock_observe
+        move.l d0,d1
+        sub.l WC_LAST(a0),d0
+        move.l d1,WC_LAST(a0)
+        add.l d0,WC_OBSERVED(a0)
+        moveq #0,d1
+        move.w WC_RATE(a0),d1
+        sub.w WC_CREDIT(a0),d1
+        cmp.l d1,d0
+        bls.s .accept
+        move.l d0,d2
+        sub.l d1,d2
+        add.l d2,WC_DROPPED(a0)
+        move.l d1,d0
+.accept
+        add.w d0,WC_CREDIT(a0)
+        rts
+
+; Return next whole interval in D0, without changing credit. Clobbers D1.
+world_clock_interval
+        moveq #7,d0
+        cmpi.w #60,WC_RATE(a0)
+        beq.s .ntsc
+        tst.w WC_PHASE(a0)
+        beq.s .done
+        moveq #6,d0
+.done
+        rts
+.ntsc
+        tst.w WC_PHASE(a0)
+        bne.s .done
+        moveq #8,d0
+        rts
+
+; Reserve one tick, or D0=0 when not due / four-tick batch exhausted.
+; The caller increments WC_TICKS only at actual tick completion.
+world_clock_take
+        cmpi.w #4,WC_BATCH(a0)
+        bcc.s .none
+        bsr.s world_clock_interval
+        cmp.w WC_CREDIT(a0),d0
+        bhi.s .none
+        sub.w d0,WC_CREDIT(a0)
+        add.l d0,WC_CONSUMED(a0)
+        addq.w #1,WC_BATCH(a0)
+        addq.w #1,WC_PHASE(a0)
+        moveq #3,d1
+        cmpi.w #60,WC_RATE(a0)
+        bne.s .phase
+        moveq #1,d1
+.phase
+        and.w d1,WC_PHASE(a0)
+        rts
+.none
+        moveq #0,d0
+        rts
+; C2 hooks for the supplied game only. All state remains in the slave.
+c2_init
+        movem.l d0-d2/a0-a2,-(sp)
+        lea (c2_h0,pc),a0
+        move.l d7,d0
+        lsl.l #2,d0
+        addq.l #4,d0
+        move.l d0,(a0)+
+        move.l d0,a1
+        move.l (-4,a1),d1
+        lsl.l #2,d1
+        addq.l #4,d1
+        move.l d1,(a0)+
+        move.l d1,a1
+        move.l (-4,a1),d2
+        lsl.l #2,d2
+        addq.l #4,d2
+        move.l d2,(a0)
+        lea (c2_pacer_rest,pc),a0
+        add.l #$127c,d0
+        move.l d0,(a0)
+        lea (c2_submit,pc),a0
+        add.l #$1da62,d2
+        move.l d2,(a0)
+        move.l (c2_h0,pc),d0
+        lea (c2_target_h0,pc),a0
+        moveq #2,d2
+.target0
+        add.l d0,(a0)+
+        dbf d2,.target0
+        move.l (c2_h2,pc),d0
+        moveq #7,d2
+.target2
+        add.l d0,(a0)+
+        dbf d2,.target2
+        movem.l (sp)+,d0-d2/a0-a2
+        rts
+
+c2_live_entry
+        move.l a0,-(sp)
+        lea (c2_mode,pc),a0
+        clr.w (a0)
+        lea (c2_in_tick,pc),a0
+        clr.w (a0)
+        movea.l (sp)+,a0
+        move.l (c2_native_entry,pc),-(sp)
+        rts
+
+c2_vbl
+        move.l a0,-(sp)
+        lea (c2_serial,pc),a0
+        addq.l #1,(a0)
+        move.l (c2_h0,pc),a0
+        ; Reproduce the stolen instruction last, including its X/N/Z/V/C.
+        adda.l #$125e,a0
+        addq.w #1,(a0)
+        movea.l (sp)+,a0
+        rts
+
+c2_live_head
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        moveq #1,d7
+        bra.s c2_head
+c2_replay_head
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        moveq #2,d7
+c2_head
+        lea (c2_clock,pc),a0
+        lea (c2_mode,pc),a1
+        cmp.w (a1),d7
+        beq.s .same_epoch
+        move.w d7,(a1)
+        lea (c2_scene_ready,pc),a1
+        clr.w (a1)
+        move.l (c2_h2,pc),a2
+        adda.l #$2a650,a2
+        lea (c2_native_rate,pc),a1
+        move.w (a2),(a1)
+        bsr c2_field_rate
+        move.l (c2_serial,pc),d0
+        bsr world_clock_rebase
+        lea (c2_sound_serial,pc),a1
+        move.l d0,(a1)
+.same_epoch
+        tst.w WC_BATCH(a0)
+        bne.s .observe
+        bsr c2_acquire
+.observe
+        lea (c2_clock,pc),a0
+        move.l (c2_serial,pc),d0
+        bsr world_clock_observe
+        bsr world_clock_take
+        tst.w d0
+        bne.s .tick_due
+        move.w (c2_scene_ready,pc),d0
+        beq.s .observe
+        movea.l (c2_h0,pc),a2
+        adda.l #$3a6e2,a2
+        tst.b (a2)
+        bne.s .observe
+        bsr c2_repeat_picture
+        bsr c2_acquire
+        bra.s .observe
+.tick_due
+        move.l (c2_h0,pc),a2
+        adda.l #$125a,a2
+        move.w d0,(a2)
+        lea (c2_sound_serial,pc),a1
+        move.l (c2_serial,pc),d0
+        move.l d0,d1
+        sub.l (a1),d1
+        move.l d0,(a1)
+        cmpi.l #32767,d1
+        bls.s .sound
+        move.l #32767,d1
+.sound
+        move.w d1,2(a2)
+        clr.w 4(a2)            ; native renderer work counter, not world time
+        lea (c2_draw_mode,pc),a1
+        move.w #1,(a1)
+        cmpi.w #4,WC_BATCH(a0)
+        bcc.s .selected
+        bsr world_clock_interval
+        cmp.w WC_CREDIT(a0),d0
+        bhi.s .selected
+        move.w #2,(a1)         ; tick-only pass: another whole tick is already due
+.selected
+        lea (c2_in_tick,pc),a1
+        move.w #1,(a1)
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        move.l a0,-(sp)
+        movea.l (c2_h0,pc),a0
+        adda.l #$2cc32,a0
+        tst.l (a0)            ; native header instruction, supplies branch flags
+        movea.l (sp)+,a0
+        rts
+
+; Observe one complete beam sweep, after synchronising to its wrap. PAL has
+; lines beyond 280; NTSC wraps near 262. Read VPOSR/VHPOSR together and discard
+; horizontal position and chip ID/LOF bits. No timer, interrupt or display write.
+; D1 returns the nominal field rate; startup observation precedes the epoch.
+c2_field_rate
+        bsr.s c2_beam_line
+        move.w d3,d2
+.sync
+        bsr.s c2_beam_line
+        cmp.w d2,d3
+        bcs.s .start
+        move.w d3,d2
+        bra.s .sync
+.start
+        move.w d3,d2
+        move.w d3,d1
+.sample
+        bsr.s c2_beam_line
+        cmp.w d2,d3
+        bcs.s .done
+        move.w d3,d2
+        cmp.w d1,d3
+        bls.s .sample
+        move.w d3,d1
+        bra.s .sample
+.done
+        lea (c2_beam_max,pc),a1
+        move.w d1,(a1)
+        cmpi.w #280,d1
+        bcs.s .ntsc
+        moveq #50,d1
+        rts
+.ntsc
+        moveq #60,d1
+        rts
+
+; A long custom-register read uses two bus cycles. Recheck VP8 so a read
+; crossing line 255/256 cannot masquerade as field wrap.
+c2_beam_line
+.retry
+        move.l $dff004,d3
+        lsr.l #8,d3
+        andi.w #$1ff,d3
+        move.w $dff004,d4
+        lsl.w #8,d4
+        eor.w d3,d4
+        btst #8,d4
+        bne.s .retry
+        rts
+
+; A5: complete old publication, cross the following VBL, then acquire old front.
+c2_acquire
+        movea.l (c2_h2,pc),a2
+        adda.l #$1dab0,a2
+.pending
+        tst.b (a2)
+        bne.s .pending
+        move.l (c2_serial,pc),d0
+.vbl
+        cmp.l (c2_serial,pc),d0
+        beq.s .vbl
+        bsr c2_drain
+        movea.l (c2_h0,pc),a2
+        adda.l #$124a,a2
+        movea.l 4(a2),a3       ; acknowledged front
+        move.l (a2),d0
+        cmp.l a3,d0
+        bne.s .back
+        movea.l (c2_h2,pc),a4
+        adda.l #$231da,a4
+        add.l (a4),d0
+.back
+        move.l d0,8(a2)
+        move.l d0,12(a2)
+        move.l d0,a4
+        ; Carry persistent HUD pixels into the owned buffer. Optimise only later.
+        move.w #7999,d0
+.copy
+        move.l (a3)+,(a4)+
+        dbf d0,.copy
+        btst #1,(preference_options+3,pc)
+        beq.s .ready
+        move.l (c2_serial,pc),d1
+.delay
+        move.l (c2_serial,pc),d0
+        sub.l d1,d0
+        cmpi.l #20,d0
+        bcs.s .delay
+.ready
+        rts
+
+c2_drain
+        movea.l (c2_h2,pc),a2
+        adda.l #$1e2de,a2
+.queue
+        move.w (a2),d0
+        cmp.w 2(a2),d0
+        bne.s .queue
+        btst #6,$dff002
+.busy
+        btst #6,$dff002
+        bne.s .busy
+        rts
+
+c2_pacer
+        move.w sr,-(sp)
+        movem.l d0-a6,-(sp)
+        move.w (c2_in_tick,pc),d0
+        beq.s .native
+        lea (c2_clock,pc),a0
+        addq.l #1,WC_TICKS(a0)
+        movea.l (c2_h0,pc),a2
+        adda.l #$1260,a2
+        addq.w #1,(a2)         ; native frame-indexed state now counts whole ticks
+        lea (c2_in_tick,pc),a1
+        clr.w (a1)
+        move.w (c2_draw_mode,pc),d0
+        cmpi.w #2,d0
+        beq.s .done
+        bsr c2_publish
+        lea (c2_clock,pc),a0
+        clr.w WC_BATCH(a0)
+.done
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        rts
+.native
+        movem.l (sp)+,d0-a6
+        move.w (sp)+,ccr
+        move.l a0,-(sp)
+        movea.l (c2_h0,pc),a0
+        adda.l #$125a,a0
+        move.w 4(a0),2(a0)
+        movea.l (sp)+,a0
+        move.l (c2_pacer_rest,pc),-(sp)
+        rts
+c2_publish
+        bsr c2_drain
+        movea.l (c2_h0,pc),a2
+        adda.l #$124e,a2
+        move.l 4(a2),(a2)
+        bsr c2_submit_call
+        lea (c2_pictures,pc),a0
+        addq.l #1,(a0)
+        rts
+c2_submit_call
+        move.l (c2_submit,pc),-(sp)
+        rts
+
+; Replace MOVEA h0+$124A plus its following LEA 32000 with the owned
+; bitmap pair during a world tick. Outside the enhanced loop, execute the
+; original MOVEA and return to its LEA. Preserve all condition flags.
+c2_pair_a0_a2
+        move.w sr,-(sp)
+        move.w (c2_in_tick,pc),-(sp)
+        lea 2(sp),sp
+        beq.s .native
+        movea.l (c2_h0,pc),a0
+        movea.l ($1252,a0),a0
+        movea.l a0,a2
+        addq.l #4,2(sp)
+        bra.s .done
+.native
+        movea.l (c2_h0,pc),a0
+        movea.l ($124a,a0),a0
+.done
+        move.w (sp)+,ccr
+        rts
+c2_pair_a5_a6
+        move.w sr,-(sp)
+        move.w (c2_in_tick,pc),-(sp)
+        lea 2(sp),sp
+        beq.s .native
+        movea.l (c2_h0,pc),a5
+        movea.l ($1252,a5),a5
+        movea.l a5,a6
+        addq.l #4,2(sp)
+        bra.s .done
+.native
+        movea.l (c2_h0,pc),a5
+        movea.l ($124a,a5),a5
+.done
+        move.w (sp)+,ccr
+        rts
+c2_pair_a1_a2
+        move.w sr,-(sp)
+        move.w (c2_in_tick,pc),-(sp)
+        lea 2(sp),sp
+        beq.s .native
+        movea.l (c2_h0,pc),a1
+        movea.l ($1252,a1),a1
+        movea.l a1,a2
+        addq.l #4,2(sp)
+        bra.s .done
+.native
+        movea.l (c2_h0,pc),a1
+        movea.l ($124a,a1),a1
+.done
+        move.w (sp)+,ccr
+        rts
+
+; Geometry/association/mirror traversal still executes on an undrawn tick.
+; Only raster leaves are suppressed, preserving the native visibility predicate
+; before h2+$29AD8 and the pit/RNG paths at the end of the traversal.
+C2_RASTER_GATE MACRO
+        move.w sr,-(sp)
+        move.w (c2_dry_scene,pc),-(sp)
+        lea 2(sp),sp
+        beq.s .native\@
+        move.w (sp)+,ccr
+        rts
+.native\@
+        move.w (sp)+,ccr
+        ENDM
+
+c2_scene
+        movem.l d0-a6,-(sp)
+        lea (c2_stage_entry,pc),a2
+        bsr c2_save_stage
+        movem.l (sp)+,d0-a6
+        move.l a0,-(sp)
+        lea (c2_dry_scene,pc),a0
+        clr.w (a0)
+        move.w (c2_draw_mode,pc),-(sp)
+        cmpi.w #2,(sp)+
+        bne.s .paint
+        btst #2,(preference_options+3,pc)
+        bne.s .paint
+        move.w #1,(a0)
+        lea (c2_dry_passes,pc),a0
+        addq.l #1,(a0)
+.paint
+        movea.l (sp)+,a0
+        bsr c2_scene_call
+        move.l a0,-(sp)
+        lea (c2_dry_scene,pc),a0
+        clr.w (a0)
+        lea (c2_scene_ready,pc),a0
+        move.w #1,(a0)
+        movea.l (sp)+,a0
+        rts
+c2_scene_call
+        move.l (c2_native_scene,pc),-(sp)
+        rts
+
+c2_fill
+        C2_RASTER_GATE
+        move.l a0,-(sp)
+        movea.l (c2_h0,pc),a0
+        adda.l #$1f37e,a0
+        move.w d3,(a0)
+        movea.l (sp)+,a0
+        move.l (c2_fill_rest,pc),-(sp)
+        rts
+c2_sprite
+        C2_RASTER_GATE
+        move.l a0,-(sp)
+        movea.l (c2_h0,pc),a0
+        move.w d3,($1348,a0)
+        movea.l (sp)+,a0
+        move.l (c2_sprite_rest,pc),-(sp)
+        rts
+c2_clear
+        C2_RASTER_GATE
+        movem.l d0-a6,-(sp)
+        bsr c2_colour_call
+        move.l (c2_clear_rest,pc),-(sp)
+        rts
+c2_colour_call
+        move.l (c2_native_colour,pc),-(sp)
+        rts
+c2_sky
+        C2_RASTER_GATE
+        movem.l a0-a3,-(sp)
+        clr.w d5
+        move.l (c2_sky_rest,pc),-(sp)
+        rts
+c2_sides
+        C2_RASTER_GATE
+        movem.l a0-a3,-(sp)
+        move.w #7,d6
+        move.l (c2_sides_rest,pc),-(sp)
+        rts
+c2_lights
+        C2_RASTER_GATE
+        move.l (c2_lights_rest,pc),-(sp)
+        move.l a0,-(sp)
+        movea.l (c2_h0,pc),a0
+        adda.l #$3a73a,a0
+        move.w (a0),d7
+        movea.l (sp)+,a0
+        rts
+c2_hands
+        C2_RASTER_GATE
+        movea.l (c2_h0,pc),a1
+        adda.l #$3eb32,a1
+        move.l (c2_hands_rest,pc),-(sp)
+        rts
+c2_blit_queue
+        C2_RASTER_GATE
+        move.l a1,-(sp)
+        movea.l (c2_h2,pc),a1
+        adda.l #$1e2e4,a1
+        move.l (c2_queue_rest,pc),-(sp)
+        rts
+
+        CNOP 0,4
+c2_target_h0
+c2_fill_rest dc.l $1f398
+c2_sprite_rest dc.l $1482
+c2_native_entry dc.l $3c5c6
+c2_target_h2
+c2_clear_rest dc.l $1e158
+c2_native_colour dc.l $1dc50
+c2_sky_rest dc.l $1f3c0
+c2_sides_rest dc.l $1f56a
+c2_lights_rest dc.l $1f782
+c2_hands_rest dc.l $1f856
+c2_queue_rest dc.l $1e6d4
+c2_native_scene dc.l $280f6
+c2_target_end
+c2_dry_passes dc.l 0
+c2_dry_scene dc.w 0
+
+; Between ticks, repaint the last tick's renderer inputs. Renderer-owned tick
+; effects are staged from that tick's entry and authoritative post-tick bytes
+; restored afterwards. No camera evolution, input or HUD/blink call is repeated.
+c2_repeat_picture
+        lea (c2_stage_saved,pc),a2
+        bsr c2_save_stage
+        lea (c2_stage_entry,pc),a2
+        bsr c2_load_stage
+        bsr c2_scene_call
+        lea (c2_stage_saved,pc),a2
+        bsr c2_load_stage
+        lea (c2_repeat_pictures,pc),a0
+        addq.l #1,(a0)
+        bsr c2_publish
+        rts
+
+; A2 is a packed 23-byte snapshot. Tables contain only A3's persistent renderer
+; effects plus the camera's one-use mirror request. Scratch stays native.
+c2_save_stage
+        lea (c2_stage_ranges,pc),a3
+.range
+        move.l (a3)+,d0
+        beq.s .done
+        movea.l (c2_h0,pc),a1
+        adda.l d0,a1
+        move.w (a3)+,d0
+.byte
+        move.b (a1)+,(a2)+
+        dbf d0,.byte
+        bra.s .range
+.done
+        rts
+c2_load_stage
+        lea (c2_stage_ranges,pc),a3
+.range
+        move.l (a3)+,d0
+        beq.s .done
+        movea.l (c2_h0,pc),a1
+        adda.l d0,a1
+        move.w (a3)+,d0
+.byte
+        move.b (a2)+,(a1)+
+        dbf d0,.byte
+        bra.s .range
+.done
+        rts
+c2_stage_ranges
+        dc.l $257c4
+        dc.w 4
+        dc.l $3a746
+        dc.w 7
+        dc.l $3a770
+        dc.w 3
+        dc.l $3a820
+        dc.w 3
+        dc.l $3a828
+        dc.w 1
+        dc.l 0
+c2_stage_entry ds.b 23
+c2_stage_saved ds.b 23
+        CNOP 0,4
+c2_repeat_pictures dc.l 0
+c2_scene_ready dc.w 0
+
+        CNOP 0,4
+c2_h0 dc.l 0
+c2_h1 dc.l 0
+c2_h2 dc.l 0
+c2_pacer_rest dc.l 0
+c2_submit dc.l 0
+c2_serial dc.l 0
+c2_sound_serial dc.l 0
+c2_pictures dc.l 0
+c2_clock ds.b WC_SIZE
+c2_mode dc.w 0
+c2_draw_mode dc.w 0
+c2_in_tick dc.w 0
+c2_native_rate dc.w 0
+c2_beam_max dc.w 0
+        ENDC
+
 ; BASELINE_PATCHES_BEGIN: mandatory B3 loader patches, never feature-gated.
 patch_582992
         PL_START
@@ -301,6 +936,57 @@ patch_582992
         PL_W $a7a46,$7300
         ; BASELINE_PATCHES_END
         IFNE DEVELOPER
+        PL_IFC2X 1
+        ; PERF_RANGE h0:3c8d2 6 custom=2 bit=1 variant=582992
+        PL_PS $3c8d2,c2_live_entry
+        ; PERF_RANGE h0:2cc3c 6 custom=2 bit=1 variant=582992
+        PL_PS $2cc3c,c2_vbl
+        ; PERF_RANGE h0:3c8f6 6 custom=2 bit=1 variant=582992
+        PL_PS $3c8f6,c2_live_head
+        ; PERF_RANGE h0:3cc40 6 custom=2 bit=1 variant=582992
+        PL_PS $3cc40,c2_replay_head
+        ; Entry replaces first six bytes of a ten-byte MOVE; tail resumes at +$127C.
+        ; PERF_RANGE h0:1272 6 custom=2 bit=1 variant=582992
+        PL_P $1272,c2_pacer
+        ; PERF_RANGE h0:3c9ba 6 custom=2 bit=1 variant=582992
+        PL_PS $3c9ba,c2_scene
+        ; PERF_RANGE h0:3cce8 6 custom=2 bit=1 variant=582992
+        PL_PS $3cce8,c2_scene
+        ; PERF_RANGE h0:1f392 6 custom=2 bit=1 variant=582992
+        PL_P $1f392,c2_fill
+        ; PERF_RANGE h0:147c 6 custom=2 bit=1 variant=582992
+        PL_P $147c,c2_sprite
+        ; PERF_RANGE h2:1e14e 6 custom=2 bit=1 variant=582992
+        PL_P $8d4e2,c2_clear
+        ; PERF_RANGE h2:1f3ba 6 custom=2 bit=1 variant=582992
+        PL_P $8e74e,c2_sky
+        ; PERF_RANGE h2:1f562 6 custom=2 bit=1 variant=582992
+        PL_P $8e8f6,c2_sides
+        ; PERF_RANGE h2:1f77c 6 custom=2 bit=1 variant=582992
+        PL_P $8eb10,c2_lights
+        ; PERF_RANGE h2:1f850 6 custom=2 bit=1 variant=582992
+        PL_P $8ebe4,c2_hands
+        ; PERF_RANGE h2:1e6cc 6 custom=2 bit=1 variant=582992
+        PL_P $8da60,c2_blit_queue
+        ; PERF_RANGE h2:1dd1a 6 custom=2 bit=1 variant=582992
+        PL_PS $8d0ae,c2_pair_a0_a2
+        ; PERF_RANGE h2:1e046 6 custom=2 bit=1 variant=582992
+        PL_PS $8d3da,c2_pair_a0_a2
+        ; PERF_RANGE h2:1f91e 6 custom=2 bit=1 variant=582992
+        PL_PS $8ecb2,c2_pair_a0_a2
+        ; PERF_RANGE h2:1f9a6 6 custom=2 bit=1 variant=582992
+        PL_PS $8ed3a,c2_pair_a0_a2
+        ; PERF_RANGE h2:1fa58 6 custom=2 bit=1 variant=582992
+        PL_PS $8edec,c2_pair_a0_a2
+        ; PERF_RANGE h2:1de4e 6 custom=2 bit=1 variant=582992
+        PL_PS $8d1e2,c2_pair_a5_a6
+        ; PERF_RANGE h2:1ea36 6 custom=2 bit=1 variant=582992
+        PL_PS $8ddca,c2_pair_a5_a6
+        ; PERF_RANGE h2:1eb94 6 custom=2 bit=1 variant=582992
+        PL_PS $8df28,c2_pair_a5_a6
+        ; PERF_RANGE h2:1f10e 6 custom=2 bit=1 variant=582992
+        PL_PS $8e4a2,c2_pair_a1_a2
+        PL_ENDIF
         PL_IFC3X 0
         ; PERF_RANGE h0:1288 4 custom=3 bit=0 variant=582992
         PL_NOP $1288,4

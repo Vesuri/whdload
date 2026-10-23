@@ -93,7 +93,7 @@ and whole-race captures repeat exactly. B5's functional races pass, but its 040/
 work gains remain unavailable. A8 has accepted A500/A1200/020/030 ceilings; a developer-only startup notification
 control fixes the 030 layout mismatch. Its 040/060 CPU timings remain unavailable. Neither B5 nor A8 is
 complete. The user has deferred shared-profiler fixes. See [open work](open-work.md).
-C1 is complete as an elapsed-VBL, whole-update clock design; C2 implementation is next
+C1 is complete as an elapsed-VBL, whole-update clock design; C2 implementation is in progress
 by the user's explicit scope, without closing B5/A8. The C1 design records the native
 race-clock increment discrepancy that must be resolved before C5(a) acceptance.
 The earlier startup deadlock is fixed; this is a distinct profiling limitation.
@@ -205,8 +205,9 @@ recorded per CPU (68020: −12% work measured).
 
 ## C. Real-time world clock (every machine)
 
-**C1 Clock.** Owe 8 ticks per 50 fields on PAL and per 60 on NTSC (detect the field rate
-as the game does, with its chip word compared with 60). Take fields from the game's own
+**C1 Clock.** Owe 8 ticks per 50 fields on PAL and per 60 on NTSC. Detect the display
+family from a complete video-beam sweep at epoch entry; C2 testing found that the
+native chip word stays at 50 under NTSC, and the user approved beam detection. Take fields from the game's own
 interrupt counter or a slave-owned one in the same handler. Write the design in internals
 "Game time". Use only whole updates and integer VBL accounting; no new CIA timer
 or fractional simulation steps. C1 is a design output; hook installation belongs to C2.

@@ -21,7 +21,7 @@ def main():
         'malformed annotation':source.replace('PERF_RANGE h0:','PERF_RANGE h:'),
         'extra unannotated hook':source.replace('        PL_ENDIF','        PL_PS $3c9d8,verify_pacer\n        PL_ENDIF'),
         'orphan annotation':source.replace('        PL_PS $3c9d2,verify_pacer',''),
-        'empty inventory':re.sub(r'; PERF_RANGE[^\n]+\n\s*PL_(?:PS|NOP|R)[^\n]+', '', source),
+        'empty inventory':re.sub(r'; PERF_RANGE[^\n]+\n\s*PL_(?:P(?:S)?|NOP|R)[^\n]+', '', source),
     }
     for name,text in bad_sources.items():
         try:
@@ -37,19 +37,21 @@ def main():
         for name in ('chip.bin','fast.bin','meta.json','slave.bin'):
             shutil.copyfile(reference/name,fixture/name)
         meta=json.loads((fixture/'meta.json').read_text())
-        fast=(fixture/'fast.bin').read_bytes()
+        images={name: (fixture/name).read_bytes() for name in ('chip.bin','fast.bin')}
         # Mutate every opcode/operand byte of every declared optional range.
         tested=0
         for item in ranges(source):
-            assert item['hunk']==0
-            offset=meta['hunk_bases'][0]-0x200000+item['offset']
+            address=meta['hunk_bases'][item['hunk']]+item['offset']
+            name='chip.bin' if address < 0x200000 else 'fast.bin'
+            offset=address-(0 if name=='chip.bin' else 0x200000)
+            original=images[name]
             for byte in range(item['size']):
-                changed=bytearray(fast); changed[offset+byte]^=1
-                (fixture/'fast.bin').write_bytes(changed)
+                changed=bytearray(original); changed[offset+byte]^=1
+                (fixture/name).write_bytes(changed)
                 assert check(fixture)['status']=='FAIL',(item,byte)
                 tested+=1
+            (fixture/name).write_bytes(original)
         print(f'all {tested} hook bytes independently rejected')
-        (fixture/'fast.bin').write_bytes(fast)
         for name,edit in (
             ('nonzero option',dict(custom=[0,0,0,0,1])),
             ('stale source',dict(source_sha256='0'*64)),
