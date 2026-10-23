@@ -82,7 +82,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$ffff,(a0)
+	move.l	#$1ffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -1350,6 +1350,7 @@ _viewalpha	dc.w	0
 _viewready	dc.w	0
 _viewpose	ds.b	32
 _viewnav	ds.b	12
+_viewlocal	ds.b	12
 _viewspaceactive dc.w 0
 _committednav	ds.b	12
 _collisiononly	dc.w	0
@@ -1374,11 +1375,15 @@ _viewcamera
 	movem.l	d0-d7,-(sp)
 	movem.l	($702a).w,d0-d2
 	movem.l	d0-d2,-(sp)
+	movem.l	($7038).w,d0-d2
+	movem.l	d0-d2,-(sp)
 	move.w	(_viewalpha,pc),d6
 	move.w	(_pstate+4,pc),d7
 	bsr.w	_interpolateplayer
 	bsr.w	_rememberview
 	bsr.w	_deriveview
+	movem.l	(sp)+,d0-d2
+	movem.l	d0-d2,($7038).w
 	movem.l	(sp)+,d0-d2
 	movem.l	d0-d2,($702a).w
 	movem.l	(sp)+,d0-d7
@@ -1519,19 +1524,22 @@ _drawbuildings
 .done	rts
 
 ; Some model and secondary-view code reads the live pose directly. Give it
-; the same pose as the camera, without exposing delayed coordinates to logic.
+; the same world, navigation and room-local pose as the camera, restoring all
+; three before returning to game logic.
 _rememberview
 	lea	(_viewpose,pc),a0
 	movem.l	($7142).w,d0-d7
 	movem.l	d0-d7,(a0)
 	movem.l	($702a).w,d0-d2
 	movem.l	d0-d2,(32,a0)
+	movem.l	($7038).w,d0-d2
+	movem.l	d0-d2,(44,a0)
 	lea	(_viewready,pc),a0
 	move.w	#1,(a0)
 	rts
 
 _VIEWDRAW MACRO
-	suba.w	#44,sp
+	suba.w	#56,sp
 	move.w	sr,-(sp)
 	movem.l	d0-d7/a0-a1,-(sp)
 	lea	(42,sp),a1
@@ -1539,6 +1547,8 @@ _VIEWDRAW MACRO
 	movem.l	d0-d7,(a1)
 	movem.l	($702a).w,d0-d2
 	movem.l	d0-d2,(32,a1)
+	movem.l	($7038).w,d0-d2
+	movem.l	d0-d2,(44,a1)
 	move.w	(_viewready,pc),d0
 	beq.b	.native
 	lea	(_viewpose,pc),a0
@@ -1546,6 +1556,8 @@ _VIEWDRAW MACRO
 	movem.l	d0-d7,($7142).w
 	movem.l	(32,a0),d0-d2
 	movem.l	d0-d2,($702a).w
+	movem.l	(44,a0),d0-d2
+	movem.l	d0-d2,($7038).w
 .native	movem.l	(sp)+,d0-d7/a0-a1
 	move.w	(sp)+,ccr
 \1
@@ -1557,9 +1569,11 @@ _VIEWDRAW MACRO
 	movem.l	d0-d7,($7142).w
 	movem.l	(32,a0),d0-d2
 	movem.l	d0-d2,($702a).w
+	movem.l	(44,a0),d0-d2
+	movem.l	d0-d2,($7038).w
 	movem.l	(sp)+,d0-d7/a0
 	move.w	(sp)+,ccr
-	adda.w	#44,sp
+	adda.w	#56,sp
 	rts
 	ENDM
 _viewobjects
@@ -1615,6 +1629,16 @@ _interpolateplayer
 	divs.w	d7,d0
 	ext.l	d0
 	add.l	d0,(a1,d4.w)
+; Bit 16: room walls use separate local XYZ words. Apply the same delta,
+; retaining the native room origin and the existing discontinuity guards.
+	cmpi.w	#1,(a1)
+	bne.b	.spaceposition
+	btst	#0,(_custom1+1,pc)
+	beq.b	.next
+	lea	($7034).w,a2
+	add.w	d0,(a2,d4.w)
+	bra.b	.next
+.spaceposition
 	cmpi.w	#2,(a1)
 	bne.b	.next
 	lea	($7026).w,a2
@@ -2078,6 +2102,13 @@ _restore_ranges
 	dc.w	$5
 	dc.l	$702a
 	dc.w	$5
+; Room-local camera words changed only during presentation (bit 16).
+	dc.l	$7038
+	dc.w	0
+	dc.l	$703c
+	dc.w	0
+	dc.l	$7040
+	dc.w	0
 	dc.l	$704a
 	dc.w	$3
 	dc.l	$7084

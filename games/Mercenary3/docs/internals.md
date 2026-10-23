@@ -103,6 +103,7 @@ Bit 13 requests the data cache through WHDLoad (R4 below).
 Bit 14 replaces prediction with consistent player/camera interpolation (P4 below);
 requires bit 4 and its restore buffer, plus bit 12 for transport modes.
 Bit 15 fixes the cached polygon clipping limit on 68040/060 (R5 below).
+Bit 16 includes room-local XYZ in P4 camera interpolation (P5 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -244,29 +245,31 @@ views were checked; the final 12 fields after stopping at the mailbox are identi
 Evidence: `tmp/presentation-fix/final4/`; the original defect probe is
 `tmp/presentation-fix/before-probe.json`.
 
-### Prison wall motion: missing local camera interpolation
+### P5: room-local camera interpolation
 
 The prison walls and spiderweb use different camera inputs. The room renderer
 (Disk.1 `$5F438`, local-coordinate reads at `$5F49A`/`$5F49E`) uses the separate
-room-local X/Z words at chip `$7038`/`$7040`. The interior detail path at `$5836A`
-uses the world camera, subtracting its X/Z at `$583A2`/`$583B4`. P4 stages the world
-pose but omits the room-local words. Thus a 25 fps redraw can show walls moving
-only at the native 12.5 Hz logic rate while the spiderweb moves between those steps.
+room-local XYZ words. The interior detail path at `$5836A` subtracts the world
+camera at `$583A2`/`$583B4`. P4 originally staged only the latter: room depth
+repeated 92/92/68/68/44/44 while the world camera advanced 12 units every two fields.
 
-040 CACHE PRELOAD prison walk: room depth at fields 178/180/182/184/186/188 is
-92/92/68/68/44/44; the world camera advances 12 units every two fields. The filled
-room polygons repeat their projected vertices on the paired fields. This is an
-interpolation coverage defect, not evidence of slow desktop frame delivery.
+Bit 16 applies P4's interpolated XYZ delta to the local words at chip
+`$7038`/`$703C`/`$7040` for walking. It preserves the native room origin and P4's
+mode/floor/scene discontinuity guards. Camera preparation and drawing wrappers save
+and restore the local pose; the presentation restore set includes all three words.
+Enhanced framerate selects this fix. Input, collision and logic retain committed
+coordinates; door animation timing is unchanged.
 
-A scratch VERIFY build, Custom2 bit 5 off/on in the same session, temporarily
-stages room-local X/Z from the presented world pose relative to object 0, restoring
-them after object drawing. In 18 two-field samples, the wall's upper/lower edge
-at capture column 300 repeats on 8/17 intervals off versus 2/17 on. This confirms
-the missing local pose is causal; individual pixel edges can still repeat after
-rounding. No FPS gain is claimed. The release remains unchanged: a production fix
-still needs room transitions, turning, collision and restore checks. Evidence:
-`tmp/wall-web/local-camera.json`, `polygons-all.json`, `edge-comparison.json` and
-`unstaged-local/` / `staged-local/` under the same directory.
+Same-build/session 040 CACHE PRELOAD walk, bit 16 off/on: local depth now advances
+110/98/86/74/62/50 on consecutive two-field frames. In 18 sampled frames, the wall's
+upper/lower edge at capture column 300 repeats on 8/17 intervals off versus 2/17 on.
+Individual pixel edges can still repeat after rounding; the native-rate hold is gone.
+Same-build 500-field FPS, bit 16 off → on: A500 4.10 → 4.10, fast 020
+12.50 → 12.50, reference 030 and 040-25 both 24.80 → 24.80. No throughput gain
+is claimed. Walking/turning stay at 6/2 units per field. All 124 routine and 300 lift
+presentation restores pass. Prison turning, stopping, exit/return, Help and mailbox
+views were checked. Options-off and shipped both produce 37 A500 route frames.
+Evidence: `tmp/room-camera/final2/` (camera probe, edge comparison and play captures).
 
 ### R5: cache-safe polygon clipping
 
@@ -1262,7 +1265,7 @@ Evidence: `tmp/r4/`.
 ### X1: release
 
 The single player control is the **Enhanced framerate** checkbox, enabled by
-CUSTOM5=1 in the installed icon. Omission or zero leaves it unchecked. `Custom5=1` selects feature bits 0–15; `Custom5=0` turns them all off. The release
+CUSTOM5=1 in the installed icon. Omission or zero leaves it unchecked. `Custom5=1` selects feature bits 0–16; `Custom5=0` turns them all off. The release
 ignores legacy Custom1 settings. VERIFY retains individual bits with
 `Custom5=0 Custom1=<mask>`. CPU/chipset/memory guards are unchanged. The README covers
 installation, WHDLoad 17+, 512 KB chip RAM, the optional 200 KB workspace and CACHE/PRELOAD.

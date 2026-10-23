@@ -129,6 +129,12 @@ collision (`$6F56`), a mode change or a stop.
   on the routine setups and reference 030. Accept this as a smoothness correction,
   with one native pass of visual delay, rather than requiring an FPS increase.
 
+**P5. Room-local camera interpolation** (follow-up to the prison wall video).
+- Bit 16 applies P4's movement delta to the room-local XYZ words during drawing,
+  retaining the native room origin, transition guards and committed collision state.
+- Check wall motion off/on, turning and room exit/return, P1 restores (including a
+  lift arrival), native speed and options off. Compare routine FPS with bit 16 off/on.
+
 ### M. Code and data in fast RAM (68020+ with fast RAM)
 
 **M1. Hot code in fast RAM** (new bit).
@@ -246,19 +252,20 @@ without it. Real cache behaviour and 040/060 hardware performance remain unverif
 - [x] L1
 - [x] P1 [x] P2 [x] P3
 - [x] P4
+- [x] P5
 - [x] M1 [x] M2
 - [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [x] S6
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
 - [x] R5
 - [x] X1
 
-P4 addresses the presentation defects reported after the original plan completed.
+P4 and P5 address the presentation defects reported after the original plan completed.
 Hardware validation remains unavailable, outside X1.
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–15.
+  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–16.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the
