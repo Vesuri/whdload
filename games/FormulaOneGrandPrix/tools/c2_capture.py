@@ -27,6 +27,9 @@ from state_diff import SIZES, scratch
 
 
 def capture(args):
+    if args.input and (args.modal or args.replay or args.view or args.profile or args.profile_tick
+                       or args.publish or args.custom4 != 3 or args.route != 'quickrace'):
+        raise ValueError('C4 input probe requires Quick Race/CUSTOM4=3 and no other probe options')
     verify()
     pins = runtime()
     out = scratch(args.out)
@@ -107,8 +110,11 @@ def capture(args):
         expected_mode = 2 if args.replay else 1
         if struct.unpack_from('>H', memory, base+symbols['c2_mode'])[0] != expected_mode:
             raise ValueError('requested live/replay loop not reached')
-        if args.modal:
-            from c3_capture import exercise
+        if args.modal or args.input:
+            if args.input:
+                from c4_capture import exercise
+            else:
+                from c3_capture import exercise
             meta.update(hunk_bases=bases, slave_base=base, symbols=symbols)
             exercise(args, command, out, base, bases, symbols, meta)
             command('gdb', 'delete breakpoints')
@@ -120,7 +126,7 @@ def capture(args):
             if meta['quit'] != 'OK':
                 raise ValueError('F10 quit failed')
             meta['status'] = 'CAPTURED'
-            print(json.dumps(meta['modal'], indent=2), flush=True)
+            print(json.dumps(meta['input' if args.input else 'modal'], indent=2), flush=True)
             return
         if args.view:
             raw = dict(rear='5f', tv='4f', front='46', cockpit='4e')[args.view]
@@ -240,6 +246,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('out')
     parser.add_argument('--build', default='tmp/c2/build-verify')
+    parser.add_argument('--input', action='store_true', help='C4 native input acceptance probe')
     parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))
     parser.add_argument('--custom4', type=int, choices=(0,1,3,5,7), default=0)
     parser.add_argument('--ticks', type=int, default=100)

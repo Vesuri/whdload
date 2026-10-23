@@ -1673,3 +1673,54 @@ bitmap writes and 82284 blitter writes with no writes to the scanned bitmap. All
 nonzero pitch updates pass the sound formula, including four overrun and four short
 intervals. These are window-scoped publication/sound checks, not C5/C6 acceptance.
 The combined current-build record is `tmp/c3/acceptance.json`.
+
+
+### C4 input acceptance — short-press gate failed
+
+The C3 slave still uses the native input readers. Live h0+$3C94A calls h0+$64
+once per tick; h0+$3C950 calls the controller reader +$34D24 before control processing
+and simulation. Replay scans at +$3CC8E and then restores recorded control input at
++$3CC94. Picture-only repetitions do not scan input. Analog acquisition retains its
+VBL ownership described in A6.
+
+View commands use active-low masks and native edge latches h0+$3A915. For example,
+raw key `$4F` maps to bit 5 of h0+$1C. h0+$3C0D0–3C10C emits bit 5 of h1+$23E on
+a newly sampled press, suppresses it while held, and rearms the latch when a released
+state is sampled. The pause path reads the configured key h0+$3A90E through h2+$51C,
+waits for release at h0+$3B6E4, and waits for a new press at +$3B7BA. These are state
+checks, not queued events.
+
+The keyboard IRQ writes `$B3` on press at h2+$4CE and zero on release at +$4C4 to
+h2+$52A indexed by raw key. No pending-press record survives a completed release.
+Consequently a press and release between native scans can be missed. Retaining native
+sampling and requiring lossless one-shot presses need an explicit policy: buffer the
+one-shot events for native consumption, or accept the original short-press limitation.
+C4 is not complete pending that decision; no input patch has been installed.
+
+`tmp/c4/input-2/` captures the C3 VERIFY slave (`330662b72ba7c19d049a0eb68cb522cbe668e27470a9ccfd24df561465273b97`)
+on `a1200-fast`, PAL, `CUSTOM2=3`, `CUSTOM4=3`. It uses real harness key/joystick
+input and read-only breakpoints, with the existing 20-field batch-delay diagnostic.
+The probe anchors to completed tick 30; all serial values below are observations from
+this capture, never route anchors for another build or machine.
+
+- A held `$4F` command produces exactly one view event across five consecutive ticks,
+  including tick-only catch-up passes. The initial IRQ arrives after that tick's mask
+  scan, so the command correctly takes effect at the following scan. An initial probe
+  (`input-1`) incorrectly demanded an event before that scan; it remains INCOMPLETE.
+- The native controller reader records right stick as `$08` and release as `$00` on
+  successive catch-up ticks, with completed-tick counts 36 and 37.
+- A short `$4F` press is recorded by the IRQ at serial 339 and its release at 340,
+  both with 40 completed ticks. The next native scan and view consumer at serial 361
+  still have 40 completed ticks: the mask is all released and there is no view event.
+  This **fails** the no-lost-one-shot requirement. The event is lost in the native
+  state table, not in the harness, and is not an AmigaXDev profiling issue.
+- `tmp/c4/input-repeat/` repeats the configuration, route, layout and every saved
+  input snapshot exactly. Both captures finish and F10 quits with `OK`. The combined
+  result is `tmp/c4/acceptance.json`: exact repeat PASS, C4 acceptance FAIL.
+  `tools/c4_report.py` independently
+  verifies the saved state hashes, decoded masks/latches, consecutive ticks and event
+  result. A successful capture is deliberately distinguished from failed acceptance.
+
+Held pause behavior already has C3 modal evidence; exhaustive C4 pause, all view keys,
+replay/input and rapid-repeat acceptance remain open until the short-press policy is
+settled. No release bytes, clock cadence or shared tooling changed.

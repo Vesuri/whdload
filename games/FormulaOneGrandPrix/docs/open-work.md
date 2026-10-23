@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C3 complete; C4 next; B5/A8 gates remain open
+# Current status: C3 complete; C4 short-press gate failed; B5/A8 gates remain open
 
 | Work | Status |
 |---|---|
@@ -17,10 +17,15 @@ results and acceptance evidence are in [internals.md](internals.md).
 | C1 | Complete: elapsed-VBL clock design, whole native updates, PAL/NTSC integer schedules and checked accounting model. The C2 prototype now installs runtime hooks behind a developer option. |
 | C2 | Complete as a developer-only loop implementation: bounded whole ticks, separated painting, safe publication and checked sound timing. PAL/NTSC beam detection is user-approved. |
 | C3 | Complete: explicit modal suspension/rebase, replay and menu handoffs, native accelerated-time ownership, and checked PAL/NTSC/68000 routes. |
-| C4–G | Input acceptance, presentation, optimisation and release work remain open under the plan. |
+| C4 | Held view and per-tick joystick probes pass; a short one-shot press between scans is lost. Input policy decision needed before completion. |
+| C5–G | Real-time acceptance, presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: C4, validate native per-tick input and one-shot keys under catch-up.**
-The user selected C3 while shared work remains deferred. The clock design
+**Next F1GP step: resolve C4 short-press handling, then finish its input acceptance.**
+The user selected C4 while shared work remains deferred. A real key press/release during
+the forced batch delay is recorded by the keyboard IRQ but lost before the next scan.
+Held view keys and per-tick joystick sampling pass. Choose buffered one-shot events or
+explicit acceptance of the native short-press limitation; no input patch is installed.
+See [C4 evidence](internals.md#c4-input-acceptance--short-press-gate-failed). The clock design
 is in [Game time](internals.md#elapsed-vbl-world-clock-c1); it adds no CIA timer and
 allows no fractional simulation updates. Its host accounting checks pass for PAL/NTSC.
 B5/A8 are still incomplete; this work does not waive their measurement gates.

@@ -95,8 +95,9 @@ control fixes the 030 layout mismatch. Its 040/060 CPU timings remain unavailabl
 complete. The user has deferred shared-profiler fixes. See [open work](open-work.md).
 C1, the developer-only C2 loop and C3 modal boundaries are complete, without closing B5/A8.
 C2's selected-state/picture, publication, sound and disabled-feature checks are in internals;
-C3's modal ownership and rebase checks are recorded there too. C4 input is next, followed
-by C5/C6 acceptance. The C1 design records the native race-clock increment discrepancy that must be resolved before C5(a) acceptance.
+C3's modal ownership and rebase checks are recorded there too. C4's held-view and joystick
+probes pass, but a short press released between scans is lost in the native state table.
+C4 remains incomplete pending the one-shot buffering policy, followed by C5/C6 acceptance. The C1 design records the native race-clock increment discrepancy that must be resolved before C5(a) acceptance.
 The earlier startup deadlock is fixed; this is a distinct profiling limitation.
 
 B5/A7/A8 acceptance covers 68000, 68020, 68030, 68040 and 68060, with 030/040/060 MMU

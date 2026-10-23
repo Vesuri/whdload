@@ -730,3 +730,30 @@ python3 tools/c2_capture.py tmp/c3/steady --build tmp/c3/build-verify --custom4 
 python3 tools/c2_publication.py tmp/c3/steady tmp/c3/publication.json
 python3 tools/c2_sound.py tmp/c3/steady tmp/c3/sound.json
 ```
+
+
+### C4 input acceptance
+
+The C4 probe uses the current C3 build, with forced catch-up enabled. It injects real
+keyboard and joystick events and stops at native keyboard-IRQ stores, input returns
+and view-consumption returns. It never writes game memory. Use fresh capture names:
+
+```sh
+. amiga/env.sh
+make slave-verify OUT=tmp/c4/build-verify
+python3 tools/c2_capture.py tmp/c4/input --build tmp/c4/build-verify --input --custom4 3
+python3 tools/c2_capture.py tmp/c4/repeat --build tmp/c4/build-verify --input --custom4 3
+python3 tools/c4_report.py tmp/c4/input --repeat tmp/c4/repeat --out tmp/c4/report.json
+```
+
+`--input` requires Quick Race and `CUSTOM4=3`; it rejects other probe modes. Metadata
+records the build/runtime/input pins, layout, native route, snapshots and clean quit.
+The saved report checks the held-key edge against actual sampled masks, not the host
+injection time. The first tick may have scanned before the keyboard interrupt arrives.
+It also checks controller press/release and a full press/release between scans.
+`CAPTURED` means the experiment finished; `input.status=FAIL` means C4 acceptance failed.
+The reporter prints and saves that acceptance result without treating a reproduced game
+failure as a corrupt capture. Check the result, not merely its process exit status.
+
+Current evidence is a failed short-press gate; see internals. C4 has not yet changed
+input semantics or completed all input acceptance cases.
