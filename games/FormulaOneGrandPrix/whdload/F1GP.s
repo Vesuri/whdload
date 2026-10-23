@@ -40,7 +40,7 @@ slv_config
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
         dc.b 'C4:X:C2 diagnostic - 20 field delay per batch:1;'
-        dc.b 'C4:X:C2 diagnostic - retain catch-up raster work:2;'
+        dc.b 'C4:X:C2 diagnostic - retain native painting:2;'
         ENDC
         IFNE VERIFY
         dc.b 'C5:X:Verify pacer relay:0;'
@@ -411,7 +411,7 @@ c2_init
         add.l d0,(a0)+
         dbf d2,.target0
         move.l (c2_h2,pc),d0
-        moveq #7,d2
+        moveq #8,d2
 .target2
         add.l d0,(a0)+
         dbf d2,.target2
@@ -658,6 +658,19 @@ c2_pacer
         rts
 c2_publish
         bsr c2_drain
+        btst #2,(preference_options+3,pc)
+        bne.s .no_replay
+        move.w (c2_mode,pc),d0
+        cmpi.w #2,d0
+        bne.s .no_replay
+        ; The R is pure painting. Draw once per published replay picture,
+        ; including zero-tick pictures, never during intermediate catch-up ticks.
+        movem.l d0-a6,-(sp)
+        bsr c2_replay_paint
+        lea (c2_replay_pictures,pc),a0
+        addq.l #1,(a0)
+        movem.l (sp)+,d0-a6
+.no_replay
         movea.l (c2_h0,pc),a2
         adda.l #$124e,a2
         move.l 4(a2),(a2)
@@ -667,6 +680,19 @@ c2_publish
         rts
 c2_submit_call
         move.l (c2_submit,pc),-(sp)
+        rts
+c2_replay_paint
+        move.l (c2_native_replay_paint,pc),-(sp)
+        rts
+c2_replay_tick_paint
+        ; Same-build native-painting control; normal enhanced ticks do no R paint.
+        move.w sr,-(sp)
+        btst #2,(preference_options+3,pc)
+        beq.s .deferred
+        move.w (sp)+,ccr
+        bra.s c2_replay_paint
+.deferred
+        move.w (sp)+,ccr
         rts
 
 ; Replace MOVEA h0+$124A plus its following LEA 32000 with the owned
@@ -840,6 +866,7 @@ c2_lights_rest dc.l $1f782
 c2_hands_rest dc.l $1f856
 c2_queue_rest dc.l $1e6d4
 c2_native_scene dc.l $280f6
+c2_native_replay_paint dc.l $1dfb4
 c2_target_end
 c2_dry_passes dc.l 0
 c2_dry_scene dc.w 0
@@ -906,6 +933,7 @@ c2_stage_entry ds.b 23
 c2_stage_saved ds.b 23
         CNOP 0,4
 c2_repeat_pictures dc.l 0
+c2_replay_pictures dc.l 0
 c2_scene_ready dc.w 0
 
         CNOP 0,4
@@ -952,6 +980,9 @@ patch_582992
         PL_PS $3c9ba,c2_scene
         ; PERF_RANGE h0:3cce8 6 custom=2 bit=1 variant=582992
         PL_PS $3cce8,c2_scene
+        ; Replay R painting belongs to publication, not the world tick.
+        ; PERF_RANGE h0:3ccfa 6 custom=2 bit=1 variant=582992
+        PL_PS $3ccfa,c2_replay_tick_paint
         ; PERF_RANGE h0:1f392 6 custom=2 bit=1 variant=582992
         PL_P $1f392,c2_fill
         ; PERF_RANGE h0:147c 6 custom=2 bit=1 variant=582992

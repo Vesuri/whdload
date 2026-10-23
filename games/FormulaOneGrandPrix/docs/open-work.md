@@ -27,7 +27,10 @@ B5/A8 are still incomplete; this work does not waive their measurement gates.
 C2 remains open: complete the mixed HUD/embedded glyph painting split; validate
 full replay, view changes and A5 CPU/blitter buffer ownership; rerun current-build
 state comparisons after the remaining changes. Fresh prototype disabled-byte gates
-pass, including all 156 optional-byte mutation checks. Early PAL tick-160 probes matched all
+pass, including all 162 optional-byte mutation checks. The replay R now paints once per publication;
+a same-build replay tick-40 comparison passes selected authoritative state, and its
+50-field trace passes CPU/blitter ownership and cadence checks. The native-painting
+control correctly fails the R cadence check. Early PAL tick-160 probes matched all
 26 car records, clocks, camera and selected A3 side effects across normal and
 artificially delayed drawing. Those are selected-state checks, not C5 acceptance.
 The qualifying probe also completed and quit cleanly, but dropped substantial debt;

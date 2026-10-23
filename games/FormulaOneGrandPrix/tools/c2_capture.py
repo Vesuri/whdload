@@ -128,7 +128,8 @@ def capture(args):
         last, credit, rate, phase, batch, observed, consumed, dropped, ticks = values
         serial = struct.unpack_from('>I', state, symbols['c2_serial'])[0]
         counters = {name: struct.unpack_from('>I', state, symbols[name])[0]
-                    for name in ('c2_pictures','c2_dry_passes','c2_repeat_pictures')}
+                    for name in ('c2_pictures','c2_dry_passes','c2_repeat_pictures',
+                                 'c2_replay_pictures')}
         meta['rate_detection'] = {
             name: struct.unpack_from('>H', state, symbols[name])[0]
             for name in ('c2_native_rate', 'c2_beam_max')}
@@ -167,7 +168,7 @@ def capture(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('out')
-    parser.add_argument('--custom4', type=int, choices=(0,1,3,7), default=0)
+    parser.add_argument('--custom4', type=int, choices=(0,1,3,5,7), default=0)
     parser.add_argument('--ticks', type=int, default=100)
     parser.add_argument('--route', choices=('quickrace','qualifying','practice'), default='quickrace')
     parser.add_argument('--setup', choices=('a1200-fast','a1200','a500-1.5m'), default='a1200-fast')

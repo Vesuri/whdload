@@ -1400,7 +1400,10 @@ Each catch-up tick retains native camera evolution, geometry, visibility and the
 A3 renderer side effects. Raster leaf gates suppress fills, sprites, clearing,
 sky, cockpit sides, lights, hands and queued blits in the intermediate scene calls.
 This preserves the native visibility predicate for debris and the order of pit/RNG
-updates. The final tick paints normally. Between ticks, the renderer can repaint
+updates. The final tick paints normally. The replay R call at h0+$3CCFA is deferred to
+publication, where h2+$1DFB4 paints once per published replay picture, including
+zero-tick pictures. `CUSTOM4` bit 2 retains native painting as a same-build control.
+Between ticks, the renderer can repaint
 using staged entry values for the shared RNG, pit phases, debris latch, shake and
 mirror request, restoring their authoritative post-tick values afterwards. No input,
 camera evolution or HUD blink routine is repeated at picture rate. D's extrapolation
@@ -1429,13 +1432,32 @@ fields with zero dropped debt, and quit OK. These are bounded probes, not whole
 replay or C5 acceptance. The pacer-entry snapshot has one fewer *completed* tick
 because completion is counted inside the replacement pacer.
 
-The fresh disabled-feature suite `tmp/b4/c2-beam-acceptance.json` passes for release,
-developer, VERIFY-off and VERIFY-relay builds. All four retain eight native loop
-updates/draws/pacers in their 50-field controls and quit OK. Negative tests reject
-all 156 optional hook bytes independently, malformed inventories, stale metadata
-and an enabled relay disguised as off. This proves the disabled-range gate for the
-prototype, not C2's enabled behaviour. The tested VERIFY SHA-256 is
-`780ebe87a3be645fe10b0c6703a6a7932b0038d9bb39d0d4f68a54eb255529a0`;
+`replay-published` and `replay-native-paint` use the same build and hunk layout.
+At replay tick 40, all selected authoritative A3/A4 ranges match: 26 car records,
+view/source state, both RNGs, pit phases, debris latch, game clocks and camera/spring.
+Their shared 50-field route window has 12 publications. The enhanced arm executes
+12 R paints; the native-painting control executes seven. `c2_publication.py` accepts
+the enhanced arm and deliberately rejects the control's missing paints between
+publications. Both windows have one VBL callback per field, at most one publication
+per field, and no CPU or blitter writes to the buffer read by bitplane DMA. This is
+window-scoped evidence, not proof of all views, modal transitions or a whole replay.
+The earlier cross-build comparison did differ in car/view/gameplay-RNG state and
+is not used as equivalence evidence; startup timing must be controlled as in A1.
+
+The mixed HUD split is still required. In particular, h2+$1EFEC parses text control
+bytes and updates cursor state; h2+$1F07A prepares glyph coordinates and +$1F2AE
+advances the cursor after rasterisation. Skipping the whole text routine would lose
+these updates. Similarly h2+$1DDC0 consumes dirty-box state and +$1DEEC writes the
+UI reuse flag. Deferred painting must preserve the ordering of box clears/copies
+and glyph composition, including calls embedded in car updates. The replay-R fix
+does not complete those mixed paths.
+
+The current disabled-feature suite `tmp/b4/c2-overlay-acceptance.json` passes for
+release, developer, VERIFY-off and VERIFY-relay builds. All four retain eight native
+updates/draws/pacers in their 50-field controls and quit OK. Negative checks reject
+all 162 optional hook bytes independently, malformed inventories, stale metadata and
+an enabled relay disguised as off. The current VERIFY SHA-256 is
+`9958097355a0274176848a5707d6496d3ba1e951b5159088abe2b3a4f461df99`;
 the unchanged release SHA-256 is
 `93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`.
 

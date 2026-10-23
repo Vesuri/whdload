@@ -581,7 +581,8 @@ sound and publication alongside C3/C4 transitions and input handling.
 C2 is not accepted. Its current prototype is confined to developer/VERIFY builds
 and the supplied executable variant. `CUSTOM2` bit 1 enables the VBL clock; bit 0
 still controls caches. `CUSTOM4` bit 1 introduces a 20-field batch delay for tests;
-bit 2 retains native raster work during catch-up as a comparison control. These
+bit 2 retains native painting (catch-up raster work and tick-time replay R) as a
+comparison control. These
 bits do not enable a release feature or waive B5/A8/C5 gates.
 
 ```sh
@@ -609,3 +610,21 @@ and build/runtime. It is neither whole-program equivalence nor C5 acceptance.
 `--route qualifying` exercises pit animation; `--replay` is an experimental route.
 Optional profiles cover the 50 fields immediately after the route, not the final
 tick snapshot. Raw artifacts stay in ignored `tmp/`.
+
+The replay-overlay comparison uses one common build and changes only painting policy:
+
+```sh
+python3 tools/c2_capture.py tmp/c2/new-replay --replay --custom4 1 --ticks 40 --profile 50
+python3 tools/c2_capture.py tmp/c2/new-replay-control --replay --custom4 5 --ticks 40 --profile 50
+python3 tools/c2_compare.py tmp/c2/new-replay tmp/c2/new-replay-control tmp/c2/replay-state.json
+python3 tools/c2_publication.py tmp/c2/new-replay tmp/c2/replay-publication.json
+```
+
+`c2_publication.py` verifies capture hashes and checks each recorded field's actual
+bitplane DMA buffer against CPU and blitter-destination writes. It also requires
+one VBL callback per field, at most one submission per field and one R paint per
+complete publication interval in replay. It excludes partial intervals at trace
+edges and requires exercised CPU, blitter and publication paths. Running that
+cadence check on the native-painting replay control is expected to fail: the control
+paints R per tick, leaving some zero-tick publications without a repaint. This is an
+intentional negative control, not a successful enhanced-mode acceptance run.
