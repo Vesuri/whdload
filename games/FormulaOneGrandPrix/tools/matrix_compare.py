@@ -4,6 +4,7 @@ Usage: matrix_compare.py FIRST SECOND
 """
 import hashlib
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -15,6 +16,19 @@ def compare(first, second):
     for i, c in enumerate(captures):
         if c['status'] != 'CAPTURED' or c.get('quit') != 'OK':
             errors.append(f'capture {i}: incomplete or unclean quit')
+    for root, capture in zip(roots, captures):
+        if capture['build']['build'] != 'verify':
+            errors.append('VERIFY cache audit missing')
+            continue
+        logs = list(root.glob('.whdl*'))
+        text = '\n'.join(p.read_text(errors='replace') for p in logs if p.is_file())
+        values = re.findall(r'F1GP VERIFY CACR=([0-9a-fA-F]{8})', text)
+        cpu = capture['effective_cpu_report'][0]
+        mask = {68000: 0, 68020: 1, 68030: 0x101,
+                68040: 0x80008000, 68060: 0x80008000}[cpu]
+        expected = mask if capture['caches'] == 'on' else 0
+        if len(values) != 1 or int(values[0], 16) & mask != expected:
+            errors.append(f'cache-register audit failed: {root.name}')
     for key in ('machine', 'caches', 'command', 'setup', 'extra_args', 'whd_args',
                 'build', 'runtime', 'fields', 'effective_cpu_report'):
         if captures[0].get(key) != captures[1].get(key):
@@ -36,6 +50,12 @@ def compare(first, second):
     for key in keys:
         if data[0].get(key) != data[1].get(key):
             errors.append(f'different {name}: {key}')
+    if not clock:
+        from race_profile import StackReduction
+        profiles = [StackReduction.load(p/'profile.pkl.gz') for p in roots]
+        for key in ('fields', 'self', 'counts', 'stacks', 'events', 'tallied'):
+            if getattr(profiles[0], key) != getattr(profiles[1], key):
+                errors.append(f'different profile reduction: {key}')
     def images(root):
         return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                 for p in sorted(root.glob('*.png'))}
