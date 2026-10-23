@@ -559,3 +559,18 @@ where their measured fps happens to agree. The 030 allocation probes are diagnos
 `tmp/matrix-workers/prefs/tmp/a8-stable-prefs/`. The new build has its own hash,
 all-off acceptance in `tmp/b4/prefs-acceptance.json`, and C4-on MMU functional pairs in
 `tmp/a8-mmu-prefs/`. Do not relabel old A7 or B3 evidence as the new build.
+
+
+## World-clock design checks (C1)
+
+```sh
+python3 tools/test_world_clock.py
+```
+
+This host-only executable specification checks the integer elapsed-VBL schedule and
+accounting contract in [Game time](internals.md#elapsed-vbl-world-clock-c1). It uses no
+game assets, emulator, CIA timer or fractional simulation updates. Five tests pass
+for both PAL and NTSC, including counter wrap, debt cap and rebase. It does not install
+a clock hook or validate the future C2 assembly. C2 must add optional hook ranges to
+the disabled-byte gate and verify live callback counts, completed ticks, field debt,
+sound and publication alongside C3/C4 transitions and input handling.

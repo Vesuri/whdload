@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: A7 complete; B5 and A8 have unresolved gates
+# Current status: C1 design complete; C2 next; B5/A8 gates remain open
 
 | Work | Status |
 |---|---|
@@ -14,9 +14,16 @@ results and acceptance evidence are in [internals.md](internals.md).
 | A8 | A500/A1200/020/030 four-arm ceiling audits pass. A developer-only preference-notification control fixes the 030 allocation mismatch. Only 040/060 CPU timings remain unavailable. |
 | 68030 | B5/A7 measurements and A8 common-layout ceiling comparisons pass; no 030 item remains deferred. |
 | A4 | Complete: car/track/camera/view map, static view paths and 250 checked A3 camera-return snapshots. |
-| C–G | Simulation, presentation, optimisation and release work remain open under the plan. |
+| C1 | Complete: elapsed-VBL clock design, whole native updates, PAL/NTSC integer schedules and checked accounting model. No runtime hook installed. |
+| C2–G | Simulation implementation, presentation, optimisation and release work remain open under the plan. |
 
-**Next required step: restore 040/060 CPU profiling when shared work is resumed.**
+**Next F1GP step: C2, implementing the C1 elapsed-VBL clock and loop separation.**
+The user explicitly selected C1 while shared work remains deferred. The clock design
+is in [Game time](internals.md#elapsed-vbl-world-clock-c1); it adds no CIA timer and
+allows no fractional simulation updates. Its host accounting checks pass for PAL/NTSC.
+B5/A8 are still incomplete; this design does not waive their measurement gates.
+
+**Shared dependency: restore 040/060 CPU profiling when shared work is resumed.**
 All currently measurable F1GP B5/A7/A8 cells and the 030 allocation fix are complete.
 The 030 difference arose during the loader's notification-enabled `SetPrefs` call.
 Developer-only `CUSTOM4=1` suppresses notification in every ceiling arm, preserving
@@ -31,8 +38,8 @@ recapture the affected B5/A7/A8 controls; do not relabel the current evidence. T
 session changed no AmigaXDev files.
 
 A4 is now complete; its state map is in [internals](internals.md#state-map-a4).
-After those acceptance gaps are resolved, proceed to **C1–C6** (real-time ticks), then
-**D1–D10** (presentation), following the plan. Caches remain opt-in while B5
+Continue with **C2–C6** (real-time ticks), then **D1–D10** (presentation), following
+the plan and retaining the unresolved B5/A8 gates. Caches remain opt-in while B5
 is open. No real-time simulation or extrapolation patches are enabled.
 
 Measurement controls now enforced:
@@ -53,6 +60,11 @@ Current results: [A7 matrix](internals.md#a7-machine-matrix--gate-passed-with-ex
 All derived artifacts remain in ignored `tmp/`. No remote is configured; commits are local.
 
 Important constraints for C:
+
+- C1 schedules exactly eight native updates per 50/60 fields. The measured native
+  race-clock increment implies a 1.03076 ratio at 8 Hz, outside C5(a)'s ±1% target.
+  Resolve the clock calibration/acceptance interpretation before claiming C5(a);
+  do not silently alter physics or the requested update cadence.
 
 - Pit-animation counters, shared RNG/camera shake and visible-car debris expiry are
   drawing side effects that must retain native tick cadence and predicates.

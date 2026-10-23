@@ -1257,6 +1257,119 @@ displayed frame (AmigaXDev `docs/playbooks/fixed-time-simulation.md`); slower ma
 need it to keep game time at real time.
 
 
+### Elapsed-VBL world clock (C1)
+
+**C1 is complete as a design.** The user selected elapsed vertical blanks for the
+8 Hz world updates: no new CIA timer, no fractional physics updates and no scaling
+of the native physics step. C2 installs the clock and separates the loops; no clock
+hook or changed slave is part of C1. B5/A8's shared-profiler dependency remains open.
+
+#### Source and ownership
+
+Use a slave-owned, aligned unsigned 32-bit `field_serial`, incremented once in the
+existing game VBL callback h0+$2CC38, beside the native increment at +$2CC3C. Preserve
+that increment and all existing interrupt work. Count VBL callbacks only, not entries
+to the shared level-3 dispatcher (which also handles copper and blitter interrupts).
+Do not install another interrupt source or program CIA timer/TOD registers. Existing
+keyboard handshake hardware remains under its native ownership.
+
+The ISR is the only writer of `field_serial`; main code samples it with one aligned
+`MOVE.L` instruction. Interrupts are taken between instructions, so the 68000's two
+word bus transfers do not require a pair of separately interruptible word reads.
+The future hook must preserve registers and CCR and retain the original callback's
+return convention. The serial is never cleared by the pacer, keyboard or world-clock
+rebase. Both h0+$128C and h2+$222 clear h0+$125E, so that native word cannot supply
+lossless elapsed time; h0+$1260 counts frames, not fields.
+
+At each active-world epoch, read h2+$2A650 as the native pacer does at h0+$12AA:
+**60 selects NTSC (F = 60); otherwise select PAL (F = 50)**. Record the raw word in
+VERIFY. Do not infer the rate from CPU type, host time or measured rendering speed.
+A display-mode change requires a new epoch. This follows the game's nominal field
+rate, not a claim that physical PAL/NTSC fields are exactly 50/60 Hz.
+
+#### Whole-field schedule
+
+Keep an integer field credit and a small interval-table index. The repeating intervals
+are PAL **7, 6, 6, 6** and NTSC **8, 7**. Starting with no credit at epoch field zero:
+
+| Mode | First eight update deadlines, in elapsed VBLs |
+|---|---|
+| PAL | 7, 13, 19, 25, 32, 38, 44, 50 |
+| NTSC | 8, 15, 23, 30, 38, 45, 53, 60 |
+
+After E fields, the total updates due are `floor(8 * E / F)` if no time was dropped
+or rebased. This formula is an independent check, not a required runtime multiply
+or division. Each deadline runs one entire native update with unchanged constants.
+There is no partial simulation step between deadlines. The PAL table is a rotation
+of the native pacer's 6,6,6,7 table; starting with the longer interval ensures the first
+update is not early. Do not run an extra free update on epoch entry. C2 must place the
+epoch before the first scheduled update, using an already prepared scene if needed.
+
+Main-code state consists of `last_serial` (32 bits), `field_credit` (0..F), `phase`
+(table index), and VERIFY counters for observed, consumed, dropped and rebased fields
+and completed ticks. The interrupt does no scheduling or simulation work.
+
+1. Sample `now` once. Calculate unsigned `elapsed = (now - last_serial) mod 2^32`,
+   then set `last_serial = now`. Re-reading the same serial adds zero.
+2. Accept at most `F - field_credit` new fields, logging the rest as dropped debt.
+   Compare elapsed with that free space **before** adding, to avoid 32-bit overflow.
+   Retain the current table phase. The one-second cap includes partial credit and
+   whole updates still owed, rather than allowing one second plus an extra remainder.
+3. While credit covers the next interval, subtract that interval, run one complete
+   tick in native order and advance the table index. Stop after four ticks per batch.
+   Retain credit and phase across batches and pictures; finishing a picture does not
+   reset either. Count a completed tick only after all its authoritative work finishes.
+4. Observe the serial again at the next scheduling boundary. VBLs during simulation,
+   rendering or publication waits accrue exactly once; do not replace `last_serial`
+   with the tick-exit or draw-exit field without first accounting for that interval.
+
+Within an epoch, `observed fields = consumed interval fields + field_credit + dropped
+fields`. Without drops, once all due work has run, credit is less than the next
+interval. A four-tick batch limit never silently discards the rest. Drops are recovery
+from overload, not successful real-time operation. C2 retains its draw/publication
+rule after each bounded batch; C6 measures whether slow machines can sustain the work.
+
+Unsigned subtraction handles serial wrap provided observations are less than 2^32
+active callbacks apart (over two years at either nominal rate). Main code never
+resets the serial to manage wrap. Long inactive periods and handler/display ownership
+changes require rebasing instead of interpreting their difference as race time.
+A rebase samples the current serial, clears credit and phase, and starts with zero
+ticks due. VERIFY closes the old epoch with its residual credit and records the reason
+and excluded interval where observable, rather than hiding it in overload counts.
+C3 determines the actual pause/menu/loading/replay boundaries; a scripted sequence
+that natively advances the world must keep ticking. This clock must not independently
+step the reconstruction paths at h0+$3CA5A / +$3CB82.
+
+#### Interfaces and limits
+
+C2 must stop the old pacer wait from also controlling enhanced loops while preserving
+native consumers of h0+$125A/+125C. These words remain sound timing inputs, never the
+new scheduler's debt or fractional remainder. The sound path at h0+$36288 uses
+`minimum / max(minimum, measured fields)`; catch-up execution and zero-field spacing
+need an explicit sound-duration policy and validation in C2. The per-field sound ISR
+continues unchanged by this design. A5's buffer-retirement rule uses `field_serial`
+for publication, independently of whether a world update was due. D may later use
+field timestamps for presentation-only prediction; C1 introduces no predicted state.
+
+There is a pre-existing acceptance discrepancy: A7 measures a native race-clock
+increment of **128.84521484375 ms per update**. Eight unchanged updates therefore
+advance that clock by **1.03076171875 seconds per nominal real second**, outside
+C5(a)'s 1.00 ± 1% requirement. The earlier 128-ms estimate was approximate. C1 preserves
+the requested 8 Hz cadence and native updates; it does not silently change race-clock
+constants, physics or cadence to force that gate to pass. Resolve the race-clock
+calibration/acceptance interpretation before claiming C5(a), keeping the world-tick
+rate and the displayed race-clock ratio as separate measurements.
+
+Validation: `tools/test_world_clock.py` is a host executable specification, not game
+code. Its five checks cover every field over 100 nominal seconds on PAL and NTSC,
+irregular observations, unsigned wrap, repeated reads, fields arriving during work,
+partial credit at the one-second cap, four-tick batches and epoch rebasing. The
+independent due-count oracle is `floor(8 * E / F)`. All five pass. Static inspection
+of the pinned game confirms the field-rate read, native counter increment/reset and
+sound consumers; local disassembly is retained in `tmp/c1/clock-paths.txt`. No emulator
+run, live hook validation, speed measurement or NTSC gameplay acceptance is claimed.
+
+
 ## Current measurements
 
 `a1200-fast` (68020, 8 MB fast RAM, PAL), three 500-field windows (10 s each) from the

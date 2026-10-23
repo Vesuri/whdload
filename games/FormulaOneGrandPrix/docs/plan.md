@@ -93,6 +93,9 @@ and whole-race captures repeat exactly. B5's functional races pass, but its 040/
 work gains remain unavailable. A8 has accepted A500/A1200/020/030 ceilings; a developer-only startup notification
 control fixes the 030 layout mismatch. Its 040/060 CPU timings remain unavailable. Neither B5 nor A8 is
 complete. The user has deferred shared-profiler fixes. See [open work](open-work.md).
+C1 is complete as an elapsed-VBL, whole-update clock design; C2 implementation is next
+by the user's explicit scope, without closing B5/A8. The C1 design records the native
+race-clock increment discrepancy that must be resolved before C5(a) acceptance.
 The earlier startup deadlock is fixed; this is a distinct profiling limitation.
 
 B5/A7/A8 acceptance covers 68000, 68020, 68030, 68040 and 68060, with 030/040/060 MMU
@@ -205,7 +208,8 @@ recorded per CPU (68020: −12% work measured).
 **C1 Clock.** Owe 8 ticks per 50 fields on PAL and per 60 on NTSC (detect the field rate
 as the game does, with its chip word compared with 60). Take fields from the game's own
 interrupt counter or a slave-owned one in the same handler. Write the design in internals
-"Game time".
+"Game time". Use only whole updates and integer VBL accounting; no new CIA timer
+or fractional simulation steps. C1 is a design output; hook installation belongs to C2.
 
 **C2 Loop.** Replace the pacer call in each live loop (`A2`) with: add the elapsed fields;
 run due ticks (the simulation calls of `A3`, in native order) up to 4 per batch; drop debt
