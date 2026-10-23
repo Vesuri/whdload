@@ -85,7 +85,7 @@ game time). Times are emulated.
 ## Current validation scope
 
 Current status: B1–B4 and A1/A2/A3/A5/A6 are complete. B5 has not passed. A7 is
-incomplete. A8 has not started. The 030/040 startup deadlock is fixed in the shared
+incomplete. A8 developer gates and all-off checks pass; ceiling collection is in progress. The 030/040 startup deadlock is fixed in the shared
 emulator ([evidence](internals.md#startup-failures-cause-and-fix-68030-68040)), and
 030/040/060 runs repeat exactly under deterministic mode.
 

@@ -34,6 +34,10 @@ slv_info dc.b 'Reconstructed loader',10,'Original install by Codetapper/Action!'
 slv_config
         dc.b 'C1:B:Skip intro;'
         dc.b 'C2:X:Enable CPU caches:0;'
+        IFNE DEVELOPER
+        dc.b 'C3:X:Ceiling - no pacer wait:0;'
+        dc.b 'C3:X:Ceiling - no polygon fill:1;'
+        ENDC
         IFNE VERIFY
         dc.b 'C5:X:Verify pacer relay:0;'
         ENDC
@@ -81,7 +85,8 @@ _bootdos
         jsr (_LVOOldOpenLibrary,a6)
         move.l d0,a6
         move.l a0,-(sp)       ; retain original DOS entry stack convention
-        ; The old loader's CPU mask leaves both caches disabled.
+        ; Original policy: BaseMem NC, ExpMem/Slave CB. Without an MMU
+        ; this disables caches globally; with MMU, Fast regions remain cacheable.
         move.l #$3b3d,d0
         move.l #$7f3f,d1
         jsr (resload_SetCPU,a2)
@@ -274,6 +279,17 @@ patch_582992
         PL_L $a7a42,'save'
         PL_W $a7a46,$7300
         ; BASELINE_PATCHES_END
+        IFNE DEVELOPER
+        PL_IFC3X 0
+        ; PERF_RANGE h0:1288 4 custom=3 bit=0 variant=582992
+        PL_NOP $1288,4
+        PL_ENDIF
+        PL_IFC3X 1
+        ; Polygon edge walk and four-plane span fill; measurement only.
+        ; PERF_RANGE h0:1f388 2 custom=3 bit=1 variant=582992
+        PL_R $1f388
+        PL_ENDIF
+        ENDC
         IFNE VERIFY
         PL_IFC5X 0
         ; PERF_RANGE h0:3c9d2 6 custom=5 bit=0 variant=582992

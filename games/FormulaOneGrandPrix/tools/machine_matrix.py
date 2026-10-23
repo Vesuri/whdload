@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Serial, fresh-boot B5/A7/A8 captures; outputs are immutable below tmp/.
-Source amiga/env.sh. Usage: machine_matrix.py MACHINE on|off clock|green|tow|follow OUT [FIELDS]
+Source amiga/env.sh. Usage: machine_matrix.py MACHINE on|off clock|green|tow|follow|all OUT [FIELDS]
 MMU cells are functional only; fixed-clock cells explicitly select cycle-exact cores.
 """
 import hashlib
@@ -47,7 +47,14 @@ def capture(machine, caches, command, destination, fields=100):
     setup, extra, mmu = MACHINES[machine]
     # Keep host mouse activity from auto-switching a disabled capture port.
     extra = (extra + ' --joystick_port_0_autoswitch=0').strip()
-    if caches not in ('on', 'off') or command not in ('clock', 'green', 'tow', 'follow'):
+    custom3 = int(os.environ.get('MATRIX_CUSTOM3', '0'), 0)
+    instant = os.environ.get('MATRIX_INSTANT_BLITTER', '0')
+    anchor_method = os.environ.get('RACE_ANCHOR', 'screen')
+    if custom3 < 0 or custom3 & ~3 or instant not in ('0', '1'):
+        raise ValueError('invalid developer ceiling options')
+    if instant == '1':
+        extra += ' --uae_immediate_blits=true --uae_waiting_blits=false'
+    if caches not in ('on', 'off') or command not in ('clock', 'green', 'tow', 'follow', 'all'):
         raise ValueError('invalid cache/command selection')
     out = Path(destination).resolve()
     if not out.is_relative_to(ROOT/'tmp'):
@@ -56,6 +63,9 @@ def capture(machine, caches, command, destination, fields=100):
     build = json.loads((slave.parent/'build.json').read_text())
     if build['slave_sha256'] != sha(slave) or build['source_sha256'] != sha(ROOT/'whdload/F1GP.s'):
         raise ValueError('stale build')
+    if custom3 or instant == '1':
+        if build['build'] not in ('developer', 'verify') or command != 'green' or anchor_method != 'start-state':
+            raise ValueError('ceiling options require a developer/VERIFY green start-state capture')
     sock = ROOT/'amiga/.run/f1gp.sock'
     if sock.exists():
         s = socket.socket(socket.AF_UNIX)
@@ -69,17 +79,19 @@ def capture(machine, caches, command, destination, fields=100):
         finally:
             s.close()
     out.mkdir(parents=True, exist_ok=False)
-    args = f'CUSTOM1=0 CUSTOM2={int(caches == "on")} CUSTOM3=0 CUSTOM4=0 CUSTOM5=0 {mmu}'
+    args = f'CUSTOM1=0 CUSTOM2={int(caches == "on")} CUSTOM3={custom3} CUSTOM4=0 CUSTOM5=0 {mmu}'
+    if caches == 'off':
+        args += ' NoCache'
     if build['build'] == 'verify':
         args += ' FileLog'
     env = dict(os.environ, AMIGA_SETUP=setup, EXTRA_ARGS=extra, WHD_ARGS=args,
                SLAVE=str(slave), WARP='1', DETERMINISTIC='1', JOY0='none', JOY1='none',
-               RACE_LEADS='0,0,0', VERIFY_EXIT='1', FSUAE=os.environ['FSUAE_ARM'])
+               RACE_LEADS='0,0,0', RACE_ANCHOR=anchor_method, VERIFY_EXIT='1', FSUAE=os.environ['FSUAE_ARM'])
     for key in ('ROUTE_SHOTS', 'RACE_KEEP_TRACES', 'CPU', 'FAST_KB', 'SLOW_KB', 'CHIP_KB'):
         env.pop(key, None)
     meta = dict(status='INCOMPLETE', machine=machine, caches=caches, command=command,
                 setup=setup, extra_args=extra, whd_args=args, build=build, runtime=pins,
-                fields=fields, tools={p.name: sha(p) for p in (ROOT/'tools').glob('*.py')})
+                fields=fields, custom3=custom3, instant_blitter=instant, anchor_method=anchor_method, tools={p.name: sha(p) for p in (ROOT/'tools').glob('*.py')})
     (out/'capture.json').write_text(json.dumps(meta, indent=2)+'\n')
     shutil.copy(slave, out/'slave.bin')
     log = out/'serve.log'

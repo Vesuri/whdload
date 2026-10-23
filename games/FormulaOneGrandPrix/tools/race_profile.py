@@ -143,13 +143,15 @@ def viewing_driver(f1gp, picture):
 def raceprofile(server, g, rest):
     import f1gp
     args = rest.split()
-    if len(args) not in (2, 3) or args[0] not in ('green', 'tow', 'follow'):
-        return 'usage: raceprofile green|tow|follow DIR [FIELDS]'
+    if len(args) not in (2, 3) or args[0] not in ('green', 'tow', 'follow', 'all'):
+        return 'usage: raceprofile green|tow|follow|all DIR [FIELDS]'
     phase, out = args[0], os.path.abspath(args[1])
     fields = int(args[2]) if len(args) == 3 else 500
     os.makedirs(out, exist_ok=True)
     leads = tuple(int(n) for n in os.environ['RACE_LEADS'].split(',')) \
         if os.environ.get('RACE_LEADS') else LEADS
+    if phase == 'all' and any(leads):
+        raise ValueError('all-window captures require RACE_LEADS=0,0,0')
     route = f1gp.quickrace(server, g, '')
     anchors, elapsed = {}, 0
 
@@ -170,15 +172,56 @@ def raceprofile(server, g, rest):
                 return image
         raise TimeoutError(f'no {name} within {POLL_LIMIT} polls')
 
-    anchor('green', leads[0], lambda im: f1gp.showing(im, 'green'))
-    if phase in ('tow', 'follow'):
+    anchor_method = os.environ.get('RACE_ANCHOR', 'screen')
+    if anchor_method == 'start-state':
+        if phase != 'green':
+            raise ValueError('start-state anchor supports only the green ceiling window')
+        from race_clock import find_hunk0
+        h0 = find_hunk0(server, g)
+        # Native transition to start-light state $82. Break only before the window;
+        # unlike visible lights, this event survives the no-polygon-fill arm.
+        reply = server.handle(g, f'until {h0 + 0x3b4fa:#x}')
+        if 'Breakpoint' not in reply or f'{h0 + 0x3b4fa:08x}' not in reply.lower():
+            raise RuntimeError(f'start-state breakpoint did not hit: {reply}')
+        picture = f1gp.screenshot(server, g)
+        picture.save(os.path.join(out, 'anchor-green.png'))
+        anchors['green'] = 'h0+3b4fa; next full field'
+    elif anchor_method == 'screen':
+        anchor('green', leads[0], lambda im: f1gp.showing(im, 'green'))
+    else:
+        raise ValueError('unknown RACE_ANCHOR')
+    def save_window(name):
+        nonlocal elapsed
+        dest = os.path.join(out, name)
+        os.makedirs(dest, exist_ok=True)
+        profile_window(server, g, name, dest, fields, route, leads, dict(anchors))
+        elapsed += fields
+
+    if phase == 'all':
+        save_window('green')
+    if phase in ('tow', 'follow', 'all'):
         tow_image = anchor('tow', leads[1], lambda im: not cockpit(f1gp, im))
-    if phase == 'follow':
+    if phase == 'all':
+        save_window('tow')
+    if phase in ('follow', 'all'):
         tow_driver = viewing_driver(f1gp, tow_image)
         if tow_driver is None:
             raise RuntimeError('tow anchor has no driver banner; cannot establish follow transition')
         anchor('follow', leads[2], lambda im: viewing_driver(f1gp, im) not in (None, tow_driver))
 
+    if phase == 'all':
+        save_window('follow')
+        meta = dict(phase='all', fields=fields, setup=os.environ.get('AMIGA_SETUP', ''),
+                    leads=leads, anchors=anchors, route=route,
+                    windows={name: json.load(open(os.path.join(out, name, 'meta.json')))
+                             for name in ('green', 'tow', 'follow')})
+        json.dump(meta, open(os.path.join(out, 'meta.json'), 'w'), indent=1)
+        return f'all: anchors {anchors}; {fields} fields per window in {out}'
+    return profile_window(server, g, phase, out, fields, route, leads, anchors, anchor_method)
+
+
+def profile_window(server, g, phase, out, fields, route, leads, anchors, anchor_method="screen"):
+    """Capture one already anchored window; no breakpoint or register read inside it."""
     setup = os.environ.get('AMIGA_SETUP', '')
     fast_kb = FAST_KB.get(setup, int(os.environ.get('FAST_KB') or 0))
     if fast_kb:
@@ -220,7 +263,7 @@ def raceprofile(server, g, rest):
     red.save(os.path.join(out, 'profile.pkl.gz'))
     meta = dict(phase=phase, fields=fields, chunk=CHUNK, setup=setup, fast_kb=fast_kb,
                 leads=leads, anchors=anchors, route=route, shot_digests=digests,
-                hunk_bases=hunk_bases,
+                hunk_bases=hunk_bases, anchor_method=anchor_method,
                 fsuae=os.environ.get('FSUAE'), whd_args=os.environ.get('WHD_ARGS', ''))
     json.dump(meta, open(os.path.join(out, 'meta.json'), 'w'), indent=1)
     return f'{phase}: anchors {anchors} (fields after the quickrace stop); {fields} fields in {out}'

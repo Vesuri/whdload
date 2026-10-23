@@ -25,12 +25,15 @@ def compare(first, second):
         values = re.findall(r'F1GP VERIFY CACR=([0-9a-fA-F]{8})', text)
         cpu = capture['effective_cpu_report'][0]
         mask = {68000: 0, 68020: 1, 68030: 0x101,
-                68040: 0x80008000, 68060: 0x80008000}[cpu]
+                68040: 0x80008000, 68060: 0xa0008000}[cpu]
         expected = mask if capture['caches'] == 'on' else 0
+        if capture['caches'] == 'off' and 'NoCache' not in capture['whd_args'].split():
+            errors.append(f'uncached control lacks NoCache: {root.name}')
         if len(values) != 1 or int(values[0], 16) & mask != expected:
             errors.append(f'cache-register audit failed: {root.name}')
     for key in ('machine', 'caches', 'command', 'setup', 'extra_args', 'whd_args',
-                'build', 'runtime', 'fields', 'effective_cpu_report'):
+                'build', 'runtime', 'fields', 'effective_cpu_report',
+                'custom3', 'instant_blitter', 'anchor_method'):
         if captures[0].get(key) != captures[1].get(key):
             errors.append(f'different {key}')
     clock = captures[0]['command'] == 'clock'
@@ -44,7 +47,7 @@ def compare(first, second):
     name = 'samples.json' if clock else 'meta.json'
     data = [json.loads((p/name).read_text()) for p in roots]
     keys = ('status', 'setup', 'hunk_bases', 'route', 'green', 'results', 'samples') if clock else (
-        'phase', 'fields', 'setup', 'fast_kb', 'leads', 'anchors', 'route', 'shot_digests', 'hunk_bases')
+        'phase', 'fields', 'setup', 'fast_kb', 'leads', 'anchors', 'route', 'shot_digests', 'hunk_bases', 'windows')
     if clock and any(d.get('status') != 'COMPLETE' for d in data):
         errors.append('whole race not complete')
     for key in keys:
@@ -52,13 +55,15 @@ def compare(first, second):
             errors.append(f'different {name}: {key}')
     if not clock:
         from race_profile import StackReduction
-        profiles = [StackReduction.load(p/'profile.pkl.gz') for p in roots]
-        for key in ('fields', 'self', 'counts', 'stacks', 'events', 'tallied'):
-            if getattr(profiles[0], key) != getattr(profiles[1], key):
-                errors.append(f'different profile reduction: {key}')
+        windows = ('green', 'tow', 'follow') if captures[0]['command'] == 'all' else ('',)
+        for window in windows:
+            profiles = [StackReduction.load(p/window/'profile.pkl.gz') for p in roots]
+            for key in ('fields', 'self', 'counts', 'stacks', 'events', 'tallied'):
+                if getattr(profiles[0], key) != getattr(profiles[1], key):
+                    errors.append(f'different profile reduction: {window}/{key}')
     def images(root):
-        return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                for p in sorted(root.glob('*.png'))}
+        return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in sorted(root.rglob('*.png'))}
     shots = [images(p) for p in roots]
     if not shots[0] or shots[0] != shots[1]:
         errors.append('different or missing screenshots')

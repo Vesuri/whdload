@@ -398,7 +398,7 @@ python3 tools/machine_matrix.py 020 off green tmp/a7/020-off-green 100
 ```
 
 The serial runner accepts machines `a500`, `a1200`, `020`, `030`, `030-mmu`, `040`,
-`040-mmu`, `060`, `060-mmu`; cache policy `on|off`; and `clock|green|tow|follow`.
+`040-mmu`, `060`, `060-mmu`; cache policy `on|off`; and `clock|green|tow|follow|all`.
 It defaults to the VERIFY slave; `MATRIX_SLAVE` selects another built variant.
 It checks the game, runtime and build hashes before boot, rejects active sockets and
 existing output directories, removes stale sockets, and waits for the new server's
@@ -413,8 +413,7 @@ without an FPU). The pinned shared launcher refuses unknown CPU names such as
 only a traceback; run `amiga/run.sh` with the same variables to see the message. The
 runner also rejects effective-CPU/MMU mismatches before advancing the route. The 040/060 timing cells explicitly select the non-MMU, cycle-exact cores.
 MMU cells are functional tests, not fixed-clock speed claims. Check effective emulator
-settings in the retained debug log before using measurements. No post-B5 timing claims
-have been established by this runner.
+settings in the retained debug log before using measurements. 040/060 results describe the emulator model, not real accelerator timing.
 
 Local input field commands now allow 1800 seconds by default (`F1GP_FIELD_TIMEOUT`
 overrides it); this does not repair an emulator semaphore wait. Screenshot collection
@@ -428,8 +427,8 @@ is not an accepted run.
 All uncalibrated profiles request `RACE_LEADS=0,0,0`. The follow anchor now requires
 an actual change in the yellow driver name inside the Viewing banner. It records the tow
 name and rejects that same banner, scene motion below it, and incomplete banners. This
-predicate passes tests against three retained tow/follow capture sets; a fresh zero-lead
-repeat is still required before accepting new A7 follow cells. Existing B3/A3 calibrated
+predicate passes tests against retained tow/follow sets and a fresh 030 zero-lead
+repeat. Existing B3/A3 calibrated
 evidence remains tied to its original capture tools.
 
 `race_profile.py` uses the shared checked profile writer, retains all four hunk bases and
@@ -457,3 +456,25 @@ The comparator requires completed captures, clean quit, matching configuration/b
 and capture-dependency hashes, all clock samples (or profile anchors/digests), actual hunk
 layout and every retained PNG. It does not mask pointer pixels. The matrix runner explicitly
 disables automatic mouse switching as well as setting both joystick sources to `none`.
+
+For a fully uncached control the runner appends `NoCache`, including MMU cells. All
+CUSTOM bits zero alone preserve the original policy, which can cache Fast RAM under
+an MMU. `matrix_compare.py` requires the override for off arms and audits CACR.
+Use `all` for green/tow/follow in one boot with zero leads; reduce each child window
+with `matrix_report.py`. Repeat comparisons include all child profiles and PNGs.
+
+For A8 use the same current VERIFY build for every arm:
+
+```sh
+RACE_ANCHOR=start-state python3 tools/machine_matrix.py 020 on green tmp/a8/control 100
+RACE_ANCHOR=start-state MATRIX_CUSTOM3=1 python3 tools/machine_matrix.py 020 on green tmp/a8/no-wait 100
+RACE_ANCHOR=start-state MATRIX_CUSTOM3=3 python3 tools/machine_matrix.py 020 on green tmp/a8/no-fill 100
+RACE_ANCHOR=start-state MATRIX_CUSTOM3=1 MATRIX_INSTANT_BLITTER=1 python3 tools/machine_matrix.py 020 on green tmp/a8/instant 100
+python3 tools/test_disabled.py tmp/b4/a8-verify-off tmp/b4/a8-verify-on
+```
+
+Each arm needs a fresh repeat, effective-config review, original-versus-enabled hook
+byte checks and clean quit. `start-state` selects the native start transition, removes
+the breakpoint, and advances to a complete field before profiling. It accepts only
+the green ceiling window. The instant arm requests `immediate_blits=true` and
+`waiting_blits=false`; inspect `debug.uae` rather than trusting the requested options.

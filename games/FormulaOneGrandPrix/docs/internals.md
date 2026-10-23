@@ -292,11 +292,76 @@ per-scene gain measurement.
 
 **Gate: not passed.** The 030/040 startup stalls were an emulator deadlock, now fixed
 (next section). All six 030/040/060 setups start with caches on and repeat exactly under
-deterministic mode. No whole race or matched gain has been measured on any of them, A7's
-paired matrix is incomplete, and A8 has not started. Disabling data-cache emulation is
+deterministic mode. Whole-race pairs now pass on all six 030/040/060 setups (see below).
+Matched gains and A7's full paired matrix remain incomplete; A8 gates are implemented
+and ceiling collection is in progress. Disabling data-cache emulation is
 not an accepted substitute. AmigaXDev TOOL2 (the launcher refuses unknown CPU names) and
 TOOL3 (failed captures leave no image or trace) are also fixed and installed. F1GP's
 runner keeps its own effective-CPU and fresh-trace checks as extra guards.
+
+### Current B5/A7 validation
+
+The current emulator is pinned by `manifest/runtime-inputs.json`; its SHA-256 is
+`950f14c966ba852372d382dec8e40544f1c49184eb9f2c24e901f352ecd9b048`.
+It retains TOOL1 and adds the shared window-title change. Earlier evidence keeps its
+original hashes. Mouse auto-switching is explicitly disabled for new captures.
+
+Cache-on whole-race pairs reach results, agree on every retained screenshot and clock
+sample, and quit with F10 OK on all six 030/040/060 setups. Evidence:
+
+| Machine | Pair under `tmp/` | Result field after cockpit route | PNGs per run |
+|---|---|---:|---:|
+| 030 non-MMU | `b5-final/030-on-clock-d`, `-e` | 19296 | 99 |
+| 040 non-MMU | `b5-final/040-on-clock-a`, `matrix-clocks/040-on-b` | 18693 | 97 |
+| 060 non-MMU | `matrix-clocks/060-on-a`, `-b` | 20502 | 105 |
+| 030 MMU | `matrix-clocks/030-mmu-on-a`, `-b` | 21708 | 111 |
+| 040 MMU | `matrix-workers/040-mmu/tmp/clocks/040-mmu-on-a`, `-b` | 18492 | 96 |
+| 060 MMU | `matrix-workers/060-mmu/tmp/clocks/060-mmu-on-a`, `-b` | 21507 | 110 |
+
+**Cache-off controls require `NoCache`.** The original `$3B3D` CPU request under mask
+`$7F3F` specifies noncacheable BaseMem and copyback ExpMem/Slave. Without an MMU it
+switches caches off globally; with an MMU Fast regions remain cacheable. Thus all bits
+off preserve the original policy, but are not a fully uncached MMU control. The matrix
+now adds WHDLoad `NoCache` to every off arm and audits CACR, including the 060 branch
+cache. Earlier off captures without this override are reference only. Fresh explicit
+NoCache whole-race pairs pass on all three MMU CPUs under each worker's
+`tmp/nocache-clocks/`; on/off are distinct deterministic races, never expected to be
+pixel twins. The abandoned old 030-MMU off capture was intentionally stopped after
+this control error was identified; it is not a game failure.
+
+The corrected zero-lead follow predicate passes a fresh 030 cache-on pair in
+`tmp/matrix-workers/profiles/tmp/a7/030-on-follow-a` and `-b`: green at 850, tow at
+3219 (Mansell), follow at 3688 (Alesi). All six PNGs and semantic profile reductions
+match. The new `all` capture collects 100 fields at each of these three independently
+recognized anchors in one race and includes the timed fields in its anchor accounting.
+This is a new capture protocol, not a relabelled B3 baseline.
+
+### A8 developer ceiling gates — measurements in progress
+
+Developer and VERIFY builds expose `CUSTOM3` bit 0 (replace the four-byte pacer branch
+at `h0+$1288` with NOPs) and bit 1 (RTS at polygon filler `h0+$1F388`). Release omits
+both options and patches; its binary SHA-256 remains
+`93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`.
+The filler walks the edge lists, loads the back buffer through `h0+$1252`, and writes
+four bitplanes. Its scratch is classified as presentation by A3. These are measurement
+options with native frame/world coupling; no-wait intentionally speeds up the game.
+
+All-off captures `tmp/b4/a8-release-off`, `a8-developer-off` and `a8-verify-off` pass
+all eight loader/name checks, original optional-range bytes, and clean quit. The actual
+VERIFY relay-on control passes separately. The checker supports declared PL_PS, PL_NOP
+and PL_R hooks and its negative tests reject mutations of all 12 optional-hook bytes,
+wrong gates/layout/source and a falsely labelled enabled relay.
+
+All ceiling arms use the same VERIFY binary and the native start-state transition at
+`h0+$3B4FA`, followed by the next full field. This avoids relying on painted lights in
+the no-fill arm. The breakpoint is removed before the 100-field timed window. The
+020 control, no-wait and no-fill pairs repeat exactly and captured hook bytes match
+the intended branches/RTS. Their common-layout rates are 7.98, 16.84 and 19.63 fps.
+The instant pair repeats but changes h2/h3 placement by 168 bytes and changes startup
+timing, so its 17.31 fps is **not accepted as a matched gain**. The four-arm audit
+correctly fails this layout comparison; allocation-controlled recapture is pending.
+Remaining CPUs are being collected. Instant-blitter comparisons must also verify the effective
+emulator configuration. No ceiling conclusion is accepted yet.
 
 ### Startup failures: cause and fix (68030, 68040)
 

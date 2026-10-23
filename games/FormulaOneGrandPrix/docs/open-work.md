@@ -4,14 +4,14 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with fast RAM. The implementation plan
 is [plan.md](plan.md); verified findings are in [internals.md](internals.md).
 
-# Current status: B5 unblocked; whole-race cache validation next
+# Current status: B5/A7/A8 validation in progress
 
 | Work | Status |
 | --- | --- |
 | B1–B4; A1/A2/A3/A5/A6 | Complete, with gates recorded in internals. |
 | B5 | Cache pilot implemented; gate not passed. 030/040 startup deadlock fixed in the emulator (AmigaXDev TOOL1); all 030/040/060 setups start with caches on and repeat exactly. |
-| A7 | Matrix incomplete; paired measurements and fresh validation of the corrected zero-lead follow anchor remain open. |
-| A8 | Not started. Developer gates and ceiling measurements remain open. |
+| A7 | Matrix incomplete; full paired measurements remain open; the corrected zero-lead follow anchor passes a fresh repeat. |
+| A8 | Developer gates and all-off checks pass; enabled ceiling measurements are in progress. |
 | 68030 B5/A7/A8 cells | No longer deferred; open like the other CPUs. |
 | A4 | Open; required before D. |
 | C–G | Implementation and acceptance work remain open under the plan. |
@@ -44,7 +44,7 @@ The B5 cache policy is opt-in and disabled by default; its acceptance gate is st
 **B5, A7 and A8 are unfinished.** The current window-title emulator build is pinned;
 a first 030 non-MMU cache-on whole race and clean quit pass (`tmp/b5-final/030-on-clock-b`).
 A fresh 030 non-MMU cache-on pair (`-d`/`-e`) passes exact comparison with mouse
-auto-switching disabled. The remaining whole-race cells and matched gains are next. The gated cache policy and VERIFY CACR logging are in
+auto-switching disabled. All six 030/040/060 cache-on whole-race pairs also pass. The 020 cache-on pair also passes; matched gains remain next. The gated cache policy and VERIFY CACR logging are in
 place. On the 68020, a whole Quick Race completed and quit cleanly with the instruction cache on.
 
 **The 030/040 startup stalls are fixed.** They were an FS-UAE deadlock between
@@ -56,6 +56,10 @@ F10 OK, and repeat exactly from fresh boots. `tools/machine_matrix.py` can now r
 cell. AmigaXDev TOOL2 and TOOL3 are also done: the launcher refuses unknown CPU names, and
 failed captures leave no image or trace. F1GP pins that launcher.
 
+**Control correction:** cache-off matrix arms now explicitly use `NoCache`; the original
+CPU policy can leave Fast RAM cacheable with an MMU. Old off runs lacking this override
+are not accepted as uncached controls. New MMU off pairs pass.
+
 Next steps, under the [current validation scope](plan.md#current-validation-scope):
 
 1. **B5:** run whole Quick Races with caches on, using `machine_matrix.py ... on clock`,
@@ -63,9 +67,10 @@ Next steps, under the [current validation scope](plan.md#current-validation-scop
    too, and record matched cache gains. Caches stay opt-in until this gate passes.
 2. **A7:** capture both cache states on A500-equivalent, A1200, 020+Fast, 030, 040 and
    060, with actual layouts, per-window timings/chip slots and full race-clock evidence.
-   Validate the corrected zero-lead follow anchor first; it now requires a changed driver name.
-3. **A8:** implement the developer-only no-wait/no-fill gates and matched instant-blitter
-   controls, extend the disabled-range checker, then measure each CPU's ceiling.
+   The corrected zero-lead follow anchor passes; combined three-window captures are being collected.
+3. **A8:** validate enabled no-wait/no-fill gates and matched instant-blitter controls, then
+   measure each CPU's ceiling. All-off byte checks pass for all three build targets. The first 020 instant-blitter
+   comparison fails the common-layout audit; investigate its startup allocation difference.
 4. **C1–C6:** implement real-time ticks using A3 ownership and A5 publication rules.
 
 **A4** remains required before D.
