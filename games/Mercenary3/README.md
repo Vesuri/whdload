@@ -76,7 +76,7 @@ Developers can use `make verify` with `CUSTOM5=0 CUSTOM1=<feature mask>` for ind
 feature comparisons. The VERIFY build also contains the measurement instruments;
 use the regular slave to play. [Development](docs/development.md) describes the tools.
 
-## Version 2.0 (23.10.2026)
+## Version 2.0 (23.10.2026) — Vesuri
 
 - Faster rendering and smoother walking, vehicles and flight without speeding up
   the game world.

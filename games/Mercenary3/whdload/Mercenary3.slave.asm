@@ -1,7 +1,7 @@
 ;*---------------------------------------------------------------------------
 ;  :Program.	mercenary3.slave.asm
 ;  :Contents.	Slave for "Mercenary 3 - The Dion Crisis"
-;  :Author.	Harry/Graham/Wepl
+;  :Author.	Harry/Graham/Wepl/Vesuri
 ;  :History.	19.03.1998
 ;		29.07.04 merged Harry and Graham (ReSourced Slave) sources
 ;		performance version, from whdload/original/ (the shipped 1.2):
@@ -51,7 +51,7 @@ _expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM+OBJECTM
 
 _name		dc.b	"Mercenary 3 - The Dion Crisis",0
 _copy		dc.b	"1991 Novagen",0
-_info		dc.b	"adapted by Harry/Graham/Wepl",10
+_info		dc.b	"adapted by Harry/Graham/Wepl/Vesuri",10
 		dc.b	"Version 2.0 (23.10.2026)",10
 		dc.b	"enhanced framerate edition"
 	IFD VERIFY

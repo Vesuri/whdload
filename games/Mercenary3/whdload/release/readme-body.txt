@@ -45,7 +45,7 @@
 
  History:
  --------
- version 2.0 (23.10.2026) by Vesa Halttunen:
+ version 2.0 (23.10.2026) by Vesuri:
  - Faster rendering and smoother walking, vehicles and flight, without
    speeding up the game world.
  - Added "Enhanced framerate", enabled by default; Off restores original
