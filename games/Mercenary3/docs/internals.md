@@ -1116,3 +1116,39 @@ panels. World speed is 6 walking units and 2 heading units per field on 020 fast
 and 030/50. Options-off and shipped both give 37 A500 frames. Evidence and rejected
 candidate sources remain ignored under `tmp/r2/{first,priority,checks}/` and
 `tmp/r2/{shared-bus,priority}.asm`. No game code changes remain from R2.
+
+### R4: data cache
+
+`Custom1` bit 13 asks `resload_SetCACR` for `CACRF_EnableD` alongside the
+instruction cache. With it off, the shipped instruction-only request is unchanged.
+WHDLoad handles CPU/MMU differences, cache flushing and `NOCACHE`; no direct CACR
+writes or emulator changes are needed. Its existing cache policy for the slave and
+expansion memory is retained. Hardware inhibits data caching of chip memory and I/O;
+this request does not make display memory safe for copy-back caching.
+
+Same build/session, `fps.py`, 500-field route, `CACHE PRELOAD`,
+`Custom1=8191 → 16383`:
+
+| Setup | Data-cache request off → on, fps |
+| --- | ---: |
+| a500-1.5m | 4.10 → 4.10 |
+| a1200, chip only | 9.40 → 9.40 |
+| a1200-fast | 12.50 → 12.50 |
+| a1200-030, reference 030/50 | 24.80 → 24.80 |
+| existing 040-25 cell | 24.80 → 24.80 |
+| 060 NOMMU, 25 MHz | 24.90 → 24.90 |
+
+No measured route gain or regression. Retained by the user's cache-support decision,
+not as a demonstrated speedup. The 040/060 counts are emulator run checks, not
+hardware performance predictions. Real-hardware cache behaviour remains an X1 check.
+The existing WHDLoad `BRANCHCACHE` switch also completed the 060 route at
+24.90 fps with bit 13 enabled. It remains available through WHDLoad; R4 does not
+force 060-specific CPU settings.
+
+Checks: options-off and shipped A500 both 37 frames; native walk/turn rates
+(6 units and 2 heading units per field) on 020-fast and 030; all 124 presentation
+restore hashes passed. Still-scene screenshots match off/on on 030. Inspected
+walking, Help/return and Quit Situation on 030, plus loaded Eagle vehicle/flight
+views on 030/040/060. The cache option alone also passed the menu/walking play
+check on 030/040. Input verification and original/release/VERIFY builds passed.
+Evidence: `tmp/r4/`.

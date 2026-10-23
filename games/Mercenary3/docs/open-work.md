@@ -57,6 +57,10 @@ split and the measured game-time model ([internals](internals.md)).
 
 ## Decisions
 
+- R4: support whatever caches can be supported (user decision before measurement).
+  Retain the cache option for compatibility even if these emulator routes show no gain;
+  real-hardware cache performance remains a release check.
+
 - P3: extend native-speed logic and smooth presentation frames to vehicles, flight
   and lifts (user approval). Check each mode and the deferred navigation/vehicle/flight screens.
 
@@ -122,4 +126,6 @@ arrival timing and closes the deferred vehicle/flight/navigation play coverage. 
 24.80 fps. Options-off matches shipped. See [P3](internals.md#p3-vehicles-flight-and-lifts).
 R2's blitter clear was measured and rejected: A500 unchanged, chip-only A1200 slower,
 including a repeated blitter-priority trial. Keep the native CPU clear.
-Next is R4's data-cache decision (U). See [plan.md](plan.md).
+R4 adds an optional WHDLoad data-cache request; route FPS is unchanged across all
+measured setups. Retained for cache support by user decision. See
+[R4](internals.md#r4-data-cache). Next is X1 (release decisions, U).

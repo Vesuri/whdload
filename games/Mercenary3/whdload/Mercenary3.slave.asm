@@ -70,7 +70,8 @@ _config		dc.b	"C1:X:Enable display DMA once and copy whole palette:0;"
 		dc.b	"C1:X:Renderer code in fast RAM (68020+):9;"
 		dc.b	"C1:X:View bitmap in fast RAM (68020+):10;"
 		dc.b	"C1:X:Interpolate other objects (requires presentation):11;"
-		dc.b	"C1:X:Vehicle and flight presentation (requires bit 4):12"
+		dc.b	"C1:X:Vehicle and flight presentation (requires bit 4):12;"
+		dc.b	"C1:X:Request data cache (68030+):13"
 		dc.b	0
 Mercenary3sav	dc.b	'Mercenary3.save',0,0
 	EVEN
@@ -236,7 +237,13 @@ lbC0002AA
 	ENDC
 	bsr.w	_hotrenderer
 	bsr.w	_objectinit
+; Let WHDLoad handle CPU/MMU differences and NOCACHE. Preserve the shipped
+; instruction-only request with bit 13 off; SetCACR also flushes patched code.
 	moveq	#CACRF_EnableI,d0
+	btst	#5,(_custom1+2,pc)
+	beq.b	.icacheonly
+	ori.l	#CACRF_EnableD,d0
+.icacheonly
 	move.l	d0,d1
 	movea.l	(_resload,pc),a0
 	jsr	(resload_SetCACR,a0)

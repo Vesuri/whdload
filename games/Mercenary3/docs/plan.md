@@ -208,8 +208,10 @@ identically. Keep the native CPU clear; see [measurements](internals.md#r2-blitt
 **R3. Triple buffering — closed, not implemented.** The user does not want triple
 buffering. Retain double buffering despite the S5 measured wait; no extra chip buffer.
 
-**R4. Data cache on 68030+ (U).** Measure the slave requesting the data cache as well, then
-ask.
+**R4. Data cache on 68030+ — supported.** User approved supporting available caches.
+Custom1 bit 13 requests the data cache through WHDLoad alongside the instruction
+cache. Route FPS is unchanged on all measured setups; retained for cache support by
+user decision. See [measurements](internals.md#r4-data-cache).
 
 ### X. Release
 
@@ -226,15 +228,15 @@ moved and self-modifying code.
 - [x] P1 [x] P2 [x] P3
 - [x] M1 [x] M2
 - [x] S0 [x] S1 [x] S2 [x] S3 [x] S4 [x] S5 [x] S6
-- [x] R1 [x] R2 (not retained) [x] R3 (closed) [ ] R4
+- [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
 - [ ] X1
 
-Next: R4 (data-cache decision, U).
+Next: X1 (release toggle/default and real-hardware decision, U).
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with `Custom1` bits 0–12.
+  with `Custom1` bits 0–13.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `presentation_check.py` (VERIFY restore hashes), the
