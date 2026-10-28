@@ -869,3 +869,26 @@ python3 tools/c5_compare.py off=tmp/d2/states-off on=tmp/d2/states-on repeat=tmp
 A capture that stops at an unexpected PC after a corrupted gdb reply is a debugger
 fault, not a result. Move it aside and capture again.
 
+### D3 stage and restore
+
+`--stage` (implies `--snapshot`) adds a stop after every staged picture's restore
+(`d3_restored`) and saves the D2 state, the D1 buffers, the D3 buffers and the restored
+game memory in `stages.bin.gz`. `--previous` also sets `CUSTOM5` bit 1, the VERIFY probe
+that stages the previous tick. `d3_stage.py` rebuilds every decision and staged value and
+checks each restore against an independent snapshot:
+
+```sh
+make slave-verify OUT=tmp/d3/build-verify
+python3 tools/c2_capture.py tmp/d3/states-previous --build tmp/d3/build-verify --states --previous --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d3/states-previous-repeat --build tmp/d3/build-verify --states --previous --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d3/states-on --build tmp/d3/build-verify --states --stage --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d3/states-off --build tmp/d3/build-verify --states --custom4 1 --setup a1200-030
+python3 tools/d3_stage.py tmp/d3/states-previous --negative --out tmp/d3/stage-previous.json
+python3 tools/d3_stage.py tmp/d3/states-on --out tmp/d3/stage-on.json
+python3 tools/c5_compare.py off=tmp/d3/states-off on=tmp/d3/states-on previous=tmp/d3/states-previous \
+  repeat=tmp/d3/states-previous-repeat --out tmp/d3/states-comparison.json
+make slave-developer OUT=tmp/d3/build-developer
+python3 tools/c2_capture.py tmp/d3/profile-developer --build tmp/d3/build-developer --stage --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
+python3 tools/c6_profile.py tmp/d3/profile-developer --out tmp/d3/profile-developer.json
+```
+

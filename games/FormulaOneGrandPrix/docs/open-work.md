@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C, D1 and D2 complete; D3 next; B5/A8 pass for the current scope
+# Current status: C and D1–D3 complete; D4 next; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -22,15 +22,24 @@ results and acceptance evidence are in [internals.md](internals.md).
 | C6 | Complete: the A1200 runs at real time (7.7 fps, 6.7 in the tow window). On the A500-equivalent the clock gives 1.65 fps at 0.83×, because an undrawn tick costs 7.2 fields, so the 68000 keeps the native pacer by default (user decision); `CUSTOM2` bit 2 forces the clock for tests. |
 | D1 | Complete: behind `CUSTOM2` bit 3, every completed tick records the A4 renderer inputs (view state, published camera, synthetic camera and 26 car records) with its field number in cur, keeping the previous tick in prev. A whole 030 race matches game memory at all 3162 ticks, leaves the race identical to the option off, repeats exactly and costs 0.24 ms per tick. |
 | D2 | Complete: every picture gets α, the Q14 fraction of the next tick from the clock's credit plus the measured lead to its first displayed field, clamped to two ticks; α is 0 when pictures are longer than a tick. Over a whole 030 race the rule recomputes exactly, 95% of leads are exact, displayed world time never goes backwards (p95 error 1 field), and the race is unchanged. |
-| D3–G | Presentation, optimisation and release work remain open under the plan. |
+| D3 | Complete: around every picture's draw the slave stages a 1080-byte pose subset of the renderer inputs (camera publication, coefficients, horizon, viewport, track anchor and per-record pose) and restores the authoritative bytes right after the draw. VERIFY checks every restore against a D1 snapshot. A VERIFY probe staging the previous tick changes the inputs of 95% of pictures, yet the whole 030 race is identical to the option off at all 3226 ticks; 0.83 ms per picture. Until D4/D5 the staged values are the authoritative ones. |
+| D4–G | Presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: D3 stage and restore (smooth presentation).**
+**Next F1GP step: D4 camera (smooth presentation).**
+D3 is complete ([evidence](internals.md#d3-stage-and-restore--complete)). Each picture is
+drawn from a staged copy of its renderer inputs, and the authoritative bytes are back in
+the game before any simulation code runs. Inside a tick the staged picture uses the
+previous tick's snapshot (cur) as history, between ticks prev. Pictures with an unusable
+history (another epoch, mode or view) snap. Inside a tick a picture is not staged when
+drawing could start the debris deadline (A3), because that must follow native visibility.
+D4 now fills the camera part of the stage set with `cur + (cur − prev) × α` and recomputes
+the derived camera values (coefficients, horizon, viewport, anchor) from the staged pose.
+
 D2 is complete ([evidence](internals.md#d2-presentation-phase-α--complete)). Each picture's
 α counts from when the current tick fell due (the clock's credit) plus the lead the
 previous picture of its kind took to reach the screen. The clamp is two ticks: pictures
 drawn between ticks are displayed after the next tick is due (ideal α up to 1.5), so a
-one-tick clamp lagged by up to 3 fields. D3 now stages predicted renderer inputs from
-the D1 snapshots at that α and restores them exactly.
+one-tick clamp lagged by up to 3 fields.
 
 D1 is complete ([evidence](internals.md#d1-presentation-snapshots--complete)). At every
 completed tick the slave keeps cur and prev copies of the renderer inputs, with field

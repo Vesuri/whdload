@@ -2047,3 +2047,68 @@ period = fields since the previous picture started
 | D1 snapshots in these runs | PASS. In the slowed run, two catch-up ticks shared a field, so the D1 check now requires field numbers that never decrease rather than strictly increase |
 | Pictures over the race | 6001 off, 5984 on (3.24 versus 3.25 fields per picture), no drops; D1 and D2 together |
 | Disabled-feature gate (`tmp/b4/d2-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D2 adds no hook |
+
+### D3 stage and restore — complete
+
+With `CUSTOM2` bit 3, `d3_stage` runs just before every picture's draw and `d3_restore`
+right after it: inside a tick around `c2_scene`'s call of h2+$280F6 (draw mode 1 only;
+tick-only passes are never staged), between ticks around `c2_repeat_picture`'s call. The
+restore runs before control returns to the native loop (h0+$3C9C0, the tick clocks) or to
+`c2_repeat_picture`'s own restore of A3's renderer effects, so no simulation code sees a
+staged byte. The stage set is the pose subset of the D1 layout, 1080 bytes in the packed
+order that `tools/d3_stage.py` defines independently as the specification of the slave
+tables `d3_ranges` and `d3_fields`:
+
+| Part | Bytes | Contents |
+|---|---:|---|
+| h1+$224 | 4 | Renderer track anchor |
+| h0+$3A7F8–3A81F | 40 | Published camera: direction, pitch, coarse and full X/Z, height, lateral, yaw, reduced X/Z, lap segment, anchor heading |
+| h0+$3A8C2–3A8C5 | 4 | Yaw trig coefficients |
+| h2+$231D4, +$231E0, +$231E4 | 6 | Horizon; viewport direction flag and relative heading (written by h0+$33F6E–33F9A) |
+| 27 records × 38 | 1026 | Synthetic camera and 26 cars: +$00 direction, +$04 pitch, +$08–0D height, lateral, longitudinal, +$12–17 segment pointer and denominator, +$1A–1F yaw, corrected longitudinal, fraction, +$26–2F lap segment and world X/Z, +$48/+$4A steering and correction, +$8C height offset |
+
+Everything else stays authoritative while a picture is drawn: the view state h1+$234–240,
+the camera spring h0+$3A820–3A827 (A3: the shake adds to it during drawing), the mirror
+request +$3A828, speed and velocity, and every flag and identity (+$19, +$25, +$66, +$72,
++$7E, +$80, +$96/+$97, +$AC, +$B6). Those discrete fields also select A3's drawing side
+effects. The pit-service phases and the shake (h2+$2A2A8, reached from h2+$28066 in the
+cockpit view only) test only the selected car's +$67 and +$97, which are not staged. The
+debris deadline (h2+$29ACE–29AD8) depends on which cars are drawn, so inside a tick a picture
+is not staged if h0+$3A770 is zero and any car has +$19 bit 4. Between ticks `c2_repeat_picture`
+already restores that deadline.
+
+Per picture, the history is the D1 snapshot of the tick before the one drawn: cur inside a
+tick (that tick's own snapshot is only taken at the pacer), prev between ticks. It is
+usable only if its tick number is the drawn tick minus one and its epoch, loop mode,
+pose source, selected car and view code equal the current ones. Otherwise the picture
+snaps. A picture with α 0 (latest state) uses no history. Within a usable history, a record whose
++$7E bit 0 (explicit pose) differs from the snapshot's keeps its authoritative pose (held).
+Until D4/D5 supply predictions, the staged values are the authoritative ones; the
+VERIFY probe `CUSTOM5` bit 1 stages the usable history instead, drawing one tick late, to
+prove the mechanism with values that really differ.
+
+VERIFY checks every restore. Before writing back it counts a draw that changed a staged
+byte (`d3_written`). Between ticks it compares the restored game with cur, because nothing
+has run since that snapshot. Inside a tick, `d1_snapshot` compares the tick's new cur with
+the saved bytes at the pacer. Mismatches count as `d3_faults`.
+
+**Evidence** (VERIFY `98b23548…`, developer `7f9262d5…`, `a1200-030` non-MMU, `CUSTOM4=1`,
+whole Quick Race in the cockpit view, `tmp/d3/`; `d3_stage.py` stops after every restore):
+
+| Check | Result |
+|---|---|
+| Probe (`stage-previous.json`, `CUSTOM5=2`) | PASS for all 6088 staged pictures (3226 inside ticks, 2862 between): decision, staged bytes (rebuilt from the D1 history with held records), game equal to the saved bytes after the restore, and saved bytes equal to the independent snapshot (cur between ticks, the drawn tick's own snapshot inside a tick). 6084 pictures used the history and 4 snapped; the staged inputs differed from the authoritative ones in 5791; 587 records were held |
+| VERIFY counters | 0 written, 0 faults; 6097 of 6098 restores checked (the last in-tick picture's check was pending when the race ended) |
+| Negative probes | A flipped restored camera byte, staged byte, saved byte and snapshot byte are each rejected |
+| Authoritative staging (`stage-on.json`) | PASS for all 6089 pictures; staged equals saved throughout |
+| Race unchanged (`states-comparison.json`) | Option off (`CUSTOM2=3`), staging (`=11`), the probe and its repeat: identical car/session state at all 3226 common ticks (6–3231); D1 snapshots pass in all three staged runs |
+| Exact repeat (`states-previous-repeat`) | Identical states and stage archive (`fa41d9b8…`) |
+| Cost (`profile-developer.json`, 100 fields from tick 300) | Developer build: 0.63 ms to stage and 0.20 ms to restore per picture, against 28.9 ms for the scene; 1.4% of the window. VERIFY adds its compares (restore 0.58 ms, `d1_snapshot` 0.49 instead of 0.24 ms). Emulated 68030 time |
+| Pictures over the race | 6211 off, 6088 staged, 6087 probe (3.25 versus 3.31 fields per picture), no drops |
+| Disabled-feature gate (`tmp/b4/d3-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D3 adds no hook |
+
+Not exercised by this race: the debris case (it never arose; `d3_debris` 0), and the
+TV and chase views, where the pose source is the synthetic camera. D7 covers every view.
+A first probe run (`states-previous-tickcheck-d0`) counted a VERIFY fault for every
+in-tick picture: the tick check lost the tick number in a register that its comparison walk
+reuses. The independent checks passed in that run, and the fixed build reports none.

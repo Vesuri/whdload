@@ -103,8 +103,8 @@ with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's ques
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
 tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
 A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
-68000 keeps the original frame-locked pacer by default (user decision). D1 and D2
-are complete (presentation snapshots and α); D3 is next.
+68000 keeps the original frame-locked pacer by default (user decision). D1, D2 and D3
+are complete (presentation snapshots, α, and staging with exact restore); D4 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -285,6 +285,11 @@ pictures drawn between ticks are displayed after the next tick is due.
 **D3 Stage and restore.** Write predicted values into the renderer's inputs (or a
 renderer-only copy), draw, restore the authoritative values exactly before any
 simulation code runs. VERIFY checks the restore on every picture.
+*Result:* complete ([internals](internals.md#d3-stage-and-restore--complete)). A 1080-byte
+pose subset of the D1 layout is staged into the game around each picture's draw and
+restored right after it; VERIFY checks every restore against a snapshot. A VERIFY probe
+that draws the previous tick leaves the whole 030 race identical to the option off.
+D4/D5 supply the predicted values; until then the staged values are the authoritative ones.
 
 **D4 Camera.** Position and heading, pitch, roll: `cur + (cur − prev) × α`; angles by the
 shortest arc, track position across the lap wrap; snap (α = 0) at view changes, TV-camera

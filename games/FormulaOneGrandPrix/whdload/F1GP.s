@@ -46,6 +46,7 @@ slv_config
         ENDC
         IFNE VERIFY
         dc.b 'C5:X:Verify pacer relay:0;'
+        dc.b 'C5:X:Verify D3 - draw the previous tick:1;'
         ENDC
         dc.b 0
 intro_name dc.b 'frontend',0
@@ -68,6 +69,10 @@ cache_options dc.l 0
         IFNE DEVELOPER
         dc.l WHDLTAG_CUSTOM4_GET
 preference_options dc.l 0
+        ENDC
+        IFNE VERIFY
+        dc.l WHDLTAG_CUSTOM5_GET
+verify_options dc.l 0
         ENDC
         dc.l 0
 game_size dc.l 0
@@ -1141,6 +1146,9 @@ d1_snapshot
         bsr.s d1_record
         lea ($c0,a4),a4
         dbf d2,.car
+        IFNE VERIFY
+        bsr d3_tick_check
+        ENDC
 d1_done
         rts
 ; Hunk*4, offset, words-1: view state, chase/player, published camera,
@@ -1258,6 +1266,326 @@ d2_shown
         move.w d0,(a2)
 .done
         rts
+
+; D3: just before a picture is drawn, write the renderer inputs it shows into the
+; game (staged) and keep the authoritative bytes (saved); write those back right
+; after the draw, before any simulation code. The staged set is the pose subset of
+; the D1 layout; flags, pointers to records, identities and the camera spring stay
+; authoritative. Until D4/D5 predict, the staged values are the authoritative ones;
+; the VERIFY probe stages the previous tick to prove the restore.
+D3_SIZE = 54+27*38
+d3_stage                        ; D0 = kind
+        btst #3,(cache_options+3,pc)
+        beq d3_off
+        movem.l d0-a6,-(sp)
+        lea (d3_kind,pc),a0
+        move.w d0,(a0)
+        lea (d3_pictures,pc),a0
+        addq.l #1,(a0)
+        ; History is the snapshot of the tick before the one drawn: cur inside a
+        ; tick (its own snapshot is taken at the pacer), prev between ticks.
+        lea (d1_buffers,pc),a3
+        move.w (d1_current,pc),d1
+        move.l (c2_clock+WC_TICKS,pc),d2
+        tst.w d0
+        beq.s .tick
+        eori.w #1,d1
+        subq.l #1,d2
+.tick
+        tst.w d1
+        beq.s .history
+        adda.w #D1_SIZE,a3
+.history
+        moveq #0,d7
+        move.w (d2_alpha,pc),d1
+        bne.s .valid
+        lea (d3_latest,pc),a0
+        addq.l #1,(a0)
+        bra.s .debris
+.valid
+        cmp.l 4(a3),d2
+        bne.s .snap
+        move.l 8(a3),d1
+        cmp.l (c3_epochs,pc),d1
+        bne.s .snap
+        move.w 20(a3),d1
+        cmp.w (c2_mode,pc),d1
+        bne.s .snap
+        movea.l (c2_h1,pc),a0
+        move.l ($234,a0),d1
+        cmp.l (D1_HEADER+$10,a3),d1
+        bne.s .snap
+        move.l ($238,a0),d1
+        cmp.l (D1_HEADER+$14,a3),d1
+        bne.s .snap
+        move.b ($23c,a0),d1
+        cmp.b (D1_HEADER+$18,a3),d1
+        bne.s .snap
+        IFNE VERIFY
+        btst #1,(verify_options+3,pc)
+        beq.s .debris
+        moveq #1,d7
+        ENDC
+        bra.s .debris
+.snap
+        lea (d3_snapped,pc),a0
+        addq.l #1,(a0)
+.debris
+        ; A3: a drawn car with record +$19 bit 4 starts the debris deadline when
+        ; it is zero. Inside a tick that must follow native visibility, so such a
+        ; picture is not staged. Between ticks C2 restores the deadline anyway.
+        tst.w d0
+        bne.s .stage
+        movea.l (c2_h0,pc),a0
+        adda.l #$3a770,a0
+        tst.l (a0)
+        bne.s .stage
+        movea.l (c2_h1,pc),a0
+        lea ($5d6+$19,a0),a0
+        moveq #25,d1
+.car
+        btst #4,(a0)
+        bne.s .skip
+        lea ($c0,a0),a0
+        dbf d1,.car
+.stage
+        lea (d3_source,pc),a0
+        move.w d7,(a0)
+        lea (d3_saved,pc),a2
+        lea (d3_copy_game,pc),a5
+        bsr d3_walk
+        lea (d3_staged,pc),a2
+        tst.w d7
+        beq.s .build
+        lea (d3_copy_history,pc),a5
+.build
+        bsr d3_walk
+        tst.w d7
+        beq.s .load
+        lea (d3_records,pc),a0
+        add.l d6,(a0)
+.load
+        lea (d3_staged,pc),a2
+        lea (d3_load,pc),a5
+        bsr d3_walk
+        lea (d3_staged_pictures,pc),a0
+        addq.l #1,(a0)
+        lea (d3_active,pc),a0
+        move.w #1,(a0)
+        bra.s .done
+.skip
+        lea (d3_debris,pc),a0
+        addq.l #1,(a0)
+.done
+        movem.l (sp)+,d0-a6
+d3_off
+        rts
+
+d3_restore
+        movem.l d0-a6,-(sp)
+        lea (d3_active,pc),a0
+        tst.w (a0)
+        beq.s .done
+        clr.w (a0)
+        lea (d1_buffers,pc),a3
+        IFNE VERIFY
+        lea (d3_staged,pc),a2
+        lea (d3_compare_game,pc),a5
+        bsr d3_walk
+        tst.w d5
+        beq.s .kept
+        lea (d3_written,pc),a0
+        addq.l #1,(a0)
+.kept
+        ENDC
+        lea (d3_saved,pc),a2
+        lea (d3_load,pc),a5
+        bsr d3_walk
+        IFNE VERIFY
+        ; Inside a tick the tick's own snapshot checks the restore at the pacer.
+        ; Between ticks nothing has run since the last snapshot: cur must match.
+        move.w (d3_kind,pc),d0
+        bne.s .repeat
+        move.l (c2_clock+WC_TICKS,pc),d0
+        addq.l #1,d0
+        lea (d3_check_tick,pc),a0
+        move.l d0,(a0)
+        bra.s .restored
+.repeat
+        move.w (d1_current,pc),d0
+        beq.s .cur
+        adda.w #D1_SIZE,a3
+.cur
+        lea (d3_compare_snapshot,pc),a5
+        bsr d3_walk
+        bsr d3_count_check
+.restored
+        ENDC
+        bsr d3_restored
+.done
+        movem.l (sp)+,d0-a6
+        rts
+d3_restored
+        rts
+
+; A5 = operation on one run of words: A0 game, A1 the run in snapshot A3, A2 packed
+; buffer (advanced), D1 words-1, D4 nonzero if the record's pose flag differs from
+; the snapshot's. Returns D5 nonzero if a comparison differed, D6 such records.
+d3_walk
+        movem.l d2-d4/a3-a4/a6,-(sp)
+        moveq #0,d4
+        moveq #0,d5
+        moveq #0,d6
+        lea (d3_ranges,pc),a6
+.range
+        move.w (a6)+,d0         ; hunk*4, or -1
+        bmi.s .records
+        lea (c2_h0,pc),a0
+        movea.l (a0,d0.w),a0
+        adda.l (a6)+,a0
+        move.w (a6)+,d1
+        lea (a3),a1
+        adda.w (a6)+,a1
+        jsr (a5)
+        bra.s .range
+.records
+        movea.l (c2_h1,pc),a4
+        lea ($256,a4),a4        ; synthetic camera, then the cars from +$5D6
+        lea (D1_HEADER+156,a3),a3
+        move.w #$5d6-$256,d3
+        moveq #26,d2
+.record
+        move.b ($7e,a4),d4
+        move.b (64,a3),d0
+        eor.b d0,d4
+        andi.w #1,d4
+        add.w d4,d6
+        lea (d3_fields,pc),a6
+.field
+        move.w (a6)+,d0
+        bmi.s .next
+        lea (a4,d0.w),a0
+        move.w (a6)+,d1
+        lea (a3),a1
+        adda.w (a6)+,a1
+        jsr (a5)
+        bra.s .field
+.next
+        adda.w d3,a4
+        move.w #$c0,d3
+        lea (D1_RECORD,a3),a3
+        dbf d2,.record
+        movem.l (sp)+,d2-d4/a3-a4/a6
+        rts
+d3_copy_history
+        tst.w d4
+        bne.s d3_copy_game
+.copy
+        move.w (a1)+,(a2)+
+        dbf d1,.copy
+        rts
+d3_copy_game
+.copy
+        move.w (a0)+,(a2)+
+        dbf d1,.copy
+        rts
+d3_load
+.copy
+        move.w (a2)+,(a0)+
+        dbf d1,.copy
+        rts
+        IFNE VERIFY
+d3_compare_game                 ; buffer against game
+.word
+        cmpm.w (a0)+,(a2)+
+        beq.s .same
+        moveq #1,d5
+.same
+        dbf d1,.word
+        rts
+d3_compare_snapshot             ; snapshot against game
+.word
+        cmpm.w (a0)+,(a1)+
+        beq.s .same
+        moveq #1,d5
+.same
+        dbf d1,.word
+        rts
+d3_compare_saved                ; snapshot against buffer
+.word
+        cmpm.w (a1)+,(a2)+
+        beq.s .same
+        moveq #1,d5
+.same
+        dbf d1,.word
+        rts
+d3_count_check
+        lea (d3_checked,pc),a0
+        addq.l #1,(a0)
+        tst.w d5
+        beq.s .ok
+        lea (d3_faults,pc),a0
+        addq.l #1,(a0)
+.ok
+        rts
+; In d1_snapshot: the in-tick picture's restore against the tick's snapshot.
+d3_tick_check
+        move.l (d3_check_tick,pc),d7
+        beq.s .none
+        lea (d3_check_tick,pc),a0
+        clr.l (a0)
+        lea (d1_buffers,pc),a3
+        move.w (d1_current,pc),d1
+        beq.s .cur
+        adda.w #D1_SIZE,a3
+.cur
+        lea (d3_saved,pc),a2
+        lea (d3_compare_saved,pc),a5
+        bsr d3_walk
+        move.l (c2_clock+WC_TICKS,pc),d1
+        addq.l #1,d1
+        cmp.l d1,d7
+        beq d3_count_check
+        moveq #1,d5             ; not the tick that was drawn
+        bra d3_count_check
+.none
+        rts
+        ENDC
+; Hunk*4, offset, words-1, offset in a D1 snapshot: renderer track anchor;
+; published camera without the spring; yaw coefficients; horizon; viewport.
+d3_ranges
+        dc.w 4
+        dc.l $224
+        dc.w 1,D1_HEADER+0
+        dc.w 0
+        dc.l $3a7f8
+        dc.w 19,D1_HEADER+56
+        dc.w 0
+        dc.l $3a8c2
+        dc.w 1,D1_HEADER+108
+        dc.w 8
+        dc.l $231d4
+        dc.w 0,D1_HEADER+136
+        dc.w 8
+        dc.l $231e0
+        dc.w 0,D1_HEADER+148
+        dc.w 8
+        dc.l $231e4
+        dc.w 0,D1_HEADER+152
+        dc.w -1
+; Record offset, words-1, offset in a D1 record: direction; pitch; height,
+; lateral and longitudinal; segment and denominator; yaw, corrected longitudinal
+; and fraction; lap segment and world X/Z; steering and correction; height offset.
+d3_fields
+        dc.w $00,0,0
+        dc.w $04,0,4
+        dc.w $08,2,8
+        dc.w $12,2,$12
+        dc.w $1a,2,$1a
+        dc.w $26,4,$26
+        dc.w $48,1,56
+        dc.w $8c,0,68
+        dc.w -1
 
 c2_publish
         bsr c2_hud_flush
@@ -1753,6 +2081,7 @@ c2_scene
         bne.s .stage
         moveq #D2_TICK,d0
         bsr d2_picture
+        bsr d3_stage
 .stage
         lea (c2_stage_entry,pc),a2
         bsr c2_save_stage
@@ -1771,6 +2100,7 @@ c2_scene
 .paint
         movea.l (sp)+,a0
         bsr c2_scene_call
+        bsr d3_restore
         move.l a0,-(sp)
         lea (c2_dry_scene,pc),a0
         clr.w (a0)
@@ -1888,7 +2218,10 @@ c2_repeat_picture
         bsr c2_save_stage
         lea (c2_stage_entry,pc),a2
         bsr c2_load_stage
+        moveq #D2_REPEAT,d0
+        bsr d3_stage
         bsr c2_scene_call
+        bsr d3_restore
         lea (c2_stage_saved,pc),a2
         bsr c2_load_stage
         lea (c2_repeat_pictures,pc),a0
@@ -1979,6 +2312,21 @@ d2_alpha dc.w 0                 ; unsigned Q14, at most $8000
 d2_leads dc.w 0,0               ; last measured lead per kind
 d1_current dc.w 0
 d1_buffers ds.b 2*D1_SIZE
+d3_pictures dc.l 0              ; pictures seen
+d3_staged_pictures dc.l 0
+d3_latest dc.l 0                ; alpha 0: no history used
+d3_snapped dc.l 0               ; history not the previous tick of this epoch and view
+d3_debris dc.l 0                ; not staged: drawing may set the debris deadline
+d3_records dc.l 0               ; records held because their pose flag changed
+d3_written dc.l 0               ; VERIFY: the renderer wrote a staged byte
+d3_checked dc.l 0               ; VERIFY: restores checked against a snapshot
+d3_faults dc.l 0                ; VERIFY: restore differs from its snapshot
+d3_check_tick dc.l 0            ; VERIFY: in-tick restore, checked at that tick's snapshot
+d3_active dc.w 0
+d3_kind dc.w 0
+d3_source dc.w 0                ; 0 authoritative, 1 previous tick
+d3_saved ds.b D3_SIZE
+d3_staged ds.b D3_SIZE
         ENDC
 
 ; BASELINE_PATCHES_BEGIN: mandatory B3 loader patches, never feature-gated.
