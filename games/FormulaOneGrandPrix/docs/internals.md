@@ -1373,14 +1373,13 @@ continues unchanged by this design. A5's buffer-retirement rule uses `field_seri
 for publication, independently of whether a world update was due. D may later use
 field timestamps for presentation-only prediction; C1 introduces no predicted state.
 
-There is a pre-existing acceptance discrepancy: A7 measures a native race-clock
-increment of **128.84521484375 ms per update**. Eight unchanged updates therefore
-advance that clock by **1.03076171875 seconds per nominal real second**, outside
-C5(a)'s 1.00 ± 1% requirement. The earlier 128-ms estimate was approximate. C1 preserves
-the requested 8 Hz cadence and native updates; it does not silently change race-clock
-constants, physics or cadence to force that gate to pass. Resolve the race-clock
-calibration/acceptance interpretation before claiming C5(a), keeping the world-tick
-rate and the displayed race-clock ratio as separate measurements.
+A7 measures a native race-clock increment of **128.84521484375 ms per update**
+(2111/16384 s), against the native 125-ms step. Eight updates therefore advance the
+displayed clock by **1.03076171875 seconds per real second**; unmodified runs that reach
+the 8-fps cap show the same ratio. The user chose to keep it: C5(a) measures the
+world-tick rate (8.00 per second ± 1%), and the displayed clock's 1.031× ratio is
+recorded separately as native behavior. C1 changes no race-clock constant, physics or
+cadence.
 
 Validation: `tools/test_world_clock.py` is a host executable specification, not game
 code. Its five checks cover every field over 100 nominal seconds on PAL and NTSC,

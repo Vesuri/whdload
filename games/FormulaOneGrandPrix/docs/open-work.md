@@ -105,10 +105,10 @@ All derived artifacts remain in ignored `tmp/`. No remote is configured; commits
 
 Important constraints for C:
 
-- C1 schedules exactly eight native updates per 50/60 fields. The measured native
-  race-clock increment implies a 1.03076 ratio at 8 Hz, outside C5(a)'s ±1% target.
-  Resolve the clock calibration/acceptance interpretation before claiming C5(a);
-  do not silently alter physics or the requested update cadence.
+- C1 schedules exactly eight native updates per 50/60 fields. C5(a) measures that tick
+  rate (8.00 per second ± 1%) on the 030, A500-equivalent and A1200 (user decision).
+  The displayed race clock keeps its native 2111/16384 s per tick (1.031× at 8 Hz);
+  record it separately and don't change physics, cadence or the clock constant.
 
 - Pit-animation counters, shared RNG/camera shake and visible-car debris expiry are
   drawing side effects that must retain native tick cadence and predicates.

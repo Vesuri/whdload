@@ -99,7 +99,7 @@ C3's modal ownership and rebase checks are recorded there too. C4's held-view an
 probes pass, but a short press released between scans is lost in the native state table.
 The user chose to buffer one-shot presses for the next native input check; no input
 patch is installed yet. Remaining C4 acceptance covers pause, all view keys, replay/input and rapid
-repeats before C5/C6 acceptance. The C1 design records the native race-clock increment discrepancy that must be resolved before C5(a) acceptance.
+repeats before C5/C6 acceptance. C5(a) measures the world-tick rate; the displayed race clock keeps its native 1.031× ratio.
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
 from now on, run new checks on that machine only, adding the A500-equivalent and the
@@ -239,8 +239,10 @@ count frames become real-time automatically if they run in the tick.
 **C4 Input.** Player input is sampled where the native game samples it, per tick; one-shot
 keys (views, pause) act exactly once; nothing is lost while catch-up ticks run.
 
-**C5 Acceptance.** (a) `race_clock.py` on every machine of `A7`: game clock ÷ real time
-1.00 ± 1% wherever the ticks fit the CPU. (b) Tick-aligned state: car records at each
+**C5 Acceptance.** (a) On the 68030/50, the A500-equivalent and the A1200 (PAL): world
+ticks ÷ real time 8.00 per second ± 1% wherever the ticks fit the CPU. The displayed
+race clock is measured separately with `race_clock.py` and keeps its native
+2111/16384 s per tick, 1.031× real time at 8 ticks per second (user decision). (b) Tick-aligned state: car records at each
 completed tick identical between normal, deliberately slowed (VERIFY delay) and
 one-field drawing, given the `A1` timing inputs held equal; classify any difference.
 (c) A whole race, a pit stop, a retirement and a replay played through. *Gate:* (a) and
