@@ -237,7 +237,11 @@ keyboard
         eor.b #$ff,d0
         cmp.b (_keyexit,pc),d0
         beq quit
+        IFNE DEVELOPER
+        bra c4_key
+        ELSE
         rts
+        ENDC
 restore_names
         movem.l d0-a6,-(sp)
         move.l d7,a1
@@ -598,6 +602,7 @@ c3_pause_begin
         lea (c3_pauses,pc),a0
         addq.l #1,(a0)
 .done
+        bsr c4_flush            ; the native wait polls keys without tick scans
         movem.l (sp)+,d0-a6
         move.w (sp)+,ccr
         bra c3_audio_off
@@ -625,7 +630,7 @@ c3_suspend
         clr.w (a1)
         lea (c3_idle_start,pc),a1
         move.l (c2_clock+WC_LAST,pc),(a1)
-        rts
+        bra c4_flush
 
 c3_resume
         move.w sr,-(sp)
@@ -752,9 +757,156 @@ c3_leave
         clr.w (a0)
         lea (c2_scene_ready,pc),a0
         clr.w (a0)
+        bsr c4_flush
 .done
         movem.l (sp)+,d0-a6
         move.w (sp)+,ccr
+        rts
+
+; C4: a key change stays visible until a native per-tick scan has seen it.
+; Between two scans, a press and release would otherwise be lost in the native
+; key table h2+$52A, which holds only the current state. Deferral is live from a
+; scan until the loop suspends, pauses or leaves; those paths flush to the
+; physical state, so native loops without tick scans never see a held-over key.
+C4_PHYS = 0                     ; key physically down
+C4_FRESH = 1                    ; shown state not yet seen by a scan
+C4_UP = 2                       ; release waits for the next scan
+C4_DOWN = 3                     ; press waits for the next scan
+
+; Keyboard interrupt, after the native decode: D0 is the key code and A0 the
+; native key table. D0=$FF makes the native handler skip its table store.
+c4_key
+        cmpi.b #$f0,d0
+        bcc.s .exit
+        movem.l d1-d3/a1,-(sp)
+        moveq #$7f,d1
+        and.w d0,d1
+        lea (c4_keys,pc),a1
+        adda.w d1,a1
+        move.b (a1),d2
+        bclr #C4_PHYS,d2
+        tst.b d0
+        bmi.s .phys
+        bset #C4_PHYS,d2
+.phys
+        move.w (c4_live,pc),d3
+        beq.s .native
+        tst.b (0,a0,d1.w)
+        sne d3                  ; shown down
+        tst.b d0
+        bmi.s .release
+        tst.b d3
+        bne.s .press_shown
+        btst #C4_FRESH,d2
+        bne.s .defer_down       ; the release has not been seen yet
+        bset #C4_FRESH,d2
+        bra.s .native
+.press_shown
+        btst #C4_UP,d2
+        beq.s .native
+.defer_down
+        bset #C4_DOWN,d2
+        bra.s .skip
+.release
+        tst.b d3
+        beq.s .release_hidden
+        btst #C4_FRESH,d2
+        bne.s .defer_up         ; the press has not been seen yet
+        bset #C4_FRESH,d2
+        bra.s .native
+.defer_up
+        bset #C4_UP,d2
+        bra.s .skip
+.release_hidden
+        btst #C4_DOWN,d2
+        beq.s .native
+.skip
+        move.b d2,(a1)
+        lea (c4_deferred,pc),a1
+        addq.l #1,(a1)
+        movem.l (sp)+,d1-d3/a1
+        moveq #-1,d0
+        rts
+.native
+        move.b d2,(a1)
+        movem.l (sp)+,d1-d3/a1
+.exit
+        rts
+
+; Replaces the live and replay JSRs to the native key scan h0+$64. The scan
+; that follows sees the current state; a deferred change is applied only after
+; a scan has seen the state before it, so each press lasts one whole tick.
+c4_scan
+        movem.l d0-d3/a0-a1,-(sp)
+        move.w $dff01c,d3
+        move.w #$0008,$dff09a   ; keyboard interrupt off while the table changes
+        movea.l (c2_h2,pc),a0
+        adda.w #$52a,a0
+        lea (c4_keys,pc),a1
+        moveq #0,d0
+        moveq #127,d1
+.key
+        move.b (a1),d2
+        bclr #C4_FRESH,d2
+        bne.s .next
+        bclr #C4_UP,d2
+        beq.s .down
+        clr.b (a0)
+        addq.l #1,d0
+        bra.s .next
+.down
+        bclr #C4_DOWN,d2
+        beq.s .next
+        move.b #$b3,(a0)
+        addq.l #1,d0
+        btst #C4_PHYS,d2
+        bne.s .next
+        bset #C4_UP,d2          ; a tap: release after this press is seen
+.next
+        move.b d2,(a1)+
+        addq.l #1,a0
+        dbf d1,.key
+        lea (c4_applied,pc),a1
+        add.l d0,(a1)
+        lea (c4_live,pc),a1
+        move.w #1,(a1)
+        btst #3,d3
+        beq.s .masked
+        move.w #$8008,$dff09a
+.masked
+        movem.l (sp)+,d0-d3/a0-a1
+        move.l (c2_h0,pc),-(sp)
+        addi.l #$64,(sp)
+        rts
+
+; Leave the deferral: show every key as it physically is.
+c4_flush
+        movem.l d1-d3/a0-a1,-(sp)
+        move.w $dff01c,d3
+        move.w #$0008,$dff09a
+        lea (c4_live,pc),a1
+        clr.w (a1)
+        movea.l (c2_h2,pc),a0
+        adda.w #$52a,a0
+        lea (c4_keys,pc),a1
+        moveq #127,d1
+.key
+        move.b (a1),d2
+        andi.b #(1<<C4_UP)|(1<<C4_DOWN),d2
+        beq.s .next
+        clr.b (a0)
+        btst #C4_PHYS,(a1)
+        beq.s .next
+        move.b #$b3,(a0)
+.next
+        andi.b #1<<C4_PHYS,(a1)+
+        addq.l #1,a0
+        dbf d1,.key
+        btst #3,d3
+        beq.s .masked
+        move.w #$8008,$dff09a
+.masked
+        movem.l (sp)+,d1-d3/a0-a1
         rts
 
         CNOP 0,4
@@ -1584,6 +1736,12 @@ c2_replay_pictures dc.l 0
 c2_scene_ready dc.w 0
 
         CNOP 0,4
+c4_deferred dc.l 0              ; key changes held back by the interrupt
+c4_applied dc.l 0               ; held-back changes shown at a scan
+c4_live dc.w 0
+c4_keys ds.b 128                ; C4_* state per raw key
+
+        CNOP 0,4
 c2_h0 dc.l 0
 c2_h1 dc.l 0
 c2_h2 dc.l 0
@@ -1614,6 +1772,10 @@ patch_582992
         PL_IFC2X 1
         ; PERF_RANGE h0:3c8d2 6 custom=2 bit=1 variant=582992
         PL_PS $3c8d2,c2_live_entry
+        ; PERF_RANGE h0:3c94a 6 custom=2 bit=1 variant=582992
+        PL_PS $3c94a,c4_scan
+        ; PERF_RANGE h0:3cc8e 6 custom=2 bit=1 variant=582992
+        PL_PS $3cc8e,c4_scan
         ; PERF_RANGE h0:3c962 6 custom=2 bit=1 variant=582992
         PL_PS $3c962,c3_live_pause
         ; PERF_RANGE h0:3ccba 6 custom=2 bit=1 variant=582992

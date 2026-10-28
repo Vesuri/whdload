@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C3 complete; C4 buffering one-shot presses; B5/A8 pass for the current scope
+# Current status: C3 complete; C4 short presses buffered; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -17,21 +17,16 @@ results and acceptance evidence are in [internals.md](internals.md).
 | C1 | Complete: elapsed-VBL clock design, whole native updates, PAL/NTSC integer schedules and checked accounting model. The C2 prototype now installs runtime hooks behind a developer option. |
 | C2 | Complete as a developer-only loop implementation: bounded whole ticks, separated painting, safe publication and checked sound timing. PAL/NTSC beam detection is user-approved. |
 | C3 | Complete: explicit modal suspension/rebase, replay and menu handoffs, native accelerated-time ownership, and checked PAL/NTSC/68000 routes. |
-| C4 | In progress. The user chose to buffer one-shot presses. Held view and per-tick joystick probes pass; the lost one-shot press repeats exactly and is the failing test to fix. |
+| C4 | In progress. One-shot presses are buffered (user decision); the short-press, held-view and joystick probes pass and repeat exactly. Pause taps, all view keys, replay input and rapid repeats remain. |
 | C5–G | Real-time acceptance, presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: buffer C4 one-shot presses, then finish its input acceptance.**
-A real key press/release during the forced batch delay is recorded by the keyboard IRQ
-but lost before the next scan. Held view keys and per-tick joystick sampling pass.
-**Decision (user):** buffer one-shot presses (view keys, pause) so the next native input
-check sees each press exactly once; do not accept the native short-press limitation.
-Keep native sampling points, held-key behavior and joystick sampling unchanged, keep
-the buffer behind the developer C2 option, and keep disabled builds byte-identical.
-The existing short-pulse probe must turn from FAIL to PASS on a rebuilt slave; then
-finish pause, all view keys, replay/input and rapid-repeat acceptance and continue to
-C5/C6. The two saved captures and their checker agree on acceptance FAIL
-and exact-repeat PASS (`tmp/c4/acceptance.json`).
-See [C4 evidence](internals.md#c4-input-acceptance--short-press-gate-failed). The clock design
+**Next F1GP step: finish C4 input acceptance with the buffer.**
+One-shot presses (user decision) are held back until a native per-tick scan has seen
+them, so a tap during catch-up acts exactly once, one tick long. The short-press probe
+now passes and repeats exactly (`tmp/c4/buffered-report.json`); the disabled-feature gate
+passes with the two new scan hooks. Next: pause taps, all view keys, replay input and
+rapid repeats, on `a1200-030` where a step doesn't need another machine; then C5/C6.
+See [C4 evidence](internals.md#c4-input-acceptance--short-presses-buffered). The clock design
 is in [Game time](internals.md#elapsed-vbl-world-clock-c1); it adds no CIA timer and
 allows no fractional simulation updates. Its host accounting checks pass for PAL/NTSC.
 

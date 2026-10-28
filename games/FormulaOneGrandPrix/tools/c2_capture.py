@@ -38,7 +38,7 @@ def capture(args):
     if build['slave_sha256'] != sha(slave) or build['source_sha256'] != sha(SOURCE):
         raise ValueError('stale C2 build')
     symbols = {n: int(o, 16) for n, o in re.findall(
-        r'^(c[23]_\w+)\s+00:([0-9A-F]+)$',
+        r'^(c[234]_\w+)\s+00:([0-9A-F]+)$',
         (slave.parent / 'F1GP.lst').read_text(errors='replace'), re.M)}
     sock = ROOT / 'amiga/.run/f1gp.sock'
     if sock.exists():

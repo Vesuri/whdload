@@ -29,6 +29,12 @@ def report(directory):
         assert item['batch']==struct.unpack_from('>H',data['slave'],symbols['c2_clock']+10)[0]
         assert item['draw_mode']==struct.unpack_from('>H',data['slave'],symbols['c2_draw_mode'])[0]
         assert item['control']==data.get('control',b'').hex()
+        if 'buffer' in item:
+            buffer=item['buffer']
+            assert buffer['deferred']==struct.unpack_from('>I',data['slave'],symbols['c4_deferred'])[0]
+            assert buffer['applied']==struct.unpack_from('>I',data['slave'],symbols['c4_applied'])[0]
+            assert buffer['live']==struct.unpack_from('>H',data['slave'],symbols['c4_live'])[0]
+            assert buffer['state']==data['slave'][symbols['c4_keys']+0x4f]
         items[name]=item
     held=[items[f'held-{n}'] for n in range(5)]
     sampled=[not bool(int(x['masks'],16)&0x2000) for x in held]
@@ -40,8 +46,17 @@ def report(directory):
     assert not items['released']['latch']&0x20
     assert int(items['stick-right']['control'],16)&8 and not int(items['stick-neutral']['control'],16)&8
     assert items['pulse-before']['ticks']==items['pulse-down']['ticks']==items['pulse-up']['ticks']
-    assert items['pulse-down']['key']==0xb3 and items['pulse-up']['key']==0
-    delivered=not int(items['pulse-scan']['masks'],16)&0x2000 and items['pulse-consumer']['event']&0x20
+    assert items['pulse-down']['key']==0xb3
+    delivered=bool(not int(items['pulse-scan']['masks'],16)&0x2000 and items['pulse-consumer']['event']&0x20)
+    if 'pulse-release' in items:   # buffered build: the release waits for one scan
+        up,scan,release,after=(items[n] for n in ('pulse-up','pulse-scan','pulse-release','pulse-after'))
+        assert up['key']==0xb3 and up['buffer']['deferred']==items['pulse-down']['buffer']['deferred']+1
+        delivered=delivered and bool(release['key']==0 and int(release['masks'],16)&0x2000
+            and release['buffer']['applied']==scan['buffer']['applied']+1
+            and release['ticks']==scan['ticks']+1
+            and not after['event']&0x20 and not after['latch']&0x20)
+    else:
+        assert items['pulse-up']['key']==0
     assert result['short_pulse']==result['status']==('PASS' if delivered else 'FAIL')
     return dict(status=result['status'], evidence_verified=True,
                 build=meta['build'],runtime=meta['runtime'],game_inputs=meta['game_inputs'],

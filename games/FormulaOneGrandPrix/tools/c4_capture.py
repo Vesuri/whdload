@@ -38,6 +38,10 @@ def exercise(args, command, out, base, bases, symbols, meta):
                     masks=native[0x18:0x1e].hex(), latch=native[0x3a915],
                     view=view.hex(), event=view[10], key=keys[0x4f],
                     control=controls.hex(), player=player,
+                    buffer=dict(deferred=struct.unpack_from('>I',state,symbols['c4_deferred'])[0],
+                                applied=struct.unpack_from('>I',state,symbols['c4_applied'])[0],
+                                live=struct.unpack_from('>H',state,symbols['c4_live'])[0],
+                                state=state[symbols['c4_keys']+0x4f]),
                     files={suffix:hashlib.sha256(data).hexdigest() for suffix,data in
                            (('slave',state),('h0',native),('view',view),('keys',keys))})
         if controls:
@@ -86,14 +90,25 @@ def exercise(args, command, out, base, bases, symbols, meta):
     command('gdb','monitor key 4f 0')
     stop(h2+0x4d4)
     up=snap('pulse-up')
-    assert up['key']==0
+    # The buffer holds the release back: the table still shows the press.
+    assert up['key']==0xb3 and up['buffer']['deferred']==down['buffer']['deferred']+1, up
     # No simulation tick ran between the actual keyboard IRQ stores.
     assert before['ticks']==down['ticks']==up['ticks'], (before,down,up)
     stop(h0+0x3c950)
     scanned=snap('pulse-scan')
     stop(h0+0x3c99a)
     consumed=snap('pulse-consumer')
+    # The next scan shows the held-back release; the press must act only once.
+    stop(h0+0x3c950)
+    released=snap('pulse-release')
+    stop(h0+0x3c99a)
+    after=snap('pulse-after')
+    once = (released['key']==0 and int(released['masks'],16)&0x2000
+            and released['buffer']['applied']==scanned['buffer']['applied']+1
+            and released['ticks']==scanned['ticks']+1
+            and not after['event']&0x20 and not after['latch']&0x20)
     result.update(held_view='PASS', joystick='PASS', short_pulse=(
-        'PASS' if not int(scanned['masks'],16)&0x2000 and consumed['event']&0x20 else 'FAIL'))
+        'PASS' if not int(scanned['masks'],16)&0x2000 and consumed['event']&0x20 and once
+        else 'FAIL'))
     result['status']='PASS' if result['short_pulse']=='PASS' else 'FAIL'
     (out/'input.json').write_text(json.dumps(result,indent=2)+'\n')

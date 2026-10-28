@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check C3 hook instructions and native direct entries in modal/loop regions."""
+"""Check C3/C4 hook instructions and native direct entries in modal/loop regions."""
 from capstone import Cs, CS_ARCH_M68K, CS_MODE_M68K_000, CS_MODE_BIG_ENDIAN
 from capstone.m68k import M68K_OP_BR_DISP, M68K_OP_MEM
 from check_disabled import SOURCE, ranges, relocated_original
@@ -14,7 +14,8 @@ def check():
     cs.detail = True
     expected = {0x3c962:(0,0x3b5de), 0x3ccba:(0,0x3b80e),
                 0x3b6de:(2,0x8e2), 0x3b8b4:(2,0x8e2),
-                0x3ba24:(0,0x3ca5a), 0x3cbd6:(0,0x39fd2), 0x3ca26:(2,0x8e2)}
+                0x3ba24:(0,0x3ca5a), 0x3cbd6:(0,0x39fd2), 0x3ca26:(2,0x8e2),
+                0x3c94a:(0,0x64), 0x3cc8e:(0,0x64)}      # C4 key scans
     annotations = {r['offset']:r for r in ranges(SOURCE.read_text()) if r['hunk']==0}
     for offset, (h,target) in expected.items():
         ins = next(cs.disasm(hunks[0][offset:offset+6],bases[0]+offset))
@@ -38,7 +39,7 @@ def check():
     assert not any(interior(offset) for offset in expected)
     # A displaced hook spanning the live loop head must be rejected.
     assert interior(0x3c8f4)
-    print(f'{len(expected)} C3 calls and {count} native instructions checked; interior-entry negative fixture rejected')
+    print(f'{len(expected)} C3/C4 calls and {count} native instructions checked; interior-entry negative fixture rejected')
 
 
 if __name__ == '__main__':

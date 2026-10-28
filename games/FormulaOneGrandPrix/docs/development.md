@@ -755,9 +755,10 @@ It also checks controller press/release and a full press/release between scans.
 The reporter prints and saves that acceptance result without treating a reproduced game
 failure as a corrupt capture. Check the result, not merely its process exit status.
 
-Current evidence is a failed short-press gate; see internals. The user chose buffered
-one-shot presses; no input patch is installed yet. With the buffer, rerun this probe
-(it must report PASS), then complete pause, all view keys, replay/input and
-rapid-repeat checks. If the
+With the buffer (VERIFY build, `CUSTOM2` bit 1) the probe also follows the held-back
+release to the next scan and requires one view event, a rearmed latch and the slave's
+deferral counters (`c4_deferred`, `c4_applied`). The report accepts the older unbuffered
+captures, which still verify as FAIL. Pause taps, all view keys, replay input and rapid
+repeats remain to be checked. If the
 slave changes, rebuild and collect fresh evidence, including the disabled-feature
 gate; retain the current captures as evidence of the original failure.

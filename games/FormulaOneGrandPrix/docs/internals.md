@@ -1688,7 +1688,7 @@ intervals. These are window-scoped publication/sound checks, not C5/C6 acceptanc
 The combined current-build record is `tmp/c3/acceptance.json`.
 
 
-### C4 input acceptance — short-press gate failed
+### C4 input acceptance — short presses buffered
 
 The C3 slave still uses the native input readers. Live h0+$3C94A calls h0+$64
 once per tick; h0+$3C950 calls the controller reader +$34D24 before control processing
@@ -1708,11 +1708,42 @@ h2+$52A indexed by raw key. No pending-press record survives a completed release
 Consequently a press and release between native scans can be missed. Retaining native
 sampling and requiring lossless one-shot presses need an explicit policy: buffer the
 one-shot events for native consumption, or accept the original short-press limitation.
-The user chose buffering: one-shot presses are held for the next native input check,
-so each acts exactly once. No input patch has been installed yet; the failed capture
-below remains the evidence of the original behavior.
+The user chose buffering.
 
-`tmp/c4/input-2/` captures the C3 VERIFY slave (`330662b72ba7c19d049a0eb68cb522cbe668e27470a9ccfd24df561465273b97`)
+**The buffer.** Developer/VERIFY builds with `CUSTOM2` bit 1 hold a key change back
+until a native per-tick scan has seen the state before it. The slave's existing keyboard
+hook at h2+$4AC (after the native decode, with A0 at the key table) keeps a state byte
+per raw key: physically down, shown state not yet scanned, release pending, press
+pending. A release of a press that no scan has seen, or a press after a release that no
+scan has seen, is recorded and the native store skipped (D0=$FF takes the native
+handler's existing branch past the store). The live and replay scan calls h0+$3C94A
+and +$3CC8E now enter `c4_scan`, which applies at most one pending change per key
+before the native scan h0+$64 runs, with the keyboard interrupt masked in INTENA.
+A tap is therefore shown pressed for exactly one tick: the scan and every reader in that
+tick (the pause check h0+$3C962, view latches) see it, and the next scan sees the
+release. A key held across a scan behaves natively. A press–release–press before a scan
+is delivered as two presses on successive ticks; further taps before those are shown
+merge.
+
+Deferral is live only from a scan until the loop suspends (`c3_suspend`), enters a pause
+wait (`c3_pause_begin`) or leaves (`c3_leave`). Each of those flushes every key to its
+physical state, so native loops that poll keys without tick scans (pause, menus) never
+see a held-over press. With the option off, no scan hook is installed and the keyboard
+path is native; release builds contain none of this code and keep their SHA-256.
+
+**Evidence with the buffer.** `tmp/c4/buffered` and `buffered-repeat` run the same probe
+on VERIFY `e4cb8540403d2bbf795625d9be02e88bc1a6ec63bc61deac2be37ac0260df9ac` (`CUSTOM2=3`,
+`CUSTOM4=3`, `a1200-fast`, PAL). The short `$4F` tap arrives during the forced 20-field
+delay at serial 340 with 40 completed ticks; the release IRQ is held back (key table
+still `$B3`, one deferral). The scan at serial 361 sees the press and the view consumer
+emits bit 5 once. The next tick's scan (41 ticks, serial 364) shows the release (one
+applied change), and its consumer emits nothing and rearms the latch. Held view and
+joystick checks pass as before. `tmp/c4/buffered-report.json`: acceptance PASS, exact
+repeat PASS; both runs quit with F10 `OK`. The four-arm disabled-feature gate passes
+again (`tmp/b4/c4-acceptance.json`), rejecting mutations of all 300 optional hook bytes;
+`check_modal_hooks.py` checks both scan call sites.
+
+**Before the buffer.** `tmp/c4/input-2/` captures the C3 VERIFY slave (`330662b72ba7c19d049a0eb68cb522cbe668e27470a9ccfd24df561465273b97`)
 on `a1200-fast`, PAL, `CUSTOM2=3`, `CUSTOM4=3`. It uses real harness key/joystick
 input and read-only breakpoints, with the existing 20-field batch-delay diagnostic.
 The probe anchors to completed tick 30; all serial values below are observations from
@@ -1736,6 +1767,6 @@ this capture, never route anchors for another build or machine.
   verifies the saved state hashes, decoded masks/latches, consecutive ticks and event
   result. A successful capture is deliberately distinguished from failed acceptance.
 
-Held pause behavior already has C3 modal evidence; exhaustive C4 pause, all view keys,
-replay/input and rapid-repeat acceptance remain open until the short-press policy is
-settled. No release bytes, clock cadence or shared tooling changed.
+Held pause behavior already has C3 modal evidence. Pause taps, all view keys,
+replay input and rapid repeats remain to be checked with the buffer. No release bytes,
+clock cadence or shared tooling changed.
