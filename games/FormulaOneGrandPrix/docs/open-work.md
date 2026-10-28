@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C and D1 complete; D2 next; B5/A8 pass for the current scope
+# Current status: C, D1 and D2 complete; D3 next; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -21,9 +21,17 @@ results and acceptance evidence are in [internals.md](internals.md).
 | C5 | Complete. (a) 7.987 ticks per emulated second (8 per 50 PAL fields, no drops) on the 030 and A1200; the A500-equivalent is overloaded (C6). (b) normal and slowed drawing give identical state at every tick of a race; the one-field difference is classified as an A1 timing input. (c) race, retirement, replay and the accepted pit coverage pass on the 030. |
 | C6 | Complete: the A1200 runs at real time (7.7 fps, 6.7 in the tow window). On the A500-equivalent the clock gives 1.65 fps at 0.83×, because an undrawn tick costs 7.2 fields, so the 68000 keeps the native pacer by default (user decision); `CUSTOM2` bit 2 forces the clock for tests. |
 | D1 | Complete: behind `CUSTOM2` bit 3, every completed tick records the A4 renderer inputs (view state, published camera, synthetic camera and 26 car records) with its field number in cur, keeping the previous tick in prev. A whole 030 race matches game memory at all 3162 ticks, leaves the race identical to the option off, repeats exactly and costs 0.24 ms per tick. |
-| D2–G | Presentation, optimisation and release work remain open under the plan. |
+| D2 | Complete: every picture gets α, the Q14 fraction of the next tick from the clock's credit plus the measured lead to its first displayed field, clamped to two ticks; α is 0 when pictures are longer than a tick. Over a whole 030 race the rule recomputes exactly, 95% of leads are exact, displayed world time never goes backwards (p95 error 1 field), and the race is unchanged. |
+| D3–G | Presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: D2 α (smooth presentation).**
+**Next F1GP step: D3 stage and restore (smooth presentation).**
+D2 is complete ([evidence](internals.md#d2-presentation-phase-α--complete)). Each picture's
+α counts from when the current tick fell due (the clock's credit) plus the lead the
+previous picture of its kind took to reach the screen. The clamp is two ticks: pictures
+drawn between ticks are displayed after the next tick is due (ideal α up to 1.5), so a
+one-tick clamp lagged by up to 3 fields. D3 now stages predicted renderer inputs from
+the D1 snapshots at that α and restores them exactly.
+
 D1 is complete ([evidence](internals.md#d1-presentation-snapshots--complete)). At every
 completed tick the slave keeps cur and prev copies of the renderer inputs, with field
 numbers and the epoch, rebase and view state that D2/D4 need to decide when to snap.
@@ -100,8 +108,8 @@ If this work is resumed, count 040/060 work with aprof and confirm timing on a r
 accelerator; do not relabel the current evidence.
 
 A4 is now complete; its state map is in [internals](internals.md#state-map-a4).
-Continue with **D2–D10** (presentation), following the plan. Caches remain opt-in until a release build turns them on; B5 no longer
-blocks that. The C2 implementation is developer-only and opt-in (`CUSTOM2` bit 1, D1 snapshots bit 3); no extrapolation
+Continue with **D3–D10** (presentation), following the plan. Caches remain opt-in until a release build turns them on; B5 no longer
+blocks that. The C2 implementation is developer-only and opt-in (`CUSTOM2` bit 1, D1 snapshots and D2 timing bit 3); no extrapolation
 patch or release clock option is enabled.
 
 Measurement controls now enforced:

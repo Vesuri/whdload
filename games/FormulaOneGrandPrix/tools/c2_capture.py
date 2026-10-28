@@ -64,6 +64,8 @@ def capture(args):
     extra = '--joystick_port_0_autoswitch=0'
     if args.ntsc:
         extra += ' --ntsc_mode=1'
+    if args.alpha:
+        args.snapshot = True
     custom2 = (7 if args.clock_68000 else 3) | (8 if args.snapshot else 0)
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5=0 FileLog'
     if args.setup == 'a1200-030':   # the primary target: 68030/50 without an MMU
@@ -308,6 +310,7 @@ if __name__ == '__main__':
     parser.add_argument('--states', action='store_true', help='C5(b) state at every completed tick')
     parser.add_argument('--cpu-hz', type=int, default=0, help='68030 clock for the one-field run')
     parser.add_argument('--clock-68000', action='store_true', help='CUSTOM2 bit 2: the clock on a 68000 too')
+    parser.add_argument('--alpha', action='store_true', help='with --states: D2 timing of every picture (implies --snapshot)')
     parser.add_argument('--snapshot', action='store_true', help='CUSTOM2 bit 3: D1 presentation snapshots')
     parser.add_argument('--expect-native', action='store_true', help='check the 68000 default keeps the native pacer')
     parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))

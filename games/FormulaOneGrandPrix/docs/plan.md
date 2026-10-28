@@ -103,8 +103,8 @@ with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's ques
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
 tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
 A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
-68000 keeps the original frame-locked pacer by default (user decision). D1 is
-complete (presentation snapshots); D2 is next.
+68000 keeps the original frame-locked pacer by default (user decision). D1 and D2
+are complete (presentation snapshots and α); D3 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -277,6 +277,10 @@ read-only for the game, 0.24 ms per tick.
 tick, in Q14, clamped. "Until shown" comes from the `A5` publication rule and the last
 picture's drawing time (Wing Commander's display-field horizon). When pictures are longer
 than a tick, show the latest state and skip prediction (Red Baron).
+*Result:* complete ([internals](internals.md#d2-presentation-phase-α--complete)). Phase
+from the clock's credit (fields since the tick fell due), lead measured per picture kind,
+α 0 when pictures (lead or period) are longer than a tick, clamped to two ticks because
+pictures drawn between ticks are displayed after the next tick is due.
 
 **D3 Stage and restore.** Write predicted values into the renderer's inputs (or a
 renderer-only copy), draw, restore the authoritative values exactly before any

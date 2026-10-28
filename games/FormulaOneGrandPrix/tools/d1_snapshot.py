@@ -101,11 +101,12 @@ def check(directory, mutate=None):
         cars = cars_data[n*c5+cars_at:n*c5+cars_at+states['ranges']['cars'][2]]
         cur, prev = split(slave)
         header = HEADER.unpack_from(cur)
-        # A VBL may fall between the snapshot's serial read and the stop.
+        # A VBL may fall between the snapshot's serial read and the stop. Catch-up
+        # ticks can share a field, so field numbers only never decrease.
         late = header[0] == item['serial']-1
         kinds['vbl_during_snapshot'] += late
         expected = (item['serial']-late, item['tick'], epochs, rebased, reconstructions, 1, item['draw_mode'])
-        if header != expected or (previous and header[0] <= HEADER.unpack_from(previous)[0]):
+        if header != expected or (previous and header[0] < HEADER.unpack_from(previous)[0]):
             failures.append(dict(tick=item['tick'], header=header, expected=expected))
         if cur[HEADER.size:] != extract(memory(game, cars)):
             body = cur[HEADER.size:]

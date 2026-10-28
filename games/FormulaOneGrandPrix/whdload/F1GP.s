@@ -37,7 +37,7 @@ slv_config
         IFNE DEVELOPER
         dc.b 'C2:X:Developer - VBL world clock:1;'
         dc.b 'C2:X:Developer - VBL world clock on a 68000 too:2;'
-        dc.b 'C2:X:Developer - presentation snapshots:3;'
+        dc.b 'C2:X:Developer - presentation snapshots and timing:3;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -639,6 +639,8 @@ c3_suspend
         clr.w WC_BATCH(a0)
         lea (c3_suspended,pc),a1
         move.w #1,(a1)
+        lea (d2_pending,pc),a1
+        clr.w (a1)
         lea (c2_in_tick,pc),a1
         clr.w (a1)
         lea (c2_draw_mode,pc),a1
@@ -767,6 +769,8 @@ c3_leave
         lea (c3_exits,pc),a0
         addq.l #1,(a0)
         lea (c2_mode,pc),a0
+        clr.w (a0)
+        lea (d2_pending,pc),a0
         clr.w (a0)
         lea (c2_in_tick,pc),a0
         clr.w (a0)
@@ -999,6 +1003,7 @@ c2_acquire
 .vbl
         cmp.l (c2_serial,pc),d0
         beq.s .vbl
+        bsr d2_shown
         bsr c2_drain
         movea.l (c2_h0,pc),a2
         adda.l #$124a,a2
@@ -1174,6 +1179,85 @@ d1_fields
         dc.w $ac,0
         dc.w $b6,0
         dc.w -1
+
+; D2: presentation phase of the picture about to be drawn, unsigned Q14 of the
+; next tick interval, 0 to 2 ticks: the fields since the current tick fell due (its remaining credit
+; plus fields not yet observed) and the lead the previous picture of the same kind
+; took from its start to its first displayed field. When pictures are longer than
+; a tick (that lead, or the period since the last picture started, exceeds the next
+; interval) the picture shows the latest state: alpha 0. Read-only for the game.
+D2_TICK = 0                     ; drawn inside a tick, from the new state
+D2_REPEAT = 2                   ; drawn between ticks
+d2_picture                      ; D0 = kind
+        btst #3,(cache_options+3,pc)
+        beq d2_off
+        movem.l d0-d3/a0-a1,-(sp)
+        lea (d2_kind,pc),a1
+        move.w d0,(a1)
+        move.w #1,d2_pending-d2_kind(a1)
+        addq.l #1,d2_pictures-d2_kind(a1)
+        lea (d2_leads,pc),a0
+        move.w (a0,d0.w),d3     ; lead, 0 before the first measurement
+        move.w d3,d2_lead-d2_kind(a1)
+        move.l (c2_serial,pc),d1
+        move.l d1,d2
+        sub.l d2_start-d2_kind(a1),d2
+        cmpi.l #$7fff,d2
+        bls.s .period
+        move.w #$7fff,d2
+.period
+        move.w d2,d2_period-d2_kind(a1)
+        move.l d1,d2_start-d2_kind(a1)
+        lea (c2_clock,pc),a0
+        sub.l WC_LAST(a0),d1
+        add.w WC_CREDIT(a0),d1
+        move.w d1,d2_phase-d2_kind(a1)
+        bsr world_clock_interval
+        move.w d0,d2_interval-d2_kind(a1)
+        cmp.w d2_period-d2_kind(a1),d3
+        bcc.s .longest
+        move.w d2_period-d2_kind(a1),d3
+.longest
+        moveq #0,d2
+        cmp.w d0,d3
+        bls.s .predict
+        addq.l #1,d2_latest-d2_kind(a1)
+        bra.s d2_done
+.predict
+        move.w d2_lead-d2_kind(a1),d3
+        add.w d3,d1
+        move.w d0,d3
+        add.w d3,d3             ; at most two ticks ahead
+        move.w #$8000,d2
+        cmp.w d3,d1
+        bcc.s d2_done
+        moveq #0,d2
+        move.w d1,d2
+        lsl.l #8,d2
+        lsl.l #6,d2
+        divu.w d0,d2
+d2_done
+        move.w d2,d2_alpha-d2_kind(a1)
+        movem.l (sp)+,d0-d3/a0-a1
+d2_off
+        rts
+; In c2_acquire, at the first field after the copper took the bitmap.
+d2_shown
+        lea (d2_pending,pc),a2
+        tst.w (a2)
+        beq.s .done
+        clr.w (a2)
+        move.l (c2_serial,pc),d0
+        sub.l (d2_start,pc),d0
+        cmpi.l #$7fff,d0
+        bls.s .store
+        move.w #$7fff,d0
+.store
+        lea (d2_leads,pc),a2
+        adda.w (d2_kind,pc),a2
+        move.w d0,(a2)
+.done
+        rts
 
 c2_publish
         bsr c2_hud_flush
@@ -1664,6 +1748,12 @@ c2_scene
         move.l (sp)+,d0
         move.w (sp)+,ccr
         movem.l d0-a6,-(sp)
+        move.w (c2_draw_mode,pc),d0
+        subq.w #1,d0
+        bne.s .stage
+        moveq #D2_TICK,d0
+        bsr d2_picture
+.stage
         lea (c2_stage_entry,pc),a2
         bsr c2_save_stage
         movem.l (sp)+,d0-a6
@@ -1781,6 +1871,8 @@ c2_dry_scene dc.w 0
 ; effects are staged from that tick's entry and authoritative post-tick bytes
 ; restored afterwards. No camera evolution, input or HUD/blink call is repeated.
 c2_repeat_picture
+        moveq #D2_REPEAT,d0
+        bsr d2_picture
         movea.l (c2_h0,pc),a2
         move.l ($1256,a2),d0
         move.l -4(a2),d1      ; next segment BPTR -> hunk 1
@@ -1874,6 +1966,17 @@ c2_draw_mode dc.w 0
 c2_in_tick dc.w 0
 c2_native_rate dc.w 0
 c2_beam_max dc.w 0
+d2_start dc.l 0                 ; field the current picture started
+d2_pictures dc.l 0
+d2_latest dc.l 0                ; pictures longer than a tick: alpha 0
+d2_kind dc.w 0
+d2_pending dc.w 0               ; started, first displayed field not yet seen
+d2_phase dc.w 0                 ; fields since the current tick fell due
+d2_interval dc.w 0              ; fields of the next tick
+d2_lead dc.w 0                  ; lead used for this picture
+d2_period dc.w 0                ; fields since the previous picture started
+d2_alpha dc.w 0                 ; unsigned Q14, at most $8000
+d2_leads dc.w 0,0               ; last measured lead per kind
 d1_current dc.w 0
 d1_buffers ds.b 2*D1_SIZE
         ENDC

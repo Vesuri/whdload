@@ -848,3 +848,24 @@ python3 tools/c2_capture.py tmp/d1/profile-030 --build tmp/d1/build-verify --sna
 python3 tools/c6_profile.py tmp/d1/profile-030 --out tmp/d1/profile-030.json
 ```
 
+### D2 presentation phase
+
+`--alpha` (implies `--snapshot`) adds a stop after every picture's α (`d2_off`) and saves
+the clock and D2 state in `pictures.bin.gz`. `d2_alpha.py` recomputes each α and judges
+its lead against the field the picture was first displayed:
+
+```sh
+make slave-verify OUT=tmp/d2/build-verify
+python3 tools/c2_capture.py tmp/d2/states-off --build tmp/d2/build-verify --states --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d2/states-on --build tmp/d2/build-verify --states --alpha --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d2/states-on-repeat --build tmp/d2/build-verify --states --alpha --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d2/states-slowed --build tmp/d2/build-verify --states --alpha --custom4 3 --setup a1200-030
+python3 tools/d2_alpha.py tmp/d2/states-on --out tmp/d2/alpha-on.json
+python3 tools/d2_alpha.py tmp/d2/states-slowed --out tmp/d2/alpha-slowed.json
+python3 tools/c5_compare.py off=tmp/d2/states-off on=tmp/d2/states-on repeat=tmp/d2/states-on-repeat \
+  slowed=tmp/d2/states-slowed --out tmp/d2/states-comparison.json
+```
+
+A capture that stops at an unexpected PC after a corrupted gdb reply is a debugger
+fault, not a result. Move it aside and capture again.
+

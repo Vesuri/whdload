@@ -199,6 +199,17 @@ def states(args, command, out, base, bases, symbols, meta):
     if condition:
         command('gdb', condition)
     command('gdb', f'commands $bpnum\nsilent\n{appends}\ncontinue\nend')
+    if getattr(args, 'alpha', False):
+        # D2: the clock and the picture's timing state after each alpha.
+        import d2_alpha
+        picture_regions = d2_alpha.regions(base, symbols)
+        picture_paths = [out/f'pictures-{n}.bin' for n in range(len(picture_regions))]
+        for path in picture_paths:
+            path.write_bytes(b'')
+        picture_appends = '\n'.join(f'append binary memory {path} {start:#x} {start+size:#x}'
+                                     for path, (start, size) in zip(picture_paths, picture_regions))
+        command('gdb', f'break *{base+symbols["d2_off"]:#x}')
+        command('gdb', f'commands $bpnum\nsilent\n{picture_appends}\ncontinue\nend')
     command('gdb', f'break *{base+symbols["c3_leave"]:#x}')
     command('gdb', 'continue')
     pc = int(re.search(r'\$\d+\s*=\s*(0x[0-9a-fA-F]+)', command('gdb', 'p/x $pc'))[1], 16)
@@ -222,6 +233,17 @@ def states(args, command, out, base, bases, symbols, meta):
         result['snapshot'] = dict(
             size=d1_snapshot.SIZE, stop=stop, regions=regions[3:],
             archive_sha256=hashlib.sha256((out/'snapshots.bin.gz').read_bytes()).hexdigest())
+    if getattr(args, 'alpha', False):
+        columns = [path.read_bytes() for path in picture_paths]
+        count = len(columns[0]) // picture_regions[0][1]
+        assert count and all(len(c) == count*size for c, (_, size) in zip(columns, picture_regions))
+        data = b''.join(b''.join(c[n*size:(n+1)*size] for c, (_, size) in zip(columns, picture_regions))
+                        for n in range(count))
+        for path in picture_paths:
+            path.unlink()
+        (out/'pictures.bin.gz').write_bytes(gzip.compress(data, mtime=0))
+        result['pictures'] = dict(count=count, stop='d2_off', regions=picture_regions,
+                                  archive_sha256=hashlib.sha256((out/'pictures.bin.gz').read_bytes()).hexdigest())
     (out/'ticks.bin.gz').write_bytes(gzip.compress(b''.join(blobs), mtime=0))
     result.update(status='PASS', record=len(blobs[0]), count=len(blobs),
                   archive_sha256=hashlib.sha256((out/'ticks.bin.gz').read_bytes()).hexdigest())

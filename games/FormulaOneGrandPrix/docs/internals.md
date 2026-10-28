@@ -1988,10 +1988,62 @@ source change). D1 does not decide that.
 
 | Check | Result |
 |---|---|
-| Snapshot = game memory (`states-on`, `d1_snapshot.py`) | PASS. At each of 3162 ticks (6–3167), stopping at `d1_done`, cur equals the A4 fields rebuilt from game memory dumped at the same stop, and prev equals the previous tick's cur (3161 consecutive pairs). Field numbers increase. In 24 ticks a VBL fell between the serial read and the stop, so the recorded field number is one below the stop's serial. |
+| Snapshot = game memory (`states-on`, `d1_snapshot.py`) | PASS. At each of 3162 ticks (6–3167), stopping at `d1_done`, cur equals the A4 fields rebuilt from game memory dumped at the same stop, and prev equals the previous tick's cur (3161 consecutive pairs). Field numbers never decrease (catch-up ticks can share a field). In 24 ticks a VBL fell between the serial read and the stop, so the recorded field number is one below the stop's serial. |
 | Negative probes | A flipped snapshot byte, published-camera byte and epoch counter are each rejected |
 | Read-only (`c5_compare.py`, `states-comparison.json`) | Option off (`CUSTOM2=3`) versus on (`=11`), same build: identical A1 inputs and identical car/session state at all 3162 common ticks |
 | Exact repeat (`states-on-repeat`) | Identical states and snapshot archive (`434cf191…`) |
 | Cost (`profile-030.json`, 100 fields from tick 300) | 0.24 ms per tick (0.19% of the window); the car update is 3.07 ms per tick. Emulated 68030 time |
 | Pictures over the race | 6203 off, 6183 on (3.18 versus 3.19 fields per picture), no drops in either |
 | Disabled-feature gate (`tmp/b4/d1-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D1 adds no hook, only code reached from `c2_pacer` |
+
+### D2 presentation phase α — complete
+
+With `CUSTOM2` bit 3, `d2_picture` gives every picture a presentation phase α just
+before it is drawn. This covers pictures drawn inside a tick (`c2_scene` with draw mode 1,
+from the new state) and pictures drawn between ticks (`c2_repeat_picture`, from the
+last tick's state). α is an unsigned Q14 fraction of the next tick's interval (the
+clock's 7/6/6/6 PAL or 8/7 NTSC table at its current phase):
+
+```
+phase  = WC_CREDIT + (c2_serial − WC_LAST)      fields since the current tick fell due
+lead   = measured lead of the previous picture of the same kind
+period = fields since the previous picture started
+α = 0                                   if max(lead, period) > interval   (latest state)
+α = min(phase + lead, 2 × interval) × 2^14 ÷ interval                       (otherwise)
+```
+
+- **Phase:** credit is the fields beyond the current tick's due point, so α measures
+  from when the tick fell due rather than when it finished running. With no drops the
+  two are the same up to the tick's own run time, and α = 1 coincides with the next
+  tick's release.
+- **Lead:** the "until shown" horizon follows A5's rule. `d2_shown`, in `c2_acquire`,
+  records the first field after the copper has taken the submitted bitmap; the lead is
+  that field minus the picture's start field. Pictures drawn inside a tick and between
+  ticks keep separate leads, because the tick's simulation work makes the former's
+  longer. Suspending or leaving the loop discards an unmeasured picture.
+- **Long pictures:** when pictures are longer than a tick, the picture shows the latest
+  state (α 0), as the plan specifies (Red Baron).
+- **Clamp at two ticks:** a first build clamped α at one tick (`tmp/d2/clamp1`). On
+  the 030, 3123 of 5983 pictures hit that clamp, so the displayed world lagged by up to
+  3 fields (p95 2). A picture drawn between ticks starts about two thirds into a tick
+  and reaches the screen about 3 fields later, after the next tick is due. The ideal α
+  measured over the whole race reaches 1.5 and never exceeds 2. D8 will set the
+  prediction limits from measured errors.
+- **Interval beyond one tick:** α above 1 still uses the next interval; the interval
+  after it may differ by one field.
+
+**Evidence** (VERIFY `caffe19a…`, `a1200-030` non-MMU, whole Quick Race, `tmp/d2/`;
+`d2_alpha.py` stops after every α, `CUSTOM4=1` unless noted):
+
+| Check | Result |
+|---|---|
+| Rule (`alpha-on.json`) | PASS: phase, interval, lead, period, α and the latest-state count recompute exactly for all 5984 pictures (3113 inside ticks, 2871 between) |
+| Lead against the display | Exact for 5669 of 5983 pictures; ±1 field for 308; ±2 for 6 |
+| Displayed world time (tick + α) | Never goes backwards. Its error against the ideal at the first displayed field: p50 0, p95 1 field, maximum 2 fields. The ideal α has p50 1.0, p95 1.33 and maximum 1.5; 2163 pictures are above 1 and none above 2 |
+| α distribution | 161 in [0.25, 0.5), 1709 in [0.5, 0.75), 984 in [0.75, 1), 1965 in [1, 1.25), 1037 in [1.25, 1.5), 128 at 1.5; none below 0.25 and none latest |
+| Long pictures (`alpha-slowed.json`, `CUSTOM4=3`) | All 778 pictures (27.3 fields apart) show the latest state with α 0 |
+| Read-only (`states-comparison.json`) | Option off (`CUSTOM2=3`) versus on (`=11`), the repeat and the slowed run: identical car/session state at all 3114 (slowed 3112) common ticks |
+| Exact repeat (`states-on-repeat`) | Identical states, pictures archive (`da337dc9…`) and snapshots. A first attempt is kept in `states-on-repeat-gdb-fault`: a corrupted gdb reply stopped it at an unrelated PC |
+| D1 snapshots in these runs | PASS. In the slowed run, two catch-up ticks shared a field, so the D1 check now requires field numbers that never decrease rather than strictly increase |
+| Pictures over the race | 6001 off, 5984 on (3.24 versus 3.25 fields per picture), no drops; D1 and D2 together |
+| Disabled-feature gate (`tmp/b4/d2-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D2 adds no hook |
