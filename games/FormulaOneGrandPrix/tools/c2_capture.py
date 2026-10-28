@@ -282,6 +282,7 @@ if __name__ == '__main__':
     parser.add_argument('--input-suite', action='store_true',
                         help='C4 view keys, pause, double tap and replay tap')
     parser.add_argument('--rate', action='store_true', help='C5(a) world-tick rate over a whole race')
+    parser.add_argument('--scenes', action='store_true', help='with --rate: classify each sample by screenshot')
     parser.add_argument('--states', action='store_true', help='C5(b) state at every completed tick')
     parser.add_argument('--cpu-hz', type=int, default=0, help='68030 clock for the one-field run')
     parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))

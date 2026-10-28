@@ -804,3 +804,15 @@ python3 tools/c5_compare.py normal=tmp/c5/states-normal repeat=tmp/c5/states-nor
 
 `DIFFERENT` lists the first differing tick and bytes; compare the recorded A1 inputs
 (`identities.*.inputs`) before reading a difference as a drawing effect.
+
+### C6 slow-machine measurements
+
+`--scenes` adds the game's view state to every C5 rate sample, so pictures, ticks and
+drops can be split into cockpit, tow and follow windows. `c6_profile.py` reduces a
+`--profile` window to inclusive time per loop routine:
+
+```sh
+python3 tools/c2_capture.py tmp/c6/scenes-a500 --build tmp/c5/build-verify --rate --scenes --custom4 1 --setup a500-1.5m
+python3 tools/c2_capture.py tmp/c6/a500-profile --build tmp/c5/build-verify --setup a500-1.5m --custom4 1 --ticks 330 --profile 100 --profile-tick 300
+python3 tools/c6_profile.py tmp/c6/a500-profile --out tmp/c6/a500-profile.json
+```

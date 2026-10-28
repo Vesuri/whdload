@@ -94,7 +94,19 @@ def evaluate(samples):
 
 
 def rate(args, command, out, base, bases, symbols, meta):
-    assert args.custom4 == 1 and args.route == 'quickrace'
+    first_viewed = []
+    def scene(name):
+        # h1+$238 selected car, +$23C view code: cockpit, the tow (the first car viewed
+        # from outside after the cockpit), or following another car.
+        path = out/(name+'-view.bin')
+        command('gdb', f'dump binary memory {path} {bases[1]+0x234:#x} {bases[1]+0x240:#x}')
+        view = path.read_bytes()
+        selected, code = struct.unpack_from('>I', view, 4)[0], view[8]
+        if code == 0:
+            return dict(scene='cockpit', view=view.hex())
+        if not first_viewed:
+            first_viewed.append(selected)
+        return dict(scene='tow' if selected == first_viewed[0] else 'follow', view=view.hex())
     result = dict(status='INCOMPLETE', step=STEP, samples=[])
     meta['rate'] = result
     def sample(name):
@@ -107,6 +119,9 @@ def rate(args, command, out, base, bases, symbols, meta):
         item.update(decode(slave, session, symbols))
         c = item['clock']
         assert c['observed'] == (c['consumed']+c['credit']+c['dropped']+item['c3_rebased'])&0xffffffff, item
+        item['pictures'] = struct.unpack_from('>I', slave, symbols['c2_pictures'])[0]
+        if getattr(args, 'scenes', False):
+            item.update(scene(name))
         result['samples'].append(item)
         (out/'rate.json').write_text(json.dumps(result, indent=2)+'\n')
         return item
@@ -119,7 +134,16 @@ def rate(args, command, out, base, bases, symbols, meta):
             break
     else:
         raise AssertionError('race did not reach its results')
-    command('shot', str(out/'results.png'))
+    # Quit only once the results menu is up; F10 during its loading is lost.
+    import f1gp
+    from PIL import Image
+    for _ in range(80):
+        command('shot', str(out/'results.png'))
+        if f1gp.showing(Image.open(out/'results.png').convert('RGB'), 'results'):
+            break
+        command('gdb', 'monitor fields 25')
+    else:
+        raise AssertionError('results menu not shown')
     result.update(evaluate(result['samples']))
     (out/'rate.json').write_text(json.dumps(result, indent=2)+'\n')
 

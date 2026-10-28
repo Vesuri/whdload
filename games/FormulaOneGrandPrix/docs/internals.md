@@ -1889,3 +1889,46 @@ captures dropped 161–1263 fields, so the garage scene is a known heavy case; i
 performance target, not a C5 rate result.
 
 Evidence: `tmp/c5/modal-{race,replay,pit}-{a,b}` and `modal-*-report.json`.
+
+### C6 slow machines — measured; the 68000 default needs a user decision
+
+Whole Quick Races with `--rate --scenes` (VERIFY `e4cb8540…`, `CUSTOM4=1`, PAL) classify
+each 250-field window by the game's view state h1+$238/+23C: cockpit, the tow (the first
+car viewed from outside after the cockpit, the retirement/tow sequence) and following
+other cars. Pictures are `c2_pictures` per field. All runs quit with F10 `OK`:
+
+| Machine | Cockpit fps | Tow fps | Follow fps | Ticks per second | Dropped fields |
+|---|---:|---:|---:|---:|---:|
+| A500-equivalent (`a500-1.5m`) | 1.73 | 1.53 | 1.65 | 6.92 / 6.07 / 6.60 | 13% / 24% / 18% |
+| A1200 (`a1200`) | 9.51 | 6.70 | 7.27 | 8.00 | 0 |
+| 68030/50 (`a1200-030`), for reference | 16.88 | 16.67 | 15.29 | 8.00 | 0 |
+
+Against the plan's projection: the **A1200 meets it**. It runs at real time throughout,
+7.7 fps over the race (6.7 in the tow window), where the original game shows 7.2–7.7 fps
+at 0.93× speed. The **A500-equivalent falls far short**: about 1.65 fps at 0.83× real
+time, where the projection was 5.2–5.6 fps at 1.0× and the original game shows 5.5–5.8 fps
+at 0.70×. Its debt cap drops 13–24% of the fields in every scene, so world time is lost
+everywhere, not only in the tow window.
+
+The projection assumed that an undrawn tick costs only the per-car update. A 100-field
+A500 profile at tick 300 (`tmp/c6/a500-profile`, `tools/c6_profile.py`) shows otherwise:
+
+| Routine | Calls | Per call | Share of the window |
+|---|---:|---:|---:|
+| Scene call (raster leaves gated on undrawn ticks) | 12 | 104.1 ms | 62.5% |
+| Per-car update h0+$2AC14 | 12 | 38.9 ms | 23.4% |
+| `c2_acquire` (32,000-byte front-to-back copy, VBL wait) | 3 | 47.0 ms | 7.0% |
+| Everything else in the loop | | | under 3% each |
+
+An undrawn tick still runs the renderer's geometry and visibility, which C2 keeps for the
+per-tick side effects (debris visibility, pit phases, shared RNG and camera shake; A3).
+Gating the raster leaves saves only about a sixth of the native 124 ms drawing cost, so a
+tick costs about 145 ms (7.2 fields) against 6.25 available: the 68000 cannot run the
+world at 8 Hz even without drawing. Making it fit would need those side effects
+separated from the scene geometry, so that an undrawn tick costs little more than the
+car update.
+
+Evidence: `tmp/c6/scenes-{a500,a1200,030}`, `tmp/c6/a500-profile` and
+`a500-profile.json`. `tmp/c6/discarded` keeps two runs that classified scenes from
+screenshots (Viewing banners are too brief) and lost F10 while the results menu
+loaded; the rate capture now waits for that menu before quitting.

@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C5 complete; C6 next; B5/A8 pass for the current scope
+# Current status: C5 complete; C6 measured, 68000 default to decide; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -19,7 +19,8 @@ results and acceptance evidence are in [internals.md](internals.md).
 | C3 | Complete: explicit modal suspension/rebase, replay and menu handoffs, native accelerated-time ownership, and checked PAL/NTSC/68000 routes. |
 | C4 | Complete: one-shot presses are buffered until a native scan has seen them (user decision). All view keys, pause, double tap, replay tap, held view and joystick pass and repeat exactly. |
 | C5 | Complete. (a) 7.987 ticks per emulated second (8 per 50 PAL fields, no drops) on the 030 and A1200; the A500-equivalent is overloaded (C6). (b) normal and slowed drawing give identical state at every tick of a race; the one-field difference is classified as an A1 timing input. (c) race, retirement, replay and the accepted pit coverage pass on the 030. |
-| C6–G | Slow-machine, presentation, optimisation and release work remain open under the plan. |
+| C6 | Measured: the A1200 runs at real time (7.7 fps, 6.7 in the tow window); the A500-equivalent manages 1.65 fps at 0.83× because an undrawn tick costs 7.2 fields. The 68000 default awaits a user decision. |
+| D–G | Presentation, optimisation and release work remain open under the plan. |
 
 **Next F1GP step: C6 slow machines.**
 C5 is complete ([evidence](internals.md#c5-real-time-acceptance)). (a) A whole Quick Race
