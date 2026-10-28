@@ -1688,7 +1688,7 @@ intervals. These are window-scoped publication/sound checks, not C5/C6 acceptanc
 The combined current-build record is `tmp/c3/acceptance.json`.
 
 
-### C4 input acceptance — short presses buffered
+### C4 input acceptance — gate passed
 
 The C3 slave still uses the native input readers. Live h0+$3C94A calls h0+$64
 once per tick; h0+$3C950 calls the controller reader +$34D24 before control processing
@@ -1767,6 +1767,20 @@ this capture, never route anchors for another build or machine.
   verifies the saved state hashes, decoded masks/latches, consecutive ticks and event
   result. A successful capture is deliberately distinguished from failed acceptance.
 
-Held pause behavior already has C3 modal evidence. Pause taps, all view keys,
-replay input and rapid repeats remain to be checked with the buffer. No release bytes,
-clock cadence or shared tooling changed.
+**Acceptance suite on the 68030/50.** `tmp/c4/suite-030` and `suite-030-repeat` run
+`--input-suite` on the same VERIFY build (`e4cb8540403d2bbf795625d9be02e88bc1a6ec63bc61deac2be37ac0260df9ac`) on `a1200-030` without an MMU
+(effective CPU 68030, MMU 0; `NOMMU`; caches on), PAL, `CUSTOM4=3`. Each tap is a real
+press and release between two scans, during the forced delay:
+
+| Check | Result |
+|---|---|
+| All seven view keys: cursor up/down (previous/next car, request bits 7/6), keypad 7 (player car, 3), cursor right (cockpit, 4), cursor left (TV, 5), Help (rear chase, 2), Del (front chase, 1) | Each mask bit is pressed for exactly one scan, its request bit is set once, and the next tick shows the release and rearms the latch |
+| Double tap on cursor left before one scan | Two TV requests on alternate ticks (59 and 61), released and rearmed on 60 and 62 |
+| Space (pause) tap | The tick's pause check pauses the game; the flush shows the key released and stops deferral; the native wait holds for 250 fields with the clock unchanged; a new tap resumes and the game does not pause again |
+| Cursor left tap in a replay (pause, R) | One TV request in the replay loop, released and rearmed on the next replay tick |
+
+`tmp/c4/suite-030-report.json`: all ten checks PASS, exact repeat PASS (configuration,
+route, layout and every saved snapshot); both runs quit with F10 `OK`. Held pause
+behavior also has C3 modal evidence. Three or more taps before the buffered ones are
+shown merge into those two; this needs taps faster than one per tick during catch-up.
+No release bytes, clock cadence or shared tooling changed.

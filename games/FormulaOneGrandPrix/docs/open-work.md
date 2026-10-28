@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C3 complete; C4 short presses buffered; B5/A8 pass for the current scope
+# Current status: C4 complete; C5 next; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -17,16 +17,18 @@ results and acceptance evidence are in [internals.md](internals.md).
 | C1 | Complete: elapsed-VBL clock design, whole native updates, PAL/NTSC integer schedules and checked accounting model. The C2 prototype now installs runtime hooks behind a developer option. |
 | C2 | Complete as a developer-only loop implementation: bounded whole ticks, separated painting, safe publication and checked sound timing. PAL/NTSC beam detection is user-approved. |
 | C3 | Complete: explicit modal suspension/rebase, replay and menu handoffs, native accelerated-time ownership, and checked PAL/NTSC/68000 routes. |
-| C4 | In progress. One-shot presses are buffered (user decision); the short-press, held-view and joystick probes pass and repeat exactly. Pause taps, all view keys, replay input and rapid repeats remain. |
+| C4 | Complete: one-shot presses are buffered until a native scan has seen them (user decision). All view keys, pause, double tap, replay tap, held view and joystick pass and repeat exactly. |
 | C5–G | Real-time acceptance, presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: finish C4 input acceptance with the buffer.**
-One-shot presses (user decision) are held back until a native per-tick scan has seen
-them, so a tap during catch-up acts exactly once, one tick long. The short-press probe
-now passes and repeats exactly (`tmp/c4/buffered-report.json`); the disabled-feature gate
-passes with the two new scan hooks. Next: pause taps, all view keys, replay input and
-rapid repeats, on `a1200-030` where a step doesn't need another machine; then C5/C6.
-See [C4 evidence](internals.md#c4-input-acceptance--short-presses-buffered). The clock design
+**Next F1GP step: C5 real-time acceptance.**
+C4 is complete: a tap during catch-up acts exactly once, one tick long, and the full
+suite passes on `a1200-030` (`tmp/c4/suite-030-report.json`). C5 now needs (a) the
+world-tick rate, 8.00 per second ± 1%, on the 030, A500-equivalent and A1200 wherever
+the ticks fit the CPU, with the displayed race clock recorded separately; (b) car
+records at each completed tick compared between normal, slowed and one-field drawing,
+with any difference classified; (c) a whole race, a pit stop, a retirement and a replay
+played through. Then C6.
+See [C4 evidence](internals.md#c4-input-acceptance--gate-passed). The clock design
 is in [Game time](internals.md#elapsed-vbl-world-clock-c1); it adds no CIA timer and
 allows no fractional simulation updates. Its host accounting checks pass for PAL/NTSC.
 
@@ -51,7 +53,7 @@ time and natural replay completion. A whole race observes green, retirement/tow 
 results, completing 3071 ticks with zero dropped fields. The fresh C3 disabled-feature
 suite rejects mutations of all 288 optional hook bytes; release bytes remain unchanged.
 Full pit-stop acceptance,
-input acceptance and the whole-machine real-time gates remain C4–C6 work. See
+the whole-machine real-time gates remain C5–C6 work; input acceptance is C4 (complete). See
 [C3 evidence](internals.md#c3-modal-clock-boundaries) and the reproducible commands in
 [development](development.md#c3-modal-boundary-validation).
 
@@ -76,7 +78,7 @@ If this work is resumed, count 040/060 work with aprof and confirm timing on a r
 accelerator; do not relabel the current evidence.
 
 A4 is now complete; its state map is in [internals](internals.md#state-map-a4).
-Continue with **C4–C6** (input acceptance and real-time validation), then **D1–D10** (presentation), following
+Continue with **C5–C6** (real-time validation), then **D1–D10** (presentation), following
 the plan. Caches remain opt-in until a release build turns them on; B5 no longer
 blocks that. The C2 implementation is developer-only and opt-in (`CUSTOM2` bit 1); no extrapolation
 patch or release clock option is enabled.

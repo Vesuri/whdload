@@ -97,9 +97,10 @@ C1, the developer-only C2 loop and C3 modal boundaries are complete.
 C2's selected-state/picture, publication, sound and disabled-feature checks are in internals;
 C3's modal ownership and rebase checks are recorded there too. C4's held-view and joystick
 probes pass, but a short press released between scans is lost in the native state table.
-One-shot presses are now buffered until a native scan has seen them (user decision);
-the short-press probe passes. Remaining C4 acceptance covers pause, all view keys, replay/input and rapid
-repeats before C5/C6 acceptance. C5(a) measures the world-tick rate; the displayed race clock keeps its native 1.031× ratio.
+C4 is complete: one-shot presses are buffered until a native scan has seen them (user
+decision), and every view key, pause, double tap and replay tap act exactly once. C5(a) measures the world-tick rate; the displayed race clock keeps its
+native 1.031× ratio.
+
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
 from now on, run new checks on that machine only, adding the A500-equivalent and the

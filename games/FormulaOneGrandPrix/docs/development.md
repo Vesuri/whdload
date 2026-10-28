@@ -744,7 +744,16 @@ make slave-verify OUT=tmp/c4/build-verify
 python3 tools/c2_capture.py tmp/c4/input --build tmp/c4/build-verify --input --custom4 3
 python3 tools/c2_capture.py tmp/c4/repeat --build tmp/c4/build-verify --input --custom4 3
 python3 tools/c4_report.py tmp/c4/input --repeat tmp/c4/repeat --out tmp/c4/report.json
+python3 tools/c2_capture.py tmp/c4/suite --build tmp/c4/build-verify --input-suite --custom4 3 --setup a1200-030
+python3 tools/c2_capture.py tmp/c4/suite-repeat --build tmp/c4/build-verify --input-suite --custom4 3 --setup a1200-030
+python3 tools/c4_report.py tmp/c4/suite --repeat tmp/c4/suite-repeat --out tmp/c4/suite-report.json
 ```
+
+`--input-suite` taps every view key, Space (pause, then a new tap to resume), a double
+tap and a replay tap, each between two scans, and records the scans and view consumers
+around them. `c4_report.py` recomputes every check from the saved, hash-verified
+snapshots. `--setup a1200-030` selects the primary target (68030/50 without an MMU,
+`NOMMU`) and refuses to run unless the emulator reports that CPU.
 
 `--input` requires Quick Race and `CUSTOM4=3`; it rejects other probe modes. Metadata
 records the build/runtime/input pins, layout, native route, snapshots and clean quit.
@@ -758,7 +767,6 @@ failure as a corrupt capture. Check the result, not merely its process exit stat
 With the buffer (VERIFY build, `CUSTOM2` bit 1) the probe also follows the held-back
 release to the next scan and requires one view event, a rearmed latch and the slave's
 deferral counters (`c4_deferred`, `c4_applied`). The report accepts the older unbuffered
-captures, which still verify as FAIL. Pause taps, all view keys, replay input and rapid
-repeats remain to be checked. If the
+captures, which still verify as FAIL. If the
 slave changes, rebuild and collect fresh evidence, including the disabled-feature
 gate; retain the current captures as evidence of the original failure.

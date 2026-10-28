@@ -27,6 +27,8 @@ from state_diff import SIZES, scratch
 
 
 def capture(args):
+    if args.input_suite:
+        args.input = True
     if args.input and (args.modal or args.replay or args.view or args.profile or args.profile_tick
                        or args.publish or args.custom4 != 3 or args.route != 'quickrace'):
         raise ValueError('C4 input probe requires Quick Race/CUSTOM4=3 and no other probe options')
@@ -55,6 +57,9 @@ def capture(args):
     if args.ntsc:
         extra += ' --ntsc_mode=1'
     whd = f'CUSTOM1=1 CUSTOM2=3 CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5=0 FileLog'
+    if args.setup == 'a1200-030':   # the primary target: 68030/50 without an MMU
+        extra += ' --cpu=68030 --uae_mmu_model=0'
+        whd += ' NOMMU'
     env = dict(os.environ, AMIGA_SETUP=args.setup, EXTRA_ARGS=extra,
                SLAVE=str(slave), WHD_ARGS=whd, WARP='1', DETERMINISTIC='1',
                JOY0='none', JOY1='none', VERIFY_EXIT='1', FSUAE=os.environ['FSUAE_ARM'],
@@ -85,6 +90,12 @@ def capture(args):
                 raise RuntimeError('server boot failed')
             time.sleep(.2)
         ready = True
+        report = re.findall(r'CPU=(\d+), FPU=(\d+).*?MMU=(\d+), JIT=(\d+)',
+                            (ROOT/'amiga/.run/fsuae/Cache/Logs/fs-uae.log.txt').read_text(errors='replace'))
+        meta['effective'] = list(map(int, report[-1])) if report else None
+        if args.setup == 'a1200-030' and (not report or meta['effective'][0] != 68030
+                                          or meta['effective'][2] != 0):
+            raise ValueError(f"effective CPU is not a 68030 without MMU: {meta['effective']}")
         meta['route_reply'] = command(args.route, str(out / 'route.jsonl'))
         if args.replay:
             command('gdb', 'monitor fields 400')
@@ -94,7 +105,7 @@ def capture(args):
             command('shot', str(out/'replay-entry.png'))
         banks = [('chip', 0, 0x80000 if args.setup == 'a500-1.5m' else 0x200000)]
         banks += ([('slow', 0xc00000, 0xd80000)] if args.setup == 'a500-1.5m'
-                  else [('fast', 0x200000, 0xa00000)] if args.setup == 'a1200-fast' else [])
+                  else [('fast', 0x200000, 0xa00000)] if args.setup in ('a1200-fast','a1200-030') else [])
         for name, start, end in banks:
             command('gdb', f'dump binary memory {out}/{name}.bin {start:#x} {end:#x}')
         memory = image(*((out/(name+'.bin')).read_bytes() if (out/(name+'.bin')).exists()
@@ -111,7 +122,9 @@ def capture(args):
         if struct.unpack_from('>H', memory, base+symbols['c2_mode'])[0] != expected_mode:
             raise ValueError('requested live/replay loop not reached')
         if args.modal or args.input:
-            if args.input:
+            if args.input_suite:
+                from c4_capture import suite as exercise
+            elif args.input:
                 from c4_capture import exercise
             else:
                 from c3_capture import exercise
@@ -230,7 +243,7 @@ def capture(args):
             try:
                 command('shot', str(out/'failure.png'))
                 command('gdb', f'dump binary memory {out}/failure-chip.bin 0 0x80000')
-                if args.setup == 'a1200-fast':
+                if args.setup in ('a1200-fast','a1200-030'):
                     command('gdb', f'dump binary memory {out}/failure-fast.bin 0x200000 0xa00000')
             except Exception as diagnostic_error:
                 meta['diagnostic_error'] = str(diagnostic_error)
@@ -247,11 +260,14 @@ if __name__ == '__main__':
     parser.add_argument('out')
     parser.add_argument('--build', default='tmp/c2/build-verify')
     parser.add_argument('--input', action='store_true', help='C4 native input acceptance probe')
+    parser.add_argument('--input-suite', action='store_true',
+                        help='C4 view keys, pause, double tap and replay tap')
     parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))
     parser.add_argument('--custom4', type=int, choices=(0,1,3,5,7), default=0)
     parser.add_argument('--ticks', type=int, default=100)
     parser.add_argument('--route', choices=('quickrace','qualifying','practice'), default='quickrace')
-    parser.add_argument('--setup', choices=('a1200-fast','a1200','a500-1.5m'), default='a1200-fast')
+    parser.add_argument('--setup', choices=('a1200-fast','a1200-030','a1200','a500-1.5m'),
+                        default='a1200-fast')
     parser.add_argument('--ntsc', action='store_true')
     parser.add_argument('--replay', action='store_true')
     parser.add_argument('--publish', action='store_true', help='stop after painting, immediately before submission')

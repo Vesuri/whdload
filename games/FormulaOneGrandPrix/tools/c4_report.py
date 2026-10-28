@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+from c4_capture import evaluate_suite
 
 
 def report(directory):
@@ -20,7 +21,8 @@ def report(directory):
         name=item['name']
         data={suffix:(root/(name+'-'+suffix+'.bin')).read_bytes() for suffix in item['files']}
         assert all(hashlib.sha256(data[s]).hexdigest()==digest for s,digest in item['files'].items())
-        assert item['key']==data['keys'][0x4f]
+        raw=item.get('raw',0x4f)
+        assert item['key']==data['keys'][raw]
         assert item['masks']==data['h0'][0x18:0x1e].hex()
         assert item['latch']==data['h0'][0x3a915]
         assert item['view']==data['view'].hex() and item['event']==data['view'][10]
@@ -34,8 +36,21 @@ def report(directory):
             assert buffer['deferred']==struct.unpack_from('>I',data['slave'],symbols['c4_deferred'])[0]
             assert buffer['applied']==struct.unpack_from('>I',data['slave'],symbols['c4_applied'])[0]
             assert buffer['live']==struct.unpack_from('>H',data['slave'],symbols['c4_live'])[0]
-            assert buffer['state']==data['slave'][symbols['c4_keys']+0x4f]
+            assert buffer['state']==data['slave'][symbols['c4_keys']+raw]
+        for field,symbol,form in (('mode','c2_mode','>H'),('suspended','c3_suspended','>H'),
+                                  ('pauses','c3_pauses','>I')):
+            if field in item:
+                assert item[field]==struct.unpack_from(form,data['slave'],symbols[symbol])[0]
         items[name]=item
+    if result.get('suite'):
+        checks=evaluate_suite(items)
+        assert checks==result['checks']
+        assert result['status']==('PASS' if all(v=='PASS' for v in checks.values()) else 'FAIL')
+        return dict(status=result['status'], evidence_verified=True, checks=checks,
+                    build=meta['build'],runtime=meta['runtime'],game_inputs=meta['game_inputs'],
+                    setup=meta['setup'],effective=meta.get('effective'),whd_args=meta['whd_args'],
+                    extra_args=meta['extra_args'],route=meta['route'],route_reply=meta['route_reply'],
+                    hunk_bases=meta['hunk_bases'],input=result)
     held=[items[f'held-{n}'] for n in range(5)]
     sampled=[not bool(int(x['masks'],16)&0x2000) for x in held]
     edges=[v and (n==0 or not sampled[n-1]) for n,v in enumerate(sampled)]
