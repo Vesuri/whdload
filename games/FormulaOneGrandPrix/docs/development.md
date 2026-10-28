@@ -788,3 +788,19 @@ Replace `a1200-030` with `a1200` or `a500-1.5m` for the slow machines. Each race
 about a minute. `c5_report.py` recomputes the result from the hash-verified samples:
 PASS, FAIL, or OVERLOADED when the run drops so much debt that no fitting time is
 left to measure. Like C4, check the printed acceptance, not the exit status.
+
+C5(b) saves the state at every completed tick of a whole race in each render schedule,
+all on the 68030 (`--cpu-hz -1` selects FS-UAE's fastest non-cycle-exact CPU for
+one-field drawing; a positive value sets a cycle-exact clock in Hz):
+
+```sh
+python3 tools/c2_capture.py tmp/c5/states-normal --build tmp/c5/build-verify --states --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/c5/states-normal-repeat --build tmp/c5/build-verify --states --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/c5/states-slowed --build tmp/c5/build-verify --states --custom4 3 --setup a1200-030
+python3 tools/c2_capture.py tmp/c5/states-one-field --build tmp/c5/build-verify --states --custom4 1 --setup a1200-030 --cpu-hz -1
+python3 tools/c5_compare.py normal=tmp/c5/states-normal repeat=tmp/c5/states-normal-repeat \
+  slowed=tmp/c5/states-slowed one-field=tmp/c5/states-one-field --out tmp/c5/states-comparison.json
+```
+
+`DIFFERENT` lists the first differing tick and bytes; compare the recorded A1 inputs
+(`identities.*.inputs`) before reading a difference as a drawing effect.

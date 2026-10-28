@@ -29,6 +29,10 @@ from state_diff import SIZES, scratch
 def capture(args):
     if args.input_suite:
         args.input = True
+    if args.states and (args.modal or args.input or args.rate or args.replay or args.view
+                        or args.profile or args.profile_tick or args.publish
+                        or args.route != 'quickrace'):
+        raise ValueError('C5 tick-state probe requires Quick Race and no other probe options')
     if args.rate and (args.modal or args.input or args.replay or args.view or args.profile
                       or args.profile_tick or args.publish or args.custom4 != 1
                       or args.route != 'quickrace'):
@@ -64,6 +68,11 @@ def capture(args):
     if args.setup == 'a1200-030':   # the primary target: 68030/50 without an MMU
         extra += ' --cpu=68030 --uae_mmu_model=0'
         whd += ' NOMMU'
+    if args.cpu_hz:     # C5(b) one-field drawing: the same 030 with a faster clock
+        if args.setup != 'a1200-030':
+            raise ValueError('--cpu-hz applies to the 68030 target only')
+        extra += (' --uae_cpu_speed=max --uae_cpu_cycle_exact=false --uae_cpu_memory_cycle_exact=false'
+                  if args.cpu_hz < 0 else f' --uae_cpu_frequency={args.cpu_hz}')
     env = dict(os.environ, AMIGA_SETUP=args.setup, EXTRA_ARGS=extra,
                SLAVE=str(slave), WHD_ARGS=whd, WARP='1', DETERMINISTIC='1',
                JOY0='none', JOY1='none', VERIFY_EXIT='1', FSUAE=os.environ['FSUAE_ARM'],
@@ -125,8 +134,10 @@ def capture(args):
         expected_mode = 2 if args.replay else 1
         if struct.unpack_from('>H', memory, base+symbols['c2_mode'])[0] != expected_mode:
             raise ValueError('requested live/replay loop not reached')
-        if args.modal or args.input or args.rate:
-            if args.rate:
+        if args.modal or args.input or args.rate or args.states:
+            if args.states:
+                from c5_capture import states as exercise
+            elif args.rate:
                 from c5_capture import rate as exercise
             elif args.input_suite:
                 from c4_capture import suite as exercise
@@ -145,8 +156,9 @@ def capture(args):
             if meta['quit'] != 'OK':
                 raise ValueError('F10 quit failed')
             meta['status'] = 'CAPTURED'
-            key = 'rate' if args.rate else 'input' if args.input else 'modal'
-            print(json.dumps({k: v for k, v in meta[key].items() if k != 'samples'}, indent=2), flush=True)
+            key = 'states' if args.states else 'rate' if args.rate else 'input' if args.input else 'modal'
+            print(json.dumps({k: v for k, v in meta[key].items() if k not in ('samples','ticks')},
+                             indent=2), flush=True)
             return
         if args.view:
             raw = dict(rear='5f', tv='4f', front='46', cockpit='4e')[args.view]
@@ -270,6 +282,8 @@ if __name__ == '__main__':
     parser.add_argument('--input-suite', action='store_true',
                         help='C4 view keys, pause, double tap and replay tap')
     parser.add_argument('--rate', action='store_true', help='C5(a) world-tick rate over a whole race')
+    parser.add_argument('--states', action='store_true', help='C5(b) state at every completed tick')
+    parser.add_argument('--cpu-hz', type=int, default=0, help='68030 clock for the one-field run')
     parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))
     parser.add_argument('--custom4', type=int, choices=(0,1,3,5,7), default=0)
     parser.add_argument('--ticks', type=int, default=100)

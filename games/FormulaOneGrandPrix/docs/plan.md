@@ -98,9 +98,10 @@ C2's selected-state/picture, publication, sound and disabled-feature checks are 
 C3's modal ownership and rebase checks are recorded there too. C4's held-view and joystick
 probes pass, but a short press released between scans is lost in the native state table.
 C4 is complete: one-shot presses are buffered until a native scan has seen them (user
-decision), and every view key, pause, double tap and replay tap act exactly once. C5(a) passes on the 030 and A1200 (7.987 ticks per emulated
-second, no drops); the A500-equivalent is overloaded, which is C6's question. The displayed
-race clock keeps its native ratio. C5(b) and (c) remain.
+decision), and every view key, pause, double tap and replay tap act exactly once. C5 is complete: the tick rate is 7.987 per emulated second
+with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's question), the
+race clock keeps its native ratio, normal and slowed drawing give identical state at every
+tick, and race, retirement, replay and the accepted pit coverage pass. C6 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -247,7 +248,12 @@ race clock is measured separately with `race_clock.py` and keeps its native
 2111/16384 s per tick, 1.031× real time at 8 ticks per second (user decision). (b) Tick-aligned state: car records at each
 completed tick identical between normal, deliberately slowed (VERIFY delay) and
 one-field drawing, given the `A1` timing inputs held equal; classify any difference.
-(c) A whole race, a pit stop, a retirement and a replay played through. *Gate:* (a) and
+All three run on the 68030; one-field drawing uses the same machine with FS-UAE's fastest
+non-cycle-exact CPU, because a faster cycle-exact clock barely shortens its pictures (user
+decision). (c) A whole race, a pit stop, a retirement and a replay played through. For
+the pit stop, the practice pit-box release and C3's in-pit accelerated time are accepted
+as the coverage; a service after driving into the box is not exercised, because no
+unattended car pits (user decision). *Gate:* (a) and
 (c) pass; (b) passes or every difference is classified.
 
 **C6 Slow machines.** Measure the A500-equivalent and A1200 after `C2` against the

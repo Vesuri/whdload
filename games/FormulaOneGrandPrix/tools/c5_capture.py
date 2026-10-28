@@ -4,8 +4,10 @@ Real time is emulated time: one PAL non-interlaced field is 313 lines of 227 col
 clocks at 3,546,895 Hz (49.92 Hz). The schedule funds 8 ticks per 50 fields, so the
 expected rate is 7.987 ticks per second, inside the 8.00 ± 1% gate.
 """
+import gzip
 import hashlib
 import json
+import re
 from fractions import Fraction
 import struct
 
@@ -120,3 +122,70 @@ def rate(args, command, out, base, bases, symbols, meta):
     command('shot', str(out/'results.png'))
     result.update(evaluate(result['samples']))
     (out/'rate.json').write_text(json.dumps(result, indent=2)+'\n')
+
+
+# C5(b): the state the native replay checkpoint copies (h0+$396AC), at each completed tick.
+CARS = (1, 0x368, 0x1956-0x368)        # car records and session, h1+$368–1955
+SESSION = (0, 0x3a714, 0x3a7bc-0x3a714)
+
+
+def tick_header(blob, symbols):
+    """Slave words from c2_serial to c2_beam_max at a tick's pacer entry."""
+    at = lambda name: symbols[name]-symbols['c2_serial']
+    values = struct.unpack_from('>I4H4I', blob, at('c2_clock'))
+    return dict(serial=struct.unpack_from('>I', blob, 0)[0],
+                pictures=struct.unpack_from('>I', blob, at('c2_pictures'))[0],
+                batch=values[4], dropped=values[7],
+                tick=values[8]+1,              # counted inside the pacer, after this stop
+                draw_mode=struct.unpack_from('>H', blob, at('c2_draw_mode'))[0])
+
+
+def states(args, command, out, base, bases, symbols, meta):
+    """Stop at every completed live tick until the race closes its epoch."""
+    assert args.route == 'quickrace'
+    result = dict(status='INCOMPLETE', ranges=dict(cars=CARS, session=SESSION), ticks=[])
+    meta['states'] = result
+    header = (symbols['c2_serial'], symbols['c2_beam_max']+2)
+    regions = [(base+header[0], header[1]-header[0]),
+               (bases[CARS[0]]+CARS[1], CARS[2]),
+               (bases[SESSION[0]]+SESSION[1], SESSION[2])]
+    # A1 timing inputs at the route stop: the UI stream (drawn in VBL-bounded menu loops,
+    # it seeds the simulation through the protection byte) and the gameplay stream.
+    inputs = {}
+    for key, (h, offset) in (('ui_rng', (2, 0x2a794)), ('gameplay_rng', (0, 0x3a7b0))):
+        path = out/(key+'.bin')
+        command('gdb', f'dump binary memory {path} {bases[h]+offset:#x} {bases[h]+offset+5:#x}')
+        inputs[key] = path.read_bytes().hex()
+    result['inputs'] = inputs
+    paths = [out/f'ticks-{n}.bin' for n in range(3)]
+    for path in paths:
+        path.write_bytes(b'')
+    # gdb appends each region at every tick's pacer entry and continues by itself,
+    # so the whole race needs one client round trip; the epoch close stops it.
+    appends = '\n'.join(f'append binary memory {path} {start:#x} {start+size:#x}'
+                         for path, (start, size) in zip(paths, regions))
+    command('gdb', 'delete breakpoints')
+    command('gdb', f'break *{base+symbols["c2_pacer"]:#x}')
+    command('gdb', f'condition $bpnum *(unsigned short*){base+symbols["c2_in_tick"]:#x} != 0')
+    command('gdb', f'commands $bpnum\nsilent\n{appends}\ncontinue\nend')
+    command('gdb', f'break *{base+symbols["c3_leave"]:#x}')
+    command('gdb', 'continue')
+    pc = int(re.search(r'\$\d+\s*=\s*(0x[0-9a-fA-F]+)', command('gdb', 'p/x $pc'))[1], 16)
+    assert pc == base+symbols['c3_leave'], hex(pc)
+    command('gdb', 'delete breakpoints')
+    columns = [path.read_bytes() for path in paths]
+    count = len(columns[0]) // regions[0][1]
+    assert count and all(len(c) == count*size for c, (_, size) in zip(columns, regions)), count
+    blobs = []
+    for n in range(count):
+        parts = [c[n*size:(n+1)*size] for c, (_, size) in zip(columns, regions)]
+        item = tick_header(parts[0], symbols)
+        item['sha256'] = hashlib.sha256(parts[1]+parts[2]).hexdigest()
+        result['ticks'].append(item)
+        blobs.append(b''.join(parts))
+    for path in paths:
+        path.unlink()
+    (out/'ticks.bin.gz').write_bytes(gzip.compress(b''.join(blobs), mtime=0))
+    result.update(status='PASS', record=len(blobs[0]), count=len(blobs),
+                  archive_sha256=hashlib.sha256((out/'ticks.bin.gz').read_bytes()).hexdigest())
+    (out/'states.json').write_text(json.dumps(result)+'\n')

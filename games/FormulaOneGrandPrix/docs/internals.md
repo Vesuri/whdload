@@ -1828,3 +1828,64 @@ Evidence: `tmp/c5/rate-{030,a1200,a500}` with `-repeat` twins, and
 OVERLOADED was distinguished from FAIL.
 No quick-race car pits (the pit-animation words h0+$3A746–3A74C stay `$8000`), so a
 pit stop is not covered by this race.
+
+#### C5(b) tick-aligned state — passes, one difference classified
+
+`--states` stops at every completed live tick's pacer entry until the race closes its
+epoch, and saves the ranges the native replay checkpoint (h0+$396AC) copies: car records
+and session h1+$368–1955 and h0+$3A714–3A7BB. gdb appends them at each stop and
+continues by itself, so a whole race takes about 2.5 minutes. It also records the A1
+timing inputs at the route stop: the UI random stream h2+$2A794–2A798 and the gameplay
+stream h0+$3A7B0–3A7B4. `tools/c5_compare.py` verifies every record's hash and compares
+the runs at each common tick.
+
+All runs use the same VERIFY build, `a1200-030` without an MMU, PAL, Quick Race, and quit
+with F10 `OK`:
+
+| Run | Schedule | Ticks | Fields per picture | Catch-up | Dropped | UI stream at route stop | Against normal |
+|---|---|---:|---:|---|---:|---|---|
+| normal | `CUSTOM4=1` | 3210 | 3.19 | none | 0 | `58b5dea1f1` | reference |
+| normal repeat | `CUSTOM4=1` | 3210 | 3.19 | none | 0 | `58b5dea1f1` | identical at all 3210 ticks |
+| slowed | `CUSTOM4=3` (20-field batch delay) | 3208 | 27.1 | 2406 tick-only passes, batches of 4 | 1651 | `58b5dea1f1` | identical at all 3208 common ticks |
+| one-field | `CUSTOM4=1`, fastest non-cycle-exact CPU | 3194 | 1.37 | none | 0 | `0da44de2c2` | differs from the first tick |
+
+Normal and slowed drawing give identical car and session state at every tick of the
+race, including over 2400 undrawn catch-up ticks and dropped debt. The one-field run's
+difference is **classified as an A1 timing input not held equal**: its menus run faster
+(protection screen at field 635, not 687), so the UI stream, drawn in VBL-bounded menu
+busy loops and feeding the simulation through the protection seed byte, enters the race
+in a different state. The race itself is therefore a different race, not a drawing
+effect. The emulator cannot change CPU speed after the menus, so this run cannot hold the
+A1 inputs equal. A faster cycle-exact clock (200 MHz) barely shortens the 030's pictures
+(3.0 fields per picture over 160 ticks, `tmp/c5/hz-200`), since Chip RAM and blitter work
+bound them; the fastest non-cycle-exact CPU reaches 1.2–1.4 (`tmp/c5/hz-max`).
+
+Evidence: `tmp/c5/states-{normal,normal-repeat,slowed,one-field}` and
+`tmp/c5/states-comparison.json`. `tmp/c5/states-v1` holds the first set, without
+the recorded A1 inputs, with the same results; `states-normal-stopped` is an
+abandoned slower capture that stopped at each tick through the client.
+
+#### C5(c) played through — passes for the accepted scope
+
+The C3 modal routes run again on the current VERIFY build on `a1200-030` without an MMU,
+PAL, `CUSTOM4=1`. Each route is captured twice; `c3_report.py` verifies every saved
+snapshot and the exact repeat (all PASS), and every run quits with F10 `OK`:
+
+| Route | Result |
+|---|---|
+| Whole race (`modal-race`) | Green at completed tick 139, retirement/tow Viewing at 701, results after 3215 ticks. One live epoch, zero dropped and zero excluded fields; a 250-field results hold leaves the clock unchanged. The C5(a) races also run cockpit to results. |
+| Replay (`modal-replay`) | Live pause, replay entry (new epoch), replay pause held 250 fields with state unchanged, exact resume rebase, natural replay completion back into live pause, live resume. Three epochs, 663 callback fields excluded, zero dropped. |
+| Pit (`modal-pit`, qualifying) | Native accelerated time in the pits: car state advances while the clock stays frozen, 50 credit fields rebased, 300 callback fields excluded on return. |
+
+Pit-stop coverage is the user-accepted scope: the practice pit-box start was observed
+interactively (tyre choice, fire confirms, the crew steps away and the car is released;
+the pit-animation phases stay `$8000`, `tmp/c5/explore/`), plus native accelerated time
+in the pits above. A service after driving into the box is not exercised.
+
+**Finding for C6/E:** the 030 does not keep up in the qualifying pit garage. Over the
+route's 400-field wait before the pit check it completes 39 ticks, drops 115 fields of
+debt, then one more (`modal-pit-a`). Races drop nothing. Earlier `a1200-fast` qualifying
+captures dropped 161–1263 fields, so the garage scene is a known heavy case; it is a
+performance target, not a C5 rate result.
+
+Evidence: `tmp/c5/modal-{race,replay,pit}-{a,b}` and `modal-*-report.json`.
