@@ -29,6 +29,10 @@ from state_diff import SIZES, scratch
 def capture(args):
     if args.input_suite:
         args.input = True
+    if args.rate and (args.modal or args.input or args.replay or args.view or args.profile
+                      or args.profile_tick or args.publish or args.custom4 != 1
+                      or args.route != 'quickrace'):
+        raise ValueError('C5 rate probe requires Quick Race/CUSTOM4=1 and no other probe options')
     if args.input and (args.modal or args.replay or args.view or args.profile or args.profile_tick
                        or args.publish or args.custom4 != 3 or args.route != 'quickrace'):
         raise ValueError('C4 input probe requires Quick Race/CUSTOM4=3 and no other probe options')
@@ -121,8 +125,10 @@ def capture(args):
         expected_mode = 2 if args.replay else 1
         if struct.unpack_from('>H', memory, base+symbols['c2_mode'])[0] != expected_mode:
             raise ValueError('requested live/replay loop not reached')
-        if args.modal or args.input:
-            if args.input_suite:
+        if args.modal or args.input or args.rate:
+            if args.rate:
+                from c5_capture import rate as exercise
+            elif args.input_suite:
                 from c4_capture import suite as exercise
             elif args.input:
                 from c4_capture import exercise
@@ -139,7 +145,8 @@ def capture(args):
             if meta['quit'] != 'OK':
                 raise ValueError('F10 quit failed')
             meta['status'] = 'CAPTURED'
-            print(json.dumps(meta['input' if args.input else 'modal'], indent=2), flush=True)
+            key = 'rate' if args.rate else 'input' if args.input else 'modal'
+            print(json.dumps({k: v for k, v in meta[key].items() if k != 'samples'}, indent=2), flush=True)
             return
         if args.view:
             raw = dict(rear='5f', tv='4f', front='46', cockpit='4e')[args.view]
@@ -262,6 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--input', action='store_true', help='C4 native input acceptance probe')
     parser.add_argument('--input-suite', action='store_true',
                         help='C4 view keys, pause, double tap and replay tap')
+    parser.add_argument('--rate', action='store_true', help='C5(a) world-tick rate over a whole race')
     parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))
     parser.add_argument('--custom4', type=int, choices=(0,1,3,5,7), default=0)
     parser.add_argument('--ticks', type=int, default=100)

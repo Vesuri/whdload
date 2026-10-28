@@ -1784,3 +1784,47 @@ route, layout and every saved snapshot); both runs quit with F10 `OK`. Held paus
 behavior also has C3 modal evidence. Three or more taps before the buffered ones are
 shown merge into those two; this needs taps faster than one per tick during catch-up.
 No release bytes, clock cadence or shared tooling changed.
+
+### C5 real-time acceptance
+
+#### C5(a) world-tick rate — passes on the 68030/50 and the A1200
+
+`--rate` runs a whole Quick Race with no input from the cockpit stop to the results and
+samples the slave clock and h0+$3A714–3A7D3 every 250 fields (`tools/c5_capture.py`).
+Real time is emulated time: every sample sees beam maximum 312, so a PAL field is
+313 × 227 colour clocks at 3,546,895 Hz (20.032 ms, 49.92 Hz). The schedule funds
+8 ticks per 50 *nominal* fields, so the expected rate is 7.987 per second (−0.16%).
+A window between samples fits the CPU if it drops no debt. The rate is measured over
+fitting windows; each contiguous fitting run is allowed one second of credit and one
+reserved tick of boundary error at either end, and PASS requires the error plus that
+bound within ±1%. A run with too little fitting time to measure within ±1% is
+OVERLOADED: outside the gate's envelope, neither a pass nor a rate failure.
+
+The displayed race clock is the session accumulator h0+$3A77C (milliseconds) with
+fraction word +$3A780; h0+$258A2 adds h0+$3A7DE/+3A7E2 to it once per tick.
+
+VERIFY `e4cb8540403d2bbf795625d9be02e88bc1a6ec63bc61deac2be37ac0260df9ac`, `CUSTOM2=3`,
+`CUSTOM4=1`, PAL, Quick Race. Every run repeats exactly and quits with F10 `OK`:
+
+| Machine | Live fields | Ticks | Dropped | Ticks per second | Race clock per tick | Race clock ÷ real time | Result |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `a1200-030` (68030/50, no MMU, caches on) | 20000 | 3200 | 0 | 7.987 (−0.16%, bound 0.56%) | 128.845 ms | 1.029 | PASS |
+| `a1200` (68020, Chip RAM only) | 20000 | 3200 | 0 | 7.987 (−0.16%, bound 0.56%) | 128.845 ms | 1.029 | PASS |
+| `a500-1.5m` (A500-equivalent) | 22250 | 2955 | 3756 | 6.63 overall | 128.845 ms | 0.853 | OVERLOADED |
+
+The race clock advances exactly 2111/16384 s per tick on every machine. Its ratio to
+real time is 1.0308 × 49.92/50 = 1.029 when the ticks keep up (the native 1.031×
+ratio, user decision). On the A500-equivalent the ticks do not fit the 68000: 87 of
+89 windows drop debt (17% of the fields), so the world runs at 0.83× real time. The
+two fitting windows (77 ticks) are too short to measure. This is the C6 debt-cap
+question, not a C5(a) failure.
+
+On the 030, 6263 pictures are published in the 20000 fields (3063 of them repeated
+pictures between ticks): about 3.2 fields per picture, so its normal drawing is not
+one-field drawing.
+
+Evidence: `tmp/c5/rate-{030,a1200,a500}` with `-repeat` twins, and
+`rate-*-report.json`. `rate-a500-old-label` is the same A500 race saved before
+OVERLOADED was distinguished from FAIL.
+No quick-race car pits (the pit-animation words h0+$3A746–3A74C stay `$8000`), so a
+pit stop is not covered by this race.

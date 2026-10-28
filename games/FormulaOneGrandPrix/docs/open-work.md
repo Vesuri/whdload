@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C4 complete; C5 next; B5/A8 pass for the current scope
+# Current status: C5(a) passes; C5(b)/(c) next; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -18,16 +18,20 @@ results and acceptance evidence are in [internals.md](internals.md).
 | C2 | Complete as a developer-only loop implementation: bounded whole ticks, separated painting, safe publication and checked sound timing. PAL/NTSC beam detection is user-approved. |
 | C3 | Complete: explicit modal suspension/rebase, replay and menu handoffs, native accelerated-time ownership, and checked PAL/NTSC/68000 routes. |
 | C4 | Complete: one-shot presses are buffered until a native scan has seen them (user decision). All view keys, pause, double tap, replay tap, held view and joystick pass and repeat exactly. |
-| C5–G | Real-time acceptance, presentation, optimisation and release work remain open under the plan. |
+| C5 | (a) passes: 7.987 ticks per emulated second (8 per 50 PAL fields, no drops) on the 030 and A1200, exact repeats; the A500-equivalent is overloaded (C6). (b) and (c) open. |
+| C6–G | Slow-machine, presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: C5 real-time acceptance.**
-C4 is complete: a tap during catch-up acts exactly once, one tick long, and the full
-suite passes on `a1200-030` (`tmp/c4/suite-030-report.json`). C5 now needs (a) the
-world-tick rate, 8.00 per second ± 1%, on the 030, A500-equivalent and A1200 wherever
-the ticks fit the CPU, with the displayed race clock recorded separately; (b) car
-records at each completed tick compared between normal, slowed and one-field drawing,
-with any difference classified; (c) a whole race, a pit stop, a retirement and a replay
-played through. Then C6.
+**Next F1GP step: C5(b) and C5(c).**
+C5(a) passes: a whole Quick Race completes 3200 ticks in 20000 fields with no dropped
+debt on `a1200-030` and `a1200`, 7.987 per emulated second (PAL fields are 49.92 Hz).
+The race clock advances exactly 2111/16384 s per tick, 1.029× real time. The
+A500-equivalent drops 17% of its fields (6.63 ticks per second): its ticks don't fit the
+68000, which is C6's debt-cap question. See [C5 evidence](internals.md#c5-real-time-acceptance).
+C5 still needs (b) car records at each completed tick compared between normal, slowed
+and one-field drawing, with any difference classified (the 030 draws about 3.2 fields
+per picture, so one-field drawing needs a control), and (c) a whole race, a pit stop,
+a retirement and a replay played through. No Quick Race car pits, so the pit stop
+needs the player's car. Then C6.
 See [C4 evidence](internals.md#c4-input-acceptance--gate-passed). The clock design
 is in [Game time](internals.md#elapsed-vbl-world-clock-c1); it adds no CIA timer and
 allows no fractional simulation updates. Its host accounting checks pass for PAL/NTSC.

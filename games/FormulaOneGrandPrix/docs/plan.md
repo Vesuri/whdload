@@ -98,8 +98,9 @@ C2's selected-state/picture, publication, sound and disabled-feature checks are 
 C3's modal ownership and rebase checks are recorded there too. C4's held-view and joystick
 probes pass, but a short press released between scans is lost in the native state table.
 C4 is complete: one-shot presses are buffered until a native scan has seen them (user
-decision), and every view key, pause, double tap and replay tap act exactly once. C5(a) measures the world-tick rate; the displayed race clock keeps its
-native 1.031× ratio.
+decision), and every view key, pause, double tap and replay tap act exactly once. C5(a) passes on the 030 and A1200 (7.987 ticks per emulated
+second, no drops); the A500-equivalent is overloaded, which is C6's question. The displayed
+race clock keeps its native ratio. C5(b) and (c) remain.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:

@@ -770,3 +770,21 @@ deferral counters (`c4_deferred`, `c4_applied`). The report accepts the older un
 captures, which still verify as FAIL. If the
 slave changes, rebuild and collect fresh evidence, including the disabled-feature
 gate; retain the current captures as evidence of the original failure.
+
+### C5 real-time acceptance
+
+C5(a) runs a whole Quick Race with no input and samples the clock every 250 fields.
+It requires `CUSTOM4=1` and no other probe option. Run each machine twice:
+
+```sh
+. amiga/env.sh
+make slave-verify OUT=tmp/c5/build-verify
+python3 tools/c2_capture.py tmp/c5/rate-030 --build tmp/c5/build-verify --rate --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/c5/rate-030-repeat --build tmp/c5/build-verify --rate --custom4 1 --setup a1200-030
+python3 tools/c5_report.py tmp/c5/rate-030 --repeat tmp/c5/rate-030-repeat --out tmp/c5/rate-030-report.json
+```
+
+Replace `a1200-030` with `a1200` or `a500-1.5m` for the slow machines. Each race takes
+about a minute. `c5_report.py` recomputes the result from the hash-verified samples:
+PASS, FAIL, or OVERLOADED when the run drops so much debt that no fitting time is
+left to measure. Like C4, check the printed acceptance, not the exit status.
