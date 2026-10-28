@@ -224,7 +224,7 @@ that timer. The automated launcher now supplies `CONFIGDELAY=0` as well as
 build initially hit bash 3.2's empty-array/nounset behavior; explicitly defining both
 build symbols fixed it. Neither failed attempt is counted as acceptance evidence.
 
-### B5: gated cache pilot — gate not passed
+### B5: gated cache pilot — passed for the current scope
 
 `CUSTOM2` bit 0 requests instruction/data caches through `resload_SetCPU`, with
 BaseMem write-through and ExpMem/Slave copyback. The 030 write-allocation disable bit
@@ -232,7 +232,7 @@ is clear because the game runs in user mode. This follows WHDLoad's documented A
 hardware inhibition of Chip/IO data caching; it is not permission to cache DMA buffers
 on arbitrary hardware. WHDLoad's `NoCache` override remains effective. All CUSTOM bits
 zero retain the old CPU request and original hooked game bytes. Caches remain opt-in
-until B5 passes; no simulation/presentation patch is enabled.
+until a release build turns them on; no simulation/presentation patch is enabled.
 
 VERIFY requires slave API 18 and logs `CACR` using `resload_Log` after the cache request.
 The read runs through Exec Supervisor, guarded by WHDLoad's 68020 attention bit; the
@@ -290,11 +290,13 @@ after 21,105 fields, logs `CACR=$00000000`, and quits OK. It validates the revis
 and incremental clock collector, including the four-hunk metadata. It is not a matched
 per-scene gain measurement.
 
-**Gate: not passed.** The 030/040 startup stalls were an emulator deadlock, now fixed
+**Gate: passed for the current scope** (68000, 68020, 68030; user decision to defer
+040/060 timing). Menus and whole races pass with caches on on every CPU, and A7 records
+the 020/030 gains. Matched 040/060 gains are deferred work, not a pass. The 030/040 startup stalls were an emulator deadlock, now fixed
 (next section). All six 030/040/060 setups start with caches on and repeat exactly under
 deterministic mode. Whole-race pairs now pass on all six 030/040/060 setups (see below).
-A7's matrix is complete under its explained-failure gate. B5 still lacks matched
-040/060 work gains because their CPU traces are empty; A8 remains partial below. Disabling data-cache emulation is
+A7's matrix is complete under its explained-failure gate. The 040/060 CPU traces are
+empty (see below), so no 040/060 gain is claimed. Disabling data-cache emulation is
 not an accepted substitute. AmigaXDev TOOL2 (the launcher refuses unknown CPU names) and
 TOOL3 (failed captures leave no image or trace) are also fixed and installed. F1GP's
 runner keeps its own effective-CPU and fresh-trace checks as extra guards.
@@ -547,8 +549,9 @@ The current combined `CUSTOM3=3 CUSTOM4=1` arm also passes fresh functional repe
 quit: `tmp/a8-mmu-prefs/{030,040,060}-mmu-{a,b}`. These are functional checks, not MMU
 timing measurements. Earlier C3-only MMU evidence remains tied to its original build.
 
-**A8 is incomplete only for the 040/060 CPU measurements.** The user has deferred
-shared AmigaXDev repairs. No substitute core or synthetic zero timing is accepted.
+**A8 passes for the current scope (68000, 68020, 68030).** The 040/060 CPU measurements
+are deferred with the rest of the 040/060 work (user decision). No substitute core or
+synthetic zero timing is accepted.
 
 ### Startup failures: cause and fix (68030, 68040)
 
@@ -1706,11 +1709,9 @@ h2+$52A indexed by raw key. No pending-press record survives a completed release
 Consequently a press and release between native scans can be missed. Retaining native
 sampling and requiring lossless one-shot presses need an explicit policy: buffer the
 one-shot events for native consumption, or accept the original short-press limitation.
-C4 is blocked awaiting the user’s decision; no input patch has been installed.
-Buffering one-shot presses for the next native input check is recommended but has not
-been selected. Accepting the native limitation would require an explicit change to
-the no-loss acceptance requirement; it would not turn the current failed test into
-a pass.
+The user chose buffering: one-shot presses are held for the next native input check,
+so each acts exactly once. No input patch has been installed yet; the failed capture
+below remains the evidence of the original behavior.
 
 `tmp/c4/input-2/` captures the C3 VERIFY slave (`330662b72ba7c19d049a0eb68cb522cbe668e27470a9ccfd24df561465273b97`)
 on `a1200-fast`, PAL, `CUSTOM2=3`, `CUSTOM4=3`. It uses real harness key/joystick

@@ -91,19 +91,27 @@ and validates camera publication in 250 retained A3 snapshots (see internals Sta
 A7 meets its gate with 24 CPU-timing cells measured and 12 unavailable 040/060 cells explained; all field/DMA
 and whole-race captures repeat exactly. B5's functional races pass, but its 040/060
 work gains remain unavailable. A8 has accepted A500/A1200/020/030 ceilings; a developer-only startup notification
-control fixes the 030 layout mismatch. Its 040/060 CPU timings remain unavailable. Neither B5 nor A8 is
-complete. The user has deferred shared-profiler fixes. See [open work](open-work.md).
-C1, the developer-only C2 loop and C3 modal boundaries are complete, without closing B5/A8.
+control fixes the 030 layout mismatch. Its 040/060 CPU timings remain unavailable. B5 and A8
+pass for the current scope below; their 040/060 timing items are deferred. See [open work](open-work.md).
+C1, the developer-only C2 loop and C3 modal boundaries are complete.
 C2's selected-state/picture, publication, sound and disabled-feature checks are in internals;
 C3's modal ownership and rebase checks are recorded there too. C4's held-view and joystick
 probes pass, but a short press released between scans is lost in the native state table.
-C4 is blocked awaiting the user’s one-shot buffering policy decision; no input patch
-is installed. Remaining C4 acceptance covers pause, all view keys, replay/input and rapid
+The user chose to buffer one-shot presses for the next native input check; no input
+patch is installed yet. Remaining C4 acceptance covers pause, all view keys, replay/input and rapid
 repeats before C5/C6 acceptance. The C1 design records the native race-clock increment discrepancy that must be resolved before C5(a) acceptance.
-The earlier startup deadlock is fixed; this is a distinct profiling limitation.
-
-B5/A7/A8 acceptance covers 68000, 68020, 68030, 68040 and 68060, with 030/040/060 MMU
-functional tests, all using the exact-repeat method.
+**Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
+caches on) is the primary target. Keep the number of configurations as small as possible:
+from now on, run new checks on that machine only, adding the A500-equivalent and the
+A1200 only where a step is about slow machines (C6, the debt cap) and PAL only unless
+the step is about NTSC. Don't repeat the 020, MMU or cache-off arms; their existing
+evidence stands. 68040/68060 work is
+deferred until everything else is done, if it is done at all: their existing functional
+passes (menus, whole races, MMU pairs) stand, but no step waits for 040/060 timing,
+gains or ceilings. FS-UAE's cycle-exact 040/060 cores charge no time for instruction
+execution or Fast RAM, so their emulated timing is an instruction count and cache gains
+can't be measured there; AmigaXDev's aprof emulator can count their instructions, and
+timing claims need a real accelerator. All remaining measurements use the exact-repeat method.
 
 ## A. Map the game (gdb, traces, static disassembly; no slave changes)
 

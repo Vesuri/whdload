@@ -4,36 +4,36 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C3 complete; C4 blocked on input policy; B5/A8 gates remain open
+# Current status: C3 complete; C4 buffering one-shot presses; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
 | B1–B4; A1–A6 | Complete. Current A8 additions also pass the disabled-range gate. |
-| B5 | Menus and whole races pass on every required CPU, with exact repeats, cache audits and clean quit. Matched work gains on 040/060 remain unavailable; gate not passed. |
+| B5 | Menus and whole races pass on every required CPU, with exact repeats, cache audits and clean quit. Gains recorded for 020/030. Passed for the current scope; 040/060 gains are deferred work. Caches are still opt-in. |
 | A7 | Complete under its “measured or failure explained” gate: 24 CPU-timing cells measured, 12 unavailable 040/060 cells explained. All 36 windows have repeated field/DMA captures; all whole-race pairs pass. |
-| A8 | A500/A1200/020/030 four-arm ceiling audits pass. A developer-only preference-notification control fixes the 030 allocation mismatch. Only 040/060 CPU timings remain unavailable. |
+| A8 | A500/A1200/020/030 four-arm ceiling audits pass. A developer-only preference-notification control fixes the 030 allocation mismatch. Passed for the current scope; 040/060 CPU timings are deferred work. |
 | 68030 | B5/A7 measurements and A8 common-layout ceiling comparisons pass; no 030 item remains deferred. |
 | A4 | Complete: car/track/camera/view map, static view paths and 250 checked A3 camera-return snapshots. |
 | C1 | Complete: elapsed-VBL clock design, whole native updates, PAL/NTSC integer schedules and checked accounting model. The C2 prototype now installs runtime hooks behind a developer option. |
 | C2 | Complete as a developer-only loop implementation: bounded whole ticks, separated painting, safe publication and checked sound timing. PAL/NTSC beam detection is user-approved. |
 | C3 | Complete: explicit modal suspension/rebase, replay and menu handoffs, native accelerated-time ownership, and checked PAL/NTSC/68000 routes. |
-| C4 | Blocked awaiting the user’s short-press policy decision. Held view and per-tick joystick probes pass; the lost one-shot press repeats exactly. |
+| C4 | In progress. The user chose to buffer one-shot presses. Held view and per-tick joystick probes pass; the lost one-shot press repeats exactly and is the failing test to fix. |
 | C5–G | Real-time acceptance, presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: resolve C4 short-press handling, then finish its input acceptance.**
-The user selected C4 while shared work remains deferred. A real key press/release during
-the forced batch delay is recorded by the keyboard IRQ but lost before the next scan.
-Held view keys and per-tick joystick sampling pass. Choose buffered one-shot events or
-explicit acceptance of the native short-press limitation; no input patch is installed.
-Buffering one-shot presses for the next native input check is the recommended option,
-but the user has not selected it. The C4 goal is blocked, not complete. After the
-decision, finish pause, all view keys, replay/input and rapid-repeat acceptance; then
-continue to C5/C6. The two saved captures and their checker agree on acceptance FAIL
+**Next F1GP step: buffer C4 one-shot presses, then finish its input acceptance.**
+A real key press/release during the forced batch delay is recorded by the keyboard IRQ
+but lost before the next scan. Held view keys and per-tick joystick sampling pass.
+**Decision (user):** buffer one-shot presses (view keys, pause) so the next native input
+check sees each press exactly once; do not accept the native short-press limitation.
+Keep native sampling points, held-key behavior and joystick sampling unchanged, keep
+the buffer behind the developer C2 option, and keep disabled builds byte-identical.
+The existing short-pulse probe must turn from FAIL to PASS on a rebuilt slave; then
+finish pause, all view keys, replay/input and rapid-repeat acceptance and continue to
+C5/C6. The two saved captures and their checker agree on acceptance FAIL
 and exact-repeat PASS (`tmp/c4/acceptance.json`).
 See [C4 evidence](internals.md#c4-input-acceptance--short-press-gate-failed). The clock design
 is in [Game time](internals.md#elapsed-vbl-world-clock-c1); it adds no CIA timer and
 allows no fractional simulation updates. Its host accounting checks pass for PAL/NTSC.
-B5/A8 are still incomplete; this work does not waive their measurement gates.
 
 C2 completion evidence covers the elapsed-VBL scheduler, bounded catch-up,
 CPU HUD/background painting separation and external-view bitmap-base handling.
@@ -60,24 +60,30 @@ input acceptance and the whole-machine real-time gates remain C4–C6 work. See
 [C3 evidence](internals.md#c3-modal-clock-boundaries) and the reproducible commands in
 [development](development.md#c3-modal-boundary-validation).
 
-**Shared dependency: restore 040/060 CPU profiling when shared work is resumed.**
-All currently measurable F1GP B5/A7/A8 cells and the 030 allocation fix are complete.
+**68030/50 is the primary target; 040/060 work is deferred to the end, if done at all**
+(user decision). Keep the number of configurations as small as possible: new checks run
+on `a1200-030` non-MMU with caches on, plus the A500-equivalent and A1200 only for
+slow-machine steps (see [plan](plan.md#current-validation-scope)).
+B5 and A8 pass for the current scope (68000, 68020, 68030). Their
+040/060 timing items are the deferred work, not open gates. All F1GP B5/A7/A8 cells
+for the current scope and the 030 allocation fix are complete.
 The 030 difference arose during the loader's notification-enabled `SetPrefs` call.
 Developer-only `CUSTOM4=1` suppresses notification in every ceiling arm, preserving
 common layout; gate-off retains the original argument and release bytes are unchanged.
 Fresh disabled-byte gates, exact 030 repeats and all three MMU functional pairs pass.
 
-**Shared tooling remains deferred by the user's decision.** The selected 040/060
-non-MMU cycle-exact cores yield field/DMA data but no CPU instruction records. Their
-repeated empty CPU profiles cannot establish drawing/tick time, work gains or ceilings.
-When shared profiling is repaired and explicitly resumed, pin the new runtime and
-recapture the affected B5/A7/A8 controls; do not relabel the current evidence. This
-session changed no AmigaXDev files.
+**Deferred 040/060 timing.** The F1GP collector uses the normal trace profiler, which
+records no CPU instructions on the 040/060 cycle-exact cores. This is not a shared bug:
+AmigaXDev's aprof emulator (`FSUAE_APROF`) profiles those cores without an MMU, and its
+docs note that FS-UAE charges 040/060 time only for Chip/custom accesses and
+multiply/divide, so emulated 040/060 frame rates and cache gains are not hardware timing.
+If this work is resumed, count 040/060 work with aprof and confirm timing on a real
+accelerator; do not relabel the current evidence.
 
 A4 is now complete; its state map is in [internals](internals.md#state-map-a4).
 Continue with **C4–C6** (input acceptance and real-time validation), then **D1–D10** (presentation), following
-the plan and retaining the unresolved B5/A8 gates. Caches remain opt-in while B5
-is open. The C2 implementation is developer-only and opt-in (`CUSTOM2` bit 1); no extrapolation
+the plan. Caches remain opt-in until a release build turns them on; B5 no longer
+blocks that. The C2 implementation is developer-only and opt-in (`CUSTOM2` bit 1); no extrapolation
 patch or release clock option is enabled.
 
 Measurement controls now enforced:
@@ -93,7 +99,7 @@ Measurement controls now enforced:
   remain recorded alongside accepted results.
 
 Current results: [A7 matrix](internals.md#a7-machine-matrix--gate-passed-with-explained-timing-failures),
-[A8 ceilings](internals.md#a8-developer-ceiling-gates--partial-result), and
+[A8 ceilings](internals.md#a8-developer-ceiling-gates--passed-for-the-current-scope), and
 [commands](development.md#cache-and-machine-matrix-pilot-b5a7).
 All derived artifacts remain in ignored `tmp/`. No remote is configured; commits are local.
 

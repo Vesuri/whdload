@@ -583,7 +583,7 @@ and the supplied executable variant. `CUSTOM2` bit 1 enables the VBL clock; bit 
 still controls caches. `CUSTOM4` bit 1 introduces a 20-field batch delay for tests;
 bit 2 retains native painting (catch-up raster work, CPU HUD operations and tick-time replay R) as a
 comparison control. These
-bits do not enable a release feature or waive B5/A8/C5 gates.
+bits do not enable a release feature or waive the C5 gate.
 
 ```sh
 make slave-verify OUT=tmp/c2/build-verify
@@ -755,8 +755,9 @@ It also checks controller press/release and a full press/release between scans.
 The reporter prints and saves that acceptance result without treating a reproduced game
 failure as a corrupt capture. Check the result, not merely its process exit status.
 
-Current evidence is a failed short-press gate; see internals. C4 is blocked awaiting
-the user’s input-policy decision and has not changed input semantics. After that
-decision, complete pause, all view keys, replay/input and rapid-repeat checks. If the
+Current evidence is a failed short-press gate; see internals. The user chose buffered
+one-shot presses; no input patch is installed yet. With the buffer, rerun this probe
+(it must report PASS), then complete pause, all view keys, replay/input and
+rapid-repeat checks. If the
 slave changes, rebuild and collect fresh evidence, including the disabled-feature
 gate; retain the current captures as evidence of the original failure.
