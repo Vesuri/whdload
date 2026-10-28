@@ -301,9 +301,10 @@ runner keeps its own effective-CPU and fresh-trace checks as extra guards.
 
 ### Current B5/A7 validation
 
-The current emulator is pinned by `manifest/runtime-inputs.json`; its SHA-256 is
-`950f14c966ba852372d382dec8e40544f1c49184eb9f2c24e901f352ecd9b048`.
-It retains TOOL1 and adds the shared window-title change. Earlier evidence keeps its
+This evidence was captured with emulator SHA-256
+`950f14c966ba852372d382dec8e40544f1c49184eb9f2c24e901f352ecd9b048`
+(TOOL1 plus the first window-title change). The current pins and their re-pin check are
+under [Current runtime](#current-runtime-and-whole-race-validation). Earlier evidence keeps its
 original hashes. Mouse auto-switching is explicitly disabled for new captures.
 
 Cache-on whole-race pairs reach results, agree on every retained screenshot and clock
@@ -467,11 +468,11 @@ Evidence locations under `tmp/matrix-workers/`:
 
 The baseline VERIFY SHA-256 is
 `ceba5ad09b28dd8741df9e0725395655b0d4dffa484edeab9ac4f1d2acc327f8`;
-all runs use the currently pinned emulator and launcher. Each capture records actual
+all runs use the `950f14…` emulator and `5a61a854…` launcher. Each capture records actual
 four-hunk bases, full effective configuration, build/runtime/tool hashes and cache audit.
 No game or trace bytes are tracked. Reproduce with the development matrix recipes.
 
-### A8 developer ceiling gates — partial result
+### A8 developer ceiling gates — passed for the current scope
 
 Developer and VERIFY builds expose `CUSTOM3` bit 0 (four NOP bytes replacing the pacer
 branch at `h0+$1288`) and bit 1 (RTS at polygon filler `h0+$1F388`). `CUSTOM4` bit 0
@@ -603,11 +604,21 @@ hunk 2 `$3D8F0`). Menus and race therefore share one executable and need no hand
 
 ### Current runtime and whole-race validation
 
-The installed native emulator now hashes to
+**Current pins.** Emulator `f582f88316687b3409e518cc7aecec6b70318035a990d252894fb2a15d5a9f42`
+and launcher `c316924a29b21a4665a3cf74b3f8a6b4bfc05178a941bf3d601944391725ba25`
+(`fsuae_common.sh`, identical to AmigaXDev's), from AmigaXDev `7eda0f2`, which titles the
+window with the running machine. With the current VERIFY slave
+(`330662b72ba7c19d049a0eb68cb522cbe668e27470a9ccfd24df561465273b97`), the C4 input
+capture `tmp/repin/c4-input` matches `tmp/c4/input-2` from the previous emulator in every
+checked field except the runtime pins (state hashes, masks, latches, ticks, events, layout,
+route). 030, 040 and 060 non-MMU boots to the race (`tmp/repin/{030,040,060}-{a,b}`)
+log the expected CACR, quit OK and repeat their screenshots exactly.
+
+Before that, the emulator hashed to
 `950f14c966ba852372d382dec8e40544f1c49184eb9f2c24e901f352ecd9b048`.
 Its source-revision record retains the TOOL1 determinism patch and adds AmigaXDev's
-window-title patch (`d5ce108`); both patch hashes match the shared sources. The launcher
-pin is unchanged. Earlier startup evidence above belongs to its recorded build.
+window-title patch (`d5ce108`); both patch hashes match the shared sources. The evidence
+below and earlier startup evidence above belong to their recorded builds.
 
 On this build, `tmp/b5-final/030-on-clock-b` completes the 030 non-MMU cache-on Quick
 Race, reaches finishing times and returns F10 `OK`, with `CACR=$00002111`.
