@@ -103,7 +103,8 @@ with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's ques
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
 tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
 A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
-68000 keeps the original frame-locked pacer by default (user decision). D is next.
+68000 keeps the original frame-locked pacer by default (user decision). D1 is
+complete (presentation snapshots); D2 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -268,6 +269,9 @@ or with the developer `CUSTOM2` bit 2.
 
 **D1 Snapshot.** At each tick's exit, copy the fields each view's renderer reads (`A4`)
 into `prev` and `cur`, with the field number.
+*Result:* complete behind `CUSTOM2` bit 3 ([internals](internals.md#d1-presentation-snapshots--complete)):
+2232-byte cur/prev buffers, checked against game memory at every tick of a whole 030 race,
+read-only for the game, 0.24 ms per tick.
 
 **D2 α.** (fields since the tick's exit + fields until the picture is shown) ÷ fields per
 tick, in Q14, clamped. "Until shown" comes from the `A5` publication rule and the last

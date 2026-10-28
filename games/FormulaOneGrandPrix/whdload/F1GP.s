@@ -37,6 +37,7 @@ slv_config
         IFNE DEVELOPER
         dc.b 'C2:X:Developer - VBL world clock:1;'
         dc.b 'C2:X:Developer - VBL world clock on a 68000 too:2;'
+        dc.b 'C2:X:Developer - presentation snapshots:3;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -1046,6 +1047,10 @@ c2_pacer
         movem.l d0-a6,-(sp)
         move.w (c2_in_tick,pc),d0
         beq.s .native
+        btst #3,(cache_options+3,pc)
+        beq.s .count
+        bsr d1_snapshot
+.count
         lea (c2_clock,pc),a0
         addq.l #1,WC_TICKS(a0)
         movea.l (c2_h0,pc),a2
@@ -1073,6 +1078,103 @@ c2_pacer
         movea.l (sp)+,a0
         move.l (c2_pacer_rest,pc),-(sp)
         rts
+; D1: at each completed tick, before the pacer counts it, record the native
+; renderer inputs mapped by A4 with the field number. Two buffers alternate, so
+; cur is the tick just completed and prev the one before. Read-only for the game.
+D1_RECORD = 76                  ; d1_fields per record
+D1_HEADER = 24
+D1_SIZE = D1_HEADER+156+27*D1_RECORD
+d1_record                       ; A4 record base, A1 destination
+        lea (d1_fields,pc),a2
+.field
+        move.w (a2)+,d0
+        bmi.s .end
+        lea (a4,d0.w),a0
+        move.w (a2)+,d1
+.copy
+        move.w (a0)+,(a1)+
+        dbf d1,.copy
+        bra.s .field
+.end
+        rts
+d1_snapshot
+        lea (d1_current,pc),a0
+        eori.w #1,(a0)
+        lea (d1_buffers,pc),a1
+        tst.w (a0)
+        beq.s .header
+        adda.w #D1_SIZE,a1
+.header
+        move.l (c2_serial,pc),(a1)+
+        move.l (c2_clock+WC_TICKS,pc),d0
+        addq.l #1,d0
+        move.l d0,(a1)+
+        move.l (c3_epochs,pc),(a1)+
+        move.l (c3_rebased,pc),(a1)+
+        move.l (c3_reconstructions,pc),(a1)+
+        move.w (c2_mode,pc),(a1)+
+        move.w (c2_draw_mode,pc),(a1)+
+        lea (d1_ranges,pc),a2
+.range
+        move.w (a2)+,d0         ; hunk*4, or -1
+        bmi.s .records
+        lea (c2_h0,pc),a0
+        movea.l (a0,d0.w),a0
+        adda.l (a2)+,a0
+        move.w (a2)+,d0
+.word
+        move.w (a0)+,(a1)+
+        dbf d0,.word
+        bra.s .range
+.records
+        movea.l (c2_h1,pc),a3
+        lea ($256,a3),a4        ; synthetic camera
+        bsr.s d1_record
+        lea ($5d6,a3),a4
+        moveq #25,d2
+.car
+        bsr.s d1_record
+        lea ($c0,a4),a4
+        dbf d2,.car
+d1_done
+        rts
+; Hunk*4, offset, words-1: view state, chase/player, published camera,
+; yaw coefficients, TV/chase parameters, horizon and viewport.
+d1_ranges
+        dc.w 4
+        dc.l $224
+        dc.w 15
+        dc.w 0
+        dc.l $3a70c
+        dc.w 11
+        dc.w 0
+        dc.l $3a7f8
+        dc.w 25
+        dc.w 0
+        dc.l $3a8c2
+        dc.w 1
+        dc.w 0
+        dc.l $3a8f8
+        dc.w 11
+        dc.w 8
+        dc.l $231d4
+        dc.w 9
+        dc.w -1
+; Record offset, words-1: pose, track position, velocity and identity bits;
+; steering and correction; list index; speed change; pose flag and packed lap;
+; height offset; status; driver; cockpit pitch effect.
+d1_fields
+        dc.w $00,27
+        dc.w $48,1
+        dc.w $66,0
+        dc.w $72,0
+        dc.w $7e,1
+        dc.w $8c,0
+        dc.w $96,0
+        dc.w $ac,0
+        dc.w $b6,0
+        dc.w -1
+
 c2_publish
         bsr c2_hud_flush
         bsr c2_drain
@@ -1772,6 +1874,8 @@ c2_draw_mode dc.w 0
 c2_in_tick dc.w 0
 c2_native_rate dc.w 0
 c2_beam_max dc.w 0
+d1_current dc.w 0
+d1_buffers ds.b 2*D1_SIZE
         ENDC
 
 ; BASELINE_PATCHES_BEGIN: mandatory B3 loader patches, never feature-gated.

@@ -48,7 +48,7 @@ def capture(args):
     if build['slave_sha256'] != sha(slave) or build['source_sha256'] != sha(SOURCE):
         raise ValueError('stale C2 build')
     symbols = {n: int(o, 16) for n, o in re.findall(
-        r'^(c[234]_\w+)\s+00:([0-9A-F]+)$',
+        r'^([cd][1234]_\w+)\s+00:([0-9A-F]+)$',
         (slave.parent / 'F1GP.lst').read_text(errors='replace'), re.M)}
     sock = ROOT / 'amiga/.run/f1gp.sock'
     if sock.exists():
@@ -64,7 +64,8 @@ def capture(args):
     extra = '--joystick_port_0_autoswitch=0'
     if args.ntsc:
         extra += ' --ntsc_mode=1'
-    whd = f'CUSTOM1=1 CUSTOM2={7 if args.clock_68000 else 3} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5=0 FileLog'
+    custom2 = (7 if args.clock_68000 else 3) | (8 if args.snapshot else 0)
+    whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5=0 FileLog'
     if args.setup == 'a1200-030':   # the primary target: 68030/50 without an MMU
         extra += ' --cpu=68030 --uae_mmu_model=0'
         whd += ' NOMMU'
@@ -307,6 +308,7 @@ if __name__ == '__main__':
     parser.add_argument('--states', action='store_true', help='C5(b) state at every completed tick')
     parser.add_argument('--cpu-hz', type=int, default=0, help='68030 clock for the one-field run')
     parser.add_argument('--clock-68000', action='store_true', help='CUSTOM2 bit 2: the clock on a 68000 too')
+    parser.add_argument('--snapshot', action='store_true', help='CUSTOM2 bit 3: D1 presentation snapshots')
     parser.add_argument('--expect-native', action='store_true', help='check the 68000 default keeps the native pacer')
     parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))
     parser.add_argument('--custom4', type=int, choices=(0,1,3,5,7), default=0)

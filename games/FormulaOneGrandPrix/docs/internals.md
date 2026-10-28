@@ -1953,3 +1953,45 @@ clock's behaviour are otherwise unchanged. Release bytes remain
 The A1200 and 030 races are shorter or longer than C5's because the changed VERIFY
 slave alters the A1 timing inputs; each still runs exactly 8 ticks per 50 fields
 apart from one tick at a sample boundary.
+
+## Smooth presentation (D)
+
+### D1 presentation snapshots — complete
+
+Behind the developer bit `CUSTOM2` bit 3 (with the clock, bit 1), `d1_snapshot` runs
+at every completed world tick, at `c2_pacer` entry before the tick is counted: after
+the tick's last native call (h0+$1272 at h0+$3C9D2), live or replay, drawn or tick-only,
+including a resumed tick. It copies the renderer inputs mapped in A4 into the current
+buffer of two 2232-byte buffers; the other buffer keeps the previous tick. It only reads
+game memory. The layout, which `tools/d1_snapshot.py` defines independently as the
+specification of the slave tables `d1_ranges` and `d1_fields`:
+
+| Part | Bytes | Contents |
+|---|---:|---|
+| Header | 24 | Field number (`c2_serial` at the tick's exit), tick number, epoch, rebased fields, reconstructions, loop mode, draw mode |
+| h1+$224–243 | 32 | Renderer track anchor, pose source +$234, selected car +$238, view code +$23C, requests +$23E, fallback +$240 |
+| h0+$3A70C–3A723 | 24 | Chase initialisation +$3A70E and heading +$3A710, controlled player +$3A720 |
+| h0+$3A7F8–3A82B | 52 | Published camera, including spring displacement and velocity +$3A820/+3A824 |
+| h0+$3A8C2–3A8C5 | 4 | Yaw trig coefficients |
+| h0+$3A8F8–3A90F | 24 | TV selection parameters and distances, view height bias +$3A904, chase offset +$3A90C |
+| h2+$231D4–231E7 | 20 | Horizon, view pitch bias, viewport +$231E0/+231E4 |
+| 27 records × 76 | 2052 | Synthetic camera h1+$256, then the 26 cars h1+$5D6 + i×$C0: +$00–37 (direction, pitch, height, lateral, longitudinal, speed, T, denominator, damage/model bytes +$19/+$25, yaw, corrected longitudinal, fraction, lap segment, world X/Z, velocity), +$48/+$4A steering and correction, +$66 list index, +$72 speed change, +$7E pose flag and +$80 packed lap position, +$8C height offset, +$96 status, +$AC driver, +$B6 cockpit pitch effect |
+
+Records are kept by slot, not by the ranking list, so a car's identity is its slot plus
++$AC. Pointers, flags and identities are recorded for validity only, not for
+extrapolation. The header's epoch, rebase and reconstruction counters and the view state
+let D2/D4 decide when prev is not a usable history (a new epoch, a resume, a view or
+source change). D1 does not decide that.
+
+**Evidence** (VERIFY `8724c100…`, `a1200-030` non-MMU, `CUSTOM4=1`, whole Quick Race,
+`tmp/d1/`):
+
+| Check | Result |
+|---|---|
+| Snapshot = game memory (`states-on`, `d1_snapshot.py`) | PASS. At each of 3162 ticks (6–3167), stopping at `d1_done`, cur equals the A4 fields rebuilt from game memory dumped at the same stop, and prev equals the previous tick's cur (3161 consecutive pairs). Field numbers increase. In 24 ticks a VBL fell between the serial read and the stop, so the recorded field number is one below the stop's serial. |
+| Negative probes | A flipped snapshot byte, published-camera byte and epoch counter are each rejected |
+| Read-only (`c5_compare.py`, `states-comparison.json`) | Option off (`CUSTOM2=3`) versus on (`=11`), same build: identical A1 inputs and identical car/session state at all 3162 common ticks |
+| Exact repeat (`states-on-repeat`) | Identical states and snapshot archive (`434cf191…`) |
+| Cost (`profile-030.json`, 100 fields from tick 300) | 0.24 ms per tick (0.19% of the window); the car update is 3.07 ms per tick. Emulated 68030 time |
+| Pictures over the race | 6203 off, 6183 on (3.18 versus 3.19 fields per picture), no drops in either |
+| Disabled-feature gate (`tmp/b4/d1-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D1 adds no hook, only code reached from `c2_pacer` |

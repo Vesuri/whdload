@@ -827,3 +827,24 @@ python3 tools/c2_capture.py tmp/c6/a500-forced --build tmp/c6/build-verify --rat
 ```
 
 Every earlier A500 command in this document that expects the clock now needs `--clock-68000`.
+
+### D1 presentation snapshots
+
+`--snapshot` sets `CUSTOM2` bit 3. With `--states`, the capture stops after each
+tick's snapshot (`d1_done`), and also saves the slave buffers and the game memory they
+were copied from (`snapshots.bin.gz`). `d1_snapshot.py` checks every snapshot against
+that memory and checks prev against the previous tick; `--negative` adds the
+injected-defect probes:
+
+```sh
+make slave-verify OUT=tmp/d1/build-verify
+python3 tools/c2_capture.py tmp/d1/states-on --build tmp/d1/build-verify --states --snapshot --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d1/states-on-repeat --build tmp/d1/build-verify --states --snapshot --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d1/states-off --build tmp/d1/build-verify --states --custom4 1 --setup a1200-030
+python3 tools/d1_snapshot.py tmp/d1/states-on --negative --out tmp/d1/states-on-report.json
+python3 tools/c5_compare.py off=tmp/d1/states-off on=tmp/d1/states-on repeat=tmp/d1/states-on-repeat \
+  --out tmp/d1/states-comparison.json
+python3 tools/c2_capture.py tmp/d1/profile-030 --build tmp/d1/build-verify --snapshot --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
+python3 tools/c6_profile.py tmp/d1/profile-030 --out tmp/d1/profile-030.json
+```
+

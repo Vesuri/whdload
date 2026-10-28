@@ -29,7 +29,8 @@ NATIVE = {
 }
 SLAVE = ('c2_live_head', 'c2_acquire', 'c2_drain', 'c2_scene_call', 'c2_repeat_picture',
          'c2_publish', 'c2_hud_flush', 'c2_pacer', 'c2_fill', 'c2_sprite', 'c2_clear',
-         'c2_sky', 'c2_sides', 'c2_lights', 'c2_hands', 'c2_blit_queue', 'c2_hud_enqueue')
+         'c2_sky', 'c2_sides', 'c2_lights', 'c2_hands', 'c2_blit_queue', 'c2_hud_enqueue',
+         'd1_snapshot')
 
 
 def report(directory):

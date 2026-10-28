@@ -181,7 +181,13 @@ def states(args, command, out, base, bases, symbols, meta):
         command('gdb', f'dump binary memory {path} {bases[h]+offset:#x} {bases[h]+offset+5:#x}')
         inputs[key] = path.read_bytes().hex()
     result['inputs'] = inputs
-    paths = [out/f'ticks-{n}.bin' for n in range(3)]
+    stop, condition = 'c2_pacer', f'condition $bpnum *(unsigned short*){base+symbols["c2_in_tick"]:#x} != 0'
+    if getattr(args, 'snapshot', False):
+        # D1: stop after the snapshot, still before the pacer counts the tick.
+        import d1_snapshot
+        regions += d1_snapshot.regions(base, bases, symbols)
+        stop, condition = 'd1_done', ''
+    paths = [out/f'ticks-{n}.bin' for n in range(len(regions))]
     for path in paths:
         path.write_bytes(b'')
     # gdb appends each region at every tick's pacer entry and continues by itself,
@@ -189,8 +195,9 @@ def states(args, command, out, base, bases, symbols, meta):
     appends = '\n'.join(f'append binary memory {path} {start:#x} {start+size:#x}'
                          for path, (start, size) in zip(paths, regions))
     command('gdb', 'delete breakpoints')
-    command('gdb', f'break *{base+symbols["c2_pacer"]:#x}')
-    command('gdb', f'condition $bpnum *(unsigned short*){base+symbols["c2_in_tick"]:#x} != 0')
+    command('gdb', f'break *{base+symbols[stop]:#x}')
+    if condition:
+        command('gdb', condition)
     command('gdb', f'commands $bpnum\nsilent\n{appends}\ncontinue\nend')
     command('gdb', f'break *{base+symbols["c3_leave"]:#x}')
     command('gdb', 'continue')
@@ -200,15 +207,21 @@ def states(args, command, out, base, bases, symbols, meta):
     columns = [path.read_bytes() for path in paths]
     count = len(columns[0]) // regions[0][1]
     assert count and all(len(c) == count*size for c, (_, size) in zip(columns, regions)), count
-    blobs = []
+    blobs, extras = [], []
     for n in range(count):
         parts = [c[n*size:(n+1)*size] for c, (_, size) in zip(columns, regions)]
         item = tick_header(parts[0], symbols)
         item['sha256'] = hashlib.sha256(parts[1]+parts[2]).hexdigest()
         result['ticks'].append(item)
-        blobs.append(b''.join(parts))
+        blobs.append(b''.join(parts[:3]))
+        extras.append(b''.join(parts[3:]))
     for path in paths:
         path.unlink()
+    if len(regions) > 3:
+        (out/'snapshots.bin.gz').write_bytes(gzip.compress(b''.join(extras), mtime=0))
+        result['snapshot'] = dict(
+            size=d1_snapshot.SIZE, stop=stop, regions=regions[3:],
+            archive_sha256=hashlib.sha256((out/'snapshots.bin.gz').read_bytes()).hexdigest())
     (out/'ticks.bin.gz').write_bytes(gzip.compress(b''.join(blobs), mtime=0))
     result.update(status='PASS', record=len(blobs[0]), count=len(blobs),
                   archive_sha256=hashlib.sha256((out/'ticks.bin.gz').read_bytes()).hexdigest())
