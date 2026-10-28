@@ -101,7 +101,9 @@ C4 is complete: one-shot presses are buffered until a native scan has seen them 
 decision), and every view key, pause, double tap and replay tap act exactly once. C5 is complete: the tick rate is 7.987 per emulated second
 with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's question), the
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
-tick, and race, retirement, replay and the accepted pit coverage pass. C6 is next.
+tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
+A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
+68000 keeps the original frame-locked pacer by default (user decision). D is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -259,7 +261,8 @@ unattended car pits (user decision). *Gate:* (a) and
 **C6 Slow machines.** Measure the A500-equivalent and A1200 after `C2` against the
 projection (about 5.2–5.6 and 8 fps at 1.0×), including the heaviest scene (the tow
 window). If the A500 cannot sustain real time in some scenes, the debt cap applies and the
-user decides whether the 68000 defaults to the original frame-locked behaviour.
+user decides whether the 68000 defaults to the original frame-locked behaviour. *Result:* it does (user decision); the clock is installed only above the 68000,
+or with the developer `CUSTOM2` bit 2.
 
 ## D. Smooth presentation (68020+ with fast RAM, when pictures are shorter than a tick)
 

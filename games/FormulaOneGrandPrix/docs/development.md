@@ -816,3 +816,14 @@ python3 tools/c2_capture.py tmp/c6/scenes-a500 --build tmp/c5/build-verify --rat
 python3 tools/c2_capture.py tmp/c6/a500-profile --build tmp/c5/build-verify --setup a500-1.5m --custom4 1 --ticks 330 --profile 100 --profile-tick 300
 python3 tools/c6_profile.py tmp/c6/a500-profile --out tmp/c6/a500-profile.json
 ```
+
+On a 68000 the clock is not installed by default (user decision). `--expect-native`
+checks that default: no clock hook, frames counted on the native pacer, clean quit.
+`--clock-68000` sets `CUSTOM2` bit 2 to force the clock on the 68000 for measurements:
+
+```sh
+python3 tools/c2_capture.py tmp/c6/a500-native --build tmp/c6/build-verify --setup a500-1.5m --custom4 1 --expect-native
+python3 tools/c2_capture.py tmp/c6/a500-forced --build tmp/c6/build-verify --rate --custom4 1 --setup a500-1.5m --clock-68000
+```
+
+Every earlier A500 command in this document that expects the clock now needs `--clock-68000`.

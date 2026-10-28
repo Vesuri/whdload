@@ -1890,7 +1890,7 @@ performance target, not a C5 rate result.
 
 Evidence: `tmp/c5/modal-{race,replay,pit}-{a,b}` and `modal-*-report.json`.
 
-### C6 slow machines — measured; the 68000 default needs a user decision
+### C6 slow machines — complete; the 68000 keeps the native pacer
 
 Whole Quick Races with `--rate --scenes` (VERIFY `e4cb8540…`, `CUSTOM4=1`, PAL) classify
 each 250-field window by the game's view state h1+$238/+23C: cockpit, the tow (the first
@@ -1932,3 +1932,24 @@ Evidence: `tmp/c6/scenes-{a500,a1200,030}`, `tmp/c6/a500-profile` and
 `a500-profile.json`. `tmp/c6/discarded` keeps two runs that classified scenes from
 screenshots (Viewing banners are too brief) and lost F10 while the results menu
 loaded; the rate capture now waits for that menu before quitting.
+
+**Decision and implementation.** The user chose the original frame-locked behaviour as
+the 68000 default. The clock hooks (the former `PL_IFC2X 1` block) are now a separate
+patch list, `patch_582992_clock`, applied by a second `resload_PatchSeg` only when
+KickEmu's `_attnflags` shows a CPU above the 68000 (AFF_68010), or when the new
+developer bit `CUSTOM2` bit 2 forces it for testing. The hooks, their ranges and the
+clock's behaviour are otherwise unchanged. Release bytes remain
+`93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`; VERIFY is
+`5f7c75cc3b603ebf8e26989613381dc1617fceb328368eef07633e83f9ab31c2`.
+
+| Check (VERIFY `5f7c75cc…`, `CUSTOM2=3` unless noted) | Result |
+|---|---|
+| A500-equivalent, default (`a500-native`) | Original VBL bytes at h0+$2CC3C (`527900ca668e`); the native pacer runs 62 frames in 500 fields (6.2 fps); F10 `OK` |
+| A500-equivalent, `CUSTOM2=7` (`a500-forced`) | Clock installed; whole race identical in counts to C5's A500 run (2955 ticks, 3756 dropped); OVERLOADED |
+| A1200 (`rate-a1200`) | Clock installed; 2919 ticks in 18250 fields, no drops, PASS |
+| 68030/50 (`rate-a1200-030`) | Clock installed; 3320 ticks in 20750 fields, no drops, PASS |
+| Disabled-feature gate (`tmp/b4/c6-acceptance.json`) | B4 PASS: release/developer/VERIFY off arms original, all 300 optional hook bytes independently rejected |
+
+The A1200 and 030 races are shorter or longer than C5's because the changed VERIFY
+slave alters the A1 timing inputs; each still runs exactly 8 ticks per 50 fields
+apart from one tick at a sample boundary.

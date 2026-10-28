@@ -36,6 +36,7 @@ slv_config
         dc.b 'C2:X:Enable CPU caches:0;'
         IFNE DEVELOPER
         dc.b 'C2:X:Developer - VBL world clock:1;'
+        dc.b 'C2:X:Developer - VBL world clock on a 68000 too:2;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -177,6 +178,21 @@ patch_game
         move.l d7,a1
         move.l (_resload,pc),a2
         jsr (resload_PatchSeg,a2)
+        IFNE DEVELOPER
+        move.l (game_size,pc),d0
+        cmp.l #582992,d0
+        bne.s .patched
+        move.l (_attnflags,pc),d0
+        btst #0,d0            ; AFF_68010: any CPU above the 68000
+        bne.s .clock
+        btst #2,(cache_options+3,pc)
+        beq.s .patched
+.clock
+        lea (patch_582992_clock,pc),a0
+        move.l d7,a1
+        jsr (resload_PatchSeg,a2)
+.patched
+        ENDC
         bsr restore_names
         IFNE VERIFY
         ; This relay is only installed for the supplied, verified layout.
@@ -1769,6 +1785,28 @@ patch_582992
         PL_W $a7a46,$7300
         ; BASELINE_PATCHES_END
         IFNE DEVELOPER
+        PL_IFC3X 0
+        ; PERF_RANGE h0:1288 4 custom=3 bit=0 variant=582992
+        PL_NOP $1288,4
+        PL_ENDIF
+        PL_IFC3X 1
+        ; Polygon edge walk and four-plane span fill; measurement only.
+        ; PERF_RANGE h0:1f388 2 custom=3 bit=1 variant=582992
+        PL_R $1f388
+        PL_ENDIF
+        ENDC
+        IFNE VERIFY
+        PL_IFC5X 0
+        ; PERF_RANGE h0:3c9d2 6 custom=5 bit=0 variant=582992
+        PL_PS $3c9d2,verify_pacer
+        PL_ENDIF
+        ENDC
+        PL_END
+        IFNE DEVELOPER
+; The C2-C4 clock hooks, applied after the main list unless the CPU is a 68000
+; (user decision: the 68000 keeps the native frame-locked pacer by default).
+patch_582992_clock
+        PL_START
         PL_IFC2X 1
         ; PERF_RANGE h0:3c8d2 6 custom=2 bit=1 variant=582992
         PL_PS $3c8d2,c2_live_entry
@@ -1869,23 +1907,8 @@ patch_582992
         ; PERF_RANGE h2:1f10e 6 custom=2 bit=1 variant=582992
         PL_PS $8e4a2,c2_pair_a1_a2
         PL_ENDIF
-        PL_IFC3X 0
-        ; PERF_RANGE h0:1288 4 custom=3 bit=0 variant=582992
-        PL_NOP $1288,4
-        PL_ENDIF
-        PL_IFC3X 1
-        ; Polygon edge walk and four-plane span fill; measurement only.
-        ; PERF_RANGE h0:1f388 2 custom=3 bit=1 variant=582992
-        PL_R $1f388
-        PL_ENDIF
-        ENDC
-        IFNE VERIFY
-        PL_IFC5X 0
-        ; PERF_RANGE h0:3c9d2 6 custom=5 bit=0 variant=582992
-        PL_PS $3c9d2,verify_pacer
-        PL_ENDIF
-        ENDC
         PL_END
+        ENDC
 ; BASELINE_PATCHES_BEGIN: mandatory B3 loader patches.
 patch_582988
         PL_START

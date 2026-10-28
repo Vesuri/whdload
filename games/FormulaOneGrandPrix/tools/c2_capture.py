@@ -64,7 +64,7 @@ def capture(args):
     extra = '--joystick_port_0_autoswitch=0'
     if args.ntsc:
         extra += ' --ntsc_mode=1'
-    whd = f'CUSTOM1=1 CUSTOM2=3 CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5=0 FileLog'
+    whd = f'CUSTOM1=1 CUSTOM2={7 if args.clock_68000 else 3} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5=0 FileLog'
     if args.setup == 'a1200-030':   # the primary target: 68030/50 without an MMU
         extra += ' --cpu=68030 --uae_mmu_model=0'
         whd += ' NOMMU'
@@ -127,6 +127,27 @@ def capture(args):
         u32 = lambda a: struct.unpack_from('>I', memory, a)[0]
         h0, h2 = found[0][0], found[2][0]
         bases = [h0, u32(h0-4)*4+4, h2, u32(h2-4)*4+4]
+        if args.expect_native:
+            # 68000 default: no clock hook; the native pacer keeps drawing every frame.
+            if memory[h0+0x2cc3c:h0+0x2cc3e] == b'\x4e\xb9':
+                raise ValueError('clock hooks installed on a native-default run')
+            frames = lambda: struct.unpack('>H', (out/'frames.bin').read_bytes())[0]
+            command('gdb', f'dump binary memory {out}/frames.bin {h0+0x1260:#x} {h0+0x1262:#x}')
+            first = frames()
+            command('gdb', 'monitor fields 500')
+            command('gdb', f'dump binary memory {out}/frames.bin {h0+0x1260:#x} {h0+0x1262:#x}')
+            meta['native'] = dict(fields=500, frames=(frames()-first) & 0xffff,
+                                  vbl_bytes=memory[h0+0x2cc3c:h0+0x2cc42].hex())
+            meta['native']['fps'] = meta['native']['frames']/10
+            command('tap', '59')
+            command('gdb', 'monitor fields 1000')
+            marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
+            meta['quit'] = marker.read_text().strip() if marker.exists() else 'MISSING'
+            if meta['quit'] != 'OK':
+                raise ValueError('F10 quit failed')
+            meta['status'] = 'CAPTURED'
+            print(json.dumps(meta['native']), flush=True)
+            return
         base = u32(h0+0x2cc3e)-symbols['c2_vbl']
         if memory[h0+0x2cc3c:h0+0x2cc3e] != b'\x4e\xb9':
             raise ValueError('VBL hook absent')
@@ -285,6 +306,8 @@ if __name__ == '__main__':
     parser.add_argument('--scenes', action='store_true', help='with --rate: classify each sample by screenshot')
     parser.add_argument('--states', action='store_true', help='C5(b) state at every completed tick')
     parser.add_argument('--cpu-hz', type=int, default=0, help='68030 clock for the one-field run')
+    parser.add_argument('--clock-68000', action='store_true', help='CUSTOM2 bit 2: the clock on a 68000 too')
+    parser.add_argument('--expect-native', action='store_true', help='check the 68000 default keeps the native pacer')
     parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))
     parser.add_argument('--custom4', type=int, choices=(0,1,3,5,7), default=0)
     parser.add_argument('--ticks', type=int, default=100)
