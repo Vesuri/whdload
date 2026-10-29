@@ -2674,3 +2674,79 @@ tick.
 Caches stay opt-in in the slave: with every `CUSTOM` bit zero the original CPU request and
 bytes remain (B4), so a release turns them on through its icon's `Custom2=1` tooltype (G1).
 No 040/060 gain is claimed (deferred; see B5).
+
+### E2 hunk 2's code in fast RAM — complete for the current scope
+
+Behind developer `CUSTOM2` bit 4, hunk 2's main code runs from a copy in fast RAM, while
+all of its data stays in chip. Hunk 2 can't simply be loaded into any memory, because it
+holds data that DMA reads: the copper list at `h2+0000–0FFF` and the audio samples at
+`h2+18000–1DFFF`. Moving it whole would mean finding every DMA consumer in every screen and
+redirecting every reference to them; copying the code instead keeps a wrong guess
+correct, only slower.
+
+**Which code.** `tools/e2_tables.py` (run by the build) disassembles hunks 0 and 2 by
+recursive descent from the program entry and the slave's hunk 2 code targets
+(`c2_target_h2`, `c2_hud_targets`). A routine entered through a redirected absolute
+`JSR`/`JMP` runs from the copy together with everything it reaches PC-relatively
+(branches, `BSR`, PC-relative `JSR`/`JMP` and `LEA`/`PEA` of code). Such a closure must
+not contain a hazard: a PC-relative `LEA`/`PEA` of data, a PC-relative read of data that
+anything else references or writes, a PC-relative computed jump, or code written through
+an absolute address. The game barely uses PC-relative addressing: the descent finds
+11,498 hunk 2 instructions, and only six are hazards:
+
+| Hazard | Why |
+|---|---|
+| h2+$520 | reads the keyboard table h2+$52A, which the level-2 handler writes |
+| h2+$21AE6, +$21AEA | read a table after h2+$21AFC that code also addresses absolutely |
+| h2+$24308 | reads a table at h2+$24310 that h2+$21A16 addresses |
+| h2+$2C430, +$2C456 | `LEA` of h2+$2FB44 (data then written through A6) and of a jump table |
+
+Of 256 absolute entries into hunk 2, the four whose closures reach these stay in chip, as
+do the 8 below h2+$1D000 (copper, interrupt, keyboard and audio code, h2+$EC–$936). The
+other 244 are redirected. The copy covers their closures, h2+$1D820–$2A640 (52,768
+bytes, 46,926 of them instructions), and the patch table lists 467 relocated `JSR`/`JMP`
+operands: 151 in hunk 0 and 316 in hunk 2. The tables contain offsets derived from the
+game and are generated under `tmp/`.
+
+**At run time.** Developer builds have 64 KB more ExpMem (`FASTMEMSIZE` `$90000`). After
+patching, on a 68020 or later with real fast RAM (the fast memory header lies at or above
+`$200000`), `e2_reserve` takes the top of fast RAM with `AllocAbs`, where the game never
+allocates. At the first live epoch, `e2_enable` copies the span and flushes the caches.
+It then adds the copy's offset to each listed operand that still holds `JSR`/`JMP`
+absolute with a target in the span, in the chip original and, for hunk 2 operands in the
+span, in the copy, and does the same for the slave's own targets in the span. Finally it
+flushes again. The seven operands that the clock's own patches replaced keep their slave
+targets (h0+$3C9BC, +$3CCEA, +$3CCFC; h2+$1E154, +$2A2CA, +$2A33C, +$2A38C), so 460 move.
+Return addresses and pointers already held keep pointing at the chip code, which stays
+valid: both copies run the same instructions against the same data. Switching at a tick
+leaves the menus at their original speed, so the race is the same race as with the option
+off; with the switch at boot the faster menus would change the race's random seed (E1).
+
+**Evidence** (`a1200-030` non-MMU, caches on, `CUSTOM4=1`, the D7 view schedule; VERIFY
+`85615275…`, developer `2a889458…`, `tmp/e2/`):
+
+| Check | Result |
+|---|---|
+| Race unchanged (`states-comparison.json`) | VERIFY with staging: off, on and its repeat identical at all 3117 common ticks. Developer (`dev-comparison.json`): off and on identical at all 3485 |
+| Every picture rebuilt (`views-on.json`) | PASS for all 7676 staged pictures; the 14 negative probes are rejected |
+| Enabled | VERIFY logs `E2 copy=009859E0 operands=460` (`whdl_log.txt`); the off arms log no E2 line |
+| Without real fast RAM (`a1200-e2`) | Not enabled (ExpMem lies in chip); runs and quits OK |
+| Disabled-feature gate (`tmp/b4/e2-acceptance.json`) | B4 PASS, all 318 hook bytes rejected; release `93dde23f…` unchanged |
+
+| Build | E2 | Ticks | Fields | Pictures | Fields per picture | Picture rate on/off |
+|---|---|---:|---:|---:|---:|---:|
+| Developer | off | 3486 | 21,854 | 6736 | 3.24 | |
+| | on | 3485 | 21,849 | 8875 | 2.46 | 1.318 |
+| VERIFY | off | 3118 | 19,555 | 5876 | 3.33 | |
+| | on | 3117 | 19,548 | 7674 | 2.55 | 1.306 |
+
+On the 68030/50 the same race draws 31–32% more pictures, with no dropped field and no
+catch-up tick. The VERIFY build's race differs from the developer build's (another slave
+size), as before. The 040/060 gain is not claimed (deferred), nor the 68020 (current
+scope).
+
+Limits: E2 needs the clock patches (`CUSTOM2` bit 1), because it switches on at the first
+live epoch. Code reached only through stored pointers (the interrupt handlers, menu code
+reached through tables) and the four unsafe entries stay in chip; in the follow and green
+windows of an earlier capture (`tmp/raw/`), 98.4% of the executed hunk 2 instructions lie in
+the code the descent finds.

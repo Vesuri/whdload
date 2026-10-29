@@ -26,6 +26,13 @@ from slave_inputs import ROOT, verify
 from state_diff import SIZES, scratch
 
 
+def keep_log(out):
+    """WHDLoad's FileLog (VERIFY's CACR and E2 lines) beside the capture."""
+    log = ROOT/'amiga/.run/dh1/.whdl_log'
+    if log.exists():
+        shutil.copyfile(log, out/'whdl_log.txt')
+
+
 def capture(args):
     if args.input_suite:
         args.input = True
@@ -70,6 +77,8 @@ def capture(args):
         args.snapshot = True
     custom2 = (7 if args.clock_68000 else 3) | (8 if args.snapshot else 0)
     custom5 = 2 if args.previous else 0
+    if args.e2:         # CUSTOM2 bit 4: hunk 2's code in fast RAM from the first live epoch
+        custom2 |= 16
     if args.no_caches:  # E1's uncached arm: bit 0 clear and WHDLoad's NoCache (B5/A7 controls)
         custom2 &= ~1
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5={custom5} FileLog'
@@ -153,6 +162,7 @@ def capture(args):
             command('gdb', 'monitor fields 1000')
             marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
             meta['quit'] = marker.read_text().strip() if marker.exists() else 'MISSING'
+            keep_log(out)
             if meta['quit'] != 'OK':
                 raise ValueError('F10 quit failed')
             meta['status'] = 'CAPTURED'
@@ -184,6 +194,7 @@ def capture(args):
             command('shot', str(out/'quit.png'))
             marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
             meta['quit'] = marker.read_text().strip() if marker.exists() else 'MISSING'
+            keep_log(out)
             if meta['quit'] != 'OK':
                 raise ValueError('F10 quit failed')
             meta['status'] = 'CAPTURED'
@@ -312,6 +323,7 @@ def capture(args):
         command('shot', str(out/'quit.png'))
         marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
         meta['quit'] = marker.read_text().strip() if marker.exists() else 'MISSING'
+        keep_log(out)
         if meta['quit'] != 'OK':
             raise ValueError('F10 quit failed')
         meta['status'] = 'CAPTURED'
@@ -359,6 +371,7 @@ if __name__ == '__main__':
     parser.add_argument('--setup', choices=('a1200-fast','a1200-030','a1200-040','a1200','a500-1.5m'),
                         default='a1200-fast')
     parser.add_argument('--ntsc', action='store_true')
+    parser.add_argument('--e2', action='store_true', help="CUSTOM2 bit 4: hunk 2's code in fast RAM")
     parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')
     parser.add_argument('--replay', action='store_true')
     parser.add_argument('--publish', action='store_true', help='stop after painting, immediately before submission')

@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C, D and E1 complete; B5/A8 pass for the current scope
+# Current status: C, D, E1 and E2 complete; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -31,9 +31,16 @@ results and acceptance evidence are in [internals.md](internals.md).
 | D9 | Complete on the 68030/50 (040/060 deferred): every picture is placed at its displayed field and its camera and car steps are compared with the actual motion. Two causes of backward motion were fixed: a car whose predicted step reaches a pit change now stops at the end of its segment instead of being held at the tick, and α falls to 0 only for pictures longer than two ticks. Over a whole race the camera never steps back and stalls 6 times in 4579 moving pairs (2127 showing the tick); cars step back 51 times in 139,607, at most 14,734 world units, mostly off the grid. Steps are even (p5–p95 0.76–1.30 of the ideal, against 0–2.1). Per-field screenshots: with prediction 98–100% of pictures change the view, against once a tick without; frame times 3–4 fields in the cockpit and chase views, 5 in TV. Race unchanged, exact repeat, B4 gate PASS. |
 | D10 | Complete (user decision): the first 040 play-test found the horizon drawn over the 3D (fixed) and steering jumps from extrapolation. Pictures now interpolate between the last two ticks, shown a tick plus the measured lead late (user decision). Over a whole 030 race the rebuild is exact, camera yaw steps back 25 times (118 extrapolated) and cars 23 (51), steps are even p5–p95 0.89–1.07 (0.76–1.30), and the race is unchanged; on the 040 the screen changes every field. The user found steering, every view, the replay cuts and the pit stop fine. |
 | E1 | Complete for the current scope: B5's gate, and with the C2 loop and interpolation a whole 030 race draws 13–14% more pictures with caches on (3.43 against 3.86 fields per picture, developer build). Caches stay opt-in in the slave; the release turns them on through its icon (G1). |
-| E2–G | Optimisation and release work remain open under the plan. |
+| E2 | Complete for the current scope (developer `CUSTOM2` bit 4): hunk 2's main code runs from a fast-RAM copy from the first live epoch, its data stays in chip. The race is identical with it off at every tick, every staged picture is rebuilt, and the 030 draws 31–32% more pictures (2.46 against 3.24 fields per picture, developer build). |
+| E3–G | Optimisation and release work remain open under the plan. |
 
-**Next F1GP step: E2 (hunk 2's code in fast RAM).** E1 is complete for the current scope
+**Next F1GP step: E3 (draw in fast RAM, copy to chip).** E2 is complete for the current
+scope ([evidence](internals.md#e2-hunk-2s-code-in-fast-ram--complete-for-the-current-scope)):
+a static descent finds which of hunk 2's routines can run from a copy (only six
+PC-relative instructions touch data), the copy switches on at the first live epoch so the
+race stays the same, and the 030 draws 31–32% more pictures. Code reached only through
+stored pointers, and four routines that read written data PC-relatively, stay in chip.
+E1 is complete for the current scope
 ([evidence](internals.md#e1-caches--complete-for-the-current-scope)): caches on draw 13–14%
 more pictures over a whole 030 race. The cached and uncached arms are different races,
 because uncached menus run slower and change the race's random seed, so the gain is over

@@ -396,7 +396,11 @@ they are. Find PC-relative data reads in the copied code: they would read the co
 stale bytes. Flush caches after copying. Expected: the 8,532 chip instruction fetches per
 field (follow window), at least 4 CPU cycles each, at least 12% of all cycles before wait
 states, become fast-RAM fetches; Powerdrome gained most from exactly this. *Gate:* the
-same pictures at the same ticks with the copy on and off; the gain per CPU.
+same pictures at the same ticks with the copy on and off; the gain per CPU. *Complete for
+the current scope:* the safe closures of 244 of 256 entries (h2+$1D820–$2A640) run from a
+copy switched on at the first live epoch; the race is identical and every picture rebuilt,
+and the 030 draws 31–32% more pictures. Hunk 2 can't move whole: DMA reads its copper list
+and samples.
 
 **E3 Draw in fast RAM, copy to chip.** A fast back buffer; the blitter's operations on
 the back buffer (1.3–2.2% of slots) replaced by CPU fills in fast RAM; a `MOVEM` copy of

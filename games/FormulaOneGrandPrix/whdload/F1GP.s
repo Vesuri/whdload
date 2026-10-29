@@ -17,7 +17,11 @@ slv_Version = 17
 slv_Flags = WHDLF_NoError|WHDLF_EmulPriv|WHDLF_ClearMem|WHDLF_Examine
 slv_keyexit = $59
 CHIPMEMSIZE = $80000
+        IFNE DEVELOPER
+FASTMEMSIZE = $90000            ; E2: 64 KB more for hunk 2's code in fast RAM
+        ELSE
 FASTMEMSIZE = $80000
+        ENDC
 NUMDRIVES = 1
 WPDRIVES = %1111
 ; Original KickEmu uses a 10,000-byte filesystem I/O cache.
@@ -38,6 +42,7 @@ slv_config
         dc.b 'C2:X:Developer - VBL world clock:1;'
         dc.b 'C2:X:Developer - VBL world clock on a 68000 too:2;'
         dc.b 'C2:X:Developer - presentation snapshots and timing:3;'
+        dc.b 'C2:X:Developer - hunk 2 code in fast RAM:4;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -197,6 +202,7 @@ patch_game
         lea (patch_582992_clock,pc),a0
         move.l d7,a1
         jsr (resload_PatchSeg,a2)
+        bsr e2_reserve
 .patched
         ENDC
         bsr restore_names
@@ -445,6 +451,142 @@ c2_init
         movem.l (sp)+,d0-d2/a0-a2
         rts
 
+; E2: hunk 2's main code (E2_LOW-E2_HIGH, tools/e2_tables.py) runs from a fast-RAM copy.
+; At load, the top of real fast RAM is reserved (68020+, with the clock patches); at the
+; first live epoch the code is copied, and every relocated JSR/JMP operand in e2_patches
+; that still holds its original target in the span, and the slave's own hunk 2 code
+; targets, move to the copy. Data stays in chip and only safe entries are redirected,
+; so chip and copy run the same code against the same data. Enabling at a tick keeps the
+; race identical to the option off (the menus run at the original speed).
+        INCLUDE e2.i
+e2_reserve
+        movem.l d0-d1/a0-a1/a6,-(sp)
+        btst #4,(cache_options+3,pc)
+        beq.s .done
+        move.l (_attnflags,pc),d0
+        btst #1,d0              ; AFF_68020
+        beq.s .done
+        move.l 4.w,a6
+        lea ($142,a6),a0        ; MemList
+.header
+        move.l (a0),a0
+        tst.l (a0)
+        beq.s .done
+        btst #2,($f,a0)         ; MEMF_FAST
+        beq.s .header
+        cmpi.l #$200000,($14,a0)        ; real fast RAM, not ExpMem in chip
+        bcs.s .done
+        move.l ($18,a0),d0      ; mh_Upper
+        sub.l #E2_HIGH-E2_LOW,d0
+        and.w #$fff0,d0
+        movea.l d0,a1
+        move.l #E2_HIGH-E2_LOW,d0
+        jsr (_LVOAllocAbs,a6)
+        lea (e2_copy,pc),a0
+        move.l d0,(a0)
+.done
+        movem.l (sp)+,d0-d1/a0-a1/a6
+        rts
+
+e2_enable
+        movem.l d0-d4/a0-a2,-(sp)
+        move.l (e2_copy,pc),d1
+        beq .done
+        lea (e2_on,pc),a0
+        tst.w (a0)
+        bne .done
+        move.w #1,(a0)
+        movea.l (c2_h2,pc),a0
+        adda.l #E2_LOW,a0
+        movea.l d1,a1
+        move.w #(E2_HIGH-E2_LOW)/4-1,d0
+.copy
+        move.l (a0)+,(a1)+
+        dbf d0,.copy
+        bsr e2_flush            ; the copy reaches memory before any jump to it
+        sub.l (c2_h2,pc),d1
+        sub.l #E2_LOW,d1        ; D1 = copy - original
+        moveq #0,d4             ; operands moved
+        lea (e2_patches,pc),a2
+        move.w #E2_PATCHES-1,d3
+.patch
+        move.l (a2)+,d0
+        movea.l (c2_h0,pc),a1
+        bclr #31,d0
+        beq.s .hunk
+        movea.l (c2_h2,pc),a1
+.hunk
+        adda.l d0,a1            ; the operand
+        move.w (-2,a1),d0
+        cmp.w #$4eb9,d0         ; JSR abs.l
+        beq.s .jump
+        cmp.w #$4ef9,d0         ; JMP abs.l
+        bne.s .next             ; replaced by a slave patch
+.jump
+        move.l (a1),d0
+        bsr.s e2_inside
+        bcc.s .next             ; a slave patch's target
+        add.l d1,(a1)
+        addq.w #1,d4
+        move.l a1,d0
+        bsr.s e2_inside
+        bcc.s .next
+        add.l d1,(0,a1,d1.l)    ; the same operand in the copy
+.next
+        dbf d3,.patch
+        lea (c2_target_h2,pc),a2
+        moveq #(c2_target_end-c2_target_h2)/4-1,d3
+.target
+        bsr.s e2_target
+        dbf d3,.target
+        lea (c2_hud_targets,pc),a2
+        moveq #11,d3
+.hud
+        bsr.s e2_target
+        bsr.s e2_target
+        bsr.s e2_target
+        addq.l #4,a2
+        dbf d3,.hud
+        bsr.s e2_flush
+        IFNE VERIFY
+        move.l d4,-(sp)
+        move.l (e2_copy,pc),-(sp)
+        lea (e2_log,pc),a0
+        move.l (_resload,pc),a2
+        jsr (resload_Log,a2)
+        addq.l #8,sp
+        ENDC
+.done
+        movem.l (sp)+,d0-d4/a0-a2
+        rts
+e2_target                       ; (A2)+ moves to the copy if it lies in the span
+        move.l (a2),d0
+        bsr.s e2_inside
+        bcc.s .kept
+        add.l d1,(a2)
+.kept
+        addq.l #4,a2
+        rts
+e2_inside                       ; carry set if D0 lies in the span of the chip original
+        move.l d0,-(sp)
+        sub.l (c2_h2,pc),d0
+        sub.l #E2_LOW,d0
+        cmp.l #E2_HIGH-E2_LOW,d0
+        movem.l (sp)+,d0        ; flags kept
+        rts
+e2_flush
+        movem.l d0-d1/a0-a2,-(sp)
+        move.l (_resload,pc),a2
+        jsr (resload_FlushCache,a2)
+        movem.l (sp)+,d0-d1/a0-a2
+        rts
+e2_copy dc.l 0
+e2_on dc.w 0
+        IFNE VERIFY
+e2_log dc.b 'F1GP VERIFY E2 copy=%08lx operands=%ld',10,0
+        EVEN
+        ENDC
+
 c2_live_entry
         bsr c3_leave_restart
         move.l a0,-(sp)
@@ -498,6 +640,7 @@ c2_head
         lea (c3_excluded,pc),a1
         add.l d2,(a1)
 .initial
+        bsr e2_enable
         bsr world_clock_rebase
         lea (c2_mode,pc),a1
         move.w d7,(a1)

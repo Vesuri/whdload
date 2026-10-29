@@ -1096,3 +1096,31 @@ for arm in on off; do
 done
 python3 tools/c5_compare.py on=tmp/e1/dev-on off=tmp/e1/dev-off --out tmp/e1/dev-comparison.json
 ```
+
+### E2 hunk 2's code in fast RAM
+
+Every build now needs Capstone 5: it runs `tools/e2_tables.py`, which fails if a slave target reaches a hazard and writes `tmp/slave/include/e2.i` (the copied
+span and the operand table); `--report tmp/...json` adds the hazards and the excluded
+entries. `c2_capture.py --e2` sets `CUSTOM2` bit 4 and keeps WHDLoad's log as
+`whdl_log.txt`, where VERIFY reports the copy and the operands moved:
+
+```sh
+python3 tools/e2_tables.py --report tmp/e2/report.json
+make slave-verify OUT=tmp/e2/build-verify && make slave-developer OUT=tmp/e2/build-developer
+python3 tools/c2_capture.py tmp/e2/states-on --build tmp/e2/build-verify --e2 --states --stage --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/e2/states-on-repeat --build tmp/e2/build-verify --e2 --states --stage --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/e2/states-off --build tmp/e2/build-verify --states --stage --views --custom4 1 --setup a1200-030
+python3 tools/c5_compare.py off=tmp/e2/states-off on=tmp/e2/states-on repeat=tmp/e2/states-on-repeat --out tmp/e2/states-comparison.json
+python3 tools/d7_views.py tmp/e2/states-on --negative --out tmp/e2/views-on.json
+for arm in on off; do
+  flag=; [ $arm = on ] && flag=--e2
+  python3 tools/c2_capture.py tmp/e2/dev-$arm --build tmp/e2/build-developer $flag --states --snapshot --views --custom4 1 --setup a1200-030
+done
+python3 tools/c5_compare.py off=tmp/e2/dev-off on=tmp/e2/dev-on --out tmp/e2/dev-comparison.json
+python3 tools/c2_capture.py tmp/e2/a1200-e2 --build tmp/e2/build-verify --e2 --snapshot --custom4 1 --setup a1200 --ticks 100
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix e2-
+```
+
+The D7 negative probes of the chase heading pick their pictures by tick (from epoch 1
+tick 900), because E2 changes the picture rate.
