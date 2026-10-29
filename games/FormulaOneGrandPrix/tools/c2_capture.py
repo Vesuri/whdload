@@ -285,10 +285,21 @@ def capture(args):
                     counters=counters, tick_sha256=sha(out/'tick.bin.gz'))
         command('gdb', 'delete breakpoints')
         command('shot', str(out/'race.png'))
-        for n in range(args.shots):     # one screenshot per field from the stop
-            command('gdb', 'monitor fields 1')
+        # One screenshot per field from the stop, each with the slave state from c2_serial
+        # to d1_current (the clock, picture counters and D2 state) after it. The server's
+        # shot traces one field and saves the field before it, so consecutive shots are
+        # consecutive fields; an extra `monitor fields 1` would skip every other one.
+        start, end = symbols['c2_serial'], symbols['d1_current']
+        records = []
+        for n in range(args.shots):
             command('shot', str(out/f'field-{n:03d}.png'))
+            command('gdb', f'dump binary memory {out}/field.bin {base+start:#x} {base+end:#x}')
+            records.append((out/'field.bin').read_bytes())
+        if records:
+            (out/'fields.bin.gz').write_bytes(gzip.compress(b''.join(records), mtime=0))
+            (out/'field.bin').unlink()
         meta['shots'] = args.shots
+        meta['shot_region'] = [start, end-start]
         command('tap', '59')
         command('gdb', 'monitor fields 1000')
         command('shot', str(out/'quit.png'))

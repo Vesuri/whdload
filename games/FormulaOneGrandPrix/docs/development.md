@@ -984,7 +984,10 @@ python3 tools/slave_gate.py --prefix d7-
 ```
 
 Without `--states`, `--views` presses the schedule's keys of the first race before the
-stop, and `--shots N` saves a screenshot of each of the N fields after it:
+stop, and `--shots N` saves a screenshot of each of the N fields after it, with the slave
+state from `c2_serial` to `d1_current` after each field (`fields.bin.gz`). The server's
+`shot` traces one field and saves the field before it, so the loop takes consecutive
+shots and nothing else; before D9 it also ran `monitor fields 1` and saved every other field:
 
 ```sh
 python3 tools/c2_capture.py tmp/d7/shots-on --build tmp/d7/build-verify --stage --views --custom4 1 --setup a1200-030 --ticks 778 --shots 260
@@ -1001,3 +1004,38 @@ python3 tools/d8_error.py tmp/d7/run3/states-on --out tmp/d8/error.json
 python3 tools/d8_error.py tmp/d7/run3/states-on-repeat --out tmp/d8/error-repeat.json
 ```
 
+### D9 smoothness
+
+`d9_smooth.py` runs the D3–D7 check on a D7-schedule capture, places every picture at the
+field it first reached the screen, and compares each camera and car step with the actual
+motion (backwards, stalled, evenness), with frame-time histograms per view. `--shots`
+measures per-field screenshot windows, with prediction off (`CUSTOM2=3`) and on
+(`--snapshot`). The α check runs on the same schedule and on slowed drawing:
+
+```sh
+make slave-verify OUT=tmp/d9/build-verify
+python3 tools/c2_capture.py tmp/d9/states-on --build tmp/d9/build-verify --states --stage --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d9/states-off --build tmp/d9/build-verify --states --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d9/states-on-repeat --build tmp/d9/build-verify --states --stage --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d9/alpha-on --build tmp/d9/build-verify --states --alpha --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d9/alpha-slowed --build tmp/d9/build-verify --states --alpha --custom4 3 --setup a1200-030
+for arm in off on; do
+  flag=; [ $arm = on ] && flag=--snapshot
+  python3 tools/c2_capture.py tmp/d9/cockpit-$arm --build tmp/d9/build-verify --setup a1200-030 $flag --custom4 1 --ticks 320 --shots 200
+  python3 tools/c2_capture.py tmp/d9/tv-$arm --build tmp/d9/build-verify --setup a1200-030 $flag --custom4 1 --views --ticks 500 --shots 200
+  python3 tools/c2_capture.py tmp/d9/chase-$arm --build tmp/d9/build-verify --setup a1200-030 $flag --custom4 1 --views --ticks 900 --shots 200
+  python3 tools/c2_capture.py tmp/d9/tow-$arm --build tmp/d9/build-verify --setup a1200-030 $flag --custom4 1 --views --ticks 778 --shots 500
+done
+python3 tools/d7_views.py tmp/d9/states-on --negative --out tmp/d9/views-on.json
+python3 tools/c5_compare.py off=tmp/d9/states-off on=tmp/d9/states-on repeat=tmp/d9/states-on-repeat \
+  --out tmp/d9/states-comparison.json
+python3 tools/d2_alpha.py tmp/d9/alpha-on --out tmp/d9/alpha-on.json
+python3 tools/d2_alpha.py tmp/d9/alpha-slowed --out tmp/d9/alpha-slowed.json
+python3 tools/d9_smooth.py tmp/d9/states-on --out tmp/d9/smooth-on.json
+python3 tools/d9_smooth.py tmp/d9/states-on-repeat --out tmp/d9/smooth-repeat.json
+python3 tools/d9_smooth.py --out tmp/d9/shots.json --shots cockpit-off=tmp/d9/cockpit-off cockpit-on=tmp/d9/cockpit-on \
+  tv-off=tmp/d9/tv-off tv-on=tmp/d9/tv-on chase-off=tmp/d9/chase-off chase-on=tmp/d9/chase-on \
+  tow-off=tmp/d9/tow-off tow-on=tmp/d9/tow-on
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix d9-
+```

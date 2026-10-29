@@ -103,10 +103,10 @@ with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's ques
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
 tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
 A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
-68000 keeps the original frame-locked pacer by default (user decision). D1–D8
+68000 keeps the original frame-locked pacer by default (user decision). D1–D9
 are complete (presentation snapshots, α, staging with exact restore, camera and car
 prediction, the remaining moving items, every view); D8 measured the prediction error
-and kept the snap thresholds; D9 is next.
+and kept the snap thresholds; D9 showed every picture moving forward on the 030; D10 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -281,7 +281,7 @@ picture's drawing time (Wing Commander's display-field horizon). When pictures a
 than a tick, show the latest state and skip prediction (Red Baron).
 *Result:* complete ([internals](internals.md#d2-presentation-phase-α--complete)). Phase
 from the clock's credit (fields since the tick fell due), lead measured per picture kind,
-α 0 when pictures (lead or period) are longer than a tick, clamped to two ticks because
+α 0 when pictures (lead or period) are longer than two ticks (one tick before D9), clamped to two ticks because
 pictures drawn between ticks are displayed after the next tick is due.
 
 **D3 Stage and restore.** Write predicted values into the renderer's inputs (or a
@@ -355,6 +355,18 @@ The largest car errors are D5's holds at the pit branch and join while pit stops
 
 **D9 Smoothness.** At 50 fps on the 68060: per-field screenshots show the camera and cars
 moving every picture, never backwards; a frame-time histogram per window.
+*Result:* complete on the 68030/50 ([internals](internals.md#d9-smoothness--complete));
+the 68060 run is deferred with the other 040/060 work. Two causes of backward motion
+were fixed: D5 held a car whose predicted step reached a pit change (it now stops at the
+end of its segment), and D2 gave α 0 to a single picture just over a tick (now only
+beyond two ticks). Over a whole race:
+- the camera never steps back and stalls in 6 of 4579 moving picture pairs (2127 showing
+  the tick);
+- cars step back 51 times in 139,607, at most 14,734 world units, mostly off the grid;
+- steps are even, p5–p95 0.76–1.30 of the ideal against 0–2.1;
+- on screen, 98–100% of predicted pictures change the view, against once a tick
+  without prediction;
+- frame times are 3–4 fields in the cockpit and chase views and 5 in TV.
 
 **D10 Play-test.** The user judges the feel. Input still takes effect at the next tick.
 

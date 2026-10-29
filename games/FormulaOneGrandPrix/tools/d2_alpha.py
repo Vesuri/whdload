@@ -36,8 +36,9 @@ def interval(rate, phase):
 
 
 def alpha(phase, lead, period, fields):
-    """The slave's rule: α 0 when pictures are longer than a tick, else Q14 clamped to two ticks."""
-    if max(lead, period) > fields:
+    """The slave's rule: α 0 when pictures are longer than the two-tick horizon, else Q14
+    clamped to two ticks (D9: a single picture just over a tick still predicts)."""
+    if max(lead, period) > 2*fields:
         return 0, True
     total = phase + lead
     return (2*Q14 if total >= 2*fields else (total*Q14)//fields), False
@@ -115,10 +116,11 @@ def check(directory):
             errors.append(item['lead'] - measured)
         ideal = tick + (item['phase'] + measured)/item['interval']
         drawn = tick + item['alpha']/Q14
-        display.append(dict(picture=n, shown=shown, tick=tick, drawn=drawn, ideal=ideal,
+        display.append(dict(picture=n, shown=shown, tick=tick, drawn=drawn, ideal=ideal, mode=item['mode'],
                             error_fields=(drawn-ideal)*item['interval'], latest=longest))
+    # Ticks restart when a replay starts or ends (a new epoch, with a change of loop mode).
     backwards = [(a['picture'], a['drawn'], b['drawn']) for a, b in zip(display, display[1:])
-                 if b['drawn'] < a['drawn'] - 1e-9]
+                 if b['drawn'] < a['drawn'] - 1e-9 and a['mode'] == b['mode']]
     predicted = [d['error_fields'] for d in display if not d['latest']]
     ideal = [d['ideal']-d['tick'] for d in display if not d['latest']]
     absolute = [abs(e) for e in predicted]

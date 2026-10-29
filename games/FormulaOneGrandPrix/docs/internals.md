@@ -2020,7 +2020,7 @@ clock's 7/6/6/6 PAL or 8/7 NTSC table at its current phase):
 phase  = WC_CREDIT + (c2_serial − WC_LAST)      fields since the current tick fell due
 lead   = measured lead of the previous picture of the same kind
 period = fields since the previous picture started
-α = 0                                   if max(lead, period) > interval   (latest state)
+α = 0                                   if max(lead, period) > 2 × interval   (latest state)
 α = min(phase + lead, 2 × interval) × 2^14 ÷ interval                       (otherwise)
 ```
 
@@ -2033,8 +2033,11 @@ period = fields since the previous picture started
   that field minus the picture's start field. Pictures drawn inside a tick and between
   ticks keep separate leads, because the tick's simulation work makes the former's
   longer. Suspending or leaving the loop discards an unmeasured picture.
-- **Long pictures:** when pictures are longer than a tick, the picture shows the latest
-  state (α 0), as the plan specifies (Red Baron).
+- **Long pictures:** when pictures are longer than the two-tick horizon, the picture shows
+  the latest state (α 0), as the plan specifies (Red Baron). D9 raised the limit from one
+  tick: a single picture just over a tick (6 fields in a pit stop) took α 0 and every car
+  in it jumped back about half a tick, and the clamp already limits how far such a picture
+  predicts.
 - **Clamp at two ticks:** a first build clamped α at one tick (`tmp/d2/clamp1`). On
   the 030, 3123 of 5983 pictures hit that clamp, so the displayed world lagged by up to
   3 fields (p95 2). A picture drawn between ticks starts about two thirds into a tick
@@ -2196,9 +2199,10 @@ the lap wrap at the end pointer h2+$1FAC2, and the pit branch (h2+$1FADE) and jo
 (h2+$1FAD6 → +$1FAE2) points passed through unless the car is changing pit state.
 
 **Kept at the tick** (per car; the rest of the picture is still predicted): a car whose
-pose flag or status word +$96 differs from the history's; a track-driven car that would
-cross into or out of the pit lane (h0+$26626 would call h0+$2655A/+265D2, which rewrite its
-lateral offset), crosses more than 3 segments in a tick or 6 in the prediction, or that
+pose flag or status word +$96 differs from the history's; a track-driven car whose step
+from the history crossed into or out of the pit lane (h0+$26626 would call
+h0+$2655A/+265D2, which rewrite its lateral offset; with pit stops on, any marked
+segment), crosses more than 3 segments in a tick or 6 in the prediction, or that
 would stand before its segment (negative progress: cars on the grid stand slightly before
 theirs); an explicit car that moved `D4_JUMP` or more in X or Z. Every record advances every
 tick whether or not it is drawn (a stopped track-driven car has speed 0), so a car entering
@@ -2344,7 +2348,7 @@ on alternate ticks (h0+$39C48 clears it when the distance grows past h0+$3A8FE;
 h0+$39804 chooses the camera again). D4 snaps on every one of those ticks, so those
 pictures show the tick. A user watching the prediction run saw blue polygons (the bridge
 and wall colour) flashing on the tarmac there. The state is identical with the option
-off. Per-field screenshots (`--shots`) did not reproduce the scene: plain and per-tick
+off. Screenshots (`--shots`, then every other field; D9) did not reproduce the scene: plain and per-tick
 captures diverge before it (the plain run switches to another car at about tick 790). It is
 therefore not established whether the original game draws this, or the repeated drawing
 of a tick.
@@ -2433,4 +2437,105 @@ Run on the repeat capture, the measure gives an identical report.
 | Jump (`D4_JUMP`, camera and explicit cars) | $100000 per tick in X or Z | The largest movement in this race is 502,528 per tick (D4's race: 480,408). The prediction error does not grow with movement: camera p95 4608, 24,064, 21,804, 34,708 and 24,320 in the movement bins 0–100k … 400–600k. The only larger movement seen is a reset (54.9 million, D4). The threshold sits at twice the largest normal movement |
 | α clamp (D2) | 2 ticks | At α = 2 the prediction is still about 14 times closer than holding. It is worse than holding at 11 of 2090 camera ticks and 66 of 71,453 car-ticks. The ideal α never exceeds 2 (D2) |
 | Segments per tick (D5) | 3 per tick, 6 in the prediction | 10 holds for segments outside pit stops in the whole race |
-| Pit branch and join while pit stops are on (D5) | held | The largest car errors, but 0.2% of moving car-ticks. Removing the hold means modelling h0+$2655A/+265D2's lateral rewrite |
+| Pit branch and join while pit stops are on (D5) | held | The largest car errors, but 0.2% of moving car-ticks. Removing the hold means modelling h0+$2655A/+265D2's lateral rewrite. D9 keeps the hold only for a step already taken; a predicted step now stops before the change, which leaves 44 held car-ticks in D9's race |
+
+### D9 smoothness — complete
+
+D9 checks, picture by picture, that what is shown moves forward. The plan names 50 fps on
+the 68060; 040/060 work is deferred (user decision), so this runs on the primary target,
+the 68030/50, at its own picture rate of about 15 pictures a second. Two measures:
+
+- **Poses** (`tools/d9_smooth.py`, from a whole-race `--states --stage --views` capture).
+  The D3–D7 check rebuilds every staged picture. Each picture is placed at the field it first
+  reached the screen (its start plus the lead measured at that display, D2), and shows until
+  the next picture does: that interval is its frame time. Between consecutive pictures of
+  the same epoch, mode and view, the step of the camera (world X/Z, yaw) and of every car
+  (world X/Z) is compared with the object's actual motion over the tick interval that
+  contains the displayed time, from snapshots with the same view. A step is *backwards*
+  when it points against that motion (dot product below zero), *stalled* when it is zero
+  while the object moves, and its *evenness* is the step per field divided by the motion
+  per field in that interval (1 is perfectly even). The same pictures showing their tick
+  are the baseline.
+- **Screen** (`--shots`): one screenshot per field, with the slave's counters after each
+  field. Each shot of the project server traces one field and saves the field before it,
+  so consecutive shots are consecutive fields. The D7 recipe's extra `monitor fields 1`
+  had made its "per-field" shots every other field; the capture no longer does that.
+
+**Two fixes.** The first measurement, on the D7 race, found two kinds of backward motion,
+both now fixed in the slave and the models:
+
+| Cause | Before | Fix |
+|---|---|---|
+| D5 held a car whose *predicted* step would cross into or out of the pit lane (with pit stops on, any marked segment). The previous picture had predicted it ahead, so it jumped back to its tick pose | 49 car steps back, up to 369,294 world units, 45 of them while pit stops were on | The predicted step stops at the end of the segment before the change (`.stop` in `d5_cars`; fraction $3FFF). A car whose step from the history already crossed is still held: it is then ahead of the previous picture, not behind |
+| D2 gave α 0 to a single picture just over a tick long (epoch 3, tick 902: 6 fields in a pit stop) | All 23 moving cars back by 77,000–157,000 in one picture | α 0 only beyond the two-tick horizon (D2 above) |
+
+The other backward camera steps in that first measurement were the reference motion
+spanning a view cut; the measure now requires the same view at both reference ticks.
+
+**Evidence** (VERIFY `e4947db4…`, developer `4f7682b6…`, `a1200-030` non-MMU, `CUSTOM4=1`,
+the D7 view schedule, `tmp/d9/`):
+
+| Check | Result |
+|---|---|
+| Prediction (`views-on.json`) | PASS for all 6266 staged pictures: every staged byte rebuilt exactly; the 14 negative probes are rejected. Car holds: 3284 grid cars before their segment, 235 pose-flag and 41 status changes, 13 segment limits; 24 predicted steps stopped before a pit change |
+| α (`alpha-on.json`, `alpha-slowed.json`) | PASS: every α recomputes exactly with the new limit. Displayed world time never goes backwards within a loop mode (ticks restart when the replay starts and ends); p95 error 1 field. Two pictures show the latest state: the first after the replay starts and after it ends, each after a 40-field pause. With `CUSTOM4=3` all 822 pictures (27 fields apart) still show the latest state |
+| Race unchanged (`states-comparison.json`) | Option off (`CUSTOM2=3`), prediction (`=11`) and its repeat: identical car/session state at all 3454 common ticks |
+| Exact repeat | Identical captures and an identical D9 report (`smooth-repeat.json`) |
+| Pictures over the race | 6521 off, 6266 predicted (3.32 versus 3.46 fields per picture), no drops |
+| Disabled-feature gate (`tmp/b4/d9-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected |
+
+The cost is unchanged: the fixes add a branch per stopped car and one compare per picture.
+
+**Motion** (`smooth-on.json`; 6117 comparable picture pairs). Predicted pictures, with
+the tick shown in brackets:
+
+| Measure | Camera (4579 moving pairs) | Cars (139,607 moving car pairs) |
+|---|---|---|
+| Stalled | 6 (2127) | 153 (62,429) |
+| Backwards | 0 (0) | 51 (0), at most 14,734 world units |
+| Evenness p5 / p50 / p95 | 0.76 / 1.04 / 1.30 (0 / 1.53 / 2.10) | 0.77 / 1.04 / 1.30 (0 / 1.26 / 2.09) |
+
+- Showing the tick, half the pictures do not move and the others move about twice as far.
+  Predicted, each picture moves about as far as the time it covers.
+- The 51 backward car steps are small, at most 14,734 world units against about 300,000 a
+  tick at speed. 39 are cars pulling away from the grid (epoch 1, ticks 164–204), where
+  speed and lateral offset change sharply from tick to tick. The rest are nine steps of two
+  cars in the front chase view (epoch 3, ticks 244–276) and three steps under 300 in the TV view.
+- The camera yaw steps against the yaw rate in 118 of 3704 turning pairs (49 showing the
+  tick). These are the steering reversals D8 measured: extrapolation overshoots a turn
+  that is about to reverse.
+- The 79 snapped pictures (view and source changes, TV cuts, jumps) show their tick; their
+  cars stall for that picture (451 car pairs).
+
+**Frame time** (fields from one picture reaching the screen to the next, whole race):
+
+| View | 2 | 3 | 4 | 5 | 6–7 | 40–41 | Mean |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Cockpit | | 691 | 98 | 1 | | | 3.13 |
+| Onboard | 56 | 1369 | 27 | 1 | | | 2.98 |
+| Rear chase | | 784 | 780 | 27 | 2 | 1 | 3.55 |
+| Front chase | | 267 | 563 | 12 | 2 | | 3.70 |
+| Replay rear chase | | 141 | 147 | 2 | | 1 | 3.65 |
+| TV | | 530 | 401 | 359 | 2 | | 3.87 |
+| Whole race | 56 | 3782 | 2016 | 402 | 6 | 2 | 3.46 |
+
+The 40-field intervals are the pauses around the replay.
+
+**Screen** (`shots.json`; 200 fields from tick 320 in the cockpit, 500 in TV, 900 in rear
+chase, and 500 from tick 778 through the retirement in TV; prediction off and on):
+
+| Window | Fields between changes, off | On | Pictures that change the view, off | On |
+|---|---|---|---:|---:|
+| Cockpit | 6–9 (mean 6.16) | 3–4 (3.25) | 50% | 98% |
+| TV | 5–10 (6.26) | 5 (5.00) | 80% | 98% |
+| Rear chase | 4–8 (6.19) | 3–5 (3.92) | 60% | 100% |
+| Retirement (TV) | 3–44 (7.24) | 3–28 (4.47) | 51% | 84% |
+
+With the option off a picture between ticks repeats the last one, so the view changes once
+a tick. With prediction every picture moves. In the retirement window D4 snaps on alternate
+ticks while view-code bit 6 alternates (D7), so those pictures show the tick.
+
+**Blue patch.** In the retirement window, right after the cut to Patrese (fields 385–391),
+both arms show light blue filling the run-off beside the tarmac, with blue specks along the
+road edge. The pictures are the same with prediction off, so the prediction does not cause
+it. Whether the original frame-locked game draws it is not established (D7's open item).

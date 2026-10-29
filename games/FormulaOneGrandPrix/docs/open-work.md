@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C and D1–D8 complete; D9 next; B5/A8 pass for the current scope
+# Current status: C and D1–D9 complete; D10 next; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -21,30 +21,39 @@ results and acceptance evidence are in [internals.md](internals.md).
 | C5 | Complete. (a) 7.987 ticks per emulated second (8 per 50 PAL fields, no drops) on the 030 and A1200; the A500-equivalent is overloaded (C6). (b) normal and slowed drawing give identical state at every tick of a race; the one-field difference is classified as an A1 timing input. (c) race, retirement, replay and the accepted pit coverage pass on the 030. |
 | C6 | Complete: the A1200 runs at real time (7.7 fps, 6.7 in the tow window). On the A500-equivalent the clock gives 1.65 fps at 0.83×, because an undrawn tick costs 7.2 fields, so the 68000 keeps the native pacer by default (user decision); `CUSTOM2` bit 2 forces the clock for tests. |
 | D1 | Complete: behind `CUSTOM2` bit 3, every completed tick records the A4 renderer inputs (view state, published camera, synthetic camera and 26 car records) with its field number in cur, keeping the previous tick in prev. A whole 030 race matches game memory at all 3162 ticks, leaves the race identical to the option off, repeats exactly and costs 0.24 ms per tick. |
-| D2 | Complete: every picture gets α, the Q14 fraction of the next tick from the clock's credit plus the measured lead to its first displayed field, clamped to two ticks; α is 0 when pictures are longer than a tick. Over a whole 030 race the rule recomputes exactly, 95% of leads are exact, displayed world time never goes backwards (p95 error 1 field), and the race is unchanged. |
+| D2 | Complete: every picture gets α, the Q14 fraction of the next tick from the clock's credit plus the measured lead to its first displayed field, clamped to two ticks; α is 0 when pictures are longer than that horizon (one tick before D9). Over a whole 030 race the rule recomputes exactly, 95% of leads are exact, displayed world time never goes backwards (p95 error 1 field), and the race is unchanged. |
 | D3 | Complete: around every picture's draw the slave stages a 1080-byte pose subset of the renderer inputs (camera publication, coefficients, horizon, viewport, track anchor and per-record pose) and restores the authoritative bytes right after the draw. VERIFY checks every restore against a D1 snapshot. A VERIFY probe staging the previous tick changes the inputs of 95% of pictures, yet the whole 030 race is identical to the option off at all 3226 ticks; 0.83 ms per picture. D4 predicts the camera and D5 the cars. |
 | D4 | Complete: each staged picture with a usable history gets a camera extrapolated from the published camera (`cur + (cur − prev) × α`); the road anchor comes from the game's own segment search, and coefficients, horizon and viewport are recomputed with the native formulas. Snaps at view/source changes, TV cuts, rebases and jumps. Over a whole 030 race an independent model rebuilds all 5990 predictions exactly, the p95 camera position error against the ideal path falls from 490k to 30k world units (yaw 882 to 126), and the race is identical to the option off at all 3210 ticks; 0.034 ms per picture. |
 | D5 | Complete: each predicted picture also extrapolates the 26 car records. Track-driven cars advance along their segments by fraction with the native stepping (lap wrap, pit branch and join), explicit cars in world X/Z with the game's segment search; a car is held at pit transitions, flag, status or jump changes and on the grid. Over a whole 030 race an independent model rebuilds every car exactly (144,157 predicted, 3263 held), the p95 car position error against the ideal path falls from 494k to 25k world units (yaw 871 to 239), and the race is identical to the option off at all 3082 ticks; 0.72 ms per picture. |
 | D6 | Complete: every other moving item has a decision. Steering (wheel images), marshal flags, start lights, pit phases, shake, instruments and car flags stay at the tick; the tow truck, smoke and debris are drawn at offsets from the predicted car, and the rear view and pit-lane overlay from the staged camera. The covered-road (no-sky) flag is now derived from the predicted anchor. Holding steering beats extrapolating it (0.79% against 1.10% of car-pictures more than half a wheel image off at α = 1). The whole 030 race is rebuilt exactly and identical to the option off at all 3258 ticks. |
 | D7 | Complete: every view draws from the staged records. In the chase and TV views the camera is placed and aimed natively from the predicted followed car, so the car no longer slides sideways in corners. Pit stops swap track ranges, now captured per picture. A whole 030 race through cockpit, TV, both chase views, onboard other cars and a replay is rebuilt exactly (3749 external cameras placed) and identical to the option off at all 3246 ticks; 0.022 ms per picture. |
 | D8 | Complete: every tick's prediction at α = 1 (and 2) against the next actual tick, over the whole D7 race. Camera p95 position error 21,504 against 446,880 for holding the tick, cars 22,784 against 430,080. Braking barely raises it, steering reversals make yaw extrapolation worse than holding, and collisions are already held through the pose flag or status. The snap thresholds stay: the $100000 jump (twice the largest normal movement), the two-tick α clamp and three segments per tick. |
-| D9–G | Presentation, optimisation and release work remain open under the plan. |
+| D9 | Complete on the 68030/50 (040/060 deferred): every picture is placed at its displayed field and its camera and car steps are compared with the actual motion. Two causes of backward motion were fixed: a car whose predicted step reaches a pit change now stops at the end of its segment instead of being held at the tick, and α falls to 0 only for pictures longer than two ticks. Over a whole race the camera never steps back and stalls 6 times in 4579 moving pairs (2127 showing the tick); cars step back 51 times in 139,607, at most 14,734 world units, mostly off the grid. Steps are even (p5–p95 0.76–1.30 of the ideal, against 0–2.1). Per-field screenshots: with prediction 98–100% of pictures change the view, against once a tick without; frame times 3–4 fields in the cockpit and chase views, 5 in TV. Race unchanged, exact repeat, B4 gate PASS. |
+| D10–G | Play-test, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: D9 smoothness.**
+**Next F1GP step: D10 play-test.** The user judges the feel; input still takes effect
+at the next tick.
+
+D9 is complete ([evidence](internals.md#d9-smoothness--complete)) on the 68030/50; the
+plan's 50 fps 68060 run is deferred with the other 040/060 work. The remaining backward
+steps are small: cars pulling away from the grid, and camera yaw at steering reversals,
+which extrapolation overshoots (D8). In the TV retirement window, a light-blue patch on
+the run-off right after a cut appears with the option off as well; whether the original
+frame-locked game draws it is not established.
+
 D8 is complete ([evidence](internals.md#d8-prediction-error--complete)). The prediction one
 tick ahead is about 20 times closer than holding the tick, the error does not grow with
 speed, and prediction is worse than holding only at 8 camera ticks and 61 of 72,199
-moving car-ticks. The thresholds stay as they are. The largest car errors are cars held
-while they cross the pit branch or join with pit stops on (115 car-ticks).
-Removing that hold would mean modelling the native lateral rewrite there.
+moving car-ticks. The thresholds stay as they are.
 
 D7 is complete ([evidence](internals.md#d7-every-view--complete)). Every view draws from
 the staged records, and in the chase and TV views the camera follows the predicted car as
 the game places it. Open from D7: blue polygons flashing on the
 tarmac were seen in the TV view while Mansell's retired car drifted at the camera's
 switching distance, where the game alternates view-code bit 6 every tick and every
-picture shows the tick. The state is identical with the option off, but the scene has not
-been reproduced in screenshots, so whether the original game draws it is not established.
+picture shows the tick. The state is identical with the option off. D9's per-field
+screenshots of that window show a light-blue patch beside the tarmac after the cut to
+Patrese, identical with the option off; whether the original game draws it is not established.
 Not exercised: a track-point TV camera and covered road.
 
 D6 is complete ([evidence](internals.md#d6-everything-else-that-moves--complete)). Every

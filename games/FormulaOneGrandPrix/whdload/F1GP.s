@@ -1196,8 +1196,9 @@ d1_fields
 ; next tick interval, 0 to 2 ticks: the fields since the current tick fell due (its remaining credit
 ; plus fields not yet observed) and the lead the previous picture of the same kind
 ; took from its start to its first displayed field. When pictures are longer than
-; a tick (that lead, or the period since the last picture started, exceeds the next
-; interval) the picture shows the latest state: alpha 0. Read-only for the game.
+; the two-tick horizon (that lead, or the period since the last picture started,
+; exceeds twice the next interval) the picture shows the latest state: alpha 0. A
+; single picture just over a tick still predicts (D9). Read-only for the game.
 D2_TICK = 0                     ; drawn inside a tick, from the new state
 D2_REPEAT = 2                   ; drawn between ticks
 d2_picture                      ; D0 = kind
@@ -1231,6 +1232,9 @@ d2_picture                      ; D0 = kind
         move.w d2_period-d2_kind(a1),d3
 .longest
         moveq #0,d2
+        cmp.w d0,d3
+        bls.s .predict
+        sub.w d0,d3             ; D9: latest only beyond the two-tick horizon
         cmp.w d0,d3
         bls.s .predict
         addq.l #1,d2_latest-d2_kind(a1)
@@ -1867,9 +1871,12 @@ d5_cars                         ; A3 = history snapshot
         subq.w #1,d5
         bmi .hold
         bsr d5_step
-        bne .hold
+        bne.s .stop
         subi.l #$4000,d2
         bra.s .ahead
+.stop                           ; D9: stop at the end of the segment before a pit change
+        lea (-$2e,a6),a6
+        move.l #$3fff,d2
 .placed
         cmpa.l (10,a2),a6
         beq.s .segment

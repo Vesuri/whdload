@@ -10,7 +10,9 @@ its progress is the fraction +$1E (Q14) plus $4000 per segment stepped from the
 history's segment to cur's, the predicted progress is placed by stepping on from cur's
 segment, and the corrected longitudinal +$1C follows from the fraction with cur's
 denominator +$16. Segments step as the native traversal does through h0+$26626 (lap
-wrap, pit branch and join points); a step into or out of the pit lane holds the car.
+wrap, pit branch and join points). A car whose history-to-cur step goes into or out
+of the pit lane is held; a predicted step that would do so stops at the end of the
+segment before it (D9).
 An explicit car's world X/Z are extrapolated and its segment found by the game's search
 h0+$26406. Both extrapolate pitch, height, lateral, yaw, correction and height offset
 as words. A car whose pose flag or status +$96 changed, that jumped, that crosses more
@@ -101,11 +103,20 @@ class Cars:
                 fraction = sw(FRACTION)      # signed: a grid car can stand before its segment
                 progress = fraction + scale(progress + fraction - hw(0x1e), alpha)
                 segment, steps = cur_segment, 0
-                while segment is not None and progress >= 0x4000 and steps < 2*STEPS:
-                    segment = self.step(segment, flags)
-                    progress -= 0x4000
-                    steps += 1
-                if segment is None or progress < 0 or progress >= 0x4000:
+                while progress >= 0x4000:
+                    if steps == 2*STEPS:
+                        segment = None
+                        break
+                    following = self.step(segment, flags)
+                    if following is None:
+                        # D9: stop at the end of the segment before a pit change, so a
+                        # car predicted towards it never goes back to the tick's pose.
+                        progress = 0x3fff
+                        self.reasons['stopped before a pit change'] = self.reasons.get(
+                            'stopped before a pit change', 0) + 1
+                        break
+                    segment, progress, steps = following, progress - 0x4000, steps + 1
+                if segment is None or progress < 0:
                     hold('before segment' if progress < 0 else 'segments')
                     continue
                 lon = (((progress - 0x4000) * sw(DEN)) >> 14) + 0x400
