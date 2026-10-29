@@ -4,8 +4,9 @@
   d4_camera.py CAPTURE [--out tmp/...json] [--negative]
 
 CAPTURE is a c2_capture --states --stage directory of a build with D4. For a picture
-with a usable history (D3) and alpha above 0, the slave extrapolates the published
-camera, cur + (cur - history) * alpha: direction, pitch, height and yaw as wrapped
+with a usable history (D3) and alpha above 0, the slave interpolates the published
+camera between the history and cur, cur - (cur - history) * weight (D10, d2_weight:
+the picture is shown a tick plus the longer measured lead late): direction, pitch, height and yaw as wrapped
 words, world X/Z as longs. The reduced and coarse X/Z follow as in h0+$33F32; the road
 anchor comes from the game's segment search h0+$26406 started at the tick's anchor;
 the yaw coefficients (h0+$3409E), horizon (+$3404C), viewport (+$33F6E) and
@@ -51,10 +52,11 @@ def signed(value, bits=16):
     return value - (1 << bits) if value >> (bits-1) else value
 
 
-def scale(delta, alpha):
-    """delta * alpha >> 14 towards zero, as d4_scale."""
-    magnitude = (abs(delta)*alpha) >> 14
-    return -magnitude if delta < 0 else magnitude
+def scale(delta, weight):
+    """-(delta * weight >> 14), the magnitude rounded towards zero, as d4_scale: with
+    delta = cur - history, cur + scale(delta, weight) = cur - (cur - history) * weight."""
+    magnitude = (abs(delta)*weight) >> 14
+    return magnitude if delta < 0 else -magnitude
 
 
 class Track:
@@ -162,7 +164,7 @@ class Model:
         anchor = struct.unpack_from('>I', buffer, 0)[0]
         buffer[54] = 0x80 if self.track.data[anchor-self.track.h1-TRACK_H1+0x26] & 8 else 0
 
-    def predict(self, saved, history, alpha, spring, clamp, view, between=None):
+    def predict(self, saved, history, weight, spring, clamp, view, between=None):
         """(staged bytes, outcome): outcome is 'jump', 'moved', 'held' or 'same'.
         BETWEEN, if given, changes the staged bytes in place after the extrapolation
         and before the coordinates, anchor and derived values are placed (D5, D7)."""
@@ -174,9 +176,9 @@ class Model:
             return bytes(saved), 'jump'
         for o in WORDS:
             delta = signed(W(saved, base+o)-W(history, o))
-            struct.pack_into('>H', out, base+o, (W(saved, base+o)+scale(delta, alpha)) & 0xffff)
+            struct.pack_into('>H', out, base+o, (W(saved, base+o)+scale(delta, weight)) & 0xffff)
         for o in LONGS:
-            struct.pack_into('>l', out, base+o, L(saved, base+o)+scale(L(saved, base+o)-L(history, o), alpha))
+            struct.pack_into('>l', out, base+o, L(saved, base+o)+scale(L(saved, base+o)-L(history, o), weight))
         if between:
             between(out)
         for o, reduced, coarse in ((0xa, 0x18, 4), (0xe, 0x20, 8)):
@@ -196,8 +198,8 @@ class Model:
 
 
 def error(shown, tick_cur):
-    """Each predicted picture against the ideal camera at its displayed time, tick +
-    alpha, interpolated between the actual published cameras of the ticks around it;
+    """Each predicted picture against the ideal camera at the time it shows, tick -
+    weight (D10), interpolated between the actual published cameras of the ticks around it;
     beside the error of showing the tick itself. Position is the larger of the X/Z
     errors in world units, yaw in angle units ($10000 a turn)."""
     def camera(buffer, at):
@@ -207,8 +209,8 @@ def error(shown, tick_cur):
     import d1_snapshot as d1
     at = d1.HEADER.size + snapshot_offset(0, 0x3a7f8)
     out = {name: [] for name in ('predicted_position', 'latest_position', 'predicted_yaw', 'latest_yaw')}
-    for tick, alpha, staged, saved in shown:
-        whole, fraction = divmod(alpha, 0x4000)
+    for tick, weight, staged, saved in shown:
+        whole, fraction = divmod(-weight, 0x4000)
         ends = [tick_cur.get(tick+whole), tick_cur.get(tick+whole+1)]
         if None in ends:
             continue

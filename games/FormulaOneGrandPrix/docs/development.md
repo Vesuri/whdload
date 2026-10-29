@@ -1039,3 +1039,44 @@ python3 tools/d9_smooth.py --out tmp/d9/shots.json --shots cockpit-off=tmp/d9/co
 make slave && make slave-developer && make slave-verify
 python3 tools/slave_gate.py --prefix d9-
 ```
+
+### D10 play-test
+
+Interpolation is checked with the D9 recipe: `d9_smooth.py` now takes the reference motion
+from T − 1 to T, `d2_alpha.py` recomputes the history's weight `d2_weight` and checks that
+the shown time, tick − weight, never goes backwards, and the models rebuild every picture
+from that weight. `c2_capture.py --setup a1200-040` runs the 040 for screenshots; there
+the debugger reads memory behind the emulated data cache, so the HUD accounting check is
+skipped. The play-test build is the developer slave on the arm FS-UAE:
+
+```sh
+make slave-verify OUT=tmp/d10/build-verify
+python3 tools/c2_capture.py tmp/d10/states-on --build tmp/d10/build-verify --states --stage --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d10/states-off --build tmp/d10/build-verify --states --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d10/states-on-repeat --build tmp/d10/build-verify --states --stage --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d10/alpha-on --build tmp/d10/build-verify --states --alpha --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d10/alpha-slowed --build tmp/d10/build-verify --states --alpha --custom4 3 --setup a1200-030
+for arm in off on; do
+  flag=; [ $arm = on ] && flag=--snapshot
+  python3 tools/c2_capture.py tmp/d10/cockpit-$arm --build tmp/d10/build-verify --setup a1200-030 $flag --custom4 1 --ticks 320 --shots 200
+  python3 tools/c2_capture.py tmp/d10/tv-$arm --build tmp/d10/build-verify --setup a1200-030 $flag --custom4 1 --views --ticks 500 --shots 200
+  python3 tools/c2_capture.py tmp/d10/chase-$arm --build tmp/d10/build-verify --setup a1200-030 $flag --custom4 1 --views --ticks 900 --shots 200
+  python3 tools/c2_capture.py tmp/d10/tow-$arm --build tmp/d10/build-verify --setup a1200-030 $flag --custom4 1 --views --ticks 778 --shots 500
+  python3 tools/c2_capture.py tmp/d10/i040-still-$arm --build tmp/d10/build-verify --setup a1200-040 $flag --custom4 1 --ticks 205 --shots 150
+done
+python3 tools/d7_views.py tmp/d10/states-on --negative --out tmp/d10/views-on.json
+python3 tools/c5_compare.py off=tmp/d10/states-off on=tmp/d10/states-on repeat=tmp/d10/states-on-repeat \
+  --out tmp/d10/states-comparison.json
+python3 tools/d2_alpha.py tmp/d10/alpha-on --out tmp/d10/alpha-on.json
+python3 tools/d2_alpha.py tmp/d10/alpha-slowed --out tmp/d10/alpha-slowed.json
+python3 tools/d9_smooth.py tmp/d10/states-on --out tmp/d10/smooth-on.json
+python3 tools/d9_smooth.py tmp/d10/states-on-repeat --out tmp/d10/smooth-repeat.json
+python3 tools/d9_smooth.py --out tmp/d10/shots.json --shots cockpit-off=tmp/d10/cockpit-off cockpit-on=tmp/d10/cockpit-on \
+  tv-off=tmp/d10/tv-off tv-on=tmp/d10/tv-on chase-off=tmp/d10/chase-off chase-on=tmp/d10/chase-on \
+  tow-off=tmp/d10/tow-off tow-on=tmp/d10/tow-on i040-off=tmp/d10/i040-still-off i040-on=tmp/d10/i040-still-on
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix d10-
+make slave-developer OUT=tmp/d10/build-developer
+FSUAE=$FSUAE_ARM DETERMINISTIC=1 AMIGA_SETUP=a1200-040 SLAVE=tmp/d10/build-developer/F1GP.Slave \
+  WHD_ARGS='CUSTOM1=1 CUSTOM2=11 CUSTOM4=1' amiga/run.sh
+```

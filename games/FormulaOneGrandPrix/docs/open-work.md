@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C and D1–D9 complete; D10 next; B5/A8 pass for the current scope
+# Current status: C and D1–D9 complete; D10 play-test in progress; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -29,7 +29,8 @@ results and acceptance evidence are in [internals.md](internals.md).
 | D7 | Complete: every view draws from the staged records. In the chase and TV views the camera is placed and aimed natively from the predicted followed car, so the car no longer slides sideways in corners. Pit stops swap track ranges, now captured per picture. A whole 030 race through cockpit, TV, both chase views, onboard other cars and a replay is rebuilt exactly (3749 external cameras placed) and identical to the option off at all 3246 ticks; 0.022 ms per picture. |
 | D8 | Complete: every tick's prediction at α = 1 (and 2) against the next actual tick, over the whole D7 race. Camera p95 position error 21,504 against 446,880 for holding the tick, cars 22,784 against 430,080. Braking barely raises it, steering reversals make yaw extrapolation worse than holding, and collisions are already held through the pose flag or status. The snap thresholds stay: the $100000 jump (twice the largest normal movement), the two-tick α clamp and three segments per tick. |
 | D9 | Complete on the 68030/50 (040/060 deferred): every picture is placed at its displayed field and its camera and car steps are compared with the actual motion. Two causes of backward motion were fixed: a car whose predicted step reaches a pit change now stops at the end of its segment instead of being held at the tick, and α falls to 0 only for pictures longer than two ticks. Over a whole race the camera never steps back and stalls 6 times in 4579 moving pairs (2127 showing the tick); cars step back 51 times in 139,607, at most 14,734 world units, mostly off the grid. Steps are even (p5–p95 0.76–1.30 of the ideal, against 0–2.1). Per-field screenshots: with prediction 98–100% of pictures change the view, against once a tick without; frame times 3–4 fields in the cockpit and chase views, 5 in TV. Race unchanged, exact repeat, B4 gate PASS. |
-| D10–G | Play-test, optimisation and release work remain open under the plan. |
+| D10 | In progress: the first 040 play-test found the horizon drawn over the 3D (fixed) and steering jumps from extrapolation. Pictures now interpolate between the last two ticks, shown a tick plus the measured lead late (user decision). Over a whole 030 race the rebuild is exact, camera yaw steps back 25 times (118 extrapolated) and cars 23 (51), steps are even p5–p95 0.89–1.07 (0.76–1.30), and the race is unchanged; on the 040 the screen changes every field. |
+| E–G | Optimisation and release work remain open under the plan. |
 
 **Next F1GP step: D10 play-test.** The user judges the feel; input still takes effect
 at the next tick.
@@ -39,14 +40,21 @@ horizon trees were drawn over the 3D. It also happened with the option off and o
 max-speed 030, wherever pictures take one field each, and it is fixed
 ([cause](internals.md#c2-developer-implementation--complete)). With the option off,
 standing still, the screen now changes 12 times in 13 tick advances on the max-speed 030
-and 24 times in 24 on the 040, against 15 and 30 before. The play-test also showed steering jumps from
-extrapolation: on the first steered frame, after releasing the steering, and in right-hand
-corners. Interpolation between the last two ticks is replacing it.
+and 24 times in 24 on the 040, against 15 and 30 before. The play-test also showed
+steering jumps from extrapolation: on the first steered frame, after releasing the
+steering, and in right-hand corners. Pictures now interpolate between the last two ticks
+([evidence](internals.md#d10-play-test--in-progress)). Interpolating at α alone held the
+newest pose in 55% of the 030's pictures, so motion paused at the end of every tick; each
+picture is now shown a tick plus the longer measured lead late, which keeps the steps even
+(user decision). That is about half a tick more lag than the original game on the
+normal-speed 030 and a sixth of a tick on the 040. The user plays the new build next. Held
+cars still show their tick pose, ahead of the interpolated pictures; 20 small backward car
+steps over a race come from that.
 
 D9 is complete ([evidence](internals.md#d9-smoothness--complete)) on the 68030/50; the
-plan's 50 fps 68060 run is deferred with the other 040/060 work. The remaining backward
-steps are small: cars pulling away from the grid, and camera yaw at steering reversals,
-which extrapolation overshoots (D8). In the TV retirement window, a light-blue patch on
+plan's 50 fps 68060 run is deferred with the other 040/060 work. The backward steps it
+left were small: cars pulling away from the grid, and camera yaw at steering reversals,
+which extrapolation overshoots (D8); D10's interpolation reduces both. In the TV retirement window, a light-blue patch on
 the run-off right after a cut appears with the option off as well; whether the original
 frame-locked game draws it is not established.
 

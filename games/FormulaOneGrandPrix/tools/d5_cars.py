@@ -4,17 +4,17 @@
   d5_cars.py CAPTURE [--out tmp/...json] [--negative]
 
 CAPTURE is a c2_capture --states --stage directory of a build with D5. For a picture
-whose camera D4 predicted, each of the 26 car records is extrapolated, cur + (cur -
-history) * alpha. A track-driven car (+$7E bit 0 clear) advances along its segments:
+whose camera D4 predicted, each of the 26 car records is interpolated, cur - (cur -
+history) * weight (D10). A track-driven car (+$7E bit 0 clear) advances along its segments:
 its progress is the fraction +$1E (Q14) plus $4000 per segment stepped from the
-history's segment to cur's, the predicted progress is placed by stepping on from cur's
-segment, and the corrected longitudinal +$1C follows from the fraction with cur's
+history's segment to cur's, the interpolated progress is placed by stepping again from
+the history's segment, and the corrected longitudinal +$1C follows from the fraction with cur's
 denominator +$16. Segments step as the native traversal does through h0+$26626 (lap
 wrap, pit branch and join points). A car whose history-to-cur step goes into or out
 of the pit lane is held; a predicted step that would do so stops at the end of the
 segment before it (D9).
-An explicit car's world X/Z are extrapolated and its segment found by the game's search
-h0+$26406. Both extrapolate pitch, height, lateral, yaw, correction and height offset
+An explicit car's world X/Z are interpolated and its segment found by the game's search
+h0+$26406. Both interpolate pitch, height, lateral, yaw, correction and height offset
 as words. A car whose pose flag or status +$96 changed, that jumped, that crosses more
 than D5_STEPS segments, or that would stand before its segment (fractions are signed; a
 grid car stands slightly before its segment) keeps the tick's pose. This module rebuilds all of it and runs
@@ -61,7 +61,7 @@ class Cars:
             return None if flags & 0x20 else track.pointer(0x1fae2)
         return segment
 
-    def predict(self, out, history_record, game, alpha):
+    def predict(self, out, history_record, game, weight):
         """Predict the staged cars in OUT in place; returns (predicted, held, moved)."""
         import d1_snapshot as d1
         from d3_stage import record_offset
@@ -101,8 +101,10 @@ class Cars:
                     hold('segments')
                     continue
                 fraction = sw(FRACTION)      # signed: a grid car can stand before its segment
-                progress = fraction + scale(progress + fraction - hw(0x1e), alpha)
-                segment, steps = cur_segment, 0
+                moved = progress + fraction - hw(0x1e)
+                # D10: from the start of the history's segment, interpolated towards cur.
+                progress = hw(0x1e) + moved + scale(moved, weight)
+                segment, steps = hl(0x12) & 0xffffffff, 0
                 while progress >= 0x4000:
                     if steps == 2*STEPS:
                         segment = None
@@ -126,14 +128,14 @@ class Cars:
                     hold('jump')
                     continue
                 for o in (0, 4):
-                    struct.pack_into('>l', out, staged+X+o, sl(X+o) + scale(sl(X+o) - hl(0x28+o), alpha))
+                    struct.pack_into('>l', out, staged+X+o, sl(X+o) + scale(sl(X+o) - hl(0x28+o), weight))
                 segment = self.track.search(cur_segment, sl(X), sl(X+4))
             if segment != cur_segment:
                 struct.pack_into('>I', out, staged+SEG, segment)
                 counts[2] += 1
             for at, o in WORDS:
                 delta = signed(sw(at) - hw(o))
-                struct.pack_into('>H', out, staged+at, (sw(at) + scale(delta, alpha)) & 0xffff)
+                struct.pack_into('>H', out, staged+at, (sw(at) + scale(delta, weight)) & 0xffff)
             counts[0] += 1
         return counts
 
@@ -165,7 +167,7 @@ def position(track, table, segment, lateral, longitudinal):
 
 def error(shown, tick_cur, cars):
     """Each drawn car of each predicted picture against its ideal pose at the displayed
-    time, tick + alpha, interpolated between the actual poses of the ticks around it;
+    time minus the delay, tick - weight, interpolated between the actual poses of the ticks around it;
     beside the error of showing the tick. Position is the larger of the X/Z errors in
     world units, yaw (+$1A) in angle units. A car whose pose flag or status changes
     between those ticks, or that jumps, has no ideal and is left out."""
@@ -191,8 +193,8 @@ def error(shown, tick_cur, cars):
         return pose(flag, g(SEG, '>I'), g(6), g(LON), g(X, '>l'), g(X+4, '>l'), g(16))
 
     out = {name: [] for name in ('predicted_position', 'latest_position', 'predicted_yaw', 'latest_yaw')}
-    for tick, alpha, staged_bytes, saved in shown:
-        whole, fraction = divmod(alpha, 0x4000)
+    for tick, weight, staged_bytes, saved in shown:
+        whole, fraction = divmod(-weight, 0x4000)
         ends = [tick_cur.get(tick+whole), tick_cur.get(tick+whole+1), tick_cur.get(tick)]
         if None in ends:
             continue

@@ -9,8 +9,8 @@ the screen (its start plus the lead measured at that display, D2) and shows unti
 next picture does: that interval is its frame time. Between consecutive pictures of the
 same epoch, mode and view the step of the camera (world X/Z and yaw) and of every car
 (world X/Z, track-driven cars placed as h0+$26286 does on that picture's track) is
-compared with the object's actual motion around the displayed time, from tick T' to
-T'+1 with T' the tick drawn plus the whole ticks of α:
+compared with the object's actual motion around the displayed time, from tick T-1 to
+T with T the tick drawn: the picture is interpolated between them (D10):
 - backwards: the step points against that motion (dot product below zero), or a yaw step
   against a yaw rate of at least TURN per tick;
 - stalled: no step while the object moves;
@@ -143,7 +143,7 @@ def poses(directory):
 
     # One entry per picture: when it shows, what it shows, predicted and at the tick.
     frames = []
-    for (tick, alpha, staged, saved, read, decision, outcome, mode), (start, kind, at) in zip(pictures, shown):
+    for (tick, weight, staged, saved, read, decision, outcome, mode), (start, kind, at) in zip(pictures, shown):
         track = track_at(tick)
         code = read(1, 0x23c, 1)[0]
         selected = struct.unpack('>I', read(1, 0x238, 4))[0]
@@ -152,7 +152,7 @@ def poses(directory):
         flags = [(read(1, d7_views.CARS_AT + n*0xc0 + 0x7e, 1)[0],
                   struct.unpack('>H', read(1, d7_views.CARS_AT + n*0xc0 + 0x96, 2))[0]) for n in range(26)]
         frames.append(dict(
-            tick=tick, alpha=alpha, decision=decision, outcome=outcome, view=view, state=state,
+            tick=tick, weight=weight, decision=decision, outcome=outcome, view=view, state=state,
             start=start, shown=at, flags=flags,
             predicted=(camera(staged), [car(staged, n, flags[n][0], track) for n in range(26)]),
             latest=(camera(saved), [car(saved, n, flags[n][0], track) for n in range(26)])))
@@ -176,11 +176,11 @@ def poses(directory):
         if a['state'] != b['state']:
             count('pairs', 'view or epoch change')
             continue
-        whole = (b['tick'] & 0xffff) + b['alpha'] // 0x4000
+        whole = (b['tick'] & 0xffff) - 1
         motion_from, motion_to = actual_poses(d3_stage.key(b['tick'] >> 16, whole)), actual_poses(
             d3_stage.key(b['tick'] >> 16, whole+1))
         if not motion_from or not motion_to:
-            count('pairs', 'no actual motion (race end)')
+            count('pairs', 'no actual motion (epoch start)')
             continue
         if motion_from[3] != b['state'] or motion_to[3] != b['state']:
             count('pairs', 'view changes during the reference motion')

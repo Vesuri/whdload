@@ -59,7 +59,9 @@ replace the original baseline or prove the projected implementation below.
    The physics and AI never see predicted values. (Indianapolis 500 StingRay
    `tmp/dev/docs/slave.md`; Wing Commander `docs/internals.md` phases 10–11.) Input is
    still sampled once per tick; interpolation would add a tick of delay, which users of
-   the sibling projects rejected even at 67 ms.
+   the sibling projects rejected even at 67 ms. The D10 play-test found extrapolation's
+   steering jumps worse, and the user chose interpolation, shown a tick plus the measured
+   lead late (user decision; D10).
 3. **Finer simulation steps only after an audit** (`F`), and only where the user asks:
    they are what Stunt Car Racer (`AGENTS.md` §Frame Rate Conversion) and Revs did, and
    the risk to F1GP's physics and AI is the reason they are optional here.
@@ -106,7 +108,9 @@ A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields,
 68000 keeps the original frame-locked pacer by default (user decision). D1–D9
 are complete (presentation snapshots, α, staging with exact restore, camera and car
 prediction, the remaining moving items, every view); D8 measured the prediction error
-and kept the snap thresholds; D9 showed every picture moving forward on the 030; D10 is next.
+and kept the snap thresholds; D9 showed every picture moving forward on the 030. The D10
+play-test is in progress: the horizon glitch it found is fixed, and pictures now
+interpolate instead of extrapolating.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -369,6 +373,10 @@ beyond two ticks). Over a whole race:
 - frame times are 3–4 fields in the cockpit and chase views and 5 in TV.
 
 **D10 Play-test.** The user judges the feel. Input still takes effect at the next tick.
+The first 040 play-test found the horizon drawn over the 3D on repeats (fixed in C2) and
+steering jumps from extrapolation. Pictures now interpolate between the last two ticks,
+each shown a tick plus the longer measured lead late so that the steps stay even (user
+decision); the user plays that build next.
 
 ## E. Performance (each change gated by measurement on every CPU)
 

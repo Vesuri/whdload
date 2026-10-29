@@ -1254,6 +1254,35 @@ d2_picture                      ; D0 = kind
         divu.w d0,d2
 d2_done
         move.w d2,d2_alpha-d2_kind(a1)
+        ; D10: the history's weight. A picture interpolates between the history and
+        ; cur, shown a tick plus the longer of the two measured leads late, so that
+        ; even a picture displayed at the end of a tick still interpolates: fraction
+        ; (fields since the tick fell due + lead - longest lead) / interval.
+        moveq #0,d3             ; alpha 0 or a tick or more: cur
+        tst.w d2
+        beq.s .weighed
+        lea (d2_leads,pc),a0
+        move.w (a0)+,d2
+        cmp.w (a0),d2
+        bcc.s .longer
+        move.w (a0),d2
+.longer
+        sub.w d2,d1
+        bmi.s .history
+        cmp.w d0,d1
+        bcc.s .weighed
+        moveq #0,d2
+        move.w d1,d2
+        lsl.l #8,d2
+        lsl.l #6,d2
+        divu.w d0,d2
+        move.w #$4000,d3
+        sub.w d2,d3
+        bra.s .weighed
+.history
+        move.w #$4000,d3
+.weighed
+        move.w d3,d2_weight-d2_kind(a1)
         movem.l (sp)+,d0-d3/a0-a1
 d2_off
         rts
@@ -1606,14 +1635,14 @@ d3_fields
         dc.w $8c,0,68
         dc.w -1
 
-; D4: the camera of a predicted picture is the published camera extrapolated from
-; the history, cur + (cur - history) * alpha: direction, pitch, height and yaw as
-; wrapped words, world X/Z as longs. The reduced and coarse X/Z follow as in
-; h0+$33F32, the road anchor is found from the tick's anchor by the game's own
-; segment search (h0+$26406), and the yaw coefficients, horizon, viewport and
-; covered-road flag are recomputed as h0+$3409E, +$3404C, +$33F6E and +$33FA0 do
-; (the flag since D6). Lateral offset and lap segment
-; stay at the tick. A camera that moved D4_JUMP or more in X or Z in one tick has
+; D4: the camera of a predicted picture is the published camera interpolated
+; between the history and cur, cur - (cur - history) * d2_weight (D10):
+; direction, pitch, height and yaw as wrapped words, world X/Z as longs. The
+; reduced and coarse X/Z follow as in h0+$33F32, the road anchor is found from
+; the tick's anchor by the game's own segment search (h0+$26406), and the yaw
+; coefficients, horizon, viewport and covered-road flag are recomputed as
+; h0+$3409E, +$3404C, +$33F6E and +$33FA0 do (the flag since D6). Lateral offset
+; and lap segment stay at the tick. A camera that moved D4_JUMP or more in X or Z in one tick has
 ; jumped (a reset or a cut): the picture snaps. VERIFY first recomputes the
 ; derived values from the tick's own camera and counts any difference.
 D4_JUMP = $100000
@@ -1651,7 +1680,7 @@ d4_camera                       ; A3 = history snapshot, d3_staged = the game's 
         addq.w #4,d2
         cmpi.w #$e,d2
         beq.s .bound
-        move.w (d2_alpha,pc),d3
+        move.w (d2_weight,pc),d3
         lea (d4_words,pc),a4
 .word
         move.w (a4)+,d2
@@ -1726,11 +1755,14 @@ d4_camera                       ; A3 = history snapshot, d3_staged = the game's 
 ; Offsets in the published camera: direction, pitch, height, yaw.
 d4_words
         dc.w 0,2,6,$14,-1
-; D0.l * D3.w (unsigned Q14) >> 14, rounded towards zero, for |D0| < 2^20.
+; -(D0.l * D3.w >> 14), the magnitude rounded towards zero, for |D0| < 2^20: with
+; D0 = cur - history and D3 = d2_weight, the step back from cur.
 d4_scale
         tst.l d0
-        bpl.s .positive
+        bpl.s .negative
         neg.l d0
+        bra.s .positive
+.negative
         bsr.s .positive
         neg.l d0
         rts
@@ -1808,21 +1840,21 @@ d4_table                        ; D0 = angle, A4 = h0+$222F0
         move.w (a4,d0.w),d0
         rts
 
-; D5: the cars of a predicted picture, cur + (cur - history) * alpha per record.
+; D5: the cars of a predicted picture, interpolated per record like the camera.
 ; A track-driven car advances along its segments: progress is its fraction (+$1E,
 ; Q14) plus $4000 per segment stepped from the history's segment to cur's, and the
-; predicted progress is placed by stepping on from cur's segment, the corrected
-; longitudinal (+$1C) following from the fraction with cur's denominator (+$16). An
-; explicit car's world X/Z are extrapolated and its segment found by the game's own
-; search (h0+$26406). Both extrapolate pitch, height, lateral, yaw, correction and
-; height offset as words; each pose accessor branch reads its own subset. A car
+; interpolated progress is placed by stepping again from the history's segment,
+; the corrected longitudinal (+$1C) following from the fraction with cur's
+; denominator (+$16). An explicit car's world X/Z are interpolated and its segment
+; found by the game's own search (h0+$26406). Both interpolate pitch, height,
+; lateral, yaw, correction and height offset as words; each pose accessor branch reads its own subset. A car
 ; whose pose flag or status (+$96) changed, that jumped, that crosses a pit
 ; transition or more than D5_STEPS segments in a tick, or that would stand before
 ; its segment (on the grid) keeps the tick's pose.
 D5_STEPS = 3                    ; segments a car may cross in a tick (2 at most seen)
 d5_cars                         ; A3 = history snapshot
         movem.l d0-a6,-(sp)
-        move.w (d2_alpha,pc),d3
+        move.w (d2_weight,pc),d3
         movea.l (c2_h1,pc),a4
         lea ($5d6,a4),a4        ; the game's record
         lea (D1_HEADER+D1_RANGES+D1_RECORD,a3),a3 ; the history's (after the synthetic camera)
@@ -1857,13 +1889,15 @@ d5_cars                         ; A3 = history snapshot
         add.l d0,d2
         move.w ($1e,a3),d0
         ext.l d0
-        sub.l d0,d2
+        sub.l d0,d2             ; the progress from the history to cur
         move.l d2,d0
         bsr d4_scale
-        move.w (20,a2),d2
-        ext.l d2
-        add.l d0,d2             ; from the start of cur's segment
+        add.l d0,d2
+        move.w ($1e,a3),d0
+        ext.l d0
+        add.l d0,d2             ; from the start of the history's segment
         bmi .hold
+        movea.l ($12,a3),a6
         moveq #D5_STEPS*2,d5
 .ahead
         cmpi.l #$4000,d2
@@ -1956,7 +1990,7 @@ d5_cars                         ; A3 = history snapshot
 ; D7: an external view's camera from the staged viewed car (h1+$238), placed and
 ; aimed as the native view code does in the tick. Chase (view bit 5, h0+$398AA):
 ; the camera stands h0+$3A90C from the car along the chase heading h0+$3A710,
-; turned by $8000 in front chase (bit 4); the heading is extrapolated like the
+; turned by $8000 in front chase (bit 4); the heading is interpolated like the
 ; camera words. TV (h0+$39BD0): the camera stays where D4 put it. Both aim the
 ; direction and yaw at the car with the game's atan h0+$256B6 (h0+$39CBE). The
 ; cockpit views, whose camera is the car itself, and a TV camera on a track point
@@ -1997,7 +2031,7 @@ d7_aim                          ; A3 = history snapshot, d3_staged with predicte
         move.w d6,d0
         sub.w (D1_HEADER+36,a3),d0 ; the history's chase heading
         ext.l d0
-        move.w (d2_alpha,pc),d3
+        move.w (d2_weight,pc),d3
         bsr d4_scale
         add.w d0,d6
         ; The staged car as a record for the pose accessor.
@@ -2945,6 +2979,7 @@ d2_lead dc.w 0                  ; lead used for this picture
 d2_period dc.w 0                ; fields since the previous picture started
 d2_alpha dc.w 0                 ; unsigned Q14, at most $8000
 d2_leads dc.w 0,0               ; last measured lead per kind
+d2_weight dc.w 0                ; the history's, unsigned Q14 (D10)
 d1_current dc.w 0
 d1_buffers ds.b 2*D1_SIZE
 d3_pictures dc.l 0              ; pictures seen

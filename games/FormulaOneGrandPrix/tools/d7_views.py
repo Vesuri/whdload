@@ -19,8 +19,8 @@ onboard (the cockpit of another car), TV, rear chase and front chase. Per view t
 camera and car errors are d4_camera.py's and d5_cars.py's. In the external views the
 viewed car is what the camera is aimed at, so its bearing from the camera relative to
 the camera's yaw is where it appears across the screen: the bearing error is the
-staged bearing against the ideal one (camera and car at the displayed time, tick +
-alpha, interpolated between the actual ticks), in angle units ($10000 a turn), beside
+staged bearing against the ideal one (camera and car at the time shown, tick -
+weight, interpolated between the actual ticks), in angle units ($10000 a turn), beside
 the error of showing the tick.
 """
 import argparse
@@ -76,7 +76,7 @@ class Aim:
             x = car[0] + ((self.model.lookup(0x4000-h)*distance) >> 6)
         return x, z, self.atan(signed((car[0]-x) >> 11), signed((car[1]-z) >> 11))
 
-    def predict(self, out, saved, history, read, alpha):
+    def predict(self, out, saved, history, read, weight):
         """Place OUT's camera from its predicted viewed car; returns 1 if placed."""
         self.tick_differs = False
         u32 = lambda b: struct.unpack('>I', b)[0]
@@ -103,7 +103,7 @@ class Aim:
                 or struct.unpack_from('>H', saved, CAMERA)[0] != yaw):
             self.tick_differs = True
         past = struct.unpack_from('>h', history, d1.HEADER.size + d3_stage.snapshot_offset(0, 0x3a710))[0]
-        heading = (heading + scale(signed(heading-past), alpha)) & 0xffff
+        heading = (heading + scale(signed(heading-past), weight)) & 0xffff
         at = d5_cars.CARS + (record-CARS_AT)//0xc0*d5_cars.RECORD
         g = lambda o, f='>h': struct.unpack_from(f, out, at+o)[0]
         car = pose(g(d5_cars.SEG, '>I'), g(6), g(d5_cars.LON), g(d5_cars.X, '>l'), g(d5_cars.X+4, '>l'))
@@ -176,7 +176,7 @@ def measure(directory):
                 struct.unpack_from('>H', buffer, at+0x14)[0])
 
     views = {}
-    for tick, alpha, staged, saved, read, decision, outcome, mode in pictures:
+    for tick, weight, staged, saved, read, decision, outcome, mode in pictures:
         code = read(1, 0x23c, 1)[0]
         selected = struct.unpack_from('>I', read(1, 0x238, 4))[0]
         name = ('replay ' if mode == 2 else '') + view_name(code, selected, player)
@@ -187,10 +187,10 @@ def measure(directory):
         v['decisions'][key] = v['decisions'].get(key, 0) + 1
         if outcome not in ('moved', 'same', 'held'):
             continue
-        v['shown'].append((tick, alpha, staged, saved))
+        v['shown'].append((tick, weight, staged, saved))
         if name.endswith(('cockpit', 'onboard')):
             continue
-        whole, fraction = divmod(alpha, 0x4000)
+        whole, fraction = divmod(-weight, 0x4000)
         ends = [tick_cur.get(tick+whole), tick_cur.get(tick+whole+1)]
         if None in ends:
             continue

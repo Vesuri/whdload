@@ -2142,12 +2142,13 @@ reuses. The independent checks passed in that run, and the fixed build reports n
 For every staged picture with a usable history (D3) and α above 0, `d4_camera` replaces
 the camera part of the staged values with a prediction from the published camera at
 h0+$3A7F8: `cur + (cur − history) × α`, with cur the tick drawn and α in Q14 up to two
-ticks. The product is rounded towards zero, using 68000 instructions only.
+ticks. The product is rounded towards zero, using 68000 instructions only. Since D10 the
+prediction is an interpolation, `cur − (cur − history) × w` (D10 below).
 
 | Staged value | Rule |
 |---|---|
-| Direction +$3A7F8, pitch +$3A7FA, height +$3A7FE, yaw +$3A80C | Extrapolated as wrapped words, so angles take the shortest arc. The published pitch already contains the view bias and the cockpit +$B6 term |
-| World X/Z +$3A802/+$3A806 | Extrapolated as longs. World coordinates do not wrap, so the lap wrap only concerns the anchor |
+| Direction +$3A7F8, pitch +$3A7FA, height +$3A7FE, yaw +$3A80C | Extrapolated (interpolated since D10) as wrapped words, so angles take the shortest arc. The published pitch already contains the view bias and the cockpit +$B6 term |
+| World X/Z +$3A802/+$3A806 | Extrapolated (interpolated since D10) as longs. World coordinates do not wrap, so the lap wrap only concerns the anchor |
 | Reduced X/Z +$3A810/+$3A818, coarse X/Z +$3A7FC/+$3A800 | Derived from the predicted X/Z as h0+$33F32 does (`>> 8`, then `>> 3`) |
 | Road anchor h1+$224, anchor heading +$3A81E | The game's own segment search h0+$26406, started at the tick's anchor, for the predicted X/Z. It steps forward or back through the native wrap helpers (+$2679A/+267DA), so it follows the lap wrap. A result in the pit/alternate segments below h1+$53DE keeps the tick's anchor, because native publication (+$26502) would convert it through +$26326, which writes h2+$231EA |
 | Yaw coefficients +$3A8C2/+$3A8C4, horizon h2+$231D4, viewport h2+$231E0/+$231E4, covered-road flag h2+$231A0 | Recomputed as h0+$3409E, +$3404C, +$33F6E and +$33FA0 do: the sine table at h0+$222F0, the spring word +$3A820 in the cockpit, the horizon limit h2+$231CC, the anchor heading minus the yaw, and the anchor's +$26 bit 3 (the flag since D6) |
@@ -2192,7 +2193,7 @@ at the tick; D5 predicts them. D4 alone is not a smoothness claim; D9 measures s
 
 For every picture whose camera D4 predicted, `d5_cars` extrapolates each of the 26 car
 records in the staged values, `cur + (cur − history) × α`, with the same history, α and
-rounding as D4. The renderer reads a car through the pose accessor h0+$26206 (A4), so each
+rounding as D4 (since D10 interpolated with D4's weight, D10 below). The renderer reads a car through the pose accessor h0+$26206 (A4), so each
 representation is predicted in its own coordinates:
 
 | Car | Rule |
@@ -2309,7 +2310,7 @@ of an external view with the native placement from the predicted car:
 
 | View | Native code | Staged camera |
 |---|---|---|
-| Chase (view-code bit 5; front with bit 4) | h0+$398AA–3990C | Heading +$3A710 extrapolated as a wrapped word (the native turn towards the car's direction is rate-limited by +$3A960, so the published heading is extrapolated rather than recomputed). X = car X + (table(\|$4000 − h\|) × L) >> 6 and Z = car Z + (table(\|h\|) × L) >> 6, with h the heading (+$8000 in front), L the distance word +$3A90C and the table h0+$222F0 |
+| Chase (view-code bit 5; front with bit 4) | h0+$398AA–3990C | Heading +$3A710 extrapolated (interpolated since D10) as a wrapped word (the native turn towards the car's direction is rate-limited by +$3A960, so the published heading is extrapolated rather than recomputed). X = car X + (table(\|$4000 − h\|) × L) >> 6 and Z = car Z + (table(\|h\|) × L) >> 6, with h the heading (+$8000 in front), L the distance word +$3A90C and the table h0+$222F0 |
 | TV (bit 5 clear, h1+$240 zero) | h0+$39BD0 | The fixed camera position of the tick |
 | Both | h0+$39CBE | Yaw and direction from the game's arctangent h0+$256B6 (table h0+$242F4) of the predicted car relative to the camera, both reduced `>> 11` |
 
@@ -2547,3 +2548,80 @@ ticks while view-code bit 6 alternates (D7), so those pictures show the tick.
 both arms show light blue filling the run-off beside the tarmac, with blue specks along the
 road edge. The pictures are the same with prediction off, so the prediction does not cause
 it. Whether the original frame-locked game draws it is not established (D7's open item).
+
+### D10 play-test — in progress
+
+The first play-test, on the 040 (`a1200-040`, the developer build, `CUSTOM2=11`), found two
+problems:
+
+- **Horizon over the 3D** about every 25 fields while standing still, with the option
+  off as well. This is fixed (C2 above): a repeat drew without the scene's blit-queue drain.
+- **Steering jumps from extrapolation**: the first steered picture turned too far, the yaw
+  sprang back after the steering was released, and right-hand corners jumped. Extrapolation
+  carries the last tick's rate past a reversal (D8). The user chose interpolation.
+
+**Interpolation.** A picture now shows the pose between the history (the previous tick)
+and cur, `cur − (cur − history) × w` with the history's weight `w` in `d2_weight`, unsigned
+Q14. The camera words and X/Z (D4), the cars (D5) and the chase heading (D7) use it. A
+track-driven car steps again from the history's segment, by its progress to cur times
+`1 − w`. D2 computes the weight after α:
+
+- A picture is shown a tick plus the longer of the two measured leads (tick and repeat)
+  late. The fraction is (fields since the tick fell due + this picture's lead − longer
+  lead) / interval, and `w` is 1 minus that fraction.
+- Below 0 the picture shows the history. At or beyond one tick, and at α 0, it shows cur.
+- Interpolating at α alone (shown one tick late) held cur in 55% of the 030's pictures,
+  because display times run 0.4–1.6 ticks after the tick. Motion then paused at the end of
+  every tick (evenness p5–p95 0.27–1.74). The user chose the even, adaptive delay instead
+  (user decision): lag is one tick plus the lead, about half a tick more than the original
+  game on the normal-speed 030 and a sixth of a tick on the 040.
+
+A snapped or latest picture still shows cur. A held car keeps its tick pose, which is now
+ahead of the interpolated pictures around it.
+
+**Evidence** (VERIFY `4ebc2d32…`, developer `5d302a49…`, `a1200-030` non-MMU, `CUSTOM4=1`,
+the D7 view schedule, `tmp/d10/`):
+
+| Check | Result |
+|---|---|
+| Interpolation (`views-on.json`) | PASS for all 6212 staged pictures: every staged byte rebuilt exactly; the 14 negative probes are rejected. The history chase heading probe now uses a picture below one tick (picture 1701), because at a tick or more the history has no weight |
+| α and weight (`alpha-on.json`, `alpha-slowed.json`) | PASS: every α and weight recomputes exactly. 5179 pictures interpolate and 1030 show the history; the shown time, tick − w, never goes backwards within a loop mode, except twice after the α-0 picture at an epoch start (a cut). With `CUSTOM4=3` all 814 pictures show the latest state |
+| Race unchanged (`states-comparison.json`) | Option off, interpolation and its repeat: identical car/session state at all 3422 common ticks |
+| Exact repeat | Identical captures and an identical D9 report (`smooth-repeat.json`) |
+| Pictures over the race | 6381 off, 6212 interpolated (3.36 versus 3.45 fields per picture), no drops |
+| Disabled-feature gate (`tmp/b4/d10-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged |
+
+**Motion** (`smooth-on.json`, 6118 comparable pairs; the reference is the motion from T − 1
+to T, between which a picture of tick T is interpolated). D9's extrapolation in brackets:
+
+| Measure | Camera | Cars |
+|---|---|---|
+| Moving pairs | 4419 | 142,441 |
+| Stalled | 5 (6) | 128 (153) |
+| Backwards | 1 of 234 world units (0) | 23 (51), at most 19,282 world units |
+| Yaw backwards (turning pairs) | 25 of 3714, at most 895 (118 of 3704, at most 1932) | |
+| Evenness p5 / p50 / p95 | 0.89 / 1.04 / 1.07 (0.76 / 1.04 / 1.30) | 0.88 / 1.04 / 1.08 (0.77 / 1.04 / 1.30) |
+
+- 20 of the 23 backward car steps follow a held car: the held picture shows cur, the next
+  interpolated one is behind it. Four are in the cockpit at the start (epoch 1, ticks
+  138–142), the others groups of cars in the TV view in epoch 3; the largest is 6982.
+- The other three are two steps of one car leaving the grid (19,282 and 982 world units)
+  and one of 2366 in the TV view.
+- The shown time never goes backwards (α and weight above), so the 25 yaw steps are not
+  pictures out of order; they have not been analysed one by one.
+
+**Screen** (`shots.json`; the D9 windows on this build's race, and 150 fields standing on
+the grid on the 040 from tick 205):
+
+| Window | Fields between changes, off | On | Pictures that change the view, off | On |
+|---|---|---|---:|---:|
+| Cockpit | 4–9 (mean 6.19) | 3–4 (3.18) | 49% | 100% |
+| TV | 6–9 (6.30) | 3–4 (3.06) | 46% | 100% |
+| Rear chase | 4–24 (7.27) | 4–24 (5.08) | 55% | 81% |
+| Retirement (TV) | 4–16 (6.83) | 4–12 (5.37) | 58% | 74% |
+| 040, standing | 6–7 (6.26) | 1–3 (1.04) | 16% | 99% |
+
+This build's race differs from D9's (the slave is larger, so the boot timing and the race's
+random seed differ). In its rear-chase and retirement windows the view stands still for up
+to 24 fields with the option off as well. On the 040 the interpolated pictures change the
+screen every field.

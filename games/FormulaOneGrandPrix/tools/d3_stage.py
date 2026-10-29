@@ -123,7 +123,7 @@ def key(epoch, tick):
 
 
 def check(directory, mutate=None, collect=None):
-    """With COLLECT, a list: each picture's (tick, alpha, staged, saved, game reader,
+    """With COLLECT, a list: each picture's (tick, weight, staged, saved, game reader,
     decision, D4 outcome, loop mode) is appended, its tick as key(epoch, tick)."""
     root = Path(directory)
     meta = json.loads((root/'meta.json').read_text())
@@ -178,7 +178,7 @@ def check(directory, mutate=None, collect=None):
         read = game_reader(game, ranges)
         word = lambda name: struct.unpack_from('>H', slave, at_slave(name))[0]
         ticks = struct.unpack_from('>I', slave, at_slave('c2_clock')+24)[0]   # WC_TICKS
-        mode, alpha = word('c2_mode'), word('d2_alpha')
+        mode, alpha, weight = word('c2_mode'), word('d2_alpha'), word('d2_weight')
         epochs = struct.unpack_from('>I', counters)[0]
         values = dict(zip(COUNTERS, struct.unpack_from('>10I', block)))
         kind, source = (struct.unpack_from('>H', block, at_d3(name))[0] for name in ('d3_kind', 'd3_source'))
@@ -221,15 +221,15 @@ def check(directory, mutate=None, collect=None):
                 nonlocal counts, aimed
                 if cars:
                     counts = car_model.predict(
-                        out, lambda r: history[records+r*d1.RECORD:records+(r+1)*d1.RECORD], read, alpha)
+                        out, lambda r: history[records+r*d1.RECORD:records+(r+1)*d1.RECORD], read, weight)
                 if aim:
-                    aimed = aim_model.predict(out, saved, history, read, alpha)
-            want, outcome = model.predict(saved, camera_history, alpha, spring, clamp, view, between)
+                    aimed = aim_model.predict(out, saved, history, read, weight)
+            want, outcome = model.predict(saved, camera_history, weight, spring, clamp, view, between)
             outcomes[outcome] = outcomes.get(outcome, 0) + 1
             if outcome == 'jump':
                 expected_source = 0
             else:
-                shown.append((tick_key, alpha, staged, saved))
+                shown.append((tick_key, weight, staged, saved))
                 if cars:
                     car_totals = [a+b for a, b in zip(car_totals, counts)]
                 if aim and aim_model.tick_differs:
@@ -242,7 +242,7 @@ def check(directory, mutate=None, collect=None):
         else:
             want = saved
         if collect is not None:
-            collect.append((tick_key, alpha, staged, saved, read, decision, outcome, mode))
+            collect.append((tick_key, weight, staged, saved, read, decision, outcome, mode))
         if source != expected_source:
             problems.append(('source', source, expected_source))
         if staged != want:
@@ -342,8 +342,11 @@ def negative(directory, camera=False, cars=False, aim=False):
                   ('staged chase camera X', lambda sizes: [staged(sizes) + 4+0xa+2])]
     results = {}
     for name, where in cases:
-        # Car cases mid-race: on the grid the cars keep the tick's pose.
-        stop = 1700 if 'chase' in name else 2000 if 'car' in name else 200
+        # Car cases mid-race: on the grid the cars keep the tick's pose. A picture at
+        # alpha one tick or more shows cur, without the history (D10): the history's
+        # chase heading is checked at a picture below one tick.
+        stop = 1701 if name == 'history chase heading' else 1700 if 'chase' in name \
+            else 2000 if 'car' in name else 200
         results[name] = check(directory, flip(where, stop))['status']
     return results
 

@@ -7,7 +7,11 @@ CAPTURE is a c2_capture --states --alpha directory. Each record is the slave sta
 from c2_serial to d1_current, saved after d2_picture stored α. The check recomputes
 the phase, the next interval, the lead and α with the slave's integer rule. The lead is
 then judged against the one measured when the picture reached the screen (the next
-record). The displayed world time, tick + α, must never go backwards.
+record). The displayed world time, tick + α, must never go backwards. D10: the history's
+weight d2_weight is recomputed too; a picture shows tick - weight, a tick plus the longer
+measured lead before its display, which must not go backwards either, except after a
+picture at α 0 that shows cur (the first of an epoch, at a cut), counted apart; the
+pictures clamped to the history or to cur are counted.
 """
 import argparse
 import collections
@@ -44,6 +48,15 @@ def alpha(phase, lead, period, fields):
     return (2*Q14 if total >= 2*fields else (total*Q14)//fields), False
 
 
+def weight(alpha_value, phase, lead, leads, fields):
+    """The slave's D10 rule: the history's weight, Q14, from the fields past a tick plus
+    the longer lead; cur (0) at α 0 or a tick or more, the history (Q14) before it."""
+    if alpha_value == 0:
+        return 0
+    total = phase + lead - max(leads)
+    return Q14 if total < 0 else 0 if total >= fields else Q14 - (total*Q14)//fields
+
+
 def decode(record, symbols):
     at = lambda name: symbols[name]-symbols['c2_serial']
     word = lambda name: struct.unpack_from('>H', record, at(name))[0]
@@ -55,7 +68,7 @@ def decode(record, symbols):
                 pictures=long('d2_pictures'), latest=long('d2_latest'), kind=word('d2_kind'),
                 pending=word('d2_pending'), phase=word('d2_phase'), interval=word('d2_interval'),
                 lead=word('d2_lead'), period=word('d2_period'), alpha=word('d2_alpha'),
-                leads=struct.unpack_from('>2H', record, at('d2_leads')))
+                leads=struct.unpack_from('>2H', record, at('d2_leads')), weight=word('d2_weight'))
 
 
 def percentile(values, p):
@@ -78,6 +91,7 @@ def check(directory):
     failures, errors, display, latest = [], [], [], 0
     kinds = collections.Counter()
     alphas = collections.Counter()
+    weights = collections.Counter()
     for n, item in enumerate(items):
         c = item['clock']
         kinds['tick' if item['kind'] == TICK else 'repeat'] += 1
@@ -100,6 +114,11 @@ def check(directory):
             problems.append(('lead', item['lead'], item['leads']))
         if item['alpha'] != expected_alpha:
             problems.append(('alpha', item['alpha'], expected_alpha))
+        expected_weight = weight(item['alpha'], item['phase'], item['lead'], item['leads'], item['interval'])
+        if item['weight'] != expected_weight:
+            problems.append(('weight', item['weight'], expected_weight))
+        if item['alpha']:
+            weights['history' if item['weight'] == Q14 else 'cur' if item['weight'] == 0 else 'between'] += 1
         if item['latest'] != (previous['latest'] if previous else item['latest']-longest) + longest:
             problems.append(('latest count', item['latest']))
         if problems:
@@ -117,16 +136,21 @@ def check(directory):
         ideal = tick + (item['phase'] + measured)/item['interval']
         drawn = tick + item['alpha']/Q14
         display.append(dict(picture=n, shown=shown, tick=tick, drawn=drawn, ideal=ideal, mode=item['mode'],
-                            error_fields=(drawn-ideal)*item['interval'], latest=longest))
+                            error_fields=(drawn-ideal)*item['interval'], latest=longest,
+                            time=tick - item['weight']/Q14, alpha=item['alpha']))
     # Ticks restart when a replay starts or ends (a new epoch, with a change of loop mode).
     backwards = [(a['picture'], a['drawn'], b['drawn']) for a, b in zip(display, display[1:])
                  if b['drawn'] < a['drawn'] - 1e-9 and a['mode'] == b['mode']]
+    time_backwards = [(a['picture'], a['time'], b['time']) for a, b in zip(display, display[1:])
+                      if b['time'] < a['time'] - 1e-9 and a['mode'] == b['mode']]
+    after_latest = [t for t in time_backwards if not display[t[0]]['alpha']]
+    time_backwards = [t for t in time_backwards if display[t[0]]['alpha']]
     predicted = [d['error_fields'] for d in display if not d['latest']]
     ideal = [d['ideal']-d['tick'] for d in display if not d['latest']]
     absolute = [abs(e) for e in predicted]
     lead_hist = collections.Counter(errors)
     result = dict(
-        status='PASS' if not failures and not backwards else 'FAIL',
+        status='PASS' if not failures and not backwards and not time_backwards else 'FAIL',
         pictures=len(items), kinds=dict(kinds), latest=latest,
         latest_share=latest/len(items),
         alpha_quarters={f'{q/4:.2f}': alphas[q] for q in sorted(alphas)},
@@ -138,6 +162,8 @@ def check(directory):
                          max=max(ideal) if ideal else None,
                          over_one=sum(a > 1 for a in ideal), over_two=sum(a > 2 for a in ideal)),
         backwards=backwards[:20], backwards_count=len(backwards),
+        weights=dict(weights), time_backwards=time_backwards[:20], time_backwards_count=len(time_backwards),
+        time_backwards_after_latest=len(after_latest),
         failures=failures[:20], failure_count=len(failures),
         archive_sha256=info['archive_sha256'])
     return result
