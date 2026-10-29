@@ -2549,7 +2549,7 @@ both arms show light blue filling the run-off beside the tarmac, with blue speck
 road edge. The pictures are the same with prediction off, so the prediction does not cause
 it. Whether the original frame-locked game draws it is not established (D7's open item).
 
-### D10 play-test — in progress
+### D10 play-test — complete
 
 The first play-test, on the 040 (`a1200-040`, the developer build, `CUSTOM2=11`), found two
 problems:
@@ -2579,7 +2579,8 @@ track-driven car steps again from the history's segment, by its progress to cur 
 In the second 040 play-test the user found steering smooth, without jumps, the chase, TV
 and onboard views fine, and nothing wrong at the replay cuts or the pit entry. A snapped
 or latest picture still shows cur. A held car keeps its tick pose, which is now ahead of
-the interpolated pictures around it.
+the interpolated pictures around it. After the pit-stop sprites below the user accepted
+D10 as complete, the extra lag included (user decision).
 
 **Pit-stop sprites.** During the player's stop, the block at h2+$2A2A8 draws three
 sprites through h0+$147C for the viewed car's +$97 bits 3–5: $AA (sign), $A9 and $AE.

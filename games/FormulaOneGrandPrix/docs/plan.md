@@ -108,9 +108,9 @@ A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields,
 68000 keeps the original frame-locked pacer by default (user decision). D1–D9
 are complete (presentation snapshots, α, staging with exact restore, camera and car
 prediction, the remaining moving items, every view); D8 measured the prediction error
-and kept the snap thresholds; D9 showed every picture moving forward on the 030. The D10
-play-test is in progress: the horizon glitch it found is fixed, and pictures now
-interpolate instead of extrapolating.
+and kept the snap thresholds; D9 showed every picture moving forward on the 030. D10 is
+complete: the horizon glitch its play-test found is fixed, pictures interpolate instead of
+extrapolating, and the user accepted the feel (user decision).
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -378,7 +378,7 @@ steering jumps from extrapolation. Pictures now interpolate between the last two
 each shown a tick plus the longer measured lead late so that the steps stay even (user
 decision). In the second 040 play-test the user found steering smooth, without jumps, and
 the chase, TV and onboard views, replay cuts and pit entry fine; the pit-stop sprites are
-now interpolated too.
+now interpolated too. *Complete:* the user accepted the feel, the extra lag included.
 
 ## E. Performance (each change gated by measurement on every CPU)
 
