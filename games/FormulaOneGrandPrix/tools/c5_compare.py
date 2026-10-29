@@ -23,13 +23,17 @@ def load(directory):
     size = states['record']
     assert len(data) == size*states['count'] == size*len(states['ticks'])
     header = size - states['ranges']['cars'][2] - states['ranges']['session'][2]
-    records = {}
-    for n, item in enumerate(states['ticks']):
+    # Ticks are consecutive within an epoch and start again from 1 in the next (a replay
+    # and the race after it): each tick is keyed by its run and its number.
+    records, run = {}, 0
+    ticks = states['ticks']
+    for n, item in enumerate(ticks):
+        if n and item['tick'] != ticks[n-1]['tick']+1:
+            assert item['tick'] <= ticks[n-1]['tick'], (n, item['tick'])
+            run += 1
         body = data[n*size+header:(n+1)*size]
         assert hashlib.sha256(body).hexdigest() == item['sha256']
-        records[item['tick']] = body
-    ticks = states['ticks']
-    assert [t['tick'] for t in ticks] == list(range(ticks[0]['tick'], ticks[0]['tick']+len(ticks)))
+        records[(run, item['tick'])] = body
     fields = ticks[-1]['serial'] - ticks[0]['serial']
     schedule = dict(ticks=len(ticks), first=ticks[0]['tick'], last=ticks[-1]['tick'], fields=fields,
                     pictures=ticks[-1]['pictures'] - ticks[0]['pictures'],

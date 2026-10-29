@@ -66,6 +66,18 @@ class Track:
         self.data = (root/'track-h1.bin').read_bytes()
         self.pointers = (root/'track-h2.bin').read_bytes()
 
+    def update(self, read, ranges):
+        """The track as at a picture (D7): while pit stops are on the game swaps the pit
+        lane with the main-track stretches beside it and moves the wrap pointers, so
+        the end-of-race dump is replaced by every captured track range."""
+        data = bytearray(self.data)
+        for h, offset, size in ranges:
+            if h == 1 and offset >= TRACK_H1:
+                at = offset - TRACK_H1
+                data[at:at+size] = read(1, offset, size)
+        self.data = bytes(data)
+        self.pointers = read(2, POINTERS[0], POINTERS[1])
+
     def pointer(self, offset):
         return struct.unpack_from('>I', self.pointers, offset-POINTERS[0])[0]
 
@@ -150,8 +162,10 @@ class Model:
         anchor = struct.unpack_from('>I', buffer, 0)[0]
         buffer[54] = 0x80 if self.track.data[anchor-self.track.h1-TRACK_H1+0x26] & 8 else 0
 
-    def predict(self, saved, history, alpha, spring, clamp, view):
-        """(staged bytes, outcome): outcome is 'jump', 'moved', 'held' or 'same'."""
+    def predict(self, saved, history, alpha, spring, clamp, view, between=None):
+        """(staged bytes, outcome): outcome is 'jump', 'moved', 'held' or 'same'.
+        BETWEEN, if given, changes the staged bytes in place after the extrapolation
+        and before the coordinates, anchor and derived values are placed (D5, D7)."""
         out = bytearray(saved)
         L = lambda b, o: struct.unpack_from('>l', b, o)[0]
         W = lambda b, o: struct.unpack_from('>h', b, o)[0]
@@ -163,6 +177,8 @@ class Model:
             struct.pack_into('>H', out, base+o, (W(saved, base+o)+scale(delta, alpha)) & 0xffff)
         for o in LONGS:
             struct.pack_into('>l', out, base+o, L(saved, base+o)+scale(L(saved, base+o)-L(history, o), alpha))
+        if between:
+            between(out)
         for o, reduced, coarse in ((0xa, 0x18, 4), (0xe, 0x20, 8)):
             value = L(out, base+o) >> 8
             struct.pack_into('>l', out, base+reduced, value)

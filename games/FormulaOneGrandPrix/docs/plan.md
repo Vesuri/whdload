@@ -103,9 +103,9 @@ with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's ques
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
 tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
 A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
-68000 keeps the original frame-locked pacer by default (user decision). D1–D6
+68000 keeps the original frame-locked pacer by default (user decision). D1–D7
 are complete (presentation snapshots, α, staging with exact restore, camera and car
-prediction, the remaining moving items); D7 is next.
+prediction, the remaining moving items, every view); D8 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -328,6 +328,12 @@ gap was fixed: the covered-road (no-sky) flag now follows the predicted anchor.
 **D7 Every view.** Cockpit, TV cameras, chase, onboard other cars, replays, the attract
 mode if there is one: each consumes its own records (Indianapolis 500's replays froze
 because only the car records were snapshotted).
+*Result:* complete ([internals](internals.md#d7-every-view--complete)). The cockpit,
+onboard and replay views draw from the staged records; there is no attract mode (A2). In
+the chase and TV views the camera is now placed and aimed natively from the predicted
+followed car, so camera and car agree. Pit stops swap track ranges, which the check now
+captures per picture. A whole 030 race through every view and a replay is rebuilt exactly
+and identical to the option off at all 3246 ticks.
 
 **D8 Prediction error.** For every tick, compare the prediction at α = 1 with the next
 actual pose: p50 and p95 per quantity, worst cases at braking, steering reversal,

@@ -34,10 +34,12 @@ FIELDS = ((0x00, 2), (0x04, 2), (0x08, 6), (0x12, 6), (0x1a, 6), (0x26, 10),
 SIZE = GLOBALS + len(d1.RECORDS)*sum(n for _, n in FIELDS)
 COUNTERS = ('pictures', 'staged', 'latest', 'snapped', 'debris', 'records',
             'written', 'checked', 'faults', 'check_tick')
-# Game memory dumped at each stop: view state and records, camera and coefficients,
-# horizon limit, horizon and viewport, covered-road flag.
-GAME = ((1, 0x224, 0x1956-0x224), (0, 0x3a7f8, 0x3a8c6-0x3a7f8), (2, 0x231cc, 28),
-        (2, 0x231a0, 2))
+# Game memory dumped at each stop: view state and records; chase state, camera,
+# coefficients and view parameters (D7: chase heading and distance); horizon limit,
+# horizon and viewport; covered-road flag; and (D7) the pit/alternate segments and the
+# track's wrap pointers and pit flag, which change during the race.
+GAME = ((1, 0x224, 0x1956-0x224), (0, 0x3a70c, 0x3a910-0x3a70c), (2, 0x231cc, 28),
+        (2, 0x231a0, 2), (1, 0x2bfa, 0x53de-0x2bfa), (2, 0x1fab8, 0x30))
 
 
 def snapshot_offset(h, offset):
@@ -59,19 +61,29 @@ def record_offset(offset):
     raise KeyError(f'record +{offset:02x} not in a D1 snapshot')
 
 
-def regions(base, bases, symbols):
+def swapped(pointers, h1):
+    """(D7) The main-track stretches beside the pit lane, from the race's start wrap
+    pointers (h2+$1FAB8 on): the lap start up to the pit join h2+$1FAE2, and the pit
+    branch h2+$1FADE up to the lap end h2+$1FAC2. While pit stops are on, the game swaps
+    them with the pit lane in place."""
+    pointer = lambda offset: struct.unpack_from('>I', pointers, offset-0x1fab8)[0] - h1
+    join, branch, end = pointer(0x1fae2), pointer(0x1fade), pointer(0x1fac2)
+    return [(1, 0x53de, join+0x2e-0x53de), (1, branch, end+0x2e-branch)]
+
+
+def regions(base, bases, symbols, game=GAME):
     """D2 state, c3 counters, D1 buffers, the D3 block and the game stage memory."""
     assert symbols['d3_staged'] - symbols['d3_saved'] == SIZE
     slave = [(base+symbols['c2_serial'], symbols['d1_current']-symbols['c2_serial']),
              (base+symbols['c3_epochs'], 20),
              (base+symbols['d1_current'], 2+2*d1.SIZE),
              (base+symbols['d3_pictures'], symbols['d3_staged']+SIZE-symbols['d3_pictures'])]
-    return slave + [(bases[h]+offset, size) for h, offset, size in GAME]
+    return slave + [(bases[h]+offset, size) for h, offset, size in game]
 
 
-def game_reader(parts):
+def game_reader(parts, game=GAME):
     def read(h, offset, size):
-        for (hunk, start, _), part in zip(GAME, parts):
+        for (hunk, start, _), part in zip(game, parts):
             if hunk == h and start <= offset and offset+size <= start+len(part):
                 return part[offset-start:offset-start+size]
         raise KeyError(f'h{h}+{offset:05x} not captured')
@@ -104,7 +116,15 @@ def from_snapshot(snap, game=None):
     return out, held
 
 
-def check(directory, mutate=None):
+def key(epoch, tick):
+    """Ticks are counted from 1 in every epoch (a replay and the race after it start
+    again), so per-tick data is keyed by both; tick arithmetic holds within an epoch."""
+    return epoch << 16 | tick
+
+
+def check(directory, mutate=None, collect=None):
+    """With COLLECT, a list: each picture's (tick, alpha, staged, saved, game reader,
+    decision, D4 outcome, loop mode) is appended, its tick as key(epoch, tick)."""
     root = Path(directory)
     meta = json.loads((root/'meta.json').read_text())
     assert meta['status'] == 'CAPTURED' and meta['quit'] == 'OK', directory
@@ -115,6 +135,7 @@ def check(directory, mutate=None):
     archive = (root/'stages.bin.gz').read_bytes()
     assert hashlib.sha256(archive).hexdigest() == info['archive_sha256']
     sizes = [size for _, size in info['regions']]
+    ranges = [tuple(r) for r in info.get('game', GAME)]
     data = bytearray(gzip.decompress(archive))
     assert len(data) == sum(sizes)*info['count']
     if mutate:
@@ -125,7 +146,8 @@ def check(directory, mutate=None):
     tick_cur = {}
     for n, item in enumerate(states['ticks']):
         at = n*sum(snap_sizes) + snap_sizes[0]
-        tick_cur[item['tick']] = d1.split(snap_data[at:at+snap_sizes[1]])[0]
+        cur = d1.split(snap_data[at:at+snap_sizes[1]])[0]
+        tick_cur[key(d1.HEADER.unpack_from(cur)[2], item['tick'])] = cur
     at_slave = lambda name: symbols[name]-symbols['c2_serial']
     at_d3 = lambda name: symbols[name]-symbols['d3_pictures']
     camera = 'd4_predicted' in symbols
@@ -139,6 +161,11 @@ def check(directory, mutate=None):
         car_model = d5_cars.Cars(model)
         d4_counters += d5_cars.COUNTERS
         car_totals = [0, 0, 0]
+    aim = 'd7_aimed' in symbols
+    if aim:
+        import d7_views
+        aim_model = d7_views.Aim(model, meta)
+        d4_counters += d7_views.COUNTERS
     outcomes, shown = {}, []
     failures, kinds, sources, differing, held_total, problem_kinds = [], {}, {}, 0, 0, {}
     previous = previous_d4 = None
@@ -148,7 +175,7 @@ def check(directory, mutate=None):
             parts.append(bytes(data[at:at+size]))
             at += size
         slave, counters, buffers, block, game = parts[0], parts[1], parts[2], parts[3], parts[4:]
-        read = game_reader(game)
+        read = game_reader(game, ranges)
         word = lambda name: struct.unpack_from('>H', slave, at_slave(name))[0]
         ticks = struct.unpack_from('>I', slave, at_slave('c2_clock')+24)[0]   # WC_TICKS
         mode, alpha = word('c2_mode'), word('d2_alpha')
@@ -160,6 +187,7 @@ def check(directory, mutate=None):
         cur, prev = d1.split(buffers)
         history = cur if kind == TICK else prev
         tick = ticks + (1 if kind == TICK else 0)
+        tick_key = key(epochs, tick)
         header = d1.HEADER.unpack_from(history)
         body = history[d1.HEADER.size:]
         view = lambda b, o, s: b[snapshot_offset(1, o):snapshot_offset(1, o)+s]
@@ -174,7 +202,9 @@ def check(directory, mutate=None):
             clamp = struct.unpack_from('>h', read(2, 0x231cc, 2))[0]
         kinds[('tick' if kind == TICK else 'repeat')] = kinds.get('tick' if kind == TICK else 'repeat', 0) + 1
         sources[decision] = sources.get(decision, 0) + 1
-        problems = []
+        problems, outcome = [], None
+        if camera:
+            model.track.update(read, ranges)
         if extract(read) != saved:
             problems.append('game not restored to the saved bytes')
         if expected_source == 1:
@@ -182,19 +212,28 @@ def check(directory, mutate=None):
             held_total += held
         elif expected_source == 2:
             camera_history = history[d1.HEADER.size+snapshot_offset(0, 0x3a7f8):]
-            want, outcome = model.predict(saved, camera_history, alpha, spring, clamp, view)
+            records = d1.HEADER.size + sum(size for _, _, size in d1.RANGES)
+            counts, aimed = None, 0
+
+            def between(out):
+                # Before the camera's coordinates, anchor and derived values: the
+                # cars (D5), then an external camera from its predicted car (D7).
+                nonlocal counts, aimed
+                if cars:
+                    counts = car_model.predict(
+                        out, lambda r: history[records+r*d1.RECORD:records+(r+1)*d1.RECORD], read, alpha)
+                if aim:
+                    aimed = aim_model.predict(out, saved, history, read, alpha)
+            want, outcome = model.predict(saved, camera_history, alpha, spring, clamp, view, between)
             outcomes[outcome] = outcomes.get(outcome, 0) + 1
             if outcome == 'jump':
                 expected_source = 0
             else:
-                shown.append((tick, alpha, staged, saved))
+                shown.append((tick_key, alpha, staged, saved))
                 if cars:
-                    want = bytearray(want)
-                    records = d1.HEADER.size + sum(size for _, _, size in d1.RANGES)
-                    counts = car_model.predict(
-                        want, lambda r: history[records+r*d1.RECORD:records+(r+1)*d1.RECORD], read, alpha)
-                    want = bytes(want)
                     car_totals = [a+b for a, b in zip(car_totals, counts)]
+                if aim and aim_model.tick_differs:
+                    problems.append('tick camera placed differs from the game')
             # The model's derived values from the tick's own camera are the game's.
             derived = bytearray(saved)
             model.derive(derived, spring, clamp, view)
@@ -202,12 +241,14 @@ def check(directory, mutate=None):
                 problems.append('derived values differ from the game')
         else:
             want = saved
+        if collect is not None:
+            collect.append((tick_key, alpha, staged, saved, read, decision, outcome, mode))
         if source != expected_source:
             problems.append(('source', source, expected_source))
         if staged != want:
             problems.append(('staged', [i for i, (x, y) in enumerate(zip(staged, want)) if x != y][:8]))
         differing += staged != saved
-        reference = cur if kind == REPEAT else tick_cur.get(tick)
+        reference = cur if kind == REPEAT else tick_cur.get(tick_key)
         if reference is None:
             problems.append(('no snapshot of tick', tick))
         elif from_snapshot(reference)[0] != saved:
@@ -227,6 +268,11 @@ def check(directory, mutate=None):
             if cars and previous_d4 and source == 2 and expected_source == 2 and [
                     d4[k]-previous_d4[k] for k in d5_cars.COUNTERS] != counts:
                 problems.append(('car counts', [d4[k]-previous_d4[k] for k in d5_cars.COUNTERS], counts))
+            if aim and d4['d7_faults']:
+                problems.append(('D7 VERIFY faults', d4['d7_faults']))
+            if aim and previous_d4 and source == 2 and expected_source == 2 and (
+                    d4['d7_aimed']-previous_d4['d7_aimed'] != aimed):
+                problems.append(('aimed count', d4['d7_aimed']-previous_d4['d7_aimed'], aimed))
             previous_d4 = d4
         if problems:
             failures.append(dict(stop=n, tick=tick, kind=kind, problems=problems))
@@ -246,7 +292,8 @@ def check(directory, mutate=None):
                           error=d5_cars.error(shown, tick_cur, car_model)) if camera and cars else None,
                 counters={k: v for k, v in (last or {}).items() if k != 'check_tick'},
                 size=SIZE, archive_sha256=info['archive_sha256'],
-                problems=problem_kinds, failures=failures[:20], failure_count=len(failures))
+                problems=problem_kinds, failures=failures[:20], failure_count=len(failures),
+                failure_ticks=sorted({f.get("tick") for f in failures if "tick" in f}))
 
 
 def symbols_offset(directory, name):
@@ -256,14 +303,15 @@ def symbols_offset(directory, name):
     return value(name) - value('d3_pictures')
 
 
-def negative(directory, camera=False, cars=False):
+def negative(directory, camera=False, cars=False, aim=False):
     """Each injected defect must be rejected."""
     def flip(where, stop=200):
         def mutate(data, sizes):
             for at in where(sizes):
                 data[stop*sum(sizes) + at] ^= 1
         return mutate
-    game_camera = lambda sizes: [sum(sizes[:5]) + 4]          # published pitch, restored game
+    game_h0 = lambda sizes, offset: sum(sizes[:5]) + offset - 0x3a70c   # restored game, h0 part
+    game_camera = lambda sizes: [game_h0(sizes, 0x3a7fc)]     # published coarse X
     staged = lambda sizes: sum(sizes[:3]) + symbols_offset(directory, 'd3_staged')
     saved = lambda sizes: sum(sizes[:3]) + symbols_offset(directory, 'd3_saved')
     staged_byte = lambda sizes: [staged(sizes) + SIZE - 100]  # staged car byte
@@ -285,10 +333,18 @@ def negative(directory, camera=False, cars=False):
                   ('staged car yaw', lambda sizes: [staged(sizes) + car + 17]),
                   ('history car lateral', lambda sizes: [sizes[0] + sizes[1] + 2 + b*d1.SIZE + records
                                                          + record_offset(0x0a) for b in (0, 1)])]
+    if aim:
+        # In the first rear chase (epoch 1, ticks 800-1100).
+        heading = d1.HEADER.size + snapshot_offset(0, 0x3a710)
+        cases += [('game chase heading', lambda sizes: [game_h0(sizes, 0x3a710)]),
+                  ('history chase heading', lambda sizes: [sizes[0] + sizes[1] + 2 + b*d1.SIZE + heading
+                                                           for b in (0, 1)]),
+                  ('staged chase camera X', lambda sizes: [staged(sizes) + 4+0xa+2])]
     results = {}
     for name, where in cases:
         # Car cases mid-race: on the grid the cars keep the tick's pose.
-        results[name] = check(directory, flip(where, 2000 if 'car' in name else 200))['status']
+        stop = 1700 if 'chase' in name else 2000 if 'car' in name else 200
+        results[name] = check(directory, flip(where, stop))['status']
     return results
 
 

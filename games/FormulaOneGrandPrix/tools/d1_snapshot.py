@@ -90,6 +90,9 @@ def check(directory, mutate=None):
     assert len(data) == record*len(states['ticks']) and snap['size'] == SIZE
     c5 = states['record']
     cars_at = c5 - states['ranges']['cars'][2] - states['ranges']['session'][2]
+    # Each tick record starts with the slave words from c2_serial: its loop mode (1 live, 2 replay).
+    symbol = lambda name: int(meta['symbols'][name], 16) if isinstance(meta['symbols'][name], str) else meta['symbols'][name]
+    mode_at = symbol('c2_mode') - symbol('c2_serial')
     if mutate:
         mutate(data, sizes)
     previous, failures, kinds = None, [], dict(first=0, consecutive=0, epoch=0, vbl_during_snapshot=0)
@@ -107,7 +110,8 @@ def check(directory, mutate=None):
         # ticks can share a field, so field numbers only never decrease.
         late = header[0] == item['serial']-1
         kinds['vbl_during_snapshot'] += late
-        expected = (item['serial']-late, item['tick'], epochs, rebased, reconstructions, 1, item['draw_mode'])
+        mode = struct.unpack_from('>H', cars_data, n*c5+mode_at)[0]
+        expected = (item['serial']-late, item['tick'], epochs, rebased, reconstructions, mode, item['draw_mode'])
         if header != expected or (previous and header[0] < HEADER.unpack_from(previous)[0]):
             failures.append(dict(tick=item['tick'], header=header, expected=expected))
         if cur[HEADER.size:] != extract(memory(game, cars)):
@@ -118,8 +122,10 @@ def check(directory, mutate=None):
             kinds['first'] += 1
         elif prev != previous:
             failures.append(dict(tick=item['tick'], prev='not the previous cur'))
+        elif HEADER.unpack_from(prev)[2] != epochs:
+            kinds['epoch'] += 1          # ticks count from 1 again in a new epoch
         elif HEADER.unpack_from(prev)[1] == item['tick']-1:
-            kinds['consecutive' if HEADER.unpack_from(prev)[2] == epochs else 'epoch'] += 1
+            kinds['consecutive'] += 1
         else:
             failures.append(dict(tick=item['tick'], prev='not consecutive'))
         previous = cur

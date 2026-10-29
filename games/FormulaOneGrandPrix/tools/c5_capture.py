@@ -17,6 +17,23 @@ PAL_FIELD = Fraction(313*227, 3546895)
 CLOCK_STEP_MS = Fraction(2111*1000, 16384)   # native race-clock increment per tick
 WORDS = ('c2_mode','c2_in_tick','c3_suspended','c3_inactive','c2_beam_max','c2_native_rate')
 LONGS = ('c2_serial','c3_epochs','c3_exits','c3_rebased','c3_excluded','c3_pauses')
+# D7: view keys pressed at a tick's pacer and released two ticks later, so the same
+# presses reach the same native scans in every run. Ticks count from 1 in every epoch,
+# so each press names its epoch: the race is epoch 1 until the replay (epoch 2), and
+# epoch 3 after it. TV and rear chase of the player, then the replay; after it front
+# chase, front chase of the next car, rear chase of it, onboard it (cockpit), TV of
+# it, then the player in rear chase and back in the cockpit.
+VIEWS = ((1, 400, 0x4f), (1, 800, 0x5f), (3, 100, 0x46), (3, 400, 0x4d), (3, 600, 0x5f),
+         (3, 900, 0x4e), (3, 1200, 0x4f), (3, 1500, 0x3d), (3, 1600, 0x5f), (3, 1800, 0x4e))
+# And a replay in rear chase: Space at this tick's pacer pauses; R pressed in the
+# pause starts the replay and is released when it starts; Space pressed in the pause
+# the replay returns to resumes the race and is released at the resume. The pause
+# wait ignores a key already down when it begins, so each press in a pause waits
+# PAUSE_FIELDS. The gdb convenience variable $replay counts the steps. Steps are rare
+# events; the field hook c2_vbl is a breakpoint only while a press is waiting, because
+# a stop at every field would stall the emulator.
+REPLAY = 1100
+PAUSE_FIELDS = 25
 
 
 def decode(slave, session, symbols):
@@ -213,7 +230,10 @@ def states(args, command, out, base, bases, symbols, meta):
     if getattr(args, 'stage', False):
         # D3: the staged and saved inputs, the restored game memory and the snapshots.
         import d3_stage
-        stage_regions = d3_stage.regions(base, bases, symbols)
+        # D7: the track stretches the pit lane swaps with, from the start wrap pointers.
+        command('gdb', f'dump binary memory {out}/track-start-h2.bin {bases[2]+0x1fab8:#x} {bases[2]+0x1fae8:#x}')
+        game = d3_stage.GAME + tuple(d3_stage.swapped((out/'track-start-h2.bin').read_bytes(), bases[1]))
+        stage_regions = d3_stage.regions(base, bases, symbols, game)
         stage_paths = [out/f'stages-{n}.bin' for n in range(len(stage_regions))]
         for path in stage_paths:
             path.write_bytes(b'')
@@ -221,10 +241,54 @@ def states(args, command, out, base, bases, symbols, meta):
                                    for path, (start, size) in zip(stage_paths, stage_regions))
         command('gdb', f'break *{base+symbols["d3_restored"]:#x}')
         command('gdb', f'commands $bpnum\nsilent\n{stage_appends}\ncontinue\nend')
-    command('gdb', f'break *{base+symbols["c3_leave"]:#x}')
+    if getattr(args, 'views', False):
+        # One instruction into c2_pacer (after its move from SR), so these never share
+        # an address with the tick stop of a run without snapshots.
+        clock = base+symbols['c2_clock']+24
+        epochs = base+symbols['c3_epochs']
+        for epoch, tick, raw in VIEWS:
+            for at, state in ((tick, 1), (tick+2, 0)):
+                command('gdb', f'break *{base+symbols["c2_pacer"]+2:#x}')
+                command('gdb', f'condition $bpnum *(unsigned short*){base+symbols["c2_in_tick"]:#x} != 0'
+                               f' && *(unsigned int*){clock:#x} == {at-1} && *(unsigned int*){epochs:#x} == {epoch}')
+                command('gdb', f'commands $bpnum\nsilent\nmonitor key {raw:x} {state}\ncontinue\nend')
+        result['views'] = [list(v) for v in VIEWS]
+        serial = f'*(unsigned int*){base+symbols["c2_serial"]:#x}'
+        command('gdb', 'set $replay = 0')
+        command('gdb', 'set $replay_at = 0')
+        presses = {}
+        for step, raw in ((2, 0x13), (5, 0x40)):
+            reply = command('gdb', f'break *{base+symbols["c2_vbl"]:#x}')
+            presses[step] = int(re.search(r'Breakpoint (\d+)', reply)[1])
+            command('gdb', f'condition {presses[step]} $replay == {step} && {serial} >= $replay_at')
+            command('gdb', f'commands {presses[step]}\nsilent\nmonitor key {raw:x} 1\nset $replay = {step+1}\n'
+                           f'disable {presses[step]}\ncontinue\nend')
+            command('gdb', f'disable {presses[step]}')
+        steps = (('c2_pacer', 0, 'monitor key 40 1'),
+                 ('c3_pause_begin', 1, f'monitor key 40 0\nset $replay_at = {serial} + {PAUSE_FIELDS}\nenable {presses[2]}'),
+                 ('c3_leave_replay_start', 3, 'monitor key 13 0'),
+                 ('c3_pause_begin', 4, f'set $replay_at = {serial} + {PAUSE_FIELDS}\nenable {presses[5]}'),
+                 ('c3_resume', 6, 'monitor key 40 0'))
+        for name, step, keys in steps:
+            if name == 'c2_pacer':
+                command('gdb', f'break *{base+symbols["c2_pacer"]+2:#x}')
+                command('gdb', f'condition $bpnum $replay == 0 && *(unsigned short*){base+symbols["c2_in_tick"]:#x} != 0'
+                               f' && *(unsigned int*){clock:#x} == {REPLAY-1} && *(unsigned int*){epochs:#x} == 1')
+            else:
+                command('gdb', f'break *{base+symbols[name]:#x}')
+                command('gdb', f'condition $bpnum $replay == {step}')
+            command('gdb', f'commands $bpnum\nsilent\n{keys}\nset $replay = {step+1}\ncontinue\nend')
+        result['replay'] = REPLAY
+    # The race's end closes its epoch; with the replay, its own entry and exit close one too.
+    leave = 'c3_leave_race' if getattr(args, 'views', False) else 'c3_leave'
+    command('gdb', f'break *{base+symbols[leave]:#x}')
     command('gdb', 'continue')
     pc = int(re.search(r'\$\d+\s*=\s*(0x[0-9a-fA-F]+)', command('gdb', 'p/x $pc'))[1], 16)
-    assert pc == base+symbols['c3_leave'], hex(pc)
+    assert pc == base+symbols[leave], hex(pc)
+    if getattr(args, 'views', False):
+        steps = re.search(r'= (\d+)', command('gdb', 'p $replay'))
+        if not steps or int(steps[1]) != 7:
+            raise ValueError(f'replay steps incomplete: {steps and steps[1]}')
     command('gdb', 'delete breakpoints')
     if getattr(args, 'stage', False):
         # D4: the track geometry and its wrap pointers, static during the race,
@@ -269,7 +333,7 @@ def states(args, command, out, base, bases, symbols, meta):
         for path in stage_paths:
             path.unlink()
         (out/'stages.bin.gz').write_bytes(gzip.compress(data, mtime=0))
-        result['stages'] = dict(count=count, stop='d3_restored', regions=stage_regions,
+        result['stages'] = dict(count=count, stop='d3_restored', regions=stage_regions, game=game,
                                 archive_sha256=hashlib.sha256((out/'stages.bin.gz').read_bytes()).hexdigest())
     (out/'ticks.bin.gz').write_bytes(gzip.compress(b''.join(blobs), mtime=0))
     result.update(status='PASS', record=len(blobs[0]), count=len(blobs),

@@ -2229,8 +2229,8 @@ A first build read the fraction as unsigned and drew the grid cars up to three s
 ahead before the start (`tmp/d5/run2-unsigned`, largest error 1.04 million); the model
 matched it, so the error measure found it. The remaining large errors (above 200,000 in
 27 of 136,717 car-pictures) are cars braking or turning hard at α near 1.5; D8 sets
-the limits. Not exercised by this race: the TV and chase views (D7) and pit stops. D6
-keeps steering at the tick.
+the limits. This race had no TV, chase or pit-stop pictures; D7 covers them. D6 keeps steering at the
+tick.
 
 ### D6 everything else that moves — complete
 
@@ -2279,3 +2279,74 @@ per tick.
 Not exercised: a track with covered road such as Monaco (the launcher's routes use
 Silverstone), and the TV and chase views, retirements and pit stops in this capture.
 D7 covers every view.
+
+### D7 every view — complete
+
+Every view draws from the staged records. The cockpit and the onboard view of another car
+are the selected car's own pose, so the D4 camera and the D5 cars cover them. In replays
+the loop draws from the replay's records; snapshots, history and epochs work the same way
+(a replay and the live race after it each start a new epoch, and their ticks restart at 1).
+The A2 walk found no attract mode.
+
+**External views.** In the chase and TV views the game builds the camera from the
+followed car each tick, so the D4 straight-line extrapolation of the camera alone moved
+the camera along a different path from the D5 car. In corners the followed car slid
+sideways in the picture. With D7, `d7_aim` (called from `d4_camera` after the cars and
+before the coordinates, anchor and derived values follow the camera) replaces the camera
+of an external view with the native placement from the predicted car:
+
+| View | Native code | Staged camera |
+|---|---|---|
+| Chase (view-code bit 5; front with bit 4) | h0+$398AA–3990C | Heading +$3A710 extrapolated as a wrapped word (the native turn towards the car's direction is rate-limited by +$3A960, so the published heading is extrapolated rather than recomputed). X = car X + (table(\|$4000 − h\|) × L) >> 6 and Z = car Z + (table(\|h\|) × L) >> 6, with h the heading (+$8000 in front), L the distance word +$3A90C and the table h0+$222F0 |
+| TV (bit 5 clear, h1+$240 zero) | h0+$39BD0 | The fixed camera position of the tick |
+| Both | h0+$39CBE | Yaw and direction from the game's arctangent h0+$256B6 (table h0+$242F4) of the predicted car relative to the camera, both reduced `>> 11` |
+
+The predicted car position comes from the game's own pose accessor h0+$26272, run on a
+copy of the followed car's record with the staged pose fields; it writes the scratch word
+h0+$25644, which `d7_place` saves and restores. A followed car that is not the view's pose
+source, and a track-point TV camera (h1+$240 nonzero), keep the D4 camera. VERIFY first
+places the camera from the tick's own car and heading and counts any difference from the
+game's published camera in `d7_faults`.
+
+**Pit stops.** While pit stops are on, the game swaps the pit lane (h1+$2BFA–53DD) with
+the main-track stretches beside it, [h1+$53DE, join + $2E) and [branch, end + $2E), with
+the join, branch and end from h2+$1FAE2, +$1FADE and +$1FAC2. It also moves the wrap
+pointers h2+$1FAB8–1FAE7. The capture now saves those ranges with every picture, and the
+model searches the track as it was at that picture; the end-of-race dump alone gave the
+wrong anchor for a car in the pit lane.
+
+**Evidence** (VERIFY `c0a4590d…`, developer `291772cb…`, `a1200-030` non-MMU,
+`CUSTOM4=1`, `tmp/d7/`). The whole Quick Race runs with the view-key schedule of
+`--views`. It starts in the cockpit, then goes to TV, rear chase, the replay (R and Space
+at tick 1100) in rear chase, then front chase, onboard other cars and back. It includes
+Mansell's retirement and tow, and Alesi's pit stop in the onboard view.
+`tools/d7_views.py` runs the D3–D6 check with the D7 model and measures each view:
+
+| Check | Result |
+|---|---|
+| Prediction (`views-on.json`) | PASS for all 5980 staged pictures (3246 inside ticks, 2734 between; 2123 in the race before the replay, 274 in the replay, 3583 after it): every staged byte rebuilt exactly. 3749 external-view cameras placed and aimed from the predicted car; `d7_faults` 0, so the native placement from each tick's own car equals the game's camera in every picture. 148,727 cars predicted and 3477 held |
+| Chase consistency | Bearing error of the followed car from the camera centre against the ideal at the displayed time, p95 in angle units ($10000 a turn): rear chase 29 (tick shown 29), front chase 31 (27), TV 60 (57), replay rear chase 28 (25). Aiming the predicted camera at the tick's car instead gives 45, 41, 19 and 40. The camera position error falls as in D4 (rear chase p95 36,332 against 563,642 at the tick) |
+| Accuracy (whole run) | Camera position p95 24,918 predicted against 475,247 at the tick, yaw 216 against 1378; cars p95 25,781 against 503,731 |
+| Negative probes | The eleven D3–D6 probes, plus flipped game and history chase headings and a staged chase camera X, are each rejected |
+| Race unchanged (`states-comparison.json`) | Option off (`CUSTOM2=3`), prediction (`=11`) and its repeat: identical car/session state at all 3246 common ticks across the three epochs; the D1 snapshots pass |
+| Exact repeat (`states-on-repeat`) | Identical states, snapshots and stage archive (`addcb9a8…`) |
+| Cost (`profile-developer.json`, rear chase, 100 fields from tick 300) | Developer build: `d7_aim` 0.022 ms per picture inside `d3_stage` (1.33 ms; `d4_camera` 0.70 including the cars, `d5_cars` 0.65, restore 0.20). Emulated 68030 time |
+| Pictures over the race | 6156 off, 5980 predicted (3.31 versus 3.40 fields per picture), no drops |
+| Disabled-feature gate (`tmp/b4/d7-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D7 adds no hook |
+
+The bearing error is no lower than showing the tick. The game's own chase camera trails the car
+by a rate-limited heading, so the car's place in the picture already changes smoothly
+between ticks. What D7 removes is the disagreement between camera and car.
+
+**Retirement flashing (open).** While Mansell's lifted car drifts at the TV camera's
+switching distance (first race, ticks 783–800), the game clears and sets view-code bit 6
+on alternate ticks (h0+$39C48 clears it when the distance grows past h0+$3A8FE;
+h0+$39804 chooses the camera again). D4 snaps on every one of those ticks, so those
+pictures show the tick. A user watching the prediction run saw blue polygons (the bridge
+and wall colour) flashing on the tarmac there. The state is identical with the option
+off. Per-field screenshots (`--shots`) did not reproduce the scene: plain and per-tick
+captures diverge before it (the plain run switches to another car at about tick 790). It is
+therefore not established whether the original game draws this, or the repeated drawing
+of a tick.
+
+Not exercised: a track-point TV camera, and a track with covered road.

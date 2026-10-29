@@ -959,3 +959,34 @@ make slave && make slave-developer && make slave-verify
 python3 tools/slave_gate.py --prefix d6-
 ```
 
+### D7 every view
+
+`--views` presses the D7 view-key schedule (`VIEWS` in `tools/c5_capture.py`): TV and
+rear chase in the race, R and Space for the replay at tick 1100, then front chase,
+onboard other cars and back; the capture ends when the race does. Every staged picture
+also saves the track ranges a pit stop changes. `d7_views.py` runs the D3–D6 check with
+the D7 model, measures camera, car and followed-car bearing errors per view, and with
+`--negative` adds the chase heading and camera probes:
+
+```sh
+make slave-verify OUT=tmp/d7/build-verify
+python3 tools/c2_capture.py tmp/d7/run3/states-on --build tmp/d7/build-verify --states --stage --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d7/run3/states-off --build tmp/d7/build-verify --states --views --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d7/run3/states-on-repeat --build tmp/d7/build-verify --states --stage --views --custom4 1 --setup a1200-030
+python3 tools/d7_views.py tmp/d7/run3/states-on --negative --out tmp/d7/views-on.json
+python3 tools/c5_compare.py off=tmp/d7/run3/states-off on=tmp/d7/run3/states-on repeat=tmp/d7/run3/states-on-repeat \
+  --out tmp/d7/states-comparison.json
+make slave-developer OUT=tmp/d7/build-developer
+python3 tools/c2_capture.py tmp/d7/profile-developer --build tmp/d7/build-developer --stage --view rear --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
+python3 tools/c6_profile.py tmp/d7/profile-developer --out tmp/d7/profile-developer.json
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix d7-
+```
+
+Without `--states`, `--views` presses the schedule's keys of the first race before the
+stop, and `--shots N` saves a screenshot of each of the N fields after it:
+
+```sh
+python3 tools/c2_capture.py tmp/d7/shots-on --build tmp/d7/build-verify --stage --views --custom4 1 --setup a1200-030 --ticks 778 --shots 260
+```
+

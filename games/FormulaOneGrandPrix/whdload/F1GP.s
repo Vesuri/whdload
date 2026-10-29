@@ -1372,10 +1372,7 @@ d3_stage                        ; D0 = kind
 .camera
         tst.w d7
         beq.s .load
-        bsr d4_camera           ; D7 = 0 if the camera jumped
-        tst.w d7
-        beq.s .load
-        bsr d5_cars
+        bsr d4_camera           ; D7 = 0 if the camera jumped; predicts the cars too
 .load
         lea (d3_source,pc),a0
         move.w d7,(a0)
@@ -1671,6 +1668,10 @@ d4_camera                       ; A3 = history snapshot, d3_staged = the game's 
         addq.w #4,d2
         cmpi.w #$e,d2
         beq.s .long
+        ; The cars, then an external view's camera from its predicted car (D7),
+        ; before the coordinates, anchor and derived values follow the camera.
+        bsr d5_cars
+        bsr d7_aim
         move.l ($a,a0),d0
         asr.l #8,d0
         move.l d0,($18,a0)
@@ -1945,6 +1946,136 @@ d5_cars                         ; A3 = history snapshot
         dbf d7,.car
         movem.l (sp)+,d0-a6
         rts
+; D7: an external view's camera from the staged viewed car (h1+$238), placed and
+; aimed as the native view code does in the tick. Chase (view bit 5, h0+$398AA):
+; the camera stands h0+$3A90C from the car along the chase heading h0+$3A710,
+; turned by $8000 in front chase (bit 4); the heading is extrapolated like the
+; camera words. TV (h0+$39BD0): the camera stays where D4 put it. Both aim the
+; direction and yaw at the car with the game's atan h0+$256B6 (h0+$39CBE). The
+; cockpit views, whose camera is the car itself, and a TV camera on a track point
+; (h1+$240 nonzero) keep D4's camera. VERIFY first places the tick's camera from
+; the game's car and heading and counts a difference from the game's.
+d7_aim                          ; A3 = history snapshot, d3_staged with predicted cars
+        movem.l d0-a6,-(sp)
+        movea.l (c2_h1,pc),a5
+        lea ($256,a5),a0
+        cmpa.l ($234,a5),a0
+        bne .done
+        btst #5,($23c,a5)
+        bne.s .external
+        tst.w ($240,a5)
+        bne .done
+.external
+        movea.l (c2_h0,pc),a4
+        adda.l #$3a710,a4
+        move.w (a4),d6          ; chase heading at the tick
+        IFNE VERIFY
+        movea.l ($238,a5),a0
+        movea.l ($12,a0),a6
+        lea (d3_saved+4,pc),a1
+        bsr d7_place
+        cmp.l ($a,a1),d0
+        bne.s .fault
+        cmp.l ($e,a1),d1
+        bne.s .fault
+        cmp.w ($14,a1),d2
+        bne.s .fault
+        cmp.w (a1),d2
+        beq.s .placed
+.fault
+        lea (d7_faults,pc),a0
+        addq.l #1,(a0)
+.placed
+        ENDC
+        move.w d6,d0
+        sub.w (D1_HEADER+36,a3),d0 ; the history's chase heading
+        ext.l d0
+        move.w (d2_alpha,pc),d3
+        bsr d4_scale
+        add.w d0,d6
+        ; The staged car as a record for the pose accessor.
+        move.l ($238,a5),d0
+        sub.l a5,d0
+        subi.l #$5d6,d0
+        divu.w #$c0,d0
+        mulu.w #38,d0
+        lea (d3_staged+D3_GLOBALS+38,pc),a2
+        adda.w d0,a2
+        movea.l ($238,a5),a1
+        lea (d7_record,pc),a0
+        move.b ($7e,a1),($7e,a0)
+        move.w (6,a2),($a,a0)
+        move.w (18,a2),($1c,a0)
+        move.l (24,a2),($28,a0)
+        move.l (28,a2),($2c,a0)
+        movea.l (10,a2),a6
+        lea (d3_staged+4,pc),a1
+        bsr d7_place
+        move.l d0,($a,a1)
+        move.l d1,($e,a1)
+        move.w d2,(a1)
+        move.w d2,($14,a1)
+        lea (d7_aimed,pc),a0
+        addq.l #1,(a0)
+.done
+        movem.l (sp)+,d0-a6
+        rts
+; A0 = record, A6 = its segment, D6 = chase heading, A1 = published camera
+; -> D0/D1 camera X/Z, D2 its yaw. The accessor's scratch word h0+$25644 is kept.
+d7_place
+        movem.l d3-d6/a0/a2-a6,-(sp)
+        movea.l (c2_h0,pc),a5
+        adda.l #$25644,a5
+        move.w (a5),-(sp)
+        move.l a1,-(sp)
+        movea.l (c2_h0,pc),a1
+        adda.l #$26272,a1
+        jsr (a1)                ; D4/D5 = the car's world X/Z
+        movea.l (sp)+,a1
+        move.w (sp)+,(a5)
+        move.l ($a,a1),d0
+        move.l ($e,a1),d1
+        movea.l (c2_h1,pc),a2
+        btst #5,($23c,a2)
+        beq.s .aim
+        btst #4,($23c,a2)
+        beq.s .rear
+        addi.w #$8000,d6
+.rear
+        movea.l (c2_h0,pc),a4
+        adda.l #$222f0,a4
+        movea.l (c2_h0,pc),a2
+        adda.l #$3a90c,a2       ; chase distance
+        move.w d6,d0
+        bsr d4_table
+        muls.w (a2),d0
+        asr.l #6,d0
+        move.l d0,d1
+        add.l d5,d1
+        move.w d6,d0
+        neg.w d0
+        addi.w #$4000,d0
+        bsr d4_table
+        muls.w (a2),d0
+        asr.l #6,d0
+        add.l d4,d0
+.aim
+        movem.l d0-d1,-(sp)
+        sub.l d0,d4
+        sub.l d1,d5
+        moveq #11,d2
+        asr.l d2,d4
+        asr.l d2,d5
+        move.w d4,d0
+        move.w d5,d1
+        movea.l (c2_h0,pc),a2
+        adda.l #$256b6,a2
+        jsr (a2)
+        move.w d0,d2
+        movem.l (sp)+,d0-d1
+        movem.l (sp)+,d3-d6/a0/a2-a6
+        rts
+
 ; Staged and history offsets: pitch, height, lateral, yaw, correction, height offset.
 d5_words
         dc.w 2,$04,4,$08,6,$0a,16,$1a,34,56+2,36,68,-1
@@ -2817,6 +2948,9 @@ d4_spring dc.w 0                ; spring word at the stage, for the horizon
 d5_predicted dc.l 0             ; car records predicted
 d5_held dc.l 0                  ; car records kept at the tick
 d5_moved dc.l 0                 ; predicted records on another segment
+d7_aimed dc.l 0                 ; external cameras placed from the predicted car
+d7_faults dc.l 0                ; VERIFY: the tick's camera placed differs from the game's
+d7_record ds.b $80              ; a staged car as the pose accessor reads it
 d3_active dc.w 0
 d3_kind dc.w 0
 d3_source dc.w 0                ; 0 authoritative, 1 previous tick, 2 predicted

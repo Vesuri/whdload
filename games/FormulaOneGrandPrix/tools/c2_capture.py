@@ -30,7 +30,7 @@ def capture(args):
     if args.input_suite:
         args.input = True
     if args.states and (args.modal or args.input or args.rate or args.replay or args.view
-                        or args.profile or args.profile_tick or args.publish
+                        or args.profile or args.profile_tick or args.publish or args.shots
                         or args.route != 'quickrace'):
         raise ValueError('C5 tick-state probe requires Quick Race and no other probe options')
     if args.rate and (args.modal or args.input or args.replay or args.view or args.profile
@@ -192,6 +192,17 @@ def capture(args):
             command('tap', raw)
             command('shot', str(out/'view-entry.png'))
         meta['view'] = args.view
+        if args.views:      # the D7 schedule's presses in the race before the stop
+            from c5_capture import VIEWS
+            epochs = base+symbols['c3_epochs']
+            meta['views'] = [list(v) for v in VIEWS if v[0] == 1 and v[1]+2 < args.ticks]
+            for epoch, tick, raw in meta['views']:
+                for at, state in ((tick, 1), (tick+2, 0)):
+                    command('gdb', f'break *{base+symbols["c2_pacer"]+2:#x}')
+                    command('gdb', f'condition $bpnum *(unsigned short*){base+symbols["c2_in_tick"]:#x} != 0'
+                                   f' && *(unsigned int*){clock+24:#x} == {at-1}'
+                                   f' && *(unsigned int*){epochs:#x} == {epoch}')
+                    command('gdb', f'commands $bpnum\nsilent\nmonitor key {raw:x} {state}\ncontinue\nend')
         meta['profile_tick'] = args.profile_tick
         meta['profile_fields'] = args.profile
         if args.profile_tick:
@@ -274,6 +285,10 @@ def capture(args):
                     counters=counters, tick_sha256=sha(out/'tick.bin.gz'))
         command('gdb', 'delete breakpoints')
         command('shot', str(out/'race.png'))
+        for n in range(args.shots):     # one screenshot per field from the stop
+            command('gdb', 'monitor fields 1')
+            command('shot', str(out/f'field-{n:03d}.png'))
+        meta['shots'] = args.shots
         command('tap', '59')
         command('gdb', 'monitor fields 1000')
         command('shot', str(out/'quit.png'))
@@ -316,6 +331,7 @@ if __name__ == '__main__':
     parser.add_argument('--alpha', action='store_true', help='with --states: D2 timing of every picture (implies --snapshot)')
     parser.add_argument('--snapshot', action='store_true', help='CUSTOM2 bit 3: D1 presentation snapshots')
     parser.add_argument('--stage', action='store_true', help='with --states: D3 staged and restored inputs of every staged picture (implies --snapshot)')
+    parser.add_argument('--views', action='store_true', help='the D7 view-key schedule (plain mode: the first race before the stop)')
     parser.add_argument('--previous', action='store_true', help='CUSTOM5 bit 1: the VERIFY probe stages the previous tick (implies --stage)')
     parser.add_argument('--expect-native', action='store_true', help='check the 68000 default keeps the native pacer')
     parser.add_argument('--modal', choices=('pause','menu','replay','race','pit','pause-menu'))
@@ -328,6 +344,7 @@ if __name__ == '__main__':
     parser.add_argument('--replay', action='store_true')
     parser.add_argument('--publish', action='store_true', help='stop after painting, immediately before submission')
     parser.add_argument('--view', choices=('rear','tv','front','cockpit'), help='request a native view after the route')
+    parser.add_argument('--shots', type=int, default=0, help='screenshots of this many fields after the stop')
     parser.add_argument('--profile', type=int, choices=(0,50,100), default=0)
     parser.add_argument('--profile-tick', type=int, default=0, help='anchor the profile at this tick pacer instead of route completion')
     capture(parser.parse_args())
