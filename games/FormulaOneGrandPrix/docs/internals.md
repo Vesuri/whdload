@@ -1209,7 +1209,7 @@ The inventory distinguishes game readers from the KickEmu/OS implementation of c
 
 | Source and readers | Class / use |
 |---|---|
-| h0+$125E: h0+$1272, +$127C; h2+$232, +$27E98 | Presentation/hardware: elapsed work, frame wait, keyboard handshake timeout, renderer work/wait decision. h0+$2CC3C increments once per VBL; h0+$128C and h2+$222 clear it. |
+| h0+$125E: h0+$1272, +$127C; h2+$232, +$27E98 | Presentation/hardware: elapsed work, frame wait, keyboard handshake timeout, renderer work/wait decision (at or above h0+$125A the scene skips its blit-queue drain). h0+$2CC3C increments once per VBL; h0+$128C and h2+$222 clear it. |
 | h0+$125C: h0+$12A4, +$36288 | Presentation cadence and sound smoothing; no direct physics integration. |
 | h0+$1260: h0+$1298 | Presentation: index modulo four into the PAL/NTSC cadence tables; increment at +$1292. It is a frame count, not a copy of elapsed fields. |
 | Menu context A6 = h2+$37B44, +$2A40: h2+$31384, +$36308, +$36420, +$37430 | Presentation waits; +$31380 and +$3742C advance the menu RNG during those waits, indirectly influencing simulation. |
@@ -1420,8 +1420,16 @@ zero-tick pictures. `CUSTOM4` bit 2 retains native painting as a same-build cont
 Between ticks, the renderer can repaint
 using staged entry values for the shared RNG, pit phases, debris latch, shake and
 mirror request, restoring their authoritative post-tick values afterwards. No input,
-camera evolution or HUD blink routine is repeated at picture rate. D's extrapolation
-is not implemented.
+camera evolution or HUD blink routine is repeated at picture rate. The D series stages
+the predicted pose on top of this (below).
+
+The field counter h0+$125E is cleared only at a tick, but the scene's h2+$27E90 skips
+its wait for the blit queue to drain (h2+$27E98) once that counter reaches
+h0+$125A. When pictures take one field each (a max-speed 030, the 040), a tick longer
+than the reserved interval therefore drew its last repeat without the wait, and the
+queued horizon blits landed on top of the CPU-drawn 3D for one field about every 25.
+Each repeat therefore draws with the counter cleared at its own start, as a native
+frame would, and adds the tick's fields back afterwards.
 
 Publication waits for the pending copper request to clear and then for a subsequent
 VBL before acquiring the complementary bitmap. It drains queued/active blits before

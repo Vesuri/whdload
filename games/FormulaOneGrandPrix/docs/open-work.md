@@ -34,6 +34,15 @@ results and acceptance evidence are in [internals.md](internals.md).
 **Next F1GP step: D10 play-test.** The user judges the feel; input still takes effect
 at the next tick.
 
+The first 040 play-test showed a glitch about every 25 fields while standing still: the
+horizon trees were drawn over the 3D. It also happened with the option off and on the
+max-speed 030, wherever pictures take one field each, and it is fixed
+([cause](internals.md#c2-developer-implementation--complete)). With the option off,
+standing still, the screen now changes 12 times in 13 tick advances on the max-speed 030
+and 24 times in 24 on the 040, against 15 and 30 before. The play-test also showed steering jumps from
+extrapolation: on the first steered frame, after releasing the steering, and in right-hand
+corners. Interpolation between the last two ticks is replacing it.
+
 D9 is complete ([evidence](internals.md#d9-smoothness--complete)) on the 68030/50; the
 plan's 50 fps 68060 run is deferred with the other 040/060 work. The remaining backward
 steps are small: cars pulling away from the grid, and camera yaw at steering reversals,

@@ -2842,7 +2842,19 @@ c2_repeat_picture
         bsr c2_load_stage
         moveq #D2_REPEAT,d0
         bsr d3_stage
+        ; The renderer skips its blit-queue drain at h2+$27E98 once the native
+        ; field counter reaches the frame's fields, so late repeats in a long tick
+        ; drew queued horizon blits over the 3D. Count from this picture instead
+        ; and add the tick's fields back afterwards.
+        movea.l (c2_h0,pc),a2
+        adda.l #$125e,a2
+        move.w (a2),-(sp)
+        clr.w (a2)
         bsr c2_scene_call
+        movea.l (c2_h0,pc),a2
+        adda.l #$125e,a2
+        move.w (sp)+,d0
+        add.w d0,(a2)
         bsr d3_restore
         bsr c2_repeat_boxes
         lea (c2_stage_saved,pc),a2
