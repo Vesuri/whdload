@@ -1080,3 +1080,19 @@ make slave-developer OUT=tmp/d10/build-developer
 FSUAE=$FSUAE_ARM DETERMINISTIC=1 AMIGA_SETUP=a1200-040 SLAVE=tmp/d10/build-developer/F1GP.Slave \
   WHD_ARGS='CUSTOM1=1 CUSTOM2=11 CUSTOM4=1' amiga/run.sh
 ```
+
+### E1 caches
+
+`c2_capture.py --no-caches` clears `CUSTOM2` bit 0 and adds WHDLoad `NoCache`, the
+uncached control of B5/A7. `c5_compare.py` reports each arm's fields per picture; the arms
+are different races (the uncached menus are slower), so its state comparison reports
+DIFFERENT:
+
+```sh
+make slave-developer OUT=tmp/e1/build-developer
+for arm in on off; do
+  flag=; [ $arm = off ] && flag=--no-caches
+  python3 tools/c2_capture.py tmp/e1/dev-$arm --build tmp/e1/build-developer --states --snapshot --views --custom4 1 --setup a1200-030 $flag
+done
+python3 tools/c5_compare.py on=tmp/e1/dev-on off=tmp/e1/dev-off --out tmp/e1/dev-comparison.json
+```

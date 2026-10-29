@@ -70,7 +70,11 @@ def capture(args):
         args.snapshot = True
     custom2 = (7 if args.clock_68000 else 3) | (8 if args.snapshot else 0)
     custom5 = 2 if args.previous else 0
+    if args.no_caches:  # E1's uncached arm: bit 0 clear and WHDLoad's NoCache (B5/A7 controls)
+        custom2 &= ~1
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5={custom5} FileLog'
+    if args.no_caches:
+        whd += ' NoCache'
     if args.setup == 'a1200-030':   # the primary target: 68030/50 without an MMU
         extra += ' --cpu=68030 --uae_mmu_model=0'
         whd += ' NOMMU'
@@ -355,6 +359,7 @@ if __name__ == '__main__':
     parser.add_argument('--setup', choices=('a1200-fast','a1200-030','a1200-040','a1200','a500-1.5m'),
                         default='a1200-fast')
     parser.add_argument('--ntsc', action='store_true')
+    parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')
     parser.add_argument('--replay', action='store_true')
     parser.add_argument('--publish', action='store_true', help='stop after painting, immediately before submission')
     parser.add_argument('--view', choices=('rear','tv','front','cockpit'), help='request a native view after the route')

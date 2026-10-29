@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C and D complete; B5/A8 pass for the current scope
+# Current status: C, D and E1 complete; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -30,11 +30,16 @@ results and acceptance evidence are in [internals.md](internals.md).
 | D8 | Complete: every tick's prediction at α = 1 (and 2) against the next actual tick, over the whole D7 race. Camera p95 position error 21,504 against 446,880 for holding the tick, cars 22,784 against 430,080. Braking barely raises it, steering reversals make yaw extrapolation worse than holding, and collisions are already held through the pose flag or status. The snap thresholds stay: the $100000 jump (twice the largest normal movement), the two-tick α clamp and three segments per tick. |
 | D9 | Complete on the 68030/50 (040/060 deferred): every picture is placed at its displayed field and its camera and car steps are compared with the actual motion. Two causes of backward motion were fixed: a car whose predicted step reaches a pit change now stops at the end of its segment instead of being held at the tick, and α falls to 0 only for pictures longer than two ticks. Over a whole race the camera never steps back and stalls 6 times in 4579 moving pairs (2127 showing the tick); cars step back 51 times in 139,607, at most 14,734 world units, mostly off the grid. Steps are even (p5–p95 0.76–1.30 of the ideal, against 0–2.1). Per-field screenshots: with prediction 98–100% of pictures change the view, against once a tick without; frame times 3–4 fields in the cockpit and chase views, 5 in TV. Race unchanged, exact repeat, B4 gate PASS. |
 | D10 | Complete (user decision): the first 040 play-test found the horizon drawn over the 3D (fixed) and steering jumps from extrapolation. Pictures now interpolate between the last two ticks, shown a tick plus the measured lead late (user decision). Over a whole 030 race the rebuild is exact, camera yaw steps back 25 times (118 extrapolated) and cars 23 (51), steps are even p5–p95 0.89–1.07 (0.76–1.30), and the race is unchanged; on the 040 the screen changes every field. The user found steering, every view, the replay cuts and the pit stop fine. |
-| E–G | Optimisation and release work remain open under the plan. |
+| E1 | Complete for the current scope: B5's gate, and with the C2 loop and interpolation a whole 030 race draws 13–14% more pictures with caches on (3.43 against 3.86 fields per picture, developer build). Caches stay opt-in in the slave; the release turns them on through its icon (G1). |
+| E2–G | Optimisation and release work remain open under the plan. |
 
-**Next F1GP step: E (performance).** D10 is complete: the user accepted the feel,
-including the extra lag of interpolation (user decision). Input still takes effect at the
-next tick.
+**Next F1GP step: E2 (hunk 2's code in fast RAM).** E1 is complete for the current scope
+([evidence](internals.md#e1-caches--complete-for-the-current-scope)): caches on draw 13–14%
+more pictures over a whole 030 race. The cached and uncached arms are different races,
+because uncached menus run slower and change the race's random seed, so the gain is over
+the same route and race length rather than tick by tick. D10 is complete: the user
+accepted the feel, including the extra lag of interpolation (user decision). Input still
+takes effect at the next tick.
 
 The first 040 play-test showed a glitch about every 25 fields while standing still: the
 horizon trees were drawn over the 3D. It also happened with the option off and on the
@@ -181,8 +186,7 @@ If this work is resumed, count 040/060 work with aprof and confirm timing on a r
 accelerator; do not relabel the current evidence.
 
 A4 is now complete; its state map is in [internals](internals.md#state-map-a4).
-Caches remain opt-in until a release build turns them on; B5 no longer
-blocks that. The C2 implementation is developer-only and opt-in (`CUSTOM2` bit 1, D1 snapshots and D2 timing bit 3); no extrapolation
+Caches remain opt-in in the slave; the release turns them on through its icon (G1). The C2 implementation is developer-only and opt-in (`CUSTOM2` bit 1, D1 snapshots and D2 timing bit 3); no extrapolation
 patch or release clock option is enabled.
 
 Measurement controls now enforced:

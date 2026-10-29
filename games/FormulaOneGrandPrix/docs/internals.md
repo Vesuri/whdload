@@ -2643,3 +2643,34 @@ This build's race differs from D9's (the slave is larger, so the boot timing and
 random seed differ). In its rear-chase and retirement windows the view stands still for up
 to 24 fields with the option off as well. On the 040 the interpolated pictures change the
 screen every field.
+
+## Performance (E)
+
+### E1 caches — complete for the current scope
+
+E1 is B5 (above): `CUSTOM2` bit 0 requests the caches, menus and whole races pass with
+them on every required CPU, and A7 records the 020/030 per-window figures. E1 adds the
+gain on the primary target with the C2 loop and D10's interpolated presentation, where it
+shows as pictures per field: two whole Quick Races on `a1200-030` non-MMU, the D7 view
+schedule, `CUSTOM4=1`, the same slave and four-hunk layout, caches on (`CUSTOM2=11`) and
+off (`CUSTOM2=10` plus WHDLoad `NoCache`, as the B5/A7 controls):
+
+| Build | Caches | Ticks | Fields | Pictures | Fields per picture | Picture rate on/off |
+|---|---|---:|---:|---:|---:|---:|
+| Developer `8782ad32…` (`tmp/e1/dev-on`, `dev-off`) | on | 3454 | 21,654 | 6319 | 3.43 | 1.127 |
+| | off | 3469 | 21,751 | 5633 | 3.86 | |
+| VERIFY `54355e0d…` (`tmp/d10/pit/states-on`, `tmp/e1/states-nocache`) | on | 3422 | 21,455 | 6210 | 3.45 | 1.139 |
+| | off | 3469 | 21,749 | 5533 | 3.93 | |
+
+Caches on draw 13–14% more pictures over a race. No run drops a field of debt; the
+uncached VERIFY race runs one catch-up tick without a picture. Every run quits with F10 OK,
+and the uncached VERIFY race rebuilds every staged picture exactly (`smooth-nocache.json`).
+The two arms are different races: uncached, the menus run slower (race entry at field 1602
+against 1358 after the route command), so the UI random stream differs at the start, as in
+C5(b)'s one-field run; both uncached races are the same race. The comparison is therefore
+over the same route, view schedule and whole race (`c5_compare.py` schedules), not tick by
+tick.
+
+Caches stay opt-in in the slave: with every `CUSTOM` bit zero the original CPU request and
+bytes remain (B4), so a release turns them on through its icon's `Custom2=1` tooltype (G1).
+No 040/060 gain is claimed (deferred; see B5).

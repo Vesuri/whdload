@@ -382,7 +382,10 @@ now interpolated too. *Complete:* the user accepted the feel, the extra lag incl
 
 ## E. Performance (each change gated by measurement on every CPU)
 
-**E1 Caches:** `B5`.
+**E1 Caches:** `B5`. *Complete for the current scope:* B5's gate, plus the gain with the
+C2 loop and interpolation on the 030 — 13–14% more pictures over a whole race with caches
+on. The slave keeps them opt-in (all bits zero stay original); the release turns them on
+through its icon (`G1`).
 
 **E2 Hunk 2's code in fast RAM** (68020+ with real fast RAM). Copy hunk 2's code ranges
 (static disassembly plus trace coverage) into a fast block. Redirect absolute references
