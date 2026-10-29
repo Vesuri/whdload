@@ -1947,6 +1947,13 @@ c2_hud_enqueue
         lea (c2_background_copies,pc),a0
         addq.l #1,(a0)
 .not_copy
+        cmpi.w #1,d0
+        beq.s .box
+        cmpi.w #2,d0
+        bne.s .logged
+.box
+        bsr c2_box_log
+.logged
         ; RPM still walks its packed run list to preserve its register outputs.
         ; Its pixel loop is separately suppressed while preparing the command.
         cmpi.w #8,d0
@@ -2204,6 +2211,78 @@ c2_hud_flush
         move.w (sp)+,ccr
         rts
 
+; A shown box (Viewing, Riding with, Race won by...) lies over the top of the
+; view. Natively the HUD runs after every scene and copies each shown box from
+; the front bitmap into the new picture (h2+$1DEF6), so the scene never covers
+; it. Here the HUD runs once per tick: log the tick's box draws and copies
+; (D0 = 1 or 2, the gate's registers above the two return addresses) as offset and
+; copy width, and repeat the copies after the scene of each picture drawn
+; between ticks.
+C2_BOXES = 16
+c2_box_log
+        movem.l d1-d2/a0,-(sp)
+        move.l (c2_clock+WC_TICKS,pc),d1
+        addq.l #1,d1            ; the tick running
+        lea (c2_box_tick,pc),a0
+        cmp.l (a0),d1
+        beq.s .same
+        move.l d1,(a0)
+        clr.w c2_box_count-c2_box_tick(a0)
+.same
+        move.w c2_box_count-c2_box_tick(a0),d1
+        cmpi.w #C2_BOXES,d1
+        bcc.s .full
+        addq.w #1,c2_box_count-c2_box_tick(a0)
+        lsl.w #2,d1
+        lea (c2_boxes,pc),a0
+        move.w 22(sp),(a0,d1.w) ; offset (gate D0)
+        move.w 30(sp),d2        ; words-1 (gate D2)
+        cmpi.w #2,d0
+        beq.s .width
+        addq.w #2,d2            ; the box draw's D2 is the copy's minus two
+.width
+        move.w d2,2(a0,d1.w)
+.full
+        movem.l (sp)+,d1-d2/a0
+        rts
+c2_repeat_boxes
+        movem.l d0-d3/a0-a3,-(sp)
+        move.l (c2_box_tick,pc),d0
+        cmp.l (c2_clock+WC_TICKS,pc),d0
+        bne.s .done             ; the last tick showed no box
+        move.w (c2_box_count,pc),d3
+        subq.w #1,d3
+        bmi.s .done
+        lea (c2_boxes,pc),a2
+        movea.l (c2_h0,pc),a3
+.box
+        movea.l ($1256,a3),a0   ; the picture being drawn
+        movea.l ($124e,a3),a1   ; the front
+        move.w (a2)+,d0
+        adda.w d0,a0
+        adda.w d0,a1
+        move.w (a2)+,d0
+        moveq #19,d1
+.line
+        movem.l a0-a1,-(sp)
+        move.w d0,d2
+.word
+        move.w (a1)+,(a0)+
+        move.w $1f3e(a1),$1f3e(a0)
+        move.w $3e7e(a1),$3e7e(a0)
+        move.w $5dbe(a1),$5dbe(a0)
+        dbf d2,.word
+        movem.l (sp)+,a0-a1
+        lea 40(a0),a0
+        lea 40(a1),a1
+        dbf d1,.line
+        lea (c2_box_repeats,pc),a0
+        addq.l #1,(a0)
+        dbf d3,.box
+.done
+        movem.l (sp)+,d0-d3/a0-a3
+        rts
+
         CNOP 0,4
 c2_hud_targets
         dc.l $1dd24,$1dd2a,$1ddba ; icon
@@ -2231,6 +2310,10 @@ c2_hud_targets
         dc.l $1dcbc,$1dcc2,$1dcda ; cockpit background copy
         dc.w 16,0
 c2_hud_skip dc.l 0
+c2_box_tick dc.l 0
+c2_box_repeats dc.l 0           ; boxes copied after a scene between ticks
+c2_boxes ds.w 2*C2_BOXES
+c2_box_count dc.w 0
 c2_hud_target dc.l 0
 c2_hud_read dc.l 0
 c2_hud_queued dc.l 0
@@ -2418,6 +2501,7 @@ c2_repeat_picture
         bsr d3_stage
         bsr c2_scene_call
         bsr d3_restore
+        bsr c2_repeat_boxes
         lea (c2_stage_saved,pc),a2
         bsr c2_load_stage
         lea (c2_repeat_pictures,pc),a0

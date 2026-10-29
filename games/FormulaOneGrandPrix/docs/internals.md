@@ -1476,6 +1476,17 @@ region with a disposable stack frame, then restores authoritative text-parser st
 and the HUD reuse flag after draining the queue. Asset pointers refer to immutable
 native graphics; the front/back pair remains owned throughout a batch.
 
+Boxes (Viewing, Riding with, Race won by and the other banners at h2+$1DF5C's nine
+offsets) lie over the top rows of the view. Natively the HUD runs after every scene: it
+draws a box once (h2+$1DDC0), then copies it from the front bitmap into each new picture
+(h2+$1DEF6), so the scene never covers it. With the clock the HUD runs once per tick,
+and a picture drawn between ticks starts from a copy of the front and draws the scene
+over the box. The front then holds the damaged box, and the tick's own copies spread the
+damage: in the external views the lower half of a banner stayed covered. The slave now
+logs each tick's box draws and copies (offset and width) when they are queued, and
+`c2_repeat_boxes` repeats those copies from the front after the scene of every picture
+drawn between ticks. A box the last tick did not show is not copied, as natively.
+
 The developer queue is bounded at 2048 commands of 96 bytes: **192 KiB** of additional
 slave storage. It records current depth, high-water mark, queued/painted counts and
 overflows. Overflow aborts with an explicit diagnostic rather than corrupting memory
