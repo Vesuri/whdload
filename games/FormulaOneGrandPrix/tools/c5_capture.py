@@ -226,6 +226,11 @@ def states(args, command, out, base, bases, symbols, meta):
     pc = int(re.search(r'\$\d+\s*=\s*(0x[0-9a-fA-F]+)', command('gdb', 'p/x $pc'))[1], 16)
     assert pc == base+symbols['c3_leave'], hex(pc)
     command('gdb', 'delete breakpoints')
+    if getattr(args, 'stage', False):
+        # D4: the track geometry and its wrap pointers, static during the race,
+        # for the segment search that places the predicted road anchor.
+        import d4_camera
+        result['track'] = d4_camera.dump_track(command, out, bases)
     columns = [path.read_bytes() for path in paths]
     count = len(columns[0]) // regions[0][1]
     assert count and all(len(c) == count*size for c, (_, size) in zip(columns, regions)), count

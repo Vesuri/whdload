@@ -1271,8 +1271,8 @@ d2_shown
 ; game (staged) and keep the authoritative bytes (saved); write those back right
 ; after the draw, before any simulation code. The staged set is the pose subset of
 ; the D1 layout; flags, pointers to records, identities and the camera spring stay
-; authoritative. Until D4/D5 predict, the staged values are the authoritative ones;
-; the VERIFY probe stages the previous tick to prove the restore.
+; authoritative. D4 predicts the camera; everything else is staged with its
+; authoritative value until D5. The VERIFY probe stages the previous tick instead.
 D3_SIZE = 54+27*38
 d3_stage                        ; D0 = kind
         btst #3,(cache_options+3,pc)
@@ -1321,6 +1321,7 @@ d3_stage                        ; D0 = kind
         move.b ($23c,a0),d1
         cmp.b (D1_HEADER+$18,a3),d1
         bne.s .snap
+        moveq #2,d7             ; predict
         IFNE VERIFY
         btst #1,(verify_options+3,pc)
         beq.s .debris
@@ -1349,22 +1350,27 @@ d3_stage                        ; D0 = kind
         lea ($c0,a0),a0
         dbf d1,.car
 .stage
-        lea (d3_source,pc),a0
-        move.w d7,(a0)
         lea (d3_saved,pc),a2
         lea (d3_copy_game,pc),a5
         bsr d3_walk
         lea (d3_staged,pc),a2
-        tst.w d7
-        beq.s .build
+        cmpi.w #1,d7
+        bne.s .build
         lea (d3_copy_history,pc),a5
 .build
         bsr d3_walk
-        tst.w d7
-        beq.s .load
+        cmpi.w #1,d7
+        bne.s .camera
         lea (d3_records,pc),a0
         add.l d6,(a0)
+        bra.s .load
+.camera
+        tst.w d7
+        beq.s .load
+        bsr d4_camera           ; D7 = 0 if the camera jumped
 .load
+        lea (d3_source,pc),a0
+        move.w d7,(a0)
         lea (d3_staged,pc),a2
         lea (d3_load,pc),a5
         bsr d3_walk
@@ -1586,6 +1592,196 @@ d3_fields
         dc.w $48,1,56
         dc.w $8c,0,68
         dc.w -1
+
+; D4: the camera of a predicted picture is the published camera extrapolated from
+; the history, cur + (cur - history) * alpha: direction, pitch, height and yaw as
+; wrapped words, world X/Z as longs. The reduced and coarse X/Z follow as in
+; h0+$33F32, the road anchor is found from the tick's anchor by the game's own
+; segment search (h0+$26406), and the yaw coefficients, horizon and viewport are
+; recomputed as h0+$3409E, +$3404C and +$33F6E do. Lateral offset and lap segment
+; stay at the tick. A camera that moved D4_JUMP or more in X or Z in one tick has
+; jumped (a reset or a cut): the picture snaps. VERIFY first recomputes the
+; derived values from the tick's own camera and counts any difference.
+D4_JUMP = $100000
+d4_camera                       ; A3 = history snapshot, d3_staged = the game's values
+        movem.l d0-d6/a0-a6,-(sp)
+        lea (d3_staged,pc),a2
+        movea.l (c2_h0,pc),a0
+        adda.l #$3a820,a0
+        lea (d4_spring,pc),a1
+        move.w (a0),(a1)
+        IFNE VERIFY
+        bsr d4_derive
+        lea (d3_staged,pc),a0
+        lea (d3_saved,pc),a1
+        moveq #54/2-1,d1
+.same
+        cmpm.w (a0)+,(a1)+
+        dbne d1,.same
+        beq.s .derived
+        lea (d4_faults,pc),a0
+        addq.l #1,(a0)
+.derived
+        ENDC
+        lea (4,a2),a0           ; staged published camera
+        lea (D1_HEADER+56,a3),a1 ; the history's
+        moveq #$a,d2
+.bound
+        move.l (a0,d2.w),d0
+        sub.l (a1,d2.w),d0
+        bpl.s .positive
+        neg.l d0
+.positive
+        cmpi.l #D4_JUMP,d0
+        bcc .jump
+        addq.w #4,d2
+        cmpi.w #$e,d2
+        beq.s .bound
+        move.w (d2_alpha,pc),d3
+        lea (d4_words,pc),a4
+.word
+        move.w (a4)+,d2
+        bmi.s .longs
+        move.w (a0,d2.w),d0
+        sub.w (a1,d2.w),d0
+        ext.l d0
+        bsr d4_scale
+        add.w d0,(a0,d2.w)
+        bra.s .word
+.longs
+        moveq #$a,d2
+.long
+        move.l (a0,d2.w),d0
+        sub.l (a1,d2.w),d0
+        bsr d4_scale
+        add.l d0,(a0,d2.w)
+        addq.w #4,d2
+        cmpi.w #$e,d2
+        beq.s .long
+        move.l ($a,a0),d0
+        asr.l #8,d0
+        move.l d0,($18,a0)
+        asr.l #3,d0
+        move.w d0,(4,a0)
+        move.l ($e,a0),d0
+        asr.l #8,d0
+        move.l d0,($20,a0)
+        asr.l #3,d0
+        move.w d0,(8,a0)
+        ; The segment search reads a record's world X/Z at +$28/+$2C.
+        lea (d4_position,pc),a4
+        move.l ($a,a0),(a4)
+        move.l ($e,a0),4(a4)
+        lea (-$28,a4),a0
+        movea.l (a2),a6
+        movea.l (c2_h0,pc),a5
+        adda.l #$26406,a5
+        jsr (a5)
+        lea (4,a2),a0
+        movea.l (c2_h1,pc),a5
+        adda.l #$53de,a5
+        cmpa.l a5,a6
+        blt.s .held             ; native publication would convert a pit segment
+        cmpa.l (a2),a6
+        beq.s .anchored
+        move.l a6,(a2)
+        lea (d4_anchors,pc),a4
+        addq.l #1,(a4)
+.anchored
+        move.w (a6),($26,a0)
+        bra.s .derive
+.held
+        lea (d4_held,pc),a4
+        addq.l #1,(a4)
+.derive
+        bsr d4_derive
+        lea (d4_predicted,pc),a4
+        addq.l #1,(a4)
+        bra.s .done
+.jump
+        lea (d4_jumps,pc),a4
+        addq.l #1,(a4)
+        moveq #0,d7
+.done
+        movem.l (sp)+,d0-d6/a0-a6
+        rts
+; Offsets in the published camera: direction, pitch, height, yaw.
+d4_words
+        dc.w 0,2,6,$14,-1
+; D0.l * D3.w (unsigned Q14) >> 14, rounded towards zero, for |D0| < 2^20.
+d4_scale
+        tst.l d0
+        bpl.s .positive
+        neg.l d0
+        bsr.s .positive
+        neg.l d0
+        rts
+.positive
+        move.l d0,d1
+        swap d1
+        mulu.w d3,d1
+        lsl.l #2,d1
+        mulu.w d3,d0
+        lsr.l #7,d0
+        lsr.l #7,d0
+        add.l d1,d0
+        rts
+; A2 = packed stage globals: yaw coefficients, horizon and viewport from the
+; published yaw, pitch and anchor heading, the spring and the horizon limit.
+d4_derive
+        movem.l d0-d1/a0-a1/a4,-(sp)
+        movea.l (c2_h0,pc),a4
+        adda.l #$222f0,a4
+        move.w (4+$14,a2),d0
+        bsr.s d4_table
+        move.w d0,(44,a2)
+        move.w (4+$14,a2),d0
+        neg.w d0
+        addi.w #$4000,d0
+        bsr.s d4_table
+        move.w d0,(46,a2)
+        move.w (4+2,a2),d0
+        movea.l (c2_h1,pc),a0
+        tst.b ($23c,a0)
+        bne.s .pitch
+        add.w (d4_spring,pc),d0
+.pitch
+        neg.w d0
+        addi.w #$4000,d0
+        bsr.s d4_table
+        asr.w #6,d0
+        addi.w #$50,d0
+        movea.l (c2_h2,pc),a1
+        adda.l #$231cc,a1
+        cmp.w (a1),d0
+        ble.s .horizon
+        move.w (a1),d0
+.horizon
+        move.w d0,(48,a2)
+        clr.w (50,a2)
+        move.w (4+$26,a2),d0
+        sub.w (4+$14,a2),d0
+        bpl.s .relative
+        neg.w d0
+.relative
+        cmpi.w #$4000,d0
+        bcs.s .viewport
+        neg.w d0
+        addi.w #$8000,d0
+        move.w #$8000,(50,a2)
+.viewport
+        move.w d0,(52,a2)
+        movem.l (sp)+,d0-d1/a0-a1/a4
+        rts
+d4_table                        ; D0 = angle, A4 = h0+$222F0
+        tst.w d0
+        bpl.s .positive
+        neg.w d0
+.positive
+        lsr.w #2,d0
+        bclr #0,d0
+        move.w (a4,d0.w),d0
+        rts
 
 c2_publish
         bsr c2_hud_flush
@@ -2322,9 +2518,16 @@ d3_written dc.l 0               ; VERIFY: the renderer wrote a staged byte
 d3_checked dc.l 0               ; VERIFY: restores checked against a snapshot
 d3_faults dc.l 0                ; VERIFY: restore differs from its snapshot
 d3_check_tick dc.l 0            ; VERIFY: in-tick restore, checked at that tick's snapshot
+d4_predicted dc.l 0             ; pictures with a predicted camera
+d4_jumps dc.l 0                 ; camera jumped: snapped
+d4_anchors dc.l 0               ; road anchor moved by the prediction
+d4_held dc.l 0                  ; anchor search left the main track: tick's anchor kept
+d4_faults dc.l 0                ; VERIFY: derived values differ from the game's
+d4_position dc.l 0,0            ; predicted world X/Z for the segment search
+d4_spring dc.w 0                ; spring word at the stage, for the horizon
 d3_active dc.w 0
 d3_kind dc.w 0
-d3_source dc.w 0                ; 0 authoritative, 1 previous tick
+d3_source dc.w 0                ; 0 authoritative, 1 previous tick, 2 predicted
 d3_saved ds.b D3_SIZE
 d3_staged ds.b D3_SIZE
         ENDC

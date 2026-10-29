@@ -2083,9 +2083,9 @@ usable only if its tick number is the drawn tick minus one and its epoch, loop m
 pose source, selected car and view code equal the current ones. Otherwise the picture
 snaps. A picture with α 0 (latest state) uses no history. Within a usable history, a record whose
 +$7E bit 0 (explicit pose) differs from the snapshot's keeps its authoritative pose (held).
-Until D4/D5 supply predictions, the staged values are the authoritative ones; the
-VERIFY probe `CUSTOM5` bit 1 stages the usable history instead, drawing one tick late, to
-prove the mechanism with values that really differ.
+D4 predicts the camera part of the staged values (below); the rest are the
+authoritative ones until D5. The VERIFY probe `CUSTOM5` bit 1 stages the usable history
+instead, drawing one tick late, to prove the mechanism with values that really differ.
 
 VERIFY checks every restore. Before writing back it counts a draw that changed a staged
 byte (`d3_written`). Between ticks it compares the restored game with cur, because nothing
@@ -2112,3 +2112,55 @@ TV and chase views, where the pose source is the synthetic camera. D7 covers eve
 A first probe run (`states-previous-tickcheck-d0`) counted a VERIFY fault for every
 in-tick picture: the tick check lost the tick number in a register that its comparison walk
 reuses. The independent checks passed in that run, and the fixed build reports none.
+
+### D4 camera prediction — complete
+
+For every staged picture with a usable history (D3) and α above 0, `d4_camera` replaces
+the camera part of the staged values with a prediction from the published camera at
+h0+$3A7F8: `cur + (cur − history) × α`, with cur the tick drawn and α in Q14 up to two
+ticks. The product is rounded towards zero, using 68000 instructions only.
+
+| Staged value | Rule |
+|---|---|
+| Direction +$3A7F8, pitch +$3A7FA, height +$3A7FE, yaw +$3A80C | Extrapolated as wrapped words, so angles take the shortest arc. The published pitch already contains the view bias and the cockpit +$B6 term |
+| World X/Z +$3A802/+$3A806 | Extrapolated as longs. World coordinates do not wrap, so the lap wrap only concerns the anchor |
+| Reduced X/Z +$3A810/+$3A818, coarse X/Z +$3A7FC/+$3A800 | Derived from the predicted X/Z as h0+$33F32 does (`>> 8`, then `>> 3`) |
+| Road anchor h1+$224, anchor heading +$3A81E | The game's own segment search h0+$26406, started at the tick's anchor, for the predicted X/Z. It steps forward or back through the native wrap helpers (+$2679A/+267DA), so it follows the lap wrap. A result in the pit/alternate segments below h1+$53DE keeps the tick's anchor, because native publication (+$26502) would convert it through +$26326, which writes h2+$231EA |
+| Yaw coefficients +$3A8C2/+$3A8C4, horizon h2+$231D4, viewport h2+$231E0/+$231E4 | Recomputed as h0+$3409E, +$3404C and +$33F6E do: the sine table at h0+$222F0, the spring word +$3A820 in the cockpit, the horizon limit h2+$231CC, and the anchor heading minus the yaw |
+| Lateral offset +$3A80A, lap segment +$3A81C, unused +$3A80E/+$3A814, every record | Stay at the tick. The lateral offset only selects road detail against ±$200 (h2+$24C46); nothing reads the lap segment. Cars are D5 |
+
+At the stage the spring word is the value the native horizon used. Inside a tick the
+camera preparation h0+$34028 has just run. Between ticks `c2_repeat_picture` has already
+loaded the tick's draw-entry stage, which undoes the shake.
+
+**Snaps** (the picture shows the tick, α treated as 0):
+- view, source or target changes, which also cover TV cuts, because a cut clears and sets view-code bit 6 in successive ticks;
+- a new epoch, so the first tick after every rebase;
+- non-consecutive ticks, and α 0 (D3);
+- a camera that moved `D4_JUMP` ($100000) or more in X or Z in one tick. The largest normal movement over the race is 480,408 per tick; the one larger value, 54.9 million, is a reset. D8 sets the final thresholds from measured errors.
+
+VERIFY first recomputes the derived values (coefficients, horizon, viewport) from the
+tick's own camera and counts any difference from the game's in `d4_faults`. This checks
+the formulas on every predicted picture.
+
+**Evidence** (VERIFY `f1ab3da7…`, developer `77193b5b…`, `a1200-030` non-MMU, `CUSTOM4=1`,
+whole Quick Race in the cockpit view, `tmp/d4/`). `tools/d4_camera.py` is the independent
+model: it runs the D3 check, then rebuilds each prediction, including the segment search
+over the track geometry and wrap pointers dumped at the end of the race:
+
+| Check | Result |
+|---|---|
+| Prediction (`camera-on.json`) | PASS for all 5992 staged pictures (3210 inside ticks, 2782 between). For every picture the model rebuilds each staged byte exactly: the decision, the extrapolation, the anchor, and the derived values. 5990 pictures are predicted and 2 snap (unusable history). The search moved the anchor in 4108 pictures; it never left the main track, and no camera jumped |
+| Derived values | The model's and the slave's recomputation from the tick's camera equals the game's in every predicted picture; `d4_faults` 0 |
+| Accuracy against the ideal camera | The ideal is the actual camera interpolated between the ticks around each picture's displayed time, tick + α. Position error, the larger of X/Z, in world units: p50 2290 and p95 29,592 predicted, against 211,308 and 490,302 when the tick is shown. Yaw error: p50 2 and p95 126 against 48 and 882. The largest error in both, about 36.7 million, is the reset |
+| Negative probes | A flipped restored camera byte, staged car byte, saved byte, history X byte, staged yaw, staged anchor and staged horizon are each rejected |
+| Race unchanged (`states-comparison.json`) | Option off (`CUSTOM2=3`), prediction (`=11`) and its repeat: identical car/session state at all 3210 common ticks (6–3215) |
+| Exact repeat (`states-on-repeat`) | Identical states, snapshots and stage archive (`ad6ef28a…`) |
+| Cost (`profile-developer.json`, 100 fields from tick 300) | Developer build: `d4_camera` 0.034 ms per picture, including the segment search, inside `d3_stage` (0.66 ms; restore 0.20 ms), against 29.3 ms for the scene. The native camera preparation h0+$34028 costs 0.033 ms per tick. Emulated 68030 time |
+| Pictures over the race | 6202 off, 5991 predicted (3.23 versus 3.35 fields per picture), no drops |
+| Disabled-feature gate (`tmp/b4/d4-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D4 adds no hook |
+
+Not exercised by this race: the TV and chase views, whose source is the synthetic camera,
+and the pit-lane anchor case. D7 covers every view. In the cockpit the cars are still drawn
+at the tick while the camera moves on, so until D5 they shift against the camera once per
+tick. D4 alone is not a smoothness claim; D9 measures smoothness.

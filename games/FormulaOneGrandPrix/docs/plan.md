@@ -103,8 +103,8 @@ with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's ques
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
 tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
 A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
-68000 keeps the original frame-locked pacer by default (user decision). D1, D2 and D3
-are complete (presentation snapshots, α, and staging with exact restore); D4 is next.
+68000 keeps the original frame-locked pacer by default (user decision). D1–D4
+are complete (presentation snapshots, α, staging with exact restore, and camera prediction); D5 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -294,6 +294,11 @@ D4/D5 supply the predicted values; until then the staged values are the authorit
 **D4 Camera.** Position and heading, pitch, roll: `cur + (cur − prev) × α`; angles by the
 shortest arc, track position across the lap wrap; snap (α = 0) at view changes, TV-camera
 cuts and the first tick after a rebase.
+*Result:* complete ([internals](internals.md#d4-camera-prediction--complete)). The
+published camera is extrapolated, the road anchor comes from the game's own segment search,
+and coefficients, horizon and viewport are recomputed natively. Over a whole 030 race the
+model rebuilds every prediction exactly, the p95 camera position error falls from 490k to
+30k world units, and the race is unchanged.
 
 **D5 Cars.** The same formula first. Then check the per-car update's order: if a car's
 rates are set before it moves, derive the exact next pose with the native arithmetic

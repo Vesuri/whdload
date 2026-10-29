@@ -892,3 +892,26 @@ python3 tools/c2_capture.py tmp/d3/profile-developer --build tmp/d3/build-develo
 python3 tools/c6_profile.py tmp/d3/profile-developer --out tmp/d3/profile-developer.json
 ```
 
+### D4 camera prediction
+
+A `--stage` capture of a build with D4 also dumps, at the end of the race, the track
+geometry (h1 from +$2BFA to the track end) and the wrap pointers (h2+$1FAB8–1FAE7)
+into `track-h1.bin` and `track-h2.bin`. `d4_camera.py` runs the D3 check with its own
+model of every prediction, segment search included, and reports the camera error against
+the ideal path between the actual ticks:
+
+```sh
+make slave-verify OUT=tmp/d4/build-verify
+python3 tools/c2_capture.py tmp/d4/states-on --build tmp/d4/build-verify --states --stage --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d4/states-on-repeat --build tmp/d4/build-verify --states --stage --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d4/states-off --build tmp/d4/build-verify --states --custom4 1 --setup a1200-030
+python3 tools/d4_camera.py tmp/d4/states-on --negative --out tmp/d4/camera-on.json
+python3 tools/c5_compare.py off=tmp/d4/states-off on=tmp/d4/states-on repeat=tmp/d4/states-on-repeat \
+  --out tmp/d4/states-comparison.json
+make slave-developer OUT=tmp/d4/build-developer
+python3 tools/c2_capture.py tmp/d4/profile-developer --build tmp/d4/build-developer --stage --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
+python3 tools/c6_profile.py tmp/d4/profile-developer --out tmp/d4/profile-developer.json
+```
+
+Captures need `amiga/env.sh` sourced and run one at a time (one project server).
+

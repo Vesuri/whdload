@@ -33,8 +33,9 @@ FIELDS = ((0x00, 2), (0x04, 2), (0x08, 6), (0x12, 6), (0x1a, 6), (0x26, 10),
 SIZE = sum(n for _, _, n in RANGES) + len(d1.RECORDS)*sum(n for _, n in FIELDS)
 COUNTERS = ('pictures', 'staged', 'latest', 'snapped', 'debris', 'records',
             'written', 'checked', 'faults', 'check_tick')
-# Game memory dumped at each stop: view state and records, camera and coefficients, horizon.
-GAME = ((1, 0x224, 0x1956-0x224), (0, 0x3a7f8, 0x3a8c6-0x3a7f8), (2, 0x231d4, 20))
+# Game memory dumped at each stop: view state and records, camera and coefficients,
+# horizon limit, horizon and viewport.
+GAME = ((1, 0x224, 0x1956-0x224), (0, 0x3a7f8, 0x3a8c6-0x3a7f8), (2, 0x231cc, 28))
 
 
 def snapshot_offset(h, offset):
@@ -67,8 +68,10 @@ def regions(base, bases, symbols):
 
 
 def game_reader(parts):
+    # D3 captures predate the horizon limit at h2+$231CC.
+    layout = GAME if len(parts[-1]) == GAME[-1][2] else GAME[:-1] + ((2, 0x231d4, 20),)
     def read(h, offset, size):
-        for (hunk, start, _), part in zip(GAME, parts):
+        for (hunk, start, _), part in zip(layout, parts):
             if hunk == h and start <= offset and offset+size <= start+len(part):
                 return part[offset-start:offset-start+size]
         raise KeyError(f'h{h}+{offset:05x} not captured')
@@ -125,8 +128,14 @@ def check(directory, mutate=None):
         tick_cur[item['tick']] = d1.split(snap_data[at:at+snap_sizes[1]])[0]
     at_slave = lambda name: symbols[name]-symbols['c2_serial']
     at_d3 = lambda name: symbols[name]-symbols['d3_pictures']
+    camera = 'd4_predicted' in symbols
+    if camera:
+        import d4_camera
+        model = d4_camera.Model(root, meta)
+        d4_counters = ('d4_predicted', 'd4_jumps', 'd4_anchors', 'd4_held', 'd4_faults')
+    outcomes, shown = {}, []
     failures, kinds, sources, differing, held_total, problem_kinds = [], {}, {}, 0, 0, {}
-    previous = None
+    previous = previous_d4 = None
     for n in range(info['count']):
         parts, at = [], n*sum(sizes)
         for size in sizes:
@@ -150,20 +159,38 @@ def check(directory, mutate=None):
         view = lambda b, o, s: b[snapshot_offset(1, o):snapshot_offset(1, o)+s]
         valid = (header[1] == tick-1 and header[2] == epochs and header[5] == mode
                  and all(view(body, o, s) == read(1, o, s) for o, s in ((0x234, 8), (0x23c, 1))))
-        expected_source = 1 if probe and alpha and valid else 0
+        expected_source = (1 if probe else 2 if camera else 0) if alpha and valid else 0
         decision = 'latest' if not alpha else 'history' if valid else 'snapped'
+        if camera:
+            d4 = {name: struct.unpack_from('>I', block, at_d3(name))[0] for name in d4_counters}
+            spring = struct.unpack_from('>h', block, at_d3('d4_spring'))[0]
+            view = read(1, 0x23c, 1)[0]
+            clamp = struct.unpack_from('>h', read(2, 0x231cc, 2))[0]
         kinds[('tick' if kind == TICK else 'repeat')] = kinds.get('tick' if kind == TICK else 'repeat', 0) + 1
         sources[decision] = sources.get(decision, 0) + 1
         problems = []
-        if source != expected_source:
-            problems.append(('source', source, expected_source))
         if extract(read) != saved:
             problems.append('game not restored to the saved bytes')
-        if expected_source:
+        if expected_source == 1:
             want, held = from_snapshot(history, read)
             held_total += held
+        elif expected_source == 2:
+            camera_history = history[d1.HEADER.size+snapshot_offset(0, 0x3a7f8):]
+            want, outcome = model.predict(saved, camera_history, alpha, spring, clamp, view)
+            outcomes[outcome] = outcomes.get(outcome, 0) + 1
+            if outcome == 'jump':
+                expected_source = 0
+            else:
+                shown.append((tick, alpha, staged[:54], saved[:54]))
+            # The model's derived values from the tick's own camera are the game's.
+            derived = bytearray(saved)
+            model.derive(derived, spring, clamp, view)
+            if bytes(derived[:54]) != saved[:54]:
+                problems.append('derived values differ from the game')
         else:
             want = saved
+        if source != expected_source:
+            problems.append(('source', source, expected_source))
         if staged != want:
             problems.append(('staged', [i for i, (x, y) in enumerate(zip(staged, want)) if x != y][:8]))
         differing += staged != saved
@@ -179,6 +206,12 @@ def check(directory, mutate=None):
             problems.append(('picture count', values))
         if values['written'] or values['faults']:
             problems.append(('VERIFY counters', values['written'], values['faults']))
+        if camera:
+            if d4['d4_faults']:
+                problems.append(('D4 VERIFY faults', d4['d4_faults']))
+            if previous_d4 and d4['d4_predicted'] != previous_d4['d4_predicted'] + (source == 2):
+                problems.append(('predicted count', d4['d4_predicted'], previous_d4['d4_predicted']))
+            previous_d4 = d4
         if problems:
             failures.append(dict(stop=n, tick=tick, kind=kind, problems=problems))
             for problem in problems:
@@ -191,12 +224,21 @@ def check(directory, mutate=None):
     return dict(status='PASS' if not failures and info['count'] else 'FAIL', probe=probe,
                 stops=info['count'], kinds=kinds, decisions=sources,
                 staged_differs=differing, held_records=held_total,
+                camera=dict(outcomes=outcomes, counters=previous_d4,
+                            error=d4_camera.error(shown, tick_cur)) if camera else None,
                 counters={k: v for k, v in (last or {}).items() if k != 'check_tick'},
                 size=SIZE, archive_sha256=info['archive_sha256'],
                 problems=problem_kinds, failures=failures[:20], failure_count=len(failures))
 
 
-def negative(directory):
+def symbols_offset(directory, name):
+    """Offset of a slave symbol in the captured D3 block."""
+    symbols = json.loads((Path(directory)/'meta.json').read_text())['symbols']
+    value = lambda key: int(symbols[key], 16) if isinstance(symbols[key], str) else symbols[key]
+    return value(name) - value('d3_pictures')
+
+
+def negative(directory, camera=False):
     """Each injected defect must be rejected."""
     def flip(where):
         def mutate(data, sizes):
@@ -204,13 +246,20 @@ def negative(directory):
                 data[200*sum(sizes) + at] ^= 1
         return mutate
     game_camera = lambda sizes: [sum(sizes[:5]) + 4]          # published pitch, restored game
-    staged_byte = lambda sizes: [sum(sizes[:3]) + 4*10 + 6 + 2*SIZE - 100]  # staged car byte
-    saved_byte = lambda sizes: [sum(sizes[:3]) + 4*10 + 6 + SIZE - 100]     # saved car byte
-    # The same published-camera byte in both D1 buffers (cur and prev).
-    snapshot = lambda sizes: [sizes[0] + sizes[1] + 2 + b*d1.SIZE + d1.HEADER.size + 60 for b in (0, 1)]
+    staged = lambda sizes: sum(sizes[:3]) + symbols_offset(directory, 'd3_staged')
+    saved = lambda sizes: sum(sizes[:3]) + symbols_offset(directory, 'd3_saved')
+    staged_byte = lambda sizes: [staged(sizes) + SIZE - 100]  # staged car byte
+    saved_byte = lambda sizes: [saved(sizes) + SIZE - 100]    # saved car byte
+    # The same published-camera byte (third byte of world X) in both D1 buffers (cur and prev).
+    snapshot = lambda sizes: [sizes[0] + sizes[1] + 2 + b*d1.SIZE + d1.HEADER.size + 56+0xb for b in (0, 1)]
+    cases = [('restored camera byte', game_camera), ('staged byte', staged_byte),
+             ('saved byte', saved_byte), ('snapshot byte', snapshot)]
+    if camera:
+        cases += [('staged yaw', lambda sizes: [staged(sizes) + 4+0x15]),
+                  ('staged anchor', lambda sizes: [staged(sizes) + 2]),
+                  ('staged horizon', lambda sizes: [staged(sizes) + 49])]
     results = {}
-    for name, where in (('restored camera byte', game_camera), ('staged byte', staged_byte),
-                        ('saved byte', saved_byte), ('snapshot byte', snapshot)):
+    for name, where in cases:
         results[name] = check(directory, flip(where))['status']
     return results
 
