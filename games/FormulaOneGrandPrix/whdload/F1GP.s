@@ -1987,6 +1987,77 @@ d5_cars                         ; A3 = history snapshot
         dbf d7,.car
         movem.l (sp)+,d0-a6
         rts
+; D10: the pit-stop sprites $AA, $A9 and $AE (the block at h2+$2A2A8, for the viewed
+; car's +$97 bits 3-5) slide sideways: h2+$2A0FA, +$2A19E and +$2A226 advance the
+; pit-service counters (A3 tick state) and return the sprite's x in D4. Each call
+; is hooked: the native routine runs unchanged, its x is kept per tick, and an
+; interpolated picture shows x interpolated between the history's tick and cur's.
+d10_pit_a
+        move.l #$2a0fa,-(sp)
+        clr.w -(sp)
+        bra.s d10_pit
+d10_pit_b
+        move.l #$2a19e,-(sp)
+        move.w #D10_PIT,-(sp)
+        bra.s d10_pit
+d10_pit_c
+        move.l #$2a226,-(sp)
+        move.w #2*D10_PIT,-(sp)
+d10_pit                         ; (SP).w = entry, 2(SP).l = the routine's h2 offset
+        move.l a1,-(sp)
+        movea.l (c2_h2,pc),a1
+        adda.l (6,sp),a1
+        jsr (a1)                ; A0 = the car record; D4 = x
+        movea.l (sp)+,a1
+        movem.l d0-d3/a0,-(sp)
+        btst #3,(cache_options+3,pc)
+        beq.s .done
+        lea (d10_pits,pc),a0
+        adda.w (20,sp),a0
+        move.l (c2_clock+WC_TICKS,pc),d1
+        move.w (d3_kind,pc),d3
+        bne.s .drawn
+        addq.l #1,d1            ; inside a tick: the new tick
+.drawn
+        move.l (c3_epochs,pc),d2
+        cmp.l (a0),d2
+        bne.s .first
+        move.l 4(a0),d3
+        cmp.l d3,d1
+        beq.s .kept
+        addq.l #1,d3
+        cmp.l d3,d1
+        bne.s .first
+        move.w 8(a0),10(a0)     ; the previous tick's x
+        move.w #1,12(a0)
+        bra.s .keep
+.first
+        clr.w 12(a0)
+.keep
+        move.l d2,(a0)
+        move.l d1,4(a0)
+        move.w d4,8(a0)
+.kept
+        move.w (d3_active,pc),d3
+        beq.s .done
+        move.w (d3_source,pc),d3
+        subq.w #2,d3
+        bne.s .done
+        tst.w 12(a0)
+        beq.s .done
+        move.w 8(a0),d0
+        sub.w 10(a0),d0
+        ext.l d0
+        move.w (d2_weight,pc),d3
+        bsr d4_scale
+        move.w 8(a0),d4
+        add.w d0,d4
+.done
+        movem.l (sp)+,d0-d3/a0
+        addq.l #6,sp
+        rts
+D10_PIT = 14                    ; epoch.l, tick.l, x.w, previous x.w, previous valid.w
+
 ; D7: an external view's camera from the staged viewed car (h1+$238), placed and
 ; aimed as the native view code does in the tick. Chase (view bit 5, h0+$398AA):
 ; the camera stands h0+$3A90C from the car along the chase heading h0+$3A710,
@@ -2980,6 +3051,7 @@ d2_period dc.w 0                ; fields since the previous picture started
 d2_alpha dc.w 0                 ; unsigned Q14, at most $8000
 d2_leads dc.w 0,0               ; last measured lead per kind
 d2_weight dc.w 0                ; the history's, unsigned Q14 (D10)
+d10_pits ds.b 3*D10_PIT          ; per pit sprite (D10)
 d1_current dc.w 0
 d1_buffers ds.b 2*D1_SIZE
 d3_pictures dc.l 0              ; pictures seen
@@ -3144,6 +3216,12 @@ patch_582992_clock
         PL_PS $8df28,c2_pair_a5_a6
         ; PERF_RANGE h2:1f10e 6 custom=2 bit=1 variant=582992
         PL_PS $8e4a2,c2_pair_a1_a2
+        ; PERF_RANGE h2:2a2c8 6 custom=2 bit=1 variant=582992
+        PL_PS $9965c,d10_pit_a
+        ; PERF_RANGE h2:2a33a 6 custom=2 bit=1 variant=582992
+        PL_PS $996ce,d10_pit_b
+        ; PERF_RANGE h2:2a38a 6 custom=2 bit=1 variant=582992
+        PL_PS $9971e,d10_pit_c
         PL_ENDIF
         PL_END
         ENDC

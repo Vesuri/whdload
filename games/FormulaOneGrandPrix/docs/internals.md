@@ -2261,7 +2261,7 @@ either in the stage set or listed here:
 | Tow truck, smoke and debris | Drawn at fixed offsets from the car's pose (h2+$29D4E, table h2+$29E2C) when +$97 bit 7 or +$19 bit 4 is set | **Follow the car.** The offsets apply to the staged (predicted) car pose, so these items move with it. The flags select them and stay at the tick |
 | Marshal flags | Flag state per track sector in h1+$456 (byte +1), written by h0+$39E2C–3A0C2; the post object (kind $20) copies it to h2+$2C3BF | **Hold.** A discrete state |
 | Start lights | h0+$3A73A, +$3A750 (h2+$1F77C) | **Hold.** Discrete session state |
-| Pit crew and service phases | h0+$3A746–3A74D | **Hold.** A3: tick counters that must not advance at picture rate; C2 stages their tick-entry values |
+| Pit crew and service phases | h0+$3A746–3A74D | **Hold.** A3: tick counters that must not advance at picture rate; C2 stages their tick-entry values. Since D10 the x positions of the pit-stop sprites drawn from them are interpolated (D10 below) |
 | Cockpit shake | Spring +$3A820 plus the shared random number stream | **Hold.** A3: random-number draws stay once per tick. The horizon uses the spring of the tick |
 | Rear view and pit-lane overlay | The scene's rear viewport (h2+$231E0) and the alternate-carriageway pass h2+$2A450 (the "mirror request" +$3A828) | **Predicted already.** Both read the staged camera, anchor and car records |
 | Cockpit sides, hands, sky | Fixed images h0+$3D742, +$3EB32; the sky reads the staged yaw and horizon | **Already consistent** (the sky's on/off flag: next row) |
@@ -2576,10 +2576,25 @@ track-driven car steps again from the history's segment, by its progress to cur 
   (user decision): lag is one tick plus the lead, about half a tick more than the original
   game on the normal-speed 030 and a sixth of a tick on the 040.
 
-In the second 040 play-test the user found steering smooth, without jumps, and the
-chase, TV and onboard views fine. A snapped or
-latest picture still shows cur. A held car keeps its tick pose, which is now
-ahead of the interpolated pictures around it.
+In the second 040 play-test the user found steering smooth, without jumps, the chase, TV
+and onboard views fine, and nothing wrong at the replay cuts or the pit entry. A snapped
+or latest picture still shows cur. A held car keeps its tick pose, which is now ahead of
+the interpolated pictures around it.
+
+**Pit-stop sprites.** During the player's stop, the block at h2+$2A2A8 draws three
+sprites through h0+$147C for the viewed car's +$97 bits 3–5: $AA (sign), $A9 and $AE.
+Each x position comes from a routine that advances a pit-service counter and turns it
+into a position through the sine table: h2+$2A0FA (h0+$3A748), +$2A19E (+$3A746) and
++$2A226 (+$3A74A); the counters are A3 tick state (D6 holds them). The three calls at
+h2+$2A2C8, +$2A33A and +$2A38A are hooked (`d10_pit_a`–`c`): the native routine runs
+unchanged, its x is kept per tick and epoch, and a picture whose camera is interpolated
+(`d3_source` 2) shows x between the previous tick's and cur's with `d2_weight`. No game
+memory changes, so the race and the counters stay native. The quick race has no player
+pit stop (the counters stay $8000), so the hooks are not exercised by the captures; the
+user checked the stop in the 040 play-test and found it fine. With the hooks the whole
+race is again identical with the option off at all 3422 common ticks, every staged
+picture is rebuilt exactly, the negative probes are rejected and B4 passes (release
+`93dde23f…` unchanged).
 
 **Evidence** (VERIFY `4ebc2d32…`, developer `5d302a49…`, `a1200-030` non-MMU, `CUSTOM4=1`,
 the D7 view schedule, `tmp/d10/`):

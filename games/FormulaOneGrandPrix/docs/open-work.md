@@ -48,10 +48,11 @@ newest pose in 55% of the 030's pictures, so motion paused at the end of every t
 picture is now shown a tick plus the longer measured lead late, which keeps the steps even
 (user decision). That is about half a tick more lag than the original game on the
 normal-speed 030 and a sixth of a tick on the 040. In the second 040 play-test the user
-found steering smooth, without jumps, and the
-chase, TV and onboard views fine. Held
-cars still show their tick pose, ahead of the interpolated pictures; 20 small backward car
-steps over a race come from that.
+found steering smooth, without jumps, the chase, TV and onboard views fine, and nothing
+wrong at the replay cuts or the pit entry. The pit-stop sprites (BRAKE ON sign, visor
+wipe) still stepped once a tick; their x positions are now interpolated too, which the
+user found fine. Held cars still show their tick pose, ahead of the interpolated pictures;
+20 small backward car steps over a race come from that.
 
 D9 is complete ([evidence](internals.md#d9-smoothness--complete)) on the 68030/50; the
 plan's 50 fps 68060 run is deferred with the other 040/060 work. The backward steps it

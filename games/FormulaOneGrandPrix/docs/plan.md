@@ -376,7 +376,9 @@ beyond two ticks). Over a whole race:
 The first 040 play-test found the horizon drawn over the 3D on repeats (fixed in C2) and
 steering jumps from extrapolation. Pictures now interpolate between the last two ticks,
 each shown a tick plus the longer measured lead late so that the steps stay even (user
-decision). In the second 040 play-test the user found steering smooth, without jumps, and the chase, TV and onboard views fine.
+decision). In the second 040 play-test the user found steering smooth, without jumps, and
+the chase, TV and onboard views, replay cuts and pit entry fine; the pit-stop sprites are
+now interpolated too.
 
 ## E. Performance (each change gated by measurement on every CPU)
 
