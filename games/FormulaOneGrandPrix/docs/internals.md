@@ -1973,7 +1973,7 @@ Behind the developer bit `CUSTOM2` bit 3 (with the clock, bit 1), `d1_snapshot` 
 at every completed world tick, at `c2_pacer` entry before the tick is counted: after
 the tick's last native call (h0+$1272 at h0+$3C9D2), live or replay, drawn or tick-only,
 including a resumed tick. It copies the renderer inputs mapped in A4 into the current
-buffer of two 2232-byte buffers; the other buffer keeps the previous tick. It only reads
+buffer of two 2234-byte buffers (2232 before D6 added the covered-road flag); the other buffer keeps the previous tick. It only reads
 game memory. The layout, which `tools/d1_snapshot.py` defines independently as the
 specification of the slave tables `d1_ranges` and `d1_fields`:
 
@@ -1986,6 +1986,7 @@ specification of the slave tables `d1_ranges` and `d1_fields`:
 | h0+$3A8C2–3A8C5 | 4 | Yaw trig coefficients |
 | h0+$3A8F8–3A90F | 24 | TV selection parameters and distances, view height bias +$3A904, chase offset +$3A90C |
 | h2+$231D4–231E7 | 20 | Horizon, view pitch bias, viewport +$231E0/+231E4 |
+| h2+$231A0–231A1 | 2 | Covered-road flag (D6): +$231A0 bit 7, set by h0+$33FA0 when the anchor's +$26 bit 3 is set; the scene then draws no sky (h2+$27DCE/+27DFC) |
 | 27 records × 76 | 2052 | Synthetic camera h1+$256, then the 26 cars h1+$5D6 + i×$C0: +$00–37 (direction, pitch, height, lateral, longitudinal, speed, T, denominator, damage/model bytes +$19/+$25, yaw, corrected longitudinal, fraction, lap segment, world X/Z, velocity), +$48/+$4A steering and correction, +$66 list index, +$72 speed change, +$7E pose flag and +$80 packed lap position, +$8C height offset, +$96 status, +$AC driver, +$B6 cockpit pitch effect |
 
 Records are kept by slot, not by the ranking list, so a car's identity is its slot plus
@@ -2066,7 +2067,7 @@ right after it: inside a tick around `c2_scene`'s call of h2+$280F6 (draw mode 1
 tick-only passes are never staged), between ticks around `c2_repeat_picture`'s call. The
 restore runs before control returns to the native loop (h0+$3C9C0, the tick clocks) or to
 `c2_repeat_picture`'s own restore of A3's renderer effects, so no simulation code sees a
-staged byte. The stage set is the pose subset of the D1 layout, 1080 bytes in the packed
+staged byte. The stage set is the pose subset of the D1 layout, 1082 bytes (1080 before D6) in the packed
 order that `tools/d3_stage.py` defines independently as the specification of the slave
 tables `d3_ranges` and `d3_fields`:
 
@@ -2076,6 +2077,7 @@ tables `d3_ranges` and `d3_fields`:
 | h0+$3A7F8–3A81F | 40 | Published camera: direction, pitch, coarse and full X/Z, height, lateral, yaw, reduced X/Z, lap segment, anchor heading |
 | h0+$3A8C2–3A8C5 | 4 | Yaw trig coefficients |
 | h2+$231D4, +$231E0, +$231E4 | 6 | Horizon; viewport direction flag and relative heading (written by h0+$33F6E–33F9A) |
+| h2+$231A0 | 2 | Covered-road flag (D6) |
 | 27 records × 38 | 1026 | Synthetic camera and 26 cars: +$00 direction, +$04 pitch, +$08–0D height, lateral, longitudinal, +$12–17 segment pointer and denominator, +$1A–1F yaw, corrected longitudinal, fraction, +$26–2F lap segment and world X/Z, +$48/+$4A steering and correction, +$8C height offset |
 
 Everything else stays authoritative while a picture is drawn: the view state h1+$234–240,
@@ -2137,7 +2139,7 @@ ticks. The product is rounded towards zero, using 68000 instructions only.
 | World X/Z +$3A802/+$3A806 | Extrapolated as longs. World coordinates do not wrap, so the lap wrap only concerns the anchor |
 | Reduced X/Z +$3A810/+$3A818, coarse X/Z +$3A7FC/+$3A800 | Derived from the predicted X/Z as h0+$33F32 does (`>> 8`, then `>> 3`) |
 | Road anchor h1+$224, anchor heading +$3A81E | The game's own segment search h0+$26406, started at the tick's anchor, for the predicted X/Z. It steps forward or back through the native wrap helpers (+$2679A/+267DA), so it follows the lap wrap. A result in the pit/alternate segments below h1+$53DE keeps the tick's anchor, because native publication (+$26502) would convert it through +$26326, which writes h2+$231EA |
-| Yaw coefficients +$3A8C2/+$3A8C4, horizon h2+$231D4, viewport h2+$231E0/+$231E4 | Recomputed as h0+$3409E, +$3404C and +$33F6E do: the sine table at h0+$222F0, the spring word +$3A820 in the cockpit, the horizon limit h2+$231CC, and the anchor heading minus the yaw |
+| Yaw coefficients +$3A8C2/+$3A8C4, horizon h2+$231D4, viewport h2+$231E0/+$231E4, covered-road flag h2+$231A0 | Recomputed as h0+$3409E, +$3404C, +$33F6E and +$33FA0 do: the sine table at h0+$222F0, the spring word +$3A820 in the cockpit, the horizon limit h2+$231CC, the anchor heading minus the yaw, and the anchor's +$26 bit 3 (the flag since D6) |
 | Lateral offset +$3A80A, lap segment +$3A81C, unused +$3A80E/+$3A814, the synthetic camera record | Stay at the tick. The lateral offset only selects road detail against ±$200 (h2+$24C46); nothing reads the lap segment. The car records are D5 |
 
 At the stage the spring word is the value the native horizon used. Inside a tick the
@@ -2227,5 +2229,53 @@ A first build read the fraction as unsigned and drew the grid cars up to three s
 ahead before the start (`tmp/d5/run2-unsigned`, largest error 1.04 million); the model
 matched it, so the error measure found it. The remaining large errors (above 200,000 in
 27 of 136,717 car-pictures) are cars braking or turning hard at α near 1.5; D8 sets
-the limits. Not exercised by this race: the TV and chase views (D7) and pit stops. Wheels
-and steering are D6.
+the limits. Not exercised by this race: the TV and chase views (D7) and pit stops. D6
+keeps steering at the tick.
+
+### D6 everything else that moves — complete
+
+D6 decides, for every remaining item that moves, whether a picture between ticks
+extrapolates it, holds it at the tick or animates it. The inventory has two sources. The
+first is a static scan of the 14,077 renderer instructions reachable from h2+$280F6 (A3),
+for absolute addresses the scene reads that other code writes. The second is A3's
+green/tow/follow access samples, which give the scene's reads of memory written outside
+the scene. Indexed tables were followed from their `lea` sites. Every input that moves is
+either in the stage set or listed here:
+
+| Item | Renderer input | Decision and evidence |
+|---|---|---|
+| Car wheels (front-wheel images) | Steering +$48 → h2+$28168 (h2+$29A58); h2+$28C30 adds it to the wheel's angle, 16 images of $1000 | **Hold.** Steering follows input and reverses abruptly. Over the race (`items.json`), at α = 1 holding puts a wheel more than half an image off in 0.79% of car-pictures and extrapolating in 1.10%; p99 1812 against 2220, worst 21,386 against 30,561. At α 0.5 and 1.5 the result is the same. Extrapolation wins only at p95 (552 against 752), where both stay below half an image |
+| Tow truck, smoke and debris | Drawn at fixed offsets from the car's pose (h2+$29D4E, table h2+$29E2C) when +$97 bit 7 or +$19 bit 4 is set | **Follow the car.** The offsets apply to the staged (predicted) car pose, so these items move with it. The flags select them and stay at the tick |
+| Marshal flags | Flag state per track sector in h1+$456 (byte +1), written by h0+$39E2C–3A0C2; the post object (kind $20) copies it to h2+$2C3BF | **Hold.** A discrete state |
+| Start lights | h0+$3A73A, +$3A750 (h2+$1F77C) | **Hold.** Discrete session state |
+| Pit crew and service phases | h0+$3A746–3A74D | **Hold.** A3: tick counters that must not advance at picture rate; C2 stages their tick-entry values |
+| Cockpit shake | Spring +$3A820 plus the shared random number stream | **Hold.** A3: random-number draws stay once per tick. The horizon uses the spring of the tick |
+| Rear view and pit-lane overlay | The scene's rear viewport (h2+$231E0) and the alternate-carriageway pass h2+$2A450 (the "mirror request" +$3A828) | **Predicted already.** Both read the staged camera, anchor and car records |
+| Cockpit sides, hands, sky | Fixed images h0+$3D742, +$3EB32; the sky reads the staged yaw and horizon | **Already consistent** (the sky's on/off flag: next row) |
+| Covered-road flag | h2+$231A0 bit 7, from the anchor's +$26 bit 3 (h0+$33FA0); no sky under cover | **Derived** from the staged anchor. D4 moved the anchor but kept the tick's flag, so a predicted picture entering or leaving a tunnel would have drawn the sky wrongly. The flag is now in the D1 and stage sets, and `d4_derive` sets it as h0+$33FA0 does |
+| Rev counter | Bar position from +$62 (h0+$3940A), drawn incrementally into both bitmaps by the HUD queue | **Hold.** Of 3257 tick changes, 2261 leave it unchanged and 639 move one of 38 segments. Gear changes jump 12–25 segments, so extrapolation would show wrong values across them. The original game updated it once per frame, which here is once per tick |
+| Gear, timing text, banners, blink | HUD queue and the box repeats (C2) | **Hold.** Readouts of the tick's state; A3 keeps their request and blink handling at tick rate |
+| Car flags, status, damage, pit garages, race order | +$19, +$23, +$25, +$66, +$7E, +$96/+$97, +$AC; h1+$3BC; h1+$520 | **Hold.** Discrete. They select models and attachments |
+
+Nothing in the inventory calls for a presentation-clock animation: every animated item
+is either attached to a staged pose or is a tick state that A3 requires to advance once
+per tick.
+
+**Evidence** (VERIFY `9aeaf5d8…`, developer `eedf342e…`, `a1200-030` non-MMU,
+`CUSTOM4=1`, whole Quick Race in the cockpit view, `tmp/d6/`):
+
+| Check | Result |
+|---|---|
+| Prediction (`cars-on.json`) | PASS for all 5886 staged pictures (3258 inside ticks, 2628 between): every staged byte rebuilt exactly, including the covered-road flag; `d4_faults` 0, so the flag recomputed from each tick's own anchor equals the game's. Silverstone has no covered segment (0 of 1280 have +$26 bit 3), so this race never sets the flag |
+| Accuracy (same run) | Camera position p95 29,654 predicted against 480,918 at the tick; cars p95 24,906 against 490,493, worst 490,240 against 742,723 |
+| Negative probes | The ten D3–D5 probes and a flipped staged covered-road flag are each rejected |
+| Item measurements (`items.json`, `tools/d6_items.py`) | Steering and rev counter as in the table, over 3258 ticks and about 84,600 car-pictures per α |
+| Race unchanged (`states-comparison.json`) | Option off (`CUSTOM2=3`), prediction (`=11`) and its repeat: identical car/session state at all 3258 common ticks (6–3263); the D1 snapshots pass at every tick |
+| Exact repeat (`states-on-repeat`) | Identical states, snapshots and stage archive (`b141e5a2…`) |
+| Cost (`profile-developer.json`, 100 fields from tick 300) | Developer build: `d4_camera` 0.036 ms per picture including the flag (D5: 0.035), `d5_cars` 0.66, `d3_stage` 1.33, restore 0.21. Emulated 68030 time |
+| Pictures over the race | 6127 off, 5885 predicted (3.32 versus 3.46 fields per picture), no drops |
+| Disabled-feature gate (`tmp/b4/d6-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D6 adds no hook |
+
+Not exercised: a track with covered road such as Monaco (the launcher's routes use
+Silverstone), and the TV and chase views, retirements and pit stops in this capture.
+D7 covers every view.

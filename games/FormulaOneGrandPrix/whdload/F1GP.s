@@ -1093,7 +1093,8 @@ c2_pacer
 ; cur is the tick just completed and prev the one before. Read-only for the game.
 D1_RECORD = 76                  ; d1_fields per record
 D1_HEADER = 24
-D1_SIZE = D1_HEADER+156+27*D1_RECORD
+D1_RANGES = 158                 ; d1_ranges bytes
+D1_SIZE = D1_HEADER+D1_RANGES+27*D1_RECORD
 d1_record                       ; A4 record base, A1 destination
         lea (d1_fields,pc),a2
 .field
@@ -1152,7 +1153,7 @@ d1_snapshot
 d1_done
         rts
 ; Hunk*4, offset, words-1: view state, chase/player, published camera,
-; yaw coefficients, TV/chase parameters, horizon and viewport.
+; yaw coefficients, TV/chase parameters, horizon and viewport, covered-road flag.
 d1_ranges
         dc.w 4
         dc.l $224
@@ -1172,6 +1173,9 @@ d1_ranges
         dc.w 8
         dc.l $231d4
         dc.w 9
+        dc.w 8
+        dc.l $231a0
+        dc.w 0
         dc.w -1
 ; Record offset, words-1: pose, track position, velocity and identity bits;
 ; steering and correction; list index; speed change; pose flag and packed lap;
@@ -1273,7 +1277,8 @@ d2_shown
 ; the D1 layout; flags, pointers to records, identities and the camera spring stay
 ; authoritative. D4 predicts the camera and D5 the cars; everything else is
 ; staged with its authoritative value. The VERIFY probe stages the previous tick instead.
-D3_SIZE = 54+27*38
+D3_GLOBALS = 56                 ; d3_ranges bytes
+D3_SIZE = D3_GLOBALS+27*38
 d3_stage                        ; D0 = kind
         btst #3,(cache_options+3,pc)
         beq d3_off
@@ -1460,7 +1465,7 @@ d3_walk
 .records
         movea.l (c2_h1,pc),a4
         lea ($256,a4),a4        ; synthetic camera, then the cars from +$5D6
-        lea (D1_HEADER+156,a3),a3
+        lea (D1_HEADER+D1_RANGES,a3),a3
         move.w #$5d6-$256,d3
         moveq #26,d2
 .record
@@ -1561,7 +1566,8 @@ d3_tick_check
         rts
         ENDC
 ; Hunk*4, offset, words-1, offset in a D1 snapshot: renderer track anchor;
-; published camera without the spring; yaw coefficients; horizon; viewport.
+; published camera without the spring; yaw coefficients; horizon; viewport;
+; covered-road flag (h0+$33FA0: no sky when the anchor's +$26 bit 3 is set).
 d3_ranges
         dc.w 4
         dc.l $224
@@ -1581,6 +1587,9 @@ d3_ranges
         dc.w 8
         dc.l $231e4
         dc.w 0,D1_HEADER+152
+        dc.w 8
+        dc.l $231a0
+        dc.w 0,D1_HEADER+156
         dc.w -1
 ; Record offset, words-1, offset in a D1 record: direction; pitch; height,
 ; lateral and longitudinal; segment and denominator; yaw, corrected longitudinal
@@ -1600,8 +1609,9 @@ d3_fields
 ; the history, cur + (cur - history) * alpha: direction, pitch, height and yaw as
 ; wrapped words, world X/Z as longs. The reduced and coarse X/Z follow as in
 ; h0+$33F32, the road anchor is found from the tick's anchor by the game's own
-; segment search (h0+$26406), and the yaw coefficients, horizon and viewport are
-; recomputed as h0+$3409E, +$3404C and +$33F6E do. Lateral offset and lap segment
+; segment search (h0+$26406), and the yaw coefficients, horizon, viewport and
+; covered-road flag are recomputed as h0+$3409E, +$3404C, +$33F6E and +$33FA0 do
+; (the flag since D6). Lateral offset and lap segment
 ; stay at the tick. A camera that moved D4_JUMP or more in X or Z in one tick has
 ; jumped (a reset or a cut): the picture snaps. VERIFY first recomputes the
 ; derived values from the tick's own camera and counts any difference.
@@ -1617,7 +1627,7 @@ d4_camera                       ; A3 = history snapshot, d3_staged = the game's 
         bsr d4_derive
         lea (d3_staged,pc),a0
         lea (d3_saved,pc),a1
-        moveq #54/2-1,d1
+        moveq #D3_GLOBALS/2-1,d1
 .same
         cmpm.w (a0)+,(a1)+
         dbne d1,.same
@@ -1730,18 +1740,19 @@ d4_scale
         add.l d1,d0
         rts
 ; A2 = packed stage globals: yaw coefficients, horizon and viewport from the
-; published yaw, pitch and anchor heading, the spring and the horizon limit.
+; published yaw, pitch and anchor heading, the spring and the horizon limit; the
+; covered-road flag from the anchor, as h0+$33FA0 does.
 d4_derive
         movem.l d0-d1/a0-a1/a4,-(sp)
         movea.l (c2_h0,pc),a4
         adda.l #$222f0,a4
         move.w (4+$14,a2),d0
-        bsr.s d4_table
+        bsr d4_table
         move.w d0,(44,a2)
         move.w (4+$14,a2),d0
         neg.w d0
         addi.w #$4000,d0
-        bsr.s d4_table
+        bsr d4_table
         move.w d0,(46,a2)
         move.w (4+2,a2),d0
         movea.l (c2_h1,pc),a0
@@ -1751,7 +1762,7 @@ d4_derive
 .pitch
         neg.w d0
         addi.w #$4000,d0
-        bsr.s d4_table
+        bsr d4_table
         asr.w #6,d0
         addi.w #$50,d0
         movea.l (c2_h2,pc),a1
@@ -1774,6 +1785,12 @@ d4_derive
         move.w #$8000,(50,a2)
 .viewport
         move.w d0,(52,a2)
+        movea.l (a2),a0
+        clr.b (54,a2)
+        btst #3,($26,a0)
+        beq.s .open
+        move.b #$80,(54,a2)
+.open
         movem.l (sp)+,d0-d1/a0-a1/a4
         rts
 d4_table                        ; D0 = angle, A4 = h0+$222F0
@@ -1803,8 +1820,8 @@ d5_cars                         ; A3 = history snapshot
         move.w (d2_alpha,pc),d3
         movea.l (c2_h1,pc),a4
         lea ($5d6,a4),a4        ; the game's record
-        lea (D1_HEADER+156+D1_RECORD,a3),a3 ; the history's (after the synthetic camera)
-        lea (d3_staged+54+38,pc),a2 ; the staged
+        lea (D1_HEADER+D1_RANGES+D1_RECORD,a3),a3 ; the history's (after the synthetic camera)
+        lea (d3_staged+D3_GLOBALS+38,pc),a2 ; the staged
         moveq #25,d7
 .car
         move.b ($7e,a4),d0

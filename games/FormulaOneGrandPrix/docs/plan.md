@@ -103,9 +103,9 @@ with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's ques
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
 tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
 A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
-68000 keeps the original frame-locked pacer by default (user decision). D1–D5
+68000 keeps the original frame-locked pacer by default (user decision). D1–D6
 are complete (presentation snapshots, α, staging with exact restore, camera and car
-prediction); D6 is next.
+prediction, the remaining moving items); D7 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -317,6 +317,13 @@ falls from 494k to 25k world units, and the race is unchanged.
 flags, smoke and debris, mirrors, the rev counter and the other instruments: per item,
 extrapolate, hold at the tick, or animate on a presentation clock. Mirrors use the same
 staged poses.
+*Result:* complete ([internals](internals.md#d6-everything-else-that-moves--complete)).
+Steering is held: it follows input and reverses abruptly, and over a whole 030 race
+holding leaves fewer wrong wheel images than extrapolating. The tow truck, smoke and
+debris are drawn at offsets from the predicted car, and the rear view and pit-lane
+overlay from the staged camera. Flags, start lights, pit phases, shake, instruments and
+car flags are tick states and stay at the tick; none needs a presentation clock. One
+gap was fixed: the covered-road (no-sky) flag now follows the predicted anchor.
 
 **D7 Every view.** Cockpit, TV cameras, chase, onboard other cars, replays, the attract
 mode if there is one: each consumes its own records (Indianapolis 500's replays froze

@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C and D1–D5 complete; D6 next; B5/A8 pass for the current scope
+# Current status: C and D1–D6 complete; D7 next; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -25,13 +25,21 @@ results and acceptance evidence are in [internals.md](internals.md).
 | D3 | Complete: around every picture's draw the slave stages a 1080-byte pose subset of the renderer inputs (camera publication, coefficients, horizon, viewport, track anchor and per-record pose) and restores the authoritative bytes right after the draw. VERIFY checks every restore against a D1 snapshot. A VERIFY probe staging the previous tick changes the inputs of 95% of pictures, yet the whole 030 race is identical to the option off at all 3226 ticks; 0.83 ms per picture. D4 predicts the camera and D5 the cars. |
 | D4 | Complete: each staged picture with a usable history gets a camera extrapolated from the published camera (`cur + (cur − prev) × α`); the road anchor comes from the game's own segment search, and coefficients, horizon and viewport are recomputed with the native formulas. Snaps at view/source changes, TV cuts, rebases and jumps. Over a whole 030 race an independent model rebuilds all 5990 predictions exactly, the p95 camera position error against the ideal path falls from 490k to 30k world units (yaw 882 to 126), and the race is identical to the option off at all 3210 ticks; 0.034 ms per picture. |
 | D5 | Complete: each predicted picture also extrapolates the 26 car records. Track-driven cars advance along their segments by fraction with the native stepping (lap wrap, pit branch and join), explicit cars in world X/Z with the game's segment search; a car is held at pit transitions, flag, status or jump changes and on the grid. Over a whole 030 race an independent model rebuilds every car exactly (144,157 predicted, 3263 held), the p95 car position error against the ideal path falls from 494k to 25k world units (yaw 871 to 239), and the race is identical to the option off at all 3082 ticks; 0.72 ms per picture. |
-| D6–G | Presentation, optimisation and release work remain open under the plan. |
+| D6 | Complete: every other moving item has a decision. Steering (wheel images), marshal flags, start lights, pit phases, shake, instruments and car flags stay at the tick; the tow truck, smoke and debris are drawn at offsets from the predicted car, and the rear view and pit-lane overlay from the staged camera. The covered-road (no-sky) flag is now derived from the predicted anchor. Holding steering beats extrapolating it (0.79% against 1.10% of car-pictures more than half a wheel image off at α = 1). The whole 030 race is rebuilt exactly and identical to the option off at all 3258 ticks. |
+| D7–G | Presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: D6 everything else that moves (smooth presentation).**
+**Next F1GP step: D7 every view (smooth presentation).**
+D6 is complete ([evidence](internals.md#d6-everything-else-that-moves--complete)). Every
+other moving item is either held at the tick (steering, flags, lights, pit phases, shake,
+instruments, car flags) or drawn from the staged poses (tow truck, smoke, debris, rear
+view, pit-lane overlay). The covered-road flag, which turns the sky off, now follows the
+predicted anchor; Silverstone has no covered road, so a tunnel track is still unexercised.
+D7 must also make the chase camera and its followed car consistent: in the chase view the
+camera is extrapolated in a straight line while the car follows the track, which can
+shift the car sideways in corners.
+
 D5 is complete ([evidence](internals.md#d5-car-prediction--complete)). Staged pictures
-draw the camera and the cars at the picture's displayed time. Steering (wheel images),
-the marshal and tow truck, flags, smoke, debris, mirrors and the instruments are still at
-the tick; D6 decides per item whether to extrapolate, hold or animate. The TV and chase
+draw the camera and the cars at the picture's displayed time. The TV and chase
 views and pit stops are not yet exercised (D7). Banners over the view (Viewing, Race won by)
 are repeated after every scene drawn between ticks, as the game's per-frame HUD did.
 

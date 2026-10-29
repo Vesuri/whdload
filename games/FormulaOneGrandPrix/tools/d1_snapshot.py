@@ -24,7 +24,8 @@ RANGES = ((1, 0x224, 32),        # pose source, selected car, view code, request
           (0, 0x3a7f8, 52),      # published camera and spring
           (0, 0x3a8c2, 4),       # yaw trig coefficients
           (0, 0x3a8f8, 24),      # TV and chase parameters, view height bias
-          (2, 0x231d4, 20))      # horizon, view bias, viewport
+          (2, 0x231d4, 20),      # horizon, view bias, viewport
+          (2, 0x231a0, 2))       # covered-road flag (D6)
 # (record offset, bytes) for the synthetic camera h1+$256 and the 26 cars h1+$5D6.
 FIELDS = ((0x00, 56), (0x48, 4), (0x66, 2), (0x72, 2), (0x7e, 4), (0x8c, 2),
           (0x96, 2), (0xac, 2), (0xb6, 2))
@@ -33,7 +34,8 @@ RECORD = sum(n for _, n in FIELDS)
 SIZE = HEADER.size + sum(n for _, _, n in RANGES) + len(RECORDS)*RECORD
 
 # Game memory dumped beside the slave state at each stop (the C5 regions cover h1+$368–1955).
-GAME = ((1, 0x224, 0x316-0x224), (0, 0x3a70c, 0x3a910-0x3a70c), (2, 0x231d4, 20))
+GAME = ((1, 0x224, 0x316-0x224), (0, 0x3a70c, 0x3a910-0x3a70c), (2, 0x231d4, 20),
+        (2, 0x231a0, 2))
 
 
 def regions(base, bases, symbols):

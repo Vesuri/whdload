@@ -935,3 +935,27 @@ python3 tools/c2_capture.py tmp/d5/profile-developer --build tmp/d5/build-develo
 python3 tools/c6_profile.py tmp/d5/profile-developer --out tmp/d5/profile-developer.json
 ```
 
+### D6 remaining moving items
+
+The same captures with a D6 build (the covered-road flag joins the D1 and stage sets, so
+older captures no longer match the tools); `d5_cars.py --negative` adds the staged
+covered-road flag probe. `d6_items.py` measures steering held against extrapolated and
+the rev counter's per-tick changes from the prediction capture. The disabled-feature
+gate builds into the default directories:
+
+```sh
+make slave-verify OUT=tmp/d6/build-verify
+python3 tools/c2_capture.py tmp/d6/run1/states-on --build tmp/d6/build-verify --states --stage --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d6/run1/states-off --build tmp/d6/build-verify --states --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d6/run1/states-on-repeat --build tmp/d6/build-verify --states --stage --custom4 1 --setup a1200-030
+python3 tools/d5_cars.py tmp/d6/run1/states-on --negative --out tmp/d6/cars-on.json
+python3 tools/c5_compare.py off=tmp/d6/run1/states-off on=tmp/d6/run1/states-on repeat=tmp/d6/run1/states-on-repeat \
+  --out tmp/d6/states-comparison.json
+python3 tools/d6_items.py tmp/d6/run1/states-on --out tmp/d6/items.json
+make slave-developer OUT=tmp/d6/build-developer
+python3 tools/c2_capture.py tmp/d6/profile-developer --build tmp/d6/build-developer --stage --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
+python3 tools/c6_profile.py tmp/d6/profile-developer --out tmp/d6/profile-developer.json
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix d6-
+```
+

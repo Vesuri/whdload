@@ -8,9 +8,9 @@ with a usable history (D3) and alpha above 0, the slave extrapolates the publish
 camera, cur + (cur - history) * alpha: direction, pitch, height and yaw as wrapped
 words, world X/Z as longs. The reduced and coarse X/Z follow as in h0+$33F32; the road
 anchor comes from the game's segment search h0+$26406 started at the tick's anchor;
-the yaw coefficients (h0+$3409E), horizon (+$3404C) and viewport (+$33F6E) are
-recomputed. Lateral offset and lap segment stay at the tick (d5_cars.py: the cars). A camera
-that moved D4_JUMP or more in X or Z snaps. This module rebuilds all of it from the
+the yaw coefficients (h0+$3409E), horizon (+$3404C), viewport (+$33F6E) and
+covered-road flag (+$33FA0, the anchor's +$26 bit 3) are recomputed. Lateral offset
+and lap segment stay at the tick (d5_cars.py: the cars). A camera that moved D4_JUMP or more in X or Z snaps. This module rebuilds all of it from the
 saved bytes, the D1 history and the track dumped at the end of the race, and runs the
 D3 check with it.
 """
@@ -147,6 +147,8 @@ class Model:
         if relative >= 0x4000:
             relative, flag = (0x8000-relative) & 0xffff, 0x8000
         struct.pack_into('>HH', buffer, 50, flag, relative)
+        anchor = struct.unpack_from('>I', buffer, 0)[0]
+        buffer[54] = 0x80 if self.track.data[anchor-self.track.h1-TRACK_H1+0x26] & 8 else 0
 
     def predict(self, saved, history, alpha, spring, clamp, view):
         """(staged bytes, outcome): outcome is 'jump', 'moved', 'held' or 'same'."""

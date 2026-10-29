@@ -22,20 +22,22 @@ import d1_snapshot as d1
 
 TICK, REPEAT = 0, 2
 # (hunk, offset, bytes): track anchor, published camera without the spring,
-# yaw coefficients, horizon and the two viewport words.
+# yaw coefficients, horizon, the two viewport words and the covered-road flag.
 RANGES = ((1, 0x224, 4), (0, 0x3a7f8, 40), (0, 0x3a8c2, 4),
-          (2, 0x231d4, 2), (2, 0x231e0, 2), (2, 0x231e4, 2))
+          (2, 0x231d4, 2), (2, 0x231e0, 2), (2, 0x231e4, 2), (2, 0x231a0, 2))
+GLOBALS = sum(n for _, _, n in RANGES)
 # (record offset, bytes): direction; pitch; height, lateral and longitudinal; segment
 # and denominator; yaw, corrected longitudinal and fraction; lap segment and world X/Z;
 # steering and correction; height offset.
 FIELDS = ((0x00, 2), (0x04, 2), (0x08, 6), (0x12, 6), (0x1a, 6), (0x26, 10),
           (0x48, 4), (0x8c, 2))
-SIZE = sum(n for _, _, n in RANGES) + len(d1.RECORDS)*sum(n for _, n in FIELDS)
+SIZE = GLOBALS + len(d1.RECORDS)*sum(n for _, n in FIELDS)
 COUNTERS = ('pictures', 'staged', 'latest', 'snapped', 'debris', 'records',
             'written', 'checked', 'faults', 'check_tick')
 # Game memory dumped at each stop: view state and records, camera and coefficients,
-# horizon limit, horizon and viewport.
-GAME = ((1, 0x224, 0x1956-0x224), (0, 0x3a7f8, 0x3a8c6-0x3a7f8), (2, 0x231cc, 28))
+# horizon limit, horizon and viewport, covered-road flag.
+GAME = ((1, 0x224, 0x1956-0x224), (0, 0x3a7f8, 0x3a8c6-0x3a7f8), (2, 0x231cc, 28),
+        (2, 0x231a0, 2))
 
 
 def snapshot_offset(h, offset):
@@ -68,10 +70,8 @@ def regions(base, bases, symbols):
 
 
 def game_reader(parts):
-    # D3 captures predate the horizon limit at h2+$231CC.
-    layout = GAME if len(parts[-1]) == GAME[-1][2] else GAME[:-1] + ((2, 0x231d4, 20),)
     def read(h, offset, size):
-        for (hunk, start, _), part in zip(layout, parts):
+        for (hunk, start, _), part in zip(GAME, parts):
             if hunk == h and start <= offset and offset+size <= start+len(part):
                 return part[offset-start:offset-start+size]
         raise KeyError(f'h{h}+{offset:05x} not captured')
@@ -198,7 +198,7 @@ def check(directory, mutate=None):
             # The model's derived values from the tick's own camera are the game's.
             derived = bytearray(saved)
             model.derive(derived, spring, clamp, view)
-            if bytes(derived[:54]) != saved[:54]:
+            if bytes(derived[:GLOBALS]) != saved[:GLOBALS]:
                 problems.append('derived values differ from the game')
         else:
             want = saved
@@ -275,7 +275,8 @@ def negative(directory, camera=False, cars=False):
     if camera:
         cases += [('staged yaw', lambda sizes: [staged(sizes) + 4+0x15]),
                   ('staged anchor', lambda sizes: [staged(sizes) + 2]),
-                  ('staged horizon', lambda sizes: [staged(sizes) + 49])]
+                  ('staged horizon', lambda sizes: [staged(sizes) + 49]),
+                  ('staged covered-road flag', lambda sizes: [staged(sizes) + 54])]
     if cars:
         import d5_cars
         car = d5_cars.CARS + 5*d5_cars.RECORD

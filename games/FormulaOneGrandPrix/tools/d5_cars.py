@@ -25,12 +25,13 @@ import struct
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from d3_stage import GLOBALS                                  # noqa: E402
 from d4_camera import JUMP, MAIN, SEGMENT, scale, signed   # noqa: E402
 
 STEPS = 3
 COUNTERS = ('d5_predicted', 'd5_held', 'd5_moved')
 RECORD = 38                      # staged bytes per record
-CARS = 54 + RECORD               # first car in the packed stage set (after the synthetic camera)
+CARS = GLOBALS + RECORD          # first car in the packed stage set (after the synthetic camera)
 # (staged offset, record offset): pitch, height, lateral, yaw, correction, height offset.
 WORDS = ((2, 0x04), (4, 0x08), (6, 0x0a), (16, 0x1a), (34, 0x4a), (36, 0x8c))
 SEG, DEN, LON, FRACTION, X = 10, 14, 18, 20, 24     # staged offsets of +$12, +$16, +$1C, +$1E, +$28
