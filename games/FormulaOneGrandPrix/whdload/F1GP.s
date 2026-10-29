@@ -1271,8 +1271,8 @@ d2_shown
 ; game (staged) and keep the authoritative bytes (saved); write those back right
 ; after the draw, before any simulation code. The staged set is the pose subset of
 ; the D1 layout; flags, pointers to records, identities and the camera spring stay
-; authoritative. D4 predicts the camera; everything else is staged with its
-; authoritative value until D5. The VERIFY probe stages the previous tick instead.
+; authoritative. D4 predicts the camera and D5 the cars; everything else is
+; staged with its authoritative value. The VERIFY probe stages the previous tick instead.
 D3_SIZE = 54+27*38
 d3_stage                        ; D0 = kind
         btst #3,(cache_options+3,pc)
@@ -1368,6 +1368,9 @@ d3_stage                        ; D0 = kind
         tst.w d7
         beq.s .load
         bsr d4_camera           ; D7 = 0 if the camera jumped
+        tst.w d7
+        beq.s .load
+        bsr d5_cars
 .load
         lea (d3_source,pc),a0
         move.w d7,(a0)
@@ -1781,6 +1784,191 @@ d4_table                        ; D0 = angle, A4 = h0+$222F0
         lsr.w #2,d0
         bclr #0,d0
         move.w (a4,d0.w),d0
+        rts
+
+; D5: the cars of a predicted picture, cur + (cur - history) * alpha per record.
+; A track-driven car advances along its segments: progress is its fraction (+$1E,
+; Q14) plus $4000 per segment stepped from the history's segment to cur's, and the
+; predicted progress is placed by stepping on from cur's segment, the corrected
+; longitudinal (+$1C) following from the fraction with cur's denominator (+$16). An
+; explicit car's world X/Z are extrapolated and its segment found by the game's own
+; search (h0+$26406). Both extrapolate pitch, height, lateral, yaw, correction and
+; height offset as words; each pose accessor branch reads its own subset. A car
+; whose pose flag or status (+$96) changed, that jumped, that crosses a pit
+; transition or more than D5_STEPS segments in a tick, or that would stand before
+; its segment (on the grid) keeps the tick's pose.
+D5_STEPS = 3                    ; segments a car may cross in a tick (2 at most seen)
+d5_cars                         ; A3 = history snapshot
+        movem.l d0-a6,-(sp)
+        move.w (d2_alpha,pc),d3
+        movea.l (c2_h1,pc),a4
+        lea ($5d6,a4),a4        ; the game's record
+        lea (D1_HEADER+156+D1_RECORD,a3),a3 ; the history's (after the synthetic camera)
+        lea (d3_staged+54+38,pc),a2 ; the staged
+        moveq #25,d7
+.car
+        move.b ($7e,a4),d0
+        move.b (64,a3),d1
+        eor.b d1,d0
+        btst #0,d0
+        bne .hold
+        move.w ($96,a4),d0
+        cmp.w (70,a3),d0
+        bne .hold
+        btst #0,($7e,a4)
+        bne .explicit
+        movea.l ($12,a3),a6     ; walk from the history's segment to cur's
+        moveq #0,d2
+        moveq #D5_STEPS,d5
+.walk
+        cmpa.l (10,a2),a6
+        beq.s .walked
+        subq.w #1,d5
+        bmi .hold
+        bsr d5_step
+        bne .hold
+        addi.l #$4000,d2
+        bra.s .walk
+.walked
+        move.w (20,a2),d0       ; signed: a grid car can stand before its segment
+        ext.l d0
+        add.l d0,d2
+        move.w ($1e,a3),d0
+        ext.l d0
+        sub.l d0,d2
+        move.l d2,d0
+        bsr d4_scale
+        move.w (20,a2),d2
+        ext.l d2
+        add.l d0,d2             ; from the start of cur's segment
+        bmi .hold
+        moveq #D5_STEPS*2,d5
+.ahead
+        cmpi.l #$4000,d2
+        bcs.s .placed
+        subq.w #1,d5
+        bmi .hold
+        bsr d5_step
+        bne .hold
+        subi.l #$4000,d2
+        bra.s .ahead
+.placed
+        cmpa.l (10,a2),a6
+        beq.s .segment
+        move.l a6,(10,a2)
+        lea (d5_moved,pc),a0
+        addq.l #1,(a0)
+.segment
+        move.w d2,(20,a2)
+        subi.w #$4000,d2
+        muls.w (14,a2),d2
+        asl.l #2,d2
+        swap d2
+        addi.w #$400,d2
+        move.w d2,(18,a2)
+        bra .words
+.explicit
+        moveq #24,d2
+.bound
+        move.l (a2,d2.w),d0
+        sub.l ($28-24,a3,d2.w),d0
+        bpl.s .positive
+        neg.l d0
+.positive
+        cmpi.l #D4_JUMP,d0
+        bcc .hold
+        addq.w #4,d2
+        cmpi.w #28,d2
+        beq.s .bound
+        lea (d4_position,pc),a0 ; the segment search reads +$28/+$2C
+        moveq #24,d2
+.long
+        move.l (a2,d2.w),d0
+        sub.l ($28-24,a3,d2.w),d0
+        bsr d4_scale
+        add.l (a2,d2.w),d0
+        move.l d0,(a2,d2.w)
+        move.l d0,(-24,a0,d2.w)
+        addq.w #4,d2
+        cmpi.w #28,d2
+        beq.s .long
+        lea (-$28,a0),a0
+        movea.l (10,a2),a6
+        movea.l (c2_h0,pc),a1
+        adda.l #$26406,a1
+        jsr (a1)
+        cmpa.l (10,a2),a6
+        beq.s .words
+        move.l a6,(10,a2)
+        lea (d5_moved,pc),a0
+        addq.l #1,(a0)
+.words
+        lea (d5_words,pc),a0
+.word
+        move.w (a0)+,d2
+        bmi.s .predicted
+        move.w (a0)+,d4
+        move.w (a2,d2.w),d0
+        sub.w (a3,d4.w),d0
+        ext.l d0
+        bsr d4_scale
+        add.w d0,(a2,d2.w)
+        bra.s .word
+.predicted
+        lea (d5_predicted,pc),a0
+        addq.l #1,(a0)
+        bra.s .next
+.hold
+        lea (d5_held,pc),a0
+        addq.l #1,(a0)
+.next
+        lea (38,a2),a2
+        lea (D1_RECORD,a3),a3
+        lea ($c0,a4),a4
+        dbf d7,.car
+        movem.l (sp)+,d0-a6
+        rts
+; Staged and history offsets: pitch, height, lateral, yaw, correction, height offset.
+d5_words
+        dc.w 2,$04,4,$08,6,$0a,16,$1a,34,56+2,36,68,-1
+; A6 one segment on as the track-driven traversal (h0+$2B402/+2B4AE) steps it
+; through h0+$26626, A4 = the game's record: the lap wrap, and the pit branch and
+; join points when the car passes them. Returns NE (hold) where h0+$26626 would
+; move the car into or out of the pit lane, or with the pit flag h2+$1FABA set.
+d5_step
+        lea ($2e,a6),a6
+        btst #3,($1f,a6)
+        beq.s .same
+        move.l a0,-(sp)
+        movea.l (c2_h2,pc),a0
+        adda.l #$1fac2,a0
+        cmpa.l (a0),a6
+        bne.s .branch
+        movea.l (c2_h1,pc),a6
+        adda.w #$53de,a6
+        bra.s .stepped
+.branch
+        tst.b ($1faba-$1fac2,a0)
+        bmi.s .pit
+        cmpa.l ($1fade-$1fac2,a0),a6
+        bne.s .join
+        btst #7,($23,a4)
+        bne.s .pit
+        bra.s .stepped
+.join
+        cmpa.l ($1fad6-$1fac2,a0),a6
+        bne.s .stepped
+        btst #5,($23,a4)
+        bne.s .pit
+        movea.l ($1fae2-$1fac2,a0),a6
+.stepped
+        movea.l (sp)+,a0
+.same
+        ori.b #4,ccr
+        rts
+.pit
+        movea.l (sp)+,a0
+        andi.b #$fb,ccr
         rts
 
 c2_publish
@@ -2609,6 +2797,9 @@ d4_held dc.l 0                  ; anchor search left the main track: tick's anch
 d4_faults dc.l 0                ; VERIFY: derived values differ from the game's
 d4_position dc.l 0,0            ; predicted world X/Z for the segment search
 d4_spring dc.w 0                ; spring word at the stage, for the horizon
+d5_predicted dc.l 0             ; car records predicted
+d5_held dc.l 0                  ; car records kept at the tick
+d5_moved dc.l 0                 ; predicted records on another segment
 d3_active dc.w 0
 d3_kind dc.w 0
 d3_source dc.w 0                ; 0 authoritative, 1 previous tick, 2 predicted

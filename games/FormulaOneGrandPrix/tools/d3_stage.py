@@ -133,6 +133,12 @@ def check(directory, mutate=None):
         import d4_camera
         model = d4_camera.Model(root, meta)
         d4_counters = ('d4_predicted', 'd4_jumps', 'd4_anchors', 'd4_held', 'd4_faults')
+    cars = 'd5_predicted' in symbols
+    if cars:
+        import d5_cars
+        car_model = d5_cars.Cars(model)
+        d4_counters += d5_cars.COUNTERS
+        car_totals = [0, 0, 0]
     outcomes, shown = {}, []
     failures, kinds, sources, differing, held_total, problem_kinds = [], {}, {}, 0, 0, {}
     previous = previous_d4 = None
@@ -181,7 +187,14 @@ def check(directory, mutate=None):
             if outcome == 'jump':
                 expected_source = 0
             else:
-                shown.append((tick, alpha, staged[:54], saved[:54]))
+                shown.append((tick, alpha, staged, saved))
+                if cars:
+                    want = bytearray(want)
+                    records = d1.HEADER.size + sum(size for _, _, size in d1.RANGES)
+                    counts = car_model.predict(
+                        want, lambda r: history[records+r*d1.RECORD:records+(r+1)*d1.RECORD], read, alpha)
+                    want = bytes(want)
+                    car_totals = [a+b for a, b in zip(car_totals, counts)]
             # The model's derived values from the tick's own camera are the game's.
             derived = bytearray(saved)
             model.derive(derived, spring, clamp, view)
@@ -211,6 +224,9 @@ def check(directory, mutate=None):
                 problems.append(('D4 VERIFY faults', d4['d4_faults']))
             if previous_d4 and d4['d4_predicted'] != previous_d4['d4_predicted'] + (source == 2):
                 problems.append(('predicted count', d4['d4_predicted'], previous_d4['d4_predicted']))
+            if cars and previous_d4 and source == 2 and expected_source == 2 and [
+                    d4[k]-previous_d4[k] for k in d5_cars.COUNTERS] != counts:
+                problems.append(('car counts', [d4[k]-previous_d4[k] for k in d5_cars.COUNTERS], counts))
             previous_d4 = d4
         if problems:
             failures.append(dict(stop=n, tick=tick, kind=kind, problems=problems))
@@ -226,6 +242,8 @@ def check(directory, mutate=None):
                 staged_differs=differing, held_records=held_total,
                 camera=dict(outcomes=outcomes, counters=previous_d4,
                             error=d4_camera.error(shown, tick_cur)) if camera else None,
+                cars=dict(predicted=car_totals[0], held=car_totals[1], moved=car_totals[2], reasons=car_model.reasons,
+                          error=d5_cars.error(shown, tick_cur, car_model)) if camera and cars else None,
                 counters={k: v for k, v in (last or {}).items() if k != 'check_tick'},
                 size=SIZE, archive_sha256=info['archive_sha256'],
                 problems=problem_kinds, failures=failures[:20], failure_count=len(failures))
@@ -238,12 +256,12 @@ def symbols_offset(directory, name):
     return value(name) - value('d3_pictures')
 
 
-def negative(directory, camera=False):
+def negative(directory, camera=False, cars=False):
     """Each injected defect must be rejected."""
-    def flip(where):
+    def flip(where, stop=200):
         def mutate(data, sizes):
             for at in where(sizes):
-                data[200*sum(sizes) + at] ^= 1
+                data[stop*sum(sizes) + at] ^= 1
         return mutate
     game_camera = lambda sizes: [sum(sizes[:5]) + 4]          # published pitch, restored game
     staged = lambda sizes: sum(sizes[:3]) + symbols_offset(directory, 'd3_staged')
@@ -258,9 +276,18 @@ def negative(directory, camera=False):
         cases += [('staged yaw', lambda sizes: [staged(sizes) + 4+0x15]),
                   ('staged anchor', lambda sizes: [staged(sizes) + 2]),
                   ('staged horizon', lambda sizes: [staged(sizes) + 49])]
+    if cars:
+        import d5_cars
+        car = d5_cars.CARS + 5*d5_cars.RECORD
+        records = d1.HEADER.size + sum(size for _, _, size in d1.RANGES) + 6*d1.RECORD
+        cases += [('staged car fraction', lambda sizes: [staged(sizes) + car + d5_cars.FRACTION + 1]),
+                  ('staged car yaw', lambda sizes: [staged(sizes) + car + 17]),
+                  ('history car lateral', lambda sizes: [sizes[0] + sizes[1] + 2 + b*d1.SIZE + records
+                                                         + record_offset(0x0a) for b in (0, 1)])]
     results = {}
     for name, where in cases:
-        results[name] = check(directory, flip(where))['status']
+        # Car cases mid-race: on the grid the cars keep the tick's pose.
+        results[name] = check(directory, flip(where, 2000 if 'car' in name else 200))['status']
     return results
 
 

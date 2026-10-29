@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C and D1–D4 complete; D5 next; B5/A8 pass for the current scope
+# Current status: C and D1–D5 complete; D6 next; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -22,18 +22,23 @@ results and acceptance evidence are in [internals.md](internals.md).
 | C6 | Complete: the A1200 runs at real time (7.7 fps, 6.7 in the tow window). On the A500-equivalent the clock gives 1.65 fps at 0.83×, because an undrawn tick costs 7.2 fields, so the 68000 keeps the native pacer by default (user decision); `CUSTOM2` bit 2 forces the clock for tests. |
 | D1 | Complete: behind `CUSTOM2` bit 3, every completed tick records the A4 renderer inputs (view state, published camera, synthetic camera and 26 car records) with its field number in cur, keeping the previous tick in prev. A whole 030 race matches game memory at all 3162 ticks, leaves the race identical to the option off, repeats exactly and costs 0.24 ms per tick. |
 | D2 | Complete: every picture gets α, the Q14 fraction of the next tick from the clock's credit plus the measured lead to its first displayed field, clamped to two ticks; α is 0 when pictures are longer than a tick. Over a whole 030 race the rule recomputes exactly, 95% of leads are exact, displayed world time never goes backwards (p95 error 1 field), and the race is unchanged. |
-| D3 | Complete: around every picture's draw the slave stages a 1080-byte pose subset of the renderer inputs (camera publication, coefficients, horizon, viewport, track anchor and per-record pose) and restores the authoritative bytes right after the draw. VERIFY checks every restore against a D1 snapshot. A VERIFY probe staging the previous tick changes the inputs of 95% of pictures, yet the whole 030 race is identical to the option off at all 3226 ticks; 0.83 ms per picture. D4 predicts the camera; other staged values are authoritative until D5. |
+| D3 | Complete: around every picture's draw the slave stages a 1080-byte pose subset of the renderer inputs (camera publication, coefficients, horizon, viewport, track anchor and per-record pose) and restores the authoritative bytes right after the draw. VERIFY checks every restore against a D1 snapshot. A VERIFY probe staging the previous tick changes the inputs of 95% of pictures, yet the whole 030 race is identical to the option off at all 3226 ticks; 0.83 ms per picture. D4 predicts the camera and D5 the cars. |
 | D4 | Complete: each staged picture with a usable history gets a camera extrapolated from the published camera (`cur + (cur − prev) × α`); the road anchor comes from the game's own segment search, and coefficients, horizon and viewport are recomputed with the native formulas. Snaps at view/source changes, TV cuts, rebases and jumps. Over a whole 030 race an independent model rebuilds all 5990 predictions exactly, the p95 camera position error against the ideal path falls from 490k to 30k world units (yaw 882 to 126), and the race is identical to the option off at all 3210 ticks; 0.034 ms per picture. |
-| D5–G | Presentation, optimisation and release work remain open under the plan. |
+| D5 | Complete: each predicted picture also extrapolates the 26 car records. Track-driven cars advance along their segments by fraction with the native stepping (lap wrap, pit branch and join), explicit cars in world X/Z with the game's segment search; a car is held at pit transitions, flag, status or jump changes and on the grid. Over a whole 030 race an independent model rebuilds every car exactly (144,157 predicted, 3263 held), the p95 car position error against the ideal path falls from 494k to 25k world units (yaw 871 to 239), and the race is identical to the option off at all 3082 ticks; 0.72 ms per picture. |
+| D6–G | Presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: D5 cars (smooth presentation).**
+**Next F1GP step: D6 everything else that moves (smooth presentation).**
+D5 is complete ([evidence](internals.md#d5-car-prediction--complete)). Staged pictures
+draw the camera and the cars at the picture's displayed time. Steering (wheel images),
+the marshal and tow truck, flags, smoke, debris, mirrors and the instruments are still at
+the tick; D6 decides per item whether to extrapolate, hold or animate. The TV and chase
+views and pit stops are not yet exercised (D7). Banners over the view (Viewing, Race won by)
+are repeated after every scene drawn between ticks, as the game's per-frame HUD did.
+
 D4 is complete ([evidence](internals.md#d4-camera-prediction--complete)). Staged pictures
 draw an extrapolated camera: direction, pitch, height, yaw and world X/Z, with the
 coordinates, road anchor, coefficients, horizon and viewport derived from them as the game
-does. Lateral offset and lap segment stay at the tick. Until D5 the cars are drawn at the
-tick, so in the cockpit they shift against the moving camera once per tick. D5 applies the
-same formula to the 26 car records (and checks whether the native update order allows an
-exact next pose), snapping at teleports and when a car enters view.
+does. Lateral offset and lap segment stay at the tick.
 
 D3 is complete ([evidence](internals.md#d3-stage-and-restore--complete)). Each picture is
 drawn from a staged copy of its renderer inputs, and the authoritative bytes are back in

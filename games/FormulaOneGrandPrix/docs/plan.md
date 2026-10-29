@@ -103,8 +103,9 @@ with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's ques
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
 tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
 A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
-68000 keeps the original frame-locked pacer by default (user decision). D1–D4
-are complete (presentation snapshots, α, staging with exact restore, and camera prediction); D5 is next.
+68000 keeps the original frame-locked pacer by default (user decision). D1–D5
+are complete (presentation snapshots, α, staging with exact restore, camera and car
+prediction); D6 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -289,7 +290,7 @@ simulation code runs. VERIFY checks the restore on every picture.
 pose subset of the D1 layout is staged into the game around each picture's draw and
 restored right after it; VERIFY checks every restore against a snapshot. A VERIFY probe
 that draws the previous tick leaves the whole 030 race identical to the option off.
-D4/D5 supply the predicted values; until then the staged values are the authoritative ones.
+D4/D5 supply the predicted values.
 
 **D4 Camera.** Position and heading, pitch, roll: `cur + (cur − prev) × α`; angles by the
 shortest arc, track position across the lap wrap; snap (α = 0) at view changes, TV-camera
@@ -304,6 +305,13 @@ model rebuilds every prediction exactly, the p95 camera position error falls fro
 rates are set before it moves, derive the exact next pose with the native arithmetic
 (Indianapolis 500's opponents: largest heading jumps 133 → 33). Snap at teleports (pit
 lane, retirement removal, crash resets) and when a car enters view.
+*Result:* complete ([internals](internals.md#d5-car-prediction--complete)). Track-driven
+cars advance along their segments by fraction with the native stepping, explicit cars in
+world X/Z with the game's segment search; a car is held at pit transitions, flag, status
+or jump changes and on the grid. Every record advances every tick, so entering view needs
+no snap. No exact next pose exists: the advance uses a speed set during the next tick.
+Over a whole 030 race the model rebuilds every car exactly, the p95 car position error
+falls from 494k to 25k world units, and the race is unchanged.
 
 **D6 Everything else that moves.** Wheels and steering, the marshal and tow truck,
 flags, smoke and debris, mirrors, the rev counter and the other instruments: per item,

@@ -9,7 +9,7 @@ camera, cur + (cur - history) * alpha: direction, pitch, height and yaw as wrapp
 words, world X/Z as longs. The reduced and coarse X/Z follow as in h0+$33F32; the road
 anchor comes from the game's segment search h0+$26406 started at the tick's anchor;
 the yaw coefficients (h0+$3409E), horizon (+$3404C) and viewport (+$33F6E) are
-recomputed. Lateral offset, lap segment and every record stay at the tick. A camera
+recomputed. Lateral offset and lap segment stay at the tick (d5_cars.py: the cars). A camera
 that moved D4_JUMP or more in X or Z snaps. This module rebuilds all of it from the
 saved bytes, the D1 history and the track dumped at the end of the race, and runs the
 D3 check with it.
@@ -124,7 +124,7 @@ class Track:
 class Model:
     def __init__(self, root, meta):
         hunks = relocated_original(meta['hunk_bases'])
-        self.table = hunks[0][0x222f0:0x222f0+0x2002]
+        self.table = hunks[0][0x222f0:0x222f0+0x2004]
         self.track = Track(root, meta)
 
     def lookup(self, angle):

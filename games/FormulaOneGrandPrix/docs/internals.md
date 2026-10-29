@@ -2094,8 +2094,8 @@ usable only if its tick number is the drawn tick minus one and its epoch, loop m
 pose source, selected car and view code equal the current ones. Otherwise the picture
 snaps. A picture with α 0 (latest state) uses no history. Within a usable history, a record whose
 +$7E bit 0 (explicit pose) differs from the snapshot's keeps its authoritative pose (held).
-D4 predicts the camera part of the staged values (below); the rest are the
-authoritative ones until D5. The VERIFY probe `CUSTOM5` bit 1 stages the usable history
+D4 predicts the camera part of the staged values and D5 the car records (below); the
+rest are the authoritative ones. The VERIFY probe `CUSTOM5` bit 1 stages the usable history
 instead, drawing one tick late, to prove the mechanism with values that really differ.
 
 VERIFY checks every restore. Before writing back it counts a draw that changed a staged
@@ -2138,7 +2138,7 @@ ticks. The product is rounded towards zero, using 68000 instructions only.
 | Reduced X/Z +$3A810/+$3A818, coarse X/Z +$3A7FC/+$3A800 | Derived from the predicted X/Z as h0+$33F32 does (`>> 8`, then `>> 3`) |
 | Road anchor h1+$224, anchor heading +$3A81E | The game's own segment search h0+$26406, started at the tick's anchor, for the predicted X/Z. It steps forward or back through the native wrap helpers (+$2679A/+267DA), so it follows the lap wrap. A result in the pit/alternate segments below h1+$53DE keeps the tick's anchor, because native publication (+$26502) would convert it through +$26326, which writes h2+$231EA |
 | Yaw coefficients +$3A8C2/+$3A8C4, horizon h2+$231D4, viewport h2+$231E0/+$231E4 | Recomputed as h0+$3409E, +$3404C and +$33F6E do: the sine table at h0+$222F0, the spring word +$3A820 in the cockpit, the horizon limit h2+$231CC, and the anchor heading minus the yaw |
-| Lateral offset +$3A80A, lap segment +$3A81C, unused +$3A80E/+$3A814, every record | Stay at the tick. The lateral offset only selects road detail against ±$200 (h2+$24C46); nothing reads the lap segment. Cars are D5 |
+| Lateral offset +$3A80A, lap segment +$3A81C, unused +$3A80E/+$3A814, the synthetic camera record | Stay at the tick. The lateral offset only selects road detail against ±$200 (h2+$24C46); nothing reads the lap segment. The car records are D5 |
 
 At the stage the spring word is the value the native horizon used. Inside a tick the
 camera preparation h0+$34028 has just run. Between ticks `c2_repeat_picture` has already
@@ -2172,6 +2172,60 @@ over the track geometry and wrap pointers dumped at the end of the race:
 | Disabled-feature gate (`tmp/b4/d4-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D4 adds no hook |
 
 Not exercised by this race: the TV and chase views, whose source is the synthetic camera,
-and the pit-lane anchor case. D7 covers every view. In the cockpit the cars are still drawn
-at the tick while the camera moves on, so until D5 they shift against the camera once per
-tick. D4 alone is not a smoothness claim; D9 measures smoothness.
+and the pit-lane anchor case. D7 covers every view. In this race the cars were still drawn
+at the tick; D5 predicts them. D4 alone is not a smoothness claim; D9 measures smoothness.
+
+### D5 car prediction — complete
+
+For every picture whose camera D4 predicted, `d5_cars` extrapolates each of the 26 car
+records in the staged values, `cur + (cur − history) × α`, with the same history, α and
+rounding as D4. The renderer reads a car through the pose accessor h0+$26206 (A4), so each
+representation is predicted in its own coordinates:
+
+| Car | Rule |
+|---|---|
+| Track-driven (+$7E bit 0 clear; 95% of car-ticks) | Progress along the track is the signed fraction +$1E (Q14) plus $4000 for every segment stepped from the history's segment to cur's (at most 3; 2 is the most seen in a tick). The predicted progress is placed by stepping on from cur's segment; +$1E becomes the remainder and the corrected longitudinal +$1C follows from it with cur's denominator +$16, the inverse of h0+$2B560. The accessor then derives position, height and pitch natively from the staged segment, +$1C, +$1E, lateral and yaw |
+| Explicit (+$7E bit 0 set) | World X/Z +$28/+$2C extrapolated as longs; the segment +$12 found by the game's search h0+$26406 from cur's segment, as h0+$263F6 does |
+| Both | Pitch +$04, height +$08, lateral +$0A, yaw +$1A, correction +$4A and height offset +$8C extrapolated as wrapped words; each accessor branch reads its own subset |
+| Held at the tick | Steering +$48 (wheel images, D6), direction +$00, uncorrected longitudinal +$0C, denominator, lap segment, the other representation's coordinates, every flag and identity, and the synthetic camera record |
+
+Segments step as the track-driven traversal does (h0+$2B402/+2B4AE through h0+$26626):
+the lap wrap at the end pointer h2+$1FAC2, and the pit branch (h2+$1FADE) and join
+(h2+$1FAD6 → +$1FAE2) points passed through unless the car is changing pit state.
+
+**Kept at the tick** (per car; the rest of the picture is still predicted): a car whose
+pose flag or status word +$96 differs from the history's; a track-driven car that would
+cross into or out of the pit lane (h0+$26626 would call h0+$2655A/+265D2, which rewrite its
+lateral offset), crosses more than 3 segments in a tick or 6 in the prediction, or that
+would stand before its segment (negative progress: cars on the grid stand slightly before
+theirs); an explicit car that moved `D4_JUMP` or more in X or Z. Every record advances every
+tick whether or not it is drawn (a stopped track-driven car has speed 0), so a car entering
+view needs no snap.
+
+**Exact next pose:** not available. The track-driven advance is the mean of the previous
+speed (h0+$2B144) and the speed set earlier in the same tick (h0+$2B34A), so the next
+tick's advance depends on a speed that does not exist at the tick's end; explicit cars
+integrate physics during the tick in the same way. The prediction stays the plain formula.
+
+**Evidence** (VERIFY `448e0283…`, developer `d3b85bac…`, `a1200-030` non-MMU, `CUSTOM4=1`,
+whole Quick Race in the cockpit view, `tmp/d5/`). `tools/d5_cars.py` is the independent
+model; it runs the D3/D4 check and rebuilds every car:
+
+| Check | Result |
+|---|---|
+| Prediction (`cars-on.json`) | PASS for all 5672 staged pictures (3082 inside ticks, 2590 between): every staged byte, camera and cars, rebuilt exactly. 144,157 car records predicted, 113,130 of them on another segment than the tick's; 3263 held: 3069 grid cars before their segment, 158 pose-flag and 27 status changes, 9 pit or segment crossings. The slave's counters agree picture by picture |
+| Accuracy against the ideal pose | Each drawn car at the picture's displayed time, tick + α, interpolated between its actual poses (track-driven positions computed as h0+$26286 does); cars whose flag or status changes between those ticks are left out. Position error, the larger of X/Z, in world units: p50 4253 and p95 25,243 predicted, against 245,069 and 493,736 when the tick is shown; maximum 419,106 against 739,072. Yaw: p50 3 and p95 239 against 158 and 871 |
+| Camera (D4, same run) | Every prediction rebuilt exactly; p95 position error 28,686 against 500,899; `d4_faults` 0 |
+| Negative probes | The seven D4 probes, a staged car fraction, a staged car yaw and a history car lateral are each rejected |
+| Race unchanged (`states-comparison.json`) | Option off (`CUSTOM2=3`), prediction (`=11`) and its repeat: identical car/session state at all 3082 common ticks (6–3087) |
+| Exact repeat (`states-on-repeat`) | Identical states, snapshots and stage archive (`eb71a344…`) |
+| Cost (`profile-developer.json`, 100 fields from tick 300) | Developer build: `d5_cars` 0.72 ms per picture inside `d3_stage` (1.38 ms; restore 0.20 ms, `d4_camera` 0.035 ms). The scene measured 39.9 ms per picture in this window against 29.3 ms in D4's: the layout change gives a different race, and the whole race shows the same drawing overhead as D4 (3.7% more fields per picture than the option off in both). Emulated 68030 time |
+| Pictures over the race | 5871 off, 5671 predicted (3.28 versus 3.40 fields per picture), no drops |
+| Disabled-feature gate (`tmp/b4/d5-acceptance.json`) | B4 PASS: release `93dde23f…` unchanged, all 300 optional hook bytes independently rejected; D5 adds no hook |
+
+A first build read the fraction as unsigned and drew the grid cars up to three segments
+ahead before the start (`tmp/d5/run2-unsigned`, largest error 1.04 million); the model
+matched it, so the error measure found it. The remaining large errors (above 200,000 in
+27 of 136,717 car-pictures) are cars braking or turning hard at α near 1.5; D8 sets
+the limits. Not exercised by this race: the TV and chase views (D7) and pit stops. Wheels
+and steering are D6.

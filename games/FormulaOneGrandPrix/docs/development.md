@@ -915,3 +915,23 @@ python3 tools/c6_profile.py tmp/d4/profile-developer --out tmp/d4/profile-develo
 
 Captures need `amiga/env.sh` sourced and run one at a time (one project server).
 
+### D5 car prediction
+
+The same captures with a D5 build; `d5_cars.py` runs the D3/D4 check with its own model
+of every car, reports the car error against the ideal poses and the reasons cars were
+held, and with `--negative` also flips a staged car fraction, a staged car yaw and a
+history car lateral mid-race:
+
+```sh
+make slave-verify OUT=tmp/d5/build-verify
+python3 tools/c2_capture.py tmp/d5/run3/states-on --build tmp/d5/build-verify --states --stage --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d5/run3/states-on-repeat --build tmp/d5/build-verify --states --stage --custom4 1 --setup a1200-030
+python3 tools/c2_capture.py tmp/d5/run3/states-off --build tmp/d5/build-verify --states --custom4 1 --setup a1200-030
+python3 tools/d5_cars.py tmp/d5/run3/states-on --negative --out tmp/d5/cars-on.json
+python3 tools/c5_compare.py off=tmp/d5/run3/states-off on=tmp/d5/run3/states-on repeat=tmp/d5/run3/states-on-repeat \
+  --out tmp/d5/states-comparison.json
+make slave-developer OUT=tmp/d5/build-developer
+python3 tools/c2_capture.py tmp/d5/profile-developer --build tmp/d5/build-developer --stage --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
+python3 tools/c6_profile.py tmp/d5/profile-developer --out tmp/d5/profile-developer.json
+```
+
