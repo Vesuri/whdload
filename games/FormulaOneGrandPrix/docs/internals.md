@@ -2576,7 +2576,8 @@ track-driven car steps again from the history's segment, by its progress to cur 
   (user decision): lag is one tick plus the lead, about half a tick more than the original
   game on the normal-speed 030 and a sixth of a tick on the 040.
 
-In the second 040 play-test the user found steering smooth, without jumps. A snapped or
+In the second 040 play-test the user found steering smooth, without jumps, and the
+chase, TV and onboard views fine. A snapped or
 latest picture still shows cur. A held car keeps its tick pose, which is now
 ahead of the interpolated pictures around it.
 

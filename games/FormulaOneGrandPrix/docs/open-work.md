@@ -48,7 +48,8 @@ newest pose in 55% of the 030's pictures, so motion paused at the end of every t
 picture is now shown a tick plus the longer measured lead late, which keeps the steps even
 (user decision). That is about half a tick more lag than the original game on the
 normal-speed 030 and a sixth of a tick on the 040. In the second 040 play-test the user
-found steering smooth, without jumps. Held
+found steering smooth, without jumps, and the
+chase, TV and onboard views fine. Held
 cars still show their tick pose, ahead of the interpolated pictures; 20 small backward car
 steps over a race come from that.
 
