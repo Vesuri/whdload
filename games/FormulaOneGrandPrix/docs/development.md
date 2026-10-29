@@ -990,3 +990,14 @@ stop, and `--shots N` saves a screenshot of each of the N fields after it:
 python3 tools/c2_capture.py tmp/d7/shots-on --build tmp/d7/build-verify --stage --views --custom4 1 --setup a1200-030 --ticks 778 --shots 260
 ```
 
+### D8 prediction error
+
+`d8_error.py` runs the D4/D5/D7 models at α = 1 and 2 on every tick of a D7 capture and
+compares each prediction with the next ticks' D1 snapshots, per quantity, class
+(steady, braking, steering reversal, collision), movement and view, with the worst cases:
+
+```sh
+python3 tools/d8_error.py tmp/d7/run3/states-on --out tmp/d8/error.json
+python3 tools/d8_error.py tmp/d7/run3/states-on-repeat --out tmp/d8/error-repeat.json
+```
+

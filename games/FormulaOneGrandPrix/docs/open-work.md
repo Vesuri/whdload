@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C and D1–D7 complete; D8 next; B5/A8 pass for the current scope
+# Current status: C and D1–D8 complete; D9 next; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -27,13 +27,20 @@ results and acceptance evidence are in [internals.md](internals.md).
 | D5 | Complete: each predicted picture also extrapolates the 26 car records. Track-driven cars advance along their segments by fraction with the native stepping (lap wrap, pit branch and join), explicit cars in world X/Z with the game's segment search; a car is held at pit transitions, flag, status or jump changes and on the grid. Over a whole 030 race an independent model rebuilds every car exactly (144,157 predicted, 3263 held), the p95 car position error against the ideal path falls from 494k to 25k world units (yaw 871 to 239), and the race is identical to the option off at all 3082 ticks; 0.72 ms per picture. |
 | D6 | Complete: every other moving item has a decision. Steering (wheel images), marshal flags, start lights, pit phases, shake, instruments and car flags stay at the tick; the tow truck, smoke and debris are drawn at offsets from the predicted car, and the rear view and pit-lane overlay from the staged camera. The covered-road (no-sky) flag is now derived from the predicted anchor. Holding steering beats extrapolating it (0.79% against 1.10% of car-pictures more than half a wheel image off at α = 1). The whole 030 race is rebuilt exactly and identical to the option off at all 3258 ticks. |
 | D7 | Complete: every view draws from the staged records. In the chase and TV views the camera is placed and aimed natively from the predicted followed car, so the car no longer slides sideways in corners. Pit stops swap track ranges, now captured per picture. A whole 030 race through cockpit, TV, both chase views, onboard other cars and a replay is rebuilt exactly (3749 external cameras placed) and identical to the option off at all 3246 ticks; 0.022 ms per picture. |
-| D8–G | Presentation, optimisation and release work remain open under the plan. |
+| D8 | Complete: every tick's prediction at α = 1 (and 2) against the next actual tick, over the whole D7 race. Camera p95 position error 21,504 against 446,880 for holding the tick, cars 22,784 against 430,080. Braking barely raises it, steering reversals make yaw extrapolation worse than holding, and collisions are already held through the pose flag or status. The snap thresholds stay: the $100000 jump (twice the largest normal movement), the two-tick α clamp and three segments per tick. |
+| D9–G | Presentation, optimisation and release work remain open under the plan. |
 
-**Next F1GP step: D8 prediction error.**
+**Next F1GP step: D9 smoothness.**
+D8 is complete ([evidence](internals.md#d8-prediction-error--complete)). The prediction one
+tick ahead is about 20 times closer than holding the tick, the error does not grow with
+speed, and prediction is worse than holding only at 8 camera ticks and 61 of 72,199
+moving car-ticks. The thresholds stay as they are. The largest car errors are cars held
+while they cross the pit branch or join with pit stops on (115 car-ticks).
+Removing that hold would mean modelling the native lateral rewrite there.
+
 D7 is complete ([evidence](internals.md#d7-every-view--complete)). Every view draws from
 the staged records, and in the chase and TV views the camera follows the predicted car as
-the game places it. D8 compares each prediction at α = 1 with the next actual pose and
-sets the snap thresholds from the errors. Open from D7: blue polygons flashing on the
+the game places it. Open from D7: blue polygons flashing on the
 tarmac were seen in the TV view while Mansell's retired car drifted at the camera's
 switching distance, where the game alternates view-code bit 6 every tick and every
 picture shows the tick. The state is identical with the option off, but the scene has not

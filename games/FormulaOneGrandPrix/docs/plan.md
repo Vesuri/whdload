@@ -103,9 +103,10 @@ with no drops on the 030 and A1200 (the A500-equivalent is overloaded, C6's ques
 race clock keeps its native ratio, normal and slowed drawing give identical state at every
 tick, and race, retirement, replay and the accepted pit coverage pass. C6 is complete: the
 A1200 holds real time, but an undrawn tick costs the A500-equivalent 7.2 fields, so the
-68000 keeps the original frame-locked pacer by default (user decision). D1–D7
+68000 keeps the original frame-locked pacer by default (user decision). D1–D8
 are complete (presentation snapshots, α, staging with exact restore, camera and car
-prediction, the remaining moving items, every view); D8 is next.
+prediction, the remaining moving items, every view); D8 measured the prediction error
+and kept the snap thresholds; D9 is next.
 
 **Target machines (user decision).** The 68030/50 with Fast RAM (`a1200-030` non-MMU,
 caches on) is the primary target. Keep the number of configurations as small as possible:
@@ -338,6 +339,19 @@ and identical to the option off at all 3246 ticks.
 **D8 Prediction error.** For every tick, compare the prediction at α = 1 with the next
 actual pose: p50 and p95 per quantity, worst cases at braking, steering reversal,
 collisions. Set snap thresholds from them.
+*Result:* complete ([internals](internals.md#d8-prediction-error--complete)). Over the
+D7 race at α = 1:
+- the camera's p95 position error is 21,504 against 446,880 for holding the tick;
+- the cars' is 22,784 against 430,080;
+- braking barely raises it; steering reversals make yaw extrapolation worse than holding;
+- collisions change the pose flag or status, so the car is already held.
+
+The thresholds stay:
+- the $100000 jump, twice the largest normal movement, while the error does not grow with movement;
+- the two-tick α clamp, where prediction is still 14 times closer than holding;
+- three segments per tick.
+
+The largest car errors are D5's holds at the pit branch and join while pit stops are on.
 
 **D9 Smoothness.** At 50 fps on the 68060: per-field screenshots show the camera and cars
 moving every picture, never backwards; a frame-time histogram per window.

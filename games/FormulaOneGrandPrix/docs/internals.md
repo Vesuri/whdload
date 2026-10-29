@@ -2039,8 +2039,8 @@ period = fields since the previous picture started
   the 030, 3123 of 5983 pictures hit that clamp, so the displayed world lagged by up to
   3 fields (p95 2). A picture drawn between ticks starts about two thirds into a tick
   and reaches the screen about 3 fields later, after the next tick is due. The ideal α
-  measured over the whole race reaches 1.5 and never exceeds 2. D8 will set the
-  prediction limits from measured errors.
+  measured over the whole race reaches 1.5 and never exceeds 2. D8's measured errors
+  keep the clamp at two ticks.
 - **Interval beyond one tick:** α above 1 still uses the next interval; the interval
   after it may differ by one field.
 
@@ -2150,7 +2150,7 @@ loaded the tick's draw-entry stage, which undoes the shake.
 - view, source or target changes, which also cover TV cuts, because a cut clears and sets view-code bit 6 in successive ticks;
 - a new epoch, so the first tick after every rebase;
 - non-consecutive ticks, and α 0 (D3);
-- a camera that moved `D4_JUMP` ($100000) or more in X or Z in one tick. The largest normal movement over the race is 480,408 per tick; the one larger value, 54.9 million, is a reset. D8 sets the final thresholds from measured errors.
+- a camera that moved `D4_JUMP` ($100000) or more in X or Z in one tick. The largest normal movement over the race is 480,408 per tick; the one larger value, 54.9 million, is a reset. D8 keeps the threshold from the measured errors.
 
 VERIFY first recomputes the derived values (coefficients, horizon, viewport) from the
 tick's own camera and counts any difference from the game's in `d4_faults`. This checks
@@ -2228,8 +2228,8 @@ model; it runs the D3/D4 check and rebuilds every car:
 A first build read the fraction as unsigned and drew the grid cars up to three segments
 ahead before the start (`tmp/d5/run2-unsigned`, largest error 1.04 million); the model
 matched it, so the error measure found it. The remaining large errors (above 200,000 in
-27 of 136,717 car-pictures) are cars braking or turning hard at α near 1.5; D8 sets
-the limits. This race had no TV, chase or pit-stop pictures; D7 covers them. D6 keeps steering at the
+27 of 136,717 car-pictures) are cars braking or turning hard at α near 1.5; D8
+measures them per class. This race had no TV, chase or pit-stop pictures; D7 covers them. D6 keeps steering at the
 tick.
 
 ### D6 everything else that moves — complete
@@ -2350,3 +2350,87 @@ therefore not established whether the original game draws this, or the repeated 
 of a tick.
 
 Not exercised: a track-point TV camera, and a track with covered road.
+
+### D8 prediction error — complete
+
+D8 measures how far the prediction is from where things actually go, and sets the snap
+thresholds from that. `tools/d8_error.py` takes every tick t of the D7 race whose history
+(tick t − 1, same epoch, mode and view) is usable. From the game state at t's first
+picture it runs the D4, D5 and D7 models at α = 1, and at α = 2 (the clamp), exactly as the
+slave would. It compares the result with the stage set of tick t + 1 (t + 2) from its D1
+snapshot; showing tick t is the baseline. Each tick's poses are placed on that tick's own
+track, because the pit stops swap track ranges between ticks (epoch 3, ticks 732→733
+and 1128→1129). Cars whose pose flag or status changes by the target tick, and ticks
+whose view changes by then (a TV cut or a key), have no comparable pose. Each car-tick is
+classed from speed +$10 and yaw +$1A at t − 1, t and t + 1:
+- **collision:** speed falls by more than 1100 in one tick, beyond the hardest braking
+  (speed change +$72 reaches −1024), or the damage byte +$25 changes;
+- **braking:** speed falls by 256 or more;
+- **steering reversal:** the yaw rate changes sign, with at least 32 on each side;
+- **steady:** anything else.
+
+The camera takes the class of the car it is in or follows.
+
+**Evidence** (`tmp/d8/error.json`, from the D7 capture `tmp/d7/run3/states-on`, VERIFY
+`c0a4590d…`, `a1200-030` non-MMU; the D3–D7 check passes). 3180 ticks have a usable
+history; 3149 are compared at α = 1 (28 view changes, 3 at the end). There are 76,025
+car-ticks. Errors are p50 / p95 / maximum. Position is the larger of the X/Z errors in
+world units; angles are in $10000 a turn:
+
+| Quantity at α = 1 | Predicted | Tick shown |
+|---|---|---|
+| Camera position | 1024 / 21,504 / 276,582 | 152,808 / 446,880 / 502,528 |
+| Camera yaw | 0 / 188 / 2085 | 96 / 1507 / 8833 |
+| Camera direction, pitch, height (p95) | 182, 7, 2 | 1507, 15, 26 |
+| Car position | 5120 / 22,784 / 453,632 | 275,200 / 430,080 / 502,528 |
+| Car yaw | 3 / 249 / 6361 | 198 / 788 / 6362 |
+
+| Class (α = 1), p95 | Camera position | Car position | Car yaw |
+|---|---|---|---|
+| Steady (2975 camera ticks, 71,519 car-ticks) | 19,712 (447,744) | 22,272 (431,104) | 225 (789) |
+| Braking (143, 3786) | 31,744 (410,424) | 25,856 (403,968) | 309 (725) |
+| Steering reversal (31, 719) | 140,422 (501,504) | 27,648 (440,832) | 1125 (727) |
+| Collision (0, 1) | — | 20,576 (157,792) | 310 (2705) |
+
+The tick shown is in brackets. By view, the camera's p95 is:
+
+| View | Predicted | Tick shown |
+|---|---|---|
+| Cockpit | 896 | 129,088 |
+| Onboard | 14,592 | 382,208 |
+| Rear chase | 29,108 | 474,594 |
+| Front chase | 25,384 | 411,904 |
+| Replay rear chase | 30,616 | 501,730 |
+| TV | 0 | 0 |
+
+The TV camera stands still between cuts.
+
+At α = 2, the prediction p95 is:
+- camera position 62,152 against 894,976 when holding; yaw 565 against 2833;
+- car position 64,000 against 860,672; car yaw 613 against 1569.
+
+Run on the repeat capture, the measure gives an identical report.
+
+**Worst cases.**
+- **Camera:**
+  - the largest errors are the front chase stopping dead (epoch 3, tick 252: the camera moves 128,000 in X and then 1500, a steering reversal; 276,582);
+  - the start of the race (epoch 1, tick 249, cockpit: the camera's step grows from 24,000 to 144,000 in one tick; 121,062);
+  - the first ticks of the replay (100,816).
+  - Prediction is worse than holding at 8 of the 2099 ticks where the camera moves.
+- **Cars:**
+  - the largest errors are cars held while moving (157 car-ticks, up to 453,632, one tick of movement);
+  - 115 of those holds come from pit stops: while they are on (epoch 3, ticks 733–1128), the native traversal rewrites the lateral offset at the pit branch and join (h0+$2655A/+265D2), so D5 holds a car whose step crosses them;
+  - the other holds are status changes and segment limits.
+  - Braking adds little at α = 1 (p95 25,856); at α = 2 the largest braking error is 845,824.
+  - Prediction is worse than holding for 61 of the 72,199 moving car-ticks.
+- **Collisions:** they rarely reach the comparison, because the game switches the car's pose flag or status in the same tick, and D5 holds such a car (40 pose-flag changes at α = 1).
+- **Steering reversal:** yaw extrapolation overshoots and is worse than holding in 718 of 719 car-ticks. A snap cannot see the reversal coming, because the new rate exists only at t + 1. Over all car-ticks extrapolation is still three times better (p95 249 against 788).
+
+**Thresholds** (unchanged; the measurement supports them):
+
+| Threshold | Value | Basis |
+|---|---|---|
+| Jump (`D4_JUMP`, camera and explicit cars) | $100000 per tick in X or Z | The largest movement in this race is 502,528 per tick (D4's race: 480,408). The prediction error does not grow with movement: camera p95 4608, 24,064, 21,804, 34,708 and 24,320 in the movement bins 0–100k … 400–600k. The only larger movement seen is a reset (54.9 million, D4). The threshold sits at twice the largest normal movement |
+| α clamp (D2) | 2 ticks | At α = 2 the prediction is still about 14 times closer than holding. It is worse than holding at 11 of 2090 camera ticks and 66 of 71,453 car-ticks. The ideal α never exceeds 2 (D2) |
+| Segments per tick (D5) | 3 per tick, 6 in the prediction | 10 holds for segments outside pit stops in the whole race |
+| Pit branch and join while pit stops are on (D5) | held | The largest car errors, but 0.2% of moving car-ticks. Removing the hold means modelling h0+$2655A/+265D2's lateral rewrite |
