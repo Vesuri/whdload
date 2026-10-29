@@ -340,12 +340,20 @@ def negative(directory, camera=False, cars=False, aim=False):
                   ('history chase heading', lambda sizes: [sizes[0] + sizes[1] + 2 + b*d1.SIZE + heading
                                                            for b in (0, 1)]),
                   ('staged chase camera X', lambda sizes: [staged(sizes) + 4+0xa+2])]
+    chase = history = None
+    if aim:
+        # The first rear chase's pictures from epoch 1 tick 900, found by tick because
+        # the picture rate differs between builds (E2). The history's chase heading needs
+        # a picture whose history has a weight but is not shown alone (D10).
+        shown = []
+        check(directory, collect=shown)
+        late = [n for n, item in enumerate(shown) if item[0] >= (1 << 16) + 900]
+        chase = late[0]
+        history = next(n for n in late if 0 < shown[n][1] < 0x4000)
     results = {}
     for name, where in cases:
-        # Car cases mid-race: on the grid the cars keep the tick's pose. A picture at
-        # alpha one tick or more shows cur, without the history (D10): the history's
-        # chase heading is checked at a picture below one tick.
-        stop = 1701 if name == 'history chase heading' else 1700 if 'chase' in name \
+        # Car cases mid-race: on the grid the cars keep the tick's pose.
+        stop = history if name == 'history chase heading' else chase if 'chase' in name \
             else 2000 if 'car' in name else 200
         results[name] = check(directory, flip(where, stop))['status']
     return results
