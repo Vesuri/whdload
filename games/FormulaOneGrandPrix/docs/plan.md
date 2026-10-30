@@ -483,7 +483,14 @@ map. The memory path was not traced: nothing can run it under WHDLoad.
 
 **F2 Collisions.** Compare the write map with every `PL_*` site, `E2`'s copied ranges,
 the `C`/`D` hooks and the state `C`/`D` read. Classify each overlap as harmless, needing
-handling, or incompatible.
+handling, or incompatible. *Complete* ([collisions](internals.md#f2-collisions--complete)):
+nothing is incompatible. Two overlaps need handling: the frame-rate settings against C's
+fixed 1/8 s clock (F3) and the 1991 names restore, which keys on the first name only (F5).
+Two baseline overrides are left to document: the filter button and the save directory (F5).
+E2's and E4's tables rebuilt from every saved file equal the stock file's, except one E2
+operand that the slave's run-time check skips (VERIFY: 494 operands against 495). The
+2002-edited file runs to practice on the A500-equivalent (release) and on the 030 (clock,
+E2, E6).
 
 **F3 Frame rate and timing.** F1GP-Ed's frame rate sets the pacer minimum and the
 simulation step (`h0+$34364`; [evidence](internals.md#native-time-step-and-f1gp-eds-frame-rate-f3-evidence)):

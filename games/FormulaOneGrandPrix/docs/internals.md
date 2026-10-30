@@ -3152,10 +3152,10 @@ they change lies inside the map below (none outside), from 3,326 (1994) to 3,814
 
 | f1gp range | Kind | What it does |
 |---|---|---|
-| h0+$0–$5 (the entry `JMP`'s target) and h0+$1F040–$1F085 (70 bytes of zeros before) | code | Startup hook: opens `f1gp.library`, calls its first function, closes it, continues at the original entry h0+$88E. Under WHDLoad the library is absent and the hook falls through. |
+| h0+$0–$5 (the entry `JMP`'s target) and h0+$1F040–$1F085 (70 bytes of zeros before) | code | Startup hook: opens `f1gp.library`, calls its first function and closes it, then jumps through a relocated pointer to F1GP-Ed's stub at h2+$14A9C, which clears the hook's 204 bytes (zeros in the stock file) and jumps to the original entry h0+$88E (`JMP $88E(A2)`). Under the slave the library is absent and the hook falls through (F2). |
 | h0+$11A4–$11AB, h0+$11FC–$1201 | code | The call at h0+$11A4 goes through a new tail at h0+$11FC (calls h0+$11EA, then jumps to A2+$145E). |
 | h0+$1D0–$1D5 | code | `NOP`s the `BSET` of bit 7 at h2+$2AF2A (the drivers' selected flags, which F1GP-Ed writes itself). |
-| h0+$3C764–$3C769, h2+$14A9C–$14B23 (136 bytes over data) | code | The call to h2+$2A020 goes to F1GP-Ed code at h2+$14ABE, which counts the named drivers and marks the remaining car records unused before continuing (grids smaller than 26). |
+| h0+$3C764–$3C769, h2+$14A9C–$14B23 (136 bytes over an IFF 8SVX header) | code | The startup stub (above), and at h2+$14ABE the new target of the call that went to h2+$2A020: it counts the named drivers, marks the remaining car records unused (grids smaller than 26) and then calls h2+$2A020 through a computed `JSR (A1)`. |
 | h2+$1FE88–$1FE89 | code | `BRA` over the session setup's detail-level write, so the preset at h0+$3A910 (below) holds. |
 | h2+$32A38, +$32B32, +$32FD4, +$3302A, +$32F3D, h2+$32F80–$32FB1 | code | The game's file requester lists up to 200 entries instead of 64, with its table moved. |
 | h2+$2D03A–$2D03B | code | An indexed byte read made fixed (purpose not identified). |
@@ -3231,3 +3231,34 @@ rather than taking every setting to its GUI extremes, so a value-dependent code 
 setting takes only near its limits could be missed; the supplied datafiles' writes all
 fall inside the map. Evidence: `tmp/f1/out` (New, the nine datafiles), `tmp/f1/chunk`,
 `tmp/f1/byte`.
+
+### F2 collisions — complete
+
+`tools/f2_collisions.py` compares F1's write set with the slave: every byte and relocation
+that any of F1's 559 distinct saved files (New, the nine datafiles, the chunk and byte
+variants) changes, 5,638 bytes and 6 relocations, against every `PL_*` site of
+`patch_582992` and `patch_582992_clock` (a hook extended to the continuation the slave
+returns to), every other hexadecimal literal in the slave that may be a hunk 0 or 2 offset
+(a 32-byte window in both hunks, reviewed by hand: entries it calls, the C/D state tables
+and displacements from the hunk bases), and E2's and E4's tables rebuilt from each saved
+file. Two runs settle what the static checks cannot. The release build ran the 2002-edited
+file on the A500-equivalent to the practice cockpit. The VERIFY build (`CUSTOM2=1043`:
+clock, E2, E6; `MEMCONFIG=1`) ran it on the 68030 to practice and quit.
+
+| Overlap | Class | Evidence and handling |
+|---|---|---|
+| Frames/sec and Target Display: h0+$125B (the low byte of the pacer minimum h0+$125A), the cadence tables h0+$1262–$1271 and the step words h0+$34362–$34369 | needs handling (F3) | C's hook at h0+$1272 (bytes disjoint, next to h0+$1271) replaces the pacer and writes h0+$125A itself; its clock delivers 1/8 s ticks (6/7 fields PAL, 7/8 NTSC) whatever the step. 1995–2002 set the tables to 6 fields and the steps to 3375, 6750, 6750, 6750; 1994 and New keep the stock `$2000`. With the clock, 8 ticks of 6750/65536 s give 0.82 s of game time a second (arithmetic, not measured). |
+| Driver names h2+$2AF52–$2B519 and the slave's 1991 names | needs handling (F5) | The slave decrunches its 1,480 bytes over exactly this range when the first name starts `Carlos S` (h0+$91A's pointer + $900). New keeps the stock names, so nothing changes there. A file whose names were edited but whose first driver is still Carlos Sanchez would lose every edited name. Compare the whole stock block before replacing it. |
+| h2+$3863A (`PL_B`, the requester's filter button) | baseline override (F5: document) | 1995–2002 write `$FF`, the slave's value. 1994 and New write the stock 0, which the slave overrides. |
+| h2+$386AE–$386B3 (`PL_L`/`PL_W` `save`, 0) inside Default Dir h2+$386AE–$386DF | baseline override (F5: document) | The slave's save directory replaces F1GP-Ed's path (for example `Games:F1GP/Saved Games`), which does not exist under WHDLoad. |
+| E2's operand h0+$3C766 | harmless | F1GP-Ed retargets this `JSR` from h2+$2A020 to h2+$14ABE, below E2's span. `e2_enable` skips an operand whose target lies outside the span, so h2+$2A020 runs from chip on this path. Rebuilt from all 559 files, E2's span (h2+$1D820–$2A640), safe and E6 entries are the stock file's; only this operand drops (the descent seeds the original entry h0+$88E, which the startup hook reaches through a computed jump). VERIFY logs `operands=494` for the 2002-edited file against 495 for the stock file (same build and options). |
+| E4's regions and operands | harmless | The rebuilt operand table equals the stock file's for all 559 files. The two relocation changes the 2002 settings make (h0+$C8 added, h0+$36B2C removed) touch no E2 or E4 entry. |
+| State the slave reads: h0+$3A8FA (inside D1's range h0+$3A8F8–$3A903) and h0+$3A90C (chase distance, D4) | harmless | F1GP-Ed sets initial values (df+$16CD); D1 copies and D4 reads the run-time values. |
+| Startup hook h0+$0–$5, h0+$1F040 | harmless | No slave site (E4's pool cursor h0+$1F03A ends before it). Under the slave's KickEmu the library open fails and the game starts normally in both runs. |
+| Other written bytes near hooks | harmless | No other `PL_*` site holds a written byte. The nearest are h0+$1D0–$1D5 before E4's strip hook h0+$20E, the colours h0+$3CD12 after C's replay hooks h0+$3CCE8 and h0+$3CCFA, and the cheat code h0+$3BAF0 after C3's h0+$3BA24 hook. The literal windows' other hits are false positives (exec's `MemList` $142, a blitter constant $7CA, h0 windows of h2 offsets such as the keyboard table h2+$52A) or the pacer words above. |
+| df+$1734–$1743 XORed by 1 (chunk c371) | invalid value only | Adds a relocation at h2+$52C, inside the keyboard table that C4 reads. No supplied datafile and no byte variant does this. |
+
+Nothing is incompatible. The routes in `tools/f1gp.py` assume the stock start: the 2002
+settings skip the language screen and the startup menu (to the Main Menu), so `quickrace`
+stops at the manual protection. F4 needs routes for edited files. Evidence: `tmp/f2`
+(`report.txt`, `report.json`, `v030-2002`, `v030-stock`).

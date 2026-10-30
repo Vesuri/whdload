@@ -1216,3 +1216,16 @@ done
 python3 tools/f1_diff.py tmp/game/FormulaOneGrandPrix4Disk/data/f1gp tmp/f1/out/new.f1gp 16
 python3 tools/f1_fields.py tmp/f1/out/df-2002.f1gp tmp/f1ed/F1GP-Ed/2002.f1gp tmp/f1/byte tmp/f1/chunk
 ```
+
+`tools/f2_collisions.py` checks the saved files against the slave (F2): `PL_*` sites, the
+slave's other hunk-offset literals (reviewed by hand) and E2's and E4's tables rebuilt from
+each distinct file (about 1 s a file):
+
+```sh
+python3 tools/f2_collisions.py tmp/f1/out tmp/f1/chunk tmp/f1/byte --report tmp/f2/report.json
+```
+
+To run an edited file, copy the game directory, replace `data/f1gp` and pass it as `GAME`
+(absolute) to `tools/f1gp.py serve`. The stock routes stop where the file's settings skip a
+screen, so drive the rest with `tap` and `menuclick`. The protection accepts A and Return;
+in the Main Menu use 395 252, then 530 246, then 235 391 for practice at Silverstone.
