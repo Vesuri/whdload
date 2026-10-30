@@ -1167,8 +1167,13 @@ what a change can affect: the copy needs the comparison and one profile pair, no
 re-compared race. `--e4-data` sets `CUSTOM2` bit 7, the renderer's chip data in fast RAM
 (`tools/e4_tables.py` writes the operand table at build time); its check is a `--publish`
 pair with the bit off and on, compared with `tools/c2_compare.py`. The capture overlays the
-moved bytes on its hunk dumps; `--states` and `--rate` refuse `--e4-data`. The rear-chase window (`--views`, profile from tick 870) moves; the
-default tick-300 window is the player standing on the grid in the cockpit:
+moved bytes on its hunk dumps; `--states` and `--rate` refuse `--e4-data`. `--e4-routines`
+sets `CUSTOM2` bit 8, the exact faster game routines (edge tracer steps, sky strip); it
+refuses `--twin`. Different builds reach different races, so measure a change with a
+same-build profile pair, its bit off and on, and compare the scene's time per picture
+(`c2_scene_call` in `c6_profile.py`'s output). The windows: rear chase (`--views`,
+`--ticks 900 --profile 100 --profile-tick 870`) and the grid at the start lights in the
+cockpit (`--views`, `--ticks 90 --profile 100 --profile-tick 60`):
 
 ```sh
 make slave && make slave-developer && make slave-verify
@@ -1182,4 +1187,8 @@ A="--build tmp/build-developer --e2 --e4 --views --setup a1200-030 --ticks 900 -
 python3 tools/c2_capture.py tmp/e4/paint-off $A
 python3 tools/c2_capture.py tmp/e4/paint-on $A --e4-data
 python3 tools/c2_compare.py tmp/e4/paint-off tmp/e4/paint-on tmp/e4/paint-compare.json
+P="--build tmp/build-developer --e2 --e4 --e4-data --snapshot --views --setup a1200-030 --custom4 1 --ticks 90 --profile 100 --profile-tick 60"
+python3 tools/c2_capture.py tmp/e4/grid-b7 $P
+python3 tools/c2_capture.py tmp/e4/grid-b8 $P --e4-routines
+for a in b7 b8; do python3 tools/c6_profile.py tmp/e4/grid-$a --out tmp/e4/grid-$a.json; done
 ```

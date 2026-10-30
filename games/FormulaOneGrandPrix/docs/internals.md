@@ -2940,25 +2940,57 @@ selected A3/A4 ranges (`c2_compare.py`). With `CUSTOM4=1` (`profile-rear-data2`)
 snapshot of h2+$231D4 holds the live values while the chip original keeps those of the
 first live epoch, so the slave reads the moved variables.
 
-Rear chase, 100 fields from tick 870 (`profile-rear-e4`; `profile-rear-data` with the
-first three regions, developer `82b8bddd…`; `profile-rear-data2` with all five):
+**The race depends on the build.** Different developer builds reach different races
+from the same route (at tick 900 one build's player is racing, another's stands retired
+beside a marshal), probably through startup timing; within one build `CUSTOM2` bits 7 and
+8 leave it unchanged. Profiles of different builds therefore draw different pictures, and
+a change's gain comes from a same-build pair with its bit off and on. Two windows:
+rear chase (`--views`, 100 fields from tick 870) and the grid at the start lights in the
+cockpit (100 fields from tick 60; the player fourth, cars ahead), at one picture per field.
+In the grid window publication absorbs any saving as the wait for the field (`e3_free`),
+so the scene's time per picture is the measure in both.
 
-| | E4 copy | + renderer data | + scene variables |
+Same-build pairs, developer `4e94a858…` (`rear-b0/b7`, `profile-rear-r8`,
+`grid-b0/b7/b8`), scene ms per picture:
+
+| Window | Bit 7 off | Bit 7 | Bits 7 and 8 |
 |---|---:|---:|---:|
-| Scene, ms per picture | 19.7 | 18.0 | 16.6 |
-| Pictures in the window | 75 | 85 | 88 |
-| Filler h0+1F388, inclusive | 23.4% | 14.4% | 17.0% |
-| Instructions naming chip data | | 17.2% | 5.9% |
+| Rear chase (pictures) | 22.98 (68) | 16.92 (88) | 16.39 (89) |
+| Grid, cockpit (pictures) | 13.47 (100) | 10.05 (100) | 9.58 (100) |
 
-The car-model wrapper h2+29C16 falls from 24.4% to 13.1% with the renderer data, while its
-callee h2+28652 stays at 11.1%, consistent with car parts being filled by the same filler.
-The filler's own time per picture rises from 3.4 to 3.9 ms between the last two windows,
-which the move cannot cause (its only moved operand, h2+$231CC, gets cheaper); the windows
-draw different pictures, so their content differs, not yet confirmed as the cause.
-Scene and publication now take about 19.8 ms a picture, close to a field, so the window's
-picture count nears its cap of one per field; the time per picture is the measure.
+In this build's rear-chase window the player's car stands retired, so pictures change
+little (about 370 longs each). The figures in earlier notes (19.7, 18.0 and 16.6 ms)
+compared different builds' windows and so different pictures.
 
-**Where the time goes now** (`profile-rear-data2`, inclusive): the scene 73%; the filler
-h0+1F388 17.0% and the tracer h0+1EABA 9.3%; the car models h2+29C16 13.5%; publication
-14.1% (the copy 12.3%); `e3_blit` 3.4%. Self time is spread thinly: the copy 12.3%, then
-nothing above 3.4%.
+**Exact faster routines (done).** Behind `CUSTOM2` bit 8 (hooks applied above the 68000):
+
+- *The tracer's X-major steps* (h0+$1EF74, h0+$1EFDE). Natively a Bresenham loop runs
+  once per pixel of X, about 31 iterations an edge in rear chase, and stores X only when Y
+  steps (3–5 stores). With dx = q·dy + m, the first store comes q/2+1 pixels in, with
+  the error term ((q odd ? dy : 0) + m)/2 + 1 − dy, and each further one q or q+1 pixels
+  on as the term passes zero: one `DIVU` and dy steps store the same values. The form
+  matches the loop exactly for every dx up to 1099 and dy ≤ dx (`tmp/e4/dda.py`) and
+  follows algebraically for all. D3.W ends as natively, ~(dx/2); D4 and D6 end at the
+  last X so the native loop exits at once, and its exit restores D4–D7.
+- *The sky band's strip* (h3+$704–$1704). h2+$1F320 builds it at a session's setup
+  (called only from h0+$20E) and only the band's blit at h2+$1F41E reads it, at most 8
+  rows of 128 bytes and 106 bytes into each. E3's CPU blit read it from chip at 36 cycles
+  a word. After each build the slave copies it to fast RAM, and the band reads the copy
+  while E3's blits run on the CPU (`e3_soft`); the native blitter keeps the chip strip.
+  The copy matched the strip at the end of the profile. The VERIFY blitter twin cannot
+  follow the copy, so `c2_capture.py` refuses `--twin` with `--e4-routines`.
+
+The check is the same tick's picture and state with the bit off and on (`p8-off/on`,
+rear chase at tick 900): identical picture and `c2_compare.py` PASS. The B4 gate
+(`tmp/b4/e4r-acceptance.json`) passes with the new ranges; release `93dde23f…` unchanged.
+Rear chase: the tracer falls from 6.73% to 6.21% of cycles inclusive and `e3_blit` from
+2.60% to 1.73%; in the grid window the tracer falls from 5.96% to 5.06% and `e3_blit` from
+4.01% to 2.57%, while the copy's share stays at 7.35% (the same pictures).
+
+**Where the time goes now** (`profile-rear-r8`, inclusive): the scene 73%; the car
+models h2+29C16 16.3%; the filler h0+1F388 15.8%; the point projection h2+$23290 9.0%
+(about 410 cycles a call, 248 calls a picture; its four `MULS.W` and two `DIVS.W` take
+about 200, and its 306 bytes exceed the 030's 256-byte instruction cache); the copy 7.9%;
+the scaled objects h0+147C 6.8%; the tracer 6.2%; the slave's own code 23%. No single
+instruction exceeds 0.9%. The grid window adds the copy's compare loop (7.4%, no longs
+written) and D3's staging walk (about 3.5%).

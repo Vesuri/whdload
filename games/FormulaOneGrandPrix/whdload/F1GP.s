@@ -50,6 +50,8 @@ slv_config
         dc.b 'C2:X:Developer - hunk 2 code in fast RAM:4;'
         dc.b 'C2:X:Developer - draw in fast RAM:5;'
         dc.b 'C2:X:Developer - copy only changed blocks:6;'
+        dc.b 'C2:X:Developer - renderer data in fast RAM:7;'
+        dc.b 'C2:X:Developer - faster game routines:8;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -796,6 +798,121 @@ e4_data dc.l 0
 e4_bases ds.l 4
 e4_spans ds.l E4_REGIONS*3      ; chip original, size, fast - chip
 e4_moved dc.w 0
+
+; h0+$1EF74 and h0+$1EFDE (CUSTOM2 bit 8): the edge tracer's X-major steps. Natively a
+; Bresenham loop runs once per pixel of X and stores X when Y steps; here one division
+; gives each scanline's X step, with the same error term, so the same dy X values are
+; stored. D1 = dx >= D2 = dy > 0, D4 the first X, A0 the edge's X list. D4 ends at the
+; last X, as D6, so the native loop exits at once; D3.W ends as natively, ~(dx/2), and
+; only D5-D7, which the native exit restores, are used besides.
+e4_trace_right
+        bsr.s e4_trace_steps
+        add.w d7,d4
+        move.w d4,(a0)+
+        move.w d2,d7
+        bra.s .next
+.step
+        add.w d5,d4             ; X += q, plus 1 when the error term passes 0
+        add.w d6,d3
+        ble.s .store
+        sub.w d2,d3
+        addq.w #1,d4
+.store
+        move.w d4,(a0)+
+.next
+        subq.w #1,d7
+        bne.s .step
+        bra.s e4_trace_end
+e4_trace_left
+        bsr.s e4_trace_steps
+        sub.w d7,d4
+        move.w d4,(a0)+
+        move.w d2,d7
+        bra.s .next
+.step
+        sub.w d5,d4
+        add.w d6,d3
+        ble.s .store
+        sub.w d2,d3
+        subq.w #1,d4
+.store
+        move.w d4,(a0)+
+.next
+        subq.w #1,d7
+        bne.s .step
+e4_trace_end
+        move.w d4,d6            ; the native loop's end test
+        move.w d1,d3
+        lsr.w #1,d3
+        not.w d3
+        rts
+e4_trace_steps                  ; -> D5.W q = dx/dy, D6.W m = dx mod dy, D3.W the error
+        moveq #0,d5             ; term and D7.W the first step, q/2+1
+        move.w d1,d5
+        divu.w d2,d5
+        move.l d5,d6
+        swap d6
+        moveq #0,d3
+        btst #0,d5
+        beq.s .even
+        move.w d2,d3
+.even
+        add.w d6,d3
+        lsr.w #1,d3
+        addq.w #1,d3
+        sub.w d2,d3             ; ((q odd ? dy : 0) + m)/2 + 1 - dy
+        move.w d5,d7
+        lsr.w #1,d7
+        addq.w #1,d7
+        rts
+
+; h0+$20E and h2+$1F41E (CUSTOM2 bit 8): the sky band's scenery strip, h3+$704-$1704,
+; which h2+$1F320 builds at a session's setup and only the band's blit reads (rows of
+; 128 bytes, at most 8 rows and 106 bytes from each plane's start). Natively the blitter
+; reads it from chip RAM; E3's CPU blits read a fast copy, taken after each build.
+e4_strip_build
+        move.l a0,-(sp)
+        movea.l (c2_h2,pc),a0
+        adda.l #$1f320,a0
+        jsr (a0)
+        movem.l d0/a0-a1,-(sp)
+        bsr.s e4_strip_chip
+        lea (e4_strip,pc),a1
+        move.w #$1000/4-1,d0
+.copy
+        move.l (a0)+,(a1)+
+        dbf d0,.copy
+        lea (e4_strip_valid,pc),a0
+        move.w #1,(a0)
+        movem.l (sp)+,d0/a0-a1
+        movea.l (sp)+,a0
+        rts
+e4_sky_source                   ; -> A0 the strip + 2, as lea h3+$706
+        move.l d0,-(sp)
+        move.w (e3_soft,pc),d0
+        and.w (e4_strip_valid,pc),d0
+        beq.s .chip
+        lea (e4_strip+2,pc),a0
+        bra.s .done
+.chip
+        bsr.s e4_strip_chip
+        addq.l #2,a0
+.done
+        move.l (sp)+,d0
+        rts
+e4_strip_chip                   ; -> A0 h3+$704
+        move.l d0,-(sp)
+        movea.l (c2_h2,pc),a0
+        move.l (-4,a0),d0       ; hunk 3 follows hunk 2 in the segment list
+        lsl.l #2,d0
+        addq.l #4,d0
+        movea.l d0,a0
+        lea ($704,a0),a0
+        move.l (sp)+,d0
+        rts
+e4_strip_valid dc.w 0
+        CNOP 0,4
+e4_strip ds.b $1000
 
 ; From c2_acquire: the chip back buffer is the one not submitted last; draw in fast RAM.
 e3_acquire
@@ -4360,6 +4477,18 @@ patch_582992
 ; (user decision: the 68000 keeps the native frame-locked pacer by default).
 patch_582992_clock
         PL_START
+        PL_IFC2X 8
+        ; The edge tracer's X-major steps, one division per edge instead of a loop per pixel.
+        ; PERF_RANGE h0:1ef74 6 custom=2 bit=8 variant=582992
+        PL_PS $1ef74,e4_trace_right
+        ; PERF_RANGE h0:1efde 6 custom=2 bit=8 variant=582992
+        PL_PS $1efde,e4_trace_left
+        ; The sky band's strip: a fast copy after each build, read by E3's CPU blits.
+        ; PERF_RANGE h0:20e 6 custom=2 bit=8 variant=582992
+        PL_PS $20e,e4_strip_build
+        ; PERF_RANGE h2:1f41e 6 custom=2 bit=8 variant=582992
+        PL_PS $8e7b2,e4_sky_source
+        PL_ENDIF
         PL_IFC2X 1
         ; PERF_RANGE h0:3c8d2 6 custom=2 bit=1 variant=582992
         PL_PS $3c8d2,c2_live_entry

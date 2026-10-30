@@ -43,6 +43,8 @@ def capture(args):
         raise ValueError('C5 tick-state probe requires Quick Race and no other probe options')
     if args.e4_data and (args.states or args.rate):
         raise ValueError('the per-tick probes read moved variables at their chip offsets')
+    if args.e4_routines and args.twin:
+        raise ValueError("the blitter twin cannot read the sky strip's fast copy")
     if args.rate and (args.modal or args.input or args.replay or args.view or args.profile
                       or args.profile_tick or args.publish or args.custom4 != 1
                       or args.route != 'quickrace'):
@@ -89,6 +91,8 @@ def capture(args):
         custom2 |= 64
     if args.e4_data:    # CUSTOM2 bit 7: the polygon renderer's chip data in fast RAM
         custom2 |= 128
+    if args.e4_routines:    # CUSTOM2 bit 8: game routines replaced by exact faster forms
+        custom2 |= 256
     if args.no_caches:  # E1's uncached arm: bit 0 clear and WHDLoad's NoCache (B5/A7 controls)
         custom2 &= ~1
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5={custom5} FileLog'
@@ -402,6 +406,8 @@ if __name__ == '__main__':
     parser.add_argument('--e4', action='store_true', help='CUSTOM2 bit 6: copy only the changed blocks of the picture (implies --e3)')
     parser.add_argument('--e4-check', action='store_true', help='CUSTOM5 bit 3: VERIFY compares every E4 copy with the fast picture (implies --e4)')
     parser.add_argument('--e4-data', action='store_true', help="CUSTOM2 bit 7: the polygon renderer's CPU-only chip data in fast RAM")
+    parser.add_argument('--e4-routines', action='store_true',
+                        help='CUSTOM2 bit 8: game routines replaced by exact faster forms (edge tracer, sky strip)')
     parser.add_argument('--memconfig', type=int, help="WHDLoad MEMCONFIG (default 1 with --e2/--e3/--e4 on machines with fast RAM)")
     parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')
     parser.add_argument('--replay', action='store_true')

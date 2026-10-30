@@ -33,17 +33,20 @@ results and acceptance evidence are in [internals.md](internals.md).
 | E1 | Complete for the current scope: B5's gate, and with the C2 loop and interpolation a whole 030 race draws 13–14% more pictures with caches on (3.43 against 3.86 fields per picture, developer build). Caches stay opt-in in the slave; the release turns them on through its icon (G1). |
 | E2 | Complete for the current scope (developer `CUSTOM2` bit 4): hunk 2's main code runs from a fast-RAM copy from the first live epoch, its data stays in chip. The race is identical with it off at every tick, every staged picture is rebuilt, and the 030 draws 31–32% more pictures (2.46 against 3.24 fields per picture, developer build). |
 | E3 | Complete for the current scope (developer `CUSTOM2` bit 5): the race picture is drawn in a fast buffer, its fills and queued blits run on the CPU, and publication copies it into the free chip back buffer. A VERIFY twin matches all 14,062 fills and blits of a race against the blitter byte for byte, the race is identical with it off at every tick, every staged picture is rebuilt, and with E2 the 030 draws 2.05–2.07 times as many pictures (1.21 against 2.51 fields per picture, developer build). |
-| E4 | In progress (developer `CUSTOM2` bit 6). Done: the picture copy writes only the longs that differ from a fast shadow of each chip bitmap; a whole race compares every copy (5271, 0 faults), and in a rear-chase window publication falls from 18.5% to 11.4% of cycles (75 pictures against 68). Done (`CUSTOM2` bit 7): the renderer's CPU-only chip data (edge pool, span masks, jump words and the scene's two variable blocks in hunk 2) moves to fast RAM; the same tick's picture and state are identical, and a rear-chase picture's scene falls from 19.7 to 16.6 ms. E2–E4's fast areas come from WHDLoad 20's alternative memory configuration (`MEMCONFIG=1`), so chip-only machines keep the release's memory and boot. Open: the rest of the game's hot routines. |
+| E4 | In progress (developer `CUSTOM2` bit 6). Done: the picture copy writes only the longs that differ from a fast shadow of each chip bitmap; a whole race compares every copy (5271, 0 faults), and in a rear-chase window publication falls from 18.5% to 11.4% of cycles (75 pictures against 68). Done (`CUSTOM2` bit 7): the renderer's CPU-only chip data (edge pool, span masks, jump words and the scene's two variable blocks in hunk 2) moves to fast RAM; the same tick's picture and state are identical, and a picture's scene falls from 22.98 to 16.92 ms in rear chase and from 13.47 to 10.05 ms on the grid (same-build pairs). Done (`CUSTOM2` bit 8): exact faster forms of the edge tracer's X-major steps and of the sky strip's reads; the same tick's picture and state are identical, and the scene falls a further 3.1% in rear chase (16.39 ms) and 4.7% on the grid (9.58 ms). E2–E4's fast areas come from WHDLoad 20's alternative memory configuration (`MEMCONFIG=1`), so chip-only machines keep the release's memory and boot. Open: whether to pursue the remaining 1–3% items. |
 | E5–E8 | Optimisation work remains open under the plan. |
 | F | Planned after E (user decision): make the slave run any F1GP-Ed-edited `f1gp` with the enhancements (write map, collisions, frame-rate policy, edited-file gates, fixes; memory-patch features optional). F1GP-Ed 3.44 and the f1gp.library developer archive are in ignored `tmp/`, not yet pinned. |
 | G, H | Release after F; finer simulation (H) only on the user's request. |
 
-**Next F1GP step: the rest of E4's game routines.** Chip data no longer dominates (5.9%
-of cycles name it). Rear chase on the 030 now draws close to one picture per field, so
-measure time per picture, and add a heavier window (the grid start with all cars in view)
-before the next change. Then avoidable work and 68020 forms in the filler, the tracer, the
-car models and h2's scene code, and the publication copy (12.3%); twin each change and
-measure only what it can affect. Captures can fail with
+**Next F1GP step: decide E4's remaining scope.** The major E4 bottlenecks are resolved:
+chip waits (the renderer's data), the tracer's per-pixel loop and the sky strip's chip
+reads. What remains is spread thin, with no instruction above 0.9%. The largest single routine is the
+point projection h2+$23290 (9.0% in rear chase, about half of it `MULS`/`DIVS`; a
+compact copy that fits the instruction cache might save about 2%, depending on how the
+emulator charges cache misses). Beyond that, the filler's per-span work (15.8%, no hot loop),
+the copy's compare loop (7.4% when nothing changes) and D3's staging walk (about 3.5%)
+each need restructuring for gains of 1–3%. The race depends on the build: measure each
+change as a same-build pair with its bit off and on. Captures can fail with
 gdb's "Invalid hex digit 79" when an emulator log line arrives during a memory read; a
 retry is the remedy.
 
