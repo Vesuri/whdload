@@ -5,6 +5,8 @@ far a car moves in a second), allow frame rates up to 50, and make the movement 
 rotation of the player and other objects smooth, with cars and physics behaving at
 real-time speed whatever the frame rate. Improve performance on every system, especially
 68020+ with fast RAM. This is a practical game optimisation, not an equivalence proof.
+Game modifications belong to F1GP-Ed, which edits the `f1gp` file; the slave must run any
+F1GP-Ed-edited file with these enhancements (user decision; `F`).
 
 Steps have identifiers (`A1`, `C2`, ...). Take them in the order of [the critical path](#order-and-critical-path)
 unless the user says otherwise; record each step's outcome where its *Output* says, and
@@ -62,7 +64,7 @@ replace the original baseline or prove the projected implementation below.
    the sibling projects rejected even at 67 ms. The D10 play-test found extrapolation's
    steering jumps worse, and the user chose interpolation, shown a tick plus the measured
    lead late (user decision; D10).
-3. **Finer simulation steps only after an audit** (`F`), and only where the user asks:
+3. **Finer simulation steps only after an audit** (`H`), and only where the user asks:
    they are what Stunt Car Racer (`AGENTS.md` §Frame Rate Conversion) and Revs did, and
    the risk to F1GP's physics and AI is the reason they are optional here.
 4. **Caches on** (the user's decision). Code that breaks with caches on is fixed (`B5`).
@@ -426,8 +428,11 @@ instruction cache). Twin every replacement against the original (Indianapolis 50
 **E5 AGA 32-bit fetch.** On AGA only, `FMODE` 1 or 2 with `DDFSTOP` adjusted; write
 `FMODE` 0 on OCS/ECS. The plane pointers already meet the 4-byte alignment; 64-bit
 (`FMODE` 3) would mean moving the screen buffers to 8-byte alignment and is worth it only
-if 32-bit gains. Check every screen's picture. Expect little: half the bus is free, and
-after `E2`/`E3` the CPU's chip traffic is mostly the copy.
+if 32-bit gains. Check every screen's picture. The plan expected little (half the bus is
+free, and after `E2`/`E3` the CPU's chip traffic is mostly the copy), but `E4` found the
+polygon filler bound by chip data, so measure. f1gp.library (F1GP-Ed's companion) set
+`FMODE` `$000F` (64-bit bitplane and sprite fetch) with its own display-window and
+data-fetch values; how it met the 8-byte alignment is not established.
 
 **E6 Chip data the CPU reads.** About 800 reads per field from hunk 2's tables and 670
 from `$50000–$53FFF` (follow). Move CPU-only hot tables to fast RAM only if `E4`'s profile
@@ -439,16 +444,44 @@ where it wins.
 
 **E8 Interrupt overhead.** The KickEmu interrupt chain (about 1.2%): leave unless cheap.
 
-## F. Finer simulation (optional; only on the user's request after `D10`)
+## F. F1GP-Ed compatibility (after `E`)
 
-**F1 Per-field steering preview.** Preview the native player motion every field from the
-current input and spread it over the tick (Gunship `TIMING_DESIGN.md`), so steering
-shows within a field. Needs a side-effect-free preview of the player physics.
+F1GP-Ed 3.44 (Oliver Roberts; closed source, donationware, files may be redistributed
+only unchanged) is how Amiga players modify F1GP. It has three kinds of change: settings
+saved into the `f1gp` file (the size stays 582,992 bytes), memory patches that run from
+F1GP-Ed's own process beside the game, and f1gp.library's in-memory patches. Under
+WHDLoad only the first kind applies: the operating system is gone, so nothing runs beside
+the game. F makes the slave and every file edit live together; the enhancements stay in
+the slave, because they need WHDLoad's caches, fast memory and the hardware.
 
-**F2 Finer world step.** A units-and-writers audit of the car physics and AI: integrators,
-damping, thresholds, timers, RNG draws, per-quantity scaling (AmigaXDev
-`fixed-time-simulation.md` §Raising the update rate; Stunt Car Racer; Revs'
-`tools/sim_equiv.py`). Large and risky; not part of the main path.
+**F1 Write map.** Pin `F1GP-Ed.lha` and the f1gp.library developer archive in
+`manifest/`. Run F1GP-Ed under FS-UAE with Workbench on copies of `f1gp` in `tmp/` and
+diff the file after each setting (one at a time, at their extremes) and after each
+supplied datafile; saving to the file needs the GUI, `SAVETOMEM` plus a memory dump
+covers the memory path. *Output:* in internals, each setting's hunk ranges, data or code,
+and its values; no game bytes.
+
+**F2 Collisions.** Compare the write map with every `PL_*` site, `E2`'s copied ranges,
+the `C`/`D` hooks and the state `C`/`D` read. Classify each overlap as harmless, needing
+handling, or incompatible.
+
+**F3 Frame rate and timing.** F1GP-Ed's frames-per-second and PAL/NTSC timing settings
+edit the pacer the `C` clock replaces, and may change the simulation step. Trace what
+they change; decide (user decision) whether the clock honours or neutralises them; run
+`C5`'s checks at each value.
+
+**F4 Edited-file inputs.** Build edited `f1gp` files reproducibly from pinned datafiles
+and settings, plus one edited cockpit and one replaced backdrop, and pin their hashes.
+Run the `B4` gate, `C5`, `D8`/`D9` and whole races on the 030 and A1200 against them.
+
+**F5 Fixes.** Keep size-based version detection. Make each colliding patch robust:
+verify the original bytes before patching, or turn the affected feature off for that
+file. Document the slave's baseline overrides (requester filter button, default save
+directory, 1991 names).
+
+**F6 Memory-patch features** (optional; user decision). Reimplement chosen F1GP-Ed memory
+patches (GPPatch, PatchF1GP, per-circuit factors, f1gp.library fixes) as slave options,
+configured from an F1GP-Ed datafile; F1GP-Ed's own code is not copied.
 
 ## G. Release
 
@@ -459,12 +492,24 @@ damping, thresholds, timers, RNG draws, per-quantity scaling (AmigaXDev
 
 **G2 Regression routes.** Quick Race, practice, qualifying, a full race weekend, a pit
 stop, a retirement, a replay, every view, menus and options, a second race (tables and
-state reset), NTSC; every CPU, caches on.
+state reset), NTSC; every CPU, caches on; the stock file and `F4`'s edited files.
 
 **G3 Final numbers.** The `A7` matrix and race-clock ratios after all changes, in
-internals; the ReadMe's requirements (memory, CPU) and options.
+internals; the ReadMe's requirements (memory, CPU) and options, and which F1GP-Ed
+settings the slave honours, overrides or rejects (`F`).
 
 **G4 Release archive** (AmigaXDev playbook §13).
+
+## H. Finer simulation (optional; only on the user's request)
+
+**H1 Per-field steering preview.** Preview the native player motion every field from the
+current input and spread it over the tick (Gunship `TIMING_DESIGN.md`), so steering
+shows within a field. Needs a side-effect-free preview of the player physics.
+
+**H2 Finer world step.** A units-and-writers audit of the car physics and AI: integrators,
+damping, thresholds, timers, RNG draws, per-quantity scaling (AmigaXDev
+`fixed-time-simulation.md` §Raising the update rate; Stunt Car Racer; Revs'
+`tools/sim_equiv.py`). Large and risky; not part of the main path.
 
 ## Order and critical path
 
@@ -474,4 +519,4 @@ internals; the ReadMe's requirements (memory, CPU) and options.
 3. `C1`–`C6`: real-time game speed on every machine.
 4. `A4`, then `D1`–`D10`: smooth pictures on 68020+.
 5. `E2`, `E3`, `E4` (they can start after `B4`, independently of `C` and `D`), then `E5`–`E8`.
-6. `F` only if asked; `G` last.
+6. `F` after `E`; `G` after `F`; `H` only if asked.
