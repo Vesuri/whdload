@@ -2991,7 +2991,7 @@ In this build's rear-chase window the player's car stands retired, so pictures c
 little (about 370 longs each). The figures in earlier notes (19.7, 18.0 and 16.6 ms)
 compared different builds' windows and so different pictures.
 
-**Exact faster routines (done).** Behind `CUSTOM2` bit 8 (hooks applied above the 68000):
+**Exact faster routines (done).** Behind `CUSTOM2` bit 8 (the tracer's hooks on every CPU since E7, the strip's above the 68000):
 
 - *The tracer's X-major steps* (h0+$1EF74, h0+$1EFDE). Natively a Bresenham loop runs
   once per pixel of X, about 31 iterations an edge in rear chase, and stores X only when Y
@@ -3090,4 +3090,37 @@ from E4's shadow of the front (bit 10; removed). In the first build's race that 
 took 3.3–3.8% of the rear-chase cycles, but its race showed no box in that window, so the
 trial was neither measured nor exercised. B4 passes (`tmp/b4/e6-acceptance.json`; release
 `93dde23f…` unchanged).
+
+### E7 the 68000 — complete
+
+A chip-only 68000 gains only from executing less, so of E4's changes only those that run
+without fast RAM apply: the copy of changed longs (E3), the data move (bit 7), the sky
+strip's fast copy (E3's CPU blits) and E6 (E2) all need fast RAM. The tracer's X-major
+form uses only 68000 instructions (`DIVU.W` gives the same quotient and remainder there),
+but its hooks sat in `patch_582992_clock`, which the 68000 does not apply. They now sit in
+the main list under the same bit 8, so they apply on every CPU; on the 020+ the patched
+bytes are unchanged.
+
+Same-build pairs on the A500-equivalent (`a500-1.5m`, developer `8db55434…`, bit 8 off and
+on):
+
+| Run | Off | On |
+|---|---:|---:|
+| Clock forced (`CUSTOM2` bit 2), 100 fields from tick 300: the tracer h0+$1EABA, inclusive | 14.2% of cycles | 11.3% |
+| Same window: scene per call | 93.2 ms | 86.4 ms (−7.3%) |
+| Native pacer (the 68000 default), frames in 500 fields after the route, two runs each | 62, 62 | 64, 64 (+3.2%) |
+
+The form's exactness follows from E4's check (every dx up to 1099 and dy ≤ dx, and
+algebraically for all). The overloaded clock drops fields, so a `--publish` pair cannot run
+on the 68000, and the native pacer's variable step makes the off and on races diverge once
+frame times differ. The rest of E4's list holds nothing for the 68000: the remaining
+entries are spread thin (1–3% each on the 030), and the 68000's time goes to the scene's
+geometry and the per-car update (C6). Evidence: `tmp/e7/{off,on,n-off,n-on,n-off2,n-on2}`;
+B4 `tmp/b4/e7-acceptance.json`.
+
+### E8 interrupt overhead — closed, not worked
+
+The race's level-3 chain (h2+$2E4 dispatcher, h2+$5DC, h0+$2CC38) measured about 1.2%
+including the slave's privileged-instruction handling (A6). The plan's condition was to
+leave it unless cheap; no cheap change is known, and it is below the 1–3% entries E4 left.
 

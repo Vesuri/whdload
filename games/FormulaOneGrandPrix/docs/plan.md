@@ -452,9 +452,13 @@ from the copy: a picture's scene falls 10–12% in rear chase and 5% on the grid
 
 **E7 The 68000.** Chip-only machines gain only from executing less. Re-profile the
 A500-equivalent after `C`, apply `E4`'s findings in 68000 forms, twin, and keep each only
-where it wins.
+where it wins. *Complete:* of `E4`'s changes only the tracer's X-major form runs without fast
+RAM; it now applies on the 68000 too (developer bit 8), and the A500-equivalent's native
+pacer draws 64 frames in 500 fields against 62 (two runs each). The rest needs fast RAM or
+is spread thin.
 
 **E8 Interrupt overhead.** The KickEmu interrupt chain (about 1.2%): leave unless cheap.
+*Closed, not worked:* no cheap change is known.
 
 ## F. F1GP-Ed compatibility (after `E`)
 

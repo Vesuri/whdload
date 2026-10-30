@@ -4538,6 +4538,14 @@ patch_582992
         ; PERF_RANGE h0:1f388 2 custom=3 bit=1 variant=582992
         PL_R $1f388
         PL_ENDIF
+        PL_IFC2X 8
+        ; The edge tracer's X-major steps, one division per edge instead of a loop per pixel
+        ; (68000 instructions; E7: on every CPU).
+        ; PERF_RANGE h0:1ef74 6 custom=2 bit=8 variant=582992
+        PL_PS $1ef74,e4_trace_right
+        ; PERF_RANGE h0:1efde 6 custom=2 bit=8 variant=582992
+        PL_PS $1efde,e4_trace_left
+        PL_ENDIF
         ENDC
         IFNE VERIFY
         PL_IFC5X 0
@@ -4556,11 +4564,6 @@ patch_582992_clock
         PL_PS $9369c,e6_table
         PL_ENDIF
         PL_IFC2X 8
-        ; The edge tracer's X-major steps, one division per edge instead of a loop per pixel.
-        ; PERF_RANGE h0:1ef74 6 custom=2 bit=8 variant=582992
-        PL_PS $1ef74,e4_trace_right
-        ; PERF_RANGE h0:1efde 6 custom=2 bit=8 variant=582992
-        PL_PS $1efde,e4_trace_left
         ; The sky band's strip: a fast copy after each build, read by E3's CPU blits.
         ; PERF_RANGE h0:20e 6 custom=2 bit=8 variant=582992
         PL_PS $20e,e4_strip_build
