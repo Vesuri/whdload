@@ -2994,3 +2994,21 @@ about 200, and its 306 bytes exceed the 030's 256-byte instruction cache); the c
 the scaled objects h0+147C 6.8%; the tracer 6.2%; the slave's own code 23%. No single
 instruction exceeds 0.9%. The grid window adds the copy's compare loop (7.4%, no longs
 written) and D3's staging walk (about 3.5%).
+
+### E5 AGA 32-bit fetch — measured, not kept
+
+The game sets the display once, at startup (h2+$182–1B8): `BPLCON0` $4200, display
+window and data fetch from h2+$2A648–2A64F (`DDFSTRT`/`DDFSTOP` $38/$D0, 20 words a
+line), modulos 0. Its copper lists at h2+0 and the menus' list (h2+$3632E) load only
+plane, colour and sprite pointers, so an `FMODE` change applies to every screen. The
+trial wrote `FMODE` 1 and `DDFSTOP` $C8 (the last of ten 2-word fetches starts 8 colour
+clocks earlier) at h2+$1A8 when `LISAID` read $F8. The emulated A1200 is AGA. `DDFSTOP`
+$C8 without `FMODE` 1 drops the last fetch, so identical pictures show the 32-bit fetch
+was in effect.
+
+Same-build pairs on the 030 (E2–E4 on, 100 pictures each): the same tick's picture is
+identical, and a picture's scene goes from 9.58 to 9.55 ms on the grid and from 16.54 to
+16.51 ms in rear chase (−0.3% and −0.2%). After E3 and E4 the CPU's chip traffic is the
+copy's writes into free bus slots, so halving bitplane DMA leaves little to recover, and
+64-bit fetch (`FMODE` 3, 8-byte-aligned buffers) can recover no more. The global display
+change was not kept.

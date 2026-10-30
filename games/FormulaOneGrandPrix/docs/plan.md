@@ -437,7 +437,10 @@ if 32-bit gains. Check every screen's picture. The plan expected little (half th
 free, and after `E2`/`E3` the CPU's chip traffic is mostly the copy), but `E4` found the
 polygon filler bound by chip data, so measure. f1gp.library (F1GP-Ed's companion) set
 `FMODE` `$000F` (64-bit bitplane and sprite fetch) with its own display-window and
-data-fetch values; how it met the 8-byte alignment is not established.
+data-fetch values; how it met the 8-byte alignment is not established. *Measured, not kept:*
+32-bit fetch left the picture identical and cut a picture's scene by only 0.2–0.3% on
+the 030 (same-build pairs). The CPU's chip traffic after `E3`/`E4` is the copy's writes into
+free slots, so neither 32-bit nor 64-bit fetch justifies changing every screen's display.
 
 **E6 Chip data the CPU reads.** About 800 reads per field from hunk 2's tables and 670
 from `$50000–$53FFF` (follow). Move CPU-only hot tables to fast RAM only if `E4`'s profile
