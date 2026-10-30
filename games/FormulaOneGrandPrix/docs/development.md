@@ -1166,7 +1166,8 @@ slave image, and VERIFY logs them at every epoch close (`F1GP VERIFY E4 ...`). T
 what a change can affect: the copy needs the comparison and one profile pair, not a
 re-compared race. `--e4-data` sets `CUSTOM2` bit 7, the renderer's chip data in fast RAM
 (`tools/e4_tables.py` writes the operand table at build time); its check is a `--publish`
-pair with the bit off and on, compared with `tools/c2_compare.py`. The rear-chase window (`--views`, profile from tick 870) moves; the
+pair with the bit off and on, compared with `tools/c2_compare.py`. The capture overlays the
+moved bytes on its hunk dumps; `--states` and `--rate` refuse `--e4-data`. The rear-chase window (`--views`, profile from tick 870) moves; the
 default tick-300 window is the player standing on the grid in the cockpit:
 
 ```sh

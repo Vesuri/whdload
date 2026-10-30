@@ -2901,38 +2901,64 @@ E4 the publication (mostly the copy) falls from 18.5% to 11.4% of cycles, and th
 draws 75 pictures instead of 68 (+10%). E4 changes only the copy, so the race and the
 staged pictures are not re-compared.
 
-**The renderer's data (done).** Behind `CUSTOM2` bit 7, the polygon renderer's chip data
-moves to fast RAM at the first live epoch. f1gp loads hunks 2 and 3 into chip memory
-(their hunk flags), and three CPU-only areas there feed the filler and the tracer:
+**The renderer's data (done).** Behind `CUSTOM2` bit 7, the renderer's CPU-only chip
+data moves to fast RAM at the first live epoch. f1gp loads hunks 2 and 3 into chip memory
+(their hunk flags). Per-instruction cycles in the profile, grouped by the chip area each
+absolute operand names (`tmp/e4/chipcost.py`), showed which areas the CPU waits on:
 
-| Region | Use |
-|---|---|
-| h3+$112F8–$14F84 | Edge pool: the tracer (h0+1EABA, stepping at h0+1EF54–1F030) writes each edge's X list from the cursor h0+$1F03A (reset at h2+$28112, limit h3+$14D90 plus one edge); the filler reads it. The standings sorts at h0+28FF6, h0+29168 and h0+29E4E use its start as scratch. |
-| h3+$200–$704 | Span masks and word offsets for X 0–320 (built by h2+$1E936), read through A5 |
-| h2+$1E804–$1E810 | The fillers' jump-offset words h2+$1E804 and h2+$1E80E |
+| Region | Use | Cycles before the move |
+|---|---|---|
+| h3+$112F8–$14F84 | Edge pool: the tracer (h0+1EABA, stepping at h0+1EF54–1F030) writes each edge's X list from the cursor h0+$1F03A (reset at h2+$28112, limit h3+$14D90 plus one edge); the filler reads it. The standings sorts at h0+28FF6, h0+29168 and h0+29E4E use its start as scratch. | the filler's and tracer's 27–50-cycle accesses |
+| h3+$200–$704 | Span masks and word offsets for X 0–320 (built by h2+$1E936), read through A5 | (with the pool) |
+| h2+$1E804–$1E810 | The fillers' jump-offset words h2+$1E804 and h2+$1E80E | (with the pool) |
+| h2+$23126–$2327E | Scene variables: camera, horizon and viewport, object lists, flags (976 operands) | 11.8%, 50 cycles an access |
+| h2+$28168–$281AE | Projection variables, with the pool cursor's saved copy (150 operands) | 4.5%, 42 cycles an access |
+
+No other chip area costs more than 0.4%. The hunk 2 blocks lie between pieces of code
+(their ends, h2+$2327E and h2+$281AE, are JSR targets).
 
 `tools/e4_tables.py` lists every relocated long that holds an address inside a region
-(36 in hunks 0 and 2, among them the cursor's saved copy h2+$2816C) plus the run-time
-cursor h0+$1F03A, and reports the end bounds it leaves alone: h3's clear (h2+$24A), the JSR
-to h2+$1E810 and the next table at h3+$704. All accesses use those addresses or
-pointers derived from them. The slave copies each region into a block below E3's picture
-(16,832 bytes, `MEMCONFIG=1`'s spare grows to $29000), then adds the distance to each
-listed long that still points into the chip region. This runs before E2's copy, so the
-copy holds the moved operands. Pointers already stored elsewhere keep the chip original,
-which still holds the same bytes.
+(1162 in hunks 0 and 2) plus the run-time cursor h0+$1F03A. It reports the end bounds it
+leaves alone: h3's clear (h2+$24A), JSRs to h2+$1E810, h2+$2327E and h2+$281AE, and the
+next table at h3+$704. It fails the build if a hunk 2 region holds a known instruction or
+a known instruction reaches it PC-relatively (from E2's recursive descent). All other
+accesses use those addresses or pointers derived from them. The slave copies each region
+into a block below E3's picture (17,264 bytes; `MEMCONFIG=1`'s spare grows to $29000),
+then moves each listed long, in the copy when it lies in a region, by the distance when it
+points into one. This runs before E2's copy, so the copy holds the moved operands.
+Pointers already stored elsewhere keep the chip original, which still holds the same
+bytes. The slave's own accesses map through `e4_map`: the bitmap stride h2+$231DA (E3 and
+C2 acquisition), the horizon clamp h2+$231CC (D4), the HUD box flag h2+$231EA, and D1's and
+D3's game ranges. `c2_capture.py` overlays the moved bytes on its hunk dumps, so the
+comparators read the live values. The per-tick probes (`--states`, `--rate`) still read
+chip offsets and refuse `--e4-data`.
 
-The move changes only where the renderer's data lives, so the check is the same tick's
-picture and state with the move off and on (developer `82b8bddd…`, rear chase,
-`--publish` at tick 900, `paint-off/on`): the picture is identical (0 of 32,000 bytes
-differ) and so are the selected A3/A4 ranges (`c2_compare.py`). The "on" arm's operands
-and cursor point into the fast block. Rear chase, 100 fields from tick 870
-(`profile-rear-data` against `profile-rear-e4`): the filler falls from 23.4% to 14.4% of
-cycles inclusive and the window holds 85 publications instead of 74 (counted as entries
-to `c2_publish` in both traces). The car-model wrapper h2+29C16 falls from 24.4% to 13.1%
-while its callee h2+28652 stays at 11.1%, consistent with car parts being filled by the
-same filler.
+The move changes only where the data lives, so the check is the same tick's picture and
+state with the move off and on (developer `8fcb7009…`, rear chase, `--publish` at tick
+900, `paint-off/on`): the picture is identical (0 of 32,000 bytes differ) and so are the
+selected A3/A4 ranges (`c2_compare.py`). With `CUSTOM4=1` (`profile-rear-data2`), D1's
+snapshot of h2+$231D4 holds the live values while the chip original keeps those of the
+first live epoch, so the slave reads the moved variables.
 
-**Where the time goes now** (`profile-rear-data`, inclusive): the scene 76%; the filler
-h0+1F388 14.4% and the tracer h0+1EABA 8.9%; the car models h2+29C16 13.1% (h2+28652
-11.1%); publication 11.2% (the copy 10.2%); `e3_blit` 3.3%. The game's self time is now
-spread over h2's scene code (h2+24000 3.0%, h2+241DC 2.1%, no other above 1.4%).
+Rear chase, 100 fields from tick 870 (`profile-rear-e4`; `profile-rear-data` with the
+first three regions, developer `82b8bddd…`; `profile-rear-data2` with all five):
+
+| | E4 copy | + renderer data | + scene variables |
+|---|---:|---:|---:|
+| Scene, ms per picture | 19.7 | 18.0 | 16.6 |
+| Pictures in the window | 75 | 85 | 88 |
+| Filler h0+1F388, inclusive | 23.4% | 14.4% | 17.0% |
+| Instructions naming chip data | | 17.2% | 5.9% |
+
+The car-model wrapper h2+29C16 falls from 24.4% to 13.1% with the renderer data, while its
+callee h2+28652 stays at 11.1%, consistent with car parts being filled by the same filler.
+The filler's own time per picture rises from 3.4 to 3.9 ms between the last two windows,
+which the move cannot cause (its only moved operand, h2+$231CC, gets cheaper); the windows
+draw different pictures, so their content differs, not yet confirmed as the cause.
+Scene and publication now take about 19.8 ms a picture, close to a field, so the window's
+picture count nears its cap of one per field; the time per picture is the measure.
+
+**Where the time goes now** (`profile-rear-data2`, inclusive): the scene 73%; the filler
+h0+1F388 17.0% and the tracer h0+1EABA 9.3%; the car models h2+29C16 13.5%; publication
+14.1% (the copy 12.3%); `e3_blit` 3.4%. Self time is spread thinly: the copy 12.3%, then
+nothing above 3.4%.

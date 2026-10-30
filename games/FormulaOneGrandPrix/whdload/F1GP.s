@@ -664,11 +664,12 @@ e_spare
 .rts
         rts
 
-; E4: the polygon renderer's CPU-only chip data (tools/e4_tables.py: the edge pool, the
-; span mask table and the fillers' jump-offset words) moves to fast RAM at the first live
-; epoch, below E3's picture (68020+, MEMCONFIG=1's spare). Each region is copied, then
-; every listed long that holds an address inside it moves by the same distance. Pointers
-; stored elsewhere keep the chip original, which still holds the same bytes.
+; E4: the renderer's CPU-only chip data (tools/e4_tables.py: the edge pool, the span mask
+; table, the fillers' jump-offset words and the scene's two variable blocks in hunk 2)
+; moves to fast RAM at the first live epoch, below E3's picture (68020+, MEMCONFIG=1's
+; spare). Each region is copied, then every listed long that holds an address inside it
+; moves by the same distance. Pointers stored elsewhere keep the chip original, which
+; still holds the same bytes. The slave reaches the moved variables through e4_map.
         INCLUDE e4.i
 e4_reserve
         movem.l d0-d1/a0-a1/a6,-(sp)
@@ -714,7 +715,6 @@ e4_move
         lea (e4_moved,pc),a0
         tst.w (a0)
         bne .done
-        move.w #1,(a0)
         lea (e4_bases,pc),a2
         move.l (c2_h0,pc),(a2)+
         move.l (c2_h1,pc),(a2)+
@@ -725,16 +725,32 @@ e4_move
         addq.l #4,d1
         move.l d1,(a2)
         lea (e4_regions,pc),a2
+        lea (e4_spans,pc),a3
         moveq #E4_REGIONS-1,d3
 .region
-        bsr.s e4_region         ; A0 = chip, A1 = fast, D1 = size
-        lsr.l #2,d1
+        move.w (a2)+,d0         ; hunk.w, low, high, fast offset
+        lsl.w #2,d0
+        lea (e4_bases,pc),a0
+        movea.l (a0,d0.w),a0
+        move.l (a2)+,d0
+        adda.l d0,a0            ; the chip original
+        move.l (a2)+,d1
+        sub.l d0,d1             ; its size
+        movea.l (e4_data,pc),a1
+        adda.l (a2)+,a1         ; its fast copy
+        move.l a0,(a3)+
+        move.l d1,(a3)+
+        move.l a1,d0
+        sub.l a0,d0
+        move.l d0,(a3)+         ; fast - chip
+        lsr.l #1,d1
         subq.w #1,d1
 .copy
-        move.l (a0)+,(a1)+
+        move.w (a0)+,(a1)+
         dbf d1,.copy
-        lea (14,a2),a2
         dbf d3,.region
+        lea (e4_moved,pc),a0
+        move.w #1,(a0)          ; e4_map follows the spans from here
         lea (e4_operands,pc),a3
         move.w #E4_OPERANDS-1,d4
 .operand
@@ -743,44 +759,42 @@ e4_move
         rol.l #6,d1
         and.w #%111100,d1       ; the hunk * 4
         lea (e4_bases,pc),a0
-        movea.l (a0,d1.w),a4
+        movea.l (a0,d1.w),a0
         and.l #$0fffffff,d0
-        adda.l d0,a4            ; the long
-        lea (e4_regions,pc),a2
-        moveq #E4_REGIONS-1,d3
-.inside
-        bsr.s e4_region
-        move.l (a4),d0
-        sub.l a0,d0
-        cmp.l d1,d0
-        bcc.s .outside
-        suba.l a0,a1
-        move.l a1,d0            ; fast - chip
-        add.l d0,(a4)
-        bra.s .next
-.outside
-        lea (14,a2),a2
-        dbf d3,.inside
-.next
+        adda.l d0,a0
+        bsr.s e4_map            ; the live long, in a copy if it lies in a region
+        movea.l a0,a4
+        movea.l (a4),a0
+        bsr.s e4_map
+        move.l a0,(a4)
         dbf d4,.operand
         bsr e2_flush
 .done
         movem.l (sp)+,d0-d4/a0-a4
         rts
-e4_region                       ; (A2) = hunk.w, low, high, fast offset
-        move.w (a2),d0
-        lsl.w #2,d0
-        lea (e4_bases,pc),a0
-        movea.l (a0,d0.w),a0
-        move.l (2,a2),d0
-        adda.l d0,a0
-        move.l (6,a2),d1
-        sub.l d0,d1
-        movea.l (e4_data,pc),a1
-        adda.l (10,a2),a1
+; A0 = an address; moved to the fast copy if it lies in a moved region.
+e4_map
+        movem.l d0-d1/a1,-(sp)
+        move.w (e4_moved,pc),d0
+        beq.s .done
+        lea (e4_spans,pc),a1
+        moveq #E4_REGIONS-1,d1
+.span
+        move.l a0,d0
+        sub.l (a1)+,d0
+        cmp.l (a1)+,d0
+        bcc.s .next
+        adda.l (a1),a0
+        bra.s .done
+.next
+        addq.l #4,a1
+        dbf d1,.span
+.done
+        movem.l (sp)+,d0-d1/a1
         rts
 e4_data dc.l 0
 e4_bases ds.l 4
+e4_spans ds.l E4_REGIONS*3      ; chip original, size, fast - chip
 e4_moved dc.w 0
 
 ; From c2_acquire: the chip back buffer is the one not submitted last; draw in fast RAM.
@@ -794,6 +808,9 @@ e3_acquire
         bne.s .back
         movea.l (c2_h2,pc),a4
         adda.l #$231da,a4
+        exg a0,a4
+        bsr e4_map
+        exg a0,a4
         add.l (a4),d0
 .back
         lea (e3_chip,pc),a4
@@ -2207,6 +2224,9 @@ c2_acquire
         bne.s .back
         movea.l (c2_h2,pc),a4
         adda.l #$231da,a4
+        exg a0,a4
+        bsr e4_map
+        exg a0,a4
         add.l (a4),d0
 .back
         move.l d0,8(a2)
@@ -2321,6 +2341,7 @@ d1_snapshot
         lea (c2_h0,pc),a0
         movea.l (a0,d0.w),a0
         adda.l (a2)+,a0
+        bsr e4_map
         move.w (a2)+,d0
 .word
         move.w (a0)+,(a1)+
@@ -2676,6 +2697,7 @@ d3_walk
         lea (c2_h0,pc),a0
         movea.l (a0,d0.w),a0
         adda.l (a6)+,a0
+        bsr e4_map
         move.w (a6)+,d1
         lea (a3),a1
         adda.w (a6)+,a1
@@ -2993,6 +3015,9 @@ d4_derive
         addi.w #$50,d0
         movea.l (c2_h2,pc),a1
         adda.l #$231cc,a1
+        exg a0,a1
+        bsr e4_map
+        exg a0,a1
         cmp.w (a1),d0
         ble.s .horizon
         move.w (a1),d0
@@ -3798,6 +3823,7 @@ c2_hud_flush
         dbf d0,.save
         movea.l (c2_h2,pc),a0
         adda.l #$231ea,a0
+        bsr e4_map
         move.b (a0),(a1)+
         lea (c2_hud_saved_tick,pc),a0
         move.w (c2_in_tick,pc),(a0)
@@ -3844,6 +3870,7 @@ c2_hud_flush
         dbf d0,.restore
         movea.l (c2_h2,pc),a0
         adda.l #$231ea,a0
+        bsr e4_map
         move.b (a1)+,(a0)
         lea (c2_in_tick,pc),a0
         move.w (c2_hud_saved_tick,pc),(a0)

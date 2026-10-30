@@ -24,6 +24,7 @@ from race_profile import game_hunks, image, locate
 from slave_compare import client
 from slave_inputs import ROOT, verify
 from state_diff import SIZES, scratch
+import e4_tables
 
 
 def keep_log(out):
@@ -40,6 +41,8 @@ def capture(args):
                         or args.profile or args.profile_tick or args.publish or args.shots
                         or args.route != 'quickrace'):
         raise ValueError('C5 tick-state probe requires Quick Race and no other probe options')
+    if args.e4_data and (args.states or args.rate):
+        raise ValueError('the per-tick probes read moved variables at their chip offsets')
     if args.rate and (args.modal or args.input or args.replay or args.view or args.profile
                       or args.profile_tick or args.publish or args.custom4 != 1
                       or args.route != 'quickrace'):
@@ -268,6 +271,16 @@ def capture(args):
             path = out/f'h{h}.bin'
             command('gdb', f'dump binary memory {path} {address:#x} {address+size:#x}')
             parts.append(path.read_bytes())
+        if 'e4_moved' in symbols:   # E4's moved data: the live bytes are in the fast copy
+            command('gdb', f'dump binary memory {out}/e4.bin {base+symbols["e4_data"]:#x} {base+symbols["e4_data"]+4:#x}')
+            fast = struct.unpack('>I', (out/'e4.bin').read_bytes())[0]
+            command('gdb', f'dump binary memory {out}/e4.bin {base+symbols["e4_moved"]:#x} {base+symbols["e4_moved"]+2:#x}')
+            if fast and struct.unpack('>H', (out/'e4.bin').read_bytes())[0]:
+                for h, lo, hi, at in e4_tables.layout()[0]:
+                    command('gdb', f'dump binary memory {out}/e4.bin {fast+at:#x} {fast+at+hi-lo:#x}')
+                    parts[h] = parts[h][:lo] + (out/'e4.bin').read_bytes() + parts[h][hi:]
+                    (out/f'h{h}.bin').write_bytes(parts[h])
+                meta['e4_moved'] = f'{fast:#x}'
         snapshot = b''.join(parts)
         (out/'tick.bin.gz').write_bytes(gzip.compress(snapshot, mtime=0))
         if args.publish:
