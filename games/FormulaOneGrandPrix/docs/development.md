@@ -1154,3 +1154,33 @@ python3 tools/c6_profile.py tmp/e3/profile-e3 --out tmp/e3/profile-e3.json
 make slave && make slave-developer && make slave-verify
 python3 tools/slave_gate.py --prefix e3-
 ```
+
+### E4 hot routines
+
+`c2_capture.py --e4` sets `CUSTOM2` bit 6 (implies `--e3`); `--e4-check` adds the VERIFY
+comparison of every E4 copy with the fast picture (`CUSTOM5` bit 3, implies `--e4`). The
+counters (`e4_copies`, `e4_full`, `e4_written`, `e4_checks`, `e4_faults`) are in the
+end-of-run slave image and VERIFY logs them at every epoch close (`F1GP VERIFY E4 ...`).
+The rear-chase window (`--views`, profile from tick 870) moves; the default tick-300
+window is the player standing on the grid in the cockpit:
+
+```sh
+make slave-verify OUT=tmp/e4/build-verify && make slave-developer OUT=tmp/e4/build-developer
+python3 tools/c2_capture.py tmp/e4/a1200 --build tmp/e4/build-verify --e2 --e4-check --snapshot --custom4 1 --setup a1200 --ticks 100
+S="--states --stage --views --custom4 1 --setup a1200-030"
+python3 tools/c2_capture.py tmp/e4/states-check --build tmp/e4/build-verify --e2 --e4-check $S
+python3 tools/c2_capture.py tmp/e4/states-off --build tmp/e4/build-verify --e2 --e3 $S
+python3 tools/c2_capture.py tmp/e4/states-on --build tmp/e4/build-verify --e2 --e4 $S
+python3 tools/c5_compare.py off=tmp/e4/states-off check=tmp/e4/states-check on=tmp/e4/states-on --out tmp/e4/states-comparison.json
+for a in off check on; do python3 tools/d7_views.py tmp/e4/states-$a --negative --out tmp/e4/views-$a.json; done
+P="--states --snapshot --views --custom4 1 --setup a1200-030"
+python3 tools/c2_capture.py tmp/e4/dev-off --build tmp/e4/build-developer --e2 --e3 $P
+python3 tools/c2_capture.py tmp/e4/dev-on --build tmp/e4/build-developer --e2 --e4 $P
+python3 tools/c5_compare.py off=tmp/e4/dev-off on=tmp/e4/dev-on --out tmp/e4/dev-comparison.json
+for a in e3 e4; do
+  python3 tools/c2_capture.py tmp/e4/profile-rear-$a --build tmp/e4/build-developer --e2 --$a --snapshot --views --setup a1200-030 --custom4 1 --ticks 900 --profile 100 --profile-tick 870
+  python3 tools/c6_profile.py tmp/e4/profile-rear-$a --out tmp/e4/profile-rear-$a.json
+done
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix e4-
+```

@@ -76,11 +76,14 @@ def capture(args):
     if args.alpha or args.stage:
         args.snapshot = True
     custom2 = (7 if args.clock_68000 else 3) | (8 if args.snapshot else 0)
-    custom5 = (2 if args.previous else 0) | (4 if args.twin else 0)
+    args.e4 = args.e4 or args.e4_check
+    custom5 = (2 if args.previous else 0) | (4 if args.twin else 0) | (8 if args.e4_check else 0)
     if args.e2:         # CUSTOM2 bit 4: hunk 2's code in fast RAM from the first live epoch
         custom2 |= 16
-    if args.e3 or args.twin:    # CUSTOM2 bit 5: the picture drawn in fast RAM
+    if args.e3 or args.twin or args.e4:     # CUSTOM2 bit 5: the picture drawn in fast RAM
         custom2 |= 32
+    if args.e4:         # CUSTOM2 bit 6: its copy writes only the changed blocks
+        custom2 |= 64
     if args.no_caches:  # E1's uncached arm: bit 0 clear and WHDLoad's NoCache (B5/A7 controls)
         custom2 &= ~1
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5={custom5} FileLog'
@@ -376,6 +379,8 @@ if __name__ == '__main__':
     parser.add_argument('--e2', action='store_true', help="CUSTOM2 bit 4: hunk 2's code in fast RAM")
     parser.add_argument('--e3', action='store_true', help='CUSTOM2 bit 5: draw the picture in fast RAM')
     parser.add_argument('--twin', action='store_true', help='CUSTOM5 bit 2: VERIFY twins each E3 CPU blit with the blitter (implies --e3)')
+    parser.add_argument('--e4', action='store_true', help='CUSTOM2 bit 6: copy only the changed blocks of the picture (implies --e3)')
+    parser.add_argument('--e4-check', action='store_true', help='CUSTOM5 bit 3: VERIFY compares every E4 copy with the fast picture (implies --e4)')
     parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')
     parser.add_argument('--replay', action='store_true')
     parser.add_argument('--publish', action='store_true', help='stop after painting, immediately before submission')

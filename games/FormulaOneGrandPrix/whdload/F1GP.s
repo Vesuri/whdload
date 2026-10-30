@@ -17,11 +17,7 @@ slv_Version = 17
 slv_Flags = WHDLF_NoError|WHDLF_EmulPriv|WHDLF_ClearMem|WHDLF_Examine
 slv_keyexit = $59
 CHIPMEMSIZE = $80000
-        IFNE DEVELOPER
-FASTMEMSIZE = $98000            ; E2, E3: 96 KB more for hunk 2's code and the picture
-        ELSE
 FASTMEMSIZE = $80000
-        ENDC
 NUMDRIVES = 1
 WPDRIVES = %1111
 ; Original KickEmu uses a 10,000-byte filesystem I/O cache.
@@ -44,6 +40,7 @@ slv_config
         dc.b 'C2:X:Developer - presentation snapshots and timing:3;'
         dc.b 'C2:X:Developer - hunk 2 code in fast RAM:4;'
         dc.b 'C2:X:Developer - draw in fast RAM:5;'
+        dc.b 'C2:X:Developer - copy only changed blocks:6;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -54,6 +51,7 @@ slv_config
         dc.b 'C5:X:Verify pacer relay:0;'
         dc.b 'C5:X:Verify D3 - draw the previous tick:1;'
         dc.b 'C5:X:Verify E3 - blits twinned with the blitter:2;'
+        dc.b 'C5:X:Verify E4 - changed-block copy compared:3;'
         ENDC
         dc.b 0
 intro_name dc.b 'frontend',0
@@ -455,7 +453,8 @@ c2_init
         rts
 
 ; E2: hunk 2's main code (E2_LOW-E2_HIGH, tools/e2_tables.py) runs from a fast-RAM copy.
-; At load, the top of real fast RAM is reserved (68020+, with the clock patches); at the
+; At load, a span at the slave's end is reserved when it and ExpMem lie in real fast RAM
+; (68020+, with the clock patches); at the
 ; first live epoch the code is copied, and every relocated JSR/JMP operand in e2_patches
 ; that still holds its original target in the span, and the slave's own hunk 2 code
 ; targets, move to the copy. Data stays in chip and only safe entries are redirected,
@@ -479,14 +478,13 @@ e2_reserve
         beq.s .header
         cmpi.l #$200000,($14,a0)        ; real fast RAM, not ExpMem in chip
         bcs.s .done
-        move.l ($18,a0),d0      ; mh_Upper
-        sub.l #E2_HIGH-E2_LOW,d0
-        and.w #$fff0,d0
-        movea.l d0,a1
-        move.l #E2_HIGH-E2_LOW,d0
-        jsr (_LVOAllocAbs,a6)
+        lea (.here,pc),a1       ; at the slave's end, which WHDLoad loads into fast RAM
+.here
+        adda.l #e2_area-.here,a1
+        cmpa.l #$200000,a1
+        bcs.s .done
         lea (e2_copy,pc),a0
-        move.l d0,(a0)
+        move.l a1,(a0)
 .done
         movem.l (sp)+,d0-d1/a0-a1/a6
         rts
@@ -600,8 +598,8 @@ e2_log dc.b 'F1GP VERIFY E2 copy=%08lx operands=%ld',10,0
 ; is what it would be with the option off. A VBL watch measures D2's lead, because the
 ; next picture has already started when the previous one is displayed.
 E3_SIZE = 32000
-e3_reserve                      ; below hunk 2's copy, or at the top of real fast RAM
-        movem.l d0-d1/a0-a1/a6,-(sp)
+e3_reserve                      ; at the slave's end, with E4's shadows
+        movem.l d0/a0-a1/a6,-(sp)
         btst #5,(cache_options+3,pc)
         beq.s .done
         move.l (_attnflags,pc),d0
@@ -617,20 +615,20 @@ e3_reserve                      ; below hunk 2's copy, or at the top of real fas
         beq.s .header
         cmpi.l #$200000,($14,a0)        ; real fast RAM, not ExpMem in chip
         bcs.s .done
-        move.l ($18,a0),d0      ; mh_Upper
-        move.l (e2_copy,pc),d1
-        beq.s .top
-        move.l d1,d0
-.top
-        sub.l #E3_SIZE,d0
-        and.w #$fff0,d0
-        movea.l d0,a1
-        move.l #E3_SIZE,d0
-        jsr (_LVOAllocAbs,a6)
+        lea (.here,pc),a1
+.here
+        adda.l #e3_area-.here,a1
+        cmpa.l #$200000,a1
+        bcs.s .done
         lea (e3_buffer,pc),a0
-        move.l d0,(a0)
+        move.l a1,(a0)
+        btst #6,(cache_options+3,pc)
+        beq.s .done
+        lea (E3_SIZE,a1),a1     ; E4: the chip bitmaps' shadows follow
+        lea (e4_last,pc),a0
+        move.l a1,(a0)
 .done
-        movem.l (sp)+,d0-d1/a0-a1/a6
+        movem.l (sp)+,d0/a0-a1/a6
         rts
 
 ; From c2_acquire: the chip back buffer is the one not submitted last; draw in fast RAM.
@@ -658,6 +656,9 @@ e3_acquire
         movea.l a3,a0
         movea.l d0,a1
         bsr e3_copy
+        lea (e4_slots,pc),a4
+        clr.l (a4)+             ; neither chip bitmap is known to E4
+        clr.l (a4)
 .valid
         IFNE VERIFY
         btst #2,(verify_options+3,pc)
@@ -714,7 +715,13 @@ e3_present
         ENDC
         movea.l (e3_buffer,pc),a0
         movea.l (e3_chip,pc),a1
+        move.l (e4_last,pc),d0
+        bne.s .changed
         bsr e3_copy
+        bra.s .copied
+.changed
+        bsr e4_copy
+.copied
         IFNE VERIFY
         btst #2,(verify_options+3,pc)
         beq.s .unchecked
@@ -820,6 +827,62 @@ e3_copy                         ; A0 -> A1, one picture
         lea 40(a1),a1
         dbf d0,.copy
         movem.l (sp)+,d0-d7/a0-a4
+        rts
+
+; E4: the picture copy writes only the longs that differ from what the chip bitmap holds.
+; Each chip bitmap has a shadow in fast RAM with the picture last copied into it, so the
+; comparison reads fast RAM only. When a chip bitmap's contents are unknown (the first
+; copies, or after a handoff), the whole picture is copied into it and its shadow.
+e4_copy                         ; A0 the fast picture -> A1 the chip back buffer
+        movem.l d0-d1/d5/d7/a0-a3,-(sp)
+        lea (e4_slots,pc),a3
+        movea.l (e4_last,pc),a2         ; the first chip bitmap's shadow
+        cmpa.l (a3),a1
+        beq.s .compare_from
+        lea (E3_SIZE,a2),a2
+        cmpa.l 4(a3),a1
+        beq.s .compare_from
+        tst.l 4(a3)
+        beq.s .second
+        lea (-E3_SIZE,a2),a2            ; a new bitmap takes the first shadow
+        move.l a1,(a3)
+        bra.s .whole
+.second
+        move.l a1,4(a3)
+.whole
+        bsr e3_copy
+        movea.l a2,a1
+        bsr e3_copy
+        lea (e4_full,pc),a3
+        addq.l #1,(a3)
+        bra.s .done
+.compare_from
+        move.l a1,d5
+        sub.l a2,d5                     ; chip bitmap - shadow
+        moveq #0,d1
+        move.w #E3_SIZE/4-1,d7
+.compare
+        cmpm.l (a0)+,(a2)+
+        dbne d7,.compare
+        beq.s .end
+        move.l -4(a0),d0                ; a long that differs from the chip bitmap
+        move.l d0,-4(a2)
+        move.l d0,-4(a2,d5.l)
+        addq.l #1,d1
+        dbf d7,.compare
+.end
+        lea (e4_written,pc),a3
+        add.l d1,(a3)
+.done
+        lea (e4_copies,pc),a3
+        addq.l #1,(a3)
+        movem.l (sp)+,d0-d1/d5/d7/a0-a3
+        IFNE VERIFY
+        btst #3,(verify_options+3,pc)
+        beq.s .unchecked
+        bsr e4_check
+.unchecked
+        ENDC
         rts
 
 ; The queued blits of one c2_blit_queue call (A0: word count - 1, then the commands the
@@ -1275,6 +1338,31 @@ e3_fault                        ; c5_capture --twin saves both pictures here
 e3_compare_same
         movem.l (sp)+,d0/a0-a2
         rts
+; E4: after the changed-block copy the chip back buffer holds the whole fast picture.
+e4_check
+        movem.l d0/a0-a2,-(sp)
+        lea (e4_checks,pc),a2
+        addq.l #1,(a2)
+        movea.l (e3_buffer,pc),a0
+        movea.l (e3_chip,pc),a1
+        move.w #E3_SIZE/4-1,d0
+.compare
+        cmpm.l (a0)+,(a1)+
+        dbne d0,.compare
+        tst.w d0
+        bmi.s .same
+        lea (e4_faults,pc),a2
+        addq.l #1,(a2)+
+        tst.l (a2)
+        bne.s .same
+        subq.l #4,a0
+        suba.l (e3_buffer,pc),a0
+        addq.l #1,a0
+        move.l a0,(a2)+         ; e4_first: byte offset + 1
+        move.l (c2_clock+WC_TICKS,pc),(a2)      ; e4_first_tick
+.same
+        movem.l (sp)+,d0/a0-a2
+        rts
 ; The chip back buffer, untouched since acquire, before its first overwrite.
 e3_check_back
         movem.l d0/a0,-(sp)
@@ -1319,9 +1407,23 @@ e3_log_counts
         move.l (_resload,pc),a2
         jsr (resload_Log,a2)
         lea 36(sp),sp
+        move.l (e4_last,pc),d0
+        beq.s .done
+        move.l (e4_first_tick,pc),-(sp)
+        move.l (e4_first,pc),-(sp)
+        move.l (e4_faults,pc),-(sp)
+        move.l (e4_checks,pc),-(sp)
+        move.l (e4_written,pc),-(sp)
+        move.l (e4_full,pc),-(sp)
+        move.l (e4_copies,pc),-(sp)
+        lea (e4_log,pc),a0
+        jsr (resload_Log,a2)
+        lea 28(sp),sp
 .done
         movem.l (sp)+,d0-d1/a0-a2
         rts
+e4_log dc.b 'F1GP VERIFY E4 copies=%ld full=%ld longs=%ld checks=%ld faults=%ld'
+        dc.b ' first=%ld tick=%ld',10,0
 e3_log dc.b 'F1GP VERIFY E3 buffer=%08lx pictures=%ld twins=%ld faults=%ld'
         dc.b ' first=%ld tick=%ld stray=%ld blits=%ld unsupported=%ld',10,0
         EVEN
@@ -1341,6 +1443,11 @@ e3_watch dc.w 0                 ; e3_vbl waits for it to be taken
 e3_drawing dc.w 0               ; h0+$1252/$1256 point to the fast picture
 e3_soft dc.w 0                  ; blits run on the CPU
 e3_valid dc.w 0                 ; the fast picture holds the last published one
+e4_last dc.l 0                  ; E4: the chip bitmaps' shadows; 0: off
+e4_slots dc.l 0,0               ; the chip bitmap of each shadow; 0: unknown
+e4_copies dc.l 0                ; pictures copied by E4
+e4_full dc.l 0                  ; of them copied whole
+e4_written dc.l 0               ; longs written by the others
 e3_regs ds.b $48                ; blitter registers $40-$77, then e3_blit's scratch
         IFNE VERIFY
         CNOP 0,4
@@ -1354,6 +1461,10 @@ e3_faults dc.l 0                ; twins that differ
 e3_first dc.l 0                 ; the first difference's byte offset + 1
 e3_first_tick dc.l 0
 e3_stray dc.l 0                 ; chip bitmaps changed between acquire and publication
+e4_checks dc.l 0                ; E4 copies compared with the fast picture
+e4_faults dc.l 0                ; that differ
+e4_first dc.l 0                 ; the first difference's byte offset + 1
+e4_first_tick dc.l 0
 e3_twin_block ds.b E3_BLOCK
         ENDC
 
@@ -4207,4 +4318,8 @@ names_rnc
         IFNE DEVELOPER
         CNOP 0,4
 c2_hud_buffer ds.b C2_HUD_STRIDE*C2_HUD_CAPACITY
+        CNOP 0,16
+e2_area ds.b E2_HIGH-E2_LOW     ; E2: hunk 2's code
+        CNOP 0,16
+e3_area ds.b E3_SIZE*3          ; E3: the picture; E4: the chip bitmaps' shadows
         ENDC
