@@ -2715,6 +2715,8 @@ d3_stage                        ; D0 = kind
         lea ($c0,a0),a0
         dbf d1,.car
 .stage
+        lea (d5_track,pc),a0
+        clr.l (a0)
         lea (d3_saved,pc),a2
         lea (d3_copy_game,pc),a5
         bsr d3_walk
@@ -2739,6 +2741,10 @@ d3_stage                        ; D0 = kind
         lea (d3_staged,pc),a2
         lea (d3_load,pc),a5
         bsr d3_walk
+        move.l (d5_track,pc),d0
+        lea (d5_applied,pc),a0
+        move.l d0,(a0)
+        bsr d5_flags
         lea (d3_staged_pictures,pc),a0
         addq.l #1,(a0)
         lea (d3_active,pc),a0
@@ -2758,6 +2764,10 @@ d3_restore
         tst.w (a0)
         beq.s .done
         clr.w (a0)
+        lea (d5_applied,pc),a0
+        move.l (a0),d0
+        clr.l (a0)
+        bsr d5_flags
         lea (d1_buffers,pc),a3
         IFNE VERIFY
         lea (d3_staged,pc),a2
@@ -3179,9 +3189,12 @@ d4_table                        ; D0 = angle, A4 = h0+$222F0
 ; denominator (+$16). An explicit car's world X/Z are interpolated and its segment
 ; found by the game's own search (h0+$26406). Both interpolate pitch, height,
 ; lateral, yaw, correction and height offset as words; each pose accessor branch reads its own subset. A car
-; whose pose flag or status (+$96) changed, that jumped, that crosses a pit
-; transition or more than D5_STEPS segments in a tick, or that would stand before
-; its segment (on the grid) keeps the tick's pose.
+; whose pose flag changed (the game switches it at collisions) advances along its
+; segments too, since explicit cars keep their track coordinates, and is drawn
+; track-driven: d5_track marks it and d5_flags flips +$7E bit 0 around the draw. A car
+; whose status (+$96) changed, that jumped, that crosses a pit transition or more
+; than D5_STEPS segments in a tick, or that would stand before its segment (on the
+; grid) keeps the tick's pose.
 D5_STEPS = 3                    ; segments a car may cross in a tick (2 at most seen)
 d5_cars                         ; A3 = history snapshot
         movem.l d0-a6,-(sp)
@@ -3192,16 +3205,18 @@ d5_cars                         ; A3 = history snapshot
         lea (d3_staged+D3_GLOBALS+38,pc),a2 ; the staged
         moveq #25,d7
 .car
-        move.b ($7e,a4),d0
+        move.b ($7e,a4),d6
         move.b (64,a3),d1
-        eor.b d1,d0
-        btst #0,d0
-        bne .hold
+        eor.b d1,d6
+        andi.w #1,d6            ; the pose flag changed: along the track
         move.w ($96,a4),d0
         cmp.w (70,a3),d0
         bne .hold
+        tst.w d6
+        bne.s .track
         btst #0,($7e,a4)
         bne .explicit
+.track
         movea.l ($12,a3),a6     ; walk from the history's segment to cur's
         moveq #0,d2
         moveq #D5_STEPS,d5
@@ -3256,6 +3271,14 @@ d5_cars                         ; A3 = history snapshot
         swap d2
         addi.w #$400,d2
         move.w d2,(18,a2)
+        tst.w d6
+        beq .words
+        moveq #25,d0
+        sub.w d7,d0
+        move.l (d5_track,pc),d1
+        bset d0,d1
+        lea (d5_track,pc),a0
+        move.l d1,(a0)
         bra .words
 .explicit
         moveq #24,d2
@@ -3441,12 +3464,19 @@ d7_aim                          ; A3 = history snapshot, d3_staged with predicte
         sub.l a5,d0
         subi.l #$5d6,d0
         divu.w #$c0,d0
+        move.l (d5_track,pc),d5
+        btst d0,d5
+        sne d5                  ; drawn in the other representation (D5)
         mulu.w #38,d0
         lea (d3_staged+D3_GLOBALS+38,pc),a2
         adda.w d0,a2
         movea.l ($238,a5),a1
         lea (d7_record,pc),a0
         move.b ($7e,a1),($7e,a0)
+        tst.b d5
+        beq.s .flag
+        bchg #0,($7e,a0)
+.flag
         move.w (6,a2),($a,a0)
         move.w (18,a2),($1c,a0)
         move.l (24,a2),($28,a0)
@@ -3519,6 +3549,23 @@ d7_place
         movem.l (sp)+,d3-d6/a0/a2-a6
         rts
 
+; D0 = cars (bit n = car n) drawn in the other representation: flip their +$7E bit 0.
+d5_flags
+        movem.l d0/a0,-(sp)
+        movea.l (c2_h1,pc),a0
+        lea ($5d6+$7e,a0),a0
+.car
+        tst.l d0
+        beq.s .done
+        lsr.l #1,d0
+        bcc.s .next
+        bchg #0,(a0)
+.next
+        lea ($c0,a0),a0
+        bra.s .car
+.done
+        movem.l (sp)+,d0/a0
+        rts
 ; Staged and history offsets: pitch, height, lateral, yaw, correction, height offset.
 d5_words
         dc.w 2,$04,4,$08,6,$0a,16,$1a,34,56+2,36,68,-1
@@ -4434,6 +4481,8 @@ d4_spring dc.w 0                ; spring word at the stage, for the horizon
 d5_predicted dc.l 0             ; car records predicted
 d5_held dc.l 0                  ; car records kept at the tick
 d5_moved dc.l 0                 ; predicted records on another segment
+d5_track dc.l 0                 ; cars drawn track-driven after a pose flag change
+d5_applied dc.l 0               ; those flipped in the game's records for the draw
 d7_aimed dc.l 0                 ; external cameras placed from the predicted car
 d7_faults dc.l 0                ; VERIFY: the tick's camera placed differs from the game's
 d7_record ds.b $80              ; a staged car as the pose accessor reads it

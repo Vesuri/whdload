@@ -76,8 +76,9 @@ class Aim:
             x = car[0] + ((self.model.lookup(0x4000-h)*distance) >> 6)
         return x, z, self.atan(signed((car[0]-x) >> 11), signed((car[1]-z) >> 11))
 
-    def predict(self, out, saved, history, read, weight):
-        """Place OUT's camera from its predicted viewed car; returns 1 if placed."""
+    def predict(self, out, saved, history, read, weight, drawn=0):
+        """Place OUT's camera from its predicted viewed car; returns 1 if placed. DRAWN:
+        the cars D5 draws track-driven (bit n = car n)."""
         self.tick_differs = False
         u32 = lambda b: struct.unpack('>I', b)[0]
         s16 = lambda b: struct.unpack('>h', b)[0]
@@ -106,6 +107,7 @@ class Aim:
         heading = (heading + scale(signed(heading-past), weight)) & 0xffff
         at = d5_cars.CARS + (record-CARS_AT)//0xc0*d5_cars.RECORD
         g = lambda o, f='>h': struct.unpack_from(f, out, at+o)[0]
+        flag ^= drawn >> (record-CARS_AT)//0xc0 & 1
         car = pose(g(d5_cars.SEG, '>I'), g(6), g(d5_cars.LON), g(d5_cars.X, '>l'), g(d5_cars.X+4, '>l'))
         x, z, yaw = self.place(car, heading, camera(out), code, distance)
         struct.pack_into('>ll', out, CAMERA+0xa, x, z)

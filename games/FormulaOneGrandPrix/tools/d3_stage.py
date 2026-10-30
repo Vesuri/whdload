@@ -122,7 +122,7 @@ def key(epoch, tick):
     return epoch << 16 | tick
 
 
-def check(directory, mutate=None, collect=None):
+def check(directory, mutate=None, collect=None, drawn=None):
     """With COLLECT, a list: each picture's (tick, weight, staged, saved, game reader,
     decision, D4 outcome, loop mode) is appended, its tick as key(epoch, tick)."""
     root = Path(directory)
@@ -213,17 +213,18 @@ def check(directory, mutate=None, collect=None):
         elif expected_source == 2:
             camera_history = history[d1.HEADER.size+snapshot_offset(0, 0x3a7f8):]
             records = d1.HEADER.size + sum(size for _, _, size in d1.RANGES)
-            counts, aimed = None, 0
+            counts, aimed, track_drawn = None, 0, 0
 
             def between(out):
                 # Before the camera's coordinates, anchor and derived values: the
                 # cars (D5), then an external camera from its predicted car (D7).
-                nonlocal counts, aimed
+                nonlocal counts, aimed, track_drawn
                 if cars:
                     counts = car_model.predict(
                         out, lambda r: history[records+r*d1.RECORD:records+(r+1)*d1.RECORD], read, weight)
+                    track_drawn = car_model.drawn
                 if aim:
-                    aimed = aim_model.predict(out, saved, history, read, weight)
+                    aimed = aim_model.predict(out, saved, history, read, weight, track_drawn)
             want, outcome = model.predict(saved, camera_history, weight, spring, clamp, view, between)
             outcomes[outcome] = outcomes.get(outcome, 0) + 1
             if outcome == 'jump':
@@ -232,6 +233,9 @@ def check(directory, mutate=None, collect=None):
                 shown.append((tick_key, weight, staged, saved))
                 if cars:
                     car_totals = [a+b for a, b in zip(car_totals, counts)]
+                if 'd5_track' in symbols and struct.unpack_from(
+                        '>I', block, at_d3('d5_track'))[0] != track_drawn:
+                    problems.append('cars drawn track-driven differ from the model')
                 if aim and aim_model.tick_differs:
                     problems.append('tick camera placed differs from the game')
             # The model's derived values from the tick's own camera are the game's.
@@ -243,6 +247,9 @@ def check(directory, mutate=None, collect=None):
             want = saved
         if collect is not None:
             collect.append((tick_key, weight, staged, saved, read, decision, outcome, mode))
+            if drawn is not None:   # as the slave drew them
+                drawn.append(struct.unpack_from('>I', block, at_d3('d5_track'))[0]
+                             if 'd5_track' in symbols and expected_source == 2 else 0)
         if source != expected_source:
             problems.append(('source', source, expected_source))
         if staged != want:

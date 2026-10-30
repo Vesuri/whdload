@@ -15,6 +15,8 @@ T with T the tick drawn: the picture is interpolated between them (D10):
   against a yaw rate of at least TURN per tick;
 - stalled: no step while the object moves;
 - evenness: the step per field divided by the motion per field of that tick interval.
+Cars whose pose flag alone changes over the pair (collisions) are measured apart, each
+picture's car in the representation the slave drew it in (d5_track).
 The same pictures showing their tick (the staged set without prediction) are the
 baseline.
 
@@ -82,8 +84,8 @@ def displays(root, meta):
 def poses(directory):
     root = Path(directory)
     meta = json.loads((root/'meta.json').read_text())
-    pictures = []
-    result = d3_stage.check(directory, collect=pictures)
+    pictures, drawn = [], []
+    result = d3_stage.check(directory, collect=pictures, drawn=drawn)
     shown = displays(root, meta)
     assert len(shown) == len(pictures)
     states = meta['states']
@@ -143,7 +145,8 @@ def poses(directory):
 
     # One entry per picture: when it shows, what it shows, predicted and at the tick.
     frames = []
-    for (tick, weight, staged, saved, read, decision, outcome, mode), (start, kind, at) in zip(pictures, shown):
+    for (tick, weight, staged, saved, read, decision, outcome, mode), (start, kind, at), track_drawn in zip(
+            pictures, shown, drawn):
         track = track_at(tick)
         code = read(1, 0x23c, 1)[0]
         selected = struct.unpack('>I', read(1, 0x238, 4))[0]
@@ -154,7 +157,8 @@ def poses(directory):
         frames.append(dict(
             tick=tick, weight=weight, decision=decision, outcome=outcome, view=view, state=state,
             start=start, shown=at, flags=flags,
-            predicted=(camera(staged), [car(staged, n, flags[n][0], track) for n in range(26)]),
+            predicted=(camera(staged), [car(staged, n, flags[n][0] ^ (track_drawn >> n & 1), track)
+                                        for n in range(26)]),
             latest=(camera(saved), [car(saved, n, flags[n][0], track) for n in range(26)])))
 
     histogram, per_view = collections.Counter(), {}
@@ -220,9 +224,23 @@ def poses(directory):
                 elif (yaw_step < 0) != (rate < 0):
                     count(label, 'camera', 'yaw backwards')
                     add(label, 'camera', 'yaw backwards angle', abs(yaw_step))
-            # Cars whose pose flag and status stay the same over the two pictures and the motion.
+            # Cars whose pose flag and status stay the same over the two pictures and the motion;
+            # apart, those whose pose flag alone changes (collisions): their step against
+            # the motion, positions in each picture's drawn representation.
             for n in range(26):
                 flag = a['flags'][n]
+                flags = (b['flags'][n], motion_from[2][n], motion_to[2][n])
+                if (all(f[1] == flag[1] for f in flags) and not flag[1] & 0x8000
+                        and any((f[0] ^ flag[0]) & 1 for f in flags)):
+                    (ax, az, _), (bx, bz, _) = a[name][1][n], b[name][1][n]
+                    (fx, fz, _), (tx, tz, _) = motion_from[1][n], motion_to[1][n]
+                    length = ((tx-fx)**2 + (tz-fz)**2) ** .5
+                    if length:
+                        count(label, 'cars', 'pose flag changes')
+                        along = ((bx-ax)*(tx-fx) + (bz-az)*(tz-fz)) / length
+                        ratio = (along/span) / (length/interval)
+                        add(label, 'cars', 'pose flag change evenness', ratio)
+                        counts[f'{label}/cars/pose flag change evenness bins/{ratio_bin(ratio)}'] += 1
                 if b['flags'][n] != flag or motion_from[2][n] != flag or motion_to[2][n] != flag or flag[1] & 0x8000:
                     count(label, 'cars', 'not comparable')
                     continue

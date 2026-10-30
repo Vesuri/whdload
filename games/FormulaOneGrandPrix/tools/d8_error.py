@@ -159,7 +159,7 @@ def measure(directory):
                 continue
             def between(out):
                 cars.predict(out, hist_rec, read, a)
-                aim.predict(out, saved, history, read, a)
+                aim.predict(out, saved, history, read, a, cars.drawn)
             predicted, result_outcome = model.predict(saved, camera_history, a, spring, clamp, code, between)
             actual = d3_stage.from_snapshot(target)[0]
             target_track = track_at(tick+steps) if tick+steps in readers else track

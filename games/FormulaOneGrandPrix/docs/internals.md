@@ -2252,7 +2252,8 @@ the lap wrap at the end pointer h2+$1FAC2, and the pit branch (h2+$1FADE) and jo
 (h2+$1FAD6 → +$1FAE2) points passed through unless the car is changing pit state.
 
 **Kept at the tick** (per car; the rest of the picture is still predicted): a car whose
-pose flag or status word +$96 differs from the history's; a track-driven car whose step
+status word +$96 differs from the history's (a pose flag change is interpolated along the
+track since D10's collision fix, below); a track-driven car whose step
 from the history crossed into or out of the pit lane (h0+$26626 would call
 h0+$2655A/+265D2, which rewrite its lateral offset; with pit stops on, any marked
 segment), crosses more than 3 segments in a tick or 6 in the prediction, or that
@@ -2687,6 +2688,38 @@ This build's race differs from D9's (the slave is larger, so the boot timing and
 random seed differ). In its rear-chase and retirement windows the view stands still for up
 to 24 fields with the option off as well. On the 040 the interpolated pictures change the
 screen every field.
+
+**Collisions.** The user saw cars jump at collisions: the game switches a colliding car
+between track-driven and explicit pose (+$7E bit 0) in that tick, usually two cars
+together, one braking hard and the other pushed forward (tick 172 of the race: car 12's
+speed 2043 to 481, car 10's 88 to 1943). D5 held such a car at cur, a whole tick ahead
+of the interpolated pictures, so it stood still and then leapt, up to 55,000 world units
+in a picture. Explicit cars keep their track coordinates (h0+$2B95A projects them every
+tick; the track form lies 2560 world units from +$28/+$2C at p50, 3840 at most, and at the
+switch to explicit it is exact), so a car whose pose flag changed now advances along its
+segments like a track-driven car and is drawn track-driven: `d5_track` marks it, and
+`d5_flags` flips its +$7E bit 0 after the stage is loaded and back before the restore. D7
+places an external camera from the same representation. Status changes are still held.
+
+Evidence (VERIFY `68f6ec97…`, developer `4dd4da7e…`, `a1200-030` non-MMU, `CUSTOM4=1`, the
+D7 view schedule, `tmp/coll/`): every staged picture is rebuilt exactly, with the model's
+mask equal to the slave's (6210 pictures), and the race is identical with the option off
+at all 3422 ticks. Over the pairs of pictures across a pose flag change (310; the step
+along the motion from T − 1 to T, per field, against that motion; D10's build in
+brackets, 303 pairs of the same race):
+
+| Pose flag change pairs | Interpolated | D10 |
+|---|---|---|
+| Evenness p50 / p95 / max | 1.03 / 3.01 / 11.6 | 1.75 / 3.17 / 13.2 |
+| Within 0.75–1.25 | 125 | 0 |
+| Stalled (below 0.25) | 75 | 147 |
+
+The tick shown has the same 147–154 stalls: the pairs include the collision's own change
+of speed. 16 more comparable car steps now go backwards (39 against 23): ten between
+interpolated pictures, 256–1693 world units, within the track form's offset from the
+explicit pose the car is drawn in again after the change; and six cars after a held
+picture in the front chase at epoch 3 tick 102 (360–5594), not analysed. B4 passes
+(release `93dde23f…` unchanged).
 
 ## Performance (E)
 

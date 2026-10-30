@@ -1043,7 +1043,7 @@ python3 tools/slave_gate.py --prefix d9-
 ### D10 play-test
 
 Interpolation is checked with the D9 recipe: `d9_smooth.py` now takes the reference motion
-from T − 1 to T, `d2_alpha.py` recomputes the history's weight `d2_weight` and checks that
+from T − 1 to T and measures cars across a pose flag change (collisions) apart, `d2_alpha.py` recomputes the history's weight `d2_weight` and checks that
 the shown time, tick − weight, never goes backwards, and the models rebuild every picture
 from that weight. `c2_capture.py --setup a1200-040` runs the 040 for screenshots; there
 the debugger reads memory behind the emulated data cache, so the HUD accounting check is

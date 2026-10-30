@@ -15,7 +15,9 @@ of the pit lane is held; a predicted step that would do so stops at the end of t
 segment before it (D9).
 An explicit car's world X/Z are interpolated and its segment found by the game's search
 h0+$26406. Both interpolate pitch, height, lateral, yaw, correction and height offset
-as words. A car whose pose flag or status +$96 changed, that jumped, that crosses more
+as words. A car whose pose flag changed (collisions) advances along its segments too,
+since explicit cars keep their track coordinates, and is drawn track-driven (the slave's
+d5_track mask). A car whose status +$96 changed, that jumped, that crosses more
 than D5_STEPS segments, or that would stand before its segment (fractions are signed; a
 grid car stands slightly before its segment) keeps the tick's pose. This module rebuilds all of it and runs
 the D3/D4 check with it.
@@ -66,6 +68,7 @@ class Cars:
         import d1_snapshot as d1
         from d3_stage import record_offset
         counts = [0, 0, 0]
+        self.drawn = 0          # bit n: car n drawn track-driven after a pose flag change
         for n, record in enumerate(d1.RECORDS[1:]):
             staged = CARS + n*RECORD
             hist = history_record(n+1)
@@ -79,14 +82,12 @@ class Cars:
             def hold(reason):
                 counts[1] += 1
                 self.reasons[reason] = self.reasons.get(reason, 0) + 1
-            if (explicit ^ H(0x7e, 1)[0]) & 1:
-                hold('pose flag')
-                continue
+            flipped = (explicit ^ H(0x7e, 1)[0]) & 1
             if game(1, record+0x96, 2) != H(0x96):
                 hold('status')
                 continue
             cur_segment = sl(SEG) & 0xffffffff
-            if not explicit:
+            if flipped or not explicit:
                 segment, progress = hl(0x12) & 0xffffffff, 0
                 for _ in range(STEPS+1):
                     if segment == cur_segment:
@@ -123,6 +124,8 @@ class Cars:
                     continue
                 lon = (((progress - 0x4000) * sw(DEN)) >> 14) + 0x400
                 struct.pack_into('>hH', out, staged+LON, signed(lon), progress)
+                if flipped:
+                    self.drawn |= 1 << n
             else:
                 if any(abs(sl(X+o) - hl(0x28+o)) >= JUMP for o in (0, 4)):
                     hold('jump')
