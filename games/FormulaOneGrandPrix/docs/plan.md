@@ -444,7 +444,11 @@ free slots, so neither 32-bit nor 64-bit fetch justifies changing every screen's
 
 **E6 Chip data the CPU reads.** About 800 reads per field from hunk 2's tables and 670
 from `$50000–$53FFF` (follow). Move CPU-only hot tables to fast RAM only if `E4`'s profile
-shows them significant.
+shows them significant. *Complete:* after `E4` no chip data area costs more than 0.4%; the
+chip cost left was hunk 2 code that `E2` could not redirect (handlers entered through
+`LEA`/`JSR (An)` and one PC-relative table read). Behind a developer option it now runs
+from the copy: a picture's scene falls 10–12% in rear chase and 5% on the grid on the 030
+(same-build pairs).
 
 **E7 The 68000.** Chip-only machines gain only from executing less. Re-profile the
 A500-equivalent after `C`, apply `E4`'s findings in 68000 forms, twin, and keep each only

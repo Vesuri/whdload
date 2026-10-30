@@ -3042,3 +3042,52 @@ copy's writes into free bus slots, so halving bitplane DMA leaves little to reco
 64-bit fetch (`FMODE` 3, 8-byte-aligned buffers) can recover no more. The global display
 change was not kept.
 
+### E6 hunk 2 code and data the CPU reads from chip — complete
+
+**Where the CPU still read chip** (030, E2–E4 on, `CUSTOM4=1`, the E5 profile windows): code
+was the largest part. 10.4% of a rear-chase window's cycles (3.0% on the grid) ran hunk 2
+code from chip, inside E2's span (h2+$23A98–$24310), almost all of it at more than 18
+cycles an instruction. Two things kept it there:
+- the scene's four handlers (h2+$23A98, +$23D80, +$24000, +$24180) are loaded by an
+  absolute `LEA` into A5 (31 sites, h2+$24E38–$25B40) and called through `JSR (A5)` at
+  h2+$244EE and +$24612; E2 relocates only `JSR`/`JMP` operands;
+- h2+$242E0, called absolutely from four sites, reaches E2's hazard h2+$24308, a
+  PC-relative read of the table at h2+$24310 that h2+$21A14 writes.
+
+The game's data reads are no longer a target: after E4 no chip operand area costs more
+than 0.4%, and the point projection's slow instructions (h2+$232B2–$23366) are its
+`MULS`/`DIVS`.
+
+**The change.** Behind developer `CUSTOM2` bit 10 (with E2):
+- `tools/e2_tables.py` adds indirect entries: an absolute `LEA` of a hunk 2 address into
+  An followed, in its block or in a routine it calls, by `JSR`/`JMP (An)` before An
+  changes. Their closures pass the usual hazard checks, and their `LEA` operands join the
+  patch table flagged with bit 30;
+- the slave replaces the read at h2+$24308 with a call (`e6_table`) that reads the chip
+  table, and `e2_tables.py` treats that hazard as replaced (`E6_REPLACED`), so
+  h2+$242E0's four callers are redirected too, also flagged;
+- `e2_enable` applies flagged patches only with bit 10, and also accepts `LEA abs.l,An`
+  operands.
+
+The table holds 502 operands: E2's 467, unchanged, and 35 for E6. The span is unchanged
+(h2+$1D820–$2A640).
+
+**Evidence** (same-build pairs, bit 10 off and on, the E4 windows):
+
+| Developer build | Window | Scene ms per picture, off | On | Pictures |
+|---|---|---:|---:|---|
+| `3594482a…` | Rear chase | 16.65 | 14.69 (−11.8%) | 88 → 97 |
+| `3594482a…` | Grid | 9.57 | 9.11 (−4.8%) | 100 each (one per field) |
+| `2fcb9ee3…` | Rear chase | 13.64 | 12.30 (−9.8%) | 100 each |
+| `2fcb9ee3…` | Grid | 9.58 | 9.12 (−4.8%) | 100 each |
+
+Hunk 2 code running from chip falls from 10.4% to 0.3% of the rear-chase cycles (7.9% to
+0.3% in the second build's race). E6 moves code only, so the check is the same tick's
+picture and state: with each build, `--publish` at tick 900 with the bit off and on gives
+an identical picture and identical selected A3/A4 ranges (`c2_compare.py`; `tmp/e6/p-*`,
+`p2-*`). The second build also contained a trial that read `c2_repeat_boxes`'s HUD boxes
+from E4's shadow of the front (bit 10; removed). In the first build's race that routine
+took 3.3–3.8% of the rear-chase cycles, but its race showed no box in that window, so the
+trial was neither measured nor exercised. B4 passes (`tmp/b4/e6-acceptance.json`; release
+`93dde23f…` unchanged).
+

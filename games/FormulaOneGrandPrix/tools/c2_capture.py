@@ -93,6 +93,8 @@ def capture(args):
         custom2 |= 128
     if args.e4_routines:    # CUSTOM2 bit 8: game routines replaced by exact faster forms
         custom2 |= 256
+    if args.e6:         # CUSTOM2 bit 10: indirectly entered hunk 2 code in fast RAM too
+        custom2 |= 1024
     if args.no_caches:  # E1's uncached arm: bit 0 clear and WHDLoad's NoCache (B5/A7 controls)
         custom2 &= ~1
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5={custom5} FileLog'
@@ -408,6 +410,8 @@ if __name__ == '__main__':
     parser.add_argument('--e4-data', action='store_true', help="CUSTOM2 bit 7: the polygon renderer's CPU-only chip data in fast RAM")
     parser.add_argument('--e4-routines', action='store_true',
                         help='CUSTOM2 bit 8: game routines replaced by exact faster forms (edge tracer, sky strip)')
+    parser.add_argument('--e6', action='store_true',
+                        help="CUSTOM2 bit 10: hunk 2's indirectly entered code in E2's copy too (with --e2)")
     parser.add_argument('--memconfig', type=int, help="WHDLoad MEMCONFIG (default 1 with --e2/--e3/--e4 on machines with fast RAM)")
     parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')
     parser.add_argument('--replay', action='store_true')

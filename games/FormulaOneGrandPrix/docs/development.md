@@ -1169,7 +1169,9 @@ re-compared race. `--e4-data` sets `CUSTOM2` bit 7, the renderer's chip data in 
 pair with the bit off and on, compared with `tools/c2_compare.py`. The capture overlays the
 moved bytes on its hunk dumps; `--states` and `--rate` refuse `--e4-data`. `--e4-routines`
 sets `CUSTOM2` bit 8, the exact faster game routines (edge tracer steps, sky strip); it
-refuses `--twin`. Different builds reach different races, so measure a change with a
+refuses `--twin`. `--e6` sets `CUSTOM2` bit 10, hunk 2's indirectly entered code in
+E2's copy too (`tools/e2_tables.py` flags its patches); its check is the same `--publish`
+pair. Different builds reach different races, so measure a change with a
 same-build profile pair, its bit off and on, and compare the scene's time per picture
 (`c2_scene_call` in `c6_profile.py`'s output). The windows: rear chase (`--views`,
 `--ticks 900 --profile 100 --profile-tick 870`) and the grid at the start lights in the

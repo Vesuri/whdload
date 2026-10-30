@@ -19,6 +19,12 @@ Entries whose closure has none are redirected: the table lists every relocated J
 operand (hunk 0 or 2) to such an entry. Slave targets must all be safe (or the build
 fails). The copied span covers the safe closures. The output contains offsets derived from
 the game and must stay under tmp/.
+
+E6 (CUSTOM2 bit 10) adds, flagged in the table: routines entered indirectly, whose address
+an absolute LEA loads into An before a JSR/JMP (An) in the same block or in a routine it
+calls (the scene's handlers), with those LEA operands; and entries whose only hazard the
+slave replaces (E6_REPLACED: h2+$24308's PC-relative table read becomes a call to the
+slave, which reads the chip table).
 """
 import argparse
 import collections
@@ -32,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from capstone import CS_ARCH_M68K, CS_MODE_BIG_ENDIAN, CS_MODE_M68K_000, Cs   # noqa: E402
 from capstone.m68k import (M68K_AM_ABSOLUTE_DATA_LONG, M68K_AM_PCI_DISP,        # noqa: E402
                            M68K_AM_PCI_INDEX_8_BIT_DISP, M68K_AM_PCI_INDEX_BASE_DISP,
-                           M68K_OP_MEM)
+                           M68K_AM_REGI_ADDR, M68K_OP_MEM, M68K_OP_REG)
 from slave_inputs import ROOT, verify                                          # noqa: E402
 
 GAME = ROOT/'tmp/game/FormulaOneGrandPrix4Disk/data/f1gp'
@@ -47,6 +53,8 @@ READ_ONLY = ('cmp', 'tst', 'btst', 'chk')
 # and the samples and data before the main code; entries whose closure starts below it
 # stay in chip, so the copy covers the main code only.
 FLOOR = 0x1d000
+# E6: hazards the slave's E6 patches replace (F1GP.s e6_table).
+E6_REPLACED = {0x24308}
 
 
 def hunks():
@@ -150,11 +158,46 @@ class Code:
         return out
 
 
+def indirect_entries(code):
+    """{hunk 2 target: [(hunk, LEA operand offset)]} for LEA abs.l,An followed in its block
+    by JSR/JMP (An), directly or in a routine it calls absolutely in hunk 2."""
+    def calls_through(h, at, reg, depth):
+        for _ in range(64):
+            i = code.insn[h].get(at)
+            if i is None:
+                return False
+            op = i.mnemonic.split('.')[0]
+            if op in ('jsr', 'jmp'):
+                o = i.operands[0]
+                if o.address_mode == M68K_AM_REGI_ADDR and o.reg == reg:
+                    return True
+                _, absolute = code.flow(h, i)
+                if absolute and absolute[0] == 2 and depth and calls_through(2, absolute[1], reg, depth-1):
+                    return True
+            if op in END:
+                return False
+            if (op not in READ_ONLY and i.operands and i.operands[-1].type == M68K_OP_REG
+                    and i.operands[-1].reg == reg):
+                return False      # An replaced
+            at += i.size
+        return False
+    found = collections.defaultdict(list)
+    for h in (0, 2):
+        for a, i in code.insn[h].items():
+            if (i.mnemonic.split('.')[0] == 'lea' and i.operands[0].address_mode == M68K_AM_ABSOLUTE_DATA_LONG
+                    and code.relocs[h].get(a+2) == 2):
+                if calls_through(h, a+i.size, i.operands[1].reg, 2):
+                    found[i.operands[0].imm].append((h, a+2))
+    return found
+
+
 def analyse():
     verify()
     code = Code()
     targets = slave_targets()
     code.descend([(0, 0)] + [(2, t) for t in targets])
+    indirect = indirect_entries(code)
+    code.descend([(2, t) for t in indirect])
     h2 = code.insn[2]
     inside = {}                       # h2 byte -> instruction start
     for a, i in h2.items():
@@ -230,19 +273,23 @@ def analyse():
                 at += i.size
         return seen
 
-    entries = set(targets)
-    sites = []                        # (hunk, operand offset, target)
+    entries = set(targets) | set(indirect)
+    sites = [(h, at, t, True) for t, where in indirect.items() for h, at in where]
+    # (hunk, operand offset, target, E6 only)
     for h in (0, 2):
         for a, i in code.insn[h].items():
             if i.mnemonic.split('.')[0] in ('jsr', 'jmp'):
                 _, absolute = code.flow(h, i)
                 if absolute and absolute[0] == 2:
                     entries.add(absolute[1])
-                    sites.append((h, a+2, absolute[1]))
-    safe, unsafe, below, spans = set(), {}, set(), set()
+                    sites.append((h, a+2, absolute[1], False))
+    safe, unsafe, below, spans, e6 = set(), {}, set(), set(), set()
     for e in sorted(entries):
         reach = closure(e)
         bad = sorted(reach & hazards.keys())
+        if bad and not set(bad) - E6_REPLACED:
+            e6.add(e)                 # safe once the slave replaces its hazards
+            bad = []
         if bad:
             unsafe[e] = [f'h2+{b:x}: {hazards[b]}' for b in bad[:3]]
         elif min(reach) < FLOOR:
@@ -257,7 +304,9 @@ def analyse():
     if failed:
         raise SystemExit('slave targets reach hazards: ' + ', '.join(
             f'h2+{t:x} ({unsafe[t][0]})' for t in failed))
-    patches = sorted((h, at) for h, at, t in sites if t in safe)
+    if set(targets) & e6:
+        raise SystemExit('a slave target needs an E6 replacement')
+    patches = sorted((h, at, only or t in e6) for h, at, t, only in sites if t in safe)
     low = min(spans) & ~0xf
     high = max(a+h2[a].size for a in spans)
     # PC-relative constant reads inside the closures stay inside the span.
@@ -271,7 +320,8 @@ def analyse():
     if any(low <= t < high for t in below):
         raise SystemExit('a target below the floor lies in the copied span')
     return dict(low=low, high=high, patches=patches, hazards=hazards, unsafe=unsafe, below=sorted(below),
-                safe=sorted(safe), entries=len(entries), targets=targets,
+                safe=sorted(safe), entries=len(entries), targets=targets, e6=sorted(e6),
+                indirect=sorted(indirect),
                 code=sum(h2[a].size for a in spans), instructions=len(h2))
 
 
@@ -288,14 +338,18 @@ def main():
              f'E2_LOW = ${r["low"]:x}', f'E2_HIGH = ${r["high"]:x}',
              f'E2_PATCHES = {len(r["patches"])}', 'e2_patches']
     # Bit 31: the operand is in hunk 2 (patched in the chip original and in the copy).
-    lines += [f'        dc.l ${(h == 2) << 31 | at:x}' for h, at in r['patches']]
+    # Bit 30: only with E6 (CUSTOM2 bit 10).
+    lines += [f'        dc.l ${(h == 2) << 31 | only << 30 | at:x}' for h, at, only in r['patches']]
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text('\n'.join(lines)+'\n')
     summary = dict(span=[f'h2+{r["low"]:x}', f'h2+{r["high"]:x}'], copied_bytes=r['high']-r['low'],
                    closure_code_bytes=r['code'], h2_instructions=r['instructions'],
                    entries=r['entries'], safe_entries=len(r['safe']), below_floor=len(r['below']),
                    patches=len(r['patches']),
-                   patches_h0=sum(h == 0 for h, _ in r['patches']),
+                   patches_h0=sum(h == 0 for h, _, _ in r['patches']),
+                   patches_e6=sum(only for _, _, only in r['patches']),
+                   e6_entries=[f'h2+{e:x}' for e in r['e6']],
+                   indirect_entries=[f'h2+{e:x}' for e in r['indirect']],
                    hazards={f'h2+{a:x}': v for a, v in sorted(r['hazards'].items())},
                    unsafe_entries={f'h2+{e:x}': v for e, v in sorted(r['unsafe'].items())},
                    slave_targets=len(r['targets']))

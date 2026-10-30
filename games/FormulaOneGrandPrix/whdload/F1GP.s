@@ -52,6 +52,7 @@ slv_config
         dc.b 'C2:X:Developer - copy only changed blocks:6;'
         dc.b 'C2:X:Developer - renderer data in fast RAM:7;'
         dc.b 'C2:X:Developer - faster game routines:8;'
+        dc.b 'C2:X:Developer - indirect hunk 2 code in fast RAM:10;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -526,6 +527,11 @@ e2_enable
 .patch
         move.l (a2)+,d0
         movea.l (c2_h0,pc),a1
+        bclr #30,d0
+        beq.s .always
+        btst #2,(cache_options+2,pc) ; E6 (CUSTOM2 bit 10)
+        beq.s .next
+.always
         bclr #31,d0
         beq.s .hunk
         movea.l (c2_h2,pc),a1
@@ -535,6 +541,9 @@ e2_enable
         cmp.w #$4eb9,d0         ; JSR abs.l
         beq.s .jump
         cmp.w #$4ef9,d0         ; JMP abs.l
+        beq.s .jump
+        andi.w #$f1ff,d0
+        cmp.w #$41f9,d0         ; LEA abs.l,An: an E6 indirect entry
         bne.s .next             ; replaced by a slave patch
 .jump
         move.l (a1),d0
@@ -911,6 +920,19 @@ e4_strip_chip                   ; -> A0 h3+$704
         move.l (sp)+,d0
         rts
 e4_strip_valid dc.w 0
+
+; h2+$24308 (CUSTOM2 bit 10, E6): the routine at h2+$242E0 reads a byte from the table at
+; h2+$24310 PC-relatively, and h2+$21A14 writes that table, so a fast copy would read stale
+; bytes. Here the read names the chip table; E2 then redirects the routine's callers. The
+; scene's handlers, loaded by absolute LEA and called through A5, move with bit 10 too
+; (tools/e2_tables.py).
+e6_table
+        move.l a0,-(sp)
+        movea.l (c2_h2,pc),a0
+        adda.l #$24310,a0
+        move.b (a0,d0.w),(-3,a3)
+        movea.l (sp)+,a0
+        rts
         CNOP 0,4
 e4_strip ds.b $1000
 
@@ -4529,6 +4551,10 @@ patch_582992
 ; (user decision: the 68000 keeps the native frame-locked pacer by default).
 patch_582992_clock
         PL_START
+        PL_IFC2X 10
+        ; PERF_RANGE h2:24308 6 custom=2 bit=10 variant=582992
+        PL_PS $9369c,e6_table
+        PL_ENDIF
         PL_IFC2X 8
         ; The edge tracer's X-major steps, one division per edge instead of a loop per pixel.
         ; PERF_RANGE h0:1ef74 6 custom=2 bit=8 variant=582992
