@@ -18,10 +18,10 @@ slv_Flags = WHDLF_NoError|WHDLF_EmulPriv|WHDLF_ClearMem|WHDLF_Examine
 slv_keyexit = $59
 CHIPMEMSIZE = $80000
 FASTMEMSIZE = $80000
-; Developer: MEMCONFIG=1 adds ExpMem for E2's copy, E3's picture and E4's shadows on
-; machines with fast RAM. The default stays the release's, which a chip-only 2 MB A1200
+; Developer: MEMCONFIG=1 adds ExpMem for E2's copy, E3's picture, E4's shadows and E4's
+; renderer data on machines with fast RAM. The default stays the release's, which a chip-only 2 MB A1200
 ; can still allocate (it cannot spare about 32 KB more).
-E_AREAS = $25000
+E_AREAS = $29000
 NUMDRIVES = 1
 WPDRIVES = %1111
 ; Original KickEmu uses a 10,000-byte filesystem I/O cache.
@@ -213,6 +213,7 @@ patch_game
         jsr (resload_PatchSeg,a2)
         bsr e2_reserve
         bsr e3_reserve
+        bsr e4_reserve
 .patched
         ENDC
         bsr restore_names
@@ -662,6 +663,125 @@ e_spare
         cmp.l #FASTMEMSIZE,d0   ; carry set: the default ExpMem
 .rts
         rts
+
+; E4: the polygon renderer's CPU-only chip data (tools/e4_tables.py: the edge pool, the
+; span mask table and the fillers' jump-offset words) moves to fast RAM at the first live
+; epoch, below E3's picture (68020+, MEMCONFIG=1's spare). Each region is copied, then
+; every listed long that holds an address inside it moves by the same distance. Pointers
+; stored elsewhere keep the chip original, which still holds the same bytes.
+        INCLUDE e4.i
+e4_reserve
+        movem.l d0-d1/a0-a1/a6,-(sp)
+        btst #7,(cache_options+3,pc)
+        beq.s .done
+        move.l (_attnflags,pc),d0
+        btst #1,d0              ; AFF_68020
+        beq.s .done
+        move.l 4.w,a6
+        lea ($142,a6),a0        ; MemList
+.header
+        move.l (a0),a0
+        tst.l (a0)
+        beq.s .done
+        btst #2,($f,a0)         ; MEMF_FAST
+        beq.s .header
+        bsr e_spare
+        bcs.s .done
+        move.l ($18,a0),d0      ; mh_Upper
+        move.l (e2_copy,pc),d1
+        beq.s .e3
+        move.l d1,d0
+.e3
+        move.l (e3_buffer,pc),d1
+        beq.s .top
+        move.l d1,d0
+.top
+        sub.l #E4_DATA_SIZE,d0
+        and.w #$fff0,d0
+        movea.l d0,a1
+        move.l #E4_DATA_SIZE,d0
+        jsr (_LVOAllocAbs,a6)
+        lea (e4_data,pc),a0
+        move.l d0,(a0)
+.done
+        movem.l (sp)+,d0-d1/a0-a1/a6
+        rts
+
+e4_move
+        movem.l d0-d4/a0-a4,-(sp)
+        move.l (e4_data,pc),d0
+        beq .done
+        lea (e4_moved,pc),a0
+        tst.w (a0)
+        bne .done
+        move.w #1,(a0)
+        lea (e4_bases,pc),a2
+        move.l (c2_h0,pc),(a2)+
+        move.l (c2_h1,pc),(a2)+
+        movea.l (c2_h2,pc),a0
+        move.l a0,(a2)+
+        move.l (-4,a0),d1       ; hunk 3 follows hunk 2 in the segment list
+        lsl.l #2,d1
+        addq.l #4,d1
+        move.l d1,(a2)
+        lea (e4_regions,pc),a2
+        moveq #E4_REGIONS-1,d3
+.region
+        bsr.s e4_region         ; A0 = chip, A1 = fast, D1 = size
+        lsr.l #2,d1
+        subq.w #1,d1
+.copy
+        move.l (a0)+,(a1)+
+        dbf d1,.copy
+        lea (14,a2),a2
+        dbf d3,.region
+        lea (e4_operands,pc),a3
+        move.w #E4_OPERANDS-1,d4
+.operand
+        move.l (a3)+,d0
+        move.l d0,d1
+        rol.l #6,d1
+        and.w #%111100,d1       ; the hunk * 4
+        lea (e4_bases,pc),a0
+        movea.l (a0,d1.w),a4
+        and.l #$0fffffff,d0
+        adda.l d0,a4            ; the long
+        lea (e4_regions,pc),a2
+        moveq #E4_REGIONS-1,d3
+.inside
+        bsr.s e4_region
+        move.l (a4),d0
+        sub.l a0,d0
+        cmp.l d1,d0
+        bcc.s .outside
+        suba.l a0,a1
+        move.l a1,d0            ; fast - chip
+        add.l d0,(a4)
+        bra.s .next
+.outside
+        lea (14,a2),a2
+        dbf d3,.inside
+.next
+        dbf d4,.operand
+        bsr e2_flush
+.done
+        movem.l (sp)+,d0-d4/a0-a4
+        rts
+e4_region                       ; (A2) = hunk.w, low, high, fast offset
+        move.w (a2),d0
+        lsl.w #2,d0
+        lea (e4_bases,pc),a0
+        movea.l (a0,d0.w),a0
+        move.l (2,a2),d0
+        adda.l d0,a0
+        move.l (6,a2),d1
+        sub.l d0,d1
+        movea.l (e4_data,pc),a1
+        adda.l (10,a2),a1
+        rts
+e4_data dc.l 0
+e4_bases ds.l 4
+e4_moved dc.w 0
 
 ; From c2_acquire: the chip back buffer is the one not submitted last; draw in fast RAM.
 e3_acquire
@@ -1558,6 +1678,7 @@ c2_head
         lea (c3_excluded,pc),a1
         add.l d2,(a1)
 .initial
+        bsr e4_move             ; before E2's copy, which then holds the moved operands
         bsr e2_enable
         bsr world_clock_rebase
         lea (c2_mode,pc),a1

@@ -1164,7 +1164,9 @@ slave's spare ExpMem for the fast areas (`--memconfig` overrides). The counters
 (`e4_copies`, `e4_full`, `e4_written`, `e4_checks`, `e4_faults`) are in the end-of-run
 slave image, and VERIFY logs them at every epoch close (`F1GP VERIFY E4 ...`). Test only
 what a change can affect: the copy needs the comparison and one profile pair, not a
-re-compared race. The rear-chase window (`--views`, profile from tick 870) moves; the
+re-compared race. `--e4-data` sets `CUSTOM2` bit 7, the renderer's chip data in fast RAM
+(`tools/e4_tables.py` writes the operand table at build time); its check is a `--publish`
+pair with the bit off and on, compared with `tools/c2_compare.py`. The rear-chase window (`--views`, profile from tick 870) moves; the
 default tick-300 window is the player standing on the grid in the cockpit:
 
 ```sh
@@ -1175,4 +1177,8 @@ for a in e3 e4; do
   python3 tools/c6_profile.py tmp/e4/profile-rear-$a --out tmp/e4/profile-rear-$a.json
 done
 python3 tools/slave_gate.py --prefix e4-
+A="--build tmp/build-developer --e2 --e4 --views --setup a1200-030 --ticks 900 --publish"
+python3 tools/c2_capture.py tmp/e4/paint-off $A
+python3 tools/c2_capture.py tmp/e4/paint-on $A --e4-data
+python3 tools/c2_compare.py tmp/e4/paint-off tmp/e4/paint-on tmp/e4/paint-compare.json
 ```

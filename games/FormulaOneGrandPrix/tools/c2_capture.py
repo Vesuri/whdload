@@ -84,11 +84,13 @@ def capture(args):
         custom2 |= 32
     if args.e4:         # CUSTOM2 bit 6: its copy writes only the changed blocks
         custom2 |= 64
+    if args.e4_data:    # CUSTOM2 bit 7: the polygon renderer's chip data in fast RAM
+        custom2 |= 128
     if args.no_caches:  # E1's uncached arm: bit 0 clear and WHDLoad's NoCache (B5/A7 controls)
         custom2 &= ~1
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5={custom5} FileLog'
     if args.memconfig is None:  # E2-E4's areas need the developer slave's spare ExpMem
-        args.memconfig = int((args.e2 or args.e3 or args.e4)
+        args.memconfig = int((args.e2 or args.e3 or args.e4 or args.e4_data)
                              and args.setup not in ('a1200', 'a500-1.5m'))
     if args.memconfig:
         whd += f' MEMCONFIG={args.memconfig}'
@@ -386,6 +388,7 @@ if __name__ == '__main__':
     parser.add_argument('--twin', action='store_true', help='CUSTOM5 bit 2: VERIFY twins each E3 CPU blit with the blitter (implies --e3)')
     parser.add_argument('--e4', action='store_true', help='CUSTOM2 bit 6: copy only the changed blocks of the picture (implies --e3)')
     parser.add_argument('--e4-check', action='store_true', help='CUSTOM5 bit 3: VERIFY compares every E4 copy with the fast picture (implies --e4)')
+    parser.add_argument('--e4-data', action='store_true', help="CUSTOM2 bit 7: the polygon renderer's CPU-only chip data in fast RAM")
     parser.add_argument('--memconfig', type=int, help="WHDLoad MEMCONFIG (default 1 with --e2/--e3/--e4 on machines with fast RAM)")
     parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')
     parser.add_argument('--replay', action='store_true')

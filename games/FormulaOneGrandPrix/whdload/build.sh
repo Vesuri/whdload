@@ -6,6 +6,7 @@ export NDK_ASM="${NDK_ASM:-$AMIGA_SHARE/ndk/Include_I}"
 python3 tools/slave_toolchain.py
 python3 tools/slave_inputs.py
 python3 tools/e2_tables.py > /dev/null
+python3 tools/e4_tables.py > /dev/null
 BUILD="${BUILD:-release}"
 case "$BUILD" in
   release) defines=(-DDEVELOPER=0 -DVERIFY=0) ;;

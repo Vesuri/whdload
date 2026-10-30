@@ -2880,9 +2880,8 @@ RAM. It was measured only together with E2. The 68020 and 040/060 gains are not 
 **Re-profile with E1–E3 on** (030, E2 and E3, `CUSTOM4=1`): the top entry was E3's own
 copy into chip (22% of cycles with the player on the grid, 15% in a rear-chase window).
 The game's self time is spread thin (no routine above about 2.5%). Its largest inclusive
-routine is the polygon filler h0+1F388 with the edge tracer h0+1EABA. The filler waits on
-chip data: its edge lists h3+$11302–$12000 (written by the tracer at h0+1EF5C–1F030),
-the mask table h3+$200 (through A5) and h2+$1E804, at 27–50 cycles per access.
+routine is the polygon filler h0+1F388 with the edge tracer h0+1EABA. The filler waited
+on chip data at 27–50 cycles per access (moved below).
 
 **The copy (done).** Behind `CUSTOM2` bit 6, each chip bitmap has a fast shadow of the
 picture last copied into it. Publication compares the fast picture with the shadow
@@ -2902,8 +2901,38 @@ E4 the publication (mostly the copy) falls from 18.5% to 11.4% of cycles, and th
 draws 75 pictures instead of 68 (+10%). E4 changes only the copy, so the race and the
 staged pictures are not re-compared.
 
-**Where the time goes now** (`profile-rear-e4`, inclusive): the scene 74%, of which the
-car models h2+29C16 → h2+28652 24% and the filler h0+1F388 23% (its self time spread
-over h0+20B04–21714, about 15%); publication 11.4% (the copy 9.5%); the tracer h0+1EABA
-8.3%. h2+29C16 is a wrapper that draws a car's model and parts; its time is in its
-callees.
+**The renderer's data (done).** Behind `CUSTOM2` bit 7, the polygon renderer's chip data
+moves to fast RAM at the first live epoch. f1gp loads hunks 2 and 3 into chip memory
+(their hunk flags), and three CPU-only areas there feed the filler and the tracer:
+
+| Region | Use |
+|---|---|
+| h3+$112F8–$14F84 | Edge pool: the tracer (h0+1EABA, stepping at h0+1EF54–1F030) writes each edge's X list from the cursor h0+$1F03A (reset at h2+$28112, limit h3+$14D90 plus one edge); the filler reads it. The standings sorts at h0+28FF6, h0+29168 and h0+29E4E use its start as scratch. |
+| h3+$200–$704 | Span masks and word offsets for X 0–320 (built by h2+$1E936), read through A5 |
+| h2+$1E804–$1E810 | The fillers' jump-offset words h2+$1E804 and h2+$1E80E |
+
+`tools/e4_tables.py` lists every relocated long that holds an address inside a region
+(36 in hunks 0 and 2, among them the cursor's saved copy h2+$2816C) plus the run-time
+cursor h0+$1F03A, and reports the end bounds it leaves alone: h3's clear (h2+$24A), the JSR
+to h2+$1E810 and the next table at h3+$704. All accesses use those addresses or
+pointers derived from them. The slave copies each region into a block below E3's picture
+(16,832 bytes, `MEMCONFIG=1`'s spare grows to $29000), then adds the distance to each
+listed long that still points into the chip region. This runs before E2's copy, so the
+copy holds the moved operands. Pointers already stored elsewhere keep the chip original,
+which still holds the same bytes.
+
+The move changes only where the renderer's data lives, so the check is the same tick's
+picture and state with the move off and on (developer `82b8bddd…`, rear chase,
+`--publish` at tick 900, `paint-off/on`): the picture is identical (0 of 32,000 bytes
+differ) and so are the selected A3/A4 ranges (`c2_compare.py`). The "on" arm's operands
+and cursor point into the fast block. Rear chase, 100 fields from tick 870
+(`profile-rear-data` against `profile-rear-e4`): the filler falls from 23.4% to 14.4% of
+cycles inclusive and the window holds 85 publications instead of 74 (counted as entries
+to `c2_publish` in both traces). The car-model wrapper h2+29C16 falls from 24.4% to 13.1%
+while its callee h2+28652 stays at 11.1%, consistent with car parts being filled by the
+same filler.
+
+**Where the time goes now** (`profile-rear-data`, inclusive): the scene 76%; the filler
+h0+1F388 14.4% and the tracer h0+1EABA 8.9%; the car models h2+29C16 13.1% (h2+28652
+11.1%); publication 11.2% (the copy 10.2%); `e3_blit` 3.3%. The game's self time is now
+spread over h2's scene code (h2+24000 3.0%, h2+241DC 2.1%, no other above 1.4%).
