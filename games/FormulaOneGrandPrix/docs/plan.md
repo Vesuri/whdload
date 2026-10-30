@@ -465,10 +465,13 @@ and its values; no game bytes.
 the `C`/`D` hooks and the state `C`/`D` read. Classify each overlap as harmless, needing
 handling, or incompatible.
 
-**F3 Frame rate and timing.** F1GP-Ed's frames-per-second and PAL/NTSC timing settings
-edit the pacer the `C` clock replaces, and may change the simulation step. Trace what
-they change; decide (user decision) whether the clock honours or neutralises them; run
-`C5`'s checks at each value.
+**F3 Frame rate and timing.** F1GP-Ed's frame rate sets the pacer minimum and the
+simulation step (`h0+$34364`; [evidence](internals.md#native-time-step-and-f1gp-eds-frame-rate-f3-evidence)):
+n fields per frame, a step of n × 1350/65536 s on PAL. The user wants it supported: the
+clock delivers 65536 ÷ step updates a second instead of 8, and D interpolates them to
+the display rate (up to 50 fps). Confirm which step words F1GP-Ed writes (F1), make C's
+schedule, D's α and thresholds and the sound denominator follow the step, and run
+`C5`, `D8` and `D9` at each setting. The PAL/NTSC timing setting is traced the same way.
 
 **F4 Edited-file inputs.** Build edited `f1gp` files reproducibly from pinned datafiles
 and settings, plus one edited cockpit and one replaced backdrop, and pin their hashes.
@@ -501,6 +504,11 @@ settings the slave honours, overrides or rejects (`F`).
 **G4 Release archive** (AmigaXDev playbook §13).
 
 ## H. Finer simulation (optional; only on the user's request)
+
+The game's own variable step (`F3`) already gives a finer world step that F1GP-Ed players
+have used for decades; with `F3` the slave can offer it without F1GP-Ed. Its known side
+effects (computer cars slower, spins in long races at 20–25 fps) are what to measure
+before H2's audit is considered.
 
 **H1 Per-field steering preview.** Preview the native player motion every field from the
 current input and spread it over the tick (Gunship `TIMING_DESIGN.md`), so steering

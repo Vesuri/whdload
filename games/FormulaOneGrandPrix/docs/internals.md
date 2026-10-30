@@ -1271,6 +1271,49 @@ displayed frame (AmigaXDev `docs/playbooks/fixed-time-simulation.md`); slower ma
 need it to keep game time at real time.
 
 
+### Native time step and F1GP-Ed's frame rate (F3 evidence)
+
+The simulation's step is a variable, not a constant. The words at `h0+$34360–$34369` hold
+`$0800 $1000 $2000 $2000 $2000` in the file (seconds × 65536, so `$2000` is 1/8 s), and
+`h0+$3436A` is written at run time as 65536 ÷ the field rate (`h0+$34932`).
+
+- `h0+$34366` scales the physics and AI: 30 `MULS`/`MULU`/`DIVS`/`DIVU` reads from
+  `h0+$2762C` to `h0+$348F6`, including `DIVS` at `h0+$2BE70` and `h0+$2BF14`.
+- `h0+$34368` gives the race clocks' per-update increments at session start
+  (`h0+$25840`, read by the tick-clock routine `h0+$258A2`).
+- `h0+$34364` is read at `h0+$36952` (selected by a car flag bit).
+
+F1GP-Ed 3.44's frame rate (a setting saved into the file) uses this step; this comes from
+static disassembly of F1GP-Ed, not from a run. Its local-speed-factor patch reads the
+pacer minimum `h0+$125A` and the step `h0+$34364`, skips its frame-rate correction when the
+step is `$2000`, and otherwise compares the step with a table indexed by the minimum
+fields: `n × 1350` on PAL (20.6 ms a field) and `n × 1125` on NTSC (17.2 ms), `$2000` at the
+default cadence. So a setting of n fields per frame sets both the minimum and a step of n
+fields' game time:
+
+| n | PAL fps | PAL step | NTSC fps | NTSC step |
+|---:|---:|---|---:|---|
+| 2 | 25 | 2700 (41 ms) | 30 (removed in 3.43) | 2250 (34 ms) |
+| 3 | 16.7 | 4050 (62 ms) | 20 | 3375 (52 ms) |
+| 4 | 12.5 | 5400 (82 ms) | 15 | 4500 (69 ms) |
+| 5 | 10 | 6750 (103 ms) | 12 | 5625 (86 ms) |
+| default | 8 (6.25 fields) | 8192 (125 ms) | 8 (7.5 fields) | 8192 |
+
+When the machine keeps up the game stays near real time (about 3% fast, like the stock
+clock); when it cannot, the game slows down. F1GP-Ed's guide records the side effects of
+smaller steps: computer cars slower (its correction is 1.065× at 20 fps), the player's
+car spinning in long races at 20–25 fps (presumably an overflow; not traced), and replays
+and saves valid only at the rate they were made with. Not yet established: which of the
+three `$2000` words F1GP-Ed writes (F1), and whether the native code also reads the
+cadence tables `h0+$1262`/`$126A` it rewrites.
+
+GPPatch 2.20's keys 1–6 (Toni Wilen; also in F1GP-Ed as "turbo keys") are different: its
+routine at `$D1C` rewrites only the cadence tables, each word lowered by key − 1 (key 6:
+1, 1, 1, 2 on PAL), and leaves the step at 1/8 s, so a machine that reaches the higher cap
+runs the whole race faster than real time (the 030 at key 6 about 3.2×, from A8's no-wait
+25.3 fps). Both tools patch from a process beside the game, which WHDLoad does not allow;
+only F1GP-Ed's saved step reaches the slave.
+
 ### Elapsed-VBL world clock (C1)
 
 **C1 is complete as a design.** The user selected elapsed vertical blanks for the
