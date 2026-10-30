@@ -4,7 +4,7 @@ Goals: keep world simulation at real-time speed, present smooth motion up to 50 
 and improve performance, especially on 68020+ with Fast RAM. Follow [plan.md](plan.md);
 results and acceptance evidence are in [internals.md](internals.md).
 
-# Current status: C, D, E1 and E2 complete; B5/A8 pass for the current scope
+# Current status: C, D and E1–E3 complete; B5/A8 pass for the current scope
 
 | Work | Status |
 |---|---|
@@ -32,14 +32,20 @@ results and acceptance evidence are in [internals.md](internals.md).
 | D10 | Complete (user decision): the first 040 play-test found the horizon drawn over the 3D (fixed) and steering jumps from extrapolation. Pictures now interpolate between the last two ticks, shown a tick plus the measured lead late (user decision). Over a whole 030 race the rebuild is exact, camera yaw steps back 25 times (118 extrapolated) and cars 23 (51), steps are even p5–p95 0.89–1.07 (0.76–1.30), and the race is unchanged; on the 040 the screen changes every field. The user found steering, every view, the replay cuts and the pit stop fine. |
 | E1 | Complete for the current scope: B5's gate, and with the C2 loop and interpolation a whole 030 race draws 13–14% more pictures with caches on (3.43 against 3.86 fields per picture, developer build). Caches stay opt-in in the slave; the release turns them on through its icon (G1). |
 | E2 | Complete for the current scope (developer `CUSTOM2` bit 4): hunk 2's main code runs from a fast-RAM copy from the first live epoch, its data stays in chip. The race is identical with it off at every tick, every staged picture is rebuilt, and the 030 draws 31–32% more pictures (2.46 against 3.24 fields per picture, developer build). |
-| E3–G | Optimisation and release work remain open under the plan. |
+| E3 | Complete for the current scope (developer `CUSTOM2` bit 5): the race picture is drawn in a fast buffer, its fills and queued blits run on the CPU, and publication copies it into the free chip back buffer. A VERIFY twin matches all 14,062 fills and blits of a race against the blitter byte for byte, the race is identical with it off at every tick, every staged picture is rebuilt, and with E2 the 030 draws 2.05–2.07 times as many pictures (1.21 against 2.51 fields per picture, developer build). |
+| E4–G | Optimisation and release work remain open under the plan. |
 
-**Next F1GP step: E3 (draw in fast RAM, copy to chip).** E2 is complete for the current
-scope ([evidence](internals.md#e2-hunk-2s-code-in-fast-ram--complete-for-the-current-scope)):
-a static descent finds which of hunk 2's routines can run from a copy (only six
-PC-relative instructions touch data), the copy switches on at the first live epoch so the
-race stays the same, and the 030 draws 31–32% more pictures. Code reached only through
-stored pointers, and four routines that read written data PC-relatively, stay in chip.
+**Next F1GP step: E4 (hot routines).** E3 is complete for the current scope
+([evidence](internals.md#e3-drawing-in-fast-ram--complete-for-the-current-scope)): with
+the picture in fast RAM, acquire no longer waits for the display or copies chip to chip,
+so the 030 with E2 draws about twice as many pictures over the same race. Per-operation
+twins prove the CPU fills and the software blitter exact; a twin of whole scenes cannot,
+because the renderer keeps caches across draws. The copy into chip (22.5% of cycles in a
+profile window) is now E3's main cost, ahead of E4's re-profile. E2 is complete for the
+current scope
+([evidence](internals.md#e2-hunk-2s-code-in-fast-ram--complete-for-the-current-scope)):
+a static descent finds which of hunk 2's routines can run from a copy, and the 030 draws
+31–32% more pictures.
 E1 is complete for the current scope
 ([evidence](internals.md#e1-caches--complete-for-the-current-scope)): caches on draw 13–14%
 more pictures over a whole 030 race. The cached and uncached arms are different races,

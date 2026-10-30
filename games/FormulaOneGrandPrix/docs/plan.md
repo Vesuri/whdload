@@ -406,7 +406,12 @@ and samples.
 the back buffer (1.3–2.2% of slots) replaced by CPU fills in fast RAM; a `MOVEM` copy of
 the 32,000-byte picture into the chip back buffer just before publication. Powerdrome's
 bitmap alone gained nothing on the 68020, so measure after `E2` and keep it only where it
-wins. *Gate:* pixel twin of the picture; gain per CPU.
+wins. *Gate:* pixel twin of the picture; gain per CPU. *Complete for the current scope:*
+behind a developer option the picture is drawn in a persistent fast buffer, its fills and
+queued blits run on the CPU, and publication copies it into the free chip back buffer, so
+acquire no longer waits for the display. Every fill and queued blit of a race matches the
+blitter byte for byte, the race is identical, and with E2 the 030 draws 2.05–2.07 times as
+many pictures. The copy is now its main cost.
 
 **E4 Hot routines.** Re-profile after `E1`–`E3`, then work on the top entries. Before
 `E2` they are (follow window, inclusive of callees): `h2+29C16` (16.4%), `h0+1F388`

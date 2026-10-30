@@ -1124,3 +1124,33 @@ python3 tools/slave_gate.py --prefix e2-
 
 The D7 negative probes of the chase heading pick their pictures by tick (from epoch 1
 tick 900), because E2 changes the picture rate.
+
+### E3 drawing in fast RAM
+
+`c2_capture.py --e3` sets `CUSTOM2` bit 5; `--twin` adds the VERIFY pixel twin (`CUSTOM5`
+bit 2, implies `--e3`), which runs every fill and queued blit on the blitter and on the
+CPU and compares the two pictures. The slave's counters (`e3_pictures`, `e3_twins`,
+`e3_faults`, `e3_stray`, `e3_unsupported`) are in the end-of-run slave image:
+`slave-end.bin` for `--states` captures, otherwise `clock.bin`. VERIFY also logs them at
+every epoch close (`F1GP VERIFY E3 ...` in `whdl_log.txt`). On a twin difference,
+`c5_capture.py` appends the fast picture, the chip picture and the slave header to
+`twin-faults.bin`, which stays empty in a clean run:
+
+```sh
+make slave-verify OUT=tmp/e3/build-verify && make slave-developer OUT=tmp/e3/build-developer
+S="--states --stage --views --custom4 1 --setup a1200-030"
+python3 tools/c2_capture.py tmp/e3/states-off --build tmp/e3/build-verify --e2 $S
+python3 tools/c2_capture.py tmp/e3/states-twin --build tmp/e3/build-verify --e2 --twin $S
+python3 tools/c2_capture.py tmp/e3/states-on --build tmp/e3/build-verify --e2 --e3 $S
+python3 tools/c5_compare.py off=tmp/e3/states-off twin=tmp/e3/states-twin on=tmp/e3/states-on --out tmp/e3/states-comparison.json
+for a in off twin on; do python3 tools/d7_views.py tmp/e3/states-$a --negative --out tmp/e3/views-$a.json; done
+P="--states --snapshot --views --custom4 1 --setup a1200-030"
+python3 tools/c2_capture.py tmp/e3/dev-off --build tmp/e3/build-developer --e2 $P
+python3 tools/c2_capture.py tmp/e3/dev-on --build tmp/e3/build-developer --e2 --e3 $P
+python3 tools/c5_compare.py off=tmp/e3/dev-off on=tmp/e3/dev-on --out tmp/e3/dev-comparison.json
+python3 tools/c2_capture.py tmp/e3/a1200-e3 --build tmp/e3/build-verify --e2 --twin --snapshot --custom4 1 --setup a1200 --ticks 100
+python3 tools/c2_capture.py tmp/e3/profile-e3 --build tmp/e3/build-developer --e2 --e3 --snapshot --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
+python3 tools/c6_profile.py tmp/e3/profile-e3 --out tmp/e3/profile-e3.json
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix e3-
+```

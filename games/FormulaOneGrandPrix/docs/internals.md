@@ -2750,3 +2750,77 @@ live epoch. Code reached only through stored pointers (the interrupt handlers, m
 reached through tables) and the four unsafe entries stay in chip; in the follow and green
 windows of an earlier capture (`tmp/raw/`), 98.4% of the executed hunk 2 instructions lie in
 the code the descent finds.
+
+### E3 drawing in fast RAM — complete for the current scope
+
+Behind developer `CUSTOM2` bit 5, the race picture is drawn in fast RAM and copied to the
+chip back buffer when it is published. With E2 alone, a picture's acquire waits for the
+previous exchange (the pending byte h2+$1DAB0), then for a VBL, and then copies the front
+buffer into the back one, chip to chip. In a 100-field profile window on the 030
+(`tmp/e3/profile-e2`) those three take 44.3% of all cycles (copy 22.5%, pending wait 12.0%,
+VBL wait 9.8%), so the CPU spends most of a picture waiting for the display.
+
+**Design.** `e3_reserve` allocates a 32,000-byte buffer F with `AllocAbs` below E2's copy
+(or at the top of real fast RAM), on a 68020 or later with real fast RAM. Developer
+builds have 32 KB more ExpMem (`FASTMEMSIZE` `$98000`). F always holds the last published
+picture.
+
+- *Acquire* (`e3_acquire`, from `c2_acquire`) drains blits queued before the picture,
+  chooses the chip back buffer as the one not submitted last, and points the renderer's
+  destinations h0+$1252/$1256 at F. It doesn't wait and doesn't copy. After native code has
+  owned the bitmaps (a modal, replay or menu handoff, `e3_leave`), the first picture first
+  copies the front buffer into F.
+- *Blits on F* run on the CPU. A new hook at h2+$27D62 (`e3_scene_wait`) skips the scene's
+  pending-exchange wait and selects the game's own CPU path for the sky and ground fill
+  (flag 0, the h2+$1E13C clear). Blits queued through h2+$1E6CC (`c2_blit_queue`) run in
+  `e3_blit`, a software blitter. It handles channels A–D, shifts, first and last word
+  masks, modulos and any minterm in ascending mode, and has a dedicated loop for the
+  sky band ($07CA with A unshifted). Anything else counts as unsupported. In the race
+  only the fill and the sky band occur.
+- *Publish* (`e3_present`, from `c2_publish`) waits until the chip back buffer is no longer
+  displayed (`e3_free`), copies F into it with `MOVEM` (800 × 40 bytes), and restores the
+  native chip addresses before the native submission. Outside the window from acquire to
+  publication, every pointer is what it would be with the option off.
+- *D2's lead.* The next picture starts before the previous one is displayed, so the lead
+  is measured by a VBL watch (`e3_vbl` in `c2_vbl`) from the submitted picture's saved
+  start field and kind.
+
+**Pixel twin (VERIFY `CUSTOM5` bit 2).** Each fill (`c2_clear`) and each queued block
+(`e3_queue`) runs twice. First F is copied into the free chip back buffer and the
+operation runs there on the real blitter. Then it runs on F on the CPU, and the two
+pictures are compared byte for byte (`e3_compare`; on a difference `e3_fault` counts it,
+and `c5_capture.py --twin` saves both pictures in `twin-faults.bin`). Chip bitmap checksums
+at acquire and before every overwrite and publication catch stray writes into chip while
+the picture is in F. A twin of whole scenes isn't exact: the renderer keeps caches in h0,
+h1 and h2 across draws (for example the track record's clipping nibbles), so a second
+draw of the same scene differs in a few bytes even with the CPU on both passes.
+
+**Evidence** (`a1200-030` non-MMU, caches on, E2 on in every arm, `CUSTOM4=1`, the D7 view
+schedule; VERIFY `d2d1fe4a…`, developer `78a15488…`, `tmp/e3/`):
+
+| Check | Result |
+|---|---|
+| Pixel twin (`states-twin`, `slave-end.bin`) | 14,062 operations twinned in 4093 pictures: 0 faults, 0 stray chip writes, 0 unsupported blits |
+| Race unchanged (`states-comparison.json`) | VERIFY with staging: off, twin and on identical at all 3389 common ticks. Developer (`dev-comparison.json`): off and on identical at all 3373 |
+| Every picture rebuilt (`views-off/twin/on.json`) | PASS for all staged pictures in all three arms (17,197 with E3 on); the 14 negative probes are rejected |
+| Enabled | VERIFY logs `E3 buffer=0097BCE0 … blits=26780 unsupported=0` at the epoch close; the off arm logs no E3 line |
+| Without real fast RAM (`a1200-e3`) | Not enabled (`e3_buffer` 0); runs and quits OK |
+| Disabled-feature gate (`tmp/b4/e3-acceptance.json`) | B4 PASS, all 324 hook bytes rejected; release `93dde23f…` unchanged |
+
+| Build | E3 | Ticks | Fields | Pictures | Fields per picture | Picture rate on/off |
+|---|---|---:|---:|---:|---:|---:|
+| Developer | off | 3373 | 21,148 | 8435 | 2.51 | |
+| | on | 3373 | 21,148 | 17,477 | 1.21 | 2.072 |
+| VERIFY | off | 3389 | 21,250 | 8371 | 2.54 | |
+| | on | 3389 | 21,248 | 17,194 | 1.24 | 2.054 |
+
+On the 68030/50 with E2, the same race draws 2.05–2.07 times as many pictures, with no
+dropped field and no catch-up tick. In the profile window (`profile-e3`) the pictures per
+100 fields rise from 49 to 90. The remaining cost of E3 is the copy (22.5% of cycles, now
+fast to chip), then the blits on the CPU (3.7%) and the wait for the back buffer (3.2%).
+The twin arm runs every operation twice and draws far fewer pictures (5.20 fields per
+picture, one catch-up tick); it checks correctness, not speed.
+
+Limits: E3 is developer-only and needs the clock patches (`CUSTOM2` bit 1) and real fast
+RAM. It was measured only together with E2. The 68020 and 040/060 gains are not claimed
+(current scope and deferred work). Menus and modal screens keep drawing in chip.

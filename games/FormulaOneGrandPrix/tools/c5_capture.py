@@ -241,6 +241,16 @@ def states(args, command, out, base, bases, symbols, meta):
                                    for path, (start, size) in zip(stage_paths, stage_regions))
         command('gdb', f'break *{base+symbols["d3_restored"]:#x}')
         command('gdb', f'commands $bpnum\nsilent\n{stage_appends}\ncontinue\nend')
+    if getattr(args, 'twin', False):
+        # E3: at each twin difference, the fast picture, the blitter's chip picture
+        # and the slave's clock words, appended in that order.
+        fast, chip = (f'*(unsigned int*){base+symbols[n]:#x}' for n in ('e3_buffer', 'e3_chip'))
+        twin = out/'twin-faults.bin'
+        twin.write_bytes(b'')
+        command('gdb', f'break *{base+symbols["e3_fault"]:#x}')
+        command('gdb', f'commands $bpnum\nsilent\nset $e3f = {fast}\nset $e3c = {chip}\n'
+                       f'append binary memory {twin} $e3f $e3f+32000\nappend binary memory {twin} $e3c $e3c+32000\n'
+                       f'append binary memory {twin} {base+header[0]:#x} {base+header[1]:#x}\ncontinue\nend')
     if getattr(args, 'views', False):
         # One instruction into c2_pacer (after its move from SR), so these never share
         # an address with the tick stop of a run without snapshots.
@@ -285,6 +295,8 @@ def states(args, command, out, base, bases, symbols, meta):
     command('gdb', 'continue')
     pc = int(re.search(r'\$\d+\s*=\s*(0x[0-9a-fA-F]+)', command('gdb', 'p/x $pc'))[1], 16)
     assert pc == base+symbols[leave], hex(pc)
+    # The slave's counters at the epoch close (E3's VERIFY counts are logged only after it).
+    command('gdb', f'dump binary memory {out}/slave-end.bin {base:#x} {base+symbols["c2_beam_max"]+2:#x}')
     if getattr(args, 'views', False):
         steps = re.search(r'= (\d+)', command('gdb', 'p $replay'))
         if not steps or int(steps[1]) != 7:

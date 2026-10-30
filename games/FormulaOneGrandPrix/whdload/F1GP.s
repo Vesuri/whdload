@@ -18,7 +18,7 @@ slv_Flags = WHDLF_NoError|WHDLF_EmulPriv|WHDLF_ClearMem|WHDLF_Examine
 slv_keyexit = $59
 CHIPMEMSIZE = $80000
         IFNE DEVELOPER
-FASTMEMSIZE = $90000            ; E2: 64 KB more for hunk 2's code in fast RAM
+FASTMEMSIZE = $98000            ; E2, E3: 96 KB more for hunk 2's code and the picture
         ELSE
 FASTMEMSIZE = $80000
         ENDC
@@ -43,6 +43,7 @@ slv_config
         dc.b 'C2:X:Developer - VBL world clock on a 68000 too:2;'
         dc.b 'C2:X:Developer - presentation snapshots and timing:3;'
         dc.b 'C2:X:Developer - hunk 2 code in fast RAM:4;'
+        dc.b 'C2:X:Developer - draw in fast RAM:5;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -52,6 +53,7 @@ slv_config
         IFNE VERIFY
         dc.b 'C5:X:Verify pacer relay:0;'
         dc.b 'C5:X:Verify D3 - draw the previous tick:1;'
+        dc.b 'C5:X:Verify E3 - blits twinned with the blitter:2;'
         ENDC
         dc.b 0
 intro_name dc.b 'frontend',0
@@ -203,6 +205,7 @@ patch_game
         move.l d7,a1
         jsr (resload_PatchSeg,a2)
         bsr e2_reserve
+        bsr e3_reserve
 .patched
         ENDC
         bsr restore_names
@@ -587,6 +590,773 @@ e2_log dc.b 'F1GP VERIFY E2 copy=%08lx operands=%ld',10,0
         EVEN
         ENDC
 
+; E3: the picture is drawn in fast RAM. Between acquire and publication the renderer's
+; destinations h0+$1252/$1256 point to a persistent fast buffer that holds the last
+; published picture, so drawing starts without waiting for the display and without the
+; front-to-back copy. Blits on it run on the CPU: the scene's sky and ground fills take
+; the game's own CPU path (h2+$1E13C clear) and queued blits run through e3_blit.
+; Publication waits until the chip back buffer is no longer displayed, copies the picture
+; into it and restores the native chip addresses, so outside that window every pointer
+; is what it would be with the option off. A VBL watch measures D2's lead, because the
+; next picture has already started when the previous one is displayed.
+E3_SIZE = 32000
+e3_reserve                      ; below hunk 2's copy, or at the top of real fast RAM
+        movem.l d0-d1/a0-a1/a6,-(sp)
+        btst #5,(cache_options+3,pc)
+        beq.s .done
+        move.l (_attnflags,pc),d0
+        btst #1,d0              ; AFF_68020
+        beq.s .done
+        move.l 4.w,a6
+        lea ($142,a6),a0        ; MemList
+.header
+        move.l (a0),a0
+        tst.l (a0)
+        beq.s .done
+        btst #2,($f,a0)         ; MEMF_FAST
+        beq.s .header
+        cmpi.l #$200000,($14,a0)        ; real fast RAM, not ExpMem in chip
+        bcs.s .done
+        move.l ($18,a0),d0      ; mh_Upper
+        move.l (e2_copy,pc),d1
+        beq.s .top
+        move.l d1,d0
+.top
+        sub.l #E3_SIZE,d0
+        and.w #$fff0,d0
+        movea.l d0,a1
+        move.l #E3_SIZE,d0
+        jsr (_LVOAllocAbs,a6)
+        lea (e3_buffer,pc),a0
+        move.l d0,(a0)
+.done
+        movem.l (sp)+,d0-d1/a0-a1/a6
+        rts
+
+; From c2_acquire: the chip back buffer is the one not submitted last; draw in fast RAM.
+e3_acquire
+        bsr c2_drain            ; native blits queued before this picture finish first
+        movea.l (c2_h0,pc),a2
+        adda.l #$124a,a2
+        movea.l 4(a2),a3        ; front: the last submitted bitmap
+        move.l (a2),d0
+        cmp.l a3,d0
+        bne.s .back
+        movea.l (c2_h2,pc),a4
+        adda.l #$231da,a4
+        add.l (a4),d0
+.back
+        lea (e3_chip,pc),a4
+        move.l d0,(a4)
+        move.l (e3_buffer,pc),d0
+        move.l d0,8(a2)
+        move.l d0,12(a2)
+        lea (e3_valid,pc),a4
+        tst.w (a4)
+        bne.s .valid
+        move.w #1,(a4)          ; first picture, or after native code owned the bitmaps
+        movea.l a3,a0
+        movea.l d0,a1
+        bsr e3_copy
+.valid
+        IFNE VERIFY
+        btst #2,(verify_options+3,pc)
+        beq.s .unchecked
+        movea.l a3,a0
+        bsr e3_sum
+        lea (e3_front_sum,pc),a4
+        move.l d0,(a4)+
+        movea.l (e3_chip,pc),a0
+        bsr e3_sum
+        move.l d0,(a4)+         ; e3_back_sum
+        move.w #1,(a4)          ; e3_back_unchecked
+.unchecked
+        ENDC
+        lea (e3_drawing,pc),a4
+        move.w #1,(a4)
+        lea (e3_soft,pc),a4
+        move.w #1,(a4)
+        rts
+
+; Wait until the chip back buffer is no longer displayed: after an E3 submission the VBL
+; watch has seen it taken; otherwise A5's rule, the pending clear and a following VBL.
+e3_free
+        move.l d0,-(sp)
+        move.w (e3_timed,pc),d0
+        beq.s .classic
+.watch
+        move.w (e3_watch,pc),d0
+        bne.s .watch
+        bra.s .done
+.classic
+        movem.l a2,-(sp)
+        movea.l (c2_h2,pc),a2
+        adda.l #$1dab0,a2
+.pending
+        tst.b (a2)
+        bne.s .pending
+        move.l (c2_serial,pc),d0
+.field
+        cmp.l (c2_serial,pc),d0
+        beq.s .field
+        movem.l (sp)+,a2
+.done
+        move.l (sp)+,d0
+        rts
+
+; From c2_publish, after the HUD, blits and replay paint: the picture into the chip back
+; buffer, and the renderer's pointers back to it.
+e3_present
+        movem.l d0-d1/a0-a2,-(sp)
+        bsr e3_free
+        IFNE VERIFY
+        bsr e3_check_back
+        ENDC
+        movea.l (e3_buffer,pc),a0
+        movea.l (e3_chip,pc),a1
+        bsr e3_copy
+        IFNE VERIFY
+        btst #2,(verify_options+3,pc)
+        beq.s .unchecked
+        movea.l (c2_h0,pc),a0
+        movea.l ($124e,a0),a0   ; the front, displayed throughout the picture
+        bsr e3_sum
+        cmp.l (e3_front_sum,pc),d0
+        beq.s .unchecked
+        lea (e3_stray,pc),a0
+        addq.l #1,(a0)
+.unchecked
+        ENDC
+        bsr.s e3_restore
+        lea (e3_pictures,pc),a0
+        addq.l #1,(a0)
+        movem.l (sp)+,d0-d1/a0-a2
+        rts
+e3_restore                      ; the chip back buffer replaces the fast one
+        movea.l (c2_h0,pc),a2
+        move.l (e3_chip,pc),d0
+        move.l ($1252,a2),d1    ; the external views draw 640 bytes in
+        sub.l (e3_buffer,pc),d1
+        add.l d0,d1
+        move.l d1,($1252,a2)
+        move.l d0,($1256,a2)
+        lea (e3_drawing,pc),a2
+        clr.w (a2)
+        lea (e3_soft,pc),a2
+        clr.w (a2)
+        rts
+
+; From c2_publish, right after the submission (its pending byte is set): the picture's
+; D2 start and kind, measured by e3_vbl once displayed.
+e3_submitted
+        movem.l d0/a0,-(sp)
+        lea (d2_pending,pc),a0
+        move.w (a0),d0
+        clr.w (a0)
+        lea (e3_d2_start,pc),a0
+        move.l (d2_start,pc),(a0)+
+        move.w (d2_kind,pc),(a0)+
+        move.w d0,(a0)+         ; e3_d2_pending
+        move.w #1,(a0)+         ; e3_timed
+        move.w #1,(a0)          ; e3_watch, armed last
+        movem.l (sp)+,d0/a0
+        rts
+; From c2_vbl, while armed: at the first VBL with the request taken, the submitted bitmap
+; is displayed and the other one free. This is the field d2_shown records in c2_acquire.
+e3_vbl
+        movem.l d0/a0,-(sp)
+        movea.l (c2_h2,pc),a0
+        adda.l #$1dab0,a0
+        tst.b (a0)
+        bne.s .done
+        lea (e3_watch,pc),a0
+        clr.w (a0)
+        lea (e3_d2_pending,pc),a0
+        tst.w (a0)
+        beq.s .done
+        clr.w (a0)
+        move.l (c2_serial,pc),d0
+        sub.l (e3_d2_start,pc),d0
+        cmpi.l #$7fff,d0
+        bls.s .store
+        move.w #$7fff,d0
+.store
+        lea (d2_leads,pc),a0
+        adda.w (e3_d2_kind,pc),a0
+        move.w d0,(a0)
+.done
+        movem.l (sp)+,d0/a0
+        rts
+
+; From c3_suspend and c3_leave, after c3_retire: native code takes over the bitmaps.
+; A picture still being drawn goes into the owned chip bitmap (retired by the caller),
+; and the fast buffer is refreshed from the front at the next acquire.
+e3_leave
+        movem.l d0-d1/a0-a2,-(sp)
+        move.l (e3_buffer,pc),d0
+        beq.s .done
+        move.w (e3_drawing,pc),d0
+        beq.s .chip
+        movea.l (e3_buffer,pc),a0
+        movea.l (e3_chip,pc),a1
+        bsr.s e3_copy
+        bsr e3_restore
+.chip
+        lea (e3_valid,pc),a0
+        clr.w (a0)
+        lea (e3_d2_pending,pc),a0
+        clr.l (a0)              ; with e3_timed
+        clr.w 4(a0)             ; e3_watch
+.done
+        movem.l (sp)+,d0-d1/a0-a2
+        rts
+
+e3_copy                         ; A0 -> A1, one picture
+        movem.l d0-d7/a0-a4,-(sp)
+        move.w #E3_SIZE/40-1,d0
+.copy
+        movem.l (a0)+,d1-d7/a2-a4
+        movem.l d1-d7/a2-a4,(a1)
+        lea 40(a1),a1
+        dbf d0,.copy
+        movem.l (sp)+,d0-d7/a0-a4
+        rts
+
+; The queued blits of one c2_blit_queue call (A0: word count - 1, then the commands the
+; level-3 interrupt h2+$35E would write) on the CPU. Registers persist between blits
+; as in the blitter. As natively, A0 ends after the block and D0.W is $FFFF.
+e3_queue
+        IFNE VERIFY
+        btst #2,(verify_options+3,pc)
+        beq.s .untwinned
+        bsr e3_twin_queue
+.untwinned
+        ENDC
+        movem.l d1-d2/a5-a6,-(sp)
+        lea (e3_regs,pc),a6
+        suba.w #$40,a6          ; indexed by custom register offset
+        move.w (a0)+,d0
+        addq.w #1,d0
+        add.w d0,d0
+        lea (a0,d0.w),a5        ; block end
+.command
+        cmpa.l a5,a0
+        bcc.s .done
+        move.w (a0)+,d1         ; long writes - 1
+.long
+        move.w (a0)+,d2
+        bsr.s .register
+        move.l (a0)+,(a6,d2.w)
+        dbf d1,.long
+.word
+        move.w (a0)+,d2
+        beq.s .size
+        bsr.s .register
+        move.w (a0)+,(a6,d2.w)
+        bra.s .word
+.size
+        move.w (a0)+,d2         ; BLTSIZE
+        bsr e3_blit
+        bra.s .command
+.register                       ; only $40-$77 lie in e3_regs; others are not supported
+        cmpi.w #$40,d2
+        bcs.s .other
+        cmpi.w #$76,d2
+        bls.s .known
+.other
+        move.l a0,-(sp)
+        lea (e3_unsupported,pc),a0
+        addq.l #1,(a0)
+        movea.l (sp)+,a0
+        moveq #$76,d2           ; the BLTADAT slot's spare
+.known
+        rts
+.done
+        IFNE VERIFY
+        lea (e3_twin_pending,pc),a5
+        tst.w (a5)
+        beq.s .compared
+        clr.w (a5)
+        bsr e3_compare
+.compared
+        ENDC
+        moveq #-1,d0
+        movem.l (sp)+,d1-d2/a5-a6
+        rts
+
+; One blit on the CPU from the shadow registers (A6 = e3_regs-$40, D2 = BLTSIZE):
+; channels A-D with shifts, first and last word masks, modulos and any minterm,
+; ascending only. Line, descending and fill modes are counted and skipped.
+E3_ROWS = $78
+E3_COLUMN = $7a
+E3_WIDTH = $7c
+E3_BSHIFT = $7e
+E3_ASHIFTED = $80
+e3_blit
+        movem.l d0-d7/a0-a3,-(sp)
+        lea (e3_blits,pc),a0
+        addq.l #1,(a0)
+        move.w ($42,a6),d0      ; BLTCON1
+        andi.w #$1b,d0          ; line, descending, inclusive or exclusive fill
+        beq.s .supported
+        lea (e3_unsupported,pc),a0
+        addq.l #1,(a0)
+        bra .done
+.supported
+        move.w d2,d0
+        lsr.w #6,d0
+        bne.s .rows
+        move.w #1024,d0
+.rows
+        move.w d0,(E3_ROWS,a6)
+        andi.w #$3f,d2
+        bne.s .width
+        moveq #64,d2
+.width
+        subq.w #1,d2
+        move.w d2,(E3_WIDTH,a6)
+        movea.l ($50,a6),a0     ; A
+        movea.l ($4c,a6),a1     ; B
+        movea.l ($48,a6),a2     ; C
+        movea.l ($54,a6),a3     ; D
+        move.w ($40,a6),d3      ; BLTCON0: shift, channels, minterm
+        move.w d3,d7
+        rol.w #4,d7
+        andi.w #15,d7           ; A shift
+        move.w ($42,a6),d0
+        rol.w #4,d0
+        andi.w #15,d0
+        move.w d0,(E3_BSHIFT,a6)
+        moveq #0,d4             ; previous B word
+        moveq #0,d5             ; previous A word, masked
+        move.w d3,d0
+        andi.w #$0fff,d0
+        cmpi.w #$07ca,d0        ; B, C and D, A constant: A ? B : C (the sky band)
+        bne.s .row
+        tst.w d7
+        beq .band
+.row
+        move.w (E3_WIDTH,a6),(E3_COLUMN,a6)
+.word
+        move.w ($74,a6),d0      ; BLTADAT
+        btst #11,d3
+        beq.s .a
+        move.w (a0)+,d0
+.a
+        move.w (E3_COLUMN,a6),d1
+        bne.s .not_last
+        and.w ($46,a6),d0       ; BLTALWM
+.not_last
+        cmp.w (E3_WIDTH,a6),d1
+        bne.s .not_first
+        and.w ($44,a6),d0       ; BLTAFWM
+.not_first
+        move.w d5,d1
+        swap d1
+        move.w d0,d1
+        move.w d0,d5
+        lsr.l d7,d1
+        move.w d1,(E3_ASHIFTED,a6)
+        move.w ($72,a6),d0      ; BLTBDAT
+        btst #10,d3
+        beq.s .b
+        move.w (a1)+,d0
+.b
+        move.w d4,d1
+        swap d1
+        move.w d0,d1
+        move.w d0,d4
+        move.w (E3_BSHIFT,a6),d0
+        lsr.l d0,d1             ; B
+        move.w ($70,a6),d2      ; BLTCDAT
+        btst #9,d3
+        beq.s .c
+        move.w (a2)+,d2         ; C
+.c
+        move.w (E3_ASHIFTED,a6),d0      ; A
+        cmpi.b #$ca,d3          ; A ? B : C
+        bne.s .copy
+        and.w d0,d1
+        not.w d0
+        and.w d0,d2
+        or.w d2,d1
+        move.w d1,d6
+        bra.s .d
+.copy
+        cmpi.b #$f0,d3          ; A
+        bne.s .general
+        move.w d0,d6
+        bra.s .d
+.general
+        bsr e3_minterm
+.d
+        btst #8,d3
+        beq.s .no_d
+        move.w d6,(a3)+
+.no_d
+        subq.w #1,(E3_COLUMN,a6)
+        bcc .word
+        btst #11,d3
+        beq.s .a_row
+        adda.w ($64,a6),a0      ; BLTAMOD
+.a_row
+        btst #10,d3
+        beq.s .b_row
+        adda.w ($62,a6),a1      ; BLTBMOD
+.b_row
+        btst #9,d3
+        beq.s .c_row
+        adda.w ($60,a6),a2      ; BLTCMOD
+.c_row
+        btst #8,d3
+        beq.s .d_row
+        adda.w ($66,a6),a3      ; BLTDMOD
+.d_row
+        subq.w #1,(E3_ROWS,a6)
+        bne .row
+        move.l a0,($50,a6)      ; the pointers end where the blitter leaves them
+        move.l a1,($4c,a6)
+        move.l a2,($48,a6)
+        move.l a3,($54,a6)
+.done
+        movem.l (sp)+,d0-d7/a0-a3
+        rts
+.band                           ; the same for that case, A unshifted
+        move.w (E3_BSHIFT,a6),d5
+        move.w (E3_ROWS,a6),d7
+        subq.w #1,d7
+.band_row
+        move.w (E3_WIDTH,a6),d6
+        move.w ($74,a6),d3
+        and.w ($44,a6),d3
+        tst.w d6
+        bne.s .band_word
+        and.w ($46,a6),d3
+.band_word                      ; D3 = A
+        move.w (a1)+,d0
+        swap d4
+        move.w d0,d4
+        move.l d4,d1
+        lsr.l d5,d1             ; B
+        and.w d3,d1
+        not.w d3
+        and.w (a2)+,d3
+        or.w d3,d1
+        move.w d1,(a3)+
+        subq.w #1,d6
+        bcs.s .band_end
+        beq.s .band_last
+        move.w ($74,a6),d3
+        bra.s .band_word
+.band_last
+        move.w ($74,a6),d3
+        and.w ($46,a6),d3
+        bra.s .band_word
+.band_end
+        adda.w ($62,a6),a1
+        adda.w ($60,a6),a2
+        adda.w ($66,a6),a3
+        dbf d7,.band_row
+        move.l a1,($4c,a6)
+        move.l a2,($48,a6)
+        move.l a3,($54,a6)
+        bra.s .done
+e3_minterm                      ; D0 A, D1 B, D2 C, D3 low byte the minterm -> D6
+        movem.l d4-d5/d7,-(sp)
+        moveq #0,d6
+        moveq #7,d7
+.term
+        btst d7,d3
+        beq.s .next
+        move.w d0,d4
+        btst #2,d7
+        bne.s .a
+        not.w d4
+.a
+        move.w d1,d5
+        btst #1,d7
+        bne.s .b
+        not.w d5
+.b
+        and.w d5,d4
+        move.w d2,d5
+        btst #0,d7
+        bne.s .c
+        not.w d5
+.c
+        and.w d5,d4
+        or.w d4,d6
+.next
+        dbf d7,.term
+        movem.l (sp)+,d4-d5/d7
+        rts
+
+; h2+$27D62: the scene waits for the pending exchange, then selects queued blitter fills
+; (h2+$1E13C bit 7). Drawing in fast RAM needs neither: the fills run on the CPU. Both
+; paths continue at h2+$27D78.
+e3_scene_wait
+        move.l a0,-(sp)
+        move.w (e3_soft,pc),-(sp)
+        movea.l (c2_h2,pc),a0
+        tst.w (sp)+
+        bne.s .fast
+        adda.l #$1dab0,a0
+.pending
+        tst.b (a0)
+        bmi.s .pending
+        movea.l (c2_h2,pc),a0
+        adda.l #$1e13c,a0
+        move.b #$80,(a0)
+        bra.s .done
+.fast
+        adda.l #$1e13c,a0
+        clr.b (a0)
+.done
+        movea.l (sp)+,a0
+        addi.l #16,(sp)
+        rts
+
+        IFNE VERIFY
+; CUSTOM5 bit 2: every operation E3 moves from the blitter to the CPU is twinned. The
+; chip back buffer gets the fast picture, the blitter does the operation there, the CPU
+; does it in fast RAM, and the two pictures are compared. Neither chip bitmap may change
+; otherwise between acquire and publication (e3_stray).
+e3_twin_begin                   ; the fast picture into the free chip back buffer
+        movem.l a0-a1,-(sp)
+        bsr e3_free
+        bsr e3_check_back
+        movea.l (e3_buffer,pc),a0
+        movea.l (e3_chip,pc),a1
+        bsr e3_copy
+        movem.l (sp)+,a0-a1
+        rts
+e3_twin_chip                    ; h0+$1252 into the chip back buffer, blits on the blitter
+        movem.l d1/a2,-(sp)
+        movea.l (c2_h0,pc),a2
+        move.l ($1252,a2),d1
+        sub.l (e3_buffer,pc),d1
+        add.l (e3_chip,pc),d1
+        move.l d1,($1252,a2)
+        lea (e3_soft,pc),a2
+        clr.w (a2)
+        movem.l (sp)+,d1/a2
+        rts
+e3_twin_fast                    ; and back
+        movem.l d1/a2,-(sp)
+        movea.l (c2_h0,pc),a2
+        move.l ($1252,a2),d1
+        sub.l (e3_chip,pc),d1
+        add.l (e3_buffer,pc),d1
+        move.l d1,($1252,a2)
+        lea (e3_soft,pc),a2
+        move.w #1,(a2)
+        movem.l (sp)+,d1/a2
+        rts
+
+; From c2_clear, with the registers h2+$1E158 receives: the row fill by the blitter
+; (h2+$1E13C bit 7) into chip, then by the game's CPU path, E3's, into fast RAM.
+e3_twin_fill
+        movem.l d0-a6,-(sp)
+        bsr e3_twin_begin
+        bsr e3_twin_chip
+        movea.l (c2_h2,pc),a0
+        adda.l #$1e13c,a0
+        move.b #$80,(a0)
+        movem.l (sp),d0-a6
+        bsr.s .fill
+        bsr c2_drain
+        bsr e3_twin_fast
+        movea.l (c2_h2,pc),a0
+        adda.l #$1e13c,a0
+        clr.b (a0)
+        movem.l (sp),d0-a6
+        bsr.s .fill
+        bsr e3_compare
+        movem.l (sp)+,d0-a6
+        rts
+.fill                           ; the rest of h2+$1E13E, back here
+        movem.l d0-a6,-(sp)     ; popped by its own epilogue
+        move.l (c2_clear_rest,pc),-(sp)
+        rts
+
+; From e3_queue (A0: the block): the blitter runs a copy of the block whose pointers
+; into the fast picture (and up to 64 bytes around it) are moved to the chip one.
+E3_BLOCK = 512
+e3_twin_queue
+        movem.l d0-d3/a0-a2,-(sp)
+        bsr e3_twin_begin
+        lea (e3_twin_block,pc),a1
+        move.w (a0)+,d0         ; words - 1
+        cmpi.w #E3_BLOCK/2-2,d0
+        bls.s .fits
+        lea (e3_unsupported,pc),a2
+        addq.l #1,(a2)
+        lea (e3_twin_pending,pc),a2
+        clr.w (a2)
+        bra.s .done
+.fits
+        move.w d0,(a1)+
+        movea.l a0,a2
+        addq.w #1,d0
+        add.w d0,d0
+        adda.w d0,a0            ; the block's end
+.command
+        cmpa.l a0,a2
+        bcc.s .copied
+        move.w (a2)+,d1         ; long writes - 1
+        move.w d1,(a1)+
+.long
+        move.w (a2)+,d2
+        move.w d2,(a1)+
+        move.l (a2)+,d3
+        cmpi.w #$48,d2          ; BLTCPT, BLTBPT, BLTAPT, BLTDPT
+        bcs.s .store
+        cmpi.w #$54,d2
+        bhi.s .store
+        move.l d3,d0
+        sub.l (e3_buffer,pc),d0
+        addi.l #64,d0
+        cmpi.l #E3_SIZE+128,d0
+        bcc.s .store
+        sub.l (e3_buffer,pc),d3
+        add.l (e3_chip,pc),d3
+.store
+        move.l d3,(a1)+
+        dbf d1,.long
+.word
+        move.w (a2)+,d2
+        move.w d2,(a1)+
+        beq.s .size
+        move.w (a2)+,(a1)+
+        bra.s .word
+.size
+        move.w (a2)+,(a1)+      ; BLTSIZE
+        bra.s .command
+.copied
+        bsr e3_twin_chip
+        lea (e3_twin_block,pc),a0
+        bsr.s .queue
+        bsr c2_drain
+        bsr e3_twin_fast
+        lea (e3_twin_pending,pc),a2
+        move.w #1,(a2)
+.done
+        movem.l (sp)+,d0-d3/a0-a2
+        rts
+.queue                          ; h2+$1E6CC's own body, A0 the block
+        move.l a1,-(sp)
+        movea.l (c2_h2,pc),a1
+        adda.l #$1e2e4,a1
+        move.l (c2_queue_rest,pc),-(sp)
+        rts
+
+e3_compare                      ; the fast and the chip picture
+        movem.l d0/a0-a2,-(sp)
+        lea (e3_twins,pc),a2
+        addq.l #1,(a2)
+        movea.l (e3_buffer,pc),a0
+        movea.l (e3_chip,pc),a1
+        move.w #E3_SIZE/4-1,d0
+.compare
+        cmpm.l (a0)+,(a1)+
+        dbne d0,.compare
+        tst.w d0
+        bmi.s e3_compare_same
+e3_fault                        ; c5_capture --twin saves both pictures here
+        lea (e3_faults,pc),a2
+        addq.l #1,(a2)+
+        tst.l (a2)
+        bne.s e3_compare_same
+        subq.l #4,a0
+        suba.l (e3_buffer,pc),a0
+        addq.l #1,a0
+        move.l a0,(a2)+         ; e3_first: byte offset + 1
+        move.l (c2_clock+WC_TICKS,pc),(a2)      ; e3_first_tick
+e3_compare_same
+        movem.l (sp)+,d0/a0-a2
+        rts
+; The chip back buffer, untouched since acquire, before its first overwrite.
+e3_check_back
+        movem.l d0/a0,-(sp)
+        btst #2,(verify_options+3,pc)
+        beq.s .done
+        lea (e3_back_unchecked,pc),a0
+        tst.w (a0)
+        beq.s .done
+        clr.w (a0)
+        movea.l (e3_chip,pc),a0
+        bsr.s e3_sum
+        cmp.l (e3_back_sum,pc),d0
+        beq.s .done
+        lea (e3_stray,pc),a0
+        addq.l #1,(a0)
+.done
+        movem.l (sp)+,d0/a0
+        rts
+e3_sum                          ; A0 -> D0, the sum of a picture's longs
+        movem.l d1/a0,-(sp)
+        moveq #0,d0
+        move.w #E3_SIZE/4-1,d1
+.sum
+        add.l (a0)+,d0
+        dbf d1,.sum
+        movem.l (sp)+,d1/a0
+        rts
+e3_log_counts
+        movem.l d0-d1/a0-a2,-(sp)
+        move.l (e3_buffer,pc),d0
+        beq.s .done
+        move.l (e3_unsupported,pc),-(sp)
+        move.l (e3_blits,pc),-(sp)
+        move.l (e3_stray,pc),-(sp)
+        move.l (e3_first_tick,pc),-(sp)
+        move.l (e3_first,pc),-(sp)
+        move.l (e3_faults,pc),-(sp)
+        move.l (e3_twins,pc),-(sp)
+        move.l (e3_pictures,pc),-(sp)
+        move.l d0,-(sp)
+        lea (e3_log,pc),a0
+        move.l (_resload,pc),a2
+        jsr (resload_Log,a2)
+        lea 36(sp),sp
+.done
+        movem.l (sp)+,d0-d1/a0-a2
+        rts
+e3_log dc.b 'F1GP VERIFY E3 buffer=%08lx pictures=%ld twins=%ld faults=%ld'
+        dc.b ' first=%ld tick=%ld stray=%ld blits=%ld unsupported=%ld',10,0
+        EVEN
+        ENDC
+
+        CNOP 0,4
+e3_buffer dc.l 0                ; the fast picture; 0: E3 unavailable
+e3_chip dc.l 0                  ; the chip back buffer of the picture being drawn
+e3_pictures dc.l 0              ; pictures published from fast RAM
+e3_blits dc.l 0                 ; blits run on the CPU
+e3_unsupported dc.l 0           ; blit modes or registers e3_blit does not run
+e3_d2_start dc.l 0              ; D2: the submitted picture's start field
+e3_d2_kind dc.w 0
+e3_d2_pending dc.w 0            ; its displayed field not yet seen
+e3_timed dc.w 0                 ; the last submission was watched
+e3_watch dc.w 0                 ; e3_vbl waits for it to be taken
+e3_drawing dc.w 0               ; h0+$1252/$1256 point to the fast picture
+e3_soft dc.w 0                  ; blits run on the CPU
+e3_valid dc.w 0                 ; the fast picture holds the last published one
+e3_regs ds.b $48                ; blitter registers $40-$77, then e3_blit's scratch
+        IFNE VERIFY
+        CNOP 0,4
+e3_front_sum dc.l 0
+e3_back_sum dc.l 0
+e3_back_unchecked dc.w 0
+e3_twin_pending dc.w 0          ; e3_queue compares after its blits
+        CNOP 0,4
+e3_twins dc.l 0                 ; operations twinned
+e3_faults dc.l 0                ; twins that differ
+e3_first dc.l 0                 ; the first difference's byte offset + 1
+e3_first_tick dc.l 0
+e3_stray dc.l 0                 ; chip bitmaps changed between acquire and publication
+e3_twin_block ds.b E3_BLOCK
+        ENDC
+
 c2_live_entry
         bsr c3_leave_restart
         move.l a0,-(sp)
@@ -602,6 +1372,11 @@ c2_vbl
         move.l a0,-(sp)
         lea (c2_serial,pc),a0
         addq.l #1,(a0)
+        lea (e3_watch,pc),a0
+        tst.w (a0)
+        beq.s .unwatched
+        bsr e3_vbl
+.unwatched
         move.l (c2_h0,pc),a0
         ; Reproduce the stolen instruction last, including its X/N/Z/V/C.
         adda.l #$125e,a0
@@ -775,6 +1550,7 @@ c3_pause_begin
 c3_suspend
         bsr c2_publish
         bsr c3_retire
+        bsr e3_leave
         lea (c2_clock,pc),a0
         move.l (c2_serial,pc),d0
         bsr world_clock_observe
@@ -898,6 +1674,10 @@ c3_leave
         beq.s .done
         bsr c2_hud_flush
         bsr c3_retire
+        bsr e3_leave
+        IFNE VERIFY
+        bsr e3_log_counts
+        ENDC
         lea (c2_clock,pc),a0
         move.l (c2_serial,pc),d0
         bsr world_clock_observe
@@ -1142,6 +1922,8 @@ c2_beam_line
 
 ; A5: complete old publication, cross the following VBL, then acquire old front.
 c2_acquire
+        move.l (e3_buffer,pc),d0
+        bne e3_acquire
         movea.l (c2_h2,pc),a2
         adda.l #$1dab0,a2
 .pending
@@ -2390,10 +3172,18 @@ c2_publish
         addq.l #1,(a0)
         movem.l (sp)+,d0-a6
 .no_replay
+        move.w (e3_drawing,pc),d0
+        beq.s .chip
+        bsr e3_present
+.chip
         movea.l (c2_h0,pc),a2
         adda.l #$124e,a2
         move.l 8(a2),(a2)      ; bitmap base, never the external-view viewport
         bsr c2_submit_call
+        move.l (e3_buffer,pc),d0
+        beq.s .counted
+        bsr e3_submitted
+.counted
         lea (c2_pictures,pc),a0
         addq.l #1,(a0)
         rts
@@ -3003,6 +3793,17 @@ c2_clear
         C2_RASTER_GATE
         movem.l d0-a6,-(sp)
         bsr c2_colour_call
+        IFNE VERIFY
+        btst #2,(verify_options+3,pc)
+        beq.s .native
+        move.w (e3_soft,pc),-(sp)
+        tst.w (sp)+
+        beq.s .native
+        bsr e3_twin_fill
+        movem.l (sp)+,d0-a6
+        rts
+.native
+        ENDC
         move.l (c2_clear_rest,pc),-(sp)
         rts
 c2_colour_call
@@ -3037,6 +3838,14 @@ c2_hands
         rts
 c2_blit_queue
         C2_RASTER_GATE
+        move.w sr,-(sp)
+        move.w (e3_soft,pc),-(sp)
+        lea 2(sp),sp
+        beq.s .chip
+        move.w (sp)+,ccr
+        bra e3_queue
+.chip
+        move.w (sp)+,ccr
         move.l a1,-(sp)
         movea.l (c2_h2,pc),a1
         adda.l #$1e2e4,a1
@@ -3341,6 +4150,9 @@ patch_582992_clock
         PL_P $8ebe4,c2_hands
         ; PERF_RANGE h2:1e6cc 6 custom=2 bit=1 variant=582992
         PL_P $8da60,c2_blit_queue
+        ; Pending-exchange wait and blitter-fill selection; resumes at h2+$27D78.
+        ; PERF_RANGE h2:27d62 6 custom=2 bit=1 variant=582992
+        PL_PS $970f6,e3_scene_wait
         ; PERF_RANGE h2:1dd1a 6 custom=2 bit=1 variant=582992
         PL_PS $8d0ae,c2_pair_a0_a2
         ; PERF_RANGE h2:1e046 6 custom=2 bit=1 variant=582992
