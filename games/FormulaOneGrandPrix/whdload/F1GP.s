@@ -3191,7 +3191,8 @@ d4_table                        ; D0 = angle, A4 = h0+$222F0
 ; lateral, yaw, correction and height offset as words; each pose accessor branch reads its own subset. A car
 ; whose pose flag changed (the game switches it at collisions) advances along its
 ; segments too, since explicit cars keep their track coordinates, and is drawn
-; track-driven: d5_track marks it and d5_flags flips +$7E bit 0 around the draw. A car
+; track-driven: if cur is explicit, d5_track marks it and d5_flags flips +$7E bit 0
+; around the draw. A car
 ; whose status (+$96) changed, that jumped, that crosses a pit transition or more
 ; than D5_STEPS segments in a tick, or that would stand before its segment (on the
 ; grid) keeps the tick's pose.
@@ -3273,6 +3274,8 @@ d5_cars                         ; A3 = history snapshot
         move.w d2,(18,a2)
         tst.w d6
         beq .words
+        btst #0,($7e,a4)
+        beq .words              ; cur track-driven: drawn so already
         moveq #25,d0
         sub.w d7,d0
         move.l (d5_track,pc),d1
@@ -4481,7 +4484,7 @@ d4_spring dc.w 0                ; spring word at the stage, for the horizon
 d5_predicted dc.l 0             ; car records predicted
 d5_held dc.l 0                  ; car records kept at the tick
 d5_moved dc.l 0                 ; predicted records on another segment
-d5_track dc.l 0                 ; cars drawn track-driven after a pose flag change
+d5_track dc.l 0                 ; explicit cars drawn track-driven after a pose flag change
 d5_applied dc.l 0               ; those flipped in the game's records for the draw
 d7_aimed dc.l 0                 ; external cameras placed from the predicted car
 d7_faults dc.l 0                ; VERIFY: the tick's camera placed differs from the game's

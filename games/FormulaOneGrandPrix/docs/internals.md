@@ -2691,34 +2691,30 @@ screen every field.
 
 **Collisions.** The user saw cars jump at collisions: the game switches a colliding car
 between track-driven and explicit pose (+$7E bit 0) in that tick, usually two cars
-together, one braking hard and the other pushed forward (tick 172 of the race: car 12's
+together, one braking hard and the other pushed forward (one race's tick 172: car 12's
 speed 2043 to 481, car 10's 88 to 1943). D5 held such a car at cur, a whole tick ahead
-of the interpolated pictures, so it stood still and then leapt, up to 55,000 world units
-in a picture. Explicit cars keep their track coordinates (h0+$2B95A projects them every
-tick; the track form lies 2560 world units from +$28/+$2C at p50, 3840 at most, and at the
-switch to explicit it is exact), so a car whose pose flag changed now advances along its
-segments like a track-driven car and is drawn track-driven: `d5_track` marks it, and
-`d5_flags` flips its +$7E bit 0 after the stage is loaded and back before the restore. D7
-places an external camera from the same representation. Status changes are still held.
+of the interpolated pictures, so it stood still and then leapt. Explicit cars keep their
+track coordinates (h0+$2B95A projects them every tick; the track form lies 2560 world
+units from +$28/+$2C at p50, 3840 at most, and at the switch to explicit it is exact), so
+a car whose pose flag changed now advances along its segments like a track-driven car
+and is drawn track-driven. When cur is explicit, `d5_track` marks it and `d5_flags` clears
+its +$7E bit 0 after the stage is loaded and sets it again before the restore; when cur
+is already track-driven nothing is flipped (the first version flipped that case too and
+drew the car from the X/Z frozen at its last explicit tick, which the user's second
+play-test caught as a car jumping back). D7 places an external camera from the same
+representation. Status changes are still held.
 
-Evidence (VERIFY `68f6ec97…`, developer `4dd4da7e…`, `a1200-030` non-MMU, `CUSTOM4=1`, the
-D7 view schedule, `tmp/coll/`): every staged picture is rebuilt exactly, with the model's
-mask equal to the slave's (6210 pictures), and the race is identical with the option off
-at all 3422 ticks. Over the pairs of pictures across a pose flag change (310; the step
-along the motion from T − 1 to T, per field, against that motion; D10's build in
-brackets, 303 pairs of the same race):
-
-| Pose flag change pairs | Interpolated | D10 |
-|---|---|---|
-| Evenness p50 / p95 / max | 1.03 / 3.01 / 11.6 | 1.75 / 3.17 / 13.2 |
-| Within 0.75–1.25 | 125 | 0 |
-| Stalled (below 0.25) | 75 | 147 |
-
-The tick shown has the same 147–154 stalls: the pairs include the collision's own change
-of speed. 16 more comparable car steps now go backwards (39 against 23): ten between
-interpolated pictures, 256–1693 world units, within the track form's offset from the
-explicit pose the car is drawn in again after the change; and six cars after a held
-picture in the front chase at epoch 3 tick 102 (360–5594), not analysed. B4 passes
+Evidence (VERIFY `d60d9604…`, `a1200-030` non-MMU, `CUSTOM4=1`, the D7 view schedule,
+`tmp/coll/fix-on`, `fix-off`): every staged picture is rebuilt exactly, with the model's
+mask equal to the slave's (6498 pictures), and the race is identical with the option off
+at every tick. Each car of each interpolated picture against its ideal pose at the
+displayed time (the two ticks around it, each in its own representation): p50 187, p95
+4259, p99.9 14,588 world units; none of the 116 car-pictures beyond 16,384 is across a pose
+flag change (the first version: 111 of 237, up to 254,093). Over the pairs of pictures
+across a pose flag change (124; the step along the motion from T − 1 to T, per field,
+against that motion), evenness p5 / p50 / p95 / maximum is 0.54 / 1.01 / 1.70 / 2.49, and
+98 lie within 0.75–1.25; D10's held cars, in another build's race, gave 0 / 1.75 / 3.17 /
+13.2 with none within. Every backward car step (37) follows a held picture. B4 passes
 (release `93dde23f…` unchanged).
 
 ## Performance (E)
@@ -3045,3 +3041,4 @@ identical, and a picture's scene goes from 9.58 to 9.55 ms on the grid and from 
 copy's writes into free bus slots, so halving bitplane DMA leaves little to recover, and
 64-bit fetch (`FMODE` 3, 8-byte-aligned buffers) can recover no more. The global display
 change was not kept.
+

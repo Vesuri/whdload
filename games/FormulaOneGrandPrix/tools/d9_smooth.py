@@ -41,6 +41,7 @@ import d5_cars                                                 # noqa: E402
 import d7_views                                                # noqa: E402
 from d4_camera import CAMERA, signed                           # noqa: E402
 
+DEVIATION = 16384               # world units off the motion that a pair reports among the deviations
 TURN = 32                       # yaw rate per tick below which a yaw step has no direction
 PIT = (733, 1128)              # D7 race: epoch 3 ticks with pit stops on (D8)
 RATIOS = (0, .25, .5, .75, 1.25, 1.5, 2, 3)                    # evenness bins
@@ -167,6 +168,7 @@ def poses(directory):
     values = {}
     add = lambda *path_value: values.setdefault('/'.join(path_value[:-1]), []).append(path_value[-1])
     worst = []
+    deviations = []
     for a, b in zip(frames, frames[1:]):
         if a['shown'] is None or b['shown'] is None:
             continue
@@ -230,6 +232,18 @@ def poses(directory):
             for n in range(26):
                 flag = a['flags'][n]
                 flags = (b['flags'][n], motion_from[2][n], motion_to[2][n])
+                # Every car: how far its step lies from the motion over the pair's fields.
+                (ax, az, _), (bx, bz, _) = a[name][1][n], b[name][1][n]
+                (fx, fz, _), (tx, tz, _) = motion_from[1][n], motion_to[1][n]
+                k = span/interval
+                deviation = ((bx-ax-(tx-fx)*k)**2 + (bz-az-(tz-fz)*k)**2) ** .5
+                if name == 'predicted' and deviation >= DEVIATION:
+                    why = [w for w, c in (('pose flag', any((f[0] ^ flag[0]) & 1 for f in flags)),
+                                          ('status', any(f[1] != flag[1] for f in flags)),
+                                          ('held at a', a['predicted'][1][n] == a['latest'][1][n]),
+                                          ('held at b', b['predicted'][1][n] == b['latest'][1][n])) if c]
+                    deviations.append((round(deviation), b['tick'] >> 16, b['tick'] & 0xffff, f'car {n+1}',
+                                       a['view'], ', '.join(why) or 'predicted', span))
                 if (all(f[1] == flag[1] for f in flags) and not flag[1] & 0x8000
                         and any((f[0] ^ flag[0]) & 1 for f in flags)):
                     (ax, az, _), (bx, bz, _) = a[name][1][n], b[name][1][n]
@@ -273,6 +287,7 @@ def poses(directory):
                 add(label, 'cars', 'evenness', ratio)
                 counts[f'{label}/cars/evenness bins/{ratio_bin(ratio)}'] += 1
     worst.sort(reverse=True)
+    deviations.sort(reverse=True)
     return dict(
         check=result['status'], failure_count=result['failure_count'], pictures=len(frames),
         decisions=result['decisions'], camera_outcomes=result['camera']['outcomes'],
@@ -286,7 +301,9 @@ def poses(directory):
         values={name: quantiles(v) for name, v in sorted(values.items())},
         worst=[dict(distance=round(d), epoch=t >> 16, tick=t & 0xffff, item=i, view=v, decision=s, fields=f)
                for d, t, i, v, s, f in worst[:20]],
-        backwards=sorted(((round(d), t >> 16, t & 0xffff, i, v, s, f) for d, t, i, v, s, f in worst), key=lambda w: (w[1], w[2])))
+        backwards=sorted(((round(d), t >> 16, t & 0xffff, i, v, s, f) for d, t, i, v, s, f in worst), key=lambda w: (w[1], w[2])),
+        deviations=dict(count=len(deviations), reasons=dict(collections.Counter(d[5] for d in deviations)),
+                        largest=deviations[:40]))
 
 
 def shots(directory):

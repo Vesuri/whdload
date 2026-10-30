@@ -68,7 +68,7 @@ class Cars:
         import d1_snapshot as d1
         from d3_stage import record_offset
         counts = [0, 0, 0]
-        self.drawn = 0          # bit n: car n drawn track-driven after a pose flag change
+        self.drawn = 0          # bit n: car n explicit at cur, drawn track-driven after a pose flag change
         for n, record in enumerate(d1.RECORDS[1:]):
             staged = CARS + n*RECORD
             hist = history_record(n+1)
@@ -124,7 +124,7 @@ class Cars:
                     continue
                 lon = (((progress - 0x4000) * sw(DEN)) >> 14) + 0x400
                 struct.pack_into('>hH', out, staged+LON, signed(lon), progress)
-                if flipped:
+                if flipped and explicit:    # cur explicit: drawn track-driven
                     self.drawn |= 1 << n
             else:
                 if any(abs(sl(X+o) - hl(0x28+o)) >= JUMP for o in (0, 4)):
