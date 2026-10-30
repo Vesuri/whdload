@@ -72,7 +72,8 @@ frontend, runs with an empty argument line, unloads each segment and quits on re
 
 ### B2: shared-KickEmu loader
 
-`whdload/F1GP.s` builds with slave version 17 and the pinned shared kick13 source.
+`whdload/F1GP.s` builds with slave version 17 (developer and VERIFY builds 20, for E2–E4's
+alternative memory configuration) and the pinned shared kick13 source.
 It retains the original memory requirements, assigns, frontend/fire/CUSTOM1 decision,
 three size-selected patch lists, conditional names restore, empty argument line and
 F10 quit hook. The default path retains the old CPU mask and installs no performance
@@ -2751,10 +2752,16 @@ bytes, 46,926 of them instructions), and the patch table lists 467 relocated `JS
 operands: 151 in hunk 0 and 316 in hunk 2. The tables contain offsets derived from the
 game and are generated under `tmp/`.
 
-**At run time.** Developer builds have 64 KB more ExpMem (`FASTMEMSIZE` `$90000`). After
-patching, on a 68020 or later with real fast RAM (the fast memory header lies at or above
-`$200000`), `e2_reserve` takes the top of fast RAM with `AllocAbs`, where the game never
-allocates. At the first live epoch, `e2_enable` copies the span and flushes the caches.
+**At run time.** Developer builds are WHDLoad 20 slaves (`slv_Version` 20) with one
+alternative memory configuration: `MEMCONFIG=1` adds `E_AREAS` (`$25000`, 148 KB) of ExpMem
+for E2's copy, E3's picture and E4's shadows. The default stays the release's
+(`FASTMEMSIZE` `$80000`), because a chip-only 2 MB A1200 cannot allocate even about 32 KB
+more (WHDLoad's "Can't allocate ExpMem"), whether in ExpMem or in the slave, and the
+game leaves only about 24 KB of ExpMem free in a race. After patching, on a 68020 or
+later whose fast memory header lies in real fast RAM (at or above `$200000`) and spans
+more than `FASTMEMSIZE` (the spare is present), `e2_reserve` takes the top of it with
+`AllocAbs`, where the game never allocates. `c2_capture.py` passes `MEMCONFIG=1` with
+`--e2`/`--e3`/`--e4` on machines with fast RAM (`--memconfig` overrides). At the first live epoch, `e2_enable` copies the span and flushes the caches.
 It then adds the copy's offset to each listed operand that still holds `JSR`/`JMP`
 absolute with a target in the span, in the chip original and, for hunk 2 operands in the
 span, in the copy, and does the same for the slave's own targets in the span. Finally it
@@ -2804,9 +2811,9 @@ buffer into the back one, chip to chip. In a 100-field profile window on the 030
 VBL wait 9.8%), so the CPU spends most of a picture waiting for the display.
 
 **Design.** `e3_reserve` allocates a 32,000-byte buffer F with `AllocAbs` below E2's copy
-(or at the top of real fast RAM), on a 68020 or later with real fast RAM. Developer
-builds have 32 KB more ExpMem (`FASTMEMSIZE` `$98000`). F always holds the last published
-picture.
+(or at the top of real fast RAM), under the same conditions as E2 (`MEMCONFIG=1`'s spare
+ExpMem in real fast RAM, 68020 or later); with E4 the same block also holds E4's two
+shadows. F always holds the last published picture.
 
 - *Acquire* (`e3_acquire`, from `c2_acquire`) drains blits queued before the picture,
   chooses the chip back buffer as the one not submitted last, and points the renderer's
@@ -2867,3 +2874,36 @@ picture, one catch-up tick); it checks correctness, not speed.
 Limits: E3 is developer-only and needs the clock patches (`CUSTOM2` bit 1) and real fast
 RAM. It was measured only together with E2. The 68020 and 040/060 gains are not claimed
 (current scope and deferred work). Menus and modal screens keep drawing in chip.
+
+### E4 hot routines — in progress
+
+**Re-profile with E1–E3 on** (030, E2 and E3, `CUSTOM4=1`): the top entry was E3's own
+copy into chip (22% of cycles with the player on the grid, 15% in a rear-chase window).
+The game's self time is spread thin (no routine above about 2.5%). Its largest inclusive
+routine is the polygon filler h0+1F388 with the edge tracer h0+1EABA. The filler waits on
+chip data: its edge lists h3+$11302–$12000 (written by the tracer at h0+1EF5C–1F030),
+the mask table h3+$200 (through A5) and h2+$1E804, at 27–50 cycles per access.
+
+**The copy (done).** Behind `CUSTOM2` bit 6, each chip bitmap has a fast shadow of the
+picture last copied into it. Publication compares the fast picture with the shadow
+(`CMPM.L`/`DBNE`, about 9 cycles a long) and writes only the longs that differ, to chip
+and shadow. An unknown bitmap (after native code owned the bitmaps) is copied whole. The
+shadows follow F in E3's block (`MEMCONFIG=1`).
+
+| Check | Result |
+|---|---|
+| Every copy compared (`states-check`, VERIFY `758dc84a…`, `CUSTOM5` bit 3) | Whole race: 5271 copies, 0 faults, 4 full copies, 3,409,343 longs written (8.1% of the picture on average) |
+| Chip-only A1200 (`a1200`, default memory) | E2–E4 not enabled; runs and quits OK |
+| A500-equivalent (`a500`, default memory, clock forced) | Reaches the race; quits OK |
+| Disabled-feature gate (`tmp/b4/e4-acceptance.json`) | B4 PASS, all 324 hook bytes rejected; release `93dde23f…` unchanged |
+
+Rear chase, 100 fields from tick 870, developer `e4347819…` (`profile-rear-e3/e4`): with
+E4 the publication (mostly the copy) falls from 18.5% to 11.4% of cycles, and the window
+draws 75 pictures instead of 68 (+10%). E4 changes only the copy, so the race and the
+staged pictures are not re-compared.
+
+**Where the time goes now** (`profile-rear-e4`, inclusive): the scene 74%, of which the
+car models h2+29C16 → h2+28652 24% and the filler h0+1F388 23% (its self time spread
+over h0+20B04–21714, about 15%); publication 11.4% (the copy 9.5%); the tracer h0+1EABA
+8.3%. h2+29C16 is a wrapper that draws a car's model and parts; its time is in its
+callees.

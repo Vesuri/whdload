@@ -33,16 +33,17 @@ results and acceptance evidence are in [internals.md](internals.md).
 | E1 | Complete for the current scope: B5's gate, and with the C2 loop and interpolation a whole 030 race draws 13–14% more pictures with caches on (3.43 against 3.86 fields per picture, developer build). Caches stay opt-in in the slave; the release turns them on through its icon (G1). |
 | E2 | Complete for the current scope (developer `CUSTOM2` bit 4): hunk 2's main code runs from a fast-RAM copy from the first live epoch, its data stays in chip. The race is identical with it off at every tick, every staged picture is rebuilt, and the 030 draws 31–32% more pictures (2.46 against 3.24 fields per picture, developer build). |
 | E3 | Complete for the current scope (developer `CUSTOM2` bit 5): the race picture is drawn in a fast buffer, its fills and queued blits run on the CPU, and publication copies it into the free chip back buffer. A VERIFY twin matches all 14,062 fills and blits of a race against the blitter byte for byte, the race is identical with it off at every tick, every staged picture is rebuilt, and with E2 the 030 draws 2.05–2.07 times as many pictures (1.21 against 2.51 fields per picture, developer build). |
-| E4 | In progress (developer `CUSTOM2` bit 6). Re-profiled with E1–E3 on: E3's picture copy is the top entry (22% of cycles on the grid, 15% in rear chase); the game's time is spread thin, and its largest routine, the polygon filler h0+1F388 (26% inclusive in rear chase), is bound by chip data (edge lists h3+$11302–$12000, mask table h3+$200, h2+$1E804): E6's case. The copy now compares with a fast shadow of each chip bitmap and writes only the longs that differ; with the shadows in ExpMem or the slave it was exact (3659 VERIFY copies, 0 faults) and cut the rear-chase copy from 14.7% to 9.0%, but the chip-only A1200 then failed with "Can't allocate ExpMem". The current source hosts E2's copy, E3's picture and E4's shadows at the developer slave's end and returns ExpMem to $80000; it builds (release unchanged) but is not yet run. |
+| E4 | In progress (developer `CUSTOM2` bit 6). Done: the picture copy writes only the longs that differ from a fast shadow of each chip bitmap; a whole race compares every copy (5271, 0 faults), and in a rear-chase window publication falls from 18.5% to 11.4% of cycles (75 pictures against 68). E2–E4's fast areas come from WHDLoad 20's alternative memory configuration (`MEMCONFIG=1`), so chip-only machines keep the release's memory and boot. Open: the game's hot routines, led by the polygon filler h0+1F388 (23% inclusive), which waits on chip data, and the car models under h2+29C16. |
 | E5–E8 | Optimisation work remains open under the plan. |
 | F | Planned after E (user decision): make the slave run any F1GP-Ed-edited `f1gp` with the enhancements (write map, collisions, frame-rate policy, edited-file gates, fixes; memory-patch features optional). F1GP-Ed 3.44 and the f1gp.library developer archive are in ignored `tmp/`, not yet pinned. |
 | G, H | Release after F; finer simulation (H) only on the user's request. |
 
-**Next F1GP step: finish E4.** Check that the slave-hosted layout boots on the chip-only
-A1200 and the A500-equivalent and that E2, E3 and E4 still enable on the 030, then run
-`tmp/e4/run.sh`'s recipe (development.md, E4), the B4 gate, and document the gain. Captures
-can fail with gdb's "Invalid hex digit 79" when an emulator log line arrives as console
-output during a memory read; a retry is the remedy.
+**Next F1GP step: E4's game routines.** Start with the polygon filler h0+1F388 and the
+tracer h0+1EABA: move their chip data (edge lists h3+$11302–$12000, mask table h3+$200,
+h2+$1E804) to fast RAM where only the CPU uses it, then look for avoidable work and 68020
+forms; twin each change and measure only what it can affect. Captures can fail with
+gdb's "Invalid hex digit 79" when an emulator log line arrives during a memory read; a
+retry is the remedy.
 
 E3 is complete for the current scope
 ([evidence](internals.md#e3-drawing-in-fast-ram--complete-for-the-current-scope)): with

@@ -9,8 +9,8 @@ DEVELOPER = 0
         IFND VERIFY
 VERIFY = 0
         ENDC
-        IFNE VERIFY
-slv_Version = 18             ; resload_Log is VERIFY-only
+        IFNE DEVELOPER
+slv_Version = 20             ; ws_MemConfig: E2-E4's fast areas; resload_Log (VERIFY)
         ELSE
 slv_Version = 17
         ENDC
@@ -18,6 +18,10 @@ slv_Flags = WHDLF_NoError|WHDLF_EmulPriv|WHDLF_ClearMem|WHDLF_Examine
 slv_keyexit = $59
 CHIPMEMSIZE = $80000
 FASTMEMSIZE = $80000
+; Developer: MEMCONFIG=1 adds ExpMem for E2's copy, E3's picture and E4's shadows on
+; machines with fast RAM. The default stays the release's, which a chip-only 2 MB A1200
+; can still allocate (it cannot spare about 32 KB more).
+E_AREAS = $25000
 NUMDRIVES = 1
 WPDRIVES = %1111
 ; Original KickEmu uses a 10,000-byte filesystem I/O cache.
@@ -31,6 +35,11 @@ slv_CurrentDir dc.b 'data',0
 slv_name dc.b 'Formula One Grand Prix',0
 slv_copy dc.b '1991 Microprose',0
 slv_info dc.b 'Reconstructed loader',10,'Original install by Codetapper/Action!',0
+        IFNE DEVELOPER
+        EVEN
+slv_MemConfig dc.l CHIPMEMSIZE,$40000+FASTMEMSIZE+E_AREAS  ; kick13.s's KICKSIZE first
+        dc.l 0
+        ENDC
 slv_config
         dc.b 'C1:B:Skip intro;'
         dc.b 'C2:X:Enable CPU caches:0;'
@@ -453,8 +462,8 @@ c2_init
         rts
 
 ; E2: hunk 2's main code (E2_LOW-E2_HIGH, tools/e2_tables.py) runs from a fast-RAM copy.
-; At load, a span at the slave's end is reserved when it and ExpMem lie in real fast RAM
-; (68020+, with the clock patches); at the
+; At load, a span at the top of ExpMem is reserved when ExpMem is real fast RAM with
+; MEMCONFIG=1's spare (68020+, with the clock patches); at the
 ; first live epoch the code is copied, and every relocated JSR/JMP operand in e2_patches
 ; that still holds its original target in the span, and the slave's own hunk 2 code
 ; targets, move to the copy. Data stays in chip and only safe entries are redirected,
@@ -476,15 +485,16 @@ e2_reserve
         beq.s .done
         btst #2,($f,a0)         ; MEMF_FAST
         beq.s .header
-        cmpi.l #$200000,($14,a0)        ; real fast RAM, not ExpMem in chip
+        bsr e_spare
         bcs.s .done
-        lea (.here,pc),a1       ; at the slave's end, which WHDLoad loads into fast RAM
-.here
-        adda.l #e2_area-.here,a1
-        cmpa.l #$200000,a1
-        bcs.s .done
+        move.l ($18,a0),d0      ; mh_Upper
+        sub.l #E2_HIGH-E2_LOW,d0
+        and.w #$fff0,d0
+        movea.l d0,a1
+        move.l #E2_HIGH-E2_LOW,d0
+        jsr (_LVOAllocAbs,a6)
         lea (e2_copy,pc),a0
-        move.l a1,(a0)
+        move.l d0,(a0)
 .done
         movem.l (sp)+,d0-d1/a0-a1/a6
         rts
@@ -598,8 +608,8 @@ e2_log dc.b 'F1GP VERIFY E2 copy=%08lx operands=%ld',10,0
 ; is what it would be with the option off. A VBL watch measures D2's lead, because the
 ; next picture has already started when the previous one is displayed.
 E3_SIZE = 32000
-e3_reserve                      ; at the slave's end, with E4's shadows
-        movem.l d0/a0-a1/a6,-(sp)
+e3_reserve                      ; below hunk 2's copy, or at the top of real fast RAM
+        movem.l d0-d1/a0-a1/a6,-(sp)
         btst #5,(cache_options+3,pc)
         beq.s .done
         move.l (_attnflags,pc),d0
@@ -613,22 +623,44 @@ e3_reserve                      ; at the slave's end, with E4's shadows
         beq.s .done
         btst #2,($f,a0)         ; MEMF_FAST
         beq.s .header
-        cmpi.l #$200000,($14,a0)        ; real fast RAM, not ExpMem in chip
+        bsr e_spare
         bcs.s .done
-        lea (.here,pc),a1
-.here
-        adda.l #e3_area-.here,a1
-        cmpa.l #$200000,a1
-        bcs.s .done
+        move.l ($18,a0),d0      ; mh_Upper
+        move.l (e2_copy,pc),d1
+        beq.s .top
+        move.l d1,d0
+.top
+        move.l #E3_SIZE,d1
+        btst #6,(cache_options+3,pc)
+        beq.s .size
+        move.l #E3_SIZE*3,d1    ; E4: the chip bitmaps' shadows follow the picture
+.size
+        sub.l d1,d0
+        and.w #$fff0,d0
+        movea.l d0,a1
+        move.l d1,d0
+        jsr (_LVOAllocAbs,a6)
         lea (e3_buffer,pc),a0
-        move.l a1,(a0)
+        move.l d0,(a0)
+        beq.s .done
         btst #6,(cache_options+3,pc)
         beq.s .done
-        lea (E3_SIZE,a1),a1     ; E4: the chip bitmaps' shadows follow
+        add.l #E3_SIZE,d0
         lea (e4_last,pc),a0
-        move.l a1,(a0)
+        move.l d0,(a0)
 .done
-        movem.l (sp)+,d0/a0-a1/a6
+        movem.l (sp)+,d0-d1/a0-a1/a6
+        rts
+
+; A0 = a MEMF_FAST header. Carry clear when it is real fast RAM (not ExpMem in chip) and
+; MEMCONFIG=1's spare ExpMem is there, so the game keeps all of the default's.
+e_spare
+        cmpi.l #$200000,($14,a0)
+        bcs.s .rts
+        move.l ($18,a0),d0      ; mh_Upper
+        sub.l ($14,a0),d0       ; mh_Lower
+        cmp.l #FASTMEMSIZE,d0   ; carry set: the default ExpMem
+.rts
         rts
 
 ; From c2_acquire: the chip back buffer is the one not submitted last; draw in fast RAM.
@@ -4318,8 +4350,4 @@ names_rnc
         IFNE DEVELOPER
         CNOP 0,4
 c2_hud_buffer ds.b C2_HUD_STRIDE*C2_HUD_CAPACITY
-        CNOP 0,16
-e2_area ds.b E2_HIGH-E2_LOW     ; E2: hunk 2's code
-        CNOP 0,16
-e3_area ds.b E3_SIZE*3          ; E3: the picture; E4: the chip bitmaps' shadows
         ENDC
