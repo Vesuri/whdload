@@ -1194,3 +1194,25 @@ python3 tools/c2_capture.py tmp/e4/grid-b7 $P
 python3 tools/c2_capture.py tmp/e4/grid-b8 $P --e4-routines
 for a in b7 b8; do python3 tools/c6_profile.py tmp/e4/grid-$a --out tmp/e4/grid-$a.json; done
 ```
+
+## F1GP-Ed (F)
+
+`amiga/ed.sh` boots Workbench 2.04 with F1GP-Ed 3.44 (extracted from the pinned archive into
+`tmp/f1ed`) and a fresh copy of the pinned `f1gp` as `DH1:f1gp`. `tools/f1_ed.py serve`
+drives it interactively (`click`, `menu`, `hold`, `key`, `run`, `shot`).
+`tools/f1_writemap.py` saves settings into the copy through F1GP-Ed's menu shortcuts and
+collects the file (about 5 s a save); `tools/f1_diff.py` lists the changed ranges as hunk
+offsets and `tools/f1_fields.py` merges attribution saves into datafile fields:
+
+```sh
+python3 tools/f1_writemap.py tmp/f1/out new --new
+for f in tmp/f1ed/F1GP-Ed/2002.f1gp tmp/f1ed/F1GP-Ed/Datafiles/*.f1gp; do
+  python3 tools/f1_writemap.py tmp/f1/out df-$(basename $f .f1gp) --datafile $f
+done
+for k in $(seq 0 391); do python3 tools/f1_writemap.py tmp/f1/chunk c$k --xor $((4+16*k)) 16 1; done
+for i in $(seq 4 35) $(seq $((0xEF4)) $((0xF03))) $(seq $((0x1644)) $((0x17E3))); do
+  python3 tools/f1_writemap.py tmp/f1/byte b$i --xor $i 1 0xff
+done
+python3 tools/f1_diff.py tmp/game/FormulaOneGrandPrix4Disk/data/f1gp tmp/f1/out/new.f1gp 16
+python3 tools/f1_fields.py tmp/f1/out/df-2002.f1gp tmp/f1ed/F1GP-Ed/2002.f1gp tmp/f1/byte tmp/f1/chunk
+```

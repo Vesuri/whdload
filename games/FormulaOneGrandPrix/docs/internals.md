@@ -3124,3 +3124,110 @@ The race's level-3 chain (h2+$2E4 dispatcher, h2+$5DC, h0+$2CC38) measured about
 including the slave's privileged-instruction handling (A6). The plan's condition was to
 leave it unless cheap; no cheap change is known, and it is below the 1–3% entries E4 left.
 
+
+## F1GP-Ed compatibility (F)
+
+### F1 write map — complete
+
+**Method.** `amiga/ed.sh` boots Workbench 2.04 on Kickstart 3.1 with F1GP-Ed 3.44 (from the
+pinned `tmp/archives/F1GP-Ed.lha`, with its bundled reqtools, gadtools13 and f1gp.library)
+on DH0 and a fresh copy of the pinned `f1gp` as `DH1:f1gp` (`f1gp_disk_#2:`).
+`tools/f1_writemap.py` saves the settings into that copy through F1GP-Ed's own menu
+shortcuts (Project/New Right-Amiga N, Save to F1GP Binary Right-Amiga B, the confirmation
+Left-Amiga V) and collects the file, about 5 s a save under warp; saves are deterministic.
+F1GP-Ed recognises the file as "Version A: Original/PowerPlus". F1GP-Ed reads its icon's
+`DATAFILE=2002.f1gp` even when started from the shell, so a run either names a datafile or
+starts from Project/New. `tools/f1_diff.py` maps differences to hunk offsets (and reads the
+relocation tables); `tools/f1_fields.py` merges attribution runs into fields.
+
+A datafile is a fixed 6,275 bytes (`V344` and the settings), so single settings were varied
+by editing it: 392 saves each XOR 1 into one 16-byte chunk of 2002.f1gp after its header,
+then 464 saves each XOR `$FF` into one byte of the regions whose chunks wrote scattered
+targets (+$04–$23, +$EF4–$F03, +$1644–$17E3). Datafile offsets below are into 2002.f1gp;
+f1gp offsets are hunk offsets; "file" offsets lie outside hunk data, in relocation tables.
+The 2002 datafile and the eight supplied seasons (1994–2001) were saved too: every byte
+they change lies inside the map below (none outside), from 3,326 (1994) to 3,814 (2002).
+
+**Written on every save** (Project/New included; not set by any datafile byte), 281 bytes:
+
+| f1gp range | Kind | What it does |
+|---|---|---|
+| h0+$0–$5 (the entry `JMP`'s target) and h0+$1F040–$1F085 (70 bytes of zeros before) | code | Startup hook: opens `f1gp.library`, calls its first function, closes it, continues at the original entry h0+$88E. Under WHDLoad the library is absent and the hook falls through. |
+| h0+$11A4–$11AB, h0+$11FC–$1201 | code | The call at h0+$11A4 goes through a new tail at h0+$11FC (calls h0+$11EA, then jumps to A2+$145E). |
+| h0+$1D0–$1D5 | code | `NOP`s the `BSET` of bit 7 at h2+$2AF2A (the drivers' selected flags, which F1GP-Ed writes itself). |
+| h0+$3C764–$3C769, h2+$14A9C–$14B23 (136 bytes over data) | code | The call to h2+$2A020 goes to F1GP-Ed code at h2+$14ABE, which counts the named drivers and marks the remaining car records unused before continuing (grids smaller than 26). |
+| h2+$1FE88–$1FE89 | code | `BRA` over the session setup's detail-level write, so the preset at h0+$3A910 (below) holds. |
+| h2+$32A38, +$32B32, +$32FD4, +$3302A, +$32F3D, h2+$32F80–$32FB1 | code | The game's file requester lists up to 200 entries instead of 64, with its table moved. |
+| h2+$2D03A–$2D03B | code | An indexed byte read made fixed (purpose not identified). |
+| h2+$2BE1F, h2+$384F4, h2+$3BC39–$3BC3A | data | Single bytes; h2+$3BC39 swaps two letters of a text. |
+
+**Settings** (datafile field, in 2002.f1gp → f1gp ranges). Copied fields hold the datafile's
+bytes; code fields switch or rewrite instructions. Labels marked † are inferred from the
+targets, F1GP-Ed's defaults and the game's internals rather than from F1GP-Ed's windows.
+
+| Datafile | Setting | f1gp ranges | Kind |
+|---|---|---|---|
+| +$04 | first car's driver entry (flipping it rewrites about 800 ranges)† | throughout h0 and h2 | data, code |
+| +$05–$19 | Teams: Driver A/B per car, bit 7 the Drivers window's Selected flag | h2+$2AF2A–$2AF3E | copied |
+| +$1A, +$EF6 | Max Teams (11 in 2002.f1gp)† | h0+$2917D, +$291CF, +$29225, +$294DD, +$29D19, +$29F89, h0+$29A7E, h2+$2AF2A–$2AF3F, h2+$2F35B, +$2F9B7 and the car tables | data, code |
+| +$24–$603 | driver names (40), team and engine names | h2+$2AF52–$2B519 | copied |
+| +$604–$8F3 | circuit names | none | — |
+| +$8F4–$EF5, +$EF7, +$EF9, +$EFB–$1493 | lap records (driver, team, time, date) and Pit Order† (+$EFB–$F03) | h2+$2B81A–$2C3AB | copied |
+| +$1504–$1648 | car setups | h2+$2A92C–$2AA6D | copied |
+| +$164D–$1658 | Level Name | h2+$3B5BA–$3B5BD, h2+$3E344–$3E34E | copied |
+| +$165B–$165D | Standard Options† | h2+$2A656, h2+$3A4F6–$3A4F9 | copied |
+| +$165E–$1669 | Analog Joystick Calibration (A6) | h2+$2A658–$2A663 | copied |
+| +$166A–$1677 | Standard Options (race options)† | h2+$2A738–$2A74B | copied |
+| +$1679–$167F | Cheats and Preferences switches† | h0+$3A935–$3A938, h0+$29912, h0+$3B156–$3B159, h0+$3B1BA–$3B1BD, h0+$3BB74, h2+$2D02B, h0+$7E1, h0+$7B3, h0+$9C7 | code, data |
+| +$1681–$168A | five In-Game Prefs words† | h0+$32B08–$32B11 | data |
+| +$168B–$168C | HP (716)† | h0+$298DC | data (scaled) |
+| +$168D–$168E | Speed Factor† | h0+$29A7E | data |
+| +$1690–$16C1 | Default Dir | h2+$386AE–$386DF | copied |
+| +$16C8–$16C9 | driving-aid cheat† | h0+$2A0D4–$2A0D7, h0+$2C9A2–$2C9A5, h0+$3BAF0, h0+$3BB40 | code |
+| +$16CB | Car Control (controller reader)† | h0+$34E05–$34E41, h0+$364BD–$364C5 and six more | code |
+| +$16CD | Standard Options flags† | h0+$3A7F7, h0+$3A8FA, h0+$3A90B–$3A90D, h0+$3A954 | data |
+| +$16CF | Detail Level (2 Full, 1 Medium, 0 Low) | h0+$3A910 | data |
+| +$16D4 | Keyboard Default† | h0+$3A7AC (bit 5), h0+$3A90E (pause key) | data |
+| +$16D6 | Degrade HP† | h0+$298FE–$298FF, h0+$29954–$29955 | code |
+| +$16D7–$16D8 | Player HP (716)† | h0+$26B14–$26B15, h0+$26B46–$26B47 | data (scaled) |
+| +$16DA | Target Display (PAL/NTSC) | h0+$1269–$1271 (pacer minimum table), h0+$34362–$34369 (step words) | data |
+| +$16DB | Frames/sec (fields per frame) | h0+$125B, h0+$1263–$1271, h0+$34362–$34369 | data |
+| +$16F3–$16FF | Points and Timing† | h0+$28–$2B, h0+$31–$37 | data |
+| +$16F7–$16F8 | In-Game Prefs delays (3, 30; × 1000)† | h0+$2A950, h0+$2A9CA | data |
+| +$1714–$1721 | Car Fragility (hit thresholds)† | h0+$26CD7–$26D1B | code |
+| +$1724–$1732 | code switches, one with a relocation† | h0+$36B26–$36B33, file $46E8D–$46E8F, h2+$33C86–$33C8D | code |
+| +$1733 | a code switch† | h0+$148 | code |
+| +$1734–$1743 | a code switch with relocations† | h2+$21236–$2124F, file $8C9A5–$8C9AF | code |
+| +$1774–$177D | Wet Weather settings† | h0+$2C905, h0+$2AB15, h0+$35752 | data |
+| +$177F–$179E | In-Game Colours (16 colour words) | h0+$3CD12–$3CD31 | copied |
+| +$17C0–$17C1 | Default Position (on/off) | h2+$30FB4, h2+$2C8E2–$2C8E5 | code |
+| +$17C2–$17C3 | Display X, Y | h2+$1C5, h2+$2A648–$2A64F (display window and data fetch, E5) | data |
+| +$17C5 | an unidentified menu byte | h2+$2D825 | data |
+| +$17C6–$17C7 | Minimum Pitstop Time, Damage Repair Time (6, 14 s) | h0+$289C0, h0+$289D0 (× 1000) | data |
+| +$17CA | a Preferences switch† | h0+$501–$503, h0+$543–$545 | code |
+| +$17D0–$17D3 | Fast GUI and menu switches† | h0+$119, h2+$2DDB4–$2EE17 (12 calls `NOP`ed), h2+$3249C | code |
+| +$17D4 | Preferences word† | h0+$3A694 | data |
+| +$17D4–$17E3 (only as a chunk) | Car Design† | h0+$31CFF–$32034 (51 ranges) | data |
+| +$17D7 | Alternative Nose† | h2+$29A67 | data |
+| +$17E4–end, +$1488–$1503, +$1649–$164C, +$1659–$165A | memory patches, GPPatch, fonts and unused bytes | none | — |
+
+Notes for F2/F3:
+- The settings write both data and code in hunks 0 and 2, including bytes the slave and
+  the C/D/E hooks may patch (h0+$125B–$1271 and h0+$34362–$34369 above; F2 checks every
+  overlap). Frames/sec and Target Display write the pacer minimum and the step words that
+  F3 needs; at 2002.f1gp's setting the step words are 3375, 6750, 6750, 6750 (n = 5).
+- Two code settings edit relocation tables (file $46E8D, $8C9A5–$8C9AF), so an edited
+  file's relocations differ from the stock file's.
+- Project/New does not restore the stock file: besides the patches above it leaves the
+  remains of the previous datafile's longer names after their terminators.
+
+**Not covered.** The Graphics, Sound Samples and Backdrops windows replace image and sample
+data interactively, without datafile settings (F4 builds an edited cockpit and backdrop).
+The memory patches (Car Control, Speed and Risk Factors, Miscellaneous, GPPatch) run from
+F1GP-Ed's process beside the game and are never written to the file; under WHDLoad nothing
+runs beside the game (F6). Save to Memory writes the File Editor settings into a running
+game; nothing can run it under WHDLoad, so it was not traced. The runs vary each byte by XOR
+rather than taking every setting to its GUI extremes, so a value-dependent code path a
+setting takes only near its limits could be missed; the supplied datafiles' writes all
+fall inside the map. Evidence: `tmp/f1/out` (New, the nine datafiles), `tmp/f1/chunk`,
+`tmp/f1/byte`.

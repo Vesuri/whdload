@@ -475,7 +475,11 @@ the slave, because they need WHDLoad's caches, fast memory and the hardware.
 diff the file after each setting (one at a time, at their extremes) and after each
 supplied datafile; saving to the file needs the GUI, `SAVETOMEM` plus a memory dump
 covers the memory path. *Output:* in internals, each setting's hunk ranges, data or code,
-and its values; no game bytes.
+and its values; no game bytes. *Complete:* both archives are pinned; F1GP-Ed runs headless under
+Workbench and saves through its menu shortcuts. 392 chunk and 464 byte variants of a
+datafile, Project/New and the nine supplied datafiles map every written range (data and
+code, relocation tables included); every byte the supplied datafiles write lies inside the
+map. The memory path was not traced: nothing can run it under WHDLoad.
 
 **F2 Collisions.** Compare the write map with every `PL_*` site, `E2`'s copied ranges,
 the `C`/`D` hooks and the state `C`/`D` read. Classify each overlap as harmless, needing
