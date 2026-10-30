@@ -423,7 +423,12 @@ many pictures. The copy is now its main cost.
 look for work not done first (AmigaXDev `m68k-optimisation.md` §10), then 68020 forms
 (scaled index, bit-field instructions, 32-bit multiply, inner loops inside the 256-byte
 instruction cache). Twin every replacement against the original (Indianapolis 500
-`pixel_verify.s`); keep the original on any CPU where it is not faster.
+`pixel_verify.s`); keep the original on any CPU where it is not faster. *Complete (user decision):* behind
+developer options the copy into chip writes only changed longs, the renderer's CPU-only
+chip data moves to fast RAM, and the tracer's X-major steps and the sky strip's reads take
+exact faster forms. Each leaves the same tick's picture and state identical; the data move
+and the faster forms cut a picture's scene by about 29% on the 030 (same-build pairs). The remaining
+entries are spread thin, 1–3% each.
 
 **E5 AGA 32-bit fetch.** On AGA only, `FMODE` 1 or 2 with `DDFSTOP` adjusted; write
 `FMODE` 0 on OCS/ECS. The plane pointers already meet the 4-byte alignment; 64-bit

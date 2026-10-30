@@ -2875,7 +2875,7 @@ Limits: E3 is developer-only and needs the clock patches (`CUSTOM2` bit 1) and r
 RAM. It was measured only together with E2. The 68020 and 040/060 gains are not claimed
 (current scope and deferred work). Menus and modal screens keep drawing in chip.
 
-### E4 hot routines — in progress
+### E4 hot routines — complete
 
 **Re-profile with E1–E3 on** (030, E2 and E3, `CUSTOM4=1`): the top entry was E3's own
 copy into chip (22% of cycles with the player on the grid, 15% in a rear-chase window).
