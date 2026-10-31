@@ -530,7 +530,8 @@ settings the slave honours, overrides or rejects (`F`).
 
 **G4 Release archive** (AmigaXDev playbook §13). *In progress:* `make dist` builds 2.0b (31.10.2026) for the user's
 A1200/040 test: Codetapper's archive with the developer slave, `release/ReadMe` (a 2.0b
-history entry) and the nine game icons set to `CUSTOM2=1531 MEMCONFIG=1`. The release
+history entry) and the nine game icons set to `CUSTOM2=1531 MEMCONFIG=1`. The user's A1200/040 runs it
+(after the 24-bit edge-pool fix in E4). The release
 build will replace the developer slave once G1 exists.
 
 ## H. Finer simulation (optional; only on the user's request)

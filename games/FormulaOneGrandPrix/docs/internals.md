@@ -2973,7 +2973,8 @@ and the slave leaves it in chip, with no span, when its copy would end above `$1
 With 32 MB of Zorro III RAM and no Zorro II (`FAST_KB=0 EXTRA_ARGS='--zorro_iii_memory=32768'`,
 `a1200-040`, `CUSTOM2=1531 MEMCONFIG=1`) the unfixed 2.0b slave faults at the same
 instruction; the fixed developer slave runs a Quick Race 1500 fields, and VERIFY logs E2's
-copy at `$41F7C9E0` (494 operands: bit 8's `PL_PS` at h0+$20E replaces one).
+copy at `$41F7C9E0` (494 operands: bit 8's `PL_PS` at h0+$20E replaces one). On the user's
+A1200/040 the fixed 2.0b (`8fe937ed…`) runs.
 
 The move changes only where the data lives, so the check is the same tick's picture and
 state with the move off and on (developer `8fcb7009…`, rear chase, `--publish` at tick
