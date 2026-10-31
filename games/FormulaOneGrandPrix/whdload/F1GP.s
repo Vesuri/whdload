@@ -30,6 +30,7 @@ HDINIT
 DOSASSIGN
 BOOTDOS
         INCLUDE whdload/kick13.s
+        INCLUDE f5.i
 
 DECL_VERSION MACRO
         dc.b '2.0b'
@@ -216,6 +217,11 @@ patch_game
         move.l (game_size,pc),d0
         cmp.l #582992,d0
         bne.s .patched
+        bsr f5_check
+        bne.s .patched
+        lea (patch_582992_options,pc),a0
+        move.l d7,a1
+        jsr (resload_PatchSeg,a2)
         move.l (_attnflags,pc),d0
         btst #0,d0            ; AFF_68010: any CPU above the 68000
         bne.s .clock
@@ -311,15 +317,47 @@ names_old
         move.l ($910,a1),a1
 names_check
         lea ($900,a1),a1
+        cmp.l #582992,d0
+        bne.s names_first
+        ; F5: replace only if every visible name (each field up to its terminator) is
+        ; the stock one, so edited names survive and Project/New's leftover tails do not count.
+        movea.l a1,a0
+        moveq #0,d0
+        moveq #40-1,d2          ; drivers
+        moveq #24,d3
+        bsr.s names_sum
+        moveq #40-1,d2          ; teams and engines
+        moveq #13,d3
+        bsr.s names_sum
+        cmp.l #NAMES_SUM,d0
+        bne.s names_done
+        bra.s names_restore
+names_first
         cmp.l #'Carl',(a1)
         bne.s names_done
         cmp.l #'os S',(4,a1)
         bne.s names_done
+names_restore
         lea (names_rnc,pc),a0
         move.l (_resload,pc),a2
         jsr (resload_Decrunch,a2)
 names_done
         movem.l (sp)+,d0-a6
+        rts
+; D2+1 fields of D3 bytes from A0, into the rotate-and-add sum D0 (tools/f5_sites.py).
+names_sum
+        movea.l a0,a2
+        move.w d3,d4
+        subq.w #1,d4
+.byte
+        rol.l #1,d0
+        moveq #0,d1
+        move.b (a2)+,d1
+        add.l d1,d0
+        tst.b d1
+        dbeq d4,.byte
+        adda.w d3,a0
+        dbf d2,names_sum
         rts
 
         IFNE VERIFY
@@ -491,6 +529,52 @@ f3_step
         move.l (sp)+,a0
 .done
         rts
+
+; F5: Z set if every optional hook site (f5_sites, from tools/f5_sites.py) holds the
+; stock file's bytes. An edited file that changed code there runs without the developer
+; options (VERIFY logs it) instead of having its changed code patched. Needs c2_init.
+f5_check
+        movem.l d0-d2/a0-a2,-(sp)
+        lea (f5_sites,pc),a0
+        moveq #0,d0
+.site
+        move.w (a0)+,d1         ; hunk
+        bmi.s .sum
+        lea (c2_h0,pc),a1
+        add.w d1,d1
+        add.w d1,d1
+        movea.l (a1,d1.w),a1
+        move.w (a0)+,d2         ; length
+        adda.l (a0)+,a1
+        subq.w #1,d2
+.byte
+        rol.l #1,d0
+        moveq #0,d1
+        move.b (a1)+,d1
+        add.l d1,d0
+        dbf d2,.byte
+        bra.s .site
+.sum
+        cmp.l #F5_SUM,d0
+        sne d1
+        lea (f5_changed,pc),a0
+        move.b d1,(a0)
+        IFNE VERIFY
+        beq.s .logged
+        lea (f5_message,pc),a0
+        move.l (_resload,pc),a2
+        jsr (resload_Log,a2)
+.logged
+        ENDC
+        lea (f5_changed,pc),a0
+        tst.b (a0)              ; Z: the sites match
+        movem.l (sp)+,d0-d2/a0-a2
+        rts
+f5_changed dc.b 0
+        IFNE VERIFY
+f5_message dc.b 'F1GP VERIFY F5: hook sites differ from the stock file; developer options off',10,0
+        ENDC
+        EVEN
 
 ; C2 hooks for the supplied game only. All state remains in the slave.
 c2_init
@@ -4617,8 +4701,12 @@ patch_582992
         PL_B $a79ce,$ff
         PL_L $a7a42,'save'
         PL_W $a7a46,$7300
+        PL_END
         ; BASELINE_PATCHES_END
         IFNE DEVELOPER
+; F5: the options of the main list, applied only when f5_check finds the stock hook sites.
+patch_582992_options
+        PL_START
         PL_IFC3X 0
         ; PERF_RANGE h0:1288 4 custom=3 bit=0 variant=582992
         PL_NOP $1288,4
@@ -4636,7 +4724,6 @@ patch_582992
         ; PERF_RANGE h0:1efde 6 custom=2 bit=8 variant=582992
         PL_PS $1efde,e4_trace_left
         PL_ENDIF
-        ENDC
         IFNE VERIFY
         PL_IFC5X 0
         ; PERF_RANGE h0:3c9d2 6 custom=5 bit=0 variant=582992
@@ -4644,7 +4731,6 @@ patch_582992
         PL_ENDIF
         ENDC
         PL_END
-        IFNE DEVELOPER
 ; The C2-C4 clock hooks, applied after the main list unless the CPU is a 68000
 ; (user decision: the 68000 keeps the native frame-locked pacer by default).
 patch_582992_clock

@@ -3338,3 +3338,36 @@ scales its cornering and target-speed terms) by 1.0653 at 20 fps. Factors from 1
 1.25 left the laps at 117.3–119.7 s, so the slave keeps the factor as the file sets it,
 as F1GP-Ed does by default. Recovering the pace needs H2's audit of the per-tick terms.
 
+### F5 edited-file checks — complete
+
+Version detection stays by size (582,992 bytes: the 4 disk release, the only file the
+enhancements patch). Two checks were added to what the slave does with such a file.
+
+**Hook sites.** Before it applies the developer options (C2–C4's clock, D, E2–E7, the C3
+and VERIFY relays), the slave sums the bytes of every optional hook site, the
+`PERF_RANGE` list B4 audits, without the bytes of relocated longwords (60 runs, 188
+bytes). The sum (rotate left one bit, add the byte) must equal the stock file's
+`F5_SUM`; `tools/f5_sites.py` generates it and the site table into the build from the
+pinned file. A file that differs leaves every hook-based option out: the baseline loader
+patches still apply and the caches option still sets the CACR, and VERIFY logs
+`F1GP VERIFY F5: hook sites differ from the stock file; developer options off`. All 866
+files F1 saved (New, the datafiles, the chunk and byte variants) keep the stock sum, so
+F1GP-Ed's settings never turn the options off. `tools/f5_variant.py site` re-encodes the
+pacer branch at h0+$1288 (`BCS.W` as `BCS.S` and `NOP`, the same branch): on the 030 the
+VERIFY build left the site and the clock hook unpatched, ran the native pacer and logged
+the line.
+
+**1991 names.** The slave replaces the names at h2+$2AF52 with the 1991 season's only if
+all 80 visible names (40 drivers of 24 bytes, 40 team and engine names of 13, each up to
+and including its terminator) are the stock ones (`NAMES_SUM`). Bytes after a terminator
+do not count: F1GP-Ed's Project/New leaves old names' tails there (342 bytes differ in
+`new.f1gp`, whose names are stock). `tools/f5_variant.py name` changes only the last
+driver's name: the old test, which read the first name only, would have replaced it;
+on the A500-equivalent the file's name survived. The 582,780-byte release keeps the
+first-name test. On the stock file B4's gate still checks the 1991 names (PASS).
+
+**Overrides the baseline keeps** (on every file, documented in the ReadMe): the 1991
+names as above; the file requester's filter button set (h2+$3863A `$FF`, which 1995–2002
+datafiles write themselves and 1994 and New leave 0); and saves to the `save`
+directory (h2+$386AE), replacing F1GP-Ed's Default Dir path, which does not exist under
+WHDLoad.

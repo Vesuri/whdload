@@ -22,7 +22,8 @@ FEATURES:
 - Intro can be skipped by pressing fire/left mouse while loading or by
   setting the CUSTOM1=1 tooltype
 - Full 1991 season drivers and teams replace the built-in names unless you
-  have modified your version of the game with F1GP-Ed
+  have modified your version of the game with F1GP-Ed (2.0b: unless any
+  driver, team or engine name was changed)
 - All save operations default to a "saves" subdirectory so as not to
   clutter up the main game directory
 - Filter button enabled by default when loading/saving (prevents the list
@@ -46,7 +47,9 @@ Version 2.0b (31.10.2026) by Vesuri (beta):
 - All of the above are enabled in the supplied icons (CUSTOM2=1531
   MEMCONFIG=1). Uncheck them in the WHDLoad startup options to play the
   original game. Leave the other developer options unchecked
-- The enhancements apply to the 4 disk release's game file only
+- The enhancements apply to the 4 disk release's game file only, and
+  only while the game code they change is the original. F1GP-Ed's settings
+  keep it; a game file changed there by other means runs without them
 - F1GP-Ed's frame rate setting (used by its 1995-2002 datafiles) sets how
   often the game updates the world; the race runs in real time at that
   rate, and motion stays smooth between the updates

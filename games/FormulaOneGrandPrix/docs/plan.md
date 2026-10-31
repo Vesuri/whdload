@@ -514,6 +514,10 @@ Run the `B4` gate, `C5`, `D8`/`D9` and whole races on the 030 and A1200 against 
 verify the original bytes before patching, or turn the affected feature off for that
 file. Document the slave's baseline overrides (requester filter button, default save
 directory, 1991 names).
+*Complete* ([evidence](internals.md#f5-edited-file-checks--complete)): the developer
+options apply only when every hook site sums to the stock file's (all of F1's saved files
+do), the 1991 names replace the file's only when all 80 visible names are stock, and the
+ReadMe documents the overrides.
 
 **F6 Memory-patch features** (optional; user decision). Reimplement chosen F1GP-Ed memory
 patches (GPPatch, PatchF1GP, per-circuit factors, f1gp.library fixes) as slave options,

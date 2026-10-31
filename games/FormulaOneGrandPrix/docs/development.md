@@ -1269,6 +1269,25 @@ python3 tools/slave_gate.py --prefix f3-
 The views schedule replays at tick 1100 (57 s into a 20 Hz race), so pace comes from the
 plain `--states` captures.
 
+### F5 edited-file checks
+
+`build.sh` runs `f5_sites.py`, which writes `tmp/slave/include/f5.i` (the hook-site
+table, `F5_SUM` and `NAMES_SUM`) from the pinned file. `f5_variant.py` builds the two
+negative cases and checks their `--expect-native` captures:
+
+```sh
+. amiga/env.sh
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix f5-
+make slave-verify OUT=tmp/f5/verify
+python3 tools/f5_variant.py site tmp/f5/game-site
+python3 tools/f5_variant.py name tmp/f5/game-name
+python3 tools/c2_capture.py tmp/f5/cap-site --build tmp/f5/verify --expect-native --setup a1200-030 --game tmp/f5/game-site
+python3 tools/c2_capture.py tmp/f5/cap-name --build tmp/f5/verify --expect-native --setup a500-1.5m --game tmp/f5/game-name
+python3 tools/f5_variant.py check site tmp/f5/cap-site
+python3 tools/f5_variant.py check name tmp/f5/cap-name
+```
+
 ## Release archive (G4)
 
 `make dist` rebuilds Codetapper's installer archive (`tmp/archives/FormulaOneGrandPrix.lha`,
