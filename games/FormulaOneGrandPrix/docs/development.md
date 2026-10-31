@@ -1229,3 +1229,25 @@ To run an edited file, copy the game directory, replace `data/f1gp` and pass it 
 (absolute) to `tools/f1gp.py serve`. The stock routes stop where the file's settings skip a
 screen, so drive the rest with `tap` and `menuclick`. The protection accepts A and Return;
 in the Main Menu use 395 252, then 530 246, then 235 391 for practice at Silverstone.
+
+## Release archive (G4)
+
+`make dist` rebuilds Codetapper's installer archive (`tmp/archives/FormulaOneGrandPrix.lha`,
+verified against the manifest first) as `dist/FormulaOneGrandPrix-<ver>.lha` with
+`tools/package_release.py`. It makes a fresh developer build in `tmp/dist-build` (G1's
+player toggle does not exist yet), takes the version from the slave's `$VER` and requires
+a matching entry in `release/ReadMe`. The archive keeps the original's 18 members; the slave,
+the ReadMe and the nine game icons change, and the icons get `CUSTOM2=1531 MEMCONFIG=1`
+after `PRELOAD`, every other byte kept. The tool re-extracts the archive and checks every
+member against its stage and the original. Bump `DECL_VERSION` and the `$VER` date in
+`whdload/F1GP.s` and the ReadMe together. A boot check of the packaged slave:
+
+```sh
+make dist
+lha xqw=tmp/g4/new dist/FormulaOneGrandPrix-2.0b.lha
+AMIGA_SETUP=a1200-040 SLAVE=tmp/g4/new/FormulaOneGrandPrixHD/FormulaOneGrandPrix.slave \
+  WHD_ARGS='CUSTOM1=1 CUSTOM2=1531 MEMCONFIG=1' WARP=1 JOY0=none JOY1=none \
+  python3 tools/f1gp.py serve > tmp/g4/serve.log 2>&1 &
+python3 tools/f1gp.py quickrace && python3 tools/f1gp.py gdb monitor fields 1500
+python3 tools/f1gp.py shot "$PWD/tmp/g4/race.png"; python3 tools/f1gp.py quit
+```

@@ -31,10 +31,20 @@ DOSASSIGN
 BOOTDOS
         INCLUDE whdload/kick13.s
 
+DECL_VERSION MACRO
+        dc.b '2.0b'
+        ENDM
+
 slv_CurrentDir dc.b 'data',0
 slv_name dc.b 'Formula One Grand Prix',0
 slv_copy dc.b '1991 Microprose',0
-slv_info dc.b 'Reconstructed loader',10,'Original install by Codetapper/Action!',0
+slv_info dc.b 'Installed by Codetapper/Action! and Vesuri',10
+        dc.b 'Version '
+        DECL_VERSION
+        dc.b 0
+        dc.b '$','VER: FormulaOneGrandPrix.slave '
+        DECL_VERSION
+        dc.b ' (31.10.2026)',0
         IFNE DEVELOPER
         EVEN
 slv_MemConfig dc.l CHIPMEMSIZE,$40000+FASTMEMSIZE+E_AREAS  ; kick13.s's KICKSIZE first

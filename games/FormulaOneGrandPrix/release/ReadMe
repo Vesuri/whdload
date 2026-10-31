@@ -1,0 +1,108 @@
+Short:    HD-Installer for Formula One Grand Prix V2.0b
+Author:   Codetapper/Action (codetapper@hotmail.com), ICQ: 26051687
+Uploader: Codetapper/Action (codetapper@hotmail.com)
+Version:  2.0b
+Type:     game/patch
+
+This patch applies to "Formula One Grand Prix" (c) 1991 Microprose.
+Supported: - 4 disk original release/PowerPlus budget release (Mad-Matt)
+           - 3 disk release (A600 Wild, Weird & Wicked pack) (Mad-Matt)
+
+REQUIREMENTS:
+- Slave requires WHDLoad V20+ and an installed A500 Kickstart 1.3 image
+- Game requires 512k chip mem and 768k other memory (+3.2Mb other memory 
+  for preload option). MEMCONFIG=1, set in the supplied icons, raises
+  this to 932k other memory. Remove the MEMCONFIG tooltype on machines
+  without fast memory
+
+FEATURES:
+- Full load from HD
+- Manual protection removed (type anything at the prompt)
+- Fully compatible with F1GP-Ed modifications to the game file!
+- Intro can be skipped by pressing fire/left mouse while loading or by
+  setting the CUSTOM1=1 tooltype
+- Full 1991 season drivers and teams replace the built-in names unless you
+  have modified your version of the game with F1GP-Ed
+- All save operations default to a "saves" subdirectory so as not to
+  clutter up the main game directory
+- Filter button enabled by default when loading/saving (prevents the list
+  of files showing invalid files)
+- Audio filter disabled for clearer sound
+- Mouse pointer sped up to maximum speed
+- Normal, RomIcon, NewIcons and OS3.5+ Colour Icons (created by Frank,
+  Mad-Matt and myself) and 2 Exoticons from http://exotica.fix.no/
+- Quit option (default key is 'F10')
+
+HISTORY:
+
+Version 2.0b (31.10.2026) by Vesuri (beta):
+- Consistent game speed on a 68020 or better: the race runs in real time
+  however long the 3D view takes to draw. A 68000 keeps the original timing
+- Smooth motion on a 68020 or better: the 3D view is drawn between the
+  game's updates, up to every frame on fast Amigas
+- Faster 3D drawing on a 68020 or better with fast memory (MEMCONFIG=1)
+- Slightly faster 3D drawing on a 68000
+- Optional CPU caches
+- All of the above are enabled in the supplied icons (CUSTOM2=1531
+  MEMCONFIG=1). Uncheck them in the WHDLoad startup options to play the
+  original game. Leave the other developer options unchecked
+- The enhancements apply to the 4 disk release's game file only
+- F1GP-Ed's frame rate settings (used by its 1995-2002 datafiles) are not
+  yet honoured with consistent game speed: the race runs slower than real
+  time. Uncheck "Developer - VBL world clock" for such files
+- Requires WHDLoad V20+
+
+Version 1.0 (06.12.2002) by Codetapper/Action:
+- Initial release
+
+I recommend anyone that enjoys this game to download the superb F1GP-Ed
+from Aminet (game/misc/F1GP-Ed.lha) or from Oliver's Amiga F1 website at
+http://www.nanunanu.org/~oliver/AmigaF1.html
+
+Using F1GP-Ed you can modify an enormous number of parameters associated
+with the game and this WHDLoad patch will still work correctly! If you
+wish to modify the game regularly, I recommend you to add an assign to
+your s:user-startup file like so:
+
+  assign f1gp_disk_#2: games:FormulaOneGrandPrix/data
+
+Replace the path with wherever you installed the game. If you do this,
+when you launch F1GP-Ed it will find the game file straight away.
+
+The install script will automatically create a "saves" directory which is
+the default directory for any information which is loaded or saved.  If you
+really want to save information in the main directory, press the "DH0:"
+button to access it.
+
+The kickstart image must be located in the directory "Devs:Kickstarts"
+and must be named "kick34005.A500". The image can be extracted from an
+A500 with tools like "GrabKick" or similar which can be found on Aminet.
+If the image is the wrong version or altered in any way, WHDLoad will
+quit with an appropriate error message. 
+
+Additionally the file "kick34005.A500.RTB" must be installed in the same
+directory as the kickstart image. It can be found in the archive 
+"util/boot/skick343.lha" on Aminet.
+
+Greetings to Mad-Matt for the original quick install, supplying both
+originals, testing and the great front and back box scan icon, Frank for
+his awesome icons, Wepl for WHDLoad, all Action members, my testing crew
+and the WHDLoad team!
+
+
+Codetapper/Action (06-Dec-2002)
+
+
+         Bug report form, full WHDLoad package and other installs:
+                          http://www.whdload.de/
+
+            ________  ________  ________  ____  ________  ________
+           _)       \_)       \_)       \_)   \_)       \_)       \
+   __ ___ /___/     /   /_____/\  /     /     /   /     /   /     /
+  /_//__// \___    /   /     /CT\/     /     /   /     /   /     /
+        /___/     /___      /   /     /_____/___      /___/     /___ __
+            \____/    \____/    \____/          \____/    \____//__//_/
+
+
+           Visit the Action website for more of our productions:
+                           http://zap.to/action/

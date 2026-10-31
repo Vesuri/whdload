@@ -528,7 +528,10 @@ state reset), NTSC; every CPU, caches on; the stock file and `F4`'s edited files
 internals; the ReadMe's requirements (memory, CPU) and options, and which F1GP-Ed
 settings the slave honours, overrides or rejects (`F`).
 
-**G4 Release archive** (AmigaXDev playbook §13).
+**G4 Release archive** (AmigaXDev playbook §13). *In progress:* `make dist` builds 2.0b (31.10.2026) for the user's
+A1200/040 test: Codetapper's archive with the developer slave, `release/ReadMe` (a 2.0b
+history entry) and the nine game icons set to `CUSTOM2=1531 MEMCONFIG=1`. The release
+build will replace the developer slave once G1 exists.
 
 ## H. Finer simulation (optional; only on the user's request)
 

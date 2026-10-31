@@ -2,7 +2,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 .PHONY: help check
 help:
-	@echo 'make check; make slave / slave-developer / slave-verify; make check-disabled CAPTURE=tmp/...; make slave-clean OUT=tmp/...'
+	@echo 'make check; make slave / slave-developer / slave-verify; make check-disabled CAPTURE=tmp/...; make slave-clean OUT=tmp/...; make dist'
 check:
 	shasum -a 256 -c manifest/SHA256SUMS
 
@@ -23,3 +23,8 @@ slave-clean:
 	@CLEAN=1 OUT="$(or $(OUT),tmp/build)" /bin/bash whdload/build.sh
 test-disabled:
 	@python3 tools/test_disabled.py
+
+# G4: the original installer archive with the new slave, ReadMe and icons -> dist/ (ignored).
+.PHONY: dist
+dist:
+	@python3 tools/package_release.py
