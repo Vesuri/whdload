@@ -26,8 +26,9 @@ from slave_inputs import ROOT, verify
 GAME = ROOT/'tmp/game/FormulaOneGrandPrix4Disk/data/f1gp'
 NAMES = (2, 0x2af52, ((40, 24), (40, 13)))
 # c2_hud_gear reads its ADDA.W operand (the gear's place, which F1GP-Ed's Graphics window
-# writes) from h2+$1F92A; the second, h2+$1F92E, lies after the site.
-READ = {(2, 0x1f92a+k) for k in range(2)}
+# writes) from h2+$1F92A; the second, h2+$1F92E, lies after the site. F6 reads the speed
+# factor base (F1GP-Ed's Speed Factor) from h0+$29A7E before it patches the site.
+READ = {(2, 0x1f92a+k) for k in range(2)} | {(0, 0x29a7e+k) for k in range(2)}
 
 
 def checksum(data, total=0):

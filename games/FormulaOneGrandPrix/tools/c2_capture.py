@@ -97,6 +97,8 @@ def capture(args):
         custom2 |= 1024
     if args.step20:     # CUSTOM2 bit 9 (F3): the 20 Hz world step instead of the file's
         custom2 |= 512
+    if args.speed_factors:  # CUSTOM2 bit 11 (F6): F1GP-Ed.f1gp's local speed factors
+        custom2 |= 2048
     if args.no_caches:  # E1's uncached arm: bit 0 clear and WHDLoad's NoCache (B5/A7 controls)
         custom2 &= ~1
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5={custom5} FileLog'
@@ -425,6 +427,8 @@ if __name__ == '__main__':
     parser.add_argument('--e6', action='store_true',
                         help="CUSTOM2 bit 10: hunk 2's indirectly entered code in E2's copy too (with --e2)")
     parser.add_argument('--step20', action='store_true', help="CUSTOM2 bit 9: the 20 Hz world step, not the file's")
+    parser.add_argument('--speed-factors', action='store_true',
+                        help="CUSTOM2 bit 11: the local speed factors of the game's F1GP-Ed.f1gp")
     parser.add_argument('--game', help='F3/F4: an edited game directory under tmp/ (tools/f4_inputs.py)')
     parser.add_argument('--memconfig', type=int, help="WHDLoad MEMCONFIG (default 1 with --e2/--e3/--e4 on machines with fast RAM)")
     parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')

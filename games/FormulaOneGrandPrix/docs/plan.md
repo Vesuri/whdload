@@ -528,6 +528,11 @@ ReadMe documents the overrides.
 **F6 Memory-patch features** (optional; user decision). Reimplement chosen F1GP-Ed memory
 patches (GPPatch, PatchF1GP, per-circuit factors, f1gp.library fixes) as slave options,
 configured from an F1GP-Ed datafile; F1GP-Ed's own code is not copied.
+*Complete for the current scope* ([evidence](internals.md#f6-local-speed-factors--complete-for-the-current-scope)):
+developer `CUSTOM2` bit 11 reads the per-circuit Local Speed Factors from `F1GP-Ed.f1gp`
+in the data directory and uses the current circuit's in place of the game file's Speed
+Factor; the states equal those of the same base set in the game file. The wet reduction,
+the risk factors, GPPatch and the library fixes are left out.
 
 ## G. Release
 

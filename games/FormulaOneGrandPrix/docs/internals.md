@@ -3335,8 +3335,9 @@ the 030: the mean lap after the standing start is 104.2–110.9 s at the stock s
 (p95 within 4%); the median and corner speeds fall 10–18%. F1GP-Ed's guide has players
 scale the speed factor (the base h0+$29A7E of each computer car's factor +$BE, which
 scales its cornering and target-speed terms) by 1.0653 at 20 fps. Factors from 1.0 to
-1.25 left the laps at 117.3–119.7 s, so the slave keeps the factor as the file sets it,
-as F1GP-Ed does by default. Recovering the pace needs H2's audit of the per-tick terms.
+1.25 left the laps at 117.3–119.7 s at 20 Hz, although at the stock step 1.25 makes them
+8.4% faster (F6), so the slave keeps the factor as the file sets it, as F1GP-Ed does by
+default. Recovering the pace needs H2's audit of the per-tick terms.
 
 ### F5 edited-file checks — complete
 
@@ -3436,3 +3437,40 @@ D10: it scores D4–D7's extrapolation, which the build no longer draws, so its 
 error is twice the held tick's on the stock file and on the combined file alike
 (camera p95 930,290 against 465,152 stock; 851,442 against 425,472 combined); it shows
 only that the edited file behaves as the stock one.
+
+### F6 local speed factors — complete for the current scope
+
+F1GP-Ed's memory patches run as a program beside the game and keep their settings only in
+its datafiles; WHDLoad runs nothing beside the game. Of the patches the plan names, the
+slave reimplements the per-circuit factors, read from the datafile the user exports from
+F1GP-Ed; F1GP-Ed's code is not copied.
+
+**The game.** Each computer car's speed factor (+$BE) is computed at h0+$29A64: a
+car-dependent term from h0+$299D4, scaled by h0+$29B40, plus the Speed Factor, the
+immediate of `ADDI.W` at h0+$29A7C (operand h0+$29A7E, 16384 stock), unless the car's
+flag +$AC is negative (then 16384). The circuit is the word at h2+$2A732 (0–15 in the
+game's order: Monaco 3, Great Britain 7), read at h0+$297EE for the setups.
+
+**The datafile** (6,275 bytes, beginning "V344"): Local Speed Factors are words at +$1700
++ 2 × circuit (in F1GP-Ed's GUI for 2002.f1gp: USA 19500, Brazil 19650, Great Britain
+18550; 1994.f1gp leaves them 0). F1GP-Ed also reduces the factor by 1200 in the wet by
+default, and keeps a qualifying and a race risk factor per circuit (+$173A, +$175A).
+
+**The option.** Developer `CUSTOM2` bit 11 loads `F1GP-Ed.f1gp` from the data directory
+when it has the datafile's size and header, and keeps each circuit's word in F1GP-Ed's
+15000–32767 (others, and an absent file, leave the game file's base). `f6_factor` replaces
+the `ADDI.W` and adds the current circuit's factor instead. It is a hook site of F5's sum,
+which leaves the immediate out, so a file with an edited Speed Factor keeps the options.
+
+**Evidence** (`tools/f6_game.py` writes the datafile and the base into a stock game
+directory; `--states` Quick Races at Silverstone on the 030, VERIFY build). Without the
+bit, with the bit and no factors, and with Great Britain at 16384, the 3,253 ticks' states
+are identical (`c5_compare.py` PASS). The game file's base at 20480 without the bit, Great
+Britain at 20480 with it, and a base of 20000 with Great Britain 20480 and Monaco 30000
+are identical too (3,045 ticks). Great Britain at 20480 makes the computer cars' mean lap
+after the first 101.7 s against 110.9 s off (72 and 73 laps, `f3_pace.py`), 8.4% faster.
+B4's gate passes.
+
+**Left out.** The wet reduction and the risk factors: the game's wet flag and the risk
+factors' read sites are not known. GPPatch, PatchF1GP's other fixes and f1gp.library's
+fixes were not done.

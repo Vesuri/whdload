@@ -60,6 +60,11 @@ Version 2.0b (31.10.2026) by Vesuri (beta):
   rate, as F1GP-Ed's 20 fps setting does. As with F1GP-Ed, the computer
   cars are slower at 20 Hz (10-14% a lap), and replays and saved games
   only work at the rate they were made with
+- "Developer - local speed factors" (off in the supplied icons) gives the
+  computer cars the per-circuit Local Speed Factors of an F1GP-Ed datafile
+  saved as F1GP-Ed.f1gp in the data directory, as F1GP-Ed's memory patch
+  does, in place of the game file's Speed Factor. The wet weather reduction
+  and risk factors are not applied
 - Requires WHDLoad V20+
 
 Version 1.0 (06.12.2002) by Codetapper/Action:

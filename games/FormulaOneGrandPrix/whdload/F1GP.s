@@ -65,6 +65,7 @@ slv_config
         dc.b 'C2:X:Developer - faster game routines:8;'
         dc.b 'C2:X:Developer - indirect hunk 2 code in fast RAM:10;'
         dc.b 'C2:X:Developer - 20 Hz world step (not the file',$27,'s):9;'
+        dc.b 'C2:X:Developer - local speed factors (F1GP-Ed.f1gp):11;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -219,6 +220,7 @@ patch_game
         bne.s .patched
         bsr f5_check
         bne.s .patched
+        bsr f6_load
         lea (patch_582992_options,pc),a0
         move.l d7,a1
         jsr (resload_PatchSeg,a2)
@@ -574,6 +576,76 @@ f5_changed dc.b 0
         IFNE VERIFY
 f5_message dc.b 'F1GP VERIFY F5: hook sites differ from the stock file; developer options off',10,0
         ENDC
+        EVEN
+
+; F6: F1GP-Ed's Local Speed Factors, which it installs into a running game beside it,
+; from an F1GP-Ed datafile named F1GP-Ed.f1gp beside f1gp (6275 bytes, "V3"): the word at
+; +$1700 + 2 * circuit. Where the file is absent or a circuit's word is outside F1GP-Ed's
+; 15000-32767, the game file's Speed Factor (the base at h0+$29A7E) stays. Needs c2_init.
+F6_SIZE = 6275
+F6_FACTORS = $1700
+f6_load
+        movem.l d0-d1/a0-a2,-(sp)
+        movea.l (c2_h0,pc),a0
+        adda.l #$29a7e,a0
+        lea (f6_base,pc),a1
+        move.w (a0),(a1)
+        btst #3,(cache_options+2,pc)    ; bit 11
+        beq.s .done
+        lea (f6_name,pc),a0
+        bsr file_size
+        cmp.l #F6_SIZE,d0
+        bne.s .done
+        move.l (_resload,pc),a2
+        moveq #4,d0
+        moveq #0,d1
+        lea (f6_name,pc),a0
+        lea (f6_factors,pc),a1
+        jsr (resload_LoadFileOffset,a2)
+        lea (f6_factors,pc),a1
+        cmp.w #'V3',(a1)
+        bne.s .clear
+        moveq #32,d0
+        move.l #F6_FACTORS,d1
+        lea (f6_name,pc),a0
+        jsr (resload_LoadFileOffset,a2)
+        lea (f6_factors,pc),a1
+        moveq #16-1,d1
+.valid
+        cmp.w #15000,(a1)+              ; signed: 15000-32767 stay
+        bge.s .next
+        clr.w (-2,a1)                   ; outside the range (or unset): the file's base
+.next
+        dbf d1,.valid
+        bra.s .done
+.clear
+        clr.l (a1)
+.done
+        movem.l (sp)+,d0-d1/a0-a2
+        rts
+; Replaces ADDI.W #base,D0 and the first word of TST.B ($AC,A0); returns after it.
+f6_factor
+        addq.l #2,(sp)
+        movem.l d1/a1,-(sp)
+        movea.l (c2_h2,pc),a1
+        adda.l #$2a732,a1               ; the circuit, 0-15
+        move.w (a1),d1
+        cmp.w #16,d1
+        bcc.s .base
+        add.w d1,d1
+        lea (f6_factors,pc),a1
+        move.w (a1,d1.w),d1
+        bne.s .add
+.base
+        move.w (f6_base,pc),d1
+.add
+        add.w d1,d0
+        movem.l (sp)+,d1/a1
+        tst.b ($ac,a0)
+        rts
+f6_base dc.w 0
+f6_factors ds.w 16
+f6_name dc.b 'F1GP-Ed.f1gp',0
         EVEN
 
 ; C2 hooks for the supplied game only. All state remains in the slave.
@@ -4729,6 +4801,11 @@ patch_582992_options
         PL_PS $1ef74,e4_trace_right
         ; PERF_RANGE h0:1efde 6 custom=2 bit=8 variant=582992
         PL_PS $1efde,e4_trace_left
+        PL_ENDIF
+        PL_IFC2X 11
+        ; F6: the computer cars' speed factor base, per circuit (ADDI.W #base,D0; TST.B).
+        ; PERF_RANGE h0:29a7c 6 custom=2 bit=11 variant=582992
+        PL_PS $29a7c,f6_factor
         PL_ENDIF
         IFNE VERIFY
         PL_IFC5X 0

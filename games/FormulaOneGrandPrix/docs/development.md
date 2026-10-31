@@ -1324,6 +1324,33 @@ python3 tools/f5_variant.py check site tmp/f5/cap-site
 python3 tools/f5_variant.py check name tmp/f5/cap-name
 ```
 
+### F6 local speed factors
+
+`f6_game.py` writes a stock game directory with `data/F1GP-Ed.f1gp` (2002.f1gp with the
+given factors, the others 0) and optionally the game file's base; `--speed-factors` sets
+`CUSTOM2` bit 11:
+
+```sh
+. amiga/env.sh
+make slave-verify OUT=tmp/f6/verify
+python3 tools/f6_game.py tmp/f6/g-off
+python3 tools/f6_game.py tmp/f6/g-gb16384 7=16384
+python3 tools/f6_game.py tmp/f6/g-gb20480 7=20480
+python3 tools/f6_game.py tmp/f6/g-base20480 --base 20480
+python3 tools/f6_game.py tmp/f6/g-mixed --base 20000 7=20480 3=30000
+B='--build tmp/f6/verify --custom4 1 --states --setup a1200-030'
+python3 tools/c2_capture.py tmp/f6/s-off $B --game tmp/f6/g-off
+python3 tools/c2_capture.py tmp/f6/s-on-none $B --game tmp/f6/g-off --speed-factors
+python3 tools/c2_capture.py tmp/f6/s-on-gb16384 $B --game tmp/f6/g-gb16384 --speed-factors
+python3 tools/c2_capture.py tmp/f6/s-on-gb20480 $B --game tmp/f6/g-gb20480 --speed-factors
+python3 tools/c2_capture.py tmp/f6/s-off-base20480 $B --game tmp/f6/g-base20480
+python3 tools/c2_capture.py tmp/f6/s-on-mixed $B --game tmp/f6/g-mixed --speed-factors
+python3 tools/c5_compare.py off=tmp/f6/s-off none=tmp/f6/s-on-none gb16384=tmp/f6/s-on-gb16384 --out tmp/f6/cmp-a.json
+python3 tools/c5_compare.py base20480=tmp/f6/s-off-base20480 gb20480=tmp/f6/s-on-gb20480 mixed=tmp/f6/s-on-mixed --out tmp/f6/cmp-b.json
+python3 tools/f3_pace.py off=tmp/f6/s-off gb20480=tmp/f6/s-on-gb20480 --out tmp/f6/pace-f6.json
+python3 tools/slave_gate.py --prefix f6-
+```
+
 ## Release archive (G4)
 
 `make dist` rebuilds Codetapper's installer archive (`tmp/archives/FormulaOneGrandPrix.lha`,
