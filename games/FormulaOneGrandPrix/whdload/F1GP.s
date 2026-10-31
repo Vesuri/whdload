@@ -4071,8 +4071,14 @@ c2_hud_glyph
         rts
 c2_hud_gear
         C2_HUD_GATE 7
-        adda.w #5832,a0
-        adda.w #5832,a2
+        ; F4: the two ADDA.W operands are the gear's place in the cockpit image, which
+        ; F1GP-Ed's Graphics window rewrites (stock 5832): read them from the file's code.
+        move.l a3,-(sp)
+        movea.l (c2_h2,pc),a3
+        adda.l #$1f92a,a3
+        adda.w (a3),a0
+        adda.w (4,a3),a2
+        movea.l (sp)+,a3
         rts
 c2_hud_rpm
         C2_HUD_GATE 8

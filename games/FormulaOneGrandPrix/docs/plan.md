@@ -509,6 +509,12 @@ not recover it (H2).
 **F4 Edited-file inputs.** Build edited `f1gp` files reproducibly from pinned datafiles
 and settings, plus one edited cockpit and one replaced backdrop, and pin their hashes.
 Run the `B4` gate, `C5`, `D8`/`D9` and whole races on the 030 and A1200 against them.
+*Complete* ([evidence](internals.md#f4-edited-file-inputs--complete)): `tools/f4_inputs.py`
+builds and pins the 2002 datafile, MattCockpit with the Ferrari backdrop, both together
+and McLaren-D2. The cockpit rewrites the gear's operands, which `c2_hud_gear` had fixed;
+it now reads them from the file. `quickrace` reaches a race from the Main Menu when the
+settings skip the startup menu. B4, C5(a) on the 030 and the A1200, D9 and D2 pass on the
+edited files; `d8_error.py` predates D10 and only shows the edited file matches the stock.
 
 **F5 Fixes.** Keep size-based version detection. Make each colliding patch robust:
 verify the original bytes before patching, or turn the affected feature off for that

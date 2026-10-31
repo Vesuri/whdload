@@ -9,7 +9,12 @@ shot <png>, profile <fields> <bin> (PAL fields, Barto format), wait <s>, until <
 and:
   quickrace [log]    from boot, drive the menus into a Quick Race at Silverstone and stop
                      at the first race field; optional log file of every input sent.
-                     ROUTE_SHOTS=dir (server environment) saves every polled screenshot
+                     ROUTE_SHOTS=dir (server environment) saves every polled screenshot.
+                     A file whose settings skip the language screen and the startup menu
+                     (F1GP-Ed's 1995-2002 datafiles) gets the shortest Non-Championship
+                     race at Silverstone instead (Race Options distance 10%); with
+                     F1GP_EDITED=1 the stop is the first field of any race view, whatever
+                     the file's cockpit and palette
   startup [log]      boot to the startup menu, with the same screen checks
   practice [log]     Main Menu -> Practise any Circuit -> Silverstone -> cockpit
   qualifying [log]   Main Menu -> Non-Championship Race -> Silverstone -> Qualifying
@@ -60,7 +65,17 @@ SCREENS = {
                    (190, 200): 0x667799, (590, 292): 0x667799},
     'times':      {(120, 438): 0x667799, (650, 438): 0x667799,      # Race Finishing Times
                    (200, 100): 0xffff44},
+    # F4: the Main Menu route of files whose settings skip the startup menu.
+    'gameoptions': {(226, 160): 0xffffff, (271, 169): 0xffffff,     # title
+                    (523, 181): 0xffffff},
+    'raceoptions': {(270, 90): 0xffffff, (500, 131): 0xaa0000,      # title, practice field
+                    (620, 131): 0xaa0000},
+    'grid':       {(340, 438): 0xcc0000, (450, 438): 0xcc0000,      # Exit selected
+                   (150, 438): 0x99aacc},
 }
+# Any race view, whatever the file's palette, cockpit and display position: one sky colour
+# across the top band, unchanged over two polls (the menus' bands fade in and out).
+LIVE = ((100, 58), (700, 58), (100, 70), (700, 70), (110, 64))
 HOME = (74, 54)            # the pointer's top-left clamp
 OK = {'language': (395, 358), 'startup': (395, 313), 'track': (235, 391),
       'times': (390, 252)}   # results menu: Race Finishing Times
@@ -95,10 +110,18 @@ def screenshot(server, g):
     return Image.open(io.BytesIO(trace.fields[0].shot)).convert('RGB')
 
 
+def sky(image, dy=0):
+    colours = {image.getpixel((x, y+dy)) for x, y in LIVE}
+    r, g, b = next(iter(colours))
+    return colours.pop() if len(colours) == 1 and b > max(r, g) else None
+
+
 def showing(image, name):
     # The pinned NTSC output places this same viewport ten pixels lower.
     # Mouse movement is relative to the home clamp, so click deltas stay unchanged.
     dy = int(os.environ.get('F1GP_SCREEN_Y', '0'))
+    if name == 'live':
+        return sky(image, dy) is not None and not showing(image, 'weekend')
     return all(0 <= p[1]+dy < image.height and image.getpixel((p[0], p[1]+dy)) == ((c >> 16) & 255, (c >> 8) & 255, c & 255)
                for p, c in SCREENS[name].items())
 
@@ -140,17 +163,21 @@ def quickrace(server, g, rest, destination="race"):
         if log:
             log.write(json.dumps(r) + '\n')
 
-    def wait_for(name, idle):
+    def wait_for(*names, idle):
+        """Wait for the first of names; return it."""
+        last = None
         for _ in range(LIMIT // POLL):
             image = screenshot(server, g)       # traces (runs) one field
             elapsed['fields'] += 1
             if shots:
-                image.save(os.path.join(shots, f'{elapsed["fields"]:06d}-{name}.png'))
-            if showing(image, name):
-                trail.append(f'{name}@{elapsed["fields"]}')
-                return
+                image.save(os.path.join(shots, f'{elapsed["fields"]:06d}-{"-".join(names)}.png'))
+            for name in names:
+                if showing(image, name) and (name != 'live' or sky(image) == last):
+                    trail.append(f'{name}@{elapsed["fields"]}')
+                    return name
+            last = sky(image)
             idle()
-        raise TimeoutError(f'no {name} screen after {LIMIT} fields; seen {trail}')
+        raise TimeoutError(f'no {"/".join(names)} screen after {LIMIT} fields; seen {trail}')
 
     def tap(c, key):
         c.key(key, True)
@@ -165,29 +192,57 @@ def quickrace(server, g, rest, destination="race"):
                 c.fields(POLL)
                 c.button('JOY1_FIRE_BUTTON', False)
                 c.fields(5)
-            wait_for('language', fire)
-            click(c, OK['language'])
-            wait_for('protection', lambda: c.fields(POLL))
+            wait = lambda: c.fields(POLL)
+            # F1GP-Ed's settings can skip the language screen and the startup menu (F4).
+            if wait_for('language', 'protection', idle=fire) == 'language':
+                click(c, OK['language'])
+                wait_for('protection', idle=wait)
+            else:
+                c.fields(100)   # seen while it is drawn, before it reads the keyboard
             tap(c, KEY_A)
             tap(c, KEY_RETURN)
-            wait_for('startup', lambda: c.fields(POLL))
+            menu = wait_for('startup', 'main', idle=wait)
             if destination == 'startup':
+                if menu != 'startup':
+                    raise ValueError('this game file skips the startup menu')
                 return ' '.join(trail) + ' (CPU stopped)'
             if destination in ('practice', 'qualifying'):
-                click(c, (500, 275))
-                click(c, OK['startup'])
-                wait_for('main', lambda: c.fields(POLL))
+                if menu == 'startup':
+                    click(c, (500, 275))
+                    click(c, OK['startup'])
+                    wait_for('main', idle=wait)
                 click(c, (395, 252 if destination == 'practice' else 290))
-                wait_for('circuit', lambda: c.fields(POLL))
+                wait_for('circuit', idle=wait)
                 click(c, (530, 246))
-            else:
+            elif menu == 'startup':
                 click(c, OK['startup'])
-            wait_for('track', lambda: c.fields(POLL))
+            else:
+                # No Quick Race: the shortest Non-Championship race at Silverstone, its
+                # distance held down to the 10% minimum in Race Options.
+                click(c, (395, 371))
+                wait_for('gameoptions', idle=wait)
+                click(c, (395, 257))
+                wait_for('raceoptions', idle=wait)
+                click(c, (476, 212))
+                c.button('JOY1_FIRE_BUTTON', True)
+                c.fields(600)           # 1% each 5 fields, from at most 100%
+                c.button('JOY1_FIRE_BUTTON', False)
+                click(c, (395, 415))
+                wait_for('gameoptions', idle=wait)
+                click(c, (395, 337))
+                wait_for('main', idle=wait)
+                click(c, (395, 290))
+                wait_for('circuit', idle=wait)
+                click(c, (530, 246))
+            wait_for('track', idle=wait)
             click(c, OK['track'])
-            if destination == 'qualifying':
-                wait_for('weekend', lambda: c.fields(POLL))
-                click(c, (395, 252))
-            wait_for('race', lambda: c.fields(POLL))
+            if destination == 'qualifying' or menu == 'main' and destination == 'race':
+                wait_for('weekend', idle=wait)
+                click(c, (395, 252 if destination == 'qualifying' else 331))
+            if menu == 'main' and destination == 'race':
+                wait_for('grid', idle=wait)
+                click(c, (395, 438))
+            wait_for('live' if os.environ.get('F1GP_EDITED') else 'race', idle=wait)
     finally:
         if log:
             log.close()

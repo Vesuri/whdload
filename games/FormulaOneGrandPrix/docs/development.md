@@ -1269,6 +1269,42 @@ python3 tools/slave_gate.py --prefix f3-
 The views schedule replays at tick 1100 (57 s into a 20 Hz race), so pace comes from the
 plain `--states` captures.
 
+### F4 edited-file inputs
+
+`f4_inputs.py build` boots `amiga/ed.sh` once per variant and drives F1GP-Ed's menus,
+Graphics and Backdrops windows and file requesters (pointer homed to `F1ED_HOME=74,37`,
+the clamp on F1GP-Ed's screen); it refuses an existing variant directory. `verify`
+compares the edited files with `manifest/f4-inputs.json`, and `slave_gate.py --game`
+verifies the variant before it boots. `c2_capture.py --game` sets `F1GP_EDITED=1`, the
+route's palette-independent race check. `f2_collisions.py` takes the variants' `f1gp`
+files as another directory:
+
+```sh
+. amiga/env.sh
+python3 tools/f4_inputs.py build tmp/f4/inputs
+python3 tools/f4_inputs.py verify tmp/f4/inputs
+mkdir -p tmp/f4/files
+for v in datafile graphics combined mclaren; do cp tmp/f4/inputs/$v/data/f1gp tmp/f4/files/$v.f1gp; done
+python3 tools/f2_collisions.py tmp/f4/files --report tmp/f4/collisions.json
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix f4-
+python3 tools/slave_gate.py --prefix f4b-graphics- --game graphics
+python3 tools/slave_gate.py --prefix f4b-combined- --game combined
+make slave-verify OUT=tmp/f4/verify
+B='--build tmp/f4/verify --custom4 1'; G=tmp/f4/inputs
+python3 tools/c2_capture.py tmp/f4/shots-graphics $B --stage --setup a1200-030 --ticks 200 --shots 2 --game $G/graphics
+for v in combined graphics; do
+  for m in a1200-030 a1200; do
+    python3 tools/c2_capture.py tmp/f4/rate-$m-$v $B --rate --setup $m --game $G/$v
+    python3 tools/c5_report.py tmp/f4/rate-$m-$v --out tmp/f4/rate-$m-$v.json
+  done
+  python3 tools/c2_capture.py tmp/f4/d9-$v-states-on $B --states --stage --views --setup a1200-030 --game $G/$v
+  python3 tools/c2_capture.py tmp/f4/d9-$v-alpha-on $B --states --alpha --views --setup a1200-030 --game $G/$v
+  python3 tools/d9_smooth.py tmp/f4/d9-$v-states-on --out tmp/f4/smooth-$v.json
+  python3 tools/d2_alpha.py tmp/f4/d9-$v-alpha-on --out tmp/f4/alpha-$v.json
+done
+```
+
 ### F5 edited-file checks
 
 `build.sh` runs `f5_sites.py`, which writes `tmp/slave/include/f5.i` (the hook-site

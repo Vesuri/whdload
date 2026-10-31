@@ -3,7 +3,9 @@
 # f1gp file, for F1's write map (tools/f1_ed.py drives it through DEBUG=1).
 #   DATAFILE=path   an F1GP-Ed datafile, loaded at start (DATAFILE=DH0:in.f1gp)
 #   GAMEFILE=path   the f1gp file to edit (default the pinned one); the copy is DH1:f1gp
-# The f1gp copy, F1GP-Ed and its settings live in .run/ed and are rebuilt on every boot.
+#   GAMEDIR=path    the game's data directory (default the pinned one), copied to DH1 with
+#                   GAMEFILE over its f1gp: the backdrops (.bkg) F1GP-Ed replaces live there
+# The data copy, F1GP-Ed and its settings live in .run/ed and are rebuilt on every boot.
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
@@ -11,7 +13,8 @@ cd "$(dirname "$0")"
 
 ARCHIVE=../tmp/archives/F1GP-Ed.lha
 ED=../tmp/f1ed
-GAMEFILE="${GAMEFILE:-../tmp/game/FormulaOneGrandPrix4Disk/data/f1gp}"
+GAMEDIR="${GAMEDIR:-../tmp/game/FormulaOneGrandPrix4Disk/data}"
+GAMEFILE="${GAMEFILE:-$GAMEDIR/f1gp}"
 WB="${WB:-$WORKBENCH_ADF}"
 RUN=.run; DH0="$RUN/ed/dh0"; DH1="$RUN/ed/dh1"
 
@@ -24,7 +27,8 @@ fi
 
 fsuae_prepare
 rm -rf "$RUN/ed"
-mkdir -p "$DH0/s" "$DH0/Libs" "$DH0/env" "$DH1" "$RUN/state"
+mkdir -p "$DH0/s" "$DH0/Libs" "$DH0/env" "$RUN/state"
+cp -R "$GAMEDIR" "$DH1"
 cp -R "$ED/F1GP-Ed" "$DH0/F1GP-Ed"
 cp -f "$ED/F1GP-Ed/Libs/"*.library "$DH0/Libs/"
 cp -f "$GAMEFILE" "$DH1/f1gp"
@@ -34,7 +38,8 @@ args=; [ -n "${DATAFILE:-}" ] && args="DATAFILE=DH0:in.f1gp"
 printf '%s\n' 'DF0:C/Assign C: DF0:C' 'Assign LIBS: DF0:Libs' 'Assign LIBS: DH0:Libs ADD' \
   'Assign DEVS: DF0:Devs' 'Assign FONTS: DF0:Fonts' 'Assign L: DF0:L' \
   'MakeDir RAM:ENV RAM:T' 'Assign ENV: RAM:ENV' 'Assign T: RAM:T' 'Assign ENVARC: DH0:env' \
-  'Assign f1gp_disk_#2: DH1:' 'Stack 16384' 'FailAt 999' 'CD DH0:F1GP-Ed' \
+  'Assign f1gp_disk_#1: DH1:' 'Assign f1gp_disk_#2: DH1:' 'Assign f1gp_disk_#3: DH1:' \
+  'Assign f1gp_disk_#4: DH1:' 'Stack 16384' 'FailAt 999' 'CD DH0:F1GP-Ed' \
   "F1GP-Ed $args" > "$DH0/s/startup-sequence"
 rm -f "$RUN"/state/*.uss
 

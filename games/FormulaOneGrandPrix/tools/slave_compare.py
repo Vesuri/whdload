@@ -141,8 +141,9 @@ def compare_original():
     return 0 if accepted else 1
 
 
-def loader_checks(mem, h0, h2, slave):
-    """Check supplied-game patches against captured RAM, including the live keyboard target."""
+def loader_checks(mem, h0, h2, slave, game=None):
+    """Check supplied-game patches against captured RAM, including the live keyboard target.
+    With game (an edited f1gp, F4) whose names are not all stock, the slave must keep them."""
     checks = {}
     for name, addr, expected in (
         ('protection_answer', h0+0x982, bytes.fromhex('22116000')),
@@ -166,7 +167,14 @@ def loader_checks(mem, h0, h2, slave):
     oldmem = image((reference/'chip.bin').read_bytes(), (reference/'fast.bin').read_bytes(), b'')
     names = struct.unpack_from('>I', mem, h0+0x91a)[0]+0x900
     oldnames = struct.unpack_from('>I', oldmem, oldmeta['hunk_bases'][0]+0x91a)[0]+0x900
-    checks['driver_names'] = mem[names:names+1480] == oldmem[oldnames:oldnames+1480]
+    expected = oldmem[oldnames:oldnames+1480]
+    if game:
+        import f1_diff, f5_sites
+        data = Path(game).read_bytes()
+        if f5_sites.names(data) != f5_sites.names(Path(f5_sites.GAME).read_bytes()):
+            start = {h: o for h, o, _ in f1_diff.hunks(data)}[2] + 0x2af52
+            expected = data[start:start+1480]
+    checks['driver_names'] = mem[names:names+1480] == expected
     return checks
 
 

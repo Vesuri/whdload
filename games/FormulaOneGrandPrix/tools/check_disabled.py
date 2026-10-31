@@ -84,9 +84,9 @@ def ranges(source):
     return result
 
 
-def relocated_original(bases):
+def relocated_original(bases, game=GAME):
     """Reconstruct HUNK_CODE/DATA relocations, including references to BSS hunks."""
-    data = Path(GAME).read_bytes()
+    data = Path(game).read_bytes()
     u = lambda p: struct.unpack_from('>I',data,p)[0]
     if u(0) != 1011 or u(4) != 0 or u(12) != 0:
         raise ValueError('unsupported HUNK header')
@@ -134,7 +134,13 @@ def check(capture, source=SOURCE):
     bases=[actual[0][0],next_hunk(actual[0][0]),actual[2][0],next_hunk(actual[2][0])]
     if bases != meta['hunk_bases']:
         raise ValueError('capture layout differs from metadata')
-    original=relocated_original(bases)
+    # F4: a capture of an edited game compares with that file (meta['game'], checked
+    # against manifest/f4-inputs.json when captured): its hook sites are the stock ones
+    # (F5), apart from operands the slave reads from the file.
+    game=meta['game']['f1gp'] if meta.get('game') else GAME
+    if meta.get('game') and hashlib.sha256(Path(game).read_bytes()).hexdigest() != meta['game']['f1gp_sha256']:
+        raise ValueError('captured game file differs from metadata')
+    original=relocated_original(bases, game)
     selected=[r for r in declared if r['variant']==Path(GAME).stat().st_size]
     if not selected:
         raise ValueError('no ranges for this game variant')

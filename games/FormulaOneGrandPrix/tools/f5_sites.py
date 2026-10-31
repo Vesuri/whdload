@@ -6,8 +6,9 @@
 From the pinned (or given) 582,992-byte file:
 - F5_SITES: every optional hook range of the slave (the PERF_RANGE list B4 audits), as
   (hunk, offset, length) without the bytes of relocated longwords, which depend on the
-  load address, and F5_SUM over their bytes. If an edited file differs there, the slave
-  leaves the developer options' patches out instead of patching changed code.
+  load address, or of the operands a hook reads from the file itself (READ), and F5_SUM
+  over their bytes. If an edited file differs there, the slave leaves the developer
+  options' patches out instead of patching changed code.
 - NAMES_SUM over the 80 name fields at h2+$2AF52 (40 drivers of 24 bytes, then 40 team
   and engine names of 13), each up to and including its terminator: the slave replaces
   the names with the 1991 season's only if every visible name is the stock one. Bytes
@@ -24,6 +25,9 @@ from slave_inputs import ROOT, verify
 
 GAME = ROOT/'tmp/game/FormulaOneGrandPrix4Disk/data/f1gp'
 NAMES = (2, 0x2af52, ((40, 24), (40, 13)))
+# c2_hud_gear reads its ADDA.W operand (the gear's place, which F1GP-Ed's Graphics window
+# writes) from h2+$1F92A; the second, h2+$1F92E, lies after the site.
+READ = {(2, 0x1f92a+k) for k in range(2)}
 
 
 def checksum(data, total=0):
@@ -34,7 +38,7 @@ def checksum(data, total=0):
 
 def sites(game):
     layout = {h: (o, n) for h, o, n in hunks(game)}
-    moved = {(h, o+k) for (h, o) in relocs(game) for k in range(4)}
+    moved = {(h, o+k) for (h, o) in relocs(game) for k in range(4)} | READ
     out = []
     for r in ranges(SOURCE.read_text()):
         h, start = r['hunk'], r['offset']

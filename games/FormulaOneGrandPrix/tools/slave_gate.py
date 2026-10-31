@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """B4 fresh-boot gate for release, developer, VERIFY-off and VERIFY relay-on.
 Run make slave slave-developer slave-verify first. All evidence is immutable tmp/b4.
+--game VARIANT runs it on an edited game directory that tools/f4_inputs.py built
+(--inputs, default tmp/f4/inputs), verified against manifest/f4-inputs.json.
 """
 import hashlib
 import json
@@ -17,7 +19,7 @@ from loop_profile import report
 from check_disabled import check, SOURCE
 
 
-def capture(name, build, custom5):
+def capture(name, build, custom5, game=None):
     verify()
     out=ROOT/'tmp/b4'/name
     out.mkdir(parents=True,exist_ok=False)
@@ -37,6 +39,8 @@ def capture(name, build, custom5):
     args=f'CUSTOM1=0 CUSTOM2=0 CUSTOM3=0 CUSTOM4=0 CUSTOM5={custom5}'
     env=dict(os.environ,AMIGA_SETUP='a1200-fast',WARP='1',DETERMINISTIC='1',
              JOY0='none',JOY1='none',SLAVE=str(slave),WHD_ARGS=args,VERIFY_EXIT='1')
+    if game:
+        env.update(GAME=str(game),F1GP_EDITED='1')
     log=out/'serve.log'
     with log.open('w') as f:
         proc=subprocess.Popen([sys.executable,'tools/f1gp.py','serve'],cwd=ROOT,env=env,
@@ -61,7 +65,11 @@ def capture(name, build, custom5):
         meta=dict(**build_meta,custom=[0,0,0,0,custom5],route=route,
                   whd_args=args,hunk_bases=[h0,nxt(h0),h2,nxt(h2)],fields=50,
                   game_inputs=json.loads((ROOT/'manifest/game-inputs.json').read_text()),
-                  loader_checks=loader_checks(mem,h0,h2,slave))
+                  loader_checks=loader_checks(mem,h0,h2,slave,game and game/'data/f1gp'))
+        if game:
+            f1gp=game/'data/f1gp'
+            meta['game']=dict(path=str(game),f1gp=str(f1gp),
+                              f1gp_sha256=hashlib.sha256(f1gp.read_bytes()).hexdigest())
         (out/'meta.json').write_text(json.dumps(meta,indent=2)+'\n')
         report(out/'trace.bin',out/'fast.bin')
         if custom5==0:
@@ -147,12 +155,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--prefix', default='', help='new evidence name prefix under tmp/b4')
+    parser.add_argument('--game', help='F4: an edited variant (tools/f4_inputs.py)')
+    parser.add_argument('--inputs', default='tmp/f4/inputs')
     args = parser.parse_args()
     if not re.fullmatch(r'[A-Za-z0-9_-]*', args.prefix):
         parser.error('prefix must contain only letters, digits, underscores and hyphens')
+    game = None
+    if args.game:
+        import f4_inputs
+        f4_inputs.verify(args.inputs, [args.game])
+        game = (ROOT/args.inputs/args.game).resolve()
     if not args.check:
         for name,build,custom in CASES:
-            capture(args.prefix+name,build,custom)
+            capture(args.prefix+name,build,custom,game)
     acceptance(args.prefix)
 
 

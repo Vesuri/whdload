@@ -6,7 +6,7 @@
 Each DIR holds f1gp files saved by F1GP-Ed (F1: tmp/f1/out, tmp/f1/chunk, tmp/f1/byte).
 The write set is every hunk byte and relocation that differs from the pinned file in any
 of them. Against it:
-- patches: every PL_* site of patch_582992 and patch_582992_clock, a hook extended to
+- patches: every PL_* site of patch_582992, its _options and _clock, a hook extended to
   the continuation the slave jumps back to (c2_target_*);
 - names: every other hexadecimal literal in the slave that may be a hunk 0 or 2 offset
   (entries it calls, tables of state ranges, displacements from the hunk bases), as the
@@ -27,7 +27,7 @@ from slave_inputs import ROOT                                     # noqa: E402
 PINNED = ROOT/'tmp/game/FormulaOneGrandPrix4Disk/data/f1gp'
 SOURCE = ROOT/'whdload/F1GP.s'
 LENGTH = {'PL_L': 4, 'PL_W': 2, 'PL_B': 1, 'PL_P': 6, 'PL_PS': 6, 'PL_R': 2}
-LISTS = ('patch_582992', 'patch_582992_clock')
+LISTS = ('patch_582992', 'patch_582992_options', 'patch_582992_clock')
 ENTRY = 0x88e                    # the stock entry JMP's target
 
 

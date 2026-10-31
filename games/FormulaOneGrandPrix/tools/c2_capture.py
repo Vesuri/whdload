@@ -120,7 +120,8 @@ def capture(args):
         directory = Path(args.game).resolve()
         if not directory.is_relative_to(ROOT/'tmp'):
             raise ValueError('--game must stay in project tmp/')
-        game = dict(GAME=str(directory))
+        # F4: the route stops at any race view, whatever the file's cockpit and palette.
+        game = dict(GAME=str(directory), F1GP_EDITED='1')
     env = dict(os.environ, **game, AMIGA_SETUP=args.setup, EXTRA_ARGS=extra,
                SLAVE=str(slave), WHD_ARGS=whd, WARP='1', DETERMINISTIC='1',
                JOY0='none', JOY1='none', VERIFY_EXIT='1', FSUAE=os.environ['FSUAE_ARM'],
@@ -424,7 +425,7 @@ if __name__ == '__main__':
     parser.add_argument('--e6', action='store_true',
                         help="CUSTOM2 bit 10: hunk 2's indirectly entered code in E2's copy too (with --e2)")
     parser.add_argument('--step20', action='store_true', help="CUSTOM2 bit 9: the 20 Hz world step, not the file's")
-    parser.add_argument('--game', help='F3: a game directory under tmp/ whose data/f1gp is edited')
+    parser.add_argument('--game', help='F3/F4: an edited game directory under tmp/ (tools/f4_inputs.py)')
     parser.add_argument('--memconfig', type=int, help="WHDLoad MEMCONFIG (default 1 with --e2/--e3/--e4 on machines with fast RAM)")
     parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')
     parser.add_argument('--replay', action='store_true')

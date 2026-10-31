@@ -3345,14 +3345,15 @@ enhancements patch). Two checks were added to what the slave does with such a fi
 
 **Hook sites.** Before it applies the developer options (C2–C4's clock, D, E2–E7, the C3
 and VERIFY relays), the slave sums the bytes of every optional hook site, the
-`PERF_RANGE` list B4 audits, without the bytes of relocated longwords (60 runs, 188
-bytes). The sum (rotate left one bit, add the byte) must equal the stock file's
+`PERF_RANGE` list B4 audits, without the bytes of relocated longwords and of the gear
+operand `c2_hud_gear` reads from the file (F4; 61 runs, 186 bytes). The sum (rotate left one bit, add the byte) must equal the stock file's
 `F5_SUM`; `tools/f5_sites.py` generates it and the site table into the build from the
 pinned file. A file that differs leaves every hook-based option out: the baseline loader
 patches still apply and the caches option still sets the CACR, and VERIFY logs
 `F1GP VERIFY F5: hook sites differ from the stock file; developer options off`. All 866
-files F1 saved (New, the datafiles, the chunk and byte variants) keep the stock sum, so
-F1GP-Ed's settings never turn the options off. `tools/f5_variant.py site` re-encodes the
+files F1 saved (New, the datafiles, the chunk and byte variants) and F4's four edited
+files keep the stock sum, so F1GP-Ed's settings, cockpits and backdrops never turn the
+options off. `tools/f5_variant.py site` re-encodes the
 pacer branch at h0+$1288 (`BCS.W` as `BCS.S` and `NOP`, the same branch): on the 030 the
 VERIFY build left the site and the clock hook unpatched, ran the native pacer and logged
 the line.
@@ -3371,3 +3372,67 @@ names as above; the file requester's filter button set (h2+$3863A `$FF`, which 1
 datafiles write themselves and 1994 and New leave 0); and saves to the `save`
 directory (h2+$386AE), replacing F1GP-Ed's Default Dir path, which does not exist under
 WHDLoad.
+
+### F4 edited-file inputs — complete
+
+**Inputs.** `tools/f4_inputs.py` drives F1GP-Ed 3.44 (amiga/ed.sh, which now copies the
+whole data directory to DH1 and assigns all four game disks there) with the keyboard and
+the homed pointer, on a fresh copy of the pinned game, and pins the edited files in
+`manifest/f4-inputs.json`:
+
+| Variant | Steps | Edited files |
+|---|---|---|
+| `datafile` | 2002.f1gp saved to the binary | `f1gp` (equal to F1's df-2002) |
+| `graphics` | Graphics/MattCockpit.settings saved to the binary; c_champ_ferrari.ilbm replacing `c_champ` (a palette-change backdrop, which also writes the binary) | `f1gp` (9,713 bytes differ), `C_CHAMP.BKG` |
+| `combined` | the three in one session | `f1gp`, `C_CHAMP.BKG` |
+| `mclaren` | McLaren-D2's settings and image, for the collision check | `f1gp` |
+
+Two builds of `graphics` (the second within the whole set) gave the same bytes, and
+`datafile` equals F1's save of the same datafile. The third supplied
+cockpit, JBCPIT99F, is left out: the same steps left the binary unchanged (not
+investigated).
+
+**A collision F2 could not see.** The cockpit writes its image (h0+$3D742–$44A20), the
+parts' position tables (h2+$1EA92–$1EB4B, h2+$1EC43–$1ECDB), the palette
+(h2+$4188A–$418C7) and code operands: the gear's place in both `ADDA.W` at h2+$1F928,
+and another part's before the assist hook (h2+$1FA65–$1FA69). The gear's hook,
+`c2_hud_gear`, replaced the first `ADDA.W` and ran both with the stock 5832, so the clock
+would have drawn the gear at the stock place, and F5 would have turned every developer
+option off for any edited cockpit. It now reads both operands from the file's code, and
+F5's sum leaves out the first, which lies in the site (h2+$1F92A–$1F92B). Rerun with the
+four files, `tools/f2_collisions.py` (now also over `patch_582992_options`) finds no
+other written hook site; the other hits are addresses inside the cockpit image (the HUD
+box and hands sources) and C's HUD target table, which name places, not contents. The
+position tables and the operand before the assist hook lie outside every hooked range,
+and the hooks capture their effect as register state. On the 030 with the clock the gear
+is drawn at MattCockpit's place.
+
+**Routes.** The 2002 settings skip the language screen and the startup menu, and the
+Main Menu has no Quick Race. `quickrace` now takes whichever start the file has; from the
+Main Menu it holds Race Options' distance down to its 10% minimum and starts a
+Non-Championship race at Silverstone (Grand Prix menu, Race, the grid's Exit: 6 laps of
+the 2002 settings' 59). With the language screen skipped, the protection screen is seen
+before it reads the keyboard, so the route waits 100 fields before answering. Edited
+cockpits, palettes and display positions defeat the stock race check, so captures of an
+edited game (`--game`, `F1GP_EDITED=1`) stop at the first field whose top band is one
+blue sky colour, unchanged over two polls (menus fade through such bands) and not the
+Grand Prix menu. Stock captures keep the stock check.
+
+**Gates** (VERIFY build, `tools/c2_capture.py --game`, whole races):
+
+| File | Machine | C5(a) ticks a second (target) | Dropped fields |
+|---|---|---|---|
+| graphics | 030 | 7.9848 (8) | 0 |
+| graphics | A1200 | 7.9873 (8) | 0 |
+| combined | 030 | 9.6931 (9.709) | 0 |
+| combined | A1200 | 9.6996 (9.709) | 16 |
+
+All four PASS. D9 on the 030 passes for both: graphics 6,200 pictures, 3.46 fields
+each, camera steps p5–p95 0.89–1.07; combined 8,618 pictures, 3.21 fields, 0.86–1.06.
+D2's α is exact in every picture of both. `tools/slave_gate.py --game` (B4 on the edited
+directory: the disabled hook ranges against that file, the names against the file's when
+they are not stock) passes for both and for the stock file. `tools/d8_error.py` predates
+D10: it scores D4–D7's extrapolation, which the build no longer draws, so its predicted
+error is twice the held tick's on the stock file and on the combined file alike
+(camera p95 930,290 against 465,152 stock; 851,442 against 425,472 combined); it shows
+only that the edited file behaves as the stock one.

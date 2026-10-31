@@ -1,0 +1,16 @@
+{
+  "datafile": {
+    "data/f1gp": "f6ac752e687849f80763163fe9c80c014d226c5e94df0706f3489d0d839c4303"
+  },
+  "graphics": {
+    "data/C_CHAMP.BKG": "3448323f21c09c0dcaf7e27af61e1ec1cf94f539d46ce6abab81d1b6ae2f789c",
+    "data/f1gp": "8bf783158080198d296246f48d230935f4e7d3008bee6beb86cc2e9cb0aa2512"
+  },
+  "combined": {
+    "data/C_CHAMP.BKG": "3448323f21c09c0dcaf7e27af61e1ec1cf94f539d46ce6abab81d1b6ae2f789c",
+    "data/f1gp": "20e49bfbca2eb5e2494ce0ce0b03713e935f414c1424ecc3599264c7424b2f73"
+  },
+  "mclaren": {
+    "data/f1gp": "9f021567b4ba9042d66eb6d55a94134d5970d032ee56f8c21e7c5467dd81330e"
+  }
+}
