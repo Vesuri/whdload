@@ -496,9 +496,15 @@ E2, E6).
 simulation step (`h0+$34364`; [evidence](internals.md#native-time-step-and-f1gp-eds-frame-rate-f3-evidence)):
 n fields per frame, a step of n × 1350/65536 s on PAL. The user wants it supported: the
 clock delivers 65536 ÷ step updates a second instead of 8, and D interpolates them to
-the display rate (up to 50 fps). Confirm which step words F1GP-Ed writes (F1), make C's
-schedule, D's α and thresholds and the sound denominator follow the step, and run
-`C5`, `D8` and `D9` at each setting. The PAL/NTSC timing setting is traced the same way.
+the display rate (up to 50 fps). A developer option (user request) replaces the file's
+step with F1GP-Ed's 20 fps step for players without F1GP-Ed.
+*Complete* ([evidence](internals.md#f3-frame-rate--complete)): the clock schedules
+⌈k × step × F ÷ 65536⌉ (the stock step keeps C1's schedule), D's α and the sound follow the
+interval, and `CUSTOM2` bit 9 writes the 20 Hz step. C5(a) passes at the stock step, at
+the 2002 datafile's 6750 and at 20 Hz on the 030; a stock A1200 cannot keep 20 Hz (14.1
+ticks a second). D9 passes at each. The computer cars are 10–14%
+slower a lap at 20 Hz, as F1GP-Ed's guide warns; its suggested speed-factor scaling does
+not recover it (H2).
 
 **F4 Edited-file inputs.** Build edited `f1gp` files reproducibly from pinned datafiles
 and settings, plus one edited cockpit and one replaced backdrop, and pin their hashes.
@@ -536,10 +542,11 @@ build will replace the developer slave once G1 exists.
 
 ## H. Finer simulation (optional; only on the user's request)
 
-The game's own variable step (`F3`) already gives a finer world step that F1GP-Ed players
-have used for decades; with `F3` the slave can offer it without F1GP-Ed. Its known side
-effects (computer cars slower, spins in long races at 20–25 fps) are what to measure
-before H2's audit is considered.
+The game's own variable step gives a finer world step that F1GP-Ed players have used for
+decades; F3 offers it without F1GP-Ed (`CUSTOM2` bit 9, 20 Hz). Its measured side effect is
+computer cars 10–14% slower a lap at 20 Hz (F3), which F1GP-Ed's speed-factor scaling
+does not recover; F1GP-Ed's guide also reports spins in long races at 20–25 fps. H2's
+audit is what would fix them.
 
 **H1 Per-field steering preview.** Preview the native player motion every field from the
 current input and spread it over the tick (Gunship `TIMING_DESIGN.md`), so steering

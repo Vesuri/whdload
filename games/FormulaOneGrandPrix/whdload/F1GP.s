@@ -63,6 +63,7 @@ slv_config
         dc.b 'C2:X:Developer - renderer data in fast RAM:7;'
         dc.b 'C2:X:Developer - faster game routines:8;'
         dc.b 'C2:X:Developer - indirect hunk 2 code in fast RAM:10;'
+        dc.b 'C2:X:Developer - 20 Hz world step (not the file',$27,'s):9;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -227,6 +228,7 @@ patch_game
         bsr e2_reserve
         bsr e3_reserve
         bsr e4_reserve
+        bsr f3_step
 .patched
         ENDC
         bsr restore_names
@@ -355,6 +357,10 @@ verify_pacer
         IFNE DEVELOPER
 ; C1 integer VBL accounting. Caller supplies a stable serial in D0.
 ; No hardware access, no partial ticks. A0 points to this clock's state.
+; F3: the clock owes 65536/step ticks a second, step being the game's world step
+; (h0+$34366, seconds x 65536): ticks fall due at whole fields ceil(k x step x F / 65536)
+; after the epoch. WC_PHASE is (k x step x F) mod 65536; QUOT and REM split step x F.
+; The stock step $2000 gives PAL 7,6,6,6 and NTSC 8,7.
 WC_LAST       = 0
 WC_CREDIT     = 4
 WC_RATE       = 6
@@ -364,9 +370,14 @@ WC_OBSERVED   = 12
 WC_CONSUMED   = 16
 WC_DROPPED    = 20
 WC_TICKS      = 24
-WC_SIZE       = 28
+WC_QUOT       = 28
+WC_REM        = 30
+WC_LIMIT      = 32              ; ticks per batch: half a second of steps, at least one
+WC_STEP       = 34
+WC_SIZE       = 36
 
-; D0=serial, D1=50/60. Start a new accounting epoch.
+; D0=serial, D1=50/60, D2=step. Start a new accounting epoch. Clobbers D2.
+; A step outside 1 field .. $7FFF (F1GP-Ed writes 2250 to 8192) keeps the stock $2000.
 world_clock_rebase
         move.l d0,WC_LAST(a0)
         clr.w WC_CREDIT(a0)
@@ -377,6 +388,23 @@ world_clock_rebase
         clr.l WC_CONSUMED(a0)
         clr.l WC_DROPPED(a0)
         clr.l WC_TICKS(a0)
+        move.w d2,WC_STEP(a0)
+        cmpi.w #$7fff,d2
+        bhi.s .stock
+        mulu.w d1,d2
+        cmpi.l #$10000,d2
+        bcc.s .valid
+.stock
+        move.w #$2000,WC_STEP(a0)
+        move.l #$2000,d2
+        mulu.w d1,d2
+.valid
+        move.w d2,WC_REM(a0)
+        swap d2
+        move.w d2,WC_QUOT(a0)
+        move.l #$8000,d2
+        divu.w WC_STEP(a0),d2
+        move.w d2,WC_LIMIT(a0)
         rts
 
 ; D0=serial. Clobbers D0-D2. Saturate before addition, including partial credit.
@@ -398,26 +426,33 @@ world_clock_observe
         add.w d0,WC_CREDIT(a0)
         rts
 
-; Return next whole interval in D0, without changing credit. Clobbers D1.
+; Return next whole interval in D0, without changing credit or other registers
+; (d2_picture keeps the picture's phase in D1 across the call).
+; QUOT + carry(PHASE + REM) + (next PHASE nonzero) - (PHASE nonzero).
 world_clock_interval
-        moveq #7,d0
-        cmpi.w #60,WC_RATE(a0)
-        beq.s .ntsc
-        tst.w WC_PHASE(a0)
+        move.l d1,-(sp)
+        moveq #0,d0
+        move.w WC_QUOT(a0),d0
+        move.w WC_PHASE(a0),d1
+        beq.s .due
+        subq.w #1,d0
+.due
+        add.w WC_REM(a0),d1
+        bcc.s .carry
+        addq.w #1,d0
+.carry
+        tst.w d1
         beq.s .done
-        moveq #6,d0
+        addq.w #1,d0
 .done
-        rts
-.ntsc
-        tst.w WC_PHASE(a0)
-        bne.s .done
-        moveq #8,d0
+        move.l (sp)+,d1
         rts
 
-; Reserve one tick, or D0=0 when not due / four-tick batch exhausted.
+; Reserve one tick, or D0=0 when not due / batch exhausted.
 ; The caller increments WC_TICKS only at actual tick completion.
 world_clock_take
-        cmpi.w #4,WC_BATCH(a0)
+        move.w WC_BATCH(a0),d0
+        cmp.w WC_LIMIT(a0),d0
         bcc.s .none
         bsr.s world_clock_interval
         cmp.w WC_CREDIT(a0),d0
@@ -425,17 +460,38 @@ world_clock_take
         sub.w d0,WC_CREDIT(a0)
         add.l d0,WC_CONSUMED(a0)
         addq.w #1,WC_BATCH(a0)
-        addq.w #1,WC_PHASE(a0)
-        moveq #3,d1
-        cmpi.w #60,WC_RATE(a0)
-        bne.s .phase
-        moveq #1,d1
-.phase
-        and.w d1,WC_PHASE(a0)
+        move.w WC_REM(a0),d1
+        add.w d1,WC_PHASE(a0)
         rts
 .none
         moveq #0,d0
         rts
+; F3: with the clock and CUSTOM2 bit 9, replace the file's world step (stock 1/8 s,
+; or F1GP-Ed's frame rate) with 1/20 s before the game starts, as F1GP-Ed's 20 fps
+; setting does: the half step h0+$34362 and the three step words h0+$34364-$34369.
+; The clock then owes 65536/F3_STEP = 20.005 ticks a second. The pacer minimum and
+; cadence tables F1GP-Ed also writes are unused while the clock owns the loop. As with
+; F1GP-Ed, the computer cars are slower at the smaller step; the speed factor F1GP-Ed's
+; guide suggests scaling (h0+$29A7E) does not recover it (internals, F3).
+F3_STEP = 3276
+f3_step
+        btst #1,(cache_options+3,pc)
+        beq.s .done
+        btst #1,(cache_options+2,pc)    ; bit 9
+        beq.s .done
+        move.l a0,-(sp)
+        move.l d7,a0
+        adda.l a0,a0
+        adda.l a0,a0
+        adda.l #4+$34362,a0
+        move.w #F3_STEP/2,(a0)+
+        move.w #F3_STEP,(a0)+
+        move.w #F3_STEP,(a0)+
+        move.w #F3_STEP,(a0)
+        move.l (sp)+,a0
+.done
+        rts
+
 ; C2 hooks for the supplied game only. All state remains in the slave.
 c2_init
         movem.l d0-d2/a0-a2,-(sp)
@@ -1861,6 +1917,9 @@ c2_head
 .initial
         bsr e4_move             ; before E2's copy, which then holds the moved operands
         bsr e2_enable
+        movea.l (c2_h0,pc),a2
+        adda.l #$34366,a2       ; F3: the world step, as the physics reads it
+        move.w (a2),d2
         bsr world_clock_rebase
         lea (c2_mode,pc),a1
         move.w d7,(a1)
@@ -1910,7 +1969,13 @@ c2_head
         clr.w 4(a2)            ; native renderer work counter, not world time
         lea (c2_draw_mode,pc),a1
         move.w #1,(a1)
-        cmpi.w #4,WC_BATCH(a0)
+        move.w WC_BATCH(a0),d0
+        cmp.w WC_LIMIT(a0),d0
+        bcc.s .selected
+        ; Smaller steps run more ticks a batch: publish (draining the HUD queue) before
+        ; the queue could fill (825 commands at most seen in four stock ticks).
+        move.w (c2_hud_count,pc),d0
+        cmpi.w #C2_HUD_CAPACITY/2,d0
         bcc.s .selected
         bsr world_clock_interval
         cmp.w WC_CREDIT(a0),d0

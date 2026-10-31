@@ -41,8 +41,9 @@ def report(directory):
             assert idle == struct.unpack_from('>I',data,meta['symbols']['c3_closed_clock'])[0]
         closed = None
         if item['c3_exits']:
-            values = struct.unpack_from('>I4H5I3H',data,meta['symbols']['c3_closed_clock'])
-            last,credit,rate,phase,batch,observed,consumed,dropped,ticks,rebased,pending,mode,reason = values
+            values = struct.unpack_from('>I4H4I4HI3H',data,meta['symbols']['c3_closed_clock'])
+            last,credit,rate,phase,batch,observed,consumed,dropped,ticks = values[:9]
+            rebased,pending,mode,reason = values[13:]
             assert observed == (consumed+credit+dropped+rebased)&0xffffffff
             assert rate in (50,60) and pending in (0,1) and mode in (1,2) and reason in (1,2,3,4)
             closed = dict(ticks=ticks,pending=pending,mode=mode,reason=reason,rebased=rebased,dropped=dropped)

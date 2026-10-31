@@ -1230,6 +1230,45 @@ To run an edited file, copy the game directory, replace `data/f1gp` and pass it 
 screen, so drive the rest with `tap` and `menuclick`. The protection accepts A and Return;
 in the Main Menu use 395 252, then 530 246, then 235 391 for practice at Silverstone.
 
+### F3 frame rate
+
+`f3_frame_rate.py` makes a game directory whose `f1gp` is the stock file with only the
+bytes F1GP-Ed's Frames/sec and Target Display write, taken from a file F1GP-Ed saved
+(F1), so the stock routes still reach the race. `c2_capture.py --game` runs it, and
+`--step20` sets `CUSTOM2` bit 9 (the 20 Hz world step). C5(a)'s gate follows the clock's
+step (65536/step ticks a second, ±1%); `d2_alpha.py` and `d9_smooth.py` read it from the
+capture. `f3_pace.py` times the computer cars' laps in `--states` captures:
+
+```sh
+. amiga/env.sh
+make slave-verify OUT=tmp/f3/v6-verify
+python3 tools/test_world_clock.py
+python3 tools/f3_frame_rate.py tmp/f1/out/df-2002.f1gp tmp/f3/game-2002rate
+B='--build tmp/f3/v6-verify --custom4 1'
+python3 tools/c2_capture.py tmp/f3/v6-rate-030-20hz $B --rate --setup a1200-030 --step20
+python3 tools/c2_capture.py tmp/f3/v6-rate-030-20hz-repeat $B --rate --setup a1200-030 --step20
+python3 tools/c5_report.py tmp/f3/v6-rate-030-20hz --repeat tmp/f3/v6-rate-030-20hz-repeat --out tmp/f3/v6-rate-030-20hz.json
+python3 tools/c2_capture.py tmp/f3/v6-rate-030-stock $B --rate --setup a1200-030
+python3 tools/c2_capture.py tmp/f3/v6-rate-030-2002rate $B --rate --setup a1200-030 --game tmp/f3/game-2002rate
+python3 tools/c2_capture.py tmp/f3/v6-rate-030-2002rate-20hz $B --rate --setup a1200-030 --game tmp/f3/game-2002rate --step20
+python3 tools/c2_capture.py tmp/f3/v6-rate-a1200-20hz $B --rate --setup a1200 --step20
+python3 tools/c2_capture.py tmp/f3/v6-pace-stock $B --states --setup a1200-030
+python3 tools/c2_capture.py tmp/f3/v6-pace-20hz $B --states --setup a1200-030 --step20
+python3 tools/f3_pace.py stock=tmp/f3/v6-pace-stock 20hz=tmp/f3/v6-pace-20hz --out tmp/f3/v6-pace.json
+for arm in 20hz stock 2002rate; do
+  case $arm in 20hz) o=--step20;; stock) o=;; 2002rate) o='--game tmp/f3/game-2002rate';; esac
+  python3 tools/c2_capture.py tmp/f3/v6-d9-$arm-states-on $B --states --stage --views --setup a1200-030 $o
+  python3 tools/c2_capture.py tmp/f3/v6-d9-$arm-alpha-on $B --states --alpha --views --setup a1200-030 $o
+  python3 tools/d9_smooth.py tmp/f3/v6-d9-$arm-states-on --out tmp/f3/v6-smooth-$arm.json
+  python3 tools/d2_alpha.py tmp/f3/v6-d9-$arm-alpha-on --out tmp/f3/v6-alpha-$arm.json
+done
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix f3-
+```
+
+The views schedule replays at tick 1100 (57 s into a 20 Hz race), so pace comes from the
+plain `--states` captures.
+
 ## Release archive (G4)
 
 `make dist` rebuilds Codetapper's installer archive (`tmp/archives/FormulaOneGrandPrix.lha`,

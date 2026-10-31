@@ -1304,9 +1304,9 @@ When the machine keeps up the game stays near real time (about 3% fast, like the
 clock); when it cannot, the game slows down. F1GP-Ed's guide records the side effects of
 smaller steps: computer cars slower (its correction is 1.065× at 20 fps), the player's
 car spinning in long races at 20–25 fps (presumably an overflow; not traced), and replays
-and saves valid only at the rate they were made with. Not yet established: which of the
-three `$2000` words F1GP-Ed writes (F1), and whether the native code also reads the
-cadence tables `h0+$1262`/`$126A` it rewrites.
+and saves valid only at the rate they were made with. F1 found that F1GP-Ed writes the
+half step `h0+$34362` and the three step words `h0+$34364–$34369` (not `h0+$34360`, a
+clamp), with the pacer minimum and cadence tables; F3 runs the step in real time.
 
 GPPatch 2.20's keys 1–6 (Toni Wilen; also in F1GP-Ed as "turbo keys") are different: its
 routine at `$D1C` rewrites only the cadence tables, each word lowered by key − 1 (key 6:
@@ -3276,3 +3276,65 @@ Nothing is incompatible. The routes in `tools/f1gp.py` assume the stock start: t
 settings skip the language screen and the startup menu (to the Main Menu), so `quickrace`
 stops at the manual protection. F4 needs routes for edited files. Evidence: `tmp/f2`
 (`report.txt`, `report.json`, `v030-2002`, `v030-stock`).
+
+### F3 frame rate — complete
+
+**The clock follows the game's step.** C's clock owes 65536 ÷ step ticks a second, the
+step being the word the physics reads (h0+$34366, seconds × 65536), read at each epoch.
+Tick k falls due at whole field ⌈k × step × F ÷ 65536⌉ (F = 50 or 60, from C1's beam
+detection), so the stock `$2000` keeps C1's PAL 7, 6, 6, 6 and NTSC 8, 7 exactly and the
+stock race is unchanged in schedule. The interval comes from the quotient and remainder
+of step × F (`WC_QUOT`, `WC_REM`) and a running remainder (`WC_PHASE`); no division at
+run time. A batch runs at most half a second of steps (32768 ÷ step ticks: 4 at the stock
+step, 10 at 20 Hz), and a batch also ends when the HUD queue is half full (four stock
+ticks queued at most 825 of its 2048 commands). A step outside one field to `$7FFF`
+keeps the stock schedule. `$125A`/`$125C` still receive each tick's interval and the
+fields since the last sound update, so the engine sound follows the step. D's α and
+D10's weight already divide by the next interval; D4's `$100000` jump and D5's three
+segments a tick are per-tick maxima that only become looser at smaller steps.
+`tools/test_world_clock.py` checks every field over 100 nominal seconds against the
+independent count ⌊65536 × E ÷ (step × F)⌋ at the stock step, F1GP-Ed's PAL and NTSC
+steps (2250–6750) and 3276, with irregular observations, counter wrap, the one-second
+cap and the batch limit.
+
+**Honoured: the file's frame rate.** F1GP-Ed's Frames/sec and Target Display write the
+pacer minimum and cadence tables (unused while the clock owns the loop) and the step
+words; the clock then runs that step in real time. The game's physics, AI and race
+clocks scale by the same word, so a 1995–2002 datafile's 6750 (10 fps NTSC) runs at
+9.709 ticks a second. Target Display and F1GP-Ed's Timing setting only choose which
+n × 1350 or n × 1125 step and which cadence table the native pacer uses; with the clock
+the step alone sets the rate, and the display family comes from the beam.
+
+**Optional: 20 Hz** (developer `CUSTOM2` bit 9, with the clock): the slave writes the
+step 3276 (`$34362` 1638, `$34364`–`$34369` 3276) before the game starts, as F1GP-Ed's
+20 fps writes its steps, whatever the file holds: 20.005 ticks a second. Without the
+clock (a 68000 by default) the option does nothing, because the native pacer would run
+the small step slower than real time. At 20 Hz the HUD queue peaked at 45 commands on
+the 030.
+
+**Measured rates** (C5(a), `tools/c5_capture.py`, Quick Race on the 030, final build):
+stock file 7.9873 ticks a second against 8; the 2002 frame rate (`tools/f3_frame_rate.py`
+builds a stock file with only the 2002 file's frame-rate bytes) 9.6941 against 9.709;
+20 Hz 19.9727 against 20.005, repeated exactly, and the same race from the 2002 file.
+Each error is −0.16%, the emulated PAL field's 49.92 Hz; none dropped a field. The race
+clock keeps its 1.029 ratio to real time at every step. **A stock A1200 cannot keep
+20 Hz:** with chip RAM only it ran 14.1 ticks a second over the whole race and dropped
+8,343 fields (OVERLOADED, no window fits), so the option is for accelerated machines.
+
+**D9 and D2 hold at each step** (`d9_smooth.py`, `d2_alpha.py`, whole races on the 030):
+at the stock step 6,261 pictures, 3.30 fields each, camera steps p5–p95 0.83–1.12 of the
+ideal; at the 2002 rate 6,996 pictures, 3.22 fields, 0.85–1.07; at 20 Hz 5,688 pictures,
+4.13 fields, 0.95–0.99 (a picture spans 1.65 ticks, so interpolation evens it out). The
+checks pass and α is exact in every picture at each step.
+
+**The computer cars are slower at 20 Hz,** as F1GP-Ed's guide warns. `f3_pace.py` times
+every computer car's laps (lap count +$22) by the race clock over whole Quick Races on
+the 030: the mean lap after the standing start is 104.2–110.9 s at the stock step
+(four builds) and 117.3–119.7 s at 20 Hz (six runs); on the final build 104.2 s against
+118.9 s, 14% slower. Top speeds hold
+(p95 within 4%); the median and corner speeds fall 10–18%. F1GP-Ed's guide has players
+scale the speed factor (the base h0+$29A7E of each computer car's factor +$BE, which
+scales its cornering and target-speed terms) by 1.0653 at 20 fps. Factors from 1.0 to
+1.25 left the laps at 117.3–119.7 s, so the slave keeps the factor as the file sets it,
+as F1GP-Ed does by default. Recovering the pace needs H2's audit of the per-tick terms.
+

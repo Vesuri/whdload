@@ -2,7 +2,8 @@
 
 Real time is emulated time: one PAL non-interlaced field is 313 lines of 227 colour
 clocks at 3,546,895 Hz (49.92 Hz). The schedule funds 8 ticks per 50 fields, so the
-expected rate is 7.987 ticks per second, inside the 8.00 ± 1% gate.
+expected rate is 7.987 ticks per second, inside the 8.00 ± 1% gate. F3: the gate is
+65536/step ± 1%, the step being the clock's (stock $2000; F1GP-Ed's or the 20 Hz step).
 """
 import gzip
 import hashlib
@@ -40,9 +41,9 @@ def decode(slave, session, symbols):
     """Rate fields of one sample, from its saved slave state and h0+$3A714–3A7D3."""
     item = {n: struct.unpack_from('>H', slave, symbols[n])[0] for n in WORDS}
     item.update({n: struct.unpack_from('>I', slave, symbols[n])[0] for n in LONGS})
-    values = struct.unpack_from('>I4H4I', slave, symbols['c2_clock'])
+    values = struct.unpack_from('>I4H4I4H', slave, symbols['c2_clock'])
     item['clock'] = dict(zip(('last','credit','rate','phase','batch','observed','consumed',
-                              'dropped','ticks'), values))
+                              'dropped','ticks','quot','rem','limit','step'), values))
     whole, fraction = struct.unpack_from('>IH', session, 0x3a77c-0x3a714)
     item['race_clock'] = [whole, fraction]          # milliseconds, 16-bit fraction
     item['start_phase'] = session[0x3a750-0x3a714]
@@ -71,9 +72,13 @@ def evaluate(samples):
             run = 0
     if run:
         runs.append(run)
-    # Each contiguous fitting run can end with at most one second of credit (8 ticks)
-    # and one reserved tick unaccounted at either end.
-    bound = Fraction(9*2*len(runs), fit_ticks) if fit_ticks else None
+    # Each contiguous fitting run can end with at most one second of credit (65536/step
+    # ticks) and one reserved tick unaccounted at either end.
+    steps = {s['clock']['step'] for s in live}
+    assert len(steps) == 1, steps
+    step = steps.pop()
+    target = Fraction(65536, step)
+    bound = Fraction((-(-65536//step)+1)*2*len(runs), fit_ticks) if fit_ticks else None
     rate = Fraction(fit_ticks) / (fit_fields*PAL_FIELD) if fit_fields else None
     clocked = [s for s in live if s['race_clock'] != first['race_clock']]
     ms = lambda s: Fraction(s['race_clock'][0]) + Fraction(s['race_clock'][1], 65536)
@@ -85,27 +90,27 @@ def evaluate(samples):
         clock = dict(from_serial=a['c2_serial'], to_serial=b['c2_serial'],
                      ratio=float((ms(b)-ms(a))/1000/dt),
                      ms_per_tick=float((ms(b)-ms(a))/dticks),
-                     native_ms_per_tick=float(CLOCK_STEP_MS))
+                     native_ms_per_tick=float(CLOCK_STEP_MS*step/0x2000))
     # PASS: the fitting time measures within ±1% including the boundary bound.
     # OVERLOADED: too little fitting time to measure; outside the gate's envelope.
     modal = (last['c3_rebased']-first['c3_rebased']) or (last['c3_excluded']-first['c3_excluded'])
     if modal or rate is None:
         status = 'FAIL' if modal else 'OVERLOADED'
-    elif abs(rate/8-1) + bound <= Fraction(1, 100):
+    elif abs(rate/target-1) + bound <= Fraction(1, 100):
         status = 'PASS'
     elif bound > Fraction(1, 100):
         status = 'OVERLOADED'
     else:
         status = 'FAIL'
     return dict(
-        status=status,
+        status=status, world_step=step, target_rate=float(target),
         field_seconds=float(PAL_FIELD), beam_max=sorted({s['c2_beam_max'] for s in live}),
         live_samples=len(live), fields=serial, seconds=float(seconds), ticks=ticks,
         whole_rate=float(ticks/seconds), dropped=last['clock']['dropped']-first['clock']['dropped'],
         fitting_fields=fit_fields, fitting_ticks=fit_ticks, fitting_runs=runs,
         fitting_share=float(Fraction(fit_fields, serial)) if serial else None,
         rate=float(rate) if rate is not None else None,
-        rate_error=float(rate/8-1) if rate is not None else None,
+        rate_error=float(rate/target-1) if rate is not None else None,
         rate_bound=float(bound) if bound is not None else None,
         unfit=unfit, race_clock=clock)
 

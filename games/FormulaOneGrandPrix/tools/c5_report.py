@@ -45,4 +45,5 @@ if __name__ == '__main__':
     if not path.is_relative_to(Path(__file__).resolve().parents[1]/'tmp'):
         raise ValueError('output must stay in project tmp/')
     path.write_text(json.dumps(result, indent=2)+'\n')
-    print(f"C5(a) evidence verified; rate {result['rate']:.4f}/s; acceptance {result['status']}")
+    rate = 'none fitting' if result['rate'] is None else f"{result['rate']:.4f}/s"
+    print(f"C5(a) evidence verified; rate {rate}; acceptance {result['status']}")

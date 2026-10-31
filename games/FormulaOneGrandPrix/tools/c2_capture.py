@@ -95,6 +95,8 @@ def capture(args):
         custom2 |= 256
     if args.e6:         # CUSTOM2 bit 10: indirectly entered hunk 2 code in fast RAM too
         custom2 |= 1024
+    if args.step20:     # CUSTOM2 bit 9 (F3): the 20 Hz world step instead of the file's
+        custom2 |= 512
     if args.no_caches:  # E1's uncached arm: bit 0 clear and WHDLoad's NoCache (B5/A7 controls)
         custom2 &= ~1
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5={custom5} FileLog'
@@ -113,13 +115,22 @@ def capture(args):
             raise ValueError('--cpu-hz applies to the 68030 target only')
         extra += (' --uae_cpu_speed=max --uae_cpu_cycle_exact=false --uae_cpu_memory_cycle_exact=false'
                   if args.cpu_hz < 0 else f' --uae_cpu_frequency={args.cpu_hz}')
-    env = dict(os.environ, AMIGA_SETUP=args.setup, EXTRA_ARGS=extra,
+    game = {}
+    if args.game:       # F3: a game directory with an edited data/f1gp, under tmp/
+        directory = Path(args.game).resolve()
+        if not directory.is_relative_to(ROOT/'tmp'):
+            raise ValueError('--game must stay in project tmp/')
+        game = dict(GAME=str(directory))
+    env = dict(os.environ, **game, AMIGA_SETUP=args.setup, EXTRA_ARGS=extra,
                SLAVE=str(slave), WHD_ARGS=whd, WARP='1', DETERMINISTIC='1',
                JOY0='none', JOY1='none', VERIFY_EXIT='1', FSUAE=os.environ['FSUAE_ARM'],
                F1GP_SCREEN_Y='10' if args.ntsc else '0')
     meta = dict(status='INCOMPLETE', build=build, runtime=pins, setup=args.setup,
                 extra_args=extra, whd_args=whd, route=args.route, ticks=args.ticks,
                 game_inputs=json.loads((ROOT/'manifest/game-inputs.json').read_text()))
+    if args.game:
+        meta['game'] = dict(path=str(Path(args.game).resolve()),
+                            f1gp_sha256=sha(Path(args.game)/'data/f1gp'))
     meta_path = out / 'meta.json'
     meta_path.write_text(json.dumps(meta, indent=2) + '\n')
     shutil.copyfile(slave, out / 'slave.bin')
@@ -298,8 +309,8 @@ def capture(args):
             meta['paint_sha256'] = sha(out/'paint.bin')
         command('gdb', f'dump binary memory {out}/clock.bin {base:#x} {base+len(slave.read_bytes()):#x}')
         state = (out/'clock.bin').read_bytes()
-        values = struct.unpack_from('>I4H4I', state, symbols['c2_clock'])
-        last, credit, rate, phase, batch, observed, consumed, dropped, ticks = values
+        values = struct.unpack_from('>I4H4I4H', state, symbols['c2_clock'])
+        last, credit, rate, phase, batch, observed, consumed, dropped, ticks, quot, rem, limit, step = values
         serial = struct.unpack_from('>I', state, symbols['c2_serial'])[0]
         counters = {name: struct.unpack_from('>I', state, symbols[name])[0]
                     for name in ('c2_pictures','c2_dry_passes','c2_repeat_pictures',
@@ -322,14 +333,14 @@ def capture(args):
         if args.view and meta['view_code'] not in views[args.view]:
             raise ValueError('requested view not active at capture')
         if (ticks != completed or observed != (consumed+credit+dropped)&0xffffffff
-                or not 1 <= batch <= 4 or not 0 <= credit <= rate
+                or not 1 <= batch <= limit or not 0 <= credit <= rate
                 or rate != (60 if args.ntsc else 50)):
             raise ValueError(f'clock accounting failed: {values}')
         if struct.unpack_from('>H', state, symbols['c2_mode'])[0] != expected_mode:
             raise ValueError('left requested live/replay loop before capture')
         meta.update(replay=args.replay, boundary=boundary, hunk_bases=bases, slave_base=base, symbols=symbols,
                     clock=dict(last=last, serial=serial, credit=credit, rate=rate, phase=phase,
-                               batch=batch, observed=observed, consumed=consumed,
+                               batch=batch, step=step, limit=limit, observed=observed, consumed=consumed,
                                dropped=dropped, completed=ticks, requested_tick=args.ticks),
                     counters=counters, tick_sha256=sha(out/'tick.bin.gz'))
         command('gdb', 'delete breakpoints')
@@ -412,6 +423,8 @@ if __name__ == '__main__':
                         help='CUSTOM2 bit 8: game routines replaced by exact faster forms (edge tracer, sky strip)')
     parser.add_argument('--e6', action='store_true',
                         help="CUSTOM2 bit 10: hunk 2's indirectly entered code in E2's copy too (with --e2)")
+    parser.add_argument('--step20', action='store_true', help="CUSTOM2 bit 9: the 20 Hz world step, not the file's")
+    parser.add_argument('--game', help='F3: a game directory under tmp/ whose data/f1gp is edited')
     parser.add_argument('--memconfig', type=int, help="WHDLoad MEMCONFIG (default 1 with --e2/--e3/--e4 on machines with fast RAM)")
     parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')
     parser.add_argument('--replay', action='store_true')

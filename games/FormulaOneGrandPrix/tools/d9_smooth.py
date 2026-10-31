@@ -82,6 +82,14 @@ def displays(root, meta):
             for n, (start, kind, _) in enumerate(items)]
 
 
+def world_step(root, meta):
+    """WC_STEP of the clock in the first completed tick's slave header (F3)."""
+    symbols = {k: int(v, 16) if isinstance(v, str) else v for k, v in meta['symbols'].items()}
+    with gzip.open(root/'ticks.bin.gz') as ticks:
+        header = ticks.read(symbols['c2_beam_max']+2-symbols['c2_serial'])
+    return struct.unpack_from('>H', header, symbols['c2_clock']-symbols['c2_serial']+34)[0]
+
+
 def poses(directory):
     root = Path(directory)
     meta = json.loads((root/'meta.json').read_text())
@@ -163,6 +171,7 @@ def poses(directory):
             latest=(camera(saved), [car(saved, n, flags[n][0], track) for n in range(26)])))
 
     histogram, per_view = collections.Counter(), {}
+    world = world_step(root, meta)              # F3: the clock's world step
     counts = collections.Counter()
     count = lambda *name: counts.__setitem__('/'.join(name), counts['/'.join(name)]+1)
     values = {}
@@ -193,7 +202,7 @@ def poses(directory):
             continue
         count('pairs', 'compared')
         snapped = 'snapped' if b['decision'] != 'history' or b['outcome'] == 'jump' else 'predicted'
-        interval = 6.25                     # fields per tick, PAL (8 ticks in 50 fields)
+        interval = world*50/65536           # fields per tick, PAL (stock: 8 ticks in 50 fields)
         for name in ('predicted', 'latest'):
             label = f'{name}' if name == 'latest' else f'{name} ({snapped})' if snapped == 'snapped' else name
             # Camera.

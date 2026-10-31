@@ -47,9 +47,14 @@ Version 2.0b (31.10.2026) by Vesuri (beta):
   MEMCONFIG=1). Uncheck them in the WHDLoad startup options to play the
   original game. Leave the other developer options unchecked
 - The enhancements apply to the 4 disk release's game file only
-- F1GP-Ed's frame rate settings (used by its 1995-2002 datafiles) are not
-  yet honoured with consistent game speed: the race runs slower than real
-  time. Uncheck "Developer - VBL world clock" for such files
+- F1GP-Ed's frame rate setting (used by its 1995-2002 datafiles) sets how
+  often the game updates the world; the race runs in real time at that
+  rate, and motion stays smooth between the updates
+- "Developer - 20 Hz world step" (off in the supplied icons) updates the
+  world 20 times a second instead of 8, or instead of an F1GP-Ed file's
+  rate, as F1GP-Ed's 20 fps setting does. As with F1GP-Ed, the computer
+  cars are slower at 20 Hz (10-14% a lap), and replays and saved games
+  only work at the rate they were made with
 - Requires WHDLoad V20+
 
 Version 1.0 (06.12.2002) by Codetapper/Action:

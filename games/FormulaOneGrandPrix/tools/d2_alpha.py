@@ -32,11 +32,11 @@ def regions(base, symbols):
     return [(base+start, end-start)]
 
 
-def interval(rate, phase):
-    """world_clock_interval: PAL 7,6,6,6 and NTSC 8,7 from the table phase."""
-    if rate == 60:
-        return 8 if phase == 0 else 7
-    return 7 if phase == 0 else 6
+def interval(quot, rem, phase):
+    """world_clock_interval (F3): whole fields from this tick's deadline to the next's,
+    ceil(k x step x F / 65536); the stock step gives PAL 7,6,6,6 and NTSC 8,7."""
+    following = (phase + rem) & 0xffff
+    return quot + (phase + rem > 0xffff) + (following != 0) - (phase != 0)
 
 
 def alpha(phase, lead, period, fields):
@@ -61,8 +61,9 @@ def decode(record, symbols):
     at = lambda name: symbols[name]-symbols['c2_serial']
     word = lambda name: struct.unpack_from('>H', record, at(name))[0]
     long = lambda name: struct.unpack_from('>I', record, at(name))[0]
-    clock = dict(zip(('last','credit','rate','phase','batch','observed','consumed','dropped','ticks'),
-                     struct.unpack_from('>I4H4I', record, at('c2_clock'))))
+    clock = dict(zip(('last','credit','rate','phase','batch','observed','consumed','dropped','ticks',
+                      'quot','rem','limit','step'),
+                     struct.unpack_from('>I4H4I4H', record, at('c2_clock'))))
     return dict(serial=long('c2_serial'), clock=clock, mode=word('c2_mode'),
                 draw_mode=word('c2_draw_mode'), start=long('d2_start'),
                 pictures=long('d2_pictures'), latest=long('d2_latest'), kind=word('d2_kind'),
@@ -96,7 +97,7 @@ def check(directory):
         c = item['clock']
         kinds['tick' if item['kind'] == TICK else 'repeat'] += 1
         expected_phase = (item['start'] - c['last'] + c['credit']) & 0xffff
-        fields = interval(c['rate'], c['phase'])
+        fields = interval(c['quot'], c['rem'], c['phase'])
         period = item['period']
         previous = items[n-1] if n else None
         if previous and item['pictures'] == previous['pictures']+1:
