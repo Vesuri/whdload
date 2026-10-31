@@ -2962,6 +2962,19 @@ D3's game ranges. `c2_capture.py` overlays the moved bytes on its hunk dumps, so
 comparators read the live values. The per-tick probes (`--states`, `--rate`) still read
 chip offsets and refuse `--e4-data`.
 
+**Fast RAM above 16 MB.** The fillers' edge lists hold edge-pool pointers with flags in
+the top byte (`$42EDF524`: bit 6) and mask them with `$FFFFFF` (`move.l #$ffffff,d3` at
+h0+$1F3B6, +$1F3CE, +$1F858, +$1F994, +$20B0A, +$20C46, +$21DEA and +$21F26; the game holds
+no other such mask). A pool copy above `$FFFFFF` loses its high byte: the user's A1200/040
+board (fast RAM at `$2E20000`) raised an access fault at h0+$1F3E2 on entering the race,
+and FS-UAE's presets, whose fast RAM is Zorro II below `$A00000`, could not show it. The
+region table marks the pool (`NARROW` in `tools/e4_tables.py`, bit 15 of its hunk word),
+and the slave leaves it in chip, with no span, when its copy would end above `$1000000`.
+With 32 MB of Zorro III RAM and no Zorro II (`FAST_KB=0 EXTRA_ARGS='--zorro_iii_memory=32768'`,
+`a1200-040`, `CUSTOM2=1531 MEMCONFIG=1`) the unfixed 2.0b slave faults at the same
+instruction; the fixed developer slave runs a Quick Race 1500 fields, and VERIFY logs E2's
+copy at `$41F7C9E0` (494 operands: bit 8's `PL_PS` at h0+$20E replaces one).
+
 The move changes only where the data lives, so the check is the same tick's picture and
 state with the move off and on (developer `8fcb7009…`, rear chase, `--publish` at tick
 900, `paint-off/on`): the picture is identical (0 of 32,000 bytes differ) and so are the

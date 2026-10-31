@@ -689,7 +689,9 @@ e_spare
 ; table, the fillers' jump-offset words and the scene's two variable blocks in hunk 2)
 ; moves to fast RAM at the first live epoch, below E3's picture (68020+, MEMCONFIG=1's
 ; spare). Each region is copied, then every listed long that holds an address inside it
-; moves by the same distance. Pointers stored elsewhere keep the chip original, which
+; moves by the same distance. The edge pool stays in chip when its copy would lie above
+; $FFFFFF: the fillers' edge lists hold flags in their pointers' top byte and mask them to
+; 24 bits (h0+$1F3B6 and its siblings). Pointers stored elsewhere keep the chip original, which
 ; still holds the same bytes. The slave reaches the moved variables through e4_map.
         INCLUDE e4.i
 e4_reserve
@@ -749,7 +751,9 @@ e4_move
         lea (e4_spans,pc),a3
         moveq #E4_REGIONS-1,d3
 .region
-        move.w (a2)+,d0         ; hunk.w, low, high, fast offset
+        move.w (a2)+,d0         ; hunk.w (bit 15: 24-bit pointers), low, high, fast offset
+        move.w d0,d2
+        and.w #$7fff,d0
         lsl.w #2,d0
         lea (e4_bases,pc),a0
         movea.l (a0,d0.w),a0
@@ -759,16 +763,27 @@ e4_move
         sub.l d0,d1             ; its size
         movea.l (e4_data,pc),a1
         adda.l (a2)+,a1         ; its fast copy
+        tst.w d2
+        bpl.s .keep
+        move.l a1,d2
+        add.l d1,d2
+        cmp.l #$1000000,d2
+        bls.s .keep
+        movea.l a0,a1           ; left in chip: no span, nothing moves
+        moveq #0,d1
+.keep
         move.l a0,(a3)+
         move.l d1,(a3)+
         move.l a1,d0
         sub.l a0,d0
         move.l d0,(a3)+         ; fast - chip
         lsr.l #1,d1
+        beq.s .next
         subq.w #1,d1
 .copy
         move.w (a0)+,(a1)+
         dbf d1,.copy
+.next
         dbf d3,.region
         lea (e4_moved,pc),a0
         move.w #1,(a0)          ; e4_map follows the spans from here

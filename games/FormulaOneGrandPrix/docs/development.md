@@ -1251,3 +1251,7 @@ AMIGA_SETUP=a1200-040 SLAVE=tmp/g4/new/FormulaOneGrandPrixHD/FormulaOneGrandPrix
 python3 tools/f1gp.py quickrace && python3 tools/f1gp.py gdb monitor fields 1500
 python3 tools/f1gp.py shot "$PWD/tmp/g4/race.png"; python3 tools/f1gp.py quit
 ```
+
+FS-UAE's presets put fast RAM below 16 MB, where the game's 24-bit pointer masks hide
+nothing; real accelerator boards put it above. Repeat the check with
+`FAST_KB=0 EXTRA_ARGS='--zorro_iii_memory=32768'` for that layout.
