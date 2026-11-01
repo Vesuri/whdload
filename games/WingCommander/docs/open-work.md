@@ -5,7 +5,7 @@
 Enhanced flight entry and exit now discard native player steering ramps, angular
 rates and private motion prediction state in both variants. This prevents held
 simulator steering from leaking into the first mission. Native CPU regressions
-pass; interactive simulator-to-mission confirmation remains.
+pass; the user confirmed it live in the CD32 version on the A1200/030 model.
 
 Smooth player steering now retains a Q14 orientation in both enhanced variants,
 preventing repeated horizontal turns from rounding away the previous pitch.
@@ -37,7 +37,7 @@ smoothing is retained; cursor input remains 25 Hz.
 
 The pilot covering his eyes before the ship explosion now plays its eight native
 frames every three display fields in both enhanced variants. CPU timing, abort and re-entry checks
-pass; live visual confirmation remains. See
+pass; the user confirmed it live in the CD32 version on the A1200/030 model. See
 [death reaction](internals.md#cockpit-death-reaction-timing).
 
 Shared scene-boundary prediction reset now restores staged poses before clearing
@@ -127,8 +127,8 @@ and the explosion stay tick-owned; native cleanup is retained. See
 [ejection timing](internals.md#ejection-cinematic-clock-and-helmet-view).
 The funeral ceremony now redraws its moving starfield between three-field steps in
 both enhanced versions, with native foreground composition and single-step
-respawn/salute state. Native CPU checks pass; live visual confirmation remains
-outstanding. See [funeral background motion](internals.md#funeral-background-motion).
+respawn/salute state. Native CPU checks pass; the user confirmed it live in the CD32 version on the A1200/030 model.
+See [funeral background motion](internals.md#funeral-background-motion).
 Carrier return and hangar landing now pace their native bitmap scripts every three fields
 with fractional position and zoom rendering in both enhanced variants. See
 [landing clocks](internals.md#carrier-return-and-hangar-landing-clocks).

@@ -7672,8 +7672,9 @@ finishes in eight fields and fails the enhanced deadline. The OCS bitmap fallbac
 is exercised; the saved-background branch is retained but not exercised here.
 Modal guard/regression checks and full option-install checks also pass.
 Reports: `tmp/death-cels-check-{cd32,ocs}`, `tmp/death-cels-modal-{cd32,ocs}`,
-`tmp/death-cels-install` and `tmp/death-cels-options`. Live visual confirmation
-of this animation remains pending; these checks make no performance claim.
+`tmp/death-cels-install` and `tmp/death-cels-options`. The user confirmed
+the animation speed live in the CD32 version on the A1200/030 model; these checks
+make no performance claim.
 
 ## Ejection cinematic clock and helmet view
 
@@ -7940,8 +7941,8 @@ time) against one native pass. A PAL star moving ten pixels per tick renders
 at X=100,97,94 before the next native X=90. Active salute records and
 respawn RNG state also match. Installer checks pass eight CD32 cases and the
 OCS public hardware/option matrix. These are functional CPU checks, not a live
-frame-rate or pixel-capture claim; visual confirmation of the updated funeral
-scene remains outstanding.
+frame-rate or pixel-capture claim. The user confirmed the updated funeral scene
+live in the CD32 version on the A1200/030 model.
 
 ## Afterburner prediction continuity
 
@@ -8331,4 +8332,5 @@ or disabled flight paths are unchanged.
 `player_reset_check.py` covers released-input residual steering, the old reset
 as a negative control, neutral entry, fresh right input, retained mission
 velocity and the assembled entry/exit calls on CD32 020/040 and OCS 000/020.
-Interactive simulator-to-mission validation remains outstanding.
+The user confirmed simulator-to-mission behaviour live in the CD32 version on
+the A1200/030 model.
