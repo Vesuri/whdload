@@ -57,9 +57,17 @@ Version 2.0b (31.10.2026) by Vesuri (beta):
   rate, and motion stays smooth between the updates
 - "Developer - 20 Hz world step" (off in the supplied icons) updates the
   world 20 times a second instead of 8, or instead of an F1GP-Ed file's
-  rate, as F1GP-Ed's 20 fps setting does. As with F1GP-Ed, the computer
-  cars are slower at 20 Hz (10-14% a lap), and replays and saved games
-  only work at the rate they were made with
+  rate, as F1GP-Ed's 20 fps setting does. Replays and saved games only
+  work at the rate they were made with
+- The computer cars lose speed in corners at every world update, so a
+  finer step slows them (8-9% a lap at 20 Hz, as F1GP-Ed's guide warns).
+  With the 20 Hz step the slave makes the loss the same each second as
+  at the original rate, and their laps are within 2% of the original's;
+  "Developer - native AI cornering loss at 20 Hz" keeps the original
+  loss. "Developer - AI cornering loss a second (file's rate)" does the
+  same at an F1GP-Ed file's own frame rate, where the effect is small
+  (under 1% a lap at the 1995-2002 datafiles' rate). F1GP-Ed's suggested
+  speed factor correction for 20 fps is no longer needed with it
 - "Developer - local speed factors" (off in the supplied icons) gives the
   computer cars the per-circuit Local Speed Factors of an F1GP-Ed datafile
   saved as F1GP-Ed.f1gp in the data directory, as F1GP-Ed's memory patch

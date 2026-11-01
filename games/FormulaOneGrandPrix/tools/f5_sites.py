@@ -40,9 +40,12 @@ def checksum(data, total=0):
 def sites(game):
     layout = {h: (o, n) for h, o, n in hunks(game)}
     moved = {(h, o+k) for (h, o) in relocs(game) for k in range(4)} | READ
-    out = []
+    out, seen = [], set()
     for r in ranges(SOURCE.read_text()):
         h, start = r['hunk'], r['offset']
+        if (h, start) in seen:      # an alternative hook of the same range
+            continue
+        seen.add((h, start))
         run = None
         for o in range(start, start+r['size']):
             if (h, o) in moved:

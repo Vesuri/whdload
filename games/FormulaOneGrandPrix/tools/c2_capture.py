@@ -99,6 +99,10 @@ def capture(args):
         custom2 |= 512
     if args.speed_factors:  # CUSTOM2 bit 11 (F6): F1GP-Ed.f1gp's local speed factors
         custom2 |= 2048
+    if args.corner:     # CUSTOM2 bit 12 (H2): the cornering loss a second at the file's step
+        custom2 |= 4096
+    if args.native_corner:  # CUSTOM2 bit 13 (H2): the native cornering loss at 20 Hz
+        custom2 |= 8192
     if args.no_caches:  # E1's uncached arm: bit 0 clear and WHDLoad's NoCache (B5/A7 controls)
         custom2 &= ~1
     whd = f'CUSTOM1=1 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4={args.custom4} CUSTOM5={custom5} FileLog'
@@ -429,6 +433,10 @@ if __name__ == '__main__':
     parser.add_argument('--step20', action='store_true', help="CUSTOM2 bit 9: the 20 Hz world step, not the file's")
     parser.add_argument('--speed-factors', action='store_true',
                         help="CUSTOM2 bit 11: the local speed factors of the game's F1GP-Ed.f1gp")
+    parser.add_argument('--corner', action='store_true',
+                        help="CUSTOM2 bit 12: the computer cars' cornering loss a second at the file's step")
+    parser.add_argument('--native-corner', action='store_true',
+                        help='CUSTOM2 bit 13: the native cornering loss a step with --step20')
     parser.add_argument('--game', help='F3/F4: an edited game directory under tmp/ (tools/f4_inputs.py)')
     parser.add_argument('--memconfig', type=int, help="WHDLoad MEMCONFIG (default 1 with --e2/--e3/--e4 on machines with fast RAM)")
     parser.add_argument('--no-caches', action='store_true', help='CUSTOM2 bit 0 clear and NoCache: the uncached control')

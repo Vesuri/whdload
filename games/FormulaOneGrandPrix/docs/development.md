@@ -1351,6 +1351,29 @@ python3 tools/f3_pace.py off=tmp/f6/s-off gb20480=tmp/f6/s-on-gb20480 --out tmp/
 python3 tools/slave_gate.py --prefix f6-
 ```
 
+### H2 cornering loss
+
+`--corner` sets `CUSTOM2` bit 12 (the loss a second at the file's step), `--native-corner`
+bit 13 (the native loss with `--step20`). `h2_corner.py` measures the loss and the median
+lap against the first capture; give each capture's step:
+
+```sh
+. amiga/env.sh
+make slave && make slave-developer && make slave-verify
+python3 tools/slave_gate.py --prefix h2-
+B='--build tmp/build-verify --custom4 1 --states --setup a1200-030'
+python3 tools/c2_capture.py tmp/h2/v8-off $B
+python3 tools/c2_capture.py tmp/h2/v8-corner $B --corner
+python3 tools/c2_capture.py tmp/h2/v20 $B --step20
+python3 tools/c2_capture.py tmp/h2/v20-native $B --step20 --native-corner
+python3 tools/c2_capture.py tmp/h2/v6750-off $B --game tmp/f3/game-2002rate
+python3 tools/c2_capture.py tmp/h2/v6750-corner $B --game tmp/f3/game-2002rate --corner
+python3 tools/c5_compare.py off=tmp/h2/v8-off corner=tmp/h2/v8-corner --out tmp/h2/vcmp8.json
+python3 tools/h2_corner.py stock=tmp/h2/v8-off:8192 corner8=tmp/h2/v8-corner:8192 \
+  hz20=tmp/h2/v20:3276 hz20native=tmp/h2/v20-native:3276 \
+  r6750=tmp/h2/v6750-off:6750 r6750corner=tmp/h2/v6750-corner:6750 --out tmp/h2/h2-corner.json
+```
+
 ## Release archive (G4)
 
 `make dist` rebuilds Codetapper's installer archive (`tmp/archives/FormulaOneGrandPrix.lha`,

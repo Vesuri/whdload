@@ -504,7 +504,7 @@ interval, and `CUSTOM2` bit 9 writes the 20 Hz step. C5(a) passes at the stock s
 the 2002 datafile's 6750 and at 20 Hz on the 030; a stock A1200 cannot keep 20 Hz (14.1
 ticks a second). D9 passes at each. The computer cars are 10–14%
 slower a lap at 20 Hz, as F1GP-Ed's guide warns; its suggested speed-factor scaling does
-not recover it (H2).
+not recover it. H2 found the cause and scales it with the 20 Hz step.
 
 **F4 Edited-file inputs.** Build edited `f1gp` files reproducibly from pinned datafiles
 and settings, plus one edited cockpit and one replaced backdrop, and pin their hashes.
@@ -558,19 +558,27 @@ build will replace the developer slave once G1 exists.
 ## H. Finer simulation (optional; only on the user's request)
 
 The game's own variable step gives a finer world step that F1GP-Ed players have used for
-decades; F3 offers it without F1GP-Ed (`CUSTOM2` bit 9, 20 Hz). Its measured side effect is
+decades; F3 offers it without F1GP-Ed (`CUSTOM2` bit 9, 20 Hz). Its measured side effect was
 computer cars 10–14% slower a lap at 20 Hz (F3), which F1GP-Ed's speed-factor scaling
-does not recover; F1GP-Ed's guide also reports spins in long races at 20–25 fps. H2's
-audit is what would fix them.
+does not recover; F1GP-Ed's guide also reports spins in long races at 20–25 fps.
+*Closed* (user decision): H2 is complete, H1 closed without work.
 
 **H1 Per-field steering preview.** Preview the native player motion every field from the
 current input and spread it over the tick (Gunship `TIMING_DESIGN.md`), so steering
 shows within a field. Needs a side-effect-free preview of the player physics.
+*Closed, not worked* ([reason](internals.md#h1-per-field-steering-preview--closed-not-worked)):
+no such preview exists; the 20 Hz step updates the world every 50 ms instead of 125.
 
 **H2 Finer world step.** A units-and-writers audit of the car physics and AI: integrators,
 damping, thresholds, timers, RNG draws, per-quantity scaling (AmigaXDev
 `fixed-time-simulation.md` §Raising the update rate; Stunt Car Racer; Revs'
 `tools/sim_equiv.py`). Large and risky; not part of the main path.
+*Complete* ([evidence](internals.md#h2-the-computer-cars-cornering-loss--complete)): of the
+computer cars' track-driven update, only the cornering loss at h0+$2B352 is taken per
+update rather than per second. Scaled by the step (with 20 Hz unless `CUSTOM2` bit 13; at
+the file's step with bit 12), the 20 Hz median lap is 1.5% faster than the stock step's
+instead of 8–9% slower, and the stock step is unchanged. The explicit-pose and player
+physics were not audited.
 
 ## Order and critical path
 

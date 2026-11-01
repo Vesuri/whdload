@@ -27,7 +27,7 @@ from slave_inputs import ROOT                                     # noqa: E402
 PINNED = ROOT/'tmp/game/FormulaOneGrandPrix4Disk/data/f1gp'
 SOURCE = ROOT/'whdload/F1GP.s'
 LENGTH = {'PL_L': 4, 'PL_W': 2, 'PL_B': 1, 'PL_P': 6, 'PL_PS': 6, 'PL_R': 2}
-LISTS = ('patch_582992', 'patch_582992_options', 'patch_582992_clock')
+LISTS = ('patch_582992', 'patch_582992_options', 'patch_582992_clock', 'patch_582992_corner20', 'patch_582992_corner')
 ENTRY = 0x88e                    # the stock entry JMP's target
 
 

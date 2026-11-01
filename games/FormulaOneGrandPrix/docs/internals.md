@@ -3336,8 +3336,10 @@ the 030: the mean lap after the standing start is 104.2–110.9 s at the stock s
 scale the speed factor (the base h0+$29A7E of each computer car's factor +$BE, which
 scales its cornering and target-speed terms) by 1.0653 at 20 fps. Factors from 1.0 to
 1.25 left the laps at 117.3–119.7 s at 20 Hz, although at the stock step 1.25 makes them
-8.4% faster (F6), so the slave keeps the factor as the file sets it, as F1GP-Ed does by
-default. Recovering the pace needs H2's audit of the per-tick terms.
+8.4% faster (F6): the factor raises the target speed, which the cars no longer reach. The
+cause is a cornering loss the game takes every update (H2,
+[cornering loss](#h2-the-computer-cars-cornering-loss--complete)); the slave now scales it
+with the 20 Hz step and keeps the factor as the file sets it.
 
 ### F5 edited-file checks — complete
 
@@ -3474,3 +3476,67 @@ B4's gate passes.
 **Left out.** The wet reduction and the risk factors: the game's wet flag and the risk
 factors' read sites are not known. GPPatch, PatchF1GP's other fixes and f1gp.library's
 fixes were not done.
+
+## Finer simulation (H)
+
+### H2 the computer cars' cornering loss — complete
+
+**The cause.** The computer cars' track-driven speed update (h0+$2AF6C–$2B3A0) is scaled
+by the step everywhere but one place:
+- the wanted change is the target speed `+$70` (the segment's `+$2C` and the car's term
+  h0+$25EEE) minus the speed `+$10`, or a traffic change when the `+$65` flags are set
+  (never set in a Quick Race);
+- acceleration and braking come from speed-indexed tables, h0+$1BE5C and h0+$1C12C,
+  that h0+$2C610–$2C6EA builds at each step as force × step, clamped to the wanted
+  change; full-throttle `+$72` at a given speed is the same a second at 8 and 20 Hz;
+- the steering, lateral and traffic constants h0+$26EEC–$26EFF are h0+$26ED8's times the
+  step (h0+$348BA), as are h0+$3A962–$3A96A; `+$76`, the distance a tick, is the mean
+  speed times the step (h0+$2B398);
+- the slope and airborne helpers (h0+$2BD9C–$2BF2A) divide by the step (h0+$2BE70,
+  h0+$2BF14).
+
+The exception, h0+$2B352–$2B388, runs after the speed update: the heading change from the
+car's segment to the next (`$2E(a6) − (a6)`, plus the change of the segments' `+$18`
+unless car `+$18` bit 4 is set), when it is 4 or more, times the speed, ÷ 65536, is taken
+from the speed every update. A car makes 65536 ÷ (speed × step) updates on a segment, so a
+corner's loss grows as 1 ÷ step.
+
+**Measured** (`tools/h2_corner.py`, whole Quick Races at Silverstone on the 030, VERIFY
+build): the part of each tick's change that `+$72` does not record is the loss, 261 a
+car-second at the stock step, 620 at 20 Hz (2.4 times) and 360 at the 2002 datafiles'
+6750 (1.4 times). The cars use more throttle at 20 Hz (+767 against +489) and brake less,
+but the corner exits fall 15–25% and the top speeds 4–10%.
+
+**The option.** `h2_loss` replaces the multiply at h0+$2B37A with the change × speed ×
+step ÷ 8192 (the stock step keeps the native loss exactly). `h2_corner` applies it with
+the 20 Hz step (`CUSTOM2` bit 9, with the clock) unless bit 13, or at the file's step
+with bit 12 (the native pacer included). The two patch lists hook the same range under
+their own gates; B4's audit now accepts a range declared again as such an alternative
+and F5 sums it once.
+
+| Run | Loss a car-second | Median lap after the first |
+|---|---:|---:|
+| stock step | 261 | 105.52 s |
+| stock step, bit 12 | 261 | 105.52 s (every tick identical) |
+| 20 Hz, native (bit 13) | 620 | 114.31 s (+8.3%) |
+| 20 Hz | 266 | 103.90 s (−1.5%) |
+| 6750, native | 360 | 105.85 s (+0.3%) |
+| 6750, bit 12 | 272 | 105.27 s (−0.2%) |
+
+The earlier scratch pair at 20 Hz repeats it (115.03 s native, 103.95 s scaled). With the
+loss scaled, the loss a second at each speed is the stock step's at both steps. The mean
+lap moves several per cent from race to race with its events (104.2–113.8 s at the stock
+step), so the median is the measure. At 6750 the native loss costs less than that spread.
+B4's gate passes.
+
+**Not audited:** the explicit-pose physics (velocity components +$30/+$34, h0+$25F4E) and
+the player's car (h0+$359BA, h0+$37506), so F1GP-Ed's report of the player's car
+spinning in long races at 20–25 fps is not traced. Only Silverstone was measured.
+F1GP-Ed's own speed-factor correction at 20 fps (1.065×) now overcorrects with the option.
+
+### H1 per-field steering preview — closed, not worked
+
+A per-field preview needs a copy of the player's physics without side effects (the RNG,
+sound, collisions and lap state it writes), which does not exist. The 20 Hz step, with the
+cornering loss scaled, updates the world, the player's steering included, every 50 ms
+instead of 125 ms without one.

@@ -21,6 +21,7 @@ def main():
         'malformed annotation':source.replace('PERF_RANGE h0:','PERF_RANGE h:'),
         'extra unannotated hook':source.replace('        PL_ENDIF','        PL_PS $3c9d8,verify_pacer\n        PL_ENDIF'),
         'orphan annotation':source.replace('        PL_PS $3c9d2,verify_pacer',''),
+        'partly overlapping range':source.replace('; PERF_RANGE h0:2b37a 6 custom=2 bit=12','; PERF_RANGE h0:2b37c 6 custom=2 bit=12').replace('PL_PS $2b37a,h2_loss\n        PL_ENDIF\n        PL_END\n        ENDC','PL_PS $2b37c,h2_loss\n        PL_ENDIF\n        PL_END\n        ENDC'),
         'empty inventory':re.sub(r'; PERF_RANGE[^\n]+\n\s*PL_(?:P(?:S)?|NOP|R)[^\n]+', '', source),
     }
     for name,text in bad_sources.items():

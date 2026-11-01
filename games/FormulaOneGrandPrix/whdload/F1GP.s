@@ -66,6 +66,8 @@ slv_config
         dc.b 'C2:X:Developer - indirect hunk 2 code in fast RAM:10;'
         dc.b 'C2:X:Developer - 20 Hz world step (not the file',$27,'s):9;'
         dc.b 'C2:X:Developer - local speed factors (F1GP-Ed.f1gp):11;'
+        dc.b 'C2:X:Developer - AI cornering loss a second (file',$27,'s rate):12;'
+        dc.b 'C2:X:Developer - native AI cornering loss at 20 Hz:13;'
         dc.b 'C3:X:Ceiling - no pacer wait:0;'
         dc.b 'C3:X:Ceiling - no polygon fill:1;'
         dc.b 'C4:X:Ceiling - no preference notifications:0;'
@@ -227,8 +229,9 @@ patch_game
         move.l (_attnflags,pc),d0
         btst #0,d0            ; AFF_68010: any CPU above the 68000
         bne.s .clock
+        moveq #0,d1
         btst #2,(cache_options+3,pc)
-        beq.s .patched
+        beq.s .corner
 .clock
         lea (patch_582992_clock,pc),a0
         move.l d7,a1
@@ -237,6 +240,8 @@ patch_game
         bsr e3_reserve
         bsr e4_reserve
         bsr f3_step
+.corner
+        bsr h2_corner
 .patched
         ENDC
         bsr restore_names
@@ -515,6 +520,7 @@ world_clock_take
 ; guide suggests scaling (h0+$29A7E) does not recover it (internals, F3).
 F3_STEP = 3276
 f3_step
+        moveq #0,d1
         btst #1,(cache_options+3,pc)
         beq.s .done
         btst #1,(cache_options+2,pc)    ; bit 9
@@ -529,7 +535,50 @@ f3_step
         move.w #F3_STEP,(a0)+
         move.w #F3_STEP,(a0)
         move.l (sp)+,a0
+        moveq #1,d1
 .done
+        rts
+
+; H2: the computer cars' cornering loss at h0+$2B37A, |heading change to the next segment|
+; x speed >> 16 taken from the speed every update, applies 65536/step times a second, so
+; finer steps slow them in corners (F3: 10-14% slower laps at 20 Hz). h2_loss scales it by step / 8192:
+; the stock step keeps it exactly. On with the 20 Hz step (D1 set by f3_step) unless bit 13;
+; at the file's step with bit 12.
+h2_corner
+        movem.l d0-d1/a0-a2,-(sp)
+        lea (patch_582992_corner,pc),a0
+        tst.w d1
+        beq.s .patch
+        lea (patch_582992_corner20,pc),a0
+        btst #5,(cache_options+2,pc)    ; bit 13
+        bne.s .done
+.patch
+        move.l d7,a1
+        move.l (_resload,pc),a2
+        jsr (resload_PatchSeg,a2)
+.done
+        movem.l (sp)+,d0-d1/a0-a2
+        rts
+; Replaces MULS.W ($10,A0),D0 and SWAP D0 (D0 the heading change, 4 or more): the high
+; word of change x speed x step / 8192. A product beyond 16 bits after the shift (a
+; change of about 18000 at top speed, not seen) keeps the native loss.
+h2_loss
+        muls.w ($10,a0),d0
+        asr.l #8,d0
+        asr.l #5,d0
+        cmp.l #$7fff,d0
+        bgt.s .native
+        move.l a1,-(sp)
+        movea.l (c2_h0,pc),a1
+        adda.l #$34366,a1
+        muls.w (a1),d0
+        movea.l (sp)+,a1
+        swap d0
+        rts
+.native
+        asl.l #8,d0
+        asl.l #5,d0
+        swap d0
         rts
 
 ; F5: Z set if every optional hook site (f5_sites, from tools/f5_sites.py) holds the
@@ -4937,6 +4986,22 @@ patch_582992_clock
         PL_PS $996ce,d10_pit_b
         ; PERF_RANGE h2:2a38a 6 custom=2 bit=1 variant=582992
         PL_PS $9971e,d10_pit_c
+        PL_ENDIF
+        PL_END
+; H2: h2_corner applies one: with the 20 Hz step (bit 9) unless bit 13, or bit 12's at the
+; file's step.
+patch_582992_corner20
+        PL_START
+        PL_IFC2X 9
+        ; PERF_RANGE h0:2b37a 6 custom=2 bit=9 variant=582992
+        PL_PS $2b37a,h2_loss
+        PL_ENDIF
+        PL_END
+patch_582992_corner
+        PL_START
+        PL_IFC2X 12
+        ; PERF_RANGE h0:2b37a 6 custom=2 bit=12 variant=582992
+        PL_PS $2b37a,h2_loss
         PL_ENDIF
         PL_END
         ENDC

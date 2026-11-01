@@ -74,8 +74,14 @@ def ranges(source):
     options = {tuple(map(int, pair)) for pair in re.findall(r'C([1-5]):X:[^;\n]+:(\d+);', source)}
     if any((r['custom'], r['bit']) not in options for r in result):
         raise ValueError('hook bit missing from slv_config')
-    occupied = set()
+    # The same range may be declared again, under another gate, as an alternative hook of
+    # another patch list (the slave applies one of them); any other overlap is an error.
+    occupied, declared = set(), set()
     for r in result:
+        whole = r['variant'],r['hunk'],r['offset'],r['size']
+        if whole in declared:
+            continue
+        declared.add(whole)
         for off in range(r['offset'],r['offset']+r['size']):
             key = r['variant'],r['hunk'],off
             if key in occupied:
