@@ -82,7 +82,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$7ffff,(a0)
+	move.l	#$fffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -312,6 +312,16 @@ _hotcode
 	move.w	#($57c68-$57380)/2-1,d0
 .copy2	move.w	(a0)+,(a1)+
 	dbra	d0,.copy2
+; F4 (Custom1 bit 19): BFFFO finds the log conversion's leading bit in the copy.
+	btst	#3,(_custom1+1,pc)
+	beq.b	.entries
+	lea	(_f4code,pc),a0
+	lea	($4ee88-$4ede4,a3),a1
+	moveq	#(_f4end-_f4code)/2-1,d0
+.copy4	move.w	(a0)+,(a1)+
+	dbra	d0,.copy4
+	move.b	#_f4word-_f4code+4,($4ee83-$4ede4,a3)	;$4EE76's bra.s
+.entries
 	lea	(_hotentries,pc),a0
 .next	move.l	(a0)+,d0
 	beq.b	.done
@@ -343,6 +353,10 @@ _hotentries
 	dc.l	$57914
 	dc.w	$4b2e2-$4b134+$57914-$57380
 	dc.l	0
+
+	machine	68020
+	INCLUDE	"whdload/log-f4.i"
+	machine	68000
 
 ; F3: CPU-only projection state, line masks and row offsets. Use the unused tail of
 ; M2's page-rounded allocation; the native display pointer stays in chip.

@@ -106,6 +106,7 @@ Bit 15 fixes the cached polygon clipping limit on 68040/060 (R5 below).
 Bit 16 includes room-local XYZ in P4 camera interpolation (P5 below).
 Bit 17 extends bit 9 to the remaining hot code and removes M1 entry hops (F2 below).
 Bit 18 moves projection state and drawing lookup tables to fast RAM (F3 below).
+Bit 19 finds the log conversion's leading bit with `bfffo` in M1's copy (F4 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -1415,7 +1416,49 @@ flight, lifts and release play pass. All 167 walking restore hashes pass in chip
 copied code and new data; transport checks pass 188 surface-flight, 187 space-flight
 and 450 lift restores. Options-off release and shipped each give 37 A500 frames /
 500 fields. Input verification and original/release/VERIFY builds pass. Enhanced
-framerate includes bit 18 (`$7FFFF`); next is F4.
+framerate includes bit 18 (`$7FFFF`).
+
+### F4: log conversion with BFFFO
+
+Custom1 bit 19, with M1's copy (68020+, real fast RAM), replaces the compare tree that
+finds the leading bit in the log conversion (Disk.1 `$4EE88..$4EF91`) with `bfffo`
+(`whdload/log-f4.i`). The `$4EE76` word entry's `bra.s` at `$4EE82` is retargeted to the new
+word path; `$4EE84` still falls through into `$4EE88`. Results match the original exactly:
+d1 (exponent in the high word, twice the 12-bit mantissa below, negated for negative input),
+d6 (the input), d7 (the exponent; its high word is preserved below `$10000`, as the
+original's `clr.w d7`) and all condition codes including X. `tools/log_harness.py` runs the
+original Disk.1 bytes and the patched copy side by side under Unicorn (68020): identical
+for all 2^32 `$4EE88` inputs, all 2^28 `$4EE84` inputs and every `$4EE76` word with 256
+high-word patterns, with varied starting d6, d7 and flags. Six deliberate mutations
+(d7 high word, sign test, shift kind, mantissa shift, zero result, X flag) are each detected.
+
+Same VERIFY build/session, Custom1 `524287 → 1048575`, two exact 500-field comparisons
+per setup (both runs identical):
+
+| Setup | F4 off fps | F4 on fps |
+| --- | ---: | ---: |
+| A500 1.5 MB slow | 4.10 | 4.10 |
+| 020 fast | 13.50 | 13.70 |
+| Reference 030/50 | 28.80 | 29.60 |
+| Existing 040-25 emulator cell | 26.50 | 26.90 |
+
+The 020 instruction profile (standard route) prices the three entries at 54,023 → 34,348
+cycles per frame (`$4EE84` 37,767 → 24,012, `$4EE88` 12,321 → 7,663, `$4EE76`
+3,935 → 2,673); main 3D falls 332,834 → 313,422.
+
+Reference 030 beam probes over fields 175..500: mean frame work **20.70 → 19.84 ms**,
+worst **24.64 → 22.55 ms**; 120 → 113 of the measured intervals exceed 20 ms. Main 3D is
+6.80 → 6.50 ms/frame; scene setup `$5765E` 1.94 → 1.90, `$5AFAA` 1.76 → 1.72, `$593A6`
+1.06 → 1.05, clear 0.36 unchanged. PER_FRAME cadence changes from 82 one-field /
+207 two-field intervals to 97 / 199, each with one three-field startup interval. The mean
+now fits a field, but most frames still do not: steady 50 fps needs F5's chip-traffic work.
+
+Native walking/turning rates remain 6/2 units per elapsed logic field on 020/030 (one
+collision stop each). Still images are pixel-identical off/on; walking, turning, room
+return and release play screenshots show intact drawing. 173 walking restore hashes
+pass. Options-off release and shipped each give 37 A500 frames / 500 fields. Enhanced
+framerate includes bit 19 (`$FFFFF`). Evidence: `tmp/f4/final/`, `tmp/log-harness/`;
+the 040 figures remain emulator counts, not hardware predictions.
 
 ### WHDLoad launch configuration
 

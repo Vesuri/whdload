@@ -142,8 +142,16 @@ FPS, repeated twice: A500 4.10 → 4.10, 020-fast 13.30 → 13.50, reference 030
 The moved blocks lose about 400 chip reads and 16.5 writes per field on the 020.
 Native speed, restore hashes, play, identical still images and options-off checks
 pass. Enhanced framerate includes bit 18. Low-word-addressed/shared/model data
-need broader relocation in F5. Next: F4 (log conversion). See
-[F3](internals.md#f3-hot-renderer-data-in-fast-ram) and the
+need broader relocation in F5. See [F3](internals.md#f3-hot-renderer-data-in-fast-ram).
+
+F4 is complete: `bfffo` replaces the log conversion's compare tree in M1's copy, with
+results identical to the original for every input (`tools/log_harness.py`, Unicorn).
+Same-build off/on FPS, repeated twice: A500 4.10 → 4.10, 020-fast 13.50 → 13.70,
+reference 030/50 28.80 → 29.60, 040 emulator 26.50 → 26.90. Mean 030 frame work falls
+20.70 → 19.84 ms, worst 24.64 → 22.55 ms; 113 of 210 intervals still exceed a field.
+Enhanced framerate includes bit 19. Next: F5 needs the user's decision (reassembling
+the renderer to move game variables and render scratch). See
+[F4](internals.md#f4-log-conversion-with-bfffo) and the
 [plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step).
 
 The post-P5 68040 investigation measures 24.80 fps: steady frames spend about

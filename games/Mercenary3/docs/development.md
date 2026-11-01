@@ -157,6 +157,11 @@ uses). Example, reference 030/50:
 `AMIGA_SETUP=a1200-030 SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM1=131071' SLAVE_LST=tmp/f1/slave.lst PROBE_FIELDS=175:500 python3 tools/beam_profile.py tmp/f1/top.json 577be 5765e 5afaa 593a6 5e840 5e458 _savepresent _restorepresent`
 (about 20 s per run).
 
+`tools/log_harness.py` checks F4's `bfffo` log conversion (`whdload/log-f4.i`) against the
+original Disk.1 code under the shared Unicorn: every input of the `$4EE88`, `$4EE84` and
+`$4EE76` entries, comparing d1, d6, d7 and flags (about three minutes; `--quick` samples
+1/257). Source `amiga/env.sh` first.
+
 The `VERIFY` build's `Custom2` makes drawing routines return at once (see
 [the frame budget](internals.md#frame-budget-toward-50-fps)): compare `fps.py` runs with
 and without it to price drawing on the 030/040/060, whose cores record no instruction

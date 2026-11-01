@@ -227,7 +227,7 @@ about 21,000 accesses per frame, 6..12 ms. Steps are in order of measured value 
 For every step, on the reference 030/50: `beam_profile.py` on the routines the step changes,
 before and after, and the publication intervals (roots `5e460`, as in F0); `fps.py` and
 `PER_FRAME=1` cadence. On the 020: `bus_audit.py` where the step targets chip traffic. New
-behaviour takes the next free `Custom1` bit (19 up); add it to the release mask (`$7FFFF`)
+behaviour takes the next free `Custom1` bit (20 up); add it to the release mask (`$FFFFF`)
 once accepted.
 
 **F0. ✓ Budget.** `render_profile.py`, `beam_profile.py`, `bus_audit.py`'s place table,
@@ -280,10 +280,13 @@ is an absolute long operand or a long immediate (patchable in chip code and copi
   below the estimated saving. Accepted as bit 18; see
   [F3 results](internals.md#f3-hot-renderer-data-in-fast-ram).
 
-**F4. Log conversion with `bfffo`** (68020+). `$4EE84`/`$4EE88` find the leading bit with a
+**F4. ✓ Log conversion with `bfffo`** (68020+). `$4EE84`/`$4EE88` find the leading bit with a
 compare tree (5.5% of the 020's cycles). Use `bfffo` in the fast copy, giving the same shift
 and exponent. Check: the two routines agree for every 28-bit input (host harness), then
 play and screenshots. Expected: 0.5..1 ms on the 030.
+- Result: `tools/log_harness.py` finds d1, d6, d7 and flags identical for every input of
+  all three entries. Mean 030 frame work 20.70 → 19.84 ms, worst 24.64 → 22.55; 030 FPS
+  28.80 → 29.60. Accepted as bit 19; see [F4 results](internals.md#f4-log-conversion-with-bfffo).
 
 **F5. (U) Game variables and render scratch in fast RAM.** Their 1,943 accesses per field
 (variables 1,135, scratch 808) and the retained presentation copies
@@ -345,19 +348,20 @@ without it. Real cache behaviour and 040/060 hardware performance remain unverif
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
 - [x] R5
 - [x] X1
-- [x] F0 [x] F1 (not retained) [x] F2 [x] F3 [ ] F4 [ ] F5 (U) [ ] F6
+- [x] F0 [x] F1 (not retained) [x] F2 [x] F3 [x] F4 [ ] F5 (U) [ ] F6
 
 P4 and P5 address the presentation defects reported after the original plan completed.
-Phase F continues toward one-field frames on the 030/50; next: F4.
+Phase F continues toward one-field frames on the 030/50; next: the user's F5 decision.
 Hardware validation remains unavailable, outside X1.
 
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–18.
+  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–19.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `render_profile.py`, `beam_profile.py`,
+  `log_harness.py` (F4 against the original, every input),
   `presentation_check.py` (VERIFY restore hashes), the
   `VERIFY` build's `Custom2` drawing bypass.
 - The game-time model and the renderer's inputs and writes ([internals](internals.md)).
