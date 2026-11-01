@@ -68,6 +68,9 @@ Version 2.0b (31.10.2026) by Vesuri (beta):
   same at an F1GP-Ed file's own frame rate, where the effect is small
   (under 1% a lap at the 1995-2002 datafiles' rate). F1GP-Ed's suggested
   speed factor correction for 20 fps is no longer needed with it
+- Fixed: at finer world steps (20 Hz, or F1GP-Ed's 25 fps) a car carrying
+  a lot of fuel spun by itself, as F1GP-Ed's guide warns for long races.
+  Always on; the original rate is unaffected
 - "Developer - local speed factors" (off in the supplied icons) gives the
   computer cars the per-circuit Local Speed Factors of an F1GP-Ed datafile
   saved as F1GP-Ed.f1gp in the data directory, as F1GP-Ed's memory patch

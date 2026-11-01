@@ -1351,6 +1351,17 @@ python3 tools/f3_pace.py off=tmp/f6/s-off gb20480=tmp/f6/s-on-gb20480 --out tmp/
 python3 tools/slave_gate.py --prefix f6-
 ```
 
+### H3 slip limit
+
+`h3_slip.py` runs the game's per-car update in unicorn (a 68030) from the A3 green capture,
+natively and with the built slave's `h3_slip`; it needs unicorn in a scratch environment:
+
+```sh
+python3 -m venv tmp/h3/venv && tmp/h3/venv/bin/pip install unicorn
+tmp/h3/venv/bin/python tools/h3_slip.py tmp/a3/green --slave tmp/build/F1GP.Slave --out tmp/h3/slip.json
+python3 tools/slave_gate.py --prefix h3-
+```
+
 ### H2 cornering loss
 
 `--corner` sets `CUSTOM2` bit 12 (the loss a second at the file's step), `--native-corner`

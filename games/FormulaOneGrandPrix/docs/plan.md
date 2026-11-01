@@ -561,7 +561,7 @@ The game's own variable step gives a finer world step that F1GP-Ed players have 
 decades; F3 offers it without F1GP-Ed (`CUSTOM2` bit 9, 20 Hz). Its measured side effect was
 computer cars 10–14% slower a lap at 20 Hz (F3), which F1GP-Ed's speed-factor scaling
 does not recover; F1GP-Ed's guide also reports spins in long races at 20–25 fps.
-*Closed* (user decision): H2 is complete, H1 closed without work.
+*Closed* (user decision): H2 and H3 are complete, H1 closed without work.
 
 **H1 Per-field steering preview.** Preview the native player motion every field from the
 current input and spread it over the tick (Gunship `TIMING_DESIGN.md`), so steering
@@ -577,8 +577,14 @@ damping, thresholds, timers, RNG draws, per-quantity scaling (AmigaXDev
 computer cars' track-driven update, only the cornering loss at h0+$2B352 is taken per
 update rather than per second. Scaled by the step (with 20 Hz unless `CUSTOM2` bit 13; at
 the file's step with bit 12), the 20 Hz median lap is 1.5% faster than the stock step's
-instead of 8–9% slower, and the stock step is unchanged. The explicit-pose and player
-physics were not audited.
+instead of 8–9% slower, and the stock step is unchanged.
+
+**H3 Explicit-pose and player physics.** The same audit of h0+$36922.
+*Complete* ([evidence](internals.md#h3-the-players-slip-limit--complete)): its terms scale
+with the step, but the force limiting the slip (mass × 32768 ÷ step) overflows a signed word
+from a mass of one step, which a full tank reaches at 20 Hz and F1GP-Ed's 25 fps and spins
+the player's car. Held at $7FFF in every build (user decision); the result is unchanged
+wherever it fits.
 
 ## Order and critical path
 

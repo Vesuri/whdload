@@ -482,8 +482,8 @@ branch at `h0+$1288`) and bit 1 (RTS at polygon filler `h0+$1F388`). `CUSTOM4` b
 suppresses preference-change notifications during startup to keep the 030 comparison's
 allocation stable. These are developer measurement options; native simulation coupling
 is retained, so no-wait intentionally speeds up the game. Release omits all three
-options and retains its SHA-256:
-`93dde23f76df6dab0ca3beea3507e29e25fb5e6a6bb3b06dab2e8697c4c75495`.
+options (current SHA-256, with H3's fix:
+`b17068796c97895e34d3e08f4a253309b754e53973aa5e80cc01a3325ea6bfe1`).
 
 The filler walks edge lists, loads the back buffer through `h0+$1252`, and writes four
 bitplanes. A3 classifies its scratch as presentation. All-off gates for the current
@@ -1303,7 +1303,7 @@ fields' game time:
 When the machine keeps up the game stays near real time (about 3% fast, like the stock
 clock); when it cannot, the game slows down. F1GP-Ed's guide records the side effects of
 smaller steps: computer cars slower (its correction is 1.065× at 20 fps), the player's
-car spinning in long races at 20–25 fps (presumably an overflow; not traced), and replays
+car spinning in long races at 20–25 fps (an overflow, H3), and replays
 and saves valid only at the rate they were made with. F1 found that F1GP-Ed writes the
 half step `h0+$34362` and the three step words `h0+$34364–$34369` (not `h0+$34360`, a
 clamp), with the pacer minimum and cadence tables; F3 runs the step in real time.
@@ -3529,10 +3529,66 @@ lap moves several per cent from race to race with its events (104.2–113.8 s at
 step), so the median is the measure. At 6750 the native loss costs less than that spread.
 B4's gate passes.
 
-**Not audited:** the explicit-pose physics (velocity components +$30/+$34, h0+$25F4E) and
-the player's car (h0+$359BA, h0+$37506), so F1GP-Ed's report of the player's car
-spinning in long races at 20–25 fps is not traced. Only Silverstone was measured.
-F1GP-Ed's own speed-factor correction at 20 fps (1.065×) now overcorrects with the option.
+Only Silverstone was measured. F1GP-Ed's own speed-factor correction at 20 fps (1.065×)
+now overcorrects with the option. The explicit-pose and player physics are H3's.
+
+### H3 the player's slip limit — complete
+
+**The physics.** h0+$36922 is the explicit (force-driven) car physics: the player's car
+runs it twice a tick with the half step h0+$34362 (h0+$2AD3E–$2ADCE), the computer cars in
+the explicit pose (`+$7E` bit 2) once with the step h0+$34364. Its step-dependent terms
+scale: the integrator h0+$374FE adds acceleration × step to the velocity `+$30/+$34` and
+yaw `+$38` and integrates the position and heading with the mean velocity; the suspension
+h0+$34B4E, the engine revs (h0+$36D58–$36E8E) and the sideways scrub use the step; the
+drag coefficient `+$58` is built × step at setup (h0+$34830) and divided by it again at
+h0+$36A4C.
+
+**The overflow.** h0+$369B8–$369C8 divides mass (`+$44`) × 32768 by the step into
+h0+$3A8CA: the force that stops a wheel pair's slip in one step, with which the tyre forces
+are limited (h0+$370A2, h0+$370B6 and the normaliser h0+$37128, `MULS.W`). It is read as a
+signed word, so from a mass of one step it is negative and the limit pushes the slip
+further: the car spins and gains speed with no input. The mass is 1254 (h0+$341BC) plus the
+fuel, the circuit's full-race load h2+$1FB88 (from its track file; 306 at Monaco to 396 at
+Imola) scaled by the distance left (h0+$2AAD8; h0+$2A25E for the computer cars at the
+start), so 1560–1650 at the start of a full-length race:
+
+| Step | Player's half step | Spins |
+|---|---:|---|
+| stock 8192, the 2002 datafiles' 6750 | 4096, 3375 | never |
+| F1GP-Ed 20 fps NTSC, 3375 | 1687 | never |
+| F3's 20 Hz, 3276 | 1638 | full-length races at Magny-Cours, Adelaide (384), Hockenheim (386), Monza (393) and Imola (396), while the fuel is above 384 (up to about 2 laps at Imola) |
+| F1GP-Ed 25 fps PAL, 2700 | 1350 | from about 25–30% of race distance on any circuit, until the fuel falls below 96 |
+
+The explicit-pose computer cars would need a mass of one full step (3276 at 20 Hz). This is
+F1GP-Ed's report of the player's car spinning in long races at 20–25 fps.
+
+**The fix.** `h3_slip` replaces the `DIVU.W` at h0+$369C2 and holds the quotient at $7FFF
+(also when the division overflows, from twice a step). Below that the result is the
+native one, so it is on in every build (the mandatory patch list of the 582992 file; the
+582988 and 582780 files keep the native code, their sites not located). At the stock step
+it changes nothing below a mass of 4096. F1GP-Ed never writes the site (F2's saved files).
+
+**Measured** (`tools/h3_slip.py`, the game's own h0+$2AC14 run in a 68030 emulator from the
+A3 green capture): four updates each give the next snapshot exactly, and the step's setup
+values rebuilt at the stock step give the snapshot's own. From frame 47, the player's car
+coasting at 1606 after the start collision, 6 s of game time at each step, the mass written
+before each tick (largest slip, heading `+$0` against body `+$1A`, and final speed):
+
+| Step | Mass | Native | `h3_slip` |
+|---:|---:|---|---|
+| 8192 | 1272, 1650, 4095 | 40, 19, 775 | identical |
+| 8192 | 4096 | 32589 (speed 1827) | 774 (856) |
+| 6750 | 1650 | 17 | identical |
+| 3375 | 1650, 1686 | 51, 50 | identical |
+| 3375 | 1687 | 7516 (181) | 50 (766) |
+| 3276 | 1272, 1612, 1637 | 65, 69, 68 | identical |
+| 3276 | 1638, 1650 | 10704 (233), 8985 (2545) | 68 (768), 67 (766) |
+| 2700 | 1272, 1349 | 151, 148 | identical |
+| 2700 | 1350, 1612, 1650 | 9969 (311), 7659 (2584), 9855 (365) | 148, 149, 149 (768, 768, 764) |
+
+Coasting after 3 s settled loses 136.0, 135.9, 136.0 and 136.2 a second at 8192, 6750, 3276
+and 2700. B4's gate passes. Not covered: steering, throttle and braking (the capture's car
+has no input), kerbs and grass.
 
 ### H1 per-field steering preview — closed, not worked
 

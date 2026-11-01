@@ -266,6 +266,23 @@ wrong_version
         move.l (_resload,pc),a2
         jmp (resload_Abort,a2)
 
+; H3: replaces DIVU.W h0+$3A8A4,D0 at h0+$369C2 in the physics h0+$36922 (the player's
+; half steps, the explicit-pose cars' steps). Mass x 32768 / step is the force that
+; stops the slip in one step, read as a signed word at h0+$370A2 and h0+$3713C; from
+; a mass of one step it turned negative and spun the car (a full tank at 20 and 25 fps).
+; It is held at $7FFF; below that, D0 is the native quotient and remainder.
+h3_slip
+        move.l a0,-(sp)
+        movea.l (4,sp),a0               ; return address h0+$369C8
+        divu.w ($3a8a4-$369c8,a0),d0
+        bvs.s .cap
+        tst.w d0
+        bpl.s .done
+.cap
+        move.w #$7fff,d0
+.done
+        movea.l (sp)+,a0
+        rts
 file_size
         movem.l d1/a0-a2,-(sp)
         move.l (_resload,pc),a2
@@ -4819,7 +4836,7 @@ d3_saved ds.b D3_SIZE
 d3_staged ds.b D3_SIZE
         ENDC
 
-; BASELINE_PATCHES_BEGIN: mandatory B3 loader patches, never feature-gated.
+; BASELINE_PATCHES_BEGIN: mandatory B3 loader patches and H3's fix, never feature-gated.
 patch_582992
         PL_START
         PL_L $982,$22116000
@@ -4828,6 +4845,7 @@ patch_582992
         PL_B $a79ce,$ff
         PL_L $a7a42,'save'
         PL_W $a7a46,$7300
+        PL_PS $369c2,h3_slip
         PL_END
         ; BASELINE_PATCHES_END
         IFNE DEVELOPER
