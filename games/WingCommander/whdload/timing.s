@@ -19,7 +19,23 @@ timing_patchseg:
         move.w  ccr,-(sp)
         move.l  slave+$1de4(pc),d0
         cmpi.l  #3,d0
+        beq.s   .enhanced
+        ifne BUFFERED
+        ; English Psygore's modes keep their game, apart from the guarded
+        ; waypoint marker order. A changed site keeps the original order.
+        tst.l   d0
         bne.w   .done
+        move.l  d7,d0
+        lsl.l   #2,d0
+        addq.l  #4,d0
+        movea.l d0,a0
+        lea     timing_game(pc),a1
+        move.l  a0,(a1)
+        bsr.l   waypoint_original_install
+        jsr     32(a2)
+        endif
+        bra.w   .done
+.enhanced:
         move.l  d7,d0
         lsl.l   #2,d0
         addq.l  #4,d0

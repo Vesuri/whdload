@@ -41,8 +41,9 @@ def check(build, mutation=None):
         require(segment.count(old)==1,'mutation site missing')
         payload=payload[:start]+segment.replace(old,new)+payload[end:]
     results=[]
-    exact=[h for h in meta['hooks'] if h[1] in ('ocs_multiply','ocs_distance_ratio','ocs_radius','ocs_collision_pair')]
-    require(len(exact)==4,'exact hooks missing from build')
+    from ocs_memory_build import ALWAYS
+    exact=[h for h in meta['hooks'] if h[1] in ALWAYS]
+    require(len(exact)==len(ALWAYS),'always-on hooks missing from build')
     banks=((0x500000,4,'z2-fast'),(0x1000000,4,'high-fast'),
            (0xc00000,4,'slow-labelled-fast'),(0x80000,2,'chip'),
            (0x500000,0,'unmapped'),(0x500000,6,'chip-and-fast'),
@@ -94,7 +95,7 @@ def check(build, mutation=None):
                                 for at,label,opcode in meta['hooks']:
                                     require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
                             elif revision==0x1302 and corrupt!='exact':
-                                # Original mode: only the bit-exact E1 hooks.
+                                # Original mode: only the E1 shortcuts and waypoint marker order.
                                 after=bytearray(c.read(CODE,0x358c8))
                                 for at,label,opcode in exact:
                                     require(after[at:at+6]==word(opcode)+long(slave+sy[label]),'missing exact hook')

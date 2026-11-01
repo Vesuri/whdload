@@ -27,7 +27,7 @@ MODALS = ((0x872,10,'pause',0),(0xf56,8,'autopilot',0),
 
 def source(root, game):
     text=(root/'whdload/ocs_clock.s').read_text()
-    text+='\nWAYPOINT_ACTIVE equ ocs_clock_active\n'+(root/'whdload/waypoint_overlay.s').read_text()+'''
+    text+='\n'+(root/'whdload/waypoint_overlay.s').read_text()+'''
 waypoint_native_marker: jmp OCS_WAYPOINT
 waypoint_native_scene: bra.w ocs_clock_scene_draw
 '''

@@ -62,7 +62,8 @@ def check(build,variant,model):
       before=c.read(DATA,0xf5b8 if ocs else 0xfda0)
       c.run(draw)
       visible=view in (0,4) and sensor==5 and z>0
-      want=(['world','marker'] if enabled else ['marker','world']) if visible else ['world']
+      # The reorder is independent of the flight clock: every patched mode.
+      want=(['world','marker'] if patched else ['marker','world']) if visible else ['world']
       require(events==want,(patched,enabled,view,sensor,z,events,want))
       require(c.reg(8)==STACK+4 and c.reg(9)==1,'flight return ABI')
       # Only native draw_count changes in this isolated native composition.
@@ -71,7 +72,7 @@ def check(build,variant,model):
       require(bytes(after)==before,'marker moved gameplay data')
       rows.append((patched,enabled,view,sensor,z,scene_arg))
   return dict(model=model,cases=len(rows),original_marker_before_world=True,
-              enhanced_marker_after_world=True,native_visibility_retained=True,
+              patched_marker_after_world_any_clock=True,native_visibility_retained=True,
               scene_argument_retained=True,gameplay_data_unchanged=True)
  finally:c.close()
 

@@ -27,6 +27,8 @@ NATIVE={'OCS_CHIP_ALLOC':0x33b60,'OCS_REGISTER':0x33c8e,
 # E1 shortcuts that are bit-exact with native code; public builds install them
 # in every mode and on every CPU.
 EXACT=('ocs_multiply','ocs_distance_ratio','ocs_radius','ocs_collision_pair')
+# Installed on every path: bit-exact E1 shortcuts and the waypoint marker order.
+ALWAYS=EXACT+('waypoint_early','waypoint_scene')
 HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x324c0,'display_create_checked',0x4ef9),
        (0x31e1e,'ocs_source_allocate',0x4eb9),
@@ -342,8 +344,9 @@ view_probe_request: dc.l 0
     if public:
         text=text.replace(' move.l d7,d6\n',
                           ' bsr.w ocs_option_gate\n tst.l d0\n beq.w exact_install\n move.l d7,d6\n',1)
-        # Bit-exact E1 shortcuts run on every path, including 68000 and
-        # original mode. A guard mismatch keeps the untouched original game.
+        # Bit-exact E1 shortcuts and the waypoint marker order run on every
+        # path, including 68000 and original mode. A guard mismatch keeps the
+        # untouched original game.
         exact='''
 exact_install:
  move.l d7,d6
@@ -431,8 +434,8 @@ exact_hooks_done:
     guards='\nguards:\n'+''.join(guard_entry(off) for off,_,_ in hooks)+' dc.l -1\n'
     tables=guards+'\nhooks:\n'+''.join(f' dc.l ${off:x}\n dc.w ${op:x}\n dc.l {label}-slave\n' for off,label,op in hooks)+' dc.l -1\n'
     if public:
-        exact_hooks=[h for h in hooks if h[1] in EXACT]
-        require(len(exact_hooks)==len(EXACT),'missing exact hooks')
+        exact_hooks=[h for h in hooks if h[1] in ALWAYS]
+        require(len(exact_hooks)==len(ALWAYS),'missing always-on hooks')
         tables+='exact_guards:\n'+''.join(guard_entry(off) for off,_,_ in exact_hooks)+' dc.l -1\n'
         tables+='exact_hooks:\n'+''.join(f' dc.l ${off:x}\n dc.w ${op:x}\n dc.l {label}-slave\n' for off,label,op in exact_hooks)+' dc.l -1\n'
     tables+='native_fixups:\n'

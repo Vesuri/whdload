@@ -13,6 +13,10 @@ def source(root, buffered=False, *, variant):
         raise ValueError('changed English executable')
     offset, size, _ = v.HUNKS[0]
     code = game[offset:offset+size]
+    if buffered and variant == 'cd32':
+        for at, target in ((0x30c, 0x3766), (0x320, 0x294d4)):
+            if code[at:at+6] != struct.pack('>HI', 0x4eb9, target):
+                raise ValueError('changed waypoint call site')
     lines=[preamble(root,v.CPU),assembly_definitions(v),unit(root, 'timing', v.CPU),unit(root, 'timing_clock', v.CPU),unit(root, 'timing_player', v.CPU),unit(root, 'player_basis', v.CPU),unit(root, 'timing_input', v.CPU),unit(root, 'timing_presentation', v.CPU),unit(root, 'timing_scene', v.CPU),'timing_install:']
     if buffered:
         lines.insert(-1, '''EFFECT_LIST equ -4456
@@ -27,7 +31,7 @@ effect_raster:
  addi.l #$2ca3e,(sp)
  rts
 ''')
-        lines.insert(-1, 'WAYPOINT_ACTIVE equ timing_active\n'+(root/'whdload/waypoint_overlay.s').read_text()+'''
+        lines.insert(-1, (root/'whdload/waypoint_overlay.s').read_text()+'''
 waypoint_native_marker:
  move.l timing_game(pc),-(sp)
  addi.l #$3766,(sp)
@@ -35,6 +39,25 @@ waypoint_native_marker:
 waypoint_native_scene:
  move.l timing_game(pc),-(sp)
  addi.l #$294d4,(sp)
+ rts
+waypoint_original_install:
+ cmpi.w #$4eb9,$30c(a0)
+ bne.s .done
+ cmpi.w #$4eb9,$320(a0)
+ bne.s .done
+ move.l a0,d0
+ addi.l #$3766,d0
+ cmp.l $30e(a0),d0
+ bne.s .done
+ move.l a0,d0
+ addi.l #$294d4,d0
+ cmp.l $322(a0),d0
+ bne.s .done
+ lea waypoint_early(pc),a1
+ move.l a1,$30e(a0)
+ lea waypoint_scene(pc),a1
+ move.l a1,$322(a0)
+.done:
  rts
 ''')
         from opening_source import source as opening_source

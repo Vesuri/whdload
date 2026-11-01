@@ -8,7 +8,7 @@ from cd32_static import HunkReader
 from ocs_reconstruct import ROOT, require, guard_game
 from ocs_clock_source import NOPS, MODALS
 from ocs_prediction_source import NOPS as PREDICTION_NOPS
-from ocs_memory_build import EXACT
+from ocs_memory_build import ALWAYS
 
 
 def check(build, run, corrupt=False):
@@ -29,9 +29,10 @@ def check(build, run, corrupt=False):
                 for offset in offsets:
                     value=int.from_bytes(expected[offset:offset+4],'big')+r['hunks'][target]
                     expected[offset:offset+4]=(value & 0xffffffff).to_bytes(4,'big')
-    # Bit-exact E1 shortcuts are installed in every mode; all else stays original.
-    exact={off:(op,label) for off,label,op in b['hooks'] if label in EXACT}
-    require(len(exact)==len(EXACT),'exact hooks missing from build')
+    # E1 shortcuts and the waypoint marker order are installed in every mode;
+    # all else stays original.
+    exact={off:(op,label) for off,label,op in b['hooks'] if label in ALWAYS}
+    require(len(exact)==len(ALWAYS),'always-on hooks missing from build')
     for off,(op,label) in exact.items():
         expected[off:off+6]=op.to_bytes(2,'big')+(r['slave']+b['symbols'][label]).to_bytes(4,'big')
     windows=[(off,6) for off,_,_ in b['hooks']]

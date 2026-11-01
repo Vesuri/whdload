@@ -6922,15 +6922,16 @@ the enabled option, CPU flags identifying 68020+ and an Exec memory header with
 FAST set, CHIP clear and a nonempty physical Zorro II Fast or high-Fast bank.
 68000/68010, slow-only and unverified memory configurations never install the
 clock, prediction, input, converter or publication hooks. Every path installs
-the four bit-exact E1 arithmetic/collision hooks (see below).
+the four bit-exact E1 arithmetic/collision hooks (see below) and the two
+[waypoint marker order](#waypoint-marker-layering) hooks.
 
 Public slave hunk offsets: the existing `OS:$11c6` detour (file `$11e6`) calls
 startup at `$14a8` (file `$14c8`); the new gate is `$16b0` (file `$16d0`).
 Header `OS:$32` (file `$52`) selects the extended config at `$1724` (file `$1744`).
 All other original slave bytes are unchanged, including its cache requests and
 native wait helpers. The off path (`exact_install`) checks only the four E1
-sites, resolves native operands, writes those four hooks and flushes. It makes
-no allocation change and writes no other hook. A changed E1 site keeps the
+and two waypoint sites, resolves native operands, writes those six hooks and
+flushes. It makes no allocation change and writes no other hook. A changed site keeps the
 untouched original game instead of aborting, and a changed enhancement-only
 source window does not make original mode abort.
 Original game revision/CRC handling is still Psygore's responsibility.
@@ -6959,8 +6960,8 @@ Validation:
 - `tmp/ocs-public-options-accepted/report.json`: 1,680 native startup cases for
   option values, CPU flags, revision lists, corrupted hooks and valid/invalid,
   empty, Chip, slow, Zorro II and high-Fast memory lists. Off paths preserve the
-  caller ABI. Since the always-on E1 hooks below, English off paths change only
-  those four sites; other revisions keep the original bytes and unrelocated payload.
+  caller ABI. English off paths now change only the four E1 and two waypoint
+  sites; other revisions keep the original bytes and unrelocated payload.
   Option, CPU-mask and slow-bank mutations are rejected. Original slave bytes
   outside the two declared edits and generated icon artwork are checked.
 - `tmp/ocs-public-prediction-final2/report.json`: native pose, constructor,
@@ -7890,27 +7891,54 @@ H0 `030e` (file `033a`) → `34e0` (file `350c`), then `0322` (file `034e`)
 renderer at CD32 H0 `38b2` (file `38de`), OCS H0 `362c` (file `3658`).
 The user's CD32 screenshots show the nebula obscuring this white symbol.
 
-`waypoint_overlay.s` defers the early marker call only while the enhanced flight
-clock is active. The scene wrapper forwards the native word argument, completes
+`waypoint_overlay.s` defers the early marker call in every English mode,
+including Psygore's modes and the OCS original path. The scene wrapper forwards the native word argument, completes
 world drawing, then calls the unchanged marker routine while preserving the
 scene's register results. OCS retains its existing scene preparation versus
 sort/raster selection. Marker eligibility, camera projection, image frame,
-clipping and cockpit/HUD composition remain native. Original mode retains its
-original ordering; this is a presentation fix under the enhancements toggle.
+clipping and cockpit/HUD composition remain native. Only the drawing order
+changes, so it is not behind the enhancements toggle.
+
+CD32 English Psygore's modes (`CUSTOM1=0` after option translation) install only
+these two hooks from `timing_patchseg`, after checking both absolute calls and
+their relocated targets; a changed site keeps the original order and game. The
+German executable remains unpatched. The OCS original path installs them with
+the always-on E1 hooks under the same guard-or-keep-original rule. With the
+clock inactive, OCS reaches the native scene through `ocs_clock_scene_draw`'s
+existing native branch.
 
 The native CPU regression executes each original flight dispatcher and marker
 routine, including projection arithmetic. Explicit boundary stubs supply camera
 orientation and record drawing calls; graphics are not pixel-emulated here.
-Original and inactive controls draw marker→world; enhanced flight draws
-world→marker. Front/rear, other views, disabled sensor and behind-camera cases
+Unpatched controls draw marker→world; patched code draws world→marker
+with the flight clock either active or inactive. Front/rear, other views, disabled sensor and behind-camera cases
 retain native eligibility, both scene-argument values survive, and game data is
 unchanged apart from the native draw counter. The 432 cases pass on CD32
-020/040 and OCS 68000/020 models. CD32's eight installer/option cases, changed
-hook-operand rejection and OCS's 1680 option/hardware cases also pass. Reports
-are in `tmp/waypoint-cd32-check2`, `tmp/waypoint-ocs-check3`,
-`tmp/waypoint-cd32-install` and `tmp/waypoint-ocs-options`.
-This verifies native ordering and integration, not a fresh live visual overlap
-capture or hardware performance. No new live overlap capture was made.
+020/040 and OCS 68000/020 models. CD32's eight installer/option cases pass,
+including the two Psygore's-mode hooks; changed enhanced operands abort, and
+changed Psygore's-mode waypoint sites keep the original game. OCS's 2520
+option/hardware cases pass. Reports are in `tmp/waypoint-always-cd32-check`,
+`tmp/waypoint-always-ocs-check`, `tmp/waypoint-always-cd32-install3` and
+`tmp/waypoint-always-ocs-options`. OCS original-mode live boots (68020 with
+`CUSTOM5=0`, and 68000) reach the menu with all six always-on hooks in place:
+`tmp/waypoint-ocs-off-check.json` and `tmp/waypoint-ocs-000-check.json`. No OCS
+flight overlap was captured live.
+This verifies native ordering and integration, not hardware performance.
+
+A live CD32 overlap capture confirms the order on screen. The run uses the
+Nav-1 direct-flight fixture (`CUSTOM2=2 CUSTOM3=1 CUSTOM4=0`) on the default
+`a1200-fast` model (68EC020). Debugger memory writes select Tiger's Claw
+(nav index 3) and place the player at Nav 3 facing +z, slightly offset so the
+Claw marker projects onto the Nav 3 nebula. The first scene was reached by
+native autopilot from just before Nav 3.
+Before this change, Psygore's normal mode (`CUSTOM5=1`) let the nebula's pixels
+cover the marker. With enhancements (`CUSTOM5=0`), and now in Psygore's normal
+mode with the always-on hooks, the same placements draw the complete marker over
+the nebula; nine consecutive Psygore's-mode frames all show it. One frame taken
+as a comms message appeared showed no marker; that was not investigated. Writes in enhanced mode are repeated until they survive the
+renderer's prediction restore. The stock debugger stub has no memory-write
+packet; the capture used a local `tmp/` debugger copy with a diagnostic `M`
+handler. Screenshots are in `tmp/waypoint-repro-shots/`.
 
 ## Player cannon contacts with asteroid and mine fields
 

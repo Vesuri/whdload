@@ -67,7 +67,7 @@ def main():
                         want[off:off+width]=struct.pack('>HI',op,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
                     for off in (0x1de20,0x1de3c,0x1df50,0x1df6c):
                         want[off:off+6]=struct.pack('>HI',0x4eb9,s+sym['cinematic_background'])
-                    for off,label in ((0x81a4,'field_shot_query'),(0x30c,'waypoint_early'),(0x320,'waypoint_scene'),(0x32e,'intro_asteroids_draw'),(0x2f8,'intro_flash_draw'),(0x306,'view_clear'),(0xc4c,'view_compose'),(0x1fdda,'intro_credits_update'),(0x1fde0,'intro_draw'),(0x1fe14,'intro_finish')):
+                    for off,label in ((0x294f0,'effect_raster'),(0x81a4,'field_shot_query'),(0x30c,'waypoint_early'),(0x320,'waypoint_scene'),(0x32e,'intro_asteroids_draw'),(0x2f8,'intro_flash_draw'),(0x306,'view_clear'),(0xc4c,'view_compose'),(0x1fdda,'intro_credits_update'),(0x1fde0,'intro_draw'),(0x1fe14,'intro_finish')):
                         want[off:off+6]=struct.pack('>HI',0x4eb9,s+sym[label])
                     for off,label in ((0x1fd00,'intro_title'),(0x1fe44,'intro_credits_end'),(0xc912,'projectile_gun_return'),(0xca5e,'projectile_missile_return'),(0xc316,'projectile_effect_return'),(0x9a52,'projectile_init_return'),(0x2b648,'timing_scene_allocate'),(0x3378e,'release_publish'),(0x337ea,'release_teardown'),(0x807a,'translation_velocity'),(0x80b6,'translation_position')):
                         want[off:off+6]=struct.pack('>HI',0x4ef9,s+sym[label])
@@ -82,7 +82,11 @@ def main():
                 want[0x87e:0x880]=bytes.fromhex('4e71')
                 assert c.read(s+sym['timing_hz'],4)==struct.pack('>I',50)
                 assert c.read(s+sym['timing_data'],4)==struct.pack('>I',c.data)
-            assert c.read(c.code,0x35ea4)==want
+            elif custom==0 and buffered:
+                # English Psygore's modes: only the waypoint marker order.
+                for off,label in ((0x30c,'waypoint_early'),(0x320,'waypoint_scene')):
+                    want[off:off+6]=struct.pack('>HI',0x4eb9,s+sym[label])
+            got=c.read(c.code,0x35ea4);assert got==want,(model,custom,[hex(i) for i in range(len(got)) if got[i]!=want[i]][:12])
             if custom!=3:assert c.read(layout["hunks"][3],0x1590)==opening_before
             cases.append(dict(model=model,custom=custom,exact=True));c.close()
         # A changed instruction operand must be rejected before any patch write.
@@ -101,8 +105,23 @@ def main():
             assert c.reg(18)==0x1000 and c.reg(9)==9
             assert c.read(c.code,0x35ea4)==before
             c.close()
-    out.mkdir(parents=True);(out/'report.json').write_text(json.dumps(dict(cases=cases,changed_operand_rejected=True,scope='installer and option-off semantics; beam timing tested live'),indent=2)+'\n')
-    print('PASS: eight native installer/option cases, whole code-hunk and register/CCR checks')
+        # Psygore's modes keep the whole original game, without aborting, when
+        # either waypoint call site differs.
+        for operand in ((0x30c,0x30e,0x310,0x320,0x322,0x324) if buffered else ()):
+            c=CPU(memory,layout,model);s=0x180000;resload=0x190000
+            c.write(s,blob);c.write(s+0x1de4,struct.pack('>I',0))
+            c.write(resload+116,bytes.fromhex('4e75'));c.write(resload+32,bytes.fromhex('4e75'))
+            c.write(c.code+operand,bytes.fromhex('0000'))
+            before=c.read(c.code,0x35ea4)
+            c.reg(17,0x2700);c.reg(8,0x1f0000)
+            c.write(0x1f0000,struct.pack('>I',0x1000))
+            c.reg(3,resload);c.reg(16,(c.code-4)//4)
+            ck(u.uc_emu_start(c.h,s+sym['timing_patchseg'],0x1000,1000000,10000))
+            assert c.reg(18)==0x1000
+            assert c.read(c.code,0x35ea4)==before
+            c.close()
+    out.mkdir(parents=True);(out/'report.json').write_text(json.dumps(dict(cases=cases,changed_operand_rejected=True,psygore_waypoint_only=buffered,scope='installer and option-off semantics; beam timing tested live'),indent=2)+'\n')
+    print('PASS: eight native installer/option cases, whole code-hunk and register/CCR checks; Psygore changed waypoint sites keep the original game')
 
 
 if __name__=='__main__':main()

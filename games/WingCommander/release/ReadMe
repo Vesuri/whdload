@@ -88,7 +88,7 @@
  - Consistent game speed on faster processors and smoother cinematic movement.
  - Retimed intro, room, briefing, launch, landing, death and funeral animations.
  - Improved projectile appearance and asteroid/mine hit detection.
- - Waypoint markers remain visible in front of nebulae.
+ - Waypoint markers stay visible in front of nebulae in every English mode.
  - More responsive room controls with limited cursor speed.
  - Disk edition: faster arithmetic and collision checks in every mode, including
    the Amiga 500, without changing game behaviour.

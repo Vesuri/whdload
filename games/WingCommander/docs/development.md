@@ -4489,7 +4489,8 @@ The checker relocates the pinned original game to each capture's hunk bases,
 compares all enhancement hook/NOP/modal windows and requires inactive state.
 A changed-hook negative control must be rejected. It does not claim complete
 screen or game-state equality across machines with different rendering speeds.
-The four bit-exact E1 sites must instead hold their always-on hooks.
+The four bit-exact E1 sites and two waypoint sites must instead hold their
+always-on hooks.
 
 ### Always-on exact E1 shortcuts and original-mode A500 profile
 
@@ -4992,20 +4993,29 @@ Build both enhanced candidates and run the native ordering/visibility checks:
 
 ```sh
 . amiga/env.sh
-python3 tools/reconstruct.py --variant cd32 --release --output tmp/waypoint-cd32
-python3 tools/ocs_memory_build.py --public --output tmp/waypoint-ocs
-python3 tools/waypoint_check.py cd32 tmp/waypoint-cd32 --output tmp/waypoint-cd32-check
-python3 tools/waypoint_check.py ocs tmp/waypoint-ocs --output tmp/waypoint-ocs-check
-python3 tools/timing_adapter_check.py tmp/waypoint-cd32 --output tmp/waypoint-cd32-install
-python3 tools/ocs_options_check.py tmp/waypoint-ocs --output tmp/waypoint-ocs-options
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/waypoint-always-cd32
+python3 tools/ocs_memory_build.py --public --output tmp/waypoint-always-ocs
+python3 tools/waypoint_check.py cd32 tmp/waypoint-always-cd32 --output tmp/waypoint-always-cd32-check
+python3 tools/waypoint_check.py ocs tmp/waypoint-always-ocs --output tmp/waypoint-always-ocs-check
+python3 tools/timing_adapter_check.py tmp/waypoint-always-cd32 --output tmp/waypoint-always-cd32-install
+python3 tools/ocs_options_check.py tmp/waypoint-always-ocs --output tmp/waypoint-always-ocs-options
 ```
 
 Use fresh output names on repeat runs. `waypoint_check.py` executes native flight
 and marker instructions with explicit camera/drawing boundary stubs. It checks
-original versus enhanced order, marker eligibility, projection arguments,
-scene argument forwarding, stack balance and data isolation. It does not claim
-pixel or live-video validation; the retained user screenshots are the reported
-visual defect, and a subsequent play-test should confirm the corrected overlap.
+unpatched versus patched order with the clock active and inactive, marker
+eligibility, projection arguments, scene argument forwarding, stack balance and
+data isolation. `timing_adapter_check.py` covers the two CD32 Psygore's-mode
+hooks and their changed-site fallback. It does not claim pixel validation.
+
+The live overlap capture uses `flight_fixture.py --release --nav 1` served by
+`tools/wc.py` with `CUSTOM2=2 CUSTOM3=1 CUSTOM4=0` and `CUSTOM5=1` or `0`. It
+needs debugger memory writes, which the stock stub lacks; add a diagnostic `M`
+packet handler to a `tmp/` copy of the debugger build. Write nav index
+`D:3894.w` (A4−18282) = 3, the player position `D:919a` and basis
+(`D:a148/b450/b750`, forward/up/right), then capture. Repeat enhanced-mode
+writes at the world-update entry `E:02a8` until they survive prediction
+restores.
 
 ## Swept player cannon contacts with fields
 
