@@ -41,6 +41,8 @@ def check(build, mutation=None):
         require(segment.count(old)==1,'mutation site missing')
         payload=payload[:start]+segment.replace(old,new)+payload[end:]
     results=[]
+    exact=[h for h in meta['hooks'] if h[1] in ('ocs_multiply','ocs_distance_ratio','ocs_radius','ocs_collision_pair')]
+    require(len(exact)==4,'exact hooks missing from build')
     banks=((0x500000,4,'z2-fast'),(0x1000000,4,'high-fast'),
            (0xc00000,4,'slow-labelled-fast'),(0x80000,2,'chip'),
            (0x500000,0,'unmapped'),(0x500000,6,'chip-and-fast'),
@@ -51,9 +53,10 @@ def check(build, mutation=None):
             for option in (0,1,2,0xffffffff):
                 for revision in (0x1302,0x12bc,0x1348):
                     enabled=option==1 and bool(flags&0x8e) and bank in ('z2-fast','high-fast','chip-slave-fast') and revision==0x1302
-                    # A damaged English enhancement site must only be examined
-                    # when enabled: original mode must not acquire new guards.
-                    for corrupt in (False,True):
+                    # A damaged enhancement-only site must only be examined
+                    # when enabled. A damaged exact site makes original mode
+                    # fall back to the untouched game instead of aborting.
+                    for corrupt in (False,'enhanced','exact'):
                         c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english')
                         events=[]
                         try:
@@ -75,7 +78,7 @@ def check(build, mutation=None):
                                 events.append('abort');c.reg(18,STOP);ck(u.uc_emu_stop(c.h))
                             c.intercept(0x190034,control)
                             c.intercept(0x190074,patch);c.intercept(0x190020,flush);c.intercept(0x190000,abort)
-                            off=meta['hooks'][0][0]
+                            off=meta['hooks'][0][0] if corrupt!='exact' else exact[0][0]
                             if corrupt:c.write(CODE+off,bytes([c.get(CODE+off,1)^1]))
                             before=c.read(CODE,0x358c8)
                             opening_before=c.read(STARTUP,0x1d94)
@@ -90,6 +93,17 @@ def check(build, mutation=None):
                                 require(events[-1]=='flush','missing enhancement flush')
                                 for at,label,opcode in meta['hooks']:
                                     require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
+                            elif revision==0x1302 and corrupt!='exact':
+                                # Original mode: only the bit-exact E1 hooks.
+                                after=bytearray(c.read(CODE,0x358c8))
+                                for at,label,opcode in exact:
+                                    require(after[at:at+6]==word(opcode)+long(slave+sy[label]),'missing exact hook')
+                                    after[at:at+6]=before[at:at+6]
+                                require(bytes(after)==before and c.read(STARTUP,0x1d94)==opening_before,'original mode modified game')
+                                require(events[-1]=='flush' and 'abort' not in events,'original mode enhanced')
+                                for pos in meta['fixups']:
+                                    value=int.from_bytes(payload[pos:pos+4],'big')
+                                    require(c.read(slave+pos,4)==long((value&0x0fffffff)+CODE),'exact native operand unresolved')
                             else:
                                 require(c.read(CODE,0x358c8)==before and c.read(STARTUP,0x1d94)==opening_before,'original mode modified game')
                                 require('flush' not in events and 'abort' not in events,'original mode enhanced')

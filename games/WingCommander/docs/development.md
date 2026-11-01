@@ -4489,6 +4489,38 @@ The checker relocates the pinned original game to each capture's hunk bases,
 compares all enhancement hook/NOP/modal windows and requires inactive state.
 A changed-hook negative control must be rejected. It does not claim complete
 screen or game-state equality across machines with different rendering speeds.
+The four bit-exact E1 sites must instead hold their always-on hooks.
+
+### Always-on exact E1 shortcuts and original-mode A500 profile
+
+The public build installs E1's arithmetic/collision hooks on every path; see
+[results](internals.md#always-on-exact-e1-shortcuts-in-original-mode). Validate
+a new public build with the startup matrix, E1 equivalence and prediction checks
+above plus `ocs_math_check.py`, then the live gates. Original-mode captures use
+the P13A4 route with a public slave; calibrate each slave separately:
+
+```sh
+. amiga/env.sh
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/ocs_math_check.py tmp/exact-ocs-v1 --output tmp/exact-ocs-v1-math
+export SLAVE="$PWD/tmp/exact-ocs-v1/WingCommander.Slave"
+WARP=1 python3 tools/ocs_boot_gate.py --calibrate --baseline on --output tmp/a500-exact-v1-layout
+WARP=0 python3 tools/ocs_boot_gate.py --layout tmp/a500-exact-v1-layout/layout.json \
+  --baseline on --output tmp/a500-exact-v1
+```
+
+Repeat with a public build from the previous commit as the control. The strict
+`ocs_baseline_report.py` pairs observer on/off runs of the pinned original slave
+only, and rejects a window containing a picture replaced before display; count
+published and displayed pictures separately for such comparisons.
+
+`--cost-profile` with `--baseline on --simulator` and no clock build adds
+original-mode instruction traces: 20 asteroid-credit fields, 20 coasting
+simulator fields, and 20 fields after native fire is pressed, each outside the
+measurement windows. Use the unpatched original slave (no `SLAVE`) for the
+native profile. The trace interpretation follows the P13E1 rules: complete
+entry/RTS scopes with matching stack pointers, calibrated 68000 only, nested
+scopes never summed.
 
 ### OCS interactive launcher
 

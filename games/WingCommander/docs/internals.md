@@ -6921,15 +6921,18 @@ executes Psygore's PatchSeg, then admits enhancements only for English `00e8`,
 the enabled option, CPU flags identifying 68020+ and an Exec memory header with
 FAST set, CHIP clear and a nonempty physical Zorro II Fast or high-Fast bank.
 68000/68010, slow-only and unverified memory configurations never install the
-clock, prediction, input, converter, publication or arithmetic hooks.
+clock, prediction, input, converter or publication hooks. Every path installs
+the four bit-exact E1 arithmetic/collision hooks (see below).
 
 Public slave hunk offsets: the existing `OS:$11c6` detour (file `$11e6`) calls
 startup at `$14a8` (file `$14c8`); the new gate is `$16b0` (file `$16d0`).
 Header `OS:$32` (file `$52`) selects the extended config at `$1724` (file `$1744`).
 All other original slave bytes are unchanged, including its cache requests and
-native wait helpers. The off path returns after original PatchSeg, without
-enhancement guards, native-operand relocation, allocation changes or hook writes.
-Thus a changed enhancement-only source window does not make original mode abort.
+native wait helpers. The off path (`exact_install`) checks only the four E1
+sites, resolves native operands, writes those four hooks and flushes. It makes
+no allocation change and writes no other hook. A changed E1 site keeps the
+untouched original game instead of aborting, and a changed enhancement-only
+source window does not make original mode abort.
 Original game revision/CRC handling is still Psygore's responsibility.
 
 Exec's memory headers, rather than `TypeOfMem(slave)`, are essential here:
@@ -6955,8 +6958,9 @@ Validation:
 
 - `tmp/ocs-public-options-accepted/report.json`: 1,680 native startup cases for
   option values, CPU flags, revision lists, corrupted hooks and valid/invalid,
-  empty, Chip, slow, Zorro II and high-Fast memory lists. Off paths retain the
-  original game bytes and unrelocated payload, and preserve the caller ABI.
+  empty, Chip, slow, Zorro II and high-Fast memory lists. Off paths preserve the
+  caller ABI. Since the always-on E1 hooks below, English off paths change only
+  those four sites; other revisions keep the original bytes and unrelocated payload.
   Option, CPU-mask and slow-bank mutations are rejected. Original slave bytes
   outside the two declared edits and generated icon artwork are checked.
 - `tmp/ocs-public-prediction-final2/report.json`: native pose, constructor,
@@ -6980,6 +6984,66 @@ modified. The new OCS ReadMe and [support document](ocs-release.md) distinguish
 original-mode selection from per-source conversion fallback and retain E2's
 campaign, hardware/cache, controller and cold-boot save/load limitations.
 
+
+### Always-on exact E1 shortcuts in original mode
+
+The public OCS slave installs E1's multiply, distance-ratio, radius-rejection
+and collision-setup hooks (`O:2adb6`, `2b6d4`, `2b950`, `1574e`) in **every
+mode and on every CPU**, including 68000 original mode. They return native
+results, scratch outputs and registers (P13E1 above), so game behaviour is
+unchanged; only time per call changes. Clock, prediction, input, converter and
+publication hooks remain behind the toggle and CPU/Fast gate.
+
+**Original-mode A500 profile.** Psygore's original slave on the stock A500
+(512 KiB Chip + 4 MiB Fast, native blitter) was traced for 20 fields each in
+asteroid credits, simulator coasting and held fire, outside the measurement
+windows. Complete entry/RTS scopes include callees and interrupts and nest:
+
+| Scope (ms per call) | Credits | Coasting | Held fire |
+|---|---:|---:|---:|
+| World update `O:02be` | 127.7 | 13.0 | 21.0 |
+| of which distance `O:2b6bc` | 98.9 | 0.4 | 1.5 |
+| Drawing `O:0512` | — | 114.8 | 112.6 |
+| Conversion submission `O:3260a` | 20.6 | 34.6 | 33.9 |
+| of which stage-1/2 blit callbacks `O:32c90`/`32a66` | 18.6 | 30.2 | 35.7 |
+| Kickstart (QBlit, interrupts) inside submission | 1.0 | 2.4 | 1.8 |
+| Systems `O:4460` | — | 20.9 | 21.2 |
+| Native input `O:18d14` | — | 0.5 | 6.6 |
+
+The source-reading conversion stages occupy the CPU in the game's per-strip
+blit callbacks, not in OS queue overhead. Blitter busy time is not separated
+here, so the saving available from fewer, larger blits is unmeasured. Native
+input is cheap; E1's 16–21 ms input figure was the enhanced field-input scope.
+About 70–84 ms of game code per 20 fields is not attributed to a function by
+the scratch call detector. Traces and analysis are under `tmp/a500-perf/`.
+
+**Original-mode throughput.** Matched P13A4 windows (250 fields, 5.007972 s
+each) compare the public slave with and without the always-on hooks in original
+mode on the same A500:
+
+| Window | World updates/s | Published / displayed pictures/s |
+|---|---:|---:|
+| Credits, control | 5.591 | 5.791 / 5.791 |
+| Credits, exact E1 | **6.190** | 6.390 / **6.190** |
+| Held fire, control | 5.391 | 5.391 / 5.391 |
+| Held fire, exact E1 | **5.591** | 5.791 / **5.591** |
+
+Mean world scope in held fire falls from 33.63 to 28.95 ms and drawing to
+submission from 90.84 to 84.33 ms. The original game advances once per picture,
+so faster arms progress further: these are different trajectories, not an
+identical-input microbenchmark. One exact-E1 credits picture was published and
+replaced within one field before display; the strict P13A4 report rejects such a
+window, so the rates above count published and displayed pictures separately.
+The settled asteroid scene, where distance dominates, was not windowed.
+
+Validation of build `tmp/exact-ocs-v1/` (40,380 bytes, SHA-256
+`4b54e0479639edcac72dc713343802da25e89816c5510177a5da3b33f28e4671`):
+2,520 native startup cases, including corrupted E1 sites that keep the original
+game and the option/CPU/slow-bank mutation controls; the E1 native equivalence
+suite on M68000 and M68020; D3 prediction checks; the live 020/Fast enhanced
+gate (70 asteroid and 29 flight images, matching forecasts); and live off-path
+byte checks on 68000 with CUSTOM5=1 and 68020 with CUSTOM5=0 (248 windows each).
+These are emulator model results, not hardware measurements.
 
 ### Opening animation speed and default caches
 

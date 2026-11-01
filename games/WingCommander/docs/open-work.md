@@ -2,6 +2,13 @@
 
 ## Current state
 
+The OCS public slave now runs E1's bit-exact arithmetic and collision shortcuts
+in every mode, including 68000 original mode. On the A500 model, original-mode
+credits rise from 5.79 to 6.19 pictures/s and held fire from 5.39 to 5.59.
+Behaviour-changing enhancements stay behind the toggle. A traced original-mode
+profile shows the blitter C2P's per-strip callbacks costing about 30 ms of CPU
+per flight picture. See [always-on shortcuts](internals.md#always-on-exact-e1-shortcuts-in-original-mode).
+
 Enhanced flight entry and exit now discard native player steering ramps, angular
 rates and private motion prediction state in both variants. This prevents held
 simulator steering from leaking into the first mission. Native CPU regressions

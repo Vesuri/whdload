@@ -17,7 +17,10 @@ RAM retain original behaviour. The gate checks Exec CPU flags and memory headers
 requiring a nonempty FAST/non-CHIP bank in Zorro II Fast space or above 16 MiB.
 It rejects trapdoor slow memory even when marked MEMF_FAST. KickEmu excludes the
 slave reservation from its managed memory, so `TypeOfMem(slave)` is not a valid
-presence test. No enhancement hook occurs on the off path.
+presence test. The off path installs only E1's four bit-exact arithmetic and
+collision shortcuts, which return native results; no other enhancement hook
+occurs. A damaged shortcut site keeps the untouched original game. See
+[always-on shortcuts](internals.md#always-on-exact-e1-shortcuts-in-original-mode).
 Other revisions/languages continue through Psygore's original patch lists.
 
 The public build includes the E1 enhancements and defaults to explicit CPU
@@ -33,8 +36,8 @@ side-cockpit images after normal campaign entry. The reservation applies in
 all option modes; the off path still uses original simulation and rendering.
 Legacy diagnostic builds and original reconstruction retain their old budgets.
 
-Current build: `tmp/steering-fix-ocs/`, 40,100-byte slave, SHA-256
-`0824075daad474b12452007f14372db30340ccd0da6252f8245913d9f8677853`.
+Current build: `tmp/exact-ocs-v1/`, 40,380-byte slave, SHA-256
+`4b54e0479639edcac72dc713343802da25e89816c5510177a5da3b33f28e4671`.
 See [public-option validation](internals.md#ocs-public-enhanced-framerate-toggle)
 and [commands](development.md#ocs-public-enhanced-framerate-toggle).
 The user-facing [OCS ReadMe](../release/ReadMe.OCS) describes the option.
@@ -73,13 +76,14 @@ The original reconstruction remains available as the rollback/control.
 
 “Checked” below means the bounded emulator/native-CPU gate, not hardware certification.
 The A500 enhancement measurements describe the earlier ungated experiments; the
-public candidate always runs original behaviour on 68000/68010. E2 campaign
+public candidate always runs original behaviour on 68000/68010, with only the
+bit-exact E1 shortcuts. E2 campaign
 coverage belongs to those acceptance binaries, not a repeated full campaign on
 the new public-option binary.
 
 | Configuration or feature | Candidate policy and evidence | Limit |
 |---|---|---|
-| A500, 68000, OCS, 512 KiB Chip + 4 MiB true Fast | Default native blitter; PAL intro, simulator and flight checked | Coasting 9.98 world updates/s and 2.75 pictures/s; heavy scenes overload |
+| A500, 68000, OCS, 512 KiB Chip + 4 MiB true Fast | Original mode with bit-exact E1 shortcuts; native blitter. Credits 6.19 and held fire 5.59 pictures/s (control 5.79/5.39) | Ungated 10 Hz experiments: coasting 9.98 world updates/s and 2.75 pictures/s; heavy scenes overload |
 | Same 68000, forced CPU | Word-write converter, Fast source; pixels/ownership checked | Slower; correctness override, not the recommended backend |
 | 68020, OCS, 512 KiB Chip + 4 MiB Fast | Explicit CPU uses longword conversion; native override also checked | C2's measured 14 MHz profile favours CPU/Fast; not a universal accelerator threshold |
 | Accelerated AGA 68020, 2 MiB Chip + 4 MiB Fast | Four-plane OCS output with explicit CPU, instruction cache enabled | Short model regression; no 030/040 data-cache claim |
@@ -125,7 +129,7 @@ Original OCS CUSTOM1–4 tooltypes remain unchanged; the public build adds CUSTO
 | `CUSTOM3=1..13` | Original system selection; requires cheat mode |
 | `CUSTOM4=0..2` | Original mission selection; requires cheat mode |
 | `CUSTOM5=1` | Request Enhanced framerate; CPU/Fast gate still applies |
-| `CUSTOM5=0` / omitted / other | Original simulation, rendering, waits and cache request |
+| `CUSTOM5=0` / omitted / other | Original simulation, rendering, waits and cache request; bit-exact E1 shortcuts |
 | `PRELOAD` | Used by the tested launcher; RAM floor includes that setup |
 | Quit | Original `*` / PrtSc key (raw key `$5d`); WHDLoad's `QUITKEY` may override |
 

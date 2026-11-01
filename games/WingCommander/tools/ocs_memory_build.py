@@ -24,6 +24,9 @@ NATIVE={'OCS_CHIP_ALLOC':0x33b60,'OCS_REGISTER':0x33c8e,
         'OCS_CLOSE_BODY':0x334bc,'OCS_VBL_CALLBACK':0x340b4,
         'OCS_VBL_RETURN':0x342c8,'OCS_VIEW_CHANGE':0x6e38,
         'OCS_SCRATCH_BODY':0x32512,'OCS_INPUT_PREPARE':0x182ce,'OCS_INPUT_BODY':0x18d1c}
+# E1 shortcuts that are bit-exact with native code; public builds install them
+# in every mode and on every CPU.
+EXACT=('ocs_multiply','ocs_distance_ratio','ocs_radius','ocs_collision_pair')
 HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x324c0,'display_create_checked',0x4ef9),
        (0x31e1e,'ocs_source_allocate',0x4eb9),
@@ -338,7 +341,65 @@ view_probe_request: dc.l 0
 '''
     if public:
         text=text.replace(' move.l d7,d6\n',
-                          ' bsr.w ocs_option_gate\n tst.l d0\n beq.w install_done\n move.l d7,d6\n',1)
+                          ' bsr.w ocs_option_gate\n tst.l d0\n beq.w exact_install\n move.l d7,d6\n',1)
+        # Bit-exact E1 shortcuts run on every path, including 68000 and
+        # original mode. A guard mismatch keeps the untouched original game.
+        exact='''
+exact_install:
+ move.l d7,d6
+ lsl.l #2,d6
+ addq.l #4,d6
+ lea install(pc),a0
+ adda.l #exact_guards-install,a0
+exact_guard_loop:
+ move.l (a0)+,d0
+ bmi.s exact_guards_done
+ movea.l d6,a5
+ adda.l d0,a5
+ move.w (a0)+,d1
+ cmp.w (a5)+,d1
+ bne.w install_done
+ move.w (a0)+,d0
+ move.l (a0)+,d1
+ tst.w d0
+ beq.s exact_compare
+ add.l d6,d1
+exact_compare:
+ cmp.l (a5),d1
+ bne.w install_done
+ bra.s exact_guard_loop
+exact_guards_done:
+ lea install(pc),a0
+ adda.l #native_fixups-install,a0
+ lea slave(pc),a1
+exact_fixup:
+ move.l (a0)+,d0
+ bmi.s exact_fixup_done
+ movea.l a1,a5
+ adda.l d0,a5
+ move.l (a5),d1
+ andi.l #$0fffffff,d1
+ add.l d6,d1
+ move.l d1,(a5)
+ bra.s exact_fixup
+exact_fixup_done:
+ lea install(pc),a0
+ adda.l #exact_hooks-install,a0
+exact_hook_loop:
+ move.l (a0)+,d0
+ bmi.s exact_hooks_done
+ movea.l d6,a5
+ adda.l d0,a5
+ move.w (a0)+,(a5)+
+ move.l (a0)+,d0
+ add.l a1,d0
+ move.l d0,(a5)
+ bra.s exact_hook_loop
+exact_hooks_done:
+ bsr.w slave+$ee8
+ bra.w install_done
+'''
+        text=text.replace('display_create_checked:',exact+'\ndisplay_create_checked:',1)
         # Keep option code/data in PC-relative range of the startup seam.
         config=original[32+0xf81:].split(b'\0',1)[0].rstrip(b';')
         config+=b';C5:B:Enhanced framerate (68020+Fast RAM);\0'
@@ -364,12 +425,17 @@ view_probe_request: dc.l 0
             text=text.replace(f' lea {label}(pc),a0', f' lea install(pc),a0\n adda.l #{label}-install,a0')
     # Resolve native operands at startup. Fixups are constructed from unique
     # sentinel values, then checked as operands in the generated build listing.
-    guards='\nguards:\n'
-    for off,_,_ in hooks:
+    def guard_entry(off):
         raw=game[44+off:44+off+6]
-        guards+=f' dc.l ${off:x}\n dc.w ${int.from_bytes(raw[:2],"big"):x},{int(int.from_bytes(raw[:2],"big") in (0x4eb9,0x4ef9))}\n dc.l ${int.from_bytes(raw[2:],"big"):x}\n'
-    guards+=' dc.l -1\n'
-    tables=guards+'\nhooks:\n'+''.join(f' dc.l ${off:x}\n dc.w ${op:x}\n dc.l {label}-slave\n' for off,label,op in hooks)+' dc.l -1\nnative_fixups:\n'
+        return f' dc.l ${off:x}\n dc.w ${int.from_bytes(raw[:2],"big"):x},{int(int.from_bytes(raw[:2],"big") in (0x4eb9,0x4ef9))}\n dc.l ${int.from_bytes(raw[2:],"big"):x}\n'
+    guards='\nguards:\n'+''.join(guard_entry(off) for off,_,_ in hooks)+' dc.l -1\n'
+    tables=guards+'\nhooks:\n'+''.join(f' dc.l ${off:x}\n dc.w ${op:x}\n dc.l {label}-slave\n' for off,label,op in hooks)+' dc.l -1\n'
+    if public:
+        exact_hooks=[h for h in hooks if h[1] in EXACT]
+        require(len(exact_hooks)==len(EXACT),'missing exact hooks')
+        tables+='exact_guards:\n'+''.join(guard_entry(off) for off,_,_ in exact_hooks)+' dc.l -1\n'
+        tables+='exact_hooks:\n'+''.join(f' dc.l ${off:x}\n dc.w ${op:x}\n dc.l {label}-slave\n' for off,label,op in exact_hooks)+' dc.l -1\n'
+    tables+='native_fixups:\n'
     # First pass obtains positions; later tables cannot shift preceding code.
     history='ocs_changed_history: ds.b 128000\n' if changed != 'off' else ''
     from runtime_buffers import source as workspace_source, container as workspace_container

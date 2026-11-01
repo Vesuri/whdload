@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Check public original-mode captures against relocated original hook bytes."""
+"""Check public original-mode captures against relocated original hook bytes.
+The bit-exact E1 sites must instead hold their always-on hooks."""
 import argparse
 import json
 from pathlib import Path
@@ -7,6 +8,7 @@ from cd32_static import HunkReader
 from ocs_reconstruct import ROOT, require, guard_game
 from ocs_clock_source import NOPS, MODALS
 from ocs_prediction_source import NOPS as PREDICTION_NOPS
+from ocs_memory_build import EXACT
 
 
 def check(build, run, corrupt=False):
@@ -27,6 +29,11 @@ def check(build, run, corrupt=False):
                 for offset in offsets:
                     value=int.from_bytes(expected[offset:offset+4],'big')+r['hunks'][target]
                     expected[offset:offset+4]=(value & 0xffffffff).to_bytes(4,'big')
+    # Bit-exact E1 shortcuts are installed in every mode; all else stays original.
+    exact={off:(op,label) for off,label,op in b['hooks'] if label in EXACT}
+    require(len(exact)==len(EXACT),'exact hooks missing from build')
+    for off,(op,label) in exact.items():
+        expected[off:off+6]=op.to_bytes(2,'big')+(r['slave']+b['symbols'][label]).to_bytes(4,'big')
     windows=[(off,6) for off,_,_ in b['hooks']]
     windows += [(off,2) for off in (*NOPS,*PREDICTION_NOPS)]
     windows += [(off,width) for off,width,_,_ in MODALS]
