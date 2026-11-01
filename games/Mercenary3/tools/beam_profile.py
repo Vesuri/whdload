@@ -7,7 +7,7 @@
 For the CPUs without an instruction profile (68030, 68040, 68060). Runs the standard route
 (ROUTE as in route_profile.py) with a breakpoint at each root: a Disk.1 offset (hex), or a
 slave symbol when SLAVE_LST names a vasm listing of the running slave (`vasm ... -L FILE`).
-A root the slave copied to expansion memory (M1, S3; tools/relocation.py) is caught at both
+A root the slave copied to expansion memory (M1, S3, F2, F5; tools/relocation.py) is caught at both
 its chip entry and its copy. At entry the tool reads the beam position (VPOSR/VHPOSR) and the
 VERTB counter, then runs to the return address with the entry stack pointer, and reads them
 again. Emulated time does not advance while the debugger holds the machine, so the elapsed
@@ -63,9 +63,6 @@ def resolve(g, names):
     if base is not None:
         expmem = (word(g, base + 0x20) << 16) | word(g, base + 0x22)
     reloc = Map(expmem if expmem < 0x80000000 else 0)
-    copies = {}
-    for lo, hi, chip in reloc.blocks:
-        copies[(lo, hi)] = chip
     roots = {}
     for name in names:
         if name.startswith('_'):
@@ -75,9 +72,9 @@ def resolve(g, names):
             continue
         chip = int(name.lstrip('$'), 16) - DISK_DELTA
         roots[chip] = name
-        for (lo, hi), start in copies.items():
-            if start <= chip < start + hi - lo:
-                roots[lo + chip - start] = name
+        copy = reloc.to_copy(chip)
+        if copy is not None:
+            roots[copy] = name
     return roots, expmem
 
 

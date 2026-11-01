@@ -18,9 +18,9 @@ on fast machines instead of predicting past stops and collisions.
 - The version 1.2 WHDLoad installation of the game and WHDLoad 17 or later.
 - A 68000 or later, 512 KB chip RAM, and additional memory for WHDLoad and preloading.
   The tested A500 setup has 1.5 MB slow RAM in addition to its 512 KB chip RAM.
-- An optional 268 KB workspace. If unavailable, code and stack stay in chip RAM and
+- An optional 288 KB workspace. If unavailable, code and stack stay in chip RAM and
   smooth intermediate frames are disabled; native-rate logic remains enabled.
-- A 68020 or later with real fast RAM is needed for code/table relocation, object
+- A 68020 or later with real fast RAM is needed for code/table/scratch relocation, object
   interpolation and drawing into fast RAM. AGA fetch optimisation is AGA-only.
 
 Build with the shared Amiga environment described in [development](docs/development.md):

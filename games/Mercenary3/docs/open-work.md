@@ -149,9 +149,26 @@ results identical to the original for every input (`tools/log_harness.py`, Unico
 Same-build off/on FPS, repeated twice: A500 4.10 → 4.10, 020-fast 13.50 → 13.70,
 reference 030/50 28.80 → 29.60, 040 emulator 26.50 → 26.90. Mean 030 frame work falls
 20.70 → 19.84 ms, worst 24.64 → 22.55 ms; 113 of 210 intervals still exceed a field.
-Enhanced framerate includes bit 19. Next: F5 needs the user's decision (reassembling
-the renderer to move game variables and render scratch). See
-[F4](internals.md#f4-log-conversion-with-bfffo) and the
+Enhanced framerate includes bit 19. See [F4](internals.md#f4-log-conversion-with-bfffo).
+
+F5 is complete. The render scratch (chip `$0340..$407F`) moves to fast RAM. The copied
+code is translated by `tools/translate.py`: 544 scratch operands become 32-bit forms, and
+its 16 blocks grow by 2,538 bytes. Every instruction is verified by re-decoding.
+Optional workspace grows to 288 KB. Same-build off/on FPS, repeated twice:
+
+| Setup | F5 off fps | F5 on fps |
+| --- | ---: | ---: |
+| A500 | 4.10 | 4.10 |
+| 020-fast | 13.70 | 14.10 |
+| Reference 030/50 | 29.60 | 48.00 |
+| 040 emulator | 26.90 | 44.50 |
+
+On the 030, mean frame work falls 19.85 → 15.60 ms and the worst 22.56 → 17.71 ms. No
+interval exceeds a field, and 464 of 480 cadence intervals are one field. The
+presentation copies fall to about 1.4 ms each. Game variables stay in chip, because
+their accessors are spread across the untranslated main loop. Enhanced framerate
+includes bit 20. Next: the F6 checkpoint. See
+[F5](internals.md#f5-render-scratch-in-fast-ram) and the
 [plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step).
 
 The post-P5 68040 investigation measures 24.80 fps: steady frames spend about

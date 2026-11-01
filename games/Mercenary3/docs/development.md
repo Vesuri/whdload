@@ -162,6 +162,19 @@ original Disk.1 code under the shared Unicorn: every input of the `$4EE88`, `$4E
 `$4EE76` entries, comparing d1, d6, d7 and flags (about three minutes; `--quick` samples
 1/257). Source `amiga/env.sh` first.
 
+`tools/translate.py` generates F5's `whdload/translate-f5.i` from the game's Disk.1
+(shared capstone; source `amiga/env.sh`): it decodes the copied blocks, rewrites every
+render-scratch operand to 32-bit form, re-targets the branches the growth moves and
+re-decodes the whole translation to verify each operand. Regenerate it after changing
+M1/S3/F2's blocks, entries or operand lists, or the moved range:
+`python3 tools/translate.py --dump DUMPDIR`. The dump comes from `tools/memory_dump.py`
+on a running VERIFY game with F5 off. From it the generator learns which chip words the
+slave patches before copying, and it refuses to edit those words. `--check DUMPDIR`
+compares an F5-on dump with the generator's simulation, operand by operand. `tools/relocation.py` maps both ways
+between chip and translated addresses (`Map(expmem, f5=True)`), so the profilers and
+`beam_profile.py` follow F5's copies. `presentation_check.py` also hashes the expansion
+ranges that hold restored data: F2/F5 code and the moved scratch.
+
 The `VERIFY` build's `Custom2` makes drawing routines return at once (see
 [the frame budget](internals.md#frame-budget-toward-50-fps)): compare `fps.py` runs with
 and without it to price drawing on the 030/040/060, whose cores record no instruction

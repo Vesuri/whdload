@@ -9,7 +9,7 @@
  The game requires a 68000 or later and 0.5 MB ChipMem, plus memory for
  WHDLoad and preloading the disk image. The original install specifies
  0.5 MB OtherMem; allow additional memory for PRELOAD and the optional
- 268 KB enhancement workspace. The tested A500 has 1.5 MB OtherMem.
+ 288 KB enhancement workspace. The tested A500 has 1.5 MB OtherMem.
  No Kickstart image is required by this slave.
 
  Enhanced framerate benefits most from a 68020 or later with Fast RAM.

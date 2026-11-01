@@ -25,6 +25,11 @@ RENDERMEM	= $1a000
 STAGEMEM	= $18000	;32 KB bitmap plus up to 64 KB alignment
 OBJECTMEM	= $3000		;256 pose histories (40 bytes each), page rounded
 RESTOREMEM	= $5000		;17,912 bytes, rounded to whole pages
+DATAMEM		= $5000		;F5: render scratch at its chip offset ($340..$407F)
+; F5 destinations, as offsets from ws_ExpMem (whdload/translate-f5.i).
+F5HOT		= STACKSIZE
+F5RENDER	= STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM
+F5DATA		= STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM+OBJECTMEM
 
 ;======================================================================
 
@@ -38,7 +43,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$41			;ws_keyexit = Backspace
-_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM+OBJECTMEM) ;optional workspace
+_expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM+OBJECTMEM+DATAMEM) ;optional workspace
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -82,7 +87,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$fffff,(a0)
+	move.l	#$1fffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -225,6 +230,7 @@ lbC0002AA
 	move.l	a0,($5a830).l
 	move.l	#$4e714e71,($5a834).l
 .nopresent
+	bsr.w	_f5check
 	bsr.w	_f3data
 	bsr.w	_hotcode
 	bsr.w	_hotdata
@@ -304,7 +310,13 @@ _hotcode
 .fast	addi.l	#STACKSIZE,d0
 	movea.l	d0,a1
 	movea.l	d0,a3
-	lea	($4b134).l,a0
+; F5: translate the blocks instead (block 1 keeps its layout, for F4).
+	btst	#0,(_f5on,pc)
+	beq.b	.m1copy
+	moveq	#0,d7
+	bsr.w	_f5translate
+	bra.b	.copied
+.m1copy	lea	($4b134).l,a0
 	move.w	#($4b2e2-$4b134)/2-1,d0
 .copy1	move.w	(a0)+,(a1)+
 	dbra	d0,.copy1
@@ -312,6 +324,7 @@ _hotcode
 	move.w	#($57c68-$57380)/2-1,d0
 .copy2	move.w	(a0)+,(a1)+
 	dbra	d0,.copy2
+.copied
 ; F4 (Custom1 bit 19): BFFFO finds the log conversion's leading bit in the copy.
 	btst	#3,(_custom1+1,pc)
 	beq.b	.entries
@@ -329,7 +342,11 @@ _hotcode
 	moveq	#0,d0
 	move.w	(a0)+,d0
 	add.l	a3,d0
-	move.w	#$4ef9,(a1)+
+	btst	#0,(_f5on,pc)
+	beq.b	.store
+	move.l	a1,d0
+	bsr.w	_f5map
+.store	move.w	#$4ef9,(a1)+
 	move.l	d0,(a1)
 	bra.b	.next
 .done	rts
@@ -669,6 +686,8 @@ _hotrenderer
 	cmpi.l	#$1000000,d0
 	blo.w	.done
 .fast
+	btst	#0,(_f5on,pc)
+	bne.w	_f5renderer
 	lea	(_render_ranges,pc),a0
 	lea	(_render_operands,pc),a1
 	lea	(_render_branches,pc),a2
@@ -818,6 +837,8 @@ _cliplimit	dc.w	$9540
 ; d0: original address -> copied address, unchanged outside the blocks.
 ; Clobbers a2/d1/d2 only. d6 holds the renderer allocation base during boot.
 _rendermap
+	btst	#0,(_f5on,pc)
+	bne.w	_f5map
 	btst	#1,(_custom1+1,pc)
 	beq.b	.ranges
 ; Native drawing dispatch entries are four-byte branches; leave them intact
@@ -874,6 +895,7 @@ _render_base	dc.l	0
 _render_tables	dc.l	0,0,0,0
 	INCLUDE	"whdload/renderer-relocs.i"
 	INCLUDE	"whdload/renderer-f2.i"
+	INCLUDE	"whdload/translate-f5.s"
 
 ; R1: full-word interiors of the sixteen horizontal colour spans.
 ; Disk.1 $4978C + colour*$B6: replace the count setup with a call,

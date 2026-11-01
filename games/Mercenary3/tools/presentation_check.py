@@ -3,6 +3,9 @@
 
 SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS="CUSTOM5=0 CUSTOM1=31" python3 tools/presentation_check.py tmp/p1/check.json
 Uses VERIFY-only markers; no guest state is altered by this checker.
+Besides the chip game image it hashes the slave's expansion-memory copies of game state
+(EXP_RANGES, offsets from ws_ExpMem): M1's code, M2/F3 tables, the S3/F2/F5 renderer
+copies and F5's render scratch. The restore buffer and the stack are not included.
 """
 import hashlib
 import json
@@ -11,10 +14,12 @@ from pathlib import Path
 import sys
 import tempfile
 from route_profile import slave_code, SLAVE, ROUTE
+from relocation import Map
 from route_runtime import session, deadline, timeouts, output_path, word, at_breakpoint, delta
 from amigaxdev.input import Input
 
 START, END = 0x5350, 0x68000
+EXP_RANGES = [(0x1000, 0x9000), (0xe000, 0x28000), (0x43340, 0x47080)]
 DISPLAY = [(0x72b2, 0x72b4), (0x72b6, 0x72b8), (0x7ce2, 0x7d26),
            (0x42c00, 0x42c04), (0x52ad0, 0x52b60),
            # Surface/space copper colours, written by both native drawing paths.
@@ -54,17 +59,38 @@ def run(path):
         if not hasattr(g,'publication_counter'):
             raise ValueError('P1 option must be enabled')
         base = g.publication_counter - count_offset
+        expmem = (word(g, base + 0x20) << 16) | word(g, base + 0x22)
+        extra = [(expmem + a, expmem + b) for a, b in EXP_RANGES] if 0 < expmem < 0x80000000 else []
+        mask.extend(b'\1' * sum(b - a for a, b in extra))
+        # Live interrupt state in the copies, too.
+        reloc = Map(expmem) if extra else None
+        for a, b in (DISPLAY + IRQ if reloc else []):
+            c = reloc.to_copy(a)
+            if c is None:
+                continue
+            i = END - START
+            for lo, hi in extra:
+                if lo <= c < hi:
+                    mask[i + c - lo:i + c - lo + b - a] = bytes(b - a)
+                i += hi - lo
         before, after = [base + x for x in markers]
         controls=Input(g, log=inputs.append)
         held=[]; segment=0; boundary=ROUTE[0][0]; total=sum(n for n,_ in ROUTE)
         with tempfile.TemporaryDirectory(prefix='presentation-',dir='tmp') as temp:
             dump=Path(temp)/'image.bin'
             def read():
-                dump.unlink(missing_ok=True)
-                g.cmd(f'dump binary memory {os.path.relpath(dump)} {START:#x} {END:#x}')
-                data=dump.read_bytes()
-                if len(data)!=END-START: raise RuntimeError('short dump')
+                data=b''
+                for a,b in [(START,END)]+extra:
+                    dump.unlink(missing_ok=True)
+                    g.cmd(f'dump binary memory {os.path.relpath(dump)} {a:#x} {b:#x}')
+                    part=dump.read_bytes()
+                    if len(part)!=b-a: raise RuntimeError('short dump')
+                    data+=part
                 return data
+            def where(i):
+                for a,b in [(START,END)]+extra:
+                    if i<b-a: return hex(a+i)
+                    i-=b-a
             # Include the loop head as an exit/input point even if no extra frame fits.
             g.cmd(f'break *{before:#x}'); g.cmd(f'break *{after:#x}')
             g.cmd('break *0x5a2e2')
@@ -79,7 +105,7 @@ def run(path):
                 elif pc==after:
                     if saved is None: raise RuntimeError('missing before marker')
                     restored=read()
-                    changed=[hex(i+START) for i,(a,b,m) in enumerate(zip(saved,restored,mask)) if m and a!=b]
+                    changed=[where(i) for i,(a,b,m) in enumerate(zip(saved,restored,mask)) if m and a!=b]
                     records.append(dict(field=field,before_sha256=digest(saved),after_sha256=digest(restored),changed=changed))
                     if changed: break
                     saved=None
@@ -96,7 +122,7 @@ def run(path):
                     held=wanted[:]
         result=dict(meta,records=records,route=ROUTE,input=inputs,fields=field,
                     input_basis='cumulative fields from entry, at loop/restore boundaries',
-                    image_range=[START,END],display_exclusions=DISPLAY,interrupt_exclusions=IRQ,
+                    image_range=[START,END],expansion_ranges=extra,display_exclusions=DISPLAY,interrupt_exclusions=IRQ,
                     passed=bool(records) and field >= total and saved is None
                     and all(not r['changed'] for r in records))
     output.write_text(json.dumps(result,indent=2)+'\n')

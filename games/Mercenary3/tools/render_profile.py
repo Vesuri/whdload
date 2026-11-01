@@ -38,7 +38,8 @@ def main():
     min_share = float(os.environ.get('MIN_SHARE', '0.01'))
     meta = json.load(open(os.path.join(d, 'route.json')))
     red = Reduction.load(os.path.join(d, 'profile.pkl.gz'))
-    reloc = Map(int(meta.get('expmem', '0'), 16))
+    from relocation import f5_enabled
+    reloc = Map(int(meta.get('expmem', '0'), 16), f5=f5_enabled(meta.get('whd_args', '')))
     slave = int(meta['slave_base'], 16) if meta.get('slave_base') else None
     names = {}
     if os.environ.get('SLAVE_LST'):

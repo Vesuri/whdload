@@ -75,10 +75,11 @@ key code at chip `$8`, with `$FF` at `$9`.
 the shipped patch list. The release exposes **Enhanced framerate**, default On
 (`Custom5=1`), which selects all feature bits below. Off (`Custom5=0`) clears them;
 release builds ignore `Custom1`. The VERIFY build accepts `Custom1` as the individual
-feature mask with `Custom5=0`. Historical measurements below name those feature bits. It asks for an optional 268 KB of expansion memory (`ws_ExpMem`):
+feature mask with `Custom5=0`. Historical measurements below name those feature bits. It asks for an optional 288 KB of expansion memory (`ws_ExpMem`):
 4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
 20 KB for bit 4's presentation restore buffer, 104 KB for bits 9/17's renderer copies and
-96 KB for bit 10's aligned staging bitmap and 12 KB for bit 11's object histories.
+96 KB for bit 10's aligned staging bitmap, 12 KB for bit 11's object histories and
+20 KB for bit 20's render scratch.
 If allocation fails, the stack, code and
 tables retain their chip paths; presentation falls back to logic gating. With every option off it runs the shipped slave's code paths.
 
@@ -107,6 +108,7 @@ Bit 16 includes room-local XYZ in P4 camera interpolation (P5 below).
 Bit 17 extends bit 9 to the remaining hot code and removes M1 entry hops (F2 below).
 Bit 18 moves projection state and drawing lookup tables to fast RAM (F3 below).
 Bit 19 finds the log conversion's leading bit with `bfffo` in M1's copy (F4 below).
+Bit 20 moves the render scratch to fast RAM and translates the copied code (F5 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -1457,8 +1459,110 @@ Native walking/turning rates remain 6/2 units per elapsed logic field on 020/030
 collision stop each). Still images are pixel-identical off/on; walking, turning, room
 return and release play screenshots show intact drawing. 173 walking restore hashes
 pass. Options-off release and shipped each give 37 A500 frames / 500 fields. Enhanced
-framerate includes bit 19 (`$FFFFF`). Evidence: `tmp/f4/final/`, `tmp/log-harness/`;
+framerate includes bit 19. Evidence: `tmp/f4/final/`, `tmp/log-harness/`;
 the 040 figures remain emulator counts, not hardware predictions.
+
+### F5: render scratch in fast RAM
+
+Custom1 bit 20 moves the render scratch (chip `$0340..$407F`, 15.7 KB, including the
+array at `$3E18` that runs to `$406F`) into a new 20 KB data area at the end of the
+optional workspace (now 288 KB). It requires M1, S3 and F2, a 68020+ and real fast RAM.
+The operands that address the scratch are absolute short words and 16-bit displacements,
+which cannot reach fast RAM at their original length. The copied code is therefore
+*translated*, not copied, with instructions allowed to grow:
+
+- `(d16,An)` becomes the full-format `(bd.l,An)` (+4 bytes).
+- `abs.w` becomes `abs.l` (+2).
+- Branches, `DBcc` and PC-relative operands inside a block are re-targeted. Six byte
+  branches that no longer reach become word branches.
+- Branches that leave a block go through 63 JMP islands.
+
+`tools/translate.py` generates `whdload/translate-f5.i` from Disk.1. It holds Disk.1
+offsets, layout values and data addresses only, no game bytes. For each block there is an
+edit recipe and a growth map:
+
+- Recipe ops: copy n words, skip, XOR the opcode's mode bits, new word, extension plus
+  long address, set the low byte, long address.
+- The growth map gives the offset in the block from which the translation has grown by
+  so many bytes.
+
+The generator works as follows:
+
+- It decodes every block recursively from the entries and from every reference a
+  whole-program descent finds. Jump-table bodies are roots.
+- Bytes it does not reach stay "rigid" and must not contain a growth point.
+- It rejects edits in the words the slave patches before copying, using a dump.
+- It re-decodes the whole translation (capstone, 68020) and checks every operand: 15,923
+  instructions.
+
+Five abs.w/d16 operands in the moved range are not scratch accesses and are excluded:
+
+- `$5D9CE` is an object index.
+- `$5DCDE..$5DD1E` are pointers into the variables.
+
+The translation covers 16 blocks: M1's two, S3/F2's and five new blocks that also use the
+scratch (Disk.1 `$5F61C..$5FA3F`, `$5EA34..$5F327`, `$57374..$5765D`, `$5A644..$5A6E7`,
+`$5D6D4..$5D78B`). They come to 56,872 bytes (+2,538), with 544 rewritten operands, 7 new
+chip entry jumps and 24 new relocated operands. M1's blocks are translated in
+`_hotcode`, the render blocks in `_f5renderer`. F5 then performs these steps:
+
+- It copies the scratch's current contents to fast RAM.
+- It maps F2's relocated operands, and P1's restore ranges, through
+  `_f5map`/`_f5datamap`, so
+  presentation restores save and restore the fast-RAM scratch and the translated code
+  words.
+
+The game variables (`$5350..$7FFF`) stay in chip: their abs.w accessors are spread
+across the untranslated main loop, so moving them needs the whole program translated.
+
+Checks:
+
+- `translate.py --check` on a running F5 game matches the simulation, apart from entry
+  stubs.
+- VERIFY `Custom2` bit 7 fills the vacated chip scratch with `$A55AA55A`, except the
+  boot stack at `$1400..$17FF`, so any missed access draws garbage. The tripwire trace
+  of the full 020 route reads the chip scratch once.
+- All 341 rewrites that execute address the scratch. The 203 that do not execute belong
+  to the same array families.
+
+Same VERIFY build/session, Custom1 `1048575 → 2097151`, two exact 500-field comparisons
+per setup (both runs identical):
+
+| Setup | F5 off fps | F5 on fps |
+| --- | ---: | ---: |
+| A500 1.5 MB slow | 4.10 | 4.10 |
+| 020 fast | 13.70 | 14.10 |
+| Reference 030/50 | 29.60 | 48.00 |
+| Existing 040-25 emulator cell | 26.90 | 44.50 |
+
+Reference 030 beam probes over fields 175..500: mean frame work **19.85 → 15.60 ms**,
+worst **22.56 → 17.71 ms**. Before F5, 113 of 210 intervals exceeded 20 ms; with F5,
+none of 323 do. Per frame, main 3D falls 6.50 → 5.76 ms, scene setup `$5765E` 1.90 → 1.85,
+`$5AFAA` 1.72 → 1.54 and `$593A6` 1.05 → 0.17. The clear stays at 0.36 ms. The
+presentation copies fall per call: save **3.41 → 1.40 ms**, restore **3.30 → 1.38 ms**.
+They do not reach the planned 0.5 ms, because the game variables they also copy are
+still in chip. PER_FRAME cadence changes from 97 one-field and 199 two-field intervals
+to 464 one-field and 15 two-field intervals; each run has one three-field startup
+interval. On the 020 instruction profile, `$593A6` falls 40,888 → 8,307 cycles per
+frame and main 3D 311,967 → 305,713.
+
+The same-build 020 bus audit (fields 175..275) removes the render scratch's chip
+traffic: 480 reads and 329 writes per field before, none after. Code fetches fall
+411 → 355 per field. Leaving out the VERTB wait and the staging writes, chip accesses
+fall **3,544 → 2,463 per field**. The game variables keep 819 reads and 297 writes.
+
+Other checks:
+
+- Native walking and turning stay at 6 and 2 units per logic field on the 020 and 030.
+- Restore hashes pass 356 walking presentations on the 030. With the tripwire (Custom2
+  bit 7) they pass 63 transport, 62 space-flight and 150 lift presentations.
+- Play with the tripwire is pixel-identical to play without it.
+- Walking, turning, room return and release play screenshots show intact drawing.
+- Options-off release and shipped each give 37 A500 frames / 500 fields.
+- The original, release and VERIFY builds pass.
+
+Enhanced framerate includes bit 20 (`$1FFFFF`). Evidence: `tmp/f5/final/`; the 040
+figures remain emulator counts, not hardware predictions.
 
 ### WHDLoad launch configuration
 
