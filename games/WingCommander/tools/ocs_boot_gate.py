@@ -46,8 +46,10 @@ def main():
     p.add_argument('--aga', action='store_true', help='E2 accelerated 020/AGA instruction-cache regression')
     p.add_argument('--fast-kib', type=int, choices=(1024,2048,4096), default=4096)
     a = p.parse_args()
-    if (a.cost_profile or a.held_fire) and not (a.clock_build and a.baseline and a.simulator):
+    if a.held_fire and not (a.clock_build and a.baseline and a.simulator):
         p.error('E1 workload options require clock build, baseline and simulator')
+    if a.cost_profile and not (a.baseline and a.simulator):
+        p.error('cost profile requires baseline and simulator')
     if a.functional and not (a.compat and a.clock_build and a.simulator):p.error('functional checks require compat, clock build and simulator')
     if a.flight_fields and not (a.compat and a.cpu=='68000'):p.error('long window requires 68000 compat')
     if a.aga and a.cpu != '68020':p.error('AGA regression requires 68020')
@@ -286,7 +288,14 @@ def main():
                     until(h0+0x06c2, f'diagnostic native view {view} active', f'*(short*)($a4-18318) == {view}')
                     baseline(f'view{view}',a.view_fields)
             if a.baseline and not (a.clock_build and build.get('prediction')):
+                if a.cost_profile and not a.clock_build:
+                    # Original-mode traces, outside the measurement windows.
+                    command('monitor trace-window-all')
+                    command(f'monitor profile 20 "" "{out}/coast-cost.bin"',timeout=120)
                 key(1, '40')  # Native Space: fire, no artificial game writes.
+                if a.cost_profile and not a.clock_build:
+                    command('monitor trace-window-all')
+                    command(f'monitor profile 20 "" "{out}/fire-cost.bin"',timeout=120)
                 baseline('fire',150 if a.clock_build and build.get('prediction') else 100 if a.clock_build else 250)
                 key(0, '40')
             # A fast run can enter the prompt during the final capture. Its
