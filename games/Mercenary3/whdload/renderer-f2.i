@@ -558,10 +558,8 @@ _f2_operands
 	dc.l	$5e3d8-$3cb0
 	dc.l	$5e5ea-$3cb0
 	dc.l	$5e67c-$3cb0
-	dc.l	$5f1e6-$3cb0
-	dc.l	$5f224-$3cb0
-	dc.l	$5f262-$3cb0
-	dc.l	$5f29c-$3cb0
+; Disk.1 $5F1E4/$5F222/$5F260/$5F29A (lea $97DC,a1) stay in chip: the doorway
+; table they address starts 14 bytes later, at the end of the $BD9A..$D49A copy.
 	dc.l	$5f42e-$3cb0
 	dc.l	$5f46a-$3cb0
 	dc.l	$5f472-$3cb0

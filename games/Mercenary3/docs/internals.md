@@ -1365,6 +1365,12 @@ copied calls to the M1 kernels and drawing callees without chip entry hops.
 The 128-entry line-plotter table stays in chip with relocated targets. Interrupt-owned
 text state remains live. Optional workspace grows from 200 to 268 KB.
 
+The four `lea $97DC,a1` at Disk.1 `$5F1E4`, `$5F222`, `$5F260` and `$5F29A` stay in chip.
+`$97DC` is the end of the copied block `$BD9A..$D49A`. The doorway table they index starts
+14 bytes later at `$97EA`, outside the copy. Relocated, they read the copy's following
+bytes as doorway bounds, and the player stuck on the first room's doors. The route
+did not walk through a door, so it never caught this.
+
 Same VERIFY build/session, Custom1 `131071 → 262143`, CACHE PRELOAD; two exact
 500-field FPS comparisons per setup:
 
