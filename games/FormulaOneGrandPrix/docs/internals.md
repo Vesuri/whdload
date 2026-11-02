@@ -3401,10 +3401,12 @@ parts' position tables (h2+$1EA92–$1EB4B, h2+$1EC43–$1ECDB), the palette
 and another part's before the assist hook (h2+$1FA65–$1FA69). The gear's hook,
 `c2_hud_gear`, replaced the first `ADDA.W` and ran both with the stock 5832, so the clock
 would have drawn the gear at the stock place, and F5 would have turned every developer
-option off for any edited cockpit. It now reads both operands from the file's code, and
-F5's sum leaves out the first, which lies in the site (h2+$1F92A–$1F92B). Rerun with the
-four files, `tools/f2_collisions.py` (now also over `patch_582992_options`) finds no
-other written hook site; the other hits are addresses inside the cockpit image (the HUD
+option off for any edited cockpit. It now saves both operands from the file's code before
+the clock's patches, since the site's `JMP` covers the first (read after patching, it was
+the high word of the hook's address, 153 on the 030, and a shift showed the gear near the
+top right for a frame), and F5's sum leaves out the first, which lies in the site
+(h2+$1F92A–$1F92B). Rerun with the four files, `tools/f2_collisions.py` (now also over
+`patch_582992_options`) finds no other written hook site; the other hits are addresses inside the cockpit image (the HUD
 box and hands sources) and C's HUD target table, which name places, not contents. The
 position tables and the operand before the assist hook lie outside every hooked range,
 and the hooks capture their effect as register state. On the 030 with the clock the gear

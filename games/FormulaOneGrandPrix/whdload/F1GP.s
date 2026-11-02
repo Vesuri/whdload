@@ -223,6 +223,11 @@ patch_game
         bsr f5_check
         bne.s .patched
         bsr f6_load
+        movea.l (c2_h2,pc),a0           ; c2_hud_gear's operands, before its JMP covers the first
+        adda.l #$1f92a,a0
+        lea (c2_hud_gear_place,pc),a1
+        move.w (a0),(a1)+
+        move.w (4,a0),(a1)
         lea (patch_582992_options,pc),a0
         move.l d7,a1
         jsr (resload_PatchSeg,a2)
@@ -4210,14 +4215,15 @@ c2_hud_glyph
 c2_hud_gear
         C2_HUD_GATE 7
         ; F4: the two ADDA.W operands are the gear's place in the cockpit image, which
-        ; F1GP-Ed's Graphics window rewrites (stock 5832): read them from the file's code.
+        ; F1GP-Ed's Graphics window rewrites (stock 5832): saved from the file's code
+        ; before the site's JMP covers the first.
         move.l a3,-(sp)
-        movea.l (c2_h2,pc),a3
-        adda.l #$1f92a,a3
-        adda.w (a3),a0
-        adda.w (4,a3),a2
+        lea (c2_hud_gear_place,pc),a3
+        adda.w (a3)+,a0
+        adda.w (a3),a2
         movea.l (sp)+,a3
         rts
+c2_hud_gear_place dc.w 5832,5832
 c2_hud_rpm
         C2_HUD_GATE 8
         move.l a0,-(sp)
