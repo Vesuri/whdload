@@ -6,5 +6,6 @@ Changes:
 - Consistent game speed regardless of rendering speed.
 - Smoother car movement on 68020 and faster Amigas with Fast memory.
 - Uses Fast memory for improved performance when available.
+- Uses all safe CPU caches in performance mode on 68020 and faster.
 
 Enable performance mode with CUSTOM2=1 (PAL, SPS 0481 version).

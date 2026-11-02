@@ -45,8 +45,8 @@ requirements to the small v1.01 release are not claimed. The documented A500
 emulator configuration has 512 KiB Chip plus 1.5 MiB Slow memory; the Fast variant
 also has 2 MiB Fast. The 020 configurations have 2 MiB Chip, with/without 4 MiB Fast.
 These configurations are qualified with WHDLoad 20.1; A500 with 512 KiB Chip
-and 2 MiB Fast also passes without Slow memory. Smaller configurations and
-WHDLoad 17.0 allocation limits are documented in RELEASE_QUALIFICATION.md.
+and 2 MiB Fast also passes without Slow memory. Smaller configurations are
+documented in RELEASE_QUALIFICATION.md. WHDLoad 17.0 and 68060 are not tested.
 
 The elapsed clock is PAL-calibrated. Enabled SPS mode requires WHDLoad to report
 PAL; NTSC is rejected with the normal WHDLoad PAL requirement message. The
@@ -84,17 +84,19 @@ is 260,276 bytes, SHA256
 `e57c42ec5160f1771146045f81a31c59ff7942f30678e801fb5c00178dd2910d`;
 an independent rebuild of the corrected source reproduces it exactly.
 
-This is an unreleased, opt-in emulator-qualified candidate. The 030/040/060,
+This is an unreleased, opt-in emulator-qualified candidate. The accelerated,
 cache/MMU, original-option/reload, track, save/load and
 clock checks are complete in [RELEASE_QUALIFICATION.md](RELEASE_QUALIFICATION.md).
+Its first section defines the current, reduced test matrix and which checks
+run on every change versus only when the code they cover changes.
 Accelerated profiles present about 16.64 FPS with less than 0.041% clock error in
 the measured automatic demo. Those are emulator observations, not physical CPU
 rankings. The original-loop observations are reported separately.
 
 For the qualified emulator save/load route, use `NoWriteCache`. Chip-only 020
 with WHDLoad 20.1 also needs `ConfigDelay=0` and `SplashDelay=0`. The slave keeps
-API 17; WHDLoad 17.0 is functionally qualified with Fast memory, not the tested
-Chip/Slow-only arrangements. Use the shared `~/.local/share/amiga/WHDLoad`
+API 17, but only WHDLoad 20.x is tested; historical 17.0 results are in
+RELEASE_QUALIFICATION.md. Use the shared `~/.local/share/amiga/WHDLoad`
 installation for development. The local candidate package and hash manifest
 remain ignored under `tmp/dev/`; nothing is published.
 
@@ -250,3 +252,42 @@ The reproducible production build is 267,940 bytes, SHA256
 `5db5a4c4fb42360578a38aa61c5cdcb3c7524fb4c5bed948f51d305050e1663e`.
 This supersedes earlier B8-PAL cleanup notes for current source. The existing
 preinstalled archives still contain their documented older builds.
+
+### Performance-mode CPU caches
+
+With CUSTOM2=1 the slave now requests every CPU cache WHDLoad can safely
+provide, following Secret Weapons of the Luftwaffe. The policy lives in
+`FerrariFormulaOne_Cache.s`. It applies when a performance path activates
+(fine path start and coarse activation). Boot, loading and menus keep
+kick13's caches-off setup, which keeps the automatic demo identical to the
+previous build. A boot-time variant changed the course of the long elapsed-
+clock demo on 040.
+
+- 68040: Chip noncacheable; ExpMem, slave and WHDLoad copyback; instruction
+  and data caches. The 060 bits (branch cache, store buffer, superscalar
+  dispatch) are requested too, but 060 is not tested. If WHDLoad cannot
+  separate Chip from ExpMem, the policy reads CACR back and falls back to
+  the setup below.
+- 68020/030: instruction cache on Chip and ExpMem, 030 instruction burst;
+  no data cache. The 030 data cache (WHDLoad's MMU option) crashes
+  performance-mode startup, also with the previous build.
+- 68000: nothing to set.
+
+Emulator results against the previous build (300 presentations, CUSTOM1=0
+CUSTOM2=1):
+
+| Profile | Previous FPS | Cache policy FPS | CACR |
+| --- | ---: | ---: | --- |
+| chip-only 020 | 6.6266 | 8.1127 | 0 → 1 |
+| 020 + 4 MiB Fast | 15.3601 | 15.3444 | 1 → 1 |
+| 030 50 MHz BCE | 24.5510 | 24.5510 | 2011 → 2011 |
+| 040 40 MHz BCE | 24.5108 | 24.5108 | 8000 → 80008000 |
+
+Only the chip-only 020 gains: its coarse path ran with every cache off. The
+030 and 040 scenes are already at the presentation ceiling here. Exact
+states, the normal and grid frames and the elapsed clock (0.025883% error)
+match the B8-PAL references. 20-update smokes pass on all core profiles, 030
+with WHDLoad's MMU option and data-cache emulation, and 040 with the MMU.
+Removing the old fine-path SetCPU also removed the cache flush after the fine
+installs; the policy's SetCPU now provides it. Without it, 020+Fast froze
+mid-race.

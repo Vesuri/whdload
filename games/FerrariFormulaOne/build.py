@@ -35,7 +35,7 @@ def payload(kind,offset,hs):
  (d/'fine.s').write_text((P/('Fine.s' if kind=='fine' else 'Coarse.s')).read_text())
  for fn in ['bindings.bin','reset.bin']:(d/fn).write_bytes(bytes.fromhex('ffffffff'))
  flags=flags0+(flagsfine if kind=='fine' else ['FF1_COARSE_STEP=1']+(flags000 if kind=='000' else ['FF1_COARSE_020=1','FF1_COARSE_NATIVE_EXACT=1','FF1_NATIVE_EXACT=1']))
- flags += [f'FF1_HOST_CODE_SIZE={offset}',f'FF1_HOST_RESLOAD={hs["_resload"]}',f'FF1_HOST_ABORT={hs["FF1PerformanceAbort"]}',f'FF1_HOST_STACK={hs["FF1PublicStackOwner"]}',f'FF1_HOST_ATTN={hs["FF1ProfileAttn"]}']
+ flags += [f'FF1_HOST_CODE_SIZE={offset}',f'FF1_HOST_RESLOAD={hs["_resload"]}',f'FF1_HOST_ABORT={hs["FF1PerformanceAbort"]}',f'FF1_HOST_STACK={hs["FF1PublicStackOwner"]}',f'FF1_HOST_ATTN={hs["FF1ProfileAttn"]}',f'FF1_HOST_CACHE={hs["FF1CachePolicy"]}']
  args=[vasm,'-m68000' if kind=='000' else '-m68020','-Fbin','-quiet',f'-I{G}',f'-I{P}']+['-D'+f for f in flags]+['-L','fine.list','-o','fine.bin','fine.s']
  run(args,d)
  run([sys.executable,str(P/'bindings.py'),str(d),str(a.game),kind],d)

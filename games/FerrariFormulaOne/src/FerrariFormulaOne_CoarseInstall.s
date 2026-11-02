@@ -349,6 +349,13 @@ C1Activate:
  bsr.w FF1PatchSeal
  tst.l d0
  bne.w C1Fault
+ IFD FF1_PRODUCTION
+ ; Performance-mode CPU caches (68020+): the host's FF1CachePolicy.
+ lea start(pc),a2
+ suba.l #FF1_HOST_CODE_SIZE,a2
+ adda.l #FF1_HOST_CACHE,a2
+ jsr (a2)
+ ENDC
  bsr.w C1Flush
  IFD FF1_C4_BLIT_GUARD
  bsr.w FF1C4BlitAcquire

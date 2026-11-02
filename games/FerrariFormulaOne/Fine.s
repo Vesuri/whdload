@@ -99,13 +99,12 @@ keep_gauges:
  bne.l FF1ProductionFault
  bsr.w schedule_install
  bsr.l FF1FineBlitAcquire
- ; Retain the accepted B8 CPU-cache policy. WHDLoad owns cache teardown.
+ ; Performance-mode CPU caches: the host's FF1CachePolicy. Its SetCPU also
+ ; flushes the code the installs above wrote. WHDLoad owns cache teardown.
  lea start(pc),a2
  suba.l #FF1_HOST_CODE_SIZE,a2
- move.l FF1_HOST_RESLOAD(a2),a2
- move.l #$13e,d0
- move.l #$13f,d1
- jsr $60(a2)
+ adda.l #FF1_HOST_CACHE,a2
+ jsr (a2)
  bsr.l public_seal
 finish:
  bsr.w schedule_begin

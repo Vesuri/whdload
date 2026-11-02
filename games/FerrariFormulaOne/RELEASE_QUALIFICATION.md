@@ -12,6 +12,34 @@ restart, steering and manual gear checks, including the reported 040/MMU/32 MiB
 configuration. Its exact binary and test scopes are in that report.
 Human full-race playtesting and real Amiga hardware testing remain deferred.
 
+## Current test matrix
+
+From 2.0b on, checks run through the local runner `tmp/dev/tools/ff1check.py`
+against one build, on WHDLoad 20.1 build 7190. The core profiles are:
+
+- A500 with 512 KiB Chip and 1.5 MiB Slow
+- chip-only 020 with 2 MiB Chip
+- 020 with 4 MiB Fast
+- cycle-exact 030 at 50 MHz and 040 at 40 MHz, each with 8 MiB Fast
+
+Core checks run on every source change: a 20-update smoke on every core
+profile, performance-mode FPS and CACR on the four 020-or-faster profiles, and
+the exact-state, stable-frame and elapsed-clock gates on 040.
+
+Feature checks run when a source file they cover changes, and all of them run
+for a release:
+
+- memory layouts, the only check that uses several A500 or chip-only setups
+- 030 with WHDLoad's MMU option and data cache, and 040 with the MMU
+- native lap completion and driving controls
+- season save, the race-control route and repair/transport clocks
+- CUSTOM2=0 native overlay reloads
+
+68060 and WHDLoad 17.0 are no longer tested. The slave's cache policy treats
+060 as a 040-class CPU. The slave still declares WHDLoad API 17, but only
+20.x runtimes are qualified. The sections below record earlier results; any
+060 or 17.0 result in them is historical.
+
 ## Accelerated clock calibration
 
 The first 030/040/060 measurements must not be used as nominal-frequency FPS
@@ -108,20 +136,17 @@ and a DOS file handle relocate.
 
 ## Qualified runtime and memory configurations
 
-Official WHDLoad 17.0 build 5139 passes 20-update functional checks on A500 with
-Fast memory, 020 with Fast memory, and 060 with Fast memory. The current shared
-runtime is WHDLoad 20.1 build 7190. The slave's required API version remains 17.
-On A500 with 512 KiB Chip and 1.5 MiB Slow, 17.0 displays “Can't allocate ExpMem”
-before game startup; the same configuration passes with 20.1. Chip-only 020 with 2 MiB Chip passes with 20.0, both with and without ExpChip.
+The qualified runtime is WHDLoad 20.1 build 7190. The slave's required API
+version remains 17. Historical WHDLoad 17.0 build 5139 checks passed only with
+Fast memory (A500, 020 and 060); 17.0 could not allocate ExpMem on A500 with
+1.5 MiB Slow or on chip-only 020. Those checks are no longer repeated.
+Chip-only 020 with 2 MiB Chip passes with 20.0, both with and without ExpChip.
 With 20.1 and its default configuration splash, it fails to allocate ExpMem,
 including with the older emulator observer. Adding `ConfigDelay=0` passes
 20 production updates on the same 2 MiB Chip configuration. The launcher already
 sets `SplashDelay=0`; both delays must be disabled for this tested configuration.
 This isolates the failure to startup memory pressure rather than game code or
-the observer correction. Disabling the configuration splash does not resolve
-the 17.0 allocation failure on A500 with 1.5 MiB Slow or chip-only 020.
-Use Fast memory for the qualified 17.0 configurations; API compatibility does
-not imply identical runtime memory requirements.
+the observer correction.
 
 With 20.1, A500 with 512 KiB Chip and 2 MiB Fast, without Slow memory, also
 passes. The production reservation is 768 KiB expansion memory in addition to
@@ -132,7 +157,7 @@ The tested smaller A500 arrangements (512 KiB Chip plus 512 KiB or 1 MiB
 Slow) and the 1 MiB Chip-only 020 do not start successfully. They are excluded
 from the qualified configurations. These are bounded startup/functionality
 checks, not a universal minimum-memory guarantee or an exhaustive runtime/OS
-cross-product. Runtime 17.0 save/load is not claimed by the 20-update checks.
+cross-product.
 
 Both CUSTOM1 values pass three matched legacy-loop state comparisons on all four
 original profiles: A500, A500+Fast, chip-only 020 and 020+Fast. All 26 state
@@ -313,8 +338,8 @@ hardware qualification. The unavailable Irek executable retains its original
 route and is not runtime-qualified. Enabled NTSC remains explicitly rejected.
 The original release's lower memory requirement is not preserved. The tested
 save/load configuration requires `NoWriteCache`; chip-only 020 with WHDLoad 20.1
-requires `ConfigDelay=0` and `SplashDelay=0`. WHDLoad 17.0 functional coverage is
-limited to the documented Fast-memory configurations. C4-T01 micro targets are
+requires `ConfigDelay=0` and `SplashDelay=0`. WHDLoad 17.0 and 68060 are not
+tested. C4-T01 micro targets are
 optional future optimization; the user-selected matched-workload gate passed.
 
 Local evidence: `tmp/dev/manifest/release-qualification.json`. The existing

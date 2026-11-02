@@ -478,5 +478,6 @@ FF1PublicMarker: dc.b 'FF1B7PUBLICROOT',0,0
  include "FerrariFormulaOne_PublicMemory.s"
  include "FerrariFormulaOne_PublicLoader.s"
  include "FerrariFormulaOne_PublicStack.s"
+ include "FerrariFormulaOne_Cache.s"
 
  include "ProductionHost.s"
