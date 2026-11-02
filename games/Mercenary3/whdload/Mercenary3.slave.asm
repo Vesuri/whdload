@@ -1364,8 +1364,24 @@ _objectmodel
 	cmp.w	(32,a1),d0
 	bne.b	.native
 	tst.w	(36,a1)
+	bne.b	.moving
+; Ships move after the renderer (Disk.1 $546A2). A pose recorded as static may
+; already be a pass ahead; draw the recorded pose, not the live one.
+	move.l	($581c,a0),d0
+	cmp.l	(12,a1),d0
+	bne.b	.moving
+	move.l	($5c1c,a0),d0
+	cmp.l	(16,a1),d0
+	bne.b	.moving
+	move.l	($601c,a0),d0
+	cmp.l	(20,a1),d0
+	bne.b	.moving
+	cmpa.w	#28*4,a0
+	bhs.b	.native
+	move.b	($6c1c,a0),d0
+	cmp.b	(35,a1),d0
 	beq.b	.native
-	movem.l	(sp)+,d0/a1
+.moving	movem.l	(sp)+,d0/a1
 	bra.b	.stage
 .native	movem.l	(sp)+,d0/a1
 	bra.w	_modelnative
@@ -1380,9 +1396,13 @@ _objectmodel
 	adda.l	d0,a1
 	move.w	(_object_alpha,pc),d6
 	move.w	(_pstate+4,pc),d7
+	tst.w	d7
+	beq.w	.draw
+; Caught up: the recorded pose. The live one may be a pass ahead.
 	cmp.w	d7,d6
-	bhs.w	.draw		; caught up: use the committed pose
-	move.l	a0,(a5)
+	bls.b	.alpha
+	move.w	d7,d6
+.alpha	move.l	a0,(a5)
 	move.l	($581c,a0),(4,a5)
 	move.l	($5c1c,a0),(8,a5)
 	move.l	($601c,a0),(12,a5)

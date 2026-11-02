@@ -345,8 +345,18 @@ the previous/current pair and elapsed fields at drawing time; delaying only the 
 frames would rewind objects. Geometry is staged at `$57C36`, after the native distance
 and nearest-object tests, and restored before each model returns. Collision, distance
 ordering, object selection and simulation keep committed poses. New/reappearing objects,
-scene/model changes and per-axis jumps over 32,767 units snap; stationary objects skip
-staging. The player proxy remains with P1. This works with the S3 copy or chip renderer.
+scene/model changes and per-axis jumps over 32,767 units snap. The player proxy remains
+with P1. This works with the S3 copy or chip renderer.
+
+Moving objects (Disk.1 `$546A2`) move after the renderer, so between
+renders their live pose is a pass ahead of the recorded one. Every staged drawing
+therefore uses the recorded pair. Once caught up, it draws the recorded current pose,
+not the live one. Only objects whose live pose and heading still match the recorded
+static pose skip staging. Previously these frames drew the live pose, and the next
+logic draw stepped back. On a user save at Tolosa with ships flying (slots 56–58,
+030, 600 fields), ship-blob direction reversals fall from 44% to 10% of steps, the level
+with bit 11 off. The remaining reversals are centroid noise from shape changes. Same
+session, `fps.py`, Custom1 `2097151`: 44.70 → 44.50 fps.
 
 Near the Eris bus crossing (HELP, F10, 150 fields walking), 20 consecutive 030 draws
 advance the bus by 256 units every two fields; committed motion stays 512 per four-field
