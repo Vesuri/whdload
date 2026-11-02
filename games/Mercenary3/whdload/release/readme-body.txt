@@ -28,8 +28,8 @@
  - Return to the operating system with the quit key.
 
  The installer enables the "Enhanced framerate" checkbox by default.
- Set it to Off for the original game behaviour; the 68040/68060
- missing-ground fix stays active. The equivalent tooltype
+ Set it to Off for the original game behaviour; fixes for the old
+ slave's display bugs stay active. The equivalent tooltype
  is CUSTOM5=1 for On or CUSTOM5=0 for Off; omission also means Off.
  Old CUSTOM1 settings are ignored.
  Smooth frames use completed movement, adding about 80 ms of visual delay

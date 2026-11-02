@@ -73,15 +73,16 @@ key code at chip `$8`, with `$FF` at `$9`.
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the startup control), reads options through `resload_Control` and keeps
 the shipped patch list. The release exposes **Enhanced framerate**, default On
-(`Custom5=1`), which selects all feature bits below. Off (`Custom5=0`) clears them
-except bit 15, the 68040/060 cache fix (R5); release builds ignore `Custom1`. The VERIFY build accepts `Custom1` as the individual
+(`Custom5=1`), which selects all feature bits below. Off (`Custom5=0`) keeps the
+original game's behaviour: it clears them except the fixes for shipped-slave defects,
+bit 0 (`_dmaon`) and bit 15 (R5); release builds ignore `Custom1`. The VERIFY build accepts `Custom1` as the individual
 feature mask with `Custom5=0`. Historical measurements below name those feature bits. It asks for an optional 288 KB of expansion memory (`ws_ExpMem`):
 4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
 20 KB for bit 4's presentation restore buffer, 104 KB for bits 9/17's renderer copies and
 96 KB for bit 10's aligned staging bitmap, 12 KB for bit 11's object histories and
 20 KB for bit 20's render scratch.
 If allocation fails, the stack, code and
-tables retain their chip paths; presentation falls back to logic gating. With every option off it runs the shipped slave's code paths.
+tables retain their chip paths; presentation falls back to logic gating. With every `Custom1` bit off (VERIFY) it runs the shipped slave's code paths.
 
 | Option | Effect |
 | --- | --- |
@@ -293,11 +294,24 @@ secondary reader still takes its original early-exit branch. This applies only t
 new limit with its other drawing state. The release applies the fix in both
 settings (user decision: fix the shipped defect also with Enhanced framerate Off).
 
-Release Off (`Custom5=0`, only bit 15) against the shipped slave, 040-25 cell, the same
+Release Off with only bit 15 (`Custom5=0`, before bit 0 joined it) against the shipped slave, 040-25 cell, the same
 outside-prison turn/stop and 600 stationary fields each (gray ground counted in the
 view's lower rows): shipped 12 fields without the ground, release Off none. A500
 options-off and shipped each give 37 frames; bit 15 acts only on 68040/060.
 Evidence: `tmp/bit15/`.
+
+### Off: original game behaviour
+
+Off keeps the original game's behaviour, not the shipped slave's (user decision). It
+keeps the two fixes for shipped-slave defects: bit 0 (the shipped `_dmaon` copies 22 of
+the 34 palette bytes and waits for a vertical blank every frame; see the patch list
+above) and bit 15 (R5). Same session, `a500-1.5m`, 500 fields: release Off 41 frames,
+VERIFY `Custom5=0 Custom1=32769` (bits 0 and 15) 41, shipped 37. World speed with bits
+0 and 15 on `a1200-fast` (`sim_speed.py PER_FRAME=1`): walking `-6 × dt`, turning
+`2 × dt`. Release Off on the 040-25 cell, the R5 turn/stop and 600 stationary fields:
+no missing ground, same major colours as the shipped capture, intact screenshots.
+The options-off check now compares release Off with the VERIFY build's bits 0 and 15.
+Evidence: `tmp/bit0/`.
 
 Same build/session, CACHE PRELOAD, 600 stationary fields after the outside-prison
 turn: bit 15 off has 10 fields with the gray ground absent; on has zero. The

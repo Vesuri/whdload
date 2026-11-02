@@ -80,11 +80,13 @@ _boot		;	A0 = resident loader
 	jsr	(resload_Control,a2)
 
 ; Boolean player control (enabled by the installed icon). VERIFY retains Custom1 for individual feature
-; comparisons when Custom5=0. The release Off setting clears every feature except bit 15,
-; which fixes a 68040/060 cache defect present in the shipped slave (user decision).
+; comparisons when Custom5=0. Off keeps the original game's behaviour, not the shipped
+; slave's defects (user decision): the release Off setting keeps bit 0 (the shipped
+; _dmaon drops part of the palette copy and waits a field every frame) and bit 15
+; (the 68040/060 cache-safe clipping limit) and clears every other feature.
 	lea	(_custom1,pc),a0
 	IFND VERIFY
-	move.l	#1<<15,(a0)
+	move.l	#1<<15|1<<0,(a0)
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready

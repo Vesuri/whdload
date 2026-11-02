@@ -10,8 +10,8 @@ are in order of value; take the first one not done whose dependencies are met. D
 - **One option per feature for development.** Each behaviour change has a `Custom1`
   bit in `whdload/Mercenary3.slave.asm`. VERIFY accepts these with `Custom5=0`. The
   release exposes one **Enhanced framerate** control, default On (`Custom5=1`); Off
-  (`Custom5=0`) runs the shipped code plus bug fixes for shipped defects (R5's 68040/060
-  cache fix; user decision) and ignores individual-feature settings. Debug aids go in the `VERIFY` build.
+  (`Custom5=0`) keeps the original game's behaviour: the shipped code plus fixes for the
+  shipped slave's defects (bits 0 and 15; user decision). It ignores individual-feature settings. Debug aids go in the `VERIFY` build.
 - **Build** with `make original slave verify` before each commit.
 - **Measure** with `tools/fps.py` on `a1200-fast`, `a500-1.5m` and the existing `040-25` matrix configuration: the same build with the
   option off and on, same session. Keep a change only if it gives a repeatable measured
@@ -30,8 +30,9 @@ are in order of value; take the first one not done whose dependencies are met. D
   the 020 profile per routine ([F0](internals.md#f0-one-field-frame-budget-03050)).
   The cycle-exact 030/50 remains the reference fast machine (S0, user decision).
 - **Check the game still works** with three tests, not more:
-  1. **Options off:** the performance slave gives the shipped slave's frame count in the
-     same session on `a500-1.5m`.
+  1. **Options off:** release `Custom5=0` gives the same frame count as the VERIFY build
+     with only the slave fixes (`CUSTOM5=0 CUSTOM1=32769`) in the same session on
+     `a500-1.5m`. The shipped slave gives fewer frames because of its `_dmaon` wait.
   2. **World speed:** `tools/sim_speed.py` shows the native walking and turning rates per
      field (6 units, 2 heading units).
   3. **Play:** play the route, and the screens the step touches, and look at the

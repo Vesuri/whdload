@@ -63,7 +63,8 @@ Run the instrumented build with `SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARG
 profile and game-time tools take the same `SLAVE` and `WHD_ARGS` and record them.
 
 The release shows only **Enhanced framerate**, a boolean checkbox, enabled by the installed icon (`CUSTOM5=1`). Off
-(`CUSTOM5=0`) clears every feature except the 68040/060 cache fix (bit 15); release builds
+(`CUSTOM5=0`) keeps the original game's behaviour: it clears every feature except the
+fixes for shipped-slave defects (bits 0 and 15, `CUSTOM1=32769` in VERIFY); release builds
 ignore `CUSTOM1`. For individual
 features in VERIFY, supply `CUSTOM5=0 CUSTOM1=<mask>`; with Custom5 omitted, VERIFY
 uses only the individual feature mask. Custom2–4 remain VERIFY-only instruments.
