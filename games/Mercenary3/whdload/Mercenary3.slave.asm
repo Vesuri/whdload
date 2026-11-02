@@ -1192,6 +1192,8 @@ _objectdraw
 	lea	(_inpresent,pc),a6
 	lea	(_object_active,pc),a0
 	clr.w	(a0)
+	tst.w	($70a2).w		;recorded-input replay: native (see _presentgate)
+	bne.w	.reset
 	move.w	($7142).w,d0
 	cmp.w	($7122).w,d0
 	bne.w	.reset
@@ -1845,6 +1847,11 @@ _presentgate
 	lea	(_viewready,pc),a0
 	clr.w	(a0)
 	lea	(_pstate,pc),a5
+; $70A2: the game replays recorded input from $709A (a passenger flight). With
+; presentations or interpolated objects the flight leaves the recording's course,
+; so replay keeps native drawing; the logic gate still applies.
+	tst.w	($70a2).w
+	bne.w	.other
 	move.w	($7142).w,d0
 	cmp.w	($7122).w,d0
 	bne.w	.other

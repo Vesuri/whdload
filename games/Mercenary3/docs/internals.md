@@ -385,6 +385,18 @@ Boarding/leaving resets history; transport, scene, planet and floor changes snap
 Transport displacements over 32,767 units per axis also snap to avoid signed-word
 arithmetic overflow. Enclosed rooms retain native drawing.
 
+A passenger flight is a recording: with `$70A2` set, the game reads its joystick
+input from the list at `$709A`, keyed to the pass counter `$7180` (Disk.1 `$5CB7A`,
+`$5D07C`, `$5D5A4`). With P1/P3 presentations during the replay, the ship leaves the
+recorded course. On the 030 the spaceport trip ended at Damocles instead of Tolosa,
+with full-view gray frames, a doubled pilot and a jumping camera. The cause has not
+been isolated; restoring `$7056..$7059` and `$709A..$709D` around presentations does
+not change it. During replay, `_presentgate` and `_objectdraw` therefore keep native
+drawing, while the logic gate still applies. On the 030 that trip (a user save, B
+to board) has no one-frame glitches over 2,500 fields and lands at Tolosa, as with
+Enhanced framerate off. The trip's game time follows the pass rate, as in the
+original game: it lands at clock 00-23 with the release and 01-26 with Off.
+
 Lifts already use walking mode and the tick timer at Disk.1 `$5A644`: the camera
 changes height at arrival, not continuously during travel. P3 preserves that behaviour
 and suppresses extrapolation across floor changes. The restore set grows from 17,366
