@@ -169,6 +169,13 @@ Optional workspace grows to 288 KB. Same-build off/on FPS, repeated twice:
 | Reference 030/50 | 29.60 | 48.00 |
 | 040 emulator | 26.90 | 44.50 |
 
+These counts predate a correction: F5 translated one read of the edge byte array at
+`$4070..$416F` (Disk.1 `$593D6`) and dropped edges, giving a dotted or gray ground line.
+Corrected, the 030 measures 27.60 → 44.70 fps in one session; the other rows and F6's
+figures are from the uncorrected build. F2 also no longer relocates the four doorway
+`lea $97DC,a1`: their table lies outside the copy, and the player stuck on the first
+room's doors.
+
 On the 030, mean frame work falls 19.85 → 15.60 ms and the worst 22.56 → 17.71 ms. No
 interval exceeds a field, and 464 of 480 cadence intervals are one field. The
 presentation copies fall to about 1.4 ms each. Game variables stay in chip, because

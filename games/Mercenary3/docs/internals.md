@@ -1521,14 +1521,19 @@ The generator works as follows:
 - It re-decodes the whole translation (capstone, 68020) and checks every operand: 15,923
   instructions.
 
-Five abs.w/d16 operands in the moved range are not scratch accesses and are excluded:
+Six abs.w/d16 operands in the moved range are not scratch accesses and are excluded:
 
 - `$5D9CE` is an object index.
 - `$5DCDE..$5DD1E` are pointers into the variables.
+- `$593D6` (`move.b $4070(a0),d3`, a0 up to `$FC`) reads the edge byte array
+  `$4070..$416F`. That array starts in the moved range but runs past `$4080`, and code
+  outside the blocks writes it in chip, as do `$4160.w`/`$4168.w` at `$59444`.
+  Translated, the read got stale bytes, so the renderer dropped or recoloured edges:
+  the ground line was dotted on the route and showed as a gray stripe outdoors.
 
 The translation covers 16 blocks: M1's two, S3/F2's and five new blocks that also use the
 scratch (Disk.1 `$5F61C..$5FA3F`, `$5EA34..$5F327`, `$57374..$5765D`, `$5A644..$5A6E7`,
-`$5D6D4..$5D78B`). They come to 56,872 bytes (+2,538), with 544 rewritten operands, 7 new
+`$5D6D4..$5D78B`). They come to 56,872 bytes (+2,534), with 543 rewritten operands, 7 new
 chip entry jumps and 24 new relocated operands. M1's blocks are translated in
 `_hotcode`, the render blocks in `_f5renderer`. F5 then performs these steps:
 
@@ -1560,6 +1565,12 @@ per setup (both runs identical):
 | 020 fast | 13.70 | 14.10 |
 | Reference 030/50 | 29.60 | 48.00 |
 | Existing 040-25 emulator cell | 26.90 | 44.50 |
+
+These figures, the beam probes below and F6 predate the `$593D6` correction; the
+edges it lost were never drawn. Measured again in one session with the corrected VERIFY
+build, Custom1 `1048575 → 2097151` on the reference 030 gives **27.60 → 44.70 fps**.
+The uncorrected translation gives 48.00 in that session. The other setups and the
+beam figures have not been measured again.
 
 Reference 030 beam probes over fields 175..500: mean frame work **19.85 → 15.60 ms**,
 worst **22.56 → 17.71 ms**. Before F5, 113 of 210 intervals exceeded 20 ms; with F5,

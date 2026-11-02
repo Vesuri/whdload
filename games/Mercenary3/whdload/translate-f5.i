@@ -12,13 +12,13 @@ _f5_blocks
 	dc.l	$569ae-$3cb0,$56c42-$3cb0,F5RENDER+$74bc,_f5_r6-_f5_blocks,_f5_t6-_f5_blocks
 	dc.l	$57374-$3cb0,$5899c-$3cb0,F5RENDER+$7750,_f5_r7-_f5_blocks,_f5_t7-_f5_blocks
 	dc.l	$593a6-$3cb0,$59470-$3cb0,F5RENDER+$8e50,_f5_r8-_f5_blocks,_f5_t8-_f5_blocks
-	dc.l	$5a644-$3cb0,$5a6e8-$3cb0,F5RENDER+$8f38,_f5_r9-_f5_blocks,_f5_t9-_f5_blocks
-	dc.l	$5a91e-$3cb0,$5aab0-$3cb0,F5RENDER+$8ffc,_f5_r10-_f5_blocks,_f5_t10-_f5_blocks
-	dc.l	$5afa8-$3cb0,$5b030-$3cb0,F5RENDER+$9190,_f5_r11-_f5_blocks,_f5_t11-_f5_blocks
-	dc.l	$5b918-$3cb0,$5c8f8-$3cb0,F5RENDER+$922c,_f5_r12-_f5_blocks,_f5_t12-_f5_blocks
-	dc.l	$5d6d4-$3cb0,$5d78c-$3cb0,F5RENDER+$a2cc,_f5_r13-_f5_blocks,_f5_t13-_f5_blocks
-	dc.l	$5d844-$3cb0,$5de1a-$3cb0,F5RENDER+$a3ac,_f5_r14-_f5_blocks,_f5_t14-_f5_blocks
-	dc.l	$5e840-$3cb0,$61506-$3cb0,F5RENDER+$a9c0,_f5_r15-_f5_blocks,_f5_t15-_f5_blocks
+	dc.l	$5a644-$3cb0,$5a6e8-$3cb0,F5RENDER+$8f34,_f5_r9-_f5_blocks,_f5_t9-_f5_blocks
+	dc.l	$5a91e-$3cb0,$5aab0-$3cb0,F5RENDER+$8ff8,_f5_r10-_f5_blocks,_f5_t10-_f5_blocks
+	dc.l	$5afa8-$3cb0,$5b030-$3cb0,F5RENDER+$918c,_f5_r11-_f5_blocks,_f5_t11-_f5_blocks
+	dc.l	$5b918-$3cb0,$5c8f8-$3cb0,F5RENDER+$9228,_f5_r12-_f5_blocks,_f5_t12-_f5_blocks
+	dc.l	$5d6d4-$3cb0,$5d78c-$3cb0,F5RENDER+$a2c8,_f5_r13-_f5_blocks,_f5_t13-_f5_blocks
+	dc.l	$5d844-$3cb0,$5de1a-$3cb0,F5RENDER+$a3a8,_f5_r14-_f5_blocks,_f5_t14-_f5_blocks
+	dc.l	$5e840-$3cb0,$61506-$3cb0,F5RENDER+$a9bc,_f5_r15-_f5_blocks,_f5_t15-_f5_blocks
 	dc.l	0
 ; Moved data: chip start, end, offset in the F5 data area (+ chip address).
 _f5_data
@@ -53,42 +53,42 @@ _f5_branches
 	dc.l	$588ec-$3cb0,$5c030-$3cb0,F5RENDER+$8e3c
 	dc.l	$588f2-$3cb0,$5c028-$3cb0,F5RENDER+$8e42
 	dc.l	$58906-$3cb0,$5341c-$3cb0,F5RENDER+$8e48
-	dc.l	$59406-$3cb0,$5b038-$3cb0,F5RENDER+$8f1e
-	dc.l	$59432-$3cb0,$5c096-$3cb0,F5RENDER+$8f24
-	dc.l	$59458-$3cb0,$5c096-$3cb0,F5RENDER+$8f2a
-	dc.l	$5946e-$3cb0,$5c096-$3cb0,F5RENDER+$8f30
-	dc.l	$5a66a-$3cb0,$5a6e8-$3cb0,F5RENDER+$8fe8
-	dc.l	$5a6c0-$3cb0,$5a762-$3cb0,F5RENDER+$8fee
-	dc.l	$5a6cc-$3cb0,$5a762-$3cb0,F5RENDER+$8ff4
-	dc.l	$5aff0-$3cb0,$5b038-$3cb0,F5RENDER+$9218
-	dc.l	$5b01c-$3cb0,$58674-$3cb0,F5RENDER+$921e
-	dc.l	$5b022-$3cb0,$5c046-$3cb0,F5RENDER+$9224
-	dc.l	$5d700-$3cb0,$59470-$3cb0,F5RENDER+$a386
-	dc.l	$5d748-$3cb0,$56582-$3cb0,F5RENDER+$a38c
-	dc.l	$5d74c-$3cb0,$5a074-$3cb0,F5RENDER+$a392
-	dc.l	$5d75e-$3cb0,$5dde0-$3cb0,F5RENDER+$a398
-	dc.l	$5d786-$3cb0,$58c38-$3cb0,F5RENDER+$a39e
-	dc.l	$5d78a-$3cb0,$5deea-$3cb0,F5RENDER+$a3a4
-	dc.l	$5db1e-$3cb0,$59048-$3cb0,F5RENDER+$a982
-	dc.l	$5dc08-$3cb0,$5912e-$3cb0,F5RENDER+$a988
-	dc.l	$5dc10-$3cb0,$5912e-$3cb0,F5RENDER+$a98e
-	dc.l	$5dc4e-$3cb0,$5912e-$3cb0,F5RENDER+$a994
-	dc.l	$5dc9c-$3cb0,$5a768-$3cb0,F5RENDER+$a99a
-	dc.l	$5dca8-$3cb0,$5a768-$3cb0,F5RENDER+$a9a0
-	dc.l	$5dcb6-$3cb0,$58c38-$3cb0,F5RENDER+$a9a6
-	dc.l	$5dd56-$3cb0,$5ae4c-$3cb0,F5RENDER+$a9ac
-	dc.l	$5dd64-$3cb0,$59470-$3cb0,F5RENDER+$a9b2
-	dc.l	$5ddac-$3cb0,$5d016-$3cb0,F5RENDER+$a9b8
-	dc.l	$5f40c-$3cb0,$59048-$3cb0,F5RENDER+$de70
-	dc.l	$5f4c2-$3cb0,$5b918-$3cb0,F5RENDER+$de76
-	dc.l	$5f4f4-$3cb0,$586f8-$3cb0,F5RENDER+$de7c
-	dc.l	$5fe9c-$3cb0,$5bf48-$3cb0,F5RENDER+$de82
-	dc.l	$60250-$3cb0,$5bf48-$3cb0,F5RENDER+$de88
-	dc.l	$603fc-$3cb0,$5bf48-$3cb0,F5RENDER+$de8e
-	dc.l	$608c0-$3cb0,$5bf48-$3cb0,F5RENDER+$de94
-	dc.l	$60cf4-$3cb0,$5bf48-$3cb0,F5RENDER+$de9a
-	dc.l	$6102a-$3cb0,$5bf48-$3cb0,F5RENDER+$dea0
-	dc.l	$61504-$3cb0,$5bf48-$3cb0,F5RENDER+$dea6
+	dc.l	$59406-$3cb0,$5b038-$3cb0,F5RENDER+$8f1a
+	dc.l	$59432-$3cb0,$5c096-$3cb0,F5RENDER+$8f20
+	dc.l	$59458-$3cb0,$5c096-$3cb0,F5RENDER+$8f26
+	dc.l	$5946e-$3cb0,$5c096-$3cb0,F5RENDER+$8f2c
+	dc.l	$5a66a-$3cb0,$5a6e8-$3cb0,F5RENDER+$8fe4
+	dc.l	$5a6c0-$3cb0,$5a762-$3cb0,F5RENDER+$8fea
+	dc.l	$5a6cc-$3cb0,$5a762-$3cb0,F5RENDER+$8ff0
+	dc.l	$5aff0-$3cb0,$5b038-$3cb0,F5RENDER+$9214
+	dc.l	$5b01c-$3cb0,$58674-$3cb0,F5RENDER+$921a
+	dc.l	$5b022-$3cb0,$5c046-$3cb0,F5RENDER+$9220
+	dc.l	$5d700-$3cb0,$59470-$3cb0,F5RENDER+$a382
+	dc.l	$5d748-$3cb0,$56582-$3cb0,F5RENDER+$a388
+	dc.l	$5d74c-$3cb0,$5a074-$3cb0,F5RENDER+$a38e
+	dc.l	$5d75e-$3cb0,$5dde0-$3cb0,F5RENDER+$a394
+	dc.l	$5d786-$3cb0,$58c38-$3cb0,F5RENDER+$a39a
+	dc.l	$5d78a-$3cb0,$5deea-$3cb0,F5RENDER+$a3a0
+	dc.l	$5db1e-$3cb0,$59048-$3cb0,F5RENDER+$a97e
+	dc.l	$5dc08-$3cb0,$5912e-$3cb0,F5RENDER+$a984
+	dc.l	$5dc10-$3cb0,$5912e-$3cb0,F5RENDER+$a98a
+	dc.l	$5dc4e-$3cb0,$5912e-$3cb0,F5RENDER+$a990
+	dc.l	$5dc9c-$3cb0,$5a768-$3cb0,F5RENDER+$a996
+	dc.l	$5dca8-$3cb0,$5a768-$3cb0,F5RENDER+$a99c
+	dc.l	$5dcb6-$3cb0,$58c38-$3cb0,F5RENDER+$a9a2
+	dc.l	$5dd56-$3cb0,$5ae4c-$3cb0,F5RENDER+$a9a8
+	dc.l	$5dd64-$3cb0,$59470-$3cb0,F5RENDER+$a9ae
+	dc.l	$5ddac-$3cb0,$5d016-$3cb0,F5RENDER+$a9b4
+	dc.l	$5f40c-$3cb0,$59048-$3cb0,F5RENDER+$de6c
+	dc.l	$5f4c2-$3cb0,$5b918-$3cb0,F5RENDER+$de72
+	dc.l	$5f4f4-$3cb0,$586f8-$3cb0,F5RENDER+$de78
+	dc.l	$5fe9c-$3cb0,$5bf48-$3cb0,F5RENDER+$de7e
+	dc.l	$60250-$3cb0,$5bf48-$3cb0,F5RENDER+$de84
+	dc.l	$603fc-$3cb0,$5bf48-$3cb0,F5RENDER+$de8a
+	dc.l	$608c0-$3cb0,$5bf48-$3cb0,F5RENDER+$de90
+	dc.l	$60cf4-$3cb0,$5bf48-$3cb0,F5RENDER+$de96
+	dc.l	$6102a-$3cb0,$5bf48-$3cb0,F5RENDER+$de9c
+	dc.l	$61504-$3cb0,$5bf48-$3cb0,F5RENDER+$dea2
 	dc.l	0
 ; Chip entries of the F5 blocks (F2 and M1 entries are installed as before).
 _f5_entries
@@ -220,9 +220,9 @@ _f5_t7
 	dc.w	$0298,36,$03a6,40,$03ce,44,$03d2,48,$09aa,52,$09b0,56,$09b4,60,$0cca,64
 	dc.w	$0cd6,68,$0cf4,72,$0cf8,76,$0d4e,78,$107a,82,$ffff
 _f5_r8
-	dc.w	$1018,$3018,$5000,$4070,$101c,$4000,$ffba,$2001,$102e,0
+	dc.w	$1065,0
 _f5_t8
-	dc.w	$0034,4,$ffff
+	dc.w	$ffff
 _f5_r9
 	dc.w	$1004,$3018,$5000,$3e19,$1045,$30c0,$1001,$5000,$3e1a,$30c0,$1001,$5000,$3e19,$1001,0
 _f5_t9

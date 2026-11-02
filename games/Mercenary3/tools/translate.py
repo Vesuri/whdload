@@ -63,8 +63,10 @@ F5_BLOCKS = [
 ]
 # Operands that only look like scratch addresses. $5D9CE: lea $3fc.w,a0 is object
 # index 255 (times 4) for the object arrays ($581E(a0), ...), as at $5727A and $59876.
-# $5DCDE..$5DD1E: a1 = a0 + $5350 points into the variables.
-NOT_SCRATCH = {0x5d9ce - D, 0x5dcde - D, 0x5dcf6 - D, 0x5dcfc - D, 0x5dd1e - D}
+# $5DCDE..$5DD1E: a1 = a0 + $5350 points into the variables. $593D6: move.b $4070(a0),d3
+# reads the edge byte array $4070..$416F (a0 up to $FC, as $4160.w/$4168.w at $59444), which
+# starts inside the moved range but is written in chip.
+NOT_SCRATCH = {0x5d9ce - D, 0x5dcde - D, 0x5dcf6 - D, 0x5dcfc - D, 0x5dd1e - D, 0x593d6 - D}
 # Displacements of display-plane offsets ($1F40 per plane), never scratch.
 PLANE = [(0x1f00, 0x1f80), (0x3e40, 0x3ec0)]
 
