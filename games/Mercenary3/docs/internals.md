@@ -406,6 +406,10 @@ drawing, while the logic gate still applies. On the 030 that trip (a user save, 
 to board) has no one-frame glitches over 2,500 fields and lands at Tolosa, as with
 Enhanced framerate off. The trip's game time follows the pass rate, as in the
 original game: it lands at clock 00-23 with the release and 01-26 with Off.
+While the ship turns, the cockpit creeps sideways and then snaps back every four passes.
+Off shows the same sequence of pilot positions, so this is native and only more frequent
+at the release's pass rate. Vehicle headings are bytes (Disk.1 `$555F0` stores
+`$6CE0 >> 2`), while the camera uses 1024 units.
 
 Lifts already use walking mode and the tick timer at Disk.1 `$5A644`: the camera
 changes height at arrival, not continuously during travel. P3 preserves that behaviour
