@@ -21,9 +21,9 @@ FEATURES:
 - Fully compatible with F1GP-Ed modifications to the game file!
 - Intro can be skipped by pressing fire/left mouse while loading or by
   setting the CUSTOM1=1 tooltype
-- Full 1991 season drivers and teams replace the built-in names unless you
-  have modified your version of the game with F1GP-Ed (2.0b: unless any
-  driver, team or engine name was changed)
+- Full 1991 season drivers and teams replace the built-in names unless any
+  driver, team or engine name was changed with F1GP-Ed (3 disk release:
+  unless the first driver's name was changed)
 - All save operations default to a "saves" subdirectory so as not to
   clutter up the main game directory
 - Filter button enabled by default when loading/saving (prevents the list
@@ -36,7 +36,7 @@ FEATURES:
 
 HISTORY:
 
-Version 2.0b (31.10.2026) by Vesuri (beta):
+Version 2.0b (02.11.2026) by Vesuri (beta):
 - Consistent game speed on a 68020 or better: the race runs in real time
   however long the 3D view takes to draw. A 68000 keeps the original timing
 - Smooth motion on a 68020 or better: the 3D view is drawn between the
@@ -51,7 +51,7 @@ Version 2.0b (31.10.2026) by Vesuri (beta):
   only while the game code they change is the original. F1GP-Ed's settings
   keep it; a game file changed there by other means runs without them
 - F1GP-Ed's cockpit designs and replaced backdrops work with the
-  enhancements; the gear indicator is drawn where the cockpit puts it
+  enhancements
 - F1GP-Ed's frame rate setting (used by its 1995-2002 datafiles) sets how
   often the game updates the world; the race runs in real time at that
   rate, and motion stays smooth between the updates
@@ -76,6 +76,9 @@ Version 2.0b (31.10.2026) by Vesuri (beta):
   saved as F1GP-Ed.f1gp in the data directory, as F1GP-Ed's memory patch
   does, in place of the game file's Speed Factor. The wet weather reduction
   and risk factors are not applied
+- Fixed: the 1991 names no longer replace driver, team or engine names
+  edited with F1GP-Ed when the first driver's name was left unchanged
+  (4 disk release)
 - Requires WHDLoad V20+
 
 Version 1.0 (06.12.2002) by Codetapper/Action:

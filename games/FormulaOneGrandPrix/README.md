@@ -6,12 +6,13 @@ The goal is real-time simulation independent of frame rate, smooth presentation 
 
 The supplied four-disk installation uses Codetapper's v1.0 WHDLoad slave.
 No source is available for the supplied slave; this repository contains a rebuilt
-loader. B1–B4 and A1/A2/A3/A5/A6 are complete. B5 cache validation is blocked by an
-unsuccessful 68040 startup check; A7 measurements are incomplete and A8 has not started.
-All 68030 validation is deferred. The cache policy is opt-in and disabled by default;
-real-time simulation and extrapolation are not implemented yet.
+loader. The mapping (A), the rebuild (B), the real-time world clock (C), smooth
+presentation between the game's updates (D), the performance work (E), F1GP-Ed
+compatibility (F) and the step-dependence fixes (H) are complete; they are developer
+options, enabled through the release icons. The release (G) is in progress: `make dist`
+builds the 2.0b beta archive.
 
-See [current status and next steps](docs/open-work.md) for the blocker and scope, and
+See [current status and next steps](docs/open-work.md) for the scope, and
 [internals](docs/internals.md) for the evidence and executable structure.
 
 - [Development setup](docs/development.md)

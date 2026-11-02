@@ -45,7 +45,7 @@ slv_info dc.b 'Installed by Codetapper/Action! and Vesuri',10
         dc.b 0
         dc.b '$','VER: FormulaOneGrandPrix.slave '
         DECL_VERSION
-        dc.b ' (31.10.2026)',0
+        dc.b ' (02.11.2026)',0
         IFNE DEVELOPER
         EVEN
 slv_MemConfig dc.l CHIPMEMSIZE,$40000+FASTMEMSIZE+E_AREAS  ; kick13.s's KICKSIZE first
