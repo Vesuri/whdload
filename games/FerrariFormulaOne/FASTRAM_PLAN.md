@@ -1,0 +1,737 @@
+# Fast RAM rendering and 50 FPS: plan (FR series, 2026-11-02)
+
+Goal: on every machine where it is faster, draw each frame with the CPU into
+Fast RAM and copy the finished image to Chip RAM once. Up to one new frame per
+PAL field (20.03 ms, 49.92 FPS) is supported; that is the ceiling, not a
+target (user decision, 2026-11-02). Game logic keeps its native
+speed: the player at 20 ms and opponents at native 100 ms with the existing B8
+render-pose blending. Nothing changes for the A500, the chip-only 020,
+`CUSTOM2=0` or Irek's version.
+
+This continues the H series in [RENDERING_PLAN.md](RENDERING_PLAN.md). It
+supersedes H14 (CPU road) and H15 (dense cars) on machines that take the Fast
+RAM path. It also covers most of H16's purpose: drawing into Fast RAM never
+waits for the beam. Step IDs are FR0–FR10. Estimates are labelled; every
+number not marked "measured" is to be confirmed by the step that needs it.
+
+## 1. What is known
+
+**Frame structure.** `FF1PresentationAfterTick` draws once it has caught up
+with the 20 ms ticks, so the fine path has no 25 FPS cap. A frame shows in one
+field when the work from one publication to the next fits in a field.
+`B8Draw` currently does the following, in order:
+
+1. Request `LoadView` of the previous frame (`$2428a`).
+2. `OwnBlitter`, then prepare the road (H3).
+3. Wait for line 256, or for a field that has passed since the request
+   (`B8_65728`).
+4. Clear and draw the back buffer:
+   - clear `$6b050` and `$6b950`;
+   - road `$6b368` and `$6bf90`;
+   - cars `$69bb8`;
+   - mirrors `$6ae70` and `$6af7e`, with their `$24ae0` bitmap operations;
+   - pit messages;
+   - cockpit `$6c0d0` and `$6ba18`, gauges `$6bbfc`, `$293d0` and `$6adf8`;
+   - demo text `$239a0`, the flag and the clock.
+5. `DisownBlitter`, then the instruments (`$6694e`).
+
+The next loop's `WaitBlit` completes the last blits.
+
+**Display.** There are two Chip banks of three planes each, used alternately.
+The native view is 384 × 200 pixels with 48-byte rows. In the A500
+calibration the planes are allocated 10,320 bytes apart (215 rows), and the
+first visible fetch is base + 4. Some rows near the top are not cleared every
+frame; the flag, clock and demo text live there. A whole three-plane bank is
+28,800 bytes for 200 rows. If only 40 of the 48 bytes per row are displayed,
+the visible part is 24,000 bytes; FR1 confirms this.
+
+**Why the accelerated machines stall.** On the 040 the CPU mostly waits for
+the blitter. The blitter and Chip RAM run at the same speed on every model.
+Measured on 040‑40 BCE, grid scene, before H9–H13:
+
+| Stage | ms per frame |
+| --- | ---: |
+| Road | 10.2 |
+| Clear | 4.7 |
+| Cars | 4.7 |
+| `$6b950` | 3.3 |
+| Cockpit, gauges and mirrors | about 11.7 |
+| Text and HUD | about 2.5 |
+
+The post-wait draw after H13 is about 36.8 ms. In dense packs the cars alone
+take 33–41 ms. The current 040‑40 BCE frame rates are 24.51 (normal), 24.96
+(solo), 24.92 (grid) and 12.48 FPS (dense). The 030‑50 BCE rates are similar
+in common scenes.
+
+**Sibling results.**
+
+- **Mercenary 3 (S4/F):** staged its 3D view in Fast RAM and copied
+  21,760 bytes to Chip with `movem` in 3.3 ms on the 030/50, measured. It
+  reached 48 FPS on the 030/50 only after its code and scratch also moved to
+  Fast RAM (F2–F5).
+- **TFX:** copies only changed blocks to Chip on the 040; that does not pay
+  on a cacheless 020.
+- **Gunship:** draws its enhanced 3D view with the CPU in Fast RAM.
+
+**Lessons from earlier work here.**
+
+- A CPU cookie-cut that writes to Chip RAM lost on the 040 (H13: 36.97 to
+  40.66 ms). CPU work only pays when it replaces Chip-bus work. It must not run
+  alongside it.
+- The 020 and 030 get no data cache. With WHDLoad's MMU option, the data cache
+  crashed performance-mode startup, and HEAD crashes the same way.
+- 060 is treated as 040-class and not tested separately. Real hardware
+  testing is deferred, so every figure here is from the emulator.
+
+## 2. Design
+
+**Per-bank Fast shadows.** Each Chip bank gets a Fast RAM shadow of the same
+layout (2 × 30,960 bytes for 215 rows). Every drawing write meant for bank X
+goes to shadow X. One shadow per bank keeps the native semantics of
+uncleared regions exactly: each bank still shows what was last drawn into
+that bank. As a result, the existing exact frame gates remain valid.
+
+**Copy point.** `B8Draw` runs a prefix of its stages into the shadow, then
+copies the region the prefix owns from the shadow to the Chip bank, then runs
+the remaining stages natively in Chip:
+
+- At the start of the series the prefix is empty; that is the equal-layout
+  control.
+- Each FR5 step moves the copy point one stage later.
+- At the end there are no blits during driving, and the copy is the only
+  write to Chip.
+
+**Publication.** Drawing into Fast RAM never conflicts with the display, so
+the line-256/field wait moves from before drawing to before the copy. The copy
+goes only into the bank that is not displayed. `LoadView` follows the copy.
+Consequences:
+
+- The CPU draws frame N+1 while frame N waits for its field. Lost waiting time
+  shrinks without a third Chip bank.
+- A frame that misses the field is shown one field later, as today.
+
+**Software blitter.** The blitter cannot reach Fast RAM, so every blit in a
+redirected stage must run on the CPU:
+
+- **Exact reference first (FR2):** a complete software blitter, the oracle
+  for everything that follows.
+- **Specialized kernels second (FR6):** for the measured hot cases.
+
+Redirection happens at the native blit sites:
+
+- The custom-register writes go to a Fast register image.
+- The `BLTSIZE` write becomes a call that executes the blit with addresses
+  translated. Bank addresses go to the shadow; source addresses go to Fast
+  mirrors where they exist.
+- `WaitBlit`/`OwnBlitter` inside redirected stages cost nothing because the
+  blits are synchronous.
+
+The race code is already a public relocated copy with a patch ledger, so this
+uses the existing patch and restore machinery.
+
+**Activation.**
+
+- Only in performance mode (`CUSTOM2=1`).
+- Only on CPUs where it measurably beats today's path (user decision,
+  2026-11-02). FR0 makes the first estimate; FR10 decides per CPU.
+- Only with real Fast RAM and successful allocation of every FR buffer.
+  Otherwise today's path runs unchanged, with no half-enabled state.
+
+The 68000 and chip-only 020 payloads stay byte-identical.
+
+## 3. Steps
+
+Each step is one switchable, equal-layout change and one commit, unless the
+step says it is analysis only. Re-measure after each accepted step, and do not
+stack estimates. The gates in section 4 apply to every code step; additional
+gates are listed per step.
+
+### FR0 — Feasibility and budget (diagnostic fixtures only)
+
+Decide whether 50 FPS is reachable and on which CPUs before writing any
+production code. Run on 040‑40 BCE and 030‑50 BCE in normal, solo, grid and
+dense, with 300 complete presentations and warp off.
+
+- **FR0a. Floor without drawing.** Bypass every stage of `B8Draw` except
+  publication.
+  - Record the interval histogram, tick cost and road-preparation cost.
+  - Record the frames that contain the 100 ms opponent update separately:
+    they come once in five frames and set the worst case.
+  - This is the ceiling per CPU: no drawing work can beat it. Report it;
+    a ceiling below one field is not a reason to stop.
+- **FR0b. CPU floor of the drawing code.** Run `B8Draw` with every `BLTSIZE`
+  write and `WaitBlit` suppressed. The pixels are wrong; the purpose is the
+  CPU cost of the native drawing logic alone (projection, sorting, setup and
+  clipping) once the blitter waits and `WaitBlit` dispatch disappear.
+- **FR0c. Copy cost.** Copy 3 × 10,320 bytes and the visible 3 × 40 × 200
+  bytes from Fast to Chip with `move.l`, 12-register `movem.l` and (040)
+  `move16`.
+  - Time each at the start of a field and mid-display with the game's
+    display DMA running.
+  - Also time Chip-to-Fast reads, which FR3 needs to resync the shadows.
+  - Estimate from Mercenary 3: 3.6–4.4 ms on the 030/50.
+- **FR0d. Kernel micro-benchmarks in Fast RAM.** Each kernel is a rough
+  prototype, not exact:
+  - a 24-word × 103-row descending exclusive fill;
+  - 50 road-edge lines;
+  - the six background fills;
+  - 37 one-row spans;
+  - one car-sized and one cockpit-sized cookie-cut, with the colour
+    expansion merged in.
+- **FR0e. Budget and go/no-go.**
+  - Budget per frame: FR0a + FR0b + FR0c + the FR0d sum, against 20.03 ms.
+    Aim for at most 18 ms in the opponent-update frame.
+  - Record the result in `tmp/dev/manifest/fr0-budget.json` and a section
+    here.
+  - **Decided (user, 2026-11-02):** every CPU that gains takes the path;
+    50 FPS is the ceiling, not a requirement. FR0 estimates the gain per
+    CPU (020+Fast, 030, 040) and scene. A CPU whose budget shows no
+    plausible gain over today's path is not pursued further.
+  - **Stop:** if no CPU shows a plausible gain, report the shortfall and stop.
+
+### FR0 results (measured 2026-11-02; emulator only)
+
+Matrix: 040‑40 BCE, 030‑50 BCE and 020+Fast (`a1200-fast`) × normal, solo,
+grid and dense, performance mode, warp off. FPS runs use 300 intervals. Traces
+are 30 fields (60 for the benchmarks); the 030 traces run as 68EC030 because the
+full-MMU 68030 loop is not instrumented (HI25 caveat M‑3). The FPS runs use the
+real 68030. Diagnostic builds and tools are in the ignored harness
+(`tools/fr0_*.py`, `tools/fr0_bench*.s`). The budget is in
+`tmp/dev/manifest/fr0-budget.json`. The `base` build is byte-identical to the
+production slave (`597a74b9…`).
+
+**Method change for FR0b.** Instead of suppressing `BLTSIZE`, FR0b runs the
+unchanged slave with the emulator's immediate blitter
+(`--uae_immediate_blits=true`, which works with the cycle-exact blitter). Each
+blit completes instantly, uses no Chip bus time, and pixels stay correct. The
+result is the cost of the drawing logic with blits free.
+
+**FPS (300 intervals).**
+
+| CPU | Scene | Today | Blits free (FR0b) | No drawing (FR0a) |
+| --- | --- | ---: | ---: | ---: |
+| 040‑40 | normal / solo / grid | 24.51 / 24.96 / 24.96 | 49.92 (all 1 field) | 49.92 |
+| 040‑40 | dense | 12.48 | 49.92 | 49.92 |
+| 030‑50 | normal / solo / grid | 24.55 / 24.96 / 24.96 | 49.92 | 49.92 |
+| 030‑50 | dense | 12.48 | 49.92 | 49.92 |
+| 020+Fast | normal / solo / grid | 15.34 / 16.64 / 14.95 | 33.88 / 34.91 / 30.01 | 49.92 |
+| 020+Fast | dense | 8.97 | 30.01 | 49.92 |
+
+**Work per frame, ms (CPU time excluding the beam wait, WaitBlit and idle).**
+
+| CPU | No drawing, mean/max | Blits free, mean/max (normal … dense) |
+| --- | --- | --- |
+| 040‑40 | 2.1–2.5 / 3.6 | 9.5–10.2 / 11.3–12.1 |
+| 030‑50 | 2.8–3.3 / 5.0 | 11.2–11.8 / 12.8–13.6 |
+| 020+Fast | 8.1–10.3 / 17.4 | 22.5–26.8 / 30.8–33.8 |
+
+Opponent-update frames add about 0.5 ms on the 040 and 030 and up to 7 ms on
+the 020. The ceiling (FR0a) is one field on every CPU.
+
+**Copy (FR0c), ms, 040 / 030 / 020.** Bank (30,960 bytes), best method:
+4.32 / 4.32 / 4.57. Visible part (24,000 bytes): 3.61 / 3.73 / 4.98.
+Chip→Fast read of a bank: 4.56 / 5.11 / 6.58. `move.l`, `movem` and `move16`
+come within 0.3 ms of each other on the 040: the Chip bus is the limit. Early
+(mid-display) and late (after line 256) copies cost the same.
+
+**Kernel prototypes (FR0d), ms, 040 / 030 / 020.**
+
+| Kernel | 040 | 030 | 020 |
+| --- | ---: | ---: | ---: |
+| Descending fill 24 × 103 | 1.42 | 0.94 | 3.31 |
+| 50 lines, 5,150 one-dot rows | 3.20 | 2.91 | 10.35 |
+| Six background fills (3 planes) | 0.23 | 0.58 | 2.06 |
+| 37 one-row spans (24 words × 3 planes) | 0.24 | 0.21 | 0.76 |
+| Car cookie-cut 6 × 40 × 3 planes | 0.41 | 0.31 | 1.12 |
+| Cockpit cookie-cut 13 × 57 × 3 planes | 1.24 | 0.95 | 3.36 |
+
+**Blitter work today (040 base traces).** Blitter DMA per frame: normal
+17.9 ms, solo 14.5, grid 19.1, dense 57.7. Today the 040 spends 10–16 ms per
+frame on CPU drawing and 20–55 ms in WaitBlit. CPU and blitter run almost
+serially.
+
+**Budget (FR0e).** The estimated frame is the logic with blits free, plus all
+blits replaced by the prototype kernels and scaled by the per-frame blit
+counts, plus a full bank copy:
+
+| CPU | Scene | Kernels | Estimate, mean | Estimated FPS (today) | Kernels must fit in, mean / worst frame | Kernel speedup needed |
+| --- | --- | ---: | ---: | --- | --- | ---: |
+| 040‑40 | normal | 14.1 | 27.9 | 24.96 (24.51) | 6.9 / 5.1 | 2.0× |
+| 040‑40 | solo | 8.6 | 22.6 | 24.96 (24.96) | 6.8 / 4.8 | 1.3× |
+| 040‑40 | grid | 16.1 | 30.6 | 24.96 (24.96) | 6.3 / 4.4 | 2.6× |
+| 040‑40 | dense | 79.3 | 93.9 | 9.98 (12.48) | 6.2 / 4.3 | 12.8× |
+| 030‑50 | normal | 11.9 | 27.4 | 24.96 (24.55) | 5.1 / 3.5 | 2.3× |
+| 030‑50 | solo | 7.7 | 23.2 | 24.96 (24.96) | 5.1 / 3.4 | 1.5× |
+| 030‑50 | grid | 13.5 | 29.5 | 24.96 (24.96) | 4.6 / 2.8 | 3.0× |
+| 030‑50 | dense | 62.0 | 78.1 | 12.48 (12.48) | 4.5 / 2.7 | 13.8× |
+| 020+Fast | all | 27–220 | 56–251 | 3.8–15.4 (9.0–16.6) | none: logic + copy exceed a field | — |
+
+"Must fit in" is the field minus the logic with blits free minus the
+visible-only copy. The "speedup needed" column is how much faster than the
+prototypes the kernels must run for the mean frame to fit one field.
+
+**Findings.**
+
+1. **The blitter is the whole bottleneck on the 030 and 040.** With blits
+   free, every scene, dense included, runs at one field per frame. The logic
+   costs 9.5–11.8 ms.
+2. **At prototype kernel costs, no CPU gains.** On the 040 and 030 the
+   estimate stays at two fields in common scenes and gets worse in dense.
+   The prototype kernels are about as fast as the blitter: 16 ms against
+   19 ms in grid on the 040.
+3. **The 020+Fast does not gain and is not pursued.** Its logic alone, 22–27
+   ms with blits free, already exceeds a field, and its kernels are about 3×
+   slower than the 040's.
+4. **Common scenes need kernels 1.3–3× faster than the prototypes on the 030
+   and 040.** The largest prototype costs are the road: lines and fill take
+   6.0 ms of the 14.1 ms on the 040 in normal. Drawing the road as spans
+   directly, without lines and fill, and treating the cockpit's opaque words
+   as plain copies would close much of that gap. This is not demonstrated
+   yet.
+5. **Dense cannot reach one field.** Its 58 ms of blitter work would need
+   kernels more than 12× faster. Reaching three fields instead of four would
+   need about 1.8×.
+6. **An alternative is visible in the data, outside this plan.** CPU and
+   blitter run serially today, and the blitter is busy only 14.5–19.1 ms per
+   common-scene frame. If the CPU logic overlapped the blits, the bound
+   would be about max(logic, blitter) ≈ 18–19 ms in normal, solo and grid on
+   the 040. That would work without Fast shadows or a copy, but blits would
+   have to be queued instead of waited for. Not measured.
+
+**FR0e verdict.** At the measured prototype costs, no CPU shows a gain, so
+the stop rule applies. The 030 and 040 come close enough in common scenes
+that the verdict depends on kernel quality, which FR0 does not settle. Two
+options for the user to choose between (not decided):
+
+- **(a) Stop the FR series** here, with these results recorded.
+- **(b) Extend FR0 by one diagnostic step (FR0f)** before any production
+  code. Prototype a span-based road (replacing lines and fill) and an
+  opaque-aware cockpit/car cookie-cut. Re-run the budget. Continue to FR1
+  only if normal, solo and grid then fit a field on the 040 or 030. Dense
+  stays at today's path either way.
+
+The serial CPU/blitter finding (6) is a separate idea and would need its
+own plan.
+
+### FR0g — One real dense frame on the 030 (measured 2026-11-02)
+
+User request: measure real code for one real dense frame on the A1200/030
+instead of extrapolating from prototypes. Everything the drawing touches is
+in Fast RAM: sprite and car graphics, masks, colour scratch and the back
+buffer. Only the final copy would go to Chip.
+
+**Method.**
+
+1. **Capture.** An emulator copy (`tmp/dev/tmp/step5-frame-observer-blitlog-build`,
+   new `monitor blitlog`) logged every blit started in one dense-fixture frame
+   on 030‑50 BCE. For each blit it records the registers, the pre-blit bytes
+   of each channel and the D bytes afterwards.
+2. **Reference check.** A Python blitter that follows the emulator's
+   semantics (`tools/fr0_blits.py`) reproduces 279 of 280 blits byte for
+   byte. The remaining one is overwritten by the CPU gauge strips (H13)
+   before the next blit, so it cannot be compared.
+3. **Fast image.** The frame needs a 117 KB Fast image: the union of every
+   region read or written, in 29 segments, filled from the Chip snapshot at
+   the frame's start. It is built with 280 translated blit records
+   (`tools/fr0_replay_gen.py`).
+4. **Replay.** 68030 code (`tools/fr0_replay.s`) executes the records with
+   run-time classification. It uses specialised loops for the classes in the
+   frame and an exact generic path for the rest (21 small blits per frame).
+   It runs in the no-draw build every frame after the line-256 wait. A
+   restore of the image runs first and is not counted.
+5. **Correctness.** After a replay, the Fast image equals the Python
+   sequential replay byte for byte: 0 differing bytes out of 119,744
+   (`tools/fr0_replay_check.py`).
+6. **Timing.** 30-field trace (68EC030, HI25 M‑3); cost charged by routine
+   and averaged over 12–15 replays.
+
+**The frame's blits.**
+
+| Class | Blits | Words or dots |
+| --- | ---: | ---: |
+| ABCD cookie-cut `$CA` | 32 | 20,309 words |
+| ABD colour masks `$C0`/`$FC`/`$30` | 23 | 15,488 words |
+| Lines `$4A` | 122 | 2,263 dots |
+| Descending fill | 10 | 3,296 words |
+| Other (BCD spans, ACD, D, CD) | 93 | |
+
+The blitter's own DMA for a dense frame is about 58 ms (040 base trace).
+
+**Cost on 030‑50, ms per frame** (each version byte-exact):
+
+| Version | Total | Cookie-cut | Lines | ABD | Fill | Rest |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Word loops, exact line emulation | 45.0 | 17.5 | 6.8 | 9.8 | 3.0 | 7.9 |
+| + Bresenham XOR lines, 32-bit ABD, transparent/opaque skip | 35.0 | 18.6 | 2.6 | 3.1 | 3.0 | 7.7 |
+| + 32-bit funnel-shift cookie-cut | **31.6** | 15.1 | 2.6 | 3.1 | 3.0 | 7.8 |
+
+**Dense frame on the 030, assembled:**
+
+| Part | ms |
+| --- | ---: |
+| Logic with blits free (FR0b, mean / max) | 11.8 / 13.6 |
+| All blits by CPU in Fast RAM | 31.6 |
+| Copy to Chip, visible / whole bank | 3.7 / 4.3 |
+| **Total, mean / max** | **about 47 / 50** |
+
+That is three fields (16.6 FPS) against today's four (12.48 FPS), a 1.33×
+gain, with no further work.
+
+**What this corrects in FR0e.** The prototype budget predicted 62 ms of
+kernels for dense on the 030 and called it unreachable. That came from
+scaling car work by blitter DMA slots. The real frame needs 31.6 ms, about
+1.8× faster than the blitter's 58 ms. Drawing with the CPU in Fast RAM is
+faster than the blitter on the 030 for this frame.
+
+**Headroom not yet used, estimates only:**
+
+- Merge the colour expansion into a single pass per car: read and shift the
+  mask once for three planes instead of separate ABD and per-plane ABCD
+  blits. This removes most of the 3.1 ms of ABD and roughly a third of the
+  cookie-cut cost.
+- Clear in Fast RAM instead of in Chip. Today's CPU clear is inside the
+  logic figure.
+- Two fields (40 ms) for dense needs about 7 ms less. That is plausible with
+  the merged pass but not shown.
+
+**Open.** This is one frame of one scene on one CPU. Normal, solo and grid,
+and the 040, are not measured this way yet. Their blitter load is 14.5–19 ms
+per frame, so one field also needs the logic (11–12 ms) to shrink. The same
+pipeline (`fr0_blitcap.py` → `fr0_replay_gen.py` → `fr0_build.py replay` →
+check → trace) can measure them in minutes.
+
+### FR0 decision and plan revisions (2026-11-02)
+
+**Go** (user and assistant agree, 2026-11-02). The real dense frame on the 030
+draws in 31.6 ms of exact CPU work against about 58 ms of blitter work. That
+gives 3 fields instead of 4 before any structural optimisation. This replaces
+the prototype-based FR0e verdict.
+
+**Scope and expectation.**
+
+- **CPUs.** The 030 and 040 are pursued. The 020+Fast is excluded: its logic
+  alone exceeds a field.
+- **Expected win.** The measured gain is in heavy scenes: dense goes from 4 to
+  3 fields, possibly 2 with the merged car pass.
+- **Common scenes.** Normal, solo and grid reach one field only if the drawing
+  logic also shrinks. Logic with blits free is 11–12 ms, so 20 ms leaves
+  about 4–5 ms for blits and copy. Until then their expected result is "no
+  slower" (2 fields).
+- **The selection gate is unchanged.** A CPU takes the path if it is faster
+  overall and slower in no scene.
+
+**Revisions to the steps below.**
+
+1. **New FR0h, the first execution step, diagnostic only.** Run the FR0g
+   pipeline for normal and grid on the 030 and for normal, grid and dense on
+   the 040. It confirms the 040 and sets each scene's real blit cost before
+   any production code. It is small: the tools exist.
+2. **All drawing data in Fast RAM** (user requirement, 2026-11-02). Only the
+   final copy writes Chip.
+   - FR1 must list every Chip source a blit or CPU drawing write reads, not
+     only the banks.
+   - FR3 allocates Fast copies of all of them. Static assets are copied at
+     driving entry and on overlay reload. Dynamic data (colour scratch, the
+     cockpit with its gauge writes, glyph scratch) lives only in Fast.
+   - FR4 translates every source pointer, not only "where mirrors exist". A
+     pointer outside the known banks and mirrors takes the production fault
+     exit.
+   - The FR4 VERIFY guard covers Chip reads as well as writes.
+3. **FR2 is reduced to medium.**
+   - `tools/fr0_blits.py` is already verified against the emulator on 280
+     real blits and becomes the offline oracle.
+   - `fr0_blitcap.py` supplies real register images per scene.
+   - `tools/fr0_replay.s` (exact generic path plus fast paths) is the
+     starting point for `FastRenderBlit.s`.
+   - The in-guest Chip-versus-Fast oracle harness and generated coverage
+     remain required.
+4. **FR6 order, from measured costs** (030 dense, ms):
+   1. Car cookie-cut with the colour expansion merged into one pass per car
+      (15.1 + 3.1).
+   2. Fill (3.0).
+   3. Lines (2.6, already Bresenham).
+   4. The remaining classes and the generic path (about 7.8).
+5. **New FR11 (optional, separate decision after FR10): drawing-logic cost
+   for common scenes.** Profile the 9.6–10 ms of non-blit drawing logic on
+   the 030 and 040 (projection, sorting, setup, today's CPU writers). Reduce
+   it towards the one-field budget. Gates as in section 4.
+
+Revised order:
+
+```
+FR0h → FR1 → FR2 → FR3 → FR4 → FR5a…FR5f → FR6 → FR7 → FR8 → FR10 → (FR11)
+                                   ↑ checkpoints at FR5c and FR5f
+FR9 any time, only if it would help the 030.
+```
+
+### FR1 — Screen write and read census (analysis only)
+
+Attribute every access to the display banks during driving. Use the existing
+trace and DMA-census tools in BCE mode (blitter DMA records). If the
+instruction trace lacks store addresses, add a bank write-watch to the
+measurement emulator. Cover normal, solo, grid and dense, plus pit messages,
+demo text, flag blinking and the countdown.
+
+1. **Writers.**
+   - For each blit: issuing PC, channels, minterm, area or line mode, fill
+     flags, shifts, masks, size and destination range.
+   - For each CPU write: PC and range, including H5/H9/H10/H11/H13.
+2. **Readers.**
+   - Blitter C channel reads, such as the cookie-cut background.
+   - CPU reads, such as the H9 pre-fill scan.
+   - Confirm that nothing outside drawing reads the banks, apart from display
+     DMA.
+   - Check for any reader of the blitter zero flag (`DMACONR` BZERO): the
+     software blitter must then produce it.
+3. **Sources outside the banks.**
+   - Car images and masks, colour scratch `$1c1b8`, the cockpit image (with
+     its H13 gauge writers), fonts and the flag: size, writers and lifetime,
+     including overlay reload.
+4. **Geometry.** DDF/modulo from the live copper list: the exact displayed
+   bytes and rows, which define the copy region.
+5. **Persistence.**
+   - Which bank regions are not rewritten every frame, and which code writes
+     them outside the fine draw: race start, pause, pit, menu, tow and
+     re-entry.
+   - This defines when the shadows must be resynced.
+
+Output: `tmp/dev/manifest/fr1-census.json`, plus a section here listing the
+native blit sites. Step 3 recorded 27 `WaitBlit` call sites in about ten
+routines in the A500 calibration; addresses must be resolved per layout.
+
+**Gate:** every byte written to a bank during a fine draw is attributed to a
+site.
+
+### FR2 — Exact software blitter (reference)
+
+`FastRenderBlit.s`, 68020+ code in the public fine payload. It executes one
+blit from a register image:
+
+- **Area mode:** all channel combinations and all 256 minterms (with a fast
+  path for the minterms found in FR1). It also handles ASH/BSH, first- and
+  last-word masks, modulos, descending mode, and inclusive or exclusive fill
+  with FCI carry.
+- **Line mode:** octants, SIGN, SING one-dot lines, texture with BSH,
+  start pixel, and the hardware's first-pixel behaviour.
+- **BZERO:** produced if FR1 finds a reader.
+
+Speed is not a goal here.
+
+**Oracle harness.** A VERIFY fixture runs each case twice: on the hardware
+blitter into a Chip scratch area, and in software into a Fast scratch area.
+It compares the complete destination plus guard bytes on both sides. Cases:
+
+- every captured FR1 register image from normal, solo, grid and dense;
+- generated coverage:
+  - each minterm in use and each line octant;
+  - every shift;
+  - mask edges and fill modes, both directions;
+  - heights 1–200 and widths 1–24 words;
+  - zero-size and clipped edge cases.
+
+Run on 040‑40 BCE and 030‑50 BCE. The emulator's blitter is the oracle until
+real hardware testing.
+
+**Gate:** zero differences.
+
+### FR3 — Shadows, copy and publication with an empty prefix
+
+The framework, with nothing drawn in Fast RAM yet.
+
+- **Allocation.** Allocate both shadows (and the FR7 mirrors, if accepted)
+  once at driving entry, all or nothing, from the public pool. Measure its
+  headroom first. If the pool is short, grow the WHDLoad reservation: a
+  somewhat larger memory requirement is accepted (user decision,
+  2026-11-02). Update the documented requirements and run the memory check.
+  Allocation failure selects today's path.
+- **Copy-point mechanism.** The prefix is empty, so the copy region is empty,
+  and the arms must match exactly.
+- **Wait and copy order.** Move the beam/field wait to just before the copy.
+  Keep the `LoadView` request order and the H3 road preparation.
+- **Resync.** Copy each Chip bank into its shadow after every route where
+  native code may have drawn outside the fine draw. FR1 lists those routes;
+  run them through the public lifecycle (pause, tow, pit, menu, re-entry and
+  overlay reload). This costs one Chip read pass per bank, measured in FR0c,
+  and only at those transitions.
+- **Selection.** Selection, an immutable A/B preset and patch-ledger entries
+  are restored on every exit route.
+
+**Gate:** section 4, with all exact gates against the H6c/B8-PAL references.
+The 040‑40 BCE frame rates do not change with the prefix empty.
+
+### FR4 — Blit redirection at native sites
+
+For the stages inside the prefix:
+
+- Point each native site's custom-register writes at the Fast register image
+  by patching absolute and base operands in the public race copy.
+- Replace each `BLTSIZE` write with a call to FR2.
+- Turn `WaitBlit` calls inside redirected stages into returns.
+- Retarget the existing CPU writers (H5/H9/H10/H11/H13) to the shadow
+  whenever their stage is in the prefix.
+
+**Guards.**
+
+- **VERIFY:** no blitter DMA and no CPU write touches a Chip bank during
+  prefix stages, except the copy. Checked with the BCE DMA records and the
+  FR1 write-watch.
+- **Production:** each redirected site checks that its destination is a bank
+  or known scratch, and otherwise takes the existing production fault exit.
+  It never draws into an unknown address.
+
+**Gate:** section 4. In addition, the site table equals the FR1 census for
+the redirected stages, and every patch word restores.
+
+### FR5 — Move the stages to Fast RAM, in draw order
+
+One step per stage, each switchable. Every step moves the copy point after
+its stage. The order follows the native draw order, so each step keeps a
+contiguous prefix:
+
+- **FR5a. Clear and background** (`$6b050`, `$6b950`). H10's CPU fill
+  targets the shadow.
+- **FR5b. Road** (`$6b368`, `$6bf90`, the H3 prepared road, lines, spans and
+  the H9 fills).
+- **FR5c. Cars** (`$69bb8`). The colour expansion (`$32e12`) gets a Fast
+  scratch, then the cookie-cut (`$32e6c`) runs. Car images and masks get Fast
+  mirrors, refreshed on overlay reload.
+- **FR5d. Mirrors** (`$6ae70`, `$6af7e`) and their `$24ae0` operations.
+- **FR5e. Pit messages, cockpit and gauges** (`$6c0d0`, `$6ba18`, `$6bbfc`,
+  `$293d0`, `$6adf8`). The cockpit image and the H13 gauge writes move to a
+  Fast mirror.
+- **FR5f. Demo text, flag, clock and the instruments** (`$239a0`/H4, H11,
+  `$6694e` after `DisownBlitter`).
+
+After FR5f the race draw issues no blits, and the H7 BLIT ownership becomes
+irrelevant while driving.
+
+**Decided (user, 2026-11-02):** the intermediate steps add a copy of about
+4 ms while later stages still wait for the blitter, so FR5a–FR5c may not gain
+on their own. Accept each step on its correctness gates and judge performance
+at the FR5c and FR5f checkpoints against FR0's budget. This replaces the
+H-series rule of keeping each change only for a measured gain.
+
+### FR6 — Specialized kernels for the hot blits
+
+After FR5, profile the 040 with the measurement emulator and replace the
+generic software blits at the costliest sites with exact kernels. The likely
+order is set by the FR0d and FR5 measurements:
+
+1. Car cookie-cut with the colour expansion merged, so the scratch is skipped
+   (dense packs).
+2. Descending exclusive road fill, using table-driven carry per byte.
+3. One-row road spans.
+4. One-dot road-edge lines.
+5. Cockpit cookie-cut with precomputed opaque, partial and transparent word
+   runs, derived from the live mask and invalidated with it.
+6. Mirror road.
+
+**Gate per kernel:** the FR2 harness compares the kernel with the generic
+software blitter and with the hardware blitter on all FR1 captures, then
+section 4 applies. Keep a kernel only where it gains on that CPU.
+
+### FR7 — Copy optimization
+
+1. Copy only the displayed region found by FR1, with the instruction chosen
+   by FR0c.
+2. Copy only changed data:
+   - Keep a Fast mirror of what each Chip bank holds and compare the shadow
+     with it.
+   - Write only the longwords or rows that differ. The static cockpit and
+     sky rows are the expected wins.
+   - Keep it only where it gains: TFX's 040-only result.
+3. Optional: copy finished bands early during drawing, only if FR1 shows
+   band-ordered completion. Not expected to pay.
+
+### FR8 — Frame pacing at 50 FPS
+
+- **Normal operation.** Expect one tick per frame. Ticks are 20 ms and fields
+  20.03 ms, so a field holds two ticks about every 12.5 s; that is not a
+  missed frame. Publish before the VBL; copy only into the bank that is not
+  displayed.
+- **Late frames.** A late frame is shown one field later.
+- **Opponent-update frames.** These come once in five. If they overrun, a
+  steady 40 FPS judder results. Reduce their cost where possible; otherwise
+  accept it (user decision, 2026-11-02). Do not split the native 100 ms
+  update; that would change state ordering.
+- **Evidence.** Interval histograms for normal, solo, grid and dense. Confirm
+  there is no tearing by checking the displayed bank against the copy log.
+- **Optional third Chip bank** (old H16): only if the wait before the copy
+  still costs measurable time.
+
+### FR9 — 030 data cache (optional)
+
+Only if the 030 takes the FR path. Find the cause of the performance-mode
+startup crash with the data cache under WHDLoad's MMU option; HEAD crashes
+the same way. Then decide whether the FR path may enable the data cache
+without the MMU option. Gates: section 4 plus both MMU smokes.
+
+### FR10 — Checkpoint and release
+
+- Run the full gates (section 4) and the FR selection gate per CPU; enable
+  the path on each CPU that passes.
+- Add an `ff1check.py` feature check named `fastrender`, covering
+  `Games/FerrariFormulaOne/FastRender*.s` and the redirected sites. Extend
+  the FPS check with the one-field share. Run the memory check if FR3
+  changed the reservation.
+- Update `README.md`, `ReadMe` and `RELEASE_QUALIFICATION.md`. State plainly
+  that these are emulator results, that 060 is assumed to behave like the 040,
+  and that real hardware is untested.
+- Record what limits each CPU next.
+
+## 4. Gates for every code step
+
+The reduced test matrix applies: no 060, no WHDLoad 17.0, one A500 setup
+except for memory checks.
+
+- **Exact state:** 100 updates with identical state and private fractions.
+  Presentation never advances simulation, so states match whatever the frame
+  rate.
+- **Exact frames:** 30 complete frames each for normal, solo, grid and dense
+  match the B8-PAL/H6c references on 040‑40 BCE. These fixtures use fixed
+  poses, so they stay valid at any frame rate.
+- **Elapsed clock:** at most 0.25% error over 60 simulated seconds.
+- **Controls and lifecycle:** pause, tow, pit, menu, re-entry, fault exit,
+  overlay reload and INTENA restoration. All patch words restore.
+- **Unchanged paths:** `CUSTOM2=0` legacy-exact on 020+Fast with both
+  `CUSTOM1` values. The 68000 and chip-only 020 payloads are byte-identical.
+- **Smokes:** the five core smokes plus both MMU smokes.
+- **Performance:** 300 complete presentations, warp off, on 040‑40 BCE,
+  030‑50 BCE and 020+Fast, path on versus off in the same session.
+- **FR selection gate (user decision, 2026-11-02):** there is no fixed FPS
+  target. A CPU takes the path when it is faster than today's path in the
+  normal, solo, grid and dense scenes combined and slower in none. Report the
+  interval histograms; one field per frame is the ceiling.
+
+## 5. Risks
+
+| Risk | Mitigation |
+| --- | --- |
+| Line-mode or fill corner cases differ from the blitter | FR2 oracle on every captured blit plus generated coverage; zero-difference gate |
+| A native writer or reader missed by the census | FR1 attribution gate; VERIFY bank write-watch during prefix stages; production destination check |
+| The 100 ms opponent frames exceed the field | Measured in FR0a; FR8 decision |
+| Copy slower on real A4000/A1200 accelerators than in the emulator | Recorded as emulator-only; FR7 reduces bytes; hardware testing deferred |
+| Fast memory headroom | FR3 measures the pool; all-or-nothing allocation; memory check |
+| Native code draws into a bank outside the fine draw | FR1 persistence list; FR3 resync on every such route |
+| The 030 is too slow without a data cache | FR0 decides the 030; FR9 optional |
+| Overlay reload moves hunks and sources | Existing binding and ledger rebinding; mirrors refreshed on reload |
+
+## 6. Work size and order
+
+- **Large:** FR2 (complete software blitter and oracle), FR5 (six
+  redirection steps) and FR6 (kernels).
+- **Medium:** FR1 and FR3.
+- **Small:** FR0, FR7, FR8 and FR10.
+
+Dependencies:
+
+```
+FR0 (go, 2026-11-02) → FR0h → FR1 → FR2 → FR3 → FR4 → FR5a…FR5f → FR6
+  → FR7 → FR8 → FR10 → (FR11, optional)
+                                      ↑ checkpoints at FR5c and FR5f
+FR9 any time after FR0, only if the 030 takes the path.
+See "FR0 decision and plan revisions" for the changes to FR1–FR6.
+```
+
+Stop adding kernels or copy work on a CPU once it reaches one field per frame
+in common scenes, or when further steps stop gaining there.
