@@ -80,10 +80,11 @@ _boot		;	A0 = resident loader
 	jsr	(resload_Control,a2)
 
 ; Boolean player control (enabled by the installed icon). VERIFY retains Custom1 for individual feature
-; comparisons when Custom5=0; the release Off setting always clears all features.
+; comparisons when Custom5=0. The release Off setting clears every feature except bit 15,
+; which fixes a 68040/060 cache defect present in the shipped slave (user decision).
 	lea	(_custom1,pc),a0
 	IFND VERIFY
-	clr.l	(a0)
+	move.l	#1<<15,(a0)
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready

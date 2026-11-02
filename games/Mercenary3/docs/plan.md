@@ -10,7 +10,8 @@ are in order of value; take the first one not done whose dependencies are met. D
 - **One option per feature for development.** Each behaviour change has a `Custom1`
   bit in `whdload/Mercenary3.slave.asm`. VERIFY accepts these with `Custom5=0`. The
   release exposes one **Enhanced framerate** control, default On (`Custom5=1`); Off
-  (`Custom5=0`) runs the shipped code and ignores individual-feature settings. Debug aids go in the `VERIFY` build.
+  (`Custom5=0`) runs the shipped code plus bug fixes for shipped defects (R5's 68040/060
+  cache fix; user decision) and ignores individual-feature settings. Debug aids go in the `VERIFY` build.
 - **Build** with `make original slave verify` before each commit.
 - **Measure** with `tools/fps.py` on `a1200-fast`, `a500-1.5m` and the existing `040-25` matrix configuration: the same build with the
   option off and on, same session. Keep a change only if it gives a repeatable measured

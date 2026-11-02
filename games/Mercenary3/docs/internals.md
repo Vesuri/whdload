@@ -73,8 +73,8 @@ key code at chip `$8`, with `$FF` at `$9`.
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the startup control), reads options through `resload_Control` and keeps
 the shipped patch list. The release exposes **Enhanced framerate**, default On
-(`Custom5=1`), which selects all feature bits below. Off (`Custom5=0`) clears them;
-release builds ignore `Custom1`. The VERIFY build accepts `Custom1` as the individual
+(`Custom5=1`), which selects all feature bits below. Off (`Custom5=0`) clears them
+except bit 15, the 68040/060 cache fix (R5); release builds ignore `Custom1`. The VERIFY build accepts `Custom1` as the individual
 feature mask with `Custom5=0`. Historical measurements below name those feature bits. It asks for an optional 288 KB of expansion memory (`ws_ExpMem`):
 4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
 20 KB for bit 4's presentation restore buffer, 104 KB for bits 9/17's renderer copies and
@@ -290,8 +290,14 @@ the ground. Bit 15 keeps that limit in slave data, redirects its writers at
 `$5380A`/`$53822`, and replaces both readers with cache-safe comparisons. The
 secondary reader still takes its original early-exit branch. This applies only to
 68040/060 and supports both chip and relocated code. Presentation restores the
-new limit with its other drawing state. Enhanced framerate includes the fix;
-Off retains the shipped behaviour, including this cache defect.
+new limit with its other drawing state. The release applies the fix in both
+settings (user decision: fix the shipped defect also with Enhanced framerate Off).
+
+Release Off (`Custom5=0`, only bit 15) against the shipped slave, 040-25 cell, the same
+outside-prison turn/stop and 600 stationary fields each (gray ground counted in the
+view's lower rows): shipped 12 fields without the ground, release Off none. A500
+options-off and shipped each give 37 frames; bit 15 acts only on 68040/060.
+Evidence: `tmp/bit15/`.
 
 Same build/session, CACHE PRELOAD, 600 stationary fields after the outside-prison
 turn: bit 15 off has 10 fields with the gray ground absent; on has zero. The
