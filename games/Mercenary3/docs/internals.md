@@ -1564,6 +1564,82 @@ Other checks:
 Enhanced framerate includes bit 20 (`$1FFFFF`). Evidence: `tmp/f5/final/`; the 040
 figures remain emulator counts, not hardware predictions.
 
+### F6: checkpoint
+
+The build is unchanged since F5 (the VERIFY slave is byte-identical). All runs use the
+standard 500-field route; the VERIFY build runs with `Custom1=2097151`, or with `Custom5=1`
+(the release mask). Evidence: `tmp/f6/`.
+
+**F0's beam table again** (reference 030/50, fields 175..500, same instruments and roots
+as F0; each nesting level in its own run). Frames rise from 163 (25.1 fps) to 325
+(50.1 fps); presentations are now 243 of 324 frames, against 81 of 162.
+
+| Work (Disk.1 / slave), ms per frame | F0 | F6 |
+| --- | ---: | ---: |
+| Frame work (publication interval minus `$5E460`), mean | 24.9 | 15.6 |
+| - range | 21.5..27.4 | 13.0..17.7 |
+| Main 3D `$577BE` | 9.6 | 5.76 |
+| - rooms `$5F438` | 4.0 | 2.38 |
+| - objects `$57BF4` (7 calls) | 4.0 | 2.92 |
+| - interior detail `$5836A` | 1.1 | 0.15 |
+| - edges `$5FDCC` (16 calls) | 2.1 | 1.18 |
+| Scene setup `$5765E` (`$536FE`) | 2.4 (2.0) | 1.85 (1.52) |
+| `$5AFAA` (`$53440`) | 2.3 (1.1) | 1.54 (0.87) |
+| `$593A6` | 1.4 | 0.17 |
+| Clear `$5E840` | 0.9 | 0.36 |
+| Staging copy (`_stagepublish` minus `$5E460`) | 3.3 | 3.3 |
+| Save + restore, per presentation | 3.7 + 3.4 | 1.40 + 1.38 |
+| Native publication incl. field wait `$5E460` | 15.0 | 4.4 |
+
+No frame in the window needs more than 20 ms; the worst has 2.3 ms to spare. The staging
+copy is now the largest single item after main 3D, and the presentation copies are bounded
+by the game variables still in chip.
+
+**Cadence** (`PER_FRAME=1`, VERIFY `Custom5=1`). On the 030/50: 464 one-field, 15
+two-field and 1 three-field intervals. Every multi-field interval lies in the first 65
+fields; from field 65 to 500 all 435 intervals are one field. The steady-route target
+holds. The 040-25 emulator cell: 394 one-field, 50 two-field and 1 three-field intervals,
+all in the first 136 fields.
+
+**Matrix** (`matrix.sh`, VERIFY `Custom5=0 Custom1=2097151`, all eight cells pass):
+
+| Cell | Frames | fps | S6 fps (other session) |
+| --- | ---: | ---: | ---: |
+| a500-1.5m | 41 | 4.10 | 4.10 |
+| a1200 (chip only) | 93 | 9.30 | 9.40 |
+| a1200-fast | 141 | 14.10 | 12.50 |
+| 030 default | 480 | 48.00 | 24.80 |
+| 030 MMU | 480 | 48.00 | 24.80 |
+| 040-25 | 445 | 44.50 | 24.90 |
+| 060-50 | 448 | 44.80 | 24.90 |
+| 040-8 sanity | 431 | 43.10 | 24.80 |
+
+The 040 frequency sanity check passes (8 MHz 431 < 25 MHz 445 frames); 040/060 counts
+remain emulator counts. Options off: release `Custom5=0` and the shipped slave each give
+37 A500 frames / 500 fields.
+
+**What limits each cell next:**
+
+- 030/50: the opening view. The route stands still for its first 175 fields, facing a
+  view that draws more than the walk: main 3D falls from 9.0 ms per frame in fields 0..40
+  to 7.3 in fields 140..175, against 5.76 in the walk (objects 4.22, rooms 3.78, edges
+  1.93 ms over fields 0..175). Frame work there averages 18.4 ms with a 20.15 ms worst;
+  16 intervals exceed a field. These are the 030 matrix cell's 20 missing frames.
+  Main 3D is the next reduction; about 0.2 ms clears the worst opening frame.
+- 040-25 (emulator): the same opening view, slower here: main 3D 9.3 ms (10.1 in
+  fields 0..40), frame work mean 19.3, worst 21.8 ms, 50 of 120 intervals over a field.
+  In the walk it runs at 50.1 fps (frame work 15.9 ms, worst 18.4; main 3D 6.26).
+  Its per-routine times exceed the 030's except the clear (0.07 ms) and the presentation
+  copies (1.04 ms each). Real 040/060 speed remains unmeasured.
+- 060-50 (emulator): counts match the 040 cell; no component ranking measured.
+- 020 fast: 3.55 fields per frame (instruction profile, F5 build). Main 3D takes 1.08
+  fields per frame (objects `$57BF4` 0.53, edges `$5FDCC` 0.29), scene setup 0.31,
+  `$5AFAA` 0.26; the field wait is 19.9% of cycles. Computation, not chip traffic,
+  now leads: the drawing's arithmetic (`$5B038`, `$53408`/`$525E2`) and the edge plotter
+  `$4A26C`.
+- A500 and chip-only 020: S6's limits stand, with drawing dominant. F2 and F5 need real
+  fast RAM and the 68000 takes no phase F option; both counts are within a frame of S6.
+
 ### WHDLoad launch configuration
 
 WHDLoad 20.1 rejected the comma in the first Custom1 checkbox label; labels cannot

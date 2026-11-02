@@ -298,10 +298,12 @@ chip, because their accessors are spread across the untranslated main loop.
   intervals are one field. The presentation save/restore copies fall 3.41/3.30 →
   1.40/1.38 ms. Accepted as bit 20; see [F5 results](internals.md#f5-render-scratch-in-fast-ram).
 
-**F6. Checkpoint.** F0's beam table again, `PER_FRAME=1` cadence on the 030/50 (target:
-steady one-field intervals), `matrix.sh` with all options, options off. Record what limits
-each cell next. A real 68040/060 is expected to gain at least as much (chip accesses cost
-the same time while its computation is faster); the emulator cells cannot show it.
+**F6. ✓ Checkpoint.** F0's beam table again, `PER_FRAME=1` cadence on the 030/50 (target:
+steady one-field intervals), `matrix.sh` with all options, options off. Result: the 030
+walk runs at 50 fps (frame work 15.6 ms, worst 17.7); cadence is one field from field
+65 on; matrix 030 48.00 fps, 040-25 44.50, 060-50 44.80, 020-fast 14.10; options off
+equals shipped. The opening view's main 3D is what limits the 030/040 next; see
+[F6](internals.md#f6-checkpoint).
 
 ### R. Faster drawing
 
@@ -351,10 +353,10 @@ without it. Real cache behaviour and 040/060 hardware performance remain unverif
 - [x] R1 [x] R2 (not retained) [x] R3 (closed) [x] R4
 - [x] R5
 - [x] X1
-- [x] F0 [x] F1 (not retained) [x] F2 [x] F3 [x] F4 [x] F5 [ ] F6
+- [x] F0 [x] F1 (not retained) [x] F2 [x] F3 [x] F4 [x] F5 [x] F6
 
 P4 and P5 address the presentation defects reported after the original plan completed.
-Phase F continues toward one-field frames on the 030/50; next: F6.
+Phase F is complete: the 030/50 walk runs in one-field frames. No plan step remains open.
 Hardware validation remains unavailable, outside X1.
 
 ## In place

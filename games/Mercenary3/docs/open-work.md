@@ -167,8 +167,17 @@ On the 030, mean frame work falls 19.85 → 15.60 ms and the worst 22.56 → 17.
 interval exceeds a field, and 464 of 480 cadence intervals are one field. The
 presentation copies fall to about 1.4 ms each. Game variables stay in chip, because
 their accessors are spread across the untranslated main loop. Enhanced framerate
-includes bit 20. Next: the F6 checkpoint. See
-[F5](internals.md#f5-render-scratch-in-fast-ram) and the
+includes bit 20. See [F5](internals.md#f5-render-scratch-in-fast-ram).
+
+F6 closes phase F. On the 030/50 the walk runs at 50 fps: frame work averages 15.6 ms
+(worst 17.7) against 24.9 (worst 27.4) at F0, and every cadence interval from field 65
+to 500 is one field. All eight matrix cells pass with all options: A500 4.10, chip-only
+020 9.30, 020-fast 14.10, 030 48.00 (also with MMU), 040-25 44.50, 060-50 44.80 fps.
+Options off equals shipped (37 A500 frames). The route's opening view, standing still for
+175 fields, draws more than the walk: on the 030 its main 3D (7.3..9.0 ms) pushes 16
+frames just past a field (worst 20.15 ms), and the 040 cell misses more. Main 3D is the
+next reduction there; on the 020 it is computation in the drawing. See
+[F6](internals.md#f6-checkpoint) and the
 [plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step).
 
 The post-P5 68040 investigation measures 24.80 fps: steady frames spend about
