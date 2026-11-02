@@ -502,6 +502,203 @@ routines in the A500 calibration; addresses must be resolved per layout.
 **Gate:** every byte written to a bank during a fine draw is attributed to a
 site.
 
+### FR1 results (2026-11-02, done)
+
+Gate passed: every blit and every CPU write into a bank during driving is
+attributed to an issuing instruction. The data is in
+`tmp/dev/manifest/fr1-census.json`; the lifecycle timelines are in
+`tmp/dev/tmp/step5/fr1-bankwatch/`. All results are from the emulator only.
+
+**Method.**
+
+- **Recorders.** The blit-log emulator copy gained three recorders:
+  - `memlog`: every CPU data access to Chip RAM and every `DMACONR` read,
+    with the instruction PC, the index of the next blit and a stack snapshot
+    at every `BLTSIZE` write;
+  - `bankwatch`: per-field accesses to given ranges, aggregated by PC and
+    enabled by an environment variable, so the release route harness runs
+    unchanged;
+  - `monitor poke`, plus the `irq-state` command the release harness needs.
+- **Tools.** `fr1_capture.py`, `fr1_census.py`, `fr1_report.py` and
+  `fr1_bankwatch.py`.
+- **Driving scenes**, 030‑50 BCE, after the 100th draw:
+  - normal (12 frames) and solo, grid and dense (4 frames each);
+  - start, 8 frames during the countdown (`$66f94` = 17);
+  - pit messages 1 and 2, set with a presentation-only `B8PitMessage` poke.
+
+  Demo text and the flag are drawn in all of them. normal, start and pit use
+  the production slave `597a74b9…`; solo, grid and dense use the matched
+  H5 fixtures.
+- **Lifecycle.** The release modal route ran twice under bankwatch: once
+  watching the banks and once watching the sources. It covers boot, race
+  start, pause, tow, exit, pit menu, paddock, race settings and re-entry into
+  qualifying driving.
+- **Attribution.** The number of logged `BLTSIZE` writes equals the number of
+  blits in every capture, so every blit has its instruction. On the 68030 CE
+  core the logged PC is the instruction after the access. The tables below
+  give the routine and that PC; the `BLTSIZE` write is the instruction
+  before it.
+
+**Display geometry (copper lists).**
+
+- **Copper lists.** Bank 0's list is at `$ce30` and bank 1's at `$20838`;
+  both are in Chip outside the banks.
+- **Display registers.** BPLCON0 `$3200` (3 planes) from line `$2c` to
+  `$f4`, which is 200 lines. DDFSTRT `$30` and DDFSTOP `$c8` give 20 words
+  per row; BPL1MOD and BPL2MOD are 8, and BPLCON1 is `$66`.
+- **Plane pointers.** They start at bank + 4, with a plane stride of 10,320
+  bytes.
+- **Copy region.** Bytes 4–43 of rows 0–199 in each plane:
+  **24,000 bytes per bank.**
+- **Banks.** Bank 0 is `$18f48`/`$1b798`/`$1dfe8` and bank 1 is
+  `$528d8`/`$55128`/`$57978`, from `$66c92`.
+
+**1. Blit sites during driving** (blits per frame: normal, solo, grid,
+dense, start).
+
+| Site (PC after `BLTSIZE`) | Per frame | Type | Destination ← sources | Callers |
+| --- | --- | --- | --- | --- |
+| `$24ae0`+`$138` (`$24c18`) | 39/39/39/39/15 | BCD, some descending; minterm `ca`; ASH 0–14 | bank ← Chip images (B), bank (C); also Chip scratch | `$6b950` (B8 `$65748`), cockpit `$6c106`/`$6c310`, gauges `$6bbfc`, flag `$66802` |
+| `$24ae0`+`$2d8` (`$24db8`) | 34–36 | BCD; minterms `0a`/`fa`/`ca`/`3a`; BSH 0–15 | bank and mirror scratch ← glyphs, font, images | `$6b950`, B8 text `$65922`/`$65a4e`/`$65b68`/`$65c94`, mirrors `$6a6d8`, `FF1RenderDemoText`, `$6c310`/`$6c56a` |
+| `$6ac4a`+`$140` (`$6ad8a`) | 97–104 | Line, `4a`, mostly EFE fill (some FCI) | bank ← bank (C) | road `$6b368` |
+| `$6ac4a`+`$194` (`$6adde`) | 20–22 | Line, `4a`, EFE | bank ← bank | road `$6b368` |
+| `FF1RenderFill`+`$b4` | 10–14 | CD, EFE fill, descending, `aa` | bank ← bank | road `$6b368` / `$6c958` |
+| `$32d50`+`$aa` (`$32dfa`) | 9/3/10/10/9 | ABD `fc` | car-mask scratch ← car image and mask | cars `$69e44`/`$6afec`, mirrors `$6ae70`/`$6af7e`, `$6adf8` |
+| `$32d50`+`$11c` (`$32e6c`) | 12/3/13/13/12 | ABD `c0`/`30` | car-mask scratch ← car image and mask | as above |
+| `$32d50`+`$1b2` (`$32f02`) | 27/9/30/30/27 | ABCD `ca`, ACD `0a`; ASH/BSH 0–15 | bank ← car (A/B), bank (C) | as above |
+| `$6c310`+`$24c` (`$6c55c`) | 3 | D only, `00`/`ff`, 12×55 | bank (cockpit rectangle fill) | B8 `$65cb8` |
+| `$6ba18`+`$1d4` (`$6bbec`) | 6 | ABCD `ca`, ASH 3–15 | bank ← Chip `$cd30`, `$41398` (A), `$cf58`, `$41398` (B) | B8 cockpit call |
+| OS `WritePixel` (graphics.library copy in Fast) | 12 | CD 1×1 `ea`/`2a` | bank, 4 pixels × 3 planes | instruments `$6694e` → `$66a08` → `$2a1b0` |
+
+There are 11 game sites plus the OS one. The `$24ae0` bitmap routine is
+reached through the public `FF1RenderBitmap` hook, and its two `BLTSIZE`
+sites carry about 74 blits per frame. Redirection at these 11 instructions
+and at `$2a1b0` covers every blit during driving.
+
+**CPU writers into the banks:**
+- `FF1RenderClearRows` (long writes, about 4,300 per frame);
+- `FF1RenderOverlapHUD`/`FF1FlagPresentation` (bytes, 168 per frame);
+- `FF1RenderBitmap`+`$14a`…`$174`, the pit-message text through the CPU
+  bitmap path (bytes, 288 or 432 per frame across both banks while a message
+  shows).
+
+**2. Readers.**
+
+- **Blitter C channel.** Every cookie-cut, line, fill and `$24ae0` site reads
+  the bank it writes.
+- **Blitter B channel.** `$24ae0` also reads the bank through B, about 225
+  words per frame from `$6b950`, a copy from one place in the back bank to
+  another.
+- **CPU reads of the banks:**
+  - the H9 pre-fill scan `FF1RenderFill`+`$68`, 138–877 long reads per
+    frame;
+  - `$24ae0`+`$3c` (`$24b1c`, `movea.l (a4),a0`). It reads the first long of
+    its bitmap argument, even when that argument is a raw bank address. The
+    value is then overwritten unless argument word 50(sp) is negative. FR4
+    translates the pointer, so the read lands in the shadow; the VERIFY
+    Chip-read guard must allow this read.
+- **Nothing else reads the banks during driving.** The only readers outside
+  the drawing routines appear during menus and setup.
+- **`DMACONR`.** Every reader tests bit 6, BBUSY, with
+  `btst #6` / `tst.b`: host `gfx_WaitBlit`/`gfx_waitblit` and the OS
+  `WritePixel`. **No reader tests BZERO**, so the software blitter does not
+  need to produce it.
+
+**3. Front-bank writes.** Two writers also draw into the bank on display
+while the other bank is being drawn:
+
+- the demo label, `FF1RenderDemoText` drawing into `$226ae` then `$226b2`:
+  528 bytes per frame (3 × 11 words × 8 rows at row 20);
+- the pit messages (`FF1RenderBitmap`): 144 or 216 bytes per frame.
+
+Both write identical pixels into both banks. With per-bank shadows, FR4
+sends them to the front shadow. The published frames stay identical, because
+the front bank receives the same pixels when it is next drawn and copied.
+Natively the text appears up to one field earlier, mid-frame. The full
+24,000-byte copy also covers these rows.
+
+**4. Chip sources outside the banks.** Everything below `$c000` and the
+supervisor stack at `$7ff6e`–`$80000` is OS and interrupt data. Neither is
+drawing data. The drawing sources are:
+
+| Range | Bytes | Content | Read by | Written during driving |
+| --- | ---: | --- | --- | --- |
+| `$cd30`–`$cd78` | 72 | small cockpit/gauge table | `$6ba18` A | CPU `$252d0`, `$6d066`, `$6d472`, `$6d4cc` |
+| `$cf58`–`$d3d6` | 1,150 | glyph/text data, including the pit strings `$d0c0`/`$d0c6` | `$24ae0` B, `$6ba18` B, CPU `FF1RenderBitmap` | CPU `$252d0`, `$68d4e`, `$6bbfc` |
+| `$17238`–`$17258` | 32 | small car image | `$32d50` A/B | no |
+| `$18d80`–`$18e0b` | 139 | Chip hunk 46 (`$255a0`, 456 bytes; the only Chip hunk) | `$24ae0` B, CPU `FF1RenderGaugeStrip` | no |
+| `$22652`–`$229ca` | 888 | flag/HUD image | `$24ae0`+`$138` B | no |
+| `$23e10`–`$28e32`, `$34ba0`–`$34cf2`, `$45478`–`$459ea` | about 18,000 | car images and masks | `$32d50` A/B | no |
+| `$35f70`, `$38300`, `$3a690` | 3 × 8,716 | cockpit image planes | `$24ae0` B | no |
+| `$41398`–`$428fa` | 5,474 | gauge/cockpit composition scratch | `$24ae0` C, `$6ba18` A/B, CPU `FF1RenderGaugeStrip` | blit `$24ae0` D, CPU `FF1RenderGaugeStrip` |
+| `$49798`–`$49a5a`, `$50188`–`$5044a` | 2 × 706 | mirror bitmaps | `$32d50`, `$24ae0` | blit `$24ae0`+`$2d8` D |
+| `$4b568`, `$4b898` | 2 × 406 | HUD images | `$24ae0`+`$138` B | no |
+| `$518e8`–`$527e2` | 3,834 | car-mask scratch and colour scratch `$1c1b8` | `$32d50`+`$1b2` A/B, `$24ae0` B | blits `$32d50`+`$aa`/`$11c` D, CPU `FF1RenderDemoText` |
+
+That is about 58 KB of sources: static images about 46 KB and dynamic
+tables and scratch about 12 KB. FR3 copies the static ranges and keeps the
+dynamic ranges in Fast only. The dynamic ranges include the native CPU
+writers listed, so those writers must be redirected too.
+
+**Source lifetime (second lifecycle run, watching these ranges):**
+
+- **During driving**, no static range is written. The only hits are the
+  dynamic ranges marked in the table. A few line-blit hits come from
+  bankwatch's deliberately wide line-mode span estimate, not from real
+  writes; the exact per-word census above shows none.
+- **Before each driving entry** (race start and re-entry, about 40 fields
+  each), setup code rewrites every range: OS graphics code and native
+  `$24e2a`/`$24e48`/`$24e62`.
+- **Menus.** The menus and paddock reuse several of these ranges (for
+  example `$41398` and `$45478`), and boot clears them.
+- **Consequence for FR3:**
+  - copy the static sources at the same point the shadows are seeded, the
+    first fine draw of each driving entry;
+  - overlay reload needs no separate trigger, because reload only happens
+    outside driving and is followed by a new entry.
+
+**5. Persistence.**
+
+- **During driving**, in every scene and every frame, the drawing rewrites
+  the same 21,954 of the 24,000 displayed bytes per bank. No byte is written
+  in some frames and not others.
+- **Never rewritten** (2,046 bytes, identical in both banks):
+  - rows 0–2 entirely;
+  - the top-right panel, rows 3–52, bytes 28 or 34–43.
+
+  At the start it is 2,592 bytes. Pit messages draw into part of this panel,
+  in both banks.
+- **Lifecycle (bank timeline):**
+  - before each driving entry (race start, and re-entry from the menus), OS
+    graphics code and native `$24ae0` (`$24c18`/`$24db8`) rewrite both banks
+    in the 4–6 fields before the first fine draw;
+  - the menus, paddock and race settings use the bank memory continuously
+    (`$24db8` in about 7,000 fields);
+  - pause and pause-held write nothing to the banks;
+  - tow and exit hand over to the menu code, which rewrites them.
+- **Consequence for FR3:**
+  - seed both shadows from Chip at the first fine draw of every driving entry;
+  - treat the shadows as invalid as soon as driving exits;
+  - no other resync point exists inside driving.
+
+**Corrections to later steps.**
+
+- **FR2:** BZERO is not needed. Line mode with EFE/IFE fill and FCI, the
+  descending fill, and all 16 ASH/BSH values are required.
+- **FR4:**
+  - the redirection list is the 11 instructions above plus `$2a1b0`
+    (`WritePixel`);
+  - front-bank writes go to the front shadow;
+  - the `$24b1c` read must be translated.
+- **FR3:** the source list is the table above, seeded at driving entry.
+  The native CPU writers of the dynamic tables (`$252d0`, `$68d4e`,
+  `$6bbfc`, `$6d066`, `$6d472`, `$6d4cc`, `FF1RenderGaugeStrip`,
+  `FF1RenderDemoText`) must write the Fast copies. Redirect them in FR4 the
+  same way as the blit sites, or keep those tables in Chip and mirror them
+  at each draw. That choice belongs to FR3.
+- **FR7:** the copy is 24,000 bytes per bank, so the persistent top-right
+  panel needs no special case.
+
 ### FR2 — Exact software blitter (reference)
 
 `FastRenderBlit.s`, 68020+ code in the public fine payload. It executes one
@@ -726,7 +923,7 @@ except for memory checks.
 Dependencies:
 
 ```
-FR0 (go, 2026-11-02) → FR0h → FR1 → FR2 → FR3 → FR4 → FR5a…FR5f → FR6
+FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 → FR3 → FR4 → FR5a…FR5f → FR6
   → FR7 → FR8 → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.
