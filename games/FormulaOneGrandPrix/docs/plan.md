@@ -561,7 +561,8 @@ The game's own variable step gives a finer world step that F1GP-Ed players have 
 decades; F3 offers it without F1GP-Ed (`CUSTOM2` bit 9, 20 Hz). Its measured side effect was
 computer cars 10–14% slower a lap at 20 Hz (F3), which F1GP-Ed's speed-factor scaling
 does not recover; F1GP-Ed's guide also reports spins in long races at 20–25 fps.
-*Closed* (user decision): H2 and H3 are complete, H1 closed without work.
+*Closed* (user decision): H2 and H3 are complete, H1 closed without work, H4 analysed and
+not implemented.
 
 **H1 Per-field steering preview.** Preview the native player motion every field from the
 current input and spread it over the tick (Gunship `TIMING_DESIGN.md`), so steering
@@ -585,6 +586,15 @@ with the step, but the force limiting the slip (mass × 32768 ÷ step) overflows
 from a mass of one step, which a full tank reaches at 20 Hz and F1GP-Ed's 25 fps and spins
 the player's car. Held at $7FFF in every build (user decision); the result is unchanged
 wherever it fits.
+
+**H4 World updates every field or every second field.** 50/60 Hz or 25/30 Hz steps with
+D's interpolated pictures between them.
+*Analysed, not implemented* (user decision;
+[analysis](internals.md#h4-world-updates-every-field-or-every-second-field--analysed-not-implemented)):
+the 030 has the time, and with `h3_slip` the player's physics holds down to 60 Hz without
+collisions. Car-to-car contact lasts longer at smaller steps, 2²⁶ ÷ step overflows below
+step 2048, and the engine sound's slew is 0 from a half step of 1310 (25 Hz PAL and 30 Hz
+NTSC).
 
 ## Order and critical path
 

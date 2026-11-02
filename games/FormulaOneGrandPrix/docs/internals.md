@@ -3590,6 +3590,70 @@ Coasting after 3 s settled loses 136.0, 135.9, 136.0 and 136.2 a second at 8192,
 and 2700. B4's gate passes. Not covered: steering, throttle and braking (the capture's car
 has no input), kerbs and grass.
 
+### H4 world updates every field or every second field — analysed, not implemented
+
+The user asked whether the world could update every field (50 Hz PAL, step 1311; 60 Hz
+NTSC, 1092) or every second field (25 Hz, 2621; 30 Hz, 2185), the pictures between them
+interpolated by D. Not implemented (user decision). The measurements are from one
+snapshot, with scratch scripts on `tools/h3_slip.py`'s harness (`tmp/h4/`, not tracked).
+
+**Cost** (100 fields from tick 300 on the 030/50, the supplied icons' options, stock
+step, `c6_profile.py`): the car update h0+$2AC14 takes 3.0 ms a tick and the rest of the
+tick under 0.5 ms; a picture takes about 20 ms (scene 9.35, publication 7.89, D3–D5 2.7).
+The capture drew 2054 pictures in 2063 fields. At 25, 30, 50 and 60 updates a second the
+updates would take about 9%, 11%, 18% and 21% of the 030, assuming the cost per update
+does not change with the step (not measured: `c2_capture.py --profile` with `--step20`
+fails its clock accounting check). Two fields (40 ms) do not hold an update and two
+pictures, so at 25 or 30 Hz some fields would repeat a picture. A stock A1200 cannot keep
+20 Hz (F3).
+
+**The player's physics alone** (the H3 harness with car-to-car collisions off, h0+$3310C
+returning at once): with `h3_slip`, coasting loses 120–150 a second at every step from 1000
+to 8192, and 6 s with a mass of 1272 or 1650 written each tick ends at 768–777 at 3276,
+2621, 2185, 1638, 1311 and 1092. The largest slip rises as the step falls (65–67 at 3276,
+154–157 at 2621, 210–217 at 2185, 324–327 at 1311, 349–353 at 1092); not explained. At
+2185 and below the half step is under even an empty car's mass (1254), so the slip limit
+holds at `h3_slip`'s $7FFF for the whole race.
+
+**Car-to-car collisions.** h0+$3310C takes both cars' velocities relative to their mean
+(h0+$330B4), exchanges them when the cars overlap (h0+$32D90, h0+$33032) and adds the mean
+back (h0+$330EE). At frame 47 the player's car (1606, slowed by the start collision) is in
+the pack while computer cars pass at 2500–5000 (the leaders at 8000–9700). With collisions
+on, the coasting test fails (outside 120–150 a second) at 1068 of the 7193 steps from 1000
+to 8192, isolated ones from about 5730 down and most below 2048; none from 5733 to 8192,
+and none with collisions off. At 3272, the player's speed goes from 966 to 4488 in one
+update, from a car at about 5000. Whether a car is hit depends chaotically on the step,
+but contact lasts longer at smaller steps: in 20 s, collisions passed h0+$331B2 42, 116,
+45, 221, 207 and 261 times at 8192, 6750, 3276, 2700, 2184 and 1311, and the longest run
+of consecutive updates for one pair was 3, 6, 5, 12, 11 and 10 updates. Whether the outcomes
+are wrong (or cars pass through each other more at large steps) is not established.
+
+**A second overflow below step 2048.** h0+$34894 stores 2²⁶ ÷ step in h0+$3A964, which
+`MULS.W` reads signed at h0+$275C0, $27C0C, $27DB8, $28034 and $28208 (car contact: the
+push `+$6C`, capped at ±h0+$3A96A) and h0+$33EBE (`+$72` into h0+$3A8BA). Below 2048 it is
+negative. With collisions on, coasting fails at 2048 but not 2049, and at 975 of the 1049
+steps from 1000 to 2048; storing 2²⁵ ÷ step with one more shift at each use (`ASL.L` #5/#6
+at h0+$275C6, $27C12, $27DBE, $2803A, $2820E and h0+$33EC4) leaves 445. It changes nothing
+with collisions off.
+
+**The engine sound below two fields a step.** h0+$34972 divides h0+$3436A (65536 ÷ 50,
+or ÷ 60 when h2+$2A650 is 60; it stays 50 under an NTSC display, C1) × 65536 by the half
+step into h0+$3A972, the factor h0+$3627E applies to the change in revs `+$62` for the
+sound's per-field slew h0+$3A706. From a half step of 1310 the `DIVU.W` overflows and
+h0+$3A972 is 0, so the slew is 0: 2621 overflows exactly, 2622 fits (8185), and 2185 and
+F1GP-Ed's former NTSC 30 fps (2250) overflow. What it sounds like was not checked.
+
+**PAL and NTSC.** The clock rounds each update to whole fields: 2621 at 50 Hz is 1.99966
+fields a tick, one 1-field gap about every 2 minutes; 2185 at 60 Hz is 2.00043, one
+3-field gap about every 78 s; an exact 2 fields would run the race 0.02–0.04% off real
+time. Different steps on PAL and NTSC give different races, and replays and saves only
+work at the step they were made with. 25 Hz on both would give NTSC 2- and 3-field gaps,
+evened out by D.
+
+**What it would need:** the engine sound fix (or 2622 on PAL), the h0+$3A964 rescale below
+2048, and whole-race checks of collision frequency and outcomes at the new steps against
+8 Hz and 20 Hz. The collision behaviour applies to F1GP-Ed's 25 fps (2700) too.
+
 ### H1 per-field steering preview — closed, not worked
 
 A per-field preview needs a copy of the player's physics without side effects (the RNG,
