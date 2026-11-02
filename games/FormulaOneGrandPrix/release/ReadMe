@@ -41,41 +41,40 @@ Version 2.0b (02.11.2026) by Vesuri (beta):
   however long the 3D view takes to draw. A 68000 keeps the original timing
 - Smooth motion on a 68020 or better: the 3D view is drawn between the
   game's updates, up to every frame on fast Amigas
-- Faster 3D drawing on a 68020 or better with fast memory (MEMCONFIG=1)
+- Faster 3D drawing on a 68020 or better with fast memory (MEMCONFIG=1,
+  set in the supplied icons)
 - Slightly faster 3D drawing on a 68000
-- Optional CPU caches
-- All of the above are enabled in the supplied icons (CUSTOM2=1531
-  MEMCONFIG=1). Uncheck them in the WHDLoad startup options to play the
-  original game. Leave the other developer options unchecked
+- CPU caches enabled
+- On a 68020 or better with fast memory the world updates 20 times a
+  second instead of 8 (or instead of an F1GP-Ed file's rate), as
+  F1GP-Ed's 20 fps setting does. The computer cars lose speed in corners
+  at every update, which at 20 Hz would slow them 8-9% a lap (as
+  F1GP-Ed's guide warns); the slave makes the loss the same each second
+  as at the original rate, and their laps stay within 2% of the
+  original's. Replays and saved games only work at the rate they were
+  made with
+- Fixed: at finer world steps (20 Hz, or F1GP-Ed's 25 fps) a car carrying
+  a lot of fuel spun by itself, as F1GP-Ed's guide warns for long races.
+  The original rate is unaffected
+- All of the above are on by default. "Original game" in the WHDLoad
+  startup options (CUSTOM2=1) turns them off, apart from the spin fix
+- "F1GP-Ed frame rate and speed factors" (CUSTOM2=2) plays the game as
+  F1GP-Ed sets it up: the world updates at the game file's frame rate (8
+  times a second unless F1GP-Ed changed it), the computer cars keep the
+  original cornering loss, and they use the per-circuit Local Speed
+  Factors of an F1GP-Ed datafile saved as F1GP-Ed.f1gp in the data
+  directory, as F1GP-Ed's memory patch does, in place of the game file's
+  Speed Factor. The wet weather reduction and risk factors are not
+  applied
+- F1GP-Ed's frame rate setting (used by its 1995-2002 datafiles) sets how
+  often the world updates wherever the 20 Hz step is not used; the race
+  runs in real time at that rate, and motion stays smooth between the
+  updates
 - The enhancements apply to the 4 disk release's game file only, and
   only while the game code they change is the original. F1GP-Ed's settings
   keep it; a game file changed there by other means runs without them
 - F1GP-Ed's cockpit designs and replaced backdrops work with the
   enhancements
-- F1GP-Ed's frame rate setting (used by its 1995-2002 datafiles) sets how
-  often the game updates the world; the race runs in real time at that
-  rate, and motion stays smooth between the updates
-- "Developer - 20 Hz world step" (off in the supplied icons) updates the
-  world 20 times a second instead of 8, or instead of an F1GP-Ed file's
-  rate, as F1GP-Ed's 20 fps setting does. Replays and saved games only
-  work at the rate they were made with
-- The computer cars lose speed in corners at every world update, so a
-  finer step slows them (8-9% a lap at 20 Hz, as F1GP-Ed's guide warns).
-  With the 20 Hz step the slave makes the loss the same each second as
-  at the original rate, and their laps are within 2% of the original's;
-  "Developer - native AI cornering loss at 20 Hz" keeps the original
-  loss. "Developer - AI cornering loss a second (file's rate)" does the
-  same at an F1GP-Ed file's own frame rate, where the effect is small
-  (under 1% a lap at the 1995-2002 datafiles' rate). F1GP-Ed's suggested
-  speed factor correction for 20 fps is no longer needed with it
-- Fixed: at finer world steps (20 Hz, or F1GP-Ed's 25 fps) a car carrying
-  a lot of fuel spun by itself, as F1GP-Ed's guide warns for long races.
-  Always on; the original rate is unaffected
-- "Developer - local speed factors" (off in the supplied icons) gives the
-  computer cars the per-circuit Local Speed Factors of an F1GP-Ed datafile
-  saved as F1GP-Ed.f1gp in the data directory, as F1GP-Ed's memory patch
-  does, in place of the game file's Speed Factor. The wet weather reduction
-  and risk factors are not applied
 - Fixed: the 1991 names no longer replace driver, team or engine names
   edited with F1GP-Ed when the first driver's name was left unchanged
   (4 disk release)

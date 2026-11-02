@@ -69,8 +69,9 @@ replace the original baseline or prove the projected implementation below.
    the risk to F1GP's physics and AI is the reason they are optional here.
 4. **Caches on** (the user's decision). Code that breaks with caches on is fixed (`B5`).
 5. **Original behaviour one switch away:** every change behind a `CUSTOMn` bit with the
-   original bytes untouched when off; the release exposes one player-facing option and
-   gates per CPU and memory automatically (`G1`).
+   original bytes untouched when off; the release turns the enhancements on by default,
+   gates them per CPU and memory automatically, and offers "Original game" and F1GP-Ed's
+   timing and speed factors as its two options (`G1`, user decision).
 
 ## Rules for every step
 
@@ -386,8 +387,8 @@ now interpolated too. *Complete:* the user accepted the feel, the extra lag incl
 
 **E1 Caches:** `B5`. *Complete for the current scope:* B5's gate, plus the gain with the
 C2 loop and interpolation on the 030 — 13–14% more pictures over a whole race with caches
-on. The slave keeps them opt-in (all bits zero stay original); the release turns them on
-through its icon (`G1`).
+on. The developer slave keeps them opt-in (all bits zero stay original); the release turns
+them on unless the player picks "Original game" (`G1`).
 
 **E2 Hunk 2's code in fast RAM** (68020+ with real fast RAM). Copy hunk 2's code ranges
 (static disassembly plus trace coverage) into a fast block. Redirect absolute references
@@ -536,10 +537,13 @@ the risk factors, GPPatch and the library fixes are left out.
 
 ## G. Release
 
-**G1 Options.** One player-facing toggle for the enhanced mode, with automatic gating:
-68000 and chip-only machines get `C` (and `E7`), 68020+ with fast RAM get `C`, `D` and
-`E`. Whether it defaults on is the user's decision. A developer build keeps individual
-`CUSTOMn` bits.
+**G1 Options.** *Complete* ([options](internals.md#g1-options--complete)). The release
+build (`make slave`) turns the enhancements on by default and gates them per machine:
+caches, `C`, `D`, `E` and `E7` wherever each applies (the 68000 keeps the native pacer,
+C6), and on a 68020+ with real fast RAM the 20 Hz step with H2's correction. Its two
+options (user decisions): "Original game" turns everything off; "F1GP-Ed frame rate and
+speed factors" keeps the file's step and the native cornering loss and adds F6's
+factors. The developer build keeps the individual `CUSTOMn` bits.
 
 **G2 Regression routes.** Quick Race, practice, qualifying, a full race weekend, a pit
 stop, a retirement, a replay, every view, menus and options, a second race (tables and
@@ -549,11 +553,10 @@ state reset), NTSC; every CPU, caches on; the stock file and `F4`'s edited files
 internals; the ReadMe's requirements (memory, CPU) and options, and which F1GP-Ed
 settings the slave honours, overrides or rejects (`F`).
 
-**G4 Release archive** (AmigaXDev playbook §13). *In progress:* `make dist` builds 2.0b (02.11.2026) for the user's
-A1200/040 test: Codetapper's archive with the developer slave, `release/ReadMe` (a 2.0b
-history entry) and the nine game icons set to `CUSTOM2=1531 MEMCONFIG=1`. The user's A1200/040 runs it
-(after the 24-bit edge-pool fix in E4). The release
-build will replace the developer slave once G1 exists.
+**G4 Release archive** (AmigaXDev playbook §13). *In progress:* `make dist` builds 2.0b
+(02.11.2026): Codetapper's archive with the release slave, `release/ReadMe` (a 2.0b
+history entry) and the nine game icons with `MEMCONFIG=1`. The user's A1200/040 ran the
+earlier developer-slave archive (after the 24-bit edge-pool fix in E4).
 
 ## H. Finer simulation (optional; only on the user's request)
 

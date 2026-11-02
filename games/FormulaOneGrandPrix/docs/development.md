@@ -252,7 +252,7 @@ boundary and can omit the call at the breakpoint. Use screen-anchored transition
 ## Build variants and disabled-hook gate (B4)
 
 ```sh
-make slave                 # release -> tmp/build
+make slave                 # release (DEVELOPER=1 PLAYER=1, G1) -> tmp/build
 make slave-developer       # DEVELOPER=1 -> tmp/build-developer
 make slave-verify          # DEVELOPER=1 VERIFY=1 -> tmp/build-verify
 make slave-verify OUT='tmp/verify with spaces'
@@ -274,6 +274,8 @@ an artifact based only on its filename; inspect the build manifest and rebuild n
 prior evidence. Move a rejected attempt aside explicitly before retrying. It starts and
 stops only project servers, verifies input/source/build hashes, reaches Quick Race and
 captures 50 fields for each of release-off, developer-off, VERIFY-off and VERIFY-on.
+The release is off with `CUSTOM2=1` ("Original game", G1); every other case has all
+`CUSTOM` values zero.
 Each case also checks the B3 loader patches/names and real F10 return. The enabled case
 uses only `CUSTOM5=1`, a VERIFY relay to the original pacer. `--check` audits retained
 captures against current binaries, runs adversarial checker tests and writes the combined
@@ -318,7 +320,7 @@ as an all-view gameplay test or an extrapolation/restore check. Those belong to 
 
 `state_diff.py` is exposed as the server command `statediff live|replay DIR [FRAMES]`.
 It currently requires `a1200-fast` (8 MB fast RAM), an explicit `SLAVE`, and a stopped
-native-route game. Use the B4 release slave with all five CUSTOM values explicitly zero,
+native-route game. Use the B4 developer slave with all five CUSTOM values explicitly zero,
 `WARP=1 DETERMINISTIC=1 JOY0=none JOY1=none`. Wait for the **new** server's `serving on`
 message; reject an active socket rather than connecting to a different run. All capture
 names must be new directories under `tmp/`.
@@ -1389,11 +1391,11 @@ python3 tools/h2_corner.py stock=tmp/h2/v8-off:8192 corner8=tmp/h2/v8-corner:819
 
 `make dist` rebuilds Codetapper's installer archive (`tmp/archives/FormulaOneGrandPrix.lha`,
 verified against the manifest first) as `dist/FormulaOneGrandPrix-<ver>.lha` with
-`tools/package_release.py`. It makes a fresh developer build in `tmp/dist-build` (G1's
-player toggle does not exist yet), takes the version from the slave's `$VER` and requires
-a matching entry in `release/ReadMe`. The archive keeps the original's 18 members; the slave,
-the ReadMe and the nine game icons change, and the icons get `CUSTOM2=1531 MEMCONFIG=1`
-after `PRELOAD`, every other byte kept. The tool re-extracts the archive and checks every
+`tools/package_release.py`. It makes a fresh release build in `tmp/dist-build` (G1),
+takes the version from the slave's `$VER` and requires a matching entry in
+`release/ReadMe`. The archive keeps the original's 18 members; the slave, the ReadMe and
+the nine game icons change, and the icons get `MEMCONFIG=1` after `PRELOAD`, every other
+byte kept. The tool re-extracts the archive and checks every
 member against its stage and the original. Bump `DECL_VERSION` and the `$VER` date in
 `whdload/F1GP.s` and the ReadMe together. A boot check of the packaged slave:
 
@@ -1401,7 +1403,7 @@ member against its stage and the original. Bump `DECL_VERSION` and the `$VER` da
 make dist
 lha xqw=tmp/g4/new dist/FormulaOneGrandPrix-2.0b.lha
 AMIGA_SETUP=a1200-040 SLAVE=tmp/g4/new/FormulaOneGrandPrixHD/FormulaOneGrandPrix.slave \
-  WHD_ARGS='CUSTOM1=1 CUSTOM2=1531 MEMCONFIG=1' WARP=1 JOY0=none JOY1=none \
+  WHD_ARGS='CUSTOM1=1 MEMCONFIG=1' WARP=1 JOY0=none JOY1=none \
   python3 tools/f1gp.py serve > tmp/g4/serve.log 2>&1 &
 python3 tools/f1gp.py quickrace && python3 tools/f1gp.py gdb monitor fields 1500
 python3 tools/f1gp.py shot "$PWD/tmp/g4/race.png"; python3 tools/f1gp.py quit

@@ -63,6 +63,8 @@ def capture(case, phase, fields):
     slave = ROOT/SLAVE if case == 'original' else padded() if case == 'padded' else BUILT
     if case != 'original':
         env['SLAVE'] = str(slave)
+    if slave == BUILT:
+        env['WHD_ARGS'] = 'CUSTOM2=1'   # G1: the release's "Original game"
     sock = ROOT/'amiga/.run/f1gp.sock'
     if sock.exists():
         # Quit through the project server; do not terminate unidentified processes.

@@ -19,9 +19,12 @@ PATTERN = re.compile(r'; PERF_RANGE h(\d+):([0-9a-fA-F]+) (\d+) custom=([1-5]) b
 
 
 def ranges(source):
-    result, baseline, pending, gate = [], False, None, None
+    result, baseline, pending, gate, macro = [], False, None, None, False
     for number, raw in enumerate(source.splitlines(), 1):
         line = raw.strip()
+        if macro or line.endswith(' MACRO'):
+            macro = line != 'ENDM'      # a definition, not a patch list
+            continue
         if line.startswith('; BASELINE_PATCHES_BEGIN'):
             if baseline:
                 raise ValueError('nested baseline block')
@@ -39,8 +42,9 @@ def ranges(source):
                            custom=int(custom), bit=int(bit), variant=int(variant))
             if gate != (pending['custom'],pending['bit']) or pending['bit'] > 31:
                 raise ValueError('range not inside its declared CUSTOM bit gate')
-        elif line.startswith('PL_IFC'):
-            match = re.fullmatch(r'PL_IFC([1-5])X (\d+)', line)
+        elif line.startswith(('PL_IFC', 'G1_IFC')):
+            # G1_IFC2X: PL_IFC2X, or in the release the byte g1_options derives from it.
+            match = re.fullmatch(r'(?:PL|G1)_IFC([1-5])X (\d+)', line)
             if not match or gate:
                 raise ValueError('unsupported or nested gate')
             gate = tuple(map(int,match.groups()))
@@ -132,8 +136,9 @@ def check(capture, source=SOURCE):
         raise ValueError('capture input pins differ')
     if meta['source_sha256'] != hashlib.sha256(source.read_bytes()).hexdigest():
         raise ValueError('capture source is stale')
-    if meta['custom'] != [0]*5:
-        raise ValueError('all CUSTOM values must be zero for the disabled gate')
+    # G1: the release turns its options off with "Original game" (CUSTOM2 bit 0).
+    if meta['custom'] != ([0,1,0,0,0] if meta.get('build') == 'release' else [0]*5):
+        raise ValueError('every option must be off for the disabled gate')
     mem=image((capture/'chip.bin').read_bytes(),(capture/'fast.bin').read_bytes(),b'')
     actual=locate(mem,game_hunks())
     next_hunk=lambda b: struct.unpack_from('>I',mem,b-4)[0]*4+4

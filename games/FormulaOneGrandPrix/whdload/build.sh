@@ -10,7 +10,7 @@ python3 tools/e4_tables.py > /dev/null
 python3 tools/f5_sites.py > /dev/null
 BUILD="${BUILD:-release}"
 case "$BUILD" in
-  release) defines=(-DDEVELOPER=0 -DVERIFY=0) ;;
+  release) defines=(-DDEVELOPER=1 -DPLAYER=1 -DVERIFY=0) ;;
   developer) defines=(-DDEVELOPER=1) ;;
   verify) defines=(-DDEVELOPER=1 -DVERIFY=1) ;;
   *) echo "Unknown BUILD: $BUILD" >&2; exit 1 ;;

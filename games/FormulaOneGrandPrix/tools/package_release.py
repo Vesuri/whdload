@@ -5,9 +5,9 @@
 
 Input, kept local and verified against manifest/SHA256SUMS: tmp/archives/FormulaOneGrandPrix.lha.
 Output: dist/FormulaOneGrandPrix-<ver>.lha (ignored), with exactly the input's members.
-Changed members are the freshly built developer slave (G1's player toggle does not exist
-yet), release/ReadMe and the nine game launch icons, which get CUSTOM2 and MEMCONFIG
-tooltypes; everything else is copied byte for byte. The archive is re-extracted and
+Changed members are the freshly built release slave (G1: the enhancements on unless the
+player picks "Original game"), release/ReadMe and the nine game launch icons, which get a
+MEMCONFIG tooltype; everything else is copied byte for byte. The archive is re-extracted and
 checked member by member against its stage and the original. LHA names LHa for UNIX
 (Lhasa, the usual `lha`, cannot create archives).
 """
@@ -26,9 +26,9 @@ TOP, SLAVE = 'FormulaOneGrandPrixHD', 'FormulaOneGrandPrix.slave'
 ICONS = ('inf', 'romicon', 'newicon', 'newintro', 'newexot', 'newexot2', 'colicon', 'colintro',
          'colbox')
 BUILD = ROOT / 'tmp/dist-build'
-# Caches, clock, D's snapshots and interpolation, E2-E4 and E6 (bits 0, 1, 3-8, 10); E's
-# fast areas need the alternative memory configuration.
-TOOLTYPES = (b'CUSTOM2=1531', b'MEMCONFIG=1')
+# The release's enhancements need no tooltype (G1); E's fast areas need the alternative
+# memory configuration.
+TOOLTYPES = (b'MEMCONFIG=1',)
 
 
 def members(archive):
@@ -96,10 +96,11 @@ def main():
     subprocess.run(['shasum', '-a', '256', '-c', 'manifest/SHA256SUMS'], cwd=ROOT, check=True,
                    capture_output=True)
     # A fresh build of its own: a VERIFY build must never be packaged.
-    subprocess.run(['make', '-C', str(ROOT), 'slave-developer', f'OUT={BUILD.relative_to(ROOT)}'],
+    subprocess.run(['make', '-C', str(ROOT), 'slave', f'OUT={BUILD.relative_to(ROOT)}'],
                    check=True, capture_output=True)
     slave = (BUILD / 'F1GP.Slave').read_bytes()
-    assert b'Developer - ' in slave and b'C5:' not in slave and b'VERIFY' not in slave, 'build'
+    assert b'Original game' in slave and b'Developer - ' not in slave, 'build'
+    assert b'C3:' not in slave and b'C5:' not in slave and b'VERIFY' not in slave, 'build'
     version, date = re.search(rb'\$VER: ' + SLAVE.encode() + rb' ([0-9.a-z]+) \(([0-9.]+)\)',
                               slave).groups()
     readme = (ROOT / 'release/ReadMe').read_bytes()

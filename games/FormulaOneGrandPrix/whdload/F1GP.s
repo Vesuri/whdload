@@ -9,6 +9,18 @@ DEVELOPER = 0
         IFND VERIFY
 VERIFY = 0
         ENDC
+; DEVELOPER: the enhancements' code. PLAYER (the release, G1): the player's options, which
+; g1_options turns into the developer bits; the patch lists test them through G1_IFC2X.
+        IFND PLAYER
+PLAYER = 0
+        ENDC
+G1_IFC2X MACRO
+        IFNE PLAYER
+        PL_IFVB g1_bits+\1
+        ELSE
+        PL_IFC2X \1
+        ENDC
+        ENDM
         IFNE DEVELOPER
 slv_Version = 20             ; ws_MemConfig: E2-E4's fast areas; resload_Log (VERIFY)
         ELSE
@@ -53,8 +65,13 @@ slv_MemConfig dc.l CHIPMEMSIZE,$40000+FASTMEMSIZE+E_AREAS  ; kick13.s's KICKSIZE
         ENDC
 slv_config
         dc.b 'C1:B:Skip intro;'
+        IFNE PLAYER
+        dc.b 'C2:X:Original game (no enhancements):0;'
+        dc.b 'C2:X:F1GP-Ed frame rate and speed factors:1;'
+        ELSE
         dc.b 'C2:X:Enable CPU caches:0;'
-        IFNE DEVELOPER
+        ENDC
+        IFNE DEVELOPER&(1-PLAYER)
         dc.b 'C2:X:Developer - VBL world clock:1;'
         dc.b 'C2:X:Developer - VBL world clock on a 68000 too:2;'
         dc.b 'C2:X:Developer - presentation snapshots and timing:3;'
@@ -98,7 +115,7 @@ custom_tags dc.l WHDLTAG_CUSTOM1_GET
 skip_intro dc.l 0
         dc.l WHDLTAG_CUSTOM2_GET
 cache_options dc.l 0
-        IFNE DEVELOPER
+        IFNE DEVELOPER&(1-PLAYER)
         dc.l WHDLTAG_CUSTOM4_GET
 preference_options dc.l 0
         ENDC
@@ -107,6 +124,9 @@ preference_options dc.l 0
 verify_options dc.l 0
         ENDC
         dc.l 0
+        IFNE PLAYER
+preference_options dc.l 0
+        ENDC
 game_size dc.l 0
         IFNE VERIFY
 verify_pacer_target dc.l 0
@@ -162,6 +182,9 @@ _bootdos
         lea (custom_tags,pc),a0
         move.l (_resload,pc),a2
         jsr (resload_Control,a2)
+        IFNE PLAYER
+        bsr g1_options
+        ENDC
         btst #0,(cache_options+3,pc)
         beq.s cache_ready
         ; Chip/IO data caching is inhibited by Amiga hardware. WT avoids
@@ -270,6 +293,56 @@ wrong_version
         pea TDREASON_WRONGVER
         move.l (_resload,pc),a2
         jmp (resload_Abort,a2)
+
+        IFNE PLAYER
+; G1: the release's options become the developer bits. Unchecked: caches, the clock, smooth
+; motion, the faster routines and the fast-RAM work (bits 0, 1, 3-8 and 10, each where the
+; machine supports it), and on a 68020+ with real fast RAM the 20 Hz step (bit 9) with
+; H2's cornering correction. "F1GP-Ed frame rate and speed factors" keeps the file's
+; step and the native cornering loss and adds F6's factors (bit 11) instead. "Original
+; game" clears every bit. g1_bits gets a byte per bit (-1 set) for G1_IFC2X.
+G1_ENHANCED = 1531
+G1_20HZ = 1<<9
+G1_FACTORS = 1<<11
+g1_options
+        movem.l d0-d2/a0/a6,-(sp)
+        move.l (cache_options,pc),d1
+        moveq #0,d0
+        btst #0,d1
+        bne.s .store
+        move.l #G1_ENHANCED,d0
+        btst #1,d1
+        beq.s .step
+        or.w #G1_FACTORS,d0
+        bra.s .store
+.step
+        move.l (_attnflags,pc),d2
+        btst #1,d2              ; AFF_68020
+        beq.s .store
+        move.l 4.w,a6
+        lea ($142,a6),a0        ; MemList
+.header
+        move.l (a0),a0
+        tst.l (a0)
+        beq.s .store
+        btst #2,($f,a0)         ; MEMF_FAST
+        beq.s .header
+        cmpi.l #$200000,($14,a0) ; real fast RAM, not ExpMem in chip
+        bcs.s .header
+        or.w #G1_20HZ,d0
+.store
+        lea (cache_options,pc),a0
+        move.l d0,(a0)
+        lea (g1_bits,pc),a0
+        moveq #32-1,d2
+.bits
+        lsr.l #1,d0
+        scs (a0)+
+        dbf d2,.bits
+        movem.l (sp)+,d0-d2/a0/a6
+        rts
+g1_bits ds.b 32
+        ENDC
 
 ; H3: replaces DIVU.W h0+$3A8A4,D0 at h0+$369C2 in the physics h0+$36922 (the player's
 ; half steps, the explicit-pose cars' steps). Mass x 32768 / step is the force that
@@ -4858,6 +4931,7 @@ patch_582992
 ; F5: the options of the main list, applied only when f5_check finds the stock hook sites.
 patch_582992_options
         PL_START
+        IFEQ PLAYER
         PL_IFC3X 0
         ; PERF_RANGE h0:1288 4 custom=3 bit=0 variant=582992
         PL_NOP $1288,4
@@ -4867,7 +4941,8 @@ patch_582992_options
         ; PERF_RANGE h0:1f388 2 custom=3 bit=1 variant=582992
         PL_R $1f388
         PL_ENDIF
-        PL_IFC2X 8
+        ENDC
+        G1_IFC2X 8
         ; The edge tracer's X-major steps, one division per edge instead of a loop per pixel
         ; (68000 instructions; E7: on every CPU).
         ; PERF_RANGE h0:1ef74 6 custom=2 bit=8 variant=582992
@@ -4875,7 +4950,7 @@ patch_582992_options
         ; PERF_RANGE h0:1efde 6 custom=2 bit=8 variant=582992
         PL_PS $1efde,e4_trace_left
         PL_ENDIF
-        PL_IFC2X 11
+        G1_IFC2X 11
         ; F6: the computer cars' speed factor base, per circuit (ADDI.W #base,D0; TST.B).
         ; PERF_RANGE h0:29a7c 6 custom=2 bit=11 variant=582992
         PL_PS $29a7c,f6_factor
@@ -4891,18 +4966,18 @@ patch_582992_options
 ; (user decision: the 68000 keeps the native frame-locked pacer by default).
 patch_582992_clock
         PL_START
-        PL_IFC2X 10
+        G1_IFC2X 10
         ; PERF_RANGE h2:24308 6 custom=2 bit=10 variant=582992
         PL_PS $9369c,e6_table
         PL_ENDIF
-        PL_IFC2X 8
+        G1_IFC2X 8
         ; The sky band's strip: a fast copy after each build, read by E3's CPU blits.
         ; PERF_RANGE h0:20e 6 custom=2 bit=8 variant=582992
         PL_PS $20e,e4_strip_build
         ; PERF_RANGE h2:1f41e 6 custom=2 bit=8 variant=582992
         PL_PS $8e7b2,e4_sky_source
         PL_ENDIF
-        PL_IFC2X 1
+        G1_IFC2X 1
         ; PERF_RANGE h0:3c8d2 6 custom=2 bit=1 variant=582992
         PL_PS $3c8d2,c2_live_entry
         ; PERF_RANGE h0:3c94a 6 custom=2 bit=1 variant=582992
@@ -5016,14 +5091,14 @@ patch_582992_clock
 ; file's step.
 patch_582992_corner20
         PL_START
-        PL_IFC2X 9
+        G1_IFC2X 9
         ; PERF_RANGE h0:2b37a 6 custom=2 bit=9 variant=582992
         PL_PS $2b37a,h2_loss
         PL_ENDIF
         PL_END
 patch_582992_corner
         PL_START
-        PL_IFC2X 12
+        G1_IFC2X 12
         ; PERF_RANGE h0:2b37a 6 custom=2 bit=12 variant=582992
         PL_PS $2b37a,h2_loss
         PL_ENDIF

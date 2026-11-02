@@ -19,7 +19,7 @@ from loop_profile import report
 from check_disabled import check, SOURCE
 
 
-def capture(name, build, custom5, game=None):
+def capture(name, build, custom5, game=None, custom2=0):
     verify()
     out=ROOT/'tmp/b4'/name
     out.mkdir(parents=True,exist_ok=False)
@@ -36,7 +36,7 @@ def capture(name, build, custom5, game=None):
         except (RuntimeError,subprocess.CalledProcessError):
             pass
         sock.unlink(missing_ok=True)
-    args=f'CUSTOM1=0 CUSTOM2=0 CUSTOM3=0 CUSTOM4=0 CUSTOM5={custom5}'
+    args=f'CUSTOM1=0 CUSTOM2={custom2} CUSTOM3=0 CUSTOM4=0 CUSTOM5={custom5}'
     env=dict(os.environ,AMIGA_SETUP='a1200-fast',WARP='1',DETERMINISTIC='1',
              JOY0='none',JOY1='none',SLAVE=str(slave),WHD_ARGS=args,VERIFY_EXIT='1')
     if game:
@@ -62,7 +62,7 @@ def capture(name, build, custom5, game=None):
         found=locate(mem,game_hunks())
         nxt=lambda h: struct.unpack_from('>I',mem,h-4)[0]*4+4
         h0,h2=found[0][0],found[2][0]
-        meta=dict(**build_meta,custom=[0,0,0,0,custom5],route=route,
+        meta=dict(**build_meta,custom=[0,custom2,0,0,custom5],route=route,
                   whd_args=args,hunk_bases=[h0,nxt(h0),h2,nxt(h2)],fields=50,
                   game_inputs=json.loads((ROOT/'manifest/game-inputs.json').read_text()),
                   loader_checks=loader_checks(mem,h0,h2,slave,game and game/'data/f1gp'))
@@ -112,9 +112,10 @@ def capture(name, build, custom5, game=None):
         proc.wait(timeout=30)
 
 
+# G1: the release's options are off with "Original game" (CUSTOM2=1).
 CASES = (
-    ('release-off','tmp/build',0), ('developer-off','tmp/build-developer',0),
-    ('verify-off','tmp/build-verify',0), ('verify-on','tmp/build-verify',1),
+    ('release-off','tmp/build',0,1), ('developer-off','tmp/build-developer',0,0),
+    ('verify-off','tmp/build-verify',0,0), ('verify-on','tmp/build-verify',1,0),
 )
 
 
@@ -124,14 +125,14 @@ def acceptance(prefix=''):
     results = {}
     required = {'protection_answer', 'protection_branch', 'save_flag', 'save_directory',
                 'keyboard_hook', 'keyboard_exit_key', 'keyboard_built_code', 'driver_names'}
-    for name, build, custom in CASES:
+    for name, build, custom, custom2 in CASES:
         out = ROOT/'tmp/b4'/(prefix+name)
         meta = json.loads((out/'meta.json').read_text())
         result = json.loads((out/'result.json').read_text())
         if meta['slave_sha256'] != hashlib.sha256((ROOT/build/'F1GP.Slave').read_bytes()).hexdigest():
             raise ValueError(f'{name}: current build differs from capture')
         if (meta['source_sha256'] != hashlib.sha256(SOURCE.read_bytes()).hexdigest()
-                or meta['custom'] != [0,0,0,0,custom]
+                or meta['custom'] != [0,custom2,0,0,custom]
                 or meta['fields'] != 50 or result['status'] != 'PASS'
                 or result['quit'] != 'OK'
                 or set(result['loader_checks']) != required
@@ -166,8 +167,8 @@ def main():
         f4_inputs.verify(args.inputs, [args.game])
         game = (ROOT/args.inputs/args.game).resolve()
     if not args.check:
-        for name,build,custom in CASES:
-            capture(args.prefix+name,build,custom,game)
+        for name,build,custom,custom2 in CASES:
+            capture(args.prefix+name,build,custom,game,custom2)
     acceptance(args.prefix)
 
 

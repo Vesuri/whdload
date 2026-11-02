@@ -232,12 +232,12 @@ BaseMem write-through and ExpMem/Slave copyback. The 030 write-allocation disabl
 is clear because the game runs in user mode. This follows WHDLoad's documented Amiga
 hardware inhibition of Chip/IO data caching; it is not permission to cache DMA buffers
 on arbitrary hardware. WHDLoad's `NoCache` override remains effective. All CUSTOM bits
-zero retain the old CPU request and original hooked game bytes. Caches remain opt-in
-until a release build turns them on; no simulation/presentation patch is enabled.
+zero retain the old CPU request and original hooked game bytes. Caches are opt-in in the
+developer build; the release turns them on unless the player picks "Original game" (G1).
 
 VERIFY requires slave API 18 and logs `CACR` using `resload_Log` after the cache request.
 The read runs through Exec Supervisor, guarded by WHDLoad's 68020 attention bit; the
-68000 never executes `MOVEC`. Release/developer builds retain API 17 and omit the audit.
+68000 never executes `MOVEC`. Release and developer builds omit the audit.
 The installed runtime accepts **`FileLog`**, not `FileLog=1` despite the API autodoc's
 numeric-option description. The rejected numeric-option probe never launched the game.
 
@@ -2744,8 +2744,9 @@ C5(b)'s one-field run; both uncached races are the same race. The comparison is 
 over the same route, view schedule and whole race (`c5_compare.py` schedules), not tick by
 tick.
 
-Caches stay opt-in in the slave: with every `CUSTOM` bit zero the original CPU request and
-bytes remain (B4), so a release turns them on through its icon's `Custom2=1` tooltype (G1).
+Caches stay opt-in in the developer slave: with every `CUSTOM` bit zero the original CPU
+request and bytes remain (B4). The release turns them on unless the player picks "Original
+game" (G1).
 No 040/060 gain is claimed (deferred; see B5).
 
 ### E2 hunk 2's code in fast RAM — complete for the current scope
@@ -3662,3 +3663,49 @@ A per-field preview needs a copy of the player's physics without side effects (t
 sound, collisions and lap state it writes), which does not exist. The 20 Hz step, with the
 cornering loss scaled, updates the world, the player's steering included, every 50 ms
 instead of 125 ms without one.
+
+## Release (G)
+
+### G1 options — complete
+
+The release build (`make slave`: `DEVELOPER=1 PLAYER=1`) carries the enhancements' code
+with the player's options in place of the developer bits (user decisions):
+
+| `CUSTOM2` | Effect |
+|---|---|
+| 0 (default) | Caches, the clock, smooth motion, the faster routines and the fast-RAM work (bits 0, 1, 3–8 and 10), each where the machine supports it (the 68000 keeps the native pacer, C6; E2–E4 need a 68020+ with `MEMCONFIG=1`'s spare fast RAM). On a 68020+ with real fast RAM (a `MEMF_FAST` header from $200000) also the 20 Hz step (bit 9) with H2's cornering correction |
+| bit 0, "Original game" | Every bit off: the original hook bytes (B4) |
+| bit 1, "F1GP-Ed frame rate and speed factors" | The default without the 20 Hz step and H2's correction (the file's step and the native cornering loss), with F6's factors (bit 11) |
+
+`g1_options` derives the developer mask in `cache_options` right after `resload_Control`,
+before the cache request, and writes a byte per bit to `g1_bits`. The patch lists test
+the bits through `G1_IFC2X`, which is `PL_IFC2X` in the developer builds and `PL_IFVB` on
+`g1_bits` in the release (in WHDLoad's `whdload.i` from 29.11.25 and its 20.1 autodoc;
+tested with 20.1). The ceiling options (`CUSTOM3`, `CUSTOM4`) are not in the release.
+The developer and VERIFY slaves are byte-identical to the builds before G1. H3's slip fix
+is a baseline patch, in every build and setting.
+
+**Evidence.** B4's gate passes with the release off at `CUSTOM2=1` and the other builds
+at zero: all 372 optional hook bytes are original, the loader and name checks and the F10
+quit pass, and the negative checks reject every mutation (`tmp/b4/g1-*`). The release's
+derived mask and the game's hook sites at the race start:
+
+| Machine, `CUSTOM2` | Bits | Clock | Step | H2 | F6 | E7 |
+|---|---|---|---|---|---|---|
+| 68020 + fast, default | 0, 1, 3–10 | yes | 3276 | yes | no | yes |
+| 68030 + fast, default | 0, 1, 3–10 | yes | 3276 | yes | no | yes |
+| 68030 + fast, 2 | 0, 1, 3–8, 10, 11 | yes | 8192 | no | yes | yes |
+| 68030 + fast, 1 | none | no | 8192 | no | no | no |
+| A1200 (no fast), default | 0, 1, 3–8, 10 | yes | 8192 | no | no | yes |
+| A500-equivalent, default | 0, 1, 3–8, 10 | no | 8192 | no | no | yes |
+
+Over 15,000 fields from the race start (the player idle, cockpit view), the 68020/14 with
+fast RAM and `MEMCONFIG=1` completes 6001 updates with none dropped at the 20 Hz default
+(19.97 a second; the step's rate is 20.005) and 2401 with the F1GP-Ed option (7.99); the
+030 completes 600 in 1500 fields. With only the clock and the 20 Hz step (no fast-RAM
+work), the same 68020 fell behind over a whole race (19.27 a second, 729 updates dropped),
+so the 20 Hz default there depends on E2–E4. The counts come from the clock's `WC_TICKS`
+and `WC_DROPPED`, read in 1500-field steps: one `monitor fields 15000` outlasts the
+server's 30-second reply wait and returns at once. Three Quick Race routes on the 68020
+with fast RAM stopped at the manual protection prompt (the typed answer not taken), with
+the developer and VERIFY slaves as well as the release; reruns passed. Not investigated.
