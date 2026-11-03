@@ -21,6 +21,12 @@ addresses used in the audited assembly. Every live game address is bound through
 the game's current hunk table, including reloads. Build offsets are not game
 addresses and must never receive native relocation bindings.
 
+The Fast RAM rendering work in progress ([FASTRAM_PLAN.md](FASTRAM_PLAN.md))
+is not part of the release slave. A development build sets
+`FF1_FINE_DEFINES=FF1_FAST_RENDER=1` in the environment of `build.py`; only
+`FF1_FAST_RENDER*` defines are accepted, and only the fine payload changes.
+Without the variable the build is byte-identical to the release.
+
 `CUSTOM2=0` (the default) selects the original loop. `CUSTOM1` retains its
 original meaning there: disable the original slave's timing repair.
 `CUSTOM2=1` enables elapsed-time scheduling for SPS 0481 in PAL mode; it supersedes that

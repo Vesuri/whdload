@@ -219,6 +219,9 @@ B8_65722:
  IFD FF1_FINE_ROAD_PREFETCH
  bsr.w FF1RenderPrepareRoad
  ENDC
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderPrefix
+ ENDC
 B8_65728:
  IFD FF1_FINE_ROAD_PREFETCH
  move.w FF1RenderRoadControl(pc),d0
@@ -242,6 +245,9 @@ B8_6572e:
 B8_65732:
  beq.w B8_65728
 B8_65734:
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderPublish
+ ENDC
  jsr $6b050.l
 B8_6573a:
  move.w -$30(a6),d0

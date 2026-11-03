@@ -184,6 +184,9 @@ public_reset:
  IFD FF1_FINE_BLIT_OWNER
  bsr.l FF1FineBlitRestore
  ENDC
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderRelease
+ ENDC
  lea (public_reset_ranges.l,pc),a0
  lea start(pc),a2
 .range:

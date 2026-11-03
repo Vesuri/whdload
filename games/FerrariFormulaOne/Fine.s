@@ -95,6 +95,9 @@ keep_gauges:
  bsr.l FF1RenderInstallClear
  bsr.l FF1RenderInstallGauges
  bsr.l FF1FinePauseInstall
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderInstall
+ ENDC
  tst.l error(pc)
  bne.l FF1ProductionFault
  bsr.w schedule_install
@@ -398,6 +401,9 @@ FF1_FINE_ROAD_PREFETCH equ 1
  include "RenderColour.s"
  include "FinePause.s"
  include "RenderBlit.s"
+ IFD FF1_FAST_RENDER
+ include "FastRender.s"
+ ENDC
  include "FerrariFormulaOne_PublicLifecycle.s"
 public_reset_ranges:
  incbin "reset.bin"

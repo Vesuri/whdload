@@ -856,6 +856,118 @@ The framework, with nothing drawn in Fast RAM yet.
 **Gate:** section 4, with all exact gates against the H6c/B8-PAL references.
 The 040‑40 BCE frame rates do not change with the prefix empty.
 
+### FR3 results (2026-11-03, done)
+
+Gate passed: with the path active and the prefix empty, every exact gate
+matches the B8-PAL references, and the frame rates equal the B arm. The data
+is in `tmp/dev/manifest/fr3-validation.json`. All results are from the
+emulator only.
+
+**Code.** `FastRender.s` (fine payload, before `public_bind` so its native
+operands are bound) plus three hooks. All of it is assembled only with
+`FF1_FAST_RENDER`; the release slave stays byte-identical (`597a74b9…`), and
+so do the 68000 and 020 payloads of the development build. A development
+build sets `FF1_FINE_DEFINES=FF1_FAST_RENDER=1` for `build.py`. Activation per
+CPU stays an FR10 decision.
+
+- **Mirror table.** One entry per Chip range: both banks (3 × 10,320 bytes
+  each) and the 14 FR1 source ranges, padded to 16 bytes and merged where
+  close. Each Fast mirror keeps its Chip address modulo 16.
+  `FF1FastRenderMap` translates a Chip address into its mirror and reports a
+  miss for anything else; FR4 uses it for every pointer.
+- **Install** (every driving entry, from the barrier) qualifies:
+  - the immutable preset `FF1FastRenderControl` (1 = path, 0 = today's path;
+    the equal-layout B arm);
+  - the CPU (030, 040 or 060 by WHDLoad's attention flags);
+  - the Chip layout. The FR1 addresses are fixed because WHDLoad's
+    Kickstart 1.3 environment gives the game the same 512 KiB Chip on every
+    machine. The native bank table at `$66c92` and the live address of Chip
+    hunk 46 anchor that layout. A different layout selects today's path.
+- **Allocation and seed** happen at the first draw of each entry, in the
+  copy-point hook before the field wait:
+  - one `MEMF_PUBLIC|MEMF_FAST` block of 125,760 bytes, all or nothing.
+    Failure keeps today's path for that entry;
+  - after `WaitBlit`, every mirror is copied from Chip (125,488 bytes), once
+    per entry and never on the per-frame path.
+- **Copy point and publication.** The prefix hook sits after `OwnBlitter` and
+  the H3 road preparation, before the line-256/field wait. The publication
+  hook sits after the wait, before the first native stage. FR5 stages will
+  run in the prefix hook. The FR3 prefix is empty, so publication copies
+  nothing. `FF1FastRenderCopyBank` copies a bank's displayed region (bytes
+  4–43 of rows 0–199 in three planes, 24,000 bytes) for FR5. `LoadView`
+  order and the H3 preparation are unchanged.
+- **Release.** `public_reset` (native loop exit, overlay unload and rollback)
+  frees the block before the payload's zero-initialized state is cleared.
+  The menus never see the allocation, and the next entry seeds again. No
+  native code is patched, so FR3 adds no patch-ledger entries.
+- **Diagnostics.** `FF1FastRenderStats` (tag `FR3S`) survives lifecycle
+  resets: installs, activations, CPU/layout rejections, allocation failures,
+  seeds, releases, publications, free Fast memory before and after.
+
+**Memory headroom (measured).** The public pool is 512 KiB of the 768 KiB
+expansion reservation; at the first draw the game's hunks and the other
+allocations use about 230 KiB of it (235,760 bytes).
+
+| Moment | Free Fast | Largest block | Free after FR3 |
+| --- | ---: | ---: | ---: |
+| 030‑50 BCE, and 040‑40 BCE in the lifecycle routes | 288,496 | 175,040 | 162,736 |
+| 040‑40 BCE probe launch (`CUSTOM1=1`) | 175,880 | 175,040 | 50,120 |
+
+In the second row, DOS-task allocations of about 110 KiB from race start were
+still held; they are freed during the same field wait. No allocation failed
+in any run. The reservation does not grow, so the memory requirements and
+the memory check are unchanged.
+
+**Checks (candidate `4f84965c…`, B arm `98186499…`).**
+
+| Check | Result |
+| --- | --- |
+| Probe, 030‑50 and 040‑40 BCE: mirrors versus Chip right after the seed | all 16 ranges identical |
+| Core smokes: A500, A1200, 020+Fast, 030‑50 BCE, 040‑40 BCE | passed |
+| Exact gates, 040‑40 BCE, fixtures built with the path: 100-update states, 30 frames normal and grid, elapsed clock | all 0 error |
+| Copy round trip (diagnostic build: every publication rereads the back bank and copies the 24,000-byte region back to Chip): 30 frames normal and grid | 0 error |
+| MMU smokes: 030 with WHDLoad MMU and data cache, 040 MMU | passed |
+| Lifecycle, 030‑50 and 040‑40 BCE: race control route (pause, tow, exit, pit menu, paddock, race settings) and the modal route (exit and re-entry into a fresh session) | passed; one install, allocation and seed per entry, one release per exit, none during pause, no allocation failure |
+| Lifecycle, 020+Fast (path not selected): route and modal; A500 season save | passed |
+| Driving controls, 040‑40 BCE | passed |
+
+FPS, 300 presentations, warp off, path on against the B arm in the same
+session:
+
+| Machine | Path on | B arm | Field intervals on / off |
+| --- | ---: | ---: | --- |
+| 040‑40 BCE | 24.51084 | 24.51084 | 289×2 + 11×3 / identical |
+| 030‑50 BCE | 24.59133 | 24.55102 | 291×2 + 9×3 / 290×2 + 10×3 |
+| 020+Fast (path not selected) | 15.40753 | 15.40753 | identical |
+| A1200 chip-only | 8.20609 | 8.20609 | identical |
+
+The 030 difference is one interval, a phase shift from the one-time seed.
+
+**Not covered.**
+
+- **`reload`** (`CUSTOM2=0` overlay reloads): the harness reference
+  `tmp/step3/release-original-030-50-custom1-1-clock-v2/anchor.bin` is
+  missing. The release slave fails at the same step, so this is not an FR3
+  result. `CUSTOM2=0` never reaches the fine payload, and the host, 68000 and
+  020 payloads are byte-identical, so the legacy path is unchanged by
+  construction.
+- **Harness fixes.** The route and modal runners now close their live
+  session after a passing replay; before, they waited for a manual `quit`.
+  The smoke runner cannot check `CUSTOM2=0`, because it waits for
+  performance-path breakpoints.
+
+**Notes for later steps.**
+
+- **FR4:** translate pointers with `FF1FastRenderMap`, and take the fault
+  exit on a miss. The FR1 source ranges are the observed extents. A
+  redirected site that reads outside them shows up as a miss in VERIFY, and
+  the table is extended then.
+- **FR5:** stages move into `FF1FastRenderPrefix`, and the publication copy
+  grows with them. `FF1FastRenderCopyBank` is the full-region copy that the
+  round-trip diagnostic verified.
+- **FR2 harness:** `tools/fr2_build.py` now patches the new `B8_65734`
+  sequence.
+
 ### FR4 — Blit redirection at native sites
 
 For the stages inside the prefix:
@@ -1023,7 +1135,7 @@ except for memory checks.
 Dependencies:
 
 ```
-FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 → FR4 → FR5a…FR5f → FR6
+FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 → FR5a…FR5f → FR6
   → FR7 → FR8 → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.
