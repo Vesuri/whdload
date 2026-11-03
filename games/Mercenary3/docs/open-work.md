@@ -217,6 +217,12 @@ advances on every rendered frame with the spiderweb; sampled repeated wall-edge
 positions fall from 8/17 to 2/17 intervals. The separate door-animation timing is
 unchanged. See [P5](internals.md#p5-room-local-camera-interpolation).
 
+P6 (bit 21) draws door motion on P4's timeline. Doors move one unit per tick, but
+natively the drawn door jumped a pass's four units at 12.5 Hz. At the prison cell door
+on the reference 030 its edges now change on 140 frames of one or two pixels instead of
+34 of about five; restore checks pass and the route measures 44.70 → 44.50 fps. See
+[P6](internals.md#p6-door-motion-on-the-presentation-timeline).
+
 P4 corrects presentation transitions with a shared, delayed camera/geometry timeline;
 starts, stops, reversals and the mailbox approach have been checked. Frame rates are
 unchanged on the routine setups; native world speed and options-off checks pass.

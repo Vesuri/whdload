@@ -110,6 +110,7 @@ Bit 17 extends bit 9 to the remaining hot code and removes M1 entry hops (F2 bel
 Bit 18 moves projection state and drawing lookup tables to fast RAM (F3 below).
 Bit 19 finds the log conversion's leading bit with `bfffo` in M1's copy (F4 below).
 Bit 20 moves the render scratch to fast RAM and translates the copied code (F5 below).
+Bit 21 draws door motion on P4's presentation timeline (P6 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -281,6 +282,32 @@ is claimed. Walking/turning stay at 6/2 units per field. All 124 routine and 300
 presentation restores pass. Prison turning, stopping, exit/return, Help and mailbox
 views were checked. Options-off and shipped both produce 37 A500 route frames.
 Evidence: `tmp/room-camera/final2/` (camera probe, edge comparison and play captures).
+
+### P6: door motion on the presentation timeline
+
+The door tick (Disk.1 `$5F724`, one of the world ticks) opens and closes doors by moving
+their vertices in the room vertex arrays (X at `$1640`, Z at `$1898`, four-byte stride,
+150 entries) one unit per tick. A walking pass runs four ticks, so natively a door edge
+jumps four units per pass, at 12.5 Hz on the gated machines; presentations and the
+delayed native draw showed the door where the last pass left it.
+
+`Custom1` bit 21 requires bit 14 (and so bit 4 and its restore buffer) and a 68020+.
+At each accepted pass `_presentgate` records `$1640..$1AEF` (F5's fast-RAM copy when
+bit 20 moves it) with the scene. The object/room drawing entry (Disk.1 `$577BE`, after
+P4's pose wrapper) draws each word that changed by 1..8 units at P4's alpha between the
+recorded and live value, and restores the live words when drawing returns. Logic,
+collision and the door timing keep committed values. A change over 8 units, more than
+48 changed words, a scene or mode change, recorded-input replay, collision-only drawing
+and enclosed rooms (`$71CC` not negative) draw the live arrays.
+
+Same session, reference 030, release mask, prison cell door opening (route
+`20:,130:JOY2_UP,250:`, the player at the door): the door edges changed on 34 frames,
+about five Amiga pixels every four fields, before and on 140, one or two pixels per
+field, after. Both edges move monotonically; `flicker.py` finds no one-frame glitches
+in either capture. Across the cell (no input) a pass moves an edge one pixel, so
+in-between positions there round to the native ones. Restore hashes pass 250
+presentations on the door route and 321 on the standard route. `fps.py`, VERIFY,
+`Custom5=1`: 44.70 → 44.50 fps. Bit 21 is in the release mask (`$3FFFFF`).
 
 ### R5: cache-safe polygon clipping
 

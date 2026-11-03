@@ -90,7 +90,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$1fffff,(a0)
+	move.l	#$3fffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -245,6 +245,7 @@ lbC0002AA
 	bsr.w	_hotrenderer
 	bsr.w	_objectinit
 	bsr.w	_viewinit
+	bsr.w	_doorinit
 	bsr.w	_clipinit
 ; Let WHDLoad handle CPU/MMU differences and NOCACHE. Preserve the shipped
 ; instruction-only request with bit 13 off; SetCACR also flushes patched code.
@@ -1782,6 +1783,161 @@ _viewobjects
 _viewscene
 	_VIEWDRAW _viewscene_call
 
+; P6 (bit 21): door motion on the presentation timeline. The door tick (Disk.1
+; $5F724) moves door vertices in the room vertex arrays ($1640..$1AEF, F5's
+; fast-RAM copy when moved) by one unit per tick. Draw them at the camera's
+; delayed alpha between the previous pass and this one; logic keeps them live.
+DOORBYTES	= $1af0-$1640
+DOORMAX		= 48			;staged words per draw; more snaps
+DOORSTEP	= 8			;the 8-tick cap at one unit per tick
+_doorinit
+	btst	#5,(_custom1+1,pc)
+	beq.b	.done
+	btst	#6,(_custom1+2,pc)
+	beq.b	.done
+	btst	#4,(_custom1+3,pc)
+	beq.b	.done
+	move.w	(_attn,pc),d0
+	btst	#AFB_68020,d0
+	beq.b	.done
+	move.l	(_restore_buffer,pc),d0
+	beq.b	.done
+; Chain after _viewinit's pose wrapper; leave a bypassed (RTS) entry alone.
+	lea	($577be-$3cb0).l,a0
+	cmpi.w	#$4ef9,(a0)
+	bne.b	.done
+	move.l	#$1640,d0
+	btst	#0,(_f5on,pc)
+	beq.b	.chip
+	bsr.w	_f5datamap
+.chip	lea	(_doorbase,pc),a1
+	move.l	d0,(a1)
+	lea	(_doordraw_call+2,pc),a1
+	lea	(_doordraw,pc),a2
+	lea	(_objectnative,pc),a3
+	bsr.w	_viewhook
+.done	rts
+
+; At each accepted pass (from _presentgate, registers saved there).
+_doorrecord
+	move.l	(_doorbase,pc),d0
+	beq.b	.done
+	movea.l	d0,a0
+	lea	(_doorprev,pc),a1
+	move.w	#DOORBYTES/4-1,d0
+.copy	move.l	(a0)+,(a1)+
+	dbra	d0,.copy
+	lea	(_doorscene,pc),a0
+	move.l	($7158).w,(a0)
+	lea	(_doorvalid,pc),a0
+	move.w	#1,(a0)
+.done	rts
+
+_doordraw
+	bsr.b	_doorstage
+_doordraw_call
+	jsr	0.l
+	move.w	sr,-(sp)
+	movem.l	d0/a0-a1,-(sp)
+	bsr.w	_doorrestore
+	movem.l	(sp)+,d0/a0-a1
+	move.w	(sp)+,ccr
+	rts
+
+_doorstage
+	move.w	sr,-(sp)
+	movem.l	d0-d7/a0-a3,-(sp)
+	move.w	(_doorcount,pc),d0
+	bne.w	.done			;nested draw: already staged
+	move.w	(_doorvalid,pc),d0
+	beq.w	.done
+	move.w	(_collisiononly,pc),d0
+	bne.w	.done
+	tst.w	($70a2).w
+	bne.w	.done
+	cmpi.w	#1,($7142).w
+	bne.w	.done
+	cmpi.w	#1,($7122).w
+	bne.w	.done
+	tst.w	($71cc).w		;enclosed rooms keep native drawing
+	bpl.w	.done
+	move.l	($7158).w,d0
+	cmp.l	(_doorscene,pc),d0
+	bne.w	.done
+	move.w	(_viewalpha,pc),d6
+	move.w	(_pstate+4,pc),d7
+	cmp.w	d7,d6
+	bhs.b	.done			;caught up: the live pose
+	movea.l	(_doorbase,pc),a0
+	lea	(_doorprev,pc),a1
+	lea	(_doorsaved,pc),a2
+	moveq	#DOORMAX,d4
+	move.w	#DOORBYTES/4-1,d5
+.scan	cmpm.l	(a1)+,(a0)+
+	dbne	d5,.scan
+	beq.b	.count
+	subq.l	#4,a0
+	subq.l	#4,a1
+	bsr.b	.word
+	bsr.b	.word
+	dbra	d5,.scan
+.count	moveq	#DOORMAX,d0
+	sub.w	d4,d0
+	lea	(_doorcount,pc),a0
+	move.w	d0,(a0)
+.done	movem.l	(sp)+,d0-d7/a0-a3
+	move.w	(sp)+,ccr
+	rts
+; a0 live, a1 previous. A change over DOORSTEP is not door motion: snap all.
+.word	move.w	(a0),d0
+	move.w	(a1)+,d1
+	sub.w	d1,d0
+	beq.b	.same
+	move.w	d0,d2
+	bpl.b	.abs
+	neg.w	d2
+.abs	cmpi.w	#DOORSTEP,d2
+	bhi.b	.snap
+	subq.w	#1,d4
+	bmi.b	.snap
+	move.l	a0,(a2)+
+	move.w	(a0),(a2)+
+	muls.w	d6,d0
+	divs.w	d7,d0
+	add.w	d1,d0
+	move.w	d0,(a0)
+.same	addq.l	#2,a0
+	rts
+.snap	addq.l	#4,sp			;leave .word and the scan
+	tst.w	d4
+	bpl.b	.undo
+	moveq	#0,d4
+.undo	moveq	#DOORMAX,d0
+	sub.w	d4,d0
+	lea	(_doorcount,pc),a0
+	move.w	d0,(a0)
+	bsr.w	_doorrestore
+	bra.b	.done
+
+_doorrestore
+	lea	(_doorcount,pc),a0
+	move.w	(a0),d0
+	beq.b	.done
+	clr.w	(a0)
+	lea	(_doorsaved,pc),a0
+	subq.w	#1,d0
+.next	movea.l	(a0)+,a1
+	move.w	(a0)+,(a1)
+	dbra	d0,.next
+.done	rts
+
+_doorbase	dc.l	0
+_doorscene	dc.l	0
+_doorvalid	dc.w	0
+_doorcount	dc.w	0
+_doorsaved	ds.b	DOORMAX*6
+_doorprev	ds.l	DOORBYTES/4
+
 
 _interpolateplayer
 	move.w	(_pstate+2,pc),d0
@@ -1938,8 +2094,11 @@ _presentgate
 	lea	(_previous,pc),a1
 	movem.l	(a0),d0-d7
 	movem.l	d0-d7,(a1)
+	bsr.w	_doorrecord
 	bra.b	.done
 .other	clr.w	(2,a5)
+	lea	(_doorvalid,pc),a0
+	clr.w	(a0)
 .done	movem.l	(sp)+,d0-d7/a0-a6
 	move.w	(sp)+,ccr
 	jmp	($5a298).l
