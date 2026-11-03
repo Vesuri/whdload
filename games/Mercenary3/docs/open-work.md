@@ -274,3 +274,10 @@ clear remains rejected and R3's triple buffering remains closed without implemen
   `a1200-030`, for saves in flight, hovering and on the ground. Possibly the interaction
   between `_savegame` (patch at `$5F26`) and the game's message handling; not yet
   checked against the shipped slave or with options off.
+- Sights blink. With the Sights in the inventory, the two white sight marks either side
+  of the view centre (just above the horizon on level ground) show only in some
+  displayed frames; sampled every 12 fields while landed on Damocles, they appeared in
+  one sample of four. They should be drawn in every frame. Seen in the release slave
+  with `CUSTOM5=1` on `a1200-030`. Possibly the sights are drawn into only one of the
+  display buffers, or only on frames that redraw the scene; not yet checked against
+  the shipped slave or with options off.
