@@ -277,10 +277,18 @@ clear remains rejected and R3's triple buffering remains closed without implemen
 - Sights blink. With the Sights in the inventory, the two white sight marks either side
   of the view centre (just above the horizon on level ground) show only in some
   displayed frames; sampled every 12 fields while landed on Damocles, they appeared in
-  one sample of four. They should be drawn in every frame. Seen in the release slave
+  one sample of four, and sampled every field in flight over the Eris sea, on every
+  other field (two shorter runs showed none for 8 and 20 fields). They should be drawn in
+  every frame. Seen in the release slave
   with `CUSTOM5=1` on `a1200-030`. Possibly the sights are drawn into only one of the
   display buffers, or only on frames that redraw the scene; not yet checked against
   the shipped slave or with options off.
+- Shots flicker. Holding fire in a craft draws a 2x2 white dot at the view centre;
+  sampled every field over the Eris sea it shows on 2 fields of every 4, locked to the
+  4-field logic pass (24 fields, fire held; none without fire). On a native machine it
+  is in every frame. Possibly drawn only on logic frames and not by presentation frames,
+  like the sights. Seen in the release slave with `CUSTOM5=1` on `a1200-030`; not yet
+  checked with the displayed-frame counter, the shipped slave or options off.
 - Enclosed rooms run at 12.5 fps. `_presentgate` (label `.screen`) skips presentation
   frames while the room word `$71CC` is not negative, so inside enclosed rooms only the
   4-field logic passes are drawn. Same VERIFY build with `CUSTOM5=1` on `a1200-030`,
