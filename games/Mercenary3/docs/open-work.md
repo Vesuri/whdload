@@ -281,17 +281,23 @@ clear remains rejected and R3's triple buffering remains closed without implemen
   sampled every field in flight over the Eris sea (slot 5), on every other field (two
   shorter runs showed none for 8 and 20 fields). With options off (`CUSTOM5=0`) on
   `a500-1.5m`, from the same save, they show on all 140 sampled fields, firing or not,
-  so the blinking comes from the enhancements. Possibly the sights are drawn into only
-  one of the display buffers, or only on frames that redraw the scene.
-- Fire marker flickers. Holding fire in a craft draws a single white pixel at the view
-  centre, between the sights (presumably the shot; over open sea there was nothing to
-  hit). Sampled every field over the Eris sea it shows on 2 fields of every 4, locked to
-  the 4-field logic pass (24 fields, fire held; none without fire). Possibly drawn only
-  on logic frames and not by presentation frames, like the sights. Seen in the release
-  slave with `CUSTOM5=1` on `a1200-030`. With options off on `a500-1.5m`, from the same
-  save, holding fire for 60 fields changed no pixel in the view, so the pixel may not be
-  the game's shot; this craft may not be armed. Retest with an armed ship (Stellar
-  Factors, Ur City 09-03, Gaea).
+  so the blinking comes from the enhancements. Hovering on Gaea in the DART III they show
+  on exactly every other field, and those fields match the A500's game frames byte for
+  byte: the sights are drawn on game frames and left out of presentation frames.
+- Shots are not interpolated on their first pass. The DART III (bought at Stellar
+  Factors, Ur City 09-03, Gaea) fires a white star that shrinks as it flies away. Same
+  hovering save, fire held for 3 fields, every field captured. With options off on
+  `a500-1.5m` the shot takes five game frames (604, 244, 124, 100 and 68 white pixels),
+  each held 2-3 fields. With `CUSTOM5=1` on `a1200-030` the fields that show the sights
+  match those game frames byte for byte, and the fields between them are presentation
+  frames: 604, 604, 604, 604, 356, 244, 180, 124, 132, 100 pixels from the first field
+  with the shot. Later passes are interpolated (356 between 604 and 244, 180 between 244
+  and 124), but the presentation frames before the first pass repeat it, because the shot
+  has no previous position yet. Its velocity is known at spawn, so a previous position
+  can be derived from it. Also unexplained: 132 between 124 and 100; the 604 frame on two
+  logic passes and no 68 frame, possibly because the 3-field hold spans two passes on
+  the 030 (fired twice) but one on the A500. The single white pixel seen earlier from a
+  different craft, which the A500 did not show, is not explained either.
 - Enclosed rooms run at 12.5 fps. `_presentgate` (label `.screen`) skips presentation
   frames while the room word `$71CC` is not negative, so inside enclosed rooms only the
   4-field logic passes are drawn. Same VERIFY build with `CUSTOM5=1` on `a1200-030`,
