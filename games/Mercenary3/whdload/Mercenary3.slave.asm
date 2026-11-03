@@ -1801,9 +1801,19 @@ _interpolateplayer
 	cmp.l	(24,a0),d0
 	bne.w	.done
 	sub.w	d7,d6
-	move.l	#1024,d3
 	cmpi.w	#1,(a1)
-	beq.b	.limit
+	bne.b	.vehicle
+; Walking: height changes over 1024 (lift arrivals) snap. A taxi carries the
+; player up to 8,200 units per pass horizontally (Disk.1 $5562A).
+	move.l	(8,a1),d0
+	sub.l	(8,a0),d0
+	bpl.b	.height
+	neg.l	d0
+.height	cmpi.l	#1024,d0
+	bgt.w	.done
+	move.l	#16383,d3
+	bra.b	.limit
+.vehicle
 	btst	#4,(_custom1+2,pc)
 	beq.w	.done
 	move.l	#32767,d3
@@ -2006,10 +2016,17 @@ _present
 	lea	($7142).w,a1
 	move.w	(_pstate+4,pc),d7
 ; Reject discontinuities before staging any position. 28-bit X/Z wrap.
-	move.l	#1024,d3
-	cmpi.w	#1,($7142).w
-	beq.b	.limit
+; Walking: height over 1024 (lift arrivals) snaps; taxis move up to 8,200.
 	move.l	#32767,d3
+	cmpi.w	#1,($7142).w
+	bne.b	.limit
+	move.l	(8,a1),d0
+	sub.l	(8,a0),d0
+	bpl.b	.height
+	neg.l	d0
+.height	cmpi.l	#1024,d0
+	bgt.w	.draw
+	move.l	#16383,d3
 .limit
 	moveq	#2,d5
 	moveq	#4,d4

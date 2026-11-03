@@ -171,7 +171,12 @@ Evidence: `tmp/l1/`. No new instruments or emulator changes.
 L1's gate. The staged pose is the committed pose plus the last pass's displacement
 scaled by elapsed fields / that pass's clamped tick count. Angles wrap at 1024;
 collision rollback, discontinuities and mode changes suppress extrapolation. A stopped
-pass gives zero displacement. Other modes and special screens retain their native path.
+pass gives zero displacement. In walking mode, a discontinuity is a height change over
+1024 units or a horizontal change over 16,383 units per pass. A taxi carries the walking
+player (Disk.1 `$5562A`) 1,025–8,200 units per pass. Under the former 1024-unit limit on
+every axis, every extra frame of the ride repeated the last image. The slot-3 Metis taxi
+save on the 030 showed about 13 distinct frames per second, as with Off. It now shows
+36–41, with the driver steady within 0.3 px and no one-frame glitches over 900 fields. Other modes and special screens retain their native path.
 With one field left, a redraw starts only if the last presentation fitted one field
 (initial estimate: two); this avoids a measured one-frame loss on the 030 MMU cell.
 
