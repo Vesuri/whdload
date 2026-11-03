@@ -264,3 +264,13 @@ passed. See [X1](internals.md#x1-release).
 No hardware is available. Real-hardware cache behaviour and 040/060 performance remain
 unverified; the user explicitly accepted completing X1 without those tests. R2's blitter
 clear remains rejected and R3's triple buffering remains closed without implementation.
+
+## To investigate
+
+- Save message stays on screen. After HELP, F1, a digit and Return, Benson's
+  "PRESS RETURN WHEN READY" stays in the message line until another message replaces
+  it, though the game keeps running and the save file is written (it appears when
+  WHDLoad quits and loads correctly). Seen in the release slave with `CUSTOM5=1` on
+  `a1200-030`, for saves in flight, hovering and on the ground. Possibly the interaction
+  between `_savegame` (patch at `$5F26`) and the game's message handling; not yet
+  checked against the shipped slave or with options off.
