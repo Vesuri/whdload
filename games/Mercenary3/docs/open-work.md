@@ -274,20 +274,6 @@ clear remains rejected and R3's triple buffering remains closed without implemen
   `a1200-030`, for saves in flight, hovering and on the ground. Possibly the interaction
   between `_savegame` (patch at `$5F26`) and the game's message handling; not yet
   checked against the shipped slave or with options off.
-- Shots are not interpolated on their first pass. The DART III (bought at Stellar
-  Factors, Ur City 09-03, Gaea) fires a white star that shrinks as it flies away. Same
-  hovering save, fire held for 3 fields, every field captured. With options off on
-  `a500-1.5m` the shot takes five game frames (604, 244, 124, 100 and 68 white pixels),
-  each held 2-3 fields. With `CUSTOM5=1` on `a1200-030` the fields that show the sights
-  match those game frames byte for byte, and the fields between them are presentation
-  frames: 604, 604, 604, 604, 356, 244, 180, 124, 132, 100 pixels from the first field
-  with the shot. Later passes are interpolated (356 between 604 and 244, 180 between 244
-  and 124), but the presentation frames before the first pass repeat it, because the shot
-  has no previous position yet. Its velocity is known at spawn, so a previous position
-  can be derived from it. Also unexplained: 132 between 124 and 100; the 604 frame on two
-  logic passes and no 68 frame, possibly because the 3-field hold spans two passes on
-  the 030 (fired twice) but one on the A500. The single white pixel seen earlier from a
-  different craft, which the A500 did not show, is not explained either.
 - Enclosed rooms run at 12.5 fps. `_presentgate` (label `.screen`) skips presentation
   frames while the room word `$71CC` is not negative, so inside enclosed rooms only the
   4-field logic passes are drawn. Same VERIFY build with `CUSTOM5=1` on `a1200-030`,

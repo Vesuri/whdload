@@ -1447,6 +1447,36 @@ _objectdraw
 .snap	movem.l	(12,a1),d1-d3
 	movem.l	d1-d3,(a1)
 	move.b	(35,a1),(34,a1)
+; Projectiles (slots 50..63, Disk.1 $546A2) first appear one pass after spawning,
+; already moved by one velocity step. In the same scene, start them one step back
+; so the presentations before their second pass move too. Life $7FFF is static.
+	cmpi.w	#50*4,d0
+	blo.b	.record
+	cmpi.w	#63*4,d0
+	bhi.b	.record
+	move.w	($5492,a0),d1
+	beq.b	.record
+	cmpi.w	#$7fff,d1
+	beq.b	.record
+	move.l	($7158).w,d1
+	cmp.l	(_object_scene,pc),d1
+	bne.b	.record
+; X, Y and Z velocities are tables $38 bytes apart; same limit as .validate.
+	lea	($54ca,a0),a2
+	moveq	#2,d2
+.check	move.l	(a2),d1
+	addi.l	#32767,d1
+	cmpi.l	#2*32767,d1
+	bhi.b	.record
+	lea	($38,a2),a2
+	dbra	d2,.check
+	lea	($54ca,a0),a2
+	movea.l	a1,a4
+	moveq	#2,d2
+.step	move.l	(a2),d1
+	sub.l	d1,(a4)+
+	lea	($38,a2),a2
+	dbra	d2,.step
 .record	move.l	($681c,a0),d1
 	clr.b	d1
 	move.l	d1,(24,a1)
@@ -1497,9 +1527,9 @@ _objectmodel
 ; Most visible objects are static. Avoid the full staging frame for them.
 	movem.l	d0/a1,-(sp)
 	move.w	(_object_active,pc),d0
-	beq.b	.native
+	beq.w	.native
 	move.w	a0,d0
-	beq.b	.native
+	beq.w	.native
 	cmpi.w	#10*4,d0
 	beq.b	.native
 	cmpi.w	#255*4,d0
@@ -1509,7 +1539,7 @@ _objectmodel
 	adda.l	d0,a1
 	move.w	(_object_generation,pc),d0
 	cmp.w	(32,a1),d0
-	bne.b	.native
+	bne.b	.unrecorded
 	tst.w	(36,a1)
 	bne.b	.moving
 ; Ships move after the renderer (Disk.1 $546A2). A pose recorded as static may
@@ -1530,6 +1560,23 @@ _objectmodel
 	beq.b	.native
 .moving	movem.l	(sp)+,d0/a1
 	bra.b	.stage
+; A projectile spawned after the last logic pass's recording is not yet on the
+; presented timeline; its live pose is a pass ahead. Presentations draw it as an
+; empty model (opcode 0 returns, Disk.1 $57C54), after the committed selection test.
+.unrecorded
+	move.w	(_inpresent,pc),d0
+	beq.b	.native
+	move.w	a0,d0
+	cmpi.w	#50*4,d0
+	blo.b	.native
+	cmpi.w	#63*4,d0
+	bhi.b	.native
+	move.w	($5492,a0),d0
+	beq.b	.native
+	cmpi.w	#$7fff,d0
+	beq.b	.native
+	movem.l	(sp)+,d0/a1
+	rts
 .native	movem.l	(sp)+,d0/a1
 	bra.w	_modelnative
 .stage	suba.w	#20,sp		; object pointer, XYZ, heading word, active word

@@ -542,6 +542,21 @@ mask now covers all six cached clock digits at chip `$52BF0..$52BF5`: the field 
 writes them at Disk.1 `$568E4..$5693C`; the old one-byte exclusion failed with P2 off too.
 Evidence: `tmp/p2/final/`. Vehicle/flight/map coverage remains for P3.
 
+Projectiles are object slots 50–63, moved once per pass by Disk.1 `$546A2`: life word
+at chip `$5492 + 4 × slot` (`$7FFF` static), XYZ velocity longwords at `$54CA`, `$5502`
+and `$553A`. Player shots spawn in slots 50–52 (Disk.1 `$54812`) and enemy shots in
+53–55 (Disk.1 `$55A42`), both after the renderer, so a shot is first recorded one pass
+after it spawns, already one step along. A plain snap held it still until the next pass
+(four 030 fields), and a presentation before that recording drew its live pose, a pass
+ahead. Now a projectile that snaps in the same scene starts one velocity step back (each
+component within the 32,767 limit), and presentations draw an unrecorded live projectile
+as an empty model: `_objectmodel` returns at `$57C36`, after the committed selection
+test, as the model interpreter's opcode 0 does. DART III, hovering over Ur City (save
+slot 5), single shots, release slave `CUSTOM5=1` on the 030: the star's width shrinks
+every field, 176, 58, 34, 26, 22, 18, 14, 14, 10 pixels (before: 44 for four fields,
+then 30, 22, 18, 14). Options off on the A500 gives byte-identical frames to the
+previous build.
+
 
 
 ### P3: vehicles, flight and lifts
@@ -558,6 +573,8 @@ frame of a single colour, a fifth of all fields on the 030
 VERIFY `Custom1=$3FFFFFF` and release `Custom5=1`; it needs bits 12 and 20).
 `tools/test_entry_calls.py` checks that no slave call targets moved code without an entry. Bit 11 also interpolates objects in those modes.
 Boarding/leaving resets history; transport, scene, planet and floor changes snap.
+Transport displacements over 32,767 units per axis also snap to avoid signed-word
+arithmetic overflow. Enclosed rooms retain native drawing.
 
 Every native path draws the sights (Disk.1 `$55DEE`, while the Sights are owned) into
 the finished frame just before publishing it; walking, surface and space presentations
@@ -565,10 +582,6 @@ now call it at the same point. Before, frames published by a presentation had no
 with the enhancements on the sights showed on every other field while hovering. Now
 they show on every field (DART III, slot 5, 030, four single shots, 14–16 fields each).
 VERIFY `CUSTOM5=1` restore hashes pass 279 route presentations on the 030.
-Transport displacements over 32,767 units per axis also snap to avoid signed-word
-arithmetic overflow. Enclosed rooms retain native drawing.
-Transport displacements over 32,767 units per axis also snap to avoid signed-word
-arithmetic overflow. Enclosed rooms retain native drawing.
 
 A passenger flight is a recording: with `$70A2` set, the game reads its joystick
 input from the list at `$709A`, keyed to the pass counter `$7180` (Disk.1 `$5CB7A`,
