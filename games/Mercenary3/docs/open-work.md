@@ -223,6 +223,11 @@ on the reference 030 its edges now change on 140 frames of one or two pixels ins
 34 of about five; restore checks pass and the route measures 44.70 → 44.50 fps. See
 [P6](internals.md#p6-door-motion-on-the-presentation-timeline).
 
+P7 (bit 22) turns the passenger-ship cockpit with the full camera heading. Natively it
+turned in 256 steps against the view's 1024 and swung by `heading & 3` during turns; in
+the slot 1 flight its console edge now holds one position over 60 turning frames, instead
+of five over about 5 pixels. See [P7](internals.md#p7-camera-attached-model-heading).
+
 P4 corrects presentation transitions with a shared, delayed camera/geometry timeline;
 starts, stops, reversals and the mailbox approach have been checked. Frame rates are
 unchanged on the routine setups; native world speed and options-off checks pass.

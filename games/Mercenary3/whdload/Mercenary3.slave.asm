@@ -90,7 +90,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$3fffff,(a0)
+	move.l	#$7fffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -246,6 +246,7 @@ lbC0002AA
 	bsr.w	_objectinit
 	bsr.w	_viewinit
 	bsr.w	_doorinit
+	bsr.w	_cockpitinit
 	bsr.w	_clipinit
 ; Let WHDLoad handle CPU/MMU differences and NOCACHE. Preserve the shipped
 ; instruction-only request with bit 13 off; SetCACR also flushes patched code.
@@ -1930,6 +1931,77 @@ _doorrestore
 	move.w	(a0)+,(a1)
 	dbra	d0,.next
 .done	rts
+
+; P7 (bit 22): camera-attached models (the passenger-ship cockpit) turn with
+; the camera heading. Disk.1 $57E0C looks it up as ($7156+$200)>>2 in the
+; 256-entry sine table at $7E68, while the view matrices use 1024 steps
+; (Disk.1 $5A91E), so the cockpit swung by (heading & 3) and snapped back.
+; Interpolate the table to the full heading instead.
+COCKPIT		= $57e0c-$3cb0		;move.w $7156.w,d0 .. movea.l d7,a4
+COCKPITSKIP	= $57e46-$3cb0		;the beq's target: no rotation
+_cockpitinit
+	btst	#6,(_custom1+1,pc)
+	beq.b	.done
+	move.l	#COCKPIT,d0
+	bsr.b	.patch
+	move.l	(_render_base,pc),d6
+	beq.b	.done
+	move.l	#COCKPITSKIP,d0
+	bsr.w	_rendermap
+	move.l	d0,d1
+	move.l	#COCKPIT,d0
+	bsr.w	_rendermap
+	cmpi.l	#COCKPIT,d0
+	beq.b	.done			;not copied
+	sub.l	d0,d1
+	cmpi.l	#COCKPITSKIP-COCKPIT,d1
+	bne.b	.done			;copy changed the layout: keep native
+.patch	movea.l	d0,a0
+	cmpi.l	#$30387156,(a0)		;move.w $7156.w,d0
+	bne.b	.done
+	move.w	#$4eb9,(a0)+
+	lea	(_cockpitangle,pc),a1
+	move.l	a1,(a0)+
+	move.w	#$6000+($57e28-($57e12+2)),(a0)	;bra.b to the rotation
+.done	rts
+
+; Returns d0 and d7/a4 as the replaced code: a4 points at sin, ($80,a4) cos.
+_cockpitangle
+	move.w	($7156).w,d0
+	addi.w	#$200,d0
+	move.w	d0,d7
+	andi.w	#$3ff,d7
+	bne.b	.rotate
+	addi.l	#COCKPITSKIP-(COCKPIT+6),(sp)	;as native: angle 0 skips
+	rts
+.rotate	movem.l	d1-d3/a0,-(sp)
+	move.w	d0,d3
+	andi.w	#3,d3
+	move.w	d0,d1
+	lsr.w	#1,d1
+	andi.w	#$1fe,d1
+	lea	($7e68).w,a0
+	lea	(a0,d1.w),a4
+	addq.w	#2,d1
+	andi.w	#$1fe,d1
+	adda.w	d1,a0
+	move.w	(a0),d1
+	sub.w	(a4),d1
+	muls.w	d3,d1
+	asr.l	#2,d1
+	add.w	(a4),d1
+	move.w	($80,a0),d2
+	sub.w	($80,a4),d2
+	muls.w	d3,d2
+	asr.l	#2,d2
+	add.w	($80,a4),d2
+	lea	(_cockpitrot,pc),a4
+	move.w	d1,(a4)
+	move.w	d2,($80,a4)
+	move.l	a4,d7
+	movem.l	(sp)+,d1-d3/a0
+	rts
+_cockpitrot	ds.w	65
 
 _doorbase	dc.l	0
 _doorscene	dc.l	0
