@@ -90,7 +90,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$1ffffff,(a0)
+	move.l	#$3ffffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -234,6 +234,7 @@ lbC0002AA
 	move.l	#$4e714e71,($5a834).l
 .nopresent
 	bsr.w	_f5check
+	bsr.w	_trafficinit
 	bsr.w	_f3data
 	bsr.w	_hotcode
 	bsr.w	_hotdata
@@ -1168,6 +1169,112 @@ _replaygate
 	moveq	#0,d0
 	rts
 _replaystamp	dc.w	0,0			;last accepted VERTB, valid replay pass
+
+; Bit 25: traffic moves at the A500's speed. The traffic routine (Disk.1 $54F0E,
+; called once per logic pass at $5E084 and $5E22A) steps every vehicle a fixed
+; distance a few times a pass: the mover loops at $553F0 and $55502 add the slot's
+; velocity ($6CB0/$6CB2) to X/Z and its speed ($6C7C) to the 16-bit cell progress
+; ($6C7E), whose carry ends the cell; $5553A then snaps the vehicle onto the cell
+; and reads the next turn. Real-time traffic speed so follows the pass rate: the
+; taxi rides are timed for the A500's ten fields a pass, the release runs four.
+; Scale each step by elapsed fields / TRAFFICFIELDS, never above the native step,
+; so velocity and progress stay in proportion and the cell snap stays exact.
+; Patch before F2 copies the loops ($553AE..$5553A); no F2 operand, branch or
+; entry lies in the replaced instructions. Replays keep native steps (bit 24).
+TRAFFICFIELDS	=	10
+_trafficinit
+	btst	#1,(_custom1,pc)
+	beq.b	.done
+	lea	($553fc-$3cb0).l,a0
+	bsr.b	.match
+	bne.b	.done
+	lea	($55510-$3cb0).l,a0
+	bsr.b	.match
+	bne.b	.done
+	cmpi.l	#$4eb9<<16|($54f0e-$3cb0)>>16,($5e084-$3cb0).l
+	bne.b	.done
+	cmpi.w	#($54f0e-$3cb0)&$ffff,($5e088-$3cb0).l
+	bne.b	.done
+	cmpi.l	#$4eb9<<16|($54f0e-$3cb0)>>16,($5e22a-$3cb0).l
+	bne.b	.done
+	cmpi.w	#($54f0e-$3cb0)&$ffff,($5e22e-$3cb0).l
+	bne.b	.done
+	lea	($553fc-$3cb0).l,a0
+	bsr.b	.patch
+	lea	($55510-$3cb0).l,a0
+	bsr.b	.patch
+	lea	(_trafficpass,pc),a0
+	move.l	a0,($5e086-$3cb0).l
+	move.l	a0,($5e22c-$3cb0).l
+.done	rts
+; move.w $6cb0(a0),d0 / move.w $6cb2(a0),d1 / ext.l d0 / ext.l d1
+.match	cmpi.l	#$30286cb0,(a0)
+	bne.b	.no
+	cmpi.l	#$32286cb2,(4,a0)
+	bne.b	.no
+	cmpi.l	#$48c048c1,(8,a0)
+.no	rts
+.patch	move.w	#$4eb9,(a0)+
+	lea	(_trafficstep,pc),a1
+	move.l	a1,(a0)+
+	move.l	#$4e714e71,(a0)+
+	move.w	#$4e71,(a0)
+	rts
+
+; Once per pass: the step scale in 1/4096 from the pass's elapsed fields ($52954,
+; stored by the gates before the world ticks). Zero keeps the native step.
+_trafficpass
+	movem.l	d0/a0,-(sp)
+	moveq	#0,d0
+	tst.w	($70a2).w
+	bne.b	.set
+	move.w	($52954).l,d0
+	bne.b	.some
+	moveq	#1,d0
+.some	cmpi.w	#TRAFFICFIELDS,d0
+	blo.b	.scale
+	moveq	#0,d0
+	bra.b	.set
+.scale	lsl.w	#8,d0
+	lsl.w	#4,d0
+	divu.w	#TRAFFICFIELDS,d0
+.set	lea	(_trafficf,pc),a0
+	move.w	d0,(a0)
+	movem.l	(sp)+,d0/a0
+	jmp	($54f0e-$3cb0).l
+
+; In both mover loops, for the replaced loads: d0/d1 = X/Z velocity, d2 = the
+; progress step (speed, negated in $55502's loop), all scaled by _trafficf.
+	IFD VERIFY
+	dc.b	'M3TRF001'
+_trafficcount	dc.l	0			;mover steps, VERIFY only
+	ENDC
+_trafficstep
+	IFD VERIFY
+	move.l	a1,-(sp)
+	lea	(_trafficcount,pc),a1
+	addq.l	#1,(a1)
+	move.l	(sp)+,a1
+	ENDC
+	move.w	($6cb0,a0),d0
+	move.w	($6cb2,a0),d1
+	ext.l	d0
+	ext.l	d1
+	move.l	d3,-(sp)
+	move.w	(_trafficf,pc),d3
+	beq.b	.native
+	muls.w	d3,d0
+	asr.l	#8,d0
+	asr.l	#4,d0
+	muls.w	d3,d1
+	asr.l	#8,d1
+	asr.l	#4,d1
+	muls.w	d3,d2
+	asr.l	#8,d2
+	asr.l	#4,d2
+.native	move.l	(sp)+,d3
+	rts
+_trafficf	dc.w	0
 
 ; P2: snapshot in the object renderer (Disk.1 $577BE), after collision.
 ; Logic frames use the previous pose too, so intermediate frames never rewind.

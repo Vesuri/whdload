@@ -241,6 +241,14 @@ flight landed after 21 seconds and the pilot talked for at least 99 seconds more
 lands after 148 seconds, as the pilot finishes, close to the A500's 185. See
 [P3](internals.md#p3-vehicles-flight-and-lifts).
 
+Bit 25 moves traffic at the A500's speed. Vehicles step a fixed distance per logic
+pass, so at the release's 12.5 Hz they drove 2.6–3.3 times faster than on the A500, and
+the slot 3 taxi reached Metis Spaceport after 38 seconds while the driver talked for another
+minute. Steps now scale with elapsed fields against the A500's ten a pass: the taxi takes
+101 seconds (A500 99.5) and the driver's farewell follows the stop. The standard route
+loses 41 frames because a vehicle now stays near the prison exit for longer. See
+[P9](internals.md#p9-traffic-at-the-a500s-speed).
+
 P4 corrects presentation transitions with a shared, delayed camera/geometry timeline;
 starts, stops, reversals and the mailbox approach have been checked. Frame rates are
 unchanged on the routine setups; native world speed and options-off checks pass.

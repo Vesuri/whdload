@@ -114,6 +114,7 @@ Bit 21 draws door motion on P4's presentation timeline (P6 below).
 Bit 22 turns camera-attached models with the full camera angles (P7 below).
 Bit 23 transforms camera-attached vertices exactly instead of through the log tables (P8 below).
 Bit 24 paces passenger-flight replays at eight fields a pass (P3 below).
+Bit 25 moves traffic at the A500's speed (P9 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -392,6 +393,49 @@ axes, so the pitch oscillation of the autopilot moves it by sub-pixel amounts.
 Restore hashes pass 321 standard-route presentations. `fps.py`, VERIFY, `Custom5=1`,
 same session: 44.50 fps with P7 and with P8. A500, VERIFY, Custom1 `$FFFFFF`: 41
 frames, as with `$7FFFFF`. Bit 23 is in the release mask.
+
+### P9: traffic at the A500's speed
+
+Traffic moves per logic pass, not per tick. The traffic routine (Disk.1 `$54F0E`,
+called after the world ticks at `$5E084` and from the one-tick path at `$5E22A`) runs
+the mover loops at `$553F0` and `$55502` for every vehicle slot (from `$40`, ending at a
+zero speed `$6C7C`). One step adds the velocity (`$6CB0`/`$6CB2`, the speed on one axis)
+to X/Z and the speed to the 16-bit cell progress `$6C7E`; its carry ends the cell, and
+`$5553A` snaps the vehicle onto the cell and reads the next turn and speed nibble from
+the route. Steps per pass: riding, the route's speed nibble + 1 (`$6DD0` → `$6EAE`,
+which also sets the engine pitch at `$4F622`); on foot, up to 16 until a vehicle is in the
+player's grid square (`$71F6`, set at `$5DA22`), so distant traffic fast-forwards.
+
+Real-time traffic speed therefore follows the pass rate. The A500 runs about 10 fields
+a pass in the taxi and the flight and 13 in the Eris street and prison scenes; the
+release's gate runs 4. The taxi driver's and the pilot's real-time scripts fit the rides
+only at the A500's rate. `Custom1` bit 25 replaces the four-instruction velocity loads in
+both loops (`$553FC`, `$55510`; checked bytes, before F2 copies the block; no F2 operand,
+branch or entry lies in them) with `_trafficstep`, and the two call operands with
+`_trafficpass`. Each pass scales velocity and progress step alike by elapsed fields
+(`$52954`) / 10, in 1/4096; ten or more fields and replays keep the native step, so the A500
+is unchanged where it is slower. The cell snap keeps routes exact.
+
+Slot 3 taxi to Metis Spaceport, * pressed after the prison dialog, fields from *:
+
+| Setup | Taxi stops | "Well here we are" | "Press 'B' to board the spacecraft" |
+| --- | ---: | ---: | ---: |
+| A500 1.5 MB, Off | 4,975 | 4,650 | 5,800 |
+| 030 release without bit 25 | 1,900 | 4,425 | 5,475 |
+| 030 release | 5,075 | 4,050 | 5,275 |
+
+Without bit 25 the driver says "We've arrived" on arrival and talks for another minute.
+With it the grid crossings follow the A500's (425/1000/1575… against 600/1150/1625…). Eris
+street (HELP, F10, 150 fields walking), nearby vehicles over 1,000 fields: A500 41 units a
+field, release 123 without and 49 with bit 25 (the A500's rate at ten fields a pass).
+
+Same session, `fps.py`, VERIFY, `Custom5=1`, 030: 447 frames without bit 25, 445 with its
+hooks forced to the native step, 404 with bit 25. The loss is scene content, not cost: a
+VERIFY step counter (`M3TRF001`) shows 798 mover steps against 1,535, but from field 100
+to 300 a vehicle stays in the player's square (one step a pass), out of view,
+where natively it crosses within 50 fields, and those chunks draw 19–38 frames instead of
+25–50. A500 41 frames. Restore hashes pass 282 presentations. Bit 25 is in the release
+mask (`$3FFFFFF`).
 
 ### R5: cache-safe polygon clipping
 
