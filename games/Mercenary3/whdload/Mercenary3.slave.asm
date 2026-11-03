@@ -90,7 +90,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$ffffff,(a0)
+	move.l	#$1ffffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -1097,6 +1097,8 @@ _pl	PL_START
 _logicgate
 	move.w	sr,-(sp)
 	movem.l	d0/a0,-(sp)
+	bsr.w	_replaygate
+	bne.b	.done
 	lea	(_logicstamp,pc),a0
 	cmpi.w	#1,($7122).w
 	beq.b	.modeok
@@ -1131,6 +1133,41 @@ _logicgate
 	jmp	($5a298).l		;original callee, Disk.1 $5DF48
 
 _logicstamp	dc.w	0,0			;last accepted VERTB, valid walking pass
+
+; Bit 24: a passenger flight replays recorded input per logic pass ($70A2, see
+; _presentgate), so its real-time length follows the pass rate. On the A500 the trip
+; takes about ten fields a pass and the pilot's talk ends before landing. Pace the
+; replay at REPLAYFIELDS fields a pass; the game's 4..8 tick clamp keeps the world
+; in real time up to 8. Returns Z clear when it paced the pass. Uses d0/a0.
+; Its own stamp, invalid outside replays: a later trip starts with native timing.
+REPLAYFIELDS	=	8
+_replaygate
+	lea	(_replaystamp,pc),a0
+	tst.w	($70a2).w
+	beq.b	.no
+	btst	#0,(_custom1,pc)
+	beq.b	.no
+	tst.w	(2,a0)
+	beq.b	.first
+.check	move.w	($529f4).l,d0
+	sub.w	(a0),d0			;word subtraction handles VERTB wrap
+	cmpi.w	#REPLAYFIELDS,d0
+	bhs.b	.ready
+	move.w	($529f4).l,d0
+.wait	cmp.w	($529f4).l,d0
+	beq.b	.wait
+	bra.b	.check
+.ready	move.w	d0,($52954).l
+	add.w	d0,(a0)
+	bra.b	.yes
+.first	move.w	($529f4).l,(a0)
+	move.w	#1,(2,a0)
+.yes	moveq	#1,d0
+	rts
+.no	clr.w	(2,a0)
+	moveq	#0,d0
+	rts
+_replaystamp	dc.w	0,0			;last accepted VERTB, valid replay pass
 
 ; P2: snapshot in the object renderer (Disk.1 $577BE), after collision.
 ; Logic frames use the previous pose too, so intermediate frames never rewind.
@@ -2448,9 +2485,12 @@ _presentgate
 	lea	(_pstate,pc),a5
 ; $70A2: the game replays recorded input from $709A (a passenger flight). With
 ; presentations or interpolated objects the flight leaves the recording's course,
-; so replay keeps native drawing; the logic gate still applies.
+; so replay keeps native drawing, paced by bit 24 (_replaygate).
 	tst.w	($70a2).w
-	bne.w	.other
+	beq.b	.live
+	bsr.w	_replaygate
+	bra.w	.other
+.live
 	move.w	($7142).w,d0
 	cmp.w	($7122).w,d0
 	bne.w	.other

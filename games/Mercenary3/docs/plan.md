@@ -229,7 +229,7 @@ about 21,000 accesses per frame, 6..12 ms. Steps are in order of measured value 
 For every step, on the reference 030/50: `beam_profile.py` on the routines the step changes,
 before and after, and the publication intervals (roots `5e460`, as in F0); `fps.py` and
 `PER_FRAME=1` cadence. On the 020: `bus_audit.py` where the step targets chip traffic. New
-behaviour takes the next free `Custom1` bit (24 up); add it to the release mask (`$FFFFFF`)
+behaviour takes the next free `Custom1` bit (25 up); add it to the release mask (`$1FFFFFF`)
 once accepted.
 
 **F0. ✓ Budget.** `render_profile.py`, `beam_profile.py`, `bus_audit.py`'s place table,

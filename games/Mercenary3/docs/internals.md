@@ -113,6 +113,7 @@ Bit 20 moves the render scratch to fast RAM and translates the copied code (F5 b
 Bit 21 draws door motion on P4's presentation timeline (P6 below).
 Bit 22 turns camera-attached models with the full camera angles (P7 below).
 Bit 23 transforms camera-attached vertices exactly instead of through the log tables (P8 below).
+Bit 24 paces passenger-flight replays at eight fields a pass (P3 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -390,7 +391,7 @@ axes, so the pitch oscillation of the autopilot moves it by sub-pixel amounts.
 
 Restore hashes pass 321 standard-route presentations. `fps.py`, VERIFY, `Custom5=1`,
 same session: 44.50 fps with P7 and with P8. A500, VERIFY, Custom1 `$FFFFFF`: 41
-frames, as with `$7FFFFF`. Bit 23 is in the release mask (`$FFFFFF`).
+frames, as with `$7FFFFF`. Bit 23 is in the release mask.
 
 ### R5: cache-safe polygon clipping
 
@@ -517,10 +518,30 @@ recorded course. On the 030 the spaceport trip ended at Damocles instead of Tolo
 with full-view gray frames, a doubled pilot and a jumping camera. The cause has not
 been isolated; restoring `$7056..$7059` and `$709A..$709D` around presentations does
 not change it. During replay, `_presentgate` and `_objectdraw` therefore keep native
-drawing, while the logic gate still applies. On the 030 that trip (a user save, B
-to board) has no one-frame glitches over 2,500 fields and lands at Tolosa, as with
-Enhanced framerate off. The trip's game time follows the pass rate, as in the
-original game: it lands at clock 00-23 with the release and 01-26 with Off.
+drawing. On the 030 that trip (a user save, B to board) has no one-frame glitches over
+2,500 fields and lands at Tolosa, as with Enhanced framerate off.
+
+The trip is a fixed number of logic passes (about 930), so its real-time length
+follows the pass rate, while the pilot's 15 messages run in real time. With P1,
+`_presentgate` replaces L1's gate and, before bit 24, did not gate replay passes at
+all: the release ran one pass per field on the 030. `Custom1` bit 24 (`_replaygate`,
+used by both gates) paces replay passes at eight fields, the top of the game's tick
+clamp, so the world still moves in real time. Fields from boarding (`taxi2.py`, slot 1):
+
+| Setup | Fields per pass | Landing | Last message starts |
+| --- | ---: | ---: | ---: |
+| A500 1.5 MB, Off | about 10 | 9,250 | 7,950 |
+| 030, Off | 4 | 3,850 | after 6,000 |
+| 030, release without bit 24 | 1 | 1,050 | after 6,000 |
+| 030, release | 8 | 7,400 | 7,700 |
+
+With bit 24 the ship lands at Tolosa as the pilot says "I do hope that you have
+enjoyed the flight"; on the A500 the last message also comes before landing. The trip
+draws at 6.25 fps, as replay keeps native drawing. Same session, `fps.py`, VERIFY,
+`Custom5=1`: 030 44.50 → 44.70 fps (447 frames twice; the standard route has no
+replay, so this is code layout), A500 41 frames. L1 without P1 (`Custom1` bits 0, 3,
+24): 10.90 fps, as without bit 24, and the trip lands at the same field. Bit 24 is in
+the release mask (`$1FFFFFF`).
 While the ship turns, the native cockpit creeps sideways and snaps back every four
 heading units; Off shows the same positions, less often at its pass rate. P7 (bit 22)
 removes this, and the matching pitch and roll steps; P8 (bit 23) removes the

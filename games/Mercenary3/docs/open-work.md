@@ -235,6 +235,12 @@ most visibly while banking. In the slot 1 flight the canopy's horizontal line no
 through pitch and bank (7 one-frame reversals before), and the turn no longer moves it.
 See [P8](internals.md#p8-exact-camera-attached-vertices).
 
+Bit 24 paces passenger-flight replays at eight fields a pass. The trip is a fixed
+number of logic passes, and the release ran them one per field on the 030: the slot 1
+flight landed after 21 seconds and the pilot talked for at least 99 seconds more. It now
+lands after 148 seconds, as the pilot finishes, close to the A500's 185. See
+[P3](internals.md#p3-vehicles-flight-and-lifts).
+
 P4 corrects presentation transitions with a shared, delayed camera/geometry timeline;
 starts, stops, reversals and the mailbox approach have been checked. Frame rates are
 unchanged on the routine setups; native world speed and options-off checks pass.
