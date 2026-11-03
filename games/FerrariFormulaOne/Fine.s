@@ -480,3 +480,6 @@ public_marker: dc.b "FF1FINE",0
  include "FerrariFormulaOne_PublicMemory.s"
 public_bindings:
  incbin "bindings.bin"
+ IFD FF1_FAST_RENDER
+ include "FastRenderBlit.s"
+ ENDC

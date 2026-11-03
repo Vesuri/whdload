@@ -731,6 +731,106 @@ real hardware testing.
 
 **Gate:** zero differences.
 
+### FR2 results (2026-11-03, done)
+
+Gate passed: the hardware blitter and `FastRenderBlit` produce identical
+bytes in all 4,479 cases on 030‑50 BCE and on 040‑40 BCE. The data is in
+`tmp/dev/manifest/fr2-oracle.json`. All results are from the emulator only.
+
+**Code.** `FastRenderBlit.s` is included in the fine payload only when
+`FF1_FAST_RENDER` is defined. Production does not define it, so the
+production slave stays byte-identical (`597a74b9…`).
+
+- **Register image.** It mirrors custom registers `$040`–`$075`
+  (offset = register − `$40`), so FR4 can point a site's register base at it.
+  Two words of internal blitter state follow: the previous B word and the
+  shifted B hold.
+- **`FastRenderBDAT`** performs the side effect of a `BLTBDAT` write. The
+  blitter shifts B data at write time, using the current BSH and the
+  previous B word.
+- **`FastRenderBlit`** runs one blit, synchronously, on memory the CPU
+  addresses directly:
+  - all channel combinations and all 256 minterms, with direct evaluators
+    for the 13 minterms FR1 found and a generic path for the rest;
+  - ASH/BSH, first- and last-word masks, modulos and descending mode;
+  - inclusive and exclusive fill with FCI;
+  - line mode: octants, SIGN, SING, texture with BSH, start pixel and the
+    first-pixel write to DPT;
+  - the BLTSIZE encodings 0 = 64 words and 0 = 1024 rows;
+  - pointer and modulo bit 0 is ignored, as in hardware;
+  - afterwards the image holds the hardware's end state: pointers, the last
+    words read into ADAT/BDAT/CDAT, and the line mode's updated
+    ASH/BSH/SIGN. A second BLTSIZE write therefore continues correctly.
+- **Not supported:** line mode with B enabled or a width other than 2. These
+  return d0 = 1 and write nothing. FR1 found only width-2 lines with B off.
+  The FR4 production guard must take the fault exit for them.
+- **Not produced:** BZERO (FR1 found no reader).
+- **Emulator semantics used.** These were read from the emulator source and
+  confirmed by the oracle:
+  - the A/B shift history is cleared at blit start;
+  - the fill carry restarts on every row;
+  - IFE together with EFE acts as EFE;
+  - a disabled B channel uses the hold from the last `BLTBDAT` write or B
+    read.
+
+**Oracle harness (ignored harness).**
+
+- **Fixture.** `tools/fr2_build.py oracle` builds the fixture. It replaces
+  the drawing stages of `B8Draw` with `tools/fr2_oracle.s`, the same cut as
+  FR0's no-draw build. Each draw runs 32 cases. For each case:
+  1. it fills a Fast scratch from the case's xorshift32 seed and copies it to
+     a Chip scratch. Bank 0 is the Chip scratch: 30,960 bytes, free because
+     nothing is drawn;
+  2. it runs a D-only primer blit to clear the B history, writes the
+     registers with `BLTBDAT` after `BLTCON1`, then writes `BLTSIZE` and
+     waits (plus an optional second `BLTSIZE`);
+  3. it runs the same case through `FastRenderBDAT`/`FastRenderBlit` on the
+     Fast side;
+  4. it compares every byte of the case area. That area is each channel's
+     span, 64-byte guards between spans, and 512 trailing bytes.
+- **Scratch contents.** Pseudo-random in four densities (½, ⅛, ⅞, 1⁄32 set
+  bits), not the captured pixels.
+- **Captured cases.** All 10,774 blits from the FR1 captures (normal, solo,
+  grid, dense, start, pit 1, pit 2). That is 2,751 distinct register images
+  after rebasing, each with the channel geometry it had in the game.
+- **Generated cases** (1,728):
+  - every minterm with ABCD in both directions;
+  - every ASH × BSH pair;
+  - all 15 channel subsets, with a disabled A, B or C supplying its data
+    register;
+  - B disabled with every BSH;
+  - 64 first/last mask combinations, including zero masks and one-word rows;
+  - IFE, EFE and both, with and without FCI, both directions, for D, CD, AD
+    and ABD;
+  - widths 1–24 and heights 1–200, and the 64-word and 1,024-row encodings;
+  - negative, row-repeating and odd modulos, and odd pointers;
+  - D disabled;
+  - second-BLTSIZE continuation for area and line;
+  - lines at 72 angles with and without SING, every BSH texture, every start
+    pixel, random lines and single dots. All 8 octant codes occur with and
+    without SING.
+- **Coverage.** 4,280 of the cases change memory: 275,941 changed words in
+  all.
+
+**Results.**
+
+| Check | Result |
+| --- | --- |
+| Oracle, 030‑50 BCE (68030) | 4,479/4,479 cases, 0 differing bytes |
+| Oracle, 040‑40 BCE (68040) | 4,479/4,479 cases, 0 differing bytes |
+| Negative control in the guest: IFE treated as EFE | 121 failing cases, all of them fill cases |
+| Host check (`tools/fr2_unicorn.py`, Unicorn 68020 and 68040) against the Python model (`tools/fr2_model.py`) | 4,479/4,479 equal in memory and end state; a one-instruction fault gives 1,008 mismatches |
+| Production slave | unchanged, `597a74b9…` |
+
+**Notes for later steps.**
+
+- **FR4:**
+  - each redirected `BLTBDAT` write must call `FastRenderBDAT`;
+  - every other register write only stores into the image;
+  - `BLTSIZE` stores into the image and then calls `FastRenderBlit`.
+- **FR6:** the kernels are checked against `FastRenderBlit` and the hardware
+  with the same harness (`fr2_cases.py` → `fr2_build.py` → `fr2_run.py`).
+
 ### FR3 — Shadows, copy and publication with an empty prefix
 
 The framework, with nothing drawn in Fast RAM yet.
@@ -923,7 +1023,7 @@ except for memory checks.
 Dependencies:
 
 ```
-FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 → FR3 → FR4 → FR5a…FR5f → FR6
+FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 → FR4 → FR5a…FR5f → FR6
   → FR7 → FR8 → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.
