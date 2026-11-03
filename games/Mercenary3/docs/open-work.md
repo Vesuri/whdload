@@ -229,6 +229,12 @@ heading, pitch and roll used 256 steps against the view's 1024, so it swung by
 position through the turn (five before), the pitch phase (four rows before) and the
 roll phase (two). See [P7](internals.md#p7-camera-attached-model-angles).
 
+P8 (bit 23) transforms camera-attached vertices exactly. The view's log-table
+arithmetic left the cockpit flickering one pixel and back while the angles changed,
+most visibly while banking. In the slot 1 flight the canopy's horizontal line now holds
+through pitch and bank (7 one-frame reversals before), and the turn no longer moves it.
+See [P8](internals.md#p8-exact-camera-attached-vertices).
+
 P4 corrects presentation transitions with a shared, delayed camera/geometry timeline;
 starts, stops, reversals and the mailbox approach have been checked. Frame rates are
 unchanged on the routine setups; native world speed and options-off checks pass.

@@ -112,6 +112,7 @@ Bit 19 finds the log conversion's leading bit with `bfffo` in M1's copy (F4 belo
 Bit 20 moves the render scratch to fast RAM and translates the copied code (F5 below).
 Bit 21 draws door motion on P4's presentation timeline (P6 below).
 Bit 22 turns camera-attached models with the full camera angles (P7 below).
+Bit 23 transforms camera-attached vertices exactly instead of through the log tables (P8 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -339,7 +340,57 @@ per-field captures:
 `flicker.py` finds no glitches in the turn. Restore hashes pass 321 standard-route
 presentations; `fps.py`, VERIFY, `Custom5=1`: 44.50 fps (unchanged from P6). A500,
 VERIFY, Custom1 `$3FFFFF → $7FFFFF` with the heading site only: 41 → 41 frames.
-Bit 22 is in the release mask (`$7FFFFF`).
+Bit 22 is in the release mask.
+
+### P8: exact camera-attached vertices
+
+With P7 the cockpit still moved one Amiga pixel and straight back while the angles
+changed, most visibly when the ship banked. The view transform (Disk.1 `$5B038`)
+multiplies through the log tables (`$64000`/`$60000`) with a 13-bit mantissa. The
+cockpit is turned by the camera angles and then back by the view, so those errors
+(about 0.1–0.2% per term) don't cancel. Near the eye they are worth a pixel, and
+they change with the angles. Probed in the slot 1 flight (native build, 672 cockpit
+vertices in the pitch, roll and turn phases), the view output matches the inverse
+model rotation with camera axes (depth, −x, −y) within the log error: a fixed tilt of
+about half a 1024-unit step (0.8 px) plus ±0.15 px that moves all cockpit vertices
+together.
+
+The transform's floats are a signed mantissa (`|m|` `$1000..$1FFE`, even) in the low
+word and an exponent in the high word: the value is `m · 2^(e−12)`. It writes depth,
+x and y to `$840/$340/$5C0 (a0)`. The screen position is `160 − x·2^k/z` and
+`68 + y·2^k/z`, with `k` from `$6FF4`'s high word (8 in flight). It goes to the
+floats `$AC0/$D40` and the rounded words `$FC0/$FC2`, and the clip code (via the
+table at `$77DA`) to `$1240`, or `$80` with the vertex behind the camera.
+
+`Custom1` bit 23 requires bit 22 and a 68020+. Only camera-attached models reach P7's
+roll site (Disk.1 `$57D9E`). There, while `$5B038` would take its log path (`$7122` ≠ 1,
+`$7124` ≥ 0, `$6FF4` a power of two) and the offset `a1-a3` is within 1,024 units,
+`_angle7152` computes the camera-space vertex exactly. That is the model vertex as
+(z, −x, −y) plus the offset turned back by heading, pitch and roll (P7's interpolated
+table, cached while the offset and angles hold). It writes `$5B038`'s outputs and
+returns to `$57F90`, past the rotation and the transform. Other models keep the
+native path untouched. F5's moved scratch is addressed through `_f5datamap`. A code
+copy whose layout moves `$57F90` is accepted only if its roll site stayed native.
+Against the exact model the outputs are within 0.12 px (mean 0.04, roll included).
+
+Slot 1 passenger flight on the reference 030, release builds with P7 and with P8,
+per-field captures. Probes measure where canopy lines cross a fixed column or row.
+A–B–A counts a line that moves and is back on the next frame:
+
+| Phase | Probe | P7: changes, A–B–A | P8: changes, A–B–A |
+| --- | --- | --- | --- |
+| Turn, 60 fields | right diagonal | 15, 7 | 0, 0 |
+| Pitch, 130 fields | horizontal line | 10, 4 | 0, 0 |
+| Pitch, 130 fields | right diagonal | 22, 7 | 11, 1 |
+| Bank, 200 fields | horizontal line | 17, 7 | 0, 0 |
+| Bank, 200 fields | right diagonal | 37, 9 | 11, 1 |
+
+The remaining changes are the cockpit's native sway: its offset is applied in world
+axes, so the pitch oscillation of the autopilot moves it by sub-pixel amounts.
+
+Restore hashes pass 321 standard-route presentations. `fps.py`, VERIFY, `Custom5=1`,
+same session: 44.50 fps with P7 and with P8. A500, VERIFY, Custom1 `$FFFFFF`: 41
+frames, as with `$7FFFFF`. Bit 23 is in the release mask (`$FFFFFF`).
 
 ### R5: cache-safe polygon clipping
 
@@ -472,7 +523,8 @@ Enhanced framerate off. The trip's game time follows the pass rate, as in the
 original game: it lands at clock 00-23 with the release and 01-26 with Off.
 While the ship turns, the native cockpit creeps sideways and snaps back every four
 heading units; Off shows the same positions, less often at its pass rate. P7 (bit 22)
-removes this, and the matching pitch and roll steps.
+removes this, and the matching pitch and roll steps; P8 (bit 23) removes the
+remaining one-pixel flicker of the log transform.
 
 Lifts already use walking mode and the tick timer at Disk.1 `$5A644`: the camera
 changes height at arrival, not continuously during travel. P3 preserves that behaviour

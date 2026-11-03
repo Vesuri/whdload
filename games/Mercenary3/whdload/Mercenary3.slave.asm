@@ -90,7 +90,7 @@ _boot		;	A0 = resident loader
 	ENDC
 	move.l	(_enhanced,pc),d0
 	beq.b	.featuresready
-	move.l	#$7fffff,(a0)
+	move.l	#$ffffff,(a0)
 .featuresready
 
 	lea	($4000).w,a0
@@ -247,6 +247,7 @@ lbC0002AA
 	bsr.w	_viewinit
 	bsr.w	_doorinit
 	bsr.w	_cockpitinit
+	bsr.w	_caminit
 	bsr.w	_clipinit
 ; Let WHDLoad handle CPU/MMU differences and NOCACHE. Preserve the shipped
 ; instruction-only request with bit 13 off; SetCACR also flushes patched code.
@@ -1991,12 +1992,18 @@ _cockpitinit
 ; same d0; at angle 0 it returns past the rotation, as natively.
 _angle7152
 	move.l	d0,-(sp)
+	bsr.w	_camcheck
+	bne.b	.exact
 	move.w	($7152).w,d0
 	bsr.b	_fineangle
 	movem.l	(sp)+,d0
 	bne.b	.done
 	addi.l	#$57dd2-($57d9e+6),(sp)
 .done	rts
+.exact	bsr.w	_camvertexexact		;P8: instead of the rotation and $5B038
+	move.l	(sp)+,d0
+	addi.l	#$57f90-($57d9e+6),(sp)
+	rts
 _angle7154
 	move.w	($7154).w,d0
 	addi.w	#$200,d0
@@ -2016,7 +2023,17 @@ _fineangle
 	move.w	d0,d7
 	andi.w	#$3ff,d7
 	beq.b	.done
-	movem.l	d1-d3/a0,-(sp)
+	movem.l	d1-d2,-(sp)
+	bsr.w	_finesc
+	lea	(_cockpitrot,pc),a4
+	move.w	d1,(a4)
+	move.w	d2,($80,a4)
+	movem.l	(sp)+,d1-d2
+	move.l	a4,d7
+.done	rts
+; d0: angle in 1024 units -> d1 sine, d2 cosine ($7E68 interpolated).
+_finesc
+	movem.l	d3/a0/a4,-(sp)
 	move.w	d0,d3
 	andi.w	#3,d3
 	move.w	d0,d1
@@ -2037,13 +2054,295 @@ _fineangle
 	muls.w	d3,d2
 	asr.l	#2,d2
 	add.w	($80,a4),d2
-	lea	(_cockpitrot,pc),a4
-	move.w	d1,(a4)
-	move.w	d2,($80,a4)
-	movem.l	(sp)+,d1-d3/a0
-	move.l	a4,d7
-.done	rts
+	movem.l	(sp)+,d3/a0/a4
+	rts
 _cockpitrot	ds.w	65
+
+; P8 (bit 23): camera-attached vertices without the logarithmic transform.
+; The view transform (Disk.1 $5B038) multiplies through log tables, about
+; 0.1-0.2% per term, so the cockpit (turned by the camera angles, then back
+; by the view) moved a pixel and back as the angles changed. The view is the
+; inverse model rotation with camera axes (depth, -x, -y), so the vertex is
+; exact in camera space: (z, -x, -y) plus the offset a1-a3 turned back by
+; heading, pitch and roll. _angle7152 (reached only by these models) writes
+; what the rotation and $5B038 would, then returns to Disk.1 $57F90: depth, x and y
+; ($840/$340/$5C0), the screen position (floats $AC0/$D40, words $FC0/$FC2)
+; and the clip code ($1240, via $77DA), or $80 behind the camera. Floats are
+; a normalised mantissa (|m| $1000..$1FFE, even) times 2^(exponent-12).
+_caminit
+	btst	#7,(_custom1+1,pc)
+	beq.b	.done
+	btst	#6,(_custom1+1,pc)
+	beq.b	.done
+	move.w	(_attn,pc),d0
+	btst	#AFB_68020,d0
+	beq.b	.done
+	btst	#0,(_f5on,pc)
+	beq.b	.chip
+	lea	(_camout,pc),a3
+	moveq	#8-1,d3
+.map	move.l	(a3),d0
+	bsr.w	_f5datamap
+	move.l	d0,(a3)+
+	dbra	d3,.map
+.chip	lea	($57d9e-$3cb0).l,a0
+	bsr.b	.patched
+	bne.b	.done
+	move.l	(_render_base,pc),d6
+	beq.b	.on
+	move.l	#$57d9e-$3cb0,d0
+	bsr.w	_rendermap
+	cmpi.l	#$57d9e-$3cb0,d0
+	beq.b	.on			;not copied
+	move.l	d0,d3
+	movea.l	d0,a0
+	bsr.b	.patched
+	bne.b	.on			;the copy keeps the native rotation
+	move.l	#$57f90-$3cb0,d0
+	bsr.w	_rendermap
+	sub.l	d3,d0
+	cmpi.l	#$57f90-$57d9e,d0
+	bne.b	.done			;copy layout changed
+.on	lea	(_camexact,pc),a0
+	st	(a0)
+.done	rts
+; a0: a $57D9E instance. Z set when P7 replaced it with _angle7152.
+.patched
+	cmpi.w	#$4eb9,(a0)
+	bne.b	.native
+	lea	(_angle7152,pc),a1
+	cmpa.l	(2,a0),a1
+	bne.b	.native
+	moveq	#0,d0
+	rts
+.native	moveq	#1,d0
+	rts
+
+; From _angle7152 (d0 saved there). Z clear: transform this vertex exactly.
+_camcheck
+	move.b	(_camexact,pc),d0
+	beq.b	.no
+	cmpi.w	#1,($7122).w		;$5B038's other transforms
+	beq.b	.no
+	tst.w	($7124).w
+	bmi.b	.no
+	tst.w	($6ff6).w		;projection scale: a power of two
+	bne.b	.no
+	cmpi.w	#20,($6ff4).w
+	bhi.b	.no
+	move.l	a1,d0			;offset within 1024: Q4 words below
+	bsr.b	.range
+	bhs.b	.no
+	move.l	a2,d0
+	bsr.b	.range
+	bhs.b	.no
+	move.l	a3,d0
+	bsr.b	.range
+	bhs.b	.no
+	moveq	#1,d0
+	rts
+.no	moveq	#0,d0
+	rts
+.range	addi.l	#1024,d0
+	cmpi.l	#2048,d0
+	rts
+
+	machine	68020
+; d3-d5: model vertex, a1-a3: offset, a0: vertex index.
+_camvertexexact
+	movem.l	d0-d7/a1-a4,-(sp)
+	lea	(_camkey,pc),a4
+	cmpa.l	(a4),a1
+	bne.w	.offset
+	cmpa.l	(4,a4),a2
+	bne.w	.offset
+	cmpa.l	(8,a4),a3
+	bne.w	.offset
+	move.l	($7152).w,d0
+	cmp.l	(12,a4),d0
+	bne.w	.offset
+	move.w	($7156).w,d0
+	cmp.w	(16,a4),d0
+	beq.w	.vertex
+.offset	movem.l	d3-d5,-(sp)
+	move.l	a1,(a4)
+	move.l	a2,(4,a4)
+	move.l	a3,(8,a4)
+	move.l	($7152).w,(12,a4)
+	move.w	($7156).w,(16,a4)
+	move.l	a1,d3
+	asl.l	#4,d3
+	move.l	a3,d4
+	asl.l	#4,d4
+	move.w	($7156).w,d0
+	addi.w	#$200,d0
+	bsr.w	.turn			;d3 X, d4 Z
+	move.l	d3,d7
+	move.l	d4,d3
+	move.l	a2,d4
+	asl.l	#4,d4
+	move.w	($7154).w,d0
+	addi.w	#$200,d0
+	bsr.w	.turn			;d3 Z, d4 Y
+	move.l	d3,(18,a4)
+	move.l	d7,d3
+	move.w	($7152).w,d0
+	bsr.w	.turn			;d3 X, d4 Y
+	neg.l	d3
+	neg.l	d4
+	move.l	d3,(22,a4)
+	move.l	d4,(26,a4)
+	movem.l	(sp)+,d3-d5
+.vertex	movem.l	(18,a4),d0-d2		;offset in camera space, Q4
+	ext.l	d5
+	asl.l	#4,d5
+	add.l	d5,d0			;depth
+	ext.l	d3
+	asl.l	#4,d3
+	sub.l	d3,d1			;x
+	ext.l	d4
+	asl.l	#4,d4
+	sub.l	d4,d2			;y
+	lea	(_camout,pc),a3
+	movea.l	d0,a1
+	bsr.w	.float
+	movea.l	(a3),a2
+	move.l	d0,(a2,a0.l)		;$840
+	move.l	d1,d0
+	bsr.w	.float
+	movea.l	(4,a3),a2
+	move.l	d0,(a2,a0.l)		;$340
+	move.l	d2,d0
+	bsr.w	.float
+	movea.l	(8,a3),a2
+	move.l	d0,(a2,a0.l)		;$5C0
+	move.l	a1,d7			;depth
+	ble.w	.behind
+	moveq	#4,d0
+	add.w	($6ff4).w,d0
+	moveq	#1,d6
+	lsl.l	d0,d6			;screen scale, Q4
+	move.l	d1,d0
+	muls.l	d6,d3:d0
+	divs.l	d7,d3:d0
+	bvs.w	.behind
+	move.l	#160*16,d1
+	sub.l	d0,d1
+	bvs.w	.behind
+	move.l	d2,d0
+	muls.l	d6,d3:d0
+	divs.l	d7,d3:d0
+	bvs.w	.behind
+	move.l	#68*16,d2
+	add.l	d0,d2
+	bvs.w	.behind
+	move.l	d1,d0
+	bsr.w	.float
+	movea.l	(12,a3),a2
+	move.l	d0,(a2,a0.l)		;$AC0
+	move.l	d2,d0
+	bsr.w	.float
+	movea.l	(16,a3),a2
+	move.l	d0,(a2,a0.l)		;$D40
+	move.l	d1,d0
+	bsr.w	.screen
+	movea.l	(20,a3),a2
+	move.w	d0,(a2,a0.l)		;$FC0
+	move.w	d0,d1
+	move.l	d2,d0
+	bsr.w	.screen
+	movea.l	(24,a3),a2
+	move.w	d0,(a2,a0.l)		;$FC2
+	moveq	#0,d2
+	cmpi.w	#$140,d1
+	blo.w	.x
+	addq.w	#1,d2
+	tst.w	d1
+	bpl.w	.x
+	addq.w	#4,d2
+.x	cmpi.w	#$88,d0
+	blo.w	.y
+	addq.w	#2,d2
+	tst.w	d0
+	bpl.w	.y
+	addq.w	#8,d2
+.y	lea	($77da).l,a4
+	movea.l	(28,a3),a2
+	move.b	(a4,d2.w),(a2,a0.l)	;$1240
+	movem.l	(sp)+,d0-d7/a1-a4
+	rts
+.behind	movea.l	(28,a3),a2
+	move.b	#$80,(a2,a0.l)
+	movem.l	(sp)+,d0-d7/a1-a4
+	rts
+; d0: Q4 -> nearest word, saturated.
+.screen	addq.l	#8,d0
+	asr.l	#4,d0
+	cmpi.l	#$7fff,d0
+	ble.w	.lo
+	move.w	#$7fff,d0
+	rts
+.lo	cmpi.l	#-$8000,d0
+	bge.w	.in
+	move.w	#$8000,d0
+.in	rts
+; d0: Q4 long -> game float.
+.float	movem.l	d1-d2,-(sp)
+	tst.l	d0
+	beq.w	.zero
+	smi	d2
+	bpl.w	.pos
+	neg.l	d0
+.pos	bfffo	d0{0:32},d1
+	neg.l	d1
+	addi.l	#31-12,d1		;shift that puts the top bit at bit 12
+	bmi.w	.left
+	lsr.l	d1,d0
+	bra.w	.norm
+.left	neg.l	d1
+	lsl.l	d1,d0
+	neg.l	d1
+.norm	andi.w	#$fffe,d0
+	tst.b	d2
+	beq.w	.sign
+	neg.w	d0
+.sign	addi.w	#12-4,d1
+	swap	d1
+	move.w	d0,d1
+	move.l	d1,d0
+	movem.l	(sp)+,d1-d2
+	rts
+.zero	move.l	#$fff01000,d0
+	movem.l	(sp)+,d1-d2
+	rts
+; d3 a, d4 b, d0 angle -> d3 a*cos - b*sin, d4 b*cos + a*sin (Q15, rounded).
+.turn	movem.l	d1-d2/d5-d6,-(sp)
+	bsr.w	_finesc
+	move.w	d3,d5
+	muls.w	d2,d5
+	move.w	d4,d6
+	muls.w	d1,d6
+	sub.l	d6,d5
+	muls.w	d2,d4
+	muls.w	d1,d3
+	add.l	d3,d4
+	move.l	d5,d3
+	moveq	#15,d6
+	addi.l	#$4000,d3
+	asr.l	d6,d3
+	addi.l	#$4000,d4
+	asr.l	d6,d4
+	movem.l	(sp)+,d1-d2/d5-d6
+	rts
+	machine	68000
+; Offset, $7152/$7154 and $7156 of the cached turn, then the result.
+_camkey		dc.l	$80000000,0,0,0
+		dc.w	0
+_camoffset	dc.l	0,0,0
+; The vertex outputs; F5 moves them with the scratch.
+_camout		dc.l	$840,$340,$5c0,$ac0,$d40,$fc0,$fc2,$1240
+_camexact	dc.b	0
+	even
 
 _doorbase	dc.l	0
 _doorscene	dc.l	0
