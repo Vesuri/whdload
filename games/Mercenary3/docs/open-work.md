@@ -283,12 +283,13 @@ clear remains rejected and R3's triple buffering remains closed without implemen
   with `CUSTOM5=1` on `a1200-030`. Possibly the sights are drawn into only one of the
   display buffers, or only on frames that redraw the scene; not yet checked against
   the shipped slave or with options off.
-- Shots flicker. Holding fire in a craft draws a 2x2 white dot at the view centre;
-  sampled every field over the Eris sea it shows on 2 fields of every 4, locked to the
-  4-field logic pass (24 fields, fire held; none without fire). On a native machine it
-  is in every frame. Possibly drawn only on logic frames and not by presentation frames,
-  like the sights. Seen in the release slave with `CUSTOM5=1` on `a1200-030`; not yet
-  checked with the displayed-frame counter, the shipped slave or options off.
+- Fire marker flickers. Holding fire in a craft draws a single white pixel at the view
+  centre, between the sights (presumably the shot; over open sea there was nothing to
+  hit). Sampled every field over the Eris sea it shows on 2 fields of every 4, locked to
+  the 4-field logic pass (24 fields, fire held; none without fire). Possibly drawn only
+  on logic frames and not by presentation frames, like the sights. Seen in the release
+  slave with `CUSTOM5=1` on `a1200-030`; not yet compared with the shipped slave or
+  options off, or checked with the displayed-frame counter.
 - Enclosed rooms run at 12.5 fps. `_presentgate` (label `.screen`) skips presentation
   frames while the room word `$71CC` is not negative, so inside enclosed rooms only the
   4-field logic passes are drawn. Same VERIFY build with `CUSTOM5=1` on `a1200-030`,
