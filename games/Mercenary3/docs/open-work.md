@@ -274,16 +274,6 @@ clear remains rejected and R3's triple buffering remains closed without implemen
   `a1200-030`, for saves in flight, hovering and on the ground. Possibly the interaction
   between `_savegame` (patch at `$5F26`) and the game's message handling; not yet
   checked against the shipped slave or with options off.
-- Sights blink. With the Sights in the inventory, the two white sight marks either side
-  of the view centre (just above the horizon on level ground) show only in some
-  displayed frames with Enhanced framerate on: release slave, `CUSTOM5=1`, `a1200-030`.
-  Sampled every 12 fields while landed on Damocles, they appeared in one sample of four;
-  sampled every field in flight over the Eris sea (slot 5), on every other field (two
-  shorter runs showed none for 8 and 20 fields). With options off (`CUSTOM5=0`) on
-  `a500-1.5m`, from the same save, they show on all 140 sampled fields, firing or not,
-  so the blinking comes from the enhancements. Hovering on Gaea in the DART III they show
-  on exactly every other field, and those fields match the A500's game frames byte for
-  byte: the sights are drawn on game frames and left out of presentation frames.
 - Shots are not interpolated on their first pass. The DART III (bought at Stellar
   Factors, Ur City 09-03, Gaea) fires a white star that shrinks as it flies away. Same
   hovering save, fire held for 3 fields, every field captured. With options off on

@@ -558,6 +558,15 @@ frame of a single colour, a fifth of all fields on the 030
 VERIFY `Custom1=$3FFFFFF` and release `Custom5=1`; it needs bits 12 and 20).
 `tools/test_entry_calls.py` checks that no slave call targets moved code without an entry. Bit 11 also interpolates objects in those modes.
 Boarding/leaving resets history; transport, scene, planet and floor changes snap.
+
+Every native path draws the sights (Disk.1 `$55DEE`, while the Sights are owned) into
+the finished frame just before publishing it; walking, surface and space presentations
+now call it at the same point. Before, frames published by a presentation had none, and
+with the enhancements on the sights showed on every other field while hovering. Now
+they show on every field (DART III, slot 5, 030, four single shots, 14–16 fields each).
+VERIFY `CUSTOM5=1` restore hashes pass 279 route presentations on the 030.
+Transport displacements over 32,767 units per axis also snap to avoid signed-word
+arithmetic overflow. Enclosed rooms retain native drawing.
 Transport displacements over 32,767 units per axis also snap to avoid signed-word
 arithmetic overflow. Enclosed rooms retain native drawing.
 

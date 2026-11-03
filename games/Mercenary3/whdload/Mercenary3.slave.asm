@@ -2803,6 +2803,8 @@ _f3sky2	equ	*
 	move.w	d0,($42c6c).l
 	jsr	($59da0).l		; Disk.1 $5DA50
 	jsr	($56c6e).l		; Disk.1 $5A91E
+; Every native path draws the sights into the finished frame before publishing it.
+	jsr	($5213e).l		; sights, Disk.1 $55DEE
 	jsr	($5a7a8).l		; publish, Disk.1 $5E458
 	jsr	($5ab90).l		; clear, Disk.1 $5E840
 	jsr	($42d14).l		; Disk.1 $469C4
@@ -2868,6 +2870,7 @@ _f3sky4	equ	*
 	move.w	d0,($42c6c).l
 	jsr	($59b94).l
 	jsr	($59da0).l
+	jsr	($5213e).l		; sights, Disk.1 $55DEE
 	jsr	($5a7a8).l
 	jsr	($5ab90).l
 	jsr	($56c6e).l
@@ -2917,6 +2920,7 @@ _f3sky4	equ	*
 	jsr	($59ba0).l
 	jsr	($56c6e).l
 	jsr	($42d14).l
+	jsr	($5213e).l		; sights, Disk.1 $55DEE
 	jsr	($5a7a8).l
 	lea	($2ea40).l,a0
 	move.w	#$444,($10,a0)
