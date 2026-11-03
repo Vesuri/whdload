@@ -281,3 +281,17 @@ clear remains rejected and R3's triple buffering remains closed without implemen
   with `CUSTOM5=1` on `a1200-030`. Possibly the sights are drawn into only one of the
   display buffers, or only on frames that redraw the scene; not yet checked against
   the shipped slave or with options off.
+- Enclosed rooms run at 12.5 fps. `_presentgate` (label `.screen`) skips presentation
+  frames while the room word `$71CC` is not negative, so inside enclosed rooms only the
+  4-field logic passes are drawn. Same VERIFY build with `CUSTOM5=1` on `a1200-030`,
+  displayed-frame counter, saves in the Eris 15-15 Mineral Trading building: in the
+  corridor behind the salesperson (`$71CC` = 1) 12.50 fps standing and through a full
+  turn, every 10-field window one frame per 4 fields; in the trading room, open to the
+  street (`$71CC` = `$8000`), 50 fps standing and 44 turning. The player sees the drop as
+  a bad frame rate in buildings. The check dates from the first presentation commit
+  ("special screens keep their native path"), later relabelled "enclosed rooms" with no
+  recorded reason or measurement. Six other `$71CC` checks follow the same rule:
+  `_stageclear`, `_stagepublish`, `_objectdraw`, `_doorstage`, `_interpolateplayer`
+  and `_present`. Find out why
+  rooms were excluded: if there is a good reason, document it; otherwise draw
+  presentation frames in rooms, with the restore checks passing there.
