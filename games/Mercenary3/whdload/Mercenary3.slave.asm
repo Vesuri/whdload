@@ -1958,17 +1958,17 @@ _cockpitinit
 	move.l	(_render_base,pc),d6
 	beq.b	.next
 	move.l	(a3),d0
-	moveq	#0,d1
-	move.w	(12,a3),d1
-	add.l	d1,d0
-	bsr.w	_rendermap
-	move.l	d0,d2
+	moveq	#0,d3
+	move.w	(12,a3),d3
+	add.l	d3,d0
+	bsr.w	_rendermap		;clobbers d1/d2/a2
+	move.l	d0,d4
 	move.l	(a3),d0
 	bsr.w	_rendermap
 	cmp.l	(a3),d0
 	beq.b	.next			;not copied
-	sub.l	d0,d2
-	cmp.l	d1,d2
+	sub.l	d0,d4
+	cmp.l	d3,d4
 	bne.b	.next			;copy changed the layout: keep native
 	bsr.b	.patch
 .next	lea	(14,a3),a3
