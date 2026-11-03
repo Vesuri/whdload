@@ -1933,48 +1933,90 @@ _doorrestore
 .done	rts
 
 ; P7 (bit 22): camera-attached models (the passenger-ship cockpit) turn with
-; the camera heading. Disk.1 $57E0C looks it up as ($7156+$200)>>2 in the
-; 256-entry sine table at $7E68, while the view matrices use 1024 steps
-; (Disk.1 $5A91E), so the cockpit swung by (heading & 3) and snapped back.
-; Interpolate the table to the full heading instead.
-COCKPIT		= $57e0c-$3cb0		;move.w $7156.w,d0 .. movea.l d7,a4
-COCKPITSKIP	= $57e46-$3cb0		;the beq's target: no rotation
+; the camera angles. Disk.1 $57D9E, $57DD2 and $57E0C look up $7152,
+; $7154+$200 and $7156+$200 as angle>>2 in the 256-entry sine table at $7E68,
+; while the view matrices use 1024 steps (Disk.1 $5A91E), so the cockpit
+; swung by (angle & 3) and snapped back. Interpolate the table instead.
+; Per site: replaced code, its first long, the wrapper, the rotation after
+; the replaced code and the original beq's target (no rotation).
+_cockpitsites
+	dc.l	$57d9e-$3cb0,$7e003e38
+	dc.w	_angle7152-_cockpitsites,$57db4-$57d9e,$57dd2-$57d9e
+	dc.l	$57dd2-$3cb0,$30387154
+	dc.w	_angle7154-_cockpitsites,$57dee-$57dd2,$57e0c-$57dd2
+	dc.l	$57e0c-$3cb0,$30387156
+	dc.w	_angle7156-_cockpitsites,$57e28-$57e0c,$57e46-$57e0c
+	dc.l	0
 _cockpitinit
 	btst	#6,(_custom1+1,pc)
 	beq.b	.done
-	move.l	#COCKPIT,d0
+	lea	(_cockpitsites,pc),a3
+.site	move.l	(a3),d0
+	beq.b	.done
 	bsr.b	.patch
 	move.l	(_render_base,pc),d6
-	beq.b	.done
-	move.l	#COCKPITSKIP,d0
+	beq.b	.next
+	move.l	(a3),d0
+	moveq	#0,d1
+	move.w	(12,a3),d1
+	add.l	d1,d0
 	bsr.w	_rendermap
-	move.l	d0,d1
-	move.l	#COCKPIT,d0
+	move.l	d0,d2
+	move.l	(a3),d0
 	bsr.w	_rendermap
-	cmpi.l	#COCKPIT,d0
-	beq.b	.done			;not copied
-	sub.l	d0,d1
-	cmpi.l	#COCKPITSKIP-COCKPIT,d1
-	bne.b	.done			;copy changed the layout: keep native
-.patch	movea.l	d0,a0
-	cmpi.l	#$30387156,(a0)		;move.w $7156.w,d0
-	bne.b	.done
-	move.w	#$4eb9,(a0)+
-	lea	(_cockpitangle,pc),a1
-	move.l	a1,(a0)+
-	move.w	#$6000+($57e28-($57e12+2)),(a0)	;bra.b to the rotation
+	cmp.l	(a3),d0
+	beq.b	.next			;not copied
+	sub.l	d0,d2
+	cmp.l	d1,d2
+	bne.b	.next			;copy changed the layout: keep native
+	bsr.b	.patch
+.next	lea	(14,a3),a3
+	bra.b	.site
 .done	rts
+.patch	movea.l	d0,a0
+	move.l	(4,a3),d1
+	cmp.l	(a0),d1
+	bne.b	.skip
+	move.w	#$4eb9,(a0)+
+	lea	(_cockpitsites,pc),a1
+	adda.w	(8,a3),a1
+	move.l	a1,(a0)+
+	move.w	(10,a3),d1		;bra.b from the call's return to the rotation
+	subq.w	#8,d1
+	ori.w	#$6000,d1
+	move.w	d1,(a0)
+.skip	rts
 
-; Returns d0 and d7/a4 as the replaced code: a4 points at sin, ($80,a4) cos.
-_cockpitangle
+; Each returns d7/a4 as the replaced code (a4 at sin, ($80,a4) cos) and the
+; same d0; at angle 0 it returns past the rotation, as natively.
+_angle7152
+	move.l	d0,-(sp)
+	move.w	($7152).w,d0
+	bsr.b	_fineangle
+	movem.l	(sp)+,d0
+	bne.b	.done
+	addi.l	#$57dd2-($57d9e+6),(sp)
+.done	rts
+_angle7154
+	move.w	($7154).w,d0
+	addi.w	#$200,d0
+	bsr.b	_fineangle
+	bne.b	.done
+	addi.l	#$57e0c-($57dd2+6),(sp)
+.done	rts
+_angle7156
 	move.w	($7156).w,d0
 	addi.w	#$200,d0
+	bsr.b	_fineangle
+	bne.b	.done
+	addi.l	#$57e46-($57e0c+6),(sp)
+.done	rts
+; d0: angle in 1024 units. Z set (d7 = 0) at angle 0.
+_fineangle
 	move.w	d0,d7
 	andi.w	#$3ff,d7
-	bne.b	.rotate
-	addi.l	#COCKPITSKIP-(COCKPIT+6),(sp)	;as native: angle 0 skips
-	rts
-.rotate	movem.l	d1-d3/a0,-(sp)
+	beq.b	.done
+	movem.l	d1-d3/a0,-(sp)
 	move.w	d0,d3
 	andi.w	#3,d3
 	move.w	d0,d1
@@ -1998,9 +2040,9 @@ _cockpitangle
 	lea	(_cockpitrot,pc),a4
 	move.w	d1,(a4)
 	move.w	d2,($80,a4)
-	move.l	a4,d7
 	movem.l	(sp)+,d1-d3/a0
-	rts
+	move.l	a4,d7
+.done	rts
 _cockpitrot	ds.w	65
 
 _doorbase	dc.l	0

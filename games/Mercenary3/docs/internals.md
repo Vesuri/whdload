@@ -111,7 +111,7 @@ Bit 18 moves projection state and drawing lookup tables to fast RAM (F3 below).
 Bit 19 finds the log conversion's leading bit with `bfffo` in M1's copy (F4 below).
 Bit 20 moves the render scratch to fast RAM and translates the copied code (F5 below).
 Bit 21 draws door motion on P4's presentation timeline (P6 below).
-Bit 22 turns camera-attached models with the full camera heading (P7 below).
+Bit 22 turns camera-attached models with the full camera angles (P7 below).
 The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
 release builds keep only the game's logic-pass counter.
 
@@ -310,30 +310,36 @@ in-between positions there round to the native ones. Restore hashes pass 250
 presentations on the door route and 321 on the standard route. `fps.py`, VERIFY,
 `Custom5=1`: 44.70 → 44.50 fps. Bit 21 is in the release mask.
 
-### P7: camera-attached model heading
+### P7: camera-attached model angles
 
 The passenger-ship cockpit is drawn at a fixed offset from the camera (own vehicle,
-Disk.1 `$57AC8`). The model code at Disk.1 `$57E0C` turns it with the camera heading,
-`($7156 + $200) >> 2`, through the 256-entry sine table at `$7E68`. The view matrices
-use the full 1024-unit heading (Disk.1 `$5A91E`, log sines at `$64000`), so the cockpit
-was turned `heading & 3` units short: during a turn it swung sideways and snapped
-back every four units. With the frame two passes behind the probed heading, the
-console edge is a function of `heading & 3` alone (60 flight frames, one exception
-of one pixel).
+Disk.1 `$57AC8`). The model code turns it with the camera angles: `$7152` at Disk.1
+`$57D9E`, `$7154 + $200` at `$57DD2` and `$7156 + $200` at `$57E0C`, each as
+`angle >> 2` through the 256-entry sine table at `$7E68`. The view matrices use full
+1024-unit angles (Disk.1 `$5A91E`, log sines at `$64000`), so the cockpit was turned
+`angle & 3` units short: it swung sideways during turns, up and down during pitch
+changes, and snapped back every four units. With the frame two passes behind the
+probed heading, the console edge during a turn is a function of `heading & 3` alone
+(60 flight frames, one exception of one pixel).
 
-`Custom1` bit 22 replaces that lookup (in chip, and in the S3/F2/F5 copy when the copy
-keeps its layout) with a call that interpolates the table between neighbouring entries
-for the full heading. It returns the same registers, with `a4` pointing at a two-entry
-sine/cosine pair, and still skips the rotation at angle 0.
+`Custom1` bit 22 replaces the three lookups (in chip, and in the S3/F2/F5 copy when the
+copy keeps its layout) with calls that interpolate the table between neighbouring
+entries for the full angle. They return the same registers, with `a4` pointing at a
+two-entry sine/cosine pair, and still skip a rotation at angle 0.
 
-Slot 1 passenger flight on the reference 030, release mask, 60 consecutive frames during
-the turn: the console edge took five positions over about 5 Amiga pixels before, and
-one position after. The pilot centroid stays within half a pixel apart from frames where
-an orange object passes outside. `flicker.py` finds no glitches. Restore hashes pass 321
-standard-route presentations; `fps.py`, VERIFY, `Custom5=1`: 44.50 fps (unchanged from
-P6). A500, VERIFY, Custom1 `$3FFFFF → $7FFFFF`: 41 → 41 frames. Surface-vehicle cockpits
-reach the same code; they were not separately captured. Bit 22 is in the release mask
-(`$7FFFFF`).
+Slot 1 passenger flight on the reference 030, release mask, previous build → bit 22,
+per-field captures:
+
+| Phase | Measured | Before | After |
+| --- | --- | --- | --- |
+| Turn, heading 508 → 136, 60 frames | console left edge | 5 positions over 5 Amiga px | 1 position |
+| Space pitch, `$7154` 496..512, 130 frames | console top | 4 rows (172..180) | 123 at one row, 7 scene changes |
+| Surface roll, `$7152` −29..0, 130 frames | console top at one column | 2 rows | 128 at one row, 2 one row off |
+
+`flicker.py` finds no glitches in the turn. Restore hashes pass 321 standard-route
+presentations; `fps.py`, VERIFY, `Custom5=1`: 44.50 fps (unchanged from P6). A500,
+VERIFY, Custom1 `$3FFFFF → $7FFFFF` with the heading site only: 41 → 41 frames.
+Bit 22 is in the release mask (`$7FFFFF`).
 
 ### R5: cache-safe polygon clipping
 
@@ -466,7 +472,7 @@ Enhanced framerate off. The trip's game time follows the pass rate, as in the
 original game: it lands at clock 00-23 with the release and 01-26 with Off.
 While the ship turns, the native cockpit creeps sideways and snaps back every four
 heading units; Off shows the same positions, less often at its pass rate. P7 (bit 22)
-removes this.
+removes this, and the matching pitch and roll steps.
 
 Lifts already use walking mode and the tick timer at Disk.1 `$5A644`: the camera
 changes height at arrival, not continuously during travel. P3 preserves that behaviour
