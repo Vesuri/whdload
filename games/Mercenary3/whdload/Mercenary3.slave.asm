@@ -2930,7 +2930,11 @@ _f3sky4	equ	*
 	move.w	#$666,($1a,a0)
 	jsr	($5ab90).l
 	jsr	($50524).l
-	jsr	($536c4).l
+; Disk.1 $57374 has no chip entry jump under F5 (bit 20): its chip original reads the
+; vacated scratch and drew a full-view frame of one colour. Call through the native
+; operand (Disk.1 $5E42C), which F2/F5 retarget to the copy.
+	movea.l	($5e42c-$3cb0).l,a0
+	jsr	(a0)
 	jmp	($53b0e).l
 
 _savepresent

@@ -550,7 +550,13 @@ Evidence: `tmp/p2/final/`. Vehicle/flight/map coverage remains for P3.
 0 (vehicle/surface flight) and 2 (space). Presentation follows their native drawing
 paths, Disk.1 `$5E280..$5E3BA` and `$5E3CE..$5E440`, without running movement,
 input or collision again. Space stages the navigation pose at chip `$702A..$7035`
-as well as the player pose. Bit 11 also interpolates objects in those modes.
+as well as the player pose. The space scene call (Disk.1 `$57374`) goes through the
+native operand at `$5E42C`: under F5 that routine has no chip entry jump, and its chip
+original read the vacated scratch. Every space presentation then showed one full-view
+frame of a single colour, a fifth of all fields on the 030
+(slot 3 Eagle, power 9, climb, Esc: 40 of 200 fields before, 0 of 200 after, on both
+VERIFY `Custom1=$3FFFFFF` and release `Custom5=1`; it needs bits 12 and 20).
+`tools/test_entry_calls.py` checks that no slave call targets moved code without an entry. Bit 11 also interpolates objects in those modes.
 Boarding/leaving resets history; transport, scene, planet and floor changes snap.
 Transport displacements over 32,767 units per axis also snap to avoid signed-word
 arithmetic overflow. Enclosed rooms retain native drawing.
@@ -559,8 +565,9 @@ A passenger flight is a recording: with `$70A2` set, the game reads its joystick
 input from the list at `$709A`, keyed to the pass counter `$7180` (Disk.1 `$5CB7A`,
 `$5D07C`, `$5D5A4`). With P1/P3 presentations during the replay, the ship leaves the
 recorded course. On the 030 the spaceport trip ended at Damocles instead of Tolosa,
-with full-view gray frames, a doubled pilot and a jumping camera. The cause has not
-been isolated; restoring `$7056..$7059` and `$709A..$709D` around presentations does
+with full-view gray frames, a doubled pilot and a jumping camera. The full-view frames
+look like the space-scene fault fixed above (not retested with replay presentations);
+the course change has not been isolated; restoring `$7056..$7059` and `$709A..$709D` around presentations does
 not change it. During replay, `_presentgate` and `_objectdraw` therefore keep native
 drawing. On the 030 that trip (a user save, B to board) has no one-frame glitches over
 2,500 fields and lands at Tolosa, as with Enhanced framerate off.
