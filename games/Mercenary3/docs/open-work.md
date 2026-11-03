@@ -276,20 +276,22 @@ clear remains rejected and R3's triple buffering remains closed without implemen
   checked against the shipped slave or with options off.
 - Sights blink. With the Sights in the inventory, the two white sight marks either side
   of the view centre (just above the horizon on level ground) show only in some
-  displayed frames; sampled every 12 fields while landed on Damocles, they appeared in
-  one sample of four, and sampled every field in flight over the Eris sea, on every
-  other field (two shorter runs showed none for 8 and 20 fields). They should be drawn in
-  every frame. Seen in the release slave
-  with `CUSTOM5=1` on `a1200-030`. Possibly the sights are drawn into only one of the
-  display buffers, or only on frames that redraw the scene; not yet checked against
-  the shipped slave or with options off.
+  displayed frames with Enhanced framerate on: release slave, `CUSTOM5=1`, `a1200-030`.
+  Sampled every 12 fields while landed on Damocles, they appeared in one sample of four;
+  sampled every field in flight over the Eris sea (slot 5), on every other field (two
+  shorter runs showed none for 8 and 20 fields). With options off (`CUSTOM5=0`) on
+  `a500-1.5m`, from the same save, they show on all 140 sampled fields, firing or not,
+  so the blinking comes from the enhancements. Possibly the sights are drawn into only
+  one of the display buffers, or only on frames that redraw the scene.
 - Fire marker flickers. Holding fire in a craft draws a single white pixel at the view
   centre, between the sights (presumably the shot; over open sea there was nothing to
   hit). Sampled every field over the Eris sea it shows on 2 fields of every 4, locked to
   the 4-field logic pass (24 fields, fire held; none without fire). Possibly drawn only
   on logic frames and not by presentation frames, like the sights. Seen in the release
-  slave with `CUSTOM5=1` on `a1200-030`; not yet compared with the shipped slave or
-  options off, or checked with the displayed-frame counter.
+  slave with `CUSTOM5=1` on `a1200-030`. With options off on `a500-1.5m`, from the same
+  save, holding fire for 60 fields changed no pixel in the view, so the pixel may not be
+  the game's shot; this craft may not be armed. Retest with an armed ship (Stellar
+  Factors, Ur City 09-03, Gaea).
 - Enclosed rooms run at 12.5 fps. `_presentgate` (label `.screen`) skips presentation
   frames while the room word `$71CC` is not negative, so inside enclosed rooms only the
   4-field logic passes are drawn. Same VERIFY build with `CUSTOM5=1` on `a1200-030`,
