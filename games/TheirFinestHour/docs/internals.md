@@ -47,6 +47,54 @@ improvements below apply to v1.1 only. Quit key `$5D` (numeric `*`).
 - **Random generator** `bob:2915c` (LFSR on `-7830/-7828(a4)`); the main menu calls it
   continuously, so input timing decides the RNG state at the start of a flight.
 
+### Screen mode and palettes
+
+Every screen is low-res 320×200 with 4 bitplanes (16 colours): `BPLCON0 = $4200` is written
+once (`bob:28e6e`) and the copper lists hold only bitplane and sprite pointers. Sprite colours
+17/18 are set to `000`/`F00` for the menu pointer (`bob:28f5c`). A loop that writes `F00` to
+COLOR00 forever (`bob:289f0`) is a fatal-error screen.
+
+Palettes are 16 words in the data hunk, loaded by `bob:28e8e` (`jsr -32010(a4)`), which keeps a
+copy in `-7938(a4)`. Screens fade in through `bob:800` (`jsr -32646(a4)`); its 32-colour path
+(`25526(a4)` = 1) is dead, since `25526` is only ever cleared.
+
+| Palette | Screen | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `-29096(a4)` | Lucasfilm logo, both credits pages (`bob:299a`, `2c60`, `2cb8`): the IBM PC EGA palette | 000 | 00A | 0A0 | 0AA | A00 | A0A | A50 | AAA | 555 | 55F | 5F5 | 5FF | F55 | F5F | FF5 | FFF |
+| `-29128(a4)` | Title picture, shown during the boot benchmark (`bob:2ba4`) | 000 | 07B | 170 | 899 | 3B2 | ABC | BDE | 7C7 | 730 | 043 | 3BF | A50 | C84 | C00 | FD3 | FFF |
+| `-29064(a4)` | Menus (also the only value of `25832(a4)`, `bob:3678`) | 000 | 43B | 37B | 4CD | A00 | BCC | 988 | 666 | 444 | 950 | 090 | 5FF | DB4 | FD3 | FF3 | FFF |
+| `-29032(a4)` | Flight (7 loads, e.g. `bob:128c6`, `1b16c`) | 000 | 0BF | 007 | F53 | A00 | 620 | A50 | AB4 | 350 | 0A0 | 5F5 | 322 | 544 | 778 | BBC | FFF |
+| `-29000(a4)` | Black, between screens (`bob:1e9c`) | 000 | 000 | 000 | 000 | 000 | 000 | 000 | 000 | 000 | 000 | 000 | 000 | 000 | 000 | 000 | 000 |
+| `-28968(a4)` | Debrief picture 0, `cp/bcrash.pac` | 000 | 006 | 55F | 077 | A00 | AAA | 493 | 444 | 07C | 730 | 170 | 3FC | B70 | FD3 | 990 | FFF |
+| `-28936(a4)` | Debrief 1, `bcrash` | 000 | 006 | 449 | F55 | A00 | AAA | ECA | 555 | 333 | 730 | 170 | 3CF | A36 | FD3 | F5F | FFF |
+| `-28904(a4)` | Debrief 2, `bcrash` | 000 | 33B | D75 | 4A3 | C00 | AAA | 950 | 666 | 333 | 530 | 170 | 3BF | DA9 | FE0 | ECA | FFF |
+| `-28872(a4)` | Debrief 3, `bcrash` | 000 | 006 | C00 | 7C7 | A00 | 888 | 940 | 444 | 4A3 | 730 | 170 | 0DE | 990 | FD3 | F81 | FFF |
+| `-28840(a4)` | Debrief 4, `bcrash` | 000 | 006 | 008 | 3BF | A00 | 899 | 9BA | 444 | AAA | 730 | 170 | 3CF | 8CF | CA1 | DED | FFF |
+| `-28808(a4)` | Debrief 5, `bcrash` | 000 | 006 | 449 | ECA | 800 | 899 | A50 | 444 | 0A0 | 730 | 170 | 3BF | D85 | ED0 | DB4 | FFF |
+| `-28776(a4)` | Debrief 6, `bcrash` | 000 | 006 | 207 | 4A3 | A00 | AAA | 7C7 | 555 | 444 | 730 | 170 | 07C | 800 | FF5 | DB7 | FFF |
+| `-28744(a4)` | Debrief 7, `cp/gcrash.pac` | 000 | 24A | 07C | DA9 | B00 | AAA | A50 | 444 | 4A3 | 730 | 170 | 3BF | B9A | FF5 | C75 | FFF |
+| `-28712(a4)` | Debrief 8, `gcrash` | 000 | 006 | 449 | 8CC | D00 | AAA | 1A1 | 555 | 333 | 730 | 160 | 3CF | 7C7 | EE0 | A80 | FFF |
+| `-28680(a4)` | Debrief 9, `gcrash` | 000 | 209 | 9BA | 7C7 | A00 | 777 | B50 | 444 | 990 | 730 | 170 | 08E | 600 | ED0 | D98 | FFF |
+| `-28648(a4)` | Debrief 10, `gcrash` | 000 | 006 | 170 | 990 | A00 | AAA | A50 | 555 | 333 | 730 | 351 | 4A3 | D85 | ED0 | DB4 | FFF |
+| `-28616(a4)` | Debrief 11, `gcrash` | 000 | 006 | 449 | 077 | C00 | 899 | 00A | 444 | 0AA | 830 | 170 | 8CF | 7C7 | FF0 | 0A0 | FFF |
+| `-28584(a4)` | Debrief 12, `gcrash` | 000 | 006 | 449 | 07C | B00 | AAA | A50 | 444 | C75 | 730 | 170 | 08E | DA9 | FE0 | 0A0 | FFF |
+| `-28552(a4)` | Debrief 13, `gcrash` | 000 | 006 | 44A | D85 | A00 | AAA | A50 | 333 | 4A3 | 730 | 170 | 3BF | 666 | EE8 | C93 | FFF |
+
+The boot screens were identified by screenshots at the palette loads; the title picture and the
+credits text are images from `intro.pac` (pointers from `12264(a4)`). The debrief palettes are
+indexed by picture (`bob:5d86`, `65c8`): 0–6 go with `cp/bcrash.pac` and 7–13 with
+`cp/gcrash.pac`, chosen by the player's side flag `13866[plane]`; which picture is which is
+not checked.
+
+The flight palette is the same in every flight snapshot (`-7938(a4)`). It is built from short
+ramps: grey-browns `322`→`544`→`778`→`BBC`→`FFF`, greens `350`→`0A0`→`5F5`, reds and oranges
+(`A00`, `F53`, `620`, `A50`), sky `0BF` and sea `007`. Against EGA, five colours keep their
+index (0 `000`, 4 `A00`, 6 `A50`, 10 `5F5`, 15 `FFF`) and EGA's green `0A0` moves from 2 to 9;
+EGA's bright colours and greys are replaced by the sky, sea, green and shading colours. Kept
+indices suggest the palette was derived from the PC version's EGA one (not checked against the
+3D data). In the training flight over the sea about 9 colours are on screen (black, the blues,
+the grey-brown ramp, `350`, white); the reds, oranges and bright greens appear in other scenes.
+
 ## Game time
 
 No clock is read in flight. Each simulation step advances `1/T` seconds of game time, with
