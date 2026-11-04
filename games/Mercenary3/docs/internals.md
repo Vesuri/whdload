@@ -72,8 +72,8 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 `whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the startup control), reads options through `resload_Control` and keeps
-the shipped patch list. The release exposes **Enhanced framerate**, default On
-(`Custom5=1`), which selects all feature bits below. Off (`Custom5=0`) keeps the
+the shipped patch list. The release exposes **Enhanced framerate**, On with
+`Custom5=1`, which selects all feature bits below. Off (`Custom5=0`) keeps the
 original game's behaviour: it clears them except the fixes for shipped-slave defects,
 bit 0 (`_dmaon`) and bit 15 (R5); release builds ignore `Custom1`. The VERIFY build accepts `Custom1` as the individual
 feature mask with `Custom5=0`. Historical measurements below name those feature bits. It asks for an optional 288 KB of expansion memory (`ws_ExpMem`):
@@ -1996,7 +1996,7 @@ Evidence: `tmp/r4/`.
 ### X1: release
 
 The single player control is the **Enhanced framerate** checkbox, enabled by
-CUSTOM5=1 in the installed icon. Omission or zero leaves it unchecked. `Custom5=1` now selects feature bits 0–18 (F3); `Custom5=0` turns them all off. The release
+CUSTOM5=1. Omission or zero leaves it unchecked; the 2.0b archive keeps the original icon, so it starts unchecked. `Custom5=1` now selects feature bits 0–18 (F3); `Custom5=0` turns them all off. The release
 ignores legacy Custom1 settings. VERIFY retains individual bits with
 `Custom5=0 Custom1=<mask>`. CPU/chipset/memory guards are unchanged. The README covers
 installation, WHDLoad 17+, 512 KB chip RAM, the optional 268 KB workspace and CACHE/PRELOAD.

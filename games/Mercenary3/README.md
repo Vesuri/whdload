@@ -1,9 +1,9 @@
 # Mercenary 3 — Enhanced framerate
 
-Version **2.0 (23.10.2026)**.
+Version **2.0b (04.11.2026)**.
 
 Performance WHDLoad slave for **Mercenary III: The Dion Crisis** (Novagen), based on
-install version 1.2. **Enhanced framerate** is enabled by default in the installed icon: rendering can run up to
+install version 1.2. **Enhanced framerate** (off unless `CUSTOM5=1`): rendering can run up to
 50 fps PAL while world simulation and game logic keep their native rates. Actual
 frame rate depends on the machine and scene.
 
@@ -30,13 +30,12 @@ Build with the shared Amiga environment described in [development](docs/developm
 make check original slave verify
 ```
 
-To build the complete template-based WHDLoad installer drawer, run `make release`.
-It writes `tmp/release-2.0/Mercenary3 Install/`, including the Amiga `ReadMe` and
-`Install` script, the release slave, imager, icons and original documentation.
-Open its Install icon on the Amiga to install from the original disk. The game icon
-gets `CACHE PRELOAD`; the installer retains source-drive and icon selection.
-Existing output is preserved; use `make release RELEASE=tmp/another-release` for a
-new build. See [release packaging](docs/development.md#release-packaging).
+To build the release archive, run `make dist`. It writes `dist/Mercenary3-2.0b.lha`:
+the original WHDLoad installer archive with only the slave and the `ReadMe` replaced.
+The ReadMe is built from the WHDLoad Install Template and `release/readme-body.txt`.
+Open its Install icon on the Amiga to install from the original disk. The original
+installer gives the game icon `PRELOAD` but no `CUSTOM5`, so Enhanced framerate starts
+unchecked. See [release packaging](docs/development.md#release-packaging).
 
 To update an existing installation manually, back up the installed slave, then copy `tmp/build/Mercenary3.Slave` into a writable
 copy of the game drawer. Keep its `Disk.1` and other game files. No game data or built
@@ -48,7 +47,7 @@ Use `CACHE PRELOAD` in the game icon's tooltypes or launch from the Amiga Shell:
 WHDLoad Mercenary3.Slave CACHE PRELOAD CUSTOM5=1
 ```
 
-`CUSTOM5=1` checks the box (set by the installer); `CUSTOM5=0` or omission
+`CUSTOM5=1` checks the box; `CUSTOM5=0` or omission
 unchecks it. The release ignores
 `CUSTOM1`, including older individual-feature settings. `NOCACHE` remains available
 for cache troubleshooting; WHDLoad also supports `BRANCHCACHE` on 68060.
@@ -80,9 +79,12 @@ Developers can use `make verify` with `CUSTOM5=0 CUSTOM1=<feature mask>` for ind
 feature comparisons. The VERIFY build also contains the measurement instruments;
 use the regular slave to play. [Development](docs/development.md) describes the tools.
 
-## Version 2.0 (23.10.2026) — Vesuri
+## Version 2.0b (04.11.2026) — Vesuri
 
-- Faster rendering and smoother walking, vehicles and flight without speeding up
-  the game world.
-- Default-on **Enhanced framerate** option; Off restores original behaviour.
-- Updated installer with CACHE and PRELOAD enabled in the game icon.
+- New **Enhanced framerate** option (`CUSTOM5=1` or the splash window checkbox): faster
+  rendering, and smoother walking, vehicles, flight, doors and shots, without speeding up
+  the game world. With it, `CACHE` also enables the data cache on 68030 and later.
+- Fixed the display routine, which waited for a vertical blank every frame and left part
+  of each frame's colour update undone.
+- Fixed intermittently missing ground with caches on 68040/68060.
+- WHDLoad 17 is required.

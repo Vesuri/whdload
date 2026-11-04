@@ -9,7 +9,7 @@ are in order of value; take the first one not done whose dependencies are met. D
 
 - **One option per feature for development.** Each behaviour change has a `Custom1`
   bit in `whdload/Mercenary3.slave.asm`. VERIFY accepts these with `Custom5=0`. The
-  release exposes one **Enhanced framerate** control, default On (`Custom5=1`); Off
+  release exposes one **Enhanced framerate** control, off unless `Custom5=1`; Off
   (`Custom5=0`) keeps the original game's behaviour: the shipped code plus fixes for the
   shipped slave's defects (bits 0 and 15; user decision). It ignores individual-feature settings. Debug aids go in the `VERIFY` build.
 - **Build** with `make original slave verify` before each commit.
@@ -364,7 +364,7 @@ Hardware validation remains unavailable, outside X1.
 ## In place
 
 - Byte-exact reconstruction of the shipped slave (`make original`); the performance slave
-  with default-on **Enhanced framerate**; VERIFY retains `Custom1` bits 0–20.
+  with the **Enhanced framerate** option; VERIFY retains `Custom1` bits 0–20.
 - `route_profile.py` (instruction profile, or `MODE=counter` untraced), `fps.py`,
   `matrix.sh`, `sim_speed.py`, `state_trace.py` (per-pass state, `--compare`),
   `write_audit.py`, `bus_audit.py`, `render_profile.py`, `beam_profile.py`,
