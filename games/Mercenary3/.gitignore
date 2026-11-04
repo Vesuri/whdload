@@ -28,6 +28,9 @@ __pycache__/
 # --- Emulator / debugger run state --------------------------------------------
 /amiga/.run/
 
+# --- Release archives (they hold the original install's files) -------------
+/dist/
+
 # --- Build output ------------------------------------------------------------
 build/
 *.o

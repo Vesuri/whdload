@@ -62,7 +62,7 @@ the shipped slave byte for byte. `BUILD` overrides the output directory.
 Run the instrumented build with `SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=1' amiga/run.sh`; the
 profile and game-time tools take the same `SLAVE` and `WHD_ARGS` and record them.
 
-The release shows only **Enhanced framerate**, a boolean checkbox, enabled by the installed icon (`CUSTOM5=1`). Off
+The release shows only **Enhanced framerate**, a boolean checkbox, enabled by `CUSTOM5=1`. Off
 (`CUSTOM5=0`) keeps the original game's behaviour: it clears every feature except the
 fixes for shipped-slave defects (bits 0 and 15, `CUSTOM1=32769` in VERIFY); release builds
 ignore `CUSTOM1`. For individual
@@ -286,22 +286,24 @@ has no spare interval. No instruction recording is needed.
 
 ## Release packaging
 
-`make release` builds version 2.0 (23.10.2026) and prepares a new
-`tmp/release-2.0/Mercenary3 Install/` drawer. Override `RELEASE` with another new
-path under `tmp/`; existing output is never overwritten. `BUILD` still selects
-the slave build directory.
+Layout: `release/` holds the maintained release text (`readme-body.txt`); `dist/`
+(ignored) receives the archives. `make dist` runs the input check and all three slave
+builds, then `tools/package_release.py` writes `dist/Mercenary3-<version>.lha`.
+The version and date come from the release slave's `Version <version> (<date>)` line and
+must match the ReadMe's history entry; a VERIFY slave is refused.
 
-The builder verifies the original installer inputs and the WHDLoad Install Template's
-`Install` and `ReadMe` against `manifest/release-templates.json`, using `$WHDLOAD`.
-It adapts the template's RawDIC path to Mercenary3, retains the original manual,
-transport guide and complete solution tree, and sets CACHE/PRELOAD and CUSTOM5=1 in the game icon.
-The ReadMe uses the template's layout, warranty and contact sections, the maintained
-text in `whdload/release/readme-body.txt`, and the original 1.2 history entry.
+The archive has exactly the members of `tmp/archives/Mercenary3.lha` (verified against
+`manifest/inputs.json`). Only `Mercenary3 Install/Mercenary3.Slave` and
+`Mercenary3 Install/ReadMe` change; the original Install script, icons, imager and
+documents are copied byte for byte, so the installed icon gets the original
+`SLAVE` and `PRELOAD` tooltypes and no `CUSTOM5`. The ReadMe is the WHDLoad Install
+Template's (pinned in `manifest/release-templates.json`, read from `$WHDLOAD`) with
+`release/readme-body.txt` and the original ReadMe's version 1.2 history entry inserted at
+build time, so no template or original text is tracked. LHa for UNIX (`LHA`) packs with
+level-1 LH5 headers; the original stores generic headers, the repack UNIX ones.
 
-Template-derived files, original icons/docs/imager and built slaves remain ignored
-under `tmp/`. The package contains no game disk image. Original extracted inputs
-are left unchanged. Use the plain release slave, never VERIFY, for packaging.
-
-Validation: the package rebuilt identically, input checks and all three slave builds
-passed, and Installer 43 accepted the generated script through its initial setup
-screen. Imaging from an original floppy has not been exercised.
+The packager stages a fresh extraction under `tmp/`, tests the result with `$LHA t`,
+re-extracts it and requires the same member names, every member equal to its staged
+copy, the two replacements different from the originals and every other member
+byte-identical. This checks the package, not gameplay. Installation from an original
+floppy has not been exercised.
