@@ -1110,6 +1110,35 @@ the hardware.
 - **Harness:** `ff1_gates.py` compares state records byte for byte, so it
   needs a reference with the same layout once ExpMem changes.
 
+### Code and data placement check (2026-11-04)
+
+Question: should the game's code and CPU data be loaded into Fast, with only
+DMA data left in Chip? Measured on the production slave, 030/50 + Fast, from
+the FR1 census dumps and memory logs:
+
+- **Code is already in Fast.** The public pool is registered at priority 10
+  before `LoadSeg`, so all root and race hunks load into it. The only
+  exception is hunk 46, 456 bytes, the one Chip-flagged hunk, which the
+  blitter reads. The overlay groups total 180 KB; root plus race are 111 KB.
+- **Chip at the first draw:** 366 KB allocated. 50 KB of that is OS, and
+  315 KB (`$ced8`–`$5a1c8`) is game data loaded at run time: both banks,
+  images, sound and drawing scratch. The pool holds 219 KB of game
+  allocations.
+- **CPU Chip accesses per frame** (memlog, data accesses, scenes normal /
+  dense / grid / start / solo): custom registers 9,700–15,000 (mostly
+  `WaitBlit` polling), bank writes 4,600–5,400, supervisor stack 690–1,400,
+  low OS memory 250–470, other game data 590–690 (the drawing sources at
+  `$cd30`–`$d3e0`, the gauge strip and the composition scratch, which the
+  blitter also reads).
+
+Conclusion: the inversion already holds for everything the CPU uses heavily.
+The remaining non-drawing Chip traffic is about 1,500–2,500 accesses per
+frame, well under 1 ms of a roughly 40 ms frame. Of that, only the
+supervisor stack could move; low OS memory is fixed by Kickstart 1.3, and the
+game data is blitter data that FR already mirrors. The speed left on the table
+is the blitter and the CPU's bank drawing, which is what FR5 onward targets.
+The 020+Fast has the same pool policy but was not measured.
+
 ### FR5 — Move the stages to Fast RAM, in draw order
 
 One step per stage, each switchable. Every step moves the copy point after
@@ -1138,6 +1167,62 @@ irrelevant while driving.
 on their own. Accept each step on its correctness gates and judge performance
 at the FR5c and FR5f checkpoints against FR0's budget. This replaces the
 H-series rule of keeping each change only for a measured gain.
+
+### FR5a results (2026-11-04, done)
+
+Gate passed on correctness in the emulator; frame rates drop, as the plan
+allowed for (performance is judged at FR5c). The data is in
+`tmp/dev/manifest/fr5a-validation.json`.
+
+**Code** (`FastRender.s`, assembled only with `FF1_FAST_RENDER`; the release
+slave stays `597a74b9…`).
+
+- **Prefix.** `FF1FastRenderPrefix`, before the field wait, runs the native
+  clear `$6b050` and background `$6b950` redirected into the shadows, with
+  B8Draw's argument from `-$30(a6)`. After the wait, `FF1FastRenderPublish`
+  copies the result to Chip and returns 1, and B8Draw skips both native
+  calls. The immutable preset `FF1FastRenderStages` (1, or 0 for the empty
+  FR4 prefix) gives an equal-layout A/B arm.
+- **Row tracking.** The shadows are exact only where the prefix drew, since
+  the later native stages draw into Chip. Every prefix starts with all 645
+  rows of each bank untrusted. A redirected access to an untrusted row first
+  reads it from Chip, unless a CPU fill covers the whole row; writes mark rows
+  dirty, and the publication copies exactly the dirty rows (full 48-byte
+  rows). The blitter is idle before the first read, and nothing draws between
+  the prefix and the publication, so Chip holds what the native stages would
+  read.
+- **Guards.** In the prefix, a blit destination outside the banks (reason 6)
+  or an untracked CPU bank write (reason 7) takes the production fault exit.
+  The H10 fill uses `FF1FastRenderTargetRows`, which tracks its rows.
+
+**Checks (candidate `20f33e1c…`, empty prefix `995ce3c0…`, control
+`22e7813b…`).**
+
+| Check | Result |
+| --- | --- |
+| Probe, 040‑40 BCE, 300 draws | 0 faults; per draw 6 software blits (`$24ae0`), about 442 rows published, 361 filled whole, 81 read from Chip first |
+| 30 frames normal and grid against B8-PAL; elapsed clock | 0 error; 0.026 % |
+| Smokes: 030‑50 BCE, 040‑40 BCE, 020+Fast, A500+Fast | passed |
+| MMU: 030 with WHDLoad MMU and data cache, 040 MMU | passed |
+| Route and modal: 030‑50 BCE, 040‑40 BCE, 020+Fast | passed |
+| Controls: 040‑40 BCE, 020+Fast | passed |
+
+The 100-update states were not rerun: they differ from B8-PAL by the FR4
+pointer shift by construction, and the exact frames cover the drawing.
+
+FPS, 300 presentations, warp off, same session:
+
+| Machine | FR5a | Empty prefix | Control | Field intervals (FR5a) | Mean (FR5a / control) |
+| --- | ---: | ---: | ---: | --- | --- |
+| 030‑50 BCE | 22.554 | 24.511 | 24.551 | 236×2 + 64×3 | 44.3 / 40.7 ms |
+| 040‑40 BCE | 20.376 | 24.471 | 24.511 | 165×2 + 135×3 | 49.1 / 40.8 ms |
+
+FR5a adds about 3.6 ms per frame on the 030 and 8.3 ms on the 040, more than
+the roughly 4 ms copy the plan expected. Where the time goes is not measured
+yet. The candidates are the generic FR2 software blitter running the
+background blits (FR6 targets that), the 21 KB row copy after the wait, and
+the 3.9 KB of row reads. Before FR5b, profile the prefix and the copy
+per stage on the 040.
 
 ### FR6 — Specialized kernels for the hot blits
 
@@ -1254,7 +1339,7 @@ except for memory checks.
 Dependencies:
 
 ```
-FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a…FR5f → FR6
+FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b…FR5f → FR6
   → FR7 → FR8 → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.

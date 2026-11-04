@@ -1,8 +1,8 @@
 ; FR3 (FASTRAM_PLAN.md): Fast RAM shadows, source mirrors, copy point and
 ; publication. 68020+ fine payload, assembled only with FF1_FAST_RENDER.
-; FR4 adds the blit redirection at the native sites (see below). The prefix
-; is still empty, so the publication copy is empty, and native drawing runs
-; in Chip through the patched sites.
+; FR4 adds the blit redirection at the native sites (see below). FR5 runs
+; a prefix of the draw stages redirected into the back shadow before the
+; field wait, and publishes the rows they wrote after it (see FR5 below).
 ;
 ; Install (every driving entry, from the barrier) qualifies the CPU (030/040/
 ; 060) and the Chip layout. The first draw then makes one MEMF_FAST allocation
@@ -40,6 +40,22 @@ FR_BANK_BYTES equ 3*10320
 FR_PLANE_STRIDE equ 10320
 FR_ROW_BYTES equ 48
 FR_COPY_ROWS equ 200
+FR_ROWS equ FR_BANK_BYTES/FR_ROW_BYTES   ; 645 rows of 48 bytes per bank
+FR_ROWS_PAD equ FR_ROWS+1
+
+; FR5 stages in the prefix: 1 = FR5a (clear $6b050 and background $6b950).
+; The FULL diagnostic redirects every stage after the wait instead.
+ IFD FF1_FAST_RENDER_FULL
+FR_STAGES equ 0
+ ELSE
+FR_STAGES equ 1
+ ENDC
+
+FR5S_PREFIXES equ 4         ; prefix runs
+FR5S_PUBLISHED equ 8        ; rows copied to Chip
+FR5S_REFRESHED equ 12       ; rows read from Chip before a partial access
+FR5S_FILLED equ 16          ; rows written whole by a CPU fill
+FR5S_LONGS equ 4
 
 FF1FastRenderInstall:
  movem.l d0-d1/a0-a1/a3,-(sp)
@@ -208,20 +224,77 @@ FF1FastRenderRelease:
 
 ; B8Draw, after OwnBlitter and the H3 road preparation, before the field
 ; wait: allocate and seed on the first draw, then run the prefix stages
-; (none in FR3).
+; redirected into the back shadow. A6 is B8Draw's frame.
+;
+; FR5 row tracking. The shadows are exact only where the prefix itself drew:
+; the native stages after the copy point draw into Chip, so every other
+; shadow row may be stale. Each prefix therefore starts with every bank row
+; untrusted (0). A redirected access to an untrusted row first reads that
+; row from Chip (1, fresh), unless a CPU fill writes the whole row; a write
+; marks the row dirty (2). The publication copies exactly the dirty rows to
+; Chip. Chip holds what the native stages would see at the same point:
+; nothing draws between the prefix and the publication, and the blitter is
+; idle before the first read.
 FF1FastRenderPrefix:
  move.w ccr,-(sp)
  tst.w FF1FastRenderPending(pc)
- beq.b .done
+ beq.b .stages
  bsr.w FF1FastRenderAllocate
+.stages:
+ IFNE FR_STAGES
+ tst.w FF1FastRenderActive(pc)
+ beq.b .done
+ tst.w FF1FastRenderStages(pc)
+ beq.b .done
+ movem.l d0-d1/a0-a1,-(sp)
+ lea FF1FastRenderRows(pc),a0
+ move.w #(2*FR_ROWS_PAD)/2-1,d0
+.clear:
+ clr.w (a0)+
+ dbf d0,.clear
+ tst.b $dff002
+.blit:
+ btst #6,$dff002
+ bne.b .blit
+ bsr.w FF1FastRenderRefresh
+ bsr.w FF1FastRenderRedirectOn
+ lea FF1FastRenderTrack(pc),a0
+ move.w #1,(a0)
+ lea FF1FastRenderStageStats(pc),a0
+ addq.l #1,FR5S_PREFIXES(a0)
+ ; FR5a: the native clear and background, as B8Draw calls them.
+ jsr $6b050.l
+ move.w -$30(a6),d0
+ ext.l d0
+ move.l d0,-(sp)
+ jsr $6b950.l
+ addq.l #4,sp
+ bsr.w FF1FastRenderRedirectOff
+ lea FF1FastRenderStaged(pc),a0
+ move.w #1,(a0)
+ movem.l (sp)+,d0-d1/a0-a1
+ ENDC
 .done:
  move.w (sp)+,ccr
  rts
 
 ; B8Draw, after the field wait, before the first native stage: copy the
-; region owned by the prefix from the back shadow to the back Chip bank.
-; The FR3 prefix is empty, so nothing is copied.
+; rows the prefix wrote from the shadows to the Chip banks. Returns D0 = 1
+; when the prefix ran the FR5a stages (B8Draw then skips them), else 0.
 FF1FastRenderPublish:
+ bsr.b FRPublishWork
+ moveq #0,d0
+ tst.w FF1FastRenderStaged(pc)
+ beq.b .out
+ move.l a0,-(sp)
+ bsr.w FRPublishRows
+ lea FF1FastRenderStaged(pc),a0
+ clr.w (a0)
+ move.l (sp)+,a0
+ moveq #1,d0
+.out:
+ rts
+FRPublishWork:
  move.w ccr,-(sp)
  tst.w FF1FastRenderActive(pc)
  beq.b .done
@@ -343,7 +416,8 @@ FF1FastRenderCopyBank:
 ; The CPU writers of redirected stages (H5 bitmap, H10 clear, H11 clock, H13
 ; gauge strips, H4 demo text, the H9 fill scan) translate their pointers with
 ; FF1FastRenderTarget.
-; The FR4 prefix is empty: nothing is redirected in the candidate.
+; FR5a runs the clear and background in the prefix (FF1FastRenderPrefix);
+; every later stage still writes the hardware.
 ; FF1_FAST_RENDER_FULL is a diagnostic that redirects the whole draw and
 ; publishes the complete back bank at the end of B8Draw.
 
@@ -363,7 +437,8 @@ FR4S_SOFT equ 4             ; 16 longs: software blits per site
 FR4S_HARD equ 68            ; 16 longs: hardware blits per patched site
 FR4S_REDIRECTS equ 132
 FR4S_FAULTS equ 136
-FR4S_FAULT_REASON equ 140   ; 1 pointer, 2 blit form, 3 CPU target, 4 native fallback, 5 RastPort
+FR4S_FAULT_REASON equ 140   ; 1 pointer, 2 blit form, 3 CPU target, 4 native fallback, 5 RastPort,
+                            ; 6 prefix write outside the banks, 7 untracked prefix CPU write
 FR4S_FAULT_SITE equ 144
 FR4S_SITE_INSTALLS equ 148
 FR4S_LONGS equ 37
@@ -800,6 +875,7 @@ FRTranslate:
  move.l d1,d0               ; lowest byte
  move.l d2,d1
  addq.l #1,d1               ; highest byte
+ movem.l d0-d1,16(a3)       ; the Chip span, for FR5 tracking
  IFD FF1_FAST_RENDER_CHIPREAD
  movem.l d0-d1,-(sp)
  bsr.w FRSpan
@@ -821,6 +897,11 @@ FRTranslate:
  btst d1,d2
  beq.w .miss
 .store:
+ tst.w FF1FastRenderTrack(pc)
+ beq.b .stored
+ bsr.w FRTrackChannel
+ bne.w .outside
+.stored:
  move.w (a1,d3.w*4),d1
  add.l d0,(a0,d1.w)
  move.l d0,(a3,d3.w*4)
@@ -832,6 +913,9 @@ FRTranslate:
  rts
 .miss:
  moveq #1,d0
+ rts
+.outside:
+ moveq #6,d0
  rts
 .line:
  ; C and D start at the first pixel; APT is the error term. Over V pixels
@@ -895,6 +979,7 @@ FRTranslate:
  move.l d1,d0
  add.l d2,d0
  add.l d5,d1
+ movem.l d0-d1,16(a3)
  IFD FF1_FAST_RENDER_CHIPREAD
  movem.l d0-d1,-(sp)
  bsr.w FRSpan
@@ -913,6 +998,11 @@ FRTranslate:
  move.l #FR_WRITABLE,d4
  btst d1,d4
  beq.w .miss
+ tst.w FF1FastRenderTrack(pc)
+ beq.b .ltracked
+ bsr.w FRTrackChannel
+ bne.w .outside
+.ltracked:
  move.w (a1,d3.w*4),d1
  add.l d0,(a0,d1.w)
  move.l d0,(a3,d3.w*4)
@@ -963,6 +1053,132 @@ FRLogChipRead:
  movem.l (sp)+,d0-d3/a2
  rts
  ENDC
+
+; FR5 tracking of one translated channel. D1 = mirror index, D3 = channel
+; (3 = D), 16(A3)/20(A3) = Chip span. Bank spans are tracked. A destination
+; outside the banks returns NZ: the native stages after the copy point
+; would read that range in Chip. Registers preserved.
+FRTrackChannel:
+ cmpi.l #2,d1
+ bhs.b .other
+ movem.l d0-d3,-(sp)
+ move.l d1,d2
+ cmpi.w #3,d3
+ seq d3
+ andi.l #1,d3               ; 1 = write
+ movem.l 16(a3),d0-d1
+ bsr.b FRTrackSpan
+ movem.l (sp)+,d0-d3
+ cmp.w d0,d0                ; Z: tracked
+ rts
+.other:
+ cmpi.w #3,d3
+ beq.b .write
+ cmp.w d0,d0
+ rts
+.write:
+ tst.w d3                   ; NZ
+ rts
+
+; D0 = lowest Chip byte, D1 = highest Chip byte + 1, both in bank D2 (0/1).
+; D3 = 0 read, 1 write, 2 a fill that writes every byte of the span.
+; Untrusted rows are first read from Chip, except rows a fill covers
+; whole; written rows become dirty. Registers preserved.
+FRTrackSpan:
+ movem.l d0-d7/a0-a2,-(sp)
+ lea FF1FastRenderMirrors(pc),a0
+ move.l (a0,d2.w*8),d4      ; Chip bank
+ lea FF1FastRenderDelta(pc),a0
+ move.l (a0,d2.w*4),d7      ; Fast - Chip
+ lea FF1FastRenderRows(pc),a2
+ mulu.w #FR_ROWS_PAD,d2
+ adda.l d2,a2
+ sub.l d4,d0
+ sub.l d4,d1
+ cmp.l d0,d1
+ bls.w .fault
+ cmpi.l #FR_BANK_BYTES,d1
+ bhi.w .fault
+ move.l d0,d5
+ divu.l #FR_ROW_BYTES,d5    ; first row
+ move.l d1,d6
+ subq.l #1,d6
+ divu.l #FR_ROW_BYTES,d6    ; last row
+.row:
+ move.l d5,d2
+ mulu.w #FR_ROW_BYTES,d2    ; row offset
+ cmpi.w #2,d3
+ bne.b .touch
+ cmp.l d2,d0
+ bhi.b .touch
+ move.l d2,a0
+ lea FR_ROW_BYTES(a0),a0
+ cmpa.l d1,a0
+ bhi.b .touch
+ move.b #2,(a2,d5.l)
+ lea FF1FastRenderStageStats(pc),a0
+ addq.l #1,FR5S_FILLED(a0)
+ bra.b .next
+.touch:
+ tst.b (a2,d5.l)
+ bne.b .fresh
+ move.l d4,a0
+ adda.l d2,a0               ; Chip row
+ lea (a0,d7.l),a1           ; its shadow row
+ rept FR_ROW_BYTES/4
+ move.l (a0)+,(a1)+
+ endr
+ move.b #1,(a2,d5.l)
+ lea FF1FastRenderStageStats(pc),a0
+ addq.l #1,FR5S_REFRESHED(a0)
+.fresh:
+ tst.w d3
+ beq.b .next
+ move.b #2,(a2,d5.l)
+.next:
+ addq.l #1,d5
+ cmp.l d6,d5
+ bls.b .row
+ movem.l (sp)+,d0-d7/a0-a2
+ rts
+.fault:
+ moveq #1,d0
+ bra.w FF1FastRenderFault
+
+; Publication: copy every dirty row of both banks from its shadow to Chip.
+FRPublishRows:
+ movem.l d0-d3/a0-a3,-(sp)
+ lea FF1FastRenderStageStats(pc),a3
+ moveq #0,d3                ; bank
+.bank:
+ lea FF1FastRenderMirrors(pc),a0
+ move.l (a0,d3.w*8),a0      ; Chip bank
+ lea FF1FastRenderDelta(pc),a1
+ move.l (a1,d3.w*4),d1
+ lea FF1FastRenderRows(pc),a2
+ move.w d3,d0
+ mulu.w #FR_ROWS_PAD,d0
+ adda.l d0,a2
+ move.w #FR_ROWS-1,d2
+.row:
+ cmpi.b #2,(a2)+
+ bne.b .skip
+ lea (a0,d1.l),a1
+ rept FR_ROW_BYTES/4
+ move.l (a1)+,(a0)+
+ endr
+ addq.l #1,FR5S_PUBLISHED(a3)
+ dbf d2,.row
+ bra.b .done
+.skip:
+ lea FR_ROW_BYTES(a0),a0
+ dbf d2,.row
+.done:
+ addq.w #1,d3
+ cmpi.w #2,d3
+ blo.b .bank
+ movem.l (sp)+,d0-d3/a0-a3
+ rts
 
 ; Image pointers back to Chip addresses after the blit.
 FRUntranslate:
@@ -1050,11 +1266,55 @@ FF1FastRenderTarget:
  move.l #FR_WRITABLE,d1
  btst d0,d1
  beq.b .fault
+ ; A prefix stage's CPU writes must be tracked: only the fill below is.
+ tst.w FF1FastRenderTrack(pc)
+ bne.b .untracked
  movem.l (sp)+,d0-d1
  move.w (sp)+,ccr
  rts
 .fault:
  moveq #3,d0
+ bra.w FF1FastRenderFault
+.untracked:
+ moveq #7,d0
+ bra.w FF1FastRenderFault
+
+; A0 = Chip address of a CPU fill of D7.w whole 48-byte rows (H10). As
+; FF1FastRenderTarget, and in a prefix stage the rows become dirty.
+FF1FastRenderTargetRows:
+ move.w ccr,-(sp)
+ tst.w FF1FastRenderRedirect(pc)
+ bne.b .map
+ move.w (sp)+,ccr
+ rts
+.map:
+ movem.l d0-d3,-(sp)
+ move.l a0,d2
+ bsr.w FRLookup
+ bmi.b .fault
+ move.l #FR_WRITABLE,d1
+ btst d0,d1
+ beq.b .fault
+ tst.w FF1FastRenderTrack(pc)
+ beq.b .out
+ cmpi.l #2,d0
+ bhs.b .outside
+ exg d0,d2                  ; D0 = Chip start, D2 = bank
+ moveq #0,d1
+ move.w d7,d1
+ mulu.w #FR_ROW_BYTES,d1
+ add.l d0,d1
+ moveq #2,d3
+ bsr.w FRTrackSpan
+.out:
+ movem.l (sp)+,d0-d3
+ move.w (sp)+,ccr
+ rts
+.fault:
+ moveq #3,d0
+ bra.w FF1FastRenderFault
+.outside:
+ moveq #6,d0
  bra.w FF1FastRenderFault
 
 ; A native fallback that would draw into Chip while redirected.
@@ -1168,6 +1428,8 @@ FF1FastRenderRedirectOff:
  move.l #$dff000,(a0)
  lea FF1FastRenderRedirect(pc),a0
  clr.w (a0)
+ lea FF1FastRenderTrack(pc),a0
+ clr.w (a0)
  move.l (sp)+,a0
  rts
 
@@ -1225,6 +1487,8 @@ FF1FastRenderFinish:
 
 ; Immutable equal-layout A/B preset, outside the lifecycle zero ranges.
 FF1FastRenderControl: dc.w 1
+; Immutable preset: 1 = run the FR5 prefix stages, 0 = empty prefix (FR4).
+FF1FastRenderStages: dc.w 1
  even
 ; Expected bank table at $66c92: plane pointers of bank 0 and bank 1.
 FF1FastRenderBanks:
@@ -1245,6 +1509,9 @@ FF1FastRenderStats:
 FF1FastRenderSiteStats:
  dc.l 'FR4S'
  dcb.l FR4S_LONGS,0
+FF1FastRenderStageStats:
+ dc.l 'FR5S'
+ dcb.l FR5S_LONGS,0
  IFD FF1_FAST_RENDER_CHIPREAD
 FR_CHIPREAD_ENTRIES equ 512
 ; 'FR4C', spans read in place, entries, entries x (low, high), unlogged.
@@ -1264,5 +1531,8 @@ FF1FastRenderPending: dc.w 0
 FF1FastRenderDelta: ds.l FR_MIRRORS
 FF1FastRenderRedirect: dc.w 0
 FF1FastRenderSite: dc.w 0
-FF1FastRenderXDelta: ds.l 4
+FF1FastRenderXDelta: ds.l 6         ; channel deltas A-D, then the Chip span
+FF1FastRenderTrack: dc.w 0
+FF1FastRenderStaged: dc.w 0
+FF1FastRenderRows: ds.b 2*FR_ROWS_PAD
 FF1FastRenderImage: ds.b $3c         ; FRB_IMAGE: registers $040-$075 and B state

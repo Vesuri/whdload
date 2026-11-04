@@ -43,7 +43,7 @@ FF1RenderClearBottom:
 .fill:
  IFD FF1_FAST_RENDER
  exg a0,a1
- bsr.l FF1FastRenderTarget
+ bsr.l FF1FastRenderTargetRows
  exg a0,a1
  ENDC
  bsr.b FF1RenderClearRows
@@ -70,7 +70,7 @@ FF1RenderClearTop:
 .fill:
  IFD FF1_FAST_RENDER
  exg a0,a1
- bsr.l FF1FastRenderTarget
+ bsr.l FF1FastRenderTargetRows
  exg a0,a1
  ENDC
  bsr.b FF1RenderClearRows

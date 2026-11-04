@@ -247,6 +247,8 @@ B8_65732:
 B8_65734:
  IFD FF1_FAST_RENDER
  bsr.l FF1FastRenderPublish
+ tst.w d0                    ; FR5a: the prefix drew the clear and background
+ bne.w B8_6574a
  ENDC
  jsr $6b050.l
 B8_6573a:
