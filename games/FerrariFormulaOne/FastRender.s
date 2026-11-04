@@ -43,8 +43,9 @@ FR_COPY_ROWS equ 200
 FR_ROWS equ FR_BANK_BYTES/FR_ROW_BYTES   ; 645 rows of 48 bytes per bank
 FR_ROWS_PAD equ FR_ROWS+1
 
-; FR5 stages in the prefix: 1 = FR5a (clear $6b050 and background $6b950).
-; The FULL diagnostic redirects every stage after the wait instead.
+; FR5 stages in the prefix, in draw order: 1 = FR5a (clear $6b050 and
+; background $6b950), 2 = FR5b (road $6b368). FF1FastRenderStages selects how
+; many run. The FULL diagnostic redirects every stage after the wait instead.
  IFD FF1_FAST_RENDER_FULL
 FR_STAGES equ 0
  ELSE
@@ -269,18 +270,66 @@ FF1FastRenderPrefix:
  move.l d0,-(sp)
  jsr $6b950.l
  addq.l #4,sp
+ move.w FF1FastRenderStages(pc),d0
+ cmpi.w #2,d0
+ blo.b .staged
+ bsr.w FRPrefixRoad
+.staged:
  bsr.w FF1FastRenderRedirectOff
  lea FF1FastRenderStaged(pc),a0
- move.w #1,(a0)
+ move.w FF1FastRenderStages(pc),(a0)
  movem.l (sp)+,d0-d1/a0-a1
  ENDC
 .done:
  move.w (sp)+,ccr
  rts
 
+; FR5b: the road, as B8Draw calls it after the background. The angle is
+; B8Draw's -$2c(a6), computed here as B8Draw computes it before the road.
+; The road leaves D4-D7/A2-A5 changed (it saves nothing), and B8Draw runs on
+; with whatever the road left; FF1FastRenderRoadExit restores them at the
+; point where B8Draw skips the road. Called inside the redirected prefix.
+FRPrefixRoad:
+ movem.l d0-d7/a0-a6,-(sp)
+ move.w $6a67a,d0
+ add.w $66f96,d0
+ andi.w #$3ff,d0
+ cmpi.w #$100,d0
+ ble.b .angle
+ cmpi.w #$300,d0
+ bge.b .angle
+ subi.w #$200,d0
+.angle:
+ move.w d0,-$2c(a6)
+ ext.l d0
+ move.l d0,-(sp)
+ IFD FF1_C4_ROAD_PREFETCH
+ bsr.l FF1C4DrawPreparedRoad
+ ELSE
+ IFD FF1_FINE_ROAD_PREFETCH
+ bsr.l FF1RenderDrawPreparedRoad
+ ELSE
+ jsr $6b368.l
+ ENDC
+ ENDC
+ addq.l #4,sp
+ movem.l d0-d7/a0-a5,-(sp)
+ lea FF1FastRenderRoadRegs(pc),a0
+ moveq #14-1,d0
+.save:
+ move.l (sp)+,(a0)+
+ dbf d0,.save
+ movem.l (sp)+,d0-d7/a0-a6
+ rts
+
+; B8Draw, where it skips the road: D0-D7/A0-A5 as the road left them.
+FF1FastRenderRoadExit:
+ movem.l FF1FastRenderRoadRegs(pc),d0-d7/a0-a5
+ rts
+
 ; B8Draw, after the field wait, before the first native stage: copy the
-; rows the prefix wrote from the shadows to the Chip banks. Returns D0 = 1
-; when the prefix ran the FR5a stages (B8Draw then skips them), else 0.
+; rows the prefix wrote from the shadows to the Chip banks. Returns D0 = the
+; number of FR5 stages the prefix ran (B8Draw then skips them), else 0.
 FF1FastRenderPublish:
  bsr.b FRPublishWork
  moveq #0,d0
@@ -289,9 +338,9 @@ FF1FastRenderPublish:
  move.l a0,-(sp)
  bsr.w FRPublishRows
  lea FF1FastRenderStaged(pc),a0
+ move.w (a0),d0
  clr.w (a0)
  move.l (sp)+,a0
- moveq #1,d0
 .out:
  rts
 FRPublishWork:
@@ -416,8 +465,8 @@ FF1FastRenderCopyBank:
 ; The CPU writers of redirected stages (H5 bitmap, H10 clear, H11 clock, H13
 ; gauge strips, H4 demo text, the H9 fill scan) translate their pointers with
 ; FF1FastRenderTarget.
-; FR5a runs the clear and background in the prefix (FF1FastRenderPrefix);
-; every later stage still writes the hardware.
+; FR5a runs the clear and background in the prefix (FF1FastRenderPrefix),
+; FR5b the road; every later stage still writes the hardware.
 ; FF1_FAST_RENDER_FULL is a diagnostic that redirects the whole draw and
 ; publishes the complete back bank at the end of B8Draw.
 
@@ -919,14 +968,55 @@ FRTranslate:
  rts
 .line:
  ; C and D start at the first pixel; APT is the error term. Over V pixels
- ; the line moves at most V - 1 rows and V - 1 pixels, in the directions
- ; of the octant bits: Y by SUD ? SUL : AUL, X by SUD ? AUL : SUL.
- move.w FRB_CMOD(a0),d0
+ ; the major axis moves V - 1 steps and the minor axis k, in the directions
+ ; of the octant bits: Y by SUD ? SUL : AUL, X by SUD ? AUL : SUL. As in
+ ; FRBLine, a minor step happens at each of the first V - 1 pixels whose
+ ; error e (APTL) is not negative; e then adds AMOD, else BMOD. With
+ ; AMOD <= 0 <= BMOD and AMOD <= e0 < BMOD, e stays in [AMOD, BMOD), so
+ ; k = floor((e0 + (V - 1) BMOD - AMOD) / (BMOD - AMOD)). Any other form
+ ; takes the bound k = V - 1 (FR5 tracks the rows the span covers).
+ move.l d4,d5
+ subq.l #1,d5               ; n = V - 1, and the bound for k
+ btst #11,d7
+ beq.b .kdone
+ move.w FRB_AMOD(a0),d0
  andi.w #$fffe,d0
  ext.l d0
+ move.w FRB_BMOD(a0),d1
+ andi.w #$fffe,d1
+ ext.l d1
+ move.w FRB_APT+2(a0),d2
+ ext.l d2
+ tst.l d0
+ bgt.b .kdone
+ tst.l d1
+ bmi.b .kdone
+ cmp.l d0,d2
+ blt.b .kdone
+ cmp.l d1,d2
+ bge.b .kdone
+ move.l d1,d3
+ sub.l d0,d3                ; BMOD - AMOD > 0
+ muls.l d5,d1
+ add.l d2,d1
+ sub.l d0,d1
+ divu.l d3,d1
+ move.l d1,d5               ; k
+.kdone:
  move.l d4,d1
- subq.l #1,d1
- muls.l d1,d0               ; Y travel in bytes
+ subq.l #1,d1               ; X pixels: V - 1 ...
+ move.l d1,d0               ; Y rows: V - 1 ...
+ btst #4,d6
+ beq.b .ymajor
+ move.l d5,d0               ; ... or k for an X-major line (SUD)
+ bra.b .travel
+.ymajor:
+ move.l d5,d1               ; ... or k for a Y-major line
+.travel:
+ move.w FRB_CMOD(a0),d2
+ andi.w #$fffe,d2
+ ext.l d2
+ muls.l d2,d0               ; Y travel in bytes
  btst #4,d6
  beq.b .yaul
  btst #3,d6
@@ -937,7 +1027,6 @@ FRTranslate:
  beq.b .ydone
  neg.l d0
 .ydone:
- move.l d4,d1
  addi.l #15,d1
  lsr.l #4,d1
  add.l d1,d1                ; X travel in bytes, rounded up to a word
@@ -1279,6 +1368,44 @@ FF1FastRenderTarget:
  moveq #7,d0
  bra.w FF1FastRenderFault
 
+; A0 = Chip address a CPU reader of a redirected stage is about to read
+; (the H9 fill scan), D0 = lowest Chip byte read, D1 = highest + 1. As
+; FF1FastRenderTarget, and in a prefix stage untrusted rows of the span are
+; first read from Chip.
+FF1FastRenderTargetScan:
+ move.w ccr,-(sp)
+ tst.w FF1FastRenderRedirect(pc)
+ bne.b .map
+ move.w (sp)+,ccr
+ rts
+.map:
+ movem.l d0-d3,-(sp)
+ move.l d0,d2
+ move.l d1,d3
+ bsr.w FRLookup
+ bmi.b .fault
+ move.l #FR_WRITABLE,d1
+ btst d0,d1
+ beq.b .fault
+ tst.w FF1FastRenderTrack(pc)
+ beq.b .out
+ cmpi.l #2,d0
+ bhs.b .untracked
+ exg d0,d2                  ; D0 = lowest byte, D2 = bank
+ move.l d3,d1
+ moveq #0,d3                ; read
+ bsr.w FRTrackSpan
+.out:
+ movem.l (sp)+,d0-d3
+ move.w (sp)+,ccr
+ rts
+.fault:
+ moveq #3,d0
+ bra.w FF1FastRenderFault
+.untracked:
+ moveq #7,d0
+ bra.w FF1FastRenderFault
+
 ; A0 = Chip address of a CPU fill of D7.w whole 48-byte rows (H10). As
 ; FF1FastRenderTarget, and in a prefix stage the rows become dirty.
 FF1FastRenderTargetRows:
@@ -1487,8 +1614,9 @@ FF1FastRenderFinish:
 
 ; Immutable equal-layout A/B preset, outside the lifecycle zero ranges.
 FF1FastRenderControl: dc.w 1
-; Immutable preset: 1 = run the FR5 prefix stages, 0 = empty prefix (FR4).
-FF1FastRenderStages: dc.w 1
+; Immutable preset: the number of FR5 prefix stages to run (2 = FR5b, 1 =
+; FR5a only, 0 = empty prefix, the FR4 arm).
+FF1FastRenderStages: dc.w 2
  even
 ; Expected bank table at $66c92: plane pointers of bank 0 and bank 1.
 FF1FastRenderBanks:
@@ -1535,4 +1663,6 @@ FF1FastRenderXDelta: ds.l 6         ; channel deltas A-D, then the Chip span
 FF1FastRenderTrack: dc.w 0
 FF1FastRenderStaged: dc.w 0
 FF1FastRenderRows: ds.b 2*FR_ROWS_PAD
+ even
+FF1FastRenderRoadRegs: ds.l 14       ; D0-D7/A0-A5 after the prefix road
 FF1FastRenderImage: ds.b $3c         ; FRB_IMAGE: registers $040-$075 and B state

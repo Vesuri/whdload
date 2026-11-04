@@ -247,8 +247,9 @@ B8_65732:
 B8_65734:
  IFD FF1_FAST_RENDER
  bsr.l FF1FastRenderPublish
- tst.w d0                    ; FR5a: the prefix drew the clear and background
- bne.w B8_6574a
+ cmpi.w #1,d0                ; FR5a: the prefix drew the clear and background
+ beq.w B8_6574a
+ bhi.w FR_B8AfterRoad        ; FR5b: and the road
  ENDC
  jsr $6b050.l
 B8_6573a:
@@ -308,6 +309,14 @@ B8_6578a:
  ENDC
 B8_65790:
  addq.l #$4,a7
+ IFD FF1_FAST_RENDER
+ bra.b B8_65792
+FR_B8AfterRoad:
+ IFD FF1_FINE_TEXT
+ bsr.l FF1RenderPrepareClock ; CPU-only workspace; native order otherwise
+ ENDC
+ bsr.l FF1FastRenderRoadExit ; the registers the road left
+ ENDC
 B8_65792:
  tst.w $66c7c.l
 B8_65798:

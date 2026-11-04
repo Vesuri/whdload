@@ -43,8 +43,17 @@ FF1RenderFill:
 .plane:
  move.l (a5)+,a2
  IFD FF1_FAST_RENDER
+ ; The scan reads rows 200 - (extent) to 199 of the plane; FR5b tracks them.
+ move.l a2,d1
+ addi.l #9600,d1
+ moveq #0,d0
+ move.w $66c8c,d0
+ addi.w #100,d0
+ mulu.w #48,d0
+ neg.l d0
+ add.l d1,d0
  move.l a2,a0
- bsr.l FF1FastRenderTarget
+ bsr.l FF1FastRenderTargetScan
  move.l a0,d4
  sub.l a2,d4
  ENDC

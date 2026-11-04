@@ -1224,6 +1224,69 @@ background blits (FR6 targets that), the 21 KB row copy after the wait, and
 the 3.9 KB of row reads. Before FR5b, profile the prefix and the copy
 per stage on the 040.
 
+### FR5b results (2026-11-04, done)
+
+Gate passed on correctness in the emulator. Frame rates drop sharply, far
+beyond FR5a; the plan judges performance at FR5c, but the road's software
+blits make that checkpoint meaningless without kernels (see below). The data
+is in `tmp/dev/manifest/fr5b-validation.json`.
+
+**Code** (`FastRender.s`, `RenderFill.s`, `FerrariFormulaOne_FullPresentation.s`;
+assembled only with `FF1_FAST_RENDER`; the release slave stays `597a74b9…`).
+
+- **Prefix.** After the clear and background, `FRPrefixRoad` computes
+  B8Draw's road angle `-$2c(a6)` as B8Draw does and calls the road through
+  the H3 prepared entry (`FF1RenderDrawPreparedRoad`, or `$6b368`). The
+  publication returns the number of staged FR5 stages; at 2 B8Draw skips the
+  clear, background and road, runs the H11 clock preparation (CPU workspace
+  only) and continues at `$66c7c`.
+- **Road registers.** The road saves nothing and leaves D4–D7/A2–A5 changed;
+  B8Draw runs on with them. The prefix records D0–D7/A0–A5 after the road and
+  `FF1FastRenderRoadExit` restores them where B8Draw skips it.
+- **`$6bf90` stays native.** It is a CPU sort of the car lists
+  (`$6a5da`/`$6a63a`/`$6a5aa`) and draws nothing.
+- **Fill scan.** The H9 scan reads rows 200 − extent … 199 of both road
+  planes with the CPU; `FF1FastRenderTargetScan` tracks them as reads, so
+  untrusted rows are first read from Chip.
+- **Line spans.** FR4's line span assumed V − 1 steps on both axes; a
+  384-pixel near-horizontal road line then reached past the bank and faulted
+  (reason 1). `FRTranslate` now counts the minor-axis steps exactly from the
+  error term as FRBLine steps it: with AMOD ≤ 0 ≤ BMOD and
+  AMOD ≤ e0 < BMOD, k = ⌊(e0 + (V − 1)·BMOD − AMOD) / (BMOD − AMOD)⌋;
+  any other form keeps the V − 1 bound.
+- **Preset.** `FF1FastRenderStages` is now the stage count (2; 1 = the FR5a
+  arm, 0 = the empty prefix).
+
+**Checks (candidate `8073eb93…`, FR5a arm `c20a256b…`, empty prefix
+`1eacee25…`, control `07b170ec…`).**
+
+| Check | Result |
+| --- | --- |
+| Probe, 040‑40 BCE, 300 draws | 0 faults; per draw about 103 + 22 software road lines, 13 fills and 6 `$24ae0` blits; 443 rows published, 361 filled whole, 82 read from Chip first |
+| 30 frames normal and grid against B8-PAL; elapsed clock | 0 error; 0.141 % |
+| Smokes: 030‑50 BCE, 040‑40 BCE, 020+Fast, A500+Fast | passed |
+| MMU: 030 with WHDLoad MMU and data cache, 040 MMU | passed |
+| Route and modal: 030‑50 BCE, 040‑40 BCE, 020+Fast | passed |
+| Controls: 040‑40 BCE, 020+Fast | passed |
+
+The published rows barely change (443 against 442): the road draws inside
+rows the clear already wrote, so the copy is not where the time goes.
+
+FPS, 300 presentations, warp off, same session:
+
+| Machine | FR5b | FR5a arm | Control | Field intervals (FR5b) | Mean (FR5b / FR5a / control) |
+| --- | ---: | ---: | ---: | --- | --- |
+| 030‑50 BCE | 14.654 | 22.419 | 24.551 | 2×1 + 13×2 + 146×3 + 139×4 | 68.2 / 44.6 / 40.7 ms |
+| 040‑40 BCE | 8.587 | 20.376 | 24.511 | 68×5 + 220×6 + 12×7 | 116.5 / 49.1 / 40.8 ms |
+
+The road costs about 24 ms on the 030 and 67 ms on the 040 in the generic
+FR2 software blitter, against the blitter's 10.2 ms (§1); its line mode
+steps one pixel at a time through frame variables (not yet profiled). The 040 is slower than the 030 at it, which also needs explaining
+(emulator cost model or the 040's handling of this loop). Before FR5c, write
+the FR6 line and fill kernels (or profile the 040 first): the FR5c
+checkpoint can only judge the design once the road no longer runs through
+the generic blitter.
+
 ### FR6 — Specialized kernels for the hot blits
 
 After FR5, profile the 040 with the measurement emulator and replace the
@@ -1339,7 +1402,7 @@ except for memory checks.
 Dependencies:
 
 ```
-FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b…FR5f → FR6
+FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b (done 2026-11-04) → FR5c…FR5f → FR6
   → FR7 → FR8 → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.
