@@ -63,18 +63,19 @@ automatically. The final archive, checksum, report and small build log remain.
 
 ## Scratch retention
 
-Raw traces, memory dumps and save states are pruned once their reports are
-written, including those behind current `tmp/fast60/corrected` and
-`tmp/release60` evidence. Reports, scripts, listings, built slaves and
-measurement summaries remain available; re-running a checker that reads a
-pruned `trace.bin`, `chip.bin` or `code.bin` requires a fresh capture. Installed
-game files and build references are retained. Local deletion inventories are
-`tmp/cleanup-manifest.json`, `tmp/cleanup-obsolete-dumps.json` and
-`tmp/cleanup-raw-dumps.json`.
+Raw traces, memory dumps, save states and the assembler listings copied beside
+captures are pruned once their reports are written, including those behind
+current `tmp/fast60/corrected` and `tmp/release60` evidence. Reports, scripts,
+built slaves and measurement summaries remain available. Re-running a checker
+that reads a pruned `trace.bin`, `chip.bin`, `code.bin` or `.lst` requires a fresh
+build and capture. Installed game files and build references are retained.
+Local deletion inventories are `tmp/cleanup-manifest.json`,
+`tmp/cleanup-obsolete-dumps.json`, `tmp/cleanup-raw-dumps.json` and
+`tmp/cleanup-listings.json`.
 
-Keep a raw trace only while its finding is still being analysed. Once its
-report is written, keep the report and reproduction settings and delete the
-trace and dumps.
+Keep a raw trace or capture listing only while its finding is still being
+analysed. Once its report is written, keep the report and reproduction settings
+and delete the trace, dumps and listing.
 
 ## Release playtest still required
 
