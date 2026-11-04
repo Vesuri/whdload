@@ -19,10 +19,10 @@
 
  Enhanced framerate draws extra frames between the game's own updates, so
  walking, driving and flying move more smoothly, while the game world keeps
- its original speed. It is off by default. Enable it with the Tooltype
- "Custom5=1" or with the "Enhanced framerate" checkbox in the WHDLoad splash
- window. "Custom5=0", or no Custom5 Tooltype, keeps the original behaviour;
- the fixes listed below for version 2.0b apply in both settings.
+ its original speed. It is on by default: the installed icon has the
+ Tooltype "Custom5=1". To keep the original behaviour, set "Custom5=0",
+ remove the Tooltype or uncheck "Enhanced framerate" in the WHDLoad splash
+ window; the fixes listed below for version 2.0b apply in both settings.
 
  Enhanced framerate benefits most from a 68020 or later with Fast RAM and
  the Tooltype "Cache". Rendering can reach 50 frames per second PAL on
@@ -40,8 +40,8 @@
  History:
  --------
  version 2.0b (04.11.2026) done by Vesuri:
- - new option Enhanced framerate (Custom5=1 or the splash window checkbox):
-   faster rendering, and smoother walking, vehicles, flight, doors and shots,
+ - new option Enhanced framerate, enabled in the installed icon: faster
+   rendering, and smoother walking, vehicles, flight, doors and shots,
    without speeding up the game world; with it, the Tooltype Cache also
    enables the data cache on 68030 and later
  - fixed the display routine, which waited for a vertical blank every frame

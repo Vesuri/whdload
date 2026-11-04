@@ -3,7 +3,7 @@
 Version **2.0b (04.11.2026)**.
 
 Performance WHDLoad slave for **Mercenary III: The Dion Crisis** (Novagen), based on
-install version 1.2. **Enhanced framerate** (off unless `CUSTOM5=1`): rendering can run up to
+install version 1.2. **Enhanced framerate** is enabled by default in the installed icon (`CUSTOM5=1`): rendering can run up to
 50 fps PAL while world simulation and game logic keep their native rates. Actual
 frame rate depends on the machine and scene.
 
@@ -31,11 +31,11 @@ make check original slave verify
 ```
 
 To build the release archive, run `make dist`. It writes `dist/Mercenary3-2.0b.lha`:
-the original WHDLoad installer archive with only the slave and the `ReadMe` replaced.
+the original WHDLoad installer archive with the slave and the `ReadMe` replaced and
+`CUSTOM5=1` added to the two game icons (`Mercenary3.inf`, `Mercenary3.romicon`).
 The ReadMe is built from the WHDLoad Install Template and `release/readme-body.txt`.
 Open its Install icon on the Amiga to install from the original disk. The original
-installer gives the game icon `PRELOAD` but no `CUSTOM5`, so Enhanced framerate starts
-unchecked. See [release packaging](docs/development.md#release-packaging).
+installer then adds `PRELOAD` to the chosen game icon, so Enhanced framerate starts checked. See [release packaging](docs/development.md#release-packaging).
 
 To update an existing installation manually, back up the installed slave, then copy `tmp/build/Mercenary3.Slave` into a writable
 copy of the game drawer. Keep its `Disk.1` and other game files. No game data or built
@@ -81,7 +81,7 @@ use the regular slave to play. [Development](docs/development.md) describes the 
 
 ## Version 2.0b (04.11.2026) — Vesuri
 
-- New **Enhanced framerate** option (`CUSTOM5=1` or the splash window checkbox): faster
+- New **Enhanced framerate** option, enabled in the installed icon (`CUSTOM5=1`): faster
   rendering, and smoother walking, vehicles, flight, doors and shots, without speeding up
   the game world. With it, `CACHE` also enables the data cache on 68030 and later.
 - Fixed the display routine, which waited for a vertical blank every frame and left part

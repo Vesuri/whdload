@@ -3,8 +3,9 @@
     make dist
 
 Input: tmp/archives/Mercenary3.lha (pinned in manifest/inputs.json). Output:
-dist/Mercenary3-<version>.lha with exactly the same members; only
-"Mercenary3 Install/Mercenary3.Slave" and "Mercenary3 Install/ReadMe" differ.
+dist/Mercenary3-<version>.lha with exactly the same members. Only the slave, the ReadMe
+and the two game icons (Mercenary3.inf and Mercenary3.romicon, which gain the tooltype
+CUSTOM5=1 so Enhanced framerate starts checked) differ.
 The ReadMe is the WHDLoad Install Template's (pinned in manifest/release-templates.json)
 with release/readme-body.txt and the original ReadMe's version 1.2 history entry.
 LHA names LHa for UNIX; Lhasa cannot create archives.
@@ -15,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import re
+import struct
 import subprocess
 import tempfile
 
@@ -25,6 +27,7 @@ SOURCE = ROOT / 'tmp/archives/Mercenary3.lha'
 TOP = 'Mercenary3 Install'
 SLAVE = f'{TOP}/Mercenary3.Slave'
 README = f'{TOP}/ReadMe'
+ICONS = [f'{TOP}/Mercenary3.inf', f'{TOP}/Mercenary3.romicon']
 
 
 def members(archive):
@@ -34,6 +37,41 @@ def members(archive):
 
 def extract(lha, archive, into):
     subprocess.run([lha, f'xqw={into}', str(archive)], check=True)
+
+
+def enhanced_icon(original):
+    """Append CUSTOM5=1 to a game icon's tooltype array.
+
+    Locate the length-prefixed WHDLoad default tool, then walk and validate the whole
+    array; its stored size includes the terminating null pointer. Appending keeps the
+    ROMIcon colour marker first. Image data and any bytes after the array are kept.
+    """
+    assert original[:2] == b'\xe3\x10'
+    found = [i for m in (b'\x00\x00\x00\x08WHDLOAD\x00', b'\x00\x00\x00\x08WHDLoad\x00')
+             for i in [original.find(m)] if i >= 0]
+    assert len(found) == 1
+    start = found[0] + 12
+    size = struct.unpack_from('>I', original, start)[0]
+    assert size >= 4 and size % 4 == 0
+    cursor = start + 4
+    entries = []
+    for _ in range(size // 4 - 1):
+        length = struct.unpack_from('>I', original, cursor)[0]
+        cursor += 4
+        value = original[cursor:cursor + length]
+        assert length and len(value) == length and value.endswith(b'\0')
+        entries.append(value.rstrip(b'\0').upper())
+        cursor += length
+    assert b'SLAVE=MERCENARY3.SLAVE' in entries
+    assert not any(value.lstrip(b'(').startswith(b'CUSTOM5=') for value in entries)
+    entry = b'CUSTOM5=1\0'
+    addition = struct.pack('>I', len(entry)) + entry
+    updated = (original[:start] + struct.pack('>I', size + 4) + original[start + 4:cursor]
+               + addition + original[cursor:])
+    # Removing the addition must give back every original byte, artwork included.
+    assert (updated[:start] + struct.pack('>I', size) + updated[start + 4:cursor]
+            + updated[cursor + len(addition):]) == original
+    return updated
 
 
 def template_readme():
@@ -74,9 +112,9 @@ def main():
         raise ValueError(f'ReadMe entry for version {version} ({date}) is missing')
 
     names = members(SOURCE)
-    changed = {SLAVE, README}
+    changed = {SLAVE, README, *ICONS}
     if not changed <= set(names):
-        raise ValueError('Source archive lacks the slave or ReadMe')
+        raise ValueError('Source archive lacks the slave, ReadMe or game icons')
     dist = ROOT / 'dist'
     dist.mkdir(exist_ok=True)
     out = dist / f'Mercenary3-{version}.lha'
@@ -85,6 +123,8 @@ def main():
         extract(lha, SOURCE, stage)
         (stage / SLAVE).write_bytes(slave)
         (stage / README).write_bytes(readme(version, (stage / README).read_bytes()))
+        for name in ICONS:
+            (stage / name).write_bytes(enhanced_icon((stage / name).read_bytes()))
         out.unlink(missing_ok=True)
         subprocess.run([lha, 'a1o5q2', str(out), *names], cwd=stage, check=True)
 

@@ -66,11 +66,11 @@ split and the measured game-time model ([internals](internals.md)).
 - The Enhanced framerate control is a boolean checkbox (user correction).
   CUSTOM5=1 checks it; CUSTOM5=0 or omission leaves it unchecked.
 
-- 2.0b archive: exactly the original installer archive's files, with only the slave
-  and ReadMe replaced (user direction). The original icon has no CUSTOM5 and the
-  original Install script sets none, so Enhanced framerate starts unchecked.
+- 2.0b archive: exactly the original installer archive's files, with the slave and
+  ReadMe replaced (user direction) and `CUSTOM5=1` added to the two game icons so
+  Enhanced framerate is on by default (user decision). The Install script is unchanged.
 
-- X1: player-facing **Enhanced framerate** (user approval). No real
+- X1: player-facing **Enhanced framerate**, default on (user approval). No real
   hardware is available; finish X1 with emulator checks and record hardware cache
   behaviour and 040/060 speed as unverified.
 
@@ -258,8 +258,8 @@ starts, stops, reversals and the mailbox approach have been checked. Frame rates
 unchanged on the routine setups; native world speed and options-off checks pass.
 See [P4](internals.md#p4-presentation-transitions). Release 2.0b (04.11.2026) is
 `dist/Mercenary3-2.0b.lha`, made by `make dist`: the original installer archive with the
-new slave and a template-based ReadMe. The release exposes **Enhanced framerate**,
-off unless CUSTOM5=1. Off keeps the original game's behaviour, with the shipped slave's defects fixed. README includes installation, requirements,
+new slave, a template-based ReadMe and CUSTOM5=1 in the game icons. The release exposes
+**Enhanced framerate**, default On. Off keeps the original game's behaviour, with the shipped slave's defects fixed. README includes installation, requirements,
 memory fallback and options; the release was played on every supported CPU class.
 Same-session route FPS Off → On: A500 3.70 → 4.10, 020-fast 7.50 → 12.50,
 reference 030/50 8.90 → 24.80. The matrix, native world-speed and options-off checks

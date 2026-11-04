@@ -293,10 +293,12 @@ The version and date come from the release slave's `Version <version> (<date>)` 
 must match the ReadMe's history entry; a VERIFY slave is refused.
 
 The archive has exactly the members of `tmp/archives/Mercenary3.lha` (verified against
-`manifest/inputs.json`). Only `Mercenary3 Install/Mercenary3.Slave` and
-`Mercenary3 Install/ReadMe` change; the original Install script, icons, imager and
-documents are copied byte for byte, so the installed icon gets the original
-`SLAVE` and `PRELOAD` tooltypes and no `CUSTOM5`. The ReadMe is the WHDLoad Install
+`manifest/inputs.json`). `Mercenary3 Install/Mercenary3.Slave` and `Mercenary3 Install/ReadMe` are replaced, and
+the two game icons (`Mercenary3.inf`, `Mercenary3.romicon`) gain the tooltype `CUSTOM5=1`
+at the end of their tooltype arrays, after the ROMIcon colour marker and existing entries;
+the packager checks that removing it restores every original byte. The original Install
+script, other icons, imager and documents are copied byte for byte. The installer adds
+`SLAVE` and `PRELOAD` to the chosen icon and keeps `CUSTOM5=1`. The ReadMe is the WHDLoad Install
 Template's (pinned in `manifest/release-templates.json`, read from `$WHDLOAD`) with
 `release/readme-body.txt` and the original ReadMe's version 1.2 history entry inserted at
 build time, so no template or original text is tracked. LHa for UNIX (`LHA`) packs with
@@ -304,6 +306,6 @@ level-1 LH5 headers; the original stores generic headers, the repack UNIX ones.
 
 The packager stages a fresh extraction under `tmp/`, tests the result with `$LHA t`,
 re-extracts it and requires the same member names, every member equal to its staged
-copy, the two replacements different from the originals and every other member
+copy, the four changed members different from the originals and every other member
 byte-identical. This checks the package, not gameplay. Installation from an original
 floppy has not been exercised.
