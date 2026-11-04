@@ -9,7 +9,7 @@ FF1ProductionBoot:
  move.l FF1ProfileCustom2(pc),d0
  move.l FF1ProfileAttn(pc),d1
  move.l _expmem(pc),d2
- move.l #$c0000,d3
+ move.l #FF1_EXPMEM_SIZE,d3
  bsr.w FF1SelectProfile
  lea FF1ProfileMode(pc),a0
  move.l d0,(a0)

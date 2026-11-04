@@ -446,10 +446,10 @@ FF1PublicBoot:
  lea FF1PublicPool(pc),a0
  move.l _expmem(pc),a1
  adda.l #$40000,a1
- move.l #$80000,d0
+ move.l #FF1_EXPMEM_SIZE-$40000,d0
  move.l a0,-(sp)
  move.l a1,d2
- move.l #$80000,d3
+ move.l #FF1_EXPMEM_SIZE-$40000,d3
  moveq #1,d0
  moveq #2,d1
  bsr.w FF1SelectProfile
@@ -459,7 +459,7 @@ FF1PublicBoot:
  moveq #5,d1
 .attrs:
  move.l (sp)+,a0
- move.l #$80000,d0
+ move.l #FF1_EXPMEM_SIZE-$40000,d0
  bsr.w FF1PublicPoolOpen
  tst.l d0
  bne.w FF1WrongVersion

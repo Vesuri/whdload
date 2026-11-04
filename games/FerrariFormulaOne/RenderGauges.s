@@ -95,6 +95,11 @@ FF1RenderGaugeStrip:
  move.l 4(a6),a0
  move.l (a2)+,a1
  adda.w d2,a1
+ IFD FF1_FAST_RENDER
+ exg a0,a1
+ bsr.l FF1FastRenderTarget
+ exg a0,a1
+ ENDC
  moveq #0,d0
  move.w d7,d4
 .word:

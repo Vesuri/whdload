@@ -24,8 +24,11 @@ addresses and must never receive native relocation bindings.
 The Fast RAM rendering work in progress ([FASTRAM_PLAN.md](FASTRAM_PLAN.md))
 is not part of the release slave. A development build sets
 `FF1_FINE_DEFINES=FF1_FAST_RENDER=1` in the environment of `build.py`; only
-`FF1_FAST_RENDER*` defines are accepted, and only the fine payload changes.
-Without the variable the build is byte-identical to the release.
+`FF1_FAST_RENDER*` defines are accepted. They change the fine payload and
+raise the WHDLoad reservation to 1 MiB (768 KiB public pool) for the Fast
+mirrors; such builds do not start on the A500 with 1.5 MiB Slow or the
+chip-only A1200. Without the variable the build is byte-identical to the
+release.
 
 `CUSTOM2=0` (the default) selects the original loop. `CUSTOM1` retains its
 original meaning there: disable the original slave's timing repair.

@@ -30,10 +30,24 @@ FF1RenderFill:
  beq.w .native
  move.l $226ae,a5
  moveq #1,d7
+ IFD FF1_FAST_RENDER
+ ; FR4: the register base is the image while redirected, and the scan reads
+ ; the Fast bank (D4 = Fast - Chip, 0 otherwise); BLTSIZE goes through FR4.
+ move.l FF1FastRenderRegs(pc),a0
+ move.l #$03aa0012,$40(a0)
+ move.l #-1,$44(a0)
+ ELSE
  move.l #$03aa0012,$dff040
  move.l #-1,$dff044
+ ENDC
 .plane:
  move.l (a5)+,a2
+ IFD FF1_FAST_RENDER
+ move.l a2,a0
+ bsr.l FF1FastRenderTarget
+ move.l a0,d4
+ sub.l a2,d4
+ ENDC
  adda.l #9598,a2
  move.w $66c8c,d5
  addi.w #100,d5
@@ -48,7 +62,11 @@ FF1RenderFill:
  subq.w #1,d3
  moveq #0,d2
 .row:
+ IFD FF1_FAST_RENDER
+ lea 2(a3,d4.l),a4
+ ELSE
  lea 2(a3),a4
+ ENDC
  moveq #24,d0
 .scan:
  cmp.w d2,d0
@@ -73,7 +91,11 @@ FF1RenderFill:
  add.w d0,d0
  move.l a2,a3
  suba.w d0,a3
+ IFD FF1_FAST_RENDER
+ move.l FF1FastRenderRegs(pc),a0
+ ELSE
  lea $dff000,a0
+ ENDC
  move.w d0,$60(a0)
  move.w d0,$66(a0)
  move.l a3,$48(a0)
@@ -81,7 +103,12 @@ FF1RenderFill:
  move.w d6,d0
  lsl.w #6,d0
  or.w d2,d0
+ IFD FF1_FAST_RENDER
+ moveq #FRSITE_FILL,d1
+ bsr.l FF1FastRenderSize
+ ELSE
  move.w d0,$58(a0)
+ ENDC
 .advance:
  move.w d6,d0
  mulu.w #48,d0
@@ -91,8 +118,14 @@ FF1RenderFill:
  ; Wait before moving to the other plane, and before returning ownership.
  jsr $2a130
  dbra d7,.plane
+ IFD FF1_FAST_RENDER
+ move.l FF1FastRenderRegs(pc),a0
+ clr.w $60(a0)
+ clr.w $66(a0)
+ ELSE
  clr.w $dff060
  clr.w $dff066
+ ENDC
  movem.l (sp)+,d0-d7/a0-a6
  ; Match native CPU outputs and the final WaitBlit boundary.
  move.l $226ae,a1
@@ -105,6 +138,9 @@ FF1RenderFill:
  addi.w #$1918,d0
  jmp $2a130
 .native:
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderNativeGuard
+ ENDC
  movem.l (sp)+,d0-d7/a0-a6
  jmp $6abcc
 ; Immutable equal-layout A/B preset; excluded from lifecycle zero ranges.

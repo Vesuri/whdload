@@ -24,7 +24,7 @@ def host(offsets):
  (out/'lvo').mkdir(exist_ok=True)
  for lib in ['exec','dos','graphics','expansion']:
   (out/'lvo'/f'{lib}.i').write_text(f' IFND FF1_LVO_{lib}\nFF1_LVO_{lib} SET 1\n INCLUDE "lvo/{lib}_lib.i"\n ENDC\n')
- run([vasm,'-DFF1_PUBLIC_MEMORY=1','-DFF1_PUBLIC_LOADER=1','-DFF1_PUBLIC_STACK=1','-m68000','-pic','-x','-devpac','-Fhunkexe','-nosym',f'-I{out}',f'-I{P}',f'-I{G}',f'-I{whd}/Include',f'-I{whd}/Src/sources',f'-I{ndk}','-L','host.list','-o','host.slave',str(G/'FerrariFormulaOne_WHD.s')],out)
+ run([vasm,f'-DFF1_EXPMEM_SIZE={EXPMEM}','-DFF1_PUBLIC_MEMORY=1','-DFF1_PUBLIC_LOADER=1','-DFF1_PUBLIC_STACK=1','-m68000','-pic','-x','-devpac','-Fhunkexe','-nosym',f'-I{out}',f'-I{P}',f'-I{G}',f'-I{whd}/Include',f'-I{whd}/Src/sources',f'-I{ndk}','-L','host.list','-o','host.slave',str(G/'FerrariFormulaOne_WHD.s')],out)
  return symbols(out/'host.list'),(out/'host.slave').read_bytes()
 flags0=['FF1_PRODUCTION=1','FF1_PUBLIC_BINDINGS=1','FF1_PUBLIC_PATCHES=1','FF1_PUBLIC_MEMORY=1','FF1_RENDER_POSES=1']
 flagsfine=['FF1_PRESENTATION_SPLIT=1','FF1_PRESENTATION_CALLBACK=1','FF1_PLAN_B=1','FF1_PLAYER_HOOKS=1','FF1_HELPERS_020=1','FF1_NATIVE_EXACT=5','FF1_PUBLIC_LIFECYCLE=1']
@@ -33,6 +33,9 @@ flagsfine=['FF1_PRESENTATION_SPLIT=1','FF1_PRESENTATION_CALLBACK=1','FF1_PLAN_B=
 extra=[x for x in os.environ.get('FF1_FINE_DEFINES','').split(',') if x]
 assert all(x.startswith('FF1_FAST_RENDER') for x in extra),extra
 flagsfine+=extra
+# ws_ExpMem: the 256 KiB Kickstart plus guest Fast. The Fast render mirrors
+# (FASTRAM_PLAN.md FR4) need 256 KiB more guest Fast than production today.
+EXPMEM=0x100000 if extra else 0xc0000
 flags000=['FF1_COARSE_NATIVE_000=1','FF1_NATIVE_000_STAGE=3','FF1_COARSE_200=1','FF1_COARSE_200_COMPLETE=1']
 flags000 += [x+'=1' for x in ['FF1_PRODUCT_AB','FF1_DIV200_AB','FF1_NATIVEMUL200_AB','FF1_RESET200_AB','FF1_CROSS200_AB','FF1_ROOTLEAD_AB','FF1_SMALLROOT_AB','FF1_C4_BLIT_GUARD','FF1_C4_ROAD_PREFETCH','FF1_C4_ROOT_SEED','FF1_C4_MUL_INLINE','FF1_C4_DIV_LIMIT','FF1_C4_MUL_WORD','FF1_C4_HOOK_P5','FF1_C4_CONTEXT_P5','FF1_C4_BOUNDARY_P5','FF1_C4_WAIT_IDLE','FF1_C4_COLOUR_ELIDE','FF1_C4_DIV_FAST','FF1_C4_ROTATE_FAST','FF1_C4_MUL_SITES','FF1_C4_SINE_INLINE','FF1_C4_NATIVE_FRAMES','FF1_C4_WAIT_DIRECT','FF1_C4_DIV_SHORT_FRAMES']]
 def payload(kind,offset,hs):
@@ -68,7 +71,7 @@ for kind in ['000','020','fine']:
  meta[kind]={'offset':offset,'bytes':len(data),'symbols':sy,'sha256':hashlib.sha256(data).hexdigest()};parts.append(data);offset+=len(data)
  if kind=='fine':defs['FF1_FINE_SELECTION']=sy['selection_path']
 check,final=host(defs);assert len(h)==len(final) and hs==check,'Host layout must be independent of payload offsets'
-code=bytearray(final[32:-4]);struct.pack_into('>H',code,24,hs['FF1ProductionBoot']);struct.pack_into('>I',code,32,0xc0000)
+code=bytearray(final[32:-4]);struct.pack_into('>H',code,24,hs['FF1ProductionBoot']);struct.pack_into('>I',code,32,EXPMEM)
 for data in parts:code+=data
 header=bytearray(final[:32]);struct.pack_into('>I',header,20,len(code)//4);struct.pack_into('>I',header,28,len(code)//4)
 result=header+code+bytes.fromhex('000003f2');(out/'FerrariFormulaOne.slave').write_bytes(result)

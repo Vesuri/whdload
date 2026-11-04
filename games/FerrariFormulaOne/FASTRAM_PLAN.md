@@ -991,6 +991,125 @@ For the stages inside the prefix:
 **Gate:** section 4. In addition, the site table equals the FR1 census for
 the redirected stages, and every patch word restores.
 
+### FR4 results (2026-11-04, done)
+
+Gate passed in the emulator, with one memory exception below: two qualified
+small-memory setups no longer boot the Fast render builds. The data is in
+`tmp/dev/manifest/fr4-validation.json`. All results are from the emulator
+only.
+
+**Code.** All of it is in `FastRender.s` and assembled only with
+`FF1_FAST_RENDER`. The release slave stays byte-identical (`597a74b9…`).
+
+- **Sites.** The 11 redirected instructions of the FR1 census are patched
+  through the barrier's patch ledger: BLTSIZE at `$24c18`, `$24db8`, `$6ad8a`,
+  `$6adde`, `$32dfa`, `$32e6c`, `$32f02`, `$6bbec`, `$6c55c`, and the line
+  routine's BLTBDAT at `$6ad6c`/`$6adc0`. `WritePixel` (`$2a1b0`) is
+  redirected too.
+  - Each thunk repeats the instructions it displaces.
+  - No patched span contains a native branch target except at its first
+    word. The `$6adde` patch moved to `$6add6` because `$6adde` is a branch
+    target.
+- **Register base.** The three base-register routines take their base from
+  `FF1FastRenderRegs`: the custom chip, or `FF1FastRenderImage − $40` when
+  redirected. The base convention is BLTCON0 at +`$40`.
+  - The two absolute-operand routines (`$6ba18`, `$6c310`) write the Fast
+    register image permanently. They flush their registers to the hardware
+    before a hardware BLTSIZE.
+- **Translation.** At a soft BLTSIZE, each enabled channel's whole span is
+  translated, line mode included (C/D extent from the octant bits). Both
+  ends must lie in one mirror, and D must lie in a writable mirror. The
+  pointers return to their Chip values after the blit.
+- **CPU writers** (H4 demo text, H5 bitmap, H10 clear, H11 overlap, H13
+  gauges, H9 fill scan, `WritePixel`) translate their targets with
+  `FF1FastRenderTarget`.
+- **Faults.** A miss, an unsupported blit form, a native fallback or an
+  unsupported RastPort takes the production fault exit. The reason and site
+  are recorded in `FR4S`.
+- **Candidate and diagnostic.** In the candidate the prefix is empty, so
+  every site writes the hardware. `FF1_FAST_RENDER_FULL` redirects the whole
+  draw from publication to the end of B8Draw and copies the back shadow
+  (30,960 bytes) to Chip there.
+
+**Census correction: the source mirrors cover the whole graphics region.**
+
+- **What was missed.** The FR1 extents were what the sampled scenes touched.
+  A diagnostic build (`FF1_FAST_RENDER_CHIPREAD`) logged every span outside
+  the mirrors and accessed it in place. Over 300 redirected draws:
+  - car, post and helmet images were read all through `$cde0`–`$51089`;
+  - the rear-view mirror bitmaps are several times the FR1 extent, with
+    writes at `$4857a`–`$486b7`, `$491dc`–`$4a9f8` and `$4f51a`–`$51898`.
+- **New mirror table.** The 16 ranges became five, all writable:
+  - both banks;
+  - `$cd30`–`$d3e0`, refreshed from Chip before each redirected draw for
+    the audio descriptors;
+  - `$d3e0` up to bank 0;
+  - the end of bank 0 up to bank 1.
+
+  The block is 316,672 bytes. With it, the same run logs no span outside the
+  mirrors.
+
+**Memory (user decision, 2026-11-04).**
+
+- **ExpMem.** The block does not fit the 512 KiB public pool, which has
+  288 KiB free at the first draw. Fast render builds therefore set ws_ExpMem
+  to 1 MiB (`build.py` `EXPMEM`), and the pool opened by `FF1PublicBoot` is
+  sized from `FF1_EXPMEM_SIZE`.
+  - At the first draw: 550,640 bytes free, largest block 437,184, and
+    233,968 free after the allocation.
+  - Production keeps `$c0000`.
+- **Machines that no longer boot.** With 1 MiB, the A500 with 512 KiB Chip
+  and 1.5 MiB Slow and the chip-only A1200 (2 MiB) do not boot. Their smoke,
+  FPS, season and controls checks fail at boot. The A500 with 2 MiB Fast
+  passes.
+- **Still open.** The release memory scheme is undecided. One option is to
+  load the hunks into ExpMem and move only the Chip-required data to Chip.
+- **State captures.** The bigger pool moves the guest's Fast allocations by
+  `$44000`. The 100-update state records therefore differ from B8-PAL, but
+  only in Fast-pointer longs (2,600 bytes, all of them pointers), and the
+  private fractions are equal apart from a trailing pointer. Over 1,200
+  matched updates on 020+Fast, the 768 KiB and 1 MiB layouts are identical
+  apart from pointers.
+- **Live race.** The live FPS race on 020+Fast reaches the tow exit after
+  about 257 presentations with 1 MiB, in both the candidate and the control;
+  production keeps racing. The FR code is not installed on the 020, so this
+  comes from the start conditions of the live run, not from FR4. That cause
+  is not verified. 020+Fast FPS is not measured for FR4.
+
+**Checks (candidate `693d4896…`, control `93a35875…`, FULL `19005479…`).**
+
+| Check | Result |
+| --- | --- |
+| FULL, 040‑40 BCE probe, 300 draws | 0 faults, 0 hardware blits, 0 spans outside the mirrors; per draw about 263 software blits and 11 `WritePixel` |
+| FULL: 30 frames normal and grid against B8-PAL | 0 error |
+| Candidate: 30 frames normal and grid; elapsed clock | 0 error; 0.0075 % |
+| Candidate: 100-update states | equal apart from Fast pointers (see above) |
+| Smokes: 030‑50 BCE, 040‑40 BCE, 020+Fast, A500+Fast | passed |
+| MMU: 030 with WHDLoad MMU and data cache, 040 MMU | passed |
+| Route and modal: 030‑50 BCE, 040‑40 BCE, 020+Fast | passed |
+| Controls: 040‑40 BCE, 020+Fast | passed |
+| A500 (1.5 MiB Slow), chip-only A1200 | do not boot with 1 MiB ExpMem |
+
+FPS, 300 presentations, warp off; candidate against the control in the same
+session:
+
+| Machine | Candidate | Control | Field intervals |
+| --- | ---: | ---: | --- |
+| 040‑40 BCE | 24.47079 | 24.51084 | 288×2 + 12×3 / 289×2 + 11×3 |
+| 030‑50 BCE | 24.47079 | 24.55102 | 288×2 + 12×3 / 290×2 + 10×3 |
+
+The thunks cost one or two intervals in 300 while every blit still goes to
+the hardware.
+
+**Notes for later steps.**
+
+- **FR5:** a stage moves by turning redirection on before it and off after
+  it. The FULL diagnostic shows that every stage already runs exactly in
+  software.
+- **Release:** the memory scheme must be decided before FR10.
+- **Harness:** `ff1_gates.py` compares state records byte for byte, so it
+  needs a reference with the same layout once ExpMem changes.
+
 ### FR5 — Move the stages to Fast RAM, in draw order
 
 One step per stage, each switchable. Every step moves the copy point after
@@ -1135,7 +1254,7 @@ except for memory checks.
 Dependencies:
 
 ```
-FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 → FR5a…FR5f → FR6
+FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a…FR5f → FR6
   → FR7 → FR8 → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.

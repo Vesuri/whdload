@@ -41,12 +41,20 @@ FF1RenderClearBottom:
  bne.b .fill
  moveq #-1,d0
 .fill:
+ IFD FF1_FAST_RENDER
+ exg a0,a1
+ bsr.l FF1FastRenderTarget
+ exg a0,a1
+ ENDC
  bsr.b FF1RenderClearRows
  movem.l (sp)+,d0-d7/a0-a5
  move.w (sp)+,ccr
  tst.w d0                  ; displaced MOVE's NZVC, preserving X
  rts
 .native:
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderNativeGuard
+ ENDC
  movem.l (sp)+,d0-d7/a0-a5
  move.w (sp)+,ccr
  move.w d0,$dff058
@@ -60,6 +68,11 @@ FF1RenderClearTop:
  bne.b .fill
  moveq #-1,d0
 .fill:
+ IFD FF1_FAST_RENDER
+ exg a0,a1
+ bsr.l FF1FastRenderTarget
+ exg a0,a1
+ ENDC
  bsr.b FF1RenderClearRows
  movem.l (sp)+,d0-d7/a0-a5
  move.w (sp)+,ccr

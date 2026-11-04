@@ -1266,6 +1266,9 @@ B8_65d6e:
  ENDC
  addq.l #1,(a0)
  ENDC
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderFinish
+ ENDC
  move.l -60(a6),$226ae
  move.l -56(a6),$226b2
  unlk a6

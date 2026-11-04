@@ -56,6 +56,11 @@ FF1RenderDemoText:
  jsr $2a130
  lea FF1RenderTextPixels(pc),a0
  move.l $1c1b8,a1
+ IFD FF1_FAST_RENDER
+ exg a0,a1
+ bsr.l FF1FastRenderTarget
+ exg a0,a1
+ ENDC
  moveq #47,d0
 .copy:
  move.l (a0)+,(a1)+

@@ -78,6 +78,11 @@ FF1RenderOverlapHUD:
 .plane:
  move.l (a2)+,a1
  adda.w #24*48+32,a1
+ IFD FF1_FAST_RENDER
+ exg a0,a1
+ bsr.l FF1FastRenderTarget
+ exg a0,a1
+ ENDC
  lea FF1RenderClockPixels(pc),a0
  moveq #7,d6
 .row:

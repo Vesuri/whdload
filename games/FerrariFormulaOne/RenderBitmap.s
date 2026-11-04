@@ -95,6 +95,11 @@ FF1RenderBitmap:
 .plane:
  move.l (a2)+,a1
  adda.w d2,a1
+ IFD FF1_FAST_RENDER
+ exg a0,a1
+ bsr.l FF1FastRenderTarget
+ exg a0,a1
+ ENDC
  move.l d5,d0
  move.l d6,d1
  btst #0,d3
