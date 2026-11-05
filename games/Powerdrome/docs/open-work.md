@@ -106,6 +106,24 @@ Evidence: `tmp/phase-f/fast-required/`. `tools/release_matrix.py` is the current
 sequential matrix runner; obsolete prototype wrappers and completion plans are
 removed. [Development](development.md) describes reproduction. Historical work is in git.
 
+## Design decisions
+
+The user approved these when the completion plan was made:
+
+- **A500:** representative behaviour, not exact matching of native A500 histories.
+- **CPU split:** native timing on 68000/68010; the fixed-step scheduler on 68020+,
+  selected at run time from AttnFlags.
+- **No interpolation** between simulation states.
+- **Bounded gates:** every check has a finite, stated bound. Open-ended exact matching
+  against native histories is not a release gate.
+- Changes worth under 3% of a frame are skipped. Caches stay under WHDLoad's own
+  options. No performance claim without a measurement.
+
+The plan originally switched the enhancements on automatically on 68020+, with opt-outs.
+After the stock A1200 regression the release made them a single opt-in checkbox
+(`CUSTOM1=1`, default off). The planning session has no record of the user approving
+this change, so confirm it before the release.
+
 ## Known limits and deferred work
 
 - **Cached 060 twin reference:** the M7 CACHE twin capture fails pixel/register
