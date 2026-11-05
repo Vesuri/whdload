@@ -1,7 +1,8 @@
 ; FR2 exact software blitter (reference; FASTRAM_PLAN.md FR2). 68020+.
 ; FastRenderBlit executes one blit from a register image, the way the
 ; blitter would, on memory the CPU addresses directly (Fast RAM shadows).
-; Speed is not a goal: this is the oracle for the FR6 kernels.
+; The generic paths are the oracle; FastRenderKernels.s holds the FR6
+; kernels that take the common shapes first.
 ;
 ; The image mirrors custom registers $040-$075 (offset = register - $40), so
 ; a redirected site can write it with its usual register offsets. Two words
@@ -59,7 +60,8 @@ FRBL_ONEDOT equ -46
 FRBL_PIXEL equ -48
 FRBL_D equ -50
 FRBL_APT equ -56                ; line: error term
-FRBL_SIZE equ -56
+FRBL_MID equ -58                ; FR6 area kernels: middle words - 1
+FRBL_SIZE equ -60
 
 ; a0 = image, d0.w = value written to BLTBDAT. Uses BLTCON1 as written.
 FastRenderBDAT:
@@ -96,7 +98,6 @@ FastRenderBlit:
  move.w FRB_CON1(a0),d6
  moveq #0,d5
  move.b d7,d5                   ; minterm
- bsr.w FRBMinterm               ; -> a5
  move.w FRB_SIZE(a0),d0
  move.w d0,d1
  andi.w #$3f,d0
@@ -110,13 +111,24 @@ FastRenderBlit:
 .v:
  move.w d1,FRBL_V(a6)
  btst #0,d6
- bne.w FRBLine
+ bne.b FRBLineKernel
+ bsr.w FRBFast                  ; FR6 kernels; d0 = 0 if handled
+ tst.w d0
+ beq.b .done
+ bsr.w FRBMinterm               ; -> a5
  bsr.w FRBArea
+.done:
  moveq #0,d0
 FRBExit:
  unlk a6
  movem.l (sp)+,d1-d7/a1-a6
  rts
+FRBLineKernel:
+ bsr.w FRKLine                  ; FR6 kernel; d0 = 0 if drawn
+ tst.w d0
+ beq.b FRBExit
+ bsr.w FRBMinterm
+ bra.w FRBLine
 
 ; d5 = minterm -> a5 = evaluator (d2 A, d3 B, d4 C -> d0; may use d1).
 FRBMinterm:
@@ -632,3 +644,5 @@ FRBLine:
 .unsupported:
  moveq #1,d0
  bra.w FRBExit
+
+ include "FastRenderKernels.s"

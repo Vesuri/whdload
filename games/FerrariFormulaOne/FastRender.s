@@ -276,13 +276,15 @@ FF1FastRenderPrefix:
  tst.w FF1FastRenderStages(pc)
  beq.w .done
  movem.l d0-d1/a0-a1,-(sp)
+ ; With every stage staged the shadows stay exact from the seed on (see
+ ; FRMarkSpan), so the row states persist; the other arms start untrusted.
+ cmpi.w #FR_SCRATCH_STAGES,FF1FastRenderStages(pc)
+ bhs.b .cleared
  lea FF1FastRenderRows(pc),a0
  move.w #(2*FR_ROWS_PAD)/2-1,d0
 .clear:
  clr.w (a0)+
  dbf d0,.clear
- cmpi.w #FR_SCRATCH_STAGES,FF1FastRenderStages(pc)
- bhs.b .cleared
  lea FF1FastRenderBlocks(pc),a0
  move.w #(FR_BLOCKS+1)/2-1,d0
 .blocks:
@@ -1239,6 +1241,11 @@ FRLogChipRead:
 ; staged (FF1FastRenderScratch) it lives in Fast alone. Returns Z.
 ; Registers preserved.
 FRTrackChannel:
+ cmpi.w #3,d3
+ beq.b .write
+ tst.w FF1FastRenderScratch(pc)
+ bne.b .own                 ; owned shadows: a read needs nothing
+.write:
  cmpi.l #2,d1
  bhs.b .other
  movem.l d0-d3,-(sp)
@@ -1382,6 +1389,8 @@ FRPublishBlocks:
 ; Untrusted rows are first read from Chip, except rows a fill covers
 ; whole; written rows become dirty. Registers preserved.
 FRTrackSpan:
+ tst.w FF1FastRenderScratch(pc)
+ bne.w FRMarkSpan
  movem.l d0-d7/a0-a2,-(sp)
  lea FF1FastRenderMirrors(pc),a0
  move.l (a0,d2.w*8),d4      ; Chip bank
@@ -1442,7 +1451,49 @@ FRTrackSpan:
  moveq #1,d0
  bra.w FF1FastRenderFault
 
-; Publication: copy every dirty row of both banks from its shadow to Chip.
+; FRTrackSpan with every stage staged (FF1FastRenderScratch). The shadows
+; were seeded from Chip, every redirected write lands in them, every dirty
+; row is published each draw, and nothing else writes the banks during
+; driving (FR1), so each shadow row equals Chip at the start of a draw.
+; Reads need nothing; a write marks its rows dirty. Rows are 48 bytes:
+; offset * 43691 >> 21 = offset / 48 for offsets below 30,960.
+FRMarkSpan:
+ tst.w d3
+ beq.b .out
+ movem.l d0-d2/a0,-(sp)
+ lea FF1FastRenderMirrors(pc),a0
+ sub.l (a0,d2.w*8),d0
+ sub.l (a0,d2.w*8),d1
+ cmp.l d0,d1
+ bls.b .fault
+ cmpi.l #FR_BANK_BYTES,d1
+ bhi.b .fault
+ subq.l #1,d1
+ mulu.w #43691,d0
+ swap d0
+ lsr.w #5,d0                ; first row
+ mulu.w #43691,d1
+ swap d1
+ lsr.w #5,d1                ; last row
+ lea FF1FastRenderRows(pc),a0
+ tst.w d2
+ beq.b .bank
+ lea FR_ROWS_PAD(a0),a0
+.bank:
+ adda.w d0,a0
+ sub.w d0,d1
+.mark:
+ move.b #2,(a0)+
+ dbf d1,.mark
+ movem.l (sp)+,d0-d2/a0
+.out:
+ rts
+.fault:
+ moveq #1,d0
+ bra.w FF1FastRenderFault
+
+; Publication: copy every dirty row of both banks from its shadow to Chip,
+; which leaves the row fresh.
 FRPublishRows:
  movem.l d0-d3/a0-a3,-(sp)
  lea FF1FastRenderStageStats(pc),a3
@@ -1460,6 +1511,7 @@ FRPublishRows:
 .row:
  cmpi.b #2,(a2)+
  bne.b .skip
+ move.b #1,-1(a2)
  lea (a0,d1.l),a1
  rept FR_ROW_BYTES/4
  move.l (a1)+,(a0)+
@@ -1493,29 +1545,34 @@ FRUntranslate:
 
 ; D0 = lowest byte, D1 = highest byte. Returns D0 = Fast - Chip delta and
 ; D1 = mirror index when both lie in the same mirror, else D0 = 0 (Z set).
+; The mirrors are disjoint, so the one holding the lowest byte decides.
 FRSpan:
- movem.l d2/a0-a1,-(sp)
- move.l d1,a1
- move.l d0,a0
- move.l d0,d2
- bsr.w FRLookup
+ move.l a0,-(sp)
+ move.l d2,-(sp)
+ lea FF1FastRenderMirrors(pc),a0
+ moveq #0,d2
+.next:
+ tst.l (a0)
  bmi.b .miss
- move.l a0,d1
- sub.l d2,d1                ; delta
- move.l d0,d2               ; index
- move.l a1,a0
- move.l d1,a1
- bsr.w FRLookup
- bmi.b .miss
- cmp.l d2,d0
- bne.b .miss
+ cmp.l (a0)+,d0
+ blo.b .skip
+ cmp.l (a0),d0
+ bhs.b .skip
+ cmp.l (a0),d1
+ bhs.b .miss
  move.l d2,d1
- move.l a1,d0
+ lea FF1FastRenderDelta(pc),a0
+ move.l (a0,d2.w*4),d0
  bra.b .out
+.skip:
+ addq.l #4,a0
+ addq.w #1,d2
+ bra.b .next
 .miss:
  moveq #0,d0
 .out:
- movem.l (sp)+,d2/a0-a1
+ move.l (sp)+,d2
+ move.l (sp)+,a0
  tst.l d0
  rts
 

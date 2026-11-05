@@ -1400,6 +1400,75 @@ order is set by the FR0d and FR5 measurements:
 software blitter and with the hardware blitter on all FR1 captures, then
 section 4 applies. Keep a kernel only where it gains on that CPU.
 
+### FR6 results (2026-11-05, done)
+
+Gate passed in the emulator. On the 030 the Fast path now runs faster than
+the native draw: 35.8 FPS against 24.6. Work was focused on the 030 (user,
+2026-11-05); the 040 is at 22.0, still below its native 24.5. The data is
+in `tmp/dev/manifest/fr6-validation.json`.
+
+**Code** (`FastRenderKernels.s`, new; `FastRenderBlit.s`, `FastRender.s`;
+assembled only with `FF1_FAST_RENDER`; the release slave stays `597a74b9…`).
+
+- **Kernels.** `FRBFast` looks up (channels, minterm) and runs a
+  register-resident loop, ascending or descending, with the first, middle
+  and last word unrolled. Shapes: BCD with $CA, $0A, $FA, $3A; ABCD $CA; ACD
+  $0A; ABD $FC, $C0, $30; D $00, $FF. ABCD $CA, ACD $0A and the ABD forms
+  have unshifted variants for ASH = BSH = 0. Any other shape returns to the
+  generic path, which now computes the minterm only when it is used.
+- **Fill.** CD $AA fills go through a 2 × 512-word table (carry out, filled
+  byte), exclusive and inclusive, built on first use.
+- **Lines.** The road and edge line form (BLTCON0 $xB4A, H = 2) has four
+  loops: X- or Y-major, with and without SING.
+- **End state.** Every kernel leaves the pointers, the data registers, the
+  shift history and the line state as FR2's `FastRenderBlit` does.
+- **Owned shadows.** With every stage staged, the shadows are seeded from
+  Chip once and every redirected write lands in them; every dirty row is
+  published each draw, and FR1 found no other writer during driving. So each
+  shadow row equals Chip when a draw starts. The prefix no longer clears the
+  row states, reads need no tracking, and a write only marks its rows
+  (`FRMarkSpan`, row = offset × 43691 >> 21). Publication resets the rows.
+  The partial arms keep the FR5 tracking.
+- **Span lookup.** `FRSpan` walks the mirror table once.
+
+**Checks (k5, `8ec61e11…`).**
+
+| Check | Result |
+| --- | --- |
+| Host check against `FastRenderBlit`, 68020/030/040 | 4,479 cases, 0 mismatches, 3,162 through kernels; seeded faults in area, fill, line and unshifted paths were caught |
+| Probe, 030‑50 BCE, 300 draws | 0 faults, 0 hardware blits, one cut per draw, 625 rows published, none read from Chip |
+| 30 frames normal and grid against B8-PAL | 0 error |
+| Elapsed clock | 0.0075 % |
+| Smokes: 030‑50 BCE, 040‑40 BCE, 020+Fast, A500+Fast | passed |
+| MMU: 030 and 040 | passed |
+| Route and modal: 030‑50 BCE, 040‑40 BCE, 020+Fast | passed |
+| Controls: 020+Fast, 030‑50 BCE, 040‑40 BCE | passed (040 failed at FR5) |
+
+The A500 with 512 KiB Chip and the chip-only A1200 still do not boot with
+1 MiB ExpMem (FR4). The first MMU run in a session sometimes stops after
+3 s because the harness finds no memory dump; reruns pass on both CPUs.
+
+FPS on the 030‑50 BCE, 300 presentations, warp off:
+
+| Build | Change | FPS |
+| --- | --- | ---: |
+| FR5f | generic software blitter | 10.61 |
+| k1 | area and fill kernels (fill table at an absolute address, a bug) | 18.35 |
+| k2 | the table addressed PC-relative | 22.86 |
+| k3 | owned shadows | 26.65 |
+| k4 | line kernel, lazy minterm, one-pass span | 34.99 |
+| k5 | unshifted kernels, reads skip tracking | 35.83 |
+| Native control | | 24.55 |
+
+- **Where the time goes now.** A 030 trace of k4 puts about 22 % in
+  per-blit overhead (translation, span, marking, setup), 13.7 % in the
+  ABCD $CA cookie-cut, 10 % in lines, 8.7 % in publication and 6.6 % in
+  fills.
+- **The 040.** It went from 6.2 to 22.0 FPS but is still below native. It
+  was not profiled in FR6.
+- **Next.** The per-blit overhead and the cookie-cut loop, then FR7 (copy)
+  and FR8 (pacing).
+
 ### FR7 — Copy optimization
 
 1. Copy only the displayed region found by FR1, with the instruction chosen
