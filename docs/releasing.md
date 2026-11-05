@@ -59,7 +59,4 @@ account:
 - title: the release ReadMe's title line, `<Title> Enhanced <version> (dd.mm.yyyy)`
   (`Wing Commander Enhanced 2.0b (19.10.2026)`);
 - notes: the ReadMe's change points for that version only. The original author and the
-  requirements are not version-specific; the game's ReadMe and docs carry them;
-- a beta version (ending in `b`) is a pre-release. GitHub marks one release of the
-  repository as "Latest", so a final version that should not take it from another game is
-  published with `--latest=false`.
+  requirements are not version-specific; the game's ReadMe and docs carry them.
