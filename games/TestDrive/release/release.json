@@ -7,7 +7,9 @@
         "TestDriveInstall/TestDrive.slave": "build:TestDrive",
         "TestDriveInstall/readme": "release/readme",
         "TestDriveInstall/Install": "release/Install",
-        "TestDriveInstall/TestDrive.inf": "release/TestDrive.inf"
+        "TestDriveInstall/TestDrive.inf": "release/TestDrive.inf",
+        "TestDriveInstall/TestDrive.glowicon": "release/TestDrive.glowicon",
+        "TestDriveInstall/TestDrive.glowicon2": "release/TestDrive.glowicon2"
       },
       "add": {},
       "remove": [],

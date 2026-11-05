@@ -535,9 +535,8 @@ WHDLoad 19.2 and 20.0 (the oldest/newest installed runtimes, as in TD2's
 checklist) pass normal C2-off/on startup, 400-field attract driving and native
 quit-key return to AmigaDOS. This does not claim WHDLoad 17.0 validation.
 
-`slv_config` exposes `C2:B:Enhanced framerate;`. The installer Normal icon and
-preinstalled launch icon enable `CUSTOM2=1`; the two optional GlowIcons retain
-their original defaults. ReadMe documents the option, off path and PAL beta scope.
+`slv_config` exposes `C2:B:Enhanced framerate;`. The installer's three icons and
+the preinstalled launch icon enable `CUSTOM2=1`. ReadMe documents the option, off path and PAL beta scope.
 `Makefile_windows.mak` already includes all source dependencies.
 
 Local `package_release.py` writes verified level-1 LH5 installer/preinstalled

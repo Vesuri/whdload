@@ -38,9 +38,8 @@
  - Optional Enhanced framerate for smoother driving, scenery and traffic.
 
  Enable Enhanced framerate in the WHDLoad options or with CUSTOM2=1. It is
- enabled by default with the Normal icon and the preinstalled game icon.
- The alternative GlowIcons keep their original defaults. Disable the option
- or use CUSTOM2=0 to turn off Enhanced framerate.
+ enabled by default in every installed icon and the preinstalled game icon.
+ Disable the option or use CUSTOM2=0 to turn off Enhanced framerate.
  The fixes for accelerated Amigas, sound, nearby vehicles and the rev counter
  apply with either setting.
 

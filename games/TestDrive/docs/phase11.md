@@ -10,8 +10,8 @@ remains in `tmp/dist/overlay-cache-ab/`.
 
 The normal and VERIFY builds expose `C2:B:Enhanced framerate;`. The installer's
 Normal icon (`TestDrive.inf`) enables `CUSTOM2=1` after its existing `preload`
-tooltype; all other icon bytes are retained. Both optional GlowIcons retain
-original defaults. The ReadMe explains how to disable the option and distinguishes
+tooltype; all other icon bytes are retained. Both optional GlowIcons (`TestDrive.glowicon`, `TestDrive.glowicon2`) gain the same
+tooltype in the same place. The ReadMe explains how to disable the option and distinguishes
 PAL emulator acceptance from hardware and NTSC validation.
 
 `tools/package_release.py` uses the pinned original installer/preinstalled inputs,
