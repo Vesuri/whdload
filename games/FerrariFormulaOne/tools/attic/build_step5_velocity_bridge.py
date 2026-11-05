@@ -1,0 +1,138 @@
+from pathlib import Path
+import struct,subprocess,hashlib,json,re
+r=Path(__file__).resolve().parents[1];o=r/'tmp/build/step5-velocity-bridge';o.mkdir(parents=True,exist_ok=True)
+base=(r/'tmp/build/release/FerrariFormulaOne.slave').read_bytes();assert hashlib.sha256(base).hexdigest()=='b8f0985e47a73b12f4822bf15960c3d6980f3484d261a5b009c163ca23a3630f'
+m=(r/'tmp/step4/a1200-c1/anchor.bin').read_bytes()
+asm=(r/'tmp/build/step5-math-v6/logic.s').read_text().replace('modeval: dc.w 6','modeval: dc.w MODE').replace(' cmpi.w #6,d0\n bne.b keep_gauges',' cmpi.w #6,d0\n blo.b keep_gauges').replace('keep_gauges:\n','keep_gauges:\n bsr.w install_velocity\n')
+hooks=[(0x671e6,6,'load'),(0x685a6,6,'store'),(0x67bcc,8,'rotate'),(0x6dc96,6,'project'),(0x6dd44,6,'raw'),(0x6e2ae,8,'returned')]
+for line in (r/'tmp/step4/active.dis').read_text().splitlines():
+ match=re.match(r'([0-9a-f]{6}):\s+[0-9a-f]+\s+(\S+)\s+\$([0-9a-f]+)',line)
+ if match and (match[2].startswith('b') or match[2] in ('jmp','jsr')):
+  pc,target=int(match[1],16),int(match[3],16);assert not any(a<target<a+n and not a<=pc<a+n for a,n,_ in hooks),line
+extra='''install_velocity:
+ movem.l d0-d7/a0-a6,-(sp)
+ cmpi.w #7,d0
+ bne.w .done
+'''
+for a,n,_ in hooks:
+ for k in range(0,n,2):extra+=f' cmpi.w #${m[a+k:a+k+2].hex()},${a+k:x}\n bne.w .bad\n'
+for a,n,_ in hooks:
+ extra+=f' lea velocity_{a:x}(pc),a0\n move.w #$4ef9,${a:x}\n move.l a0,${a+2:x}\n'
+ for k in range(6,n,2):extra+=f' move.w #$4e71,${a+k:x}\n'
+extra+=''' lea velocity_installed(pc),a0
+ move.l #1,(a0)
+ bra.b .done
+.bad:
+ lea error(pc),a0
+ move.l #16,(a0)
+.done:
+ movem.l (sp)+,d0-d7/a0-a6
+ rts
+'''
+for a,n,action in hooks:
+ extra+=f'velocity_{a:x}:\n dc.w '+','.join('$'+m[a+k:a+k+2].hex() for k in range(0,n,2))+'\n'
+ extra+=f' movem.l d0-d7/a0-a6,-(sp)\n move.w sr,-(sp)\n move.l d0,d7\n bsr.w velocity_{action}\n move.w (sp)+,ccr\n movem.l (sp)+,d0-d7/a0-a6\n jmp ${a+n:x}\n'
+extra+='''velocity_context:
+ moveq #0,d0
+ move.w $32fbc,d0
+ cmpi.w #7,d0
+ bhi.w velocity_fault
+ lsl.l #3,d0
+ lea velocity_shadow(pc),a0
+ adda.l d0,a0
+ rts
+velocity_sync:
+ bsr.w velocity_context
+ move.w $32f94,d0
+ move.w $32f96,d1
+ bsr.w FF1VelocityReset
+ rts
+velocity_load:
+ lea velocity_loads(pc),a1
+ addq.l #1,(a1)
+ bra.w velocity_sync
+velocity_store:
+ lea velocity_stores(pc),a1
+ addq.l #1,(a1)
+ bra.w velocity_sync
+velocity_rotate:
+ lea velocity_rotations(pc),a1
+ addq.l #1,(a1)
+ bra.w velocity_sync
+velocity_record:
+ move.l velocity_records_count(pc),d0
+ cmpi.l #800,d0
+ bhs.w velocity_fault
+ mulu.w #40,d0
+ lea velocity_records(pc),a4
+ adda.l d0,a4
+ rts
+velocity_project:
+ bsr.w velocity_record
+ move.w $32fbc,(a4)
+ move.w 10(a6),2(a4)
+ move.w 14(a6),4(a4)
+ move.w -14(a6),8(a4)
+ move.w -16(a6),10(a4)
+ move.w $32f94,12(a4)
+ move.w $32f96,14(a4)
+ moveq #0,d0
+ move.w 10(a6),d0
+ andi.l #1023,d0
+ add.l d0,d0
+ lea $2180c,a0
+ move.w (a0,d0.l),d1
+ lea $21a0c,a0
+ move.w (a0,d0.l),d2
+ move.w 14(a6),d0
+ swap d0
+ clr.w d0
+ lea 24(a4),a0
+ bsr.w FF1VelocityProject020
+ tst.l d1
+ bne.w velocity_fault
+ lea velocity_projects(pc),a0
+ addq.l #1,(a0)
+ rts
+velocity_raw:
+ bsr.w velocity_record
+ move.w -12(a6),32(a4)
+ move.w -10(a6),34(a4)
+ move.w d7,36(a4)
+ lea velocity_raws(pc),a0
+ addq.l #1,(a0)
+ rts
+velocity_returned:
+ bsr.w velocity_record
+ move.w d7,6(a4)
+ move.w $32f94,16(a4)
+ move.w $32f96,18(a4)
+ move.w -12(a6),20(a4)
+ move.w -10(a6),22(a4)
+ lea velocity_records_count(pc),a0
+ addq.l #1,(a0)
+ rts
+velocity_fault:
+ lea error(pc),a0
+ move.l #17,(a0)
+velocity_stop:
+ bra.b velocity_stop
+velocity_installed: dc.l 0
+velocity_loads: dc.l 0
+velocity_stores: dc.l 0
+velocity_rotations: dc.l 0
+velocity_projects: dc.l 0
+velocity_raws: dc.l 0
+velocity_records_count: dc.l 0
+velocity_shadow: ds.b 64
+'''
+for module in ('Step','Velocity'):extra+=' include "'+str(r.parent.parent/('Games/FerrariFormulaOne_'+module+'.s'))+'"\n'
+asm+=extra+'velocity_records: ds.b 32000\n'
+(o/'hooks.json').write_text(json.dumps(hooks,indent=2)+'\n');(o/'original_div.bin').write_bytes((r/'tmp/build/step5-math-v6/original_div.bin').read_bytes())
+for mode,name in ((6,'control'),(7,'bridge')):
+ (o/(name+'.s')).write_text(asm.replace('MODE',str(mode)))
+ subprocess.run([str(Path.home()/'.local/vasmm68k_mot'),'-m68020','-Fbin','-quiet','-L',name+'.list','-o',name+'.bin',name+'.s'],cwd=o,check=True)
+ code=bytearray(base[32:-4]);pos=code.find(bytes.fromhex('d0ab001c2240'));pos=code.find(bytes.fromhex('d0ab001c2240'),pos+6)
+ code[pos:pos+6]=bytes.fromhex('6100')+struct.pack('>h',len(code)-pos-2)+bytes.fromhex('4e71');code+=(o/(name+'.bin')).read_bytes();code+=b'\0'*((-len(code))%4)
+ header=bytearray(base[:32]);header[20:24]=struct.pack('>I',len(code)//4);header[28:32]=header[20:24];(o/(name+'.slave')).write_bytes(header+code+bytes.fromhex('000003f2'))
+print('Built native velocity diagnostic')

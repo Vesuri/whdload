@@ -1,0 +1,115 @@
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -19,6 +19,7 @@
+ #include <thread>
+ #include <vector>
+ #include <array>
++#include <map>
+ 
+ #include "options.h"
+ #include "memory.h"
+@@ -252,6 +253,8 @@
+ 	std::string profile_outname;
+ 	int profile_num_frames{};
+ 	int profile_frame_count{};
++ bool survey_mode=false;
++ bool survey_cpu=true;
+ 	std::unique_ptr<cpu_profiler_unwind[]> profile_unwind{};
+ 
+ 	enum class state {
+@@ -626,6 +629,14 @@
+ 								} else if(request.substr(0, strlen("qRcmd,")) == "qRcmd,") {
+ 									// "monitor" command. used for profiling
+ 									auto cmd = from_hex(request.substr(strlen("qRcmd,")));
++                                    if(cmd.substr(0,7)=="survey ") {
++                                      survey_mode=true; survey_cpu=true; cmd="profile "+cmd.substr(7);
++                                      baseText=0; sizeText=0x7fffffff;
++                                    } else if(cmd.substr(0,7)=="census ") {
++                                      survey_mode=true; survey_cpu=false; cmd="profile "+cmd.substr(7);
++                                      baseText=0; sizeText=0x7fffffff;
++                                    } else if(cmd.substr(0,8)=="profile ") { survey_mode=false; baseText=0;sizeText=0x7fffffff; }
++
+ 									barto_log("GDBSERVER:   monitor %s\n", cmd.c_str());
+ 									// syntax: monitor profile <num_frames> <unwind_file> <out_file>
+ 									if(cmd.substr(0, strlen("profile")) == "profile") {
+@@ -639,7 +650,7 @@
+ 											profile_num_frames = profile_num_frames * 10 + s[0] - '0';
+ 											s = s.substr(1);
+ 										}
+-										profile_num_frames = max(1, min(100, profile_num_frames));
++										profile_num_frames = max(1, min(survey_mode ? 2000 : 100, profile_num_frames));
+ 										s = s.substr(1); // skip space
+ 
+ 										// get profile_unwindname
+@@ -1017,7 +1028,10 @@
+ 					activate_debugger();
+ 					return;
+ 				}
+-				int section_count = (int)sections.size();
++				if(survey_mode) {
++                  fprintf(profile_outfile,"{\"meta\":true,\"baseclock\":%d,\"cpucycleunit\":%d,\"vblank_hz\":%.9g,\"cpu_model\":%d,\"cpu_frequency\":%d,\"cpu_multiplier\":%d,\"cycle_exact\":%d,\"mmu\":%d,\"cacr\":%u}\n",baseclock,cpucycleunit,vblank_hz,currprefs.cpu_model,currprefs.cpu_frequency,currprefs.cpu_clock_multiplier,currprefs.cpu_cycle_exact,currprefs.mmu_model,regs.cacr);
++                } else {
++                int section_count = (int)sections.size();
+ 				fwrite(&profile_num_frames, sizeof(int), 1, profile_outfile);
+ 				fwrite(&section_count, sizeof(int), 1, profile_outfile);
+ 				fwrite(sections.data(), sizeof(uint32_t), section_count, profile_outfile);
+@@ -1064,6 +1078,7 @@
+ 				// CPU information
+ 				fwrite(&baseclock, sizeof(int), 1, profile_outfile);
+ 				fwrite(&cpucycleunit, sizeof(int), 1, profile_outfile);
++                }
+ 			}
+ 
+ 			// store custom registers
+@@ -1077,7 +1092,7 @@
+ 			}
+ 
+ 			// start profiler
+-			start_cpu_profiler(baseText, baseText + sizeText, profile_unwind.get());
++			if(!survey_mode || survey_cpu) start_cpu_profiler(baseText, baseText + sizeText, profile_unwind.get());
+ 			debug_dma = 1;
+ 			profile_start_cycles = static_cast<uae_u32>(get_cycles() / cpucycleunit);
+ 			//barto_log("GDBSERVER: Start CPU Profiler @ %u cycles\n", get_cycles() / cpucycleunit);
+@@ -1090,6 +1105,42 @@
+ 			uae_u32 profile_end_cycles = static_cast<uae_u32>(get_cycles() / cpucycleunit);
+ 			//barto_log("GDBSERVER: Stop CPU Profiler @ %u cycles => %u cycles\n", profile_end_cycles, profile_end_cycles - profile_start_cycles);
+ 
++            if(survey_mode) {
++                unsigned planes[3]={}; unsigned counts[32]={};
++                auto dma=get_dma_records();
++                for(int y=0;y<313;y++) for(int x=0;x<227;x++) {
++                  auto &v=dma[y*256+x];
++                  if(v.type>=0 && v.type<32) counts[v.type]++;
++                  if(v.type==6 && v.reg>=0x110 && v.reg<=0x114 && !(v.reg&1)) {
++                    int i=(v.reg-0x110)/2; if(!planes[i]) planes[i]=v.addr;
++                  }
++                }
++                fprintf(profile_outfile,"{\"field\":%d,\"cycles\":%u,\"cacr\":%u,\"planes\":[%u,%u,%u],\"dma\":[",profile_frame_count-1,profile_end_cycles-profile_start_cycles,regs.cacr,planes[0],planes[1],planes[2]);
++                for(int i=0;i<32;i++) fprintf(profile_outfile,"%s%u",i?",":"",counts[i]);
++                fprintf(profile_outfile,"],\"pcs\":[");
++                std::map<uae_u32,std::pair<unsigned long long,unsigned>> costs;
++                auto words=get_cpu_profiler_output(); int n=survey_cpu?get_cpu_profiler_output_count():0;
++                unsigned long long total=0;
++                for(int at=0;at<n;) {
++                  uae_u32 pc=0xfffffffe, v;
++                  do {v=words[at++];if(v<0xffff0000 && pc==0xfffffffe)pc=v;} while(v<0xffff0000 && at<n);
++                  unsigned cost=0xffffffff-v;
++                  // Preserve context in the key: supervisor stack lies at top of base memory.
++                  if(at+17>n) break;
++                  auto sp=words[at+15]; at+=17;
++                  if(pc<0x1000000 && sp>=0x70000 && sp<0x80000) pc|=0x1000000;
++                  auto &c=costs[pc]; c.first+=cost;c.second++;total+=cost;
++                }
++                bool comma=false;
++                for(auto &e:costs) {fprintf(profile_outfile,"%s[%u,%llu,%u]",comma?",":"",e.first,e.second.first,e.second.second);comma=true;}
++                fprintf(profile_outfile,"],\"recorded_cycles\":%llu}\n",total);
++                free(profile_custom_regs);profile_custom_regs=nullptr;
++                free(profile_custom_agacolors);profile_custom_agacolors=nullptr;
++                if(profile_frame_count==profile_num_frames) {
++                  fclose(profile_outfile);send_response("$OK");debugger_state=state::debugging;activate_debugger();
++                } else {debugger_state=state::profile;goto start_profile;}
++                return;
++            }
+ 			// process dma records
+ 			static constexpr int NR_DMA_REC_HPOS_IN = 256, NR_DMA_REC_VPOS_IN = 1000;
+ 			static constexpr int NR_DMA_REC_HPOS_OUT = 227, NR_DMA_REC_VPOS_OUT = 313;

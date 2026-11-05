@@ -1,0 +1,148 @@
+[
+  {
+    "op": "move",
+    "x": 12,
+    "y": 196
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 500
+  },
+  {
+    "op": "shot",
+    "label": "pit-long-click"
+  },
+  {
+    "op": "move",
+    "x": 282,
+    "y": 172
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 300
+  },
+  {
+    "op": "shot",
+    "label": "paddock"
+  },
+  {
+    "op": "move",
+    "x": 75,
+    "y": 150
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "race-control"
+  },
+  {
+    "op": "move",
+    "x": 50,
+    "y": 108
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 12
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "control-panel"
+  },
+  {
+    "op": "move",
+    "x": 12,
+    "y": 196
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "move",
+    "x": 50,
+    "y": 135
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "race-settings"
+  }
+]

@@ -1,0 +1,247 @@
+; Full-width arithmetic for the opt-in 68000 200 ms conversion.
+; No hooks or CPU selection are installed here. CPU-only code/data use public
+; memory under the host's ownership. All instructions are valid on MC68000.
+;
+; D0/D1 unsigned 32-bit operands -> D1:D0 exact unsigned 64-bit product.
+; D2-D7/A0-A6 preserved; CCR scratch. Four 16-bit partial products.
+FF1MultiplyU64_000:
+ movem.l d2-d5,-(sp)
+ move.l d0,d2
+ move.l d1,d3
+ move.l d0,d4
+ mulu.w d1,d0
+ swap d2
+ mulu.w d2,d1
+ swap d3
+ mulu.w d3,d4
+ mulu.w d3,d2
+ moveq #0,d5
+ add.l d4,d1
+ addx.l d5,d5
+ swap d5
+ add.l d5,d2
+ move.l d1,d4
+ swap d1
+ andi.l #$ffff,d1
+ add.l d1,d2
+ swap d4
+ clr.w d4
+ moveq #0,d5
+ add.l d4,d0
+ addx.l d5,d2
+ move.l d2,d1
+ movem.l (sp)+,d2-d5
+ rts
+
+; Same ABI, signed operands and signed full-width result. Correct the unsigned
+; product's upper half by the other operand for each negative input. This also
+; covers -2^31 without negating it in a signed 32-bit temporary.
+FF1MultiplyS64_000:
+ movem.l d2-d3,-(sp)
+ move.l d0,d2
+ move.l d1,d3
+ bsr.w FF1MultiplyU64_000
+ tst.l d2
+ bpl.b .b
+ sub.l d3,d1
+.b:
+ tst.l d3
+ bpl.b .done
+ sub.l d2,d1
+.done:
+ movem.l (sp)+,d2-d3
+ rts
+
+; Exact floor sqrt of unsigned D1:D0 -> D0 (0..$ffffffff).
+; All other registers preserved; CCR scratch. Restoring base-four algorithm:
+; remainder and trial retain their high words, including near 2^64-1.
+FF1SquareRootU64_000:
+ IFD FF1_C4_ROOT_SEED
+ move.w C4RootSeedControl(pc),-(sp)
+ tst.w (sp)+
+ bne.b .restoring
+ cmpi.l #$10000,d1
+ blo.b .restoring
+ cmpi.l #$40000,d1
+ bhs.b .restoring
+ bra.w FF1C4SeededRoot
+.restoring:
+ ENDC
+ movem.l d1-d7,-(sp)
+ moveq #0,d2
+ moveq #0,d3
+ moveq #0,d4
+ IFD FF1_ROOT_AB
+ move.w FF1RootControl(pc),-(sp)
+ tst.w (sp)+
+ bne.b .wide_start
+ ENDC
+ ; After k<=30 rounds, remainder <2*root+1 <=2^(k+1)-1.
+ ; Before subtraction its largest value fits 32 bits for these rounds;
+ ; trial 4*previous_root+1 also fits. Keep full width for rounds 31/32.
+ moveq #29,d7
+ IFD FF1_ROOTLEAD_AB
+ move.w FF1RootLeadControl(pc),-(sp)
+ tst.w (sp)+
+ bne.b .narrow
+ ENDC
+ ; Empty leading base-four digits leave root/remainder zero. If the top
+ ; twelve bits are clear, shift them out and omit exactly six narrow rounds.
+ move.l d1,d5
+ andi.l #$fff00000,d5
+ bne.b .narrow
+ move.l d0,d5
+ swap d5
+ andi.l #$ffff,d5
+ lsr.l #4,d5
+ lsl.l #8,d0
+ lsl.l #4,d0
+ lsl.l #8,d1
+ lsl.l #4,d1
+ or.l d5,d1
+ moveq #23,d7
+.narrow:
+ add.l d0,d0
+ addx.l d1,d1
+ addx.l d2,d2
+ add.l d0,d0
+ addx.l d1,d1
+ addx.l d2,d2
+ move.l d4,d5
+ add.l d5,d5
+ add.l d5,d5
+ addq.l #1,d5
+ add.l d4,d4
+ cmp.l d5,d2
+ blo.b .narrow_next
+ sub.l d5,d2
+ addq.l #1,d4
+.narrow_next:
+ dbra d7,.narrow
+ moveq #1,d7
+ bra.b .loop
+ IFD FF1_ROOT_AB
+.wide_start:
+ moveq #31,d7
+ ENDC
+.loop:
+ ; Shift the next two input bits into the 64-bit remainder D3:D2.
+ add.l d0,d0
+ addx.l d1,d1
+ addx.l d2,d2
+ addx.l d3,d3
+ add.l d0,d0
+ addx.l d1,d1
+ addx.l d2,d2
+ addx.l d3,d3
+ ; Trial = 4*partial_root+1 in D6:D5.
+ move.l d4,d5
+ moveq #0,d6
+ add.l d5,d5
+ addx.l d6,d6
+ add.l d5,d5
+ addx.l d6,d6
+ addq.l #1,d5
+ add.l d4,d4
+ cmp.l d6,d3
+ blo.b .next
+ bhi.b .accept
+ cmp.l d5,d2
+ blo.b .next
+.accept:
+ sub.l d5,d2
+ subx.l d6,d3
+ addq.l #1,d4
+.next:
+ dbra d7,.loop
+ move.l d4,d0
+ movem.l (sp)+,d1-d7
+ rts
+
+; D0 signed 32-bit, D1.low signed 16-bit -> D1:D0 exact signed 64-bit product.
+; D1.high is ignored. D2-D7/A0-A6 preserved; CCR scratch. Two word products:
+; unsigned low(A)*unsigned(B), plus signed high(A)*signed(B) shifted by 16.
+; For B<0, subtract low(A) from the high partial product before composing.
+FF1MultiplyS32x16_000:
+ IFD FF1_C4_SINE_INLINE
+C4ProductFrameGate equ *
+ bra.w C4ProductFrameControl
+C4ProductFrameControl equ *
+ ENDC
+ IFD FF1_PRODUCT_AB
+ move.w FF1ProductControl(pc),-(sp)
+ tst.w (sp)+
+ bne.b .general
+ ENDC
+ IFD FF1_C4_SINE_INLINE
+C4ProductFrameSelected equ *
+ ENDC
+ ; A zero coefficient and an integer Q16 operand need no partial products.
+ ; For low(A)=0, signed high(A)*signed(B), shifted by 16, is the full result.
+ tst.w d1
+ beq.b .zero
+ tst.w d0
+ bne.b .general
+ swap d0
+ muls.w d1,d0
+ move.l d0,d1
+ swap d1
+ ext.l d1
+ swap d0
+ clr.w d0
+ rts
+.zero:
+ moveq #0,d0
+ moveq #0,d1
+ rts
+.general:
+ IFD FF1_WIDE_AB
+ ; Equal-layout diagnostic control; absent from the ordinary helper build.
+ move.w FF1WideControl(pc),-(sp)
+ tst.w (sp)+
+ beq.b .fast
+ ext.l d1
+ bra.w FF1MultiplyS64_000
+.fast:
+ ENDC
+ movem.l d2-d3,-(sp)
+ move.l d0,d2
+ moveq #0,d3
+ move.w d0,d3
+ mulu.w d1,d0
+ swap d2
+ muls.w d1,d2
+ tst.w d1
+ bpl.b .compose
+ sub.l d3,d2
+.compose:
+ move.l d2,d1
+ swap d1
+ ext.l d1
+ swap d2
+ clr.w d2
+ moveq #0,d3
+ add.l d2,d0
+ addx.l d3,d1
+ movem.l (sp)+,d2-d3
+ rts
+
+ IFD FF1_WIDE_AB
+FF1WideControl: dc.w 0
+ ENDC
+
+ IFD FF1_ROOT_AB
+FF1RootControl: dc.w 0
+ ENDC
+
+ IFD FF1_PRODUCT_AB
+FF1ProductControl: dc.w 0
+ ENDC
+
+ IFD FF1_ROOTLEAD_AB
+FF1RootLeadControl: dc.w 0
+ ENDC
+
+ IFD FF1_C4_ROOT_SEED
+ include "FerrariFormulaOne_Coarse200Root.s"
+ ENDC

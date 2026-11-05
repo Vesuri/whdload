@@ -1,0 +1,60 @@
+[
+  {
+    "op": "move",
+    "x": 230,
+    "y": 75
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "shot",
+    "label": "fiorano-pit-state"
+  },
+  {
+    "op": "move",
+    "x": 55,
+    "y": 8
+  },
+  {
+    "op": "click",
+    "settle": 500
+  },
+  {
+    "op": "shot",
+    "label": "fiorano-track-entry"
+  },
+  {
+    "op": "move",
+    "x": 115,
+    "y": 83
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 100
+  },
+  {
+    "op": "shot",
+    "label": "f1-after-click-release"
+  },
+  {
+    "op": "exec",
+    "code": "memory=dump(\"f1-entry\");addresses=Addresses(memory,table);report['f1']={'mode':val(f\"*(unsigned short*){native(0x1c1c2)}\"),'difficulty':val(f\"*(unsigned short*){native(0x1c1c4)}\")};save()"
+  },
+  {
+    "op": "exec",
+    "code": "def row(label):\n until(0x65174 if kind=='legacy' else probe+sym(fine_listing,'C1Checkpoint'))\n d={'label':label}\n for n,addr in {'speed':0x2275a,'gear':0x66c3c,'rpm':0x6f270,'buttons':0x66f92,'countdown':0x66f94,'latch':0x32f92,'mode':0x1c1c2,'difficulty':0x1c1c4,'steering':0x1c6a2,'mouse_x':0x24aa8,'heading':0x6a66a,'segment':0x6a60a,'longitudinal':0x6a62a,'lateral':0x6a61a,'status':0x2268e,'demo':0x1bee8}.items():d[n]=val(f'*(unsigned short*){native(addr)}')\n d['automatic_gear']=val(f'*(unsigned char*){native(0x6f0e8)}')\n if kind!='legacy':d['error']=val(f'*(unsigned int*){probe+sy['error']}');assert d['error']==0\n report.setdefault('drive',[]).append(d);save();print(d,flush=True);return d\nassert report['f1']=={'mode':1,'difficulty':1},report.get('f1')\nrow('f1-start')\ncmd('monitor input JOY1_FIRE_BUTTON 1');cmd('monitor input JOY1_2ND_BUTTON 1');advance_fields(50,False);row('f1-clutch')\ncmd('monitor input KEY_ALT_RIGHT 1');advance_fields(10,False);cmd('monitor input KEY_ALT_RIGHT 0');advance_fields(5,False);up=row('f1-up');assert up['gear']==2\ncmd('monitor input KEY_ALT_LEFT 1');advance_fields(10,False);cmd('monitor input KEY_ALT_LEFT 0');advance_fields(5,False);down=row('f1-down');assert down['gear']==1\ncmd('monitor input JOY1_FIRE_BUTTON 0');advance_fields(50,False);moving=row('f1-launch');assert moving['speed']>20\ncmd('monitor input JOY1_2ND_BUTTON 0');cmd('monitor input JOY1_FIRE_BUTTON 1')\nfor i in range(12):\n advance_fields(30,False);stopped=row('f1-brake-'+str(i))\n if stopped['speed']==0:break\nassert stopped['speed']==0\ncmd('monitor input JOY1_FIRE_BUTTON 0');cmd('monitor input JOY1_2ND_BUTTON 1');advance_fields(50,False);restart=row('f1-restart');assert restart['speed']>20\ncmd('monitor input JOY1_2ND_BUTTON 0');report['manual_controls_status']='passed';save()\n"
+  },
+  {
+    "op": "shot",
+    "label": "f1-controls-passed"
+  },
+  {
+    "op": "quit"
+  }
+]

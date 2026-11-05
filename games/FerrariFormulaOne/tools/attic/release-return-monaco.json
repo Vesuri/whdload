@@ -1,0 +1,129 @@
+[
+  {
+    "op": "move",
+    "x": 75,
+    "y": 150
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "race-control"
+  },
+  {
+    "op": "move",
+    "x": 50,
+    "y": 108
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 12
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "control-panel"
+  },
+  {
+    "op": "move",
+    "x": 12,
+    "y": 196
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "move",
+    "x": 50,
+    "y": 135
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "race-settings"
+  },
+  {
+    "op": "move",
+    "x": 45,
+    "y": 99
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 220,
+    "y": 110
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 257,
+    "y": 48
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "shot",
+    "label": "monaco-return-settings"
+  }
+]

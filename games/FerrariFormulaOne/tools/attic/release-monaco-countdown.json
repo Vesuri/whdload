@@ -1,0 +1,10 @@
+[
+  {
+    "op": "exec",
+    "code": "memory=dump('monaco-race-start');addresses=Addresses(memory,table)\nassert report['monaco_prestart_entry_pc']==checkpoint\nreport['monaco_countdown_start']=val(f'*(unsigned short*){native(0x66f94)}')\ncmd('delete');cmd(f'break *{checkpoint}')\nrecords=[]\nfor n in range(150):\n assert 'Breakpoint' in cmd('continue')\n assert val(f'*(unsigned int*){probe+sy[\"error\"]}')==0\n if n%10==0:records.append(dict(presentation=n+1,countdown=val(f'*(unsigned short*){native(0x66f94)}'),speed=val(f'*(unsigned int*){native(0x2275a)}')))\nreport['monaco_start_observations']=records;save()\nsnapshot('monaco-after-150-presentations')\n"
+  },
+  {
+    "op": "shot",
+    "label": "monaco-start-moving"
+  }
+]

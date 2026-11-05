@@ -1,0 +1,15 @@
+{
+  "archives": [
+    {
+      "input": "FerrariFormulaOne.lha",
+      "output": "FerrariFormulaOneEnhanced-{version}-{date}.lha",
+      "replace": {
+        "FerrariFormulaOne_Install/FerrariFormulaOne.slave": "build:FerrariFormulaOne",
+        "FerrariFormulaOne_Install/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "FerrariFormulaOne_Install/Source", "variants": ["FerrariFormulaOne"]}
+    }
+  ]
+}

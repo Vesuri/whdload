@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import os,sys,json,signal,shutil,hashlib,struct,time,re
+sys.path.insert(0,str(Path.home()/'.local/share/amiga/pylib'))
+from amigaxdev.gdbserve import Server
+root=Path(__file__).resolve().parents[1];os.chdir(root)
+name=sys.argv[1];fields=int(os.environ.get('FIELDS','1000'));mode=os.environ.get('OBSERVE','survey');out=root/'tmp/step5'/name;out.mkdir(parents=True,exist_ok=True)
+os.environ.update(SLAVE=os.environ.get('SLAVE',str(root/'tmp/build/release/FerrariFormulaOne.slave')),WARP='1',WINDOW='none',WHD_ARGS=os.environ.get('WHD_ARGS','CUSTOM1=0'),DETERMINISTIC='1',FSUAE=str(root/'tmp/step3/fs-uae'))
+s=Server('ff1measure',root=str(root),profile_window=False);log=[];result={'name':name,'protocol':'matched_completed_loops','extra_args':os.environ.get('EXTRA_ARGS','')}
+try:
+ g=s.boot()
+ def cmd(c,timeout=180):
+  v=g.cmd(c,timeout=timeout);log.append(c+'\n'+v);return v
+ def val(e):return int(cmd('p/x '+e).split('=')[-1].strip(),16)
+ def dump(label):cmd(f'dump binary memory tmp/step5/{name}/{label}.bin 0 0x80000')
+ cmd('break *0x65606');cmd('ignore $bpnum 119');v=cmd('continue');assert 'Breakpoint' in v,v
+ dump('update120');result['demo']=val('*(unsigned short*)0x1bee8');assert result['demo']==1
+ result['warp_before']=cmd('monitor warp-status');assert result['warp_before']=='warp=1';cmd('monitor warp 0');cmd('ignore $bpnum 4');assert 'Breakpoint' in cmd('continue')
+ dump('anchor');result['warp_after']=cmd('monitor warp-status');assert result['warp_after']=='warp=0'
+ b=(out/'anchor.bin').read_bytes();assert b[0x65600:0x65606]==bytes.fromhex('4eb900067120'),b[0x65600:0x65606].hex()
+ result['anchor_state']={n:struct.unpack_from('>H',b,a)[0] for n,a in [('demo',0x1bee8),('segment',0x6a60a),('speed',0x2275a),('countdown',0x66f94),('field_counter',0x24ad2)]}
+ cmd('delete');cmd('break *0x65174');assert 'Breakpoint' in cmd('continue')
+ dump('loop125')
+ previous=125
+ if os.environ.get('CONTACT')=='1':
+  cmd('delete');cmd('break *0x6988c');cmd('break *0x69496');v=cmd('continue');assert 'Breakpoint' in v,v;assert val('$pc')==0x6988c,v
+  dump('contact');result['contact_car']=val('*(unsigned short*)0x32fbc');assert result['contact_car']==0
+  cmd('delete');cmd('break *0x65174');assert 'Breakpoint' in cmd('continue');dump('loop126');previous=126
+ for tick in (150,175,225):
+  cmd(f'ignore $bpnum {tick-previous-1}');assert 'Breakpoint' in cmd('continue');dump(f'loop{tick}');previous=tick
+ listing=Path(os.environ['SLAVE']).with_suffix('.list').read_text()
+ def sym(n):return int(re.search(r'^'+n+r'\s+00:([0-9A-F]+)',listing,re.M).group(1),16)
+ probe=val('*(unsigned int*)0x654e8')-sym('barrier')
+ result['probe']={n:val(f'*(unsigned int*){probe+sym(n)}') for n in ('installed','error','ticks','verified','cache_called','cache_api','cache_old','bridge_installed','bridge_loads','bridge_stores','bridge_rotations','bridge_resets','bridge_contacts','bridge_array_resets','bridge_snapshots','bridge_restores')}
+ assert result['probe']['installed']==1 and result['probe']['error']==0,result['probe']
+ if name.endswith('-bridge'):
+  assert result['probe']['bridge_installed']==1 and result['probe']['bridge_loads']==800 and result['probe']['bridge_stores']==800 and result['probe']['bridge_rotations']>0,result['probe']
+  start=probe+sym('position_shadow');cmd(f'dump binary memory tmp/step5/{name}/shadow.bin {start} {start+96}')
+  shadow=(out/'shadow.bin').read_bytes();state=(out/'loop225.bin').read_bytes()
+  for car in range(8):
+   assert shadow[car*12:car*12+2]==state[0x6a61a+car*2:0x6a61c+car*2]
+   assert shadow[car*12+6:car*12+8]==state[0x6a62a+car*2:0x6a62c+car*2]
+   assert shadow[car*12+2:car*12+6]==bytes(4) and shadow[car*12+8:car*12+12]==bytes(4)
+  result['shadow_matches_all_cars']=True
+ cmd(f'monitor census 1 "" "{out}/cache-check.jsonl"')
+ result['cache_meta']=json.loads((out/'cache-check.jsonl').read_text().splitlines()[0])
+ result['warp_end']=cmd('monitor warp-status');assert result['warp_end']=='warp=0'
+ result['end_state']={n:val(f'*(unsigned short*){a}') for n,a in [('demo',0x1bee8),('segment',0x6a60a),('speed',0x2275a)]};assert result['end_state']['demo']==1
+ for f in ('launch.json','fsuae.log'):shutil.copy(root/'amiga/.run'/f,out/f)
+ result['emulator_sha256']=hashlib.sha256(Path(os.environ['FSUAE']).read_bytes()).hexdigest();result['status']='complete'
+ (out/'result.json').write_text(json.dumps(result,indent=2)+'\n');print(name,'complete',result['end_state'],flush=True)
+except Exception as e:
+ result['status']='failed';result['error']=repr(e);(out/'result.json').write_text(json.dumps(result,indent=2)+'\n');raise
+finally:
+ (out/'capture.log').write_text('\n'.join(log))
+ if s.g:s.g.p.kill()
+ try:os.kill(int((root/'amiga/.run/fsuae.pid').read_text()),signal.SIGKILL)
+ except (ProcessLookupError,FileNotFoundError):pass

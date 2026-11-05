@@ -1,0 +1,121 @@
+
+ Ferrari Formula One Enhanced 2.0b (16.10.2026)
+
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "Ferrari Formula One" © 1988 Electronic Arts.
+
+ Requirements:
+ -------------
+ This install requires WHDLoad 17 or newer to be in the path.
+ To install from a different drive than DF0: select installation mode Expert.
+
+ The installed game requires 0.5 MB ChipMem and 0.75 MB OtherMem (Kickstart
+ ROM and performance mode), plus memory for preload.
+ It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
+
+ The game requires an installed A500 Kickstart 1.3 image.
+ The kickstart image must be located in the directory "Devs:Kickstarts" and
+ must be named "kick34005.A500". The image can be extracted from a A500 with
+ tools like 'GrabKick' or similar which can be found on aminet.
+ If the image is of wrong version or altered in any way WHDLoad will quit with
+ an appropriate message.
+ Additionally the file "kick34005.A500.RTB" must be installed in the same
+ directory as the kickstart image. It can be found in the archive
+ "util/boot/skick346.lha" on aminet.
+
+
+ Features:
+ ---------
+ - Full load from HD
+ - 2 versions supported
+ - Protection removed (disk check)
+ - Access fault fixed
+ - Crash when starting race fixed
+ - Wrong blit fixed
+ - CPU dependent delay fixed
+ - Timing fixed (can be disabled with CUSTOM1)
+ - Manual included 
+ - lots of nice icons (one created by me, all others by Irek)
+ - Source code included as usual
+ - Quit option that works on 68000 machines (default key is 'F10')
+ - Performance mode (CUSTOM2=1, PAL, SPS 0481 version)
+
+ The performance mode keeps the game speed constant whatever the rendering
+ speed and renders faster. On a 68020 or faster with Fast memory the player's
+ car moves more smoothly. It uses Fast memory and the safe CPU caches when
+ available. Set CUSTOM2=1 to enable it; without it the game runs as before.
+ Irek's version keeps its original behaviour.
+
+ Finally this patch is finished, started it back in 2013, disabled the
+ protection and then tried to find the reason for the crash that happened
+ when starting a race. The game uses overlay hunks and is programmed in C
+ which didn't make things any easier at all. It looked like an interrupt bug
+ but actually it wasn't, real problem was using a register without properly
+ initialising it which in turn trashed the screen pointer. There also was a
+ similar problem when leaving the race track, this one caused a completely
+ wrong and buggy blitter operation and was also caused by using a register
+ without initialising it. Fixing these two bugs took me a long time but finally
+ the game works without problems!
+
+ As the game was made for the A500 the coder didn't wait for the raster beam
+ which means the game runs much too fast on anything else than a plain 68000
+ machine. I have fixed the timing of course, if you want to disable the timing
+ fix use CUSTOM1=1.
+
+ Enjoy the game from HD.
+ Sting, 01-Aug-2016
+
+
+ Greetings to all in Scarab and Scoopex, the WHDLoad team, PMC,
+ Musashi5150, Skan, Slummy, Loaderror, Frequent, Wayne Kerr, Mr.Spiv,
+ Alpha One, CFou!, Paradroid, Audiomonster, Vention, Slammer
+ Axis, Tim, Triace, Britelite, Buzzer and all the other usual suspects. :)
+
+ Special greetings to all Golf MK1 fans worldwide and all classic
+ car owners/drivers. :)
+
+ Extra greetings to the usual suspects on #amigascne, see you all at
+ Revision 2017! :)
+
+
+ History:
+ --------
+
+ version 2.0b (16.10.2026) done by Vesuri:
+ - added performance mode (CUSTOM2=1)
+ - faster rendering on A500 and accelerated Amigas
+ - consistent game speed regardless of rendering speed
+ - smoother car movement on 68020 and faster Amigas with Fast memory
+ - uses Fast memory when available
+ - uses all safe CPU caches on 68020 and faster
+
+ version 1.01 (07.08.2016)
+ - support for another version added, thanks to Irek Kloska for
+   sending it
+ - lots of nice icons by Irek added, thanks! 
+ 
+ version 1.00 (01.08.2016) done by StingRay:
+ - initial release
+ - source code included
+
+ Contact:
+ --------
+ If you have problems with this installation please try and get a newer
+ version of this package from the WHDLoad WWW-Page. If that doesn't help try
+ some Tooltypes like NOCACHE, NOAUTOVEC, EXPCHIP, NOMMU, PAL or NTSC. If
+ that also fails, please inform the author via the Bug-Report-Form which
+ can be accessed on the WHDLoad WWW-Page.
+
+ For the full WHDLoad package, other installs and updates refer to:
+	http://www.whdload.de/
+ or	aminet:dev/misc/whdload#?
+ and	aminet:game/patch/
+

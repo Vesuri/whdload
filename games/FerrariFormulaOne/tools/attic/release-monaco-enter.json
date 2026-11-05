@@ -1,0 +1,15 @@
+[
+  {
+    "op": "move",
+    "x": 115,
+    "y": 83
+  },
+  {
+    "op": "exec",
+    "code": "checkpoint=probe+sym(fine_listing,'C1Checkpoint')\ncmd('delete');cmd(f'break *{checkpoint}');cmd(f'break *{native(0x2482a)}');entry_vbl=val('$bpnum');cmd('ignore $bpnum 29');cmd('monitor input JOY1_FIRE_BUTTON 1');cmd('continue');cmd('monitor input JOY1_FIRE_BUTTON 0')\nif val('$pc')!=checkpoint:cmd(f'ignore {entry_vbl} 4999');cmd('continue')\nreport['monaco_prestart_entry_pc']=val('$pc');report['monaco_prestart_checkpoint']=checkpoint;save()\n"
+  },
+  {
+    "op": "shot",
+    "label": "monaco-prestart-entry"
+  }
+]

@@ -1,0 +1,177 @@
+[
+  {
+    "op": "move",
+    "x": 12,
+    "y": 196
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 500
+  },
+  {
+    "op": "move",
+    "x": 282,
+    "y": 172
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 300
+  },
+  {
+    "op": "move",
+    "x": 75,
+    "y": 150
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "move",
+    "x": 50,
+    "y": 108
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 12
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "move",
+    "x": 12,
+    "y": 196
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "move",
+    "x": 50,
+    "y": 135
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "move",
+    "x": 57,
+    "y": 132
+  },
+  {
+    "op": "click",
+    "settle": 20
+  },
+  {
+    "op": "move",
+    "x": 45,
+    "y": 99
+  },
+  {
+    "op": "click",
+    "settle": 40
+  },
+  {
+    "op": "move",
+    "x": 220,
+    "y": 143
+  },
+  {
+    "op": "click",
+    "settle": 20
+  },
+  {
+    "op": "move",
+    "x": 257,
+    "y": 48
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 75,
+    "y": 36
+  },
+  {
+    "op": "click",
+    "settle": 1500
+  },
+  {
+    "op": "shot",
+    "label": "f1-selected"
+  }
+]

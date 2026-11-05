@@ -1,0 +1,9 @@
+from pathlib import Path
+r=Path(__file__).resolve().parents[1]
+s=(r/'tools/build_step5_b8_default_control.py').read_text().replace('step5-b8-default-control','step5-c4-final-default-control').replace("'tmp/build/step5-b8-v3/lean/fine.slave'","'tmp/build/step5-c4-boundary-p5-v3-ab/000/candidate.slave'").replace("'b8'","'c4-final'")
+# Both coarse builds are same length. Their entry wrapper is 68000-safe; only
+# selected, disabled coarse code has CPU-specific flag saves. Use 020 bytes
+# for both default-off tests, which cannot execute those entries.
+exec(compile(s,str(r/'tools/build_step5_b8_default_control.py'),'exec'))
+s=(r/'tools/test_step5_b8_default.py').read_text().replace('b8','c4-final')
+(r/'tools/test_step5_c4_final_default.py').write_text(s)

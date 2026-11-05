@@ -1,0 +1,9 @@
+from pathlib import Path
+import sys,subprocess
+r=Path(__file__).resolve().parents[1]
+for group in ['fps','exact','tracecontrol','trace']:
+ print('RUN',group,flush=True)
+ subprocess.run([sys.executable,str(r/'tools/run_h10_checks.py'),group],check=True)
+ if group.startswith('trace'):
+  arm='control' if group=='tracecontrol' else 'candidate';subprocess.run([sys.executable,str(r/'tools/analyze_h10_trace.py'),str(r/f'tmp/step5/hi25-profile-040-40-bce-h10-grid-{arm}')],check=True)
+ print('PASS',group,flush=True)
