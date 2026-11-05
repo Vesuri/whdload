@@ -14,7 +14,7 @@ import sys
 from slave_inputs import ROOT, verify
 from race_profile import GAME, image, locate, game_hunks
 
-SOURCE = ROOT/'whdload/F1GP.s'
+SOURCE = ROOT/'src/F1GP.s'
 PATTERN = re.compile(r'; PERF_RANGE h(\d+):([0-9a-fA-F]+) (\d+) custom=([1-5]) bit=(\d+) variant=(\d+)$')
 
 

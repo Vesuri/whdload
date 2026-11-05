@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """B3 modern-KickEmu repeatability and original-reference comparisons.
 
-Source amiga/env.sh. Usage:
+Source ../../common/env.sh. Usage:
   python3 tools/slave_compare.py capture original|rebuilt|padded|baseline|repeat green|tow|follow [fields]
   python3 tools/slave_compare.py compare
   python3 tools/slave_compare.py compare-original
@@ -16,11 +16,11 @@ import struct
 import subprocess
 import sys
 import time
-from slave_inputs import verify, ROOT, SLAVE
+from slave_inputs import verify, ROOT, RUN, SLAVE
 from race_profile import game_hunks, image, locate
 
 OUT = ROOT/'tmp/b3'
-BUILT = ROOT/'tmp/build/F1GP.Slave'
+BUILT = ROOT/'tmp/build/release/F1GP.Slave'
 
 def padded():
     verify()
@@ -61,11 +61,11 @@ def capture(case, phase, fields):
         env.pop(key, None)
     env['RACE_LEADS'] = '0,0,400'
     slave = ROOT/SLAVE if case == 'original' else padded() if case == 'padded' else BUILT
-    if case != 'original':
-        env['SLAVE'] = str(slave)
+    # SLAVE=original: common/run.sh boots the installed slave unchanged.
+    env['SLAVE'] = 'original' if case == 'original' else str(slave)
     if slave == BUILT:
         env['WHD_ARGS'] = 'CUSTOM2=1'   # G1: the release's "Original game"
-    sock = ROOT/'amiga/.run/f1gp.sock'
+    sock = RUN/'f1gp.sock'
     if sock.exists():
         # Quit through the project server; do not terminate unidentified processes.
         try:

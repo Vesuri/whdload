@@ -42,7 +42,7 @@ from capstone.m68k import (M68K_AM_ABSOLUTE_DATA_LONG, M68K_AM_PCI_DISP,        
 from slave_inputs import ROOT, verify                                          # noqa: E402
 
 GAME = ROOT/'tmp/game/FormulaOneGrandPrix4Disk/data/f1gp'
-SOURCE = ROOT/'whdload/F1GP.s'
+SOURCE = ROOT/'src/F1GP.s'
 BRANCH = {'bra', 'bsr', 'bhi', 'bls', 'bcc', 'bcs', 'bne', 'beq', 'bvc', 'bvs', 'bpl', 'bmi',
           'bge', 'blt', 'bgt', 'ble', 'bhs', 'blo'}
 END = {'rts', 'rte', 'rtr', 'jmp', 'bra', 'illegal'}

@@ -19,7 +19,7 @@ from f1_diff import hunks
 from slave_inputs import ROOT, verify
 
 STOCK = ROOT/'tmp/game/FormulaOneGrandPrix4Disk'
-DATAFILE = ROOT/'tmp/f1ed/F1GP-Ed/2002.f1gp'
+DATAFILE = ROOT/'tmp/game/F1GP-Ed/2002.f1gp'
 FACTORS = 0x1700
 DATAFILE_SHA256 = '2e310d945b3fd21fda118f9aac7229c530ac550ccf8170b457b87874e4204abc'
 

@@ -2,7 +2,7 @@
 """H3: the player's slip limit at h0+$369C2 in the game's own physics, run in unicorn.
 
   python3 -m venv tmp/h3/venv; tmp/h3/venv/bin/pip install unicorn
-  tmp/h3/venv/bin/python tools/h3_slip.py A3_CAPTURE [--slave tmp/build/F1GP.Slave] [--out tmp/h3/slip.json]
+  tmp/h3/venv/bin/python tools/h3_slip.py A3_CAPTURE [--slave tmp/build/release/F1GP.Slave] [--out tmp/h3/slip.json]
 
 A3_CAPTURE is an A3 state capture of the green window (tools/state_diff.py live, e.g.
 tmp/a3/green): whole-memory snapshots around each call of the live loop. Its per-car update
@@ -139,7 +139,7 @@ def coast(capture, step, routine):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('capture')
-    parser.add_argument('--slave', default='tmp/build/F1GP.Slave')
+    parser.add_argument('--slave', default='tmp/build/release/F1GP.Slave')
     parser.add_argument('--out')
     args = parser.parse_args()
     capture = Path(args.capture)

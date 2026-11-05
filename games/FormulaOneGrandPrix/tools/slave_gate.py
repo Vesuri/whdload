@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """B4 fresh-boot gate for release, developer, VERIFY-off and VERIFY relay-on.
-Run make slave slave-developer slave-verify first. All evidence is immutable tmp/b4.
+Run make slave developer verify first. All evidence is immutable tmp/b4.
 --game VARIANT runs it on an edited game directory that tools/f4_inputs.py built
 (--inputs, default tmp/f4/inputs), verified against manifest/f4-inputs.json.
 """
@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 from slave_compare import ROOT, client, loader_checks
-from slave_inputs import verify
+from slave_inputs import RUN, verify
 from race_profile import barto, image, locate, game_hunks
 from loop_profile import report
 from check_disabled import check, SOURCE
@@ -29,7 +29,7 @@ def capture(name, build, custom5, game=None, custom2=0):
     if digest != build_meta['slave_sha256'] or build_meta['source_sha256'] != hashlib.sha256(SOURCE.read_bytes()).hexdigest():
         raise ValueError('stale build; rebuild before capturing')
     (out/'slave.bin').write_bytes(slave.read_bytes())
-    sock=ROOT/'amiga/.run/f1gp.sock'
+    sock=RUN/'f1gp.sock'
     if sock.exists():
         try:
             client('quit',quiet=True)
@@ -40,7 +40,7 @@ def capture(name, build, custom5, game=None, custom2=0):
     env=dict(os.environ,AMIGA_SETUP='a1200-fast',WARP='1',DETERMINISTIC='1',
              JOY0='none',JOY1='none',SLAVE=str(slave),WHD_ARGS=args,VERIFY_EXIT='1')
     if game:
-        env.update(GAME=str(game),F1GP_EDITED='1')
+        env.update(GAME_DIR=os.path.relpath(game,ROOT/'tmp/game'),F1GP_EDITED='1')
     log=out/'serve.log'
     with log.open('w') as f:
         proc=subprocess.Popen([sys.executable,'tools/f1gp.py','serve'],cwd=ROOT,env=env,
@@ -92,7 +92,7 @@ def capture(name, build, custom5, game=None, custom2=0):
                 raise ValueError('VERIFY relay not installed correctly')
         if not all(meta['loader_checks'].values()):
             raise ValueError('loader check failed')
-        marker=ROOT/'amiga/.run/dh0/whdload-exit.txt'
+        marker=RUN/'dh0/whdload-exit.txt'
         if marker.exists():
             raise ValueError('game already exited')
         client('tap','59')
@@ -114,8 +114,8 @@ def capture(name, build, custom5, game=None, custom2=0):
 
 # G1: the release's options are off with "Original game" (CUSTOM2=1).
 CASES = (
-    ('release-off','tmp/build',0,1), ('developer-off','tmp/build-developer',0,0),
-    ('verify-off','tmp/build-verify',0,0), ('verify-on','tmp/build-verify',1,0),
+    ('release-off','tmp/build/release',0,1), ('developer-off','tmp/build/developer',0,0),
+    ('verify-off','tmp/build/verify',0,0), ('verify-on','tmp/build/verify',1,0),
 )
 
 

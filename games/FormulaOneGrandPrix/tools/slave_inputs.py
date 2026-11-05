@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verify local inputs; reconstruct the original slave and extract its names payload.
 
-Run after sourcing amiga/env.sh. Generated source contains derived bytes and must stay
+The build runs it (game.sh game_build) with the shared environment. Generated source contains derived bytes and must stay
 under tmp/. The original loader is symbolic assembly; the old KickEmu is a separate
 opaque section, replaced by the shared source in the new slave.
 """
@@ -14,6 +14,8 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+# The emulator's run directory (common/run.sh): the INSTANCE's, default "default".
+RUN = ROOT/'tmp/run'/(os.environ.get('INSTANCE') or 'default')/'.run'
 SLAVE = 'tmp/game/FormulaOneGrandPrix4Disk/FormulaOneGrandPrix4Disk.Slave'
 CODE = ((0x170, 0x2a6), (0x358, 0x3a4), (0x3b6, 0x424))
 

@@ -3,7 +3,7 @@
 
   python3 tools/f1_writemap.py OUT NAME [--new] [--datafile PATH] [--xor START LEN VALUE]
 
-Boots amiga/ed.sh (Workbench 2.04, F1GP-Ed on DH0, a fresh copy of the pinned f1gp as
+Boots tools/ed.sh (Workbench 2.04, F1GP-Ed on DH0, a fresh copy of the pinned f1gp as
 DH1:f1gp), optionally resets every setting (Project/New, Right-Amiga N), saves to the F1GP
 binary (Right-Amiga B, confirmed with Left-Amiga V), waits for the file to change and copies
 it to OUT/NAME.f1gp. Without --datafile F1GP-Ed loads 2002.f1gp, named by its icon's
@@ -18,7 +18,7 @@ from amigaxdev.input import Input  # noqa: E402
 
 ROOT = f1_ed.ROOT
 PINNED = os.path.join(ROOT, 'tmp/game/FormulaOneGrandPrix4Disk/data/f1gp')
-EDITED = os.path.join(ROOT, 'amiga/.run/ed/dh1/f1gp')
+EDITED = os.path.join(ROOT, 'tmp/run/ed/.run/dh1/f1gp')
 R_AMIGA, L_AMIGA, KEY_N, KEY_B, KEY_V = 0x67, 0x66, 0x36, 0x35, 0x34
 
 
@@ -38,7 +38,7 @@ def main():
     env = {}
     if args.xor:
         start, length, value = args.xor
-        data = bytearray(open(args.datafile or os.path.join(ROOT, 'tmp/f1ed/F1GP-Ed/2002.f1gp'), 'rb').read())
+        data = bytearray(open(args.datafile or os.path.join(ROOT, 'tmp/game/F1GP-Ed/2002.f1gp'), 'rb').read())
         for i in range(start, min(start + length, len(data))):
             data[i] ^= value
         args.datafile = os.path.join(args.out, args.name + '.datafile')

@@ -1,49 +1,52 @@
 # Development setup
 
 AmigaXDev supplies the shared tools and documentation. Its `make setup` installs
-`~/.local` and `~/.local/share/amiga`. Source `amiga/env.sh` to use that environment;
+`~/.local` and `~/.local/share/amiga`. The `make` targets load that environment
+(`common/env.sh`); source `../../common/env.sh` before running a tool directly.
 `AMIGA_ENV` can select a different shared environment file. Shared tool, ROM and
 WHDLoad paths are supplied by that file, not by copies from other projects.
-The launcher uses `KICKSTART`, `KICK13`, `RTB`, `WORKBENCH_ADF`, `WHDLOAD_BINARY`,
-`FSUAE_COMMON` and, for the gdb server, `FSUAE_ARM`.
+The launcher uses `KICKSTART`, `WORKBENCH_ADF`, `WHDLOAD_BINARY`, `FSUAE_COMMON`, the
+Kickstart 1.3 image and its `.RTB` in `$AMIGA_SHARE/Kickstarts` and, for the gdb server,
+`FSUAE_ARM`.
 
-`make check` verifies the retained archives against `manifest/SHA256SUMS`.
+`inputs.sha256` pins the four original archives: Codetapper's installer
+(`FormulaOneGrandPrix.lha`), the complete four-disk install
+(`FormulaOneGrandPrix_v1.0_4Disk_0325.lha`), F1GP-Ed 3.44 (`F1GP-Ed.lha`, Oliver Roberts,
+user-supplied) and the f1gp.library developer archive (`f1gplib_dev.lha`, user-supplied).
 The hashes pin the downloaded inputs; they are not independently authenticated
-publisher checksums. `manifest/inputs.json` records their source URLs.
-
-Local layout:
-
-- `tmp/archives/`: original installer and complete four-disk install archives.
-- `tmp/installer/`: pristine installer extraction.
-- `tmp/game/`: pristine full-install extraction.
-- `tmp/extracted-files.sha256`: local extraction inventory.
-
-To recreate the extractions, download the named archives from their manifest URLs
-into `tmp/archives/`, run `make check`, then extract the installer into an empty
-`tmp/installer/` and the complete install into an empty `tmp/game/` using `lha x`.
-Do not merge into modified game data.
+publisher checksums. `make unpack ARCHIVES=<directory>` copies them into `tmp/archives/`,
+verifies them and extracts each into `tmp/game/` (`FormulaOneGrandPrixHD`,
+`FormulaOneGrandPrix4Disk`, `F1GP-Ed`, `f1gplib_dev`). `FORCE=1` replaces an extraction;
+do not merge into modified game data.
 
 ## Running
 
-`amiga/run.sh` copies `tmp/game/FormulaOneGrandPrix4Disk` to the disposable
-`amiga/.run/dh1`, boots Kickstart 3.1 with the Workbench 2.04 floppy and runs
-`WHDLoad FormulaOneGrandPrix4Disk.Slave PRELOAD SPLASHDELAY=0 CONFIGDELAY=0 NOREQ`. The default machine
-is the A500-equivalent: 68000, 512 KB chip, 1.5 MB slow, no fast RAM. `AMIGA_SETUP`,
-`CHIP_KB`/`SLOW_KB`/`FAST_KB`, `WHD_ARGS` (for example `CUSTOM1=1`), `SLAVE`, `DEBUG`,
-`WARP` and the other shared launcher variables apply.
+`make run` builds the release slave, copies `tmp/game/FormulaOneGrandPrix4Disk` to the
+disposable `tmp/run/default/.run/dh1` with that slave as `FormulaOneGrandPrix4Disk.Slave`,
+boots Kickstart 3.1 with the Workbench 2.04 floppy and runs
+`WHDLoad FormulaOneGrandPrix4Disk.Slave PRELOAD SPLASHDELAY=0 CONFIGDELAY=0 NOREQ`.
+`make run SLAVE=original` boots Codetapper's installed slave instead. The default machine
+is the A500-equivalent: 68000, 512 KB chip, 1.5 MB slow, no fast RAM (`SETUP=custom` in
+`game.conf`). `AMIGA_SETUP` (or `SETUP`), `CHIP_KB`/`SLOW_KB`/`FAST_KB`, `WHD_ARGS` (for
+example `CUSTOM1=1`), `BUILD`, `SLAVE`, `DEBUG`, `WARP`, `INSTANCE` and the other shared
+launcher variables apply (the repository's `docs/running.md`). The tools pass the machine as
+`AMIGA_SETUP`, which `race_clock.py` and `race_profile.py` also read from the server's
+environment; pass it the same way to them. `GAME_DIR` (relative to `tmp/game/`) boots
+another game directory, which is how the captures run an edited `f1gp` (`--game`).
 
-`python3 tools/f1gp.py serve` boots with `DEBUG=1` on the native FS-UAE (`FSUAE_ARM`
+`python3 tools/f1gp.py serve` boots through `common/run.sh` with `DEBUG=1` on the native FS-UAE (`FSUAE_ARM`
 unless `FSUAE` is set) and serves the shared `amigaxdev.gdbserve` commands
 (`shot PNG`, `wait S`, `gdb TEXT`, `profile N BIN`, `quit`). Drive input with
 `gdb monitor mouse DX DY`, `gdb monitor input JOY1_FIRE_BUTTON 1|0`,
 `gdb monitor key RAW 1|0` and `gdb monitor fields N` while stopped. One mouse count
-moves the game's pointer one screenshot pixel in both axes.
+moves the game's pointer one screenshot pixel in both axes. Without `SLAVE` it builds and
+boots the release slave; `SLAVE=original` boots the shipped one, `SLAVE=<file>` any build.
 
 To reach gameplay without manual input:
 
 ```sh
-. amiga/env.sh
-WARP=1 DETERMINISTIC=1 JOY0=none JOY1=none python3 tools/f1gp.py serve > amiga/.run/serve.log 2>&1 &
+. ../../common/env.sh
+WARP=1 DETERMINISTIC=1 JOY0=none JOY1=none python3 tools/f1gp.py serve > tmp/serve.log 2>&1 &
 python3 tools/f1gp.py quickrace tmp/route.jsonl   # stops at the first race field
 python3 tools/f1gp.py shot "$PWD/tmp/race.png"
 python3 tools/f1gp.py quit
@@ -109,7 +112,7 @@ as good as that nearest-call-target heuristic: check a large entry with
 ## Race clock across machines
 
 ```sh
-AMIGA_SETUP=a500-1.5m WARP=1 DETERMINISTIC=1 JOY0=none JOY1=none python3 tools/f1gp.py serve > amiga/.run/serve.log 2>&1 &
+AMIGA_SETUP=a500-1.5m WARP=1 DETERMINISTIC=1 JOY0=none JOY1=none python3 tools/f1gp.py serve > tmp/serve.log 2>&1 &
 python3 tools/f1gp.py raceclock tmp/clock/a500-1.5m
 python3 tools/f1gp.py quit
 ```
@@ -128,12 +131,12 @@ left one field untraced before each profile, so counts from them are not compara
 
 ## Reconstructing the original slave (B1)
 
-After `make check`, the retained install archive was extracted into a separate scratch
+After verifying the archives (now `make unpack`), the retained install archive was extracted into a separate scratch
 folder and its game and slave compared with `tmp/game`. Their verified standalone
 hashes are in `manifest/game-inputs.json`. Do not update those pins to accept changed data.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/slave_inputs.py
 "$VASM" -m68000 -no-opt -devpac -Fbin -o tmp/slave/reassembled.bin tmp/slave/original.s
 cmp tmp/slave/original.bin tmp/slave/reassembled.bin
@@ -144,8 +147,9 @@ Both generated assembly and binaries contain derived bytes and stay in ignored `
 
 ## Building the reconstructed loader (B2)
 
-`make slave` invokes `whdload/build.sh` under bash 3.2 and writes `tmp/build/F1GP.Slave`
-and its listing. `OUT="tmp/build spaced" make slave` is supported. The build verifies
+`make slave` runs `game_build` in `game.sh` (through `common/build.sh`, bash 3.2) and writes
+`tmp/build/release/F1GP.Slave`, its listing, vasm's log, `F1GP.deps` and `build.json`. The
+build verifies
 the assembler, NDK trees, WHDLoad headers and shared KickEmu against
 `manifest/slave-toolchain.json`, then verifies the original game and slave before
 extracting the names payload. Tree hashes cover sorted relative filenames, a NUL,
@@ -153,11 +157,14 @@ and each file's raw SHA-256 digest; no machine paths are stored in the manifest.
 
 `NDK_ASM` defaults to `$AMIGA_SHARE/ndk/Include_I`; the installed assembly LVO headers
 use `_lib.i` names, so the build generates four include-name adapters under `tmp/slave`.
+It then generates the E2, E4 and F5 tables from the pinned game into `tmp/slave/include`
+and assembles with `-m68000 -no-opt -pic` and the build's defines from `game.conf`
+(`VASM_FLAGS`, `DEFINES_<BUILD>`); `VASM_EXTRA` adds flags for one build.
 The normal `NDK` and shared environment overrides remain supported. To deliberately
-repin a reviewed toolchain update, source `amiga/env.sh`, set/export `NDK_ASM`, and run
+repin a reviewed toolchain update, source `../../common/env.sh`, set/export `NDK_ASM`, and run
 `python3 tools/slave_toolchain.py --record`. A differing input is otherwise a build error.
 
-Run with `SLAVE=tmp/build/F1GP.Slave` in the server environment. Do not interpret a
+Run with `SLAVE=tmp/build/release/F1GP.Slave` in the server environment. Do not interpret a
 successful boot as B3 acceptance. All slave builds, listings and captures stay in `tmp/`.
 
 ## Slave acceptance captures (B3)
@@ -172,7 +179,7 @@ B3 uses the modern shared KickEmu with `IOCACHE = 10000`. Build normally with
 to that build. Rejected captures must not be promoted into the baseline.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 make slave
 python3 tools/slave_compare.py capture baseline green
 python3 tools/slave_compare.py capture repeat green
@@ -214,7 +221,7 @@ modern-baseline acceptance command.
 `tools/slave_quit.py` performs the separate real-input quit check with `CUSTOM1=1`.
 For a manual check, set `VERIFY_EXIT=1` in the server environment,
 enter the race and send raw key `$59` (F10) through the native harness. The launcher
-records WHDLoad's return as `OK` or `FAIL` in `amiga/.run/dh0/whdload-exit.txt` after it
+records WHDLoad's return as `OK` or `FAIL` in `tmp/run/default/.run/dh0/whdload-exit.txt` after it
 returns. A missing marker is not a pass. Save that evidence in ignored `tmp/b3/` before
 another launch replaces the disposable hard drive. Check the returned screen as well,
 then quit the project server normally.
@@ -252,22 +259,23 @@ boundary and can omit the call at the breakpoint. Use screen-anchored transition
 ## Build variants and disabled-hook gate (B4)
 
 ```sh
-make slave                 # release (DEVELOPER=1 PLAYER=1, G1) -> tmp/build
-make slave-developer       # DEVELOPER=1 -> tmp/build-developer
-make slave-verify          # DEVELOPER=1 VERIFY=1 -> tmp/build-verify
-make slave-verify OUT='tmp/verify with spaces'
-make slave-clean OUT='tmp/verify with spaces'
-. amiga/env.sh
+make slave                 # release (DEVELOPER=1 PLAYER=1, G1) -> tmp/build/release
+make developer             # DEVELOPER=1 -> tmp/build/developer
+make verify                # DEVELOPER=1 VERIFY=1 -> tmp/build/verify
+make snapshot BUILD=verify OUT='tmp/verify with spaces'
+make clean                 # removes tmp/build/
+. ../../common/env.sh
 python3 tools/slave_gate.py
 python3 tools/slave_gate.py --check
 make check-disabled CAPTURE=tmp/b4/verify-off
 make test-disabled
 ```
 
-Each build writes the slave, listing and `build.json` into its selected `tmp/` directory.
-`OUT` accepts relative or absolute paths, including spaces; paths outside `tmp/` fail.
-Cleanup removes only those three generated files. The normal target excludes VERIFY
-code, even if a VERIFY build previously occupied that output directory. Never release
+Each build writes the slave, listing and `build.json` into `tmp/build/<BUILD>/`.
+`make snapshot BUILD=<build> OUT=<dir>` builds and copies that directory to `OUT`, which
+keeps a capture's build fixed while later builds replace `tmp/build/`; `OUT` is relative to
+the game directory and must lie under `tmp/` (spaces are fine). The release build never
+contains VERIFY code, since each build has its own directory. Never release
 an artifact based only on its filename; inspect the build manifest and rebuild normally.
 
 `slave_gate.py` requires fresh capture directories under `tmp/b4`; it refuses to overwrite
@@ -414,8 +422,8 @@ The cache register is logged after the policy request, before loading the intro/
 It is a point observation, not proof of every later memory page's cacheability.
 
 ```sh
-. amiga/env.sh
-make check slave slave-developer slave-verify
+. ../../common/env.sh
+make slave developer verify
 python3 tools/machine_matrix.py 020 on clock tmp/b5/new-020-on-clock
 python3 tools/machine_matrix.py 020 off green tmp/a7/020-off-green 100
 ```
@@ -433,7 +441,7 @@ The 030 non-MMU timing cell explicitly removes the emulator MMU model as well as
 WHDLoad `NOMMU`: `--cpu=68030 --uae_mmu_model=0` (either order; `68EC030` also works,
 without an FPU). The pinned shared launcher refuses unknown CPU names such as
 `68030-NOMMU` before starting the emulator (AmigaXDev TOOL2). `f1gp.py serve` then shows
-only a traceback; run `amiga/run.sh` with the same variables to see the message. The
+only a traceback; run `make run` with the same variables to see the message. The
 runner also rejects effective-CPU/MMU mismatches before advancing the route. The 040/060 timing cells explicitly select the non-MMU, cycle-exact cores.
 MMU cells are functional tests, not fixed-clock speed claims. Check effective emulator
 settings in the retained debug log before using measurements. 040/060 results describe the emulator model, not real accelerator timing.
@@ -588,8 +596,8 @@ comparison control. These
 bits do not enable a release feature or waive the C5 gate.
 
 ```sh
-make slave-verify OUT=tmp/c2/build-verify
-. amiga/env.sh
+make snapshot BUILD=verify OUT=tmp/c2/build-verify
+. ../../common/env.sh
 python3 tools/c2_capture.py tmp/c2/new-pal --custom4 1 --ticks 160 --profile 50
 python3 tools/c2_capture.py tmp/c2/new-ntsc --ntsc --custom4 1 --ticks 160
 python3 tools/c2_capture.py tmp/c2/new-delayed --custom4 3 --ticks 160
@@ -675,8 +683,8 @@ They run with `CUSTOM2=3`, keeping caches and the developer clock enabled; `CUST
 uses the common-layout preference control. Build products and evidence remain in `tmp/`.
 
 ```sh
-. amiga/env.sh
-make slave-verify OUT=tmp/c3/build-verify
+. ../../common/env.sh
+make snapshot BUILD=verify OUT=tmp/c3/build-verify
 python3 tools/check_modal_hooks.py
 python3 tools/check_hud_hooks.py
 python3 tools/c2_capture.py tmp/c3/pause --build tmp/c3/build-verify --modal pause --custom4 1
@@ -741,8 +749,8 @@ keyboard and joystick events and stops at native keyboard-IRQ stores, input retu
 and view-consumption returns. It never writes game memory. Use fresh capture names:
 
 ```sh
-. amiga/env.sh
-make slave-verify OUT=tmp/c4/build-verify
+. ../../common/env.sh
+make snapshot BUILD=verify OUT=tmp/c4/build-verify
 python3 tools/c2_capture.py tmp/c4/input --build tmp/c4/build-verify --input --custom4 3
 python3 tools/c2_capture.py tmp/c4/repeat --build tmp/c4/build-verify --input --custom4 3
 python3 tools/c4_report.py tmp/c4/input --repeat tmp/c4/repeat --out tmp/c4/report.json
@@ -779,8 +787,8 @@ C5(a) runs a whole Quick Race with no input and samples the clock every 250 fiel
 It requires `CUSTOM4=1` and no other probe option. Run each machine twice:
 
 ```sh
-. amiga/env.sh
-make slave-verify OUT=tmp/c5/build-verify
+. ../../common/env.sh
+make snapshot BUILD=verify OUT=tmp/c5/build-verify
 python3 tools/c2_capture.py tmp/c5/rate-030 --build tmp/c5/build-verify --rate --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/c5/rate-030-repeat --build tmp/c5/build-verify --rate --custom4 1 --setup a1200-030
 python3 tools/c5_report.py tmp/c5/rate-030 --repeat tmp/c5/rate-030-repeat --out tmp/c5/rate-030-report.json
@@ -839,7 +847,7 @@ that memory and checks prev against the previous tick; `--negative` adds the
 injected-defect probes:
 
 ```sh
-make slave-verify OUT=tmp/d1/build-verify
+make snapshot BUILD=verify OUT=tmp/d1/build-verify
 python3 tools/c2_capture.py tmp/d1/states-on --build tmp/d1/build-verify --states --snapshot --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d1/states-on-repeat --build tmp/d1/build-verify --states --snapshot --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d1/states-off --build tmp/d1/build-verify --states --custom4 1 --setup a1200-030
@@ -857,7 +865,7 @@ the clock and D2 state in `pictures.bin.gz`. `d2_alpha.py` recomputes each α an
 its lead against the field the picture was first displayed:
 
 ```sh
-make slave-verify OUT=tmp/d2/build-verify
+make snapshot BUILD=verify OUT=tmp/d2/build-verify
 python3 tools/c2_capture.py tmp/d2/states-off --build tmp/d2/build-verify --states --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d2/states-on --build tmp/d2/build-verify --states --alpha --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d2/states-on-repeat --build tmp/d2/build-verify --states --alpha --custom4 1 --setup a1200-030
@@ -880,7 +888,7 @@ that stages the previous tick. `d3_stage.py` rebuilds every decision and staged 
 checks each restore against an independent snapshot:
 
 ```sh
-make slave-verify OUT=tmp/d3/build-verify
+make snapshot BUILD=verify OUT=tmp/d3/build-verify
 python3 tools/c2_capture.py tmp/d3/states-previous --build tmp/d3/build-verify --states --previous --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d3/states-previous-repeat --build tmp/d3/build-verify --states --previous --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d3/states-on --build tmp/d3/build-verify --states --stage --custom4 1 --setup a1200-030
@@ -889,7 +897,7 @@ python3 tools/d3_stage.py tmp/d3/states-previous --negative --out tmp/d3/stage-p
 python3 tools/d3_stage.py tmp/d3/states-on --out tmp/d3/stage-on.json
 python3 tools/c5_compare.py off=tmp/d3/states-off on=tmp/d3/states-on previous=tmp/d3/states-previous \
   repeat=tmp/d3/states-previous-repeat --out tmp/d3/states-comparison.json
-make slave-developer OUT=tmp/d3/build-developer
+make snapshot BUILD=developer OUT=tmp/d3/build-developer
 python3 tools/c2_capture.py tmp/d3/profile-developer --build tmp/d3/build-developer --stage --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
 python3 tools/c6_profile.py tmp/d3/profile-developer --out tmp/d3/profile-developer.json
 ```
@@ -903,19 +911,19 @@ model of every prediction, segment search included, and reports the camera error
 the ideal path between the actual ticks:
 
 ```sh
-make slave-verify OUT=tmp/d4/build-verify
+make snapshot BUILD=verify OUT=tmp/d4/build-verify
 python3 tools/c2_capture.py tmp/d4/states-on --build tmp/d4/build-verify --states --stage --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d4/states-on-repeat --build tmp/d4/build-verify --states --stage --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d4/states-off --build tmp/d4/build-verify --states --custom4 1 --setup a1200-030
 python3 tools/d4_camera.py tmp/d4/states-on --negative --out tmp/d4/camera-on.json
 python3 tools/c5_compare.py off=tmp/d4/states-off on=tmp/d4/states-on repeat=tmp/d4/states-on-repeat \
   --out tmp/d4/states-comparison.json
-make slave-developer OUT=tmp/d4/build-developer
+make snapshot BUILD=developer OUT=tmp/d4/build-developer
 python3 tools/c2_capture.py tmp/d4/profile-developer --build tmp/d4/build-developer --stage --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
 python3 tools/c6_profile.py tmp/d4/profile-developer --out tmp/d4/profile-developer.json
 ```
 
-Captures need `amiga/env.sh` sourced and run one at a time (one project server).
+Captures need `../../common/env.sh` sourced and run one at a time (one project server).
 
 ### D5 car prediction
 
@@ -925,14 +933,14 @@ held, and with `--negative` also flips a staged car fraction, a staged car yaw a
 history car lateral mid-race:
 
 ```sh
-make slave-verify OUT=tmp/d5/build-verify
+make snapshot BUILD=verify OUT=tmp/d5/build-verify
 python3 tools/c2_capture.py tmp/d5/run3/states-on --build tmp/d5/build-verify --states --stage --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d5/run3/states-on-repeat --build tmp/d5/build-verify --states --stage --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d5/run3/states-off --build tmp/d5/build-verify --states --custom4 1 --setup a1200-030
 python3 tools/d5_cars.py tmp/d5/run3/states-on --negative --out tmp/d5/cars-on.json
 python3 tools/c5_compare.py off=tmp/d5/run3/states-off on=tmp/d5/run3/states-on repeat=tmp/d5/run3/states-on-repeat \
   --out tmp/d5/states-comparison.json
-make slave-developer OUT=tmp/d5/build-developer
+make snapshot BUILD=developer OUT=tmp/d5/build-developer
 python3 tools/c2_capture.py tmp/d5/profile-developer --build tmp/d5/build-developer --stage --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
 python3 tools/c6_profile.py tmp/d5/profile-developer --out tmp/d5/profile-developer.json
 ```
@@ -946,7 +954,7 @@ the rev counter's per-tick changes from the prediction capture. The disabled-fea
 gate builds into the default directories:
 
 ```sh
-make slave-verify OUT=tmp/d6/build-verify
+make snapshot BUILD=verify OUT=tmp/d6/build-verify
 python3 tools/c2_capture.py tmp/d6/run1/states-on --build tmp/d6/build-verify --states --stage --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d6/run1/states-off --build tmp/d6/build-verify --states --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d6/run1/states-on-repeat --build tmp/d6/build-verify --states --stage --custom4 1 --setup a1200-030
@@ -954,10 +962,10 @@ python3 tools/d5_cars.py tmp/d6/run1/states-on --negative --out tmp/d6/cars-on.j
 python3 tools/c5_compare.py off=tmp/d6/run1/states-off on=tmp/d6/run1/states-on repeat=tmp/d6/run1/states-on-repeat \
   --out tmp/d6/states-comparison.json
 python3 tools/d6_items.py tmp/d6/run1/states-on --out tmp/d6/items.json
-make slave-developer OUT=tmp/d6/build-developer
+make snapshot BUILD=developer OUT=tmp/d6/build-developer
 python3 tools/c2_capture.py tmp/d6/profile-developer --build tmp/d6/build-developer --stage --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
 python3 tools/c6_profile.py tmp/d6/profile-developer --out tmp/d6/profile-developer.json
-make slave && make slave-developer && make slave-verify
+make slave developer verify
 python3 tools/slave_gate.py --prefix d6-
 ```
 
@@ -971,17 +979,17 @@ the D7 model, measures camera, car and followed-car bearing errors per view, and
 `--negative` adds the chase heading and camera probes:
 
 ```sh
-make slave-verify OUT=tmp/d7/build-verify
+make snapshot BUILD=verify OUT=tmp/d7/build-verify
 python3 tools/c2_capture.py tmp/d7/run3/states-on --build tmp/d7/build-verify --states --stage --views --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d7/run3/states-off --build tmp/d7/build-verify --states --views --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d7/run3/states-on-repeat --build tmp/d7/build-verify --states --stage --views --custom4 1 --setup a1200-030
 python3 tools/d7_views.py tmp/d7/run3/states-on --negative --out tmp/d7/views-on.json
 python3 tools/c5_compare.py off=tmp/d7/run3/states-off on=tmp/d7/run3/states-on repeat=tmp/d7/run3/states-on-repeat \
   --out tmp/d7/states-comparison.json
-make slave-developer OUT=tmp/d7/build-developer
+make snapshot BUILD=developer OUT=tmp/d7/build-developer
 python3 tools/c2_capture.py tmp/d7/profile-developer --build tmp/d7/build-developer --stage --view rear --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
 python3 tools/c6_profile.py tmp/d7/profile-developer --out tmp/d7/profile-developer.json
-make slave && make slave-developer && make slave-verify
+make slave developer verify
 python3 tools/slave_gate.py --prefix d7-
 ```
 
@@ -1015,7 +1023,7 @@ measures per-field screenshot windows, with prediction off (`CUSTOM2=3`) and on
 (`--snapshot`). The α check runs on the same schedule and on slowed drawing:
 
 ```sh
-make slave-verify OUT=tmp/d9/build-verify
+make snapshot BUILD=verify OUT=tmp/d9/build-verify
 python3 tools/c2_capture.py tmp/d9/states-on --build tmp/d9/build-verify --states --stage --views --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d9/states-off --build tmp/d9/build-verify --states --views --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d9/states-on-repeat --build tmp/d9/build-verify --states --stage --views --custom4 1 --setup a1200-030
@@ -1038,7 +1046,7 @@ python3 tools/d9_smooth.py tmp/d9/states-on-repeat --out tmp/d9/smooth-repeat.js
 python3 tools/d9_smooth.py --out tmp/d9/shots.json --shots cockpit-off=tmp/d9/cockpit-off cockpit-on=tmp/d9/cockpit-on \
   tv-off=tmp/d9/tv-off tv-on=tmp/d9/tv-on chase-off=tmp/d9/chase-off chase-on=tmp/d9/chase-on \
   tow-off=tmp/d9/tow-off tow-on=tmp/d9/tow-on
-make slave && make slave-developer && make slave-verify
+make slave developer verify
 python3 tools/slave_gate.py --prefix d9-
 ```
 
@@ -1052,7 +1060,7 @@ the debugger reads memory behind the emulated data cache, so the HUD accounting 
 skipped. The play-test build is the developer slave on the arm FS-UAE:
 
 ```sh
-make slave-verify OUT=tmp/d10/build-verify
+make snapshot BUILD=verify OUT=tmp/d10/build-verify
 python3 tools/c2_capture.py tmp/d10/states-on --build tmp/d10/build-verify --states --stage --views --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d10/states-off --build tmp/d10/build-verify --states --views --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/d10/states-on-repeat --build tmp/d10/build-verify --states --stage --views --custom4 1 --setup a1200-030
@@ -1076,11 +1084,11 @@ python3 tools/d9_smooth.py tmp/d10/states-on-repeat --out tmp/d10/smooth-repeat.
 python3 tools/d9_smooth.py --out tmp/d10/shots.json --shots cockpit-off=tmp/d10/cockpit-off cockpit-on=tmp/d10/cockpit-on \
   tv-off=tmp/d10/tv-off tv-on=tmp/d10/tv-on chase-off=tmp/d10/chase-off chase-on=tmp/d10/chase-on \
   tow-off=tmp/d10/tow-off tow-on=tmp/d10/tow-on i040-off=tmp/d10/i040-still-off i040-on=tmp/d10/i040-still-on
-make slave && make slave-developer && make slave-verify
+make slave developer verify
 python3 tools/slave_gate.py --prefix d10-
-make slave-developer OUT=tmp/d10/build-developer
+make snapshot BUILD=developer OUT=tmp/d10/build-developer
 FSUAE=$FSUAE_ARM DETERMINISTIC=1 AMIGA_SETUP=a1200-040 SLAVE=tmp/d10/build-developer/F1GP.Slave \
-  WHD_ARGS='CUSTOM1=1 CUSTOM2=11 CUSTOM4=1' amiga/run.sh
+  WHD_ARGS='CUSTOM1=1 CUSTOM2=11 CUSTOM4=1' make run
 ```
 
 ### E1 caches
@@ -1091,7 +1099,7 @@ are different races (the uncached menus are slower), so its state comparison rep
 DIFFERENT:
 
 ```sh
-make slave-developer OUT=tmp/e1/build-developer
+make snapshot BUILD=developer OUT=tmp/e1/build-developer
 for arm in on off; do
   flag=; [ $arm = off ] && flag=--no-caches
   python3 tools/c2_capture.py tmp/e1/dev-$arm --build tmp/e1/build-developer --states --snapshot --views --custom4 1 --setup a1200-030 $flag
@@ -1108,7 +1116,7 @@ entries. `c2_capture.py --e2` sets `CUSTOM2` bit 4 and keeps WHDLoad's log as
 
 ```sh
 python3 tools/e2_tables.py --report tmp/e2/report.json
-make slave-verify OUT=tmp/e2/build-verify && make slave-developer OUT=tmp/e2/build-developer
+make snapshot BUILD=verify OUT=tmp/e2/build-verify && make snapshot BUILD=developer OUT=tmp/e2/build-developer
 python3 tools/c2_capture.py tmp/e2/states-on --build tmp/e2/build-verify --e2 --states --stage --views --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/e2/states-on-repeat --build tmp/e2/build-verify --e2 --states --stage --views --custom4 1 --setup a1200-030
 python3 tools/c2_capture.py tmp/e2/states-off --build tmp/e2/build-verify --states --stage --views --custom4 1 --setup a1200-030
@@ -1120,7 +1128,7 @@ for arm in on off; do
 done
 python3 tools/c5_compare.py off=tmp/e2/dev-off on=tmp/e2/dev-on --out tmp/e2/dev-comparison.json
 python3 tools/c2_capture.py tmp/e2/a1200-e2 --build tmp/e2/build-verify --e2 --snapshot --custom4 1 --setup a1200 --ticks 100
-make slave && make slave-developer && make slave-verify
+make slave developer verify
 python3 tools/slave_gate.py --prefix e2-
 ```
 
@@ -1139,7 +1147,7 @@ every epoch close (`F1GP VERIFY E3 ...` in `whdl_log.txt`). On a twin difference
 `twin-faults.bin`, which stays empty in a clean run:
 
 ```sh
-make slave-verify OUT=tmp/e3/build-verify && make slave-developer OUT=tmp/e3/build-developer
+make snapshot BUILD=verify OUT=tmp/e3/build-verify && make snapshot BUILD=developer OUT=tmp/e3/build-developer
 S="--states --stage --views --custom4 1 --setup a1200-030"
 python3 tools/c2_capture.py tmp/e3/states-off --build tmp/e3/build-verify --e2 $S
 python3 tools/c2_capture.py tmp/e3/states-twin --build tmp/e3/build-verify --e2 --twin $S
@@ -1153,7 +1161,7 @@ python3 tools/c5_compare.py off=tmp/e3/dev-off on=tmp/e3/dev-on --out tmp/e3/dev
 python3 tools/c2_capture.py tmp/e3/a1200-e3 --build tmp/e3/build-verify --e2 --twin --snapshot --custom4 1 --setup a1200 --ticks 100
 python3 tools/c2_capture.py tmp/e3/profile-e3 --build tmp/e3/build-developer --e2 --e3 --snapshot --setup a1200-030 --custom4 1 --ticks 330 --profile 100 --profile-tick 300
 python3 tools/c6_profile.py tmp/e3/profile-e3 --out tmp/e3/profile-e3.json
-make slave && make slave-developer && make slave-verify
+make slave developer verify
 python3 tools/slave_gate.py --prefix e3-
 ```
 
@@ -1180,18 +1188,18 @@ same-build profile pair, its bit off and on, and compare the scene's time per pi
 cockpit (`--views`, `--ticks 90 --profile 100 --profile-tick 60`):
 
 ```sh
-make slave && make slave-developer && make slave-verify
-python3 tools/c2_capture.py tmp/e4/states-check --build tmp/build-verify --e2 --e4-check --states --stage --views --custom4 1 --setup a1200-030
+make slave developer verify
+python3 tools/c2_capture.py tmp/e4/states-check --build tmp/build/verify --e2 --e4-check --states --stage --views --custom4 1 --setup a1200-030
 for a in e3 e4; do
-  python3 tools/c2_capture.py tmp/e4/profile-rear-$a --build tmp/build-developer --e2 --$a --snapshot --views --setup a1200-030 --custom4 1 --ticks 900 --profile 100 --profile-tick 870
+  python3 tools/c2_capture.py tmp/e4/profile-rear-$a --build tmp/build/developer --e2 --$a --snapshot --views --setup a1200-030 --custom4 1 --ticks 900 --profile 100 --profile-tick 870
   python3 tools/c6_profile.py tmp/e4/profile-rear-$a --out tmp/e4/profile-rear-$a.json
 done
 python3 tools/slave_gate.py --prefix e4-
-A="--build tmp/build-developer --e2 --e4 --views --setup a1200-030 --ticks 900 --publish"
+A="--build tmp/build/developer --e2 --e4 --views --setup a1200-030 --ticks 900 --publish"
 python3 tools/c2_capture.py tmp/e4/paint-off $A
 python3 tools/c2_capture.py tmp/e4/paint-on $A --e4-data
 python3 tools/c2_compare.py tmp/e4/paint-off tmp/e4/paint-on tmp/e4/paint-compare.json
-P="--build tmp/build-developer --e2 --e4 --e4-data --snapshot --views --setup a1200-030 --custom4 1 --ticks 90 --profile 100 --profile-tick 60"
+P="--build tmp/build/developer --e2 --e4 --e4-data --snapshot --views --setup a1200-030 --custom4 1 --ticks 90 --profile 100 --profile-tick 60"
 python3 tools/c2_capture.py tmp/e4/grid-b7 $P
 python3 tools/c2_capture.py tmp/e4/grid-b8 $P --e4-routines
 for a in b7 b8; do python3 tools/c6_profile.py tmp/e4/grid-$a --out tmp/e4/grid-$a.json; done
@@ -1199,8 +1207,10 @@ for a in b7 b8; do python3 tools/c6_profile.py tmp/e4/grid-$a --out tmp/e4/grid-
 
 ## F1GP-Ed (F)
 
-`amiga/ed.sh` boots Workbench 2.04 with F1GP-Ed 3.44 (extracted from the pinned archive into
-`tmp/f1ed`) and a fresh copy of the pinned `f1gp` as `DH1:f1gp`. `tools/f1_ed.py serve`
+`make ed` (`tools/ed.sh`) boots Workbench 2.04 with F1GP-Ed 3.44 (extracted by `make unpack`
+into `tmp/game/F1GP-Ed`) and a fresh copy of the pinned `f1gp` as `DH1:f1gp`, in its own run
+directory `tmp/run/ed/.run` (`make stop INSTANCE=ed` stops it). `common/run.sh` boots only
+WHDLoad, so this launcher uses the shared `fsuae_common.sh` directly. `tools/f1_ed.py serve`
 drives it interactively (`click`, `menu`, `hold`, `key`, `run`, `shot`).
 `tools/f1_writemap.py` saves settings into the copy through F1GP-Ed's menu shortcuts and
 collects the file (about 5 s a save); `tools/f1_diff.py` lists the changed ranges as hunk
@@ -1208,7 +1218,7 @@ offsets and `tools/f1_fields.py` merges attribution saves into datafile fields:
 
 ```sh
 python3 tools/f1_writemap.py tmp/f1/out new --new
-for f in tmp/f1ed/F1GP-Ed/2002.f1gp tmp/f1ed/F1GP-Ed/Datafiles/*.f1gp; do
+for f in tmp/game/F1GP-Ed/2002.f1gp tmp/game/F1GP-Ed/Datafiles/*.f1gp; do
   python3 tools/f1_writemap.py tmp/f1/out df-$(basename $f .f1gp) --datafile $f
 done
 for k in $(seq 0 391); do python3 tools/f1_writemap.py tmp/f1/chunk c$k --xor $((4+16*k)) 16 1; done
@@ -1216,7 +1226,7 @@ for i in $(seq 4 35) $(seq $((0xEF4)) $((0xF03))) $(seq $((0x1644)) $((0x17E3)))
   python3 tools/f1_writemap.py tmp/f1/byte b$i --xor $i 1 0xff
 done
 python3 tools/f1_diff.py tmp/game/FormulaOneGrandPrix4Disk/data/f1gp tmp/f1/out/new.f1gp 16
-python3 tools/f1_fields.py tmp/f1/out/df-2002.f1gp tmp/f1ed/F1GP-Ed/2002.f1gp tmp/f1/byte tmp/f1/chunk
+python3 tools/f1_fields.py tmp/f1/out/df-2002.f1gp tmp/game/F1GP-Ed/2002.f1gp tmp/f1/byte tmp/f1/chunk
 ```
 
 `tools/f2_collisions.py` checks the saved files against the slave (F2): `PL_*` sites, the
@@ -1227,8 +1237,8 @@ each distinct file (about 1 s a file):
 python3 tools/f2_collisions.py tmp/f1/out tmp/f1/chunk tmp/f1/byte --report tmp/f2/report.json
 ```
 
-To run an edited file, copy the game directory, replace `data/f1gp` and pass it as `GAME`
-(absolute) to `tools/f1gp.py serve`. The stock routes stop where the file's settings skip a
+To run an edited file, copy the game directory, replace `data/f1gp` and pass it as `GAME_DIR`
+(relative to `tmp/game/`, e.g. `GAME_DIR=../f3/game-2002rate`) to `tools/f1gp.py serve`. The stock routes stop where the file's settings skip a
 screen, so drive the rest with `tap` and `menuclick`. The protection accepts A and Return;
 in the Main Menu use 395 252, then 530 246, then 235 391 for practice at Silverstone.
 
@@ -1242,8 +1252,8 @@ step (65536/step ticks a second, ±1%); `d2_alpha.py` and `d9_smooth.py` read it
 capture. `f3_pace.py` times the computer cars' laps in `--states` captures:
 
 ```sh
-. amiga/env.sh
-make slave-verify OUT=tmp/f3/v6-verify
+. ../../common/env.sh
+make snapshot BUILD=verify OUT=tmp/f3/v6-verify
 python3 tools/test_world_clock.py
 python3 tools/f3_frame_rate.py tmp/f1/out/df-2002.f1gp tmp/f3/game-2002rate
 B='--build tmp/f3/v6-verify --custom4 1'
@@ -1264,7 +1274,7 @@ for arm in 20hz stock 2002rate; do
   python3 tools/d9_smooth.py tmp/f3/v6-d9-$arm-states-on --out tmp/f3/v6-smooth-$arm.json
   python3 tools/d2_alpha.py tmp/f3/v6-d9-$arm-alpha-on --out tmp/f3/v6-alpha-$arm.json
 done
-make slave && make slave-developer && make slave-verify
+make slave developer verify
 python3 tools/slave_gate.py --prefix f3-
 ```
 
@@ -1273,7 +1283,7 @@ plain `--states` captures.
 
 ### F4 edited-file inputs
 
-`f4_inputs.py build` boots `amiga/ed.sh` once per variant and drives F1GP-Ed's menus,
+`f4_inputs.py build` boots `tools/ed.sh` once per variant and drives F1GP-Ed's menus,
 Graphics and Backdrops windows and file requesters (pointer homed to `F1ED_HOME=74,37`,
 the clamp on F1GP-Ed's screen); it refuses an existing variant directory. `verify`
 compares the edited files with `manifest/f4-inputs.json`, and `slave_gate.py --game`
@@ -1282,17 +1292,17 @@ route's palette-independent race check. `f2_collisions.py` takes the variants' `
 files as another directory:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/f4_inputs.py build tmp/f4/inputs
 python3 tools/f4_inputs.py verify tmp/f4/inputs
 mkdir -p tmp/f4/files
 for v in datafile graphics combined mclaren; do cp tmp/f4/inputs/$v/data/f1gp tmp/f4/files/$v.f1gp; done
 python3 tools/f2_collisions.py tmp/f4/files --report tmp/f4/collisions.json
-make slave && make slave-developer && make slave-verify
+make slave developer verify
 python3 tools/slave_gate.py --prefix f4-
 python3 tools/slave_gate.py --prefix f4b-graphics- --game graphics
 python3 tools/slave_gate.py --prefix f4b-combined- --game combined
-make slave-verify OUT=tmp/f4/verify
+make snapshot BUILD=verify OUT=tmp/f4/verify
 B='--build tmp/f4/verify --custom4 1'; G=tmp/f4/inputs
 python3 tools/c2_capture.py tmp/f4/shots-graphics $B --stage --setup a1200-030 --ticks 200 --shots 2 --game $G/graphics
 for v in combined graphics; do
@@ -1314,10 +1324,10 @@ table, `F5_SUM` and `NAMES_SUM`) from the pinned file. `f5_variant.py` builds th
 negative cases and checks their `--expect-native` captures:
 
 ```sh
-. amiga/env.sh
-make slave && make slave-developer && make slave-verify
+. ../../common/env.sh
+make slave developer verify
 python3 tools/slave_gate.py --prefix f5-
-make slave-verify OUT=tmp/f5/verify
+make snapshot BUILD=verify OUT=tmp/f5/verify
 python3 tools/f5_variant.py site tmp/f5/game-site
 python3 tools/f5_variant.py name tmp/f5/game-name
 python3 tools/c2_capture.py tmp/f5/cap-site --build tmp/f5/verify --expect-native --setup a1200-030 --game tmp/f5/game-site
@@ -1333,8 +1343,8 @@ given factors, the others 0) and optionally the game file's base; `--speed-facto
 `CUSTOM2` bit 11:
 
 ```sh
-. amiga/env.sh
-make slave-verify OUT=tmp/f6/verify
+. ../../common/env.sh
+make snapshot BUILD=verify OUT=tmp/f6/verify
 python3 tools/f6_game.py tmp/f6/g-off
 python3 tools/f6_game.py tmp/f6/g-gb16384 7=16384
 python3 tools/f6_game.py tmp/f6/g-gb20480 7=20480
@@ -1360,7 +1370,7 @@ natively and with the built slave's `h3_slip`; it needs unicorn in a scratch env
 
 ```sh
 python3 -m venv tmp/h3/venv && tmp/h3/venv/bin/pip install unicorn
-tmp/h3/venv/bin/python tools/h3_slip.py tmp/a3/green --slave tmp/build/F1GP.Slave --out tmp/h3/slip.json
+tmp/h3/venv/bin/python tools/h3_slip.py tmp/a3/green --slave tmp/build/release/F1GP.Slave --out tmp/h3/slip.json
 python3 tools/slave_gate.py --prefix h3-
 ```
 
@@ -1371,10 +1381,10 @@ bit 13 (the native loss with `--step20`). `h2_corner.py` measures the loss and t
 lap against the first capture; give each capture's step:
 
 ```sh
-. amiga/env.sh
-make slave && make slave-developer && make slave-verify
+. ../../common/env.sh
+make slave developer verify
 python3 tools/slave_gate.py --prefix h2-
-B='--build tmp/build-verify --custom4 1 --states --setup a1200-030'
+B='--build tmp/build/verify --custom4 1 --states --setup a1200-030'
 python3 tools/c2_capture.py tmp/h2/v8-off $B
 python3 tools/c2_capture.py tmp/h2/v8-corner $B --corner
 python3 tools/c2_capture.py tmp/h2/v20 $B --step20
@@ -1390,18 +1400,20 @@ python3 tools/h2_corner.py stock=tmp/h2/v8-off:8192 corner8=tmp/h2/v8-corner:819
 ## Release archive (G4)
 
 `make dist` rebuilds Codetapper's installer archive (`tmp/archives/FormulaOneGrandPrix.lha`,
-verified against the manifest first) as `dist/FormulaOneGrandPrix-<ver>.lha` with
-`tools/package_release.py`. It makes a fresh release build in `tmp/dist-build` (G1),
-takes the version from the slave's `$VER` and requires a matching entry in
+verified against `inputs.sha256` first) as `FormulaOneGrandPrix-<ver>.lha` and its `.sha256`
+in the repository's `dist/`, through `game_dist` in `game.sh` and
+`tools/package_release.py` (`FORCE=1` replaces an existing archive). It packages the
+release build `make dist` has just made in `tmp/build/release` (G1), after checking its
+`build.json` against the slave and the source, takes the version from the slave's `$VER` and requires a matching entry in
 `release/ReadMe`. The archive keeps the original's 18 members; the slave, the ReadMe and
 the nine game icons change, and the icons get `MEMCONFIG=1` after `PRELOAD`, every other
 byte kept. The tool re-extracts the archive and checks every
 member against its stage and the original. Bump `DECL_VERSION` and the `$VER` date in
-`whdload/F1GP.s` and the ReadMe together. A boot check of the packaged slave:
+`src/F1GP.s` and the ReadMe together. A boot check of the packaged slave:
 
 ```sh
 make dist
-lha xqw=tmp/g4/new dist/FormulaOneGrandPrix-2.0b.lha
+lha xqw=tmp/g4/new ../../dist/FormulaOneGrandPrix-2.0b.lha
 AMIGA_SETUP=a1200-040 SLAVE=tmp/g4/new/FormulaOneGrandPrixHD/FormulaOneGrandPrix.slave \
   WHD_ARGS='CUSTOM1=1 MEMCONFIG=1' WARP=1 JOY0=none JOY1=none \
   python3 tools/f1gp.py serve > tmp/g4/serve.log 2>&1 &

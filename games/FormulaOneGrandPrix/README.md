@@ -1,4 +1,4 @@
-# F1GP
+# Formula One Grand Prix
 
 Investigation and WHDLoad slave rebuild for the Amiga game Formula One Grand Prix.
 The goal is real-time simulation independent of frame rate, smooth presentation up to
@@ -20,7 +20,9 @@ See [current status and next steps](docs/open-work.md) for the scope, and
 - [Current scope and next work](docs/open-work.md)
 - [Plan: real-time speed, up to 50 fps, performance](docs/plan.md)
 - [Internals](docs/internals.md)
-- [Input provenance](manifest/inputs.json)
+- [Original archives](inputs.sha256), pinned by SHA-256
 
-Original archives and extracted files live only in ignored `tmp/`. The repository
-contains instructions, setup helpers, filenames and checksums, not game bytes.
+Original archives and extracted files live only in ignored `tmp/` (`make unpack
+ARCHIVES=<directory>`). The repository contains instructions, setup helpers, filenames
+and checksums, not game bytes. `make run` boots the release slave, `make dist` builds
+the release archive into the repository's `dist/`.

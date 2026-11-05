@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """G4: rebuild Codetapper's installer archive with the new slave -> dist/ (LH5, level-1 headers).
 
-    python3 tools/package_release.py        (make dist)
+    make dist        (game.sh game_dist: --dist names the output directory, --force
+                      replaces an existing archive)
 
-Input, kept local and verified against manifest/SHA256SUMS: tmp/archives/FormulaOneGrandPrix.lha.
-Output: dist/FormulaOneGrandPrix-<ver>.lha (ignored), with exactly the input's members.
-Changed members are the freshly built release slave (G1: the enhancements on unless the
+Input, kept local and verified against inputs.sha256: tmp/archives/FormulaOneGrandPrix.lha.
+Output: <dist>/FormulaOneGrandPrix-<ver>.lha (the repository's ignored dist/), with exactly
+the input's members, and its .sha256 beside it.
+Changed members are the current release build, tmp/build/release/F1GP.Slave, which make dist
+has just built and whose build.json must match it and the source (G1: the enhancements on unless the
 player picks "Original game"), release/ReadMe and the nine game launch icons, which get a
 MEMCONFIG tooltype; everything else is copied byte for byte. The archive is re-extracted and
 checked member by member against its stage and the original. LHA names LHa for UNIX
 (Lhasa, the usual `lha`, cannot create archives).
 """
 from pathlib import Path
+import argparse
 import hashlib
+import json
 import os
 import re
 import struct
@@ -25,7 +30,7 @@ SOURCE = ROOT / 'tmp/archives/FormulaOneGrandPrix.lha'
 TOP, SLAVE = 'FormulaOneGrandPrixHD', 'FormulaOneGrandPrix.slave'
 ICONS = ('inf', 'romicon', 'newicon', 'newintro', 'newexot', 'newexot2', 'colicon', 'colintro',
          'colbox')
-BUILD = ROOT / 'tmp/dist-build'
+BUILD = ROOT / 'tmp/build/release'
 # The release's enhancements need no tooltype (G1); E's fast areas need the alternative
 # memory configuration.
 TOOLTYPES = (b'MEMCONFIG=1',)
@@ -88,17 +93,28 @@ def archive(stage, names, out, changed):
             assert a == (stage / name).read_bytes(), name
             assert (a != b) == (name in changed), name
     digest = hashlib.sha256(out.read_bytes()).hexdigest()
-    print(f'{out.relative_to(ROOT)}: {len(names)} files, {out.stat().st_size} bytes, '
+    out.with_name(out.name + '.sha256').write_text(f'{digest}  {out.name}\n')
+    print(f'{out}: {len(names)} files, {out.stat().st_size} bytes, '
           f'SHA-256 {digest}\n  changed: {", ".join(sorted(changed))}')
 
 
 def main():
-    subprocess.run(['shasum', '-a', '256', '-c', 'manifest/SHA256SUMS'], cwd=ROOT, check=True,
-                   capture_output=True)
-    # A fresh build of its own: a VERIFY build must never be packaged.
-    subprocess.run(['make', '-C', str(ROOT), 'slave', f'OUT={BUILD.relative_to(ROOT)}'],
-                   check=True, capture_output=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dist', type=Path, default=ROOT.parents[1] / 'dist')
+    parser.add_argument('--force', action='store_true', help='replace an existing archive')
+    args = parser.parse_args()
+    pins = {name: digest for digest, name in (line.split() for line in
+            (ROOT / 'inputs.sha256').read_text().splitlines() if line.strip() and not line.startswith('#'))}
+    assert hashlib.sha256(SOURCE.read_bytes()).hexdigest() == pins[SOURCE.name], \
+        f'{SOURCE} differs from inputs.sha256'
+    # The current release build (make dist builds it first): never a VERIFY or developer
+    # build, never a stale one.
     slave = (BUILD / 'F1GP.Slave').read_bytes()
+    meta = json.loads((BUILD / 'build.json').read_text())
+    assert meta['build'] == 'release', 'build'
+    assert meta['slave_sha256'] == hashlib.sha256(slave).hexdigest(), 'stale build.json'
+    assert meta['source_sha256'] == hashlib.sha256((ROOT / 'src/F1GP.s').read_bytes()).hexdigest(), \
+        'stale build: make slave'
     assert b'Original game' in slave and b'Developer - ' not in slave, 'build'
     assert b'C3:' not in slave and b'C5:' not in slave and b'VERIFY' not in slave, 'build'
     version, date = re.search(rb'\$VER: ' + SLAVE.encode() + rb' ([0-9.a-z]+) \(([0-9.]+)\)',
@@ -106,7 +122,11 @@ def main():
     readme = (ROOT / 'release/ReadMe').read_bytes()
     assert b'Version ' + version + b' (' + date + b')' in readme, 'ReadMe entry'
     assert b'Version:  ' + version + b'\n' in readme, 'ReadMe header'
-    (ROOT / 'dist').mkdir(exist_ok=True)
+    dist = args.dist.resolve()
+    dist.mkdir(parents=True, exist_ok=True)
+    out = dist / f'FormulaOneGrandPrix-{version.decode()}.lha'
+    if out.exists() and not args.force:
+        raise SystemExit(f'{out} exists (FORCE=1 replaces it)')
     with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as stage:
         stage = Path(stage)
         extract(SOURCE, stage)
@@ -118,7 +138,7 @@ def main():
         for s in ICONS:
             icon = stage / TOP / f'FormulaOneGrandPrix.{s}'
             icon.write_bytes(enhanced_icon(icon.read_bytes()))
-        archive(stage, names, ROOT / 'dist' / f'FormulaOneGrandPrix-{version.decode()}.lha', changed)
+        archive(stage, names, out, changed)
 
 
 if __name__ == '__main__':

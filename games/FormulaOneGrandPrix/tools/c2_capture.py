@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fresh, pinned C2 tick-boundary probe. All evidence stays in tmp/.
 
-Source amiga/env.sh; c2_capture.py OUT --custom4 3 --ticks 100
+Source ../../common/env.sh; c2_capture.py OUT --custom4 3 --ticks 100
 CUSTOM4=3 delays batches; 7 retains raster work in those same catch-up ticks.
 These are diagnostic controls, not a performance comparison.
 """
@@ -22,14 +22,14 @@ from check_disabled import SOURCE
 from machine_matrix import runtime, sha
 from race_profile import game_hunks, image, locate
 from slave_compare import client
-from slave_inputs import ROOT, verify
+from slave_inputs import ROOT, RUN, verify
 from state_diff import SIZES, scratch
 import e4_tables
 
 
 def keep_log(out):
     """WHDLoad's FileLog (VERIFY's CACR and E2 lines) beside the capture."""
-    log = ROOT/'amiga/.run/dh1/.whdl_log'
+    log = RUN/'dh1/.whdl_log'
     if log.exists():
         shutil.copyfile(log, out/'whdl_log.txt')
 
@@ -62,7 +62,7 @@ def capture(args):
     symbols = {n: int(o, 16) for n, o in re.findall(
         r'^([cde][1-9]_\w+)\s+00:([0-9A-F]+)$',
         (slave.parent / 'F1GP.lst').read_text(errors='replace'), re.M)}
-    sock = ROOT / 'amiga/.run/f1gp.sock'
+    sock = RUN/'f1gp.sock'
     if sock.exists():
         with socket.socket(socket.AF_UNIX) as connection:
             connection.settimeout(1)
@@ -127,7 +127,7 @@ def capture(args):
         if not directory.is_relative_to(ROOT/'tmp'):
             raise ValueError('--game must stay in project tmp/')
         # F4: the route stops at any race view, whatever the file's cockpit and palette.
-        game = dict(GAME=str(directory), F1GP_EDITED='1')
+        game = dict(GAME_DIR=os.path.relpath(directory, ROOT/'tmp/game'), F1GP_EDITED='1')
     env = dict(os.environ, **game, AMIGA_SETUP=args.setup, EXTRA_ARGS=extra,
                SLAVE=str(slave), WHD_ARGS=whd, WARP='1', DETERMINISTIC='1',
                JOY0='none', JOY1='none', VERIFY_EXIT='1', FSUAE=os.environ['FSUAE_ARM'],
@@ -162,7 +162,7 @@ def capture(args):
             time.sleep(.2)
         ready = True
         report = re.findall(r'CPU=(\d+), FPU=(\d+).*?MMU=(\d+), JIT=(\d+)',
-                            (ROOT/'amiga/.run/fsuae/Cache/Logs/fs-uae.log.txt').read_text(errors='replace'))
+                            (RUN/'fsuae/Cache/Logs/fs-uae.log.txt').read_text(errors='replace'))
         meta['effective'] = list(map(int, report[-1])) if report else None
         if args.setup == 'a1200-030' and (not report or meta['effective'][0] != 68030
                                           or meta['effective'][2] != 0):
@@ -199,7 +199,7 @@ def capture(args):
             meta['native']['fps'] = meta['native']['frames']/10
             command('tap', '59')
             command('gdb', 'monitor fields 1000')
-            marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
+            marker = RUN/'dh0/whdload-exit.txt'
             meta['quit'] = marker.read_text().strip() if marker.exists() else 'MISSING'
             keep_log(out)
             if meta['quit'] != 'OK':
@@ -231,7 +231,7 @@ def capture(args):
             command('tap', '59')
             command('gdb', 'monitor fields 1000')
             command('shot', str(out/'quit.png'))
-            marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
+            marker = RUN/'dh0/whdload-exit.txt'
             meta['quit'] = marker.read_text().strip() if marker.exists() else 'MISSING'
             keep_log(out)
             if meta['quit'] != 'OK':
@@ -370,7 +370,7 @@ def capture(args):
         command('tap', '59')
         command('gdb', 'monitor fields 1000')
         command('shot', str(out/'quit.png'))
-        marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
+        marker = RUN/'dh0/whdload-exit.txt'
         meta['quit'] = marker.read_text().strip() if marker.exists() else 'MISSING'
         keep_log(out)
         if meta['quit'] != 'OK':

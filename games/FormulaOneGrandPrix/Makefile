@@ -1,30 +1,19 @@
-SHELL := /bin/bash
-.DEFAULT_GOAL := help
-.PHONY: help check
-help:
-	@echo 'make check; make slave / slave-developer / slave-verify; make check-disabled CAPTURE=tmp/...; make slave-clean OUT=tmp/...; make dist'
-check:
-	shasum -a 256 -c manifest/SHA256SUMS
+include ../../common/mk/game.mk
 
-.PHONY: slave
-slave:
-	@BUILD=release OUT="$(or $(OUT),tmp/build)" /bin/bash whdload/build.sh
+# A build kept for a capture: make snapshot BUILD=verify OUT=tmp/c3/build-verify builds
+# tmp/build/<BUILD>/ and copies it (slave, listing, build.json) to OUT, under tmp/.
+.PHONY: snapshot ed check-disabled test-disabled
+snapshot:
+	@case "$(OUT)" in *..*) false ;; tmp/?*) true ;; *) false ;; esac || { echo "snapshot: OUT must be a directory under tmp/" >&2; exit 1; }
+	@"$(COMMON)/build.sh" "$(or $(BUILD),release)"
+	@mkdir -p "$(OUT)" && cp tmp/build/$(or $(BUILD),release)/* "$(OUT)/" && echo "copied to $(OUT)"
 
-.PHONY: slave-developer slave-verify check-disabled
-slave-developer:
-	@BUILD=developer OUT="$(or $(OUT),tmp/build-developer)" /bin/bash whdload/build.sh
-slave-verify:
-	@BUILD=verify OUT="$(or $(OUT),tmp/build-verify)" /bin/bash whdload/build.sh
+# F1GP-Ed 3.44 under Workbench on a writable copy of the game's data (tools/ed.sh).
+ed:
+	@tools/ed.sh
+
+# B4: the disabled-options check on a capture, and its negative tests.
 check-disabled:
 	@python3 tools/check_disabled.py "$(CAPTURE)"
-
-.PHONY: slave-clean test-disabled
-slave-clean:
-	@CLEAN=1 OUT="$(or $(OUT),tmp/build)" /bin/bash whdload/build.sh
 test-disabled:
 	@python3 tools/test_disabled.py
-
-# G4: the original installer archive with the new slave, ReadMe and icons -> dist/ (ignored).
-.PHONY: dist
-dist:
-	@python3 tools/package_release.py

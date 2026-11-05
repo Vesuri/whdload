@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Drive F1GP-Ed 3.44 under Workbench in FS-UAE (amiga/ed.sh) for F1's write map.
+"""Drive F1GP-Ed 3.44 under Workbench in FS-UAE (tools/ed.sh) for F1's write map.
 
-  python3 tools/f1_ed.py serve          boot amiga/ed.sh DEBUG=1, attach gdb, run; listen
+  python3 tools/f1_ed.py serve          boot tools/ed.sh DEBUG=1, attach gdb, run; listen
   python3 tools/f1_ed.py <command...>   send one command to the running server
 
 Commands are the shared server's (shot <png>, fields via gdb, quit, ...) and:
@@ -99,7 +99,7 @@ def run(server, g, rest):
     return 'ran; CPU stopped'
 
 
-server = Server('f1ed', root=ROOT, run_script='amiga/ed.sh', profile_window=False,
+server = Server('f1ed', root=ROOT, run_script='tools/ed.sh', run_dir='tmp/run/ed/.run', profile_window=False,
                 commands={'click': click, 'menu': menu, 'hold': lambda s_, g, r: menu(s_, g, r, False), 'move': move, 'key': key, 'run': run})
 
 if __name__ == '__main__':

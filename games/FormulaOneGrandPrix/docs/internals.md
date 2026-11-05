@@ -72,7 +72,7 @@ frontend, runs with an empty argument line, unloads each segment and quits on re
 
 ### B2: shared-KickEmu loader
 
-`whdload/F1GP.s` builds with slave version 17 (developer and VERIFY builds 20, for E2–E4's
+`src/F1GP.s` builds with slave version 17 (developer and VERIFY builds 20, for E2–E4's
 alternative memory configuration) and the pinned shared kick13 source.
 It retains the original memory requirements, assigns, frontend/fire/CUSTOM1 decision,
 three size-selected patch lists, conditional names restore, empty argument line and
@@ -350,7 +350,7 @@ activity in each window. Thus drawing/tick time, work and event-derived fps are
 unavailable. Repeating empty CPU data does not satisfy a timing gate. The 030 control
 contains instruction records and complete calls with the same collector.
 
-Evidence: `tmp/matrix-workers/{040-mmu,060-mmu}/tmp/a7-all/{040,060}-on-{a,b}`
+Evidence: `tmp/matrix-workers/<040-mmu|060-mmu>/tmp/a7-all/<040|060>-on-<a|b>`
 (the worker names describe isolation directories; these captures explicitly use
 non-MMU CPUs). Effective logs and configuration are retained. The installed runtime
 source-revision lists the normal tracing patches but not the separate optional `aprof`
@@ -3144,7 +3144,7 @@ leave it unless cheap; no cheap change is known, and it is below the 1–3% entr
 
 ### F1 write map — complete
 
-**Method.** `amiga/ed.sh` boots Workbench 2.04 on Kickstart 3.1 with F1GP-Ed 3.44 (from the
+**Method.** `tools/ed.sh` boots Workbench 2.04 on Kickstart 3.1 with F1GP-Ed 3.44 (from the
 pinned `tmp/archives/F1GP-Ed.lha`, with its bundled reqtools, gadtools13 and f1gp.library)
 on DH0 and a fresh copy of the pinned `f1gp` as `DH1:f1gp` (`f1gp_disk_#2:`).
 `tools/f1_writemap.py` saves the settings into that copy through F1GP-Ed's own menu
@@ -3379,7 +3379,7 @@ WHDLoad.
 
 ### F4 edited-file inputs — complete
 
-**Inputs.** `tools/f4_inputs.py` drives F1GP-Ed 3.44 (amiga/ed.sh, which now copies the
+**Inputs.** `tools/f4_inputs.py` drives F1GP-Ed 3.44 (tools/ed.sh, which now copies the
 whole data directory to DH1 and assigns all four game disks there) with the keyboard and
 the homed pointer, on a fresh copy of the pinned game, and pins the edited files in
 `manifest/f4-inputs.json`:

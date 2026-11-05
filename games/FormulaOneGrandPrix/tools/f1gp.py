@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive Formula One Grand Prix in FS-UAE through the Barto gdb stub.
 
-  python3 tools/f1gp.py serve          boot (amiga/run.sh DEBUG=1), attach gdb, run; listen
+  python3 tools/f1gp.py serve          boot (common/run.sh DEBUG=1), attach gdb, run; listen
   python3 tools/f1gp.py <command...>   send one command to the running server, print the reply
 
 Commands are the shared server's (AmigaXDev amigaxdev.gdbserve): stop, cont, gdb <text>,
@@ -32,14 +32,19 @@ Input goes through the native build's harness: gdb monitor key|mouse|input|field
 The CPU stays halted from reset until the first command (BOOT_BREAK, below); `cont` resumes.
 Uses the native arm64 FS-UAE ($FSUAE_ARM) unless FSUAE is set; it profiles the whole
 24-bit space without a trigger, so no lldb profiler-window fix.
+The run options of common/run.sh (SETUP, BUILD, SLAVE, WHD_ARGS, INSTANCE, ...) apply to
+serve; without SLAVE it builds and boots the release slave, SLAVE=original boots
+Codetapper's installed one.
 """
 import io, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _amigaxdev  # noqa: F401
 from amigaxdev import barto
-from amigaxdev.gdbserve import Server, require_harness
+from amigaxdev.gdbserve import require_harness
 from amigaxdev.input import Input as SharedInput
 from PIL import Image
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../common/tools'))
+from game_server import game_server  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault('FSUAE', os.environ.get('FSUAE_ARM')
@@ -293,13 +298,15 @@ def raceclock(server, g, rest):
 # and the race (its random elements included) differs from boot to boot.  $F800D6 is the
 # second instruction of the Kickstart 3.1 reset code in both host ROMs.
 os.environ.setdefault('BOOT_BREAK', '0xf800d6')
-server = Server('f1gp', root=ROOT, profile_window=False,
-                commands={'quickrace': quickrace, 'menuclick': menuclick, 'tap': tap_key,
-                          'startup': lambda s, g, r: quickrace(s, g, r, 'startup'),
-                          'practice': lambda s, g, r: quickrace(s, g, r, 'practice'),
-                          'qualifying': lambda s, g, r: quickrace(s, g, r, 'qualifying'),
-                          'raceprofile': raceprofile,
-                          'raceclock': raceclock, 'statediff': statediff})
+# This game, whatever the caller's GAME: the tool may be started from anywhere.
+os.environ['GAME'] = os.path.basename(ROOT)
+server = game_server('f1gp', profile_window=False,
+                     commands={'quickrace': quickrace, 'menuclick': menuclick, 'tap': tap_key,
+                               'startup': lambda s, g, r: quickrace(s, g, r, 'startup'),
+                               'practice': lambda s, g, r: quickrace(s, g, r, 'practice'),
+                               'qualifying': lambda s, g, r: quickrace(s, g, r, 'qualifying'),
+                               'raceprofile': raceprofile,
+                               'raceclock': raceclock, 'statediff': statediff})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])

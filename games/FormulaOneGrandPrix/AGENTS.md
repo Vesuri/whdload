@@ -1,40 +1,27 @@
-# F1GP — Formula One Grand Prix
+# Formula One Grand Prix
 
-## Scope
+Real-time simulation independent of frame rate, smooth presentation up to 50 fps and
+better performance (especially on 68020+ with fast RAM) for the supplied four-disk
+Formula One Grand Prix. The original slave is by Codetapper (game.conf `AUTHOR`,
+`UPSTREAM`): his v1.0 shipped without source, so `src/F1GP.s` is a rebuilt loader. The
+work follows the steps in `docs/plan.md`; take them when the user asks.
+The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
+this file and `docs/` here hold only what is specific to this game.
 
-The launcher (`amiga/run.sh`, `tools/f1gp.py`) boots the game to gameplay, and the slave
-loader and executable layout are documented. The work follows the steps
-in `docs/plan.md`; take them when the user asks. The supplied install uses Codetapper's v1.0 slave;
-no slave source is available.
+Read `docs/open-work.md` first. The relevant AmigaXDev workflow is
+`docs/playbooks/new-game-playbook.md`.
 
-Read `docs/open-work.md` first. Shared guidance starts at AmigaXDev
-`docs/index.md`; the relevant workflow is `docs/playbooks/new-game-playbook.md`.
-The current task takes precedence over that playbook's full setup workflow.
+| Doc | Read it for |
+|---|---|
+| `docs/open-work.md` | the scope, where each step stands (G, the release, in progress) and next work |
+| `docs/plan.md` | the plan: real-time speed, up to 50 fps, performance (steps A to H) |
+| `docs/development.md` | inputs, the build, the gdb server and its routes, every capture recipe, F1GP-Ed, packaging |
+| `docs/internals.md` | the loader, executable layout, game time, every slave patch, the evidence |
+| `README.md` | the summary |
 
-## Rules
-
-- Never commit game, Kickstart, Workbench, WHDLoad or derived bytes, including
-  unpacked data, built slaves, traces, dumps, screenshots and recordings.
-  Keep them in ignored `tmp/`. Keep original inputs immutable.
-- Pin inputs by SHA-256 in `manifest/` and verify them before extracting or using
-  them. Never overwrite changed shared files. Shared setup moves differences to
-  `.replaced/`; use AmigaXDev's `make pull-shared` for shared edits. WHDLoad
-  developer packages retain only the latest verified installation, without backups.
-- No machine-specific paths or paths into other projects in tracked files.
-  Name other projects without their location. Use `amiga/env.sh` and overridable
-  shared variables under `~/.local` and `~/.local/share/amiga`. Scratch goes in
-  `tmp/`. Kickstart and Workbench sources are user-supplied (`TOSEC=`, `AMIGA_OS=`);
-  never record mirror addresses for them.
-- Never `pkill fs-uae` or `pkill gdb`. Use the shared `fsuae_common.sh` and stop
-  only verified project-owned process IDs.
-- Document addresses as game code-hunk or file offsets, not runtime addresses.
-  No performance claims without appropriate measurements.
-- Commits: author and committer Vesa Halttunen <vesuri@jormas.com>, unsigned,
-  `core.hooksPath=/dev/null`, no trailers, one commit per coherent change.
-  Set repository-local `commit.gpgsign=false` and `tag.gpgsign=false` when creating
-  or cloning a personal repository and verify both effective values.
-- Shell scripts must work with macOS `/bin/bash` 3.2.
-- History belongs in git. Update current documentation in place.
-- Agent instructions belong in `AGENTS.md`; `CLAUDE.md` only imports it.
-- Before touching another project, check its git status. Leave dirty projects
-  alone and report them. Follow its own instructions and commit conventions.
+The slave source is `src/`; `tools/` is the development harness and never ships.
+`game.sh` builds the slave (`game_build`: tables generated from the pinned game into
+`tmp/slave/`, then vasm), packages the release (`game_dist`) and runs the unit tests
+(`game_check`). `manifest/` pins the derived game files, the toolchain, the runtime and
+F4's edited files, which the build and the tools verify. `make ed` boots F1GP-Ed;
+`make snapshot BUILD=... OUT=tmp/...` keeps a build for a capture.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""B3 real-input F10 check; run after sourcing amiga/env.sh.
+"""B3 real-input F10 check; run after sourcing ../../common/env.sh.
 
 A fresh deterministic boot uses CUSTOM1=1, enters Quick Race, presses F10 and
 requires WHDLoad to return successfully. Evidence stays in immutable tmp/b3/quit.
@@ -11,12 +11,12 @@ import subprocess
 import sys
 import time
 from slave_compare import client, ROOT, BUILT
-from slave_inputs import verify
+from slave_inputs import RUN, verify
 
 verify()
 out = ROOT/'tmp/b3/quit'
 out.mkdir(parents=True, exist_ok=False)
-sock = ROOT/'amiga/.run/f1gp.sock'
+sock = RUN/'f1gp.sock'
 if sock.exists():
     try:
         client('quit', quiet=True)
@@ -38,7 +38,7 @@ try:
     result = dict(route=client('quickrace'),
                   slave_sha256=hashlib.sha256(BUILT.read_bytes()).hexdigest(),
                   whd_args=env['WHD_ARGS'])
-    marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
+    marker = RUN/'dh0/whdload-exit.txt'
     if marker.exists():
         raise RuntimeError('WHDLoad already returned before F10')
     result['marker_absent_before_key'] = True

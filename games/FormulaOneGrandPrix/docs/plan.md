@@ -197,7 +197,7 @@ Separate KickEmu's kick13 code from Codetapper's loader. Decode the three
 driver-names patch (`$3D6`): offset, original and new bytes, purpose. *Output:* internals
 "Slave".
 
-**B2 New slave source.** `whdload/` with the playbook §10 build (vasm, shared WHDLoad
+**B2 New slave source.** `src/` with the playbook §10 build (vasm, shared WHDLoad
 kit, `slv_Version` 17, KickEmu kick13), reproducing the loader: assigns, `frontend`
 unless `CUSTOM1` or fire, `LoadSeg` of `f1gp`, the patch list for each known size, driver
 names, quit. Pin the toolchain inputs in `manifest/`; built slaves stay in `tmp/`.

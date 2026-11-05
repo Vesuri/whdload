@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Serial, fresh-boot B5/A7/A8 captures; outputs are immutable below tmp/.
-Source amiga/env.sh. Usage: machine_matrix.py MACHINE on|off clock|green|tow|follow|all OUT [FIELDS]
+Source ../../common/env.sh. Usage: machine_matrix.py MACHINE on|off clock|green|tow|follow|all OUT [FIELDS]
 MMU cells are functional only; fixed-clock cells explicitly select cycle-exact cores.
 """
 import hashlib
@@ -13,7 +13,7 @@ import socket
 import subprocess
 import sys
 import time
-from slave_inputs import ROOT, verify
+from slave_inputs import ROOT, RUN, verify
 from slave_compare import client
 
 MACHINES = {
@@ -61,14 +61,14 @@ def capture(machine, caches, command, destination, fields=100):
     out = Path(destination).resolve()
     if not out.is_relative_to(ROOT/'tmp'):
         raise ValueError('captures must stay in tmp/')
-    slave = ROOT/os.environ.get('MATRIX_SLAVE', 'tmp/build-verify/F1GP.Slave')
+    slave = ROOT/os.environ.get('MATRIX_SLAVE', 'tmp/build/verify/F1GP.Slave')
     build = json.loads((slave.parent/'build.json').read_text())
-    if build['slave_sha256'] != sha(slave) or build['source_sha256'] != sha(ROOT/'whdload/F1GP.s'):
+    if build['slave_sha256'] != sha(slave) or build['source_sha256'] != sha(ROOT/'src/F1GP.s'):
         raise ValueError('stale build')
     if custom3 or custom4 or instant == '1':
         if build['build'] not in ('developer', 'verify') or command != 'green' or anchor_method != 'start-state':
             raise ValueError('ceiling options require a developer/VERIFY green start-state capture')
-    sock = ROOT/'amiga/.run/f1gp.sock'
+    sock = RUN/'f1gp.sock'
     if sock.exists():
         s = socket.socket(socket.AF_UNIX)
         s.settimeout(1)
@@ -110,7 +110,7 @@ def capture(machine, caches, command, destination, fields=100):
         ready = True
         # A spelling accepted on 040/060 need not exist on 030. Reject silent
         # CPU fallback before collecting any game evidence.
-        debug = ROOT/'amiga/.run/fsuae/Cache/Logs/fs-uae.log.txt'
+        debug = RUN/'fsuae/Cache/Logs/fs-uae.log.txt'
         reports = re.findall(r'CPU=(\d+), FPU=(\d+).*?MMU=(\d+), JIT=(\d+)',
                              debug.read_text(errors='replace'))
         cpu = {'a500': 68000, 'a1200': 68020, '020': 68020,
@@ -127,7 +127,7 @@ def capture(machine, caches, command, destination, fields=100):
         else:
             meta['result'] = client('raceprofile', command, str(out), str(fields))
         print(meta['result'], flush=True)
-        marker = ROOT/'amiga/.run/dh0/whdload-exit.txt'
+        marker = RUN/'dh0/whdload-exit.txt'
         if marker.exists():
             raise RuntimeError('WHDLoad returned before F10')
         client('gdb', 'monitor key 59 1')
@@ -144,11 +144,11 @@ def capture(machine, caches, command, destination, fields=100):
         # to reuse its old trace and mislabel that image as the failed machine.
         raise
     finally:
-        for path in (ROOT/'amiga/.run/dh1').rglob('.whdl*'):
+        for path in (RUN/'dh1').rglob('.whdl*'):
             if path.is_file():
                 shutil.copy(path, out/path.name)
-        shutil.copy(ROOT/'amiga/.run/fsuae.log', out/'fsuae.log')
-        debuglog = ROOT/'amiga/.run/fsuae/Cache/Logs/fs-uae.log.txt'
+        shutil.copy(RUN/'fsuae.log', out/'fsuae.log')
+        debuglog = RUN/'fsuae/Cache/Logs/fs-uae.log.txt'
         if debuglog.exists():
             shutil.copy(debuglog, out/'emulator-debug.log')
         (out/'capture.json').write_text(json.dumps(meta, indent=2)+'\n')

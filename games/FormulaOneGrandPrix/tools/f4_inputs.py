@@ -4,7 +4,7 @@
   python3 tools/f4_inputs.py build OUT [VARIANT...]   (OUT normally tmp/f4/inputs)
   python3 tools/f4_inputs.py verify OUT
 
-Each VARIANT (default all) boots amiga/ed.sh on a fresh copy of the pinned game's data
+Each VARIANT (default all) boots tools/ed.sh on a fresh copy of the pinned game's data
 directory, drives F1GP-Ed 3.44 with the keyboard and the homed pointer (the window and
 gadget positions of its default Workbench 2.04 screen), and copies the result into
 OUT/VARIANT, a copy of the verified stock game directory with the edited data/f1gp and
@@ -34,8 +34,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from slave_inputs import ROOT, verify as verify_game  # noqa: E402
 
 STOCK = ROOT/'tmp/game/FormulaOneGrandPrix4Disk'
-DATAFILE = ROOT/'tmp/f1ed/F1GP-Ed/2002.f1gp'
-RUN = ROOT/'amiga/.run/ed/dh1'
+DATAFILE = ROOT/'tmp/game/F1GP-Ed/2002.f1gp'
+RUN = ROOT/'tmp/run/ed/.run/dh1'
 PINS = ROOT/'manifest/f4-inputs.json'
 VARIANTS = {'datafile': ('save',), 'graphics': ('cockpit', 'backdrop'),
             'combined': ('save', 'cockpit', 'backdrop'),
