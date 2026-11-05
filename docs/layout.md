@@ -58,6 +58,7 @@ The caller's environment (make command-line variables included) beats every valu
 |---|---|---|
 | `game_build BUILD OUT` | build | a build vasm alone cannot do (generated tables, several passes) |
 | `game_prepare` | run | defaults that depend on the machine or variant, another emulator binary |
+| `game_stop` | stop | refusing to stop (`die`), such as an emulator the game cannot prove it started |
 | `game_drives DH0 DH1` | run | extra files on the boot or game drive |
 | `game_setup` | run | editing `FSUAE_SETUP_ARGS` after the named machine is applied |
 | `GAME_FSUAE_ARGS=(...)` | run | extra FS-UAE arguments |

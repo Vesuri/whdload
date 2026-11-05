@@ -61,6 +61,7 @@ mkdir -p "$RUN_ROOT"
 [ ! -L "$RUN_ROOT" ] || die "$RUN_ROOT must not be a symlink"
 
 if [ "$ACTION" = stop ]; then
+  hook game_stop
   cd "$RUN_ROOT"
   . "$FSUAE_COMMON"
   fsuae_stop_previous

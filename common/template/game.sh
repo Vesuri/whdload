@@ -4,6 +4,7 @@
 #
 # game_build BUILD OUT     replace the vasm build; leave OUT/$VARIANT.Slave and OUT/$VARIANT.deps
 # game_prepare             before a run builds or boots (set SLAVE, FSUAE, AMIGA_SETUP, ...)
+# game_stop                before make stop stops the instance's emulator (refuse with die)
 # game_drives DH0 DH1      add to or change the boot drives
 # game_setup               edit FSUAE_SETUP_ARGS after the named machine is applied
 # GAME_FSUAE_ARGS=(...)    extra FS-UAE arguments
