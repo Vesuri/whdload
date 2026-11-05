@@ -57,5 +57,5 @@ such as `shot`, `wait`, `profile` and `quit` then go to the running server.
 ## Game data
 
 `make unpack ARCHIVES=<directory>` copies each file named in `inputs.sha256` from that
-directory into `tmp/archives/`, checks it, and unpacks the archives into `tmp/game/`. The
+directory into `tmp/archives/` (of several copies, the one whose hash matches), checks it, and unpacks the archives into `tmp/game/`. The
 archives stay outside the repository; nothing records where they came from.

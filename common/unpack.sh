@@ -3,7 +3,8 @@
 #   ARCHIVES=<directory> common/unpack.sh     (make unpack ARCHIVES=<directory>)
 # inputs.sha256 in the game directory pins every input, in `shasum -a 256` format
 # ("<sha256>  <file name>"). Each named file is taken from tmp/archives/ or, when it is not
-# there yet, copied from $ARCHIVES (searched recursively), then checked against its hash.
+# there yet, copied from $ARCHIVES (searched recursively; of several files with that name,
+# the first whose hash matches), then checked against its hash.
 # Archives (.lha, .lzh, .zip, .lzx) are then unpacked into tmp/game/. A drawer already in
 # tmp/game/ is kept unless FORCE=1. Other files (disk images, ...) are only verified.
 # A game whose data needs more than unpacking (an installer, disk images) defines
@@ -22,8 +23,13 @@ while read -r sum name; do
   names+=("$name")
   if [ ! -f "tmp/archives/$name" ]; then
     [ -n "${ARCHIVES:-}" ] || die "tmp/archives/$name is missing: pass ARCHIVES=<directory holding it>"
-    src="$(find "$(caller_path "$ARCHIVES")" -type f -name "$name" -print 2>/dev/null | head -1)"
-    [ -n "$src" ] || die "no $name under $ARCHIVES"
+    src="" found=0
+    while IFS= read -r f; do
+      found=1
+      if [ "$(shasum -a 256 "$f" | cut -d' ' -f1)" = "$sum" ]; then src="$f"; break; fi
+    done < <(find "$(caller_path "$ARCHIVES")" -type f -name "$name" -print 2>/dev/null)
+    [ "$found" = 1 ] || die "no $name under $ARCHIVES"
+    [ -n "$src" ] || die "no $name under $ARCHIVES matches inputs.sha256"
     cp "$src" "tmp/archives/$name"
   fi
 done < inputs.sha256
