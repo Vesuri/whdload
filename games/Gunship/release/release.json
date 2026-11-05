@@ -2,7 +2,7 @@
   "archives": [
     {
       "input": "Gunship.lha",
-      "output": "Gunship-{version}.lha",
+      "output": "GunshipEnhanced-{version}-{date}.lha",
       "replace": {
         "GunshipHD/Gunship.slave": "build:Gunship",
         "GunshipHD/ReadMe": "release/ReadMe",

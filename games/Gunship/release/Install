@@ -156,6 +156,12 @@
   (set #icon_set_deftool_stack "true")
   (P_CopySlave)
   (P_SelectIcon)
+  ; Enhanced framerate is on in the installed icon; CUSTOM1=0 restores the
+  ; original timing. Releases other than PAL 0658 and NTSC 1489 ignore it.
+  (tooltype
+    (dest (tackon #dest #icon_prefix))
+    (settooltype "CUSTOM1" "1")
+  )
 
   ; Uncomment the following lines if you have a multiple slave/icon
   ;(set #icon_desc "Extended RAM")

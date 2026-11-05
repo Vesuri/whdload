@@ -1,4 +1,6 @@
 
+ Gunship Enhanced 2.0b (21.10.2026)
+
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
  PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
@@ -37,11 +39,13 @@
  - Disk and password protections removed on the supported original versions.
  - Access fault fixed; fast memory and caches supported.
  - Quick manual, source code and icons by Exoticons and Chris Vella included.
- - Optional Enhanced framerate for the PAL 0658 and NTSC 1489 releases.
+ - Enhanced framerate for the PAL 0658 and NTSC 1489 releases, enabled in the
+   installed icon.
 
  Options:
  --------
- CUSTOM1=1: Enhanced framerate (default: off).
+ CUSTOM1=1: Enhanced framerate, set in the installed icon. 0 or unset keeps
+ the original timing.
  Runs the world at its intended pace while updating controls and helicopter
  motion more frequently. Other moving objects are drawn smoothly between
  world updates. Weapons launch on the next world update. On a 68000 this
@@ -74,7 +78,8 @@
  History:
  --------
  version 2.0b (21.10.2026) done by Vesa Halttunen:
- - optional smoother framerate and responsive controls on 68020 and later
+ - smoother framerate and responsive controls on 68020 and later, enabled in
+   the installed icon (CUSTOM1=1)
  - selectable faster CPU renderer
  - fixes for enhanced-mode ground climb indication, missile kills and
    small-bank left drift; damage-flash background colour restores correctly
