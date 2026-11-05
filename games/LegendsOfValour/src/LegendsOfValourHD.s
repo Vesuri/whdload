@@ -407,4 +407,9 @@ _timing_combat_clock_records ds.b 64*20
 	ENDC
 	ENDC
 
+; Last in the slave, so no code or data offset moves; the version and date match slv_info
+; and the release ReadMe.
+		dc.b	"$VER: LegendsOfValour.Slave 1.1b (09.10.2026)",0
+	EVEN
+
 	END
