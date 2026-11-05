@@ -116,6 +116,7 @@ HEADER	SLAVE_HEADER			; ws_security + ws_ID
 	dc.b	"DEBUG (do NOT release!) "
 	ENDC
 	dc.b	"Version 3.1b (10.10.2026)",0
+	dc.b	"$VER: Indianapolis500.Slave 3.1b (10.10.2026)",0
 
 	CNOP	0,4
 
