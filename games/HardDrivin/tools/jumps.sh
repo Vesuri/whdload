@@ -1,0 +1,8 @@
+#!/bin/bash
+# tools/jumps.sh PREFIX: the seven jump_clear probes, from the current root
+p=$1
+SCENARIO=jump_clear SUMMARY=jump_pass.py bash tools/probe.sh a500 450 \
+  $p-180:C4_VELOCITY=180,C4_THROTTLE=35 $p-220:C4_VELOCITY=220,C4_THROTTLE=45 \
+  $p-250:C4_VELOCITY=250,C4_THROTTLE=100 $p-260:C4_VELOCITY=260,C4_THROTTLE=60 \
+  $p-300:C4_VELOCITY=300,C4_THROTTLE=100 $p-350:C4_VELOCITY=350,C4_THROTTLE=100 \
+  $p-400:C4_VELOCITY=400,C4_THROTTLE=100

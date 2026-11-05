@@ -1,0 +1,273 @@
+"""Regenerate current findings from retained evidence, never from rounded notes."""
+import json
+from pathlib import Path
+from machine_profiles import PROFILES
+from capture_demo import ROOT
+P=ROOT/'tmp/prof';target=ROOT/'docs/PERFORMANCE.md'
+def read(p):return json.loads(p.read_text())
+def table(head,rows):return '\n'.join(['| '+' | '.join(head)+' |','| '+' | '.join(['---']*len(head))+' |']+['| '+' | '.join(map(str,r))+' |' for r in rows])+'\n'
+base=read(P/'step2-baselines.json');assert len(base)==7
+names={'a500':'A500 / 68000','a500-fast':'A500 / 68000 + Fast','a1200-020':'A1200 / 68EC020','a1200-030-50':'A1200 / 030/50','a4000-040-25':'A4000 / 040/25','a4000-040-40':'A4000 / 040/40','a4000-060-50':'A4000 / 060/50'}
+metrics={}
+for p in PROFILES:
+ for w in ['attract','A','B']:
+  d=P/('s2-a500-attract-analysis' if p=='a500' and w=='attract' else f's2-profile-{p}-{w}')
+  metrics[p,w]=read(d/'window-metrics.json')
+rows=[]
+for p in PROFILES:
+ v=base[p];m=PROFILES[p];memory=f'{m[2]} / {m[4]} / {m[3]}' + (' + 8192 motherboard' if p.startswith('a4000') else '')
+ rows.append([names[p],memory]+[f'{v[w]["swaps"]} / {v[w]["fps"]:.3f}' for w in ['attract','A','B']])
+s='''# Hard Drivin' performance investigation
+
+These findings apply to SPS 0126 and the rebuilt slave. Addresses are offsets
+into the decompressed game code, not runtime addresses. Steps 1 and 2 establish
+verification fixtures and baselines; no performance optimization is enabled in
+normal builds. Intro optimization remains deferred.
+
+## Capture definition and machine matrix
+
+All runs use PAL, PRELOAD, CUSTOM2=0, CUSTOM4=0, disabled host inputs and the
+unchanged VERIFY_ATTRACT or VERIFY_DRIVE startup/input fixture. FPS is completed
+conditional buffer swaps divided by emulated duration, never host elapsed time.
+Warp affects collection throughput only. The 040/060 measurements use the NOMMU
+cores, fixed requested frequency, real CPU speed and cycle-exact CPU/memory
+settings; JIT is off. FS-UAE's fast-CPU timing is a model, not a prediction of the
+ranking or speed of physical accelerator cards.
+
+The attract anchor is `$10844`, after the initial eight-step cockpit dissolve.
+Its 1,000 PAL fields last 20.031887 s, including the high-score overlay. Each
+machine has two fresh boots with identical per-field complete globals/BSS,
+32,000-byte front-buffer hashes and swap events. The original A500 pair also
+matches every instruction, DMA record, screenshot and before/after memory byte.
+The normal rebuild's stable image/pose sequence matches the shipped slave;
+transient per-field state is not cycle-exact between those two slave builds.
+
+Gameplay uses the frozen 97-record field-indexed mouse/key tape from race entry
+`$10ed4`. Full swap/state windows remain A [1,1251), 25.039859 s, and B
+[3000,5600), 52.082906 s. As requested, CPU/DMA gameplay samples are only
+500 consecutive PAL fields (10.015944 s): A starts at race field 1, B at 4300.
+The B sample spans the calibrated A500 jump, collision and start of replay.
+A swap precedes the VBL input publication, so its interval label is one less
+than the ensuing input field. Full-window FPS and short-sample costs must not
+be mixed as if they covered the same duration.
+
+Memory below is KiB: Chip / slow / Fast. Each result is **swaps / FPS**.
+
+'''+table(['Machine','Memory','Attract, 1000 fields','Gameplay A, 1250 fields','Gameplay B, 2600 fields'],rows)
+s+='''
+The same input tape does **not** produce the same route on every CPU. Native
+physics and controls still run once per rendering pass: faster profiles collide,
+replay and reach other scenes at different fields. For example, A500 B has the
+validated jump and complete 90-record replay, whereas A500 + Fast B has no replay.
+These are repeatable fixed-input baselines, not equal-scene renderer speedups.
+
+## Rendering and memory placement
+
+The display is 320 × 200 with four separate bitplanes, 16 colours, 40 bytes per
+scanline and 8,000 bytes per plane. Two 32,000-byte planar screen images are
+used. The CPU writes planar pixels directly; this path has no chunky buffer or
+chunky-to-planar conversion. It performs vertex rotation, clipping, edge setup,
+masked boundary words, unrolled span stores and patterned fills at `$0329a`.
+Background fill `$03a28` also uses CPU stores. The blitter assists bitmap copies,
+including plane-by-plane rectangular copies at `$01566`; polygon fill is CPU code.
+
+The VBL handler `$00044` tests the ready byte through `a4-$703e`. Only the
+conditional exchange at `$000b4`–`$000be` publishes a newly rendered frame.
+Hardware bitplane-pointer writes at `$000e0` occur even without a swap.
+On the fast profiles, read-only changes of the front-buffer pointer at successive
+VBLs count those exchanges. That method reproduces every explicit swap-breakpoint
+event on the independently checked 68000/020 runs.
+
+Placement is read from loaded hunks and live pointers at the cockpit anchor.
+Globals include CPU working vertex data; edge arrays are the pointers through
+`a4-$69dc`/`a4-$69e0`, patterns through `a4-$69e4`, and screens through
+`a4-$6a0e`/`a4-$6a12`. Slow RAM is not true Fast RAM.
+
+'''
+rows=[]
+for p,v in base.items():
+ m=v['placement'];rows.append([names[p],m['code']['bank'],m['data']['bank']+'/'+m['bss']['bank'],m['edge_left']['bank']+'/'+m['edge_right']['bank'],m['patterns']['bank'],m['front']['bank']+'/'+m['back']['bank']])
+s+=table(['Machine','Code','Globals/BSS','Edge arrays','Patterns','Screens'],rows)
+s+='''
+The edge arrays remain in Chip RAM even when code, globals and patterns land in
+Fast RAM. A4000 profiles have an additional motherboard Fast bank, but these
+observed allocations use their configured Zorro-II Fast bank. Sprite data in the
+original A500 inspection is also Chip RAM. This is an observed layout, not an
+assertion about every allocation or object throughout a run.
+
+## Routine costs
+
+Instruction timing is validated for 68000 and 68EC020. The current backend does
+not provide validated instruction timing for 030/040/060: their routine, wait and
+physics-cycle costs are **unavailable**, rather than zero. Those profiles still
+have independent full-window swap counts and DMA samples. Do not rank their
+unmeasured CPU routines by copying the A500 percentages.
+
+Shares below use the entire sampled window as denominator. Self attribution
+excludes callees; inclusive attribution includes their traced descendants, so
+inclusive rows overlap and must not be added. Call-target-aware attribution uses
+the exact live slave layout. Routine shares are boundary-reconstruction estimates;
+the leaf blitter-wait row instead uses its exact source-delimited instruction range.
+Top self routines are listed in descending order;
+parenthesized values are self/inclusive percentages for that same routine.
+
+'''
+rows=[]
+for p in ['a500','a500-fast','a1200-020']:
+ for w in ['attract','A','B']:
+  m=metrics[p,w];incl={r['routine']:r['share'] for r in m['inclusive']}
+  top=[]
+  for r in m['self'][:4]:
+   label=r['routine'];label=('`$'+label[5:]+'`') if label.startswith('game:') else ('slave blitter check/wait' if r['routine'] in ['slave:01712','slave:0172a'] else 'slave routine')
+   sv=r['share'];iv=incl.get(r['routine'])
+   if label=='slave blitter check/wait':sv=iv=m['blitter_check_wait_cycles']/m['elapsed_cycles']
+   top.append(f'{label} ({sv*100:.2f}/'+(f'{iv*100:.2f}' if iv is not None else 'below top 40')+')')
+  rows.append([names[p],w,'; '.join(top)])
+s+=table(['Machine','Sample','Top routines: self/inclusive %'],rows)
+s+='''
+`$0329a` is polygon edges/spans; `$02a2e` vertex rotation; `$03a28` background
+fill; `$03736` polygon bounds/clipping. Full retained reports include 40 self and
+inclusive entries, calls and cycle counts. Cross-machine differences include
+changed scenes and iteration counts, not only faster execution of the same work.
+
+The following percentages are exact instruction-range costs. Blitter-check/wait
+includes checking and polling overhead, not just stalled cycles. `$00740` waits
+for the previous ready byte to clear; `$00750` calls it and sets the new ready
+byte. Its own column excludes the `$00740` callee. Publication waiting is negligible
+on the 68000, but costs 7.02% in the 020 attract sample and 3.82% in 020 A;
+the faster loop sometimes reaches the handshake before the next VBL consumes
+the previous frame.
+
+'''
+rows=[]
+for p in ['a500','a500-fast','a1200-020']:
+ for w in ['attract','A','B']:
+  m=metrics[p,w];rows.append([names[p],w]+[f'{100*m[k]/m["elapsed_cycles"]:.4f}' for k in ['blitter_check_wait_cycles','wait_740_cycles','submit_750_own_cycles']])
+s+=table(['Machine','Sample','Blitter check/wait %','$00740 %','$00750 own %'],rows)
+s+='''
+Physics measurements count only complete `$0cda4` entry-to-return calls and
+exclude traced interrupt work. “Own” is the wrapper itself; “subtree” includes
+its physics callees. The B samples mix driving, crash and replay phases, and
+include native early-return calls; they are not isolated collision-cost tests.
+Partial calls at trace edges are excluded. These are native
+CPU cycles, not equivalent cycles normalized across CPU models. The attract
+path makes no `$0cda4` calls. Controls `$07c32` are outside this measurement and
+will be included in the step-3 simulation-capacity audit.
+
+'''
+rows=[]
+for p in ['a500','a500-fast','a1200-020']:
+ for w in ['A','B']:
+  m=metrics[p,w];rows.append([names[p],w,m['physics_completed_calls'],f'{m["physics_own_cycles_per_completed_call"]:.2f}',f'{m["physics_cycles_per_completed_call"]:.2f}'])
+s+=table(['Machine','Sample','Completed calls','Mean own cycles/call','Mean subtree cycles/call'],rows)
+s+='''
+## DMA activity
+
+Values are percentages of all recorded DMA slots, not CPU-time percentages.
+Each cell gives **bitplanes / blitter**; N/A means unavailable blitter slots.
+The effective 030/040/060 configurations have `blitter_cycle_exact=false`, and
+their traces contain no blitter slot records despite real blitter use. Do not
+interpret those missing records as zero activity. The retained JSON includes CPU, free,
+refresh, sprite and other slot categories as present. Attract uses 1,000 fields;
+A and B use the 500-field samples defined above.
+
+'''
+rows=[]
+for p in PROFILES:
+ rows.append([names[p]]+[f'{metrics[p,w]["dma_share"].get("6",0)*100:.2f} / '+(f'{metrics[p,w]["dma_share"].get("5",0)*100:.2f}' if PROFILES[p][-1]=='trace' else 'N/A') for w in ['attract','A','B']])
+s+=table(['Machine','Attract','A','B'],rows)
+s+='''
+## Cache state
+
+Separate VERIFY_CACHEAUDIT boots query the existing slave setup with zero change
+masks immediately after its SetCPU call. WHDLoad FILELOG records attention flags,
+SetCPU/SetCACR API state and hardware CACR, then the audit exits normally. Reading
+CACR uses Supervisor only on 020+, so the 68000 never executes MOVEC. These boots
+are not timing captures. The audit alone requires WHDLoad 18 for resload_Log;
+normal builds retain their original requirement and cache policy.
+
+All logs report setup `$00003b3a` and cache API `$00000101`. API state requests
+I/D caches even on CPUs without those caches; hardware CACR distinguishes them.
+
+'''
+rows=[]
+for p in PROFILES:
+ c=read(P/f's2-cache-{p}'/'cache.json');state='none (no hardware cache)' if p.startswith('a500') else 'I only' if p=='a1200-020' else 'I + D'
+ rows.append([names[p],f'`${c["cacr"]:08x}`',state])
+s+=table(['Machine','Logged hardware CACR','Active caches'],rows)
+s+='''
+Both 68040 and 68060 also complete separate MMU-enabled 500-field gameplay
+functional runs with cockpit output and disabled-range checks. Their timings
+are excluded from the matrix because the MMU core does not model the requested
+frequency and Chip timing in the same way.
+
+## Rendering ceiling
+
+The fastest measured attract profile is the 68030/50. VERIFY_CEILING builds a
+matched control and VERIFY_NOPOLY bypass with equal size, placement and alignment.
+They differ only in the two-byte patch value at `$0329a`: native `move.l a4,-(sp)`
+versus `rts`, skipping the whole polygon filler before its side effects. The
+instant-blitter run uses the same control binary. Other settings are identical.
+The regular fixture gives 771 swaps; the matched control gives 772, so the
+control, rather than the differently laid-out regular build, is the comparison.
+
+'''
+rows=[]
+for variant in ['control','instant','nopoly']:
+ d=read(P/f's2-ceiling-030-{variant}'/'baseline.json');v=d['windows']['attract'];e=[x['field'] for x in d['events'] if x['offset']==180 and x['field']>=0]
+ rows.append([variant,v['swaps'],f'{v["fps"]:.3f}',e[99]+1,f'{(e[99]+1)*142102/7093790:.6f}'])
+s+=table(['Case','Swaps / 1000 fields','FPS','Fields to 100th swap','Seconds to 100th swap'],rows)
+s+='''
+Instant blits demonstrate a material blitter/bus-wait contribution. Removing CPU
+polygon work reaches almost one swap per field with the normal blitter, showing
+that no unavoidable 25-FPS publication cap exists here. This does not isolate
+pure arithmetic from Chip stores: bypassing the filler removes both. Nor do the
+two gains add; overlap, changed geometry and VBL quantization affect them.
+The first-100-swap comparison limits the changed route workload, but the bypass
+intentionally omits polygon output and is not a visual-equivalence test.
+
+## Time model and next work
+
+Attract `$1084e` calls the route/view update and renderer once per loop. The
+route routine `$0d54c` increments `a4-$6b2c` once per call at `$0d8fe`, interpolates
+phase/10, then advances its route pointer by `$14`. There is no elapsed-time
+multiplier. Gameplay `$10ed4`–`$10f5a` similarly calls controls `$07c32`, camera
+`$0d960`, physics `$0cda4`, drawing and submit `$00750` once per pass. Steering,
+control ramps, crash countdown and the 90-entry replay are pass-based. Mouse
+accumulation and clock/countdown routines `$02c4c`/`$02c8a` are VBL-driven.
+
+Step 1's CUSTOM4=4 instrument reduces A500 A from 108 to 75 swaps and changes the
+route with the same field-indexed input. Step 2 also demonstrates different routes
+across CPUs. This supports the coupling diagnosis, but does not complete step 3:
+per-step comparisons must account for the changed input sequence per step, audit
+all writers/time sources, establish reference rate f0 and measure controls plus
+physics before implementing frame-time scaling. Keep clocks and input semantics
+explicit; independent functions are not independently scheduled simulation.
+
+## Evidence and reproduction
+
+Builds, input/game hashes, effective configurations, memory dumps, screenshots,
+WHDLoad logs and traces remain under ignored `tmp/`, never in Git. Local evidence
+is `tmp/prof/step2-baselines.json`, `s2-<profile>-attract{1,2}` and `-drive`,
+`s2-profile-<profile>-{A,B,attract}`, `s2-cache-<profile>`, `s2-ceiling-030-*`, and
+`s2-mmu-*`. The accepted earlier A500 attract traces supply its CPU/DMA result.
+The local development documentation specifies capture commands and retained hashes.
+
+The 68020 B trace repeats exactly across all 500 fields: instructions, DMA,
+screenshots, cycles and complete before/after memory. Its independent breakpoint
+run has the same 202 swaps, but four swaps differ by one field. The 68020 attract
+trace also repeats identically across all 1,000 fields and memory snapshots,
+and totals 484 swaps with two one-field differences against the counter. This is a
+cross-instrument timing uncertainty, not discarded evidence or a claim of
+field-exact counter agreement; the 000 samples and 020 A agree field-for-field.
+
+The local profiler copy changes only capture range/length controls, avoiding a
+host-debugger attachment on each boot. Its first 100 A500 fields match the accepted
+profiler's instructions, DMA, screenshots and cycles exactly. Per-field hashes and
+losslessly compressed traces retain reviewable evidence. This is an instrument
+change, not a game optimization. Normal, VERIFY_ATTRACT and VERIFY_DRIVE binaries
+remain byte-identical after the new audit and ceiling fixtures; disabled patch
+ranges are checked against pristine relocated game bytes.
+'''
+target.write_text(s)
+print(target)
