@@ -40,10 +40,19 @@ tracked.
    `git log --all --format= --name-only` against the copyrighted and built extensions,
    and `git log -p` for home-directory paths and work identities.
 2. **Rewrite the history** in a scratch clone under the ignored `tmp/import/`, never in
-   the source: `git filter-repo --to-subdirectory-filter games/<Game>` for a standalone
-   project; for a fork, `--refs <merge-base>..HEAD` with `--path <game dir>` and
-   `--path-rename <game dir>/:games/<Game>/src/`. Fetch the result and merge it with
-   `git merge --allow-unrelated-histories --no-ff`, message `Import <Title> with its history`.
+   the source.
+   - A standalone project: `git filter-repo --to-subdirectory-filter games/<Game>`, then
+     fetch the result and `git merge --allow-unrelated-histories --no-ff` it, message
+     `Import <Title> with its history`.
+   - A fork: `git filter-repo --path <game dir>/ --path-rename <game dir>/source/:games/<Game>/src/
+     --path-rename <game dir>/:games/<Game>/release/` (the slave source to `src/`, the
+     shipped ReadMe, Install script and icons to `release/`; adjust to the directory's
+     layout). The commit map (`.git/filter-repo/commit-map`) gives the rewritten form of
+     the merge base's state and of each of our commits after it. On a branch from `main`,
+     commit that merge-base state as `Import <Title> slave source from <repository> at
+     <commit> (by <maintainer>)`, then `git cherry-pick` our rewritten commits in order,
+     which keeps their authors, dates and messages. Upstream commits before the merge base
+     stay out.
 3. **Record the baseline**: build every slave and the VERIFY builds with the project's own
    build, from a `git archive` of the imported tree under `tmp/baseline/` (a VERIFY build
    may overwrite the release file name; build them separately). Pass the shared
