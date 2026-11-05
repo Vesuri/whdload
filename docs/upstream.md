@@ -33,6 +33,48 @@ After the move the game must still build the same release bytes as before (`make
 then records them), boot with `make run`, and pass `make check` with no game or ROM files
 tracked.
 
+### Procedure
+
+1. **Check the source.** Its `git status` is clean (uncommitted work stays behind, so ask
+   first). Scan the history that will come in for files that must never be published:
+   `git log --all --format= --name-only` against the copyrighted and built extensions,
+   and `git log -p` for home-directory paths and work identities.
+2. **Rewrite the history** in a scratch clone under the ignored `tmp/import/`, never in
+   the source: `git filter-repo --to-subdirectory-filter games/<Game>` for a standalone
+   project; for a fork, `--refs <merge-base>..HEAD` with `--path <game dir>` and
+   `--path-rename <game dir>/:games/<Game>/src/`. Fetch the result and merge it with
+   `git merge --allow-unrelated-histories --no-ff`, message `Import <Title> with its history`.
+3. **Record the baseline**: build every slave and the VERIFY builds with the project's own
+   build, from a `git archive` of the imported tree under `tmp/baseline/` (a VERIFY build
+   may overwrite the release file name; build them separately). Pass the shared
+   `WHDLOAD=$WHDLOAD`: old makefiles may default to a retired versioned tree.
+4. **Restructure** in one commit:
+   - slave source (everything the assembler reads, VERIFY modules included) to `src/`;
+     include bridges stay where `INCLUDES` finds them;
+   - `game.conf` reproduces every slave the project built as a variant, with the same
+     flags, include order and defines; `game.sh` only where needed (`game_build` for
+     generated sources, `game_dist` for a custom packager, `game_check` for unit tests);
+   - delete what `common/` replaces: `amiga/run.sh`, `amiga/env.sh`, the slave makefile,
+     the project `.gitignore` and `CLAUDE.md`. Game-specific launchers move to `tools/` and
+     call `common/run.sh`, with a target in the game's `Makefile`;
+   - tools: `whdload/` becomes `src/`; built slaves come from `tmp/build/<BUILD>/<Variant>.Slave`
+     via `make slave|verify VARIANT=...` (one variant when a listing path is given);
+     `amiga/.run` becomes `tmp/run/<INSTANCE or default>/.run`; gdb servers use
+     `common/tools/game_server.py`; sourcing `amiga/env.sh` becomes `../../common/env.sh`;
+     vasm working directories and `-L` paths are relative to the game directory now; the
+     original archives are in `tmp/archives/`; packagers write to `--dist` (the
+     repository's `dist/`), keep their logs in the game's `tmp/`, and judge dirtiness by
+     `git status -- .`; `NTSC_MODE` becomes `NTSC`;
+   - docs: rewrite commands for the new targets (`make run SLAVE=original` boots the
+     shipped slave, which the old `amiga/run.sh` did by default), keep the content; a new
+     `AGENTS.md` in the template's form keeps the scope and the doc table, and the rules
+     move to the root's.
+5. **Verify**: `make unpack ARCHIVES=<the project's tmp>`, the release and VERIFY builds
+   byte-identical to the baseline, `make record`, `make check` (with the unit tests),
+   a boot through the game's server (`WARP=1 WINDOW=none`, `wait`, `shot`) reaching the
+   game, every game-specific launcher, `make dist` into `dist/` (then delete the test
+   output), `common/check.sh repo`, and both identity checks before committing.
+
 ## Following upstream
 
 When upstream changes a slave we also changed, diff the recorded `UPSTREAM` commit against
