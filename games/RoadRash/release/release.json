@@ -2,7 +2,7 @@
   "archives": [
     {
       "input": "RoadRash.lha",
-      "output": "RoadRash-{version}.lha",
+      "output": "RoadRashEnhanced-{version}-{date}.lha",
       "replace": {
         "RoadRashHD/RoadRash.slave": "build:RoadRash",
         "RoadRashHD/Readme": "release/Readme",

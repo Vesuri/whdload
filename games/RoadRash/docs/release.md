@@ -31,7 +31,8 @@ The template's file-copy branch retains the 2.0 disk-label choices (`rr1` or
 directory on volume `roadrash`. Files install into `RoadRash/data`. The five
 original RomIcon, NewIcon, OS3.5, Glow and Exoticon variants remain available;
 Slave, PRELOAD, WHDLoad and stack settings are initialized by the template.
-CUSTOM2 is not forced in any icon. Existing destination drawers or drawer icons
+The installer writes CUSTOM2=1 into the installed icon (this repository's release;
+the development branch's left it unset). Existing destination drawers or drawer icons
 require explicit replacement; cancellation leaves them and saved games intact.
 
 The ReadMe uses the template's requirements/features/history/contact structure,

@@ -9,6 +9,7 @@
  PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
  This install applies to "Road Rash" (c) 1992 Electronic Arts - 2 disks.
+ Road Rash Enhanced 3.0b (22.10.2026)
 
  Requirements:
  -------------
@@ -29,8 +30,8 @@
  --------
  CUSTOM1 selects one of the preset passwords in the WHDLoad startup options.
  CUSTOM accepts a user-defined password; see the format and examples below.
- CUSTOM2=1 enables "Enhanced framerate". It is off by default; omit CUSTOM2
- or use CUSTOM2=0 for original timing. Visual bug fixes apply in both modes.
+ CUSTOM2=1 enables "Enhanced framerate", set in the installed icon. CUSTOM2=0
+ or no CUSTOM2 keeps the original timing. Visual bug fixes apply in both modes.
 
  Enhanced framerate uses Fast RAM for smoother, vsynced play while keeping
  game logic at a consistent speed. It enables caches unless NoCache is set.
@@ -91,8 +92,9 @@ Source: GameWinners.com ,  http://www.gamewinners.com
 
  History:
  --------
- Version 3.0b (22.10.2026):
- - optional Enhanced framerate for smoother, vsynced play on Fast RAM Amigas
+ Version 3.0b (22.10.2026) done by Vesa Halttunen:
+ - Enhanced framerate for smoother, vsynced play on Fast RAM Amigas, enabled
+   in the installed icon (CUSTOM2=1)
  - consistent simulation speed on the accelerated path, with reduced visible
    steering lag and corrected opponent lane occupancy
  - fixed distant and mirror bike flicker and vertical jumps on hills

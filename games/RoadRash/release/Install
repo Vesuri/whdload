@@ -334,6 +334,12 @@
   (set #icon_set_deftool_stack "true")
   (P_CopySlave)
   (P_SelectIcon)
+  ; Enhanced framerate is on in the installed icon; CUSTOM2=0 restores the
+  ; original timing.
+  (tooltype
+    (dest (tackon #dest #icon_prefix))
+    (settooltype "CUSTOM2" "1")
+  )
 
   ; Uncomment the following lines if you have a multiple slave/icon
   ;(set #icon_desc "Extended RAM")

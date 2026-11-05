@@ -1,9 +1,9 @@
 # Road Rash
 
-Road Rash 3.0b for the version 2.0 (SPS 1313) install: an optional Enhanced framerate
-(`CUSTOM2=1`) that renders as fast as the machine allows, vsynced, while the simulation keeps
-fixed 20 ms PAL steps, with the game's code, stacks and CPU data moved to Fast RAM, reduced
-blitter and CPU work, and fixes that apply in both modes (rider visibility, hill projection,
+Road Rash 3.0b for the version 2.0 (SPS 1313) install: Enhanced framerate (`CUSTOM2=1`, set
+in the installed icon) that renders as fast as the machine allows, vsynced, while the
+simulation keeps fixed 20 ms PAL steps, with the game's code, stacks and CPU data moved to
+Fast RAM, reduced blitter and CPU work, and fixes that apply in both modes (rider visibility, hill projection,
 steering and pause, loading on uncached 68030s, ECS/AGA border). The original slave is by
 JOTD, whose repository it comes from (game.conf `AUTHOR`, `UPSTREAM`: jotd666/whdload_slaves
 `R/RoadRash/usr` at ce5a2a25). JOTD merged this work upstream (e72e067b, then changed it in
