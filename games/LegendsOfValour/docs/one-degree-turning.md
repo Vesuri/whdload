@@ -120,7 +120,7 @@ Reproduce with `tools/turning_input_validate.sh PREFIX`.
 
 Release, developer and VERIFY builds assemble. Binary menu/default checks confirm
 2/9/17 menu options respectively, with the release forcing CUSTOM2 mask 191 and
-developer/VERIFY builds keeping independent bit selection. Both beta archives pass
+developer/VERIFY builds keeping independent bit selection. The release archive passes
 packaging CRC and replacement-content checks. No new performance claim is made.
 
 ## Cost

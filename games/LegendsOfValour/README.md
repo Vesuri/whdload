@@ -18,7 +18,8 @@ The player-facing options are:
 | Character creation | `CUSTOM1=1` |
 | Frame-independent game timing (25 ticks/second) | `CUSTOM2=64` |
 
-Timing is off by default. Fixed-rate simulation can reduce rendering speed on slow
+The release's installed icon sets `CUSTOM2=64`, so timing is on by default; `CUSTOM2=0`
+restores the original timing. Fixed-rate simulation can reduce rendering speed on slow
 machines. Direct mouse control automatically uses one-degree precision; UI turn buttons
 retain their native increments and repeat behavior. Allocation failure falls back to
 the original five-degree precision.
@@ -30,8 +31,8 @@ Keep these original archives locally; they are not part of the repository and ar
 in `inputs.sha256`:
 
 ```
-LegendsOfValour_v1.0_0837.lha   preinstalled game
-LegendsOfValour.lha             original installer (needed for packaging)
+LegendsOfValour_v1.0_0837.lha   preinstalled game (the game data)
+LegendsOfValour.lha             original installer (repackaged by make dist)
 ```
 
 `make unpack ARCHIVES=<directory holding them>` copies them into `tmp/archives/`, verifies
@@ -56,7 +57,7 @@ From this directory:
 
 ```sh
 make run                          # build the release slave and boot it, timing off
-make run WHD_ARGS=CUSTOM2=64      # with the optional timing
+make run WHD_ARGS=CUSTOM2=64      # with the timing, as the installed icon sets it
 make run SLAVE=original           # CFou!'s v1.0, unchanged
 ```
 
@@ -100,13 +101,14 @@ sessions.
 make dist
 ```
 
-Builds `LegendsOfValour-1.1b.lha` and `LegendsOfValour_v1.1b_0837.lha` in the repository's
-`dist/`. Only the slave and ReadMe are replaced; entry lists and every other compressed record
-are preserved. Packaging verifies CRCs and replacement contents before publishing the
-local outputs. See [releasing.md](docs/releasing.md).
+Builds `LegendsOfValourEnhanced-1.1b-20261009.lha` (version and date from the slave's `$VER`)
+from the original installer in the repository's `dist/`. Only the slave, the ReadMe and the
+six game icons (`CUSTOM2=64` added to their tooltypes) are replaced; the entry list and every
+other compressed record are preserved. Packaging verifies CRCs, replacement contents and the
+icons' tooltypes before publishing the local output. See [releasing.md](docs/releasing.md).
 
 Original game/ROM bytes and generated artifacts are local only, under ignored `tmp/`
-and `dist/`. The preinstalled distribution contains game data; archives are not committed.
+and `dist/`; archives are not committed.
 
 ## Remaining acceptance and limitations
 

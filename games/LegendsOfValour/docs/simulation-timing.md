@@ -19,8 +19,9 @@ elapsed-field accumulator:
 - The movement step is the constant 10 (the original value at 25 fps), set in every
   compensation-table entry.
 - Combat keeps its native minimum cadence: one combat step per 4 fields (two world ticks).
-- Bit 6 is independent of the rendering patches (W1–W6) and of mouse precision (developer bit 7). It
-  is opt-in in release builds and off in persistent preferences.
+- Bit 6 is independent of the rendering patches (W1–W6) and of mouse precision (developer bit 7). The
+  slave leaves it off unless CUSTOM2 sets it; the release's installed icon sets `CUSTOM2=64`,
+  and `CUSTOM2=0` restores the original timing.
 
 It **changes gameplay speed** on machines that rendered below 25 fps: the world now runs at
 the 25 fps reference. It also **costs CPU**: on the A500 catch-up ticks take rendering time

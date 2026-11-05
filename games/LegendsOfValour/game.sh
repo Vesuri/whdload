@@ -10,10 +10,13 @@ game_drives() {
   cp -f "$tape" "$2/data/lovtape"
 }
 
-# Both 1.1b archives: tools/release.py replaces only the Slave and ReadMe records of the
-# original archives and copies every other record byte for byte.
+# The installer archive: tools/release.py replaces only the Slave, ReadMe and game icon
+# records of the original and copies every other record byte for byte. FORCE=1 replaces an
+# existing archive.
 game_dist() {
-  (cd "$GAME_ROOT" && python3 tools/release.py --dist "$1")
+  local force=
+  [ "${FORCE:-0}" != 1 ] || force=--force
+  (cd "$GAME_ROOT" && python3 tools/release.py --dist "$1" $force)
 }
 
 # The offline checks: every route tape builds, and, with the game installed, the one-degree

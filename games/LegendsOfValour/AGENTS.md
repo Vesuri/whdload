@@ -1,8 +1,8 @@
 # Legends of Valour
 
 A performance and timing rework of the 1992 US Gold / Synthetic Dimensions game under
-WHDLoad: rendering patches always on, optional frame-independent game timing, one-degree
-mouse precision. CFou!'s v1.0 slave (06.02.2005, `LegendsOfValour_v1.0_0837.lha`) is
+WHDLoad: rendering patches always on, frame-independent game timing (CUSTOM2 bit 6, on in
+the release's installed icon), one-degree mouse precision. CFou!'s v1.0 slave (06.02.2005, `LegendsOfValour_v1.0_0837.lha`) is
 credited as the original (`game.conf` `AUTHOR`, `UPSTREAM`): `src/LegendsOfValourHD.s`
 reconstructs it from the binary on WHDLoad 20.0's kick13 example. There is no game source:
 work from cycle-exact FS-UAE traces and disassembly. The game is `data/AMIGA2`, a
@@ -21,7 +21,7 @@ Read `docs/open-work.md` first.
 | `docs/performance-patches.md` | the rendering pipeline, game time, W1–W6 hooks and invariants, before changing rendering code |
 | `docs/simulation-timing.md` | the optional game timing (CUSTOM2 bit 6) |
 | `docs/one-degree-turning.md` | automatic mouse precision (developer CUSTOM2 bit 7) |
-| `docs/releasing.md` | the release archives (`make dist`) |
+| `docs/releasing.md` | the release archive (`make dist`) |
 | `README.md` | the summary, setup, how to play, the release options |
 
 The slave source is `src/` (VERIFY-only fixtures included, Kalms C2P in `src/kalms/`, the

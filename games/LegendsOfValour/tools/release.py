@@ -1,24 +1,39 @@
 #!/usr/bin/env python3
-"""Build both local 1.1b distributions, changing only Slave and ReadMe entries.
+"""Build the release archive from the original installer, changing only declared entries.
 
-    make dist        (game.sh game_dist; --dist names the output directory)
+    make dist        (game.sh game_dist; --dist names the output directory, --force
+                      replaces an existing archive)
+
+Input: tmp/archives/LegendsOfValour.lha (make unpack). Output, in the repository's dist/:
+LegendsOfValourEnhanced-<version>-<YYYYMMDD>.lha and its .sha256, the version and date
+from the release slave's $VER string. Replaced: the Slave, the ReadMe and the six game
+icons (CUSTOM2=64 appended to their tooltypes); every other record is copied byte for byte.
 """
 import argparse
+import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 from datetime import datetime
 
+from icon import parse, with_tooltype
 from slave_info import code_hunk, header
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = (
-    ('LegendsOfValour.lha', 'LegendsOfValour-1.1b.lha', 'LegendsOfValourHd'),
-    ('LegendsOfValour_v1.0_0837.lha', 'LegendsOfValour_v1.1b_0837.lha', 'LegendsOfValour'),
-)
+sys.path.insert(0, str(ROOT.parents[1] / 'common/tools'))
+from package_release import date_of, version_of  # noqa: E402
+
+INPUT = 'LegendsOfValour.lha'
+PREFIX = 'LegendsOfValourHd'
+OUTPUT = 'LegendsOfValourEnhanced-{version}-{date}.lha'
+# The installer offers these as the game icon; it sets the default tool, Slave and PreLoad
+# and keeps the other tooltypes, so each one installs with the timing option on.
+ICONS = ('inf', 'infC', 'colcfou', 'colcfou2', 'colcfou3', 'colcfou4')
+TIMING = b'CUSTOM2=64'
 
 
 def records(data):
@@ -93,14 +108,14 @@ def read_member(lha, archive, name):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dist', type=Path, default=ROOT.parents[1] / 'dist')
+    ap.add_argument('--force', action='store_true', help='replace an existing archive')
     args = ap.parse_args()
     lha = shutil.which('lha')
     if not lha:
         raise SystemExit('Install lha/lhasa (archive reading and CRC verification).')
-    originals = [(ROOT / 'tmp/archives' / src, dst, prefix) for src, dst, prefix in PACKAGES]
-    for archive, _, _ in originals:
-        if not archive.is_file():
-            raise SystemExit(f'Missing input archive: {archive} (make unpack)')
+    archive = ROOT / 'tmp/archives' / INPUT
+    if not archive.is_file():
+        raise SystemExit(f'Missing input archive: {archive} (make unpack)')
     build = ROOT / 'tmp/build/release'
     # The plain release build: no extra defines from the caller.
     subprocess.run(['make', '-s', 'slave'], cwd=ROOT, check=True,
@@ -108,47 +123,67 @@ def main():
     slave_path = build / 'LegendsOfValour.Slave'
     slave = slave_path.read_bytes()
     info = header(code_hunk(slave_path)[0])
+    version, date = version_of(slave_path), date_of(slave_path)
     expected = 'C1:B:Character creation;C2:X:Frame-independent game timing:6;'
-    if info['ws_config'] != expected or 'Version 1.1b ' not in info['ws_info']:
-        raise SystemExit('Expected the version 1.1b release slave with two options')
+    ver_date = f'{date[6:]}.{date[4:6]}.{date[:4]}'
+    if info['ws_config'] != expected or f'Version {version} ({ver_date})' not in info['ws_info']:
+        raise SystemExit('Expected the release slave with two options and slv_info matching $VER')
     notes = (ROOT / 'release/ReadMe').read_bytes()
+    if f'Changes in {version} ({ver_date})'.encode() not in notes:
+        raise SystemExit(f'release/ReadMe has no "Changes in {version} ({ver_date})" entry')
     destination = args.dist.resolve()
     destination.mkdir(parents=True, exist_ok=True)
-    # Stage and validate both before publishing either. All temporary bytes stay in tmp/.
+    output = OUTPUT.format(version=version, date=date)
+    target = destination / output
+    if target.exists() and not args.force:
+        raise SystemExit(f'{target} exists (FORCE=1 replaces it)')
+    original = records(archive.read_bytes())
+    slave_name, readme_name = f'{PREFIX}/LegendsOfValour.Slave', f'{PREFIX}/ReadMe'
+    icon_names = [f'{PREFIX}/LegendsOfValour.{suffix}' for suffix in ICONS]
+    if not {slave_name, readme_name, *icon_names} <= original.keys():
+        raise ValueError(f'Missing replacement entries in {archive}')
+    old_readme = read_member(lha, archive, readme_name)
+    old_requirement = b'The installed program requires 0.5 MB ChipMem and 0.5 MB OtherMem.'
+    if old_readme.count(old_requirement) != 1:
+        raise ValueError('Original ReadMe memory requirement has changed; review it')
+    old_readme = old_readme.replace(old_requirement,
+        b'The slave reserves 512 KiB ChipMem and 656 KiB OtherMem.\n'
+        b' Additional memory is needed by WHDLoad and optional features.')
+    replacements = {slave_name: slave, readme_name: notes + b'\n' + old_readme}
+    for name in icon_names:
+        icon = read_member(lha, archive, name)
+        tool, entries, _, _ = parse(icon)
+        if entries != [b'CUSTOM1=0'] or tool not in (b'amiga2', b'WHDLoad'):
+            raise ValueError(f'{name}: unexpected tooltypes {entries}; review it')
+        replacements[name] = with_tooltype(icon, TIMING)
+    # Stage and validate before publishing. All temporary bytes stay in tmp/.
     with tempfile.TemporaryDirectory(prefix='release-', dir=ROOT / 'tmp') as temp:
-        ready = []
-        for archive, output, prefix in originals:
-            original = records(archive.read_bytes())
-            slave_name, readme_name = f'{prefix}/LegendsOfValour.Slave', f'{prefix}/ReadMe'
-            if not {slave_name, readme_name} <= original.keys():
-                raise ValueError(f'Missing replacement entries in {archive}')
-            old_readme = read_member(lha, archive, readme_name)
-            old_requirement = b'The installed program requires 0.5 MB ChipMem and 0.5 MB OtherMem.'
-            if old_readme.count(old_requirement) != 1:
-                raise ValueError('Original ReadMe memory requirement has changed; review it')
-            old_readme = old_readme.replace(old_requirement,
-                b'The slave reserves 512 KiB ChipMem and 656 KiB OtherMem.\n'
-                b' Additional memory is needed by WHDLoad and optional features.')
-            replacements = {slave_name: slave, readme_name: notes + b'\n' + old_readme}
-            updated = {name: stored_record(name, replacements[name])
-                       if name in replacements else raw for name, raw in original.items()}
-            path = Path(temp) / output
-            path.write_bytes(b''.join(updated.values()) + b'\0')
-            check = records(path.read_bytes())
-            if list(check) != list(original):
-                raise ValueError('Archive entry names or order changed')
-            for name, raw in original.items():
-                if name not in replacements and check[name] != raw:
-                    raise ValueError(f'Unchanged entry was modified: {name}')
-            subprocess.run([lha, 'tq', str(path)], check=True, stdout=subprocess.PIPE)
-            for name, content in replacements.items():
-                if read_member(lha, path, name) != content:
-                    raise ValueError(f'Replacement extraction mismatch: {name}')
-            ready.append((path, destination / output))
-            print(f'Verified {output}: {len(check)} entries; only Slave and ReadMe replaced', flush=True)
-        for source, target in ready:
-            os.replace(source, target)
-            print(target)
+        updated = {name: stored_record(name, replacements[name])
+                   if name in replacements else raw for name, raw in original.items()}
+        path = Path(temp) / output
+        path.write_bytes(b''.join(updated.values()) + b'\0')
+        check = records(path.read_bytes())
+        if list(check) != list(original):
+            raise ValueError('Archive entry names or order changed')
+        for name, raw in original.items():
+            if name not in replacements and check[name] != raw:
+                raise ValueError(f'Unchanged entry was modified: {name}')
+        subprocess.run([lha, 'tq', str(path)], check=True, stdout=subprocess.PIPE)
+        for name, content in replacements.items():
+            extracted = read_member(lha, path, name)
+            if extracted != content or extracted == read_member(lha, archive, name):
+                raise ValueError(f'Replacement extraction mismatch: {name}')
+        for name in icon_names:
+            if parse(read_member(lha, path, name))[1] != [b'CUSTOM1=0', TIMING]:
+                raise ValueError(f'{name}: tooltypes did not read back')
+        if version.encode() not in replacements[readme_name]:
+            raise ValueError(f'ReadMe does not mention version {version}')
+        os.replace(path, target)
+    digest = hashlib.sha256(target.read_bytes()).hexdigest()
+    (destination / (output + '.sha256')).write_text(f'{digest}  {output}\n')
+    print(f'Verified {output}: {len(check)} entries; replaced the Slave, the ReadMe and '
+          f'{len(icon_names)} icons ({TIMING.decode()})')
+    print(target)
 
 
 if __name__ == '__main__':
