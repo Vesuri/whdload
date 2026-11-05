@@ -1,0 +1,16 @@
+{
+  "archives": [
+    {
+      "input": "4DSportsDriving.lha",
+      "output": "4DSportsDrivingEnhanced-{version}-{date}.lha",
+      "replace": {
+        "4DSportsDrivingInstall/4DSportsDriving.slave": "build:4DSportsDriving",
+        "4DSportsDrivingInstall/ReadMe": "release/ReadMe",
+        "4DSportsDrivingInstall/Install": "release/Install"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "4DSportsDrivingInstall/source", "variants": ["4DSportsDriving"]}
+    }
+  ]
+}

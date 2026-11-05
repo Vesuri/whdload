@@ -1,0 +1,34 @@
+--- a/src/newcpu.cpp
++++ b/src/newcpu.cpp
+@@ -5955,7 +5955,9 @@
+ 				mmu_opcode = -1;
+ 				mmu_opcode = regs.opcode = x_prefetch (0);
+ 				count_instr (regs.opcode);
++				{ cpu_profiler profiler(regs.instruction_pc); // 4DS: MMU event recorder
+ 				cpu_cycles = (*cpufunctbl[regs.opcode])(regs.opcode);
++				}
+ 				cpu_cycles = adjust_cycles(cpu_cycles);
+ 				regs.instruction_cnt++;
+ 
+@@ -6151,7 +6153,9 @@
+ 					debug_trainer_match();
+ 				}
+ 
++				{ cpu_profiler profiler(r->instruction_pc); // 4DS: observe 040 opcode, no timing changes
+ 				(*cpufunctbl_noret[r->opcode])(r->opcode);
++				}
+ 
+ 				if (r->spcflags) {
+ 					if (do_specialties (0))
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -1058,7 +1058,8 @@
+ 			}
+ 
+ 			// start profiler
+-			start_cpu_profiler(baseText, baseText + sizeText, profile_unwind.get());
++			// 4DS: whole 24-bit guest address space for unlinked WHDLoad captures.
++			start_cpu_profiler(profile_unwind ? baseText : 0, profile_unwind ? baseText + sizeText : 0x01000000, profile_unwind.get());
+ 			debug_dma = 1;
+ 			profile_start_cycles = static_cast<uae_u32>(get_cycles() / cpucycleunit);
+ 			//barto_log("GDBSERVER: Start CPU Profiler @ %u cycles\n", get_cycles() / cpucycleunit);

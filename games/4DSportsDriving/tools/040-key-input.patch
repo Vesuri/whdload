@@ -1,0 +1,63 @@
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -25,6 +25,7 @@
+ #include "newcpu.h"
+ #include "debug.h"
+ #include "inputdevice.h"
++#include "keybuf.h"
+ #include "uae.h"
+ #include "debugmem.h"
+ #include "custom.h"
+@@ -689,7 +690,16 @@
+ 											deactivate_debugger();
+ 											return; // response is sent when profile is finished (vsync)
+ 										}
+-									} else if(cmd == "aprof start") {
++									} else if(cmd.substr(0, 4) == "key ") {
++                                        // Private harness: use the native Amiga keyboard path.
++                                        unsigned key = 0; int pressed = -1; char extra;
++                                        if (sscanf(cmd.c_str(), "key %x %d %c", &key, &pressed, &extra) == 2 && key < 0x80 && (pressed == 0 || pressed == 1)) {
++                                            const unsigned raw = key | (pressed ? 0 : 0x80);
++                                            int accepted = record_key_debug(((raw << 1) | (raw >> 7)) & 0xff);
++                                            barto_log("4DKEY queued raw=%02x accepted=%d\n", raw, accepted);
++                                            response += "OK";
++                                        } else response += "E01";
++                                    } else if(cmd == "aprof start") {
+ 										response += aprof_start() ? "OK" : "E03";
+ 									} else if(cmd.substr(0, strlen("aprof stop ")) == "aprof stop ") {
+ 										response += aprof_stop(cmd.substr(strlen("aprof stop ")).c_str()) ? "OK" : "E02";
+--- a/src/keybuf.cpp
++++ b/src/keybuf.cpp
+@@ -252,7 +252,7 @@
+ 		}
+ 	}
+ 
+-	//write_log (_T("%02x:%d\n"), key >> 1, key & 1);
++	write_log (_T("4DKEY dequeue raw=%02x\n"), ((key >> 1) | (key << 7)) & 0xff);
+ 	return key;
+ }
+ 
+@@ -295,6 +295,13 @@
+ 	keybuf[kpb_first] = kc;
+ 	kpb_first = kpb_next;
+ 	return 1;
++}
++
++// Explicit debugger input is independent of frontend focus transitions.
++int record_key_debug (int kc)
++{
++    ignore_next_release = false;
++    return record_key_direct(kc);
+ }
+ 
+ void keybuf_init (void)
+--- a/src/include/keybuf.h
++++ b/src/include/keybuf.h
+@@ -14,6 +14,7 @@
+ extern int keys_available (void);
+ extern int record_key (int);
+ extern int record_key_direct (int);
++extern int record_key_debug (int);
+ extern void keybuf_init (void);
+ extern int getcapslockstate (void);
+ extern void setcapslockstate (int);

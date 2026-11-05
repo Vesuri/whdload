@@ -1,0 +1,5 @@
+--- a/src/newcpu.cpp
++++ b/src/newcpu.cpp
+@@ -2407 +2407 @@
+-		cpucycleunit = (uae_s64)CYCLE_UNIT * baseclock / currprefs.cpu_frequency;
++		cpucycleunit = (uae_s64)CYCLE_UNIT * (baseclock / 8) / currprefs.cpu_frequency;
