@@ -3,7 +3,7 @@
 The slave is at version **2.0b** (13.10.2026, beta): Psygore's v1.1 plus all
 subsequent changes in `internals.md`. Versions 1.2b and 1.3b were internal,
 unreleased development versions; all their changes belong to 2.0b.
-`make dist` builds the release archives (`development.md`). Historical evidence
+`make dist` builds the release archive (`development.md`). Historical evidence
 below retains the development version names used when the checks ran.
 
 ## Next

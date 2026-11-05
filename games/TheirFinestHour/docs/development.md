@@ -48,7 +48,7 @@ directory its own gdb port. Never `pkill fs-uae` or `pkill gdb`.
 make slave    # tmp/build/release/TheirFinestHour.Slave, the release slave, and its listing .lst
 make verify   # VERIFY build (input tapes): tmp/build/verify/TheirFinestHour.Slave and .lst
 make check    # the release bytes against release/slaves.sha256, then the timing regressions
-make dist     # the two release archives in the repository's dist/ (tools/package_release.py)
+make dist     # the release archive in the repository's dist/ (tools/package_release.py)
 ```
 
 The slave source is `src/TheirFinestHour.s`: Psygore's v1.1 slave, which shipped without
@@ -63,18 +63,20 @@ not appropriate for the game's blitter buffers. That alone does not establish 68
 compatibility. Game changes are in `render.s`, `transform.s`, `timing.s`, `sound.s` and
 `replay.s`, instruments in `verify.s` (VERIFY build only).
 
-`make dist` rebuilds the two archives from `tmp/archives/` into
-`dist/TheirFinestHour-<ver>.lha` and `dist/TheirFinestHour_v<ver>_0037.lha`: the same
-members, with the game launch icons, slave and ReadMe changed, plus the installer script in
-the installer archive. Both archives are checked member by member after re-extraction. The
-ReadMe and installer are adapted from `$WHDLOAD/Install Template/Xxx Install` by
-`tools/install_package.py`, retaining Psygore's release history, disk-copy rules and optional
+`make dist` rebuilds the installer archive `tmp/archives/TheirFinestHour.lha` into
+`dist/TheirFinestHourEnhanced-<ver>-<YYYYMMDD>.lha` and its `.sha256`: the same members, with
+the six game launch icons, slave, ReadMe and installer script changed. It is checked member
+by member after re-extraction. The preinstalled 0037 archive is a development input only;
+no preinstalled release is made (`docs/releasing.md` at the root). The ReadMe carries the
+"Their Finest Hour Enhanced <ver> (<date>)" line. The ReadMe and installer are adapted from
+`$WHDLOAD/Install Template/Xxx Install` by `tools/install_package.py`, retaining Psygore's release history, disk-copy rules and optional
 Missions Volume 1. The current features and concise changelog live in
 `release/readme-features.txt` and `release/readme-history.txt`. The installer keeps the
 original archive filename.
 All game launch icon styles include `CUSTOM2=1`,
 so Enhanced framerate is checked when launched from Workbench. The slave itself defaults
-to enhancements off when that tooltype/argument is absent. `<ver>` comes from the slave's `$VER`.
+to enhancements off when that tooltype/argument is absent. `<ver>` and the date come from the
+slave's `$VER`.
 
 ## Input and combat routine checks
 

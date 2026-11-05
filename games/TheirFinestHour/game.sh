@@ -1,7 +1,8 @@
 # Their Finest Hour hooks (common/template/game.sh lists them).
 
-# Psygore's two v1.1 archives with the new slave, ReadMe, launch icons (CUSTOM2=1) and
-# installer: more than release.json describes (tools/package_release.py).
+# Psygore's v1.1 installer archive with the new slave, ReadMe, launch icons (CUSTOM2=1) and
+# installer, as TheirFinestHourEnhanced-<version>-<YYYYMMDD>.lha: more than release.json
+# describes (tools/package_release.py).
 game_dist() {
   (cd "$GAME_ROOT" && python3 tools/package_release.py --dist "$1")
 }

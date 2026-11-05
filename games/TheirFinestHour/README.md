@@ -25,7 +25,7 @@ Fly British and German aircraft in training missions and the Battle of Britain c
 - A500 Kickstart 1.3 image `kick34005.A500` and its matching
   `kick34005.A500.RTB` in `Devs:Kickstarts`.
 
-Unpack **TheirFinestHour-2.0b.lha**, open **TheirFinestHourHD** and run
+Unpack **TheirFinestHourEnhanced-2.0b-20261013.lha**, open **TheirFinestHourHD** and run
 **Install-TheirFinestHour**. Choose a destination and icon, then supply the
 BOB1 and BOB2 disks or disk images. The installer also offers Missions Volume 1
 and copies the manual and key reference. Start the installed game icon.
@@ -56,7 +56,7 @@ two v1.1 archives (pinned in `inputs.sha256`):
 
 ```sh
 make unpack ARCHIVES=<directory>
-make dist        # the two archives in the repository's dist/
+make dist        # the installer archive in the repository's dist/
 ```
 
 Build instructions and checks are in [development.md](docs/development.md).

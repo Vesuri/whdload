@@ -30,4 +30,4 @@ The slave source is `src/` (`TheirFinestHour.s` with the game changes in `render
 `transform.s`, `timing.s`, `sound.s`, `replay.s` and the VERIFY-only `verify.s`);
 `release/readme-*.txt` are the ReadMe's features and history. `tools/` is the development
 harness and never ships: `tools/tfh.py` drives the game through the gdb stub, and
-`tools/package_release.py` (`make dist`) repacks Psygore's two archives.
+`tools/package_release.py` (`make dist`) repacks Psygore's installer archive.

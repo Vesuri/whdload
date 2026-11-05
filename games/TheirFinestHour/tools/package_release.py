@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-"""Rebuild Psygore's two v1.1 archives with the new slave -> dist/ (LH5, level-1 headers).
+"""Rebuild Psygore's v1.1 installer archive with the new slave -> dist/ (LH5, level-1 headers).
 
     make dist        (game.sh game_dist; --dist names the output directory, default the
                       repository's dist/)
 
-Inputs, kept local in tmp/archives/ (make unpack; never committed): the installer
-TheirFinestHour.lha and the preinstalled archive TheirFinestHour_v1.1_0037.lha. Outputs:
+Input, kept local in tmp/archives/ (make unpack; never committed): the installer
+TheirFinestHour.lha. Output, with its .sha256 beside it:
 
-  dist/TheirFinestHour-<ver>.lha            the same members as TheirFinestHour.lha
-  dist/TheirFinestHour_v<ver>_0037.lha      the same members as the 0037 archive
+  dist/TheirFinestHourEnhanced-<version>-<YYYYMMDD>.lha   the same members as TheirFinestHour.lha
 
-Changed members are the game launch icons (CUSTOM2=1), the freshly built slave,
-the template-based ReadMe, and (in the installer archive) Install-TheirFinestHour.
-Everything else is copied byte for byte; the archives are
-re-extracted and checked member by member against their sources. The preinstalled archive
-holds the game itself: dist/ is ignored by git. LHA names LHa for UNIX (Lhasa, the usual
-`lha`, cannot create archives).
+<version> and <YYYYMMDD> come from the slave's $VER string (common/tools/package_release.py
+version_of, date_of). Changed members are the six game launch icons (CUSTOM2=1), the freshly
+built slave, the template-based ReadMe and Install-TheirFinestHour. Everything else is copied
+byte for byte; the archive is re-extracted and checked member by member against its source.
+Only the installer package ships, never the preinstalled game (docs/releasing.md). LHA names
+LHa for UNIX (Lhasa, the usual `lha`, cannot create archives).
 """
 from pathlib import Path
 import argparse
+import hashlib
+import importlib.util
 import os
-import re
 import subprocess
 import struct
 import tempfile
@@ -28,12 +28,17 @@ import tempfile
 from install_package import readme, installer
 
 ROOT = Path(__file__).resolve().parents[1]
+# The shared packager's $VER rules (this file shares its module name, so load it by path).
+_spec = importlib.util.spec_from_file_location(
+    'common_package_release', ROOT.parents[1] / 'common/tools/package_release.py')
+_common = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_common)
+version_of, date_of = _common.version_of, _common.date_of
+
 LHA = os.environ.get('LHA', os.path.expanduser('~/.local/share/amiga/lha-compressor/src/lha'))
-# source archive, top directory, slave member name, output name pattern
-ARCHIVES = [(ROOT / 'tmp/archives/TheirFinestHour.lha', 'TheirFinestHourHD', 'TheirFinestHour.slave',
-             'TheirFinestHour-{v}.lha'),
-            (ROOT / 'tmp/archives/TheirFinestHour_v1.1_0037.lha', 'TheirFinestHour', 'TheirFinestHour.Slave',
-             'TheirFinestHour_v{v}_0037.lha')]
+SOURCE = ROOT / 'tmp/archives/TheirFinestHour.lha'
+TOP, SLAVE = 'TheirFinestHourHD', 'TheirFinestHour.slave'
+ICONS = ('inf', 'newicon', 'colicon', 'colicon2', 'colbox', 'colbox2')
 
 
 def members(archive):
@@ -91,8 +96,10 @@ def archive(stage, names, out, source, changed):
             a, b = (Path(new) / name).read_bytes(), (Path(old) / name).read_bytes()
             assert a == (stage / name).read_bytes(), name
             assert (a != b) == (name in changed), name
-    print(f'{out}: {len(names)} files, {out.stat().st_size} bytes; '
-          f'changed: {", ".join(sorted(changed))}')
+    digest = hashlib.sha256(out.read_bytes()).hexdigest()
+    out.with_name(out.name + '.sha256').write_text(f'{digest}  {out.name}\n')
+    print(f'{out}: {len(names)} files, {out.stat().st_size} bytes, SHA-256 {digest}\n'
+          f'  changed: {", ".join(sorted(changed))}')
 
 
 def main():
@@ -102,36 +109,35 @@ def main():
     (ROOT / 'tmp').mkdir(exist_ok=True)
     with (ROOT / 'tmp/dist-build.log').open('w') as log:
         subprocess.run(['make', 'slave'], cwd=ROOT, check=True, stdout=log, stderr=subprocess.STDOUT)
-    slave = (ROOT / 'tmp/build/release/TheirFinestHour.Slave').read_bytes()
+    slave_path = ROOT / 'tmp/build/release/TheirFinestHour.Slave'
+    slave = slave_path.read_bytes()
     assert b'C5:' not in slave, 'VERIFY build'
-    version = re.search(rb'\$VER: slave ([0-9.a-z]+)', slave).group(1).decode()
+    version, date = version_of(slave_path), date_of(slave_path)
     assert f'Version {version} '.encode() in (ROOT / 'release/readme-history.txt').read_bytes()
+    dmy = f'{date[6:]}.{date[4:6]}.{date[:4]}'
+    title = f'Their Finest Hour Enhanced {version} ({dmy})'
     dist.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as tmp:
-        for source, top, slave_name, pattern in ARCHIVES:
-            stage = Path(tmp) / top
-            extract(source, stage)
-            names = members(source)
-            changed = {f'{top}/{slave_name}', f'{top}/ReadMe'}
-            assert changed <= set(names), source
-            (stage / top / slave_name).write_bytes(slave)
-            (stage / top / 'ReadMe').write_bytes(readme((stage / top / 'ReadMe').read_bytes()))
-            install_name = f'{top}/Install-TheirFinestHour'
-            if install_name in names:
-                install = stage / install_name
-                install.write_bytes(installer(install.read_bytes()))
-                changed.add(install_name)
-            icon_suffixes = ('.info', '.inf', '.newicon', '.colicon', '.colicon2',
-                             '.colbox', '.colbox2')
-            icons = [name for name in names
-                     if name.startswith(f'{top}/TheirFinestHour.')
-                     and name.endswith(icon_suffixes)]
-            assert len(icons) == (6 if top == 'TheirFinestHourHD' else 1), icons
-            for name in icons:
-                icon = stage / name
-                icon.write_bytes(enhanced_icon(icon.read_bytes()))
-                changed.add(name)
-            archive(stage, names, dist / pattern.format(v=version), source, changed)
+    with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as stage:
+        stage = Path(stage)
+        extract(SOURCE, stage)
+        names = members(SOURCE)
+        install_name = f'{TOP}/Install-TheirFinestHour'
+        icons = [f'{TOP}/TheirFinestHour.{s}' for s in ICONS]
+        changed = {f'{TOP}/{SLAVE}', f'{TOP}/ReadMe', install_name, *icons}
+        assert changed <= set(names), sorted(changed - set(names))
+        # Every launch icon style gets the tooltype; no other icon is a game launcher.
+        assert sorted(icons) == sorted(n for n in names if n.startswith(f'{TOP}/TheirFinestHour.')
+                                       and not n.endswith(('.slave', '.Slave'))), names
+        (stage / TOP / SLAVE).write_bytes(slave)
+        new_readme = readme((stage / TOP / 'ReadMe').read_bytes(), title)
+        assert f' {title}\n'.encode() in new_readme
+        (stage / TOP / 'ReadMe').write_bytes(new_readme)
+        install = stage / install_name
+        install.write_bytes(installer(install.read_bytes()))
+        for name in icons:
+            icon = stage / name
+            icon.write_bytes(enhanced_icon(icon.read_bytes()))
+        archive(stage, names, dist / f'TheirFinestHourEnhanced-{version}-{date}.lha', SOURCE, changed)
 
 
 if __name__ == '__main__':

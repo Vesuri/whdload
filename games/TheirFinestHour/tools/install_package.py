@@ -16,13 +16,15 @@ def template(name):
     return (base / 'Install Template/Xxx Install' / name).read_bytes().decode('latin-1')
 
 
-def readme(original):
+def readme(original, title):
+    """title: the release name line, "Their Finest Hour Enhanced <version> (<date>)"."""
     text = template('ReadMe')
     start = text.index(' This install applies to')
     requirements = text.index(' The game requires an installed A500')
     text = text[:start] + ''' This install applies to "Their Finest Hour: The Battle of Britain"
  (c) 1990 Lucasfilm. Supports game versions 1.0, 1.1, KIXX and Missions Volume 1.
  Enhanced framerate requires game version 1.1.
+ ''' + title + '''
 
  Requirements:
  -------------
