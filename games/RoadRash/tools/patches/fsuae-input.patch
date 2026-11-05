@@ -1,0 +1,37 @@
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -34,6 +34,9 @@
+ #include "fsemu-log.h"
+ #include "fsemu-action.h"
+ #include "fsemu-video.h"
++#include "fsemu-control.h"
++#include "fsemu-frame.h"
++extern "C" void fsemu_control_set_warp_internal(bool);
+ #include "fs/conf.h"
+ 
+ #define OPTION_REMOTE_DEBUGGER_START_TIMER "remote_debugger"
+@@ -689,7 +692,23 @@
+ 											deactivate_debugger();
+ 											return; // response is sent when profile is finished (vsync)
+ 										}
+-									} else if(cmd == "aprof start") {
++									// FF1 diagnostic: paused monitor control; no game memory changes.
++                                    } else if(cmd == "warp 0" || cmd == "warp 1") {
++                                        fsemu_action_post_from_main(cmd.back() == '1' ? FSEMU_ACTION_WARP_ENABLE : FSEMU_ACTION_WARP_DISABLE);
++                                        response += "OK";
++                                    } else if(cmd == "warp-status") {
++                                        response += to_hex(std::string("warp=") + (fsemu_frame_warping() ? "1\n" : "0\n"));
++                                     } else if(cmd.substr(0, 6) == "mouse ") {
++                                        int dx=0, dy=0;
++                                        if(sscanf(cmd.c_str()+6, "%d %d", &dx, &dy) == 2 && abs(dx)<=127 && abs(dy)<=127) {
++                                            inputdevice_uaelib("MOUSE1_HORIZ", dx, 0, false);
++                                            inputdevice_uaelib("MOUSE1_VERT", dy, 0, false);
++                                            response += "OK";
++                                        } else response += "E04";
++                                    } else if(cmd.substr(0, 6) == "input ") {
++                                        auto sep = cmd.find(' ', 6);
++                                        response += sep != std::string::npos && inputdevice_uaelib(cmd.substr(6, sep-6).c_str(), cmd.substr(sep+1).c_str()) ? "OK" : "E04";
++                                    } else if(cmd == "aprof start") {
+ 										response += aprof_start() ? "OK" : "E03";
+ 									} else if(cmd.substr(0, strlen("aprof stop ")) == "aprof stop ") {
+ 										response += aprof_stop(cmd.substr(strlen("aprof stop ")).c_str()) ? "OK" : "E02";

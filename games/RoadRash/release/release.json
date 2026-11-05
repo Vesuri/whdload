@@ -1,0 +1,16 @@
+{
+  "archives": [
+    {
+      "input": "RoadRash.lha",
+      "output": "RoadRash-{version}.lha",
+      "replace": {
+        "RoadRashHD/RoadRash.slave": "build:RoadRash",
+        "RoadRashHD/Readme": "release/Readme",
+        "RoadRashHD/Install": "release/Install"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "RoadRashHD/source", "variants": ["RoadRash"]}
+    }
+  ]
+}

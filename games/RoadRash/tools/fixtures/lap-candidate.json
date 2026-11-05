@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "description": "Candidate 30-second Sierra Nevada input tape; coverage requires validation.",
+  "start_field": 100,
+  "end_field": 1600,
+  "events": [[100,"JOY2_UP",1],[600,"JOY2_RIGHT",1],[620,"JOY2_RIGHT",0],[800,"JOY2_LEFT",1],[820,"JOY2_LEFT",0],[1100,"JOY2_RIGHT",1],[1200,"JOY2_RIGHT",0],[1600,"JOY2_UP",0]],
+  "screenshots": [400,600,800,1000,1200,1400,1600]
+}

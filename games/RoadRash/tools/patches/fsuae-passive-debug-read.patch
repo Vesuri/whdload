@@ -1,0 +1,15 @@
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -956,7 +956,11 @@
+ 											int data = -1;
+ 											if (debug_safe_addr(adr, 1)) {
+ 												ad = &get_mem_bank(adr);
+-												data = ad->bget(adr);
++												// Debugger RAM/ROM reads must not invoke bus-access callbacks.
++                                                if ((ad->flags & (ABFLAG_RAM | ABFLAG_ROM)) && ad->check(adr, 1))
++                                                    data = *ad->xlateaddr(adr);
++                                                else
++                                                    data = ad->bget(adr);
+ 											} else {
+ 												if ((adr >= 0xdff000) && (adr < 0xdff1fe)) {
+ 													if (custom_data == NULL) {

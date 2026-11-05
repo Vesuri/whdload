@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "description": "C action replay: steering/crash tape plus fire-button attacks to both sides.",
+  "start_field": 100,
+  "end_field": 1600,
+  "events": [
+    [
+      100,
+      "JOY2_UP",
+      1
+    ],
+    [
+      200,
+      "JOY2_FIRE_BUTTON",
+      1
+    ],
+    [
+      240,
+      "JOY2_FIRE_BUTTON",
+      0
+    ],
+    [
+      600,
+      "JOY2_RIGHT",
+      1
+    ],
+    [
+      600,
+      "JOY2_FIRE_BUTTON",
+      1
+    ],
+    [
+      620,
+      "JOY2_RIGHT",
+      0
+    ],
+    [
+      640,
+      "JOY2_FIRE_BUTTON",
+      0
+    ],
+    [
+      800,
+      "JOY2_LEFT",
+      1
+    ],
+    [
+      800,
+      "JOY2_FIRE_BUTTON",
+      1
+    ],
+    [
+      820,
+      "JOY2_LEFT",
+      0
+    ],
+    [
+      840,
+      "JOY2_FIRE_BUTTON",
+      0
+    ],
+    [
+      1100,
+      "JOY2_RIGHT",
+      1
+    ],
+    [
+      1100,
+      "JOY2_FIRE_BUTTON",
+      1
+    ],
+    [
+      1140,
+      "JOY2_RIGHT",
+      0
+    ],
+    [
+      1140,
+      "JOY2_LEFT",
+      1
+    ],
+    [
+      1180,
+      "JOY2_FIRE_BUTTON",
+      0
+    ],
+    [
+      1500,
+      "JOY2_LEFT",
+      0
+    ],
+    [
+      1600,
+      "JOY2_UP",
+      0
+    ]
+  ],
+  "screenshots": [
+    400,
+    600,
+    800,
+    1000,
+    1200,
+    1360,
+    1380,
+    1400,
+    1440,
+    1460,
+    1600
+  ],
+  "coverage": {
+    "overtake_by_field": 1120,
+    "crash_onset_window": [
+      1350,
+      1400
+    ],
+    "crash_count": 1
+  }
+}
