@@ -1,7 +1,7 @@
 """Watch non-stack native scenery stores in one presentation rebuild.
 
 Run from the configured harness after reach_flight.py --no-shot --out CAPTURE:
-  python3 -B ../../R/RedBaron/tools/scenery_write_watch.py CAPTURE
+  python3 -B tools/scenery_write_watch.py CAPTURE
 Leaves the same emulator paused at the native scenery return. Guest memory is
 never modified. Stack locals and IRQ-owned memory are not scenery outputs.
 """

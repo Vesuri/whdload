@@ -1,0 +1,20 @@
+{
+  "archives": [
+    {
+      "input": "RedBaron.lha",
+      "output": "RedBaron-{version}-{date}.lha",
+      "replace": {
+        "RedBaronHD/RedBaron.slave": "build:RedBaron",
+        "RedBaronHD/ReadMe": "release/ReadMe",
+        "RedBaronHD/Install": "release/Install",
+        "RedBaronHD/RedBaron.exoticon": "release/RedBaron.exoticon",
+        "RedBaronHD/RedBaron.inf": "release/RedBaron.inf",
+        "RedBaronHD/RedBaron.newexot": "release/RedBaron.newexot",
+        "RedBaronHD/RedBaron.newicon": "release/RedBaron.newicon"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "RedBaronHD/source", "variants": ["RedBaron"]}
+    }
+  ]
+}

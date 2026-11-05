@@ -511,8 +511,8 @@ To repeat a timing pair, freeze a developer slave and its listing, set
 run the established harness with `BENCH_DEVELOPER=1 BENCH_BATCH_KEYS=1`:
 
 ```sh
-python3 -B ../../R/RedBaron/tools/scene_profile_case.py 040 0x17f2ffa CAPTURE_OFF --fields 2000 --groups rate --bank-after 250
-python3 -B ../../R/RedBaron/tools/scene_profile_case.py 040 0x37f2ffa CAPTURE_ON --fields 2000 --groups rate --bank-after 250
+python3 -B tools/scene_profile_case.py 040 0x17f2ffa CAPTURE_OFF --fields 2000 --groups rate --bank-after 250
+python3 -B tools/scene_profile_case.py 040 0x37f2ffa CAPTURE_ON --fields 2000 --groups rate --bank-after 250
 ```
 
 Use fresh capture names; for 060 use masks `0x1ff2ffa` and `0x3ff2ffa`.
@@ -830,7 +830,7 @@ Manual trial from the initialized harness (choose a fresh output name):
 
 ```sh
 BENCH_DEVELOPER=1 BENCH_BATCH_KEYS=1 \
-python3 -B ../../R/RedBaron/tools/scene_profile_case.py \
+python3 -B tools/scene_profile_case.py \
   060 0x1ff2ffa tmp/prof/manual-w6-060 --fields 2000 --groups rate --bank-after 250
 ```
 
@@ -940,7 +940,7 @@ in the capture's `bank` subdirectory. For example, from the initialized harness:
 
 ```sh
 BENCH_BATCH_KEYS=1 BENCH_OMIT_CUSTOM2=1 \
-python3 -B ../../R/RedBaron/tools/scene_profile_case.py \
+python3 -B tools/scene_profile_case.py \
   060 0 tmp/prof/manual-level-bank --fields 2000 --groups fps --bank-after 250
 ```
 
@@ -1042,7 +1042,7 @@ To reproduce a normal default stage window from the initialized harness:
 
 ```sh
 BENCH_BATCH_KEYS=1 BENCH_OMIT_CUSTOM2=1 \
-python3 -B ../../R/RedBaron/tools/scene_profile_case.py \
+python3 -B tools/scene_profile_case.py \
   040 0 tmp/prof/fc4-manual-normal --fields 250 --groups stages
 ```
 
@@ -1134,7 +1134,7 @@ and one owned emulator at a time. Normal default stage window:
 
 ```sh
 BENCH_BATCH_KEYS=1 BENCH_OMIT_CUSTOM2=1 \
-python3 -B ../../R/RedBaron/tools/scene_profile_case.py \
+python3 -B tools/scene_profile_case.py \
   060 0 tmp/prof/fc3-manual-normal --fields 250 --groups stages
 ```
 
@@ -1231,7 +1231,7 @@ For a manual normal-build profile, use the configured development harness and a
 fresh output name:
 
 ```sh
-BENCH_BATCH_KEYS=1 BENCH_OMIT_CUSTOM2=1 python3 -B ../../R/RedBaron/tools/scene_profile_case.py 030 0 tmp/prof/manual-fc2 --groups stages --fields 250
+BENCH_BATCH_KEYS=1 BENCH_OMIT_CUSTOM2=1 python3 -B tools/scene_profile_case.py 030 0 tmp/prof/manual-fc2 --groups stages --fields 250
 ```
 
 Choose `040` or `060` for those classes. The driver selects maximum detail using
@@ -1424,15 +1424,14 @@ no 50 FPS or frame-independent normal-game-speed claim. No push was made.
 To reproduce the normal final matrix with the established local harness:
 
 ```sh
-source tmp/dev/amiga/env.sh
-cd tmp/dev
+. ../../common/env.sh
 python3 -B tools/release_final.py
 ```
 
 The driver refuses to overwrite completed output directories. Archive completed
 results or choose fresh output names before an intentional rerun. It runs one
 owned emulator at a time and deletes consumed memory-location scans after saving
-compact evidence. The final binary is `tmp/dev/tmp/build/RedBaron.slave` from the
+compact evidence. The final binary is `tmp/build/RedBaron.slave` from the
 repository root; replace the installed slave with that normal binary to use it.
 
 ## Fast-CPU rendering reprofile (2026-10-12)
@@ -1654,12 +1653,12 @@ input controllers were closed after validation.
 
 Reproduce an isolated developer comparison from the local harness with
 `BENCH_BATCH_KEYS=1 BENCH_DEVELOPER=1 BENCH_FROZEN_SLAVE=<capture>/slave.slave`
-and `../../R/RedBaron/tools/artwork_profile_case.py <machine> <mask> <new-output>`.
+and `tools/artwork_profile_case.py <machine> <mask> <new-output>`.
 Use the identical binary for both masks and change only bit 19; each group is
 250 PAL fields. Current source gates that bit off on 000/010/020, so the rejected
 slow-CPU experiments require their frozen pre-policy binary. The bounded native
 comparison and keyboard transitions use
-`python3 -B ../../R/RedBaron/tools/artwork_verify.py 040 <new-output> --transitions`.
+`python3 -B tools/artwork_verify.py 040 <new-output> --transitions`.
 VERIFY timings are not performance evidence. Run one owned emulator at a time.
 
 ## Direct scene viewport development (2026-10-12)
@@ -2008,7 +2007,7 @@ return to debrief worked correctly, with no reported fault. This passes the
 060 crash smoke test; landing and AI shoot-down checks remain open on both
 machines, as does the A500 crash check.
 
-For a live D5 flight, `python3 R/RedBaron/tools/completion_soak.py <capture>`
+For a live D5 flight, `python3 tools/completion_soak.py <capture>`
 counts 90,000 PAL fields in bounded 10,000-field debugger reads, with no guest
 reset or input between them. Each segment requires the native VBL stop and
 rejects mission exit or faults. The host suite passes 443 tests, including
@@ -2193,7 +2192,7 @@ The benchmark realism file has SHA-256
 Recalculate steady cadence without another capture:
 
 ```sh
-python3 R/RedBaron/tools/completion_cadence.py <capture>/event.log --fields 2000
+python3 tools/completion_cadence.py <capture>/event.log --fields 2000
 ```
 
 ### B1: larger game memory pool
@@ -3155,8 +3154,8 @@ Both native endpoints pass core/input/presentation/phase self-tests
 426/512/638/133, terrain stores/cache/list 2/1/2, and all 54 selected timing/pacing
 targets. Both owned emulators were quit. No slave code changed for this checkpoint.
 
-Retained evidence is in `tmp/dev/tmp/prof/w6-current-capacity-a500/` and
-`tmp/dev/tmp/prof/w6-current-capacity-030/`: capacity manifests/checks, frame DMA
+Retained evidence is in `tmp/prof/w6-current-capacity-a500/` and
+`tmp/prof/w6-current-capacity-030/`: capacity manifests/checks, frame DMA
 checks, routine costs and event census for A500; exact-field manifest/check and
 publication logs for 68030. Reproduce the accounting with `time_capacity.py` on
 each A500 manifest and `field_capacity.py` on the 68030 field census.
@@ -3179,7 +3178,7 @@ down pre-existing debt. The final boundary has one update in progress. Two
 completed draws over 505 elapsed fields do not establish a usable steady frame
 rate, sustained capacity, or consistent-gameplay acceptance. The zero-draw first
 window is catch-up, not a speed gain. Evidence is
-`tmp/dev/tmp/prof/w6-transaction-capacity-a500/`.
+`tmp/prof/w6-transaction-capacity-a500/`.
 
 The preceding `f92e9eed…` raw capture stopped during a credit transaction. Its
 second chunk appeared short by exactly one CIA credit and the third gained that
@@ -3197,7 +3196,7 @@ The VERIFY build `1a0677e18c874809ae0270549b4efbeaae6d778d4d3e210a6f936fafbca7e1
 uses CUSTOM2=16319: all currently verified W1–W5 bits plus W6, at maximum detail
 and default Time Scale (F=33). The A500-equivalent configuration retains 512 KB
 chip RAM, 1.5 MB slow RAM and cycle-exact 68000 timing. No fast-draw fixture is
-active. Evidence is `tmp/dev/tmp/prof/w6-capacity-a500-full/`.
+active. Evidence is `tmp/prof/w6-capacity-a500-full/`.
 
 Two adjacent windows each retain 250 PAL fields in 100/100/50 chunks. Boundary
 counters include profiler alignment fields; the measured intervals are 252 and
@@ -3253,7 +3252,7 @@ fields are omitted or inferred.
 
 Cached 68030/50 uses CUSTOM2=12218: W6 plus the current CPU-adapted verified
 performance selection (table mirror, G1 and S3 remain disabled on this CPU).
-Evidence is `tmp/dev/tmp/prof/w6-capacity-030-full/`.
+Evidence is `tmp/prof/w6-capacity-030-full/`.
 
 | Window | CIA ticks | Completed / newly nominal world ticks | CIA debt, start → end | Publications / FPS | Message start / shorten calls |
 | --- | ---: | --- | --- | --- | --- |
@@ -3269,7 +3268,7 @@ progress while rendering at 11.2–12.4 FPS, not full-state gameplay consistency
 sustained capacity across the acceptance matrix, or smooth 50 FPS.
 
 The A1200-class 68EC020 configuration uses 2 MB chip RAM, 8 MB fast RAM and
-CUSTOM2=16319. Its capture `tmp/dev/tmp/prof/w6-capacity-020-full/` uses the same
+CUSTOM2=16319. Its capture `tmp/prof/w6-capacity-020-full/` uses the same
 binary and exact-field procedure:
 
 | Window | CIA ticks | Completed / newly nominal world ticks | CIA debt, start → end | Publications / FPS | Message start / shorten calls |
@@ -3295,7 +3294,7 @@ two-field flight cap; 768 selects both. See `w5-verification.md` for contracts
 and the independently observed cap/wrap stress test. The stress fixture is not
 a game-performance workload.
 
-The same-build A500 OFF baseline (`tmp/dev/tmp/prof/w5-a500-0-r2/`) spans swaps
+The same-build A500 OFF baseline (`tmp/prof/w5-a500-0-r2/`) spans swaps
 140–240: **2,905 fields, 3,441 CIA ticks, 1.7184 FPS**. Its event census has one
 message call and no mirror call, with dt=450 throughout. Separate 250-recorded-
 field samples (100/100/50, two unrecorded joins) contain eight complete swap
@@ -3304,7 +3303,7 @@ and including RTS. Its thirteen sim and three sound disabled ranges match the
 original bytes. The first 100-field DMA sample has 129,365 framebuffer writes
 and zero active-display conflicts. This is an OFF baseline, not a W5 gain or cost.
 
-P1 alone (`tmp/dev/tmp/prof/w5-a500-256/`) takes **2,921 fields**, or
+P1 alone (`tmp/prof/w5-a500-256/`) takes **2,921 fields**, or
 **1.7090 FPS: a 0.55% frame-rate cost** against that OFF baseline. The 100
 intervals add 16 fields in total (0.16 field/frame). Both censuses contain the
 same single message call and no mirror event, with dt=450. Complete h3 snapshots
@@ -3316,7 +3315,7 @@ Its twelve disabled sim ranges and three sound ranges pass, and its first
 P1 remains selected on A500; the measured cost does not justify removing its
 publication safety there.
 
-With both P1/P2 (`tmp/dev/tmp/prof/w5-a500-768/`), the same A500 window takes
+With both P1/P2 (`tmp/prof/w5-a500-768/`), the same A500 window takes
 **2,926 fields, 1.7061 FPS: a 0.72% total cost**. The event census and dt match;
 entry and step-140 h3 snapshots are byte-identical, and step 241 differs only
 in the elapsed-time word at `h3:0483a`. The short trace's eight swap calls average
@@ -3324,13 +3323,13 @@ in the elapsed-time word at `h3:0483a`. The short trace's eight swap calls avera
 sample, not a direct estimate of the counter's overhead. Selected/disabled byte
 audits pass, with zero conflicts among 128,350 observed framebuffer writes.
 
-The 68020 OFF baseline (`tmp/dev/tmp/prof/w5-020-0/`) spans swaps 80–400:
+The 68020 OFF baseline (`tmp/prof/w5-020-0/`) spans swaps 80–400:
 **2,596 fields, 3,075 ticks, 6.1535 FPS**, with no dashboard events. Twenty
 complete swap calls in its separate 250-field sample average **2,553.5 main
 cycles** (573–5,271). All disabled byte ranges pass, with zero conflicts among
 394,259 framebuffer writes in its first 100-field DMA sample.
 
-With P1/P2 on 68020 (`tmp/dev/tmp/prof/w5-020-768/`), swaps 80–400 take
+With P1/P2 on 68020 (`tmp/prof/w5-020-768/`), swaps 80–400 take
 **2,661 fields, 3,151 ticks, 6.0032 FPS: a 2.44% rate cost**. Both windows
 have no dashboard events. Variable dt permits world-state divergence; this
 is the observed same-step window, not an identical world trajectory. The
@@ -3343,7 +3342,7 @@ On cached 68030/50, swaps 120–780 take **2,585 → 2,650 fields** and
 **3,062 → 3,138 ticks**, or **12.7456 → 12.4330 FPS: a 2.45% rate cost**.
 Both windows have 660 intervals, no dashboard events and variable dt; do not
 interpret this as a bit-identical trajectory. Evidence:
-`tmp/dev/tmp/prof/w5-030-{0,768}/`. Separate 20-field DMA samples observe
+`tmp/prof/w5-030-{0,768}/`. Separate 20-field DMA samples observe
 185,818 / 175,070 framebuffer writes and zero active-display conflicts.
 Disabled/selected byte audits pass. No cached instruction-cycle cost is claimed.
 The recorded configuration is 68030/50 with data cache and cycle-exact
@@ -3356,7 +3355,7 @@ the later flight event history. Earlier sections below retain their historical
 build-specific results; statements that the release mask was zero describe
 those earlier checkpoints, superseded by the W5 player selection.
 
-To repeat W5 locally, source `amiga/env.sh` from the development workspace, then
+To repeat W5 locally, source `../../common/env.sh` from the development workspace, then
 run `python3 tools/w5_measure.py a500 0 --suffix=-manual-off` followed by
 `python3 tools/w5_measure.py a500 768 --suffix=-manual-on`. Use `020` or `030`
 for the other retained configurations; use 256 for A500 P1 alone. These local
@@ -3396,7 +3395,7 @@ Costs include RTS and exclude IRQ cycles and chunk-cut calls. A rectangle's
 last plane remains asynchronous: whole-pass costs include later waits. Other
 rectangle shapes have different call mixes (88/97); no paired per-shape claim
 is made from their pooled averages. These are W4-only results. Evidence:
-`tmp/dev/tmp/prof/w4-a500-{0,128}/`.
+`tmp/prof/w4-a500-{0,128}/`.
 
 
 On the 14 MHz 68020, swaps 80–400 take **2,594 → 2,507 fields**:
@@ -3406,7 +3405,7 @@ rates describe the observed windows, not bit-identical world histories.
 Separate 250-field samples give full-width rectangle means of
 **73,202.06 → 53,828.28 main cycles** (51/54 calls). This is a CPU-cycle
 comparison within the 68020 configuration, not a direct time comparison with
-68000 cycles. Evidence: `tmp/dev/tmp/prof/w4-020-{0,128}/`.
+68000 cycles. Evidence: `tmp/prof/w4-020-{0,128}/`.
 
 On the cached 50 MHz 68030, swaps **120–780** take **2,591 → 2,411 fields**:
 **12.7161 → 13.6655 FPS (+7.47%)**, over 660 intervals with no dashboard events.
@@ -3415,7 +3414,7 @@ extended to satisfy the 2,000-field minimum. The fresh OFF rate-only boot's
 120–660 overlap takes 2,117 fields versus the earlier capture's 2,118 (2,508
 versus 2,509 ticks): about 0.05% baseline variation. Variable dt again means
 these are observed rates, not identical world histories or cumulative W1–W4 gains.
-Evidence: `tmp/dev/tmp/prof/w4-030-0-rate/` and `w4-030-128/`.
+Evidence: `tmp/prof/w4-030-0-rate/` and `w4-030-128/`.
 
 Separate steps 8–59 give these phase-checked beam-clock measurements:
 
@@ -3430,7 +3429,7 @@ last-plane completion can occur later. They are not cached instruction-cycle
 counts. Phase/horizontal-boundary checks exclude 55 OFF and 129 ON observations
 across all sampled routines. Different acceptance and world-state histories limit
 paired interpretation. Rejected height-22 rectangles are excluded from the fill
-comparison. Evidence: `tmp/dev/tmp/prof/w4-030-{0,128}/`. Cache configuration:
+comparison. Evidence: `tmp/prof/w4-030-{0,128}/`. Cache configuration:
 68030/50, data cache enabled, cycle-exact CPU/memory/blitter, WHDLoad MMU;
 no new raw CACR read is claimed.
 
@@ -3445,7 +3444,7 @@ D1 is retained on all three measured CPUs; normal release enablement remains off
 
 ### Running W4 manually
 
-From `tmp/dev`, source `amiga/env.sh`. The local helpers use the recorded
+From the game directory, source `../../common/env.sh`. The local helpers use the recorded
 machine settings and require the exact frozen binary above:
 
 ```sh
@@ -3464,7 +3463,7 @@ to this worktree.
 For another binary, use the generic flight-entry workflow with CUSTOM2=128
 and CUSTOM5=512, advance to step 8, then record **100 + 100 + 50 fields** with
 `tools/capture_current.py` into three new directories. Analyze them using
-`R/RedBaron/tools/fill_costs.py` with the live sim base from entry metadata.
+`tools/fill_costs.py` with the live sim base from entry metadata.
 Do not join cut calls across the two missing fields, or use cached-CPU
 instruction cycles as timings. Record the long swap census separately.
 For pixel verification, use CUSTOM2=128 and CUSTOM5=66048 (steady), 66050
@@ -3503,7 +3502,7 @@ L6 call was preempted by a higher interrupt. Variation includes chip/slow-memory
 bus contention; group volume inputs before comparing. The two inter-chunk gaps
 remain unrecorded. OFF retains all nine sim and three sound hook ranges; ON’s
 seven disabled sim ranges remain original, and the five selected ranges match
-the intended assembled bytes. Evidence: `tmp/dev/tmp/prof/w3-a500-{0,7168}/`.
+the intended assembled bytes. Evidence: `tmp/prof/w3-a500-{0,7168}/`.
 On the 14 MHz 68020, swaps 80–400 take **2,594 → 2,582 fields**:
 **6.1583 → 6.1869 FPS (+0.46%)**. Both censuses are free of dashboard events.
 The world is not continuously dt-clamped on this CPU, so its state can diverge;
@@ -3518,7 +3517,7 @@ three and four volume calls are respectively **4,676.35 → 3,676.46**,
 27 OFF and 13 ON routine observations containing IRQ-entry markers are excluded.
 Every timed call lies in the observed timer-dispatch interrupt stack. OFF/ON
 byte audits pass, including exact selected bytes. Evidence:
-`tmp/dev/tmp/prof/w3-020-{0,7168}/`.
+`tmp/prof/w3-020-{0,7168}/`.
 
 Cached 50 MHz 68030 beam clocks at steps 8–59, after VBlank-phase and horizontal
 boundary exclusions, give the following **inclusive wall times before RTS**:
@@ -3540,7 +3539,7 @@ no dashboard events; their variable dt means their world states need not match.
 Separate 20-field DMA observations have exactly matching per-register ordered
 Paula/control writes and all four channels’ sample-fetch value sequences across
 OFF, full and reduced settings. Original-byte and selected-byte audits pass.
-Evidence: `tmp/dev/tmp/prof/w3-030-{0,7168,3072}/`. The routine samples have 103,
+Evidence: `tmp/prof/w3-030-{0,7168,3072}/`. The routine samples have 103,
 100 and 99 phase/boundary exclusions respectively; no instruction-cycle claim is
 made for the cached CPU. These W3 results are not cumulative W2+W3 gains.
 
@@ -3552,7 +3551,7 @@ Use CUSTOM2=0 for OFF. For queue/division twins use CUSTOM2=7168 and CUSTOM5=496
 do not use those instrumented costs as timings. Time Scale remains 40.
 
 For the exact recorded build, the local helpers automate the same comparisons
-from `tmp/dev` after sourcing `amiga/env.sh`:
+from the game directory after sourcing `../../common/env.sh`:
 
 ```sh
 python3 tools/w3_measure.py a500 0 --suffix=-manual
@@ -3655,7 +3654,7 @@ The complete W2 development audit and explicit low-value deferrals are in
 
 ## Running the W2 profile manually
 
-From `tmp/dev`, source `amiga/env.sh` and ensure no other controller is using this
+From the game directory, source `../../common/env.sh` and ensure no other controller is using this
 project's emulator. The normal player build still has a zero release mask; these
 checks use the VERIFY build with its per-feature options and twins disabled.
 `reach_flight.py` builds that variant and reaches the maximum-detail flight fixture:
@@ -4209,10 +4208,10 @@ earlier scene/machine limitations; optimization claims still require feature-spe
 
 ## Repeat the profiling run manually
 
-From the worktree root, using the established local harness and shared Amiga inputs:
+From the game directory, using the harness and shared Amiga inputs:
 
 ```sh
-python3 tmp/dev/tools/profile_flight.py
+python3 tools/profile_flight.py
 ```
 
 The default is now **one 100-field cycle capture**, with no internal joins. Use `--fields`
@@ -4413,7 +4412,7 @@ formats to match every register value and reject a corrupted publication.
 
 Evidence: `w0-final-a1200-entry`, `w0-final-a1200-repeat` and
 `w0-final-a1200-census`. To reproduce the machine configuration from the local
-harness directory, source `amiga/env.sh`, then use:
+harness directory, source `../../common/env.sh`, then use:
 
 ```sh
 MallocScribble=1 AMIGA_MODEL=A1200 KICKSTART="$KICKSTART_A1200" \
@@ -4650,7 +4649,7 @@ primary case's `common-mixed-rate.json`, derived from its complete guarded censu
 
 ## Repeating the W1 checks manually
 
-Run from the local development harness after sourcing `amiga/env.sh`. Use a fresh
+Run from the local development harness after sourcing `../../common/env.sh`. Use a fresh
 output directory per boot and stop only this project's recorded emulator before
 starting another. Do not run a second capture controller alongside a queue.
 
@@ -4683,7 +4682,7 @@ at a fresh no-shot flight checkpoint, then run:
 
 ```sh
 python3 tools/dashboard_census.py --out tmp/prof/my-w1-census
-python3 ../../R/RedBaron/tools/census_window.py \
+python3 tools/census_window.py \
   tmp/prof/my-w1-census/census.json --start 8 --end 108 \
   --out tmp/prof/my-w1-census/rate.json
 ```
@@ -4698,7 +4697,7 @@ read-only routine clocks instead of instruction costs:
 ```sh
 python3 tools/w1_clock.py --entry tmp/prof/my-w1-entry --mask 2 \
   --step 120 --out tmp/prof/my-w1-entry/clock.json
-python3 ../../R/RedBaron/tools/routine_wall_time.py \
+python3 tools/routine_wall_time.py \
   tmp/prof/my-w1-entry/clock.json --first-step 1 --last-step 119 \
   --out tmp/prof/my-w1-entry/costs.json
 ```

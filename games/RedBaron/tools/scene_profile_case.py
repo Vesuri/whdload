@@ -1,6 +1,6 @@
 """Short direct-scene comparison using the established local native-input harness.
 
-Run from tmp/dev. Set BENCH_DEVELOPER=1 and BENCH_BATCH_KEYS=1.
+Run from the game directory. Set BENCH_DEVELOPER=1 and BENCH_BATCH_KEYS=1.
 Use the same frozen developer binary for both masks; only the feature under test may differ.
 The local completion_boot driver supports BENCH_FROZEN_SLAVE for this purpose.
 """
@@ -12,7 +12,7 @@ p=argparse.ArgumentParser();p.add_argument('machine',choices=('a500','020','030'
 if a.bank_after and (not 250 <= a.bank_after <= 2000 or a.check_only or a.dma_fields):p.error('Bank-after requires 250–2000 fields and excludes check-only/DMA')
 if not 10 <= a.fields <= 2000:p.error('Use a bounded 10–2000-field window')
 if a.dma_fields and (not 10 <= a.dma_fields <= 40 or a.check_only or 'stages' not in a.groups):p.error('DMA checking requires stages and 10–40 fields')
-ROOT=Path.cwd();os.environ['GAME']=str(ROOT/'tmp/game/completion-benchmark/RedBaron');TRACKED=ROOT.parents[1]/'R/RedBaron/tools'
+ROOT=Path.cwd();os.environ['GAME_DIR']='completion-benchmark/RedBaron';TRACKED=ROOT/'tools'
 def run(*args):subprocess.run([sys.executable,'-B',*map(str,args)],check=True)
 if not a.resume_entry:run('tools/completion_boot.py',a.machine,a.mask,a.out,'--entry-only')
 ready=json.loads((a.out/'ps-ready.json').read_text());ps=ready['ps']
@@ -45,7 +45,7 @@ keys=['tab']*5+['return']+['right']*20+['return','tab','return']+['right']*20+['
 run('tools/completion_keys.py',hex(sim),'sim',*keys)
 r.command(f'until {sim+0x21d30:#x}')
 env=ready['environment']
-meta=dict(machine=a.machine,mask=a.mask,build_mode='developer' if env['DEVELOPER']=='1' else 'normal',sim=sim,ps=ps,slave_sha256=hashlib.sha256((a.out/'slave.slave').read_bytes()).hexdigest(),environment={k:env[k] for k in ['CPU','AMIGA_MODEL','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS']},realism_sha256=hashlib.sha256((Path(os.environ['GAME'])/'data/mreal.prf').read_bytes()).hexdigest(),route='Damage-protected benchmark fixture; native keyboard queue via host debugger; maximum World/Aircraft, Ground ON IN COMBAT; unchanged Time Scale')
+meta=dict(machine=a.machine,mask=a.mask,build_mode='developer' if env['DEVELOPER']=='1' else 'normal',sim=sim,ps=ps,slave_sha256=hashlib.sha256((a.out/'slave.slave').read_bytes()).hexdigest(),environment={k:env[k] for k in ['CPU','AMIGA_MODEL','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS']},realism_sha256=hashlib.sha256(((Path('tmp/game')/os.environ['GAME_DIR'])/'data/mreal.prf').read_bytes()).hexdigest(),route='Damage-protected benchmark fixture; native keyboard queue via host debugger; maximum World/Aircraft, Ground ON IN COMBAT; unchanged Time Scale')
 (a.out/'entry.json').write_text(json.dumps(meta,indent=2)+'\n')
 if os.environ.get('BENCH_OMIT_CUSTOM2')=='1':
  proof=r.command(f'gdb x/1hx {sim+0xb06:#x}')
@@ -137,7 +137,7 @@ if a.bank_after:
  if 'rate' in a.groups:run(TRACKED/'w6_rate_profile.py',bank,'--fields',a.bank_after)
  else:run(TRACKED/'render_profile.py',bank,'--group','fps','--fields',a.bank_after)
  r.command('shot '+str((bank/'final.png').resolve()))
-(a.out/'debug.uae').write_bytes(Path('amiga/.run/fsuae/Cache/Logs/debug.uae').read_bytes())
+(a.out/'debug.uae').write_bytes(Path('tmp/run/default/.run/fsuae/Cache/Logs/debug.uae').read_bytes())
 if not a.bank_after:r.command('shot '+str((a.out/'final.png').resolve()))
 if a.dma_fields:
  assert 10 <= a.dma_fields <= 40

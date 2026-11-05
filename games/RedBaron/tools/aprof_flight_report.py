@@ -4,7 +4,7 @@
 Per-PC records give exact emulated units and the share spent in Chip-bus accesses. Stage
 totals use the call tree: inclusive units of each callee of the render function sim:0056c
 (and the world step sim:01098), plus interrupt (exception) subtrees.
-Usage (from tmp/dev): python3 ../../R/RedBaron/tools/aprof_flight_report.py CAPTURE [--top N] [--slave-base ADDR]
+Usage (from the game directory): python3 tools/aprof_flight_report.py CAPTURE [--top N] [--slave-base ADDR]
 """
 import argparse,bisect,collections,json,re,struct
 from pathlib import Path

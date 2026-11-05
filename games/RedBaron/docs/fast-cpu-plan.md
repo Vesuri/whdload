@@ -24,7 +24,7 @@ lower bounds there with exact per-instruction attribution.
 
 **Bus cross-check.**
 - Barto DMA-slot traces of the **normal** build on 030/50 MMU (40 fields) and
-  030 NOMMU, using `tmp/dev/tools/render_trace_case.py`.
+  030 NOMMU, using `tools/render_trace_case.py`.
 - These record slot ownership only. The emulator logs no instructions on
   cached-CPU configurations.
 - They show a strict three-field rhythm, per field:
@@ -338,8 +338,8 @@ per-PC records for the Zorro III window at `0x40000000`. Earlier aprof builds
 refuse 040/060; run `make setup` in AmigaXDev to rebuild.
 
 ```sh
-UNTIL_TIMEOUT=2000 python3 -B ../../R/RedBaron/tools/aprof_flight.py 040 0x17f2ffa tmp/prof/aprof-040-w6b --warm 500 --fields 100
-python3 -B ../../R/RedBaron/tools/aprof_flight_report.py tmp/prof/aprof-040-w6b
+UNTIL_TIMEOUT=2000 python3 -B tools/aprof_flight.py 040 0x17f2ffa tmp/prof/aprof-040-w6b --warm 500 --fields 100
+python3 -B tools/aprof_flight_report.py tmp/prof/aprof-040-w6b
 ```
 
 On 060 with W6, the FC3 background-twin and CPU-restore counters stay at zero,

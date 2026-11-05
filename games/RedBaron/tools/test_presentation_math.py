@@ -10,7 +10,7 @@ class PresentationMathTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp)/'cases.i'
             write_cases(output)
-            expected = Path(__file__).resolve().parents[1]/'usr/source/time-present-cases.i'
+            expected = Path(__file__).resolve().parents[1]/'src/time-present-cases.i'
             self.assertEqual(output.read_bytes(), expected.read_bytes())
 
     def test_extreme_positions_and_rounding(self):

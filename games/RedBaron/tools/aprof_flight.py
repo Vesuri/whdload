@@ -1,19 +1,19 @@
 """Exact per-PC cycle profile (aprof FS-UAE) of steady flight, VERIFY tape route.
 
-Run from the local harness (tmp/dev, env.sh sourced). The VERIFY tape replaces the lldb
+Run from the game directory. The VERIFY tape replaces the lldb
 keyboard driver, which cannot attach to arm64 FS-UAE. aprof needs a cycle-exact CPU without
 an MMU model: use APROF_CPU=68EC030 for the 030 class. 040/060 need AmigaXDev's aprof
 from 82aa455 or later; APROF_FSUAE selects another profiler binary.
 CUSTOM2 should be the normal build's CPU-filtered selection (030: 0x7f0ffa). The capture
 uses the unmodified VERIFY source, including artwork twins.
-  APROF_CPU=68EC030 UNTIL_TIMEOUT=1500 python3 -B ../../R/RedBaron/tools/aprof_flight.py \
+  APROF_CPU=68EC030 UNTIL_TIMEOUT=1500 python3 -B tools/aprof_flight.py \
     030-nommu 0x7f0ffa tmp/prof/aprof-030n-1 --warm 500 --fields 50
 Summarize with aprof_flight_report.py CAPTURE --slave-base <live slave copy>.
 """
 import argparse,hashlib,json,os,re,struct,subprocess,sys
 from pathlib import Path
 sys.path.insert(0,str(Path.cwd()/'tools'))
-sys.path.insert(0,str(Path.cwd().parents[1]/'R/RedBaron/tools'))
+sys.path.insert(0,str(Path.cwd().parents[1]/'tools'))
 import route_status as r
 from completion_machines import environment
 p=argparse.ArgumentParser();p.add_argument('machine');p.add_argument('mask',type=lambda s:int(s,0));p.add_argument('out',type=Path)
@@ -24,7 +24,7 @@ if a.out.exists():raise SystemExit('Refusing overwrite')
 env=environment(a.machine,a.mask);env.pop('BOOT_BREAK',None)
 if os.environ.get('APROF_CPU'):env['CPU']=os.environ['APROF_CPU']
 env['FSUAE']=os.path.expanduser(os.environ.get('APROF_FSUAE','~/.local/share/amiga/fs-uae-aprof/fs-uae'))
-env['GAME']=str(Path.cwd()/'tmp/game/completion-benchmark/RedBaron')
+env['GAME_DIR']='completion-benchmark/RedBaron'
 os.environ.update(env)
 subprocess.run([sys.executable,'-B','tools/reach_flight.py','--no-shot','--out',str(a.out)],env=env,check=True)
 at=r.locate();state=r.read(at);sim=state['sim']

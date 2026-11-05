@@ -1,7 +1,7 @@
 """Owned-emulator native keyboard queue control through LLDB, explicitly user-authorized."""
 import argparse,subprocess,sys,time,socket,json,os,re
 from pathlib import Path
-HARNESS=Path(__file__).resolve().parents[3]/'tmp/dev'
+HARNESS=Path(__file__).resolve().parents[1]
 os.chdir(HARNESS)
 sys.path.insert(0,str(HARNESS/'tools'))
 import route_status as r
@@ -10,14 +10,14 @@ p=argparse.ArgumentParser();p.add_argument('--serve',action='store_true');p.add_
 if a.serve and not a.irq_only and a.ps is None and a.mapping is None:p.error('--serve requires --ps, an observed --mapping, or --irq-only')
 if a.irq_only and (not a.serve or a.ps is not None or a.mapping is not None):p.error('--irq-only requires --serve and excludes guest RAM mapping')
 if not a.serve and a.key is None:p.error('Supply base,bitmap,raw or quit')
-SOCK=Path('amiga/.run/completion-input.sock').resolve()
+SOCK=Path('tmp/run/default/.run/completion-input.sock').resolve()
 if not a.serve:
  with socket.socket(socket.AF_UNIX) as s:
   s.connect(str(SOCK));s.sendall(a.key.encode());answer=s.recv(65536).decode();print(answer)
  raise SystemExit(0 if answer.startswith(('OK ','bye')) else 1)
-pid=Path('amiga/.run/fsuae.pid').read_text().strip()
+pid=Path('tmp/run/default/.run/fsuae.pid').read_text().strip()
 owned=subprocess.check_output(['ps','-p',pid,'-o','command='],text=True)
-assert '--base_dir='+str(Path.cwd()/'amiga/.run/fsuae') in owned
+assert '--base_dir='+str(Path.cwd()/'tmp/run/default/.run/fsuae') in owned
 r.command('stop');r.command('gdb delete')
 class Host:
  read_until=Gdb.read_until

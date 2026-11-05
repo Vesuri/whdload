@@ -390,7 +390,7 @@ matches its requested value; the world counter advances once per interval.
 All five initial player objects match. Complete entry h3 differs only in the
 explicitly forced word `h3:04834`; no other difference is hidden. This is a
 step-size experiment, not a comparison of normal mission speed or CPU FPS.
-Evidence: `tmp/dev/tmp/prof/w6-force-{100,225,450,900,2200}/`.
+Evidence: `tmp/prof/w6-force-{100,225,450,900,2200}/`.
 
 | Equal primary-time budget | dt | World updates | Travelled distance, raw | Difference from small-step reference |
 | ---: | ---: | ---: | ---: | ---: |
@@ -442,7 +442,7 @@ normal has reached frame 91 and slow frame 57; their position separation is
 tracking regime, including the early shortcut and per-step integer rounding.
 It is not a claim that every difference is caused by the one-frame lag alone.
 
-Evidence: `tmp/dev/tmp/prof/w6-tracking-{normal,slow}/`. The committed
+Evidence: `tmp/prof/w6-tracking-{normal,slow}/`. The committed
 `game_time_report.py` validates shared starting state, forced-clock boundaries,
 reference models and common-clock comparisons. The earlier W0 clamped-regime
 experiment remains valid: equal steps can match while equal wall times do not.
@@ -470,7 +470,7 @@ reach vertical position 50 with that byte cleared by step 11.
 | 900 | 2 | 1800 | −270 | −822 |
 | 2200 | 2 | 4400 | −270 | −822 |
 
-Evidence: `tmp/dev/tmp/prof/w6-ground-{100,225,450,900,2200}/`.
+Evidence: `tmp/prof/w6-ground-{100,225,450,900,2200}/`.
 The extra attempted ground-entry breakpoint logged no events and is not used
 as evidence. This is one synthetic impact, not a landing-quality tolerance or
 proof of aircraft-to-aircraft collision convergence. It shows that a larger
@@ -510,7 +510,7 @@ component against that distance. Preserve this segment-query behavior. A
 controlled hit/near-miss, moving-target, aircraft-collision and AI/RNG matrix
 remains required before accepting an implemented scheduler.
 
-Evidence: `tmp/dev/tmp/prof/w6-fire-{225,900}/`. No performance or gameplay
+Evidence: `tmp/prof/w6-fire-{225,900}/`. No performance or gameplay
 balance claim is made from these synthetic probes.
 
 ## Capacity and final recommendation
@@ -558,19 +558,19 @@ of its eventual implementation.
 Committed analysis tools operate on the retained local evidence:
 
 ```sh
-python3 R/RedBaron/tools/game_time_report.py tmp/dev/tmp/prof --out tmp/dev/tmp/game-time/w6-results.json
-python3 R/RedBaron/tools/game_time_inventory.py tmp/dev/tmp/game/RedBaron_v2.1/RedBaron/data/sim --out tmp/dev/tmp/game-time/w6-inventory.json
-python3 -m unittest discover -s R/RedBaron/tools -p 'test_*.py'
+python3 tools/game_time_report.py tmp/prof --out tmp/game-time/w6-results.json
+python3 tools/game_time_inventory.py tmp/game/RedBaron/data/sim --out tmp/game-time/w6-inventory.json
+python3 -m unittest discover -s tools -p 'test_*.py'
 ```
 
-For a new live experiment, use the existing local harness from `tmp/dev` after
-loading `amiga/env.sh`. Its ignored helpers and retained game installation are
-local prerequisites; they are not a distributable game fixture. Use one capture
+For a new live experiment, use the harness in `tools/` from the game directory after
+loading `../../common/env.sh`. The installed game (`make unpack`) is a local
+prerequisite; it is not a distributable game fixture. Use one capture
 at a time, verify the running emulator belongs to this harness before quitting
 it, and keep hands off mouse/keyboard during the route and capture.
 
 ```sh
-source amiga/env.sh
+. ../../common/env.sh
 python3 tools/w6_boot_current.py 030 0 tmp/prof/w6-manual-225 --dt 225
 python3 tools/w6_players.py --end 89 --out tmp/prof/w6-manual-225/players
 python3 tools/redbaron.py quit

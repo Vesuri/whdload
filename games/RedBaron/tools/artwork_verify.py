@@ -1,6 +1,6 @@
 """Bounded artwork twins plus native keyboard view/firing transitions.
 
-Run from tmp/dev after sourcing the shared environment. VERIFY-only flight route;
+Run from the game directory. VERIFY-only flight route;
 never use its elapsed time as a performance measurement. One owned emulator.
 """
 import argparse
@@ -24,14 +24,14 @@ p.add_argument('--mask', type=lambda x: int(x, 0), help='Developer mask override
 a = p.parse_args()
 if a.out.exists():
     raise SystemExit('Refusing overwrite')
-pid = Path('amiga/.run/fsuae.pid')
+pid = Path('tmp/run/default/.run/fsuae.pid')
 if pid.exists():
     owned = subprocess.run(['ps', '-p', pid.read_text().strip(), '-o', 'stat=,command='], capture_output=True, text=True)
     if owned.returncode == 0 and not owned.stdout.lstrip().startswith('Z'):
         raise SystemExit('Inspect existing emulator first: ' + owned.stdout)
 mask = a.mask if a.mask is not None else (0xf0ffa if a.machine == '040' else 0xb0ffa)
 env = environment(a.machine, mask)
-env.update(BOOT_TIMEOUT='240', GAME=str(Path('tmp/game/completion-benchmark/RedBaron').resolve()))
+env.update(BOOT_TIMEOUT='240', GAME_DIR='completion-benchmark/RedBaron')
 subprocess.run([sys.executable, '-B', 'tools/reach_flight.py', '--no-shot', '--out', str(a.out)], env=env, check=True)
 symbols = {m[1]: int(m[2], 16) for line in (a.out / 'slave.lst').read_text(encoding='latin1').splitlines()
            if (m := re.match(r'^(\w+)\s+00:([0-9A-Fa-f]+)\s*$', line))}
@@ -117,7 +117,7 @@ if a.transitions:
 
     def key(raw, up=False):
         with socket.socket(socket.AF_UNIX) as sock:
-            sock.connect(str(Path('amiga/.run/completion-input.sock').resolve()))
+            sock.connect(str(Path('tmp/run/default/.run/completion-input.sock').resolve()))
             sock.sendall(f'irq-{"up" if up else "down"}:{sim},200588,{raw}'.encode())
             reply = sock.recv(65536).decode()
             assert reply.startswith('OK '), reply

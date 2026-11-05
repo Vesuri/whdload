@@ -1,4 +1,4 @@
-"""Bounded direct scene primitive twins; run from tmp/dev after env.sh."""
+"""Bounded direct scene primitive twins; run from the game directory."""
 import json, os, re, socket, subprocess, sys, time
 from pathlib import Path
 sys.path.insert(0,str(Path.cwd()/'tools'))
@@ -8,12 +8,12 @@ import argparse
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('out',type=Path);p.add_argument('--machine',choices=('030','040','060'),default='060');p.add_argument('--bank',action='store_true');p.add_argument('--transitions',action='store_true');a=p.parse_args()
 assert not (a.bank and a.transitions), 'Scripted bank and native transition input are separate fixtures'
 out=a.out;assert not out.exists()
-pid=Path('amiga/.run/fsuae.pid')
+pid=Path('tmp/run/default/.run/fsuae.pid')
 if pid.exists():
  z=subprocess.run(['ps','-p',pid.read_text().strip(),'-o','stat=,command='],capture_output=True,text=True)
  assert z.returncode or z.stdout.lstrip().startswith('Z'),z.stdout
 env=environment(a.machine,0x1f0ffa if a.machine=='040' else 0x1b0ffa)
-env.update(GAME=str(Path('tmp/game/completion-benchmark/RedBaron').resolve()),BOOT_TIMEOUT='240',FILL_TRACE='1',TWIN_FAIL_SYMBOL='scene_frame_bad')
+env.update(GAME_DIR='completion-benchmark/RedBaron',BOOT_TIMEOUT='240',FILL_TRACE='1',TWIN_FAIL_SYMBOL='scene_frame_bad')
 subprocess.run([sys.executable,'-B','tools/reach_flight.py','--no-shot','--out',str(out)]+(['--bank'] if a.bank else []),env=env,check=True)
 e=json.loads((out/'entry.json').read_text())['entry']
 sym={m[1]:int(m[2],16) for line in (out/'slave.lst').read_text(encoding='latin1').splitlines() if (m:=re.match(r'^(\w+)\s+00:([0-9A-Fa-f]+)',line))}
@@ -35,7 +35,7 @@ if a.transitions:
  sim=e['sim']
  def key(raw,up=False):
   with socket.socket(socket.AF_UNIX) as sock:
-   sock.connect(str(Path('amiga/.run/completion-input.sock').resolve()))
+   sock.connect(str(Path('tmp/run/default/.run/completion-input.sock').resolve()))
    sock.sendall(f'irq-{"up" if up else "down"}:{sim},200588,{raw}'.encode())
    reply=sock.recv(65536).decode();assert reply.startswith('OK '),reply
  def advance(n):

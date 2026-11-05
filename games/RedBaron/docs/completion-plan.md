@@ -138,7 +138,7 @@ fills, `15e96` instrument scripts at 14.5 ms, `19ba6` at 8.7 ms, overlay
 ### Phase A — scoreboard (do first)
 
 **A1. Add 040 and 060 machine configs** to the local harness
-(`tmp/dev/tools/w1_primary.py` and siblings).
+(`tools/w1_primary.py` and siblings).
 - Machine: A1200 or A4000 AGA, 2 MB chip, 16 MB fast, KS 3.1.
 - Timing runs: the cycle-exact `68040-NOMMU` / `68060-NOMMU` CPU types. The
   MMU cores ignore frequency (AmigaXDev `docs/playbooks/new-game-playbook-jotd.md`
@@ -341,7 +341,7 @@ Developer/VERIFY retain CUSTOM2 bit 13. The original checklist follows for conte
 - A 30-minute soak with no fault.
 
 *Play-test:* ask the user to fly on A500 and 060 settings. The handling feel is
-the user's call. `bash R/RedBaron/tools/playtest.sh a500` (or `060`) launches
+the user's call. `bash tools/playtest.sh a500` (or `060`) launches
 the current D5 developer candidate at real speed with sound and the original
 realism preferences; close the previous Red Baron window before switching.
 Set maximum World/Aircraft detail and Ground ON IN COMBAT with F10; leave

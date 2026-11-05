@@ -536,7 +536,7 @@ Launch fresh reproducibility runs with `MallocScribble=1` in the environment
 and retain that setting with their manifests. Compare raw captures with:
 
 ```sh
-python3 R/RedBaron/tools/compare_traces.py LEFT_TRACE RIGHT_TRACE --out comparison.json
+python3 tools/compare_traces.py LEFT_TRACE RIGHT_TRACE --out comparison.json
 ```
 
 The tool exits unsuccessfully for any differing field, including screenshot-only

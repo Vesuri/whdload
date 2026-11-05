@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path.cwd()/'tools'))
 import route_status as r
 p=argparse.ArgumentParser();p.add_argument('machine',choices=('030','030-nommu','040','060'));p.add_argument('mask',type=lambda s:int(s,0));p.add_argument('out',type=Path);p.add_argument('--resume-entry',action='store_true');a=p.parse_args()
-ROOT=Path.cwd();os.environ['GAME']=str(ROOT/'tmp/game/completion-benchmark/RedBaron');TRACKED=ROOT.parents[1]/'R/RedBaron/tools'
+ROOT=Path.cwd();os.environ['GAME_DIR']='completion-benchmark/RedBaron';TRACKED=ROOT/'tools'
 def run(*args):subprocess.run([sys.executable,'-B',*map(str,args)],check=True)
 if not a.resume_entry:run('tools/completion_boot.py',a.machine,a.mask,a.out,'--entry-only')
 ready=json.loads((a.out/'ps-ready.json').read_text());ps=ready['ps']
@@ -28,7 +28,7 @@ keys=['tab']*5+['return']+['right']*20+['return','tab','return']+['right']*20+['
 run('tools/completion_keys.py',hex(sim),'sim',*keys)
 r.command(f'until {sim+0x21d30:#x}')
 env=ready['environment']
-meta=dict(machine=a.machine,mask=a.mask,build_mode='developer' if env['DEVELOPER']=='1' else 'normal',sim=sim,ps=ps,slave_sha256=hashlib.sha256((a.out/'slave.slave').read_bytes()).hexdigest(),environment={k:env[k] for k in ['CPU','AMIGA_MODEL','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS']},realism_sha256=hashlib.sha256((Path(os.environ['GAME'])/'data/mreal.prf').read_bytes()).hexdigest(),route='Damage-protected benchmark fixture; native keyboard queue via host debugger; maximum World/Aircraft, Ground ON IN COMBAT; unchanged Time Scale')
+meta=dict(machine=a.machine,mask=a.mask,build_mode='developer' if env['DEVELOPER']=='1' else 'normal',sim=sim,ps=ps,slave_sha256=hashlib.sha256((a.out/'slave.slave').read_bytes()).hexdigest(),environment={k:env[k] for k in ['CPU','AMIGA_MODEL','CHIP_KB','FAST_KB','EXTRA_ARGS','WHD_ARGS']},realism_sha256=hashlib.sha256(((Path('tmp/game')/os.environ['GAME_DIR'])/'data/mreal.prf').read_bytes()).hexdigest(),route='Damage-protected benchmark fixture; native keyboard queue via host debugger; maximum World/Aircraft, Ground ON IN COMBAT; unchanged Time Scale')
 (a.out/'entry.json').write_text(json.dumps(meta,indent=2)+'\n')
 if os.environ.get('BENCH_OMIT_CUSTOM2')=='1':
  proof=r.command(f'gdb x/1hx {sim+0xb06:#x}')
@@ -39,7 +39,7 @@ if os.environ.get('BENCH_OMIT_CUSTOM2')=='1':
 for path in a.out.glob('locate-*.bin'):path.unlink()
 for group in ('stages','cockpit','draw','bitmap','lines','programs','wait_overlay','wait_rectangle','wait_polygon','blits'):
  run(TRACKED/'render_profile.py',a.out,'--group',group,'--fields',250 if group in ('stages','cockpit','draw','bitmap') else 100)
-(a.out/'debug.uae').write_bytes(Path('amiga/.run/fsuae/Cache/Logs/debug.uae').read_bytes())
+(a.out/'debug.uae').write_bytes(Path('tmp/run/default/.run/fsuae/Cache/Logs/debug.uae').read_bytes())
 r.command('shot '+str((a.out/'final.png').resolve()))
 run(TRACKED/'completion_host_input.py','quit');host.wait(timeout=20)
 r.command('quit')

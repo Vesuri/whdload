@@ -33,7 +33,7 @@ class Live:
     def bounded_command(self,command):
         # A flight VBL disappears when sim unloads. Also bound host time so a
         # stale guest address cannot strand a test indefinitely.
-        pid=int(Path('amiga/.run/gdb.pid').read_text())
+        pid=int(Path('tmp/run/default/.run/gdb.pid').read_text())
         identity=subprocess.check_output(['ps','-p',str(pid),'-o','command='],text=True)
         if 'm68k-amiga-elf-gdb -q -nx' not in identity:raise RuntimeError('Unexpected owned debugger')
         expired=threading.Event()

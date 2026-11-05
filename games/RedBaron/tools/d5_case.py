@@ -1,6 +1,6 @@
 """Prepare an owned D5 developer flight for external acceptance checks.
 
-Run from tmp/dev. Leaves the emulator paused and native input server available;
+Run from the game directory. Leaves the emulator paused and native input server available;
 finish with completion_host_input.py quit and redbaron.py quit.
 """
 import argparse,hashlib,json,os,shutil,struct,subprocess,sys,time
@@ -10,7 +10,7 @@ import route_status as r
 p=argparse.ArgumentParser();p.add_argument('machine');p.add_argument('mask',type=lambda s:int(s,0));p.add_argument('out',type=Path);p.add_argument('--resume-entry',action='store_true');p.add_argument('--scale',type=int,choices=(0,40,60),default=40);p.add_argument('--scene',choices=('ace','squadron'),default='ace');a=p.parse_args()
 os.environ['BENCH_DEVELOPER']='1'
 os.environ['BENCH_BATCH_KEYS']='1'
-ROOT=Path.cwd();TRACKED=ROOT.parents[1]/'R/RedBaron/tools'
+ROOT=Path.cwd();TRACKED=ROOT/'tools'
 # Use the game's own persisted preference input; slider key repeat under warp
 # cannot select a reproducible exact value. Never modify the source fixture.
 fixture=ROOT/'tmp/game'/('d5-'+a.out.name)/'RedBaron'
@@ -19,7 +19,7 @@ if not a.resume_entry:
  shutil.copytree(ROOT/'tmp/game/completion-benchmark/RedBaron',fixture)
  pref=fixture/'data/SIMPREFS.PRF';data=bytearray(pref.read_bytes())
  struct.pack_into('>H',data,0,a.scale);pref.write_bytes(data)
-os.environ['GAME']=str(fixture)
+os.environ['GAME_DIR']=str(fixture.relative_to(ROOT/'tmp/game'))
 def run(*args):subprocess.run([sys.executable,'-B',*map(str,args)],check=True)
 if not a.resume_entry:run('tools/completion_boot.py',a.machine,a.mask,a.out,'--entry-only')
 ready=json.loads((a.out/'ps-ready.json').read_text());ps=ready['ps']

@@ -26,7 +26,7 @@ def main():
     args = parser.parse_args()
     if args.fields <= 0 or not 0 < args.chunk <= 10000:
         parser.error('Use positive fields and a chunk of at most 10000 fields')
-    harness = Path(__file__).resolve().parents[3] / 'tmp/dev'
+    harness = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(harness / 'tools'))
     import route_status as r
     sim = json.loads((args.capture / 'sim.json').read_text())['sim']

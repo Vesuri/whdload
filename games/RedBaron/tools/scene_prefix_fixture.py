@@ -132,7 +132,7 @@ r2_cases:
         body += f' dc.l {offset}\n dc.w {word},{value},{passed}\n'
     body += 'r2_masks:\n'+words(masks)+'r2_pixels:\n'+words(pixels)
     body += 'r2_expected:\n'+words(expected)+'r2_screen: dcb.b 48064,0\n'
-    source = (root/'usr/source/RedBaronHD.s').read_text()
+    source = (root/'src/RedBaronHD.s').read_text()
     needle = '_bootdos\n\tbsr perf_read_options'
     assert source.count(needle) == 1
     source = source.replace(needle, '_bootdos\n lea .r2(pc),a0\n.r2\n adda.l #r2_fixture-.r2,a0\n jmp (a0)\n\tbsr perf_read_options')

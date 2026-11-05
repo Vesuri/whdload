@@ -225,13 +225,12 @@ rendering throughput remain separate acceptance requirements.
 
 ## Reproducing the profiles
 
-Use the existing local development harness, source `tmp/dev/amiga/env.sh`, then
-change into `tmp/dev`. One owned emulator at a time; the driver refuses an
+From the game directory, source `../../common/env.sh`. One owned emulator at a time; the driver refuses an
 existing live emulator and refuses to overwrite a capture directory.
 
 ```sh
 BENCH_BATCH_KEYS=1 BENCH_OMIT_CUSTOM2=1 python3 -B \
-  ../../R/RedBaron/tools/render_profile_case.py 060 0 tmp/prof/my-render-060
+  tools/render_profile_case.py 060 0 tmp/prof/my-render-060
 ```
 
 Use `030` or `040` for the other configurations. Input goes through the established
@@ -242,7 +241,7 @@ use 250 PAL fields each; narrower groups use 100. Groups are consecutive windows
 not an identical scene replay and not an optimization A/B test.
 
 ```sh
-python3 -B ../../R/RedBaron/tools/render_profile_report.py \
+python3 -B tools/render_profile_report.py \
   tmp/prof/my-render-060 --out tmp/my-render-report.json
 ```
 

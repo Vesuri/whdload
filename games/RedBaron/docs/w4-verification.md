@@ -28,14 +28,14 @@ directory after a matching VERIFY fill-twin boot.
 
 ## Reproduce
 
-From the repository root, using the shared environment:
+From the game directory, using the shared environment:
 
 ```sh
-source tmp/dev/amiga/env.sh
-python3 -B -m unittest discover -s R/RedBaron/tools -p 'test_fill_model.py'
-python3 -B -m unittest discover -s R/RedBaron/tools -p 'test_cpu_span_model.py'
-python3 -B -m unittest discover -s R/RedBaron/tools -p 'test_fast_blitter.py'
-VERIFY=1 bash tmp/dev/tools/build.sh
+. ../../common/env.sh
+python3 -B -m unittest discover -s tools -p 'test_fill_model.py'
+python3 -B -m unittest discover -s tools -p 'test_cpu_span_model.py'
+python3 -B -m unittest discover -s tools -p 'test_fast_blitter.py'
+VERIFY=1 bash tools/build.sh
 ```
 
 Native rechecks require the ignored development game installation, one owned

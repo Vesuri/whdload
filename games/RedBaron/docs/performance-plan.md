@@ -48,7 +48,7 @@ combined design justifies its cost. Sound and game-time decisions are unchanged.
 These restate `AGENTS.md`, the playbook (AmigaXDev `docs/playbooks/new-game-playbook-jotd.md`)
 and the sibling projects' practice, because they bite.
 
-- Every change ships as a patch in the fork's slave source, `R/RedBaron/usr/source/`, applied
+- Every change ships as a patch in the fork's slave source, `src/`, applied
   from `_cb_dosLoadSeg`. New code goes in new `.s` modules included from `RedBaronHD.s`, as the
   `testdrive2` branch did. Add every new module to `Makefile_windows.mak`'s dependencies.
 - **Only the supported v1 `sim` gets performance patches** (signature at `sim:0a66a`, list
@@ -78,7 +78,7 @@ and the sibling projects' practice, because they bite.
 
   Never quote absolute addresses; chip buffers are named by role.
 - One capture at a time. Never `pkill fs-uae`/`gdb`, and never stop an emulator you did not
-  start (check the pid against `tmp/dev/amiga/.run/fsuae.pid`).
+  start (check the pid against `tmp/run/default/.run/fsuae.pid`).
 - **No performance claim without a measurement from the right instrument** (§3).
 - Commits: author and committer Vesa Halttunen <vesuri@jormas.com>, unsigned,
   `core.hooksPath=/dev/null`, no assistant trailers. One commit per coherent feature, staged by
@@ -478,7 +478,7 @@ voices *(est.)*; four voices could reach ~24% *(est.)*.
 ## 3. Measurement protocol (every item)
 
 1. **One build, two settings.** Build once and vary only CUSTOM2 (`WHD_ARGS="CUSTOM2=…"`, which
-   `amiga/run.sh` passes to WHDLoad). Keep the slave and its listing with each capture.
+   `common/run.sh` passes to WHDLoad). Keep the slave and its listing with each capture.
 2. **Fixed windows** (W0.4) on **three machines**, one capture at a time. Use the existing
    68000 + fast configuration only for continuity with `profiling.md`.
 
@@ -608,7 +608,7 @@ That decides how much of real play W1 removes, compared with W2.
   twice during startup. Match the full filename, handle reloads, and restrict activation
   to the supported sim v1. See `w3-verification.md`.
 - **Builds:** add normal, `DEVELOPER` (individual switches) and `VERIFY` modes to
-  `tmp/dev/tools/build.sh`, with separate outputs, and update `Makefile_windows.mak`.
+  `tools/build.sh`, with separate outputs, and update `Makefile_windows.mak`.
 - **Checker tools:**
   - **`tools/check_disabled.py`** compares every `PERF_RANGE` with the original `sim` hunk 0,
     using the relocation table and the live hunk bases from a dump.
@@ -983,12 +983,12 @@ P1/P2 apply there.
 
 | What | Where |
 |---|---|
-| Baseline capture, reports, RAM dumps, screenshots | `tmp/dev/tmp/prof/baseline/` (see `profiling.md`) |
-| Live disassembly of hunk 0 (`sim-live.dis`) and the range printer `r.py` | `tmp/dev/tmp/plan/` |
-| Per-frame window reports | `tmp/dev/tmp/plan/report-steady-178-231.txt`, `report-mirror-60-117.txt` |
-| Frame loop and swap analysis | `tmp/dev/tmp/plan/frame/` (`frames.py`, `pipeline.py`, `waits.py`, `dmawrites.py`, `frames.json`) |
-| Dashboard bitmap and decompressor | `tmp/dev/tmp/plan/cockpit/` (`cockpit-composite.png`, `lzns.py`, `extract.py`, `waits.py`) |
-| Geometry call tree and models | `tmp/dev/tmp/plan/geometry/` (`model38c82.py`, `tree.py`, `out-*.txt`) |
-| Interrupt and sound passes | `tmp/dev/tmp/plan/sound/` (`pass.py`, `ann.py`, `paula.py`, `div63.py`) |
+| Baseline capture, reports, RAM dumps, screenshots | `tmp/prof/baseline/` (see `profiling.md`) |
+| Live disassembly of hunk 0 (`sim-live.dis`) and the range printer `r.py` | `tmp/plan/` |
+| Per-frame window reports | `tmp/plan/report-steady-178-231.txt`, `report-mirror-60-117.txt` |
+| Frame loop and swap analysis | `tmp/plan/frame/` (`frames.py`, `pipeline.py`, `waits.py`, `dmawrites.py`, `frames.json`) |
+| Dashboard bitmap and decompressor | `tmp/plan/cockpit/` (`cockpit-composite.png`, `lzns.py`, `extract.py`, `waits.py`) |
+| Geometry call tree and models | `tmp/plan/geometry/` (`model38c82.py`, `tree.py`, `out-*.txt`) |
+| Interrupt and sound passes | `tmp/plan/sound/` (`pass.py`, `ann.py`, `paula.py`, `div63.py`) |
 
 None of these is shipped; any of them can be regenerated from the baseline capture.

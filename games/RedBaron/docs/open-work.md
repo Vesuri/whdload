@@ -46,7 +46,10 @@ rendering and timing bundle with CUSTOM2=1. Code defaults to Off (omitted/zero);
 supplied icons and the installer enable it. CUSTOM3 is unused. Developer/VERIFY
 retain individual CUSTOM2 bits. This policy supersedes earlier option mappings
 and opt-in descriptions in the historical completion notes below.
-The work is submitted upstream in PR #30.
+JOTD merged the work upstream (jotd666/whdload_slaves PR #37, commit 94ee5451 "Red Baron
+3.0b: optional enhanced framerate", without the VERIFY and developer instruments and with a
+shorter ReadMe; its release slave is byte-identical to this one) but has not released it.
+This repository releases it as Red Baron Enhanced.
 
 ## Postponed beyond this release
 

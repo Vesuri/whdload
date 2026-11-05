@@ -57,15 +57,15 @@ output path is fixed, so use a fresh path before intentional reproduction.
 
 ## Reproduce
 
-From the repository root, using the shared environment:
+From the game directory, using the shared environment:
 
 ```sh
-source tmp/dev/amiga/env.sh
-python3 -B -m unittest discover -s R/RedBaron/tools -p 'test_game_time_model.py'
-python3 -B -m unittest discover -s R/RedBaron/tools -p 'test_time_capacity.py'
-python3 -B -m unittest discover -s R/RedBaron/tools -p 'test_input_events.py'
-python3 -B -m unittest discover -s R/RedBaron/tools -p 'test_pose_history.py'
-VERIFY=1 bash tmp/dev/tools/build.sh
+. ../../common/env.sh
+python3 -B -m unittest discover -s tools -p 'test_game_time_model.py'
+python3 -B -m unittest discover -s tools -p 'test_time_capacity.py'
+python3 -B -m unittest discover -s tools -p 'test_input_events.py'
+python3 -B -m unittest discover -s tools -p 'test_pose_history.py'
+VERIFY=1 bash tools/build.sh
 ```
 
 Native rechecks require the ignored development game installation, one owned

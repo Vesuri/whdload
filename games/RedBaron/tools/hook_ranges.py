@@ -2,7 +2,7 @@
 from pathlib import Path
 import re
 
-SOURCE=Path(__file__).resolve().parents[1]/'usr/source'
+SOURCE=Path(__file__).resolve().parents[1]/'src'
 PATTERN=re.compile(r'PERF_RANGE\s+(sim|sound):([0-9a-fA-F]+)\s+(\d+)\s+bit=(\d+)')
 
 def ranges(source=SOURCE, domain="sim"):

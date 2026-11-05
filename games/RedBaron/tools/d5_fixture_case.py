@@ -4,22 +4,22 @@ from pathlib import Path
 from completion_machines import environment
 p=argparse.ArgumentParser();p.add_argument('machine',choices=('a500','060'));p.add_argument('scenario',choices=('landing','crash','transit','combat'));p.add_argument('out',type=Path);p.add_argument('--track-target',action='store_true',help='Bounded firing-line fixture; excludes AI evasion/handling acceptance');a=p.parse_args()
 if a.track_target and a.scenario!='combat':p.error('--track-target requires combat')
-root=Path(__file__).resolve().parents[3];harness=root/'tmp/dev';os.chdir(harness);sys.path.insert(0,str(harness/'tools'))
+root=Path(__file__).resolve().parents[1];harness=root;os.chdir(harness);sys.path.insert(0,str(harness/'tools'))
 import route_status as r
 out=a.out.resolve()
 if out.exists():raise FileExistsError(out)
-pid=harness/'amiga/.run/fsuae.pid'
+pid=harness/'tmp/run/default/.run/fsuae.pid'
 if pid.exists() and subprocess.run(['ps','-p',pid.read_text().strip()],stdout=subprocess.DEVNULL).returncode==0:
     raise RuntimeError('Close the owned previous emulator first')
 out.mkdir(parents=True)
 fixture=harness/'tmp/game'/('d5-'+out.name)/'RedBaron'
-shutil.copytree(harness/'tmp/game/RedBaron_v2.1/RedBaron',fixture)
+shutil.copytree(harness/'tmp/game/RedBaron',fixture)
 if a.scenario=='combat':
     # Native preference: player protection only. Enemy damage remains original.
     realism=fixture/'data/mreal.prf'
     data=bytearray(realism.read_bytes());data[18:20]=bytes(2);realism.write_bytes(data)
 mask=0x33fff if a.machine=='a500' else 0x1ff2ffa
-env=environment(a.machine,mask);env.update(VERIFY='1',WARP='1',DETERMINISTIC='1',JOY0='none',JOY0_MODE='nothing',JOY1='none',GAME=str(fixture),SLAVE=str(out/'slave.slave'),WHD_ARGS=f'CUSTOM2={mask} CUSTOM5=512')
+env=environment(a.machine,mask);env.update(VERIFY='1',WARP='1',DETERMINISTIC='1',JOY0='none',JOY0_MODE='nothing',JOY1='none',GAME_DIR=str(fixture.relative_to(harness/'tmp/game')),SLAVE=str(out/'slave.slave'),WHD_ARGS=f'CUSTOM2={mask} CUSTOM5=512')
 # VERIFY carries large instrumentation buffers; this is functional CPU coverage,
 # not a minimum-memory or timing claim (developer cases cover those separately).
 if a.machine=='a500':env['FAST_KB']='8192'
@@ -27,7 +27,7 @@ env.pop('BOOT_BREAK',None)
 share=Path(env.get('AMIGA_SHARE',str(Path.home()/'.local/share/amiga')))
 whd=Path(env.get('WHDLOAD',str(share/'WHDLoad-20.0')))
 scenario={'landing':1,'crash':2,'transit':3,'combat':4}[a.scenario]
-subprocess.run([env.get('VASM',str(Path.home()/'.local/vasmm68k_mot')),'-DVERIFY=1',f'-DVERIFY_D5_SCENARIO={scenario}',f'-DVERIFY_D5_DISTANCE_SHIFT={5 if a.machine=="a500" else 4}',*(['-DVERIFY_D5_TRACK_TARGET=1'] if a.track_target else []),'-m68000','-pic','-x','-devpac','-Fhunkexe','-nosym','-I'+str(harness/'tmp/include'),'-I'+str(whd/'Include'),'-I'+str(whd/'Src/sources'),'-I'+env.get('NDK',str(share/'ndk/Include_I')),'-L',str(out/'slave.lst'),'-o',str(out/'slave.slave'),'RedBaronHD.s'],cwd=root/'R/RedBaron/usr/source',check=True)
+subprocess.run([env.get('VASM',str(Path.home()/'.local/vasmm68k_mot')),'-DVERIFY=1',f'-DVERIFY_D5_SCENARIO={scenario}',f'-DVERIFY_D5_DISTANCE_SHIFT={5 if a.machine=="a500" else 4}',*(['-DVERIFY_D5_TRACK_TARGET=1'] if a.track_target else []),'-m68000','-pic','-x','-devpac','-Fhunkexe','-nosym','-I'+str(share/'include'),'-I'+str(whd/'Include'),'-I'+str(whd/'Src/sources'),'-I'+env.get('NDK',str(share/'ndk/Include_I')),'-L',str(out/'slave.lst'),'-o',str(out/'slave.slave'),'RedBaronHD.s'],cwd=root/'src',check=True)
 with (out/'serve.log').open('w') as log:
     server=subprocess.Popen([sys.executable,'tools/redbaron.py','serve'],env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
 deadline=time.monotonic()+240
