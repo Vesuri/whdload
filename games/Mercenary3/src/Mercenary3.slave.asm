@@ -3354,3 +3354,6 @@ _resload	dc.l	0
 	CNOP	0,4
 
 _restore_buffer	dc.l	0
+
+; The version string (docs/releasing.md); last, so every other byte keeps its offset.
+	dc.b	"$VER: Mercenary3.Slave 2.0b (04.11.2026)",0
