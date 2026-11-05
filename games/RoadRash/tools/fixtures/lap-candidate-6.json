@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "description": "30-second Sierra Nevada level 1: acceleration, steering through curves, overtaking, roadside collision and crash.",
+  "start_field": 100,
+  "end_field": 1600,
+  "events": [
+    [
+      100,
+      "JOY2_UP",
+      1
+    ],
+    [
+      600,
+      "JOY2_RIGHT",
+      1
+    ],
+    [
+      620,
+      "JOY2_RIGHT",
+      0
+    ],
+    [
+      800,
+      "JOY2_LEFT",
+      1
+    ],
+    [
+      820,
+      "JOY2_LEFT",
+      0
+    ],
+    [
+      1100,
+      "JOY2_RIGHT",
+      1
+    ],
+    [
+      1120,
+      "JOY2_RIGHT",
+      0
+    ],
+    [
+      1120,
+      "JOY2_LEFT",
+      1
+    ],
+    [
+      1500,
+      "JOY2_LEFT",
+      0
+    ],
+    [
+      1600,
+      "JOY2_UP",
+      0
+    ]
+  ],
+  "screenshots": [
+    400,
+    600,
+    800,
+    1000,
+    1200,
+    1400,
+    1440,
+    1460,
+    1600
+  ],
+  "coverage": {
+    "overtake_by_field": 1120,
+    "crash_onset_window": [
+      1420,
+      1440
+    ],
+    "crash_count": 1
+  }
+}

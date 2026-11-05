@@ -1,0 +1,7241 @@
+## Current displacement calibration and acceptance — 2026-10-21
+
+The user approved separating A4a speed calibration from latency. The unchanged
+±1% distance tolerance now compares completed simulation boundaries after
+identical applied input durations. Original fixed-live-field measurements remain
+diagnostics; input is never backdated. Visible-response safeguards, 50 Hz
+elapsed-time accounting, no dropped time and cadence invariance remain required.
+This acceptance supersedes earlier pending-approval and live-field-gate status
+statements below; the historical measurements retain their original scope.
+
+The integrated normal runtime is 20,616 bytes, SHA-256
+`5f2484e2b880cd73a8334239f00139d33391d8e16baafa325abdbe97ae5eed19`.
+It is byte-identical to the displacement candidate validated below. The full
+fixed-period diagnostic also matches its tested candidate byte-for-byte.
+`VERIFY_C_REFERENCE_MOTION` selects the correction explicitly for diagnostics;
+the older `REFERENCE_MOTION` define remains compatible. Runtime selection follows
+the common CPU/Fast-RAM/CUSTOM2 gate. The new include is a Makefile dependency.
+
+Normal movement uses
+`max(0, new_speed + floor(3*new_speed/2) - floor(3*old_speed/2))`.
+For constant acceleration, four unit updates reproduce the original delta-4
+endpoint convention. This changes displacement only, with no new input delay,
+acceleration/gear changes or persistent fractional actor state. The two movement
+hooks save old speed on the stack and restore stack/register state before
+returning to the relocated physics. This does not claim exact agreement with
+every variable-delta B trajectory, especially during startup and collisions.
+
+### Equal-exposure hardware calibration
+
+Fresh normal-binary B/C traces use the passive-read debugger, corrected committed
+B (SHA `6892f327…ba10bf3`, CUSTOM2=3), the integrated C binary (CUSTOM2=1),
+and each cell's original cache policy. Input is applied at live field 100.
+At every completed movement boundary, player throttle flags determine accumulated
+applied fields. Position increments are checked against the saved displacement,
+including the first increment from position 524288; normal-riding flags are
+asserted throughout the comparison window. No input times are modified.
+
+The endpoint rule, set before the matrix completed, is the last common completed
+boundary at or before 400 applied throttle fields (8 seconds). B's variable steps
+produce endpoints at 398–400 fields; each pair has exactly equal exposure.
+This extends the earlier default-020 400-field calibration, before terrain
+interferes. All earlier common checkpoints are retained, not filtered for success.
+
+| Cell | Applied fields | B distance | C distance | Difference |
+|---|---:|---:|---:|---:|
+| `030-50` | 399 | 2401052 | 2400287 | -0.031861% |
+| `030-50+cache` | 399 | 2395872 | 2400287 | +0.184275% |
+| `040-25` | 399 | 2395852 | 2400287 | +0.185112% |
+| `040-25+cache` | 399 | 2395852 | 2400287 | +0.185112% |
+| `060-50` | 400 | 2402794 | 2410684 | +0.328368% |
+| `060-50+cache` | 400 | 2402794 | 2410684 | +0.328368% |
+| `a1200-fast` | 400 | 2412512 | 2410684 | -0.075772% |
+| `a1200-fast+cache` | 398 | 2387544 | 2389906 | +0.098930% |
+| `a1200-fast+nocache` | 400 | 2412512 | 2410684 | -0.075772% |
+
+All nine accelerated cells meet ±1% at these documented endpoints. The maximum
+absolute error is 0.328368%. The tolerance is a distance calibration over this
+window, not a promise that every startup checkpoint is within 1%: configurations
+whose first B step is three fields show a 16.667% relative difference at that
+small first displacement. The four-field reference matches the default/NoCache
+020 startup; the corrected C trajectory is independent of rendering cadence.
+The existing default-020 comparison still passes all 100 common 4–400-field
+checkpoints with maximum error 0.075772%.
+
+Evidence: ignored `c-approved-exposure-matrix/{cell}/{b,c}/result.json`,
+`comparison.json`, `summary.txt`; tools `approved_exposure_matrix_c.py` and
+`compare_exposure_matrix_c.py`. All 18 processes completed successfully.
+The original 490-live-field candidate diagnostics retain -1.1762% default-020
+and -1.4668% NoCache-020 differences; those were not changed into passes.
+
+### Response, throughput and cost
+
+The identical candidate's eight-phase visible response remains 180/160/140/120 ms
+repeated on cached 020 (median 150, maximum 180) and 140/120 ms repeated on 040
+(median 130). Each phase meets its same-cell B limit. These are captured-field
+estimates with one PAL-field boundary uncertainty, not exact host-input latency.
+No scheduler change was introduced to improve the old live-field diagnostic.
+
+Normal throughput remains A500 8.5, Chip-only 020 12.5, Fast 020 default/Cache
+12.5, NoCache 8.3, 030 16.7, 040 22.8 and 060 23.3 fps. This completes C's
+independent simulation, not D–F's performance targets; cached 020 and NoCache
+still render slower than B. A500/Chip fallbacks match B's sampled states,
+deltas, distance and throughput exactly. Both MMU functional cells pass with
+data-cache emulation disabled; real-hardware cache/timing claims remain excluded.
+
+Fresh read-only probes surround complete simulation steps near field 300:
+
+| CPU cell | Samples | Approximate median step | Observed range |
+|---|---:|---:|---:|
+| Fast 020 | 54 | 7.69 ms | 7.18–8.59 ms |
+| NoCache 020 | 63 | 8.91 ms | 8.53–9.74 ms |
+| 030/50 | 49 | 4.94 ms | 4.55–5.06 ms |
+| 040/25 | 39 | 3.91 ms | 3.46–4.81 ms |
+| 060/50 | 39 | 3.59 ms | 3.33–4.55 ms |
+
+These estimates convert PAL beam lines using 312 lines/20 ms and have line-level
+resolution. They are small-workload emulator observations, not worst-case bounds
+or hardware cycle measurements. Raw beam/field/cursor snapshots and provenance
+are retained in `c-approved-motion-{wait,cost-window}-*/windows.json` and
+`c-approved-motion-step-cost.json`. Native wait/swap/publication is unchanged.
+The field-590 040 B/C scenes were reviewed: road, rider, HUD and backdrop remain
+intact; road/opponent positions differ consistently with the corrected motion.
+
+## C completion audit — 2026-10-21
+
+C1–C3 are complete for the integrated normal hash stated above, within the
+explicit emulator/fixture limits. This is the current acceptance record;
+older entries below describe their named historical builds and superseded
+open-item status. D–G remain open, including real-hardware cache validation
+and further throughput work. The changed handling baseline is explicit and
+cadence invariant; it is not represented as exact B behavior or RNG variation.
+
+| Requirement | Final evidence |
+|---|---|
+| C1a: boundaries and delta consumers | Existing ownership/direct-delta audit identifies native simulation, input/clock, presentation and record publication. Final displacement adds two movement hooks, preserving the existing boundary split. |
+| C1b: fixed step, correct speed and cost | STEP_FIELDS=1; camera, steering, road carry and displacement normalization. Nine accelerated equal-exposure cells pass ±1%; fresh step-cost samples and end-of-phase profiles are retained. |
+| C1c: ownership and historical input | Simulation owns actors, AI, collision, pose/camera and sound requests. The field queue supplies historical input; rendering changes neither authoritative actor state nor sound events. Final cross-cadence hashes/events validate this split. |
+| C2a: elapsed-time consumption | Catch-up runs every due unit step; final full-race tests preserve completed-tick state through long frame intervals. Terminal state stops catch-up, pause freezes active time and restarts clear capture/fraction history. Existing exhaustion handling remains an explicit abort, never silent input/time loss. |
+| C2b: latest state and response | Latest completed state with isolated forward heading prediction; no delayed interpolation. Every tested normal 020/040 visible-response phase meets B. |
+| C2c: vsync without pacing | Native wait/swap/copper handoff remains; no normal frame-period setting or B floor/clamp. One-field diagnostic rendering omission demonstrates that the scheduler can present each field; full drawing remains cost limited. |
+| C2d: hardware gate/fallback | Default-off CUSTOM2 boolean, CPU/Fast selection, original instructions when disabled, A500/Chip sampled states/deltas/distance/rate identical to B. |
+| C3a: cadence independence | Final 1/2/3/4/varying short traces match 1595 common hashes, sound events and six state regions. Fixed/varying full finish matches 16230 hashes/72 events; arrest 7977/19; controlled native wreck transition 2463/3. Exit ticks and resets agree. |
+| C3b: controls, scenes, transitions and latency | Normal keyboard/CD32/pause/resume, demo fire/timeout, disabled path, paired visible-response tests and B/C scene review pass. Native crash/recovery, finish/arrest and controlled low-health wreck/restart are covered. No claim of a final-binary natural zero-damage-to-wreck run. |
+| C3c: matrix and cost | Eleven normal cells, two functional MMU cells, current step-cost probes and 020/030/040/060 profiles. A500 remains on its original path. Rates and emulator limits are stated above; D–F throughput targets remain open. |
+
+### End-of-phase profiles
+
+`c-complete-profile-020` captures race fields 100–600 from the final normal
+binary through the passive debugger. The five 100-field Barto chunks contain
+495 complete recorded fields, 284204 cycles per recorded field and no missing
+PC samples. DMA shares are CPU 25.5%, free 34.4%, blitter 13.5%, bitplane 22.5%,
+refresh 1.8%, copper 0.9%, audio 0.8% and sprite 0.7% (rounded).
+Raw chunks are compressed with decompressed SHA-256 verification; reduced
+profile, placement symbols and provenance remain in the ignored harness.
+
+`c-complete-profiles/{030-50+cache,040-25,060-50}` each captures 500 vsyncs,
+fields 100–600, with zero profile overflow. Native vsync polling remains the
+largest single reported chip-time PC. The profiles retain unmatched-return
+counts and gap units: use flat PC execution/chip-access data, not inclusive
+call costs or real 040/060 cycle claims. This completes the phase's A5 refresh.
+
+## Historical experiments and validation records
+
+The entries below retain the data and conclusions for their named builds.
+Their statements that C is open, a candidate is private or approval is pending
+are historical; the acceptance and completion audit above supersede that status.
+
+## Displacement candidate: controlled wreck-boundary coverage
+
+A VERIFY-only fixture sets damage to 31 at simulation cursor 1000, one point
+below the native threshold of 32. It preserves D0 and changes no input, actor
+position, collision flag, race clock, exit flag or countdown. The ordinary
+recorded finish tape then drives a native collision, increasing damage to 33.
+The game displays WRECKED, exits at tick 2464 and restarts cleanly.
+This is controlled low-health coverage, not an unmodified natural wreck run.
+
+`c-approved-motion-wreck-boundary-{fixed,vary}` match all 2463 completed actor
+hashes, all three sound events, six terminal capture regions and end time.
+Both resets clear capture and road-fraction state. The terminal WRECKED image
+was inspected. Direct snapshot inspection confirms damage 33; observations at
+fields 1500/2000 show 31. All 2463 actor hashes also match the unseeded finish
+recording's prefix, including the 999 pre-seed hashes. Actor hashing excludes
+the global damage counter, so this prefix agreement is not itself evidence
+that damage is unchanged; direct reads are required and retained.
+
+The fixture and exact defines are retained in
+`c-approved-motion-wreck-boundary-source/fixture.patch` and each diagnostic
+build's `fixture.json`. Both normal companion builds remain byte-identical to
+the private displacement candidate. No fixture code enters production.
+Natural crash/recovery, successful finish and arrest coverage remains as
+recorded below; natural progression from undamaged bike to terminal wreck has
+not been demonstrated for this candidate.
+
+The original live-field distance gate remains unchanged and still fails two
+candidate configurations. Its proposed clarification awaits the user's
+answer. This additional transition coverage does not approve that proposal,
+promote the candidate, or complete C.
+
+## Displacement candidate: remaining hardware, controls and fallback checks
+
+The unchanged private displacement candidate completes its eleven normal
+hardware cells. The five additional cells in `c-approved-motion-remaining-matrix`
+are A500 8.5 fps, Chip-only 020 12.5, Cache 030 16.7, Cache 040 22.8 and Cache
+060 23.3. Combining these with the earlier six cells leaves exactly two
+live-field distance failures: default Fast 020 (-1.1762%) and NoCache Fast 020
+(-1.4668%). `c-approved-motion-complete-distance-gates.json` retains all eleven;
+functional matrix success is not acceptance of these two failures.
+
+Both unsupported-machine fallbacks match corrected B exactly at initial,
+field-590 and field-600 state hashes, every sampled native delta, distance and
+fps. The explicit normal CUSTOM2=0 run also preserves the original displacement
+instructions at $8b4a4/$8b4d2, both D4 lane operands, all 22 previously checked
+hooks, 14 scratch operands and the collision tail. Evidence:
+`c-approved-motion-fallback-comparison.json` and `c-approved-motion-off`.
+
+The 040/060 MMU functional cells both pass with TC=$8000, verification flags=1
+and CACR=$80008000. These use the full candidate diagnostic with VERIFY_MMU;
+`c-approved-motion-mmu-cells/build.json` records the exact defines and copied
+binary SHA. The normal companion remains byte-identical to the measured
+20616-byte candidate. Data-cache emulation is disabled in these MMU cells;
+there is no MMU throughput claim or physical-hardware timing claim.
+
+Keyboard and CD32 steering/release/pause/resume, fire-button demo exit and
+natural demo timeout all pass on normal 040 in
+`c-approved-motion-{keyboard,cd32,demo-fire,demo-timeout}`. The stack probes retain
+intact guards. All eight paired 040 visible-response samples pass initial-state
+equality and B limits: 140/120 ms repeated four times, median 130 ms. The first
+response image inspected shows rider/bike pixels. One-field capture uncertainty
+still applies. Evidence: `c-approved-motion-visible-040`.
+
+A delayed natural-crash driver stays on the ordinary race-driving path until
+field 10000, then seeks left-roadside collisions. It avoids the earlier arrest
+outcome but reaches FINISHED at exit tick 18045, with 18044 completed hashes and
+75 sound events, followed by a clean restart. This is another successful race
+exit, **not** terminal-wreck coverage. `c-approved-motion-late-wreck` retains the
+input recording and outcome despite its intended fixture name.
+
+A further ordinary-input run adds periodic attack-button input while retaining
+the center-lane driver. `c-approved-motion-combat-race` also finishes at 16042
+and exits at 16231, with the same 72 sound events as the no-fire recording.
+Its simulation hashes differ transiently (see `no-fire-comparison.json`), so the
+additional input is not claimed to be a no-op; no terminal wreck results.
+Neither intended fixture name is evidence of its actual terminal state.
+
+Production is unchanged. The A4a proposal still awaits approval and the private
+candidate's terminal-wreck validation remains open. These checks do not close C.
+
+## Displacement candidate: response, finish and arrest validation
+
+The private 20616-byte displacement candidate remains unchanged (SHA-256
+`5f2484e2b880cd73a8334239f00139d33391d8e16baafa325abdbe97ae5eed19`).
+`c-approved-motion-visible-020` completes all eight paired cached-020 visible
+response phases with equal initial states: 180/160/140/120 ms, repeated twice.
+Median 150 ms and maximum 180 ms match the committed lane-width candidate's
+aggregate results, although phase alignment differs. Every phase is no worse
+than its corrected B reference. The inspected first differing pixels belong to
+the rider/bike. These remain capture-boundary estimates with one-field
+uncertainty; no exact host-input or scanline-latency claim is made.
+
+`c-approved-motion-driven-finish` records a successful race using the ordinary
+joystick driver, with no injected state or attacks. Replaying its recorded
+inputs unchanged with varying rendering intervals matches all 16230 completed
+tick hashes, 72 sound events and six terminal capture regions. Finish occurs at
+16042 and exit at 16231. Both fixed/varying runs restart with cleared capture
+and road-fraction state. The FINISHED image was inspected and renders correctly.
+The new recording is specific to this corrected model; it does not claim
+unchanged B or lane-only race outcomes.
+
+The existing arrest tape in `c-approved-motion-arrest{,-vary}` matches all
+7977 hashes, 19 sound events, six terminal regions and exit tick 7978 across
+cadences. Both runs restart cleanly. The terminal image confirms BUSTED.
+
+Two ordinary-input natural-wreck attempts did **not** reach WRECKED. The left
+roadside driver (`c-approved-motion-driven-wreck`) was arrested at tick 8580;
+the right roadside variant (`c-approved-motion-driven-right-wreck`) was arrested
+at 8323. Their images confirm BUSTED and both restart cleanly. They demonstrate
+crash/recovery and arrest, not terminal-wreck coverage. Neither is relabelled as
+a passing wreck fixture. Their outcomes are retained in
+`c-approved-motion-lifecycle-summary.json` alongside the successful comparisons.
+
+The proposal to separate applied-input-duration speed checks from live-field
+measurements is still awaiting user approval; A4a is unchanged. The candidate
+remains private. Wreck coverage, wider response/controls/hardware checks and
+acceptance of the remaining distance results are unresolved. Production and
+its five failing live-field distance cells are unchanged; C is not complete.
+
+## Separating input exposure from speed: proposed acceptance clarification
+
+The remaining one-, two- and three-field diagnostic cadences are now complete.
+Together with the earlier varying run, each matches the fixed-four reference
+on all 1595 common hashes, sound events and six captured regions. The one-field
+case skips drawing, as in earlier C tests. Normal candidate bytes are unchanged.
+Evidence: `c-approved-lane-motion-v3-period{1,2,3,4,0}-state` and
+`c-approved-lane-motion-cadence-summary.json`. Full lifecycle and visible response
+validation remain outstanding for this candidate.
+
+`c-approved-motion-exposure-comparison.json` independently accumulates applied
+throttle delta from the actor's throttle flag in the retained passive traces.
+It asserts normal riding before cursor 500 and compares 100 common exposures
+(4 through 400 fields), without altering inputs, game state or the test window.
+For the displacement candidate, the maximum absolute distance difference from
+corrected B across those checkpoints is 0.075772%. At 400 applied fields, B
+travels 2412512 units and the candidate 2410684; player speeds are 10384/10373.
+The committed control travels 2395125 (-0.720701% at that endpoint); its initial
+four-field distance is 37.5% below B's coarse endpoint convention.
+
+This distinguishes simulation integration from input exposure. At B cursor
+102 the new throttle has already affected four fields; at C cursor 102 it has
+affected two. C applies the first recorded throttle at cursor 101. Backdating
+C input to reproduce B would contradict the retained historical-input design.
+The result is limited to this player/normal-riding trace. It is not evidence
+that every CPU, braking transition, terrain path or crash duration is correct.
+
+**Proposal, awaiting user approval; A4a is not changed:** use the existing ±1%
+distance tolerance to compare completed simulation states after identical
+applied input durations, with documented start/end boundaries and no change
+to game input timing. Retain the original fixed-live-field measurements as
+reported regressions/diagnostics. Independently require the existing visible
+response safeguards, 50 Hz elapsed-time accounting, no dropped time, and exact
+cadence-invariant simulation outcomes. Repeat the relevant hardware and
+movement-path checks before accepting a corrected timing baseline.
+
+This would separate speed calibration from the intentionally corrected input
+semantics. It would not approve this private candidate automatically, relax
+latency, permit backdated input, or declare C complete. If the original live-field
+rule is retained as the sole gate, the candidate continues to fail default 020
+and NoCache, and further implementation work is required.
+
+## Reference displacement after the lane-width correction
+
+A new private candidate applies the earlier compact four-field endpoint
+normalization to the committed lane-width model. It changes displacement to
+`max(0, new_speed + floor(3*new_speed/2) - floor(3*old_speed/2))` for every actor
+using the normal movement path. It changes neither acceleration nor input
+history, and does not backdate throttle. This calibrates the unit-step
+integration against B's observed delta-4 endpoint convention; it is not a
+uniquely determined physical model for B's other variable deltas.
+
+The normal binary in `c-approved-lane-motion-build` is 20616 bytes, SHA-256
+`5f2484e2b880cd73a8334239f00139d33391d8e16baafa325abdbe97ae5eed19`.
+The exact source delta is retained in `c-approved-lane-motion-source/source.patch`.
+The passive-debugger normal matrix gives:
+
+| Configuration | fps | Distance | Difference from corrected B | ±1% |
+| --- | ---: | ---: | ---: | --- |
+| Default Fast 020 | 12.5 | 3324779 | -1.1762% | Fail |
+| Cache Fast 020 | 12.5 | 3334538 | +0.0672% | Pass |
+| NoCache Fast 020 | 8.3 | 3315004 | -1.4668% | Fail |
+| 030/50 | 16.7 | 3324779 | -0.7933% | Pass |
+| 040/25 | 22.8 | 3334538 | -0.7966% | Pass |
+| 060/50 | 23.3 | 3334538 | -0.0269% | Pass |
+
+Fresh `c-approved-motion-{control,candidate}-trace` runs stop after movement,
+before event/pose completion. For each of player, $a61e0 and $a6260, 401 adjacent
+intervals through cursor 500 exactly match the intended displacement formula
+and position increment. The control retains speed-times-delta. At cursor 500
+both player speeds are 10373; positions are 2919413 / 2934972. This arithmetic
+check does not cover all actors, braking, crashes or later terrain transitions.
+
+At completed cursor 590 the control/candidate positions are 3855684 / 3868569;
+both boundaries are reached at live field 591 in these traces. Corrected B's
+retained cursor-590 position is 3888640. Equalizing *applied throttle exposure*
+compares that B boundary with candidate cursor 592, position 3888007: only 633
+units separate them. This explains the correction's effect; it does not replace
+the fixed-live-field gate. The earlier input-exposure difference and rendering
+phase remain relevant, and the two failed live-field cells are not waived.
+
+`c-approved-lane-motion-v3-period{4,0}-state` compares fixed-four and varying
+render intervals: all 1595 common completed hashes, sound requests and six
+field-1457 capture regions agree. The first diagnostic failed before the race
+because its patch target exceeded WHDLoad's signed displacement range. An
+attempt to place the helper before simulation also failed assembly (forward
+STEP_FIELDS definition and a distant code-copy jump). The successful diagnostic
+places it after hash storage, within range of both references. These diagnostic
+layout changes leave the measured normal binary byte-identical; failed logs
+remain under `c-approved-lane-motion-cadences{,-v2}.log`.
+
+A same-size unit-step variant replaces only the helper's multiply-by-one with
+zero-extension and an immediate word load, preserving D2's upper word. Its 12
+changed bytes occupy file offsets $4f28..$4f33; all other bytes match. Default
+020 measures 12.4 fps and NoCache 8.3, with unchanged distances 3324779/3315004.
+There is no measured throughput gain, so this variant is not promoted.
+
+Both candidates remain private. At this checkpoint full handling/lifecycle/response
+checks and the other cadence intervals had not been run; the later entry above
+records completion of the remaining cadence checks. Production remains
+7475cfc6, with its five failing distance cells; C remains incomplete.
+
+## Approved lane-width correction: integration validation
+
+The layout-preserving correction is now in `physics_aux.s`. Its normal build
+is byte-identical to `c-approved-lane-layout-build/RoadRash.slave` (20532 bytes,
+SHA-256 `e64caab08e23e2f0ac55cf9441501d376502d06f6cc373a3a45c7b9d91035c4c`).
+Initialization uses reserved space before the existing lane-scan helper and
+flushes the modified copy before execution. It runs behind the existing
+CUSTOM2/020/Fast gate; it does not patch the original lane operands.
+
+The normal candidate passes keyboard/CD32 controls, pause/resume and both
+fire/timeout demo exits on 040, with intact Fast-stack guards. The explicit
+CUSTOM2=0 check retains all 22 original hooks, 14 original scratch operands,
+the collision tail and both original D4 lane-width operands. Evidence is under
+`c-approved-lane-{keyboard,cd32,demo-fire,demo-timeout,off}`.
+
+Eight paired visible-response phases on each normal CPU configuration pass
+initial-state equality. On cached 020 the upper estimates are
+160/140/120/180/160/140/120/180 ms (median 150); on 040 they are
+120/140/120/140/120/140/120/140 ms (median 130). Every phase is no worse than
+its B reference. These are field-capture estimates with one PAL field of
+boundary uncertainty, not scanline-exact or host-input latency measurements.
+The first differing pixels inspected on both CPUs belong to the rider/bike.
+Evidence: `c-approved-lane-visible-{020,040}`.
+
+The previous finish tape releases throttle before this corrected model finishes.
+Both fixed and varying runs reach the 30000-field deadline without exiting;
+`c-approved-lane-finish-{fixed,vary}` remain failed fixtures. A fresh joystick-only
+driver records `c-approved-lane-driven-finish/driven-tape.json`; replaying it
+unchanged with varying render intervals matches all 12856 completed hashes,
+73 sound events and all six terminal capture regions. Finish is at tick 12668,
+exit at 12857. Both runs restart with cleared capture and road-fraction state.
+
+The existing arrest tape still reaches BUSTED. Fixed and varying runs in
+`c-approved-lane-arrest{,-vary}` match all 7977 hashes, 20 sound events, six
+capture regions and exit tick 7978; both restart with cleared state.
+The old natural-wreck tape also stops before the corrected bike is wrecked;
+its fixed/varying runs remain failures, not accepted lifecycle evidence.
+
+A fresh natural-crash driver reaches WRECKED without changing game memory.
+`c-approved-lane-driven-wreck{,-vary}` match all 24774 completed tick hashes,
+112 sound events, six capture regions and exit tick 24775. Both restart with
+cleared capture and road-fraction state. The final WRECKED image was inspected;
+repeated crashes, recovery and the terminal wreck are covered by this tape.
+
+Visual inspection covers the normal field-1600 scene against corrected B,
+finish, arrest and subsequent race start. The normal C scene shows a riding
+player in 13th place where B shows the player recovering from a crash; this
+is the documented handling difference, not an RNG-only claim. The inspected
+road, rider, scenery and HUD render correctly. Static captures alone do not
+prove absence of tearing during motion.
+
+The six-cell throughput measurements and five failing distance tolerances
+recorded below remain applicable. This correction establishes explicit lane
+occupancy; it does not close C or waive the distance/performance work.
+
+## Approved lane-width candidate: cadence and hardware checks
+
+The first candidate under the clarified handling criteria changes only the two
+lane-boundary operands in relocated `$8da5c` from D4 to D2. D2 is the native
+half-width loaded from `$9414e`; the intervening `$8db0a` lane-list writer
+preserves it. No NPC lateral normalization or attack-damage adjustment is added.
+This removes the proven graphics-register dependency. The table's use as the
+intended lane width remains an explicit interpretation of the native code.
+
+`c-approved-lane-width-period{1,2,3,4,0}-state` validates intervals 1/2/3/4 and
+varying (0), with period 1's diagnostic drawing skipped. Each non-reference run
+matches the period-4 reference on 1595 common completed tick hashes, all sound
+requests and all six field-1457 capture regions. This establishes a new model's
+cadence invariance, not equivalence to the old model's captured state.
+
+The initial 20548-byte candidate completes all eleven normal matrix cells.
+Default/Cache 020 throughput is 12.1 fps versus current production's 12.5;
+NoCache is 8.3, 030 is 16.7, 040 is 23.0 and 060 is 23.1. Unsupported A500 and
+Chip-only 020 retain 8.5/12.5 fps and their original distances. The same five
+distance gates remain failing; default 020 now measures 3311794 (-1.562%).
+
+A second candidate places the 16-byte initialization in existing reserved
+space, retaining every hot-code address and the production size of 20532 bytes.
+It changes only one jump-displacement byte and 14 previously zero bytes.
+SHA-256: `e64caab08e23e2f0ac55cf9441501d376502d06f6cc373a3a45c7b9d91035c4c`.
+Its six-cell matrix still gives 12.1 fps on default/Cache 020; NoCache/030/040/060
+are 8.3/16.7/22.9/23.3. Thus moving hot code is not necessary for the 020 slowdown;
+no specific AI or drawing subroutine is yet assigned that cost.
+The layout-preserving period-4 diagnostic also matches the first candidate's
+1595 hashes, all sound requests and six captured regions exactly.
+
+`c-approved-lane-layout-lap` confirms the normal handling change: no crash
+through field 1600, lateral -974 and displayed rank 13, versus B's one crash,
+-931 and rank 15. The user's approval permits this difference to be reviewed;
+it does not prove collisions, difficulty or race exits correct. Evidence and
+source diff are retained under `c-approved-lane-{width,layout}-*`. At this checkpoint both candidates remained private pending full-race,
+collision/lifecycle, response and visual validation. The later integration
+entry above records the completed checks; no distance failure is waived.
+
+## Approved handling acceptance clarification — 2026-10-21
+
+The user approved intentional opponent-trajectory and crash-outcome changes
+when correcting render-dependent logic, after being told these can be noticeable
+and are not explained solely by RNG. A4b now permits a documented, reviewed C
+handling baseline in place of exact B opponent order/crash count for such fixes.
+A4c still requires visual review of the resulting scene and no rendering defects.
+This supersedes the exact-B handling rejection criterion in historical entries;
+it does not promote any previously rejected experiment automatically.
+
+The fixed-field ±1% distance gate, input/display latency safeguards, native vsync,
+50 Hz steps, original fallback and default-off master toggle remain unchanged.
+Corrected simulation must produce the same outcomes across render cadences at
+identical simulation boundaries. The goal has resumed; C is not complete.
+The next candidate isolates lane occupancy's explicit table half-width from
+leftover graphics-register data, without combining unvalidated NPC rounding or
+attack-damage changes. Its intended-width interpretation and gameplay effects
+must remain explicit in review and validation.
+
+## Passive movement audit and rejected all-CPU world reuse
+
+Fresh normal traces `b-passive-completed-motion` and
+`c-passive-completed-motion` use the reproduced corrected B binary and current
+production C, with passive debugger reads. They stop at the native movement
+boundary / entry to `step_end`, before C's event/pose helpers. The result agrees
+with the earlier movement decomposition: at cursor 590 B position is 3888640,
+C is 3855684, a 32956-unit (0.979565%) distance deficit from starting position
+524288. C reaches this boundary at live field 592 in this trace. Its first
+moving step is cursor 101, delta 1, speed 34; B's is cursor 102, delta 4, speed
+136. This confirms the input-exposure difference with the corrected reference;
+it does not authorize retroactive input or replace A4's live-field measurement.
+Decoded samples are retained in `passive-motion-decoded.json`.
+
+A new private experiment enables the previously validated D4-preserving
+world-object/geometry reuse on selected 020/030 hardware as well as 040/060.
+The source is copied from `c-world-reuse-d4-guarded-source`; the sole change is
+replacing the four-byte CPU-mask instruction with `moveq #-1,d1; nop` at reset.
+The enhancement master toggle and 020/Fast hardware gate remain required.
+Candidate and CPU-gated control are both 20580 bytes and differ only at
+file offsets `$b86..$b89`. This isolates enabling reuse from code-size/layout
+changes. The candidate SHA-256 is
+`6bf5d64c03cb21e2996061ced87b2fd15cc0c472ee60541cc39d8157ed0aafe8`.
+`c-world-reuse-allcpu-build` retains the source and byte diffs.
+
+The passive-debugger normal matrices give:
+
+| Cell | All-CPU reuse fps / distance | Same-layout gated control fps / distance |
+|---|---:|---:|
+| Fast 020 default | 11.4 / 3321603 | 12.5 / 3321603 |
+| Fast 020 Cache | 11.4 / 3321603 | 12.5 / 3311794 |
+| Fast 020 NoCache | 8.3 / 3301969 | 8.3 / 3301969 |
+| 030 default | 16.7 / 3311794 | 16.7 / 3311794 |
+| 030 Cache | 16.7 / 3311794 | 16.7 / 3311794 |
+
+Evidence: `c-world-reuse-allcpu-matrix` and
+`c-world-reuse-cpugate-control-matrix`. All probes complete, but the default/
+Cache 020 throughput regression rejects the candidate. NoCache and 030 show
+no improvement; the corresponding distance failures remain. This is not a
+full semantic validation of the expanded hardware selection, nor proof of the
+internal cause of its slowdown. No further acceptance tests or production
+integration are justified for this candidate. Production remains unchanged.
+
+## Passive debugger: MMU and diagnostic capture validation
+
+The direct-read emulator `e0b2532a...` now also passes the retained C diagnostic
+checks. `c-passive-040-mmu` and `c-passive-060-mmu` use the unchanged
+`c-geometry-reuse-mmu-build` slave. Both prove enabled TC translation (`$8000`)
+and the diagnostic MMU flag, with initial/590/600 state hashes identical to their
+pinned-emulator references. Data-cache emulation remains disabled in these
+functional MMU configurations; no hardware throughput claim follows from them.
+`passive-mmu-comparison.json` records these checks.
+
+The exact-period diagnostic builds and the existing varying-period build run
+the same attack tape with passive reads. Each compares its hashes at identical
+simulation tick numbers, complete sound-request records, and six captured
+simulation regions against its retained reference:
+
+| Render interval | Common tick hashes | Sound events / six regions |
+|---|---:|---|
+| 1 field (diagnostic draw skipped) | 1598 | identical |
+| 2 fields | 1597 | identical |
+| 3 fields | 1598 | identical |
+| 4 fields | 1595 | identical |
+| Varying | 1596 | identical |
+
+Evidence is `c-passive-period{1..4}-state`, `c-passive-vary-state`, and
+`passive-diagnostic-comparison.json`. The comparator excludes the terminal
+in-progress slot and compares only common completed ticks; different live
+observation cursors are not claimed equal. The field-1457 capture and all sound
+records match exactly. This validates reading the Fast-memory diagnostic buffers
+as well as the gameplay state in Chip RAM.
+
+The private harness now recognizes this exact emulator hash alongside the
+original pinned hash for the older fields/input protocol. Other emulator builds
+still require capability discovery. Selection remains explicit through `FSUAE`;
+the default emulator and all original evidence are retained. This removes the
+need for a blanket capability-check bypass in future passive-read runs.
+`c-passive-off` also passes through the normal harness entry point: CUSTOM2=0
+leaves all 22 checked hooks, 14 scratch operands and the collision-flag tail
+native. The earlier 16 transient C replay hash differences between emulator builds remain
+documented; diagnostic tick-boundary equivalence does not erase that distinction.
+No simulation code or acceptance tolerance changes. Five normal-matrix distance
+failures and the native opponent-order failure still prevent C completion.
+
+## Passive debugger: full normal matrix and handling replay
+
+`b-passive-matrix` and `c-passive-matrix` each run all eleven normal hardware
+cells twice, with and without the extra native-ranking reads: 44 runs total.
+Every pair matches distance, all 250 sampled native deltas, rotation count,
+and state hashes at fields 100, 590 and 600. These are normal binaries, with
+corrected B `6892f327...` and unchanged production C `85250ab3...`, using the
+private direct-read emulator `e0b2532a...` identified below. MMU functional
+runs are not included in this normal-matrix result.
+
+| Cell | B distance | C distance | Change | B / C fps |
+|---|---:|---:|---:|---:|
+| a500-1m | 3425028 | 3425028 | +0.000% | 8.5 / 8.5 |
+| a1200 | 3337152 | 3337152 | +0.000% | 12.5 / 12.5 |
+| a1200-fast | 3364352 | 3321603 | -1.271% | 12.5 / 12.5 |
+| a1200-fast+cache | 3332298 | 3321603 | -0.321% | 16.5 / 12.5 |
+| a1200-fast+nocache | 3364352 | 3301969 | -1.854% | 12.5 / 8.3 |
+| 030-50 | 3351364 | 3311794 | -1.181% | 13.3 / 16.7 |
+| 030-50+cache | 3341412 | 3311794 | -0.886% | 16.6 / 16.7 |
+| 040-25 | 3361313 | 3321603 | -1.181% | 22.5 / 22.9 |
+| 040-25+cache | 3361313 | 3321603 | -1.181% | 22.5 / 22.9 |
+| 060-50 | 3335434 | 3321603 | -0.415% | 23.1 / 23.1 |
+| 060-50+cache | 3335434 | 3321603 | -0.415% | 23.1 / 23.1 |
+
+`passive-distance-gates.json` records six passing and five failing A4a cells.
+The failures are default/NoCache 020, default 030 and both 040 cells. The matrix
+agreement verifies invariance to these additional ranking reads, not all
+possible debugger interventions or correctness of C's gameplay.
+
+The normal default-Fast-020 lap is also repeated. `b-passive-lap` matches all
+752 samples of `b-corrected-provenance-lap` exactly: crash onset 1376, final
+position 13031078, lateral -931 and native ahead-list tail
+`$a6360/$a62e0/$a63e0`. C's passive lap has one crash at 1374, final position
+13138349, lateral -901 and tail `$a63e0/$a62e0/$a6360`. Both finish at displayed
+rank 15; C still fails the native-order requirement.
+
+C replay observation needs a more precise qualification. Compared with the
+pinned emulator (`c-pinned-observer-lap`), the rebuilt callback control
+(`c-callback-control-lap`) differs in 16 intermediate state hashes and in the
+player flags at field 1288 (`4202` versus `4203`). All other reported gameplay
+fields, crash count and the complete final sample agree. The callback control
+and passive build (`c-passive-lap`) match every sample exactly. Omitting ranking
+reads under the passive build (`c-passive-legacy-lap`) also matches every shared
+sample field, including hashes. Thus those transient differences arise across
+emulator builds, not from the passive-read patch. Do not report full equivalence
+to the pinned C replay or silently overwrite its evidence.
+`passive-replay-comparison.json` retains the exact differing field numbers.
+
+A source audit recovered the original harness patch from AmigaXDev commit
+`013f0ee9865670dbb4ecb40498ff35682de33ca1`; the shared current patch has a
+different hash. Applying the six patches whose hashes are recorded for the
+pinned emulator to base `b70b1180` reconstructs all six modified source files
+byte for byte with the rebuilt callback control's source. Evidence is
+`pinned-emulator-source-audit/comparison.json`. Therefore the newer shared
+harness patch is not the cause of the control's transient C replay differences.
+The exact binary/build-level reason remains unproven. The original binary and
+shared checkout are unchanged. The passive debugger is still a private candidate;
+its broader normal matrix is validated, but MMU and diagnostic capture use need
+separate checks before general adoption. Production C remains unchanged.
+
+## 030 reference discrepancy isolated to debugger memory reads
+
+The preceding reference audit's unresolved default-030 measurement is now
+explained by the observation schedule. The old and fresh runs have identical
+DH1 file contents and effective emulator configuration apart from output paths.
+Their initial state hashes match; sampled native deltas first diverge at field
+400. Removing only the two newer native-ranking reads from `snapshot` reproduces
+the retained B distance 3351364 (`b-corrected-030-legacy-reads`), versus 3324562
+with those reads. No game binary or input tape changes are involved.
+
+The private GDB server services memory packets through `ad->bget(adr)`, even for
+RAM. A diagnostic patch instead uses the bank's checked `xlateaddr` pointer for
+RAM/ROM and retains the callback for other banks. Matched emulator builds from
+the same local source, differing only by that read-path patch, establish:
+
+| Emulator / snapshot reads | B distance | B fps |
+|---|---:|---:|
+| Original pinned emulator, current ranking reads | 3324562 | 13.3 |
+| Original pinned emulator, ranking reads omitted | 3351364 | 13.3 |
+| Rebuilt callback control, current ranking reads | 3324562 | 13.3 |
+| Direct RAM reads, current ranking reads | 3351364 | 13.3 |
+| Direct RAM reads, ranking reads omitted | 3351364 | 13.3 |
+
+The matched control SHA-256 is
+`b4fd56d305f71183e64c2aa90663274a039044fabe8cfba5521dd25e5bd0cce3`;
+the direct-read build is
+`e0b2532ace1de7dd4d66d811488ec67ea7080b9991ee57e7190d8e31483f99cc`.
+These are private diagnostic builds, not replacements for the pinned emulator.
+Both retain its old fields/input protocol and predate capability discovery.
+The exact patch is retained under ignored harness
+`tools/patches/fsuae-passive-debug-read.patch` (SHA-256
+`cf20d03d059009e6592d096b8cf1ea6ebcf71f844e4a1eaaeaae58f2109726c0`),
+with before/after source and `b-gdb-passive-provenance.json`. The shared
+AmigaXDev checkout and original emulator binary are unchanged.
+
+`b-gdb-passive-030{,-legacy}` matches all sampled deltas, rotation counts,
+and initial/590/600 state hashes across the two observation schedules.
+The unchanged production C build also matches those quantities in
+`c-gdb-passive-030{,-legacy}`: distance 3311794 at 16.7 fps.
+`b-gdb-passive-comparison.json` records the assertions. Thus C is -1.181%
+against B in the now observation-invariant tested 030 pair, and fails A4a.
+The favorable -0.384% comparison came from observer-perturbed B timing.
+This isolates the effect to the callback read path; it does not yet attribute
+the side effect to a particular internal bank implementation.
+
+Do not discard native ranking checks to recover an old numeric result. Expand
+validation of the passive-read debugger to the full matrix and replay before
+adopting it for acceptance. In particular, previous cross-speed observations
+must not be assumed immune merely because they were repeatable. The four other
+known distance failures and handling discrepancies remain open; no simulation
+constants or production code are changed by this investigation.
+
+## B reference provenance: committed condition-code fix
+
+The retained normal B binaries are not interchangeable. Rebuilding all source
+files from commit `10d0e5b7` reproduces `b-final-build/RoadRash.slave` byte for
+byte: 2476 bytes, SHA-256
+`6892f327f8f6c7719a3d5603a4bd1ed6a844dbd228b7e50c916678d58ba10bf3`.
+Removing only `andi #$ef,ccr` from `field_animation` reproduces the older
+`b-final-replay-on/tested.slave`: 2472 bytes, SHA-256
+`ae511e817d5f1544cade20c1d2e30dd8631ec05c3396e7625f2fbe53686fb57a`.
+The instruction restores the original phase increment's cleared X flag.
+Its addition also changes execution cost and subsequent code placement; these
+experiments do not isolate which effect changes the cached timing results.
+Reproduction builds and the audit are retained as `b-provenance-*`.
+
+`b-final-normal-on` used the older binary; `b-final-matrix-v2` used the
+committed corrected binary. A fresh three-cell run of the older binary,
+`b-distance-audit-fresh`, reproduces its distances: default/NoCache 3364352,
+Cache 3347896. Thus the Cache difference from corrected B's 3332298 is a
+reference-build difference, not evidence of nondeterminism. Keep both historical
+results, but identify the exact B binary in comparisons and use the committed
+corrected build for C's B-completion regression gate.
+
+A fresh normal default Fast-020 lap, `b-corrected-provenance-lap`, with
+`CUSTOM2=3` reproduces the older reference's sampled crash at field 1376,
+final position 13031078, lateral -931 and displayed rank 15. Its native ahead
+list ends `$a6360/$a62e0/$a63e0`, also unchanged. All shared reported gameplay
+fields match across the 752 samples; broad state hashes differ at 11 samples,
+so this is not a claim of complete memory equality. The older harness also
+stored raw player bytes at later samples. The handling discrepancy in C remains
+real; switching to corrected B does not remove it.
+
+A fresh eleven-cell run, `b-corrected-provenance-matrix`, confirms ten of
+`b-final-matrix-v2`'s eleven distance measurements. Compared with the unchanged
+production C binary (SHA-256
+`85250ab3d331371e2672ef052eaf44e7b87843363a07cc04c882b1ee4de1ee05`),
+the fresh measurements are:
+
+| Cell | Corrected B distance | C distance | Change |
+|---|---:|---:|---:|
+| a500-1m | 3425028 | 3425028 | +0.000% |
+| a1200 | 3337152 | 3337152 | +0.000% |
+| a1200-fast | 3364352 | 3321603 | -1.271% |
+| a1200-fast+cache | 3332298 | 3321603 | -0.321% |
+| a1200-fast+nocache | 3364352 | 3301969 | -1.854% |
+| 030-50 | 3324562 | 3311794 | -0.384% |
+| 030-50+cache | 3341412 | 3311794 | -0.886% |
+| 040-25 | 3361313 | 3321603 | -1.181% |
+| 040-25+cache | 3361313 | 3321603 | -1.181% |
+| 060-50 | 3335434 | 3321603 | -0.415% |
+| 060-50+cache | 3335434 | 3321603 | -0.415% |
+
+These are fixed live-field observations from the normal binaries. Matrix
+`status: passed` means the boot/probe completed; it does not mean the A4 distance
+gate passed. Default and NoCache 020, plus both 040 cells, fail ±1%. The default
+030 result is unresolved: retained corrected B measured 3351364, whereas this
+fresh run and `b-corrected-provenance-030-repeat` both measured 3324562,
+despite identical recorded emulator/binary hashes,
+effective configuration and initial state hash. Against the retained result C
+is -1.181%; against the fresh result it is -0.384%. Do not select the favorable
+reference or declare that cell accepted until this discrepancy is explained.
+The other six cells pass the distance comparison. Handling acceptance remains
+open independently. No runtime change is made by this reference audit.
+
+## Explicit lane width: matched NPC control and crash origin
+
+`c-lane-width-npc-control-build` retains the same NPC fractional-lateral
+fixture as `c-lane-width-npc-build` but restores the original D4 lane operands.
+Both binaries are 20856 bytes and differ only at file offsets `$44bd` and
+`$44c3` (operand low byte `$42` versus `$44`). This isolates the lane-width
+choice without changing code layout. The normal Fast-020 lap control crashes
+at 1546, ending at position 13279366 and lateral -924. The explicit-width
+fixture crashes at 1320, ending at 12281000 and -188. Both display rank 15,
+but their native ahead order differs from B. Neither passes the handling gate.
+
+`c-lane-width-npc-crash-origin` stops before the first player crash write:
+native `$8ee6c`, live field 1319, simulation cursor 1316, with rival `$a61e0`
+in A2 and damage D0=192. This is the health-depletion branch in the attack
+response, not B's first roadside crash. Two-field replay sampling reports the
+transition at field 1320; the values are different observation boundaries.
+
+A further matched diagnostic pair sets the attack coefficient initialization
+to 4 or 16 while retaining explicit lane width and NPC rounding. The binaries
+are both 20860 bytes and differ only at `$5af`. The normal replay outcomes are:
+
+| Fixture | Sampled crash onset | Final position | Lateral | Displayed rank |
+|---|---:|---:|---:|---:|
+| `c-lane-npc-damage16-lap` | 1320 | 12281000 | -188 | 15 |
+| `c-lane-npc-damage4-lap` | none through 1600 | 13738954 | -1003 | 14 |
+| B reference | 1376 | 13031078 | -931 | 15 |
+
+Quartering damage prevents this fixture's premature health-depletion crash,
+but does not recover B's contact sequence or roadside crash. Native attack
+damage is a per-contact impulse, so this sensitivity test alone does not
+establish a legitimate elapsed-time scaling rule. Do not promote the coefficient
+change or use it to tune the replay outcome. All fixtures remain private;
+production is unchanged. The contact/approach trajectory remains the relevant
+handling issue, separate from the open fixed-field distance gate.
+
+## Lane-input origin and explicit-width interaction experiment
+
+`b-lane-d4-origin` traces normal B across rendering and the next simulation
+on the cycle-exact Fast-020 handling-reference configuration. At field 1202,
+D4 is 0 before `$b076e` and 1 after it, then remains 1 through simulation entry
+and all six lane-builder calls. Subsequent sampled frames carry 0 or 1 in the
+same way. World projection earlier leaves 453 or 517, but drawing and the
+post-handoff sprite setup overwrite that value before B's simulation.
+
+The native `$b076e` path ends through `$b0be2` and `$b0c34`. The latter clears
+D4, then uses shifts and ROXL to pack sprite-position control bits into it
+before copying its byte into D7. The remaining pointer writer `$aec6a` changes
+D0 only. Thus B's sampled narrow lane value originates in graphics control
+bits, not an explicit actor width. C's projection rebuild introduces a different
+register residue before the same lane routine. Neither residue is an adequate
+ownership contract for independent simulation.
+
+Native `$8da5c` separately loads a word from `$9414e`, indexed by actor `+$16`,
+and halves it into D2 at `$8da92`; its boundary calculations instead add/subtract
+D4 at `$8da96`/`$8dab8`. A private fixture changes only those arithmetic operands
+to D2 in the relocated helper, retaining the table, lane clamps and list writes.
+`c-lane-explicit-width-probe` verifies runtime instruction words `$d042` and
+`$9042` and observes D2=16 for all sampled calls, while D4 still contains
+453/517. This proves the fixture uses the loaded half-width; interpreting that
+as the original author's intended behavior remains an inference.
+
+`c-lane-explicit-width-lap` has no crash by field 1600, position 13802410,
+lateral -974, displayed rank 13 and a different native ahead order from B.
+Its early trajectory differs from the prior constant-0/1 fixtures, although
+those final values happen to agree. It does not pass the B handling gate.
+
+A second private fixture combines the explicit width with the previous
+four-field-reference NPC lateral formula and signed fractional carry, without
+the older longitudinal endpoint correction. It transfers carry on companion
+copies and clears it at race reset/reactivation; full carry lifecycle and
+non-riding transitions are not validated. `c-lane-width-npc-lap2` produces one
+crash at field 1320, final position 12281000, lateral -188, displayed rank 15,
+and an ahead order still different from B. B crashes at 1376, ends at 13031078
+and -931, also displaying rank 15. Equal crash count and displayed rank alone
+therefore do not establish equivalence. The earlier `-lap` launch failed before
+boot because the build was missing; `-lap2` is the completed tested run.
+
+Both fixtures remain private under `c-lane-explicit-width-*` and
+`c-lane-width-npc-*`. Production is unchanged. This establishes the graphics
+origin of the dependency and tests an explicit-width interpretation and its
+interaction with NPC rounding, but neither is an accepted handling fix.
+C's distance, opponent-order and scene requirements remain open.
+
+## Object reuse disposition and lane-width handling evidence
+
+Do not promote the current D4-preserving object-reuse layout. It improves the
+normal 040 result only from 22.9 to 23.0 fps, leaves 020/060 fps unchanged,
+and worsens explicit-Cache 020 fixed-field distance from 3321603 to 3311794.
+Passing same-boundary simulation tests does not override that live checkpoint
+regression. The accepted production geometry-only reuse remains unchanged.
+
+`c-world-reuse-d4-visible-040` completes all eight neutral/right pairs at
+injection fields 300–307: upper estimates are 140/120/140/120/140/120/140/120 ms,
+median 130. Current production has the opposite phase pattern with the same
+median; each candidate phase remains below its same-cell B reference
+(220/200/220/200/220/200/220/200 ms, median 210).
+
+The 020 batch accepts phases 300–305, then rejects phase 306 because the
+initial-state SHA differs between its neutral/right runs. The saved player
+bytes and other reported initial scalar fields match, but the broader state
+hash does not; the cause is unresolved. No response estimate is accepted from
+that pair. Fresh `c-world-reuse-d4-visible-020-tail` pairs at 306/307 satisfy the
+original equality prerequisite and report 180/160 ms. Together the eight
+accepted pairs give 140/120/180/160/140/120/180/160 ms, median 150, matching
+production. `c-world-reuse-d4-visible-020-combined.json` retains the excluded
+pair explicitly. This retry is not proof that the original mismatch is harmless.
+
+The discovered D4 dependency also affects the open B handling investigation.
+`c-lane-width-real-{b,c}` uses the same normal cycle-exact Fast-020 configuration
+as the handling reference, replays the lap tape through field 1200, then samples
+lane-builder entries. B receives D4 words 0/1 across cursors 1202–1220; production
+C receives 453/517 across cursors 1199–1208. The earlier functional probes
+`c-lane-width-baseline-{b,c}` show the same value sets. These are observations
+of differing lane construction inputs, not proof of the entire handling cause.
+
+Two private sensitivity fixtures (`c-lane-d4-{0,1}-source/build/lap`) explicitly
+set D4 to 0 or 1 immediately before simulation's native body. Both follow the
+unchanged field-timed lap on the reference machine and produce no crash through
+field 1600, final position 13802410, lateral -974, displayed rank 13 and the
+same native ahead order. B crashes at 1376 and ends at position 13031078,
+lateral -931, rank 15 with a different ahead order. Thus replacing the wide
+projection residue with either sampled narrow value materially changes AI but
+does not satisfy the B handling gate. Neither fixture is a proposed production
+constant or an accepted physics change. Future work must establish explicit
+lane-input ownership and its interaction with per-tick AI before changing it;
+matching the short sampled D4 range alone is insufficient. C remains open.
+
+## World-object reuse: lifecycle, cadence and hardware checks
+
+The D4-preserving candidate remains private. Its normal binary is unchanged
+from `c-world-reuse-d4-build` (20580 bytes). A guarded source variant in
+`c-world-reuse-d4-guarded-source` wraps the new render hook and cache helper in
+`C_GEOMETRY_REUSE`; its normal output is byte-identical. No production source
+has been replaced.
+
+`c-world-reuse-d4-arrest` passes strict comparison with `c-pair-clear-arrest`:
+7084 hashes, 24 events, six terminal regions and exit field 7085. Its fresh
+race capture is `(100,99,0,1)`. `c-world-reuse-d4-wreck` passes against
+`c-pair-clear-wreck`: 23509 hashes, 105 events, six terminal regions and exit
+23510 after natural damage reaches 32; restart captures `(99,98,0,1)`.
+Both clear capture state and player/NPC road fractions on restart. The exact
+restart observation field need not equal the reference; terminal race state
+and the reset invariants are the assertions.
+
+`c-world-reuse-d4-period{1,2,3,4}-state` each matches 1595 shared hashes, sound
+events and six regions against `c-pair-clear-4-state`. Histograms contain
+1600/799/533/399 frames in the requested one/two/three/four-field bins.
+The one-field diagnostic skips drawing; these functional runs prove cadence
+invariance, not achievable hardware frame rates. Every normal companion is
+byte-identical to the candidate. The previously recorded variable-cadence
+attack replay and full finish replay also pass.
+
+The initial three-cell matrix plus `c-world-reuse-d4-other-matrix` cover all
+11 normal cells. Rates are A500 8.5, Chip-only 020 12.5, Fast 020 12.5,
+NoCache 020 8.3, 030 16.7, 040 23.0 and 060 23.1 fps; explicit Cache gives
+the same frame rates. Explicit-Cache 020 distance is 3311794, versus 3321603
+in the current production result, despite equal fps. Default Fast 020 remains
+3321603 and NoCache 3301969. Thus this candidate does not close the fixed-field
+distance gate, and the Cache observation must not be hidden by aggregate rates.
+`c-world-reuse-d4-mmu` passes both 040 and 060 functional cells with CPU data
+cache emulation disabled; these are not performance measurements.
+
+On normal 040, `c-world-reuse-d4-off` verifies the original instruction at the
+new `$87692` hook in addition to the previous 21 sites, 14 scratch operands
+and collision-tail instruction. `-keyboard` and `-cd32` pass release, pause
+at active field 161, clock freeze and resume. Stack guards remain intact,
+with observed high-water use of 228 and 364 bytes respectively.
+
+`c-world-reuse-d4-demo-fire` and `-demo-timeout` both return to a normal
+race with intact stack guards. Timeout exits at active field 3598; observed
+stack high-water use is 308/304 bytes for fire/timeout respectively.
+
+Latency remains to be measured before promotion. C's B distance and handling
+acceptance gates remain open independently of candidate equivalence.
+
+## World-object reuse: D4 dependency isolated and corrected privately
+
+Follow-up probes identify the first divergence from direct reuse. At simulation
+cursor 1239 (hash slot 1238), projected world records match byte-for-byte after
+accounting for the rendered actor prefix. Actor state matches through native
+`$87592`. AI dispatch `$8d2c0` then changes opponent `$a61e0`'s steering word
+`+$46` to 4 in the rebuild control versus 2 in the direct-reuse candidate.
+The later three-byte movement difference in `$a62e0` is not the first cause.
+
+`c-world-reuse-{control,candidate}-lane2` captures D4 at the simulation entry
+and the relocated `$8da5c` lane builder. The rebuild leaves `$1b7` (439) in D4;
+direct reuse leaves `$ffff` (-1 in the word operations). All six observed lane
+builder calls retain their respective value. Native `$8da5c` uses D4 at
+`$8da96` and `$8dab8` without initializing it. Consequently lane membership
+lists differ before AI decisions. `-all-stages` and `-ai2` traces locate the
+steering write: control reaches `$8dba6`, candidate reaches `$8db70`.
+These observations establish a live register dependency beyond projected data.
+They do not justify changing the native lane-width behavior independently.
+
+A private correction captures D4 after the render's `$8a492` projection call
+and restores it when consuming the reuse marker. The existing 040/060 selection
+and CUSTOM2 gate remain in force. `c-world-reuse-d4-state` matches all 1596
+shared hashes, sound events and six captured regions against
+`c-pair-clear-vary-state`. `c-world-reuse-d4-finish` matches all 12095 hashes,
+66 events, six terminal regions, finish field 11907 and exit field 12096
+against `c-pair-clear-finish`. Restart captures `(93,92,0,1)` with cleared road
+fraction history. These tests force reuse on the functional 020 diagnostic.
+
+The normal candidate is 20580 bytes, SHA-256
+`967630422235d305103e9007dc404588ff5c681de0cb324873af677ac6e29498`.
+`c-world-reuse-d4-matrix` measures Fast 020 12.5, 040 23.0 and 060 23.1 fps;
+all three distances are 3321603. Current production measures 12.5/22.9/23.1,
+so the additional measured benefit is small and does not close B's distance gate.
+The equal-layout control differs only at file offset `$1e90` (BEQ to BRA,
+always rebuilding objects); it measures 040 21.5 and 060 23.0 fps. This separates
+the reuse benefit within that layout from the smaller net production gain.
+
+Source and builds remain under `c-world-reuse-d4-*`. Production remains
+unchanged pending arrest/wreck, exact cadence, hardware/fallback, controls,
+demo and latency checks. The added render hook must be included in the option-off
+patch audit before integration. C's B distance and handling gates remain open.
+
+## Rendered world-object reuse: short replay rejects direct reuse
+
+A private candidate extends the existing geometry-ready marker to return from
+`step_collision_objects` immediately on the first post-render simulation tick.
+This preserves the rendered mixed actor/world list, its `$a59fc` actor offset,
+`$a59fe` world count and `$a8092` roadside pointer. Later ticks rebuild normally.
+The diagnostic forces reuse on 020; production source is unchanged.
+
+The native collision reader at `$8c3b8` explicitly applies the actor offset,
+and `$8c492` uses the roadside pointer. The depth sorter at `$8b37e` sorts
+separate depth/index arrays rather than the object records. Those facts make
+reuse plausible, but do not prove that the rendered and rebuilt lists are
+interchangeable.
+
+`c-world-reuse-state` tests the candidate against `c-pair-clear-vary-state`
+with the field-timed attack tape and functional CPU settings, period four plus
+variable cadence, capture 1457. The first actor-hash difference is at simulation
+cursor 1238; 216 of the first 1596 hash slots differ. Sound events match. The
+capture differs in three bytes, all in opponent `$a62e0`, at `$a62e1`,
+`$a62fb` and `$a6311`. Thus matching sound and most captured state do not establish
+simulation equivalence. The strict short comparator rejects this candidate.
+
+The private source, 20,544-byte normal companion, 49,820-byte diagnostic and
+rejection summary remain in `c-world-reuse-source`, `c-world-reuse-build` and
+`c-world-reuse-state`. No throughput claim or runtime integration follows from
+this failed replay. Before another reuse attempt, compare object records and
+collision inputs immediately before cursor 1238 against a fresh rebuild;
+the root cause is not yet established. C's B distance and handling gates remain
+open.
+
+## Integrated 040/060 geometry reuse
+
+The normal runtime now reuses render geometry for the first subsequent
+simulation tick on 040/060. The existing CUSTOM2/CPU/Fast gate still owns
+all enhancements; 020/030 retain rebuilding, and unsupported/off paths stay
+native. Catch-up ticks after the consumed marker rebuild normally. Race reset
+clears readiness and selects the CPU path again. Diagnostic reuse is explicit
+(`VERIFY_C_GEOMETRY_REUSE`); forcing it on a test CPU additionally requires
+VERIFY. Assembly guards require collision geometry and the measured pose
+render hook and reject whole-view extrapolation.
+
+The integrated normal build is byte-identical to the tested 20,532-byte
+candidate: SHA-256
+`85250ab3d331371e2672ef052eaf44e7b87843363a07cc04c882b1ee4de1ee05`.
+The previous five-cell CPU matrix plus `c-geometry-reuse-other-matrix` cover
+all eleven normal cells. Rates are A500 8.5, Chip-only 020 12.5, Fast 020
+12.5, NoCache 020 8.3, 030 16.7, 040 22.9 and 060 23.1 fps; explicit Cache
+agrees with defaults. Both `c-geometry-reuse-mmu` functional cells pass with
+CPU data-cache emulation disabled, not a hardware performance claim.
+
+Normal `c-geometry-reuse-keyboard` and `-cd32` pass steering release,
+pause-clock freeze at field 161 and resume; stack guards remain intact.
+`-demo-fire` and `-demo-timeout` return to a fresh normal race, with timeout
+at active field 3598. `-off` verifies the 21 native hook sites, 14 scratch
+operands and original collision-tail instruction with CUSTOM2=0 on 040.
+
+Response capture now accepts a hardware cell in the private batch driver.
+`c-geometry-reuse-visible-020` retains all eight existing response values:
+140/120/180/160/140/120/180/160 ms, median 150. On 040,
+`c-geometry-reuse-visible-040` gives 120/140/120/140/120/140/120/140 ms,
+median 130, against a fresh same-cell B run (`-visible-b040`) of
+220/200/220/200/220/200/220/200, median 210. Every phase is within B.
+These are the existing capture-based upper estimates, not device-level
+input-latency measurements. The field-318 steering capture was visually
+inspected: road, rider, scenery and dashboard are coherent. A still image
+does not independently prove tear-free motion; native buffer/vsync handoff
+code remains unchanged.
+
+`c-geometry-reuse-final-finish` repeats the successful race with the exact
+final guarded full-diagnostic binary. The strict comparison passes all
+12,095 hashes, 66 sound events, finish/exit timing and six terminal regions,
+then restarts. Combined with the preceding exact-cadence, arrest and natural
+wreck comparisons, this validates the integrated reuse calculation against
+the current simulation. It does not make the existing simulation B-equivalent.
+All sessions are terminal. The default/uncached 020 distances remain
+3,321,603 / 3,301,969, outside the unchanged B tolerance; opponent handling
+and other remaining C acceptance work are still open.
+
+## Geometry reuse: CPU selection and remaining lifecycle/cadence checks
+
+`c-geometry-reuse-cpu-source` enables reuse only when attention flags report
+040 or 060 ($88 mask), inside the existing enhanced simulation path. A
+separate ready byte is cleared on race-history reset and set by rendering
+only when that hardware selection is enabled. The normal 20,532-byte build
+SHA-256 is `85250ab3d331371e2672ef052eaf44e7b87843363a07cc04c882b1ee4de1ee05`.
+`c-geometry-reuse-cpu-matrix` passes Fast 020, NoCache 020, 030/50, 040/25
+and 060/50 with rates 12.5/8.3/16.7/22.9/23.1 fps respectively. The two
+020 distances remain 3,321,603 and 3,301,969. Direct normal-binary reads in
+`c-geometry-reuse-gate-{a1200-fast,030-50,040-25,060-50}` confirm the enable
+byte is false/false/true/true, rather than inferring selection from FPS.
+
+The full diagnostic explicitly forces reuse on its 020 test machine.
+`c-geometry-reuse-cpu-arrest` and `-wreck` pass the unchanged strict full
+comparator against the current pair-clear references: 7,084/23,509 hashes,
+24/105 sound requests, capture fields, terminal timings and all six regions
+match. Exit ticks are 7,085/23,510. Both restart; player road history and all
+35 actor carries are zero. This complements the preceding finish result.
+The full diagnostic SHA-256 is
+`bb6c0654d5a045ab0bdf9f6b91adb5835ae478bf0b25018b41c2ac082859a665`.
+
+The initial `c-geometry-reuse-period{1,2,3,4}-state` runs used cycle-exact
+020 timing and matched state, but could not sustain all requested intervals.
+They are not evidence of exact fixed cadence. Repeated functional runs
+`c-geometry-reuse-exact-period{1,2,3,4}-state` actually reach the requested
+intervals, with main histogram bins 1600/799/533/399. Each matches 1,595
+shared hashes, sound events and six captured regions against
+`c-pair-clear-4-state`. One-field coverage omits drawing. All normal companion
+binaries match the selected CPU-gated normal binary exactly.
+
+`c-geometry-reuse-guarded-source` adds explicit diagnostic opt-in and assembly
+requirements for collision geometry and the measured render hook, rejects
+whole-view extrapolation, and restricts forced selection to VERIFY builds.
+Its normal and full-diagnostic binaries are byte-identical to the tested CPU
+candidate. These private build directories retain source.patch. All sessions
+are terminal. Remaining work before production integration includes the full
+hardware/MMU and disabled-path checks, controls/pause/demo transitions,
+response measurements and visual review. The baseline B distance/handling
+gates remain unchanged and open; production code is not yet modified.
+
+## Geometry reuse: promising 040 candidate, not yet integrated
+
+A fresh normal `c-pair-clear-current-profile` captures uncached 020 fields
+100–600 using the current 20,480-byte binary. Recorded live placement is
+$9f6018. Flat-PC units total 18,162,428,800; the header gap is 26,627,584
+with 1,511 unmatched returns, so inclusive call attribution is not used.
+Mapped spans account for 11.5206% in the 7,040-byte physics copy, 4.1139%
+in world-object projection, 3.7401% in collision geometry and 2.1676% in
+the 292-byte raster copy. `mapped-flat.json` retains individual PC mapping;
+`regions.json` retains the span totals. These are emulator measurements,
+not hardware cycle claims or proof that Chip stalls are removable.
+
+The new private `c-geometry-reuse-source` marks geometry available when
+native render geometry runs. The next simulation geometry call consumes
+that marker and omits rebuilding the road arrays; subsequent catch-up ticks
+build normally. Race-history reset clears the marker. World-object projection,
+collisions, native rendering and vsync still execute. The existing master
+switch/hardware gate still selects the containing simulation. This tests
+reuse of rendering's output before the next movement update; it does not
+skip simulation ticks or defer input.
+
+`c-geometry-reuse-vary-state2` matches 1,596 shared hashes, sound requests
+and six captured regions against `c-pair-clear-vary-state`.
+`c-geometry-reuse-finish` replays the retained successful-race tape under
+varying cadence and passes the strict comparator against
+`c-pair-clear-finish`: all 12,095 hashes, 66 sound events, six terminal
+regions, finish 11,907 and exit 12,096 match. Restart succeeds with fresh
+capture tuple (93,92,0,1). This does not yet establish arrest/wreck coverage,
+all fixed cadences, input-to-display response, visual acceptance or all CPU
+and fallback paths for the candidate.
+
+Normal candidate/control binaries are both 20,516 bytes and differ only
+at file byte 20208 (conditional branch versus unconditional rebuild).
+`c-geometry-reuse-{vary,control}-matrix` measures:
+
+| Cell | Reuse | Same-layout rebuild control |
+| --- | ---: | ---: |
+| Fast 020 | 12.3 | 12.5 |
+| NoCache 020 | 8.3 | 8.3 |
+| 040/25 | 22.9 | 21.5 |
+| 060/50 | 23.1 | 23.0 |
+
+All eight functional cells pass. Both builds give cached/default 020
+distance 3,321,603 and uncached 3,301,969: B's distance gate remains open.
+The current integrated 040 rate is 21.8, so the candidate also exceeds it,
+but its cached-020 regression prevents unconditional integration. Next work
+must select and validate an appropriate hardware path and complete the
+remaining regression checks; neither this result nor the full finish pass
+closes C. Production source is unchanged.
+
+Private candidate/control build directories retain `source.patch`.
+The initial diagnostic build failed before producing a runnable binary;
+`-vary-state2` is the successful replay. The full-race build uses the same
+source with ring hashes and end capture. Normal SHA-256 values:
+
+- Candidate: `6dcf9ac1328b8dab8740f84a290c9659b48b43ad6ac5ecc33bfcc26e2c12bf23`.
+- Control: `fbaf49c53b1f3334362c260f7b204ed27dcd5bdcaa19f84716a8942c9ebacd87`.
+
+## Current movement deficit and rejected collision-mode relocation
+
+Fresh `c-pair-clear-motion-{cache,nocache}` traces use the integrated
+20,480-byte normal runtime and field-100 throttle. All three sampled actor
+records agree at 500 shared cursors, and the cached run agrees with
+`c-road-integrated-completed-motion` at all 500 common cursors. At cursor
+590 the player position remains 3,855,684, versus B's 3,888,640: the
+accumulated deficit is still 32,956 (0.979565% of B's distance). Both new
+traces reach this movement boundary at live field 592. This observation is
+at entry to step_end, before event/pose work, not a completed-state hash.
+The production matrix's default distance 3,321,603 corresponds to movement
+cursor 589; its NoCache distance 3,301,969 corresponds to cursor 587.
+These reproduce the remaining scheduling component without changing the
+live-field acceptance window or the B baseline.
+
+A private follow-up moves collision-mode scratch $8b482 to Fast RAM. It
+patches 19 direct absolute operands, including five native response handlers,
+and the 14 corresponding copied-physics operands. The conditional extension
+runs inside the existing enhancement gate after copying physics and before
+cache flushing. This is a direct-reference experiment, not a proof excluding
+all possible indirect aliases. Both 20,736-byte builds retain existing code
+layout; each build directory contains source.patch and collision_mode.s.
+
+`c-collision-mode-vary-state` matches 1,596 shared hashes, sound events and
+all six captured regions against `c-pair-clear-vary-state`. In
+`c-collision-mode-{fast,control}-matrix`, both variants give 12.5 fps on
+Fast 020, 8.3 uncached and 23.0 on 060; 040 gives 21.5 versus 21.8.
+Both 020 distances remain 3,311,794 / 3,301,969. The relocation is not
+integrated: it improves neither the 020 distance gate nor throughput.
+No full-race or response acceptance is claimed. All eight matrix cells
+pass functional checks and all sessions are terminal.
+
+Candidate SHA-256: `c4beeb33071bc866e7be6b30c1908b90c70434aea668db92d97be8d2a23898cb`.
+Control SHA-256: `af10aee6f2ea2fb28c586f15d562afaf687b4fa5087bb322b05f2293295b350a`.
+
+## Combined collision scratch clear is slower
+
+A private candidate combines the two word clears at native $8c8ae/$8c8b4
+into one longword clear of the adjacent Fast scratch words. Nine copied BSR
+callers (native $8c1b2/$8c1de/$8c2f8/$8c352/$8c610/$8c638/$8c6b4/
+$8c724/$8c7c4) target the second instruction directly. The old copied entry
+jumps there for any remaining external users. The new CLR.L leaves both
+words zero with the same CCR result as the old final CLR.W. Shared native
+pose users retain their existing scratch aliases. Initialization is inside
+the master-toggle/hardware gate and precedes cache flushing.
+
+The extension replaces four initialization NOP bytes and appends 256 bytes;
+normal binaries are 20,736 bytes. `c-scratch-clear-{fast,control}-matrix`
+measures 12.5/8.3/23.0 fps for Fast 020/uncached 020/060 in both builds.
+On 040 the candidate is slower: 21.0 versus 21.8 fps. Both give Fast 020
+distance 3,311,794 and uncached distance 3,301,969, without closing B's
+one-percent gate. `c-scratch-clear-vary-state` matches 1,596 shared hashes,
+sound requests and six captured state regions against
+`c-pair-clear-vary-state`. This is short varying-cadence coverage only.
+
+The original scratch block is word-aligned. A follow-up moves both words
+to an explicitly longword-aligned block in the appended extension, for both
+candidate and control. `c-scratch-clear-aligned-probe` confirms live storage
+at $9fae44, CLR.L, all nine retargeted BSRs, and the native pose/copied physics
+aliases. `c-scratch-clear-aligned-{fast,control}-matrix` reproduces exactly
+the same rates and distances, including 21.0/21.8 on 040. Alignment alone
+therefore does not explain the slowdown. All sixteen matrix cells pass
+functional checks, but neither variant is integrated; there is no full-race
+or response acceptance claim. All runs are terminal.
+
+Each build directory retains `source.patch` and `scratch_clear.s`. Normal
+SHA-256 values:
+
+- c-scratch-clear-fast: `5a7ac4118a288a639de470605b15a0b26c26ad7c7594dab3d4b103252ffbb834`.
+- c-scratch-clear-control: `55441377e8ffe46628ccaa513e8d0cae47dd8ed9aedf3e3c84ef695a9534b48c`.
+- c-scratch-clear-aligned-fast: `61cec77cbef59e8ca36a81ab2024ca11cb9922cca5507bb47ad5335d8934ce3d`.
+- c-scratch-clear-aligned-control: `67ecb85daa23c6b28bb91b6ee13d5ac55a3b3b84d5e5e35ab0cc571cdb344592`.
+
+## Normal riding-pose relocation does not improve the current runtime
+
+The remaining native riding-pose selector $8a8aa..$8a92f is 134 bytes,
+including its saved-D3 restore and RTS. The previous mapped uncached profile
+attributes about 1.6% of flat costs to this path. A private candidate copies
+it after the enhanced patch list, preserving the absolute prediction call
+at $8a8e2, all internal relative branches, native tables and native result
+storage. Its entry replaces exactly the six-byte BCLR at $8a8aa. Other
+pose branches can still reach the untouched native epilogue at $8a92c.
+Initialization occurs inside the existing CUSTOM2/CPU/Fast gate and before
+the existing cache flush.
+
+`c-normal-pose-copy-probe` reads the initial candidate live at Fast address
+$9fad48 and verifies all 134 bytes against the patched native span (using
+the original first six bytes before the entry redirect). It includes the
+prediction call and the native epilogue. This is relocation-byte evidence,
+not a full gameplay-equivalence claim.
+
+Fresh normal `c-normal-pose-{fast,control}-matrix` results use 20,668-byte
+binaries differing only at enabled byte 20166. Both give 12.5 fps on Fast
+020, 8.3 uncached and 23.0 on 060. Candidate/control 040 rates are
+21.5/21.3 fps. Both Fast 020 distances are 3,311,794, below the current
+integrated 3,321,603; uncached distance remains 3,301,969.
+
+A follow-up appends the extension after existing code and replaces four
+initialization NOP bytes with its call. Every one of the 473 existing named
+assembler values retains its value; the binary grows exactly 256 bytes to
+20,736. This preserves relative layout, not a claim of equal absolute
+runtime placement. `c-normal-pose-aligned-{fast,control}-matrix` again gives
+12.5/8.3/23.0 fps on Fast 020/uncached 020/060, but 21.7/21.8 on 040.
+Distances are unchanged from the first pair. Candidate/control differ only
+at enabled byte 20524. The relocation is slower than this control and does
+not improve the distance gate, so it is not integrated. No full-race,
+response or cadence-equivalence acceptance is claimed for these candidates.
+
+All sixteen matrix cells pass their functional checks. All sessions are
+terminal. Build directories retain `source.patch`; appended builds also
+retain `normal_pose_fast.s`. Normal SHA-256 values:
+
+- Initial candidate: `cf77f22739ce3180b46a150be077ce0e931c106b932bf498296608eaa57f94f0`.
+- Initial control: `34eccdc4531a1329b337a65a97d31a17c36c011fd2c5488d8f7c9a682b54377c`.
+- Appended candidate: `aba899cc08e4ea457f85f660d65a25565400d858e4b1e96217cf5cad3feb882e`.
+- Appended control: `e6379430aa9bf5bec8e480d0d7219dee2abe2d6ee93c2b4efb749841e232841f`.
+
+## Separating side-contact guard fails the handling regression
+
+`c-heading-exchange-probe` records native $8ef5c entry and $8efb6 exit
+without changing game state. At cursors 1255–1259 the current runtime
+exchanges headings (-52,8)→(8,-52), (13,-50)→(-50,13),
+(-52,11)→(11,-52), (21,-50)→(-50,21), and
+(-52,19)→(19,-52). Both added heading impulses are zero. The relative
+lateral displacements are 7, -9, 6, -10 and 7, all at delta 1. With
+coefficient 5120, the native magnitude multiplication/high-word extraction
+rounds every velocity-derived impulse to zero. These reversals are therefore
+the unconditional exchange itself, not division amplification or attack
+damage. The second and fourth exchanges occur while this side's relative
+motion is separating.
+
+The matching `b-heading-exchange-probe` confirms the same exchange mechanism
+at delta 4. Its four player-heading results are -1, 3, 3 and 4 at
+cursors 1253/1265/1286/1302. Only the last contact has an added heading
+impulse (2 from the other actor). Its zero health-damage impulse, established
+separately, must not be confused with this heading impulse.
+
+A new private candidate narrows the earlier separating-contact experiment:
+only native side-contact caller $8ebb4 (return $8ebb8), only two riding
+racers below the traffic bank, and only when both added heading impulses
+are zero. It skips the exchange for separating/stationary relative lateral
+motion; positional correction and subsequent attack damage still execute.
+Rear-end calls and nonzero attack impulses retain the native response.
+It uses the current road-normalized runtime, without the rejected
+longitudinal endpoint or NPC lateral corrections from older experiments.
+
+`c-side-heading-guard-probe` verifies actual execution: cursor 1255 exchanges
+(-52,8)→(8,-52), then 1256 retains (13,-50) and 1257 retains (25,-48).
+Cursor 1322 exchanges (-52,1)→(1,-52), then 1323 retains (0,-50).
+Thus the guard works as intended, but the full lap does not meet the B gate.
+`c-side-heading-{guard,control}-lap2` use the original tape and two-field
+samples. The equal-layout control crashes at 1374 and ends at position
+13,138,349, lateral -901. The guard never crashes through field 1600 and
+ends at 13,783,002, lateral -986 (displayed rank 13 versus control 15).
+B's retained crash is at 1376. Preventing repeated exchanges alone does not
+restore the required handling, so the guard is not integrated. No full-race
+cadence, response or performance acceptance is claimed for it.
+
+Both builds are 20,608 bytes and differ only in the enabled byte at file
+offset 9250. Their build directories retain `source.patch`. SHA-256:
+
+- Guard: `e12958a6e6b00821b05a8ec668d45a3bc3e01c7302ddb8594680a5930ce27568`.
+- Control: `eef0cbab846a8b38f3d74394f342590548c4576e65c11b0d223993b74a27a05c`.
+
+The initial private build failed on a 68020-only PC-relative TST encoding
+under the 68000 assembler target; replacing that flag test with BTST fixed
+it. Initial `-lap` launches had no runnable binary; only `-lap2` runs are
+evidence. All sessions terminated normally after the successful runs.
+
+## Attack damage does not explain the heading reversals
+
+Read-only entry/exit probes at native $8ee46/$8eece now isolate health
+subtraction from the preceding $8ef5c heading exchange. In
+`c-attack-damage-probe`, player contacts at simulation cursors
+1255–1259 have damage payloads 18, 8, 6, 4 and 15. Each loses payload times
+16 health with delta 1: 2560→2272, 2273→2145, 2146→2050,
+2051→1987 and 1988→1748. The one-point recovery between calls is real:
+$90198 adds delta to player health; $8d318 does the same for opponents.
+The later cursor-1316 contact has zero damage. These traces use the current
+20,480-byte normal binary, SHA-256
+`edc24f08aba85e634156fc920cb5f62dd45b220e3c92951c9523788c17b87a8b`.
+
+Native attack reach ($8ce1e/$8ce32) is a spatial constant. Pair overlap
+writes +$52, attack strength scales that payload, and $8ee52/$8ee90
+multiply the resulting health impulse by the coefficient at $8e0f0.
+There is no elapsed-time factor in this subtraction. This establishes
+per-contact behavior, not by itself that damage must be quartered:
+contact geometry and blocking also change whether damage is published.
+In `b-attack-damage-probe`, all four contacts at cursors
+1253/1265/1286/1302 have zero published player-damage impulse with delta 4,
+including the last contact with nonzero attack reach. An attack payload in
+an actor record alone therefore does not prove health damage occurred.
+
+A private diagnostic changes the initialization immediate at $86df0 from
+16 to 4 inside the enhanced patch list. `c-attack-quarter-probe` confirms
+the coefficient and quarter-sized losses. All twelve paired entry/exit
+records for both actors match the current runtime byte-for-byte outside
+health (+$5c): positions, headings and contact times are unchanged. This
+rules out health subtraction as the cause of these heading reversals.
+
+Fresh normal `c-attack-{control,quarter,layout-control}-lap` replays use
+the original lap tape and two-field samples. All crash at field 1374 and
+finish the tape at position 13,138,349, lateral -901. The equal-layout
+candidate/control are 20,488 bytes and differ only at file byte 1455
+(value 4 versus 16). Intermediate live-field snapshots can differ; no
+full-state equivalence or performance improvement is claimed. The change
+does not close the B handling gate and is not integrated. The next handling
+investigation should isolate the heading exchange/contact geometry itself;
+quartering health damage cannot substitute for that work.
+
+Private builds retain `source.patch`. Candidate SHA-256:
+`a696214280d66ddc1e839bce1edd559cd0c059db9e9405d9e50adcaac9b7d120`;
+equal-layout control:
+`37f9fefb93556d1d2f688f161868bd729a2e312d5ffd85be8f5052e34aae6a6e`.
+
+## Reject conditional direction-bit updates
+
+A private extension tests actor A1 +$69 bit 0 before the native pair-distance
+gate's BSET at $8c8c4 or BCLR at $8c8de. Two Fast helpers retain the flag's
+value/condition-code effects and jump back before the original position
+comparison; no pair ordering, arithmetic or rejection decision is changed.
+`c-pair-direction-vary-state` matches 1,596 common hashes, sound requests and
+six field-1457 regions against the current conditional-tail runtime. This is
+short replay coverage only; the candidate is not accepted for full gameplay.
+
+The initial 20,568-byte candidate/control keep identical layouts. Their
+`c-pair-direction-{fast,control}-matrix` results are 12.5/8.3 fps on the
+cached/default and uncached 020, 21.3/20.2 on 040 and 23.0/23.0 on 060.
+The candidate's default 020 distance is 3,311,794 versus the control's
+3,321,603. Although faster than its control on 040, it remains slower than
+the current integrated 21.8 fps and loses a tick in the live-field distance
+sample. A layout-controlled follow-up was therefore necessary before
+attributing the apparent gain to fewer writes.
+
+The second pair appends the helpers after existing code and reuses four
+initialization NOP bytes for its call. Every existing assembler symbol keeps
+its original relative offset. Padding makes the binary exactly 256 bytes
+larger than the current runtime (20,736 total); this preserves relative
+layout and total-size modulo 256, not a verified absolute runtime-address
+claim. In `c-pair-direction-aligned-{fast,control}-matrix`, candidate/control
+rates are 12.5/12.5 (020), 8.3/8.3 (NoCache), 21.5/21.8 (040), 23.0/23.0
+(060). Both default 020 distances are 3,311,794; both uncached distances are
+3,301,969. The placement-preserving candidate is slower than its control,
+so no direction-bit change is integrated. Full-race/response validation was
+not pursued after this result; the existing runtime remains unchanged.
+
+Private builds retain `source.patch`; the appended-helper builds additionally
+retain `pair_direction.s`. Normal SHA-256 values:
+
+- Initial candidate: `321787db8528fe3662ed65d0a31e9a9f65e2e834e4d2411d18df295e7d667be3`.
+- Initial control: `6e727e29015eac5a9994dedf7638e60ab12edf13333257c0256ab35e92e3a7ca`.
+- Appended candidate: `ffcb89db2ddf367efe0435239757372ab52eb60230340f9279767699e7bccb84`.
+- Appended control: `48db9b2a736f68d4646e803153eee453840f7767d3cd99f3b0f99f7f2a99a383`.
+
+## Avoid redundant actor-pair flag writes
+
+The copied collision tail at native $8cb70/$8cb76/$8cb7c clears actor A1 bit 4
+at +$68 and bit 7 at +$69, then A2 bit 7 at +$69. The enhanced path now tests
+each bit and writes only when it was set. BTST and BCLR alter only Z from
+the prior bit value, so the final test/clear retains native CCR semantics,
+including when A1/A2 alias. No data/address registers are used as scratch.
+The copy is patched during gated initialization and flushed with the existing
+code-copy cache flush. Native fallback code remains unchanged.
+
+Two normal binaries of 20,480 bytes differ in only the control flag byte at
+file offset 9,705. Private `c-pair-clear-{fast,control}-matrix` results:
+
+| Runtime | Fast 020 | NoCache 020 | 040/25 | 060/50 |
+| --- | ---: | ---: | ---: | ---: |
+| Identical-layout unconditional-clear control | 12.5 | 8.3 | 19.5 | 23.0 |
+| Conditional clears, selected | 12.5 | 8.3 | 21.8 | 23.0 |
+| Preceding integrated scratch runtime | 12.5 | 8.3 | 20.2 | 23.0 |
+
+The selected default/Cache 020 field-490 distance improves from 3,311,794 to
+3,321,603. Against B's default 3,364,352 this is still 1.270646% low, outside
+the unchanged one-percent gate. NoCache remains 3,301,969. This is performance
+progress, not a physics-speed correction or closure of C's B handling checks.
+All 11 normal hardware cells pass; 040 default/Cache both reach 21.8. Both MMU
+functional cells pass with data-cache emulation disabled, not a hardware
+cache-performance claim.
+
+`c-pair-clear-vary-state` matches 1,596 common hashes, sound requests and all
+six field-1457 state regions. Fresh `c-pair-clear-{1,2,3,4}-state` runs each
+match 1,595 hashes, sounds and six regions against the fixed-four reference;
+main histogram bins are 1600/799/533/399 respectively. One-field coverage
+omits drawing. Normal binaries built alongside all four are identical.
+
+Full `c-pair-clear-{finish,arrest,wreck}` comparisons pass the unchanged
+strict comparator: 12,095/7,084/23,509 hashes and 66/24/105 sound requests,
+respectively. Captures, finish/exit ticks and all six terminal regions agree;
+all three restarts clear the 12 player and 140 actor road-history/carry bytes.
+The wreck uses naturally accumulated damage, without a fixture.
+
+The live probes `c-pair-clear-live-probe` and
+`c-pair-clear-live-collision-probe` each validate 256 calls: all three byte
+results, 15 data/address registers, stack return balance and the low five
+CCR bits match the native tail's expected effects. All sampled target bits
+were already clear; this is direct coverage of the skipped-write branch,
+not exhaustive execution of every set-bit or alias combination.
+
+Normal eight-phase response remains 140/120/180/160/140/120/180/160 ms,
+median 150, passing each B limit. Keyboard/CD32 release, pause/resume and
+stack guards pass. Demo fire/timeout exits reach a fresh normal race.
+The disabled-toggle probe checks the original 21 hooks, 14 scratch operands
+and the native collision-tail instruction. All changes remain behind the
+single Enhanced framerate toggle and existing CPU/Fast checks.
+
+The integrated normal binary is byte-identical to the selected candidate:
+SHA-256 `edc24f08aba85e634156fc920cb5f62dd45b220e3c92951c9523788c17b87a8b`.
+The identical-layout control is
+`d7c9f5b0b856afe8076d5b88d50b678e37583b593596e1714f7546e1f900d033`.
+`VERIFY_C_PAIR_CLEAR_CONTROL` preserves the diagnostic control. Exact private
+source patches remain with the build evidence. B distance/opponent-order and
+remaining performance acceptance stay open.
+
+## Move shared collision/pose scratch words into Fast RAM
+
+The enhanced runtime moves native scratch words $8b480 and $a59ca into four
+bytes in the selected public Fast slave hunk. `step_scratch_init` initializes
+them and patches all 14 native absolute operand sites before the physics copy
+is made, so both copied physics and the five native pose/render users of
+$a59ca share the same storage. Pair/pose entry clears precede their use.
+The existing CUSTOM2/CPU/Fast gate owns initialization; option-off and
+unsupported-machine execution retain the native references. No DMA data moves.
+The retained original disassembly agrees with the operand-site audit; tests
+below cover the shared-state behavior rather than treating a literal scan as
+an exhaustive indirect-alias proof.
+
+The private normal candidate/control have identical 20,396-byte layouts and
+differ in exactly one flag byte at file offset 9,623. `VERIFY_C_SCRATCH_CONTROL`
+retains this control in diagnostics. Results for `c-collision-scratch-{fast,
+control}-matrix`:
+
+| Runtime | Fast 020 | NoCache 020 | 040/25 | 060/50 |
+| --- | ---: | ---: | ---: | ---: |
+| Equal-layout native scratch control | 12.5 | 8.3 | 19.4 | 22.9 |
+| Fast scratch, selected | 12.5 | 8.3 | 20.2 | 23.0 |
+| Preceding integrated runtime | 12.5 | 8.3 | 19.5 | 22.9 |
+
+The two 020 distance results remain 3,311,794 and 3,301,969: the B one-percent
+failures are not solved. Default/Cache 040 and 060 agree. All 11 hardware cells
+and both MMU functional cells pass; MMU tests disable CPU data-cache emulation
+and are not hardware cache-performance claims. Candidate/control cached-020
+field-590 and field-600 images are pixel-identical.
+
+`c-collision-scratch-vary-state` matches 1,596 common hashes, sound requests
+and all six authoritative field-1457 regions against the current varying
+reference. Fresh `c-scratch-period{1,2,3,4}-state` diagnostics each match 1,595
+hashes, sound and six regions against the fixed-four reference. Their main
+histogram bins are 1600/799/533/399 frames respectively; one-field coverage
+omits drawing. Normal companions all match the integrated binary.
+
+Strict full comparisons pass for `c-collision-scratch-finish-exact` (12,095
+hashes, 66 requests, finish 11,907, exit 12,096), `-arrest` (7,084 hashes,
+24 requests, exit 7,085), and `-wreck` (23,509 hashes, 105 requests, exit
+23,510, naturally accumulated damage 32). All six terminal regions and
+captured times agree with their corrected-road references; each restarts with
+all 12 player and 140 actor road-history/carry bytes zero. The first sparse
+finish observation matched hashes but read the live end-time field after the
+post-race screen changed it to 11,907. Repeating with the original observation
+cadence resolves that discrepancy and passes the unchanged strict comparator.
+
+Normal response tests in `c-collision-scratch-visible` give
+140/120/180/160/140/120/180/160 ms, median 150; all eight phases meet B's limits.
+Keyboard/CD32 release, pause/resume and stack guards pass. Demo fire/timeout
+exits both reach a fresh normal race, with timeout at active field 3598/native
+timer 3600. `c-collision-scratch-off` verifies 21 original hook sites plus all
+14 original scratch operands with CUSTOM2=0.
+
+The integrated `c-scratch-integrated-build/RoadRash.slave` is byte-identical
+to the selected normal candidate, SHA-256
+`c3c38783615f3d295fb4eef198734eee0ecb1e702073242938024b143fdc11f0`.
+The equal-layout control SHA-256 is
+`c4b804acc30af34fb8f4c267c9d22da0baac4fbc67a2d673cd9fd6ca22b63a93`.
+Private build directories retain exact patches. This restores the measured
+040/060 rates lost with road normalization while preserving its simulation.
+C remains open for B distance/handling and remaining performance acceptance.
+
+## Current normal runtime: mapped uncached profile
+
+`c-road-integrated-nocache-profile` and `c-road-integrated-mapped-profile`
+capture fields 100–600 on the cycle-exact 020, NoCache CUSTOM2=1, with UP
+from field 100. Both use the current `3af9c2c…87a662` normal binary. The second
+records the live `step_main` target and assembler symbols, establishing the
+slave base at $9f61d8; both raw profiles are byte-identical. No diagnostic
+per-step hashing or pacing is active.
+
+The sum of flat-PC units is 18,162,194,688; the header reports 18,189,056,512
+with a gap of 26,861,824 and 1,507 unmatched returns. Therefore use disjoint
+flat regions only; these are not inclusive routine costs.
+
+| Region | Share of recorded flat-PC units |
+| --- | ---: |
+| Fast movement/collision copy, 7,040 bytes | 12.1443% |
+| Fast world-object projection, 848 bytes | 4.1133% |
+| Fast simulation-only road geometry, 388 bytes | 3.7426% |
+| Native normal riding-pose span $8a8aa..$8a92b | 1.6184% |
+| Player road-normalization helper | 0.0809% |
+| NPC road-normalization helper | 0.2711% |
+| Required native vsync polling $aecf0..$aecf5 | 5.3482% |
+
+The two road-normalization helpers together consume only 0.3520%, making
+further local arithmetic tuning a small opportunity. The movement copy's
+hottest individual PCs include native $8cb76 (14,049 executions), $8c614
+(21,084), and $8c8be (14,049). $8cb70/$8cb76/$8cb7c are the actor-pair tail's
+three flag clears, including pairs rejected by the longitudinal-distance gate.
+They are authoritative state writes and cannot simply be omitted.
+The large native Chip costs still include blitter-stalled instructions;
+this capture does not prove those stalls removable.
+
+`c-road-collision-scratch-audit` retains a game-memory dump and disassembly
+around absolute references to two collision scratch words. $a59ca also has
+five references in native pose/render code ($89d60, $89e1a, $89f04, $89f92,
+$89fc4 are operand locations), in addition to the collision routine. Moving
+only the collision routine's references would split shared state. $8b480's
+visible native store operand is at $8ce6c; its collision-entry clear is now
+inside the Fast copy because the original entry was redirected. This scan
+covers aligned absolute longword occurrences in $80000..$bffff, not indirect
+or PC-relative aliases, and is not yet a relocation-safety proof. No runtime
+change is made from this audit. Any scratch relocation must cover both native
+and copied users and preserve the existing master-toggle/fallback behavior.
+
+## Natural damage exhaustion and restart across render cadences
+
+`c-road-natural-crash-recover` now supplies a full race from zero damage to
+native WRECKED without a damage fixture. The private joystick driver runs at
+10-field intervals, follows lane zero with deadzone 24 and prediction 1, and
+targets lane -384 after speed reaches 10,000. Each crash clears that target,
+so the rider returns to the road and accelerates again. Attacks are disabled.
+Only UP/LEFT/RIGHT change; the 352 recorded input changes are retained in
+`driven-tape.json`, SHA-256
+`89c841f2873998846cfcd265d276386987ff9c84946f9ae1d683e37f25a555b6`.
+The driver parameters and script digest are retained in `driver.json`.
+
+The existing fixed-four-field road diagnostic starts with zero damage,
+accumulates 32 through native collisions, and exits at simulation field
+23,510. There are 23,509 completed hashes and 105 sound requests. The native
+WRECKED screenshot was inspected. Finish flag/time remain zero. No debugger
+memory writes, seeded damage, forced exit flag or modified countdown is used.
+
+`c-road-natural-wreck-vary` replays exactly that tape using the existing
+2/3/4/12/16-field diagnostic. `compare_full_c.py` passes all 23,509 hashes,
+all 105 requests, capture/exit times and all six terminal state regions.
+Both terminal snapshots contain damage 32. The replay harness preserves each
+input event's exact field, collects every 500 fields, and polls for exit at
+additional 100-field boundaries. Its later final screenshot shows the native
+post-race repair screen; it does not capture the WRECKED banner itself.
+The simulation terminal snapshot and exit tick are captured by the slave,
+independently of that host polling interval.
+
+Both runs restart normally. Fixed/varying fresh capture tuples are
+(97,96,0,1)/(99,98,0,1); the 12 player history/carry bytes and all 140 actor
+carry bytes are zero in both. The fixed run records 5,879 four-field frames;
+the varying run records 1,525/555/1,044/522/522 frames at 2/3/4/12/16 fields,
+plus startup/transition bins. Diagnostic SHA-256 values are
+`6a4264b3fc9a7fb347d440a8f951eee5df9c6a0b892706b97edf74d6f5dfae41`
+and `781aebe8a8b9029af827ec7f52dacdfb0b8cdde87df13e109b92e3fb5a405bc9`.
+Both companion normal binaries match the current `3af9c2c…87a662` runtime.
+This closes the missing naturally accumulated wreck/restart coverage for
+this road model; it does not resolve B handling/distance or throughput gates.
+
+Two other ordinary-input attempts ended in arrest: target -1024 at tick
+8,454 with damage 2; earlier roadside targeting at speed 6,000 at tick 11,551
+with damage 20. Their BUSTED screenshots were inspected, and neither is
+counted as wreck coverage.
+
+A separate current normal-runtime probe, `c-road-integrated-crash-history`,
+checks a naturally occurring player crash at live field 1,028. Entry to
+`step_steering_finish` has history/carry bytes
+`00000000fffefffffffe0000`; return has twelve zero bytes, with no injected
+state. This directly verifies crash-history clearing in the production path,
+in addition to the diagnostic restart reset checks.
+
+## Reject shorter road-history arithmetic after hardware measurements
+
+Three private candidates shorten `step_road_reference`, keeping the normal
+binary at 20,256 bytes and compensating with unreachable padding after its
+unconditional return jump. The combined candidate replaces LSL.L #2 followed
+by LSR.L #8 with LSR.L #6, and replaces two word history copies with one
+longword copy. Only bits 6..21 enter the subsequent MULS.W, so discarded upper
+bits cannot change that multiplication; all 65,536 operand patterns were
+checked with upper-bit and low-bit boundary cases. The overlapping longword
+copy reads the two old history words before writing their new locations.
+
+Assembler listings confirm unchanged addresses for the player helper, actor
+helper, physics copy, auxiliary initializer and raster helper (respectively
+$21a4, $220c, $2534, $40ea, $4ddc relative to the slave). These are measured
+normal-build comparisons, not a claim that fewer instructions necessarily
+mean higher frame throughput:
+
+| Variant | Cached/default 020 | NoCache 020 | 040/25 | 060/50 |
+| --- | ---: | ---: | ---: | ---: |
+| Current integrated runtime | 12.5 | 8.3 | 19.5 | 22.9 |
+| Both changes | 12.5 | 8.3 | 19.3 | 23.0 |
+| Shift only | not measured | not measured | 19.4 | 22.9 |
+| History copy only | not measured | not measured | 19.4 | 23.0 |
+
+The combined candidate's 020 live-field distances are unchanged at 3,311,794
+and 3,301,969. Its varying-cadence diagnostic matches the current road reference
+on 1,596 common completed hashes, sound requests and six field-1457 state
+regions; both collect 282 frames. That check does not establish full-race or
+response equivalence. No further acceptance runs were justified once the
+normal 040 measurements regressed. No production code changes are selected.
+
+Private evidence: `c-road-compact-{matrix,fast-matrix,vary-state}`, and
+`c-road-{shift,history}-matrix`. Each build directory retains `source.patch`.
+Normal SHA-256 values:
+
+- Combined: `0386db5f80494ad44e4e862e4f6d4cb843a887d4c7b9f6b440f31ca96092b8f3`.
+- Shift: `f303acb1696c11f75d6732047985093aae6c8878ce6cd184f0036845abcc3a74`.
+- History: `b460ab0e144791c97286c5ccb8a42f30972e85eebc282bfff0176bfa14cf3685`.
+
+## Separate accumulated movement from live-field lag
+
+Fresh normal-runtime probes `c-road-integrated-completed-motion` and
+`c-road-integrated-completed-motion-nocache` use
+`npc_acceleration_trace_c.py`, the same field-100 throttle input, and the
+current 20,256-byte binary (SHA-256 `3af9c2c…87a662`). They stop at entry to
+`step_end`, after native movement but before the simulation-owned event/pose
+helpers. These are completed movement observations, not full-step hashes.
+The retained B reference is `b-npc-acceleration-native` (SHA-256
+`ae511e817d5f1544cade20c1d2e30dd8631ec05c3396e7625f2fbe53686fb57a`).
+
+At cursor 590, B position is 3,888,640 and C is 3,855,684. Both start at
+524,288: the accumulated distance deficit is 32,956, or 0.979565% of B's
+3,364,352. C reaches this movement boundary at live field 591 with automatic
+caches, and 592 with NoCache. The three sampled 128-byte actor records
+(player, `$a61e0`, `$a6260`) match at all 501 common cursors across the two
+current runs. The automatic-cache run also matches the preceding road
+candidate at every shared cursor. This rules out a new movement difference
+from integrating that candidate within this trace's scope.
+
+The existing A4 field-590 snapshots have positions 3,836,082 (default) and
+3,826,257 (NoCache), exactly the current traces' cursor-588 and cursor-587
+movement positions. Relative to cursor 590, those lag by another 19,602 and
+29,427 units respectively. The total deficits are therefore 52,558 (1.5622%)
+and 62,383 (1.8542%), reproducing the failing live-field measurements.
+Cache-dependent rendering/scheduling changes when movement is observable,
+without changing the sampled actor trajectory at equal simulation cursors.
+
+This is causal evidence, not a replacement acceptance test: A4 still measures
+live field 590 and still fails. It does not establish all-actor equivalence,
+B-equivalent handling, or long-race equivalence. Performance/scheduling work
+must reduce the live-field lag while preserving queued input, one-field
+simulation, native vsync and the response safeguard; the accumulated B
+trajectory difference remains a separate requirement. Do not compensate by
+retroactively applying input, scaling physics to this checkpoint, or changing
+the baseline window.
+
+## Integrate road normalization for the one-field simulation
+
+The normal enhanced runtime now enables C_ROAD_TIMING. It restores positive
+road-centre motion lost when native products round to zero at one-field
+steps, using the existing four-field reference calculation and fractional
+carry. Player history and per-actor carry remain simulation-owned; companion
+copies, reactivation, crashes and new races retain their explicit handling.
+The existing master-toggle/CPU/Fast gate owns every hook. Diagnostics retain
+explicit VERIFY_C_ROAD_TIMING selection to reproduce preceding references.
+
+`c-road-integrated-build/RoadRash.slave` is byte-identical to the validated
+road candidate: 20,256 bytes, SHA-256
+`3af9c2c9294942e3cbe4d11022431e0d2061d82cb14fef0f220572a1bb87a662`.
+Only normal-build selection and explanatory source/ReadMe text change.
+This is an incremental correctness fix, not a declaration that all B
+handling/distance comparisons now pass. The plan retains those failures and
+the measured 040/060 cost (19.5/22.9 fps versus 20.2/23.0 previously).
+
+Fresh `c-road-integrated-period{1,2,3}-state` runs each match 1,595 completed
+hashes, sound requests and six authoritative snapshot regions against the
+corrected fixed-four-field reference. Observed cadences are 1600 one-field,
+799 two-field and 533 three-field frames, excluding startup bins. The first
+omits drawing. Existing corrected fixed/varying and full finish/arrest
+comparisons retain their scopes. All normal binaries built with these
+diagnostics match the integrated normal binary.
+
+Remaining normal controls and demo checks now pass: CD32 release/pause/resume
+and stack guards, demo fire exit, and unattended timeout at active field 3598
+with native timer 3600, followed by a normal race at field 100. Combined with
+the earlier keyboard, disabled hooks, 11 hardware/two MMU and eight response
+phase checks, these validate the unchanged candidate binary being integrated.
+
+Additional transition evidence is explicitly diagnostic. Private
+VERIFY_C_NEAR_WRECK sets damage to 31 once at simulation cursor 101, below
+the native 32-point wreck threshold. It does not set a wreck/exit flag or
+shorten a timer. The ordinary recorded drive then reaches damage 33 through
+native collision and displays WRECKED. Fixed/varying runs in
+`c-raster-road-near-wreck-{fixed,vary}` match all 2,463 completed hashes,
+three sound requests, terminal regions and exit field 2464. Both restart with
+zero road history and all actor carries. The fixture is absent from the
+normal binary; its source patch is retained beside the diagnostic build.
+This proves the tested damage-exhaustion transition, not natural accumulation
+of all damage from zero over a full race. That latter coverage remains open.
+
+The left-edge drive ends at 6345 with eight damage; the right-edge drive
+finishes at 13388 with four damage. Neither supplies wreck coverage.
+The CUSTOM1=1 drive reproduces all 12,095 standard-drive hashes exactly;
+there is no demonstrated distinct-bike coverage from that attempt. No broader
+claim is inferred from the option's label. Section C remains incomplete:
+original B distance and opponent-order differences, remaining visual/handling
+acceptance and performance work are not waived by this integration.
+
+## Road correction: finish replay, full hardware matrix and disabled hooks
+
+`c-raster-road-finish-vary` matches the successful joystick-driven fixed
+reference across all 12,095 completed hashes, 66 sound requests, six terminal
+ranges and capture/timing fields. Finish is 11907 and exit is 12096.
+Both restart with all 12 player/history bytes and all 140 actor carry bytes
+zero; the varying capture is (92,91,0,1). This establishes successful-finish
+and restart invariance for the corrected model as well as the arrest
+comparison above.
+
+All 11 normal hardware configurations pass in `c-raster-road-matrix` and
+`-hardware`: A500 8.5 fps, Chip-only 020 12.5, Fast 020 default/Cache 12.5,
+NoCache 8.3, 030 default/Cache 16.7, 040 default/Cache 19.5 and 060
+default/Cache 22.9. The extra normalization work reduces 040/060 throughput
+from the current runtime's 20.2/23.0; this cost is not hidden as a performance
+win. Existing B distance failures remain. Both functional MMU cells in
+`c-raster-road-mmu` pass with CACR $80008000 and CPU data-cache emulation
+disabled; no physical hardware cache-speed claim is made.
+
+`c-raster-road-off` checks the actual normal candidate with CUSTOM2=0.
+All 21 inspected sites retain native instructions, including the four road
+hooks at $8babe, $8bcd0, $8bdf0 and $90c64. The CPU/Fast selection gate is
+unchanged. `c-raster-road-keyboard` passes release, pause/resume and stack
+guards; the active clock remains 161 throughout pause.
+
+The previously retained wreck tape does not supply wreck coverage here:
+`c-raster-road-wreck-fixed` ends at 7963 with finish zero, damage 11 and
+crash state 3, an arrest-state exit rather than damage exhaustion. It restarts
+successfully but no wreck equivalence is claimed. Two additional joystick-only
+drives, lane targets -192 and +192 with attacks enabled, are collecting
+natural high-risk riding outcomes. Neither their outcome nor any future replay
+is assumed. CD32 and demo fire-exit checks are running. Production physics
+remains unchanged while the remaining coverage is gathered.
+
+## Road correction: successful finish, reset and response safeguard
+
+The joystick-only drive `c-raster-road-driven-race` successfully finishes at
+simulation field 11907 and exits at 12096. It records 12,095 completed
+hashes and 66 sound requests; the inspected native FINISHED screen shows
+rank 2. Its recorded ten-field input tape is retained as `driven-tape.json`.
+The next race starts with capture (97,96,0,1). Direct memory inspection finds
+all 12 bytes of player road carry/history and all 140 bytes of actor road
+carries zero. This is successful-finish/restart evidence for the corrected
+model, not B handling equivalence. The identical tape's varying-cadence replay
+`c-raster-road-finish-vary` is running; no cross-cadence finish result is yet
+claimed. The retained wreck tape is also being checked under the new model.
+
+All eight fresh normal response pairs in `c-raster-road-visible` have identical
+initial snapshots. Estimates are 160/140/120/180/160/140/120/180 ms, median
+150 ms. Each meets the corresponding B limit 180/220/200/180/220/200/180/220.
+This preserves the response safeguard despite the changed motion and layout.
+
+`c-raster-road-copy` and its extended 5,000-field probe both observe one
+natural companion transfer with zero carry. It preserves the checked registers
+and expected destination carry, but does not establish nonzero carry transfer.
+The separate reactivation check above does observe a nonzero carry being
+cleared. These are distinct coverage claims; no state was injected.
+
+The road candidate's remaining hardware matrix has so far passed A500,
+Chip-only 020 and default 030. The complete matrix, varying finish and wreck
+coverage remain pending. Production physics remains unchanged. The C status
+summary in performance-plan.md is refreshed to the actual integrated runtime
+and current candidate evidence; C1–C3 and all following requirements are
+unchanged, and the original distance/opponent-order failures remain open.
+
+## Road correction: complete arrest replay and reactivation reset
+
+`c-raster-road-fixed-fullrace` and `c-raster-road-vary-fullrace` finish the
+unchanged `c-steering-finish-lane` tape with the corrected road model. Both
+now end in arrest, confirmed by the native BUSTED screen, with damage 6,
+finish flag zero, terminal crash state 3 and exit field 7085. They are not
+successful-finish coverage merely because the input tape previously finished
+under the uncorrected model.
+
+The strict full comparison passes all 7,084 completed hashes, 24 sound
+requests, six terminal regions and capture/timing fields. Both restart with
+cleared capture state: fixed (97,96,0,1), varying (95,94,0,1). Different
+live restart cursors reflect cadence; the captured previous-race marker is
+zero in both. This establishes arrest/restart invariance for the corrected
+model, while original-behaviour differences remain explicitly unresolved.
+
+`c-raster-road-reactivation` checks the actual normal road candidate. One
+natural actor reactivation carries a nonzero prior road remainder. The
+helper clears it, preserves every checked register and SR except native A4
+replacement, and resumes with A4=$a851a. No memory injection is used.
+
+Successful-finish coverage requires a tape appropriate to this corrected
+motion. `c-raster-road-driven-race` has started a joystick-only driver with
+10-field decisions, lane target 0, dead zone 24, one-sample trend prediction,
+full throttle and no attacks. Its input tape will be retained and replayed
+without adaptive decisions under varying cadence. No course, actor state,
+finish flag or timer is altered. The run also requests direct inspection of
+player/history and all 35 actor road carries after restart. Its outcome and
+that reset check are not yet claimed. The original B tape and comparison
+remain unchanged; this new tape supplies transition coverage, not a substitute
+for A4. Full normal response phases and natural carry-copy checks are also
+running. Production physics remains unchanged.
+
+## Current fixed-cadence checks and road-correction validation
+
+Fresh `c-raster-period{1,2,3,4}-state` replays use the integrated raster
+runtime with the retained attack tape. Normal binaries built alongside all
+four diagnostics are byte-identical to the integrated normal slave. Compared
+against `c-raster-recent-fallback-vary-state`, completed hashes, sound events
+and all six authoritative snapshot regions match:
+
+| Requested interval | Common completed hashes | Observed steady cadence |
+| --- | ---: | --- |
+| 1 | 1598 | 1600 one-field frames; drawing omitted |
+| 2 | 1597 | 799 two-field frames |
+| 3 | 1598 | 533 three-field frames |
+| 4 | 1595 | 399 four-field frames |
+
+Startup bins are excluded from these cadence counts. One-field cadence uses
+VERIFY_SKIP_RENDER; this is simulation equivalence, not full-draw 50 fps.
+The prior varying replay includes 2/3/4/12/16-field intervals. These results
+close the explicit short fixed-cadence evidence gap for the current runtime.
+
+Visual review of the retained field-800 screenshots from the current lap,
+B default reference and road-corrected candidate shows an important distinction:
+current C places the rider off the road; B and the road correction place it
+on the road. Road edges, scenery, rider and dashboard render coherently in
+these still images. The scenes are not pixel-identical and this review does
+not approve a new A4 reference or establish tear-free motion.
+
+The earlier operand audit proves a specific defect: unit-step positive curve
+products truncate to zero instead of returning the road centre toward the
+rider. The road correction addresses that defect, even though it does not
+close every B comparison. Continue validating it as a separate normalization
+fix rather than dismissing the proven correction solely because remaining
+opponent/distance differences persist. Those original acceptance gates remain
+open; no baseline or completion requirement is replaced.
+
+Fresh `c-raster-road-fixed-state` and `c-raster-road-vary-state` explicitly
+compile VERIFY_C_ROAD_TIMING. They match 1,595 common completed hashes,
+sound events and six authoritative regions at capture 1457. Varying cadence
+observes 2/3/4/12/16 fields (76/63/69/35/35 frames, plus startup). Both
+report the same captured position 12692524. This compares the corrected model
+against itself across rendering intervals, not against the previous model's
+expected hashes. Full-race fixed/varying replay with restart has started in
+`c-raster-road-{fixed,vary}-fullrace`; its outcome is not yet claimed.
+Production physics is unchanged while that validation proceeds.
+
+## Uncached profile and rejected normal-pose omission
+
+`c-raster-current-nocache-profile` profiles the integrated 19,700-byte normal
+runtime over exactly fields 100–600, CACR=0. Flat PC totals are
+18,162,007,936 units; the header total includes a 27,047,424-unit gap.
+The native vsync poll accounts for 5.618%, normal riding pose selection
+$8a8aa..$8a92b for 1.625% (3,958 entries), lane insertion for 0.983%
+and lane steering for 0.561%. These are flat emulator costs, not inclusive
+calls or physical hardware cycle measurements. The profile has 1,511
+unmatched returns, so inclusive attribution is not used.
+
+The highest Chip-cost PCs include native blitter-busy reads and instructions
+following blit dispatch. Their stalls cannot be treated as CPU work removed
+merely by relocating the instruction. Existing vsync and blitter waits remain.
+
+Private `c-pose-normal-skip-source` tests omission of the ordinary riding
+sprite selector at $8a8aa only while step_pose_busy is set. Attack/event
+paths before that branch remain native; rendering executes the displaced
+BCLR and continues normally. The skipped branch returns through the native
+D3 restore at $8a92c. The exact patch is in its build directory. This is an
+ownership hypothesis, not a validated equivalence claim.
+
+The 19,736-byte candidate and equal-size control have identical offsets for
+step_main, step_pose_busy, step_pose_normal_skip and raster_edge_fast,
+recorded in `c-pose-normal-skip-build/layout.json`. The control writes the
+original entry opcode instead of redirecting it. The complete two-cell
+matrices measure:
+
+| Variant | Cache fps | NoCache fps |
+| --- | ---: | ---: |
+| Simulation pose omission | 11.5 | 8.3 |
+| Equal-layout native control | 12.2 | 8.3 |
+
+No uncached gain is demonstrated and cached throughput regresses. The
+candidate SHA-256 is
+`5c4c97ff7e10b1d02c51c523ea912849dc9a83f7a0fdf7f1f62ba43a9eaa6bd1`;
+control SHA-256 is
+`29d23e13f35a068711d26770b1f88dfe6b27d6425afd3bcb14990396b917204a`.
+The independent large diagnostic in `c-pose-normal-skip-vary` fails before
+entering a race: WHDLoad reports the $a8aa patch target outside slave memory.
+The helper appended after diagnostic storage exceeds the patch target's
+signed range. The route-failure screenshot retains the exact error. No state,
+event or cadence equivalence is claimed from that run. Repairing that
+layout and performing broad validation is not justified for this slower
+candidate; it remains private. Production is unchanged.
+
+## Recheck road normalization after raster integration
+
+Fresh normal lap replays `c-raster-current-lap` and `c-raster-road-lap`
+use the unchanged field-timed tape and default Fast 020 configuration.
+The private road variant enables only the existing VERIFY_C_ROAD_TIMING
+correction on the integrated raster runtime. It is 20,256 bytes, SHA-256
+`3af9c2c9294942e3cbe4d11022431e0d2061d82cb14fef0f220572a1bb87a662`;
+`c-raster-road-build/source.patch` retains the selection change.
+
+| Normal runtime | Sampled crash | Final position | Final lateral | Displayed rank |
+| --- | ---: | ---: | ---: | ---: |
+| Retained B default reference | 1376 | 13031078 | -931 | 15 |
+| Integrated raster | 1444 | 10275100 | -1009 | 15 |
+| Raster plus road correction | 1374 | 13138349 | -901 | 15 |
+
+All have one crash, but neither C run matches B's native ahead-list order.
+For the road variant the final relevant sequence is $a63e0/$a62e0/$a6360,
+versus B's $a6360/$a62e0/$a63e0. This comparison uses native lists rather
+than the rejected stale-position sort. The road variant's final position,
+lateral and native ordering reproduce the older `c-fused-road-lap`; its
+sampled crash appears two fields earlier with the new render phase.
+`c-raster-road-lap/comparison.json` retains the explicit observations.
+
+The three-cell `c-raster-road-matrix` records 12.5 fps for default/Cache and
+8.3 fps for NoCache. Default/Cache distance is 3311794: -1.562% against
+B default and -0.615% against B Cache. NoCache distance is 3301969,
+-1.854% against B NoCache. Only the explicit Cache distance passes the
+unchanged one-percent gate. The improved trajectory therefore remains
+insufficient for integration; neither the fixed-field distance nor opponent
+order criterion is waived. Production remains at the raster integration.
+
+## Integrate Fast raster edges and responsive heading prediction
+
+The normal runtime now includes the validated raster-edge Fast RAM helper and
+recent-heading predictor with four-tick fallback on zero increments. Both are
+selected only by the existing Enhanced framerate and CPU/Fast RAM gate.
+The helper preserves the native mutable table pointer and removes only four
+redundant operations established by the earlier opcode and live differential
+audits. The predictor changes presentation only; it retains the measured
+four-field horizon bound and release/reversal guards. No frame pacing or
+simulation ownership changes are introduced.
+
+The tracked source rebuilt in `c-raster-integrated-build` is byte-identical
+to `c-raster-recent-fallback-build`: 19,700 bytes, SHA-256
+`1aec3a65bda324d18cf5b6d5e52c0a27850ffad272f5c23a263b2969b7d04ede`.
+The Makefile includes the new helper dependency. Source comments and the
+ReadMe describe the final implementation. This connects the candidate's
+normal-binary checks directly to the integrated runtime.
+
+All 11 normal hardware cells pass in `c-raster-recent-fallback-matrix` and
+`-hardware`: A500 8.5 fps, Chip-only 020 12.5, Fast 020 default/Cache 12.5,
+Fast 020 NoCache 8.3, 030 default/Cache 16.7, 040 default/Cache 20.2 and
+060 default/Cache 23.0. The preceding fused runtime measured 12.1 cached
+020, 16.6 on 030 and 19.6 on 040. The 040/060 functional MMU checks in
+`c-raster-recent-fallback-mmu` also pass with CACR $80008000. Their CPU
+data-cache emulation is disabled; these are not hardware speed claims.
+
+Strict full comparisons against `c-fused-lean-{finish,arrest,wreck}` pass:
+
+| Outcome | Completed hashes | Sound requests | Exit field | Fresh capture |
+| --- | ---: | ---: | ---: | --- |
+| Finish | 12822 | 24 | 12823 | (95,94,0,1) |
+| Arrest | 8377 | 241 | 8378 | (92,91,0,1) |
+| Wreck | 11945 | 120 | 11946 | (92,91,0,1) |
+
+All six terminal ranges, capture/timing fields and event sequences match;
+each run includes RR_RESTART=1. `c-raster-recent-fallback-demo-timeout`
+exits at field 3598 with native timer 3600 and reaches a normal race at 100.
+Together with the earlier fire-exit, keyboard/CD32, stack, master-toggle,
+short varying-cadence and eight-phase response checks, this supports the
+integration. Response estimates are 180/160/140/120/180/160/140/120 ms,
+all within B's corresponding limits, median 150 ms.
+
+C remains incomplete. The original B distance/handling and overall
+throughput requirements still need work; this change does not waive them.
+Long-run visual prediction smoothness and extreme-heading arithmetic have
+not been established by these short pose probes. Historical one-field and
+fixed-cadence checks below retain their original binary scope; the new
+candidate's explicit short replay covers varying 2/3/4/12/16-field cadence.
+
+## Fallback predictor: complete response sweep and finish/restart pass
+
+The unchanged 19,700-byte normal fallback candidate completes all eight
+fresh neutral/right response pairs in `c-raster-recent-fallback-visible`.
+Every pair verifies identical initial snapshots. The estimates for injection
+fields 300–307 are 180/160/140/120/180/160/140/120 ms, median 150 ms.
+All eight meet B's corresponding 180/220/200/180/220/200/180/220 ms limits.
+This closes the raster candidate's tested response regression; it does not
+close section C's outstanding distance, handling or throughput requirements.
+
+`c-raster-recent-fallback-finish` replays the retained finish tape with
+explicit varying render cadence and RR_RESTART=1. The strict
+`compare_full_c.py` comparison against `c-fused-lean-finish` passes all
+12,822 completed hashes, 24 sound requests, six terminal state ranges and
+capture/timing records. Finish is field 12634 and exit is field 12823.
+The new race reaches capture (95,94,0,1), with no stale terminal capture.
+Arrest/wreck and their restart checks are still being collected.
+
+The actual normal candidate also passes:
+
+- `c-raster-recent-fallback-off`: CUSTOM2=0 retains the native ten-byte
+  raster entry `2f08207affb848e75000` at $b1994.
+- `c-raster-recent-fallback-keyboard` and `-cd32`: steering release,
+  pause/resume and Fast stack guards. The active clock remains at 161
+  throughout the paused interval.
+- `c-raster-recent-fallback-demo-fire`: demo advances, exits on fire and
+  reaches a normal race at field 100.
+
+The wider hardware matrix has so far passed A500 fallback at 8.5 fps and
+Chip-only 020 fallback at 12.5 fps. Its remaining cells and demo timeout are
+still running. The earlier two Fast 020 cells remain 12.5/8.3 fps.
+No complete hardware/MMU, arrest/wreck, or long-run visual/arithmetic claim
+is made yet. Production remains unchanged pending integration checks.
+
+## Zero-change heading ticks explain the latest-tick response failures
+
+`c-recent-pose-response-stages-302` traces the unchanged latest-tick normal
+binary with input injected at field 302. Its completed heading sequence is
+0/1/3/3 at cursors 303–306. At the cursor-306 render, the latest difference
+is zero and heading 3 remains predicted heading 3, below the next visible
+sprite threshold. The continuing turn again yields zero difference at cursor
+310 (heading 9). This confirms that a single integer-heading increment is
+an unreliable motion estimate even while steering remains held.
+
+The private `c-raster-recent-fallback-source` variant uses the existing
+four-tick difference only when the latest difference is zero. Nonzero latest
+differences retain the previous experiment's extrapolation. Direction,
+release and horizon guards are unchanged. Its normal binary is 19,700 bytes,
+SHA-256 `1aec3a65bda324d18cf5b6d5e52c0a27850ffad272f5c23a263b2969b7d04ede`;
+the exact patch is in `c-raster-recent-fallback-build/source.patch`.
+
+Fresh field-302 neutral/right captures start from identical snapshots and
+first differ at field 309: 140 ms, versus 240 ms for the latest-only estimate
+and B's 200 ms. This single-phase result is not sufficient for integration;
+the completed sweep `c-raster-recent-fallback-visible` is reported above.
+
+The fallback candidate passes the 65-call release/reversal probe
+`c-raster-recent-fallback-guards` and the explicit varying-cadence replay
+`c-raster-recent-fallback-vary-state`. The latter observes 2/3/4/12/16-field
+intervals and matches all 1,595 common completed hashes, sound events and
+six authoritative snapshot ranges against `c-fused-lean-state-v2`.
+`c-raster-recent-fallback-matrix` retains 12.5 fps with Cache and 8.3 fps
+with NoCache on Fast 020; corresponding 490-field distances are 3318164
+and 3298632. The outstanding B distance/handling gates remain unchanged.
+No full hardware, full-race/restart, long-run visual smoothness or extreme
+heading arithmetic claim is made for this candidate. Production is unchanged.
+
+## Raster response trace and recent-tick prediction experiment
+
+The normal-binary traces `c-fused-response-stages` and
+`c-raster-response-stages` isolate the field-300 response regression. Both
+consume the first right input at simulation cursor 301, live field 302.
+The fused runtime renders at cursor 303 with heading 3 and predicted heading
+5; the raster candidate renders earlier, at cursor 302 with heading 1 and
+predicted heading 1. Its four-tick average truncates the onset prediction.
+The difference is visible-pose selection, not delayed input consumption.
+These are breakpoint observations of the unchanged normal binaries.
+
+The private `c-raster-recent-pose-source` experiment replaces the four-tick
+heading difference with four times the latest completed tick's difference,
+retaining the existing prediction division, measured horizon and direction
+checks. It does not change authoritative heading. The normal binary is
+19,684 bytes, SHA-256
+`4cdac11ec9c056edd9f2635eb5e9a366c22a476a15dcbb647bd702072ffe7bf3`;
+its source patch is retained in `c-raster-recent-pose-build/source.patch`.
+
+Fresh neutral/right field-300 captures have identical initial snapshots and
+first differ at field 306 (120 ms upper estimate). The stage trace
+`c-recent-pose-response-stages` confirms cursor-302 heading 1 now predicts 4.
+This improves the failed raster phase from 200 ms, versus B's 180 ms.
+The completed eight-phase sweep `c-raster-recent-pose-visible` measures
+120/180/240/140/120/180/240/140 ms (median 160 ms). Phases 302 and 306
+both take 240 ms, worse than B's 200 and 180 ms respectively. The
+latest-tick-only candidate is rejected despite its improved median.
+
+`c-raster-recent-pose-guards` checks 63 player-pose calls across steering,
+release at field 310 and reversal at 320. Simulation calls and guarded
+presentation calls retain authoritative heading; the observed horizon is
+three fields, within the existing four-field bound. This short probe does
+not establish long-run visual smoothness or extreme-heading arithmetic.
+
+`c-raster-recent-pose-vary-state` uses explicit period and pattern defines
+and observes 2/3/4/12/16-field presentation intervals. It matches all 1,595
+common completed hashes, sound events and six authoritative snapshot ranges
+against `c-fused-lean-state-v2`. These checks establish short replay isolation,
+not full-race, restart or hardware equivalence for this new predictor.
+The production source remains unchanged. Section C remains incomplete.
+
+## Raster-edge candidate: full-race state matches, response gate fails
+
+`c-raster-edge-finish`, `-arrest` and `-wreck` replay the retained
+`c-steering-finish-lane`, `c-steering-finish-drive` and
+`c-steering-quarter-fullrace` field-input tapes with varying render intervals.
+The full diagnostic uses STEP_HASH_RING and STEP_CAPTURE_END. Comparisons
+against the corresponding fused-runtime references pass:
+
+| Outcome | Completed hashes | Sound requests | Finish field | Exit field |
+| --- | ---: | ---: | ---: | ---: |
+| Finish | 12822 | 24 | 12634 | 12823 |
+| Arrest | 8377 | 241 | 0 | 8378 |
+| Wreck | 11945 | 120 | 0 | 11946 |
+
+Every hash, sound request, capture record and all six authoritative terminal
+memory ranges match. These runs omitted RR_RESTART: they validate the full
+race and terminal outcome, not the subsequent restart. The original full
+comparison script correctly fails on the missing next_race field after its
+terminal checks. `compare_terminal_c.py` records the narrower evidence with
+`restart_tested: false`; the strict full comparison is unchanged. No restart
+coverage is claimed from these runs.
+
+The normal candidate's eight-phase visible-response test is retained in
+`c-raster-edge-visible`. Each phase uses fresh neutral/right runs and verifies
+identical initial snapshots. The completed estimates are
+200/180/160/140/200/180/160/140 ms, median 170 ms (the same median as the
+integrated fused runtime). Seven phases meet or beat B; field 300 is the
+sole B regression. Field-300 input first changes the captured road/
+rider region at field 310 (200 ms upper estimate), versus field 309 (180 ms)
+in `b-visible-phases`. The integrated fused runtime previously responds at
+307 (140 ms) for this phase. This candidate therefore fails the current
+per-phase B response safeguard despite its modest throughput gain and exact
+simulation outputs. It is not promoted. Further normal controls/demo and
+restart integration checks are not started for this failed candidate.
+
+## Raster-edge candidate: hardware, cadence and image validation
+
+The unchanged normal raster-edge candidate passes all 11 hardware cells in
+`c-raster-edge-built-matrix` and `c-raster-edge-hardware`. Results are:
+
+| Normal configuration | fps |
+| --- | ---: |
+| A500 fallback | 8.5 |
+| 020 without Fast RAM fallback | 12.5 |
+| Fast 020 default / Cache | 12.5 / 12.5 |
+| Fast 020 NoCache | 8.3 |
+| 030 default / Cache | 16.7 / 16.7 |
+| 040 default / Cache | 19.9 / 19.9 |
+| 060 default / Cache | 23.0 / 23.0 |
+
+The 040/060 functional MMU cells in `c-raster-edge-mmu` also pass, both
+recording CACR $80008000. Their emulator configuration disables CPU data-cache
+emulation, so these runs provide no physical MMU/cached throughput claim.
+These checks do not close the existing live-field B distance failures.
+
+The diagnostic source places the edge helper before simulation storage to
+keep the signed patch reference in range; normal builds retain its original
+location and are byte-identical to the tested 19672-byte candidate. The
+assembled-instruction audit checks 105 retained instructions, including all
+27 internal branch destinations. Apart from the absolute $b1950 pointer read
+and those relocated branch operands, retained instruction bytes match native
+code exactly; only the four documented redundant instructions are omitted.
+The audit is retained in `c-raster-edge-build/opcode-audit.json`.
+
+`c-raster-edge-fixed-state`, `-period1-state`, `-period2-state` and
+`-period3-state` each match the accepted `c-fused-lean-state-v2` reference for
+1595 common completed hashes, all sound requests and all six authoritative
+snapshot ranges at cursor 1457 on the seeded attack tape. Their histograms
+record 399 four-field, 1600 one-field, 799 two-field and 533 three-field
+intervals respectively, plus startup intervals. One-field coverage skips
+drawing; two-/three-/four-field runs render normally. The final image in each
+of these four tests is pixel-identical to its corresponding fused-runtime
+reference at the same cadence.
+
+The first intended varying test (`c-raster-edge-vary-state`) omitted
+VERIFY_FRAME_PERIOD, so VERIFY_FRAME_PATTERN was inactive and the actual
+histogram shows two-field rendering. It is retained as an extra uncapped
+functional comparison, not claimed as varying-cadence coverage. The corrected
+`c-raster-edge-pattern-state` enables both defines and records 81/59/70/35/35
+intervals of 2/3/4/12/16 fields, plus startup. It also matches all 1595 hashes,
+sound requests and six authoritative ranges. No cross-cadence pixel identity
+is claimed for that run. `compare_raster_edge_c.py` retains the comparisons.
+
+`c-raster-edge-off` boots the actual normal candidate with CUSTOM2=0 and
+confirms all ten native bytes at $b1994 remain unchanged.
+
+The candidate remains private. Full finish/arrest/wreck and restart coverage,
+normal input-response/controls/transitions, and final integration checks still
+need to pass before promotion. The B handling/distance requirements remain
+open independently of this rendering change.
+
+## Fast raster-edge candidate: small cached gain and live differential audit
+
+The current fused-runtime profile attributes 4.4511% of recorded flat units
+to $b1994..$b1ab7, with 15900 calls. This edge-word routine builds D0/D2/D4/D6
+from two repeated background words and selected road/stripe masks. The two
+word reads separated by SWAP are required to replicate each 16-bit value;
+they are not simply duplicate loads that can be deleted.
+
+Private `c-raster-edge-source` moves this routine into the selected Fast RAM
+slave hunk. The sole PC-relative data access becomes an absolute read of the
+same mutable pointer at $b1950; all internal branches target copied labels.
+It removes the initial clears of D0/D2 (both halves are overwritten by their
+word/SWAP/word sequence) and the ANDs of already-zero D4/D6. It retains all
+conditional flag reads, mask ORs, output registers and register restoration.
+The new $b1994 entry is patched only inside the existing C enhancement gate.
+
+The matching control retains the identical helper and code layout but writes
+the original entry word instead of installing the jump. Both normal binaries
+are 19672 bytes. Cached 020 results are candidate 12.5 fps versus control
+12.4; both report distance 3318164. Uncached results are 8.3 fps for each,
+with distances 3298632/3308406 respectively. All four functional cells pass.
+The small cached gain is not evidence of a general hardware improvement.
+The earlier `c-raster-edge-matrix` attempt failed before emulator execution
+because the generated assembly had syntax errors; only the successfully built
+`c-raster-edge-built-matrix` and control matrix provide timing evidence.
+
+`c-raster-edge-audit-source` adds a private differential wrapper: capture all
+15 data/address registers, run the native routine via a displaced-entry stub,
+restore the same inputs, run the optimized helper, then compare all output
+registers and the five condition bits. Both routines only read their native
+data and write their own stack, so the first invocation does not alter inputs
+to the second. The wrapper returns the optimized result and counts mismatches.
+The unchanged field-scheduled handling tape in `c-raster-edge-audit-lap`
+executes 40953 comparisons with zero mismatches through field 1600. This checks
+live edge outputs, not the instrumented run's speed or B handling equivalence.
+It is not exhaustive input coverage or a complete pixel/cadence release audit.
+
+Exact source deltas are retained in the three build directories. Normal
+candidate SHA-256 is
+`4d7ff898b451d6c64785b9524059a6b5b317ee66a92ab76b036faf82e13362a2`,
+control is `330a480a8b6da1ecd10442fcc92e57915d758aae24cc6c7c1e19a288f907f563`,
+and the differential binary is
+`6310743844f8339133e5dea5a01ea9e0311e40ac784566077ca57e61fda0e045`.
+The candidate remains private pending broader hardware, cadence, rendering
+and regression validation. C's existing handling/distance failures are not
+resolved by this rendering optimization.
+
+## Fused-runtime profile and projection register-save experiment
+
+`c-fused-current-profile` measures the actual integrated 19376-byte normal
+runtime on cycle-exact cached Fast 020 over live fields 100..600. The flat-PC
+rows total 18162107392 units; the header reports 18189063168 including a
+26955392-unit gap. These are emulator profiling units, not physical CPU-cycle
+claims. The native vsync poll at $aecf0 alone accounts for 7.318% of recorded
+flat cost; required hardware waits are not removable CPU calculations.
+
+The $b10d0..$b1baf raster region accounts for 22.806% of recorded units (including
+its waits), actor pose $8a83c..$8af75 for 2.416%, lane scan $8d966..$8d9e1 for
+1.545%, and sprite/blitter region $b3d00..$b3f3f for 8.038%. The largest individual
+sprite-region costs are blitter-status reads. The profile and explicit region
+bounds are retained in `remaining-regions.json`; no inclusive cost or guaranteed
+saving is inferred from these flat totals.
+
+The sprite projection routine $8a716..$8a83b accounts for 0.7094%, with 968
+entries. Its native save/restore covers D0-D7/A0-A6, but static inspection of
+the entire routine finds writes only to D0-D5/A2, no callees, and no internal
+stack-relative accesses. A private experiment changes only the MOVEM masks at
+$8a718/$8a838 to $fc20/$043f inside the selected C patch list. It retains the
+same arithmetic, branches, memory writes and final condition-code behavior.
+The matching control writes the original $fffe/$7fff masks in the same list;
+both normal binaries are 19388 bytes and differ in exactly those four bytes.
+
+`c-projection-registers-matrix` and `c-projection-registers-control-matrix`
+complete both functional cells: each measures 12.2 fps with Cache and 8.3 with
+NoCache. All four distance observations are 3308406. There is no demonstrated
+throughput improvement, so the mask reduction is not promoted and no broader
+semantic/release validation is claimed. The source patches, exact binaries and
+matrix provenance remain in the corresponding private build/run directories.
+The candidate SHA-256 is
+`6a05cd3195dc8a9e44d8c5da8129d90199d2b9c61004112b336fb9197bae5f00`;
+the control is
+`b267cc162ac499ccc9de0cc6503f24f8d5592755cd9d41c604980dc1e8e7c2a6`.
+
+The fresh profile points back to substantial raster/blitter work, rather than
+further isolated register-save changes, for meaningful throughput gains.
+Simulation/handling acceptance remains a separate open requirement.
+
+## Player exposure decomposition and isolated displacement correction
+
+`player_exposure_c.py` decodes the player from the retained fresh NPC motion
+traces, stopping at cursor 500 and asserting normal riding flags. It counts
+actual applied throttle deltas rather than treating a native cursor stamp as
+elapsed throttle time. At cursor 102, B has already applied four fields of
+throttle (speed 136), while C has applied two (68). C reaches speed 136 at
+cursor 104. B applies the newly read input across its whole preceding delta;
+C consumes historical field inputs and first applies throttle at cursor 101.
+The first-shift samples are B cursor 262, speed 5544; C cursor 260, speed 5432.
+
+At the first NPC dispatch threshold, cursor 322, B/C player speeds are
+7104/7044 with 224/222 applied throttle fields. Matching exposure at C cursor
+324 gives speed 7096: 52 of the 60-unit same-cursor gap is the two-field input
+exposure difference, and eight units remain from discrete gear selection.
+At 400 applied throttle fields B/C speeds are 10384/10373. The corresponding
+positions differ by 17387 units, versus 38117 at common cursor 498.
+`player-exposure.json` beside the C trace retains all paired observations.
+Equal exposure is a causal comparison, not a replacement for the live-field
+acceptance gate. No retroactive throttle or additional input delay is added.
+
+A private `c-player-motion-source` experiment isolates the previously tested
+four-field endpoint displacement correction to the player. It retains the
+road-only correction and all fused-runtime optimizations; NPCs use ordinary
+new-speed-times-delta displacement. The helper checks A1 against $a5d60 before
+applying `max(0, new_speed + floor(3*new_speed/2) - floor(3*old_speed/2))`.
+There are no acceleration, gear-threshold or AI changes. The normal binary is
+20044 bytes, SHA-256
+`ced019f287d919dc3a3604a75b9deeaf5c4858ec500c548b51c3efb25653da58`;
+`c-player-motion-build/source.patch` preserves the complete source difference.
+
+`c-player-motion-arithmetic` validates 402 adjacent intervals through cursor
+500 for each of player/$a61e0/$a6260. Player displacement matches the endpoint
+formula; both NPC displacements match speed times delta. All three position
+increments match their stored displacement. This confirms the intended scope
+of the experiment rather than relying only on the source guard.
+
+The complete unchanged input tape in `c-player-motion-lap` crashes at field
+1572, compared with 1376 in both B and the road-only candidate. It ends at
+displayed rank 15 with one crash, but clearly fails the handling comparison.
+Thus the earlier all-actor endpoint candidate's failure was not solely caused
+by applying that correction to NPCs. This isolated candidate is rejected and
+remains private; no broad performance/cadence matrix or runtime promotion is
+justified. C's handling, distance and performance requirements remain open.
+
+## First NPC braking difference follows the player-speed dispatch threshold
+
+`b-npc-brake-branch` and `c-road-npc-brake-branch` retain the same binaries,
+cache policies and field-100 throttle input as the preceding acceleration
+traces. Breakpoints cover both native and relocated equivalents of dispatch
+$8d3d6, pursuit entry $8d586, the actor threshold comparison $8d59e,
+relative-speed test $8d5c0, speed-limit-helper return $8d62a and brake writer
+$8d630. The trace stops at the race-loop entry after live field 332. It
+records 18 B and 45 C observations without modifying game state.
+
+All six B and 21 C dispatch observations retain actor state bytes $74/$75
+as $08/$00 and stored speed threshold $66 as 7100. The selected target is
+$8d40a while player speed is below that threshold, then $903f2 once it is
+reached. Native dispatch compares the actor's $66 threshold against player
+speed at $8d3aa..$8d3b4 before considering the alternate function slot.
+B changes target at cursor 322 (player speed 7104, previous observation 7000
+at 318). C changes at 325 (7122, previous observation 7096 at 324).
+This is the same threshold, reached at different simulation times; actor
+initial traits and the dispatch state bytes have not changed.
+
+For both first braking decisions, the observed path after dispatch is
+$8d586 -> $8d59e -> $8d5c0 -> $8d630. At $8d5c0 the rival is ahead and
+faster: B position gap 686271 and relative speed 1311, C gap 724756 and
+relative speed 1393. These independently decoded actor differences match
+D7 and the low word of D6 exactly. The nonnegative relative-speed branch at
+$8d5c2 goes directly to braking. Neither first decision reaches the curve
+speed-limit return at $8d62a. The private comparison JSON asserts the
+observed paths, dispatch choices, state bytes and register arithmetic.
+
+Thus this first braking mismatch is downstream of player speed/gear timing
+and differing positions, rather than a missing elapsed-time multiplier in
+the brake branch. Adding an AI delay or changing the shared 7100 threshold
+would mask that dependency. This closes the specific first-brake branch
+question raised below, not all later AI/lateral differences. The next useful
+handling experiment should address the player integration discrepancy while
+preserving immediate field input and the 50 Hz simulation; no production
+AI patch is justified by this trace. C remains incomplete.
+
+## Early rival lead reverses through different acceleration decisions
+
+`b-npc-acceleration-native` and `c-road-npc-acceleration-native` extend the
+unmodified-binary motion trace through simulation cursor 599 (B's last row
+is 602). Both apply throttle at live field 100 through the standard route;
+there are no steering inputs before this trace ends. They observe the same
+post-motion/pre-pose boundary as the startup trace. The B binary/cache policy
+and road-only C candidate are unchanged. These are not complete-step hashes.
+
+`compare_npc_acceleration_c.py` verifies 125 adjacent B intervals and 501 C
+intervals for each of riders $a61e0 and $a6260. Every speed is exactly
+`max(0, previous_speed + previous_acceleration * delta)`. Every position
+increment is exactly new speed times delta. There are no unexplained speed
+writes or position corrections in these intervals. Acceleration selection,
+rather than arithmetic application, differs between the paths.
+
+Both rivals are 3471 position units ahead of B at common cursor 102. Rider
+$a61e0 first falls behind at common cursor 442 (-178); rider $a6260 does so at
+550 (-118). At cursor 598 their respective differences are -12925 and -4606.
+The first rider starts braking at B/C cursors 426/419 and resumes throttle at
+458/449. The second starts braking at 322/325 and resumes at 342/346. Both use
+acceleration -69 while braking; subsequent coasting uses -5, with distinct
+throttle/coast transition sequences. Full acceleration-change lists and the
+common-boundary comparisons are retained beside the C trace.
+
+Fresh natural flag watchpoints in `b-npc-first-brake` and
+`c-road-npc-first-brake` cover fields 310..350 for $a6260. Both set brake at
+$8d630, clear throttle at $8d636, later restore throttle/clear brake at
+$8d612/$8d618, and then clear throttle through the native $8d5f2 coast branch.
+The first braking observations are:
+
+| Quantity | B, cursor 322 | C, cursor 325 |
+| --- | ---: | ---: |
+| Rival position | 2061375 | 2095806 |
+| Player position | 1375104 | 1371050 |
+| Rival speed | 8415 | 8515 |
+| Player speed | 7104 | 7122 |
+| Rival stored speed threshold ($66) | 7100 | 7100 |
+
+The observations confirm the same native flag writer and differing live
+inputs. A watchpoint after the write does not identify which preceding branch
+reached it, so this is not proof of a particular threshold test or a missing
+per-call scale factor. The remaining causal check is the decision path into
+that writer, including its actor dispatch state and speed-limit helper.
+No arbitrary acceleration correction, fixed AI cadence or added input delay
+is introduced. The evidence narrows the investigation without closing B's
+handling/distance acceptance or C's performance requirement.
+
+## Starter release matches; first NPC acceleration differs by update cadence
+
+The one-time `$8f57a` capture in `b-release-observation` and
+`c-release-observation` records the first racing enable at simulation cursor
+41 in both runs (live fields 41 and 43, delta 4 and 1). Each captures the
+player and riders $a61e0/$a6260 before replaying the displaced enable write.
+The source patches and binaries remain in `b/c-release-capture-build`.
+
+The follow-up `b-early-motion-native` / `c-road-early-motion-native` traces
+use the unmodified retained B handling binary and road-only C candidate.
+They route only to the early race entry, without settling to field 100, then
+observe `$8f57a` and the post-motion boundary (native $875b6 in B; the patched
+step-end destination in C). C's boundary precedes its additional pose/camera
+work. No throttle is applied. These are early motion observations, not full
+completed-step state hashes or a throughput measurement.
+
+Both unmodified runs confirm cursor 41 for the first inactive-to-active write.
+All three complete 128-byte actor records are identical at that boundary.
+The later visits to the enable instruction, B cursor 70 and C 73, already have
+$a59d4=1; they are starter animation repetitions, not a second race start.
+Thus the earlier post-priming countdown difference does not establish a
+three-tick race-start error and does not justify a compensating starter patch.
+
+`compare_early_motion_c.py` checks every active motion row up to cursor 100:
+14 B rows (through 98, cumulative delta 57) and 59 C rows (through 100,
+cumulative delta 59). For both rivals, every speed equals previous speed plus
+previous acceleration times the current delta, and every position increment
+equals the new speed times delta. The first active call sets acceleration to
+39 while speed remains zero: B cursor 45, C cursor 42. Subsequent calls retain
+that acceleration. This produces an initial three-tick speed advantage for C,
+not a different acceleration constant or missing arithmetic operation.
+
+At the 14 common cursors, C's speed is 117 higher except cursor 54 (156).
+B's cursor 54 consumes delta 4 and cursor 58 consumes delta 5, accounting for
+that temporary difference. At cursor 98 the rivals' speeds are B 2067/C 2184,
+and C is 3237 position units ahead. The same differences apply to both rivals;
+the unthrottled player remains stationary. Exact comparisons are retained in
+`c-road-early-motion-native/comparison.json`; B's final cursor-102 row is
+excluded from the pre-field-100 scope.
+
+This isolates an early cadence effect but does not explain the later reversal
+of the rival's longitudinal difference or its lateral/contact divergence.
+It supplies no basis for adding startup input delay or changing acceleration
+constants. No production change is promoted; B handling/distance and overall
+throughput acceptance remain open.
+
+## Startup actor state matches; priming leaves a countdown difference
+
+The first `b-first-simulation-state` / `c-road-first-simulation-state`
+attempts installed an entry breakpoint while routing with `monitor fields`.
+Neither captured that entry before the 10,000-field route bound; both exit as
+failed observation setups and provide no starting-state evidence.
+
+The replacement private diagnostics copy state before the first native priming
+call at $86616 and, in a second build, after the fourth call at $8667a. They
+save registers, copy $a5900..$a873f and the additive RNG table/cursors to slave
+storage once, then replay the displaced instruction. The normal field-driven
+menu route is unchanged; snapshots are read back at field 100. No debugger
+memory injection is used. Source deltas and exact binaries are retained in
+`b/c-startup-observe-build` and `b/c-priming-observe-build`.
+
+The B source reconstruction first matches the final B build. The retained
+handling replay binary predates its four-byte explicit CCR clear in
+`field_animation`; removing only that instruction produces a byte-identical
+2,472-byte match to `b-final-replay-on/tested.slave` before adding observation.
+The C base is the exact current road-only private candidate.
+
+`b-startup-observation` / `c-startup-observation` capture field/cursor/delta
+1/1/1. All 11,840 bytes of game state, including all 35 actor records (4,480
+bytes), are identical, as are all 136 additive RNG bytes. This rules out
+different actor initialization or initial traits in these instrumented runs.
+
+`b-priming-observation` / `c-priming-observation` still capture field/cursor/
+delta 1/1/1 after the four setup calls. All actor records and additive RNG
+bytes remain identical. Player position/speed/x are 524288/0/160; riders
+$a61e0 and $a6260 are 524288/0/32 and 720896/0/160 respectively. The wider
+state region differs in 38 bytes: the clock subcounter at $a5d59 (B 0/C 1),
+the starter countdown at $a6ee1 (B 5/C 8), and projected-object records in
+$a7c5f..$a7cef. Exact byte comparisons are retained beside the snapshots.
+
+Native $8f552..$8f59c maintains the starter sequence using $a6ee0/$a6ee1;
+its helper subtracts delta from the remaining count at $8f5a6. Sequence
+completion sets $a59d4, enabling racing. Thus the three-count difference is
+not a friction coefficient or an actor-trait difference. C performs one
+elapsed-time update while B invokes the native initialization simulation four
+times at the same race field. The actor snapshots do not establish that their
+later race activation times match. The next check is the actual $a59d4 release
+boundary and its contribution to pre-input NPC motion, before changing either
+the startup sequence or active 50 Hz timing. No production patch is promoted
+from this observation alone.
+
+## Early NPC divergence is not increased additive-RNG consumption
+
+`early_rng_c.py` observes every entry to the additive generator at $900ce,
+without filtering by current A1 or caller. Both runs start at live field 100,
+apply the original throttle input and stop at race-loop entry after field 580;
+there are no other lap inputs in that interval. B uses its retained default
+cache-policy reference, while C uses the current road-only candidate with Cache.
+
+`b-early-rng-calls` and `c-road-early-rng-calls` both record zero calls.
+Their 136-byte additive table/cursor snapshots at $90000..$90087 are identical,
+SHA-256 `4380ceb485be5237f57dba2199ac7b46029654486c87c577a94cf7fe5d521786`.
+The comparison is retained in `c-road-early-rng-calls/comparison.json`.
+Thus neither a different initial additive-generator state nor increased calls
+to this generator explains the previously measured early NPC lateral divergence
+around fields 400..500. In particular, the random approach branch at $9058a
+uses this generator and is not being rolled four times as frequently here.
+
+Live disassembly is retained in each run's `rng-code.txt`. The nearby $90180
+routine called by the race loop is a capped player counter update using delta,
+not the generator at $90160 (whose call at $9017e lies before that entry).
+This distinction prevents treating the once-per-simulation $90180 call as an
+extra random draw. No random-call throttle or probability adjustment is added.
+This evidence covers the observed generator/window only, not later spawning,
+all initial rider traits or every random routine in the game.
+
+## Missing NPC contacts are preceded by lateral separation
+
+`npc_pair_bounds_c.py` observes riders $a61e0/$a6260 in either orientation
+between live fields 1050 and 1100, retaining native and relocated breakpoint
+addresses. It checks both lateral-bound branches and the contact-marking
+instruction, rather than assuming every caller enters through the relocated
+routine. Original lap inputs through field 820 are retained; no input changes
+inside this observation window.
+
+`b-npc-pair-bounds` records body-bound checks and subsequent contact marking
+at cursors 1077 and 1097. Relative lateral separations are 19/18 units against
+combined half-widths 25, giving overlaps 6/7. Neither actor has attack reach.
+Their longitudinal gaps are -24,528 / -20,706. The first pair's world x values
+are 2/40. This corroborates the earlier natural collision-flag writes.
+
+`c-npc-pair-bounds` records 50 body-bound checks at completed cursors
+1048..1097, including initial catch-up. The body overlap expression stays
+negative, from -74 to -103, and no contact marking occurs. Initial world x
+values are -159/-64; by cursor 1097 they are -187/-64. Longitudinal spacing
+remains comparable (-21,159 initially, -22,456 at 1097), but the lateral
+separation excludes the contact before response. Changing response impulses
+cannot restore these missing collisions. Operand comparisons are retained in
+`c-road-npc-lateral-pair-bounds/comparison.json`.
+
+To isolate the previously measured negative NPC rounding bias, private
+`c-road-npc-lateral-source` adds the retained four-field-reference fractional
+lateral helper to the current road-only candidate. It preserves companion
+carry transfer, clears carry for non-riding/inactive actors and reactivation,
+and resets all 35 slots at race initialization. It does not include reference-
+endpoint longitudinal motion or the rejected brake-release change. The helper
+and its lifecycle code are unchanged from the earlier NPC-lifecycle experiment;
+this tests their composition without those other motion changes.
+
+The 20,316-byte candidate SHA-256 is
+`5bf0ae7abf5a05e601dd17cdc44bf2a4190a74d86566b4c1b2bf362a04cb643c`;
+its build directory retains the exact source delta. The complete original lap
+in `c-road-npc-lateral-lap` now crashes at sampled field 1546, versus B and the
+road-only candidate's 1376. It finishes with displayed/reconstructed rank 15
+and one crash, but does not restore handling. The corresponding pair probe
+observes no lateral-bound or contact-marking entries in the window; this does
+not identify which earlier rejection excluded the pair. No performance or
+release matrix is warranted for this failed handling candidate. It remains
+private; preserving fractional lateral motion alone is insufficient to recover
+B's opponent trajectories and contacts.
+
+## Completed passing gap and retained NPC brake bit
+
+`b-road-passing-boundaries` and `c-road-passing-boundaries` replay the lap
+through the field-1100 right input, then stop at completed simulation returns. The B run records nine boundaries
+(1101..1141) and C records 41 (1098..1138). The eight common cursors end at
+1136, before the next input transition; B's trailing 1141 row is outside that
+shared comparison and does not include the scheduled 1140 input. At cursor 1101,
+B/C gaps to rider $a6260 are 6398/29602; C's player is 45,869 position units
+behind B and its rival is 22,665 behind. At cursor 1111 B has passed that rider
+(gap -1517), while C has not (19427). C has still not passed by cursor 1138.
+This establishes a real completed-state difference, not just the previously
+observed mid-update rank sample. The comparison is retained in
+`c-road-passing-boundaries/comparison.json`.
+
+Native B's cursor stamps and consumed deltas are not interchangeable: over
+the eight adjacent records its cursor advances 40 fields while summed delta
+is 39; C advances and consumes 40. All C position increments equal the stored
+displacement for player/$a61e0/$a6260. In B, the sole exception in those records
+is $a6260 at cursor 1131: position moves 44,563 despite stored displacement
+50,405. Later contact side effects must not be misclassified as integration
+rounding. The player velocities at common cursors are close (for example
+10476/10435 at 1111), while rival acceleration decisions differ.
+
+Natural flag watchpoints in `b-road-brake-writes` and `c-road-brake-writes`
+cover fields 1050..1100. B marks $a6260 for collision at cursors 1077 and 1097
+from a routine whose A1 is $a61e0. C instead sets the rival's brake flag at
+cursor 1079 through $8d630. Native disassembly in `native-avoidance-audit`
+shows that the coast path at $8d5f2/$8d5f8 clears throttle bit 1 twice; it does
+not clear brake bit 2. The relative-speed/time-to-catch arithmetic in this
+branch has no frame-delta multiplier to normalize.
+
+`c-road-coast-original-probe` observes that naturally braking rival reach the
+second clear at cursor 1080: bytes `08a900010068` leave flags $44 unchanged.
+The private `c-road-coast-source` changes the immediate operand to bit 2 only
+inside the enhanced patch list, before the auxiliary copy is initialized.
+`c-road-coast-fixed-probe` observes bytes `08a900020068` at cursor 1091 and
+verifies flags $44 become $40 after that instruction. These are natural-state
+single-instruction checks; no debugger memory seeding is used. Their different
+first-hit times reflect the candidate's already changed gameplay.
+
+The 19,936-byte candidate is SHA-256
+`788a6644abf380d55015e7a35c3bf1e660a7d9bd666814ecba0fc64a04562de8`.
+`c-road-coast-lap` moves sampled crash onset to 1324, versus 1376 for both B
+and the unmodified road candidate, although final displayed rank remains 15.
+Clearing the retained brake globally therefore does not satisfy compatibility.
+The candidate and source delta remain private; no runtime change or broad
+validation is claimed. The NPC speed difference includes native contact and
+brake-retention behavior, not merely a missing elapsed-time factor.
+
+## Isolated road correction on the fused runtime
+
+`c-fused-road-source` enables only the retained `VERIFY_C_ROAD_TIMING`
+correction on the current normal runtime, including companion carry transfer,
+crash reset and reactivation reset. It does not add reference-endpoint motion
+or the private NPC lateral correction. The 19,928-byte normal candidate has
+SHA-256 `da47633f48e41ad51d1257c6773e1cf7c0fcbf05420349c78ac08fab13e4a485`;
+`c-fused-road-build/source.patch` retains the exact selection change.
+
+`c-fused-road-matrix` passes the three 020 functional checks but fails the
+same-cell B distance gate: default/Cache measure 12.2 fps and distance
+3,321,603 (-1.271% / -0.321% respectively); NoCache measures 8.3 fps and
+3,311,794 (-1.562%). The B default/NoCache reference is 3,364,352; explicit
+Cache uses 3,332,298. This remains an experimental candidate.
+
+`c-fused-road-lap` samples its first crash at field 1376, now matching B,
+and finishes with displayed/native reconstructed rank 15 and one crash.
+By comparison, the combined endpoint-motion candidate crashes at 1538.
+The fresh `b-fused-road-default-reference-lap` uses the retained B binary and
+its recorded `CUSTOM2=3` default cache policy. All 751 shared state hashes,
+positions, speeds, lateral positions and crash states reproduce
+`b-reference-lateral`. The initial `b-fused-road-reference-lap` mistakenly
+specified Cache and crashes at 1062; it is retained as a different configuration,
+not substituted for the established default-policy handling reference.
+
+Corrected native-rank observations still differ at 128 sampled fields between
+1112 and 1534. At the first difference, B has passed rider $a6260 (gap -1517)
+while C still trails it (gap +19427). Both have the same nine inactive riders
+ahead, so this early rank difference is not caused by the old stale-position
+sort. These are live-field samples, potentially inside a simulation step;
+a boundary trace is needed before attributing the gap to a particular update.
+At field 1600 both show rank 15, but their ahead lists exchange $a6360 and
+$a63e0 around $a62e0. Final displayed rank alone does not establish full order.
+
+All eleven scheduled PNGs differ. Visual inspection at field 1360 shows the
+same pre-crash off-road/skidding situation, but different road and scenery
+positions. At crash onset B/C speeds are 9878/10314. State 1 begins at sampled
+fields 1398/1396; at field 1600 B has entered state 2 while C remains in state 1.
+No crash-duration correction is justified by these observations alone because
+entry velocities and trajectories differ. The comparison is retained in
+`c-fused-road-lap/comparison.json`. Distance, complete handling/order and scene
+acceptance remain open; matching crash onset does not authorize promotion.
+
+## Native gear arithmetic accounts for the pre-terrain speed differences
+
+Fresh disabled-enhancement reads in `native-gear-audit`, `native-gear-tables`
+and `native-gear-parameters` retain native disassembly and the selected bike's
+parameter table. The initial broad audit's `gear.txt` at $8da5c is actually
+lane registration; the actual gear/acceleration routine is $8dd66..$8de6a.
+The selected bike 0 points to $a5924. Its six acceleration rates are
+34, 26, 21, 18, 16 and 14. The nominal upshift thresholds are 4700, 6200,
+7800, 9200, 10400 and 12000; lower thresholds are 0, 5400, 7100, 8400,
+9700 and 10800.
+
+At $8ddcc the routine can upshift, then immediately undo that shift at $8dde0
+when speed is below the new gear's lower threshold. For example, the first
+persistent shift requires pre-update speed at least 5400, despite the nominal
+4700 threshold. It selects acceleration using this resulting gear before the
+movement loop multiplies that acceleration by delta at $8b4be. No additional
+per-call velocity increment was found in this normal riding path.
+
+`tools/check_gear_arithmetic_c.py` reconstructs those instructions using the
+captured table and independently verifies 99 adjacent B steps (cursors 106..498)
+and 402 C steps (99..500) from `b-default-distance-dynamics` and
+`c-aux-distance-dynamics`. Every resulting gear, acceleration, speed,
+displacement and position increment matches exactly. The check asserts normal
+riding flags and stops before terrain drag; it does not claim crash, braking,
+sliding or NPC coverage. Results are retained in
+`native-gear-parameters/arithmetic.json`.
+
+An isolated constant-throttle, flat-road model using the same instructions
+for 400 applied fields produces:
+
+| Step fields | Final speed | Accumulated distance | First persistent shift |
+| --- | ---: | ---: | ---: |
+| 1 | 10,373 | 2,395,125 | field 160, speed 5,432 |
+| 3 | 10,381 | 2,406,253 | field 162, speed 5,484 |
+| 4 | 10,384 | 2,412,512 | field 164, speed 5,544 |
+
+These are arithmetic-model results, not additional game replays. They isolate
+coarse-step threshold overshoot and endpoint integration without input-age,
+road-state or rendering effects. The table-driven acceleration itself is
+already correctly scaled by elapsed fields in the audited C path. Changing
+its rates to fit the live-field distance checkpoint is therefore unsupported;
+no gameplay constant or shift delay is changed. The existing B distance and
+handling failures remain open, including the previously observed NPC road/lane
+trajectory divergence.
+
+## Motion correction still fails B safeguards after lean fusion
+
+Private `c-fused-motion-source` applies the existing reference-endpoint motion
+formula and quarter-reference road correction to the integrated fused-lean
+runtime, without tuning coefficients. Build/source provenance is retained in
+`c-fused-motion-build`; its normal binary is 20,032 bytes, SHA-256
+`f11eef3a2d4ea68ea020dc55d2fabb81f787827ab14ad27a39a49b36396c1c3b`.
+
+`c-fused-motion-matrix` passes functional boot checks but does not pass B's
+same-cell distance safeguard:
+
+| Policy | fps | Distance at 490 fields | Difference from same-cell B |
+| --- | ---: | ---: | ---: |
+| Default | 12.3 | 3,324,779 | -1.1762% (fails) |
+| Cache | 12.3 | 3,324,779 | -0.2256% |
+| NoCache | 8.2 | 3,324,779 | -1.1762% (fails) |
+
+The unchanged lap tape in `c-fused-motion-lap` still produces sampled crash
+onset 1538, versus B's 1376, and ends in crash state 2 / displayed rank 15.
+This exactly retains the preceding combined candidate's sampled crash onset.
+The new traversal and layout therefore do not resolve the handling difference;
+the earlier NoCache distance pass also does not survive this build's live-field
+alignment. The correction remains private. Further work must address the
+simulation/trajectory discrepancy rather than treating a favorable rendering
+phase as a correction to game speed.
+
+## Diagnostic fusion of lean derivation and actor pose traversal
+
+`VERIFY_C_FUSED_LEAN` removes the separate `step_derive_lean` traversal and
+computes each eligible actor's lean at native pose-loop entry `$89de8`, before
+that actor's crash/pose side effects. The existing native list eligibility
+checks are reused; the helper retains the original 0..30 segment visibility
+condition and calls the unchanged authoritative lean calculation. It saves the
+calculation's scratch registers, then replays the displaced display-record
+clear and cop comparison. Render-only calls bypass the calculation. This
+remains inside the existing Enhanced framerate/hardware patch gate.
+
+The principal ordering risk is that all actors' lean values were formerly
+computed before any pose side effects. The fused pass interleaves those operations
+by actor. Full crash/recovery, slot-copy, special-actor and cadence comparisons
+are therefore necessary; the short and long comparisons below address this risk.
+
+`c-fused-lean-state-v2` matches `c-lane-scan-selective-state` for all 1,595
+common completed hashes, all sound requests and all six authoritative snapshot
+ranges at cursor 1457 on the seeded attack tape. The initial full diagnostic
+failed during WHDLoad patching because the helper lay beyond the signed patch
+reference range; placing it beside `step_compute_lean` fixes that limit. The
+failed run is retained separately as `c-fused-lean-state`. The corrected tracked
+full diagnostic is byte-identical to the tested private v2 full binary.
+
+`c-fused-lean-period1`, `-period2` and `-period3` each match the fixed-four-field
+`c-fused-lean-state-v2` reference for 1,595 common completed hashes, all sound
+requests and all six authoritative snapshot ranges at cursor 1457. Histograms
+confirm 1,600 one-field, 799 two-field and 533 three-field intervals respectively,
+plus startup intervals. One-field coverage skips drawing to reach that cadence;
+two- and three-field runs render normally. These are functional-speed replays.
+
+Full varying-cadence replays now match the preceding lane-scan runtime:
+
+| Outcome | Completed hashes | Sound events | Exit cursor |
+| --- | ---: | ---: | ---: |
+| Finish | 12,822 | 24 | 12,823 |
+| Arrest | 8,377 | 241 | 8,378 |
+| Wreck | 11,945 | 120 | 11,946 |
+
+`c-fused-lean-finish`, `-arrest` and `-wreck` match their corresponding
+`c-lane-scan-*` references in every collected hash, event, finish/exit timestamp
+and all six authoritative terminal snapshot ranges. All restart successfully;
+terminal and next-race screenshots were inspected. This provides long-tape
+ordering evidence, including crashes and race transitions.
+
+The 19,376-byte private normal candidate in `c-fused-lean-matrix` measures
+12.1 fps cached and 8.3 uncached on Fast 020. The equal-size
+`c-fused-lean-control-matrix` retains separate traversal and the same pose hook,
+but bypasses the fused calculation: 12.0 / 8.3 fps. Thus the small cached gain
+survives this layout control. Both build directories retain their source delta.
+
+`c-fused-lean-remaining-matrix` completes the other nine normal cells: A500 8.5,
+Chip-only 020 12.5, default Fast 020 12.1, 030 16.6, 040 19.6 and 060 23.0 fps.
+Explicit Cache and default agree on 030/040/060. The prior runtime measures
+19.3 on 040; remaining CPU rates are unchanged. A500 and Chip-only 020 retain
+their reference distances. `c-fused-lean-mmu` passes both 040/060 functional
+checks with TC enabled and CACR $80008000; these are not throughput results.
+
+`c-fused-lean-visible` measures [140,200,180,160,140,200,180,160] ms at input
+phases 300..307, median 170 ms. Every phase is no slower than B's corresponding
+[180,220,200,180,220,200,180,220] ms. Some phases are slower than the preceding
+C binary, whose phase alignment differs; its median was also 170 ms. These are
+field-sampled upper estimates, not physical input-to-photon measurements.
+
+`c-fused-lean-smoke` passes keyboard/CD32 steering release, pause/resume,
+demo fire exit, demo timeout and stack checks. `c-fused-lean-off` verifies the
+normal candidate retains all ten original bytes at $89de8 with CUSTOM2=0.
+
+Fusion is now selected automatically by the normal runtime through
+`C_FUSED_LEAN`; reference diagnostics retain explicit `VERIFY_C_FUSED_LEAN`
+selection. The shared `lean_pose.s` helper is appended in the normal build and
+placed near `step_compute_lean` in full diagnostics to fit signed patch
+references. Both call sites include exactly the same helper source.
+
+`c-fused-lean-runtime-build/RoadRash.slave` is byte-identical to the tested
+19,376-byte private candidate (SHA-256
+`1ec1fb8226541302faf63542fdb0159a5bc0ea521762964e737991a28db7f3ab`). Its full
+snapshot diagnostic is also byte-identical to `c-fused-lean-retained-build`.
+Thus the completed normal, fallback, controls, latency and diagnostic replay
+checks apply to the integrated binaries. The hook is installed only after the
+master-toggle/CPU/Fast gate selects C. C's separate B handling/distance and
+overall performance requirements remain open.
+
+## Exact Fast RAM lean copy does not improve measured throughput
+
+The fresh current-runtime profile attributes 0.841% of cached flat time and
+1.679% of uncached flat time to `$89e76..$89eef`, with 4,008 / 4,000 entries.
+This is the authoritative lean calculation: the render/pose passes already
+reuse simulation-owned lean, so removing these calls would change gameplay.
+
+Private `c-lean-fast-source` copies the 122 bytes after C patches are installed,
+then appends a return jump to `step_lean_end`. The copied span uses absolute data
+references and internal branches, requiring no relocation fixups. Only
+`step_compute_lean` routes to it. The initializer runs inside the existing
+collision-geometry enhancement gate, before its cache flush. A 256-byte padded
+extension retains the low-byte layout convention. The control initializes the
+same copy but retains native dispatch; both normal binaries are 19,552 bytes.
+
+`c-lean-fast-matrix` measures 11.9 fps cached versus 12.0 for the matched
+`c-lean-fast-control-matrix`; both measure 8.3 fps uncached. Cached distances
+are 3,318,164 / 3,308,406; uncached distances are both 3,308,406. Functional
+checks pass, but no throughput improvement is demonstrated. The copy remains
+private and no broad equivalence or release validation is claimed. Build
+folders retain exact source patches and binaries; matrix results retain
+provenance. All four measured cells completed successfully.
+
+Together with the lane-insertion experiment, this cautions against treating
+small flat-profile percentages as guaranteed frame-rate gains. Further work
+should target a larger repeated computation or verify a meaningful reduction
+in simulation cost before undertaking another complete release matrix.
+
+## Current runtime profile and rejected lane insertion copy
+
+Fresh normal-runtime profiles `c-current-lane-cache-profile` and
+`c-current-lane-nocache-profile` cover live fields 100–600 using the integrated
+19,296-byte lane-scan runtime. Flat instruction totals are 18,161,919,360 and
+18,163,662,464 profiler units. The lane insertion routine `$8db0a..$8db31`
+accounts for 0.7621% cached / 0.9804% uncached, with 10,168 / 10,148 entries.
+Nearby lane steering `$8db40..$8dbb1` accounts for 0.5333% / 0.5605%.
+These are flat costs, not inclusive call costs or physical-hardware results.
+The larger costs remain spread across drawing, simulation and hardware polling;
+for example the `$aec00` bucket includes the required vsync poll and must not
+be treated as removable computation.
+
+Private `c-lane-insert-source` replaces the auxiliary copy's existing native
+lane-insertion jump stub with a Fast RAM helper. It reproduces the 40-byte native
+routine, changing only its two PC-relative table LEAs to absolute aliases of
+the same mutable tables. Register saves, counter increment, actor ID write and
+index arithmetic remain unchanged. The original native entry is not patched;
+the helper is reachable only through the already gated auxiliary copy.
+Padding preserves 256-byte overall growth. The matched control retains the
+same helper and padding but routes the original stub to native code.
+
+Both normal variants are 19,552 bytes. `c-lane-insert-matrix` measures 11.4 fps
+cached and 8.3 fps uncached; `c-lane-insert-control-matrix` measures 12.0 and
+8.3 respectively. Cached distance is 3,318,164 in the copy versus 3,308,406 in
+the control; both uncached distances are 3,308,406. Functional matrix checks
+pass, but the helper offers no measured uncached gain and regresses cached
+throughput. It is not integrated. Source patches, binaries and provenance are
+retained in the build/test directories. No broader equivalence or release
+matrix is claimed for this rejected performance candidate.
+
+## State-age presentation prediction has no demonstrated response benefit
+
+Private `c-pose-state-age-source` adds `render_start_field - simulation_cursor`
+to the measured drawing interval before predicting the player's displayed
+heading, retaining the existing four-field cap, direction guards and simulation
+isolation. Its equal-size control zeros that added term. Both normal binaries
+are 19,316 bytes. This tests an omitted-age hypothesis without adding a wait.
+
+`c-pose-state-age-probe` verifies the formula at 63 player pose calls, including
+release at field 310 and reversal at 320. All 12 sampled render calls have
+state age zero and measured/effective horizon three. Simulation calls and the
+release/reversal exclusions remain unpredicted. The normal catch-up loop rereads
+the live clock after each tick, consistent with these zero-age observations;
+this sample is not a universal guarantee that no field can elapse before drawing.
+
+All eight normal screen-response phases in `c-pose-state-age-visible` and
+`c-pose-state-age-control-visible` are identical: **200, 180, 160, 140, 200,
+180, 160, 140 ms**, median 170 ms. The isolated phase-303 pair reproduces
+140 ms in both binaries. Thus the improvement at that phase versus production
+cannot be attributed to the added state age. Other phases worsen versus
+production; phase 300 remains 20 ms worse than B. This does not close latency
+acceptance, and the candidate is not integrated.
+
+Build directories retain source patches and binaries. Candidate SHA-256:
+`7821efdc6a33a0014ccaf9fa2848fb3e22fbb20028885119fc43a8740dab3942`;
+control: `c369dfdd97149c9e094b858a7afe4dc2e6f7bd5ff6ef391855b25d66f0c5872b`.
+The direct probe and both eight-phase suites completed successfully. Their
+screen timings are capture-based upper estimates under the recorded emulator
+configuration, not measurements on physical hardware.
+
+## Fixed-clock opponent AI also fails the handling comparison
+
+The private `c-npc-ai-clock-source` experiment starts from the retained
+NPC-lifecycle candidate. A hook at `$8d2e4` preserves every-field player and
+crashed-actor dispatch, but runs normal-riding opponents only when the simulation
+cursor is divisible by four. During those NPC AI calls it sets the delta to four
+so action timers consume four elapsed fields. A return hook at `$8d3da` restores
+delta one before the next actor. Movement and collision simulation retain their
+one-field schedule. This is an isolated diagnostic, not a user option or a
+production change; first-update and actor-transition timing would require
+additional lifecycle validation before any possible integration.
+
+`c-npc-ai-clock-dispatch` verifies 20 measured rival AI dispatches, all at
+cursor modulo four equal to zero and all with delta four. Of the 20 lane
+lookups, 18 return no target and two return `$a63e0`. It does not restore B's
+intervening `$a61e0` target. Independently, `c-npc-ai-clock-boundaries` records
+502 completed simulation boundaries: every recorded delta is one, and all 501
+adjacent cursor increments are one. The temporary AI delta does not leak into
+those completed updates.
+
+The unchanged lap replay in `c-npc-ai-clock-lap` still fails: sampled crash onset
+is 1542 versus B's 1376, and final displayed rank is 15. Rival `$a6260` is in
+lane 5 at field 1200, and lane 4 with attack active at field 1240. Its road
+centre at field 800 is 53 versus B's 73. At field 500, world x=100 and centre=-47
+match B, so this experiment still diverges later despite the fixed AI cadence.
+The result rejects this isolated decision-rate change as a sufficient fix;
+no reduced AI update rate is integrated and no crash-window tolerance changes.
+
+The normal binary is 20,172 bytes, SHA-256
+`987db7bc0f2bdb17705fc0d84d8a395c7205b0604630f67fbe2688882b0a22c2`.
+Its build directory retains the exact source patch; the replay, dispatch and
+boundary traces retain tested binaries and provenance. All three sessions
+completed successfully. Performance and release matrices were not run for a
+candidate that already fails the required handling comparison.
+
+## NPC heading rate limit already scales with elapsed fields
+
+A read-only watchpoint on rival `$a6260`'s heading word at `$a6268` identifies
+its actual writer during live fields 300–410. `c-npc-heading-writes` observes
+27 changes, all immediately after relocated native `$8cf56` (`move.w
+12(a1),8(a1)`). `b-npc-heading-writes` observes six changes at the same native
+instruction. The runs hold throttle from field 100 and retain raw actor records,
+registers, watchpoint old/new values, instruction windows and binary provenance.
+C uses the retained NPC-lifecycle candidate, not the normal runtime.
+
+The complete native `$8cef0..$8d005` disassembly in B's trace explains the
+calculation. It selects a curve byte seven road segments ahead into actor +$44,
+adds requested steering +$46 when flag bit 2 of +$69 is set, then calls `$8cfd4`.
+That helper moves actor +$0c toward the requested heading by at most twice the
+elapsed simulation delta, and `$8cf56` copies that result into actual heading
++$08. Its limit is already time-scaled; it is not a fixed per-call turn amount.
+
+Every observed write in both traces satisfies
+`new_heading = clamp(target, old_heading - 2*delta, old_heading + 2*delta)`.
+The saved D1 contains the signed rate limit immediately after the writer;
+D0 retains the target. All six B writes reach their targets without limiting.
+Four of C's 27 changes are limited; all others reach their targets. B's observed
+targets span -3 through +1 and C's -3 through +2. These watchpoints report
+changes only, so these counts are not total helper-call counts.
+
+This rules out an omitted timestep multiplier in the measured normal-riding
+heading helper. More frequent evaluation of evolving spatial/AI targets can
+still change the integrated path; dividing this already time-scaled limit by
+four would introduce a new error. The earlier `$8b8f0` companion-motion path
+also multiplies its movement by the elapsed delta, but was not the writer in
+this measured normal-riding interval. No heading-rate patch is integrated.
+The remaining trajectory work must consider target selection and movement
+integration together rather than infer a fourfold turn-rate error from the
+larger number of observed heading changes.
+
+## Fixed-phase opponent road update does not restore handling
+
+Four private `c-npc-road-phaseN-source` variants test the alternative to the
+quarter-unit curve accumulator. They clone the retained NPC-lifecycle candidate
+and change only `step_actor_road`: for native-table actors, add the full native
+D1 only when `(simulation_cursor & 3) == N`; otherwise leave road centre alone.
+The main simulation, input capture, movement and collision ticks remain one
+field. This is a diagnostic four-field schedule for the NPC road contribution,
+not a render limiter or delayed presentation. Existing lifecycle hooks and
+fraction tables remain present; the scheduled path does not consume the road
+fraction. Actors outside the native table retain the native fallback.
+
+All four builds are 20,108 bytes and differ from phase zero at exactly one byte,
+file offset 8771, containing the comparison immediate. Retained build directories
+include their exact source patches and binaries. Each unchanged lap replay uses
+the same cached 020 configuration and two-field observations:
+
+| Phase | Sampled crash onset | Final displayed rank | Rival road centre at field 800 |
+|---|---:|---:|---:|
+| 0 | 1568 | 15 | 66 |
+| 1 | 1542 | 15 | 66 |
+| 2 | none through 1600 | 14 | 44 |
+| 3 | none through 1600 | 14 | 46 |
+| B reference | 1376 | 15 | 73 |
+
+All four have rival `$a6260` in lane 4 with its attack flag set at field 1240,
+while B is in lane 3 and follows the intervening rider. None restores B's
+pre-contact approach or required crash outcome. Phase zero's road centre at
+field 1000 (+39 versus B +42) is locally close, but its subsequent handling
+still fails. Choosing that phase on the strength of one coordinate would not
+be a valid correction.
+
+Normal binary SHA-256 values, phases 0 through 3:
+
+- `1bb98bdd0810c777c74191e3df43ed32b6d8ac3595dadb03f9f5f44cd6a2cd97`
+- `34c41516dad7b9dfcfc1e527b22bc1267e1b831d261ae8c0b94fa8a61d9cc26f`
+- `b2296a91fe3a2e42e8e1e5d9d612a92ee0e312743f139f516f52e392e560f577`
+- `dd56b6edd90caf5cc40739dfcb8271cb6111a633db7927741d571de60ca405f6`
+
+Results and provenance remain in `c-npc-road-phaseN-lap/replay.json`; a compact
+summary is `c-npc-road-phase-summary.json`. All four emulator sessions completed
+successfully. These failed functional candidates do not warrant performance or
+release matrices. No fixed-phase road schedule is integrated, and no user-facing
+option is added. The result rules out selecting a global four-field phase as a
+sufficient solution to the observed NPC trajectory difference.
+
+## Opponent curve carry is correct; sampling phase still changes the path
+
+Comparing retained rival `$a6260` records before contact narrows the remaining
+trajectory error. At field 500 B and the fractional-NPC candidate both have
+world x=100 and road centre=-47. At field 600 their centres are -60 and -61.
+At field 800 they are +73 and +56, despite similar longitudinal positions
+(5,991,169 and 6,014,870). This predates the lane/attack difference.
+
+`npc_curve_operands_c.py` captures D1, D6, delta and the raw actor immediately
+before `$8bcd0`, resolving the relocated movement-code address in C. It replays
+the original lap through field 620, including the right-steering release, then
+observes until field 790; no input transition occurs inside the interval.
+`b-npc-curve-operands` uses the retained B binary and contains 42 samples at
+cursors 622–787, with 41 delta-4 updates and one delta-5 update.
+`c-npc-curve-operands` uses the exact retained NPC-lifecycle candidate and
+contains 169 samples at cursors 619–787, all delta 1. The live-field start can
+leave a backlog, so these are explicitly different initial completed cursors.
+
+Every adjacent B centre change equals its preceding signed D1. B starts at
+-50 and reaches +65: the first 41 D1 values sum to 115. Every adjacent C centre
+change is exactly reproduced by the existing quarter accumulator, with initial
+carry 2. C starts at -51 and reaches +51: its first 168 D1 values sum to 409,
+which together with that carry yields 102 whole units. There is no missing
+quarter-unit update or carry loss in this interval.
+
+The native disassembly shows D1 is `floor(curve_byte * position_fraction /
+65536)`, where position_fraction is the low word of the updated longitudinal
+position. D6 separately computes the crossed-segment/interpolation difference;
+the subsequent centre addition uses D1, not D6. Reconstructing possible signed
+curve bytes from C's position/D1 pairs gives nonempty coefficient sets for all
+22 covered segments, unique in 20. These predict B's D1 exactly for 40 of its
+42 samples. For the remaining two, B's value is among the two predictions
+allowed by the insufficiently constrained segment coefficient. No inconsistent
+curve operand is observed; the comparison does not claim those two coefficients
+were uniquely recovered.
+
+A same-trajectory phase check makes the sampling sensitivity explicit. C's 168
+consecutive operands at cursors 620–787 sum to 406, or 101.5 after division by
+four. Selecting every fourth operand from that identical trajectory instead
+gives sums 110, 113, 93 or 90 depending only on the starting phase. This is an
+offline operand comparison, not a simulated alternate gameplay outcome. It
+shows why multiplying update frequency by four and dividing each contribution
+by four cannot guarantee the original sparsely sampled centre trajectory.
+
+The operands and arithmetic comparison are retained in
+`c-npc-curve-operands/comparison.json`; both emulator runs exit cleanly. This
+rules out a carry implementation error in this measured interval and identifies
+native sampling phase as a material source of pre-contact trajectory drift.
+It does not pass the full handling comparison or authorize adjusting a constant
+to match one lap. The remaining work must reconcile the reference road model
+with the one-field simulation across trajectories, not just its final crash.
+
+## Lane-target dispatch explains B's missing attack checks
+
+`attack_dispatch_c.py` observes the actual AI function dispatch, the return
+from native lane-target selection, and the selected follow-up function. The
+first site `$8d3d8` is mapped into C's relocated auxiliary copy; `$90422`,
+`$90494` and `$90646` remain native. All breakpoints restrict A1 to rival
+`$a6260`. The probe replays the unchanged lap inputs through live field 1200
+and observes until 1280, with no input transitions inside that interval.
+Raw actor/player records, registers and binary provenance are retained.
+
+`b-attack-dispatch` records 57 observations over 19 AI updates. All select
+`$903f2` initially. At cursors 1224, 1228, 1232, 1236, 1240, 1245, 1249 and
+1253, the lane lookup returns rider `$a61e0` and dispatch selects `$8d400`,
+which follows avoidance/acceleration rather than calling the attack test.
+At cursor 1257 the lookup returns -1 again and dispatch selects `$90570`,
+which calls `$90670`. This explains the gap in the preceding attack trace:
+B is handling another rider in the lane, not merely missing a timer deadline.
+
+`c-lane-motion-attack-dispatch` records 231 observations over 77 AI updates.
+All initial dispatches are also `$903f2`, but every lane lookup returns -1
+and every follow-up selects `$90570`. At cursor 1240 B's rival is in lane 3,
+world x=39, road-relative x=48, while the combined C candidate's rival is in
+lane 2, world x=-60, road-relative x=-33. At cursor 1253 those values are
+B lane 3 / x=17 / relative=24 and C lane 2 / x=-47 / relative=-21.
+The changed lane precedes the additional attack and explains why that attack
+path remains available in C. This is evidence of upstream trajectory divergence,
+not justification to suppress the native attack test or force a lane target.
+
+As a countercheck, `c-npc-lifecycle-attack-dispatch` runs the exact retained
+fractional-NPC candidate from `c-npc-lifecycle-lap/tested.slave` (SHA-256
+`46eddb8e9be08f869cbb6cacb11a82a87dcf265608f9f6e472c5f7f63e5493fb`).
+It records 243 observations over 81 AI updates: 76 lane misses and five targets
+at `$a63e0`; follow-up dispatch is `$90570` 57 times, `$90530` 19 times and
+`$8d400` five times. This older candidate is not an equal-layout comparison
+with the lane-scan runtime. Its retained lap samples show rival lane 5 at 1224
+and lane 4 at 1240, with attack active at 1240. It therefore does not restore
+B's lane-3 approach either; fractional conservation alone has not closed the
+handling requirement.
+
+Next validation should compare the rival's steering target, heading update,
+road-relative accumulation and fractional displacement before lane assignment
+first diverges. The target is the trajectory that feeds these decisions, not
+an attack cooldown selected to make the final crash field match. No runtime
+change or relaxation of C's handling acceptance follows from this audit.
+The probe passes Python compilation and all three emulator sessions exit cleanly.
+
+## Native attack-selection audit and approach measurements
+
+The current combined candidate's live disassembly is retained in
+`c-lane-motion-attack-selection`. The native `$90670..$90784` routine does not
+roll a random attack probability: it checks the existing attack flag, absolute
+longitudinal separation against the rider's table word at +2, and lateral
+separation against the two collision half-widths plus 16. Equality does not
+start an attack. The close-range threshold uses half-widths plus 8. Its farther
+branch selects an animation variant from cursor parity. Countdown updates at
+`$903f4` and `$904c0` subtract the simulation delta; phase expiry reloads the
+next native duration. No timer-rate patch is justified by this disassembly.
+
+There is a random approach branch at `$9058a`: it calls the stateful generator
+`$900ce` and tests bit zero. To distinguish that possibility from the geometric
+approach, `attack_choice_c.py` observes its return at `$9058e` for rival `$a6260`
+over live fields 1140–1250. Both `b-approach-choice` and
+`c-lane-motion-approach-choice` record zero calls. That rules out this branch
+for this actor/window only, not randomness elsewhere or earlier in the race.
+
+`attack_approach_c.py` then observes entry to `$90670` over live fields
+1140–1320, retaining both actor records and the selected rider table before
+any predicate changes registers. It replays all preceding lap inputs; no input
+changes occur inside the observed interval. `b-attack-approach` records 11
+checks, six within longitudinal range while not already attacking. None also
+passes the lateral threshold. The closest is cursor 1257: separation 73,
+threshold 47, longitudinal gap 1,333 versus limit 16,384. B has no checks
+between cursors 1220 and 1257; this is more than merely four-field sampling.
+
+`c-lane-motion-attack-approach` records 152 checks (simulation cursors
+1137–1288; the initial live-field stop may leave a simulation backlog), including
+118 within longitudinal range while not already attacking. At cursor 1253,
+separation equals the threshold, 47, so it does not start. At cursor 1254,
+separation 41 is strictly below 47, longitudinal gap is 1,360, and attack is
+still clear on entry. The next check observes the flag set. This reproduces
+the previously captured native initialization at `$90728`.
+
+The evidence distinguishes changed approach/AI dispatch from a presumed random
+attack-rate or timer bug. It does not prove why B bypasses the geometric test
+through the intervening approach interval. The next useful trace is the native
+AI dispatch and lane-target selection in that interval, before changing attack
+probabilities, adding cooldowns or suppressing contact responses. No gameplay
+patch or baseline waiver follows from these observations. Both probes preserve
+binary/emulator provenance and pass Python compilation.
+
+## Combined motion correction retest after lane-scan integration
+
+The private `c-lane-motion-source` rebuild starts from runtime commit `8938181`
+and adds the existing road-timing diagnostic (including its reactivation reset)
+and reference-endpoint displacement correction. It uses the same two hooks and
+formula as `c-combined-motion-source`; no correction coefficient was tuned to
+these measurements. `c-lane-motion-build/RoadRash.slave` is 19,952 bytes,
+SHA-256 `36009d81b31aa90655c90170cc102edea4b5608cec9506ce65e21c80c429d36e`.
+
+Fresh normal cycle-exact 020 measurements in `c-lane-motion-matrix`, compared
+with the matching cells of `b-final-matrix-v2`:
+
+| Policy | fps | Distance at 490 fields | Difference from same-cell B |
+|---|---:|---:|---:|
+| Default | 12.4 | 3,324,779 | -1.1762% (fails) |
+| Cache | 12.3 | 3,334,538 | +0.0672% |
+| NoCache | 8.2 | 3,334,538 | -0.8862% |
+
+The NoCache distance now passes the short-window tolerance, unlike the earlier
+combined candidate. This is not enough to integrate it: default still fails,
+and NoCache throughput is slightly below the current runtime's 8.3 fps.
+Explicit Cache has a different B reference distance (3,332,298) from the
+default/NoCache reference (3,364,352); those references are not interchangeable.
+
+`c-lane-motion-boundaries` records 500 completed player states. All 499 adjacent
+pairs satisfy `displacement = max(0, speed + floor(3*speed/2) -
+floor(3*previous_speed/2))`. This verifies the intended endpoint correction in
+this run; it does not establish whole-game handling equivalence.
+
+`c-lane-motion-lap` replays the unchanged original lap tape at two-field sample
+spacing. Its sampled crash onset is still 1538, exactly the earlier combined
+candidate's onset, versus B's 1376. It ends in crash state 2 and displayed rank
+15. Faster execution and the road reactivation reset have therefore not resolved
+the observed handling difference. The candidate remains private; production
+continues to use only the validated lane-scan optimization. Further handling
+work must address the native contact/attack and opponent-motion differences,
+not accept a matching short distance as sufficient evidence.
+
+## Runtime integration of the uncached 68020 lane scan
+
+`C_LANE_SCAN` is now selected by normal/lean runtime builds. Full snapshot
+builds still opt in with `VERIFY_C_LANE_SCAN`. The copy remains inside the
+CUSTOM2/CPU/Fast gate and additionally requires a 68020 with instruction cache
+disabled. No extra user option or changed simulation arithmetic is introduced.
+The normal and lean outputs in `c-lane-scan-runtime-build` are byte-identical
+to the tested selective normal and retained lean binaries respectively. Normal
+size is 19,296 bytes, SHA-256
+`6bbfd96a5f790f530af54e3f9ecf44fa0f01860a7e06de83a25589136b266d81`.
+
+Validation completed before integration:
+
+- `c-lane-scan-selective-matrix` and `c-lane-scan-remaining-matrix` cover all
+  eleven normal cells. NoCache 020 improves from 7.6 to 8.3 fps; other measured
+  rates remain unchanged. A500 and Chip-only 020 snapshots match production.
+- `c-lane-scan-excluded` checks native entry bytes on 68000, Chip-only 020,
+  030, 040 and 060, explicitly using NoCache. Cached 020 and CUSTOM2=0 entry
+  checks are retained in the probes described below.
+- `c-lane-scan-mmu` passes 040/060 functional checks with TC=$8000 and
+  CACR=$80008000. These are not hardware data-cache performance measurements.
+- `c-lane-scan-smoke` passes keyboard, CD32, demo-fire and demo-timeout checks,
+  with the Fast stack checks enabled.
+- `c-lane-scan-visible` matches all eight production response phases:
+  180, 160, 140, 200, 180, 160, 140, 200 ms. Phase 303 remains 20 ms worse
+  than B; this does not close the latency gate.
+- `c-lane-scan-finish-fixed` matches production for 12,822 completed hashes,
+  24 sound events and all six terminal memory regions. The varying-render
+  replay matches the fixed replay. Finish is at 12,634, exit at 12,823.
+- Varying-render `c-lane-scan-arrest` matches production for 8,377 hashes,
+  241 events and all six regions; exit is at 8,378. `c-lane-scan-wreck`
+  matches for 11,945 hashes, 120 events and all six regions; exit is at 11,946.
+  Both restart with counters (92, 91, 0, 1). Final images show BUSTED and WRECKED.
+- `c-lane-scan-cached-boundaries` matches all 501 shared completed player
+  states in `c-current-distance-default`, excluding the live observation clock.
+  This rules out a changed captured player update in that trace, but does not
+  replace the live-field distance gate or prove equivalence of all actor state.
+  The cached matrix distance remains 3,308,406 versus production's 3,318,164.
+
+Section C remains open: B handling/distance comparisons, the remaining visible
+latency regression and the broader performance acceptance criteria still need
+resolution. The following diagnostic history records how this implementation
+was selected; its earlier pending checks are superseded by the evidence above.
+
+## Diagnostic Fast RAM lane scan for uncached 68020
+
+A fresh normal NoCache profile (`c-current-nocache-cost`) covers exactly 500
+vsyncs with CACR=0. Flat costs attribute 3.893% to `$8d966..$8d9e1`, entered
+3,551 times. Its 1,508 unmatched returns prevent inclusive-call attribution;
+the result identifies a local instruction-cost target, not a complete timing
+model.
+
+The new `VERIFY_C_LANE_SCAN` diagnostic preserves the native lane-scan algorithm.
+It reproduces the first two instructions, changes the PC-relative table LEA to
+an absolute LEA of the same mutable table `$8d012`, and copies the remaining
+114 bytes verbatim. All body branches and DBRA stay internal. Actor records,
+mutable tables, arithmetic, loop iteration and outputs remain native. The
+entry redirects only after the existing CUSTOM2/CPU/Fast gate, and cache flush
+occurs after initialization. `VERIFY_C_LANE_SCAN_CONTROL` retains native dispatch;
+the broader auxiliary-copy control also disables this redirect.
+
+Initial experiments show why the final selection is narrow:
+
+| Candidate / equal-layout native control | Cached 020 fps | NoCache 020 fps | 060 fps |
+|---|---:|---:|---:|
+| Copy inserted into existing initializer | 10.0 / 10.0 | 8.3 / 7.8 | 22.9 / 23.0 |
+| Appended initializer, existing symbol offsets retained | 10.0 / 11.4 | 8.3 / 7.6 | 23.0 / 23.0 |
+| Slave growth aligned to 256 bytes | 11.4 / 12.0 | 8.3 / 7.7 | not rerun |
+
+Keeping offsets alone does not keep loaded addresses fixed. Placement probes
+measure the production base at `$9f6b58` and the 256-byte-larger variant at
+`$9f6958`: the existing symbols move by $200 while retaining their low-byte
+cache indices. This establishes the placement change; it is not a universal
+allocator guarantee. Source offsets of all existing named symbols remain
+unchanged in the appended variants. Exact sources, controls, matrices and
+copy/placement probes remain under the `c-lane-scan-*` ignored directories.
+
+The retained diagnostic therefore selects the copy only on a 68020 with its
+instruction cache disabled. After the outer hardware gate, attention flags
+exclude 030/040/060 and MOVEC reads CACR; bit 0 must be clear. Other paths retain
+the native entry. No user-facing option is added. Padding keeps this diagnostic
+256 bytes larger than its counterpart; its normal private measurement binary
+is 19,296 bytes, SHA-256
+`6bbfd96a5f790f530af54e3f9ecf44fa0f01860a7e06de83a25589136b266d81`.
+
+`c-lane-scan-selective-matrix` passes five functional cells: default/Cache 020
+12.0 fps, NoCache 020 **8.3** (production 7.6), 030 16.6 and 060 23.0.
+Live-field distances are 3,318,164 for default 020/030/060 and 3,308,406 for
+Cache/NoCache 020. The cached sample regresses from production's 3,318,164;
+these values do not establish distance acceptance. There is no claim that a
+successful boot/race cell also passes the separate B distance comparison.
+
+`c-lane-scan-selective-default` and `-off` verify the original ten entry bytes
+with caches enabled and with CUSTOM2=0. `-nocache` verifies the Fast entry,
+12-byte reconstructed prefix and all 114 copied bytes at `$9fb412`. Earlier
+copy audits also pass. The direct-copy and selective NoCache snapshot runs each
+match the native control for 1,595 completed hashes, all three sound requests
+and all six captured regions at cursor 1457.
+
+Tracked lean/full diagnostics are byte-identical to their tested private
+counterparts. The auxiliary-control configuration also assembles. Every normal
+build remains byte-identical to the 19,040-byte production runtime: this
+optimization is deliberately not selected there. Remaining work includes the
+full hardware/MMU matrix, explicit excluded-CPU dispatch checks, long-race and
+cadence comparisons, controls/demos, latency and the changed distance sample.
+The NoCache gain is evidence to pursue those checks, not completion of C.
+
+## Current normal runtime: completed ticks versus live distance sampling
+
+Fresh cycle-exact 020 traces `c-current-distance-default` and
+`c-current-distance-nocache` use the current normal compact-geometry runtime.
+All 499 shared completed simulation cursors match every captured player field
+except the live clock: position, speed, acceleration, gear, lateral/height,
+flags, crash state, road state and displacement. Every cursor advances by one;
+every position increment equals its stored displacement. This is player-movement
+evidence, not a comparison of the entire actor bank or all gameplay outcomes.
+
+`b-retained-distance-boundary` repeats the measurement using the exact retained
+B replay binary (`ae511e817d5f1544cade20c1d2e30dd8631ec05c3396e7625f2fbe53686fb57a`).
+Its 126 rows exactly reproduce the earlier `b-default-distance-dynamics` trace,
+which used a different B build. That build difference is therefore not being
+silently assumed irrelevant.
+
+The input is pressed at live field 100 while stationary at position 524,288.
+B first moves at cursor 102 with delta 4, speed 136 and displacement 544: it
+applies the newly sampled throttle across the entire preceding four-field step.
+C first moves at cursor 101 with delta 1, speed 34 and displacement 34. At the
+same completed cursor 590, B is at 3,888,640 and C at 3,852,194, a **-1.0833%**
+distance difference. B has then applied 492 fields of throttle, C only 490.
+At 492 applied throttle fields (C cursor 592), C is at 3,871,631 with speed
+9,711, versus B's speed 9,712. The distance difference becomes **-0.5056%**.
+
+Rendering adds a separate live-clock delay: C's completed cursor 590 is observed
+at live field 591 with caches and 593 with NoCache. Its completed state is
+identical in both. This explains why altering a global speed constant to fix
+one live sample would conflate input sampling, integration and rendering work.
+The existing live-field acceptance gate is unchanged and remains failed;
+the equal-exposure comparison is explanatory evidence, not a replacement gate.
+The comparison and increment assertions are reproducible with the ignored
+`compare_distance_clock_c.py`; its result is retained as
+`c-current-distance-default/clock-comparison.json`.
+
+## Road-reset finish, wreck and short-cadence coverage
+
+The changed road diagnostic now has fresh finish and wreck tapes, recorded
+using ordinary field-timed inputs. Two feedback-driven runs used a 10-field
+interval, deadzone 32, one-interval position prediction, unrestricted throttle
+and periodic attacks. Their target lanes were +160 (finish) and -80 (wreck).
+Exact inputs and driver options are retained with each run; no synthetic
+damage or altered finish condition was used.
+
+| Outcome | Four-field reference / varying replay | Completed hashes | Sound requests | Finish field | Exit field |
+|---|---|---:|---:|---:|---:|
+| Finish | `c-road-reset-drive-right` / `c-road-reset-finish-replay` | 13,807 | 124 | 13619 | 13808 |
+| Wreck | `c-road-reset-drive-left` / `c-road-reset-wreck-replay` | 12,179 | 73 | none | 12180 |
+
+Each pair matches every published completed-tick hash, every sound request,
+terminal timing and all six authoritative terminal regions. Varying schedules
+include actual intervals 2/3/4/12/16 fields. All four runs restart with the
+capture field cleared and all 12 player-road and 140 actor-carry bytes zero.
+The fixed references restart at `(97,96,0,1)`; varying finish and wreck restart
+at `(99,98,0,1)` and `(92,91,0,1)` respectively. These are fresh-race capture
+counters, not a claim that arbitrary post-restart live checkpoints coincide.
+Both reference runs exercise riding, airborne state, skid and crash states
+0–4. FINISHED, WRECKED and the next race after finishing were visually checked.
+Together with the preceding arrest pair, these cover all three native exit
+outcomes and restart for this version of the road diagnostic.
+
+The missing short intervals are also checked by `c-road-reset-period1/2/3`.
+All match the four-field attack reference for 1,595 conservatively completed
+hashes, all 10 sound requests and the six captured regions at cursor 1457.
+Observed interval counts, excluding startup zeros, are:
+
+- Period 1: 1,600 one-field intervals; drawing is explicitly skipped.
+- Period 2: 799 two-field intervals plus one startup one-field interval.
+- Period 3: 533 three-field intervals plus one startup one-field interval.
+
+Period 4 and varying/longer intervals were checked in the preceding section.
+The one-field test establishes simulation scheduling, not rendered 50 fps.
+These functional-speed tests restore cadence and transition evidence for the
+road-reactivation correction. They do not resolve its changed B trajectory,
+NPC integration, distance, throughput, control, MMU or latency acceptance.
+Normal runtime selection remains unchanged and section C is still open.
+
+## Road-reset cadence validation and changed terminal outcome
+
+`c-road-reset-fixed` and `c-road-reset-varying` exercise the attack tape on the
+tracked road-reactivation correction. All 1,595 conservatively completed hashes,
+10 sound requests, and six authoritative snapshot ranges at cursor 1457 agree.
+Measured presentation intervals are 4 fields in the fixed run and 2/3/4/12/16
+in the varying run, excluding startup entries. These are functional-speed
+checks, not throughput or one-field rendering claims.
+
+The old finish tape from `c-road-lifecycle-lane-drive` now ends in **BUSTED**.
+The result directories retain their launch-time names
+`c-road-reset-finish-fixed` and `c-road-reset-finish-varying`; they must not be
+counted as finish coverage. Both match all 7,161 completed hashes, 36 sound
+requests, terminal field 7162, and all six terminal state ranges. Both restart
+with capture cleared and all 12 player-road and 140 actor-carry bytes zero.
+The final and next-race screenshots were inspected. These observations cover
+arrest/restart, riding, airborne state and crash states 0–4.
+
+A matched reference removes only installation of the new reactivation hook,
+retaining its unused helper source and all other build selections. The
+`c-road-reset-reference-exit` replay reproduces the older finish exactly:
+16,454 hashes byte-identical to `c-road-lifecycle-lane-drive`, finish field
+16266, exit field 16455, and 67 sound requests. The changed build's first actor
+hash difference is completed tick 2782. This isolates the new reset as the
+cause of divergence for this input, rather than attributing it to subsequent
+code relocation or compact-geometry integration. Correctly discarding a
+fraction on native repositioning changes later interactions; this comparison
+is evidence of a behavioral change, not a regression pass.
+
+A fresh feedback-driven run (`c-road-reset-driven`) also ends in BUSTED, at
+exit field 6151 after 6,150 hashes and 29 sound requests. The driver used a
+10-field interval, lane 80, deadzone 32, one-interval position prediction,
+no attacks and unrestricted throttle; its exact controls and options are
+retained with the result. Restart and road-state clearing pass, but this run
+does not supply the outstanding finish coverage and has not been replayed at
+a different cadence.
+
+The normal runtime remains byte-identical. The road experiment still needs
+finish/wreck transition revalidation, the other prescribed presentation
+intervals, and the unresolved B handling/distance/performance/latency checks.
+No old finish or wreck result is carried forward as validation of this reset.
+
+## Clear road carry when native reactivation repositions a rider
+
+The native reactivation routine `$90c64` resets actor road coordinates
+`+$36/+$38` and related derived state. The optional road-timing diagnostic
+previously retained its external quarter-unit remainder across that reset.
+`step_actor_road_reactivate` now clears the corresponding external road carry,
+replays the overwritten `LEA $a851a,A4`, and resumes at `$90c6a`. It validates
+actor-bank range and record alignment and preserves registers and condition
+codes. The patch remains inside `C_ROAD_TIMING` and the CUSTOM2/hardware gate.
+
+`c-road-reactivation-probe` observes a real reactivation of actor `$a6360` at
+simulation cursor 1140 during a throttle-only run through field 3000. Its road
+remainder changes from 2 to 0. Registers, stack pointer and status agree across
+the wrapper except the expected A4 value and instruction address. The lean
+road diagnostic is 20,208 bytes, SHA-256
+`c9264d2f12cfb553c79c96e42a5a58f2edf7e518564097934993c571fead0ddf`.
+The full snapshot configuration also assembles (48,804 bytes). The normal
+19,040-byte runtime remains byte-identical to the integrated compact-geometry
+build; road normalization is still diagnostic only.
+
+This fix emerged from the private combined NPC lifecycle experiment. That
+candidate additionally clears lateral carry on native inactive movement and
+on non-riding lateral updates, and clears both carries during reactivation.
+`c-npc-lifecycle-probe` observes actor `$a6360` at cursor 1138 with road carry
+3 and lateral carry 0, both zero after the wrapper, with registers/status
+preserved. This exercises a nonzero road carry, not a nonzero lateral carry;
+non-riding and inactive lateral reset coverage remains incomplete.
+
+The private original-lap replay `c-npc-lifecycle-lap` still crashes first at
+1316 and ends at lateral -627/rank 15, like its preceding NPC candidate and
+unlike B's crash at 1376. Those coarse outcomes agree; arbitrary live-field
+snapshots are not byte-identical and do not establish cadence equivalence.
+The private normal binary is 20,084 bytes, SHA-256
+`46eddb8e9be08f869cbb6cacb11a82a87dcf265608f9f6e472c5f7f63e5493fb`.
+Its generator and exact delta remain under `tools/make_npc_lifecycle_c.py`
+and `tmp/c-npc-lifecycle-source/lifecycle-delta.patch`. Only the isolated
+road-reactivation correction is retained in tracked code. Full cadence and
+transition revalidation of the changed road diagnostic remains required.
+
+## Earlier rival drift: measured per-update rounding loss
+
+The relevant rival is actor `$a6260`, native identity byte `+$71 = 10`.
+Use `b-reference-rivals` for its older two-record lap trace; the similarly named
+`b-lateral-leaders` records a different pair and must not be indexed as this
+rival. The correctly selected B samples also confirm no attack flag during
+1100–1320, preserving the preceding conclusion. The ignored lap wrapper now
+records `rival_base` explicitly in every new extended snapshot so that pair
+selection cannot silently depend on an old shell environment.
+
+On the original tape, B's rival x at fields 400/500/600 is 142/100/127, versus
+138/68/73 in the combined candidate. Its road-relative positions at field 500
+are 147 versus 115, while both stored road centres are -47. The lateral
+approach has therefore already diverged hundreds of fields before the extra
+attack; changing only contact response cannot correct that earlier difference.
+
+A direct movement probe now accepts and records `RR_NPC_ACTOR`. Fresh runs
+`b-rival10-motion` and `c-combined-rival10-motion` select `$a6260`, apply throttle
+at field 100, and stop before each native lateral-motion store after field 400.
+They end on the first observed simulation cursor at or beyond 460. No steering
+input from the original lap occurs before this window. All captured motions
+match the native unskidded expression
+`floor(((displacement >> 8) * heading) / 256)` exactly.
+
+| Trace | Cursor range | Updates | Sum of motion words | Sum of motion minus unrounded product |
+|---|---|---:|---:|---:|
+| B | 402..462 | 16 | -26 | -7.06640625 |
+| Combined C | 400..460 | 61 | -44 | -36.19140625 |
+
+These different boundary windows and heading histories are not equal-boundary
+trajectory comparisons. The last column measures the arithmetic rounding loss
+within each actual trace. C has 14 positive-heading updates that produce zero
+movement. For example, heading +2 with displacement 7,491 produces zero; heading
+-1 with displacement 7,475 produces -1. B's captured headings are all negative
+(-4..-1), whereas C's span -3..+2. The measured bias is a concrete reason to
+retain fractional NPC motion when normalizing timestep; it is not proof that
+rounding is the only source of the changed trajectory.
+
+The earlier quarter-reference carry experiment already addresses this class of
+loss but still fails the whole-lap comparison. Its outstanding carry lifecycle,
+AI approach feedback and interaction with longitudinal/road corrections remain
+necessary work. No production change or acceptance waiver follows from these
+local arithmetic checks. Both new traces retain actor address, raw numerical
+inputs, binary provenance and the tested slave; both diagnostic wrappers pass
+Python compilation.
+
+## Collision bounds identify an additional NPC attack
+
+The next probe observes the calculated lateral body gap at `$8c9c4` and
+`$8caee`, before penetration and response, restricted to player `$a5d60` versus
+rival `$a6260` during fields 1200–1320. `contact_bounds_c.py` maps the relocated
+movement-code addresses in C, retains both raw actor records and D0, and captures
+the native timestep. `b-contact-bounds` contains 17 observations;
+`c-combined-contact-bounds` contains 79. All observations use the right-side
+branch. For every observation, the signed word in D0 agrees with
+`player[+$30] - player[+$4a] - rival[+$4a] - rival[+$30]`.
+
+B has one negative body gap at cursor 1253: -2, with zero attack reach for both
+riders. C's first negative gap is -3 at cursor 1256, but the rival's `+$50`
+attack reach is already 25. The following six C observations have positive body
+gaps 23,18,18,22,23,24 at cursors 1257..1262. Each remains inside that attack
+reach. These match the seven downstream heading exchanges recorded previously.
+Thus the repeated contacts are not seven consecutive body overlaps: six are
+reach-only lateral overlaps. This comparison does not remove native longitudinal
+and height tests or prove that each overlap necessarily causes damage.
+
+The approach differs before contact. At B's first observed check (cursor 1206),
+player/rival world x is 143/34, road-relative position 326/46, and body gap 247.
+At C's first check (cursor 1200), these are 153/-65, 339/-35, and 343. These
+are different simulation boundaries, not an equal-boundary error measurement;
+they identify the already different rival placement that needs investigation.
+
+`attack_start_c.py` then observes the two native NPC attack-initialization sites
+`$906c6` and `$90728` for this rival. `b-attack-start` records no initialization
+between fields 1200 and 1320. `c-combined-attack-start` reaches `$90728` at
+simulation/live field 1254: D0=41 lateral separation, D1=47 attack threshold,
+D2=39 close-range threshold, D7=$4000 longitudinal threshold. The raw player and
+rival positions differ by 1,360 longitudinal units. Player/rival road-relative
+positions are 20/-21; collision half-widths are 18/13. The native initiation
+path therefore accepts this approach, and selects the farther-range branch
+because 41 is below 47 but not below 39.
+
+Ordinary lap samples independently show the rival's attack flag beginning at
+1256, phase 1 at 1258, phase 2 at 1280, and clearing by 1292; B's sampled attack
+flag remains clear throughout 1100–1320. These are observations at two-field
+sampling points, not exact phase-transition times. Native attack phase countdown
+at `$904c0..$904ca` subtracts the elapsed timestep, so this evidence alone does
+not establish a missing timer scaling correction.
+
+This narrows the next investigation to the pre-contact approach and attack
+selection. A direction-only body-collision guard is insufficiently justified
+for reach-only attack contacts. No runtime change, baseline waiver or C
+completion is claimed. Both trace pairs use the same binaries as the preceding
+combined-model/B comparisons and retain provenance and tested binaries in their
+ignored result directories.
+
+## NPC motion and directional collision-response experiments
+
+Three private normal-build experiments extend the combined reference-motion and
+road-timing candidate. All retain the default-off CUSTOM2 gate and one-field
+simulation. None is promoted: reducing repeated heading exchanges does not
+restore B's recorded handling or first scenery collision.
+
+| Candidate / replay prefix | Steering-write observations, fields 1200–1400 | First sampled crash | Lateral at 1400 / 1600 |
+|---|---:|---:|---:|
+| B reference | 4 | 1376 | already crashed |
+| Combined motion, previous experiment | 8 | 1538 | -475 / -902 |
+| `c-combined-npc` | 21 | 1316 | -488 / -627 |
+| `c-contact-direction` (NPC plus guard) | 9 | 1556 | -359 / -871 |
+| `c-contact-only` (guard without NPC change) | 5 | none through 1600 | -508 / -984 |
+
+The NPC experiment evaluates the existing lateral formula at four times the
+one-field displacement, then divides its result by four with a per-actor signed
+remainder. Its 35 carries reset at race start and follow the existing actor-copy
+hook; reactivation and non-riding carry lifecycle remain unaudited. The first
+contact cluster moves to cursors 1228..1238. Heading alternates
+3/-50/5/-50/7/-50/9/-50/13/-50/23 while LEFT is held. A second cluster spans
+1303..1312. This worsens the earlier repeated-heading-exchange observation.
+
+`c-combined-npc-impulse` breaks before native `$8ef5c`, preserving raw actor
+records. In the first cluster, side bit 1 of actor `+$69` remains set while
+`+$22` relative lateral displacement changes sign on successive ticks. Native
+response exchanges headings regardless of that sign. This motivates a private
+guard, but does not establish that world displacement is a sufficient collision
+normal: the side bit derives from previous road-relative coordinates and the
+response has already applied positional separation.
+
+The guard replicates `$8ef5c`'s initial relative-displacement calculation, then
+skips the heading exchange for zero/separating displacement according to the
+side bit, only when both actors are riding and below the traffic bank at
+`$a6560`. Detection, separation and damage remain native. Other paths resume at
+`$8ef64`. The same entry also serves rear-end responses, so this experiment is
+not validated for all contact classes. No cooldown or collision sampling limit
+is introduced.
+
+With NPC normalization, the recorded headings become 3,3,8,6,9,15,4,-3,-7.
+Without it, the five observations occur at cursors 1256,1257,1298,1299,1300,
+with headings 4,5,7,11,21. These are steering-write counts, not counts of impulses
+actually applied: the downstream steering write still executes when the guard
+returns early. Both lap outcomes fail the B comparison despite removal of the
+rapid sign alternation. Further changes need to account for actor approach and
+contact geometry, rather than treating fewer exchanges as acceptance evidence.
+
+Reproduction lives in the ignored harness: `make_combined_npc_c.py`,
+`make_contact_direction_c.py`, and the three matching `*-source` directories
+with exact deltas; results are in `*-lap` and `*-contact`. Normal binary sizes
+and SHA-256 values are:
+
+- NPC: 19,924 bytes, `a6271575b06a9054ba57dba84fce0a45ad904dba61c7532668c146a2b04f633e`.
+- NPC plus guard: 20,008 bytes, `5c55a4d159c0fb0dd33d43c188ad1f7de2d6dc9c96f6e6b56539e359429993e4`.
+- Guard only: 19,712 bytes, `33282bb4a1c2e14a1ad778c73c61e0e6649ffe41310a6f0716075c4a2fe730b8`.
+
+These are functional experiments on cycle-exact cached 020 emulation. No new
+throughput, full-race cadence, latency, or hardware-matrix acceptance is claimed.
+The production runtime and C's remaining acceptance gates are unchanged.
+
+## Combined-model crash origin and collision-driven steering
+
+`crash_origin_c.py` replays the original lap input through a known pre-crash
+checkpoint, asserts that the player is still riding, then breaks immediately
+before native writes that enter a crash state. Relocated movement-code sites
+are mapped back to native addresses. The probe preserves field-timed controls;
+B starts observing at 1300, the combined candidate at 1500 after releasing LEFT.
+
+`b-crash-origin` reaches `$8e3b0` at live/simulation field **1374**, before
+crash state 0 is stored. The usual sampled onset at 1376 observes that transition later.
+The caller returns through `$8c450` in world-object collision handling; A0 is
+object-record `$a7c8e`, A4 is handler `$8e35a`. Player lateral position is -468.
+`c-combined-crash-origin` reaches the different object handler's `$8e4b8` at
+live/simulation field **1537**, with A0 `$a7c3e`, A4 `$8e418` and lateral -902.
+This is observed at 1538 by the two-field lap samples. Neither first crash is
+entered through the rider-health or skid-threshold crash-state write. These
+records identify object handlers and record addresses, not a decoded scenery
+sprite identity.
+
+The approach differs before either terminal collision. At field 1374, the
+ordinary lap snapshots place B at position 11,792,110/lateral -468 and the
+candidate at 11,817,279/lateral -385. B's snapshot can interrupt the collision
+routine before its crash-state store, so it must not be treated as a completed
+pre-contact state. Candidate lateral motion briefly reverses during the held-
+LEFT turn. This prompted a separate probe of collision-driven steering writes.
+
+`steering_contact_c.py` watches `$8c25e` and `$8c36c` for player A1 from field
+1200 to 1400, while preserving the original held-LEFT input. All observed
+writes occur at `$8c25e`, which replaces steering and actor `+$42` using the
+current heading multiplied by 64. Results:
+
+| Run | Simulation cursors | Other riders |
+|---|---|---|
+| `b-steering-contact` | 1253, 1265, 1286, 1302 | `$a6260`, then `$a61e0` three times |
+| `c-combined-steering-contact` | 1256..1262 inclusive, 1309 | `$a6260` seven times, then `$a61e0` |
+
+At the first contact, B's player/rival lateral positions are -107/+17, whereas
+the candidate's are -176/-66. During the candidate's repeated contact its
+player heading alternates 4/-51/7/-50/9/-50/13, repeatedly overwriting the
+steering response despite LEFT remaining held. The different NPC approach and
+contact sequence therefore need investigation before attributing the missed
+scenery collision to road thresholds. The trace does not by itself prove that
+per-tick collision frequency is wrong or justify adding a collision cooldown.
+The existing private NPC lateral normalization is the next relevant component
+to evaluate with the combined model; no runtime change is made here.
+
+## Combined reference motion and road timing on the compact runtime
+
+A private candidate combines the existing four-field endpoint displacement
+correction with `VERIFY_C_ROAD_TIMING` on the newly integrated compact-geometry
+runtime. It still advances one PAL field per tick, preserves velocity/input
+updates, and introduces no arbitrary speed multiplier. It changes authoritative
+movement and therefore requires comparison to B, not just self-equivalence.
+
+`c-combined-motion-build/RoadRash.slave` is 19,624 bytes,
+SHA-256 `35860a067eae178b4a8afd25e4c55321d52d60828d0a5951aff425dbd5adea03`.
+Exact source deltas and the generator are retained in
+`c-combined-motion-source/source.patch` and `make_combined_motion_c.py` under
+the ignored harness. Tracked normal source is unchanged by this experiment.
+
+| Cell | Distance @490 | Difference from corresponding B | fps |
+|---|---:|---:|---:|
+| Fast 020 default | 3,334,538 | -0.886% | 12.2 |
+| Fast 020 Cache | 3,334,538 | -0.399% | 12.2 |
+| Fast 020 NoCache | 3,315,004 | -1.467% | 7.2 |
+| 060/50 | 3,334,538 | — | 23.0 |
+
+All four functional runs pass. Default/Cache 020 meet the short distance
+tolerance, but NoCache remains outside it and loses 0.4 fps against the current
+runtime. This does not establish an overall improvement or close A4.
+
+`c-combined-motion-dynamics` records 501 completed updates. All 500 consecutive
+pairs match `max(0,new_speed + floor(3*new_speed/2) - floor(3*old_speed/2))`
+exactly. At completed cursor 590, position is 3,868,569; at cursor 592 it is
+3,888,007, versus B's 3,888,640 at cursor 590 after 492 applied throttle fields.
+This 633-unit aligned gap supports the reference-integration explanation, but
+is not the prescribed live-field comparison and does not waive its failure.
+
+`c-combined-motion-lap` restores speed near B on the returning curve (9,714 at
+field 800 and 12,009 at 1000). Nevertheless its first sampled crash is at 1538,
+versus B's 1376 and the standalone road candidate's 1372. The final decoded
+rank is 15. Improved early speed/road placement is insufficient to claim
+collision or handling equivalence; the changed overtaking/collision sequence
+still needs investigation.
+
+Full snapshot builds use the previously tested register-preserving nearby
+bridges to avoid WHDLoad patch-target reach limits. Their normal outputs are
+byte-identical to the candidate above. `c-combined-motion-fixed` and
+`c-combined-motion-vary` match all **1595** common completed hashes, all **15**
+sound requests, and all six authoritative cursor-1457 snapshot ranges using
+`c-attacks.json`. This establishes sampled render-cadence independence of the
+changed model, not equivalence to the current runtime or B. No integration is
+made pending NoCache cost/distance and handling resolution.
+
+## Integrate simulation-only collision geometry
+
+Normal builds and lean `C_SIMULATION` diagnostics now select
+`C_COLLISION_GEOMETRY`. Full snapshot diagnostics retain explicit
+`VERIFY_C_COLLISION_GEOMETRY` selection for reference reproduction. The compact
+routine is initialized only after the existing Enhanced framerate/CPU/Fast gate;
+rendering keeps native complete geometry. There is no new user option or pacing.
+
+`c-collision-geometry-runtime-build/RoadRash.slave` is 19,040 bytes,
+SHA-256 `e94f1aeb2f6ac8ac8da133d73bcfac299bf0a829e3fa9339bab526690edc8daf`.
+The normal binary is byte-identical to the private normal candidate used in the
+hardware/response/control tests. Its lean diagnostic is byte-identical to the
+tracked diagnostic used for the copy and toggle-off probes. This connects the
+integration to the measured binaries without extrapolating from changed code.
+
+The original three-cell matrix plus `c-collision-geometry-remaining-matrix`
+cover all 11 normal configurations. Default/Cache Fast 020 reach 12.0 fps,
+NoCache 7.6, 030 default/Cache 16.6, 040 default/Cache 19.3, and 060 default/Cache
+23.0. A500 and Chip-only A1200 retain 8.5/12.5 fps and exactly match all legacy
+initial, field-590 and final snapshot fields from the previous runtime. The
+separate 040/060 `c-collision-geometry-mmu` checks pass with TC `$8000` and CACR
+`$80008000`; data-cache emulation is disabled and these provide no speed claim.
+Default/NoCache 020 distance is 3,308,406, still outside B's tolerance. Other
+accelerated samples are 3,318,164; optimization does not close A4.
+
+`c-collision-geometry-visible` measures paired neutral/RIGHT captures at fields
+300..307: **180/160/140/200/180/160/140/200 ms**, identical to the previous normal
+runtime at every phase (median 170 ms). Estimates retain one-field capture
+uncertainty; phase 303 remains 20 ms behind B. This optimization adds no measured
+response regression, but does not resolve the outstanding B phase difference.
+
+In addition to the successful-finish comparison below, the varying-cadence
+`c-collision-geometry-arrest` and `c-collision-geometry-wreck` preserve respectively
+**8377/11945** completed hashes, **241/120** sound requests, all six authoritative
+terminal ranges and exit fields **8378/11946** against the current physics/AI
+references. Both restart with capture `(92,91,0,1)`. These use the original
+recorded input tapes, with no synthetic damage or terminal-state seed.
+The inspected final images confirm BUSTED and WRECKED respectively.
+
+`c-collision-geometry-smoke` passes keyboard and CD32 steering/release,
+pause/resume (active field held at 161), demo fire exit and natural timeout,
+then enters a normal race after each demo. Stack guards remain intact; measured
+high-water use is 256/356 bytes for keyboard/CD32 and 300 for both demo tests.
+These are tests of the byte-identical normal candidate now integrated above.
+
+
+## Collision geometry: full finish, cadence and disabled-path checks
+
+`c-collision-geometry-finish` replays the retained
+`c-steering-finish-lane/driven-tape.json` with the tracked diagnostic and a
+four-field rendering floor. Against `c-physics-aux-finish`, all **12,822**
+completed actor hashes, **24** sound requests, six authoritative terminal
+ranges, finish at **12634**, and exit at **12823** match. A new race starts with
+capture `(97,96,0,1)`. The inspected final image shows FINISHED and rank 01;
+the next-race image has the expected road, riders, scenery and HUD.
+
+`c-collision-geometry-finish-vary` uses the identical input tape with the
+existing varying rendering pattern. It matches every hash, sound request,
+terminal range and finish/exit boundary above, and starts a new race with
+capture `(95,94,0,1)`. Actual frame intervals include 2, 3, 4, 12 and 16 fields
+(counts 743/385/565/283/283, plus startup entries); the fixed run records 3207
+four-field frames plus startup entries. Both runs cover airborne movement
+and all crash states 0..4 in sampled steering coverage. The fixed run samples
+two skid flags; the varying run samples none (their completed-tick hashes still
+match). These are
+functional-speed runs, not throughput measurements or full-draw 50 fps proof.
+
+`c-collision-geometry-copy` verifies all **388** relocated bytes at `$9f8560`,
+including the adjusted DBF displacement, against the two native spans. The
+native rendering entry retains `LEA $a6f3c,A0`. The diagnostic is in Fast RAM.
+`c-collision-geometry-off` uses the tracked lean diagnostic with `CUSTOM2=0`
+and confirms original instructions at all 33 existing enhancement hook sites.
+Normal production output remains unchanged.
+
+This closes successful-finish/restart and the tested varying-cadence comparison
+for this candidate. Arrest/wreck transitions, broader hardware/MMU coverage,
+visible-response phases and gameplay/presentation review remain required before
+normal integration. The existing B distance/handling differences remain open.
+
+## Compact collision geometry on the current runtime
+
+The earlier collision-only road experiment is retested after integration of
+Fast RAM physics/AI. It copies `$8970e..$8984d` and `$8989e..$898e1` into a
+388-byte Fast routine, omitting width and both edge projections only for the
+simulation's collision-preparation call. Centre, height and occlusion remain;
+native rendering still executes the full geometry routine. The sole relative
+branch crossing the omitted span is adjusted from `$ff14` to `$ff64`.
+
+`c-current-collision-geometry-matrix` measures the private 19,040-byte normal
+candidate against the current normal-runtime matrix:
+
+| Configuration | Current fps | Compact fps | Compact distance @490 |
+|---|---:|---:|---:|
+| Fast 020, default caches | 11.9 | 12.0 | 3,308,406 |
+| Fast 020, NoCache | 7.0 | 7.6 | 3,308,406 |
+| 060/50 | 22.8 | 23.0 | 3,318,164 |
+
+All three functional checks pass. Unlike the earlier lean-runtime experiment,
+these measurements improve throughput, especially NoCache (+8.6%). They do not
+prove which phase/cache interaction changed. Both 020 distances are still
+outside B's 1% tolerance and lower than the current normal runtime. Functional
+pass is not A4 acceptance.
+
+`c-current-collision-geometry-fixed` matches the fresh matched
+`c-current-lut-reference` (despite its name, that reference has no lookup): all
+1595 completed actor hashes, all three sound requests and all six authoritative
+snapshot ranges at cursor 1457 agree. RNG and the attack tape are identical;
+the diagnostic render floor is four fields. The in-flight final hash is excluded.
+
+Retain the candidate in `collision_geometry.s` under
+`VERIFY_C_COLLISION_GEOMETRY`, requiring C simulation and VERIFY. It rejects the
+separate road relocation and width lookup combinations. Initialization occurs
+only after the Enhanced framerate/CPU/Fast gate and flushes caches after copying.
+The default normal binary remains byte-identical to the current runtime.
+Tracked lean and full diagnostic builds are byte-identical to the corresponding
+private tested builds (`c-collision-geometry-tracked-build` and
+`c-collision-geometry-tracked-fixed-build`). No normal integration is made yet:
+full-course/restart, cross-cadence, all-CPU/MMU, disabled-path, visible-response
+and presentation checks remain necessary. This candidate does not resolve the
+outstanding handling or distance differences.
+
+## Current-runtime exact road-width lookup retest
+
+`c-current-cost-audit` profiles the current 18,592-byte enhanced normal slave on
+cycle-exact Fast 020 over fields 100..600. The road geometry routine
+`$8970e..$898e1` accounts for 5.821% of flat recorded units, with 619 calls
+(simulation preparation plus rendered frames). Its constant-width division at
+`$89854` executes 19,808 times and accounts for 0.494%. These are flat profiler
+units for this workload, not inclusive hardware timing or a universal cost split.
+
+Retest the existing exact `VERIFY_C_GEOMETRY_LUT` with the current physics/AI
+copies. The private normal source enables the flag for normal/C_SIMULATION
+builds only; the tracked runtime remains unchanged. It reserves 40 KiB optional
+ExpMem rather than 20 KiB and uses the existing gated, exact 8193-word lookup.
+Candidate `c-current-lut-build/RoadRash.slave` is 18,696 bytes,
+SHA-256 `d26613ddea22e611a7257c34af896f38796d0d93f4b82dcad49ef3c9649a9df4`.
+
+| Normal configuration | Current runtime fps | Lookup candidate fps | Candidate distance at 490 fields |
+|---|---:|---:|---:|
+| Fast 020, default caches | 11.9 | 12.4 | 3,318,164 |
+| Fast 020, NoCache | 7.0 | 6.9 | 3,318,164 |
+| 060/50 | 22.8 | 22.8 | 3,318,164 |
+
+All three `c-current-lut-matrix` cells pass their functional checks. The cached
+020 gain is 4.2%; it is not a universal improvement, and the flat division cost
+alone does not explain the whole throughput change. Frame deadlines and code
+layout can affect the result. The distance remains outside the default/NoCache
+B tolerance. No promotion to the normal runtime follows from these measurements.
+
+`c-current-lut-fixed` and `c-current-lut-reference` use fresh matched builds,
+seeded RNG, `c-attacks.json`, a four-field diagnostic presentation floor and
+capture cursor 1457. All **1595 completed actor hashes**, all **three sound
+requests**, and all six authoritative snapshot ranges match. The final in-flight
+hash is excluded. These checks establish short-tape equivalence for the retest;
+full-race/restart, cadence, cache/MMU, fallback and latency validation would still
+be required before any integration. Earlier lookup evidence is retained below.
+
+## Native rank audit: stale off-screen positions invalidate the old order check
+
+### Enhanced comparisons and publication-boundary validation
+
+The same observation on `c-road-rank-audit` and `c-npc-rank-audit` covers all
+15 racers exactly once across active/ahead/behind lists at all 23 sampled
+boundaries in each run. Neither substitutes a sorted off-screen stack for a
+complete race order. The decoded HUD ranks differ from B as follows:
+
+| Field | B | Road correction | NPC lateral prototype |
+|---|---:|---:|---:|
+| 1140 | 14 | 15 | 15 |
+| 1200 | 14 | 15 | 14 |
+| 1300 | 14 | 13 | 13 |
+| 1460 | 15 | 13 | 13 |
+| 1500 | 15 | 14 | 14 |
+
+At 1140 the road candidate still has rider `$a6260` 3409 position units ahead;
+B has that rider 20989 behind. At 1300, `$a61e0` is 1018 behind in the candidate
+and 10 ahead in B. These are nearby-rider differences, not artifacts of sorting
+inactive positions. The NPC prototype does not restore the sampled B rank
+sequence or crash behavior.
+
+The road candidate's field-1200 snapshot reconstructs rank 14 while its stored
+HUD rank is still 15. A field stop can interrupt a simulation step between
+movement and rank publication. `c-road-rank-boundary` therefore stops at
+`$8936c`, immediately after the native rank store, through simulation cursor
+1202. All **55** observations match reconstructed and decoded rank. The rank
+formula is validated at that boundary; an arbitrary field-boundary mismatch
+must not be called a gameplay bug without checking publication timing.
+
+The shared ignored `harness_a.py` now retains legacy raw `rank` and stored-
+position `order` for old-capture compatibility, adds `rank_displayed` and
+`native_ranking` (ahead/behind membership, reconstructed and displayed rank,
+and the mid-simulation observation caveat), and validates the complete rider
+partition. `replay_a.py` prints the decoded rank. Legacy raw-state hashes and
+comparison inputs are unchanged; this does not silently turn failed comparisons
+into passes. `c-road-native-ranking-harness` reruns the enhanced lap and
+preserves every legacy field, including state hashes, in all 24 snapshots
+(initial plus 23 scheduled samples). Full opponent-order equivalence remains
+an open verification task.
+
+
+The A4 harness's `order` field sorts all 15 riders by their stored actor `+4`
+positions. This is not the game's complete race order: inactive riders stop
+updating those positions. Do not use prior `order` mismatches alone as evidence
+of a race-order regression, or treat their removal as an A4 pass. Existing raw
+captures remain unchanged for reproducibility; full order equivalence is still
+unproven.
+
+Native `$892a0` computes the player's rank from the count at `$90946` (inactive
+riders ahead, excluding cop `$a5de0`), plus active riders in `$909cc` whose
+unsigned positions exceed the player's, plus one. `$89356..$89366` converts
+10..15 to packed decimal before storing `$a59f4`. Earlier reports of rank 21
+therefore mean raw `$0015`, displayed **15th**, not 21st; raw 20 and 19 mean
+14th and 13th. Equality checks of the raw rank remain meaningful.
+
+The ahead/behind arrays at `$90946`/`$90988` are counted pointer stacks:
+`$90d04` appends and `$90d12` removes the last entry. Their internal order is
+not a proven positional ranking. `$90ac0` estimates inactive progress using
+actor `+$66` multiplied by the low word of the simulation cursor at `$a5d52`.
+A replacement full-order verifier must account for this model rather than
+merely concatenate or sort the arrays.
+
+Live evidence: `tmp/b-rank-audit-v2/replay.json`, produced by
+`tools/rank_audit_c.py` with the retained B normal slave, A1200 Fast,
+`CUSTOM2=3`, and the original lap tape at 100-field sample spacing plus tape
+and screenshot boundaries. All **23** audited samples reconstruct exactly the
+decoded stored rank. All 23 disagree with the rank inferred by sorting stored
+positions. At field 100 the native rank is 15 while the old position sort says
+8; at field 1600 native rank is 15 while the sort says 6. The wrapper adds
+`rank_audit` with both inactive lists, reconstructed rank, decoded rank and old
+position-sort rank without changing the legacy fields or comparisons. This is
+a sampled pre-finish validation, not proof about terminal ranking behavior.
+
+The preceding NPC lateral prototype remains private. Quarter-reference
+integration improves rival `$a61e0` at fields 600/1000/1200 from lateral
+-15/-103/-187 to 4/18/5 versus B's 4/11/4, but moves the sampled player crash
+onset from road correction's 1372 to 1544 versus B's 1376. Evidence remains in
+`c-npc-lateral-lap`, `c-npc-lateral-leaders` and the retained build's source
+patch. Neither this prototype nor the rank-audit finding closes handling,
+distance, throughput or input-response acceptance.
+
+# Simulation/presentation separation audit
+
+C is in progress. The normal beta now uses the shared independent simulation
+on supported hardware when Enhanced framerate is enabled. Runtime integration
+and remaining regression/latency checks are not yet a completion claim.
+Addresses follow performance-plan.md's absolute-address convention.
+
+## Current runtime: combined Fast RAM AI and acceleration helpers
+
+Normal and lean builds now also select `C_PHYSICS_AUX`; full diagnostics
+opt in with `VERIFY_C_PHYSICS_AUX`. The four audited spans below add 2,356
+copied code bytes and eight entry redirects. Initialization remains inside
+the existing Enhanced framerate/CPU/Fast gate. Native data and the simulation
+timestep remain unchanged. Two movement-code stubs call copied helpers directly.
+
+The normal slave is 18,592 bytes, SHA-256
+`4a6a5d667acaf0462ead705b5a342e5f6de8449e2fbe3dedb7bef638b82a966f`.
+Tracked-source normal, full and MMU binaries are byte-identical to the tested
+`c-physics-aux-runtime-build`, `c-physics-aux-full-build` and
+`c-physics-aux-runtime-mmu-build` variants respectively.
+
+`c-physics-aux-runtime-matrix` passes all 11 normal configurations:
+
+| Configuration | Previous fps | Current fps |
+| --- | ---: | ---: |
+| A500 | 8.5 | 8.5 |
+| Chip-only 020 | 12.5 | 12.5 |
+| Fast 020, default | 10.3 | 11.9 |
+| Fast 020, Cache | 10.2 | 11.9 |
+| Fast 020, NoCache | 6.3 | 7.0 |
+| 030, default/Cache | 16.6 | 16.6 |
+| 040, default/Cache | 18.8 | 18.9 |
+| 060, default/Cache | 20.7 | 22.8 |
+
+A500 and Chip-only 020 initial, field-590 and final state hashes remain exact.
+Both enabled-MMU functional cells pass with CACR `$80008000`.
+`c-physics-aux-runtime-off` checks all eight new entries in addition to the
+previously covered hooks. `c-physics-aux-runtime-probe` verifies the normal
+copy, all 30 branch adjustments and the three movement-code branches that
+reach the two direct helper stubs.
+
+`c-physics-aux-{finish,arrest,wreck}` match their steering references across
+12,822/8,377/11,945 completed hashes, 24/241/120 sound requests, all six
+terminal authoritative regions, and terminal times. All three restart with
+`[99,98,0,1]`. The varying-cadence attack comparison below also passes.
+
+Normal keyboard/CD32 steering, release, pause and resume pass in
+`c-aux-runtime-{input,pad}`; stack use is 284/332 bytes with intact guards.
+The fire and timeout demo checks exit at fields 507/3,598 and both enter
+a normal race at field 100. Their stack use is 288/308 bytes with intact
+guards. The resulting race screenshots were inspected.
+
+`c-physics-aux-runtime-visible` measures 180/160/140/200/180/160/140/200 ms,
+median 170 ms. The first three phases match the preceding runtime; the
+remaining five improve by 20–40 ms. Against B, six phases improve, one
+matches, and phase 303 still trails by 20 ms. Capture-end estimates have
+one-field resolution and do not prove all-phase equivalence.
+
+The accelerated matrix's live-field distance is now 3,318,164 in every cell.
+Default Fast 020 and NoCache remain 1.373% below their B references; the
+Cache 020 and all 030/040/060 cells are within 1%. Handling/rank/crash
+equivalence remains unresolved. Throughput is closer to B but still below
+it in several configurations. These improvements do not complete C.
+
+### Current distance accounting and reference-integration candidate
+
+`c-aux-distance-dynamics` traces completed ticks in the current normal runtime
+with default cache policy. `b-default-distance-dynamics` runs the preserved
+B normal binary with CUSTOM2=3 and its original default cache policy. Both
+receive throttle at live field 100. Every B step in this window uses delta 4.
+
+At completed cursor 590, B is at 3,888,640 and C at 3,852,194. The actual
+live-field C checkpoint still contains cursor 589, position 3,842,452.
+The 46,188-unit live-field gap can be decomposed without changing either run:
+
+| Component | Distance units |
+| --- | ---: |
+| C cursor 589 to completed cursor 590 | 9,742 |
+| C cursor 590 to 592, equalizing applied throttle fields | 19,437 |
+| B four-field end-speed integration versus unit interpolation | 14,568 |
+| Remaining aligned difference | 2,441 |
+
+B has applied 492 throttle fields by cursor 590, starting with speed 136
+and displacement 544 at cursor 102. C first moves at cursor 101, speed 34
+and displacement 34. Its cursor-592 position is 3,871,631. For each
+four-field B step, using its end speed over the whole step exceeds unit
+linear velocity integration by `3/2 * (end_speed - start_speed)`. Summed
+over this window, that is `3/2 * 9712 = 14568`. This is an accounting
+counterfactual over B's recorded steps, not proof that intermediate gear
+or terrain states would remain identical. The raw live-field acceptance
+failure remains; the aligned comparison does not replace it.
+
+A private `REFERENCE_MOTION` experiment tests preserving the four-field
+endpoint convention while continuing to advance one tick per active field.
+In the primary movement loop it captures velocity before the native update
+and sets displacement to:
+
+`max(0, new_speed + floor(3*new_speed/2) - floor(3*old_speed/2))`.
+
+For constant acceleration without clamping, four such updates sum to the
+native four-field end-speed displacement. Differencing the rounded offsets
+preserves half units without persistent per-actor fractional state. The helper
+does not write velocity or change tick count or input sampling; altered
+positions can affect later terrain and velocity decisions. Other paths that
+override this displacement, including special crash paths, have not been
+normalized by this prototype. This is a gameplay change, unlike code copying;
+old authoritative trajectory hashes are not expected to remain equal.
+
+`c-reference-motion-dynamics` checks 500 completed primary updates against
+the formula and their resulting position increments. Completed-cursor-590
+distance is 0.707% below B, versus the current runtime's 1.083%.
+The actual normal-candidate live-field measurements in
+`c-reference-motion-runtime-020` are:
+
+| Fast 020 policy | Distance | Difference from B | fps |
+| --- | ---: | ---: | ---: |
+| Default | 3,330,871 | -0.995% | 12.0 |
+| Cache | 3,330,871 | -0.509% | 12.0 |
+| NoCache | 3,321,166 | -1.284% | 6.8 |
+
+The first two pass the distance gate, narrowly in the default case. NoCache
+still fails and loses 0.2 fps against the integrated runtime. The prototype
+is therefore not promoted. Its normal binary is 18,696 bytes, SHA-256
+`f12150a0710da2b9aaa07f605975bafb891d011f11d84748d580c5d459cec2c0`.
+
+The first full diagnostics failed before entering the game because their
+new PL_P targets exceeded WHDLoad's signed patch-target reach. The retained
+v2 builds use nearby register-preserving bridges to the same motion helper.
+`c-reference-motion-period4-v2` and `c-reference-motion-varying-v2` match
+1,595 conservatively completed hashes (excluding the last counted tick),
+three sound requests and all six authoritative field-1,457 regions. This
+proves the sampled cadence independence of the candidate, not B-equivalent
+handling or full-race acceptance. The source deltas are retained in
+`c-reference-motion-build/source.patch` and
+`c-reference-motion-period4-v2-build/source.patch`; normal source is unchanged.
+Further work must reduce the candidate's cost and cover the remaining
+movement paths, full-race outcomes and response phases before integration.
+
+### Compact correction tests and the longer lap discrepancy
+
+Two private variants retain the same displacement formula. The compact version
+saves old velocity in a two-byte stack slot between the hooks, replacing the
+global scratch word and its A0 save/restore. The native update between those
+hooks has no calls or exits: both acceleration branches join at `$8b4d2`.
+The correction uses `floor(3*v/2) = v + floor(v/2)` to reduce arithmetic.
+The aligned variant saves the adjacent actor words in a four-byte slot and
+reads its speed half, preserving the incoming stack alignment instead.
+
+`c-reference-motion-compact-varying` matches the earlier formula's fixed-period
+reference across 1,595 conservatively completed hashes, three sound requests
+and all six authoritative field-1,457 regions. The shorter code does not
+produce a useful throughput improvement:
+
+| Fast 020 policy | Compact fps | Four-byte-slot fps | Distance, both |
+| --- | ---: | ---: | ---: |
+| Default | 11.8 | 11.9 | 3,321,166 |
+| Cache | 11.8 | 11.9 | 3,321,166 |
+| NoCache | 6.8 | 6.8 | 3,301,708 |
+
+Against B these distances differ by -1.284%, -0.798% and -1.862% respectively.
+The four-byte-slot result isolates a small cached improvement within this
+equal-size layout, but does not prove that stack alignment alone caused it.
+Neither variant closes the default/NoCache gates. The original larger helper
+had a more favorable sampled phase; reducing instruction count did not
+preserve that advantage.
+
+Both normal candidates are 18,676 bytes. Compact SHA-256:
+`264625a71035c1b6e1e1a2a5f665db56d14fca7f4cadfb5e4cccc64bc8b657fb`;
+four-byte-slot:
+`31bfa48b9522a51e3b6a392922775b6781440f3b1bcdf167d8757ec917538629`.
+Their build directories retain exact source deltas. Neither is promoted;
+the aligned variant has not received the compact variant's replay acceptance.
+
+The original A1b lap tape is now also replayed on the current normal runtime
+in `c-aux-runtime-lap` and on the compact candidate in
+`c-reference-motion-compact-lap`. Both end with rank 21 and one sampled crash,
+as does `b-final-replay-on`, but the complete opponent orders differ.
+Crash onsets are 1442/1444 for current/candidate C versus B's 1376.
+Thus the distance correction does not close A4 handling equivalence.
+
+The trace identifies a larger divergence after the first steering input:
+at field 800 B's player speed is 9,772 with flags `$4200`, while current C
+is at 7,710 with `$4a00` and corrected C at 7,700 with `$4a00`.
+Bit 3 of actor `+$68`, set by the native road-relative lateral bounds check,
+therefore still marks both C players off-road when B is back on the road.
+By field 1000, B travels at 12,024 versus 7,099 in both C variants.
+Their positions are 8,005,924 / 7,084,951 / 7,096,105 respectively.
+This much larger later difference cannot be resolved by the small endpoint
+correction alone. The next investigation should trace road-centre/relative
+position across the returning curve and steering input, including positive
+curve updates. The earlier road-operand audit covered the initial negative
+curve and does not establish equivalence through this later section.
+
+### Returning-curve road-relative trace
+
+`b-reference-road-lap` and `c-aux-road-lap` repeat the unchanged field-scheduled
+lap tape, adding read-only player road-centre and road-relative snapshots.
+The B run reproduces all 752 prior sampled state hashes. C reproduces every
+sampled speed, lateral position, rank, opponent order and crash state; one
+position sample (1326) and two flag samples (1188/1486) differ, so this is not
+an exact whole-state replay claim. The checkpoints below reproduce the earlier
+player position/speed observations.
+
+| Field | B road centre | C road centre | B centre minus lateral | C centre minus lateral |
+| --- | ---: | ---: | ---: | ---: |
+| 600 | -105 | -102 | -265 | -262 |
+| 700 | -33 | -111 | -250 | -325 |
+| 800 | 63 | -111 | -126 | -305 |
+| 900 | 96 | -111 | 15 | -226 |
+| 1000 | 0 | -114 | -85 | -229 |
+
+This directly locates the later slowdown in the returning road-centre motion:
+C does not recover the positive centre movement that brings B inside the
+native +/-224 road-relative bounds. At field 700 the native road update word
+at player +$38 is positive in both runs (B 2, C 6), while C's centre is still
+negative. Positive small-step truncation is the next hypothesis to test at the
+actual integration instruction; these snapshots alone do not establish the
+operand-level cause. No motion correction or new runtime patch is promoted.
+The comparison is retained in `c-aux-road-lap/comparison.json`.
+
+### Curve integration operand audit
+
+`b-road-return-operands` and `c-road-return-operands-v2` trace the player
+integration after the original tape's field-600/620 right-steering input.
+The first C attempt targeted the native address and timed out; the corrected
+trace resolves the Fast RAM copy through the `$8b486` entry redirect.
+Every captured centre transition is checked against the preceding arithmetic.
+The native update is `3 * floor(floor(displacement/256) * d6 /256)`;
+`d6` is a change in the interpolated track curve, not an independent fixed
+curve coefficient. Thus both factors depend on the step length.
+
+B records 41 updates through cursor 783, curvature changes totalling 125,
+and centre movement +162. C records 162 updates through cursor 780,
+curvature changes totalling 114: 114 increments of one and 48 zeroes.
+Every C product rounds to zero. This proves the returning-curve loss at the
+integration instruction, not just from sampled player flags. The intervals
+and trajectories differ slightly, so their totals are not an exact aligned
+physics comparison.
+
+The private `c-road-reference-source` experiment evaluates displacement and
+curvature change at four times their unit-step values, runs the native signed
+rounding, then carries quarter-unit output into the road centre. It restores
+positive motion, but overcorrects: road centres at fields 600/800 are -78/+146
+versus B -105/+63; its crash occurs at 1330 versus B 1376. It is rejected for
+integration. Its normal binary is 18,692 bytes, SHA-256
+`e54e2b682149d0e95d1605dc48a9d7a491abb8da176132c716b695728c9c82ae`.
+Exact private source changes are retained in its build directory. Multiplying
+an already-rounded one-field curvature change is insufficient to reproduce
+the original reference calculation.
+
+The follow-up `c-road-window-source` substitutes the sum of the current and
+three preceding curvature changes for `4*d6`, retaining the four-field
+reference displacement and quarter-unit carry. History and carry reset with
+simulation state. It still executes every simulation field; there is no
+render wait or delayed presentation buffer. This is a private numerical
+integration experiment, not a change to the accepted runtime.
+
+`c-road-window-lap` brings road centres much closer to B:
+
+| Field | B centre | Candidate centre | B position | Candidate position |
+| --- | ---: | ---: | ---: | ---: |
+| 600 | -105 | -102 | 3,965,632 | 3,933,461 |
+| 800 | 63 | 54 | 5,761,316 | 5,730,305 |
+| 1000 | 0 | 10 | 8,005,924 | 7,936,097 |
+| 1200 | -183 | -184 | 10,124,359 | 10,087,294 |
+
+However, the later trajectory still fails: at field 1300 the player's lateral
+position is -427 versus B -172, with similar road centres (-158/-156).
+The sampled crash begins at 1324 rather than 1376 and final rank is 20 versus
+21. This isolates a remaining later handling difference after correcting
+most of the road-centre error; it does not establish a cause for that later
+difference. The next comparison should trace steering, skid/collision state
+and lateral increments around fields 1140–1324 with this candidate.
+The binary is 18,728 bytes, SHA-256
+`e3da1a13a4d0ea0ad15c6565700625e1b154f3ff290f8b01a7494bdb599f54d5`;
+its build directory retains the source patch. Neither cadence equivalence,
+full-race acceptance nor the hardware/performance matrix has been run for it.
+
+### Later steering divergence: opponent road integration
+
+The extended `b-reference-lateral` / `c-road-window-lateral` snapshots show
+that B's heading repeatedly approaches zero after field 1250 while left
+remains held. `b-lateral-collision-writes` then traces four writes at `$8c266`,
+at fields 1253, 1265, 1286 and 1302, involving actors `$a6260` and `$a61e0`.
+These collision paths reset the steering accumulator `$a7262`.
+`c-road-window-collision-writes` sees no corresponding writes through 1325.
+Both traces schedule the original inputs through 1140 and stop at race-field
+boundaries, resolving relocated collision addresses in C.
+
+`b-reference-rivals` / `c-road-window-rivals` locate the preceding opponent
+error. At field 800 actor `$a61e0` has road centre +54 in B versus +249 in C;
+at field 600 it was -54 versus -213. By field 1250 its C position trails the
+player by 3,678,751 units, whereas B's actor is 27,228 units ahead. The missing
+player collisions therefore cannot be repaired solely by changing player
+steering arithmetic.
+
+The native opponent road routine differs from the player's: at `$8bcd0` it
+adds the interpolated curve value `d1` directly to actor `+$36` on every call.
+It computes a curve difference in `d6` immediately beforehand but does not use
+that difference for this addition. This is a per-call accumulation requiring
+normalization independently of the player's displacement-product correction.
+
+Private `c-road-actors-source` adds a separate quarter-unit carry for each of
+35 actor records. A hook at `$8bcd0` adds one quarter of the native signed value
+per one-field tick, preserving the remainder and replaying the displaced
+following instruction. The table clears with simulation state; actor addresses
+outside the native table fall back to the original addition. This candidate
+also retains the player's four-tick curve history from the previous experiment.
+Actor-slot reuse/remount carry lifecycle and the reverse-travel routine remain
+to be audited before integration.
+
+`c-road-actors-lap` improves the original lap substantially:
+
+| Field | B player position | Candidate position | B rival centre | Candidate rival centre |
+| --- | ---: | ---: | ---: | ---: |
+| 600 | 3,965,632 | 3,933,461 | -54 | -54 |
+| 800 | 5,761,316 | 5,730,305 | 54 | 61 |
+| 1000 | 8,005,924 | 7,948,095 | 16 | 27 |
+| 1200 | 10,124,359 | 10,087,294 | -31 | -27 |
+| 1300 | 11,023,526 | 11,037,597 | -16 | -11 |
+| 1600 | 13,031,078 | 13,138,349 | -13 | -73 |
+
+The sampled player crash is now 1372 versus B 1376; both finish rank 21 with
+one crash. The complete opponent order still differs, including `$a6360` and
+`$a63e0`, so A4b is not passed. These are normal unseeded baseline comparisons,
+not proof that every AI difference is attributable to this arithmetic alone.
+The 18,952-byte candidate SHA-256 is
+`1c95b8dba97ff7ab684e03ac4aff34cb6b264ead687e3c597599b585ad486f0c`.
+Its build directory retains the source patch. The next gates are completed-tick
+cadence equivalence, carry lifecycle/reverse-path audit, and normal hardware
+throughput/distance checks before any runtime promotion.
+
+### Road correction cadence check and lifecycle audit
+
+The unmodified private actor-road candidate now passes the controlled-seed
+attack tape at requested period 4 versus varying/long rendering intervals:
+`c-road-actors-period4` and `c-road-actors-varying` match 1,595 conservatively
+completed actor hashes, ten sound requests and all six authoritative regions
+at capture field 1457. The actual frame histograms differ: the first run has
+280 frames with ordinary intervals mostly 4–8 fields; the varying run has
+170 frames and intervals reaching 20 fields. This verifies catch-up invariance
+under those measured schedules, not exact 1/2/3-field presentation coverage.
+The comparison is retained in the varying run's `comparison.json`.
+
+The new fractional state still needs lifecycle work. Native `$8bdc8` copies a
+complete actor record to its companion through the `$941ea` pointer table,
+but the candidate's external quarter-unit carry is not included. The native
+initialization clears actor road fields at `$87eb4` onward. The candidate does
+clear all carries during simulation reset, but has no actor-copy hook.
+The player's three prior curvature changes also survive a crash: the existing
+`step_steering_finish` clears only lateral steering carry. These omissions
+must be resolved and tested through crash/remount and race restart before
+runtime integration.
+
+The reverse routines at `$8be02` and `$8bf06` subtract the sum of crossed
+track segments from road centre (`$8bec6` / `$8bfb6`), rather than adding the
+forward routine's interpolated value every call. Applying the forward /4
+correction to these instructions would therefore change a spatial increment
+incorrectly. Reverse transitions still need lifecycle coverage for the new
+forward-history state.
+
+The candidate also completes all eleven normal hardware cells in
+`c-road-actors-020` and `c-road-actors-rest`. A500 and Chip-only 020 initial,
+field-590 and final hashes exactly match the preceding runtime. Throughput is:
+
+| Configuration | Candidate fps | Preceding runtime fps |
+| --- | ---: | ---: |
+| A500 | 8.5 | 8.5 |
+| Chip-only 020 | 12.5 | 12.5 |
+| Fast 020 default / Cache | 11.8 | 11.9 |
+| Fast 020 NoCache | 6.7 | 7.0 |
+| 030 default / Cache | 16.6 | 16.6 |
+| 040 default / Cache | 18.9 | 18.9 |
+| 060 default / Cache | 21.8 | 22.8 |
+
+Accelerated distance is 3,321,603 except 020 NoCache at 3,311,794. Against B,
+020 default differs by -1.271%, Cache by -0.785%, and NoCache by -1.562%.
+Thus the improved lap handling does not close the short-window distance or
+performance gates. No MMU, full-race transition, or visible-latency acceptance
+is claimed for this candidate. It remains private and unpromoted.
+
+### Private road-state lifecycle repair
+
+`c-road-lifecycle-source` extends the preceding private candidate in two places.
+At native `$8bdf0`, after companion-record copying has restored A0/A1, a hook
+copies the external per-actor road carry alongside the native record. It checks
+that both pointers name aligned records in the 35-record table; an in-table
+destination with an out-of-table source is cleared. The hook preserves its
+working registers and replays the displaced height shift and `$8b484` store.
+At the completed-step crash boundary, `step_steering_finish` now clears the
+player's road carry and three historical curvature changes as well as its
+existing lateral carry. Both additions remain within the enhanced patch path.
+
+`c-road-lifecycle-period4` and `c-road-lifecycle-varying` match 1,595 completed
+hashes, ten sound requests and all six field-1457 authoritative regions.
+These hashes also match the preceding actor-road candidate on this short tape;
+that fact alone does not exercise nonzero companion carry transfer.
+
+The direct natural copy probe observes player `$a5d60` copied to companion
+`$a6560` at field 1029, with zero carry on both sides and unchanged D0–D2/A0–A2.
+An attempted debugger-injected nonzero test failed because memory readback
+showed that the debugger writes had not taken effect. Those runs are retained
+as failed test setup, not evidence of a faulty copy hook or successful injection.
+A separate diagnostic binary seeds source carry 3 and destination carry 1 in
+its reset routine. `c-road-lifecycle-copy-seeded` then verifies the real copy
+changes destination to 3 and preserves the same registers. Its seeds are not
+present in the candidate binary.
+
+`c-road-lifecycle-crash-natural` starts from naturally nonzero history
+`00000000fffefffffffe0000` and verifies that the real crash boundary clears
+all twelve bytes. No debugger writes are used for this acceptance. This
+supersedes the earlier crash probe's unverified injection label.
+
+The unseeded normal lifecycle candidate is 19,076 bytes, SHA-256
+`976ef0d2adcbcde99c9b310e597117388e87ba0a20070a6b74a009287c3fce90`.
+Its period4 build directory retains the complete source delta. Full-race
+finish/arrest/wreck and restart coverage, reverse/slot-reuse transitions,
+normal lap, hardware costs and remaining A4 differences still require checks
+before promotion. The production runtime remains unchanged.
+
+### Reproducible road diagnostic and full-race coverage
+
+The road correction and lifecycle helpers are now retained in `road_timing.s`,
+selected explicitly with `VERIFY_C_ROAD_TIMING` alongside normalized steering.
+They are not selected by normal builds. All associated patch sites remain in
+the Enhanced framerate/CPU/Fast gated simulation patch list. This makes the
+experiment reproducible without promoting its unresolved A4/performance costs.
+The tracked period4 and varying full-diagnostic builds are byte-identical to
+the tested private lifecycle binaries. The normal build remains 18,592 bytes,
+SHA-256 `4a6a5d667acaf0462ead705b5a342e5f6de8449e2fbe3dedb7bef638b82a966f`.
+
+Two newly recorded field-timed tapes now cover full-race exits and restarts on
+the lifecycle candidate, using functional-speed 020 diagnostics:
+
+| Outcome | Reference / varying replay | Completed hashes | Sound requests | Finish field | Exit field |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Arrest | `c-road-lifecycle-driven-v2` / `c-road-lifecycle-replay-vary` | 6,885 | 78 | none | 6886 |
+| Finish | `c-road-lifecycle-lane-drive` / `c-road-lifecycle-finish-vary` | 16,454 | 67 | 16266 | 16455 |
+
+Each pair matches every published completed-tick hash, all sound requests,
+terminal timing and all six authoritative terminal regions. Both tapes exercise
+crash states 0–4, riding/remount, and airborne state; lateral carry remains
+within the configured quarter-unit bound. Restart probes read the twelve player
+road-state bytes and 140 actor-carry bytes and verify they are all zero after
+entering the next race. Final screenshots were inspected and show BUSTED and
+FINISHED respectively. These results establish cadence equivalence for the
+candidate, not equality to the preceding runtime or B's different trajectories.
+
+The initial full-race launch failed in AmigaDOS because CUSTOM2 was supplied
+twice; its screenshot and output are retained as `c-road-lifecycle-driven`.
+The harness now avoids appending a duplicate option. The normal-build original
+lap rerun (`c-road-lifecycle-lap`) retains crash onset 1372, final rank 21 and
+position 13,138,349, with the same final racer order as the preceding candidate.
+Intermediate live-field samples are not all identical; they are not substituted
+for the completed-tick comparison above.
+
+Wreck-exit coverage, shorter exact render periods, remaining reverse/actor-slot
+lifecycle cases, the final candidate's hardware/MMU/control/latency checks and
+B-equivalence/performance gaps remain open. Section C is not complete.
+
+### Road diagnostic: exact short presentation intervals
+
+Functional-speed 020 runs now exercise the short schedules explicitly with
+`VERIFY_C_ROAD_TIMING`, the seeded attack tape and capture field 1457:
+
+| Run | Requested interval | Measured ordinary intervals | Frame count |
+| --- | ---: | --- | ---: |
+| `c-road-period1-functional` | 1 | 799 at 2 fields | 803 |
+| `c-road-period2-functional` | 2 | 799 at 2 fields | 803 |
+| `c-road-period3-functional` | 3 | 533 at 3 fields | 537 |
+| `c-road-period4-functional` | 4 | 399 at 4 fields | 403 |
+| `c-road-period1-skip` | 1, drawing omitted | 1,600 at 1 field | 1,603 |
+
+Counts include three initial zero-interval samples and, except the skip run,
+one initial one-field sample. The nominal period-1 full-drawing run does not
+reach one-field presentation; it must not be counted as that coverage.
+The existing `VERIFY_SKIP_RENDER` diagnostic provides the actual one-field
+case, preserving simulation work and the native presentation handoff while
+omitting drawing. It is not a full-render throughput or visual test.
+
+Every run matches the real-speed period4 lifecycle reference across 1,595
+conservatively completed hashes, ten sound requests and all six authoritative
+field-1457 regions. Each output directory retains its measured histogram and
+comparison. Together with the prior long/varying tests, this verifies the road
+candidate's simulation invariance across the requested short scheduling cases;
+it does not close its B handling, hardware performance, or remaining transition
+gates. No production source or default runtime behaviour changes in this check.
+
+### Road diagnostic arithmetic cost
+
+The player's reference arithmetic now replaces signed multiplication by 768
+followed by an eight-bit arithmetic shift with three times the sign-extended
+low word. Signed quarter division uses a negative-input bias of three before
+an arithmetic shift, then subtracts four times the quotient to retain the
+signed remainder. Exhaustive comparison of all 65,536 signed-word inputs with
+seven possible carries (-3 through +3), 458,752 combinations, matches the
+preceding expressions exactly.
+
+The unpadded change shortened the helper and shifted later code. Direct normal
+candidate measurements therefore included two layout controls:
+
+| Candidate | Cached 020 fps | NoCache 020 fps | 060 fps | NoCache distance |
+| --- | ---: | ---: | ---: | ---: |
+| Preceding lifecycle | 11.9 | 6.7 | 21.5 | 3,311,794 |
+| Shortened arithmetic | 11.8 | 6.7 | 21.8 | 3,321,603 |
+| 12-byte pad, selected | 11.9 | 6.7 | 21.7 | 3,321,603 |
+| 10-byte exact-address control | 11.9 | 6.7 | 21.8 | 3,292,128 |
+
+These are `c-road-lifecycle-cost`, `c-road-arithmetic-cost`,
+`c-road-arithmetic-pad-cost` and `c-road-arithmetic-pad10-cost`. The selected
+padding follows an unconditional jump and is not executed. It restores the
+later movement/AI code-copy locations; the immediate actor helper starts two
+bytes later than before. The exact-address control restores that helper too,
+but worsens the live-field NoCache sample. None closes the distance gate.
+The selected layout gives a small measured 060 improvement without the
+unpadded cached-020 regression; this is not a broad performance acceptance.
+
+`c-road-arithmetic-final` matches the preceding varying-cadence lifecycle run
+across 1,595 completed hashes, ten sound requests and all six field-1457
+regions. The measured enabled normal candidate is 19,076 bytes, SHA-256
+`f168ec601a55a63d127fdb220979641582e3d3e1c45009c38124297ee03a1cb8`.
+The tracked correction remains opt-in diagnostic code; the default normal
+binary still matches SHA-256 `4a6a5d667acaf0462ead705b5a342e5f6de8449e2fbe3dedb7bef638b82a966f`.
+
+### Current road diagnostic: MMU and wreck-fixture checks
+
+`c-road-final-mmu` passes the 040 and 060 functional MMU cells using the current
+arithmetic and lifecycle code (`C_SIMULATION`, `VERIFY_MMU` and
+`VERIFY_C_ROAD_TIMING`). Both report TC `$8000`, CACR `$80008000`, exclusively
+one-field simulation deltas, and distance 3,331,396. The tested 19,712-byte
+instrumented binary SHA-256 is
+`83c13f85e4ab6fa9329fecffe37b17500ec981e0d31211b49b7c030e819af6d5`.
+These are translation/functionality checks with the harness's data-cache
+emulation disabled, not physical cached throughput measurements.
+
+The retained old wreck tape now produces arrest under the corrected physics:
+`c-road-final-wreck-fixed` exits at field 7963 after 7,962 completed ticks and
+18 sound requests, with damage 9. Its final screenshot shows BUSTED; restart
+and the road-state zero checks pass. It must not count as wreck coverage.
+
+A controlled wreck fixture uses the previously recorded lane-following finish
+route, with starting damage set to 10 by a private diagnostic reset patch.
+Only that starting condition changes; subsequent collisions accumulate damage
+through the native game code. The exact fixture patch is retained in
+`c-road-wreck-fixture-fixed-build/fixture.patch`. It is absent from tracked
+source and normal builds. This is explicitly a controlled transition test,
+not a claim that the old unmodified wreck tape still has the same outcome.
+
+`c-road-wreck-fixture-fixed` and `c-road-wreck-fixture-vary` match all 14,443
+completed hashes, 57 sound requests, terminal timing and the six authoritative
+terminal regions. Both captured damage 32 and exit field 14444, without a
+finish. The fixed run's inspected screenshot shows WRECKED. Both restart with
+all twelve player road-state bytes and 140 per-actor carry bytes zero.
+Together with the unseeded finish and arrest replays, this covers the three
+native exit types for the road-state transition audit, with the stated wreck
+initial-condition limitation. B-equivalence and remaining performance/control/
+latency checks are still open; the correction remains diagnostic-only.
+
+## Preceding runtime: Fast RAM movement and collision code
+
+Normal and lean runtime builds now select `C_PHYSICS_FAST`; full diagnostics
+opt in with `VERIFY_C_PHYSICS_FAST`. The 7,040-byte copy and its eight entry
+redirects are initialized after the existing C patches, only when the
+Enhanced framerate/CPU/Fast selection succeeds. Actors, graphics, simulation
+quantum and the native display handshake are unchanged. The implementation
+and relocation details are described in the candidate audit below.
+
+The normal slave is 15,600 bytes, SHA-256
+`63fbc6383922e5ce96d05d90e08445135ae5e978409877b7302d685cde4641c8`.
+The tracked-source normal and lean builds are byte-identical to
+`c-physics-fast-runtime-build`; its full diagnostic is byte-identical to
+`c-physics-fast-full-build`. These identities connect the candidate tests to
+the integrated implementation.
+
+`c-physics-fast-runtime-matrix` passes all 11 normal configurations:
+
+| Configuration | Prior fps | Current fps |
+| --- | ---: | ---: |
+| A500 | 8.5 | 8.5 |
+| Chip-only 020 | 12.5 | 12.5 |
+| Fast 020, default | 10.0 | 10.3 |
+| Fast 020, Cache | 10.0 | 10.2 |
+| Fast 020, NoCache | 5.0 | 6.3 |
+| 030, default/Cache | 12.5 | 16.6 |
+| 040, default/Cache | 16.6 | 18.8 |
+| 060, default/Cache | 18.5 | 20.7 |
+
+A500 and Chip-only 020 initial, field-590 and final state hashes exactly match
+the preceding runtime, which matched B. Both MMU functional cells pass in
+`c-physics-fast-runtime-mmu`, with TC translation enabled and CACR
+`$80008000`. These are functional checks, not real 040/060 data-cache timings.
+`c-physics-fast-runtime-off` verifies all eight new entry sites plus the
+previously checked enhancement hooks retain their native instructions.
+
+Full finish/arrest/wreck comparisons in `c-physics-fast-{finish,arrest,wreck}`
+match 12,822/8,377/11,945 completed hashes and 24/241/120 sound requests.
+All six authoritative terminal regions and terminal times match their
+respective steering references; each next race resets to `[99,98,0,1]`.
+The varying-cadence attack replay remains the 1,596-hash comparison below.
+
+Normal keyboard and CD32 tests pass in `c-physics-runtime-{input,pad}`:
+release recentres steering, pause holds field 161, and resume advances active
+time. Observed stack use is 276/332 bytes with guards intact. Demo fire exits
+at field 507; timeout exits at 3,598 with the existing two-field timer offset.
+Both reach a normal race at field 100. Screenshots were inspected; demo stack
+use is 268/284 bytes with intact guards.
+
+`c-physics-fast-runtime-visible` measures 180/160/140/220/200/180/160/240 ms
+over phases 300–307: median 180 ms versus the preceding runtime's 170 ms
+and B's 200 ms. Seven phases are one capture field later than the preceding
+runtime, while phase 302 is four fields earlier. These capture-end estimates
+have one-field resolution; neither aggregate throughput nor median response
+proves response equivalence at every phase. This trade-off remains explicit.
+
+Three live-field A4 distances still exceed B's 1% tolerance: default Fast 020
+(-1.953%), Fast 020 Cache (-1.471%), and Fast 020 NoCache (-1.663%).
+All 030/040/060 cells are within that distance tolerance, but this does not
+settle handling/rank/crash equivalence. Accelerated throughput still falls
+short of B in several configurations. C remains incomplete.
+
+## Preceding runtime: measured rider-heading prediction
+
+Normal and ordinary lean runtime builds now select `C_POSE_PREDICT` with
+`POSE_PREDICT_MEASURED`. Explicit `VERIFY_C_POSE_PREDICT` selection preserves
+fixed-horizon diagnostic controls. That normal slave is 8,212 bytes,
+SHA-256 `91ba5e9a2c5828c0cd7031bf68ff0917e6c0f62c928b3475ef266fd0bc79e484`.
+Prediction remains behind the existing Enhanced framerate/CPU/Fast selection.
+It affects the displayed rider heading, never authoritative actors or events.
+
+`c-pose-predict-runtime-visible` measures all eight input phases on this normal
+binary: 160/140/220/200/180/160/140/220 ms, median 170 ms, versus the preceding
+runtime's 230 ms and B's 200 ms. Phases 302 and 303 still trail B by 20 ms;
+the aggregate gain does not establish response equivalence at every phase.
+
+`c-pose-predict-runtime-matrix` passes all 11 normal configurations with the
+same fps as the preceding automatic-cache runtime below. A500 and Chip-only
+A1200 initial, field-590 and final state hashes exactly match B.
+Both integrated MMU checks pass in `c-pose-predict-runtime-mmu`.
+The expanded `c-pose-predict-runtime-off` probe verifies original instructions
+at the three new prediction hook sites as well as all previously checked
+enhanced hooks when CUSTOM2=0.
+
+Normal keyboard and CD32 steering/release/pause checks pass; active time
+holds at field 161 while paused. Stack guards are intact, with 276/368 bytes
+observed respectively. Both demo exits pass: fire at field 566 and timeout
+at 3,598 with the native timer offset, then a normal race at field 100.
+The resulting race screenshots were inspected. Demo stack use is 228/232
+bytes with guards intact.
+
+The rebuilt full diagnostic in `c-pose-predict-integrated-full-build` is
+byte-identical to `c-pose-predict-measured-finish-build`. In addition to the
+successful finish below, `c-pose-predict-measured-arrest` matches all 8,377
+actor hashes and 241 sound requests against `c-steering-finish-drive`, exiting
+at 8,378. `c-pose-predict-measured-wreck` matches all 11,945 hashes and 120
+requests against `c-steering-quarter-fullrace`, exiting at 11,946. Both
+match terminal authoritative ranges and restart with capture `[99,98,0,1]`.
+These diagnostic replay checks complement the actual normal-build tests.
+
+The current live-field A4 matrix still has four distances outside B's 1%
+tolerance: default Fast 020 (-1.373%), Fast 020 NoCache (-1.953%), and both
+060 configurations (-1.105%). Frame rates remain below B on accelerated
+hardware, and handling equivalence remains unresolved. Prediction does not
+close those gates; C is still in progress.
+
+### Unit-timestep arithmetic experiment: no measured throughput gain
+
+`c-unit-delta-{build,cost}` specializes five direct timestep multiplies at
+`$8b756`, `$8b764`, `$8b8f0`, `$8d536` and `$8e0d6`, plus the collision
+division at `$8ef64..$8ef6b`. For delta one, signed multiply becomes sign
+extension and unsigned multiply becomes zero extension. The collision
+dividend is explicitly sign-extended from a word, so division cannot overflow;
+zero extension followed by `TST.W` preserves the quotient, zero remainder and
+word-sign flags needed by the following `BPL`.
+
+The expanded `c-unit-delta-v2-*` candidate also specializes acceleration at
+`$8b4b8`/`$8bd1c` and speed-to-displacement at `$8b4d2`. It preserves D2's
+upper word and unit low word as well as the arithmetic result and flags.
+The native disassembly has no direct branch into the replaced sequence
+interiors. Both experiments require one-field simulation and use the existing
+enhanced-path gate.
+
+Each candidate has an equal-size, equal-layout control patch list that writes
+the original native instructions. On the cached 020, the initial candidate
+and control both render 193 frames over fields 100..1,000 (10.722 fps).
+The expanded candidate and its control both render 192 (10.667 fps).
+The different layouts between experiments mean the one-frame difference is
+not evidence that the arithmetic changes made rendering slower; within each
+controlled comparison there is no measured frame-count gain.
+
+Both `c-unit-delta-replay` and `c-unit-delta-v2-replay` match all 1,596 completed
+actor hashes, three sound requests, and the six authoritative field-1,457
+regions against `c-audit-period-4`, with the varying render-interval pattern.
+This establishes the observed replay equivalence, not a throughput benefit.
+The expanded patch is retained privately in
+`tmp/c-unit-delta-v2-build/source.patch`; no specialization remains in
+the tracked runtime. Normal runtime identity and the remaining C gates are
+unchanged. Further optimization needs to target larger costs than these
+isolated timestep arithmetic operations.
+
+### Actor-memory audit: race state shares storage with graphics
+
+`c-actor-memory-audit` examines the current 8,212-byte normal runtime without
+changing its memory or instructions. During a 300..320 live-field capture,
+19 complete recorded fields contain 44,893 bus accesses into
+`$a5d60..$a6edf`, all classified as CPU accesses. They touch 417 distinct bus
+addresses and account for 10.779% of the sample's 416,482 CPU bus records.
+This identifies a substantial source of Chip RAM traffic, not a measured
+speedup or proof that the region is CPU-only throughout the game.
+
+The native snapshot has 202 instruction operands referring into this address
+range and 51 populated pointer slots. These are address references, not all
+semantically actor references. Three real operands require decoding from the
+correct entry rather than following the linear disassembly through preceding
+data: `$898e6` (instruction at `$898e4`), `$8af7c` (`$8af7a`), and `$8b48a`
+(`$8b486`). A blind word-aligned scan finds another 40 address-shaped values
+that straddle instructions and must not be relocated.
+
+The live runtime matches 201 of those native operand values. The exception
+is `$8a8e8`, whose original player comparison is covered by the integrated
+prediction hook. The replacement comparison lives in the slave. Its emitted
+listing contains 12 direct references into this range; they also need explicit
+handling. The existing Fast RAM object-projection copy has no direct operand
+in this range. Populated data pointers include `$9017c`, the lists around
+`$90948`/`$909cc`, and the actor tables at `$94192..$94226`; the sampled slots
+are not an exhaustive lifetime inventory of every possible pointer.
+
+Crucially, the same Chip addresses serve graphics routines outside the actor
+lifetime. `$8172c` copies a variable-sized resource to `$a5de0`, then `$afd9c`
+turns its relative image offsets into absolute pointers. `$81fb2` reads the
+first such pointer from `$a5de2` into A1 and can call `$b452a`; that path writes
+A1 to `BLTAPT` at `$b465a`. `$83ba4` and `$b2b4c` also use `$a5de0` as a
+resource-load destination. `$b2b58` copies 6,048 bytes from there to `$f0de`,
+extending beyond the 4,480-byte actor region. Globally rebasing every reference
+would therefore both risk feeding Fast RAM to DMA and exceed a small
+actor-only allocation.
+
+Any actor relocation must split these lifetimes: keep graphics scratch and
+DMA sources in Chip RAM, establish separate Fast actor storage for races,
+and audit initialization, results, exit and restart transfers. It must rebase
+typed actor references and the slave's helpers, not every matching literal.
+The audit JSON and retained bus trace document the observations. No relocation
+is installed yet; this is a concrete D3 dependency for pursuing C's remaining
+simulation cost, not completion of D3's eligibility or transition audit.
+
+### Race-only Fast actor experiment: less physics traffic, inconsistent fps
+
+A private source generated by `tools/make_actor_fast_source_c.py`
+tests the race lifetime only. After field 100 it copies all 35 128-byte actors
+to a guarded optional Fast allocation, rebases 167 native race operands and
+12 emitted slave operands, and updates the race pointer tables. Graphics
+scratch references remain in Chip RAM. Initialization preflights the native
+operands and flushes caches after patching. Exit/restart restoration is not
+implemented, so this is not a candidate for normal-runtime integration.
+
+The equal-layout control performs the same allocation, copy, preflight and
+patching work with a zero relocation delta, leaving active actors in Chip RAM.
+The two 10,572-byte diagnostic binaries differ by five bytes within one
+six-byte instruction span. The candidate SHA-256 is
+`10c33ba16e147fe39e5f5fbe519a99c64b74e1aaa04de237409a39bc8ce2da39`;
+the control is
+`a20667b5bc6c4b238cebef86ab3595e54a6dee6c14e4ccc35a9d6a09223b3403`.
+
+Cycle-exact 020 measurements subtract each run's initial frame count:
+
+| Input/window | Cache policy | Chip actors | Fast actors |
+| --- | --- | ---: | ---: |
+| UP at 100, fields 100–1000 | Cache | 193 | 174 |
+| UP at 100, fields 100–1000 | NoCache | 108 | 113 |
+| UP at 200, fields 200–1100 | Cache | 216 | 218 |
+| UP at 200, fields 200–1100 | NoCache | 144 | 148 |
+
+Each window is 18 seconds. Delaying UP changes the scene as other riders
+continue moving; compare within each row, not between the two start times.
+The original cached scenario also regresses after initialization: fields
+300–1000 produce 153 control frames versus 140 candidate frames. Allocation
+guards pass throughout. The `c-actor-fast-replay` comparison against
+`c-actor-fast-control-replay` matches all actor, clock, camera and rank hashes
+at 501 completed ticks, 100 through 600. This establishes short-race equivalence,
+not attack/crash, full-race or transition coverage. Positions sampled at
+arbitrary live fields are not equal-tick comparisons.
+
+The cached profiles `c-actor-fast-profile` and `c-actor-fast-control-profile`
+cover fields 300–800 after UP at 100. The candidate produces 90 frames versus
+103. Physics at `$8b486..$8eff7` falls from 5,426,800,256 to 5,027,184,640
+profile units (7.4%) and from 3,984,370 to 3,081,461 Chip accesses (22.7%).
+However, the native vsync poll at `$aecf0..$aecf5` rises from 1,274,019,584
+to 2,350,782,080 units. Its additional waiting exceeds the measured physics
+saving; the sampled blitter waits also cost more. These observations do not
+establish the cause of the changed phase or justify removing the native
+display handshake.
+
+The prototype and its harness remain under ignored `tmp/`. There is no
+reliable overall throughput benefit to promote, and the normal runtime is
+unchanged. One scheduling question remains worth isolating: `step_main`
+currently rereads the live field clock on every catch-up iteration. A private
+comparison could capture the target once per outer frame, preserving every
+elapsed tick for subsequent frames, to test whether chasing newly arriving
+ticks contributes to the phase sensitivity. That hypothesis is untested;
+it must not introduce a limiter, discard time or weaken latency gates.
+
+### Fixed frame-target scheduling experiment: rejected
+
+The subsequent private `c-frame-target-source` captures the live field counter
+once on entry to `step_main`, then consumes ticks through that target. Fields
+arriving during catch-up remain due on the next outer frame; the prototype
+neither discards elapsed time nor adds a wait. Its equal-layout control retains
+the same capture but compares against the live clock on each iteration.
+The experiment starts from the normal source, without actor relocation.
+
+`c-frame-target-cost` and `c-frame-target-control-cost` run the cycle-exact
+cached 020 with CUSTOM2=1 and UP at field 100. Both start with 29 rendered
+frames. Over fields 100–1000, the fixed target produces 183 frames versus
+193 for the live-clock control. Sampled simulation cursors at fields
+100/300/600/1000 are 97/297/596/998 versus 99/299/599/999. These samples
+show greater simulation age in the candidate, not dropped ticks or a measured
+input-response result. The result supplies no reason to replace the current
+catch-up loop. No full gameplay or latency acceptance is claimed.
+
+Both diagnostic binaries are 8,844 bytes. Candidate SHA-256:
+`d5a7a209f85fb89f6175c17f3121d467a62ea244ee5a4ed6d1513c53997224b1`;
+control:
+`9de194737abed1dd117e0ee009c07e6f2924e9ef5f9d8375f3ab71c77188b2ee`.
+The exact source delta is retained in
+`tmp/c-frame-target-build/source.patch`. Normal runtime code remains
+unchanged. This rejects this particular scheduling change; it does not explain
+the actor-relocation regression or close C's outstanding throughput gates.
+
+### Actor relocation handoff trace: different deadline phases
+
+`c-actor-fast-handoff` and `c-actor-control-handoff` use the same tested actor
+binaries as above, cached cycle-exact 020, UP at field 100. Each collects
+400 breakpoint events beginning at field 300: render entry `$875c8`, swap
+entry `$87736`, swap return `$8773c`, publication `$871dc`, and consumer
+release `$8713a`. The breakpoints observe existing instructions; no timing
+instrumentation is inserted into the slave. The retained JSON includes
+beam position, live field, SOFT counter, record readiness and buffer pointers.
+
+Comparing the common live-field window 310–700:
+
+| Observation | Chip actor control | Fast actors |
+| --- | ---: | ---: |
+| Render entries | 77 | 66 |
+| Median render-entry beam line | 115 | 227.5 |
+| Median swap-entry beam line | 146 | 268 |
+| Swap entries before line 250 | 76 of 78 | 24 of 65 |
+| Complete swap intervals of five fields | 72 | 3 |
+| Complete swap intervals of six fields | 4 | 62 |
+| Median swap-return beam line | 254 | 254 |
+
+Counts differ because the window cuts through different frames; interval counts
+use consecutive returns wholly inside it. Beam medians describe phase within
+the raster, not elapsed duration across a wrapped raster.
+
+Both record-ready flags are zero at every sampled render entry, and screen
+buffers remain distinct and alternate at consecutive swaps. The slower cadence
+therefore does not arise from waiting for an occupied producer record at that
+point. Fast actors usually finish drawing after the line-250 SOFT signal and
+wait for the next one. This supports the earlier flat profile's increased
+vsync wait, while preserving the requirement for a safe buffer handoff.
+
+The trace establishes where the deadline is missed, not why the initial
+timing differs or how much individual drawing/simulation operations contribute.
+Extra waiting also means more elapsed ticks to consume before the next render,
+which can sustain a slower cadence; that feedback is an interpretation, not an
+isolated causal measurement. Do not remove the original swap wait or infer a
+fixed frame limiter from these five/six-field intervals. The next optimization
+needs enough measured work reduction to improve complete frame throughput,
+with phase and input-response checks alongside instruction/Chip-access counts.
+
+### Broad movement/collision code copy: promising private candidate
+
+The next experiment copies `$8b486..$8d005` (7,040 bytes) into the selected
+slave's Fast RAM hunk after installing the existing C hooks. Actors, lookup
+tables and graphics stay at their native addresses. Decoding the three code
+spans `$8b486..$8c583`, `$8c5a8..$8ce7f`, and `$8cef0..$8d005` covers
+1,922 instructions with no PC-relative data operands. Embedded data between
+those spans is copied but its absolute native references are not rebased.
+Seventeen word-sized branches leaving the copy use nearby absolute-JMP stubs.
+Internal relative branches keep their offsets; absolute and indirect calls
+retain their native destinations. Eight native entries redirect into the copy:
+`$8b486`, `$8baec`, `$8bbe6`, `$8c130`, `$8c48e`, `$8c5a8`, `$8c8ae`, `$8cef0`.
+Existing steering wrappers retain their canonical native return addresses.
+
+The private generator is `tools/make_physics_fast_source_c.py`.
+`c-physics-fast-probe` checks all 7,040 copied bytes, accounting for the 17
+branch fixups and eight overwritten entry points, and verifies each stub's
+destination. The observed copy begins at `$9fa4f0`. The equal-layout control
+allocates/copies/fixes the same block but skips installing entry redirects.
+
+Cycle-exact 020, UP at field 100, fields 100–1000:
+
+| Cache policy | Control frames | Candidate frames | Control fps | Candidate fps |
+| --- | ---: | ---: | ---: | ---: |
+| Cache | 192 | 198 | 10.667 | 11.000 |
+| NoCache | 108 | 128 | 6.000 | 7.111 |
+
+These subtract each run's own initial count: cached control/candidate 29/28,
+uncached 18/19. They establish gains in these scenarios, not yet a general
+hardware or phase-independent improvement. Results reside in
+`c-physics-fast[-control][-nocache]-cost`. Both cost binaries are 16,200 bytes:
+candidate SHA-256
+`493d15b2826fb79e4a05b8f52d6d2aed78e08e639e78ed8f9c1065d345049503`,
+control `e576dfb9f06f5c68d4b14722ed1caeff6792b151a33a95808973256ecdcffa87`.
+
+`c-physics-fast-varying` uses the seeded attack tape and varying render
+intervals, including 12 and 16 fields. It matches `c-audit-period-4` across
+1,596 completed actor hashes, all three sound requests, and the six
+authoritative field-1,457 regions (actors, clock, camera and ranks). Raw
+snapshot equality is not claimed for presentation-owned bytes.
+The 44,716-byte full diagnostic uses long-distance initialization addressing
+because its snapshot/hash storage exceeds short PC-relative reach; its SHA-256
+is `adb83105950f18443f920fc63e900fe97c0810cfc19338f832aa0a2006d429da`.
+Both tested source deltas are retained in their build directories.
+
+This candidate remains private and normal runtime code is unchanged. Before
+promotion it needs full finish/wreck/arrest and restart coverage, the normal
+hardware/disabled-toggle matrix, visible-response phases, and the existing
+distance/handling checks. The modest cached gain does not by itself close C's
+throughput deficit against B.
+
+### Combined AI/acceleration helper copy: next private candidate
+
+`c-physics-integrated-profile` profiles the integrated lean runtime over fields
+300–800 on the cached cycle-exact 020, after UP at 100. It renders 108 frames.
+The relocated movement/collision code and its stubs consume 1,943,214,848
+profile units; the remaining native `$8b486..$8eff7` range consumes
+2,378,648,832. These must be added when comparing simulation cost after
+relocation; looking only at the native address range would omit executed work.
+The leading remaining native ranges include AI dispatch `$8d2c0..$8d409`
+(375,215,872 units), acceleration `$8dd66..$8de6b` (299,334,528), and
+`$8e166..$8e251` (252,138,496). Range totals are flat-PC observations,
+not inclusive function costs.
+
+The next private copy groups four spans: `$8d2c0..$8d8cf`,
+`$8dd66..$8de6b`, `$8e166..$8e2d5`, and `$8da5c..$8db09`.
+Together they occupy 2,356 bytes with no PC-relative data operands.
+Thirty relative branches need adjustment: transfers between copied spans
+go directly to the matching copied target, while remaining external targets
+use nine native JMP stubs. Eight entry redirects cover the four AI entries
+and the four helper entries. Two stubs in the existing movement/collision
+copy now jump directly to the copied helpers, avoiding a native trampoline.
+Native data and mutable PC-relative tables outside these spans stay in place.
+
+`c-physics-aux-probe` verifies every copied byte after accounting for fixups,
+all entry redirects, cross-copy targets, native stubs and fallthrough jumps.
+The equal-layout control performs the same copies/fixups but skips installing
+entry redirects and retains the two existing native helper destinations.
+This combined experiment differs from the previously rejected isolated AI
+copy: several hot callees now execute in Fast RAM too.
+
+Cached cycle-exact 020 cost runs `c-physics-aux-cost` and
+`c-physics-aux-control-cost` produce 219 versus 195 frames over fields
+100–1000 (12.167 versus 10.833 fps), subtracting initial counts 30 and 28.
+The paired `-nocache-cost` runs produce 138 versus 128 frames
+(7.667 versus 7.111 fps), both starting at 19. This is a measured benefit
+in two scenarios, not yet a hardware-wide performance result.
+
+Both lean diagnostics are 19,208 bytes. Candidate SHA-256:
+`b3eaf5b07ce6fd23c3fab3bfdcb24d81d118dc5d2fe2aed98a5de3c5bb5cb742`;
+control:
+`604aeaa0f3c2c04dbfcdc848fef26eac5e8df2b346bea45e96a5b2fb75ed384d`.
+`c-physics-aux-varying` matches `c-audit-period-4` across 1,596 completed
+actor hashes, all three sound requests and all six authoritative field-1,457
+regions. Its full diagnostic is 47,708 bytes, SHA-256
+`57109b5768be7369b16c3e0d96dda9444088fe4746a58d1ced801bc1014641e0`.
+
+The generator `tools/make_physics_aux_source_c.py`, manifest and exact
+`c-physics-aux-build/source.patch` preserve the experiment. It is not enabled
+in the normal runtime. Full finish/arrest/wreck and restart replay, normal
+hardware/MMU/disabled checks, controls/transitions and response phases remain
+required before integration. The normal binary remains the integrated
+15,600-byte movement/collision version documented above.
+
+## Preceding runtime: automatic enhanced-path caching
+
+Normal and lean runtime builds now select `C_CACHE`; full diagnostics retain
+`VERIFY_C_CACHE` as an explicit alias for reproducible references. SetCPU runs
+only after the existing master-toggle/CPU/Fast selection succeeds. It uses
+the policy validated below and honors WHDLoad `NoCache`.
+The normal slave is now 7,940 bytes, SHA-256
+`b881288139d4b54192648e9533139ce7ace28a8de21daf1e7cdadca34ebed2ee`.
+The earlier 7,920-byte audit and experiments below retain their historical
+binary identities rather than silently becoming evidence for this build.
+
+`c-cache-runtime-matrix` passes all 11 normal configurations:
+
+| Configuration | Standard-window fps |
+|---|---:|
+| A500 1 MB Chip | 8.5 |
+| A1200 Chip only | 12.5 |
+| A1200 Fast, plain or `Cache` | 10.0 |
+| A1200 Fast + `NoCache` | 5.0 |
+| 030/50, plain or `Cache` | 12.5 |
+| 040/25, plain or `Cache` | 16.6 |
+| 060/50, plain or `Cache` | 18.5 |
+
+Default Fast-RAM 020 and 030 improve from 5.0/7.5 to 10.0/12.5 fps.
+Already-cached rates do not improve. A500 and Chip-only A1200 exactly match
+B's initial, field-590 and final state hashes. `c-cache-runtime-off` retains
+the original instructions at every enhanced hook inspected by the dispatch
+probe. Both integrated MMU configurations pass in `c-cache-runtime-mmu`.
+
+The rebuilt integrated MMU diagnostic is byte-identical to
+`c-cache-policy-pages-build`, and the rebuilt full-finish diagnostic is
+byte-identical to `c-cache-finish-build`. Thus the preceding page-descriptor
+and 12,822-hash finish/restart checks apply to those exact diagnostic
+instructions. They supplement the separate actual-normal matrix above.
+Normal keyboard and CD32 pause/release tests pass without a user `Cache`
+option; active time holds at field 161 while paused. Stack guards remain
+intact, with observed use of 256 and 344 bytes.
+
+This removes the need for a separate cache option on the selected enhanced
+path. It does not make the cached runtime faster than B, remove the A4
+distance/handling differences, or close the remaining response regression.
+C remains in progress.
+
+### Current normal-build response and rider-pose threshold
+
+`c-cache-runtime-visible` repeats all eight input phases (fields 300..307)
+against paired neutral runs using the actual 7,940-byte normal binary above.
+Upper estimates are 260/240/220/200/180/260/240/220 ms (median 230 ms).
+The B reference `b-visible-phases` is 180/220/200/180/220/200/180/220 ms
+(median 200 ms). Screenshot capture has one-field timing uncertainty; these
+are visible-pixel response measurements, not input sampling latency.
+Automatic cache integration has not removed the response regression.
+
+Native debugger probes `response_timeline_c.py` and `response_pose_c.py`
+in the ignored harness record the actual normal binaries without installing
+instrumentation. Evidence is in `{b,c}-current-response-{timeline,pose}`.
+The pose probe adds `$8a92c`, filters to the player actor, and records the
+selected sprite index in d0. Both binaries read heading thresholds 4/13/32
+from `$a7bfa`. For RIGHT injected at field 300:
+
+| Path | Render start | Player heading | Pose index | Swap return | First changed capture |
+|---|---:|---:|---:|---:|---:|
+| B | 302 | 1 | 3 | 305 | unchanged |
+| B | 305 | 4 | 2 | 308 | 309 |
+| C | 304 | 3 | 3 | 307 | unchanged |
+| C | 309 | 11 | 2 | 312 | 313 |
+
+C first selects pose 2 during catch-up at live field 307, simulation cursor
+305, heading 5. That selection cannot appear in the frame already rendered
+from cursor 304. The first changed B difference image contains only the
+rider; C's includes rider and scenery. Both images were inspected.
+Native `$aec78` exchanges `$404`/`$408` and publishes the new `$404` through
+the copper pointer writer `$aec2c`; the observed delay does not establish an
+extra queued frame or tearing.
+
+This narrows the first-response problem to a discrete sprite threshold and
+the time between rendered frames. It does not justify changing authoritative
+steering to hit the threshold earlier. A next experiment can predict the
+presentation heading through the render interval, with no added wait and
+without changing actor state, collision inputs, or simulation pose events.
+It must still pass phase-swept visible response, release/reversal behavior,
+and authoritative replay checks. No prediction is enabled by this audit;
+the throughput, A4, and response gates remain open.
+
+### Diagnostic presentation-heading prediction
+
+`VERIFY_C_POSE_PREDICT` adds a presentation-only experiment behind the existing
+enhanced-path selection and CUSTOM2 conditional patch list. It retains the
+last four authoritative player headings, estimates three fields of further
+heading change, and supplies that estimate only to the player's ordinary
+rider-sprite selector at `$8a8e2`. It never stores prediction in the actor.
+The simulation-owned pose/event pass always receives the authoritative
+heading. `POSE_PREDICT_FIELDS=0` builds a control with identical code layout.
+The experiment requires one-field simulation and is not selected by normal
+or ordinary lean runtime builds.
+
+Prediction requires held steering in the same direction as the observed
+heading change. Release, opposed heading, and reversal through zero suppress
+it. The zero-heading guard matters because native code has already chosen
+the sprite mirror bit before this hook; predicting negative heading from
+zero would otherwise use the wrong orientation. Crash/attack sprite branches
+that bypass this ordinary pose selector are unaffected.
+
+The initial cached-020 eight-phase run, `c-pose-heading-predict-visible`,
+measures 160/140/220/200/180/160/140/220 ms, median 170 ms.
+`c-pose-heading-control-visible` measures
+260/240/220/200/180/260/240/220 ms, median 230 ms. Those diagnostic binaries
+differ in one immediate byte (prediction horizon 3 versus 0).
+The first changed image at phase 300 contains only the rider, as intended.
+This improves the aggregate response measure, but phases 302 and 303 remain
+20 ms behind B. It is not proof that every input phase now matches B.
+
+The corrected mirror-guard build is `c-pose-heading-predict-v2-build`:
+8,740-byte diagnostic SHA-256
+`d686121d8a98a95d69817bb96a5ab4a3c33f5413a0232e4f610890dfcd681273`.
+Its complete repeat in `c-pose-heading-predict-v2-visible` reproduces all eight
+response measurements above, including the 170 ms median.
+`c-pose-heading-predict-v2-release` probes 60 player pose calls through release
+at live field 311 and opposite input at 321. Simulation calls remain exact;
+render headings 11 and 7 remain unpredicted after release, zero remains zero
+on reversal, and negative prediction resumes only after heading becomes
+negative. This checks the values entering sprite selection, not just input
+flags.
+
+`c-pose-heading-predict-v2-replay` matches `c-audit-period-4` on all 1,596
+completed actor hashes, all three sound requests and the six authoritative
+snapshot regions listed above at field 1,457. Stack guards remain intact
+(228 bytes observed). This is a four-field rendered-cadence replay, not yet
+full cadence, full-race, or hardware coverage for prediction.
+
+`c-pose-heading-{predict,control}-v2-cost` both render 192 frames between
+fields 100 and 1,000 (10.667 fps), with identical recorded cursors and player
+positions. The two binaries differ only in the horizon immediate byte.
+This isolates prediction versus zero prediction in this straight-line
+diagnostic; it does not establish zero overhead versus the uninstrumented
+normal runtime.
+
+Normal binaries remain byte-identical to the current 7,940-byte runtime.
+The diagnostic's fixed three-field prediction horizon is an experiment for
+the measured 020 render interval; it is not a calibrated policy for every
+CPU. C's throughput and A4 gates remain open.
+
+### Prediction cadence coverage and measured horizon
+
+The fixed-horizon diagnostic now also passes `c-pose-predict-varying`.
+Its observed non-startup intervals include 2/3/4/12/16 fields. All 1,596
+completed actor hashes, three sound requests, and six authoritative regions
+at simulation field 1,457 match `c-audit-period-4`.
+`c-pose-predict-finish` matches `c-cache-finish` across all 12,822 actor hashes,
+24 sound requests and terminal authoritative regions: finish at field 12,634,
+exit at 12,823, followed by fresh capture `[99,98,0,1]` in the next race.
+The finish diagnostics use the established full-snapshot configuration
+without the optional Fast RAM stack; the varying replay includes that stack.
+
+`POSE_PREDICT_MEASURED` adds an alternative diagnostic horizon. It observes
+the live-field interval from render entry `$875c8` through return from the
+native display handoff at `$8773c`, then uses that interval for the next
+frame's rider-heading prediction. Race initialization clears the estimate.
+It caps extrapolation at four fields after a long frame, with no waiting or
+change to the original vsync handshake. This variant rejects simultaneous
+whole-view extrapolation or the diagnostic latency hook at assembly time,
+since those experiments share patch sites.
+
+Direct player-pose probes in `c-pose-predict-measured-020` and
+`c-pose-predict-measured-060` pass simulation isolation and release/reversal
+checks. The cached 020 sample uses three fields on all ten observed renders.
+The 060 sample uses three fields on five renders and two on eighteen.
+Those are measurements of these emulator scenes, not assumed CPU constants
+or a claim of cycle-accurate 060 hardware timing.
+
+The measured lean diagnostic is 8,828 bytes, SHA-256
+`2c6399c3d25d58f21fb222635498892250d76844455defac1f05ee6b124846ff`.
+`c-pose-predict-measured-visible` repeats all eight response phases and
+reproduces 160/140/220/200/180/160/140/220 ms, median 170 ms. The remaining
+20 ms deficits at phases 302 and 303 against B are unchanged.
+`c-pose-predict-measured-bounded` observes horizons 2/3/4 over long-frame
+testing and passes the release/reversal and simulation-isolation assertions.
+
+`c-pose-predict-measured-varying` matches the same 1,596 hashes, three sound
+requests and six authoritative snapshot regions as the fixed-horizon
+experiment; its observed cadence again includes 2/3/4/12/16 fields.
+`c-pose-predict-measured-finish` matches all 12,822 hashes, 24 events,
+finish/exit fields, terminal regions and fresh-race capture against
+`c-cache-finish`. Live checkpoints can land on different in-flight simulation
+ticks; these claims use completed-tick hashes and the captured boundaries.
+
+Both prediction variants remain diagnostic-only. All normal binaries built
+alongside this work retain the current 7,940-byte runtime hash. These checks
+do not yet cover prediction in the normal hardware matrix, demo transitions,
+MMU configurations, or the complete arrest/wreck replays, and they do not
+close C's existing throughput or A4 differences from B.
+
+## C completion audit against the preceding integrated steering runtime
+
+This audit applies to the normal 7,920-byte runtime with SHA-256
+`60ef76f312d7f08ce067b5a6b32966bb47f074ee78fd1166bd1cd1e0a7916bdb`.
+Historical tests below retain their original scope; a passing older build is not
+automatically a passing test of this binary.
+
+| Requirement | Evidence and remaining work |
+|---|---|
+| C1a: boundaries and delta consumers | The ownership table and direct-delta audit below identify the race loop, field hook, display handshake and per-frame side effects. |
+| C1b: 20 ms simulation, clock, pause and normalized effects | Runtime uses `STEP_FIELDS=1`; camera decay and steering have explicit normalization. Current CD32 pause/resume passes. Original-speed equivalence remains incomplete: live-field distance and collision/handling comparisons still differ from B. |
+| C1c: ownership and field input | Simulation owns actor/collision/AI updates, camera, poses and sound requests; display retains buffer publication. Current finish, wreck and arrest tapes compare completed-tick hashes and sound events across cadences. This does not prove B-equivalent handling. |
+| C2a: consume elapsed time | Catch-up uses one-field steps and queued field inputs. Terminal ticks stop catch-up; history exhaustion aborts explicitly rather than dropping input/time. Historical overflow and initialization tests exist; current full-race replay validates terminal/restart behavior. |
+| C2b: latest state, no delayed interpolation | Normal runtime renders completed simulation state without interpolation. Current normal eight-phase visible-response median is 230 ms versus B's 200 ms. No explicit interpolation delay exists, but the measured response regression remains open. |
+| C2c: original safe handoff, no extra pacing | Normal patch list retains the native swap without B's floor/clamp. Historical beam/record trace demonstrates one-field handoff when drawing is omitted. Full-render throughput is not evidence of a limiter; replacing B's safeguards is not fully validated until the other regression requirements pass. |
+| C2d: CPU/Fast selection and fallback | Current normal off/Chip-only probes retain original enhanced-hook instructions; current A500 distance and final state match B exactly. The boolean is off by default and gates all runtime enhancements. |
+| C3a: explicit cadence replay | Fresh current-model checks below match at observed 1/2/3/4 and varying intervals; one-field cadence requires diagnostic drawing omission. Current finish/arrest and equivalent wreck builds additionally prove full-race varying/longer cadence replay. |
+| C3b: A2/A4, controls, demos, transitions and latency | Current normal keyboard/CD32, both demo exits, fallback and latency tests exist, with current-model full-race transition coverage. A4 live-field distance, full opponent order and screenshot review remain unresolved. Equal-duration diagnostic distance accounting does not replace A4's fixed-live-field gate. |
+| C3c: hardware throughput and simulation cost | All 11 normal hardware cells now have current-binary results, plus the integrated 040/060 MMU checks. The current normal cached-020 physics profile is refreshed below. Cached throughput is 10.0/12.5/16.6/18.5 fps and remains below B; optimization and its validation remain open. |
+
+C remains incomplete. D–F are expected to provide further rendering speedups;
+that expectation does not waive C's original-behavior, latency or verification
+requirements. Current-build control/demo and hardware checks are now complete
+at their stated scopes. The next work must address the distance/handling,
+throughput and response regressions rather than rename the baseline.
+
+### Fresh explicit-cadence replay
+
+`c-audit-period-{1,2,3,4}` rebuilds the current simulation with steering, Fast RAM
+object projection and stack, fixed diagnostic RNG, sound-event capture, and
+the identical `c-attacks.json` field tape. `c-audit-varying` adds the existing
+1/2/3/4/12/2/16/4 interval pattern. All normal binaries produced alongside these
+diagnostics match the runtime SHA above.
+
+Observed histograms matter: requested periods 1 and 2 both produce 799
+two-field intervals, while periods 3 and 4 produce 533 three-field and 399
+four-field intervals. The varying run observes 2/3/4/12/16-field intervals.
+These counts exclude startup bins. `c-audit-one-field` uses the existing
+`VERIFY_SKIP_RENDER` diagnostic and observes 1,600 one-field intervals. It
+retains simulation, geometry and the native display handoff, but omits drawing:
+it establishes one-field scheduling coverage, not full-render 50 fps.
+
+All six runs match 1,596 common completed actor hashes and all three sound
+requests, including their tick numbers. At completed simulation field 1,457,
+the entire actor range `$a5d60..$a6edf`, clock/spawn range `$a5d50..$a5d5f`,
+camera longs `$a5d1e/$a5d22`, and rank ranges `$a7220..$a7227` and
+`$a59f4..$a59f5` match byte for byte. Thus player distance and actor crash state
+also agree at that boundary. All stack guards remain intact.
+The full snapshot includes presentation-owned bytes and is not expected to be
+identical across cadences.
+
+The linear diagnostic's live step counter can include a tick whose hash has
+not yet been written: period 3 stops during tick 1,599. The comparison therefore
+uses the shared completed window through tick 1,596, checking every slot is
+populated rather than treating the live counter as a publication marker.
+The retained `c-audit-varying/comparison.json` records ranges, histograms and
+binary hashes. These tests close the explicit short-tape cadence coverage gap;
+they do not close the B-reference regressions above.
+
+### Current normal keyboard and demo transitions
+
+`c-audit-keyboard` runs the normal binary on the cached, cycle-exact 020 setup.
+Joystick steering reaches 798 at active field 120 and returns to zero after
+release at field 160. Keyboard pause holds the active clock at 161 through
+the additional paused interval; keyboard resume advances it to 180. The Fast
+RAM stack guards remain intact, with 276 bytes of observed use. The slave
+copied into the runtime directory matches the audited SHA above.
+
+`c-audit-demo-fire` and `c-audit-demo-timeout` use the same normal binary on the
+functional-speed 020 setup. Both show demo position advancing at fields
+163/263/363/463. Fire exits the first demo at field 566. The unattended demo
+exits at field 3,598, preserving the native 3,600-count timeout with its
+initial two-count offset. Both clear the active race hook on exit, then start
+a human-controlled race at field 100 with demo mode cleared, lateral position
+160 and speed zero. Screenshots were inspected and show the normal race start
+after both exits. Stack guards remain intact, with observed use of 216 and
+232 bytes respectively.
+
+These checks refresh the previously historical keyboard and demo evidence.
+They are functional transition checks, not a new original-behavior distance,
+handling or latency result.
+
+### Complete current normal hardware matrix and refreshed profile
+
+`c-audit-matrix-remaining` adds the six missing normal configurations to
+`c-steering-runtime-matrix`. All 11 runs use the audited normal-binary SHA.
+The table compares actual normal binaries against `b-final-normal-on`, avoiding
+instrumentation differences in the older diagnostic matrix.
+
+| Configuration | B fps | C fps | Fixed-live-field distance change |
+|---|---:|---:|---:|
+| A500 1 MB Chip | 8.5 | 8.5 | 0.000% |
+| A1200 Chip only | 12.5 | 12.5 | 0.000% |
+| A1200 Fast | 12.5 | 5.0 | -1.373% |
+| A1200 Fast + Cache | 16.6 | 10.0 | -1.180% |
+| A1200 Fast + NoCache | 12.5 | 5.0 | -1.373% |
+| 030/50 | 13.3 | 7.5 | -0.192% |
+| 030/50 + Cache | 16.6 | 12.5 | -0.988% |
+| 040/25 | 22.6 | 16.6 | -0.836% |
+| 040/25 + Cache | 22.6 | 16.6 | -0.836% |
+| 060/50 | 23.2 | 18.5 | -1.105% |
+| 060/50 + Cache | 23.2 | 18.5 | -1.105% |
+
+Every cell completes the measurement window. A500 and Chip-only A1200 also
+match B's initial, field-590 and final state hashes exactly. Five accelerated
+cells exceed A4's 1% distance tolerance; none of the accelerated cells improves
+on B's throughput. Passing boot/race checks must not be reported as passing
+those regression gates. The existing current integrated 040/060 MMU results
+remain functional checks with translation enabled, not hardware speed claims.
+The retained `comparison.json` records each normal result path and both distances.
+
+`c-audit-runtime-profile` refreshes the actual normal cached-020 flat profile
+over active fields 100–600. Native physics/AI addresses `$8b486..$8eff7`
+account for 31.165% of recorded units. The largest 256-byte blocks remain
+`$8d900` (2.006% of all units), `$8d300` (1.934%), `$8b500` (1.726%),
+`$8bc00` (1.617%) and `$8c800` (1.604%). This range excludes relocated slave
+helpers and is not the entire inclusive simulation cost. The distribution
+still shows substantial work spread across physics and AI; it does not
+justify repeating the already rejected AI relocation/invariant-read changes.
+Flat emulator units and the 040/060 timing limitations retain the qualifications
+documented in the earlier profile sections.
+
+### Distance regression: gear thresholds and road-centre rounding
+
+`b-audit-distance-dynamics` / `c-audit-distance-dynamics` and the extended
+`b-audit-road-dynamics` / `c-audit-road-dynamics` trace completed steps on the
+cached cycle-exact 020. B uses the preserved seeded reference; C uses the fresh
+period-1 diagnostic with current steering, Fast object projection and stack.
+Both receive throttle at live field 100. The additional fields are acceleration,
+gear, lateral position, height, riding flags, crash state, road centre, road
+fraction and displacement. They supplement, rather than replace, the earlier
+completed-step distance accounting.
+
+All recorded steps retain lateral position 160 and crash state -1. Every
+successive position increment exactly equals the completed speed multiplied
+by that step's delta. Thus the earlier endpoint-velocity integration bias is
+still present; no additional unexplained displacement term is needed for this
+window. Gear thresholds also produce different overshoots: the first shift
+completes at speed 5,552 in B and 5,432 in C. This is distinct from lost small
+steering movements.
+
+A further difference appears in the road-relative position used for drag:
+
+| First off-road flag | B | C |
+|---|---:|---:|
+| Completed cursor | 533 | 528 |
+| World position | 3,307,451 | 3,216,351 |
+| Road centre | -66 | -66 |
+| Bike lateral position | 160 | 160 |
+| Speed | 10,929 | 10,819 |
+
+C reaches the same road-relative threshold 91,100 world-position units
+earlier. Its first subsequent downshift completes at cursor 530, versus B's
+545. No steering input or crash explains the discrepancy.
+
+The native calculation at `$8babe..$8bace` combines displacement with `d6`,
+the accumulated road-curve change including its fractional lookup difference:
+`3 * floor(floor(displacement / 256) * d6 / 256)`, using signed arithmetic
+shifts. This is quantized before the result is added to actor `+$36`.
+In these traces every nonzero centre update is -3. C has already made 14
+such updates at position 2,694,903 (centre -42); B has made only 13 at
+2,698,025 (centre -39). Coarser steps can combine curve changes before
+rounding, so replacing their delta with one field does not preserve this
+stateful effect. For example, a negative product between -256 and -1 rounds
+to -1 before multiplication by three.
+
+`c-audit-road-dynamics/comparison.json` retains the first off-road states,
+gear transitions and the exact endpoint-integration checks. This initially
+identified road-centre integration as a normalization hypothesis. The operand
+and fixed-four-field tests below narrow that conclusion: a discrepancy against
+one variable-delta B run does not establish an error against the four-field
+handling reference. No speed multiplier or road-state correction is installed.
+
+### Road operand trace: distinguish variable B rounding from the reference
+
+`b-audit-road-operands` and `c-audit-road-operands` break at `$8babe`,
+before the native road-centre update. They read signed `d6`, displacement and
+the old centre, then verify that the next observed centre exactly equals the
+previous centre plus the independently calculated update. All 166 B and 503 C
+observations pass. The B run contains 160 delta-3 and six delta-4 updates;
+all C updates use delta 1.
+
+The C trace has 35 negative curve changes, each -1; B has 34 changes of -1
+and one of -2. In the relevant speed range, two small negative changes each
+round to a -3 centre update, while one combined change can also round to
+only -3. This explains the observed three-unit centre difference without
+assuming a different road table or steering input.
+
+An offline four-field grouping of the C operands, tested at all four grouping
+phases, still ends at centre -105 and crosses the off-road threshold at
+positions 3,216,351–3,248,688. Simply retaining fractional products is not a
+faithful correction: it ends at approximately -15.82 rather than -105.
+Even multiplying displacement by four before fractional accumulation ends
+at approximately -63.94. These are calculations over the captured trajectory,
+not closed-loop gameplay tests; they reject a simplistic correction rather
+than validate a replacement model.
+
+`b-audit-four-field-road-operands` adds a native B diagnostic with fixed RNG
+and `VERIFY_FRAME_PERIOD=4`. Its 126 observed updates all use delta 4 and all
+pass the same native-formula check. Its road centre first crosses -64 at
+position 3,234,720, compared with C's 3,216,351: the 18,369-unit difference
+is smaller than that B step's 43,328-unit displacement. Its -2 curve changes
+produce -6 updates at this speed, preserving changes that the mostly delta-3
+run combines differently.
+
+This short straight-input trace therefore does not justify altering C's
+road-centre integration to match the mostly delta-3 B run. It is consistent
+with the four-field reference within its discrete crossing interval; that
+is narrower than proving road handling equivalent over a complete course.
+`c-audit-road-operands/comparison.json` retains the crossing operands and
+delta/curve distributions for all three runs. The original live-field A4
+failure remains open, including input retroactivity, endpoint integration,
+gear overshoots and rendering debt identified in the earlier accounting.
+
+### Rejected collision-only road projection experiment
+
+The refreshed profile places 4.624% of recorded units in `$89800..$898ff`.
+Simulation calls the native road geometry before world-object projection;
+rendering calls it again before drawing. The region `$8984e..$8989d`
+computes road width and both edge projections. Direct consumers of those
+arrays occur in the rendering path, while object collision projection reads
+the retained centre, height and occlusion arrays.
+
+The private `VERIFY_C_ROAD_COLLISION` candidate copied the 468-byte native
+routine into the already-selected Fast RAM slave hunk. Only simulation used
+this copy. A branch skipped the width/edge region, retaining the native render
+entry and its complete geometry calculation. It was initialized only after
+the master toggle and hardware checks selected C.
+
+`c-road-collision-replay` matches all 1,596 common actor hashes, three sound
+requests and the completed-field-1457 authoritative ranges against
+`c-audit-varying`. The stack guards remain intact. This is short-tape evidence,
+not full-course acceptance or proof that every indirect consumer was audited.
+
+The cached cycle-exact 020 cost comparison over active fields 100–1,000 fails:
+
+| Lean runtime | Completed frames | fps |
+|---|---:|---:|
+| Current reference | 193 | 10.722 |
+| Copied geometry with skip branch | 173 | 9.611 |
+| Compact geometry copy | 174 | 9.667 |
+
+The compact variant omits the 80-byte region from the copy entirely and
+adjusts the sole loop-back displacement crossing it, from `$ff14` to `$ff64`.
+It avoids the extra skip branch but still regresses. No particular cache or
+memory mechanism is claimed as the cause without a trace establishing it.
+The compact variant was cost-tested only; the full gameplay comparison above
+belongs to the first candidate.
+
+Both candidates were removed from tracked source. Their patches, binaries and
+measurements remain in `c-road-collision-{cost,compact}-build` and corresponding
+run directories; `c-road-collision-reference` is the fresh control.
+All accompanying normal builds retain the audited 7,920-byte runtime SHA.
+Do not install this reduction merely because it omits arithmetic: neither
+measured implementation improves throughput.
+
+### Geometry reduction control: layout alone does not explain the slowdown
+
+`c-road-collision-layout-control-build` differs from the first rejected
+geometry candidate in only three binary bytes. Its initializer writes the
+original instruction prefix instead of the skip branch, retaining the same
+9,044-byte diagnostic layout and simulation-only Fast RAM routine copy.
+All native calculations therefore execute in the control.
+
+`c-road-collision-layout-control` produces 192 frames over fields 100–1,000
+(10.667 fps), versus 193 for the current-runtime control and 173 for the
+skip candidate. This rules out the extra copy/layout alone as a sufficient
+explanation for the 20-frame regression.
+
+Same-layout flat profiles over fields 100–600 are retained in
+`c-road-profile-{full,skip}`. Full geometry enters rendering 99 times; the
+skip candidate enters 83 times. The native next-field polling instruction
+at `$aecf0` accounts for 5.839% versus 12.802% of total recorded units,
+respectively, with 941,783 versus 2,056,451 executions. At drawing address
+`$b17ec`, recorded Chip-access units rise from 3,520,768 over 99 executions
+to 108,913,408 over 83; `$b1874` likewise rises from 1,129,728 to 86,915,072.
+These measurements show increased waiting, including Chip-access stalls,
+despite fewer drawing calls. They do not prove which DMA/arbitration or
+frame-phase interaction causes it, nor establish that every removed array
+write is irrelevant to every path.
+
+No runtime change is retained. The control patch and binary remain private,
+and `c-road-collision-layout-control/comparison.json` records the counts.
+Further speed work should examine scheduling and Chip/DMA overlap rather
+than infer a benefit from arithmetic counts alone. In particular, the planned
+D2 priority audit is relevant; its effect must be measured, not assumed.
+
+### CPU/blitter priority control on the current 020 path
+
+The private `VERIFY_C_CPU_PRIORITY` experiment writes DMACON at enhanced race
+preparation/reset, after the existing master-toggle and CPU/Fast selection.
+It clears only `BLTPRI` (`$0400`); the equal-layout control sets that bit
+(`$8400`). No instruction is inserted in the per-tick loop. The two 8,552-byte
+lean diagnostics differ in exactly the set/clear byte at the two writes.
+The normal runtime remains unchanged.
+
+`cost_priority_c.py` records live DMACONR and the last completed frame's
+DMACONR at fields 100, 300, 600 and 1,000. Every recorded priority bit matches
+the requested setting. The lower control bits read `$03f7` with priority
+cleared and `$07f7` with it set; live reads can additionally contain blitter
+status bits. This verifies the setting in the sampled window, without
+claiming to identify the original writer or watch every write.
+
+| Cycle-exact 020 configuration | BLTPRI | Frames, fields 100–1,000 | fps |
+|---|---|---:|---:|
+| Cache, current reference | set | 193 | 10.722 |
+| Cache, equal-layout control | set | 193 | 10.722 |
+| Cache, candidate | clear | 183 | 10.167 |
+| NoCache, equal-layout control | set | 109 | 6.056 |
+| NoCache, candidate | clear | 105 | 5.833 |
+
+The experiment therefore does not improve either tested 020 configuration.
+It is not a justification for changing priority on 030/040/060, and does not
+complete the all-cell D2 audit. The native setting is retained; the candidate
+was removed from source. Evidence is under `c-cpu-priority-*`, including
+`c-cpu-priority-clear/comparison.json` and the private patch in
+`c-cpu-priority-on-build`. The earlier expectation that clearing priority
+would turn Chip stalls into a throughput gain is not supported on current C's
+020 path.
+
+### Automatic cache policy candidate
+
+`VERIFY_C_CACHE` now exercises `resload_SetCPU` after C's boolean/CPU/Fast
+selection and before installing its game patches. It requests BaseMem
+write-through plus instruction/data caches, masking only those settings.
+It preserves the existing ExpMem/slave policy and never requests BaseMem
+copyback. This remains diagnostic-only; normal builds are unchanged.
+
+The installed WHDLoad autodoc specifies that SetCPU honors `NoCache` without
+changing the setup, and flushes caches on return. LoadFile, LoadFileDecrunch
+and Patch also document automatic flushing. This avoids adding redundant
+flushes to those APIs; native writes/decrunch boundaries still require their
+own audit. WHDLoad's cache-handling documentation explains the distinction
+between CACR enable bits, MMU page cacheability and hardware Chip/IO cache
+inhibition. A CACR reading alone does not prove DMA coherency.
+
+`c-cache-policy-{plain,cache,nocache}` test the same lean candidate on the
+cycle-exact 020 with `CUSTOM2=1`. Plain and explicit `Cache` runs produce
+identical checkpoints: CACR `$1`, 10.0 fps over fields 100–600 and 10.667
+over fields 100–1,000. `NoCache` retains CACR zero, 5.0 and 6.056 fps.
+The normal runtime without explicit cache control previously needed the
+separate `Cache` option to obtain the faster result.
+
+`c-cache-policy-matrix` tests the candidate without a user cache option:
+
+| Configuration | Race CACR | Standard-window fps |
+|---|---:|---:|
+| 030/50 | `$2111` | 12.5 |
+| 040/25 | `$80008000` | 16.6 |
+| 060/50 | `$80008000` | 18.9 |
+
+Both explicit MMU cells in `c-cache-policy-mmu` complete with TC `$8000`
+and CACR `$80008000`. These remain functional checks; the emulator configuration
+has `cpu_data_cache=false`, so they do not prove physical data-cache coherency
+or real 040/060 timing. `c-cache-policy-off` and `c-cache-policy-chip` retain
+the original simulation entry and CACR zero when the toggle is disabled or
+the hardware selection rejects the accelerated path.
+
+This is a viable candidate for avoiding the default uncached slowdown,
+not a resolution of the cached C-versus-B regression. Before normal integration,
+verify longer gameplay/transitions with the policy, finish the write/decrunch
+coherency audit, and inspect the requested memory policy under MMU translation.
+The accompanying normal slave still has the audited SHA; no additional
+user-facing cache toggle is introduced.
+
+### Cache candidate: full finish, page descriptors and loader boundaries
+
+`c-cache-finish` replays the existing successful-finish field tape without a
+user `Cache` option. Against `c-steering-finish-lane`, it matches all 12,822
+published actor hashes, 24 sound requests and terminal actor/clock/camera/rank
+ranges. Finish remains field 12,634 and exit field 12,823; the next race
+resets the capture to `[99,98,0,1]`. This verifies the cache candidate through
+that complete gameplay and restart path, not every championship transition.
+
+The new optional `VERIFY_MMU_POLICY` sidecar captures SRP, URP and both
+instruction/data transparent-translation registers on the first race field.
+It requires `VERIFY_MMU` and reads these registers only after the existing
+040/060 CPU check. It leaves the 320-byte `RRA1STAT` ABI intact; the separate
+`RRCMMU01` record follows it. Normal builds contain neither record.
+
+`c-cache-pages-040` and `c-cache-pages-060` walk the captured root/pointer/page
+tables for every 4 KiB page of the 1 MB BaseMem area. All 256 supervisor and
+256 user descriptors in each run are resident and have cache mode 0
+(write-through); none requests copyback. Transparent translations are disabled,
+so they do not override those descriptors. The sampled Fast simulation-code
+and stack pages have cache mode 1 (copyback), preserving their existing policy.
+TC is `$8000`; stack guards remain intact. Descriptor decoding follows the
+emulator's 040/060 table-walk implementation, including indirect page descriptors.
+Raw registers and every descriptor address/value are retained in `policy.json`.
+This proves the requested mappings in these emulator runs, while retaining
+the previously stated limit that physical data-cache/DMA coherency is not
+emulated by their configuration.
+
+The source/API review accounts for the cache-changing and code-loading paths:
+
+| Boundary | Flush coverage |
+|---|---|
+| Initial `lomain.ami` loading | `resload_LoadFileDecrunch` flushes on return; automatic enhanced caching has not yet been requested. |
+| Boot patch list | `resload_Patch` flushes after installing loader hooks. |
+| Intro hooks `$4800` / `$4844` | `PatchIntro1/2` call `resload_Patch`, including the intro reader hook at `$8e58`. |
+| Main loader hook `$496a` | `PatchLoader2` applies the main patch list, selects C, calls SetCPU, then applies C patches; each API flushes on return. |
+| Disk-reader hooks `$4dca`, `$adf82` and `$8e58` | `ReadSomeFile` delegates to `resload_LoadFile`, which flushes before returning to the loader. |
+| Runtime Fast code copies | The object-copy initializer explicitly calls `resload_FlushCache` after writing executable bytes. Diagnostic road-copy initializers do likewise. |
+
+The earlier race trace found mutable data, but no self-modifying instructions,
+in the sampled code region. This does not establish an exhaustive write audit
+of every unexecuted game path. No redundant flush is added after APIs that
+already provide one. These results support proceeding to normal-build
+integration and its controls/matrix validation; they do not close C's distance,
+handling, cached-throughput or latency regressions.
+
+## Existing boundaries and ownership
+
+| Boundary | Existing behaviour | Requirement for C |
+|---|---|---|
+| `$87040` field hook | advances clock, consumes completed display records, latches frame delta, updates controls | keep display consumption and field sampling; separate simulation time and queued input |
+| `$8747e` through `$875b6` | race timers, spawning, player/AI motion, collision, ranking | run once per simulation step, including when rendering misses fields |
+| `$89138` camera update | derives view origin; also integrates/decays crash camera displacement | step-owned state, not a pure render helper |
+| `$875bc` display gate | may skip geometry/rendering after simulation has already executed | must not authorize another simulation step by itself |
+| `$875c8` through `$87730` | geometry, object lists, sound events, HUD and drawing | split pure presentation from event/timer side effects |
+| `$87736` → `$aecba` | waits for next SOFT tick and swaps screen/copper pointers | retain vsync, without an added minimum frame interval |
+| `$87748` → `$871dc` | publishes completion and rotates display records | remains presentation-owned; cannot choose simulation delta |
+| `$a8c8c` | copies live race clock to `$a5d50` before each main-loop invocation | simulation consumers need the scheduled step's time |
+
+The field input handler mutates `$a7262` (steering) and player flags at `$a5dc8`.
+Collision routines also write steering (`$8c266`, `$8c310`, `$8c36c`). Merely saving
+the latest input at render completion is insufficient: catch-up steps need inputs
+from their own field boundaries, with collision-induced steering changes in order.
+Pause and exit handling must remain responsive while rendering or catching up.
+
+The camera writes `$a5d1e` and `$a7c02`. Physics and collisions read `$a5d1e`, including
+`$8b792`, `$8b9ee`, `$8bc2a`, `$8be5e`, `$8bf4e`, `$8c3c8`, `$8c6c4` and `$8cefc`.
+During a crash, `$89162` decays camera displacement once per call and `$89182`
+integrates it from actor movement. Calling the camera once per render would therefore
+preserve a gameplay dependency on rendering frequency.
+Moving this call to a 50 Hz simulation did not by itself preserve its decay rate:
+four calls leave approximately `(3/4)^4 = 31.6%` of the offset, whereas the
+four-field original reference leaves 75%. The movement integration reads the
+delta-scaled actor displacement, but the decay needs explicit elapsed-time
+normalization. The correction and its reference are recorded below;
+cross-render-rate hashes alone cannot detect this error.
+
+`$8eff8`, called among rendering preparation at `$876c6`, consumes sound-event flags,
+decrements `$a5d5e` using delta, and clears `$a598a/$a598b`. It must consume each
+simulation step's events once, including intermediate catch-up steps. The audio
+sequencer and music interrupts remain on their existing field/timer clocks.
+
+## Direct delta references
+
+The captured program disassembly contains **39 direct references** to `$a6f00`:
+five writes, one zero check, and 33 consumers. In addition, `$8f5a6` reads its
+low byte at `$a6f01` for the shared start/crash animation interpreter. This
+inventory does not rule out other indirect aliases or frame-dependent updates.
+
+| Addresses | Role |
+|---|---|
+| `$8660e`, `$86916`, `$86a48` | initialization writes |
+| `$86fa0` | display-completion delta latch |
+| `$87040`, `$87048` | zero check and minimum-one fallback |
+| `$8749e`, `$8c0c4` | race/end countdown |
+| `$8aecc` | actor `+$70` timer in sprite selection; clears `+$6a` bit 2 on expiry |
+| `$8b438` | attack countdown |
+| `$8b4b8`, `$8b4d6` | speed integration and longitudinal movement |
+| `$8b756`, `$8b764`, `$8b8f0`, `$8bafe`, `$8bd1c`, `$8bd3a` | movement, crash and lateral/curve integration |
+| `$8cbfc`, `$8cd70`, `$8cfd4` | special-actor movement and steering |
+| `$8d318`, `$8d4cc`, `$8d536` | AI animation, countdown and motion |
+| `$8dc6c`, `$8dcd6` | actor spawn/activation countdowns |
+| `$8deaa` | police countdown |
+| `$8e0d6`, `$8e1be` | speed reduction and actor `+$78` timer |
+| `$8ef66`, `$8efd8` | collision velocity from displacement divided by delta |
+| `$8f094`, `$8f138` | sound/event countdowns |
+| `$90198`, `$902ae`, `$902c8`, `$903f4`, `$904c0` | actor action timers |
+| `$90a28` | event/spawn countdown |
+
+Keeping the core physics delta constant is necessary but insufficient. The
+sprite-selection timer at `$8aecc`, camera integration and event consumption are
+explicit examples outside the initial physics block.
+
+The start-signal animation is also gameplay state. `$8a40e` calls `$8f552` while
+building the banner; that routine calls the byte-delta animation interpreter and
+sets `$a59d4` at `$8f57a` to start racer updates. A fixed-physics-step prototype
+that leaves this animation on the render path produces the same player distance
+but different opponent state. Per-step actor hashes first diverge at step 6;
+with slower rendering, the same actor-state sequence begins five steps later.
+The signal transition must run on simulation time; rendering should reuse its
+selected sprite without advancing it. Moving that update into the provisional
+four-field simulation produces matching hashes of all actor records for 199
+straight-line steps at the two tested rendering rates, with a byte-identical
+actor snapshot at simulation field 601. This is a diagnostic proof of the split,
+not final validation or a selected production timestep. The longer steering/crash tape initially diverges at step 202 (simulation
+field 809); queuing historical field inputs moves the first divergence to the
+crash at step 357 (field 1429). Moving crash animation and sprite timers into
+simulation then produces matching actor hashes for all 399 steps at tested
+render intervals of 1, 3 and 4 fields. A 12-field rendering interval still
+diverges, so these results do not yet establish independent timing under
+multi-step catch-up. The nominal one-field test includes actual two-field
+frames and is not proof of sustained 50 fps.
+
+`$89d20` is not a pure draw-list builder either: `$89e26` clears actor crash bit 4,
+and `$89e0e` calls `$8f190`, which advances crash/recovery state and updates rider
+records. `$8a492` advances `$a808e`, the scenery cursor read by AI and collision
+routines (`$8dfcc`, `$8e056`, `$8c49c`). These are additional split points, not
+exceptions that can be excluded from gameplay comparisons.
+
+Additional dependencies exposed by catch-up tests:
+
+- `$89eec` writes actor `+$34`, a lean/orientation value read by physics at
+  `$8c054`, `$8e372` and `$8e480`. Computing it for simulation is insufficient
+  if rendering can subsequently overwrite it; authoritative writes need one owner.
+- `$8c3b2..$8c408` reads the projected world-object list at `$a7c3e`, using
+  `$a59fc/$a59fe` to locate its section. `$8b02e`, on the presentation path,
+  builds those records and updates `$a59e4`, used by special-actor simulation.
+  The collision check `$8c7f2` uses projected distance, scale and sprite data.
+  Updating only the scenery cursor does not remove this dependency.
+- `$8c48e` also combines world scenery at `$a808e` with a display-record pointer
+  at `$a8092`. These inputs must describe the same simulation boundary.
+- Sprite selection can clear actor `+$69` bit 4 at `$8aa90/$8abae`, and rider
+  presentation clears `+$6a` bit 7 at `$8a11c`. These remain audit obligations;
+  passing a tape without the relevant action does not validate them.
+- The field input handler writes raw `$a598c`, which physics and attack handling
+  read directly. Queueing steering alone is insufficient: IRQ polling must not
+  overwrite the input belonging to an in-progress historical simulation step.
+
+The catch-up prototype uses a provisional four-field quantum and no interpolation.
+It is diagnostic code only; rendering its discrete positions faster does not yet
+satisfy the smooth-presentation requirement. The normal slave remains unchanged.
+
+## Diagnostic snapshots
+
+`VERIFY` plus `VERIFY_C_AUDIT` captures one selected main-loop invocation at:
+
+1. entry to `$8747e`, before simulation;
+2. `$875b6`, before camera/geometry/rendering;
+3. `$87748`, after swap and copper rebuild, before publishing completion.
+
+`VERIFY_C_AUDIT_FRAME` selects the invocation (default 40). The `RRCAUD01` block
+contains the invocation count (+8), captured-boundary bit mask (+12), captured
+start address (+16), byte size (+20), three boundary field numbers (+24), selected
+invocation (+36), then three snapshots (+40). The captured range is
+`$a5900..$a873f`, including all 35 actor records, globals and projection scratch.
+
+Copies alter execution time. Use functional runs only, not timing measurements.
+Interrupts remain enabled, so differences include IRQ-written state; differences
+identify dependencies, not the writing instruction. Missing boundary bits fail the
+host check rather than silently accepting an incomplete capture.
+
+The initial field-71 capture and acceleration capture at field 360 show no actor
+record changes during presentation in those particular frames. They do show
+camera/view, animation, display-list, projection and interrupt-clock changes.
+These limited samples do not prove that actor records are presentation-read-only;
+the sprite-selection timer above already disproves that generalization.
+
+Raw snapshots and the host reader remain in ignored `tmp/`. Normal builds
+contain no audit hooks or storage and remain byte-identical to the final B build.
+
+## Next implementation checks
+
+- Measure fixed-step candidates against B's baseline and CPU budget, rather than
+  picking a step from the desired rendering rate.
+- Separate event, camera and sprite-timer updates from optional rendering.
+- Queue field-timed inputs and preserve authoritative state during presentation.
+- Check simulation-step boundary state across forced rendering intervals; use a
+  separate presentation comparison because projection scratch is frame-dependent.
+- Preserve elapsed-time remainder, pause/resume and race transitions, then validate
+  throughput, controls, slow-machine catch-up and MMU configurations.
+
+## Fixed-step diagnostic checkpoint
+
+`VERIFY` plus `VERIFY_C_STEP` enables `verify_c_step.s`; it is not a runtime
+feature. Use `CUSTOM2=1` (Enhanced framerate) and a first-race functional run, without `VERIFY_C_AUDIT`.
+`STEP_FIELDS` defaults to four and `STEP_CAPTURE` to simulation field 601.
+The `RRCSTEP1` block records the consumed field (+8), step count (+12), captured
+field (+16), quantum (+20), then a frozen `$a5900..$a873f` snapshot (+24).
+Immediately following is `RRCHASH1` and 1024 longword actor hashes, indexed by
+step number (zero unused). Hashes cover every byte of all 35 actor records.
+A missing capture or exhausted hash capacity must not count as a passing replay.
+
+The prototype queues raw controls by active race field, replays inputs in order,
+advances the original simulation with constant delta, and retains unconsumed time.
+It owns camera integration, starter/crash animation, sprite timers and actor lean.
+Before each step it rebuilds the road/world-object collision inputs through
+`$8970e`, `$8b02e` and `$8a492`. This last dependency was material: without it,
+the 12-field rendering test first differed in player collision flags at step 57
+and later in player position. With it, all 399 actor hashes match between the
+fast-render and 12-field test, including the steering/crash sequence; the frozen
+actor snapshot at simulation field 1353 also matches byte for byte.
+
+Evidence is in ignored `tmp/c-collision-render1` and
+`c-collision-render12`, with their comparison JSON. Both runs used functional
+68020 emulation, not cycle-accurate hardware performance measurement. The test
+compares equal simulation boundaries, not wall-clock snapshots during catch-up.
+
+Remaining limitations include choosing and costing the quantum, interpolation,
+other action/animation paths, input-ring overflow handling, reset and pause
+semantics, complete event/clock comparisons, and the A2/A4/MMU regression suite.
+At this stage the 2048-field input ring only flagged overflow; the explicit
+failure policy below supersedes that behavior. Matching this one tape is not
+completion of C1, C2 or C3.
+
+### Clock, track events and quantum cost
+
+The live `$a5d4c` field count schedules work. The stopwatch at `$a5d58..$a5d5b`
+now advances in simulation, retaining the original 60-field BCD second and
+finish-bit check. Otherwise an IRQ would observe a finish at a different live
+field depending on how far rendering delayed simulation. Track-section events
+formerly dispatched by `$a8c7c..$a8cbc` also run at each step, including catch-up.
+Their high-water position remains `$a5d38`. The input replay/overflow flags are
+reset when installing the race hook.
+
+The two-field-quantum steering/crash replay in `c-clock-render2` and
+`c-clock-render12` matches all **798 common actor hashes**, and its actor,
+stopwatch and displayed-rank snapshot at simulation field 1457 is identical.
+The faster run had completed one additional step at live field 1600; only common
+completed steps were compared. This checks snapshot clock/rank agreement, not
+all event counts or end-of-race behaviour.
+
+`STEP_NO_HASH` disables the per-step actor hash for cost experiments;
+`STEP_CAPTURE=0` disables the snapshot. These runs cannot prove state agreement.
+Initial cycle-configured measurements over active fields 100–1000, with throttle
+held, are recorded in `tmp/c-cost-{cell}-q{quantum}/cost.json`:
+
+| Simulation quantum (fields) | A500 rendered fps | A1200 + Fast rendered fps | Result |
+|---|---:|---:|---|
+| 1 | 0.00 | 4.89 | A500 backlog grows to 131 fields; no frames completed in the window |
+| 2 | 4.56 | 8.89 | both keep advancing and rendering; sampled backlog 5/3 fields |
+| 4 | 7.00 | 11.28 | both keep advancing and rendering; sampled backlog 7 fields |
+
+These are diagnostic throughput observations over this window, not final
+production performance or every-CPU validation. A point sampled during a step
+can include work still in progress. The one-field quantum is rejected for the
+current implementation on A500: it cannot sustain real-time simulation, even
+before interpolation. The two-/four-field choice still needs baseline and
+broader-scene comparison. A larger quantum requires presentation interpolation;
+it must not become a rendering-rate limit.
+
+The four-field diagnostic also passes keyboard and CD32 steering-release and
+pause/resume smoke tests (`c-clock-input-keyboard`, `c-clock-input-cd32`). The
+active field counter stays at 161 throughout the paused observation, and resumes
+on input. These smoke tests do not measure complete input-to-display latency or
+prove transition/restart behaviour.
+
+
+### Rejected interpolation experiment and actor-isolation evidence
+
+The former `STEP_INTERPOLATE` experiment enabled interpolation for two- or four-field
+quanta. It keeps previous and current actor positions, draws an intermediate
+position with a one-step display delay, and restores the authoritative actor and
+camera records before publishing the completed frame. This is still diagnostic,
+not a released option or a rendering-rate cap. Other mutable presentation globals
+and action paths still need the full ownership audit.
+
+The `RRCVIEW1` block near the `$875c8` hook records frame count (+8), last fraction
+index (+12), four fraction histogram counters (+16), and four triples of previous,
+current and rendered player position (+32). The observed fractions include 1/4
+and 3/4, with exact expected positions; the view is not simply repeating whole
+simulation positions. `c-interp-pose` records that check, including the failed
+initial isolation comparison.
+
+Restoring actor state exposed the rider spark flag: rendering cleared `+$6a`
+bit 7 at `$8a11c`, causing the initial interpolated/non-interpolated replay to
+first differ at step 355. The diagnostic now consumes that event in simulation
+and stores a separate spark bit for drawing. After this split, all 399 hashes
+match between `c-spark-interp` and `c-spark-base` on the steering/crash tape.
+The earlier `c-interp-render1/12` comparison also matched across rendering rates.
+The final crash screenshot was inspected for correct road, rider, bike and HUD
+presentation; this is not complete visual validation of every scene or action.
+
+### Attack-state preparation
+
+Pose selection at `$89d20` also owns attack-state transitions (`$8aa90/$8abae`)
+and the `$a5991` sound-event gate. The diagnostic now evaluates it once per
+simulation step, after derived lean and crash state, including catch-up steps.
+The visual phase bytes at `$a598d/$a5990` derive from simulation time rather than
+incrementing on every draw. The original crash-bit clearing branch runs only
+when called from simulation. Complete action/weapon coverage is still pending.
+
+`c-attacks-before1/12` exercises fire-button attacks with both steering
+orientations. The tape changes 304 actor hashes relative to the no-attack tape,
+and sampled player flags confirm active attack states. Its actor hashes already
+match between those render intervals; this alone does not prove sound-event
+ownership. After moving pose/event preparation, `c-attacks-pose1/12` also matches
+all 399 actor hashes and the frozen actor snapshot. Audio event counts remain a
+separate verification requirement. These tests used the now-rejected delayed
+interpolation experiment; they remain evidence about simulation ownership, not
+acceptance of its presentation latency.
+
+
+### Current direction: forward prediction without deliberate display delay
+
+The user rejected the one-step interpolation delay. `STEP_EXTRAPOLATE` replaces
+that experiment: it draws the current position plus the observed per-field motion
+for the elapsed remainder, never deliberately drawing one simulation step behind.
+Authoritative state is still restored after drawing. A crash-state transition or
+zero current speed suppresses prediction for that actor. The simulation quantum
+is still provisional; this change alone does not resolve input waiting for a step.
+An 80 ms input delay is also unacceptable and must be measured independently.
+
+Earlier interpolation results above are historical isolation evidence only.
+They do not validate the prediction path, its collision corrections, or latency.
+
+
+Forward-prediction replay `c-predict-render1/12` matches all 399 actor hashes.
+The recorded moving-player positions satisfy current + elapsed-fraction × motion,
+including quarter- and three-quarter-step predictions ahead of current position.
+These results verify prediction arithmetic/isolation on that tape, not latency.
+
+Following the user's timing clarification, the primary candidate is now one PAL
+field per simulation step: **50 Hz with catch-up**. `STEP_FIELDS` defaults to one.
+The earlier A500 overload is a compatibility finding, not a reason to impose a
+larger simulation quantum on accelerated Amigas. Accelerated-machine cost and
+50 Hz gameplay validation must decide the implementation. Forward prediction is
+only a diagnostic alternative for larger quanta; delayed interpolation is removed.
+
+The hardware policy is now two paths: original timing on 68000, and fixed 50 Hz
+simulation on 68020+ with Fast RAM. Diagnostic hardware dispatch is implemented
+as described below; production integration remains open. These experiments do not change the normal
+slave. The loader's existing `expansion_memory=$80000` is a game address in Chip
+RAM, not evidence of an allocated Fast RAM region.
+
+The `c-50-target-*-q1` cost runs, with caches enabled and diagnostic hashing and
+snapshot copying disabled, reached field 1000 with simulation cursors 999
+(A1200 Fast), 999 (030/50), 998 (040/25), and 999 (060/50). At the sampled fields
+300, 600, and 1000 none had growing simulation debt. This supports continuing the
+50 Hz accelerated candidate, but does not establish correct gameplay speed or
+input latency. Rendering still needs optimization; these are emulator results,
+subject to the CPU-model limitations recorded in the baseline.
+
+The full attack/steering tape now runs at one-field simulation steps with
+presentation intervals of 1 and 12 fields (`c-50-full1`, `c-50-full12`).
+All **1,596 common consecutive actor hashes match**, including the previously
+unrecorded portion beyond tick 1,023. The actor snapshot at field 1,457 also
+matches. Other snapshot bytes include presentation state and are not identical;
+this is an actor-state result, not a whole-state or event-count equivalence claim.
+Both runs use fast functional emulation, not hardware throughput measurements.
+
+The diagnostic hash record is now `RRCHASH2`: an eight-byte marker, a longword
+slot count, then that many longword hashes (slot zero unused). The default is
+2,048 slots, configurable with `STEP_HASH_SLOTS`. The harness reads that capacity
+and rejects runs that exceed it, instead of silently comparing a prefix.
+The builds use `VERIFY_B`, `VERIFY_C_STEP`, `STEP_CAPTURE=1457`, and
+`VERIFY_FRAME_PERIOD=1` or `12`; `STEP_FIELDS` remains its default of one.
+The input fixture is `tools/fixtures/c-attacks.json`.
+
+The simulation lean pass now follows the original list eligibility rules at
+`$89d64..$89de4`: secondary actors require `$56=-1`; the third list at `$941e2`
+is considered from field 1,800, with its activation and camera-position checks.
+Previously that third list was omitted and secondary eligibility was unchecked.
+Extending throttle to field 1,950 (`c-attacks-late.json`) gives **1,944 matching
+consecutive actor hashes** at presentation intervals 1 and 12, with identical
+actor snapshots at field 1,901 (`c-50-late1/12`). The earlier 1,598-tick prefix
+is unchanged by this correction. The special actor is inactive in the captured
+snapshot, so a scenario with it active and visible is still required.
+
+## Demo and input dispatch correction
+
+The original demo exit branches at `$87104` and `$8710a` target `$87110`.
+The former diagnostic `PL_PSS $710c,...,4` overwrote that target inside its
+replacement instruction sequence. The field hook now replaces the complete
+demo/player dispatch at `$870dc..$87115`, returning the exit flag's condition
+codes to the existing branch at `$87116`. It preserves the 3,600-field demo
+timeout and native demo input polling. Demo simulation skips the human input
+queue, which has no producer while the AI drives the player.
+
+`c-demo-race-regression` matches all 1,598 recorded human-input actor hashes
+against `c-50-full1`. Keyboard and CD32 steering/release and pause/resume checks
+pass (`c-demo-keyboard`, `c-demo-cd32`); the active field clock remains 161
+through the paused interval. `c-demo-transition-intro` observes the demo advancing
+from field 163 to 463, exits it with fire, then reaches a normal race at field 100.
+The first unattended test stayed at a pre-race message; the successful harness
+first presses fire after 1,000 boot fields, then waits for the demo.
+`c-demo-timeout-verified` also exits without input at race field 3,598, matching
+the native 3,600-count limit with the observed initial two-count offset, then
+starts a normal race. Cleanup clears the demo timer, so the timeout check uses
+elapsed fields rather than expecting its post-exit value to remain 3,600.
+
+All C simulation patches now require the boolean `CUSTOM2=1` (Enhanced framerate).
+Earlier experiments using `CUSTOM2=0` predate this master switch. With it off,
+normal and C diagnostic builds retain original timing; instrumentation may still
+observe execution. Future C–F optimizations must obey the same switch.
+The `toggle-normal-off/on` and `toggle-step-off/on` boot checks inspect the
+simulation entry, delta latch, animation, swap and input-dispatch instructions.
+Both off builds retain the original instructions at all five sites. The enabled
+normal build installs B's patches; the enabled C build installs C's patches and
+keeps the original swap without B's extra floor. `toggle-step-replay` matches
+all 1,598 actor hashes from the pre-switch human-input replay.
+
+## Crash-camera decay on elapsed time
+
+The C path now replaces only the recovery-decay branch at `$8915a`.
+Its reference is the original A1200's four-field cadence, where each call
+retains 75% of the camera offset. A one-field update subtracts
+`floor(offset * 4548 / 65536)`: the coefficient approximates
+`1 - (3/4)^(1/4)`. Four updates retain 74.9994095% before integer rounding.
+Larger diagnostic quanta repeat the same one-field operation. This deliberately
+replaces the old hardware-dependent recovery rate with one consistent rate;
+it does not slow input or add a presentation delay. The movement branch already
+reads delta-scaled actor displacement and is unchanged.
+
+The signed product is split into signed high-word and unsigned low-word
+products, avoiding overflow at either 32-bit limit with 68000 instructions.
+`VERIFY_C_DECAY_TEST` checks ten signed cases in the actual emulator, including
+both limits, zero and both signs. One- and four-field results match independent
+host integer arithmetic (`c-decay1/12`, `c-decay4`). For offset -28,672, four
+normalized updates give -21,502 versus the original -21,504: two fixed-point
+units of rounding difference.
+
+The attack/crash tape still gives **1,596 identical consecutive actor hashes**
+between rendering intervals 1 and 12. Relative to the previous, overly fast
+decay, actor hashes first change at tick 1,263; this is an intentional timing
+correction, not a claim of byte equivalence to that prototype. The normal slave
+is byte-identical to the master-toggle build; this correction remains diagnostic
+until the rest of C is validated. Large extrapolation snapshot buffers now follow
+the executable helpers so their optional build retains valid PC-relative ranges.
+
+## Hardware selection inside Enhanced framerate
+
+The C patch list is now separate from the common loader/input fixes. The loader
+applies it only when `CUSTOM2` is enabled, `WHDLTAG_ATTNFLAGS_GET` reports
+`AFF_68020`, and the allocated slave hunk lies in a supported Fast RAM window.
+Otherwise it leaves original timing intact, including on 68000 machines with
+Fast RAM. Diagnostic frame-pacing/skip hooks obey the same selection.
+
+This checks the memory actually holding the slave, without probing unallocated
+addresses or reserving extra memory while enhancements are off. The conservative
+address windows are `$200000..$9fffff` and `$1000000` upwards; Chip RAM and the
+reserved upper-24-bit window (including `$c00000` slow RAM) are rejected.
+This is a conventional Amiga address-map check, not a generic OS memory-type
+query. Unconventional Fast RAM inside the rejected window falls back. WHDLoad's
+local developer autodoc explicitly permits `ws_ExpMem` to come from Chip RAM,
+so a nonzero optional expansion allocation would not be a valid substitute.
+
+`RRCSEL01` records Custom2, AttnFlags, slave address and selection reason
+(0 disabled, 1 CPU, 2 memory placement, 3 selected). Functional boot checks:
+
+| Configuration | Slave location | Result |
+|---|---:|---|
+| 68000, Chip + slow | `$d72ac0` | original, CPU |
+| 68000 + 8 MB Fast | `$9f2ac0` | original, CPU |
+| 68020, 2 MB Chip only | `$1f12c0` | original, memory |
+| 68020, Chip + slow, no Fast | `$d72a98` | original, memory |
+| 68020 + 8 MB Fast | `$9f2ac0` | C selected |
+| same, Custom2 off | `$9f2ac0` | original, disabled |
+| 68040/MMU + Fast | `$9f2000` | C selected, TC=`$8000` |
+| 68060/MMU + Fast | `$9f2000` | C selected, TC=`$8000` |
+| 68040/MMU, 32-bit Fast only | `$407f2000` | C selected, TC=`$8000` |
+
+Evidence is under `c-select-*`. The slow-only check also builds the diagnostic
+12-field pacing hook and confirms it is not installed on the fallback path.
+The initial `c-select-a1200-slow` attempt did not actually enable slow RAM in
+the preset; `c-select-slow-only` checks the effective configuration and allocated
+slow-RAM address. The selected C path matches all 1,598 actor hashes from the
+camera-normalized replay (`c-select-replay`). The normal slave remains
+byte-identical to the master-toggle build. These are functional dispatch checks,
+not a replacement for the full C regression/performance matrix.
+
+## Input-to-frame handoff measurements
+
+`VERIFY_C_LATENCY` records the first RIGHT input after reset through polling,
+historical input replay, simulation completion, frame construction and return
+from the original vsynced buffer swap. It is optional instrumentation in the C
+patch list, never an extra user mode. `RRCLAT01` contains fourteen longwords
+after its marker; the layout is documented in `verify_c_latency.s`.
+The latency builds disable actor hashing and frozen snapshot copies.
+
+The host accelerates from field 100, injects RIGHT at field 300, and inspects the
+first frame constructed from a simulation tick that consumed that input. Times
+below are field-count differences multiplied by 20 ms. They have field
+resolution, are single-phase samples rather than latency distributions, and
+measure buffer handoff, **not completed scanout or a proven first changed pixel**.
+
+| Emulator configuration | Input sampled | Input replayed | Simulation done | Frame starts | Swap starts | Swap returns |
+|---|---:|---:|---:|---:|---:|---:|
+| Fast functional execution | 20 ms | 20 ms | 20 ms | 20 ms | 40 ms | 60 ms |
+| A1200 Fast + Cache | 20 ms | 40 ms | 40 ms | 80 ms | 140 ms | 160 ms |
+| 030/50 + Cache | 20 ms | 60 ms | 60 ms | 100 ms | 140 ms | 160 ms |
+| 040/25 + Cache | 20 ms | 20 ms | 40 ms | 40 ms | 80 ms | 100 ms |
+| 060/50 + Cache | 20 ms | 20 ms | 40 ms | 40 ms | 80 ms | 100 ms |
+
+Evidence: `c-latency-functional`, `c-latency-<cell>/latency.json`.
+040/060 numbers retain the emulator-model limitations documented in the baseline.
+All samples replay the input for historical field 301, so there is no deliberate
+four-field input quantum. Nevertheless the measured presentation wait is too
+large to claim the requested response goal is met. Catch-up work and rendering
+cost must be reduced before promoting this candidate. The probe leaves all 1,598
+actor hashes unchanged (`c-latency-regression`); disabling the probe yields a
+byte-identical diagnostic slave to `c-select-build`.
+
+The A1200 Fast + Cache flat-PC profile over fields 100–300
+(`c-latency-profile/aprof.txt`) records 199 simulation updates and 19 renders.
+Geometry, actor-pose preparation and world-object projection each execute 218
+times: once per simulation update plus once per render. Flat instruction-address
+ranges account for 36.63% of recorded units in `$8b486..$8eff7` (physics/AI),
+9.28% in `$8b02e..$8b37d` (world-object projection), 6.21% in
+`$89d20..$8a491` (actor pose/selection), and 5.16% in `$8970e..$89a9b`
+(road geometry). These are disjoint flat-PC costs, not inclusive call-tree
+estimates. Stack/register traffic also appears prominently in the Chip-access
+profile. Moving the CPU-only stack to public memory is a concrete next
+experiment, subject to D3e's stack/interrupt/DMA audit; redundant projection and
+pose work remain further candidates.
+
+## Optional expansion-memory stack experiment
+
+`VERIFY_C_FAST_STACK` is a diagnostic cost experiment inside the selected C path
+and the Enhanced framerate toggle. It requests 20 KiB of optional `ws_ExpMem`
+(`-$5000`); 16 KiB is usable stack, with 16-byte guards on both sides. The stack
+switch replaces the native `$a876c` initialization, which already discards the
+trap frame. Interrupts stay masked during initialization, and the original
+`SR=$2700` is restored before continuing at `$a8776`. No live stack is copied.
+The allocation must be in the same conventional Fast-memory windows used by the
+C selector; otherwise this hook establishes the original Chip stack. Normal
+builds neither allocate this memory nor install this hook.
+
+The first attempt put the stack in the public slave hunk. WHDLoad rejected it
+on level-2 interrupt entry with “Bad stack pointer”; that attempt is discarded.
+A CPU-accessible public address alone is insufficient for a WHDLoad stack: use
+its managed BaseMem/ExpMem allocation. The corrected experiment uses optional
+ExpMem, checks its actual placement, and retains the original stack on failure.
+
+The `RRCSTK01` diagnostic header stores stack size, initialization count, bottom
+and top at offsets +8, +12, +16 and +20. The host checks both guard patterns and
+measures the deepest overwritten pattern. A short replay is not a proof of a
+maximum stack depth. Static inspection found register/argument saves and local
+words on the native stack, including `$83f8c..$83fb8` and `$b0628..$b0654`; the
+latter preserves sprite/screen addresses rather than creating stack-based DMA
+buffers. A complete executed DMA-pointer/lifetime audit remains required by D3e.
+
+Functional checks:
+
+- All 1,598 attack/steering/crash replay hashes match `c-select-replay`.
+  The stack at `$9fa010..$9fe010` uses 224 bytes in that replay, with intact guards.
+- Keyboard and CD32 pause/resume preserve the stopped field counter; steering
+  and release work. Demo entry, fire exit and subsequent human race work.
+- 040/MMU and 060/MMU with only 32-bit Fast memory reach a race, report TC=`$8000`,
+  and return to the AmigaDOS prompt via the actual Help quit key. The respective
+  stack bottoms are `$9fa010` and `$407fa010`; guards remain intact.
+- With the master toggle off, all checked timing hooks and native stack setup
+  remain original. A Chip-only 020 also preserves native timing and stack setup
+  (`c-stack-chip-fallback`). Compiling without this experiment reproduces the prior
+  latency diagnostic binary, and the normal slave remains byte-identical.
+- The optional four-field extrapolation configuration still assembles. Its large
+  data blocks require a full-width relative offset when locating `_expmem`.
+
+A1200 Fast + Cache, accelerating over fields 100–1000 with hashing/capture off:
+
+| Candidate | Frames during the 900-field interval | Average fps |
+|---|---:|---:|
+| Chip stack | 114 | 6.33 |
+| Optional Fast stack | 153 | 8.50 |
+
+This is a 34.2% throughput gain for this workload, not a 50 fps result or a
+cross-machine performance claim. The field-300 RIGHT latency sample gets worse:
+20 ms poll, 60 ms replay, 80 ms simulation completion, 140 ms frame start,
+200 ms swap entry and 220 ms swap return, versus 160 ms swap return with the
+Chip stack. A single input phase cannot characterize the distribution; neither
+result meets the response target. Increased throughput does not establish lower
+input latency. Keep the experiment optional until broader validation and further
+simulation/render cost reductions are complete.
+
+Evidence: `c-stack-final-replay`, `c-stack-final-cost-a1200-fast+cache-q1`,
+`c-stack-baseline-cost-a1200-fast+cache-q1`, `c-stack-final-latency-a1200-fast+cache`,
+`c-stack-input`, `c-stack-pad`, `c-stack-demo`, `c-stack-040-mmu-quit`,
+`c-stack-060-z3-mmu-quit`, `c-stack-final-off`, and `c-stack-disabled-build`.
+The final full-width header-address correction is checked again by
+`c-stack-ready-replay` and `c-stack-ready-latency-a1200-fast+cache`.
+
+## Exact road-width lookup experiment
+
+`VERIFY_C_GEOMETRY_LUT` requires the selected C path and
+`VERIFY_C_FAST_STACK`. It increases optional ExpMem from 20 to 40 KiB and places
+an 8,193-word table at allocation + `$5000`. Entries 1..8192 are the exact
+unsigned quotients `7168 / depth`; entry zero is unused. The original geometry
+loop's divisor is `256 - fraction + 256*row`, with fraction 0..255 and row 0..31,
+so every possible divisor is covered without approximation.
+
+After initialization, the experiment replaces `$8984e..$89859` with a 68020
+full-extension indexed `MOVE.W (table.l,ZA0,D6.W*2),$64(A3)` and a NOP. This
+avoids 32 constant-numerator divisions per geometry call without changing the
+other projected coordinates or collision calculations. The next native
+instruction clears D2, so its former division result is not live. The original
+store's condition flags are preserved. `resload_FlushCache` follows code writes
+before the game resumes. No code is changed unless C was selected and optional
+ExpMem has a verified Fast address. The master-off and Chip-only fallback keep
+the original division instruction. Disabling this experiment reproduces the
+stack-only diagnostic binary exactly; normal builds remain unchanged.
+
+A subroutine lookup was rejected: its entry/register-save overhead reduced the
+A1200 Fast + Cache interval to 148 frames (8.22 fps), against 153 (8.50 fps) for
+the stack-only candidate. The direct indexed version produces 156 (8.67 fps)
+over the same fields 100–1000. This is only a 2% additional gain in this workload.
+The final build's RIGHT-at-300 sample returns from swap at 160 ms, still too slow
+to establish the response target. Earlier binary layouts yielded 120 or 140 ms
+single samples; those phase-sensitive results are not latency distributions.
+
+The host verifies every table entry against independent integer division and
+checks the actual patched instruction/address. Fast-render replay matches all
+1,598 actor hashes; the 12-field rendering experiment matches all 1,596 completed
+steps against the same reference. 040/MMU and 060/MMU with 32-bit Fast memory
+pass table checks, preserve stack guards and quit through Help to AmigaDOS.
+The extrapolation combination also assembles. Evidence: `c-width-lut-cost-*`,
+`c-width-inline-replay`, `c-width-ready12-replay`, `c-width-ready-cost-*`,
+`c-width-ready-latency-*`, `c-width-040-mmu`, `c-width-060-z3-mmu`, `c-width-off`,
+`c-width-chip-fallback`, `c-width-disabled-build`, and `c-width-extrap-build`.
+
+The remaining two-field cadence in fast functional execution still needs a
+handoff audit before claiming C2c's uncapped rendering requirement. The native
+swap waits for a new SOFT tick at `$aecea`, then changes the live copper pointers
+at `$aec78`; completion records are published later at `$871dc`. Removing the
+wait without redesigning that handoff would risk tearing. The next timing work
+must establish when completed buffers become visible and when each buffer can
+be reused, rather than treating a higher throughput sample as proof of uncapped
+presentation.
+
+## Vsync handoff trace: two-field cadence is rendering cost
+
+The follow-up trace resolves the concern above without changing the safe swap.
+In `c-handoff-full-trace`, a completed swap returns at field 301, beam line 250;
+record publication follows at line 253. The next frame starts in that same field
+at line 303, with its producer record already free. It reaches the swap at field
+302, line 299: the next SOFT tick at line 250 has already passed. Waiting for
+field 303 is therefore a missed deadline, not a two-field pacing condition or a
+wait for the previous completion record. The sampled swap fields are
+301,303,305,307,309,311,313,315.
+
+The existing `VERIFY_SKIP_RENDER` cost diagnostic omits `$afd60` while retaining
+simulation, geometry, publication and the original swap. In
+`c-handoff-skip-trace`, successive swaps complete at fields 301,302,303,304,305,
+306,307,308, always at beam line 250. The producer begins the next frame before
+the previous record is consumed, using the other free record. At every sampled
+render entry its ready flag is zero; front and back buffer pointers remain
+distinct and alternate at swaps. The previous consumer record is released at
+the next SOFT interrupt. These observations prove that the retained handoff can
+support one presentation per field without an artificial two-field floor.
+They do **not** prove full-render 50 fps: the diagnostic deliberately omits work.
+
+The trace uses breakpoints at `$875c8` (frame construction), `$87736` (swap entry),
+`$8773c` (swap return), `$871dc` (publication), and `$8713a` (consumer release),
+recording active field, beam, SOFT counter, both ready flags, pending drain counts
+and buffer/record pointers. Preserve the original blanking-safe swap; simply
+removing its wait would write the live copper list at unsafe beam positions.
+
+## Discrete sound-request audit across rendering intervals
+
+`VERIFY_C_EVENTS` records five discrete dispatch sites in `$8eff8`: engine/crash
+sound start (`$8f06a`), stop (`$8f080`), primary effect (`$8f0be`), secondary effect
+(`$8f0de`) and siren start (`$8f120`). Wrappers preserve the original registers and
+condition flags before tail-calling the original audio entry. They are installed
+only by the selected C patch list under Enhanced framerate. The trace resets at
+race initialization and is excluded from normal builds.
+
+`RRCSEV01` contains count, overflow count, capacity (1024) and record size (8) at
++8, +12, +16 and +20. Records begin at +24: historical simulation field (long),
+kind (word, 1..5 in the order above), parameter (word). The stop parameter is
+normalized to zero because that entry has no sound-number argument. A host must
+reject overflow rather than compare a silently truncated stream.
+
+`VERIFY_FRAME_PATTERN`, together with `VERIFY_FRAME_PERIOD`, cycles diagnostic
+presentation waits through 1,2,3,4,12,2,16,4 fields. It keeps the original vsync
+swap and changes no simulation quantum. This is test instrumentation, not a user
+frame-rate mode. Actual frame histograms must be checked: requesting period 1
+with full drawing produces two-field frames in the functional configuration.
+
+The attack/steering/crash tape produces these identical requests for periods
+1,2,3,4,12 and the varying pattern:
+
+| Simulation field | Kind | Parameter |
+|---|---|---|
+| 1096 | primary effect | 2 |
+| 1122 | engine/crash start | 5 |
+| 1263 | stop | 0 |
+
+All overlapping completed actor hashes match (1,596–1,598 depending on the
+consumer's position when the host stops). At the fixed field-1457 snapshot,
+all 35 actor records, the simulation time, stopwatch, camera position,
+crash-camera offset and rank cells match exactly. The varying run has actual
+2,3,4,12,16-field frames, so this includes repeated multi-step catch-up rather
+than only a steady-rate comparison. Evidence: `c-events{1,2,3,4,12}-replay` and
+`c-events-variable-replay`; their `step.json` files include the event streams and
+actual frame histograms. `c-events-disabled-build` reproduces the earlier
+latency diagnostic byte-for-byte, and the normal slave remains unchanged.
+
+These results cover the sound requests exercised by this tape, not every event:
+secondary attacks and siren start have not occurred in these samples. The trace
+also does not measure sample audibility, sequencer interrupts, volume updates,
+or stop requests from pause/exit paths outside `$8eff8`. Those coverage limits
+remain open; matching actor hashes alone must not be used to close them.
+
+`c-events-onefield-replay` additionally omits the existing expensive draw call
+with `VERIFY_SKIP_RENDER`: its measured histogram has 1,600 one-field frames
+(after startup), and all 1,598 common actor hashes, the same fixed-boundary state
+and all three requests match the full-render cases. This supplies an actual
+one-field scheduling comparison; it is not a full-render throughput or visual
+quality result.
+
+## Long replay hash collection and siren coverage
+
+`STEP_HASH_RING` makes the diagnostic hash buffer reusable for long runs without
+increasing its memory footprint or crossing 68000 PC-relative addressing limits.
+It requires hashing and a power-of-two slot count. The frozen snapshot stays in
+the same position; the following header becomes `RRCHASH3`: capacity at +8,
+last completely published simulation step at +12, and the hash ring at +16.
+Step N uses slot `N & (capacity-1)`. The producer stores the hash before publishing
+N, so an interrupted, partially executed step cannot be mistaken for a completed
+hash. Race reset clears the published counter. The default linear `RRCHASH2`
+format is unchanged when the option is absent.
+
+The host collects periodically, rejects a backward counter or a gap larger than
+the capacity, and assembles a complete linear trace. `c-long1-replay` and
+`c-longvar-replay` collect through two wraps of the 2,048-slot ring over 6,000
+active fields. All 5,985 common completed actor hashes match. Their first 1,598
+hashes also match the earlier linear-buffer replay, and the fixed field-5501
+actor, clock, camera and rank snapshots match. `c-ring-disabled-build` remains
+byte-identical to `c-events1-build`.
+
+Both longer runs add a siren-start request (kind 5, parameter 10) at simulation
+field 4878, with the earlier three requests unchanged. Thus siren dispatch now
+has cross-render-rate coverage. The special actor remains inactive in this
+route; its timer threshold alone is not evidence of an exercised special actor.
+
+The route also exposed a test-input issue: holding UP after a crash keeps the
+player running away from the motorcycle. This is native behavior: `$8b6ce`
+checks raw controls, and `$8b6ee` calls the manual running handler `$8b7a8` when
+input is held, bypassing the automatic return at `$8b6f4`. The long screenshot
+shows the rider running off-road; both traces retain state 3 accordingly. Further
+routes must release controls during recovery to cover remounting and subsequent
+riding. Do not count mere time spent in state 3 as completed crash recovery.
+
+## Special actor, remounting and armed sound coverage
+
+The recorded `c-road-drive.json` route follows the road and releases controls
+during a crash. Its input was generated once from the reference run, then replayed
+unchanged for the varying-cadence comparison. The special actor at `$a6e60`
+becomes active (flags `$4000`) near fields 3000 and 5000. All 5,996 common
+completed hashes and all 32 sound requests match between `c-long-drive` and
+`c-long-drive-var`. This exercises special-actor activity rather than merely
+waiting for its timer threshold.
+
+`c-road-recovery.json` extends that recorded input to field 7000, retaining
+released controls after field 5780. `c-recovery1-replay` and
+`c-recoveryvar-replay` match all 6,992 common completed hashes, all 32 sound
+requests, and the frozen field-5501 actor, clock, camera and rank state.
+Both reach crash state `$ff` by field 6500 and remain there at 7000.
+Both final screenshots show the player remounted on the motorcycle. This route
+uses ordinary controls without injecting game state. It establishes completed
+recovery across render cadences, not race completion or subsequent racing.
+
+The optional `VERIFY_C_SEED_ATTACK` fixture requires `VERIFY_C_EVENTS` and seeds
+an armed player attack at historical simulation field 501. Native action,
+pose-selection and sound-dispatch code then runs normally. This is a synthetic
+boundary test, not evidence that the player naturally acquired a weapon.
+`c-armed1-replay` and `c-armedvar-replay` match all 1,597 common completed hashes
+and the frozen field-1457 state. Both request secondary effect 6 at fields
+501, 641 and 841, followed by the same three original crash-tape requests.
+Neither trace overflows. With the fixture disabled, `c-seed-disabled-build`
+is byte-identical to `c-events1-build`, including the unchanged normal slave.
+
+Together with the earlier siren route, these tests exercise all five traced
+request kinds. Audible playback, pause/exit sound behavior, race finish and
+restart still need separate validation.
+
+## Input history exhaustion
+
+The input producer now latches exhaustion and stops writing the ring when the
+live-field distance reaches its capacity. The main task checks the latch before
+simulation work and again before replaying controls. It aborts through WHDLoad
+with an explanatory message instead of consuming stale controls. An interrupt
+during replay cannot overwrite queued history: the producer never writes after
+exhaustion. The abort runs outside the interrupt handler.
+
+The default capacity remains 2,048 fields, with a conservative maximum backlog
+of 2,047 fields (40.94 seconds at 50 Hz). Below that boundary, all elapsed ticks
+are still consumed without resetting time or changing the timestep. Exhaustion
+terminates the run; this is an explicit resource-limit failure, not seamless
+recovery or a promise of real-time operation on an overloaded CPU.
+
+`STEP_INPUT_SLOTS` permits smaller diagnostic capacities and rejects non-power-
+of-two values, capacities below two, or capacities beyond signed word indexing.
+`c-input-full-build` uses eight slots and a 16-field presentation interval.
+`c-input-full-replay/overflow.png` confirms a clean AmigaDOS return with the
+expected message. `c-input-guard-replay` uses the default capacity and matches
+all 1,598 completed hashes, the field-1457 actor/clock/camera/rank state and the
+three sound requests from `c-events1-replay`. The normal slave is byte-identical.
+With the same forced-overflow build but `CUSTOM2=0`, `c-input-full-off` reaches
+the race with selection reason 0 and all checked original timing, input, stack
+and geometry instructions intact.
+
+## Reset before native race preparation
+
+The first human-to-human race transition exposed a missing reset boundary.
+Native initialization clears the game clock at `$8690c`, then `$86616/$8661c`
+call the patched race loop and `$86630/$8665c` call the field handler while
+preparing display buffers. These calls occur before `$a8c4c`, where C previously
+reset its history. A later race therefore used the preceding race's simulation
+cursor during preparation. The overflow guard made this visible as an explicit
+input-history error in `c-restart-f10` and `c-restart-f10-var`; merely removing
+that guard would conceal the stale state.
+
+The selected C patch list now hooks `$8660e` to reset history before preparation,
+clear queued controls and clear the cached start pose. Its initial cursor is
+live field minus one, reproducing the first boot's initial field-1 step.
+The existing reset at interrupt installation remains, establishing the active
+race's cursor after preparation. Both paths use the same history-reset helper.
+The early hook retains the replaced delta assignment and is under CUSTOM2.
+
+`c-restart-fixed` drives the first race to field 1600, exits with native F10
+(raw key `$59`), passes the repair screen with fire, and starts another race.
+At its field 100, the cursor is 99, step count 98 and capture flag zero, replacing
+the prior race's field-1457 capture. RIGHT produces steering 798 at field 120;
+release returns it to zero by field 160. The final screenshot shows the second
+race. `c-reset-fixed-regression` preserves all 1,598 original attack-tape hashes,
+sound requests and fixed-boundary actor/clock/camera/rank state.
+The normal slave remains byte-identical. This covers voluntary race exit and
+restart, not crossing the finish line or progression after winning.
+`c-reset-fixed-off` verifies that `$8660e` and all other checked timing/input
+hooks retain their original instructions when CUSTOM2 is off.
+
+`c-restart-var-settled` repeats the transition with the varying render-period
+pattern. The second race again reaches field 100 with cursor 99, 98 steps and
+capture flag zero. RIGHT is consumed during catch-up; released steering reaches
+zero by live field 200 (cursor 198). An earlier check at live field 160 still had
+steering 24 because the cursor was only 154. Live-field checkpoints are not
+equal simulation boundaries, so that intermediate difference is not treated as
+a state mismatch.
+
+## Stop catch-up at the race-ending tick
+
+`VERIFY_C_SEED_FINISH` is a synthetic boundary fixture: at field 501 it sets
+the player's finished flag, finish timestamp and native finish-countdown state.
+It does not set the race-exit request or shorten the countdown. Native action
+code at `$90252` calls `$8f136`; the ten countdown increments request exit at
+field 690. This fixture does not cover naturally crossing the finish line.
+
+Before the correction, `c-finish1-before` and `c-finishvar-before` both capture
+the exit flag already set at field 690 but continue through field 691. The
+native outer loop consequently records 691 in `$a5d54`. C now checks the exit
+request before starting another simulation step, publishes the final state
+through the existing rendering path, and lets the native outer loop leave.
+Elapsed time after a terminal race state does not authorize further gameplay.
+
+`c-finish1-fixed` and `c-finishvar-fixed` both stop at cursor 690, with 689
+completed active-race steps (the active cursor starts at field 1), finish timestamp
+501 and end timestamp 690. All completed hashes match across cadences and match
+the corresponding pre-fix prefixes. The frozen field-690 actor, stopwatch,
+simulation clock, camera, crash-camera and rank state also matches. The native
+finish counter reaches ten and the race interrupt hook is cleared in both runs.
+The test does not establish winning progression or audible end-of-race sound.
+With the fixture disabled, `c-finish-regression` retains all 1,598 attack/crash
+tape hashes, sound requests and the field-1457 comparison state from
+`c-reset-fixed-regression`. The normal slave binary remains unchanged.
+
+## Full race through the actual finish line
+
+`STEP_CAPTURE_END` optionally captures the final simulation step when the native
+exit request is set, publishing its actual cursor in the existing capture field.
+This permits equal-boundary comparisons without predicting the race duration.
+With the option absent, `c-endcapture-disabled-build` is byte-identical to
+`c-finish-disabled-build`; the normal slave is also unchanged.
+
+`c-fullrace1` uses ordinary controls throughout a complete race. A host driver
+follows the road, releases controls during crashes, and resumes after remounting.
+It records 148 input changes at exact field boundaries. No game state, finish
+flag, timer or course length is injected. The original finish coordinate is
+1855; the player crosses it at simulation field 13835, finishes in rank 4, and
+the native countdown ends the race at 14024. This includes continued racing
+after the earlier crash/recovery scenario and additional later crashes.
+
+`c-fullracevar` replays those exact recorded inputs with varying render
+intervals. All 14,023 completed active-race hashes match, including six complete
+wraps of the 2,048-slot hash ring. All 52 traced sound requests match: seven
+engine/crash starts, seven stops and 38 primary effects. Neither event log
+overflows. Both runs have finish timestamp 13835 and end timestamp 14024;
+the terminal actor records, stopwatch, simulation clock, camera, crash-camera
+offset and rank cells match exactly.
+
+The varying-cadence run also passes the post-race screens with fire and starts
+another human race. At live field 100 its cursor is 98, step count 97 and capture
+flag zero; the finish flag is clear. `next-race.png` shows the new race.
+This establishes actual finish-line and post-race restart coverage for this
+route. It does not cover every championship outcome or audible sound playback.
+The private evidence and recorded tape are under `tmp/c-fullrace1` and
+`tmp/c-fullracevar`.
+
+## Shared runtime integration
+
+`simulation.s` now contains the shared C implementation formerly in
+`verify_c_step.s`. Normal builds include it with `C_RUNTIME_ONLY`, omitting the
+large frozen snapshot, hash array and per-step hashing. They retain the small
+cursor/counter record used by scheduling and the input ring. `VERIFY` builds
+retain the earlier A/B path unless `VERIFY_C_STEP` selects the full C diagnostic;
+`C_SIMULATION` explicitly selects the lean runtime with optional generic
+instrumentation. None of these build switches is a user-facing frame-rate mode.
+
+The normal beta is 6,584 bytes and is byte-identical to the private runtime
+prototype used for steering/release and keyboard pause/resume checks
+(`c-runtime-prototype-input`). Pause freezes the active clock at field 161.
+The full C diagnostic built after extraction is byte-identical to
+`c-endcapture-disabled-build`, retaining the earlier regression implementation.
+
+`c-runtime-boundary` runs the actual normal slave with the attack/crash tape,
+then breaks immediately before returning from the completed simulation step.
+At cursor 1457, all actor records, stopwatch, simulation clock, camera,
+crash-camera offset and rank cells match the diagnostic capture in
+`c-finish-regression`. The runtime binary contains no capture instrumentation;
+the debugger reads the authoritative state at that boundary.
+
+`c-runtime-dispatch` verifies the actual normal slave in five configurations:
+toggle omitted, toggle explicitly off, enabled with 68020/Fast RAM, enabled on
+the 1 MB Chip 68000 setup, and enabled on a Chip-only 68020. Both off cases and
+both unsupported configurations retain the original preparation, simulation,
+delta, animation, swap, input and camera instructions. The supported machine
+installs C and advances one-field simulation steps. The normal Readme and build
+dependencies now describe this integration. Broader A2/A4, MMU, CD32 and latency
+validation remains required before declaring C complete.
+
+## Integrated runtime hardware matrix
+
+`c-runtime-matrix-low` and `c-runtime-matrix-high` exercise all 13 A2 cells with
+the lean runtime plus generic field/frame counters and the MMU-register probe.
+Each cell has a 240-second deadline. All complete the route and measurement
+window; both explicit MMU configurations report TC `$8000`. Those two cells are
+functional checks only, and the existing 040/060 emulator timing limitations
+still apply.
+
+| Cell | B reference fps | C measured fps | Distance change vs B |
+|---|---:|---:|---:|
+| A500 1 MB Chip | 8.5 | 8.5 | -1.70% |
+| A1200 Chip only | 12.5 | 12.5 | 0.00% |
+| A1200 Fast | 12.5 | 1.8 | -1.66% |
+| A1200 Fast + Cache | 16.5 | 4.9 | -0.42% |
+| A1200 Fast + NoCache | 12.5 | 1.8 | -1.66% |
+| 030/50 | 13.3 | 4.4 | -1.28% |
+| 030/50 + Cache | 16.6 | 9.0 | -0.99% |
+| 040/25 | 22.5 | 12.5 | -1.28% |
+| 040/25 + Cache | 22.5 | 12.5 | -1.28% |
+| 060/50 | 23.1 | 13.7 | -0.52% |
+| 060/50 + Cache | 23.1 | 13.7 | -0.52% |
+
+The B reference is `b-final-matrix-v2`; the window is 500 active fields after
+field 100, with distance measured after 490 fields. JSON evidence retains the
+frame histograms, CPU/cache settings and screenshots. These are **functional
+passes, not a performance or A4 pass**. The new simulation consumes appreciably
+more CPU time and several live-field distance comparisons exceed 1%. C must
+remain open; the integrated beta is not evidence of an achieved speedup.
+
+The A500 distance discrepancy is an instrumentation effect: the actual normal
+slave in `c-runtime-normal-a500` matches `b-final-normal-off` exactly at 8.5 fps
+and distance 3,425,028, including initial, field-590 and final actor/clock/rank
+hashes. The unsupported path retains native game instructions.
+`c-runtime-cd32` also passes steering/release and CD32 pause/resume on the actual
+normal slave, holding the active field clock at 161 while paused.
+
+The cached-020 field-590 screenshots show the same road scene and player off the
+right edge, but differ in displayed road/scenery and opponent details. A completed
+tick-1457 comparison between functional and real-speed runs likewise matches
+player movement, stopwatch, camera and rank cells but differs in some opponents
+and the random spawn timer at `$a5d5c`. This is not yet a proven CPU-dependent
+simulation defect: the native menu calls all three random generators at
+`$8187a..$81886`, so matching race inputs does not establish matching RNG state.
+The prior six-byte “clock” comparison also includes `$a5d5c`; only
+`$a5d58..$a5d5b` is the stopwatch.
+
+`VERIFY_C_SEED_RNG` provides controlled diagnostic initial conditions by calling
+the native seed routines `$90088` (table generator, seed zero) and `$9011c`
+before native race initialization at `$8657c`. Seeding after actors have spawned
+would be too late. The switch requires VERIFY and does not alter the normal
+binary or normal-game randomness. New cross-speed probes record the initial
+RNG table/cursors as well as the initial actor state.
+
+`c-runtime-seeded-functional` and `c-runtime-seeded-real020` have identical RNG
+tables/cursors at live field 100. Their initial live snapshots are not equivalent
+simulation boundaries (cursors 99 and 97), so those actor snapshots are not used
+as an equality assertion. At the completed tick-1457 breakpoint, however, every
+actor byte, stopwatch, spawn timer, simulation clock, camera, crash-camera offset
+and rank cell matches exactly. For this scenario, the earlier opponent
+differences are resolved by controlled initial randomness; they are not evidence
+of a different result from the same seeded simulation at the two CPU speeds.
+This does not remove the measured throughput regression or close the outstanding
+performance and latency work.
+
+## Fast RAM stack enabled in the runtime
+
+The previously tested stack experiment is now enabled in `C_RUNTIME_ONLY`
+builds as `C_FAST_STACK`, sharing `runtime_stack.s` with the diagnostic
+`VERIFY_C_FAST_STACK` opt-in. WHDLoad reserves an optional 20 KiB expansion block;
+16 KiB is used for the CPU stack with guards at both ends. The selected C path
+switches at the original trap-2 stack setup while interrupts are masked. It
+does not copy an active frame, and retains the original Chip stack if the block
+is absent or outside the supported Fast RAM windows. The master toggle and
+hardware selector still control installation of the stack hook. The optional
+reservation is declared in the slave header, before the toggle is read; an
+off-toggle run never switches to it.
+
+The normal slave is 6,744 bytes. `c-stack-matrix-low/high` repeats all 13 A2 cells
+with the same 500-field window and limits as the preceding runtime matrix.
+Every cell completes, including both explicit MMU cases. Measured changes:
+
+| Configuration | Previous C fps | Fast-stack C fps |
+|---|---:|---:|
+| A1200 Fast / explicit NoCache | 1.8 | 3.5 |
+| A1200 Fast + Cache | 4.9 | 6.8 |
+| 030/50 | 4.4 | 6.1 |
+| 030/50 + Cache | 9.0 | 12.5 |
+| 040/25, with or without Cache | 12.5 | 16.6 |
+| 060/50, with or without Cache | 13.7 | 18.3 |
+
+A500 and Chip-only A1200 fallback rates remain 8.5 and 12.5 fps respectively.
+These gains do not yet recover the earlier B rendering throughput. The stack
+removes a measured source of CPU/Chip-bus cost; it does not change simulation
+steps, discard elapsed time, or add pacing.
+
+`c-runtime-stack-seeded-boundary` matches all compared actor, clock, spawn-timer,
+camera and rank state at completed tick 1457 against the previous controlled-
+seed real-speed 020 runtime. `c-runtime-stack-cd32` passes steering and CD32
+pause/resume on the actual normal binary, with 336 bytes of observed stack use
+and both guards intact. `c-runtime-stack-off` confirms the normal binary retains
+native stack setup and all checked original timing/input hooks with CUSTOM2=0.
+
+`c-runtime-stack-040-quit` and `c-runtime-stack-060-z3-quit` verify TC `$8000`,
+intact stack guards and 204 bytes of observed stack use, then press the actual
+Help quit key. Both inspected screenshots show return to AmigaDOS without an
+error. The 060 case uses Z3 RAM, with stack bottom `$407ed010`. These are bounded
+observations, not proof of a universal worst-case stack bound. Remaining
+throughput, A4 and latency validation stays open.
+
+## Reuse simulation-owned actor lean
+
+The actor pose loop at `$89e70..$89eec` repeated the lean calculation already
+performed by `step_derive_lean`, including a division and threshold-table walk.
+Its result was discarded: C suppresses the native actor `+$34` store, and the
+pose selectors read the stored simulation lean. The enhanced patch now enters
+`step_lean_end` directly from that presentation entry. The authoritative pass
+executes the displaced subtraction and enters the original calculation at
+`$89e76`. Native visibility tests, pose side effects and projection remain.
+The hook belongs to the same CUSTOM2-gated C patch list.
+
+Validation in the private harness:
+
+- `c-lean-attacks` matches all 1,598 common completed actor hashes and all sound
+  events against `c-finish-regression`. The entire tick-1457 snapshot and final
+  screenshot pixels match too.
+- `c-lean-fullrace` replays the recorded full race: all 14,023 hashes, 52 sound
+  events, finish and exit times match `c-fullrace1`. Final actor, clock,
+  spawn-timer, camera and rank ranges match. Presentation scratch data and the
+  asynchronous final image differ; this is not a full-snapshot equality claim.
+  The inspected finish and next-race images render correctly, and the next race
+  resets the capture and simulation counters.
+- `c-lean-armedvar` matches 1,597 common hashes, all sound requests and the same
+  authoritative snapshot ranges against the earlier varying-cadence armed
+  fixture, including secondary sound requests.
+- `c-lean-runtime-matrix`, using the explicit runtime binary, measures 7.1 fps
+  on cached A1200 Fast (previous Fast-stack C: 6.8) and 12.5 on cached 030/50
+  (unchanged), over the same 500-field window. This small improvement does not
+  resolve the remaining throughput regression or establish latency acceptance.
+- `c-lean-off` checks the actual normal slave with CUSTOM2=0: the new lean
+  entry and all previously checked timing, input and stack sites remain native.
+
+The normal slave is now 6,768 bytes. This change leaves C open.
+
+## Project forward actors only for presentation
+
+The forward actor path finishes pose selection and its attack/sound side
+effects before `$89f48`. From that point it builds depth and screen records,
+clips them and appends crash, rider and spark visuals. Those helpers write
+presentation records and counts; C already owns spark lifetime separately.
+`step_pose_project` now returns to the next actor during `step_pose_events`.
+During rendering it executes the displaced position subtraction and continues
+the original projection path. The rear-view path is unchanged.
+
+This does not remove the world-object projection used for collisions:
+`step_collision_objects` still rebuilds those inputs before every simulation
+tick. Nor does it bypass the earlier pose eligibility checks or state changes.
+The new patch is inside the existing CUSTOM2/hardware-selected patch list.
+
+`c-pose-project-fullrace` matches all 14,023 completed hashes, all 52 sound
+requests and the original finish/exit boundaries against `c-fullrace1`. Final
+actor, clock, spawn-timer, camera and rank ranges match. Starting the next race
+resets simulation and capture state. `c-pose-project-armedvar` matches all
+1,596 common hashes, sound requests and those authoritative snapshot ranges
+against the earlier varying-cadence armed fixture. Inspected finish, next-race
+and armed-fixture screenshots render correctly; presentation scratch buffers
+are intentionally not compared for byte equality.
+
+The explicit runtime build in `c-pose-project-matrix` measures 8.7 fps on cached
+A1200 Fast, up from 7.1 after lean reuse. Cached 030/50 remains 12.5 fps; 040/25
+is 16.6 and 060/50 is 18.5. These are the existing 500-field measurements, not
+50 fps or B-throughput acceptance. `c-pose-project-pad` passes actual normal
+binary steering/release and CD32 pause/resume with intact stack guards.
+`c-pose-project-off` confirms that CUSTOM2=0 leaves the projection entry and all
+other checked enhanced hook sites native. The normal slave is 6,804 bytes.
+
+`c-pose-project-fullvar` repeats the complete tape with varying presentation
+intervals (2, 3, 4, 12 and 16 fields). All 14,023 hashes, 52 events, terminal
+boundaries and the authoritative snapshot ranges match the original full-race
+reference too.
+
+`c-pose-project-latency-a1200-fast+cache` uses the runtime with only the optional
+latency probe added. For RIGHT injected after field 300, input is captured and
+replayed at 301, its simulation finishes at live field 302, rendering starts
+at 302, swap is entered at 304 and returns at 305. That is 100 ms from injection
+to buffer handoff. This one phase is not a latency distribution or a measurement
+of the first changed scanout pixels; it does not close C3b. Performance, A4 and
+latency acceptance remain open.
+
+## Visible steering response: a remaining simulation regression
+
+The buffer-handoff probe does not establish when steering first becomes visible.
+`visible_latency_c.py` and `visible_latency_batch_c.py` now compare paired normal
+binary runs on the real-speed cached A1200 Fast configuration. Each pair reaches
+the same race field with identical initial snapshot hashes; both hold throttle
+from field 100, then one adds RIGHT and the other stays neutral. Eight pairs per
+binary inject at fields 300 through 307. The B reference is the preserved
+`b-final-build/RoadRash.slave`, with its validated `Cache CUSTOM2=3` settings;
+C uses the current normal binary with `Cache CUSTOM2=1`. Neither has timing
+probes or per-tick hashes compiled in.
+
+Twenty consecutive profiler screenshots are retained per run. The capture
+advances 21 active fields; image labels are assigned backwards from that end
+boundary. The table reports capture-end estimates with one PAL field of boundary
+uncertainty, not host-display latency or an exact scanline timestamp. Within each
+pair, the road viewport is pixel-identical until the first differing image.
+The inspected first differences are the player's steering pose, rather than a
+HUD clock change. Initial state and effective configuration equality are checked
+within each pair; B and C do not have identical simulation histories.
+
+| Input field | B first-visible estimate (ms) | C first-visible estimate (ms) |
+|---:|---:|---:|
+| 300 | 180 | 360 |
+| 301 | 220 | 340 |
+| 302 | 200 | 420 |
+| 303 | 180 | 400 |
+| 304 | 220 | 380 |
+| 305 | 200 | 360 |
+| 306 | 180 | 340 |
+| 307 | 220 | 420 |
+
+These are eight consecutive phases of one low-speed steering scenario, not a
+general latency distribution. Their medians are 200 and 370 ms respectively.
+The gap is substantially larger than the capture-boundary uncertainty. Evidence
+is in `b-visible-phases`, `c-visible-phases`, and the reused C field-300 pilot
+pair. Tested slave SHA-256 values are
+`6892f327f8f6c7719a3d5603a4bd1ed6a844dbd228b7e50c916678d58ba10bf3` (B) and
+`fc07ed239f111fb376dc0101fabffee2dd42bd779190df73c87b1a8cdc16e7cf` (C).
+
+Retained instruction traces in `b-visible-steering-trace` and
+`c-visible-steering-trace` explain why presentation scheduling alone is not
+enough. Native player steering at `$8b93a` starts with actor `+$26` (speed times
+elapsed fields), shifts it by eight, multiplies by steering `+$42`, then shifts
+again at `$8b946`. The resulting integer is stored in `+$0c` and normally `+$08`.
+Later `$8b97a..$8b97c` multiplies by that elapsed-movement factor again before
+another shift and the `$d000` scale. Small one-field results round away.
+
+For field-300 input, C's first captured movement factor is 25; B's is 76 with a
+three-field native update. At the end of the 20-image capture (live field 321),
+C has `+$08=6`, `+$22=0`, and lateral position `+$00=160`; B has `+$08=21`,
+`+$22=4`, and `+$00=174`. Both start at 160, with similar speeds (6446 and 6454).
+The traces and player records are retained alongside reduced `steering-math.json`.
+This demonstrates lost small movement in C; it does not assign the entire
+visible-response gap to rounding, since frame throughput also differs.
+
+C1b therefore still needs steering/displacement normalization and fractional
+remainder handling, with the camera, tyre-grip and pose consumers audited too.
+Simply amplifying input or changing the simulation quantum would not establish
+correct behavior. Any correction needs fresh cross-cadence state/event replays,
+B handling comparisons and these visible-response checks. Existing identical
+C replay hashes prove determinism, not correct handling relative to B.
+
+## Diagnostic steering normalization candidate
+
+`VERIFY_C_STEERING` includes `verify_c_steering.s`, requires VERIFY and
+`STEP_FIELDS=1`, and installs its hooks only through the selected C patch list.
+It is not enabled in the normal build. The normal slave remains byte-identical
+to `a2eb36e` (6,804 bytes).
+
+The candidate separates two native uses of elapsed movement:
+
+- For a riding player, the initial heading/pose calculation uses speed times
+  the established four-field timing reference. Its second movement factor stays
+  one-field distance. Crashing players retain the native initial calculation.
+- For non-skidding ground movement, the two truncations `/256` and `*13/16`
+  become one signed rational calculation with denominator 4096. The residual
+  is carried to the next tick, with symmetric truncation toward zero.
+  Native skid scaling remains in place and clears the residual; crash handling
+  clears it too. The normalized heading still feeds the native grip test, so
+  retaining its code does not prove identical skid behavior.
+- Race preparation and active-race reset clear the residual. Airborne movement
+  bypasses this native ground path; landing and collision/reset interactions
+  still need explicit validation.
+
+On the field-300 real-speed cached-020 paired-image test,
+`c-steering-candidate-0/1`, the first differing viewport capture is field 311
+(220 ms capture-end estimate), versus field 318 (360 ms) in the current normal
+C binary. This is a diagnostic-build, single-phase observation, not a new
+normal-runtime latency claim. At live field 321, the candidate has player
+position 179, heading 25 and last lateral increment 2; the current normal C
+has position 160, heading 6 and increment 0. The earlier B three-field sample
+has position 174, heading 21 and increment 4.
+
+The controlled B-style four-field diagnostic
+`b-steering-fourfield-trace` ends at position 187, heading 30 and increment 10.
+It starts with speed 6480 and ends at 7104, whereas the candidate starts at
+6420 and ends at 6966. These live-field snapshots are not equal simulation
+boundaries and do not establish calibrated trajectory equivalence. They are a
+reason to continue the reference comparison, not to promote the candidate.
+
+The retained candidate RIGHT and LEFT traces each provide 20 ground-path
+returns. Every observed `$8b9a0` result matches an independent calculation of
+`trunc((13 * signed_product + previous_remainder) / 4096)`; final remainders
+are 3556 and -3345. The LEFT sample ends at position 138 and heading -28.
+The carry is symmetric, but the earlier native input/heading truncations and
+input history are not thereby proved symmetric.
+
+`c-steering-candidate-replay` and `c-steering-candidate-var` replay the attack
+tape with ordinary and varying presentation cadence. All 1,598 completed actor
+hashes, three sound requests, and tick-1457 actor/clock/spawn-timer/camera/rank
+ranges match between the two candidate runs. The candidate intentionally
+differs from the old C state; cross-cadence equality alone is not acceptance.
+Full-race, skid/crash/landing, pause/restart, curve/AI interactions, signed
+handling calibration and multi-phase visible-response checks remain required.
+
+## Steering candidate: full-race and phase coverage
+
+`c-steering-fullrace` drives a complete race using ordinary controls and records
+the input tape. `c-steering-fullvar` replays it with varying render intervals.
+All 11,990 completed actor hashes, 35 sound events, finish tick 11802, end tick
+11991 and terminal actor/clock/spawn-timer/camera/rank ranges match. Both start
+another race with reset simulation/capture state. Finish and next-race images
+were inspected. This compares the candidate against itself across presentation
+cadences, not against the previous C race with different controls.
+
+The variable replay samples player state every 20 fields: 595 samples include
+15 with the skid flag, 12 airborne, and crash states 0, 1, 2, 3 and 4 followed
+by riding again. Remainders stay between -4056 and 4080. The samples expose a
+cleanup hole: airborne crash states bypass the ground-motion hook, retaining
+remainders such as 2434 through fields 2200–2260. The candidate now calls
+`step_steering_finish` at the completed simulation boundary, clearing residual
+ground movement whenever the player is crashing. Native ground-path clearing
+alone was insufficient.
+
+Before that cleanup, `c-steering-visible-phases` completed the same eight
+paired visible-response scenarios as the B/normal-C audit:
+
+| Input field | Candidate first-visible estimate (ms) |
+|---:|---:|
+| 300 | 220 |
+| 301 | 200 |
+| 302 | 180 |
+| 303 | 260 |
+| 304 | 240 |
+| 305 | 220 |
+| 306 | 200 |
+| 307 | 180 |
+
+The median is 210 ms, compared with B's 200 and uncorrected normal C's 370.
+The same one-field capture-boundary uncertainty applies. These remain
+diagnostic-build measurements in one low-speed scenario, not a general latency
+pass for the normal runtime or for the subsequent cleanup build.
+
+`c-steering-candidate-pad` passes steering/release and CD32 pause/resume on
+real-speed cached 020, with the clock frozen at field 161 while paused.
+Fast-stack guards remain intact, with 332 bytes of observed use.
+
+The native input routine itself explains one source of left/right asymmetry:
+`$872d2..$872e0` gives LEFT a reversal increment when starting from zero,
+whereas `$87310..$8731e` omits it for RIGHT at zero. The candidate preserves
+that existing behavior; symmetric fractional carry does not make the entire
+control response symmetric.
+
+`c-steering-reset-fullvar` validates the boundary cleanup on the full recorded
+tape: all 11,990 hashes, 35 sound events, finish/exit boundaries and authoritative
+terminal ranges still match `c-steering-fullrace`. All 38 sampled crash states
+now have a zero fractional remainder. The next race starts with reset counters.
+The normal binary remains byte-identical; this closes the observed candidate
+cleanup defect, not the outstanding B handling calibration or normal-runtime
+integration and acceptance checks.
+
+## Shared seeded B/C handling calibration
+
+`VERIFY_C_SEED_RNG` now installs its existing initializer through `pl_main`,
+still behind CUSTOM2 and still diagnostic-only. Its code is shared by B-style
+VERIFY builds and C, so a native timing reference can start from the same
+random state as the candidate. The normal slave remains byte-identical.
+
+`b-steering-seeded-lap`, `b-fourfield-seeded-lap` and
+`c-steering-seeded-lap` use cached real-speed 020, the established A1 tape and
+the same initializer. All three live-field-100 additive RNG snapshots
+(`$90000..$90087`) have SHA-256
+`c28968215eeea324c122f851f13d71f1658b9668d801360bef88d4c632bf3dec`.
+This controls the initial randomness; it does not equate their simulation
+boundaries or subsequent random consumption.
+
+The comparison identifies a candidate handling defect independent of that
+randomness: before steering begins at field 600, both B references retain
+player lateral position 160, whereas the candidate reaches 183. The
+unseeded replay showed the same effect. This is why the earlier full-race
+cross-cadence pass and better response time were insufficient for promotion.
+
+## Retain native reference rounding in steering
+
+The neutral-input traces `c-neutral-base-trace` and
+`c-neutral-candidate-trace` isolate the drift. At field 440 both have steering
+`+$42=0`, heading `+$08=0`, road centre `+$36=-9` and road fraction `+$38=-1`.
+The native signed-word multiplication at `$8b97a` consequently multiplies 36
+by 1. The original two rounding stages discard that displacement. The previous
+candidate instead accumulates it, moving from lateral position 161 to 164
+during the 20-image capture while the original C path stays at 160.
+
+A temporary zero-steering guard removed that drift, but the
+`c-steering-neutralfix-lap` still oversteered the first pulse (237 at field 700
+versus the four-field reference's 215). The committed diagnostic model therefore
+supersedes the earlier combined `/4096` carry:
+
+- Both movement factors use the four-field reference for a riding player.
+- The original integer `/256`, tyre-grip path and `$d000` scale run unchanged
+  on that reference displacement.
+- A new hook at `$8b9a0` integrates one quarter of the resulting signed integer
+  per simulation tick, carrying only the quarter-unit remainder (-3 through 3).
+  It does not resurrect road fractions that the native reference discarded.
+- Crashing/airborne players keep their native displacement path, clearing the
+  remainder. The completed-tick crash cleanup remains in place for bypasses.
+
+`c-steering-reference-lap` uses the same seed and tape as
+`b-fourfield-seeded-lap`. It remains at lateral position 160 until steering starts.
+The first-pulse checkpoints are now 214 versus 215 at field 700, and 194 versus
+192 at field 800. Later trajectories still diverge: sampled crash onset is 1442
+versus 1350. Both have one crash and final rank 21, but complete opponent order
+and image equality fail. The retained `a4-comparison.json` explicitly reports
+that failure; this is improved calibration, not A4 acceptance.
+
+The seeded `c-steering-reference-replay/var` pair matches all 1,596 common
+completed hashes, three sound requests, and tick-1457 authoritative ranges.
+These tests cover the revised model; the earlier full-race and eight-phase
+latency results describe its predecessor and must not be claimed for this model.
+
+The RIGHT and LEFT traces each validate 20 writes against an independent
+signed quarter-displacement calculation; final remainders are 2 and -2.
+`c-steering-reference-distance` measures 8.5 fps and distance 3,318,164 over the
+standard window, versus seeded B's 3,374,076. The -1.657% difference fails A4a.
+This live-field comparison includes different simulation/render progress and
+does not by itself identify the cause. The normal 6,804-byte slave is unchanged.
+
+## Completed-step distance accounting
+
+`b-reference-distance-boundaries` and `c-reference-distance-boundaries` repeat
+seeded cached-020 throttle input at live field 100. They stop at every completed
+logic step (B's `$875b6`, C's final `step_end` RTS), recording live field,
+simulation cursor, position, speed and applied delta. Debugger stops do not
+advance emulated time. C records 501 completions through live field 600; B
+records 166 through live field 602. These are the same candidate/reference
+binaries used for the preceding distance comparison.
+
+At completed cursor 590, B's position is 3,898,364 and C's is 3,852,194.
+Relative to the initial 524,288, C remains 1.368% behind. C completes that tick
+at live field 593. Thus render debt explains only part of the earlier 1.657%
+live-field difference; it is not sufficient to explain away the A4 failure.
+
+The B trace also sums to 492 applied fields after the live-field-100 input,
+although its cursor advances to 590. Its first completed step, at cursor 101,
+already applies delta 3, reaching speed 102. C's cursor-101 step applies one
+field, reaching speed 34. B applies the sampled throttle to a whole native
+multi-field step. Its cursor labels alone do not measure the integrated time
+following this input; the native delta can also lag the current render interval.
+
+At C cursor 592 (492 applied throttle fields), position is 3,871,631: a 0.792%
+distance difference from B's 492-field result. This is a diagnostic time-aligned
+comparison, not a replacement for the A4 live-field acceptance window. Every B
+position increment in the measured window equals its end-of-step speed times
+its delta. Splitting those same B speed changes linearly into unit steps would
+remove 10,161 distance units of endpoint-integration bias; another 16,572 units
+remain relative to C. That calculation does not equate gear, terrain or other
+state-dependent decisions across the two paths. No compensating speed multiplier
+or extra simulation time has been introduced. Raw steps and the derived figures
+are retained in `c-reference-distance-boundaries/comparison.json`; C remains open.
+
+## Revised steering: visible response and race-exit replay
+
+`c-steering-reference-visible-phases` measures the revised quarter-displacement
+candidate, using fresh neutral/RIGHT pairs for all eight injection fields 300–307.
+Within each pair the initial snapshots match exactly. First changed race-view
+captures give upper estimates of 260, 240, 220, 200, 180, 260, 240 and 220 ms,
+median 230 ms. The field-300 difference image includes the rider and road view.
+These remain capture-end estimates with one-field uncertainty, not hardware
+input-to-monitor latency. The corresponding retained B median is 200 ms and
+uncorrected C median is 370 ms. The new candidate substantially improves response
+but does not eliminate the regression against B. Its predecessor's 210 ms
+median does not describe this revised model.
+
+`c-steering-quarter-fullrace` drives the current model using ordinary adaptive
+controls, recording the resulting input tape. It publishes 11,945 completed
+step hashes, then exits at simulation field 11946 after bike damage; `finish=0`.
+This is a wreck/exit test, not proof of successful race completion. It records
+120 sound requests and starts another race with capture state `(99,98,0,1)`.
+Of 593 samples, three have skid flags and 19 are airborne; all five crash states
+occur, with zero residual in all 97 sampled crash states. Every sampled steering
+residual stays strictly between -4 and 4. Sampling every 20 fields does not
+prove every intermediate state. The normal slave remains unchanged, SHA-256
+`fc07ed239f111fb376dc0101fabffee2dd42bd779190df73c87b1a8cdc16e7cf`.
+
+`c-steering-quarter-fullvar` replays that exact tape with the existing
+2/3/4/12/16-field render pattern. All 11,945 hashes and all 120 sound requests
+match, as do terminal capture fields and the actor, clock/spawn-timer, camera
+and rank ranges recorded in its `comparison.json`. Both runs restart with the
+same cleared capture state. This establishes render-cadence independence for
+the revised model through the tested wreck and restart; successful finish-line
+coverage for this model, remaining A4 differences and the latency/performance
+regressions are still open.
+
+## Defer width division until after object rejection
+
+`VERIFY_C_OBJECT_WIDTH` is a diagnostic-only C patch under the same CUSTOM2 and
+hardware gates. It replaces the divide/store at `$8b2e8` with NOPs and performs
+those operations at `$8b326`, after the native depth/lateral rejection tests.
+The numerator D3 and divisor D1 remain unchanged through that interval. Accepted
+records receive the same width before D3 is reused for height at `$8b332`;
+rejected records are not published. The hook restores the displaced `add.w d2,d2`
+and `lea $a7068,a2`. It neither removes the collision projection pass nor changes
+its visibility decisions. Normal builds remain byte-identical.
+
+`c-object-width-replay1457` matches all 1,598 common hashes, sound requests and
+the entire captured `$a5900..$a873f` state against
+`c-steering-reference-replay`. The first attempted replay build mistakenly used
+the default capture field 601; the harness correctly rejected it rather than
+comparing it with field 1457. Only the rebuilt 1457 run is acceptance evidence.
+
+On cycle-exact cached 020, the standard 500-field window measures 8.7 fps versus
+8.5 for the unchanged steering candidate. The longer paired cost runs
+`c-object-width-baseline-cost` and `c-object-width-cost` show 177 versus 179
+renders over fields 100–1000 (9.833 versus 9.944 fps, about 1.13%). Their sampled
+simulation cursor/count and position agree at every checkpoint. This is a small
+workload-specific gain, not resolution of C's throughput regression, and the
+experiment is not yet enabled in the normal slave.
+
+`c-object-width-fullvar` also matches all 11,945 completed hashes and 120 sound
+requests against `c-steering-quarter-fullrace` while replaying its tape under
+varying render intervals. The terminal actor, clock/spawn-timer, camera and rank
+ranges match, as do exit field 11946 and restart capture `(99,98,0,1)`. This
+extends the experiment's equivalence evidence through crashes, wreck and restart.
+
+## Fast RAM world-object projection experiment
+
+`VERIFY_C_OBJECT_FAST` copies `$8b02e..$8b37d` (848 bytes) into reserved space
+inside the selected C slave hunk. `step_select_path` already proves that hunk
+is in Fast RAM; no separate allocation or DMA storage is moved. The instruction
+audit covers 263 instructions and 36 relative branches/calls, all targeting
+within the copied block. There are no PC-relative data accesses. Absolute data
+references continue to address the one authoritative native state.
+
+The C patch list redirects `$8b02e` to the copy. Immediately after applying the
+patch list, before native main-game execution resumes, initialization copies the
+body and restores the original eight-byte entry instruction in the copy. The
+body is copied after patching so other selected patches are retained. A
+`resload_FlushCache` follows all writes. Both simulation and rendering calls
+through the native entry use the relocated code. Nothing runs this initializer
+or installs the entry jump when the master toggle/hardware selection rejects C.
+
+`c-object-fast-copy` confirms the actual entry target `$9fd83c` and byte equality
+for all 848 bytes against the patched native body plus its original entry.
+`c-object-fast-off` confirms CUSTOM2=0 retains the original entry.
+`c-object-fast-040-mmu` and `c-object-fast-060-mmu` reach the race, verify the
+copy at `$9fbb20`, and confirm enabled TC translation. These are functional
+cache/MMU checks, not cycle-accurate performance measurements.
+
+`c-object-fast-replay` matches all 1,598 common completed hashes, sound events
+and the entire tick-1457 snapshot against `c-steering-reference-replay`.
+The cached cycle-exact 020 cost window (fields 100–1000) improves from 177 to
+193 renders, 9.833 to 10.722 fps, about 9.04%. Initialization and live checkpoint
+phases differ, so this frame count is not a claim of equal state at arbitrary
+live fields; the completed-step replay supplies that equivalence evidence.
+This experiment is independent of deferred width division and remains disabled
+in the normal slave, whose SHA-256 remains
+`fc07ed239f111fb376dc0101fabffee2dd42bd779190df73c87b1a8cdc16e7cf`.
+
+`c-object-fast-fullvar` matches all 11,945 hashes, 120 sound requests and the
+recorded terminal actor/clock/spawn-timer/camera/rank ranges against the unchanged
+quarter-steering reference, through wreck at field 11946 and restart. The
+Chip-only 020 test `c-object-fast-chip-fallback` retains the original entry even
+with CUSTOM2=1. Successful-finish coverage and normal-runtime integration remain
+separate outstanding work; this does not close C or the broader D3 audit.
+
+## Integrate Fast RAM projection in the enhanced runtime
+
+`C_OBJECT_FAST` now enables the tested copy/entry patch in normal and lean
+runtime builds. Full-snapshot diagnostics retain explicit
+`VERIFY_C_OBJECT_FAST` selection so historical references remain reproducible.
+The copy is still initialized only after CUSTOM2 and CPU/Fast-memory selection.
+Neither the steering candidate nor deferred-width experiment is enabled by this
+change. No additional public option is introduced.
+
+The actual normal slave in `c-object-runtime-matrix` measures:
+
+| Cached machine | Previous normal C | Fast projection normal C |
+| --- | ---: | ---: |
+| 020 | 8.7 fps | 10.0 fps |
+| 030/50 | 12.5 fps | 12.5 fps |
+| 040/25 | 16.6 fps | 16.6 fps |
+| 060/50 | 18.5 fps | 18.9 fps |
+
+These use the existing 500-field cycle-exact window. They remain below B's
+throughput and do not establish C completion. `c-object-runtime-off` and
+`c-object-runtime-chip` inspect all enhanced hook sites, including the new
+projection entry: both retain the original code. The integrated lean runtime's
+040/060 MMU probes verify all copied bytes and enabled TC translation; these
+functional results are not speed measurements.
+
+The normal slave is now 7,708 bytes, SHA-256
+`e7653f3f5964730115faf8a4c0971fb8b984bc46a518c5c1bfb2c8ee3aa6cd89`.
+The size increase reserves executable storage within the slave hunk; the
+optional expansion-memory stack reservation remains unchanged.
+
+`c-object-runtime-fullvar` uses the integrated projection with the original C
+steering and the recorded successful-finish tape, under varying render intervals.
+All 14,023 hashes and 52 sound requests match `c-fullrace1`, as do the terminal
+actor/clock/spawn-timer/camera/rank ranges, finish field 13835 and exit field
+14024. The next race resets capture state to `(93,92,0,1)`. Inspected finish and
+next-race screenshots render correctly. This validates successful finish/restart
+for this integration, not for the separate revised steering candidate.
+
+`c-object-runtime-pad` tests the actual normal binary: steering/release works,
+pause holds active field 161, resume reaches 172, and both stack guards remain
+intact (348 bytes observed high-water usage). `c-object-runtime-a500` retains
+8.5 fps, distance 3,425,028 and the exact final actor/clock/rank state hash of
+`b-final-normal-off`. C still needs further performance improvements and the
+remaining handling, latency and A4 acceptance work.
+
+## Road-geometry relocation: no measured cached-020 gain
+
+`VERIFY_C_ROAD_FAST` tests copying only `$8970e..$898e1` (468 bytes) into the
+selected Fast RAM slave hunk. The adjacent mutable word at `$898e2` is excluded.
+The audit covers 145 instructions and 26 branches, all internal, with absolute
+data references and no PC-relative data. Initialization restores the displaced
+six-byte LEA, copies the remaining words after the C patches, and flushes caches
+before native execution resumes. The experiment rejects the separate late width
+LUT patch combination at assembly time; that patch would otherwise modify only
+the old Chip copy. It remains inside the existing CUSTOM2/hardware gates.
+
+`c-road-fast-copy` verifies all 468 bytes at the actual target `$9fd5e0`.
+`c-road-fast-fullvar` matches all 14,023 hashes, all 52 sound requests and the
+recorded authoritative terminal ranges against `c-fullrace1`, including finish
+13835, exit 14024 and a fresh next race. Thus the tested relocation preserves
+simulation outcomes through the successful-finish tape.
+
+However, the paired cached cycle-exact 020 cost runs show no throughput benefit:
+`c-road-base-cost` renders 192 frames over fields 100–1000, while
+`c-road-fast-cost` renders 191 (10.667 versus 10.611 fps). Both start with 29
+frames and cursor 100; different later live-field states reflect progress within
+the current tick and are not used for equivalence. The standard 500-field
+candidate result is 9.9 fps. This is not evidence for enabling the optimization
+in normal C, and no such promotion is made. The loop contains repeated divides
+and is compact enough to fit the 020 instruction cache; the measured result does
+not prove which cost dominates. Broader CPU/cache testing belongs to any later
+D3 evaluation. The normal slave remains 7,708 bytes with its previous SHA-256.
+
+## Current physics profile and rejected collision-gate relocation
+
+`c-runtime-physics-profile` profiles the actual 7,708-byte normal slave on the
+cached cycle-exact 020 over fields 100–600. Physics/AI PCs `$8b486..$8eff7`
+account for 31.247% of total recorded units. The actor-pair collision entry
+`$8c8ae` executes 13,972 times; 1,266 checks reach `$8c8f8` for detailed testing.
+The initial distance gate accounts for 1.522% and the rejection tail for 0.536%.
+The tail executes 13,972 times, including pairs rejected by later detailed tests.
+These are flat-PC costs, not inclusive call-tree timings or universal workloads.
+
+An experimental Fast RAM replacement duplicated the native distance gate and
+its rejection tail, including both scratch-word clears, actor flag writes,
+unsigned comparisons and BCLR condition-code semantics. Accepted pairs returned
+to the unchanged native `$8c8f8`. The experiment preserves all 14,023 full-race
+hashes, 52 sound requests, recorded terminal authoritative ranges and finish/exit
+boundaries, and restarts correctly (`c-collision-gate-fullvar`).
+
+It does not improve performance: `c-collision-gate-cost` renders 189 frames over
+fields 100–1000, compared with the matching lean reference's 192 (10.500 versus
+10.667 fps). The standard candidate window measures 9.8 fps. The source change
+was removed after measurement; its exact patch is retained with the private
+candidate build for reproduction. The normal slave remains unchanged. This
+rules out promoting this small relocation as C's next performance fix; the
+current profile shows substantial remaining cost spread across the wider
+physics/AI routines rather than concentrated in this gate.
+
+## Revised steering: arrest, successful finish and current response
+
+The revised quarter-displacement model now has separate ordinary-control tapes
+for arrest and successful finish, using the integrated Fast RAM object projection.
+The host driver only sends joystick inputs; it does not change game state,
+course length, damage, finish flags or timers. Inputs are recorded at ten-field
+boundaries and the replay reads that interval from the tape.
+
+The first driver releases throttle above speed 10,000 and does not attack.
+`c-steering-finish-drive` ends with the native BUSTED screen at field 8378,
+not a finish. Its 8,377 hashes and all 241 sound requests match
+`c-steering-arrest-var`, which replays the same inputs with 2/3/4/12/16-field
+render intervals. The recorded terminal authoritative ranges match and both
+start another race with capture cleared. All 272 sampled crash states have a
+zero steering residual. This establishes arrest/restart coverage; it is not
+counted as successful-finish evidence.
+
+The second driver uses full throttle, no attacks, a road-relative lane target
+of 96, a 32-unit dead zone, and one sample of lateral trend to release steering
+earlier. `c-steering-finish-lane` finishes at simulation field 12634 and exits
+at 12823, publishing 12,822 step hashes and 24 sound requests. The inspected
+finish image shows rank 1, and the next-race image renders correctly. Of 1,273
+samples, 20 are airborne, one has the skid flag, and all five crash states occur.
+All 113 sampled crash states have zero residual; all sampled residuals stay
+strictly between -4 and 4. Sampling does not prove every intermediate state.
+
+Fresh visible-response pairs in `c-steering-integrated-projection-visible` use
+this steering model with the current Fast RAM object projection. All eight
+estimates are identical to the earlier quarter-model measurements:
+260/240/220/200/180/260/240/220 ms, median 230 ms, versus B's 200 ms median.
+The cost reduction therefore does not establish a visible-response improvement
+for these injection phases. These remain capture-end estimates with one-field
+uncertainty. The normal slave is unchanged; steering remains diagnostic.
+
+`c-steering-finish-lane-var` replays the successful tape under varying render
+intervals. All 12,822 hashes, all 24 sound requests, the recorded terminal
+actor/clock/spawn-timer/camera/rank ranges and finish/exit times match. It starts
+a new race with capture `(98,97,0,1)`. This closes successful-finish/restart
+coverage for the revised steering model; remaining baseline handling, latency
+and normal-runtime integration work are not implied to be complete.
+
+## Integrate conserved one-field steering in the runtime
+
+Normal and lean runtime builds now select `C_STEERING`. Full-snapshot diagnostics
+retain `VERIFY_C_STEERING` as an explicit alias for reproducible older references.
+The implementation is renamed to `steering.s`, with the Makefile dependency
+updated while preserving its original line endings. Its calculations are
+unchanged: evaluate native heading/ground displacement at the four-field
+reference, retain native grip/rounding, integrate one quarter per simulation
+field, and clear the residual on initialization or crash. All three hooks stay
+inside the master-toggle/hardware-selected C patch list.
+
+The rebuilt full diagnostic `c-steering-runtime-full-build` is byte-identical
+to `c-steering-finish-build`, so the previously verified successful-finish and
+arrest tapes exercise these exact diagnostic instructions. Normal-build tests
+are separate: `c-steering-runtime-off` and `c-steering-runtime-chip` inspect the
+three steering entries in addition to the other enhanced hooks and retain the
+original instructions. The actual normal A500 run matches B's distance and
+final state hash exactly at 8.5 fps. CD32 steering/release, pause at active field
+161 and resume at 172 pass with intact stack guards (344 observed bytes used).
+Both integrated lean 040/060 MMU race checks verify enabled translation.
+
+The normal cached 020/030/040/060 matrix measures 10.0/12.5/16.6/18.5 fps in the
+standard window. Relative to the preceding normal build, only 060 changes
+(from 18.9). These results and the remaining A4 differences are retained rather
+than described as B-equivalent performance. The normal slave is 7,920 bytes,
+SHA-256 `60ef76f312d7f08ce067b5a6b32966bb47f074ee78fd1166bd1cd1e0a7916bdb`.
+
+`c-steering-runtime-visible` tests eight fresh neutral/RIGHT pairs against the
+actual normal binary. Each pair starts with identical snapshots. The capture-end
+estimates are 260/240/220/200/180/260/240/220 ms, median 230 ms, matching the
+candidate rather than uncorrected C's 370 ms median. B's median remains 200 ms;
+this integration improves C but does not close the remaining response gap.
+All five standard-window normal configurations retain lateral position 160
+under neutral steering, including the accelerated paths. No delayed interpolation
+or extra presentation wait is added.
+
+## Broader AI relocation: external-call overhead experiment
+
+The next audit covered `$8d2c0..$8d8cf`: 1,552 bytes, 422 contiguous decoded
+instructions. There are no PC-relative data accesses inside this range, but 25
+word-sized relative transfers leave it for nine native targets. The following
+native code reads mutable PC-relative tables, so the experiment deliberately
+ends before that code and returns through an absolute jump at `$8d8d0`.
+
+A private diagnostic copied the block before patching its four public entries
+(`$8d2c0`, `$8d40a`, `$8d46e`, `$8d4e6`). External relative operands were adjusted
+to nearby absolute-JMP stubs; indirect dispatch pointers and all data remained
+native. `c-ai-fast-copy` checks every copied byte after accounting for the 25
+fixups, all four entry targets, each stub's destination, and the fallthrough
+jump. The exact candidate patch and helper source are retained with
+`c-ai-fast-build` for reproduction.
+
+The cycle-exact cached-020 cost result is worse: `c-ai-base-cost` renders 193
+frames over fields 100–1000, versus 187 in `c-ai-fast-cost` (10.722 versus
+10.389 fps). Each result subtracts its own initial frame count (29 and 28).
+The additional cross-block jumps are a plausible cost, but this experiment does
+not isolate their contribution from code layout/cache effects. No full gameplay
+regression acceptance is claimed from the copy audit or short cost run.
+
+The experimental source has been removed, leaving the normal runtime unchanged.
+This result argues against further partial AI copying with the same stub design.
+The audit also identifies an algorithmic opportunity for later measurement:
+`$8d966` executes 3,538 times in the current profile, while its loop reloads the
+unchanged current actor's speed/direction 14,502 times. Hoisting invariant reads
+would reduce actual work rather than merely relocating it; register preservation
+and the interrupted-input ownership still need checking before implementation.
+
+## AI invariant-read experiment: no throughput improvement
+
+Two private implementations tested hoisting the current actor's signed speed
+out of `$8d966`'s scan. Neither the native loop nor its callees write that actor's
+speed/direction; the loop has no callees, and the per-field input path contains
+no speed/direction-field writes. D5 was saved and restored, with MOVEM on return
+to preserve the final native condition codes. All original comparisons, table
+selection, division, output registers and minimum-time updates were retained.
+
+The first version moved the scan into Fast RAM. `c-ai-invariant-cost` produces
+191 frames over fields 100–1000, versus the matching reference's 193. The second
+keeps the loop at its native addresses: an entry wrapper saves/derives D5, calls
+the original body, then restores D5. A MOVE/BRA replaces just the repeated
+speed/sign calculation. `c-ai-invariant-inline-cost` produces 192 frames.
+Both start with 29 frames. Their finish positions at arbitrary live checkpoints
+are not used as equal-boundary proof.
+
+Neither variant supplies evidence of a throughput gain, so both were removed
+without promotion or a claim of full gameplay equivalence. Exact helper sources,
+the final patch and tested binaries remain in their private build directories.
+The normal source and binary are unchanged. These results do not close C's
+performance requirement; further work should be guided by an explicit remaining-
+requirements audit, not continued small edits without measured benefit.
