@@ -75,6 +75,36 @@ Windowed, real speed, sound enabled. `CPU`, `CHIP_KB`, `FAST_KB`, `AMIGA_MODEL`,
 are silent with the window behind the others; `SOUND=0|1` and `WINDOW=front|back|none` (none:
 no video) choose explicitly.
 
+### Release installer archive
+
+`install/Install` and `install/ReadMe` are the maintained installer text sources.
+The icons, manual and hints come from the original local installer archive; no
+proprietary binaries or built slaves are tracked. `tmp/Powerdrome-2.0.lha` contains
+exactly the original twelve files, replacing only Install, ReadMe and the slave.
+
+To package the current sources after extracting the original installer as above:
+
+```sh
+source amiga/env.sh
+make -C whdload all
+cp install/Install install/ReadMe tmp/installer/PowerdromeHD/
+cp tmp/build/Powerdrome.slave tmp/installer/PowerdromeHD/Powerdrome.slave
+cp tmp/Powerdrome.lha tmp/Powerdrome-2.0.lha
+(
+  cd tmp/installer
+  "$LHA" a -g -0 -o5 ../Powerdrome-2.0.lha \
+    PowerdromeHD/Install PowerdromeHD/ReadMe PowerdromeHD/Powerdrome.slave
+)
+"$LHA" t tmp/Powerdrome-2.0.lha
+```
+
+The packaged 2.0 archive passed extraction and SHA-256 comparison: all twelve
+paths match the original archive, the three replacements match their sources,
+and the other nine files are byte-identical. Local details are recorded in
+`tmp/Powerdrome-2.0-verification.json`. Archive integrity checks do not substitute
+for running the Installer end to end on AmigaOS; that installation test remains
+unperformed.
+
 ### Timing instrument
 
 `make -C whdload coverage VASMFLAGS="-DTIMING_FULL=1 -DVERIFY_PHASE=1"`

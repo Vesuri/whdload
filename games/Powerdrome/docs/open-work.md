@@ -16,6 +16,11 @@ The earlier Phase F gates below remain evidence for the implemented paths and
 include the accepted stock A1200 Practice exception; their captures predate this
 UI/default-selection change. Enhanced runs now require `CUSTOM1=1` explicitly.
 
+The release installer text is maintained in `install/`. The verified local archive
+is `tmp/Powerdrome-2.0.lha`; [packaging instructions](development.md#release-installer-archive)
+describe its contents and reproduction. End-to-end AmigaOS Installer execution
+has not been tested.
+
 ## Fine mouse steering
 
 Implemented behind **Enhanced framerate**. Mouse rotation uses fractional rates
