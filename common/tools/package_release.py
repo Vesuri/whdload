@@ -8,7 +8,7 @@ Driven by the game's release/release.json:
       "archives": [
         {
           "input": "TheirFinestHour.lha",
-          "output": "TheirFinestHour-{version}.lha",
+          "output": "TheirFinestHourEnhanced-{version}-{date}.lha",
           "replace": {
             "TheirFinestHour/TheirFinestHour.Slave": "build:TheirFinestHour",
             "TheirFinestHour/ReadMe": "release/ReadMe"
@@ -24,6 +24,8 @@ Driven by the game's release/release.json:
 - output: the file name in dist/; {version} is the release version from the first replaced
   slave's $VER string: the word before its date ("$VER: Name.Slave 1.2b (date)" and
   "$VER: Name WHDLoad Slave 1.2b (date)" give 1.2b), else the word after a one-word name.
+  {date} is that string's date as YYYYMMDD ("(05.11.2026)" gives 20261105). Releases are
+  named <Game>Enhanced-{version}-{date}.lha (docs/releasing.md).
 - replace / add: archive member -> "build:<Variant>" (that variant's release slave) or a
   path relative to the game directory. A replaced member must exist in the original and an
   added one must not. remove: members to drop.
@@ -68,6 +70,16 @@ def version_of(slave):
     if not m:
         sys.exit(f'{slave}: no "$VER: <name> <version> (<date>)" string')
     return m.group(1).decode('latin-1')
+
+
+def date_of(slave):
+    """The $VER string's date, "(dd.mm.yyyy)", as YYYYMMDD."""
+    m = re.search(rb'\$VER: [^\x00\n(]*? \d[^\s\x00]* \((\d{1,2})\.(\d{1,2})\.(\d{4})\)',
+                  slave.read_bytes())
+    if not m:
+        sys.exit(f'{slave}: no "$VER: <name> <version> (dd.mm.yyyy)" date')
+    day, month, year = (int(x) for x in m.groups())
+    return f'{year:04d}{month:02d}{day:02d}'
 
 
 def true_case(root, rel):
@@ -120,7 +132,8 @@ def main():
             slave_members = [m for m, v in replace.items() if v.startswith('build:')]
             if not slave_members:
                 sys.exit(f'{entry["input"]}: replace names no build:<Variant> slave')
-            version = version_of(source_of(replace[slave_members[0]]))
+            first_slave = source_of(replace[slave_members[0]])
+            version = version_of(first_slave)
 
             for member, value in replace.items():
                 if member not in before:
@@ -169,7 +182,10 @@ def main():
                 if Path(member).name.lower() == 'readme' and version.encode() not in (stage / member).read_bytes():
                     sys.exit(f'{member} does not mention version {version}')
 
-            out = args.dist / entry['output'].format(version=version)
+            fields = {'version': version}
+            if '{date}' in entry['output']:
+                fields['date'] = date_of(first_slave)
+            out = args.dist / entry['output'].format(**fields)
             if out.exists() and not args.force:
                 sys.exit(f'{out} exists (FORCE=1 replaces it)')
             for d in sorted((p for p in stage.rglob('*') if p.is_dir()), reverse=True):
