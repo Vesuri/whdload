@@ -211,8 +211,8 @@ shortcuts. A500 coasting holds 9.98 world updates/s and 2.75 pictures/s; asteroi
 credits reach 8.59/4.19 and held fire 8.99/0.25. Heavy scenes still miss 10 Hz;
 catch-up can starve drawing. See the [E1 limits and evidence](internals.md#p13e1-focused-ocs-performance-gate).
 P13E2 passes the bounded compatibility/functional model gate; P13E3 completes the
-[OCS candidate support and release hand-off](ocs-release.md). Packaging/publication
-remain later work; CD32 E1 and phase 12 remain paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
+[OCS candidate support and release hand-off](ocs-release.md). `make dist` builds the
+combined installer archive; publication remains later work; CD32 E1 and phase 12 remain paused. See the [P13A4 baseline](internals.md#p13a4-short-native-ocs-baseline) and
 [P13B3 scope and checks](internals.md#p13b3-shared-instrumentation-and-validation-interfaces).
 
 The following completed implementation results concern **CD32**:

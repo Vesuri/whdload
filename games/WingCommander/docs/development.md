@@ -4430,7 +4430,7 @@ python3 tools/flight_render_check.py tmp/p13e1-cd32-control --output tmp/p13e2-c
 ### P13E3 reproducible hand-off
 
 The [OCS hand-off](ocs-release.md) defines the exact candidate pair, support
-limits, options and proposed packaging. Rebuild without generating more live
+limits, options and the release packaging. Rebuild without generating more live
 captures; E2 acceptance carries over only if both binaries remain identical.
 Use fresh output names on repeats. All generated material stays in `tmp/`.
 

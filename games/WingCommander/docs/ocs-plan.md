@@ -374,7 +374,7 @@ share packaging machinery, never game assets. Propose the preinstalled archive
 and release checklist. The CD32 phase 12 save/load stash remains separate.
 Gate: a reviewable OCS candidate and an explicit support/limitations table.
 
-Gate passed: the [support/limitations table and archive proposal](ocs-release.md)
+Gate passed: the [support/limitations table and release packaging](ocs-release.md)
 identify the unchanged E2-tested native and CPU candidates. Fresh builds match
 both accepted hashes exactly. Build/runtime options, RAM floor, revision guards,
 reproduction commands and remaining release checks are documented. No archive
@@ -382,7 +382,7 @@ was published and no CD32 release or save/load-stash work was resumed.
 
 ## Remaining release work
 
-P13A1–P13E3 are complete. The [later release checklist](ocs-release.md#later-release-checklist)
-covers packaging, extracted-archive smoke tests and publication separately.
+P13A1–P13E3 are complete. The [release checklist](ocs-release.md#release-checklist)
+covers the combined installer archive, extracted-archive smoke tests and publication.
 The scoped model evidence does not remove E1's heavy-scene performance limits or
 E2's campaign, hardware, cache and cold-boot save/load coverage limits.

@@ -1,14 +1,17 @@
 # OCS candidate support and release hand-off
 
 P13E3 is complete. The current public-option candidate adds the requested
-**Enhanced framerate (68020+Fast RAM)** checkbox. It is a local candidate, not a
-published release. CD32 E1/phase 12 and their save/load stash remain separate.
+**Enhanced framerate (68020+Fast RAM)** checkbox. It is not published yet; it ships
+with the CD32 slave in the single combined installer archive (below). CD32 E1/phase 12
+and their save/load stash remain separate.
 
 ## Current public-option candidate
 
 Build with `--public` to generate `WingCommander.Slave`, `WingCommander.info`
-and the OCS `ReadMe`. The icon contains `CUSTOM5=1` and `DCACHE` (instruction/data caches); command-line launches must
-supply it explicitly. Clear the checkbox, use `CUSTOM5=0`, or omit the option
+and the OCS `ReadMe`. The generated icon, used for test boots (`make run`), contains
+`CUSTOM5=1` and `DCACHE` (instruction/data caches); in a release the installer writes the
+same tooltypes into the installed icon. Command-line launches must supply them
+explicitly. Clear the checkbox, use `CUSTOM5=0`, or omit the option
 for original per-frame simulation, rendering, waits and cache behaviour in the
 same slave. Only the value 1 requests enhancements; other values stay original.
 
@@ -149,27 +152,38 @@ The OCS slave ships only in the combined installer archive,
 writes `CUSTOM5=1` and `DCACHE` into the OCS game icon. No preinstalled archive
 is made: a release never carries game data.
 
-## Later release checklist
+## Release checklist
 
-1. Select the release identity and intended support envelope. Keep the heavy-load
-   and coverage limitations visible unless new evidence resolves them.
+A release is one archive holding both slaves: the installer asks for the disk (OCS/ECS)
+or CD32 version and installs `WingCommanderECS.slave` or `WingCommanderCD32.slave`.
+
+1. Select the release identity and support envelope: the version and date in both
+   slaves' `$VER`, the matching `Wing Commander Enhanced <version> (<date>)` line and
+   history entry in `release/ReadMe` (kept identical to `release/ReadMe.OCS`). Keep the
+   heavy-load and coverage limitations visible unless new evidence resolves them.
 2. Rebuild using the [hand-off commands](development.md#p13e3-reproducible-hand-off).
-   Check hashes against the candidate table; code/option changes need the
-   affected native and live gates again, not an assumed carry-over of E2.
-3. Review the public checkbox/rollback UX and OCS ReadMe. If changing runtime options,
-   changing metadata or combining C6 histories, validate those new binaries.
-4. Stage from the verified OCS input into a new `tmp/` tree. Preserve existing
-   installations and saves; never overwrite a changed game tree. Exclude CD32
-   assets, ROM/OS/WHDLoad files, traces, dumps and development fixtures.
-5. Create the LHa, extract to another fresh scratch tree and compare every file
-   and hash. Check both launch icons select the intended slave, data and options.
-6. Smoke-test the extracted archive through intro, simulator/name and quit on
-   the default and explicit CPU profiles. Test save persistence after a fresh
-   boot before adding that claim; user play-testing can cover longer campaign,
-   devices and real hardware without relabelling the current evidence.
-7. Record the final archive checksum and exact support statement. Publication is
-   separate from this hand-off. Keep CD32's phase-12 save/load stash separate;
-   its identifier and restore procedure remain in [open work](open-work.md#phase-12--definitive-edition-polish-and-release).
+   Check hashes against the candidate table and `release/slaves.sha256`; code/option
+   changes need the affected native and live gates again, not an assumed carry-over
+   of E2.
+3. Review the public checkbox/rollback UX, the ReadMe and the installer's choices: the
+   disk version's icon gets `CUSTOM5=1` and `DCACHE`, the CD32 icon `CUSTOM5=0` (its
+   enhanced mode) and `DCACHE`. If changing runtime options, changing metadata or
+   combining C6 histories, validate those new binaries.
+4. `make dist` stages the package from Psygore's verified installer archive
+   (`tools/release_install.py`), packs `WingCommanderEnhanced-<version>-<YYYYMMDD>.lha`,
+   extracts it again and compares every file with the staging report. It carries no
+   game data, ROM/OS/WHDLoad files, traces, dumps or development fixtures, and every
+   original member it does not replace stays byte-identical.
+5. Smoke-test both slaves from the extracted archive with the installer's tooltypes
+   through intro, simulator/name and quit on the default and explicit CPU profiles.
+   Run the installer's two choices on an Amiga with the original disks and CD before
+   claiming installer acceptance, and test save persistence after a fresh boot before
+   adding that claim; user play-testing can cover longer campaign, devices and real
+   hardware without relabelling the current evidence.
+6. Record the archive checksum and exact support statement, then publish as
+   `docs/releasing.md` at the repository root describes. Keep CD32's phase-12
+   save/load stash separate; its identifier and restore procedure remain in
+   [open work](open-work.md#phase-12--definitive-edition-polish-and-release).
 
 P13A1–P13E3 are complete with the documented limitations. The checklist above is
-later release work, not unfinished P13E3 implementation or a new performance matrix.
+release work, not unfinished P13E3 implementation or a new performance matrix.
