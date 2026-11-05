@@ -75,7 +75,7 @@ slv_keyexit	= $5D	; num '*'
 
 
 DECL_VERSION:MACRO
-	dc.b	"2.0b (13.10.2026)"
+	dc.b	"2.0b (14.10.2026)"
 	IFD BARFLY
 		dc.b	" "
 		INCBIN	"T:date"
