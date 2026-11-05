@@ -31,7 +31,8 @@ after `make unpack ARCHIVES=<directory holding the two archives>`:
 make slave verify original check
 ```
 
-To build the release archive, run `make dist`. It writes the repository's `dist/Mercenary3-2.0b.lha`:
+To build the release archive, run `make dist`. It writes the repository's
+`dist/Mercenary3Enhanced-2.0b-20261104.lha`:
 the original WHDLoad installer archive with the slave and the `ReadMe` replaced and
 `CUSTOM5=1` added to the two game icons (`Mercenary3.inf`, `Mercenary3.romicon`).
 The ReadMe is built from the WHDLoad Install Template and `release/readme-body.txt`.

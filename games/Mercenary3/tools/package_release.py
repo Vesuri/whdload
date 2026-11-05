@@ -3,8 +3,9 @@
     make dist [FORCE=1]          (game.sh game_dist: --dist DIST [--force])
 
 Input: tmp/archives/Mercenary3.lha (pinned in manifest/inputs.json). Output:
-DIST/Mercenary3-<version>.lha with exactly the same members; an existing archive is
-replaced only with --force. Only the slave, the ReadMe
+DIST/Mercenary3Enhanced-<version>-<YYYYMMDD>.lha, from the slave's $VER string (docs/releasing.md),
+with exactly the same members, and its .sha256; an existing archive is replaced only with
+--force. Only the slave, the ReadMe
 and the two game icons (Mercenary3.inf and Mercenary3.romicon, which gain the tooltype
 CUSTOM5=1 so Enhanced framerate starts checked) differ.
 The ReadMe is the WHDLoad Install Template's (pinned in manifest/release-templates.json)
@@ -13,10 +14,10 @@ LHA names LHa for UNIX; Lhasa cannot create archives.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
-import re
 import struct
 import subprocess
 import tempfile
@@ -24,6 +25,11 @@ import tempfile
 from check_inputs import main as check_inputs
 
 ROOT = Path(__file__).resolve().parents[1]
+# The shared packager's version_of and date_of; it has this module's name, so load it by path.
+_spec = importlib.util.spec_from_file_location(
+    'shared_package_release', ROOT.parents[1] / 'common/tools/package_release.py')
+shared = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(shared)
 SOURCE = ROOT / 'tmp/archives/Mercenary3.lha'
 TOP = 'Mercenary3 Install'
 SLAVE = f'{TOP}/Mercenary3.Slave'
@@ -109,10 +115,16 @@ def main():
     slave = args.slave.read_bytes()
     if b'(VERIFY)' in slave:
         raise ValueError('VERIFY build; package the release slave')
-    match = re.search(rb'Version ([0-9]+\.[0-9]+[a-z]?) \(([0-9.]+)\)', slave)
-    version, date = match.group(1).decode(), match.group(2).decode()
-    if f' version {version} ({date}) ' not in (ROOT / 'release/readme-body.txt').read_text():
+    version, stamp = shared.version_of(args.slave), shared.date_of(args.slave)
+    date = f'{stamp[6:]}.{stamp[4:6]}.{stamp[:4]}'
+    # The splash window's version (ws_info) must agree with $VER.
+    if f'Version {version} ({date})'.encode() not in slave:
+        raise ValueError(f'ws_info lacks "Version {version} ({date})"')
+    body = (ROOT / 'release/readme-body.txt').read_text()
+    if f' version {version} ({date}) ' not in body:
         raise ValueError(f'ReadMe entry for version {version} ({date}) is missing')
+    if f' Mercenary 3 Enhanced {version} ({date})\n' not in body:
+        raise ValueError(f'ReadMe lacks the title "Mercenary 3 Enhanced {version} ({date})"')
 
     names = members(SOURCE)
     changed = {SLAVE, README, *ICONS}
@@ -120,7 +132,8 @@ def main():
         raise ValueError('Source archive lacks the slave, ReadMe or game icons')
     dist = args.dist.resolve()
     dist.mkdir(parents=True, exist_ok=True)
-    out = dist / f'Mercenary3-{version}.lha'
+    out = dist / f'Mercenary3Enhanced-{version}-{stamp}.lha'
+    digest_file = dist / f'{out.name}.sha256'
     if out.exists() and not args.force:
         raise ValueError(f'{out} exists (FORCE=1 replaces it)')
     with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as tmp:
@@ -131,6 +144,7 @@ def main():
         for name in ICONS:
             (stage / name).write_bytes(enhanced_icon((stage / name).read_bytes()))
         out.unlink(missing_ok=True)
+        digest_file.unlink(missing_ok=True)
         subprocess.run([lha, 'a1o5q2', str(out), *names], cwd=stage, check=True)
 
         test = subprocess.run([lha, 't', str(out)], capture_output=True, text=True)
@@ -151,6 +165,7 @@ def main():
             extra = {p.relative_to(path).as_posix() for p in path.rglob('*') if p.is_file()}
             if extra != set(names):
                 raise ValueError(f'Extraction holds other files: {sorted(extra ^ set(names))}')
+    digest_file.write_text(f'{hashlib.sha256(out.read_bytes()).hexdigest()}  {out.name}\n')
     print(f'{os.path.relpath(out, ROOT)}: {len(names)} files, {out.stat().st_size} bytes; '
           f'changed: {", ".join(sorted(changed))}')
 

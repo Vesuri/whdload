@@ -1,4 +1,5 @@
  This install applies to "Mercenary 3 - The Dion Crisis" © 1991 Novagen.
+ Mercenary 3 Enhanced 2.0b (04.11.2026)
 
  Requirements:
  -------------

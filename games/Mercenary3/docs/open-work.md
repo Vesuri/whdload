@@ -257,7 +257,7 @@ P4 corrects presentation transitions with a shared, delayed camera/geometry time
 starts, stops, reversals and the mailbox approach have been checked. Frame rates are
 unchanged on the routine setups; native world speed and options-off checks pass.
 See [P4](internals.md#p4-presentation-transitions). Release 2.0b (04.11.2026) is
-`dist/Mercenary3-2.0b.lha`, made by `make dist`: the original installer archive with the
+`dist/Mercenary3Enhanced-2.0b-20261104.lha`, made by `make dist`: the original installer archive with the
 new slave, a template-based ReadMe and CUSTOM5=1 in the game icons. The release exposes
 **Enhanced framerate**, default On. Off keeps the original game's behaviour, with the shipped slave's defects fixed. README includes installation, requirements,
 memory fallback and options; the release was played on every supported CPU class.

@@ -299,10 +299,12 @@ has no spare interval. No instruction recording is needed.
 Layout: `release/` holds the maintained release text (`readme-body.txt`) and
 `slaves.sha256`; the repository's ignored `dist/` receives the archives. `make dist` builds
 both release slaves, then `game.sh` `game_dist` runs the input check, `make original` and
-the VERIFY build, and `tools/package_release.py` writes `dist/Mercenary3-<version>.lha`
-(an existing archive is replaced only with `FORCE=1`).
-The version and date come from the release slave's `Version <version> (<date>)` line and
-must match the ReadMe's history entry; a VERIFY slave is refused.
+the VERIFY build, and `tools/package_release.py` writes
+`dist/Mercenary3Enhanced-<version>-<YYYYMMDD>.lha` and its `.sha256` (an existing archive
+is replaced only with `FORCE=1`). The version and date come from the release slave's
+`$VER: Mercenary3.Slave <version> (dd.mm.yyyy)` string, the last bytes of the code hunk so
+no other offset moves; they must match its `Version <version> (<date>)` line, the ReadMe's
+`Mercenary 3 Enhanced` title line and its history entry. A VERIFY slave is refused.
 
 The archive has exactly the members of `tmp/archives/Mercenary3.lha` (verified against
 `manifest/inputs.json`). `Mercenary3 Install/Mercenary3.Slave` and `Mercenary3 Install/ReadMe` are replaced, and
