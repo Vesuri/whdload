@@ -1,0 +1,413 @@
+# Open work
+
+The slave is at version **2.0b** (13.10.2026, beta): Psygore's v1.1 plus all
+subsequent changes in `internals.md`. Versions 1.2b and 1.3b were internal,
+unreleased development versions; all their changes belong to 2.0b.
+`make dist` builds the release archives (`development.md`). Historical evidence
+below retains the development version names used when the checks ran.
+
+## Next
+
+1. **Release decisions:** when to drop the "b". Enhanced framerate is off by default
+   (`CUSTOM2=1` enables it); packaged game icons include that tooltype, so
+   Workbench launches enable it by default. Real A1200/68040 feedback on mouse feel and combat
+   in 2.0b is pending; the 68040 emulator is checked, not physical hardware. 68060 remains
+   unmeasured.
+
+2. **Bomb validation:** 2.0b fixes the reproduced ballistic landing drift using
+   fixed bomb steps. Native CPU checks cover variable frame rates, dives, climbs,
+   target boundaries, salvos and slot reuse. Real-machine bombing, bombing sights
+   and full missions with automatic bomb guidance still need play-testing.
+
+3. **Framerate validation:** FR-01 through FR-28 are implemented or verified
+   within their documented scope. Follow the remaining hardware/play-testing
+   limits in each item; the CPU audit is not a performance or complete campaign
+   certification. [resource-timing-audit.md](resource-timing-audit.md) closes the
+   resource/callback inventory and records the additional fuel fix.
+
+## Framerate work items
+
+FR-01 through FR-28 are **complete** within the evidence and limits below. Each item is
+independently closable; shared timing
+helpers may be reused, but do not close another item without its own evidence.
+“Reproduced” means the audit's isolated native CPU check demonstrates a defect.
+“Static finding” or “candidate” still requires a controlled reproduction before
+choosing a gameplay change. A candidate may be closed as verified unaffected,
+with the tested scope and evidence recorded, rather than patched speculatively.
+
+For each fix: preserve original-mode behavior, gate changes behind Enhanced
+framerate, keep version **2.0b**, and replace defect-reproduction assertions with
+regression checks for the intended behavior. Compare equal elapsed simulation
+time at T=8/25/50/60, changing T and time acceleration where applicable. Exercise
+native code on 68000 and 68040; distinguish these checks from emulator integration
+and physical-hardware validation. Record any accepted rounding or sampling
+bounds. Input tapes, pinned RNG and other instruments stay in VERIFY builds.
+
+### FR-01 — Falling debris and wreckage
+
+- [x] **Complete — 12 October 2026, unreleased 1.3b.** Fixed gravity and vertical integration for falling
+  classes 9/10/11, including their drag and expiry clocks. Entry: `bob:15954`;
+  constructors: `bob:1d588`, `1d670`.
+- **Done when:** equal-time trajectories, ground contact and lifetimes agree
+  across rates for all three classes, including slot reuse. Keep class-3 bomb
+  behavior covered by its existing regressions.
+- **Validation:** native 68000 and 68040 checks pass for all three classes at
+  T=2/4/8/25/50/60 and changing rates: trajectories, first ground contact,
+  four-second expiry, repeated five-second drag, zero speed and all 12 slot
+  resets. Bomb regressions pass on both CPUs; input/combat and original-mode
+  gate checks pass on 68040. Normal/VERIFY builds and 1.3b archive validation pass.
+  See [internals.md](internals.md#fr-01-debris-and-wreckage-unreleased-13b).
+  Physical-Amiga play-testing and full-pool performance remain unmeasured;
+  effect emission/animation timing is tracked separately in FR-03.
+
+### FR-02 — Aircraft-group processing timer
+
+- [x] **Complete — 12 October 2026, unreleased 1.3b.** Removed the 5T byte overflow and frame-counted
+  scheduling error at `bob:bfa4`, `bfac`, `bf9c`.
+- **Done when:** the intended interval survives rate changes and T=51/52/60,
+  and a mission-level check confirms eligible group processing/placement through
+  `bob:c0fe` retains its intended behavior.
+- **Validation:** five-second elapsed-time cadence and new-flight reset pass
+  on 68000 and 68040 at T=2/4/8/25/50/51/52/60 and changing-rate sequences.
+  Controlled native mission-group eligibility, placement and aircraft creation
+  match an original due scan; blocked groups remain blocked and eligible
+  replacements wait for their deadline. Original-mode gate checks pass.
+  The combined 68040 audit also passes FR-01 and the remaining baseline checks.
+  Normal/VERIFY builds and both 1.3b archive validations pass. See
+  [internals.md](internals.md#fr-02-aircraft-group-processing-clock-unreleased-13b).
+  No end-to-end emulator mission or physical-Amiga test was performed.
+
+### FR-03 — Effect animation, emission and cleanup
+
+- [x] **Complete — 12 October 2026, unreleased 1.3b.** Gave the effect update a consistent
+  elapsed-time cadence, including fragment emission, motion stops and removal.
+- **Done when:** animation duration, emitted fragment counts and cleanup times
+  agree across rates, with no skipped or duplicated state-transition effects.
+- **Validation:** native effect-state equivalence passes on 68000 and 68040
+  for nine fixtures at T=2/4/8/25/50/60 and changing rates. Native fragment
+  emission, motion stops, removal, secondary effects, multi-tick catch-up,
+  new-flight reset and original-mode gate are covered. Normal/VERIFY builds
+  and both 1.3b archive validations pass. See
+  [internals.md](internals.md#fr-03-effect-animation-clock-unreleased-13b).
+  No visual emulator run, physical-Amiga test or catch-up cost measurement was
+  performed; other world systems still supply state once per outer update.
+
+### FR-04 — World clock and daylight
+
+- [x] **Complete — unreleased 1.3b.** Corrected the T+1 update second and changing-rate
+  countdown at `bob:14e5e`.
+- **Done when:** long-run clock time tracks simulation time, including second,
+  minute, hour and day rollover, daylight transitions and accelerated time.
+- **Validation:** `world_clock_check.py` passes on 68000 and 68040, including
+  an hour-long run, changing rates, daylight equivalence and flight reset.
+  Normal slave build passes; visual/hardware validation remains pending.
+
+### FR-05 — Projectile lifetimes
+
+- [x] **Complete — unreleased 1.3b.** Replaced frame-counted bullet expiry initialized at
+  `bob:1cdaa` and consumed at `bob:15a2c`; inspect associated age/grace checks.
+- **Done when:** lifetime and expiry distance remain consistent across rate
+  changes, slot reuse resets age correctly, and existing hit regressions pass.
+- **Validation:** native lifetime and input/combat checks pass on 68000 and
+  68040. Coverage includes final-segment hits, equal expiry distance, all 48
+  constructor slots and the one-second damage-age boundary. Normal build
+  passes; rendering/hardware tests remain pending.
+
+### FR-06 — Flak and delayed anti-aircraft damage
+
+- [x] **Complete — unreleased 1.3b.** Corrected timing in the separate launch/outcome
+  and delayed-damage path (`bob:1f77e`, `1f9ce`, `1fdb8`, `1feaa`). Preserve the
+  native launch-time probability model while establishing its timing policy.
+- **Done when:** controlled equal-time trials compare attack opportunities,
+  selected outcomes, damage delay and miss effects across rates; cover target
+  removal/reuse while damage is pending. Coordinate attack scheduling with FR-13.
+- **Validation:** native launch/RNG/placement equivalence to the T=8 reference
+  and elapsed delivery pass on both CPU models, including removed/reused
+  targets, no repeat and zero delay. All twelve flak slots/full-pool failure
+  are checked; FR-02 group placement still passes. Native probability is
+  preserved; AI attack-opportunity scheduling remains FR-12/FR-13.
+
+### FR-07 — Gun reloads and automatic bursts
+
+- [x] **Complete — unreleased 1.3b.** Replaced rounded T/3 reloads and frame-counted
+  burst cadence (`bob:1cc30`, `1c5dc`) for player and AI guns.
+- **Done when:** equal-time shots, ammunition use, burst length and damage agree
+  across rates, including rate changes during reload and held-fire transitions.
+- **Validation:** native player/AI firing, ammunition and burst completion agree
+  at T=2/4/8/25/50/60 and changing rates on both CPU models. Six fire events
+  give identical native target damage. Release/repress, empty ammo, full pool,
+  allocation reset and original-mode gating pass. Rendered validation pending.
+
+### FR-08 — Bomb-salvo release spacing
+
+- [x] **Complete — unreleased 1.3b.** Corrected the release cooldown at `bob:1d4e0`
+  and its consumption at `bob:1c6b6`, independently of bomb motion.
+- **Done when:** full-salvo release times, inventory use and spatial spacing
+  agree across rates, including rate changes during an active salvo.
+- **Validation:** native eight-bomb salvos have equal half-second release
+  spacing and inventory use at T=2/4/8/25/50/60 and changing rates, on both
+  CPU models. Interpolated release positions agree within one coordinate unit.
+  Source restoration, full-pool failure and gun cadence regression pass.
+
+### FR-09 — Automatic bomb guidance
+
+- [x] **Complete — unreleased 1.3b.** Fixed countdown and sampled altitude
+  transitions in `bob:1fee4`, synchronizing native guidance and the entire bomb
+  pool on the same fixed-step clock.
+- **Done when:** complete guided drops compare transition times/positions and
+  impact patterns across rates and accelerated time, with a mission integration
+  check. Keep the existing bomb-motion and impact regressions passing.
+- **Validation:** native guidance diverges at T=8/50 even with the prior fixed
+  bomb motion. New cohort transition positions and impacts match a native
+  fixed-step reference across steady/changing rates on both CPU models.
+  Earlier timing and bomb regressions pass. VERIFY tape 9 constructs a guided
+  bomb in a live cached 68030/50 mission and reaches native ground-impact
+  dispatch after guidance. Physical-machine play-testing remains pending.
+
+### FR-10 — Progressive aircraft damage
+
+- [x] **Complete — unreleased 1.3b.** Corrected the T/3 damage-processing cadence in
+  `bob:1ea46`, `1ea66`, including its interaction with effect state changes.
+- **Done when:** identical initial damage produces consistent times to disabled
+  guns, further damage states and destruction across rates.
+- **Validation:** original equal-time state/RNG divergence reproduced; complete
+  native data-state sequences match prescribed three-per-second damage passes
+  across steady/changing rates on both CPU models. Coverage includes disabled
+  guns, native destruction-effect creation, reset and original mode.
+
+### FR-11 — Ground and ship damage progression
+
+- [x] **Complete — unreleased 1.3b.** Corrected the four-second ship processing
+  clock at `bob:1f4f6`, `1f50a`; static ground damage is event-driven.
+- **Done when:** identical damage produces consistent destruction and applicable
+  sinking/state-transition times for each supported ground/surface target type.
+- **Validation:** native 68000/68040 checks cover all four ship slots, damage
+  thresholds, RNG, sinking/removal, flight reset and original-mode gating at
+  constant and changing rates. Ground impacts agree for aircraft and all four
+  bomb types, direct and nearby. See
+  [internals.md](internals.md#fr-11-surface-damage-progression-unreleased-13b).
+  Physical hardware and visual mission checks remain outstanding.
+
+### FR-12 — Aircraft AI decisions and target acquisition
+
+- [x] **Complete — unreleased 1.3b.** Aircraft skill delays and the player
+  gunner target-refresh gate at `bob:22090`, `22eaa` use elapsed time.
+- **Done when:** controlled encounters compare reaction latency, target changes
+  and random-decision opportunities over equal time at different rates. Record
+  which differences are expected consequences of changed physical encounters.
+- **Validation:** 68000/68040 native checks reproduce the old defect and verify
+  skill periods, multi-aircraft deadline order, eligibility, resets and manual
+  control transitions. A controlled combat encounter retains target choices,
+  script states and RNG opportunities across rates. Aim and script-wait outputs
+  remain separately tracked in FR-13/14. See
+  [internals.md](internals.md#fr-12-aircraft-decisions-and-target-refresh-unreleased-13b).
+
+### FR-13 — AI aiming and firing opportunities
+
+- [x] **Complete — unreleased 1.3b.** Normalized native pursuit prediction
+  (`bob:26e46`) and gunner lead (`bob:1cf98`) to the reference timestep, using
+  the rate that produced the target movement delta.
+- **Done when:** fixed-state, controlled-RNG trials compare aim updates, attack
+  opportunities and shot outcomes over equal time. Validate separately from
+  weapon reload (FR-07) and delayed flak damage (FR-06).
+- **Validation:** native 68000/68040 checks cover skill/range/burst branches,
+  signed and stationary movement, changed-rate pairs, RNG and gun-arc outcomes,
+  projectile creation and a complete burst-to-damage path. Flak now shares
+  previous-step metadata. See
+  [internals.md](internals.md#fr-13-aircraft-pursuit-and-gunner-lead-unreleased-13b).
+
+### FR-14 — Surface-object scheduling and AI script waits
+
+- [x] **Complete — unreleased 1.3b.** Independent two-second surface deadlines
+  replace the one-object-per-update scheduler (`bob:218a2`, `2190a`). Corrected
+  script wait conversion (`bob:24fee`) and the audited taxi action.
+- **Done when:** multiple active surface objects have consistent scheduling and
+  script-wait durations across rates, without starvation; document opcode and
+  callback coverage and create separate IDs for any newly discovered systems.
+
+- **Validation:** native 68000/68040 checks cover all surface scripts, native
+  state/RNG, all wait arguments/skill periods, all 34 action/initializer entries
+  at three controlled phases, taxi branches, eligibility and original gating.
+  The [complete dispatch inventory](ai-script-timing.md) records static coverage
+  and the limits of the controlled tests.
+
+### FR-15 — AI manoeuvre pitch and roll
+
+- [x] **Complete — unreleased 1.3b.** Carried signed attitude fractions and
+  corrected remaining-step time at pitch-pole crossings in
+  `bob:200c0`, including `bob:200d0`, `205fa`, `206a8`, `20cf6`, `20e1e`, `20f02`.
+- **Done when:** equal-time pitch/roll responses and complete manoeuvres agree
+  for affected aircraft types, including small inputs and direction reversals.
+  Existing AI heading fixes must remain covered.
+- **Validation:** native 68000/68040 checks cover all aircraft types, normal/fast
+  roll, pitch, complete command reversals, stall/fall/spin states, player bank
+  terms, both poles, heading, reset and original gating. Equal-time trajectories
+  agree within one angle unit in the tested cases. See
+  [internals.md](internals.md#fr-15-continuous-attitude-and-pole-crossings-unreleased-13b).
+
+### FR-16 — Player attitude recovery
+
+- [x] **Complete — unreleased 1.3b.** Carried recovery fractions, fixed the
+  below-level pitch clamp and transferred unused roll-recovery time to pitch at
+  `bob:149d2`, `14a66`, independently of the already patched flight controls.
+- **Done when:** return-to-level/recovery trajectories and completion times
+  agree across rates, including both signs and small remaining deflections.
+- **Validation:** native 68000/68040 checks agree with a continuous-time oracle
+  within one angle unit, including complete recovery, gates, throttle, changing
+  rates, accelerated world time, reversals, resets and original mode. See
+  [internals.md](internals.md#fr-16-player-attitude-recovery-unreleased-13b).
+
+### FR-17 — Ground steering
+
+- [x] **Complete — unreleased 1.3b.** Carried signed ground-steering fractions
+  at `bob:146aa`.
+- **Done when:** equal-time taxi/landing steering responses agree across rates
+  for small and large inputs in both directions, without changing airborne input.
+- **Validation:** native 68000/68040 checks cover small/full inputs, both signs,
+  changing rates, reversals, acceleration, neutral input, all slots and resets.
+  Airborne and other gated-out native state snapshots remain identical. See
+  [internals.md](internals.md#fr-17-player-ground-steering-unreleased-13b).
+
+### FR-18 — Auxiliary drift and wind terms
+
+- [x] **Complete — unreleased 1.3b.** Mapped formation/descent writers and
+  carried signed position fractions at `bob:155d6`, `1563a`, `1569e`.
+- **Done when:** small positive and negative components accumulate consistently
+  across rates, including zero crossings and object reuse; document which
+  components actually represent wind.
+- **Validation:** native 68000/68040 checks cover every axis, signed/zero/tiny
+  rates, clamps, changing rates, reversals, polar superposition and slot reuse.
+  Native formation-writer outputs and coordinate-error scales are checked.
+  No inspected writer represents atmospheric wind. See
+  [internals.md](internals.md#fr-18-auxiliary-aircraft-movement-unreleased-13b).
+
+### FR-19 — Landing, ground contact and collision transitions
+
+- [x] **Complete — unreleased 1.3b.** Interpolate aircraft ground-contact
+  position, attitude and moving-ship poses at `bob:1d974`; remove the sampled
+  AI below-125 altitude shortcut. Audited the other `bob:1db62` handlers.
+- **Done when:** controlled boundary crossings compare landing versus crash,
+  overshoot and contact outcomes across rates. Record handler coverage and
+  validate any swept/contact-time correction independently of bullet collision.
+- **Validation:** native 68000/68040 checks cover shoreline, attitude, gear,
+  player/AI, static-component and moving-ship boundaries, parachutes, slot reuse,
+  reset and original gating. Bomb/debris regressions pass on 68040. See
+  [internals.md](internals.md#fr-19-aircraft-ground-contact-unreleased-13b)
+  for the interpolation policy and its limits.
+
+### FR-20 — Mission waits and flight transitions
+
+- [x] **Complete — unreleased 1.3b.** Replace frame-counted mission/transition
+  waits at `bob:c31e`, `c336`, `12dd0`, `1299a`, retaining their distinct clocks.
+- **Done when:** relevant mission and flight transitions expire consistently
+  through sustained rate changes and accelerated time, with mission-level checks.
+- **Validation:** native 68000/68040 checks cover all four clocks, their gates,
+  rate changes/acceleration, initial delay, reminders, transition dispatch, all
+  eleven mission-condition modes and contact-report state equivalence. See
+  [internals.md](internals.md#fr-20-mission-waits-and-flight-transitions-unreleased-13b).
+  Full rendered transitions and hardware play-testing remain pending.
+
+### FR-21 — Radio and HUD message durations
+
+- [x] **Complete — unreleased 1.3b.** Message expiry (`bob:1c51a`, `1c536`)
+  uses twelve elapsed control seconds, preserving readability under acceleration.
+- **Done when:** message visibility and replacement behavior remain consistent
+  across rates, including accelerated time and interrupted/replaced messages.
+- **Validation:** native 68000/68040 checks cover expiry, same-message refresh,
+  replacement, follow-up messages, manual station, dual buffers, forced clear,
+  reset and original gating. FR-20 regressions pass. See
+  [internals.md](internals.md#fr-21-radio-and-hud-message-duration-unreleased-13b).
+
+### FR-22 — Flight recording and replay
+
+- [x] **Complete — unreleased 1.3b.** Record 128 control seconds with timestep
+  history, pace playback by elapsed time and restore private/native state
+  (`bob:13bf8`, `16a3a`, `16a9e`).
+- **Done when:** recording duration has an explicit policy and replay reproduces
+  recorded simulation events despite a different playback rendering rate; verify
+  RNG, timing accumulators, end-of-recording behavior and save compatibility.
+- **Validation:** native 68000/68040 checks pass for full world-state replay,
+  RNG/T history, snapshot isolation, capacity, last step, PAL/NTSC pacing,
+  pause/resume, fast-forward, file round trips, legacy and failed/invalid I/O.
+  A hidden cached-68030 mission records/replays 21 live steps with identical
+  object types and positions, then restores the flight. See
+  [internals.md](internals.md#fr-22-recording-replay-and-timing-state-unreleased-13b)
+  for file compatibility and memory costs. Physical hardware remains untested.
+
+### FR-23 — Camera motion
+
+- [x] **Complete — unreleased 1.3b.** Movie-camera movement and selection
+  debounce use elapsed display time at `bob:16050`, `16642` through `1674a`.
+- **Done when:** equivalent view commands produce consistent camera movement
+  over equal time across rates, including small inputs and mode changes.
+- **Validation:** native 68000/68040 checks reproduce the original divergence
+  and cover all axes, small polar components, PAL/NTSC, changing rates, limits,
+  reversals, modes, reset, field wrap/stalls and original gating. Replay state
+  regression passes on 68040. See
+  [internals.md](internals.md#fr-23-movie-camera-motion-unreleased-13b).
+
+### FR-24 — Gunner view and controls
+
+- [x] **Complete — unreleased 1.3b.** Remove the rate-dependent gunner yaw
+  dead zone and carry fractional aiming at `bob:139d2`.
+- **Done when:** equivalent input produces consistent gunner aiming movement
+  across rates, including entering/leaving stations and aim limits.
+- **Validation:** native 68000/68040 gunner checks cover signed/small inputs,
+  mouse gains, changing rates, keyboard overrides, aim limits and context reset.
+  Full native replay including gunner keys passes on both CPUs; flight mouse
+  and combat checks pass on 68000. See
+  [internals.md](internals.md#fr-24-gunner-and-free-look-input-unreleased-13b).
+
+### FR-25 — Field-based input timing
+
+- [x] **Complete — unreleased 1.3b.** Normalize joystick ramps/cursor motion
+  and field-key repeat to 50 Hz; preserve unread joystick motion on release.
+- **Done when:** controlled input sequences establish the intended elapsed-time
+  response on PAL and NTSC at varying render rates, with any required fixes and
+  regressions for existing mouse gain and counter-wrap handling.
+- **Validation:** native 68000/68040 PAL/NTSC checks pass for ramp limits,
+  reversals, cursor motion, field-key repeat, varying renderer reads and signed
+  mouse count/wrap handling. Flight mouse/combat and replay checks pass on
+  68040. See [internals.md](internals.md#fr-25-field-based-input-unreleased-13b).
+
+### FR-26 — Audio envelopes and fixed waits
+
+- [x] **Complete — unreleased 1.3b.** Normalize audio envelope and fixed UI
+  waits, preserving per-field sample queueing and hardware protocol waits.
+- **Done when:** each relevant wait/envelope has a documented clock policy and
+  PAL/NTSC plus varying-render-rate checks, with corrected unintended timing
+  differences and preserved sound behavior.
+- **Validation:** native 68000/68040 channel envelopes, sample queues, waits,
+  key memory and UI polling checks pass. Input/combat and replay pass on
+  68040. Clock policies and audible-hardware limits are recorded in
+  [internals.md](internals.md#fr-26-audio-envelopes-and-fixed-waits-unreleased-13b).
+
+### FR-27 — Fuel, engine and resource accounting coverage
+
+- [x] **Complete — unreleased 1.3b.** Mapped fuel, engine, resource and world
+  callbacks; the newly confirmed fuel remainder defect is fixed separately as
+  FR-28. Existing speed fractions and event-driven health accounting are retained.
+- **Done when:** each discovered resource system has mapped update paths and
+  equal-time consumption/transition evidence across rates. Assign new stable IDs
+  to independent defects before fixing them; do not treat an untraced system as
+  verified unaffected. Ammunition and bomb inventory remain FR-07/FR-08 scope.
+- **Validation:** the complete FR-01–FR-28 native audit passes on both 68000
+  and 68040, including resource and fuel checks. The
+  [resource/callback inventory](resource-timing-audit.md) links every world-update
+  callback to its checks and records the limits of the inspected scope. A hidden
+  cached-68030 mission with FR-26 reaches flight, replays matching object poses
+  and restores live state. Normal/VERIFY builds and both rebuilt 1.3b archive
+  validations pass. Physical endurance and campaign coverage remain open.
+
+
+### FR-28 — Fractional fuel consumption (discovered by FR-27)
+
+- [x] **Complete — unreleased 1.3b.** Fuel consumption at `bob:20264` now
+  retains fractional burn below the native fuel value's least significant bit.
+- **Done when:** reproduce the native difference, retain fractional consumption
+  across steady/changing rates and acceleration, preserve fuel/engine gates,
+  and test depletion, slot reuse and replay snapshots on both CPU models.
+- **Validation:** native 68000/68040 fuel and engine-path checks pass for all
+  slots/types, tiny/full rates, changing T, acceleration, depletion, reuse and
+  unlimited fuel. Replay passes on 68040. See
+  [internals.md](internals.md#fr-28-fractional-fuel-consumption-unreleased-13b).
