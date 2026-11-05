@@ -8,7 +8,7 @@
 # Machines: a500 (A500-equivalent), a1200 (68EC020 + 4 MB fast), 68000-fast (68000 + 8 MB fast).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-. amiga/env.sh
+. ../../common/env.sh
 PREFIX=$1 OFF_BITS=$2 ON_BITS=$3 ROUTES=${4:-"spin wall"} MACHINES=${5:-"a500 a1200"}
 measure() {
   local route=$1 machine=$2 mode=$3 out base bits

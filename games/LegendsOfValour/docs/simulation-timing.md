@@ -1,6 +1,6 @@
 # Optional 25 Hz simulation (CUSTOM2 bit 6)
 
-Read this before changing `whdload/simulation*.s`, the game's clock/input paths, or anything
+Read this before changing `src/simulation*.s`, the game's clock/input paths, or anything
 that runs between rendered frames.
 
 ## What it does
@@ -130,7 +130,7 @@ The `h5:01934` adapter performs the CMP and signed branch internally, then resum
 `h5:01942` (advance) or `h5:01954` (hold). Returning through a pushed continuation would
 destroy the flags.
 
-## Constants (`whdload/simulation.s`, keep together)
+## Constants (`src/simulation.s`, keep together)
 
 `SIM_FIELDS_PER_TICK = 2`, `SIM_MOVEMENT_STEP = 10`, `SIM_ANIMATION_PACING = 8`,
 `SIM_VISUAL_DIVISOR = 2`, `SIM_TURN_STEP = 5`, `SIM_FIRE_TICKS = 4`,
@@ -164,8 +164,8 @@ pacing with it, then rerunning all the checks below.
 - **Device IO stays in task context.** No device IO from VBL. Collector records are published
   only after initialisation.
 - **Fixtures stay out of release builds.** Normal builds must not contain the tape, drawing
-  delays, observers or input-device fixtures. All code must stay 68000/PIC-clean: `make` is
-  `-m68000 -pic`.
+  delays, observers or input-device fixtures. All code must stay 68000/PIC-clean: the build is
+  `-m68000 -pic` (`game.conf` `VASM_FLAGS`).
 
 Actor speeds are also frame-clock dependent at creation. `h12:14b64`, called from
 `h12:14c56`, stores (step + random(−3..1)) in actor fields 28/30. The other readers of the
@@ -199,14 +199,15 @@ The `TIMING_STUDY` CUSTOM5 bits are:
 
 ## Verification
 
-All captures go through `tools/fixed_window.sh`, which runs in `amiga/.cap` with
+All captures go through `tools/fixed_window.sh`, which runs as `INSTANCE=cap` with
 `JOY0=none`, one capture at a time. Machines:
 - **A500:** `AMIGA_MODEL=A500 CPU=68000 CHIP_KB=512 FAST_KB=0 EXTRA_ARGS=--slow_memory=1536`,
   base `0xc00000`;
 - **020:** `AMIGA_MODEL=A1200 KICKSTART=$KICKSTART_A1200 CPU=68EC020 CHIP_KB=2048
   FAST_KB=4096 EXTRA_ARGS=--slow_memory=0`, base `0x200000`.
 
-Build a VERIFY slave with the flags a check needs, copy it into each `OUT` as
+Build a VERIFY slave with the flags a check needs (`make verify VASM_EXTRA='-DTIMING_STUDY=1 ...'`),
+copy `tmp/build/verify/LegendsOfValour.{Slave,lst}` into each `OUT` as
 `slave.slave`/`slave.lst`, and use `KEEP_SLAVE=1`, so that both members of a pair run the
 identical slave. A normal/delayed pair differs only in the final anchor flag: `A` versus
 `AD`.

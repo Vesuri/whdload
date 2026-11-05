@@ -55,13 +55,13 @@ checks; with it off, the turning hooks and five-degree units remain original.
 
 | File | Role |
 |---|---|
-| `whdload/turning.s` | Bit-7 install, allocation/free, publishing table and units; hooks guarded by signatures |
-| `whdload/turning_generate.s` | `_turn_generate`: D0 width, D1 focal length, A0 180-row destination, A1 36-row legacy table |
-| `whdload/turning_trig.s` | Q22 sine constants 0..90°, computed from mathematics |
-| `whdload/turning_input.s` | Signed direct-mouse heading normalization |
-| `whdload/turning_verify.s` | VERIFY table oracle: checks copied rows, and new rows against a host-model checksum |
-| `whdload/turning_pixels.s` | VERIFY wall twin (CUSTOM5 bit 19): runs `h12:02808` with the new and the original table at legacy headings and compares all chunky bytes |
-| `whdload/turning_sweep.s` | VERIFY ray sweep (CUSTOM5 bit 21): all 360 headings through the real ray walker in every view |
+| `src/turning.s` | Bit-7 install, allocation/free, publishing table and units; hooks guarded by signatures |
+| `src/turning_generate.s` | `_turn_generate`: D0 width, D1 focal length, A0 180-row destination, A1 36-row legacy table |
+| `src/turning_trig.s` | Q22 sine constants 0..90°, computed from mathematics |
+| `src/turning_input.s` | Signed direct-mouse heading normalization |
+| `src/turning_verify.s` | VERIFY table oracle: checks copied rows, and new rows against a host-model checksum |
+| `src/turning_pixels.s` | VERIFY wall twin (CUSTOM5 bit 19): runs `h12:02808` with the new and the original table at legacy headings and compares all chunky bytes |
+| `src/turning_sweep.s` | VERIFY ray sweep (CUSTOM5 bit 21): all 360 headings through the real ray walker in every view |
 
 `rays.s` (W5) and `walls.s` (W3) consume the published table through the original selector.
 They need no turning-specific code.
@@ -79,10 +79,11 @@ They need no turning-specific code.
 
 ## Verification
 
-Run captures one at a time, with `JOY0=none`, in `amiga/.cap`. Use both the A500 equivalent and
-the 020 machine (`KICKSTART=$KICKSTART_A1200` from `amiga/env.sh`; settings in
-`docs/profiling.md`). Build VERIFY with `make -C whdload verify VASMFLAGS=-DVERIFY_WAIT_RESCUE=1`,
-copy the slave and listing into each OUT, and pass `KEEP_SLAVE=1`.
+Run captures one at a time, with `JOY0=none`, as `INSTANCE=cap`. Use both the A500 equivalent and
+the 020 machine (`KICKSTART=$KICKSTART_A1200` from the shared environment; settings in
+`docs/profiling.md`). Build VERIFY with `make verify VASM_EXTRA=-DVERIFY_WAIT_RESCUE=1`,
+copy `tmp/build/verify/LegendsOfValour.{Slave,lst}` into each OUT as `slave.slave` and
+`slave.lst`, and pass `KEEP_SLAVE=1`.
 
 - **Host model.** `python3 tools/turning_tables.py` reproduces every consumed column of all 108
   original rows (13,824 columns) from the local game files. The floating-point model needs the

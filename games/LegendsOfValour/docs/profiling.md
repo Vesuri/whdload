@@ -7,7 +7,7 @@
 ## TL;DR
 
 ```sh
-source amiga/env.sh
+make unpack ARCHIVES=<directory>                          # once: verify and install the game
 python3 tools/unpack.py                                   # once: decrunch AMIGA2 -> tmp/unpacked/
 tools/fixed_window.sh tmp/prof/x                          # VERIFY slave, spin route, 100 fields
 OUT=tmp/prof/x
@@ -22,10 +22,10 @@ A/B a patch: `tools/ab_window.sh PREFIX OFF_BITS ON_BITS [ROUTES [MACHINES]]`, t
 
 Everything shared lives under `~/.local`, installed by AmigaXDev (`make setup`): the m68k
 toolchain and gdb in `~/.local/opt/bin`, vasm at `~/.local/vasmm68k_mot`, FS-UAE with the Barto
-gdb stub, and the shared Amiga files in `~/.local/share/amiga`. `amiga/env.sh` sources the
-shared `env.sh` (AmigaXDev's `docs/environment.md` lists every variable), which puts the
-toolchain on PATH and resolves the shared files, after setting this project's own choices:
-WHDLoad 19.2 (`WHDLOAD`) and the native vasm (`VASM`). Each has an environment override:
+gdb stub, and the shared Amiga files in `~/.local/share/amiga`. The `common/` scripts and the
+shell tools here source the shared `env.sh` through `../../common/env.sh` (AmigaXDev's
+`docs/environment.md` lists every variable), which puts the toolchain on PATH and resolves
+the shared files. Each has an environment override:
 
 | Variable | Default | Used for |
 |---|---|---|
@@ -35,25 +35,25 @@ WHDLoad 19.2 (`WHDLOAD`) and the native vasm (`VASM`). Each has an environment o
 | `WORKBENCH_ADF` | `~/.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf` | boot floppy |
 | `WHDLOAD_BINARY` | `~/.local/share/amiga/WHDLoad/C/WHDLoad` | copied onto the game drive |
 | `SOUND`, `WINDOW` | 1, `front`; 0, `back` with `DEBUG` or `WARP` | audio on/off; FS-UAE window in front, behind the others, or `none` (no video) |
-| `FSEMU_SCREENSHOTS_DIR` | `amiga/<run dir>/shots` | FS-UAE screenshots |
+| `FSEMU_SCREENSHOTS_DIR` | `tmp/shots` | FS-UAE screenshots |
 
-Build-side overrides (`whdload/makefile`): `WHDLOAD` (WHDLoad dev tree, default
-`~/.local/share/amiga/WHDLoad`), `NDK` (`~/.local/opt/m68k-amiga-elf/sys-include`), `VASM`
-(a native build at `tmp/vasm-native-src/vasm/vasmm68k_mot` if present, else
-`~/.local/vasmm68k_mot`), `OUT` (`tmp/build`). Run-side: `FSUAE` (executable, default
-`fs-uae` on PATH; native captures use `$HOME/.local/share/amiga/fs-uae-arm/fs-uae`, §4),
-`FSUAE_COMMON` (`~/.local/share/amiga/fsuae_common.sh`). The game itself is expected at
-`tmp/game/LegendsOfValour` (`GAME`). Every game-derived file (archives, unpacked hunks,
-builds, captures, screenshots, scratch dumps in `tmp/scratch`) stays in the ignored `tmp/`.
+Build-side (`common/build.sh`, the repository's `docs/building.md`): `WHDLOAD` (WHDLoad dev
+tree, default `~/.local/share/amiga/WHDLoad`), `NDK` (`~/.local/opt/m68k-amiga-elf/sys-include`),
+`VASM` (`~/.local/vasmm68k_mot`), `VASM_EXTRA` (extra defines for one build); builds go to
+`tmp/build/<BUILD>/`. Run-side: `FSUAE` (executable, default `fs-uae` on PATH; native
+captures use `$HOME/.local/share/amiga/fs-uae-arm/fs-uae`, §4), `FSUAE_COMMON`
+(`~/.local/share/amiga/fsuae_common.sh`). `make unpack ARCHIVES=<directory>` installs the game
+at `tmp/game/LegendsOfValour`. Every game-derived file (archives, unpacked hunks, builds,
+captures, screenshots, scratch dumps in `tmp/scratch`) stays in the ignored `tmp/`.
 
 ## 2. The game and the slave
 
 | Field | Value |
 |---|---|
-| Archive | `LegendsOfValour_v1.0_0837.lha` (Retroplay, pre-installed): `LegendsOfValour.Slave` (4 488 bytes), `data/` (3.2 MB: `AMIGA2`, `charact`, `textfile`, pictures, maps). Hashes in `tmp/archive.sha256` |
+| Archive | `LegendsOfValour_v1.0_0837.lha` (Retroplay, pre-installed): `LegendsOfValour.Slave` (4 488 bytes), `data/` (3.2 MB: `AMIGA2`, `charact`, `textfile`, pictures, maps). Pinned in `inputs.sha256` |
 | Slave | CFou! v1.0 (06.02.2005), **no source**. Decode it with `tools/slave_info.py [--pl OFF]` |
 | Header | `ws_Version` 16, flags `$2402` (NoError, EmulPriv, Examine), `ws_BaseMemSize` `$80000`, `ws_ExpMem` `$C0000` (256 KB Kickstart + 512 KB), CurrentDir `data`, KeyExit `$59` (F10), no `slv_config` (v16) |
-| Type | **OS game, kickemu Kickstart 1.3** (`ws_kickname` `34005.a500`, `$40000` bytes, CRC `$F9E3`); needs `kick34005.A500` + `.RTB` in `DEVS:Kickstarts` (run.sh copies them) |
+| Type | **OS game, kickemu Kickstart 1.3** (`ws_kickname` `34005.a500`, `$40000` bytes, CRC `$F9E3`); needs `kick34005.A500` + `.RTB` in `DEVS:Kickstarts` (`game.conf` `KICKS`; the run copies them) |
 | Kick patches | `slave+$60`: the stock kick13.s list (70 entries, `slave_info.py --pl 60`), applied with `resload_Patch` to ExpMem, then `jmp ExpMem+2` |
 | `_bootdos` | `slave+$fa4`. `resload_Control` reads CUSTOM1 (`slave+$10fc`); assigns `LOV:`; opens and CRC16s the first 300 bytes of `AMIGA2` (result unused); `LoadSeg`s **`AMIGA2`**, or **`CHARACT`** (character creation) when CUSTOM1≠0; tells WHDLoad the segment list; patches; calls the program with `d0=1, a0="\n"`; `resload_Abort` on return |
 | Stub patches | if the first long of hunk 0 is `$487A0178` (the PowerPacker stub): `jmp slave+$110c` over the stub's final `movem/rts` at stub `+$176`, and `bra.s` over the decrunch colour flash at stub `+$210` |
@@ -77,19 +77,22 @@ Hunks 0–10 are **Lattice/SAS C** (`link a5` prologues); hunk 12 is hand-writte
 as `hN:OFFSET`. `tools/xref.py` lists relocations into a range; `python3 -m amigaxdev.disasm disd`
 (AmigaXDev's shared package) disassembles a dump by hunk offset.
 
-**The rebuilt slave.** `whdload/LegendsOfValourHD.s` rebuilds CFou!'s v1.0 on WHDLoad 20.0's
+**The rebuilt slave.** `src/LegendsOfValourHD.s` rebuilds CFou!'s v1.0 on WHDLoad 20.0's
 `kick13.asm` example and the vendored 2025 `kick13.s`, with the example's options (`IOCACHE =
 1024`: without it every small game `Read()` is a resload call; `CACHECHIP`, `SETPATCH`,
 `SEGTRACKER`, `POINTERTICKS`, `SETKEYBOARD`, `HRTMON`, `WHDCTRL`). `slv_Version` 17.
-`tools/behaviour_check.py OUT [--slave tmp/build/LegendsOfValour.Slave]` snapshots the first
+`tools/behaviour_check.py OUT [--slave tmp/build/release/LegendsOfValour.Slave]` snapshots the first
 start-screen button poll with the original or rebuilt slave; both give byte-identical view
 planes (only the Intuition pointer colour differs).
 
 | Build | Command | Contents |
 |---|---|---|
-| release | `make -C whdload` | W1–W6 and mouse precision always on; menu: character creation, game timing |
-| developer | `make -C whdload developer` | individual CUSTOM2 switches for W1–W6 and mouse precision, no instruments |
-| VERIFY | `make -C whdload verify` | developer + input tape, pixel twins and other CUSTOM5 instruments; never ship |
+| release | `make slave` | W1–W6 and mouse precision always on; menu: character creation, game timing |
+| developer | `make developer` | individual CUSTOM2 switches for W1–W6 and mouse precision, no instruments |
+| VERIFY | `make verify` | developer + input tape, pixel twins and other CUSTOM5 instruments; never ship |
+
+Each goes to `tmp/build/<build>/LegendsOfValour.Slave` with its listing
+(`LegendsOfValour.lst`); `VASM_EXTRA='-DTIMING_STUDY=1 ...'` adds a study's defines.
 
 The `slv_config` string in `LegendsOfValourHD.s` is the authoritative bit map.
 
@@ -97,8 +100,10 @@ The `slv_config` string in `LegendsOfValourHD.s` is the authoritative bit map.
 
 Kickstart 3.1 host + Workbench 2.04 floppy boot DH0, whose startup-sequence runs `WHDLoad
 LegendsOfValour.Slave PRELOAD SPLASHDELAY=0 NOREQ` on DH1 (a fresh copy of the game + WHDLoad
-each run: **save games written during a run are lost**). `amiga/run.sh` boots it; optional
-`amiga/performance.env` (see the `.example`) selects the patch mask for interactive runs.
+each run: **save games written during a run are lost**). `make run` builds and boots the
+release slave on the interactive machine (`game.conf`: A500, 68000, 1 MB chip, 8 MB fast);
+`make run SLAVE=original` boots CFou!'s v1.0 unchanged, and `WHD_ARGS=CUSTOM2=64` enables
+the optional timing (the repository's `docs/running.md` lists every option).
 
 | Machine | Settings | Code base in dumps |
 |---|---|---|
@@ -116,12 +121,14 @@ game is mouse-driven.
 ## 4. Driving and tracing (`tools/lov.py`)
 
 AmigaXDev's shared server (`amigaxdev.gdbserve`) with this game's `until`, `gdb` and capture:
-`serve` boots `amiga/run.sh DEBUG=1` and attaches gdb; then `stop`, `cont`, `gdb <text>`,
-`shot <png>`, `profile <fields> <bin>`, `wait`, `until <addr>`, `quit`. Socket
-`amiga/<run dir>/lov.sock`. Captures run in `amiga/.cap` (`FSUAE_RUN`), interactive sessions in
-`amiga/.run`; **never stop an emulator in `.run`, and run one capture at a time** (two parallel
-captures broke both debugger sessions). gdb runs in the repo root and cannot quote file names,
-so dump paths are relative (`tmp/scratch/...`). `until` waits in the background
+`serve` boots `common/run.sh DEBUG=1` and attaches gdb; then `stop`, `cont`, `gdb <text>`,
+`shot <png>`, `profile <fields> <bin>`, `wait`, `until <addr>`, `quit`. Every `common/run.sh`
+option (`SLAVE`, `WHD_ARGS`, `TAPE`, the machine) applies to `serve`. Socket
+`tmp/run/<instance>/.run/lov.sock`. Captures run as `INSTANCE=cap` (`tmp/run/cap/`, the
+default for `lov.py` and every capture tool), interactive `make run` sessions in
+`tmp/run/default/`; **never stop an interactive emulator, and run one capture at a time** (two
+parallel captures broke both debugger sessions). gdb runs in the game directory and cannot
+quote file names, so dump paths are relative (`tmp/scratch/...`). `until` waits in the background
 (`UNTIL_TIMEOUT`, default 1 800 s) and stops the capture cleanly on expiry; a `profile` is
 capped at 100 fields.
 
@@ -163,14 +170,15 @@ Screens (coordinates are tape window coordinates, below):
   → options dialog → second icon from the right on the top row (193,52); each click cycles
   medium → small → large → medium (`tools/tapes/viewcycle.txt`); clicking outside applies it.
 
-## 6. The input tape (VERIFY, `CUSTOM5` bit 0, `whdload/tape.s`)
+## 6. The input tape (VERIFY, `CUSTOM5` bit 0, `src/tape.s`)
 
 `h12:05298` jumps into the slave, which writes the tape's pointer position into the game
 window's `MouseX/MouseY` (the game copies them every poll, `h1:01b8c`) and its buttons into
 `h12:05292`. Tape field 0 is the first VBL after the game installs its server.
 
 `tools/tape.py SCRIPT OUT` builds a tape from `FIELDS X Y [L|R|A|W|H]` lines (window coordinates
-= (screenshot x − 75) / 2, (y − 38) / 2); `run.sh` installs it as `data/lovtape` (`TAPE=`).
+= (screenshot x − 75) / 2, (y − 38) / 2); the run installs it as `data/lovtape` (`TAPE=`,
+`game.sh` `game_drives`). `make check` builds every route.
 - **`W`** waits on game state: the tape hooks the button hit test `h6:0076c` and holds the entry
   until the last hit-tested list has button id FIELDS (0 = any) under (X,Y). It covers every
   screen that hit-tests through h6 but **not the conversation panel**, which polls through h2:

@@ -4,21 +4,23 @@
 # Retain one exact VERIFY build; calibrate each CPU before arming startup aborts.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-. amiga/env.sh
+. ../../common/env.sh
 PREFIX=${1:?capture prefix required}
 [[ "$PREFIX" =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'invalid capture prefix' >&2; exit 1; }
 BITS=${2:-3}
 if [ "$#" -lt 2 ]; then
   for feature in 'walls.s:7' 'sprites.s:15' 'rays.s:31' 'clear.s:63'; do
     name=${feature%:*}
-    if rg -q "INCLUDE[[:space:]]+$name" whdload/LegendsOfValourHD.s; then BITS=${feature#*:}; fi
+    if rg -q "INCLUDE[[:space:]]+$name" src/LegendsOfValourHD.s; then BITS=${feature#*:}; fi
   done
 fi
 TWINS=$((BITS & 60))
 OPTIONS=$((3 | (TWINS << 2)))
 export UNTIL_TIMEOUT=${UNTIL_TIMEOUT:-300}
 BUILD="tmp/prof/$PREFIX-build"
-make -s -C whdload verify OUT="../$BUILD" VASMFLAGS="${VASMFLAGS:-} -DVERIFY_WAIT_RESCUE=1"
+make -s verify VASM_EXTRA="${VASM_EXTRA:-} -DVERIFY_WAIT_RESCUE=1" > /dev/null
+mkdir -p "$BUILD"
+cp tmp/build/verify/LegendsOfValour.Slave tmp/build/verify/LegendsOfValour.lst "$BUILD/"
 unset PROFILE_WINDOW BOOT_BREAK
 for machine in a1200 a500; do
   base=0xc00000

@@ -6,7 +6,7 @@
 
 ## Rules for every patch
 
-- Ships as a WHDLoad slave patch, installed by `_patchgame` (`whdload/LegendsOfValourHD.s`)
+- Ships as a WHDLoad slave patch, installed by `_patchgame` (`src/LegendsOfValourHD.s`)
   after the PowerPacker stub has loaded the 17 hunks. Hunk N is `_hunks[N]` (filled from the
   segment chain); patch with `_hunks[N] + offset`, checking the original bytes first and
   aborting with `TDREASON_FAILMSG` on mismatch. Flush caches after writing. Skip all patches in
@@ -73,7 +73,7 @@ VERIFY twins (`*_verify.s`, CUSTOM5 bits 1 and 4–7) may force W3–W5 bodies o
 
 Replaces the first ten bytes of `h12:054ce` (whole `movem` + `movea`) with a jump and two NOPs;
 the adapter preserves d0–a6 and returns to the caller. Mikael Kalms' public-domain routines are
-vendored in `whdload/kalms/` (commit `d8ecf79`; the README lists every local change):
+vendored in `src/kalms/` (commit `d8ecf79`; the README lists every local change):
 `c2p1x1_4_c5_bm_word.s` (word writes) on 68000/10, `c2p1x1_4_c5_bm.s` (longword writes) on
 68020+. Local changes: read the high nibble, source stride 192, finish each row's pipeline before
 skipping to the next row.

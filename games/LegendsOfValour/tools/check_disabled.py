@@ -49,7 +49,7 @@ mem = (a.capture/'code.bin').read_bytes()
 r = {n: lo for lo, hi, n, origin in regions(mem, a.base)}
 # Every optional mutation has a PERF_RANGE declaration beside its patch installer.
 ranges = []
-for source in (root/'whdload').glob('*.s'):
+for source in (root/'src').glob('*.s'):
     ranges += [(int(h), int(o,16), int(n), int(bit or 0)) for h,o,n,bit in
                re.findall(r'PERF_RANGE h(\d+):([0-9a-fA-F]+) (\d+)(?: bit=(\d+))?', source.read_text())]
 ranges = [entry for entry in ranges if not a.custom2 & (1 << entry[3])]

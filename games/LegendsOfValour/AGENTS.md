@@ -1,65 +1,32 @@
-# Legends of Valour (Amiga) — performance study
+# Legends of Valour
 
-Profiling the ORIGINAL 1992 US Gold / Synthetic Dimensions game, run under CFou!'s WHDLoad install
-(slave v1.0, 06.02.2005, `LegendsOfValour_v1.0_0837.lha`). No game source and **no slave source**:
-work from cycle-exact FS-UAE traces and disassembly. The slave is a kickemu (Kickstart 1.3) slave;
-the game is `data/AMIGA2`, a PowerPacker-crunched 17-hunk executable that `tools/unpack.py`
-decrunches into `tmp/unpacked/AMIGA2`. Any change to the game is meant to ship as WHDLoad slave
-patches.
+A performance and timing rework of the 1992 US Gold / Synthetic Dimensions game under
+WHDLoad: rendering patches always on, optional frame-independent game timing, one-degree
+mouse precision. CFou!'s v1.0 slave (06.02.2005, `LegendsOfValour_v1.0_0837.lha`) is
+credited as the original (`game.conf` `AUTHOR`, `UPSTREAM`): `src/LegendsOfValourHD.s`
+reconstructs it from the binary on WHDLoad 20.0's kick13 example. There is no game source:
+work from cycle-exact FS-UAE traces and disassembly. The game is `data/AMIGA2`, a
+PowerPacker-crunched 17-hunk executable that `tools/unpack.py` decrunches into
+`tmp/unpacked/AMIGA2`; every change ships as slave patches.
 
-## Shared environment and knowledge
+The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
+this file and `docs/` here hold only what is specific to this game.
 
-The shared environment comes from AmigaXDev, the repository next to this one: `make setup`
-there installs `~/.local` and `~/.local/share/amiga`, and `amiga/env.sh` sources
-`~/.local/share/amiga/env.sh`. The method and the lessons the projects share are in AmigaXDev:
+Read `docs/open-work.md` first.
 
-| AmigaXDev doc | Holds |
+| Doc | Read it for |
 |---|---|
-| `docs/playbooks/new-game-playbook.md` | the method this repo follows |
-| `docs/playbooks/new-game-playbook-hardware.md` | black screens and dumps on real Amigas, CPU caches |
-| `docs/playbooks/whdload-mmu.md` | MMU compatibility and crash diagnosis |
-| `docs/playbooks/fixed-time-simulation.md` | game time, fixed ticks, input per tick, raising the update rate |
-| `docs/playbooks/simulation-and-presentation.md` | uncapped drawing, interpolation, smaller timesteps |
-| `docs/environment.md` | the shared variables |
-| `docs/reference/headless-fsuae.md` | the shared launcher, FS-UAE builds, the gdb stub |
-| `docs/reference/measurement-method.md` | instruments, A/B discipline, pricing a change |
-| `docs/reference/m68k-optimisation.md` | 68000/68020 cost model and code rules |
-| `docs/reference/amiga-hardware.md` | Chip bus, FMODE, copper, blitter, caches |
+| `docs/open-work.md` | current state and what is still open |
+| `docs/profiling.md` | running, driving and tracing the game, the machines, any performance number |
+| `docs/performance-patches.md` | the rendering pipeline, game time, W1–W6 hooks and invariants, before changing rendering code |
+| `docs/simulation-timing.md` | the optional game timing (CUSTOM2 bit 6) |
+| `docs/one-degree-turning.md` | automatic mouse precision (developer CUSTOM2 bit 7) |
+| `docs/releasing.md` | the release archives (`make dist`) |
+| `README.md` | the summary, setup, how to play, the release options |
 
-Generic lessons go into those docs (edit them in AmigaXDev); this repository keeps what is
-specific to this game.
-
-
-## Rules
-
-- **Never commit game, Kickstart or WHDLoad bytes**, or anything made from them: unpacked
-  executables, traces, memory dumps, screenshots, input recordings, save games, built slaves. They
-  live in `tmp/` (ignored).
-- Addresses in docs are **`hN:OFFSET` offsets into hunk N of the decrunched AMIGA2** (the slave's
-  game patches are hunk-1 offsets), `slave+OFFSET` slave code-hunk offsets, or `kick:` ROM
-  addresses — never absolute addresses.
-- **No machine-specific paths** in tracked files: no `/Users/...` or `~/Documents`-style paths, no
-  paths into other projects (name them by project name only). Shared Amiga files come from
-  `~/.local/share/amiga` (AmigaXDev) through the overridable variables of the shared `env.sh`,
-  which `amiga/env.sh` sources; scratch output goes
-  to `tmp/`. Docs describe the current state; history belongs in git.
-- Commits: author Vesa Halttunen <vesuri@jormas.com>, unsigned, no hooks, no Co-Authored-By lines.
-  One commit per coherent feature.
-- Never `pkill fs-uae` or `pkill gdb` (other projects run emulators): `fsuae_common.sh` kills only
-  our own pid.
-- Capture runs use `JOY0=none`: the host mouse over the window feeds port 0 and changes the game.
-- Captures run in `amiga/.cap` (`FSUAE_RUN`), interactive `amiga/run.sh` in `amiga/.run`: never
-  quit or kill an emulator in `.run`. Run one capture at a time.
-- No performance claim without a measurement from the right instrument (`docs/profiling.md`).
-
-## Reference docs — read before working in the area
-
-| Doc | Read it when |
-|---|---|
-| `docs/open-work.md` | **First.** Current state and what is still open |
-| `docs/profiling.md` | Running the game, driving it, tracing it, or quoting any performance number |
-| `docs/performance-patches.md` | Before changing any rendering code: pipeline, game time, W1–W6 hooks and invariants |
-| `docs/simulation-timing.md` | Before touching the optional game timing (CUSTOM2 bit 6) |
-| `docs/one-degree-turning.md` | Before touching automatic mouse precision (developer CUSTOM2 bit 7) |
-| `docs/releasing.md` | Building the release archives |
-| `README.md` | Setup, build/run quick start, dependencies and release overview |
+The slave source is `src/` (VERIFY-only fixtures included, Kalms C2P in `src/kalms/`, the
+vendored `src/whdload/kick13.s`); `tools/` is the development harness and never ships.
+Addresses in docs are `hN:OFFSET` offsets into hunk N of the decrunched AMIGA2,
+`slave+OFFSET` slave code-hunk offsets, or `kick:` ROM addresses. Captures use `JOY0=none`
+(the host mouse feeds port 0) and run one at a time as `INSTANCE=cap`, apart from
+interactive `make run` sessions: never stop an interactive emulator.

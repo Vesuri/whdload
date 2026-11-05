@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Snapshot the first start-screen button poll, without a tape (original or rebuilt slave).
 Two boots: learn h6 in the first, arm its first hit before reset advances in the second.
-Use only amiga/.cap; retain all game-derived material under tmp/.
+Runs in the capture instance (tools/lov.py, INSTANCE=cap); retains all game-derived material under tmp/.
 """
 import argparse, hashlib, json, os, subprocess, sys, time
 from pathlib import Path
-from lov import SCRATCH
+from lov import SCRATCH, SOCK
 from lov_report import regions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,7 +19,7 @@ shutil_source = source_slave.resolve()
 import shutil
 shutil.copy2(shutil_source, a.out/'slave.slave')
 a.slave = a.out/'slave.slave'
-env = dict(os.environ, FSUAE_RUN='.cap', JOY0='none', CHIP_KB='512', FAST_KB='0',
+env = dict(os.environ, JOY0='none', CHIP_KB='512', FAST_KB='0',
            EXTRA_ARGS='--slow_memory=1536', DETERMINISTIC='1', WARP='1', WHD_ARGS='CUSTOM2=0')
 if a.slave:
     env['SLAVE'] = str(a.slave.resolve())
@@ -28,7 +28,7 @@ else:
     os.environ.pop('SLAVE', None)
 if a.slave:
     os.environ['SLAVE'] = str(a.slave.resolve())
-sock = ROOT/'amiga/.cap/lov.sock'
+sock = Path(SOCK)
 def command(*args):
     return subprocess.check_output([sys.executable, str(ROOT/'tools/lov.py'), *args], env=env, text=True, stderr=subprocess.PIPE)
 def boot(anchor=None):

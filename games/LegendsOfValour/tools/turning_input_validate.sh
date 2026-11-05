@@ -2,11 +2,13 @@
 # Serial native-button and direct-mouse input checks on both reference CPUs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-. amiga/env.sh
+. ../../common/env.sh
 prefix=${1:-mouse-native}
 export FSUAE="${FSUAE:-$FSUAE_ARM}"
 build=tmp/build-mouse-native
-make -s -C whdload verify OUT="../$build" VASMFLAGS='-DTIMING_STUDY=1 -DVERIFY_WAIT_RESCUE=1'
+make -s verify VASM_EXTRA='-DTIMING_STUDY=1 -DVERIFY_WAIT_RESCUE=1' > /dev/null
+mkdir -p "$build"
+cp tmp/build/verify/LegendsOfValour.Slave tmp/build/verify/LegendsOfValour.lst "$build/"
 for machine in a1200 a500; do
   base=0x200000
   machine_args=(AMIGA_MODEL=A1200 "KICKSTART=$KICKSTART_A1200" CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 EXTRA_ARGS=--slow_memory=0)

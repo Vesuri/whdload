@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Benchmark window: trace FIELDS PAL fields from the input tape's anchor (an entry marked A,
-# whdload/tape.s _tape_anchor).  Default route tools/tapes/spin.txt: default character,
+# src/tape.s _tape_anchor).  Default route tools/tapes/spin.txt: default character,
 # large view, 250 fields into turning right on the spot.
 #   tools/fixed_window.sh OUTDIR [TAPE.txt]
 # Builds the VERIFY slave and keeps it (OUT/slave.slave + listing) with the capture; analyse
@@ -9,19 +9,21 @@
 #   FIELDS=100      fields traced          STATE_ONLY / SWAP_ONLY as in Test Drive II
 #   TAPE_CHECKPOINTS="before-save before-load" retains intermediate ordinary tape anchors
 #   CHIP_KB/FAST_KB/EXTRA_ARGS/CPU/AMIGA_MODEL/KICKSTART: machine (default A500-equivalent)
+#   VASM_EXTRA: extra defines for the VERIFY build; INSTANCE: run instance (default cap)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export FSUAE_RUN="${FSUAE_RUN:-.cap}"; CAP=$FSUAE_RUN; mkdir -p "amiga/$CAP"
+# Captures run in their own instance (tools/lov.py), never in an interactive one.
+export INSTANCE="${INSTANCE:-cap}"; RUN="tmp/run/$INSTANCE/.run"; mkdir -p "$RUN"
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}; TAPE_TXT=${2:-tools/tapes/spin.txt}
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
 if [ -z "${KEEP_SLAVE:-}" ]; then
   if [ "${PROFILE_WINDOW:-}" = guest ]; then
-    make -s -C whdload verify VASMFLAGS="${VASMFLAGS:-} -DPROFILER_WINDOW=1" > /dev/null
+    make -s verify VASM_EXTRA="${VASM_EXTRA:-} -DPROFILER_WINDOW=1" > /dev/null
   else
-    make -s -C whdload verify > /dev/null
+    make -s verify > /dev/null
   fi
-  cp tmp/build/LegendsOfValour.Slave "$OUT/slave.slave"
-  cp tmp/build/LegendsOfValour.lst "$OUT/slave.lst"
+  cp tmp/build/verify/LegendsOfValour.Slave "$OUT/slave.slave"
+  cp tmp/build/verify/LegendsOfValour.lst "$OUT/slave.lst"
 fi
 python3 tools/tape.py "$TAPE_TXT" "$OUT/tape.bin" > /dev/null
 cp "$TAPE_TXT" "$OUT/tape.txt"
@@ -50,22 +52,22 @@ if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))
 else BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024)); fi
 lov() { python3 tools/lov.py "$@"; }
 retain_log() {
-  cp amiga/$CAP/fsuae.log "$OUT/fsuae-stdout.log"
+  cp $RUN/fsuae.log "$OUT/fsuae-stdout.log"
   local logfile
-  logfile=$(sed -n 's/^LOGFILE: //p' amiga/$CAP/fsuae.log | tail -1)
+  logfile=$(sed -n 's/^LOGFILE: //p' $RUN/fsuae.log | tail -1)
   if [ -n "$logfile" ] && [ -f "$logfile" ]; then cp "$logfile" "$OUT/fsuae.log"; fi
 }
-[ -S amiga/$CAP/lov.sock ] && { lov quit > /dev/null 2>&1 || true; sleep 1; }
-rm -f amiga/$CAP/serve.log "$OUT/trace.bin"
-WARP=1 python3 tools/lov.py serve > amiga/$CAP/serve.log 2>&1 &
+[ -S $RUN/lov.sock ] && { lov quit > /dev/null 2>&1 || true; sleep 1; }
+rm -f $RUN/serve.log "$OUT/trace.bin"
+WARP=1 python3 tools/lov.py serve > $RUN/serve.log 2>&1 &
 trap 'lov quit > /dev/null 2>&1 || true' EXIT
 SERVER=$!
 for _ in $(seq 1 "${SERVE_WAIT:-180}"); do
-  grep -q serving amiga/$CAP/serve.log 2>/dev/null && break
-  kill -0 "$SERVER" 2>/dev/null || { cat amiga/$CAP/serve.log >&2; exit 1; }
+  grep -q serving $RUN/serve.log 2>/dev/null && break
+  kill -0 "$SERVER" 2>/dev/null || { cat $RUN/serve.log >&2; exit 1; }
   sleep 1
 done
-grep -q serving amiga/$CAP/serve.log || { echo "server did not start" >&2; exit 1; }
+grep -q serving $RUN/serve.log || { echo "server did not start" >&2; exit 1; }
 
 dump() { lov gdb "dump binary memory tmp/scratch/lov-code-$$.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv tmp/scratch/lov-code-$$.bin "$OUT/code.bin"; }
 region() { python3 -c "

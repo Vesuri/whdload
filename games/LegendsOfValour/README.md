@@ -26,35 +26,23 @@ F10 quits, or use WHDLoad's `QuitKey` tooltype.
 
 ## Setup
 
-Keep these original archives locally; they are not part of the repository:
+Keep these original archives locally; they are not part of the repository and are pinned
+in `inputs.sha256`:
 
 ```
-tmp/LegendsOfValour_v1.0_0837.lha   preinstalled game
-tmp/LegendsOfValour.lha             original installer (needed for packaging)
+LegendsOfValour_v1.0_0837.lha   preinstalled game
+LegendsOfValour.lha             original installer (needed for packaging)
 ```
 
-Extract the preinstalled game with Lhasa/LHA:
-
-```sh
-mkdir -p tmp/game
-(cd tmp/game && lha xq ../LegendsOfValour_v1.0_0837.lha)
-```
+`make unpack ARCHIVES=<directory holding them>` copies them into `tmp/archives/`, verifies
+them and installs the game into `tmp/game/LegendsOfValour/`.
 
 Building needs make, vasm's Motorola 68000 assembler, WHDLoad development headers, and
-Amiga NDK headers. Python 3 supports the inspection and packaging tools. Local gameplay
+Amiga NDK headers, all from AmigaXDev's shared environment (the repository's
+`docs/building.md`). Python 3 supports the inspection and packaging tools. Local gameplay
 uses FS-UAE, the shared launcher, Workbench 2.04, WHDLoad, and Kickstart images. Tracing
 additionally needs the Barto-enabled FS-UAE build and m68k GDB described in
 [profiling.md](docs/profiling.md).
-
-| Setting | Default |
-|---|---|
-| `VASM` (make variable) | native assembler in `tmp/vasm-native-src/vasm/`, else `~/.local/vasmm68k_mot` |
-| `WHDLOAD` (make variable) | `~/.local/share/amiga/WHDLoad` (development headers) |
-| `NDK` (make variable) | `~/.local/opt/m68k-amiga-elf/sys-include` |
-| Shared runtime files | `~/.local/share/amiga`, installed by AmigaXDev (`make setup`); [amiga/env.sh](amiga/env.sh) sources its `env.sh` and sets this project's choices |
-| `FSUAE` | `fs-uae` on PATH |
-| `FSUAE_COMMON` | `~/.local/share/amiga/fsuae_common.sh` |
-| `GAME` | `tmp/game/LegendsOfValour` (use an absolute path when overriding) |
 
 The game slave requires WHDLoad 17+, Kickstart 1.3 `kick34005.A500` and its `.RTB`.
 It reserves 512 KiB chip memory and 656 KiB other memory, with additional memory needed
@@ -64,58 +52,56 @@ from the Kickstart 1.3 image used by the slave; see the runtime path table in
 
 ## Build and play
 
-From the repository root:
+From this directory:
 
 ```sh
-source amiga/env.sh
-make -C whdload
-SLAVE="$PWD/tmp/build/LegendsOfValour.Slave" WHD_ARGS=CUSTOM2=0 amiga/run.sh
+make run                          # build the release slave and boot it, timing off
+make run WHD_ARGS=CUSTOM2=64      # with the optional timing
+make run SLAVE=original           # CFou!'s v1.0, unchanged
 ```
 
-This explicitly selects the new release with optional timing off.
-Use `WHD_ARGS=CUSTOM2=64` to enable timing. The launcher defaults to a 68000 with 1 MiB
-chip and 8 MiB fast RAM; reference capture machines are specified separately in
+The launcher defaults to a 68000 with 1 MiB chip and 8 MiB fast RAM (`game.conf`);
+reference capture machines are specified separately in
 [profiling.md §3](docs/profiling.md#3-the-machine).
 
 An expanded 68020 trial can be launched with:
 
 ```sh
-AMIGA_MODEL=A1200 CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 \
-KICKSTART="$KICKSTART_A1200" EXTRA_ARGS=--slow_memory=0 \
-SLAVE="$PWD/tmp/build/LegendsOfValour.Slave" WHD_ARGS=CUSTOM2=64 amiga/run.sh
+make run AMIGA_MODEL=A1200 CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 SLOW_KB=0 \
+  KICKSTART="$KICKSTART_A1200" WHD_ARGS=CUSTOM2=64
 ```
 
-The launcher uses `amiga/.run` and copies the game into a fresh run directory each time.
+The launcher copies the game into a fresh run directory (`tmp/run/default/`) each time.
 Save games written there are lost on the next launch: copy any you want to keep before
-restarting. Optional local preferences are described in
-[amiga/performance.env.example](amiga/performance.env.example); explicit `SLAVE` and
-`WHD_ARGS` take precedence. Do not launch over an existing interactive session.
+restarting. `make stop` stops it. The repository's `docs/running.md` lists every option.
 
 ## Development and validation
 
 ```sh
-make -C whdload developer OUT='../tmp/build developer'
-make -C whdload verify OUT='../tmp/build verify'
+make developer       # tmp/build/developer/LegendsOfValour.Slave
+make verify          # tmp/build/verify/LegendsOfValour.Slave
+make check           # the release slave matches release/slaves.sha256; tapes, ray tables
 ```
 
 Developer builds retain individual W1–W6 and mouse-precision switches. VERIFY adds input tapes, pixel twins,
-and simulation checks; it must not ship. `OUT` is relative to `whdload/` unless absolute;
-paths containing spaces are supported. All build variants are assembled afresh.
+and simulation checks; it must not ship. `VASM_EXTRA='-DTIMING_STUDY=1'` adds a study's
+defines to one build. All builds are assembled afresh.
 
 Use [profiling.md](docs/profiling.md) for capture commands and fixed-window A/B checks,
 [performance-patches.md](docs/performance-patches.md) for rendering invariants,
 [simulation-timing.md](docs/simulation-timing.md) for timing validation, and
 [one-degree-turning.md](docs/one-degree-turning.md) for fine-turning checks. Captures run
-one at a time with `JOY0=none` in `amiga/.cap`, separate from interactive sessions.
+one at a time with `JOY0=none` as `INSTANCE=cap` (`tmp/run/cap/`), separate from interactive
+sessions.
 
 ## Release archives
 
 ```sh
-python3 tools/release.py
+make dist
 ```
 
-Builds `dist/LegendsOfValour-1.1b.lha` and `dist/LegendsOfValour_v1.1b_0837.lha`.
-Only the slave and ReadMe are replaced; entry lists and every other compressed record
+Builds `LegendsOfValour-1.1b.lha` and `LegendsOfValour_v1.1b_0837.lha` in the repository's
+`dist/`. Only the slave and ReadMe are replaced; entry lists and every other compressed record
 are preserved. Packaging verifies CRCs and replacement contents before publishing the
 local outputs. See [releasing.md](docs/releasing.md).
 

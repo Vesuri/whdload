@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive the original Legends of Valour in FS-UAE through the Barto gdb stub.
 
-  python3 tools/lov.py serve          boot (amiga/run.sh DEBUG=1), attach gdb, run; listen
+  python3 tools/lov.py serve          boot (common/run.sh DEBUG=1), attach gdb, run; listen
   python3 tools/lov.py <command...>   send one command to the running server, print the reply
 
 Commands (the emulator is left running after each unless noted):
@@ -12,21 +12,29 @@ Commands (the emulator is left running after each unless noted):
   wait <seconds>               let it run
   until <addr>                 run to a breakpoint at addr and stay stopped there
   quit                         kill gdb and the emulator
+
+The run options of common/run.sh (SETUP, SLAVE, BUILD, WHD_ARGS, TAPE, ...) apply to serve
+through the environment. The server runs as INSTANCE=cap unless INSTANCE is set, so captures
+never stop an interactive `make run` (tmp/run/default/).
 """
 import os, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _amigaxdev
 from amigaxdev.gdbserve import Server
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
+from game_server import COMMON  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Captures run in amiga/.cap (FSUAE_RUN), apart from interactive amiga/run.sh sessions in
-# amiga/.run: run.sh stops the emulator its run directory last started.
-CAP = os.environ.get('FSUAE_RUN', '.cap')
-RUN = os.path.join(ROOT, 'amiga', CAP)
+os.environ['GAME'] = os.path.basename(ROOT)
+# Captures run in their own instance, tmp/run/cap/, apart from interactive sessions in
+# tmp/run/default/: run.sh stops only the emulator its instance last started.
+INSTANCE = os.environ['INSTANCE'] = os.environ.get('INSTANCE') or 'cap'
+RUN_DIR = os.path.join('tmp/run', INSTANCE, '.run')
+RUN = os.path.join(ROOT, RUN_DIR)
 SOCK = os.path.join(RUN, 'lov.sock')
-# gdb runs in the repo root and cannot quote file names, so dump paths are given relative to
-# it (SCRATCH), clear of the space in the checkout path.
+# gdb runs in the game directory and cannot quote file names, so dump paths are given
+# relative to it (SCRATCH).
 SCRATCH = 'tmp/scratch'
 
 
@@ -56,7 +64,7 @@ class Lov(Server):
         here = os.getcwd()
         os.chdir(ROOT)  # gdb inherits it
         try:
-            g = super().boot(dict(env or {}, FSUAE_RUN=CAP))
+            g = super().boot(env)
         finally:
             os.chdir(here)
         g.profiler_pc_base = None
@@ -104,7 +112,7 @@ def gdb(server, g, rest):
     return out
 
 
-server = Lov('lov', root=ROOT, run_dir=os.path.join('amiga', CAP),
+server = Lov('lov', root=ROOT, run_script=str(COMMON / 'run.sh'), run_dir=RUN_DIR,
              commands={'until': until, 'gdb': gdb})
 
 if __name__ == '__main__':
