@@ -6,8 +6,8 @@ available. They build on slaves by other authors, who are credited in every game
 and release ReadMe. This repository releases the changes the original maintainers have not
 taken.
 
-Releases are on the [releases page](https://github.com/Vesuri/whdload/releases), one tag
-per game (`<Game>/v<version>`). Each archive is the original release with the slave, the
+Releases are on the [releases page](https://github.com/Vesuri/whdload/releases), tagged
+by archive name (`WingCommanderEnhanced-2.0b-20261019`). Each archive is the original release with the slave, the
 ReadMe and only the files that changed replaced. Install it as you would the original.
 
 ## Games

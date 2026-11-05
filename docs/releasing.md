@@ -51,7 +51,15 @@ Before packaging:
 
 ## Publishing
 
-A release is tagged `<Game>/v<version>` on the commit it was built from, and the archive
-from `dist/` is attached to a GitHub release of that tag, titled `<Title> Enhanced
-<version>`, under the Vesuri account. The release notes name the original slave's author
-and what changed.
+A release is a lightweight tag, the archive's name without `.lha`
+(`WingCommanderEnhanced-2.0b-20261019`), on the commit it was built from. The archive and
+its `.sha256` from `dist/` are attached to a GitHub release of that tag under the Vesuri
+account:
+
+- title: the release ReadMe's title line, `<Title> Enhanced <version> (dd.mm.yyyy)`
+  (`Wing Commander Enhanced 2.0b (19.10.2026)`);
+- notes: the ReadMe's change points for that version, its requirements line, and a line
+  naming the original slave's author;
+- a beta version (ending in `b`) is a pre-release. GitHub marks one release of the
+  repository as "Latest", so a final version that should not take it from another game is
+  published with `--latest=false`.
