@@ -30,7 +30,9 @@ Build with `make slave` and `make verify` (or `tools/build.sh` and
 the repository's (`game.conf`): vasm with the shared WHDLoad includes, the shared lvo
 bridges and `AMIGA_SHARE/ndk/Include_I`; `make check` proves the release build still gives
 `release/slaves.sha256`, compiles every tool and runs the static checks that need no
-captures (`GAME_CHECKS` in `game.sh`). No build date is embedded. `manifest/baseline-source.commit` pins
+captures (`GAME_CHECKS` in `game.sh`). No build date is embedded: the slave's
+`$VER` string carries the fixed release date, `2.0b (13.10.2026)`, which also names the
+release archive. `manifest/baseline-source.commit` pins
 the original 1.4 source; `manifest/overlay-reference.commit` pins TD2's helper source.
 
 ## Harness (phase 1)

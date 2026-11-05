@@ -66,20 +66,8 @@ slv_keyexit	= $5D	; num '*'
 
 ;============================================================================
 
-	IFD BARFLY
-	DOSCMD	"WDate  >T:date"
-	ENDC
-
 DECL_VERSION:MACRO
-	dc.b	"2.0b"
-	IFD BARFLY
-		dc.b	" "
-		INCBIN	"T:date"
-	ENDC
-	IFD	DATETIME
-		dc.b	" "
-		incbin	datetime
-	ENDC
+	dc.b	"2.0b (13.10.2026)"
 	ENDM
 	dc.b	"$","VER: slave "
 	DECL_VERSION

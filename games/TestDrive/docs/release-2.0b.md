@@ -39,7 +39,9 @@ change display code, apart from the separately verified audio interrupt fix. The
 report applies only to the preserved pre-fix 2.0b baseline. The full phase-11
 regression remains evidence for unchanged simulation/features, complemented by
 the targeted road-fix regression and 68040 smoke checks. The fixed release date
-is in ReadMe; the reproducible build omits build dates.
+is in the ReadMe and the slave's `$VER: slave 2.0b (13.10.2026)`; the reproducible build
+omits build dates. The slaves with the date differ from the 2.0b builds above (12772
+bytes) only in that string: removing the date from `DECL_VERSION` gives them back.
 
 `make dist` packages the release with the shared packager (`release/release.json`):
 the original installer archive with the release slave, `release/readme`,
