@@ -1,0 +1,113 @@
+
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "Powerdrome" (c) 1989 Electronic Arts.
+ Supported version: PAL original release.
+
+ Original install by Galahad/Fairlight.
+ Version 2.0 enhancements by Vesuri.
+
+ Requirements:
+ -------------
+ This install requires WHDLoad version 18.0 or later and DIC in the path.
+ These programs can be found in the WHDLoad package.
+ Version 2.0 has been tested with WHDLoad 20.0.
+ To install from a different drive than DF0: select installation mode Expert.
+
+ The installed program requires 512 KiB ChipMem and 384 KiB additional memory.
+ Extra memory is needed for WHDLoad itself and the optional PRELOAD tooltype.
+ Enhanced framerate requires a 68020 or faster CPU and usable Fast RAM.
+ It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
+
+ The game requires an installed A500 Kickstart 1.3 image.
+ The kickstart image must be located in the directory "Devs:Kickstarts" and
+ must be named "kick34005.A500". The image can be extracted from an A500 with
+ tools like 'GrabKick' or similar which can be found on Aminet.
+ If the image is the wrong version or altered in any way, WHDLoad will quit
+ with an appropriate message.
+ Additionally the file "kick34005.A500.RTB" must be installed in the same
+ directory as the kickstart image. It can be found in the archive
+ "util/boot/skick346.lha" on Aminet.
+
+ Features:
+ ---------
+ - Full loading from hard disk.
+ - Copylock protection removed.
+ - EndCLI startup bug removed; the game starts without an extra icon click.
+ - Quit option (F10).
+ - Manual and hints included.
+ - Optional Enhanced framerate mode for 68020+ with Fast RAM.
+
+ Enhanced framerate:
+ -------------------
+ Select "Enhanced framerate" in the WHDLoad splash screen, or add the tooltype
+ CUSTOM1=1 to the game icon. This option is OFF by default.
+
+ On a 68020 or faster CPU with usable Fast RAM, it enables:
+ - Faster rendering of the original planar graphics in Fast RAM, followed by
+   a copy to the Chip RAM display buffer.
+ - Fine mouse rotation at 50 updates per second, retaining calibration gain.
+ - Fixed-step gameplay timing, so movement and other gameplay updates no
+   longer advance once per rendered frame. Cockpit liftoff is paced as well.
+
+ With the option off, on a 68000/68010, or without usable Fast RAM, the game
+ retains its original rendering and frame-dependent timing.
+ The option does not change WHDLoad's cache policy. CACHE and DCACHE remain
+ standard WHDLoad tooltypes under the user's control.
+
+ The timing changes support PAL. Menus, the external pit animation and the
+ title demo retain their original timing. NTSC support is not provided.
+
+ Extra notes:
+ ------------
+ Galahad's original observation still applies:
+ "This game is so hard, its unreal! I remember playing this the first time
+ around, and it doesn't get any easier!!!"
+
+ Thanks to Slinka & Yoyo for the PAL image.
+ Thanks to Frank for the installer and icons.
+
+ History:
+ --------
+ version 2.0 (13.10.2026) done by Vesuri:
+ - Updated the installer to the WHDLoad 20.0 template, retaining the original
+   single-disk imaging settings, documentation and icon choices.
+ - Reworked the slave using the WHDLoad KickEmu support from version 20.0.
+ - Added the single, opt-in Enhanced framerate option (CUSTOM1=1).
+ - Added Fast RAM planar rendering and static polygon drawing loops.
+ - Overlapped Fast RAM rendering with display synchronization and added a
+   block copy to publish the completed scene to Chip RAM.
+ - Added 20 ms movement steps and 90 ms control updates, with elapsed-time
+   handling for input, opponents, resources, repairs, laps and weather.
+ - Paced cockpit liftoff to the measured original A500 movement cadence.
+ - Added fractional mouse steering with smooth 20 ms rotation updates.
+ - Kept original rendering and timing on 68000/68010 and without Fast RAM.
+ - Corrected the command-line arguments passed to the game at startup.
+ - Retained user control of WHDLoad CACHE and DCACHE options.
+
+ version 1.0 (22.05.2003) done by Galahad/Fairlight:
+ - Initial release.
+ - Hard disk loading, Copylock removal and EndCLI startup fix.
+ - F10 quit option; manual and hints included.
+ - Installer and icons by Frank; PAL image supplied by Slinka & Yoyo.
+
+ Contact:
+ --------
+ If you have problems with this installation, first try the latest version
+ of this package from the WHDLoad WWW page. If a problem occurs with Enhanced
+ framerate enabled, also try disabling that option.
+ Please report remaining problems using the Bug-Report-Form on the WHDLoad
+ WWW page. Include your CPU, memory configuration, WHDLoad version and
+ tooltypes, and whether Enhanced framerate was enabled.
+
+ For the full WHDLoad package, other installs and updates refer to:
+        https://www.whdload.de/
+ or     aminet:dev/misc/whdload#?
+ and    aminet:game/patch/
