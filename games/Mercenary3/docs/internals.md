@@ -1,0 +1,2028 @@
+# Internals
+
+Addresses are offsets in `Disk.1` unless marked as slave patch-list offsets. The game
+image loads to a fixed chip address, so the slave's absolute addresses map to `Disk.1`
+by one constant (below).
+
+## Slave
+
+`Mercenary3.Slave` (1,148 bytes, Harry, Graham and Wepl, version 1.2, 29.07.2004) is
+identical in the full install and the official installer. The installer's
+`src/Mercenary3.slave.asm` is an earlier state of its source: the shipped slave also
+has the `PL_W $716` and `PL_P $A858` patches below, a `_waitvb` subroutine where the
+source expands the `waitvb` macro inline, and the build date. `src/Mercenary3.islave.asm`
+is the RawDIC imager.
+
+`src/original/Mercenary3.slave.asm` is the reconstruction: the installer source
+with those additions and with Barfly's optimised encodings written out (`moveq`, short
+branches, PC-relative `lea`, `cmpi` and an `abs.w` operand). vasm `-no-opt` rebuilds the
+shipped slave byte for byte (`make original`).
+
+| Field | Value |
+| --- | --- |
+| `ws_Version` | 10 |
+| `ws_Flags` | `NoError`, `Disk`, `EmulTrap` |
+| `ws_BaseMemSize` | `$80000` (512 KB, all chip) |
+| `ws_ExpMem` | 0 |
+| KickEmu | none: a direct (no-OS) game |
+| `ws_keyexit` | raw `$41` (Backspace; the source comment says F10). Raw `$78` also quits |
+| Options | none |
+
+Boot sequence in `_boot`:
+
+1. `resload_DiskLoad` `Disk.1` `$0..$7D80` to chip `$4000`: a title picture whose
+   palette and four planes are shown for one second (`resload_Delay 50`).
+2. Clear chip `$100..$80000`, then load `Disk.1` `$9000..$767B0` to chip `$5350`.
+   A chip address `A` in the game image is therefore `Disk.1` offset `A + $3CB0`.
+3. Point four game variables at the slave's keyboard bytes (chip `$8`/`$9`). On a 68040
+   or later only, rewrite eight code locations to use vectors at chip `$C0..$CC`.
+4. If the word at `Disk.1` `$5DE60` is `jsr abs.l` (`$4EB9`), this is the copy-protected
+   version and the slave replaces the call with three `moveq #0,d0`. The supplied install
+   is that version.
+5. `resload_Patch` with base `$50000`, `resload_SetCACR` with the instruction cache on,
+   then jump to `Disk.1` `$4EDB0` with SR `$2700`.
+
+Patch list (offsets relative to `$50000`; add `$53CB0` for the `Disk.1` offset):
+
+| Offset | Patch | Purpose |
+| --- | --- | --- |
+| `$716` | `PL_W $8200` | the operand of the game's `move.w #$8380,dmacon`: enable master DMA only, without copper and bitplanes |
+| `$1E30` | `PL_S 8` | skip a ROM access |
+| `$205A` | `PL_P _subd0` | replace an empty `dbf` delay with a raster-line wait |
+| `$29A6`, `$29BC`, `$29C6` | `PL_P _patch_aud1` | AUD1 interrupt exits: poll the keyboard, acknowledge, `rte` |
+| `$2AC0`, `$2C9E` | `PL_P _patch_vertb` | VERTB interrupt exits: the same |
+| `$5E8A` | `PL_P _loadgame` | load `Mercenary3.saveN` from the install directory |
+| `$5F26` | `PL_P _savegame` | save `$2056` bytes from chip `$5550` |
+| `$A858` | `PL_P _dmaon` | enable copper and bitplane DMA after a vertical blank, then copy six bytes and return |
+
+`$A858` is inside the frame publication routine (below): every frame it copies 34 bytes
+from chip `$7CC0` to the pointer at `$72B4` with an unrolled `move.l (a1)+,(a0)+` run, and
+the patch replaces its fifth to seventh moves. `_dmaon` then copies six bytes and returns, so
+each frame copies 22 bytes instead of 34: the moves at `$A85E` and `$A860` never execute
+(0 of 75 frames in the profile window). `_dmaon`'s body (`move.l`, `move.w`, `rts`) matches
+the copy's last six bytes at `$A85E`, so the patch looks placed for a layout 12 bytes
+different, probably the other supported version. `_dmaon` also rewrites DMACON and waits
+for a vertical blank on every frame, not once.
+
+The slave installs its own level-2 handler at `$68` for the keyboard. Its keyboard
+poll (`_checkkeyboard`) busy-waits three raster lines for the handshake and stores the
+key code at chip `$8`, with `$FF` at `$9`.
+
+## Performance slave
+
+`src/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
+(for the startup control), reads options through `resload_Control` and keeps
+the shipped patch list. The release exposes **Enhanced framerate**, default On
+(`Custom5=1` in the game icons), which selects all feature bits below. Off (`Custom5=0`) keeps the
+original game's behaviour: it clears them except the fixes for shipped-slave defects,
+bit 0 (`_dmaon`) and bit 15 (R5); release builds ignore `Custom1`. The VERIFY build accepts `Custom1` as the individual
+feature mask with `Custom5=0`. Historical measurements below name those feature bits. It asks for an optional 288 KB of expansion memory (`ws_ExpMem`):
+4 KB for bit 2's stack, 4 KB for bit 5's hot code, 28 KB for bit 6's lookup tables and
+20 KB for bit 4's presentation restore buffer, 104 KB for bits 9/17's renderer copies and
+96 KB for bit 10's aligned staging bitmap, 12 KB for bit 11's object histories and
+20 KB for bit 20's render scratch.
+If allocation fails, the stack, code and
+tables retain their chip paths; presentation falls back to logic gating. With every `Custom1` bit off (VERIFY) it runs the shipped slave's code paths.
+
+| Option | Effect |
+| --- | --- |
+| `Custom1` bit 0 | `_dmaon` enables copper and bitplane DMA on its first call only, after the vertical blank, and completes the frame's 34-byte copy (the three replaced moves, then the original code from `$A85E`) |
+| `Custom1` bit 1 | On AGA (Lisa's ID `$F8` in `LISAID`), 64-bit bitplane fetch: `FMODE` = 3 and `DDFSTOP` `$B8` in the two known in-game copper lists (Disk.1 `$56780`, `$567CC`). Buffers and planes are 8-byte aligned, rows 40 bytes, modulos 0; vehicle, flight, lift and A-to-Z panel coverage is recorded under P3 |
+| `Custom1` bit 2 | The supervisor stack in a 4 KB expansion block (fast RAM when fitted) instead of the top of chip RAM: the three `lea $7fffa,a0` / `unlk a0` stack setups (Disk.1 `$5DE66`, `$5DE88`, `$5DEEA`) get its top. The game uses less than a page of stack |
+
+`Custom1` bit 3 gates walking logic to at most 12.5 passes/s (L1 below).
+Bit 4 adds walking presentation frames and includes that gate (P1 below).
+Bit 5 moves numeric helpers and projection code to fast RAM on 68020+ (M1 below).
+Bit 6 copies their read-only lookup tables to fast RAM (M2 below).
+Bit 7 accelerates horizontal span interiors on 68000 and fast-RAM 68020+ (R1 below).
+Bit 8 copies the full presentation restore set with bulk moves (S2 below).
+Bit 9 moves the remaining hot renderer blocks and their private mutable data to fast RAM (S3 below).
+Bit 10 stages the 3D bitmap in fast RAM and copies the view before publication (S4 below).
+Bit 11 interpolates object geometry with bit 4 and real fast RAM on 68020+.
+Bit 12 extends logic gating and presentation to vehicle/surface flight and space flight
+(P3); requires bit 4 for presentation.
+Bit 13 requests the data cache through WHDLoad (R4 below).
+Bit 14 replaces prediction with consistent player/camera interpolation (P4 below);
+requires bit 4 and its restore buffer, plus bit 12 for transport modes.
+Bit 15 fixes the cached polygon clipping limit on 68040/060 (R5 below).
+Bit 16 includes room-local XYZ in P4 camera interpolation (P5 below).
+Bit 17 extends bit 9 to the remaining hot code and removes M1 entry hops (F2 below).
+Bit 18 moves projection state and drawing lookup tables to fast RAM (F3 below).
+Bit 19 finds the log conversion's leading bit with `bfffo` in M1's copy (F4 below).
+Bit 20 moves the render scratch to fast RAM and translates the copied code (F5 below).
+Bit 21 draws door motion on P4's presentation timeline (P6 below).
+Bit 22 turns camera-attached models with the full camera angles (P7 below).
+Bit 23 transforms camera-attached vertices exactly instead of through the log tables (P8 below).
+Bit 24 paces passenger-flight replays at eight fields a pass (P3 below).
+Bit 25 moves traffic at the A500's speed (P9 below).
+The `VERIFY` build adds the presentation restore markers and displayed-frame counter;
+release builds keep only the game's logic-pass counter.
+
+### O1: existing options
+
+Expansion memory is optional (`ws_ExpMem = -$1000`); a zero returned pointer leaves
+all three chip-stack setups untouched. Allocation failure was not forced in these runs.
+Same-build, same-session `fps.py` results over the 500-field route:
+
+| Custom1 | a1200-fast fps | a500-1.5m fps |
+| --- | --- | --- |
+| 0 | 7.50 | 3.70 |
+| 1 (DMA) | 9.00 | 4.10 |
+| 3 (DMA + FMODE) | 9.40 | 4.10 |
+| 5 (DMA + stack) | 9.40 | 4.10 |
+| 7 (all three) | 9.60 | 4.10 |
+
+Options off matches the shipped slave's 37 A500 frames. On `a1200-fast`,
+`sim_speed.py PER_FRAME=1 CUSTOM1=7` gives walking displacement `-6 × dt` and
+turning `2 × dt`, with dt 4–6 fields. Route, Help, save/load and Quit Situation
+screens were played and inspected with all three options on: loading restored the
+saved view, heading and clock; Quit Situation moved to Eris and walking continued.
+No display fault was seen. Map, vehicle and flight screens (and any separate fetch
+windows there) are deferred by user decision. Evidence: `tmp/o1/`.
+
+### L1: walking logic gate
+
+`Custom1` bit 3 redirects the six-byte `jsr` at Disk.1 `$5DF92`. In walking mode
+(chip `$7122 = 1`), it waits until four VERTBs have elapsed since the previous accepted
+pass, stores the true elapsed count in chip `$52954`, then runs the original callee
+(`$5DF48`). A separate word timestamp handles counter wrap without disturbing the
+publication stamp. The original 4..8 tick clamp remains. The first pass keeps native
+timing; another mode clears the timestamp's validity and otherwise runs unchanged.
+
+Same build/session, `fps.py`, 500 fields, `Custom1=7 → 15`:
+
+| Machine | Gate off | Gate on |
+| --- | ---: | ---: |
+| a1200-fast | 96 / 9.60 fps | 96 / 9.60 fps |
+| a500-1.5m | 41 / 4.10 fps | 41 / 4.10 fps |
+| 060-50 emulator cell | 198 / 19.80 fps | 125 / 12.50 fps |
+
+The fast-cell reduction is intentional: rendering still accompanies each logic pass
+until P1. Its counts are not hardware speed predictions. `sim_speed.py PER_FRAME=1`
+shows the 060 gate-off walk advancing 24 units and turn 8 heading units per 2–3 fields;
+gate-on gives exactly 24 and 8 every four fields. On the 020, gate-on motion is
+`6 × dt` and `2 × dt`, dt 4–6. The word now measures pass-start intervals, rather than
+the previous publication interval. No waits are needed when a pass already takes four
+or more fields; the slow-machine 8-tick cap remains.
+
+Options-off and shipped both give 37 A500 frames. The fastest-cell idle, walk, turn and
+stop screenshots show an intact scene and panel, and the view stays still after stopping.
+Builds and input checks pass. O1's deferred map/vehicle/flight coverage remains deferred.
+Evidence: `tmp/l1/`. No new instruments or emulator changes.
+
+### P1: player presentation frames
+
+`Custom1` bit 4 replaces spare walking waits with a saved-state redraw. It includes
+L1's gate. The staged pose is the committed pose plus the last pass's displacement
+scaled by elapsed fields / that pass's clamped tick count. Angles wrap at 1024;
+collision rollback, discontinuities and mode changes suppress extrapolation. A stopped
+pass gives zero displacement. In walking mode, a discontinuity is a height change over
+1024 units or a horizontal change over 16,383 units per pass. A taxi carries the walking
+player (Disk.1 `$5562A`) 1,025–8,200 units per pass. Under the former 1024-unit limit on
+every axis, every extra frame of the ride repeated the last image. The slot-3 Metis taxi
+save on the 030 showed about 13 distinct frames per second, as with Off. It now shows
+36–41, with the driver steady within 0.3 px and no one-frame glitches over 900 fields. Other modes and special screens retain their native path.
+With one field left, a redraw starts only if the last presentation fitted one field
+(initial estimate: two); this avoids a measured one-frame loss on the 030 MMU cell.
+
+Camera/view setup precedes publication; back-buffer setup and drawing follow it, in
+native order. Disk.1 `$5E0BA` is an inline block, not a callable routine. The redraw
+includes `$469C8` and `$5765E`, omitted from the initial plan sketch, and never calls
+collision or main-loop logic. A 17,366-byte expansion-memory buffer restores scratch, drawing
+variables, object-selection tables and self-modified words, including the 040 indirect
+vectors. Copper state and bitmap output remain live. Chip `$7180` counts logic passes;
+a separate displayed-frame counter exists only in VERIFY.
+
+Same VERIFY build/session, `fps.py` through `matrix.sh`, 500 fields, `Custom1=15 → 31`:
+
+| Machine | P1 off | P1 on |
+| --- | ---: | ---: |
+| a500-1.5m | 40 / 4.00 fps | 40 / 4.00 fps |
+| a1200 | 94 / 9.40 fps | 94 / 9.40 fps |
+| a1200-fast | 96 / 9.60 fps | 96 / 9.60 fps |
+| 030 default / MMU | 116 / 11.60 fps | 116 / 11.60 fps |
+| 040-25 emulator cell | 125 / 12.50 fps | 141 / 14.10 fps |
+| 060-50 emulator cell | 125 / 12.50 fps | 153 / 15.30 fps |
+| 040-8 advisory cell | 125 / 12.50 fps | 139 / 13.90 fps |
+
+The 040/060 increases are emulator frame counts, not hardware speed predictions.
+There is no measured gain on the lower cells; faster drawing remains necessary there.
+Both matrices complete. Release options-off and shipped both give 37 A500 frames.
+Release `sim_speed.py PER_FRAME=1` skips staged poses: held walking is `-6 × dt`,
+turning `2 × dt`, with dt 4–6 on both 020 and 060. The route's 32 VERIFY presentation
+restores have identical masked SHA-256 hashes. Exclusions are display state and the
+identified live interrupt updates, including startup panel bars and text scrolling;
+these updates are not rolled back. The check caught and corrected a missing renderer
+selection-table restore at chip `$AA6E..$AF65` and its selection word `$5447E`.
+
+Release idle, walking, 20 successive turning publications and stopping screenshots
+were inspected. Intermediate views appear between logic frames, without visible scene
+or panel faults. After stopping, position and heading modulo 1024 stay fixed across
+81 fields. This is route coverage, not the deferred map/vehicle/flight coverage.
+Inputs, three builds and 17 existing tool tests pass. Evidence: `tmp/p1/final-off/`,
+`final-on/`, `restore-route.json`, `world-020.json`, `world-060.json`, `play/`,
+`options-off.json` and `shipped.json`, all under `tmp/p1/`.
+
+### P4: presentation transitions
+
+Bit 14 replaces player prediction with previous/current interpolation on logic and
+extra frames. Camera and geometry use one alpha sampled **after** the publication
+wait; sampling before it could cross a field during camera preparation. The old
+2/6-heading-unit and 6/18-position-unit alternation becomes 4/12 per two fields.
+Starts, stops and reversals stay within committed movement, without overshoot.
+The visual delay is one native pass (80 ms at four fields); input and logic stay native.
+
+Renderer calls reading the player directly receive the same staged pose as the
+camera, then restore it. Space also stages navigation coordinates. Collision sees
+committed camera inputs; its drawing tail (Disk.1 `$5AEDA`) is drawn with the
+presented camera, including in extra frames. Hook `$5AEE0`, preserving the loop
+entry at `$5AEDE`. Mode, scene, floor and large coordinate changes snap.
+Preserve polygon clipping scratch through chip `$B31D` and drawing word `$6F48`,
+within the existing 20 KB restore allocation. Copper colours `$2EA50..$2EA57` are
+explicit display exclusions in the restore check.
+
+Same build/session, `fps.py`, 500 fields, `Custom1=16383 → 32767`, CACHE PRELOAD:
+
+| Setup | Bit 14 off | Bit 14 on |
+| --- | ---: | ---: |
+| a500-1.5m | 4.10 fps | 4.10 fps |
+| a1200-fast | 12.50 fps | 12.50 fps |
+| reference 030/50 | 24.80 fps | 24.80 fps |
+| 040-25 emulator check | 24.80 fps | 24.80 fps |
+
+The loaded flight route is 50.00 → 49.30 fps; retain this small presentation cost
+for correct transitions. Its 31 logic intervals remain four fields with XYZ deltas
+362/60/159, matching P3; space retains four-field logic within each mode.
+Options off and shipped both give 37 A500 frames. Walking/turning retain 6/2 units
+per field in all 79/80 checked 020/030 intervals. Restore hashes pass 124 walking,
+188 flight, 187 space and 300 lift presentations.
+The mailbox approach, turning, reversals, vehicle, flight, space and Help/return
+views were checked; the final 12 fields after stopping at the mailbox are identical.
+Evidence: `tmp/presentation-fix/final4/`; the original defect probe is
+`tmp/presentation-fix/before-probe.json`.
+
+### P5: room-local camera interpolation
+
+The prison walls and spiderweb use different camera inputs. The room renderer
+(Disk.1 `$5F438`, local-coordinate reads at `$5F49A`/`$5F49E`) uses the separate
+room-local XYZ words. The interior detail path at `$5836A` subtracts the world
+camera at `$583A2`/`$583B4`. P4 originally staged only the latter: room depth
+repeated 92/92/68/68/44/44 while the world camera advanced 12 units every two fields.
+
+Bit 16 applies P4's interpolated XYZ delta to the local words at chip
+`$7038`/`$703C`/`$7040` for walking. It preserves the native room origin and P4's
+mode/floor/scene discontinuity guards. Camera preparation and drawing wrappers save
+and restore the local pose; the presentation restore set includes all three words.
+Enhanced framerate selects this fix. Input, collision and logic retain committed
+coordinates; door animation timing is unchanged.
+
+Same-build/session 040 CACHE PRELOAD walk, bit 16 off/on: local depth now advances
+110/98/86/74/62/50 on consecutive two-field frames. In 18 sampled frames, the wall's
+upper/lower edge at capture column 300 repeats on 8/17 intervals off versus 2/17 on.
+Individual pixel edges can still repeat after rounding; the native-rate hold is gone.
+Same-build 500-field FPS, bit 16 off → on: A500 4.10 → 4.10, fast 020
+12.50 → 12.50, reference 030 and 040-25 both 24.80 → 24.80. No throughput gain
+is claimed. Walking/turning stay at 6/2 units per field. All 124 routine and 300 lift
+presentation restores pass. Prison turning, stopping, exit/return, Help and mailbox
+views were checked. Options-off and shipped both produce 37 A500 route frames.
+Evidence: `tmp/room-camera/final2/` (camera probe, edge comparison and play captures).
+
+### P6: door motion on the presentation timeline
+
+The door tick (Disk.1 `$5F724`, one of the world ticks) opens and closes doors by moving
+their vertices in the room vertex arrays (X at `$1640`, Z at `$1898`, four-byte stride,
+150 entries) one unit per tick. A walking pass runs four ticks, so natively a door edge
+jumps four units per pass, at 12.5 Hz on the gated machines; presentations and the
+delayed native draw showed the door where the last pass left it.
+
+`Custom1` bit 21 requires bit 14 (and so bit 4 and its restore buffer) and a 68020+.
+At each accepted pass `_presentgate` records `$1640..$1AEF` (F5's fast-RAM copy when
+bit 20 moves it) with the scene. The object/room drawing entry (Disk.1 `$577BE`, after
+P4's pose wrapper) draws each word that changed by 1..8 units at P4's alpha between the
+recorded and live value, and restores the live words when drawing returns. Logic,
+collision and the door timing keep committed values. A change over 8 units, more than
+48 changed words, a scene or mode change, recorded-input replay, collision-only drawing
+and enclosed rooms (`$71CC` not negative) draw the live arrays.
+
+Same session, reference 030, release mask, prison cell door opening (route
+`20:,130:JOY2_UP,250:`, the player at the door): the door edges changed on 34 frames,
+about five Amiga pixels every four fields, before and on 140, one or two pixels per
+field, after. Both edges move monotonically; `flicker.py` finds no one-frame glitches
+in either capture. Across the cell (no input) a pass moves an edge one pixel, so
+in-between positions there round to the native ones. Restore hashes pass 250
+presentations on the door route and 321 on the standard route. `fps.py`, VERIFY,
+`Custom5=1`: 44.70 → 44.50 fps. Bit 21 is in the release mask.
+
+### P7: camera-attached model angles
+
+The passenger-ship cockpit is drawn at a fixed offset from the camera (own vehicle,
+Disk.1 `$57AC8`). The model code turns it with the camera angles: `$7152` at Disk.1
+`$57D9E`, `$7154 + $200` at `$57DD2` and `$7156 + $200` at `$57E0C`, each as
+`angle >> 2` through the 256-entry sine table at `$7E68`. The view matrices use full
+1024-unit angles (Disk.1 `$5A91E`, log sines at `$64000`), so the cockpit was turned
+`angle & 3` units short: it swung sideways during turns, up and down during pitch
+changes, and snapped back every four units. With the frame two passes behind the
+probed heading, the console edge during a turn is a function of `heading & 3` alone
+(60 flight frames, one exception of one pixel).
+
+`Custom1` bit 22 replaces the three lookups (in chip, and in the S3/F2/F5 copy when the
+copy keeps its layout) with calls that interpolate the table between neighbouring
+entries for the full angle. They return the same registers, with `a4` pointing at a
+two-entry sine/cosine pair, and still skip a rotation at angle 0.
+
+Slot 1 passenger flight on the reference 030, release mask, previous build → bit 22,
+per-field captures:
+
+| Phase | Measured | Before | After |
+| --- | --- | --- | --- |
+| Turn, heading 508 → 136, 60 frames | console left edge | 5 positions over 5 Amiga px | 1 position |
+| Space pitch, `$7154` 496..512, 130 frames | console top | 4 rows (172..180) | 123 at one row, 7 scene changes |
+| Surface roll, `$7152` −29..0, 130 frames | console top at one column | 2 rows | 128 at one row, 2 one row off |
+
+`flicker.py` finds no glitches in the turn. Restore hashes pass 321 standard-route
+presentations; `fps.py`, VERIFY, `Custom5=1`: 44.50 fps (unchanged from P6). A500,
+VERIFY, Custom1 `$3FFFFF → $7FFFFF` with the heading site only: 41 → 41 frames.
+Bit 22 is in the release mask.
+
+### P8: exact camera-attached vertices
+
+With P7 the cockpit still moved one Amiga pixel and straight back while the angles
+changed, most visibly when the ship banked. The view transform (Disk.1 `$5B038`)
+multiplies through the log tables (`$64000`/`$60000`) with a 13-bit mantissa. The
+cockpit is turned by the camera angles and then back by the view, so those errors
+(about 0.1–0.2% per term) don't cancel. Near the eye they are worth a pixel, and
+they change with the angles. Probed in the slot 1 flight (native build, 672 cockpit
+vertices in the pitch, roll and turn phases), the view output matches the inverse
+model rotation with camera axes (depth, −x, −y) within the log error: a fixed tilt of
+about half a 1024-unit step (0.8 px) plus ±0.15 px that moves all cockpit vertices
+together.
+
+The transform's floats are a signed mantissa (`|m|` `$1000..$1FFE`, even) in the low
+word and an exponent in the high word: the value is `m · 2^(e−12)`. It writes depth,
+x and y to `$840/$340/$5C0 (a0)`. The screen position is `160 − x·2^k/z` and
+`68 + y·2^k/z`, with `k` from `$6FF4`'s high word (8 in flight). It goes to the
+floats `$AC0/$D40` and the rounded words `$FC0/$FC2`, and the clip code (via the
+table at `$77DA`) to `$1240`, or `$80` with the vertex behind the camera.
+
+`Custom1` bit 23 requires bit 22 and a 68020+. Only camera-attached models reach P7's
+roll site (Disk.1 `$57D9E`). There, while `$5B038` would take its log path (`$7122` ≠ 1,
+`$7124` ≥ 0, `$6FF4` a power of two) and the offset `a1-a3` is within 1,024 units,
+`_angle7152` computes the camera-space vertex exactly. That is the model vertex as
+(z, −x, −y) plus the offset turned back by heading, pitch and roll (P7's interpolated
+table, cached while the offset and angles hold). It writes `$5B038`'s outputs and
+returns to `$57F90`, past the rotation and the transform. Other models keep the
+native path untouched. F5's moved scratch is addressed through `_f5datamap`. A code
+copy whose layout moves `$57F90` is accepted only if its roll site stayed native.
+Against the exact model the outputs are within 0.12 px (mean 0.04, roll included).
+
+Slot 1 passenger flight on the reference 030, release builds with P7 and with P8,
+per-field captures. Probes measure where canopy lines cross a fixed column or row.
+A–B–A counts a line that moves and is back on the next frame:
+
+| Phase | Probe | P7: changes, A–B–A | P8: changes, A–B–A |
+| --- | --- | --- | --- |
+| Turn, 60 fields | right diagonal | 15, 7 | 0, 0 |
+| Pitch, 130 fields | horizontal line | 10, 4 | 0, 0 |
+| Pitch, 130 fields | right diagonal | 22, 7 | 11, 1 |
+| Bank, 200 fields | horizontal line | 17, 7 | 0, 0 |
+| Bank, 200 fields | right diagonal | 37, 9 | 11, 1 |
+
+The remaining changes are the cockpit's native sway: its offset is applied in world
+axes, so the pitch oscillation of the autopilot moves it by sub-pixel amounts.
+
+Restore hashes pass 321 standard-route presentations. `fps.py`, VERIFY, `Custom5=1`,
+same session: 44.50 fps with P7 and with P8. A500, VERIFY, Custom1 `$FFFFFF`: 41
+frames, as with `$7FFFFF`. Bit 23 is in the release mask.
+
+### P9: traffic at the A500's speed
+
+Traffic moves per logic pass, not per tick. The traffic routine (Disk.1 `$54F0E`,
+called after the world ticks at `$5E084` and from the one-tick path at `$5E22A`) runs
+the mover loops at `$553F0` and `$55502` for every vehicle slot (from `$40`, ending at a
+zero speed `$6C7C`). One step adds the velocity (`$6CB0`/`$6CB2`, the speed on one axis)
+to X/Z and the speed to the 16-bit cell progress `$6C7E`; its carry ends the cell, and
+`$5553A` snaps the vehicle onto the cell and reads the next turn and speed nibble from
+the route. Steps per pass: riding, the route's speed nibble + 1 (`$6DD0` → `$6EAE`,
+which also sets the engine pitch at `$4F622`); on foot, up to 16 until a vehicle is in the
+player's grid square (`$71F6`, set at `$5DA22`), so distant traffic fast-forwards.
+
+Real-time traffic speed therefore follows the pass rate. The A500 runs about 10 fields
+a pass in the taxi and the flight and 13 in the Eris street and prison scenes; the
+release's gate runs 4. The taxi driver's and the pilot's real-time scripts fit the rides
+only at the A500's rate. `Custom1` bit 25 replaces the four-instruction velocity loads in
+both loops (`$553FC`, `$55510`; checked bytes, before F2 copies the block; no F2 operand,
+branch or entry lies in them) with `_trafficstep`, and the two call operands with
+`_trafficpass`. Each pass scales velocity and progress step alike by elapsed fields
+(`$52954`) / 10, in 1/4096; ten or more fields and replays keep the native step, so the A500
+is unchanged where it is slower. The cell snap keeps routes exact.
+
+Slot 3 taxi to Metis Spaceport, * pressed after the prison dialog, fields from *:
+
+| Setup | Taxi stops | "Well here we are" | "Press 'B' to board the spacecraft" |
+| --- | ---: | ---: | ---: |
+| A500 1.5 MB, Off | 4,975 | 4,650 | 5,800 |
+| 030 release without bit 25 | 1,900 | 4,425 | 5,475 |
+| 030 release | 5,075 | 4,050 | 5,275 |
+
+Without bit 25 the driver says "We've arrived" on arrival and talks for another minute.
+With it the grid crossings follow the A500's (425/1000/1575… against 600/1150/1625…). Eris
+street (HELP, F10, 150 fields walking), nearby vehicles over 1,000 fields: A500 41 units a
+field, release 123 without and 49 with bit 25 (the A500's rate at ten fields a pass).
+
+Same session, `fps.py`, VERIFY, `Custom5=1`, 030: 447 frames without bit 25, 445 with its
+hooks forced to the native step, 404 with bit 25. The loss is scene content, not cost: a
+VERIFY step counter (`M3TRF001`) shows 798 mover steps against 1,535, but from field 100
+to 300 a vehicle stays in the player's square (one step a pass), out of view,
+where natively it crosses within 50 fields, and those chunks draw 19–38 frames instead of
+25–50. A500 41 frames. Restore hashes pass 282 presentations. Bit 25 is in the release
+mask (`$3FFFFFF`).
+
+### R5: cache-safe polygon clipping
+
+Outside the prison, turning then stopping exposed intermittent missing gray ground
+on the 040 with CACHE. The shipped slave and enhancement-off controls also flash;
+this predates P4. NOCACHE removes the fault in the control capture. No flashes were
+observed in the matching enhanced 030 capture.
+
+The polygon renderer changes the immediate operand at Disk.1 `$5366C` between
+`$8AA0` (68 rows) and `$9540` (136 rows). The shipped 040 indirect-call patches
+leave this self-modifying comparison intact. A cached half-height limit clips away
+the ground. Bit 15 keeps that limit in slave data, redirects its writers at
+`$5380A`/`$53822`, and replaces both readers with cache-safe comparisons. The
+secondary reader still takes its original early-exit branch. This applies only to
+68040/060 and supports both chip and relocated code. Presentation restores the
+new limit with its other drawing state. The release applies the fix in both
+settings (user decision: fix the shipped defect also with Enhanced framerate Off).
+
+Release Off with only bit 15 (`Custom5=0`, before bit 0 joined it) against the shipped slave, 040-25 cell, the same
+outside-prison turn/stop and 600 stationary fields each (gray ground counted in the
+view's lower rows): shipped 12 fields without the ground, release Off none. A500
+options-off and shipped each give 37 frames; bit 15 acts only on 68040/060.
+Evidence: `tmp/bit15/`.
+
+### Off: original game behaviour
+
+Off keeps the original game's behaviour, not the shipped slave's (user decision). It
+keeps the two fixes for shipped-slave defects: bit 0 (the shipped `_dmaon` copies 22 of
+the 34 palette bytes and waits for a vertical blank every frame; see the patch list
+above) and bit 15 (R5). Same session, `a500-1.5m`, 500 fields: release Off 41 frames,
+VERIFY `Custom5=0 Custom1=32769` (bits 0 and 15) 41, shipped 37. World speed with bits
+0 and 15 on `a1200-fast` (`sim_speed.py PER_FRAME=1`): walking `-6 × dt`, turning
+`2 × dt`. Release Off on the 040-25 cell, the R5 turn/stop and 600 stationary fields:
+no missing ground, same major colours as the shipped capture, intact screenshots.
+The options-off check now compares release Off with the VERIFY build's bits 0 and 15.
+Evidence: `tmp/bit0/`.
+
+Same build/session, CACHE PRELOAD, 600 stationary fields after the outside-prison
+turn: bit 15 off has 10 fields with the gray ground absent; on has zero. The
+chip-renderer-only fix and enhanced 060 also have zero absent-ground fields in
+100-field captures. Vehicle, flight and Help/return views were inspected. All 124
+presentation restore hashes pass; 040 walking/turning remain 6/2 units per field.
+Options-off and shipped both give 37 frames on A500.
+
+Same-build 500-field `fps.py`, bit 15 off → on: A500 4.10 → 4.10 fps,
+020-fast 12.50 → 12.50, reference 030 24.80 → 24.80, 040-25 24.80 → 24.80.
+The 040 figure remains emulated-time throughput, not a measurement of distinct
+images delivered to the desktop. Evidence: `tmp/ground-flicker/final/`.
+
+The earlier interactive timing capture (`tmp/live-pacing/`) covers 37.8 seconds
+after boot: display submissions average 49.92 Hz, median gap 20.15 ms,
+99th percentile 25.8 ms, maximum 31.1 ms. This rules out sustained emulator
+slowdown in that capture, but does not count distinct game images or establish
+smooth monitor delivery. The subsequent prison-wall investigation above identifies
+a scene-motion defect that this submission-rate measurement cannot detect.
+
+### P2: other-object interpolation
+
+`Custom1` bit 11 requires bit 4, a 68020+ and real fast RAM. It uses 12 KB of
+optional expansion memory for 256 pose histories. Object XYZ are the longword arrays
+at chip `$581C`, `$5C1C`, `$601C` (four-byte stride); vehicle slots 1–27 use byte
+headings at `$6C1C + 4 × slot`, wrapping at 256. `$AF36` and `$B31E` are drawing
+scratch, not world poses. The visible-object list is at `$7423`, count `$71E6`.
+
+Disk.1 `$577BE` captures native-pass poses. Both logic and presentation drawings use
+the previous/current pair and elapsed fields at drawing time; delaying only the extra
+frames would rewind objects. Geometry is staged at `$57C36`, after the native distance
+and nearest-object tests, and restored before each model returns. Collision, distance
+ordering, object selection and simulation keep committed poses. New/reappearing objects,
+scene/model changes and per-axis jumps over 32,767 units snap. The player proxy remains
+with P1. This works with the S3 copy or chip renderer.
+
+Moving objects (Disk.1 `$546A2`) move after the renderer, so between
+renders their live pose is a pass ahead of the recorded one. Every staged drawing
+therefore uses the recorded pair. Once caught up, it draws the recorded current pose,
+not the live one. Only objects whose live pose and heading still match the recorded
+static pose skip staging. Previously these frames drew the live pose, and the next
+logic draw stepped back. On a user save at Tolosa with ships flying (slots 56–58,
+030, 600 fields), ship-blob direction reversals fall from 44% to 10% of steps, the level
+with bit 11 off. The remaining reversals are centroid noise from shape changes. Same
+session, `fps.py`, Custom1 `2097151`: 44.70 → 44.50 fps.
+
+Near the Eris bus crossing (HELP, F10, 150 fields walking), 20 consecutive 030 draws
+advance the bus by 256 units every two fields; committed motion stays 512 per four-field
+logic pass. Inspected off/on screenshots show the intermediate positions rather than
+repeated frames. Same-build/session 500-field `Custom1=2047 → 4095` measurements:
+
+| Cell | P2 off | P2 on |
+| --- | ---: | ---: |
+| A500 | 4.10 fps | 4.10 fps |
+| 020-fast | 12.50 fps | 12.50 fps |
+| 030/50 reference | 24.80 fps | 24.80 fps |
+| 040-25 run check | 24.90 fps | 24.80 fps |
+
+The gain is smoother object motion, not more frames. The 040 cadence check shows two
+isolated one-field frames becoming two-field frames, not a startup difference; with P2,
+all intervals after the first are two fields. This emulator cell is a run check under
+S0, not a hardware-performance acceptance target. The reference 030 count is unchanged.
+
+World-speed checks pass all 79/80 walking and turning intervals on 020/030. Options-off
+and shipped each give 37 A500 frames. Restore hashes pass 124 route presentations,
+63 beside moving buses, and another 28 there with S3 off. The check's live-interrupt
+mask now covers all six cached clock digits at chip `$52BF0..$52BF5`: the field handler
+writes them at Disk.1 `$568E4..$5693C`; the old one-byte exclusion failed with P2 off too.
+Evidence: `tmp/p2/final/`. Vehicle/flight/map coverage remains for P3.
+
+Projectiles are object slots 50–63, moved once per pass by Disk.1 `$546A2`: life word
+at chip `$5492 + 4 × slot` (`$7FFF` static), XYZ velocity longwords at `$54CA`, `$5502`
+and `$553A`. Player shots spawn in slots 50–52 (Disk.1 `$54812`) and enemy shots in
+53–55 (Disk.1 `$55A42`), both after the renderer, so a shot is first recorded one pass
+after it spawns, already one step along. A plain snap held it still until the next pass
+(four 030 fields), and a presentation before that recording drew its live pose, a pass
+ahead. Now a projectile that snaps in the same scene starts one velocity step back (each
+component within the 32,767 limit), and presentations draw an unrecorded live projectile
+as an empty model: `_objectmodel` returns at `$57C36`, after the committed selection
+test, as the model interpreter's opcode 0 does. DART III, hovering over Ur City (save
+slot 5), single shots, release slave `CUSTOM5=1` on the 030: the star's width shrinks
+every field, 176, 58, 34, 26, 22, 18, 14, 14, 10 pixels (before: 44 for four fields,
+then 30, 22, 18, 14). Options off on the A500 gives byte-identical frames to the
+previous build.
+
+
+
+### P3: vehicles, flight and lifts
+
+`Custom1` bit 12 extends the four-field logic gate to matching committed/render modes
+0 (vehicle/surface flight) and 2 (space). Presentation follows their native drawing
+paths, Disk.1 `$5E280..$5E3BA` and `$5E3CE..$5E440`, without running movement,
+input or collision again. Space stages the navigation pose at chip `$702A..$7035`
+as well as the player pose. The space scene call (Disk.1 `$57374`) goes through the
+native operand at `$5E42C`: under F5 that routine has no chip entry jump, and its chip
+original read the vacated scratch. Every space presentation then showed one full-view
+frame of a single colour, a fifth of all fields on the 030
+(slot 3 Eagle, power 9, climb, Esc: 40 of 200 fields before, 0 of 200 after, on both
+VERIFY `Custom1=$3FFFFFF` and release `Custom5=1`; it needs bits 12 and 20).
+`tools/test_entry_calls.py` checks that no slave call targets moved code without an entry. Bit 11 also interpolates objects in those modes.
+Boarding/leaving resets history; transport, scene, planet and floor changes snap.
+Transport displacements over 32,767 units per axis also snap to avoid signed-word
+arithmetic overflow. Enclosed rooms retain native drawing.
+
+Every native path draws the sights (Disk.1 `$55DEE`, while the Sights are owned) into
+the finished frame just before publishing it; walking, surface and space presentations
+now call it at the same point. Before, frames published by a presentation had none, and
+with the enhancements on the sights showed on every other field while hovering. Now
+they show on every field (DART III, slot 5, 030, four single shots, 14–16 fields each).
+VERIFY `CUSTOM5=1` restore hashes pass 279 route presentations on the 030.
+
+A passenger flight is a recording: with `$70A2` set, the game reads its joystick
+input from the list at `$709A`, keyed to the pass counter `$7180` (Disk.1 `$5CB7A`,
+`$5D07C`, `$5D5A4`). With P1/P3 presentations during the replay, the ship leaves the
+recorded course. On the 030 the spaceport trip ended at Damocles instead of Tolosa,
+with full-view gray frames, a doubled pilot and a jumping camera. The full-view frames
+look like the space-scene fault fixed above (not retested with replay presentations);
+the course change has not been isolated; restoring `$7056..$7059` and `$709A..$709D` around presentations does
+not change it. During replay, `_presentgate` and `_objectdraw` therefore keep native
+drawing. On the 030 that trip (a user save, B to board) has no one-frame glitches over
+2,500 fields and lands at Tolosa, as with Enhanced framerate off.
+
+The trip is a fixed number of logic passes (about 930), so its real-time length
+follows the pass rate, while the pilot's 15 messages run in real time. With P1,
+`_presentgate` replaces L1's gate and, before bit 24, did not gate replay passes at
+all: the release ran one pass per field on the 030. `Custom1` bit 24 (`_replaygate`,
+used by both gates) paces replay passes at eight fields, the top of the game's tick
+clamp, so the world still moves in real time. Fields from boarding (`taxi2.py`, slot 1):
+
+| Setup | Fields per pass | Landing | Last message starts |
+| --- | ---: | ---: | ---: |
+| A500 1.5 MB, Off | about 10 | 9,250 | 7,950 |
+| 030, Off | 4 | 3,850 | after 6,000 |
+| 030, release without bit 24 | 1 | 1,050 | after 6,000 |
+| 030, release | 8 | 7,400 | 7,700 |
+
+With bit 24 the ship lands at Tolosa as the pilot says "I do hope that you have
+enjoyed the flight"; on the A500 the last message also comes before landing. The trip
+draws at 6.25 fps, as replay keeps native drawing. Same session, `fps.py`, VERIFY,
+`Custom5=1`: 030 44.50 → 44.70 fps (447 frames twice; the standard route has no
+replay, so this is code layout), A500 41 frames. L1 without P1 (`Custom1` bits 0, 3,
+24): 10.90 fps, as without bit 24, and the trip lands at the same field. Bit 24 is in
+the release mask (`$1FFFFFF`).
+While the ship turns, the native cockpit creeps sideways and snaps back every four
+heading units; Off shows the same positions, less often at its pass rate. P7 (bit 22)
+removes this, and the matching pitch and roll steps; P8 (bit 23) removes the
+remaining one-pixel flicker of the log transform.
+
+Lifts already use walking mode and the tick timer at Disk.1 `$5A644`: the camera
+changes height at arrival, not continuously during travel. P3 preserves that behaviour
+and suppresses extrapolation across floor changes. The restore set grows from 17,366
+to 17,912 bytes within its existing 20 KB allocation, covering navigation scratch,
+star colours, sorting and the entry-delay timer mixed into planet drawing. The restore
+check exposed live sound-envelope updates; its interrupt exclusions now include the
+callback at chip `$4B390` and envelope state `$4B39A..$4B39F` (field-handler code at
+Disk.1 `$4F202..$4F22A`, `$4FC96..$4FCB8`, callback writer `$4FCCC`). These remain
+live rather than being restored.
+
+Play with options 0–12 enabled covered the Eagle key pickup, B to board, powered
+surface flight, stopping, landing, L to leave, escape to space, and planetary arrival.
+Dooberry's and ETA House lifts reached floor 9; the floor-9 transporter connected them.
+The A-to-Z computer was collected and activated at ETA House. It uses the normal
+navigation panel (Disk.1 `$511C4`), not a separate full-screen copper/fetch-window path;
+vehicle, flight, lift and navigation screenshots showed intact views and panels with
+FMODE 3. This closes O1's deferred coverage for the reached screens; the earlier
+assumption of a separate full-screen map was unsupported by the supplied manual.
+
+
+Same final VERIFY build/session, `fps.py`, 500-field standard route,
+`Custom1=4095 → 8191`: A500 **4.10 → 4.10 fps**, 020-fast **12.50 → 12.50**,
+030/50 **24.80 → 24.80**, existing 040-25 run check **24.80 → 24.80**.
+The loaded Eagle/open-flight route gives **50.00 → 50.00 fps** over 500 fields.
+With P3 on, all 31 sampled logic intervals are four fields, advancing XYZ by
+362/60/159 units per pass at fixed power/pitch. This preserves 50 fps presentation
+while reducing the previously frame-driven logic from 50 to 12.5 passes/s in that view;
+it is not a claim that every flight scene reaches 50 fps. All 650 lift samples match
+exactly off/on: the ground-floor arrival changes height at field 316. Space also
+keeps four-field logic spacing in all 28 sampled within-mode intervals; planetary
+entry resets the gate for its first surface pass, then resumes four-field spacing.
+
+Options-off and shipped each give **37 frames / 500 fields** on A500.
+Walking/turning retain 6/2 units per field in all 79/80 checked 020/030 intervals.
+Restore hashes pass 124 walking, 188 surface-flight, 187 space-flight and 392 lift
+presentations. Evidence: `tmp/p3/final2/`, `tmp/p3/restore-space-3.json`; play screenshots
+and the locally saved Eagle, lift and A-to-Z situations are under `tmp/p3/`.
+
+
+### M1: hot code in fast RAM
+
+`Custom1` bit 5 copies 2,710 bytes at boot: the numeric helpers at Disk.1
+`$4EDE4..$4EF92` and projection kernels at `$5B030..$5B918` (exclusive ends).
+These cover the two leading instruction-fetch regions in the existing bus profile.
+The first 4 KB of the optional expansion allocation holds the stack;
+the second holds the code copies. Relocation requires 68020+ and an allocated block in
+Zorro-II fast RAM or the 32-bit expansion address range. Chip/slow RAM and allocation
+failure keep the original code.
+
+Copy both blocks before installing seven entry jumps. The long-input conversion
+entry at `$4EE84` retains its first two instructions, then falls through the relocated
+entry at `$4EE88`, avoiding overlapping patches. All relative branches stay within
+their copied block; data references remain absolute or register based. No external
+PC-relative fixups are needed for these blocks. The self-modifying drawing sites
+remain in chip RAM with their existing 040 patches. The subsequent `resload_SetCACR`
+flushes the caches before game entry. No runtime copying or new instrumentation.
+
+Same VERIFY build, `Custom1=31` versus `63`, the 500-field route in one session:
+
+| Cell | M1 off fps | M1 on fps |
+| --- | ---: | ---: |
+| a500-1.5m | 4.00 | 4.00 |
+| a1200 | 9.40 | 9.40 |
+| a1200-fast | 9.50 | 10.90 |
+| 030 default / MMU | 11.60 | 12.40 |
+| 040 25 MHz | 14.10 | 14.60 |
+| 060 50 MHz | 15.30 | 16.00 |
+| 040 8 MHz sanity | 13.90 | 14.30 |
+
+A1200-fast gains 14.7%, with no measured loss in the matrix. The 040/060 figures
+remain emulator counts, not hardware-speed predictions. Evidence:
+`tmp/m1/matrix-off/`, `tmp/m1/matrix-on/`; an initial A1200-fast pair also gave
+95 versus 109 frames.
+
+The release slave with all options off matches the shipped slave at 37 A500 frames
+in this session (`tmp/m1/options-off.json`, `shipped.json`). With bit 5 enabled,
+per-logic-publication samples on A1200-fast and the 060 cell retain walking at
+6 units and turning at 2 heading units per field (`world-020.json`, `world-060.json`).
+Release route play with M1 off/on shows intact cell, exterior, turning view and panel,
+then a stable stopped pose (`tmp/m1/play-off/`, `play-on/`). O1's deferred map,
+vehicle and flight coverage remains open.
+
+### M2: read-only lookup tables in fast RAM
+
+The post-M1 `bus_audit.py` run reports 10,057 chip-data reads per gameplay field.
+The numeric/trigonometric region at chip `$60000..$66000` (exclusive end) accounts
+for 364,337 reads over 325 fields: 11.1% of data reads, with no writes to that region
+on the route (`tmp/m2/bus.txt`, `table-reads.txt`, `profile/`).
+
+`Custom1` bit 6 copies chip `$60000..$66104` at boot and redirects 77 explicit
+table-base loads
+for chip `$60000` and `$64000`. The original data remains available to other readers.
+The same CPU/fast-memory guard as M1 applies; this option also works without M1.
+The optional expansion allocation is now 36 KB, retaining the stack and code slots.
+The copy includes the angle lookup at chip `$66002..$66102`: the MMU check exposed
+its use by Disk.1 `$5231E` beyond the main 24 KB tables. The allocation is rounded
+to WHDLoad's required 4 KB pages.
+The existing post-patch cache flush covers the changed operands. No per-frame work
+or new guest instrumentation is added. The corrected post-M2 bus census gives
+8,501 chip-data reads per field (`tmp/m2/final-bus.txt`); the remaining drawing
+costs are examined together with R1.
+
+### R1: horizontal span interiors
+
+The sixteen colour variants share a word-at-a-time, four-bitplane fill loop.
+Before the rewrite, their full-word interiors account for 7.18% of the A500 profile
+(`tmp/m2/r1-000/`); colour 14 alone is 3.57%. The post-M1 A1200-fast profile spends
+4.96% there (`tmp/m2/profile/`). These loops do not use the moved lookup tables:
+they repeatedly fetch store instructions and write the chip bitplanes.
+
+`Custom1` bit 7 replaces their interiors at Disk.1 `$4978C + colour*$B6`.
+The original clipping and left/right masks stay in place. The 68000 variant writes
+pairs of words with long stores and handles an odd word separately. The 68020+
+variant requires fast RAM, first aligns the destination, then uses an 80-byte routine
+with a compact
+paired-store loop; an odd final word remains a word write. Both advance the same
+pointer by the same amount and preserve the native edge-mask inputs. The chip-only
+020 keeps the native loop: a measured 9.40 → 9.20 fps regression
+showed the call/alignment overhead was not worthwhile there. No blitter or
+change to buffer layout is involved. In the same VERIFY build, the A1200-fast
+route spends 5.14% of CPU time in the original interiors versus 4.32% in the patched
+calls and replacements (`tmp/m2/final-profile-020-off/`, `final-profile-020-on/`).
+The smaller FPS gain reflects the remaining drawing cost and field-boundary waits.
+
+M2 and R1 were completed together by user decision. Final same-build, same-session
+500-field measurements (`Custom1=63` versus `255`):
+
+| Cell | Both off fps | Both on fps |
+| --- | ---: | ---: |
+| a500-1.5m | 4.00 | 4.10 |
+| a1200, no fast RAM | 9.40 | 9.40 |
+| a1200-fast | 10.90 | 11.30 |
+| 030 default | 12.40 | 12.40 |
+| 030 MMU | 12.40 | 12.50 |
+| 040 25 MHz | 14.60 | 16.50 |
+| 060 50 MHz | 15.90 | 16.90 |
+| 040 8 MHz sanity | 14.10 | 16.50 |
+
+The same final build with only M2 added (`Custom1=127`) gives 11.20 fps on
+A1200-fast: M2 contributes 0.30 fps, R1 another 0.10 fps. The earlier corrected
+same-build pair repeated those counts, and R1 raised A500 from 4.00 to 4.10 fps.
+Evidence: `tmp/m2/accepted-off/`, `accepted-on/`, `accepted-020-data-only.json`,
+`020-v2-*.json`, `000-v2-*.json`. No measured matrix losses remain. The 040 frequency
+sanity remains advisory; 040/060 counts are not hardware-speed predictions.
+
+All options off and shipped both give 37 A500 frames. The release world-speed checks
+on A1200-fast and 060 retain 6 walking units and 2 heading units per field. Release
+route screenshots with the span option off/on show intact edges, scenery and panel;
+the stopped poses remain stable. A500 route screenshots also show intact drawing.
+Evidence: `tmp/m2/options-off.json`, `shipped.json`, `world-*.json`, `play-off/`,
+`play-on/`, `final-profile-000-on/`. Deferred map, vehicle and flight coverage remains.
+
+## Running
+
+The title picture is followed directly by gameplay: the prison cell on Metis, with the
+on-screen clock running from `00-00-00` and the chief prison officer's scripted messages.
+There is no attract demo. Walking uses the port-1 joystick (up walks, left and right turn);
+`R` toggles running. The cell door opens on the game clock from about two seconds after the
+entry; walking into it earlier gives "LOCKED".
+
+## Frame loop and game time
+
+Offsets are `Disk.1` offsets; chip variables are BaseMem addresses, which do not move.
+
+- **Frame publication** (`$5E4B0`): writes `COP1LC` with one of two copper lists, waits
+  for the VERTB counter at chip `$529F4` to change (`$5E4D6`), counts the frame in chip
+  `$7180` (`$5E4DE`), and stores the fields since the previous frame in chip `$52954`
+  (`$5E4F0`). Then the copy that the slave's `_dmaon` patch interrupts.
+- **Main loop** (head `$5DF92`, one pass per frame):
+  1. per-frame calls `$5DF92..$5E004` (not yet classified; together about 7,000 cycles);
+  2. a snapshot of the player pose (chip `$7146..`, `$7038`, `$7040` to `$70D2..`);
+  3. the world ticks below;
+  4. per-frame calls after the ticks (`$5E084..`), the frame publication call (`$5E0E2`),
+     drawing and the instrument panel;
+  5. a collision test (`$5E18A..`): on a hit it restores the pre-tick snapshot, undoing
+     the pass's ticks of player movement, and draws again from `$5E0E6`.
+- **World ticks** (`$5E040`): the fields since the previous frame, clamped to 4..8, are
+  stored in a word inside the code (`$5DF46`); the loop `$5E060..$5E082` runs that many
+  ticks (`$5A644`, `$5C8F8`, `$5F724`, `$5F328`). One tick is one field of game time:
+  walking moves the player (chip `$714E`) 6 units, turning changes the heading (chip
+  `$7156`, 1024 per turn) 2 units. A separate path at `$5C9EA` adds velocity times the
+  unclamped field count to the position.
+- **In-game clock**: chip `$57B0..$57B3`, the displayed seconds in `$57B3` and a 16-bit
+  fraction in `$57B0`. It advances by the same amount every field (`$A790` per 25 fields,
+  about 1.31 game seconds per real second) whatever the frame rate.
+
+So game speed depends on the frame rate outside 6.25..12.5 fps:
+
+| Frame rate | Fields per frame | Ticks per frame | World speed |
+| --- | --- | --- | --- |
+| below 6.25 fps | over 8 | 8 | slower than real time |
+| 6.25 to 12.5 fps | 4 to 8 | equal to fields | real time |
+| above 12.5 fps | under 4 | 4 | faster than real time |
+
+Measured with `tools/sim_speed.py`, same input on the same fields: in the walk the
+A500-equivalent published a frame every 13–14 fields and moved 48 units per frame
+(8 ticks); `a1200-fast` every 5–7 fields and moved 30–42 (5–7 ticks). Over the route the
+A500-equivalent walked at 62% and turned at 71% of `a1200-fast`'s speed while the clock ran
+identically. No measured frame was shorter than 5 fields, so the lower clamp is read from
+the code, not observed.
+
+## A1 anchor investigation
+
+A1 is complete without changing the 68030 MMU backend. The original entry breakpoint
+(`Disk.1` `$4EDB0`) works on `a1200-030`; the previous failure occurred before gameplay.
+No counter fallback or route shift is necessary. The entry check requires a breakpoint
+stop at the expected PC and a zero initial frame counter.
+
+The failure is the combination of deterministic directory I/O and the preset's indirect
+UAE board. A bounded probe with `DETERMINISTIC=1` stalled at directory-drive startup.
+A host stack sample placed the emulator thread in
+`filesys_hsync → filesys_iteration → trap_get_bytes → call_hardware_trap_back`, waiting
+on a semaphore. The installed build's source runs deterministic filesystem work on the
+emulation thread; the indirect access waits for a guest callback that needs that thread
+to advance. With only `DETERMINISTIC=0` changed, the same binary and preset reached the
+entry and completed the route. This diagnoses a boot-I/O scheduling problem, not a
+missing game breakpoint or evidence of stale instruction-cache contents.
+
+`route_runtime.py` shares checked entry anchoring, PAL validation, bounded boot/route
+execution and owned-process cleanup across the three tools. For `a1200-030` it explicitly
+prints and records the default `DETERMINISTIC=0`; other setups retain 1, and explicit
+environment values are honored. The 030 still uses 50 MHz, MMU model 68030, CPU/data-cache
+emulation, cycle-exact CPU/memory/blitter settings and `uaeboard=full+indirect`.
+These are effective configuration facts, not a hardware-timing calibration or proof of
+WHDLoad translation-table state. No emulator, shared installation or slave code changed.
+
+Instruction recording is a separate limitation. The selected MMU loop has no Barto
+`cpu_profiler` scope. `route_profile.py MODE=counter` explicitly delegates to `fps.py`
+and writes counts/fps with no instruction costs. Normal profiling rejects unsupported
+CPU backends instead of reporting missing instruction records as zero cost. Per the
+user's request, A1 acceptance now requires untraced route/state completion on the 030
+and preservation of the 020 reference, rather than an impossible 030 instruction profile.
+
+Validation, the same 175/185/140-field wait/walk/turn route:
+
+| Setup / build / options | Instrument | Frames | Fields | Full-window fps |
+| --- | --- | ---: | ---: | ---: |
+| `a1200-030`, shipped, no extra WHDLoad options | `MODE=counter` | 89 | 500 | 8.90 |
+| same, independent boot | `sim_speed.py`, every 5 fields | 89 | 500 | 8.90 |
+| same, publication-aligned input | `fps.py PER_FRAME=1` | 89 | 504 | 8.83 |
+| `a1200-fast`, performance, `Custom1=1` | `fps.py` | 90 | 500 | 9.00 |
+| same, independent boot | instruction markers and endpoint counter | 90 | 500 | 9.00 |
+
+The 030 state samples show z changing by −1,116 units during the walk and heading by
++278 during the turn. Its entry counters are zero; after 500 harness fields the VERTB
+counter is 499 and frame count 89. The initial partial field and harness convention are
+unchanged from the entry-anchored route. Both independent 030 tools agree on endpoint
+frame/VERTB counts and their recorded build, route, options and machine settings.
+This does not establish that arbitrary threaded boots or all intermediate states are
+identical; A6 still owns repeated committed-state equivalence.
+
+The 030 publication breakpoint (`Disk.1` `$5E4DE`) also works: 88 complete stored
+intervals span 5..7 fields, mean 5.614. Publication-aligned inputs overshoot the requested
+route by 4 fields, so this is a cadence diagnostic, not an exact-field comparison.
+The 020 counter and instruction markers both preserve A2's 90-frame reference; the
+profiler's first-to-last-publication rate remains 9.06 fps. No performance gain is claimed.
+
+The native emulator and WHDLoad hashes are unchanged from A2. Additional SHA-256 identities:
+
+- Shipped slave: `e1d0dc878ff941a03d8a2685d0e2a2ed353381f065a5d8e013aece956dedf76d`.
+- Shared launcher: `4e05e36d4a121fde37f4f371effbb82c7a3d2bf450126964c84fb2dd39c26f83`.
+
+Inputs verify and the original build is byte-identical. Ten offline checks cover the
+counter/cadence boundaries, stop and deadline validation, boot-mode defaults/overrides
+and refusal of unsupported instruction profiles. The failing deterministic probe reached
+its 90-second deadline and cleaned up the owned emulator. Generated evidence is ignored
+under `tmp/a1-finish/`. The historical A500 38-frame/picture gate remains unresolved as
+recorded in A2; A1 changes no game behavior. A3 below subsequently validates route completion, but its frequency sanity fails.
+
+## A2 frame counting without traces
+
+`tools/fps.py` counts chip `$7180` at the entry and at the end of the same route used
+by `route_profile.py`, with no instruction capture. Counter subtraction wraps at 16 bits.
+The default route advances exactly 500 whole harness fields after the entry's partial
+field, just as the profiler does. Full-window fps is frames × 50 / fields; it includes
+startup and the unfinished interval at the end. The profiler's existing fps instead uses
+the interval from the first to the last publication, so those fps values need not agree.
+
+`PER_FRAME=1` stops at publication (`Disk.1` `$5E4DE`) and records chip `$52952`, `$52954`,
+`$529F4` and `$7180`. At this instruction the current frame increment and elapsed-field
+store have **not** executed: sample i's elapsed count belongs to publication i−1. The
+report excludes the startup interval and the final unobserved store, and checks each
+remaining elapsed count against the difference between stored field stamps. This mode
+moves input boundaries to publications and reports segment overshoot explicitly; it is
+not the exact-field route used for the count comparison.
+
+Validation with the current shared runtime:
+
+| Setup / build / options | Method | Frames | Fields | Full-window fps |
+| --- | --- | ---: | ---: | ---: |
+| `a1200-fast`, performance, `Custom1=1` | untraced counter | 90 | 500 | 9.00 |
+| same | profiler markers and endpoint counter | 90 | 500 | 9.00 |
+| same, publication-aligned input | `PER_FRAME=1` counter | 91 | 507 | 8.97 |
+| `a500-1.5m`, performance, all options off | untraced counter | 37 | 500 | 3.70 |
+| `a500-1.5m`, shipped | untraced counter | 37 | 500 | 3.70 |
+
+The cadence run yielded 90 complete stored intervals, 4..8 fields each, mean 5.522 fields;
+its three segments overshot by 1, 1 and 5 fields. The exact-field profiler reported
+9.06 fps between its first and last publication. A second traced comparison with counter
+reads between chunks also counted 90; omitting those reads left the marker count and
+traced cycle total unchanged.
+
+The old 89-frame `Custom1=1` reference and 38-frame A500 reference are not reproduced.
+The current performance slave still has the same SHA-256 as those stored reference
+runs. The cause of the reference drift is unresolved; those old reports did not record
+an emulator or WHDLoad binary hash. No optimization or performance gain is claimed.
+The A500 counter matches the shipped slave on the current runtime, but the historical
+38-frame regression target and the picture comparison are **not** declared passed.
+Resolve that baseline discrepancy before using the optimization regression gate.
+
+Runtime identities for these checks (SHA-256):
+
+- Performance slave: `4a4492b58fdf01346680715311c9420bf949ef76db01b9423e79946e33669ca9`.
+- Native emulator: `5e18f89c3440bb12378b4df1a079efd72dc28d64b402a1859a904816d3e0f9f0`.
+- WHDLoad: `e904dbe9494f85475fedf926b53ee8597dcdf581209f00122d7baf7b7df4cd8e`.
+
+Boot/attachment/anchor have one wall-clock deadline (default 120 seconds), and the route
+has another (180 seconds). A real 3-second boot-deadline check on `a1200-030` exited with
+failure, stopped the recorded project emulator through the shared helper, and produced
+no success JSON. Six offline checks cover wraparound, rejected reads, wrong stops,
+previous-publication stamp alignment, PAL configuration and deadline handling. Inputs and the original
+byte-identical build also pass. Slave code is unchanged.
+
+Results and diagnostics are ignored under `tmp/a2/`. New reports retain slave, emulator
+and WHDLoad hashes, effective machine settings, input events and both counters. Existing
+output files are refused. The profiler now retains its endpoint counter and emulator
+hash too. A1 subsequently validates the same entry anchor on the 030; A3 below records 040/060 route completion and its failed frequency sanity.
+
+## A3 machine matrix
+
+`tools/matrix.sh SLAVE "WHD_ARGS..." OUTDIR` runs `fps.py` sequentially for each target,
+then an extra 8 MHz 040 sanity cell. All results use the same entry-anchored
+175/185/140-field route and counter delta over 500 fields (10 nominal PAL seconds).
+Each cell retains its log and JSON; `table.md` and `matrix.json` aggregate the results.
+Missing or invalid results are failures, never zero fps. The runner validates effective
+CPU/MMU, frequency, memory, cache-emulation and timing configuration, and rejects a
+changed slave or runtime between cells. It returns failure if any cell fails. The frequency sanity is advisory by user decision. `--report-only` revalidates the captured JSON without another emulator run.
+
+The 030 cells both retain the full 68030 emulator backend. The default WHDLoad mode on
+030 disables its MMU use; the second cell adds `MMU` to enable it. This follows the
+installed WHDLoad manual (`Docs/en/mmu.html`, User control); `NoMMU` is not substituted
+for the default. The runner rejects caller MMU/NoMMU overrides to preserve this pairing.
+The 040/060 use the `a1200-030` preset with explicit `--cpu=68040-NOMMU` /
+`--cpu=68060-NOMMU` and frequency overrides. They retain CPU/memory/blitter cycle-exact
+flags, data-cache emulation and the indirect UAE board. All these 030-derived cells use
+`DETERMINISTIC=0` for boot I/O as in A1; the three lower-end presets use 1.
+These are configuration flags, not the guest's actual cache state.
+
+Shipped slave, no caller WHDLoad options, one boot per cell:
+
+| Cell | CPU / configured MHz | WHDLoad option | Frames | Full-window fps |
+| --- | --- | --- | ---: | ---: |
+| `a500-1.5m` | 68000 / 7.094 | none | 37 | 3.70 |
+| `a1200` | 68020 / 14.188, chip only | none | 75 | 7.50 |
+| `a1200-fast` | 68020 / 14.188, 8 MB fast | none | 75 | 7.50 |
+| `030-default` | 68030 / 50 | none | 89 | 8.90 |
+| `030-mmu` | 68030 / 50 | `MMU` | 89 | 8.90 |
+| `040-25` | 68040-NOMMU / 25 | none | 118 | 11.80 |
+| `060-50` | 68060-NOMMU / 50 | none | 127 | 12.70 |
+| `040-8-sanity` | 68040-NOMMU / 8 | none | 118 | 11.80 |
+
+**Frequency sanity failed.** The two 040 results have identical segment frame counts
+(35, 47, 36), ending frame count 118, VERTB 501, stamp 500 and elapsed count 4. Their
+recorded frequencies are 8,000,000 and 25,000,000 respectively; other recorded machine
+settings and runtime hashes match. The 500-field denominator is the harness route,
+not a claim that the game's VERTB counter is exactly 500 at the endpoint.
+
+Read-only inspection of the installed emulator's source finds the non-MMU cycle-exact
+040/060 selection uses `m68k_run_3ce` in `newcpu.cpp`. That loop executes instructions
+without a per-instruction clock charge; if no cycles advance, its fallback charges one
+fixed `CYCLE_UNIT` after four such instructions. Frequency sets `cpucycleunit` elsewhere,
+and some memory paths use it, so this is not a claim that every execution path ignores
+frequency. It does explain why the cycle-exact flags alone are insufficient evidence
+of realistic 040/060 instruction timing. This route has not demonstrated the required
+frequency response. The 040/060 figures are diagnostic emulator counts, not validated
+hardware-speed baselines or evidence of optimization gains. The user accepts this known
+emulator limitation: A3 is complete without a timing fix. The report
+retains the failed sanity as an advisory; no alternate timing mode or emulator patch was used.
+
+Runtime SHA-256 identities:
+
+- Emulator: `e4beb4588634ecc4b41b833a76f37ea859ced77c1128de43d4d302089d1df264`.
+- Shipped slave: `e1d0dc878ff941a03d8a2685d0e2a2ed353381f065a5d8e013aece956dedf76d`.
+- WHDLoad: `e904dbe9494f85475fedf926b53ee8597dcdf581209f00122d7baf7b7df4cd8e`.
+- Shared launcher: `4e05e36d4a121fde37f4f371effbb82c7a3d2bf450126964c84fb2dd39c26f83`.
+
+The installed emulator hash differs from A1/A2; this work did not rebuild or change it.
+All eight cells used the same current hash. The A500 remains at 37, so the historical
+38-frame/picture gate remains unresolved. No slave code or shared project was changed.
+Input verification and the byte-identical original build pass. Fifteen offline tests
+pass, including rejected machine/build/route mismatches, absent-MMU serialization,
+strict frequency sanity and failed-cell rendering. The report validator was corrected
+for UAE's omitted zero MMU setting and its 256 KB slow-memory units, then the same
+captured results were revalidated without rerunning any cell. Ignored evidence is under
+`tmp/a3/shipped/`.
+
+## A6 committed-state recorder
+
+`tools/state_trace.py` stops at the main-loop head, `Disk.1` `$5DF92`, before its
+first `jsr`. The former `$5E992` in the plan was a transcription error: that offset
+is a `movem` inside the screen-clear routine. The existing profiler's loop marker
+and disassembly agree on `$5DF92`; the per-frame call range ends at `$5E004`.
+
+Each stop reads chip `$5350..$67FFF` once, then derives the pose bytes
+`$7142..$7161`, clock bytes `$57B0..$57B3`, words `$7180`, `$52952`, `$52954`,
+`$6F56`, and `$529F4`, and a SHA-256 of the entire read. Nothing is masked from
+that hash, including stack, display-control state and self-modified code; the bitmap
+buffers themselves lie outside it. Object data is recorded as raw bytes in two
+provisional 1,000-byte windows, `$AF36..$B31D` and `$B31E..$B705`. These cover the
+known table writes; their ends are capture boundaries, not established table extents.
+P2 must map and extend them. The full image hash also detects changes beyond them.
+The instrument is entirely host-side; no guest instrumentation or slave code changed.
+
+The entry anchor remains `Disk.1` `$4EDB0`. At each loop head the recorder captures
+state committed by the preceding pass, with a zero-based record index. Joystick
+changes occur **after** the capture at the first head reaching each cumulative route
+boundary (175, 360, 500 fields). `held` describes the input leading into the sample.
+The route therefore differs from the exact-field FPS route and must not be used as
+its performance baseline.
+
+Two independent deterministic `a1200-fast` boots of the shipped slave, with no WHDLoad
+options, produced **75 identical records**, including all 75 full-image hashes:
+
+| Observation | Both boots |
+| --- | --- |
+| First head | record 0, field 11, frame counter 1 |
+| Walk starts after capture | record 23, field 179 |
+| Turn starts after capture | record 52, field 365 |
+| Last head | record 74, field 501, frame counter 75 |
+| Last publication stamp / elapsed word | 494 / 7 |
+| Final clock bytes | `bb18000a` |
+| Comparison | identical, exit status 0 |
+
+Evidence: `tmp/a6/boot-a.json` and `tmp/a6/boot-b.json`. The emulator, shipped slave,
+WHDLoad and shared-launcher hashes match the A3 identities above, and the effective
+configuration matches A3's `a1200-fast` cell (68020, 14,187,580 Hz, 2 MB chip, 8 MB fast,
+cycle-exact PAL, no JIT). The repeat boots are the explicit A6 exception to the
+plan's no-reruns rule. A sandboxed launch could not attach to the debugger; a first
+capture attempt exposed GDB's filename quoting limitation, fixed with a relative
+scratch filename before the successful pair. Neither failed attempt yielded a trace.
+
+`--compare` checks the trace definition and every record field, reports the first
+unequal pass and field names, and rejects unequal lengths or empty evidence. It compares
+records rather than machine/build metadata, allowing later option comparisons; callers
+must check those identities when claiming same-build repeatability. A6 establishes
+repeatability on this 020 setup only, not on threaded 030 boots, across CPU speeds or
+between different slave options. It makes no performance or A500 picture-parity claim.
+
+## Renderer inputs and writes
+
+From `tools/write_audit.py` over 175 fields of the route (walking and turning; executed
+paths only). Chip addresses are BaseMem addresses; code is named by `Disk.1` offset.
+
+- **Camera derivation** (`$5D844`, called before and after the ticks): copies the pose
+  block chip `$7142..$7161` (mode `$7142`, X `$7146`, Y `$714A`, Z `$714E`, angles
+  `$7152..$7156`) to the render copy `$7122..$7141`, wraps the position's high words to
+  12 bits, and writes the camera-relative position `$70C2..$70CD` (pose minus `$6F4A`/`$6F4E`),
+  the projection value `$704A..$7051` and the view angles `$7132..$7136`. Everything the
+  renderer knows about the player passes through it.
+- **View setup after the ticks**: `$5E0BA` (sky heading `$42C6C`), `$5DA50` (`$70CE`),
+  `$5A91E` (`$700E..`, `$7084..`, `$7162..$7179`, `$42C08..`), `$469C4`/`$469C8` (`$42C20..$42C67`
+  and palette source words near `$7CF2`).
+- **Frame publication** (`$5E458`): copper list pointers `$72B2`/`$72B6`, the buffer toggle
+  `$42C01`, `COP1LC`, the frame counter `$7180`, the field stamps `$52952`/`$52954`, and the
+  palette copy into the copper list. The renderer reads `$7180` for blinking (`$57A4E`).
+- **Drawing**: `$5E840` clears the back buffer; `$5410E` (palette allocation, with `$5765E`),
+  `$593A6`, `$5AFAA` and `$577BE` draw. Besides the display buffers they write render scratch
+  below the game image (`$0340..$4000`), variables such as `$719E`, `$71AE..$71E9`, `$7220..`,
+  `$727C`, object-table areas at `$AF36..` and `$B31E..`, and code words at `$459BA`,
+  `$4F700..` and `$4F9C2..` (self-modifying drawing code).
+- **Collision**: `$5AAB0..$5ADAA` (called at `$5E186` only when `$6F56` is set) sets
+  `$6F56`; on a hit the main loop restores the pre-tick snapshot and draws again.
+- **Other movement modes**: when the mode copy `$7122` is not 1 the loop takes `$5E214`
+  or `$5E3CA` instead of the tick loop. Those paths move one step per frame and publish
+  through their own calls, so their game speed follows the frame rate natively.
+
+## Measurements
+
+Same route, `a1200-fast`, frames in the 500-field window:
+
+| Slave | Options | Frames | fps | `_waitvb` share |
+| --- | --- | ---: | ---: | ---: |
+| shipped | | 75 | 7.51 | 14.7% |
+| performance | none | 74 | 7.40 | 14.5% |
+| performance | `Custom1=1` | 89 | 8.98 | 0.2% |
+
+Compare options only within one build: the performance slave without options differs from
+the shipped one by a frame (a different slave changes WHDLoad's layout and timing).
+
+The options against each other, one build (with bits 1 and 2), same route and machine:
+
+| `Custom1` | Frames | fps | Bitplane slots | CPU slots | Game's VERTB wait |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 89 | 8.93 | 22.3% | 39.2% | 7.3% |
+| 3 (+ FMODE 3) | 94 | 9.45 | 5.6% | 40.8% | 8.0% |
+| 5 (+ stack in fast RAM) | 94 | 9.49 | 22.3% | 37.5% | 7.2% |
+| 7 (all) | 96 | 9.62 | 5.6% | 39.3% | 9.6% |
+
+On `a500-1.5m` (500 fields): the shipped slave and the performance slave without options
+both draw 38 frames (3.82 fps); `Custom1` 1, 3, 5 and 7 all draw 42 (4.28 fps). Bit 1
+stays off without AGA, and bit 2's expansion memory is slow RAM there, on the chip bus.
+
+The gains don't add: frames are published on whole fields (the game waits for the VERTB
+counter after each `COP1LC` write), and the saved time partly moves into that wait. A
+frame is about 1% of the window. The pictures match; frame-timed animation (the panel logo)
+and the scene position differ with the frame rate.
+
+### Where the CPU's chip-bus time goes
+
+`tools/bus_audit.py` over the gameplay fields 175..500 of the `Custom1=1` route
+(325 fields): 27,800 CPU chip accesses per field, against 284,200 CPU cycles, and
+31,900 instructions per field (97 KB of instruction bytes, about 9 cycles each).
+
+| Kind | Region | Per field | Share |
+| --- | --- | ---: | ---: |
+| instruction fetch (32-bit) | game image | 13,830 | 49.7% |
+| data read | game image | 5,270 | 18.9% |
+| write | display buffers | 4,060 | 14.6% |
+| data read | display buffers | 1,500 | 5.4% |
+| write | stack (top of chip) | 1,010 | 3.6% |
+| data read | stack | 1,000 | 3.6% |
+| data read / write | below the image | 730 | 2.6% |
+| write | game image | 410 | 1.5% |
+| custom chip registers | | 26 | 0.1% |
+
+- Only the display accesses (20%) need chip RAM; the other 80% go to code and CPU-only
+  data that could sit in fast RAM.
+- The instruction cache is on (the slave's `resload_SetCACR` with `CACRF_EnableI`) but
+  hits only about 43% of the longwords: 97 KB of executed instructions need 13,800
+  fetches. The hot code is concentrated: 80% of the fetches come from 8.8 KB of code
+  (256-byte pages), 95% from 18.5 KB, 99% from 31.5 KB. The hottest pages are chip
+  `$4B100..$4B2FF` (15%) and `$57900..$57CFF` (24%).
+- 28% of the image's data reads are the publication's spin on the VERTB counter
+  (page `$52900`), which costs nothing that matters.
+- No longword access is misaligned (address 2 mod 4).
+- In the 200 bitplane lines the CPU gets 37.5% of the slots (bitplanes 35.2%, free
+  25.2%), outside them 42.1% (free 55.7%): display DMA slows the CPU's chip accesses but
+  never starves them.
+- The blitter is never used; all drawing is by the CPU. The panel below row 140 gets
+  almost no writes per frame: it is not redrawn.
+- The level 3 handler, once per field, costs 1.6% of the CPU's cycles; no other
+  interrupt ran on the route.
+
+The rest of this section is the shipped slave's profile.
+
+`a1200-fast` (68EC020 14 MHz, 2 MB chip, 8 MB fast, cycle-exact), the 500-field route of
+`tools/route_profile.py` from the game entry. Two boots gave identical call stacks,
+per-field totals, frame timestamps and final screenshot; three adjacent instructions
+differed by 3 cycles in total.
+
+| Item | Share of CPU cycles |
+| --- | --- |
+| slave `_waitvb`, from `_dmaon` once per frame | 14.7% |
+| game's wait for the VERTB counter (`$5E4D6`) | 6.3% |
+| other game code (all in chip RAM) | 78.8% |
+| WHDLoad outside the slave | 0.2% |
+
+- 75 frames in 500 fields: 7.51 fps, 6.66 fields per frame.
+- Chip-bus DMA slots: CPU 38.8%, bitplane 22.3%, refresh 1.8%, audio 0.3%, copper 0.1%,
+  free 36.8%. No `STOP`.
+- The game and its data sit in the slave's 512 KB chip BaseMem, so on this machine every
+  game instruction fetch and data access competes with display DMA; the fast RAM holds
+  only WHDLoad and the slave.
+- Cycles per main loop pass (71 complete passes, interrupts included): before the ticks
+  7,100; the ticks 11,600 (6.6 per pass, 1,770 per tick); after them 1,893,500. The
+  costliest call sites after the ticks:
+
+  | Call site | Callee | Cycles per pass | Role |
+  | --- | --- | ---: | --- |
+  | `$5E1E2` | `$577BE` | 887,000 | main 3D drawing (by cost and call tree; not yet confirmed) |
+  | `$5E0E2` | `$5E458` | 421,000 | frame publication: its field wait and the slave's `_waitvb` |
+  | `$5E150` | `$5410E` | 245,000 | not yet classified |
+  | `$5E1DE` | `$5AFAA` | 228,000 | not yet classified |
+  | `$5E1DA` | `$593A6` | 101,000 | not yet classified |
+  | `$5E0E6` | `$5E840` | 57,000 | not yet classified |
+
+  World logic, ticks included, is therefore about 1% of a frame; drawing is about
+  1.4 million cycles (5 fields on this machine).
+- The game is assembly with one supervisor stack for its main loop and interrupts, so the
+  reconstructed call tree roots everything under interrupt frames; use the self-cycle
+  tables. Outside the waits no single routine exceeds 1.5%.
+
+### Routine 040 performance check
+
+The routine measurement set now includes the existing `040-25` matrix configuration:
+`a1200-030` with `68040-NOMMU`, 25 MHz and `DETERMINISTIC=0`. The separate
+`a1200-040` preset is not substituted (user decision).
+With current Enhanced framerate, the standard 500-field route gives 248 frames /
+24.80 fps, repeated identically. The [post-P5 component measurements](#68040-frame-budget-after-p5)
+find 25.6 ms of work per frame on average, exceeding the one-field 20 ms budget.
+Main 3D drawing is the largest measured component at 10.9 ms; bypassing it reaches
+49.60 fps. Bitmap copying, scene setup and presentation save/restore also matter.
+The 12.5 Hz logic gate is not a rendering cap. Keep these emulator measurements
+separate from hardware-speed predictions and from older 020 instruction profiles.
+
+### Frame budget toward 50 fps
+
+Current checkpoint: [S6](#s6-budget-checkpoint). S1–S4 reach one-field no-draw and
+two-field full frames on the reference 030/50 after startup; R3 is closed by user
+decision, retaining double buffering. The current release's
+[68040 frame budget](#68040-frame-budget-after-p5) is measured below.
+
+The `VERIFY` build's `Custom2` bits make drawing routines return at once (bit 0 the 3D
+drawing `$577BE`, 1 the clear `$5E840`, 2 `$5410E`, 3 `$5AFAA`, 4 `$593A6`). The 030 and
+040 cores record no profile ("Protocol error" on `monitor profile`), so this elimination is
+the frame-cost instrument there. Before S2: `fps.py`, 500-field route, `Custom1=255`, one session:
+
+| `Custom2` (skipped) | a1200-fast | 030/50 | 040-25 cell |
+| --- | ---: | ---: | ---: |
+| 0 (none) | 11.3 | 12.5 | 16.5 |
+| 1 (3D drawing) | 17.4 | 24.8 | 24.9 |
+| 2 (clear) | 11.6 | 12.6 | 18.4 |
+| 4 (`$5410E`) | 11.3 | 12.5 | 16.5 |
+| 8 (`$5AFAA`) | 11.6 | 13.7 | 19.1 |
+| 16 (`$593A6`) | 11.0 | 12.4 | 16.7 |
+| 31 (all five) | 25.4 | 37.0 | 49.6 |
+
+Frames land on whole fields, so single bypasses under a field change little. Before S2,
+without any drawing, frames took two fields on `a1200-fast` and about 1.35 on the 030. The
+profile of that case (`tmp/prof/nodraw/`) shows why:
+
+- The CPU waits 43% of the time in the publication's field wait: presentation work that
+  spills past the field boundary costs a whole second field.
+- P1's save and restore copy the 17,366-byte restore set word by word, both ways, on every
+  presentation: about 17% of all cycles, roughly 200,000 cycles (0.7 field) per presentation
+  frame on the 020. Most of the set is render scratch at chip `$0340..$4000`.
+- Scene setup (`$5765E`, not bypassed) is 15.5% inclusive, about 0.3 field per frame.
+
+With all options on (`tmp/prof/b255/`, a1200-fast), the 3D drawing is half of a logic pass
+(625,000 of 1,245,000 cycles), `$5410E` 15%, `$5AFAA` 13%, publication 11% (mostly its
+field wait), `$593A6` 7%, the clear 4%, logic 1.3%. The CPU still makes 10,400 instruction
+fetches per field from chip RAM; 95% come from 20 KB of code, led by Disk.1
+`$524B0..$53AB0` (33%, containing the self-modified words at `$533B0..`), `$48DB0..$4A5B0`
+(25%, the span fills and the word at `$4966A`), `$5B8B0..$5C4B0` (12%) and `$575B0..$580B0`
+(11%). Display buffers take 4,500 CPU writes and 1,900 reads per field, much of it
+read-modify-write.
+
+### 68040 frame budget after P5
+
+Current Enhanced framerate, existing `040-25` cell, CACHE PRELOAD: the standard
+500-field route gives **248 frames / 24.80 fps**, repeated identically. Publication
+sampling gives 248 two-field intervals and one three-field startup interval.
+This is actual scene publication cadence, not host window refresh.
+
+The 040 backend cannot record instruction profiles. Breakpoints at routine entry
+and return, with VERTB and video-beam samples, measure inclusive emulated elapsed
+time (including interrupts). Separate publication probes split the bitmap copy
+from the field wait. These probes move route boundaries to breakpoints; the FPS
+comparisons use the exact-field route. Times below are approximate PAL milliseconds,
+rounded to 0.1 ms, not calibrated 68040 hardware timings.
+
+| Work | Mean ms per rendered frame |
+| --- | ---: |
+| Main 3D renderer, Disk.1 `$577BE` | 10.9 |
+| Drawing at `$5AFAA` / `$593A6` | 2.3 / 1.5 |
+| Scene setup, `$5765E` | 2.7 |
+| Fast bitmap to chip copy, publication at `$5E458` | 3.3 |
+| Presentation save/restore, amortised over all frames | 3.3 |
+| Clear, `$5E840` | 0.1 |
+
+Saving and restoring cost **3.3 ms each**, about **6.7 ms per extra presentation**;
+roughly half the frames are extra presentations. Within the main 3D cost, separate
+inclusive probes measure the room path (`$5F438`) at **4.8 ms** and the interior
+detail path (`$5836A`) at **0.8 ms** per call; these are not additional costs.
+
+Between publication and the following wait, steady frames do **21.0–29.2 ms** of
+work, averaging **25.6 ms**; remaining time includes camera, logic and other glue.
+The field wait averages **14.3 ms**, giving approximately 40 ms between publications.
+The workload misses the 20 ms boundary, then double buffering rounds delivery up
+to two fields. Reaching one field needs about **5.6 ms less work on average**, and
+about **9.2 ms** on the slowest sampled steady frame. Removing the wait alone
+would not make the measured work fit in 20 ms. R3 stays closed.
+
+Same corrected VERIFY build/session, `Custom5=1`, `Custom2` bypass results:
+
+| Bypass | FPS |
+| --- | ---: |
+| None / repeated baseline | 24.80 / 24.80 |
+| Main 3D | 49.60 |
+| Clear / staging | 21.50 |
+| `$5410E` | 24.80 |
+| `$5AFAA` | 25.70 |
+| `$593A6` | 24.80 |
+| All five | 49.60 |
+
+The clear bypass also disables fast bitmap staging, so it is not a pure clear-cost
+test. Bypass gains are not additive. The main 3D renderer remains the largest
+measured target; presentation copying and scene setup also consume substantial
+budget. Optimisation must retain P5's room-camera consistency and native logic.
+
+The investigation corrected a VERIFY-only instrument fault: `_objectinit` checked
+Custom2 bit 4 instead of bit 0, replacing the main-3D bypass RTS with its hook.
+Before correction, bit 0 misleadingly gave 24.80 fps. Release bytes are unchanged
+from the P5 build, whose world-speed, play, restore and options-off checks still
+apply. No emulator changes or hardware-speed claims. Evidence and sampling scripts:
+`tmp/profile-040/`; final same-build comparisons in `tmp/profile-040/final/`.
+
+### S1: presentation restore buffer in expansion memory
+
+The restore buffer occupies a 20 KB page-rounded slot in the optional expansion block;
+without it, bit 4 retains L1 gating and skips presentation frames. Release slave size is
+5,596 bytes (VERIFY 5,716, previously 23,052). The 040 route exercises 43 presentations;
+all restore hashes pass. Same-build `Custom1=239 → 255` gives 11.20 → 11.20 fps on
+`a1200-fast`, 4.10 → 4.10 on A500, 12.40 → 12.40 on 030/50 and 12.50 → 16.50 on
+040-25. This tests presentation off/on, not a speed gain from moving the buffer.
+Options-off and shipped both give 37 A500 frames. Walking remains 6 units/field and
+turning 2 heading units/field; route screenshots show no scene or panel faults.
+Evidence: `tmp/s1/`.
+
+### S2: bulk presentation restore
+
+`Custom1` bit 8 copies the full 17,366-byte set in 32-byte `movem` groups, with longword
+and word tails. The 020 no-draw profile measures 185,845 → 114,790 copy cycles per
+presentation (0.65 → 0.40 field). Scene setup stays: `$5765E` projects objects relative
+to the staged camera, so its inputs change between presentations.
+
+Removing scratch was rejected. Matched-cost VERIFY poison on/off comparisons first
+differed at pass 75: chip `$0340..$2000` changed the recorded object window even at equal
+field counts; `$2000..$4000` also failed, with timing differences. No scratch range is
+omitted. The test uses `Custom2=64` (read/write unchanged) versus `96` (complement words),
+with `Custom3`/`Custom4` as optional start/end chip addresses; defaults are `$0340..$4000`.
+It runs only after presentations and exists only in VERIFY.
+
+Same-build/session `Custom1=255 → 511`, with `Custom2=31` (no drawing):
+
+| Cell | Off fps | On fps |
+| --- | ---: | ---: |
+| A500 | 12.30 | 16.20 |
+| 020 chip-only | 24.80 | 25.30 |
+| 020 fast | 25.40 | 35.90 |
+| 030/50 | 37.30 | 49.60 |
+| 030 MMU | 36.90 | 49.60 |
+| 040-25 | 49.60 | 49.60 |
+| 060-50 | 49.60 | 49.60 |
+
+Full drawing: A500 4.10 → 4.10, 020 fast 11.30 → 11.30, 030/50 12.40 → 12.40,
+040-25 16.50 → 16.80 fps. All 45 full-drawing 040 restore hashes pass. Options-off and
+shipped both give 37 A500 frames. World speed on 020 and 030 remains 6 walking units and
+2 heading units per field; route screenshots show no scene or panel faults.
+The 030 no-draw cadence has one two-field startup interval, then 495 one-field
+intervals (mean 1.002). Evidence: `tmp/s2/`.
+
+
+### S3: renderer code in fast RAM
+
+`Custom1` bit 9 moves 23,762 bytes in four renderer blocks into a 36 KB fast-RAM
+area, on 68020+ with real fast RAM. Relocation includes absolute operands, external
+branches, colour-span tables and mutable drawing state. The indirect-call variant
+avoids the four cached call-operand writes; P1 restores the relocated state. Flush
+the instruction cache after installing the entry jumps.
+
+Same build/session, `Custom1=511 → 1023`, full drawing:
+
+| Cell | Off fps | On fps |
+| --- | ---: | ---: |
+| A500 | 4.10 | 4.10 |
+| 020 chip-only | 9.40 | 9.40 |
+| 020 fast | 11.20 | 12.40 |
+| 030/50 | 12.40 | 20.30 |
+| 030 MMU | 12.50 | 19.90 |
+| 040-25 | 16.80 | 19.10 |
+| 060-50 | 17.50 | 19.50 |
+
+World speed remains 6 walking units and 2 heading units per field on 020/030;
+options-off and shipped both give 37 A500 frames. Complete-field route screenshots
+show intact drawing and panel, including turning and stopping. A suspected missing
+wall in the first field captured after an untraced advance prompted checks: later
+fields draw correctly and all 74 presentation hashes of the relocated workspace
+pass on the 040. Use the last of two captured fields for still screenshots.
+Evidence: `tmp/s3/accepted/`, `tmp/s3/play-complete/`, `tmp/s3/fast-restore-040.json`.
+
+
+### S4: stage the view bitmap in fast RAM
+
+`Custom1` bit 10 redirects view writers and clearing to fast RAM on 68020+ with
+real fast RAM. Publication copies four 5,440-byte planes (136 rows, 21,760 bytes)
+with `movem`, then runs the native buffer flip. The panel, IRQ text and full-screen
+copies keep the native chip pointer. Special screens bypass staging. The drawing's
+low-word address arithmetic requires bitmap alignment at `$8000`; a 96 KB slot
+holds the 32 KB bitmap plus alignment slack, making optional workspace 188 KB.
+The original 140-row estimate copied four uninitialised rows over the separator;
+136-row copies give pixel-identical off/on still screenshots.
+
+Same-build/session `Custom1=1023 → 2047`, full drawing:
+
+| Cell | Off fps | On fps |
+| --- | ---: | ---: |
+| A500 | 4.10 | 4.10 |
+| 020 chip-only | 9.40 | 9.40 |
+| 020 fast | 12.40 | 12.50 |
+| 030/50 | 20.00 | 24.80 |
+| 030 MMU | 19.90 | 24.80 |
+| 040-25 | 19.10 | 24.90 |
+| 060-50 | 19.50 | 24.90 |
+
+Without S3, bit 10 also gains: 020 fast 11.30 → 11.60, 030/50 12.40 → 14.40 fps.
+It therefore remains independent. The 030 full-drawing cadence has one three-field
+startup interval, then 248 two-field intervals; no-draw has one two-field startup
+interval, then 495 one-field intervals (49.60 fps). The VERIFY clear bypass also
+omits staging/copying, so the no-draw budget excludes bitmap work.
+World speed remains 6 walking units and 2 heading units per field on 020/030.
+Options-off and shipped both give 37 A500 frames. Walking, turning and stopping
+screenshots retain the view and panel. Help, return to game and Quit Situation also
+show intact screens, with walking continuing on Eris. Evidence: `tmp/s4/accepted/`,
+`tmp/s4/still-fixed-{off,on}/`, `tmp/s4/play-final/`, `tmp/s4/cadence-030-*.json`.
+
+
+### S5: publication wait after staging
+
+With `Custom1=2047`, the 020 instruction profile assigns 16.39% of route cycles to
+Disk.1 `$5E4D6`'s field wait. Beam-position samples at wait entry/exit measure 17.0%
+including interrupt time, averaging 0.675 field per publication. The same sampling
+on the 030/50 measures 36.4%, averaging 0.731 field per publication over 502 fields.
+This is a measured 030 wait cost, not an inference from the 020 profile. It is large
+enough to bring R3's triple-buffer decision to the user; the steady two-field target
+already holds without it. The user rejected triple buffering; R3 is closed without
+implementation and the native publication wait remains.
+
+The unchanged S4 build passes the three guards: options-off equals shipped (37 A500
+frames), native 6/2 world rates on 020/030, and intact route/menu screenshots.
+Evidence: `tmp/s4/profile-020/`, `tmp/s4/wait-a1200-{fast,030}.json`.
+
+
+### S6: budget checkpoint
+
+`matrix.sh`, `Custom1=2047`, all eight cells pass (same VERIFY build as S4/S5).
+Full-drawing fps: A500 **4.10**, 020 chip-only **9.40**, 020 fast **12.50**,
+030/50 and 030 MMU **24.80**, 040-25 and 060-50 **24.90**. The 040 8 MHz sanity
+cell gives 24.80: its one-frame difference from 25 MHz does not establish reliable
+frequency scaling. The 040/060 results remain run checks, not hardware predictions.
+
+Same-build/session drawing-bypass budget, fps:
+
+| `Custom2` (skipped) | 020 fast | 030/50 | 040-25 |
+| --- | ---: | ---: | ---: |
+| 0 (none) | 12.50 | 24.80 | 24.90 |
+| 1 (3D drawing) | 24.80 | 49.60 | 49.60 |
+| 2 (clear / staging) | 12.50 | 24.00 | 22.70 |
+| 4 (`$5410E`) | 12.50 | 24.80 | 24.90 |
+| 8 (`$5AFAA`) | 13.80 | 25.60 | 27.00 |
+| 16 (`$593A6`) | 12.50 | 24.80 | 24.90 |
+| 31 (all five) | 49.50 | 49.60 | 49.60 |
+
+Bit 1's clear bypass also skips staging and its copy, leaving subsequent drawing in
+chip RAM. That row does not isolate clear cost. Whole-field publication and changed
+presentation admission also mean bypass gains are not additive cost percentages.
+
+Remaining limits:
+
+- A500 and chip-only 020: drawing still dominates; skipping all drawing gives 16.20
+  and 25.30 fps. Skipping only the clear gives 4.30 and 9.60, so R2 has modest measured
+  headroom on this route. The remaining no-draw work still exceeds one field.
+- Fast-RAM 020: main 3D drawing is the leading measured cost (433,063 cycles per logic
+  pass in the S5 profile); bypassing it doubles route fps. Fixed work now approaches
+  50 fps with all drawing bypassed. Publication waiting remains 16.39% of profile cycles.
+- 030/50, including MMU: full frames occupy two fields. Bypassing the main 3D drawing
+  reaches 49.60 fps, identifying it as the next reduction needed for one-field frames.
+  The measured 36.4% publication wait stays by the decision to close R3.
+- 040-25: the same 3D bypass reaches 49.60 fps in the emulator. 060-50 reaches 49.60
+  with all drawing bypassed; no component ranking is measured for that cell. Real
+  040/060 speed and cache behaviour remain unverified.
+
+S0 checkpoint: the unchanged build's 030 cadence has 495 consecutive one-field
+no-draw intervals and 248 consecutive two-field full-drawing intervals. In each
+run the preceding startup interval is one field longer; the steady-route targets
+hold, rather than a strict bound covering startup. World checks on 020/030 retain
+6 walking units and 2 heading units per field. Route, turning, stopping, Help and
+Quit Situation screenshots remain valid for the identical build; no new behaviour
+was introduced in S5/S6. Fresh options-off and shipped runs both give 37 A500 frames.
+The existing deferred map/vehicle/flight coverage gap remains. Evidence: `tmp/s6/`,
+S4's same-build cadence/world/play checks, and S5's 020 profile.
+
+### F0: one-field frame budget (030/50)
+
+Measured on the current build, VERIFY with all Enhanced framerate features (`Custom1=131071`),
+standard route. Per-frame costs come from two instruments: the 020 instruction profile
+(`route_profile.py`, read with `render_profile.py`; calls inside fast-RAM copies are now
+recognised) and beam-timed entry/return probes on the reference 030/50
+(`beam_profile.py`, fields 175..500, 163 frames, 25.1 fps). Evidence: `tmp/f1/`.
+
+**Work per frame on the 030/50.** Publication interval minus the native publication call:
+mean 24.9 ms, 21.5..27.4 ms per interval. One-field frames need every frame under 20 ms.
+A presentation frame does the same drawing as a logic frame plus the save and restore
+(7.1 ms), so presentation frames are about 28 ms and logic frames about 21.5 ms.
+
+| Work (Disk.1 / slave) | 030/50 ms per frame | 020 cycles per frame |
+| --- | ---: | ---: |
+| Main 3D `$577BE` | 9.6 | 423,859 |
+| - rooms `$5F438` | 4.0 | 28,156 |
+| - objects `$57BF4` (7 calls outside rooms) | 4.0 | 194,481 |
+| - interior detail `$5836A` | 1.1 | 31,092 |
+| - edges `$5FDCC` outside rooms (16 calls, chip-resident) | 2.1 | 87,914 |
+| Scene setup `$5765E` (`$536FE` 2.0 ms) | 2.4 | 115,365 |
+| `$5AFAA` (`$53440` 1.1 ms) | 2.3 | 101,974 |
+| `$593A6` | 1.4 | 53,133 |
+| Clear `$5E840` | 0.9 | 25,029 |
+| Staging copy (`_stagepublish` minus `$5E460`) | 3.3 | 61,510 |
+| Save + restore, per presentation | 3.7 + 3.4 | (no presentations on the 020) |
+| Native publication incl. field wait `$5E460` | 15.0 | 196,294 |
+
+The 020 runs at 12.5 fps (4 fields per frame); its L1 gate waits another 113,720 cycles
+per frame. Its profile covers fields 0..500, the probes 175..500. The room path's share
+differs most: 6.6% of main 3D on the 020, 42% on the 030. Its code (Disk.1 page `$5F000`,
+with `$5FDCC`) runs from chip RAM, the most-fetched chip page below, and a chip fetch costs
+the 50 MHz 030 many more cycles than the 14 MHz 020. Beam times include interrupts; per-call times under about 0.1 ms read high
+(`$5C096`, 37 calls per frame, sums above its caller), so treat them as upper bounds.
+The 020 profile has no single hot loop left: no 64-byte window above 2.6% outside the
+field wait. Shared kernels, summed over callers (020): log-domain multiply and projection
+`$5B038` 113k cycles per frame (10%), log conversion `$4EE84`/`$4EE88` 62k (5.5%; a
+compare-and-shift search for the leading bit), `$5C046` 38k, `$5C096` 36k.
+
+**Chip-bus traffic left.** `bus_audit.py` on the same build (020, fields 175..275): apart
+from the VERTB counter poll (8,429 reads per field, the waits) and the staging writes
+(1,363), the CPU still makes about 5,200 chip accesses per field, about 21,000 per frame:
+
+| Place | Accesses per field (020) |
+| --- | ---: |
+| Code fetches from chip-resident game code | 1,943 |
+| - Disk.1 pages `$5F000` 353, `$5E000` 232, `$4E000` 157, `$5A000` 157, `$5D000` 148, `$4B000` 144, `$5B000` 100, `$56000` 91, `$55000` 89, `$59000` 80, `$60000` 80, `$0C000..$0DFFF` 58 | |
+| Game variables, chip `$5350..$7FFF` (read / write) | 838 / 297 |
+| Render scratch, chip `$0340..$3FFF` (read / write) | 479 / 329 |
+| Renderer state and projection constants, chip `$42000` page (`$42C00..$42F3F`) | 513 |
+| Other game-image data pages (`$49000`, `$0A000` read and write, `$04000`, `$37000`, `$28000`, ...) | about 700 |
+| `$C0` indirect-call vectors | 136 |
+
+The `$5B000` and part of the `$4E000` fetches are chip entry jumps into M1 copies (and
+the two instructions `$4EE84` keeps in chip). The `$0C000..$0DFFF` code is the per-colour,
+per-octant line plotters, entered by computed jumps.
+
+Cost per chip access on the 030/50: the copy loops measure 0.61 µs per longword written
+(staging), 0.85 µs read (save) and 0.78 µs written (restore), with the bus saturated.
+Scattered accesses cost less: subtracting the measured copies and a compute estimate (the
+020's non-chip cycles at 50 MHz, about 12 ms) from the 24.9 ms leaves about 6 ms, about
+0.3 µs per access. Chip traffic is therefore an estimated **6..12 ms per frame** on the
+030/50, the largest reducible block after the presentation copies. It does not shrink with
+a faster CPU: on a real 68040/060 the same accesses cost about the same time while the
+computation shrinks, so the same reductions apply there. The 040/060 cells cannot confirm
+that (their timing does not follow the CPU frequency).
+
+### F1: deferred restore tested, not retained
+
+A temporary Custom1 bit 17 saved the restore set at the first presentation and
+restored it immediately before accepting the next logic pass (including mode-change
+paths). A small 56-byte player/navigation/room pose backup still restored after each
+redraw, avoiding repeated interpolation of an already staged pose. The existing
+restore path and Enhanced framerate mask remain unchanged.
+
+Same candidate build, bit 17 off/on (`Custom1=131071 → 262143`), reference 030/50,
+beam probes over route fields 175..500: work between publications **24.9 → 26.2 ms
+mean**, **27.4 → 28.4 ms worst**. Save and restore calls both remained 81 over the
+163-frame window; restore cost moved from 3.4 ms during presentation to 3.3 ms at
+the gate. PER_FRAME cadence remained 247 two-field intervals and one three-field
+startup interval. Same-session exact 500-field FPS comparisons, repeated twice:
+A500 4.10 → 4.10, 020-fast 12.50 → 12.50, reference 030/50 24.80 → 24.80,
+040-25 24.80 → 24.80. All runs used CACHE PRELOAD. These are emulator
+measurements, not hardware results. The candidate was rejected on timing before
+completing world-speed and full movement-mode play acceptance; no game change is
+retained. Rebuilt release bytes match the accepted build. Input verification and
+original/release/VERIFY builds pass; options-off and shipped A500 runs both give
+37 frames over 500 fields.
+
+The proposed worst-frame saving was based on the wrong frame boundary: the native
+path publishes before drawing. Moving a restore from the end of presentation to
+the gate before logic leaves it between the same two publications. At the current
+two-field cadence there is only one presentation per pass, so no copies disappear.
+Reject the candidate; reconsider amortisation only after more than one presentation
+fits per pass. Evidence: `tmp/f1-restore/final/` and the rejected candidate
+in `tmp/f1-restore/rejected.slave.asm`.
+
+### F2: remaining hot code in fast RAM
+
+Custom1 bit 17 extends S3 on 68020+ with real fast RAM. It moves another
+25,954 bytes of code/private state: room and edge drawing, clearing, camera/view
+setup, colour lines and computed line plotters, movement/projection helpers,
+room lookup and scrolling text. Relocation preserves the main loop and presentation
+hook sites in chip, remaps mutable renderer words into P1's restore set, and directs
+copied calls to the M1 kernels and drawing callees without chip entry hops.
+The 128-entry line-plotter table stays in chip with relocated targets. Interrupt-owned
+text state remains live. Optional workspace grows from 200 to 268 KB.
+
+The four `lea $97DC,a1` at Disk.1 `$5F1E4`, `$5F222`, `$5F260` and `$5F29A` stay in chip.
+`$97DC` is the end of the copied block `$BD9A..$D49A`. The doorway table they index starts
+14 bytes later at `$97EA`, outside the copy. Relocated, they read the copy's following
+bytes as doorway bounds, and the player stuck on the first room's doors. The route
+did not walk through a door, so it never caught this.
+
+Same VERIFY build/session, Custom1 `131071 → 262143`, CACHE PRELOAD; two exact
+500-field FPS comparisons per setup:
+
+| Setup | F2 off fps | F2 on fps |
+| --- | ---: | ---: |
+| A500 1.5 MB slow | 4.10 | 4.10 |
+| 020 fast | 12.40–12.50 | 13.30 |
+| Reference 030/50 | 24.80 | 26.40 |
+| Existing 040-25 emulator cell | 24.80 | 25.00 |
+
+On the reference 030, beam timing over fields 175..500 gives mean frame work
+**24.8 → 21.6 ms**, worst **27.3 → 24.6 ms**. Main 3D is 9.54 → 7.27 ms/frame,
+rooms 4.02 → 3.08, clear 0.88 → 0.36. PER_FRAME cadence changes from 247 two-field
+intervals to 233 two-field and 31 one-field intervals; each run has one three-field
+startup interval. This improves delivery but does not reach steady 50 fps.
+
+The same-build 020 bus audit (fields 175..275) reduces chip-code fetches
+**1,963 → 430 per field**. Remaining traffic includes native main-loop/interrupt
+code and indirect entry paths. Still-scene screenshots are pixel-identical off/on;
+walking and turning retain 6 and 2 units per field on 020/030, apart from native
+collision stops. Restore hashes pass 146 walking presentations in both chip and
+copied renderer state, 188 surface-flight, 187 space-flight and 450 lift presentations.
+Walking/turning/room-return and transport screenshots show intact drawing.
+Options-off release and shipped each give 37 frames / 500 fields on A500;
+release play with Enhanced framerate on and the input/original/release/VERIFY builds
+pass. Bit 17 is included in the release mask (`$3FFFF`).
+Evidence: `tmp/f2/final-v6/`. The 040 figures remain emulator counts,
+not real-hardware speed predictions.
+
+### F3: hot renderer data in fast RAM
+
+Custom1 bit 18 moves 1,078 bytes on 68020+ with real fast RAM: projection state
+at chip `$42C04..$42C75`, line masks/offsets at `$49880..$49B33`, and row offsets
+at `$43080..$4318F`. It uses the unused tail of M2's page-rounded allocation;
+optional workspace remains 268 KB. Patch 193 native long operands before copying
+code, plus the slave's five sky writers. P1 restores the moved projection state.
+The display pointer `$42C00` stays in chip. The mask copy includes negative-index
+entries before its `$498B0` base; the row table's startup writer moves too.
+
+The low-word-addressed coordinate table, shared variable-length scratch and model
+data remain in chip; they need broader relocation (F5). Dynamic `$C0` calls retain
+the cache-safe indirect form. The [plan](plan.md#f-one-field-frames-on-the-03050-the-50-fps-step)
+records why these candidates do not meet F3's long-operand criterion.
+
+Same VERIFY build/session, Custom1 `262143 → 524287`, CACHE PRELOAD, two exact
+500-field comparisons per setup:
+
+| Setup | F3 off fps | F3 on fps |
+| --- | ---: | ---: |
+| A500 1.5 MB slow | 4.10 | 4.10 |
+| 020 fast | 13.30 | 13.50 |
+| Reference 030/50 | 26.30 | 28.80 |
+| Existing 040-25 emulator cell | 25.00 | 26.50 |
+
+Reference 030 beam probes over fields 175..500: mean frame work **21.61 → 20.76 ms**,
+worst **24.64 → 24.65 ms**. Main 3D is 7.28 → 6.81 ms/frame, rooms 3.09 → 2.84;
+clear remains 0.36. Scene setup `$5765E` falls 2.30 → 1.95 ms, `$5AFAA`
+1.96 → 1.81, and `$593A6` 1.09 → 1.06. The saving is below the estimated 1.5..3 ms, and the worst frame
+still exceeds one field. PER_FRAME cadence changes from 29 one-field / 233 two-field
+intervals to 80 / 208; both have one three-field startup interval.
+
+The 020 bus trace (fields 175..275) removes all chip accesses to the moved blocks:
+399.61 reads and 16.50 writes per field → zero. Remaining coordinate-table/model/
+scratch traffic is unchanged. Total chip reads fall less because the faster drawing
+spends longer polling VERTB. Evidence: `tmp/f3/final/`; the 040 figures remain emulator
+counts, not hardware predictions.
+
+Native walking/turning rates remain 6/2 units per elapsed logic field on 020/030.
+Still images are pixel-identical off/on; walking, turning, room return, surface/space
+flight, lifts and release play pass. All 167 walking restore hashes pass in chip,
+copied code and new data; transport checks pass 188 surface-flight, 187 space-flight
+and 450 lift restores. Options-off release and shipped each give 37 A500 frames /
+500 fields. Input verification and original/release/VERIFY builds pass. Enhanced
+framerate includes bit 18 (`$7FFFF`).
+
+### F4: log conversion with BFFFO
+
+Custom1 bit 19, with M1's copy (68020+, real fast RAM), replaces the compare tree that
+finds the leading bit in the log conversion (Disk.1 `$4EE88..$4EF91`) with `bfffo`
+(`src/log-f4.i`). The `$4EE76` word entry's `bra.s` at `$4EE82` is retargeted to the new
+word path; `$4EE84` still falls through into `$4EE88`. Results match the original exactly:
+d1 (exponent in the high word, twice the 12-bit mantissa below, negated for negative input),
+d6 (the input), d7 (the exponent; its high word is preserved below `$10000`, as the
+original's `clr.w d7`) and all condition codes including X. `tools/log_harness.py` runs the
+original Disk.1 bytes and the patched copy side by side under Unicorn (68020): identical
+for all 2^32 `$4EE88` inputs, all 2^28 `$4EE84` inputs and every `$4EE76` word with 256
+high-word patterns, with varied starting d6, d7 and flags. Six deliberate mutations
+(d7 high word, sign test, shift kind, mantissa shift, zero result, X flag) are each detected.
+
+Same VERIFY build/session, Custom1 `524287 → 1048575`, two exact 500-field comparisons
+per setup (both runs identical):
+
+| Setup | F4 off fps | F4 on fps |
+| --- | ---: | ---: |
+| A500 1.5 MB slow | 4.10 | 4.10 |
+| 020 fast | 13.50 | 13.70 |
+| Reference 030/50 | 28.80 | 29.60 |
+| Existing 040-25 emulator cell | 26.50 | 26.90 |
+
+The 020 instruction profile (standard route) prices the three entries at 54,023 → 34,348
+cycles per frame (`$4EE84` 37,767 → 24,012, `$4EE88` 12,321 → 7,663, `$4EE76`
+3,935 → 2,673); main 3D falls 332,834 → 313,422.
+
+Reference 030 beam probes over fields 175..500: mean frame work **20.70 → 19.84 ms**,
+worst **24.64 → 22.55 ms**; 120 → 113 of the measured intervals exceed 20 ms. Main 3D is
+6.80 → 6.50 ms/frame; scene setup `$5765E` 1.94 → 1.90, `$5AFAA` 1.76 → 1.72, `$593A6`
+1.06 → 1.05, clear 0.36 unchanged. PER_FRAME cadence changes from 82 one-field /
+207 two-field intervals to 97 / 199, each with one three-field startup interval. The mean
+now fits a field, but most frames still do not: steady 50 fps needs F5's chip-traffic work.
+
+Native walking/turning rates remain 6/2 units per elapsed logic field on 020/030 (one
+collision stop each). Still images are pixel-identical off/on; walking, turning, room
+return and release play screenshots show intact drawing. 173 walking restore hashes
+pass. Options-off release and shipped each give 37 A500 frames / 500 fields. Enhanced
+framerate includes bit 19. Evidence: `tmp/f4/final/`, `tmp/log-harness/`;
+the 040 figures remain emulator counts, not hardware predictions.
+
+### F5: render scratch in fast RAM
+
+Custom1 bit 20 moves the render scratch (chip `$0340..$407F`, 15.7 KB, including the
+array at `$3E18` that runs to `$406F`) into a new 20 KB data area at the end of the
+optional workspace (now 288 KB). It requires M1, S3 and F2, a 68020+ and real fast RAM.
+The operands that address the scratch are absolute short words and 16-bit displacements,
+which cannot reach fast RAM at their original length. The copied code is therefore
+*translated*, not copied, with instructions allowed to grow:
+
+- `(d16,An)` becomes the full-format `(bd.l,An)` (+4 bytes).
+- `abs.w` becomes `abs.l` (+2).
+- Branches, `DBcc` and PC-relative operands inside a block are re-targeted. Six byte
+  branches that no longer reach become word branches.
+- Branches that leave a block go through 63 JMP islands.
+
+`tools/translate.py` generates `src/translate-f5.i` from Disk.1. It holds Disk.1
+offsets, layout values and data addresses only, no game bytes. For each block there is an
+edit recipe and a growth map:
+
+- Recipe ops: copy n words, skip, XOR the opcode's mode bits, new word, extension plus
+  long address, set the low byte, long address.
+- The growth map gives the offset in the block from which the translation has grown by
+  so many bytes.
+
+The generator works as follows:
+
+- It decodes every block recursively from the entries and from every reference a
+  whole-program descent finds. Jump-table bodies are roots.
+- Bytes it does not reach stay "rigid" and must not contain a growth point.
+- It rejects edits in the words the slave patches before copying, using a dump.
+- It re-decodes the whole translation (capstone, 68020) and checks every operand: 15,923
+  instructions.
+
+Six abs.w/d16 operands in the moved range are not scratch accesses and are excluded:
+
+- `$5D9CE` is an object index.
+- `$5DCDE..$5DD1E` are pointers into the variables.
+- `$593D6` (`move.b $4070(a0),d3`, a0 up to `$FC`) reads the edge byte array
+  `$4070..$416F`. That array starts in the moved range but runs past `$4080`, and code
+  outside the blocks writes it in chip, as do `$4160.w`/`$4168.w` at `$59444`.
+  Translated, the read got stale bytes, so the renderer dropped or recoloured edges:
+  the ground line was dotted on the route and showed as a gray stripe outdoors.
+
+The translation covers 16 blocks: M1's two, S3/F2's and five new blocks that also use the
+scratch (Disk.1 `$5F61C..$5FA3F`, `$5EA34..$5F327`, `$57374..$5765D`, `$5A644..$5A6E7`,
+`$5D6D4..$5D78B`). They come to 56,872 bytes (+2,534), with 543 rewritten operands, 7 new
+chip entry jumps and 24 new relocated operands. M1's blocks are translated in
+`_hotcode`, the render blocks in `_f5renderer`. F5 then performs these steps:
+
+- It copies the scratch's current contents to fast RAM.
+- It maps F2's relocated operands, and P1's restore ranges, through
+  `_f5map`/`_f5datamap`, so
+  presentation restores save and restore the fast-RAM scratch and the translated code
+  words.
+
+The game variables (`$5350..$7FFF`) stay in chip: their abs.w accessors are spread
+across the untranslated main loop, so moving them needs the whole program translated.
+
+Checks:
+
+- `translate.py --check` on a running F5 game matches the simulation, apart from entry
+  stubs.
+- VERIFY `Custom2` bit 7 fills the vacated chip scratch with `$A55AA55A`, except the
+  boot stack at `$1400..$17FF`, so any missed access draws garbage. The tripwire trace
+  of the full 020 route reads the chip scratch once.
+- All 341 rewrites that execute address the scratch. The 203 that do not execute belong
+  to the same array families.
+
+Same VERIFY build/session, Custom1 `1048575 → 2097151`, two exact 500-field comparisons
+per setup (both runs identical):
+
+| Setup | F5 off fps | F5 on fps |
+| --- | ---: | ---: |
+| A500 1.5 MB slow | 4.10 | 4.10 |
+| 020 fast | 13.70 | 14.10 |
+| Reference 030/50 | 29.60 | 48.00 |
+| Existing 040-25 emulator cell | 26.90 | 44.50 |
+
+These figures, the beam probes below and F6 predate the `$593D6` correction; the
+edges it lost were never drawn. Measured again in one session with the corrected VERIFY
+build, Custom1 `1048575 → 2097151` on the reference 030 gives **27.60 → 44.70 fps**.
+The uncorrected translation gives 48.00 in that session. The other setups and the
+beam figures have not been measured again.
+
+Reference 030 beam probes over fields 175..500: mean frame work **19.85 → 15.60 ms**,
+worst **22.56 → 17.71 ms**. Before F5, 113 of 210 intervals exceeded 20 ms; with F5,
+none of 323 do. Per frame, main 3D falls 6.50 → 5.76 ms, scene setup `$5765E` 1.90 → 1.85,
+`$5AFAA` 1.72 → 1.54 and `$593A6` 1.05 → 0.17. The clear stays at 0.36 ms. The
+presentation copies fall per call: save **3.41 → 1.40 ms**, restore **3.30 → 1.38 ms**.
+They do not reach the planned 0.5 ms, because the game variables they also copy are
+still in chip. PER_FRAME cadence changes from 97 one-field and 199 two-field intervals
+to 464 one-field and 15 two-field intervals; each run has one three-field startup
+interval. On the 020 instruction profile, `$593A6` falls 40,888 → 8,307 cycles per
+frame and main 3D 311,967 → 305,713.
+
+The same-build 020 bus audit (fields 175..275) removes the render scratch's chip
+traffic: 480 reads and 329 writes per field before, none after. Code fetches fall
+411 → 355 per field. Leaving out the VERTB wait and the staging writes, chip accesses
+fall **3,544 → 2,463 per field**. The game variables keep 819 reads and 297 writes.
+
+Other checks:
+
+- Native walking and turning stay at 6 and 2 units per logic field on the 020 and 030.
+- Restore hashes pass 356 walking presentations on the 030. With the tripwire (Custom2
+  bit 7) they pass 63 transport, 62 space-flight and 150 lift presentations.
+- Play with the tripwire is pixel-identical to play without it.
+- Walking, turning, room return and release play screenshots show intact drawing.
+- Options-off release and shipped each give 37 A500 frames / 500 fields.
+- The original, release and VERIFY builds pass.
+
+Enhanced framerate includes bit 20 (`$1FFFFF`). Evidence: `tmp/f5/final/`; the 040
+figures remain emulator counts, not hardware predictions.
+
+### F6: checkpoint
+
+The build is unchanged since F5 (the VERIFY slave is byte-identical). All runs use the
+standard 500-field route; the VERIFY build runs with `Custom1=2097151`, or with `Custom5=1`
+(the release mask). Evidence: `tmp/f6/`.
+
+**F0's beam table again** (reference 030/50, fields 175..500, same instruments and roots
+as F0; each nesting level in its own run). Frames rise from 163 (25.1 fps) to 325
+(50.1 fps); presentations are now 243 of 324 frames, against 81 of 162.
+
+| Work (Disk.1 / slave), ms per frame | F0 | F6 |
+| --- | ---: | ---: |
+| Frame work (publication interval minus `$5E460`), mean | 24.9 | 15.6 |
+| - range | 21.5..27.4 | 13.0..17.7 |
+| Main 3D `$577BE` | 9.6 | 5.76 |
+| - rooms `$5F438` | 4.0 | 2.38 |
+| - objects `$57BF4` (7 calls) | 4.0 | 2.92 |
+| - interior detail `$5836A` | 1.1 | 0.15 |
+| - edges `$5FDCC` (16 calls) | 2.1 | 1.18 |
+| Scene setup `$5765E` (`$536FE`) | 2.4 (2.0) | 1.85 (1.52) |
+| `$5AFAA` (`$53440`) | 2.3 (1.1) | 1.54 (0.87) |
+| `$593A6` | 1.4 | 0.17 |
+| Clear `$5E840` | 0.9 | 0.36 |
+| Staging copy (`_stagepublish` minus `$5E460`) | 3.3 | 3.3 |
+| Save + restore, per presentation | 3.7 + 3.4 | 1.40 + 1.38 |
+| Native publication incl. field wait `$5E460` | 15.0 | 4.4 |
+
+No frame in the window needs more than 20 ms; the worst has 2.3 ms to spare. The staging
+copy is now the largest single item after main 3D, and the presentation copies are bounded
+by the game variables still in chip.
+
+**Cadence** (`PER_FRAME=1`, VERIFY `Custom5=1`). On the 030/50: 464 one-field, 15
+two-field and 1 three-field intervals. Every multi-field interval lies in the first 65
+fields; from field 65 to 500 all 435 intervals are one field. The steady-route target
+holds. The 040-25 emulator cell: 394 one-field, 50 two-field and 1 three-field intervals,
+all in the first 136 fields.
+
+**Matrix** (`matrix.sh`, VERIFY `Custom5=0 Custom1=2097151`, all eight cells pass):
+
+| Cell | Frames | fps | S6 fps (other session) |
+| --- | ---: | ---: | ---: |
+| a500-1.5m | 41 | 4.10 | 4.10 |
+| a1200 (chip only) | 93 | 9.30 | 9.40 |
+| a1200-fast | 141 | 14.10 | 12.50 |
+| 030 default | 480 | 48.00 | 24.80 |
+| 030 MMU | 480 | 48.00 | 24.80 |
+| 040-25 | 445 | 44.50 | 24.90 |
+| 060-50 | 448 | 44.80 | 24.90 |
+| 040-8 sanity | 431 | 43.10 | 24.80 |
+
+The 040 frequency sanity check passes (8 MHz 431 < 25 MHz 445 frames); 040/060 counts
+remain emulator counts. Options off: release `Custom5=0` and the shipped slave each give
+37 A500 frames / 500 fields.
+
+**What limits each cell next:**
+
+- 030/50: the opening view. The route stands still for its first 175 fields, facing a
+  view that draws more than the walk: main 3D falls from 9.0 ms per frame in fields 0..40
+  to 7.3 in fields 140..175, against 5.76 in the walk (objects 4.22, rooms 3.78, edges
+  1.93 ms over fields 0..175). Frame work there averages 18.4 ms with a 20.15 ms worst;
+  16 intervals exceed a field. These are the 030 matrix cell's 20 missing frames.
+  Main 3D is the next reduction; about 0.2 ms clears the worst opening frame.
+- 040-25 (emulator): the same opening view, slower here: main 3D 9.3 ms (10.1 in
+  fields 0..40), frame work mean 19.3, worst 21.8 ms, 50 of 120 intervals over a field.
+  In the walk it runs at 50.1 fps (frame work 15.9 ms, worst 18.4; main 3D 6.26).
+  Its per-routine times exceed the 030's except the clear (0.07 ms) and the presentation
+  copies (1.04 ms each). Real 040/060 speed remains unmeasured.
+- 060-50 (emulator): counts match the 040 cell; no component ranking measured.
+- 020 fast: 3.55 fields per frame (instruction profile, F5 build). Main 3D takes 1.08
+  fields per frame (objects `$57BF4` 0.53, edges `$5FDCC` 0.29), scene setup 0.31,
+  `$5AFAA` 0.26; the field wait is 19.9% of cycles. Computation, not chip traffic,
+  now leads: the drawing's arithmetic (`$5B038`, `$53408`/`$525E2`) and the edge plotter
+  `$4A26C`.
+- A500 and chip-only 020: S6's limits stand, with drawing dominant. F2 and F5 need real
+  fast RAM and the 68000 takes no phase F option; both counts are within a frame of S6.
+
+### WHDLoad launch configuration
+
+WHDLoad 20.1 rejected the comma in the first Custom1 checkbox label; labels cannot
+contain commas. The corrected label and config terminator boot without the warning
+(shell inspected after exit). Runs now explicitly pass `CACHE PRELOAD`; PRELOAD was
+already present. `NOCACHE` still overrides CACHE for cache-off comparisons, and route
+results record the complete launch command. Fresh 500-field checks give 37 frames
+for both options-off and shipped on A500; `Custom1=2047` gives 12.50 fps on 020-fast,
+24.80 on 030/50 and 24.90 in the 040-25 emulator cell. These match the S6 counts;
+no speed gain is claimed. Evidence: `tmp/p2/launch-check/`, `tmp/p2/config-runs/`.
+
+### R2: blitter clear
+
+Tested and rejected. A temporary `Custom1` bit 13 replaced Disk.1 `$5E840` with
+four destination-only blits: 136 × 40 bytes per plane, 8,000-byte plane spacing,
+three zero planes and one all-ones plane. Each blit completed before the next;
+the last completed before returning to drawing. S4-active configurations kept
+the CPU clear. A second candidate gave the blitter priority while clearing and
+restored the previous priority afterward. Neither candidate is retained.
+
+Same-build/session `fps.py`, `Custom1=8191 → 16383`, 500-field standard route,
+`CACHE PRELOAD`:
+
+| Setup | CPU clear fps | Blitter clear fps |
+| --- | ---: | ---: |
+| A500 | 4.10 | 4.10 |
+| 020 chip-only | 9.40 | 9.20 |
+| 020 fast (S4 active) | 12.50 | 12.50 |
+| 030/50 (S4 active) | 24.80 | 24.80 |
+| 040-25 (S4 active) | 24.80 | 24.80 |
+
+The priority candidate repeated the A500 and chip-only 020 pairs twice with
+identical counts (41/41 and 94/92). These synchronous clears provide no measured
+gain and regress on chip-only 020; retain the native CPU clear. This does not
+measure a future design overlapping clearing with other work. The 040 result is
+an emulator run check, not a hardware speed prediction.
+
+Candidate checks: A500 and chip-only 020 still screenshots are byte-identical
+off/on; help, return, Quit Situation and subsequent walking show intact views and
+panels. World speed is 6 walking units and 2 heading units per field on 020 fast
+and 030/50. Options-off and shipped both give 37 A500 frames. Evidence and rejected
+candidate sources remain ignored under `tmp/r2/{first,priority,checks}/` and
+`tmp/r2/{shared-bus,priority}.asm`. No game code changes remain from R2.
+
+### R4: data cache
+
+`Custom1` bit 13 asks `resload_SetCACR` for `CACRF_EnableD` alongside the
+instruction cache. With it off, the shipped instruction-only request is unchanged.
+WHDLoad handles CPU/MMU differences, cache flushing and `NOCACHE`; no direct CACR
+writes or emulator changes are needed. Its existing cache policy for the slave and
+expansion memory is retained. Hardware inhibits data caching of chip memory and I/O;
+this request does not make display memory safe for copy-back caching.
+
+Same build/session, `fps.py`, 500-field route, `CACHE PRELOAD`,
+`Custom1=8191 → 16383`:
+
+| Setup | Data-cache request off → on, fps |
+| --- | ---: |
+| a500-1.5m | 4.10 → 4.10 |
+| a1200, chip only | 9.40 → 9.40 |
+| a1200-fast | 12.50 → 12.50 |
+| a1200-030, reference 030/50 | 24.80 → 24.80 |
+| existing 040-25 cell | 24.80 → 24.80 |
+| 060 NOMMU, 25 MHz | 24.90 → 24.90 |
+
+No measured route gain or regression. Retained by the user's cache-support decision,
+not as a demonstrated speedup. The 040/060 counts are emulator run checks, not
+hardware performance predictions. Real-hardware cache behaviour remains unverified; X1 was accepted without hardware
+testing because no hardware was available.
+The existing WHDLoad `BRANCHCACHE` switch also completed the 060 route at
+24.90 fps with bit 13 enabled. It remains available through WHDLoad; R4 does not
+force 060-specific CPU settings.
+
+Checks: options-off and shipped A500 both 37 frames; native walk/turn rates
+(6 units and 2 heading units per field) on 020-fast and 030; all 124 presentation
+restore hashes passed. Still-scene screenshots match off/on on 030. Inspected
+walking, Help/return and Quit Situation on 030, plus loaded Eagle vehicle/flight
+views on 030/040/060. The cache option alone also passed the menu/walking play
+check on 030/040. Input verification and original/release/VERIFY builds passed.
+Evidence: `tmp/r4/`.
+
+### X1: release
+
+The single player control is the **Enhanced framerate** checkbox, enabled by
+CUSTOM5=1. Omission or zero leaves it unchecked; the 2.0b archive's game icons carry CUSTOM5=1. `Custom5=1` now selects feature bits 0–18 (F3); `Custom5=0` turns them all off. The release
+ignores legacy Custom1 settings. VERIFY retains individual bits with
+`Custom5=0 Custom1=<mask>`. CPU/chipset/memory guards are unchanged. The README covers
+installation, WHDLoad 17+, 512 KB chip RAM, the optional 268 KB workspace and CACHE/PRELOAD.
+
+Same-session, same VERIFY build, 500-field `fps.py` route, enhancement Off → On:
+
+| Setup | Off → On, fps |
+| --- | ---: |
+| a500-1.5m | 3.70 → 4.10 |
+| a1200-fast | 7.50 → 12.50 |
+| reference 030/50 | 8.90 → 24.80 |
+| existing 040-25 | 11.70 → 24.80 |
+| 060-50 | 12.80 → 24.90 |
+
+The default-on matrix passed every cell, including explicit 030 MMU (24.80 fps)
+and chip-only A1200 (9.40 fps). The known 040 frequency advisory remains: both 8 and
+25 MHz give 248 frames. These 040/060 numbers do not predict hardware speed.
+
+Release Off and shipped A500 both give 37 frames. Release world-speed checks on
+020-fast and 030 give 6 walking units and 2 heading units per field. Release play
+checks on 68000/020/030/040/060 covered Help/return, Quit Situation and walking;
+030/040/060 also loaded the Eagle save, boarded, flew and returned from Help.
+Screenshots were inspected, including the startup control showing Enhanced framerate
+enabled. All 124 VERIFY presentation restores passed.
+Input verification and original/release/VERIFY builds passed. Evidence: `tmp/x1/`.
+
+No real hardware is available (user decision). X1 is complete without hardware tests;
+real-cache behaviour with relocated/self-modifying code and 040/060 speed remain
+unverified. No hardware-performance claim is made.
