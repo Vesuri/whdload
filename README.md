@@ -22,7 +22,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Mercenary 3 Enhanced | Harry, Graham and Wepl | not yet released |
 | Stellar 7 Enhanced | Psygore | not yet released |
 | Their Finest Hour Enhanced | Psygore | not yet released |
-| Wing Commander Enhanced | Psygore | not yet released |
+| Wing Commander Enhanced | Psygore | [2.0b (19.10.2026)](https://github.com/Vesuri/whdload/releases/tag/WingCommanderEnhanced-2.0b-20261019) |
 
 ## Building
 
