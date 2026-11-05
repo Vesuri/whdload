@@ -14,7 +14,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 
 | Game | Original slave by | Release |
 |---|---|---|
-| Formula One Grand Prix Enhanced | Codetapper | not yet released |
+| Formula One Grand Prix Enhanced | Codetapper | [2.0b (02.11.2026)](https://github.com/Vesuri/whdload/releases/tag/FormulaOneGrandPrixEnhanced-2.0b-20261102) |
 | Gunship Enhanced | JOTD | not yet released |
 | Hard Drivin' Enhanced | JOTD | not yet released |
 | Indianapolis 500 Enhanced | StingRay | not yet released |
