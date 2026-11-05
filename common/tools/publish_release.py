@@ -144,6 +144,24 @@ def gh_api(path, jq, tries=5):
     sys.exit(f'GitHub API {path} failed:\n{r.stderr}')
 
 
+# The user's name in the URL keeps a global url.<ssh>.insteadOf https://github.com/ from
+# rewriting it back to SSH.
+HTTPS = f'https://{OWNER}@github.com/{GH_REPO}.git'
+
+
+def push(refspec):
+    """git push to origin; when SSH fails, over HTTPS with the gh account's credential."""
+    try:
+        # A failing SSH agent can hang rather than fail.
+        if subprocess.run(['git', 'push', '-q', 'origin', refspec], cwd=REPO,
+                          capture_output=True, timeout=30).returncode == 0:
+            return
+    except subprocess.TimeoutExpired:
+        pass
+    run('git', '-c', 'credential.helper=', '-c', 'credential.helper=!gh auth git-credential',
+        'push', '-q', HTTPS, refspec, check=False)
+
+
 def remote_tag(tag):
     """The commit the tag names on GitHub (lightweight tags only), or None."""
     return gh_api(f'git/ref/tags/{tag}', '.object.sha') or None
@@ -172,14 +190,14 @@ def delete_release(tag):
     retry(lambda: run('gh', 'release', 'delete', tag, '-R', GH_REPO, '--cleanup-tag', '-y',
                       check=False),
           lambda: not release_exists(tag), f'deleting release {tag}')
-    retry(lambda: run('git', 'push', '-q', 'origin', f':refs/tags/{tag}', check=False),
+    retry(lambda: push(f':refs/tags/{tag}'),
           lambda: remote_tag(tag) is None, f'deleting tag {tag}')
     run('git', 'tag', '-d', tag, check=False)
 
 
 def publish(tag, head, title, notes, archive, digest):
     run('git', 'tag', tag, head)
-    retry(lambda: run('git', 'push', '-q', 'origin', f'refs/tags/{tag}', check=False),
+    retry(lambda: push(f'refs/tags/{tag}'),
           lambda: remote_tag(tag) == head, f'pushing tag {tag}')
     with tempfile.NamedTemporaryFile('w', suffix='.md', dir=REPO / 'tmp', delete=False) as f:
         f.write(notes)
@@ -232,9 +250,8 @@ def list_in_readme(title, author, label, tag):
     path.write_text(after)
     run('git', 'commit', '-q', '--only', '-m', f'List the {title} Enhanced {label} release',
         '--', 'README.md')
-    # A successful push moves origin/main to HEAD.
-    retry(lambda: run('git', 'push', '-q', 'origin', 'main', check=False),
-          lambda: run('git', 'rev-list', '--count', 'origin/main..HEAD').stdout.strip() == '0',
+    head = run('git', 'rev-parse', 'HEAD').stdout.strip()
+    retry(lambda: push('main'), lambda: gh_api('commits/main', '.sha') == head,
           'pushing README.md')
     return True
 

@@ -77,4 +77,5 @@ With `PUBLISH=1` it then checks the identity, the GitHub account and that HEAD i
 `origin/main`, tags HEAD, creates the release, uploads both files, downloads the archive to
 compare it with the `.sha256`, and lists the release in the root `README.md` (a commit of
 `README.md` alone, pushed). An existing release of the game stops it unless `REPLACE=1`.
-GitHub's API fails intermittently, so each remote step is retried and read back.
+GitHub's API fails intermittently, so each remote step is retried and read back; a push
+that fails over SSH is retried over HTTPS with the `gh` account's credential.
