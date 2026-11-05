@@ -2,7 +2,7 @@
   "archives": [
     {
       "input": "GrandPrixCircuit.lha",
-      "output": "GrandPrixCircuit-{version}.lha",
+      "output": "GrandPrixCircuitEnhanced-{version}-{date}.lha",
       "replace": {
         "GrandPrixCircuitHD/GrandPrixCircuit.slave": "build:GrandPrixCircuit",
         "GrandPrixCircuitHD/ReadMe": "release/ReadMe",
