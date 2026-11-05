@@ -8,6 +8,16 @@ Keep both supplied archives in ignored `tmp/`. Extract the installer to `tmp/ins
 and Retroplay pack to `tmp/game/`; the playable tree is `tmp/game/Powerdrome/`.
 `tmp/archive.sha256` records local input hashes. Never commit proprietary inputs or captures.
 
+Historical instruction traces, memory snapshots and raw debugger/emulator logs
+may be stored as `.gz` files to reduce disk usage. Reports, configuration files and
+frozen slaves remain beside them. Before rerunning an analysis, expand the files
+it needs with `gzip -dk tmp/prof/CAPTURE/FILE.gz` (use the actual capture path);
+the analysis tools expect uncompressed files. Remove the expanded copies afterwards.
+`tmp/storage-cleanup.json` and `tmp/storage-cleanup-snapshots.json` list locally
+archived files, original SHA-256 hashes and sizes. Every archive was decompressed
+and checked against its original before the redundant raw copy was removed.
+Current mouse steering, release-option and Phase F captures remain uncompressed.
+
 Source `amiga/env.sh` for the shared Amiga environment that AmigaXDev installs (`make setup`);
 it sources the shared `env.sh`, whose variables AmigaXDev's `docs/environment.md` describes.
 Shared inputs use these overrides:
