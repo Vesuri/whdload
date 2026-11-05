@@ -3,6 +3,7 @@
 # or the whole file.
 #
 # game_build BUILD OUT     replace the vasm build; leave OUT/$VARIANT.Slave and OUT/$VARIANT.deps
+#                          (vasm_build BUILD OUT runs the default build, after generated sources)
 # game_prepare             before a run builds or boots (set SLAVE, FSUAE, AMIGA_SETUP, ...)
 # game_stop                before make stop stops the instance's emulator (refuse with die)
 # game_drives DH0 DH1      add to or change the boot drives
