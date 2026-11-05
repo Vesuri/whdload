@@ -1,45 +1,77 @@
-Legends of Valour Enhanced - WHDLoad slave 2.0b (09.10.2026)
-Beta release (the b suffix signifies beta).
-Reworked by Vesuri, based on the work of CFou!
 
-Changes in 2.0b (09.10.2026)
-----------------------------
-Rendering optimizations are enabled automatically, with routines selected for
-68000/68010 or 68020 and later processors. The chunky buffer uses PUBLIC memory,
-allowing the system to use fast RAM when available. Allocation failure retains
-the original allocation path. Chunky-to-planar conversion uses routines by
-Mikael Kalms, adapted for this game.
+ Legends of Valour Enhanced 2.0b (09.10.2026)
 
-The WHDLoad options are:
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
-  Character creation             CUSTOM1=1
-  Frame-independent game timing  CUSTOM2 bit 6 (value 64)
+ This install applies to "Legends Of Valour" M-) 1992 US-Gold.
 
-The installed icon sets CUSTOM2=64, so timing is on by default; CUSTOM2=0 (or
-unticking the option in WHDLoad's splash window) restores the original timing.
-To enable it in an existing installation, add CUSTOM2=64 to the game icon.
-Rendering optimizations and one-degree mouse precision need no custom tooltypes.
+ Requirements:
+ -------------
+ This install requires WHDLoad 17 or newer, DIC, RawDIC and The Patcher to be
+ in the path. The programs can be found in the WHDLoad package.
+ To install from a different drive than DF0: select installation mode Expert.
 
-Frame-independent timing advances simulation at 25 ticks per second and
-corrects animation pacing. On slower machines this can reduce rendering speed.
-The existing display cap and beam synchronization are retained.
+ The installed program requires 0.5 MB ChipMem and 0.7 MB OtherMem.
+ It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
 
-Direct mouse control always uses one-degree heading and rendering precision
-when the finer ray table can be allocated. UI turn buttons retain their native
-increments and repeat behavior. This works with or without the timing option.
+ The game requires an installed A500 Kickstart 1.3 image.
+ The kickstart image must be located in the directory "Devs:Kickstarts" and
+ must be named "kick34005.A500". The image can be extracted from a A500 with
+ tools like 'GrabKick' or similar which can be found on aminet.
+ If the image is of wrong version or altered in any way WHDLoad will quit with
+ an appropriate message.
+ Additionally the file "kick34005.A500.RTB" must be installed in the same
+ directory as the kickstart image. It can be found in the archive
+ "util/boot/skick345.lha" on aminet.
 
-Requirements and compatibility
-------------------------------
-WHDLoad 17 or later, an A500 Kickstart 1.3 image and its matching RTB file.
-The slave reserves 512 KiB chip memory and 656 KiB other memory; allow additional
-memory for WHDLoad, game allocations and optional features. Fast RAM is useful.
-This version was validated against the English game of the preinstalled
-LegendsOfValour_v1.0_0837.lha. The original release's other language/version
-support is recorded below but has not been revalidated for the new patches.
+ Features:
+ ---------
+ Use Custom1=1 first to launch character creation.
 
-F10 quits (or use the WHDLoad QuitKey tooltype).
+ Frame-independent game timing (Custom2=64) is enabled by the game icon. It
+ keeps the game speed and animations correct at any frame rate. Set Custom2=0
+ for the original timing.
 
-Original installation notes and credits follow. The memory requirement has
-been updated for this slave. The bundled legacy source (.src) is unchanged and
-describes the original 1.0 slave.
+ The enhancements have been tested with the English version only.
 
+
+ History:
+ --------
+ version 2.0b (09.10.2026) done by Vesuri:
+ - faster 3D rendering, using Fast RAM when available
+ - chunky-to-planar conversion by Mikael Kalms
+ - added frame-independent game timing (Custom2=64), enabled by the game icon
+ - finer turning with the mouse
+ - memory requirement increased to 0.7 MB OtherMem
+
+ version 1.0 (05.02.05) done by CFou!:
+ - initial release
+ - 4 versions supported (French, German and 2 English)
+ - manual protection ripped
+ - Custom1=1 tooltype used to launch character creation (use it first)
+ - decrunch flash removed
+ - Manual picture added
+ - some pretty colored icons added
+
+ Thanks Frank and CAPS Tream for original disk images
+
+
+ Contact:
+ --------
+ If you have problems with this installation please try and get a newer
+ version of this package from the WHDLoad WWW-Page. If that doesn't help try
+ some Tooltypes like NOCACHE, NOAUTOVEC, EXPCHIP, NOMMU, PAL or NTSC. If
+ that also fails, please inform the author via the Bug-Report-Form which
+ can be accessed on the WHDLoad WWW-Page.
+
+ For the full WHDLoad package, other installs and updates refer to:
+        http://www.whdload.de/
+ or     aminet:dev/misc/whdload#?
+ and    aminet:game/patch/

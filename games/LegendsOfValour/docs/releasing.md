@@ -16,9 +16,9 @@ repository's ignored `dist/`, is `LegendsOfValourEnhanced-<version>-<YYYYMMDD>.l
 
 The command rebuilds the plain release slave (`make slave` with no `VASM_EXTRA`) and checks
 its two-option menu, that `slv_info` carries the `$VER` version and date, and that
-`release/ReadMe` has a `Changes in <version> (<date>)` entry. It prepends `release/ReadMe` to
-the original ReadMe and updates the original memory requirement. Original credits (CFou!'s)
-and installation notes remain.
+`release/ReadMe` has a `version <version> (<date>)` history entry. `release/ReadMe` is the
+whole shipped ReadMe, in the WHDLoad Install Template layout; it keeps CFou!'s 1.0 history
+entry and credits.
 
 Replaced records: `LegendsOfValourHd/LegendsOfValour.Slave`, `LegendsOfValourHd/ReadMe` and
 the six game icons the installer offers, `LegendsOfValourHd/LegendsOfValour.{inf,infC,

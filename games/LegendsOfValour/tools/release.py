@@ -129,8 +129,8 @@ def main():
     if info['ws_config'] != expected or f'Version {version} ({ver_date})' not in info['ws_info']:
         raise SystemExit('Expected the release slave with two options and slv_info matching $VER')
     notes = (ROOT / 'release/ReadMe').read_bytes()
-    if f'Changes in {version} ({ver_date})'.encode() not in notes:
-        raise SystemExit(f'release/ReadMe has no "Changes in {version} ({ver_date})" entry')
+    if f'version {version} ({ver_date})'.encode() not in notes:
+        raise SystemExit(f'release/ReadMe has no "version {version} ({ver_date})" history entry')
     destination = args.dist.resolve()
     destination.mkdir(parents=True, exist_ok=True)
     output = OUTPUT.format(version=version, date=date)
@@ -142,14 +142,7 @@ def main():
     icon_names = [f'{PREFIX}/LegendsOfValour.{suffix}' for suffix in ICONS]
     if not {slave_name, readme_name, *icon_names} <= original.keys():
         raise ValueError(f'Missing replacement entries in {archive}')
-    old_readme = read_member(lha, archive, readme_name)
-    old_requirement = b'The installed program requires 0.5 MB ChipMem and 0.5 MB OtherMem.'
-    if old_readme.count(old_requirement) != 1:
-        raise ValueError('Original ReadMe memory requirement has changed; review it')
-    old_readme = old_readme.replace(old_requirement,
-        b'The slave reserves 512 KiB ChipMem and 656 KiB OtherMem.\n'
-        b' Additional memory is needed by WHDLoad and optional features.')
-    replacements = {slave_name: slave, readme_name: notes + b'\n' + old_readme}
+    replacements = {slave_name: slave, readme_name: notes}
     for name in icon_names:
         icon = read_member(lha, archive, name)
         tool, entries, _, _ = parse(icon)
