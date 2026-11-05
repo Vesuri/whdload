@@ -1,0 +1,5 @@
+dd5b9608d64de145a6138c99d175f148939bd8e8c37d793631314a50c9d606db  tmp/game/TestDrive_v1.3_0089/TestDrive/data/TD
+fb1ad998b41ad27c53c7b8fe4ac5186f38c783528be1944e3596b1c664c4cc59  src/TestDriveHD.s
+f05e6839766141c99f375165dd61e6dec2781b493f9fd04a5ad34cf24b736601  $AMIGA_SHARE/ndk/Include_I/lvo/graphics_lib.i
+afdc25dd4066eb0b13258e4bb67c083772e60e32afc74452a71bf3c24bb2fa98  $AMIGA_SHARE/ndk/Include_I/lvo/exec_lib.i
+473c94ce5cf9222578c91c7e16d6ddc65ae0f1da0126699af55922ccd0df3819  src/simulation-verify.s

@@ -66,7 +66,7 @@ References below to 1.5b–1.8b identify retained, unpublished development test
 snapshots only; they are not separate releases. Their evidence and the deferred
 hardware A/B binaries remain unchanged.
 
-## Phase 1: local harness (complete; in `tmp/dev/`, never committed)
+## Phase 1: local harness (complete; now `tools/`, `docs/` and `manifest/`)
 
 1. Runner/debug server: disposable per-launch game copy, worktree-owned emulator and
    debugger, shared environment defaults, pinned runtime inputs checked before use.
@@ -104,7 +104,7 @@ hardware A/B binaries remain unchanged.
    acceptance checker is `tools/check_harness.py`; the phase-6.1 A/B bundle is preserved.
 8. Current local references: `docs/development.md`, `docs/testing.md`,
    `docs/internals.md` and `docs/open-work.md`. Commands and evidence are documented
-   there; acceptance artifacts are under ignored `tmp/dev/tmp/phase1/`.
+   there; acceptance artifacts are under ignored `tmp/phase1/`.
 
 **Acceptance:** the shipped 1.3 and rebuilt 1.5b slaves boot through startup into the
 A500 attract/driving sequence from copies of the same pristine drawer. Normal/VERIFY
@@ -136,7 +136,7 @@ measurement validation; the phase-5 time model below now defines the simulation 
 
 **Acceptance:** local `tools/identify_game.py` checks pinned inputs, all explicit
 patch signatures/source coverage, hunk sizes, root JMP targets and both overlay
-node/export lists. Evidence is under ignored `tmp/dev/tmp/phase2/`. Every requested
+node/export lists. Evidence is under ignored `tmp/phase2/`. Every requested
 routine family has an evidenced TD location or an explicit not-found entry in
 the local inventory. Performance measurements are recorded separately in phase 4.
 
@@ -203,7 +203,7 @@ and DMA shares. The normal 1.5b build remains byte-identical to the hardware A/B
 CUSTOM3=0 leaves the original demo call and RNG instructions intact in VERIFY builds.
 
 **Acceptance:** the measurement portion of playbook §12 is satisfied, with evidence
-under ignored `tmp/dev/tmp/phase4/base-*` and reproducible commands in the local docs.
+under ignored `tmp/phase4/base-*` and reproducible commands in the local docs.
 The phase-5 time model below completes the “ready to improve” analysis gate.
 The traced vehicle and road calls are five fields apart on both CPUs in this window.
 Phase 5 identifies why cross-CPU endpoint state differs and establishes the
@@ -270,7 +270,7 @@ dependencies. The period-6 and integer-subdivision assumptions are rejected.
    fast, JIT disabled, WHDLoad 20.0. Evidence and reproducible commands are in the local
    harness docs. The earlier emulation result described as “shipped 1.4” was actually 1.3.
 
-   A/B slaves are under ignored `tmp/dev/dist/overlay-cache-ab/`: fixed 1.5b and the
+   A/B slaves are under ignored `tmp/dist/overlay-cache-ab/`: fixed 1.5b and the
    unmodified repository-1.4 rebuild, both built with the same pinned dependencies.
    No equivalence to an unavailable shipped 1.4 is claimed. Real A1200/68040 A/B testing
    is deferred at the user’s request and does not block phase-6 completion. Normal user quit passed on the same 68040 preset using the pinned native
@@ -541,7 +541,7 @@ their original defaults. ReadMe documents the option, off path and PAL beta scop
 `Makefile_windows.mak` already includes all source dependencies.
 
 Local `package_release.py` writes verified level-1 LH5 installer/preinstalled
-archives to `tmp/dev/dist/2.0b/`, with explicit member/checksum manifests.
+archives to `tmp/dist/2.0b/`, with explicit member/checksum manifests.
 Only intended slave, ReadMe, Install script, icon and installer source members change.
 ReadMe and Install use the WHDLoad 20 Install Template, retaining the Test Drive
 file-copy layout, supplied executable, instructions, icons and original credits.

@@ -1,0 +1,71 @@
+{
+  "removed_files": 273639,
+  "removed_bytes": 36444761413,
+  "groups": {
+    "phase4": {
+      "files": 168,
+      "bytes": 9163058213
+    },
+    "phase5": {
+      "files": 10502,
+      "bytes": 1528818526
+    },
+    "phase7": {
+      "files": 64040,
+      "bytes": 633381716
+    },
+    "phase8": {
+      "files": 112132,
+      "bytes": 2462419287
+    },
+    "phase9": {
+      "files": 1662,
+      "bytes": 156135480
+    },
+    "phase10": {
+      "files": 4772,
+      "bytes": 4515286168
+    },
+    "phase11": {
+      "files": 76155,
+      "bytes": 2022844986
+    },
+    "audio": {
+      "files": 33,
+      "bytes": 4087719129
+    },
+    "corner-jump": {
+      "files": 1849,
+      "bytes": 2905446379
+    },
+    "rpm-needle": {
+      "files": 448,
+      "bytes": 2757191159
+    },
+    "steer-reversal": {
+      "files": 381,
+      "bytes": 2078192813
+    },
+    "road-shift": {
+      "files": 1351,
+      "bytes": 1761344775
+    },
+    "wheel-dot": {
+      "files": 58,
+      "bytes": 1011790279
+    },
+    "handling-collision": {
+      "files": 76,
+      "bytes": 931704491
+    },
+    "intro-cadence": {
+      "files": 12,
+      "bytes": 429428012
+    },
+    "corner-video": {
+      "files": 0,
+      "bytes": 0
+    }
+  },
+  "scope": "Generated diagnostic .bin files and text/log files over 1 MiB only. Inputs, distributions, tools, reports, screenshots and live runtime untouched. Retained Countach pre-crash code/chip snapshot."
+}

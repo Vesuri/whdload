@@ -1,0 +1,27 @@
+{
+  "sha256": "ffd5c960322f445e72a02bc47c84312dfb8b189ce8327b55e1211d7fa170148d",
+  "baseText": "0x32dea04",
+  "sizeText": "0x32dea08",
+  "references": [
+    {
+      "pc": "0x5a49e",
+      "target": "0x32dea04",
+      "instruction": "mov dword ptr [rip + 0x328455c], 0"
+    },
+    {
+      "pc": "0x5a4a8",
+      "target": "0x32dea08",
+      "instruction": "mov dword ptr [rip + 0x3284556], 0x7fffffff"
+    },
+    {
+      "pc": "0x5f380",
+      "target": "0x32dea04",
+      "instruction": "mov edi, dword ptr [rip + 0x327f67e]"
+    },
+    {
+      "pc": "0x5f386",
+      "target": "0x32dea08",
+      "instruction": "mov esi, dword ptr [rip + 0x327f67c]"
+    }
+  ]
+}
