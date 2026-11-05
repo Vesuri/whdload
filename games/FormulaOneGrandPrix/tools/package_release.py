@@ -5,7 +5,8 @@
                       replaces an existing archive)
 
 Input, kept local and verified against inputs.sha256: tmp/archives/FormulaOneGrandPrix.lha.
-Output: <dist>/FormulaOneGrandPrix-<ver>.lha (the repository's ignored dist/), with exactly
+Output: <dist>/FormulaOneGrandPrixEnhanced-<version>-<YYYYMMDD>.lha (the repository's ignored
+dist/; version and date from the slave's $VER, common/tools/package_release.py), with exactly
 the input's members, and its .sha256 beside it.
 Changed members are the current release build, tmp/build/release/F1GP.Slave, which make dist
 has just built and whose build.json must match it and the source (G1: the enhancements on unless the
@@ -17,6 +18,7 @@ checked member by member against its stage and the original. LHA names LHa for U
 from pathlib import Path
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -25,6 +27,12 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+# The shared packager's $VER rules (this file shares its module name, so load it by path).
+_spec = importlib.util.spec_from_file_location(
+    'common_package_release', ROOT.parents[1] / 'common/tools/package_release.py')
+_common = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_common)
+version_of, date_of = _common.version_of, _common.date_of
 LHA = os.environ.get('LHA', os.path.expanduser('~/.local/share/amiga/lha-compressor/src/lha'))
 SOURCE = ROOT / 'tmp/archives/FormulaOneGrandPrix.lha'
 TOP, SLAVE = 'FormulaOneGrandPrixHD', 'FormulaOneGrandPrix.slave'
@@ -119,12 +127,15 @@ def main():
     assert b'C3:' not in slave and b'C5:' not in slave and b'VERIFY' not in slave, 'build'
     version, date = re.search(rb'\$VER: ' + SLAVE.encode() + rb' ([0-9.a-z]+) \(([0-9.]+)\)',
                               slave).groups()
+    assert version.decode() == version_of(BUILD / 'F1GP.Slave'), 'version'
+    stamp = date_of(BUILD / 'F1GP.Slave')
     readme = (ROOT / 'release/ReadMe').read_bytes()
     assert b'Version ' + version + b' (' + date + b')' in readme, 'ReadMe entry'
     assert b'Version:  ' + version + b'\n' in readme, 'ReadMe header'
+    assert b'Short:    Formula One Grand Prix Enhanced V' + version + b'\n' in readme, 'ReadMe Short'
     dist = args.dist.resolve()
     dist.mkdir(parents=True, exist_ok=True)
-    out = dist / f'FormulaOneGrandPrix-{version.decode()}.lha'
+    out = dist / f'FormulaOneGrandPrixEnhanced-{version.decode()}-{stamp}.lha'
     if out.exists() and not args.force:
         raise SystemExit(f'{out} exists (FORCE=1 replaces it)')
     with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as stage:

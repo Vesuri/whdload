@@ -1400,20 +1400,21 @@ python3 tools/h2_corner.py stock=tmp/h2/v8-off:8192 corner8=tmp/h2/v8-corner:819
 ## Release archive (G4)
 
 `make dist` rebuilds Codetapper's installer archive (`tmp/archives/FormulaOneGrandPrix.lha`,
-verified against `inputs.sha256` first) as `FormulaOneGrandPrix-<ver>.lha` and its `.sha256`
-in the repository's `dist/`, through `game_dist` in `game.sh` and
-`tools/package_release.py` (`FORCE=1` replaces an existing archive). It packages the
-release build `make dist` has just made in `tmp/build/release` (G1), after checking its
-`build.json` against the slave and the source, takes the version from the slave's `$VER` and requires a matching entry in
-`release/ReadMe`. The archive keeps the original's 18 members; the slave, the ReadMe and
-the nine game icons change, and the icons get `MEMCONFIG=1` after `PRELOAD`, every other
+verified against `inputs.sha256` first) as `FormulaOneGrandPrixEnhanced-<ver>-<YYYYMMDD>.lha`
+and its `.sha256` in the repository's `dist/`, the only release archive, through `game_dist`
+in `game.sh` and `tools/package_release.py` (`FORCE=1` replaces an existing archive). It
+packages the release build `make dist` has just made in `tmp/build/release` (G1), after
+checking its `build.json` against the slave and the source, takes the version and date from
+the slave's `$VER` and requires a matching entry, `Version:` header and "Formula One Grand
+Prix Enhanced V<ver>" `Short:` line in `release/ReadMe`. The archive keeps the original's 18
+members; the slave, the ReadMe and the nine game icons change, and the icons get `MEMCONFIG=1` after `PRELOAD`, every other
 byte kept. The tool re-extracts the archive and checks every
 member against its stage and the original. Bump `DECL_VERSION` and the `$VER` date in
 `src/F1GP.s` and the ReadMe together. A boot check of the packaged slave:
 
 ```sh
 make dist
-lha xqw=tmp/g4/new ../../dist/FormulaOneGrandPrix-2.0b.lha
+lha xqw=tmp/g4/new ../../dist/FormulaOneGrandPrixEnhanced-2.0b-20261102.lha
 AMIGA_SETUP=a1200-040 SLAVE=tmp/g4/new/FormulaOneGrandPrixHD/FormulaOneGrandPrix.slave \
   WHD_ARGS='CUSTOM1=1 MEMCONFIG=1' WARP=1 JOY0=none JOY1=none \
   python3 tools/f1gp.py serve > tmp/g4/serve.log 2>&1 &
