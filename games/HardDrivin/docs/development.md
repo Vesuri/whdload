@@ -39,7 +39,12 @@ tools/build.sh [flags...]` runs the same build (`tmp/build/tool_NAME/`) and copi
 to `OUTPUT_SLAVE`; the commands below use it. Flags are word-split, so listing paths must
 not contain spaces. Tools that assemble by themselves (`build_feel.py`, the C4 probes, the
 Unicorn checks) need the shared environment with the NDK 3.2 includes: `. tools/env.sh`
-first. The VERIFY_DRIVE builds (and VERIFY_SLOW with them) no longer assemble at the
+first. Lists of plans or environment settings kept in a shell variable must be word-split:
+zsh does not split `$N`, so use `${=N}` or run the line through `/bin/bash -c` (the same
+for `env $envs` in the MAME sessions). A failed capture leaves `tmp/prof/ROOT/NAME`
+behind and the rerun stops with `FileExistsError`: delete it first. A run killed by
+`timeout` can leave its FS-UAE running; stop only process IDs verified to belong to that
+run's instance directory. The VERIFY_DRIVE builds (and VERIFY_SLOW with them) no longer assemble at the
 current source: `HardDrivinPhase.s` line 20 is out of displacement range with the drive
 fixture.
 
@@ -449,6 +454,28 @@ python3 tools/hang_probe.py tmp/prof/OUT --plan lap-jump --custom1 2 --records 1
   (the game's code base); the server gives one gdb command 30 minutes, and each breakpoint
   hit with commands costs about 30 ms, so count a few thousand events, not tens of thousands. Games that end show exec's idle loop
   (`stop #$2000` in ROM): WHDLoad runs with NOREQ and has quit.
+
+### Reaching the Phantom race (2026-11-04)
+
+The Phantom (championship) race needs a qualifying lap, which the fixture's driver does not
+make. A probe reaches it from the first race with a patched source copy:
+
+- In the copy's `src/HardDrivinPhantom.s`, add to `_phantom_patches`:
+  `PL_W $11958,$4e71`, `PL_W $1195a,$4e71`, `PL_L $1195c,$50ec9c9e`,
+  `PL_W $11960,$4e71`. This marks the race as qualified (`st G($9C9E)`).
+- Build it with `build_feel.py --source DIR`, and give the capture's `Session` the anchor
+  `0x11664`, the Phantom loop (`capture_feel.py` passes `0x10ed4`, the race loop).
+- The fixture's input does not reach the Phantom loop. Press the gas (the right mouse
+  button) with FS-UAE's `monitor input JOY1_2ND_BUTTON`.
+
+The code (game code-hunk offsets):
+- `$1194c` is the per-game routine. `jsr $10ec8` runs the race, then `tst.b G($9C9E)` at
+  `$1195c` (qualified) leads to the Phantom setup at `$116ee`.
+- The setup sets the gear G($9936) to 1 for the automatic box (else 0) and centres the
+  mouse through −$7ff8(a4).
+- `$11664` is the Phantom loop, the race loop's counterpart. VERIFY_TIME_PHANTOM hooks
+  `$11894`, `$11668`, `$116bc` and `$116e6`. The race loop's own hook is
+  `_dispatch_after_physics`, entered from `$10f28`.
 
 ## Arcade race timing (CUSTOM5=1, ARCADE_TIMING.md)
 

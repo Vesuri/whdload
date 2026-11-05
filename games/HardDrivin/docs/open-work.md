@@ -1,3 +1,35 @@
+# Release 4.0b (2026-11-04)
+
+The user chose to release r39 (H3c 2, ARCADE_HANDLING_PLAN.md) as 4.0b, dated 04.11.2026
+(fork ddaf8365). New installs set CUSTOM1=2 (arcade handling; was 1). The splash offers Race
+timing Amiga or Arcade only; CUSTOM5=2 stays as a tooltype for testing (ARCADE_TIMING.md).
+The fork's archive had 65 members: the earlier 64 plus `source/HardDrivinDepth.s`.
+
+**The A500 cost.** For CUSTOM1=1, the step 5 renderer saves 12.5 ms per swap in window A and
+5.8 ms in B; the step 4 simulation costs 7.1 and 5.8 ms. So CUSTOM1=1 runs at about the
+original's speed. That is arithmetic across two builds, never measured directly. The user:
+"If the net is about 0 on the A500, that's perfectly fine."
+
+**Open:**
+- CUSTOM1=2 costs 12% over CUSTOM1=1 on the flat C1c test ground (r34: 67.7 against
+  60.2 ms a frame), estimated 4–5% in scenery windows (not measured). The user has not
+  accepted it against the 10% budget.
+- The user's verdict on the 90 MPH slide gap (C1f 90 hold, 7.7° arcade against 10.3 A500 /
+  9.5 020) after driving r39. They drive with `make aja` (68040), so the A500's extra
+  1–1.5° of slide is not what they feel.
+- Two ReadMe "Arcade controls" claims come from the code and were never checked in play:
+  joystick and keyboard keep the game's own throttle under arcade handling, and manual gears
+  work with arcade handling.
+- The H3c (2) scratch analyses are in ignored `tmp/hdgrab/` (copied from the session's
+  scratch; their paths are the old repository's): `replay.py` replays a 020 run's per-field
+  `model.bin` inputs through `handling_fx` in the game's drivetrain mode (it reproduced the
+  game's 9.4° exactly; variants for loads, rear torque, constant u); `allarc.py` feeds the
+  twin the arcade's loads, rear force, speed and steering from the MAME `n_trace3` traces
+  (8.6° against the arcade's 7.7°); `coast.py` runs `feel.c1f(S, …, 'hold')` over the C1h
+  runs, arcade against Amiga; `mdump.py` dumps `model.bin` per pass. The MAME traces are
+  `tmp/arcade/mame/c/forces/` (c1f-60/90-hold and -brake) and `tmp/arcade/mame/c/coast/`
+  (C1h).
+
 # The arcade brake (2026-11-01, H3c 1)
 
 ARCADE_HANDLING_PLAN.md "H3, refined" and its gap table (H3a). At CUSTOM1 = 2 full pedal is the

@@ -1,8 +1,11 @@
 # Arcade race timing (CUSTOM5, 2026-10-22)
 
-`C5:L:Race timing:Amiga,Arcade,Arcade with Amiga qualifying time`. CUSTOM5=0 keeps the game's own
+`C5:L:Race timing:Amiga,Arcade`. CUSTOM5=0 keeps the game's own
 clocks, defects included. CUSTOM5=2 (2026-11-03, the user's request for easier testing) is
-CUSTOM5=1 with the track's own qualifying time, 2:00 in Track.DAT, never overwritten.
+CUSTOM5=1 with the track's own qualifying time, 2:00 in Track.DAT, never overwritten. It is a
+testing aid: it works as a tooltype in every build, but the splash offers it ("Arcade with
+Amiga qualifying time") only in `-DVERIFY_CLOCK_TEST` builds (the user's choice for 4.0b,
+2026-11-04).
 CUSTOM5=1 installs `src/HardDrivinClock.s` (release flag `VERIFY_CLOCK`),
 for the SPS 0126 edition and with any CUSTOM1. It is commit 16b1981 on the local branch `harddrivin-handling`, not pushed.
 

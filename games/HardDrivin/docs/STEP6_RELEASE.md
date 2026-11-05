@@ -11,7 +11,8 @@ investigation. No game, Kickstart, WHDLoad or built-slave bytes are tracked.
 
 - WHDLoad 17.0 minimum, with the standard configuration header and startup UI.
 - CUSTOM1: **Enhanced framerate**, jointly controlling simulation and rendering.
-  The installer sets CUSTOM1=1 in every selected new icon; unchecked/0 restores
+  The installer sets CUSTOM1=2 (with arcade handling) in every selected new icon
+  since 4.0b's release (2026-11-04, the user's choice; CUSTOM1=1 before); unchecked/0 restores
   the existing native simulation and renderer. Command-line use requires
   explicit CUSTOM1=1. No ambiguous distinction between absent and zero options.
 - CUSTOM2: existing frame delay, unchanged. The startup list offers 0 through 9;
