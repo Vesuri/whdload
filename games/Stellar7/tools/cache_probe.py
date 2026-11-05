@@ -18,17 +18,17 @@ ROOT=Path(__file__).resolve().parent.parent
 
 def build(prefix, substeps):
     prefix=prefix.resolve();prefix.relative_to(ROOT/'tmp');prefix.parent.mkdir(parents=True,exist_ok=True)
-    relative=lambda p:os.path.relpath(p,ROOT/'whdload')
-    source=(ROOT/'whdload/Stellar7.s').read_text()
+    relative=lambda p:os.path.relpath(p,ROOT/'src')
+    source=(ROOT/'src/Stellar7.s').read_text()
     assert source.count('jsr (resload_SetCPU,a2)')==1
     source=source.replace('jsr (resload_SetCPU,a2)','jsr (resload_SetCPU,a2)\n        bsr cache_probe_boot')
-    simulation=(ROOT/'whdload/sim60.s').read_text().replace('s60_loop_complete:\n','s60_loop_complete:\n        bsr cache_probe_tick\n')
+    simulation=(ROOT/'src/sim60.s').read_text().replace('s60_loop_complete:\n','s60_loop_complete:\n        bsr cache_probe_tick\n')
     sim=prefix.with_suffix('.sim.s');sim.write_text(simulation)
     source=source.replace('INCLUDE sim60.s',f'INCLUDE "{relative(sim)}"')
     source+='\n        INCLUDE "../tools/cache_probe.s"\n'
     src=prefix.with_suffix('.s');src.write_text(source)
     cmd=[os.environ['VASM'],'-m68000','-pic','-x','-devpac','-Fhunkexe','-nosym','-DSIM60=1','-DVERIFY=1',f'-DS60_SUBSTEPS={substeps}', '-I.','-Iinclude','-I'+os.environ['WHDLOAD']+'/Include','-I'+os.environ['WHDLOAD']+'/Src/sources','-I'+os.environ['NDK'],'-L',relative(prefix.with_suffix('.lst')),'-o',relative(prefix.with_suffix('.slave')),relative(src)]
-    with prefix.with_suffix('.log').open('w') as log:subprocess.run(cmd,cwd=ROOT/'whdload',stdout=log,stderr=subprocess.STDOUT,check=True)
+    with prefix.with_suffix('.log').open('w') as log:subprocess.run(cmd,cwd=ROOT/'src',stdout=log,stderr=subprocess.STDOUT,check=True)
 
 
 def read(folder,listing):

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build an experimental installer snapshot from the untouched supplied archive."""
+"""Build an experimental installer snapshot from the untouched supplied archive.
+
+    make dist        (game.sh game_dist; --dist names the output directory)
+"""
+import argparse
 import fcntl
 import hashlib
 import json
@@ -55,22 +59,25 @@ def inventory(folder):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--dist', type=Path, default=ROOT.parents[1]/'dist')
+    args = ap.parse_args()
     os.chdir(ROOT)
-    original = ROOT/'tmp/Stellar7.lha'
+    original = ROOT/'tmp/archives/Stellar7.lha'
     lha = os.environ.get('LHA') or shutil.which('lha')
     if not lha or not original.is_file():
-        raise SystemExit('Need LHa for UNIX and tmp/Stellar7.lha; source amiga/env.sh.')
+        raise SystemExit('Need LHa for UNIX and tmp/archives/Stellar7.lha (make unpack).')
     revision = subprocess.check_output(['git', 'rev-parse', '--short=12', 'HEAD'], text=True).strip()
-    dirty = bool(subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal']))
+    # Only this game's files: other games' work in progress does not make this build dirty.
+    dirty = bool(subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal', '--', '.']))
     build_id = revision + ('-dirty' if dirty else '')
-    out = ROOT/'tmp/dist'
+    out = args.dist.resolve()
     out.mkdir(parents=True, exist_ok=True)
     archive = out/f'Stellar7_{build_id}_experimental_install.lha'
     with (ROOT/'tmp/rate-matrix.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        with (out/'build.log').open('w') as log:
-            subprocess.run(['make', '-C', 'whdload', 'all', 'sim',
-                            'VASMFLAGS=', 'VERIFY_FLAGS=', 'SIM68000_SUBSTEPS=3'],
+        with (ROOT/'tmp/dist-build.log').open('w') as log:
+            subprocess.run(['make', 'slave', 'VERIFY_FLAGS=', 'SIM68000_SUBSTEPS=3'],
                            check=True, stdout=log, stderr=subprocess.STDOUT)
         with tempfile.TemporaryDirectory(prefix='package-', dir=ROOT/'tmp') as scratch:
             scratch = Path(scratch)
@@ -83,7 +90,7 @@ def main():
                       'Stellar7-Sim68000.Slave': 'Stellar7-Sim68000.Slave',
                       'Stellar7-Sim60.Slave': 'Stellar7-Sim60.Slave'}
             for target, source in builds.items():
-                data = (ROOT/'whdload'/source).read_bytes()
+                data = (ROOT/'tmp/build/release'/source).read_bytes()
                 assert b'WHDLOADS' in data
                 for forbidden in (b'Movement and firing fixture', b'Deterministic menu fixture'):
                     assert forbidden not in data, 'VERIFY build cannot be packaged'
@@ -167,7 +174,7 @@ under Amiga Installer. Archive integrity and extracted contents are verified.
                           members={p: hashlib.sha256(data).hexdigest() for p, data in sorted(expected.items())})
             archive.with_suffix('.json').write_text(json.dumps(report, indent=2)+'\n')
             archive.with_suffix('.sha256').write_text(report['sha256']+'  '+archive.name+'\n')
-            print(archive.relative_to(ROOT))
+            print(archive)
             print(f'Archive integrity and all {len(expected)} extracted files verified ({report["bytes"]} bytes).')
 
 

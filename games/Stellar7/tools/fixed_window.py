@@ -49,6 +49,8 @@ if a.checkpoints != sorted(set(a.checkpoints)) or any(x <= a.frame for x in a.ch
 if a.native_events and (a.tick is not None or not a.state_only or a.swaps_only or a.latency_listing or not a.checkpoints):
     p.error('--native-events requires native --frame/--checkpoints and --state-only, without another field observer')
 root=Path(__file__).resolve().parent.parent
+# common/run.sh runs each instance in tmp/run/<INSTANCE>/.
+RUN=root/'tmp/run'/(os.environ.get('INSTANCE') or 'default')/'.run'
 os.chdir(root)
 out=a.out.resolve(); out.relative_to(root/'tmp')
 assert ' ' not in str(out.relative_to(root)), 'capture subdirectory must not contain spaces (gdb limitation)'
@@ -65,16 +67,16 @@ def cmd(text, timeout=900):
 try:cmd('quit',5)
 except (OSError,RuntimeError):pass
 if a.prebuilt is None:
-    subprocess.run(['make','-s','-C','whdload','verify'],check=True)
-    selected_slave = Path('whdload/Stellar7.Slave')
+    subprocess.run(['make','-s','verify','VARIANT=Stellar7'],check=True)
+    selected_slave = Path('tmp/build/verify/Stellar7.Slave')
 else:
     selected_slave = a.prebuilt
 (out/'slave.slave').write_bytes(selected_slave.read_bytes())
 env=dict(os.environ,SLAVE=str(out/'slave.slave'),WHD_ARGS='CUSTOM5=1 '+os.environ.get('WHD_ARGS',''),JOY0='none',JOY1='none',DETERMINISTIC='1',WARP='1')
 os.environ['SLAVE']=env['SLAVE']
-ntsc_mode = int(env.get('NTSC_MODE', '1'))
+ntsc_mode = int(env.get('NTSC', '1'))
 if ntsc_mode not in (0, 1):
-    raise ValueError('NTSC_MODE must be 0 or 1')
+    raise ValueError('NTSC must be 0 or 1')
 field_hz = 60 if ntsc_mode else 50
 fast=int(env.get('FAST_KB','0')); chip=int(env.get('CHIP_KB','512'))
 slow_match = re.search(r'--slow_memory=(\d+)', env.get('EXTRA_ARGS', ''))
@@ -153,7 +155,7 @@ try:
     (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=struct.unpack_from('>H',mem,data-base+0x1e96)[0],tick=a.tick,level_filter=a.level,session_filter=a.session,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast,slow_kb=slow,extra_args=env.get('EXTRA_ARGS',''),whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS',''),ntsc_mode=ntsc_mode,field_hz=field_hz,observed_exec_hz=observed_hz),indent=2)+'\n')
     (out/'state.bin').write_bytes(mem[data-base:data-base+0x823c])
     if a.retain_command:
-        pid=int((root/'amiga/.run/fsuae.pid').read_text().strip())
+        pid=int((RUN/'fsuae.pid').read_text().strip())
         actual=subprocess.run(['ps','-ww','-p',str(pid),'-o','command='],capture_output=True,text=True,check=True).stdout.strip()
         assert actual and Path(actual.split()[0]).name.startswith('fs-uae'), 'recorded pid is not the project emulator'
         (out/'emulator-command.txt').write_text(actual+'\n')
@@ -235,7 +237,7 @@ delete''')
             break
         previous_boundary=checkpoint
     # Retain the emulator configuration log for comparison with observed state.
-    emulator_log = root/'amiga/.run/fsuae/Cache/Logs/fs-uae.log.txt'
+    emulator_log = RUN/'fsuae/Cache/Logs/fs-uae.log.txt'
     if emulator_log.exists():
         with emulator_log.open(errors='replace') as source:
             settings = [line for line in source if 'Set option ' in line or

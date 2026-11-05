@@ -36,8 +36,8 @@ def run(prefix,machines,end):
                 if folder.exists():raise ValueError(f'Use a fresh prefix; preserving {folder}')
                 flags=f'-DSIM60=1 -DS60_SUBSTEPS={n} -DLEVEL_TEST={scale(201)-1} -DLEVEL_LAST=6 -DAPPROACH_TYPE=10'
                 if n==3:flags+=' -DPOLYGON_BLIT_IRQ=1'
-                flags+=' -L '+os.path.relpath(listing,ROOT/'whdload')
-                env=dict(os.environ,CPU=cpu,AMIGA_MODEL=model,CHIP_KB=str(chip),FAST_KB=str(fast),SLOW_KB=str(slow),NTSC_MODE=str(ntsc),EXTRA_ARGS=(f'--uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency={hz} --uae_cpu_cycle_exact=true' if hz else ''),WHD_ARGS='CUSTOM1=1 CUSTOM3=1',VERIFY_FLAGS=flags)
+                flags+=' -L '+os.path.relpath(listing,ROOT)
+                env=dict(os.environ,CPU=cpu,AMIGA_MODEL=model,CHIP_KB=str(chip),FAST_KB=str(fast),SLOW_KB=str(slow),NTSC=str(ntsc),EXTRA_ARGS=(f'--uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency={hz} --uae_cpu_cycle_exact=true' if hz else ''),WHD_ARGS='CUSTOM1=1 CUSTOM3=1',VERIFY_FLAGS=flags)
                 if model=='A1200':env['KICKSTART']=os.environ['KICKSTART_A1200']
                 points=[scale(t) for t in range(900,end+1,300)]
                 command=[sys.executable,'tools/fixed_window.py',os.path.relpath(folder,ROOT),'--tick',str(scale(600)),'--tick-checkpoints',*map(str,points),'--level','6','--state-only','--fields','1','--stop-on-inactive']
@@ -60,7 +60,7 @@ def run(prefix,machines,end):
                 report.write_text(json.dumps(result,indent=2)+'\n');results[machine]=result
                 print(machine,json.dumps(result['measurement']),flush=True)
         finally:
-            with (prefix/'restore.log').open('w') as log:subprocess.run(['make','-s','-C','whdload'],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
+            with (prefix/'restore.log').open('w') as log:subprocess.run(['make','-s','slave'],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
     return results
 
 

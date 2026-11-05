@@ -15,8 +15,8 @@ ROOT=Path(__file__).resolve().parent.parent
 
 def build(prefix, flags, swap_only=True):
     prefix=prefix.resolve();prefix.relative_to(ROOT/'tmp');prefix.parent.mkdir(parents=True,exist_ok=True)
-    relative=lambda p:os.path.relpath(p,ROOT/'whdload')
-    draw=(ROOT/'whdload/draw60.s').read_text()
+    relative=lambda p:os.path.relpath(p,ROOT/'src')
+    draw=(ROOT/'src/draw60.s').read_text()
     assert draw.count('        S60_CALL $2bb4')==1
     draw=draw.replace('        S60_CALL $2bb4','        bsr s60_swap_probe')
     draw+='''
@@ -43,16 +43,16 @@ s60_swap_probe:
         rts
 '''
     drawpath=prefix.with_suffix('.draw.s');drawpath.write_text(draw)
-    sim=(ROOT/'whdload/sim60.s').read_text()
+    sim=(ROOT/'src/sim60.s').read_text()
     assert sim.count('INCLUDE draw60.s')==1
     sim=sim.replace('INCLUDE draw60.s',f'INCLUDE "{relative(drawpath)}"')
     simpath=prefix.with_suffix('.sim.s');simpath.write_text(sim)
-    source=(ROOT/'whdload/Stellar7.s').read_text()
+    source=(ROOT/'src/Stellar7.s').read_text()
     assert source.count('INCLUDE sim60.s')==1
     source=source.replace('INCLUDE sim60.s',f'INCLUDE "{relative(simpath)}"')
     src=prefix.with_suffix('.s');src.write_text(source)
     command=[os.environ['VASM'],'-m68000','-pic','-x','-devpac','-Fhunkexe','-nosym','-DSIM60=1','-DVERIFY=1','-DS60_SUBSTEPS=12',f'-DSWAP_ONLY={int(swap_only)}',*flags,'-I.','-Iinclude','-I'+os.environ['WHDLOAD']+'/Include','-I'+os.environ['WHDLOAD']+'/Src/sources','-I'+os.environ['NDK'],'-L',relative(prefix.with_suffix('.lst')),'-o',relative(prefix.with_suffix('.slave')),relative(src)]
-    with prefix.with_suffix('.log').open('w') as log:subprocess.run(command,cwd=ROOT/'whdload',stdout=log,stderr=subprocess.STDOUT,check=True)
+    with prefix.with_suffix('.log').open('w') as log:subprocess.run(command,cwd=ROOT/'src',stdout=log,stderr=subprocess.STDOUT,check=True)
 
 
 if __name__=='__main__':

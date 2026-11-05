@@ -18,35 +18,36 @@ extended-combat, input, lifecycle and both launcher checks pass. Step 5 is
 complete; broader gameplay, physical-control, pace and audio playtesting remain
 open in step 6.
 
-Source the shared environment and launch the separate experimental build:
+Launch the separate experimental build from this directory:
 
 ```sh
-source amiga/env.sh
-amiga/play60.sh
+make play60                      # the default machine: A500, 15 Hz
+make play60 SETUP=a1200-fast     # 60 Hz
 ```
 
 The launcher resolves `AMIGA_SETUP` before selecting by `CPU` (default 68000),
 enables `CUSTOM1=1` and uses
-normal controls and sound. Build both variants with `make -C whdload sim`, or
-use `sim68000` / `sim60` separately. The resulting files are
-`whdload/Stellar7-Sim68000.Slave` and `whdload/Stellar7-Sim60.Slave`.
+normal controls and sound. `make slave` builds all three variants, and
+`make slave VARIANT=Stellar7-Sim68000` (or `Stellar7-Sim60`) builds one. The resulting files are
+`tmp/build/release/Stellar7-Sim68000.Slave` and `tmp/build/release/Stellar7-Sim60.Slave`.
 For real hardware, copy the appropriate variant; the slaves do not switch
 rates at runtime. Scripted tests use the existing VERIFY fixtures.
 
-To try 20 Hz on the 68000, use `SIM68000_SUBSTEPS=4 amiga/play60.sh`.
+To try 20 Hz on the 68000, use `make play60 SIM68000_SUBSTEPS=4`.
 Without that override the next launch rebuilds the selected 15 Hz default.
 
 Build the current experimental installer archive with `make dist`. The `.lha`,
-checksum and verification report are written to `tmp/dist/`. It includes both
+checksum and verification report are written to the repository's `dist/`. It includes both
 CPU builds and an installer choice; original English NTSC disks are required.
 
 Read [current status and remaining work](docs/open-work.md),
 [build and validation instructions](docs/development.md), and
 [internals and measurements](docs/internals.md).
 
-The original playable pack belongs in ignored `tmp/game/Stellar7NTSC/`.
-`amiga/run.sh` boots it. `make -C whdload` builds the reconstructed development
-loader against the shared WHDLoad 20.0 KickEmu sources (`$WHDLOAD`).
+`make unpack ARCHIVES=<directory>` installs the original playable pack into ignored
+`tmp/game/Stellar7NTSC/`; `make run SLAVE=original` boots it unchanged. `make slave
+VARIANT=Stellar7` builds the reconstructed development loader against the shared WHDLoad
+KickEmu sources (`$WHDLOAD`).
 That normal build retains the earlier opt-in five-Hz timing prototype; it
 does not contain the fixed-rate conversion.
 

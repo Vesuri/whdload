@@ -10,20 +10,19 @@ Input history supplies each tick's recorded controls; native modal input is live
 Selected-rate checks pass. The normal loader remains unchanged.
 
 ```sh
-source amiga/env.sh
-make -C whdload sim                         # both playable variants
-amiga/play60.sh                             # default A500, 15 Hz
-SIM68000_SUBSTEPS=4 amiga/play60.sh          # A500 playtest at 20 Hz
+. ../../common/env.sh
+make slave                         # both playable variants
+make play60                             # default A500, 15 Hz
+make play60 SIM68000_SUBSTEPS=4          # A500 playtest at 20 Hz
 CPU=68020 AMIGA_MODEL=A1200 CHIP_KB=2048 FAST_KB=4096 SLOW_KB=0 \
-  KICKSTART="$KICKSTART_A1200" amiga/play60.sh # 60 Hz
+  KICKSTART="$KICKSTART_A1200" make play60 # 60 Hz
 ```
 
-`sim68000` builds `Stellar7-Sim68000.Slave`, default N=3; `sim60` builds
-`Stellar7-Sim60.Slave`, default N=12. `SIM68000_SUBSTEPS=4` selects N=4 for
+The `Stellar7-Sim68000` variant has default N=3; `Stellar7-Sim60` has default N=12. `SIM68000_SUBSTEPS=4` selects N=4 for
 the former. Named machine presets take precedence over an explicit `CPU`,
 matching the shared launcher. `tools/test_play60_launcher.py` checks selection
 without booting, including contradictory CPU settings and invalid presets.
-Explicit `VASMFLAGS=-DS60_SUBSTEPS=N` still selects diagnostic
+Explicit `VASM_EXTRA=-DS60_SUBSTEPS=N` still selects diagnostic
 rates for the latter. For actual hardware select the appropriate slave file;
 there is no runtime CPU dispatch or rate switching inside a slave. The source
 and matrix-driver default remain N=12, so use `--substeps 3` for A500 matrix runs.
@@ -37,14 +36,15 @@ remains byte-identical.
 
 ## Installer archive
 
-Run `make dist` from the repository root. It sources the shared environment,
-forces fresh non-VERIFY builds, then creates
-`tmp/dist/Stellar7_<commit>_experimental_install.lha` with an adjacent SHA-256
-file and content-validation report. A dirty checkout is labelled in the name.
+Run `make dist` in this directory (or `make dist GAME=Stellar7` at the repository root;
+`game.sh` hands it to `tools/package_release.py`). It forces fresh non-VERIFY builds,
+then creates `dist/Stellar7_<commit>_experimental_install.lha` at the repository root
+with an adjacent SHA-256 file and content-validation report. Uncommitted changes in
+this game's directory label the name as dirty.
 This is a commit-labelled experimental snapshot, not a new stable release
 version or completion of step 6.
 
-Packaging starts with a fresh extraction of `tmp/Stellar7.lha`. It replaces the
+Packaging starts with a fresh extraction of `tmp/archives/Stellar7.lha`. It replaces the
 normal slave, ReadMe and Install-Stellar7 script, adds the two CPU-specific
 simulation slaves, and preserves all eleven other original members exactly.
 The installer targets English NTSC disks and offers 15 Hz for 68000/68010,
@@ -84,13 +84,13 @@ acceptable gameplay pace. Use normal-speed launches with sound and real input,
 one at a time, after debugger captures have stopped. From a fresh shell:
 
 ```sh
-source amiga/env.sh
-AMIGA_SETUP=a500 NTSC_MODE=1 DEBUG=0 WARP=0 SOUND=1 SILENT=0 \
-  WINDOW=front JOY0=mouse JOY1=keyboard WHD_ARGS='' SLAVE='' amiga/run.sh
-AMIGA_SETUP=a500 NTSC_MODE=1 DEBUG=0 WARP=0 SOUND=1 SILENT=0 \
-  WINDOW=front JOY0=mouse JOY1=keyboard amiga/play60.sh
-AMIGA_SETUP=a1200-fast NTSC_MODE=1 DEBUG=0 WARP=0 SOUND=1 SILENT=0 \
-  WINDOW=front JOY0=mouse JOY1=keyboard amiga/play60.sh
+. ../../common/env.sh
+AMIGA_SETUP=a500 NTSC=1 DEBUG=0 WARP=0 SOUND=1 SILENT=0 \
+  WINDOW=front JOY0=mouse JOY1=keyboard WHD_ARGS='' make run SLAVE=original
+AMIGA_SETUP=a500 NTSC=1 DEBUG=0 WARP=0 SOUND=1 SILENT=0 \
+  WINDOW=front JOY0=mouse JOY1=keyboard make play60
+AMIGA_SETUP=a1200-fast NTSC=1 DEBUG=0 WARP=0 SOUND=1 SILENT=0 \
+  WINDOW=front JOY0=mouse JOY1=keyboard make play60
 ```
 
 The first launch uses the installed original slave as the pace/loader reference.
@@ -138,11 +138,11 @@ when testing the playable 68000 path. The all-off diagnostic definitions
 preceding input-history N=12 release/VERIFY bytes.
 
 ```sh
-source amiga/env.sh
+. ../../common/env.sh
 tools/rate_matrix.sh tmp/render-check --substeps 3 --machines a500 --routes type10-heavy sol boss
 tools/rate_matrix.sh tmp/render-stock --substeps 12 --machines a1200-stock --routes type10-heavy
 WHD_ARGS='CUSTOM1=1 CUSTOM3=1' \
-VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=3 -DPOLYGON_BLIT_IRQ=1 -DRETICLE_TEST=100 -L ../tmp/reticle.lst' \
+VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=3 -DPOLYGON_BLIT_IRQ=1 -DRETICLE_TEST=100 -L tmp/reticle.lst' \
 python3 tools/fixed_window.py tmp/reticle --tick 101 --state-only --fields 1
 cp tmp/reticle/slave.slave tmp/reticle.slave
 python3 tools/reticle_state.py tmp/reticle --listing tmp/reticle.lst
@@ -189,9 +189,9 @@ Run one capture at a time, with a fresh prefix. Automated serial runners use
 `tmp/rate-matrix.lock`:
 
 ```sh
-source amiga/env.sh
+. ../../common/env.sh
 WHD_ARGS='CUSTOM1=1' \
-VERIFY_FLAGS='-DSIM60=1 -DHISTORY_TEST=1 -DHISTORY_QUEUE_TEST=1 -L ../tmp/input-edge.lst' \
+VERIFY_FLAGS='-DSIM60=1 -DHISTORY_TEST=1 -DHISTORY_QUEUE_TEST=1 -L tmp/input-edge.lst' \
 python3 tools/fixed_window.py tmp/input-edge --tick 200 --tick-checkpoints 220 --state-only --fields 1
 cp tmp/input-edge/slave.slave tmp/input-edge.slave
 python3 tools/input_history_state.py tmp/input-edge/checkpoints/220 --fixture
@@ -226,7 +226,7 @@ Normal and playable release builds are restored after validation.
 Use fresh prefixes and one capture at a time:
 
 ```sh
-source amiga/env.sh
+. ../../common/env.sh
 tools/rate_matrix.sh tmp/current60/matrix
 python3 tools/rate_matrix_report.py tmp/current60/matrix
 tools/rate_matrix.sh tmp/current60/native-combat --routes native-type10-early native-type10-late native-boss
@@ -266,8 +266,8 @@ evidence is under `tmp/input-history/lifecycle`.
 
 ## Substep validation
 
-Build an explicit rate with `make -C whdload sim60 VASMFLAGS=-DS60_SUBSTEPS=12`
-or a diagnostic with `make -C whdload verify VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=12 ...'`.
+Build an explicit rate with `make slave VARIANT=Stellar7-Sim60 VASM_EXTRA=-DS60_SUBSTEPS=12`
+or a diagnostic with `make verify VARIANT=Stellar7 VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=12 ...'`.
 The current ABI version word keeps layout 30 in its low byte and encodes 12-N
 in its high byte. Layout 29 remains readable for the restoration reference.
 Readers must decode it through
@@ -297,7 +297,7 @@ The private groups use tick 100 for injection and tick 101 for capture:
 | scan-sort | SCAN_TWIN=1 SCAN_TEST=100 SCAN_FLAG_TEST=1 SHOT_TEST=100 SORT_TWIN=1 SORT_TEST=100 DISTANCE_TWIN=1 DISTANCE_TEST=100 |
 
 Prefix each definition with `-D` in `VERIFY_FLAGS`. Retain the exact listing
-with `-L ../tmp/NAME.lst` and the corresponding `tmp/NAME.slave`. Capture with
+with `-L tmp/NAME.lst` and the corresponding `tmp/NAME.slave`. Capture with
 `fixed_window.py tmp/NAME --prebuilt tmp/NAME.slave --tick 101 --state-only
 --fields 1`, supplying the same VERIFY_FLAGS and only `CUSTOM1=1 CUSTOM3=1`
 in WHD_ARGS. Run one capture at a time. Validate with the group reader above;
@@ -337,7 +337,7 @@ To reproduce the retained lower-rate experiments, run serially with a fresh
 prefix per build:
 
 ```sh
-source amiga/env.sh
+. ../../common/env.sh
 for n in 1 2 3 4 6; do
   tools/rate_matrix.sh tmp/candidate-n$n --substeps "$n" --routes sol type10-early type10-late boss
   python3 tools/rate_matrix_report.py tmp/candidate-n$n --routes sol type10-early type10-late boss
@@ -352,7 +352,7 @@ the ordinary candidate report still requires all eight machines.
 The retained N=1 regression below requires explicit `S60_SUBSTEPS=1`.
 The source-default regression uses `SIM60=1` alone and must report N=12;
 the 68000 regression adds `S60_SUBSTEPS=3` and must report N=3. Retain a release
-listing with `make -C whdload sim60 VASMFLAGS='-L ../tmp/selected-release.lst'`
+listing with `make slave VARIANT=Stellar7-Sim60 VASM_EXTRA='-L tmp/selected-release.lst'`
 and copy its slave to `tmp/selected-release.slave`; run
 `python3 tools/audit_hooks.py tmp/selected-release.lst` against that exact build.
 For route comparisons, capture 68020 + fast RAM with `SLOW_DRAW=20` at ticks
@@ -369,7 +369,7 @@ for early exits. Capture restarted ticks 50→125 on A500 and SLOW_DRAW=20
 68020, with `--level 6` for exits. Validate with `death_state.py` (and
 `--decline` for No) or `level_state.py`, then compare both endpoint pairs.
 Keep the ordinary CUSTOM1-off frame-90 capture for `check_disabled.py` with
-its exact listing and menu-only allowance. `amiga/play60.sh` must also reach
+its exact listing and menu-only allowance. `make play60` must also reach
 the native menu using its default release/CUSTOM1 setting with VERIFY absent.
 These selected-rate checks do not establish physical-input or audible-output
 playtesting. Evidence is retained under `tmp/rate-selected-n1`.
@@ -378,8 +378,8 @@ For matched A500 presentation comparisons, record the corresponding native frame
 windows, rather than comparing only the shorter 100-field spot references:
 
 ```sh
-source amiga/env.sh
-CPU=68000 AMIGA_MODEL=A500 CHIP_KB=512 FAST_KB=0 SLOW_KB=1536 NTSC_MODE=1 VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=12 -DNATIVE_SCENE=6 -DAPPROACH_TYPE=10 -L ../tmp/native-exact.lst' WHD_ARGS='CUSTOM3=1' python3 tools/fixed_window.py tmp/native-exact --frame 150 --level 6 --checkpoints 200 375 450 --state-only --native-events --fields 1
+. ../../common/env.sh
+CPU=68000 AMIGA_MODEL=A500 CHIP_KB=512 FAST_KB=0 SLOW_KB=1536 NTSC=1 VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=12 -DNATIVE_SCENE=6 -DAPPROACH_TYPE=10 -L tmp/native-exact.lst' WHD_ARGS='CUSTOM3=1' python3 tools/fixed_window.py tmp/native-exact --frame 150 --level 6 --checkpoints 200 375 450 --state-only --native-events --fields 1
 cp tmp/native-exact/slave.slave tmp/native-exact.slave
 python3 tools/native_rate.py tmp/native-exact --listing tmp/native-exact.lst --scene type10 --window 150 200 --window 375 450
 ```
@@ -411,7 +411,7 @@ and VERIFY builds omit this fixture. Do not resume a pre-fixture baseline
 under changed source identity; retain its directory and use a fresh prefix.
 
 
-Source `amiga/env.sh`, then run `tools/rate_matrix.sh tmp/rate-current` for
+Run `tools/rate_matrix.sh tmp/rate-current` for
 the current default, or `tools/rate_matrix.sh tmp/rate-reference --substeps 12`
 for a fresh N=12 reference. Retain existing evidence under its original prefix.
 The driver runs one capture at a time and restores the normal development build.
@@ -524,12 +524,14 @@ records CACR after SetCPU and at tick 200; it changes no cache enables and must
 never be used for performance comparisons. Its 68000 guard is separately tested.
 
 Keep supplied archives and all derived game material in ignored `tmp/`.
-The installer is `tmp/Stellar7.lha`; the Retroplay pack is
-`tmp/Stellar7_v1.0_NTSC_2026.lha`. Extract them under `tmp/installer/` and
-`tmp/game/` respectively. The playable directory is `tmp/game/Stellar7NTSC/`.
+`inputs.sha256` pins the installer `Stellar7.lha` and the Retroplay pack
+`Stellar7_v1.0_NTSC_2026.lha`; `make unpack ARCHIVES=<directory>` copies them to
+`tmp/archives/` and unpacks both into `tmp/game/` (the installer as `Stellar7HD/`).
+The playable directory is `tmp/game/Stellar7NTSC/`.
 
-Source `amiga/env.sh`, which loads AmigaXDev's shared environment through
-`AMIGA_ENV` (default `~/.local/share/amiga/env.sh`). Overrides include
+The `make` targets load AmigaXDev's shared environment (`common/env.sh` sources
+`AMIGA_ENV`, default `~/.local/share/amiga/env.sh`); before running a tool by hand,
+source it with `. ../../common/env.sh`. Overrides include
 `AMIGA_PREFIX`, `AMIGA_TOOLCHAIN`, `KICKSTART` (host A600 3.1), `KICK13`, `RTB`,
 `KICKSTART_A1200`, `WORKBENCH_ADF`, `WHDLOAD`, `WHDLOAD_BINARY`, `FSUAE`, `VASM`,
 `NDK`, and `FSUAE_COMMON`. See AmigaXDev `docs/environment.md`. The shared
@@ -539,7 +541,7 @@ helpers are AmigaXDev's `amigaxdev` package (`tools/_amigaxdev.py` finds it
 under any python3): `python3 -m amigaxdev.disasm disd DUMP BASE HUNKBASE START
 END` disassembles by hunk offset, `python3 -m amigaxdev.disasm hotspots --label
 s7 TRACE DUMP BASE HUNKBASE OFF[,OFF...]` lists the hottest instructions, and
-`python3 -m amigaxdev.patchlist SLAVE LIST_OFFSET` decodes a patch list. The makefile takes API headers and KickEmu sources directly from
+`python3 -m amigaxdev.patchlist SLAVE LIST_OFFSET` decodes a patch list. The build takes API headers and KickEmu sources directly from
 `$WHDLOAD/Include` and `$WHDLOAD/Src/sources`; do not use removed vendored paths.
 Missing inputs are reported explicitly. There are no fallbacks into another
 project. The SIM60 type-10 combat build has also been checked byte-identical
@@ -564,11 +566,10 @@ not expose the FS-UAE process even while it is alive. Use the existing VERIFY
 fixtures for scripted gameplay controls; they do not require host app access.
 Physical input and audible output still need a separate check.
 
-`amiga/play60.sh` builds and starts the CPU-selected experimental conversion
+`make play60` builds and starts the CPU-selected experimental conversion
 with normal controls and sound. It selects `Stellar7-Sim68000.Slave` or
-`Stellar7-Sim60.Slave` and defaults to CUSTOM1=1; CPU/memory/display overrides
-match `amiga/run.sh`.
-To build without launching, source `amiga/env.sh` and run `make -C whdload sim60`.
+`Stellar7-Sim60.Slave` and defaults to CUSTOM1=1; every `make run` option applies.
+To build without launching, run `make slave VARIANT=Stellar7-Sim60`.
 These builds contain no VERIFY fixtures. The selected N=3/N=12 launcher smoke
 checks reach the native menu with 107/106 installed hooks and release bytes
 matching the audited builds. They use debug/warp/silent mode and disconnected
@@ -578,14 +579,15 @@ contradictory CPU=68000 before build selection. They do not verify interactive g
 If overriding WHD_ARGS, include CUSTOM1=1 to enable the replacement. Current
 selected-rate performance and its scene limits are recorded in internals.
 
-`amiga/run.sh` boots the shipped slave windowed with sound (debug and warp runs are silent
-and open behind other windows; `SOUND=` and `WINDOW=` override). Defaults: 68000,
-512 KB chip, 1536 KB slow RAM, no fast RAM, NTSC. This is an A500-equivalent
+`make run SLAVE=original` boots the shipped slave windowed with sound (debug and warp runs
+are silent and open behind other windows; `SOUND=` and `WINDOW=` override); without
+`SLAVE`, `make run` builds and boots the release `Stellar7` variant. Defaults (`game.conf`,
+`SETUP=custom`): 68000, 512 KB chip, 1536 KB slow RAM, no fast RAM, NTSC. This is an A500-equivalent
 bus configuration with enough memory for WHDLoad. The supplied game is NTSC;
-the simulation uses 5*N Hz (default N=12) regardless of display mode. `NTSC_MODE=1` uses the emulator's `uae_ntsc=true` core option.
+the simulation uses 5*N Hz (default N=12) regardless of display mode. `NTSC=1` uses the emulator's `uae_ntsc=true` core option.
 The older `ntsc_mode` option did not alter this emulator's PAL scan timing.
 The driver now rejects a requested mode that disagrees with Exec's observed
-field frequency. NTSC boot and scan timing are verified. Use `NTSC_MODE=0` to reproduce
+field frequency. NTSC boot and scan timing are verified. Use `NTSC=0` to reproduce
 the earlier PAL baseline and prototype measurements. GLib queue warnings also occur
 in successful PAL runs and are not proof of a stall.
 
@@ -704,9 +706,8 @@ the negative capture must stop at the mismatch handler, not reach its requested
 completed tick. Diagnostics are absent without VERIFY. Paired performance and
 five-checkpoint gameplay evidence is in `tmp/sort-inline-long-validation.json`.
 
-`make -C whdload` builds the normal development loader. `make -C whdload verify`
-builds the menu fixture; `SLAVE=whdload/Stellar7.Slave WHD_ARGS=CUSTOM5=1`
-selects it in `amiga/run.sh`. Both retain the original CRC acceptance check. `CUSTOM1=1` enables the
+`make slave VARIANT=Stellar7` builds the normal development loader. `make verify VARIANT=Stellar7`
+builds the menu fixture; `make run BUILD=verify WHD_ARGS=CUSTOM5=1` boots it. Both retain the original CRC acceptance check. `CUSTOM1=1` enables the
 experimental fixed-step timing patches; without it the game code is unchanged
 except for explicitly enabled VERIFY fixtures.
 SIM60 labels CUSTOM1 with its compiled rate (“Experimental 60 Hz simulation”
@@ -749,7 +750,7 @@ semantics require separate evidence.
 
 The 68020 configuration uses `AMIGA_MODEL=A1200 KICKSTART=$KICKSTART_A1200
 CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 SLOW_KB=0` after sourcing
-`amiga/env.sh`. This is an A1200 with fast RAM, not a stock A1200.
+`../../common/env.sh`. This is an A1200 with fast RAM, not a stock A1200.
 
 `tools/state_summary.py CAPTURE...` reports only mapped player/RNG/timer state.
 It is not a full-state equivalence test. `tools/compare_traces.py A/trace.bin
@@ -760,7 +761,7 @@ between the current repeated captures instead of masking them.
 
 ## Fixed-step timing tests
 
-`NTSC_MODE=0 WHD_ARGS='CUSTOM1=1 CUSTOM3=1' python3 tools/fixed_window.py
+`NTSC=0 WHD_ARGS='CUSTOM1=1 CUSTOM3=1' python3 tools/fixed_window.py
  tmp/prof/fixed-a500 --frame 115 --fields 100 --checkpoints 140 160`
 uses fixed timing plus the VERIFY native movement/firing route. `CUSTOM3`
 requires the `CUSTOM5` menu fixture (enabled by the driver). It supplies forward
@@ -1183,7 +1184,7 @@ after tick 1210, before its first native decrement. With `POWERS_TEST=1205`,
 its first decrement must then occur at tick 1222, instead of 1217. This tests
 refreshing the same native value, which cannot be detected by value changes alone.
 
-The 68000 update-cost profile is reproduced with `NTSC_MODE=1
+The 68000 update-cost profile is reproduced with `NTSC=1
 VERIFY_FLAGS=-DSIM60=1 WHD_ARGS='CUSTOM1=1 CUSTOM3=1' python3
 tools/fixed_window.py tmp/prof/update-cost --tick 300 --tick-checkpoints 600
 --fields 10`. Compare completed-call cycle costs, not the short catch-up count
@@ -1957,7 +1958,7 @@ to 4 after the late-combat comparison described below. Both CPUs match baseline 
 at 1800/2400 with all six resets passing; heavy-window mean update cost falls
 1.99% on A500 and 2.09% on 68020. This does not resolve heavy A500 overload.
 Use the makefile for retained listings so builds inherit shared WHDLoad paths,
-e.g. `make -C whdload verify VERIFY_FLAGS="-DSIM60=1 -L ../tmp/cache.lst"`.
+e.g. `make verify VARIANT=Stellar7 VERIFY_FLAGS="-DSIM60=1 -L tmp/cache.lst"`.
 
 ### Radar backup flags in state comparisons
 
@@ -2265,7 +2266,7 @@ and producers whose sites are listed but not executed are not validated by
 these traces; the report records actual sites. Other scratch consumers and
 unseen rendering-to-simulation paths remain outside this check.
 
-The retained N=12 SIM60 type-10 combat route passes `NTSC_MODE=0` with
+The retained N=12 SIM60 type-10 combat route passes `NTSC=0` with
 Exec reporting 50 Hz. Matched gameplay/HUD/fresh projection at ticks 1800/2400
 agrees with its NTSC counterpart, allowing only deferred projection scratch;
 all six resets and 88 hooks pass. Exact scheduler credit conservation uses

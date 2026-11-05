@@ -51,7 +51,7 @@ def inspect():
                          instruction=instruction.mnemonic+' '+instruction.op_str))
     assert position == 0x100de
     assert {int(row['offset'], 16) for row in rows} == set.union(*GROUPS.values())
-    source = (Path(__file__).resolve().parent.parent/'whdload/motion60.s').read_text()
+    source = (Path(__file__).resolve().parent.parent/'src/motion60.s').read_text()
     table = source.split('S60_INPUT_ENTRIES MACRO', 1)[1].split('        ENDM', 1)[0]
     entries = {int(site, 16): (int(opcode, 16), row) for site, opcode, row in
                re.findall(r'S60_INPUT_SITE \$([0-9a-f]+),\$([0-9a-f]+),(0|S60_SUBSTEPS|2\*S60_SUBSTEPS)', table)}

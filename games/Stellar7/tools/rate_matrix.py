@@ -68,20 +68,20 @@ def route_window(route, substeps):
 def run(args):
     os.chdir(ROOT)
     if args.substeps is not None:
-        source = (ROOT/'whdload/sim60.s').read_text()
+        source = (ROOT/'src/sim60.s').read_text()
         if not re.search(r'^S60_SUBSTEPS\s*=', source, re.M):
             raise ValueError('This source does not implement S60_SUBSTEPS; finish step 1 before measuring another rate')
     default_match = re.search(r'^S60_SUBSTEPS\s*=\s*(\d+)',
-                              (ROOT/'whdload/sim60.s').read_text(), re.M)
+                              (ROOT/'src/sim60.s').read_text(), re.M)
     substeps = args.substeps if args.substeps is not None else int(default_match[1])
     prefix = args.prefix.resolve()
     prefix.relative_to(ROOT/'tmp')
     prefix.mkdir(parents=True, exist_ok=True)
     # Build-source identity, independent of documentation/report edits.
     source = hashlib.sha256()
-    for path in sorted((ROOT/'whdload').glob('*.s')):
+    for path in sorted((ROOT/'src').glob('*.s')):
         source.update(path.name.encode()+path.read_bytes())
-    source.update((ROOT/'whdload/makefile').read_bytes())
+    source.update((ROOT/'game.conf').read_bytes())
     source_id = source.hexdigest()
     with (ROOT/'tmp/rate-matrix.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -96,7 +96,7 @@ def run(args):
                          if frequency else '')
                 env = dict(os.environ, CPU=cpu, AMIGA_MODEL=model, CHIP_KB=str(chip),
                            FAST_KB=str(fast), SLOW_KB=str(slow), EXTRA_ARGS=extra,
-                           NTSC_MODE=str(ntsc))
+                           NTSC=str(ntsc))
                 if model == 'A1200':
                     env['KICKSTART'] = os.environ['KICKSTART_A1200']
                 for route in args.routes:
@@ -112,9 +112,8 @@ def run(args):
                     # route flags retain the reference arm for paired tests.
                     if not native and cpu == '68000' and '-DPOLYGON_BLIT_IRQ=' not in flags:
                         flags += ' -DPOLYGON_BLIT_IRQ=1'
+                    # The build runs in the game directory, so the listing path is relative to it.
                     flags += ' -L '+str(listing.relative_to(ROOT))
-                    # make runs in whdload, so the listing path is relative to it.
-                    flags = flags.replace(' -L tmp/', ' -L ../tmp/')
                     env['VERIFY_FLAGS'] = flags
                     env['WHD_ARGS'] = ('CUSTOM3=1' if route in NATIVE_COMBAT_ROUTES else '') if native else 'CUSTOM1=1 CUSTOM3=1'
                     config = dict(machine=machine, route=route, source_id=source_id,
@@ -173,7 +172,7 @@ def run(args):
                     print('Completed '+name+': '+json.dumps(measurement), flush=True)
         finally:
             with (prefix/'restore.log').open('w') as log:
-                subprocess.run(['make','-s','-C','whdload'], stdout=log, stderr=subprocess.STDOUT, check=True)
+                subprocess.run(['make','-s','slave'], stdout=log, stderr=subprocess.STDOUT, check=True)
         return results
 
 
