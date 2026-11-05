@@ -1,0 +1,134 @@
+
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "Indianapolis 500" © 1990 Papyrus Design Group.
+
+ Requirements:
+ -------------
+ This installed package requires WHDLoad 17 or newer in the path.
+ DIC is only needed when installing from the original disks.
+ To install from a different drive than DF0: select installation mode Expert.
+
+ The installed game requires 0.5 MB ChipMem and 0.5 MB OtherMem
+ (+0.9 MB for preload).
+ It can be quit by pressing Del (key can be changed with Tooltype "QuitKey=").
+
+
+ Features:
+ --------
+ - Full load from HD
+ - Protection removed (manual check)
+ - Interrupts fixed
+ - Manual and hints included
+ - Lots of icons by various authors included
+ - Source code: https://github.com/Vesuri/Stingray_WHDLoad_Patches
+   (branch indianapolis500)
+ - Quit option that works on 68000 machines
+
+
+  
+
+ High frame rate support:
+ ------------------------
+ Version 3.1b is a beta contribution by Vesuri, based on StingRay's v3.0.
+
+ Enable CUSTOM1=1 in the icon tooltypes or select "High frame rate support"
+ in the WHDLoad splash window. It is off by default and requires a 68020 or
+ better with the game in Fast RAM. Other machines run the original game.
+
+ Use the WHDLoad tooltype DCACHE (or at least CACHE) for the best speed.
+ The slave leaves cache settings to WHDLoad. Example from the Shell:
+
+ WHDLoad Indianapolis500.Slave PRELOAD CUSTOM1=1 CACHE DCACHE
+
+ The option removes the original frame-rate limit, smooths motion between
+ simulation ticks, and uses CPU drawing where it is faster than the blitter.
+ Game logic and simulation speed are unchanged. While driving, the camera
+ and player's car are predicted, so wall hits, hard braking or steering
+ reversals can overshoot briefly. Opponents advance by their native rates.
+ The demo and instant replays use interpolation.
+
+ This is an already-installed package: unpack the drawer and double-click
+ the game icon. The game data, icons, manual and hints are unchanged from
+ the v3.0 SPS 0686 installed archive. Only the slave and this ReadMe were
+ replaced. The supplied icons retain their original tooltypes; enable the
+ new option in the splash window or add CUSTOM1=1 and DCACHE yourself.
+
+ The beta has been checked in FS-UAE; real-hardware testing is outstanding.
+
+
+ History:
+ --------
+ version 3.1b (10/10/2026), high frame rate support by Vesuri:
+ - optional high frame rate support (CUSTOM1=1), off by default
+ - 68020+ and Fast RAM required; original behavior on other machines
+ - smooth driving motion and CPU drawing optimizations
+ - smooth instant replay motion with the original transition-wipe pace
+
+ version 3.0 (30/04/2022) done by StingRay:
+ - patch redone
+ - saves are done to separated files now (issue #5601)
+ - manual protection completely skipped
+ - interrupts fixed
+ - default quitkey changed to Del
+ - new install script
+
+ version 2.1 (26/11/2020) done by JOTD:
+ - quit key with 68000 (issue #0004864)
+ - source code rework
+ 
+ version 2.0 (24/11/2002) done by JOTD:
+ - Uses 68060 caches & fast memory for better framerate
+ - Rewritten installer script
+ - Adapted to Barfly/WHDLoad 13+
+ - added a great choice of icons by various authors
+ - Reworked readme file
+ - Manual included
+ - Source included
+
+ version 1.1 (05/08/1998) done by Dark Angel:
+ - Instant replay now enabled but 1 MB chip required
+ - Caches now by default on
+
+ version 1.0 done by Dark Angel:
+ - Initial release
+ - Protection removed
+ - Saves to HD
+ - Return to OS (Numl)
+ 
+
+;--- GORE DESIGN - RIDE HARD, DIE FREE!
+
+Greetings to all members of the whdload family...wepl, harry, mr. larmer and
+all the others. Special hello to my pal Flynn!  =)
+
+                                                                    ____
+                                                                   /   /
+_____________________ STAY CLEAR CIVILIAN... ____________________ / / /_
+                                                                 / / /
+   Dark Angel of Gore Design                              ____  / / /
+e-mail:  wir96fme@studserv.uni-leipzig.de                 \   \/ / /
+________________________________________ powered by AMIGA  \ \ \/ /_____
+                                                            \_\_\/
+
+
+ Contact:
+ --------
+ If you have problems with this installation please try and get a newer
+ version of this package from the WHDLoad WWW-Page. If that doesn't help try
+ some Tooltypes like NOCACHE, NOAUTOVEC, EXPCHIP, NOMMU, PAL or NTSC. If
+ that also fails, please inform the author via the Bug-Report-Form which
+ can be accessed on the WHDLoad WWW-Page.
+
+ For the full WHDLoad package, other installs and updates refer to:
+	http://www.whdload.de/
+ or	aminet:dev/misc/whdload#?
+ and	aminet:game/patch/
+
