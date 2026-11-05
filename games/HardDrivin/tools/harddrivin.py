@@ -20,18 +20,10 @@ from pathlib import Path
 import _amigaxdev  # noqa: F401 (finds amigaxdev)
 from amigaxdev.gdbserve import BASETEXT_VM, Lldb, Server
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
-from game_server import COMMON  # noqa: E402
+from game_server import game_server  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.environ['GAME'] = os.path.basename(ROOT)
-RUN_DIR = os.path.join('tmp/run', os.environ.get('INSTANCE') or 'default', '.run')
-RUN = os.path.join(ROOT, RUN_DIR)
-SOCK = os.path.join(RUN, 'harddrivin.sock')
-if len(SOCK.encode()) > 103:
-    # Over the AF_UNIX path limit (a deep checkout): server and client use the socket's path
-    # relative to the game directory. The capture tools need the absolute path to fit.
-    os.chdir(ROOT)
-    SOCK = os.path.join(RUN_DIR, 'harddrivin.sock')
+RUN = os.path.join(ROOT, 'tmp/run', os.environ.get('INSTANCE') or 'default', '.run')
 
 
 class LoggedLldb(Lldb):
@@ -129,10 +121,8 @@ def profile(server, g, rest):
     return out or 'ok'
 
 
-# common/tools/game_server.py's wiring (common/run.sh, the instance's run directory), with
-# this game's Server subclass.
-server = HardDrivin('harddrivin', root=ROOT, run_script=str(COMMON / 'run.sh'), run_dir=RUN_DIR, sock=SOCK,
-                    commands={'host': host, 'poke': poke, 'gdb': gdb, 'profile': profile})
+server = game_server('harddrivin', server_class=HardDrivin,
+                     commands={'host': host, 'poke': poke, 'gdb': gdb, 'profile': profile})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])

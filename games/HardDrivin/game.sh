@@ -22,15 +22,6 @@ game_unpack() {
   done < inputs.sha256
 }
 
-# The installer package with the new slave, ReadMe, installer and source. The shared
-# packager, with a version pattern that reads this slave's several-word $VER name.
-game_dist() {
-  local force=()
-  [ "${FORCE:-0}" != 1 ] || force=(--force)
-  python3 "$GAME_ROOT/tools/package_release.py" --game-root "$GAME_ROOT" --dist "$1" \
-    --variants "$VARIANTS" ${force[@]+"${force[@]}"}
-}
-
 # The comparison tools' failure-path unit tests. The rest of test_step1_tools needs the
 # local step 1 captures, and the emulator-driven checks are run by hand (docs/development.md).
 game_check() {
