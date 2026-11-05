@@ -1,10 +1,11 @@
 # Timing design and validation
 
-The normal slave contains the full scheduler. It is selected automatically only on
-68020 or faster CPUs with real fast RAM. `CUSTOM3=1` selects original timing;
-`CUSTOM1=1` independently selects the original renderer. 68000/68010 and every
-configuration without real fast RAM retain original timing and rendering.
-WHDLoad `CACHE` and `DCACHE` remain user-controlled.
+The normal slave contains the full scheduler. **Enhanced framerate** (`CUSTOM1=1`)
+enables it together with fast planar rendering on 68020+ with real fast RAM.
+The checkbox defaults off. Unchecked, on 68000/68010 or without real fast RAM,
+both paths remain original. CUSTOM3 is no longer a user option; its internal
+storage and `bit=C3` timing-range annotations retain their diagnostic meaning.
+WHDLoad CACHE/DCACHE remain user-controlled.
 
 The release matrix is complete with the accepted M3 exception;
 [open work](open-work.md) records the measurements and validation limits. Steady A500 handling and unseeded natural-weather validation are deferred
@@ -184,7 +185,7 @@ unverified rows as passes. Scene-dependent native histories are not exact oracle
 ## Checks and diagnostics
 
 - `check_disabled.py CAPTURE --timing` checks relocated native bytes across all
-  declared rendering and timing hook ranges. M1/no-fast-RAM defaults and opt-outs
+  declared rendering and timing hook ranges. M1/no-fast-RAM fallbacks and the unchecked default
   must leave those hooks native.
 - `check_timing_layout.py` audits complete instruction boundaries and direct
   branches. Every timing patch carries a `TIMING_RANGE` comment.

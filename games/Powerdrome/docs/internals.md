@@ -4,7 +4,9 @@ Current release status and validation limits are in [open work](open-work.md).
 
 ## Current measurements
 
-These are FS-UAE PAL route measurements over 500 fields from the first driving
+These measurements precede the single-checkbox UI change. Enhanced runs now
+require `CUSTOM1=1` explicitly.
+They are FS-UAE PAL route measurements over 500 fields from the first driving
 presentation (`$bc7c`), counted with read-only breakpoints. FPS uses complete
 first-to-last presentation intervals. Builds have no phase instrumentation or
 renderer twins during these measurements; VERIFY/coverage supply native inputs.
@@ -227,8 +229,8 @@ and restoration remain untested; see the [current gate ledger](open-work.md#phas
 `whdload/Powerdrome.s` uses unmodified WHDLoad 20 KickEmu sources, interface 17, one disk,
 512 KiB chip for the guest, 256 KiB expansion for Kickstart and 128 KiB additional guest
 expansion. It retains the EndCLI redirection and Copylock replacement, with a signature
-check at game `$843c`. Cache selection is left to standard WHDLoad options. Fast planar rendering is selected on 68020+ with real fast RAM;
-`CUSTOM1=1` opts out. See the [implementation report](performance-implementation.md). In VERIFY builds only, CUSTOM5 replaces the name-entry key-ready
+check at game `$843c`. Cache selection is left to standard WHDLoad options. `CUSTOM1=1` enables fast planar rendering and timing together on 68020+ with real fast RAM;
+the unchecked default keeps both paths original. See the [implementation report](performance-implementation.md). In VERIFY builds only, CUSTOM5 replaces the name-entry key-ready
 and key-read calls at `$13772` and `$1377c` with ready/Return responses. The shipped original
 and byte-identical rebuild both reach the name screen; the fixture-enabled modern rebase boots
 through it into the automatic title demo. The [loader audit](loader-equivalence.md) resolves

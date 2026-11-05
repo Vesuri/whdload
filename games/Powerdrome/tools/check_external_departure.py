@@ -2,7 +2,7 @@
 """Measure the 17-position external pit animation and compare native geometry.
 
 Capture from 1475C with TIMING_STATE=1, marker 1479E and probes 14764/147A6.
-The reference should be an A500 capture with CUSTOM3=0. Without candidates this
+The reference should be an A500 capture with native timing. Without candidates this
 reports calibration only; it does not certify elapsed-time pacing.
 """
 import argparse
@@ -59,7 +59,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     config = json.loads((args.reference / 'configuration.json').read_text())
     assert config['CPU'] == '68000' and config['FAST_KB'] == '0'
-    assert 'CUSTOM3=0' in config['WHD_ARGS'], 'Reference must disable timing corrections'
+    game = int((args.reference/'game-base.txt').read_text(), 0)
+    assert (args.reference/'chip.bin').read_bytes()[game+0xca44:game+0xca46] == bytes.fromhex('082e'), 'Reference must retain native timing'
     positions, reference_fields, _ = inspect(args.reference)
     for capture in args.captures:
         actual, fields, clocks = inspect(capture)

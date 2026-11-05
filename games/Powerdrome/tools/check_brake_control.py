@@ -20,8 +20,11 @@ def check(root):
     cfg = json.loads((root/'configuration.json').read_text())
     options = dict(v.split('=', 1) for v in cfg['WHD_ARGS'].split() if '=' in v)
     assert options['CUSTOM5'] == '9', 'This report is scoped to the joystick fixture'
-    native = options.get('CUSTOM3', '0') == '0'
     game = int((root/'game-base.txt').read_text(), 0)
+    # Read installed behavior: option meanings changed, and hardware can fall back.
+    hook = (root/'chip.bin').read_bytes()[game+0xca44:game+0xca46]
+    assert hook in (bytes.fromhex('082e'), bytes.fromhex('4ef9'))
+    native = hook == bytes.fromhex('082e')
     epoch = fixture(root/'code.bin')['epoch']
     anchor = struct.unpack_from('>I', (root/'chip.bin').read_bytes(), game+0x48fe)[0]
     shift = (anchor-epoch) & 0xffffffff

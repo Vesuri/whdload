@@ -39,10 +39,11 @@ installed slave. This is the reference reconstruction. `make -C whdload all` bui
 slave with interface 17 and the full timing scheduler. `make -C whdload verify` additionally saves
 `tmp/build/Powerdrome-verify.slave`; `CUSTOM5=1` submits an empty pilot name through the
 native name-entry routine. `CUSTOM5=2` also selects Practice and submits Space in the pit.
-`CUSTOM1=1` selects the original renderer; `CUSTOM3=1` selects original timing.
-Without these opt-outs, 68020+ with real fast RAM enables both the scheduler and
-planar staging. 68000/68010 and all configurations without real fast RAM keep both
-native paths, including original frame-dependent timing. The normal
+The normal splash has one checkbox, **Enhanced framerate** (`CUSTOM1=1`), off by
+default. It enables fast planar rendering and the scheduler together on 68020+
+with real fast RAM. Unchecked, on 68000/68010, or without real fast RAM, both paths
+remain native, including original frame-dependent timing. CUSTOM3 is no longer a
+user option. The normal
 build contains no input or twin-drawing fixtures. The slave requests 128 KiB of guest
 expansion in addition to KickEmu's 256 KiB, including when the option is off. Slow-backed
 expansion does not enable the renderer. See the [implementation and measured results](performance-implementation.md)
@@ -54,7 +55,7 @@ To launch the new slave explicitly (the runner otherwise uses the installed orig
 
 ```sh
 make -C whdload all
-CPU=68030 FAST_KB=4096 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
+CPU=68030 FAST_KB=4096 WHD_ARGS=CUSTOM1=1 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
 ```
 
 The default machine is 68000, 512 KB chip and 1,536 KB slow with no fast RAM. The host boots
@@ -95,7 +96,7 @@ wraps the native `$8056` call, including its time bookkeeping and LoadView.
 
 ### Release matrix
 
-`tools/release_matrix.py` runs the current default configuration sequentially on
+`tools/release_matrix.py` runs the enhanced opt-in configuration sequentially on
 M1–M7, with Practice and race routes. M5–M7 run with both WHDLoad CACHE and NoCache.
 It compares complete driving intervals against the matching frozen native baseline,
 then checks renderer twins on M4/M5/M7 and a CACHE pit/departure/track smoke on M6.
@@ -166,14 +167,14 @@ retained VERIFY-only pit-sync, stall, render-rate or seed options explicitly for
 `TIMING_FULL=0` permits explicit individual-feature experiments; WORLD requires WORLD20 and
 repair requires drawing suppression. Explicit per-feature overrides retain the existing
 dependency checks. Normal `make -C whdload all` includes `TIMING_FULL=1` by default. Runtime selection
-requires 68020+ with real fast RAM and no C3 opt-out.
+requires `CUSTOM1=1`, 68020+ and real fast RAM.
 
 ### Verification-only guest chip-memory override
 
 `make -C whdload verify VASMFLAGS='-DVERIFY_CHIPMEMSIZE=1048576'` exposes 1 MiB
 of guest chip memory to exercise native resources unavailable in the normal 512-KiB
 configuration. Use a host with at least `CHIP_KB=1024`; the default A500 has
-only 512 KiB and cannot run this artifact. Use 030/fast for enhanced timing checks.
+only 512 KiB and cannot run this artifact. Use 030/fast with `CUSTOM1=1` for enhanced timing checks.
 Set `PROBE_OFFSETS='0x17836 0x178e6'` for ordered read-only audio call checks. Freeze the verification slave
 under `tmp/` before restoring `make -C whdload all`.
 

@@ -8,11 +8,10 @@ fallbacks and twin reference blocks keep the early wait. The write audit, beam
 ordering checks and accelerator gains are in [Current measurements](internals.md#rendering-costs-and-retained-choices).
 
 
-The fast-RAM renderer is enabled automatically on 68020+ with real fast RAM.
-`CUSTOM1=1` opts out. All other configurations use native rendering. The renderer
-retains the planar format and native double buffering. Timing is selected separately
-by the same CPU/memory eligibility rule and can be disabled with `CUSTOM3=1`.
-There is no chunky conversion, render interpolation or extra display buffer.
+**Enhanced framerate** (`CUSTOM1=1`) enables fast planar rendering and fixed-step
+timing together on 68020+ with real fast RAM. It defaults off. Otherwise both
+paths stay native. The renderer retains the planar format and native double
+buffering; there is no chunky conversion, interpolation or extra display buffer.
 
 On 68020+ with static code installed, fallback scenes also use that raster code,
 drawing directly to their native chip bitmap. Only supported cockpit scenes stage
@@ -185,8 +184,8 @@ check establishes unchanged hooks, imagery and presentation cadence, not whole-t
 
 ## Reproduction and limits
 
-Build with `make -C whdload all`; rendering is enabled automatically on 68020+
-with real fast RAM. `CUSTOM1=1` opts out.
+Build with `make -C whdload all`; set `CUSTOM1=1` to enable both enhancements
+on 68020+ with real fast RAM.
 `make -C whdload verify` includes the input and comparison fixtures. The additional VERIFY
 settings are `CUSTOM2=0` (the normal bitmap-and-code path), `1` (bitmap only), `2` (bitmap, code
 and scratch), or `3` (bitmap and scratch); `CUSTOM4=1` enables twins, and `CUSTOM5=2` enters Practice.

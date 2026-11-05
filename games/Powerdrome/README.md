@@ -1,10 +1,11 @@
 # Powerdrome
 
-Performance and timing improvements for the Amiga PAL release. The normal build
-selects fast planar rendering and fixed-step gameplay automatically on **68020+
-with real fast RAM**. Other machines retain original rendering and frame-dependent
-timing. `CUSTOM1=1` selects the original renderer; `CUSTOM3=1` selects original
-timing, independently. WHDLoad `CACHE` and `DCACHE` remain user-controlled.
+Performance and timing improvements for the Amiga PAL release. Enable the
+**Enhanced framerate** checkbox (`CUSTOM1=1`) to use fast planar rendering and
+fixed-step gameplay together on **68020+ with real fast RAM**. It is off by default.
+Unchecked, or on unsupported machines, both rendering and timing remain original
+and frame-dependent. There is no separate timing option; WHDLoad CACHE/DCACHE
+remain user-controlled.
 
 The renderer draws the original planar graphics in fast memory, then copies the
 scene to chip memory. Gameplay uses 20 ms world steps and 90 ms control epochs on
@@ -12,7 +13,7 @@ the enhanced path. There is no chunky conversion or render interpolation.
 
 ```sh
 make -C whdload all
-CPU=68030 FAST_KB=4096 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
+CPU=68030 FAST_KB=4096 WHD_ARGS=CUSTOM1=1 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
 ```
 
 The launcher otherwise defaults to a 68000 and the installed original slave.
@@ -20,7 +21,9 @@ See [development](docs/development.md) for setup, CPU configuration and testing.
 
 ## Release measurements
 
-These are FS-UAE PAL route measurements over 500 fields from the first driving
+These measurements precede the single-checkbox UI change. Enhanced runs now
+require `CUSTOM1=1` explicitly.
+They are FS-UAE PAL route measurements over 500 fields from the first driving
 presentation (`$bc7c`), counted with read-only breakpoints. FPS uses complete
 first-to-last presentation intervals. Builds have no phase instrumentation or
 renderer twins during these measurements; VERIFY/coverage supply native inputs.

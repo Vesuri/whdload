@@ -107,7 +107,7 @@ does not establish that the local instructions alone became slower. It does fail
 end-to-end acceptance test. The selected implementation therefore preserves the previous
 loops on 68000/68010 and selects the refinement only when Exec reports 68020 capability.
 This selection happens once during installation; no CPU test is added to the drawing loop.
-The current release selector enables this path on 68020+ with real fast RAM. Cache selection remains entirely WHDLoad's responsibility.
+The current release selector enables this path with `CUSTOM1=1` on 68020+ with real fast RAM. Cache selection remains entirely WHDLoad's responsibility.
 
 The final CPU-selected build passes these 500-field drawing twins:
 
@@ -138,13 +138,13 @@ Build and freeze baseline and candidate slaves separately. For the 68020 trace a
 source amiga/env.sh
 export AMIGA_MODEL=A1200 CPU=68EC020 KICKSTART="$KICKSTART_A1200"
 export CHIP_KB=2048 FAST_KB=4096 EXTRA_ARGS=--slow_memory=0 ANCHOR=0xbc7c
-WHD_ARGS='CUSTOM4=1 CUSTOM5=2 NoCache' FIELDS=100 \
+WHD_ARGS='CUSTOM1=1 CUSTOM4=1 CUSTOM5=2 NoCache' FIELDS=100 \
   tools/fixed_window.sh tmp/prof/raster-twin tmp/build/Powerdrome-verify.slave
 python3 tools/perf_status.py tmp/prof/raster-twin
 python3 tools/raster_pairs.py tmp/prof/raster-twin
 python3 tools/raster_costs.py tmp/prof/raster-twin
 python3 tools/check_raster_layout.py tmp/prof/raster-twin
-WHD_ARGS='CUSTOM5=2 NoCache' FIELDS=500 SWAP_ONLY=1 \
+WHD_ARGS='CUSTOM1=1 CUSTOM5=2 NoCache' FIELDS=500 SWAP_ONLY=1 \
   tools/fixed_window.sh tmp/prof/raster-timing tmp/build/Powerdrome-verify.slave
 ```
 
@@ -186,7 +186,7 @@ trial; see [A500 measurements](internals.md#a500-and-chip-only-limits).
 ## R5: selected change
 
 Retain only direct plane-address construction on 68020+. The 68000/68010 use the previous
-fast loops, and `CUSTOM1=1` selects native drawing. Endpoint masking and all edge
+fast loops, and the unchecked default selects native drawing. Endpoint masking and all edge
 arithmetic remain native. No cache-control, simulation, clipping, scheduler or presentation
 changes are included.
 

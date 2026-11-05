@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit timing hook boundaries and optionally prove C3-off native hook equivalence."""
+"""Audit timing hook boundaries and optionally prove timing-disabled native hook equivalence."""
 import argparse
 from pathlib import Path
 import re
@@ -47,7 +47,7 @@ for ins in m.disasm(bytes(code[0x4fc0:]),base+0x4fc0):
         for off,n in ranges:
             assert not off<target<off+n,f'Direct branch at {ins.address-base:#x} enters hook interior {target:#x}'
 print('No decoded direct branch enters a timing hook interior')
-if a.off_capture:print('All declared timing hooks are native in both C3-off snapshots')
+if a.off_capture:print('All declared timing hooks are native in both timing-disabled snapshots')
 
 # The input prototype reuses this body with a private a6 input structure. It must
 # neither call other game code nor reference fields outside that structure.

@@ -60,7 +60,7 @@ def run(root, reference, job):
     extra = f'--slow_memory={slow}'
     if hz:
         extra += f' --uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency={hz} --uae_cpu_cycle_exact=true'
-    options = f'CUSTOM5={4 if route == "race" else 2} {cache}'
+    options = f'CUSTOM1=1 CUSTOM5={4 if route == "race" else 2} {cache}'
     if kind == 'twins':
         options += ' CUSTOM4=1'
     env = dict(os.environ, AMIGA_MODEL=model, CPU=cpu, CHIP_KB=str(chip), FAST_KB=str(fast),

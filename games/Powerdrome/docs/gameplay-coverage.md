@@ -5,8 +5,8 @@ Current release status and validation limits are in [open work](open-work.md).
 The coverage campaign is complete for the existing guarded fast planar renderer. Across
 seven selected twin captures, **30,623 completed staged scenes** passed with zero pixel,
 register/CCR, scratch or guard mismatches. Copied fast raster code remained unchanged.
-The fixtures are separate from the normal build. Current builds select the renderer
-on 68020+ with real fast RAM; `CUSTOM1=1` opts out. The timing scheduler has its
+The fixtures are separate from the normal build. Current builds enable both enhancements with
+`CUSTOM1=1` on 68020+ with real fast RAM. The timing scheduler has its
 own validation and remaining limits in [the timing design](timing-implementation.md).
 
 ## Completed steps
@@ -84,7 +84,7 @@ Source `amiga/env.sh`, then run `make -C whdload coverage`. This produces the is
 | 5 | Centering/acceleration cruise on the default course |
 | 6 | Cruise on track index 2, selected with two native `0` menu keys |
 
-`CUSTOM1=1` disables rendering acceleration and `CUSTOM4=1` enables drawing twins. Ordinary `all`,
+`CUSTOM1=1` enables both enhancements and `CUSTOM4=1` enables drawing twins. Ordinary `all`,
 `verify` and `original-verify` targets omit the coverage replay and counters. Do not edit
 capture scripts or rebuild a capture's slave while it is running.
 
@@ -92,7 +92,7 @@ capture scripts or rebuild a capture's slave while it is running.
 AMIGA_MODEL=A1200 CPU=68060-NOMMU KICKSTART="$KICKSTART_A1200" \
 CHIP_KB=2048 FAST_KB=4096 \
 EXTRA_ARGS='--slow_memory=0 --uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency=50000000 --uae_cpu_cycle_exact=true' \
-WHD_ARGS='CUSTOM4=1 CUSTOM5=4 NoCache' \
+WHD_ARGS='CUSTOM1=1 CUSTOM4=1 CUSTOM5=4 NoCache' \
 ANCHOR=0xbc7c FIELDS=66000 SWAP_ONLY=1 CAPTURE_SHOT=1 COVERAGE_STATE=1 \
 COVERAGE_PROBES='0xc7f0 0xc736 0xc7d2 0x103a2 0xbf32 0xd3d6 0xc75c 0xc6b8 0xc6fe 0xbe12 0xbe40 0x13cde 0xfb84 0xfc9e 0x112f4 0x14764 0x120ca' \
 tools/fixed_window.sh tmp/prof/coverage-race tmp/build/Powerdrome-coverage.slave

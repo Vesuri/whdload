@@ -1,15 +1,24 @@
 # Current status and limits
 
-Phase F is complete within the confirmed scope, including the user-accepted stock
-A1200 Practice exception. The normal build includes the full timing scheduler and
-fast planar renderer, enabled automatically on 68020+ with real fast RAM.
-68000/68010 and every machine without real fast RAM keep original rendering and
-frame-dependent timing. `CUSTOM1=1` selects the original renderer; `CUSTOM3=1`
-selects original timing independently. WHDLoad CACHE/DCACHE remain user-controlled.
+The release has a single **Enhanced framerate** checkbox (`CUSTOM1=1`), off by
+default. It enables fast planar rendering and fixed-step timing together on
+68020+ with real fast RAM. Unchecked, on 68000/68010, or without real fast RAM,
+both paths stay original and gameplay remains frame-dependent. CUSTOM3 is no
+longer a user option. WHDLoad CACHE/DCACHE remain user-controlled.
 
-## Release measurements
+The splash version is **2.0 (13.10.2026)**. The single-checkbox revision is built
+and checked. Evidence is
+under `tmp/release-opt-in/`: M7 enabled runs the scheduler and passes 29 completed
+drawing twins; M7 unchecked, M3 checked without fast RAM and M2 checked on 68000
+retain all original renderer/timing hook bytes. The normal splash has exactly one
+checkbox. The original slave still rebuilds byte-identically.
+The earlier Phase F gates below remain evidence for the implemented paths and
+include the accepted stock A1200 Practice exception; their captures predate this
+UI/default-selection change. Enhanced runs now require `CUSTOM1=1` explicitly.
 
-All 20 release measurements are complete. The full intervals/fields, fps and mean
+## Release baseline measurements
+
+All 20 release baseline measurements are complete. The full intervals/fields, fps and mean
 frame intervals are in [README](../README.md#release-measurements) and
 [internals](internals.md#current-measurements). These compare the same modern loader
 with the frozen native baseline, using uninstrumented 500-PAL-field driving windows.
@@ -35,8 +44,8 @@ not isolated renderer speedups. These are emulator results, not physical-board c
 ## Completed release gates
 
 - Normal-build name-entry boots pass on M1/M3/M4/M7. M4/M7 have timing and static
-  renderer hooks installed; fallback and opt-out cases retain native hooks.
-- M1/M3 defaults and M7 with both opt-outs pass original relocated renderer/timing
+  renderer hooks installed; fallback and disabled-option cases retain native hooks.
+- M1/M3 defaults and M7 with both enhancements disabled pass original relocated renderer/timing
   hook-byte checks in initial and final snapshots. M3 gameplay also passes.
 - M7 default gameplay in the matching input-only VERIFY build advances 501 world
   steps and completes 491 staged scenes during the window; timing records are active.

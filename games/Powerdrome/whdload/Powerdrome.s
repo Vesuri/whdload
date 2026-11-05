@@ -56,11 +56,10 @@ slv_keyexit = $59
  INCLUDE whdload/kick13.s
 slv_name dc.b "Powerdrome",0
 slv_copy dc.b "1989 Electronic Arts",0
-slv_info dc.b "Installed by Galahad/Fairlight",10,"Enhancements by Vesuri",10,"Version 1.1",0
+slv_info dc.b "Installed by Galahad/Fairlight",10,"Enhancements by Vesuri",10,"Version 2.0 (13.10.2026)",0
 slv_CurrentDir dc.b 0
 slv_config
- dc.b "C1:B:Original renderer;"
- dc.b "C3:B:Original timing;"
+ dc.b "C1:B:Enhanced framerate;"
  IFD VERIFY
  dc.b "C2:L:Rendering experiment:Bitmap and code,Bitmap only,Bitmap code and scratch,Bitmap and scratch;"
  dc.b "C4:B:Twin planar drawing for verification;"
@@ -159,30 +158,27 @@ launch_pd
  pea TDREASON_WRONGVER
  move.l _resload(pc),a2
  jmp resload_Abort(a2)
- ; Resolve user opt-outs once. The internal custom1/custom3 values remain
- ; enable flags for installers and diagnostics; WHDLoad cache policy is untouched.
+ ; Resolve the single opt-in once. Internal custom1/custom3 enable the two
+ ; installers together; custom3 is not a WHDLoad option. Cache policy is untouched.
 select_features
- movem.l d0-d2/a0,-(sp)
+ movem.l d0-d1/a0,-(sp)
  lea custom1(pc),a0
  move.l (a0),d0
  clr.l (a0)
- move.l custom3(pc),d1
  clr.l custom3-custom1(a0)
- move.l cpu_attn(pc),d2
- btst #AFB_68020,d2
- beq.s .done
- ; Both enhancements require real fast RAM. Otherwise keep native timing too.
- move.l perf_bitmap(pc),d2
- beq.s .done
- tst.l d1
- bne.s .renderer
- move.l #1,custom3-custom1(a0)
-.renderer
  tst.l d0
- bne.s .done
- move.l #1,(a0)
+ beq.s .done
+ move.l cpu_attn(pc),d1
+ btst #AFB_68020,d1
+ beq.s .done
+ ; Both enhancements require real fast RAM. Otherwise keep both native paths.
+ move.l perf_bitmap(pc),d1
+ beq.s .done
+ moveq #1,d0
+ move.l d0,(a0)
+ move.l d0,custom3-custom1(a0)
 .done
- movem.l (sp)+,d0-d2/a0
+ movem.l (sp)+,d0-d1/a0
  rts
 
 pl_game PL_START
@@ -212,8 +208,6 @@ tags dc.l WHDLTAG_ATTNFLAGS_GET
 cpu_attn dc.l 0
  dc.l WHDLTAG_CUSTOM1_GET
 custom1 dc.l 0
- dc.l WHDLTAG_CUSTOM3_GET
-custom3 dc.l 0
  IFD VERIFY
  dc.l WHDLTAG_CUSTOM2_GET
 custom2 dc.l 0
@@ -223,12 +217,14 @@ custom4 dc.l 0
 custom5 dc.l 0
  ENDC
  dc.l TAG_DONE
+custom3 dc.l 0 ; resolved internal timing enable, not a user option
  IFND VERIFY
 custom2 dc.l 0
  ENDC
  INCLUDE timing.s
  INCLUDE planar.s
  INCLUDE fast_raster.s
+
 
  IFNE VERIFY_PHASE
  INCLUDE phase.s

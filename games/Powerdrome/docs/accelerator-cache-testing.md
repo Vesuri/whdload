@@ -99,9 +99,9 @@ not real 040/060 cache coherency. Its timing must not be compared with the table
 
 ## Compatibility and release policy
 
-Both the full timing scheduler and fast planar renderer are selected automatically
-on 68020+ with real fast RAM. All other machines keep original timing and rendering.
-`CUSTOM1=1` and `CUSTOM3=1` independently select original rendering and timing.
+The Enhanced framerate opt-in (`CUSTOM1=1`) enables the full timing scheduler
+and fast planar renderer together on 68020+ with real fast RAM. Unchecked or on
+other machines, both paths remain original. There is no separate CUSTOM3 option.
 Normal builds have no automated input, twin drawing or mismatch fixtures.
 
 Read [open work](open-work.md) for release gate status and remaining limits.

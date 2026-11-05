@@ -117,7 +117,7 @@ slaves and capture bytes in ignored `tmp/`. The checkpoints do not write guest s
 source amiga/env.sh
 make -C whdload original original-verify verify
 export PROBE_OFFSETS='0x8962 0x173b2 0x173b6 0x16c4c 0x16c4e 0x11d70'
-export WHD_ARGS='CUSTOM1=1 CUSTOM3=1 CUSTOM5=2 NoCache'
+export WHD_ARGS='CUSTOM1=0 CUSTOM5=2 NoCache'
 export ANCHOR=0x14764 FIELDS=500 SWAP_ONLY=1
 
 tools/fixed_window.sh tmp/prof/equivalence-original-new tmp/build/Powerdrome-original-verify.slave

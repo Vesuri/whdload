@@ -61,6 +61,7 @@ for root in a.captures:
             row['boundary_logical_ms'] = other['boundary_logical_ms']
             assert row['boundary_logical_ms'] == 880 and row['steps'] == 45
     else:
-        assert re.search(r'\bCUSTOM3=0\b', cfg['WHD_ARGS'])
+        game = int((root/'game-base.txt').read_text(), 0)
+        assert (root/'chip.bin').read_bytes()[game+0xca44:game+0xca46] == bytes.fromhex('082e'), 'Reference needs native timing'
         assert all(row['steps'] == 10 for row in rows)
     print(json.dumps(dict(capture=root.name, episodes=rows), indent=2))
