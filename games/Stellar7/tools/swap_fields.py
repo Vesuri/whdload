@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Count frames (gameplay swaps, s7:6a0a) over video fields with read-only debugger breakpoints.
+Used by fixed_window.py when a CPU backend provides no instruction trace (68030).
+Fields are counted at Kickstart 1.3's VERTB branch ($FC0D4A in the relocated image).
+Only debugger convenience variables change; target memory/registers are read-only.
+
+  swap_fields.py FIELDS OUTDIR CODE.bin BASE CHIP.bin
+"""
+import argparse, os, re, socket, struct, sys, json
+from pathlib import Path
+sys.path.insert(0, os.path.dirname(__file__))
+from stellar7 import SOCK
+from stellar7_report import regions
+C2P = 0x6a0a
+
+
+def command(s):
+    with socket.socket(socket.AF_UNIX) as c:
+        c.connect(SOCK); c.sendall(('gdb ' + s).encode()); out = b''
+        while chunk := c.recv(65536): out += chunk
+    reply = out.decode()
+    if 'ERROR' in reply: raise RuntimeError(reply)
+    return reply
+
+
+p = argparse.ArgumentParser(description=__doc__)
+p.add_argument('fields', type=int)
+p.add_argument('out', type=Path)
+p.add_argument('dump', type=Path)
+p.add_argument('base', type=lambda x: int(x, 0))
+p.add_argument('chip', type=Path)
+p.add_argument('--field-hz', type=int, choices=(50, 60), default=50)
+p.add_argument('--update-offset', type=int, help='SIM60 update offset relative to ABI entry')
+a = p.parse_args()
+hz = a.field_hz
+standard = 'NTSC' if hz == 60 else 'PAL'
+assert a.fields > 1
+r = {name: (lo, origin) for lo, hi, name, origin in regions(a.dump.read_bytes(), a.base, a.chip.read_bytes())}
+frame = r['s7'][0] + C2P
+step = r['s7'][0] + 0x2d4e
+code = a.dump.read_bytes()
+hook = r['s7'][0] - a.base + 0x2af6
+if code[hook:hook+2] == bytes.fromhex('4ef9'):
+    entry = struct.unpack_from('>I', code, hook+2)[0]
+    offset = entry-a.base
+    if code[offset+4:offset+8] == b'S760':
+        step = entry + struct.unpack_from('>H',code,offset+44)[0]
+start_commands = ''
+start_branch = ''
+start_address = None
+if code[hook:hook+2] == bytes.fromhex('4a39'):
+    start_address = r['s7'][0]+0x2af6
+if a.update_offset is not None:
+    assert code[offset+4:offset+8] == b'S760', 'SIM60 ABI required'
+    start_address = entry+a.update_offset
+if start_address is not None:
+    start_commands = f'break *{start_address:#x}'
+    start_branch = f'if $pc == {start_address:#x}\nprintf "S7START %d\\n", $s7_field\nelse\n'
+vbl = 0xfc0d4a + r['kick'][1]
+reply = command(f'''break *{vbl:#x}
+break *{frame:#x}
+break *{step:#x}
+{start_commands}
+set $s7_field = -1
+while $s7_field < {a.fields}
+continue
+if $pc == {vbl:#x}
+set $s7_field = $s7_field + 1
+else
+if $pc == {frame:#x}
+printf "S7FRAME %d\\n", $s7_field
+else
+{start_branch}printf "S7STEP %d\\n", $s7_field
+{'end' if start_branch else ''}
+end
+end
+end
+delete
+''')
+(a.out / 'swaps-gdb.txt').write_text(reply)
+swaps = [0] * a.fields
+for field in re.findall(r'^S7FRAME (-?\d+)$', reply, re.M):
+    index = int(field)
+    if 0 <= index < a.fields:
+        swaps[index] += 1
+steps = [0] * a.fields
+for field in re.findall(r'^S7STEP (-?\d+)$', reply, re.M):
+    index = int(field)
+    if 0 <= index < a.fields:
+        steps[index] += 1
+first = next((i for i, n in enumerate(swaps) if n), None)
+last = max((i for i, n in enumerate(swaps) if n), default=None)
+report = (f'Read-only frame counter ({a.fields} {standard} fields)\n'
+          f'Simulation steps: {sum(steps)} over {a.fields} {standard} fields ({hz * sum(steps) / a.fields:.2f} steps/s)\n'
+          f'gameplay swaps per field: {"".join(str(n) for n in swaps)}\n')
+if first is not None and last > first:
+    frames = sum(swaps[first + 1:last + 1])
+    report += (f'{frames} frames in {last - first} fields: {(last - first) / frames:.2f} fields/frame, '
+               f'{hz * frames / (last - first):.1f} fps ({standard})\n')
+else:
+    report += f'{sum(swaps)} presentations; no complete inter-presentation interval for FPS.\n'
+(a.out / 'frames.txt').write_text(report)
+print(report, end='')
+
+events = {}
+for label, marker in (('presentations','S7FRAME'),('updates','S7STEP'),('update_starts','S7START')):
+    events[label] = [int(v) for v in re.findall(r'^'+marker+r' (-?\d+)$', reply, re.M)
+                     if 0 <= int(v) < a.fields]
+(a.out/'field-events.json').write_text(json.dumps(dict(fields=a.fields,field_hz=hz,events=events),indent=2)+'\n')
