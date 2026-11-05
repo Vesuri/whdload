@@ -1,0 +1,31 @@
+"""Read-only native pose snapshots plus exact intervening lifecycle addresses."""
+import argparse,json,re,sys
+from pathlib import Path
+import route_status as r
+sys.path.insert(0,str(Path('tools').resolve()))
+from presentation_state import symbol
+p=argparse.ArgumentParser();p.add_argument('capture',type=Path);p.add_argument('--steps',type=int,default=16);a=p.parse_args()
+m=json.loads((a.capture/'entry.json').read_text());lines=(a.capture/'slave.lst').read_text(encoding='latin-1').splitlines();base=m['entry']['game_anchor']-symbol(lines,'tape_game_anchor');stop=base+symbol(lines,'time_pose_captured');life=base+symbol(lines,'time_pose_invalidate');h3=json.loads((a.capture/'entry-steps.json').read_text())['h3'];banks=r.memory_regions()
+cmd=['delete',f'break *{life:#x}','commands','silent','printf "LIFE %u\\n", $a3','continue','end',f'break *{stop:#x}']
+initial=[]
+for address,end in banks:
+ file=a.capture/f'world-initial-{address:x}.bin'
+ r.command(f'gdb dump binary memory {file} {address:#x} {end:#x}')
+ assert file.stat().st_size==end-address
+ initial.append(dict(base=address,size=end-address,file=file.name))
+(a.capture/'world-initial.json').write_text(json.dumps(dict(sha256=m['slave_sha256'],h3=h3,banks=initial),indent=2)+'\n')
+r.command('gdb '+'\n'.join(cmd));frames=[]
+for i in range(a.steps):
+ raw=r.command('gdb continue\nprintf "POSESTOP %u\\n", $pc')
+ (a.capture/f'pose-{i}-events.txt').write_text(raw)
+ match=re.search(r'POSESTOP (\d+)',raw)
+ if not match or int(match[1])!=stop:raise RuntimeError(raw[-1500:])
+ files=[]
+ for address,end in banks:
+  file=a.capture/f'pose-{i}-{address:x}.bin'
+  r.command(f'gdb dump binary memory {file} {address:#x} {end:#x}')
+  assert file.stat().st_size==end-address
+  files.append(dict(base=address,size=end-address,file=file.name))
+ frames.append(dict(index=i,lifecycle=[int(v) for v in re.findall(r'^LIFE (\d+)',raw,re.M)],banks=files))
+ (a.capture/'poses.json').write_text(json.dumps(dict(sha256=m['slave_sha256'],h3=h3,frames=frames),indent=2)+'\n')
+ print('Captured pose boundary',i,'lifecycle events',len(frames[-1]['lifecycle']),flush=True)

@@ -1,0 +1,108 @@
+ Red Baron Enhanced 3.0b (13.10.2026)
+
+
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "Red Baron" © 1992 Sierra/Dynamix.
+
+ Requirements:
+ -------------
+ This install requires WHDLoad 17 or later to be in the path. It can be found in the
+ WHDLoad package.
+ XFDDecrunch must also be in the path for installation. It is available in
+ aminet:util/pack/xfdmaster.lha.
+
+ Install from the three DOS disks named "Red Baron #1", "Red Baron #2"
+ and "Red Baron #3", in any drive. DOS disk images can also be mounted
+ using DiskImage; the installer lists the required tools.
+ The copy-protected MFM release is not supported.
+ Installer 44.10 or later enables icon previews and drawer opening.
+
+ The tested minimum is 0.5 MB ChipMem and 2 MB FastMem.
+ It can be quit by pressing num '*' (key can be changed with Tooltype "QuitKey=").
+
+ The game requires an installed A500 Kickstart 1.3 image.
+ The kickstart image must be located in the directory "Devs:Kickstarts" and
+ must be named "kick34005.A500". The image can be extracted from a A500 with
+ tools like 'GrabKick' or similar which can be found on aminet.
+ If the image is of wrong version or altered in any way WHDLoad will quit with
+ an appropriate requester.
+ Additionally the file "kick34005.A500.RTB" must be installed in the same
+ directory as the kickstart image. It can be found in the archive 
+ "util/boot/skick346.lha" on aminet.
+
+ Features:
+ ---------
+ - FastMem and CPU cache support, keyboard fixes and mission-tape saving.
+ - English and German releases supported; Manual and Keys included.
+ - Enhanced framerate (68020+Fast RAM): faster cockpit and scene drawing,
+   geometry optimizations and game speed independent of rendering framerate.
+   Applies to sim v1 only; other versions retain their existing fixes.
+
+ Enhanced framerate is enabled in the supplied icons (CUSTOM2=1).
+ To disable all enhancements, clear the splash checkbox or set CUSTOM2=0.
+ Without the tooltype, enhancements are off.
+
+ The option preserves Time Scale. Reduce graphics detail if the game cannot
+ keep up; very slow systems can still lose simulation time.
+
+ History:
+ --------
+ version 3.0b (13.10.2026)
+ - CPU-specific rendering improvements and consistent game speed under one
+   Enhanced framerate checkbox, enabled in the supplied icons.
+ - ReadMe and installer adapted to the WHDLoad Install Template, retaining
+   JOTD's three-disk layout, executable decompression and icon choices.
+
+ version 2.1 (26.11.2005) done by JOTD
+ - german version supported
+ - OS swaps removed (thanks Bert for the advice)
+
+ version 2.0 (10.05.2005) done by JOTD
+ - keyboard fixed
+ - save tape to disk now works
+ - 2 versions now properly supported
+
+ version 1.2 (19.09.2003)
+ - fixed access fault when replaying missions (happens in non-BTTR version)
+
+ version 1.1
+ - removed "tapes" check, not necessary
+ - adapted for BTTR version (kickfs update was needed)
+ - now requires WHDLoad v16
+ - source code included
+
+ version 1.0-B (10.04.03)
+ - install script fixed, now creates the "tapes" directory
+ - slave checks that the directory "tapes" exists in the data sub-directory
+   (if you installed with v1.0, create this directory manually or reinstall)
+
+ version 1.0 (30.03.03) done by JOTD:
+ - initial release
+ - fixed to work with fastmem and caches on 68060
+ - manual included
+ - icons by Exoticons & VC
+
+ To do:
+ - support the MFM version
+
+ Contact:
+ --------
+ If you have problems with this installation please try and get a newer
+ version of this package from the WHDLoad WWW-Page. If that doesn't help try
+ some Tooltypes like NOCACHE, NOAUTOVEC, NOVBRMOVE, NOMMU, PAL or NTSC. If
+ that also fails, please inform the author via the Bug-Report-Form which
+ can be accessed on the WHDLoad WWW-Page or create a mantis issue directly
+ at http://mantis.whdload.de
+
+ For the full WHDLoad package, other installs and updates refer to:
+	http://www.whdload.de/
+ or	aminet:dev/misc/whdload#?
+ and	aminet:game/patch/

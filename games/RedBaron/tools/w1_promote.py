@@ -1,0 +1,10 @@
+"""Promote W1 only after final saved scene and independent cache gates pass."""
+import json
+from pathlib import Path
+root=Path(__file__).resolve().parents[1]
+summary=json.loads(Path('tmp/prof/w1-scene-summary.json').read_text());assert summary['complete']
+proof=json.loads(Path('tmp/prof/w1-scene-twins-030-bank-2/full-proof.json').read_text());assert proof['full_flight_exit'] and proof['mirror_hook_original'] and proof['cache']['pixel_twins']>1
+assert json.loads(Path('tmp/prof/w1-clock-030-2/clock.json').read_text())['complete']
+p=root/'src/perf.s';s=p.read_text();assert 'PERF_VERIFIED_MASK = 0' in s;p.write_text(s.replace('PERF_VERIFIED_MASK = 0','PERF_VERIFIED_MASK = 3'))
+p=root/'src/RedBaronHD.s';s=p.read_text();p.write_text(s.replace('; Release default/icon policy remains a user decision. No verified bits yet.','; Release default/icon policy remains a user decision. Verified bits: perf.s.'))
+p=root/'release/ReadMe';b=p.read_bytes();old=b' Development groundwork:\r\n - Faster rendering splash switch reserved; no optimized features enabled yet.\r\n - Performance patches will apply only to sim v1; v2/v3 keep their existing fixes.\r\n - Sound is unchanged. VERIFY instruments are absent from normal builds.\r\n';new=b' Development W1 rendering improvements:\r\n - Faster rendering (CUSTOM2=1) enables the verified dashboard mirror cache.\r\n   It uses about 13.7 KB extra ChipMem and falls back if allocation fails.\r\n - The table mirror is also enabled on 68000/010/020; 68030/040/060 retain\r\n   the original in-place mirror. Developer builds expose individual bits.\r\n - Default remains off; supplied icon tooltypes are unchanged.\r\n - Applies only to sim v1; v2/v3 keep their existing fixes.\r\n - Faster redraws can accelerate the world on slow machines. Sound and\r\n   Time Scale behavior are unchanged. Display pacing is separate future work.\r\n - VERIFY instruments are absent from normal builds.\r\n';assert old in b;p.write_bytes(b.replace(old,new));print('W1 player mask promoted; build and normal-option checks still required')
