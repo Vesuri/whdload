@@ -20,6 +20,8 @@
 #   CPU, CHIP_KB, FAST_KB, SLOW_KB, AMIGA_MODEL, KICKSTART
 #                        single settings; given by the caller, they also change a named SETUP
 #   NTSC=1, JOY0, JOY1, JOY0_MODE, JOY1_MODE, FSUAE (another emulator binary)
+#   WB=0                 boot DH0 without the Workbench floppy (default WB=1). The floppy only
+#                        supplies C: and LIBS:, but it changes where the game is loaded
 # The launch (AmigaXDev docs/reference/headless-fsuae.md):
 #   DEBUG=1, WARP=1, SOUND, WINDOW=front|back|none, RECORD, DETERMINISTIC, EXTRA_ARGS
 #   INSTANCE=name        a second emulator of the same game, with its own run directory,
@@ -109,9 +111,17 @@ done
 chmod -R u+w "$DH0" "$DH1"
 hook game_drives "$DH0" "$DH1"
 printf 'Expert\nReadDelay=0\n' > "$DH0/s/WHDLoad.prefs"
-printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assign DEVS: DH0:devs' \
-  'Stack 16384' 'FailAt 999' 'CD DH1:' \
-  "WHDLoad $SLAVE_FILE ${WHD_DEFAULTS-PRELOAD SPLASHDELAY=0 NOREQ} ${WHD_ARGS:-}" > "$DH0/s/startup-sequence"
+# Without the floppy DH0 is the boot volume, so DEVS: is DH0:devs; Stack, FailAt and CD are
+# shell built-ins.
+floppy=()
+: > "$DH0/s/startup-sequence"
+if [ "${WB:-1}" = 1 ]; then
+  floppy=(--floppy_drive_0="$WORKBENCH_ADF")
+  printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assign DEVS: DH0:devs' \
+    >> "$DH0/s/startup-sequence"
+fi
+printf '%s\n' 'Stack 16384' 'FailAt 999' 'CD DH1:' \
+  "WHDLoad $SLAVE_FILE ${WHD_DEFAULTS-PRELOAD SPLASHDELAY=0 NOREQ} ${WHD_ARGS:-}" >> "$DH0/s/startup-sequence"
 if [ "${VERIFY_EXIT:-0}" = 1 ]; then
   printf '%s\n' 'If WARN' 'Echo "FAIL" >DH0:whdload-exit.txt' 'Else' \
     'Echo "OK" >DH0:whdload-exit.txt' 'EndIf' >> "$DH0/s/startup-sequence"
@@ -148,7 +158,7 @@ export FSUAE_TITLE="${FSUAE_TITLE:-${TITLE:-$GAME}${INSTANCE:+ ($INSTANCE)} · {
 
 fsuae_options
 fsuae_launch --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
-  --floppy_drive_0="$WORKBENCH_ADF" --state_dir="$FSUAE_RUN/state" \
+  ${floppy[@]+"${floppy[@]}"} --state_dir="$FSUAE_RUN/state" \
   ${mode_args[@]+"${mode_args[@]}"} ${GAME_FSUAE_ARGS[@]+"${GAME_FSUAE_ARGS[@]}"}
 if [ "${WAIT:-0}" = 1 ]; then
   while kill -0 "$FSUAE_PID" 2>/dev/null; do sleep 1; done

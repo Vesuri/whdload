@@ -40,9 +40,23 @@ def game_root():
     sys.exit('run this inside games/<Game> or set GAME=<Game>')
 
 
+# macOS limits a Unix socket path to 104 bytes.
+SOCKET_PATH_MAX = 100
+
+
 def game_server(name, **kwargs):
     root = game_root()
     os.environ['GAME'] = root.name
     instance = os.environ.get('INSTANCE') or 'default'
+    run_dir = f'tmp/run/{instance}/.run'
+    if 'sock' not in kwargs:
+        sock = str(root / run_dir / f'{name}.sock')
+        if len(sock) > SOCKET_PATH_MAX:
+            # A deep checkout (a worktree): the same socket by a relative path. Server and
+            # client then have to be started from the same directory, as tools usually are.
+            sock = os.path.relpath(sock)
+            if len(sock) > SOCKET_PATH_MAX:
+                sys.exit(f'socket path too long even relative to {os.getcwd()}: run from the game directory')
+        kwargs['sock'] = sock
     return Server(name, root=str(root), run_script=str(COMMON / 'run.sh'),
-                  run_dir=f'tmp/run/{instance}/.run', **kwargs)
+                  run_dir=run_dir, **kwargs)

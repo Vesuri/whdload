@@ -25,7 +25,8 @@ cd "$GAME_ROOT"
 BUILD="${1:-${BUILD:-release}}"
 case "$BUILD" in
   clean) rm -rf tmp/build; exit 0 ;;
-  *[!a-zA-Z0-9_-]*|'') die "BUILD must be a plain name" ;;
+  # Letters, digits and _ only: the name is part of the DEFINES_<BUILD> variable.
+  *[!a-zA-Z0-9_]*|'') die "BUILD must be letters, digits and _" ;;
 esac
 OUT="$GAME_ROOT/tmp/build/$BUILD"
 mkdir -p "$OUT"

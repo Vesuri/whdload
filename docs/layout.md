@@ -27,6 +27,7 @@ games/<Game>/
   tools/             the development harness: captures, reports, checks; never ships
   docs/              this game's docs: open-work.md first, then any others it needs
   release/           ReadMe, release.json, slaves.sha256, other shipped non-source files
+  manifest/          optional: pins the tools check (derived files, toolchain, runtime inputs)
   tmp/               ignored: archives/, game/, build/, run/, shots/, captures
 ```
 

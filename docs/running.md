@@ -28,6 +28,7 @@ make stop [INSTANCE=b]
 | `INSTANCE` | another emulator of the same game with its own drives, run directory and gdb-stub port |
 | `DEBUG=1`, `WARP=1`, `SOUND`, `WINDOW=front\|back\|none`, `RECORD`, `DETERMINISTIC`, `EXTRA_ARGS`, `FSUAE` | AmigaXDev's launcher options (its `docs/reference/headless-fsuae.md`) |
 | `NTSC=1`, `JOY0`, `JOY1`, `JOY0_MODE`, `JOY1_MODE` | video timing and ports |
+| `WB=0` | boot without the Workbench floppy. It only supplies `C:` and `LIBS:`, but it changes where the game is loaded, so a game whose captures depend on addresses may set `WB=0` in `game.conf` |
 | `WAIT=1` | stay until the emulator exits |
 | `VERIFY_EXIT=1` | WHDLoad's result (`OK`/`FAIL`) in `tmp/run/<instance>/.run/dh0/whdload-exit.txt` |
 

@@ -38,7 +38,10 @@ tracked.
 1. **Check the source.** Its `git status` is clean (uncommitted work stays behind, so ask
    first). Scan the history that will come in for files that must never be published:
    `git log --all --format= --name-only` against the copyrighted and built extensions,
-   and `git log -p` for home-directory paths and work identities.
+   and `git log -p` for home-directory paths and work identities. Copyrighted or built
+   files stop the import. Paths are rewritten out of the history with filter-repo's
+   `--replace-text` (to the shared variable or the other project's name), and the
+   imported tree is then compared with the source's to show only history changed.
 2. **Rewrite the history** in a scratch clone under the ignored `tmp/import/`, never in
    the source.
    - A standalone project: `git filter-repo --to-subdirectory-filter games/<Game>`, then
