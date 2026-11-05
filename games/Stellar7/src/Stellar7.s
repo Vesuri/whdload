@@ -136,3 +136,15 @@ _bootdos:
         ELSE
         INCLUDE timing.s
         ENDC
+
+; The version string (docs/releasing.md), named as the installer ships each build; last, so
+; every other byte keeps its offset. POLYGON_BLIT_IRQ marks the 68000 target (game.conf).
+        IFD SIM60
+        IFNE POLYGON_BLIT_IRQ
+        dc.b "$VER: Stellar7-Sim68000.Slave 2.0b (05.11.2026)",0
+        ELSE
+        dc.b "$VER: Stellar7-Sim60.Slave 2.0b (05.11.2026)",0
+        ENDC
+        ELSE
+        dc.b "$VER: Stellar7.slave 2.0b (05.11.2026)",0
+        ENDC
