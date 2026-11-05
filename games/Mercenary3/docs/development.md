@@ -310,8 +310,8 @@ The archive has the members of `tmp/archives/Mercenary3.lha` (verified against
 `manifest/inputs.json`) with the source drawer updated: `Mercenary3 Install/src/` holds
 exactly the `src/` files the release slave was assembled from (`tmp/build/release/Mercenary3.deps`),
 `Mercenary3.slave.asm` under its shipped name and the included files beside it, so the
-shipped source assembles to the shipped slave. The original `Mercenary3.islave.asm` is not
-among them and is dropped; the imager it built ships unchanged.
+shipped source assembles to the shipped slave. The original `Mercenary3.islave.asm` stays
+unchanged beside them, with the unchanged imager it builds.
 `Mercenary3 Install/Mercenary3.Slave` and `Mercenary3 Install/ReadMe` are replaced, and
 the two game icons (`Mercenary3.inf`, `Mercenary3.romicon`) gain the tooltype `CUSTOM5=1`
 at the end of their tooltype arrays, after the ROMIcon colour marker and existing entries;

@@ -7,9 +7,9 @@ DIST/Mercenary3Enhanced-<version>-<YYYYMMDD>.lha, from the slave's $VER string (
 and its .sha256; an existing archive is replaced only with --force. The slave, the ReadMe
 and the two game icons (Mercenary3.inf and Mercenary3.romicon, which gain the tooltype
 CUSTOM5=1 so Enhanced framerate starts checked) are replaced, and the source drawer holds
-exactly the src/ files the release slave was assembled from (its .deps, beside the slave),
-under the shipped names where they exist (docs/releasing.md); every other member is the
-original's.
+the src/ files the release slave was assembled from (its .deps, beside the slave), under
+the shipped names where they exist (docs/releasing.md), and the original source of the
+unchanged imager (Mercenary3.islave.asm); every other member is the original's.
 The ReadMe is the WHDLoad Install Template's (pinned in manifest/release-templates.json)
 with release/readme-body.txt and the original ReadMe's version 1.2 history entry.
 LHA names LHa for UNIX; Lhasa cannot create archives.
@@ -38,6 +38,8 @@ SLAVE = f'{TOP}/Mercenary3.Slave'
 README = f'{TOP}/ReadMe'
 ICONS = [f'{TOP}/Mercenary3.inf', f'{TOP}/Mercenary3.romicon']
 SRC = f'{TOP}/src'
+# The source of a binary the release ships unchanged (the RawDIC imager) stays as shipped.
+KEPT = {f'{SRC}/Mercenary3.islave.asm'}
 
 
 def true_case(rel):
@@ -165,8 +167,10 @@ def main():
     shipped = {m for m in names if m.startswith(SRC + '/')}
     if not shipped:
         raise ValueError(f'Source archive ships no {SRC}/')
+    if not KEPT <= shipped:
+        raise ValueError(f'Source archive lacks {sorted(KEPT - shipped)}')
     sources = release_sources(args.slave, shipped)
-    removed = shipped - set(sources)
+    removed = shipped - set(sources) - KEPT
     added = set(sources) - set(names)
     changed |= set(sources)
     final = [m for m in names if m not in removed] + sorted(added)
