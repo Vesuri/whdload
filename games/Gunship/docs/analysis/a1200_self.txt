@@ -1,0 +1,68 @@
+traced cycles 142101776  fields 500  (284204/field)
+
+self cycles by region:
+  gamemule    71.06%
+  kick13      20.72%
+  other        7.68%
+
+top 60 functions by self cycles (kick13/other grouped by 256-byte page):
+  gamemule  +0921c  27.45%     78023 cyc/field
+  kick13    +00f00  10.01%     28455 cyc/field  ROM $fc0f00
+  gamemule  +08548   7.97%     22650 cyc/field
+  gamemule  +02c34   7.35%     20877 cyc/field
+  other     +930d00   4.26%     12111 cyc/field
+  gamemule  +08b6c   3.69%     10473 cyc/field
+  gamemule  +063dc   2.88%      8197 cyc/field
+  kick13    +00d00   2.58%      7345 cyc/field  ROM $fc0d00
+  gamemule  +05ea4   2.37%      6747 cyc/field
+  gamemule  +090da   2.32%      6601 cyc/field
+  other     +930e00   2.06%      5868 cyc/field
+  kick13    +00e00   2.04%      5803 cyc/field  ROM $fc0e00
+  gamemule  +066e8   1.85%      5266 cyc/field
+  gamemule  +02f44   1.19%      3390 cyc/field
+  gamemule  +0625c   1.14%      3233 cyc/field
+  gamemule  +089e4   1.09%      3090 cyc/field
+  gamemule  +06642   1.03%      2919 cyc/field
+  gamemule  +08818   0.98%      2790 cyc/field
+  gamemule  +05d62   0.95%      2687 cyc/field
+  gamemule  +08842   0.82%      2345 cyc/field
+  gamemule  +08466   0.81%      2308 cyc/field
+  other     +9fd400   0.79%      2246 cyc/field
+  gamemule  +082ec   0.75%      2133 cyc/field
+  gamemule  +0828a   0.56%      1603 cyc/field
+  gamemule  +08698   0.47%      1337 cyc/field
+  kick13    +06f00   0.45%      1285 cyc/field  ROM $fc6f00
+  kick13    +06e00   0.43%      1230 cyc/field  ROM $fc6e00
+  kick13    +06d00   0.40%      1139 cyc/field  ROM $fc6d00
+  gamemule  +0e7ac   0.39%      1112 cyc/field
+  gamemule  +01068   0.34%       958 cyc/field
+  gamemule  +04288   0.29%       836 cyc/field
+  kick13    +0a300   0.29%       814 cyc/field  ROM $fca300
+  kick13    +11700   0.27%       772 cyc/field  ROM $fd1700
+  gamemule  +011e0   0.27%       759 cyc/field
+  gamemule  +060a8   0.27%       756 cyc/field
+  kick13    +0c800   0.26%       725 cyc/field  ROM $fcc800
+  other     +975200   0.24%       683 cyc/field
+  gamemule  +0e2fc   0.22%       617 cyc/field
+  gamemule  +08214   0.20%       562 cyc/field
+  gamemule  +06818   0.18%       514 cyc/field
+  kick13    +01f00   0.18%       511 cyc/field  ROM $fc1f00
+  kick13    +25800   0.16%       459 cyc/field  ROM $fe5800
+  gamemule  +09c5c   0.16%       447 cyc/field
+  gamemule  +0ad30   0.14%       411 cyc/field
+  gamemule  +082b6   0.14%       401 cyc/field
+  gamemule  +00ec6   0.14%       396 cyc/field
+  gamemule  +08538   0.14%       394 cyc/field
+  gamemule  +04b48   0.14%       386 cyc/field
+  kick13    +01300   0.14%       384 cyc/field  ROM $fc1300
+  gamemule  +05f8e   0.13%       367 cyc/field
+  kick13    +0a500   0.13%       359 cyc/field  ROM $fca500
+  kick13    +29300   0.12%       354 cyc/field  ROM $fe9300
+  kick13    +0a700   0.12%       352 cyc/field  ROM $fca700
+  kick13    +0ed00   0.11%       318 cyc/field  ROM $fced00
+  gamemule  +08208   0.11%       316 cyc/field
+  kick13    +0ee00   0.10%       291 cyc/field  ROM $fcee00
+  kick13    +01700   0.10%       282 cyc/field  ROM $fc1700
+  gamemule  +045b0   0.09%       269 cyc/field
+  kick13    +1fb00   0.09%       263 cyc/field  ROM $fdfb00
+  gamemule  +08240   0.09%       261 cyc/field

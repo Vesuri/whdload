@@ -1,0 +1,18 @@
+{
+  "archives": [
+    {
+      "input": "Gunship.lha",
+      "output": "Gunship-{version}.lha",
+      "replace": {
+        "GunshipHD/Gunship.slave": "build:Gunship",
+        "GunshipHD/ReadMe": "release/ReadMe",
+        "GunshipHD/Install": "release/Install"
+      },
+      "add": {
+        "GunshipHD/GunshipNTSC.slave": "build:GunshipNTSC"
+      },
+      "remove": [],
+      "source": {"dir": "GunshipHD/source", "variants": ["Gunship", "GunshipNTSC"]}
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+"""Read-only observations of the installed enhanced flight loop."""
+import os,sys,re,json,struct,hashlib
+from pathlib import Path
+from gunship import Session,machine
+from route import run
+from flight_profile import ROUTE
+from amitools.binfmt.BinFmt import BinFmt
+root=Path(__file__).resolve().parents[1]
+slave=Path(os.environ['SLAVE']);blob=bytes(BinFmt().load_image(str(slave)).get_segments()[0].get_data())
+listing=slave.with_suffix(slave.suffix+'.lst').read_text(encoding='latin1')
+def sym(n):return int(re.search(r'^([0-9A-F]{8}) '+n+r'$',listing,re.M)[1],16)
+marker=b'Enhanced framerate: flight timing failed';off=blob.index(marker)
+s=Session(sys.argv[1],dict(NTSC=os.environ.get('NTSC','0'),EXTRA_ARGS=machine().get('EXTRA_ARGS','')+' --video_driver=null',WHD_ARGS='CUSTOM1=1 CUSTOM2=12345'))
+try:
+ effective=s.run/'dh1/Gunship.slave'
+ expected=hashlib.sha256(slave.read_bytes()).hexdigest()
+ assert hashlib.sha256(effective.read_bytes()).hexdigest()==expected
+ (s.out/'provenance.json').write_text(json.dumps(dict(slave_sha256=expected,listing_sha256=hashlib.sha256(listing.encode('latin1')).hexdigest(),machine=os.environ.get('MACHINE'),ntsc=os.environ.get('NTSC','0')),indent=2))
+ route=ROUTE[:ROUTE.index('t:n1')];assert route[-1]=='f:800';run(s,route[:-1]+['f:500'])
+ mem=s.read(0x200000,0x800000);hits=[];i=0
+ while True:
+  i=mem.find(marker,i)
+  if i<0:break
+  candidate=0x200000+i-off
+  ptr=int.from_bytes(s.read(candidate+sym('timing_runtime_arena'),4),'big')
+  if 0x200000<=ptr<0xa00000:hits.append((candidate,ptr))
+  i+=len(marker)
+ assert len(hits)==1,hits
+ base,arena=hits[0]
+ (s.out/'fast.bin').write_bytes(mem)
+ (s.out/'arena.bin').write_bytes(s.read(arena,sym('RT_ARENA_SIZE')))
+ (s.out/'addresses.json').write_text(json.dumps(dict(base=base,arena=arena)))
+
+ h6=int.from_bytes(s.read(arena+sym('RT_HUNKS')+24,4),'big')
+ h2=int.from_bytes(s.read(arena+sym('RT_HUNKS')+8,4),'big')
+
+ # Synchronize host-injected controls to the native producer's field epoch.
+ initial=s.read(arena,sym('RT_ARENA_SIZE'))
+ last,total=struct.unpack_from('>II',initial,sym('RT_CLOCK'));epoch=last-total
+ events=[(240,'key 5 1'),(244,'key 5 0'),(300,'input JOY2_FIRE_BUTTON 1'),(304,'input JOY2_FIRE_BUTTON 0'),(320,'input JOY2_FIRE_BUTTON 1'),(324,'input JOY2_FIRE_BUTTON 0')]
+ observations=[]
+ def inject(field,command):
+  s.cmd(f'break *{base+sym("timing_live_field"):#x}')
+  s.cmd(f'condition $bpnum *(unsigned int*){h2+0x1c:#x} >= {epoch+field}')
+  s.cmd('continue',timeout=600);s.cmd('delete')
+  actual=int.from_bytes(s.read(h2+0x1c,4),'big')-epoch
+  assert actual==field,(actual,field)
+  (s.out/f'input-{field}-arena.bin').write_bytes(s.read(arena,sym('RT_ARENA_SIZE')))
+  s.cmd('monitor '+command)
+  observations.append(dict(field=field,command=command))
+  print('input',field,command,flush=True)
+ for field,command in events:inject(field,command)
+ (s.out/'input-events.json').write_text(json.dumps(dict(epoch=epoch,events=observations),indent=2))
+ checkpoint=base+sym('scheduler_world_done')
+ s.cmd(f'break *{checkpoint:#x}')
+ s.cmd(f'condition $bpnum *(unsigned int*){arena+sym("RT_SCHEDULER")+36:#x} >= 19')
+ for i in range(111):
+  s.cmd('continue',timeout=600)
+  d=s.out/f'world-{20+i}';d.mkdir(exist_ok=True)
+  a=s.read(arena,sym('RT_ARENA_SIZE'));(d/'arena.bin').write_bytes(a)
+  hunks=struct.unpack_from('>9I',a,sym('RT_HUNKS'))
+  for n in (0,2,4,5,6):
+   length=int.from_bytes(s.read(hunks[n]-8,4),'big')-8
+   assert 0<length<1000000,(n,length)
+   (d/f'h{n}.bin').write_bytes(s.read(hunks[n],length))
+  data=(d/'h6.bin').read_bytes()
+  for name,offset,length in [('mission',0x45c8,0xac),('alive',0x45e2,256)]:
+   ptr=int.from_bytes(data[offset:offset+4],'big');(d/(name+'.bin')).write_bytes(s.read(ptr,length))
+  # Full fast-RAM snapshots are unnecessary for this lifetime comparison.
+  worlds=struct.unpack_from('>I',a,sym('RT_SCHEDULER')+36)[0]
+  assert worlds==19+i,worlds
+  print('captured completed native world',worlds+1,flush=True)
+  if worlds in (64,66):
+   s.cmd('delete')
+   if worlds==64:
+    # Controlled fixture discontinuity: bring the scripted helicopter back
+    # into view after natural expiry; certify its changed generation.
+    player=hunks[6]+0x3b88;pos=s.read(player,4);x,y=struct.unpack('>HH',pos)
+    nx,ny=(x+0x400)&65535,(y+0x600)&65535
+    writes=[(player+0x5b,nx>>8,1),(player+0xd5,nx&255,1),(player+0xdb,ny>>8,1),(player+0x155,ny&255,1),(player+0x15b,96,1),(player+0x1db,1,1),(player+0x25b,6,1)]
+    generation=arena+sym('RT_SCRIPT_GENERATION')
+    writes.append((generation,int.from_bytes(s.read(generation,4),'big')+1,4))
+    changes=[]
+    for address,value,size in writes:
+     before=s.read(address,size).hex();kind='unsigned char' if size==1 else 'unsigned int'
+     s.cmd(f'set *({kind}*){address:#x} = {value}')
+     after=s.read(address,size);assert int.from_bytes(after,'big')==value
+     changes.append(dict(address=address,size=size,before=before,after=after.hex()))
+    (s.out/'target-reposition.json').write_text(json.dumps(dict(after_world=65,writes=changes),indent=2))
+   start=1090 if worlds==64 else 1120
+   for field,command in [(start,'input JOY2_FIRE_BUTTON 1'),(start+4,'input JOY2_FIRE_BUTTON 0')]:inject(field,command)
+   (s.out/'input-events.json').write_text(json.dumps(dict(epoch=epoch,events=observations),indent=2))
+   s.cmd(f'break *{checkpoint:#x}')
+   s.cmd(f'condition $bpnum *(unsigned int*){arena+sym("RT_SCHEDULER")+36:#x} >= {worlds+1}')
+ s.cmd('delete')
+ s.shot('end.png')
+finally:s.quit()
