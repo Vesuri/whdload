@@ -1,0 +1,8 @@
+# Start screen -> load -> cancel (default character) -> walk forward along the first street.
+3000 51 174 -     # wait at the load button (start screen is up by ~field 2400)
+10   51 174 L     # click: save-slot screen
+300  132 175 -    # move to the right die (id 10: cancel)
+10   132 175 L    # click: the game starts with the default character
+2500 126 148 -    # to the arrow pad's forward button; wait until the game has loaded
+1000 126 148 L    # hold forward
+0    126 148 -
