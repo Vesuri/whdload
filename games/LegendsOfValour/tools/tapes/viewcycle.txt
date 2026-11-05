@@ -1,0 +1,25 @@
+# View-size study: one click on the view-size icon per visit to the options dialog.
+1    51 174 W     # start screen: green (character) button, id 1
+10   51 174 L
+10   132 175 W    # save-slot screen: right die, id 10
+10   132 175 L    # cancel -> default character
+0    15 188 W     # in game: computer button live
+600  15 188 -     # observe the default view
+10   15 188 L     # options dialog
+150  193 52 -
+10   193 52 L     # view-size icon, click 1
+50   160 90 -
+10   160 90 L     # apply
+600  15 188 -     # observe
+10   15 188 L
+150  193 52 -
+10   193 52 L     # click 2
+50   160 90 -
+10   160 90 L
+600  15 188 -
+10   15 188 L
+150  193 52 -
+10   193 52 L     # click 3
+50   160 90 -
+10   160 90 L
+0    15 188 -

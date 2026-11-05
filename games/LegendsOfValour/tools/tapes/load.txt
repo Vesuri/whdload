@@ -1,0 +1,4 @@
+# Start screen -> load button (green, left) -> slot screen.
+3000 51 174 -     # wait at the button (start screen is up by ~field 2400)
+10  51 174 L      # click
+0   51 174 -
