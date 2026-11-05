@@ -1,0 +1,162 @@
+500 fields, 71050646 cycles (142101/field)
+  task         72.61%
+  supervisor   26.44%
+  exception     0.94%
+  (STOP idle inside supervisor: 4.56%)
+
+supervisor time by handler entry:
+  ROM $fc0d14               19.74%    28.7 entries/field
+  ROM $fc090e                4.86%     0.5 entries/field
+  ROM $fc0d6c                1.38%     0.5 entries/field
+  ROM $fc0c8e                0.46%     0.4 entries/field
+  ROM $fc0f90                0.00%     0.0 entries/field
+  ROM $fc0ec0                0.00%     0.0 entries/field
+
+supervisor self by PC page:
+  ROM $fc0f80                4.65%
+  ROM $fc0d00                4.01%
+  ROM $fc0e80                3.11%
+  other+9fd400               1.04%
+  gamemule+0e780             0.97%
+  ROM $fc6f80                0.74%
+  gamemule+01080             0.57%
+  ROM $fc6e00                0.51%
+  ROM $fc0ec0                0.46%
+  gamemule+0e7c0             0.35%
+  ROM $fc6dc0                0.33%
+  ROM $fc1340                0.33%
+
+task call tree (inclusive, >= 0.15% of all cycles, depth 12):
+  gamemule+04288                69.97%  calls/field     0.1
+    gamemule+05c04                69.62%  calls/field     0.1
+      gamemule+060a8                42.02%  calls/field     0.1
+        gamemule+0625c                41.40%  calls/field     1.4
+          gamemule+063dc                39.13%  calls/field     1.8
+            gamemule+08538                11.77%  calls/field     5.8
+              gamemule+082ec                 2.72%  calls/field     5.8
+                gamemule+08466                 1.20%  calls/field    18.9
+              gamemule+0828a                 0.81%  calls/field     2.2
+                gamemule+082b6                 0.24%  calls/field     2.2
+              gamemule+08238                 0.26%  calls/field     3.8
+            gamemule+06642                 7.47%  calls/field    11.2
+              ROM $fe620e                    0.17%  calls/field     0.2
+            gamemule+08b6c                 6.20%  calls/field     1.2
+            gamemule+08698                 4.81%  calls/field     3.6
+              gamemule+08466                 0.75%  calls/field    18.9
+              gamemule+08928                 0.22%  calls/field     0.8
+            gamemule+08818                 2.64%  calls/field     1.2
+            gamemule+08208                 0.51%  calls/field     7.2
+            gamemule+06818                 0.38%  calls/field     1.8
+            gamemule+06792                 0.19%  calls/field     0.2
+      gamemule+0aa4c                 8.62%  calls/field     0.1
+        gamemule+0aa80                 3.05%  calls/field     0.1
+          gamemule+0ab24                 2.39%  calls/field     0.3
+          gamemule+0ab18                 0.63%  calls/field     0.7
+        gamemule+0ab3c                 1.42%  calls/field     0.1
+          gamemule+0b680                 0.69%  calls/field     0.2
+            gamemule+02f44                 0.64%  calls/field     0.4
+          gamemule+04916                 0.34%  calls/field     0.1
+            gamemule+02c20                 0.28%  calls/field     0.4
+              gamemule+02c34                 0.27%  calls/field     0.4
+          gamemule+02f44                 0.29%  calls/field     0.4
+        gamemule+0b740                 1.00%  calls/field     0.1
+          gamemule+0b90e                 0.90%  calls/field     0.1
+            gamemule+02c20                 0.86%  calls/field     0.4
+              gamemule+02c34                 0.85%  calls/field     0.4
+        gamemule+0ae3c                 0.80%  calls/field     0.1
+          gamemule+08548                 0.76%  calls/field     0.4
+        gamemule+0acf0                 0.74%  calls/field     0.1
+          gamemule+0ad30                 0.68%  calls/field     0.3
+        gamemule+0ac14                 0.58%  calls/field     0.1
+          gamemule+0ac32                 0.38%  calls/field     0.2
+        gamemule+0ac70                 0.57%  calls/field     0.1
+          gamemule+02f44                 0.46%  calls/field     0.4
+        gamemule+0828a                 0.30%  calls/field     2.2
+      gamemule+077b8                 8.49%  calls/field     0.1
+        gamemule+0921c                 5.61%  calls/field     0.2
+        gamemule+08538                 1.47%  calls/field     5.8
+        gamemule+090da                 1.30%  calls/field     0.2
+      gamemule+04496                 4.50%  calls/field     0.1
+        gamemule+00b7c                 4.31%  calls/field     0.1
+          gamemule+00c38                 2.34%  calls/field     0.1
+            intuition:-390                 2.33%  calls/field     0.1
+              ROM $fdc778                    1.91%  calls/field     0.1
+                ROM $fe0460                    1.13%  calls/field     0.1
+                  graphics:-210                  1.12%  calls/field     0.1
+                    ROM $fca5b4                    1.12%  calls/field     0.1
+                      ROM $fd16f0                    0.39%  calls/field     0.6
+                      ROM $fd1470                    0.19%  calls/field     0.2
+                        ROM $fd3c34                    0.17%  calls/field     0.2
+                      ROM $fca484                    0.17%  calls/field     0.4
+                ROM $fe04f4                    0.41%  calls/field     0.1
+                  graphics:-270                  0.41%  calls/field     0.1
+                    ROM $fd3cd0                    0.29%  calls/field     0.1
+                      exec:-318                      0.28%  calls/field     0.4
+                        exec:-30                       0.25%  calls/field     0.5
+                ROM $fe06e4                    0.18%  calls/field     0.2
+                  graphics:-564                  0.16%  calls/field     0.2
+                    ROM $fcfe58                    0.15%  calls/field     0.2
+              ROM $fdfb22                    0.28%  calls/field     0.7
+                ROM $fe0380                    0.27%  calls/field     0.7
+                  exec:-570                      0.26%  calls/field     0.7
+                    exec:-138                      0.22%  calls/field     2.1
+                      exec:-30                       0.22%  calls/field     0.5
+          gamemule+00c2c                 1.65%  calls/field     0.1
+            intuition:-378                 1.64%  calls/field     0.1
+              ROM $fdc474                    1.64%  calls/field     0.1
+                ROM $fe0474                    1.50%  calls/field     0.1
+                  graphics:-216                  1.49%  calls/field     0.1
+                    ROM $fcc678                    1.48%  calls/field     0.1
+                      ROM $fcc5c0                    0.30%  calls/field     0.5
+                      ROM $fca358                    0.28%  calls/field     2.8
+          gamemule+022fa                 0.24%  calls/field     0.2
+      gamemule+05ea4                 3.04%  calls/field     0.1
+      gamemule+0468c                 1.36%  calls/field     0.1
+        gamemule+0489a                 1.34%  calls/field     0.1
+          gamemule+02c20                 1.23%  calls/field     0.4
+            gamemule+02c34                 1.23%  calls/field     0.4
+      gamemule+05cbe                 1.22%  calls/field     0.1
+        gamemule+05d62                 1.20%  calls/field     0.1
+      gamemule+05f8e                 0.15%  calls/field     0.1
+  gamemule+060a8                 0.85%  calls/field     0.1
+    gamemule+0625c                 0.84%  calls/field     1.4
+      gamemule+063dc                 0.80%  calls/field     1.8
+        gamemule+08538                 0.23%  calls/field     5.8
+        gamemule+08b6c                 0.16%  calls/field     1.2
+  gamemule+09c5c                 0.62%  calls/field     0.1
+    gamemule+0af36                 0.31%  calls/field     0.1
+      gamemule+048ea                 0.27%  calls/field     0.1
+        gamemule+02c20                 0.23%  calls/field     0.4
+          gamemule+02c34                 0.22%  calls/field     0.4
+  gamemule+04496                 0.29%  calls/field     0.1
+    gamemule+00b7c                 0.18%  calls/field     0.1
+  gamemule+0625c                 0.20%  calls/field     1.4
+    gamemule+063dc                 0.19%  calls/field     1.8
+  gamemule+0aa4c                 0.17%  calls/field     0.1
+
+library calls by inclusive cycles:
+  intuition:-390             2.42%  calls/field    0.11
+  intuition:-378             1.72%  calls/field    0.11
+  graphics:-216              1.57%  calls/field    0.11
+  graphics:-210              1.17%  calls/field    0.11
+  exec:-30                   0.52%  calls/field    0.53
+  graphics:-270              0.44%  calls/field    0.11
+  exec:-138                  0.37%  calls/field    2.13
+  exec:-318                  0.36%  calls/field    0.38
+  exec:-570                  0.36%  calls/field    0.71
+  timer.dev:-30              0.31%  calls/field    0.44
+  graphics:-564              0.17%  calls/field    0.21
+  exec:-198                  0.16%  calls/field    0.21
+  exec:-564                  0.14%  calls/field    0.72
+  exec:-210                  0.12%  calls/field    0.21
+  graphics:-222              0.08%  calls/field    0.11
+  exec:-372                  0.05%  calls/field    0.45
+  exec:-552                  0.03%  calls/field    0.02
+  exec:-444                  0.03%  calls/field    0.02
+  exec:-306                  0.03%  calls/field    0.13
+  exec:-462                  0.02%  calls/field    0.03
+  console.dev:-48            0.02%  calls/field    0.20
+  exec:-324                  0.02%  calls/field    0.05
+  exec:-474                  0.01%  calls/field    0.20
+  exec:-246                  0.01%  calls/field    0.11
+  exec:-450                  0.01%  calls/field    0.02

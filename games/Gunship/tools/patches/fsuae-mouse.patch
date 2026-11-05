@@ -1,0 +1,29 @@
+diff --git a/src/barto_gdbserver.cpp b/src/barto_gdbserver.cpp
+index 20074360..efa03aef 100644
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -715,6 +715,24 @@ namespace barto_gdbserver {
+ 											response += record_key_debug(((raw << 1) | (raw >> 7)) & 0xff) ? "OK" : "E02";
+ 										} else
+ 											response += "E01";
++									} else if(cmd.substr(0, strlen("mouse ")) == "mouse ") {
++										// Harness: relative motion (decimal counts) of the port-0 mouse, added to
++										// its counters like host mouse motion.
++										int dx = 0, dy = 0; char extra;
++										if(sscanf(cmd.c_str(), "mouse %d %d %c", &dx, &dy, &extra) == 2 && abs(dx) <= 1000 && abs(dy) <= 1000) {
++											if(dx) send_input_event(INPUTEVENT_MOUSE1_HORIZ, dx, 0, 0);
++											if(dy) send_input_event(INPUTEVENT_MOUSE1_VERT, dy, 0, 0);
++											response += "OK";
++										} else
++											response += "E01";
++									} else if(cmd.substr(0, strlen("button ")) == "button ") {
++										// Harness: port-0 mouse button (1 left, 2 right), 1 = press, 0 = release.
++										int button = 0, pressed = -1; char extra;
++										if(sscanf(cmd.c_str(), "button %d %d %c", &button, &pressed, &extra) == 2 && (button == 1 || button == 2) && (pressed == 0 || pressed == 1)) {
++											send_input_event(button == 1 ? INPUTEVENT_JOY1_FIRE_BUTTON : INPUTEVENT_JOY1_2ND_BUTTON, pressed, 1, 0);
++											response += "OK";
++										} else
++											response += "E01";
+ 									} else {
+ 										// unknown monitor command
+ 										response += "E01";
