@@ -1,0 +1,73 @@
+[
+  {
+    "op": "exec",
+    "code": "key('KEY_K',0x27);until(probe+sy['FF1FineExit']);until(native(0x65f48));snapshot('monaco-tow-restored');advance_fields(2200,False);snapshot('monaco-tow-results')\n"
+  },
+  {
+    "op": "move",
+    "x": 12,
+    "y": 196
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 500
+  },
+  {
+    "op": "move",
+    "x": 282,
+    "y": 172
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 300
+  },
+  {
+    "op": "move",
+    "x": 288,
+    "y": 150
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "travel-second-requester"
+  }
+]

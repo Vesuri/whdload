@@ -1,0 +1,11 @@
+--- a/src/newcpu.cpp
++++ b/src/newcpu.cpp
+@@ -2404,7 +2404,7 @@
+ 			cpucycleunit /= 2;
+ 		}
+ 	} else if (currprefs.cpu_frequency) {
+-		cpucycleunit = CYCLE_UNIT * baseclock / currprefs.cpu_frequency;
++		cpucycleunit = (uae_u64)CYCLE_UNIT * (baseclock / 8) / currprefs.cpu_frequency;
+ 	} else if (currprefs.cpu_memory_cycle_exact && currprefs.cpu_clock_multiplier == 0) {
+ 		if (currprefs.cpu_model >= 68040) {
+ 			cpucycleunit = CYCLE_UNIT / 16;

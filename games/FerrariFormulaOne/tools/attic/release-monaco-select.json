@@ -1,0 +1,78 @@
+[
+  {
+    "op": "move",
+    "x": 45,
+    "y": 99
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 220,
+    "y": 110
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 257,
+    "y": 48
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "shot",
+    "label": "monaco-race-selection"
+  }
+]

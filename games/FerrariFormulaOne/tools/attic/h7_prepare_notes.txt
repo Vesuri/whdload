@@ -1,0 +1,8 @@
+H7 implementation plan pending enabler observation:
+- Fine-only define and RenderBlit.s; immutable enabled=1, equal-layout zero arm.
+- Acquire once after schedule_install, on resume, each B8Draw.
+- Active flag separate from saved BLIT bit: remember initially disabled state too.
+- Recheck INTENAR exactly once per acquire; clear any intervening enable without replacing entry state.
+- Restore on pause and public_reset before data zeroing; production fault fine conditional restores before host abort.
+- Shared FullPresentation/PublicLifecycle/ProductionFault changes conditional on fine-only define; coarse binary compare required.
+- All existing native patch installation remains under patch ledger. No new native patch sites required.

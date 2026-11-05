@@ -1,0 +1,6 @@
+from pathlib import Path
+import sys,shutil,json,struct
+r=Path(__file__).resolve().parents[1]
+s=(r/'tools/build_h7_legacy.py').read_text().replace('render-h7','render-h9').replace('test_h7_legacy.py','test_h9_legacy.py');exec(compile(s,str(r/'tools/build_h7_legacy.py'),'exec'))
+b=r/'tmp/build/render-h9';o=r/'tmp/build/render-h9-bad-signature';shutil.copytree(b,o,dirs_exist_ok=True);m=json.loads((b/'build.json').read_text());f=m['payloads']['fine'];at=32+f['offset']+f['symbols']['FF1RenderInstallFill']+2;p=o/'FerrariFormulaOne.slave';v=bytearray(p.read_bytes());assert v[at:at+2]==bytes.fromhex('4eb9');v[at:at+2]=bytes.fromhex('4eb8');p.write_bytes(v)
+s=(r/'tools/test_h5_fault.py').read_text().replace('h5-bad-signature','h9-bad-signature').replace('render-h5-bad-signature','render-h9-bad-signature').replace("str(r/'tmp/step3/fs-uae-q03-final')","str(r/'tmp/step5-frame-observer-build/fs-uae')").replace('bitmap=addresses.map(0x24ae0)','bitmap=addresses.map(0x6abc6)').replace("bytes.fromhex('4a79')+struct.pack('>I',addresses.map(0x1c1b4))","bytes.fromhex('4eb9')+struct.pack('>I',addresses.map(0x2a130))").replace('bitmap','road_fill').replace('H5','H9');(r/'tools/test_h9_fault.py').write_text(s)

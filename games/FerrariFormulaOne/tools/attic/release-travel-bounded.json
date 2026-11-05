@@ -1,0 +1,37 @@
+[
+  {
+    "op": "move",
+    "x": 216,
+    "y": 104
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 125,
+    "y": 104
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 173,
+    "y": 11
+  },
+  {
+    "op": "shot",
+    "label": "travel-bounded-rio-selected"
+  },
+  {
+    "op": "exec",
+    "code": "# Observe native transport day addition; no guest memory/register writes.\ndef travel_charge(label):\n modal_table=table if 'table' in globals() else val('*(unsigned int*)0x197b0')*4\n h167=val(f'*(unsigned int*){modal_table+167*4}')*4+4\n before_pc=h167+0x84;after_pc=h167+0xaa\n assert val(f'*(unsigned short*){before_pc}')==0x42ae\n cmd('delete');cmd(f'break *{before_pc}');cmd(f'break *{native(0x2482a)}');vbl=val('$bpnum');cmd('ignore $bpnum 29');cmd('monitor input JOY1_FIRE_BUTTON 1');cmd('continue');cmd('monitor input JOY1_FIRE_BUTTON 0')\n if val('$pc')!=before_pc:cmd(f'ignore {vbl} 1999');cmd('continue')\n assert val('$pc')==before_pc\n days=val('*(unsigned int*)($a6-8)');_,before=snapshot(label+'-before')\n cmd('delete');cmd(f'break *{after_pc}');cmd('continue');assert val('$pc')==after_pc\n _,after=snapshot(label+'-after')\n report.setdefault('travel_charges',[]).append(dict(label=label,days=days,clock_loop='menu h167+$84..$aa',before=before,after=after));save()\n\ntravel_charge('monaco-rio-bounded')"
+  },
+  {
+    "op": "shot",
+    "label": "travel-bounded-after"
+  }
+]

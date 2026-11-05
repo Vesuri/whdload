@@ -1,0 +1,360 @@
+[
+  {
+    "op": "move",
+    "x": 12,
+    "y": 196
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 500
+  },
+  {
+    "op": "shot",
+    "label": "pit-long-click"
+  },
+  {
+    "op": "exec",
+    "code": "advance_fields(1,False);_,pit_before=snapshot(\"pit-clock-before\");advance_fields(120,False);_,pit_after=snapshot(\"pit-clock-after\");assert pit_before[\"context\"]==pit_after[\"context\"]==ex[\"context\"];assert pit_before[\"calendar\"]!=pit_after[\"calendar\"];report[\"pit_native_clock_without_driving_debt\"]=True;save()"
+  },
+  {
+    "op": "move",
+    "x": 282,
+    "y": 172
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 300
+  },
+  {
+    "op": "shot",
+    "label": "paddock"
+  },
+  {
+    "op": "move",
+    "x": 75,
+    "y": 150
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "race-control"
+  },
+  {
+    "op": "move",
+    "x": 50,
+    "y": 108
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 12
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "control-panel"
+  },
+  {
+    "op": "move",
+    "x": 12,
+    "y": 196
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "move",
+    "x": 50,
+    "y": 135
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "race-settings"
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 84
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "shot",
+    "label": "session-selected"
+  },
+  {
+    "op": "move",
+    "x": 75,
+    "y": 36
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 300
+  },
+  {
+    "op": "shot",
+    "label": "session-applied"
+  },
+  {
+    "op": "exec",
+    "code": "assert report[\"session-applied\"][\"context\"]==ex[\"context\"];assert bytes.fromhex(report[\"session-applied\"][\"calendar\"])[:7]==bytes([86,4,11,1,1,3,2]);report[\"session_change_without_driving_debt\"]=True;save()"
+  },
+  {
+    "op": "move",
+    "x": 50,
+    "y": 135
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "move",
+    "x": 20,
+    "y": 148
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 20
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 148
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 20
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 148
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 20
+  },
+  {
+    "op": "shot",
+    "label": "qualifying-clock-set"
+  },
+  {
+    "op": "move",
+    "x": 75,
+    "y": 36
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 2500
+  },
+  {
+    "op": "shot",
+    "label": "qualifying-paddock-ready"
+  },
+  {
+    "op": "exec",
+    "code": "assert report[\"qualifying-paddock-ready\"][\"context\"]==ex[\"context\"];report[\"scripted_session_clock_without_driving_debt\"]=True;save()"
+  },
+  {
+    "op": "move",
+    "x": 160,
+    "y": 35
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 500
+  },
+  {
+    "op": "shot",
+    "label": "qualifying-driving"
+  },
+  {
+    "op": "move",
+    "x": 115,
+    "y": 83
+  },
+  {
+    "op": "exec",
+    "code": "cmd('delete')\ncmd(f'break *{probe+sym(fine_listing,\"C1Checkpoint\")}')\ncmd(f'break *{native(0x2482a)}')\ncmd('ignore $bpnum 29')\ncmd('monitor input JOY1_FIRE_BUTTON 1')\nassert 'Breakpoint' in cmd('continue')\ncmd('monitor input JOY1_FIRE_BUTTON 0')\nif val('$pc')!=probe+sym(fine_listing,'C1Checkpoint'):\n cmd('delete');cmd(f'break *{probe+sym(fine_listing,\"C1Checkpoint\")}')\n assert 'Breakpoint' in cmd('continue')\ncmd('monitor input JOY1_FIRE_BUTTON 0')\nassert val('$pc')==probe+sym(fine_listing,'C1Checkpoint')\nm,fresh=snapshot('fresh-session-update')\nf=fresh['context'];interval=20 if fine else 200 if kind=='000' else 100\nassert fresh['completed']==1 and f[6]==1 and (f[7]&65535)==interval and (f[7]>>16)==interval%100 and f[8:]==[0,0,0,0,0,0]\nassert (f[3]<<32|f[4])==f[5]\nif kind=='000':assert fresh['owned']==64 and not fresh['intena']&64\nreport['fresh_epoch_after_actual_session_change']=True\nroad=probe+sy['FF1RenderRoadField'];assert m[road:road+66]==bytes(66)\nassert struct.unpack_from('>H',m,probe+sy['FF1RenderRoadControl'])[0]==1\nreport['road_workspace_reset_after_reload']=True\nassert m[probe+sy['FF1RenderTextPixels']:probe+sy['FF1RenderTextPixels']+192]==bytes(192)\nassert struct.unpack_from('>H',m,probe+sy['FF1RenderBitmapControl'])[0]==1\nreport['text_workspace_reset_after_reload']=True\ncmd('ignore $bpnum 19');assert 'Breakpoint' in cmd('continue')\nm,settled=snapshot('fresh-session-step21');assert settled['completed']==21 and val(f'*(unsigned int*){probe+sym(fine_listing,\"error\")}')==0\nreport['fresh_race']=hex(struct.unpack_from('>I',m,table+160*4)[0]*4+4)\nfresh_addresses=Addresses(m,table);colour=fresh_addresses.map(0x32e34)\nassert m[colour:colour+2]==bytes.fromhex('4ef9') and struct.unpack_from('>I',m,colour+2)[0]==probe+sy['FF1RenderColourPlane']\nreport['colour_hook_verified_after_reload']=True\nbitmap=fresh_addresses.map(0x24ae0)\nassert m[bitmap:bitmap+2]==bytes.fromhex('4ef9') and struct.unpack_from('>I',m,bitmap+2)[0]==probe+sy['FF1RenderBitmap']\nreport['bitmap_hook_verified_after_reload']=True\nassert struct.unpack_from('>H',m,probe+sy['FF1RenderTextControl'])[0]==1\nif take['blit_control']:assert settled['owned']==1 and not settled['intena']&64\nreport['status']='passed';save()\ncmd('delete');s.handle(g,'shot '+str(out/'fresh-session-driving.png'))\n"
+  },
+  {
+    "op": "quit"
+  }
+]

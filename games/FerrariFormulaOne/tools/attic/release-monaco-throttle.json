@@ -1,0 +1,10 @@
+[
+  {
+    "op": "exec",
+    "code": "cmd('delete');cmd(f'break *{checkpoint}');cmd('monitor input JOY1_2ND_BUTTON 1')\nrows=[]\nfor n in range(350):\n assert 'Breakpoint' in cmd('continue')\n assert val(f'*(unsigned int*){probe+sy[\"error\"]}')==0\n if n%25==0:rows.append(dict(update=152+n,countdown=val(f'*(unsigned short*){native(0x66f94)}'),speed=val(f'*(unsigned int*){native(0x2275a)}')))\ncmd('monitor input JOY1_2ND_BUTTON 0')\nfor row in report['monaco_start_observations']:row['update']=row.pop('presentation')+1\nreport['monaco_start_throttle_updates']=rows;report['monaco_observation_unit']='Production update checkpoints, not rendered presentation counts';save();snapshot('monaco-after-501-updates')\n"
+  },
+  {
+    "op": "shot",
+    "label": "monaco-green-running"
+  }
+]

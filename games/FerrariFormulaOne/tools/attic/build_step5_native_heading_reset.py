@@ -1,0 +1,151 @@
+from pathlib import Path
+import struct,subprocess,json,hashlib
+r=Path(__file__).resolve().parents[1];o=r/'tmp/build/step5-native-heading-reset';o.mkdir(parents=True,exist_ok=True)
+base=(r/'tmp/build/release/FerrariFormulaOne.slave').read_bytes();assert hashlib.sha256(base).hexdigest()=='b8f0985e47a73b12f4822bf15960c3d6980f3484d261a5b009c163ca23a3630f'
+asm=(r/'tmp/build/step5-heading-fine/heading.s').read_text().replace('modeval: dc.w 9','modeval: dc.w MODE')
+asm=asm.replace('finish:\n move.w (sp)+,ccr','''finish:
+ lea ticks(pc),a0
+ cmpi.l #126,(a0)
+ bne.b no_contact_fixture
+ bsr.w contact_fixture
+no_contact_fixture:
+ move.w (sp)+,ccr''')
+asm=asm.replace('bridge_contact_first:\n','bridge_contact_first:\n lea contact_first_count(pc),a1\n addq.l #1,(a1)\n').replace('bridge_contact_second:\n','bridge_contact_second:\n lea contact_second_count(pc),a1\n addq.l #1,(a1)\n')
+cases=[dict(first=a,second=0,front=0) for a in range(8)]
+extra='''
+contact_fixture:
+ lea contact_vectors(pc),a3
+ lea contact_results(pc),a4
+ move.w #7,d7
+case_loop:
+ clr.w $1c21e
+ lea position_shadow(pc),a0
+ moveq #0,d6
+seed_loop:
+ move.l d6,d0
+ add.l d0,d0
+ lea $2268e,a1
+ move.w #1,(a1,d0.l)
+ lea $6a60a,a1
+ move.w #10,(a1,d0.l)
+ lea $6a61a,a1
+ clr.w (a1,d0.l)
+ lea $6a62a,a1
+ move.w #100,(a1,d0.l)
+ lea $2275a,a1
+ move.w #100,(a1,d0.l)
+ lea $6f14c,a1
+ move.w #100,(a1,d0.l)
+ clr.w (a0)+
+ move.w d6,d0
+ mulu.w #257,d0
+ addi.w #256,d0
+ move.w d0,(a0)+
+ move.w d6,d0
+ subq.w #4,d0
+ move.w d0,(a0)+
+ move.w #100,(a0)+
+ move.w d6,d0
+ mulu.w #513,d0
+ addi.w #512,d0
+ move.w d0,(a0)+
+ move.w d6,d0
+ subq.w #4,d0
+ move.w d0,(a0)+
+ addq.w #1,d6
+ cmpi.w #8,d6
+ blo.b seed_loop
+ lea heading_shadow(pc),a0
+ lea $2278a,a1
+ lea $227aa,a2
+ moveq #0,d6
+seed_heading:
+ move.l d6,d0
+ mulu.w #12345,d0
+ subi.l #50000,d0
+ move.l d0,(a1)+
+ move.l d0,(a0)+
+ move.w d6,d0
+ subq.w #4,d0
+ move.w d0,(a0)+
+ move.l d6,d0
+ mulu.w #45678,d0
+ addi.l #90000,d0
+ move.l d0,(a2)+
+ move.l d0,(a0)+
+ moveq #4,d0
+ sub.w d6,d0
+ move.w d0,(a0)+
+ addq.w #1,d6
+ cmpi.w #8,d6
+ blo.b seed_heading
+ move.w (a3)+,$32fbc
+ addq.l #4,a3
+ clr.w $32fc2
+ move.w #100,$32fc4
+run_contact:
+ ; Match shadow integers to the fixture input, keeping distinct tails.
+ lea position_shadow+6(pc),a0
+ lea $6a62a,a1
+ moveq #7,d6
+sync_seed:
+ move.w (a1)+,(a0)
+ adda.w #12,a0
+ dbra d6,sync_seed
+ movem.l d0-d7/a0-a6,-(sp)
+ jsr $69496
+ movem.l (sp)+,d0-d7/a0-a6
+ lea position_shadow(pc),a0
+ moveq #23,d6
+save_shadow:
+ move.l (a0)+,(a4)+
+ dbra d6,save_shadow
+ lea $6a62a,a0
+ moveq #3,d6
+save_positions:
+ move.l (a0)+,(a4)+
+ dbra d6,save_positions
+ lea $2275a,a0
+ moveq #3,d6
+save_speeds:
+ move.l (a0)+,(a4)+
+ dbra d6,save_speeds
+ lea $6f14c,a0
+ moveq #3,d6
+save_velocities:
+ move.l (a0)+,(a4)+
+ dbra d6,save_velocities
+ move.l $32fc2,(a4)+
+ move.l bridge_resets(pc),(a4)+
+ lea heading_shadow(pc),a0
+ moveq #23,d6
+save_heading_shadow:
+ move.l (a0)+,(a4)+
+ dbra d6,save_heading_shadow
+ lea $2278a,a0
+ moveq #15,d6
+save_heading_arrays:
+ move.l (a0)+,(a4)+
+ dbra d6,save_heading_arrays
+ move.l $32fb4,(a4)+
+ move.l $32fb8,(a4)+
+ move.l heading_resets(pc),(a4)+
+ dbra d7,case_loop
+contact_complete:
+ bra.b contact_complete
+contact_first_count: dc.l 0
+contact_second_count: dc.l 0
+contact_vectors:
+'''
+for c in cases:extra+=f" dc.w {c['first']},{c['second']},{c['front']}\n"
+extra+='contact_results: ds.b '+str(len(cases)*324)+'\n'
+asm=asm.replace('fine_records: ds.b 25600','').replace('heading_records: ds.b 38400','')
+asm+=extra+'fine_records: ds.b 25600\nheading_records: ds.b 38400\n'
+(o/'cases.json').write_text(json.dumps(cases,indent=2)+'\n');(o/'original_div.bin').write_bytes((r/'tmp/build/step5-heading-fine/original_div.bin').read_bytes())
+for mode,name in ((6,'control'),(9,'heading')):
+ (o/(name+'.s')).write_text(asm.replace('MODE',str(mode)))
+ subprocess.run([str(Path.home()/'.local/vasmm68k_mot'),'-m68020','-Fbin','-quiet','-L',name+'.list','-o',name+'.bin',name+'.s'],cwd=o,check=True)
+ code=bytearray(base[32:-4]);pos=code.find(bytes.fromhex('d0ab001c2240'));pos=code.find(bytes.fromhex('d0ab001c2240'),pos+6);assert pos>=0
+ code[pos:pos+6]=bytes.fromhex('6100')+struct.pack('>h',len(code)-pos-2)+bytes.fromhex('4e71');code+=(o/(name+'.bin')).read_bytes();code+=b'\0'*((-len(code))%4)
+ header=bytearray(base[:32]);header[20:24]=struct.pack('>I',len(code)//4);header[28:32]=header[20:24];(o/(name+'.slave')).write_bytes(header+code+bytes.fromhex('000003f2'))
+print('Built',len(cases),'native reset cases, one per car')

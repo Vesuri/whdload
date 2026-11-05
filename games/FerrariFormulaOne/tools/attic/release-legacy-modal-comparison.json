@@ -1,0 +1,236 @@
+[
+  {
+    "op": "move",
+    "x": 45,
+    "y": 99
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 220,
+    "y": 110
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 257,
+    "y": 48
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 85,
+    "y": 83
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "shot",
+    "label": "monaco-race-selection"
+  },
+  {
+    "op": "move",
+    "x": 75,
+    "y": 36
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 2500
+  },
+  {
+    "op": "move",
+    "x": 160,
+    "y": 35
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 500
+  },
+  {
+    "op": "move",
+    "x": 188,
+    "y": 180
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 100
+  },
+  {
+    "op": "move",
+    "x": 164,
+    "y": 68
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "shot",
+    "label": "legacy-tyre-selection"
+  },
+  {
+    "op": "move",
+    "x": 164,
+    "y": 11
+  },
+  {
+    "op": "exec",
+    "code": "# Execute within the native UI harness via its exec operation. No guest writes.\ndef repair_charge(label):\n modal_table=table if 'table' in globals() else val('*(unsigned int*)0x197b0')*4\n h176=val(f'*(unsigned int*){modal_table+176*4}')*4+4\n h179=val(f'*(unsigned int*){modal_table+179*4}')*4+4\n helper=h179+0x9f4;caller=h176+0xeb4\n assert val(f'*(unsigned short*){helper}')==0x4e56\n assert val(f'*(unsigned short*){h176+0xeae}')==0x4eb9\n assert val(f'*(unsigned int*){h176+0xeb0}')==helper\n cmd('delete');cmd(f'break *{helper}');cmd(f'condition $bpnum *(unsigned int*)$sp == {caller}');cmd(f'break *{native(0x2482a)}');vbl_bp=val('$bpnum');cmd('ignore $bpnum 29');cmd('monitor input JOY1_FIRE_BUTTON 1');assert 'Breakpoint' in cmd('continue');cmd('monitor input JOY1_FIRE_BUTTON 0')\n if val('$pc')!=helper:\n  cmd(f'ignore {vbl_bp} 999');assert 'Breakpoint' in cmd('continue')\n assert val('$pc')==helper\n amount=val('*(unsigned int*)($sp+4)');returned=val('*(unsigned int*)$sp')\n _,before=snapshot(label+'-before');cmd('delete');cmd(f'break *{returned}');assert 'Breakpoint' in cmd('continue');_,after=snapshot(label+'-after')\n report.setdefault('repair_charges',[]).append(dict(label=label,tenths_argument=amount,caller='menu h176+$eae',before=before,after=after));save()\n\nrepair_charge('legacy-monaco-tyre-change')"
+  },
+  {
+    "op": "move",
+    "x": 100,
+    "y": 36
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 300,
+    "y": 108
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 300,
+    "y": 11
+  },
+  {
+    "op": "click",
+    "settle": 30
+  },
+  {
+    "op": "move",
+    "x": 282,
+    "y": 172
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 300
+  },
+  {
+    "op": "move",
+    "x": 288,
+    "y": 150
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 1"
+  },
+  {
+    "op": "fields",
+    "count": 30
+  },
+  {
+    "op": "gdb",
+    "command": "monitor input JOY1_FIRE_BUTTON 0"
+  },
+  {
+    "op": "fields",
+    "count": 200
+  },
+  {
+    "op": "shot",
+    "label": "legacy-travel-requester"
+  }
+]
