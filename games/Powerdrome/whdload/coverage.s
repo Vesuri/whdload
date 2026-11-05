@@ -70,6 +70,34 @@ coverage_vbl
  beq.s .force_axes
  cmp.l #7,d0
  bne.w .normal_axes
+ IFNE COVERAGE_MOUSE_TEST
+ move.l $48fe(a0),d0
+ sub.l cov_epoch-coverage_status(a1),d0
+ cmp.l #260,d0
+ beq.s .mouse_x_plus
+ cmp.l #310,d0
+ beq.s .mouse_x_minus
+ cmp.l #360,d0
+ beq.s .mouse_x_plus
+ cmp.l #380,d0
+ beq.s .mouse_y_plus
+ cmp.l #410,d0
+ beq.s .mouse_y_minus
+ cmp.l #440,d0
+ bne.s .normal_axes
+.mouse_y_plus
+ addq.w #1,$a6e+$42e(a0)
+ bra.s .normal_axes
+.mouse_y_minus
+ subq.w #2,$a6e+$42e(a0)
+ bra.s .normal_axes
+.mouse_x_plus
+ addq.w #1,$a6e+$42a(a0)
+ bra.s .normal_axes
+.mouse_x_minus
+ subq.w #2,$a6e+$42a(a0)
+ bra.s .normal_axes
+ ELSE
  move.l $48fe(a0),d0
  sub.l cov_epoch-coverage_status(a1),d0
  cmp.l #160,d0
@@ -86,6 +114,7 @@ coverage_vbl
  bne.s .normal_axes
  add.w #40,$a6e+$42a(a0)
  bra.s .normal_axes
+ ENDC
 .force_axes
  move.l $48fe(a0),d0
  sub.l cov_epoch-coverage_status(a1),d0
@@ -465,7 +494,11 @@ coverage_timing_tape
  dc.w 9,0,0
  dc.l 650
  ELSE
+ IFNE COVERAGE_MOUSE_TEST
+ dc.l 550
+ ELSE
  dc.l 250
+ ENDC
  ENDC
  dc.w -1,0,0
 

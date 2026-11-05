@@ -36,7 +36,8 @@ work can fall behind; retaining time debt does not guarantee real-time throughpu
 | Work | Logical cadence |
 | --- | --- |
 | Movement and geometric collision checks | 20 ms |
-| Controls, orientation, resources, engine decisions, opponents | 90 ms |
+| Mouse orientation integration | 20 ms |
+| Control decisions/input consumption, joystick orientation, resources, engine decisions, opponents | 90 ms |
 | Repeated contact penalties, damage and age counters | Control epochs |
 | Fall/impulse displacement | Integrated over each world step, split at effect boundaries |
 | Weather generation | 80/140 ms according to effect state |
@@ -77,6 +78,58 @@ carrying signed remainders. Geometric collision checks run every world step;
 repeated contact feedback/speed penalties at `$fb64`, damage at `$fb84` and age at
 `$cde2` are limited to control epochs. Different simulation policies need not give
 identical collision trajectories; there is only one enhanced physics rate here.
+
+## Fine mouse rotation
+
+`TIMING_MOUSE=1` is part of `TIMING_FULL`. It is selected by the existing
+**Enhanced framerate** checkbox, with the same 68020+/real-fast-RAM gate. Set
+`TIMING_MOUSE=0` only for diagnostic comparisons. The native fallback retains its original hooks; checked-option A500 and
+unchecked A1200 name-screen snapshots verify this for the current build.
+
+The mouse is a held turning command, not a direct heading offset. The native
+`$d0a8` gain (136/256) and `$d11c` per-ship calibration divisors are retained.
+The patch preserves their discarded fractions in Q12 (1/4096 degree per 90 ms),
+without changing the native integer fields used by other control decisions.
+For the measured setup, horizontal/vertical divisors are 55/38: a single mouse
+count now produces a nonzero rate even when the native angle rounds to zero.
+Input history and control decisions still use the 90 ms cadence; this change does
+not promise 20 ms input latency.
+
+Held mouse rotation is integrated every 20 ms, scaled by 4/18. Fractional time
+conversion is carried between control epochs. Within an epoch, each candidate is
+recomputed from its saved starting matrix and cumulative angle, avoiding repeated
+rounding from subdividing a single turn. A private Q28 matrix preserves orientation
+between epochs; the native game/renderer receive rounded Q14 matrices. Q30 sine
+and cosine come from a mathematical quarter-wave table generated at build time
+(23,044 bytes), with 1/64-degree entries and interpolation to Q12 angles. No native
+lookup-table units or renderer format change.
+
+The patch replaces the three-rotation call sequence at `$cc58`; native candidate
+validation/acceptance from `$cc66` remains in place. Rejected candidates clear
+pending fractional rotation. A native matrix replacement rebases the private
+matrix; session/pit initialization clears it. Joystick and animation paths retain
+the native rotation routines. Weather/banking/control decisions retain their
+existing cadence. This is simulation rotation, not display interpolation.
+
+`tools/check_mouse_math.py --ticks 30000` executes the actual assembly with the
+shared Unicorn runtime. It checks 2,949,120 signed fractional angles, 2,056 input/
+calibration combinations, both signs of sustained turns, rejection, native matrix
+replacement, joystick fallback and reset. Ten-minute constant-yaw tests have less
+than 0.003 degree final heading error and less than 0.011% row-length error against
+the specified Q12 rates. These are isolated arithmetic tests, not a ten-minute
+in-game handling test. Three in-game single-count tapes (020, 060 and a 060 draw
+cap of 10 Hz after 200 world steps) match all 499 common private/native steering
+states, with 126 matrix changes between control epochs in each capture. Both axes
+respond in both directions and no input queue overflows. The uncapped 060 tape
+spends most of the window at one display field per frame; the capped portion uses
+five fields. The tape is correctness evidence, not a performance benchmark.
+
+Uninstrumented Practice throughput is 24.089 fps on 020/fast versus 24.291 with
+`TIMING_MOUSE=0` (0.833% lower), and 45.591/49.098 fps on 060/50 with NoCache/CACHE.
+These are 500-field route measurements; different orientation/scene inputs mean
+the comparison is not an isolated routine-cost measurement. The full older release
+matrix has not been rerun for this feature. [Open work](open-work.md) records that
+scope and the remaining unrelated validation limits.
 
 ## Inputs, pause and sessions
 

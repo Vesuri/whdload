@@ -9,7 +9,9 @@ remain user-controlled.
 
 The renderer draws the original planar graphics in fast memory, then copies the
 scene to chip memory. Gameplay uses 20 ms world steps and 90 ms control epochs on
-the enhanced path. There is no chunky conversion or render interpolation.
+the enhanced path. Mouse rotation runs every 20 ms with fractional precision,
+retaining the original calibration gain. There is no chunky conversion or render
+interpolation.
 
 ```sh
 make -C whdload all
@@ -21,8 +23,16 @@ See [development](docs/development.md) for setup, CPU configuration and testing.
 
 ## Release measurements
 
-These measurements precede the single-checkbox UI change. Enhanced runs now
-require `CUSTOM1=1` explicitly.
+The current fine-mouse build measures **24.09 fps** in Practice on A1200 + fast
+(24.29 with coarse mouse rotation), and **49.10 fps** on cached 060/50 + fast.
+The [current measurements and validation](docs/open-work.md#fine-mouse-steering)
+include the 0.83% A1200 route cost and cross-render-rate steering checks.
+
+### Baseline matrix
+
+These measurements precede the single-checkbox UI and fine mouse-steering changes.
+They are historical release baselines, not performance measurements of the current
+mouse integration. Enhanced and native paths are now selected by `CUSTOM1=1` and the unchecked default.
 They are FS-UAE PAL route measurements over 500 fields from the first driving
 presentation (`$bc7c`), counted with read-only breakpoints. FPS uses complete
 first-to-last presentation intervals. Builds have no phase instrumentation or

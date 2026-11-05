@@ -4,8 +4,27 @@ Current release status and validation limits are in [open work](open-work.md).
 
 ## Current measurements
 
-These measurements precede the single-checkbox UI change. Enhanced runs now
-require `CUSTOM1=1` explicitly.
+Fine mouse rotation uses Q12 angular rates and a private Q28 matrix, publishing
+native Q14 orientation every 20 ms. The original calibration gain and 90 ms control
+input cadence remain. See [timing design](timing-implementation.md#fine-mouse-rotation).
+Current uninstrumented 500-field Practice measurements are:
+
+| Configuration | Intervals / fields | FPS | Mean ms/frame |
+| --- | ---: | ---: | ---: |
+| A1200 + fast, NoCache, coarse mouse control | 240 / 494 | 24.291 | 41.167 |
+| A1200 + fast, NoCache, fine mouse | 238 / 494 | 24.089 | 41.513 |
+| 060/50 + fast, NoCache, fine mouse | 455 / 499 | 45.591 | 21.934 |
+| 060/50 + fast, CACHE, fine mouse | 490 / 499 | 49.098 | 20.367 |
+
+The A1200 comparison changes only `TIMING_MOUSE`, and uses matching hunk placement.
+Fine mouse costs 0.833% route throughput there. These are end-to-end routes, not
+isolated rotation costs. Evidence: `tmp/mouse-steering/perf*/`.
+
+### Release baseline matrix
+
+These measurements precede the single-checkbox UI and fine mouse-steering changes.
+They are historical release baselines, not performance measurements of the current
+mouse integration. Enhanced and native paths are now selected by `CUSTOM1=1` and the unchecked default.
 They are FS-UAE PAL route measurements over 500 fields from the first driving
 presentation (`$bc7c`), counted with read-only breakpoints. FPS uses complete
 first-to-last presentation intervals. Builds have no phase instrumentation or

@@ -14,6 +14,9 @@ timing_world_initialize
  lea timing_session_state(pc),a0
  addq.l #1,8(a0)
  lea timing_world_state(pc),a0
+ IFNE TIMING_MOUSE
+ bsr timing_mouse_reset
+ ENDC
  bsr timing_forces_initialize
  IFNE TIMING_WEATHER_EFFECTS
  bsr timing_weather_reset

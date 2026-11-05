@@ -10,7 +10,11 @@ VASMFLAGS ?=
 .PHONY: all verify coverage original original-verify FORCE
 all: ../tmp/build/Powerdrome.slave
 
-../tmp/build/Powerdrome.slave: Powerdrome.s FORCE
+../tmp/build/mouse-sine.i: ../tools/mouse_sine.py
+	mkdir -p ../tmp/build
+	python3 $< $@
+
+../tmp/build/Powerdrome.slave: Powerdrome.s ../tmp/build/mouse-sine.i FORCE
 	mkdir -p ../tmp/build
 	$(VASM) -m68000 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I. -Iinclude -I$(WHDLOAD)/Include -I$(WHDLOAD)/Src/sources -I$(NDK) -o $@ $<
 

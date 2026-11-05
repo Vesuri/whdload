@@ -10,6 +10,9 @@ TIMING_FULL = 1
  ENDC
 ; Fixture-free cadence2 configuration. VERIFY fixtures remain explicit opt-ins;
 ; *_TEST defaults are zero and seed defaults are -1 (native RNG, no injection).
+ IFND TIMING_MOUSE
+TIMING_MOUSE = 1
+ ENDC
  IFND TIMING_PERIODIC
 TIMING_PERIODIC = 1
  ENDC
@@ -43,6 +46,9 @@ TIMING_WEATHER_FADE = 1
  IFND TIMING_WEATHER_CYCLE
 TIMING_WEATHER_CYCLE = 1
  ENDC
+ ENDC
+ IFND TIMING_MOUSE
+TIMING_MOUSE = 0
  ENDC
  IFND TIMING_DEPARTURE
 TIMING_DEPARTURE = 1

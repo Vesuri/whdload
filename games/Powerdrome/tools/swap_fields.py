@@ -59,6 +59,16 @@ if repair_buffers:
 if os.environ.get('COVERAGE_STATE') == '1':
     values = ', '.join(f'*(unsigned short*){state+x:#x}' for x in state_offsets)
     state_probe = 'printf \"PDSTATE %d ' + ' '.join(['%u']*len(state_offsets)) + '\\n\", $pd_field, ' + values + '\n'
+if os.environ.get('MOUSE_STATE') == '1':
+    mouse = [m.start() for m in re.finditer(b'PDMOUSE1', code)
+             if struct.unpack_from('>H', code, m.start()+8)[0] == 1]
+    assert len(mouse) == 1, 'Need one initialized fine mouse steering record'
+    mp = a.base + mouse[0]
+    mouse_values = [f'*(unsigned short*){mp+x:#x}' for x in range(8,152,2)]
+    mouse_values += [f'*(unsigned short*){state+x:#x}' for x in (0x422,0x1ec,0x1ee,0x3a6,0x3a8,0x3aa)]
+    mouse_values += [f'*(short*){state+x:#x}' for x in range(0x3e8,0x3fa,2)]
+    mouse_sample = 'printf "PDMOUSE_EVENT %d {off} ' + ' '.join(['%d']*len(mouse_values)) + '\\n", $pd_field, ' + ', '.join(mouse_values) + '\n'
+    probe_tests += ''.join(f'if $pc == {r["game"][0]+x:#x}\n'+mouse_sample.replace('{off}',hex(x))+'end\n' for x in probes)
 # Optional timing samples are read-only and use the same completed-frame marker.
 if os.environ.get('TIMING_STATE') == '1':
     early = os.environ.get('TIMING_EARLY') == '1'
@@ -66,7 +76,7 @@ if os.environ.get('TIMING_STATE') == '1':
     if early:
         chip = (a.out/'chip.bin').read_bytes()
         patch = r['game'][0] + 0xca44
-        assert struct.unpack_from('>H', chip, patch)[0] == 0x4ef9, 'Early timing capture needs installed C3 hooks'
+        assert struct.unpack_from('>H', chip, patch)[0] == 0x4ef9, 'Early timing capture needs installed timing hooks'
         live_frame = struct.unpack_from('>I', chip, patch+2)[0] - a.base
         assert 0 <= live_frame < len(code)
 

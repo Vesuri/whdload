@@ -196,6 +196,11 @@ TIMING_SETUP_SEED = -1
  FAIL "TIMING_SETUP_SEED requires TIMING_WORLD20"
  ENDC
  ENDC
+ IFNE TIMING_MOUSE
+ IFEQ TIMING_WORLD20
+ FAIL "TIMING_MOUSE requires TIMING_WORLD20"
+ ENDC
+ ENDC
 ; Development-only staged extraction. Not included unless TIMING_PERIODIC=1.
 ; An 18-unit (90 ms) cadence is 11.111 Hz on PAL, near the measured A500 routes.
 TIMING_PERIOD = 18
@@ -359,6 +364,17 @@ install_periodic
  movem.l (sp)+,d0-d2/a0-a2
  rts
 pl_periodic PL_START
+ IFNE TIMING_MOUSE
+ ; Preserve fractional mouse gain and calibrated angular divisions.
+ ; TIMING_RANGE h0:$d0a8 12 bit=C3
+ PL_PSS $d0a8,timing_mouse_gain,6
+ ; TIMING_RANGE h0:$d11c 16 bit=C3
+ PL_PSS $d11c,timing_mouse_divide,10
+ ; Native NOP + three complete BSRs. Candidate validation remains native.
+ ; TIMING_RANGE h0:$cc58 14 bit=C3
+ PL_P $cc58,timing_mouse_rotate
+ PL_NOP $cc5e,8
+ ENDC
  IFNE TIMING_WEATHER_CYCLE
  ; TIMING_RANGE h0:$dd0e 6 bit=C3
  PL_P $dd0e,timing_weather_cycle_outer
@@ -790,7 +806,11 @@ timing_orientation_again
  bsr timing_world_begin
  IFNE TIMING_WORLD20
  bsr timing_world20_test_control
+ IFNE TIMING_MOUSE
+ beq.w timing_mouse_between
+ ELSE
  beq.w timing_orientation_move
+ ENDC
  ENDC
  ENDC
  IFNE TIMING_ORIENTATION
@@ -912,6 +932,9 @@ timing_brake_parity
 timing_after_brake_parity dc.w $4ef9
  dc.l 0
 timing_orientation_end
+ IFNE TIMING_MOUSE
+ bsr timing_mouse_finish
+ ENDC
  IFNE TIMING_WORLD
  ; Finish this whole world update before starting the next owed control update.
  bra.w timing_orientation_move
@@ -951,6 +974,20 @@ timing_resource_continuation dc.w $4ef9
  dc.l 0
 
 timing_targets
+ IFNE TIMING_MOUSE
+ dc.l $8d0e
+ dc.w timing_mouse_native_trig+2-timing_targets
+ dc.l $aa4c
+ dc.w timing_mouse_native_pitch+2-timing_targets
+ dc.l $ab00
+ dc.w timing_mouse_native_yaw+2-timing_targets
+ dc.l $abba
+ dc.w timing_mouse_native_roll+2-timing_targets
+ dc.l $cc66
+ dc.w timing_mouse_after_rotate+2-timing_targets
+ dc.l $cbd2
+ dc.w timing_mouse_candidate+2-timing_targets
+ ENDC
  dc.l $59b6
  dc.w timing_clock+2-timing_targets
  dc.l $ca4a
@@ -1270,4 +1307,8 @@ timing_control_phase dc.w 1
 
  IFNE TIMING_WEATHER_CYCLE
  INCLUDE timing_weather_cycle.s
+ ENDC
+
+ IFNE TIMING_MOUSE
+ INCLUDE timing_mouse.s
  ENDC

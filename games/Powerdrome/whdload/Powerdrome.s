@@ -1,3 +1,11 @@
+ IFND COVERAGE_MOUSE_TEST
+COVERAGE_MOUSE_TEST = 0
+ ENDC
+ IFNE COVERAGE_MOUSE_TEST
+ IFND COVERAGE_INPUT
+ FAIL "COVERAGE_MOUSE_TEST requires coverage input"
+ ENDC
+ ENDC
 ; Powerdrome release slave. Original install by Galahad/Fairlight.
 ; WHDLoad 20 KickEmu supplies the OS; interface 17 requires no v20-only feature.
  INCLUDE whdload.i
@@ -228,4 +236,9 @@ custom2 dc.l 0
 
  IFNE VERIFY_PHASE
  INCLUDE phase.s
+ ENDC
+
+ IFNE TIMING_MOUSE
+timing_mouse_sine
+ INCLUDE ../tmp/build/mouse-sine.i
  ENDC
