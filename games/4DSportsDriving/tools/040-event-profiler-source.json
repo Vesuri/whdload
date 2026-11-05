@@ -1,0 +1,13 @@
+{
+  "source_commit": "b70b1180b44ab25b97cd66466c70879897d8a362",
+  "source_files": {
+    "src/newcpu.cpp": "aa0c13afc172cb5dc8f0eab8611c5987d57b47f7cc63b41326166730e689f12c",
+    "src/barto_gdbserver.cpp": "15c794e725802117fbb11e1cc43715d41b8adb9a3b3882f8b1af3c1ac9257e22"
+  },
+  "patched_files": {
+    "src/newcpu.cpp": "72824e43d2440c79e3360bb4fb31ee24451979477e8cb1c5f0899fb416241404",
+    "src/barto_gdbserver.cpp": "700a80eac6eb75751ecf77ad1eaedd76be293b1f1e4513ca7d5f30461215879f"
+  },
+  "binary_sha256": "2a171e655c12b8434a0e1a81f369de6af4de1bc355840e271d678adb16bfe025",
+  "scope": "Event ordering and PAL-field timing only. MMU core charges instruction cycles in the following iteration; per-PC Barto cost fields are not usable as instruction cost measurements."
+}

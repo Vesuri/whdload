@@ -1,8 +1,0 @@
-PROGNAME = 4DSportsDriving
-WHDLOADER = $(PROGNAME).slave
-SOURCE = $(PROGNAME)HD.asm
-
-all :  $(WHDLOADER)
-
-$(WHDLOADER) : $(SOURCE)
-	basm $(SOURCE)
