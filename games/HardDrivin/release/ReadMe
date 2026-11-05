@@ -1,0 +1,231 @@
+
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "Hard Drivin'" (c) 1989/1990 Tengen/Atari/Domark.
+ Version 4.0b (04.11.2026)
+
+ Requirements:
+ -------------
+ An original copy of the game and WHDLoad version 17.0 or later are required.
+ WHDLoad must be accessible in the command path.
+
+ The installed program requires 0.5 MB ChipMem and 1.0 MB OtherMem.
+ Additional memory is needed to preload the game files. PRELOAD is recommended
+ to avoid repeated disk access. An A1200 with Fast RAM is recommended for
+ enhanced gameplay.
+
+ The game requires an A500 Kickstart 1.3 image named "kick34005.A500" in
+ "Devs:Kickstarts", together with "kick34005.A500.RTB". The image can be
+ extracted from an A500 with GrabKick or a similar tool from Aminet.
+ An incorrect or altered image will be rejected by WHDLoad. The RTB file
+ is available in "util/boot/skick346.lha" on Aminet.
+
+ Supported editions:
+ - Original release
+ - TNT compilation (same disk as Toobin')
+ - Wheels Of Fire compilation (same disk as Chase HQ)
+ - ReSpray budget release
+ - Racing Masters compilation
+
+ The new enhancements have been tested with the original SPS 0126 edition.
+ The other supported editions retain their existing patches. Action 5,
+ Summer Smashers and Sport Games Hits editions remain unverified.
+
+ Installation:
+ -------------
+ Extract the package, double-click "Install" and follow the prompts.
+ Select the game edition, destination drawer and preferred icon. Existing
+ support for floppy disks and disk images is retained. Installing from disk
+ images requires the additional tools described by the installer's help.
+ For Wheels Of Fire, select the file named "2" (49804 bytes) when requested.
+ The installer creates a HardDrivin drawer with the game files in "data".
+
+ Features:
+ ---------
+ Start the game from its icon. Steering and menus use the mouse; see Arcade
+ controls below for the buttons with arcade handling.
+ High scores are loaded from and saved to hard disk.
+
+ Keys:
+   Q       Abort the current race.
+   Esc/F10 Quit to Workbench. F10 is the default WHDLoad QuitKey, which can
+           be changed with the QuitKey tooltype.
+
+ CUSTOM2 controls the existing frame delay: 0 gives maximum rendering speed;
+ higher values slow rendering down.
+
+ The options below affect only the original SPS 0126 edition. Set them in
+ the WHDLoad splash window or as tooltypes.
+
+ Simulation (CUSTOM1):
+   Original (0)
+       The original simulation and renderer.
+   Enhanced framerate (1)
+       Smoother gameplay on accelerated Amigas with the original Amiga
+       handling, including its abrupt skids.
+   Enhanced framerate with arcade handling (2)
+       As Enhanced framerate, with the car driving like the arcade
+       machine's. This is the default for newly installed icons.
+ Command-line launches must specify CUSTOM1=1 or CUSTOM1=2 to enable the
+ enhanced simulations.
+
+ Enhanced framerate:
+ Movement, physics, traffic and replay timing use elapsed time. On 68020 and
+ faster CPUs, physics can update every PAL field (50 times per second); the
+ renderer draws as often as it can. On 68000, physics updates follow rendered
+ frames. Original race-clock behaviour and its defects are retained unless
+ arcade race timing is selected.
+
+ Both enhanced settings also draw the road and the objects on it in depth
+ order, so cars no longer appear in front of scenery that hides them, and
+ let traffic slow down behind a slower car in its lane instead of driving
+ through it.
+
+ Rendering optimizations are selected automatically: optimized rotations and
+ blitter waits on 68000, and on 68020 with the executable in Fast RAM; optimized
+ rotations on 68040/68060, and the original renderer on 68030. Other untested
+ configurations retain the original renderer. CUSTOM3 is not a release option.
+
+ Arcade handling:
+ The car follows the arcade machine's own car model: tyre grip and slides,
+ weight transfer, springs, the engine and automatic gearbox, and the brakes.
+ The course is driven at its real scale, so speeds match the scenery. Ramps,
+ jumps and the loop follow the arcade, including falling off the loop when
+ too slow. Crashes follow the arcade's rules: a wall is only a crash when hit
+ hard, objects are a crash above about 40 MPH, and landings never are.
+
+ Arcade controls (mouse):
+   Mouse left/right  Steer. Steering is gentle around the centre and quicker
+                     towards full lock, for fine corrections at speed.
+   Right button      Gas pedal. Hold it to open the throttle (fully in about
+                     0.2 seconds); release it and the throttle closes over
+                     0.4 seconds.
+   Left button       Brake pedal. A single press brakes at about a third of
+                     the pedal, which slows the car while it still turns.
+                     Press again within half a second and hold (a double
+                     click) for full braking: the front wheels lock, and the
+                     car stops hardest but hardly steers. Release to let go.
+ Lifting off or braking in a fast corner moves weight off the rear wheels
+ and can start a slide, as in the arcade; steer into the slide to catch it.
+ The gears are automatic or manual as selected in the game. These pedals
+ apply to mouse control; other control methods keep the game's own throttle.
+
+ Arcade brake (CUSTOM4), with arcade handling:
+   Full (0)  The arcade's brake, locking the front wheels at full pedal.
+   Soft (1)  A weaker brake that stops short of locking the front wheels
+             and comes on more gradually.
+
+ Race timing (CUSTOM5), with any Simulation setting:
+   Amiga (0)   The game's own clocks.
+   Arcade (1)  The arcade's race timing: the countdown runs in real time,
+               checkpoint time limits follow the arcade (doubled unless arcade
+               handling is selected, as the other settings cross the course
+               at half speed), the difficulty in the options menu selects the
+               arcade's matching difficulty, and the championship lap needs
+               the arcade's qualifying time, shown on the dashboard from the
+               start.
+
+ This is a beta with limited human playtesting. Enhancements can add
+ overhead on an A500, and arcade handling adds more; they are not a promise
+ of higher frame rates on every setup.
+
+ History:
+ --------
+ version 4.0b (04.11.2026) done by Vesa Halttunen:
+ - added a Simulation option for the SPS 0126 edition: Original, Enhanced
+   framerate, or Enhanced framerate with arcade handling, the default for
+   new installs
+ - Enhanced framerate: smoother gameplay on faster Amigas with the original
+   handling; traffic, replays and related animation and sound timing follow
+   elapsed time; automatic CPU-specific rendering optimizations
+ - arcade handling: the arcade machine's car model, driven at the course's
+   real scale, with the mouse buttons as gas and brake pedals, a steering
+   response suited to the mouse, and the arcade's ramps, jumps, loop and
+   crash rules
+ - added an Arcade brake option, Full or Soft, for arcade handling
+ - added a Race timing option, Amiga or Arcade
+ - with the enhanced settings, the road and objects are drawn in depth order
+   so cars no longer show through scenery, and traffic follows a slower car
+   in its lane instead of driving through it
+ - fixed rare renderer crashes present in the original game
+ - updated the installer using the WHDLoad Install Template, retaining all
+   five game editions and seven icon choices
+
+ version 3.0 (23.03.2024) done by JOTD:
+ - fixed keyboard on version SPS0126 (issue #0006342)
+ - source code reworked & available
+ 
+ version 2.04 (06/2008) done by Girv:
+ - fixed crash bug when saving high scores (introduced with 2.03)
+
+ v 2.03    03/2008
+      - supports Racing Masters compilation version
+      - upgraded installer script to latest version
+      - added some new icons
+      - requires WHDLoad v16.5+
+ v 2.02    01/2005
+      - supports ReSpray budget version
+ v 2.01    01/2005
+      - supports TNT compilation version
+      - supports Wheels Of Fire compilation version
+ v 2.00    12/2004
+      - rewritten to use Kickstart emulation
+      - fixed blthog usage
+      - fixed access errors
+      - fixed more cpu dependent delay loops
+      - fixed self modifying graphics code
+      - WHDLoad v16.0 compatible
+      - uses standard release numbering system
+      - uses standard WHDLoad installer script
+ v 0801.1  08/2001
+      - uses OSEmu 20010818
+      - version checks moved from installer script into slave
+      - miscellaneous installer script improvements
+      - fixed cpu dependent delay loops
+
+ v 0601.1  06/2001
+      - fixed file loading crash bug
+ 
+ v 0501.1  05/2001
+      - first release
+      - fixed to run with fastram and caches
+      - fixed gear selection bug
+      - fixed access violation
+      - added high score loading/saving
+      - added framerate control
+      - added "abort game" key
+
+ Licence and credits:
+ -------------------
+ The original licence is supplied in LICENCE and installed with this ReadMe.
+ Original installation (c) 2001-2008 Halibut Software / John Girvin.
+ Version 3.0 by JOTD; version 4.0b enhancements by Vesa Halttunen.
+
+ WHDLoad is by Bert Jahn. Versions before 2.00 used OSEmu by Wepl, Harry,
+ Jeff, Mr. Larmer and others. Versions from 2.00 use Kickstart 1.3 emulation
+ by Wepl and Psygore.
+
+ Thanks to Carlo and the other disk-image contributors, and to dflrsilver
+ for the Racing Masters edition. Thanks to Jeff for the music timing fixes
+ and to Codetapper for CopyLock decryption and decrunching. Respect to
+ Mr. Larmer/Wanted Team, who also made an installer for this game.
+
+ Contact:
+ --------
+ If you have problems, first check for a newer version of the install.
+ Report problems through the WHDLoad Bug-Report-Form or its issue tracker:
+   http://www.whdload.de/
+   http://mantis.whdload.de/
+ Include your game edition, Amiga configuration and selected tooltypes.
+
+ For WHDLoad, other installs and updates, see the WHDLoad website or
+ Aminet's dev/misc/whdload#? and game/patch/ directories.
+
+ $VER: Hard Drivin' ReadMe 4.0b (04.11.2026)

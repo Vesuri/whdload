@@ -1,0 +1,16 @@
+{
+  "archives": [
+    {
+      "input": "HardDrivin.lha",
+      "output": "HardDrivin-{version}.lha",
+      "replace": {
+        "HardDrivinInstall/HardDrivin.slave": "build:HardDrivin",
+        "HardDrivinInstall/ReadMe": "release/ReadMe",
+        "HardDrivinInstall/Install": "release/Install"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "HardDrivinInstall/source", "variants": ["HardDrivin"]}
+    }
+  ]
+}
