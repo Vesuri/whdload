@@ -2,7 +2,7 @@
   "archives": [
     {
       "input": "RedBaron.lha",
-      "output": "RedBaron-{version}-{date}.lha",
+      "output": "RedBaronEnhanced-{version}-{date}.lha",
       "replace": {
         "RedBaronHD/RedBaron.slave": "build:RedBaron",
         "RedBaronHD/ReadMe": "release/ReadMe",
