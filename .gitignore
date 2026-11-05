@@ -2,7 +2,7 @@
 
 # --- OS / local tooling state ------------------------------------------------
 .DS_Store
-.claude/*.lock
+.claude/
 __pycache__/
 *.pyc
 
