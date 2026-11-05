@@ -52,12 +52,12 @@ make run BUILD=race                        # a diagnostic build
 WHD_DEFAULTS='PRELOAD SPLASHDELAY=-1' make run   # show the splash window and wait for Start
 ```
 
-`common/run.sh` boots Kickstart 3.1 from DH0 with the Workbench 2.04 floppy in DF0; the
+`common/run.sh` boots Kickstart 3.1 from DH0 without a floppy (`WB=0` in `game.conf`); the
 startup-sequence runs `WHDLoad Indianapolis500.Slave PRELOAD SPLASHDELAY=0 NOREQ` on DH1, a fresh
 copy of the install plus WHDLoad. The slave is direct (no OS): no Kickstart image is needed
-inside WHDLoad. The floppy moves the load address: the harness this came from booted without
-it, so load addresses, calibrations and demo courses from captures made before the move to this
-repository are not comparable with new ones. Compare only captures made the same way.
+inside WHDLoad. `WB=1` inserts the Workbench 2.04 floppy, which moves the load address, so
+load addresses, calibrations and demo courses from such captures are not comparable with the
+default ones. Compare only captures made the same way.
 
 | Variable | `make run` default | fixed_window.sh default | Meaning |
 |---|---|---|---|
