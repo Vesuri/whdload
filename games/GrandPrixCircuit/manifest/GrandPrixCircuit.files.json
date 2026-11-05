@@ -1,0 +1,13 @@
+{
+  "GrandPrixCircuitHD/GrandPrixCircuit.inf": "e9276c155faba770d761cd0d9d51a3976d5129658d4ac76b996956988f918675",
+  "GrandPrixCircuitHD/GrandPrixCircuit.slave": "f8d802b72969ee13901c8ad4e8864e35a07cb51ed1d20bf4783941fee0cdc045",
+  "GrandPrixCircuitHD/Install": "d94b5bff009ec78296176f191546d383753b7cd1dd2e4e1f4eee2442e56cfa1f",
+  "GrandPrixCircuitHD/Install.info": "e51576954efd9fad288e6c274265fedfc98c946ed8e62850ca1873bb46ebb339",
+  "GrandPrixCircuitHD/Manual": "44ba01941d1ce93b832d365c04956754cb07a0854bf3b9c618b97be96dd36921",
+  "GrandPrixCircuitHD/Manual.info": "efb5f9ddbc26ead66712058579707b4f362208e728ce03fd5b38ffd65b0fa1b9",
+  "GrandPrixCircuitHD/ReadMe": "101538599348b4e0466a68246449d37eb5b5275d46734168e6695da0e8d03cc8",
+  "GrandPrixCircuitHD/ReadMe.info": "63f87accf4bb5ed403f14e48fcc73f6d570a01295eac912636347ebc0ef6163f",
+  "GrandPrixCircuitHD/SPSID": "0c856952bf1c796658b6f7ca16074fa9335990b78b32a5c78231649219f67c31",
+  "GrandPrixCircuitHD/source/GrandPrixCircuitHD.asm": "acdc8ddfb94bc17a6b8127565418ac5863d938c3ea12580a4a2793674bcb3199",
+  "GrandPrixCircuitHD/source/Makefile": "afd41002a9499fbcf245b7e2a23c8c69ddb07e8f2b33c18324693eae0c254e10"
+}

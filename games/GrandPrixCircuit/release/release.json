@@ -1,0 +1,17 @@
+{
+  "archives": [
+    {
+      "input": "GrandPrixCircuit.lha",
+      "output": "GrandPrixCircuitEnhanced-{version}-{date}.lha",
+      "replace": {
+        "GrandPrixCircuitHD/GrandPrixCircuit.slave": "build:GrandPrixCircuit",
+        "GrandPrixCircuitHD/ReadMe": "release/ReadMe",
+        "GrandPrixCircuitHD/Install": "release/Install",
+        "GrandPrixCircuitHD/GrandPrixCircuit.inf": "release/GrandPrixCircuit.inf"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "GrandPrixCircuitHD/source", "variants": ["GrandPrixCircuit"]}
+    }
+  ]
+}
