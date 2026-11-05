@@ -97,7 +97,8 @@ FF1RenderBitmap:
  adda.w d2,a1
  IFD FF1_FAST_RENDER
  exg a0,a1
- bsr.l FF1FastRenderTarget
+ move.l #7*48+1,d0          ; one byte in each of eight rows
+ bsr.l FF1FastRenderTargetSpan
  exg a0,a1
  ENDC
  move.l d5,d0

@@ -44,8 +44,19 @@ FR_ROWS equ FR_BANK_BYTES/FR_ROW_BYTES   ; 645 rows of 48 bytes per bank
 FR_ROWS_PAD equ FR_ROWS+1
 
 ; FR5 stages in the prefix, in draw order: 1 = FR5a (clear $6b050 and
-; background $6b950), 2 = FR5b (road $6b368). FF1FastRenderStages selects how
-; many run. The FULL diagnostic redirects every stage after the wait instead.
+; background $6b950), 2 = FR5b (road $6b368), 3 = FR5c (cars $69bb8),
+; 4 = FR5d (rear-view mirrors $6ae70/$6af7e and their bitmap operations),
+; 5 = FR5e (pit messages, cockpit $6c0d0/$6ba18, gauges $6bbfc, $6adf8),
+; 6 = FR5f (demo text, flag, clock and the instruments $6694e): the whole
+; draw. FF1FastRenderStages selects how many run. The FULL diagnostic
+; redirects every stage after the wait instead.
+FR_STAGES_ALL equ 6
+; From this many staged stages the non-bank scratch lives in Fast alone.
+ IFD FF1_FAST_RENDER_BLOCKS
+FR_SCRATCH_STAGES equ FR_STAGES_ALL+1   ; diagnostic: track blocks in every arm
+ ELSE
+FR_SCRATCH_STAGES equ FR_STAGES_ALL
+ ENDC
  IFD FF1_FAST_RENDER_FULL
 FR_STAGES equ 0
  ELSE
@@ -56,7 +67,24 @@ FR5S_PREFIXES equ 4         ; prefix runs
 FR5S_PUBLISHED equ 8        ; rows copied to Chip
 FR5S_REFRESHED equ 12       ; rows read from Chip before a partial access
 FR5S_FILLED equ 16          ; rows written whole by a CPU fill
-FR5S_LONGS equ 4
+FR5S_CUTS equ 20            ; field waits moved after a later stage (FR5c-f)
+FR5S_BLOCKS_REFRESHED equ 24 ; non-bank blocks read from Chip (FR5a-e arms)
+FR5S_BLOCKS_PUBLISHED equ 28 ; non-bank blocks copied to Chip (FR5a-e arms)
+FR5S_LONGS equ 7
+
+; Non-bank mirrors (entries 2-4), tracked in 256-byte blocks by the arms
+; whose prefix ends before the last stage.
+FR_M2_LO equ $cd30
+FR_M2_HI equ $d3e0
+FR_M3_LO equ $d3e0
+FR_M3_HI equ $18f48
+FR_M4_LO equ $18f48+FR_BANK_BYTES
+FR_M4_HI equ $528d8
+FR_BLOCK_SHIFT equ 8
+FR_M2_BLOCKS equ (FR_M2_HI-FR_M2_LO+255)>>FR_BLOCK_SHIFT
+FR_M3_BLOCKS equ (FR_M3_HI-FR_M3_LO+255)>>FR_BLOCK_SHIFT
+FR_M4_BLOCKS equ (FR_M4_HI-FR_M4_LO+255)>>FR_BLOCK_SHIFT
+FR_BLOCKS equ FR_M2_BLOCKS+FR_M3_BLOCKS+FR_M4_BLOCKS
 
 FF1FastRenderInstall:
  movem.l d0-d1/a0-a1/a3,-(sp)
@@ -244,15 +272,23 @@ FF1FastRenderPrefix:
 .stages:
  IFNE FR_STAGES
  tst.w FF1FastRenderActive(pc)
- beq.b .done
+ beq.w .done
  tst.w FF1FastRenderStages(pc)
- beq.b .done
+ beq.w .done
  movem.l d0-d1/a0-a1,-(sp)
  lea FF1FastRenderRows(pc),a0
  move.w #(2*FR_ROWS_PAD)/2-1,d0
 .clear:
  clr.w (a0)+
  dbf d0,.clear
+ cmpi.w #FR_SCRATCH_STAGES,FF1FastRenderStages(pc)
+ bhs.b .cleared
+ lea FF1FastRenderBlocks(pc),a0
+ move.w #(FR_BLOCKS+1)/2-1,d0
+.blocks:
+ clr.w (a0)+
+ dbf d0,.blocks
+.cleared:
  tst.b $dff002
 .blit:
  btst #6,$dff002
@@ -261,6 +297,13 @@ FF1FastRenderPrefix:
  bsr.w FF1FastRenderRedirectOn
  lea FF1FastRenderTrack(pc),a0
  move.w #1,(a0)
+ ; With every stage staged (FR5f) no native stage follows, and the scratch
+ ; and rear-view mirror images outside the banks live in Fast alone.
+ cmpi.w #FR_SCRATCH_STAGES,FF1FastRenderStages(pc)
+ blo.b .tracked
+ lea FF1FastRenderScratch(pc),a0
+ move.w #1,(a0)
+.tracked:
  lea FF1FastRenderStageStats(pc),a0
  addq.l #1,FR5S_PREFIXES(a0)
  ; FR5a: the native clear and background, as B8Draw calls them.
@@ -275,9 +318,16 @@ FF1FastRenderPrefix:
  blo.b .staged
  bsr.w FRPrefixRoad
 .staged:
- bsr.w FF1FastRenderRedirectOff
  lea FF1FastRenderStaged(pc),a0
  move.w FF1FastRenderStages(pc),(a0)
+ cmpi.w #3,(a0)
+ bhs.b .later
+ bsr.w FF1FastRenderRedirectOff
+ bra.b .prefixed
+.later:
+ ; FR5c-f: B8Draw draws on, still redirected, and waits at the cut after
+ ; its last staged stage (FF1FastRenderCutDue).
+.prefixed:
  movem.l (sp)+,d0-d1/a0-a1
  ENDC
 .done:
@@ -327,6 +377,38 @@ FF1FastRenderRoadExit:
  movem.l FF1FastRenderRoadRegs(pc),d0-d7/a0-a5
  rts
 
+; B8Draw, after the prefix: NE when the staged stages go on past the road
+; (FR5c-f), so B8Draw skips its field wait and continues after the road,
+; still redirected. Other registers preserved.
+FF1FastRenderLate:
+ move.w FF1FastRenderStaged(pc),d0
+ cmpi.w #3,d0
+ shs d0
+ ext.w d0
+ rts
+
+; B8Draw cut point after FR5 stage D0.w (3-6). NE when the staged prefix
+; ends here: redirection is then off, and B8Draw waits for the field and
+; publishes. A cut at or after the last staged stage ends it, so no path
+; through B8Draw can skip the publication. Other registers preserved.
+FF1FastRenderCutDue:
+ move.l a0,-(sp)
+ lea FF1FastRenderStaged(pc),a0
+ cmpi.w #3,(a0)
+ blo.b .no
+ cmp.w (a0),d0
+ blo.b .no
+ bsr.w FF1FastRenderRedirectOff
+ lea FF1FastRenderStageStats(pc),a0
+ addq.l #1,FR5S_CUTS(a0)
+ move.l (sp)+,a0
+ moveq #1,d0
+ rts
+.no:
+ move.l (sp)+,a0
+ cmp.w d0,d0
+ rts
+
 ; B8Draw, after the field wait, before the first native stage: copy the
 ; rows the prefix wrote from the shadows to the Chip banks. Returns D0 = the
 ; number of FR5 stages the prefix ran (B8Draw then skips them), else 0.
@@ -338,6 +420,10 @@ FF1FastRenderPublish:
  move.l a0,-(sp)
  bsr.w FRPublishRows
  lea FF1FastRenderStaged(pc),a0
+ cmpi.w #FR_SCRATCH_STAGES,(a0)
+ bhs.b .blocked
+ bsr.w FRPublishBlocks
+.blocked:
  move.w (a0),d0
  clr.w (a0)
  move.l (sp)+,a0
@@ -466,7 +552,9 @@ FF1FastRenderCopyBank:
 ; gauge strips, H4 demo text, the H9 fill scan) translate their pointers with
 ; FF1FastRenderTarget.
 ; FR5a runs the clear and background in the prefix (FF1FastRenderPrefix),
-; FR5b the road; every later stage still writes the hardware.
+; FR5b the road; FR5c-f keep the redirection on through the rest of B8Draw
+; and move its field wait to the cut after the last staged stage. With all
+; six (the preset) the race draw issues no hardware blit.
 ; FF1_FAST_RENDER_FULL is a diagnostic that redirects the whole draw and
 ; publishes the complete back bank at the end of B8Draw.
 
@@ -1144,9 +1232,12 @@ FRLogChipRead:
  ENDC
 
 ; FR5 tracking of one translated channel. D1 = mirror index, D3 = channel
-; (3 = D), 16(A3)/20(A3) = Chip span. Bank spans are tracked. A destination
-; outside the banks returns NZ: the native stages after the copy point
-; would read that range in Chip. Registers preserved.
+; (3 = D), 16(A3)/20(A3) = Chip span. Bank spans are tracked in rows. Outside
+; the banks, the arms that end the prefix before the last stage track 256-
+; byte blocks the same way, because native stages after the cut (and before
+; the next prefix) read and write that scratch in Chip; with every stage
+; staged (FF1FastRenderScratch) it lives in Fast alone. Returns Z.
+; Registers preserved.
 FRTrackChannel:
  cmpi.l #2,d1
  bhs.b .other
@@ -1156,17 +1247,134 @@ FRTrackChannel:
  seq d3
  andi.l #1,d3               ; 1 = write
  movem.l 16(a3),d0-d1
- bsr.b FRTrackSpan
+ bsr.w FRTrackSpan
  movem.l (sp)+,d0-d3
  cmp.w d0,d0                ; Z: tracked
  rts
 .other:
+ tst.w FF1FastRenderScratch(pc)
+ bne.b .own
+ movem.l d0-d3,-(sp)
+ move.l d1,d2
  cmpi.w #3,d3
- beq.b .write
+ seq d3
+ andi.l #1,d3               ; 1 = write
+ movem.l 16(a3),d0-d1
+ bsr.w FRTrackBlocks
+ movem.l (sp)+,d0-d3
+.own:
  cmp.w d0,d0
  rts
-.write:
- tst.w d3                   ; NZ
+
+; D0 = lowest Chip byte, D1 = highest + 1, in non-bank mirror D2 (2-4).
+; D3 = 0 read, else write. Untrusted blocks are first read from Chip;
+; written blocks become dirty, and the publication copies them whole (the
+; rest of a block equals Chip). Registers preserved.
+FRTrackBlocks:
+ movem.l d0-d7/a0-a2,-(sp)
+ lea FF1FastRenderMirrors(pc),a0
+ move.l (a0,d2.w*8),d4      ; mirror start
+ move.l 4(a0,d2.w*8),d6     ; mirror end
+ lea FF1FastRenderDelta(pc),a0
+ move.l (a0,d2.w*4),d7      ; Fast - Chip
+ lea FRBlockOffsets(pc),a0
+ lea FF1FastRenderBlocks(pc),a2
+ adda.w -4(a0,d2.w*2),a2
+ cmp.l d0,d1
+ bls.w .fault
+ cmp.l d4,d0
+ blo.w .fault
+ cmp.l d6,d1
+ bhi.w .fault
+ sub.l d4,d0
+ sub.l d4,d1
+ subq.l #1,d1
+ lsr.l #FR_BLOCK_SHIFT,d0   ; first block
+ lsr.l #FR_BLOCK_SHIFT,d1   ; last block
+.block:
+ tst.b (a2,d0.l)
+ bne.b .fresh
+ move.l d0,d5
+ lsl.l #FR_BLOCK_SHIFT,d5
+ add.l d4,d5
+ move.l d5,a0               ; Chip block
+ add.l #1<<FR_BLOCK_SHIFT,d5
+ cmp.l d6,d5
+ bls.b .end
+ move.l d6,d5
+.end:
+ sub.l a0,d5
+ lsr.l #2,d5
+ subq.l #1,d5
+ lea (a0,d7.l),a1
+.copy:
+ move.l (a0)+,(a1)+
+ dbf d5,.copy
+ move.b #1,(a2,d0.l)
+ lea FF1FastRenderStageStats(pc),a0
+ addq.l #1,FR5S_BLOCKS_REFRESHED(a0)
+.fresh:
+ tst.w d3
+ beq.b .next
+ move.b #2,(a2,d0.l)
+.next:
+ addq.l #1,d0
+ cmp.l d1,d0
+ bls.b .block
+ movem.l (sp)+,d0-d7/a0-a2
+ rts
+.fault:
+ moveq #1,d0
+ bra.w FF1FastRenderFault
+
+; Publication of the arms before the last stage: copy every dirty non-bank
+; block from its Fast mirror to Chip.
+FRPublishBlocks:
+ movem.l d0-d7/a0-a3,-(sp)
+ moveq #2,d2
+.mirror:
+ lea FF1FastRenderMirrors(pc),a0
+ move.l (a0,d2.w*8),d4
+ move.l 4(a0,d2.w*8),d6
+ lea FF1FastRenderDelta(pc),a0
+ move.l (a0,d2.w*4),d7
+ lea FRBlockOffsets(pc),a0
+ lea FF1FastRenderBlocks(pc),a2
+ adda.w -4(a0,d2.w*2),a2
+ move.l d6,d1
+ sub.l d4,d1
+ subq.l #1,d1
+ lsr.l #FR_BLOCK_SHIFT,d1   ; last block
+ moveq #0,d0
+.block:
+ cmpi.b #2,(a2,d0.l)
+ bne.b .next
+ move.l d0,d5
+ lsl.l #FR_BLOCK_SHIFT,d5
+ add.l d4,d5
+ move.l d5,a1               ; Chip block
+ add.l #1<<FR_BLOCK_SHIFT,d5
+ cmp.l d6,d5
+ bls.b .end
+ move.l d6,d5
+.end:
+ sub.l a1,d5
+ lsr.l #2,d5
+ subq.l #1,d5
+ lea (a1,d7.l),a0
+.copy:
+ move.l (a0)+,(a1)+
+ dbf d5,.copy
+ lea FF1FastRenderStageStats(pc),a3
+ addq.l #1,FR5S_BLOCKS_PUBLISHED(a3)
+.next:
+ addq.l #1,d0
+ cmp.l d1,d0
+ bls.b .block
+ addq.w #1,d2
+ cmpi.w #FR_MIRRORS,d2
+ blo.w .mirror
+ movem.l (sp)+,d0-d7/a0-a3
  rts
 
 ; D0 = lowest Chip byte, D1 = highest Chip byte + 1, both in bank D2 (0/1).
@@ -1355,9 +1563,15 @@ FF1FastRenderTarget:
  move.l #FR_WRITABLE,d1
  btst d0,d1
  beq.b .fault
- ; A prefix stage's CPU writes must be tracked: only the fill below is.
+ ; A prefix stage's CPU writes must be tracked (TargetSpan, Rows), except
+ ; scratch outside the banks when every stage is staged.
  tst.w FF1FastRenderTrack(pc)
- bne.b .untracked
+ beq.b .out
+ cmpi.l #2,d0
+ blo.b .untracked
+ tst.w FF1FastRenderScratch(pc)
+ beq.b .untracked
+.out:
  movem.l (sp)+,d0-d1
  move.w (sp)+,ccr
  rts
@@ -1366,6 +1580,52 @@ FF1FastRenderTarget:
  bra.w FF1FastRenderFault
 .untracked:
  moveq #7,d0
+ bra.w FF1FastRenderFault
+
+; A0 = Chip address a CPU writer of a redirected stage is about to write,
+; D0.l = bytes from A0 to the end of what it writes. As FF1FastRenderTarget,
+; and in a prefix stage the span is tracked as written, in bank rows or
+; non-bank blocks (untrusted ones are first read from Chip). Other registers and the
+; condition codes are preserved.
+FF1FastRenderTargetSpan:
+ move.w ccr,-(sp)
+ tst.w FF1FastRenderRedirect(pc)
+ bne.b .map
+ move.w (sp)+,ccr
+ rts
+.map:
+ movem.l d0-d3,-(sp)
+ move.l d0,d3
+ move.l a0,d2
+ bsr.w FRLookup
+ bmi.b .fault
+ move.l #FR_WRITABLE,d1
+ btst d0,d1
+ beq.b .fault
+ tst.w FF1FastRenderTrack(pc)
+ beq.b .out
+ cmpi.l #2,d0
+ bhs.b .other
+ move.l d2,d1
+ add.l d3,d1                ; highest Chip byte + 1
+ exg d0,d2                  ; D0 = lowest Chip byte, D2 = bank
+ moveq #1,d3                ; write
+ bsr.w FRTrackSpan
+.out:
+ movem.l (sp)+,d0-d3
+ move.w (sp)+,ccr
+ rts
+.other:
+ tst.w FF1FastRenderScratch(pc)
+ bne.b .out
+ move.l d2,d1
+ add.l d3,d1                ; highest Chip byte + 1
+ exg d0,d2                  ; D0 = lowest Chip byte, D2 = mirror
+ moveq #1,d3                ; write
+ bsr.w FRTrackBlocks
+ bra.b .out
+.fault:
+ moveq #3,d0
  bra.w FF1FastRenderFault
 
 ; A0 = Chip address a CPU reader of a redirected stage is about to read
@@ -1502,7 +1762,10 @@ FF1FastRenderWritePixel:
  btst #0,d5
  beq.b .skip
  adda.l d1,a0
- bsr.w FF1FastRenderTarget
+ move.l d0,-(sp)
+ moveq #1,d0                ; one byte
+ bsr.w FF1FastRenderTargetSpan
+ move.l (sp)+,d0
  addq.l #1,(a1)
  btst #0,d4
  beq.b .clear
@@ -1556,6 +1819,8 @@ FF1FastRenderRedirectOff:
  lea FF1FastRenderRedirect(pc),a0
  clr.w (a0)
  lea FF1FastRenderTrack(pc),a0
+ clr.w (a0)
+ lea FF1FastRenderScratch(pc),a0
  clr.w (a0)
  move.l (sp)+,a0
  rts
@@ -1614,9 +1879,9 @@ FF1FastRenderFinish:
 
 ; Immutable equal-layout A/B preset, outside the lifecycle zero ranges.
 FF1FastRenderControl: dc.w 1
-; Immutable preset: the number of FR5 prefix stages to run (2 = FR5b, 1 =
-; FR5a only, 0 = empty prefix, the FR4 arm).
-FF1FastRenderStages: dc.w 2
+; Immutable preset: the number of FR5 prefix stages to run (6 = the whole
+; draw, FR5f; 5..1 = FR5e..FR5a; 0 = empty prefix, the FR4 arm).
+FF1FastRenderStages: dc.w FR_STAGES_ALL
  even
 ; Expected bank table at $66c92: plane pointers of bank 0 and bank 1.
 FF1FastRenderBanks:
@@ -1626,11 +1891,13 @@ FF1FastRenderBanks:
 FF1FastRenderMirrors:
  dc.l $18f48,$18f48+FR_BANK_BYTES   ; bank 0 shadow
  dc.l $528d8,$528d8+FR_BANK_BYTES   ; bank 1 shadow
- dc.l $cd30,$d3e0                   ; cockpit/gauge table, glyphs, text
- dc.l $d3e0,$18f48                  ; game graphics up to bank 0
- dc.l $18f48+FR_BANK_BYTES,$528d8   ; game graphics up to bank 1
+ dc.l FR_M2_LO,FR_M2_HI             ; cockpit/gauge table, glyphs, text
+ dc.l FR_M3_LO,FR_M3_HI             ; game graphics up to bank 0
+ dc.l FR_M4_LO,FR_M4_HI             ; game graphics up to bank 1
  dc.l -1
 FR_MIRRORS equ 5
+; Block table offset of each non-bank mirror (entries 2-4).
+FRBlockOffsets: dc.w 0,FR_M2_BLOCKS,FR_M2_BLOCKS+FR_M3_BLOCKS
 ; Diagnostics; the nonzero tag keeps the counters across lifecycle resets.
 FF1FastRenderStats:
  dc.l 'FR3S',0,0,0,0,0,0,0,0,0,0,-1,0
@@ -1661,8 +1928,11 @@ FF1FastRenderRedirect: dc.w 0
 FF1FastRenderSite: dc.w 0
 FF1FastRenderXDelta: ds.l 6         ; channel deltas A-D, then the Chip span
 FF1FastRenderTrack: dc.w 0
+FF1FastRenderScratch: dc.w 0
 FF1FastRenderStaged: dc.w 0
 FF1FastRenderRows: ds.b 2*FR_ROWS_PAD
+ even
+FF1FastRenderBlocks: ds.b FR_BLOCKS+1
  even
 FF1FastRenderRoadRegs: ds.l 14       ; D0-D7/A0-A5 after the prefix road
 FF1FastRenderImage: ds.b $3c         ; FRB_IMAGE: registers $040-$075 and B state

@@ -1287,6 +1287,100 @@ the FR6 line and fill kernels (or profile the 040 first): the FR5c
 checkpoint can only judge the design once the road no longer runs through
 the generic blitter.
 
+### FR5c–FR5f results (2026-11-05, done)
+
+Gate passed on correctness in the emulator: the whole race draw runs in the
+prefix, and no hardware blit is issued while driving. Frame rates fall
+further. Performance was set aside (user, 2026-11-05: "get everything
+rendered with the CPU, then look at the performance"). The data is in
+`tmp/dev/manifest/fr5f-validation.json`.
+
+**Code** (`FastRender.s`, `FerrariFormulaOne_FullPresentation.s`, and
+`RenderBitmap.s`, `RenderOverlap.s`, `RenderText.s`, `RenderGauges.s`;
+assembled only with `FF1_FAST_RENDER`; the release slave stays `597a74b9…`).
+
+- **Stages 3–6 run inline.** The later stages are interleaved with B8Draw's
+  own computations, so they are not called from the prefix. From preset 3
+  on, `FF1FastRenderPrefix` leaves the redirection on after the road.
+  B8Draw then skips its field wait (`FF1FastRenderLate`) and runs on from
+  the end of the road, redirected.
+- **Cut points.** `FR_B8Cut` cuts follow stage 3 (`B8_657a6`), 4 (before
+  `B8PresentPit`), 5 (after `$6adf8`) and 6 (after the instruments' last
+  WaitBlit). The cut matching the preset turns the redirection off, waits for
+  the field as B8Draw did, including the H3/C4 field test, and publishes.
+  A cut at or after the staged count ends the prefix, so no path skips the
+  publication.
+- **CPU writers.** `FF1FastRenderTargetSpan` tracks the span written: the
+  H5 bitmap path (8 rows), the H11 clock, `WritePixel` (1 byte), the H4 demo
+  scratch (192 bytes) and the H13 gauge rows. The plain `FF1FastRenderTarget`
+  still faults (reason 7) on an untracked bank write in a prefix.
+- **Memory outside the banks.**
+  - With every stage staged (preset 6, `FF1FastRenderScratch`), the scratch
+    and rear-view mirror images live in Fast alone.
+  - The partial arms (1–5) track 256-byte blocks of the three non-bank
+    mirrors as the bank rows are tracked. An untrusted block is read from
+    Chip on its first access, and written blocks are published with the rows.
+  - This was needed. Without it, arm 4 drew a stale cockpit digit: the B8
+    text blits of the mirror stage write the cockpit digit bitmap, and the
+    native `$6ba18` after the cut reads it in Chip.
+  - The FR5a/b fault-6 guard is gone; those arms now track blocks too.
+  - `FF1_FAST_RENDER_BLOCKS` is a diagnostic that tracks blocks in every arm.
+- **Preset.** `FF1FastRenderStages` is 6, and `fr5_build.py` makes arms
+  1–5 (`fr5-fr5a` … `fr5-fr5e`) and the empty prefix.
+
+**Correction to FR5a and FR5b.** Their frame gates ran on fixtures built
+without `FF1_FAST_RENDER` (`ff1_gates.py` builds the fixtures from the
+environment, and `FF1_FINE_DEFINES` was not set), so the frame gates did not
+cover the Fast path. Only the timing gate used the candidate. Rerun now with
+the define: arms 1 and 2 match B8-PAL in both scenes (below).
+
+**Checks (candidate `9461f4bf…`).**
+
+| Check | Result |
+| --- | --- |
+| Probe, 040‑40 BCE, 300 draws | 0 faults, 0 hardware blits, one cut per draw; per draw about 37 + 35 `$24ae0`, 104 + 22 road lines, 13 fills, 8.5 + 10 + 26 car blits, 3 cockpit fills, 6 compositions, 11 `WritePixel` planes; 624 rows published, 361 filled whole, 263 read from Chip first; no block tracked |
+| Probe, arm 4 (cars and mirrors) | 0 faults; per draw about 115 blocks read from Chip, 13.5 published |
+| 30 frames normal and grid against B8-PAL, fixtures with the path, preset 6 | 0 error |
+| The same frames, arms 1–5 (preset patched into the fixtures) | 0 error |
+| Elapsed clock | 0.059 % |
+| Smokes: 030‑50 BCE, 040‑40 BCE, 020+Fast, A500+Fast | passed |
+| MMU: 030 with WHDLoad MMU and data cache, 040 MMU | passed |
+| Route and modal: 030‑50 BCE, 040‑40 BCE, 020+Fast | passed |
+| Controls: 020+Fast, 030‑50 BCE | passed |
+| Controls: 040‑40 BCE | fails at "idle" (below) |
+
+**Controls on the 040.**
+
+- **The failure.** After braking to 0, the test expects speed 0 for 50
+  fields with no input. It reads 371, with the player moved to the far
+  lateral position.
+- **The positions.** A rear-end collision fits them: car 4 was two segments
+  behind the stopped car in the same lane, and at "idle" it sits where the
+  player stopped.
+- **Why only this build.** The frame rate decides where the player stops
+  and when the traffic arrives. The same build passes on the 030, and arms 2
+  and 5 and the `FF1_FAST_RENDER_BLOCKS` diagnostic pass on the 040 at
+  similar rates.
+- **Status.** The test is sensitive to frame rate, and this is not a render
+  fault, but the collision itself is inferred from positions, not observed.
+  The test needs a stop point that traffic cannot reach before it is used to
+  judge changes in frame rate.
+
+FPS, 300 presentations, warp off, same session:
+
+| Machine | FR5f (all) | Arm 5 | Arm 4 | Arm 3 | Arm 2 | Control |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 030‑50 BCE | 10.606 | 9.625 | 11.746 | 12.833 | 13.541 | 24.551 |
+| 040‑40 BCE | 6.214 | 6.034 | 7.207 | 7.788 | 8.270 | 24.511 |
+
+- **The arms.** The partial arms now pay for reading non-bank blocks from
+  Chip, so arm 2 is below its FR5b figure (13.54 against 14.65 on the 030)
+  and arm 5 is below the full arm.
+- **The whole draw in software.** It takes about 94 ms on the 030 and
+  161 ms on the 040, against 40.7 ms natively. The road alone accounts for
+  about 24 ms and 67 ms of that (FR5b).
+- **Next.** Profile the 040 per stage, then write the FR6 kernels.
+
 ### FR6 — Specialized kernels for the hot blits
 
 After FR5, profile the 040 with the measurement emulator and replace the
@@ -1402,7 +1496,7 @@ except for memory checks.
 Dependencies:
 
 ```
-FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b (done 2026-11-04) → FR5c…FR5f → FR6
+FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b (done 2026-11-04) → FR5c…FR5f (done 2026-11-05) → FR6
   → FR7 → FR8 → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.

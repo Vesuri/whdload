@@ -80,7 +80,8 @@ FF1RenderOverlapHUD:
  adda.w #24*48+32,a1
  IFD FF1_FAST_RENDER
  exg a0,a1
- bsr.l FF1FastRenderTarget
+ move.l #7*48+10,d0         ; bytes 0..9 of eight rows
+ bsr.l FF1FastRenderTargetSpan
  exg a0,a1
  ENDC
  lea FF1RenderClockPixels(pc),a0

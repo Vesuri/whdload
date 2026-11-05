@@ -221,6 +221,8 @@ B8_65722:
  ENDC
  IFD FF1_FAST_RENDER
  bsr.l FF1FastRenderPrefix
+ bsr.l FF1FastRenderLate     ; FR5c-f: the wait moves to a later cut
+ bne.w FR_B8AfterRoad
  ENDC
 B8_65728:
  IFD FF1_FINE_ROAD_PREFETCH
@@ -326,6 +328,11 @@ B8_6579a:
 B8_657a0:
  jsr $69bb8.l
 B8_657a6:
+ IFD FF1_FAST_RENDER
+ pea 3.w                     ; FR5 cut after stage 3
+ bsr.w FR_B8Cut
+ addq.l #4,a7
+ ENDC
  move.w $1c6a2.l,d0
 B8_657ac:
  move.w d0,$c(a7)
@@ -1132,6 +1139,11 @@ B8_65c8e:
 B8_65c94:
  lea $34(a7),a7
 B8_65c98:
+ IFD FF1_FAST_RENDER
+ pea 4.w                     ; FR5 cut after stage 4
+ bsr.w FR_B8Cut
+ addq.l #4,a7
+ ENDC
  IFD FF1_COARSE_STEP
  bsr.w B8PresentPit
  ELSE
@@ -1219,6 +1231,11 @@ B8_65d2a:
  jsr $6adf8.l
 B8_65d30:
  addq.l #$8,a7
+ IFD FF1_FAST_RENDER
+ pea 5.w                     ; FR5 cut after stage 5
+ bsr.w FR_B8Cut
+ addq.l #4,a7
+ ENDC
 B8_65d32:
  tst.w $1bee8.l
 B8_65d38:
@@ -1269,6 +1286,11 @@ B8_65d6e:
  clr.w $1c1b4
  jsr $6694e
  jsr $2a130
+ IFD FF1_FAST_RENDER
+ pea 6.w                     ; FR5 cut after stage 6
+ bsr.w FR_B8Cut
+ addq.l #4,a7
+ ENDC
  IFND FF1_PRODUCTION
  IFD FF1_COARSE_STEP
  lea B8Frames(pc),a0
@@ -1285,6 +1307,43 @@ B8_65d6e:
  unlk a6
  rts
 B8Frames: dc.l 0
+ IFD FF1_FAST_RENDER
+; FR5 cut point (4(sp) = the stage just drawn). Where the staged prefix ends,
+; wait for the field as B8Draw does before its first stage, then publish the
+; rows the prefix wrote. All registers and the condition codes are kept.
+FR_B8Cut:
+ move.w ccr,-(sp)
+ movem.l d0-d1/a0-a1,-(sp)
+ move.w 24(a7),d0
+ bsr.l FF1FastRenderCutDue
+ beq.w .out
+.wait:
+ IFD FF1_FINE_ROAD_PREFETCH
+ move.w FF1RenderRoadControl(pc),d0
+ beq.b .fine_native_wait
+ move.l schedule_context+FF1T_FIELDS(pc),d0
+ cmp.l FF1RenderRoadField(pc),d0
+ bne.w .waited
+.fine_native_wait:
+ ENDC
+ IFD FF1_C4_ROAD_PREFETCH
+ move.w C4RoadPrefetchEnabled(pc),d0
+ beq.b .native_wait
+ move.l C1Context(pc),d0
+ cmp.l C4RoadField(pc),d0
+ bne.w .waited
+.native_wait:
+ ENDC
+ move.w $dff004,d0
+ btst #0,d0
+ beq.w .wait
+.waited:
+ bsr.l FF1FastRenderPublish
+.out:
+ movem.l (a7)+,d0-d1/a0-a1
+ move.w (a7)+,ccr
+ rts
+ ENDC
  IFD FF1_C4_ROAD_PREFETCH
  IFND FF1_COARSE_200_COMPLETE
  fail "Road prefetch requires complete C4"

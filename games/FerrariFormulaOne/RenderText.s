@@ -58,7 +58,8 @@ FF1RenderDemoText:
  move.l $1c1b8,a1
  IFD FF1_FAST_RENDER
  exg a0,a1
- bsr.l FF1FastRenderTarget
+ move.l #192,d0
+ bsr.l FF1FastRenderTargetSpan
  exg a0,a1
  ENDC
  moveq #47,d0

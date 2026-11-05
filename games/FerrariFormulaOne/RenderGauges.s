@@ -97,7 +97,11 @@ FF1RenderGaugeStrip:
  adda.w d2,a1
  IFD FF1_FAST_RENDER
  exg a0,a1
- bsr.l FF1FastRenderTarget
+ moveq #0,d0
+ move.w d7,d0
+ addq.l #1,d0
+ add.l d0,d0                ; the words of one row
+ bsr.l FF1FastRenderTargetSpan
  exg a0,a1
  ENDC
  moveq #0,d0
