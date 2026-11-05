@@ -126,6 +126,12 @@
   (set #icon_set_deftool_stack "true")
   (P_CopySlave)
   (P_SelectIcon)
+  ; Enhanced framerate is on in the installed icon; CUSTOM2=0 restores the
+  ; original drawing.
+  (tooltype
+    (dest (tackon #dest #icon_prefix))
+    (settooltype "CUSTOM2" "1")
+  )
 )
 
 ; ** ATTENTION! YOU SHOULD NOT HAVE TO CHANGE ANYTHING BEYOND THIS POINT! **

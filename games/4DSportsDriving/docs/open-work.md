@@ -23,6 +23,10 @@ P1-P7 are complete. P6 unifies the production build and refreshes validation,
 documentation and the local testing archive. A4000 remains experimental by user
 decision: the frozen handling gate is 27/29. The A500 9.5-10 FPS target is deferred.
 
+The release is 4D Sports Driving Enhanced 2.0b (13.10.2026), a beta: `make dist` packages
+it, and the installed icon enables Enhanced framerate (CUSTOM2=1). Its evidence is
+emulator measurement only; no real-hardware play-test is recorded.
+
 ## P7 integrated
 
 P7 is complete under the user's accepted experimental27/29 decision. Both screened
@@ -52,7 +56,8 @@ fixture combination from its variables (`VERIFY=1 SIM_A4000=1 tools/build.sh`) i
 it is the production build. The former `SIM_RUNTIME=1` spelling selects the same build.
 There is no separate supported runtime binary.
 
-`make run WHD_ARGS="CUSTOM2=1"` launches the production slave; `make run SLAVE=original` boots JOTD's shipped 1.2 slave.
+`make run WHD_ARGS="CUSTOM2=1"` launches the production slave as the installed icon
+runs it (the installer writes CUSTOM2=1); `make run SLAVE=original` boots JOTD's shipped 1.2 slave.
 `python3 tools/driving.py serve` boots under the gdb-stub server with the same options.
 The machine is the harness's A500 (68000, 1 MB chip, 2 MB fast); NTSC=1 adds AddMonitor
 to the startup-sequence, P6_QUIT_MARKER=1 and P3_HDF_BOOT=1 work as before (`game.sh`). Return skips the opening screens; cursor keys
@@ -140,8 +145,9 @@ are not acceptance evidence. Their screenshots and logs remain for diagnosis.
 ## Archive and research history
 
 `make dist` repacks JOTD's installer archive (`4DSportsDriving.lha`) with the
-production slave, `release/ReadMe` and the assembled source (`release/release.json`),
-into the repository's `dist/` as `4DSportsDriving-<version>.lha`. The fork harness's
+production slave, `release/ReadMe`, `release/Install` (which writes CUSTOM2=1 into the
+installed icon) and the assembled source (`release/release.json`), into the repository's
+`dist/` as `4DSportsDrivingEnhanced-<version>-<date>.lha`. The fork harness's
 `tools/package_testing.py`, which repacked the pre-installed Retroplay archive into
 `dist/4DSportsDriving_v2.0b_1461.lha` (926691 bytes, SHA256
 `9dd3ba4058c88fb7945852eedf6c20e39c1630765f6ce85b1e12be415167fb06`, a local testing

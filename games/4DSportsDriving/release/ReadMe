@@ -1,4 +1,6 @@
 
+ 4D Sports Driving Enhanced 2.0b (13.10.2026)
+
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
  PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
@@ -40,20 +42,23 @@
  and	aminet:game/patch/
 
  Options:
- - Enable "Enhanced framerate" on the WHDLoad splash screen for faster drawing.
+ - "Enhanced framerate" (faster drawing) is enabled in the installed icon
+   (CUSTOM2=1) and can be switched on the WHDLoad splash screen.
    The CPU renderer requires a 68020 or faster processor and Fast RAM.
  - Press CTRL-G in the game to choose graphics detail and simulation mode.
    Simulation changes are saved and take effect on the next race.
  - Experimental A4000 mode is PAL-only. It is selected automatically on
    68040/68060 systems unless you have saved a different choice.
    Other systems default to Normal (68000/68010) or A2500 (68020/68030).
- - Advanced tooltypes: CUSTOM2=0 uses original drawing (default), CUSTOM2=1
-   enables all rendering enhancements, CUSTOM2=2 enables only the CPU renderer.
+ - Advanced tooltypes: CUSTOM2=0 or unset uses original drawing, CUSTOM2=1
+   (set in the installed icon) enables all rendering enhancements, CUSTOM2=2
+   enables only the CPU renderer.
    CUSTOM3=1 restores original simulation timing and disables A4000 mode.
 
  version 2.0b (13.10.2026) - enhancements by Vesuri:
  - Fixed the flickering blue background in the DSI intro.
- - Faster rendering with a single "Enhanced framerate" option.
+ - Faster rendering with a single "Enhanced framerate" option, enabled in the
+   installed icon (CUSTOM2=1).
  - Correct game speed and race timing regardless of rendering speed.
  - Experimental A4000 simulation for smoother, more responsive driving on
    faster PAL Amigas, selected by default on 68040/68060 systems.
