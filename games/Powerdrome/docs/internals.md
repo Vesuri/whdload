@@ -144,7 +144,7 @@ they do not predict physical accelerator-board gains.
 
 Supported input: PAL original, Retroplay `Powerdrome_v1.0_0140.lha`, Galahad/Fairlight slave 1.0 (22 May 2003).
 Both supplied archives contain the same 1,592-byte slave; neither contains source.
-`whdload/original/Powerdrome.s` reconstructs it and rebuilds byte-identically with vasm.
+`src/original/Powerdrome.s` reconstructs it and rebuilds byte-identically with vasm.
 
 The header declares WHDLoad interface 15, flags `NoError|EmulPriv`, BaseMem `$80000`,
 ExpMem `$40000`, loader `$132`, F10 exit (`$59`), and no CUSTOM options.
@@ -245,7 +245,7 @@ and restoration remain untested; see the [current gate ledger](open-work.md#phas
 
 ## Development slave and reproducible title-demo profile
 
-`whdload/Powerdrome.s` uses unmodified WHDLoad 20 KickEmu sources, interface 17, one disk,
+`src/Powerdrome.s` uses unmodified WHDLoad 20 KickEmu sources, interface 17, one disk,
 512 KiB chip for the guest, 256 KiB expansion for Kickstart and 128 KiB additional guest
 expansion. It retains the EndCLI redirection and Copylock replacement, with a signature
 check at game `$843c`. Cache selection is left to standard WHDLoad options. `CUSTOM1=1` enables fast planar rendering and timing together on 68020+ with real fast RAM;

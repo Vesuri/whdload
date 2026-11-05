@@ -32,7 +32,7 @@ while (count := struct.unpack_from('>I', b, pos)[0]):
         struct.pack_into('>I', code, offset, value+base)
     pos += 4*count
 ranges = set()
-for src in Path('whdload').glob('*.s'):
+for src in Path('src').glob('*.s'):
     for offset, length in re.findall(r'PERF_RANGE h0:\$([0-9a-fA-F]+) (\d+) bit=C1', src.read_text()):
         ranges.add((int(offset, 16), int(length)))
 assert ranges

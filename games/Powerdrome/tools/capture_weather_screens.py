@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Capture three visible phases using an existing directed-fade calibration.
 
-Source amiga/env.sh first. Runs startup-only Practice (CUSTOM5=2), without a
+Source ../../common/env.sh first. Runs startup-only Practice (CUSTOM5=2), without a
 driving tape, so weather has an unobstructed flat region for the screen check.
 Uses only this repository's emulator server; do not run alongside another capture.
 """

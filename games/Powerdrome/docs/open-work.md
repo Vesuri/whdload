@@ -16,17 +16,19 @@ The earlier Phase F gates below remain evidence for the implemented paths and
 include the accepted stock A1200 Practice exception; their captures predate this
 UI/default-selection change. Enhanced runs now require `CUSTOM1=1` explicitly.
 
-The release installer text is maintained in `install/`. The verified local archive
-is `tmp/Powerdrome-2.0.lha`; [packaging instructions](development.md#release-installer-archive)
-describe its contents and reproduction. End-to-end AmigaOS Installer execution
-has not been tested.
+The release installer text is maintained in `release/`. `make dist` packages it
+(`release/release.json`), but only once the slave carries a `$VER` string, which names the
+archive and the release: the slave has the version only in its splash text. Adding it
+changes the release bytes, so `make record` follows. The earlier hand-packaged archive is
+`tmp/Powerdrome-2.0.lha` ([packaging](development.md#release-installer-archive)).
+End-to-end AmigaOS Installer execution has not been tested.
 
 ## Fine mouse steering
 
 Implemented behind **Enhanced framerate**. Mouse rotation uses fractional rates
 and a precise private orientation matrix, applied every 20 ms. Calibration gain is
 unchanged; input/control decisions remain at 90 ms. The normal build is available
-at `tmp/build/Powerdrome.slave`.
+at `tmp/build/release/Powerdrome.Slave`.
 
 - All 2,949,120 signed Q12 angles and 2,056 mouse/calibration combinations pass
   the assembly arithmetic checks. Ten-minute constant-turn tests stay within

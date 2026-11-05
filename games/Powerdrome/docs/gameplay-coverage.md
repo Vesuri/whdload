@@ -74,8 +74,8 @@ for reproducibility. These are emulator results; physical boards are outside sco
 
 ## Reproduce
 
-Source `amiga/env.sh`, then run `make -C whdload coverage`. This produces the isolated
-`tmp/build/Powerdrome-coverage.slave`. Only this build advertises the additional routes:
+Run `make build BUILD=coverage`. This produces the isolated
+`tmp/build/coverage/Powerdrome.Slave`. Only this build advertises the additional routes:
 
 | CUSTOM5 | Route |
 | --- | --- |
@@ -84,8 +84,8 @@ Source `amiga/env.sh`, then run `make -C whdload coverage`. This produces the is
 | 5 | Centering/acceleration cruise on the default course |
 | 6 | Cruise on track index 2, selected with two native `0` menu keys |
 
-`CUSTOM1=1` enables both enhancements and `CUSTOM4=1` enables drawing twins. Ordinary `all`,
-`verify` and `original-verify` targets omit the coverage replay and counters. Do not edit
+`CUSTOM1=1` enables both enhancements and `CUSTOM4=1` enables drawing twins. Ordinary `release`,
+`verify` and `original_verify` builds omit the coverage replay and counters. Do not edit
 capture scripts or rebuild a capture's slave while it is running.
 
 ```sh
@@ -95,7 +95,7 @@ EXTRA_ARGS='--slow_memory=0 --uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cp
 WHD_ARGS='CUSTOM1=1 CUSTOM4=1 CUSTOM5=4 NoCache' \
 ANCHOR=0xbc7c FIELDS=66000 SWAP_ONLY=1 CAPTURE_SHOT=1 COVERAGE_STATE=1 \
 COVERAGE_PROBES='0xc7f0 0xc736 0xc7d2 0x103a2 0xbf32 0xd3d6 0xc75c 0xc6b8 0xc6fe 0xbe12 0xbe40 0x13cde 0xfb84 0xfc9e 0x112f4 0x14764 0x120ca' \
-tools/fixed_window.sh tmp/prof/coverage-race tmp/build/Powerdrome-coverage.slave
+tools/fixed_window.sh tmp/prof/coverage-race tmp/build/coverage/Powerdrome.Slave
 python3 tools/perf_status.py tmp/prof/coverage-race
 python3 tools/coverage_status.py tmp/prof/coverage-race --require-long
 ```

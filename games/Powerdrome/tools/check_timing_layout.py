@@ -25,7 +25,7 @@ while (count:=struct.unpack_from('>I',b,pos)[0]):
         struct.pack_into('>I',code,off,struct.unpack_from('>I',code,off)[0]+base)
     pos+=count*4
 ranges=set()
-for src in Path('whdload').glob('*.s'):
+for src in Path('src').glob('*.s'):
     ranges.update((int(off,16),int(n)) for off,n in re.findall(r'TIMING_RANGE h0:\$([0-9a-f]+) (\d+) bit=C3',src.read_text()))
 assert ranges
 m=Cs(CS_ARCH_M68K,CS_MODE_BIG_ENDIAN|CS_MODE_M68K_000)

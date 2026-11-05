@@ -135,17 +135,17 @@ writer instructions must match the game's untouched chip-memory copy exactly.
 Build and freeze baseline and candidate slaves separately. For the 68020 trace and timing:
 
 ```sh
-source amiga/env.sh
+source ../../common/env.sh
 export AMIGA_MODEL=A1200 CPU=68EC020 KICKSTART="$KICKSTART_A1200"
 export CHIP_KB=2048 FAST_KB=4096 EXTRA_ARGS=--slow_memory=0 ANCHOR=0xbc7c
 WHD_ARGS='CUSTOM1=1 CUSTOM4=1 CUSTOM5=2 NoCache' FIELDS=100 \
-  tools/fixed_window.sh tmp/prof/raster-twin tmp/build/Powerdrome-verify.slave
+  tools/fixed_window.sh tmp/prof/raster-twin tmp/build/verify/Powerdrome.Slave
 python3 tools/perf_status.py tmp/prof/raster-twin
 python3 tools/raster_pairs.py tmp/prof/raster-twin
 python3 tools/raster_costs.py tmp/prof/raster-twin
 python3 tools/check_raster_layout.py tmp/prof/raster-twin
 WHD_ARGS='CUSTOM1=1 CUSTOM5=2 NoCache' FIELDS=500 SWAP_ONLY=1 \
-  tools/fixed_window.sh tmp/prof/raster-timing tmp/build/Powerdrome-verify.slave
+  tools/fixed_window.sh tmp/prof/raster-timing tmp/build/verify/Powerdrome.Slave
 ```
 
 For long twins use `CUSTOM4=1 FIELDS=500 SWAP_ONLY=1`; the diagnostic counters still compare

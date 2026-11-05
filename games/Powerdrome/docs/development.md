@@ -4,9 +4,11 @@ Current release status and validation limits are in [open work](open-work.md).
 
 ## Inputs and shared tools
 
-Keep both supplied archives in ignored `tmp/`. Extract the installer to `tmp/installer/`
-and Retroplay pack to `tmp/game/`; the playable tree is `tmp/game/Powerdrome/`.
-`tmp/archive.sha256` records local input hashes. Never commit proprietary inputs or captures.
+`inputs.sha256` pins both archives: Galahad's installer `Powerdrome.lha` and the Retroplay
+pack `Powerdrome_v1.0_0140.lha`. `make unpack ARCHIVES=<directory>` installs them into
+`tmp/game/`: the playable tree is `tmp/game/Powerdrome/`, the installer `tmp/game/PowerdromeHD/`.
+`tmp/archive.sha256` records the hashes of the files the research used.
+The research harness's own frozen slaves are in `tmp/old-build/`, out of reach of `make clean`.
 
 Historical instruction traces, memory snapshots and raw debugger/emulator logs
 may be stored as `.gz` files to reduce disk usage. Reports, configuration files and
@@ -18,9 +20,8 @@ archived files, original SHA-256 hashes and sizes. Every archive was decompresse
 and checked against its original before the redundant raw copy was removed.
 Current mouse steering, release-option and Phase F captures remain uncompressed.
 
-Source `amiga/env.sh` for the shared Amiga environment that AmigaXDev installs (`make setup`);
-it sources the shared `env.sh`, whose variables AmigaXDev's `docs/environment.md` describes.
-Shared inputs use these overrides:
+The tools that need the shared Amiga environment source `../../common/env.sh`, which sources
+the shared `env.sh` (AmigaXDev's `docs/environment.md`). Shared inputs use these overrides:
 
 | Variable | Default under the shared Amiga directory |
 |---|---|
@@ -33,21 +34,27 @@ Shared inputs use these overrides:
 
 `FSUAE` overrides the executable, `FSUAE_COMMON` the shared process/port helper.
 The shared directory convention is `~/.local/share/amiga`. `VASM` and `NDK` override the
-assembler and Amiga include directory in the makefile; `WHDLOAD` also supplies the API headers
-and KickEmu sources the slave builds with.
+assembler and Amiga include directory; `WHDLOAD` also supplies the API headers and KickEmu
+sources the slave builds with.
 
 ## Build and run
 
 ```sh
-make -C whdload original
-amiga/run.sh
-SLAVE=tmp/build/Powerdrome-original.slave amiga/run.sh
+make build BUILD=original
+make run SLAVE=original
+make run BUILD=original
 ```
 
+Every build first generates the sine table `tmp/build/mouse-sine.i` (`game.sh`). The builds
+are `release` (`make slave`), `verify`, `coverage`, `original` and `original_verify`;
+`VASM_EXTRA` adds defines, e.g. `make build BUILD=coverage VASM_EXTRA=-DTIMING_FULL=1`.
+Each lands in `tmp/build/<build>/Powerdrome.Slave`. `make check` checks the release
+bytes and that every build assembles and the reconstruction equals the installed slave.
+
 `original` assembles with optimizations disabled and compares the entire result with the
-installed slave. This is the reference reconstruction. `make -C whdload all` builds the WHDLoad 20 KickEmu
-slave with interface 17 and the full timing scheduler. `make -C whdload verify` additionally saves
-`tmp/build/Powerdrome-verify.slave`; `CUSTOM5=1` submits an empty pilot name through the
+installed slave. This is the reference reconstruction. `make slave` builds the WHDLoad 20 KickEmu
+slave with interface 17 and the full timing scheduler. `make verify` builds
+`tmp/build/verify/Powerdrome.Slave`; `CUSTOM5=1` submits an empty pilot name through the
 native name-entry routine. `CUSTOM5=2` also selects Practice and submits Space in the pit.
 The normal splash has one checkbox, **Enhanced framerate** (`CUSTOM1=1`), off by
 default. It enables fast planar rendering and the scheduler together on 68020+
@@ -61,53 +68,39 @@ for supported states, diagnostic options and limitations. The [loader equivalenc
 state and resolves Copylock D2, with explicit allocation and timing differences. Performance
 A/B tests continue to use the same development loader.
 
-To launch the new slave explicitly (the runner otherwise uses the installed original):
+`make run` builds the release slave and boots it (the repository's `docs/running.md`):
 
 ```sh
-make -C whdload all
-CPU=68030 FAST_KB=4096 WHD_ARGS=CUSTOM1=1 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
+make run CPU=68030 FAST_KB=4096 WHD_ARGS=CUSTOM1=1
 ```
 
-The default machine is 68000, 512 KB chip and 1,536 KB slow with no fast RAM. The host boots
-Kickstart 3.1 and Workbench 2.04 provides Assign for the original slave's Kickstart files.
-Windowed, real speed, sound enabled. `CPU`, `CHIP_KB`, `FAST_KB`, `AMIGA_MODEL`, `EXTRA_ARGS`,
-`WHD_ARGS`, `WB`, `SILENT`, `WARP`, `JOY0` and `JOY1` override the setup. `DEBUG` and `WARP` runs
-are silent with the window behind the others; `SOUND=0|1` and `WINDOW=front|back|none` (none:
-no video) choose explicitly.
+The default machine (`game.conf`, `SETUP=custom`) is 68000, 512 KB chip and 1,536 KB slow
+with no fast RAM. The host boots Kickstart 3.1 and Workbench 2.04 provides Assign for the
+original slave's Kickstart files. Windowed, real speed, sound enabled. `CPU`, `CHIP_KB`,
+`FAST_KB`, `SLOW_KB`, `AMIGA_MODEL`, `EXTRA_ARGS` (which beats them all), `WHD_ARGS`, `WB`,
+`WARP`, `JOY0` and `JOY1` override the setup; `WHD_SPLASH=1` shows WHDLoad's options and
+waits for Start. `DEBUG` and `WARP` runs are silent with the window behind the others;
+`SOUND=0|1` and `WINDOW=front|back|none` (none: no video) choose explicitly.
 
 ### Release installer archive
 
-`install/Install` and `install/ReadMe` are the maintained installer text sources.
-The icons, manual and hints come from the original local installer archive; no
-proprietary binaries or built slaves are tracked. `tmp/Powerdrome-2.0.lha` contains
-exactly the original twelve files, replacing only Install, ReadMe and the slave.
+`release/Install` and `release/ReadMe` are the maintained installer text sources.
+The icons, manual and hints come from the original installer archive; no proprietary
+binaries or built slaves are tracked. `make dist` builds the archive from
+`release/release.json`: Galahad's twelve files, replacing only Install, ReadMe and the
+slave. It needs the slave's `$VER` string, which names the archive; the slave does not
+have one yet ([open work](open-work.md)).
 
-To package the current sources after extracting the original installer as above:
-
-```sh
-source amiga/env.sh
-make -C whdload all
-cp install/Install install/ReadMe tmp/installer/PowerdromeHD/
-cp tmp/build/Powerdrome.slave tmp/installer/PowerdromeHD/Powerdrome.slave
-cp tmp/Powerdrome.lha tmp/Powerdrome-2.0.lha
-(
-  cd tmp/installer
-  "$LHA" a -g -0 -o5 ../Powerdrome-2.0.lha \
-    PowerdromeHD/Install PowerdromeHD/ReadMe PowerdromeHD/Powerdrome.slave
-)
-"$LHA" t tmp/Powerdrome-2.0.lha
-```
-
-The packaged 2.0 archive passed extraction and SHA-256 comparison: all twelve
-paths match the original archive, the three replacements match their sources,
-and the other nine files are byte-identical. Local details are recorded in
-`tmp/Powerdrome-2.0-verification.json`. Archive integrity checks do not substitute
-for running the Installer end to end on AmigaOS; that installation test remains
+The earlier hand-packaged 2.0 archive (`tmp/Powerdrome-2.0.lha`) passed extraction and
+SHA-256 comparison: all twelve paths match the original archive, the three replacements
+match their sources, and the other nine files are byte-identical. Local details are
+recorded in `tmp/Powerdrome-2.0-verification.json`. Archive integrity checks do not
+substitute for running the Installer end to end on AmigaOS; that installation test remains
 unperformed.
 
 ### Timing instrument
 
-`make -C whdload coverage VASMFLAGS="-DTIMING_FULL=1 -DVERIFY_PHASE=1"`
+`make build BUILD=coverage VASM_EXTRA="-DTIMING_FULL=1 -DVERIFY_PHASE=1"`
 adds the diagnostic phase ring. `VERIFY_PHASE` is rejected outside VERIFY builds.
 Use the ordinary coverage/verify builds for baseline fps: the ring adds hook overhead
 and 256 KiB of requested expansion, but never changes the normal build.
@@ -153,15 +146,15 @@ Freeze a fresh build set in an ignored directory:
 
 ```sh
 set -e
-source amiga/env.sh
+source ../../common/env.sh
 out=tmp/release-repeat
 mkdir -p "$out"
-make -C whdload verify
-cp tmp/build/Powerdrome-verify.slave "$out/verify.slave"
-make -C whdload coverage
-cp tmp/build/Powerdrome-coverage.slave "$out/coverage.slave"
-make -C whdload all
-cp tmp/build/Powerdrome.slave "$out/normal.slave"
+make verify
+cp tmp/build/verify/Powerdrome.Slave "$out/verify.slave"
+make build BUILD=coverage
+cp tmp/build/coverage/Powerdrome.Slave "$out/coverage.slave"
+make slave
+cp tmp/build/release/Powerdrome.Slave "$out/normal.slave"
 python3 tools/release_matrix.py "$out" --reference tmp/phase-b
 ```
 
@@ -197,7 +190,7 @@ snapshots. Their driving counts came from the live game/VBL addresses in chip RA
 ### Timing feature configuration
 
 ```sh
-make -C whdload coverage VASMFLAGS='-DTIMING_FULL=1'
+make build BUILD=coverage VASM_EXTRA='-DTIMING_FULL=1'
 ```
 
 This selects the full release feature set: periodic controls, fine mouse rotation, orientation,
@@ -206,17 +199,17 @@ All test defaults are zero and seed defaults are -1 (native initialization). Add
 retained VERIFY-only pit-sync, stall, render-rate or seed options explicitly for timing regression checks.
 `TIMING_FULL=0` permits explicit individual-feature experiments; WORLD requires WORLD20 and
 repair requires drawing suppression. Explicit per-feature overrides retain the existing
-dependency checks. Normal `make -C whdload all` includes `TIMING_FULL=1` by default. Runtime selection
+dependency checks. Normal `make slave` includes `TIMING_FULL=1` by default. Runtime selection
 requires `CUSTOM1=1`, 68020+ and real fast RAM.
 
 ### Verification-only guest chip-memory override
 
-`make -C whdload verify VASMFLAGS='-DVERIFY_CHIPMEMSIZE=1048576'` exposes 1 MiB
+`make verify VASM_EXTRA='-DVERIFY_CHIPMEMSIZE=1048576'` exposes 1 MiB
 of guest chip memory to exercise native resources unavailable in the normal 512-KiB
 configuration. Use a host with at least `CHIP_KB=1024`; the default A500 has
 only 512 KiB and cannot run this artifact. Use 030/fast with `CUSTOM1=1` for enhanced timing checks.
 Set `PROBE_OFFSETS='0x17836 0x178e6'` for ordered read-only audio call checks. Freeze the verification slave
-under `tmp/` before restoring `make -C whdload all`.
+under `tmp/` before restoring `make slave`.
 
 The override requires `VERIFY` and accepts only 524288 or 1048576 bytes. Both invalid-build
 guards have been checked; explicit 524288 produces the same verification binary as the
@@ -252,7 +245,9 @@ python3 tools/powerdrome_report.py tmp/trace.bin tmp/slow.bin
 python3 tools/powerdrome.py quit
 ```
 
-The server occupies its terminal; issue clients from another. Only one server/capture per repo.
+The server (`common/tools/game_server.py`) boots through `common/run.sh`, so the run options
+above apply to `serve`; it occupies its terminal; issue clients from another. One
+server/capture per instance (`INSTANCE`).
 Local command requests carry an explicit byte-length header; the server reads exactly
 that payload before dispatching it, even when the client keeps the connection open.
 Debugger scripts also handle partial pipe writes. This matters for large read-only probe sets: a single socket read or
@@ -275,13 +270,13 @@ the path under any `python3`. `tools/powerdrome.py` adds the request framing and
 and either the original or development slave.
 
 `python3 -m amigaxdev.adf` lists/extracts the local disk image; `python3 -m amigaxdev.patchlist`
-decodes original lists (AmigaXDev's shared package, on the path after sourcing `amiga/env.sh`).
+decodes original lists (AmigaXDev's shared package, on the path after sourcing `../../common/env.sh`).
 See `docs/open-work.md` before interpreting a capture as a benchmark.
 
 ## Fixed attract-demo window
 
 ```sh
-make -C whdload verify
+make verify
 FIELDS=100 tools/fixed_window.sh tmp/prof/demo-a
 FIELDS=100 tools/fixed_window.sh tmp/prof/demo-b
 python3 tools/compare_traces.py tmp/prof/demo-a/trace.bin tmp/prof/demo-b/trace.bin
@@ -301,7 +296,7 @@ for renderer bring-up, but cannot establish simulation correctness or full-scree
 For the 68020 comparison (run sequentially, after the A500 capture):
 
 ```sh
-source amiga/env.sh
+source ../../common/env.sh
 AMIGA_MODEL=A1200 CPU=68EC020 KICKSTART="$KICKSTART_A1200" CHIP_KB=2048 FAST_KB=4096 \
   EXTRA_ARGS=--slow_memory=0 FIELDS=100 tools/fixed_window.sh tmp/prof/demo-a1200
 ```
@@ -314,7 +309,7 @@ and screenshots excluding only three rightmost host-border columns.
 ## Ten-second practice launch profile
 
 ```sh
-make -C whdload verify
+make verify
 WHD_ARGS=CUSTOM5=2 ANCHOR=0x14764 FIELDS=500 \
   tools/fixed_window.sh tmp/prof/practice-10s
 ```
@@ -356,13 +351,13 @@ results and emulator limits.
 
 ## Gameplay coverage
 
-`make -C whdload coverage` produces a separate `tmp/build/Powerdrome-coverage.slave`.
+`make build BUILD=coverage` produces a separate `tmp/build/coverage/Powerdrome.Slave`.
 `CUSTOM5=3/4` replay native inputs in Practice or qualifying/racing respectively.
 `CUSTOM5=5/6` select centering/acceleration cruise routes on the default course or track
 index 2. The natural-weather twin capture uses the first effect draw (`$112f4`) as its anchor.
 The fixture exercises views, overlays, pause, collisions, rescue, native pit repairs and
 session transitions. Its controls and diagnostic counters are absent from ordinary
-`all` and `verify` builds. Keep `CUSTOM4=1` for drawing equivalence checks.
+`release` and `verify` builds. Keep `CUSTOM4=1` for drawing equivalence checks.
 
 Follow the [coverage checklist and commands](gameplay-coverage.md). Read-only execution
 probes and state samples are enabled with `COVERAGE_PROBES` and `COVERAGE_STATE=1`.
@@ -374,9 +369,9 @@ Coverage timings are not performance results.
 
 ## Original/development loader comparison
 
-`make -C whdload original-verify` builds a separate input-only original-loader reference.
+`make build BUILD=original_verify` builds a separate input-only original-loader reference.
 The ordinary `original` target remains byte-identical to the installed slave. Both VERIFY
-variants share `whdload/verify_input.s`; the original reference always selects Practice.
+variants share `src/verify_input.s`; the original reference always selects Practice.
 `PROBE_OFFSETS` adds ordered read-only checkpoints before `ANCHOR` in the fixed-window
 runner. `tools/compare_loaders.py ORIGINAL DEVELOPMENT` checks the register lifetime,
 relocated code, state and bitmap evidence. See the [loader audit](loader-equivalence.md)
@@ -384,7 +379,7 @@ for exact reproduction commands, explicit allowances and measured timing differe
 
 ### Fine mouse steering checks
 
-After building, source `amiga/env.sh` and run:
+After building, source `../../common/env.sh` and run:
 
 ```sh
 python3 tools/check_mouse_math.py --ticks 30000

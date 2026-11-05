@@ -259,7 +259,7 @@ capture, but only 0.15% of the track phase.
 Reproduce the capture with the existing setup from [development](development.md):
 
 ```sh
-make -C whdload verify
+make verify
 WHD_ARGS=CUSTOM5=2 ANCHOR=0x14764 FIELDS=500 \
   tools/fixed_window.sh tmp/prof/practice-continuous-10s
 python3 tools/analyze_practice.py tmp/prof/practice-continuous-10s \

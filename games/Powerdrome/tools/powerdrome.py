@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive the original Powerdrome in FS-UAE through the Barto gdb stub.
 
-  python3 tools/powerdrome.py serve          boot (amiga/run.sh DEBUG=1), attach gdb, run; listen
+  python3 tools/powerdrome.py serve          boot (common/run.sh DEBUG=1), attach gdb, run; listen
   python3 tools/powerdrome.py <command...>   send one command to the running server, print the reply
 
 Commands (the emulator is left running after each unless noted):
@@ -14,12 +14,11 @@ Commands (the emulator is left running after each unless noted):
   quit                         kill gdb and the emulator
 """
 import os, signal, socket, subprocess, sys
-import _amigaxdev
-from amigaxdev.gdbserve import BASETEXT_VM, Gdb, Server
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
+from game_server import game_server  # noqa: E402
+from amigaxdev.gdbserve import BASETEXT_VM, Gdb, Server  # noqa: E402
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RUN = os.path.join(ROOT, 'amiga/.run')
-SOCK = os.path.join(RUN, 'powerdrome.sock')
 SENT = '@@POWERDROME-DONE@@'
 
 
@@ -136,7 +135,10 @@ def quit(server, g, rest):
     return 'bye'
 
 
-server = Powerdrome('powerdrome', root=ROOT, sock=SOCK, sentinel=SENT, commands={'quit': quit})
+# The run options of common/run.sh (SLAVE, BUILD, WHD_ARGS, CPU, FAST_KB, INSTANCE, ...) apply
+# to serve through the environment; the run directory is the instance's.
+server = game_server('powerdrome', server_class=Powerdrome, sentinel=SENT, commands={'quit': quit})
+RUN, SOCK = server.run_dir, server.sock
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])

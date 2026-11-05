@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Execute the actual mouse assembly with shared Unicorn; proprietary inputs stay local.
 
-Source amiga/env.sh first. Requires vasm and AMIGA_UNICORN. This is an arithmetic
+Source ../../common/env.sh first. Requires vasm and AMIGA_UNICORN. This is an arithmetic
 and native-matrix integration check, not a substitute for in-game input captures.
 """
 import argparse
@@ -42,7 +42,7 @@ timing_orientation_move
 '''
 (out/'harness.s').write_text(source)
 subprocess.run([os.environ.get('VASM', str(Path.home()/'.local/vasmm68k_mot')),
-                '-m68000', '-devpac', '-Fbin', '-I'+str(root/'whdload'),
+                '-m68000', '-devpac', '-Fbin', '-I'+str(root/'src'),
                 '-o', str(out/'harness.bin'), str(out/'harness.s')], check=True,
                stdout=subprocess.DEVNULL)
 lib = C.CDLL(str(Path(os.environ['AMIGA_UNICORN'])/'lib/libunicorn.2.dylib'))

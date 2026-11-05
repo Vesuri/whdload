@@ -3,11 +3,11 @@
 # Default: title inset. Practice: WHD_ARGS=CUSTOM5=2 ANCHOR=0x14764 FIELDS=500.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-source amiga/env.sh
+source ../../common/env.sh
 OUT=${1:?output directory required}
 mkdir -p "$OUT" tmp/cache
 OUT=$(cd "$OUT" && pwd)
-INPUT=${2:-tmp/build/Powerdrome-verify.slave}
+INPUT=${2:-tmp/build/verify/Powerdrome.Slave}
 cp "$INPUT" "$OUT/slave.slave"
 export SLAVE="$OUT/slave.slave"
 export JOY0=none JOY1=none DETERMINISTIC=1 WARP=1
@@ -59,7 +59,7 @@ start() {
   python3 tools/powerdrome.py serve > "$OUT/serve.log" 2>&1 &
   SERVER=$!
   for ((i=0;i<${SERVE_WAIT:-300};i++)); do
-    rg -q 'serving on' "$OUT/serve.log" && return
+    grep -q 'serving on' "$OUT/serve.log" && return
     kill -0 "$SERVER" 2>/dev/null || { cat "$OUT/serve.log"; return 1; }
     sleep 1
   done
@@ -156,7 +156,7 @@ dumpmem
 cp tmp/window-chip.bin "$OUT/final-chip.bin"
 cp tmp/window-other.bin "$OUT/final-code.bin"
 if [ "${CAPTURE_SHOT:-0}" = 1 ]; then pd shot "$OUT/last.png" > "$OUT/shot.txt"; fi
-cp amiga/.run/fsuae.log "$OUT/emulator.log"
+cp "tmp/run/${INSTANCE:-default}/.run/fsuae.log" "$OUT/emulator.log"
 cleanup
 trap - EXIT
 printf 'Captured %s fields in %s\n' "$FIELDS" "$OUT"

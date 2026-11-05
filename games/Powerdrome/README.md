@@ -14,11 +14,12 @@ retaining the original calibration gain. There is no chunky conversion or render
 interpolation.
 
 ```sh
-make -C whdload all
-CPU=68030 FAST_KB=4096 WHD_ARGS=CUSTOM1=1 SLAVE=tmp/build/Powerdrome.slave amiga/run.sh
+make run CPU=68030 FAST_KB=4096 WHD_ARGS=CUSTOM1=1
+make run SLAVE=original
 ```
 
-The launcher otherwise defaults to a 68000 and the installed original slave.
+`make run` builds the release slave and boots it; the machine defaults to a 68000 with
+512 KB Chip and 1.5 MB slow memory.
 See [development](docs/development.md) for setup, CPU configuration and testing.
 
 ## Release measurements

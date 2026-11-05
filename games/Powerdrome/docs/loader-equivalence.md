@@ -45,11 +45,11 @@ query an obsolete private registration tag in the development slave or hard-code
 
 ## Comparison boundaries and results
 
-`make -C whdload original` still rebuilds the installed slave byte-identically.
-`original-verify` builds a separate input-only reference: a position-independent launch
+`make build BUILD=original` still rebuilds the installed slave byte-identically.
+`original_verify` builds a separate input-only reference: a position-independent launch
 wrapper saves/restores the original launch registers and installs the same six input
 hooks as the development VERIFY build. Its original Copylock replacement, allocator and
-OS patches remain in use. `whdload/verify_input.s` supplies both builds' Enter, Practice
+OS patches remain in use. `src/verify_input.s` supplies both builds' Enter, Practice
 and Space responses. The original reference always takes this Practice route.
 
 `tools/compare_loaders.py ORIGINAL_CAPTURE DEVELOPMENT_CAPTURE` checks:
@@ -114,21 +114,21 @@ Run sequentially in the project; the capture server is shared by its runs. Keep 
 slaves and capture bytes in ignored `tmp/`. The checkpoints do not write guest state.
 
 ```sh
-source amiga/env.sh
-make -C whdload original original-verify verify
+source ../../common/env.sh
+make build BUILD=original && make build BUILD=original_verify && make verify
 export PROBE_OFFSETS='0x8962 0x173b2 0x173b6 0x16c4c 0x16c4e 0x11d70'
 export WHD_ARGS='CUSTOM1=0 CUSTOM5=2 NoCache'
 export ANCHOR=0x14764 FIELDS=500 SWAP_ONLY=1
 
-tools/fixed_window.sh tmp/prof/equivalence-original-new tmp/build/Powerdrome-original-verify.slave
-tools/fixed_window.sh tmp/prof/equivalence-development-new tmp/build/Powerdrome-verify.slave
+tools/fixed_window.sh tmp/prof/equivalence-original-new tmp/build/original_verify/Powerdrome.Slave
+tools/fixed_window.sh tmp/prof/equivalence-development-new tmp/build/verify/Powerdrome.Slave
 python3 tools/compare_loaders.py tmp/prof/equivalence-original-new tmp/prof/equivalence-development-new
 python3 tools/check_disabled.py tmp/prof/equivalence-development-new
 ```
 
 For the accelerated pair, additionally export `AMIGA_MODEL=A1200 CPU=68EC020 CHIP_KB=2048
 FAST_KB=4096 EXTRA_ARGS=--slow_memory=0` and `KICKSTART="$KICKSTART_A1200"`, then use new output
-directories. Restore the normal build with `make -C whdload all`.
+directories. Restore the normal build with `make slave`.
 
 Evidence: `tmp/prof/equivalence-original-000-final`, `equivalence-development-000`,
 `equivalence-original-020`, `equivalence-development-020`, and comparison summaries

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the finite release matrix sequentially against frozen slave inputs.
 
-Source amiga/env.sh first. Supply normal.slave, verify.slave and coverage.slave
+Source ../../common/env.sh first. Supply normal.slave, verify.slave and coverage.slave
 in a new tmp/ directory. Completed matching captures are reused; incomplete ones
 are preserved and rejected. Stop on any failed gate and inspect before a retry.
 """

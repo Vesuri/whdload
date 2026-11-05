@@ -1,0 +1,15 @@
+{
+  "archives": [
+    {
+      "input": "Powerdrome.lha",
+      "output": "PowerdromeEnhanced-{version}-{date}.lha",
+      "replace": {
+        "PowerdromeHD/Powerdrome.slave": "build:Powerdrome",
+        "PowerdromeHD/Install": "release/Install",
+        "PowerdromeHD/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": []
+    }
+  ]
+}

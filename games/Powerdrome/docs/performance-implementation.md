@@ -184,13 +184,13 @@ check establishes unchanged hooks, imagery and presentation cadence, not whole-t
 
 ## Reproduction and limits
 
-Build with `make -C whdload all`; set `CUSTOM1=1` to enable both enhancements
+Build with `make slave`; set `CUSTOM1=1` to enable both enhancements
 on 68020+ with real fast RAM.
-`make -C whdload verify` includes the input and comparison fixtures. The additional VERIFY
+`make verify` includes the input and comparison fixtures. The additional VERIFY
 settings are `CUSTOM2=0` (the normal bitmap-and-code path), `1` (bitmap only), `2` (bitmap, code
 and scratch), or `3` (bitmap and scratch); `CUSTOM4=1` enables twins, and `CUSTOM5=2` enters Practice.
 `COPY_MOVEM=0` and `FULL_PLANAR=1` are assembly-time experiment overrides, passed through
-`make -C whdload verify VASMFLAGS="..."`.
+`make verify VASM_EXTRA="..."`.
 
 Use `tools/fixed_window.sh` with `ANCHOR=0x14764 FIELDS=500` for movement-onset profiling,
 or `ANCHOR=0xbc7c` for driving-only windows. `SWAP_ONLY=1` uses the independent read-only
