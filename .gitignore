@@ -1,0 +1,37 @@
+# NOTE: gitignore has no inline-comment syntax; comments go on their own line.
+
+# --- OS / local tooling state ------------------------------------------------
+.DS_Store
+.claude/*.lock
+__pycache__/
+*.pyc
+
+# FS-UAE writes a .uaem metadata sidecar next to every file in a directory it
+# mounts as an Amiga hard drive.
+*.uaem
+*.uss
+
+# --- Copyrighted / captured material: kept LOCAL only, never committed -------
+# Each game's tmp/ holds its install archives and unpacked game data, builds,
+# traces, memory dumps, screenshots and input recordings.  The patterns below
+# guard against an image, ROM or archive landing anywhere else in the tree.
+tmp/
+*.png
+*.rom
+*.adf
+*.lha
+*.lzx
+*.zip
+*.slave
+*.bin
+*.rec
+*.RTB
+kick[0-9]*.A*
+
+# --- Emulator / debugger run state --------------------------------------------
+.run/
+
+# --- Build and release output ------------------------------------------------
+build/
+/dist/
+*.o
