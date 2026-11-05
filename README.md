@@ -14,6 +14,15 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 
 | Game | Original slave by | Release |
 |---|---|---|
+| Formula One Grand Prix Enhanced | Codetapper | not yet released |
+| Gunship Enhanced | JOTD | not yet released |
+| Hard Drivin' Enhanced | JOTD | not yet released |
+| Indianapolis 500 Enhanced | StingRay | not yet released |
+| Legends of Valour Enhanced | CFou! | not yet released |
+| Mercenary 3 Enhanced | Harry, Graham and Wepl | not yet released |
+| Stellar 7 Enhanced | Psygore | not yet released |
+| Their Finest Hour Enhanced | Psygore | not yet released |
+| Wing Commander Enhanced | Psygore | not yet released |
 
 ## Building
 
