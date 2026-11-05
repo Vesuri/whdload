@@ -29,14 +29,14 @@ def table(text, label):
 
 
 def unentered_calls():
-    f2 = (ROOT / 'whdload/renderer-f2.i').read_text()
-    f5 = (ROOT / 'whdload/translate-f5.i').read_text()
+    f2 = (ROOT / 'src/renderer-f2.i').read_text()
+    f5 = (ROOT / 'src/translate-f5.i').read_text()
     moved = [tuple(r[:2]) for r in table(f2, '_f2_ranges') + table(f5, '_f5_blocks')]
     moved += M1_BLOCKS
     entries = {r[0] for r in table(f2, '_f2_entries') + table(f5, '_f5_entries')}
     entries |= M1_ENTRIES
     bad = []
-    source = (ROOT / 'whdload/Mercenary3.slave.asm').read_text().splitlines()
+    source = (ROOT / 'src/Mercenary3.slave.asm').read_text().splitlines()
     for number, line in enumerate(source, 1):
         match = re.search(r'\b(?:jsr|jmp)\s+\(\$([0-9a-f]+)\)\.l', line, re.I)
         if match:

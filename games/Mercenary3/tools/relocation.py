@@ -2,10 +2,10 @@
 
 Maps a copied instruction's address back to the original chip address, given the
 allocated ws_ExpMem base (route_profile.py records it in route.json). The S3/F2 ranges come
-from whdload/renderer-relocs.i and renderer-f2.i; the M1 blocks and area offsets follow _hotcode and
-_hotrenderer in whdload/Mercenary3.slave.asm. Copies keep the original instruction
+from src/renderer-relocs.i and renderer-f2.i; the M1 blocks and area offsets follow _hotcode and
+_hotrenderer in src/Mercenary3.slave.asm. Copies keep the original instruction
 lengths, so opcodes and offsets within a block match the chip original. With F5 (Custom1
-bit 20) the blocks are translated instead (whdload/translate-f5.i): instructions may grow,
+bit 20) the blocks are translated instead (src/translate-f5.i): instructions may grow,
 and addresses map through each block's growth list. Map(expmem) takes F5 from WHD_ARGS
 (CUSTOM1 bit 20, or the release default when CUSTOM5 is not 0); f5= overrides.
 """
@@ -17,7 +17,7 @@ DISK_DELTA = 0x3cb0
 
 
 def _constants():
-    text = open(os.path.join(ROOT, 'whdload/Mercenary3.slave.asm'), encoding='latin1').read()
+    text = open(os.path.join(ROOT, 'src/Mercenary3.slave.asm'), encoding='latin1').read()
     return {k: int(v, 16) for k, v in re.findall(r'^(\w+)\s*=\s*\$([0-9a-fA-F]+)', text, re.M)}
 
 
@@ -35,7 +35,7 @@ def blocks(expmem):
     seen = set()
     for filename, label in (('renderer-relocs.i', '_render_ranges'),
                             ('renderer-f2.i', '_f2_ranges')):
-        text = open(os.path.join(ROOT, 'whdload', filename), encoding='latin1').read()
+        text = open(os.path.join(ROOT, 'src', filename), encoding='latin1').read()
         text = text.split(label, 1)[1].split('dc.l\t0', 1)[0]
         for lo, hi, off in re.findall(r'dc\.l\s+\$(\w+)-\$3cb0,\$(\w+)-\$3cb0,\$(\w+)', text):
             lo, hi = int(lo, 16) - DISK_DELTA, int(hi, 16) - DISK_DELTA
@@ -53,7 +53,7 @@ def islands(expmem):
     out = {}
     for filename, label in (('renderer-relocs.i', '_render_branches'),
                             ('renderer-f2.i', '_f2_branches')):
-        text = open(os.path.join(ROOT, 'whdload', filename), encoding='latin1').read()
+        text = open(os.path.join(ROOT, 'src', filename), encoding='latin1').read()
         text = text.split(label, 1)[1].split('dc.l\t0', 1)[0]
         for target, off in re.findall(r'dc\.l\s+\$\w+-\$3cb0,\$(\w+)-\$3cb0,\$(\w+)', text):
             out[render + int(off, 16)] = int(target, 16) - DISK_DELTA
@@ -73,7 +73,7 @@ def f5_layout(expmem):
     k = _constants()
     hot = k['STACKSIZE']
     render = k['STACKSIZE'] + k['HOTSIZE'] + k['TABLEMEM'] + k['RESTOREMEM']
-    text = open(os.path.join(ROOT, 'whdload/translate-f5.i'), encoding='latin1').read()
+    text = open(os.path.join(ROOT, 'src/translate-f5.i'), encoding='latin1').read()
     base = {'F5HOT': hot, 'F5RENDER': render}
     out = []
     for lo, hi, dest, off, label in re.findall(

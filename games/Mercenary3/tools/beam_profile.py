@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Elapsed time of chosen routines on any CPU, from beam positions at entry and return.
 
-  SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM1=131071' AMIGA_SETUP=a1200-030 \\
+  SLAVE=tmp/build/verify/Mercenary3.Slave WHD_ARGS='CUSTOM1=131071' AMIGA_SETUP=a1200-030 \\
     python3 tools/beam_profile.py OUT.json 577be 5765e _savepresent ...
 
 For the CPUs without an instruction profile (68030, 68040, 68060). Runs the standard route

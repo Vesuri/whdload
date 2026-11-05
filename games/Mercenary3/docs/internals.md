@@ -13,7 +13,7 @@ has the `PL_W $716` and `PL_P $A858` patches below, a `_waitvb` subroutine where
 source expands the `waitvb` macro inline, and the build date. `src/Mercenary3.islave.asm`
 is the RawDIC imager.
 
-`whdload/original/Mercenary3.slave.asm` is the reconstruction: the installer source
+`src/original/Mercenary3.slave.asm` is the reconstruction: the installer source
 with those additions and with Barfly's optimised encodings written out (`moveq`, short
 branches, PC-relative `lea`, `cmpi` and an `abs.w` operand). vasm `-no-opt` rebuilds the
 shipped slave byte for byte (`make original`).
@@ -70,7 +70,7 @@ key code at chip `$8`, with `$FF` at `$9`.
 
 ## Performance slave
 
-`whdload/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
+`src/Mercenary3.slave.asm` starts from the reconstruction. It declares WHDLoad 17
 (for the startup control), reads options through `resload_Control` and keeps
 the shipped patch list. The release exposes **Enhanced framerate**, default On
 (`Custom5=1` in the game icons), which selects all feature bits below. Off (`Custom5=0`) keeps the
@@ -1685,7 +1685,7 @@ framerate includes bit 18 (`$7FFFF`).
 
 Custom1 bit 19, with M1's copy (68020+, real fast RAM), replaces the compare tree that
 finds the leading bit in the log conversion (Disk.1 `$4EE88..$4EF91`) with `bfffo`
-(`whdload/log-f4.i`). The `$4EE76` word entry's `bra.s` at `$4EE82` is retargeted to the new
+(`src/log-f4.i`). The `$4EE76` word entry's `bra.s` at `$4EE82` is retargeted to the new
 word path; `$4EE84` still falls through into `$4EE88`. Results match the original exactly:
 d1 (exponent in the high word, twice the 12-bit mantissa below, negated for negative input),
 d6 (the input), d7 (the exponent; its high word is preserved below `$10000`, as the
@@ -1738,7 +1738,7 @@ which cannot reach fast RAM at their original length. The copied code is therefo
   branches that no longer reach become word branches.
 - Branches that leave a block go through 63 JMP islands.
 
-`tools/translate.py` generates `whdload/translate-f5.i` from Disk.1. It holds Disk.1
+`tools/translate.py` generates `src/translate-f5.i` from Disk.1. It holds Disk.1
 offsets, layout values and data addresses only, no game bytes. For each block there is an
 edit recipe and a growth map:
 

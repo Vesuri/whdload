@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """F5: relocating copies of the game code, with instructions allowed to grow.
 
-  . amiga/env.sh; python3 tools/translate.py [--check DUMPDIR]
+  . ../../common/env.sh; python3 tools/translate.py [--check DUMPDIR]
 
 M1, S3 and F2 copy game code to fast RAM at its original length, so an absolute short
 (`$1240.w`) or 16-bit displacement (`$840(a0)`) operand can never reach fast RAM. This
 generator decodes the copied blocks (and the F5 blocks below) from the game's Disk.1 and
-writes whdload/translate-f5.i: per block an edit recipe that the slave applies while
+writes src/translate-f5.i: per block an edit recipe that the slave applies while
 copying, the map from original to copied addresses, island stubs and entries. No game
 bytes are emitted: the recipe copies runs of the loaded image and changes only opcode mode
 bits, displacements and addresses.
@@ -42,8 +42,8 @@ from capstone.m68k_const import (M68K_OP_BR_DISP, M68K_OP_MEM, M68K_OP_IMM, M68K
                                  M68K_AM_IMMEDIATE, M68K_REG_A7)
 
 ROOT = Path(__file__).resolve().parents[1]
-GAME = Path(os.environ.get('GAME', ROOT / 'tmp/game/Mercenary3_v1.2_0356/Mercenary3'))
-OUT = ROOT / 'whdload/translate-f5.i'
+GAME = Path(os.environ.get('GAME_DRAWER', ROOT / 'tmp/game/Mercenary3_v1.2_0356/Mercenary3'))
+OUT = ROOT / 'src/translate-f5.i'
 D = 0x3cb0                       # chip address + D = Disk.1 offset
 IMAGE, IMAGE_END = 0x5350, 0x5350 + 0x6d7b0
 
@@ -109,7 +109,7 @@ def table(text, label):
 
 
 def slave_tables():
-    f2 = (ROOT / 'whdload/renderer-f2.i').read_text()
+    f2 = (ROOT / 'src/renderer-f2.i').read_text()
     ranges = [(int(a, 16) - D, int(b, 16) - D) for a, b, _ in
               re.findall(r'dc\.l\s+\$(\w+)-\$3cb0,\$(\w+)-\$3cb0,\$(\w+)', table(f2, '_f2_ranges'))]
     operands = [int(a, 16) - D for a in re.findall(r'\$(\w+)-\$3cb0', table(f2, '_f2_operands'))]
@@ -876,7 +876,7 @@ def main():
             if p in patched:
                 raise ValueError(f'widened branch is patched at {p + D:05x}')
     # Words the slave patches in the copies after translation (mapped addresses).
-    slave = (ROOT / 'whdload/Mercenary3.slave.asm').read_text()
+    slave = (ROOT / 'src/Mercenary3.slave.asm').read_text()
     foreign = set()
     for a in re.findall(r'move\.l\t#\$([0-9a-f]+)-\$3cb0,d0', slave):
         foreign.update(range(int(a, 16) - D, int(a, 16) - D + 6, 2))

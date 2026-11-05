@@ -26,8 +26,14 @@ from relocation import Map
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHIPPED = os.path.join(ROOT, 'tmp/game/Mercenary3_v1.2_0356/Mercenary3/Mercenary3.Slave')
-# SLAVE= runs another build (amiga/run.sh copies it in); WHD_ARGS= passes WHDLoad options.
-SLAVE = os.path.abspath(os.environ.get('SLAVE') or SHIPPED)
+# SLAVE= runs another build (common/run.sh copies it in); WHD_ARGS= passes WHDLoad options.
+# The default is the shipped slave: SLAVE=original for common/run.sh, which would otherwise
+# build and run the release slave. A path is passed on absolute.
+if os.environ.get('SLAVE') in (None, '', 'original'):
+    SLAVE = SHIPPED
+    os.environ['SLAVE'] = 'original'
+else:
+    SLAVE = os.environ['SLAVE'] = os.path.abspath(os.environ['SLAVE'])
 
 
 def slave_code(path):
@@ -60,7 +66,7 @@ CALLS = {0x5a3da: 0x5b678, 0x5a420: 0x59b94, 0x5a424: 0x59da0, 0x5a428: 0x56c6e,
          0x5a52a: 0x556f6, 0x5a52e: 0x572fa, 0x5a532: 0x53b0e, 0x5a536: 0x509f2,
          0x5a53c: 0x51d2a, 0x5a542: 0x51dfc, 0x5a548: None, 0x5a54c: 0x5b774}
 MARKS.update({f'site{a:05x}': a for a in CALLS})
-# Shipped slave code offsets (whdload/original/Mercenary3.slave.asm), named in the report
+# Shipped slave code offsets (src/original/Mercenary3.slave.asm), named in the report
 # when the shipped slave runs.
 SLAVE_SYMBOLS = {0x27c: '_dmaon', 0x28e: '_diskload', 0x298: '_patch_vertb',
                  0x2aa: '_patch_aud1', 0x2bc: '_int68', 0x2ce: '_checkkeyboard',

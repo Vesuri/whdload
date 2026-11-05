@@ -6,46 +6,51 @@
 - [Official installer](https://whdload.de/games/Mercenary3.lha).
 - [User-supplied full install](https://ftp2.grandis.nu/turran/FTP/Retroplay%20WHDLoad%20Packs/Commodore_Amiga_-_WHDLoad_-_Games/M/Mercenary3_v1.2_0356.lha).
 
-`manifest/inputs.json` pins archive URLs and SHA-256 hashes. File manifests record
-relative names and hashes only. Downloaded and extracted bytes remain ignored:
+`inputs.sha256` and `manifest/inputs.json` pin the two archives; the file manifests in
+`manifest/` record every extracted file's relative name and hash. Downloaded and extracted
+bytes remain ignored:
 
 | Path | Purpose |
 | --- | --- |
-| `tmp/archives/` | Original archives and SHA-256 sidecars |
-| `tmp/game/Mercenary3_v1.2_0356/Mercenary3/` | Pristine installed game |
+| `tmp/archives/` | Original archives |
+| `tmp/game/Mercenary3_v1.2_0356/Mercenary3/` | Pristine installed game (`GAME_DIR`) |
 | `tmp/installer/Mercenary3/` | Pristine official installer, including source |
 
-`make check` checks every archive and extracted file against the pinned manifests,
-including unexpected files. It never runs the game or inspects code.
-For restoring inputs, download the exact named archives from the recorded URLs,
-verify their SHA-256 hashes before extracting, then extract each into its recorded
-extraction directory. Preserve any differing existing files separately first.
+`make unpack ARCHIVES=<directory>` copies both archives into `tmp/archives/`, verifies them,
+and (`game.sh` `game_unpack`) extracts each into its directory above; an existing one is
+kept unless `FORCE=1`. `tools/check_inputs.py` then checks every archive and extracted file
+against the manifests, including unexpected files; `make check` and `make dist` run it
+too. It never runs the game or inspects code.
 
 ## Shared environment
 
-Source `amiga/env.sh` from the repository root. `AMIGA_ENV` can override the shared
-environment file, whose default is `~/.local/share/amiga/env.sh`. Missing shared
-environment files fail explicitly. Shared tool and ROM paths are inherited from it;
-no local copies or paths into other projects are used.
+The common scripts load the shared environment (`../../common/env.sh`, which sources
+`~/.local/share/amiga/env.sh`, or `AMIGA_ENV`). The Python tools that read shared variables
+(`FSUAE_ARM`, `FSUAE_COMMON`, `WHDLOAD_BINARY`, `VASM`, `LHA`) need it in the environment:
+source `../../common/env.sh` in the game directory before running them. `tools/matrix.sh`
+sources it itself.
 
 ## Running
 
-`amiga/run.sh` boots Kickstart 3.1 from a generated `DH0` that runs
-`WHDLoad Mercenary3.Slave CACHE PRELOAD` on `DH1`, a disposable copy of the pristine drawer
-under ignored `amiga/.run/`. The default machine is the A500-equivalent (68000, 512 KB
-chip, 1.5 MB slow, no fast RAM); the slave needs 512 KB chip and WHDLoad needs other
-memory beside it. Variables: `SLAVE`, `WHD_SPLASH=1`, `WHD_ARGS`, and the shared
-launcher's (`AMIGA_SETUP`, `CPU`, `CHIP_KB`, `SLOW_KB`, `FAST_KB`, `DEBUG`, `WARP`,
-`DETERMINISTIC`, `JOY0`, `JOY1`, `SOUND`, `WINDOW`). Defaults: mouse in port 0,
-keyboard joystick in port 1. `CACHE PRELOAD` are supplied for normal and measured runs;
-`WHD_ARGS=NOCACHE` overrides cache use for an explicit cache-off test. Route results
-record the complete launch command, including these defaults.
+`make run` (repository `docs/running.md`) boots Kickstart 3.1 from a generated `DH0` that
+runs `WHDLoad Mercenary3.Slave CACHE PRELOAD SPLASHDELAY=0 NOREQ` (`WHD_DEFAULTS`) on `DH1`,
+a disposable copy of the pristine drawer under ignored `tmp/run/<instance>/.run/`. It
+builds and runs the release slave; `SLAVE=original` runs the shipped one, `BUILD=verify`
+the VERIFY build, `VARIANT=Mercenary3-original` the rebuilt original. The default machine
+is the A500-equivalent (`SETUP=custom`: 68000, 512 KB chip, 1.5 MB slow, no fast RAM); the
+slave needs 512 KB chip and WHDLoad needs other memory beside it. `AMIGA_SETUP` or `SETUP`
+selects a named machine. Defaults: mouse in port 0, keyboard joystick in port 1. `CACHE
+PRELOAD` are supplied for normal and measured runs; `WHD_ARGS=NOCACHE` overrides cache use
+for an explicit cache-off test, and `WHD_DEFAULTS='CACHE PRELOAD SPLASHDELAY=-1'` shows the
+WHDLoad options and waits for Start. Route results record the complete launch command,
+including these defaults.
 
-The debugger server uses the native build:
+The debugger server (`tools/merc3.py`, on `common/tools/game_server.py`) takes the same
+options; use the native build:
 
 ```sh
-. amiga/env.sh
-FSUAE="$FSUAE_ARM" JOY0=none python3 tools/merc3.py serve > tmp/serve.log 2>&1 &
+. ../../common/env.sh
+FSUAE="$FSUAE_ARM" JOY0=none SLAVE=original python3 tools/merc3.py serve > tmp/serve.log 2>&1 &
 python3 tools/merc3.py gdb 'monitor fields 400'
 python3 tools/merc3.py shot tmp/shots/now.png
 python3 tools/merc3.py quit
@@ -53,14 +58,16 @@ python3 tools/merc3.py quit
 
 ## Building
 
-`make original` assembles `whdload/original/Mercenary3.slave.asm` with vasm
-(`-no-opt`, the shared `WHDLOAD` includes) into `tmp/build/` and requires it to equal
-the shipped slave byte for byte. `BUILD` overrides the output directory.
-
-`make slave` builds the performance slave `whdload/Mercenary3.slave.asm` into
-`tmp/build/Mercenary3.Slave`, `make verify` its VERIFY build `Mercenary3.verify.Slave`.
-Run the instrumented build with `SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=1' amiga/run.sh`; the
-profile and game-time tools take the same `SLAVE` and `WHD_ARGS` and record them.
+`game.conf` has two variants, both assembled with vasm `-no-opt` against the shared
+WHDLoad includes into `tmp/build/<BUILD>/`. `Mercenary3` is the performance slave
+(`src/Mercenary3.slave.asm`): `make slave` builds `tmp/build/release/Mercenary3.Slave`,
+`make verify` its VERIFY build `tmp/build/verify/Mercenary3.Slave`. `Mercenary3-original`
+is the reconstruction (`src/original/Mercenary3.slave.asm`); `make original` builds it and
+requires it to equal the shipped slave byte for byte. `release/slaves.sha256` records both
+release slaves (`make check`, `make record`).
+Run the instrumented build with `make run BUILD=verify WHD_ARGS='CUSTOM5=0 CUSTOM1=1'`; the
+profile and game-time tools take `SLAVE=tmp/build/verify/Mercenary3.Slave` and `WHD_ARGS`
+and record them.
 
 The release shows only **Enhanced framerate**, a boolean checkbox, enabled by `CUSTOM5=1`. Off
 (`CUSTOM5=0`) keeps the original game's behaviour: it clears every feature except the
@@ -69,16 +76,19 @@ ignore `CUSTOM1`. For individual
 features in VERIFY, supply `CUSTOM5=0 CUSTOM1=<mask>`; with Custom5 omitted, VERIFY
 uses only the individual feature mask. Custom2–4 remain VERIFY-only instruments.
 
+`make check` also runs the unit tests (`python3 -m unittest discover -s tools -p
+'test_*.py'`); they read the installed slave, so unpack first.
+
 ## Profiling and game time
 
-Both tools boot the shipped slave with the native build (`FSUAE_ARM`), `WARP=1`,
+Both tools boot the shipped slave (unless `SLAVE` names another) with the native build (`FSUAE_ARM`), `WARP=1`,
 `DETERMINISTIC=1` on the 020 and `JOY0=none`, stop at the game's entry and drive the same route
 with the port-1 joystick through `monitor input`: wait 175 fields for the cell door,
 walk 185 fields through it and outside, then turn right for 140 (500 fields, 10 s PAL).
 `ROUTE` overrides it (`ROUTE='175:,185:JOY2_UP,140:JOY2_RIGHT'`).
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/route_profile.py                       # tmp/prof/a1200-fast-route/
 AMIGA_SETUP=a1200-fast python3 tools/sim_speed.py tmp/sim/a1200-fast.json
 AMIGA_SETUP=a500-1.5m python3 tools/sim_speed.py tmp/sim/a500-1.5m.json
@@ -101,8 +111,8 @@ the frame and VERTB counters every `STEP` fields (default 5), or at every frame 
 new filename for each run (existing results are refused):
 
 ```sh
-SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=1' python3 tools/fps.py tmp/fps/count.json
-SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=1' PER_FRAME=1 python3 tools/fps.py tmp/fps/cadence.json
+SLAVE=tmp/build/verify/Mercenary3.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=1' python3 tools/fps.py tmp/fps/count.json
+SLAVE=tmp/build/verify/Mercenary3.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=1' PER_FRAME=1 python3 tools/fps.py tmp/fps/cadence.json
 python3 -m unittest discover -s tools -p test_fps.py
 ```
 
@@ -112,7 +122,7 @@ without running the full matrix, using the same VERIFY build and route for both 
 ```sh
 AMIGA_SETUP=a1200-030 DETERMINISTIC=0 \
 EXTRA_ARGS='--cpu=68040-NOMMU --uae_cpu_frequency=25000000' \
-SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=255' \
+SLAVE=tmp/build/verify/Mercenary3.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=255' \
 python3 tools/fps.py tmp/fps/040-on.json
 ```
 
@@ -156,16 +166,16 @@ Roots are Disk.1 offsets or slave symbols (`SLAVE_LST=`); copies in expansion me
 caught too. Nested roots are not counted inside an outer root, so probe each level in its
 own run. `PROBE_FIELDS=175:500` limits probing to gameplay (not `WINDOW`, which `run.sh`
 uses). Example, reference 030/50:
-`AMIGA_SETUP=a1200-030 SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM1=131071' SLAVE_LST=tmp/f1/slave.lst PROBE_FIELDS=175:500 python3 tools/beam_profile.py tmp/f1/top.json 577be 5765e 5afaa 593a6 5e840 5e458 _savepresent _restorepresent`
+`AMIGA_SETUP=a1200-030 SLAVE=tmp/build/verify/Mercenary3.Slave WHD_ARGS='CUSTOM1=131071' SLAVE_LST=tmp/f1/slave.lst PROBE_FIELDS=175:500 python3 tools/beam_profile.py tmp/f1/top.json 577be 5765e 5afaa 593a6 5e840 5e458 _savepresent _restorepresent`
 (about 20 s per run).
 
-`tools/log_harness.py` checks F4's `bfffo` log conversion (`whdload/log-f4.i`) against the
+`tools/log_harness.py` checks F4's `bfffo` log conversion (`src/log-f4.i`) against the
 original Disk.1 code under the shared Unicorn: every input of the `$4EE88`, `$4EE84` and
 `$4EE76` entries, comparing d1, d6, d7 and flags (about three minutes; `--quick` samples
-1/257). Source `amiga/env.sh` first.
+1/257). Source `../../common/env.sh` first.
 
-`tools/translate.py` generates F5's `whdload/translate-f5.i` from the game's Disk.1
-(shared capstone; source `amiga/env.sh`): it decodes the copied blocks, rewrites every
+`tools/translate.py` generates F5's `src/translate-f5.i` from the game's Disk.1
+(shared capstone; source `../../common/env.sh`): it decodes the copied blocks, rewrites every
 render-scratch operand to 32-bit form, re-targets the branches the growth moves and
 re-decodes the whole translation to verify each operand. Regenerate it after changing
 M1/S3/F2's blocks, entries or operand lists, or the moved range:
@@ -222,7 +232,7 @@ tools/matrix.sh tmp/game/Mercenary3_v1.2_0356/Mercenary3/Mercenary3.Slave '' tmp
 tools/matrix.sh --report-only tmp/game/Mercenary3_v1.2_0356/Mercenary3/Mercenary3.Slave '' tmp/matrix/shipped
 ```
 
-The Bash 3.2 entry point sources the shared environment. Pass the slave, a single quoted
+The Bash 3.2 entry point sources the shared environment (`../../common/env.sh`). Pass the slave, a single quoted
 WHDLoad argument string (empty for none), and a new directory under `tmp/`. The runner
 uses the fixed 500-field route and runs seven target cells plus an 8 MHz 040 frequency
 sanity cell, one at a time. It preserves logs and per-cell JSON and writes `table.md`
@@ -247,7 +257,7 @@ See [A3 evidence](internals.md#a3-machine-matrix). A3 is complete.
 ## Committed-state traces
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/state_trace.py tmp/state/boot-a.json
 python3 tools/state_trace.py tmp/state/boot-b.json
 python3 tools/state_trace.py --compare tmp/state/boot-a.json tmp/state/boot-b.json
@@ -286,9 +296,11 @@ has no spare interval. No instruction recording is needed.
 
 ## Release packaging
 
-Layout: `release/` holds the maintained release text (`readme-body.txt`); `dist/`
-(ignored) receives the archives. `make dist` runs the input check and all three slave
-builds, then `tools/package_release.py` writes `dist/Mercenary3-<version>.lha`.
+Layout: `release/` holds the maintained release text (`readme-body.txt`) and
+`slaves.sha256`; the repository's ignored `dist/` receives the archives. `make dist` builds
+both release slaves, then `game.sh` `game_dist` runs the input check, `make original` and
+the VERIFY build, and `tools/package_release.py` writes `dist/Mercenary3-<version>.lha`
+(an existing archive is replaced only with `FORCE=1`).
 The version and date come from the release slave's `Version <version> (<date>)` line and
 must match the ReadMe's history entry; a VERIFY slave is refused.
 

@@ -6,10 +6,13 @@ from pathlib import Path
 import re
 import signal
 import subprocess
+import sys
 
 import _amigaxdev  # noqa: F401
 from amigaxdev import gdbserve
 from route_profile import ENTRY, ROOT, SLAVE
+sys.path.insert(0, str(Path(ROOT).resolve().parents[1] / 'common/tools'))
+from game_server import game_server  # noqa: E402
 
 
 def delta(end, start):
@@ -118,7 +121,7 @@ def session(boot_timeout):
         raise ValueError('only ANCHOR=entry is supported; the 030 entry breakpoint works '
                          'with DETERMINISTIC=0')
     configure()
-    server = gdbserve.Server('merc3', root=ROOT, profile_window=False)
+    server = game_server('merc3', profile_window=False)
     # Retain the owned debugger even if its constructor fails during attachment.
     original_gdb, owned = gdbserve.Gdb, []
 
@@ -157,7 +160,7 @@ def session(boot_timeout):
                 raise RuntimeError('entry anchor did not start a fresh game')
         print('anchored at Disk.1 $4EDB0', flush=True)
         meta = dict(setup=os.environ['AMIGA_SETUP'], whd_args=os.environ.get('WHD_ARGS', ''),
-                    launch_command=(Path(ROOT) / 'amiga/.run/dh0/s/startup-sequence').read_text().splitlines()[-1],
+                    launch_command=(Path(server.run_dir) / 'dh0/s/startup-sequence').read_text().splitlines()[-1],
                     extra_args=os.environ.get('EXTRA_ARGS', ''),
                     deterministic=os.environ['DETERMINISTIC'],
                     slave=os.path.relpath(SLAVE, ROOT),
@@ -178,5 +181,5 @@ def session(boot_timeout):
                 g.p.kill()
                 g.p.wait(timeout=5)
         subprocess.run(['/bin/bash', '-c', '. "$FSUAE_COMMON"; fsuae_stop_previous'],
-                       cwd=os.path.join(ROOT, 'amiga'), check=True, timeout=10)
+                       cwd=os.path.dirname(server.run_dir), check=True, timeout=10)
 

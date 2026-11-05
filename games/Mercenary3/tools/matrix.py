@@ -107,7 +107,7 @@ def main():
     # Refuse hidden overrides rather than silently measuring a different matrix.
     controlled = ('EXTRA_ARGS', 'CPU', 'AMIGA_SETUP', 'AMIGA_MODEL', 'CHIP_KB',
                   'FAST_KB', 'SLOW_KB', 'NTSC', 'RECORD', 'DETERMINISTIC', 'ROUTE',
-                  'PER_FRAME', 'ANCHOR', 'WHD_SPLASH', 'GAME')
+                  'PER_FRAME', 'ANCHOR', 'WHD_DEFAULTS', 'GAME_DIR', 'SLAVE_FILE')
     conflicts = [key for key in controlled if os.environ.get(key)]
     if conflicts:
         parser.error('unset matrix-controlled variables: ' + ', '.join(conflicts))

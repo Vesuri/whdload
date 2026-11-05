@@ -1,9 +1,10 @@
-"""Repack the WHDLoad installer archive with the new slave and ReadMe -> dist/ (ignored).
+"""Repack the WHDLoad installer archive with the new slave and ReadMe -> the repository's dist/.
 
-    make dist
+    make dist [FORCE=1]          (game.sh game_dist: --dist DIST [--force])
 
 Input: tmp/archives/Mercenary3.lha (pinned in manifest/inputs.json). Output:
-dist/Mercenary3-<version>.lha with exactly the same members. Only the slave, the ReadMe
+DIST/Mercenary3-<version>.lha with exactly the same members; an existing archive is
+replaced only with --force. Only the slave, the ReadMe
 and the two game icons (Mercenary3.inf and Mercenary3.romicon, which gain the tooltype
 CUSTOM5=1 so Enhanced framerate starts checked) differ.
 The ReadMe is the WHDLoad Install Template's (pinned in manifest/release-templates.json)
@@ -99,7 +100,9 @@ def readme(version, original):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--slave', type=Path, default=ROOT / 'tmp/build/Mercenary3.Slave')
+    parser.add_argument('--slave', type=Path, default=ROOT / 'tmp/build/release/Mercenary3.Slave')
+    parser.add_argument('--dist', type=Path, default=ROOT.parents[1] / 'dist')
+    parser.add_argument('--force', action='store_true', help='replace an existing archive')
     args = parser.parse_args()
     lha = os.environ['LHA']
     check_inputs()
@@ -115,9 +118,11 @@ def main():
     changed = {SLAVE, README, *ICONS}
     if not changed <= set(names):
         raise ValueError('Source archive lacks the slave, ReadMe or game icons')
-    dist = ROOT / 'dist'
-    dist.mkdir(exist_ok=True)
+    dist = args.dist.resolve()
+    dist.mkdir(parents=True, exist_ok=True)
     out = dist / f'Mercenary3-{version}.lha'
+    if out.exists() and not args.force:
+        raise ValueError(f'{out} exists (FORCE=1 replaces it)')
     with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as tmp:
         stage, new, old = (Path(tmp) / d for d in ('stage', 'new', 'old'))
         extract(lha, SOURCE, stage)
@@ -146,7 +151,7 @@ def main():
             extra = {p.relative_to(path).as_posix() for p in path.rglob('*') if p.is_file()}
             if extra != set(names):
                 raise ValueError(f'Extraction holds other files: {sorted(extra ^ set(names))}')
-    print(f'{out.relative_to(ROOT)}: {len(names)} files, {out.stat().st_size} bytes; '
+    print(f'{os.path.relpath(out, ROOT)}: {len(names)} files, {out.stat().st_size} bytes; '
           f'changed: {", ".join(sorted(changed))}')
 
 

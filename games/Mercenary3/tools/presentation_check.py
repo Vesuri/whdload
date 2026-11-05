@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """P1 VERIFY restore hashes, excluding display and live interrupt-owned state.
 
-SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS="CUSTOM5=0 CUSTOM1=31" python3 tools/presentation_check.py tmp/p1/check.json
+SLAVE=tmp/build/verify/Mercenary3.Slave WHD_ARGS="CUSTOM5=0 CUSTOM1=31" python3 tools/presentation_check.py tmp/p1/check.json
 Uses VERIFY-only markers; no guest state is altered by this checker.
 Besides the chip game image it hashes the slave's expansion-memory copies of game state
 (EXP_RANGES, offsets from ws_ExpMem): M1's code, M2/F3 tables, the S3/F2/F5 renderer

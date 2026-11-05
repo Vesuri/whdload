@@ -3,7 +3,8 @@
 Version **2.0b (04.11.2026)**.
 
 Performance WHDLoad slave for **Mercenary III: The Dion Crisis** (Novagen), based on
-install version 1.2. **Enhanced framerate** is enabled by default in the installed icon (`CUSTOM5=1`): rendering can run up to
+install version 1.2 by Harry, Graham and Wepl, whose source came with the official installer.
+**Enhanced framerate** is enabled by default in the installed icon (`CUSTOM5=1`): rendering can run up to
 50 fps PAL while world simulation and game logic keep their native rates. Actual
 frame rate depends on the machine and scene.
 
@@ -23,21 +24,21 @@ on fast machines instead of predicting past stops and collisions.
 - A 68020 or later with real fast RAM is needed for code/table/scratch relocation, object
   interpolation and drawing into fast RAM. AGA fetch optimisation is AGA-only.
 
-Build with the shared Amiga environment described in [development](docs/development.md):
+Build with the shared Amiga environment described in [development](docs/development.md),
+after `make unpack ARCHIVES=<directory holding the two archives>`:
 
 ```sh
-. amiga/env.sh
-make check original slave verify
+make slave verify original check
 ```
 
-To build the release archive, run `make dist`. It writes `dist/Mercenary3-2.0b.lha`:
+To build the release archive, run `make dist`. It writes the repository's `dist/Mercenary3-2.0b.lha`:
 the original WHDLoad installer archive with the slave and the `ReadMe` replaced and
 `CUSTOM5=1` added to the two game icons (`Mercenary3.inf`, `Mercenary3.romicon`).
 The ReadMe is built from the WHDLoad Install Template and `release/readme-body.txt`.
 Open its Install icon on the Amiga to install from the original disk. The original
 installer then adds `PRELOAD` to the chosen game icon, so Enhanced framerate starts checked. See [release packaging](docs/development.md#release-packaging).
 
-To update an existing installation manually, back up the installed slave, then copy `tmp/build/Mercenary3.Slave` into a writable
+To update an existing installation manually, back up the installed slave, then copy `tmp/build/release/Mercenary3.Slave` into a writable
 copy of the game drawer. Keep its `Disk.1` and other game files. No game data or built
 slaves are distributed in this repository.
 
@@ -53,15 +54,16 @@ unchecks it. The release ignores
 for cache troubleshooting; WHDLoad also supports `BRANCHCACHE` on 68060.
 Backspace quits WHDLoad. Keep a writable game drawer for saved situations.
 
-For this workspace's emulator launcher:
+For the repository's emulator launcher (`docs/running.md` at the repository root):
 
 ```sh
-SLAVE=tmp/build/Mercenary3.Slave WHD_ARGS=CUSTOM5=1 WHD_SPLASH=1 amiga/run.sh
+make run WHD_ARGS=CUSTOM5=1 WHD_DEFAULTS='CACHE PRELOAD SPLASHDELAY=-1'
 ```
 
-It supplies `CACHE PRELOAD`. Use `WHD_ARGS=CUSTOM5=0` to start with the enhancement off.
-Without `SLAVE`, the launcher still runs the installed original. Its game drawer is a
-scratch copy, so saves made there are not copied back to the original installation.
+It builds the release slave and supplies `CACHE PRELOAD`; `SPLASHDELAY=-1` shows the
+WHDLoad options and waits for Start. Use `WHD_ARGS=CUSTOM5=0` to start with the enhancement
+off, and `SLAVE=original` to run the installed original. Its game drawer is a scratch copy,
+so saves made there are not copied back to the original installation.
 
 ## Validation and limitations
 

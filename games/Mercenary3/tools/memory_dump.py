@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Dump chip RAM and the slave's expansion memory from a running game.
 
-  SLAVE=tmp/build/Mercenary3.verify.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=...' \\
+  SLAVE=tmp/build/verify/Mercenary3.Slave WHD_ARGS='CUSTOM5=0 CUSTOM1=...' \\
   python3 tools/memory_dump.py OUTDIR
 
 Boots like the route tools (AMIGA_SETUP, SLAVE, WHD_ARGS, BOOT_TIMEOUT), stops at the

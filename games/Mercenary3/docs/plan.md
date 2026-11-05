@@ -8,11 +8,11 @@ are in order of value; take the first one not done whose dependencies are met. D
 ## How to work
 
 - **One option per feature for development.** Each behaviour change has a `Custom1`
-  bit in `whdload/Mercenary3.slave.asm`. VERIFY accepts these with `Custom5=0`. The
+  bit in `src/Mercenary3.slave.asm`. VERIFY accepts these with `Custom5=0`. The
   release exposes one **Enhanced framerate** control, default On (`Custom5=1` in the game icons); Off
   (`Custom5=0`) keeps the original game's behaviour: the shipped code plus fixes for the
   shipped slave's defects (bits 0 and 15; user decision). It ignores individual-feature settings. Debug aids go in the `VERIFY` build.
-- **Build** with `make original slave verify` before each commit.
+- **Build** with `make slave verify original check` before each commit.
 - **Measure** with `tools/fps.py` on `a1200-fast`, `a500-1.5m` and the existing `040-25` matrix configuration: the same build with the
   option off and on, same session. Keep a change only if it gives a repeatable measured
   gain somewhere and loses nowhere; there is no fixed percentage cutoff (user decision).

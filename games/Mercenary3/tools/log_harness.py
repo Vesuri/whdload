@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Check F4's log conversion against the original, for every input, under shared Unicorn.
 
-  . amiga/env.sh; python3 tools/log_harness.py [--quick]
+  . ../../common/env.sh; python3 tools/log_harness.py [--quick]
 
 Assembles a 68020 driver with the original Disk.1 $4EDE4..$4EF91 twice: one copy as
-shipped, one patched as _hotcode patches M1's copy with whdload/log-f4.i. Both run in
+shipped, one patched as _hotcode patches M1's copy with src/log-f4.i. Both run in
 the emulator for each input and the driver compares d1, d6, d7 and the condition codes
 (X included). The scratch registers' starting values and flags vary with the input.
 Entries and inputs: $4EE88 every 32-bit value, $4EE84 every 28-bit value, $4EE76 every
 word with varied high words. --quick tests 1/257 of each range (spread). Exits non-zero
-on the first difference. The game is read from GAME (default tmp/game/...).
+on the first difference. The game is read from GAME_DRAWER (default tmp/game/...).
 """
 import argparse
 import ctypes as C
@@ -22,7 +22,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-GAME = Path(os.environ.get('GAME', ROOT / 'tmp/game/Mercenary3_v1.2_0356/Mercenary3'))
+GAME = Path(os.environ.get('GAME_DRAWER', ROOT / 'tmp/game/Mercenary3_v1.2_0356/Mercenary3'))
 OUT = ROOT / 'tmp/log-harness'
 BASE, STACK, RESULT = 0x1000, 0x80000, 0x7f000
 
@@ -105,7 +105,7 @@ def build():
     (OUT / 'driver.s').write_text(DRIVER.replace('{block}', block))
     vasm = os.environ.get('VASM', str(Path.home() / '.local/vasmm68k_mot'))
     subprocess.run([vasm, '-quiet', '-m68020', '-devpac', '-Fbin',
-                    '-I' + str(ROOT / 'whdload'), '-o', str(OUT / 'driver.bin'), str(OUT / 'driver.s')],
+                    '-I' + str(ROOT / 'src'), '-o', str(OUT / 'driver.bin'), str(OUT / 'driver.s')],
                    check=True, stdout=subprocess.DEVNULL)
     blob = (OUT / 'driver.bin').read_bytes()
     return blob, struct.unpack_from('>I', blob, 4)[0]

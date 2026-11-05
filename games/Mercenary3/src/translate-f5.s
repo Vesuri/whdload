@@ -277,4 +277,4 @@ _f5renderer
 .installed
 	rts
 
-	INCLUDE	"whdload/translate-f5.i"
+	INCLUDE	"translate-f5.i"

@@ -4,7 +4,7 @@
 ;  :Author.	Harry/Graham/Wepl/Vesuri
 ;  :History.	19.03.1998
 ;		29.07.04 merged Harry and Graham (ReSourced Slave) sources
-;		performance version, from whdload/original/ (the shipped 1.2):
+;		performance version, from src/original/ (the shipped 1.2):
 ;		WHDLoad 17 header with options; with every option off the game
 ;		runs as with the shipped slave
 ;  :Requires.	whdload-package :)
@@ -26,7 +26,7 @@ STAGEMEM	= $18000	;32 KB bitmap plus up to 64 KB alignment
 OBJECTMEM	= $3000		;256 pose histories (40 bytes each), page rounded
 RESTOREMEM	= $5000		;17,912 bytes, rounded to whole pages
 DATAMEM		= $5000		;F5: render scratch at its chip offset ($340..$407F)
-; F5 destinations, as offsets from ws_ExpMem (whdload/translate-f5.i).
+; F5 destinations, as offsets from ws_ExpMem (src/translate-f5.i).
 F5HOT		= STACKSIZE
 F5RENDER	= STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM
 F5DATA		= STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM+OBJECTMEM
@@ -379,7 +379,7 @@ _hotentries
 	dc.l	0
 
 	machine	68020
-	INCLUDE	"whdload/log-f4.i"
+	INCLUDE	"log-f4.i"
 	machine	68000
 
 ; F3: CPU-only projection state, line masks and row offsets. Use the unused tail of
@@ -462,7 +462,7 @@ _f3_slave
 	dc.w	_f3sky3+2-_base
 	dc.w	_f3sky4+2-_base
 	dc.w	0
-	INCLUDE "whdload/data-f3.i"
+	INCLUDE "data-f3.i"
 
 ; M2: the read-only lookup region at chip $60000..$66103 supplies
 ; the renderer's numeric and trigonometric tables. Keep the original copy
@@ -900,9 +900,9 @@ _render_aliases
 	dc.l	0
 _render_base	dc.l	0
 _render_tables	dc.l	0,0,0,0
-	INCLUDE	"whdload/renderer-relocs.i"
-	INCLUDE	"whdload/renderer-f2.i"
-	INCLUDE	"whdload/translate-f5.s"
+	INCLUDE	"renderer-relocs.i"
+	INCLUDE	"renderer-f2.i"
+	INCLUDE	"translate-f5.s"
 
 ; R1: full-word interiors of the sixteen horizontal colour spans.
 ; Disk.1 $4978C + colour*$B6: replace the count setup with a call,
