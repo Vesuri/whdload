@@ -36,9 +36,10 @@ rates at runtime. Scripted tests use the existing VERIFY fixtures.
 To try 20 Hz on the 68000, use `make play60 SIM68000_SUBSTEPS=4`.
 Without that override the next launch rebuilds the selected 15 Hz default.
 
-Build the current experimental installer archive with `make dist`. The `.lha`,
-checksum and verification report are written to the repository's `dist/`. It includes both
-CPU builds and an installer choice; original English NTSC disks are required.
+Build the installer archive, Stellar 7 Enhanced 2.0b, with `make dist`: the repository's
+`dist/Stellar7Enhanced-2.0b-20261105.lha` and its checksum. It includes both CPU builds
+and an installer choice, and the installed icon of a fixed-rate build enables it with
+`CUSTOM1=1`; original English NTSC disks are required.
 
 Read [current status and remaining work](docs/open-work.md),
 [build and validation instructions](docs/development.md), and

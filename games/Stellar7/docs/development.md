@@ -38,14 +38,17 @@ remains byte-identical.
 
 Run `make dist` in this directory (or `make dist GAME=Stellar7` at the repository root;
 `game.sh` hands it to `tools/package_release.py`). It forces fresh non-VERIFY builds,
-then creates `dist/Stellar7_<commit>_experimental_install.lha` at the repository root
-with an adjacent SHA-256 file and content-validation report. Uncommitted changes in
-this game's directory label the name as dirty.
-This is a commit-labelled experimental snapshot, not a new stable release
-version or completion of step 6.
+then creates `dist/Stellar7Enhanced-<version>-<YYYYMMDD>.lha` at the repository root
+with an adjacent `.sha256`. The version and date come from the release slaves' `$VER`
+strings (`$VER: <installed name> 2.0b (05.11.2026)`, each named as the installer ships it:
+`Stellar7.slave`, `Stellar7-Sim68000.Slave`, `Stellar7-Sim60.Slave`); all three must agree.
+The string ends the code hunk, so it is the only byte change from the builds the evidence
+in this document was recorded with. Release 2.0b does not complete step 6: the ReadMe
+lists the open playtesting.
 
 Packaging starts with a fresh extraction of `tmp/archives/Stellar7.lha`. It replaces the
-normal slave, ReadMe and Install-Stellar7 script, adds the two CPU-specific
+normal slave, ReadMe (its `Short:` line and title read "Stellar 7 Enhanced", with a
+version 2.0b history entry above Psygore's) and Install-Stellar7 script, adds the two CPU-specific
 simulation slaves, and preserves all eleven other original members exactly.
 The installer targets English NTSC disks and offers 15 Hz for 68000/68010,
 60 Hz for 68020+, or original timing through the reconstructed development
@@ -59,7 +62,7 @@ options, checks both simulation labels and statically validates Installer
 expression balance and procedure references. The changed Installer choice UI
 has not been exercised under Amiga Installer; these checks establish package
 contents, not end-to-end installation. Temporary extraction drawers are removed
-automatically. The final archive, checksum, report and small build log remain.
+automatically. The final archive, checksum and small build log (`tmp/dist-build.log`) remain.
 
 ## Scratch retention
 

@@ -217,7 +217,9 @@ waves remain open. Natural
 combat death, Continue and No/menu/new-game pass at both rates after
 fixture-controlled earlier exits to level 6. Evidence is retained under
 `tmp/release60`; completed step-5 measurements remain the current performance
-reference. The normal loader still excludes SIM60.
+reference. The normal loader still excludes SIM60. Release 2.0b (05.11.2026), `make dist`'s
+`Stellar7Enhanced-2.0b-20261105.lha`, packages the current builds; it does not complete
+step 6.
 
 Completion requires the following evidence on both selected paths:
 
