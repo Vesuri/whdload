@@ -1,8 +1,8 @@
-Legends of Valour Enhanced - WHDLoad slave 1.1b (09.10.2026)
+Legends of Valour Enhanced - WHDLoad slave 2.0b (09.10.2026)
 Beta release (the b suffix signifies beta).
 Reworked by Vesuri, based on the work of CFou!
 
-Changes in 1.1b (09.10.2026)
+Changes in 2.0b (09.10.2026)
 ----------------------------
 Rendering optimizations are enabled automatically, with routines selected for
 68000/68010 or 68020 and later processors. The chunky buffer uses PUBLIC memory,

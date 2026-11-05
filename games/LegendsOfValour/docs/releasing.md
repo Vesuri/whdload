@@ -10,8 +10,8 @@ The input is the original installer, `tmp/archives/LegendsOfValour.lha` (`make u
 ARCHIVES=<directory>` copies and verifies it, `inputs.sha256`). The output, in the
 repository's ignored `dist/`, is `LegendsOfValourEnhanced-<version>-<YYYYMMDD>.lha` and its
 `.sha256`, the version and date from the release slave's `$VER` string (`version_of` and
-`date_of` of `common/tools/package_release.py`): for 1.1b,
-`LegendsOfValourEnhanced-1.1b-20261009.lha`. The preinstalled 0837 archive is an input of
+`date_of` of `common/tools/package_release.py`): for 2.0b,
+`LegendsOfValourEnhanced-2.0b-20261009.lha`. The preinstalled 0837 archive is an input of
 `make unpack` (the game data) but is not repackaged.
 
 The command rebuilds the plain release slave (`make slave` with no `VASM_EXTRA`) and checks

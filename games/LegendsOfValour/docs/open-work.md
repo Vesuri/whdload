@@ -3,8 +3,8 @@
 ## State
 
 - The slave is rebuilt from CFou!'s v1.0 disassembly on WHDLoad 20.0's kick13 example
-  (`src/`), with a VERIFY-only input tape and instruments. Release 1.1b (beta),
-  `LegendsOfValourEnhanced-1.1b-20261009.lha`, is built from the original installer by
+  (`src/`), with a VERIFY-only input tape and instruments. Release 2.0b (beta),
+  `LegendsOfValourEnhanced-2.0b-20261009.lha`, is built from the original installer by
   `make dist` (`tools/release.py`, `docs/releasing.md`).
 - W1–W6 rendering patches are always on in release builds and individually switchable in
   developer/VERIFY builds (`docs/performance-patches.md`). Spin route: 2.5 → 3.2 fps on the

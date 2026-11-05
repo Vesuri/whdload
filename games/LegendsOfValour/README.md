@@ -2,7 +2,7 @@
 
 WHDLoad slave patches for the original 1992 game from US Gold / Synthetic Dimensions.
 The slave is reconstructed from CFou!'s v1.0 disassembly using WHDLoad 20.0's KickEmu
-sources. Release **1.1b is a beta**, validated with the English game in the 0837 archive.
+sources. Release **2.0b is a beta**, validated with the English game in the 0837 archive.
 Other versions supported by the original install have not been revalidated.
 
 Release builds automatically enable the six validated rendering improvements:
@@ -101,7 +101,7 @@ sessions.
 make dist
 ```
 
-Builds `LegendsOfValourEnhanced-1.1b-20261009.lha` (version and date from the slave's `$VER`)
+Builds `LegendsOfValourEnhanced-2.0b-20261009.lha` (version and date from the slave's `$VER`)
 from the original installer in the repository's `dist/`. Only the slave, the ReadMe and the
 six game icons (`CUSTOM2=64` added to their tooltypes) are replaced; the entry list and every
 other compressed record are preserved. Packaging verifies CRCs, replacement contents and the
