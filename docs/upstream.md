@@ -9,7 +9,8 @@ Every game here improves a slave someone else made. That work stays credited and
   authors its ReadMe or slave names.
 - `UPSTREAM` records where the source came from: a repository URL, path and commit, or
   `none` when the original shipped without source and `src/` is a reconstruction.
-- The game's `AGENTS.md` and its release ReadMe name the original author. The release ReadMe keeps the original credits and history; the new entry goes above.
+- The game's `AGENTS.md` and its release ReadMe name the original author. The release
+  ReadMe keeps the original credits and history; the new entry goes above.
 - Source files taken from upstream keep their headers.
 
 ## Bringing a game in
