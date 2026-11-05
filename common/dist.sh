@@ -19,12 +19,7 @@ if has_hook game_dist; then
   exit 0
 fi
 [ -f release/release.json ] || die "no release/release.json in games/$GAME"
-slaves=()
-for v in $VARIANTS; do
-  slaves+=(--slave "$(env -u GAME_DIR -u SLAVE_FILE -u SOURCE VARIANT="$v" bash -c \
-    '. "$1/lib.sh"; load_game; printf "%s=%s\n" "$VARIANT" "$GAME_ROOT/tmp/build/release/$SLAVE_FILE"' _ "$COMMON")")
-done
 force=()
 [ "${FORCE:-0}" != 1 ] || force=(--force)
 python3 "$COMMON/tools/package_release.py" --game-root "$GAME_ROOT" --dist "$DIST" \
-  "${slaves[@]}" ${force[@]+"${force[@]}"}
+  --variants "$VARIANTS" ${force[@]+"${force[@]}"}

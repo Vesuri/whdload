@@ -10,8 +10,8 @@ make record           # write release/slaves.sha256 from the current release bui
 make clean
 ```
 
-Every build goes to `tmp/build/<BUILD>/`: the slave (`SLAVE_FILE`), its listing
-(`<Variant>.lst`) and `<Variant>.deps`, the game files it was assembled from, which the
+Every build goes to `tmp/build/<BUILD>/`: the slave (`<Variant>.Slave`; a run copies it
+into the game drawer as `SLAVE_FILE`), its listing (`<Variant>.lst`) and `<Variant>.deps`, the game files it was assembled from, which the
 release packager uses for the shipped source. Without `VARIANT` every variant is built.
 
 The default build assembles `SOURCE` with vasm against the shared WHDLoad 20.1 tree:
@@ -24,7 +24,7 @@ $VASM $VASM_FLAGS $DEFINES $DEFINES_<BUILD> -Isrc [-I<INCLUDES>] \
 `VASM_FLAGS` defaults to `-m68000 -x -devpac -Fhunkexe -nosym`. The build defines are
 none for `release`, `-DVERIFY=1` for `verify` and `-DDEVELOPER=1` for `developer`; a game
 sets `DEFINES_<BUILD>` to change one or add a build. A game whose build is more than one
-vasm call defines `game_build BUILD OUT` in `game.sh`.
+vasm call defines `game_build BUILD OUT` in `game.sh`, leaving `OUT/<Variant>.Slave`.
 
 ## Conventions
 

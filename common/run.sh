@@ -80,7 +80,7 @@ case "${SLAVE:-}" in
   '')
     BUILD="${BUILD:-release}"
     if [ "${NOBUILD:-0}" != 1 ]; then VARIANT="$VARIANT" "$COMMON/build.sh" "$BUILD"; fi
-    RUN_SLAVE="$GAME_ROOT/tmp/build/$BUILD/$SLAVE_FILE"
+    RUN_SLAVE="$GAME_ROOT/tmp/build/$BUILD/$VARIANT.Slave"
     ;;
   *) RUN_SLAVE="$(caller_path "$SLAVE")" ;;
 esac

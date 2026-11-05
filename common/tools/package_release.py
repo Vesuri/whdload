@@ -70,11 +70,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--game-root', required=True, type=Path)
     ap.add_argument('--dist', required=True, type=Path)
-    ap.add_argument('--slave', action='append', default=[], metavar='VARIANT=PATH')
+    ap.add_argument('--variants', required=True, help="the game's VARIANTS")
     ap.add_argument('--force', action='store_true', help='replace an existing dist file')
     args = ap.parse_args()
     root = args.game_root.resolve()
-    slaves = dict(s.split('=', 1) for s in args.slave)
+    variants = args.variants.split()
     spec = json.loads((root / 'release/release.json').read_text())
     build = root / 'tmp/build/release'
     args.dist.mkdir(parents=True, exist_ok=True)
@@ -82,9 +82,9 @@ def main():
     def source_of(value):
         if value.startswith('build:'):
             variant = value[len('build:'):]
-            if variant not in slaves:
-                sys.exit(f'unknown variant {variant}; VARIANTS has {", ".join(slaves)}')
-            return Path(slaves[variant])
+            if variant not in variants:
+                sys.exit(f'unknown variant {variant}; VARIANTS has {", ".join(variants)}')
+            return build / f'{variant}.Slave'
         path = root / value
         if not path.is_file():
             sys.exit(f'no {value}')

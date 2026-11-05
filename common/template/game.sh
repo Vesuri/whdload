@@ -2,7 +2,7 @@
 # game.conf and the shared environment by every common/ script. Delete what is unused,
 # or the whole file.
 #
-# game_build BUILD OUT     replace the vasm build; leave OUT/$SLAVE_FILE and OUT/$VARIANT.deps
+# game_build BUILD OUT     replace the vasm build; leave OUT/$VARIANT.Slave and OUT/$VARIANT.deps
 # game_prepare             before a run builds or boots (set SLAVE, FSUAE, AMIGA_SETUP, ...)
 # game_drives DH0 DH1      add to or change the boot drives
 # game_setup               edit FSUAE_SETUP_ARGS after the named machine is applied

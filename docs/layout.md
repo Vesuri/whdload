@@ -47,7 +47,7 @@ The caller's environment (make command-line variables included) beats every valu
 | `TITLE` | the game's name |
 | `AUTHOR`, `UPSTREAM` | the original slave's credited maintainer or authors, and its source ([upstream](upstream.md)) |
 | `VARIANTS` | the slaves in the package, by base name; the first is the default |
-| `GAME_DIR`, `SLAVE_FILE`, `SOURCE` | installed drawer under `tmp/game/`, slave file name, main source (defaults `$VARIANT`, `$VARIANT.Slave`, `src/$VARIANT.s`) |
+| `GAME_DIR`, `SLAVE_FILE`, `SOURCE` | installed drawer under `tmp/game/`, the slave's file name in it, main source (defaults `$VARIANT`, `$VARIANT.Slave`, `src/$VARIANT.s`). Variants may share a drawer and `SLAVE_FILE` |
 | `VASM_FLAGS`, `INCLUDES`, `DEFINES`, `DEFINES_<BUILD>` | the build ([building](building.md)) |
 | `KICKS`, `SETUP`, `SETUPS`, `WHD_DEFAULTS`, `JOY0`, `JOY1`, `NTSC`, machine variables | the run ([running](running.md)) |
 
