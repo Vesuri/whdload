@@ -451,8 +451,12 @@ startup log, so simultaneous project boots can contaminate the copied frontend
 `cpu =` / `ntsc_mode =` header. That header is not authoritative runtime evidence.
 PAL defaults and an omitted disabled MMU are checked with the serializer's
 conventions rather than treated as missing enabled settings.
-The driver passes CUSTOM1/CUSTOM3 only for SIM60; `fixed_window.py` supplies
-CUSTOM5. Measurements and exact binaries/listings remain in `tmp/`.
+The driver passes CUSTOM1/CUSTOM3 only for SIM60; `fixed_window.py` prepends
+CUSTOM5=1 itself. Passing CUSTOM5 in `WHD_ARGS` as well duplicates the argument:
+AmigaDOS stops at a "wrong number of arguments" prompt and the driver reports
+"game/SIM60 patch did not become ready". Use `WHD_ARGS='CUSTOM1=1 CUSTOM3=1'` and
+diagnose such a failure from a screenshot, not the log. Reports and exact built
+slaves remain in `tmp/`; raw captures and listings are pruned (Scratch retention).
 
 
 ### Fast-CPU and extended-combat instruments
