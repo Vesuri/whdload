@@ -15,10 +15,87 @@
   icon instead); decide the version, date and icon default then.
 - **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
   FR1–FR6 done. FR6 (2026-11-05): 030-50 BCE 35.8 FPS against 24.6 native, 040-40 BCE 22.0
-  against 24.5. Next: the per-blit overhead and the cookie-cut loop on the 040, then FR7
-  (publish copy) and FR8 (pacing); FR0h is still open. FR builds need 1 MiB ExpMem and do
-  not boot on the 512 KiB A500 or the chip-only A1200.
+  against 24.5. The work concentrates on the 68030 (below); FR0h is still open. FR builds
+  need 1 MiB ExpMem and do not boot on the 512 KiB A500 or the chip-only A1200.
 - Human playtesting (full races) and real Amiga hardware remain deferred.
+
+## Fast RAM rendering: continuing
+
+The user's decisions (2026-11-05): concentrate on the 68030 and leave the 68040 for now;
+30–38 FPS on the 030 is a good result. The 040 is slower than the 030 on this path (FR5
+already showed it: 161 against 94 ms per draw, road 67 against 24 ms), the cause is not
+known and it has not been profiled since FR5, so no 040 figure follows from an 030 one.
+Commit each FR step when its gates pass; push only when asked. Production stays the
+`597a74b9…` slave with DEBUG off and ExpMem `$c0000`; the 1 MiB ExpMem is only for
+`FF1_FAST_RENDER` builds and the release memory scheme is undecided. The hunks already load
+into Fast memory (FASTRAM_PLAN "Code and data placement check"); that needs no new look.
+The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory checks.
+
+The final FR6 build is k5 (`8ec61e11…`); `tmp/manifest/fr6-validation.json` holds the FPS
+of k1–k5, the gates and the trace shares, and `tmp/logs/fr6-*.log` the gate, FPS and
+profile logs. Next, in order:
+
+1. Profile k5 on the 030 (`tools/fr6_trace.sh k5`). The k4 shares: per-blit overhead
+   (FRTranslate, FRSpan, FRMarkSpan, FRKSetup and FF1FastRenderSize's register saves)
+   22 %, the ABCD `$CA` cookie-cut 13.7 %, lines 10 %, publish 8.7 %, fill 6.6 %. Ideas:
+   fewer `movem` saves on the per-blit path, translate and span merged, the cookie-cut with
+   the colour expansion merged so it skips the scratch (FR6 item 1), the cockpit cookie-cut
+   from precomputed word runs (FR6 item 5).
+2. FR7: copy only the dirty or displayed rows, compared with a mirror.
+3. FR8: pacing.
+
+Commands, from this directory after `. ../../common/env.sh`, one emulator job at a time
+(they share gdb port 2573):
+
+```sh
+python3 tools/fr2_unicorn.py 68020   # and 68030, 68040, after any kernel change:
+                                     # "cases 4479 mismatches 0 kernel cases 3162"
+python3 tools/fr6_build.py TAG       # tmp/build/fr6-production (asserts 597a74b9) and fr6-TAG
+H5_BUILD=$PWD/tmp/build/fr6-TAG C1_VARIANT=fr6-TAG python3 tools/test_h5_fps.py 030-50-bce
+                                     # 300 intervals, warp off; grep "'fps':"
+FF1_FINE_DEFINES=FF1_FAST_RENDER=1 python3 tools/ff1_gates.py --build tmp/build/fr6-TAG \
+  --tag TAG frames/normal frames/grid timing/elapsed
+FR4_BUILD=tmp/build/fr6-TAG FR4_TAG=-TAG \
+  RELEASE_WHD_ARGS='CUSTOM1=0 CUSTOM2=1 ConfigDelay=0 NoWriteCache' \
+  python3 tools/fr4_probe.py 030-50-bce 300
+                                     # tmp/step5/fr4-probe-030-50-bce-TAG/result.json
+                                     # stats_after: fr4.faults, fr4.hard, fr5
+python3 tools/ff1check.py run smoke --build tmp/build/fr6-TAG \
+  --profiles 030-50-bce,040-40-bce,a1200-fast,a500-fast
+python3 tools/ff1check.py run mmu --build tmp/build/fr6-TAG --profiles 030-50  # then 040-40
+python3 tools/ff1check.py run route modal --build tmp/build/fr6-TAG \
+  --profiles 030-50-bce,040-40-bce,a1200-fast
+python3 tools/ff1check.py run controls --build tmp/build/fr6-TAG \
+  --profiles a1200-fast,030-50-bce,040-40-bce
+tools/fr6_trace.sh TAG               # 68EC030, 60 fields, cost per routine
+python3 tools/fr6_sites.py tmp/step5/hi25-profile-030-50-bce-fr6-prof-TAG DRAWS
+```
+
+Pitfalls:
+
+- `ff1_gates.py` builds its frame fixtures from the working tree with the environment;
+  without `FF1_FINE_DEFINES=FF1_FAST_RENDER=1` it silently tests the non-FR path (FR5a/b
+  were invalid this way). Check with `grep FF1FastRenderPrefix:` in
+  `tmp/build/render-TAG-matched-stable-frames/fine/fine.list`.
+- Give `ff1check.py` explicit `--profiles` on FR builds: the defaults include the A500 and
+  chip-only A1200, which fail (smoke: `assert len(hits)==1, []`, no `FF1B7PUBLICROOT`).
+- The first `mmu` run of a sequence sometimes fails after 3 s with `FileNotFoundError` on
+  `memory.bin` (the gdb dump did not land), on either CPU; a rerun passes. Harness, not game.
+- The fine payload is position-independent: address all payload data `(pc)`-relative
+  (`lea X(pc),aN` before a store). An absolute reference assembles and silently hits low
+  Chip memory (k1 rebuilt its fill table every blit this way).
+- vasm: define a macro before its use; a local label (`.x`) does not survive a global
+  label in between; references like `FRBFast\.none` fail.
+- Kernels must leave FastRenderBlit's end state exactly: pointers, ADAT/BDAT/CDAT the last
+  raw word, BHOLD the last shifted B, BOLD the last raw B or 0, and the line ASH/BSH/SIGN.
+  `fr2_unicorn.py` checks it (it sets `uc_ctl`'s argtypes, needed on arm64).
+- The owned shadows (FRMarkSpan, reads untracked) hold only because nothing else writes
+  the banks while driving (FR1) and the full arm publishes every dirty row each draw;
+  partial arms keep the FR5 tracking. A new writer outside the redirection breaks this
+  silently. The probe's `rows_refreshed=0` is expected.
+- FPS runs use warp off (`test_h5_fps.py` switches it off); smokes run with `WARP=1`.
+  Trace milliseconds read about 1.5–1.9× high: compare shares only.
+- 040 controls pass at k5 but the test stays frame-rate sensitive (FASTRAM_PLAN FR5c–f).
 
 The evidence (measurement and validation JSON, `tmp/manifest/`, with `project.json` as the
 index) and the captures (`tmp/step5/`, ...) are local and ignored. `tmp/step5-frame-observer-build/`
