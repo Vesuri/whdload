@@ -2,7 +2,7 @@
   "archives": [
     {
       "input": "TestDrive.lha",
-      "output": "TestDrive-{version}.lha",
+      "output": "TestDriveEnhanced-{version}-{date}.lha",
       "replace": {
         "TestDriveInstall/TestDrive.slave": "build:TestDrive",
         "TestDriveInstall/readme": "release/readme",

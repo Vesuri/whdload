@@ -21,7 +21,8 @@ from the original archive), but JOTD has not released it, so the release is made
    fixed 1.5b versus rebuilt repository 1.4 in `tmp/dist/overlay-cache-ab/` and its
    zip. Include a player race and native quit; record CPU/cache/MMU and WHDLoad
    settings. Public archives contain 1.3, not a shipped 1.4 baseline.
-3. Release: `make dist` gives the installer archive; publishing it is a separate step
+3. Release: `make dist` gives the installer archive, `TestDriveEnhanced-2.0b-20261013.lha`
+   ("Test Drive Enhanced 2.0b (13.10.2026)"); publishing it is a separate step
    (the repository's `docs/releasing.md`).
 4. NTSC timing is unvalidated; do not extend PAL acceptance claims to it.
 5. Investigate the intermittent post-crash steering-dot displacement report.
