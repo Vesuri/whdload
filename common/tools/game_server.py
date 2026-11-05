@@ -15,6 +15,8 @@ A game's tool (games/<Game>/tools/<game>.py):
     python3 tools/tfh.py serve        boot (common/run.sh with DEBUG=1), attach gdb, listen
     python3 tools/tfh.py shot x.png   one command to the running server
 
+A game that extends the server passes its subclass: game_server('hd', server_class=HardDrivin).
+
 The run options of common/run.sh (SETUP, VARIANT, BUILD, SLAVE, WHD_ARGS, INSTANCE, ...)
 apply to `serve` through the environment. The socket and the run directory are the
 instance's, so instances are served side by side.
@@ -44,7 +46,7 @@ def game_root():
 SOCKET_PATH_MAX = 100
 
 
-def game_server(name, **kwargs):
+def game_server(name, server_class=Server, **kwargs):
     root = game_root()
     os.environ['GAME'] = root.name
     instance = os.environ.get('INSTANCE') or 'default'
@@ -58,5 +60,5 @@ def game_server(name, **kwargs):
             if len(sock) > SOCKET_PATH_MAX:
                 sys.exit(f'socket path too long even relative to {os.getcwd()}: run from the game directory')
         kwargs['sock'] = sock
-    return Server(name, root=str(root), run_script=str(COMMON / 'run.sh'),
-                  run_dir=run_dir, **kwargs)
+    return server_class(name, root=str(root), run_script=str(COMMON / 'run.sh'),
+                        run_dir=run_dir, **kwargs)
