@@ -1,0 +1,6 @@
+# Local C2 instrument inputs; rebuild provenance is in docs/development.md.
+fs-uae	432c44f7a9b59dd0454727851faecd413a308f5e557da42af0772ade61e764d6
+src/newcpu.cpp	aa7c24253fae5b139c0074667512fc9f6fc58b71ec2d6101e345208c1197139f
+src/wc_ocs_observer.inc	6b7690dd5c85233e0c8ae2f4401c0e12cce451fb4c05f818393559f7080e3c1a
+src/custom.cpp	72a9cd7794dc7ce77ddd17a32e746e49a5e35056d0cd489dcc3686e08ece64fe
+src/barto_gdbserver.cpp	e83b38bacd17ece3e305ce3684ffe7b3f6bf654353d7bd44772de0d38c2ef83a
