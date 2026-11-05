@@ -16,10 +16,10 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 |---|---|---|
 | 4D Sports Driving Enhanced | JOTD | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/4DSportsDrivingEnhanced-2.0b-20261013) |
 | Formula One Grand Prix Enhanced | Codetapper | [2.0b (02.11.2026)](https://github.com/Vesuri/whdload/releases/tag/FormulaOneGrandPrixEnhanced-2.0b-20261102) |
-| Grand Prix Circuit Enhanced | JOTD | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/GrandPrixCircuitEnhanced-2.0b-20261013) |
+| Grand Prix Circuit Enhanced | JOTD | [2.0b (14.10.2026)](https://github.com/Vesuri/whdload/releases/tag/GrandPrixCircuitEnhanced-2.0b-20261014) |
 | Gunship Enhanced | JOTD | not yet released |
 | Hard Drivin' Enhanced | JOTD | not yet released |
-| Indianapolis 500 Enhanced | StingRay | [3.1b (10.10.2026)](https://github.com/Vesuri/whdload/releases/tag/Indianapolis500Enhanced-3.1b-20261010) |
+| Indianapolis 500 Enhanced | StingRay | [4.0b (10.10.2026)](https://github.com/Vesuri/whdload/releases/tag/Indianapolis500Enhanced-4.0b-20261010) |
 | Legends of Valour Enhanced | CFou! | not yet released |
 | Mercenary 3 Enhanced | Harry, Graham and Wepl | [2.0b (04.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Mercenary3Enhanced-2.0b-20261104) |
 | Red Baron Enhanced | JOTD | [3.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/RedBaronEnhanced-3.0b-20261013) |
