@@ -1,5 +1,5 @@
 
- Indianapolis 500 Enhanced 3.1b (10.10.2026)
+ Indianapolis 500 Enhanced 4.0b (10.10.2026)
 
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
@@ -38,7 +38,7 @@
 
  High frame rate support:
  ------------------------
- Version 3.1b is a beta contribution by Vesuri, based on StingRay's v3.0.
+ Version 4.0b is a beta contribution by Vesuri, based on StingRay's v3.0.
 
  The installer sets CUSTOM1=1 in the game icon, so the option is on in a
  new installation; CUSTOM1=0 (or unselecting "High frame rate support" in
@@ -67,7 +67,7 @@
 
  History:
  --------
- version 3.1b (10/10/2026), high frame rate support by Vesuri:
+ version 4.0b (10/10/2026), high frame rate support by Vesuri:
  - high frame rate support (CUSTOM1=1), enabled in the installed icon
  - 68020+ and Fast RAM required; original behavior on other machines
  - smooth driving motion and CPU drawing optimizations

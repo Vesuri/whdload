@@ -32,7 +32,7 @@ The current state is in [slave.md](slave.md). These items are open, most importa
   installer sets `CUSTOM1=1` in the game icon (profiling.md "Release"). The changed installer
   branch has not been executed in the Amiga Installer yet; run an installation from the
   original disk and read back the game icon's tooltypes. To decide: what happens to the pull
-  request and the final version (3.1 or keep 3.1b).
+  request. The release here is 4.0b (10.10.2026).
 
 ## Not pursued
 
