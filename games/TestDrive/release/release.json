@@ -1,0 +1,17 @@
+{
+  "archives": [
+    {
+      "input": "TestDrive.lha",
+      "output": "TestDriveEnhanced-{version}-{date}.lha",
+      "replace": {
+        "TestDriveInstall/TestDrive.slave": "build:TestDrive",
+        "TestDriveInstall/readme": "release/readme",
+        "TestDriveInstall/Install": "release/Install",
+        "TestDriveInstall/TestDrive.inf": "release/TestDrive.inf"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "TestDriveInstall/source", "variants": ["TestDrive"]}
+    }
+  ]
+}

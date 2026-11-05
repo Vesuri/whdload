@@ -1,0 +1,16 @@
+{
+  "commit": "9f179524215b6d91d1631f21c993929cb3469d07",
+  "version": "2.0b (13.10.2026)",
+  "files": {
+    "tmp/dev/dist/2.0b/TestDrive.slave": "6987a32ba7854629b136428650fa40620d7eccfe29539872d180d5c21ad1b30f",
+    "T/TestDrive/usr/source/render.s": "861f32c9eb2975231556e414d219b7937132c6519008b3ab958079381455e9dd",
+    "T/TestDrive/usr/source/render-patches.i": "f8acec74d0c8a2c74f9898bbc4f664cf0b5975273e3085cdd4c1b12d4a777af0",
+    "T/TestDrive/usr/readme": "27178fe460482796496b79979ff3a8ba54ffb6bf18662612e2faf95d9e54e06c"
+  },
+  "native_geometry": "tmp/corner-jump/geometry-regression.json",
+  "native_before_after": "tmp/corner-jump/native-before-after.json",
+  "cost_exception": "tmp/corner-jump/cost-comparison.json",
+  "release_manifest": "dist/2.0b/manifest.json",
+  "hardware": "deferred",
+  "pushed": false
+}

@@ -1,0 +1,21 @@
+{
+  "slave_sha256": "d1b3a400a7a20bb7d78ee9745b815351fee6373f552a536b311076df6046fb07",
+  "runtime_manifest_sha256": "cefaf5243f2c4c27a3e18c30708007ad3c086512efcdf218106dd6ad29732fe2",
+  "anchor_hunk": "h4",
+  "anchor_offset": 246,
+  "presets": {
+    "a500": {
+      "h4": 124232,
+      "evidence": "tmp/phase4/base-a500-1/capture.json"
+    },
+    "a1200": {
+      "h4": 124232,
+      "evidence": "tmp/phase4/base-a1200-1/capture.json"
+    },
+    "a1200-030": {
+      "h4": 124232,
+      "evidence": "tmp/phase4/base-a1200-030-1/capture.json"
+    }
+  },
+  "whd_args": "CUSTOM3=1"
+}

@@ -1,0 +1,11 @@
+{
+  "sha256": "3627080a0932fac3c546edf67c611b6fba57cdf1355a08868732606bd82e1c27",
+  "source_commit": "b70b1180b44ab25b97cd66466c70879897d8a362",
+  "source_patch_sha256": "6faecfcfba349498acc22f97fcdda9f180c4aa94a8e65cc8e21cb9a9af7a2db4",
+  "origin": "4D Sports Driving private contact-write diagnostic build",
+  "profile_window": [
+    0,
+    16777216
+  ],
+  "input": "monitor key rawhex 0|1; monitor fields 1..6000"
+}
