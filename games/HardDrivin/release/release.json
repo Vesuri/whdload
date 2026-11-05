@@ -2,7 +2,7 @@
   "archives": [
     {
       "input": "HardDrivin.lha",
-      "output": "HardDrivin-{version}.lha",
+      "output": "HardDrivinEnhanced-{version}-{date}.lha",
       "replace": {
         "HardDrivinInstall/HardDrivin.slave": "build:HardDrivin",
         "HardDrivinInstall/ReadMe": "release/ReadMe",
