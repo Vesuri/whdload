@@ -141,30 +141,13 @@ The test environment uses the shared WHDLoad installation and user-supplied
 Kickstart 1.3 image/RTB. It does not establish compatibility with every WHDLoad or
 host OS version. Never include those dependencies in a game archive.
 
-## Proposed preinstalled archive
+## Release archive
 
-Prepare a separate local `WingCommander_OCS_candidate.lha` under `tmp/` when
-packaging is requested. It must not replace the CD32 archive or claim to be a
-final version 2.0b release. Keep the tested candidate's existing embedded metadata
-unchanged until release metadata is deliberately reviewed.
-
-Proposed contents:
-
-- `WingCommanderOCS/` with only the verified OCS archive's game data, original
-  documentation/credits and OCS icon adapted to that drawer.
-- `WingCommander.Slave` as the public-option candidate, its generated enabled launch icon,
-  and an optional original reconstruction for binary rollback. The checkbox
-  already provides original behaviour without selecting another slave.
-- An OCS-specific `ReadMe` with the identity, options, RAM floor, measured limits,
-  fallback and rollback instructions above; preserve Psygore and Kalms credits.
-- A candidate manifest with source commit, build arguments, slave hashes and
-  archive hash recorded outside the archive. No test saves or personal pilot data.
-
-Share archive creation, icon handling, checksums and round-trip verification
-machinery with CD32 where practical, parameterised by variant. Keep distinct
-input pins, asset trees, slave names, icons and ReadMes. The existing
-[`release/ReadMe`](../release/ReadMe) is CD32-only and must not be copied as OCS
-instructions. No new packager or archive is required for this proposal gate.
+The OCS slave ships only in the combined installer archive,
+`WingCommanderEnhanced-<version>-<YYYYMMDD>.lha` (`make dist`,
+[development](development.md)), as `WingCommanderECS.slave`; its Install script
+writes `CUSTOM5=1` and `DCACHE` into the OCS game icon. No preinstalled archive
+is made: a release never carries game data.
 
 ## Later release checklist
 

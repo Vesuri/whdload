@@ -5342,15 +5342,13 @@ The release archive retains the pinned `WingCommander.lha` member list exactly,
 including `WingCommanderHD.info` and the original installer/slave filenames.
 Only `Install-WingCommander`, `ReadMe`, `WingCommanderCD32.slave` and
 `WingCommanderECS.slave` are replaced. The staging report is a sibling JSON file,
-not an archive member. From a fresh staged output directory, package with:
-
-```sh
-"$LHA" a1o5q2 ../WingCommander-2.0b.lha WingCommanderHD.info WingCommanderHD
-"$LHA" t ../WingCommander-2.0b.lha
-```
-
-Extract the archive into a separate fresh directory and compare every file hash
-and relative filename with the staging report before handing it off.
+not an archive member. `make dist` (`game_dist` in `game.sh`) packs the staged
+output as `dist/WingCommanderEnhanced-<version>-<YYYYMMDD>.lha`, the version and
+date taken from the CD32 slave's `$VER`, requires the ReadMe's
+"Wing Commander Enhanced <version> (<date>)" line, re-extracts the archive and
+compares every file hash and relative filename with the staging report, then
+writes the `.sha256`. This combined installer is the only release archive; no
+preinstalled archive is made.
 
 ## Runtime workspaces in public slaves
 

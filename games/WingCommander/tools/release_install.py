@@ -37,6 +37,7 @@ def main():
     readme=(ROOT/'release/ReadMe').read_bytes()
     assert readme==(ROOT/'release/ReadMe.OCS').read_bytes()
     assert b'Version 2.0b (19.10.2026)' in readme and b'Version 1.0 (11.01.2014)' in readme
+    assert b'\n Wing Commander Enhanced 2.0b (19.10.2026)\n' in readme
     assert 'QuickDocED' not in script
     for variant,build,name in [('cd32',a.cd32,'WingCommanderCD32'),('ocs',a.ocs,'WingCommander')]:
         meta=json.loads((build/'build.json').read_text());slave=(build/(name+'.Slave')).read_bytes()

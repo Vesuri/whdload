@@ -210,13 +210,25 @@ game_setup() {
   fi
 }
 
-# The installer archive: Psygore's installer with the new Install script, ReadMe and both
-# release slaves (tools/release_install.py stages and checks it), packed with LHa.
+# The installer archive, WingCommanderEnhanced-<version>-<YYYYMMDD>.lha and its .sha256:
+# Psygore's installer with the new Install script, ReadMe and both release slaves
+# (tools/release_install.py stages and checks it), packed with LHa. The version and date
+# come from the first release slave's $VER (common/tools/package_release.py).
 game_dist() {
-  local dist="$1" version stage archive
-  version="$(sed -n 's/^ *Version \([^ ]*\) (.*/\1/p' "$GAME_ROOT/release/ReadMe" | head -1)"
-  [ -n "$version" ] || die "no version in release/ReadMe"
-  archive="$dist/WingCommander-$version.lha"
+  local dist="$1" vd version date dmy stage archive
+  vd="$(python3 -I -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from package_release import version_of, date_of
+slave = Path(sys.argv[2])
+print(version_of(slave), date_of(slave))
+' "$COMMON/tools" "$GAME_ROOT/tmp/build/release/${VARIANTS%% *}.Slave")" || die "no version in the release slave"
+  version="${vd% *}" date="${vd#* }"
+  dmy="${date:6:2}.${date:4:2}.${date:0:4}"
+  grep -q "^ Wing Commander Enhanced $version ($dmy)\$" "$GAME_ROOT/release/ReadMe" ||
+    die "release/ReadMe has no \"Wing Commander Enhanced $version ($dmy)\" line"
+  archive="$dist/WingCommanderEnhanced-$version-$date.lha"
   if [ -e "$archive" ] && [ "${FORCE:-0}" != 1 ]; then die "$archive exists (FORCE=1 replaces it)"; fi
   stage="$GAME_ROOT/tmp/dist/package"
   rm -rf "$GAME_ROOT/tmp/dist"
@@ -242,6 +254,7 @@ if got != expected:
 print(f'{archive}: {len(got)} files verified against the staging report')
 PY
     { rm -f "$archive"; die "$archive failed its check"; }
+  (cd "$dist" && shasum -a 256 "${archive##*/}" > "${archive##*/}.sha256")
 }
 
 # The quick unit tests: the reconstructions still give the original slaves, and the
