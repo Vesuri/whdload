@@ -33,6 +33,7 @@ case "${1:-}" in
       env -u GAME_DIR -u SLAVE_FILE -u SOURCE VARIANT="$v" "$COMMON/build.sh" release > /dev/null
     done
     if [ "$1" = record ]; then
+      mkdir -p release
       (cd tmp/build/release && for v in $VARIANTS; do shasum -a 256 "$v.Slave"; done) > "$sums"
       echo "recorded games/$GAME/$sums"
       exit 0

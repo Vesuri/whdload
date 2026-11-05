@@ -3,8 +3,9 @@
 #   common/build.sh [BUILD]        BUILD: release (default), verify, developer or any name
 #                                  the game defines; VARIANT=name builds only that slave
 #   common/build.sh clean          remove tmp/build/
-# Output: games/<Game>/tmp/build/<BUILD>/<Variant>.Slave, with its listing (.lst) and the
-# source files it was assembled from (.deps, one path per line, relative to the game).
+# Output: games/<Game>/tmp/build/<BUILD>/<Variant>.Slave, with its listing (.lst), vasm's
+# messages (.log) and the source files it was assembled from (.deps, one path per line,
+# relative to the game).
 # The run copies it into the game drawer as SLAVE_FILE.
 #
 # The default build assembles $SOURCE with vasm. game.conf adjusts it with
@@ -13,6 +14,7 @@
 #   DEFINES          defines for every build, e.g. "-DFOO=1"
 #   DEFINES_<BUILD>  defines for one build; the defaults are none for release,
 #                    -DVERIFY=1 for verify and -DDEVELOPER=1 for developer
+# and the caller adds flags for one build with VASM_EXTRA (e.g. "-DFOO=2 -L tmp/x.lst").
 # A game with its own build defines game_build BUILD OUT in game.sh, which must leave
 # OUT/$VARIANT.Slave for the selected VARIANT (and should write OUT/$VARIANT.deps).
 set -euo pipefail
@@ -32,7 +34,7 @@ build_one() {
   if has_hook game_build; then
     game_build "$BUILD" "$OUT"
   else
-    local defines flags inc incs=() d
+    local defines flags inc incs=() d listing
     case "$BUILD" in
       release) defines="${DEFINES_release-}" ;;
       verify) defines="${DEFINES_verify--DVERIFY=1}" ;;
@@ -44,14 +46,23 @@ build_one() {
     incs=(-I"$GAME_ROOT/src")
     for inc in ${INCLUDES:-}; do incs+=(-I"$GAME_ROOT/$inc"); done
     incs+=(-I"$AMIGA_INCLUDE" -I"$WHDLOAD/Include" -I"$WHDLOAD/Src/sources" -I"$NDK")
+    # The listing goes beside the slave unless the defines ask for one elsewhere (-L file).
+    listing=(-L "$OUT/$VARIANT.lst")
+    defines="$defines ${VASM_EXTRA:-}"
+    case " ${DEFINES:-} $defines " in *" -L "*) listing=() ;; esac
     # shellcheck disable=SC2086  # flag lists are word-split on purpose
-    "$VASM" $flags ${DEFINES:-} $defines "${incs[@]}" -quiet \
-      -o "$OUT/$VARIANT.Slave" -L "$OUT/$VARIANT.lst" "$SOURCE"
+    # vasm's messages go to <Variant>.log, and to the terminal only when the build fails.
+    if ! "$VASM" $flags ${DEFINES:-} $defines "${incs[@]}" -quiet \
+        -o "$OUT/$VARIANT.Slave" ${listing[@]+"${listing[@]}"} "$SOURCE" > "$OUT/$VARIANT.log" 2>&1; then
+      cat "$OUT/$VARIANT.log" >&2
+      rm -f "$OUT/$VARIANT.Slave"
+      die "the $BUILD build of $VARIANT failed (tmp/build/$BUILD/$VARIANT.log)"
+    fi
     # The files the slave is made of, for the release archive's source (common/tools/
     # package_release.py). vasm lists every include it opened; keep the game's own.
     # shellcheck disable=SC2086
     "$VASM" $flags ${DEFINES:-} $defines "${incs[@]}" -quiet -depend=list \
-      -o "$OUT/$VARIANT.Slave" "$SOURCE" |
+      -o "$OUT/$VARIANT.Slave" "$SOURCE" 2>/dev/null |
       while IFS= read -r d; do
         case "$d" in "$GAME_ROOT"/*) d="${d#"$GAME_ROOT"/}" ;; /*) continue ;; esac
         [ -f "$d" ] && printf '%s\n' "$d"
