@@ -22,13 +22,15 @@ Driven by the game's release/release.json:
 
 - input: a file named in inputs.sha256, taken from tmp/archives/.
 - output: the file name in dist/; {version} is the release version from the first replaced
-  slave's $VER string ("$VER: Name.Slave 1.2b (date)" gives 1.2b).
+  slave's $VER string: the word before its date ("$VER: Name.Slave 1.2b (date)" and
+  "$VER: Name WHDLoad Slave 1.2b (date)" give 1.2b), else the word after a one-word name.
 - replace / add: archive member -> "build:<Variant>" (that variant's release slave) or a
   path relative to the game directory. A replaced member must exist in the original and an
   added one must not. remove: members to drop.
 - source (optional): the archive's slave source drawer. Its files are replaced by exactly
   the game's src/ files the listed variants' release builds were assembled from (the .deps
-  lists), keeping src/-relative paths. Only an archive that already ships source gets one.
+  lists), keeping src/-relative paths in the files' own spelling (an include may name a
+  file in another case). Only an archive that already ships source gets one.
 
 Checks: every replaced slave and ReadMe must differ from the original, a replaced ReadMe
 must mention the version, the archive must pass `lha t`, and its extraction must hold
@@ -60,10 +62,22 @@ def extract(archive, into):
 
 
 def version_of(slave):
-    m = re.search(rb'\$VER: \S+ (\d[^\s\x00]*)', slave.read_bytes())
+    data = slave.read_bytes()
+    m = (re.search(rb'\$VER: [^\x00\n(]*? (\d[^\s\x00]*) \(', data)
+         or re.search(rb'\$VER: \S+ (\d[^\s\x00]*)', data))
     if not m:
-        sys.exit(f'{slave}: no "$VER: <name> <version>" string')
+        sys.exit(f'{slave}: no "$VER: <name> <version> (<date>)" string')
     return m.group(1).decode('latin-1')
+
+
+def true_case(root, rel):
+    """rel (a path under root) in the spelling the directory entries have. vasm reports an
+    include as the source wrote it, which on a case-insensitive disk may differ."""
+    path = root
+    for part in Path(rel).parts:
+        names = {n.lower(): n for n in os.listdir(path)}
+        path = path / names.get(part.lower(), part)
+    return str(path.relative_to(root))
 
 
 def main():
@@ -136,6 +150,7 @@ def main():
                     if not deps.is_file():
                         sys.exit(f'no {deps.relative_to(root)}: the release build lists its sources there')
                     for dep in deps.read_text().split():
+                        dep = true_case(root, dep)
                         if not dep.startswith('src/'):
                             sys.exit(f'{variant} is built from {dep}, outside src/; ship it by hand')
                         wanted[f'{drawer}/{dep[len("src/"):]}'] = root / dep
