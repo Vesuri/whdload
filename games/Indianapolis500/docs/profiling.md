@@ -201,10 +201,14 @@ tools/profile_demo.sh                            # quick unanchored demo trace
 
 ## Release
 
-`make dist` builds the release slave and runs `tools/package_release.py` (game.sh `game_dist`):
-the SPS 0686 installed archive with `Indianapolis500/Indianapolis500.Slave` and
-`Indianapolis500/ReadMe` (`release/ReadMe`) replaced, stored, dated by the slave's version
-date, every other member copied byte for byte, written to the repository's
-`dist/Indianapolis500_v<version>_0686.lha` with its `.sha256`. It refuses a slave with
-instrument magics (`I5PV`, `I5DR`, `I5TM`) or a ReadMe without the version's history entry.
-StingRay's installer archive is not repacked.
+`make dist` builds the release slave and repacks StingRay's installer archive
+`Indianapolis500.lha` with the shared packager (`release/release.json`, the repository's
+`docs/releasing.md`) into the repository's `dist/Indianapolis500Enhanced-<version>-<date>.lha`
+with its `.sha256`; version and date come from the slave's `$VER` string. Replaced:
+`Indianapolis500_Install/Indianapolis500.slave` (the release build), `ReadMe`
+(`release/ReadMe`) and `Install` (`release/Install`, StingRay's script with one added
+`tooltype` block in `P_MakeIcons` that writes `CUSTOM1=1` into the chosen game icon). The
+`Source/` drawer holds exactly the release build's `src/` files. Every other member is the
+original's bytes. The preinstalled archive, which holds the game data, is never repacked.
+The release build assembles no instrument (`I5PV`, `I5DR`, `I5TM`); a release slave must not
+contain those magics.

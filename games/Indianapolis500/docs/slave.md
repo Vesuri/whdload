@@ -9,7 +9,7 @@
 
 | Tooltype | Splash window | Effect |
 |---|---|---|
-| `Custom1=1` | "High frame rate support (68020+ with Fast RAM)", off by default | Motion and CPU drawing, only on a 68020 or better with hunk 0 in fast RAM (not chip RAM below `$200000`, not slow RAM at `$C00000–$DFFFFF`). Elsewhere it is ignored, because both features would slow the machine down |
+| `Custom1=1` | "High frame rate support (68020+ with Fast RAM)"; off without the tooltype, on in the installed icon (the release installer writes `CUSTOM1=1`; `CUSTOM1=0` restores the original) | Motion and CPU drawing, only on a 68020 or better with hunk 0 in fast RAM (not chip RAM below `$200000`, not slow RAM at `$C00000–$DFFFFF`). Elsewhere it is ignored, because both features would slow the machine down |
 | `Custom1=4/5/6/7` | not listed (tooling) | Bit 2 = manual: bits 0 (motion) and 1 (CPU drawing) are applied on any machine. 4 = all off |
 | `Custom3=N` | not listed (VERIFY builds) | Pixel-twin fixture: 0 natural demo, 1–6 director 50/200/350/500/650/800 |
 

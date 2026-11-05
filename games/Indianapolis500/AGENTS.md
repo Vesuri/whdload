@@ -1,6 +1,7 @@
 # Indianapolis 500
 
-Optional high frame rate support (`CUSTOM1`, off by default) for the SPS 0686 Indianapolis 500
+High frame rate support (`CUSTOM1`; the slave's default is off, the installed icon sets
+`CUSTOM1=1`) for the SPS 0686 Indianapolis 500
 on a 68020+ with the game in fast memory: no 15 fps limit, smooth motion between the game's
 ticks, CPU drawing where it beats the blitter; the game logic is untouched. The original
 slave is StingRay's v3.0 from his WHDLoad patches repository (game.conf `AUTHOR`,

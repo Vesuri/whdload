@@ -27,9 +27,12 @@ The current state is in [slave.md](slave.md). These items are open, most importa
 - StingRay has passed away; no reply will come. Pull request MK1Roxxor/WHDLoad_Patches#2 is
   still open from the Vesuri fork's `indianapolis500` branch (version 3.1b, the history entry, a
   proposed ReadMe entry in the description, a greeting addressed to him).
-- This repository now carries the release: `make dist` writes the installed archive
-  (profiling.md "Release"). To decide: what happens to the pull request, the final version
-  (3.1 or keep 3.1b), whether to also ship StingRay's installer archive, and the ReadMe.
+- This repository now carries the release: `make dist` writes
+  `Indianapolis500Enhanced-<version>-<date>.lha` from StingRay's installer archive, whose
+  installer sets `CUSTOM1=1` in the game icon (profiling.md "Release"). The changed installer
+  branch has not been executed in the Amiga Installer yet; run an installation from the
+  original disk and read back the game icon's tooltypes. To decide: what happens to the pull
+  request and the final version (3.1 or keep 3.1b).
 
 ## Not pursued
 

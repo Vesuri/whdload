@@ -1,0 +1,16 @@
+{
+  "archives": [
+    {
+      "input": "Indianapolis500.lha",
+      "output": "Indianapolis500Enhanced-{version}-{date}.lha",
+      "replace": {
+        "Indianapolis500_Install/Indianapolis500.slave": "build:Indianapolis500",
+        "Indianapolis500_Install/ReadMe": "release/ReadMe",
+        "Indianapolis500_Install/Install": "release/Install"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "Indianapolis500_Install/Source", "variants": ["Indianapolis500"]}
+    }
+  ]
+}

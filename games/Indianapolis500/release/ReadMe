@@ -1,4 +1,6 @@
 
+ Indianapolis 500 Enhanced 3.1b (10.10.2026)
+
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
  PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
@@ -12,8 +14,8 @@
 
  Requirements:
  -------------
- This installed package requires WHDLoad 17 or newer in the path.
- DIC is only needed when installing from the original disks.
+ This install requires WHDLoad 17 or newer and DIC to be in the path.
+ These programs can be found in the WHDLoad package.
  To install from a different drive than DF0: select installation mode Expert.
 
  The installed game requires 0.5 MB ChipMem and 0.5 MB OtherMem
@@ -28,8 +30,7 @@
  - Interrupts fixed
  - Manual and hints included
  - Lots of icons by various authors included
- - Source code: https://github.com/Vesuri/Stingray_WHDLoad_Patches
-   (branch indianapolis500)
+ - Source code included (also on GitHub: https://github.com/Vesuri/whdload)
  - Quit option that works on 68000 machines
 
 
@@ -39,9 +40,10 @@
  ------------------------
  Version 3.1b is a beta contribution by Vesuri, based on StingRay's v3.0.
 
- Enable CUSTOM1=1 in the icon tooltypes or select "High frame rate support"
- in the WHDLoad splash window. It is off by default and requires a 68020 or
- better with the game in Fast RAM. Other machines run the original game.
+ The installer sets CUSTOM1=1 in the game icon, so the option is on in a
+ new installation; CUSTOM1=0 (or unselecting "High frame rate support" in
+ the WHDLoad splash window) restores the original game. It requires a 68020
+ or better with the game in Fast RAM. Other machines run the original game.
 
  Use the WHDLoad tooltype DCACHE (or at least CACHE) for the best speed.
  The slave leaves cache settings to WHDLoad. Example from the Shell:
@@ -55,11 +57,10 @@
  reversals can overshoot briefly. Opponents advance by their native rates.
  The demo and instant replays use interpolation.
 
- This is an already-installed package: unpack the drawer and double-click
- the game icon. The game data, icons, manual and hints are unchanged from
- the v3.0 SPS 0686 installed archive. Only the slave and this ReadMe were
- replaced. The supplied icons retain their original tooltypes; enable the
- new option in the splash window or add CUSTOM1=1 and DCACHE yourself.
+ Only the slave, its source, this ReadMe and the installer (which writes
+ CUSTOM1=1) differ from StingRay's v3.0 install package. To update an
+ existing installation, copy Indianapolis500.slave into the installed
+ drawer and add CUSTOM1=1 (and DCACHE) to the game icon.
 
  The beta has been checked in FS-UAE; real-hardware testing is outstanding.
 
@@ -67,7 +68,7 @@
  History:
  --------
  version 3.1b (10/10/2026), high frame rate support by Vesuri:
- - optional high frame rate support (CUSTOM1=1), off by default
+ - high frame rate support (CUSTOM1=1), enabled in the installed icon
  - 68020+ and Fast RAM required; original behavior on other machines
  - smooth driving motion and CPU drawing optimizations
  - smooth instant replay motion with the original transition-wipe pace
