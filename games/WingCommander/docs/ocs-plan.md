@@ -1,0 +1,388 @@
+# OCS implementation plan — P13A1–P13E3 complete
+
+The investigation and all ordered implementation items P13A1–P13E3 are complete
+within their documented gates. The [OCS candidate hand-off](ocs-release.md)
+records support, options, exact candidate hashes and the later release checklist.
+A500 heavy-scene overload and bounded model coverage remain explicit limitations.
+CD32 E1 and phase 12 remain paused. The supplied English executable is the first
+supported target; unavailable revisions and German must not inherit its patches.
+
+The subsequent public option now limits enhancements to an enabled checkbox and
+verified 68020+/true Fast hardware. 68000/68010 use original behaviour; the earlier
+A500 enhancement experiments remain evidence for that policy. See the
+[current candidate](ocs-release.md#current-public-option-candidate).
+
+## Design decisions and unresolved choices
+
+- Retain native four-plane blitter C2P as a supported candidate. Its DMA source
+  must remain in Chip RAM. Do not replace it simply because a CPU converter exists.
+- Provide a genuinely 68000-safe CPU candidate. For the CPU backend, start with
+  Kalms' four-plane word-write routine on 68000/68010 and longword-write routine
+  on 68020+. This is a candidate policy, not a measured performance result.
+- Select **blitter versus CPU** using measured CPU/memory profiles, independently
+  of the word/longword choice inside the CPU backend. A 68020 with no true Fast
+  RAM may still favour blitter conversion. The scoped C2 crossover is recorded below; unknown profiles remain unresolved.
+- Retain Chip RAM chunky storage for the blitter path. Move only audited CPU-only
+  surfaces to true Fast RAM for a CPU path. A Fast-to-Chip staging copy is a third
+  candidate only if measurements justify it; account for the entire copy.
+- Share timing, prediction, input-history semantics, ownership rules and test
+  machinery with CD32. Keep variant addresses, native ABIs, assets, loader,
+  palette/depth, hardware publication and scene definitions separate.
+- Target 10 Hz authoritative updates for OCS gameplay and its world-based intro,
+  with renderer-only extrapolation between ticks. Confirm the native OCS units
+  and event ownership before enabling it. Extra pictures depend on available CPU
+  time; there is no unmeasured 25/50 FPS promise for an Amiga 500.
+- Amiga 500 with 512 KiB Chip RAM and true Fast RAM is the required baseline.
+  Start development with a nominated 4 MiB Fast configuration, then measure and
+  document the actual minimum, including WHDLoad/preload overhead. This is a test
+  target, not a claim that the finished install fits it. Do not quietly require
+  more Chip RAM. No-Fast accelerated configurations are comparison/fallback cases,
+  not a relaxation of the required A500/Fast target.
+
+## A — Establish a trustworthy OCS baseline
+
+**P13A1 — Reconstruct the supplied OCS slave (complete).**
+Use the pinned install and installer, reconstruct into `tmp/`, and require
+byte-for-byte equality with the original 5,324-byte slave before adding hooks.
+Preserve its Kickstart 1.3, relocation, cache, language, cheat and start-mission
+behaviour. Decode all three revision selectors, but implement enhanced hooks only
+for the verified English CRC `00e8`, guarded by SHA and displaced bytes.
+Deliverable: reproducible OCS reconstruction and negative revision checks.
+Gate passed: identical original bytes; unexpected input rejected without modifying it.
+See [results and limits](internals.md#p13a1-byte-identical-ocs-reconstruction) and
+[commands](development.md#p13a1-ocs-slave-reconstruction).
+
+**P13A2 — Finish the native display and allocation contract (complete).** Depends on A1.
+Trace each QBlit phase, completion flag, source lifetime, plane pointer, row
+padding, buffer transition and direct planar writer from the offsets in the
+internals notes. Establish pixel nibble/bit order from distinct-colour fixtures
+and the native converter; do not infer it from an almost-black intro frame.
+Inventory allocation sizes, memory flags, consumers and free paths. Distinguish
+the two display buffers from the third, shared conversion workspace.
+Gate: native output is reproduced by an independent pixel oracle, and every
+DMA-read source in the display/conversion subsystem has a named owner and safe
+release point. The isolated functional gate passes 45 conversions plus
+allocation, direct-writer, publication and queue checks. See the
+[contract and explicit live gaps](internals.md#p13a2-native-display-and-allocation-contract).
+Checkerboard nibble selection is required. P13A3 confirms the four edge pixels
+and scoped native publication live; general beam deadlines and sprite teardown
+remain part of C4–C5/E2 acceptance.
+
+**P13A3 — Add the OCS launcher and live-layout discovery (complete).** Depends on A1.
+Make install selection explicit in setup, runtime inputs and launcher; keep OCS
+and CD32 files separate. Supply the A500 Kickstart/RTB through existing user-input
+conventions. Discover OCS hunks and A4 from their own signatures/relocations.
+Boot original and reconstructed slaves on a 68000/OCS machine with 512 KiB Chip
+and true Fast RAM; compare intro, menu and simulator/name-prompt endpoints.
+Gate: matching native state/pixels, working controls and project-owned cleanup.
+Gate passed: six matching state/pixel checkpoints on 68000/OCS with 512 KiB
+Chip and 4 MiB true Fast RAM, native keyboard controls, independent published
+pixel checks and project-owned cleanup. See [live evidence and limits](internals.md#p13a3-ocs-launcher-and-matched-live-baseline).
+Explicit OCS install selection is required; an A500 preset alone does not select it.
+
+**P13A4 — Measure the short native baseline (complete).** Depends on A2–A3.
+Use one repeatable intro/asteroid window and one flight/fire window, with a turn
+only if it materially changes costs. Record displayed pictures/s and interval
+percentiles, completed world updates/s, drawing, conversion submission-to-completion,
+CPU waiting, publication delay, source-change fraction and Chip/Fast high-water
+usage. Separate conversion service time from waits inserted by the native queue.
+Gate: recorder/independent display-counter agreement and observer-off state/pixel
+agreement. Label emulator results; do not borrow CD32 or sibling performance.
+Gate passed: two calibrated stock-clock A500 windows, 29/27 native publications
+matching actual display-buffer changes, exact observer-off state/pixel agreement
+at eight checkpoints, and rejecting instrument controls. See the
+[measurements and scoped limits](internals.md#p13a4-short-native-ocs-baseline).
+
+
+## B — Share mechanisms without imposing a newer CPU
+
+**P13B1 — Extract compile-time variant definitions (complete).** Depends on A1–A2.
+Introduce separate OCS/CD32 maps for hooks, relocated hunks, native entry points,
+A4 fields, object limits, bitmap layout and scene rules. Extract shared algorithms
+incrementally; avoid runtime variant branches in hot loops. Extend build and
+analysis tools to accept an explicit variant instead of silently using CD32.
+Gate: unchanged CD32 output where possible; otherwise equal-size native controls
+and the existing focused timing/pixel checks. Original OCS reconstruction remains
+identical. Do not fold this refactor into an unreviewable OCS patch dump.
+Gate passed: separate verified maps and explicit build/analysis selection, zero-byte
+compile-time equates, byte-identical CD32 release/timing/render/native outputs and
+original OCS reconstruction. Existing focused timing/pixel and rejecting controls
+pass. See [scope and evidence](internals.md#p13b1-compile-time-variant-definitions).
+
+**P13B2 — Make shared execution paths 68000-safe (complete).** Depends on B1.
+Replace or select alternatives for long multiply/divide, scaled indexing, long
+branches and flag preservation. `MOVE CCR` is unavailable on 68000; indiscriminate
+`MOVE SR` is not a safe replacement on later CPUs in user mode. Audit startup,
+interrupts, exceptional exits and diagnostics as well as hot code. Reuse native
+math only after signedness, overflow, rounding and register contracts are tested.
+Gate: base-ISA assembly plus executed arithmetic/flag boundary tests on 68000,
+and unchanged results on 68020+. Keep accelerated implementations where useful.
+Gate passed: all 13 owned timing/prediction/publication/recorder units assemble
+for 68000 under four conditional profiles. Signed math, clock boundaries, all
+32 condition-code combinations, indexed addressing and call stacks pass on CPU
+models; actual interrupt/recorder wrappers pass with explicit native/OS boundaries.
+CD32 release/timing/render/native and original OCS outputs remain identical.
+This is an ISA gate, not a linked OCS enhancement or a speed result. See
+[contracts and audit limits](internals.md#p13b2-shared-68000-execution-safety).
+
+**P13B3 — Share instrumentation and validation interfaces (complete).** Depends on B2, A4.
+Port the frame-statistics schema with a 68000-safe recorder and OCS publication
+observer. Add variant-aware native state/pixel, allocation and ownership checks.
+Gate: separate counts for world ticks, rendered pictures and actually displayed
+pictures; bounded observer overhead and a working uninstrumented control.
+Gate passed: shared WCFS/WCDS reader/writer, OCS field-clock recorder assembled and
+executed on 68000/020/040, native-data/event replay, distinct world/render/display
+counts and exact retained observer-off state/pixels. Host observer has zero matched
+emulated-cycle effect; the guest retry loop is bounded. The callable recorder is
+not yet hooked into the OCS game: later users must measure its installed overhead
+and validate allocation/IRQ integration. No backend or timing hooks are added.
+See [evidence and boundaries](internals.md#p13b3-shared-instrumentation-and-validation-interfaces).
+
+## C — Choose conversion from measured CPU and memory behaviour
+
+**P13C1 — Build interchangeable experimental converters (complete).** Depends on A2, B2–B3.
+Keep native QBlit conversion. Pin and adapt the two Kalms four-plane candidates
+listed in `tools/manifest/ocs-c2p-candidates.tsv`; honour width/alignment/stride, plane
+order and destination padding. Cover every native view size with enclosing-window
+or native fallbacks where necessary. Do not copy Legends of Valour's high-nibble
+or 192-byte-stride modifications into Wing Commander. Preserve the OCS
+checkerboard high/low-nibble selection established by A2; neither nibble is unused.
+The four edge pixels are confirmed live by A3; preserve them unless a deliberate
+correction is chosen. Odd-height support still requires its own bounds checks.
+Gate: native-versus-independent-oracle-versus-CPU pixels match with all 16 colours,
+independent high/low nibbles, edge widths, row canaries and alternating destinations.
+Experimental CPU conversion does not become the default yet.
+Gate passed: pinned Kalms word/longword components with shared checkerboard-row
+adaptation, exact native/oracle visible pixels at all native view sizes, guarded
+padding/source/stack, alternating destinations, base-ISA execution, explicit
+native requests for 16-but-not-32-pixel widths and rejecting odd-height checks.
+Normal builds keep native conversion. The C2 diagnostic comparison below charges
+row staging and wrapper calls and preserves the native scheduling control. See
+[evidence and component ABI](internals.md#p13c1-experimental-four-plane-converters).
+
+**P13C2 — Establish the blitter/CPU/memory crossover (complete).** Depends on C1.
+Run matched short windows with identical source content, world state, display DMA,
+audio, buffer ownership and publication policy. Compare these arms:
+
+| Arm | Drawing/source storage | Conversion |
+|---|---|---|
+| Native | Chip RAM | Native blitter, including all queue waits |
+| CPU/Chip | Chip RAM | CPU word/longword candidate |
+| CPU/Fast | Verified true Fast RAM | CPU candidate into Chip planes |
+| Staged, only if useful | Fast RAM plus Chip staging source | Copy plus native blitter |
+
+Start with 68000/OCS plus Fast RAM, 68000 without true Fast RAM if the stock memory
+requirements can be met, 68020/OCS without true Fast RAM, and the same 68020 with
+Fast RAM. A no-Fast test that cannot boot is an unsupported memory case, not a
+conversion result. Use representative 7 MHz 68000 and documented 68020 clocks;
+expand to another clock/memory width or 030 only where the winner changes or the
+margin is inconclusive. Distinguish slow expansion RAM from true Fast RAM using
+actual allocation addresses/attributes, not an emulator preset's label.
+
+Measure end-to-end displayed frames/s and frame tails as well as conversion time,
+CPU draw/world time, CPU/blitter overlap, queue stalls and Chip bus contention.
+First preserve native scheduling; isolate unnecessary native pacing only in a
+separate arm. An isolated blitter throughput result cannot choose the backend.
+Deliverable: a small CPU/clock/memory/backend table, reproducible runs, and an
+explicit crossover range or uncertainty. Gate: retain blitter wherever it wins;
+no claim of a universal CPU threshold from one emulator configuration. Do not
+require a broad calibrated-040 matrix to finish this decision.
+
+Gate passed: ten asteroid CPU/memory/backend cells and focused flight/fire checks,
+byte-exact matched inputs and starting state, actual DMA/publication agreement,
+live pixels, queue/overlap/Chip-contention measurements, and three exact observer-off
+controls. Native wins the measured 68000 and no-Fast 68020 cases; CPU/Fast longword
+wins the 14 MHz 68020/Fast case by about 6% on matched images in both scenes.
+The Fast move includes compositor shadow rows and both copy-command pointer columns.
+Normal slaves remain identical. No universal CPU threshold or hardware claim follows;
+C3 retains conservative fallback for unknown profiles. See [results and limits](internals.md#p13c2-measured-ocs-converter-crossover).
+
+**P13C3 — Install conservative backend selection and fallback (complete).** Depends on C2.
+Select once from measured CPU/memory profiles, retain a user override for unknown
+accelerators, and fall back safely when the required memory is unavailable.
+Within the CPU backend select the tested word-write 68000/68010 and longword-write
+68020+ paths, unless C2 establishes a better rule. CPU capability and chipset are
+independent: an accelerated OCS machine still needs four-plane OCS output.
+Gate passed at the bounded conversion seam: automatic/forced longword runs
+match all submitted images and starting/ending game/Chip state. Seven short
+runtime windows pass 305 independent pixel checks, including forced 68000 word,
+A500 default native, unknown-profile native, missing-storage native and actual
+slow-memory native fallback. The 68000-safe initializer freezes its choice and
+calls the original FlushCache trampoline without changing cache policy.
+Normal builds remain native; C4 owns production allocations and transitions.
+See [selection contract and limits](internals.md#p13c3-conservative-backend-selection).
+
+**P13C4 — Apply backend-specific memory ownership (complete).** Depends on C3.
+For blitter conversion retain its Chip source and shared workspace, with waits
+before reuse. For CPU conversion move only proven CPU-only source/work buffers
+to Fast RAM and bypass all obsolete QBlit consumers before reclaiming workspace.
+Keep planes, Copper lists and every remaining DMA consumer in Chip RAM. Account
+for histories, prediction snapshots, code, ROM and preload in the memory budget.
+Gate: allocation failure/partial setup/exit work on both backends, no stale DMA
+reads, and the documented A500 minimum follows measurements. A staging backend,
+if selected, retains both source lifetimes through the final asynchronous read.
+Gate passed in the allocation-integrated OCS candidate: main-source ownership is
+chosen before aliases are built, failed setup rolls back, and native queue
+retirement precedes source release. Both backends pass controlled native teardown
+and complete-field DMA checks; the restored OS Copper list is separately owned.
+The combined Chip workspace is retained for native fallback, not reclaimed as
+an independent block. The documented tested launcher floor is 512 KiB Chip plus
+4 MiB Fast; 1 MiB fails the expansion reservation and 2 MiB stalls in a native
+wait that also fails in the original slave. Normal reconstruction remains the
+control. See [ownership, budget and limits](internals.md#p13c4-backend-specific-memory-ownership).
+
+**P13C5 — Publish completed images safely on both backends (complete).** Depends on C4.
+Share the pending/drawing/displayed ownership model with CD32 while retaining
+OCS-specific completion events, Copper setup and publication deadline. Verify
+blitter completion before publishing or reusing its source; CPU completion alone
+does not certify a blitter frame. Preserve native direct-plane updates and view
+transitions. Do not copy CD32 FMODE or its scanline deadline.
+Gate: no tearing, old rows or mixed frames across intro, view changes and flight;
+actual display fields agree with ownership and forecast records.
+Gate passed: native and CPU candidates queue completion for the OCS VBL, drain
+before reuse/direct writes/teardown, and retain native Copper/BitMap handling.
+The 900-field native and 660-field CPU view/flight/intro windows have no mixed
+buffers or checked DMA pixel mismatches; 249 forecasts match actual publications.
+Native observer-off state/pixels match at 13 checkpoints. Diagnostic view changes
+use the native routine because the simulator suppresses view keys. See
+[evidence and limits](internals.md#p13c5-completed-image-publication-and-display-ownership).
+
+**P13C6 — Evaluate changed-block conversion only where it helps (complete).** Depends on C5.
+Measure comparison/history cost against full CPU conversion and retained blitter
+conversion. Include both destination histories and invalidations for direct
+planar writes, palettes, clears, resizing and modal transitions. Keep a full or
+native path when comparison is slower or costs too much memory on 68000.
+Gate: identical pixels and an end-to-end improvement on the selected profile.
+Otherwise close this item with the simpler backend and documented measurements.
+Gate passed on the scoped 020/Fast intro: 54 matching images rise from 13.64
+to 18.76 displayed pictures/s versus full CPU conversion. Native blitter remains
+faster on A500; no history cost is added to its default path. The opt-in candidate
+uses two 64,000-byte Fast histories and invalidates native scratch loans, direct
+writers and View teardown. Pixels, all four diagnostic views and observer-off
+state pass. Flight correctness passes, but unequal pre-window world progression
+precludes a matched flight-speed claim. See [measurements and limits](internals.md#p13c6-measured-changed-block-conversion).
+
+## D — Share the gameplay and intro timing model
+
+**P13D1 — Complete the OCS timing/side-effect map (complete).** Depends on A3–A4, B1.
+Map the CD32 FR-01–FR-23 responsibilities to actual OCS functions and state fields.
+Verify speed/range units, field clock, input ownership, audio and every world- or
+render-driven timer. Include damage, AI, weapons, explosions, random calls,
+simulator score/death/name entry, autopilot, menus and scene resets.
+Gate: every responsibility has an OCS owner and executable test or a named
+excluded scene; analogous code is not accepted as proof of an identical ABI.
+All 23 responsibilities have OCS owners and executed local tests, with named
+campaign/cinematic/device/UI exclusions. Native OCS units establish 10 Hz;
+72 tables/791 entries and input/score/clock/reload checks pass on 68000/68020.
+The OCS keyboard queue and joystick edge records require their own adapter;
+CD32 input offsets do not apply. No timing patch is included. See the
+[D1 map and limits](internals.md#p13d1-ocs-timing-and-side-effect-map).
+
+**P13D2 — Port the shared 10 Hz authoritative clock (complete).** Depends on D1, B2–B3.
+Preserve native OCS units while separating world updates from presentation.
+Count completed ticks, handle PAL/NTSC fractions, bounded catch-up and modal
+rebasing. Test slow-frame and wraparound cases. If the A500 cannot sustain the
+world budget, report the overload and optimise the measured cause; do not silently
+change game speed or describe skipped simulation as correct timing.
+Gate: equal elapsed-time world/event results at deliberately varied render rates,
+plus measured normal-load world cadence on the required A500 target.
+The opt-in candidate passes native 68000/68020 PAL/NTSC, wrap, retained-debt
+and modal tests, matched live tick-state checks, and the bounded A500/Fast
+normal-load gate. Completed ticks are distinct from issued work; native
+post-flight calls are excluded from that cadence. See the
+[D2 evidence and limits](internals.md#p13d2-ocs-authoritative-flight-clock).
+
+**P13D3 — Port responsive input and renderer-only prediction (complete).** Depends on D2, C5.
+Reuse player/camera and world-pose algorithms, native inertia and selective
+backup/restore with OCS field definitions and 68000-safe arithmetic. Predict to
+the actual backend's publication time, including pending work. Carry over the
+new-projectile constructor certificates and the gun-cooldown/reset distinction
+for all native player/AI spawning paths. Do not invent motion before identity is
+known or let presentation consume authoritative randomness/allocations.
+Gate: world state restores exactly, first-interval shots move, slot reuse and
+view cuts reject stale history, and prediction stays within the shared bound.
+Measure overhead on 68000; avoid useless extrapolation work when no intermediate
+picture can be displayed without changing authoritative simulation policy.
+The opt-in candidate passes native 68000/68020 input, restore, first-interval
+player/AI shot, stale-history and forecast-bound checks. CPU/Fast prediction on/off
+preserves authoritative state at matched ticks; both backends pass live pixel
+checks. The A500 coasting window holds 9.98 world updates/s but displays 0.75
+pictures/s, and early sustained fire overloads it. E1 owns these measured world,
+input-geometry and display bottlenecks; no smooth-A500 claim follows from D3.
+See the [D3 evidence and limits](internals.md#p13d3-ocs-field-input-and-bounded-presentation).
+
+**P13D4 — Apply the same model to the OCS world-based intro (complete).** Depends on D3.
+Port the shared title/asteroid world clock and prediction with OCS script data:
+296 title updates, 15 credit pages, and native text/music deadlines. Move
+render-side asteroid creation to its authoritative owner so credits retain visible
+asteroids even when world ticks suppress drawing. Map any other cinematic route
+separately; do not assume the Origin logo or ending uses this intro path.
+Gate: short motion/state checks plus one full 15-page cycle and repeat, correct
+asteroid visibility, native music/credit pacing, and clean transition to gameplay.
+The shared title/prediction adapter passes native 68000/020 checks and a full
+15-page cycle/repeat on 020/Fast, with native text/music deadlines retained.
+Both backends pass pixel checks and reach simulator/name entry. The A500 asteroid
+window manages 7.39 world updates/s and 3.59 displayed pictures/s; its retained
+debt and slow-render fallback do not establish sustained 10 Hz. This is an E1
+overload. See the [D4 evidence](internals.md#p13d4-ocs-title-and-asteroid-credit-timing).
+
+## E — Focused acceptance and hand-off
+
+**P13E1 — Close measured A500 bottlenecks — focused gate complete, heavy-scene limits retained.** Depends on C6, D4.
+Close the measured D4 asteroid-world overload (7.39 updates/s on A500) and
+D3 sustained-fire/display gaps. Profile the remaining world/drawing/composition/conversion cost and optimise only
+what prevents the accepted A500 timing or selected backend from working. Retain
+shared optimisations where their cost pays off; do not impose cached-030 region
+copying or full-image comparison on a 68000 without evidence.
+Gate: report displayed frames/s, interval tails, world cadence and memory on the
+required A500/Fast target and representative 020/Fast configuration. Document
+heavy-scene gaps instead of promising CD32 smoothness on a 7 MHz CPU.
+
+The opt-in `--math-fast` candidate retains exact native arithmetic/collision
+results, native blitter on A500 and CPU/Fast conversion on the measured 020.
+A500 coasting holds 9.98 updates/s and 2.75 pictures/s. Credits improve from
+7.39/3.59 to 8.59/4.19; sustained fire remains 8.99 updates/s with only one new
+picture in four seconds. **These heavy workloads are not fixed to 10 Hz.**
+E1's reported cadence, tails, memory and correctness gate is complete; the
+remaining overload/display starvation is an explicit limitation for E2/E3, not
+a reason to drop world ticks or relax the pixel gate. See
+[E1 evidence](internals.md#p13e1-focused-ocs-performance-gate).
+
+**P13E2 — Complete compatibility and functional checks (complete).** Depends on E1.
+Exercise native-blitter and CPU backends on 68000/OCS and 68020/OCS, then a short
+accelerated AGA/cache-enabled regression and PAL/NTSC checks. Cover intro, combat,
+all views, controls, save/load, pause/resume, simulator/name prompt, repeated scene
+changes, quit and low-memory fallback. Retest shared CD32 code with its existing
+focused gates. Unavailable languages/revisions remain explicitly unsupported by
+enhancements, with original behaviour or a clear rejection instead of blind hooks.
+Gate: pixels/ownership/state pass, options have defined semantics, no expanded
+hardware matrix without a failure that needs it. Real hardware feedback is useful
+when available and is labelled separately from model evidence.
+
+Gate passed: unchanged E1 native/CPU candidates cover 68000/OCS and 68020/OCS,
+PAL/NTSC, and accelerated 020/AGA with instruction cache. The native campaign
+route covers all nine player-accessible camera modes, missile/cannon controls,
+record-exact save/load and flushed saves, pause/resume and DOS quit. Allocation
+failure/revision rejection and focused CD32 regressions pass. Coverage and limits:
+[E2 evidence](internals.md#p13e2-compatibility-and-functional-gate). No full-campaign,
+hardware, smaller-memory or OCS 030/040 data-cache claim is made.
+
+**P13E3 — Document support and prepare the later release hand-off (complete).** Depends on E2.
+Record supported revisions, CPU/memory/backend selection, minimum RAM, options,
+reproducible checks and remaining gaps. Keep OCS and CD32 installers distinct;
+share packaging machinery, never game assets. Propose the preinstalled archive
+and release checklist. The CD32 phase 12 save/load stash remains separate.
+Gate: a reviewable OCS candidate and an explicit support/limitations table.
+
+Gate passed: the [support/limitations table and archive proposal](ocs-release.md)
+identify the unchanged E2-tested native and CPU candidates. Fresh builds match
+both accepted hashes exactly. Build/runtime options, RAM floor, revision guards,
+reproduction commands and remaining release checks are documented. No archive
+was published and no CD32 release or save/load-stash work was resumed.
+
+## Remaining release work
+
+P13A1–P13E3 are complete. The [later release checklist](ocs-release.md#later-release-checklist)
+covers packaging, extracted-archive smoke tests and publication separately.
+The scoped model evidence does not remove E1's heavy-scene performance limits or
+E2's campaign, hardware, cache and cold-boot save/load coverage limits.

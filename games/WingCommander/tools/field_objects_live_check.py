@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""Bounded Enyo 1 field-object fixture after native mission setup."""
+import argparse
+import json
+import os
+import re
+import struct
+import subprocess
+import time
+from pathlib import Path
+import _amigaxdev
+import wc_run
+from amigaxdev import barto
+from ocs_reconstruct import ROOT, new_output
+from variants import get
+
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('variant',choices=('ocs','cd32'));p.add_argument('build',type=Path)
+    p.add_argument('--output',required=True)
+    p.add_argument('--mine',action='store_true',help='replace the field type with native mine type 23')
+    a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
+    v=get(a.variant)
+    if a.variant=='ocs':
+        from ocs_runtime import locate
+        slave=a.build/'WingCommander.Slave'
+    else:
+        from cd32_runtime import locate
+        slave=a.build/'WingCommanderCD32.Slave'
+    length=0x400000
+    env=wc_run.run_env(out,variant=a.variant,SLAVE=str(slave.resolve()),
+             WARP='1',NTSC='0',WINDOW='front',
+             JOY0='none',JOY1='none',DETERMINISTIC='1',AMIGA_SETUP='a1200-030',
+             WHD_ARGS='CUSTOM5=1 DCACHE' if a.variant=='ocs' else 'CUSTOM5=0 CUSTOM3=1 CUSTOM4=0 DCACHE',
+             EXTRA_ARGS='--fast_memory=4096',OCS_STOCK_CLOCK='0',INTRO_STOCK_CLOCK='0',
+             WC_BASELINE_CACHE_MODEL='1')
+    g=None
+    def stop():
+        nonlocal g
+        if g:g.p.kill();g=None
+        wc_run.stop(env)
+    def boot():return wc_run.server('wc-cinematic', env, profile_window=False).boot(env)
+    def cmd(s,timeout=60):
+        r=g.cmd(s,timeout=timeout)
+        if any(x in r for x in ('Remote connection closed','Cannot access','Error','Invalid hex','Protocol error')):raise RuntimeError(r)
+        return r
+    def until(addr,condition=None,timeout=60):
+        print("checkpoint",hex(addr),condition,flush=True)
+        if condition:
+            r=cmd(f'break *{addr:#x}\ncondition $bpnum {condition}\ncontinue\ndelete',timeout)
+        else:r=cmd(f'break *{addr:#x}\ncontinue\ndelete',timeout)
+        if 'Breakpoint' not in r:raise ValueError('checkpoint missed: '+r)
+    def shot(name):
+        path=out/(name+'.bin')
+        cmd(f'monitor profile 1 "" "{path}"',60)
+        (out/(name+'.png')).write_bytes(barto.load(str(path)).fields[-1].shot)
+        path.unlink() # Keep the screenshot; no large instruction capture is needed.
+    try:
+        g=boot()
+        snapshot=out/'calibration.bin'
+        for _ in range(12):
+            g.cont();time.sleep(1);g.stop()
+            cmd(f'dump binary memory {snapshot.relative_to(ROOT)} 0x200000 {0x200000+length:#x}')
+            try:layout=locate(snapshot.read_bytes());break
+            except ValueError:pass
+        else:raise ValueError('live segment chain not found')
+        snapshot.unlink();stop()
+        (out/'layout.json').write_text(json.dumps(layout,indent=2)+'\n')
+        g=boot();h0,h1,_,_=layout['hunks']
+        field=h1+v.A4_BASE+v.A4['field_clock']
+        until(h0+(0x180c4 if a.variant=='ocs' else 0x1898a))
+        cmd('monitor key 45 1')
+        until(h0+(0x1edde if a.variant=='ocs' else 0x1fbba))
+        cmd('monitor key 45 0')
+        until(h0+(0x180c4 if a.variant=='ocs' else 0x1898a))
+        cmd('monitor key 45 1')
+        until(h0+(0x1f396 if a.variant=='ocs' else 0x20164))
+        cmd('monitor key 45 0')
+        until(h0+(0x1f43c if a.variant=='ocs' else 0x20214))
+        # A bounded native setup/launch fixture, not a briefing/campaign replay.
+        sb=layout['slave']
+        sy=(json.loads((a.build/'build.json').read_text())['symbols'] if a.variant=='ocs' else
+            {n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(a.build/'slave.lst').read_text(),re.M)})
+        ocs=a.variant=='ocs'
+        stub=h0+(0x19e9e if ocs else 0x1ab76) # unused cinematic entry in this disposable run
+        callsite=h0+(0x1f440 if ocs else 0x20218)
+        routines=(0x1ac60,0x13fbc,0x1d8b6,0x2029c,0x1a454) if ocs else (0x1b9a8,0x14246,0x1e5ec,0x2106c,0x1b19c)
+        load,pack,exterior,mission,tunnel=routines
+        src=out/'fixture.s';binary=out/'fixture.bin'
+        src.write_text('\n'.join([' movem.l d0-d7/a0-a6,-(sp)',
+            ' clr.w -28796(a4)' if ocs else ' clr.w -28820(a4)',
+            ' clr.w $87a(a4)' if ocs else ' clr.b $110f(a4)',
+            ' clr.w -(sp)',f' jsr ${h0+load:x}',' move.w #1,-(sp)',f' jsr ${h0+pack:x}',
+            ' addq.l #4,sp',f' jsr ${h0+exterior:x}',
+            ' clr.w -(sp)',' move.w #1,-(sp)',f' jsr ${h0+mission:x}',' addq.l #4,sp',
+            f' jsr ${h0+tunnel:x}',
+            ' move.w #2,-(sp)',f' jsr ${h0+0x63e:x}' if not ocs else f' jsr ${h0+0x640:x}', ' addq.l #2,sp', ' movem.l (sp)+,d0-d7/a0-a6',' rts'])+'\n')
+        subprocess.run([os.environ['VASM'],'-m68020','-Fbin','-o',str(binary),str(src)],check=True)
+        old=out/'original-stub.bin';cmd(f'dump binary memory {old.relative_to(ROOT)} {stub:#x} {stub+binary.stat().st_size:#x}')
+        original=out/'original-call.bin';cmd(f'dump binary memory {original.relative_to(ROOT)} {callsite:#x} {callsite+6:#x}')
+        fixture=out/'call.bin';fixture.write_bytes(struct.pack('>HI',0x4eb9,stub))
+        cmd(f'monitor ocs-load {stub:x} "{binary}"');cmd(f'monitor ocs-load {callsite:x} "{fixture}"')
+        def number(expr):
+            r=cmd('printf "VALUE %u\\n", '+expr)
+            return int(re.search(r'VALUE (\d+)',r)[1])
+        until(sb+sy['launch_resume'])
+        until(sb+sy['ocs_clock_loop' if ocs else 'timing_loop'])
+        a4=h1+v.A4_BASE
+        table=a4+(0x350a if ocs else 0x3f1c)
+        count=number(f'*(unsigned short*){a4+(0x8de if ocs else 0x1150):#x}')
+        records=[]
+        for i in range(count):
+            r=cmd(f'printf "FIELD %u %d %d %d %u %u %u\\n", *(unsigned short*){table+i*20:#x}, *(int*){table+i*20+2:#x}, *(int*){table+i*20+6:#x}, *(int*){table+i*20+10:#x}, *(unsigned short*){table+i*20+14:#x}, *(unsigned short*){table+i*20+16:#x}, *(unsigned short*){table+i*20+18:#x}')
+            records.append(list(map(int,re.search(r'FIELD (.*)',r)[1].split())))
+        (out/'fields.json').write_text(json.dumps(records,indent=2)+'\n')
+        assert records, 'Enyo 1 has no hazard fields'
+        # Place the player at the native mission field centre. Native world
+        # detection, allocation, movement and all rendering remain in charge.
+        centre=records[0][1:4]
+        pos=a4+v.A4['position']
+        fixture=out/'position.bin';fixture.write_bytes(struct.pack('>3i',*centre))
+        cmd(f'monitor ocs-load {pos:x} "{fixture}"')
+        assert [number(f'*(unsigned int*){pos+j*4:#x}') for j in range(3)]==[x&0xffffffff for x in centre]
+
+        if a.mine:
+            fixture=out/'field-type.bin';fixture.write_bytes(struct.pack('>H',23))
+            cmd(f'monitor ocs-load {table:x} "{fixture}"')
+        rows=[]
+        for i in range(35):
+            until(sb+sy['ocs_clock_tick_done' if ocs else 'timing_world_done'])
+            ptr=number(f'*(unsigned int*){a4+(0x904 if ocs else 0x1176):#x}')
+            snapshot=out/'objects.bin'
+            cmd(f'dump binary memory {snapshot.relative_to(ROOT)} {h1:#x} {h1+v.HUNKS[1][2]:#x}')
+            data=snapshot.read_bytes()
+            active=[]
+            for slot in range(1,61):
+                k=struct.unpack_from('>H',data,v.A4_BASE+v.A4['object_class']+slot*2)[0]
+                model=struct.unpack_from('>H',data,v.A4_BASE+(0xf86 if ocs else 0x17f8)+slot*2)[0]
+                if k and 33<=model<=38:
+                    position=struct.unpack_from('>3i',data,v.A4_BASE+v.A4['position']+slot*12)
+                    active.append([slot,k,model,*position])
+            rows.append(dict(field=number(f'*(unsigned int*){field:#x}'),pointer=ptr,objects=active))
+        shown=[]
+        for i in range(8):
+            until(sb+sy['timing_scene_end'],f'*(unsigned short*){sb+sy["timing_scene_staged"]:#x} != 0')
+            snapshot=out/'shown.bin'
+            cmd(f'dump binary memory {snapshot.relative_to(ROOT)} {h1:#x} {h1+v.HUNKS[1][2]:#x}')
+            data=snapshot.read_bytes();objects=[]
+            for slot in range(1,61):
+                k=struct.unpack_from('>H',data,v.A4_BASE+v.A4['object_class']+slot*2)[0]
+                model=struct.unpack_from('>H',data,v.A4_BASE+(0xf86 if ocs else 0x17f8)+slot*2)[0]
+                if k and 33<=model<=38:
+                    objects.append([slot,model,*struct.unpack_from('>3i',data,v.A4_BASE+v.A4['position']+slot*12)])
+            shown.append(dict(tick=struct.unpack_from('>H',data,v.A4_BASE+v.A4['world_count'])[0],objects=objects))
+        shot('field')
+        (out/'report.json').write_text(json.dumps(dict(variant=a.variant,mine_fixture=a.mine,records=records,samples=rows,shown=shown),indent=2)+'\n')
+        assert any(r['pointer'] for r in rows), 'native field detection not reached'
+        assert max(len(r['objects']) for r in rows)>=4, 'field failed to replenish objects'
+        assert any(p['tick']==q['tick'] and any(x[:2]==y[:2] and x[2:]!=y[2:] for x in p['objects'] for y in q['objects']) for p,q in zip(shown,shown[1:])), 'field motion not sampled between ticks'
+        if a.mine:assert any(x[2]==33 for r in rows for x in r['objects']), 'mine constructor not reached'
+
+    finally:stop()
+
+if __name__=='__main__':main()
