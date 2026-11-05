@@ -53,9 +53,9 @@ class ReplayChecks:
     def snapshots(self):
         a,c=self.a,self.c;a.reset();r=random.Random(22);manifest=self.manifest()
         assert sum(n for _,n in manifest)==a.syms['REPLAY_SNAPSHOT_BYTES']
-        names=set(re.findall(r'^(dt_\w+)\s+dcb?\.',Path('whdload/timing.s').read_text(),re.M))
+        names=set(re.findall(r'^(dt_\w+)\s+dcb?\.',Path('src/timing.s').read_text(),re.M))
         names-={'dt_contact_angle_offsets','dt_contact_bounds'}
-        declared=set(re.findall(r'dc.w (dt_\w+)-replay_state_table',Path('whdload/replay.s').read_text()))
+        declared=set(re.findall(r'dc.w (dt_\w+)-replay_state_table',Path('src/replay.s').read_text()))
         assert names==declared,('snapshot manifest missing state',names-declared,declared-names)
         for addr,size in manifest:c.write(addr,r.randbytes(size))
         saved=self.state();c.reg(1,0x10000);c.reg(9,0);c.run(a.sym('replay_state_copy'))

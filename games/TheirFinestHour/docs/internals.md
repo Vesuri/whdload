@@ -16,7 +16,7 @@ through a `jsr d16(a4)` jump table that executes in the data hunk. Hunk 0 code a
 BSS, 4 bytes. `bob:00000` jumps to the startup at `bob:30b4a`. Some routines are compiled C
 (locals in the stack frame), the 3D maths and drawing are hand-written assembly.
 
-**The slave** (`whdload/TheirFinestHour.s`) is Psygore's v1.1: KickEmu (Kickstart 34.005 +
+**The slave** (`src/TheirFinestHour.s`) is Psygore's v1.1: KickEmu (Kickstart 34.005 +
 RTB) with HDINIT, BOOTDOS, DOSASSIGN; assigns `BobData`, `BOB1`, `BOB2` to `data`; loads `bob`
 (or `mb`, the Mission Builder, with `CUSTOM1=1`), identifies it by CRC16 and applies a patch
 list: v1.0 `$201F` and KIXX `$2D72` (`PL_P $57a` quit, `PL_NOP $60e` large-memory setting,
@@ -1178,7 +1178,7 @@ The native snapshot helpers (`bob:1996`, `19f6`) copy 195 fields totaling 12,213
 bytes. Companion snapshots now cover every mutable timing field, generations,
 fractions, guidance phase, previous-velocity divisor and contact state, plus
 native RNG, mission/message/transition state and aiming fields omitted by that
-table. `whdload/replay.s` has the explicit manifest; the regression rejects new
+table. `src/replay.s` has the explicit manifest; the regression rejects new
 timing fields missing from it. Movie-start and live-return companions are
 separate. Restoring a movie cannot overwrite the suspended flight's timing
 state. Host PAL/NTSC rate, boot calibration and mouse preference stay local;

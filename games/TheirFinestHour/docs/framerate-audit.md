@@ -105,10 +105,13 @@ Build a matching normal slave/listing and use a local live flight dump as
 specified in [development.md](development.md):
 
 ```sh
-make -C whdload VASMFLAGS='-L ../tmp/input-combat/release.lst'
-python3 tools/timing_audit_check.py tmp/input-combat/bomb-smoke/code.bin 0x200000 whdload/TheirFinestHour.slave tmp/input-combat/release.lst --cpu 68000
-python3 tools/timing_audit_check.py tmp/input-combat/bomb-smoke/code.bin 0x200000 whdload/TheirFinestHour.slave tmp/input-combat/release.lst --cpu 68040
+make slave        # tmp/build/release/TheirFinestHour.Slave and its listing .lst
+python3 tools/timing_audit_check.py tmp/input-combat/bomb-smoke/code.bin 0x200000 tmp/build/release/TheirFinestHour.Slave tmp/build/release/TheirFinestHour.lst --cpu 68000
+python3 tools/timing_audit_check.py tmp/input-combat/bomb-smoke/code.bin 0x200000 tmp/build/release/TheirFinestHour.Slave tmp/build/release/TheirFinestHour.lst --cpu 68040
 ```
+
+`make check` runs both after the byte check when that capture is in `tmp/` (or
+`CAPTURE=<code.bin>` names another), logging to `tmp/timing-audit-<cpu>.log`.
 
 The aggregate now runs fixed-behavior regressions for all work items. Individual
 checks may first restore original instructions to reproduce the baseline defect.

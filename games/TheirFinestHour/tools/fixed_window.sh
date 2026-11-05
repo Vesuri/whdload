@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
 # Retain exactly the slave used by this capture.
-INPUT_SLAVE=${2:-tmp/slaves/verify.slave}
+INPUT_SLAVE=${2:-tmp/build/verify/TheirFinestHour.Slave}
 if [ "$INPUT_SLAVE" != "$PWD/$OUT/slave.slave" ]; then
   cp "$INPUT_SLAVE" "$OUT/slave.slave"
 fi
@@ -32,20 +32,22 @@ CACHE="tmp/prof/hunk-$KEY.txt"
 BOOT_HUNK=${BOOT_HUNK:-$(cat "$CACHE" 2>/dev/null || true)}
 ANCHOR=${ANCHOR:-0x12968}
 if [ -n "$BOOT_HUNK" ]; then export BOOT_BREAK=$(printf '%#x' $((BOOT_HUNK + ANCHOR))); fi
+RUN="tmp/run/${INSTANCE:-default}/.run"
+mkdir -p "$RUN"
 tfh() { python3 tools/tfh.py "$@"; }
-[ -S amiga/.run/tfh.sock ] && { tfh quit > /dev/null 2>&1 || true; sleep 1; }
-rm -f amiga/.run/serve.log "$OUT/trace.bin"
-WARP=1 python3 tools/tfh.py serve > amiga/.run/serve.log 2>&1 &
+[ -S "$RUN"/tfh.sock ] && { tfh quit > /dev/null 2>&1 || true; sleep 1; }
+rm -f "$RUN"/serve.log "$OUT/trace.bin"
+WARP=1 python3 tools/tfh.py serve > "$RUN"/serve.log 2>&1 &
 trap 'tfh quit > /dev/null 2>&1 || true' EXIT
 SERVER=$!
 for _ in $(seq 1 "${SERVE_WAIT:-300}"); do
-  grep -q serving amiga/.run/serve.log 2>/dev/null && break
-  kill -0 "$SERVER" 2>/dev/null || { cat amiga/.run/serve.log >&2; exit 1; }
+  grep -q serving "$RUN"/serve.log 2>/dev/null && break
+  kill -0 "$SERVER" 2>/dev/null || { cat "$RUN"/serve.log >&2; exit 1; }
   sleep 1
 done
-grep -q serving amiga/.run/serve.log || { echo "anchor not reached" >&2; exit 1; }
+grep -q serving "$RUN"/serve.log || { echo "anchor not reached" >&2; exit 1; }
 
-# gdb runs in the repo root and its dump command takes no spaces in the path: dump to tmp/.
+# gdb runs in the game directory and its dump command takes no spaces in the path: dump to tmp/.
 dump() { tfh gdb "dump binary memory tmp/tfh-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv tmp/tfh-code.bin "$OUT/code.bin"; }
 hunk=
 for _ in $(seq 1 300); do
@@ -105,21 +107,21 @@ if [ "${XFORM_CHECK:-0}" -gt 0 ]; then
 fi
 if [ "${STATE_ONLY:-0}" = 1 ]; then
   dump; tfh quit > /dev/null; trap - EXIT
-  cp amiga/.run/fsuae.log "$OUT/fsuae-stdout.log"
+  cp "$RUN"/fsuae.log "$OUT/fsuae-stdout.log"
   echo "state-only capture complete (no frame-rate measurement)"
   exit 0
 fi
 if [ "${SWAP_ONLY:-0}" = 1 ]; then
   python3 tools/swap_fields.py "$FIELDS" "$OUT" "$OUT/code.bin" "$BASE"
   dump; tfh quit > /dev/null; trap - EXIT
-  cp amiga/.run/fsuae.log "$OUT/fsuae-stdout.log"
+  cp "$RUN"/fsuae.log "$OUT/fsuae-stdout.log"
   exit 0
 fi
 reply=$(tfh profile "$FIELDS" "$PWD/$OUT/trace.bin")
 [ -f "$OUT/trace.bin" ] || { echo "no trace: $reply" >&2; exit 1; }
 dump
 tfh quit > /dev/null; trap - EXIT
-cp amiga/.run/fsuae.log "$OUT/fsuae-stdout.log"
+cp "$RUN"/fsuae.log "$OUT/fsuae-stdout.log"
 python3 - "$OUT" <<'EOF'
 import sys; sys.path.insert(0, 'tools'); import _amigaxdev; from amigaxdev import barto
 out = sys.argv[1]; t = barto.load(f'{out}/trace.bin')

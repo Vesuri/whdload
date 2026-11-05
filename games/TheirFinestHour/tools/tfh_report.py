@@ -81,7 +81,7 @@ def locate(mem, blob, base, step=64, header=0x28):
 BOB = 'tmp/game/TheirFinestHour/data/bob'
 CODE_FILE, CODE_SIZE = 0x28, 0x31e40
 DATA_SIZE = 0xfa14
-# As amiga/env.sh: KICK13, default the shared directory's copy.
+# As the shared env.sh: KICK13, default the shared directory's copy.
 KICK13 = os.environ.get('KICK13') or os.path.expanduser('~/.local/share/amiga/Kickstarts/kick34005.A500')
 
 

@@ -1,4 +1,4 @@
-"""Adapt the shared WHDLoad 20.0 templates without vendoring WHDLoad files."""
+"""Adapt the shared WHDLoad install templates without vendoring WHDLoad files."""
 from pathlib import Path
 import os
 import re
@@ -12,7 +12,7 @@ def replace_once(text, old, new):
 
 
 def template(name):
-    base = Path(os.environ.get('WHDLOAD', Path.home() / '.local/share/amiga/WHDLoad-20.0'))
+    base = Path(os.environ.get('WHDLOAD', Path.home() / '.local/share/amiga/WHDLoad'))
     return (base / 'Install Template/Xxx Install' / name).read_bytes().decode('latin-1')
 
 
@@ -42,13 +42,13 @@ def readme(original):
 ''' + text[requirements:]
     start = text.index(' The game requires an installed A600')
     end = text.index(' History:')
-    features = (ROOT / 'whdload/readme-features.txt').read_text()
+    features = (ROOT / 'release/readme-features.txt').read_text()
     text = text[:start] + features + '\n\n' + text[end:]
     start = text.index(' version 1.0')
     end = text.index(' Contact:')
     old = original.decode('latin-1')
     history = old[old.index('Version 1.1 ('):old.index('Thanks to Philippe')].rstrip()
-    current = (ROOT / 'whdload/readme-history.txt').read_text().rstrip()
+    current = (ROOT / 'release/readme-history.txt').read_text().rstrip()
     text = text[:start] + current + '\n\n' + history + '''
 
  Thanks to Philippe Bovier for the original disks and Mad-Matt for the

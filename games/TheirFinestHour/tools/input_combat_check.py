@@ -2,13 +2,13 @@
 """Execute input, projectile and damage regressions in Unicorn's 68000/68040 CPU.
 
 Inputs are local FS-UAE fast-memory flight dumps and a normal slave/listing:
-        make -C whdload VASMFLAGS='-L ../tmp/input-combat/release.lst'
+        make slave      (tmp/build/release/TheirFinestHour.Slave and its .lst)
         python3 tools/input_combat_check.py DUMP BASE SLAVE LISTING [--cpu 68000|68040]
 
 No emulator services, timing or performance are modelled. Native game routines
 run with controlled actor positions and mouse counts. Sound and impact artwork
 are stubbed in this isolated memory only; native damage accounting is exercised.
-Original bytes and captures remain local. Run from the repository root.
+Original bytes and captures remain local. Run from the game directory.
 """
 import argparse, ctypes as C, os, random, re, struct, sys
 from fractions import Fraction

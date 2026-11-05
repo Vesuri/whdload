@@ -103,7 +103,7 @@ def main():
     if a.routine == 'aiturn': return check_aiturn(a.calls, hb, db)
     if a.routine == 'scen': return check_scen(a.calls, hb, db)
     if a.routine == 'pnorm': return check_pnorm(a.calls, hb, db)
-    # under tmp/, by a relative path: gdb runs in the repo root and its dump takes no spaces
+    # under tmp/, by a relative path: gdb runs in the game directory and its dump takes no spaces
     with tempfile.TemporaryDirectory(prefix='tfh-xform-', dir='tmp') as t:
         t = os.path.relpath(t)
         entry = {'xform': 0x2f4ae, 'proj': 0x2f28a, 'div': 0x2f374}[a.routine]

@@ -51,10 +51,12 @@ original movie files can still be loaded.
 
 ## Building
 
-With the shared Amiga toolchain and local source archives configured:
+With the shared Amiga toolchain, from this directory, given a directory holding Psygore's
+two v1.1 archives (pinned in `inputs.sha256`):
 
 ```sh
-make dist
+make unpack ARCHIVES=<directory>
+make dist        # the two archives in the repository's dist/
 ```
 
 Build instructions and checks are in [development.md](docs/development.md).

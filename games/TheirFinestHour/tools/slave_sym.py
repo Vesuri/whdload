@@ -3,8 +3,8 @@
 
   python3 tools/slave_sym.py CODE.bin BASE SYMBOL [SYMBOL...]
 
-Symbol offsets come from the vasm listing of the verify build (whdload/TheirFinestHour.lst,
-written by `make -C whdload verify`); the slave base comes from tfh_report.regions(), which
+Symbol offsets come from the vasm listing of the verify build
+(tmp/build/verify/TheirFinestHour.lst, written by `make verify`); the slave base comes from tfh_report.regions(), which
 needs SLAVE= naming the slave that is running.
 """
 import os, re, sys
@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from tfh_report import ROOT, regions
 
 
-def offsets(lst=os.path.join(ROOT, 'whdload/TheirFinestHour.lst')):
+def offsets(lst=os.path.join(ROOT, 'tmp/build/verify/TheirFinestHour.lst')):
     out = {}
     for line in open(lst, encoding='latin1'):
         m = re.match(r'^([0-9A-F]{8}) (\S+)$', line.rstrip('\n'))

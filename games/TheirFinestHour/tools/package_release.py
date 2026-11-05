@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Rebuild Psygore's two v1.1 archives with the new slave -> dist/ (LH5, level-1 headers).
 
-    python3 tools/package_release.py        (make dist)
+    make dist        (game.sh game_dist; --dist names the output directory, default the
+                      repository's dist/)
 
-Inputs, kept local in tmp/ (never committed): the installer tmp/TheirFinestHour.lha and the
-preinstalled archive tmp/TheirFinestHour_v1.1_0037.lha. Outputs:
+Inputs, kept local in tmp/archives/ (make unpack; never committed): the installer
+TheirFinestHour.lha and the preinstalled archive TheirFinestHour_v1.1_0037.lha. Outputs:
 
-  dist/TheirFinestHour-<ver>.lha            the same members as tmp/TheirFinestHour.lha
+  dist/TheirFinestHour-<ver>.lha            the same members as TheirFinestHour.lha
   dist/TheirFinestHour_v<ver>_0037.lha      the same members as the 0037 archive
 
 Changed members are the game launch icons (CUSTOM2=1), the freshly built slave,
@@ -17,6 +18,7 @@ holds the game itself: dist/ is ignored by git. LHA names LHa for UNIX (Lhasa, t
 `lha`, cannot create archives).
 """
 from pathlib import Path
+import argparse
 import os
 import re
 import subprocess
@@ -28,9 +30,9 @@ from install_package import readme, installer
 ROOT = Path(__file__).resolve().parents[1]
 LHA = os.environ.get('LHA', os.path.expanduser('~/.local/share/amiga/lha-compressor/src/lha'))
 # source archive, top directory, slave member name, output name pattern
-ARCHIVES = [(ROOT / 'tmp/TheirFinestHour.lha', 'TheirFinestHourHD', 'TheirFinestHour.slave',
+ARCHIVES = [(ROOT / 'tmp/archives/TheirFinestHour.lha', 'TheirFinestHourHD', 'TheirFinestHour.slave',
              'TheirFinestHour-{v}.lha'),
-            (ROOT / 'tmp/TheirFinestHour_v1.1_0037.lha', 'TheirFinestHour', 'TheirFinestHour.Slave',
+            (ROOT / 'tmp/archives/TheirFinestHour_v1.1_0037.lha', 'TheirFinestHour', 'TheirFinestHour.Slave',
              'TheirFinestHour_v{v}_0037.lha')]
 
 
@@ -89,17 +91,22 @@ def archive(stage, names, out, source, changed):
             a, b = (Path(new) / name).read_bytes(), (Path(old) / name).read_bytes()
             assert a == (stage / name).read_bytes(), name
             assert (a != b) == (name in changed), name
-    print(f'{out.relative_to(ROOT)}: {len(names)} files, {out.stat().st_size} bytes; '
+    print(f'{out}: {len(names)} files, {out.stat().st_size} bytes; '
           f'changed: {", ".join(sorted(changed))}')
 
 
 def main():
-    subprocess.run(['make', '-C', str(ROOT / 'whdload')], check=True, capture_output=True)
-    slave = (ROOT / 'whdload/TheirFinestHour.slave').read_bytes()
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--dist', type=Path, default=ROOT.parents[1] / 'dist')
+    dist = ap.parse_args().dist.resolve()
+    (ROOT / 'tmp').mkdir(exist_ok=True)
+    with (ROOT / 'tmp/dist-build.log').open('w') as log:
+        subprocess.run(['make', 'slave'], cwd=ROOT, check=True, stdout=log, stderr=subprocess.STDOUT)
+    slave = (ROOT / 'tmp/build/release/TheirFinestHour.Slave').read_bytes()
     assert b'C5:' not in slave, 'VERIFY build'
     version = re.search(rb'\$VER: slave ([0-9.a-z]+)', slave).group(1).decode()
-    assert f'Version {version} '.encode() in (ROOT / 'whdload/readme-history.txt').read_bytes()
-    (ROOT / 'dist').mkdir(exist_ok=True)
+    assert f'Version {version} '.encode() in (ROOT / 'release/readme-history.txt').read_bytes()
+    dist.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=ROOT / 'tmp') as tmp:
         for source, top, slave_name, pattern in ARCHIVES:
             stage = Path(tmp) / top
@@ -124,7 +131,7 @@ def main():
                 icon = stage / name
                 icon.write_bytes(enhanced_icon(icon.read_bytes()))
                 changed.add(name)
-            archive(stage, names, ROOT / 'dist' / pattern.format(v=version), source, changed)
+            archive(stage, names, dist / pattern.format(v=version), source, changed)
 
 
 if __name__ == '__main__':
