@@ -14,13 +14,19 @@
 # WHDLoad
 
 Improved WHDLoad slaves for Amiga games, released here when the original maintainer
-does not take the changes. Each game is a directory under `games/`; shared build, run and
-release code is in `common/` and shared docs are in `docs/`.
+does not take the changes. Each game is a directory under `games/` with its own
+`AGENTS.md` and `docs/`; shared build, run and release scripts are in `common/` and shared
+docs are in `docs/`.
 
-Shared guidance starts at AmigaXDev `docs/index.md` (installed as
-`~/.local/share/amiga/docs/index.md`): read the rows that match the task. The relevant
-workflow is `docs/playbooks/new-game-playbook.md`; the current task takes precedence over
-its full setup workflow.
+Working on a game: read its `AGENTS.md`, then its `docs/open-work.md`. For anything about
+the repository (layout, running, building, releasing, bringing a game in) start at
+`docs/index.md` and read only the rows that match the task. `make list` shows the games;
+`make run` inside a game directory boots it (`docs/running.md`).
+
+Shared Amiga guidance starts at AmigaXDev's `docs/index.md`, installed as
+`~/.local/share/amiga/docs/index.md`. Its WHDLoad playbook is the method; a game's current
+task takes precedence over the playbook's full setup workflow. Generic lessons go there
+(edit them in AmigaXDev); this repository keeps what is specific to these games.
 
 ## Rules
 

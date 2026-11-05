@@ -1,0 +1,14 @@
+{
+  "archives": [
+    {
+      "input": "@GAME@.lha",
+      "output": "@GAME@-{version}.lha",
+      "replace": {
+        "@GAME@/@GAME@.Slave": "build:@GAME@",
+        "@GAME@/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": []
+    }
+  ]
+}

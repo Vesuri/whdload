@@ -1,0 +1,34 @@
+# WHDLoad
+
+Improved [WHDLoad](https://www.whdload.de) slaves for Amiga games: faster frame rates,
+smoother play and fixes, each behind a `CUSTOM` option so the original behaviour stays
+available. They build on slaves by other authors, who are credited in every game's docs
+and release ReadMe. This repository releases the changes the original maintainers have not
+taken.
+
+Releases are on the [releases page](https://github.com/Vesuri/whdload/releases), one tag
+per game (`<Game>/v<version>`). Each archive is the original release with the slave, the
+ReadMe and only the files that changed replaced. Install it as you would the original.
+
+## Games
+
+| Game | Original slave by | Release |
+|---|---|---|
+
+## Building
+
+The slaves are built on macOS with the environment from
+[AmigaXDev](https://github.com/Vesuri/amigaxdev)'s `make setup` (vasm, WHDLoad's developer
+package, FS-UAE). No game data, Kickstart or WHDLoad files are in this repository: supply
+the original archives yourself.
+
+```sh
+make list                                   # the games
+cd games/<Game>
+make unpack ARCHIVES=<directory with the original archives>
+make slave                                  # tmp/build/release/
+make run SETUP=a1200                        # boot it in FS-UAE
+make dist                                   # repack the original archives into dist/
+```
+
+`docs/index.md` describes the layout, running, building and releasing.
