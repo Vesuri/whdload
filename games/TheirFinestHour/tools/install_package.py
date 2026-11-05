@@ -77,8 +77,12 @@ def installer(original):
     start = text.index('(procedure P_SelectVersion\n')
     end = text.index('\n;---------------------------------------------------------------------', start)
     text = text[:start] + '(procedure P_SelectVersion\n  ("")\n)\n' + text[end:]
+    # Older templates check every imaging tool at startup. Newer templates
+    # check inside their imaging procedures, unused by this DOS-file install.
     for program in ('RawDIC', 'Patcher', 'DIC'):
-        text = replace_once(text, f'(set #program "{program}")\n(P_ChkRun)\n', '')
+        check = f'(set #program "{program}")\n(P_ChkRun)\n'
+        if check in text:
+            text = replace_once(text, check, '')
     # The template stores a suffix in #icon before askchoice; use the Normal index.
     text = replace_once(text, '(default #icon)', '(default 0)')
     # Preserve the prepared NewIcon tooltypes; explicitly retain the launch default.
