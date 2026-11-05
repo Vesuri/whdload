@@ -46,7 +46,7 @@ game_build() {
 # - 68040 and 68060 machines use FSUAE_MMU: the pinned core takes CHIP write cache
 #   attributes from the wrong MMU cache entry, which FSUAE_MMU corrects (it is the binary
 #   tools/build_mmu_fix.py builds). Other machines use FSUAE_ARM.
-# A recorded emulator that another directory started is never stopped.
+# A recorded emulator that another directory started is never stopped, by a run or make stop.
 game_prepare() {
   if [ -z "${SLAVE:-}" ]; then
     if ! user_set WHD_ARGS; then
@@ -68,8 +68,14 @@ game_prepare() {
     esac
   fi
   export FSUAE WHD_ARGS AMIGA_SETUP
-  # A pid file alone does not prove ownership: the pid may since belong to another
-  # project's emulator.
+  wc_check_owner
+}
+
+game_stop() { wc_check_owner; }
+
+# A pid file alone does not prove ownership: the pid may since belong to another
+# project's emulator.
+wc_check_owner() {
   local run="$GAME_ROOT/tmp/run/${INSTANCE:-default}" tracked
   if [ -f "$run/.run/fsuae.pid" ]; then
     tracked="$(cat "$run/.run/fsuae.pid")"
