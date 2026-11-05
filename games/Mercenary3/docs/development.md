@@ -306,8 +306,13 @@ is replaced only with `FORCE=1`). The version and date come from the release sla
 no other offset moves; they must match its `Version <version> (<date>)` line, the ReadMe's
 `Mercenary 3 Enhanced` title line and its history entry. A VERIFY slave is refused.
 
-The archive has exactly the members of `tmp/archives/Mercenary3.lha` (verified against
-`manifest/inputs.json`). `Mercenary3 Install/Mercenary3.Slave` and `Mercenary3 Install/ReadMe` are replaced, and
+The archive has the members of `tmp/archives/Mercenary3.lha` (verified against
+`manifest/inputs.json`) with the source drawer updated: `Mercenary3 Install/src/` holds
+exactly the `src/` files the release slave was assembled from (`tmp/build/release/Mercenary3.deps`),
+`Mercenary3.slave.asm` under its shipped name and the included files beside it, so the
+shipped source assembles to the shipped slave. The original `Mercenary3.islave.asm` is not
+among them and is dropped; the imager it built ships unchanged.
+`Mercenary3 Install/Mercenary3.Slave` and `Mercenary3 Install/ReadMe` are replaced, and
 the two game icons (`Mercenary3.inf`, `Mercenary3.romicon`) gain the tooltype `CUSTOM5=1`
 at the end of their tooltype arrays, after the ROMIcon colour marker and existing entries;
 the packager checks that removing it restores every original byte. The original Install
@@ -319,7 +324,7 @@ build time, so no template or original text is tracked. LHa for UNIX (`LHA`) pac
 level-1 LH5 headers; the original stores generic headers, the repack UNIX ones.
 
 The packager stages a fresh extraction under `tmp/`, tests the result with `$LHA t`,
-re-extracts it and requires the same member names, every member equal to its staged
-copy, the four changed members different from the originals and every other member
-byte-identical. This checks the package, not gameplay. Installation from an original
+re-extracts it and requires the expected member names, every member equal to its staged
+copy, the slave, ReadMe and icons different from the originals and every member outside
+the source drawer byte-identical. This checks the package, not gameplay. Installation from an original
 floppy has not been exercised.

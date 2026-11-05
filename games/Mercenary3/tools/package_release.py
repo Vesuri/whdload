@@ -4,10 +4,12 @@
 
 Input: tmp/archives/Mercenary3.lha (pinned in manifest/inputs.json). Output:
 DIST/Mercenary3Enhanced-<version>-<YYYYMMDD>.lha, from the slave's $VER string (docs/releasing.md),
-with exactly the same members, and its .sha256; an existing archive is replaced only with
---force. Only the slave, the ReadMe
+and its .sha256; an existing archive is replaced only with --force. The slave, the ReadMe
 and the two game icons (Mercenary3.inf and Mercenary3.romicon, which gain the tooltype
-CUSTOM5=1 so Enhanced framerate starts checked) differ.
+CUSTOM5=1 so Enhanced framerate starts checked) are replaced, and the source drawer holds
+exactly the src/ files the release slave was assembled from (its .deps, beside the slave),
+under the shipped names where they exist (docs/releasing.md); every other member is the
+original's.
 The ReadMe is the WHDLoad Install Template's (pinned in manifest/release-templates.json)
 with release/readme-body.txt and the original ReadMe's version 1.2 history entry.
 LHA names LHa for UNIX; Lhasa cannot create archives.
@@ -35,6 +37,36 @@ TOP = 'Mercenary3 Install'
 SLAVE = f'{TOP}/Mercenary3.Slave'
 README = f'{TOP}/ReadMe'
 ICONS = [f'{TOP}/Mercenary3.inf', f'{TOP}/Mercenary3.romicon']
+SRC = f'{TOP}/src'
+
+
+def true_case(rel):
+    """rel (under the game directory) in the spelling its directory entries have."""
+    path = ROOT
+    for part in Path(rel).parts:
+        names = {n.lower(): n for n in os.listdir(path)}
+        path = path / names.get(part.lower(), part)
+    return path.relative_to(ROOT).as_posix()
+
+
+def release_sources(slave, shipped):
+    """Archive member -> game file for each src/ file the slave's build read.
+
+    A file keeps a shipped member's name when one matches it ignoring case; shipped
+    sources the build did not read are dropped.
+    """
+    deps = slave.with_suffix('.deps')
+    if not deps.is_file():
+        raise ValueError(f'no {deps}: the release build lists its sources there')
+    by_case = {m.lower(): m for m in shipped}
+    wanted = {}
+    for dep in deps.read_text().split():
+        dep = true_case(dep)
+        if not dep.startswith('src/'):
+            raise ValueError(f'the slave is built from {dep}, outside src/')
+        member = f'{SRC}/{dep[len("src/"):]}'
+        wanted[by_case.get(member.lower(), member)] = ROOT / dep
+    return wanted
 
 
 def members(archive):
@@ -130,6 +162,14 @@ def main():
     changed = {SLAVE, README, *ICONS}
     if not changed <= set(names):
         raise ValueError('Source archive lacks the slave, ReadMe or game icons')
+    shipped = {m for m in names if m.startswith(SRC + '/')}
+    if not shipped:
+        raise ValueError(f'Source archive ships no {SRC}/')
+    sources = release_sources(args.slave, shipped)
+    removed = shipped - set(sources)
+    added = set(sources) - set(names)
+    changed |= set(sources)
+    final = [m for m in names if m not in removed] + sorted(added)
     dist = args.dist.resolve()
     dist.mkdir(parents=True, exist_ok=True)
     out = dist / f'Mercenary3Enhanced-{version}-{stamp}.lha'
@@ -143,31 +183,40 @@ def main():
         (stage / README).write_bytes(readme(version, (stage / README).read_bytes()))
         for name in ICONS:
             (stage / name).write_bytes(enhanced_icon((stage / name).read_bytes()))
+        for name in removed:
+            (stage / name).unlink()
+        for name, path in sources.items():
+            (stage / name).parent.mkdir(parents=True, exist_ok=True)
+            (stage / name).write_bytes(path.read_bytes())
         out.unlink(missing_ok=True)
         digest_file.unlink(missing_ok=True)
-        subprocess.run([lha, 'a1o5q2', str(out), *names], cwd=stage, check=True)
+        subprocess.run([lha, 'a1o5q2', str(out), *final], cwd=stage, check=True)
 
         test = subprocess.run([lha, 't', str(out)], capture_output=True, text=True)
         if test.returncode:
             raise ValueError(test.stdout + test.stderr)
         # LHa for UNIX sorts members, so compare sorted lists.
-        if sorted(members(out)) != sorted(names):
-            raise ValueError('Member list differs from the source archive')
+        if sorted(members(out)) != sorted(final):
+            raise ValueError('Member list differs from the expected one')
         extract(lha, out, new)
         extract(lha, SOURCE, old)
-        for name in names:
-            a, b = (new / name).read_bytes(), (old / name).read_bytes()
+        for name in final:
+            a = (new / name).read_bytes()
             if a != (stage / name).read_bytes():
                 raise ValueError(f'Extracted member differs from staging: {name}')
-            if (a != b) != (name in changed):
+            if name in added:
+                continue
+            # Replaced sources may happen to equal the original; everything else must not.
+            if (a != (old / name).read_bytes()) != (name in changed) and name not in sources:
                 raise ValueError(f'Unexpected change state: {name}')
-        for path in (new, old):
+        for path, expected in ((new, set(final)), (old, set(names))):
             extra = {p.relative_to(path).as_posix() for p in path.rglob('*') if p.is_file()}
-            if extra != set(names):
-                raise ValueError(f'Extraction holds other files: {sorted(extra ^ set(names))}')
+            if extra != expected:
+                raise ValueError(f'Extraction holds other files: {sorted(extra ^ expected)}')
     digest_file.write_text(f'{hashlib.sha256(out.read_bytes()).hexdigest()}  {out.name}\n')
-    print(f'{os.path.relpath(out, ROOT)}: {len(names)} files, {out.stat().st_size} bytes; '
-          f'changed: {", ".join(sorted(changed))}')
+    print(f'{os.path.relpath(out, ROOT)}: {len(final)} files, {out.stat().st_size} bytes; '
+          f'changed: {", ".join(sorted(changed - added))}; added: {", ".join(sorted(added))}; '
+          f'removed: {", ".join(sorted(removed))}')
 
 
 if __name__ == '__main__':

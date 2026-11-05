@@ -258,7 +258,7 @@ starts, stops, reversals and the mailbox approach have been checked. Frame rates
 unchanged on the routine setups; native world speed and options-off checks pass.
 See [P4](internals.md#p4-presentation-transitions). Release 2.0b (04.11.2026) is
 `dist/Mercenary3Enhanced-2.0b-20261104.lha`, made by `make dist`: the original installer archive with the
-new slave, a template-based ReadMe and CUSTOM5=1 in the game icons. The release exposes
+new slave and its source, a template-based ReadMe and CUSTOM5=1 in the game icons. The release exposes
 **Enhanced framerate**, default On. Off keeps the original game's behaviour, with the shipped slave's defects fixed. README includes installation, requirements,
 memory fallback and options; the release was played on every supported CPU class.
 Same-session route FPS Off → On: A500 3.70 → 4.10, 020-fast 7.50 → 12.50,
