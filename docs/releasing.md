@@ -52,12 +52,29 @@ Before packaging:
 
 ## Publishing
 
+```sh
+make release                 # inside games/<Game>, or GAME=<Game> at the root: a dry run
+make release PUBLISH=1       # publish it
+make release PUBLISH=1 REPLACE=1   # delete the game's earlier releases first
+```
+
 A release is a lightweight tag, the archive's name without `.lha`
 (`WingCommanderEnhanced-2.0b-20261019`), on the commit it was built from. The archive and
 its `.sha256` from `dist/` are attached to a GitHub release of that tag under the Vesuri
 account:
 
-- title: the release ReadMe's title line, `<Title> Enhanced <version> (dd.mm.yyyy)`
-  (`Wing Commander Enhanced 2.0b (19.10.2026)`);
-- notes: the ReadMe's change points for that version only. The original author and the
-  requirements are not version-specific; the game's ReadMe and docs carry them.
+- title: `<Title> Enhanced <version> (dd.mm.yyyy)` (`Wing Commander Enhanced 2.0b
+  (19.10.2026)`), from `TITLE` and the release slave's `$VER`;
+- notes: the change points of that version's history entry in the archive's ReadMe (the
+  `- ` items after the line `version <version> (...)`), without the WHDLoad requirement.
+  The original author and the requirements are not version-specific; the game's ReadMe
+  and docs carry them. A ReadMe whose entry is not such a list gives the notes in a file,
+  `NOTES=<file>`.
+
+`make release` (`common/release.sh`, `common/tools/publish_release.py`) needs the game and
+`common/` committed. It runs `make dist` at HEAD and prints the tag, title, files and notes.
+With `PUBLISH=1` it then checks the identity, the GitHub account and that HEAD is on
+`origin/main`, tags HEAD, creates the release, uploads both files, downloads the archive to
+compare it with the `.sha256`, and lists the release in the root `README.md` (a commit of
+`README.md` alone, pushed). An existing release of the game stops it unless `REPLACE=1`.
+GitHub's API fails intermittently, so each remote step is retried and read back.

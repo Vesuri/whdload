@@ -2,7 +2,7 @@
 # `make run` inside games/F1GP equals `make run GAME=F1GP` here.
 SHELL := /bin/bash
 GAMES := $(patsubst games/%/game.conf,%,$(wildcard games/*/game.conf))
-GAME_TARGETS := slave verify developer build run stop unpack record clean
+GAME_TARGETS := slave verify developer build run stop unpack release record clean
 # Paths given on the command line (SLAVE=, ARCHIVES=) are relative to this directory.
 export CALLER_DIR := $(CURDIR)
 
@@ -11,7 +11,7 @@ export CALLER_DIR := $(CURDIR)
 
 help:
 	@echo 'make list                       the games'
-	@echo 'make <target> GAME=<Game>       slave verify developer build run stop unpack dist check record clean'
+	@echo 'make <target> GAME=<Game>       slave verify developer build run stop unpack dist release check record clean'
 	@echo 'make dist | make check          every game (or GAME=<Game>); check also runs the repo checks'
 	@echo 'make new GAME=<Game>            start a game from common/template'
 	@echo 'Inside games/<Game>, the same targets without GAME=. Run options: common/run.sh.'
