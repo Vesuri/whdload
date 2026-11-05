@@ -58,7 +58,7 @@ def adapt(text):
 def source(root):
     pieces=[]
     for name in ('timing_player','player_basis','timing_translation','timing_scene','timing_scene_slots','timing_projectiles'):
-        s=(root/'whdload'/f'{name}.s').read_text()
+        s=(root/'src'/f'{name}.s').read_text()
         if name=='player_basis':
             s=re.sub(r'(player_basis_offsets: dc.w[^\n]+)',lambda m:re.sub(r'\$[0-9a-f]+',lambda x:field(x[0]),m[0]),s)
         if name=='timing_scene':
@@ -115,13 +115,13 @@ def source(root):
 
 
 def field_source(root):
-    text=adapt((root/'whdload/timing_field_shots.s').read_text())
+    text=adapt((root/'src/timing_field_shots.s').read_text())
     text=text.replace('timing_active','ocs_clock_active').replace('timing_game','game_base')
     return select(text,'68000')
 
 
 def external_source(root):
-    text=(root/'whdload/timing_external.s').read_text()
+    text=(root/'src/timing_external.s').read_text()
     text=re.sub(r'(dc.w[^\n]+)',lambda m:re.sub(r'\$[0-9a-f]+',lambda x:field(x[0]),m[0]),text)
     text=adapt(text).replace('timing_hz','ocs_clock_hz')
     # Placed after exhaust to retain the existing early clock-call reach.

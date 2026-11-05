@@ -26,14 +26,14 @@ MODALS = ((0x872,10,'pause',0),(0xf56,8,'autopilot',0),
 
 
 def source(root, game):
-    text=(root/'whdload/ocs_clock.s').read_text()
-    text+='\n'+(root/'whdload/waypoint_overlay.s').read_text()+'''
+    text=(root/'src/ocs_clock.s').read_text()
+    text+='\n'+(root/'src/waypoint_overlay.s').read_text()+'''
 waypoint_native_marker: jmp OCS_WAYPOINT
 waypoint_native_scene: bra.w ocs_clock_scene_draw
 '''
     # Reuse the established beam classification and scheduler, selecting the
     # previously checked 68000 arithmetic expansions. No CD32 game ABI enters.
-    shared=(root/'whdload/timing.s').read_text()
+    shared=(root/'src/timing.s').read_text()
     rate=shared[shared.index('timing_rate:'):shared.index('; Ordinary loop consumes')]
     text += '\n'+rate+'\n'+unit(root,'timing_clock','68000')
     for off,width,name,arg in MODALS:

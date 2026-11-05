@@ -64,7 +64,7 @@ def main():
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():
         raise ValueError('new tmp output required')
     out.mkdir(parents=True)
-    subprocess.run([os.environ['VASM'],'-m68020','-spaces','-no-opt','-Fbin','-o',str(out/'clock.bin'),str(ROOT/'whdload/timing_clock.s')],check=True)
+    subprocess.run([os.environ['VASM'],'-m68020','-spaces','-no-opt','-Fbin','-o',str(out/'clock.bin'),str(ROOT/'src/timing_clock.s')],check=True)
     blob=(out/'clock.bin').read_bytes();cases=check(blob)
     # A wrong world rate must fail the independent ledger, not share its oracle.
     needle=bytes.fromhex('c6fc000a')

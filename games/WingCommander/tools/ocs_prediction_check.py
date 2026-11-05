@@ -68,7 +68,7 @@ def projectiles(build,model):
     c.write(CODE+0x146ce,word(0x4e75))
     put('ocs_clock_active',1);call('timing_scene_snapshot');call('timing_scene_snapshot')
     entry,args=(0xbf5a,struct.pack('>hhI',shooter,400,DATA+0x8928)) if weapon==48 else (0xc1ce,struct.pack('>hh',shooter,0))
-    ref=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english',model=model)
+    ref=Native(ROOT/'tmp/game/WingCommander/data/Wing.english',model=model)
     try:
      ref.write(0x200000,c.read(0x200000,0x400000));ref.write(DATA,c.read(DATA,0xf5b8))
      ref.write(CODE+0x146ce,word(0x4e75));ref.run(entry,args);c.run(entry,args)

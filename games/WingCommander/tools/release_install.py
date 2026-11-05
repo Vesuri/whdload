@@ -3,6 +3,7 @@
 import argparse,hashlib,json,re,shutil,subprocess
 from pathlib import Path
 from ocs_reconstruct import ROOT,new_output
+from archives import verified
 
 
 def validate_script(text):
@@ -31,7 +32,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--cd32',type=Path,required=True);p.add_argument('--ocs',type=Path,required=True)
     p.add_argument('--output',required=True);a=p.parse_args();out=new_output(a.output)
-    subprocess.run(['/bin/bash',str(ROOT/'tools/inputs.sh'),'verify'],cwd=ROOT,check=True)
+    installer=verified('installer')
     script=(ROOT/'release/Install').read_text(encoding='latin1');validate_script(script)
     readme=(ROOT/'release/ReadMe').read_bytes()
     assert readme==(ROOT/'release/ReadMe.OCS').read_bytes()
@@ -45,7 +46,7 @@ def main():
         assert ('$VER: '+name+' 2.0b (19.10.2026)\0').encode() in slave
     out.mkdir(parents=True)
     # Extract the verified original afresh, retaining its exact member names.
-    subprocess.run(['lha','xq',str(ROOT/'tmp/downloads/WingCommander.lha')],cwd=out,check=True)
+    subprocess.run(['lha','xq',str(installer)],cwd=out,check=True)
     def hashes():
         return {str(f.relative_to(out)):hashlib.sha256(f.read_bytes()).hexdigest()
                 for f in sorted(out.rglob('*')) if f.is_file()}

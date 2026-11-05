@@ -7,7 +7,7 @@ HOOKS=((0x1ef24,'intro_title',0x4ef9),(0x1effc,'intro_credits_update',0x4eb9),
  (0x1f066,'intro_credits_end',0x4ef9),(0x2fa,'intro_flash_draw',0x4eb9))
 
 def source(root):
-    shared=(root/'whdload/timing_intro.s').read_text()
+    shared=(root/'src/timing_intro.s').read_text()
     title=shared[shared.index('intro_title:'):shared.index('; Native credit loop')]
     replacements={'timing_game':'game_base','timing_clock':'ocs_clock_state',
      'timing_hz':'ocs_clock_hz','WC_A4_FIELD_CLOCK':'-2048','WC_SCENE_APPROACH':'135',
@@ -32,8 +32,8 @@ EFFECT_CLASS equ $e8e
 EFFECT_MODEL equ $f86
 EFFECT_OWNER equ $3058
 EFFECT_DEPTH equ $252e
-'''+(root/'whdload/effect_order.s').read_text()
-    return select((root/'whdload/ocs_intro.s').read_text()+'\n'+title+'\n'+order,'68000')
+'''+(root/'src/effect_order.s').read_text()
+    return select((root/'src/ocs_intro.s').read_text()+'\n'+title+'\n'+order,'68000')
 
 def integrate(text):
     # These three wrappers are shared with flight, but intro never enables its

@@ -24,14 +24,14 @@ EFFECT_CLASS equ $1700
 EFFECT_MODEL equ $17f8
 EFFECT_OWNER equ $3a6a
 EFFECT_DEPTH equ $24de
-'''+(root/'whdload/effect_order.s').read_text()+'''
+'''+(root/'src/effect_order.s').read_text()+'''
 effect_raster:
  bsr.w effect_order
  move.l timing_game(pc),-(sp)
  addi.l #$2ca3e,(sp)
  rts
 ''')
-        lines.insert(-1, (root/'whdload/waypoint_overlay.s').read_text()+'''
+        lines.insert(-1, (root/'src/waypoint_overlay.s').read_text()+'''
 waypoint_native_marker:
  move.l timing_game(pc),-(sp)
  addi.l #$3766,(sp)
@@ -68,7 +68,7 @@ waypoint_original_install:
         lines.insert(-1,unit(root, 'timing_scene_slots', v.CPU))
         lines.insert(-1,unit(root, 'timing_external', v.CPU))
         lines.insert(-1,unit(root, 'view_regions', v.CPU))
-        lines.insert(-1,(root/'whdload/cinematic_background.s').read_text().replace(
+        lines.insert(-1,(root/'src/cinematic_background.s').read_text().replace(
             '        CINEMATIC_DRAW','        movea.l timing_game(pc),a0\n        jmp $2efe8(a0)'))
     if buffered:lines += [' bsr.w opening_guard',' bsr.w modal_guard']
     for offset,_,_ in patches:
@@ -108,5 +108,5 @@ waypoint_original_install:
         at=lines.index('timing_install:')+1
         lines[at:at]=['\tlea $33796(a0),a1','\tlea release_publish_resume(pc),a3','\tmove.l a1,(a3)',
                      '\tlea $337f0(a0),a1','\tlea release_teardown_resume(pc),a3','\tmove.l a1,(a3)']
-    if buffered: lines.append((root/'whdload/timing_field_shots.s').read_text())
+    if buffered: lines.append((root/'src/timing_field_shots.s').read_text())
     return '\n'.join(lines)

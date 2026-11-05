@@ -10,7 +10,7 @@ from pathlib import Path
 import subprocess
 import time
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from amigaxdev import barto
 from cd32_runtime import BASE, SIZES, ROOT, locate
 
@@ -33,12 +33,11 @@ def main():
         raise ValueError('EXTRA_ARGS is not allowed in the fixed phase 2 gate')
     out.mkdir(parents=True)
     os.chdir(ROOT)
-    run = '../'+str(out.relative_to(ROOT))+'/run'
-    env = dict(os.environ, FSUAE_RUN=run, WARP=os.environ.get('WARP','0') if a.calibrate else '0', WINDOW='front',
+    env = wc_run.run_env(out, WARP=os.environ.get('WARP','0') if a.calibrate else '0', WINDOW='front',
                JOY0='none', JOY1='none',
                DETERMINISTIC=os.environ.get('DETERMINISTIC', '1') if a.calibrate else '1',
                AMIGA_SETUP=os.environ.get('AMIGA_SETUP','a1200-fast') if a.calibrate else 'a1200-fast')
-    server = Server('wc-gate',root=str(ROOT),run_dir='amiga/'+run,profile_window=False)
+    server = wc_run.server('wc-gate', env, profile_window=False)
     g = None
     actions = []
     def command(text, timeout=60):
@@ -103,8 +102,8 @@ def main():
         shot = barto.load(str(trace)).fields[-1].shot
         if not shot: raise ValueError('empty screenshot')
         (out/'menu.png').write_bytes(shot)
-        boot = next((out/'run').glob('boot.*'))
-        slave = (boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()
+        boot = wc_run.drawer(env)
+        slave = (boot/'WingCommanderCD32.Slave').read_bytes()
         metadata = dict(layout, actions=actions, slave_sha256=hashlib.sha256(slave).hexdigest(),
                         whd_args=env.get('WHD_ARGS',''),fsuae_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest(),
                         machine='a1200-fast',warp=False)
@@ -131,6 +130,6 @@ def main():
     finally:
         (out/'actions.json').write_text(json.dumps(actions,indent=2)+'\n')
         if g: g.p.kill()
-        subprocess.run(['/bin/bash',str(ROOT/'amiga/run.sh'),'stop'],env=env,check=True)
+        wc_run.stop(env)
 
 if __name__ == '__main__': main()

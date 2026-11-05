@@ -138,7 +138,7 @@ def cd32_main(argv):
         lines.append('RENDER_FAMILY equ '+str({'auto':0,'030':30,'040':40}[a.render_family]))
         lines.append(render_source(ROOT, variant="cd32"))
     if a.release:
-        lines.append((ROOT/'whdload/release.s').read_text())
+        lines.append((ROOT/'src/release.s').read_text())
     if a.timing:
         lines.append('TIMING_VERIFY equ '+str(int(a.timing_verify)))
         lines.append('FRAME_STATS equ '+str(int(a.frame_stats)))
@@ -167,13 +167,13 @@ def cd32_main(argv):
         renderer=renderer.replace('render_wait:\n','render_wait:\n        tst.w timing_active(pc)\n        bne.w render_wait_done\n        tst.w intro_active(pc)\n        bne.w render_wait_done\n')
         lines += ['RENDER_VERIFY equ 0','RENDER_FAMILY equ 0',renderer]
     if a.verify or a.verify_control:
-        lines.append((ROOT/'whdload/verify.s').read_text())
+        lines.append((ROOT/'src/verify.s').read_text())
     if a.ceiling and a.ceiling.startswith('drawing'):
         bitmap='$4e75' if a.ceiling in ('drawing','drawing-bitmap') else '$48e7'
         clear='$4e75' if a.ceiling in ('drawing','drawing-clear') else '$48e7'
-        lines.append((ROOT/'whdload/drawing_ceiling.s').read_text().replace('BITMAP_OPCODE',bitmap).replace('CLEAR_OPCODE',clear))
+        lines.append((ROOT/'src/drawing_ceiling.s').read_text().replace('BITMAP_OPCODE',bitmap).replace('CLEAR_OPCODE',clear))
     if a.cache_audit:
-        lines.append((ROOT/'whdload/cache_audit.s').read_text())
+        lines.append((ROOT/'src/cache_audit.s').read_text())
     if a.release:
         from modal_source import source as modal_source
         lines.append(modal_source(ROOT,"cd32"))

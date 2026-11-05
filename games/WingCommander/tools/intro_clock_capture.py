@@ -3,7 +3,7 @@
 import argparse, hashlib, json, os, re, shutil, struct, subprocess
 from pathlib import Path
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from cd32_runtime import ROOT, BASE, locate
 
 
@@ -22,7 +22,7 @@ def main():
     pcs=[s+sy['release_presented'],h[0]+0x34162,s+sy['intro_world'],s+sy['intro_draw'],h[0]+0x1fdd6,h[0]+0x1fe38,h[0]+0x1fe48]
     cfg=out/'observer.cfg';cfg.write_text(' '.join(f'{x:x}' for x in [h[0],h[1],h[3]]+pcs)+'\n')
     env={k:v for k,v in os.environ.items() if not k.startswith(('WC_OBSERVER_','WC_MATRIX_','WC_STATE_'))}
-    env.update(FSUAE_RUN='../'+str(out.relative_to(ROOT))+'/run',SLAVE=str(slave),AMIGA_SETUP=a.machine,WARP='1',NTSC='0',
+    env = wc_run.run_env(out, env, SLAVE=str(slave),AMIGA_SETUP=a.machine,WARP='1',NTSC='0',
         WC_NOMMU_CORE='1' if a.machine=='a1200-040' else '0',INTRO_STOCK_CLOCK='0',WC_BASELINE_CACHE_MODEL='1',
         WHD_ARGS='CUSTOM5=0 NOWRITECACHE '+('NoMMU' if a.machine=='a1200-040' else 'CACHE DCACHE'),
         WINDOW='front',JOY0='none',JOY1='none',DETERMINISTIC='1',WC_INSTANT_BLITTER='0',
@@ -50,7 +50,7 @@ def main():
         shutil.copyfile(cfg,dst/'observer.cfg')
         return dict(records=count,pictures=dc,epoch=epoch)
     try:
-        g=Server('wc-intro-clock',root=str(ROOT),run_dir='amiga/'+env['FSUAE_RUN'],profile_window=False).boot(env)
+        g=wc_run.server('wc-intro-clock', env, profile_window=False).boot(env)
         until(h[0]+0x1fd00)
         live=cmd('monitor wc-audit')
         memory=dump('title-start-fast.bin',BASE,0x800000)
@@ -78,7 +78,7 @@ def main():
         (out/'result.json').write_text(json.dumps(result,indent=2)+'\n')
     finally:
         if g:g.p.kill()
-        subprocess.run(['/bin/bash','amiga/run.sh','stop'],env=env,check=True)
+        wc_run.stop(env)
     for label in ('title','credits'):shutil.copyfile(out/'events.txt',out/label/'events.txt')
 
 if __name__=='__main__':main()

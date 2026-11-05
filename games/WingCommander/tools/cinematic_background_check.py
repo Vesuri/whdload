@@ -14,7 +14,7 @@ def check(variant, build, capture, model):
     assert report['slave_sha256']==hashlib.sha256((build/name).read_bytes()).hexdigest()
     sy=(json.loads((build/'build.json').read_text())['symbols'] if variant=='ocs' else
         {n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(build/'slave.lst').read_text(),re.M)})
-    c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english',model=model)
+    c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english',model=model)
     try:
         c.write(0,(capture/'chip.bin').read_bytes());c.write(0x200000,(capture/'fast.bin').read_bytes())
         h0,h1,_,_=layout['hunks'];a4=h1+0x7ffe;entry=layout['slave']+sy['cinematic_background']

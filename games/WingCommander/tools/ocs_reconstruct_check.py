@@ -39,7 +39,7 @@ def main():
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
     out = ocs.new_output(args.output)
-    original_root = ocs.ROOT / 'tmp/originals/ocs/WingCommander'
+    original_root = ocs.ROOT / 'tmp/game/WingCommander'
     before = {p.relative_to(original_root): ocs.sha(p.read_bytes())
               for p in original_root.rglob('*') if p.is_file()}
     slave = (original_root / 'WingCommander.Slave').read_bytes()
@@ -71,7 +71,7 @@ def main():
     cli_reject('changed-slave', changed, '--input', 'unsupported/changed OCS slave')
     cli_reject('truncated-slave', slave[:-1], '--input', 'unsupported/changed OCS slave')
     cli_reject('truncated-game', game[:-1], '--game', 'unsupported/changed OCS game')
-    cd32 = (ocs.ROOT / 'tmp/originals/cd32/WingCommanderCD32/data/wing.english').read_bytes()
+    cd32 = (ocs.ROOT / 'tmp/game/WingCommanderCD32/data/wing.english').read_bytes()
     cli_reject('wrong-variant', cd32, '--game', 'unsupported/changed OCS game')
     changed = bytearray(game)
     changed[0x2c + 0x26a3c] ^= 1

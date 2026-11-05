@@ -21,7 +21,7 @@ def digest(path):
 
 
 def scopes(build, layout):
-    original = ROOT/'tmp/originals/cd32/WingCommanderCD32/data/wing.english'
+    original = ROOT/'tmp/game/WingCommanderCD32/data/wing.english'
     if digest(original) != '093505483aed4c9dbd1b97484c3336e92fdb156be9c15a67ed0199bd4dade657':
         raise ValueError('pinned English executable required')
     code = original.read_bytes()[0x2c:0x2c+0x35ea4]

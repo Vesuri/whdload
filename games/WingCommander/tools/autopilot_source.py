@@ -16,7 +16,7 @@ def source(root, variant):
     off = site(variant)
     ocs = variant == 'ocs'
     assert code[off:off + 6] == bytes.fromhex('4ebafacc5c4f')
-    lines = [(root / 'whdload/autopilot_clock.s').read_text()]
+    lines = [(root / 'src/autopilot_clock.s').read_text()]
     fix = [('autopilot_camera', 0x6e24 if ocs else 0x70ae),
            ('autopilot_resume', off + 6)]
     overlays = (0x2018, 0x404, 0x371e) if ocs else (0x22a0, 0x402, 0x39a4)

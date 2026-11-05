@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+import wc_run
 from PIL import Image
 from ocs_publication_report import report as publication, window
 from ocs_baseline_report import parse
@@ -81,7 +82,7 @@ def report(root, build):
         require((root/'loaded-player.bin').read_bytes()==saved[0x158:0x19e] and
                 (root/'loaded-campaign.bin').read_bytes()==saved[2:0x158] and
                 (root/'loaded-state.bin').read_bytes()==saved[0x19e:],'save/load record mismatch')
-        files=list((root/'run').glob('boot.*/dh1/WingCommander/data/SAVEGAME.WLD'))
+        files=list(wc_run.capture_drawer(root).glob('data/SAVEGAME.WLD'))
         require(len(files)==1,'save was not flushed on quit')
         disk=files[0].read_bytes()
         require(len(disk)==8*894 and disk[:894]==saved,'persistent save differs from loaded slot')

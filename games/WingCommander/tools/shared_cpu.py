@@ -104,8 +104,8 @@ def select(source, cpu):
 
 def unit(root, name, cpu):
     if name not in UNITS: raise ValueError('not an audited shared source unit')
-    return select((root / 'whdload' / (name + '.s')).read_text(), cpu)
+    return select((root / 'src' / (name + '.s')).read_text(), cpu)
 
 
 def preamble(root, cpu):
-    return (root / 'whdload/shared_math.s').read_text() if cpu == '68000' else ''
+    return (root / 'src/shared_math.s').read_text() if cpu == '68000' else ''

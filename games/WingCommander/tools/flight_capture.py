@@ -3,7 +3,7 @@
 import argparse,hashlib,json,os,re,subprocess
 from pathlib import Path
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from amigaxdev import barto
 from cd32_runtime import ROOT,BASE,locate
 
@@ -28,9 +28,8 @@ def main():
     pcs += [s+x for x in (0x178e,0x1792,0x17b8,0x17e6)]
     config=out/'observer.cfg';config.write_text(' '.join(f'{v:x}' for v in [h[0],h[1],h[3]]+pcs)+'\n')
     matrix=out/'matrix.cfg';matrix.write_text(f'{h[0]:x} 1\n{h[0]+0x698:x} 0\n')
-    run='../'+str(out.relative_to(ROOT))+'/run'
     env={k:v for k,v in os.environ.items() if not k.startswith(('WC_OBSERVER_','WC_MATRIX_','WC_STATE_'))}
-    env.update(FSUAE_RUN=run,SLAVE=str(slave),AMIGA_SETUP=a.machine,
+    env = wc_run.run_env(out, env, SLAVE=str(slave),AMIGA_SETUP=a.machine,
         INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',WC_NOMMU_CORE='0' if a.machine=='a1200-fast' else '1',
         WHD_ARGS='CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0',WARP='1',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',DETERMINISTIC='1',WC_INSTANT_BLITTER='0',
         WC_OBSERVER_CONFIG=str(config),WC_OBSERVER_OUTPUT=str(out/'events.txt'),WC_MATRIX_CONFIG=str(matrix),WC_MATRIX_DIR=str(out),WC_MATRIX_PROFILES='0')
@@ -57,7 +56,7 @@ def main():
         windows.append(dict(name=name,first_event=before,end_event=after,fields=len(t.fields),aprof=aprof))
         print(f'captured {name}: {len(t.fields)} fields',flush=True)
     try:
-        g=Server('wc-flight',root=str(ROOT),run_dir='amiga/'+run,profile_window=False).boot(env)
+        g=wc_run.server('wc-flight', env, profile_window=False).boot(env)
         boot=cmd('monitor wc-audit');audit=dict(re.findall(r'(\w+)=(\w+)',boot))
         expected=dict(model='68020' if a.machine=='a1200-fast' else '68030',mmu='0',unit='128' if a.machine=='a1200-fast' else '36',exact='1',memory_exact='1',immediate_blits='0')
         if any(audit.get(k)!=v for k,v in expected.items()):raise ValueError(boot)
@@ -88,6 +87,6 @@ def main():
     finally:
         (out/'actions.json').write_text(json.dumps(actions,indent=2)+'\n')
         if g:g.p.kill()
-        subprocess.run(['/bin/bash','amiga/run.sh','stop'],env=env,check=True)
+        wc_run.stop(env)
 
 if __name__=='__main__':main()

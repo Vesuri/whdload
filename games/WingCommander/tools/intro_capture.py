@@ -3,7 +3,7 @@
 import argparse, hashlib, json, os, subprocess
 from pathlib import Path
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from amigaxdev import barto
 from cd32_runtime import ROOT, BASE, locate
 
@@ -42,8 +42,7 @@ def main():
     pcs += [0xf800d2, h3]
     pcs += [h[n]+offset for n,offset,_ in SCENES]
     config=out/'observer.cfg'; config.write_text(' '.join(f'{v:x}' for v in [h0,h1,h3]+pcs)+'\n')
-    run='../'+str(out.relative_to(ROOT))+'/run'
-    env=dict(os.environ, FSUAE_RUN=run, WARP='0', NTSC='0', WINDOW='front', JOY0='none',JOY1='none',
+    env=wc_run.run_env(out, WARP='0', NTSC='0', WINDOW='front', JOY0='none',JOY1='none',
              DETERMINISTIC='1', AMIGA_SETUP='a1200-fast', WHD_ARGS='CUSTOM5=0', SLAVE='',
              INTRO_STOCK_CLOCK='1',
              WC_OBSERVER_CONFIG=str(config), WC_OBSERVER_OUTPUT=str(out/'events.txt'))
@@ -72,7 +71,7 @@ def main():
         (out/'milestones.json').write_text(json.dumps(milestones,indent=2)+'\n')
         print('captured '+name,flush=True)
     try:
-        g=Server('wc-intro',root=str(ROOT),run_dir='amiga/'+run,profile_window=False).boot(env)
+        g=wc_run.server('wc-intro', env, profile_window=False).boot(env)
         check_clock(out)
         if 'profile-window 00000000 7fffffff' not in cmd('monitor trace-window-all'): raise ValueError('explicit profiler window unavailable')
         for n,offset,name in SCENES:
@@ -98,8 +97,8 @@ def main():
         cmd('monitor key 45 0')
         until(h0+0x20214)
         capture('menu')
-        boot=next((out/'run').glob('boot.*'))
-        slave=boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave'
+        boot=wc_run.drawer(env)
+        slave=boot/'WingCommanderCD32.Slave'
         report=dict(layout,milestones=milestones,trace_fields=a.trace_fields,
                     slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(),
                     emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest(),
@@ -108,6 +107,6 @@ def main():
         (out/'result.json').write_text(json.dumps(report,indent=2)+'\n')
     finally:
         if g:g.p.kill()
-        subprocess.run(['/bin/bash',str(ROOT/'amiga/run.sh'),'stop'],env=env,check=True)
+        wc_run.stop(env)
 
 if __name__=='__main__':main()

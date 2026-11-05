@@ -18,6 +18,7 @@ import subprocess
 import time
 from pathlib import Path
 import _amigaxdev
+import wc_run
 from cd32_runtime import ROOT
 
 
@@ -76,9 +77,8 @@ def main():
     lst = (slave.parent/'slave.lst').read_text().splitlines()
     symbols = {name: int(off, 16) for off, name in re.findall(r'^([0-9A-F]{8}) (\S+)$', '\n'.join(lst), re.M)}
     save_call = listing_address(lst, 'jsr     12(a2)           ; resload_SaveFile')
-    run = '../'+str(out.relative_to(ROOT))+'/run'
     env = {k: v for k, v in os.environ.items() if not k.startswith(('WC_OBSERVER_', 'WC_MATRIX_', 'WC_STATE_'))}
-    env.update(FSUAE_RUN=run, SLAVE=str(slave), AMIGA_SETUP=a.machine,
+    env = wc_run.run_env(out, env, SLAVE=str(slave), AMIGA_SETUP=a.machine,
         INTRO_STOCK_CLOCK='1' if a.timing_core and a.machine == 'a1200-fast' else '0',
         WC_NOMMU_CORE='1' if a.timing_core and a.machine != 'a1200-fast' else '0',
         WHD_ARGS=f'CUSTOM1={language} CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5={a.custom5} NOWRITECACHE {a.options}'.strip(),
@@ -108,8 +108,7 @@ def main():
     g = None
     try:
         if a.debugger:
-            from amigaxdev.gdbserve import Server
-            g = Server('wc-frames', root=str(ROOT), run_dir='amiga/'+run, profile_window=False).boot(env)
+            g = wc_run.server('wc-frames', env, profile_window=False).boot(env)
             def cmd(text, timeout=600):
                 r = g.cmd(text, timeout=timeout)
                 if any(e in r for e in ('Error', 'Cannot access', 'Remote connection closed', 'E01')):
@@ -137,14 +136,14 @@ def main():
                 cmd(f'monitor profile 3 \"\" \"{out}/display.bin\"',600)
                 if not (out/'display.bin').exists():raise ValueError('missing display trace')
         else:
-            subprocess.run(['/bin/bash', 'amiga/run.sh'], env=env, check=True, capture_output=True, text=True)
+            wc_run.launch(env, capture_output=True, text=True)
             deadline = started+a.timeout
             while time.time() < deadline:
-                files = glob.glob(str(out/'run/boot.*/dh1/WingCommanderCD32/**/framestats.bin'), recursive=True)
+                files = glob.glob(str(wc_run.drawer(env)/'**/framestats.bin'), recursive=True)
                 if files and os.path.getsize(files[0]) == record_bytes:
                     break
                 time.sleep(5)
-        files = glob.glob(str(out/'run/boot.*/dh1/WingCommanderCD32/**/framestats.bin'), recursive=True)
+        files = glob.glob(str(wc_run.drawer(env)/'**/framestats.bin'), recursive=True)
         if not files or os.path.getsize(files[0]) != record_bytes:
             raise TimeoutError('frame statistics were not saved')
         time.sleep(2)
@@ -153,7 +152,7 @@ def main():
             display=Path(files[0]).with_name('displaystats.bin')
             if not display.exists():raise ValueError('missing completed-display ledger')
             shutil.copyfile(display,out/'displaystats.bin')
-        config = glob.glob(str(out/'run/fsuae/Cache/Logs/debug.uae')) or glob.glob(str(out/'run/**/debug.uae'), recursive=True)
+        config = glob.glob(str(wc_run.run_dir(env)/'fsuae/Cache/Logs/debug.uae')) or glob.glob(str(wc_run.run_dir(env)/'**/debug.uae'), recursive=True)
         result = dict(fixture=fixture, machine=a.machine, timing_core=a.timing_core,
             baseline_cache_model=a.baseline_cache_model, custom5=a.custom5, options=a.options, cpu_speed=a.cpu_speed,
             ntsc=a.ntsc, held_key=a.held_key, debugger=a.debugger, observer=a.observer, live_cpu=live, frame_epoch=frame_epoch,
@@ -166,7 +165,7 @@ def main():
     finally:
         if g:
             g.p.kill()
-        subprocess.run(['/bin/bash', 'amiga/run.sh', 'stop'], env=env, check=True)
+        wc_run.stop(env)
 
 
 if __name__ == '__main__':

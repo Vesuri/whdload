@@ -15,7 +15,7 @@ def choose(option, cpu, profile, ready):
 
 
 def source():
-    return (ROOT/'whdload/ocs_backend.s').read_text()
+    return (ROOT/'src/ocs_backend.s').read_text()
 
 
 def diagnostic(option, cpu, memory_base, source, size, profile='measured', unavailable=False):

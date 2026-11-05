@@ -6,6 +6,7 @@ import json
 import re
 import struct
 from pathlib import Path
+import wc_run
 from PIL import Image
 from matrix_scene_report import report as scene_report
 
@@ -40,7 +41,7 @@ def compare(control, candidate):
             raise ValueError('unmatched configuration: '+key)
     binaries = []
     for run, meta in zip(runs, metadata):
-        paths = list((run/'run').glob('boot.*/dh1/WingCommanderCD32/WingCommanderCD32.Slave'))
+        paths = list(wc_run.capture_drawer(run).glob('WingCommanderCD32.Slave'))
         if len(paths) != 1:
             raise ValueError('one retained boot slave required')
         data = paths[0].read_bytes()
@@ -55,7 +56,7 @@ def compare(control, candidate):
     expected = bytearray(binaries[0])
     if drawing:
         from cd32_runtime import ROOT
-        original = (ROOT/'tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()
+        original = (ROOT/'tmp/game/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()
         if hashlib.sha256(original).hexdigest()!=ORIGINAL:
             raise ValueError('pinned original needed to check drawing control')
         code=bytearray(original[32:-4])

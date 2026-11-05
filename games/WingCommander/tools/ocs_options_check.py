@@ -18,7 +18,7 @@ def check(build, mutation=None):
     meta=json.loads((build/'build.json').read_text());sy=meta['symbols']
     blob=(build/'WingCommander.Slave').read_bytes();payload=load_slave(blob)
     require(meta.get('public_option'), 'public build required')
-    original=(ROOT/'tmp/originals/ocs/WingCommander/WingCommander.Slave').read_bytes()[32:-4]
+    original=(ROOT/'tmp/game/WingCommander/WingCommander.Slave').read_bytes()[32:-4]
     require(payload[0x20:0x24] == long(0x100000), 'missing expansion headroom')
     require(payload[0x1fc:0x202] == bytes.fromhex('d9fc000c0000'),
             'expansion reservation/pool mismatch')
@@ -58,7 +58,7 @@ def check(build, mutation=None):
                     # when enabled. A damaged exact site makes original mode
                     # fall back to the untouched game instead of aborting.
                     for corrupt in (False,'enhanced','exact'):
-                        c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english')
+                        c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english')
                         events=[]
                         try:
                             if slave>=0x1000000:ck(u.uc_mem_map(c.h,slave,0x100000,7))
@@ -115,7 +115,7 @@ def check(build, mutation=None):
                                 require(all(c.reg(r)==v for r,v in expected.items()),'startup register ABI changed')
                             results.append(dict(bank=bank,flags=flags,option=option,revision=revision,corrupt=corrupt,enhanced=enabled,events=events))
                         finally:c.close()
-    original=(ROOT/'tmp/originals/ocs/WingCommander/WingCommander.info').read_bytes()
+    original=(ROOT/'tmp/game/WingCommander/WingCommander.info').read_bytes()
     icon=(build/'WingCommander.info').read_bytes()
     require(icon==enhanced_icon(original),'generated icon mismatch')
     require(tooltypes(icon)[2][:2]==[b'CUSTOM5=1\0',b'DCACHE\0'],'icon defaults disabled')

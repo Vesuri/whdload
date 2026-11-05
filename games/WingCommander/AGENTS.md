@@ -1,7 +1,7 @@
 # Wing Commander
 
-Standalone WHDLoad improvement project for the OCS disk and CD32 versions.
-Current status: P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E3 are complete.
+WHDLoad improvements for the OCS disk (SPS 1657) and CD32 versions, two variants of one
+package. Current status: P13A1–P13A4, P13B1–P13B3, P13C1–P13C6, P13D1–P13D4 and P13E1–P13E3 are complete.
 D1 verifies OCS timing owners and 10 Hz units with native CPU checks; its input
 queue/edge ABI differs from CD32. D2 integrates the opt-in 10 Hz flight clock with retained catch-up debt and
 world-owned side effects. D3 adds field input and bounded renderer prediction;
@@ -40,44 +40,29 @@ The CD32 intro 10 Hz timing and first-interval projectile fixes are complete;
 phase 11b D1–D5 are complete on current models. A2 calibration remains separate.
 OCS live evidence is limited to the documented emulator gate; no OCS hardware
 performance or broader compatibility claim follows from it.
-Derived material stays in `tmp/`.
-Psygore authored the original v1.0 slaves; source code is unavailable.
+Psygore authored the original v1.0 slaves (`game.conf` `AUTHOR`); they shipped without
+source (`UPSTREAM=none`), so `tools/reconstruct.py` and `tools/ocs_reconstruct.py`
+reassemble them byte for byte from the pinned originals.
 
-## Rules
+The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
+this file and `docs/` here hold only what is specific to this game. Keep the two
+variants separate: do not assume their code or timing matches.
 
-- Never commit game, Kickstart, Workbench or WHDLoad bytes, or anything made from
-  them: unpacked data, disassemblies, traces, dumps, screenshots, input recordings
-  and built slaves stay in ignored `tmp/`.
-- Never `pkill fs-uae` or `pkill gdb`. Use the shared `fsuae_common.sh` and only
-  stop this project's processes, checking ownership before killing a PID.
-- Commits: author and committer `Vesa Halttunen <vesuri@jormas.com>`, unsigned,
-  `core.hooksPath=/dev/null`, no Co-Authored-By or other trailers; one coherent
-  change per commit.
-- Addresses in documentation are code-hunk or file offsets, not runtime addresses.
-- No performance claims without measurements from the appropriate instrument.
-- No local paths in the repository: no home directories, usernames or paths into
-  other projects. Name projects by name. Shared files use overridable variables
-  from `amiga/env.sh`; `~/.local` and `~/.local/share/amiga` are the conventions.
-  Scratch output belongs in `tmp/`, never in a system temporary directory.
-- Pin downloaded inputs by SHA-256 in `manifest/`; verify before extracting or
-  using them. Never overwrite changed local inputs or game trees.
-- Setup never deletes: preserve differing files under `.replaced/` before any
-  explicitly requested replacement. Never overwrite shared files edited in place.
-- Kickstart and Workbench sources must be supplied by the user (`TOSEC=`,
-  `AMIGA_OS=`); never record mirror addresses for them.
-- Scripts must run under macOS `/bin/bash` 3.2. Quote paths containing spaces.
-- History belongs in git; update current-state documentation in place.
-- Keep the two game variants separate; do not assume their code or timing matches.
-- Agent instructions belong in `AGENTS.md`; `CLAUDE.md` only imports it.
+Read `docs/open-work.md` first.
 
-## Read first
-
-| Document | Purpose |
+| Doc | Read it for |
 |---|---|
-| `docs/open-work.md` | Current scope and deferred work |
-| `docs/development.md` | Inputs, setup and shared environment |
-| `docs/internals.md` | Verified knowledge and unknowns |
+| `docs/open-work.md` | current scope and deferred work |
+| `docs/development.md` | builds and runs, inputs, every phase's tools and reproduction commands |
+| `docs/internals.md` | verified knowledge and unknowns |
+| `docs/ocs-plan.md` | the ordered OCS work |
+| `docs/ocs-release.md` | the OCS candidate, its support and the release hand-off |
+| `docs/timing-design.md`, `docs/framerate-audit.md` | the CD32 timing design and its audit |
 | AmigaXDev `docs/playbooks/new-game-playbook.md` | WHDLoad workflow and validation |
-| AmigaXDev `docs/environment.md` | Shared tools and variables |
-| AmigaXDev `docs/reference/measurement-method.md` | Measurement discipline |
-| AmigaXDev `docs/reference/validation-harness.md` | Correctness checks |
+| AmigaXDev `docs/reference/measurement-method.md` | measurement discipline |
+| AmigaXDev `docs/reference/validation-harness.md` | correctness checks |
+
+The slave source is `src/`: the modules the generators in `tools/` add to the
+disassembled original slaves (no main source file; `game.sh` `game_build` runs the
+generators). `tools/` is the development harness and never ships; `tools/manifest/`
+holds its pinned tables. `tools/wc_run.py` boots captures through `common/run.sh`.

@@ -2,37 +2,79 @@
 
 ## Inputs
 
-The [official install page](https://whdload.de/games/WingCommander.html) identifies
-Psygore's v1.0 installer. The user supplied the Retroplay OCS (SPS 1657) and CD32
-full-install URLs. Exact URLs and initial-download SHA-256 fingerprints are in
-`manifest/inputs.tsv`; these fingerprints pin the received files, not an
-independently authenticated upstream release.
+Three archives are the inputs: Psygore's v1.0 installer (`WingCommander.lha`) and the
+pre-installed OCS (SPS 1657, `WingCommander_v1.0_1657.lha`) and CD32
+(`WingCommander_v1.0_CD32.lha`) drawers. `inputs.sha256` pins the received files; the
+fingerprints are not an independently authenticated upstream release.
 
-`make fetch` downloads missing inputs and checks them before accepting them.
-`make verify` checks every cached archive. `make prepare` verifies each archive
-before extracting to separate `tmp/originals/installer`, `tmp/originals/ocs` and
-`tmp/originals/cd32` directories. Extraction requires `lha` on PATH. Existing
-extractions are left untouched; their contents are not revalidated by this target.
-Failed downloads or extractions are retained in ignored scratch storage.
+`make unpack ARCHIVES=<directory>` copies them into `tmp/archives/`, checks them and
+unpacks them into `tmp/game/`: `WingCommanderHD` (the installer), `WingCommander` (OCS)
+and `WingCommanderCD32`, each with its `.info`. A drawer already there is kept unless
+`FORCE=1`; its contents are not revalidated. Tools that read an archive check it against
+its pin first (`tools/archives.py`).
 
-The originals are reference copies. Later emulator work should use separate
-working copies under `tmp/game/`. Never commit archives or extracted contents.
+The drawers in `tmp/game/` are reference copies: the generators read the original
+slaves and game files there, and every boot copies a drawer to a fresh drive under
+`tmp/run/`. Never commit archives or extracted contents.
 
 ## Shared environment
 
-Source `amiga/env.sh`, which sources `${AMIGA_ENV}` or the conventional
-`~/.local/share/amiga/env.sh`. The shared environment supplies toolchain, WHDLoad,
-ROM and launcher variables. CD32 defaults to the shared A1200-fast preset;
-explicit OCS selection defaults to the A500/Fast baseline described below.
-Install shared prerequisites through AmigaXDev; ROM/OS sources are user supplied.
+The make targets load the shared environment themselves. The tools run in
+`games/WingCommander` after `. ../../common/env.sh`, which sources `${AMIGA_ENV}` or the
+conventional `~/.local/share/amiga/env.sh`. The shared environment supplies toolchain,
+WHDLoad, ROM and launcher variables. Install shared prerequisites through AmigaXDev;
+ROM/OS sources are user supplied.
+
+## Builds and runs
+
+`game.conf` names the two variants, `WingCommanderCD32` (the default) and
+`WingCommander` (OCS); `game.sh` builds them with the generators in `tools/`:
+
+| Build | CD32 (`WingCommanderCD32`) | OCS (`WingCommander`) |
+|---|---|---|
+| `release` (`make slave`) | `reconstruct.py --variant cd32 --release` | `ocs_memory_build.py --public` |
+| `verify` | `reconstruct.py --variant cd32 --verify` | none |
+| `reconstruct` | `reconstruct.py --variant cd32`: the original, byte for byte | `reconstruct.py --variant ocs` |
+| `render`, `render-control`, `render-verify` | `--render`, `--render-control`, `--render --render-verify` | none |
+
+`make build BUILD=<name> [VARIANT=<variant>]` writes `tmp/build/<name>/<variant>.Slave`
+and the generator's whole output directory beside it as `tmp/build/<name>/<variant>/`
+(`build.json`, `slave.lst`, `payload.bin`, the release ReadMe and the OCS icon), which the
+checking tools take as their build argument. `make verify` exists only for CD32:
+`make verify VARIANT=WingCommanderCD32`. Other diagnostic builds (timing, ceiling, cache
+audit, frame statistics, OCS candidates) call the generators directly with a new
+`--output` below `tmp/`, as the sections below show. `make check` checks the release
+build against `release/slaves.sha256`, rebuilds both reconstructions (each asserts
+byte identity with the pinned original) and runs `release_check.py`,
+`ocs_options_check.py` and the installer staging check.
+
+`make run` boots the release build (common/run.sh, the repository's `docs/running.md`):
+CD32 on `a1200-fast` with `WHD_ARGS` defaulting to `CUSTOM5=0 DCACHE`, OCS
+(`VARIANT=WingCommander`) on `a3000` with `CUSTOM5=1 DCACHE`. An explicitly empty
+`WHD_ARGS=` selects the original behaviour. A run with `SLAVE` (`SLAVE=original`, the
+shipped slave, or any build) gets no default options, and for OCS boots the `a500`
+baseline unless `SETUP` is given. On `a500` the OCS variant gets 4 MB of Zorro II Fast RAM
+and no slow RAM. `a1200-040` and `a1200-060` boot `FSUAE_MMU` (AmigaXDev's build with the
+MMU write-cache correction, the same binary `tools/build_mmu_fix.py` builds), everything
+else `FSUAE_ARM`, unless `FSUAE` is given. The boot drive keeps the archive's slave
+beside a replaced one as `<drawer>.original`, and a public OCS slave gets the generated
+icon with its Enhanced framerate tooltype. The machine edits the harness selects
+(`INTRO_STOCK_CLOCK`, `OCS_STOCK_CLOCK`, `WC_NOMMU_CORE`, `WC_BASELINE_CACHE_MODEL`,
+`WC_CPU_SPEED`, `WC_INSTANT_BLITTER`) are `game.sh`'s `game_setup`; the sections below
+describe each.
+
+The harness boots through `tools/wc_run.py`: every capture directory below `tmp/` is its
+own run instance, so its emulator, drives (`tmp/run/<instance>/.run/dh0`, `dh1`),
+screenshots and gdb-stub port are its own. `python3 tools/wc.py serve` runs in the
+instance `cap` unless `INSTANCE` names another.
 
 ## Current commands
 
-Fetch, input verification, archive preparation, static identification, reconstruction,
+Input verification and unpacking, static identification, reconstruction,
 windowed boots, a state-driven A/B gate and experimental phase-6 rendering
 builds/checks are implemented.
 The phase 2 launcher and byte-identical reconstruction are available; the phase 2 boot gate is complete. All shell tooling is written
-for `/bin/bash` 3.2 and supports the project name's space.
+for `/bin/bash` 3.2.
 
 ## Phase 1: reproducible CD32 static identification
 
@@ -47,14 +89,14 @@ imports the non-executing HunkReader directly.
 From the project root, in `/bin/bash` 3.2:
 
 ```sh
-. amiga/env.sh
-/bin/bash tools/inputs.sh verify
+. ../../common/env.sh
+make unpack
 python3 tools/cd32_static.py --output tmp/cd32-static
 ```
 
 The output directory must be new and below `tmp/`; use a different name on
 subsequent runs. The script verifies the installer/CD32 archives against
-`manifest/inputs.tsv` **before extraction**, extracts fresh copies only inside
+`inputs.sha256` **before extraction**, extracts fresh copies only inside
 that output directory, compares every reference game-directory file and its
 file set, and checks that the two slaves match. A differing reference or input
 causes failure and is preserved. Failed scratch runs are also retained. It
@@ -145,24 +187,24 @@ assertions and a full-file comparison reject any drift. Data islands remain data
 including the original KickEmu tables. No replacement KickEmu version is used.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --output tmp/reconstructed
-SLAVE="$PWD/tmp/reconstructed/WingCommanderCD32.Slave" /bin/bash amiga/run.sh
-/bin/bash amiga/run.sh stop
+make run SLAVE=tmp/reconstructed/WingCommanderCD32.Slave
+make stop
 WHD_ARGS=CUSTOM5=0 WINDOW=front python3 tools/wc.py serve
 # In a second shell with the same environment:
 python3 tools/wc.py shot tmp/boot.png
 python3 tools/wc.py quit
 ```
 
-`amiga/run.sh` is adapted from Legends of Valour. Defaults: native `FSUAE_ARM`,
-shared `AMIGA_SETUP=a1200-fast`, PAL, 68EC020, 2 MiB chip plus 8 MiB fast, windowed,
-real speed. `WHD_ARGS` selects the original Custom options. Each boot extracts a
-fresh pinned CD32 archive into a new scratch drive directory; no existing game
-or boot tree is replaced. `KICKSTART_A1200`, `RTB_A1200` (default ROM path + `.RTB`),
-`WORKBENCH_ADF` and `WHDLOAD_BINARY` come from the supplied shared environment.
-`FSUAE_RUN` must resolve below project `tmp/`; interactive and debugger defaults
-are `tmp/run` and `tmp/cap`. Process cleanup uses `FSUAE_COMMON`.
+The CD32 defaults: native `FSUAE_ARM`, shared `a1200-fast`, PAL, 68EC020, 2 MiB chip
+plus 8 MiB fast, windowed, real speed. `WHD_ARGS` selects the original Custom options.
+Each boot copies the pristine `tmp/game/WingCommanderCD32` to a fresh drive; no game
+tree is changed. `kick40068.A1200` with its `.RTB`, `WORKBENCH_ADF` and
+`WHDLOAD_BINARY` come from the supplied shared environment. The interactive and
+debugger runs are the instances `default` and `cap` under `tmp/run/`. Process cleanup
+uses `FSUAE_COMMON`; a recorded emulator that another directory started is never
+stopped.
 
 The `wc.py` adapter uses `amigaxdev.gdbserve`; disassembly and trace readers remain
 shared modules. `until` is bounded by `UNTIL_TIMEOUT` (60 seconds by default).
@@ -185,14 +227,14 @@ emulator fails before the route starts.
 
 The builder requires `FSUAE_SOURCE` (default `${AMIGA_SHARE}/fs-uae-aprof-build/fs-uae`),
 its configured dependencies/objects and the host compiler. It checks the source
-revision and modified-file digests in `manifest/debugger.tsv`, copies that build
+revision and modified-file digests in `tools/manifest/debugger.tsv`, copies that build
 under `tmp/`, recompiles the two changed translation units and links locally.
 It does not install or overwrite shared files. This is a rebuild from the supplied
 configured toolchain, not a self-contained emulator release. Every capture records
 the actual emulator and slave SHA-256.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/build_debugger.py --output tmp/debugger
 export FSUAE="$PWD/tmp/debugger/fs-uae"
 python3 tools/reconstruct.py --variant cd32 --output tmp/control
@@ -238,7 +280,7 @@ python3 tools/compare_boots.py --name tmp/ab/original-0 tmp/ab/reconstructed-0
 ### VERIFY seam
 
 The ordinary reconstructed slave is byte-identical. `--verify` replaces only the
-four-byte call at `S:14da` with a call to the appended seam in `whdload/verify.s`.
+four-byte call at `S:14da` with a call to the appended seam in `src/verify.s`.
 It still calls the original resload_PatchSeg and preserves its register/CCR outputs.
 `CUSTOM1=0` is English, `CUSTOM1=1` remains German; diagnostic `CUSTOM1=2` uses
 English and sets the marker at `S:1e34` to one. With the option disabled the marker
@@ -292,7 +334,7 @@ page 17 completes at `E:1fe48`, the harness waits for the next input poll, press
 Escape, and releases it on menu entry. No earlier input is sent.
 
 Build a fresh local debugger with the read-only observer. Shared files and game
-bytes are unchanged. The added source input is pinned in `manifest/debugger.tsv`.
+bytes are unchanged. The added source input is pinned in `tools/manifest/debugger.tsv`.
 The `trace-window-all` monitor command explicitly enables RAM instruction PCs;
 its acknowledgement is mandatory. The observer runs in the cycle-exact 68020
 interpreter and records selected PCs, registers, physical fields, emulator cycle
@@ -302,7 +344,7 @@ registers, memory, clocks or inputs. Other CPU backends are not validated.
 From the project root, with new output names:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/build_debugger.py --intro-observer --output tmp/intro-debugger
 export FSUAE="$PWD/tmp/intro-debugger/fs-uae"
 INTRO_STOCK_CLOCK=1 python3 tools/boot_gate.py --calibrate --output tmp/intro-layout
@@ -371,7 +413,7 @@ emulators sequentially. Shared source files, CPU presets and game inputs remain
 unchanged; all generated files stay below `tmp/`.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --cache-audit --output tmp/cache-audit-slave
 python3 tools/reconstruct.py --variant cd32 --output tmp/stock-recheck
 python3 tools/build_debugger.py --matrix-observer --output tmp/matrix-debugger
@@ -478,7 +520,7 @@ the run's `fsuae/Cache/Logs/fs-uae.log.txt`; use it only for short diagnostic ru
 This logger does not resolve context attribution.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/build_debugger.py --aprof-diagnostics --output tmp/pc-control-debugger
 FSUAE="$PWD/tmp/pc-control-debugger/fs-uae" python3 tools/matrix_probe.py   --machine a1200-fast --output tmp/pc-control
 python3 tools/build_debugger.py --aprof-diagnostics --aprof-stable-pc   --output tmp/pc-fixed-debugger
@@ -644,7 +686,7 @@ The WHDLoad `NoMMU` option does not select the emulator CPU core. Use the explic
 project-local selector, following Hard Drivin' and Red Baron's timing setups:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 export FSUAE="$PWD/tmp/phase4-profile-control-debugger/fs-uae"
 python3 tools/matrix_probe.py --machine a1200-030 --nommu-core --output tmp/nommu-probe-030
 python3 tools/matrix_probe.py --machine a1200-040 --nommu-core --options NoMMU --output tmp/nommu-probe-040
@@ -708,7 +750,7 @@ Build a local correction candidate and compare its numeric 020 clock to the
 existing stock-multiplier trace:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
   --frequency-clock --output tmp/frequency-debugger
 export FSUAE="$PWD/tmp/frequency-debugger/fs-uae"
@@ -802,7 +844,7 @@ The `tc030` audit field records actual translation control. These counter hooks
 are under validation; general instruction profiling remains unavailable on this
 interpreter.
 
-Independent runs may use distinct `FSUAE_RUN` directories and explicit
+Independent runs may use distinct `INSTANCE` names and explicit
 `DEBUG_PORT` values. The strict ownership check must remain enabled; a busy port
 must fail without stopping its listener. Current MMU diagnostics use port 2457,
 separate from the NOMMU batch on 2456.
@@ -981,7 +1023,7 @@ their own matched controls before accepting their DMA figures.
 Use a fresh output directory and debugger ports not owned by another capture.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
   --matrix-mmu030-counters --frequency-clock --matrix-dma --matrix-idle \
   --aprof-stable-pc --dma-cia-unsplit --output tmp/phase4-dma-cia-debugger
@@ -1026,7 +1068,7 @@ root. The retained run uses `tmp/phase4-dma-cia-accelerated/`.
 Build the read-only callback observer and obtain a fresh cache audit:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/build_debugger.py --matrix-observer --matrix-nommu-counters \
   --matrix-mmu030-counters --frequency-clock --matrix-dma --matrix-idle \
   --dma-cia-unsplit --matrix-irq --output tmp/phase4-irq-debugger
@@ -1310,7 +1352,7 @@ the shared launcher refuses foreign listeners and stops only owned processes.
 Every output directory must be new and below `tmp/`.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 export FSUAE="$PWD/tmp/phase4-irq-v2-debugger/fs-uae"
 export DEBUG_PORT=2483
 python3 tools/intro_timing_fixture.py --iterations 0 \
@@ -1381,10 +1423,10 @@ keeps the original language/rendering behaviour. Automatic selection uses Kalms
 limiter choices. Enabled rendering rejects `CUSTOM5=4` (old blitter converter).
 
 ```sh
-. amiga/env.sh
-make render-slave VARIANT=cd32 OUT=tmp/render
-make render-control VARIANT=cd32 OUT=tmp/render-control
-make render-verify VARIANT=cd32 OUT=tmp/render-twin
+. ../../common/env.sh
+python3 tools/reconstruct.py --variant cd32 --render --output tmp/render
+python3 tools/reconstruct.py --variant cd32 --render-control --output tmp/render-control
+python3 tools/reconstruct.py --variant cd32 --render --render-verify --output tmp/render-twin
 python3 tools/c2p_check.py tmp/render \
   --capture tmp/phase4-dma-cia-matrix/020-default/bare \
   --output tmp/render-native.json
@@ -1479,7 +1521,7 @@ only the latter delays the existing c2p. The extra argument uses the game's
 native direct-flight parser. `--nav 1` starts at the first combat navpoint.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/flight_fixture.py --output tmp/flight-control --iterations 0
 python3 tools/flight_fixture.py --output tmp/flight-delay --iterations 100000
 python3 tools/flight_fixture.py --output tmp/flight-combat --nav 1
@@ -1494,7 +1536,7 @@ python3 tools/boot_gate.py --calibrate --output tmp/flight-layout
 ```
 
 The retained Nav-1 fixture also rebuilds byte-identically in
-`tmp/phase7-fixture-repro-verified/`. Source `amiga/env.sh` first: the assembler
+`tmp/phase7-fixture-repro-verified/`. Source `../../common/env.sh` first: the assembler
 path is supplied through `VASM`.
 
 Calibration only locates the loaded hunks/slave; it does not run the phase-2
@@ -1597,7 +1639,7 @@ for Capstone and the installed Unicorn library, as for the existing native c2p
 checks. Run Python without `-O`: assertions are the native test oracle.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/timing_inventory.py tmp/phase7-combat-controls \
   --output tmp/timing-inventory
 python3 tools/timing_audit_check.py tmp/phase7-combat-controls \
@@ -1661,7 +1703,7 @@ Reproduce with fresh output directories (the retained run used
 `tmp/phase7-debugger-v2/fs-uae` and `tmp/phase7-fixture-repro-verified/`):
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/flight_fixture.py --output tmp/design-flight --nav 1
 python3 tools/build_debugger.py --output tmp/design-debugger \
   --intro-observer --matrix-observer --aprof-stable-pc \
@@ -1710,7 +1752,7 @@ All commands require fresh output directories under `tmp/`.
 Build the candidate and run native component checks:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --timing --output tmp/timing-candidate
 python3 tools/timing_clock_check.py --output tmp/timing-clock-check
 python3 tools/timing_adapter_check.py tmp/timing-candidate --output tmp/timing-install-check
@@ -1800,7 +1842,7 @@ The original reconstruction and options 0/1/2 remain unchanged. Rebuild and reta
 fresh output directories; all derived material stays in `tmp/`:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --timing --output tmp/scene-candidate
 python3 tools/flight_fixture.py --timing --timing-verify --nav 1 --output tmp/scene-flight
 export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
@@ -1880,7 +1922,7 @@ this rendering pass. The original limiter is retained.
 Build and native checks (fresh output directories are required):
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --timing --output tmp/flight-render-candidate
 python3 tools/history_storage_check.py tmp/flight-render-candidate
 python3 tools/flight_render_check.py tmp/flight-render-candidate \
@@ -1966,7 +2008,7 @@ WHDLoad's `NoWriteCache` option (WHDLoad otherwise keeps saved files in memory
 until exit).
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/flight_fixture.py --timing --frame-stats --nav 1 --output tmp/a1-fixture
 # Shared preset, emulated data cache and indirect board off (they do not boot here):
 python3 tools/frame_capture.py --fixture tmp/a1-fixture/WingCommanderCD32.Slave \
@@ -2007,7 +2049,7 @@ release. `CUSTOM1=0/1` selects English/German; `CUSTOM5=0` selects enhanced Engl
 The authored `release/ReadMe` documents the changed numbering and fallbacks.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/b1-release
 python3 tools/release_check.py tmp/b1-release --negative-controls --output tmp/b1-native-gate.json
 python3 tools/flight_render_check.py tmp/b1-release --output tmp/b1-flight-native.json
@@ -2075,7 +2117,7 @@ still retains the earlier display wait. Normal builds allocate no new display
 buffers or recorder memory. Use a fresh output directory for each build/run.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/b2-final
 python3 tools/buffer_check.py tmp/b2-final --output tmp/b2-buffer-final.json
 python3 tools/release_check.py tmp/b2-final --negative-controls --output tmp/b2-options-final.json
@@ -2150,22 +2192,24 @@ has no recorder, ownership diagnostic abort or extra allocation. Stop before C1.
 
 ## Cached 040 visual regression and local emulator correction
 
-The normal launcher builds/reuses `tmp/fsuae-mmu-fixed/fs-uae` for a1200-040 and
-a1200-060 when `FSUAE` is unset. It fixes six MMU write-attribute lookups in the
-pinned core. `FSUAE_SOURCE` can select the configured source tree; by default it
-comes from `$AMIGA_SHARE/fs-uae-aprof-build/fs-uae`. Revision and source hashes are
-checked against `manifest/mmu-fix.tsv` before copying. Existing outputs and the
-shared source remain untouched. `--ensure` accepts only the recorded intact normal
-binary. Stop commands never build anything.
+`make run` boots `FSUAE_MMU` on a1200-040 and a1200-060 when `FSUAE` is unset. It fixes
+six MMU write-attribute lookups in the pinned core. `FSUAE_MMU` is the binary
+`tools/build_mmu_fix.py` builds (the same SHA-256, `b668456f…`, recorded in its
+`mmu-fix.json`), installed by AmigaXDev; the tool remains for rebuilding it and for the
+audit builds. `FSUAE_SOURCE` selects the configured source tree; the default,
+`$AMIGA_SHARE/fs-uae-aprof-build/fs-uae`, is no longer installed by AmigaXDev. Revision
+and source hashes are checked against `tools/manifest/mmu-fix.tsv` before copying.
+Existing outputs and the shared source remain untouched. `--ensure` accepts only the
+recorded intact normal binary.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/build_mmu_fix.py --ensure
 python3 tools/build_mmu_fix.py --audit --output tmp/mmu-fixed-audit-final
 python3 tools/build_mmu_fix.py --audit --unfixed-control --output tmp/mmu-control-audit
 
 # Calibrate each slave with the same setup used by the pixel observer.
-FSUAE="$PWD/tmp/fsuae-mmu-fixed/fs-uae" DEBUG_PORT=2499 \
+FSUAE="$FSUAE_MMU" DEBUG_PORT=2499 \
 SLAVE="$PWD/tmp/b2-final/WingCommanderCD32.Slave" \
 WHD_ARGS='CUSTOM1=0 CUSTOM5=0 CACHE DCACHE' \
 AMIGA_SETUP=a1200-040 WARP=0 DETERMINISTIC=0 \
@@ -2198,9 +2242,8 @@ Launch the corrected normal build for play-testing:
 
 ```sh
 unset FSUAE
-SLAVE="$PWD/tmp/b2-final/WingCommanderCD32.Slave" \
-AMIGA_SETUP=a1200-040 WHD_ARGS='CUSTOM1=0 CUSTOM5=0 CACHE DCACHE' \
-/bin/bash amiga/run.sh
+make run SLAVE=tmp/b2-final/WingCommanderCD32.Slave \
+  SETUP=a1200-040 WHD_ARGS='CUSTOM1=0 CUSTOM5=0 CACHE DCACHE'
 ```
 
 
@@ -2210,7 +2253,7 @@ Build from the C1 commit, preserving unrelated work separately. The normal
 candidate stays 2.0b (19.10.2026). All outputs and recordings remain below `tmp/`.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/c1-final
 python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/c1-final-frames
 python3 tools/display_predict_check.py tmp/c1-final --output tmp/c1-final-native.json
@@ -2270,7 +2313,7 @@ snapshot `tmp/phase7-combat-controls/start-fast.bin` from the phase-7 capture
 instructions; `locate()` verifies its game identity. No snapshot is committed.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/c2-candidate
 python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/c2-frames
 python3 tools/translation_check.py tmp/c2-candidate --output tmp/c2-native-complete.json
@@ -2353,7 +2396,7 @@ boundaries, whole-data isolation and a disabled-solver negative control. It does
 not measure performance. No extra long gameplay capture is needed for this gate.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/c3-final
 python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/c3-frames
 python3 tools/heading_check.py tmp/c3-final --output tmp/c3-heading-final.json
@@ -2415,7 +2458,7 @@ only the current-build 040 steady window needs a new capture. Fresh output paths
 are required; the same fixture hash is enforced across all three windows.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
 DEBUG_PORT=2499 python3 tools/frame_capture.py \
   --fixture tmp/c3-frames/WingCommanderCD32.Slave --machine a1200-040 \
@@ -2457,7 +2500,7 @@ above. Address calibration does not calibrate CPU performance. Generate fresh
 scope/output files below `tmp/`; no guest code or emulator rebuild is needed.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/render_cost.py --build tmp/c3-frames \
   --layout tmp/c3-layout/layout.json --output tmp/d1-scopes-new.json
 export FSUAE="$PWD/tmp/phase7-debugger-v2/fs-uae"
@@ -2513,7 +2556,7 @@ both backup layouts; the C3 heading checker remains the forecast oracle for the
 current release's heading-aware, extended prediction interval.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/d2-final
 python3 tools/flight_fixture.py --release --frame-stats --nav 1 --output tmp/d2-final-frames
 python3 tools/prediction_cost_check.py tmp/d2-final --output tmp/d2-final-equivalence.json
@@ -2586,7 +2629,7 @@ native composition. Use fresh output names under `tmp/`. Native twins include
 byte tails, overlap, crop/colour/bulk fallbacks and rejecting clear/span controls.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/d3-gate
 python3 tools/view_regions_check.py tmp/d3-gate --output tmp/d3-gate-native.json
 python3 tools/timing_adapter_check.py tmp/d3-gate --output tmp/d3-gate-install
@@ -2669,7 +2712,7 @@ it is byte-identical to D3. Its metadata prevents treating it as a normal releas
 Use fresh output names below `tmp/`.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/d4-final
 python3 tools/reconstruct.py --variant cd32 --release --comparison-control --output tmp/d4-final-control
 python3 tools/flight_render_check.py tmp/d4-final --output tmp/d4-final-native.json
@@ -2759,7 +2802,7 @@ This tests 320×200 flight, not a new intro speed or cache-policy choice.
 From the project root in `/bin/bash`, with new output names if rerunning:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 for arm in control block040 full-original full030 full040; do
   python3 tools/flight_fixture.py --release --frame-stats --nav 1 \
     --c2p-experiment "$arm" --output "tmp/d5-$arm"
@@ -2818,7 +2861,7 @@ these as identical leaf operations or treat these 040 timings as hardware proof.
 ### Player cannon muzzle presentation
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/muzzle-cd32-v2
 python3 tools/ocs_memory_build.py --public --output tmp/muzzle-ocs-v3
 python3 tools/projectile_spawn_check.py tmp/muzzle-cd32-v2 --output tmp/muzzle-cd32-path-final.json
@@ -2840,7 +2883,7 @@ shot position. No large recordings or live emulator run are required for this ga
 ### Intro cannon contact prediction
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/intro-shot-cd32-final
 python3 tools/ocs_memory_build.py --public --output tmp/intro-shot-ocs-v2
 python3 tools/intro_shot_check.py cd32 tmp/intro-shot-cd32-final \
@@ -2877,7 +2920,7 @@ The retained combat fixture is the same one used by `timing_scene_check.py`.
 All derived output stays under `tmp/`; choose fresh names when rerunning.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/projectile-fix-final
 python3 tools/projectile_spawn_check.py tmp/projectile-fix-final \
   --output tmp/projectile-fix-final-spawn.json
@@ -2939,7 +2982,7 @@ The normal build checks native semantics. The diagnostic build supplies measured
 end-to-end display cadence; do not time Unicorn instruction execution.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/intro-clock-release-r2
 python3 tools/reconstruct.py --variant cd32 --release --frame-stats --output tmp/intro-clock-stats-r2
 python3 tools/intro_clock_check.py tmp/intro-clock-release-r2 --output tmp/intro-clock-native-r2.json
@@ -2982,15 +3025,15 @@ page-end entries and terminal dumps permit separate exit-state inspection.
 ## Phase 13: OCS static investigation
 
 This procedure boots no emulator and changes no game tree. Use the shared
-Python/tool environment described above. `make verify` must pass for the cached
-archives, and `make prepare` supplies reference extractions if absent. The OCS
+Python/tool environment described above. `make unpack` must pass for the archives
+and supplies the reference drawers if absent. The OCS
 inspector independently checks the pinned archives, a fresh extraction against
 the entire reference tree, and the installer's `WingCommanderECS.slave` against
 the installed `WingCommander.Slave`. It refuses an existing output directory or
 one outside `tmp/`. Choose a fresh suffix for repeated runs.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_static.py --output tmp/phase13-static-repro
 python3 -m amigaxdev.disasm dis --cpu 68000 \
   tmp/phase13-static-repro/Wing.english.h0.bin 0 0x3291e 0x329e4
@@ -3019,14 +3062,14 @@ Run this block with `/bin/bash`:
 
 ```sh
 set -e
-. amiga/env.sh
+. ../../common/env.sh
 export OCS_KALMS_ROOT="${OCS_KALMS_ROOT:-$AMIGA_SHARE/kalms-c2p}"
 python3 - <<'PYVERIFY'
 import hashlib
 import os
 from pathlib import Path
 root = Path(os.environ['OCS_KALMS_ROOT'])
-for line in Path('manifest/ocs-c2p-candidates.tsv').read_text().splitlines():
+for line in Path('tools/manifest/ocs-c2p-candidates.tsv').read_text().splitlines():
     if not line or line.startswith('#'):
         continue
     name, expected, upstream = line.split('\t')
@@ -3062,15 +3105,15 @@ Use the shared environment's Python (Capstone and amigaxdev), `VASM`, `WHDLOAD`
 headers and `NDK`. From the project root, with fresh output names:
 
 ```sh
-/bin/bash tools/inputs.sh verify
-make reconstruct-ocs OUT=tmp/p13a1-reconstruct
+make unpack
+python3 tools/reconstruct.py --variant ocs --output tmp/p13a1-reconstruct
 make check-ocs-reconstruction OUT=tmp/p13a1-check
 ```
 
 The first target uses the pinned original OCS slave and English game from
-`tmp/originals/ocs/WingCommander`. It validates their SHA-256 identities, the
+`tmp/game/WingCommander`. It validates their SHA-256 identities, the
 English CRC, all three native selector/list structures, and the eight displaced
-source windows in `manifest/ocs-patch-sites.tsv` before creating build output.
+source windows in `tools/manifest/ocs-patch-sites.tsv` before creating build output.
 It emits `WingCommanderOCS.s`, `slave.lst`, `payload.bin`, `WingCommander.Slave`
 and `report.json` below the chosen `tmp/` directory. Vasm assembles with
 `-m68000 -spaces -no-opt -Fbin`; the complete HUNK file must equal the original.
@@ -3088,10 +3131,10 @@ For explicit source selection, use the same Python entry point after sourcing
 the shared environment (the same strict identities still apply):
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_reconstruct.py --output tmp/p13a1-explicit \
-  --input tmp/originals/ocs/WingCommander/WingCommander.Slave \
-  --game tmp/originals/ocs/WingCommander/data/Wing.english
+  --input tmp/game/WingCommander/WingCommander.Slave \
+  --game tmp/game/WingCommander/data/Wing.english
 ```
 
 These guards operate at build time. The byte-identical slave retains its original
@@ -3100,7 +3143,7 @@ Boot equivalence is P13A3, not part of this reconstruction gate.
 
 ## P13A2: native display contract check
 
-Use the shared Python dependencies and `AMIGA_UNICORN` from `amiga/env.sh`, with
+Use the shared Python dependencies and `AMIGA_UNICORN` from `../../common/env.sh`, with
 the pinned English OCS input prepared as above. No Kickstart, OS boot or FS-UAE
 run is needed. Use a fresh output directory:
 
@@ -3134,27 +3177,26 @@ launcher, timing patch, CPU converter or backend selection is part of P13A2.
 
 ## P13A3: OCS launcher and live-layout gate
 
-Select the install independently of the machine: `WC_VARIANT=ocs` selects the
-OCS archive, drawer and slave; omission retains `cd32`. `WC_VARIANT=ocs make
-prepare` verifies/extracts only the installer and OCS inputs. Original trees and
-runtime drives remain separate. The launcher creates fresh drives every time;
-an existing drive is never replaced. A selected `SLAVE` replaces only the slave
-in that new runtime copy, with the archive's original retained alongside it.
+Select the install independently of the machine: `VARIANT=WingCommander` selects the
+OCS drawer and slave; omission retains CD32. Original trees and runtime drives remain
+separate. The launcher creates fresh drives every time from `tmp/game/`. A selected
+`SLAVE` replaces only the slave in that new runtime copy, with the archive's original
+retained alongside it.
 
 ```sh
-. amiga/env.sh
-WC_VARIANT=ocs make prepare
-make reconstruct-ocs OUT=tmp/ocs-reconstructed
-WC_VARIANT=ocs WINDOW=front /bin/bash amiga/run.sh
-/bin/bash amiga/run.sh stop
+. ../../common/env.sh
+python3 tools/reconstruct.py --variant ocs --output tmp/ocs-reconstructed
+make run VARIANT=WingCommander SLAVE=original WINDOW=front
+make stop
 ```
 
-OCS defaults to the shared A500 preset with the project baseline override:
+An OCS run with an explicit `SLAVE` defaults to the shared A500 preset with the
+project baseline override:
 68000, OCS, PAL, 512 KiB Chip, 4 MiB Zorro-II Fast, no slow/trapdoor RAM, real
 CPU speed and cycle-exact CPU/memory/blitter. Other machine selections remain
 explicit experiments. The host boots directory drives with the shared 3.1 ROM;
-the unchanged slave uses the user-supplied `KICKSTART13` and `RTB` as
-`devs/Kickstarts/kick34005.A500` and `.RTB`. Workbench and WHDLoad use the existing
+the unchanged slave uses the shared `kick34005.A500` and its `.RTB` in
+`devs/Kickstarts`. Workbench and WHDLoad use the existing
 `WORKBENCH_ADF` and `WHDLOAD_BINARY` variables. No ROM/OS downloads are added.
 
 The gate needs the existing project debugger's native `key-raw-v1` capability,
@@ -3211,7 +3253,7 @@ files already match. To reproduce that preparation without overwriting shared
 inputs (requires the retained configured build and frozen CPU source):
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 export OCS_SHARED_BUILD="${FSUAE_SOURCE:-$AMIGA_SHARE/fs-uae-aprof-build/fs-uae}"
 export OCS_FROZEN_CPU="${OCS_FROZEN_CPU:-$PWD/tmp/debugger/src/newcpu.cpp}"
 python3 - <<'PYOCS'
@@ -3220,7 +3262,7 @@ from pathlib import Path
 source = Path(os.environ['OCS_SHARED_BUILD'])
 frozen = Path(os.environ['OCS_FROZEN_CPU'])
 expected = dict(line.split('\t') for line in
-    Path('manifest/debugger.tsv').read_text().splitlines()
+    Path('tools/manifest/debugger.tsv').read_text().splitlines()
     if line and not line.startswith('#'))['src/newcpu.cpp']
 assert hashlib.sha256(frozen.read_bytes()).hexdigest() == expected
 out = Path('tmp/ocs-debugger-source')
@@ -3245,7 +3287,7 @@ Use the P13A3 pinned source staging procedure above; retain its frozen input and
 choose new output directories. Build the read-only **68000** observer locally:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 FSUAE_SOURCE="$PWD/tmp/ocs-debugger-source" \
   python3 tools/build_debugger.py --ocs-pixels --ocs-observer \
   --output tmp/ocs-baseline-debugger
@@ -3314,9 +3356,9 @@ Explicitly named OCS tools remain available. Existing CD32 capture/check tools
 remain CD32-specific; selecting a map does not port their observers or native ABI.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/b1-release
-make reconstruct VARIANT=ocs OUT=tmp/b1-ocs
+python3 tools/reconstruct.py --variant ocs --output tmp/b1-ocs
 python3 tools/analyze.py --variant cd32 definitions
 python3 tools/analyze.py --variant ocs definitions
 python3 tools/analyze.py --variant cd32 static --output tmp/b1-cd32-static
@@ -3332,11 +3374,12 @@ Bash with fresh directory names (the initial `mkdir` must fail if reused):
 
 ```sh
 set -e
-. amiga/env.sh
+. ../../common/env.sh
 mkdir tmp/b1-parent
-git archive 495542d | tar -x -C tmp/b1-parent
-mkdir tmp/b1-parent/tmp
-ln -s ../../originals tmp/b1-parent/tmp/originals
+git archive 817c787:games/WingCommander | tar -x -C tmp/b1-parent
+mkdir -p tmp/b1-parent/tmp/originals/cd32 tmp/b1-parent/tmp/originals/ocs
+ln -s ../../../../game/WingCommanderCD32 tmp/b1-parent/tmp/originals/cd32/WingCommanderCD32
+ln -s ../../../../game/WingCommander tmp/b1-parent/tmp/originals/ocs/WingCommander
 (
   cd tmp/b1-parent
   for mode in release timing render native; do
@@ -3383,7 +3426,7 @@ directory. The 68000 selector is an ISA layer; requesting an enhanced OCS slave
 still rejects until its native hooks/ABIs are implemented in later work.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/shared_cpu_check.py --output tmp/b2-cpu
 for mode in release timing render native; do
   args=()
@@ -3437,7 +3480,7 @@ live capture is required when the observer, game and retained inputs are unchang
 Every output directory must be new and below `tmp/`.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/instrumentation_check.py --variant ocs \
   --run tmp/p13a4-stock-on --control tmp/p13a4-stock-off \
   --output tmp/b3-ocs
@@ -3496,7 +3539,7 @@ changed inputs are preserved and rejected. No download or checkout reset occurs.
 Every output must be a fresh directory below `tmp/`.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_c2p.py --output tmp/c1-components
 python3 tools/ocs_c2p_check.py --output tmp/c1-check
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/c1-release
@@ -3537,11 +3580,11 @@ Stop before P13C2's matched crossover experiment.
 This builds a **diagnostic-only** slave reservation and installs experimental
 hooks into a stopped guest for one bounded window. It never changes normal builds
 or game trees. Keep every generated file below `tmp/`. Use the canonical shared
-`WHDLoad` directory through `amiga/env.sh`; there is no version-suffixed path.
+`WHDLoad` directory through `../../common/env.sh`; there is no version-suffixed path.
 The C1 Kalms pins and A3 debugger-source pins remain required.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 FSUAE_SOURCE="$PWD/tmp/p13a3-source" \
   python3 tools/build_debugger.py --ocs-pixels --ocs-observer \
   --output tmp/c2-meter
@@ -3676,7 +3719,7 @@ dumps and screenshots remain in `tmp/`. Shared WHDLoad comes from `$WHDLOAD`
 (the stable `~/.local/share/amiga/WHDLoad` directory).
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_backend_check.py --output tmp/c3-unit
 # Use the C2 instrument build procedure above if the instrument is absent.
 export FSUAE="$PWD/tmp/p13c2-debugger-measured/fs-uae" WARP=1
@@ -3727,7 +3770,7 @@ candidate and validate its owned allocation code as follows; use new output
 names on repeats. No game or slave output belongs outside ignored `tmp/`.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --backend auto --output tmp/c4-auto
 python3 tools/ocs_memory_build.py --backend cpu --output tmp/c4-cpu
 python3 tools/ocs_memory_check.py --output tmp/c4-memory-check
@@ -3799,7 +3842,7 @@ For the memory boundary, repeat calibration and the native-backend simulator run
 with `--ownership --fast-kib 2048`, then `1024`, using separate layouts for each.
 The smaller configurations do not pass the current gate: 1 MiB fails the WHDLoad
 expansion reservation, while 2 MiB stalls in a native QBlit wait. Reproduce the
-2 MiB control using `SLAVE="$PWD/tmp/originals/ocs/WingCommander/WingCommander.Slave"`
+2 MiB control using `SLAVE="$PWD/tmp/game/WingCommander/WingCommander.Slave"`
 and a fresh calibration. The original stalls too. These failures do not prove
 an absolute hardware minimum; 512 KiB Chip plus 4 MiB Fast is the smallest tested
 passing configuration with this launcher. Ownership waits have a bounded timeout,
@@ -3817,7 +3860,7 @@ OCS reconstruction and the CD32 release remain separate controls. Use fresh outp
 names; all derived artifacts stay under `tmp/`.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --backend auto --output tmp/c5-normal
 python3 tools/ocs_publication_check.py --output tmp/c5-unit
 python3 tools/ocs_memory_install_check.py tmp/c5-normal --output tmp/c5-install
@@ -3828,7 +3871,7 @@ python3 tools/ocs_publication_debugger.py --output tmp/c5-debugger
 ```
 
 The debugger extension uses the retained C2 local build tree by default (override
-with `--source`). It verifies `manifest/ocs-publication-debugger.tsv`, copies the
+with `--source`). It verifies `tools/manifest/ocs-publication-debugger.tsv`, copies the
 tree and replaces only the read-only observer plus its optimized DMA span hook.
 It never edits the shared emulator. Reconstructing the C2 input uses the earlier
 [C2 instrument workflow](#p13c2-measured-converter-comparison); its pinned local tree is
@@ -3882,7 +3925,7 @@ converts every pixel. The A500 recommendation remains native, without histories.
 This is not a WHDLoad tooltype or a release-package change.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --backend cpu --changed blocks --exit-probe --output tmp/c6-blocks
 python3 tools/ocs_memory_build.py --backend cpu --changed full --exit-probe --output tmp/c6-full
 python3 tools/ocs_memory_build.py --backend native --changed full --exit-probe --output tmp/c6-native
@@ -3958,8 +4001,8 @@ matrix is needed. The OCS unit/input/state owners and named scene exclusions
 are in [internals](internals.md#p13d1-ocs-timing-and-side-effect-map).
 
 ```sh
-. amiga/env.sh
-/bin/bash tools/inputs.sh verify
+. ../../common/env.sh
+make unpack
 python3 tools/ocs_timing_inventory.py --output tmp/p13d1-inventory-final
 python3 tools/ocs_timing_check.py --output tmp/p13d1-native-final-v2
 ```
@@ -3968,9 +4011,9 @@ Use new names for subsequent runs; outputs must be fresh directories below
 `tmp/`. Run without Python `-O` because assertions are the native oracle.
 The installed `AMIGA_UNICORN` library requires executable JIT memory. The tool
 records its SHA-256 and uses explicit M68000/M68020 models (enum values 1/2).
-Both tools hash-check `tmp/originals/ocs/WingCommander/data/Wing.english` before
+Both tools hash-check `tmp/game/WingCommander/data/Wing.english` before
 loading, relocate its original hunks into a private fixture, and never overwrite
-an input. Obtain missing inputs with the existing `make prepare` procedure.
+an input. Obtain missing inputs with `make unpack ARCHIVES=<directory>`.
 
 `inventory.json` records roots, direct edges, decoded tables and classified
 indirect boundaries; `reachable.dis` is derived scratch output. The common
@@ -4012,8 +4055,8 @@ currently polled at ticks; responsive input/prediction remains D3 and the intro
 remains native until D4. See [the clock contract and measured limits](internals.md#p13d2-ocs-authoritative-flight-clock).
 
 ```sh
-. amiga/env.sh
-/bin/bash tools/inputs.sh verify
+. ../../common/env.sh
+make unpack
 python3 tools/ocs_memory_build.py --clock --output tmp/p13d2-candidate
 python3 tools/ocs_clock_check.py tmp/p13d2-candidate --output tmp/p13d2-clock-final
 python3 tools/ocs_memory_install_check.py tmp/p13d2-candidate --output tmp/p13d2-install-final
@@ -4087,8 +4130,8 @@ regenerated with the preceding D2 procedure. All generated material remains in
 `tmp/`. Use fresh output names for repeat runs.
 
 ```sh
-. amiga/env.sh
-/bin/bash tools/inputs.sh verify
+. ../../common/env.sh
+make unpack
 python3 tools/ocs_memory_build.py --prediction --output tmp/p13d3-candidate
 python3 tools/ocs_prediction_check.py tmp/p13d3-candidate --output tmp/p13d3-native-final5
 python3 tools/ocs_memory_install_check.py tmp/p13d3-candidate --output tmp/p13d3-install-final
@@ -4163,8 +4206,8 @@ OCS script constants, field addresses and native calls. Use fresh output names.
 The existing D3 fixture and debugger prerequisites above still apply.
 
 ```sh
-. amiga/env.sh
-/bin/bash tools/inputs.sh verify
+. ../../common/env.sh
+make unpack
 python3 tools/ocs_memory_build.py --intro --output tmp/p13d4-candidate5
 python3 tools/ocs_memory_build.py --intro --backend cpu --output tmp/p13d4-cpu5
 python3 tools/ocs_intro_check.py tmp/p13d4-candidate5 --output tmp/p13d4-native-final2
@@ -4225,8 +4268,8 @@ Use fresh output names. D3's pinned debugger and simulator fixture remain the
 prerequisites described above.
 
 ```sh
-. amiga/env.sh
-/bin/bash tools/inputs.sh verify
+. ../../common/env.sh
+make unpack
 python3 tools/ocs_memory_build.py --math-fast --output tmp/p13e1-final2
 python3 tools/ocs_memory_build.py --math-fast --backend cpu --output tmp/p13e1-cpu-final2
 python3 tools/ocs_math_check.py tmp/p13e1-final2 --output tmp/p13e1-native-final3
@@ -4318,7 +4361,7 @@ All paths below refer to local scratch outputs; choose a new output directory
 when repeating a run.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
 export SLAVE="$PWD/tmp/p13e1-cpu-final2/WingCommander.Slave"
 WARP=1 python3 tools/ocs_boot_gate.py --ownership --cpu 68020 \
@@ -4392,8 +4435,8 @@ captures; E2 acceptance carries over only if both binaries remain identical.
 Use fresh output names on repeats. All generated material stays in `tmp/`.
 
 ```sh
-. amiga/env.sh
-/bin/bash tools/inputs.sh verify
+. ../../common/env.sh
+make unpack
 python3 tools/ocs_memory_build.py --math-fast --output tmp/p13e3-native
 python3 tools/ocs_memory_build.py --math-fast --backend cpu --output tmp/p13e3-cpu
 shasum -a 256 tmp/p13e3-native/WingCommander.Slave tmp/p13e3-cpu/WingCommander.Slave
@@ -4412,8 +4455,8 @@ that evidence, rather than making fresh multi-gigabyte captures for a doc edit.
 To run a candidate interactively using the existing separate OCS launcher:
 
 ```sh
-WC_VARIANT=ocs SLAVE="$PWD/tmp/p13e3-native/WingCommander.Slave" \
-  AMIGA_SETUP=a500 OCS_STOCK_CLOCK=1 WARP=0 /bin/bash amiga/run.sh
+make run VARIANT=WingCommander SLAVE=tmp/p13e3-native/WingCommander.Slave \
+  SETUP=a500 OCS_STOCK_CLOCK=1 WARP=0
 ```
 
 The explicit CPU candidate is at `tmp/p13e3-cpu/WingCommander.Slave`; select the
@@ -4432,7 +4475,7 @@ the icon, not an implicit slave default, requests enhancements. CPU and true-Fas
 checks always apply. Existing original/CD32 input trees are not modified.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/ocs-public-final2
 python3 tools/ocs_options_check.py tmp/ocs-public-final2 --output tmp/ocs-public-options-accepted
 python3 tools/ocs_prediction_check.py tmp/ocs-public-final2 --output tmp/ocs-public-prediction-final2
@@ -4470,7 +4513,7 @@ A clock fixture requires installed enhancements and is deliberately rejected for
 a public build with an off option or 68000. These original-mode runs stop at the
 menu, sufficient to inspect unchanged hook sites and native intro rendering.
 
-Interactive launches use `WHD_ARGS='CUSTOM5=1'` explicitly with `WC_VARIANT=ocs`
+Interactive launches use `WHD_ARGS='CUSTOM5=1'` explicitly with `VARIANT=WingCommander`
 and the selected public `SLAVE`; clearing that argument selects original mode.
 The runtime preparer only enables the icon in a fresh OCS tree when a public
 slave is selected. CD32 and original OCS icon contents remain unchanged. Merely
@@ -4501,7 +4544,7 @@ above plus `ocs_math_check.py`, then the live gates. Original-mode captures use
 the P13A4 route with a public slave; calibrate each slave separately:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
 python3 tools/ocs_math_check.py tmp/exact-ocs-v1 --output tmp/exact-ocs-v1-math
 export SLAVE="$PWD/tmp/exact-ocs-v1/WingCommander.Slave"
@@ -4525,26 +4568,28 @@ scopes never summed.
 
 ### OCS interactive launcher
 
-`amiga/run-ocs.sh` is the OCS entry point. It builds the current public candidate
-into a fresh `tmp/ocs-launch.*/build/`, then uses the shared launcher with the
-A3000 preset and `CUSTOM5=1 DCACHE` (instruction and data caches). Its process/log directory is `tmp/run-ocs`, separate
-from the default CD32 run. Each boot still uses a fresh game tree.
+`make run VARIANT=WingCommander` is the OCS entry point. It builds the current public
+candidate (`tmp/build/release/WingCommander/`), then boots the A3000 preset with
+`CUSTOM5=1 DCACHE` (instruction and data caches). Each boot uses a fresh game drive.
 
 ```sh
-./amiga/run-ocs.sh
-./amiga/run-ocs.sh stop
-AMIGA_SETUP=a500 ./amiga/run-ocs.sh
-WHD_ARGS='CUSTOM5=0' ./amiga/run-ocs.sh
+make run VARIANT=WingCommander
+make stop
+make run VARIANT=WingCommander SETUP=a500
+make run VARIANT=WingCommander WHD_ARGS='CUSTOM5=0'
+make run VARIANT=WingCommander INSTANCE=ocs    # beside a CD32 run
 ```
 
 A500 automatically retains original behaviour despite the requested toggle.
-`SLAVE` overrides the automatic build; `AMIGA_SETUP`, `WHD_ARGS`, `FSUAE_RUN`
-and the shared sound/window settings remain overridable. An explicitly empty
-`WHD_ARGS` also selects original behaviour. `stop` does not build a slave.
-`amiga/run.sh` builds and runs the latest enhanced CD32 slave by default in a
-fresh `tmp/cd32-launch.*/build` directory, with `CUSTOM5=0 DCACHE`. An explicit
-`SLAVE` bypasses this build for original or diagnostic runs; explicit `WHD_ARGS`
-overrides the defaults. `stop` never builds. Explicit variant support remains.
+`SLAVE` replaces the automatic build; it also drops the default `WHD_ARGS` and selects
+the A500 baseline unless `SETUP` is given, so a diagnostic slave on the A3000 with the
+toggle is `SLAVE=... SETUP=a3000 WHD_ARGS='CUSTOM5=1 DCACHE'`. `SETUP`, `WHD_ARGS`,
+`INSTANCE` and the shared sound/window settings remain overridable. An explicitly
+empty `WHD_ARGS=` also selects original behaviour. `make stop` does not build a slave.
+`make run` builds and runs the latest enhanced CD32 slave by default
+(`tmp/build/release/WingCommanderCD32/`), with `CUSTOM5=0 DCACHE`. An explicit
+`SLAVE` (`SLAVE=original` for the shipped slave) bypasses this build for original or
+diagnostic runs; explicit `WHD_ARGS` overrides the defaults.
 
 The OCS generated launch icon also adds `DCACHE` unless an explicit CACHE,
 DCACHE or NOCACHE choice already exists. The launcher default can be replaced
@@ -4560,7 +4605,7 @@ OCS candidates without `--public` and normal reconstructions remain unchanged.
 Use fresh output directories; all binaries, screenshots and reports stay in `tmp/`.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/opening-ocs
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/opening-cd32
 python3 tools/opening_check.py ocs tmp/opening-ocs --output tmp/opening-ocs-clock-check
@@ -4587,7 +4632,7 @@ Accepted artifacts are `tmp/opening-ocs-v3` and `tmp/opening-cd32-final`
 reports are `tmp/opening-{ocs,cd32}-final-clock` and
 `tmp/opening-{ocs,cd32}-final-options`; full opening reports/screenshots are
 `tmp/opening-{ocs,cd32}-live`. Launch the current OCS code through
-`./amiga/run-ocs.sh`, which builds a fresh public candidate by default.
+`make run VARIANT=WingCommander`, which builds the public candidate by default.
 
 ### Wing Commander title zoom and rotation
 
@@ -4595,7 +4640,7 @@ The shared title loop now samples its own sprite scale and rotation between worl
 ticks. Build and test both variants with fresh output directories:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/title-ocs-new
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/title-cd32-new
 python3 tools/title_motion_check.py ocs tmp/title-ocs-new --output tmp/title-ocs-native-new
@@ -4627,7 +4672,7 @@ captures each. The existing OCS launcher builds these changes automatically.
 Build the public OCS candidate and check native placement/restoration:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/exhaust-ocs-v2
 python3 tools/exhaust_check.py tmp/exhaust-ocs-v2 --output tmp/exhaust-native-final
 python3 tools/ocs_prediction_check.py tmp/exhaust-ocs-v2 --output tmp/exhaust-prediction
@@ -4656,7 +4701,7 @@ not a frame-rate measurement. All owned observer processes stop on exit.
 Build fresh enhanced candidates and run the bounded cinematic fixture:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/running-ocs
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/running-cd32
 export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
@@ -4684,7 +4729,7 @@ native whole-tick basis endpoints, plus restoration and view-cut/disabled guards
 Use fresh output directories:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/camera-ocs-new
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/camera-cd32-new
 python3 tools/intro_camera_check.py ocs tmp/camera-ocs-new --output tmp/camera-ocs-native-new
@@ -4707,7 +4752,7 @@ are `tmp/camera-ocs-live2/report.json` and `tmp/camera-cd32-live/report.json`.
 ### Simulator, room and running-pilot timing
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/modal-ocs
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/modal-cd32
 python3 tools/modal_clock_check.py ocs tmp/modal-ocs --output tmp/modal-ocs-native
@@ -4737,7 +4782,7 @@ samples held-direction cursor positions between 10 Hz room ticks and captures
 the bar at an intermediate publication.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/room-hover-ocs-v2
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/room-hover-cd32-v2
 python3 tools/modal_clock_check.py ocs tmp/room-hover-ocs-v2 --output tmp/room-hover-ocs-check
@@ -4755,7 +4800,7 @@ single-field capture files are removed immediately after extracting their image.
 ### Mission launch clocks
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/launch-ocs
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/launch-cd32
 python3 tools/launch_clock_check.py ocs tmp/launch-ocs --output tmp/launch-ocs-native
@@ -4789,7 +4834,7 @@ rejects the old partial-word dividend that sent the ship offscreen between ticks
 ### Mission asteroid and mine fields
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/field-objects-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/field-objects-ocs
 python3 tools/field_objects_check.py cd32 tmp/field-objects-cd32 --output tmp/field-objects-cd32-classes
@@ -4818,7 +4863,7 @@ CD32's missing world dispatch and OCS's render-counter cleanup dependency.
 ### Waypoint autopilot clock
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/autopilot-ocs
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/autopilot-cd32
 python3 tools/autopilot_clock_check.py ocs tmp/autopilot-ocs --output tmp/autopilot-ocs-native
@@ -4841,7 +4886,7 @@ patches and stops only its owned emulator. This is not a full campaign replay.
 ### Ejection and helmet camera
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/ejection-ocs-build
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/ejection-cd32-build
 python3 tools/ejection_clock_check.py ocs tmp/ejection-ocs-build --output tmp/ejection-ocs-check
@@ -4873,7 +4918,7 @@ profile, not a full mission/death trigger or hardware performance test.
 ### Carrier return and hangar landing
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/ocs_memory_build.py --public --output tmp/landing-ocs-build
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/landing-cd32-build
 python3 tools/landing_clock_check.py ocs tmp/landing-ocs-build --output tmp/landing-ocs-check
@@ -4910,7 +4955,7 @@ Build separate enhanced candidates and compare their render-only size sampler
 against the original effect interpreters. Use fresh output names on repeats.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/effect-cd32-build
 python3 tools/ocs_memory_build.py --public --output tmp/effect-ocs-build
 python3 tools/effect_size_check.py cd32 tmp/effect-cd32-build --output tmp/effect-cd32-check
@@ -4946,7 +4991,7 @@ compares against these original routines and checks full restoration. Use fresh
 output directories on repeats.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/flyby-cd32-build
 python3 tools/ocs_memory_build.py --public --output tmp/flyby-ocs-build
 python3 tools/autopilot_camera_check.py cd32 tmp/flyby-cd32-build --output tmp/flyby-cd32-camera
@@ -4976,7 +5021,7 @@ functional test, not a campaign replay or performance claim.
 Build and check the title replay independently of the 25 Hz input sampler:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/room-compose-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/room-compose-ocs
 python3 tools/modal_clock_check.py cd32 tmp/room-compose-cd32 --output tmp/room-compose-cd32-check
@@ -4992,7 +5037,7 @@ Use `modal_live_check.py` with either build for the bounded room navigation gate
 Build both enhanced candidates and run the native ordering/visibility checks:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/waypoint-always-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/waypoint-always-ocs
 python3 tools/waypoint_check.py cd32 tmp/waypoint-always-cd32 --output tmp/waypoint-always-cd32-check
@@ -5020,7 +5065,7 @@ restores.
 ## Swept player cannon contacts with fields
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/field-shot-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/field-shot-ocs
 python3 tools/field_shots_check.py cd32 tmp/field-shot-cd32 --output tmp/field-shot-cd32-check
@@ -5047,7 +5092,7 @@ field spawning and sampling, not shot impacts or uninterrupted campaign play.
 ## Funeral background redraw checks
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/funeral-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/funeral-ocs
 python3 tools/funeral_check.py cd32 tmp/funeral-cd32 --output tmp/funeral-check-cd32
@@ -5064,7 +5109,7 @@ backends are intercepted; this does not replace a visual funeral-scene check.
 Build and check both enhanced variants in fresh scratch directories:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/afterburn-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/afterburn-ocs
 python3 tools/afterburn_prediction_check.py cd32 tmp/afterburn-cd32 --output tmp/afterburn-check-cd32
@@ -5092,16 +5137,15 @@ allocation lifetimes from the simulator, rooms, briefing and launch and did not
 reproduce the missing cockpit.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/sideview-candidate
 python3 tools/history_storage_check.py tmp/sideview-candidate
 python3 tools/flight_render_check.py tmp/sideview-candidate \
   --output tmp/sideview-conversion.json
 python3 tools/release_check.py tmp/sideview-candidate \
   --output tmp/sideview-release.json
-SLAVE="$PWD/tmp/sideview-candidate/WingCommanderCD32.Slave" \
-  AMIGA_SETUP=a1200-030 WHD_ARGS='CUSTOM5=0 CUSTOM3=1 CUSTOM4=0 CACHE' \
-  /bin/bash amiga/run.sh
+make run SLAVE=tmp/sideview-candidate/WingCommanderCD32.Slave \
+  SETUP=a1200-030 WHD_ARGS='CUSTOM5=0 CUSTOM3=1 CUSTOM4=0 CACHE'
 ```
 
 Advance opening scenes with Enter, start the Vega campaign, complete the
@@ -5109,16 +5153,15 @@ simulator/name entry, go from the bar to the barracks and then the briefing room
 Advance briefing/launch scenes with Enter. In first-mission flight, switch
 F1 → F2 → F3 → F2 and inspect the cockpit while stars/debris move. Exercise
 F1–F9 as well. Repeat normal entry with `AMIGA_SETUP=a1200-030` and
-`WHD_ARGS='CUSTOM5=1 DCACHE'` using `amiga/run-ocs.sh` for OCS. The checked OCS
+`WHD_ARGS='CUSTOM5=1 DCACHE'` using `VARIANT=WingCommander` for OCS. The checked OCS
 run uses 4 MiB Fast RAM. Its public build and startup check are reproducible with:
 
 ```sh
 python3 tools/ocs_memory_build.py --public --output tmp/sideview-ocs-candidate
 python3 tools/ocs_options_check.py tmp/sideview-ocs-candidate \
   --output tmp/sideview-ocs-options
-SLAVE="$PWD/tmp/sideview-ocs-candidate/WingCommander.Slave" \
-  AMIGA_SETUP=a1200-030 WHD_ARGS='CUSTOM5=1 DCACHE' \
-  EXTRA_ARGS='--fast_memory=4096' /bin/bash amiga/run-ocs.sh
+make run VARIANT=WingCommander SLAVE=tmp/sideview-ocs-candidate/WingCommander.Slave \
+  SETUP=a1200-030 WHD_ARGS='CUSTOM5=1 DCACHE' EXTRA_ARGS='--fast_memory=4096'
 ```
 
 A memory-assisted check must verify that the saved cockpit allocation is
@@ -5129,7 +5172,7 @@ The history initializer must not allocate from the fixed native game pools.
 ### External flight camera regression
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/external-candidate
 python3 tools/ocs_memory_build.py --public --output tmp/external-ocs-candidate
 python3 tools/external_camera_check.py cd32 tmp/external-candidate \
@@ -5157,7 +5200,7 @@ remove its disposable boot tree after shutdown.
 ## Simulator star stability after intro skip
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/sim-stars2-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/sim-stars2-ocs
 python3 tools/external_camera_check.py cd32 tmp/sim-stars2-cd32 --output tmp/sim-stars2-cd32-check
@@ -5189,7 +5232,7 @@ Return skip (`tmp/sim-stars-skip3/`); an early skip did not. Native checks are i
 Rebuild and run the bounded CPU regressions (outputs must be fresh directories):
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/scene-reset-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/scene-reset-ocs
 python3 tools/external_camera_check.py cd32 tmp/scene-reset-cd32 --output tmp/scene-reset-cd32-check2
@@ -5208,7 +5251,7 @@ and resumed camera history on the second snapshot. See
 Build both enhanced candidates and run the native eight-frame loop checks:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/death-cels-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/death-cels-ocs
 python3 tools/death_clock_check.py cd32 tmp/death-cels-cd32 --output tmp/death-cels-check-cd32
@@ -5234,7 +5277,7 @@ update every three fields, retaining fractional movement. The cockpit tunnel rem
 10 Hz. Reproduce the focused native checks with fresh output directories:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/cels3b-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/cels3b-ocs
 for variant in cd32 ocs; do
@@ -5252,7 +5295,7 @@ restoration and intermediate movement; live visual acceptance remains pending.
 ### Briefing crowd timing
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/crowd3b-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/crowd3b-ocs
 for variant in cd32 ocs; do
@@ -5270,7 +5313,7 @@ transitions through normal campaign flow.
 ## Template-based release installer
 
 `release/ReadMe` and `release/Install` adapt the shared WHDLoad Install Template.
-The input fingerprints are in `manifest/install-template.tsv`; template paths
+The input fingerprints are in `tools/manifest/install-template.tsv`; template paths
 are relative to `WHDLOAD`. Psygore's pinned installer supplies the WingDisk1-3
 copy filters, German executable detection, Bundle:Wingco CD32 files, unpacking,
 original icons, Manual and QuickDocEN/DE/FR/IT. The old QuickDocED/QuickDocIt
@@ -5278,7 +5321,7 @@ spelling is corrected. The combined ReadMe also supplies the OCS build's ReadMe.
 Both enhanced slaves report 2.0b (19.10.2026); original reconstruction is untouched.
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/release-docs2-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/release-docs2-ocs
 python3 tools/release_install.py --cd32 tmp/release-docs2-cd32 --ocs tmp/release-docs2-ocs --output tmp/release-docs-package
@@ -5314,7 +5357,7 @@ and relative filename with the staging report before handing it off.
 Build fresh public candidates and check their unstored allocation tails:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/runtime-buffers3-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/runtime-buffers3-ocs
 for variant in cd32 ocs; do
@@ -5344,7 +5387,7 @@ flat assembler outputs retain the complete memory image for analysis.
 Build both public variants and run the native sort/tie regression:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/intro-order-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/intro-order-ocs
 for variant in cd32 ocs; do
@@ -5384,7 +5427,7 @@ still build without intro symbols.
 Build both public candidates and run the bounded functional regressions:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/steering-fix-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/steering-fix-ocs
 for variant in cd32 ocs; do
@@ -5414,7 +5457,7 @@ This interactive confirmation remains separate from the passing native CPU check
 From the project root, build fresh candidates and run the focused CPU checks:
 
 ```sh
-. amiga/env.sh
+. ../../common/env.sh
 python3 tools/reconstruct.py --variant cd32 --release --output tmp/flight-reset-cd32
 python3 tools/ocs_memory_build.py --public --output tmp/flight-reset-ocs
 python3 tools/player_reset_check.py tmp/flight-reset-cd32 --variant cd32 --output tmp/flight-reset-check-cd32

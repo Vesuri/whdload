@@ -3,6 +3,7 @@
 import argparse, hashlib, json, os, re, subprocess, time
 from pathlib import Path
 from cd32_runtime import ROOT
+import wc_run
 
 
 def main():
@@ -20,17 +21,17 @@ def main():
     if hashlib.sha256(slave.read_bytes()).hexdigest()!=build['sha256']:raise ValueError('audit build digest mismatch')
     if os.environ.get('EXTRA_ARGS'):raise ValueError('fixed audit configuration required')
     out.mkdir(parents=True);os.chdir(ROOT)
-    env=dict(os.environ,WC_NOMMU_CORE='1' if a.nommu_core else '0',FSUAE_RUN='../'+str(out.relative_to(ROOT))+'/run',SLAVE=str(slave),
+    env=wc_run.run_env(out,WC_NOMMU_CORE='1' if a.nommu_core else '0',SLAVE=str(slave),
              AMIGA_SETUP=a.machine,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',
              WHD_ARGS='CUSTOM5=0 FILELOG '+a.options,WARP='0',NTSC='0',DEBUG='0',
              DETERMINISTIC='1',WINDOW='front',SILENT='1',JOY0='none',JOY1='none')
     for key in ('WC_OBSERVER_CONFIG','WC_OBSERVER_OUTPUT','WC_MATRIX_CONFIG','WC_MATRIX_DIR'):
         env.pop(key,None)
     try:
-        subprocess.run(['/bin/bash','amiga/run.sh'],env=env,check=True)
+        wc_run.launch(env)
         deadline=time.monotonic()+120
         while time.monotonic()<deadline:
-            for path in (out/'run').glob('boot.*/dh*/**/*'):
+            for path in wc_run.run_dir(env).glob('dh*/**/*'):
                 if path.is_file() and 'log' in path.name.lower() and path.suffix!='.uaem':
                     data=path.read_bytes()
                     m=re.search(rb'WC_CACHE attn=([0-9a-fA-F]+) setup=([0-9a-fA-F]+) cache_api=([0-9a-fA-F]+) cacr=([0-9a-fA-F]+)',data)
@@ -44,6 +45,6 @@ def main():
                         print(json.dumps(result));return
             time.sleep(1)
         raise TimeoutError('VERIFY audit did not produce its success record')
-    finally:subprocess.run(['/bin/bash','amiga/run.sh','stop'],env=env,check=True)
+    finally:wc_run.stop(env)
 
 if __name__=='__main__':main()

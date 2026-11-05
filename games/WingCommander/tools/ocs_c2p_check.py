@@ -98,7 +98,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__); p.add_argument('--output', required=True)
     a = p.parse_args(); inputs = candidates(); out = new_output(a.output); out.mkdir(parents=True)
     blob, sy = build(out, inputs)
-    native = Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english')
+    native = Native(ROOT/'tmp/game/WingCommander/data/Wing.english')
     runners = [(arm,model,Candidate(blob,sy,model)) for arm,models in
                (('word',(1,2,4)),('long',(2,4))) for model in models]
     records = []; cpu_count = native_count = 0

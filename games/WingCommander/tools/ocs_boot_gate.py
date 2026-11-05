@@ -14,7 +14,7 @@ from pathlib import Path
 import subprocess
 import time
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from amigaxdev import barto
 from ocs_runtime import BASE, LENGTH, SIZES, ROOT, locate
 
@@ -81,11 +81,10 @@ def main():
         raise ValueError('set FSUAE to the local --ocs-pixels debugger build')
     out.mkdir(parents=True)
     os.chdir(ROOT)
-    run = '../'+str(out.relative_to(ROOT))+'/run'
-    env = dict(os.environ, FSUAE_RUN=run, WARP=os.environ.get('WARP','0') if a.calibrate or a.ownership else '0', WINDOW='front',
+    env = wc_run.run_env(out, WARP=os.environ.get('WARP','0') if a.calibrate or a.ownership else '0', WINDOW='front',
                JOY0='none', JOY1='none', NTSC='1' if a.ntsc else '0',
                DETERMINISTIC=os.environ.get('DETERMINISTIC', '1') if a.calibrate else '1',
-               AMIGA_SETUP='a1200-fast' if a.aga else 'a500', OCS_COMPAT_AGA='1' if a.aga else '0', WC_VARIANT='ocs', WHD_ARGS='' if a.enhanced is None else f'CUSTOM5={a.enhanced}', OCS_STOCK_CLOCK='1' if a.baseline or a.ownership else '0')
+               AMIGA_SETUP='a1200-fast' if a.aga else 'a500', OCS_COMPAT_AGA='1' if a.aga else '0', VARIANT=wc_run.VARIANTS['ocs'], WHD_ARGS='' if a.enhanced is None else f'CUSTOM5={a.enhanced}', OCS_STOCK_CLOCK='1' if a.baseline or a.ownership else '0')
     if a.ownership:
         env['EXTRA_ARGS']=f'--uae_cpu_model={a.cpu} --fast_memory={a.fast_kib}'
         if a.aga:env['EXTRA_ARGS']+=' --chip_memory=2048'
@@ -98,7 +97,7 @@ def main():
         if candidate.get('prediction'):
             location=json.loads((ROOT/a.layout).read_text())['slave'];symbols=candidate['symbols']
             env['WC_OCS_PREDICTION_FIELDS']=','.join(f'{location+symbols[n]:x}' for n in ('ocs_target_field','release_render_time','ocs_prediction_queued'))
-    server = Server('wc-gate',root=str(ROOT),run_dir='amiga/'+run,profile_window=False)
+    server = wc_run.server('wc-gate', env, profile_window=False)
     g = None
     actions = []
     def command(text, timeout=60):
@@ -335,8 +334,8 @@ def main():
         for name, value in expected.items():
             if options.get(name) != value:
                 raise ValueError('effective machine differs: '+name)
-        boot = next((out/'run').glob('boot.*'))
-        slave = (boot/'dh1/WingCommander/WingCommander.Slave').read_bytes()
+        boot = wc_run.drawer(env)
+        slave = (boot/'WingCommander.Slave').read_bytes()
         metadata = dict(layout, actions=actions, slave_sha256=hashlib.sha256(slave).hexdigest(),
                         whd_args=env['WHD_ARGS'], fsuae_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest(),
                         machine=f'{a.cpu}-'+('aga' if a.aga else 'ocs')+f'-{2048 if a.aga else 512}k-chip-{a.fast_kib}k-fast', video_standard='NTSC' if a.ntsc else 'PAL', warp=env['WARP']=='1', variant='ocs', effective=expected,
@@ -371,6 +370,6 @@ def main():
     finally:
         (out/'actions.json').write_text(json.dumps(actions,indent=2)+'\n')
         if g: g.p.kill()
-        subprocess.run(['/bin/bash',str(ROOT/'amiga/run.sh'),'stop'],env=env,check=True)
+        wc_run.stop(env)
 
 if __name__ == '__main__': main()

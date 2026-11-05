@@ -15,7 +15,7 @@ def source(variant, capacity=2048):
     v = get(variant)
     if not 1 <= capacity <= 16384:
         raise ValueError('invalid recorder capacity')
-    whole = (ROOT/'whdload/frame_stats.s').read_text()
+    whole = (ROOT/'src/frame_stats.s').read_text()
     core = whole[whole.index('frame_stat:\n'):whole.index('frame_stats_flush:\n')]
     if (core.count('$7f02(a0)') != 2 or core.count('bne.s   .sample') != 2
             or core.count('move.w  26(sp),d2') != 1 or core.count('.done:\n') != 1):
@@ -37,5 +37,5 @@ def source(variant, capacity=2048):
 ''')
     core = re.sub(r'\b(b[a-z]+)\.s\b', r'\1.w', core)
     header = f'BUFFERED equ 0\nFS_RECORDS equ {capacity}\nFS_SKIP equ 0\n'
-    wrappers = (ROOT/'whdload/recorder_window.s').read_text()
+    wrappers = (ROOT/'src/recorder_window.s').read_text()
     return header+preamble(ROOT, v.CPU)+select(wrappers+core, v.CPU)

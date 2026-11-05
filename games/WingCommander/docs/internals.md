@@ -16,7 +16,7 @@ numbers are API displacements. ROM patch offsets below are ROM **file offsets**.
 
 ## Input identity and executable layout
 
-The CD32 full install and installer are pinned in `manifest/inputs.tsv`.
+The CD32 full install and installer are pinned in `inputs.sha256`.
 A fresh extraction matched every file of the reference CD32 game directory;
 the installer and full-install slaves are byte-identical. File fingerprints:
 
@@ -771,7 +771,7 @@ Retained preflights are `tmp/phase4-probe-{020,030,030-mmu,040,060}/`.
 The local audit/probe debugger SHA-256 is
 `c3292762b619d735182d68ee60326dc9950284a90ce575b84873aa5887b38352`;
 shared tools were not modified. The source revision and modified source inputs
-are checked by `manifest/debugger.tsv` before each local build.
+are checked by `tools/manifest/debugger.tsv` before each local build.
 
 ### Corrected NOMMU-core coverage
 
@@ -1210,7 +1210,7 @@ reported as zero CPU idle. A missing instruction PC is likewise labelled
 an appropriate idle/interrupt instrument accounts for them.
 
 The debug record layout and idle-marker implementation, plus the custom-chip
-recording source, are now pinned in `manifest/debugger.tsv` alongside the existing
+recording source, are now pinned in `tools/manifest/debugger.tsv` alongside the existing
 CPU/debugger source inputs. They remain shared read-only build inputs.
 
 ### Deferred gaps after practical-baseline closeout
@@ -2081,7 +2081,7 @@ selects the old blitter converter, not Akiko. No Akiko implementation was found.
 The embedded converter's authorship has not been established: “existing slave
 converter” identifies its location, not its author. Mikael Kalms' public-domain
 030 and 040/060 routines are vendored unmodified and pinned in
-`manifest/kalms-c2p.tsv`. The build generates immutable specialisations for
+`tools/manifest/kalms-c2p.tsv`. The build generates immutable specialisations for
 320×128, 320×166 and 320×200, with plane strides 5120, 6640 and 8000 bytes.
 Full-frame conversion follows the intro change census. No new converter performs
 SMC, copies code, or allocates workspace.
@@ -4024,7 +4024,7 @@ open. No production assembly or cache policy changes in D5.
 
 Kalms does provide CPU-specific routines: the pinned
 `c2p1x1_8_c5_030` and `c2p1x1_8_c5_040` sources in
-`manifest/kalms-c2p.tsv` are the applicable 1:1, eight-plane, contiguous-plane
+`tools/manifest/kalms-c2p.tsv` are the applicable 1:1, eight-plane, contiguous-plane
 families. The latter explicitly targets 040/060. The upstream
 [collection](https://github.com/Kalmalyzer/kalms-c2p) also contains other pixel
 formats and layouts, which are not interchangeable with this surface.
@@ -4276,7 +4276,7 @@ by this native check. Input waiting for its next world tick is a separate latenc
 
 ### Constructor-certified first-interval prediction
 
-`whdload/timing_projectiles.s` records the completed native slot's class/model and
+`src/timing_projectiles.s` records the completed native slot's class/model and
 its shooter's observed cooldown. The guarded English hook sites are:
 
 | Hook | Code / file offset | Coverage |
@@ -4661,7 +4661,8 @@ an explicit change.
 Enhanced timing generation remains CD32-only until the OCS ABI and ISA gates pass;
 `cd32_runtime.py` retains CD32-specific discovery guards.
 The runtime inputs and launcher previously assumed CD32 hashes, names, hunk sizes, patches or Kickstart inputs.
-P13A3 adds explicit OCS selection to `runtime_inputs.py` and `amiga/run.sh`, plus
+P13A3 added explicit OCS selection to the runtime drives and the launcher (now the
+`WingCommander` variant of `game.conf`), plus
 a separate `ocs_runtime.py` locator. CD32 discovery still uses its own patched
 converter; OCS uses its native startup relocations and original slave helpers.
 Extract variant maps and shared mechanics rather than duplicating whole tools.
@@ -4685,7 +4686,7 @@ base-CPU versions even when the chosen A500 converter remains the blitter.
 
 The local Kalms checkout is pinned to commit
 `d8ecf79a3325615305dd800ae7704b518e0d9dda`. The two examined four-plane bitmap
-routines and hashes are recorded in `manifest/ocs-c2p-candidates.tsv`. Both
+routines and hashes are recorded in `tools/manifest/ocs-c2p-candidates.tsv`. Both
 `c2p1x1_4_c5_bm_word.s` and `c2p1x1_4_c5_bm.s` assemble with `-m68000` (560 and
 744 code bytes respectively). Assembly success is not pixel, speed or integration
 validation. “68020 path” here means a proposed longword-write selection, not that
@@ -4697,7 +4698,7 @@ large enough. The source masks low nibbles. Native OCS bit/nibble order still ne
 the independent oracle; duplicating high and low nibbles in fixtures would hide
 an incorrect adapter.
 
-Legends of Valour `whdload/c2p.s` selects the word routine on 68000/68010 and the
+Legends of Valour `src/c2p.s` selects the word routine on 68000/68010 and the
 longword routine through attention-flag bit 1 on 68020+. Its
 `docs/performance-patches.md` documents high-nibble/192-byte-stride adaptations,
 window alignment, independent pixel checks and CPU-only allocation ownership.
@@ -4733,7 +4734,7 @@ enhancement map. No enhanced hooks or runtime SHA checks are added by P13A1:
 these are **build-time guards** for subsequent work, alongside the unchanged
 original runtime CRC selector.
 
-`manifest/ocs-patch-sites.tsv` pins eight original English source windows by
+`tools/manifest/ocs-patch-sites.tsv` pins eight original English source windows by
 hunk offset, file offset, length and SHA-256. Hunk-0 file coordinates add `002c`;
 hunk-3 coordinates add `041e4c`. The protected windows are `O:26a3c` (6 bytes),
 `27132` (4), `27740` (4), `272b2` (6), and `O3:0036` (2), `06a2` (2), `06a4`
@@ -5224,7 +5225,7 @@ forms still require an ISA audit and executed contract checks.
 The 13 audited units are `timing`, `timing_clock`, `timing_player`, `timing_input`,
 `timing_presentation`, `timing_scene`, `timing_intro`, `timing_translation`,
 `timing_projectiles`, `timing_scene_slots`, `view_regions`, `release_buffer` and
-`frame_stats` (all under `whdload/`). This includes the `timing_patchseg` startup
+`frame_stats` (all under `src/`). This includes the `timing_patchseg` startup
 wrapper, pause/autopilot rebasing and exceptional `timing_bad` exit path, input
 interrupt and projectile-return flag saves, publication interrupt early/future/
 late/locked/success paths, recorder disabled/full paths, allocation and flush.
@@ -5387,8 +5388,8 @@ The following P13C1 gate adds experimental converter components without installi
 ### P13C1: experimental four-plane converters
 
 **P13C1 is complete as a component correctness gate.** `tools/ocs_c2p.py`
-verifies both sources in `manifest/ocs-c2p-candidates.tsv` before assembling the
-owned `whdload/ocs_c2p.s` adapter with Kalms' unchanged word-write and longword-write
+verifies both sources in `tools/manifest/ocs-c2p-candidates.tsv` before assembling the
+owned `src/ocs_c2p.s` adapter with Kalms' unchanged word-write and longword-write
 routines. Generated source, binary, listing and reports stay in `tmp/`. Standard
 OCS/CD32 builds do not include these components; native QBlit remains unchanged.
 There is no automatic CPU/backend selection or new live emulator run in this gate.
@@ -5658,7 +5659,7 @@ C3 selection is complete below. [Reproduction](development.md#p13c2-measured-con
 ### P13C3: conservative backend selection
 
 **P13C3 is complete at the bounded conversion seam.** The owned 68000 assembly
-`whdload/ocs_backend.s` provides selection and once-only initialization. The C2
+`src/ocs_backend.s` provides selection and once-only initialization. The C2
 installer consumes it; the selector runs in the guest before dispatch. Normal
 OCS and CD32 outputs remain unchanged. This is not a release or a claim that
 production source ownership, allocation rollback or view transitions are complete.
@@ -5888,7 +5889,7 @@ prediction/history memory remain their respective C5/D/E work items.
 ### P13C5: completed-image publication and display ownership
 
 P13C5 is complete for the English OCS allocation-integrated candidate. The builder
-now links `whdload/ocs_publication.s` as well as C4 allocation/conversion hooks.
+now links `src/ocs_publication.s` as well as C4 allocation/conversion hooks.
 It shares CD32's pending/drawing/displayed protocol: the producer commits immutable
 request data last; the display interrupt releases the old front only after
 publication; task-side conversion and teardown drain pending ownership. The OCS
@@ -7048,7 +7049,7 @@ These are emulator model results, not hardware measurements.
 
 ### Opening animation speed and default caches
 
-The enhanced OCS and CD32 builds now share `whdload/opening_clock.s` for the
+The enhanced OCS and CD32 builds now share `src/opening_clock.s` for the
 separate orchestra/planet/Origin FX/fireworks opening. `opening_source.py` derives
 variant-specific guards and displaced instructions from pinned inputs into
 `tmp/`. Original modes retain the native opening. This is separate from the
@@ -8375,7 +8376,7 @@ orientation drift, not a stale steering ramp or a fractional pitch accumulator.
 The original larger-step path also rounds; the enhancement made the effect much
 more pronounced by repeatedly committing small Q8 rotations.
 
-`whdload/player_basis.s` now retains the player's three basis vectors in Q14 and
+`src/player_basis.s` now retains the player's three basis vectors in Q14 and
 uses a mathematically generated Q14 sine table. Pitch/yaw/roll retain their native
 axis order, signs, degree units and field-rate angle fractions. Symmetric rounding,
 Q14 cross products and near-unit normalization keep precision between fields.

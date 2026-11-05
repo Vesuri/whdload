@@ -16,7 +16,7 @@ def check(build, run, corrupt=False):
     r=json.loads((run/'result.json').read_text())
     require(b.get('public_option') and b['sha256']==r['slave_sha256'],'wrong public build')
     require(r['whd_args']=='CUSTOM5=0' or (r['whd_args']=='CUSTOM5=1' and r['machine'].startswith('68000-')),'not an original-mode run')
-    reader=HunkReader();game=ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english'
+    reader=HunkReader();game=ROOT/'tmp/game/WingCommander/data/Wing.english'
     guard_game(game.read_bytes())
     require(reader.read_file(str(game))==0,'cannot read original hunks')
     expected=None

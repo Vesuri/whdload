@@ -11,7 +11,7 @@ SLAVE=0x500000
 
 def machine(build, model):
     b=json.loads((build/'build.json').read_text());sy=b['symbols']
-    c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english',model=model)
+    c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english',model=model)
     c.write(SLAVE,load_slave((build/'WingCommander.Slave').read_bytes()))
     for pos in b['fixups']:c.write(SLAVE+pos,long(CODE+(c.get(SLAVE+pos,4)&0xfffffff)))
     for off,label,op in b['hooks']:c.write(CODE+off,word(op)+long(SLAVE+sy[label]))
@@ -30,7 +30,7 @@ def check(build,out,model):
  jsr $12bbcc
  moveq #0,d2
 '''
-    game=(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english').read_bytes()
+    game=(ROOT/'tmp/game/WingCommander/data/Wing.english').read_bytes()
     body+=' dc.b '+','.join(f'${x:02x}' for x in game[44+0x7e2c:44+0x7e56])+'\n jsr $12a816\n lea 12(sp),sp\n rts\n'
     fixture,_=assemble(out,f'world-{model}',body)
     results=[]

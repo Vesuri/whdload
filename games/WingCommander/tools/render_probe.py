@@ -3,7 +3,7 @@
 import argparse,hashlib,json,os,re,subprocess,time
 from pathlib import Path
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from amigaxdev import barto
 from cd32_runtime import ROOT,BASE,locate
 from render_fixture import load as load_render_fixture
@@ -26,15 +26,14 @@ def main():
     if os.environ.get('EXTRA_ARGS'):raise ValueError('fixed preflight configuration required')
     slave,fixture=load_render_fixture(a.render_slave) if a.render_slave else ('',{})
     out.mkdir(parents=True);os.chdir(ROOT)
-    run='../'+str(out.relative_to(ROOT))+'/run'
-    env=dict(os.environ,WC_NOMMU_CORE='1' if a.nommu_core else '0',FSUAE_RUN=run,AMIGA_SETUP=a.machine,SLAVE=str(slave),
+    env=wc_run.run_env(out,WC_NOMMU_CORE='1' if a.nommu_core else '0',AMIGA_SETUP=a.machine,SLAVE=str(slave),
         WHD_ARGS='CUSTOM5=0 '+a.options,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' and not a.numeric_clock else '0',
         WARP='1' if a.warp else '0',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',DETERMINISTIC='1')
     for key in ('WC_OBSERVER_CONFIG','WC_OBSERVER_OUTPUT','WC_MATRIX_CONFIG','WC_MATRIX_DIR'):env.pop(key,None)
     g=None
     def command(text,timeout=60):return g.cmd(text,timeout=timeout)
     try:
-        g=Server('wc-matrix-probe',root=str(ROOT),run_dir='amiga/'+run,profile_window=False).boot(env)
+        g=wc_run.server('wc-matrix-probe', env, profile_window=False).boot(env)
         boot_config=command('monitor wc-audit')
         if 'WC_CPU ' not in boot_config:raise ValueError('capability command unavailable')
         (out/'boot-cpu.txt').write_text(boot_config+'\n')
@@ -74,16 +73,16 @@ def main():
         t=barto.load(str(trace))
         pcs=[pc for f in t.fields for pc,cost,regs in t.instructions(f) if pc not in (None,0x7fffffff)]
         (out/'credits.png').write_bytes(t.fields[-1].shot)
-        boot=next((out/'run').glob('boot.*'))
+        boot=wc_run.drawer(env)
         result=dict(layout,ceiling=fixture.get("ceiling"),machine=a.machine,nommu_core=a.nommu_core,numeric_clock=a.numeric_clock,host_warp=a.warp,options=a.options,complete=True,boot_cpu=boot_config,live_cpu=live,
                     aprof_reply=aprof,aprof_supported=enabled,fields=len(t.fields),instruction_records=len(pcs),
                     game_instruction_records=sum(h0<=pc<h0+0x35ea4 for pc in pcs),
                     publications=pcs.count(h0+0x3378e),vbls=pcs.count(h0+0x34162),
-                    slave_sha256=hashlib.sha256((boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()).hexdigest(),
+                    slave_sha256=hashlib.sha256((boot/'WingCommanderCD32.Slave').read_bytes()).hexdigest(),
                     emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())
         (out/'result.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result))
     finally:
         if g:g.p.kill()
-        subprocess.run(['/bin/bash','amiga/run.sh','stop'],env=env,check=True)
+        wc_run.stop(env)
 
 if __name__=='__main__':main()

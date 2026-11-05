@@ -25,7 +25,7 @@ def check(build):
         for flags,cpu in ((0,0),(1,10),(2,20),(4,30),(8,40),(128,60)):
             for revision in (0x1302,0x12bc,0x1348):
                 for bad in (None,)+guard_offsets if revision==0x1302 else (None,):
-                    c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english')
+                    c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english')
                     events=[]
                     try:
                         c.write(slave,payload);c.write(4,long(0x8000));c.write(0x8000+296,word(flags))

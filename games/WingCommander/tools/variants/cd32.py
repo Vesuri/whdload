@@ -2,9 +2,9 @@
 # See docs/internals.md; missing entries are deliberately unavailable.
 NAME = 'cd32'
 CPU = '68020'
-GAME = 'tmp/originals/cd32/WingCommanderCD32/data/wing.english'
+GAME = 'tmp/game/WingCommanderCD32/data/wing.english'
 GAME_SHA = '093505483aed4c9dbd1b97484c3336e92fdb156be9c15a67ed0199bd4dade657'
-SLAVE = 'tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave'
+SLAVE = 'tmp/game/WingCommanderCD32/WingCommanderCD32.Slave'
 SLAVE_SHA = '5fbbb774bba3c794a776acc25f33c3f47c579449e1ba1a21c31418716aa74986'
 SLAVE_SIZE = 0x1e0c
 # file payload base, stored bytes, allocated bytes; None denotes BSS.

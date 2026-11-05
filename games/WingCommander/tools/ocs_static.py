@@ -18,23 +18,15 @@ def main():
     out = (ROOT / args.output).resolve()
     require((ROOT / 'tmp').resolve() in out.parents, 'output must be below tmp/')
     require(not out.exists(), 'output exists; nothing overwritten')
-    archives = {}
-    for line in (ROOT / 'manifest/inputs.tsv').read_text().splitlines():
-        if not line or line.startswith('#'):
-            continue
-        variant, filename, digest, _ = line.split('\t')
-        if variant in ('ocs', 'installer'):
-            archive = ROOT / 'tmp/downloads' / filename
-            require(sha(archive.read_bytes()) == digest, f'checksum mismatch: {filename}')
-            archives[variant] = archive
-    require(set(archives) == {'ocs', 'installer'}, 'missing manifest entries')
+    from archives import verified
+    archives = {variant: verified(variant) for variant in ('ocs', 'installer')}
     out.mkdir(parents=True)
     for variant, archive in archives.items():
         dest = out / variant
         dest.mkdir()
         subprocess.run(['lha', 'xq', str(archive)], cwd=dest, check=True)
     game = out / 'ocs/WingCommander'
-    reference = ROOT / 'tmp/originals/ocs/WingCommander'
+    reference = ROOT / 'tmp/game/WingCommander'
     fresh_files = {p.relative_to(game): sha(p.read_bytes()) for p in game.rglob('*') if p.is_file()}
     reference_files = {p.relative_to(reference): sha(p.read_bytes()) for p in reference.rglob('*') if p.is_file()}
     require(fresh_files == reference_files, 'reference tree differs; preserved unchanged')

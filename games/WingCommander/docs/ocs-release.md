@@ -49,7 +49,7 @@ Enhancements support only the supplied English OCS SPS 1657 executable,
 `data/Wing.english`, 278,304 bytes, SHA-256
 `eff90d6cfbc80b008e5e508ff6488f221b6e7243958aaff6fdfd0b06e6724a30`
 (WHDLoad CRC16 `00e8`). Its input archive is pinned in
-[`manifest/inputs.tsv`](../manifest/inputs.tsv). The original 5,324-byte OCS slave
+[`inputs.sha256`](../inputs.sha256). The original 5,324-byte OCS slave
 has SHA-256 `eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913`.
 The original installer's broader revision list is not enhancement support.
 Other language/revision patch lists retain original behaviour; unrecognised or

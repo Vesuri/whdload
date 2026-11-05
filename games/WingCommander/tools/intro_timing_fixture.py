@@ -12,7 +12,7 @@ def main():
     a=p.parse_args(); out=(ROOT/a.output).resolve()
     if (ROOT/'tmp').resolve() not in out.parents or out.exists():
         raise ValueError('new output below tmp/ required')
-    original=(ROOT/'tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()
+    original=(ROOT/'tmp/game/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()
     if hashlib.sha256(original).hexdigest()!=SLAVE_SHA: raise ValueError('changed original')
     code=original[32:-4]; assert len(code)==0x1e0c and code[0x178e:0x1792]==bytes.fromhex('203a0674')
     out.mkdir(parents=True)

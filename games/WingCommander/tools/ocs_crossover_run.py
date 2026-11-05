@@ -9,7 +9,7 @@ from pathlib import Path
 import subprocess
 import time
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from amigaxdev import barto
 from ocs_crossover import fixture, install
 import ocs_runtime
@@ -55,13 +55,12 @@ def main():
     out.mkdir(parents=True)
     fixture(out)
     os.chdir(ROOT)
-    run = '../'+str(out.relative_to(ROOT))+'/run'
-    env = dict(os.environ, FSUAE_RUN=run, WARP=os.environ.get('WARP','0'), WINDOW='front',
+    env = wc_run.run_env(out, WARP=os.environ.get('WARP','0'), WINDOW='front',
                JOY0='none', JOY1='none', SLAVE=str(out/'WingCommander.Slave'),
                EXTRA_ARGS=('--uae_cpu_model=68020 ' if a.cpu=='68020' else '')+('--fast_memory=0 --slow_memory=1792' if a.memory=='slow' else ''),
                DETERMINISTIC=os.environ.get('DETERMINISTIC', '1') if a.calibrate else '1',
-               AMIGA_SETUP='a500', WC_VARIANT='ocs', WHD_ARGS='', OCS_STOCK_CLOCK='1')
-    server = Server('wc-gate',root=str(ROOT),run_dir='amiga/'+run,profile_window=False)
+               AMIGA_SETUP='a500', VARIANT=wc_run.VARIANTS['ocs'], WHD_ARGS='', OCS_STOCK_CLOCK='1')
+    server = wc_run.server('wc-gate', env, profile_window=False)
     g = None
     actions = []
     def command(text, timeout=60):
@@ -204,6 +203,6 @@ def main():
     finally:
         (out/'actions.json').write_text(json.dumps(actions,indent=2)+'\n')
         if g: g.p.kill()
-        subprocess.run(['/bin/bash',str(ROOT/'amiga/run.sh'),'stop'],env=env,check=True)
+        wc_run.stop(env)
 
 if __name__ == '__main__': main()

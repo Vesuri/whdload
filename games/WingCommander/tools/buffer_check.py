@@ -127,7 +127,7 @@ def main():
     if a.output.exists() or (ROOT/'tmp').resolve() not in a.output.resolve().parents:raise ValueError('new tmp report required')
     blob=(a.build/'payload.bin').read_bytes()
     sy={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(a.build/'slave.lst').read_text(),re.M)}
-    raw=(ROOT/'tmp/originals/cd32/WingCommanderCD32/data/wing.english').read_bytes()
+    raw=(ROOT/'tmp/game/WingCommanderCD32/data/wing.english').read_bytes()
     assert hashlib.sha256(raw).hexdigest()=='093505483aed4c9dbd1b97484c3336e92fdb156be9c15a67ed0199bd4dade657'
     game=raw[44:44+0x35ea4]
     results=exercise(blob,sy,game)

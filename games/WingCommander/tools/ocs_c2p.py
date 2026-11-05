@@ -14,7 +14,7 @@ def candidates(root=None):
     root = Path(root or os.environ.get('OCS_KALMS_ROOT') or
                 Path(os.environ['AMIGA_SHARE'])/'kalms-c2p')
     result = []
-    for line in (ROOT/'manifest/ocs-c2p-candidates.tsv').read_text().splitlines():
+    for line in (ROOT/'tools/manifest/ocs-c2p-candidates.tsv').read_text().splitlines():
         if not line or line.startswith('#'): continue
         name, digest, url = line.split('\t')
         raw = (root/name).read_bytes()
@@ -28,7 +28,7 @@ def candidates(root=None):
 def source(inputs):
     # Upstream byte/word/plane shuffle is unchanged. A row adapter supplies
     # low-nibble colour values; full upstream sources remain derived tmp output.
-    return (ROOT/'whdload/ocs_c2p.s').read_text()+'\n'+'\n'.join(x[2] for x in inputs)
+    return (ROOT/'src/ocs_c2p.s').read_text()+'\n'+'\n'.join(x[2] for x in inputs)
 
 
 def assemble(out, name, text):

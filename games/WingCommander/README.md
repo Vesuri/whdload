@@ -9,9 +9,9 @@ The current OCS public candidate has an **Enhanced framerate (68020+Fast RAM)**
 checkbox (`CUSTOM5=1`, enabled in the generated icon). The enhanced OCS and
 CD32 orchestra/fireworks opening now uses 10 Hz animation steps, with smooth
 field-sampled planet/Origin FX zooms and unchanged music cues. Launch it with
-`./amiga/run-ocs.sh` (A3000 by default; `AMIGA_SETUP` overrides it). Unchecked/absent, or on
+`make run VARIANT=WingCommander` (A3000 by default; `SETUP` overrides it). Unchecked/absent, or on
 68000/68010 or without verified true Fast RAM, it keeps original simulation,
-rendering and frame waits. Build with `tools/ocs_memory_build.py --public`;
+rendering and frame waits. Build with `make slave VARIANT=WingCommander` (`tools/ocs_memory_build.py --public`);
 see the [OCS ReadMe](release/ReadMe.OCS) and [reproduction commands](docs/development.md#ocs-public-enhanced-framerate-toggle).
 
 The [OCS candidate hand-off](docs/ocs-release.md) records exact build hashes,
@@ -193,14 +193,15 @@ See [open work](docs/open-work.md), [development](docs/development.md) and
 [known internals](docs/internals.md). Agent rules are in [AGENTS.md](AGENTS.md).
 
 ```sh
-make fetch
-make verify
-make prepare
-. amiga/env.sh
+make unpack ARCHIVES=<directory holding the three archives>
+make run                         # the enhanced CD32 slave on a1200-fast
+make run VARIANT=WingCommander   # the OCS public candidate on a3000
+make check
+make dist
 ```
 
-The installer and both full installs are pinned in `manifest/inputs.tsv`.
-Archives and separate extracted originals live under ignored `tmp/`.
+The installer and both full installs are pinned in `inputs.sha256`.
+Archives and the extracted drawers live under ignored `tmp/`.
 The shared development tools come from AmigaXDev's installed environment.
 
 Intro timing is complete: the enhanced English ship/title and asteroid intro uses

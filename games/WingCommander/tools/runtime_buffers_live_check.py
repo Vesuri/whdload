@@ -3,7 +3,7 @@
 import argparse,json,os,re,subprocess,time
 from pathlib import Path
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from ocs_reconstruct import ROOT,new_output
 from runtime_buffers import load
 
@@ -18,10 +18,10 @@ def main():
  meta=json.loads((a.build/'build.json').read_text())
  name='WingCommander.Slave' if ocs else 'WingCommanderCD32.Slave'
  slave=a.build/name;image=load(slave.read_bytes())
- original=ROOT/('tmp/originals/ocs/WingCommander/WingCommander.Slave' if ocs else 'tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')
+ original=ROOT/('tmp/game/WingCommander/WingCommander.Slave' if ocs else 'tmp/game/WingCommanderCD32/WingCommanderCD32.Slave')
  entry=int.from_bytes(original.read_bytes()[56:58],'big')
- env=dict(os.environ,SLAVE=str(slave.resolve()),WC_VARIANT=a.variant,
-          FSUAE_RUN='../'+str(out.relative_to(ROOT))+'/run',WARP='1',NTSC='0',WINDOW='front',
+ env=wc_run.run_env(out,variant=a.variant,SLAVE=str(slave.resolve()),
+          WARP='1',NTSC='0',WINDOW='front',
           JOY0='none',JOY1='none',DETERMINISTIC='1',AMIGA_SETUP='a1200-030',
           WHD_ARGS=('CUSTOM5=1' if ocs else 'CUSTOM5=0')+' DCACHE',
           WC_BASELINE_CACHE_MODEL='1',EXTRA_ARGS='')
@@ -29,8 +29,8 @@ def main():
  def stop():
   nonlocal g
   if g:g.p.kill();g=None
-  subprocess.run(['/bin/bash',str(ROOT/'amiga/run.sh'),'stop'],env=env,check=True)
- def boot():return Server('wc-workspace',root=str(ROOT),run_dir='amiga/'+env['FSUAE_RUN'],profile_window=False).boot(env)
+  wc_run.stop(env)
+ def boot():return wc_run.server('wc-workspace', env, profile_window=False).boot(env)
  def cmd(s):
   result=g.cmd(s,timeout=60)
   if any(x in result for x in ('Cannot access','Remote connection closed','Error')):raise ValueError(result)

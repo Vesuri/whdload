@@ -8,8 +8,8 @@ def source(root, *, variant):
     v = get(variant)
     if v.NAME != "cd32":
         raise ValueError("eight-plane renderer requires cd32")
-    parts = [(root/'whdload/render.s').read_text()]
-    for row in (root/'manifest/kalms-c2p.tsv').read_text().splitlines():
+    parts = [(root/'src/render.s').read_text()]
+    for row in (root/'tools/manifest/kalms-c2p.tsv').read_text().splitlines():
         if not row or row.startswith('#'): continue
         path,sha,upstream=row.split('\t')
         cpu=Path(path).stem.rsplit('_',1)[1]
@@ -41,7 +41,7 @@ def source(root, *, variant):
 
 
 def flight_source(root, verify=False, control=False, comparison_control=False, experiment=None, *, variant):
-    wrapper=(root/'whdload/flight_render.s').read_text()
+    wrapper=(root/'src/flight_render.s').read_text()
     # Keep the comparison region exactly 82 bytes, including the no-change
     # branch. The control reproduces the old instruction stream; the candidate
     # uses advancing scratch pointers and never executes the padding.

@@ -15,7 +15,7 @@ LEAVES = [('tod_limiter', 0x17b8, 0x17ee), ('c2p_128', 0x17f6, 0x195e),
 
 
 def verify_leaves():
-    original = (ROOT/'tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()
+    original = (ROOT/'tmp/game/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()
     if hashlib.sha256(original).hexdigest() != SLAVE_SHA:
         raise ValueError('changed original slave')
     code = original[32:-4]

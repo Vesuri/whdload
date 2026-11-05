@@ -8,7 +8,7 @@ import re
 import subprocess
 from pathlib import Path
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from cd32_runtime import ROOT, BASE, locate
 
 
@@ -40,8 +40,7 @@ def main():
     config = out/'observer.cfg'
     config.write_text(' '.join(f'{v:x}' for v in [h[0], h[1], h[3]] + [h[0]+x for x in (0x698, 0x2a8, 0x6bc, 0x6c0, 0x3378e)])+'\n')
     env = {k:v for k,v in os.environ.items() if not k.startswith(('WC_OBSERVER_', 'WC_MATRIX_', 'WC_STATE_'))}
-    run = '../'+str(out.relative_to(ROOT))+'/run'
-    env.update(FSUAE_RUN=run, SLAVE=str(slave), AMIGA_SETUP=ref['machine'],
+    env = wc_run.run_env(out, env, SLAVE=str(slave), AMIGA_SETUP=ref['machine'],
         INTRO_STOCK_CLOCK='1' if ref['machine']=='a1200-fast' else '0',
         WC_NOMMU_CORE='1' if ref['nommu_core'] else '0',
         WHD_ARGS='CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0 '+ref['options'],
@@ -56,7 +55,7 @@ def main():
             raise RuntimeError(result)
         return result
     try:
-        g = Server('wc-simulation', root=str(ROOT), run_dir='amiga/'+run, profile_window=False).boot(env)
+        g = wc_run.server('wc-simulation', env, profile_window=False).boot(env)
         pc = h[0]+0x698
         cmd(f'break *{pc:#x}\ncontinue\ndelete')
         if f'0x{pc:x}' not in cmd('info registers pc'):
@@ -84,7 +83,7 @@ def main():
     finally:
         if g:
             g.p.kill()
-        subprocess.run(['/bin/bash', 'amiga/run.sh', 'stop'], env=env, check=True)
+        wc_run.stop(env)
 
 
 if __name__ == '__main__':

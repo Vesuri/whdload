@@ -25,7 +25,7 @@ def source(root, variant):
     lines = [f'EJECTION_SLOT equ {-0x478a if ocs else -0x4764}',
              f'EJECTION_VIEW equ {-18318 if ocs else -18280}',
              f'EJECTION_SUBJECT equ {-18334 if ocs else -18296}',
-             (root / 'whdload/ejection_clock.s').read_text()]
+             (root / 'src/ejection_clock.s').read_text()]
     fix = []
     dis = Cs(CS_ARCH_M68K, CS_MODE_BIG_ENDIAN | CS_MODE_M68K_000)
     # Lift only bounded native fragments. Local branches get fresh labels;

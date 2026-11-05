@@ -43,13 +43,13 @@ def externals(source):
 
 
 def fstat_macro():
-    src=(ROOT/'whdload/timing.s').read_text()
+    src=(ROOT/'src/timing.s').read_text()
     start=src.index('FSTAT   macro')
     return src[start:src.index('        endm',start)+len('        endm')]+ '\n'
 
 
 def assembly_gate(out):
-    assert {p.stem for p in (ROOT/'whdload').glob('timing*.s')} <= set(UNITS)
+    assert {p.stem for p in (ROOT/'src').glob('timing*.s')} <= set(UNITS)
     rows=[]
     for buffered,stats,verify in ((0,0,0),(0,1,1),(1,0,0),(1,1,0)):
         for name in UNITS:
@@ -80,11 +80,11 @@ def trunc(n,d): return (abs(n)//d)*(-1 if n<0 else 1)
 
 
 def arithmetic_gate(out):
-    scene=(ROOT/'whdload/timing_scene.s').read_text()
-    trans=(ROOT/'whdload/timing_translation.s').read_text()
+    scene=(ROOT/'src/timing_scene.s').read_text()
+    trans=(ROOT/'src/timing_translation.s').read_text()
     src=scene[scene.index('timing_scene_scale:'):scene.index('timing_scene_begin:')]
     src+=trans[trans.index('translation_fraction:'):trans.index('translation_field:')]
-    src+=(ROOT/'whdload/timing_clock.s').read_text()
+    src+=(ROOT/'src/timing_clock.s').read_text()
     rng=random.Random(0x13b2)
     values=[-2**31,-2**31+1,-65536,-32769,-1,0,1,32767,65535,2**31-1]+[rng.randrange(-2**31,2**31) for _ in range(40)]
     rows=[]

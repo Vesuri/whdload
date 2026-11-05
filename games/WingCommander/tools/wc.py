@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
-"""Shared debugger server, adapted from Legends of Valour. Products stay in tmp/."""
+"""Drive Wing Commander in FS-UAE through the gdb stub. Products stay in tmp/.
+
+  python3 tools/wc.py serve          boot (common/run.sh DEBUG=1), attach gdb, run; listen
+  python3 tools/wc.py <command...>   send one command to the running server, print the reply
+
+Commands are the shared server's (AmigaXDev amigaxdev.gdbserve): stop, cont, gdb <text>,
+shot <png>, profile <fields> <bin>, wait <seconds>, quit, plus until <address...> (run to the
+first of these breakpoints). The run options of common/run.sh (SETUP, VARIANT, BUILD, SLAVE,
+WHD_ARGS, ...) apply to serve. The server runs in its own instance, `cap` unless INSTANCE
+names another, beside `make run`.
+"""
 import os
 from pathlib import Path
 import subprocess
 import sys
-import _amigaxdev
-from amigaxdev.gdbserve import Server
 
-ROOT = Path(__file__).resolve().parents[1]
-CAP = os.environ.get('FSUAE_RUN', '../tmp/cap')
+os.environ.setdefault('INSTANCE', 'cap')
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
+from game_server import COMMON, game_server  # noqa: E402
+
 
 def until(server, g, rest):
     g.stop()
@@ -23,19 +33,14 @@ def until(server, g, rest):
         g.stop()
         g.cmd('delete')
 
+
 def quit_(server, g, rest):
-    # Use the shared launcher ownership checks instead of Server's unguarded PID kill.
+    # The launcher's ownership checks instead of the shared server's unguarded pid kill.
     g.p.kill()
-    subprocess.run(['/bin/bash', str(ROOT/'amiga/run.sh'), 'stop'],
-                   env=dict(os.environ, FSUAE_RUN=CAP), check=True)
+    subprocess.run(['/bin/bash', str(COMMON / 'run.sh'), 'stop'], check=True)
     return 'bye'
 
-class WingCommander(Server):
-    def boot(self, env=None):
-        os.chdir(ROOT)
-        return super().boot(dict(env or {}, FSUAE_RUN=CAP))
 
-server = WingCommander('wc', root=str(ROOT), run_dir='amiga/'+CAP,
-                       commands={'until': until, 'quit': quit_})
+server = game_server('wc', commands={'until': until, 'quit': quit_})
 if __name__ == '__main__':
     server.main(sys.argv[1:])

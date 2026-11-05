@@ -10,7 +10,7 @@ import subprocess
 import time
 from pathlib import Path
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from amigaxdev import barto
 from ocs_reconstruct import ROOT, new_output
 from variants import get
@@ -33,8 +33,8 @@ def main():
         from cd32_runtime import locate
         sy={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(a.build/'slave.lst').read_text(),re.M)}
         slave=a.build/'WingCommanderCD32.Slave';length=0x800000
-    env=dict(os.environ,SLAVE=str(slave.resolve()),WC_VARIANT=a.variant,
-             FSUAE_RUN='../'+str(out.relative_to(ROOT))+'/run',WARP='1',NTSC='0',WINDOW='front',
+    env=wc_run.run_env(out,variant=a.variant,SLAVE=str(slave.resolve()),
+             WARP='1',NTSC='0',WINDOW='front',
              JOY0='none',JOY1='none',DETERMINISTIC='1',AMIGA_SETUP='a500' if a.variant=='ocs' else 'a1200-fast',
              WHD_ARGS='CUSTOM5=1 DCACHE' if a.variant=='ocs' else 'CUSTOM5=0 DCACHE',
              EXTRA_ARGS='--uae_cpu_model=68020 --fast_memory=4096' if a.variant=='ocs' else '',
@@ -47,8 +47,8 @@ def main():
     def stop():
         nonlocal g
         if g:g.p.kill();g=None
-        subprocess.run(['/bin/bash',str(ROOT/'amiga/run.sh'),'stop'],env=env,check=True)
-    def boot():return Server('wc-opening',root=str(ROOT),run_dir='amiga/'+env['FSUAE_RUN'],profile_window=False).boot(env)
+        wc_run.stop(env)
+    def boot():return wc_run.server('wc-opening', env, profile_window=False).boot(env)
     def cmd(s,timeout=60):
         r=g.cmd(s,timeout=timeout)
         if any(x in r for x in ('Remote connection closed','Cannot access','Error','Invalid hex','Protocol error')):raise RuntimeError(r)

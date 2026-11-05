@@ -253,7 +253,7 @@ memory_message: dc.b "OCS display allocation failed",0
 contract_message: dc.b "OCS CPU conversion contract failed",0
  even
 game_base: dc.l 0
-'''+(ROOT/'whdload/ocs_memory.s').read_text()+'\n'+(ROOT/'whdload/ocs_publication.s').read_text()+'\n'+backend_source()+'\n'+converter_source(candidates())
+'''+(ROOT/'src/ocs_memory.s').read_text()+'\n'+(ROOT/'src/ocs_publication.s').read_text()+'\n'+backend_source()+'\n'+converter_source(candidates())
     if clock:
         from ocs_clock_source import source as clock_source
         if prediction:
@@ -268,12 +268,12 @@ game_base: dc.l 0
         if prediction:
             from ocs_prediction_source import source as prediction_source
             from shared_cpu import select
-            text+='\n'+prediction_source(ROOT)+'\n'+select((ROOT/'whdload/ocs_prediction.s').read_text(),'68000')
+            text+='\n'+prediction_source(ROOT)+'\n'+select((ROOT/'src/ocs_prediction.s').read_text(),'68000')
             text=prediction_clock(text)
             if intro:
                 from ocs_intro_source import source as intro_source, integrate
                 text=integrate(text)+intro_source(ROOT)
-            text+=select((ROOT/'whdload/ocs_exhaust.s').read_text(),'68000')
+            text+=select((ROOT/'src/ocs_exhaust.s').read_text(),'68000')
             from ocs_prediction_source import external_source
             text+=external_source(ROOT)
         # Extra overwritten words are separately guarded before any mutation.
@@ -284,7 +284,7 @@ game_base: dc.l 0
         text=text.replace('guards_done:\n','guards_done:\n'+checks)
         text=text.replace('hooks_done:\n','hooks_done:\n'+''.join(f' movea.l d6,a5\n adda.l #${off:x},a5\n move.w #$4e71,(a5)\n' for off in nops))
     if math_fast:
-        text+='\n'+(ROOT/'whdload/ocs_math.s').read_text()
+        text+='\n'+(ROOT/'src/ocs_math.s').read_text()
         text+='\nocs_multiply_native:\n dc.b '+','.join(f'${v:02x}' for v in game[44+0x2adb6:44+0x2adbc])+'\n jmp $f002adbc\n'
         text+='\nocs_radius_native:\n dc.b '+','.join(f'${v:02x}' for v in game[44+0x2b950:44+0x2b956])+'\n jmp $f002b956\n'
     if changed != 'off':
@@ -298,7 +298,7 @@ game_base: dc.l 0
         if changed == 'blocks':
             text=text.replace(' bsr.w ocs_c2p_word', ' bsr.w ocs_changed_word')
             text=text.replace(' bsr.w ocs_c2p_long', ' bsr.w ocs_changed_long')
-        text+='\n'+(ROOT/'whdload/ocs_changed.s').read_text()+'''
+        text+='\n'+(ROOT/'src/ocs_changed.s').read_text()+'''
 ; Native O:32504 lends inactive display storage to general scratch consumers.
 ; Its six displaced bytes follow the original final-conversion/field wait.
 ocs_changed_borrow:
@@ -406,7 +406,7 @@ exact_hooks_done:
         # Keep option code/data in PC-relative range of the startup seam.
         config=original[32+0xf81:].split(b'\0',1)[0].rstrip(b';')
         config+=b';C5:B:Enhanced framerate (68020+Fast RAM);\0'
-        options=(ROOT/'whdload/ocs_options.s').read_text()
+        options=(ROOT/'src/ocs_options.s').read_text()
         options+='\nocs_public_info: dc.b "2.0b (19.10.2026)",10,"Original slave: Psygore",10,"Improvements: Vesuri",0\nocs_public_version: dc.b "$VER: WingCommander 2.0b (19.10.2026)",0\n even\n'
         options+='\nocs_public_config: dc.b '+','.join(str(x) for x in config)+'\n even\n'
         text=text.replace('display_create_checked:',options+'\ndisplay_create_checked:',1)
@@ -417,7 +417,7 @@ exact_hooks_done:
         text=text.replace('guards_done:\n','guards_done:\n movea.l d6,a0\n bsr.w opening_guard\n lea install(pc),a1\n adda.l #modal_guard-install,a1\n jsr (a1)\n',1)
         text=text.replace('hooks_done:\n','hooks_done:\n movea.l d6,a0\n bsr.w opening_install\n lea install(pc),a1\n adda.l #modal_install-install,a1\n jsr (a1)\n',1)
     if public:
-        text+=(ROOT/'whdload/cinematic_background.s').read_text().replace(
+        text+=(ROOT/'src/cinematic_background.s').read_text().replace(
             '        CINEMATIC_DRAW','        jmp OCS_CINEMATIC_DRAW')
     if public:
         # The enlarged payload needs a long address calculation for this call.
@@ -487,7 +487,7 @@ exact_hooks_done:
     if public:
         report.update(runtime_workspace_bytes=len(payload)-sy['runtime_workspace'],initialized_bytes=sy['runtime_workspace'])
         from ocs_icon import enhanced_icon
-        icon=(ROOT/'tmp/originals/ocs/WingCommander/WingCommander.info').read_bytes()
+        icon=(ROOT/'tmp/game/WingCommander/WingCommander.info').read_bytes()
         (out/'WingCommander.info').write_bytes(enhanced_icon(icon))
         (out/'ReadMe').write_bytes((ROOT/'release/ReadMe.OCS').read_bytes())
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')

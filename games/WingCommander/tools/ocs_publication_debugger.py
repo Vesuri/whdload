@@ -14,7 +14,7 @@ def main():
     p.add_argument('--source',default='tmp/p13c2-debugger-measured')
     p.add_argument('--output',required=True);a=p.parse_args()
     source=Path(a.source);out=new_output(a.output)
-    for line in (ROOT/'manifest/ocs-publication-debugger.tsv').read_text().splitlines():
+    for line in (ROOT/'tools/manifest/ocs-publication-debugger.tsv').read_text().splitlines():
         if not line or line.startswith('#'):continue
         path,digest=line.split('\t')
         require(hashlib.sha256((source/path).read_bytes()).hexdigest()==digest,'changed C2 input: '+path)

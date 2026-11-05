@@ -43,7 +43,7 @@ def main():
     if revision != REVISION:
         raise ValueError('unsupported source revision')
     inputs = {}
-    for line in (ROOT/'manifest/mmu-fix.tsv').read_text().splitlines():
+    for line in (ROOT/'tools/manifest/mmu-fix.tsv').read_text().splitlines():
         if not line or line.startswith('#'):
             continue
         name, expected = line.split()

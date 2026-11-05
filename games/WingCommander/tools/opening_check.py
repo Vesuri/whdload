@@ -25,7 +25,7 @@ def check(build, variant):
         sy={name:int(off,16) for off,name in re.findall(r'^([0-9A-F]{8}) (\S+)$',(build/'slave.lst').read_text(),re.M)}
         payload=(build/'payload.bin').read_bytes()
     slave=0x500000
-    c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english',model=2)
+    c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english',model=2)
     try:
         # Load and relocate each variant independently, including its segment chain.
         reader=HunkReader();require(reader.read_file(str(ROOT/v.GAME))==0,reader.error_string)

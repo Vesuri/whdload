@@ -3,7 +3,7 @@
 import argparse,hashlib,json,os,re,subprocess
 from pathlib import Path
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from amigaxdev import barto
 from cd32_runtime import ROOT,BASE,locate
 from intro_capture import SCENES
@@ -59,8 +59,7 @@ def main():
     assert len(names)==35
     out.mkdir(parents=True);os.chdir(ROOT)
     config=out/'matrix.cfg';config.write_text(f'{h[0]:x} {len(cuts)}\n'+''.join(f'{pc:x} {index}\n' for pc,index in cuts))
-    run='../'+str(out.relative_to(ROOT))+'/run'
-    env=dict(os.environ,FSUAE_RUN=run,AMIGA_SETUP=a.machine,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',
+    env=wc_run.run_env(out, AMIGA_SETUP=a.machine,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',
         WC_NOMMU_CORE='1' if a.nommu_core else '0',WC_INSTANT_BLITTER='1' if a.instant_blitter else '0',SLAVE=slave,
         WHD_ARGS='CUSTOM5=0 '+a.options,WARP='1' if a.warp else '0',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',
         DETERMINISTIC='1',WC_MATRIX_IRQ='1' if a.irq_scopes else '0',WC_MATRIX_IDLE='1' if a.idle else '0',WC_MATRIX_DMA='1' if a.dma else '0',WC_MATRIX_CONFIG=str(config),WC_MATRIX_DIR=str(out),WC_MATRIX_RAW='1' if a.raw_chunky else '0',WC_MATRIX_PROFILES='0' if a.no_profiles else '1')
@@ -74,7 +73,7 @@ def main():
         result=cmd(f'break *{pc:#x}\ncontinue\ndelete',900)
         if 'Breakpoint' not in result or f'0x{pc:x}' not in cmd('info registers pc'):raise ValueError('scene endpoint not reached')
     try:
-        g=Server('wc-matrix',root=str(ROOT),run_dir='amiga/'+run,profile_window=False).boot(env)
+        g=wc_run.server('wc-matrix', env, profile_window=False).boot(env)
         cpu=cmd('monitor wc-audit')
         fields=dict(re.findall(r'(\w+)=(\w+)',cpu))
         model={'a1200-fast':'68020','a1200-030':'68030','a1200-040':'68040','a1200-060':'68060'}[a.machine]
@@ -137,10 +136,10 @@ def main():
         if a.irq_scopes and not (out/'irq-events.txt').is_file():raise ValueError('IRQ scope observer unavailable')
         if a.idle and not (out/'idle-events.txt').is_file():raise ValueError('idle observer unavailable')
         if a.dma and not (out/'dma-events.txt').is_file():raise ValueError('DMA observer unavailable')
-        boot=next((out/'run').glob('boot.*'))
+        boot=wc_run.drawer(env)
         result=dict(layout,complete=True,names=names,machine=a.machine,nommu_core=a.nommu_core,mmu_core=a.mmu_core,ceiling=ceiling,instant_blitter=a.instant_blitter,irq_scopes=a.irq_scopes,irq_trace=a.irq_trace,irq_beam=a.irq_beam,idle=a.idle,dma=a.dma,host_warp=a.warp,clock_validated=a.machine=='a1200-fast',options=a.options,chunky_oracle=chunky_oracle,diagnostic_stops=a.chunky_oracle or a.irq_trace or a.irq_beam,raw_chunky=a.raw_chunky,profiles=not a.no_profiles,
             boot_cpu=cpu,live_cpu=live,audit_cacr=audit['cacr'],
-            slave_sha256=hashlib.sha256((boot/'dh1/WingCommanderCD32/WingCommanderCD32.Slave').read_bytes()).hexdigest(),
+            slave_sha256=hashlib.sha256((boot/'WingCommanderCD32.Slave').read_bytes()).hexdigest(),
             emulator_sha256=hashlib.sha256(Path(env['FSUAE']).read_bytes()).hexdigest())
         (out/'result.json').write_text(json.dumps(result,indent=2)+'\n')
     except subprocess.CalledProcessError as error:
@@ -151,6 +150,6 @@ def main():
         raise
     finally:
         if g:g.p.kill()
-        subprocess.run(['/bin/bash','amiga/run.sh','stop'],env=env,check=True)
+        wc_run.stop(env)
 
 if __name__=='__main__':main()

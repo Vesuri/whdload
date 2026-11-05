@@ -856,13 +856,15 @@ if available.
 Deferred local work: the pre-existing save/load length guard and native checks
 are preserved in stash `5237ca28782a8e1fd1f615c91232c80b2fd93391`
 (`Phase 12: deferred save-load length guard and native checks`). It contains only
-`whdload/release.s`, `tools/reconstruct.py` and `tools/release_check.py`: reject
+`whdload/release.s` (now `src/release.s`), `tools/reconstruct.py` and
+`tools/release_check.py`: reject
 missing or wrong-sized save files before loading, install the load detour, and
 test valid/invalid lengths. This work is not part of the accepted C1 build and
 still needs phase-12 review and validation. Restore when phase 12 resumes with
 `git stash apply 5237ca28782a8e1fd1f615c91232c80b2fd93391`, then review the diff;
-keep the stash until the work is safely committed. This stash is local to this
-checkout and is not transferred by pushing the documentation commit.
+keep the stash until the work is safely committed. The stash is local to the
+standalone Wing Commander checkout this game came from; it did not come into this
+repository, so carry it over by hand (its paths predate the move to `src/`).
 
 ### Phase 13 — OCS investigation and implementation plan (complete)
 

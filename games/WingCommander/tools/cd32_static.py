@@ -100,16 +100,8 @@ def main():
     scratch = (ROOT / 'tmp').resolve()
     require(scratch in out.parents, 'output must be below tmp/')
     require(not out.exists(), 'output exists; choose a new directory (nothing overwritten)')
-    archives = {}
-    for line in (ROOT / 'manifest/inputs.tsv').read_text().splitlines():
-        if not line or line.startswith('#'):
-            continue
-        variant, filename, expected, _ = line.split('\t')
-        if variant in ('cd32', 'installer'):
-            path = ROOT / 'tmp/downloads' / filename
-            require(sha(path.read_bytes()) == expected, f'checksum mismatch: {filename}')
-            archives[variant] = path
-    require(set(archives) == {'cd32', 'installer'}, 'missing manifest entries')
+    from archives import verified
+    archives = {variant: verified(variant) for variant in ('cd32', 'installer')}
     out.mkdir(parents=True)
     extracted = {}
     for variant, path in archives.items():
@@ -118,7 +110,7 @@ def main():
         subprocess.run(['lha', 'xq', str(path)], cwd=dest, check=True)
         extracted[variant] = dest
     fresh = extracted['cd32'] / 'WingCommanderCD32'
-    reference = ROOT / 'tmp/originals/cd32/WingCommanderCD32'
+    reference = ROOT / 'tmp/game/WingCommanderCD32'
     for path in fresh.rglob('*'):
         if path.is_file():
             local = reference / path.relative_to(fresh)

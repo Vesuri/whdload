@@ -32,7 +32,7 @@ def source(root,variant):
     input_offset=0x180c4 if variant=='ocs' else 0x1898a
     lines=[f'OPEN_FIELD equ {v.A4["field_clock"]}',
            f'OPEN_COUNTDOWN equ {-32592 if variant=="ocs" else -32624}',
-           (root/'whdload/opening_clock.s').read_text()]
+           (root/'src/opening_clock.s').read_text()]
     resumes=[]
     for off,width,name in stages:
         raw=code[off:off+width]

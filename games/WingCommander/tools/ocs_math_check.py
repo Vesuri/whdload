@@ -7,7 +7,7 @@ from ocs_display_check import Native,CODE,DATA,long,word
 from ocs_reconstruct import ROOT,new_output,require
 
 def check(build,model):
- c,sy=machine(build,model);ref=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english',model=model)
+ c,sy=machine(build,model);ref=Native(ROOT/'tmp/game/WingCommander/data/Wing.english',model=model)
  rng=random.Random(13051);values=[0,1,255,256,257,32767,32768,65535,65536,0x7fffffff,0x80000000,0xffffffff,0xffffff00]
  pairs=[(a,b) for a in values for b in values]+[(rng.getrandbits(32),rng.getrandbits(32)) for _ in range(1000)]
  pairs += [(rng.getrandbits(32),rng.randrange(-65535,65536)&0xffffffff) for _ in range(1000)]

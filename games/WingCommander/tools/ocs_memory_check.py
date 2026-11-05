@@ -23,11 +23,11 @@ def source():
         ('OCS_SURFACE_CREATE',0x31dc4),('OCS_SURFACE_FREE',0x32476),
         ('OCS_DISPLAY_CREATE',0x33200),('OCS_PUBLIC_ALLOC',0x33b76),
         ('OCS_DISPLAY_FREE',0x32526),('OCS_CONVERSION',0x324a8),
-        ('OCS_WAIT',0x32990),('OCS_SURFACE_FREE_BODY',0x3247c)))+'\n'+(ROOT/'whdload/ocs_memory.s').read_text()
+        ('OCS_WAIT',0x32990),('OCS_SURFACE_FREE_BODY',0x3247c)))+'\n'+(ROOT/'src/ocs_memory.s').read_text()
 
 
 def case(blob, sy, backend, fast_bank, failures, primary=True, public=False, full=False, width=320, height=200):
-    c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english')
+    c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english')
     active={}; events=[]; calls=0
     cursor={'chip':0x20000,'fast':fast_bank,'public':0x190000}
     try:
@@ -103,7 +103,7 @@ def case(blob, sy, backend, fast_bank, failures, primary=True, public=False, ful
 
 
 def display_cases(blob,sy):
-    c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english')
+    c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english')
     active={}; events=[]; calls=0; fail=0
     cursor={'chip':0x20000,'public':0x190000}
     try:

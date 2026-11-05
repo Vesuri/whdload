@@ -48,7 +48,7 @@ def main():
     revision = subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()
     if revision != 'b70b1180b44ab25b97cd66466c70879897d8a362':
         raise ValueError('unsupported shared source revision')
-    for row in (ROOT/'manifest/debugger.tsv').read_text().splitlines():
+    for row in (ROOT/'tools/manifest/debugger.tsv').read_text().splitlines():
         if not row or row.startswith('#'): continue
         name, digest = row.split('\t')
         if hashlib.sha256((source/name).read_bytes()).hexdigest() != digest:

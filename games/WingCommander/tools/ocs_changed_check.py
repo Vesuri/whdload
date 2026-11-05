@@ -77,7 +77,7 @@ def borrow(build):
         value=int.from_bytes(payload[pos:pos+4],'big')
         payload[pos:pos+4]=long(CODE+(value&0xfffffff))
     for index in (0,1):
-        c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english');events=[]
+        c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english');events=[]
         try:
             c.write(base,bytes(payload))
             c.write(CODE+0x3250c,struct.pack('>HI',0x4ef9,base+sy['ocs_changed_borrow']))
@@ -100,7 +100,7 @@ def borrow(build):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',required=True);p.add_argument('--build');a=p.parse_args()
     out=new_output(a.output);out.mkdir(parents=True)
-    text=(ROOT/'whdload/ocs_changed.s').read_text()+'\n'+source(candidates())+'\nocs_changed_history: ds.b 128000\n'
+    text=(ROOT/'src/ocs_changed.s').read_text()+'\n'+source(candidates())+'\nocs_changed_history: ds.b 128000\n'
     blob,sy=assemble(out,'changed',text)
     results={f'{model}-{arm}':exercise(blob,sy,model,arm) for model,arm in ((1,'word'),(2,'long'))}
     rejected=[]

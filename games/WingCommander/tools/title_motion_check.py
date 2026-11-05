@@ -16,7 +16,7 @@ def check(build,variant,model):
  else:
   sy={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(build/'slave.lst').read_text(),re.M)}
   blob=(build/'payload.bin').read_bytes();clock,rate='timing_clock','timing_hz'
- c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english',model)
+ c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english',model)
  try:
   c.write(slave,blob);cases=0;examples={}
   for hz in (50,60):

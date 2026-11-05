@@ -2,9 +2,9 @@
 # See docs/internals.md; missing entries are deliberately unavailable.
 NAME = 'ocs'
 CPU = '68000'
-GAME = 'tmp/originals/ocs/WingCommander/data/Wing.english'
+GAME = 'tmp/game/WingCommander/data/Wing.english'
 GAME_SHA = 'eff90d6cfbc80b008e5e508ff6488f221b6e7243958aaff6fdfd0b06e6724a30'
-SLAVE = 'tmp/originals/ocs/WingCommander/WingCommander.Slave'
+SLAVE = 'tmp/game/WingCommander/WingCommander.Slave'
 SLAVE_SHA = 'eec155c946e8a247e2c4811fc2279d476c330f2d1b5797cc0defb35918913913'
 SLAVE_SIZE = 0x14a8
 HUNKS = ((0x2c,0x358c8,0x358c8),(0x39948,0x7bb8,0xf5b8),

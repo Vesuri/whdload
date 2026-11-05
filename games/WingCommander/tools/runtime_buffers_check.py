@@ -25,8 +25,8 @@ def main():
     expected=(a.build/('candidate.bin' if a.variant=='ocs' else 'payload.bin')).read_bytes()
     # OCS writes its native header changes after the assembler output.
     if a.variant=='cd32':assert expected==image
-    original=(ROOT/('tmp/originals/ocs/WingCommander/WingCommander.Slave' if a.variant=='ocs' else
-                    'tmp/originals/cd32/WingCommanderCD32/WingCommanderCD32.Slave')).read_bytes()
+    original=(ROOT/('tmp/game/WingCommander/WingCommander.Slave' if a.variant=='ocs' else
+                    'tmp/game/WingCommanderCD32/WingCommanderCD32.Slave')).read_bytes()
     entry=int.from_bytes(original[32+0x18:32+0x1a],'big')
     assert int.from_bytes(image[0x18:0x1a],'big')==sy['runtime_workspace_init']<32768
     cases=[]

@@ -16,7 +16,7 @@ def source(root, variant):
     prefix = raw[44 + off:44 + off + 8]
     assert prefix == bytes.fromhex('48e73e20342c') + state.to_bytes(2, 'big')
     lines = [f'FUNERAL_STATE equ ${state:x}', f'FUNERAL_BYTES equ {size}',
-             (root / 'whdload/funeral_clock.s').read_text(),
+             (root / 'src/funeral_clock.s').read_text(),
              'funeral_rate:', ' lea funeral_rate(pc),a0',
              ' adda.l #timing_rate-funeral_rate,a0', ' jmp (a0)',
              'funeral_native:', ' dc.b ' + ','.join(map(str, prefix)),

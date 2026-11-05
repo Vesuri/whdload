@@ -17,7 +17,7 @@ def source(root,variant):
     v=get(variant);raw=(root/v.GAME).read_bytes()
     if hashlib.sha256(raw).hexdigest()!=v.GAME_SHA:raise ValueError('changed landing input')
     code=raw[44:44+v.HUNKS[0][1]];ocs=variant=='ocs'
-    lines=[f'LANDING_SCROLL equ {0x3f5a if ocs else 0x476a}',(root/'whdload/landing_clock.s').read_text()]
+    lines=[f'LANDING_SCROLL equ {0x3f5a if ocs else 0x476a}',(root/'src/landing_clock.s').read_text()]
     fix=[]
     for name,target in [('landing_skip_clear',0x1a65c if ocs else 0x1b3a4),('landing_skip_draw',0x1a750 if ocs else 0x1b498)]:
         lines.append(name+': jmp $0');fix.append((name,target))

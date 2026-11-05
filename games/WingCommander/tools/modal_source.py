@@ -37,7 +37,7 @@ def source(root, variant):
     lines=[*(f'{k} equ {n}' for k,n in fields.items()),
            'MODAL_CLOCK equ '+('ocs_clock_state' if ocs else 'timing_clock'),
            'MODAL_HZ equ '+('ocs_clock_hz' if ocs else 'timing_hz'),
-           (root/'whdload/modal_clock.s').read_text()]
+           (root/'src/modal_clock.s').read_text()]
     room_tables=(-0x4b78,-0x4ab8) if ocs else (-0x4b8a,-0x4aca)
     fix=[]
     def native(label, target):

@@ -37,7 +37,7 @@ def new_output(path):
 def guard_sites(game):
     """Check displaced file bytes independently of the whole-file identity guard."""
     sites = []
-    for line in (ROOT / 'manifest/ocs-patch-sites.tsv').read_text().splitlines():
+    for line in (ROOT / 'tools/manifest/ocs-patch-sites.tsv').read_text().splitlines():
         if not line or line.startswith('#'):
             continue
         hunk, offset, file_offset, length, digest = line.split('\t')

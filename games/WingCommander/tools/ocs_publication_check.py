@@ -11,7 +11,7 @@ from ocs_reconstruct import ROOT, new_output, require
 MODULE=0x180000
 
 def check(out, mutation=None):
-    source=(ROOT/'whdload/ocs_publication.s').read_text()
+    source=(ROOT/'src/ocs_publication.s').read_text()
     if mutation:source=source.replace(*mutation)
     text='\n'.join(f'{key} equ ${CODE+off:x}' for key,off in NATIVE.items())+'\n'+source
     blob,sy=assemble(out,'publication',text)
@@ -19,7 +19,7 @@ def check(out, mutation=None):
     for clock in (0,0xfffffffe,0xffffffff):
       for index in (0,1):
        for mode in ('idle','future','locked','copper-locked','early','late','overrun','ready'):
-        c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english')
+        c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english')
         try:
             c.setup(320,16,bytes([0x12])*5120)
             c.write(MODULE,blob)
@@ -62,7 +62,7 @@ def check(out, mutation=None):
         finally:c.close()
     for entry,args in [('ocs_publish_rotate',b''),('ocs_publish_clear',word(0)),
                        ('ocs_publish_pixel',word(5)+word(4)+word(2)),('ocs_publish_close',b'')]:
-        c=Native(ROOT/'tmp/originals/ocs/WingCommander/data/Wing.english')
+        c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english')
         try:
             c.setup(320,16,bytes([0x12])*5120);c.write(MODULE,blob)
             c.write(MODULE+sy['ocs_pending'],word(1));polls=[];retired=[]

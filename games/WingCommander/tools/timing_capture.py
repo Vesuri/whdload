@@ -8,7 +8,7 @@ import re
 import subprocess
 from pathlib import Path
 import _amigaxdev
-from amigaxdev.gdbserve import Server
+import wc_run
 from cd32_runtime import ROOT, BASE, locate
 
 
@@ -46,8 +46,7 @@ def main():
     pcs += [s+symbols[k] for k in ('flight_render_work','flight_render_work_done','flight_reference_work','flight_reference_done') if k in symbols]
     config=out/'observer.cfg';config.write_text(' '.join(f'{v:x}' for v in [h[0],h[1],h[3]]+pcs)+'\n')
     env={k:v for k,v in os.environ.items() if not k.startswith(('WC_OBSERVER_','WC_MATRIX_','WC_STATE_'))}
-    run='../'+str(out.relative_to(ROOT))+'/run'
-    env.update(FSUAE_RUN=run,SLAVE=str(slave),AMIGA_SETUP=a.machine,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',
+    env = wc_run.run_env(out, env, SLAVE=str(slave),AMIGA_SETUP=a.machine,INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',
         WC_NOMMU_CORE='0',WHD_ARGS=f'CUSTOM1={0 if a.off else 3} CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0',
         WARP='1',NTSC='1' if a.ntsc else '0',WINDOW='front',JOY0='none',JOY1='none',DETERMINISTIC='1',WC_INSTANT_BLITTER='0',
         WC_OBSERVER_CONFIG=str(config),WC_OBSERVER_OUTPUT=str(out/'events.txt'),WC_STATE_OUTPUT=str(out/'states.bin'),WC_STATE_PC=f'{h[0]+(0x3378e if a.presentation_states else 0x2da):x}')
@@ -73,7 +72,7 @@ def main():
         windows.append(dict(name=name,first_event=first,end_event=end,fields=fields))
         print(f'{out.name}: {name}',flush=True)
     try:
-        g=Server('wc-timing',root=str(ROOT),run_dir='amiga/'+run,profile_window=False).boot(env)
+        g=wc_run.server('wc-timing', env, profile_window=False).boot(env)
         pc=h[0]+0x698
         cmd(f'break *{pc:#x}\ncontinue\ndelete')
         if f'0x{pc:x}' not in cmd('info registers pc'):raise ValueError('flight not reached')
@@ -122,7 +121,7 @@ def main():
         (out/'result.json').write_text(json.dumps(result,indent=2)+'\n')
     finally:
         if g:g.p.kill()
-        subprocess.run(['/bin/bash','amiga/run.sh','stop'],env=env,check=True)
+        wc_run.stop(env)
 
 
 if __name__=='__main__':main()

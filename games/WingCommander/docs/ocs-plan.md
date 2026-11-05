@@ -142,7 +142,7 @@ See [evidence and boundaries](internals.md#p13b3-shared-instrumentation-and-vali
 
 **P13C1 — Build interchangeable experimental converters (complete).** Depends on A2, B2–B3.
 Keep native QBlit conversion. Pin and adapt the two Kalms four-plane candidates
-listed in `manifest/ocs-c2p-candidates.tsv`; honour width/alignment/stride, plane
+listed in `tools/manifest/ocs-c2p-candidates.tsv`; honour width/alignment/stride, plane
 order and destination padding. Cover every native view size with enclosing-window
 or native fallbacks where necessary. Do not copy Legends of Valour's high-nibble
 or 192-byte-stride modifications into Wing Commander. Preserve the OCS

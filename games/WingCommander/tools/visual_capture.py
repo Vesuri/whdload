@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+import wc_run
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -36,7 +37,7 @@ def main():
         p.error('slave differs from its build manifest')
     layout = json.loads(a.layout.read_text())
     out.mkdir(parents=True)
-    env = dict(os.environ, FSUAE=str(binary), FSUAE_RUN=os.path.relpath(out/'run', ROOT/'amiga'),
+    env = wc_run.run_env(out, FSUAE=str(binary),
                WC_VISUAL_OUT=str(out), WC_VISUAL_H0=format(layout['hunks'][0], 'x'),
                WC_VISUAL_H3=format(layout['hunks'][3], 'x'), WC_VISUAL_FRAMES=str(a.frames),
                SLAVE=str(a.slave.resolve()), AMIGA_SETUP='a1200-040',
@@ -44,17 +45,17 @@ def main():
                (' CUSTOM2=2 CUSTOM3=1 CUSTOM4=0' if build.get('direct_flight') else ''), DEBUG='0', WARP='0',
                DETERMINISTIC='0', FSUAE_QUIET='1')
     try:
-        subprocess.run(['/bin/bash', 'amiga/run.sh'], cwd=ROOT, env=env, check=True)
+        wc_run.launch(env)
         deadline = time.monotonic()+120
         while time.monotonic() < deadline:
-            shots = list((out/'run').glob('boot.*/shots/*.png'))
+            shots = list((wc_run.run_dir(env)/'shots').glob('*.png'))
             if (out/'done.txt').exists() and shots:
                 break
             time.sleep(1)
         else:
             raise TimeoutError('scene not captured; verify layout matches this slave/setup')
     finally:
-        subprocess.run(['/bin/bash', 'amiga/run.sh', 'stop'], cwd=ROOT, env=env, check=True)
+        wc_run.stop(env)
     rows = [line.split() for line in (out/'frames.txt').read_text().splitlines()]
     assert rows, 'no conversion observations'
     if build.get('direct_flight'):
