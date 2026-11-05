@@ -19,7 +19,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Hard Drivin' Enhanced | JOTD | not yet released |
 | Indianapolis 500 Enhanced | StingRay | not yet released |
 | Legends of Valour Enhanced | CFou! | not yet released |
-| Mercenary 3 Enhanced | Harry, Graham and Wepl | not yet released |
+| Mercenary 3 Enhanced | Harry, Graham and Wepl | [2.0b (04.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Mercenary3Enhanced-2.0b-20261104) |
 | Stellar 7 Enhanced | Psygore | not yet released |
 | Their Finest Hour Enhanced | Psygore | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TheirFinestHourEnhanced-2.0b-20261013) |
 | Wing Commander Enhanced | Psygore | [2.0b (19.10.2026)](https://github.com/Vesuri/whdload/releases/tag/WingCommanderEnhanced-2.0b-20261019) |
