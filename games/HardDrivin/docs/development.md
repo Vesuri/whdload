@@ -2,8 +2,11 @@
 
 The slave source is `src/` (`HardDrivinHD.s` is authoritative), from JOTD's
 `whdload_slaves` at `7003fc6fa65634d5affc55d6e5acac0d1e83dccb` (`H/HardDrivin/usr`), with
-this work's history on top. `tools/` is the development harness; it never ships. Every
-command below runs in the game directory (`games/HardDrivin`), and paths are relative to it.
+this work's history on top. `tools/` is the development harness; it never ships. It keeps
+the tools this document and `ARCADE_HANDLING_PLAN.md` use; the one-off checks, captures and
+reports that the step documents and old log entries name were removed on 2026-11-06 and are
+in git history before that date. Every command below runs in the game directory
+(`games/HardDrivin`), and paths are relative to it.
 
 Follow AmigaXDev `docs/playbooks/new-game-playbook-jotd.md`. Read this document,
 `internals.md`, then `open-work.md` when continuing.
