@@ -29,7 +29,8 @@ mirrors; such builds do not start on the A500 with 1.5 MiB Slow or the
 chip-only A1200. Without the variable the build is byte-identical to the
 release.
 
-`CUSTOM2=0` (the default) selects the original loop. `CUSTOM1` retains its
+`CUSTOM2=0` (the slave's default) selects the original loop. The release installer
+writes `CUSTOM2=1` into the installed icon, so installed games start in performance mode. `CUSTOM1` retains its
 original meaning there: disable the original slave's timing repair.
 `CUSTOM2=1` enables elapsed-time scheduling for SPS 0481 in PAL mode; it supersedes that
 repair, so both CUSTOM1 settings select the same performance behavior:

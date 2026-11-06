@@ -51,7 +51,8 @@
  The performance mode keeps the game speed constant whatever the rendering
  speed and renders faster. On a 68020 or faster with Fast memory the player's
  car moves more smoothly. It uses Fast memory and the safe CPU caches when
- available. Set CUSTOM2=1 to enable it; without it the game runs as before.
+ available. The installed icon enables it (CUSTOM2=1); set CUSTOM2=0 to run
+ the game as before.
  Irek's version keeps its original behaviour.
 
  Finally this patch is finished, started it back in 2013, disabled the

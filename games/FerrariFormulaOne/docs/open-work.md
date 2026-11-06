@@ -11,8 +11,11 @@
 - **Before a release here:** `tools/build.py` appends `$VER: FerrariFormulaOne.slave 2.0b
   (06.11.2026)` after the payloads, from `slv_info`'s version and date, so no host or payload
   byte moves (`$VER` alone changed the slave from `597a74b9…`; the core smokes pass on it).
-  The icons still leave `CUSTOM2` off (the earlier local candidate added a separate
-  Performance icon instead); decide the icon default and the memory scheme then.
+  The installed icon enables performance mode: `release/Install` writes `CUSTOM2=1` into it
+  (the user's decision, 2026-11-06; not yet run under Installer). Memory: the release is to
+  reserve what the FR path needs (1 MiB ExpMem, 768 KiB pool), which drops the A500 with
+  1.5 MiB Slow and the chip-only A1200. It goes into the release slave with the FR path at
+  FR10; until then the release slave has no use for it, and it keeps the `9008bdb0…` pin.
 - **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
   FR1–FR8 done, FR12 (draw speed) in progress: 030-50 BCE 48.5 FPS against 24.6 native,
   040-40 BCE 28.5 against 24.5 (FR12 step 4 checkpoint, 2026-11-06). FR8 showed the draw is the limit. The work concentrates on the 68030 (below); FR0h is still open. FR builds

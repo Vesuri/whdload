@@ -5,7 +5,8 @@
       "output": "FerrariFormulaOneEnhanced-{version}-{date}.lha",
       "replace": {
         "FerrariFormulaOne_Install/FerrariFormulaOne.slave": "build:FerrariFormulaOne",
-        "FerrariFormulaOne_Install/ReadMe": "release/ReadMe"
+        "FerrariFormulaOne_Install/ReadMe": "release/ReadMe",
+        "FerrariFormulaOne_Install/Install": "release/Install"
       },
       "add": {},
       "remove": [],
