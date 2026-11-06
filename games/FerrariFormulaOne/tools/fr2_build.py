@@ -16,7 +16,7 @@ sys.path.insert(0, str(r / 'tools'))
 from ff1layout import legacy
 GAMES = legacy()
 GAME = r / 'tmp/game/FerrariFormulaOne/data/racemenu'
-PRODUCTION_SHA = '597a74b9fd9a9e67bf317de1f02395d771fbc12bd6ee047e83f8630c2a4189f6'
+PRODUCTION_SHA = '9008bdb0ce780cfbaed1bbb891e4a7117e101d273d8adf7c710fdf6be78fb0cb'
 
 
 def source(tag):

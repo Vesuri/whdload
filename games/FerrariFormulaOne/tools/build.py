@@ -76,6 +76,10 @@ for kind in ['000','020','fine']:
 check,final=host(defs);assert len(h)==len(final) and hs==check,'Host layout must be independent of payload offsets'
 code=bytearray(final[32:-4]);struct.pack_into('>H',code,24,hs['FF1ProductionBoot']);struct.pack_into('>I',code,32,EXPMEM)
 for data in parts:code+=data
+# $VER (docs/releasing.md) after the payloads, so no host or payload offset moves; the
+# version and date are slv_info's.
+ver=re.search(r'"Version (\S+ \(\d\d\.\d\d\.\d{4}\))"',(MAIN/'FerrariFormulaOne_WHD.s').read_text(errors='replace')).group(1)
+code+=f'$VER: FerrariFormulaOne.slave {ver}'.encode()+b'\0';code+=bytes((-len(code))%4)
 header=bytearray(final[:32]);struct.pack_into('>I',header,20,len(code)//4);struct.pack_into('>I',header,28,len(code)//4)
 result=header+code+bytes.fromhex('000003f2');(out/'FerrariFormulaOne.slave').write_bytes(result)
 (out/'build.json').write_text(json.dumps({'sha256':hashlib.sha256(result).hexdigest(),'bytes':len(result),'host_bytes':len(final)-36,'host_symbols':hs,'payloads':meta,'game_sha256':hashlib.sha256(a.game.read_bytes()).hexdigest()}|({'fine_defines':extra} if extra else {}),indent=2)+'\n')

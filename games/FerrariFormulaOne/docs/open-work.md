@@ -2,17 +2,17 @@
 
 ## Where it stands (2026-11-05)
 
-- **Release 2.0b (16.10.2026), unreleased.** The release slave is the default-off combined
+- **Release 2.0b (06.11.2026), unreleased.** The release slave (`9008bdb0…`) is the default-off combined
   performance slave (`CUSTOM2=1`, PAL, SPS 0481): RC2 plus the performance-mode cache
   policy. The cache-policy build has not passed the feature checks yet: run
   `python3 tools/ff1check.py release` (or `changed --run`) on the release build before
   releasing. `ff1check.py changed` lists memory, lap, controls and reload as never passed
   on the current sources and season as changed (`ProductionHost.s`).
-- **Before a release here:** the slave has no `$VER` string (only `Version 2.0b
-  (16.10.2026)` in its info), which `make dist` needs for the archive name;
-  `release/ReadMe` and `release/release.json` follow the repository's convention but the
-  icons still leave `CUSTOM2` off (the earlier local candidate added a separate Performance
-  icon instead); decide the version, date and icon default then.
+- **Before a release here:** `tools/build.py` appends `$VER: FerrariFormulaOne.slave 2.0b
+  (06.11.2026)` after the payloads, from `slv_info`'s version and date, so no host or payload
+  byte moves (`$VER` alone changed the slave from `597a74b9…`; the core smokes pass on it).
+  The icons still leave `CUSTOM2` off (the earlier local candidate added a separate
+  Performance icon instead); decide the icon default and the memory scheme then.
 - **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
   FR1–FR7 done. FR7 (2026-11-06): 030-50 BCE 40.0 FPS against 24.6 native, 040-40 BCE 22.7
   against 24.5. The work concentrates on the 68030 (below); FR0h is still open. FR builds
@@ -26,7 +26,7 @@ The user's decisions (2026-11-05): concentrate on the 68030 and leave the 68040 
 already showed it: 161 against 94 ms per draw, road 67 against 24 ms), the cause is not
 known and it has not been profiled since FR5, so no 040 figure follows from an 030 one.
 Commit each FR step when its gates pass; push only when asked. Production stays the
-`597a74b9…` slave with DEBUG off and ExpMem `$c0000`; the 1 MiB ExpMem is only for
+`9008bdb0…` slave (`597a74b9…` before the `$VER` string) with DEBUG off and ExpMem `$c0000`; the 1 MiB ExpMem is only for
 `FF1_FAST_RENDER` builds and the release memory scheme is undecided. The hunks already load
 into Fast memory (FASTRAM_PLAN "Code and data placement check"); that needs no new look.
 The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory checks.
