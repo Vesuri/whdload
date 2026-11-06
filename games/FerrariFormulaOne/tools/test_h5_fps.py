@@ -69,7 +69,9 @@ try:
  # Preserve the same first 300 complete intervals; smaller initial windows
  # avoid collecting unused tail fields in fast profiles.
  for capture_fields in [int(os.environ.get('FPS_INITIAL_FIELDS','1000')),1000,1000]:
-  path=out/f'census-{len(rows)}.jsonl';cmd(f'monitor census {capture_fields} "" "{path}"')
+  path=out/f'census-{len(rows)}.jsonl';before=val(f'*(unsigned int*){ctx}');cmd(f'monitor census {capture_fields} "" "{path}"')
+  # FR8: the game's field counter around each census window, to align the log with it.
+  report.setdefault('census_game_fields',[]).append([before,val(f'*(unsigned int*){ctx}'),len(rows)])
   chunk=[json.loads(x) for x in path.read_text().splitlines()];meta=chunk[0]
   piece=chunk[1:];changes=[x['field'] for prev,x in zip(piece,piece[1:]) if prev['planes']!=x['planes']]
   intervals.extend(b-a for a,b in zip(changes,changes[1:]))
@@ -78,6 +80,13 @@ try:
  assert len(intervals)>=300,len(intervals)
  assert all(all(x['planes']) for x in rows)
  (out/'window.jsonl').write_text('\n'.join(json.dumps(x) for x in [meta]+rows)+'\n')
+ if 'FF1FastRenderShowStats' in sy:
+  # FR8S: early LoadView requests, those left to B8Draw, B8Draw requests skipped.
+  report['fr8s']=[val(f'*(unsigned int*){probe+sy["FF1FastRenderShowStats"]+4*i}') for i in range(4)]
+ if 'FR8Log' in sy:
+  # FR8 pacing diagnostic (FastRenderPacing.s): the per-frame log, decoded by tools/fr8_report.py.
+  report['fr8_count']=val(f'*(unsigned int*){probe+sy["FR8Count"]}')
+  cmd(f'dump binary memory {(out/"fr8-log.bin").relative_to(r)} {probe+sy["FR8Log"]} {probe+sy["FR8Log"]+1024*32}')
  intervals=intervals[:300];report['fps_end']=context();report['intena_end']=val('*(unsigned short*)0xdff01c');fields=sum(intervals)
  import statistics,math
  report['fps']=300/(fields*71051/3546895);report['fps_fields']=fields;report['interval_fields']=intervals;report['mean_ms']=statistics.mean(intervals)*71051/3546895*1000;report['p95_ms']=sorted(intervals)[math.ceil(len(intervals)*.95)-1]*71051/3546895*1000

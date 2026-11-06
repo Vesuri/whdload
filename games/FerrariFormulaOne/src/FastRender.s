@@ -57,6 +57,10 @@ FR7S_WRITTEN equ 8          ; longwords written to Chip
 FR7S_FLUSHES equ 12         ; whole banks written back at release
 FR7S_VIEW_SEEDS equ 16
 FR7S_LONGS equ 4
+FR8S_EARLY equ 4            ; FR8: LoadView requests made after the publication
+FR8S_SAME_FIELD equ 8       ; left to B8Draw: the last request was in this field
+FR8S_NATIVE_SKIPPED equ 12  ; B8Draw requests skipped: the early one loaded the view
+FR8S_LONGS equ 3
 
 ; FR5 stages in the prefix, in draw order: 1 = FR5a (clear $6b050 and
 ; background $6b950), 2 = FR5b (road $6b368), 3 = FR5c (cars $69bb8),
@@ -1664,6 +1668,95 @@ FRFlushBanks:
 .out:
  rts
 
+; FR8: after the publication, request the LoadView of the bank just
+; published (B8Draw's $66f88) through the native $2428a at once, so it shows
+; from the next field. Natively the request waits for the next B8Draw, after
+; the wait for the next tick and its logic: a frame published before a VBL
+; showed a field later than it could. The next B8Draw skips its own request
+; for the same bank (FF1FastRenderNativeShow), so a frame still makes one
+; LoadView call. Two requests in one field would hide the first frame, so an
+; early request in the field of the last one is left to B8Draw. Only with owned shadows (the whole draw staged), where nothing
+; draws into the bank after the publication; FF1FastRenderEarly 0 is the
+; native arm. The next frame's field wait counts from its road preparation,
+; after both requests, so it stays safe.
+FF1FastRenderShow:
+ move.w ccr,-(sp)
+ tst.w FF1FastRenderEarly(pc)
+ beq.b .done
+ tst.w FF1FastRenderOwned(pc)
+ beq.b .done
+ movem.l d0-d1/a0-a1,-(sp)
+ lea FF1FastRenderShowStats(pc),a1
+ lea (schedule_context.l,pc),a0
+ move.l FF1T_FIELDS(a0),d0
+ cmp.l FF1FastRenderShownField(pc),d0
+ beq.b .skip
+ addq.l #1,FR8S_EARLY(a1)
+ move.w $66f88,d0
+ ext.l d0
+ move.l d0,-(sp)
+ jsr $2428a
+ addq.l #4,sp
+ bsr.b FF1FastRenderShown
+ ; What the request left in GfxBase (graphics/gfxbase.h: ActiView, LOFlist),
+ ; for FF1FastRenderNativeShow.
+ lea FF1FastRenderShowView(pc),a1
+ move.l $243c8,a0           ; the game's GfxBase
+ move.l 34(a0),(a1)+
+ move.l 50(a0),(a1)+
+ move.w $66f88,(a1)+
+ move.w #1,(a1)
+ bra.b .out
+.skip:
+ addq.l #1,FR8S_SAME_FIELD(a1)
+.out:
+ movem.l (sp)+,d0-d1/a0-a1
+.done:
+ move.w (sp)+,ccr
+ rts
+
+; B8Draw, before its native request for bank $66f88: EQ (skip it) when the
+; early request loaded that bank's view and GfxBase still shows exactly that
+; (no other LoadView since, from pause, a menu or anything else), else NE.
+; All registers kept.
+FF1FastRenderNativeShow:
+ movem.l d0/a0-a1,-(sp)
+ lea FF1FastRenderShowView(pc),a1
+ tst.w 10(a1)
+ beq.b .native
+ clr.w 10(a1)
+ move.w $66f88,d0
+ cmp.w 8(a1),d0
+ bne.b .native
+ move.l $243c8,a0
+ move.l 34(a0),d0
+ cmp.l (a1),d0
+ bne.b .native
+ move.l 50(a0),d0
+ cmp.l 4(a1),d0
+ bne.b .native
+ lea FF1FastRenderShowStats(pc),a1
+ addq.l #1,FR8S_NATIVE_SKIPPED(a1)
+ movem.l (sp)+,d0/a0-a1
+ cmp.w d0,d0                ; EQ
+ rts
+.native:
+ movem.l (sp)+,d0/a0-a1
+ move.w #0,-(sp)            ; NE: CCR with Z clear
+ move.w (sp)+,ccr
+ rts
+
+; After a LoadView request: record its field, read after the call, so a VBL
+; during the call can only make the next early request wait. All registers
+; kept; the condition codes are not.
+FF1FastRenderShown:
+ movem.l a0-a1,-(sp)
+ lea (schedule_context.l,pc),a0
+ lea FF1FastRenderShownField(pc),a1
+ move.l FF1T_FIELDS(a0),(a1)
+ movem.l (sp)+,a0-a1
+ rts
+
 ; FR6 publication: copy every dirty row of both banks from its shadow to
 ; Chip, which leaves the row fresh.
 FRPublishWhole:
@@ -2116,6 +2209,9 @@ FF1FastRenderStages: dc.w FR_STAGES_ALL
 ; Immutable preset: the FR7 copy mode (2 = compare, 1 = displayed region,
 ; 0 = FR6 whole rows).
 FF1FastRenderCopy: dc.w 2
+; Immutable preset: FR8 early LoadView request (1), or the native request in
+; the next B8Draw only (0).
+FF1FastRenderEarly: dc.w 1
  even
 ; Expected bank table at $66c92: plane pointers of bank 0 and bank 1.
 FF1FastRenderBanks:
@@ -2144,6 +2240,9 @@ FF1FastRenderStageStats:
 FF1FastRenderCopyStats:
  dc.l 'FR7S'
  dcb.l FR7S_LONGS,0
+FF1FastRenderShowStats:
+ dc.l 'FR8S'
+ dcb.l FR8S_LONGS,0
  IFD FF1_FAST_RENDER_CHIPREAD
 FR_CHIPREAD_ENTRIES equ 512
 ; 'FR4C', spans read in place, entries, entries x (low, high), unlogged.
@@ -2169,6 +2268,11 @@ FF1FastRenderScratch: dc.w 0
 FF1FastRenderStaged: dc.w 0
 FF1FastRenderOwned: dc.w 0           ; FR7: Chip banks lag their shadows outside the view
 FF1FastRenderView: dc.l 0            ; FR7: view mirrors, bank 0 then bank 1
+FF1FastRenderShownField: dc.l 0      ; FR8: field of the last LoadView request
+; FR8: after an early request, GfxBase ActiView and LOFlist, the bank, and
+; 1 until B8Draw's next request consumes it.
+FF1FastRenderShowView: dc.l 0,0
+ dc.w 0,0
 FF1FastRenderRows: ds.b 2*FR_ROWS_PAD
  even
 FF1FastRenderBlocks: ds.b FR_BLOCKS+1

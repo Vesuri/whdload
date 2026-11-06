@@ -1555,6 +1555,137 @@ removes most Chip writes. The 040 gains too but stays below its native
 - **Optional third Chip bank** (old H16): only if the wait before the copy
   still costs measurable time.
 
+### FR8 results (2026-11-06, done)
+
+Done in the emulator, on the 030 (the 040 is set aside). Pacing is not what
+limits the frame rate: in every scene the draw alone takes longer than a
+field. The one change is the early LoadView request below. It shows every
+frame in the field after its copy and makes the motion steadier, with the
+same frame rate. The data is in `tmp/manifest/fr8-validation.json`.
+
+**Code** (assembled only with `FF1_FAST_RENDER`; the release slave is
+unchanged).
+
+- **Early LoadView request** (`FF1FastRenderShow`, `FastRender.s`). After the
+  publication, `FR_B8Cut` calls the native `$2428a` (copper lists and
+  `LoadView`) for the bank just drawn (`$66f88`). Natively the request waited
+  for the next `B8Draw`, after the next tick's wait and logic, so a frame
+  copied just before a VBL showed a field late.
+  - **One request per frame.** The next `B8Draw` skips its own request
+    (`FF1FastRenderNativeShow`) when the early one showed the same bank and
+    GfxBase's `ActiView` and `LOFlist` are unchanged since. Anything that
+    loaded another view in between (pause, a menu) makes `B8Draw` request as
+    before. In 1.3 `LoadView` installs the copper lists `MrgCop` already built,
+    so the early request costs what the native one did.
+  - **Same field.** Two requests in one field would hide a frame, so a
+    request in the field of the last one (`FF1FastRenderShownField`, read
+    after each call) is left to `B8Draw`.
+  - **Conditions.** Only with owned shadows, where nothing draws into the
+    bank after the publication. The next frame's field wait counts from its
+    road preparation, after both requests, so it stays safe.
+  - **Preset.** The immutable `FF1FastRenderEarly` (1; 0 is the native arm).
+    `FF1FastRenderShowStats` (`FR8S`) counts the early requests, those left
+    to `B8Draw` (same field) and the `B8Draw` requests skipped. In the final
+    normal run all 869 early requests were followed by a skip.
+- **Pacing log** (diagnostic, `FF1_FAST_RENDER_PACING`,
+  `src/FastRenderPacing.s`). Each frame records the field and beam line at:
+  - the last tick's start;
+  - the road preparation;
+  - the end of the draw;
+  - the start of the copy;
+  - the end of the copy.
+
+  It also records the ticks, the opponent pulses and the bank.
+  `test_h5_fps.py` saves the log and the game's field counter at each census
+  window. `tools/fr8_report.py` lines the log up with the census, which shows
+  the bank displayed in each field, and reports:
+  - the phase times;
+  - the histograms;
+  - tearing;
+  - the delay from each frame's tick to the screen.
+
+  `tools/fr8_build.py` builds the candidate, the log build, the four
+  scene fixtures (through `fr0_build.py`'s matched builders) and the
+  `-early0` arms. The log moves the layout, so it shifts the frame rates by
+  up to 1 %; compare arms built together.
+
+**Where a frame's time goes**, 030‑50 BCE, the log build of the final
+candidate, milliseconds per one-tick frame. Pulse frames run the native
+100 ms opponent update. Steady motion is the share of frames whose ticks
+equal their fields on screen.
+
+| Scene | FPS | Logic (pulse) | Draw | Wait | Copy | Busy | Intervals 1 / 2 fields | Steady |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: |
+| normal | 40.5 | 0.5 (1.9) | 22.3 | 0.0 | 1.7 | 24.6 | 230 / 70 | 55 % |
+| solo | 45.1 | 0.6 (2.0) | 19.8 | 0.0 | 1.3 | 21.7 | 268 / 32 | 88 % |
+| grid | 38.9 | 0.6 (2.0) | 23.0 | 0.0 | 1.4 | 25.0 | 215 / 85 | 54 % |
+| dense | 29.8 | 0.6 (2.0) | 30.9 | 0.0 | 1.2 | 32.7 | 98 / 202 | 34 % |
+
+- **Normal operation.** A frame is busy for more than a field in every
+  scene, solo included. The loop therefore never waits for a tick (idle
+  0.1 ms), and two-tick frames follow. 50 FPS needs a draw of about 17.5 ms.
+  That is drawing work (the FR6 kind), not pacing.
+- **Field wait.** 4–8 % of frames wait at all, and the mean wait is under
+  0.01 ms. No third Chip bank is needed.
+- **Opponent-update frames.** These cost 1.4 ms more logic and cause no
+  judder of their own. They are accepted, and the native 100 ms update is not
+  split.
+- **Late copies.** 5–7 % of copies end after the VBL they started before; the
+  early request still shows them in the next field.
+- **No tearing.** The census was lined up with the log in all twelve runs
+  (the four final scenes, and four scenes in both arms of the version that
+  still requested twice). Across 9,768 checked fields, no copy wrote a bank
+  while it was on screen, except after line 256.
+
+**Early request against the native request**, measured on the version that
+still requested twice per frame (the same layout in both arms), 030‑50 BCE.
+The table shows the share of frames shown in the field after their copy, and
+steady motion.
+
+| Scene | FPS early / native | Next field | Steady motion |
+| --- | --- | --- | --- |
+| normal | 39.41 / 39.31 | 100 % / 94 % | 47 % / 38 % |
+| solo | 44.84 / 44.84 | 100 % / 95 % | 84 % / 77 % |
+| grid | 37.63 / 37.63 | 100 % / 94 % | 45 % / 35 % |
+| dense | 30.07 / 30.07 | 100 % / 96 % | 32 % / 32 % |
+
+In the final candidate every frame shows in the field after its copy (100 %
+in all four scenes). Its steady-motion shares are higher than the table's,
+but it has another layout, so the difference is not attributed to removing
+the duplicate request.
+
+**Final candidate** (`fr8-candidate`, `e9ae9b3c…`; native arm `-early0`,
+`d7e7c0f2…`), 300 presentations, warp off:
+
+| Machine | Early | Native arm |
+| --- | ---: | ---: |
+| 030‑50 BCE | 39.94 | 39.94 |
+| 040‑40 BCE | 22.52 | 22.52 |
+
+Gates, all passed: frames (normal, grid) and timing, the FR4 probe
+(030‑50 BCE), smokes (030‑50 BCE, 040‑40 BCE, 020+Fast, A500+Fast), MMU (030
+and 040, twice), route and modal (030‑50 BCE, 040‑40 BCE, 020+Fast) and
+controls (020+Fast, 030‑50 BCE, 040‑40 BCE).
+
+- **Frame gate.** It screenshots a fixed number of fields after `B8Draw`,
+  where the early request already shows the next frame, so the early arm's
+  capture differs from the B8-PAL reference. `ff1_gates.py` therefore runs
+  the frame fixtures with `FF1FastRenderEarly` 0. The arms differ only in that
+  word, and the native arm matches the reference.
+
+**Still open: steady motion.** At 1.2–1.6 fields per frame, the delay from a
+frame's tick to the screen is 2 or 3 fields depending on the phase, so the
+simulated time per frame and the time on screen often differ ("1 tick, 2
+fields" next to "2 ticks, 1 field"). There are two ways to make the delay
+constant:
+- hold the request to a fixed delay, which stalls the next copy without a
+  third bank;
+- run the tick a frame needs slightly ahead of its due time, which changes
+  when input is sampled.
+
+Either is a design decision. A faster draw shrinks the problem: solo, at
+1.1 fields per frame, is already 88 % steady.
+
 ### FR9 — 030 data cache (optional)
 
 Only if the 030 takes the FR path. Find the cause of the performance-mode
@@ -1623,7 +1754,7 @@ Dependencies:
 
 ```
 FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b (done 2026-11-04) → FR5c…FR5f (done 2026-11-05) → FR6 (done 2026-11-05)
-  → FR7 (done 2026-11-06) → FR8 → FR10 → (FR11, optional)
+  → FR7 (done 2026-11-06) → FR8 (done 2026-11-06) → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.
 See "FR0 decision and plan revisions" for the changes to FR1–FR6.

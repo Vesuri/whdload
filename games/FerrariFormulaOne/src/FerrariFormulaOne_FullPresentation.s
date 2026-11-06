@@ -23,7 +23,14 @@ B8_654f2:
 B8_654f4:
  move.l d0,-(a7)
 B8_654f6:
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderNativeShow ; FR8: EQ when the early request loaded this view
+ beq.w B8_654fc
+ ENDC
  jsr $2428a.l
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderShown    ; FR8: the field of the last LoadView request
+ ENDC
 B8_654fc:
  addq.l #$4,a7
 B8_654fe:
@@ -215,6 +222,11 @@ B8_65722:
  jsr $2a260.l
  IFD FF1_C4_ROAD_PREFETCH
  bsr.w FF1C4PrepareRoad
+ ENDC
+ IFD FF1_FAST_RENDER_PACING
+ move.l $226ae,-(sp)
+ bsr.l FR8MarkPrep
+ addq.l #4,sp
  ENDC
  IFD FF1_FINE_ROAD_PREFETCH
  bsr.w FF1RenderPrepareRoad
@@ -1317,6 +1329,9 @@ FR_B8Cut:
  move.w 24(a7),d0
  bsr.l FF1FastRenderCutDue
  beq.w .out
+ IFD FF1_FAST_RENDER_PACING
+ bsr.l FR8MarkDrawn
+ ENDC
 .wait:
  IFD FF1_FINE_ROAD_PREFETCH
  move.w FF1RenderRoadControl(pc),d0
@@ -1338,7 +1353,14 @@ FR_B8Cut:
  btst #0,d0
  beq.w .wait
 .waited:
+ IFD FF1_FAST_RENDER_PACING
+ bsr.l FR8MarkCopy
+ ENDC
  bsr.l FF1FastRenderPublish
+ IFD FF1_FAST_RENDER_PACING
+ bsr.l FR8MarkDone
+ ENDC
+ bsr.l FF1FastRenderShow     ; FR8: request the LoadView now
 .out:
  movem.l (a7)+,d0-d1/a0-a1
  move.w (a7)+,ccr

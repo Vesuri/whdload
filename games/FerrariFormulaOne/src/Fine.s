@@ -489,3 +489,6 @@ public_bindings:
  IFD FF1_FAST_RENDER
  include "FastRenderBlit.s"
  ENDC
+ IFD FF1_FAST_RENDER_PACING
+ include "FastRenderPacing.s"
+ ENDC

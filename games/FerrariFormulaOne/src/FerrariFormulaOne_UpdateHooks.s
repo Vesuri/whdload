@@ -6310,6 +6310,9 @@ schedule_begin:
  addq.l #1,(a1)
  ENDC
 .done:
+ IFD FF1_FAST_RENDER_PACING
+ bsr.l FR8MarkBegin
+ ENDC
  rts
 schedule_end:
  movem.l d0-d7/a0-a6,-(sp)

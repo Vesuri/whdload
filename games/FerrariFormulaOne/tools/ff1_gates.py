@@ -53,6 +53,29 @@ def raw(p, name):
 
 if not a.skip_prepare:
     prepare()
+
+
+def early0(b):
+    # FR8 (FASTRAM_PLAN.md): the frame capture screenshots a fixed number of fields after
+    # B8Draw returns, so the early LoadView request (FF1FastRenderEarly 1) shows a newer
+    # frame there than the references. The frame fixtures take the preset's native arm
+    # (0), which differs from the build in that word alone; the census check in
+    # tools/fr8_report.py covers the early arm's display.
+    j = b / 'build.json'
+    if not j.exists():
+        return
+    m = json.loads(j.read_text())
+    at = m['payloads']['fine']['symbols'].get('FF1FastRenderEarly')
+    if at is None:
+        return
+    at += 32 + m['payloads']['fine']['offset']
+    d = bytearray((b / 'FerrariFormulaOne.slave').read_bytes())
+    if d[at:at + 2] == bytes((0, 1)):
+        d[at:at + 2] = bytes((0, 0))
+        (b / 'FerrariFormulaOne.slave').write_bytes(d)
+        print('frames fixture', b.name, 'FF1FastRenderEarly 0', flush=True)
+
+
 build = Path(a.build).resolve()
 cases = [('states', 'state', r / f'tmp/build/render-{tag}-matched'),
          ('frames', 'normal', r / f'tmp/build/render-{tag}-matched-stable-frames'),
@@ -66,6 +89,8 @@ for mode, case, b in cases:
     key = f'{mode}/{case}'
     if a.cases and key not in a.cases:
         continue
+    if mode == 'frames':
+        early0(b)
     ctag = f'{tag}-{case}'
     env = dict(os.environ, H5_BUILD=str(b), DRIVE_MATCHED=str(b / 'FerrariFormulaOne.slave'), C1_VARIANT=ctag,
                RELEASE_WHD_ARGS=PERF)

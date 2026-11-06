@@ -1,6 +1,6 @@
 # Ferrari Formula One current work
 
-## Where it stands (2026-11-05)
+## Where it stands (2026-11-06)
 
 - **Release 2.0b (06.11.2026), unreleased.** The release slave (`9008bdb0…`) is the default-off combined
   performance slave (`CUSTOM2=1`, PAL, SPS 0481): RC2 plus the performance-mode cache
@@ -14,8 +14,8 @@
   The icons still leave `CUSTOM2` off (the earlier local candidate added a separate
   Performance icon instead); decide the icon default and the memory scheme then.
 - **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
-  FR1–FR7 done. FR7 (2026-11-06): 030-50 BCE 40.0 FPS against 24.6 native, 040-40 BCE 22.7
-  against 24.5. The work concentrates on the 68030 (below); FR0h is still open. FR builds
+  FR1–FR8 done. FR8 (2026-11-06): 030-50 BCE 39.9 FPS against 24.6 native, 040-40 BCE 22.5
+  against 24.5; pacing is not the limit, the draw is. The work concentrates on the 68030 (below); FR0h is still open. FR builds
   need 1 MiB ExpMem and do not boot on the 512 KiB A500 or the chip-only A1200.
 - Human playtesting (full races) and real Amiga hardware remain deferred.
 
@@ -31,19 +31,21 @@ Commit each FR step when its gates pass; push only when asked. Production stays 
 into Fast memory (FASTRAM_PLAN "Code and data placement check"); that needs no new look.
 The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory checks.
 
-The current build is FR7's candidate (`a00d4072…`, `tools/fr7_build.py`); FR6's final
-build was k5 (`8ec61e11…`). `tmp/manifest/fr6-validation.json` holds the FPS of k1–k5, the
-gates and the trace shares; `tmp/logs/fr6-*.log` and `tmp/logs/fr7-*.log` the gate, FPS,
-probe and profile logs. Next, in order:
+The current build is FR8's candidate (`e9ae9b3c…`, `tools/fr8_build.py`); FR6's final
+build was k5 (`8ec61e11…`). `tmp/manifest/fr6-validation.json` and `fr8-validation.json`
+hold the FPS, gates and measurements; `tmp/logs/fr6-*.log`, `fr7-*.log` and `fr8-*.log` the
+gate, FPS, probe and profile logs. Next, in order:
 
-1. Profile the FR7 candidate on the 030 (`tools/fr6_trace.sh fr7-candidate`); FR7 took most
-   of the publication's share. The k4 shares: per-blit overhead
-   (FRTranslate, FRSpan, FRMarkSpan, FRKSetup and FF1FastRenderSize's register saves)
-   22 %, the ABCD `$CA` cookie-cut 13.7 %, lines 10 %, publish 8.7 %, fill 6.6 %. Ideas:
-   fewer `movem` saves on the per-blit path, translate and span merged, the cookie-cut with
-   the colour expansion merged so it skips the scratch (FR6 item 1), the cockpit cookie-cut
-   from precomputed word runs (FR6 item 5).
-2. FR8: pacing.
+1. Draw work on the 030. FR8 showed the draw alone takes 20–31 ms per frame and 50 FPS needs
+   about 17.5 ms. Profile the FR8 candidate (`tools/fr6_trace.sh fr8-candidate`). The k4
+   shares: per-blit overhead (FRTranslate, FRSpan, FRMarkSpan, FRKSetup and
+   FF1FastRenderSize's register saves) 22 %, the ABCD `$CA` cookie-cut 13.7 %, lines 10 %,
+   publish 8.7 %, fill 6.6 %. Ideas: fewer `movem` saves on the per-blit path, translate
+   and span merged, the cookie-cut with the colour expansion merged so it skips the scratch
+   (FR6 item 1), the cockpit cookie-cut from precomputed word runs (FR6 item 5).
+2. The user's decision on steady motion (FASTRAM_PLAN "FR8 results", "Still open"): the
+   tick-to-screen delay is 2 or 3 fields.
+3. FR10: checkpoint and release.
 
 Commands, from this directory after `. ../../common/env.sh`, one emulator job at a time
 (they share gdb port 2573):
@@ -51,27 +53,34 @@ Commands, from this directory after `. ../../common/env.sh`, one emulator job at
 ```sh
 python3 tools/fr2_unicorn.py 68020   # and 68030, 68040, after any kernel change:
                                      # "cases 4479 mismatches 0 kernel cases 3162"
-python3 tools/fr7_build.py TAG       # tmp/build/fr7-production (asserts 597a74b9), fr7-TAG and
-                                     # its -copy1/-copy0 arms (FF1FastRenderCopy)
-H5_BUILD=$PWD/tmp/build/fr7-TAG C1_VARIANT=fr7-TAG python3 tools/test_h5_fps.py 030-50-bce
+python3 tools/fr8_build.py TAG [--scenes]
+                                     # tmp/build/fr8-production (asserts 9008bdb0), fr8-TAG,
+                                     # fr8-TAG-pace (pacing log) and their -early0 arms
+                                     # (FF1FastRenderEarly 0); --scenes: fr8-TAG-pace-{normal,
+                                     # solo,grid,dense}[-early0]
+H5_BUILD=$PWD/tmp/build/fr8-TAG-pace-normal C1_VARIANT=fr8-pace-normal \
+  python3 tools/test_h5_fps.py 030-50-bce
+python3 tools/fr8_report.py tmp/step5/c4-q03-h5-fps-030-50-bce-fr8-pace-normal
+                                     # phases, histograms, tearing, tick-to-screen delay
+H5_BUILD=$PWD/tmp/build/fr8-TAG C1_VARIANT=fr8-TAG python3 tools/test_h5_fps.py 030-50-bce
                                      # 300 intervals, warp off; grep "'fps':"
-FF1_FINE_DEFINES=FF1_FAST_RENDER=1 python3 tools/ff1_gates.py --build tmp/build/fr7-TAG \
+FF1_FINE_DEFINES=FF1_FAST_RENDER=1 python3 tools/ff1_gates.py --build tmp/build/fr8-TAG \
   --tag TAG frames/normal frames/grid timing/elapsed
-FR4_BUILD=tmp/build/fr7-TAG FR4_TAG=-fr7-TAG \
+FR4_BUILD=tmp/build/fr8-TAG FR4_TAG=-fr8-TAG \
   RELEASE_WHD_ARGS='CUSTOM1=0 CUSTOM2=1 ConfigDelay=0 NoWriteCache' \
   python3 tools/fr4_probe.py 030-50-bce 300
-                                     # tmp/step5/fr4-probe-030-50-bce-fr7-TAG/result.json
+                                     # tmp/step5/fr4-probe-030-50-bce-fr8-TAG/result.json
                                      # stats_after: fr4.faults, fr4.hard, fr5, fr7;
                                      # fr7_check: Chip, shadows and views equal
-python3 tools/ff1check.py run smoke --build tmp/build/fr7-TAG \
+python3 tools/ff1check.py run smoke --build tmp/build/fr8-TAG \
   --profiles 030-50-bce,040-40-bce,a1200-fast,a500-fast
-python3 tools/ff1check.py run mmu --build tmp/build/fr7-TAG --profiles 030-50  # then 040-40
-python3 tools/ff1check.py run route modal --build tmp/build/fr7-TAG \
+python3 tools/ff1check.py run mmu --build tmp/build/fr8-TAG --profiles 030-50  # then 040-40
+python3 tools/ff1check.py run route modal --build tmp/build/fr8-TAG \
   --profiles 030-50-bce,040-40-bce,a1200-fast
-python3 tools/ff1check.py run controls --build tmp/build/fr7-TAG \
+python3 tools/ff1check.py run controls --build tmp/build/fr8-TAG \
   --profiles a1200-fast,030-50-bce,040-40-bce
-tools/fr6_trace.sh fr7-TAG           # 68EC030, 60 fields, cost per routine
-python3 tools/fr6_sites.py tmp/step5/hi25-profile-030-50-bce-prof-fr7-TAG DRAWS
+tools/fr6_trace.sh fr8-TAG           # 68EC030, 60 fields, cost per routine
+python3 tools/fr6_sites.py tmp/step5/hi25-profile-030-50-bce-prof-fr8-TAG DRAWS
 ```
 
 Pitfalls:
@@ -96,6 +105,12 @@ Pitfalls:
   the banks while driving (FR1) and the full arm publishes every dirty row each draw;
   partial arms keep the FR5 tracking. A new writer outside the redirection breaks this
   silently. The probe's `rows_refreshed=0` is expected.
+- The frame gate's capture is timed from `B8Draw`, so `ff1_gates.py` patches its FR frame
+  fixtures to `FF1FastRenderEarly` 0 (the early request would show a newer frame).
+- The pacing log (`FF1_FAST_RENDER_PACING`) moves the layout and shifts FPS by up to 1 %;
+  compare arms built together. Native absolute addresses are bound only in code before
+  `public_bind`: `FastRenderPacing.s` (at the end of `Fine.s`) gets them passed from
+  `FullPresentation.s`.
 - FPS runs use warp off (`test_h5_fps.py` switches it off); smokes run with `WARP=1`.
   Trace milliseconds read about 1.5–1.9× high: compare shares only.
 - 040 controls pass at k5 but the test stays frame-rate sensitive (FASTRAM_PLAN FR5c–f).
