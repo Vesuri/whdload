@@ -12,7 +12,7 @@ Being prepared for public release (the user's decisions, 2026-11-06):
   stops at "Can't allocate ExpMem", as the original slave's sizes always required); its
   history lists only the user-visible changes since JOTD's 3.0;
 - CUSTOM2 is ignored under CUSTOM1 nonzero and listed as "Frame delay (Original
-  simulation)";
+  simulation only)";
 - accepted: CUSTOM1=2's 12% A500 cost over CUSTOM1=1 (r34 on the flat C1c ground: 67.7
   against 60.2 ms a frame), the 90 MPH slide gap (C1f 90 hold: 7.7° arcade against 10.3
   A500 / 9.5 020), the native screech and off-road sounds; manual gears with arcade handling

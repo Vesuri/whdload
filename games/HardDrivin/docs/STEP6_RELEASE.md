@@ -15,7 +15,7 @@ investigation. No game, Kickstart, WHDLoad or built-slave bytes are tracked.
   since 4.0b's release (2026-11-04, the user's choice; CUSTOM1=1 before); unchecked/0 restores
   the existing native simulation and renderer. Command-line use requires
   explicit CUSTOM1=1. No ambiguous distinction between absent and zero options.
-- CUSTOM2: existing frame delay, listed as "Frame delay (Original simulation)". The
+- CUSTOM2: existing frame delay, listed as "Frame delay (Original simulation only)". The
   startup list offers 0 through 9; existing numeric tooltypes remain supported. It
   applies with CUSTOM1=0 and on other editions; with the elapsed-time dispatcher
   (CUSTOM1 nonzero) `_blitwait` skips the delay and the lean wait is selected
