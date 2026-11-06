@@ -54,6 +54,9 @@ try:
   if 'FF1FastRenderStageStats' in sy:
    raw=dump('stats5',probe+sy['FF1FastRenderStageStats'],probe+sy['FF1FastRenderStageStats']+32)
    a['fr5']=dict(zip(['tag','prefixes','published','refreshed','filled','cuts','blocks_refreshed','blocks_published'],struct.unpack('>8I',raw)))
+  if 'FF1FastRenderCopyStats' in sy:
+   raw=dump('stats7',probe+sy['FF1FastRenderCopyStats'],probe+sy['FF1FastRenderCopyStats']+20)
+   a['fr7']=dict(zip(['tag','rows','written','flushes','view_seeds'],struct.unpack('>5I',raw)))
   if 'FF1FastRenderBlocks' in sy:
    raw=dump('blocks',probe+sy['FF1FastRenderBlocks'],probe+sy['FF1FastRenderBlocks']+1000)
    segs=[(0xcd30,0xd3e0),(0xd3e0,0x18f48),(0x18f48+30960,0x528d8)];out=[];o=0
@@ -106,9 +109,25 @@ try:
  cmd(f'ignore $b8 {draws-1}');v=cmd('continue',timeout=1800)
  assert stopped(v)==probe+sy['B8Draw'],(hex(val('$pc')),v)
  report['stats_after']=stats();report['draws']=draws
+ if 'FF1FastRenderView' in sy:
+  # FR7: between draws both Chip banks show their shadows' displayed region
+  # (bytes 4..43 of rows 0..199 of each plane), and in copy mode 2 the view
+  # mirror holds the same bytes.
+  mem=full('views');u=lambda a:struct.unpack_from('>I',mem,a)[0]
+  mode=struct.unpack_from('>H',mem,probe+sy['FF1FastRenderCopy'])[0];view=u(probe+sy['FF1FastRenderView'])
+  bad={'shadow':0,'view':0}
+  for bank,base in enumerate((0x18f48,0x528d8)):
+   sh=base+u(probe+sy['FF1FastRenderDelta']+4*bank)
+   for pl in range(3):
+    for row in range(200):
+     o=pl*10320+row*48+4;c=mem[base+o:base+o+40]
+     bad['shadow']+=c!=mem[sh+o:sh+o+40]
+     v=view+((bank*3+pl)*200+row)*40
+     bad['view']+=mode==2 and c!=mem[v:v+40]
+  report['fr7_check']=dict(copy_mode=mode,rows_differing=bad)
  a,b0=report['stats_after']['fr4'],report['stats_draw1']['fr4']
  report['per_draw']={k:{s:round((a[k][s]-b0[k][s])/draws,2) for s in SITES} for k in ('soft','hard')}
- report['status']='passed' if report['active'] and a['faults']==0 else 'failed'
+ report['status']='passed' if report['active'] and a['faults']==0 and not any(report.get('fr7_check',{}).get('rows_differing',{}).values()) else 'failed'
  (out/'result.json').write_text(json.dumps(report,indent=1)+'\n');print(json.dumps({k:v for k,v in report.items() if k not in('stats_first','stats_draw1')},indent=1),flush=True)
 finally:
  (out/'capture.log').write_text('\n'.join(log))

@@ -3,6 +3,8 @@
 ; FR4 adds the blit redirection at the native sites (see below). FR5 runs
 ; a prefix of the draw stages redirected into the back shadow before the
 ; field wait, and publishes the rows they wrote after it (see FR5 below).
+; FR7 publishes only the displayed region and, in copy mode 2, only the
+; longwords that differ from a view mirror of each Chip bank (FRPublishRows).
 ;
 ; Install (every driving entry, from the barrier) qualifies the CPU (030/040/
 ; 060) and the Chip layout. The first draw then makes one MEMF_FAST allocation
@@ -42,6 +44,19 @@ FR_ROW_BYTES equ 48
 FR_COPY_ROWS equ 200
 FR_ROWS equ FR_BANK_BYTES/FR_ROW_BYTES   ; 645 rows of 48 bytes per bank
 FR_ROWS_PAD equ FR_ROWS+1
+FR_PLANE_ROWS equ FR_PLANE_STRIDE/FR_ROW_BYTES  ; 215
+FR_COPY_BYTES equ 40        ; displayed bytes 4..43 of a row
+FR_VIEW_BYTES equ 3*FR_COPY_ROWS*FR_COPY_BYTES  ; 24,000: a bank's displayed region
+
+; FR7 publication (FF1FastRenderCopy): 0 = FR6, every dirty row whole;
+; 1 = the displayed region of the dirty rows; 2 = that region compared with
+; the view mirror of what Chip holds, writing only the longwords that differ.
+; 1 and 2 apply with every stage staged (owned shadows); other arms use 0.
+FR7S_ROWS equ 4             ; dirty displayed rows published
+FR7S_WRITTEN equ 8          ; longwords written to Chip
+FR7S_FLUSHES equ 12         ; whole banks written back at release
+FR7S_VIEW_SEEDS equ 16
+FR7S_LONGS equ 4
 
 ; FR5 stages in the prefix, in draw order: 1 = FR5a (clear $6b050 and
 ; background $6b950), 2 = FR5b (road $6b368), 3 = FR5c (cars $69bb8),
@@ -149,6 +164,7 @@ FF1FastRenderAllocate:
  add.l d1,d2
  bra.b .size
 .sized:
+ addi.l #2*FR_VIEW_BYTES,d2 ; FR7 view mirrors, after the mirrors
  move.l d2,FRS_BLOCK_BYTES(a3)
  move.l $4.w,a6
  moveq #4,d1                ; MEMF_FAST
@@ -196,6 +212,8 @@ FF1FastRenderAllocate:
  add.l d1,d3
  bra.b .place
 .placed:
+ lea FF1FastRenderView(pc),a0
+ move.l d3,(a0)
  ; Seed every mirror from Chip once the blitter is idle.
  tst.b $dff002
 .blit:
@@ -220,6 +238,7 @@ FF1FastRenderAllocate:
  move.l (sp)+,a1
  bra.b .range
 .seeded:
+ bsr.w FRSeedView
  lea FF1FastRenderActive(pc),a0
  move.w #1,(a0)
  addq.l #1,FRS_ACTIVE(a3)
@@ -235,6 +254,7 @@ FF1FastRenderRelease:
  lea FF1FastRenderBlock(pc),a0
  move.l (a0),d0
  beq.b .done
+ bsr.w FRFlushBanks
  move.l d0,a1
  move.l 4(a0),d0
  clr.l (a0)+
@@ -1492,9 +1512,161 @@ FRMarkSpan:
  moveq #1,d0
  bra.w FF1FastRenderFault
 
-; Publication: copy every dirty row of both banks from its shadow to Chip,
-; which leaves the row fresh.
+; Publication (FR7). With every stage staged the shadows are owned (see
+; FRMarkSpan) and only the displayed region needs to reach Chip: bytes 4..43
+; of rows 0..199 of each plane (FR1). Nothing reads the Chip banks during
+; driving, so the rest of each bank may lag its shadow until the release
+; writes both banks back (FRFlushBanks); a dirty row outside the region is
+; just marked clean. Copy mode 2 also keeps a view mirror of the displayed
+; region of each Chip bank and writes only the longwords that differ from
+; it. The other arms, and copy mode 0, publish whole rows (FRPublishWhole).
+FR7_LONG macro                  ; mode 2: a1 shadow, a5 view, a3 Chip
+ move.l (a1)+,d0
+ cmp.l (a5)+,d0
+ beq.b .same\@
+ move.l d0,-4(a5)
+ move.l d0,(a3)
+ addq.l #1,d6
+.same\@:
+ addq.l #4,a3
+ endm
+
 FRPublishRows:
+ tst.w FF1FastRenderCopy(pc)
+ beq.w FRPublishWhole
+ cmpi.w #FR_SCRATCH_STAGES,FF1FastRenderStaged(pc)
+ blo.w FRPublishWhole
+ movem.l d0-d7/a0-a6,-(sp)
+ lea FF1FastRenderOwned(pc),a0
+ move.w #1,(a0)
+ lea FF1FastRenderStageStats(pc),a6
+ move.w FF1FastRenderCopy(pc),d5
+ moveq #0,d6                ; longwords written
+ moveq #0,d7                ; rows published
+ move.l FF1FastRenderView(pc),a4
+ moveq #0,d3                ; bank
+.bank:
+ lea FF1FastRenderMirrors(pc),a0
+ move.l (a0,d3.w*8),a0      ; Chip bank
+ lea FF1FastRenderDelta(pc),a1
+ move.l (a1,d3.w*4),d1      ; Fast - Chip
+ lea FF1FastRenderRows(pc),a2
+ move.w d3,d0
+ mulu.w #FR_ROWS_PAD,d0
+ adda.l d0,a2
+ moveq #3-1,d4              ; plane
+.plane:
+ move.w #FR_COPY_ROWS-1,d2
+.row:
+ cmpi.b #2,(a2)+
+ bne.w .next
+ move.b #1,-1(a2)
+ addq.l #1,d7
+ lea 4(a0,d1.l),a1          ; shadow bytes 4..43
+ lea 4(a0),a3               ; Chip bytes 4..43
+ cmpi.w #2,d5
+ beq.b .compare
+ rept FR_COPY_BYTES/4
+ move.l (a1)+,(a3)+
+ endr
+ moveq #FR_COPY_BYTES/4,d0
+ add.l d0,d6
+ bra.w .next
+.compare:
+ move.l a4,a5
+ rept FR_COPY_BYTES/4
+ FR7_LONG
+ endr
+.next:
+ lea FR_ROW_BYTES(a0),a0
+ lea FR_COPY_BYTES(a4),a4
+ dbf d2,.row
+ ; Rows 200..214 are not displayed.
+ moveq #FR_PLANE_ROWS-FR_COPY_ROWS-1,d2
+.hidden:
+ cmpi.b #2,(a2)+
+ bne.b .clean
+ move.b #1,-1(a2)
+.clean:
+ lea FR_ROW_BYTES(a0),a0
+ dbf d2,.hidden
+ dbf d4,.plane
+ addq.w #1,d3
+ cmpi.w #2,d3
+ blo.w .bank
+ add.l d7,FR5S_PUBLISHED(a6)
+ lea FF1FastRenderCopyStats(pc),a0
+ add.l d7,FR7S_ROWS(a0)
+ add.l d6,FR7S_WRITTEN(a0)
+ movem.l (sp)+,d0-d7/a0-a6
+ rts
+
+; First draw of an entry, right after the seed: the view mirrors take the
+; displayed region of both shadows, which equal Chip there.
+FRSeedView:
+ movem.l d0-d3/a0-a2,-(sp)
+ move.l FF1FastRenderView(pc),a2
+ moveq #0,d3
+.bank:
+ lea FF1FastRenderMirrors(pc),a0
+ move.l (a0,d3.w*8),a0
+ lea FF1FastRenderDelta(pc),a1
+ adda.l (a1,d3.w*4),a0      ; shadow bank
+ addq.l #4,a0
+ moveq #3-1,d1
+.plane:
+ move.w #FR_COPY_ROWS-1,d0
+.row:
+ rept FR_COPY_BYTES/4
+ move.l (a0)+,(a2)+
+ endr
+ lea FR_ROW_BYTES-FR_COPY_BYTES(a0),a0
+ dbf d0,.row
+ lea FR_PLANE_STRIDE-FR_COPY_ROWS*FR_ROW_BYTES(a0),a0
+ dbf d1,.plane
+ addq.w #1,d3
+ cmpi.w #2,d3
+ blo.b .bank
+ lea FF1FastRenderCopyStats(pc),a0
+ addq.l #1,FR7S_VIEW_SEEDS(a0)
+ movem.l (sp)+,d0-d3/a0-a2
+ rts
+
+; Release, before the block is freed: after a displayed-region publication
+; the rest of each Chip bank lags its shadow, so both shadows are written
+; back whole and the banks hold what the native draw would have left. Not
+; after a fault or inside a redirected draw (a shadow may be half drawn).
+FRFlushBanks:
+ tst.w FF1FastRenderOwned(pc)
+ beq.b .out
+ tst.w FF1FastRenderRedirect(pc)
+ bne.b .out
+ movem.l d0-d1/a0-a2,-(sp)
+ lea FF1FastRenderMirrors(pc),a2
+ lea FF1FastRenderDelta(pc),a1
+ moveq #2-1,d1
+.bank:
+ move.l (a2),a0             ; Chip bank
+ addq.l #8,a2
+ move.l a1,-(sp)
+ move.l (a1),a1
+ adda.l a0,a1               ; its shadow
+ move.w #FR_BANK_BYTES/4-1,d0
+.long:
+ move.l (a1)+,(a0)+
+ dbf d0,.long
+ move.l (sp)+,a1
+ addq.l #4,a1
+ dbf d1,.bank
+ lea FF1FastRenderCopyStats(pc),a0
+ addq.l #1,FR7S_FLUSHES(a0)
+ movem.l (sp)+,d0-d1/a0-a2
+.out:
+ rts
+
+; FR6 publication: copy every dirty row of both banks from its shadow to
+; Chip, which leaves the row fresh.
+FRPublishWhole:
  movem.l d0-d3/a0-a3,-(sp)
  lea FF1FastRenderStageStats(pc),a3
  moveq #0,d3                ; bank
@@ -1845,6 +2017,8 @@ FF1FastRenderWritePixel:
 ; D0 = reason. Never draws into an unknown address: record it and leave
 ; through the production fault exit.
 FF1FastRenderFault:
+ lea FF1FastRenderOwned(pc),a1
+ clr.w (a1)                 ; a half-drawn shadow is not written back
  lea FF1FastRenderSiteStats(pc),a1
  addq.l #1,FR4S_FAULTS(a1)
  move.l d0,FR4S_FAULT_REASON(a1)
@@ -1939,6 +2113,9 @@ FF1FastRenderControl: dc.w 1
 ; Immutable preset: the number of FR5 prefix stages to run (6 = the whole
 ; draw, FR5f; 5..1 = FR5e..FR5a; 0 = empty prefix, the FR4 arm).
 FF1FastRenderStages: dc.w FR_STAGES_ALL
+; Immutable preset: the FR7 copy mode (2 = compare, 1 = displayed region,
+; 0 = FR6 whole rows).
+FF1FastRenderCopy: dc.w 2
  even
 ; Expected bank table at $66c92: plane pointers of bank 0 and bank 1.
 FF1FastRenderBanks:
@@ -1964,6 +2141,9 @@ FF1FastRenderSiteStats:
 FF1FastRenderStageStats:
  dc.l 'FR5S'
  dcb.l FR5S_LONGS,0
+FF1FastRenderCopyStats:
+ dc.l 'FR7S'
+ dcb.l FR7S_LONGS,0
  IFD FF1_FAST_RENDER_CHIPREAD
 FR_CHIPREAD_ENTRIES equ 512
 ; 'FR4C', spans read in place, entries, entries x (low, high), unlogged.
@@ -1987,6 +2167,8 @@ FF1FastRenderXDelta: ds.l 6         ; channel deltas A-D, then the Chip span
 FF1FastRenderTrack: dc.w 0
 FF1FastRenderScratch: dc.w 0
 FF1FastRenderStaged: dc.w 0
+FF1FastRenderOwned: dc.w 0           ; FR7: Chip banks lag their shadows outside the view
+FF1FastRenderView: dc.l 0            ; FR7: view mirrors, bank 0 then bank 1
 FF1FastRenderRows: ds.b 2*FR_ROWS_PAD
  even
 FF1FastRenderBlocks: ds.b FR_BLOCKS+1

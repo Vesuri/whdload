@@ -14,7 +14,7 @@
   icons still leave `CUSTOM2` off (the earlier local candidate added a separate Performance
   icon instead); decide the version, date and icon default then.
 - **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
-  FR1–FR6 done. FR6 (2026-11-05): 030-50 BCE 35.8 FPS against 24.6 native, 040-40 BCE 22.0
+  FR1–FR7 done. FR7 (2026-11-06): 030-50 BCE 40.0 FPS against 24.6 native, 040-40 BCE 22.7
   against 24.5. The work concentrates on the 68030 (below); FR0h is still open. FR builds
   need 1 MiB ExpMem and do not boot on the 512 KiB A500 or the chip-only A1200.
 - Human playtesting (full races) and real Amiga hardware remain deferred.
@@ -31,18 +31,19 @@ Commit each FR step when its gates pass; push only when asked. Production stays 
 into Fast memory (FASTRAM_PLAN "Code and data placement check"); that needs no new look.
 The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory checks.
 
-The final FR6 build is k5 (`8ec61e11…`); `tmp/manifest/fr6-validation.json` holds the FPS
-of k1–k5, the gates and the trace shares, and `tmp/logs/fr6-*.log` the gate, FPS and
-profile logs. Next, in order:
+The current build is FR7's candidate (`a00d4072…`, `tools/fr7_build.py`); FR6's final
+build was k5 (`8ec61e11…`). `tmp/manifest/fr6-validation.json` holds the FPS of k1–k5, the
+gates and the trace shares; `tmp/logs/fr6-*.log` and `tmp/logs/fr7-*.log` the gate, FPS,
+probe and profile logs. Next, in order:
 
-1. Profile k5 on the 030 (`tools/fr6_trace.sh k5`). The k4 shares: per-blit overhead
+1. Profile the FR7 candidate on the 030 (`tools/fr6_trace.sh fr7-candidate`); FR7 took most
+   of the publication's share. The k4 shares: per-blit overhead
    (FRTranslate, FRSpan, FRMarkSpan, FRKSetup and FF1FastRenderSize's register saves)
    22 %, the ABCD `$CA` cookie-cut 13.7 %, lines 10 %, publish 8.7 %, fill 6.6 %. Ideas:
    fewer `movem` saves on the per-blit path, translate and span merged, the cookie-cut with
    the colour expansion merged so it skips the scratch (FR6 item 1), the cockpit cookie-cut
    from precomputed word runs (FR6 item 5).
-2. FR7: copy only the dirty or displayed rows, compared with a mirror.
-3. FR8: pacing.
+2. FR8: pacing.
 
 Commands, from this directory after `. ../../common/env.sh`, one emulator job at a time
 (they share gdb port 2573):
@@ -50,25 +51,27 @@ Commands, from this directory after `. ../../common/env.sh`, one emulator job at
 ```sh
 python3 tools/fr2_unicorn.py 68020   # and 68030, 68040, after any kernel change:
                                      # "cases 4479 mismatches 0 kernel cases 3162"
-python3 tools/fr6_build.py TAG       # tmp/build/fr6-production (asserts 597a74b9) and fr6-TAG
-H5_BUILD=$PWD/tmp/build/fr6-TAG C1_VARIANT=fr6-TAG python3 tools/test_h5_fps.py 030-50-bce
+python3 tools/fr7_build.py TAG       # tmp/build/fr7-production (asserts 597a74b9), fr7-TAG and
+                                     # its -copy1/-copy0 arms (FF1FastRenderCopy)
+H5_BUILD=$PWD/tmp/build/fr7-TAG C1_VARIANT=fr7-TAG python3 tools/test_h5_fps.py 030-50-bce
                                      # 300 intervals, warp off; grep "'fps':"
-FF1_FINE_DEFINES=FF1_FAST_RENDER=1 python3 tools/ff1_gates.py --build tmp/build/fr6-TAG \
+FF1_FINE_DEFINES=FF1_FAST_RENDER=1 python3 tools/ff1_gates.py --build tmp/build/fr7-TAG \
   --tag TAG frames/normal frames/grid timing/elapsed
-FR4_BUILD=tmp/build/fr6-TAG FR4_TAG=-TAG \
+FR4_BUILD=tmp/build/fr7-TAG FR4_TAG=-fr7-TAG \
   RELEASE_WHD_ARGS='CUSTOM1=0 CUSTOM2=1 ConfigDelay=0 NoWriteCache' \
   python3 tools/fr4_probe.py 030-50-bce 300
-                                     # tmp/step5/fr4-probe-030-50-bce-TAG/result.json
-                                     # stats_after: fr4.faults, fr4.hard, fr5
-python3 tools/ff1check.py run smoke --build tmp/build/fr6-TAG \
+                                     # tmp/step5/fr4-probe-030-50-bce-fr7-TAG/result.json
+                                     # stats_after: fr4.faults, fr4.hard, fr5, fr7;
+                                     # fr7_check: Chip, shadows and views equal
+python3 tools/ff1check.py run smoke --build tmp/build/fr7-TAG \
   --profiles 030-50-bce,040-40-bce,a1200-fast,a500-fast
-python3 tools/ff1check.py run mmu --build tmp/build/fr6-TAG --profiles 030-50  # then 040-40
-python3 tools/ff1check.py run route modal --build tmp/build/fr6-TAG \
+python3 tools/ff1check.py run mmu --build tmp/build/fr7-TAG --profiles 030-50  # then 040-40
+python3 tools/ff1check.py run route modal --build tmp/build/fr7-TAG \
   --profiles 030-50-bce,040-40-bce,a1200-fast
-python3 tools/ff1check.py run controls --build tmp/build/fr6-TAG \
+python3 tools/ff1check.py run controls --build tmp/build/fr7-TAG \
   --profiles a1200-fast,030-50-bce,040-40-bce
-tools/fr6_trace.sh TAG               # 68EC030, 60 fields, cost per routine
-python3 tools/fr6_sites.py tmp/step5/hi25-profile-030-50-bce-fr6-prof-TAG DRAWS
+tools/fr6_trace.sh fr7-TAG           # 68EC030, 60 fields, cost per routine
+python3 tools/fr6_sites.py tmp/step5/hi25-profile-030-50-bce-prof-fr7-TAG DRAWS
 ```
 
 Pitfalls:
@@ -96,6 +99,12 @@ Pitfalls:
 - FPS runs use warp off (`test_h5_fps.py` switches it off); smokes run with `WARP=1`.
   Trace milliseconds read about 1.5–1.9× high: compare shares only.
 - 040 controls pass at k5 but the test stays frame-rate sensitive (FASTRAM_PLAN FR5c–f).
+- The live runners (route, modal, reload, season) default to the emulator
+  `tmp/step3/fs-uae-q03-final`, which needs `data`, `share` and `fsemu` beside it (links to
+  `tmp/step5-frame-observer-build`); without them FS-UAE exits at once and the runner
+  reports `could not connect: Connection refused`. The frame gate needs the fixture sources
+  `tmp/build/step5-b8-v3*` and the B8-PAL references `tmp/step5/c4-q03-*-b8pal-*`. All are
+  local and ignored.
 
 The evidence (measurement and validation JSON, `tmp/manifest/`, with `project.json` as the
 index) and the captures (`tmp/step5/`, ...) are local and ignored. `tmp/step5-frame-observer-build/`

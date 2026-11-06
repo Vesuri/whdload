@@ -1467,7 +1467,7 @@ FPS on the 030‑50 BCE, 300 presentations, warp off:
 - **The 040.** It went from 6.2 to 22.0 FPS but is still below native. It
   was not profiled in FR6.
 - **Next.** The per-blit overhead and the cookie-cut loop, then FR7 (copy)
-  and FR8 (pacing).
+  and FR8 (pacing). (FR7 was done first; see its results.)
 
 ### FR7 — Copy optimization
 
@@ -1481,6 +1481,63 @@ FPS on the 030‑50 BCE, 300 presentations, warp off:
    - Keep it only where it gains: TFX's 040-only result.
 3. Optional: copy finished bands early during drawing, only if FR1 shows
    band-ordered completion. Not expected to pay.
+
+### FR7 results (2026-11-06, done)
+
+Gate passed in the emulator. On the 030 the Fast path now runs at 40.0 FPS
+(FR6 35.8, native 24.6). Items 1 and 2 are done; item 3 was not tried. The data
+is in `tmp/manifest/fr7-validation.json`.
+
+**Code** (`FastRender.s`, assembled only with `FF1_FAST_RENDER`; the release
+slave stays `597a74b9…`).
+
+- **Copy modes.** The immutable preset `FF1FastRenderCopy` selects the
+  publication: 2 (the preset) compares, 1 copies the displayed region of the
+  dirty rows, 0 is FR6 (every dirty row whole). Modes 1 and 2 apply only with
+  every stage staged (owned shadows); the partial arms always use 0, because
+  their native stages read Chip.
+- **Displayed region.** Only bytes 4–43 of rows 0–199 of each plane reach
+  Chip (FR1); a dirty row outside it is just marked clean.
+- **View mirrors.** Two 24,000-byte Fast copies of what each Chip bank
+  displays, placed after the mirrors in the one block (316,672 to 364,672
+  bytes) and filled from the shadows right after the seed. Mode 2 compares
+  each displayed longword of a dirty row with its view copy and writes Chip
+  and the view only where they differ.
+- **Write-back at release.** Outside the displayed region the Chip banks now
+  lag their shadows. Nothing reads them during driving, so the release (every
+  lifecycle reset) writes both shadows back whole before the block is freed,
+  and the banks then hold what the native draw would have left. A fault, or a
+  release inside a redirected draw, skips it (`FF1FastRenderOwned`).
+- **Diagnostics.** `FF1FastRenderCopyStats` (tag `FR7S`): rows published,
+  longwords written to Chip, write-backs, view seeds. `tools/fr4_probe.py`
+  reads it and, at the final stop, checks that both Chip banks' displayed
+  region equals their shadows and, in mode 2, the view mirrors.
+- **Builds.** `tools/fr7_build.py TAG` makes the candidate and the
+  `-copy1` and `-copy0` arms by patching the preset word.
+
+**Checks (candidate `a00d4072…`).**
+
+| Check | Result |
+| --- | --- |
+| Probe, 030‑50 BCE, 300 draws | 0 faults, 0 hardware blits; Chip, shadows and views equal in the displayed region of both banks; 616 dirty displayed rows and 1,266 of 6,160 longwords written per draw (FR6 wrote 625.5 whole rows, about 30,000 bytes) |
+| 30 frames normal and grid against B8-PAL | 0 error |
+| Elapsed clock | 0.093 % |
+| Smokes: 030‑50 BCE, 040‑40 BCE, 020+Fast, A500+Fast | passed |
+| MMU: 030 and 040 | passed |
+| Route and modal: 030‑50 BCE, 040‑40 BCE, 020+Fast | passed |
+| Controls: 020+Fast, 030‑50 BCE, 040‑40 BCE | passed |
+
+FPS, 300 presentations, warp off; the arms share the candidate's layout:
+
+| Machine | Mode 2 (compare) | Mode 1 (displayed) | Mode 0 (FR6) |
+| --- | ---: | ---: | ---: |
+| 030‑50 BCE | 40.04 | 36.98 | 35.57 |
+| 040‑40 BCE | 22.69 | | 22.06 |
+
+About 80 % of the displayed longwords in dirty rows are unchanged from the
+frame before in that bank, so the compare, which costs only Fast reads,
+removes most Chip writes. The 040 gains too but stays below its native
+24.5; it was not profiled (the work concentrates on the 030).
 
 ### FR8 — Frame pacing at 50 FPS
 
@@ -1565,8 +1622,8 @@ except for memory checks.
 Dependencies:
 
 ```
-FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b (done 2026-11-04) → FR5c…FR5f (done 2026-11-05) → FR6
-  → FR7 → FR8 → FR10 → (FR11, optional)
+FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b (done 2026-11-04) → FR5c…FR5f (done 2026-11-05) → FR6 (done 2026-11-05)
+  → FR7 (done 2026-11-06) → FR8 → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.
 See "FR0 decision and plan revisions" for the changes to FR1–FR6.
