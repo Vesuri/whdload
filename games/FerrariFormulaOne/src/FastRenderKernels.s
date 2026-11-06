@@ -668,6 +668,14 @@ FRK_FILLWORD macro
  move.w d1,d0
  endm
 
+; FR12: d4 = the fill of a zero word for the carry in d3: $ffff with the
+; carry (exclusive and inclusive alike), else 0; the carry passes unchanged.
+FRK_FILLZERO macro
+ tst.w d3
+ sne d4
+ ext.w d4
+ endm
+
 ; Fill kernels: CD with minterm $AA (D = C, then filled), the road fill.
 ; Each byte is filled through FRKFillTab, right byte first.
 FRKFill:
@@ -705,13 +713,21 @@ FRKFill:
  bne.w FRKFillD
 .row:
  move.w d5,d3                   ; carry offset, 0 or 256
+ FRK_FILLZERO
  move.w FRBL_H(a6),d6
  subq.w #1,d6
 .word:
  move.w (a3)+,d7
+ beq.b .zero
  FRK_FILLWORD
  move.w d0,(a4)+
+ FRK_FILLZERO
  dbra d6,.word
+ bra.b .rowend
+.zero:
+ move.w d4,(a4)+                ; FR12: a zero word is all carry
+ dbra d6,.word
+.rowend:
  adda.l FRBL_CMOD(a6),a3
  adda.l FRBL_DMOD(a6),a4
  subq.w #1,FRBL_V(a6)
@@ -722,13 +738,21 @@ FRKFill:
 FRKFillD:
 .row:
  move.w d5,d3
+ FRK_FILLZERO
  move.w FRBL_H(a6),d6
  subq.w #1,d6
 .word:
  move.w -(a3),d7
+ beq.b .zero
  FRK_FILLWORD
  move.w d0,-(a4)
+ FRK_FILLZERO
  dbra d6,.word
+ bra.b .rowend
+.zero:
+ move.w d4,-(a4)                ; FR12: a zero word is all carry
+ dbra d6,.word
+.rowend:
  adda.l FRBL_CMOD(a6),a3
  adda.l FRBL_DMOD(a6),a4
  subq.w #1,FRBL_V(a6)

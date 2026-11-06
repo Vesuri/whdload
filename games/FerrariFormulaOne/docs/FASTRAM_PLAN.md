@@ -1757,6 +1757,55 @@ smokes (030‑50 BCE, 040‑40 BCE, 020+Fast, A500+Fast), MMU (030 and 040,
 twice), route and modal (030‑50 BCE, 040‑40 BCE, 020+Fast) and controls
 (020+Fast, 030‑50 BCE, 040‑40 BCE). The 040 now matches the native game.
 
+**Profile of the checkpoint** (shares of the draw): road lines 21 %, road
+fill 10 %, bitmap blits (`$24ae0`) 19 %, publication 8 %, cockpit 6 %, cars
+12 %.
+
+**Step 3: zero words in the road fill** (`FRKFill`, `FRKFillD`). A zero word
+fills to all ones with the carry and to zero without, in both modes, and
+leaves the carry; most words of a road row are zero. The kernels keep that
+word in d4 and update it only after a non-zero word. Host check: 0
+mismatches on all three CPUs, a seeded fault caught. 030 FPS: 45.52 against
+44.31.
+
+**Tried and dropped** (no gain beyond the layout noise of about 1 %; the 030's
+256-byte instruction cache makes small changes move the frame rate either
+way):
+- BCD $CA with ADAT = $FFFF as a plain shifted copy from the third word
+  (45.25).
+- Leaner per-blit work: fewer registers saved per blit, no tracking call for
+  read channels with owned shadows, the last mirror tried first in `FRSpan`
+  (45.11).
+
+**Step 4: the whole car in one pass.** Step 2's pass now draws all three
+planes, and the mask blit is skipped too: `FRT32df6` defers it, and `FRCar`
+either draws the car and returns to the routine's `rts` (`$32f0e`), or runs
+the deferred mask blit and leaves the planes to the native code (the
+register image still holds the mask setup). The routine's plane loop changes
+only d0, d1, a3, a5 and the colour argument words, which `FRCar` sets as the
+loop would. The car's blits are gone, so the blitter registers end
+differently; the register census of the other sites shows that each loads
+what it uses (the bitmap routine sets ADAT, the road its line registers and
+texture, the cockpit sites flush their own). The mask and colour scratch are
+no longer written; only the same car's cookie-cuts read them. Host check
+(`tools/fr12_car.py`, now three planes and the end registers): 0 mismatches
+in 1,500 cars on each CPU; a seeded fault in the argument words was caught.
+Frame gate: passed. 030 FPS: 48.47 against 45.52.
+
+**Checkpoint after step 4** (`fr12-candidate`, `3c1a0f16…`; arm `-merge0`,
+the native car blits, `182c052b…`). FPS, 300 presentations, warp off:
+
+| Machine | Whole-car pass | Native car blits | Native game |
+| --- | ---: | ---: | ---: |
+| 030‑50 BCE | 48.47 | 40.70 | 24.55 |
+| 040‑40 BCE | 28.53 | 25.00 | 24.5 |
+
+Gates, all passed, the same set as the first checkpoint: frames (normal,
+grid) and timing (elapsed error 0.059 %), the FR4 probe, smokes, MMU (030
+and 040), route, modal and controls. The 040 is now ahead of the native
+game. Next: road lines (21 % of the draw at the first checkpoint), the
+bitmap blits (19 %), publication (8 %) and the cockpit (6 %).
+
 ### FR9 — 030 data cache (optional)
 
 Only if the 030 takes the FR path. Find the cause of the performance-mode

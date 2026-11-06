@@ -14,8 +14,8 @@
   The icons still leave `CUSTOM2` off (the earlier local candidate added a separate
   Performance icon instead); decide the icon default and the memory scheme then.
 - **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
-  FR1–FR8 done, FR12 (draw speed) in progress: 030-50 BCE 44.3 FPS against 24.6 native,
-  040-40 BCE 24.6 against 24.5 (FR12 checkpoint, 2026-11-06). FR8 showed the draw is the limit. The work concentrates on the 68030 (below); FR0h is still open. FR builds
+  FR1–FR8 done, FR12 (draw speed) in progress: 030-50 BCE 48.5 FPS against 24.6 native,
+  040-40 BCE 28.5 against 24.5 (FR12 step 4 checkpoint, 2026-11-06). FR8 showed the draw is the limit. The work concentrates on the 68030 (below); FR0h is still open. FR builds
   need 1 MiB ExpMem and do not boot on the 512 KiB A500 or the chip-only A1200.
 - Human playtesting (full races) and real Amiga hardware remain deferred.
 
@@ -31,20 +31,19 @@ Commit each FR step when its gates pass; push only when asked. Production stays 
 into Fast memory (FASTRAM_PLAN "Code and data placement check"); that needs no new look.
 The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory checks.
 
-The current build is FR12's candidate (`b0a3b937…`, `tools/fr12_build.py`; FR8's was `e9ae9b3c…`); FR6's final
+The current build is FR12's candidate (`3c1a0f16…`, `tools/fr12_build.py`; FR8's was `e9ae9b3c…`); FR6's final
 build was k5 (`8ec61e11…`). `tmp/manifest/fr6-validation.json` and `fr8-validation.json`
 hold the FPS, gates and measurements; `tmp/logs/fr6-*.log`, `fr7-*.log` and `fr8-*.log` the
 gate, FPS, probe and profile logs. Next, in order:
 
 1. FR12, draw work on the 030 (FASTRAM_PLAN "FR12"). FR8 showed the draw alone takes 20–31 ms
-   per frame and 50 FPS needs about 17.5 ms. Steps 1 (one-dot lines) and 2 (merged car planes,
-   `tools/fr12_car.py` checks it) are done; profile the FR12 candidate next
-   (`tools/fr6_trace.sh fr12-candidate`), then the remaining sites. The k4
-   shares: per-blit overhead (FRTranslate, FRSpan, FRMarkSpan, FRKSetup and
-   FF1FastRenderSize's register saves) 22 %, the ABCD `$CA` cookie-cut 13.7 %, lines 10 %,
-   publish 8.7 %, fill 6.6 %. Ideas: fewer `movem` saves on the per-blit path, translate
-   and span merged, the cookie-cut with the colour expansion merged so it skips the scratch
-   (FR6 item 1), the cockpit cookie-cut from precomputed word runs (FR6 item 5).
+   per frame and 50 FPS needs about 17.5 ms. Steps 1–4 are done (one-dot lines, zero
+   words in the road fill, the whole car in one pass; `tools/fr12_car.py` checks the car).
+   Next by the profile's shares: road lines 21 %, bitmap blits (`$24ae0`) 19 %,
+   publication 8 %, cockpit 6 % (`tools/fr6_trace.sh fr12-candidate`). Leaner per-blit
+   work alone gave nothing measurable; only removing work shows up (030 I-cache layout
+   noise is about 1 %). Ideas: the cockpit cookie-cut from precomputed word runs (FR6
+   item 5), fewer road-line pixels touched twice.
 2. Steady motion (FASTRAM_PLAN "FR8 results", "Still open"; the user's decision 2026-11-06):
    no frame rate traded for it. After the draw work, measure again, then try running the
    ticks a frame needs up to the field it is predicted to show in.
