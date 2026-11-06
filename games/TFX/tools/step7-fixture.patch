@@ -1,0 +1,29 @@
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -736,7 +736,25 @@
+ 											response += inputdevice_uaelib(name, value, 1, false) ? "OK" : "E02";
+ 										else
+ 											response += "E01";
+-									} else if(cmd.find("tfxstart ")==0) {
++									} else if(cmd.find("tfxmem ")==0) {
++                                        unsigned adr; char data[4097];
++                                        if(sscanf(cmd.c_str(), "tfxmem %x %4096s", &adr, data)==2 && strlen(data)%2==0 && debug_safe_addr(adr, strlen(data)/2)) {
++                                            if(currprefs.cpu_model>=68040) { flush_cpu_caches_040(0x78); flush_cpu_caches_040(0x58); } else cpu_invalidate_cache(adr, strlen(data)/2); flush_cpu_caches(true);
++                                            for(size_t i=0;i<strlen(data);i+=2) { char v[3]={data[i],data[i+1],0}; put_byte(adr+i/2,strtoul(v,nullptr,16)); }
++                                            flush_cpu_caches(true); response += "OK";
++                                        } else response += "E01";
++                                    } else if(cmd.find("tfxsync ")==0) {
++                                        unsigned adr,len;
++                                        if(sscanf(cmd.c_str(), "tfxsync %x %u", &adr,&len)==2) { if(currprefs.cpu_model>=68040) { flush_cpu_caches_040(0x78); flush_cpu_caches_040(0x58); } else cpu_invalidate_cache(adr,len); response += "OK"; } else response += "E01";
++                                    } else if(cmd.find("tfxreg ")==0) {
++                                        unsigned reg,value;
++                                        if(sscanf(cmd.c_str(), "tfxreg %u %x", &reg,&value)==2 && (reg<16 || reg==17)) {
++                                            if(reg<8) m68k_dreg(regs,reg)=value;
++                                            else if(reg<16) m68k_areg(regs,reg-8)=value;
++                                            else { m68k_setpc_normal(value); fill_prefetch(); }
++                                            response += "OK";
++                                        } else response += "E01";
++                                    } else if(cmd.find("tfxstart ")==0) {
+                                         ::tfx_start(strtoul(cmd.c_str()+9,nullptr,0)); response += "OK";
+                                     } else if(cmd.find("tfxsave ")==0) {
+                                         ::tfx_save(cmd.c_str()+8); response += "OK";

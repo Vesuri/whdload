@@ -1,0 +1,145 @@
+
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "TFX" © 1995 Digital Image Design.
+ 
+ It was released on CU amiga coverdisk in 1997.
+  
+ This install requires WHDLoad to be in the path. It can be found in the
+ WHDLoad package.
+
+ It can be quit by pressing right amiga key
+ (key can be changed with Tooltype "QuitKey=" but with that game it's not
+  easy to find something that's not used).
+
+
+ The installed program requires 2.0 MB ChipMem and 7.0 MB OtherMem (16 MB with PRELOAD)
+ It also requires the AGA chipset and at least a 68020, but a 68030 and/or
+ a FPU or even a 68040 or 68060 will help a lot with framerate.
+
+ The game requires an installed A1200 or A4000 Kickstart 3.1 image.
+ The kickstart image must be located in the directory "Devs:Kickstarts" and
+ must be named "kick40068.A1200" (resp kick40068.A4000). 
+ The image can be extracted from a A1200 (resp A4000) with tools like 'GrabKick'
+ or similar which can be found on aminet.
+ If the image is of wrong version or altered in any way WHDLoad will quit with
+ an appropriate requester.
+ Additionally the file "kick40068.A1200.RTB" (resp "kick40068.A4000.RTB")
+ must be installed in the same directory as the kickstart image.
+ It can be found in the archive "util/boot/skick346.lha" on aminet.
+
+ If you have problems with this installation please try and get a newer
+ version of this package from the WHDLoad WWW-Page. If that doesn't help try
+ some Tooltypes like NOCACHE, NOAUTOVEC, NOVBRMOVE, NOMMU, PAL or NTSC. If
+ that also fails, please inform the author via the Bug-Report-Form which
+ can be accessed on the WHDLoad WWW-Page or create a mantis issue directly
+ at http://mantis.whdload.de
+
+ For the full WHDLoad package, other installs and updates refer to:
+	http://www.whdload.de/
+ or	aminet:dev/misc/whdload#?
+ and	aminet:game/patch/
+
+ Version 2.2 (22.10.2026) done by Vesuri:
+  - automatically selects the faster 1997 TFX.020 on FPU-equipped 68020,
+    68030, 68040 and 68060 systems
+  - faster rendering and better use of fast RAM in TFX.020, with additional
+    68040 optimizations and native 68040 FPU maths
+  - faster rendering in the plain 68020 executable
+  - fixed maximum-object sorting and duplicate joystick missile launches
+    in TFX.020
+  - frame-rate display and experimental frame-limit options now work in TFX.020
+  - integer projection in the optimized TFX.020 renderer
+
+ Version 2.2 (22.07.2025) done by JOTD:
+  - Enabled data cache by default
+  
+ Version 2.1 (09.08.2023) done by paraj:
+  - fix bug when maximum number of screen objects reached
+  - fix glitchy mouse cursor in config/quit menu
+  - NTSC tool type support
+
+ Version 2.0 (25.06.2023) done by paraj:
+  - major rework of rendering code (buffer is now in fast ram until final display)
+  - option to show fps
+  - options to uncap fps (only for benchmarking - game might have issues)
+  - option to start in action mode (requires an active player in first slot)
+  - option to still use original rendering code
+  - plain 020 version is now default unless original rendering code is used (other versions lack
+    features, and won't be well supported going forward)
+  
+  Version 1.1 (xx.02.2021) done by JOTD:
+  - patched the CPU vectors so the FPU versions run on 68040/68060 FPUs, using
+    a rebuilt version of Motorola FPSP emulation code, integrated in the slave :)
+  - directly patched some unsupported FPU instructions for faster operation on 68040/68060
+  - modified TFX executable autodetect now that the FPU versions can be used with
+    68040 and 68060 processors. Make sure to copy the "fpsp040" (resp "fpsp060") file in "data" directory
+    if you're upgrading your installation
+  - note: this version requires whdload 18.7 or newer. With older version you'll get
+    access fault right at startup (writing to VBR)
+  
+  Version 1.0 (28.12.2020) done by JOTD
+  - automatic executable selection depending on cpu/fpu (or manual)
+  - self-modifying code removed (fonts were trashed)
+  - CD32 joypad support for some frequently used keys (see below)
+  - small manual included (thanks Angus)
+  - source code included
+ 
+ Installation:
+ 
+ the game wasn't distributed in floppies but only in an archive of a beta
+ version or CU amiga CD version.
+ To install manually, just create a "data" directory and unpack the files there
+ 
+ Versions:
+ 
+ there are a lot of executables around for this game. 4 of them are supported, the
+ others (newer beta versions). Not all of them are working.
+ 
+ - TFX (554340 bytes): base 68020/nofpu version (working on 68040/68060)
+ - TFX.FPU (503340 bytes): 68020/68881 fpu version
+ - TFX.??? (599152 bytes): 68020+FPU (from DamienD@EAB collection, wonder where you got that
+   this is a version with unmerged hunks and SYMBOLS!!! I love when that happens!)
+ - TFX.floppy (555644): original CD, never tried this version
+ - TFX.020 (571008 bytes) linked in HOL: 68020+FPU, almost destroyed by Hunk Wizard
+   chip/fast hunks merged but I could convert those dynamically to chip so it runs!)
+   This last HOL version is a newer 1997 build of the game with probable bug fixes
+
+ Below are unusable/corrupt versions (no thanks to Hunk Wizard tool):
+ - TFX.030 (HOL https://is.gd/A6yk2T)
+ - TFX.strip (68040, HOL https://is.gd/XfxhAL)
+ - TFX.040 (original from CU amiga CD)
+   
+ The slave tries to select the best executable for your configuration but if
+ for some reason it doesn't work, it can be selected manually.
+
+ You can select between 4 versions:
+ - TFX (68020, no fpu, on CD, also working on 68040/68060)
+ - TFX.FPU (68020/030, 68881/82 fpu, on CD)
+ - TFX.020 (68020/030, 68881/82 fpu, newer, data in chip, download at https://is.gd/A6yk2T)
+ - TFX.040 (68020/030, 68881/82 fpu, wrong name, symbols, NOT the one on CD)
+ 
+ Joypad controls:
+ 
+ Obviously I couldn't map the million keys required but at least a few
+ that are probably frequently used.
+ 
+ FORWARD: thrust (+)
+ REVERSE: thrust (-)
+ BLU:     switch weapons (return)
+ YEL:     lock to target (Z)
+ RED:     fire (original controls)
+ GRN:     increase afterburner (*)
+ PLAY:    options screen (key left to "1", tilda something)
+
+ FORWARD+REVERSE+YELLOW: quit to workbench
+ 
+
+ 

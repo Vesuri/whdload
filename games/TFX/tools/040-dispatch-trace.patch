@@ -1,0 +1,29 @@
+--- a/src/newcpu.cpp
++++ b/src/newcpu.cpp
+@@ -5783,6 +5783,15 @@
+ 
+ 				mmu_opcode = -1;
+ 				mmu_opcode = regs.opcode = x_prefetch (0);
++				// TFX validation: dispatch records, not instruction-cost estimates.
++                // Emit before execution so MMU/FPU exception longjmps cannot lose PCs.
++                if (cpu_profiler_end_addr) {
++                    cpu_profiler_output.push_back(regs.instruction_pc);
++                    cpu_profiler_output.push_back(0xffffffff);
++                    for (int i = 0; i < 16; ++i)
++                        cpu_profiler_output.push_back(regs.regs[i]);
++                    cpu_profiler_output.push_back(regs.sr);
++                }
+ 				count_instr (regs.opcode);
+ 				cpu_cycles = (*cpufunctbl[regs.opcode])(regs.opcode);
+ 				cpu_cycles = adjust_cycles(cpu_cycles);
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -1105,7 +1105,7 @@
+ 			// start profiler
+ 			// Without a trigger (WHDLoad, directory boots) there is no program to unwind: profile
+ 			// the whole 24-bit address space instead of the uninitialised [baseText, +sizeText).
+-			start_cpu_profiler(profile_unwind ? baseText : 0, profile_unwind ? baseText + sizeText : 0x01000000, profile_unwind.get());
++			start_cpu_profiler(profile_unwind ? baseText : 0, profile_unwind ? baseText + sizeText : 0x7fffffff, profile_unwind.get());
+ 			debug_dma = 1;
+ 			profile_start_cycles = static_cast<uae_u32>(get_cycles() / cpucycleunit);
+ 			//barto_log("GDBSERVER: Start CPU Profiler @ %u cycles\n", get_cycles() / cpucycleunit);

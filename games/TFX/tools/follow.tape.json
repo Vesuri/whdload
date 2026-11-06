@@ -1,0 +1,40 @@
+{
+ "description": "Follow camera fixture: flight.tape.json enrolment and right-bank input, then F5 (follow camera) at swap 25 (4-swap hold), kept to the end.",
+ "enrolment": [
+  32,
+  53,
+  51
+ ],
+ "key_hold_fields": 8,
+ "key_release_fields": 20,
+ "flight_inputs": [
+  {
+   "swap": 10,
+   "event": "JOY2_RIGHT",
+   "value": 1
+  },
+  {
+   "swap": 20,
+   "event": "JOY2_RIGHT",
+   "value": 0
+  },
+  {
+   "swap": 25,
+   "event": "KEY",
+   "key": 84,
+   "value": 1
+  },
+  {
+   "swap": 29,
+   "event": "KEY",
+   "key": 84,
+   "value": 0
+  }
+ ],
+ "checkpoints": [
+  1,
+  10,
+  20,
+  30
+ ]
+}

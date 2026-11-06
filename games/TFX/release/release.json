@@ -1,0 +1,15 @@
+{
+  "archives": [
+    {
+      "input": "TFX.lha",
+      "output": "TFXEnhanced-{version}-{date}.lha",
+      "replace": {
+        "TFXInstall/TFX.slave": "build:TFX",
+        "TFXInstall/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "TFXInstall/source", "variants": ["TFX", "fpsp040", "fpsp060"]}
+    }
+  ]
+}

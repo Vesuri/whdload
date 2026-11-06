@@ -1,0 +1,8 @@
+{
+  "description": "Fresh pilot A/B/C, action mode; PAL-field waits are exact debugger commands, each fields command also finishes the current partial field.",
+  "enrolment": [32,53,51],
+  "key_hold_fields": 8,
+  "key_release_fields": 20,
+  "flight_inputs": [{"swap": 10, "event": "JOY2_RIGHT", "value": 1}, {"swap": 20, "event": "JOY2_RIGHT", "value": 0}],
+  "checkpoints": [1,10,20,30]
+}

@@ -1,0 +1,14 @@
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -748,9 +748,10 @@
+                                         if(sscanf(cmd.c_str(), "tfxsync %x %u", &adr,&len)==2) { if(currprefs.cpu_model>=68040) { flush_cpu_caches_040(0x78); flush_cpu_caches_040(0x58); } else cpu_invalidate_cache(adr,len); response += "OK"; } else response += "E01";
+                                     } else if(cmd.find("tfxreg ")==0) {
+                                         unsigned reg,value;
+-                                        if(sscanf(cmd.c_str(), "tfxreg %u %x", &reg,&value)==2 && (reg<16 || reg==17)) {
++                                        if(sscanf(cmd.c_str(), "tfxreg %u %x", &reg,&value)==2 && (reg<=17)) {
+                                             if(reg<8) m68k_dreg(regs,reg)=value;
+                                             else if(reg<16) m68k_areg(regs,reg-8)=value;
++                                            else if(reg==16) { regs.sr=value; MakeFromSR(); }
+                                             else { m68k_setpc_normal(value); fill_prefetch(); }
+                                             response += "OK";
+                                         } else response += "E01";
