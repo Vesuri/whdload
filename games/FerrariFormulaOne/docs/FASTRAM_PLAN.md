@@ -459,7 +459,7 @@ the prototype-based FR0e verdict.
 Revised order:
 
 ```
-FR0h → FR1 → FR2 → FR3 → FR4 → FR5a…FR5f → FR6 → FR7 → FR8 → FR10 → (FR11)
+FR0h → FR1 → FR2 → FR3 → FR4 → FR5a…FR5f → FR6 → FR7 → FR8 → FR12 → FR10 → (FR11)
                                    ↑ checkpoints at FR5c and FR5f
 FR9 any time, only if it would help the 030.
 ```
@@ -1686,6 +1686,77 @@ constant:
 Either is a design decision. A faster draw shrinks the problem: solo, at
 1.1 fields per frame, is already 88 % steady.
 
+### FR12 — Draw speed on the 030
+
+FR8 showed that the draw limits the frame rate: 20–31 ms per frame against
+about 17.5 ms for 50 FPS. Each step is profiled first (`tools/fr6_trace.sh`,
+with the per-site attribution), kept only where it gains, and goes through
+section 4. The tick-to-screen delay (FR8, "Still open") is measured again
+after the draw work, and then a predicted-tick variant is tried (the user's
+decision, 2026-11-06: no frame rate is traded for steady motion).
+
+**Profile of the FR8 candidate** (030, 60 fields, shares of the draw):
+
+| Site | Share | Mostly |
+| --- | ---: | --- |
+| Cars (`$32d50`: mask, colour and cookie-cut blits) | 19 % | ABCD $CA cookie-cut |
+| Road lines (`$6ac4a`) | 18 % | X-major one-dot lines |
+| Bitmap blits (`$24ae0`, both sites) | 16 % | BCD $CA, $0A |
+| Road fill | 8 % | the fill kernel |
+| Cockpit and gauges (`$6ba18`) | 6 % | ABCD $CA |
+| Publication | 7 % | |
+
+Across all sites about 24 % is per-blit work outside the kernels:
+translation, span lookup, row marking, setup and end state.
+
+**Step 1: one-dot X-major lines** (`FRKLineXS`, `FastRenderKernels.s`). In a
+one-dot line only the first pixel of each row is written. The other pixels
+now skip the minterm and keep only the error term, the steps and the C read
+(for CDAT). Host check (`fr2_unicorn.py`): 0 mismatches on the 68020, 030
+and 040; a seeded fault in the new path was caught. 030 FPS (normal):
+40.26 against 39.94.
+
+**Step 2: merged car planes** (`FRCar`, `FastRender.s`, preset
+`FF1FastRenderMerge`). Natively each car takes a mask blit, then per plane a
+colour blit into a scratch (except for colours 0 and 3, FR H2) and a
+cookie-cut. The colour of a plane is one of 0, P1 & P0, P1 & ~P0 or P1 (the
+table at `$32d48`, A = P1, B = P0), and the shift commutes with these
+functions, so one pass reads P1 and P0 once, shifts each once and writes
+D = (C & ~M) | colour into planes 0 and 1. Plane 2 still runs natively, so
+the mask scratch and the register image end as before. The colour scratch
+is no longer written for planes 0 and 1. Only the same plane's cookie-cut
+reads it, and beyond the car's words only in the masked extra word (BDAT and
+BHOLD, which every later blit loads or does not use).
+- Hook: `$32e0c` (`asr.w #4,d6; lsl.w $12(a7)`, six bytes before the plane
+  loop). The install checks those bytes and the minterm table.
+- Conditions: owned shadows only. A span outside the mirrors, or a width
+  below two words, leaves the car to the native blits (`FR12` stats: merged
+  and native cars).
+- Host check (`tools/fr12_car.py`): FRCar assembled alone under Unicorn
+  against the native blits on the FR2 model, on random cars (width, height,
+  clipping, shift, position, colour bits): 0 mismatches in 1,500 cars on each
+  of the 68020, 030 and 040. A seeded fault (the shift read from the wrong
+  word) was caught.
+- The first emulator run failed the frame gate: the pass read the native
+  registers' high words from the stack. The host check, written then, finds
+  it at once.
+- 030 FPS (normal): 44.31, against 40.26 after step 1.
+
+**Checkpoint after steps 1 and 2** (`fr12-candidate`, `b0a3b937…`; arm
+`-merge0`, the native car blits, `e8de2ef9…`; `tools/fr12_build.py`). FPS,
+300 presentations, warp off, the same layout:
+
+| Machine | Merged | Native car blits | Native game |
+| --- | ---: | ---: | ---: |
+| 030‑50 BCE | 44.31 | 40.59 | 24.55 |
+| 040‑40 BCE | 24.59 | 23.33 | 24.5 |
+
+Gates, all passed: frames (normal, grid) and timing, the FR4 probe
+(030‑50 BCE: 0 faults, no hardware blit, shadows and views equal to Chip),
+smokes (030‑50 BCE, 040‑40 BCE, 020+Fast, A500+Fast), MMU (030 and 040,
+twice), route and modal (030‑50 BCE, 040‑40 BCE, 020+Fast) and controls
+(020+Fast, 030‑50 BCE, 040‑40 BCE). The 040 now matches the native game.
+
 ### FR9 — 030 data cache (optional)
 
 Only if the 030 takes the FR path. Find the cause of the performance-mode
@@ -1754,7 +1825,7 @@ Dependencies:
 
 ```
 FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b (done 2026-11-04) → FR5c…FR5f (done 2026-11-05) → FR6 (done 2026-11-05)
-  → FR7 (done 2026-11-06) → FR8 (done 2026-11-06) → FR10 → (FR11, optional)
+  → FR7 (done 2026-11-06) → FR8 (done 2026-11-06) → FR12 (in progress) → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.
 See "FR0 decision and plan revisions" for the changes to FR1–FR6.

@@ -61,6 +61,9 @@ FR8S_EARLY equ 4            ; FR8: LoadView requests made after the publication
 FR8S_SAME_FIELD equ 8       ; left to B8Draw: the last request was in this field
 FR8S_NATIVE_SKIPPED equ 12  ; B8Draw requests skipped: the early one loaded the view
 FR8S_LONGS equ 3
+FR12S_MERGED equ 4          ; FR12: cars whose planes 0 and 1 took the merged pass
+FR12S_NATIVE equ 8          ; cars left to the native blits (not redirected, or a check failed)
+FR12S_LONGS equ 2
 
 ; FR5 stages in the prefix, in draw order: 1 = FR5a (clear $6b050 and
 ; background $6b950), 2 = FR5b (road $6b368), 3 = FR5c (cars $69bb8),
@@ -669,6 +672,14 @@ FF1FastRenderInstallSites:
  bne.w .bad
  cmpi.l #$33400058,$32efe
  bne.w .bad
+ cmpi.l #$e846e3ef,$32e0c   ; asr.w #4,d6; lsl.w $12(a7)
+ bne.w .bad
+ cmpi.w #$0012,$32e10
+ bne.w .bad
+ cmpi.l #$01000dc0,$32d48   ; the colour minterms FRCar evaluates
+ bne.w .bad
+ cmpi.l #$0d3009f0,$32d4c
+ bne.w .bad
  cmpi.l #$d6fc0001,$32f02
  bne.w .bad
  cmpi.l #$33c000df,$6bbe6
@@ -756,6 +767,9 @@ FF1FastRenderInstallSites:
  move.w #$4eb9,$32efe
  lea FRT32efe(pc),a0
  move.l a0,$32f00
+ move.w #$4eb9,$32e0c       ; FR12: the merged car pass
+ lea FRT32e0c(pc),a0
+ move.l a0,$32e0e
  move.w #$4e71,$32f04
  move.w #$4eb9,$6bbe6
  lea FRT6bbe6(pc),a0
@@ -887,6 +901,339 @@ FRT32efe:                   ; move.w d0,88(a1); adda.w #1,a3
  movem.l (sp)+,d1/a0
  addq.w #1,a3
  rts
+FRT32e0c:                   ; asr.w #4,d6; lsl.w $12(a7)
+ asr.w #4,d6
+ lsl.w $16(sp)
+ tst.w FF1FastRenderMerge(pc)
+ beq.b .native
+ cmpa.l #$dff000,a1
+ beq.b .native
+ tst.w FF1FastRenderScratch(pc)
+ bne.w FRCar
+.native:
+ rts
+
+; ---------------------------------------------------------------------------
+; FR12: the car's planes 0 and 1 in one pass (FASTRAM_PLAN.md FR12).
+;
+; Natively each plane p of a car takes a colour blit into the colour scratch
+; ($1c1b8) and a cookie-cut into the bank: D = M ? c : C, A = the mask scratch
+; ($1c1bc, P0 | P1 from the mask blit), B = the colour scratch, both shifted
+; by the same amount, AFWM = 0 when clipped on the left, ALWM = 0. The colour
+; is minterm (colour bit pair) of the table at $32d48 on A = P1 ($10(a0)) and
+; B = P0 ($c(a0)): 0, P1 & P0, P1 & ~P0 or P1. Shifting commutes with the
+; bitwise functions, so the pass reads P1 and P0 once, shifts each once, and
+; for each plane writes D = (C & ~M) | c, where c lies inside M:
+;   0: C & ~M;  P1: (C & ~M) | P1;  P1 & P0: ((C & ~M) | P1) & (P0 | ~M);
+;   P1 & ~P0: ((C & ~M) | P1) & ~P0.
+; The AFWM word is masked in both sources (it masks M and so every colour);
+; the ALWM word is zero in both, so the extra source word is never read.
+; Plane 2 then runs natively, so the mask scratch and the register image
+; end as before; the colour scratch is not written for planes 0 and 1. It is
+; read only by the cookie-cut of the same plane, and beyond the car's words
+; only in the masked extra word (BDAT and BHOLD, which nothing reads later:
+; every later blit loads them or does not use B).
+; Only with owned shadows (redirected, every stage staged); any span outside
+; the mirrors, or an odd size, leaves the car to the native blits.
+;
+; Entry from FRT32e0c (native registers: a0 car, a1 register image - $40,
+; d3/d4 right/left clip words, d5 shift << 12, d6 x word, d7 24 y, a4 the
+; mask BLTSIZE). Returns with a3 = 2 and the colour bits shifted for plane 2.
+FRC_ROWS equ -2
+FRC_MID equ -4
+FRC_FIRST equ -6
+FRC_SRCMOD equ -10
+FRC_DSTMOD equ -14
+FRC_LOCALS equ -16
+FRC_X equ $56               ; native $12(a7) and $16(a7) from a6
+FRC_Y equ $5a
+FRC_A3 equ $30              ; the saved a3 from a6
+
+; One plane of one word. \1 = colour (0, 1 = P1 & P0, 2 = P1 & ~P0, 3 = P1),
+; \2 = bank pointer. d0 = P1, d1 = P0, d5 = ~M.
+FRC_PLANE macro
+ move.w (\2),d7
+ and.w d5,d7
+ if \1=1
+ or.w d0,d7
+ or.w d5,d1                     ; P0 | ~M (idempotent; after any colour 2)
+ and.w d1,d7
+ endif
+ if \1=2
+ or.w d0,d7
+ not.w d1
+ and.w d1,d7
+ not.w d1
+ endif
+ if \1=3
+ or.w d0,d7
+ endif
+ move.w d7,(\2)+
+ endm
+
+; One word: \1, \2 = colours of planes 0 and 1, \3 = 1 to read the sources
+; (0: the zero ALWM word).
+FRC_WORD macro
+ swap d2
+ if \3
+ move.w (a1)+,d2
+ else
+ clr.w d2
+ endif
+ move.l d2,d0
+ lsr.l d4,d0                    ; P1
+ swap d3
+ if \3
+ move.w (a2)+,d3
+ else
+ clr.w d3
+ endif
+ move.l d3,d1
+ lsr.l d4,d1                    ; P0
+ move.w d0,d5
+ or.w d1,d5
+ not.w d5                       ; ~M
+ if \1=2
+ FRC_PLANE 2,a3
+ endif
+ if \2=2
+ FRC_PLANE 2,a4
+ endif
+ if \1<>2
+ FRC_PLANE \1,a3
+ endif
+ if \2<>2
+ FRC_PLANE \2,a4
+ endif
+ endm
+
+FRC_VARIANT macro               ; \1, \2 = colours of planes 0 and 1
+.row\@:
+ tst.w FRC_FIRST(a6)
+ bne.b .first\@
+ addq.l #2,a1                   ; AFWM = 0: the first word draws nothing
+ addq.l #2,a2
+ addq.l #2,a3
+ addq.l #2,a4
+ bra.b .mids\@
+.first\@:
+ FRC_WORD \1,\2,1
+.mids\@:
+ move.w FRC_MID(a6),d6
+ bmi.b .last\@
+.mid\@:
+ FRC_WORD \1,\2,1
+ dbra d6,.mid\@
+.last\@:
+ FRC_WORD \1,\2,0
+ adda.l a5,a1
+ adda.l a5,a2
+ adda.l a0,a3
+ adda.l a0,a4
+ subq.w #1,FRC_ROWS(a6)
+ bne.w .row\@
+ bra.w FRCarDone
+ endm
+
+FRCar:
+ movem.l d0-d7/a0-a6,-(sp)
+ link a6,#FRC_LOCALS
+ move.w a4,d0                   ; the cookie-cut's BLTSIZE
+ addq.w #1,d0
+ sub.w d3,d0
+ sub.w d4,d0
+ moveq #$3f,d1
+ and.w d0,d1                    ; width: 2..63 words here
+ cmpi.w #2,d1
+ blo.w .native
+ lsr.w #6,d0                    ; rows: 1..1023 here
+ beq.w .native
+ move.w d0,FRC_ROWS(a6)
+ move.w d1,d2
+ subq.w #3,d2
+ move.w d2,FRC_MID(a6)          ; middle words - 1
+ move.w d3,d0                   ; AMOD = BMOD = 2 (d3 + d4 - 1)
+ add.w d4,d0
+ subq.w #1,d0
+ add.w d0,d0
+ move.w d0,d2
+ sub.w (a0),d2
+ sub.w (a0),d2
+ addi.w #$30,d2                 ; CMOD = DMOD
+ ext.l d0
+ ext.l d2
+ move.l d0,d6
+ addq.l #2,d6                   ; source step after the bw - 1 words read
+ move.l d6,FRC_SRCMOD(a6)
+ move.l d2,FRC_DSTMOD(a6)
+ add.l d1,d0
+ add.l d1,d0                    ; source row stride
+ bmi.w .native
+ add.l d1,d2
+ add.l d1,d2                    ; bank row stride
+ bmi.w .native
+ cmpi.l #$8000,d0
+ bhs.w .native
+ cmpi.l #$8000,d2
+ bhs.w .native
+ moveq #-1,d6
+ tst.w d4
+ beq.b .afwm
+ moveq #0,d6
+.afwm:
+ move.w d6,FRC_FIRST(a6)
+ move.w FRC_ROWS(a6),d7
+ subq.w #1,d7                   ; rows - 1
+ ; Sources: (bw - 1) words of each row, from 2 d4 on.
+ mulu.w d7,d0
+ move.w d1,d6
+ add.w d6,d6
+ subq.w #3,d6
+ ext.l d6
+ add.l d6,d0                    ; last source byte - first
+ movea.l $10(a0),a1
+ adda.w d4,a1
+ adda.w d4,a1                   ; P1 in Chip
+ movea.l $c(a0),a2
+ adda.w d4,a2
+ adda.w d4,a2                   ; P0 in Chip
+ move.l d0,d6
+ move.l a1,d0
+ move.l d0,d1
+ add.l d6,d1
+ bsr.w FRSpan
+ beq.w .native
+ adda.l d0,a1                   ; P1 in Fast
+ move.l a2,d0
+ move.l d0,d1
+ add.l d6,d1
+ bsr.w FRSpan
+ beq.w .native
+ adda.l d0,a2                   ; P0 in Fast
+ ; Planes 0 and 1: bw words of each row at 2 (d4 + d7 + d6) in the bank.
+ mulu.w d7,d2
+ move.w FRC_MID(a6),d6
+ addq.w #2,d6
+ add.w d6,d6
+ addq.w #1,d6                   ; 2 (bw - 1) + 1
+ ext.l d6
+ add.l d2,d6                    ; last bank byte - first
+ move.w 22(a6),d0               ; native d4 (low word)
+ add.w 34(a6),d0                ; native d7
+ add.w 30(a6),d0                ; native d6 (already >> 4)
+ add.w d0,d0
+ movea.l $226ae,a5
+ movea.l (a5),a3
+ adda.w d0,a3                   ; plane 0 in Chip
+ movea.l 4(a5),a4
+ adda.w d0,a4                   ; plane 1 in Chip
+ move.l a3,d0
+ move.l d0,d1
+ add.l d6,d1
+ bsr.w FRSpan
+ beq.w .native
+ move.l d0,d4                   ; plane 0 delta
+ move.l d1,d5                   ; and mirror
+ move.l a4,d0
+ move.l d0,d1
+ add.l d6,d1
+ bsr.w FRSpan
+ beq.w .native
+ move.l d0,d7                   ; plane 1 delta
+ move.l d1,d2                   ; and mirror
+ ; Committed: mark the bank rows, translate, take the colour bits.
+ moveq #1,d3
+ cmpi.l #2,d2
+ bhs.b .m1
+ move.l a4,d0
+ move.l d0,d1
+ add.l d6,d1
+ bsr.w FRMarkSpan
+.m1:
+ move.l d5,d2
+ cmpi.l #2,d2
+ bhs.b .m0
+ move.l a3,d0
+ move.l d0,d1
+ add.l d6,d1
+ bsr.w FRMarkSpan
+.m0:
+ adda.l d4,a3
+ adda.l d7,a4
+ move.w FRC_X(a6),d0
+ move.w FRC_Y(a6),d1
+ move.w d0,d2
+ andi.w #2,d2
+ move.w d1,d3
+ andi.w #1,d3
+ or.w d3,d2                     ; plane 0 colour
+ lsr.w #1,d0
+ lsr.w #1,d1
+ move.w d0,d3
+ andi.w #2,d3
+ move.w d1,d5
+ andi.w #1,d5
+ or.w d5,d3                     ; plane 1 colour
+ lsr.w #1,d0
+ lsr.w #1,d1
+ move.w d0,FRC_X(a6)
+ move.w d1,FRC_Y(a6)
+ move.l #2,FRC_A3(a6)
+ lea FF1FastRenderCarStats(pc),a5
+ addq.l #1,FR12S_MERGED(a5)
+ move.w d2,d1
+ lsl.w #2,d1
+ or.w d3,d1
+ add.w d1,d1                    ; variant = 4 plane 0 + plane 1 colour
+ move.w 26(a6),d4               ; native d5: the shift << 12
+ lsr.w #8,d4
+ lsr.w #4,d4
+ movea.l FRC_SRCMOD(a6),a5
+ movea.l FRC_DSTMOD(a6),a0
+ moveq #0,d2                    ; P1 and P0 history
+ moveq #0,d3
+ move.w FRCarTab(pc,d1.w),d0
+ jmp FRCarTab(pc,d0.w)
+.native:
+ lea FF1FastRenderCarStats(pc),a5
+ addq.l #1,FR12S_NATIVE(a5)
+FRCarDone:
+ unlk a6
+ movem.l (sp)+,d0-d7/a0-a6
+ rts
+FRCarTab:
+ dc.w FRC_00-FRCarTab
+ dc.w FRC_01-FRCarTab
+ dc.w FRC_02-FRCarTab
+ dc.w FRC_03-FRCarTab
+ dc.w FRC_10-FRCarTab
+ dc.w FRC_11-FRCarTab
+ dc.w FRC_12-FRCarTab
+ dc.w FRC_13-FRCarTab
+ dc.w FRC_20-FRCarTab
+ dc.w FRC_21-FRCarTab
+ dc.w FRC_22-FRCarTab
+ dc.w FRC_23-FRCarTab
+ dc.w FRC_30-FRCarTab
+ dc.w FRC_31-FRCarTab
+ dc.w FRC_32-FRCarTab
+ dc.w FRC_33-FRCarTab
+FRC_00: FRC_VARIANT 0,0
+FRC_01: FRC_VARIANT 0,1
+FRC_02: FRC_VARIANT 0,2
+FRC_03: FRC_VARIANT 0,3
+FRC_10: FRC_VARIANT 1,0
+FRC_11: FRC_VARIANT 1,1
+FRC_12: FRC_VARIANT 1,2
+FRC_13: FRC_VARIANT 1,3
+FRC_20: FRC_VARIANT 2,0
+FRC_21: FRC_VARIANT 2,1
+FRC_22: FRC_VARIANT 2,2
+FRC_23: FRC_VARIANT 2,3
+FRC_30: FRC_VARIANT 3,0
+FRC_31: FRC_VARIANT 3,1
+FRC_32: FRC_VARIANT 3,2
+FRC_33: FRC_VARIANT 3,3
 FRT6bbe6:                   ; move.w d0,$dff058
  movem.l d1/a0-a1,-(sp)
  lea FRFlush6ba18(pc),a1
@@ -2212,6 +2559,8 @@ FF1FastRenderCopy: dc.w 2
 ; Immutable preset: FR8 early LoadView request (1), or the native request in
 ; the next B8Draw only (0).
 FF1FastRenderEarly: dc.w 1
+; Immutable preset: FR12 merged car planes 0 and 1 (1), or the native blits (0).
+FF1FastRenderMerge: dc.w 1
  even
 ; Expected bank table at $66c92: plane pointers of bank 0 and bank 1.
 FF1FastRenderBanks:
@@ -2243,6 +2592,9 @@ FF1FastRenderCopyStats:
 FF1FastRenderShowStats:
  dc.l 'FR8S'
  dcb.l FR8S_LONGS,0
+FF1FastRenderCarStats:
+ dc.l 'FR12'
+ dcb.l FR12S_LONGS,0
  IFD FF1_FAST_RENDER_CHIPREAD
 FR_CHIPREAD_ENTRIES equ 512
 ; 'FR4C', spans read in place, entries, entries x (low, high), unlogged.

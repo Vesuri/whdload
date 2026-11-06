@@ -467,7 +467,66 @@ FRK_LINE macro
 FRKLineY: FRK_LINE 0,0
 FRKLineYS: FRK_LINE 0,1
 FRKLineX: FRK_LINE 1,0
-FRKLineXS: FRK_LINE 1,1
+
+; X-major with SING (FR12): only the first dot of each row is written, so the
+; other pixels skip the C minterm. C is still read at each pixel for the end
+; state (CDAT).
+FRK_LINE_STEP macro             ; error term, C, X and Y steps, B shift
+ tst.w d2
+ smi d5                         ; SIGN
+ bmi.b .neg\@
+ add.l a1,d2
+ bra.b .err\@
+.neg\@:
+ add.l a2,d2
+.err\@:
+ move.w (a3),d7                 ; C
+ endm
+FRK_LINE_MOVE macro
+ add.w d6,d3                    ; X every pixel
+ btst #4,d3
+ beq.b .x\@
+ adda.l FRBL_STEP(a6),a3
+ andi.w #15,d3
+.x\@:
+ tst.b d5
+ bne.b .y\@
+ adda.l a5,a3                   ; Y when SIGN is clear
+ bclr #8,d5
+.y\@:
+ subq.w #1,d4
+ andi.w #15,d4
+ endm
+FRKLineXS:
+.pix:
+ btst #8,d5
+ bne.w .skip
+ bset #8,d5                     ; the first dot of this row
+ FRK_LINE_STEP
+ move.w FRBL_ADAT(a6),d0
+ lsr.w d3,d0                    ; A
+ move.w FRB_BDAT(a0),d1
+ btst d4,d1                     ; B: texture bit BSH
+ sne d1
+ ext.w d1
+ and.w d0,d1                    ; $4A = ((A & B) | C) & ~(A & C)
+ or.w d7,d1
+ and.w d7,d0
+ not.w d0
+ and.w d1,d0
+ FRK_LINE_MOVE
+ move.w d0,(a4)
+ movea.l a3,a4
+ subq.w #1,FRBL_V(a6)
+ bne.w .pix
+ bra.w FRKLineEnd
+.skip:
+ FRK_LINE_STEP
+ FRK_LINE_MOVE
+ movea.l a3,a4
+ subq.w #1,FRBL_V(a6)
+ bne.w .pix
+ bra.w FRKLineEnd
 
 ; End state, as FRBLine leaves it.
 FRKLineEnd:
