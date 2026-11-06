@@ -86,9 +86,9 @@
  arcade race timing is selected.
 
  Both enhanced settings also draw the road and the objects on it in depth
- order, so cars no longer appear in front of scenery that hides them, and
- let traffic slow down behind a slower car in its lane instead of driving
- through it.
+ order, so cars appear in front of scenery that hides them less often (they
+ can still show through some slopes and structures), and let traffic slow
+ down behind a slower car in its lane instead of driving through it.
 
  Rendering optimizations are selected automatically: optimized rotations and
  blitter waits on 68000, and on 68020 with the executable in Fast RAM;
@@ -153,9 +153,9 @@
  - added an Arcade brake option, Full or Soft, and a Race timing option,
    Amiga or Arcade
  - new installs use arcade handling and arcade race timing
- - the road and objects are drawn in depth order, so cars no longer show
-   through scenery, and traffic slows behind a slower car instead of driving
-   through it
+ - the road and objects are drawn in depth order, so cars show through
+   scenery less often, and traffic slows behind a slower car instead of
+   driving through it
  - the frame delay (CUSTOM2) now applies only to the original simulation
  - fixed rare renderer crashes present in the original game
 
