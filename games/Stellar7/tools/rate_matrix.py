@@ -98,6 +98,9 @@ def run(args):
                     # route flags retain the reference arm for paired tests.
                     if not native and cpu == '68000' and '-DPOLYGON_BLIT_IRQ=' not in flags:
                         flags += ' -DPOLYGON_BLIT_IRQ=1'
+                    # Paired controls switch a retained change off (e.g. BLIT_IRQ_IDLE=0).
+                    if not native:
+                        flags += ''.join(' -D'+define for define in args.define)
                     # The build runs in the game directory, so the listing path is relative to it.
                     flags += ' -L '+str(listing.relative_to(ROOT))
                     env['VERIFY_FLAGS'] = flags
@@ -172,4 +175,6 @@ if __name__ == '__main__':
     rates.add_argument('--substeps', type=int, choices=(1,2,3,4,6,12))
     rates.add_argument('--selected-rates', action='store_true', help='use playable N=3 on 68000 and N=12 on 68020+')
     parser.add_argument('--boot-timeout', type=float, default=1800)
+    parser.add_argument('--define', action='append', default=[], metavar='NAME=VALUE',
+                        help='extra define for the SIM60 cells, e.g. a control arm; repeatable')
     run(parser.parse_args())

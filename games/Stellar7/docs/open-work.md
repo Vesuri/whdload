@@ -203,7 +203,7 @@ is a performance comparison; retain 60 Hz on the 68020+ path. Any unresolved A50
 
 ## Remaining work
 
-Steps 7–11 run in order; step 6 is complete. Each change ends with its measurements in
+Steps 8–11 run in order; steps 6 and 7 are complete. Each change ends with its measurements in
 `docs/internals.md`, its commands in `docs/development.md` and its own commit.
 
 ### Validation machines
@@ -259,29 +259,54 @@ Mapped gameplay state matches the native references at every checkpoint. Both
 changes are 68000-only. The original and Sim60 slaves are byte-identical to step 5,
 and `-DBLIT_IRQ_IDLE=0 -DSOUND_FAST=0` rebuilds the step 5 68000 slave. In the
 frame interrupt, the slave's input sample costs about 0.9%; a movem copy would
-save 0.25%, so it is unchanged. Whether the freed time raises the A500 frame rate
-or allows 20 Hz is measured in step 7. Measurements are in internals ("A500
+save 0.25%, so it is unchanged. Step 7 measured the result: 10–17% more A500
+presentations, and 20 Hz still not viable. Measurements are in internals ("A500
 interrupts and the sound timer").
 
 ### Step 7: Fresh baseline on the three machines
 
-Status: not started. Step 6 changed only the 68000 slave (blitter interrupt and
-sound pass). Check here whether its freed time raises the A500 frame rate.
+Status: complete. The selected-rate matrix, native-combat and heavy routes pass
+`rate_matrix_report.py` on all three machines (30 cells). Every SIM60 cell holds
+its rate. The `a1200-fast` boss window gains 4 pending updates, as it did at
+step 5 (3 to 8).
+Presentations/s in SOL, type-10 early, late, boss and heavy combat:
 
-1. Run the matrix with selected rates on all three machines
-   (`tools/rate_matrix.sh tmp/three/main --selected-rates`), plus native-combat
-   and the A500 heavy route; verify it with `rate_matrix_report.py`.
-2. Run extended combat to natural death (`tools/sustained_combat.py`) on all
-   three. Require the selected average rate with no accumulating pending trend.
-3. Port the earlier release-validation runners still needed from untracked
-   `tmp/release60` into
-   `tools/`, selecting machines with `SETUP` instead of explicit CPU and memory
-   variables.
-4. Re-run the input-history fixtures (recorded controls, native key queue),
-   same-rate state comparisons (`a1200-fast` against `a1200-060` at N=12),
-   delayed-draw and lifecycle comparisons (death, Continue, No, exits), the
-   buffer-reuse display-stability check on `a1200-060`, and the build and
-   off-byte identities.
+| Setup | Rate | Presentations/s |
+|---|---|---|
+| `a500-1.5m` | 15 Hz | 4.46, 5.41, 4.57, 2.66, 4.66 |
+| `a1200-fast` | 60 Hz | 8.62, 9.09, 8.91, 5.76, 9.00 |
+| `a1200-060` | 60 Hz | 22.1, 29.2, 29.4, 18.4, 28.6 |
+
+Step 6 raises the A500 presentation rate by 10–17%. A matched control on
+`a500-1.5m` with `BLIT_IRQ_IDLE=0 SOUND_FAST=0` gives 4.02, 4.69, 3.92, 2.42
+and 4.04, with identical mapped state at all 25 paired boundaries. 20 Hz is still not
+viable: N=4 keeps 20 updates/s but presents less often in four of the five
+routes (3.46 in late combat), and heavy combat ends with pending debt rising
+to 5–6. 15 Hz stays.
+
+Extended combat reaches natural death on all three machines at the selected
+average rate. The A500 run covers 114.1 s at 14.99 updates/s, with 4.54
+presentations/s (3.93 at step 5) and pending 0–4. Both A1200 runs cover 143.6 s
+at 59.99 updates/s, with pending 1–8 on `a1200-fast` and 0–2 on `a1200-060`;
+none of the three trends upward.
+
+The remaining release checks are now `tools/baseline_checks.py`, selecting
+machines by setup. They replace the `tmp/release60` and `tmp/fast60`
+scratch runners for these checks, and all pass:
+- **Input:** the recorded-controls and native key-queue fixtures on all three
+  machines, plus `a1200-fast` against `a1200-060` at N=12.
+- **Delayed draw:** 38 comparisons against the matrix cells.
+- **Lifecycle:** 16 endpoint comparisons, with both CUSTOM1-off checks.
+- **Builds:** the original and Sim60 slaves are byte-identical to step 5, and the
+  off switches rebuild the step 5 68000 slave. Fixtures and diagnostics are
+  excluded from both release slaves, and the hook audits pass.
+
+The buffer-reuse check on `a1200-060` shows no changed displayed words in the
+release build, in warp mode (50 fields) or at normal speed (100 fields). The
+deliberately unsafe `BUFFER_REUSE=0` control is also clean on this machine. The
+step 5 hazard reproduced on the earlier cycle-exact 68060, but not here, so this
+machine shows stability but cannot show that the guard is needed. Measurements
+are in internals ("Three-machine baseline").
 
 ### Step 8: Encounter coverage at both rates
 
@@ -308,6 +333,23 @@ Still to run:
 5. Each power active during combat: its effect on hits, shots and contacts.
 6. Natural deaths in later levels, with Continue and No.
 7. The remaining native dialog paths.
+8. Flicker seen on 2026-11-06 while watching the step 7 capture windows, in a
+   full-screen view of a ship exploding, possibly the player's death. Those
+   windows showed the extended-combat natural deaths and the lifecycle check's
+   forced deaths at N=3 and N=12. They were warp-mode captures, which skip
+   displayed fields, and some added `SLOW_DRAW=20`, a deliberate draw delay.
+   Reproduce it at normal speed without SLOW_DRAW
+   (`EXTRA_ARGS=--warp_mode=0`), compare the native build in the same scene,
+   and check the displayed buffers
+   (`presentation_buffers.py`) before deciding whether it is a defect. The
+   explosion frame clock is described in internals ("Animation and explosion
+   activation clocks").
+   Flickering in-game graphics were also seen on `a1200-060` (68060, MMU, FPU,
+   AGA) in the same capture windows, all in warp mode. That does not
+   explain it: the step 7 buffer check's 50 traced warp-mode fields on that
+   machine have no changed displayed words in either the release build or
+   the deliberately unsafe `BUFFER_REUSE=0` control, which therefore did not
+   reproduce the step 5 hazard there.
 
 ### Step 9: Final build checks
 

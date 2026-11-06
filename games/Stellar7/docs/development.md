@@ -442,6 +442,29 @@ nominal, not exact. Recorded results from the
 earlier eight-configuration matrix (custom 4 MB fast RAM, 68030/68040/68060
 without MMU and cycle-exact, PAL checks) are references, not cells of this matrix.
 
+The step 7 baseline used these commands (results in internals, "Three-machine
+baseline"). They run one capture at a time under `tmp/rate-matrix.lock`:
+
+```sh
+tools/rate_matrix.sh tmp/three/main --selected-rates --routes sol type10-early type10-late boss native-90 native-240 native-type10-early native-type10-late native-boss type10-heavy
+python3 tools/rate_matrix_report.py tmp/three/main --routes sol type10-early type10-late boss native-90 native-240 native-type10-early native-type10-late native-boss type10-heavy
+# the step 6 control and 20 Hz on the A500
+tools/rate_matrix.sh tmp/three/control --selected-rates --machines a500-1.5m --routes sol type10-early type10-late boss type10-heavy --define BLIT_IRQ_IDLE=0 --define SOUND_FAST=0
+tools/rate_matrix.sh tmp/three/n4 --substeps 4 --machines a500-1.5m --routes sol type10-early type10-late boss type10-heavy
+python3 tools/sustained_combat.py tmp/three/sustained
+python3 tools/baseline_checks.py tmp/three/checks builds --reference 52e52251
+python3 tools/baseline_checks.py tmp/three/checks input delayed lifecycle buffers buffers_normal --matrix tmp/three/main
+```
+
+`--define NAME=VALUE` adds a define to every SIM60 cell for a paired control.
+`baseline_checks.py` selects machines by setup and writes
+`<prefix>/<check>/validation.json`: input fixtures and same-rate state, delayed
+drawing against the matrix cells, lifecycle scenes and CUSTOM1-off preservation,
+buffer stability (warp and normal speed), and the build identities against a git
+revision it exports into `tmp/`. Its docstring lists each check's machines.
+It replaces the scratch `tmp/release60` and `tmp/fast60` runners for these checks;
+the encounter runners there still select explicit machines.
+
 Run `tools/rate_matrix.sh tmp/rate-current` for
 the current default, or `tools/rate_matrix.sh tmp/rate-reference --substeps 12`
 for a fresh N=12 reference. Retain existing evidence under its original prefix.

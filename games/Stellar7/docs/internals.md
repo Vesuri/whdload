@@ -9,8 +9,10 @@ at runtime. Movement, input quanta and game clocks scale with N, retaining
 real-time game speed. History assigns controls to their tick; native menus stay live.
 
 The displayed-buffer reuse correction is enabled in both playable source paths.
-Build, matrix, extended-combat, input, delayed-draw and lifecycle checks pass.
-Both actual-launcher smoke checks also pass.
+The step 7 matrix, extended-combat, input, delayed-draw, lifecycle, buffer and
+build checks pass on the three validation machines ("Three-machine baseline").
+Step 6 raises A500 presentations by 10–17% there. The actual-launcher smoke
+checks passed on the earlier configurations.
 Fast-CPU timing diagnostics and extended-combat checks pass within the scopes below;
 the corrected selected-rate matrix and its 350 state comparisons pass. Broader encounters and physical-control
 playtesting remain open. The normal loader still omits this experimental conversion.
@@ -819,8 +821,8 @@ references at all three checkpoints, and the frames render normally.
 All six combined and twin checkpoints match the native-sound, polygon-wrapper
 references in mapped state. `BLIT_IRQ_IDLE=0 SOUND_FAST=0` rebuilds the step 5
 68000 slave byte for byte; the original and Sim60 slaves are unchanged. The
-traced windows hold too few frames to show a frame-rate change; step 7 measures
-it.
+traced windows hold too few frames to show a frame-rate change; the step 7
+matrix measures it ("Three-machine baseline").
 
 The frame interrupt runs the game's callback dispatcher $1c6e8 (about 2190
 cycles). That includes the slave's input sample `s60_history_sample` (1120
@@ -832,6 +834,104 @@ Evidence: `tmp/irq6/` (`validation.json`, each capture's `report.txt`,
 `interrupts.txt`, `twin.json`, `paula-compare.json`; runners `run_profiles.sh`,
 `run_twin.sh`, `run_fast.sh`), `tmp/blit/` (`BLIT_IRQ_IDLE` only) and
 `tmp/combo/` (retained build: twins, profiles, `blit.json`, `validation.json`).
+
+## Three-machine baseline
+
+Step 7 reran the selected-rate matrix, extended combat and the release checks on
+`a500-1.5m`, `a1200-fast` and `a1200-060` (NTSC) with the step 6 source. Every
+capture also passes `rate_matrix_report.py`'s accepted-settings check.
+
+Selected-rate matrix, 30 cells, all passing `rate_matrix_report.py`
+(updates/s, presentations/s; pending growth in the window):
+
+| Route | `a500-1.5m` 15 Hz | `a1200-fast` 60 Hz | `a1200-060` 60 Hz |
+|---|---|---|---|
+| SOL | 15.20, 4.46, −3 | 60.61, 8.62, −9 | 60.07, 22.09, −1 |
+| Type-10 early | 15.03, 5.41, 0 | 59.90, 9.09, +1 | 60.00, 29.20, 0 |
+| Type-10 late | 15.14, 4.57, −2 | 60.27, 8.91, −4 | 60.07, 29.43, −1 |
+| Boss | 15.36, 2.66, −4 | 59.60, 5.76, +4 | 60.10, 18.43, −1 |
+| Heavy (80 s) | 15.00, 4.66, 0 | 60.05, 9.00, −4 | 60.00, 28.60, 0 |
+
+Native presentations/s at frames 90 and 240 and in type-10 early, late and boss
+combat are 5.0, 3.9, 4.4, 4.1 and 1.8 on `a500-1.5m`; 12.0, 7.9, 10.0, 9.5 and
+5.8 on `a1200-fast`; 30.0, 20.6, 30.0, 24.7 and 19.1 on `a1200-060`. The
+`a1200-fast` boss window's +4 matches step 5 on the same machine (pending 3 to 8,
+5.75 presentations/s). Sim60 is unchanged by step 6.
+
+### A500 gain from step 6
+
+A matched control on `a500-1.5m`, the same matrix with
+`--define BLIT_IRQ_IDLE=0 --define SOUND_FAST=0` (the step 5 68000 code),
+separates the step 6 gain from the machine change:
+
+| Route | Step 6 off | Step 6 on | Gain |
+|---|---:|---:|---:|
+| SOL | 4.02 | 4.46 | +11.0% |
+| Type-10 early | 4.69 | 5.41 | +15.3% |
+| Type-10 late | 3.92 | 4.57 | +16.7% |
+| Boss | 2.42 | 2.66 | +10.2% |
+| Heavy | 4.04 | 4.66 | +15.5% |
+
+All 25 paired boundaries match in mapped state, and both arms hold 15
+updates/s. The control equals the step 5 A500 figures (4.02 SOL, 4.03 heavy),
+so the earlier explicit A500 and `a500-1.5m` measure alike. The presentation gain
+exceeds the 4–7% of cycles freed. Drawing keeps the same fixed costs, so the
+freed cycles all go to it, and they are a larger share of drawing time than
+of all cycles.
+
+At N=4 (20 Hz, `SIM68000_SUBSTEPS=4`) the A500 keeps 20 updates/s, but
+presentations fall to 4.74, 4.54, 3.46, 2.56 and 4.07; only SOL improves. Heavy
+combat gains 3 pending updates, with 5–6 in its last segments against 0–3 at
+N=3. 15 Hz remains the 68000 rate.
+
+### Extended combat
+
+`sustained_combat.py` reaches natural death on all three machines with no
+accumulating pending trend:
+
+| Setup | Active s | Updates/s | Presentations/s | Pending samples |
+|---|---:|---:|---:|---|
+| `a500-1.5m` | 114.1 | 14.987 | 4.54 | 0–4 |
+| `a1200-fast` | 143.6 | 59.993 | 8.83 | 1–8 |
+| `a1200-060` | 143.6 | 59.993 | 28.17 | 0–2 |
+
+The A500 run covers the same 114.1 s as step 5's (3.93 presentations/s then).
+
+### Release checks
+
+`tools/baseline_checks.py` (development, "Validation machines") ran:
+
+- **Input:** the HISTORY_TEST and HISTORY_QUEUE_TEST fixtures pass on all three
+  machines: 200 ticks, 8 control edges, 96 native key-queue assertions each.
+  `a1200-fast` and `a1200-060` match at ticks 200 and 220, differing only in
+  deferred projection scratch.
+- **Delayed draw:** 38 comparisons, all matching. SLOW_DRAW=20 on `a1200-fast`
+  at N=3 (SOL, boss, heavy) matches the `a500-1.5m` matrix cells, and at N=12
+  (heavy) the `a1200-fast` cell. Input history is complete in every capture.
+- **Lifecycle:** death with Continue, declining Continue, normal and early level
+  exit pass at N=3 (`a500-1.5m` against delayed `a1200-fast`) and N=12
+  (`a1200-060` against delayed `a1200-fast`): 16 endpoint comparisons. Both
+  CUSTOM1-off checks find no unexpected byte (151969 checked).
+- **Builds, against `52e52251`:**
+  - The original (`418f86e4…`) and Sim60 (`591be19f…`) slaves are byte-identical.
+  - The 68000 slave (`aacb8c97…`) with the step 6 off switches rebuilds
+    `9ecb5e81…`.
+  - Release builds with the VERIFY-only fixture defines are byte-identical and
+    carry no VERIFY marker.
+  - The hook audits pass, and N=4 builds a distinct slave.
+- **Buffer reuse on `a1200-060`:** the release build shows no changed displayed
+  word, in warp mode (50 fields) or at normal speed (100 fields, warp off
+  verified from the running command). Draws start only after the presentation
+  field (16 of 16). The `BUFFER_REUSE=0` control is clean too, so on this
+  machine (not cycle-exact, data cache on) the step 5 hazard does not reproduce.
+  The check shows stability, not that the guard is needed.
+
+Flicker was reported while watching these warp-mode capture windows, in a
+full-screen ship explosion and in-game on `a1200-060`. None of the traced
+windows above shows it; it is open-work step 8, item 8.
+
+Evidence: `tmp/three/main` (matrix, `main-report.txt`), `control`, `n4`,
+`sustained` and `checks/{input,delayed,lifecycle,buffers,buffers_normal,builds}/validation.json`.
 
 ## Rendering cost and presentation
 

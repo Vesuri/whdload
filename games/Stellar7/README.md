@@ -17,8 +17,10 @@ starting another draw, while simulation continues. Its fresh performance matrix,
 extended-combat, input, lifecycle and both launcher checks pass. Step 5 is
 complete. Step 6 cut A500 interrupt time: the 68000 build masks Kickstart's unused
 blitter-finished interrupt and runs an exact faster pass of the music driver's channel
-update, freeing 4–7% of the A500's cycles in gameplay. Remaining, in order (`docs/open-work.md`): a fresh baseline on the three
-validation machines, encounter coverage, final build checks, playtesting and the release.
+update, freeing 4–7% of the A500's cycles in gameplay; the step 7 baseline on the three
+validation machines measures 10–17% more A500 presentations from it, and its
+regression checks pass. Remaining, in order (`docs/open-work.md`): encounter
+coverage, final build checks, playtesting and the release.
 
 Launch the separate experimental build from this directory:
 
