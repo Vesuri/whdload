@@ -1,0 +1,15 @@
+{
+  "archives": [
+    {
+      "input": "PrinceOfPersia.lha",
+      "output": "PrinceOfPersiaEnhanced-{version}-{date}.lha",
+      "replace": {
+        "PrinceOfPersiaInstall/PrinceOfPersia.slave": "build:PrinceOfPersia",
+        "PrinceOfPersiaInstall/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "PrinceOfPersiaInstall/source", "variants": ["PrinceOfPersia"]}
+    }
+  ]
+}
