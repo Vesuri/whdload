@@ -155,7 +155,9 @@ fi
 mode_args=()
 [ -z "${JOY0_MODE:-}" ] || mode_args+=(--joystick_port_0_mode="$JOY0_MODE")
 [ -z "${JOY1_MODE:-}" ] || mode_args+=(--joystick_port_1_mode="$JOY1_MODE")
-export FSUAE_TITLE="${FSUAE_TITLE:-${TITLE:-$GAME}${INSTANCE:+ ($INSTANCE)} · {machine} · port $DEBUG_PORT}"
+# Built outside ${FSUAE_TITLE:-...}: the "}" of {machine} would end that expansion early.
+title="${TITLE:-$GAME}${INSTANCE:+ ($INSTANCE)} · {machine} · port $DEBUG_PORT"
+export FSUAE_TITLE="${FSUAE_TITLE:-$title}"
 
 fsuae_options
 fsuae_launch --hard_drive_0="$DH0" --hard_drive_0_priority=10 --hard_drive_1="$DH1" \
