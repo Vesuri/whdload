@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Capture a fixed SOL gameplay window with the VERIFY/CUSTOM5 menu fixture.
 Usage: tools/fixed_window.py tmp/prof/base [--fields 100] [--frame 90] [--swaps-only]
-CPU, CHIP_KB, FAST_KB, SLOW_KB, EXTRA_ARGS, AMIGA_MODEL and KICKSTART remain overridable.
+The machine is SETUP (an AmigaXDev named setup, default game.conf's); explicit CPU,
+CHIP_KB, FAST_KB, SLOW_KB, AMIGA_MODEL and KICKSTART without SETUP select SETUP=custom.
 """
 import argparse, os, socket, subprocess, sys, time, struct, json, re
 from pathlib import Path
 from stellar7 import SOCK
+import machines
 from stellar7_report import loaded_game_regions
 
 p=argparse.ArgumentParser(description=__doc__)
@@ -78,9 +80,23 @@ ntsc_mode = int(env.get('NTSC', '1'))
 if ntsc_mode not in (0, 1):
     raise ValueError('NTSC must be 0 or 1')
 field_hz = 60 if ntsc_mode else 50
-fast=int(env.get('FAST_KB','0')); chip=int(env.get('CHIP_KB','512'))
-slow_match = re.search(r'--slow_memory=(\d+)', env.get('EXTRA_ARGS', ''))
-slow = int(slow_match[1]) if slow_match else int(env.get('SLOW_KB', '1536'))
+setup = machines.effective(env)
+if setup:
+    if any(env.get(key) for key in machines.SELECTORS):
+        p.error('give either SETUP or explicit machine variables, not both')
+    for key in machines.SETTINGS:
+        env.pop(key, None)
+    machine = machines.resolve(setup, ntsc_mode)
+    cpu, chip, fast, slow = machine['cpu'], machine['chip_kb'], machine['fast_kb'], machine['slow_kb']
+    setup_args = machine['args']
+else:
+    cpu = env.get('CPU','68000')
+    fast=int(env.get('FAST_KB','0')); chip=int(env.get('CHIP_KB','512'))
+    slow_match = re.search(r'--slow_memory=(\d+)', env.get('EXTRA_ARGS', ''))
+    slow = int(slow_match[1]) if slow_match else int(env.get('SLOW_KB', '1536'))
+    setup_args = []
+env['SETUP'] = setup or 'custom'
+env.pop('AMIGA_SETUP', None)
 base = 0x200000 if fast else 0xc00000 if slow else 0
 size = (fast or slow or chip)*1024
 log=(out/'serve.log').open('w')
@@ -152,7 +168,7 @@ try:
         raise RuntimeError(f'Requested {field_hz} Hz display but Exec reports {observed_hz}; verify scan timing before reporting FPS')
     legacy_count=struct.unpack_from('>H',mem,data-base+0x1e96)[0]
     (out/'anchor.txt').write_text(reply+f'\nframe={legacy_count}\ntick={a.tick}\ncode={h:#x}\ndata={data:#x}\nbase={base:#x}\n')
-    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=struct.unpack_from('>H',mem,data-base+0x1e96)[0],tick=a.tick,level_filter=a.level,session_filter=a.session,fields=a.fields,cpu=env.get('CPU','68000'),chip_kb=chip,fast_kb=fast,slow_kb=slow,extra_args=env.get('EXTRA_ARGS',''),whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS',''),ntsc_mode=ntsc_mode,field_hz=field_hz,observed_exec_hz=observed_hz),indent=2)+'\n')
+    (out/'metadata.json').write_text(json.dumps(dict(code_base=h,data_base=data,base=base,frame=struct.unpack_from('>H',mem,data-base+0x1e96)[0],tick=a.tick,level_filter=a.level,session_filter=a.session,fields=a.fields,setup=env['SETUP'],setup_args=setup_args,cpu=cpu,chip_kb=chip,fast_kb=fast,slow_kb=slow,extra_args=env.get('EXTRA_ARGS',''),whd_args=env['WHD_ARGS'],verify_flags=env.get('VERIFY_FLAGS',''),ntsc_mode=ntsc_mode,field_hz=field_hz,observed_exec_hz=observed_hz),indent=2)+'\n')
     (out/'state.bin').write_bytes(mem[data-base:data-base+0x823c])
     if a.retain_command:
         pid=int((RUN/'fsuae.pid').read_text().strip())

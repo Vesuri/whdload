@@ -18,18 +18,10 @@ import sys
 import simulation_rate
 import simulation_latency
 import native_scene_state
+import machines
 
 ROOT = Path(__file__).resolve().parent.parent
-MACHINES = {
-    'a500': ('68000', 'A500', 512, 0, 1536, None, 1),
-    'a1200-stock': ('68EC020', 'A1200', 2048, 0, 0, None, 1),
-    'a1200-fast': ('68EC020', 'A1200', 2048, 4096, 0, None, 1),
-    '030-50': ('68030', 'A1200', 2048, 4096, 0, 50000000, 1),
-    '040-25': ('68040-NOMMU', 'A1200', 2048, 4096, 0, 25000000, 1),
-    '060-50': ('68060-NOMMU', 'A1200', 2048, 4096, 0, 50000000, 1),
-    'a500-pal': ('68000', 'A500', 512, 0, 1536, None, 0),
-    '060-50-pal': ('68060-NOMMU', 'A1200', 2048, 4096, 0, 50000000, 0),
-}
+MACHINES = machines.MACHINES
 ROUTES = {
     'sol': (600, 1500, ''),
     'type10-early': (1800, 2400, '-DLEVEL_TEST=200 -DLEVEL_LAST=6 -DAPPROACH_TYPE=10'),
@@ -88,17 +80,11 @@ def run(args):
         results = {}
         try:
             for machine in args.machines:
-                cpu, model, chip, fast, slow, frequency, ntsc = MACHINES[machine]
+                spec = machines.resolve(machine)
+                cpu = spec['cpu']
                 if getattr(args, 'selected_rates', False):
                     substeps = 3 if cpu == '68000' else 12
-                extra = ('--uae_cpu_speed=real --uae_cpu_multiplier=0'
-                         f' --uae_cpu_frequency={frequency} --uae_cpu_cycle_exact=true'
-                         if frequency else '')
-                env = dict(os.environ, CPU=cpu, AMIGA_MODEL=model, CHIP_KB=str(chip),
-                           FAST_KB=str(fast), SLOW_KB=str(slow), EXTRA_ARGS=extra,
-                           NTSC=str(ntsc))
-                if model == 'A1200':
-                    env['KICKSTART'] = os.environ['KICKSTART_A1200']
+                env = machines.env(machine)
                 for route in args.routes:
                     start, end, fixture, checkpoints = route_window(route, substeps)
                     native = route.startswith('native-')
@@ -117,8 +103,9 @@ def run(args):
                     env['VERIFY_FLAGS'] = flags
                     env['WHD_ARGS'] = ('CUSTOM3=1' if route in NATIVE_COMBAT_ROUTES else '') if native else 'CUSTOM1=1 CUSTOM3=1'
                     config = dict(machine=machine, route=route, source_id=source_id,
-                                  cpu=cpu, model=model, chip_kb=chip, fast_kb=fast,
-                                  slow_kb=slow, extra_args=extra, ntsc_mode=ntsc,
+                                  setup_args=spec['args'], cpu=cpu, model=spec['model'],
+                                  chip_kb=spec['chip_kb'], fast_kb=spec['fast_kb'],
+                                  slow_kb=spec['slow_kb'], ntsc_mode=spec['ntsc_mode'],
                                   substeps=substeps, start=start, end=end, checkpoints=checkpoints, flags=flags,
                                   whd_args=env['WHD_ARGS'])
                     report_path = prefix/(name+'.json')

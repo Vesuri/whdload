@@ -38,6 +38,28 @@ class RuntimeSettings(unittest.TestCase):
             with self.subTest(override=override),self.assertRaises(AssertionError):
                 self.check(override=override)
 
+    def named(self, override=None):
+        meta=dict(cpu='68060',chip_kb=2048,fast_kb=8192,slow_kb=0,ntsc_mode=1,
+                  observed_exec_hz=60,extra_args='',
+                  setup_args=['--cpu=68060','--uae_mmu_model=68060','--uae_cpu_speed=real',
+                              '--uae_cpu_frequency=50000000','--uae_cpu_data_cache=true',
+                              '--uae_cpu_cycle_exact=false','--uae_chipset=aga'])
+        options=dict(cpu_model='68060',cpu_speed='real',chipmem_size='4',fastmem_size='8',
+                     bogomem_size='0',mmu_model='68060',cpu_frequency='50000000',
+                     cpu_data_cache='true',cpu_cycle_exact='false',ntsc='true')
+        options.update(override or {})
+        scratch=Path(__file__).resolve().parent.parent/'tmp';scratch.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch) as path:
+            folder=Path(path)
+            (folder/'emulator-settings.log').write_text(''.join(f'[UAE] [000] Set option {k} = "{v}"\n' for k,v in options.items()))
+            return settings(folder,meta)
+
+    def test_named_setup_launch_arguments(self):
+        self.assertEqual(self.named()['cpu_data_cache'],'true')
+        for override in ({'cpu_data_cache':'false'},{'mmu_model':'0'},{'cpu_cycle_exact':'true'}):
+            with self.subTest(override=override),self.assertRaises(AssertionError):
+                self.named(override)
+
     def test_conflicting_effective_configuration_rejected(self):
         with self.assertRaises(AssertionError):self.check(effective={'cpu_model':'68040'})
 

@@ -29,6 +29,8 @@ def settings(folder, meta):
     # PAL is the default; corroborate it with the observed Exec clock.
     if 'ntsc' not in options and meta['ntsc_mode']==0 and meta['observed_exec_hz']==50:
         options['ntsc']='false'
+    # Named setups record their launch arguments; custom captures their EXTRA_ARGS.
+    launch=meta.get('setup_args') or meta['extra_args'].split()
     expected=dict(cpu_model=meta['cpu'].replace('68EC020','68020').replace('-NOMMU',''),
                   cpu_speed='real',cpu_cycle_exact='true',
                   chipmem_size=str(meta['chip_kb']//512),
@@ -36,7 +38,8 @@ def settings(folder, meta):
                   fastmem_size=str(meta['fast_kb']//1024),
                   ntsc='true' if meta['ntsc_mode'] else 'false')
     if 'NOMMU' in meta['cpu']:expected['mmu_model']='0'
-    for option,value in re.findall(r'--uae_(\w+)=([^ ]+)',meta['extra_args']):
+    for option,value in (re.fullmatch(r'--uae_(\w+)=(\S+)',arg).groups() for arg in launch
+                         if re.fullmatch(r'--uae_(cpu_(?:cycle_exact|frequency|speed|data_cache)|mmu_model)=\S+',arg)):
         expected[option]=value
     for key,value in expected.items():
         assert options.get(key)==value,(str(folder),key,options.get(key),value)
@@ -48,6 +51,9 @@ def settings(folder, meta):
             # UAE omits disabled MMU and may omit the multiplier. Explicit
             # fixed frequency, CPU model and timing options remain checked.
             if key=='mmu_model' and value=='0' and key not in values:continue
+            # Without cycle exactness UAE replaces the clock with cpu_multiplier
+            # (8 for a1200-060); the requested frequency is checked in the log.
+            if key=='cpu_frequency' and expected.get('cpu_cycle_exact')=='false' and key not in values:continue
             if key=='cpu_multiplier' and key not in values:continue
             assert values.get(key)==value,(str(folder),'effective',key,values.get(key),value)
     return {key:options.get(key) for key in (*expected,'blitter_cycle_exact','waiting_blits','immediate_blits')}
@@ -73,7 +79,7 @@ def inspect(prefix, partial=False, routes=None):
             assert binary == (prefix/(name+'.slave')).read_bytes()
             meta = json.loads((folder/'metadata.json').read_text())
             settings(folder,meta)
-            for key in ('cpu','chip_kb','fast_kb','slow_kb','ntsc_mode','extra_args'):
+            for key in ('setup_args','cpu','chip_kb','fast_kb','slow_kb','ntsc_mode'):
                 assert meta[key] == config[key], (name,key)
             assert meta['whd_args'].split().count('CUSTOM5=1') == 1
             assert meta['whd_args'].strip() == ('CUSTOM5=1 '+config['whd_args']).strip()

@@ -18,6 +18,7 @@ import input_history_state
 import rate_matrix
 import sim60_state
 import simulation_rate
+import machines as setups
 ROOT=Path(__file__).resolve().parent.parent
 
 
@@ -29,7 +30,7 @@ def run(prefix,machines,end):
         fcntl.flock(lock,fcntl.LOCK_EX)
         try:
             for machine in machines:
-                cpu,model,chip,fast,slow,hz,ntsc=rate_matrix.MACHINES[machine]
+                cpu=setups.resolve(machine)['cpu']
                 n=3 if cpu=='68000' else 12
                 scale=lambda tick:(tick*n+11)//12
                 folder=prefix/machine;listing=prefix/(machine+'.lst');report=prefix/(machine+'.json')
@@ -37,8 +38,7 @@ def run(prefix,machines,end):
                 flags=f'-DSIM60=1 -DS60_SUBSTEPS={n} -DLEVEL_TEST={scale(201)-1} -DLEVEL_LAST=6 -DAPPROACH_TYPE=10'
                 if n==3:flags+=' -DPOLYGON_BLIT_IRQ=1'
                 flags+=' -L '+os.path.relpath(listing,ROOT)
-                env=dict(os.environ,CPU=cpu,AMIGA_MODEL=model,CHIP_KB=str(chip),FAST_KB=str(fast),SLOW_KB=str(slow),NTSC=str(ntsc),EXTRA_ARGS=(f'--uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency={hz} --uae_cpu_cycle_exact=true' if hz else ''),WHD_ARGS='CUSTOM1=1 CUSTOM3=1',VERIFY_FLAGS=flags)
-                if model=='A1200':env['KICKSTART']=os.environ['KICKSTART_A1200']
+                env=dict(setups.env(machine),WHD_ARGS='CUSTOM1=1 CUSTOM3=1',VERIFY_FLAGS=flags)
                 points=[scale(t) for t in range(900,end+1,300)]
                 command=[sys.executable,'tools/fixed_window.py',os.path.relpath(folder,ROOT),'--tick',str(scale(600)),'--tick-checkpoints',*map(str,points),'--level','6','--state-only','--fields','1','--stop-on-inactive']
                 print('Extended combat '+machine,flush=True)
