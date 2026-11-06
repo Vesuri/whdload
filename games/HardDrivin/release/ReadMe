@@ -9,17 +9,17 @@
  PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
  This install applies to "Hard Drivin'" (c) 1989/1990 Tengen/Atari/Domark.
- Hard Drivin' Enhanced 4.0b (04.11.2026)
+ Hard Drivin' Enhanced 4.0b (06.11.2026)
 
  Requirements:
  -------------
  An original copy of the game and WHDLoad version 17.0 or later are required.
  WHDLoad must be accessible in the command path.
 
- The installed program requires 0.5 MB ChipMem and 1.0 MB OtherMem.
- Additional memory is needed to preload the game files. PRELOAD is recommended
- to avoid repeated disk access. An A1200 with Fast RAM is recommended for
- enhanced gameplay.
+ The installed program requires 0.5 MB ChipMem and 1.0 MB OtherMem, so an
+ Amiga with only 1 MB in total is not enough. Additional memory is needed to
+ preload the game files. PRELOAD is recommended to avoid repeated disk
+ access. An A1200 with Fast RAM is recommended for enhanced gameplay.
 
  The game requires an A500 Kickstart 1.3 image named "kick34005.A500" in
  "Devs:Kickstarts", together with "kick34005.A500.RTB". The image can be
@@ -76,7 +76,7 @@
        As Enhanced framerate, with the car driving like the arcade
        machine's. This is the default for newly installed icons.
  Command-line launches must specify CUSTOM1=1 or CUSTOM1=2 to enable the
- enhanced simulations.
+ enhanced simulations, and CUSTOM5=1 for arcade race timing.
 
  Enhanced framerate:
  Movement, physics, traffic and replay timing use elapsed time. On 68020 and
@@ -126,21 +126,21 @@
 
  Race timing (CUSTOM5), with any Simulation setting:
    Amiga (0)   The game's own clocks.
-   Arcade (1)  The arcade's race timing: the countdown runs in real time,
-               checkpoint time limits follow the arcade (doubled unless arcade
-               handling is selected, as the other settings cross the course
-               at half speed), the difficulty in the options menu selects the
+   Arcade (1)  The arcade's race timing, the default for newly installed
+               icons: the countdown runs in real time, checkpoint time
+               limits follow the arcade (doubled unless arcade handling is
+               selected, as the other settings cross the course at half
+               speed), the difficulty in the options menu selects the
                arcade's matching difficulty, and the championship lap needs
                the arcade's qualifying time, shown on the dashboard from the
                start.
 
- This is a beta with limited human playtesting. Enhancements can add
- overhead on an A500, and arcade handling adds more; they are not a promise
- of higher frame rates on every setup.
+ Enhancements can add overhead on an A500, and arcade handling adds more;
+ they are not a promise of higher frame rates on every setup.
 
  History:
  --------
- version 4.0b (04.11.2026) done by Vesa Halttunen:
+ version 4.0b (06.11.2026) done by Vesa Halttunen:
  - added a Simulation option for the SPS 0126 edition: Original, Enhanced
    framerate, or Enhanced framerate with arcade handling, the default for
    new installs
@@ -221,13 +221,14 @@
 
  Contact:
  --------
- If you have problems, first check for a newer version of the install.
- Report problems through the WHDLoad Bug-Report-Form or its issue tracker:
-   http://www.whdload.de/
-   http://mantis.whdload.de/
- Include your game edition, Amiga configuration and selected tooltypes.
+ Version 4.0b is not maintained by the WHDLoad team: please do not report
+ its problems through the WHDLoad Bug-Report-Form. Report them as an issue
+ at https://github.com/Vesuri/whdload/issues or to Vesuri
+ <vesuri@jormas.com>. Include your game edition, Amiga configuration (CPU,
+ memory, Kickstart), WHDLoad version and tooltypes. Updates and the source
+ code are at https://github.com/Vesuri/whdload.
 
  For WHDLoad, other installs and updates, see the WHDLoad website or
  Aminet's dev/misc/whdload#? and game/patch/ directories.
 
- $VER: Hard Drivin' ReadMe 4.0b (04.11.2026)
+ $VER: Hard Drivin' ReadMe 4.0b (06.11.2026)
