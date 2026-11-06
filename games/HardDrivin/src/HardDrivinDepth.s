@@ -9,8 +9,6 @@
 ; background and type-57 passes before the road are unchanged. A car more than
 ; 5 units under the ground ($FE40: in the stunt road's dip) was drawn before
 ; the road, which then covered it; it is drawn by depth with the other cars.
-; A car beyond both roads' last strip points is not drawn: the road ends there
-; on the screen, and the car stood on the grass beyond it.
 DEPTH_MAX equ 255		; sections of both roads (each count is a byte)
 DEPTH_REC equ 12		; far depth.w, colour.w, polygon.l, marking.l
 
@@ -36,8 +34,6 @@ _depth_collect:
 	movem.l d2-d7/a2-a3/a6,-(sp)
 	lea _depth_recs(pc),a6
 	moveq #0,d7			; records
-	lea _depth_extent(pc),a1
-	move.w #-$8000,(a1)
 	lea _occ_nsolid(pc),a1
 	clr.w (a1)
 	lea _occ_nroad(pc),a1
@@ -134,30 +130,6 @@ _depth_collect:
 .next:
 	cmp.w d5,d4
 	blt .section
-	; the road's extent: the farther end of its strip (it starts or ends
-	; at the camera). A0 (the next road's polygons) is kept.
-	cmpi.w #1,d5
-	ble.s .extent_done
-	lea _depth_extent(pc),a1
-	move.w 4(a3),d1
-	cmp.w 10(a3),d1
-	bge.s .e1
-	move.w 10(a3),d1
-.e1:	cmp.w (a1),d1
-	ble.s .e2
-	move.w d1,(a1)
-.e2:	move.w d5,d1
-	subq.w #1,d1
-	mulu.w #12,d1
-	neg.l d1
-	move.w 4(a3,d1.l),d2
-	cmp.w 10(a3,d1.l),d2
-	bge.s .e3
-	move.w 10(a3,d1.l),d2
-.e3:	cmp.w (a1),d2
-	ble.s .extent_done
-	move.w d2,(a1)
-.extent_done:
 	; the strip runs along the road, near to far or far to near: reverse it
 	; to far to near, so the sort below has little to move
 	move.w d7,d4
@@ -255,19 +227,7 @@ _depth_object:
 	sub.w d1,d0			; the list's depth was its far side
 .near:
 	sub.w d1,d0
-	move.w d0,-(sp)
 	bsr.s _depth_flush
-	move.w (sp)+,d2
-	cmpi.b #8,28(a2)
-	bne.s .solid
-	cmp.w _depth_extent(pc),d2	; a car beyond the road's end
-	ble.s .car
-	lea _depth_none(pc),a0
-	bra.s .call
-.car:
-	lea _occ_car(pc),a0		; drawn, then the faces in front of it
-	bra.s .call
-.solid:
 	lea OCC_FACES(a4),a0		; faces with planes ($F792): kept
 	cmpa.l 36(a2),a0
 	bne.s .other
@@ -288,8 +248,6 @@ _depth_object:
 	movea.l (sp),a1
 	move.l a2,(sp)
 	jmp (a1)
-_depth_none:
-	rts
 
 ; Replaces MOVEM.L (SP)+,D4-D5/A2-A3; UNLK A5; RTS of $FDD4.
 _depth_tail:
@@ -833,6 +791,5 @@ _occ_cars: ds.b OCC_CARS*OCC_CAR
 
 _depth_count: dc.w 0
 _depth_next: dc.w 0
-_depth_extent: dc.w 0		; the farther end of the roads' strips
 _depth_recs: ds.b DEPTH_MAX*DEPTH_REC
 	even
