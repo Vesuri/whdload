@@ -1,3 +1,38 @@
+# The tyre and off-road sounds, the landing's pitch (2026-11-06)
+
+The user's drive (recording 13.46.48): the tyre screech is nearly always a slow howl and now
+and then much higher, the off-road sound is weak, and on a landing (0:32) the car's pitch
+turns to the ground's in one frame where the replay (0:46) turns it over several.
+
+**Sounds.** The effects are native events through `$8AE` (table at `$A0C`), each a channel,
+a sample (G entries of 10 bytes: length in words at +2, pointer at +6), a volume and a
+Paula period, which the channel service (`$2F8`-`$3D4`) writes to AUDxLC/LEN/PER/VOL:
+- event 4, the screech (`$950`): channel 3, period 1100 (3.2 kHz), volume 30, a 5,598-byte
+  sample (1.7 s). Live (`$B624`, arcade handling `_audio_skid`) and replay (`$10C24`) both
+  use it, so every screech is at 1100.
+- event 7 (`$9A4`): channel 3, period 500 (7.1 kHz), volume 25, a 4,158-byte sample: the
+  pitch-correction and landing contacts (`$CD52`, `$CC84`, `$BD02`, `$BDE2`). Likely the
+  higher sound the user hears.
+- event 8, off the road (`$9BE`, from `$B166`): channel 2, period 700 (5.1 kHz), volume 64,
+  a 10,706-byte sample (2.1 s).
+The samples at their own and faster periods are in ignored `tmp/sfx/` (dumped from chip RAM
+in a race) for the user to choose. A period is one word in each event's code (`$952`, `$9C0`).
+
+**Landing pitch, postponed.** The native contact pass (`$CAB6`) and the springs' first
+ground pass (`_suspension_touch`, CUSTOM1=2) put the car on the ground's pitch at once; the
+replay interpolates its records. Two attempts were reverted:
+- keeping the body's pitch against the ground at the touchdown, eased out an eighth a field
+  (or the springs displaced within their travel): the pitch is level in about 0.7 s, but on
+  the A500 `lap-stunt` the first jump landed at 43 MPH from 58 (the native snap kept 61)
+  and the run then crashed short of the big jump;
+- easing only the camera's pitch (`$D9D8` G($994C) to G($9946), `$B376` taking it back at
+  the pass's start): the camera's pose is the physics' frame too (the road's camera-space
+  strip is searched for the car's section, `$DD84`, and the contact's geometry follows), so
+  a one-word offset at a lip gave the car a nose-up rate of 5 words a pass in the air and
+  it turned over (`lap-stunt` on the A4000/040).
+A smooth landing needs the renderer's matrices apart from the physics', or the springs'
+landing tuned so the speed is kept.
+
 # The car in replays on grass, the draw distance postponed (2026-11-06)
 
 **Replays.** The user's drive of 480502d2 (recording 12.37.56, 0:55-0:57 and 1:43-1:54): in
