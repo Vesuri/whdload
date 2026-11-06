@@ -28,6 +28,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Road Rash Enhanced | JOTD | [3.0b (22.10.2026)](https://github.com/Vesuri/whdload/releases/tag/RoadRashEnhanced-3.0b-20261022) |
 | Stellar 7 Enhanced | Psygore | not yet released |
 | Test Drive Enhanced | JOTD | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TestDriveEnhanced-2.0b-20261013) |
+| Test Drive II Enhanced | JOTD | released upstream as JOTD's 2.1 (11.10.2026) |
 | Their Finest Hour Enhanced | Psygore | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TheirFinestHourEnhanced-2.0b-20261013) |
 | Wing Commander Enhanced | Psygore | [2.0b (19.10.2026)](https://github.com/Vesuri/whdload/releases/tag/WingCommanderEnhanced-2.0b-20261019) |
 
