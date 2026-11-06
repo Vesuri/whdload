@@ -23,6 +23,10 @@ _render_install:
 	adda.l #_ct_ct1-_render_install,a1
 	tst.l (a1)
 	beq.s .rotation
+	lea _depth_mem(pc),a0		; its arrays, or the native order
+	move.l #DM_SIZE,d0
+	bsr _render_allocate
+	beq.s .rotation
 	lea _depth_patches(pc),a0
 	lea _render_install(pc),a1
 	adda.l #_code_start-_render_install,a1
@@ -30,6 +34,10 @@ _render_install:
 	jsr resload_Patch(a2)
 	move.l _render_attn(pc),d0	; and farther on a 68020 or later
 	btst #AFB_68020,d0
+	beq.s .rotation
+	lea _distance_mem(pc),a0
+	move.l #DIST_POOL,d0
+	bsr _render_allocate
 	beq.s .rotation
 	lea _distance_patches(pc),a0
 	lea _render_install(pc),a1
@@ -63,6 +71,21 @@ _render_install:
 .restore:
 	movem.l (sp)+,d0-d2/a0-a2/a6
 .done:
+	rts
+
+; A0 the pointer, D0 the size: allocated once (cleared); Z set when there is
+; none. D0-D1/A0-A1 are scratch.
+_render_allocate:
+	tst.l (a0)
+	bne.s .allocated
+	movem.l a0/a6,-(sp)
+	move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
+	movea.l 4.w,a6
+	jsr _LVOAllocMem(a6)
+	movem.l (sp)+,a0/a6
+	move.l d0,(a0)
+.allocated:
+	tst.l (a0)
 	rts
 
 	IFND HD_DEVELOPMENT

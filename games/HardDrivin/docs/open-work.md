@@ -22,12 +22,16 @@ is, and the road extended only ahead. Native limits:
 
 With CUSTOM1 nonzero on a 68020 or later (`_distance_patches`, AttnFlags): 17 and 11
 sections (4 more ahead), 6,000 units for the road and the objects, and the pool moved to
-16,000 bytes in the slave. The first build without the pool move faulted in
+an allocation of 16,000 bytes (`_distance_mem`). The user: no buffers in the slave, allocate
+them; the depth module's arrays (records, structure road sections, object centres, solids)
+are one allocation with CUSTOM1 nonzero (`_depth_mem`, 4.5 KB). Without either allocation
+its patches are not installed. The slave is 64,420 bytes. The first build without the pool move faulted in
 `_depth_collect` (`CoreDump`: the stream pointers overwritten with an object's rotated
 points). Checked on the A1200/040: the course road drive to field 680 and the stunt road
 drive to field 660 run without a fault, the road reaches over the rise past the barn and
-farther signs appear; the crash replay is unchanged. On the A500 the patched sites keep the
-native bytes (read from memory after boot). The cost on the faster CPUs is not measured.
+farther signs appear; the crash replay is unchanged. On the A500 (1.5 MB, in a race) the
+running code has the depth patches and the distance sites' native bytes; at the title the
+patches are not yet installed, and the loaded file's copy stays unpatched. The cost on the faster CPUs is not measured.
 
 # Cars and signs behind slopes, the car in replays (2026-11-06)
 

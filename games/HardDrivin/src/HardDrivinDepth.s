@@ -37,7 +37,7 @@ _depth_patches:
 ; ($E358 the background list, $E4DC the sorted one); now 6,000. The points
 ; of the road and the objects are kept in a pool from G(-$1688) up, 3,600
 ; bytes with nothing checking its end; with the larger square it ran into
-; the road's stream pointers above it, so it moves to the slave.
+; the road's stream pointers above it, so it moves to an allocation.
 DIST_POOL equ 16000
 _distance_patches:
 	PL_START
@@ -61,19 +61,18 @@ _distance_patches:
 	PL_END
 
 _distance_pool:
-	lea _distance_points(pc),a0
-	move.l a0,-$16ca(a4)
+	move.l _distance_mem(pc),-$16ca(a4)
 	rts
 _distance_road:
-	lea _distance_points(pc),a0
-	move.l a0,d5
+	move.l _distance_mem(pc),d5
+	movea.l d5,a0
 	rts
 
 ; Replaces JSR $FC1E; TST.W D5. Walks both roads' polygon streams as $FC1E
 ; does and records each drawn section; D5 and its flags are returned.
 _depth_collect:
 	movem.l d2-d7/a2-a3/a6,-(sp)
-	lea _depth_recs(pc),a6
+	movea.l _depth_mem(pc),a6	; DM_RECS
 	moveq #0,d7			; records
 	lea _occ_nsolid(pc),a1
 	clr.w (a1)
@@ -160,7 +159,7 @@ _depth_collect:
 	move.l (sp)+,(a6)+		; surface polygon, its count first
 	subq.l #2,-4(a6)
 	move.l d2,(a6)
-	lea _depth_recs(pc),a6
+	movea.l _depth_mem(pc),a6	; DM_RECS
 	addq.w #1,d7
 	bra.s .step
 .full:
@@ -206,7 +205,8 @@ _depth_collect:
 	bhs.s .s_full
 	addq.w #1,(a6)
 	mulu.w #OCC_ROAD,d2
-	lea _occ_roads(pc),a6
+	movea.l _depth_mem(pc),a6
+	lea DM_ROADS(a6),a6
 	adda.w d2,a6
 	move.w d0,(a6)+			; flags
 	move.l 8(sp),d2
@@ -225,7 +225,7 @@ _depth_collect:
 
 ; Insertion sort, far depth descending. Scratch D0-D4/A0-A3.
 _depth_sort:
-	lea _depth_recs(pc),a0
+	movea.l _depth_mem(pc),a0	; DM_RECS
 	move.w _depth_count(pc),d4
 	subq.w #1,d4
 	ble.s .done
@@ -276,8 +276,10 @@ _depth_object:
 	move.w (a0),d0
 	cmpi.w #OCC_SOLIDS,d0
 	bhs.s .draw
-	addq.w #1,(a0)+
+	addq.w #1,(a0)
 	lsl.w #2,d0
+	movea.l _depth_mem(pc),a0
+	lea DM_SOLIDS(a0),a0
 	move.l a2,(a0,d0.w)
 .draw:
 	movea.l 36(a2),a0
@@ -313,7 +315,7 @@ _depth_flush:
 	ble.s .done
 	move.w (a2),d0
 	mulu.w #DEPTH_REC,d0
-	lea _depth_recs(pc),a2
+	movea.l _depth_mem(pc),a2	; DM_RECS
 	adda.l d0,a2
 .loop:
 	cmp.w (a2),d5
@@ -382,8 +384,10 @@ _occ_centre:
 	move.w (a1),d0
 	cmpi.w #OCC_CARS,d0
 	bhs.s .done
-	addq.w #1,(a1)+
+	addq.w #1,(a1)
 	mulu.w #OCC_CAR,d0
+	movea.l _depth_mem(pc),a1
+	lea DM_CARS(a1),a1
 	adda.w d0,a1
 	move.l a0,(a1)+
 	move.w d5,(a1)+
@@ -411,8 +415,9 @@ _occ_car:
 	movea.l 32+4(sp),a2		; the car
 	tst.b 34(a2)			; clipped at the camera: near, left
 	bne .out
-	lea _occ_ncar(pc),a0
-	move.w (a0)+,d0
+	move.w _occ_ncar(pc),d0
+	movea.l _depth_mem(pc),a0
+	lea DM_CARS(a0),a0
 	bra.s .find_next
 .find:
 	cmpa.l (a0),a2
@@ -475,8 +480,9 @@ _occ_car:
 	lsl.l d1,d0
 	lea _occ_margin(pc),a0
 	move.l d0,(a0)
-	lea _occ_nsolid(pc),a3
-	move.w (a3)+,d4
+	move.w _occ_nsolid(pc),d4
+	movea.l _depth_mem(pc),a3
+	lea DM_SOLIDS(a3),a3
 	bra.s .solid_next
 .solid:
 	movea.l (a3)+,a2
@@ -630,7 +636,8 @@ _occ_road:
 	rts
 .any:
 	movem.l d3-d7/a2-a3/a5-a6,-(sp)
-	lea _occ_work(pc),a6
+	movea.l _depth_mem(pc),a6
+	lea DM_WORK(a6),a6
 	movem.w d5-d7,OW_C(a6)
 	move.w d0,OW_N(a6)
 	move.b 25(a2),d1
@@ -647,7 +654,8 @@ _occ_road:
 	cmpi.b #61,d1
 	bne .out
 .mask:
-	lea _occ_roads(pc),a3
+	movea.l _depth_mem(pc),a3
+	lea DM_ROADS(a3),a3
 	bra .next
 .section:
 	move.w (a3),d0
@@ -821,19 +829,21 @@ _occ_filled: dc.b 0
 	even
 _occ_radius: dc.w 0
 _occ_nroad: dc.w 0
-_occ_work: ds.w 10
-_occ_roads: ds.b OCC_ROADS*OCC_ROAD
 	even
 _occ_nsolid: dc.w 0
-_occ_solids: ds.l OCC_SOLIDS
 _occ_ncar: dc.w 0
-_occ_cars: ds.b OCC_CARS*OCC_CAR
 	even
 
-_distance_points: ds.b DIST_POOL
-	even
-
+; The arrays are allocated at install (_render_install): _depth_mem with
+; CUSTOM1 nonzero, _distance_mem (DIST_POOL bytes) on a 68020 or later.
+DM_RECS equ 0
+DM_ROADS equ DM_RECS+DEPTH_MAX*DEPTH_REC
+DM_CARS equ DM_ROADS+OCC_ROADS*OCC_ROAD
+DM_SOLIDS equ DM_CARS+OCC_CARS*OCC_CAR
+DM_WORK equ DM_SOLIDS+OCC_SOLIDS*4
+DM_SIZE equ DM_WORK+20
+_depth_mem: dc.l 0
+_distance_mem: dc.l 0
 _depth_count: dc.w 0
 _depth_next: dc.w 0
-_depth_recs: ds.b DEPTH_MAX*DEPTH_REC
 	even
