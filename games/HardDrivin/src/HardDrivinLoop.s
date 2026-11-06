@@ -1247,7 +1247,8 @@ ROAD_CROSS macro
 	endm
 _road_quad:
 	movem.l d6-d7/a1/a3,-(a7)
-	lea _road_points(pc),a3
+	movea.l _time_mem(pc),a3
+	lea TM_ROAD_POINTS(a3),a3
 	move.w -$670a(a4),d2		; X, Y, Z G($98F6..$98FA)
 	move.w -$6708(a4),d3
 	move.w -$6706(a4),d4
@@ -1268,7 +1269,8 @@ _road_quad:
 	dbf d1,.point
 	addq.l #8,a1
 	dbf d5,.row
-	lea _road_points(pc),a3		; LA 0, RA 6, LB 12, RB 18
+	movea.l _time_mem(pc),a3		; LA 0, RA 6, LB 12, RB 18
+	lea TM_ROAD_POINTS(a3),a3
 	lea _road_inside(pc),a1
 	st (a1)
 	; inside: between the end lines and between the edges, by the
@@ -1297,7 +1299,8 @@ _road_quad:
 	add.w d0,(a3)+
 	sub.w d0,4(a3)
 	dbf d5,.widen
-	lea _road_points(pc),a3
+	movea.l _time_mem(pc),a3
+	lea TM_ROAD_POINTS(a3),a3
 	ROAD_CROSS 0,12,d7		; LA x LB
 	ROAD_CROSS 6,18,d1		; RA x RB
 	eor.l d7,d1
@@ -1393,7 +1396,6 @@ _road_quad:
 	moveq #0,d1
 	movem.l (a7)+,d6-d7/a1/a3
 	rts
-_road_points: dcb.w 18,0		; LA, RA, LB, RB, u, v
 _road_inside: dc.b 0			; nonzero: between the edges
 	even
 ; D0 = angle: D0 within -720..720

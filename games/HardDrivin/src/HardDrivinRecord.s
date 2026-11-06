@@ -63,8 +63,6 @@ RR_FIRST equ 30
 RR_SIZE equ 32
 _record_signature: dc.b 'HDRECRD1'
 _record_state: dcb.b RR_SIZE,0
-_record_previous: dcb.b 158,0
-_record_current: dcb.b 158,0
 _record_reset:
 	movem.l d0/a1,-(a7)
 	; The native reset clears only XYZ, so finish old samples first to retain
@@ -96,9 +94,11 @@ _record_reset:
 	move.l d0,(a0)+
 	clr.l (a0)
 	lea _record_previous_ptr(pc),a0
-	lea _record_previous(pc),a1
+	movea.l _time_mem(pc),a1
+	lea TM_RECORD_PREVIOUS(a1),a1
 	move.l a1,(a0)+
-	lea _record_current(pc),a1
+	movea.l _time_mem(pc),a1
+	lea TM_RECORD_CURRENT(a1),a1
 	move.l a1,(a0)
 	movea.l (a7)+,a0
 	move.w (a7)+,d0
@@ -693,15 +693,19 @@ _record_wrap_test:
 	move.w #728,RR_FIELDS(a3)
 	st RR_NEW(a3)
 	lea _replay_math_left(pc),a0
-	lea _record_previous(pc),a1
+	movea.l _time_mem(pc),a1
+	lea TM_RECORD_PREVIOUS(a1),a1
 	bsr _record_copy
 	lea _replay_math_right(pc),a0
-	lea _record_current(pc),a1
+	movea.l _time_mem(pc),a1
+	lea TM_RECORD_CURRENT(a1),a1
 	bsr _record_copy
 	lea _record_previous_ptr(pc),a0
-	lea _record_previous(pc),a1
+	movea.l _time_mem(pc),a1
+	lea TM_RECORD_PREVIOUS(a1),a1
 	move.l a1,(a0)+
-	lea _record_current(pc),a1
+	movea.l _time_mem(pc),a1
+	lea TM_RECORD_CURRENT(a1),a1
 	move.l a1,(a0)
 	bsr _record_emit
 	lea _record_wrap_results(pc),a1

@@ -20,7 +20,7 @@
 	ENDC
 
 HANDLING_CAP equ 50		; steps a frame may catch up, 1 s
-HANDLING_RING equ 64		; mouse samples kept, a power of two
+HANDLING_RING equ 64		; mouse samples kept, a power of two (TM_HANDLING_*)
 HANDLING_V8_MAX equ 8138	; velocity eighths the model accepts, 145 MPH
 HANDLING_JUMP equ 78		; eighths per field (3.2 g): a faster change is a reset
 HANDLING_FX_BRAKE equ 4653	; front brake torque at full pedal, lb ft: the arcade's
@@ -313,10 +313,12 @@ _handling_vbl:
 	move.w TS_FIELDS+2(a0),d1
 	andi.w #HANDLING_RING-1,d1
 	bsr _handling_buttons
-	lea _handling_held(pc),a0
+	movea.l _time_mem(pc),a0
+	lea TM_HANDLING_HELD(a0),a0
 	move.b d0,(a0,d1.w)
 	add.w d1,d1
-	lea _handling_ring(pc),a0
+	movea.l _time_mem(pc),a0
+	lea TM_HANDLING_RING(a0),a0
 	move.w -$6a06(a4),(a0,d1.w)
 	movem.l (a7)+,d0-d1/a0
 	move.w (a7)+,ccr
@@ -642,10 +644,12 @@ _handling_steer:
 	bra.s .mouse
 .ring:
 	andi.w #HANDLING_RING-1,d0
-	lea _handling_held(pc),a1
+	movea.l _time_mem(pc),a1
+	lea TM_HANDLING_HELD(a1),a1
 	move.b (a1,d0.w),HS_HELD(a0)
 	add.w d0,d0
-	lea _handling_ring(pc),a1
+	movea.l _time_mem(pc),a1
+	lea TM_HANDLING_RING(a1),a1
 	move.w (a1,d0.w),d1
 .mouse:
 	subi.w #320,d1
@@ -2301,8 +2305,6 @@ _handling_circle:
 	dc.w 0
 _handling_signature: dc.b 'HDHAND01'
 _handling_state: dcb.b HS_SIZE,0
-_handling_ring: dcb.w HANDLING_RING,0
-_handling_held: dcb.b HANDLING_RING,0
 _handling_curve: dc.w 1		; the mouse steering curve, 0 for a test driver
 _handling_pad: dc.w 0		; buttons a test driver holds, as HS_HELD's bits
 _handling_gas: dc.w -1		; a test driver's gas pedal 0..100, or -1: the buttons

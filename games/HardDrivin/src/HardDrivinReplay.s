@@ -49,7 +49,6 @@ RP_EFFECT_TARGET equ 22
 RP_RNG1 equ 24
 RP_RNG2 equ 28
 _replay_state: dcb.b 32,0
-_replay_frame: dcb.b 158,0
 ; Separate publication keeps the playback state/scratch layout stable.
 _replay_overlay_last: dc.l 0
 _replay_audio_signature: dc.b 'HDRAUD01'
@@ -173,9 +172,11 @@ _replay_pose:
 .right:
 	move.l _replay_state+RP_AGE(pc),d2
 	andi.w #7,d2
-	lea _replay_frame(pc),a2
+	movea.l _time_mem(pc),a2
+	lea TM_REPLAY_FRAME(a2),a2
 	bsr _replay_interpolate
-	lea _replay_frame(pc),a3
+	movea.l _time_mem(pc),a3
+	lea TM_REPLAY_FRAME(a3),a3
 	movem.l (a7)+,d0-d7/a0-a2
 	; Native first two instructions; A3 deliberately points at the scratch pose.
 	movea.l -$6686(a4),a0

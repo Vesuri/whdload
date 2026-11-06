@@ -2,6 +2,7 @@
 ; flight and manual gears. Full step-4 acceptance remains separate.
 _phase_install:
  movem.l d0/a0-a2,-(a7)
+ bsr _phase_power_build
  lea _phase_power_status(pc),a0
  clr.w (a0)
  lea _phase_tail_ptr(pc),a0
@@ -1082,7 +1083,7 @@ _phase_power:
  lsl.w #8,d1
  move.b -$66e4(a4),d1
  lsl.w #3,d1
- lea _phase_power_table(pc),a0
+ movea.l _time_mem(pc),a0
  move.l (a0,d1.w),d0
  move.w 4(a0,d1.w),d4
  move.w d0,-14(a5)
@@ -1093,38 +1094,33 @@ _phase_power:
  bra _drivetrain_power
 _phase_power_status: dc.w 0
 
-; D0 retains DIVS's remainder/quotient pair, or its unchanged full product
-; on signed-word quotient overflow. D4 receives the first conversion word.
-; Entries include every signed throttle byte, not only the normal0..100.
-; Eight-byte stride keeps lookup arithmetic short on a68000.
-_phase_power_table:
-HD_POWER_ROW MACRO
-HD_POWER_T SET 0
- REPT 256
-HD_POWER_S SET HD_POWER_T
- IFGE HD_POWER_T-128
-HD_POWER_S SET HD_POWER_T-256
- ENDC
-HD_POWER_FIRST SET (HD_POWER_S*450)/100
-HD_POWER_PRODUCT SET HD_POWER_FIRST*\2
-HD_POWER_QUOT SET HD_POWER_PRODUCT/\1
-HD_POWER_OVER SET 0
- IFGT HD_POWER_QUOT-32767
-HD_POWER_OVER SET 1
- ENDC
- IFLT HD_POWER_QUOT+32768
-HD_POWER_OVER SET 1
- ENDC
- IFNE HD_POWER_OVER
- dc.l HD_POWER_PRODUCT
- ELSE
- dc.w HD_POWER_PRODUCT-HD_POWER_QUOT*\1,HD_POWER_QUOT
- ENDC
- dc.w HD_POWER_FIRST,0
-HD_POWER_T SET HD_POWER_T+1
- ENDR
- ENDM
- HD_POWER_ROW 7,800
- HD_POWER_ROW 9,750
- HD_POWER_ROW 10,600
- HD_POWER_ROW 10,450
+; The table (TM_POWER, 8-byte entries, gear-1 x 256 + the throttle byte) holds
+; D0 as native DIVS leaves it: the remainder/quotient pair, or the unchanged
+; full product on signed-word quotient overflow. D4 receives the first
+; conversion word. Every signed throttle byte is built, not only 0..100.
+_phase_power_build:
+ movem.l d0-d5/a0-a1,-(a7)
+ movea.l _time_mem(pc),a0
+ lea .rows(pc),a1
+ moveq #3,d5
+.row:
+ move.w (a1)+,d2
+ move.w (a1)+,d3
+ moveq #0,d4
+.entry:
+ move.b d4,d0
+ ext.w d0
+ muls.w #450,d0
+ divs.w #100,d0
+ move.w d0,d1
+ muls.w d3,d0
+ divs.w d2,d0
+ move.l d0,(a0)+
+ move.w d1,(a0)+
+ clr.w (a0)+
+ addq.b #1,d4
+ bne.s .entry
+ dbf d5,.row
+ movem.l (a7)+,d0-d5/a0-a1
+ rts
+.rows: dc.w 7,800,9,750,10,600,10,450	; divisor, ratio for gears 1..4

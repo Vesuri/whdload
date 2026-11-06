@@ -94,10 +94,25 @@ _time_install:
 	bsr _time_math_test
 	ENDC
 	cmpi.l #$11a4e,d0
-	bne.s .done
+	bne .done
 	movem.l d0-d1/a0-a2,-(a7)
 	move.l _ct_ct1(pc),d0
-	beq.s .restore
+	beq .restore
+	; The modules' arrays and the engine power table are allocated, never in
+	; the slave. Without the memory CUSTOM1 acts as 0.
+	movem.l a0/a6,-(a7)
+	move.l #TM_SIZE,d0
+	move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
+	movea.l 4.w,a6
+	jsr _LVOAllocMem(a6)
+	movem.l (a7)+,a0/a6
+	lea _time_mem(pc),a1
+	move.l d0,(a1)
+	bne.s .allocated
+	lea _ct_ct1(pc),a1
+	clr.l (a1)
+	bra .restore
+.allocated:
 	movea.l a0,a1
 	lea _time_patches(pc),a0
 	movea.l _resload(pc),a2
@@ -889,6 +904,17 @@ _time_q16_results: dcb.l 7*9*7*2,0
 	IFD VERIFY_TIME_PHANTOM
 	INCLUDE "HardDrivinPhantom.s"
 	ENDC
+
+; The allocation at _time_install (mid-slave, so every module reaches the pointer).
+TM_POWER equ 0				; 4 gears x 256 throttle bytes x 8 (_phase_power)
+TM_RECORD_PREVIOUS equ TM_POWER+4*256*8	; 158 each (_record_*_ptr)
+TM_RECORD_CURRENT equ TM_RECORD_PREVIOUS+158
+TM_REPLAY_FRAME equ TM_RECORD_CURRENT+158	; 158
+TM_HANDLING_RING equ TM_REPLAY_FRAME+158	; HANDLING_RING words
+TM_HANDLING_HELD equ TM_HANDLING_RING+64*2	; HANDLING_RING bytes
+TM_ROAD_POINTS equ TM_HANDLING_HELD+64	; 18 words
+TM_SIZE equ TM_ROAD_POINTS+36
+_time_mem: dc.l 0
 
 	IFD VERIFY_TIME_AUDIO
 	INCLUDE "HardDrivinAudio.s"

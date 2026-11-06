@@ -581,7 +581,9 @@ Implemented changes:
   only with its complete key. Intermediate scalar companion stores are removed;
   final frame publication still produces their exact original values.
 - A generated power table preserves both native conversions, including signed
-  DIVS overflow. All four immutable gear ratios are validated before use;
+  DIVS overflow. It was assembled into the slave by a macro; since 2026-11-06
+  `_phase_power_build` computes it at install into `_time_mem` (`TM_POWER`) with
+  the native MULS/DIVS, and the result is the assembled table's 8,192 bytes. All four immutable gear ratios are validated before use;
   inactive or unexpected-ratio paths retain the original helper. Phase builds
   bypass the mostly-missing square-root memo wrapper; reference builds retain it.
 - Projection preserves native word rounding and uses exact flat/cardinal paths.

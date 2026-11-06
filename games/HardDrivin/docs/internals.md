@@ -12,6 +12,14 @@ source’s quit key. Existing code handles loading, keyboard, CPU delay loops,
 self-modifying graphics/text routines and high scores. Version 3.0 fixes the
 SPS 0126 keyboard handling. The supplied installation is the SPS 0126 variant.
 
+4.0b's slave keeps no arrays: they are allocated at install (exec AllocMem, cleared), only
+for CUSTOM1 nonzero. `_time_install` allocates `_time_mem` (layout `TM_*` in
+`HardDrivinTime.s`): the engine power table that `_phase_power_build` computes (8 KB, the
+assembled table's bytes exactly), the record and replay pose frames, the mouse ring and the
+loop's road points; without it CUSTOM1 acts as 0. The others are `_depth_mem` (depth
+order), the record's pending samples and the traffic lists. Small state structs stay in the
+slave, several behind the signatures the capture tools search for.
+
 The local build uses shared WHDLoad 20.0 KickEmu sources. Its successful assembly
 is not evidence of gameplay equivalence to the shipped slave. The attract route and A500 performance baseline are now validated below. The
 player-physics time model is documented in GAME_TIME.md; the full step-2 machine
