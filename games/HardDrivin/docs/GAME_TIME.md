@@ -17,7 +17,7 @@ Code addresses below are offsets from the decompressed code hunk. `G($xxxx)`
 means the signed 16-bit displacement from a4, e.g. G($991c) = a4-$66e4. It is
 not a code address. All captures, full direct-reference indexes and tools remain
 in the game's ignored `tmp/`. The current implementation inventory, including its
-writer/consumer index, is also in `docs/open-work.md`.
+writer/consumer index, is in `docs/open-work.md`'s history (git, up to b9b59016).
 
 ## Coupling experiment
 

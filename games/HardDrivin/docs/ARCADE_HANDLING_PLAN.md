@@ -911,7 +911,7 @@ report `report.txt`). `feel_fixture.s` gained a road follower (FE_FOLLOW):
   - In an earlier version of the driver the arcade car entered exactly on the axis too.
     It stayed on the loop to the top and fell from there; the native car lost contact at
     69° and came back. Step 4 already recorded the loop's pitch domain and contact failures
-    (open-work.md, C4).
+    (open-work.md's history (git, up to b9b59016), C4).
   - The jump: step 4's seeded jump landed at 112 MPH; this driver reaches 89–104 MPH at the
     lip and lands short. The tape route (VERIFY_DRIVE) also crashes on landing at 103 MPH.
 - **One thing the arcade handling changes:** at loop speed the native car turns at most

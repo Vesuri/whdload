@@ -8,12 +8,12 @@ Software / John Girvin, reworked by JOTD, whose repository it comes from (game.c
 repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`; this
 file and `docs/` here hold only what is specific to this game.
 
-Read `docs/open-work.md` first: it is a log, newest first, so its first sections are where
-the work stands.
+Read `docs/open-work.md` first: it is where the work stands (the release, what is
+postponed and what is known); the history is in git.
 
 | Doc | Read it for |
 |---|---|
-| `docs/open-work.md` | where the work stands (arcade handling, H3c) and the history of every step |
+| `docs/open-work.md` | where the work stands: the release, postponed work, known issues |
 | `docs/development.md` | inputs, builds and VERIFY fixtures, runs, every capture and check tool, the arcade harness |
 | `docs/internals.md` | the program, the slave's patches, the attract and gameplay baselines |
 | `docs/ARCADE_HANDLING_PLAN.md`, `docs/ARCADE_ROMS.md`, `docs/ARCADE_TIMING.md` | the arcade car model, the arcade program (MAME), arcade race timing |

@@ -268,7 +268,7 @@ Use separate INSTANCE values for concurrent instances.
 `step3_compare.py`, `step3_costs.py` and `step3_validate.py` check the retained
 captures and unchanged builds. The extra impact trace is 500 fields from race
 field 1900; its whole-window swaps match the independent baseline field-for-field.
-Current local evidence names and full inventory are in open-work.md. Normal,
+Current local evidence names and full inventory are in open-work.md's history (git, up to b9b59016). Normal,
 VERIFY_DRIVE and VERIFY_ATTRACT hashes are unchanged; source adds only the gated
 VERIFY_STEPINPUT experiment. See GAME_TIME.md for the f0 recommendation and its
 low-confidence engineering range, native clock defects and substep cost limit.
@@ -281,14 +281,14 @@ scale gameplay. VERIFY_TIME_MATH adds the boot arithmetic fixture. Combine
 VERIFY_DRIVE with VERIFY_TIME_PAUSE for native keyboard pause/resume, or with
 VERIFY_TIME_REPLAY for button release during native crash/replay. Build outputs
 must remain under tmp/build. capture_time.py and check_time_math.py retain the
-local evidence; see GAME_TIME.md and open-work.md for current test names and
+local evidence; see GAME_TIME.md and open-work.md's history (git, up to b9b59016) for the test names and
 remaining implementation. Normal builds remain unchanged.
 
 The scalar module is a development-only constant-T experiment: build
 VERIFY_TIME + VERIFY_TIME_SCALARS, optionally VERIFY_SCALAR_FIELDS=1..8 (default8).
 VERIFY_DRIVE + VERIFY_STEPINPUT supplies matched inputs. VERIFY_STEPINPUT_RAMP
 exercises both throttle directions; VERIFY_TIME_SCALAR_MATH exercises retention
-in private fake globals. Current helpers/capture formats are in open-work.md.
+in private fake globals. The helpers and capture formats are in open-work.md's history (git, up to b9b59016).
 Do not use these partial builds to claim frame-time-independent gameplay.
 
 VERIFY_TIME_MOTION adds angular-rate and gravity-acceleration diagnostics on top

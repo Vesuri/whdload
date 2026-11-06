@@ -5,7 +5,7 @@ VERIFY_SCALAR_FIELDS. Do not confuse these arithmetic experiments with a real
 variable-T dispatcher. Keep the full step-4 objective and acceptance unchanged.
 
 Ordinary projected position b500/b578 and its arithmetic are implemented; see
-open-work.md and GAME_TIME.md for evidence. Fractional longitudinal velocity is
+open-work.md's history (git, up to b9b59016) and GAME_TIME.md for evidence. Fractional longitudinal velocity is
 still absent from native projection. Remaining nonlinear handling is unverified.
 
 Position insertion points audited from native disassembly:
@@ -52,7 +52,7 @@ this follows preserving native explicit Euler, and must be assessed in handling
 rather than silently choosing a different integrator.
 
 Crash drift and countdown are now implemented and verified at native T. See
-GAME_TIME.md and open-work.md for state and current evidence. The drift envelope
+GAME_TIME.md and open-work.md's history (git, up to b9b59016) for the evidence. The drift envelope
 keeps the native signed-truncated sample for eight fields, splitting at sample
 boundaries. This preserves exact native total displacement for all subdivisions
 and avoids the negative final drift in the earlier continuous correction design.
