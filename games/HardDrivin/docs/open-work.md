@@ -1,4 +1,4 @@
-# The draw distance on faster CPUs, the car in replays on grass (2026-11-06)
+# The car in replays on grass, the draw distance postponed (2026-11-06)
 
 **Replays.** The user's drive of 480502d2 (recording 12.37.56, 0:55-0:57 and 1:43-1:54): in
 replays the player's car vanished on the grass. A car farther than both roads' last strip
@@ -7,8 +7,8 @@ off the road with only the sections near it drawn. The skip is gone (10f38b59): 
 drawn as the native order draws them, and the crash replay is still pixel identical to it.
 The grass case was not reproduced by a scripted drive.
 
-**Draw distance.** The user asked for 1.5 times the distance on faster machines, the A500 as it
-is, and the road extended only ahead. Native limits:
+**Draw distance (reverted, postponed).** The user asked for 1.5 times the distance on faster
+machines, the A500 as it is, and the road extended only ahead. Native limits:
 - Each road takes 13 sections from 6 behind its cursor (`$DC00` the course road, `$DF52`
   the stunt road; 7 at `$DF76` for the stunt road seen from another road), up to 40 when
   sections are flagged (the strip buffers' size), and keeps the strip points between -700
@@ -16,22 +16,20 @@ is, and the road extended only ahead. Native limits:
   the course road (sections ~500 units), 2,900 on the stunt road (~420).
 - Objects are drawn within 4,000 units of the camera in X and Z (`$E364`-`$E38A` the
   background list, `$E4E0`-`$E506` the sorted list of 100 entries; the course has 99
-  objects).
+  objects). The box is compared unsigned: a wider one wraps near the world's edges.
 - The road's and objects' points share a pool from G(-$1688), 3,600 bytes up to the road's
-  stream pointers G(-$878), with no check of its end.
+  stream pointers G(-$878), with no check of its end; a larger square overran it.
 
-With CUSTOM1 nonzero on a 68020 or later (`_distance_patches`, AttnFlags): 17 and 11
-sections (4 more ahead), 6,000 units for the road and the objects, and the pool moved to
-an allocation of 16,000 bytes (`_distance_mem`). The user: no buffers in the slave, allocate
-them; the depth module's arrays (records, structure road sections, object centres, solids)
-are one allocation with CUSTOM1 nonzero (`_depth_mem`, 4.5 KB). Without either allocation
-its patches are not installed. The slave is 64,420 bytes. The first build without the pool move faulted in
-`_depth_collect` (`CoreDump`: the stream pointers overwritten with an object's rotated
-points). Checked on the A1200/040: the course road drive to field 680 and the stunt road
-drive to field 660 run without a fault, the road reaches over the rise past the barn and
-farther signs appear; the crash replay is unchanged. On the A500 (1.5 MB, in a race) the
-running code has the depth patches and the distance sites' native bytes; at the title the
-patches are not yet installed, and the loaded file's copy stays unpatched. The cost on the faster CPUs is not measured.
+ed9ab03a/518710b6 took 4 more sections, 6,000 units and an allocated pool on a 68020 or
+later; the user's drive of it (recording 13.46.48) had a lap finished off the road (2:06),
+cars and the player's car inside the bridge (0:37, 0:53) and a car pitched on level ground
+(0:28). The section count is not only drawing: the same routines search the selected
+sections for the nearest one to the car (`$DD84`-`$DE5A`, `$E106`-`$E1E2`, limited to 10
+past the previous best) and set the cursor G(-$671C), the road G(-$66B0) and the section
+triggers (`$DB80`, `$92C0`, `$936A`); with 4 more sections ahead the cursor can jump 10
+sections ahead instead of 6. The user: revert and postpone. A later attempt has to keep that
+search on the native count (only the transform loop longer), clamp the object box, and keep
+the allocated pool.
 
 # Cars and signs behind slopes, the car in replays (2026-11-06)
 

@@ -28,46 +28,6 @@ _depth_patches:
 	PL_P $9ae4,_occ_centre
 	PL_END
 
-; The draw distance on a 68020 or later (CUSTOM1 nonzero): 1.5 times the
-; native. Each road ($DBF4 the course road, $DF46 the stunt road) takes the
-; sections from 6 behind its cursor, 13 of them (7 for the stunt road seen
-; from another road), and keeps the strip points less than 4,000 units ahead;
-; now 4 more sections ahead and 6,000. The game's limit of 40 sections each
-; is kept. Objects are drawn within 4,000 units of the camera in X and Z
-; ($E358 the background list, $E4DC the sorted one); now 6,000. The points
-; of the road and the objects are kept in a pool from G(-$1688) up, 3,600
-; bytes with nothing checking its end; with the larger square it ran into
-; the road's stream pointers above it, so it moves to an allocation.
-DIST_POOL equ 16000
-_distance_patches:
-	PL_START
-	PL_PS $b0f2,_distance_pool	; LEA -$1688(A4),A0; MOVE.L A0,-$16CA(A4)
-	PL_NOP $b0f8,2
-	PL_PS $af24,_distance_road	; LEA -$1688(A4),A0; MOVE.L A0,D5
-	PL_W $dc00,$7a11		; MOVEQ #17,D5
-	PL_W $df52,$7a11
-	PL_W $df76,$7a0b		; MOVEQ #11,D5
-	PL_W $df0c,6000			; CMPI.W #6000,4(A2)
-	PL_W $e29a,6000
-	PL_W $e2b2,6000
-	PL_W $e366,6000			; SUB.W #6000,D0
-	PL_W $e372,6000
-	PL_W $e37e,12000		; ADD.W #12000,D0
-	PL_W $e38a,12000
-	PL_W $e4e2,6000
-	PL_W $e4ee,6000
-	PL_W $e4fa,12000
-	PL_W $e506,12000
-	PL_END
-
-_distance_pool:
-	move.l _distance_mem(pc),-$16ca(a4)
-	rts
-_distance_road:
-	move.l _distance_mem(pc),d5
-	movea.l d5,a0
-	rts
-
 ; Replaces JSR $FC1E; TST.W D5. Walks both roads' polygon streams as $FC1E
 ; does and records each drawn section; D5 and its flags are returned.
 _depth_collect:
@@ -835,7 +795,7 @@ _occ_ncar: dc.w 0
 	even
 
 ; The arrays are allocated at install (_render_install): _depth_mem with
-; CUSTOM1 nonzero, _distance_mem (DIST_POOL bytes) on a 68020 or later.
+; CUSTOM1 nonzero.
 DM_RECS equ 0
 DM_ROADS equ DM_RECS+DEPTH_MAX*DEPTH_REC
 DM_CARS equ DM_ROADS+OCC_ROADS*OCC_ROAD
@@ -843,7 +803,6 @@ DM_SOLIDS equ DM_CARS+OCC_CARS*OCC_CAR
 DM_WORK equ DM_SOLIDS+OCC_SOLIDS*4
 DM_SIZE equ DM_WORK+20
 _depth_mem: dc.l 0
-_distance_mem: dc.l 0
 _depth_count: dc.w 0
 _depth_next: dc.w 0
 	even
