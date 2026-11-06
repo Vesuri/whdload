@@ -116,7 +116,7 @@ slv_name		dc.b	"TFX"
 	ENDC
 			dc.b	0
 slv_copy		dc.b	"1995-1997 Digital Image Design",0
-slv_info		dc.b	"adapted by JOTD, paraj & Vesuri",10,10
+slv_info		dc.b	"adapted by JOTD & Vesuri",10,10
 		dc.b	"Version "
 		DECL_VERSION
 		dc.b	0
