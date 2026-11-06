@@ -66,6 +66,12 @@ errors. `tools/harddrivin.py serve` boots through the same launcher with the gdb
 The attract benchmark and rebuilt-slave comparison are documented below and in
 `internals.md`; real-gameplay verification uses the separate VERIFY_DRIVE fixture.
 
+Memory writes through the stub (`gdb set {short} ADDR = V`) are acknowledged but do not
+reach the emulated memory: read the address back, or use `harddrivin.py poke ADDR HEX
+SIGHEX SIGADDR`, which writes through lldb and prints `VERIFIED`. Its first call after
+`serve` can fail while lldb attaches, so retry once. Breakpoints, `x` and `dump memory`
+through the stub work.
+
 ## Repeatable attract benchmark
 
 The validated A500-equivalent baseline is in `tmp/prof/benchmark-report.txt`.
