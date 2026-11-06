@@ -1803,8 +1803,82 @@ the native car blits, `182c052b…`). FPS, 300 presentations, warp off:
 Gates, all passed, the same set as the first checkpoint: frames (normal,
 grid) and timing (elapsed error 0.059 %), the FR4 probe, smokes, MMU (030
 and 040), route, modal and controls. The 040 is now ahead of the native
-game. Next: road lines (21 % of the draw at the first checkpoint), the
-bitmap blits (19 %), publication (8 %) and the cockpit (6 %).
+game.
+
+**Profile after step 4** (030, shares of the draw): the road lines 23 %, of
+which under two fifths is the line kernels and the rest the general per-blit
+path (translation, span lookup, tracking, setup); the bitmap blits 21 %, half
+of it the same path; publication 8 %; the cockpit cookie-cut 7 %; the fill
+5 %.
+
+**Step 5: the road lines on their own path** (`FRLineFast`, preset
+`FF1FastRenderLine`). The two line sites (`$6ad8a`, `$6adde`) call it instead
+of `FF1FastRenderSize`. With owned shadows, a one-word `$0B4A` line whose C
+and D spans each lie in a bank shadow is translated, its D rows marked and
+the kernel run directly; the span is FRTranslate's line span, now one routine
+(`FRLineSpan`) for both. Anything else takes the general path. 030 FPS:
+49.75 against 48.15 for the same build with the lines on the general path
+(arm `-line0`).
+
+**Step 6: area blits on their own path** (`FRAreaFast`, preset
+`FF1FastRenderArea`). `FF1FastRenderSize` sends every redirected area blit
+there when the shadows are owned: FRTranslate's spans and mirror test inline,
+no tracking for read channels, a write marks bank rows (as `FRTrackChannel`
+does with owned shadows). A line, or a span outside the mirrors, takes the
+general path. 030 FPS: 49.92 against 49.26 (arm `-area0`).
+
+**The view switch** (`FF1FastRenderShowSafe`, `FF1FastRenderVbl`). With
+frames at one field, the census (FR8's log, whose alignment now holds)
+showed a few copies into the bank still on screen: 4 in 1,126 fields of the
+normal scene after step 5. The cause is how 1.3 switches views. `LoadView`
+only stores the view's copper list in GfxBase (`LOFlist`); graphics' VBL
+server loads it into `COP2LC`, and `copinit` jumps to `COP2LC` at line 12.
+So a view shows from the first field after the request whose VBL is
+serviced before line 12. In the log, one late switch followed a VBL serviced
+at line 58; the others followed requests late in the field (none late below
+line 256; from line 304 on all were late), which the ROM's sequence does not
+explain and may be the emulator's CPU and copper timing. The copy into the
+back bank now also waits until the bank cannot be on screen: the last
+request (field R, line L) shows from field E = R + 1, or R + 2 for L ≥ 256,
+at the first VBL from E on serviced before line 8 (the game's VBL server
+records it). The copy goes ahead once that VBL has passed, or from line 256
+of field E − 1 on, past the display. `FR8S` counts the held polls. After
+the change no scene shows a copy into a displayed bank; the one flagged copy
+in the normal scene took 18 ms instead of about 2 (a stall seen once before
+the change too, cause not known), and one in the grid scene started at line
+0, before that field's VBL server counted it. The cost is within the layout
+noise (normal 49.59 against 49.75).
+
+The pacing log (`FF1_FAST_RENDER_PACING`) now has 48-byte entries: the
+copy field's VBL service line and the last request's field, line, kind and
+bank. `test_h5_fps.py` reads the entry size (`FR8EntryBytes`) and
+`fr8_report.py` decodes either size.
+
+**Checkpoint after steps 5 and 6** (`fr12-candidate`, `766c50db…`; arm
+`-merge0` `cc7c3389…`). FPS, 300 presentations, warp off:
+
+| Machine | Candidate | Native car blits | Native game |
+| --- | ---: | ---: | ---: |
+| 030‑50 BCE | 49.92 | 44.18 | 24.55 |
+| 040‑40 BCE | 29.36 | 25.64 | 24.5 |
+
+Gates, all passed: frames (normal, grid) and timing (elapsed error 0.059 %),
+the FR4 probe, smokes, MMU (030 and 040), route, modal and controls.
+
+**The scenes** (030‑50 BCE, the log build of the same source; milliseconds
+per one-tick frame; steady motion is the share of frames whose ticks equal
+their fields on screen, FR8 in brackets):
+
+| Scene | FPS | Draw | Copy | Intervals 1 / 2 fields | Steady |
+| --- | ---: | ---: | ---: | --- | ---: |
+| normal | 49.92 (40.5) | 16.1 | 1.8 | 300 / 0 | 99.6 % (55 %) |
+| solo | 49.92 (45.1) | 16.1 | 1.2 | 300 / 0 | 99.9 % (88 %) |
+| grid | 49.92 (38.9) | 16.4 | 1.3 | 300 / 0 | 99.9 % (54 %) |
+| dense | 45.52 (29.8) | 19.7 | 1.3 | 271 / 29 | 88.7 % (34 %) |
+
+Normal, solo and grid now draw every field. Dense is the one scene left
+above a field; its profile: the car pass 21 %, the bitmap kernel 6 %,
+publication 6 %, the area and line paths 8 %, row marking 3 %.
 
 ### FR9 — 030 data cache (optional)
 

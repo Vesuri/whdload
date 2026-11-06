@@ -81,12 +81,14 @@ try:
  assert all(all(x['planes']) for x in rows)
  (out/'window.jsonl').write_text('\n'.join(json.dumps(x) for x in [meta]+rows)+'\n')
  if 'FF1FastRenderShowStats' in sy:
-  # FR8S: early LoadView requests, those left to B8Draw, B8Draw requests skipped.
-  report['fr8s']=[val(f'*(unsigned int*){probe+sy["FF1FastRenderShowStats"]+4*i}') for i in range(4)]
+  # FR8S: early LoadView requests, those left to B8Draw, B8Draw requests skipped, copy-wait
+  # polls held for the view switch (FR12).
+  report["fr8s"]=[val(f"*(unsigned int*){probe+sy['FF1FastRenderShowStats']+4*i}") for i in range(5)]
  if 'FR8Log' in sy:
   # FR8 pacing diagnostic (FastRenderPacing.s): the per-frame log, decoded by tools/fr8_report.py.
   report['fr8_count']=val(f'*(unsigned int*){probe+sy["FR8Count"]}')
-  cmd(f'dump binary memory {(out/"fr8-log.bin").relative_to(r)} {probe+sy["FR8Log"]} {probe+sy["FR8Log"]+1024*32}')
+  entry=val(f'*(unsigned short*){probe+sy["FR8EntryBytes"]}') if 'FR8EntryBytes' in sy else 32;report['fr8_entry']=entry
+  cmd(f'dump binary memory {(out/"fr8-log.bin").relative_to(r)} {probe+sy["FR8Log"]} {probe+sy["FR8Log"]+1024*entry}')
  intervals=intervals[:300];report['fps_end']=context();report['intena_end']=val('*(unsigned short*)0xdff01c');fields=sum(intervals)
  import statistics,math
  report['fps']=300/(fields*71051/3546895);report['fps_fields']=fields;report['interval_fields']=intervals;report['mean_ms']=statistics.mean(intervals)*71051/3546895*1000;report['p95_ms']=sorted(intervals)[math.ceil(len(intervals)*.95)-1]*71051/3546895*1000

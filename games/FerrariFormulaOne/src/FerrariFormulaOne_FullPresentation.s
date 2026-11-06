@@ -31,6 +31,12 @@ B8_654f6:
  IFD FF1_FAST_RENDER
  bsr.l FF1FastRenderShown    ; FR8: the field of the last LoadView request
  ENDC
+ IFD FF1_FAST_RENDER_PACING
+ move.l d0,-(sp)
+ moveq #0,d0
+ bsr.l FR8Request
+ move.l (sp)+,d0
+ ENDC
 B8_654fc:
  addq.l #$4,a7
 B8_654fe:
@@ -1353,6 +1359,8 @@ FR_B8Cut:
  btst #0,d0
  beq.w .wait
 .waited:
+ bsr.l FF1FastRenderShowSafe ; FR12: the back bank can no longer be displayed
+ bne.w .wait
  IFD FF1_FAST_RENDER_PACING
  bsr.l FR8MarkCopy
  ENDC

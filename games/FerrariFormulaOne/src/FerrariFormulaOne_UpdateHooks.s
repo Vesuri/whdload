@@ -6267,6 +6267,12 @@ schedule_vbl:
  move.w ccr,-(sp)
  lea (schedule_context.l,pc),a0
  bsr.w FF1TimeField
+ IFD FF1_FAST_RENDER
+ bsr.l FF1FastRenderVbl
+ ENDC
+ IFD FF1_FAST_RENDER_PACING
+ bsr.l FR8Vbl
+ ENDC
  move.w (sp)+,ccr
  movem.l (sp)+,d0-d3/a0-a1
  rts

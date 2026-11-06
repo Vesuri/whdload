@@ -8,7 +8,9 @@
   --scenes: also the pacing build's normal, solo, grid and dense fixtures through
   tools/fr0_build.py's matched builders: tmp/build/fr12-TAG-pace-{normal,solo,grid,dense}.
 Every build X gets the arms X-early0 (FF1FastRenderEarly 1 -> 0, FR8) and X-merge0
-(FF1FastRenderMerge 1 -> 0: the native car blits); the arms share X's layout.
+(FF1FastRenderMerge 1 -> 0: the native car blits) and X-line0 (FF1FastRenderLine 1 -> 0:
+the road lines through the general path) and X-area0 (FF1FastRenderArea 1 -> 0: the area
+blits through FRTranslate); the arms share X's layout.
 """
 from pathlib import Path
 import hashlib, json, os, shutil, subprocess, sys
@@ -19,7 +21,7 @@ GAME = r / 'tmp/game/FerrariFormulaOne/data/racemenu'
 PRODUCTION_SHA = '9008bdb0ce780cfbaed1bbb891e4a7117e101d273d8adf7c710fdf6be78fb0cb'
 FR = 'FF1_FAST_RENDER=1'
 PACE = FR + ',FF1_FAST_RENDER_PACING=1'
-ARMS = {'early0': 'FF1FastRenderEarly', 'merge0': 'FF1FastRenderMerge'}
+ARMS = {'early0': 'FF1FastRenderEarly', 'merge0': 'FF1FastRenderMerge', 'line0': 'FF1FastRenderLine', 'area0': 'FF1FastRenderArea'}
 
 
 def build(tag, defines=''):

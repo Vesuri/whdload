@@ -25,7 +25,7 @@ import collections, json, statistics, struct, sys
 FIELD_MS = 71051 / 3546895 * 1000
 LINES = 312.5
 LINE_MS = FIELD_MS / LINES
-ENTRIES, SIZE = 1024, 32
+ENTRIES = 1024
 EVENTS = ['begin', 'prep', 'drawn', 'copy', 'done']
 SAFE_LINE = 256
 
@@ -34,12 +34,18 @@ def decode(run):
     res = json.loads((run / 'result.json').read_text())
     raw = (run / 'fr8-log.bin').read_bytes()
     count = res['fr8_count']
+    size = res.get('fr8_entry', 32)
     frames = []
     full = None
     for n in range(max(0, count - ENTRIES), count):
-        e = raw[(n % ENTRIES) * SIZE:(n % ENTRIES + 1) * SIZE]
+        e = raw[(n % ENTRIES) * size:(n % ENTRIES + 1) * size]
         ticks, pulses, bank = struct.unpack_from('>IHH', e, 0)
         f = dict(n=n, ticks=ticks, pulses=pulses, bank=bank, written=struct.unpack_from('>I', e, 28)[0])
+        if size >= 44:
+            # The copy field's VBL service and the last LoadView request (field low words).
+            f['vbl'] = struct.unpack_from('>HH', e, 32)
+            f['req'] = struct.unpack_from('>HH', e, 36)
+            f['req_kind'], f['req_bank'] = struct.unpack_from('>HH', e, 40)
         for i, name in enumerate(EVENTS):
             field, vpos = struct.unpack_from('>HH', e, 8 + 4 * i)
             if full is None:

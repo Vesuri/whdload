@@ -19,7 +19,7 @@
 ; lifecycle reset leaves alone.
 
 FR8_ENTRIES equ 1024
-FR8_ENTRY equ 32
+FR8_ENTRY equ 48
 FR8E_TICKS equ 0
 FR8E_PULSES equ 4
 FR8E_BANK equ 6
@@ -29,6 +29,10 @@ FR8E_DRAWN equ 16
 FR8E_COPY equ 20
 FR8E_DONE equ 24
 FR8E_WRITTEN equ 28
+FR8E_VBL equ 32                 ; at the copy: the field's VBL service, field and line
+FR8E_REQ equ 36                 ; the last LoadView request before this frame: field, line
+FR8E_REQKIND equ 40             ; 1 early (FF1FastRenderShow), 0 B8Draw
+FR8E_REQBANK equ 42             ; $66f88 at the request
 
 ; D0.w = event offset. Stores the field and beam line in the current entry.
 ; All registers and the condition codes are kept.
@@ -96,7 +100,44 @@ FR8MarkCopy:
  move.l d0,-(sp)
  moveq #FR8E_COPY,d0
  bsr.w FR8Mark
+ move.l a0,-(sp)
+ lea (FR8Current.l,pc),a0
+ move.l FR8VblMark(pc),FR8E_VBL(a0)
+ move.l (sp)+,a0
  move.l (sp)+,d0
+ rts
+
+; The game's VBL server (schedule_vbl), after the field count: the field and
+; beam line it ran at. Graphics' VBL server loads COP2LC from LOFlist, and the
+; 1.3 copinit list jumps to COP2LC at line 12, so a later service shows the
+; previous view for one more field. All registers and the CCR are kept.
+FR8Vbl:
+ move.w ccr,-(sp)
+ movem.l d0/a0,-(sp)
+ lea (schedule_context.l,pc),a0
+ move.w FF1T_FIELDS+2(a0),d0
+ lea FR8VblMark(pc),a0
+ move.w d0,(a0)+
+ move.l $dff004,d0
+ lsr.l #8,d0
+ andi.w #$1ff,d0
+ move.w d0,(a0)
+ movem.l (sp)+,d0/a0
+ move.w (sp)+,ccr
+ rts
+
+; After a LoadView request (D0.w = 1 early, 0 B8Draw): its field, line and
+; bank, for the next frame's entry. All registers and the CCR are kept.
+FR8Request:
+ move.w ccr,-(sp)
+ movem.l d0-d1/a0-a1,-(sp)
+ lea (FR8Current.l,pc),a0
+ move.w d0,FR8E_REQKIND(a0)
+ move.w $66f88,FR8E_REQBANK(a0)
+ moveq #FR8E_REQ,d0
+ bsr.w FR8Mark
+ movem.l (sp)+,d0-d1/a0-a1
+ move.w (sp)+,ccr
  rts
 
 ; After the publication: complete the entry and append it to the ring.
@@ -114,7 +155,7 @@ FR8MarkDone:
  move.l (a1),d0
  addq.l #1,(a1)
  andi.l #FR8_ENTRIES-1,d0
- lsl.l #5,d0
+ mulu.w #FR8_ENTRY,d0
  lea (FR8Log.l,pc),a1
  adda.l d0,a1
  moveq #FR8_ENTRY/4-1,d1
@@ -130,5 +171,7 @@ FR8MarkDone:
  even
 FR8Tag: dc.l 'FR8L'
 FR8Count: dcb.l 1,0
+FR8EntryBytes: dc.w FR8_ENTRY
+FR8VblMark: dc.w 0,0
 FR8Current: dcb.b FR8_ENTRY,0
 FR8Log: dcb.b FR8_ENTRIES*FR8_ENTRY,0

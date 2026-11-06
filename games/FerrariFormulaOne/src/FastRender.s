@@ -60,7 +60,8 @@ FR7S_LONGS equ 4
 FR8S_EARLY equ 4            ; FR8: LoadView requests made after the publication
 FR8S_SAME_FIELD equ 8       ; left to B8Draw: the last request was in this field
 FR8S_NATIVE_SKIPPED equ 12  ; B8Draw requests skipped: the early one loaded the view
-FR8S_LONGS equ 3
+FR8S_HELD equ 16            ; FR12: copy-wait polls held by FF1FastRenderShowSafe
+FR8S_LONGS equ 4
 FR12S_MERGED equ 4          ; FR12: cars whose planes 0 and 1 took the merged pass
 FR12S_NATIVE equ 8          ; cars left to the native blits (not redirected, or a check failed)
 FR12S_LONGS equ 2
@@ -865,7 +866,7 @@ FRT6ad86:                   ; move.w d4,88(a0); tst.w $6ade4
  movem.l d0-d1,-(sp)
  move.w d4,d0
  moveq #FRSITE_6AD8A,d1
- bsr.w FF1FastRenderSize
+ bsr.w FRLineFast
  movem.l (sp)+,d0-d1
  tst.w $6ade4
  rts
@@ -874,7 +875,7 @@ FRT6add6:                   ; move.w d3,98(a0); move.w d4,88(a0)
  movem.l d0-d1,-(sp)
  move.w d4,d0
  moveq #FRSITE_6ADDE,d1
- bsr.w FF1FastRenderSize
+ bsr.w FRLineFast
  movem.l (sp)+,d0-d1
  rts
 FRT32df6:                   ; move.w d0,88(a1); movea.w d0,a4
@@ -1466,6 +1467,11 @@ FF1FastRenderSize:
  movem.l (sp)+,d1/a0
  rts
 .soft:
+ tst.w FF1FastRenderArea(pc)
+ beq.b FRSizeGeneral
+ tst.w FF1FastRenderScratch(pc)
+ bne.w FRAreaFast
+FRSizeGeneral:
  movem.l d0-d7/a0-a6,-(sp)
  lea $40(a0),a0             ; base -> image
  move.w d0,FRB_SIZE(a0)
@@ -1485,6 +1491,243 @@ FF1FastRenderSize:
  bsr.w FRUntranslate
  movem.l (sp)+,d0-d7/a0-a6
  rts
+
+; FR12: the road line sites. With owned shadows, a one-word line ($0B4A:
+; A, C and D, B off) whose C and D spans each lie in a bank shadow is
+; translated, marked and drawn here; anything else takes FF1FastRenderSize.
+; The same span (FRLineSpan), checks, tracking (FRMarkSpan) and kernel
+; (FastRenderBlit) as the general path. A0 = register base, D0.w =
+; BLTSIZE, D1 = site; all registers are preserved.
+FRLineFast:
+ cmpa.l #$dff000,a0
+ beq.w FF1FastRenderSize
+ tst.w FF1FastRenderLine(pc)
+ beq.w FF1FastRenderSize
+ tst.w FF1FastRenderScratch(pc)
+ beq.w FF1FastRenderSize
+ movem.l d0-d7/a1-a3,-(sp)
+ lea $40(a0),a0             ; base -> image
+ move.w FRB_CON1(a0),d6
+ btst #0,d6
+ beq.w .general
+ move.w FRB_CON0(a0),d7
+ move.w d7,d2
+ andi.w #$0fff,d2
+ cmpi.w #$0b4a,d2
+ bne.w .general
+ move.w d0,d2
+ andi.w #$3f,d2
+ cmpi.w #2,d2
+ bne.w .general
+ moveq #0,d4
+ move.w d0,d4
+ lsr.w #6,d4                ; V
+ beq.w .general
+ move.w d0,FRB_SIZE(a0)
+ lea FF1FastRenderSite(pc),a1
+ move.w d1,(a1)
+ lea FF1FastRenderSiteStats+FR4S_SOFT(pc),a1
+ lsl.w #2,d1
+ addq.l #1,(a1,d1.w)
+ bsr.w FRLineSpan           ; d2 lowest, d5 highest offset
+ lea FF1FastRenderMirrors(pc),a2
+ move.l FRB_CPT(a0),d0
+ bclr #0,d0
+ bsr.b .bank                ; C: d3 = mirror, d1 = delta
+ bmi.b .generalUndo
+ movea.l d1,a3              ; C delta
+ move.l FRB_DPT(a0),d0
+ bclr #0,d0
+ bsr.b .bank
+ bmi.b .generalUndo
+ tst.w FF1FastRenderTrack(pc)
+ beq.b .marked
+ movem.l d0-d3,-(sp)
+ move.l d0,d1
+ add.l d2,d0                ; lowest byte
+ add.l d5,d1                ; highest byte
+ move.l d3,d2               ; mirror
+ moveq #1,d3                ; write
+ bsr.w FRMarkSpan
+ movem.l (sp)+,d0-d3
+.marked:
+ move.l a3,d0
+ add.l d0,FRB_CPT(a0)
+ add.l d1,FRB_DPT(a0)
+ movea.l d1,a1              ; D delta
+ bsr.l FastRenderBlit
+ tst.l d0
+ beq.b .drawn
+ moveq #2,d0
+ bra.w FF1FastRenderFault
+.drawn:
+ move.l a3,d0
+ sub.l d0,FRB_CPT(a0)
+ move.l a1,d0
+ sub.l d0,FRB_DPT(a0)
+ lea -$40(a0),a0
+ movem.l (sp)+,d0-d7/a1-a3
+ rts
+.generalUndo:
+ lea FF1FastRenderSiteStats+FR4S_SOFT(pc),a1
+ move.w FF1FastRenderSite(pc),d1
+ lsl.w #2,d1
+ subq.l #1,(a1,d1.w)        ; FF1FastRenderSize counts it
+.general:
+ lea -$40(a0),a0
+ movem.l (sp)+,d0-d7/a1-a3
+ bra.w FF1FastRenderSize
+; D0 = first word; the span D0 + D2 .. D0 + D5 must lie in bank shadow 0
+; or 1 (FRSpan's test: the lowest byte inside, the highest below the end).
+; Returns D3 = mirror and D1 = delta, or N set.
+.bank:
+ moveq #0,d3
+ move.l d0,d1
+ add.l d2,d1                ; lowest byte
+.try:
+ cmp.l (a2,d3.w*8),d1
+ blo.b .no
+ cmp.l 4(a2,d3.w*8),d1
+ bhs.b .no
+ move.l d0,d1
+ add.l d5,d1                ; highest byte
+ cmp.l 4(a2,d3.w*8),d1
+ bhs.b .miss
+ lea FF1FastRenderDelta(pc),a1
+ move.l (a1,d3.w*4),d1
+ tst.w d3                   ; N clear
+ rts
+.no:
+ addq.w #1,d3
+ cmpi.w #2,d3
+ blo.b .try
+.miss:
+ moveq #-1,d3
+ rts
+
+; FR12: area blits with owned shadows (FF1FastRenderScratch). FRTranslate's
+; spans and mirror test inline; reads need no tracking and a write marks
+; bank rows (FRMarkSpan), as FRTrackChannel does with owned shadows. A line,
+; or a span outside the mirrors, takes the general path. A0 = register base
+; (the image - $40), D0.w = BLTSIZE, D1 = site; all registers are preserved.
+FRAreaFast:
+ movem.l d0-d7/a1-a4,-(sp)
+ lea $40(a0),a0             ; base -> image
+ move.w FRB_CON1(a0),d6
+ btst #0,d6
+ bne.w .general
+ move.w d0,FRB_SIZE(a0)
+ lea FF1FastRenderSite(pc),a1
+ move.w d1,(a1)
+ lea FF1FastRenderXDelta(pc),a3
+ clr.l (a3)
+ clr.l 4(a3)
+ clr.l 8(a3)
+ clr.l 12(a3)
+ lea FRChanTab(pc),a1
+ lea FF1FastRenderMirrors(pc),a2
+ move.w FRB_CON0(a0),d7
+ moveq #0,d5
+ move.w d0,d5
+ moveq #0,d4
+ move.w d0,d4
+ andi.w #$3f,d5             ; width in words, 0 = 64
+ bne.b .h
+ moveq #64,d5
+.h:
+ lsr.w #6,d4                ; height, 0 = 1024
+ bne.b .v
+ move.w #1024,d4
+.v:
+ subq.l #1,d4               ; V - 1
+ moveq #0,d3                ; channel 0 = A .. 3 = D
+.chan:
+ moveq #11,d0
+ sub.w d3,d0
+ btst d0,d7
+ beq.w .next
+ move.w 2(a1,d3.w*4),d0     ; offset of the last word from the first:
+ move.w (a0,d0.w),d0        ; (V - 1) * (2H + mod) + 2(H - 1),
+ andi.w #$fffe,d0           ; negated in descending mode
+ ext.l d0
+ add.l d5,d0
+ add.l d5,d0
+ muls.l d4,d0
+ add.l d5,d0
+ add.l d5,d0
+ subq.l #2,d0
+ btst #1,d6
+ beq.b .asc
+ neg.l d0
+.asc:
+ move.w (a1,d3.w*4),d1
+ move.l (a0,d1.w),d1
+ bclr #0,d1                 ; first word
+ move.l d1,d2
+ add.l d0,d2                ; last word
+ cmp.l d1,d2
+ bge.b .ordered
+ exg d1,d2
+.ordered:
+ addq.l #1,d2               ; highest byte
+ ; FRSpan: the mirror holding the lowest byte, the highest below its end.
+ movea.l a2,a4
+ moveq #0,d0
+.m:
+ tst.l (a4)
+ bmi.w .miss
+ cmp.l (a4)+,d1
+ blo.b .skip
+ cmp.l (a4),d1
+ bhs.b .skip
+ cmp.l (a4),d2
+ bhs.w .miss
+ cmpi.w #3,d3
+ bne.b .read
+ cmpi.w #2,d0
+ bhs.b .read                ; owned scratch: nothing to track
+ tst.w FF1FastRenderTrack(pc)
+ beq.b .read
+ movem.l d0-d3,-(sp)
+ exg d0,d2                  ; d2 = mirror, d0 = highest
+ exg d0,d1                  ; d0 = lowest, d1 = highest
+ moveq #1,d3                ; write
+ bsr.w FRMarkSpan
+ movem.l (sp)+,d0-d3
+.read:
+ lea FF1FastRenderDelta(pc),a4
+ move.l (a4,d0.w*4),d0
+ move.w (a1,d3.w*4),d1
+ add.l d0,(a0,d1.w)
+ move.l d0,(a3,d3.w*4)
+.next:
+ addq.w #1,d3
+ cmpi.w #4,d3
+ blo.w .chan
+ bsr.l FastRenderBlit
+ tst.l d0
+ beq.b .drawn
+ moveq #2,d0
+ bra.w FF1FastRenderFault
+.drawn:
+ lea FF1FastRenderSiteStats+FR4S_SOFT(pc),a1
+ move.w FF1FastRenderSite(pc),d1
+ lsl.w #2,d1
+ addq.l #1,(a1,d1.w)
+ bsr.w FRUntranslate
+ lea -$40(a0),a0
+ movem.l (sp)+,d0-d7/a1-a4
+ rts
+.skip:
+ addq.l #4,a4
+ addq.w #1,d0
+ bra.w .m
+.miss:
+ bsr.w FRUntranslate        ; the channels translated so far
+.general:
+ lea -$40(a0),a0
+ movem.l (sp)+,d0-d7/a1-a4
+ bra.w FRSizeGeneral
 
 ; A0 = image with BLTSIZE. Translates each enabled channel pointer to its
 ; Fast copy after checking that the channel's complete span lies in one
@@ -1589,6 +1832,59 @@ FRTranslate:
  moveq #6,d0
  rts
 .line:
+ bsr.w FRLineSpan
+.span:
+ moveq #2,d3                ; C, then D
+.lchan:
+ moveq #11,d0
+ sub.w d3,d0
+ btst d0,d7
+ beq.b .lnext
+ move.w (a1,d3.w*4),d1
+ move.l (a0,d1.w),d1
+ bclr #0,d1
+ move.l d1,d0
+ add.l d2,d0
+ add.l d5,d1
+ movem.l d0-d1,16(a3)
+ IFD FF1_FAST_RENDER_CHIPREAD
+ movem.l d0-d1,-(sp)
+ bsr.w FRSpan
+ bne.b .lfound
+ movem.l (sp)+,d0-d1
+ cmpi.l #$80000,d1
+ bhs.w .miss
+ bsr.w FRLogChipRead
+ bra.b .lnext
+.lfound:
+ addq.l #8,sp
+ ELSE
+ bsr.w FRSpan
+ beq.w .miss
+ ENDC
+ move.l #FR_WRITABLE,d4
+ btst d1,d4
+ beq.w .miss
+ tst.w FF1FastRenderTrack(pc)
+ beq.b .ltracked
+ bsr.w FRTrackChannel
+ bne.w .outside
+.ltracked:
+ move.w (a1,d3.w*4),d1
+ add.l d0,(a0,d1.w)
+ move.l d0,(a3,d3.w*4)
+.lnext:
+ addq.w #1,d3
+ cmpi.w #4,d3
+ blo.b .lchan
+ moveq #0,d0
+ rts
+
+
+; Line span (FRTranslate). A0 = image, D4 = V, D6 = BLTCON1, D7 = BLTCON0.
+; Returns D2 = lowest and D5 = highest byte offset from the first pixel's
+; word. Uses D0, D1, D3.
+FRLineSpan:
  ; C and D start at the first pixel; APT is the error term. Over V pixels
  ; the major axis moves V - 1 steps and the minor axis k, in the directions
  ; of the octant bits: Y by SUD ? SUL : AUL, X by SUD ? AUL : SUL. As in
@@ -1674,54 +1970,9 @@ FRTranslate:
  tst.l d1
  bmi.b .xlow
  add.l d1,d5
- bra.b .span
+ rts
 .xlow:
  add.l d1,d2
-.span:
- moveq #2,d3                ; C, then D
-.lchan:
- moveq #11,d0
- sub.w d3,d0
- btst d0,d7
- beq.b .lnext
- move.w (a1,d3.w*4),d1
- move.l (a0,d1.w),d1
- bclr #0,d1
- move.l d1,d0
- add.l d2,d0
- add.l d5,d1
- movem.l d0-d1,16(a3)
- IFD FF1_FAST_RENDER_CHIPREAD
- movem.l d0-d1,-(sp)
- bsr.w FRSpan
- bne.b .lfound
- movem.l (sp)+,d0-d1
- cmpi.l #$80000,d1
- bhs.w .miss
- bsr.w FRLogChipRead
- bra.b .lnext
-.lfound:
- addq.l #8,sp
- ELSE
- bsr.w FRSpan
- beq.w .miss
- ENDC
- move.l #FR_WRITABLE,d4
- btst d1,d4
- beq.w .miss
- tst.w FF1FastRenderTrack(pc)
- beq.b .ltracked
- bsr.w FRTrackChannel
- bne.w .outside
-.ltracked:
- move.w (a1,d3.w*4),d1
- add.l d0,(a0,d1.w)
- move.l d0,(a3,d3.w*4)
-.lnext:
- addq.w #1,d3
- cmpi.w #4,d3
- blo.b .lchan
- moveq #0,d0
  rts
 
 
@@ -2205,7 +2456,13 @@ FF1FastRenderShow:
  move.l d0,-(sp)
  jsr $2428a
  addq.l #4,sp
+ IFD FF1_FAST_RENDER_PACING
+ bsr.w FF1FastRenderShown
+ moveq #1,d0
+ bsr.l FR8Request
+ ELSE
  bsr.b FF1FastRenderShown
+ ENDC
  ; What the request left in GfxBase (graphics/gfxbase.h: ActiView, LOFlist),
  ; for FF1FastRenderNativeShow.
  lea FF1FastRenderShowView(pc),a1
@@ -2255,14 +2512,84 @@ FF1FastRenderNativeShow:
  rts
 
 ; After a LoadView request: record its field, read after the call, so a VBL
-; during the call can only make the next early request wait. All registers
-; kept; the condition codes are not.
+; during the call can only make the next early request wait, and its beam
+; line (FF1FastRenderShowSafe). All registers kept; the condition codes are
+; not.
 FF1FastRenderShown:
- movem.l a0-a1,-(sp)
+ movem.l d0-d1/a0-a1,-(sp)
  lea (schedule_context.l,pc),a0
+.again:
+ move.l FF1T_FIELDS(a0),d0
+ move.l $dff004,d1
+ cmp.l FF1T_FIELDS(a0),d0
+ bne.b .again
+ lsr.l #8,d1
+ andi.w #$1ff,d1
  lea FF1FastRenderShownField(pc),a1
- move.l FF1T_FIELDS(a0),(a1)
- movem.l (sp)+,a0-a1
+ move.l d0,(a1)
+ lea FF1FastRenderShownLine(pc),a1
+ move.w d1,(a1)
+ movem.l (sp)+,d0-d1/a0-a1
+ rts
+
+; FR12. In 1.3, LoadView only stores the view's copper list (GfxBase
+; LOFlist); graphics' VBL server loads it into COP2LC, and copinit jumps to
+; COP2LC at line 12. So a request shows from the first field after it whose
+; VBL is serviced in time, and in the emulator a request from line 256 on
+; can show a field later still. Called from the game's VBL server after the
+; field count: a field serviced before line FR_VBL_LINE is recorded as one
+; that switches. All registers and the condition codes are kept.
+FR_VBL_LINE equ 8
+FR_LATE_REQUEST equ 256
+FF1FastRenderVbl:
+ move.w ccr,-(sp)
+ movem.l d0/a0,-(sp)
+ move.w $dff006,d0
+ lsr.w #8,d0                ; line (V7-V0; the VBL is early in the field)
+ cmpi.w #FR_VBL_LINE,d0
+ bhs.b .late
+ lea (schedule_context.l,pc),a0
+ move.l FF1T_FIELDS(a0),d0
+ lea FF1FastRenderVblGood(pc),a0
+ move.l d0,(a0)
+.late:
+ movem.l (sp)+,d0/a0
+ move.w (sp)+,ccr
+ rts
+
+; Before the copy into the back bank: EQ when the bank can no longer be on
+; screen. The last request (field R, line L) shows from field E = R + 1, or
+; R + 2 for L >= FR_LATE_REQUEST, at the first in-time VBL from E on. So EQ
+; when an in-time VBL in a field >= E has passed, or from line 256 (past the
+; display) of field E - 1 on. All registers kept.
+FF1FastRenderShowSafe:
+ movem.l d0-d1/a0,-(sp)
+ move.l FF1FastRenderShownField(pc),d1
+ addq.l #1,d1               ; E
+ cmpi.w #FR_LATE_REQUEST,FF1FastRenderShownLine(pc)
+ blo.b .e
+ addq.l #1,d1
+.e:
+ cmp.l FF1FastRenderVblGood(pc),d1
+ ble.b .safe                ; switched
+ lea (schedule_context.l,pc),a0
+ move.l FF1T_FIELDS(a0),d0
+ addq.l #1,d0
+ cmp.l d1,d0
+ blt.b .unsafe              ; before field E - 1
+ move.w $dff004,d0
+ btst #0,d0
+ beq.b .unsafe              ; above line 256
+.safe:
+ movem.l (sp)+,d0-d1/a0
+ cmp.w d0,d0                ; EQ
+ rts
+.unsafe:
+ lea FF1FastRenderShowStats(pc),a0
+ addq.l #1,FR8S_HELD(a0)
+ movem.l (sp)+,d0-d1/a0
+ move.w #0,-(sp)            ; NE
+ move.w (sp)+,ccr
  rts
 
 ; FR6 publication: copy every dirty row of both banks from its shadow to
@@ -2722,6 +3049,10 @@ FF1FastRenderCopy: dc.w 2
 FF1FastRenderEarly: dc.w 1
 ; Immutable preset: FR12 merged car planes 0 and 1 (1), or the native blits (0).
 FF1FastRenderMerge: dc.w 1
+; Immutable preset: FR12 road lines through FRLineFast (1), or FF1FastRenderSize (0).
+FF1FastRenderLine: dc.w 1
+; Immutable preset: FR12 area blits through FRAreaFast (1), or FRTranslate (0).
+FF1FastRenderArea: dc.w 1
  even
 ; Expected bank table at $66c92: plane pointers of bank 0 and bank 1.
 FF1FastRenderBanks:
@@ -2782,6 +3113,8 @@ FF1FastRenderStaged: dc.w 0
 FF1FastRenderOwned: dc.w 0           ; FR7: Chip banks lag their shadows outside the view
 FF1FastRenderView: dc.l 0            ; FR7: view mirrors, bank 0 then bank 1
 FF1FastRenderShownField: dc.l 0      ; FR8: field of the last LoadView request
+FF1FastRenderShownLine: dc.w 0       ; FR12: its beam line
+FF1FastRenderVblGood: dc.l 0         ; FR12: the last field whose VBL was serviced in time
 FRCarDeferred: dc.w 0                ; FR12: the car's mask blit is deferred to FRCar
 ; FR8: after an early request, GfxBase ActiView and LOFlist, the bank, and
 ; 1 until B8Draw's next request consumes it.
