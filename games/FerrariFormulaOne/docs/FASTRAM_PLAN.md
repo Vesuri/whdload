@@ -1889,6 +1889,27 @@ fault in the skip was caught. Dense: 46.51 FPS against 45.52, the draw
 030‑50 BCE 49.92 (44.05), 040‑40 BCE 29.66 (25.69); all gates passed
 (elapsed error 0.026 %).
 
+**Step 8: WaitBlit returns when the blitter is idle.** The game's WaitBlit
+wrapper (code hunk $2a130: save a6, load GfxBase, call WaitBlit) runs after
+every blit the FR path has already finished in Fast RAM. The patch tests
+BBUSY first, as WaitBlit does, and returns at once when the blitter is idle;
+otherwise it continues into the native call. Dense: 47.85 FPS against 46.51,
+the draw 18.9 ms against 19.6, busy 20.8 ms against 21.4. Checkpoint
+`376d1164…` (arm `-merge0` `27a2373f…`): 030‑50 BCE 49.92 (45.25), 040‑40
+BCE 29.77 (25.73); all gates passed (elapsed error 0.026 %).
+
+Tried for dense and dropped, against step 8:
+
+- Publication with `cmpm.l` and offset stores: the draw fell 0.45 ms and the
+  copy rose by the same; busy 20.8 ms both.
+- Two middle car words per longword step: 45.8 FPS, the draw 19.8 ms. About
+  83 % of the middle words are opaque in the busiest variants, so this cut the
+  plane work in half where it runs, yet it lost; the bank and source pointers
+  are only word aligned (unverified cause). With it the fine payload grew
+  enough that `move.l public_table(pc),a0` in `FastRender.s` took the 32-bit
+  displacement form in the second payload pass only (the build's bindings
+  check stops); `(public_table.l,pc)` fixes that if the payload grows again.
+
 **Steady motion: the predicted-tick variant is dropped** (the user's
 decision, 2026-11-06). After the draw work the ticks match the fields on
 screen in 99.6–99.9 % of frames in normal, solo and grid, so the variant

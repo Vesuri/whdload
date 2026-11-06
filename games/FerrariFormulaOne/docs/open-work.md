@@ -43,8 +43,9 @@ gate, FPS, probe and profile logs. Next, in order:
    per frame and 50 FPS needs about 17.5 ms. Steps 1–6 are done (one-dot lines, zero
    words in the road fill, the whole car in one pass, the road lines and the area blits
    on their own paths; `tools/fr12_car.py` checks the car), and the copy waits for the
-   view switch (FASTRAM_PLAN "The view switch"); step 7 skips transparent car words.
-   Normal, solo and grid draw every field; dense is at 46.5 FPS with a 19.3 ms draw, and
+   view switch (FASTRAM_PLAN "The view switch"); step 7 skips transparent car words and
+   step 8 returns from WaitBlit when the blitter is idle.
+   Normal, solo and grid draw every field; dense is at 47.9 FPS with an 18.9 ms draw, and
    the user wants it at one field too (2026-11-06). Its profile: the car pass, the bitmap
    kernel, publication, the area and line paths (`tools/fr6_trace.sh fr12-candidate-pace-dense`
    after `tools/fr12_build.py candidate --scenes`). Leaner per-blit work alone gave nothing

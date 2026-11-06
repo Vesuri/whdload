@@ -731,6 +731,19 @@ FF1FastRenderInstallSites:
  bne.w .bad
  cmpi.l #$00dff054,$6c550
  bne.w .bad
+ cmpi.l #$2f0e2c79,$2a130   ; the graphics WaitBlit wrapper
+ bne.w .bad
+ cmpi.l #$000243c8,$2a134
+ bne.w .bad
+ cmpi.l #$4eaeff1c,$2a138
+ bne.w .bad
+ cmpi.l #$2c5f4e75,$2a13c
+ bne.w .bad
+ ; FR12: WaitBlit returns at once when the blitter is idle (FRWaitIdle).
+ move.w #$4ef9,$2a130
+ lea FRWaitIdle(pc),a0
+ move.l a0,$2a132
+ move.w #$4e71,$2a136
  ; Base registers.
  move.w #$4eb9,$24b0e
  lea FRTBaseA2(pc),a0
@@ -861,6 +874,20 @@ FRT24db4:                   ; move.w d0,88(a2); addi.w #1,d5
  bsr.w FF1FastRenderSize
  movem.l (sp)+,d1/a0
  addq.w #1,d5
+ rts
+; FR12: the game's WaitBlit wrapper ($2a130). With every blit of the draw
+; synchronous the blitter is idle at nearly every call; then it returns
+; after the two busy reads and the final status read the C4 shortcut keeps
+; (FF1C4WaitIdle), else it runs the graphics WaitBlit as before.
+FRWaitIdle:
+ tst.b $dff002
+ btst #6,$dff002
+ beq.b .idle
+ move.l a6,-(sp)
+ move.l $243c8,a6
+ jmp $2a138
+.idle:
+ tst.b $dff002
  rts
 FRT6ad86:                   ; move.w d4,88(a0); tst.w $6ade4
  movem.l d0-d1,-(sp)
