@@ -1,3 +1,20 @@
+# The public release of 4.0b (06.11.2026)
+
+The user: 4.0b dated 06.11.2026, no beta note. Decided:
+- new icons set CUSTOM1=2 and CUSTOM5=1; reports go to the repository's issues, not the
+  WHDLoad bug form; the ReadMe says a 1 MB Amiga is not enough (a 512 KB + 512 KB A500
+  stops at "Can't allocate ExpMem", as the original slave's sizes always required);
+- CUSTOM2 is ignored under CUSTOM1 nonzero and listed as "Frame delay (Original simulation)";
+- CUSTOM1=2's 12% A500 cost over CUSTOM1=1 is accepted; the 90 MPH slide gap stays; the
+  screech and off-road periods stay native; manual gears with arcade handling work (the
+  user's own test); the landing's pitch snap stays postponed (below);
+- the slave's arrays and the engine power table are allocated (`_time_mem`, internals.md):
+  63,720 to 55,004 bytes. A500 `lap-main` is equivalent (5,809 against 5,814 fields, the
+  same route and checkpoints); the crash replay's 34 frames are identical to 01135eeb's.
+
+Still to do for the release: shrink this log to the open issues, drop the one-off tools,
+regenerate `release/slaves.sha256` with the archive.
+
 # The tyre and off-road sounds, the landing's pitch (2026-11-06)
 
 The user's drive (recording 13.46.48): the tyre screech is nearly always a slow howl and now
@@ -134,8 +151,8 @@ original's speed. That is arithmetic across two builds, never measured directly.
 
 **Open:**
 - CUSTOM1=2 costs 12% over CUSTOM1=1 on the flat C1c test ground (r34: 67.7 against
-  60.2 ms a frame), estimated 4–5% in scenery windows (not measured). The user has not
-  accepted it against the 10% budget.
+  60.2 ms a frame), estimated 4–5% in scenery windows (not measured). Accepted by the user
+  on 2026-11-06.
 - The user's verdict on the 90 MPH slide gap (C1f 90 hold, 7.7° arcade against 10.3 A500 /
   9.5 020) after driving r39. They drive with `make aja` (68040), so the A500's extra
   1–1.5° of slide is not what they feel.
