@@ -17,8 +17,8 @@
   1.5 MiB Slow and the chip-only A1200. It goes into the release slave with the FR path at
   FR10; until then the release slave has no use for it, and it keeps the `9008bdb0…` pin.
 - **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
-  FR1–FR8 done, FR12 (draw speed) in progress: 030-50 BCE 49.9 FPS (every field) against
-  24.6 native, 040-40 BCE 29.4 against 24.5 (FR12 steps 5–6 checkpoint, 2026-11-06). FR8 showed the draw is the limit. The work concentrates on the 68030 (below); FR0h is still open. FR builds
+  FR1–FR8 and FR12 (draw speed) done: 030-50 BCE 49.9 FPS (every field) against
+  24.6 native, 040-40 BCE 29.8 against 24.5 (FR12 checkpoint `376d1164…`, 2026-11-06). FR8 showed the draw is the limit. The work concentrates on the 68030 (below); FR0h is still open. FR builds
   need 1 MiB ExpMem and do not boot on the 512 KiB A500 or the chip-only A1200.
 - Human playtesting (full races) and real Amiga hardware remain deferred.
 
@@ -34,26 +34,21 @@ Commit each FR step when its gates pass; push only when asked. Production stays 
 into Fast memory (FASTRAM_PLAN "Code and data placement check"); that needs no new look.
 The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory checks.
 
-The current build is FR12's candidate (`caff0a86…`, `tools/fr12_build.py`; FR8's was `e9ae9b3c…`); FR6's final
+The current build is FR12's candidate (`376d1164…`, `tools/fr12_build.py`; FR8's was `e9ae9b3c…`); FR6's final
 build was k5 (`8ec61e11…`). `tmp/manifest/fr6-validation.json` and `fr8-validation.json`
 hold the FPS, gates and measurements; `tmp/logs/fr6-*.log`, `fr7-*.log` and `fr8-*.log` the
 gate, FPS, probe and profile logs. Next, in order:
 
-1. FR12, draw work on the 030 (FASTRAM_PLAN "FR12"). FR8 showed the draw alone takes 20–31 ms
-   per frame and 50 FPS needs about 17.5 ms. Steps 1–6 are done (one-dot lines, zero
-   words in the road fill, the whole car in one pass, the road lines and the area blits
-   on their own paths; `tools/fr12_car.py` checks the car), and the copy waits for the
-   view switch (FASTRAM_PLAN "The view switch"); step 7 skips transparent car words and
-   step 8 returns from WaitBlit when the blitter is idle.
-   Normal, solo and grid draw every field; dense is at 47.9 FPS with an 18.9 ms draw, and
-   the user wants it at one field too (2026-11-06). Its profile: the car pass, the bitmap
-   kernel, publication, the area and line paths (`tools/fr6_trace.sh fr12-candidate-pace-dense`
-   after `tools/fr12_build.py candidate --scenes`). Leaner per-blit work alone gave nothing
-   measurable; only removing work shows up (030 I-cache layout noise is about 1 %).
-2. Steady motion: done. After the draw work the ticks match the fields on screen in
-   99.6–99.9 % of frames in normal, solo and grid; the predicted-tick variant is dropped
-   (the user's decision, 2026-11-06).
-3. FR10: checkpoint and release.
+1. FR10: checkpoint and release (FASTRAM_PLAN "FR10"), with the release memory scheme
+   above.
+
+Done: FR12, draw work on the 030 (FASTRAM_PLAN "FR12"; closed by the user's decision,
+2026-11-06). Eight steps (one-dot lines, zero road-fill words, the car in one pass, the road
+lines and the area blits on their own paths, transparent car words, WaitBlit when idle; the
+copy waits for the view switch; `tools/fr12_car.py` checks the car). Normal, solo and grid
+draw every field; dense is 47.85 FPS (busy 20.8 ms), and the ideas left for it are listed
+there. Steady motion: the ticks match the fields on screen in 99.6–99.9 % of frames in
+normal, solo and grid; the predicted-tick variant is dropped (the user's decision).
 
 Commands, from this directory after `. ../../common/env.sh`, one emulator job at a time
 (they share gdb port 2573):

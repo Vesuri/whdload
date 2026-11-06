@@ -1912,6 +1912,15 @@ Tried for dense and dropped, against step 8:
   displacement form in the second payload pass only (the build's bindings
   check stops); `(public_table.l,pc)` fixes that if the payload grows again.
 
+**FR12 is closed** (the user's decision, 2026-11-06). Result, checkpoint
+`376d1164…`: normal, solo and grid draw every field on the 030; dense is
+47.85 FPS (busy 20.8 ms; 50 FPS needs about 19.5). The dense profile has no
+large item left: the remaining ideas, merging the line path into one
+routine (about 125 lines of about 18 pixels per draw, the path costing more
+than the pixels), a single-dot line loop without the per-pixel C read, and
+lighter area setup, add up to an estimated 0.6–1.0 ms, short of the 1.3 ms
+needed. They stay here for a later look.
+
 **Steady motion: the predicted-tick variant is dropped** (the user's
 decision, 2026-11-06). After the draw work the ticks match the fields on
 screen in 99.6–99.9 % of frames in normal, solo and grid, so the variant
@@ -1986,7 +1995,7 @@ Dependencies:
 
 ```
 FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b (done 2026-11-04) → FR5c…FR5f (done 2026-11-05) → FR6 (done 2026-11-05)
-  → FR7 (done 2026-11-06) → FR8 (done 2026-11-06) → FR12 (in progress) → FR10 → (FR11, optional)
+  → FR7 (done 2026-11-06) → FR8 (done 2026-11-06) → FR12 (done 2026-11-06) → FR10 → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.
 See "FR0 decision and plan revisions" for the changes to FR1–FR6.
