@@ -17,7 +17,7 @@ playtesting remain open. The normal loader still omits this experimental convers
 
 ## Release validation
 
-Step 6 is in progress. All thirteen native-reference fixture groups pass on both the
+These checks predate the current step numbering (now steps 8–9). All thirteen native-reference fixture groups pass on both the
 selected N=3 A500 and N=12 68020 paths, for 26 completed groups with the
 displayed-buffer correction enabled. Exact captures, listings, installed-hook results
 and checker output are under `tmp/release60/native-fixtures`. These private
@@ -615,7 +615,8 @@ builds. Evidence: `tmp/fast60/corrected/play60-smoke-68000/validation.json` and
 execution and disconnected controls; they establish neither audible output nor
 physical-control behavior. Final source identities match all forty fresh matrix
 cells, and retained audited build hashes match their binaries.
-These fixtures do not replace step 6's full-encounter and physical-control tests.
+These fixtures do not replace the full-encounter and physical-control tests (open-work
+steps 8 and 10).
 
 ### Observed cache configuration
 
@@ -644,13 +645,202 @@ coherency or validate the emulator's fast-CPU instruction timing.
 Evidence: `tmp/fast60/cache/validation.json`, the separate captures and the
 exact scratch probe listing/binary under `tmp/fast60/cache-build`.
 
+## A500 interrupts and the sound timer
+
+Open-work step 6. Fresh 100-field instruction profiles on `a500-1.5m` (NTSC,
+68000, 512 KB chip + 1536 KB slow), 15 Hz VERIFY build with the step 5 polygon
+BLIT wrapper: SOL from tick 150, late type-10 from 1125 (level 6), boss from 875.
+`tools/interrupt_profile.py` starts a dispatch at each Kickstart 1.3 autovector
+entry (KickEmu's RAM copy) and ends it at its RTE. It names the source by the
+INTREQ vector taken, and CIA-B dispatches by the cia.resource ICR bit. Shares are
+of all recorded cycles; a field is 119665 cycles.
+
+| Source | SOL | Type-10 | Boss |
+|---|---:|---:|---:|
+| All interrupt dispatch | 17.42% | 20.67% | 14.85% |
+| CIA-B timer A (sound): dispatches/field, cycles each | 0.79, 10844 | 1.23, 10778 | 0.80, 10530 |
+| CIA-B timer A share | 7.16% | 11.08% | 7.04% |
+| BLIT: dispatches/field (557 cycles each) | 11.50 | 10.01 | 6.37 |
+| BLIT share | 5.35% | 4.66% | 2.97% |
+| VERTB share (one per field, ~5870 cycles) | 4.90% | 4.93% | 4.85% |
+
+The timer rate follows the music tempo, about 47 Hz in SOL and at the boss and
+74 Hz in this type-10 window. Turning the native Music or Sounds preference off
+(PREFERENCES_CHOICE=3/4 at tick 100, both confirmed changed 1→0) leaves the
+handler's cycles identical: the instruction streams are the same, while the two
+runs' Paula volume words differ. Music off zeroes music channel volumes and
+does not skip channel updates.
+
+### Sound-timer handler
+
+The driver is Mark Riley's Sonix music driver, version 2.3b (copyright string at $248a).
+Kickstart dispatch costs about 1080 cycles per timer call: exception,
+autovector, server walk at kick $fc1338, cia.resource at $fc4678 and ExitIntr.
+Handler $1126 saves D0–A6, calls an optional hook at 42(a6), then the
+eight-ramp volume loop $1448, auto-stop scan $14a4, sequencer $1190 and the
+channel pass $134c. Per call, in the type-10 window (self cycles, all
+callees attributed to their own range):
+
+| Range | Cycles/call | Role |
+|---|---:|---|
+| $23fa | 1472 | sampled-instrument steady tail: period, envelope, volume |
+| $d20 | 1243 | sample countdown: `59659/period`, × tempo |
+| $134c | 1175 | first channel loop, vtable calls 12(a4) |
+| $1190 | 1010 | sequencer tick |
+| $ccc, $cec | 615, 599 | channel volume, pitch override/bend |
+| $13a0 + $c4a | 569 + 486 | second loop and Paula writes, 16(a4) |
+| $22d4 entry | 514 | method dispatch on status |
+| $1126, $1448, $14a4 | 414, 413, 324 | handler, ramps, auto-stop |
+
+All four channels use the sampled class at $2084 (vtable $2090 → $22d4,
+$2094 → $c4a) in all three windows, in steady sustain with no bend or ramp.
+The Paula method writes AUDxPER and AUDxVOL on every call for every allocated
+channel, and AUDxLC/LEN only when a sample or loop pointer is pending. DMACON
+is written once per call (`$8000` with no new channel).
+
+`SOUND_FAST=1` (`src/sound60.s`, on for the 68000 target) redirects $134c, whose
+only caller is $1144. It keeps both loops, status transitions and write order;
+inlines the sampled class's steady tail and Paula method; and keys each
+channel's $d20 decrement by its exact divisor and tempo. The volume is 0
+whenever the level is 0 (`((x*0)>>16+1)>>2`; about 60% of steady channel
+updates in SOL are silent). Otherwise it is cached per channel by its three
+inputs: channel volume, note volume and level. A steady status byte is written
+only when it changes. Loop 2 skips the class lookup when loop 1 called no native
+method, because every channel still allocated then took the sampled steady path. A zero divisor is
+never cached, so the native divide-by-zero behaviour stays. Note starts
+(status 1) and other classes call the native methods. Install guards check the
+displaced instructions, the caller, the vtable branches and the bend table.
+
+`SOUND_TWIN=1` (VERIFY) checks every timer call. A RAM copy of native
+$134c..$13db, with its two Paula constants pointing at a shadow block, runs
+twice from the same channel records, the block pre-filled with $5555 and then
+$aaaa. A word counts as written exactly when both runs leave the same value.
+The replacement runs the same way. Records (336 bytes) and written words must
+match, and then the replacement's real run must reproduce the native records.
+Calls with a native note start are run normally and counted as skipped.
+
+| Capture (boot to checkpoint) | Compared calls | Skipped | Written words | Errors |
+|---|---:|---:|---:|---:|
+| SOL to tick 375 | 26623 | 572 | 200883 | 0 |
+| Type-10 to tick 1350 | 64036 | 2749 | 356388 | 0 |
+| Boss to tick 1025 | 28199 | 938 | 216794 | 0 |
+| `SOUND_TWIN_BAD` (volume +1) to tick 200 | 7873 | 315 | 31760 | 3098 per kind |
+
+The retained version (silent and cached volume, class skip) was rerun with
+`BLIT_IRQ_IDLE` on. The twin runs the replacement twice from the same records,
+so the second run and the real run take the cache hits the first run filled:
+
+| Capture (retained version) | Compared calls | Skipped | Written words | Errors |
+|---|---:|---:|---:|---:|
+| SOL to tick 375 | 27694 | 475 | 210232 | 0 |
+| Type-10 to tick 1350 | 63620 | 2500 | 353001 | 0 |
+| Boss to tick 1025 | 29969 | 844 | 232472 | 0 |
+| `SOUND_TWIN_BAD` to tick 200 | 7441 | 273 | 27680 | 2655 per kind |
+
+An earlier replacement that wrote period and volume only alongside a new
+sample pointer matched all channel records but failed 18340 calls on written
+words. The twin caught it before any measurement. Native-sound
+(`SOUND_FAST=0`) and replacement captures match mapped gameplay state
+(`simulation_state.py`) at ticks 375, 1350 and 1025, for both the plain
+replacement and the twin builds.
+
+| Route | Timer cycles/field: native → first → retained | $1126 per call | $134c per call | Whole frame (retained) |
+|---|---:|---:|---:|---:|
+| SOL | 8567 → 7373 → 7061 | 9767 → 8155 → 7757 | 6681 → 5161 → 4710 | 1.26% |
+| Type-10 | 13257 → 11326 → 10932 | 9736 → 8148 → 7758 | 6940 → 5217 → 4844 | 1.94% |
+| Boss | 8424 → 7038 → 6709 | 9484 → 7851 → 7449 | 6586 → 4914 → 4524 | 1.43% |
+
+Alone, this is under the 3% whole-frame rule. It is retained together with
+`BLIT_IRQ_IDLE` (below), which the two clear together. Caching the period or
+the whole steady update by its inputs does not pay on the 68000. Each
+compared input costs a load, a compare and a branch (about 34 cycles), roughly
+what the multiply it replaces costs (42–58 cycles), so only the volume (two
+multiplies, three inputs) and the silent case are cached.
+
+`tools/paula_writes.py` lists every audio write from the trace's DMA records
+(CPU word writes with beam slot). Instruction time ÷ 2 lands within about 100
+slots of the matching DMA write. The tool compares windows by (register,
+value) sequence. Baseline and replacement windows are not identical: each
+starts at a different point of the music, because the builds reach a tick at
+different real times. Per-call equality therefore rests on the twin. No SDL
+recorded-audio comparison was made, because the change is not retained.
+
+### Blitter and frame interrupts
+
+Kickstart 1.3's BLIT handler at $fc6dfa clears the request, finds the QBlit
+queue empty and returns: 85 of 557 cycles; the rest is generic dispatch.
+Inside the polygon wrapper, 74–103 BLIT dispatches remain per 100 fields (the
+pending request taken at restore). Outside it, 1047, 927 and 560 come from:
+
+| Interrupted chain (SOL count) | Blitter use |
+|---|---|
+| $1e138 → glue $25210 → WritePixel (264) | Kickstart, owns internally |
+| $09c18 → $18340 → $1bc94 native blits (171) | no OwnBlitter |
+| $1bc94 → $1ce2e → WaitBlit (155) | no OwnBlitter |
+| $1de00 → glue $25150 → Draw (101) | Kickstart, owns internally |
+| $04232 → $0d372 → $1bc94 (87) | no OwnBlitter |
+
+The only native ownership scopes are the polygon caller ($14c56/$14c62), an
+immediate own/disown at $1c624/$1c62a, $1e1e8–$1e208 and $1f422–$1f5f0. None
+appears among the interrupted chains. Masking a single OS call only defers its
+one interrupt, so no further scope meets the polygon proof.
+
+The interrupt itself is not needed outside Kickstart's own queue. Kickstart 1.3
+graphics.library enables INTENA BLIT whenever it queues work: QBlit at $fc5916,
+QBSBlit at $fc641e and DisownBlitter with a pending queue at $fc6508. Its handler
+disables it again when the queue empties ($fc6e76). QBlit with the enable clear
+runs a multi-part blit synchronously ($fc5934). WaitBlit and OwnBlitter's waiting
+use DMACONR and task signals, not the interrupt. The game installs no BLIT
+handler: every profiled dispatch reaches $fc6dfa. Stock A1200 traces already
+show the enable clear.
+
+`BLIT_IRQ_IDLE=1` (`src/blit60.s`, the 68000 default) therefore masks the enable
+from the native field callback ($11748, frame interrupt) whenever it finds it
+set while Kickstart is idle: QBlit queue (GfxBase+58), beam queue (+66) and
+QBlit-in-progress bit (+169 bit 1) all clear. It rechecks after the write; work
+queued in between could come only from a level-6 QBSBlit timer, and gets its
+enable back with its request still pending. Requests are never cleared. Install
+guards check graphics.library version 34 and the QBlit/QBSBlit instructions that
+read those fields. The polygon wrapper is superseded and not built.
+`BLIT_IRQ_IDLE=0` restores it.
+
+VERIFY counters (`tools/blit_idle_state.py`) at the checkpoints show one mask
+per run (at boot) and no field with Kickstart's queue active or a restore:
+4250 fields to SOL tick 375, 26353 to type-10 tick 1350 and 6858 to boss tick
+1025. No BLIT dispatch remains in the profiles. Mapped state matches the native
+references at all three checkpoints, and the frames render normally.
+
+| Route | Interrupt share: native | `BLIT_IRQ_IDLE` | + retained `SOUND_FAST` | Cycles freed |
+|---|---:|---:|---:|---:|
+| SOL | 17.42% | 12.27% | 10.87% | 6.55% |
+| Type-10 | 20.67% | 16.18% | 14.12% | 6.55% |
+| Boss | 14.85% | 12.04% | 10.57% | 4.28% |
+
+All six combined and twin checkpoints match the native-sound, polygon-wrapper
+references in mapped state. `BLIT_IRQ_IDLE=0 SOUND_FAST=0` rebuilds the step 5
+68000 slave byte for byte; the original and Sim60 slaves are unchanged. The
+traced windows hold too few frames to show a frame-rate change; step 7 measures
+it.
+
+The frame interrupt runs the game's callback dispatcher $1c6e8 (about 2190
+cycles). That includes the slave's input sample `s60_history_sample` (1120
+cycles: 128 key bytes copied with a MOVE.L loop), plus graphics VBL $fe5824
+(1710) and KickEmu's `gfx_vbserver`. A MOVEM copy would save about 300 cycles
+per field (0.25%); not done.
+
+Evidence: `tmp/irq6/` (`validation.json`, each capture's `report.txt`,
+`interrupts.txt`, `twin.json`, `paula-compare.json`; runners `run_profiles.sh`,
+`run_twin.sh`, `run_fast.sh`), `tmp/blit/` (`BLIT_IRQ_IDLE` only) and
+`tmp/combo/` (retained build: twins, profiles, `blit.json`, `validation.json`).
+
 ## Rendering cost and presentation
 
 Both paths draw only newly completed ticks (`RENDER_NEW_TICK=1`) and call the
 native presentation routine. The `BUFFER_REUSE=1` field-counter guard also
 protects the displayed bitmap while simulation polling continues. Its matrix,
 scanout and gameplay regression results are recorded above. The 68000 target additionally enables
-`POLYGON_BLIT_IRQ=1`; 68020+ retains the native polygon call. No interpolation,
+`POLYGON_BLIT_IRQ=1`, which since step 6 selects `BLIT_IRQ_IDLE` instead of the
+polygon wrapper described here; 68020+ retains the native polygon call. No interpolation,
 extrapolation, intentional pose delay or simulation-rate change is involved.
 
 ### Measured opportunity and implementation

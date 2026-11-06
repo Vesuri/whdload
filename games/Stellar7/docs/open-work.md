@@ -18,8 +18,9 @@ cross-rate trajectory differences must be identified and explained.
 Each implementation step ends with measurements in `docs/internals.md`,
 commands in `docs/development.md` and a coherent commit following AGENTS.md.
 The source default remains N=12; the 68000 playable build explicitly selects
-N=3. Steps 1–5 are complete. Step 6 remains: broader release validation and
-physical-control, pace and audio playtesting.
+N=3. Steps 1–6 are complete; step 6 retained two exact 68000 interrupt changes.
+Steps 7–11 remain, in order: a fresh baseline on the three validation machines, encounter
+coverage, final build checks, playtesting and the release.
 
 ### Existing evidence and limitations
 
@@ -40,7 +41,7 @@ The lower 68000 rate resolves the measured update-debt problem in this route,
 with current early/late presentation comparisons recorded in internals.
 Step 5 now measures the fast-CPU drawing limit and extended combat through
 natural death. The corrected selected-rate matrix passes; broader encounters
-and physical-control playtesting remain in step 6.
+and physical-control playtesting remain in steps 8 and 10.
 
 ### Step 1: Restore and verify the 60 Hz baseline
 
@@ -88,7 +89,7 @@ Input-consumption and render-handoff delays are measured in fields. They are
 not physical-device or display-scanout latency bounds. Input history fixes
 which controls overdue ticks receive; reducing catch-up delay remains part of
 the performance work. Physical-control and visible-response playtesting remains
-in step 6. No interpolation has been added.
+in step 10. No interpolation has been added.
 
 ### Step 3: CPU-specific fixed rates and simulation optimization
 
@@ -187,7 +188,7 @@ The completed matrix records both current corrected performance and
 the measured presentation cost against the unfixed build. The final source
 identity matches all forty fresh matrix cells; both launcher releases match
 the audited builds. Broader encounter, physical-control and audio checks remain
-in step 6.
+in steps 8 and 10.
 
 Measure field boundaries, buffer handshakes, blitter/chip-bus contention and
 cache policy on 68030/040/060 at N=12. Determine the cause of the presentation
@@ -200,73 +201,148 @@ at the same rate.
 Report presentation rates and input latency alongside that result. Native FPS
 is a performance comparison; retain 60 Hz on the 68020+ path. Any unresolved A500 limitation must be explicit before release decisions.
 
-### Step 6: Release validation and playtest
+## Remaining work
 
-Status: in progress. All 26 native-reference fixture groups pass on the
-selected 15 Hz A500 and 60 Hz 68020 paths. Combined preference changes and
-re-enabling pass through the native menus at both rates. Input-driven cycling
-through six overlapping powers and a jump/landing also pass at both rates;
-lethal shield contact and controlled airborne/landed terrain contacts pass at
-both rates. Lethal mine contact and native mine destruction also pass; visual/audio
-detonation and arbitrary terrain remain open. Incoming-projectile midair impacts
-also pass at both rates. Powered input-only pilots now clear the full SOL wave, kill its full-strength
-boss and take the native exit to level 1 at both rates; direct native-event
-verification passes. Full-health final-boss kills and native ending entry/return
-also pass at both rates after explicit earlier-level/wave shortcuts. Later full
-waves remain open. Natural
-combat death, Continue and No/menu/new-game pass at both rates after
-fixture-controlled earlier exits to level 6. Evidence is retained under
-`tmp/release60`; completed step-5 measurements remain the current performance
-reference. The normal loader still excludes SIM60. Release 2.0b (05.11.2026), `make dist`'s
-`Stellar7Enhanced-2.0b-20261105.lha`, packages the current builds; it does not complete
-step 6.
+Steps 7–11 run in order; step 6 is complete. Each change ends with its measurements in
+`docs/internals.md`, its commands in `docs/development.md` and its own commit.
 
-Completion requires the following evidence on both selected paths:
+### Validation machines
 
-- Native-reference replacement checks and full encounter runs, including
-  full-strength boss kills, ending, natural deaths and Continue/No. Existing
-  shortened-wave and reduced-health fixtures retain their narrower scope.
-- Level/UI transitions, combined preference changes and re-enabling, active
-  power cycling and combat effects, jumps over terrain and midair impacts,
-  lethal shield/type-43 hits, boss helpers and mine detonation.
-- Exact-build disabled-code, hook and indirect-entry checks, diagnostic
-  exclusion and actual playable-launcher checks after any fixes.
-- Playable controls, visible response, sound and original-reference pace.
-  Automated input/state checks alone do not establish subjective control feel
-  or audible output; record the actual observation used for each conclusion.
-- Current documentation, removal of unused tools, a release decision supported
-  by those checks, and commits following the repository conventions.
+Every remaining step uses three NTSC machines, the AmigaXDev named setups in
+`game.conf` `SETUPS` (`tools/machines.py`, `docs/development.md` "Validation
+machines"):
 
+| Setup | Build | Role |
+|---|---|---|
+| `a500-1.5m` | Sim68000, 15 Hz | the 68000 path and the performance limit |
+| `a1200-fast` | Sim60, 60 Hz | the typical 68020 path |
+| `a1200-060` | Sim60, 60 Hz | the fast end: MMU, data cache, not cycle-exact |
 
-Run native twins, full encounters, boss kills/ending, natural deaths,
-Continue/No, level/UI transitions, powers, jump and preferences at each selected rate on
-its CPU path. Repeat disabled-byte preservation, hook/indirect-entry checks,
-diagnostic exclusion and play60 smoke tests. Keep PAL timing coverage separate
-from claims about the supplied NTSC game's audiovisual behavior.
+They replace the earlier eight-configuration matrix. Its recorded results remain
+references, but its fast-RAM A1200 (4 MB) and 68060 (no MMU, cycle-exact, data cache
+off) differ from these setups, so steps 6 and 7 measure afresh (step 6 on `a500-1.5m`). The coverage that
+already passes (step 8) ran on the earlier explicit 68000 A500 and 68020 A1200
+(4 MB fast) configurations. Raw captures behind earlier evidence were pruned on
+2026-11-04; recorded verdicts stand, but any re-check needs a fresh capture.
 
-Playtest real controls, sound, original-reference pace and responsiveness.
-Only after correctness and performance validation consider enabling SIM60 in
-the normal loader. Update current docs and remove unused tools.
+### Step 6: A500 interrupt and sound-handler cost
 
-## Remaining release validation
+Status: complete. Fresh 100-field profiles on `a500-1.5m` with the 15 Hz VERIFY
+build (`tools/interrupt_profile.py`) put interrupt dispatch at 17.4% of cycles in
+SOL, 20.7% in late type-10 combat and 14.9% at the boss. The 68000 build now
+frees 6.6%, 6.6% and 4.3% of all cycles there (interrupt share 10.9%, 14.1%
+and 10.6%):
 
-The conversion remains experimental. The plan above includes lower-rate
-68000 selection and excludes interpolation. Input history is complete; broader coverage includes:
+| Source | SOL | Type-10 | Boss | Retained |
+|---|---:|---:|---:|---|
+| Blitter-finished (Kickstart handler, no-op) | 5.4% | 4.7% | 3.0% | masked while Kickstart's queue is idle: all removed |
+| Sound timer (CIA-B timer A, hunk $1126) | 7.2% | 11.1% | 7.0% | exact channel pass: 1.3%, 1.9%, 1.4% saved |
+| Frame interrupt (VERTB) | 4.9% | 4.9% | 4.9% | unchanged: slave share under 1% |
 
-- Broaden full-encounter coverage at both selected rates: boss kills and ending,
-  later natural deaths, level and UI transitions,
-  boss helpers and visible/audible mine detonation. Lethal shield/type-43 contact
-  and native mine destruction pass at both rates. Controlled placement, native twins and
-  sampled mapped-state comparisons do not cover every encounter branch.
-- Extend the passing input-driven power-cycle checks to combat effects, and
-  jump checks to arbitrary terrain. Incoming-projectile midair impacts pass at
-  both rates. Combined preference
-  changes and re-enabling pass; additional native dialog paths remain.
-- Confirm original-reference gameplay pace and the reconstructed loader's
-  behavior through playtesting. The modern KickEmu loader is not a byte-identical
-  rebuild of the supplied 2008 slave.
-- Finish replacement-semantic and indirect-entry coverage before enabling
-  SIM60 in the normal loader. Static patch-boundary checks and observed
-  calls/returns leave exceptions, external-source returns and unseen paths
-  outside coverage. Keep disabled-code preservation and diagnostic exclusion
-  in the final release checks.
+Kickstart 1.3 enables the blitter interrupt itself whenever it queues a blit and
+disables it when its queue empties. The game queues none, so the interrupt
+only costs dispatch time. `BLIT_IRQ_IDLE` (`src/blit60.s`) masks it from the
+field callback whenever Kickstart's queue is idle, rechecking after the write.
+It supersedes the step 4 polygon wrapper. VERIFY counters show one mask per run
+and the queue never active, over 4250–26353 fields per route.
+
+The sound timer is the Sonix music driver. `SOUND_FAST` (`src/sound60.s`)
+replaces its per-channel pass at $134c with an exact inline version. It caches
+the divide and the volume, and computes no volume for silent channels. The
+VERIFY twin compared it with native $134c on 121283 timer calls across SOL,
+type-10 and boss: identical channel records and 795705 identical written Paula
+words. The altered build fails. Alone, its gain is below the 3% rule, so it is
+retained only together with the blitter change. Caching the period or the whole
+update does not pay on the 68000.
+
+Mapped gameplay state matches the native references at every checkpoint. Both
+changes are 68000-only. The original and Sim60 slaves are byte-identical to step 5,
+and `-DBLIT_IRQ_IDLE=0 -DSOUND_FAST=0` rebuilds the step 5 68000 slave. In the
+frame interrupt, the slave's input sample costs about 0.9%; a movem copy would
+save 0.25%, so it is unchanged. Whether the freed time raises the A500 frame rate
+or allows 20 Hz is measured in step 7. Measurements are in internals ("A500
+interrupts and the sound timer").
+
+### Step 7: Fresh baseline on the three machines
+
+Status: not started. Step 6 changed only the 68000 slave (blitter interrupt and
+sound pass). Check here whether its freed time raises the A500 frame rate.
+
+1. Run the matrix with selected rates on all three machines
+   (`tools/rate_matrix.sh tmp/three/main --selected-rates`), plus native-combat
+   and the A500 heavy route; verify it with `rate_matrix_report.py`.
+2. Run extended combat to natural death (`tools/sustained_combat.py`) on all
+   three. Require the selected average rate with no accumulating pending trend.
+3. Port the earlier release-validation runners still needed from untracked
+   `tmp/release60` into
+   `tools/`, selecting machines with `SETUP` instead of explicit CPU and memory
+   variables.
+4. Re-run the input-history fixtures (recorded controls, native key queue),
+   same-rate state comparisons (`a1200-fast` against `a1200-060` at N=12),
+   delayed-draw and lifecycle comparisons (death, Continue, No, exits), the
+   buffer-reuse display-stability check on `a1200-060`, and the build and
+   off-byte identities.
+
+### Step 8: Encounter coverage at both rates
+
+Status: in progress. Run each item on `a500-1.5m` (15 Hz) and `a1200-fast`
+(60 Hz), with `a1200-060` for the final full run.
+
+Already passing on the earlier configurations: all 26 native-reference fixture
+groups; combined preference changes and re-enabling through the native menus;
+input-driven cycling through six overlapping powers; a jump and landing; lethal
+shield contact; controlled airborne and landed terrain contact; lethal mine
+contact and native mine destruction; incoming-projectile midair impacts; the full
+SOL wave, its full-strength boss and the native exit to level 1, with direct
+native-event verification; full-health final-boss kills and native ending entry
+and return after explicit earlier-level and wave shortcuts; natural combat death,
+Continue and No/menu/new-game after fixture-controlled exits to level 6.
+
+Still to run:
+
+1. Full waves and full-strength boss kills in levels 1–6 without wave shortcuts,
+   including each level transition and the ending.
+2. Boss helpers in each boss encounter.
+3. Mine detonation checked by display capture and recorded audio.
+4. Jumps and landings over arbitrary terrain, not only the controlled contacts.
+5. Each power active during combat: its effect on hits, shots and contacts.
+6. Natural deaths in later levels, with Continue and No.
+7. The remaining native dialog paths.
+
+### Step 9: Final build checks
+
+Status: not started; repeat after the last fix.
+
+1. Disabled-code preservation and the normal loader byte-identical to the
+   original timing (it stays without SIM60 unless step 11 decides otherwise).
+2. Hook and indirect-entry checks on the exact release builds. Static
+   patch-boundary checks and observed calls and returns leave exceptions,
+   external-source returns and unseen paths outside coverage; close what can be
+   closed before step 11 considers SIM60 in the normal loader.
+3. Diagnostic exclusion: no VERIFY-only code in the release builds.
+4. `make play60` launcher checks on all three machines and
+   `tools/test_play60_launcher.py`.
+
+### Step 10: Playtest
+
+Status: not started; needs you to play. Automated checks cannot settle these.
+
+1. On each machine, play `make play60 SETUP=<machine> WINDOW=front` with sound,
+   and the original slave (`make run SLAVE=original`) on the same machine.
+2. Check controls and visible response, music and sound effects, and pace against
+   the original. On the A500, check that 15 Hz control feels acceptable; try
+   `SIM68000_SUBSTEPS=4` (20 Hz) for comparison.
+3. Check the reconstructed loader's behaviour: the modern KickEmu loader is not a
+   byte-identical rebuild of the supplied 2008 slave.
+4. Record each observation, and the machine it came from, in internals.
+
+### Step 11: Release
+
+Status: not started.
+
+1. Remove tools no longer used by a current check; update the docs in place.
+2. Decide the release and whether the normal loader gets SIM60.
+3. The slaves' `$VER`, the ReadMe and the local
+   `dist/Stellar7Enhanced-2.0b-20261105.lha` carry a provisional 2.0b label dated
+   05.11.2026. Nothing is published. Set the version and date when releasing,
+   then `make dist`, and `make release` only on your go.

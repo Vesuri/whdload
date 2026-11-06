@@ -15,8 +15,10 @@ simulation rates, although slow machines still show substantial response delays.
 The buffer-reuse correction now waits for the native display handoff before
 starting another draw, while simulation continues. Its fresh performance matrix,
 extended-combat, input, lifecycle and both launcher checks pass. Step 5 is
-complete; broader gameplay, physical-control, pace and audio playtesting remain
-open in step 6.
+complete. Step 6 cut A500 interrupt time: the 68000 build masks Kickstart's unused
+blitter-finished interrupt and runs an exact faster pass of the music driver's channel
+update, freeing 4–7% of the A500's cycles in gameplay. Remaining, in order (`docs/open-work.md`): a fresh baseline on the three
+validation machines, encounter coverage, final build checks, playtesting and the release.
 
 Launch the separate experimental build from this directory:
 
@@ -36,7 +38,8 @@ rates at runtime. Scripted tests use the existing VERIFY fixtures.
 To try 20 Hz on the 68000, use `make play60 SIM68000_SUBSTEPS=4`.
 Without that override the next launch rebuilds the selected 15 Hz default.
 
-Build the installer archive, Stellar 7 Enhanced 2.0b, with `make dist`: the repository's
+Build the installer archive, Stellar 7 Enhanced (provisionally 2.0b; not released), with
+`make dist`: the repository's
 `dist/Stellar7Enhanced-2.0b-20261105.lha` and its checksum. It includes both CPU builds
 and an installer choice, and the installed icon of a fixed-rate build enables it with
 `CUSTOM1=1`; original English NTSC disks are required.

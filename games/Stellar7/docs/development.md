@@ -14,8 +14,8 @@ Selected-rate checks pass. The normal loader remains unchanged.
 make slave                         # both playable variants
 make play60                             # default A500, 15 Hz
 make play60 SIM68000_SUBSTEPS=4          # A500 playtest at 20 Hz
-CPU=68020 AMIGA_MODEL=A1200 CHIP_KB=2048 FAST_KB=4096 SLOW_KB=0 \
-  KICKSTART="$KICKSTART_A1200" make play60 # 60 Hz
+make play60 SETUP=a1200-fast             # 60 Hz
+make play60 SETUP=a1200-060              # 60 Hz, fast end
 ```
 
 The `Stellar7-Sim68000` variant has default N=3; `Stellar7-Sim60` has default N=12. `SIM68000_SUBSTEPS=4` selects N=4 for
@@ -43,8 +43,8 @@ with an adjacent `.sha256`. The version and date come from the release slaves' `
 strings (`$VER: <installed name> 2.0b (05.11.2026)`, each named as the installer ships it:
 `Stellar7.slave`, `Stellar7-Sim68000.Slave`, `Stellar7-Sim60.Slave`); all three must agree.
 The string ends the code hunk, so it is the only byte change from the builds the evidence
-in this document was recorded with. Release 2.0b does not complete step 6: the ReadMe
-lists the open playtesting.
+in this document was recorded with. The 2.0b label and date are provisional: nothing is
+released until open-work step 11, which sets them.
 
 Packaging starts with a fresh extraction of `tmp/archives/Stellar7.lha`. It replaces the
 normal slave, ReadMe (its `Short:` line and title read "Stellar 7 Enhanced", with a
@@ -132,18 +132,22 @@ post-presentation field saved at `-22(a5)` still equals the current field.
 Drawing resumes after the field advances, allowing the display handoff to
 finish before reusing the old bitmap. This adds no interpolation and does not defer owed simulation updates.
 `BUFFER_REUSE=0` is an unsafe diagnostic reference, not a playable setting.
-`sim68000` additionally enables `POLYGON_BLIT_IRQ=1`; the `sim60` source default
-is zero. The matrix driver matches this CPU policy for non-native 68000 cells,
+`sim68000` additionally enables `POLYGON_BLIT_IRQ=1`, which marks the 68000
+target and defaults `BLIT_IRQ_IDLE=1` (BLIT masked while Kickstart's blit queue is
+idle, superseding the polygon-only wrapper) and `SOUND_FAST=1` (the exact sound-timer
+channel pass); the `sim60` source defaults are zero. The matrix driver matches this CPU policy for non-native 68000 cells,
 including PAL; explicit route flags can select the reference arm.
 For direct VERIFY captures, add `-DPOLYGON_BLIT_IRQ=1 -DS60_SUBSTEPS=3`
-when testing the playable 68000 path. The all-off diagnostic definitions
+when testing the playable 68000 path. `-DBLIT_IRQ_IDLE=0 -DSOUND_FAST=0` with it
+reproduces the step 5 68000 slave (polygon wrapper, native sound pass). The all-off
+diagnostic definitions
 `-DBUFFER_REUSE=0 -DRENDER_NEW_TICK=0 -DRETICLE_CLOCK=0 -DPOLYGON_BLIT_IRQ=0` reproduce the
 preceding input-history N=12 release/VERIFY bytes.
 
 ```sh
 . ../../common/env.sh
-tools/rate_matrix.sh tmp/render-check --substeps 3 --machines a500 --routes type10-heavy sol boss
-tools/rate_matrix.sh tmp/render-stock --substeps 12 --machines a1200-stock --routes type10-heavy
+tools/rate_matrix.sh tmp/render-check --substeps 3 --machines a500-1.5m --routes type10-heavy sol boss
+tools/rate_matrix.sh tmp/render-stock --substeps 12 --machines a1200-fast --routes type10-heavy
 WHD_ARGS='CUSTOM1=1 CUSTOM3=1' \
 VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=3 -DPOLYGON_BLIT_IRQ=1 -DRETICLE_TEST=100 -L tmp/reticle.lst' \
 python3 tools/fixed_window.py tmp/reticle --tick 101 --state-only --fields 1
@@ -234,12 +238,12 @@ tools/rate_matrix.sh tmp/current60/matrix
 python3 tools/rate_matrix_report.py tmp/current60/matrix
 tools/rate_matrix.sh tmp/current60/native-combat --routes native-type10-early native-type10-late native-boss
 python3 tools/rate_matrix_report.py tmp/current60/native-combat --routes native-type10-early native-type10-late native-boss
-tools/rate_matrix.sh tmp/current60/heavy --machines a500 --routes type10-heavy
+tools/rate_matrix.sh tmp/current60/heavy --machines a500-1.5m --routes type10-heavy
 python3 tools/rate_matrix_report.py tmp/current60/heavy --partial --routes type10-heavy
 ```
 
 The heavy report intentionally requests only A500. Main/native-combat reports
-require all eight machines. Successful fresh captures retain the emulator's
+require all three machines. Successful fresh captures retain the emulator's
 accepted settings separately from requested metadata. The initial two restored
 A500 cells predate that logging addition; the remaining A500 cells confirm its
 configuration. Chip and slow memory core units are 512 KB and 256 KB; fast
@@ -350,7 +354,7 @@ done
 ```
 
 The heavy report deliberately uses `--partial`: only its A500 cell is requested;
-the ordinary candidate report still requires all eight machines.
+the ordinary candidate report still requires all three machines.
 
 The retained N=1 regression below requires explicit `S60_SUBSTEPS=1`.
 The source-default regression uses `SIM60=1` alone and must report N=12;
@@ -414,16 +418,39 @@ and VERIFY builds omit this fixture. Do not resume a pre-fixture baseline
 under changed source identity; retain its directory and use a fresh prefix.
 
 
+### Validation machines
+
+The matrix, extended combat and new release checks run on three AmigaXDev named
+setups, always NTSC, listed in `game.conf` `SETUPS` and `tools/machines.py`:
+
+| Setup | Machine | Build |
+|---|---|---|
+| `a500-1.5m` | A500 OCS, 68000/7 MHz, 512 KB chip, 1.5 MB slow | Sim68000, 15 Hz |
+| `a1200-fast` | A1200 AGA, 68EC020/14 MHz, 2 MB chip, 8 MB fast | Sim60, 60 Hz |
+| `a1200-060` | A1200 AGA, 68060/50 MHz with MMU/FPU and data cache, 2 MB chip, 8 MB fast | Sim60, 60 Hz |
+
+`tools/machines.py` reads each setup's values and launch arguments from the
+shared launcher's `fsuae_setup`, so a capture boots exactly what
+`make run SETUP=<name>` boots. `fixed_window.py` boots `SETUP` (default
+`game.conf`'s); explicit `CPU`/`CHIP_KB`/`FAST_KB`/`SLOW_KB`/`AMIGA_MODEL`/`KICKSTART`
+without `SETUP` select `SETUP=custom`, as the earlier release-validation runners
+under `tmp/release60` do. Capture metadata records `setup` and `setup_args`, and
+`rate_matrix_report.py` checks the emulator's accepted CPU model, clock, cycle
+exactness, data cache and MMU against those arguments. `a1200-060` is not cycle-exact:
+UAE accepts its 50 MHz request but runs it as `cpu_multiplier=8`, so its clock is
+nominal, not exact. Recorded results from the
+earlier eight-configuration matrix (custom 4 MB fast RAM, 68030/68040/68060
+without MMU and cycle-exact, PAL checks) are references, not cells of this matrix.
+
 Run `tools/rate_matrix.sh tmp/rate-current` for
 the current default, or `tools/rate_matrix.sh tmp/rate-reference --substeps 12`
 for a fresh N=12 reference. Retain existing evidence under its original prefix.
 The driver runs one capture at a time and restores the normal development build.
-Use `--machines a500 a1200-stock` or `--routes sol native-90` for a subset;
+Use `--machines a500-1.5m a1200-fast` or `--routes sol native-90` for a subset;
 rerunning the same prefix skips completed cells with matching source/configuration.
 Incomplete cells are retained and reported, never silently replaced.
 `--boot-timeout 1800` is a wall-clock deadline for the same boot, not a dump
-count. A stock A1200 is captured from chip RAM; the other configurations use
-their actual slow/fast RAM regions.
+count. Captures read the game from the machine's slow or fast RAM region.
 For a retained diagnostic build, `fixed_window.py --prebuilt SLAVE` skips
 rebuilding and copies those exact bytes into the capture. Supply its matching
 flags/listing and do not mix it with another emulator run.
@@ -588,9 +615,9 @@ selected-rate performance and its scene limits are recorded in internals.
 
 `make run SLAVE=original` boots the shipped slave windowed with sound (debug and warp runs
 are silent and open behind other windows; `SOUND=` and `WINDOW=` override); without
-`SLAVE`, `make run` builds and boots the release `Stellar7` variant. Defaults (`game.conf`,
-`SETUP=custom`): 68000, 512 KB chip, 1536 KB slow RAM, no fast RAM, NTSC. This is an A500-equivalent
-bus configuration with enough memory for WHDLoad. The supplied game is NTSC;
+`SLAVE`, `make run` builds and boots the release `Stellar7` variant. The default machine
+(`game.conf`) is `SETUP=a500-1.5m` with `NTSC=1`: 68000, 512 KB chip, 1536 KB slow RAM, no
+fast RAM. `SETUP=custom` starts from the same A500 values. The supplied game is NTSC;
 the simulation uses 5*N Hz (default N=12) regardless of display mode. `NTSC=1` uses the emulator's `uae_ntsc=true` core option.
 The older `ntsc_mode` option did not alter this emulator's PAL scan timing.
 The driver now rejects a requested mode that disagrees with Exec's observed
@@ -603,6 +630,9 @@ harness. `python3 tools/stellar7.py shot tmp/screen.png` captures a field;
 `profile 10 tmp/trace.bin` captures ten fields with instruction PCs. Use `stop`
 and `cont` to hold/resume the emulated CPU. The `gdb` command is read-only;
 the emulator stub silently ignores memory/register writes.
+The server uses the shared `amigaxdev.gdbserve` profiler-window handling: the
+native FS-UAE build (it answers `monitor harness`) records PCs as it is, and only
+the older x86_64 build gets its PC window fixed through lldb.
 
 Use `gdb 'dump binary memory tmp/slow.bin 0xc00000 0xd80000'` for the default
 slow-memory snapshot, and `python3 tools/stellar7_report.py tmp/trace.bin
@@ -630,6 +660,53 @@ context, and the call is already active and has not returned. Entry, return,
 context-switch and missing-PC gaps are excluded; this remains a scoped cost,
 not total elapsed time. `tools/test_routine_cost.py` checks call/interrupt edges,
 partial calls and corrupt gap snapshots.
+
+### Interrupt and sound-timer checks
+
+`python3 tools/interrupt_profile.py CAPTURE --listing EXACT.lst [--out
+interrupts.json]` splits a traced capture's interrupt cycles by source (INTREQ
+vector, CIA-B ICR bit), with the handler call tree and Kickstart dispatch cost
+for each. It also lists the interrupted main-context chains of BLIT dispatches
+outside the polygon wrapper (when the build has one). The step 6 profiles use the
+usual VERIFY build on `a500-1.5m`, for example SOL:
+
+```sh
+SETUP=a500-1.5m VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=3 -DPOLYGON_BLIT_IRQ=1 -L tmp/irq6/sol.lst' \
+  WHD_ARGS='CUSTOM1=1 CUSTOM3=1' python3 tools/fixed_window.py tmp/irq6/sol --tick 150 --fields 100
+```
+
+`python3 tools/paula_writes.py list CAPTURE` lists every CPU write to an audio
+register from a trace's DMA records (DMACON and INTENA/INTREQ only when they touch
+audio bits), with field and beam slot. `compare A B` passes only on an identical
+(register, value) sequence and reports the largest timing shift. Windows from
+different builds start at different points of the music, so use the twin below
+for per-call equality. `tools/test_paula_writes.py` checks the register filter.
+
+`SOUND_FAST=1` (the 68000 default) builds the exact replacement of the sound
+timer's channel pass ($134c). `SOUND_TWIN=1` (VERIFY, requires `SOUND_FAST=1`)
+compares it with a RAM copy of native $134c on every timer call, and
+`SOUND_TWIN_BAD=1` perturbs it as a negative control.
+Capture state-only to a later tick and read the record from the last
+checkpoint:
+
+```sh
+SETUP=a500-1.5m VERIFY_FLAGS='-DSIM60=1 -DS60_SUBSTEPS=3 -DPOLYGON_BLIT_IRQ=1 -DSOUND_TWIN=1 -L tmp/irq6/twin-sol.lst' \
+  WHD_ARGS='CUSTOM1=1 CUSTOM3=1' python3 tools/fixed_window.py tmp/irq6/twin-sol --tick 150 --tick-checkpoints 375 --state-only --fields 1
+cp tmp/irq6/twin-sol/slave.slave tmp/irq6/twin-sol.slave
+python3 tools/sound_twin_state.py tmp/irq6/twin-sol --listing tmp/irq6/twin-sol.lst
+```
+
+The checker passes on compared calls, observed written words and zero state,
+write, real-run and reference errors; `--expect-errors` inverts it for the
+negative control.
+
+`BLIT_IRQ_IDLE=1` VERIFY builds count, in the field callback, the fields checked,
+masks applied, fields left enabled because Kickstart's queue or a QBlit was active,
+and masks undone because work was queued in between.
+`python3 tools/blit_idle_state.py CAPTURE --listing EXACT.lst` reads them from the
+last checkpoint and passes when the enable was masked and the queue was never found
+active. `tools/polygon_irq_trace.py` applies only to `-DBLIT_IRQ_IDLE=0` builds,
+which keep the polygon wrapper.
 The four retained collision-order profiles reproduce every prior instruction-only
 mean and completed-call count. Adding attributable gaps gives full-update means
 92303.10→90004.42 on A500 (2.49% lower) and 53499.50→52422.49 on delayed 68020

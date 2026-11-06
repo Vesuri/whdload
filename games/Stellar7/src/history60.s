@@ -171,6 +171,9 @@ s60_history_reset:
 ; not advance the private active-field sequence, matching s60_modal_return.
 s60_history_field:
         movem.l d0-d2/a0-a2/a4,-(sp)
+        IFNE BLIT_IRQ_IDLE
+        bsr s60_blit_idle
+        ENDC
         move.l (s60_code,pc),a0
         move.l (14,a0),a4
         move.w (s60_running,pc),d0

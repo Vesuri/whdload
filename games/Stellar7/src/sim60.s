@@ -10,6 +10,17 @@ RENDER_NEW_TICK = 1 ; draw each completed simulation state at most once
         IFND POLYGON_BLIT_IRQ
 POLYGON_BLIT_IRQ = 0 ; enabled by the 68000 target; 68020+ retains native drawing
         ENDC
+        IFND BLIT_IRQ_IDLE
+BLIT_IRQ_IDLE = POLYGON_BLIT_IRQ ; 68000: BLIT masked while Kickstart's queue is idle (blit60.s)
+        ENDC
+        IFND SOUND_FAST
+SOUND_FAST = POLYGON_BLIT_IRQ ; 68000: exact sound-timer channel pass (sound60.s)
+        ENDC
+        IFD SOUND_TWIN
+        IFEQ SOUND_FAST
+        FAIL "SOUND_TWIN requires SOUND_FAST=1"
+        ENDC
+        ENDC
         IFND SCAN_GEOMETRY_FIRST
 SCAN_GEOMETRY_FIRST = 1 ; native twins, boundary cases and extended combat verified
         ENDC
@@ -204,6 +215,12 @@ timing_install:
         ENDC
         bsr s60_motion_install
         bsr s60_draw_install
+        IFNE BLIT_IRQ_IDLE
+        bsr s60_blit_install
+        ENDC
+        IFNE SOUND_FAST
+        bsr s60_sound_install
+        ENDC
         IFNE HUD_CLOCK
         bsr s60_hud_install
         ENDC
@@ -994,6 +1011,12 @@ s60_project:
         INCLUDE idle60_test.s
         INCLUDE flat60_test.s
         INCLUDE draw60.s
+        IFNE BLIT_IRQ_IDLE
+        INCLUDE blit60.s
+        ENDC
+        IFNE SOUND_FAST
+        INCLUDE sound60.s
+        ENDC
         INCLUDE events60.s
         INCLUDE terrain60_test.s
         INCLUDE history60.s

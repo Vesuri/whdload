@@ -112,7 +112,9 @@ s60_draw_install:
 s60_draw_patches:
         PL_START
         IFNE POLYGON_BLIT_IRQ
+        IFEQ BLIT_IRQ_IDLE ; superseded: BLIT is already masked during the polygon
         PL_PS $14c5c,s60_polygon
+        ENDC
         ENDC
         PL_P $132b2,s60_mesh
         PL_NOP $132b8,2
@@ -360,6 +362,7 @@ s60_stars_update:
 ; Batch blitter completion notifications only while the native polygon caller
 ; owns the blitter. VBL and audio interrupt enables are never changed.
         IFNE POLYGON_BLIT_IRQ
+        IFEQ BLIT_IRQ_IDLE
 s60_polygon:
         subq.l #2,sp
         movem.l d0-d1/a0-a1,-(sp)
@@ -382,4 +385,5 @@ s60_polygon_restore:
         move.l (sp)+,d0
         addq.l #2,sp
         rts
+        ENDC
         ENDC
