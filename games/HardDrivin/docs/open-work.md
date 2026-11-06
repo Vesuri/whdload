@@ -1,3 +1,34 @@
+# The draw distance on faster CPUs, the car in replays on grass (2026-11-06)
+
+**Replays.** The user's drive of 480502d2 (recording 12.37.56, 0:55-0:57 and 1:43-1:54): in
+replays the player's car vanished on the grass. A car farther than both roads' last strip
+points was not drawn (`_depth_extent`, from the depth reorder), and the replay camera stands
+off the road with only the sections near it drawn. The skip is gone (10f38b59): cars are
+drawn as the native order draws them, and the crash replay is still pixel identical to it.
+The grass case was not reproduced by a scripted drive.
+
+**Draw distance.** The user asked for 1.5 times the distance on faster machines, the A500 as it
+is, and the road extended only ahead. Native limits:
+- Each road takes 13 sections from 6 behind its cursor (`$DC00` the course road, `$DF52`
+  the stunt road; 7 at `$DF76` for the stunt road seen from another road), up to 40 when
+  sections are flagged (the strip buffers' size), and keeps the strip points between -700
+  and 4,000 units ahead (`$DF0A`, `$E298`, `$E2B0`). About 7 sections ahead: 3,500 units on
+  the course road (sections ~500 units), 2,900 on the stunt road (~420).
+- Objects are drawn within 4,000 units of the camera in X and Z (`$E364`-`$E38A` the
+  background list, `$E4E0`-`$E506` the sorted list of 100 entries; the course has 99
+  objects).
+- The road's and objects' points share a pool from G(-$1688), 3,600 bytes up to the road's
+  stream pointers G(-$878), with no check of its end.
+
+With CUSTOM1 nonzero on a 68020 or later (`_distance_patches`, AttnFlags): 17 and 11
+sections (4 more ahead), 6,000 units for the road and the objects, and the pool moved to
+16,000 bytes in the slave. The first build without the pool move faulted in
+`_depth_collect` (`CoreDump`: the stream pointers overwritten with an object's rotated
+points). Checked on the A1200/040: the course road drive to field 680 and the stunt road
+drive to field 660 run without a fault, the road reaches over the rise past the barn and
+farther signs appear; the crash replay is unchanged. On the A500 the patched sites keep the
+native bytes (read from memory after boot). The cost on the faster CPUs is not measured.
+
 # Cars and signs behind slopes, the car in replays (2026-11-06)
 
 The user's drives of 4.0b: on the stunt road past the barn (recording 09.28.11, 2:42-2:45)

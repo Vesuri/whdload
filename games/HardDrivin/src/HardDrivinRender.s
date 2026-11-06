@@ -28,6 +28,14 @@ _render_install:
 	adda.l #_code_start-_render_install,a1
 	movea.l (a1),a1
 	jsr resload_Patch(a2)
+	move.l _render_attn(pc),d0	; and farther on a 68020 or later
+	btst #AFB_68020,d0
+	beq.s .rotation
+	lea _distance_patches(pc),a0
+	lea _render_install(pc),a1
+	adda.l #_code_start-_render_install,a1
+	movea.l (a1),a1
+	jsr resload_Patch(a2)
 .rotation:
 	move.l _render_options(pc),d0
 	btst #1,d0
