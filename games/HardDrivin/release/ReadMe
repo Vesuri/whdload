@@ -91,9 +91,10 @@
  through it.
 
  Rendering optimizations are selected automatically: optimized rotations and
- blitter waits on 68000, and on 68020 with the executable in Fast RAM; optimized
- rotations on 68040/68060, and the original renderer on 68030. Other untested
- configurations retain the original renderer. CUSTOM3 is not a release option.
+ blitter waits on 68000, and on 68020 with the executable in Fast RAM;
+ optimized rotations on 68040/68060, and the original renderer on 68030.
+ Other untested configurations retain the original renderer. CUSTOM3 is not
+ a release option.
 
  Arcade handling:
  The car follows the arcade machine's own car model: tyre grip and slides,
@@ -142,23 +143,23 @@
  --------
  version 4.0b (06.11.2026) done by Vesa Halttunen:
  - added a Simulation option for the SPS 0126 edition: Original, Enhanced
-   framerate, or Enhanced framerate with arcade handling, the default for
-   new installs
- - Enhanced framerate: smoother gameplay on faster Amigas with the original
-   handling; traffic, replays and related animation and sound timing follow
-   elapsed time; automatic CPU-specific rendering optimizations
- - arcade handling: the arcade machine's car model, driven at the course's
-   real scale, with the mouse buttons as gas and brake pedals, a steering
-   response suited to the mouse, and the arcade's ramps, jumps, loop and
-   crash rules
- - added an Arcade brake option, Full or Soft, for arcade handling
- - added a Race timing option, Amiga or Arcade
- - with the enhanced settings, the road and objects are drawn in depth order
-   so cars no longer show through scenery, and traffic follows a slower car
-   in its lane instead of driving through it
+   framerate, or Enhanced framerate with arcade handling
+ - Enhanced framerate: smoother gameplay on faster Amigas, with movement,
+   traffic and replays following elapsed time, and automatic CPU-specific
+   rendering optimizations
+ - arcade handling: the arcade machine's car model at the course's real
+   scale, mouse buttons as gas and brake pedals, and the arcade's ramps,
+   jumps, loop and crash rules
+ - added an Arcade brake option, Full or Soft, and a Race timing option,
+   Amiga or Arcade
+ - new installs use arcade handling and arcade race timing
+ - the road and objects are drawn in depth order, so cars no longer show
+   through scenery, and traffic slows behind a slower car instead of driving
+   through it
+ - the frame delay (CUSTOM2) now applies only to the original simulation
  - fixed rare renderer crashes present in the original game
- - updated the installer using the WHDLoad Install Template, retaining all
-   five game editions and seven icon choices
+ - the installer is based on the WHDLoad Install Template and keeps all five
+   game editions and seven icon choices
 
  version 3.0 (23.03.2024) done by JOTD:
  - fixed keyboard on version SPS0126 (issue #0006342)
