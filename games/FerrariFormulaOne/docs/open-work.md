@@ -34,7 +34,7 @@ Commit each FR step when its gates pass; push only when asked. Production stays 
 into Fast memory (FASTRAM_PLAN "Code and data placement check"); that needs no new look.
 The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory checks.
 
-The current build is FR12's candidate (`766c50db…`, `tools/fr12_build.py`; FR8's was `e9ae9b3c…`); FR6's final
+The current build is FR12's candidate (`caff0a86…`, `tools/fr12_build.py`; FR8's was `e9ae9b3c…`); FR6's final
 build was k5 (`8ec61e11…`). `tmp/manifest/fr6-validation.json` and `fr8-validation.json`
 hold the FPS, gates and measurements; `tmp/logs/fr6-*.log`, `fr7-*.log` and `fr8-*.log` the
 gate, FPS, probe and profile logs. Next, in order:
@@ -43,15 +43,15 @@ gate, FPS, probe and profile logs. Next, in order:
    per frame and 50 FPS needs about 17.5 ms. Steps 1–6 are done (one-dot lines, zero
    words in the road fill, the whole car in one pass, the road lines and the area blits
    on their own paths; `tools/fr12_car.py` checks the car), and the copy waits for the
-   view switch (FASTRAM_PLAN "The view switch"). Normal, solo and grid draw every field;
-   dense is at 45.5 FPS with a 19.7 ms draw, the car pass 21 % of it
-   (`tools/fr6_trace.sh fr12-candidate`). Leaner per-blit work alone gave nothing
+   view switch (FASTRAM_PLAN "The view switch"); step 7 skips transparent car words.
+   Normal, solo and grid draw every field; dense is at 46.5 FPS with a 19.3 ms draw, and
+   the user wants it at one field too (2026-11-06). Its profile: the car pass, the bitmap
+   kernel, publication, the area and line paths (`tools/fr6_trace.sh fr12-candidate-pace-dense`
+   after `tools/fr12_build.py candidate --scenes`). Leaner per-blit work alone gave nothing
    measurable; only removing work shows up (030 I-cache layout noise is about 1 %).
-2. Steady motion (FASTRAM_PLAN "FR8 results", "Still open"; the user's decision 2026-11-06):
-   no frame rate traded for it. Measured again after the draw work: the ticks match the
-   fields on screen in 99.6–99.9 % of frames in normal, solo and grid, 88.7 % in dense.
-   The predicted-tick variant (running the ticks a frame needs up to the field it is
-   predicted to show in) would only change frames that take more than a field.
+2. Steady motion: done. After the draw work the ticks match the fields on screen in
+   99.6–99.9 % of frames in normal, solo and grid; the predicted-tick variant is dropped
+   (the user's decision, 2026-11-06).
 3. FR10: checkpoint and release.
 
 Commands, from this directory after `. ../../common/env.sh`, one emulator job at a time

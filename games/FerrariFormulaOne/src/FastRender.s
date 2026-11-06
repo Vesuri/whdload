@@ -1021,6 +1021,7 @@ FRC_WORD macro
  lsr.l d4,d1                    ; P0
  move.w d0,d5
  or.w d1,d5
+ beq.w .clear\@                ; M = 0: every plane keeps C
  not.w d5                       ; ~M
  if \1=2
  FRC_PLANE 2,a3
@@ -1040,6 +1041,12 @@ FRC_WORD macro
  if \3<>2
  FRC_PLANE \3,a0
  endif
+ bra.b .done\@
+.clear\@:
+ addq.l #2,a3
+ addq.l #2,a4
+ addq.l #2,a0
+.done\@:
  endm
 
 FRC_VARIANT macro               ; \1, \2, \3 = colours of planes 0, 1, 2

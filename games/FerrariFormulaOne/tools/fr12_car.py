@@ -5,7 +5,7 @@
 
 Assembles FRCar alone (FRSpan and FRMarkSpan stubbed: every span is in a mirror
 at +$40000), runs it under Unicorn on random cars (width, height, clipping, shift,
-position, colour bits) and compares planes 0 and 1 with the native sequence on
+position, colour bits, about 40 % transparent words) and compares planes 0 and 1 with the native sequence on
 tools/fr2_model.py's blitter: the mask blit (ABD $FC), the colour blit (the minterm
 of the table at $32d48) and the cookie-cut (ABCD $CA) with the native registers.
 Planes 0, 1 and 2 are compared, and the routine's end state: FRCar returns to its
@@ -83,8 +83,11 @@ def main():
         if w + 1 - d3 - d4 < 2:
             continue
         s = rng.randint(0, 15); cx = rng.getrandbits(3); cy = rng.getrandbits(3)
-        p0 = [rng.getrandbits(16) for _ in range(w * h + 4)]
-        p1 = [rng.getrandbits(16) for _ in range(w * h + 4)]
+        # About 40 % transparent words (P0 = P1 = 0), as in the car images: FRCar skips
+        # words whose shifted mask is zero.
+        clear = [rng.random() < 0.4 for _ in range(w * h + 4)]
+        p0 = [0 if c else rng.getrandbits(16) for c in clear]
+        p1 = [0 if c else rng.getrandbits(16) for c in clear]
         scr = [[rng.getrandbits(16) for _ in range(24 * (h + 2) + 40)] for _ in range(3)]
         x = rng.randint(0, 12); y = rng.randint(0, 1); off = d4 + 24 * y + x
         u = UC(cpu); u.w(0x1000, code); u.w(sy['FRTestTable'], struct.pack('>I', 0xd000))

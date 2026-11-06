@@ -1880,6 +1880,21 @@ Normal, solo and grid now draw every field. Dense is the one scene left
 above a field; its profile: the car pass 21 %, the bitmap kernel 6 %,
 publication 6 %, the area and line paths 8 %, row marking 3 %.
 
+**Step 7: transparent car words** (`FRC_WORD`). Where the shifted mask
+P1 | P0 is zero, every colour formula leaves C, so the pass skips the word's
+three planes. Host check (`tools/fr12_car.py`, now with about 40 %
+transparent source words): 0 mismatches in 3,000 cars on each CPU; a seeded
+fault in the skip was caught. Dense: 46.51 FPS against 45.52, the draw
+19.3 ms against 19.7. Checkpoint `caff0a86…` (arm `-merge0` `95943925…`):
+030‑50 BCE 49.92 (44.05), 040‑40 BCE 29.66 (25.69); all gates passed
+(elapsed error 0.026 %).
+
+**Steady motion: the predicted-tick variant is dropped** (the user's
+decision, 2026-11-06). After the draw work the ticks match the fields on
+screen in 99.6–99.9 % of frames in normal, solo and grid, so the variant
+would only change frames that take more than a field. Dense goes on to one
+field instead (the user's decision, the same day).
+
 ### FR9 — 030 data cache (optional)
 
 Only if the 030 takes the FR path. Find the cause of the performance-mode
